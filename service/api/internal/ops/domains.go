@@ -6,8 +6,8 @@ import (
 )
 
 // Business-domain microservices (IR180). Each Core API service serves the operations of its catalog modules; the
-// gateway routes each REST route to the service that owns its operation. Phase A shares the PostgreSQL cluster: a service
-// writes only its own schemas, and the remaining cross-domain reads are listed in IR180.
+// gateway routes each REST route to the service that owns its operation. Phase A shares the PostgreSQL cluster: a
+// service writes only its own schemas, and the remaining cross-domain reads are listed in IR180.
 const (
 	DomainIdentity    = "identity"    // identity-api
 	DomainEquipment   = "equipment"   // equipment-api
@@ -77,7 +77,8 @@ func CheckDomains() error {
 }
 
 // ServeDomains restricts the mounted routes to the operations of the given domains; other routes are not served
-// (NOT_FOUND), so a request routed to the wrong service never runs. Nil serves every domain (tests, single-process runs).
+// (NOT_FOUND), so a request routed to the wrong service never runs. Nil serves every domain (tests, single-process
+// runs).
 func (r *Registry) ServeDomains(domains ...string) {
 	if len(domains) == 0 {
 		r.domains = nil

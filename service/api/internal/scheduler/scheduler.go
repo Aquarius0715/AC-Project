@@ -106,6 +106,7 @@ func tick(
 
 	for rows.Next() {
 		var id uuid.UUID
+
 		err := rows.Scan(&id)
 		if err != nil {
 			rows.Close()
@@ -172,6 +173,7 @@ func tick(
 					}
 
 					var ok bool
+
 					err := tx.QueryRow(ctx, tryLockSQL, d, t).Scan(&ok)
 					if err != nil {
 						return err
@@ -218,6 +220,7 @@ func tick(
 						Events:          nil,
 						Audits:          nil,
 					} // restriction policies come from billing
+
 					n, err = control.AdvanceRuns(
 						ctx,
 						c,
@@ -291,12 +294,14 @@ func tick(
 					}
 
 					r.ExpiredOffers += n
+
 					n, err = maintenance.ExpireProposals(ctx, tx, now)
 					if err != nil {
 						return err
 					}
 
 					r.ExpiredProposals += n
+
 					n, err = maintenance.ConfirmUnrated(ctx, tx, now)
 					if err != nil {
 						return err

@@ -16,7 +16,8 @@ func newAlert(t *testing.T, unit, org, severity string, at time.Time) string {
 	// one open alert per unit / policy / rule / type (alerts_one_open_per_rule): use the severity as the rule key
 	owner(
 		t,
-		`INSERT INTO monitoring.alerts (id, tenant_id, unit_id, customer_org_id, rule_key, type, severity, status, cause_code, evidence_kind, evidence_text, observed_at, detected_at)
+		`INSERT INTO monitoring.alerts (id, tenant_id, unit_id, customer_org_id, rule_key, type, severity, status, cause_code,
+			evidence_kind, evidence_text, observed_at, detected_at)
 		VALUES ($1,$2,$3,$4,$5,'sensor',$5,'open','unknown','demo_observation','demo',$6,$6)`,
 		id,
 		seed.ID("tenant-a"),
@@ -64,10 +65,14 @@ func TestAlerts(t *testing.T) {
 	for body, n := range map[string]int{
 		`{"filters":{"unitIds":["` + u + `"],"severity":"warning"}}`: 1,
 		`{"filters":{"unitId":"` + u + `","status":"open"}}`:         3,
-		`{"filters":{"unitId":"` + u + `","from":"` + clock.Add(-6*time.Minute).Format(time.RFC3339) + `","to":"` + clock.Format(time.RFC3339) + `"}}`: 2,
-		`{"filters":{"unitId":"` + u + `","customerId":"` + seed.ID("cust-b").String() + `"}}`:                                                         3,
-		`{"filters":{"propertyId":"` + seed.ID("property-home-b").String() + `","unitId":"` + u + `"}}`:                                                3,
-		`{"filters":{"unitId":"` + u + `","customerId":"` + uuid.NewString() + `"}}`:                                                                   0,
+		`{"filters":{"unitId":"` + u + `","from":"` + clock.Add(-6*time.Minute).Format(time.RFC3339) + `","to":"` +
+			clock.Format(time.RFC3339) + `"}}`: 2,
+		`{"filters":{"unitId":"` + u + `","customerId":"` + seed.ID("cust-b").String() +
+			`"}}`: 3,
+		`{"filters":{"propertyId":"` + seed.ID("property-home-b").String() + `","unitId":"` + u +
+			`"}}`: 3,
+		`{"filters":{"unitId":"` + u + `","customerId":"` + uuid.NewString() +
+			`"}}`: 0,
 	} {
 		if code, m := post(s, &hq, "alerts.list", body); code != 200 || len(items(m)) != n {
 			t.Errorf("%s: %d want %d", body, len(items(m)), n)
@@ -82,7 +87,11 @@ func TestAlerts(t *testing.T) {
 		"{\"sort\":{\"field\":\"title\",\"direction\":\"asc\"}}":                            "sort.field=error.invalid",
 	}
 
-	for _, b := range []string{`{"filters":{"severity":"info"}}`, `{"filters":{"status":"x"}}`, `{"filters":{"from":"2026-09-14T01:00:00Z","to":"2026-09-14T00:00:00Z"}}`, `{"filters":{"z":1}}`, `{"sort":{"field":"title","direction":"asc"}}`} {
+	for _, b := range []string{
+		`{"filters":{"severity":"info"}}`, `{"filters":{"status":"x"}}`,
+		`{"filters":{"from":"2026-09-14T01:00:00Z","to":"2026-09-14T00:00:00Z"}}`, `{"filters":{"z":1}}`,
+		`{"sort":{"field":"title","direction":"asc"}}`,
+	} {
 		code, m := post(s, &hq, "alerts.list", b)
 		refusal(t, b, code, m, want[b])
 	}
@@ -224,9 +233,11 @@ func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
 	policy := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO monitoring.alert_policies (id, tenant_id, kind, customer_id, name, owner_membership_id, created_by_user_id, timezone, condition)
+		`INSERT INTO monitoring.alert_policies (id, tenant_id, kind, customer_id, name, owner_membership_id,
+			created_by_user_id, timezone, condition)
 		VALUES ($1, $2, 'alert', $3, 'Bedroom too hot', $4, $4, 'Asia/Kuala_Lumpur',
-		'{"metric":"temperature","operator":"gte","threshold":30,"recoveryThreshold":28,"durationSeconds":60,"activeWindow":null,"severity":"warning"}')`,
+		'{"metric":"temperature","operator":"gte","threshold":30,"recoveryThreshold":28,"durationSeconds":60,`+
+			`"activeWindow":null,"severity":"warning"}')`,
 		policy,
 		seed.ID("tenant-a"),
 		seed.ID("cust-b"),
@@ -245,7 +256,8 @@ func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
 		id := uuid.NewString()
 		owner(
 			t,
-			`INSERT INTO monitoring.alerts (id, tenant_id, unit_id, customer_org_id, policy_id, rule_key, type, severity, status, cause_code, evidence_kind, evidence_text, observed_at, detected_at)
+			`INSERT INTO monitoring.alerts (id, tenant_id, unit_id, customer_org_id, policy_id, rule_key, type, severity, status,
+				cause_code, evidence_kind, evidence_text, observed_at, detected_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,'warning','open','unknown','demo_observation','demo',$8,$8)`,
 			id,
 			seed.ID("tenant-a"),
@@ -319,13 +331,15 @@ func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
 	// a technician on the unit without alert.resolve acknowledges (alert.read) but does not resolve (DD-T07)
 	owner(
 		t,
-		`DELETE FROM maintenance.assignments WHERE technician_membership_id = $1 AND job_id IN (SELECT id FROM maintenance.jobs WHERE customer_org_id = $2)`,
+		`DELETE FROM maintenance.assignments WHERE technician_membership_id = $1 AND job_id IN (SELECT id FROM
+			maintenance.jobs WHERE customer_org_id = $2)`,
 		seed.ID("tech-internal-a"),
 		seed.ID("org-customer-b"),
 	)
 	owner(
 		t,
-		`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES ($1,$2,'unit',$3) ON CONFLICT DO NOTHING`,
+		`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES ($1,$2,'unit',$3) ON CONFLICT
+			DO NOTHING`,
 		seed.ID("tenant-a"),
 		seed.ID("tech-internal-a"),
 		u,
@@ -339,7 +353,8 @@ func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
 	t.Cleanup(func() {
 		owner(
 			t,
-			`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES ($1, $2, 'alert.resolve') ON CONFLICT DO NOTHING`,
+			`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES ($1, $2, 'alert.resolve')
+				ON CONFLICT DO NOTHING`,
 			seed.ID("tenant-a"),
 			seed.ID("tech-internal-a"),
 		)
@@ -368,7 +383,8 @@ func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
 
 	owner(
 		t,
-		`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES ($1, $2, 'alert.resolve') ON CONFLICT DO NOTHING`,
+		`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES ($1, $2, 'alert.resolve')
+			ON CONFLICT DO NOTHING`,
 		seed.ID("tenant-a"),
 		seed.ID("tech-internal-a"),
 	)

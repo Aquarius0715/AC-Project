@@ -41,7 +41,8 @@ func TestResolveAndNext(t *testing.T) {
 
 	if w3 := w2.Next(5); w3 == nil {
 		t.Fatal("third page")
-	} else if w4, _ := Resolve(Query{Limit: new(2), Cursor: w3, Sort: nil, Filters: nil}, cond, 1, 1); w4.Next(5) != nil || w4.Offset != 4 {
+	} else if w4, _ := Resolve(Query{Limit: new(2), Cursor: w3, Sort: nil, Filters: nil}, cond, 1, 1); w4.Next(5) != nil ||
+		w4.Offset != 4 {
 		t.Fatal("last page")
 	}
 

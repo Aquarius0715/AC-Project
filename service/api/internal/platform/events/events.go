@@ -88,8 +88,11 @@ func (c *Consumer) failed(ctx context.Context, e Event, cause error) (bool, erro
 	dead := false
 	err := c.DB.Run(ctx, false, nil, func(tx pgx.Tx) error {
 		var attempts int
-		scanErr := tx.QueryRow(ctx, `INSERT INTO platform.event_failures (consumer, event_id, attempts, last_error, last_attempt_at) VALUES ($1, $2, 1, $3, $4)
-			ON CONFLICT (consumer, event_id) DO UPDATE SET attempts = platform.event_failures.attempts + 1, last_error = EXCLUDED.last_error, last_attempt_at = EXCLUDED.last_attempt_at
+
+		scanErr := tx.QueryRow(ctx, `INSERT INTO platform.event_failures (consumer, event_id, attempts, last_error,
+			last_attempt_at) VALUES ($1, $2, 1, $3, $4)
+			ON CONFLICT (consumer, event_id) DO UPDATE SET attempts = platform.event_failures.attempts + 1, last_error =
+			EXCLUDED.last_error, last_attempt_at = EXCLUDED.last_attempt_at
 			RETURNING attempts`, c.Name, e.ID, cause.Error(), c.now()).
 			Scan(&attempts)
 		if scanErr != nil {
@@ -203,7 +206,8 @@ func (c *Consumer) pending(ctx context.Context, types []string, limit int) ([]Ev
 	err := c.DB.Run(ctx, true, nil, func(tx pgx.Tx) error {
 		rows, err := tx.Query(
 			ctx,
-			`SELECT o.id, o.seq, o.tenant_id, o.aggregate_type, o.aggregate_id, o.event_type, o.payload, o.correlation_id, o.occurred_at,
+			`SELECT o.id, o.seq, o.tenant_id, o.aggregate_type, o.aggregate_id, o.event_type, o.payload, o.correlation_id,
+				o.occurred_at,
 				COALESCE(f.attempts, 0), f.last_attempt_at
 			FROM platform.outbox o LEFT JOIN platform.event_failures f ON f.consumer = $2 AND f.event_id = o.id
 			WHERE o.event_type = ANY($1)
@@ -222,6 +226,7 @@ func (c *Consumer) pending(ctx context.Context, types []string, limit int) ([]Ev
 
 		for rows.Next() {
 			var e Event
+
 			err := rows.Scan(
 				&e.ID,
 				&e.Seq,

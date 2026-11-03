@@ -72,7 +72,8 @@ type Measurement struct {
 	EventID       uuid.UUID `json:"eventId"`
 }
 
-const measurementCols = `m.event_id, m.tenant_id, m.received_at, m.boundary_id, m.quality_reason, m.raw_unit, m.unit_id, m.sensor_id, m.metric, m.value,
+const measurementCols = `m.event_id, m.tenant_id, m.received_at, m.boundary_id, m.quality_reason, m.raw_unit, ` +
+	`m.unit_id, m.sensor_id, m.metric, m.value,
 	m.unit, m.observed_at, m.origin, m.quality, m.sequence`
 
 func scanMeasurement(r pgx.Row) (Measurement, error) {
@@ -242,40 +243,46 @@ type AirSeries struct {
 	Buckets             []SeriesBucket       `json:"buckets"` // with bucketMinutes only; null otherwise (IR605)
 }
 
-// @Summary		telemetry.series (read)
-// @ID				telemetry.series
-// @Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:automation.policy.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR98 allergenObservation source rows
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-C07, DD-T03, DD-A05, DD-A12, DD-C01 · Query: filters none · sort observedAt (default observedAt asc;sensorId asc;id asc)
-// @Tags			telemetry
-// @Accept			json
-// @Produce		json
-// @Param			from			query		string		false	"input field from"
-// @Param			to				query		string		false	"input field to"
-// @Param			unitIds			query		[]string	false	"input field unitIds (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
-// @Param			spaceId			query		string		false	"input field spaceId"
-// @Param			metric			query		string		false	"input field metric"
-// @Param			sensorId		query		string		false	"input field sensorId"
-// @Param			bucketMinutes	query		integer		false	"input field bucketMinutes"
-// @Param			cursor			query		string		false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit			query		integer		false	"page size 1–100, default 25"
-// @Param			sort			query		string		false	"field:direction — fields observedAt; default observedAt asc;sensorId asc;id asc"
-// @Success		200				{object}	ops.Envelope{data=AirSeries}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/telemetry/series [get]
+// series serves telemetry.series.
+//
+//	@Summary		telemetry.series (read)
+//	@ID				telemetry.series
+//	@Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | \
+//	@Description	admin:dashboard.read | admin:automation.policy.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR98 \
+//	@Description	allergenObservation source rows
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-C07, DD-T03, DD-A05, DD-A12, DD-C01 · Query: filters none · sort observedAt (default \
+//	@Description	observedAt asc;sensorId asc;id asc)
+//	@Tags			telemetry
+//	@Accept			json
+//	@Produce		json
+//	@Param			from			query		string		false	"input field from"
+//	@Param			to				query		string		false	"input field to"
+//	@Param			unitIds			query		[]string	false	"input field unitIds (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
+//	@Param			spaceId			query		string		false	"input field spaceId"
+//	@Param			metric			query		string		false	"input field metric"
+//	@Param			sensorId		query		string		false	"input field sensorId"
+//	@Param			bucketMinutes	query		integer		false	"input field bucketMinutes"
+//	@Param			cursor			query		string		false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit			query		integer		false	"page size 1–100, default 25"
+//	@Param			sort			query		string		false	"field:direction — fields observedAt; default observedAt asc;sensorId asc;id asc"
+//	@Success		200				{object}	ops.Envelope{data=AirSeries}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/telemetry/series [get]
 func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (AirSeries, error) {
 	units := in.UnitIDs
 	if in.SpaceID != nil {
 		var err error
+
 		units, err = m.Units.UnitsInSpace(ctx, c, *in.SpaceID)
 		if err != nil {
 			return AirSeries{}, err
@@ -319,6 +326,7 @@ func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (Ai
 	}
 
 	var total int
+
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM monitoring.measurements m WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
@@ -361,7 +369,8 @@ func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (Ai
 	rows, err := c.Tx.Query(
 		ctx,
 		fmt.Sprintf(
-			"SELECT %s FROM monitoring.measurements m WHERE %s ORDER BY m.observed_at %s, m.sensor_id ASC, m.event_id ASC LIMIT %d OFFSET %d",
+			"SELECT %s FROM monitoring.measurements m WHERE %s ORDER BY m.observed_at %s, m.sensor_id ASC, m.event_id ASC "+
+				"LIMIT %d OFFSET %d",
 			measurementCols,
 			where,
 			dir,
@@ -424,7 +433,8 @@ func bucketed(
 	size time.Duration,
 ) ([]SeriesBucket, error) {
 	q := fmt.Sprintf(`SELECT date_bin(make_interval(secs => $%d), m.observed_at, $3) AS b,
-		avg(m.value) FILTER (WHERE m.quality = 'valid' AND m.value IS NOT NULL), count(*) FILTER (WHERE m.quality = 'valid' AND m.value IS NOT NULL)
+		avg(m.value) FILTER (WHERE m.quality = 'valid' AND m.value IS NOT NULL), count(*) FILTER (WHERE m.quality = 'valid'
+		AND m.value IS NOT NULL)
 		FROM monitoring.measurements m WHERE %s GROUP BY b`, len(args)+1, where)
 
 	rows, err := c.Tx.Query(ctx, q, append(append([]any{}, args...), size.Seconds())...)
@@ -436,6 +446,7 @@ func bucketed(
 
 	for rows.Next() {
 		var b SeriesBucket
+
 		err := rows.Scan(&b.Start, &b.Value, &b.Count)
 		if err != nil {
 			rows.Close()
@@ -476,7 +487,8 @@ func bucketed(
 func allergen(ctx context.Context, c *ops.Call, unit uuid.UUID) (AllergenObservation, error) {
 	var a AllergenObservation
 
-	err := c.Tx.QueryRow(ctx, `SELECT availability, substance, value, unit, source_label, observed_at, evidence_text FROM monitoring.allergen_observations
+	err := c.Tx.QueryRow(ctx, `SELECT availability, substance, value, unit, source_label, observed_at, evidence_text FROM
+		monitoring.allergen_observations
 		WHERE unit_id = $1 ORDER BY observed_at DESC NULLS LAST, created_at DESC, id ASC LIMIT 1`, unit).
 		Scan(&a.Availability, &a.Substance, &a.Value, &a.Unit, &a.SourceLabel, &a.ObservedAt, &a.EvidenceText)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -539,30 +551,33 @@ type TelemetrySummary struct {
 	Energy       any           `json:"energy"`
 }
 
-// @Summary		telemetry.summary (read)
-// @ID				telemetry.summary
-// @Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:automation.policy.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-P04, DD-T03
-// @Tags			telemetry
-// @Accept			json
-// @Produce		json
-// @Param			from	query		string		false	"input field from"
-// @Param			to		query		string		false	"input field to"
-// @Param			unitIds	query		[]string	false	"input field unitIds (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
-// @Param			metric	query		string		false	"input field metric"
-// @Success		200		{object}	ops.Envelope{data=TelemetrySummary}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/telemetry/summary [get]
+// summary serves telemetry.summary.
+//
+//	@Summary		telemetry.summary (read)
+//	@ID				telemetry.summary
+//	@Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | \
+//	@Description	admin:dashboard.read | admin:automation.policy.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-P04, DD-T03
+//	@Tags			telemetry
+//	@Accept			json
+//	@Produce		json
+//	@Param			from	query		string		false	"input field from"
+//	@Param			to		query		string		false	"input field to"
+//	@Param			unitIds	query		[]string	false	"input field unitIds (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
+//	@Param			metric	query		string		false	"input field metric"
+//	@Success		200		{object}	ops.Envelope{data=TelemetrySummary}
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/telemetry/summary [get]
 func (m Telemetry) summary(
 	ctx context.Context,
 	c *ops.Call,
@@ -583,7 +598,8 @@ func (m Telemetry) summary(
 
 	rows, err := c.Tx.Query(
 		ctx,
-		`SELECT `+measurementCols+` FROM (SELECT DISTINCT ON (m.unit_id, m.metric) m.* FROM monitoring.measurements m WHERE `+where+`
+		`SELECT `+measurementCols+` FROM (SELECT DISTINCT ON (m.unit_id, m.metric) m.* FROM monitoring.measurements m WHERE
+			`+where+`
 		ORDER BY m.unit_id, m.metric, m.observed_at DESC, m.sequence DESC) m ORDER BY m.unit_id, m.metric`,
 		args...)
 	if err != nil {
@@ -630,7 +646,8 @@ type VentilationLog struct {
 	LoggedAt             time.Time   `json:"loggedAt"`
 }
 
-const ventCols = `v.id, v.tenant_id, v.version, v.created_at, v.updated_at, v.space_id, v.unit_id, v.method, v.duration_minutes, v.co2_at_log,
+const ventCols = `v.id, v.tenant_id, v.version, v.created_at, v.updated_at, v.space_id, v.unit_id, v.method, ` +
+	`v.duration_minutes, v.co2_at_log,
 	v.logged_by_membership_id, v.logged_at`
 
 func scanVent(r pgx.Row) (VentilationLog, error) {
@@ -687,28 +704,32 @@ func (in *VentLogInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		ventilation.log (write)
-// @ID				ventilation.log
-// @Description	Authorization: client:self
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR110 manual record only; never creates a Command; duration 1–240 minutes; IR213 co2AtLog: latest CO₂ reading when valid at logging time, never an older one
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-C07
-// @Tags			ventilation
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		VentLogInput	true	"input"
-// @Success		200				{object}	ops.Envelope{data=VentilationLog}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/ventilation [post]
+// log serves ventilation.log.
+//
+//	@Summary		ventilation.log (write)
+//	@ID				ventilation.log
+//	@Description	Authorization: client:self
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR110 manual record only; never creates a Command; duration 1–240 minutes; IR213 co2AtLog: latest \
+//	@Description	CO₂ reading when valid at logging time, never an older one
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-C07
+//	@Tags			ventilation
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		VentLogInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=VentilationLog}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ventilation [post]
 func (m Telemetry) log(ctx context.Context, c *ops.Call, in *VentLogInput) (VentilationLog, error) {
 	org, spaceUnits, found, err := m.Units.SpaceInfo(ctx, c, in.SpaceID)
 	if err != nil {
@@ -747,7 +768,8 @@ func (m Telemetry) log(ctx context.Context, c *ops.Call, in *VentLogInput) (Vent
 		c.Tx.QueryRow(
 			ctx,
 			`INSERT INTO monitoring.ventilation_logs AS v (tenant_id, space_id, unit_id, method, duration_minutes, co2_at_log,
-		logged_by_membership_id, logged_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7) RETURNING `+ventCols,
+		logged_by_membership_id, logged_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7)
+		RETURNING `+ventCols,
 			in.SpaceID,
 			in.UnitID,
 			in.Method,
@@ -812,33 +834,36 @@ func (m Telemetry) currentCO2(
 	return out, nil
 }
 
-// @Summary		ventilation.list (read)
-// @ID				ventilation.list
-// @Description	Authorization: client:self | technician:assigned | admin:alert.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-C07 · Query: filters spaceId,unitId,from,to · sort id,createdAt (default createdAt desc;id asc)
-// @Tags			ventilation
-// @Accept			json
-// @Produce		json
-// @Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit	query		integer	false	"page size 1–100, default 25"
-// @Param			sort	query		string	false	"field:direction — fields id,createdAt; default createdAt desc;id asc"
-// @Param			spaceId	query		string	false	"filter → spaceId"
-// @Param			unitId	query		string	false	"filter → unitId"
-// @Param			from	query		string	false	"filter → [from,to) on loggedAt"
-// @Param			to		query		string	false	"filter → [from,to) on loggedAt"
-// @Success		200		{object}	ops.Envelope{data=VentilationLogPage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/ventilation [get]
+// list serves ventilation.list.
+//
+//	@Summary		ventilation.list (read)
+//	@ID				ventilation.list
+//	@Description	Authorization: client:self | technician:assigned | admin:alert.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-C07 · Query: filters spaceId,unitId,from,to · sort id,createdAt (default createdAt \
+//	@Description	desc;id asc)
+//	@Tags			ventilation
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit	query		integer	false	"page size 1–100, default 25"
+//	@Param			sort	query		string	false	"field:direction — fields id,createdAt; default createdAt desc;id asc"
+//	@Param			spaceId	query		string	false	"filter → spaceId"
+//	@Param			unitId	query		string	false	"filter → unitId"
+//	@Param			from	query		string	false	"filter → [from,to) on loggedAt"
+//	@Param			to		query		string	false	"filter → [from,to) on loggedAt"
+//	@Success		200		{object}	ops.Envelope{data=VentilationLogPage}
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ventilation [get]
 func (m Telemetry) list(
 	ctx context.Context,
 	c *ops.Call,
@@ -941,6 +966,7 @@ func (m Telemetry) list(
 	}
 
 	var total int
+
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM monitoring.ventilation_logs v WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
@@ -1000,8 +1026,8 @@ type SensorLimits interface {
 }
 
 // PowerMeasured implements assets.Monitoring (SR27): per unit, whether the latest power reading at or before now —
-// chosen by observedAt desc, sequence desc, id asc, never falling back to older rows — is measured, valid, non-null
-// and within its sensor's stale limit (D07). Units without a reading are absent; a reading without its sensor is not fresh.
+// chosen by observedAt desc, sequence desc, id asc, never falling back to older rows — is measured, valid, non-null and
+// within its sensor's stale limit (D07). Units without a reading are absent; a reading without its sensor is not fresh.
 func (m Telemetry) PowerMeasured(
 	ctx context.Context,
 	c *ops.Call,
@@ -1036,6 +1062,7 @@ func (m Telemetry) PowerMeasured(
 			origin, quality string
 			value           *float64
 		)
+
 		err := rows.Scan(&r.unit, &r.sensor, &origin, &quality, &value, &r.at)
 		if err != nil {
 			rows.Close()
@@ -1100,7 +1127,9 @@ func (m Telemetry) LatestMeasurements(
 	rows, err := c.Tx.Query(
 		ctx,
 		`SELECT x.* FROM unnest($1::uuid[]) AS u(id) CROSS JOIN unnest($3::text[]) AS k(metric)
-		CROSS JOIN LATERAL (SELECT `+measurementCols+` FROM monitoring.measurements m WHERE m.unit_id = u.id AND m.metric = k.metric AND m.observed_at <= $2
+		CROSS JOIN LATERAL (SELECT
+		`+measurementCols+` FROM monitoring.measurements m WHERE m.unit_id = u.id AND m.metric =
+			k.metric AND m.observed_at <= $2
 		ORDER BY m.observed_at DESC, m.sequence DESC, m.event_id ASC LIMIT 1) x ORDER BY x.unit_id, x.metric`,
 		units,
 		c.Now,
@@ -1150,20 +1179,22 @@ func (m Telemetry) LatestMeasurements(
 	return out, nil
 }
 
-// RunHours implements IR134 item 1: hours with a valid measured power reading > 0 since `since` (nil = all), each reading
-// counting until the next one capped at its sensor's stale limit; the reading in force at `since` counts from `since`, so a
-// unit with power readings but none running since then has 0 h (IR238); nil without any power reading.
+// RunHours implements IR134 item 1: hours with a valid measured power reading > 0 since `since` (nil = all), each
+// reading counting until the next one capped at its sensor's stale limit; the reading in force at `since` counts from
+// `since`, so a unit with power readings but none running since then has 0 h (IR238); nil without any power reading.
 func (m Telemetry) RunHours(
 	ctx context.Context,
 	c *ops.Call,
 	unit uuid.UUID,
 	since *time.Time,
 ) (*float64, error) {
-	const cols = `SELECT sensor_id, observed_at, sequence, value, origin, quality FROM monitoring.measurements WHERE unit_id = $1 AND metric = 'power' AND observed_at <= $2`
+	const cols = `SELECT sensor_id, observed_at, sequence, value, origin, quality FROM monitoring.measurements WHERE
+		unit_id = $1 AND metric = 'power' AND observed_at <= $2`
 
 	q, args := cols, []any{unit, c.Now}
 	if since != nil {
-		q = `(` + cols + ` AND observed_at <= $3 ORDER BY observed_at DESC, sequence DESC LIMIT 1) UNION ALL (` + cols + ` AND observed_at > $3)`
+		q = `(` + cols + ` AND observed_at <= $3 ORDER BY observed_at DESC, sequence DESC LIMIT 1) UNION ALL
+			(` + cols + ` AND observed_at > $3)`
 
 		args = append(args, *since)
 	}
@@ -1193,6 +1224,7 @@ func (m Telemetry) RunHours(
 			v               *float64
 			origin, quality string
 		)
+
 		err := rows.Scan(&x.sensor, &x.at, &v, &origin, &quality)
 		if err != nil {
 			rows.Close()

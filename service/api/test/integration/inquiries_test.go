@@ -27,14 +27,17 @@ func TestInquiries(t *testing.T) {
 		body string
 		code int
 	}{
-		"payment without invoice":  {`{"subjectType":"payment","message":"why"}`, 422},
-		"payment with restriction": {`{"subjectType":"payment","invoiceId":"` + inv + `","restrictionId":"` + rid + `","message":"why"}`, 422},
-		"restriction without id":   {`{"subjectType":"restriction","message":"why"}`, 422},
-		"bad subject":              {`{"subjectType":"other","message":"why"}`, 422},
-		"blank message":            {`{"subjectType":"payment","invoiceId":"` + inv + `","message":"  "}`, 422},
-		"unknown invoice":          {`{"subjectType":"payment","invoiceId":"` + uuid.NewString() + `","message":"why"}`, 404},
-		"unknown restriction":      {`{"subjectType":"restriction","restrictionId":"` + uuid.NewString() + `","message":"why"}`, 404},
-		"unknown cited invoice":    {`{"subjectType":"restriction","restrictionId":"` + rid + `","invoiceId":"` + uuid.NewString() + `","message":"why"}`, 404},
+		"payment without invoice": {`{"subjectType":"payment","message":"why"}`, 422},
+		"payment with restriction": {`{"subjectType":"payment",` +
+			`"invoiceId":"` + inv + `","restrictionId":"` + rid + `","message":"why"}`, 422},
+		"restriction without id": {`{"subjectType":"restriction","message":"why"}`, 422},
+		"bad subject":            {`{"subjectType":"other","message":"why"}`, 422},
+		"blank message":          {`{"subjectType":"payment","invoiceId":"` + inv + `","message":"  "}`, 422},
+		"unknown invoice":        {`{"subjectType":"payment","invoiceId":"` + uuid.NewString() + `","message":"why"}`, 404},
+		"unknown restriction": {`{"subjectType":"restriction",` +
+			`"restrictionId":"` + uuid.NewString() + `","message":"why"}`, 404},
+		"unknown cited invoice": {`{"subjectType":"restriction",` +
+			`"restrictionId":"` + rid + `","invoiceId":"` + uuid.NewString() + `","message":"why"}`, 404},
 	} {
 		code, m := write(s, &customerB, "inquiries.create", tc.body, 0)
 		if w, ok := refused[name]; ok {
@@ -214,7 +217,8 @@ func TestAuditList(t *testing.T) {
 	sys := uuid.NewString() // a system actor matches no user, so it has no name
 	owner(
 		t,
-		`INSERT INTO audit.audit_log (tenant_id, actor_id, actor_role_at_time, action, target_kind, target_id, occurred_at, correlation_id, result)
+		`INSERT INTO audit.audit_log (tenant_id, actor_id, actor_role_at_time, action, target_kind, target_id, occurred_at,
+			correlation_id, result)
 		VALUES ($1, 'system-demo', 'system', 'demo.tick', 'test', $2, $3, $4, 'success')`,
 		seed.ID("tenant-a"),
 		sys,

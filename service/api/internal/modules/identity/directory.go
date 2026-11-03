@@ -71,7 +71,8 @@ func registerDirectory(r *ops.Registry) {
 func nonReaders(ctx context.Context, c *ops.Call, in *NonReadersInput) ([]uuid.UUID, error) {
 	rows, err := c.Tx.Query(ctx, `SELECT m.id FROM identity.memberships m
 		WHERE m.id = ANY($1) AND m.valid_from <= $3 AND (m.valid_until IS NULL OR m.valid_until > $3)
-		  AND ((m.role = 'admin' AND EXISTS (SELECT 1 FROM identity.membership_permissions p WHERE p.membership_id = m.id AND p.permission = 'alert.read'))
+		  AND ((m.role = 'admin' AND EXISTS (SELECT 1 FROM identity.membership_permissions p WHERE p.membership_id = m.id AND
+		  p.permission = 'alert.read'))
 		    OR (m.role = 'client' AND m.organization_id = $2))`, in.IDs, in.CustomerOrgID, c.Now)
 	if err != nil {
 		return nil, err
@@ -133,7 +134,8 @@ func technician(ctx context.Context, c *ops.Call, in *MembershipInput) (Technici
 		until *time.Time
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT organization_id, employment, valid_from, valid_until FROM identity.memberships WHERE id = $1 AND role = 'technician'`, in.MembershipID).
+	err := c.Tx.QueryRow(ctx, `SELECT organization_id, employment, valid_from, valid_until FROM identity.memberships WHERE
+		id = $1 AND role = 'technician'`, in.MembershipID).
 		Scan(&t.OrgID, &emp, &from, &until)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return TechnicianResult{
@@ -175,6 +177,7 @@ func technician(ctx context.Context, c *ops.Call, in *MembershipInput) (Technici
 			k  string
 			id uuid.UUID
 		)
+
 		err := rows.Scan(&k, &id)
 		if err != nil {
 			return t, err
@@ -191,7 +194,8 @@ func technician(ctx context.Context, c *ops.Call, in *MembershipInput) (Technici
 func qualified(ctx context.Context, c *ops.Call, in *QualifiedInput) (bool, error) {
 	var n int
 
-	err := c.Tx.QueryRow(ctx, `SELECT count(DISTINCT code) FROM identity.qualification_grants WHERE membership_id = $1 AND code = ANY($2)
+	err := c.Tx.QueryRow(ctx, `SELECT count(DISTINCT code) FROM identity.qualification_grants WHERE membership_id = $1 AND
+		code = ANY($2)
 		AND valid_from <= $3 AND valid_until >= $4 AND revoked_at IS NULL`, in.MembershipID, in.Codes, in.Start, in.End).
 		Scan(&n)
 
@@ -204,6 +208,7 @@ func GrantHandlers() map[string]events.Handler {
 	return map[string]events.Handler{
 		events.QualificationGranted: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var g events.Grant
+
 			err := e.Decode(&g)
 			if err != nil {
 				return err
@@ -211,7 +216,8 @@ func GrantHandlers() map[string]events.Handler {
 
 			tag, err := tx.Exec(
 				ctx,
-				`UPDATE identity.qualification_grants SET valid_from = $3, valid_until = $4, revoked_at = NULL WHERE membership_id = $1 AND code = $2`,
+				`UPDATE identity.qualification_grants SET valid_from = $3, valid_until = $4, revoked_at = NULL WHERE membership_id =
+					$1 AND code = $2`,
 				g.MembershipID,
 				g.Code,
 				g.ValidFrom,
@@ -223,7 +229,8 @@ func GrantHandlers() map[string]events.Handler {
 
 			_, err = tx.Exec(
 				ctx,
-				`INSERT INTO identity.qualification_grants (tenant_id, membership_id, code, valid_from, valid_until) VALUES ($1, $2, $3, $4, $5)`,
+				`INSERT INTO identity.qualification_grants (tenant_id, membership_id, code, valid_from, valid_until) VALUES ($1, $2,
+					$3, $4, $5)`,
 				e.TenantID,
 				g.MembershipID,
 				g.Code,

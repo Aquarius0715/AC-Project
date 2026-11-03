@@ -52,6 +52,7 @@ func TestLoadErrors(t *testing.T) {
 	p := t.TempDir() + "/bad.json"
 
 	_ = os.WriteFile(p, []byte("{"), 0o600)
+
 	_, err = Load(p)
 	if err == nil {
 		t.Fatal("bad json")
@@ -145,6 +146,7 @@ func TestApplyFixture(t *testing.T) {
 	}
 	for table, want := range counts {
 		var got int
+
 		err := tx.QueryRow(ctx, "SELECT count(DISTINCT id) FROM "+table+" WHERE id = ANY($1::uuid[])", want).
 			Scan(&got)
 		if err != nil {
@@ -165,15 +167,22 @@ func TestApplyFixture(t *testing.T) {
 	}
 
 	var name string
+
 	scanErr := tx.QueryRow(ctx, `SELECT display_name FROM assets.units WHERE id=$1`, ID("unit-online-rto")).
 		Scan(&name)
 	if scanErr != nil ||
 		name != "Bedroom AC" {
 		t.Fatalf("unit-online-rto: %v %q", scanErr, name)
 	}
-	// IR91 item 2: rows without createdAt carry fixture.seedCreatedAt, not the wall clock (IR318); explicit ones keep theirs
-	for _, table := range []string{"identity.organizations", "identity.users", "identity.memberships", "devices.capabilities", "assets.customers", "assets.properties", "assets.spaces", "assets.units", "devices.devices", "monitoring.alert_policies", "billing.invoices"} {
+	// IR91 item 2: rows without createdAt carry fixture.seedCreatedAt, not the wall clock (IR318); explicit ones keep
+	// theirs
+	for _, table := range []string{
+		"identity.organizations", "identity.users", "identity.memberships",
+		"devices.capabilities", "assets.customers", "assets.properties", "assets.spaces", "assets.units", "devices.devices",
+		"monitoring.alert_policies", "billing.invoices",
+	} {
 		var later int
+
 		err := tx.QueryRow(ctx, "SELECT count(*) FROM "+table+" WHERE created_at <> $1", f.SeedCreatedAt).
 			Scan(&later)
 		if err != nil ||
@@ -183,6 +192,7 @@ func TestApplyFixture(t *testing.T) {
 	}
 
 	var now time.Time
+
 	scanErr = tx.QueryRow(ctx, `SELECT platform.app_now()`).
 		Scan(&now)
 	if scanErr != nil ||

@@ -27,7 +27,10 @@ func TestAssetLists(t *testing.T) {
 		t.Fatalf("client cannot list customers: %d", code)
 	}
 
-	for _, f := range []string{`{"filters":{"kind":"rto"}}`, `{"filters":{"status":"inactive"}}`, `{"filters":{"organizationId":"` + seed.ID("org-customer-a").String() + `"}}`} {
+	for _, f := range []string{
+		`{"filters":{"kind":"rto"}}`, `{"filters":{"status":"inactive"}}`,
+		`{"filters":{"organizationId":"` + seed.ID("org-customer-a").String() + `"}}`,
+	} {
 		if code, _ := post(s, &hq, "customers.list", f); code != 200 {
 			t.Errorf("%s: %d", f, code)
 		}
@@ -40,7 +43,10 @@ func TestAssetLists(t *testing.T) {
 		"{\"sort\":{\"field\":\"name\",\"direction\":\"asc\"}}": "sort.field=error.invalid",
 	}
 
-	for _, f := range []string{`{"filters":{"kind":"x"}}`, `{"filters":{"status":"x"}}`, `{"filters":{"x":1}}`, `{"sort":{"field":"name","direction":"asc"}}`} {
+	for _, f := range []string{
+		`{"filters":{"kind":"x"}}`, `{"filters":{"status":"x"}}`, `{"filters":{"x":1}}`,
+		`{"sort":{"field":"name","direction":"asc"}}`,
+	} {
 		code, m := post(s, &hq, "customers.list", f)
 		refusal(t, f, code, m, want[f])
 	}
@@ -144,7 +150,9 @@ func TestCustomersSaveAndRename(t *testing.T) {
 		t.Fatalf("customer validation: %d %s", code, fields(m))
 	}
 
-	upd := `{"id":"` + id + `","name":"Test Co 2","organizationId":"` + org + `","serviceProfile":"energy","status":"inactive"}`
+	upd := `{"id":"` + id + `","name":"Test Co 2",` +
+		`"organizationId":"` + org + `","serviceProfile":"energy",` +
+		`"status":"inactive"}`
 	if code, m := write(
 		s,
 		&hq,

@@ -24,7 +24,8 @@ var (
 //	@Summary		baselines.save (write) — update
 //	@ID				baselines.save.update
 //	@Description	Authorization: admin:energy.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; SR29 Repository computes measured quality; fixed is modeled
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	SR29 Repository computes measured quality; fixed is modeled
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A13
 //	@Tags			baselines

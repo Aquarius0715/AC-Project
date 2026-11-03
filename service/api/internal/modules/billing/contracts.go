@@ -81,9 +81,11 @@ type Contract struct {
 	RulesVersion          *string     `json:"rulesVersion"`
 }
 
-const contractCols = `k.id, k.tenant_id, k.version, k.created_at, k.customer_id, k.customer_org_id, k.plan_type, lower(k.term), upper(k.term), k.price_minor, k.currency,
+const contractCols = `k.id, k.tenant_id, k.version, k.created_at, k.customer_id, k.customer_org_id, k.plan_type, ` +
+	`lower(k.term), upper(k.term), k.price_minor, k.currency,
 	k.restriction_eligible, k.rules_version,
-	COALESCE((SELECT array_agg(cu.unit_id ORDER BY cu.unit_id) FROM billing.contract_units cu WHERE cu.contract_id = k.id AND cu.contract_version = k.version), '{}')`
+	COALESCE((SELECT array_agg(cu.unit_id ORDER BY cu.unit_id) FROM billing.contract_units cu WHERE cu.contract_id = ` +
+	`k.id AND cu.contract_version = k.version), '{}')`
 
 func scanContract(r pgx.Row) (Contract, error) {
 	var x Contract
@@ -155,32 +157,35 @@ func (m Billing) loadContract(
 	return x, m.decorate(ctx, c, &x)
 }
 
-// @Summary		contracts.list (read)
-// @ID				contracts.list
-// @Description	Authorization: client:self | admin:contract.read | admin:billing.read | admin:restriction.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A07, DD-A08, DD-C10, DD-A09, DD-A19 · Query: filters customerId,unitId,kind · sort id,createdAt,updatedAt,startAt (default id asc)
-// @Tags			contracts
-// @Accept			json
-// @Produce		json
-// @Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit		query		integer	false	"page size 1–100, default 25"
-// @Param			sort		query		string	false	"field:direction — fields id,createdAt,updatedAt,startAt; default id asc"
-// @Param			customerId	query		string	false	"filter → customerId"
-// @Param			unitId		query		string	false	"filter → unitIds contains"
-// @Param			kind		query		string	false	"filter → planType"
-// @Success		200			{object}	ops.Envelope{data=ContractPage}
-// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/contracts [get]
+// listContracts serves contracts.list.
+//
+//	@Summary		contracts.list (read)
+//	@ID				contracts.list
+//	@Description	Authorization: client:self | admin:contract.read | admin:billing.read | admin:restriction.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A07, DD-A08, DD-C10, DD-A09, DD-A19 · Query: filters customerId,unitId,kind · sort \
+//	@Description	id,createdAt,updatedAt,startAt (default id asc)
+//	@Tags			contracts
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit		query		integer	false	"page size 1–100, default 25"
+//	@Param			sort		query		string	false	"field:direction — fields id,createdAt,updatedAt,startAt; default id asc"
+//	@Param			customerId	query		string	false	"filter → customerId"
+//	@Param			unitId		query		string	false	"filter → unitIds contains"
+//	@Param			kind		query		string	false	"filter → planType"
+//	@Success		200			{object}	ops.Envelope{data=ContractPage}
+//	@Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/contracts [get]
 func (m Billing) listContracts(
 	ctx context.Context,
 	c *ops.Call,
@@ -238,7 +243,8 @@ func (m Billing) listContracts(
 	if f.UnitID != nil {
 		conds = append(
 			conds,
-			"EXISTS (SELECT 1 FROM billing.contract_units cu WHERE cu.contract_id = k.id AND cu.contract_version = k.version AND cu.unit_id = "+add(
+			"EXISTS (SELECT 1 FROM billing.contract_units cu WHERE cu.contract_id = k.id AND cu.contract_version = k.version "+
+				"AND cu.unit_id = "+add(
 				*f.UnitID,
 			)+")",
 		)
@@ -251,6 +257,7 @@ func (m Billing) listContracts(
 	where := strings.Join(conds, " AND ")
 
 	var total int
+
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM billing.contracts k WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
@@ -363,7 +370,9 @@ func (in *ContractInput) Validate() map[string]string {
 	switch {
 	case in.RestrictionEligible && in.PlanType != "rto":
 		fe["restrictionEligible"] = "errors.rto_only"
-	case in.RestrictionEligible && (in.RulesVersion == nil || utf8.RuneCountInString(strings.TrimSpace(*in.RulesVersion)) < 1 || utf8.RuneCountInString(*in.RulesVersion) > 64):
+	case in.RestrictionEligible &&
+		(in.RulesVersion == nil || utf8.RuneCountInString(strings.TrimSpace(*in.RulesVersion)) < 1 ||
+			utf8.RuneCountInString(*in.RulesVersion) > 64):
 		fe["rulesVersion"] = "error.required"
 	case !in.RestrictionEligible && in.RulesVersion != nil:
 		fe["rulesVersion"] = "error.notAllowed"
@@ -372,28 +381,30 @@ func (in *ContractInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		contracts.save (write)
-// @ID				contracts.save
-// @Description	Authorization: admin:contract.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A07
-// @Tags			contracts
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		ContractInput	true	"input"
-// @Success		200				{object}	ops.Envelope{data=Contract}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/contracts [post]
+// saveContract serves contracts.save.
+//
+//	@Summary		contracts.save (write)
+//	@ID				contracts.save
+//	@Description	Authorization: admin:contract.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A07
+//	@Tags			contracts
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		ContractInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Contract}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/contracts [post]
 func (m Billing) saveContract(
 	ctx context.Context,
 	c *ops.Call,
@@ -465,8 +476,10 @@ func (m Billing) saveContract(
 
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`INSERT INTO billing.contracts (id, version, tenant_id, customer_id, customer_org_id, plan_type, term, price_minor, currency, restriction_eligible,
-		rules_version, created_by, created_at) VALUES ($1, $2, current_setting('app.tenant_id')::uuid, $3, $4, $5, tstzrange($6, $7), $8, $9, $10, $11, $12, $13)`,
+		`INSERT INTO billing.contracts (id, version, tenant_id, customer_id, customer_org_id, plan_type, term, price_minor,
+			currency, restriction_eligible,
+		rules_version, created_by, created_at) VALUES ($1, $2, current_setting('app.tenant_id')::uuid, $3, $4, $5,
+		tstzrange($6, $7), $8, $9, $10, $11, $12, $13)`,
 		id,
 		version,
 		in.CustomerID,
@@ -488,7 +501,8 @@ func (m Billing) saveContract(
 	for _, u := range in.UnitIDs {
 		_, err := c.Tx.Exec(
 			ctx,
-			`INSERT INTO billing.contract_units (tenant_id, contract_id, contract_version, unit_id) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3)`,
+			`INSERT INTO billing.contract_units (tenant_id, contract_id, contract_version, unit_id) VALUES
+				(current_setting('app.tenant_id')::uuid, $1, $2, $3)`,
 			id,
 			version,
 			u,
@@ -584,8 +598,10 @@ type Invoice struct {
 	customerOrg     uuid.UUID
 }
 
-const invoiceCols = `i.id, i.tenant_id, i.version, i.created_at, i.updated_at, i.amount_minor, i.currency, i.number, i.contract_id, i.contract_version, lower(i.period), upper(i.period),
-	i.due_at, i.status, i.paid_at, (SELECT p.method FROM billing.payments p WHERE p.invoice_id = i.id ORDER BY p.created_at DESC LIMIT 1),
+const invoiceCols = `i.id, i.tenant_id, i.version, i.created_at, i.updated_at, i.amount_minor, i.currency, i.number, ` +
+	`i.contract_id, i.contract_version, lower(i.period), upper(i.period),
+	i.due_at, i.status, i.paid_at, (SELECT p.method FROM billing.payments p WHERE p.invoice_id = i.id ORDER BY ` +
+	`p.created_at DESC LIMIT 1),
 	(SELECT p.status FROM billing.payments p WHERE p.invoice_id = i.id ORDER BY p.created_at DESC LIMIT 1),
 	(SELECT k.customer_org_id FROM billing.contracts k WHERE k.id = i.contract_id AND k.version = i.contract_version)`
 
@@ -648,28 +664,32 @@ func (in *InvoiceInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		invoices.create (write)
-// @ID				invoices.create
-// @Description	Authorization: admin:billing.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR90 dueAt must be after now; no period overlapping an invoice of the contract (CONFLICT errors.invoice_period_exists; IR469)
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A08 · Input versions: contractVersion=Contract.version
-// @Tags			invoices
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		InvoiceInput	true	"input"
-// @Success		200				{object}	ops.Envelope{data=Invoice}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/invoices [post]
+// createInvoice serves invoices.create.
+//
+//	@Summary		invoices.create (write)
+//	@ID				invoices.create
+//	@Description	Authorization: admin:billing.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR90 dueAt must be after now; no period overlapping an invoice of the contract (CONFLICT \
+//	@Description	errors.invoice_period_exists; IR469)
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A08 · Input versions: contractVersion=Contract.version
+//	@Tags			invoices
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		InvoiceInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Invoice}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/invoices [post]
 func (m Billing) createInvoice(
 	ctx context.Context,
 	c *ops.Call,
@@ -697,7 +717,9 @@ func (m Billing) createInvoice(
 	}
 	// the tenant sequence: serialize concurrent creates of one tenant so two invoices never draw the same number
 	var seq int
-	scanErr := c.Tx.QueryRow(ctx, `SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtext('billing.invoice_number:' || current_setting('app.tenant_id')))) l`).
+
+	scanErr := c.Tx.QueryRow(ctx, `SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtext('billing.invoice_number:' ||
+		current_setting('app.tenant_id')))) l`).
 		Scan(&seq)
 	if scanErr != nil {
 		return Invoice{}, scanErr
@@ -713,8 +735,10 @@ func (m Billing) createInvoice(
 
 	var id uuid.UUID
 
-	err = c.Tx.QueryRow(ctx, `INSERT INTO billing.invoices (tenant_id, number, contract_id, contract_version, customer_id, amount_minor, currency, period, due_at, status, created_at, updated_at)
-		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, tstzrange($7, $8), $9, 'unpaid', $10, $10) RETURNING id`,
+	err = c.Tx.QueryRow(ctx, `INSERT INTO billing.invoices (tenant_id, number, contract_id, contract_version, customer_id,
+		amount_minor, currency, period, due_at, status, created_at, updated_at)
+		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, tstzrange($7, $8), $9, 'unpaid', $10, $10)
+		RETURNING id`,
 		number, k.ID, k.Version, k.CustomerID, in.AmountMinor, in.Currency, in.Period.From, in.Period.To, in.DueAt, c.Now).
 		Scan(&id)
 	if err != nil {
@@ -797,27 +821,29 @@ type InvoiceDetail struct {
 	RestrictionIDs []uuid.UUID `json:"restrictionIds"`
 }
 
-// @Summary		invoices.get (read)
-// @ID				invoices.get
-// @Description	Authorization: client:self | admin:billing.read | admin:restriction.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-C11, DD-A08
-// @Tags			invoices
-// @Accept			json
-// @Produce		json
-// @Param			id	path		string	true	"input field id"
-// @Success		200	{object}	ops.Envelope{data=InvoiceDetail}
-// @Failure		401	{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403	{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404	{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409	{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422	{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429	{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503	{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504	{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/invoices/{id} [get]
+// getInvoice serves invoices.get.
+//
+//	@Summary		invoices.get (read)
+//	@ID				invoices.get
+//	@Description	Authorization: client:self | admin:billing.read | admin:restriction.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-C11, DD-A08
+//	@Tags			invoices
+//	@Accept			json
+//	@Produce		json
+//	@Param			id	path		string	true	"input field id"
+//	@Success		200	{object}	ops.Envelope{data=InvoiceDetail}
+//	@Failure		401	{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403	{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404	{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409	{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422	{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429	{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503	{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504	{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/invoices/{id} [get]
 func (m Billing) getInvoice(ctx context.Context, c *ops.Call, in *IDInput) (InvoiceDetail, error) {
 	inv, err := m.loadInvoice(ctx, c, in.ID, false)
 
@@ -828,7 +854,8 @@ func (m Billing) getInvoice(ctx context.Context, c *ops.Call, in *IDInput) (Invo
 
 	rows, err := c.Tx.Query(
 		ctx,
-		`SELECT id, tenant_id, version, created_at, updated_at, amount_minor, currency, invoice_id, method, status, payment_reference, confirmed_at, confirmation_reason
+		`SELECT id, tenant_id, version, created_at, updated_at, amount_minor, currency, invoice_id, method, status,
+			payment_reference, confirmed_at, confirmation_reason
 		FROM billing.payments WHERE invoice_id = $1 ORDER BY created_at DESC, id`,
 		x.ID,
 	)
@@ -840,6 +867,7 @@ func (m Billing) getInvoice(ctx context.Context, c *ops.Call, in *IDInput) (Invo
 
 	for rows.Next() {
 		var p Payment
+
 		err := rows.Scan(
 			&p.ID,
 			&p.TenantID,
@@ -885,36 +913,40 @@ func InvoiceNumber(periodFrom time.Time, seq int) string {
 	return fmt.Sprintf("INV-%s-%04d", periodFrom.In(kualaLumpur).Format("200601"), seq)
 }
 
-// @Summary		invoices.list (read)
-// @ID				invoices.list
-// @Description	Authorization: client:self | admin:billing.read | admin:restriction.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A08, DD-C10, DD-A09 · Query: filters contractId,status,from,to,customerId,propertyId,overdueOnly · sort id,dueAt,createdAt,updatedAt (default dueAt desc;id asc)
-// @Tags			invoices
-// @Accept			json
-// @Produce		json
-// @Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit		query		integer	false	"page size 1–100, default 25"
-// @Param			sort		query		string	false	"field:direction — fields id,dueAt,createdAt,updatedAt; default dueAt desc;id asc"
-// @Param			contractId	query		string	false	"filter → contractId"
-// @Param			status		query		string	false	"filter → status"
-// @Param			from		query		string	false	"filter → [from,to) on period.from"
-// @Param			to			query		string	false	"filter → [from,to) on period.from"
-// @Param			customerId	query		string	false	"filter"
-// @Param			propertyId	query		string	false	"filter"
-// @Param			overdueOnly	query		boolean	false	"filter"
-// @Success		200			{object}	ops.Envelope{data=InvoicePage}
-// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/invoices [get]
+// listInvoices serves invoices.list.
+//
+//	@Summary		invoices.list (read)
+//	@ID				invoices.list
+//	@Description	Authorization: client:self | admin:billing.read | admin:restriction.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A08, DD-C10, DD-A09 · Query: filters \
+//	@Description	contractId,status,from,to,customerId,propertyId,overdueOnly · sort id,dueAt,createdAt,updatedAt \
+//	@Description	(default dueAt desc;id asc)
+//	@Tags			invoices
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit		query		integer	false	"page size 1–100, default 25"
+//	@Param			sort		query		string	false	"field:direction — fields id,dueAt,createdAt,updatedAt; default dueAt desc;id asc"
+//	@Param			contractId	query		string	false	"filter → contractId"
+//	@Param			status		query		string	false	"filter → status"
+//	@Param			from		query		string	false	"filter → [from,to) on period.from"
+//	@Param			to			query		string	false	"filter → [from,to) on period.from"
+//	@Param			customerId	query		string	false	"filter"
+//	@Param			propertyId	query		string	false	"filter"
+//	@Param			overdueOnly	query		boolean	false	"filter"
+//	@Success		200			{object}	ops.Envelope{data=InvoicePage}
+//	@Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/invoices [get]
 func (m Billing) listInvoices(
 	ctx context.Context,
 	c *ops.Call,
@@ -1022,6 +1054,7 @@ func (m Billing) listInvoices(
 	where := strings.Join(conds, " AND ")
 
 	var total int
+
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM billing.invoices i WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
@@ -1097,30 +1130,32 @@ type Receipt struct {
 	NotificationID uuid.UUID `json:"notificationId"`
 }
 
-// @Summary		invoices.remind (write)
-// @ID				invoices.remind
-// @Description	Authorization: admin:billing.write
-// @Description	Validation: IR04: overdue unpaid; current recipient; expectedVersion=Invoice.version
-// @Description	Recovery: D04: same-key receipt; no duplicate notification
-// @Description	Design: DD-A08
-// @Tags			invoices
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer		true	"all: required (target invoice, read invoices.get)"
-// @Param			invoiceId			path		string		true	"input field invoiceId"
-// @Param			request				body		RemindInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Receipt}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/invoices/{invoiceId}/remind [post]
+// remind serves invoices.remind.
+//
+//	@Summary		invoices.remind (write)
+//	@ID				invoices.remind
+//	@Description	Authorization: admin:billing.write
+//	@Description	Validation: IR04: overdue unpaid; current recipient; expectedVersion=Invoice.version
+//	@Description	Recovery: D04: same-key receipt; no duplicate notification
+//	@Description	Design: DD-A08
+//	@Tags			invoices
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target invoice, read invoices.get)"
+//	@Param			invoiceId			path		string		true	"input field invoiceId"
+//	@Param			request				body		RemindInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=Receipt}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/invoices/{invoiceId}/remind [post]
 func (m Billing) remind(ctx context.Context, c *ops.Call, in *RemindInput) (Receipt, error) {
 	x, err := m.loadInvoice(ctx, c, in.InvoiceID, true)
 	if err != nil {
@@ -1166,7 +1201,9 @@ func (m Billing) remind(ctx context.Context, c *ops.Call, in *RemindInput) (Rece
 	}
 
 	var v int
-	scanErr := c.Tx.QueryRow(ctx, `UPDATE billing.invoices SET last_reminded_at = $2, version = version + 1, updated_at = $2 WHERE id = $1 RETURNING version`, x.ID, c.Now).
+
+	scanErr := c.Tx.QueryRow(ctx, `UPDATE billing.invoices SET last_reminded_at = $2, version = version + 1, updated_at =
+		$2 WHERE id = $1 RETURNING version`, x.ID, c.Now).
 		Scan(&v)
 	if scanErr != nil {
 		return Receipt{}, scanErr

@@ -79,6 +79,7 @@ func Integrate(
 			unit, origin, quality string
 			boundary              *string
 		)
+
 		err := rows.Scan(&v, &unit, &origin, &quality, &boundary)
 		if err != nil {
 			return out, err

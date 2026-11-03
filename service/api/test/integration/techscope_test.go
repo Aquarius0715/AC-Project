@@ -9,9 +9,9 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
-// TestInternalTechnicianScopeKinds: an internal technician reads the units within Membership.scopes, whatever their kind
-// (D01, unitscope): a property scope gives that property's units, an organization scope its customer's units, and no
-// scope none at all. The seed technicians hold unit scopes only, so the property and organization branches and the
+// TestInternalTechnicianScopeKinds: an internal technician reads the units within Membership.scopes, whatever their
+// kind (D01, unitscope): a property scope gives that property's units, an organization scope its customer's units, and
+// no scope none at all. The seed technicians hold unit scopes only, so the property and organization branches and the
 // empty scope had no test (IR381).
 func TestInternalTechnicianScopeKinds(t *testing.T) {
 	s := server(t)
@@ -28,12 +28,14 @@ func TestInternalTechnicianScopeKinds(t *testing.T) {
 			clock.Add(-24*time.Hour),
 		)
 		owner(t, `INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission)
-			SELECT tenant_id, $1, permission FROM identity.membership_permissions WHERE membership_id = $2 ON CONFLICT DO NOTHING`, id, seed.ID("tech-internal-a"))
+			SELECT tenant_id, $1, permission FROM identity.membership_permissions WHERE membership_id = $2 ON CONFLICT DO
+			NOTHING`, id, seed.ID("tech-internal-a"))
 
 		for kind, ref := range scopes {
 			owner(
 				t,
-				`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+				`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES ($1,$2,$3,$4) ON CONFLICT DO
+					NOTHING`,
 				seed.ID("tenant-a"),
 				id,
 				kind,

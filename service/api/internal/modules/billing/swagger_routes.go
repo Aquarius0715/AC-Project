@@ -51,7 +51,8 @@ func swaggerContractsSaveUpdate() {}
 //	@Summary		payouts.transition (write) — mark paid
 //	@ID				payouts.transition.mark_paid
 //	@Description	Authorization: admin:billing.payment
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 draft→approved; approved→paid only on or after payDate
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR111 draft→approved; approved→paid only on or after payDate
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A23 · This route sets action=mark_paid
 //	@Tags			payouts

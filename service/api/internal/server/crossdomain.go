@@ -498,6 +498,7 @@ func (v maintenanceView) AddJobNote(
 	message string,
 ) error {
 	var tenant uuid.UUID
+
 	err := c.Tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')::uuid`).
 		Scan(&tenant)
 	if err != nil {

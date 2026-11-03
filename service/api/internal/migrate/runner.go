@@ -132,6 +132,7 @@ func Up(ctx context.Context, conn *pgx.Conn, ms []Migration) ([]int64, error) {
 
 	if cur == 0 {
 		var exists bool
+
 		err := conn.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'platform')`).
 			Scan(&exists)
 		if err != nil {
@@ -238,6 +239,7 @@ func EnsureLogin(ctx context.Context, conn *pgx.Conn, login, password, group str
 	ident := pgx.Identifier{login}.Sanitize()
 
 	var exists bool
+
 	scanErr := conn.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = $1)`, login).
 		Scan(&exists)
 	if scanErr != nil {

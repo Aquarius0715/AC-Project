@@ -57,15 +57,18 @@ type AlertRule struct {
 // alertRule reads the condition of the alert's policy — the policy's own for kind alert, the rule of rule_key for the
 // default policy — so everyone who reads the alert sees what raised it and when it recovers, without reading the policy
 // itself (policy reads stay with policy permission holders, IR284); NULL for an alert without a policy.
-const alertRule = `(SELECT jsonb_build_object('name', x.name, 'metric', x.c->>'metric', 'operator', x.c->>'operator', 'threshold', x.c->'threshold',
+const alertRule = `(SELECT jsonb_build_object('name', x.name, 'metric', x.c->>'metric', 'operator', x.c->>'operator',` +
+	` 'threshold', x.c->'threshold',
 		'recoveryThreshold', x.c->'recoveryThreshold', 'durationSeconds', x.c->'durationSeconds')
 	FROM (SELECT p.name, p.condition AS c FROM monitoring.alert_policies p WHERE p.id = a.policy_id AND p.kind = 'alert'
 		UNION ALL
 		SELECT r->>'name', r FROM monitoring.alert_policies p CROSS JOIN LATERAL jsonb_array_elements(p.rules) r
 		WHERE p.id = a.policy_id AND p.kind = 'default_alert' AND r->>'ruleKey' = a.rule_key) x LIMIT 1)`
 
-const alertCols = `a.id, a.tenant_id, a.version, a.created_at, a.updated_at, a.unit_id, a.policy_id, a.type, a.severity, a.status, a.cause_code,
-	a.evidence_kind, a.evidence_text, a.observed_at, a.evidence_ids, a.detected_at, a.acknowledged_at, a.resolved_at, a.resolution_reason,
+const alertCols = `a.id, a.tenant_id, a.version, a.created_at, a.updated_at, a.unit_id, a.policy_id, a.type, ` +
+	`a.severity, a.status, a.cause_code,
+	a.evidence_kind, a.evidence_text, a.observed_at, a.evidence_ids, a.detected_at, a.acknowledged_at, a.resolved_at, ` +
+	`a.resolution_reason,
 	a.previous_alert_id, a.delivery_failures, ` + alertRule
 
 func scanAlert(r pgx.Row) (Alert, error) {
@@ -137,37 +140,42 @@ var (
 
 const severityRank = `CASE a.severity WHEN 'normal' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END`
 
-// @Summary		alerts.list (read)
-// @ID				alerts.list
-// @Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:alert.read | admin:alert.policy.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A05, DD-C01, DD-C08, DD-P04, DD-T01, DD-T07, DD-T02 · Query: filters unitId,unitIds,severity,status,from,to,customerId,propertyId · sort id,createdAt,updatedAt,severity (default severity desc;id asc)
-// @Tags			alerts
-// @Accept			json
-// @Produce		json
-// @Param			cursor		query		string		false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit		query		integer		false	"page size 1–100, default 25"
-// @Param			sort		query		string		false	"field:direction — fields id,createdAt,updatedAt,severity; default severity desc;id asc"
-// @Param			unitId		query		string		false	"filter → unitId"
-// @Param			unitIds		query		[]string	false	"filter → unitIds (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
-// @Param			severity	query		string		false	"filter → severity"
-// @Param			status		query		string		false	"filter → status"
-// @Param			from		query		string		false	"filter → [from,to) on observedAt"
-// @Param			to			query		string		false	"filter → [from,to) on observedAt"
-// @Param			customerId	query		string		false	"filter"
-// @Param			propertyId	query		string		false	"filter"
-// @Success		200			{object}	ops.Envelope{data=AlertPage}
-// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/alerts [get]
+// list serves alerts.list.
+//
+//	@Summary		alerts.list (read)
+//	@ID				alerts.list
+//	@Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | \
+//	@Description	admin:alert.read | admin:alert.policy.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A05, DD-C01, DD-C08, DD-P04, DD-T01, DD-T07, DD-T02 · Query: filters \
+//	@Description	unitId,unitIds,severity,status,from,to,customerId,propertyId · sort id,createdAt,updatedAt,severity \
+//	@Description	(default severity desc;id asc)
+//	@Tags			alerts
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor		query		string		false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit		query		integer		false	"page size 1–100, default 25"
+//	@Param			sort		query		string		false	"field:direction — fields id,createdAt,updatedAt,severity; default severity desc;id asc"
+//	@Param			unitId		query		string		false	"filter → unitId"
+//	@Param			unitIds		query		[]string	false	"filter → unitIds (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
+//	@Param			severity	query		string		false	"filter → severity"
+//	@Param			status		query		string		false	"filter → status"
+//	@Param			from		query		string		false	"filter → [from,to) on observedAt"
+//	@Param			to			query		string		false	"filter → [from,to) on observedAt"
+//	@Param			customerId	query		string		false	"filter"
+//	@Param			propertyId	query		string		false	"filter"
+//	@Success		200			{object}	ops.Envelope{data=AlertPage}
+//	@Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/alerts [get]
 func (m Alerts) list(
 	ctx context.Context,
 	c *ops.Call,
@@ -299,6 +307,7 @@ func (m Alerts) list(
 	where := strings.Join(conds, " AND ")
 
 	var total int
+
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM monitoring.alerts a WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
@@ -354,27 +363,30 @@ func (in *GetInput) Validate() map[string]string {
 	return nil
 }
 
-// @Summary		alerts.get (read)
-// @ID				alerts.get
-// @Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:alert.read | admin:alert.policy.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-T07, DD-A05, DD-T12, DD-P05, DD-P02
-// @Tags			alerts
-// @Accept			json
-// @Produce		json
-// @Param			id	path		string	true	"input field id"
-// @Success		200	{object}	ops.Envelope{data=Alert}
-// @Failure		401	{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403	{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404	{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409	{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422	{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429	{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503	{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504	{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/alerts/{id} [get]
+// get serves alerts.get.
+//
+//	@Summary		alerts.get (read)
+//	@ID				alerts.get
+//	@Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | \
+//	@Description	admin:alert.read | admin:alert.policy.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-T07, DD-A05, DD-T12, DD-P05, DD-P02
+//	@Tags			alerts
+//	@Accept			json
+//	@Produce		json
+//	@Param			id	path		string	true	"input field id"
+//	@Success		200	{object}	ops.Envelope{data=Alert}
+//	@Failure		401	{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403	{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404	{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409	{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422	{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429	{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503	{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504	{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/alerts/{id} [get]
 func (m Alerts) get(ctx context.Context, c *ops.Call, in *GetInput) (Alert, error) {
 	args := []any{in.ID}
 
@@ -414,7 +426,8 @@ func (m Alerts) lockAlert(
 		v      int
 	)
 
-	err := c.Tx.QueryRow(ctx, "SELECT a.status, a.unit_id, a.version FROM monitoring.alerts a WHERE a.id = $1 AND "+alertScope(c, &args, unitscope.List)+" FOR UPDATE", args...).
+	err := c.Tx.QueryRow(ctx, "SELECT a.status, a.unit_id, a.version FROM monitoring.alerts a WHERE a.id = $1 AND "+
+		alertScope(c, &args, unitscope.List)+" FOR UPDATE", args...).
 		Scan(&status, &unit, &v)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", unit, apperr.E(apperr.NotFound, "error.notFound")
@@ -458,30 +471,33 @@ func (in *AckInput) Validate() map[string]string {
 	return nil
 }
 
-// @Summary		alerts.acknowledge (write)
-// @ID				alerts.acknowledge
-// @Description	Authorization: technician:alert.read:assigned | admin:alert.resolve
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed)
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-T07, DD-T12, DD-A05
-// @Tags			alerts
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer		true	"all: required (target alerts, read alerts.get)"
-// @Param			alertId				path		string		true	"input field alertId"
-// @Param			request				body		AckInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Alert}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/alerts/{alertId}/acknowledge [post]
+// acknowledge serves alerts.acknowledge.
+//
+//	@Summary		alerts.acknowledge (write)
+//	@ID				alerts.acknowledge
+//	@Description	Authorization: technician:alert.read:assigned | admin:alert.resolve
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR94 technician write table (assignment and work window, jobId required when typed)
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-T07, DD-T12, DD-A05
+//	@Tags			alerts
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target alerts, read alerts.get)"
+//	@Param			alertId				path		string		true	"input field alertId"
+//	@Param			request				body		AckInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=Alert}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/alerts/{alertId}/acknowledge [post]
 func (m Alerts) acknowledge(ctx context.Context, c *ops.Call, in *AckInput) (Alert, error) {
 	status, unit, err := m.lockAlert(ctx, c, in.AlertID)
 	if err != nil {
@@ -555,30 +571,35 @@ func (in *ResolveInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		alerts.resolve (write)
-// @ID				alerts.resolve
-// @Description	Authorization: technician:alert.resolve:assigned | admin:alert.resolve
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR87 resolutionReason 1-1000; IR94 technician write table (assignment and work window, jobId required when typed); IR327 a policy-free alert needs at least one evidence ID, every ID a candidate of alerts.evidence
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-T07, DD-A05
-// @Tags			alerts
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer			true	"all: required (target alerts, read alerts.get)"
-// @Param			alertId				path		string			true	"input field alertId"
-// @Param			request				body		ResolveInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Alert}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/alerts/{alertId}/resolve [post]
+// resolve serves alerts.resolve.
+//
+//	@Summary		alerts.resolve (write)
+//	@ID				alerts.resolve
+//	@Description	Authorization: technician:alert.resolve:assigned | admin:alert.resolve
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR87 resolutionReason 1-1000; IR94 technician write table (assignment and work window, jobId \
+//	@Description	required when typed); IR327 a policy-free alert needs at least one evidence ID, every ID a candidate \
+//	@Description	of alerts.evidence
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-T07, DD-A05
+//	@Tags			alerts
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer			true	"all: required (target alerts, read alerts.get)"
+//	@Param			alertId				path		string			true	"input field alertId"
+//	@Param			request				body		ResolveInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=Alert}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/alerts/{alertId}/resolve [post]
 func (m Alerts) resolve(ctx context.Context, c *ops.Call, in *ResolveInput) (Alert, error) {
 	status, unit, err := m.lockAlert(ctx, c, in.AlertID)
 	if err != nil {
@@ -609,7 +630,8 @@ func (m Alerts) resolve(ctx context.Context, c *ops.Call, in *ResolveInput) (Ale
 		c.Tx.QueryRow(
 			ctx,
 			`UPDATE monitoring.alerts a SET status = 'resolved', resolved_at = $2, resolved_by = $3, resolution_reason = $4,
-		resolution_evidence_ids = $5, version = version + 1, updated_at = platform.app_now() WHERE a.id = $1 RETURNING `+alertCols,
+		resolution_evidence_ids = $5, version = version + 1, updated_at = platform.app_now() WHERE a.id = $1 RETURNING
+		`+alertCols,
 			in.AlertID,
 			c.Now,
 			c.Principal.MembershipID,
@@ -667,6 +689,7 @@ func (Alerts) ActiveAlertCounts(
 			u uuid.UUID
 			n int
 		)
+
 		err := rows.Scan(&u, &n)
 		if err != nil {
 			return nil, err
@@ -711,6 +734,7 @@ func (Alerts) UnitSeverities(
 			u uuid.UUID
 			s string
 		)
+
 		err := rows.Scan(&u, &s)
 		if err != nil {
 			return nil, err

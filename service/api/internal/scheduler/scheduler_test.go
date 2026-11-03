@@ -3,7 +3,17 @@ package scheduler
 import "testing"
 
 func TestResultChanges(t *testing.T) {
-	if (Result{ExpiredOffers: 0, ExpiredCommands: 0, Runs: 0, Confirmed: 0, ExpiredProposals: 0, FrozenHistories: 0, Jobs: 0, Skipped: 0}).changes() != 0 {
+	empty := Result{
+		ExpiredOffers:    0,
+		ExpiredCommands:  0,
+		Runs:             0,
+		Confirmed:        0,
+		ExpiredProposals: 0,
+		FrozenHistories:  0,
+		Jobs:             0,
+		Skipped:          0,
+	}
+	if empty.changes() != 0 {
 		t.Fatal("an empty tick changes nothing")
 	}
 

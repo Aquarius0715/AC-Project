@@ -36,6 +36,13 @@ linters:
       require-explanation: true
       require-specific: true
       allow-unused: false
+  exclusions:
+    rules:
+      # swag reads a parameter from one line (name, in, type, required, "description", attributes) and cannot continue
+      # it on the next, unlike @Description; the descriptions come from the catalogs (scripts/swag_annotate.py)
+      - linters:
+          - lll
+        source: '^\s*//\s*@Param\s'
 formatters:
   enable:
     - gci

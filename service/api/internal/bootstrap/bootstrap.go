@@ -33,7 +33,8 @@ type Input struct {
 type Result struct {
 	TenantID, OrganizationID, UserID, MembershipID uuid.UUID
 	NewTenant, NewOrganization                     bool
-	At                                             time.Time // the membership's start: the business time (with a demo clock's offset)
+	// the membership's start: the business time (with a demo clock's offset)
+	At time.Time
 }
 
 // ErrAdminExists refuses a tenant that already has an active identity administrator.
@@ -76,6 +77,7 @@ func (in *Input) Validate() error {
 // them (IR472), so a save that adds one at the same time waits for this one.
 func Admin(ctx context.Context, tx pgx.Tx, in Input) (Result, error) {
 	var r Result
+
 	err := in.Validate()
 	if err != nil {
 		return r, err
@@ -83,7 +85,8 @@ func Admin(ctx context.Context, tx pgx.Tx, in Input) (Result, error) {
 	// the business time: a demo environment's clock runs at an offset from the wall clock (IR168)
 	r.At = in.At
 	if r.At.IsZero() {
-		err := tx.QueryRow(ctx, `SELECT now() + COALESCE((SELECT offset_ms FROM platform.demo_clock WHERE id), 0) * interval '1 millisecond'`).
+		err := tx.QueryRow(ctx, `SELECT now() + COALESCE((SELECT offset_ms FROM platform.demo_clock WHERE id), 0) * interval
+			'1 millisecond'`).
 			Scan(&r.At)
 		if err != nil {
 			return r, err
@@ -104,7 +107,8 @@ func Admin(ctx context.Context, tx pgx.Tx, in Input) (Result, error) {
 
 	switch len(ids) {
 	case 0:
-		err := tx.QueryRow(ctx, `INSERT INTO platform.tenants (name, created_at) VALUES ($1, $2) RETURNING id`, in.Tenant, r.At).
+		err := tx.QueryRow(ctx, `INSERT INTO platform.tenants (name, created_at) VALUES ($1, $2) RETURNING
+			id`, in.Tenant, r.At).
 			Scan(&r.TenantID)
 		if err != nil {
 			return r, err
@@ -127,7 +131,9 @@ func Admin(ctx context.Context, tx pgx.Tx, in Input) (Result, error) {
 	}
 
 	var exists bool
-	scanErr := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.memberships m JOIN identity.membership_permissions p ON p.membership_id = m.id AND p.permission = 'identity.write'
+
+	scanErr := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.memberships m JOIN identity.membership_permissions p
+		ON p.membership_id = m.id AND p.permission = 'identity.write'
 		WHERE m.tenant_id = $1 AND m.valid_from <= $2 AND (m.valid_until IS NULL OR m.valid_until > $2))`, r.TenantID, r.At).
 		Scan(&exists)
 	if scanErr != nil {
@@ -138,10 +144,12 @@ func Admin(ctx context.Context, tx pgx.Tx, in Input) (Result, error) {
 		return r, ErrAdminExists
 	}
 
-	err = tx.QueryRow(ctx, `SELECT id FROM identity.organizations WHERE tenant_id = $1 AND kind = 'operator' ORDER BY created_at, id LIMIT 1`, r.TenantID).
+	err = tx.QueryRow(ctx, `SELECT id FROM identity.organizations WHERE tenant_id = $1 AND kind = 'operator' ORDER BY
+		created_at, id LIMIT 1`, r.TenantID).
 		Scan(&r.OrganizationID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		err = tx.QueryRow(ctx, `INSERT INTO identity.organizations (tenant_id, name, kind, status, created_at, updated_at) VALUES ($1, $2, 'operator', 'active', $3, $3) RETURNING id`,
+		err = tx.QueryRow(ctx, `INSERT INTO identity.organizations (tenant_id, name, kind, status, created_at, updated_at)
+			VALUES ($1, $2, 'operator', 'active', $3, $3) RETURNING id`,
 			r.TenantID, in.Organization, r.At).
 			Scan(&r.OrganizationID)
 		r.NewOrganization = true
@@ -151,7 +159,8 @@ func Admin(ctx context.Context, tx pgx.Tx, in Input) (Result, error) {
 		return r, err
 	}
 
-	err = tx.QueryRow(ctx, `INSERT INTO identity.users (email, display_name, status, created_at, updated_at) VALUES ($1, $2, 'active', $3, $3)
+	err = tx.QueryRow(ctx, `INSERT INTO identity.users (email, display_name, status, created_at, updated_at) VALUES ($1,
+		$2, 'active', $3, $3)
 		ON CONFLICT (email) DO NOTHING RETURNING id`, in.Email, in.Name, r.At).
 		Scan(&r.UserID)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -162,7 +171,8 @@ func Admin(ctx context.Context, tx pgx.Tx, in Input) (Result, error) {
 		return r, err
 	}
 
-	scanErr = tx.QueryRow(ctx, `INSERT INTO identity.memberships (tenant_id, user_id, organization_id, role, valid_from, created_at, updated_at)
+	scanErr = tx.QueryRow(ctx, `INSERT INTO identity.memberships (tenant_id, user_id, organization_id, role, valid_from,
+		created_at, updated_at)
 		VALUES ($1, $2, $3, 'admin', $4, $4, $4) RETURNING id`, r.TenantID, r.UserID, r.OrganizationID, r.At).
 		Scan(&r.MembershipID)
 	if scanErr != nil {
@@ -192,8 +202,10 @@ func Admin(ctx context.Context, tx pgx.Tx, in Input) (Result, error) {
 
 	_, execErr = tx.Exec(
 		ctx,
-		`INSERT INTO audit.audit_log (tenant_id, actor_id, actor_role_at_time, action, target_kind, target_id, next_version, occurred_at, correlation_id, result, reason)
-		VALUES ($1, 'system-bootstrap', 'system', 'bootstrap.admin', 'membership', $2::text, 1, $3, 'bootstrap-admin', 'success', 'first HQ administrator')`,
+		`INSERT INTO audit.audit_log (tenant_id, actor_id, actor_role_at_time, action, target_kind, target_id, next_version,
+			occurred_at, correlation_id, result, reason)
+		VALUES ($1, 'system-bootstrap', 'system', 'bootstrap.admin', 'membership', $2::text, 1, $3, 'bootstrap-admin',
+		'success', 'first HQ administrator')`,
 		r.TenantID,
 		r.MembershipID,
 		r.At,
@@ -204,8 +216,10 @@ func Admin(ctx context.Context, tx pgx.Tx, in Input) (Result, error) {
 
 	_, err = tx.Exec(
 		ctx,
-		`INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id, occurred_at)
-		VALUES ($1, 'membership', $2::uuid, 'AccountRequested', jsonb_build_object('userId', $3::uuid::text, 'membershipId', $2::uuid::text, 'role', 'admin'), 'bootstrap-admin', $4)`,
+		`INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id,
+			occurred_at)
+		VALUES ($1, 'membership', $2::uuid, 'AccountRequested', jsonb_build_object('userId', $3::uuid::text, 'membershipId',
+		$2::uuid::text, 'role', 'admin'), 'bootstrap-admin', $4)`,
 		r.TenantID,
 		r.MembershipID,
 		r.UserID,

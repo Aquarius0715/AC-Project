@@ -50,7 +50,8 @@ func statusCounts(ctx context.Context, c *ops.Call, in *StatusCountsInput) (map[
 
 	rows, err := c.Tx.Query(
 		ctx,
-		`SELECT status, count(*) FROM maintenance.jobs WHERE unit_id = ANY($1) AND lower(requested_slot) >= $2 AND lower(requested_slot) < $3 GROUP BY status`,
+		`SELECT status, count(*) FROM maintenance.jobs WHERE unit_id = ANY($1) AND lower(requested_slot) >= $2 AND
+			lower(requested_slot) < $3 GROUP BY status`,
 		in.UnitIDs,
 		in.From,
 		in.To,
@@ -65,6 +66,7 @@ func statusCounts(ctx context.Context, c *ops.Call, in *StatusCountsInput) (map[
 			s string
 			k int
 		)
+
 		err := rows.Scan(&s, &k)
 		if err != nil {
 			return nil, err

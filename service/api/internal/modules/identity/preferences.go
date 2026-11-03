@@ -32,7 +32,8 @@ func loadPreferences(ctx context.Context, c *ops.Call) (Preferences, error) {
 		TwoFactorEnabled:   false,
 	}
 
-	err := c.Tx.QueryRow(ctx, `SELECT locale, timezone, currency, monthly_report_email FROM identity.preferences WHERE user_id = $1`, c.Principal.UserID).
+	err := c.Tx.QueryRow(ctx, `SELECT locale, timezone, currency, monthly_report_email FROM identity.preferences WHERE
+		user_id = $1`, c.Principal.UserID).
 		Scan(&p.Locale, &p.Timezone, &p.Currency, &p.MonthlyReportEmail)
 	if errors.Is(err, pgx.ErrNoRows) {
 		err = nil
@@ -85,7 +86,8 @@ func (in *PreferencesInput) Validate() map[string]string {
 //	@Summary		preferences.update (write)
 //	@ID				preferences.update
 //	@Description	Authorization: authenticated:own-session
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR112 monthlyReportEmail only for client sessions
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR112 monthlyReportEmail only for client sessions
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DDC-07
 //	@Tags			preferences
@@ -127,8 +129,10 @@ func updatePreferences(
 
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`INSERT INTO identity.preferences (user_id, locale, timezone, monthly_report_email, updated_at) VALUES ($1, $2, $3, $4, $5)
-		ON CONFLICT (user_id) DO UPDATE SET locale = $2, timezone = $3, monthly_report_email = $4, version = identity.preferences.version + 1, updated_at = $5`,
+		`INSERT INTO identity.preferences (user_id, locale, timezone, monthly_report_email, updated_at) VALUES ($1, $2, $3,
+			$4, $5)
+		ON CONFLICT (user_id) DO UPDATE SET locale = $2, timezone = $3, monthly_report_email = $4, version =
+		identity.preferences.version + 1, updated_at = $5`,
 		c.Principal.UserID,
 		in.Locale,
 		in.Timezone,
@@ -187,7 +191,8 @@ func (in *ConsentGetInput) Validate() map[string]string {
 }
 
 func loadConsent(ctx context.Context, c *ops.Call, purpose string, lock bool) (Consent, error) {
-	q := `SELECT id::text, tenant_id::text, version, created_at, updated_at, membership_id::text, purpose, granted, granted_at, revoked_at
+	q := `SELECT id::text, tenant_id::text, version, created_at, updated_at, membership_id::text, purpose, granted,
+		granted_at, revoked_at
 		FROM identity.consents WHERE membership_id = $1 AND purpose = $2`
 	if lock {
 		q += " FOR UPDATE"
@@ -196,7 +201,8 @@ func loadConsent(ctx context.Context, c *ops.Call, purpose string, lock bool) (C
 	var x Consent
 
 	err := c.Tx.QueryRow(ctx, q, c.Principal.MembershipID, purpose).
-		Scan(&x.ID, &x.TenantID, &x.Version, &x.CreatedAt, &x.UpdatedAt, &x.MembershipID, &x.Purpose, &x.Granted, &x.GrantedAt, &x.RevokedAt)
+		Scan(&x.ID, &x.TenantID, &x.Version, &x.CreatedAt, &x.UpdatedAt, &x.MembershipID, &x.Purpose, &x.Granted,
+			&x.GrantedAt, &x.RevokedAt)
 	if errors.Is(err, pgx.ErrNoRows) { // IR84: a missing record is a fixture defect
 		return x, apperr.E(apperr.NotFound, "error.notFound")
 	}
@@ -204,27 +210,30 @@ func loadConsent(ctx context.Context, c *ops.Call, purpose string, lock bool) (C
 	return x, err
 }
 
-// @Summary		consents.get (read)
-// @ID				consents.get
-// @Description	Authorization: client:own-membership
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR84 seed/initial record; absent record NOT_FOUND
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-C05, DD-C01
-// @Tags			consents
-// @Accept			json
-// @Produce		json
-// @Param			purpose	path		string	true	"input field purpose"
-// @Success		200		{object}	ops.Envelope{data=Consent}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/consents/{purpose} [get]
+// getConsent serves consents.get.
+//
+//	@Summary		consents.get (read)
+//	@ID				consents.get
+//	@Description	Authorization: client:own-membership
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR84 seed/initial \
+//	@Description	record; absent record NOT_FOUND
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-C05, DD-C01
+//	@Tags			consents
+//	@Accept			json
+//	@Produce		json
+//	@Param			purpose	path		string	true	"input field purpose"
+//	@Success		200		{object}	ops.Envelope{data=Consent}
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/consents/{purpose} [get]
 func getConsent(ctx context.Context, c *ops.Call, in *ConsentGetInput) (Consent, error) {
 	return loadConsent(ctx, c, in.Purpose, false)
 }
@@ -293,7 +302,8 @@ func updateConsent(ctx context.Context, c *ops.Call, in *ConsentUpdateInput) (Co
 
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`UPDATE identity.consents SET granted = $2, granted_at = $3, revoked_at = $4, version = version + 1, updated_at = $5 WHERE id = $1::uuid`,
+		`UPDATE identity.consents SET granted = $2, granted_at = $3, revoked_at = $4, version = version + 1, updated_at = $5
+			WHERE id = $1::uuid`,
 		x.ID,
 		in.Granted,
 		x.GrantedAt,

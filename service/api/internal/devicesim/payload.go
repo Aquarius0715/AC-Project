@@ -1,6 +1,7 @@
 // Package devicesim builds the MQTT messages of a simulated IoT module, as the backend design describes them
 // (backend-architecture §9): telemetry batches every minute, a heartbeat every 60 seconds, on
-// t/<tenantId>/d/<deviceId>/<kind>. The broker connection lives in cmd/devicesim; this package only shapes the messages.
+// t/<tenantId>/d/<deviceId>/<kind>. The broker connection lives in cmd/devicesim; this package only shapes the
+// messages.
 package devicesim
 
 import (
@@ -156,9 +157,9 @@ func (m *Module) HeartbeatTopic() string { return Topic(m.TenantID, m.DeviceID, 
 // Telemetry takes one reading of every sensor at the given time and returns it as a batch; each reading gets the
 // next sequence number, so the backend can keep them in order and drop duplicates.
 //
-// The pattern changes the readings: silent sends nothing (nil), as does a module without sensors; unit_mismatch reports the temperature in kelvin,
-// out_of_range reports an impossible temperature, missing reports no values, invalid_time stamps the readings an
-// hour ahead; a module whose air conditioner draws no power reports 0 kW.
+// The pattern changes the readings: silent sends nothing (nil), as does a module without sensors; unit_mismatch reports
+// the temperature in kelvin, out_of_range reports an impossible temperature, missing reports no values, invalid_time
+// stamps the readings an hour ahead; a module whose air conditioner draws no power reports 0 kW.
 func (m *Module) Telemetry(at time.Time) ([]byte, error) {
 	if m.telemetry == "silent" {
 		return nil, nil
@@ -228,7 +229,8 @@ type Command struct {
 	ExpiresAt time.Time `json:"expiresAt"`
 }
 
-// Ack is the acknowledgement sent on /cmd/ack: whether the command was applied and the state the module observes after it.
+// Ack is the acknowledgement sent on /cmd/ack: whether the command was applied and the state the module observes after
+// it.
 type Ack struct {
 	DeviceID   string    `json:"deviceId"`
 	CommandID  string    `json:"commandId"`
@@ -253,6 +255,7 @@ func (m *Module) AckTopic() string     { return Topic(m.TenantID, m.DeviceID, "c
 // applies the command but sends the answer two seconds after the command expired.
 func (m *Module) Acknowledge(raw []byte, at time.Time) ([]byte, time.Time, error) {
 	var c Command
+
 	err := json.Unmarshal(raw, &c)
 	if err != nil {
 		return nil, at, fmt.Errorf("command: %w", err)
@@ -309,6 +312,7 @@ func (m *Module) Keep() ([]byte, error) { return json.Marshal(Kept{SetpointCelsi
 // Restore applies a kept state read back from the broker; a setpoint outside 16–30 °C is ignored.
 func (m *Module) Restore(raw []byte) error {
 	var k Kept
+
 	err := json.Unmarshal(raw, &k)
 	if err != nil {
 		return fmt.Errorf("kept state: %w", err)

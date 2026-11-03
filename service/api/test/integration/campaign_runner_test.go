@@ -41,7 +41,8 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 			devs,
 			`","`,
 		)+
-			`"],"waves":[{"label":"Pilot","percent":34},{"label":"All","percent":100}],"window":{"startLocal":"01:00","endLocal":"05:00"},"autoPauseFailurePercent":20,"startAt":"`+
+			`"],"waves":[{"label":"Pilot","percent":34},{"label":"All","percent":100}],"window":{"startLocal":"01:00",`+
+			`"endLocal":"05:00"},"autoPauseFailurePercent":20,"startAt":"`+
 			clock.Add(30*24*time.Hour).
 				Format(time.RFC3339)+
 			`"}`,
@@ -83,6 +84,7 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 		t.Helper()
 
 		at += d
+
 		_, err := schedTick(ctx, s, base.Add(at))
 		if err != nil {
 			t.Fatal(err)
@@ -98,7 +100,8 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 		for i, d := range devs {
 			ownerScan(
 				t,
-				`SELECT result, COALESCE(detail, ''), COALESCE(operation_id::text, '') FROM devices.firmware_campaign_devices WHERE campaign_id = $1 AND device_id = $2`,
+				`SELECT result, COALESCE(detail, ''), COALESCE(operation_id::text, '') FROM devices.firmware_campaign_devices WHERE
+					campaign_id = $1 AND device_id = $2`,
 				[]any{camp, d},
 				&out[i].status,
 				&out[i].key,
@@ -192,14 +195,16 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 	var notices, clients int
 	ownerScan(
 		t,
-		`SELECT count(*) FROM notify.notifications WHERE type = 'device_operation' AND template_key = 'device_operation' AND target->>'kind' = 'unit'
+		`SELECT count(*) FROM notify.notifications WHERE type = 'device_operation' AND template_key = 'device_operation' AND
+			target->>'kind' = 'unit'
 		AND target->>'id' = ANY($1::text[]) AND params->>'message' LIKE 'Firmware update from %'`,
 		[]any{units},
 		&notices,
 	)
 	ownerScan(
 		t,
-		`SELECT count(*) FROM identity.memberships WHERE organization_id = $1 AND role = 'client' AND valid_from <= $2 AND (valid_until IS NULL OR valid_until > $2)`,
+		`SELECT count(*) FROM identity.memberships WHERE organization_id = $1 AND role = 'client' AND valid_from <= $2 AND
+			(valid_until IS NULL OR valid_until > $2)`,
 		[]any{seed.ID("org-customer-b"), base.Add(at)},
 		&clients,
 	)
@@ -245,7 +250,8 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 	busy := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO devices.device_operations (id, tenant_id, device_id, unit_id, kind, status, expires_at) VALUES ($1,$2,$3,$4,'check','running',$5)`,
+		`INSERT INTO devices.device_operations (id, tenant_id, device_id, unit_id, kind, status, expires_at) VALUES ($1,$2,$3,
+			$4,'check','running',$5)`,
 		busy,
 		seed.ID("tenant-a"),
 		devs[4],
@@ -254,7 +260,8 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 	)
 	tick(time.Minute)
 
-	if got := statuses(); got != "succeeded succeeded skipped:errors.device_offline skipped:errors.tamper_unresolved skipped:errors.device_busy installing" {
+	if got := statuses(); got != "succeeded succeeded skipped:errors.device_offline skipped:errors.tamper_unresolved "+
+		"skipped:errors.device_busy installing" {
 		t.Fatalf("second wave: %s", got)
 	}
 
@@ -389,7 +396,8 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 			devs,
 			`","`,
 		)+
-			`"],"waves":[{"label":"All","percent":100}],"window":{"startLocal":"00:00","endLocal":"23:59"},"autoPauseFailurePercent":50,"startAt":"`+
+			`"],"waves":[{"label":"All","percent":100}],"window":{"startLocal":"00:00","endLocal":"23:59"},`+
+			`"autoPauseFailurePercent":50,"startAt":"`+
 			clock.Add(30*24*time.Hour).
 				Format(time.RFC3339)+
 			`"}`,
@@ -443,7 +451,8 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 	cmd := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO control.commands (id, tenant_id, unit_id, device_id, actor_membership_id, source, action, status, delivery, requested_at, expires_at, correlation_id)
+		`INSERT INTO control.commands (id, tenant_id, unit_id, device_id, actor_membership_id, source, action, status,
+			delivery, requested_at, expires_at, correlation_id)
 		VALUES ($1,$2,$3,$4,$5,'ui','{"kind":"set_power","power":false}','requested','sent',$6,$7,'t')`,
 		cmd,
 		tenant,
@@ -468,7 +477,8 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 		var result, key string
 		ownerScan(
 			t,
-			`SELECT result, COALESCE(detail, '') FROM devices.firmware_campaign_devices WHERE campaign_id = $1 AND device_id = $2`,
+			`SELECT result, COALESCE(detail, '') FROM devices.firmware_campaign_devices WHERE campaign_id = $1 AND device_id =
+				$2`,
 			[]any{camp, d},
 			&result,
 			&key,
@@ -488,8 +498,10 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 	big := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO devices.firmware_campaigns (id, tenant_id, model_id, from_versions, target_version, checksum, waves, window_start_local, window_end_local,
-		auto_pause_failure_percent, start_at, state) VALUES ($1,$2,$3,'{1.0}','v2','sha256:x','[{"label":"All","percent":100}]','00:00','23:59',5,$4,'running')`,
+		`INSERT INTO devices.firmware_campaigns (id, tenant_id, model_id, from_versions, target_version, checksum, waves,
+			window_start_local, window_end_local,
+		auto_pause_failure_percent, start_at, state) VALUES ($1,$2,$3,'{1.0}','v2','sha256:x',
+		'[{"label":"All","percent":100}]','00:00','23:59',5,$4,'running')`,
 		big,
 		tenant,
 		model,
@@ -508,7 +520,8 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 		dev := uuid.NewString()
 		owner(
 			t,
-			`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version) VALUES ($1,$2,$3,$4,$5,'1.0')`,
+			`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version)
+				VALUES ($1,$2,$3,$4,$5,'1.0')`,
 			dev,
 			tenant,
 			"W-"+dev[:8],
@@ -519,7 +532,8 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 		if i < 19 {
 			owner(
 				t,
-				`INSERT INTO devices.firmware_campaign_devices (campaign_id, device_id, tenant_id, wave, result, result_at) VALUES ($1,$2,$3,0,'succeeded',$4)`,
+				`INSERT INTO devices.firmware_campaign_devices (campaign_id, device_id, tenant_id, wave, result, result_at) VALUES
+					($1,$2,$3,0,'succeeded',$4)`,
 				big,
 				dev,
 				tenant,
@@ -531,7 +545,8 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 
 		owner(
 			t,
-			`INSERT INTO devices.device_operations (id, tenant_id, device_id, kind, status, target_version, campaign_id, expires_at, started_at) VALUES ($1,$2,$3,'firmware','running','v2',$4,$5,$6)`,
+			`INSERT INTO devices.device_operations (id, tenant_id, device_id, kind, status, target_version, campaign_id,
+				expires_at, started_at) VALUES ($1,$2,$3,'firmware','running','v2',$4,$5,$6)`,
 			op,
 			tenant,
 			dev,
@@ -541,7 +556,8 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 		)
 		owner(
 			t,
-			`INSERT INTO devices.firmware_campaign_devices (campaign_id, device_id, tenant_id, wave, result, operation_id, result_at) VALUES ($1,$2,$3,0,'installing',$4,$5)`,
+			`INSERT INTO devices.firmware_campaign_devices (campaign_id, device_id, tenant_id, wave, result, operation_id,
+				result_at) VALUES ($1,$2,$3,0,'installing',$4,$5)`,
 			big,
 			dev,
 			tenant,

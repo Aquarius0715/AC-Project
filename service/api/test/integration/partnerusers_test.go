@@ -345,7 +345,8 @@ func TestPartnerUserAccess(t *testing.T) {
 		s,
 		&contrA,
 		"partnerUsers.save",
-		`{"id":"`+booked+`","email":"tech-external-a@ac.local","partnerRole":"technician","status":"disabled","reason":"on leave"}`,
+		`{"id":"`+booked+`","email":"tech-external-a@ac.local","partnerRole":"technician","status":"disabled","reason":"on `+
+			`leave"}`,
 		bv,
 	); code != 409 ||
 		m["messageKey"] != "errors.technician_booked" {
@@ -514,13 +515,15 @@ func TestPartnerUserAccess(t *testing.T) {
 	var active []string
 	ownerScan(
 		t,
-		`SELECT COALESCE(array_agg(id::text), '{}') FROM identity.partner_users WHERE organization_id = $1 AND partner_role = 'contractor' AND status = 'active'`,
+		`SELECT COALESCE(array_agg(id::text), '{}') FROM identity.partner_users WHERE organization_id = $1 AND partner_role =
+			'contractor' AND status = 'active'`,
 		[]any{seed.ID("org-contractor-a")},
 		&active,
 	)
 	owner(
 		t,
-		`INSERT INTO identity.partner_users (id, tenant_id, organization_id, membership_id, email, partner_role, status, invited_at, invited_by_membership_id)
+		`INSERT INTO identity.partner_users (id, tenant_id, organization_id, membership_id, email, partner_role, status,
+			invited_at, invited_by_membership_id)
 		VALUES ($1, $2, $3, $4, $5, 'contractor', 'active', $6, $7)`,
 		other,
 		seed.ID("tenant-a"),
@@ -585,7 +588,8 @@ func TestPartnerAccountCreated(t *testing.T) {
 	email := "added-" + uuid.NewString()[:8] + "@example.com"
 
 	body := func(until time.Time) string {
-		return `{"email":"` + email + `","partnerRole":"technician","displayName":"Added Tech","accessUntil":"` + until.Format(
+		return `{"email":"` + email + `","partnerRole":"technician","displayName":"Added Tech",` +
+			`"accessUntil":"` + until.Format(
 			time.RFC3339,
 		) + `"}`
 	}
@@ -630,8 +634,10 @@ func TestPartnerAccountCreated(t *testing.T) {
 	)
 	ownerScan(
 		t,
-		`SELECT m.role, m.employment, m.valid_until, (SELECT count(*) FROM identity.membership_permissions p WHERE p.membership_id = m.id),
-		(SELECT count(*) FROM identity.membership_scopes s WHERE s.membership_id = m.id) FROM identity.memberships m WHERE m.id = $1`,
+		`SELECT m.role, m.employment, m.valid_until, (SELECT count(*) FROM identity.membership_permissions p WHERE
+			p.membership_id = m.id),
+		(SELECT count(*) FROM identity.membership_scopes s WHERE s.membership_id = m.id) FROM identity.memberships m WHERE
+		m.id = $1`,
 		[]any{membership},
 		&role,
 		&employment,
@@ -667,7 +673,8 @@ func TestPartnerAccountCreated(t *testing.T) {
 	var sub, user string
 	ownerScan(
 		t,
-		`SELECT u.cognito_sub, u.id::text FROM identity.users u JOIN identity.memberships m ON m.user_id = u.id WHERE m.id = $1`,
+		`SELECT u.cognito_sub, u.id::text FROM identity.users u JOIN identity.memberships m ON m.user_id = u.id WHERE m.id =
+			$1`,
 		[]any{membership},
 		&sub,
 		&user,
@@ -810,7 +817,8 @@ func TestPartnerResendAfterAccessEnd(t *testing.T) {
 	id, membership := data(m)["id"].(string), data(m)["membershipId"].(string)
 	owner(
 		t,
-		`UPDATE identity.memberships SET valid_from = $2::timestamptz - interval '2 days', valid_until = $2::timestamptz - interval '1 hour' WHERE id = $1`,
+		`UPDATE identity.memberships SET valid_from = $2::timestamptz - interval '2 days', valid_until = $2::timestamptz -
+			interval '1 hour' WHERE id = $1`,
 		membership,
 		clock,
 	)
@@ -854,17 +862,23 @@ func TestPartnerResendAfterAccessEnd(t *testing.T) {
 	}
 }
 
-// TestPartnerUserInputs: the inputs of partnerUsers.remove and resendInvite name their field, an invite takes no reason,
-// a removal needs the current version, and removing an account ends its membership now.
+// TestPartnerUserInputs: the inputs of partnerUsers.remove and resendInvite name their field, an invite takes no
+// reason, a removal needs the current version, and removing an account ends its membership now.
 func TestPartnerUserInputs(t *testing.T) {
 	s := server(t)
 	for name, c := range map[string]struct {
 		op, body, want string
 	}{
-		"remove without id":   {"partnerUsers.remove", `{"id":"00000000-0000-0000-0000-000000000000","reason":"x"}`, "id=error.required"},
-		"remove long reason":  {"partnerUsers.remove", `{"id":"` + uuid.NewString() + `","reason":"` + strings.Repeat("x", 1001) + `"}`, "reason=error.length"},
-		"resend without id":   {"partnerUsers.resendInvite", `{"id":"00000000-0000-0000-0000-000000000000"}`, "id=error.required"},
-		"reason on an invite": {"partnerUsers.save", `{"email":"x-` + uuid.NewString()[:8] + `@example.com","partnerRole":"contractor","displayName":"X","reason":"why"}`, "reason=error.notAllowed"},
+		"remove without id": {"partnerUsers.remove", `{"id":"00000000-0000-0000-0000-000000000000",` +
+			`"reason":"x"}`, "id=error.required"},
+		"remove long reason": {"partnerUsers.remove", `{"id":"` + uuid.NewString() + `","reason":"` +
+			strings.Repeat("x", 1001) + `"}`, "reason=error.length"},
+		"resend without id": {
+			"partnerUsers.resendInvite", `{"id":"00000000-0000-0000-0000-000000000000"}`,
+			"id=error.required",
+		},
+		"reason on an invite": {"partnerUsers.save", `{"email":"x-` + uuid.NewString()[:8] + `@example.com",` +
+			`"partnerRole":"contractor","displayName":"X","reason":"why"}`, "reason=error.notAllowed"},
 	} {
 		code, m := write(s, &contrA, c.op, c.body, 1)
 		if c.op == "partnerUsers.resendInvite" || c.op == "partnerUsers.save" {
@@ -889,7 +903,8 @@ func TestPartnerUserInputs(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO identity.partner_users (id, tenant_id, organization_id, membership_id, email, partner_role, status, invited_at, invited_by_membership_id)
+		`INSERT INTO identity.partner_users (id, tenant_id, organization_id, membership_id, email, partner_role, status,
+			invited_at, invited_by_membership_id)
 		VALUES ($1, $2, $3, $4, $5, 'technician', 'active', $6, $7)`,
 		id,
 		seed.ID("tenant-a"),
@@ -952,7 +967,8 @@ func TestNotificationMailRetry(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type, channel, template_key, target, params, severity, occurred_at)
+		`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type, channel,
+			template_key, target, params, severity, occurred_at)
 		VALUES ($1, $2, $3, 1, 'fault', 'email', 'alert', '{"kind":"unit","id":"`+seed.ID("unit-online-rto").
 			String()+
 			`"}', $4, 'warning', $5)`,
@@ -1045,7 +1061,8 @@ func TestNotificationMail(t *testing.T) {
 		id := uuid.NewString()
 		owner(
 			t,
-			`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type, channel, template_key, target, params, severity, occurred_at)
+			`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type, channel,
+				template_key, target, params, severity, occurred_at)
 			VALUES ($1, $2, $3, 1, 'fault', 'email', 'alert', '{"kind":"unit","id":"`+seed.ID("unit-online-rto").
 				String()+
 				`"}', '{"targetName":"Mail AC","status":"open"}', 'warning', $4)`,
@@ -1061,7 +1078,8 @@ func TestNotificationMail(t *testing.T) {
 		id := uuid.NewString()
 		owner(
 			t,
-			`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from, valid_until)
+			`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from,
+				valid_until)
 			VALUES ($1, $2, $3, $4, 'client', 'member', $5, $6)`,
 			id,
 			seed.ID("tenant-a"),
@@ -1076,6 +1094,7 @@ func TestNotificationMail(t *testing.T) {
 	active, ended := note(member(clock.Add(time.Hour))), note(member(clock.Add(-time.Minute)))
 
 	sender := &fakeMail{err: nil, sent: nil}
+
 	_, err := notify.DeliverAll(
 		context.Background(),
 		s.DB,
@@ -1134,7 +1153,8 @@ func TestNotificationMail(t *testing.T) {
 	var left int
 	ownerScan(
 		t,
-		`SELECT (SELECT count(*) FROM notify.notifications WHERE id = $1) + (SELECT count(*) FROM notify.deliveries WHERE notification_id = $1)`,
+		`SELECT (SELECT count(*) FROM notify.notifications WHERE id = $1) + (SELECT count(*) FROM notify.deliveries WHERE
+			notification_id = $1)`,
 		[]any{active},
 		&left,
 	)
@@ -1253,8 +1273,9 @@ func TestDisabledAccountStaysClosed(t *testing.T) {
 	}
 }
 
-// TestContractorAddedTechnicianAssigned (IR461): a technician the contractor added has no unit scope, and the contractor
-// still assigns them on its own accepted offer once HQ verified their qualification; another contractor cannot.
+// TestContractorAddedTechnicianAssigned (IR461): a technician the contractor added has no unit scope, and the
+// contractor still assigns them on its own accepted offer once HQ verified their qualification; another contractor
+// cannot.
 func TestContractorAddedTechnicianAssigned(t *testing.T) {
 	s := server(t)
 	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
@@ -1278,7 +1299,8 @@ func TestContractorAddedTechnicianAssigned(t *testing.T) {
 	for _, code := range []string{"demo_indoor", "demo_outdoor", "demo_electrical"} {
 		owner(
 			t,
-			`INSERT INTO identity.qualification_grants (tenant_id, membership_id, code, valid_from, valid_until) VALUES ($1, $2, $3, $4, $5)`,
+			`INSERT INTO identity.qualification_grants (tenant_id, membership_id, code, valid_from, valid_until) VALUES ($1, $2,
+				$3, $4, $5)`,
 			seed.ID("tenant-a"),
 			tech,
 			code,

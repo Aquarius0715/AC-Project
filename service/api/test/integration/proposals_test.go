@@ -14,7 +14,8 @@ func TestSlotProposals(t *testing.T) {
 	s := server(t)
 	owner(
 		t,
-		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = ANY($1) AND status = 'active' AND lower(scheduled) > $2`,
+		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = ANY($1) AND status = 'active'
+			AND lower(scheduled) > $2`,
 		[]uuid.UUID{seed.ID("tech-internal-a"), seed.ID("tech-external-a")},
 		clock.Add(2*time.Hour),
 	)
@@ -44,7 +45,8 @@ func TestSlotProposals(t *testing.T) {
 		var id string
 		ownerScan(
 			t,
-			`SELECT id::text FROM maintenance.slot_proposals WHERE job_id = $1 ORDER BY (status = 'pending') DESC, created_at DESC LIMIT 1`,
+			`SELECT id::text FROM maintenance.slot_proposals WHERE job_id = $1 ORDER BY (status = 'pending') DESC, created_at
+				DESC LIMIT 1`,
 			[]any{job},
 			&id,
 		)
@@ -69,18 +71,26 @@ func TestSlotProposals(t *testing.T) {
 		slot, hold, reply string
 		code              int
 	}{
-		"preferred slot":       {slotJSON(25, 2), internalHold, ts(48), 422},
-		"today":                {slotJSON(3, 1), internalHold, ts(48), 422},
-		"reply after 7 days":   {slotJSON(97, 2), internalHold, ts(24 * 8), 422},
-		"reply in the past":    {slotJSON(97, 2), internalHold, ts(-1), 422},
-		"external as internal": {slotJSON(97, 2), `{"kind":"internal","membershipId":"` + seed.ID("tech-external-a").String() + `"}`, ts(48), 403},
-		"bad hold":             {slotJSON(97, 2), `{"kind":"robot"}`, ts(48), 422},
-		"unknown contractor":   {slotJSON(97, 2), `{"kind":"contractor","contractorOrgId":"` + uuid.NewString() + `","technicianMembershipId":null}`, ts(48), 404},
+		"preferred slot":     {slotJSON(25, 2), internalHold, ts(48), 422},
+		"today":              {slotJSON(3, 1), internalHold, ts(48), 422},
+		"reply after 7 days": {slotJSON(97, 2), internalHold, ts(24 * 8), 422},
+		"reply in the past":  {slotJSON(97, 2), internalHold, ts(-1), 422},
+		"external as internal": {slotJSON(97, 2), `{"kind":"internal",` +
+			`"membershipId":"` + seed.ID("tech-external-a").String() + `"}`, ts(48), 403},
+		"bad hold": {slotJSON(97, 2), `{"kind":"robot"}`, ts(48), 422},
+		"unknown contractor": {slotJSON(97, 2), `{"kind":"contractor",` +
+			`"contractorOrgId":"` + uuid.NewString() + `","technicianMembershipId":null}`, ts(48), 404},
 		// a hold names exactly the side it holds (IR128 item 1)
-		"internal without technician":  {slotJSON(97, 2), `{"kind":"internal"}`, ts(48), 422},
-		"internal with a contractor":   {slotJSON(97, 2), `{"kind":"internal","membershipId":"` + seed.ID("tech-internal-a").String() + `","contractorOrgId":"` + seed.ID("org-contractor-a").String() + `"}`, ts(48), 422},
-		"contractor with a member":     {slotJSON(97, 2), `{"kind":"contractor","contractorOrgId":"` + seed.ID("org-contractor-a").String() + `","membershipId":"` + seed.ID("tech-internal-a").String() + `"}`, ts(48), 422},
-		"another company's technician": {slotJSON(97, 2), `{"kind":"contractor","contractorOrgId":"` + seed.ID("org-contractor-a").String() + `","technicianMembershipId":"` + seed.ID("tech-external-b").String() + `"}`, ts(48), 403},
+		"internal without technician": {slotJSON(97, 2), `{"kind":"internal"}`, ts(48), 422},
+		"internal with a contractor": {slotJSON(97, 2), `{"kind":"internal",` +
+			`"membershipId":"` + seed.ID("tech-internal-a").String() + `","contractorOrgId":"` +
+			seed.ID("org-contractor-a").String() + `"}`, ts(48), 422},
+		"contractor with a member": {slotJSON(97, 2), `{"kind":"contractor",` +
+			`"contractorOrgId":"` + seed.ID("org-contractor-a").String() + `","membershipId":"` +
+			seed.ID("tech-internal-a").String() + `"}`, ts(48), 422},
+		"another company's technician": {slotJSON(97, 2), `{"kind":"contractor",` +
+			`"contractorOrgId":"` + seed.ID("org-contractor-a").String() + `","technicianMembershipId":"` +
+			seed.ID("tech-external-b").String() + `"}`, ts(48), 403},
 	} {
 		code, m := propose(job, tc.slot, tc.hold, tc.reply, 1)
 		if w, ok := refused[name]; ok {
@@ -92,7 +102,8 @@ func TestSlotProposals(t *testing.T) {
 	// a contractor whose offers are suspended cannot be held
 	owner(
 		t,
-		`INSERT INTO maintenance.contractors (tenant_id, organization_id, name, status, registration_no, contact_email, delegation, suspended_reason)
+		`INSERT INTO maintenance.contractors (tenant_id, organization_id, name, status, registration_no, contact_email,
+			delegation, suspended_reason)
 		VALUES ($1, $2, 'Demo Contractor A', 'suspended', 'SSM-TEST', 'ops@contractor-a.example', tstzrange($3, $4), 'test')`,
 		seed.ID("tenant-a"),
 		seed.ID("org-contractor-a"),
@@ -380,7 +391,8 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 	s := server(t)
 	owner(
 		t,
-		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = ANY($1) AND status = 'active' AND lower(scheduled) > $2`,
+		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = ANY($1) AND status = 'active'
+			AND lower(scheduled) > $2`,
 		[]uuid.UUID{seed.ID("tech-internal-a"), seed.ID("tech-external-a")},
 		clock.Add(2*time.Hour),
 	)
@@ -490,7 +502,8 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 		t.Fatalf("offer projection: %d %v", code, m)
 	} else if o := data(
 		m,
-	); o["partnerSlotProposal"] == nil || o["partnerSlotProposal"].(map[string]any)["id"] != partner || o["partnerSlotProposal"].(map[string]any)["status"] != "pending" ||
+	); o["partnerSlotProposal"] == nil || o["partnerSlotProposal"].(map[string]any)["id"] != partner ||
+		o["partnerSlotProposal"].(map[string]any)["status"] != "pending" ||
 		o["offeredAt"] == nil || o["accessValidFrom"] != ts(0) ||
 		o["accessValidUntil"] != ts(200) {
 		t.Fatalf("offer projection fields: %v", o)
@@ -671,7 +684,8 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 	plan, pj := uuid.NewString(), uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO maintenance.plans (id, tenant_id, unit_id, interval_months, anchor_day, next_due_at) VALUES ($1,$2,$3,3,8,$4)`,
+		`INSERT INTO maintenance.plans (id, tenant_id, unit_id, interval_months, anchor_day, next_due_at) VALUES ($1,$2,$3,3,
+			8,$4)`,
 		plan,
 		seed.ID("tenant-a"),
 		unit,
@@ -679,7 +693,8 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, plan_id, occurrence_at, type, status, origin, requested_slot, due_at)
+		`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, plan_id, occurrence_at, type, status, origin,
+			requested_slot, due_at)
 		VALUES ($1,$2,$3,$4,$5,$6,'periodic','requested','periodic_plan',tstzrange($6,$7),$7)`,
 		pj,
 		seed.ID("tenant-a"),
@@ -784,7 +799,8 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 	pj2 := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, plan_id, occurrence_at, type, status, origin, requested_slot, scheduled_slot, due_at)
+		`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, plan_id, occurrence_at, type, status, origin,
+			requested_slot, scheduled_slot, due_at)
 		VALUES ($1,$2,$3,$4,$5,$6,'periodic','assigned','periodic_plan',tstzrange($6,$7),tstzrange($6,$7),$7)`,
 		pj2,
 		seed.ID("tenant-a"),
@@ -820,8 +836,10 @@ func TestRescheduleAfterContractorAssignment(t *testing.T) {
 		func() { // the seed assignment comes back unless a test assignment now holds its window
 			owner(
 				t,
-				`UPDATE maintenance.assignments a SET status = 'active' WHERE a.id = $1 AND NOT EXISTS (SELECT 1 FROM maintenance.assignments b
-			WHERE b.id <> a.id AND b.status = 'active' AND b.technician_membership_id = a.technician_membership_id AND b.scheduled && a.scheduled)`,
+				`UPDATE maintenance.assignments a SET status = 'active' WHERE a.id = $1 AND NOT EXISTS (SELECT 1 FROM
+					maintenance.assignments b
+			WHERE b.id <> a.id AND b.status = 'active' AND b.technician_membership_id = a.technician_membership_id AND
+			b.scheduled && a.scheduled)`,
 				seed.ID("assignment-contractor-a"),
 			)
 		},
@@ -988,7 +1006,8 @@ func TestPartnerProposalRefusals(t *testing.T) {
 	s := server(t)
 	owner(
 		t,
-		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND lower(scheduled) > $2`,
+		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND
+			lower(scheduled) > $2`,
 		seed.ID("tech-external-a"),
 		clock.Add(2*time.Hour),
 	)
@@ -1127,7 +1146,8 @@ func TestRescheduleOfferedPeriodicVisit(t *testing.T) {
 	plan, job := uuid.NewString(), uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO maintenance.plans (id, tenant_id, unit_id, interval_months, anchor_day, next_due_at) VALUES ($1,$2,$3,3,8,$4)`,
+		`INSERT INTO maintenance.plans (id, tenant_id, unit_id, interval_months, anchor_day, next_due_at) VALUES ($1,$2,$3,3,
+			8,$4)`,
 		plan,
 		seed.ID("tenant-a"),
 		unit,
@@ -1135,7 +1155,8 @@ func TestRescheduleOfferedPeriodicVisit(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, plan_id, occurrence_at, type, status, origin, requested_slot, due_at, contractor_org_id)
+		`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, plan_id, occurrence_at, type, status, origin,
+			requested_slot, due_at, contractor_org_id)
 		VALUES ($1,$2,$3,$4,$5,$6,'periodic','offered','periodic_plan',tstzrange($6,$7),$7,$8)`,
 		job,
 		seed.ID("tenant-a"),
@@ -1148,7 +1169,8 @@ func TestRescheduleOfferedPeriodicVisit(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at, offer_expires_at, access_valid_from, access_valid_until)
+		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at,
+			offer_expires_at, access_valid_from, access_valid_until)
 		VALUES ($1,$2,$3,'t',tstzrange($4,$5),$6,$7,$6,$8)`,
 		seed.ID("tenant-a"),
 		job,
@@ -1199,7 +1221,8 @@ func TestPartnerProposalEndsWithClientProposal(t *testing.T) {
 
 	owner(
 		t,
-		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND lower(scheduled) > $2`,
+		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND
+			lower(scheduled) > $2`,
 		seed.ID("tech-external-a"),
 		clock.Add(2*time.Hour),
 	)
@@ -1350,7 +1373,8 @@ func TestPartnerProposalEndsWithOffer(t *testing.T) {
 
 	owner(
 		t,
-		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND lower(scheduled) > $2`,
+		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND
+			lower(scheduled) > $2`,
 		seed.ID("tech-external-a"),
 		clock.Add(2*time.Hour),
 	)
@@ -1504,7 +1528,8 @@ func TestDeclineWithdrawsClientProposal(t *testing.T) {
 	s := server(t)
 	owner(
 		t,
-		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND lower(scheduled) > $2`,
+		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND
+			lower(scheduled) > $2`,
 		seed.ID("tech-external-a"),
 		clock.Add(2*time.Hour),
 	)
@@ -1593,7 +1618,8 @@ func TestDeclineWithdrawsClientProposal(t *testing.T) {
 	var clientStatus, partnerStatus string
 	ownerScan(
 		t,
-		`SELECT (SELECT status FROM maintenance.slot_proposals WHERE id = $1), (SELECT status FROM maintenance.partner_slot_proposals WHERE id = $2)`,
+		`SELECT (SELECT status FROM maintenance.slot_proposals WHERE id = $1), (SELECT status FROM
+			maintenance.partner_slot_proposals WHERE id = $2)`,
 		[]any{proposal, partner},
 		&clientStatus,
 		&partnerStatus,
@@ -1658,7 +1684,8 @@ func TestAcceptRechecksHold(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO maintenance.contractors (tenant_id, organization_id, name, status, registration_no, contact_email, delegation, suspended_reason)
+		`INSERT INTO maintenance.contractors (tenant_id, organization_id, name, status, registration_no, contact_email,
+			delegation, suspended_reason)
 		VALUES ($1, $2, 'Demo Contractor A', 'suspended', 'SSM-TEST', 'ops@contractor-a.example', tstzrange($3, $4), 'test')`,
 		seed.ID("tenant-a"),
 		seed.ID("org-contractor-a"),
@@ -1690,7 +1717,8 @@ func TestAcceptRechecksHold(t *testing.T) {
 	)
 	ownerScan(
 		t,
-		`SELECT (SELECT count(*) FROM maintenance.offers WHERE job_id = $1), (SELECT status FROM maintenance.slot_proposals WHERE id = $2)`,
+		`SELECT (SELECT count(*) FROM maintenance.offers WHERE job_id = $1), (SELECT status FROM maintenance.slot_proposals
+			WHERE id = $2)`,
 		[]any{job, proposal},
 		&offers,
 		&status,
@@ -1707,7 +1735,8 @@ func TestAcceptedProposalExtendsAccess(t *testing.T) {
 	s := server(t)
 	owner(
 		t,
-		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND lower(scheduled) > $2`,
+		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND
+			lower(scheduled) > $2`,
 		seed.ID("tech-external-a"),
 		clock.Add(2*time.Hour),
 	)
@@ -1785,8 +1814,10 @@ func TestAcceptedProposalExtendsAccess(t *testing.T) {
 	// a contractor history frozen earlier (IR458) is removed when the window widens
 	owner(
 		t,
-		`INSERT INTO maintenance.job_history_snapshots (tenant_id, job_id, owner_kind, owner_id, as_of, type, status, has_report, acceptance)
-		SELECT tenant_id, id, 'organization', $2, $3, type, status, false, 'not_accepted' FROM maintenance.jobs WHERE id = $1`,
+		`INSERT INTO maintenance.job_history_snapshots (tenant_id, job_id, owner_kind, owner_id, as_of, type, status,
+			has_report, acceptance)
+		SELECT tenant_id, id, 'organization', $2, $3, type, status, false, 'not_accepted' FROM maintenance.jobs WHERE id =
+		$1`,
 		job,
 		seed.ID("org-contractor-a"),
 		clock,

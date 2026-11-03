@@ -68,6 +68,7 @@ func TestHTTPErrorHandler(t *testing.T) {
 		}
 
 		var de apperr.DomainError
+
 		err := json.Unmarshal(
 			w.Body.Bytes(),
 			&de,

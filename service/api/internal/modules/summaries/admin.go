@@ -83,7 +83,8 @@ func collectIDs(rows pgx.Rows) ([]uuid.UUID, error) {
 //	@Summary		admin.summary (read)
 //	@ID				admin.summary
 //	@Description	Authorization: admin:dashboard.read; billing fields require billing.read
-//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR51 alertCount critical/warning; IR78 energyForecast (prorated modeled baseline); energySummary savings null
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR51 alertCount \
+//	@Description	critical/warning; IR78 energyForecast (prorated modeled baseline); energySummary savings null
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
 //	@Description	Design: DD-A01
 //	@Tags			admin
@@ -240,7 +241,8 @@ func (m Summaries) admin(ctx context.Context, c *ops.Call, in *AdminInput) (Admi
 	}
 
 	if len(active) > 0 {
-		err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM assets.customers cu WHERE cu.organization_id = ANY("+cadd(active)+") AND "+strings.Join(cconds, " AND "), cargs...).
+		err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM assets.customers cu WHERE cu.organization_id = ANY("+cadd(active)+
+			") AND "+strings.Join(cconds, " AND "), cargs...).
 			Scan(&out.CustomerCount)
 		if err != nil {
 			return out, err

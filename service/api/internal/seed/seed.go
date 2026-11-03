@@ -219,6 +219,7 @@ func Load(path string) (*Fixture, error) {
 	}
 
 	var f Fixture
+
 	unmarshalErr := json.Unmarshal(b, &f)
 	if unmarshalErr != nil {
 		return nil, fmt.Errorf("fixture: %w", unmarshalErr)
@@ -278,7 +279,8 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 		}
 
 		err := ex(
-			`INSERT INTO identity.organizations (id, tenant_id, name, kind, status) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`,
+			`INSERT INTO identity.organizations (id, tenant_id, name, kind, status) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO
+				NOTHING`,
 			ID(o.ID),
 			ID(o.TenantID),
 			o.Name,
@@ -293,7 +295,8 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 	for _, a := range f.Actors {
 		// the realm's account of the actor names this membership in its claims (IR462)
 		err := ex(
-			`INSERT INTO identity.users (id, email, display_name, sign_in_membership_id) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+			`INSERT INTO identity.users (id, email, display_name, sign_in_membership_id) VALUES ($1,$2,$3,$4) ON CONFLICT DO
+				NOTHING`,
 			ID(
 				a.UserID,
 			),
@@ -306,7 +309,8 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 		}
 
 		err = ex(
-			`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, client_role, scope_version, valid_from, valid_until)
+			`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, client_role,
+				scope_version, valid_from, valid_until)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT DO NOTHING`,
 			ID(
 				a.MembershipID,
@@ -327,7 +331,8 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 
 		for _, p := range a.Permissions {
 			err := ex(
-				`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
+				`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES ($1,$2,$3) ON CONFLICT DO
+					NOTHING`,
 				ID(a.TenantID),
 				ID(a.MembershipID),
 				p,
@@ -356,7 +361,8 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 
 		for _, s := range a.Scopes {
 			err := ex(
-				`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+				`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES ($1,$2,$3,$4) ON CONFLICT DO
+					NOTHING`,
 				ID(a.TenantID),
 				ID(a.MembershipID),
 				s.Kind,
@@ -386,8 +392,10 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 
 			return a
 		}
+
 		err := ex(
-			`INSERT INTO devices.capabilities (id, version, tenant_id, manufacturer, model, control, mode_control, fan_control, temperature,
+			`INSERT INTO devices.capabilities (id, version, tenant_id, manufacturer, model, control, mode_control, fan_control,
+				temperature,
 			modes, fan_levels, ventilation, ventilation_levels, sensors, firmware_candidates, is_current)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,true) ON CONFLICT DO NOTHING`,
 			ID(
@@ -417,7 +425,8 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 
 	for _, c := range f.DemoSeed.Customers {
 		err := ex(
-			`INSERT INTO assets.customers (id, tenant_id, organization_id, name, status, service_profile) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`,
+			`INSERT INTO assets.customers (id, tenant_id, organization_id, name, status, service_profile) VALUES ($1,$2,$3,$4,$5,
+				$6) ON CONFLICT DO NOTHING`,
 			ID(
 				c.ID,
 			),
@@ -438,6 +447,7 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 		t := orgTenant[p.CustomerOrgID]
 
 		propTenant[p.ID] = t
+
 		err := ex(
 			`INSERT INTO assets.properties (id, tenant_id, customer_org_id, kind, name, address, access_instructions, archived)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING`,
@@ -477,7 +487,8 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 			}
 
 			err := ex(
-				`INSERT INTO assets.spaces (id, tenant_id, property_id, parent_space_id, kind, name) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`,
+				`INSERT INTO assets.spaces (id, tenant_id, property_id, parent_space_id, kind, name) VALUES ($1,$2,$3,$4,$5,$6) ON
+					CONFLICT DO NOTHING`,
 				ID(
 					s.ID,
 				),
@@ -527,7 +538,8 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 		}
 
 		err := ex(
-			`INSERT INTO assets.units (id, tenant_id, customer_org_id, property_id, space_id, display_name, model_id, installed_at,
+			`INSERT INTO assets.units (id, tenant_id, customer_org_id, property_id, space_id, display_name, model_id,
+				installed_at,
 			service_scope, archived, capability_version, observed_state, observed_restriction, version, warranty_ends_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) ON CONFLICT DO NOTHING`,
 			ID(
@@ -574,7 +586,8 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 		}
 
 		err := ex(
-			`INSERT INTO devices.devices (id, tenant_id, serial, binding_id, unit_id, target_unit_id, created_by_membership_id, connection, last_seen_at,
+			`INSERT INTO devices.devices (id, tenant_id, serial, binding_id, unit_id, target_unit_id, created_by_membership_id,
+				connection, last_seen_at,
 			firmware_version, power_signal, tamper) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT DO NOTHING`,
 			ID(
 				d.ID,
@@ -597,7 +610,8 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 
 		for _, x := range d.Sensors {
 			err := ex(
-				`INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, boundary_id, stale_after_seconds, calibrated_at)
+				`INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, boundary_id, stale_after_seconds,
+					calibrated_at)
 				VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING`,
 				ID(x.ID),
 				tenant,
@@ -618,7 +632,8 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 		}
 
 		err = ex(
-			`INSERT INTO devices.device_bindings (id, tenant_id, device_id, unit_id, customer_org_id, bound_at, reason, actor_membership_id)
+			`INSERT INTO devices.device_bindings (id, tenant_id, device_id, unit_id, customer_org_id, bound_at, reason,
+				actor_membership_id)
 			SELECT $1,$2,$3,$4,u.customer_org_id,$5,'demo seed',$6 FROM assets.units u WHERE u.id = $4 ON CONFLICT DO NOTHING`,
 			*binding,
 			tenant,
@@ -644,7 +659,8 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 
 	for _, m := range f.DemoSeed.Measurements { // IR121: Measurement.id = eventId
 		err := ex(
-			`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit, origin, quality, boundary_id, received_at, event_id)
+			`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit,
+				origin, quality, boundary_id, received_at, event_id)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT DO NOTHING`,
 			ID(
 				unitTenant[m.UnitID],
@@ -669,7 +685,8 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 
 	for _, a := range f.DemoSeed.AllergenObservations {
 		err := ex(
-			`INSERT INTO monitoring.allergen_observations (id, tenant_id, unit_id, availability, substance, value, unit, source_label, observed_at, evidence_text, created_at)
+			`INSERT INTO monitoring.allergen_observations (id, tenant_id, unit_id, availability, substance, value, unit,
+				source_label, observed_at, evidence_text, created_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT DO NOTHING`,
 			ID(
 				a.ID,
@@ -693,7 +710,8 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 	hq := ID("hq-operator")
 	for _, x := range f.DemoSeed.Factors {
 		err := ex(
-			`INSERT INTO energy.emission_factors (id, version, tenant_id, region, year, kg_co2e_per_kwh, source, created_by, created_at)
+			`INSERT INTO energy.emission_factors (id, version, tenant_id, region, year, kg_co2e_per_kwh, source, created_by,
+				created_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT DO NOTHING`,
 			ID(x.ID),
 			x.Version,
@@ -717,7 +735,8 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 		}
 
 		err := ex(
-			`INSERT INTO energy.baselines (id, version, tenant_id, unit_ids, period, method, baseline_kwh, quality, boundary_id, boundary, assumptions, source, created_by, created_at)
+			`INSERT INTO energy.baselines (id, version, tenant_id, unit_ids, period, method, baseline_kwh, quality, boundary_id,
+				boundary, assumptions, source, created_by, created_at)
 			VALUES ($1,$2,$3,$4,tstzrange($5,$6),$7,$8,$9,$10,$11,$12,$13,$14,$15) ON CONFLICT DO NOTHING`,
 			ID(x.ID),
 			x.Version,
@@ -742,7 +761,8 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 
 	for _, x := range f.DemoSeed.Consents { // IR84 initial location consents
 		err := ex(
-			`INSERT INTO identity.consents (id, tenant_id, membership_id, purpose, granted, granted_at, revoked_at, created_at, updated_at)
+			`INSERT INTO identity.consents (id, tenant_id, membership_id, purpose, granted, granted_at, revoked_at, created_at,
+				updated_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8) ON CONFLICT DO NOTHING`,
 			ID(x.ID),
 			ID(x.TenantID),
@@ -759,9 +779,12 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 	}
 	// client_users rows for the seed client memberships (owners, active; IR144)
 	err := ex(
-		`INSERT INTO identity.client_users (id, tenant_id, customer_id, membership_id, email, display_name, client_role, status, invited_at, invited_by_membership_id, created_at, updated_at)
-		SELECT m.id, m.tenant_id, cu.id, m.id, u.email, u.display_name, COALESCE(m.client_role, 'owner'), 'active', $1, m.id, $1, $1
-		FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id JOIN assets.customers cu ON cu.organization_id = m.organization_id
+		`INSERT INTO identity.client_users (id, tenant_id, customer_id, membership_id, email, display_name, client_role,
+			status, invited_at, invited_by_membership_id, created_at, updated_at)
+		SELECT m.id, m.tenant_id, cu.id, m.id, u.email, u.display_name, COALESCE(m.client_role, 'owner'), 'active', $1, m.id,
+		$1, $1
+		FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id JOIN assets.customers cu ON cu.organization_id =
+		m.organization_id
 		WHERE m.role = 'client' AND m.id = ANY($2) ON CONFLICT DO NOTHING`,
 		f.SeedCreatedAt,
 		clientMemberships(f),
@@ -771,9 +794,11 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 	}
 	// partner_users rows for the seed contractor company accounts (contractors and their technicians, active; FR-P11)
 	err = ex(
-		`INSERT INTO identity.partner_users (id, tenant_id, organization_id, membership_id, email, display_name, partner_role, status, invited_at, invited_by_membership_id, created_at, updated_at)
+		`INSERT INTO identity.partner_users (id, tenant_id, organization_id, membership_id, email, display_name, partner_role,
+			status, invited_at, invited_by_membership_id, created_at, updated_at)
 		SELECT m.id, m.tenant_id, m.organization_id, m.id, u.email, u.display_name, m.role, 'active', $1, m.id, $1, $1
-		FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id JOIN identity.organizations o ON o.id = m.organization_id
+		FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id JOIN identity.organizations o ON o.id =
+		m.organization_id
 		WHERE o.kind = 'contractor' AND m.role IN ('contractor','technician') ON CONFLICT DO NOTHING`,
 		f.SeedCreatedAt,
 	)
@@ -818,8 +843,10 @@ func applyPolicies(ex func(string, ...any) error, f *Fixture) error {
 		done[a.TenantID] = true
 
 		id := DefaultPolicyID(a.TenantID)
+
 		err := ex(
-			`INSERT INTO monitoring.alert_policies (id, tenant_id, kind, customer_id, name, owner_membership_id, created_by_user_id, timezone, enabled, priority, rules)
+			`INSERT INTO monitoring.alert_policies (id, tenant_id, kind, customer_id, name, owner_membership_id,
+				created_by_user_id, timezone, enabled, priority, rules)
 			VALUES ($1,$2,'default_alert',NULL,'Default policy',$3,$4,'Asia/Kuala_Lumpur',true,0,$5) ON CONFLICT DO NOTHING`,
 			id,
 			ID(a.TenantID),
@@ -833,7 +860,8 @@ func applyPolicies(ex func(string, ...any) error, f *Fixture) error {
 
 		if a.TenantID == "tenant-a" {
 			err := ex(
-				`INSERT INTO monitoring.default_rule_settings (tenant_id, policy_id, rule_key, customer_id, enabled, changed_by_membership_id, reason)
+				`INSERT INTO monitoring.default_rule_settings (tenant_id, policy_id, rule_key, customer_id, enabled,
+					changed_by_membership_id, reason)
 				VALUES ($1,$2,'ac_offline',$3,false,$4,'Demo: customer switched the offline rule off') ON CONFLICT DO NOTHING`,
 				ID(a.TenantID),
 				id,
@@ -955,9 +983,12 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 		t := tenantOf[str(k, "customerId")]
 
 		contractTenant[str(k, "id")] = t
+
 		err := ex(
-			`INSERT INTO billing.contracts (id, version, tenant_id, customer_id, customer_org_id, plan_type, term, price_minor, currency, restriction_eligible, rules_version, created_by, created_at)
-			VALUES ($1,$2,$3,$4,$5,$6,tstzrange($7::timestamptz,$8::timestamptz),$9,$10,$11,$12,$13,$7::timestamptz) ON CONFLICT DO NOTHING`,
+			`INSERT INTO billing.contracts (id, version, tenant_id, customer_id, customer_org_id, plan_type, term, price_minor,
+				currency, restriction_eligible, rules_version, created_by, created_at)
+			VALUES ($1,$2,$3,$4,$5,$6,tstzrange($7::timestamptz,$8::timestamptz),$9,$10,$11,$12,$13,$7::timestamptz) ON CONFLICT
+			DO NOTHING`,
 			ID(
 				str(k, "id"),
 			),
@@ -982,7 +1013,8 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 
 		for _, u := range ids(k["unitIds"]) {
 			err := ex(
-				`INSERT INTO billing.contract_units (tenant_id, contract_id, contract_version, unit_id) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+				`INSERT INTO billing.contract_units (tenant_id, contract_id, contract_version, unit_id) VALUES ($1,$2,$3,$4) ON
+					CONFLICT DO NOTHING`,
 				ID(t),
 				ID(str(k, "id")),
 				int(num(k, "version")),
@@ -1013,7 +1045,8 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 		}
 
 		exErr := ex(
-			`INSERT INTO billing.invoices (id, tenant_id, number, contract_id, contract_version, customer_id, amount_minor, currency, period, due_at, status, paid_at, version)
+			`INSERT INTO billing.invoices (id, tenant_id, number, contract_id, contract_version, customer_id, amount_minor,
+				currency, period, due_at, status, paid_at, version)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,tstzrange($9::timestamptz,$10::timestamptz),$11,$12,$13,$14) ON CONFLICT DO NOTHING`,
 			ID(
 				str(inv, "id"),
@@ -1051,8 +1084,10 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 		}
 
 		err := ex(
-			`INSERT INTO restrictions.restrictions (id, tenant_id, contract_id, contract_version, customer_id, rules_version, notice_at, execute_after, reason, policy, state,
-			notice_notification_ids, version, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$7,$7) ON CONFLICT DO NOTHING`,
+			`INSERT INTO restrictions.restrictions (id, tenant_id, contract_id, contract_version, customer_id, rules_version,
+				notice_at, execute_after, reason, policy, state,
+			notice_notification_ids, version, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$7,$7)
+			ON CONFLICT DO NOTHING`,
 			ID(
 				str(r, "id"),
 			),
@@ -1078,7 +1113,8 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 
 		for _, inv := range ids(r["causeInvoiceIds"]) {
 			err := ex(
-				`INSERT INTO restrictions.restriction_invoices (tenant_id, restriction_id, invoice_id) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
+				`INSERT INTO restrictions.restriction_invoices (tenant_id, restriction_id, invoice_id) VALUES ($1,$2,$3) ON CONFLICT
+					DO NOTHING`,
 				ID(t),
 				ID(str(r, "id")),
 				inv,
@@ -1104,7 +1140,8 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 			}
 
 			err := ex(
-				`INSERT INTO restrictions.restriction_units (tenant_id, restriction_id, unit_id, apply_state, release_state, apply_command_ids, release_command_ids, observed_restriction,
+				`INSERT INTO restrictions.restriction_units (tenant_id, restriction_id, unit_id, apply_state, release_state,
+					apply_command_ids, release_command_ids, observed_restriction,
 				observed_at, pending_reason) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT DO NOTHING`,
 				ID(t),
 				ID(str(r, "id")),
@@ -1139,9 +1176,12 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 
 	for _, c := range f.DemoSeed.Commands {
 		a, _ := c["action"].(map[string]any)
+
 		err := ex(
-			`INSERT INTO control.commands (id, tenant_id, unit_id, actor_membership_id, source, action, restriction_id, status, delivery, requested_at, sent_at, acknowledged_at,
-			expires_at, correlation_id, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'seed',$10,$10) ON CONFLICT DO NOTHING`,
+			`INSERT INTO control.commands (id, tenant_id, unit_id, actor_membership_id, source, action, restriction_id, status,
+				delivery, requested_at, sent_at, acknowledged_at,
+			expires_at, correlation_id, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'seed',$10,
+			$10) ON CONFLICT DO NOTHING`,
 			ID(
 				str(c, "id"),
 			),
@@ -1172,8 +1212,10 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 			}
 
 			kind, _ := a["kind"].(string)
+
 			err := ex(
-				`INSERT INTO restrictions.restriction_commands (tenant_id, command_id, restriction_id, unit_id, kind, delivered, status, requested_at, updated_at)
+				`INSERT INTO restrictions.restriction_commands (tenant_id, command_id, restriction_id, unit_id, kind, delivered,
+					status, requested_at, updated_at)
 				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8) ON CONFLICT DO NOTHING`,
 				ID(unitTenant[str(c, "unitId")]),
 				ID(str(c, "id")),
@@ -1192,9 +1234,12 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 
 	for _, a := range f.DemoSeed.Alerts {
 		u := str(a, "unitId")
+
 		err := ex(
-			`INSERT INTO monitoring.alerts (id, tenant_id, unit_id, customer_org_id, policy_id, type, severity, status, cause_code, evidence_kind, evidence_text, observed_at, detected_at,
-			previous_alert_id, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$13,$13) ON CONFLICT DO NOTHING`,
+			`INSERT INTO monitoring.alerts (id, tenant_id, unit_id, customer_org_id, policy_id, type, severity, status,
+				cause_code, evidence_kind, evidence_text, observed_at, detected_at,
+			previous_alert_id, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$13,$13) ON
+			CONFLICT DO NOTHING`,
 			ID(
 				str(a, "id"),
 			),
@@ -1229,8 +1274,10 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 		tg, _ := n["target"].(map[string]any)
 
 		target := raw(map[string]any{"kind": tg["kind"], "id": ID(tg["id"].(string)).String()})
+
 		err := ex(
-			`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type, channel, template_key, target, params, source_alert_id, severity,
+			`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type, channel,
+				template_key, target, params, source_alert_id, severity,
 			occurred_at, read_at, created_at) VALUES ($1,$2,$3,1,$4,$5,$6,$7,'{}',$8,$9,$10,$11,$10) ON CONFLICT DO NOTHING`,
 			ID(
 				str(n, "id"),
@@ -1265,9 +1312,11 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 		}
 
 		err := ex(
-			`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, type, status, origin, symptom, contact_window, requested_slot, preferred_slots, preference_round,
+			`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, type, status, origin, symptom,
+				contact_window, requested_slot, preferred_slots, preference_round,
 			scheduled_slot, due_at, contractor_org_id, assignment_id, version, created_at, updated_at)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,tstzrange($10::timestamptz,$11::timestamptz),$12,$13,$14::tstzrange,$15,$16,$17,$18,$19,$19) ON CONFLICT DO NOTHING`,
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,tstzrange($10::timestamptz,$11::timestamptz),$12,$13,$14::tstzrange,$15,$16,$17,
+			$18,$19,$19) ON CONFLICT DO NOTHING`,
 			ID(
 				str(j, "id"),
 			),
@@ -1316,10 +1365,13 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 
 	for _, o := range f.DemoSeed.Offers {
 		vs, ve := rng(o, "visitSlot", "startAt", "endAt")
+
 		err := ex(
-			`INSERT INTO maintenance.offers (id, tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at, offer_expires_at, access_valid_from, access_valid_until,
+			`INSERT INTO maintenance.offers (id, tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at,
+				offer_expires_at, access_valid_from, access_valid_until,
 			decision, decided_by, decided_at, decline_reason, created_at, updated_at)
-			VALUES ($1,$2,$3,$4,$5,tstzrange($6::timestamptz,$7::timestamptz),$8,$9,$10,$11,$12,$13,$14,$15,$8,$8) ON CONFLICT DO NOTHING`,
+			VALUES ($1,$2,$3,$4,$5,tstzrange($6::timestamptz,$7::timestamptz),$8,$9,$10,$11,$12,$13,$14,$15,$8,$8) ON CONFLICT DO
+			NOTHING`,
 			ID(
 				str(o, "id"),
 			),
@@ -1348,8 +1400,10 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 
 	for _, a := range f.DemoSeed.Assignments {
 		err := ex(
-			`INSERT INTO maintenance.assignments (id, tenant_id, job_id, technician_membership_id, valid_from, valid_until, scheduled, status, reason, acknowledgement, acknowledged_at,
-			cant_make_reason, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,tstzrange($7::timestamptz,$8::timestamptz),$9,$10,$11,$12,$13,$14,$14) ON CONFLICT DO NOTHING`,
+			`INSERT INTO maintenance.assignments (id, tenant_id, job_id, technician_membership_id, valid_from, valid_until,
+				scheduled, status, reason, acknowledgement, acknowledged_at,
+			cant_make_reason, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,tstzrange($7::timestamptz,$8::timestamptz),$9,
+			$10,$11,$12,$13,$14,$14) ON CONFLICT DO NOTHING`,
 			ID(
 				str(a, "id"),
 			),
@@ -1377,8 +1431,10 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 
 	for _, r := range f.DemoSeed.RateCards { // contractor rate cards (FR-A22 / FR-P10): the payout prices of a contractor
 		lines, _ := json.Marshal(r["lines"])
+
 		err := ex(
-			`INSERT INTO maintenance.rate_cards (id, tenant_id, contractor_org_id, effective_from, currency, lines, version, created_at)
+			`INSERT INTO maintenance.rate_cards (id, tenant_id, contractor_org_id, effective_from, currency, lines, version,
+				created_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING`,
 			ID(
 				str(r, "id"),
@@ -1398,7 +1454,8 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 
 	for _, c := range f.DemoSeed.FilterCleanings {
 		err := ex(
-			`INSERT INTO maintenance.filter_cleanings (id, tenant_id, unit_id, cleaned_at, marked_by_membership_id) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`,
+			`INSERT INTO maintenance.filter_cleanings (id, tenant_id, unit_id, cleaned_at, marked_by_membership_id) VALUES ($1,
+				$2,$3,$4,$5) ON CONFLICT DO NOTHING`,
 			ID(
 				str(c, "id"),
 			),
@@ -1421,7 +1478,8 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 func seedJobEvents(ex func(string, ...any) error, f *Fixture, jobTenant map[string]string) error {
 	ev := func(job, action string, actor, at any) error {
 		return ex(
-			`INSERT INTO maintenance.job_events (id, tenant_id, job_id, actor_user_id, action, occurred_at) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`,
+			`INSERT INTO maintenance.job_events (id, tenant_id, job_id, actor_user_id, action, occurred_at) VALUES ($1,$2,$3,$4,
+				$5,$6) ON CONFLICT DO NOTHING`,
 			ID("event:"+job+":"+action),
 			ID(jobTenant[job]),
 			ID(job),
@@ -1439,6 +1497,7 @@ func seedJobEvents(ex func(string, ...any) error, f *Fixture, jobTenant map[stri
 
 	for _, o := range f.DemoSeed.Offers {
 		job := str(o, "jobId")
+
 		err := ev(job, "job.offered", nil, str(o, "offeredAt"))
 		if err != nil {
 			return err

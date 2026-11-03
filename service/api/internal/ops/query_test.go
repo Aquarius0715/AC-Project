@@ -50,6 +50,7 @@ func TestAskRoutesQueries(t *testing.T) {
 		Events:          nil,
 		Audits:          nil,
 	}
+
 	out, err := Ask[echoOut](
 		ctx,
 		r,
@@ -101,6 +102,7 @@ func TestAskRoutesQueries(t *testing.T) {
 	}
 
 	local := func(_ context.Context, _ *Call, in *echoIn) (echoOut, error) { return echoOut{Twice: in.N * 2}, nil }
+
 	out, err = Delegate(
 		ctx,
 		&Call{
@@ -210,6 +212,7 @@ func TestHTTPQueries(t *testing.T) {
 		Events:          nil,
 		Audits:          nil,
 	} // a scheduler job: no user, the tenant only (IR195)
+
 	_, queryErr := h.Query(
 		ctx,
 		worker,
@@ -260,7 +263,12 @@ func TestHTTPQueries(t *testing.T) {
 		t.Error("an undecodable envelope")
 	}
 
-	for name, c := range map[string]*Call{"no principal": {Bearer: "x", Tx: nil, Principal: nil, Now: time.Time{}, CorrelationID: "", Queries: nil, ExpectedVersion: nil, Candidates: nil, Events: nil, Audits: nil}} {
+	for name, c := range map[string]*Call{
+		"no principal": {
+			Bearer: "x", Tx: nil, Principal: nil, Now: time.Time{}, CorrelationID: "", Queries: nil,
+			ExpectedVersion: nil, Candidates: nil, Events: nil, Audits: nil,
+		},
+	} {
 		_, err := h.Query(
 			ctx,
 			c,

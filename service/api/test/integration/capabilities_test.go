@@ -16,9 +16,13 @@ func capBody(id, model, extra string) string {
 		idf = `"id":"` + id + `",`
 	}
 
-	return `{` + idf + `"manufacturer":"TestAir","model":"` + model + `","control":true,"modeControl":true,"fanControl":true,` +
-		`"temperature":{"min":16,"max":30,"step":0.5},"modes":["cool","dry"],"fanLevels":["low","high"],"ventilation":false,"ventilationLevels":[],` +
-		`"sensors":[{"metric":"temperature","unit":"°C","staleAfterSeconds":120,"boundaryId":null},{"metric":"power","unit":"kW","staleAfterSeconds":120,"boundaryId":"ac_input_electricity"}],` +
+	return `{` + idf + `"manufacturer":"TestAir",` +
+		`"model":"` + model + `","control":true,"modeControl":true,` +
+		`"fanControl":true,` +
+		`"temperature":{"min":16,"max":30,"step":0.5},"modes":["cool","dry"],"fanLevels":["low","high"],` +
+		`"ventilation":false,"ventilationLevels":[],` +
+		`"sensors":[{"metric":"temperature","unit":"°C","staleAfterSeconds":120,"boundaryId":null},{"metric":"power",` +
+		`"unit":"kW","staleAfterSeconds":120,"boundaryId":"ac_input_electricity"}],` +
 		`"firmwareCandidates":["v1"]` + extra + `}`
 }
 
@@ -155,7 +159,9 @@ func TestCapabilities(t *testing.T) {
 			String()+
 			`","propertyId":"`+seed.ID("property-home-b").
 			String()+
-			`","spaceId":null,"displayName":"Cap AC `+uuid.NewString()[:4]+`","modelId":"`+id+`","type":"split","installedAt":null,"serviceScope":["indoor"]}`,
+			`","spaceId":null,"displayName":"Cap `+
+			`AC `+uuid.NewString()[:4]+`","modelId":"`+id+`","type":"split",`+
+			`"installedAt":null,"serviceScope":["indoor"]}`,
 		0,
 	)
 	unit, _ := data(um)["id"].(string)

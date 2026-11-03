@@ -56,8 +56,9 @@ func TestBootstrapAdmin(t *testing.T) {
 		At:           clock,
 	}
 	for name, bad := range map[string]bootstrap.Input{
-		"no tenant": {Organization: "HQ", Email: in.Email, Name: in.Name, Tenant: "", At: time.Time{}}, "no address": {Tenant: in.Tenant, Organization: "HQ", Email: "nobody", Name: in.Name, At: time.Time{}},
-		"no name": {Tenant: in.Tenant, Organization: "HQ", Email: in.Email, Name: "", At: time.Time{}},
+		"no tenant":  {Organization: "HQ", Email: in.Email, Name: in.Name, Tenant: "", At: time.Time{}},
+		"no address": {Tenant: in.Tenant, Organization: "HQ", Email: "nobody", Name: in.Name, At: time.Time{}},
+		"no name":    {Tenant: in.Tenant, Organization: "HQ", Email: in.Email, Name: "", At: time.Time{}},
 	} {
 		_, err := run(bad)
 		if err == nil {
@@ -91,7 +92,8 @@ func TestBootstrapAdmin(t *testing.T) {
 	)
 	ownerScan(
 		t,
-		`SELECT count(*) FROM platform.outbox WHERE aggregate_id = $1 AND event_type = 'AccountRequested' AND payload->>'role' = 'admin'`,
+		`SELECT count(*) FROM platform.outbox WHERE aggregate_id = $1 AND event_type = 'AccountRequested' AND payload->>'role'
+			= 'admin'`,
 		[]any{r.MembershipID},
 		&events,
 	)
@@ -121,6 +123,7 @@ func TestBootstrapAdmin(t *testing.T) {
 	other := in
 
 	other.Tenant = "Bootstrap other " + tag
+
 	_, runErr = run(other)
 	if !errors.Is(runErr, bootstrap.ErrEmailTaken) {
 		t.Errorf("an address someone holds: %v", runErr)
@@ -128,7 +131,8 @@ func TestBootstrapAdmin(t *testing.T) {
 
 	owner(
 		t,
-		`DELETE FROM platform.tenants WHERE name = $1 AND NOT EXISTS (SELECT 1 FROM identity.organizations o WHERE o.tenant_id = platform.tenants.id)`,
+		`DELETE FROM platform.tenants WHERE name = $1 AND NOT EXISTS (SELECT 1 FROM identity.organizations o WHERE o.tenant_id
+			= platform.tenants.id)`,
 		other.Tenant,
 	)
 

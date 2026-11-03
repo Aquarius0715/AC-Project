@@ -9,8 +9,8 @@ import (
 	"strings"
 )
 
-// ClientRequest is the request a client of the Core API makes for one operation call — its name and JSON input — at
-// the operation's REST routes (IR222); the Go counterpart of the web apps' coreRequest (service/web/shared/lib/rest.ts),
+// ClientRequest is the request a client of the Core API makes for one operation call — its name and JSON input — at the
+// operation's REST routes (IR222); the Go counterpart of the web apps' coreRequest (service/web/shared/lib/rest.ts),
 // used by the tests:
 //   - the route whose path parameters the input holds (an item route before a collection route) and whose fixed
 //     field it matches;

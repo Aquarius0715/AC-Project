@@ -83,9 +83,11 @@ type Profile struct {
 	KPIs                KPIs       `json:"kpis"`
 }
 
-const profileCols = `p.id, p.tenant_id, p.version, p.created_at, p.updated_at, p.organization_id, p.name, p.status, p.registration_no, p.service_areas, p.contact_email::text,
+const profileCols = `p.id, p.tenant_id, p.version, p.created_at, p.updated_at, p.organization_id, p.name, p.status, ` +
+	`p.registration_no, p.service_areas, p.contact_email::text,
 	p.insurance_valid_until, lower(p.delegation), upper(p.delegation), p.suspended_reason,
-	(SELECT r.id FROM maintenance.rate_cards r WHERE r.contractor_org_id = p.organization_id AND r.effective_from <= $1 ORDER BY r.effective_from DESC LIMIT 1)`
+	(SELECT r.id FROM maintenance.rate_cards r WHERE r.contractor_org_id = p.organization_id AND r.effective_from <= $1 ` +
+	`ORDER BY r.effective_from DESC LIMIT 1)`
 
 func scanProfile(r pgx.Row) (Profile, error) {
 	var p Profile
@@ -136,7 +138,8 @@ func (m Partners) kpis(ctx context.Context, c *ops.Call, org uuid.UUID) (KPIs, e
 
 	var acc, dec int
 	// offers closed by HQ's cancellation or the client's reschedule were no decision of the contractor (IR452)
-	err := c.Tx.QueryRow(ctx, `SELECT count(*) FILTER (WHERE decision = 'accept'), count(*) FILTER (WHERE decision IS NOT NULL OR expired_at IS NOT NULL)
+	err := c.Tx.QueryRow(ctx, `SELECT count(*) FILTER (WHERE decision = 'accept'), count(*) FILTER (WHERE decision IS NOT
+		NULL OR expired_at IS NOT NULL)
 		FROM maintenance.offers WHERE contractor_org_id = $1 AND offered_at >= $2 AND offered_at < $3
 		AND NOT COALESCE(decision = 'decline' AND decline_reason IN ('job_cancelled','rescheduled'), false)`,
 		org, k.Period.From, k.Period.To).
@@ -232,13 +235,18 @@ func jobMetrics(ctx context.Context, c *ops.Call, extra string, args []any) ([]j
 		COALESCE((SELECT min(o.decided_at) FROM maintenance.offers o WHERE o.job_id = j.id AND o.decision = 'accept'),
 			(SELECT min(a.created_at) FROM maintenance.assignments a WHERE a.job_id = j.id)),
 		(j.time_on_site->>'arrivedAt')::timestamptz,
-		COALESCE((j.time_on_site->>'arrivedAt')::timestamptz >= lower(j.scheduled_slot) AND (j.time_on_site->>'arrivedAt')::timestamptz < upper(j.scheduled_slot), false),
-		COALESCE((SELECT rr.decision FROM maintenance.report_reviews rr JOIN maintenance.work_reports w ON w.id = rr.report_id AND w.version = rr.report_version
+		COALESCE((j.time_on_site->>'arrivedAt')::timestamptz >= lower(j.scheduled_slot) AND
+		(j.time_on_site->>'arrivedAt')::timestamptz < upper(j.scheduled_slot), false),
+		COALESCE((SELECT rr.decision FROM maintenance.report_reviews rr JOIN maintenance.work_reports w ON w.id = rr.report_id
+		AND w.version = rr.report_version
 			WHERE w.job_id = j.id ORDER BY rr.occurred_at, rr.report_version LIMIT 1), ''),
-		EXISTS (SELECT 1 FROM maintenance.report_reviews rr JOIN maintenance.work_reports w ON w.id = rr.report_id AND w.version = rr.report_version
+		EXISTS (SELECT 1 FROM maintenance.report_reviews rr JOIN maintenance.work_reports w ON w.id = rr.report_id AND
+		w.version = rr.report_version
 			WHERE w.job_id = j.id AND rr.decision = 'return'),
-		EXISTS (SELECT 1 FROM maintenance.jobs f WHERE f.unit_id = j.unit_id AND f.id <> j.id AND j.completed_at IS NOT NULL AND f.origin <> 'periodic_plan'
-			AND f.created_at > j.completed_at AND f.created_at <= j.completed_at + interval '30 days'), -- a plan's next visit is no follow-up (IR450)
+		EXISTS (SELECT 1 FROM maintenance.jobs f WHERE f.unit_id = j.unit_id AND f.id <> j.id AND j.completed_at IS NOT NULL
+		AND f.origin <> 'periodic_plan'
+			AND f.created_at > j.completed_at AND f.created_at <= j.completed_at + interval '30 days'),
+			-- a plan's next visit is no follow-up (IR450)
 		EXISTS (SELECT 1 FROM maintenance.jobs f WHERE f.follow_up_of_job_id = j.id AND f.follow_up_class = 'rework'),
 		COALESCE((j.rating->>'stars')::int, 0),
 		(SELECT min(e.occurred_at) FROM maintenance.job_events e WHERE e.job_id = j.id AND e.action = 'job.cancelled'),
@@ -254,6 +262,7 @@ func jobMetrics(ctx context.Context, c *ops.Call, extra string, args []any) ([]j
 
 	for rows.Next() {
 		var j jobMetric
+
 		err := rows.Scan(
 			&j.id,
 			&j.customerOrg,
@@ -310,31 +319,33 @@ func (m Partners) loadProfile(
 	return p, err
 }
 
-// @Summary		contractors.list (read)
-// @ID				contractors.list
-// @Description	Authorization: admin:job.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A21 · Query: filters status,search · sort id,name,updatedAt (default name asc;id asc)
-// @Tags			contractors
-// @Accept			json
-// @Produce		json
-// @Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit	query		integer	false	"page size 1–100, default 25"
-// @Param			sort	query		string	false	"field:direction — fields id,name,updatedAt; default name asc;id asc"
-// @Param			status	query		string	false	"filter → status"
-// @Param			search	query		string	false	"filter → name, registrationNo or service area contains"
-// @Success		200		{object}	ops.Envelope{data=ProfilePage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/contractors [get]
+// list serves contractors.list.
+//
+//	@Summary		contractors.list (read)
+//	@ID				contractors.list
+//	@Description	Authorization: admin:job.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A21 · Query: filters status,search · sort id,name,updatedAt (default name asc;id asc)
+//	@Tags			contractors
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit	query		integer	false	"page size 1–100, default 25"
+//	@Param			sort	query		string	false	"field:direction — fields id,name,updatedAt; default name asc;id asc"
+//	@Param			status	query		string	false	"filter → status"
+//	@Param			search	query		string	false	"filter → name, registrationNo or service area contains"
+//	@Success		200		{object}	ops.Envelope{data=ProfilePage}
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/contractors [get]
 func (m Partners) list(
 	ctx context.Context,
 	c *ops.Call,
@@ -385,7 +396,8 @@ func (m Partners) list(
 		conds = append(
 			conds,
 			fmt.Sprintf(
-				"(p.name ILIKE $%d OR p.registration_no ILIKE $%d OR EXISTS (SELECT 1 FROM unnest(p.service_areas) a WHERE a ILIKE $%d))",
+				"(p.name ILIKE $%d OR p.registration_no ILIKE $%d OR EXISTS (SELECT 1 FROM unnest(p.service_areas) a WHERE a "+
+					"ILIKE $%d))",
 				n,
 				n,
 				n,
@@ -396,7 +408,9 @@ func (m Partners) list(
 	where := strings.Join(conds, " AND ")
 
 	var total int
-	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM maintenance.contractors p WHERE "+where+" AND $1::timestamptz IS NOT NULL", args...).
+
+	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM maintenance.contractors p WHERE "+where+" AND $1::timestamptz "+
+		"IS NOT NULL", args...).
 		Scan(&total)
 	if scanErr != nil {
 		return paging.Page[Profile]{}, scanErr
@@ -489,6 +503,7 @@ func (in *ProfileInput) Validate() map[string]string {
 	}
 
 	in.ContactEmail = strings.TrimSpace(in.ContactEmail)
+
 	a, err := mail.ParseAddress(
 		in.ContactEmail,
 	)
@@ -500,28 +515,31 @@ func (in *ProfileInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		contractors.save (write)
-// @ID				contractors.save
-// @Description	Authorization: admin:job.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 organization kind=contractor; service areas at least one
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A21
-// @Tags			contractors
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		ProfileInput	true	"input"
-// @Success		200				{object}	ops.Envelope{data=Profile}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/contractors [post]
+// save serves contractors.save.
+//
+//	@Summary		contractors.save (write)
+//	@ID				contractors.save
+//	@Description	Authorization: admin:job.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR111 organization kind=contractor; service areas at least one
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A21
+//	@Tags			contractors
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		ProfileInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Profile}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/contractors [post]
 func (m Partners) save(ctx context.Context, c *ops.Call, in *ProfileInput) (Profile, error) {
 	kind, _, found, err := m.Orgs.OrgState(ctx, c, in.OrganizationID)
 	if err != nil {
@@ -553,7 +571,9 @@ func (m Partners) save(ctx context.Context, c *ops.Call, in *ProfileInput) (Prof
 
 	if in.ID == nil {
 		var exists bool
-		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id = $1)`, in.OrganizationID).
+
+		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id =
+			$1)`, in.OrganizationID).
 			Scan(&exists)
 		if err != nil {
 			return Profile{}, err
@@ -563,9 +583,13 @@ func (m Partners) save(ctx context.Context, c *ops.Call, in *ProfileInput) (Prof
 			return Profile{}, apperr.E(apperr.Conflict, "errors.profile_exists")
 		}
 
-		err = c.Tx.QueryRow(ctx, `INSERT INTO maintenance.contractors (tenant_id, organization_id, name, status, registration_no, service_areas, contact_email,
-			insurance_valid_until, delegation, created_at, updated_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, 'active', $3, $4, $5, $6, tstzrange($7, $8), $7, $7)
-			RETURNING id`, in.OrganizationID, name, in.RegistrationNo, in.ServiceAreas, in.ContactEmail, in.InsuranceValidUntil, c.Now, delegationEnd(c.Now)).
+		err = c.Tx.QueryRow(ctx, `INSERT INTO maintenance.contractors (tenant_id, organization_id, name, status,
+			registration_no, service_areas, contact_email,
+			insurance_valid_until, delegation, created_at, updated_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2,
+			'active', $3, $4, $5, $6, tstzrange($7, $8), $7, $7)
+			RETURNING
+			id`, in.OrganizationID, name, in.RegistrationNo, in.ServiceAreas, in.ContactEmail, in.InsuranceValidUntil, c.Now,
+			delegationEnd(c.Now)).
 			Scan(&id)
 		if err != nil {
 			return Profile{}, err
@@ -586,7 +610,8 @@ func (m Partners) save(ctx context.Context, c *ops.Call, in *ProfileInput) (Prof
 
 		_, execErr := c.Tx.Exec(
 			ctx,
-			`UPDATE maintenance.contractors SET name = $2, registration_no = $3, service_areas = $4, contact_email = $5, insurance_valid_until = $6,
+			`UPDATE maintenance.contractors SET name = $2, registration_no = $3, service_areas = $4, contact_email = $5,
+				insurance_valid_until = $6,
 			delegation = tstzrange(lower(delegation), $7), version = version + 1, updated_at = $8 WHERE id = $1`,
 			p.ID,
 			name,
@@ -653,30 +678,33 @@ func (in *OfferStatusInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		contractors.setOfferStatus (write)
-// @ID				contractors.setOfferStatus
-// @Description	Authorization: admin:job.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 reason 1–1000; suspension blocks new jobs.offer only
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A21
-// @Tags			contractors
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer				true	"all: required (target contractor, read contractors.list)"
-// @Param			contractorOrgId		path		string				true	"input field contractorOrgId"
-// @Param			request				body		OfferStatusInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Profile}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/contractors/{contractorOrgId}/offer-status [put]
+// setOfferStatus serves contractors.setOfferStatus.
+//
+//	@Summary		contractors.setOfferStatus (write)
+//	@ID				contractors.setOfferStatus
+//	@Description	Authorization: admin:job.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR111 reason 1–1000; suspension blocks new jobs.offer only
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A21
+//	@Tags			contractors
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer				true	"all: required (target contractor, read contractors.list)"
+//	@Param			contractorOrgId		path		string				true	"input field contractorOrgId"
+//	@Param			request				body		OfferStatusInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=Profile}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/contractors/{contractorOrgId}/offer-status [put]
 func (m Partners) setOfferStatus(
 	ctx context.Context,
 	c *ops.Call,
@@ -702,7 +730,8 @@ func (m Partners) setOfferStatus(
 
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`UPDATE maintenance.contractors SET status = $2, suspended_reason = $3, version = version + 1, updated_at = $4 WHERE id = $1`,
+		`UPDATE maintenance.contractors SET status = $2, suspended_reason = $3, version = version + 1, updated_at = $4 WHERE
+			id = $1`,
 		p.ID,
 		in.Status,
 		reason,
@@ -841,28 +870,31 @@ func scanRateCard(r pgx.Row) (RateCard, error) {
 
 const rateCols = `id, tenant_id, version, created_at, contractor_org_id, effective_from, currency, lines`
 
-// @Summary		rateCards.save (write)
-// @ID				rateCards.save
-// @Description	Authorization: admin:job.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 effectiveFrom in the future; creates a new version
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A21
-// @Tags			rateCards
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		RateCardInput	true	"input"
-// @Success		200				{object}	ops.Envelope{data=RateCard}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/rate-cards [post]
+// saveRateCard serves rateCards.save.
+//
+//	@Summary		rateCards.save (write)
+//	@ID				rateCards.save
+//	@Description	Authorization: admin:job.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR111 effectiveFrom in the future; creates a new version
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A21
+//	@Tags			rateCards
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		RateCardInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=RateCard}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/rate-cards [post]
 func (m Partners) saveRateCard(
 	ctx context.Context,
 	c *ops.Call,
@@ -873,7 +905,9 @@ func (m Partners) saveRateCard(
 	}
 
 	var exists bool
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id = $1)`, in.ContractorOrgID).
+
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id =
+		$1)`, in.ContractorOrgID).
 		Scan(&exists)
 	if err != nil {
 		return RateCard{}, err
@@ -888,7 +922,8 @@ func (m Partners) saveRateCard(
 	x, err := scanRateCard(
 		c.Tx.QueryRow(
 			ctx,
-			`INSERT INTO maintenance.rate_cards (tenant_id, contractor_org_id, effective_from, currency, lines, version, created_at)
+			`INSERT INTO maintenance.rate_cards (tenant_id, contractor_org_id, effective_from, currency, lines, version,
+				created_at)
 		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4,
 			COALESCE((SELECT max(version) FROM maintenance.rate_cards WHERE contractor_org_id = $1), 0) + 1, $5)
 		RETURNING `+rateCols,
@@ -928,30 +963,33 @@ func (m Partners) saveRateCard(
 	return x, nil
 }
 
-// @Summary		rateCards.list (read)
-// @ID				rateCards.list
-// @Description	Authorization: admin:job.read | admin:billing.read | contractor:own-company
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A21, DD-A23, DD-P10 · Query: filters contractorOrgId · sort id,createdAt,effectiveFrom (default effectiveFrom desc;id asc)
-// @Tags			rateCards
-// @Accept			json
-// @Produce		json
-// @Param			cursor			query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit			query		integer	false	"page size 1–100, default 25"
-// @Param			sort			query		string	false	"field:direction — fields id,createdAt,effectiveFrom; default effectiveFrom desc;id asc"
-// @Param			contractorOrgId	query		string	false	"filter → contractorOrgId"
-// @Success		200				{object}	ops.Envelope{data=RateCardPage}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/rate-cards [get]
+// listRateCards serves rateCards.list.
+//
+//	@Summary		rateCards.list (read)
+//	@ID				rateCards.list
+//	@Description	Authorization: admin:job.read | admin:billing.read | contractor:own-company
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A21, DD-A23, DD-P10 · Query: filters contractorOrgId · sort id,createdAt,effectiveFrom \
+//	@Description	(default effectiveFrom desc;id asc)
+//	@Tags			rateCards
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor			query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit			query		integer	false	"page size 1–100, default 25"
+//	@Param			sort			query		string	false	"field:direction — fields id,createdAt,effectiveFrom; default effectiveFrom desc;id asc"
+//	@Param			contractorOrgId	query		string	false	"filter → contractorOrgId"
+//	@Success		200				{object}	ops.Envelope{data=RateCardPage}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/rate-cards [get]
 func (m Partners) listRateCards(
 	ctx context.Context,
 	c *ops.Call,
@@ -996,6 +1034,7 @@ func (m Partners) listRateCards(
 	}
 
 	var total int
+
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM maintenance.rate_cards WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
@@ -1104,29 +1143,32 @@ func (in *TargetsInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		sla.saveTargets (write)
-// @ID				sla.saveTargets
-// @Description	Authorization: admin:job.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 percentages 0–100; responseHours 1–168; applies to jobs created after effectiveFrom
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A22
-// @Tags			sla
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			planType		path		string			true	"input field planType"
-// @Param			request			body		TargetsInput	true	"input; the path parameters come from the route"
-// @Success		200				{object}	ops.Envelope{data=SlaTargets}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/sla/targets/{planType} [put]
+// saveTargets serves sla.saveTargets.
+//
+//	@Summary		sla.saveTargets (write)
+//	@ID				sla.saveTargets
+//	@Description	Authorization: admin:job.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR111 percentages 0–100; responseHours 1–168; applies to jobs created after effectiveFrom
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A22
+//	@Tags			sla
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			planType		path		string			true	"input field planType"
+//	@Param			request			body		TargetsInput	true	"input; the path parameters come from the route"
+//	@Success		200				{object}	ops.Envelope{data=SlaTargets}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/sla/targets/{planType} [put]
 func (m Partners) saveTargets(
 	ctx context.Context,
 	c *ops.Call,
@@ -1138,11 +1180,15 @@ func (m Partners) saveTargets(
 
 	var t SlaTargets
 
-	err := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.sla_targets (tenant_id, plan_type, response_hours, arrival_in_window_percent, first_time_fix_percent, effective_from, version)
-		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, COALESCE((SELECT max(version) FROM maintenance.sla_targets WHERE plan_type = $1), 0) + 1)
-		RETURNING id, tenant_id, version, plan_type, response_hours, arrival_in_window_percent::float8, first_time_fix_percent::float8, effective_from`,
+	err := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.sla_targets (tenant_id, plan_type, response_hours,
+		arrival_in_window_percent, first_time_fix_percent, effective_from, version)
+		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, COALESCE((SELECT max(version) FROM
+		maintenance.sla_targets WHERE plan_type = $1), 0) + 1)
+		RETURNING id, tenant_id, version, plan_type, response_hours, arrival_in_window_percent::float8,
+		first_time_fix_percent::float8, effective_from`,
 		in.PlanType, in.ResponseHours, in.ArrivalInWindowPercent, in.FirstTimeFixPercent, in.EffectiveFrom).
-		Scan(&t.ID, &t.TenantID, &t.Version, &t.PlanType, &t.ResponseHours, &t.ArrivalInWindowPercent, &t.FirstTimeFixPercent, &t.EffectiveFrom)
+		Scan(&t.ID, &t.TenantID, &t.Version, &t.PlanType, &t.ResponseHours, &t.ArrivalInWindowPercent, &t.FirstTimeFixPercent,
+			&t.EffectiveFrom)
 	if err != nil {
 		if apperr.From(err).Code == apperr.Conflict {
 			return t, apperr.E(apperr.Conflict, "errors.targets_exist")
@@ -1280,12 +1326,13 @@ type TargetView struct {
 // Breach is one scorecard breach. Detail is English for logs; screens phrase the kind with the response minutes in
 // the user's language (IR291).
 type Breach struct {
-	JobID        uuid.UUID `json:"jobId"`
-	CustomerID   uuid.UUID `json:"customerId"`
-	Kind         string    `json:"kind"`
-	Detail       string    `json:"detail"`
-	TookMinutes  *int      `json:"tookMinutes"`  // response: request → response; null while unanswered and for other kinds
-	LimitMinutes *int      `json:"limitMinutes"` // response: the target in effect when the job was created; null for other kinds
+	JobID       uuid.UUID `json:"jobId"`
+	CustomerID  uuid.UUID `json:"customerId"`
+	Kind        string    `json:"kind"`
+	Detail      string    `json:"detail"`
+	TookMinutes *int      `json:"tookMinutes"` // response: request → response; null while unanswered and for other kinds
+	// response: the target in effect when the job was created; null for other kinds
+	LimitMinutes *int `json:"limitMinutes"`
 	at           time.Time
 }
 
@@ -1344,29 +1391,31 @@ func durationText(d time.Duration) string {
 	return fmt.Sprintf("%d h %d min", h, mnt)
 }
 
-// @Summary		sla.scorecard (read)
-// @ID				sla.scorecard
-// @Description	Authorization: admin:job.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A22
-// @Tags			sla
-// @Accept			json
-// @Produce		json
-// @Param			period.from		query		string	false	"input field period.from"
-// @Param			period.to		query		string	false	"input field period.to"
-// @Param			contractorOrgId	query		string	false	"input field contractorOrgId"
-// @Success		200				{object}	ops.Envelope{data=Scorecard}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/sla/scorecard [get]
+// scorecard serves sla.scorecard.
+//
+//	@Summary		sla.scorecard (read)
+//	@ID				sla.scorecard
+//	@Description	Authorization: admin:job.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A22
+//	@Tags			sla
+//	@Accept			json
+//	@Produce		json
+//	@Param			period.from		query		string	false	"input field period.from"
+//	@Param			period.to		query		string	false	"input field period.to"
+//	@Param			contractorOrgId	query		string	false	"input field contractorOrgId"
+//	@Success		200				{object}	ops.Envelope{data=Scorecard}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/sla/scorecard [get]
 func (m Partners) scorecard(
 	ctx context.Context,
 	c *ops.Call,
@@ -1386,7 +1435,8 @@ func (m Partners) scorecard(
 
 	rows, err := c.Tx.Query(
 		ctx,
-		`SELECT plan_type, response_hours, arrival_in_window_percent::float8, first_time_fix_percent::float8, effective_from, version FROM maintenance.sla_targets`,
+		`SELECT plan_type, response_hours, arrival_in_window_percent::float8, first_time_fix_percent::float8, effective_from,
+			version FROM maintenance.sla_targets`,
 	)
 	if err != nil {
 		return Scorecard{}, err
@@ -1394,6 +1444,7 @@ func (m Partners) scorecard(
 
 	for rows.Next() {
 		var t SlaTargets
+
 		err := rows.Scan(
 			&t.PlanType,
 			&t.ResponseHours,

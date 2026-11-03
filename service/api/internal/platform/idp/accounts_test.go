@@ -12,8 +12,8 @@ import (
 	"time"
 )
 
-// TestKeycloakAccounts (IR461, IR462, IR468): a created account carries the claim attributes and returns the new user's ID;
-// an existing e-mail is found and updated instead (a retried provisioning is one account), keeping the user's other
+// TestKeycloakAccounts (IR461, IR462, IR468): a created account carries the claim attributes and returns the new user's
+// ID; an existing e-mail is found and updated instead (a retried provisioning is one account), keeping the user's other
 // attributes; an update of an account the realm lost is ErrNoAccount; the set-up e-mail asks for a password and the
 // e-mail check and returns to the app; an account is turned off.
 func TestKeycloakAccounts(t *testing.T) {
@@ -57,7 +57,8 @@ func TestKeycloakAccounts(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == "/admin/users/old-id":
 			_, _ = w.Write(
 				[]byte(
-					`{"id":"old-id","username":"tech@contractor.example","email":"tech@contractor.example","enabled":false,"attributes":{"locale":["ms"],"membership_id":["m0"]}}`,
+					`{"id":"old-id","username":"tech@contractor.example","email":"tech@contractor.example","enabled":false,` +
+						`"attributes":{"locale":["ms"],"membership_id":["m0"]}}`,
 				),
 			)
 		case r.URL.Path == "/admin/users/gone-id":
@@ -99,6 +100,7 @@ func TestKeycloakAccounts(t *testing.T) {
 		Enabled    bool                `json:"enabled"`
 		Attributes map[string][]string `json:"attributes"`
 	}
+
 	unmarshalErr := json.Unmarshal(
 		[]byte(calls[0].body),
 		&user,
@@ -110,6 +112,7 @@ func TestKeycloakAccounts(t *testing.T) {
 	}
 
 	exists, calls = true, nil
+
 	createAccountId, createAccountErr := k.CreateAccount(
 		ctx,
 		a,
@@ -142,6 +145,7 @@ func TestKeycloakAccounts(t *testing.T) {
 	}
 
 	calls = nil
+
 	sendSetupErr := k.SendSetup(
 		ctx,
 		"new-id",
@@ -158,6 +162,7 @@ func TestKeycloakAccounts(t *testing.T) {
 	hq.Role = "admin"
 
 	exists, calls = false, nil
+
 	_, createAccountErr = k.CreateAccount(
 		ctx,
 		hq,
@@ -168,6 +173,7 @@ func TestKeycloakAccounts(t *testing.T) {
 	}
 
 	calls = nil
+
 	sendSetupErr = k.SendSetup(
 		ctx,
 		"hq-new",
@@ -179,6 +185,7 @@ func TestKeycloakAccounts(t *testing.T) {
 	}
 
 	calls = nil
+
 	sendSetupErr = k.SendSetup(
 		ctx,
 		"hq-otp",
@@ -190,6 +197,7 @@ func TestKeycloakAccounts(t *testing.T) {
 	}
 
 	calls = nil
+
 	setEnabledErr := k.SetEnabled(
 		ctx,
 		"new-id",

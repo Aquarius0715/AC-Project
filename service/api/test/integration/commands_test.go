@@ -23,7 +23,8 @@ func TestCommands(t *testing.T) {
 	)
 	owner(
 		t,
-		`UPDATE restrictions.restrictions SET state = 'cancelled' WHERE id IN (SELECT restriction_id FROM restrictions.restriction_units WHERE unit_id = $1)`,
+		`UPDATE restrictions.restrictions SET state = 'cancelled' WHERE id IN (SELECT restriction_id FROM
+			restrictions.restriction_units WHERE unit_id = $1)`,
 		unit,
 	)
 	_, m := post(s, &customerA, "units.get", `{"id":"`+unit+`"}`)
@@ -63,7 +64,9 @@ func TestCommands(t *testing.T) {
 		"stale unit version": {&customerA, `{"kind":"set_power","power":true}`, "", 409},
 		"unknown source":     {&customerA, `{"kind":"set_power","power":true}`, `,"source":"automation"`, 422},
 		"hq voice":           {&hq, `{"kind":"set_power","power":true}`, `,"reason":"check","source":"voice"`, 422},
-		"technician voice":   {&techInt, `{"kind":"set_power","power":true}`, `,"reason":"test","jobId":"` + uuid.NewString() + `","source":"voice"`, 422},
+		"technician voice": {&techInt, `{"kind":"set_power",` +
+			`"power":true}`, `,"reason":"test",` +
+			`"jobId":"` + uuid.NewString() + `","source":"voice"`, 422},
 	} {
 		uv := v
 		if name == "stale unit version" {
@@ -200,7 +203,8 @@ func TestCommands(t *testing.T) {
 	rid := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO restrictions.restrictions (id, tenant_id, contract_id, contract_version, customer_id, rules_version, notice_at, execute_after, reason, policy, state)
+		`INSERT INTO restrictions.restrictions (id, tenant_id, contract_id, contract_version, customer_id, rules_version,
+			notice_at, execute_after, reason, policy, state)
 		VALUES ($1,$2,$3,1,$4,'r',$5,$6,'demo','{"kind":"temperature_limit","minimumCoolingSetpoint":26}','applied')`,
 		rid,
 		seed.ID("tenant-a"),
@@ -211,7 +215,8 @@ func TestCommands(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO restrictions.restriction_units (tenant_id, restriction_id, unit_id, apply_state, release_state) VALUES ($1,$2,$3,'applied','none')`,
+		`INSERT INTO restrictions.restriction_units (tenant_id, restriction_id, unit_id, apply_state, release_state) VALUES
+			($1,$2,$3,'applied','none')`,
 		seed.ID("tenant-a"),
 		rid,
 		unit,
@@ -288,7 +293,8 @@ func TestCommands(t *testing.T) {
 		s,
 		&techInt,
 		"commands.create",
-		`{"unitId":"`+missing+`","jobId":"`+uuid.NewString()+`","action":{"kind":"set_power","power":true},"reason":"check","expectedUnitVersion":1}`,
+		`{"unitId":"`+missing+`","jobId":"`+uuid.NewString()+`","action":{"kind":"set_power","power":true},`+
+			`"reason":"check","expectedUnitVersion":1}`,
 		0,
 	); code != 404 {
 		t.Errorf("technician command for an unknown unit: %d", code)
@@ -319,12 +325,14 @@ func TestCommandHistory(t *testing.T) {
 	free()
 	owner(
 		t,
-		`UPDATE restrictions.restrictions SET state = 'cancelled' WHERE id IN (SELECT restriction_id FROM restrictions.restriction_units WHERE unit_id = $1)`,
+		`UPDATE restrictions.restrictions SET state = 'cancelled' WHERE id IN (SELECT restriction_id FROM
+			restrictions.restriction_units WHERE unit_id = $1)`,
 		unit,
 	)
 	owner(
 		t,
-		`UPDATE control.diagnostic_runs SET state = 'completed' WHERE unit_id = $1 AND state IN ('awaiting_start','running','end_requested')`,
+		`UPDATE control.diagnostic_runs SET state = 'completed' WHERE unit_id = $1 AND state IN ('awaiting_start','running',
+			'end_requested')`,
 		unit,
 	)
 	job := assignedNow(t, s)
@@ -335,7 +343,8 @@ func TestCommandHistory(t *testing.T) {
 		s,
 		&techInt,
 		"commands.create",
-		`{"unitId":"`+unit+`","jobId":"`+job+`","action":{"kind":"set_mode","mode":"cool"},"reason":"airflow check","expectedUnitVersion":`+itoa(
+		`{"unitId":"`+unit+`","jobId":"`+job+`","action":{"kind":"set_mode","mode":"cool"},"reason":"airflow check",`+
+			`"expectedUnitVersion":`+itoa(
 			uv,
 		)+`}`,
 		0,
@@ -416,7 +425,8 @@ func TestCommandHistory(t *testing.T) {
 	_, m = post(s, &customerA, "commands.list", `{"unitId":"`+unit+`","query":{"limit":1}}`)
 	if next, _ := data(m)["nextCursor"].(string); next == "" {
 		t.Fatal("history of one per page has a next page")
-	} else if code, m := post(s, &customerA, "commands.list", `{"unitId":"`+unit+`","query":{"limit":1,"cursor":"`+next+`"}}`); code != 200 || len(items(m)) != 1 {
+	} else if code, m := post(s, &customerA, "commands.list", `{"unitId":"`+unit+`","query":{"limit":1,`+
+		`"cursor":"`+next+`"}}`); code != 200 || len(items(m)) != 1 {
 		t.Fatalf("second page: %d %v", code, m)
 	}
 
@@ -455,7 +465,8 @@ func TestCommandHistory(t *testing.T) {
 		t.Errorf("HQ history: %v", got[tech])
 	}
 
-	for q, want := range map[string]string{`{"sort":{"field":"status","direction":"asc"}}`: "sort.field=error.invalid", `{"filters":{"status":"sent"}}`: "status=error.notAllowed"} {
+	for q, want := range map[string]string{`{"sort":{"field":"status",` +
+		`"direction":"asc"}}`: "sort.field=error.invalid", `{"filters":{"status":"sent"}}`: "status=error.notAllowed"} {
 		code, m := post(s, &hq, "commands.list", `{"unitId":"`+unit+`","query":`+q+`}`)
 		refusal(t, q, code, m, want)
 	}

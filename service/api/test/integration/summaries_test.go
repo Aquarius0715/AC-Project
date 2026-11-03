@@ -48,7 +48,8 @@ func TestSummariesCustomer(t *testing.T) {
 	var alerts int
 	ownerScan(
 		t,
-		`SELECT count(*) FROM monitoring.alerts a JOIN assets.units u ON u.id = a.unit_id WHERE u.customer_org_id = (SELECT organization_id FROM identity.memberships WHERE id = $1)
+		`SELECT count(*) FROM monitoring.alerts a JOIN assets.units u ON u.id = a.unit_id WHERE u.customer_org_id = (SELECT
+			organization_id FROM identity.memberships WHERE id = $1)
 		AND NOT u.archived AND a.status IN ('open','acknowledged') AND a.severity IN ('critical','warning')`,
 		[]any{seedID("customer-a")},
 		&alerts,
@@ -89,7 +90,9 @@ func TestSummariesCustomer(t *testing.T) {
 		"{\"kind\":\"shop\",\"filters\":{}}":                            "kind=error.invalid",
 	}
 
-	for _, b := range []string{`{"kind":"customer","filters":{"status":"assigned"}}`, `{"kind":"customer","filters":{"overdueOnly":true}}`, `{"kind":"shop","filters":{}}`} {
+	for _, b := range []string{`{"kind":"customer",` +
+		`"filters":{"status":"assigned"}}`, `{"kind":"customer",` +
+		`"filters":{"overdueOnly":true}}`, `{"kind":"shop","filters":{}}`} {
 		code, m := post(s, &customerA, "summaries.get", b)
 		refusal(t, b, code, m, want[b])
 	}
@@ -120,13 +123,16 @@ func TestSummariesTechnicianPartner(t *testing.T) {
 	)
 	owner(
 		t,
-		`UPDATE maintenance.jobs j SET assignment_id = a.id, scheduled_slot = a.scheduled FROM maintenance.assignments a WHERE a.job_id = j.id AND j.id = $1`,
+		`UPDATE maintenance.jobs j SET assignment_id = a.id, scheduled_slot = a.scheduled FROM maintenance.assignments a WHERE
+			a.job_id = j.id AND j.id = $1`,
 		job,
 	)
 	owner(
 		t,
-		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at, offer_expires_at, decision, decided_at, access_valid_from, access_valid_until)
-		SELECT tenant_id, id, $2, 'terms-1', requested_slot, $3, $4, 'accept', $3, $3, $4 FROM maintenance.jobs WHERE id = $1`,
+		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at,
+			offer_expires_at, decision, decided_at, access_valid_from, access_valid_until)
+		SELECT tenant_id, id, $2, 'terms-1', requested_slot, $3, $4, 'accept', $3, $3, $4 FROM maintenance.jobs WHERE id =
+		$1`,
 		job,
 		seedID("org-contractor-b"),
 		clock.Add(-3*time.Hour),
@@ -245,7 +251,8 @@ func TestSummaryJobCounts(t *testing.T) {
 		)
 		owner(
 			t,
-			`UPDATE maintenance.jobs j SET status = $2, due_at = $3, assignment_id = a.id, scheduled_slot = a.scheduled FROM maintenance.assignments a
+			`UPDATE maintenance.jobs j SET status = $2, due_at = $3, assignment_id = a.id, scheduled_slot = a.scheduled FROM
+				maintenance.assignments a
 			WHERE a.job_id = j.id AND j.id = $1`,
 			j,
 			status,
@@ -268,7 +275,10 @@ func TestSummaryJobCounts(t *testing.T) {
 		t.Fatalf("summary: %d %v", code, m)
 	}
 
-	for k, want := range map[string]int{"scheduledCount": 1, "inProgressCount": 1, "reviewCount": 1, "activeCount": 2, "overdueCount": 1, "assignedCount": 3, "total": 1, "online": 1} {
+	for k, want := range map[string]int{
+		"scheduledCount": 1, "inProgressCount": 1, "reviewCount": 1, "activeCount": 2,
+		"overdueCount": 1, "assignedCount": 3, "total": 1, "online": 1,
+	} {
 		if got := count(m, k); got != want {
 			t.Errorf("%s: %d, want %d", k, got, want)
 		}

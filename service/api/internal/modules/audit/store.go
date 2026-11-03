@@ -30,8 +30,11 @@ func History(ctx context.Context, c *ops.Call, kind, id string) ([]View, error) 
 func history(ctx context.Context, c *ops.Call, in *HistoryInput) ([]View, error) {
 	rows, err := c.Tx.Query(
 		ctx,
-		`SELECT a.id, a.tenant_id, a.actor_id, u.display_name, a.actor_role_at_time, a.action, a.previous_version, a.next_version, a.occurred_at, a.correlation_id, a.result,
-		a.masked_before, a.masked_after, a.reason FROM audit.audit_log a `+actorJoin+` WHERE a.target_kind = $1 AND a.target_id = $2 ORDER BY a.occurred_at, a.correlation_id, a.id`,
+		`SELECT a.id, a.tenant_id, a.actor_id, u.display_name, a.actor_role_at_time, a.action, a.previous_version,
+			a.next_version, a.occurred_at, a.correlation_id, a.result,
+		a.masked_before, a.masked_after, a.reason FROM audit.audit_log a
+		`+actorJoin+` WHERE a.target_kind = $1 AND
+			a.target_id = $2 ORDER BY a.occurred_at, a.correlation_id, a.id`,
 		in.TargetKind,
 		in.TargetID,
 	)
@@ -44,6 +47,7 @@ func history(ctx context.Context, c *ops.Call, in *HistoryInput) ([]View, error)
 
 	for rows.Next() {
 		var x View
+
 		err := rows.Scan(
 			&x.ID,
 			&x.TenantID,
@@ -82,6 +86,7 @@ func EventHandlers() map[string]events.Handler {
 	return map[string]events.Handler{
 		events.AuditRecorded: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var a events.Audit
+
 			decodeErr := e.Decode(&a)
 			if decodeErr != nil {
 				return decodeErr
@@ -98,9 +103,11 @@ func EventHandlers() map[string]events.Handler {
 
 			_, err := tx.Exec(
 				ctx,
-				`INSERT INTO audit.audit_log (id, tenant_id, actor_id, actor_role_at_time, membership_id, action, target_kind, target_id,
+				`INSERT INTO audit.audit_log (id, tenant_id, actor_id, actor_role_at_time, membership_id, action, target_kind,
+					target_id,
 				previous_version, next_version, occurred_at, correlation_id, result, reason, masked_before, masked_after)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NULLIF($14, ''), $15, $16) ON CONFLICT (id, occurred_at) DO NOTHING`,
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NULLIF($14, ''), $15, $16) ON CONFLICT (id,
+				occurred_at) DO NOTHING`,
 				a.ID,
 				e.TenantID,
 				a.ActorID,

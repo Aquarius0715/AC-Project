@@ -231,6 +231,7 @@ func (r *Registry) recordDenied(ctx context.Context, c *Call, op string, in any,
 	}
 
 	kind, id := deniedTarget(op, in)
+
 	rerr := r.DB.Run(ctx, false, c.Principal, func(tx pgx.Tx) error {
 		if tx != nil {
 			_, err := tx.Exec(

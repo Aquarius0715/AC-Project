@@ -17,6 +17,7 @@ func EventHandlers() map[string]events.Handler {
 	return map[string]events.Handler{
 		events.CommandAcknowledged: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.Commands
+
 			err := e.Decode(&p)
 			if err != nil {
 				return err
@@ -24,7 +25,8 @@ func EventHandlers() map[string]events.Handler {
 
 			_, err = tx.Exec(
 				ctx,
-				`UPDATE restrictions.restriction_commands SET status = 'acknowledged', updated_at = $2 WHERE command_id = ANY($1) AND status = 'requested'`,
+				`UPDATE restrictions.restriction_commands SET status = 'acknowledged', updated_at = $2 WHERE command_id = ANY($1)
+					AND status = 'requested'`,
 				p.CommandIDs,
 				p.At,
 			)
@@ -43,6 +45,7 @@ func EventHandlers() map[string]events.Handler {
 		},
 		events.UnitRestrictionObserved: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.Observation
+
 			decodeErr := e.Decode(&p)
 			if decodeErr != nil {
 				return decodeErr
@@ -56,6 +59,7 @@ func EventHandlers() map[string]events.Handler {
 					Policy:        nil,
 					ObservedAt:    time.Time{},
 				}
+
 				err := json.Unmarshal(p.Observed, observed)
 				if err != nil {
 					return err
@@ -68,6 +72,7 @@ func EventHandlers() map[string]events.Handler {
 		},
 		events.CommandsEnded: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.Commands
+
 			err := e.Decode(&p)
 			if err != nil {
 				return err
@@ -81,7 +86,8 @@ func EventHandlers() map[string]events.Handler {
 
 				_, err := tx.Exec(
 					ctx,
-					`UPDATE restrictions.restriction_commands SET status = $2, updated_at = $3 WHERE command_id = $1 AND status = 'requested'`,
+					`UPDATE restrictions.restriction_commands SET status = $2, updated_at = $3 WHERE command_id = $1 AND status =
+						'requested'`,
 					id,
 					status,
 					p.At,

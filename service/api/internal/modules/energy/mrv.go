@@ -138,7 +138,9 @@ func preview(ctx context.Context, c *ops.Call, in *Conditions) (Preview, error) 
 	}
 
 	var inOrg int
-	scanErr := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND customer_org_id = $2 AND NOT archived`, in.UnitIDs, in.OrganizationID).
+
+	scanErr := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND customer_org_id = $2 AND
+		NOT archived`, in.UnitIDs, in.OrganizationID).
 		Scan(&inOrg)
 	if scanErr != nil {
 		return Preview{}, scanErr
@@ -209,13 +211,15 @@ type stored struct {
 	Incomplete bool    `json:"incomplete"`
 }
 
-const reportCols = `r.id, r.tenant_id, r.version, (SELECT min(created_at) FROM energy.mrv_reports o WHERE o.id = r.id), r.created_at, r.conditions, r.results, r.status, r.evidence_ids`
+const reportCols = `r.id, r.tenant_id, r.version, (SELECT min(created_at) FROM energy.mrv_reports o WHERE o.id = ` +
+	`r.id), r.created_at, r.conditions, r.results, r.status, r.evidence_ids`
 
 func scanReport(row pgx.Row) (Report, error) {
 	var (
 		x         Report
 		cond, res []byte
 	)
+
 	err := row.Scan(
 		&x.ID,
 		&x.TenantID,
@@ -243,7 +247,8 @@ func scanReport(row pgx.Row) (Report, error) {
 func reviews(ctx context.Context, c *ops.Call, x *Report) error {
 	rows, err := c.Tx.Query(
 		ctx,
-		`SELECT user_id, report_version, comment, reviewed_at FROM energy.mrv_reviews WHERE report_id = $1 AND report_version < $2 ORDER BY reviewed_at, id`,
+		`SELECT user_id, report_version, comment, reviewed_at FROM energy.mrv_reviews WHERE report_id = $1 AND report_version
+			< $2 ORDER BY reviewed_at, id`,
 		x.ID,
 		x.Version,
 	)
@@ -256,6 +261,7 @@ func reviews(ctx context.Context, c *ops.Call, x *Report) error {
 
 	for rows.Next() {
 		var r Review
+
 		err := rows.Scan(&r.UserID, &r.ReportVersion, &r.Comment, &r.At)
 		if err != nil {
 			return err
@@ -290,6 +296,7 @@ func LoadReport(ctx context.Context, c *ops.Call, id uuid.UUID, version *int) (R
 		v = *version
 	} else {
 		var err error
+
 		v, err = latestVersion(ctx, c, id)
 		if err != nil {
 			return Report{}, err
@@ -330,28 +337,30 @@ func (in *GetInput) Validate() map[string]string {
 	return nil
 }
 
-// @Summary		mrv.get (read)
-// @ID				mrv.get
-// @Description	Authorization: admin:mrv.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A14
-// @Tags			mrv
-// @Accept			json
-// @Produce		json
-// @Param			id				path		string	true	"input field id"
-// @Param			reportVersion	query		integer	false	"input field reportVersion"
-// @Success		200				{object}	ops.Envelope{data=Report}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/mrv/{id} [get]
+// getReport serves mrv.get.
+//
+//	@Summary		mrv.get (read)
+//	@ID				mrv.get
+//	@Description	Authorization: admin:mrv.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A14
+//	@Tags			mrv
+//	@Accept			json
+//	@Produce		json
+//	@Param			id				path		string	true	"input field id"
+//	@Param			reportVersion	query		integer	false	"input field reportVersion"
+//	@Success		200				{object}	ops.Envelope{data=Report}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/mrv/{id} [get]
 func getReport(ctx context.Context, c *ops.Call, in *GetInput) (Report, error) {
 	return LoadReport(ctx, c, in.ID, in.ReportVersion)
 }
@@ -371,6 +380,7 @@ func pageReports(
 	}
 
 	var total int
+
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM energy.mrv_reports r WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
@@ -427,34 +437,37 @@ func pageReports(
 	}, nil
 }
 
-// @Summary		mrv.list (read)
-// @ID				mrv.list
-// @Description	Authorization: admin:mrv.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A14 · Query: filters unitId,from,to,status,organizationId · sort id,createdAt,updatedAt,periodFrom (default createdAt desc;id desc)
-// @Tags			mrv
-// @Accept			json
-// @Produce		json
-// @Param			cursor			query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit			query		integer	false	"page size 1–100, default 25"
-// @Param			sort			query		string	false	"field:direction — fields id,createdAt,updatedAt,periodFrom; default createdAt desc;id desc"
-// @Param			unitId			query		string	false	"filter → conditions.unitIds contains"
-// @Param			from			query		string	false	"filter → [from,to) on conditions.from"
-// @Param			to				query		string	false	"filter → [from,to) on conditions.from"
-// @Param			status			query		string	false	"filter → status"
-// @Param			organizationId	query		string	false	"filter → conditions.organizationId"
-// @Success		200				{object}	ops.Envelope{data=ReportPage}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/mrv [get]
+// listReports serves mrv.list.
+//
+//	@Summary		mrv.list (read)
+//	@ID				mrv.list
+//	@Description	Authorization: admin:mrv.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A14 · Query: filters unitId,from,to,status,organizationId · sort \
+//	@Description	id,createdAt,updatedAt,periodFrom (default createdAt desc;id desc)
+//	@Tags			mrv
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor			query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit			query		integer	false	"page size 1–100, default 25"
+//	@Param			sort			query		string	false	"field:direction — fields id,createdAt,updatedAt,periodFrom; default createdAt desc;id desc"
+//	@Param			unitId			query		string	false	"filter → conditions.unitIds contains"
+//	@Param			from			query		string	false	"filter → [from,to) on conditions.from"
+//	@Param			to				query		string	false	"filter → [from,to) on conditions.from"
+//	@Param			status			query		string	false	"filter → status"
+//	@Param			organizationId	query		string	false	"filter → conditions.organizationId"
+//	@Success		200				{object}	ops.Envelope{data=ReportPage}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/mrv [get]
 func listReports(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Report], error) {
 	var f struct {
 		OrganizationID *uuid.UUID `json:"organizationId,omitempty"`
@@ -540,30 +553,32 @@ func (in *VersionsInput) Validate() map[string]string {
 	return nil
 }
 
-// @Summary		mrv.versions (read)
-// @ID				mrv.versions
-// @Description	Authorization: admin:mrv.read
-// @Description	Validation: D01; SR08/SR09
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A14 · Query: filters none · sort version (default version asc)
-// @Tags			mrv
-// @Accept			json
-// @Produce		json
-// @Param			id		path		string	true	"input field id"
-// @Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit	query		integer	false	"page size 1–100, default 25"
-// @Param			sort	query		string	false	"field:direction — fields version; default version asc"
-// @Success		200		{object}	ops.Envelope{data=ReportPage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/mrv/{id}/versions [get]
+// versions serves mrv.versions.
+//
+//	@Summary		mrv.versions (read)
+//	@ID				mrv.versions
+//	@Description	Authorization: admin:mrv.read
+//	@Description	Validation: D01; SR08/SR09
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A14 · Query: filters none · sort version (default version asc)
+//	@Tags			mrv
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		string	true	"input field id"
+//	@Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit	query		integer	false	"page size 1–100, default 25"
+//	@Param			sort	query		string	false	"field:direction — fields version; default version asc"
+//	@Success		200		{object}	ops.Envelope{data=ReportPage}
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/mrv/{id}/versions [get]
 func versions(ctx context.Context, c *ops.Call, in *VersionsInput) (paging.Page[Report], error) {
 	if in.Query.HasFilters() { // no filters (query catalog)
 		return paging.Page[Report]{}, apperr.Fields(
@@ -629,7 +644,8 @@ func insertReport(
 	res, _ := json.Marshal(stored{Summary: p.Summary, Incomplete: p.Incomplete})
 	_, err := c.Tx.Exec(
 		ctx,
-		`INSERT INTO energy.mrv_reports (id, version, tenant_id, organization_id, period, status, conditions, results, evidence_ids, created_by, created_at)
+		`INSERT INTO energy.mrv_reports (id, version, tenant_id, organization_id, period, status, conditions, results,
+			evidence_ids, created_by, created_at)
 		VALUES ($1, $2, current_setting('app.tenant_id')::uuid, $3, tstzrange($4, $5), $6, $7, $8, $9, $10, $11)`,
 		id,
 		version,
@@ -689,6 +705,7 @@ func saveDraft(ctx context.Context, c *ops.Call, in *SaveInput) (Report, error) 
 	}
 
 	var found int
+
 	err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_attachments WHERE id = ANY($1)`, in.EvidenceIDs).
 		Scan(&found)
 	if err != nil {
@@ -755,7 +772,8 @@ func (in *ReviewInput) Validate() map[string]string {
 //	@Summary		mrv.recordReview (write)
 //	@ID				mrv.recordReview
 //	@Description	Authorization: admin:mrv.review
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR87 reviewComment 1-1000
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR87 reviewComment 1-1000
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A14 · Input versions: reportVersion=MRVReport.version
 //	@Tags			mrv
@@ -822,6 +840,7 @@ func recordReview(ctx context.Context, c *ops.Call, in *ReviewInput) (Report, er
 		Scope:      "",
 		IsDemo:     false,
 	}
+
 	insertReportErr := insertReport(ctx, c, x.ID, next, p, "demo_reviewed", x.EvidenceIDs)
 	if insertReportErr != nil {
 		return x, insertReportErr

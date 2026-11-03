@@ -32,8 +32,10 @@ func TestAutomationNotifications(t *testing.T) {
 		)
 		owner(
 			t,
-			`INSERT INTO monitoring.alert_policies (id, tenant_id, kind, customer_id, name, owner_membership_id, created_by_user_id, timezone, enabled, priority, condition,
-			recipient_membership_ids, channels, escalate_after_minutes, cooldown_minutes) VALUES ($1,$2,'alert',$3,'CO2 high',$4,$5,'Asia/Kuala_Lumpur',true,50,$6,$7,'{inApp,email}',60,30)`,
+			`INSERT INTO monitoring.alert_policies (id, tenant_id, kind, customer_id, name, owner_membership_id,
+				created_by_user_id, timezone, enabled, priority, condition,
+			recipient_membership_ids, channels, escalate_after_minutes, cooldown_minutes) VALUES ($1,$2,'alert',$3,'CO2 high',$4,
+			$5,'Asia/Kuala_Lumpur',true,50,$6,$7,'{inApp,email}',60,30)`,
 			id,
 			seed.ID("tenant-a"),
 			cust,
@@ -140,7 +142,8 @@ func TestAutomationNotifications(t *testing.T) {
 	var alerts, failures int
 	ownerScan(
 		t,
-		`SELECT count(*), COALESCE(sum(jsonb_array_length(delivery_failures)), 0) FROM monitoring.alerts WHERE unit_id IN ($1, $2) AND status = 'open'`,
+		`SELECT count(*), COALESCE(sum(jsonb_array_length(delivery_failures)), 0) FROM monitoring.alerts WHERE unit_id IN ($1,
+			$2) AND status = 'open'`,
 		[]any{u, lonely},
 		&alerts,
 		&failures,
@@ -192,7 +195,8 @@ func TestAutomationNotifications(t *testing.T) {
 	var open int
 	ownerScan(
 		t,
-		`SELECT count(*), COALESCE(sum(jsonb_array_length(delivery_failures)), 0) FROM monitoring.alerts WHERE unit_id = $1 AND policy_id = $2 AND status = 'open'`,
+		`SELECT count(*), COALESCE(sum(jsonb_array_length(delivery_failures)), 0) FROM monitoring.alerts WHERE unit_id = $1
+			AND policy_id = $2 AND status = 'open'`,
 		[]any{lonely, noRecipient},
 		&open,
 		&failures,
@@ -261,7 +265,8 @@ func TestAutomationNotifications(t *testing.T) {
 	// IR115: the customer switched the default CO2 rule off, so the default policy no longer fires for its units
 	owner(
 		t,
-		`INSERT INTO monitoring.default_rule_settings (tenant_id, policy_id, rule_key, customer_id, enabled, changed_by_membership_id) VALUES ($1, $2, 'ventilation_co2', $3, false, $4)`,
+		`INSERT INTO monitoring.default_rule_settings (tenant_id, policy_id, rule_key, customer_id, enabled,
+			changed_by_membership_id) VALUES ($1, $2, 'ventilation_co2', $3, false, $4)`,
 		seed.ID("tenant-a"),
 		def,
 		cust,
@@ -280,7 +285,8 @@ func TestAutomationNotifications(t *testing.T) {
 
 	owner(
 		t,
-		`DELETE FROM monitoring.default_rule_settings WHERE policy_id = $1 AND customer_id = $2 AND rule_key = 'ventilation_co2'`,
+		`DELETE FROM monitoring.default_rule_settings WHERE policy_id = $1 AND customer_id = $2 AND rule_key =
+			'ventilation_co2'`,
 		def,
 		cust,
 	)
@@ -309,8 +315,10 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO monitoring.alert_policies (id, tenant_id, kind, customer_id, name, owner_membership_id, created_by_user_id, timezone, enabled, priority, condition,
-		recipient_membership_ids, channels) VALUES ($1,$2,'alert',$3,'CO2 high',$4,$5,'Asia/Kuala_Lumpur',true,50,$6,$7,'{inApp}')`,
+		`INSERT INTO monitoring.alert_policies (id, tenant_id, kind, customer_id, name, owner_membership_id,
+			created_by_user_id, timezone, enabled, priority, condition,
+		recipient_membership_ids, channels) VALUES ($1,$2,'alert',$3,'CO2 high',$4,$5,'Asia/Kuala_Lumpur',true,50,$6,$7,
+		'{inApp}')`,
 		pol,
 		seed.ID("tenant-a"),
 		seed.ID("cust-b"),
@@ -330,7 +338,8 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 	manual := uuid.NewString() // an alert without a policy resolves only by hand (IR66)
 	owner(
 		t,
-		`INSERT INTO monitoring.alerts (id, tenant_id, unit_id, customer_org_id, type, severity, status, cause_code, evidence_kind, evidence_text, observed_at, detected_at)
+		`INSERT INTO monitoring.alerts (id, tenant_id, unit_id, customer_org_id, type, severity, status, cause_code,
+			evidence_kind, evidence_text, observed_at, detected_at)
 		VALUES ($1,$2,$3,$4,'tamper','warning','open','unknown','demo_observation','cover opened',$5,$5)`,
 		manual,
 		seed.ID("tenant-a"),
@@ -386,7 +395,8 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 		// the test clock stands still, so a recurrence has its predecessor's times: the one it links to comes first
 		rs, err := conn.Query(
 			ctx,
-			`SELECT id, status, resolution_reason, resolution_evidence_ids, previous_alert_id FROM monitoring.alerts WHERE unit_id = $1 AND policy_id = $2
+			`SELECT id, status, resolution_reason, resolution_evidence_ids, previous_alert_id FROM monitoring.alerts WHERE
+				unit_id = $1 AND policy_id = $2
 			ORDER BY detected_at, created_at, previous_alert_id IS NOT NULL`,
 			u,
 			policy,
@@ -403,6 +413,7 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 				r  row
 				id uuid.UUID
 			)
+
 			err := rs.Scan(&id, &r.status, &r.reason, &r.evidence, &r.previous)
 			if err != nil {
 				t.Fatal(err)
@@ -506,8 +517,8 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 
 // TestDemoAutomationNotifiesOnly: a gateway's facts (demo.trigger automation, IR529) open the unit's matching alert
 // policy and notify, and a recovered reading resolves it, as the UI's fire does; but no automation is decided, so HQ's
-// automation policy whose tariff condition holds sends nothing. heartbeat_gap, a contract Metric the default rule ac_offline
-// watches (IR120), is taken. A schedule phase, an empty event and a report from the future are refused.
+// automation policy whose tariff condition holds sends nothing. heartbeat_gap, a contract Metric the default rule
+// ac_offline watches (IR120), is taken. A schedule phase, an empty event and a report from the future are refused.
 func TestDemoAutomationNotifiesOnly(t *testing.T) {
 	s := serverWith(t, true)
 	u := newUnit(t, s, "Gateway AC")
@@ -533,8 +544,10 @@ func TestDemoAutomationNotifiesOnly(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO monitoring.alert_policies (id, tenant_id, kind, customer_id, name, owner_membership_id, created_by_user_id, timezone, enabled, priority, condition,
-		recipient_membership_ids, channels, escalate_after_minutes, cooldown_minutes) VALUES ($1,$2,'alert',$3,'Too hot',$4,$5,'Asia/Kuala_Lumpur',true,50,$6,$7,'{inApp,email}',60,30)`,
+		`INSERT INTO monitoring.alert_policies (id, tenant_id, kind, customer_id, name, owner_membership_id,
+			created_by_user_id, timezone, enabled, priority, condition,
+		recipient_membership_ids, channels, escalate_after_minutes, cooldown_minutes) VALUES ($1,$2,'alert',$3,'Too hot',$4,
+		$5,'Asia/Kuala_Lumpur',true,50,$6,$7,'{inApp,email}',60,30)`,
 		pol,
 		tenant,
 		cust,
@@ -566,13 +579,15 @@ func TestDemoAutomationNotifiesOnly(t *testing.T) {
 	var was *bool
 	ownerScan(
 		t,
-		`SELECT (SELECT enabled FROM monitoring.default_rule_settings WHERE policy_id = $1 AND rule_key = 'ac_offline' AND customer_id = $2)`,
+		`SELECT (SELECT enabled FROM monitoring.default_rule_settings WHERE policy_id = $1 AND rule_key = 'ac_offline' AND
+			customer_id = $2)`,
 		[]any{def, cust},
 		&was,
 	)
 	owner(
 		t,
-		`INSERT INTO monitoring.default_rule_settings (tenant_id, policy_id, rule_key, customer_id, enabled, changed_by_membership_id) VALUES ($1,$2,'ac_offline',$3,true,$4)
+		`INSERT INTO monitoring.default_rule_settings (tenant_id, policy_id, rule_key, customer_id, enabled,
+			changed_by_membership_id) VALUES ($1,$2,'ac_offline',$3,true,$4)
 		ON CONFLICT (policy_id, rule_key, customer_id) DO UPDATE SET enabled = true`,
 		tenant,
 		def,
@@ -583,14 +598,16 @@ func TestDemoAutomationNotifiesOnly(t *testing.T) {
 		if was == nil {
 			owner(
 				t,
-				`DELETE FROM monitoring.default_rule_settings WHERE policy_id = $1 AND rule_key = 'ac_offline' AND customer_id = $2`,
+				`DELETE FROM monitoring.default_rule_settings WHERE policy_id = $1 AND rule_key = 'ac_offline' AND customer_id =
+					$2`,
 				def,
 				cust,
 			)
 		} else {
 			owner(
 				t,
-				`UPDATE monitoring.default_rule_settings SET enabled = $3 WHERE policy_id = $1 AND rule_key = 'ac_offline' AND customer_id = $2`,
+				`UPDATE monitoring.default_rule_settings SET enabled = $3 WHERE policy_id = $1 AND rule_key = 'ac_offline' AND
+					customer_id = $2`,
 				def,
 				cust,
 				*was,
@@ -614,9 +631,10 @@ func TestDemoAutomationNotifiesOnly(t *testing.T) {
 		)
 	}
 	fact := func(metric, value, unit string, at time.Time) string {
-		return `{"unitId":"` + u + `","metric":"` + metric + `","value":` + value + `,"unit":"` + unit + `","observedAt":"` + at.Format(
-			time.RFC3339,
-		) + `","quality":"valid"}`
+		return `{"unitId":"` + u + `","metric":"` + metric + `","value":` + value + `,"unit":"` + unit + `","observedAt":"` +
+			at.Format(
+				time.RFC3339,
+			) + `","quality":"valid"}`
 	}
 	alerts := func(rule string, status string) int {
 		var n int

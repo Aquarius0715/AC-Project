@@ -85,15 +85,31 @@ func TestMembersSave(t *testing.T) {
 		f    map[string]string
 		code int
 	}{
-		"no employment":          {map[string]string{"employment": "null"}, 422},
-		"employment for admin":   {map[string]string{"role": `"admin"`}, 422},
-		"technician permission":  {map[string]string{"permissions": `["job.write"]`}, 422},
-		"write without read":     {map[string]string{"role": `"admin"`, "employment": "null", "permissions": `["job.write"]`, "scopes": `[]`}, 422},
-		"unknown permission":     {map[string]string{"role": `"admin"`, "employment": "null", "permissions": `["god.mode"]`, "scopes": `[]`}, 422},
-		"admin unit scope":       {map[string]string{"role": `"admin"`, "employment": "null", "permissions": `[]`}, 422},
-		"admin two tenants":      {map[string]string{"role": `"admin"`, "employment": "null", "permissions": `[]`, "scopes": `[{"kind":"tenant","id":"` + seed.ID("tenant-a").String() + `"},{"kind":"tenant","id":"` + uuid.NewString() + `"}]`}, 422},
-		"external without end":   {map[string]string{"employment": `"external"`, "organizationId": `"` + contractor + `"`}, 422},
-		"until before from":      {map[string]string{"validUntil": `"` + clock.Add(-2*time.Hour).Format(time.RFC3339) + `"`}, 422},
+		"no employment":         {map[string]string{"employment": "null"}, 422},
+		"employment for admin":  {map[string]string{"role": `"admin"`}, 422},
+		"technician permission": {map[string]string{"permissions": `["job.write"]`}, 422},
+		"write without read": {
+			map[string]string{"role": `"admin"`, "employment": "null", "permissions": `["job.write"]`, "scopes": `[]`}, 422,
+		},
+		"unknown permission": {
+			map[string]string{"role": `"admin"`, "employment": "null", "permissions": `["god.mode"]`, "scopes": `[]`}, 422,
+		},
+		"admin unit scope": {map[string]string{"role": `"admin"`, "employment": "null", "permissions": `[]`}, 422},
+		"admin two tenants": {
+			map[string]string{
+				"role": `"admin"`, "employment": "null", "permissions": `[]`,
+				"scopes": `[{"kind":"tenant","id":"` + seed.ID("tenant-a").String() + `"},{"kind":"tenant","id":"` +
+					uuid.NewString() + `"}]`,
+			}, 422,
+		},
+		"external without end": {
+			map[string]string{"employment": `"external"`, "organizationId": `"` + contractor + `"`},
+			422,
+		},
+		"until before from": {
+			map[string]string{"validUntil": `"` + clock.Add(-2*time.Hour).Format(time.RFC3339) + `"`},
+			422,
+		},
 		"blank reason":           {map[string]string{"reason": `" "`}, 422},
 		"internal at contractor": {map[string]string{"organizationId": `"` + contractor + `"`}, 422},
 		"unknown scope":          {map[string]string{"scopes": `[{"kind":"unit","id":"` + uuid.NewString() + `"}]`}, 422},
@@ -242,7 +258,8 @@ func TestMembersSave(t *testing.T) {
 
 	perms, _ := json.Marshal(me["permissions"])
 	selfBody := func(p string) string {
-		return `{"id":"` + me["id"].(string) + `","userId":"` + me["userId"].(string) + `","organizationId":"` + op + `","role":"admin","employment":null,"permissions":` + p +
+		return `{"id":"` + me["id"].(string) + `","userId":"` + me["userId"].(string) + `","organizationId":"` + op +
+			`","role":"admin","employment":null,"permissions":` + p +
 			`,"scopes":[{"kind":"tenant","id":"` + seed.ID("tenant-a").
 			String() +
 			`"}],"validFrom":"` + me["validFrom"].(string) + `","validUntil":null,"reason":"self"}`
@@ -275,7 +292,8 @@ func TestMembersSave(t *testing.T) {
 	// tenant-a's own: other tenants' administrators (TestBootstrapAdmin's) are not this test's
 	owner(
 		t,
-		`UPDATE identity.memberships SET valid_until = $2 WHERE id <> $1 AND role = 'admin' AND id IN (SELECT membership_id FROM identity.membership_permissions WHERE permission = 'identity.write')
+		`UPDATE identity.memberships SET valid_until = $2 WHERE id <> $1 AND role = 'admin' AND id IN (SELECT membership_id
+			FROM identity.membership_permissions WHERE permission = 'identity.write')
 		AND created_at > $3 AND tenant_id = $4`,
 		seed.ID("hq-operator"),
 		clock.Add(-time.Minute),
@@ -362,7 +380,8 @@ func TestMembersList(t *testing.T) {
 		"{\"sort\":{\"field\":\"name\",\"direction\":\"asc\"}}": "sort.field=error.invalid",
 	}
 
-	for _, b := range []string{`{"filters":{"role":"guest"}}`, `{"filters":{"x":1}}`, `{"sort":{"field":"name","direction":"asc"}}`} {
+	for _, b := range []string{`{"filters":{"role":"guest"}}`, `{"filters":{"x":1}}`, `{"sort":{"field":"name",` +
+		`"direction":"asc"}}`} {
 		code, m := post(s, &hq, "members.list", b)
 		refusal(t, b, code, m, want[b])
 	}
@@ -372,8 +391,8 @@ func TestMembersList(t *testing.T) {
 	}
 }
 
-// TestMembersListCarriesEachMembersOwn (IR496): members.list reads the permissions, scopes and qualification grants of a
-// page of members in one query per table; each member still gets only its own, and each revoked grant keeps its own
+// TestMembersListCarriesEachMembersOwn (IR496): members.list reads the permissions, scopes and qualification grants of
+// a page of members in one query per table; each member still gets only its own, and each revoked grant keeps its own
 // revocation time.
 func TestMembersListCarriesEachMembersOwn(t *testing.T) {
 	s := server(t)
@@ -413,8 +432,10 @@ func TestMembersListCarriesEachMembersOwn(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO identity.qualification_grants (tenant_id, membership_id, code, valid_from, valid_until, revoked_at) VALUES
-		($1, $2, 'test.ir496.a', '2026-01-01Z', '2027-01-01Z', $4), ($1, $3, 'test.ir496.b', '2026-01-01Z', '2027-01-01Z', $5)`,
+		`INSERT INTO identity.qualification_grants (tenant_id, membership_id, code, valid_from, valid_until, revoked_at)
+			VALUES
+		($1, $2, 'test.ir496.a', '2026-01-01Z', '2027-01-01Z', $4), ($1, $3, 'test.ir496.b', '2026-01-01Z', '2027-01-01Z',
+		$5)`,
 		seed.ID("tenant-a"),
 		a,
 		b,

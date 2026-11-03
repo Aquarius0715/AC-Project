@@ -16,9 +16,10 @@ func TestWorkedFor(t *testing.T) {
 		off  [][2]time.Time
 		want int
 	}{
-		"nothing off":                   {nil, 120},
-		"one pause":                     {[][2]time.Time{iv(10, 20)}, 110},
-		"a hold of a day":               {[][2]time.Time{iv(30, 30+24*60)}, 30}, // the hold runs past the end: 30 minutes worked
+		"nothing off": {nil, 120},
+		"one pause":   {[][2]time.Time{iv(10, 20)}, 110},
+		// the hold runs past the end: 30 minutes worked
+		"a hold of a day":               {[][2]time.Time{iv(30, 30+24*60)}, 30},
 		"a pause inside a hold":         {[][2]time.Time{iv(30, 90), iv(40, 50)}, 60},
 		"overlapping, out of order":     {[][2]time.Time{iv(50, 70), iv(40, 60)}, 90},
 		"before the arrival is clipped": {[][2]time.Time{iv(-30, 10)}, 110},

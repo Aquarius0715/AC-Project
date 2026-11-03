@@ -105,6 +105,7 @@ func addCap(ctx context.Context, c *ops.Call, org uuid.UUID) error {
 		n      int
 		oldest *time.Time
 	)
+
 	err = c.Tx.QueryRow(ctx, `SELECT count(*), min(created_at) FROM (SELECT created_at FROM identity.memberships
 		WHERE organization_id = $1 AND created_at > $2 AND created_at <= $3 ORDER BY created_at DESC LIMIT $4) x`,
 		org, c.Now.Add(-24*time.Hour), c.Now, AccountsPerOrgPerDay).
@@ -136,7 +137,8 @@ func personFor(ctx context.Context, c *ops.Call, email, name string) (uuid.UUID,
 
 	var user uuid.UUID
 
-	err := c.Tx.QueryRow(ctx, `INSERT INTO identity.users (email, display_name, status, created_at, updated_at) VALUES ($1, $2, 'active', $3, $3)
+	err := c.Tx.QueryRow(ctx, `INSERT INTO identity.users (email, display_name, status, created_at, updated_at) VALUES ($1,
+		$2, 'active', $3, $3)
 		ON CONFLICT (email) DO NOTHING RETURNING id`, email, name, c.Now).
 		Scan(&user)
 	if !errors.Is(err, pgx.ErrNoRows) {
@@ -146,7 +148,8 @@ func personFor(ctx context.Context, c *ops.Call, email, name string) (uuid.UUID,
 	err = c.Tx.QueryRow(ctx, `SELECT u.id FROM identity.users u
 		WHERE u.email = $1 AND u.status = 'active'
 			AND EXISTS (SELECT 1 FROM identity.memberships m WHERE m.id = u.sign_in_membership_id)
-			AND NOT EXISTS (SELECT 1 FROM identity.memberships m WHERE m.user_id = u.id AND (m.valid_until IS NULL OR m.valid_until > $2))
+			AND NOT EXISTS (SELECT 1 FROM identity.memberships m WHERE m.user_id = u.id AND (m.valid_until IS NULL OR
+			m.valid_until > $2))
 		FOR UPDATE OF u`, email, c.Now).Scan(&user)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return uuid.Nil, errEmailTaken
@@ -158,7 +161,8 @@ func personFor(ctx context.Context, c *ops.Call, email, name string) (uuid.UUID,
 
 	_, err = c.Tx.Exec(
 		ctx,
-		`UPDATE identity.users SET display_name = $2, last_sign_in_at = NULL, version = version + 1, updated_at = $3 WHERE id = $1`,
+		`UPDATE identity.users SET display_name = $2, last_sign_in_at = NULL, version = version + 1, updated_at = $3 WHERE id
+			= $1`,
 		user,
 		name,
 		c.Now,
@@ -189,9 +193,12 @@ func createAccount(
 		return user, membership, err
 	}
 
-	if c.Principal.Role != "admin" { // a person whose access HQ ended comes back only through HQ (IR508), not as a new account
+	if c.Principal.Role != "admin" {
+		// a person whose access HQ ended comes back only through HQ (IR508), not as a new account
 		var revoked bool
-		err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.memberships WHERE user_id = $1 AND revoked_at IS NOT NULL)`, user).
+
+		err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.memberships WHERE user_id = $1 AND revoked_at IS NOT
+			NULL)`, user).
 			Scan(&revoked)
 		if err != nil {
 			return user, membership, err
@@ -204,7 +211,8 @@ func createAccount(
 		}
 	}
 
-	err = c.Tx.QueryRow(ctx, `INSERT INTO identity.memberships (tenant_id, user_id, organization_id, role, employment, client_role, valid_from, valid_until, created_at, updated_at)
+	err = c.Tx.QueryRow(ctx, `INSERT INTO identity.memberships (tenant_id, user_id, organization_id, role, employment,
+		client_role, valid_from, valid_until, created_at, updated_at)
 		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7, $6, $6) RETURNING id`,
 		user, a.OrgID, a.Role, a.Employment, a.ClientRole, c.Now, a.ValidUntil).
 		Scan(&membership)
@@ -215,7 +223,8 @@ func createAccount(
 	for _, p := range a.Permissions {
 		_, err = c.Tx.Exec(
 			ctx,
-			`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES (current_setting('app.tenant_id')::uuid, $1, $2)`,
+			`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES
+				(current_setting('app.tenant_id')::uuid, $1, $2)`,
 			membership,
 			p,
 		)
@@ -227,7 +236,8 @@ func createAccount(
 	for _, sc := range a.Scopes {
 		_, err = c.Tx.Exec(
 			ctx,
-			`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3) ON CONFLICT DO NOTHING`,
+			`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES
+				(current_setting('app.tenant_id')::uuid, $1, $2, $3) ON CONFLICT DO NOTHING`,
 			membership,
 			sc.Kind,
 			sc.ID,
@@ -240,7 +250,8 @@ func createAccount(
 	if a.Role == "client" { // IR84 initial Consent
 		_, err = c.Tx.Exec(
 			ctx,
-			`INSERT INTO identity.consents (tenant_id, membership_id, purpose, granted) VALUES (current_setting('app.tenant_id')::uuid, $1, 'location_automation', false)`,
+			`INSERT INTO identity.consents (tenant_id, membership_id, purpose, granted) VALUES
+				(current_setting('app.tenant_id')::uuid, $1, 'location_automation', false)`,
 			membership,
 		)
 		if err != nil {
@@ -302,6 +313,7 @@ func AccountHandlers(p Provider, apps AccountApps) map[string]events.Handler {
 				MembershipID uuid.UUID `json:"membershipId"`
 				Role         string    `json:"role"`
 			}
+
 			decodeErr := e.Decode(&in)
 			if decodeErr != nil {
 				return decodeErr
@@ -405,6 +417,7 @@ func AccountHandlers(p Provider, apps AccountApps) map[string]events.Handler {
 				MembershipID uuid.UUID `json:"membershipId"`
 				Enabled      bool      `json:"enabled"`
 			}
+
 			decodeErr := e.Decode(&in)
 			if decodeErr != nil {
 				return decodeErr
@@ -413,7 +426,8 @@ func AccountHandlers(p Provider, apps AccountApps) map[string]events.Handler {
 			// membership the account does not sign in with leaves it alone (IR462)
 			var sub string
 
-			err := tx.QueryRow(ctx, `SELECT coalesce(u.cognito_sub, u.id::text) FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id
+			err := tx.QueryRow(ctx, `SELECT coalesce(u.cognito_sub, u.id::text) FROM identity.memberships m JOIN identity.users u
+				ON u.id = m.user_id
 				WHERE m.id = $1 AND (u.sign_in_membership_id IS NULL OR u.sign_in_membership_id = m.id)`, in.MembershipID).
 				Scan(&sub)
 			if errors.Is(err, pgx.ErrNoRows) {

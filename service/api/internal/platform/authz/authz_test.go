@@ -74,7 +74,10 @@ func contains(xs []string, s string) bool {
 }
 
 func TestParseErrors(t *testing.T) {
-	for _, s := range []string{"", "nobody:self", "admin:self", "client:foo.bar", "client:Bad", "client:self | ", "IR01:only"} {
+	for _, s := range []string{
+		"", "nobody:self", "admin:self", "client:foo.bar", "client:Bad", "client:self | ",
+		"IR01:only",
+	} {
 		_, err := Parse(s)
 		if err == nil {
 			t.Errorf("%q should fail", s)

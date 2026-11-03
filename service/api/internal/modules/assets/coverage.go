@@ -89,33 +89,36 @@ var coverageStatuses = map[string]bool{
 	"no_coverage":    true,
 }
 
-// @Summary		units.coverage (read)
-// @ID				units.coverage
-// @Description	Authorization: admin:asset.read | admin:contract.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A19 · Query: filters customerId,coverage,expiringWithinDays,search · sort id,name,dueAt (default dueAt asc;id asc)
-// @Tags			units
-// @Accept			json
-// @Produce		json
-// @Param			cursor				query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit				query		integer	false	"page size 1–100, default 25"
-// @Param			sort				query		string	false	"field:direction — fields id,name,dueAt; default dueAt asc;id asc"
-// @Param			customerId			query		string	false	"filter → customerId"
-// @Param			coverage			query		string	false	"filter → status"
-// @Param			expiringWithinDays	query		number	false	"filter → warrantyEndsAt within N days of now"
-// @Param			search				query		string	false	"filter → unit name or ID contains"
-// @Success		200					{object}	ops.Envelope{data=UnitCoveragePage}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/units/coverage [get]
+// unitsCoverage serves units.coverage.
+//
+//	@Summary		units.coverage (read)
+//	@ID				units.coverage
+//	@Description	Authorization: admin:asset.read | admin:contract.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A19 · Query: filters customerId,coverage,expiringWithinDays,search · sort id,name,dueAt \
+//	@Description	(default dueAt asc;id asc)
+//	@Tags			units
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor				query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit				query		integer	false	"page size 1–100, default 25"
+//	@Param			sort				query		string	false	"field:direction — fields id,name,dueAt; default dueAt asc;id asc"
+//	@Param			customerId			query		string	false	"filter → customerId"
+//	@Param			coverage			query		string	false	"filter → status"
+//	@Param			expiringWithinDays	query		number	false	"filter → warrantyEndsAt within N days of now"
+//	@Param			search				query		string	false	"filter → unit name or ID contains"
+//	@Success		200					{object}	ops.Envelope{data=UnitCoveragePage}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/units/coverage [get]
 func (m *Module) unitsCoverage(
 	ctx context.Context,
 	c *ops.Call,
@@ -127,6 +130,7 @@ func (m *Module) unitsCoverage(
 		ExpiringWithinDays *int       `json:"expiringWithinDays,omitempty"`
 		Search             *string    `json:"search,omitempty"`
 	}
+
 	err := decodeFilters(in.Filters, &f)
 	if err != nil {
 		return paging.Page[UnitCoverage]{}, err
@@ -190,6 +194,7 @@ func (m *Module) unitsCoverage(
 
 	for rows.Next() {
 		var x UnitCoverage
+
 		err := rows.Scan(
 			&x.UnitID,
 			&x.CustomerID,

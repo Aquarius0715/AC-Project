@@ -162,7 +162,9 @@ func (s Idempotency) Begin(
 			resp          []byte
 			expired       bool
 		)
-		scanErr := tx.QueryRow(ctx, `SELECT operation, request_hash, status, response, expires_at < platform.app_now() FROM platform.idempotency_keys
+
+		scanErr := tx.QueryRow(ctx, `SELECT operation, request_hash, status, response, expires_at < platform.app_now() FROM
+			platform.idempotency_keys
 			WHERE tenant_id=$1 AND membership_id=$2 AND key=$3 FOR UPDATE`, p.TenantID, p.MembershipID, key).
 			Scan(&gotOp, &gotHash, &status, &resp, &expired)
 		if scanErr != nil {
@@ -173,7 +175,8 @@ func (s Idempotency) Begin(
 			_, err := tx.Exec(
 				ctx,
 				`UPDATE platform.idempotency_keys SET operation=$4, request_hash=$5, status='in_progress', response=NULL,
-				created_at=platform.app_now(), expires_at=platform.app_now()+interval '24 hours' WHERE tenant_id=$1 AND membership_id=$2 AND key=$3`,
+				created_at=platform.app_now(), expires_at=platform.app_now()+interval '24 hours' WHERE tenant_id=$1 AND
+				membership_id=$2 AND key=$3`,
 				p.TenantID,
 				p.MembershipID,
 				key,
@@ -293,7 +296,8 @@ func (Recorder) Record(ctx context.Context, tx pgx.Tx, c *ops.Call, op string) e
 		return nil
 	}
 
-	for _, a := range c.Audits { // the audit log is identity's: published in this transaction, stored by its consumer (IR196)
+	for _, a := range c.Audits {
+		// the audit log is identity's: published in this transaction, stored by its consumer (IR196)
 		id := uuid.Must(uuid.NewV7())
 
 		result := a.Result
@@ -350,7 +354,8 @@ func (Recorder) Record(ctx context.Context, tx pgx.Tx, c *ops.Call, op string) e
 
 		_, execErr := tx.Exec(
 			ctx,
-			`INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id, occurred_at)
+			`INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id,
+				occurred_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7)`,
 			p.TenantID,
 			e.AggregateType,
@@ -378,7 +383,12 @@ func newPool(ctx context.Context, url string) (*pgxpool.Pool, error) {
 
 	cfg.AfterConnect = func(_ context.Context, conn *pgx.Conn) error {
 		conn.TypeMap().
-			RegisterType(&pgtype.Type{Name: "timestamptz", OID: pgtype.TimestamptzOID, Codec: &pgtype.TimestamptzCodec{ScanLocation: time.UTC}})
+			RegisterType(
+				&pgtype.Type{
+					Name:  "timestamptz",
+					OID:   pgtype.TimestamptzOID,
+					Codec: &pgtype.TimestamptzCodec{ScanLocation: time.UTC},
+				})
 
 		return nil
 	}

@@ -37,7 +37,10 @@ func TestRoutesEachOperationToItsDomain(t *testing.T) {
 
 	e := New(targets, nil)
 
-	for op, want := range map[string]string{"jobs.create": ops.DomainMaintenance, "units.save": ops.DomainEquipment, "preferences.update": ops.DomainIdentity, "invoices.create": ops.DomainBilling, "factors.save": ops.DomainEnergy} {
+	for op, want := range map[string]string{
+		"jobs.create": ops.DomainMaintenance, "units.save": ops.DomainEquipment,
+		"preferences.update": ops.DomainIdentity, "invoices.create": ops.DomainBilling, "factors.save": ops.DomainEnergy,
+	} {
 		if ops.DomainOf(op) == "" {
 			t.Fatalf("%s is not in the catalog", op)
 		}

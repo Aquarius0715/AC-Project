@@ -10,6 +10,7 @@ func TestDir(t *testing.T) {
 	d := Dir(t.TempDir())
 
 	ctx := context.Background()
+
 	err := d.Put(ctx, "a/b.png", "image/png", []byte("x"))
 	if err != nil {
 		t.Fatal(err)

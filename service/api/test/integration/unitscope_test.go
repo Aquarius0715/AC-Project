@@ -46,7 +46,8 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 
 	owner(
 		t,
-		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at, offer_expires_at, access_valid_from, access_valid_until, decision, decided_at)
+		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at,
+			offer_expires_at, access_valid_from, access_valid_until, decision, decided_at)
 		VALUES ($1,$2,$3,'v1',tstzrange($4,$5),$6,$5,$6,$5,'accept',$6)`,
 		seed.ID(
 			"tenant-a",
@@ -82,7 +83,8 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 	// the unit list carries no telemetry before the work window (latestMeasurements is an equipment read, IR213)
 	owner(
 		t,
-		`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit, origin, quality, received_at, event_id)
+		`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit,
+			origin, quality, received_at, event_id)
 		VALUES ($1,$2,$3,'temperature',$4,1,26.5,'°C','measured','valid',$4,$5)`,
 		seed.ID("tenant-a"),
 		unit,
@@ -102,7 +104,8 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 	// equipment reads (IR49(b)): lists omit the unit, single reads answer FORBIDDEN until the work window starts
 	owner(
 		t,
-		`UPDATE monitoring.alerts SET status = 'resolved', resolved_at = $2 WHERE unit_id = $1 AND rule_key = 'warning' AND status <> 'resolved'`,
+		`UPDATE monitoring.alerts SET status = 'resolved', resolved_at = $2 WHERE unit_id = $1 AND rule_key = 'warning' AND
+			status <> 'resolved'`,
 		unit,
 		clock,
 	)
@@ -163,7 +166,8 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 	// work window running → equipment reads allowed; internal technicians never depend on assignments
 	owner(
 		t,
-		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND job_id <> $2 AND scheduled && tstzrange($3, $4)`,
+		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND
+			job_id <> $2 AND scheduled && tstzrange($3, $4)`,
 		seed.ID("tech-external-b"),
 		job,
 		clock.Add(-time.Minute),
@@ -226,7 +230,8 @@ func TestUnitAccessProjection(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at, offer_expires_at, access_valid_from, access_valid_until)
+		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at,
+			offer_expires_at, access_valid_from, access_valid_until)
 		VALUES ($1,$2,$3,'v1',tstzrange($4,$5),$6,$5,$6,$5)`,
 		seed.ID(
 			"tenant-a",

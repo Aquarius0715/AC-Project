@@ -276,7 +276,8 @@ func TestRecordSignIn(t *testing.T) {
 	set := func(last *time.Time) {
 		_, err := owner.Exec(
 			ctx,
-			`UPDATE identity.users SET last_sign_in_at = $2, sign_in_auth_time = CASE WHEN $2::timestamptz IS NULL THEN NULL ELSE sign_in_auth_time END WHERE id = $1`,
+			`UPDATE identity.users SET last_sign_in_at = $2, sign_in_auth_time = CASE WHEN $2::timestamptz IS NULL THEN NULL ELSE
+				sign_in_auth_time END WHERE id = $1`,
 			user,
 			last,
 		)

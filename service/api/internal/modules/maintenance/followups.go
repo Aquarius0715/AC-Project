@@ -67,7 +67,8 @@ func (m FollowUps) lock(ctx context.Context, c *ops.Call, id uuid.UUID) (jobStat
 		v int
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT status, customer_org_id, unit_id, completed_at, rating, follow_up_class, warranty_claims, version FROM maintenance.jobs WHERE id = $1 FOR UPDATE`, id).
+	err := c.Tx.QueryRow(ctx, `SELECT status, customer_org_id, unit_id, completed_at, rating, follow_up_class,
+		warranty_claims, version FROM maintenance.jobs WHERE id = $1 FOR UPDATE`, id).
 		Scan(&s.status, &s.org, &s.unit, &s.completedAt, &s.rating, &s.followUp, &s.claims, &v)
 	if errors.Is(err, pgx.ErrNoRows) ||
 		(err == nil && c.Principal.Role == "client" && s.org != c.Principal.OrgID) {
@@ -167,30 +168,33 @@ func (in *RateInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		jobs.rate (write)
-// @ID				jobs.rate
-// @Description	Authorization: client:self:completed
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR110 stars 1–5 required; tags from a fixed list; comment 0–1000; editable for 7 days
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-C17
-// @Tags			jobs
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get)"
-// @Param			jobId				path		string		true	"input field jobId"
-// @Param			request				body		RateInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/jobs/{jobId}/rate [post]
+// rate serves jobs.rate.
+//
+//	@Summary		jobs.rate (write)
+//	@ID				jobs.rate
+//	@Description	Authorization: client:self:completed
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR110 stars 1–5 required; tags from a fixed list; comment 0–1000; editable for 7 days
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-C17
+//	@Tags			jobs
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get)"
+//	@Param			jobId				path		string		true	"input field jobId"
+//	@Param			request				body		RateInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=MaintenanceJob}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs/{jobId}/rate [post]
 func (m FollowUps) rate(ctx context.Context, c *ops.Call, in *RateInput) (MaintenanceJob, error) {
 	return written(m.rateJob(ctx, c, in))
 }
@@ -217,6 +221,7 @@ func (m FollowUps) rateJob(ctx context.Context, c *ops.Call, in *RateInput) (Job
 	first := len(s.rating) == 0 || string(s.rating) == "null"
 	if !first {
 		var prev Rating
+
 		err := json.Unmarshal(s.rating, &prev)
 		if err != nil {
 			return Job{}, err
@@ -230,6 +235,7 @@ func (m FollowUps) rateJob(ctx context.Context, c *ops.Call, in *RateInput) (Job
 	}
 
 	raw, _ := json.Marshal(r)
+
 	bumpErr := m.bump(
 		ctx,
 		c,
@@ -372,30 +378,33 @@ func (in *ProblemInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		jobs.reportProblem (write)
-// @ID				jobs.reportProblem
-// @Description	Authorization: client:self:completed
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR110 details 10–2000; up to 5 photos; creates a requested follow-up job
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-C17
-// @Tags			jobs
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get)"
-// @Param			jobId				path		string			true	"input field jobId"
-// @Param			request				body		ProblemInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/jobs/{jobId}/report-problem [post]
+// reportProblem serves jobs.reportProblem.
+//
+//	@Summary		jobs.reportProblem (write)
+//	@ID				jobs.reportProblem
+//	@Description	Authorization: client:self:completed
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR110 details 10–2000; up to 5 photos; creates a requested follow-up job
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-C17
+//	@Tags			jobs
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get)"
+//	@Param			jobId				path		string			true	"input field jobId"
+//	@Param			request				body		ProblemInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=MaintenanceJob}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs/{jobId}/report-problem [post]
 func (m FollowUps) reportProblem(
 	ctx context.Context,
 	c *ops.Call,
@@ -439,9 +448,13 @@ func (m FollowUps) reportProblemJob(
 	pref, _ := json.Marshal(preferred)
 
 	var id uuid.UUID
-	scanErr := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.jobs (tenant_id, unit_id, customer_org_id, type, status, origin, symptom, requested_slot, preferred_slots,
-		preference_round, due_at, follow_up_of_job_id, follow_up_class) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, 'reactive', 'requested', 'client_request',
-		$3, tstzrange($4, $5), $6, 1, $5, $7, 'pending') RETURNING id`, s.unit, s.org, in.Details, requested.StartAt, requested.EndAt, pref, in.JobID).
+
+	scanErr := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.jobs (tenant_id, unit_id, customer_org_id, type, status, origin,
+		symptom, requested_slot, preferred_slots,
+		preference_round, due_at, follow_up_of_job_id, follow_up_class) VALUES (current_setting('app.tenant_id')::uuid, $1,
+		$2, 'reactive', 'requested', 'client_request',
+		$3, tstzrange($4, $5), $6, 1, $5, $7, 'pending') RETURNING
+		id`, s.unit, s.org, in.Details, requested.StartAt, requested.EndAt, pref, in.JobID).
 		Scan(&id)
 	if scanErr != nil {
 		return Job{}, scanErr
@@ -451,6 +464,7 @@ func (m FollowUps) reportProblemJob(
 		aid := uuid.New()
 
 		key := "jobs/" + id.String() + "/" + aid.String()
+
 		err := m.Blobs.Put(ctx, key, p.Mime, p.Bytes)
 		if err != nil {
 			return Job{}, err
@@ -539,30 +553,33 @@ func (in *ClassifyInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		jobs.classifyFollowUp (write)
-// @ID				jobs.classifyFollowUp
-// @Description	Authorization: admin:job.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR110 only followUpClass=pending; reason 1–1000
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A06
-// @Tags			jobs
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get)"
-// @Param			jobId				path		string			true	"input field jobId"
-// @Param			request				body		ClassifyInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/jobs/{jobId}/classify-follow-up [post]
+// classify serves jobs.classifyFollowUp.
+//
+//	@Summary		jobs.classifyFollowUp (write)
+//	@ID				jobs.classifyFollowUp
+//	@Description	Authorization: admin:job.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR110 only followUpClass=pending; reason 1–1000
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A06
+//	@Tags			jobs
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get)"
+//	@Param			jobId				path		string			true	"input field jobId"
+//	@Param			request				body		ClassifyInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=MaintenanceJob}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs/{jobId}/classify-follow-up [post]
 func (m FollowUps) classify(
 	ctx context.Context,
 	c *ops.Call,
@@ -650,30 +667,32 @@ func (in *CostInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		jobs.saveCost (write)
-// @ID				jobs.saveCost
-// @Description	Authorization: admin:job.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A06
-// @Tags			jobs
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			jobId				path		string		true	"input field jobId"
-// @Param			request				body		CostInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/jobs/{jobId}/cost-lines [put]
+// saveCost serves jobs.saveCost.
+//
+//	@Summary		jobs.saveCost (write)
+//	@ID				jobs.saveCost
+//	@Description	Authorization: admin:job.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A06
+//	@Tags			jobs
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
+//	@Param			jobId				path		string		true	"input field jobId"
+//	@Param			request				body		CostInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=MaintenanceJob}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs/{jobId}/cost-lines [put]
 func (m FollowUps) saveCost(
 	ctx context.Context,
 	c *ops.Call,
@@ -694,6 +713,7 @@ func (m FollowUps) saveCostJob(ctx context.Context, c *ops.Call, in *CostInput) 
 	}
 
 	raw, _ := json.Marshal(in.CostLines)
+
 	bumpErr := m.bump(ctx, c, in.JobID, "costs = $2", raw)
 	if bumpErr != nil {
 		return Job{}, bumpErr
@@ -727,30 +747,32 @@ func (in *ExtendInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		jobs.extendAccess (write)
-// @ID				jobs.extendAccess
-// @Description	Authorization: admin:job.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A06
-// @Tags			jobs
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			jobId				path		string		true	"input field jobId"
-// @Param			request				body		ExtendInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/jobs/{jobId}/extend-access [post]
+// extendAccess serves jobs.extendAccess.
+//
+//	@Summary		jobs.extendAccess (write)
+//	@ID				jobs.extendAccess
+//	@Description	Authorization: admin:job.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A06
+//	@Tags			jobs
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
+//	@Param			jobId				path		string		true	"input field jobId"
+//	@Param			request				body		ExtendInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=MaintenanceJob}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs/{jobId}/extend-access [post]
 func (m FollowUps) extendAccess(
 	ctx context.Context,
 	c *ops.Call,
@@ -771,7 +793,8 @@ func (m FollowUps) extendAccessJob(ctx context.Context, c *ops.Call, in *ExtendI
 		until             time.Time
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT id, access_valid_until, contractor_org_id FROM maintenance.offers WHERE job_id = $1 AND decision = 'accept' ORDER BY decided_at DESC LIMIT 1 FOR UPDATE`, in.JobID).
+	err := c.Tx.QueryRow(ctx, `SELECT id, access_valid_until, contractor_org_id FROM maintenance.offers WHERE job_id = $1
+		AND decision = 'accept' ORDER BY decided_at DESC LIMIT 1 FOR UPDATE`, in.JobID).
 		Scan(&offer, &until, &contractor)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Job{}, apperr.E(apperr.Conflict, "errors.no_accepted_offer")
@@ -787,7 +810,8 @@ func (m FollowUps) extendAccessJob(ctx context.Context, c *ops.Call, in *ExtendI
 
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`UPDATE maintenance.offers SET access_valid_until = $2, version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
+		`UPDATE maintenance.offers SET access_valid_until = $2, version = version + 1, updated_at = platform.app_now() WHERE
+			id = $1`,
 		offer,
 		in.AccessValidUntil,
 	)
@@ -865,30 +889,34 @@ type WarrantyClaim struct {
 	Reason      *string    `json:"reason"`
 }
 
-// @Summary		jobs.recordWarrantyClaim (write)
-// @ID				jobs.recordWarrantyClaim
-// @Description	Authorization: admin:job.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 only for completed jobs whose replaced part was under warranty; amount > 0 in contract currency
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A19
-// @Tags			jobs
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get)"
-// @Param			jobId				path		string		true	"input field jobId"
-// @Param			request				body		ClaimInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/jobs/{jobId}/warranty-claims [post]
+// recordWarrantyClaim serves jobs.recordWarrantyClaim.
+//
+//	@Summary		jobs.recordWarrantyClaim (write)
+//	@ID				jobs.recordWarrantyClaim
+//	@Description	Authorization: admin:job.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR111 only for completed jobs whose replaced part was under warranty; amount > 0 in contract \
+//	@Description	currency
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A19
+//	@Tags			jobs
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get)"
+//	@Param			jobId				path		string		true	"input field jobId"
+//	@Param			request				body		ClaimInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=MaintenanceJob}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs/{jobId}/warranty-claims [post]
 func (m FollowUps) recordWarrantyClaim(
 	ctx context.Context,
 	c *ops.Call,
@@ -944,6 +972,7 @@ func (m FollowUps) recordWarrantyClaimJob(
 	)
 
 	raw, _ := json.Marshal(claims)
+
 	bumpErr := m.bump(ctx, c, in.JobID, "warranty_claims = $2", raw)
 	if bumpErr != nil {
 		return Job{}, bumpErr
@@ -964,8 +993,10 @@ func (m FollowUps) recordWarrantyClaimJob(
 func ConfirmUnrated(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) {
 	tag, err := tx.Exec(
 		ctx,
-		`UPDATE maintenance.jobs SET customer_confirmed_at = completed_at + interval '7 days', version = version + 1, updated_at = platform.app_now()
-		WHERE status = 'completed' AND customer_confirmed_at IS NULL AND rating IS NULL AND completed_at + interval '7 days' <= $1`,
+		`UPDATE maintenance.jobs SET customer_confirmed_at = completed_at + interval '7 days', version = version + 1,
+			updated_at = platform.app_now()
+		WHERE status = 'completed' AND customer_confirmed_at IS NULL AND rating IS NULL AND completed_at + interval '7 days'
+		<= $1`,
 		now,
 	)
 

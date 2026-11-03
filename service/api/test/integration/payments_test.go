@@ -14,7 +14,8 @@ import (
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
 
-// newInvoice creates a customer-b contract (rto, restriction eligible) and an unpaid invoice; returns contract and invoice IDs.
+// newInvoice creates a customer-b contract (rto, restriction eligible) and an unpaid invoice; returns contract and
+// invoice IDs.
 func newInvoice(t *testing.T, s *apiserver.Server) (string, string) {
 	t.Helper()
 	u := newUnit(t, s, "Pay AC")
@@ -271,7 +272,8 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 	rid := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO restrictions.restrictions (id, tenant_id, contract_id, contract_version, customer_id, rules_version, notice_at, execute_after, reason, policy, state)
+		`INSERT INTO restrictions.restrictions (id, tenant_id, contract_id, contract_version, customer_id, rules_version,
+			notice_at, execute_after, reason, policy, state)
 		VALUES ($1,$2,$3,1,$4,'rules-1',$5,$6,'unpaid','{"kind":"power_off"}','applied')`,
 		rid,
 		seed.ID("tenant-a"),
@@ -297,7 +299,8 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO restrictions.restriction_units (tenant_id, restriction_id, unit_id, apply_state, release_state) VALUES ($1,$2,$3,'applied','none')`,
+		`INSERT INTO restrictions.restriction_units (tenant_id, restriction_id, unit_id, apply_state, release_state) VALUES
+			($1,$2,$3,'applied','none')`,
 		seed.ID("tenant-a"),
 		rid,
 		unit,
@@ -310,7 +313,8 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 			s,
 			&hq,
 			"payments.recordManual",
-			`{"invoiceId":"`+inv+`","paymentReference":"`+ref+`","confirmedAmountMinor":`+amount+`,"currency":"MYR","reason":"bank transfer seen"}`,
+			`{"invoiceId":"`+inv+`","paymentReference":"`+ref+`","confirmedAmountMinor":`+amount+`,"currency":"MYR",`+
+				`"reason":"bank transfer seen"}`,
 			v,
 		)
 	}
@@ -347,7 +351,10 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 	for _, c := range []struct{ op, body, want string }{
 		{"payments.recordManual", `{` + entry + `}`, "invoiceId=error.required"},
 		{"payments.recordManual", `{"paymentId":"` + inv + `",` + entry + `}`, "_=error.malformedInput"},
-		{"payments.recordManual", `{"invoiceId":"` + inv + `","paymentId":"` + inv + `",` + entry + `}`, "_=error.malformedInput"},
+		{
+			"payments.recordManual", `{"invoiceId":"` + inv + `","paymentId":"` + inv + `",` + entry + `}`,
+			"_=error.malformedInput",
+		},
 		{"payments.confirm", `{"invoiceId":"` + inv + `",` + entry + `}`, "_=error.malformedInput"},
 	} {
 		code, m := write(s, &hq, c.op, c.body, 1)
@@ -386,7 +393,8 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 	)
 	ownerScan(
 		t,
-		`SELECT r.state, ru.pending_reason FROM restrictions.restrictions r JOIN restrictions.restriction_units ru ON ru.restriction_id = r.id WHERE r.id = $1`,
+		`SELECT r.state, ru.pending_reason FROM restrictions.restrictions r JOIN restrictions.restriction_units ru ON
+			ru.restriction_id = r.id WHERE r.id = $1`,
 		[]any{rid},
 		&state,
 		&pending,
@@ -427,7 +435,8 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 			s,
 			&hq,
 			"payments.confirm",
-			`{"paymentId":"`+pay+`","paymentReference":"HQ-`+pay[:8]+`","confirmedAmountMinor":5000,"currency":"MYR","reason":"checked"}`,
+			`{"paymentId":"`+pay+`","paymentReference":"HQ-`+pay[:8]+`","confirmedAmountMinor":5000,"currency":"MYR",`+
+				`"reason":"checked"}`,
 			v,
 		)
 	}
@@ -447,7 +456,8 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 		s,
 		&hq,
 		"payments.recordManual",
-		`{"invoiceId":"`+inv2+`","paymentReference":"M-`+pay[:8]+`","confirmedAmountMinor":5000,"currency":"MYR","reason":"x"}`,
+		`{"invoiceId":"`+inv2+`","paymentReference":"M-`+pay[:8]+`","confirmedAmountMinor":5000,"currency":"MYR",`+
+			`"reason":"x"}`,
 		3,
 	); code != 409 {
 		t.Error("manual on an invoice with a payment")
@@ -461,7 +471,8 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 		s,
 		&hq,
 		"payments.confirm",
-		`{"paymentId":"`+pay+`","paymentReference":"`+ref+`","confirmedAmountMinor":5000,"currency":"MYR","reason":"checked"}`,
+		`{"paymentId":"`+pay+`","paymentReference":"`+ref+`","confirmedAmountMinor":5000,"currency":"MYR",`+
+			`"reason":"checked"}`,
 		2,
 	); code != 409 ||
 		m["messageKey"] != "errors.reference_used" {
@@ -504,7 +515,8 @@ func TestManualAfterFailedPayment(t *testing.T) {
 			s,
 			&hq,
 			"payments.recordManual",
-			`{"invoiceId":"`+inv+`","paymentReference":"BANK-`+pay[:8]+`","confirmedAmountMinor":5000,"currency":"MYR","reason":"bank transfer seen"}`,
+			`{"invoiceId":"`+inv+`","paymentReference":"BANK-`+pay[:8]+`","confirmedAmountMinor":5000,"currency":"MYR",`+
+				`"reason":"bank transfer seen"}`,
 			v,
 		)
 	}
@@ -569,11 +581,14 @@ func TestInvoiceOnePaymentAtATime(t *testing.T) {
 
 	_, err = conn.Exec(
 		context.Background(),
-		`INSERT INTO billing.payments (tenant_id, invoice_id, amount_minor, currency, method, channel, status, created_at, updated_at)
-		SELECT tenant_id, id, amount_minor, currency, 'demo_credit_card', 'demo', 'processing', $2, $2 FROM billing.invoices WHERE id = $1`,
+		`INSERT INTO billing.payments (tenant_id, invoice_id, amount_minor, currency, method, channel, status, created_at,
+			updated_at)
+		SELECT tenant_id, id, amount_minor, currency, 'demo_credit_card', 'demo', 'processing', $2, $2 FROM billing.invoices
+		WHERE id = $1`,
 		inv,
 		clock,
 	)
+
 	pe := (*pgconn.PgError)(nil)
 	if !errors.As(err, &pe) || pe.Code != "23505" {
 		t.Fatalf("a second open payment in the database: %v", err)

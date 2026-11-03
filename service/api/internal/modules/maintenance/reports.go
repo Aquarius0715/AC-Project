@@ -198,7 +198,8 @@ type Reports struct {
 	Units  ServiceUnits
 }
 
-const reportCols = `id, tenant_id, version, created_at, updated_at, job_id, author_id, state, items, measurements, parts, refrigerant, sign_off, work_text,
+const reportCols = `id, tenant_id, version, created_at, updated_at, job_id, author_id, state, items, measurements, ` +
+	`parts, refrigerant, sign_off, work_text,
 	next_action, submitted_at, accepted_at`
 
 func scanReport(r pgx.Row) (Report, error) {
@@ -245,6 +246,7 @@ func scanReport(r pgx.Row) (Report, error) {
 
 	if len(next) > 0 && string(next) != "null" {
 		x.NextAction = &NextAction{Kind: "", Date: nil, Note: nil}
+
 		err := json.Unmarshal(next, x.NextAction)
 		if err != nil {
 			return x, err
@@ -274,6 +276,7 @@ func (m Reports) decorate(ctx context.Context, c *ops.Call, x *Report) error {
 
 	for rows.Next() {
 		var a AttachmentRef
+
 		err := rows.Scan(
 			&a.ID,
 			&a.TenantID,
@@ -304,7 +307,8 @@ func (m Reports) decorate(ctx context.Context, c *ops.Call, x *Report) error {
 
 	rows, err = c.Tx.Query(
 		ctx,
-		`SELECT reviewer_user_id, report_version, decision, reason, occurred_at FROM maintenance.report_reviews WHERE report_id = $1 ORDER BY occurred_at, report_version`,
+		`SELECT reviewer_user_id, report_version, decision, reason, occurred_at FROM maintenance.report_reviews WHERE
+			report_id = $1 ORDER BY occurred_at, report_version`,
 		x.ID,
 	)
 	if err != nil {
@@ -315,6 +319,7 @@ func (m Reports) decorate(ctx context.Context, c *ops.Call, x *Report) error {
 
 	for rows.Next() {
 		var r Review
+
 		err := rows.Scan(
 			&r.ReviewerUserID,
 			&r.ReportVersion,
@@ -339,6 +344,7 @@ func (m Reports) decorate(ctx context.Context, c *ops.Call, x *Report) error {
 	}
 
 	var latest int
+
 	scanErr := c.Tx.QueryRow(ctx, `SELECT max(version) FROM maintenance.work_reports WHERE id = $1`, x.ID).
 		Scan(&latest)
 	if scanErr != nil {
@@ -348,7 +354,8 @@ func (m Reports) decorate(ctx context.Context, c *ops.Call, x *Report) error {
 	reason := any(nil)
 
 	switch {
-	case (c.Principal.Role != "contractor" || !c.Principal.Permissions["partner.review"]) && (c.Principal.Role != "admin" || !c.Principal.Permissions["job.write"]):
+	case (c.Principal.Role != "contractor" || !c.Principal.Permissions["partner.review"]) &&
+		(c.Principal.Role != "admin" || !c.Principal.Permissions["job.write"]):
 		reason = "permission_denied"
 	case x.AuthorID == c.Principal.UserID:
 		reason = "self_authored"
@@ -528,30 +535,34 @@ func (m Reports) draftOf(
 	return &x, err
 }
 
-// @Summary		jobs.saveDraft (write)
-// @ID				jobs.saveDraft
-// @Description	Authorization: technician:assigned-valid-job
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed); IR100 partial items allowed
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-T04, DD-T05, DD-T06, DD-T09, DD-T14
-// @Tags			jobs
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer		false	"reportId omitted: omit (target none, read jobs.get); reportId present: required (target report, read reports.get)"
-// @Param			jobId				path		string		true	"input field jobId"
-// @Param			request				body		DraftInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Report}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/jobs/{jobId}/report-draft [put]
+// saveDraft serves jobs.saveDraft.
+//
+//	@Summary		jobs.saveDraft (write)
+//	@ID				jobs.saveDraft
+//	@Description	Authorization: technician:assigned-valid-job
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR94 technician write table (assignment and work window, jobId required when typed); IR100 partial \
+//	@Description	items allowed
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-T04, DD-T05, DD-T06, DD-T09, DD-T14
+//	@Tags			jobs
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		false	"reportId omitted: omit (target none, read jobs.get); reportId present: required (target report, read reports.get)"
+//	@Param			jobId				path		string		true	"input field jobId"
+//	@Param			request				body		DraftInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=Report}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs/{jobId}/report-draft [put]
 func (m Reports) saveDraft(ctx context.Context, c *ops.Call, in *DraftInput) (Report, error) {
 	var (
 		status string
@@ -587,6 +598,7 @@ func (m Reports) saveDraft(ctx context.Context, c *ops.Call, in *DraftInput) (Re
 	switch {
 	case in.ReportID == nil:
 		var n int
+
 		err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM maintenance.work_reports WHERE job_id = $1`, in.JobID).
 			Scan(&n)
 		if err != nil {
@@ -640,6 +652,7 @@ func (m Reports) saveDraft(ctx context.Context, c *ops.Call, in *DraftInput) (Re
 
 	for rows.Next() {
 		var id uuid.UUID
+
 		err := rows.Scan(&id)
 		if err != nil {
 			rows.Close()
@@ -782,8 +795,10 @@ func (m Reports) saveDraft(ctx context.Context, c *ops.Call, in *DraftInput) (Re
 	if in.ReportID == nil {
 		_, err = c.Tx.Exec(
 			ctx,
-			`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state, items, measurements, parts, refrigerant, work_text,
-			next_action, created_at, updated_at) VALUES ($1, 1, current_setting('app.tenant_id')::uuid, $2, $3, 'draft', $4, $5, $6, $7, $8, $9, $10, $10)`,
+			`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state, items, measurements, parts,
+				refrigerant, work_text,
+			next_action, created_at, updated_at) VALUES ($1, 1, current_setting('app.tenant_id')::uuid, $2, $3, 'draft', $4, $5,
+			$6, $7, $8, $9, $10, $10)`,
 			prev.ID,
 			in.JobID,
 			c.Principal.UserID,
@@ -798,7 +813,8 @@ func (m Reports) saveDraft(ctx context.Context, c *ops.Call, in *DraftInput) (Re
 	} else {
 		_, err = c.Tx.Exec(
 			ctx,
-			`UPDATE maintenance.work_reports SET version = version + 1, items = $3, measurements = $4, parts = $5, refrigerant = $6, work_text = $7,
+			`UPDATE maintenance.work_reports SET version = version + 1, items = $3, measurements = $4, parts = $5, refrigerant =
+				$6, work_text = $7,
 			next_action = $8, sign_off = NULL, updated_at = $9 WHERE id = $1 AND version = $2`,
 			prev.ID,
 			prev.Version,
@@ -945,30 +961,34 @@ func (m Reports) lockJob(
 	return status, unit, nil
 }
 
-// @Summary		jobs.submit (write)
-// @ID				jobs.submit
-// @Description	Authorization: technician:assigned-valid-job
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed); IR100 component set and report completeness
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-T04, DD-T05, DD-T06, DD-T08, DD-T09 · Input versions: reportVersion=WorkReport.version
-// @Tags			jobs
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;reports.get)"
-// @Param			jobId				path		string		true	"input field jobId"
-// @Param			request				body		SubmitInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/jobs/{jobId}/submit [post]
+// submit serves jobs.submit.
+//
+//	@Summary		jobs.submit (write)
+//	@ID				jobs.submit
+//	@Description	Authorization: technician:assigned-valid-job
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR94 technician write table (assignment and work window, jobId required when typed); IR100 component \
+//	@Description	set and report completeness
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-T04, DD-T05, DD-T06, DD-T08, DD-T09 · Input versions: reportVersion=WorkReport.version
+//	@Tags			jobs
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;reports.get)"
+//	@Param			jobId				path		string		true	"input field jobId"
+//	@Param			request				body		SubmitInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=MaintenanceJob}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs/{jobId}/submit [post]
 func (m Reports) submit(ctx context.Context, c *ops.Call, in *SubmitInput) (MaintenanceJob, error) {
 	return written(m.submitJob(ctx, c, in))
 }
@@ -1009,7 +1029,8 @@ func (m Reports) submitJob(ctx context.Context, c *ops.Call, in *SubmitInput) (J
 
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`UPDATE maintenance.work_reports SET state = 'submitted', submitted_at = $3, updated_at = $3 WHERE id = $1 AND version = $2`,
+		`UPDATE maintenance.work_reports SET state = 'submitted', submitted_at = $3, updated_at = $3 WHERE id = $1 AND version
+			= $2`,
 		draft.ID,
 		draft.Version,
 		c.Now,
@@ -1019,6 +1040,7 @@ func (m Reports) submitJob(ctx context.Context, c *ops.Call, in *SubmitInput) (J
 	}
 
 	var raw []byte
+
 	scanErr := c.Tx.QueryRow(ctx, `SELECT time_on_site FROM maintenance.jobs WHERE id = $1`, in.JobID).
 		Scan(&raw)
 	if scanErr != nil {
@@ -1057,9 +1079,11 @@ func (m Reports) submitJob(ctx context.Context, c *ops.Call, in *SubmitInput) (J
 	}
 
 	tos, _ := json.Marshal(t)
+
 	_, execErr = c.Tx.Exec(
 		ctx,
-		`UPDATE maintenance.jobs SET status = 'submitted', time_on_site = $2, draft_report_version = NULL, version = version + 1, updated_at = platform.app_now()
+		`UPDATE maintenance.jobs SET status = 'submitted', time_on_site = $2, draft_report_version = NULL, version = version +
+			1, updated_at = platform.app_now()
 		WHERE id = $1`,
 		in.JobID,
 		tos,
@@ -1120,6 +1144,7 @@ func offWork(
 			action string
 			at     time.Time
 		)
+
 		err := rows.Scan(&action, &at)
 		if err != nil {
 			return nil, err
@@ -1206,8 +1231,9 @@ func submitErrors(x *Report, components []string, now time.Time) map[string]stri
 	switch {
 	case x.NextAction == nil:
 		fe["nextAction"] = "error.required"
-	case x.NextAction.Kind == "follow_up" && (x.NextAction.Date == nil || !x.NextAction.Date.After(now) || x.NextAction.Note == nil ||
-		utf8.RuneCountInString(*x.NextAction.Note) < 1):
+	case x.NextAction.Kind == "follow_up" &&
+		(x.NextAction.Date == nil || !x.NextAction.Date.After(now) || x.NextAction.Note == nil ||
+			utf8.RuneCountInString(*x.NextAction.Note) < 1):
 		fe["nextAction"] = "error.invalid"
 	}
 
@@ -1242,7 +1268,8 @@ func (m Reports) reportEvent(
 ) error {
 	_, err := c.Tx.Exec(
 		ctx,
-		`INSERT INTO maintenance.job_events (id, tenant_id, job_id, actor_user_id, action, report_id, report_version, occurred_at)
+		`INSERT INTO maintenance.job_events (id, tenant_id, job_id, actor_user_id, action, report_id, report_version,
+			occurred_at)
 		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7)`,
 		uuid.Must(uuid.NewV7()),
 		job,
@@ -1297,30 +1324,34 @@ func (in *ReviewInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		jobs.review (write)
-// @ID				jobs.review
-// @Description	Authorization: contractor:partner.review:own-offer | admin:job.write:internal-or-escalation; no-self-review
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR87 reason 1-1000; IR234 accept releases the active assignment (status completed)
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A06, DD-P05 · Input versions: reportVersion=WorkReport.version
-// @Tags			jobs
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;reports.get)"
-// @Param			jobId				path		string		true	"input field jobId"
-// @Param			request				body		ReviewInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/jobs/{jobId}/review [post]
+// review serves jobs.review.
+//
+//	@Summary		jobs.review (write)
+//	@ID				jobs.review
+//	@Description	Authorization: contractor:partner.review:own-offer | admin:job.write:internal-or-escalation; \
+//	@Description	no-self-review
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR87 reason 1-1000; IR234 accept releases the active assignment (status completed)
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A06, DD-P05 · Input versions: reportVersion=WorkReport.version
+//	@Tags			jobs
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;reports.get)"
+//	@Param			jobId				path		string		true	"input field jobId"
+//	@Param			request				body		ReviewInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=MaintenanceJob}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs/{jobId}/review [post]
 func (m Reports) review(ctx context.Context, c *ops.Call, in *ReviewInput) (MaintenanceJob, error) {
 	return written(m.reviewJob(ctx, c, in))
 }
@@ -1328,6 +1359,7 @@ func (m Reports) review(ctx context.Context, c *ops.Call, in *ReviewInput) (Main
 // reviewJob is review answering the job with its detail extras.
 func (m Reports) reviewJob(ctx context.Context, c *ops.Call, in *ReviewInput) (Job, error) {
 	var contractor *uuid.UUID
+
 	err := c.Tx.QueryRow(ctx, `SELECT contractor_org_id FROM maintenance.jobs WHERE id = $1`, in.JobID).
 		Scan(&contractor)
 	if err != nil {
@@ -1364,7 +1396,8 @@ func (m Reports) reviewJob(ctx context.Context, c *ops.Call, in *ReviewInput) (J
 		state  string
 	)
 
-	err = c.Tx.QueryRow(ctx, `SELECT id, author_id, state FROM maintenance.work_reports WHERE job_id = $1 ORDER BY version DESC LIMIT 1 FOR UPDATE`, in.JobID).
+	err = c.Tx.QueryRow(ctx, `SELECT id, author_id, state FROM maintenance.work_reports WHERE job_id = $1 ORDER BY version
+		DESC LIMIT 1 FOR UPDATE`, in.JobID).
 		Scan(&id, &author, &state)
 	if errors.Is(err, pgx.ErrNoRows) || status != "submitted" {
 		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
@@ -1375,6 +1408,7 @@ func (m Reports) reviewJob(ctx context.Context, c *ops.Call, in *ReviewInput) (J
 	}
 
 	var latest int
+
 	scanErr := c.Tx.QueryRow(ctx, `SELECT max(version) FROM maintenance.work_reports WHERE id = $1`, id).
 		Scan(&latest)
 	if scanErr != nil {
@@ -1396,7 +1430,8 @@ func (m Reports) reviewJob(ctx context.Context, c *ops.Call, in *ReviewInput) (J
 
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`UPDATE maintenance.work_reports SET state = $3, accepted_at = CASE WHEN $3 = 'accepted' THEN $4::timestamptz END, updated_at = $4
+		`UPDATE maintenance.work_reports SET state = $3, accepted_at = CASE WHEN $3 = 'accepted' THEN $4::timestamptz END,
+			updated_at = $4
 		WHERE id = $1 AND version = $2`,
 		id,
 		latest,
@@ -1409,7 +1444,8 @@ func (m Reports) reviewJob(ctx context.Context, c *ops.Call, in *ReviewInput) (J
 
 	_, execErr = c.Tx.Exec(
 		ctx,
-		`INSERT INTO maintenance.report_reviews (tenant_id, report_id, report_version, reviewer_user_id, decision, reason, occurred_at)
+		`INSERT INTO maintenance.report_reviews (tenant_id, report_id, report_version, reviewer_user_id, decision, reason,
+			occurred_at)
 		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6)`,
 		id,
 		latest,
@@ -1424,7 +1460,8 @@ func (m Reports) reviewJob(ctx context.Context, c *ops.Call, in *ReviewInput) (J
 
 	_, execErr = c.Tx.Exec(
 		ctx,
-		`UPDATE maintenance.jobs SET status = $2, completed_at = CASE WHEN $2 = 'completed' THEN $3::timestamptz ELSE completed_at END,
+		`UPDATE maintenance.jobs SET status = $2, completed_at = CASE WHEN $2 = 'completed' THEN $3::timestamptz ELSE
+			completed_at END,
 		version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
 		in.JobID,
 		jobStatus,
@@ -1455,10 +1492,13 @@ func (m Reports) reviewJob(ctx context.Context, c *ops.Call, in *ReviewInput) (J
 func NewDraftFromLatest(ctx context.Context, c *ops.Call, job uuid.UUID) error {
 	_, err := c.Tx.Exec(
 		ctx,
-		`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state, items, measurements, parts, refrigerant, work_text,
+		`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state, items, measurements, parts,
+			refrigerant, work_text,
 			next_action, created_at, updated_at)
-		SELECT id, version + 1, tenant_id, job_id, author_id, 'draft', items, measurements, parts, refrigerant, work_text, next_action, $2, $2
-		FROM maintenance.work_reports r WHERE r.job_id = $1 AND NOT EXISTS (SELECT 1 FROM maintenance.work_reports d WHERE d.job_id = $1 AND d.state = 'draft')
+		SELECT id, version + 1, tenant_id, job_id, author_id, 'draft', items, measurements, parts, refrigerant, work_text,
+		next_action, $2, $2
+		FROM maintenance.work_reports r WHERE r.job_id = $1 AND NOT EXISTS (SELECT 1 FROM maintenance.work_reports d WHERE
+		d.job_id = $1 AND d.state = 'draft')
 		ORDER BY version DESC LIMIT 1`,
 		job,
 		c.Now,
@@ -1469,37 +1509,41 @@ func NewDraftFromLatest(ctx context.Context, c *ops.Call, job uuid.UUID) error {
 
 	_, err = c.Tx.Exec(
 		ctx,
-		`UPDATE maintenance.jobs SET draft_report_version = (SELECT version FROM maintenance.work_reports WHERE job_id = $1 AND state = 'draft') WHERE id = $1`,
+		`UPDATE maintenance.jobs SET draft_report_version = (SELECT version FROM maintenance.work_reports WHERE job_id = $1
+			AND state = 'draft') WHERE id = $1`,
 		job,
 	)
 
 	return err
 }
 
-// @Summary		jobs.resumeRework (write)
-// @ID				jobs.resumeRework
-// @Description	Authorization: technician:assigned-valid-job
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed)
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-T08
-// @Tags			jobs
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			jobId				path		string		true	"input field jobId"
-// @Param			request				body		JobIDInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/jobs/{jobId}/resume-rework [post]
+// resumeRework serves jobs.resumeRework.
+//
+//	@Summary		jobs.resumeRework (write)
+//	@ID				jobs.resumeRework
+//	@Description	Authorization: technician:assigned-valid-job
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR94 technician write table (assignment and work window, jobId required when typed)
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-T08
+//	@Tags			jobs
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
+//	@Param			jobId				path		string		true	"input field jobId"
+//	@Param			request				body		JobIDInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=MaintenanceJob}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs/{jobId}/resume-rework [post]
 func (m Reports) resumeRework(
 	ctx context.Context,
 	c *ops.Call,
@@ -1526,7 +1570,8 @@ func (m Reports) resumeReworkJob(ctx context.Context, c *ops.Call, in *JobIDInpu
 
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`UPDATE maintenance.jobs SET status = 'in_progress', version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
+		`UPDATE maintenance.jobs SET status = 'in_progress', version = version + 1, updated_at = platform.app_now() WHERE id =
+			$1`,
 		in.JobID,
 	)
 	if execErr != nil {
@@ -1568,29 +1613,32 @@ func (in *GetReportInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		reports.get (read)
-// @ID				reports.get
-// @Description	Authorization: client:accepted-report-only | contractor:partner.review:submitted | technician:assigned-valid-job | admin:job.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A06, DD-C09, DD-P05, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T15
-// @Tags			reports
-// @Accept			json
-// @Produce		json
-// @Param			jobId			path		string	true	"input field jobId"
-// @Param			reportId		path		string	true	"input field reportId"
-// @Param			reportVersion	query		integer	false	"input field reportVersion"
-// @Success		200				{object}	ops.Envelope{data=Report}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/jobs/{jobId}/reports/{reportId} [get]
+// get serves reports.get.
+//
+//	@Summary		reports.get (read)
+//	@ID				reports.get
+//	@Description	Authorization: client:accepted-report-only | contractor:partner.review:submitted | \
+//	@Description	technician:assigned-valid-job | admin:job.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A06, DD-C09, DD-P05, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T15
+//	@Tags			reports
+//	@Accept			json
+//	@Produce		json
+//	@Param			jobId			path		string	true	"input field jobId"
+//	@Param			reportId		path		string	true	"input field reportId"
+//	@Param			reportVersion	query		integer	false	"input field reportVersion"
+//	@Success		200				{object}	ops.Envelope{data=Report}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs/{jobId}/reports/{reportId} [get]
 func (m Reports) get(ctx context.Context, c *ops.Call, in *GetReportInput) (Report, error) {
 	var (
 		org        uuid.UUID
@@ -1598,7 +1646,8 @@ func (m Reports) get(ctx context.Context, c *ops.Call, in *GetReportInput) (Repo
 		contractor *uuid.UUID
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT customer_org_id, unit_id, contractor_org_id FROM maintenance.jobs WHERE id = $1`, in.JobID).
+	err := c.Tx.QueryRow(ctx, `SELECT customer_org_id, unit_id, contractor_org_id FROM maintenance.jobs WHERE id =
+		$1`, in.JobID).
 		Scan(&org, &unit, &contractor)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Report{}, apperr.E(apperr.NotFound, "error.notFound")

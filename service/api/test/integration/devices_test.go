@@ -44,7 +44,8 @@ func assign(t *testing.T, unit, membership string, from, until time.Time, status
 	if status == "active" { // isolate from active assignments other tests left in the same window
 		owner(
 			t,
-			`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND scheduled && tstzrange($2, $3)`,
+			`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND
+				scheduled && tstzrange($2, $3)`,
 			seed.ID(membership),
 			from,
 			until,
@@ -64,7 +65,8 @@ func assign(t *testing.T, unit, membership string, from, until time.Time, status
 	)
 	owner(
 		t,
-		`INSERT INTO maintenance.assignments (tenant_id, job_id, technician_membership_id, valid_from, valid_until, scheduled, status)
+		`INSERT INTO maintenance.assignments (tenant_id, job_id, technician_membership_id, valid_from, valid_until, scheduled,
+			status)
 		VALUES ($1,$2,$3,$4,$5,tstzrange($4,$5),$6)`,
 		seed.ID("tenant-a"),
 		job,
@@ -103,7 +105,8 @@ func TestDevicesRegisterListGet(t *testing.T) {
 
 	d := data(m)
 
-	_, detail := d["activeOperation"] // the write answers Device; calibrations and the running operation are devices.get's (IR392)
+	// the write answers Device; calibrations and the running operation are devices.get's (IR392)
+	_, detail := d["activeOperation"]
 	if d["serial"] != strings.ToUpper(serial) || len(d["sensors"].([]any)) != 2 ||
 		d["unitId"] != nil ||
 		d["targetUnitId"] != unit ||
@@ -385,7 +388,8 @@ func TestDeviceBindAndOperations(t *testing.T) {
 		s,
 		&hq,
 		"devices.calibrate",
-		`{"deviceId":"`+dev+`","sensorId":"`+sensor+`","metric":"temperature","unit":"°C","referenceValue":25,"measuredValue":25.4,"calibratedAt":"2026-09-14T00:30:00Z"}`,
+		`{"deviceId":"`+dev+`","sensorId":"`+sensor+`","metric":"temperature","unit":"°C","referenceValue":25,`+
+			`"measuredValue":25.4,"calibratedAt":"2026-09-14T00:30:00Z"}`,
 		v,
 	)
 	if code != 200 || data(m)["isDemo"] != true || data(m)["unitIdAtOccurrence"] != u1 {
@@ -401,10 +405,14 @@ func TestDeviceBindAndOperations(t *testing.T) {
 	}
 
 	for name, b := range map[string]string{
-		"future":         `{"deviceId":"` + dev + `","sensorId":"` + sensor + `","metric":"temperature","unit":"°C","referenceValue":1,"measuredValue":1,"calibratedAt":"2030-01-01T00:00:00Z"}`,
-		"unit mismatch":  `{"deviceId":"` + dev + `","sensorId":"` + sensor + `","metric":"temperature","unit":"%","referenceValue":1,"measuredValue":1,"calibratedAt":"2026-09-14T00:30:00Z"}`,
-		"other sensor":   `{"deviceId":"` + dev + `","sensorId":"` + uuid.NewString() + `","metric":"temperature","unit":"°C","referenceValue":1,"measuredValue":1,"calibratedAt":"2026-09-14T00:30:00Z"}`,
-		"metric differs": `{"deviceId":"` + dev + `","sensorId":"` + sensor + `","metric":"humidity","unit":"%","referenceValue":1,"measuredValue":1,"calibratedAt":"2026-09-14T00:30:00Z"}`,
+		"future": `{"deviceId":"` + dev + `","sensorId":"` + sensor + `","metric":"temperature","unit":"°C",` +
+			`"referenceValue":1,"measuredValue":1,"calibratedAt":"2030-01-01T00:00:00Z"}`,
+		"unit mismatch": `{"deviceId":"` + dev + `","sensorId":"` + sensor + `","metric":"temperature","unit":"%",` +
+			`"referenceValue":1,"measuredValue":1,"calibratedAt":"2026-09-14T00:30:00Z"}`,
+		"other sensor": `{"deviceId":"` + dev + `","sensorId":"` + uuid.NewString() + `","metric":"temperature",` +
+			`"unit":"°C","referenceValue":1,"measuredValue":1,"calibratedAt":"2026-09-14T00:30:00Z"}`,
+		"metric differs": `{"deviceId":"` + dev + `","sensorId":"` + sensor + `","metric":"humidity","unit":"%",` +
+			`"referenceValue":1,"measuredValue":1,"calibratedAt":"2026-09-14T00:30:00Z"}`,
 	} {
 		code, m := write(s, &hq, "devices.calibrate", b, v)
 		refusal(t, name, code, m, want[name])

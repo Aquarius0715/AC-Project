@@ -166,6 +166,7 @@ func setup(t *testing.T) (*Registry, *echo.Echo, *fakeRec, *fakeIdem, *bool) {
 	e := echo.New()
 
 	e.HTTPErrorHandler = HTTPErrorHandler
+
 	err := r.MountREST(e.Group("/v1"))
 	if err != nil {
 		t.Fatal(err)
@@ -197,6 +198,7 @@ func errCode(t *testing.T, w *httptest.ResponseRecorder) string {
 	t.Helper()
 
 	var de apperr.DomainError
+
 	err := json.Unmarshal(w.Body.Bytes(), &de)
 	if err != nil {
 		t.Fatalf("not a DomainError: %s", w.Body.String())
@@ -214,7 +216,8 @@ var (
 		Principal: authz.Principal{
 			Role:        "admin",
 			Permissions: map[string]bool{"asset.write": true, "asset.read": true}, ClientRole: "",
-		}, TenantID: uuid.UUID{}, MembershipID: uuid.UUID{}, UserID: uuid.UUID{}, OrgID: uuid.UUID{}, ScopeVersion: 0, Scopes: nil, Employment: "", Timezone: "", SessionsRevokedAt: nil,
+		}, TenantID: uuid.UUID{}, MembershipID: uuid.UUID{}, UserID: uuid.UUID{}, OrgID: uuid.UUID{}, ScopeVersion: 0,
+		Scopes: nil, Employment: "", Timezone: "", SessionsRevokedAt: nil,
 	}
 	client = &Principal{
 		Principal: authz.Principal{
@@ -257,7 +260,8 @@ func TestPipeline(t *testing.T) {
 				Principal: authz.Principal{
 					Role:        "admin",
 					Permissions: map[string]bool{"asset.read": true}, ClientRole: "",
-				}, TenantID: uuid.UUID{}, MembershipID: uuid.UUID{}, UserID: uuid.UUID{}, OrgID: uuid.UUID{}, ScopeVersion: 0, Scopes: nil, Employment: "", Timezone: "", SessionsRevokedAt: nil,
+				}, TenantID: uuid.UUID{}, MembershipID: uuid.UUID{}, UserID: uuid.UUID{}, OrgID: uuid.UUID{}, ScopeVersion: 0,
+				Scopes: nil, Employment: "", Timezone: "", SessionsRevokedAt: nil,
 			},
 			403,
 			"FORBIDDEN",
@@ -410,7 +414,11 @@ func TestRegisterGuards(t *testing.T) {
 func TestCatalogShape(t *testing.T) {
 	if len(
 		Catalog,
-	) != 212 { // IR612 members.unavailability + members.clearUnavailability, IR437 jobs.getAttachment, IR436 certificates.getContent, IR214 automations.delete, IR216 commands.list, IR238 filterCare.getSettings, IR327 alerts.evidence, IR349 attachments.list, IR379 notifications.markAllRead, IR384 members.revokeSessions, IR416 partnerUsers.*
+	) != 212 {
+		// IR612 members.unavailability + members.clearUnavailability, IR437 jobs.getAttachment, IR436
+		// certificates.getContent, IR214 automations.delete, IR216 commands.list, IR238 filterCare.getSettings, IR327
+		// alerts.evidence, IR349 attachments.list, IR379 notifications.markAllRead, IR384 members.revokeSessions, IR416
+		// partnerUsers.*
 		t.Fatalf("catalog size %d", len(Catalog))
 	}
 

@@ -416,7 +416,8 @@ func (m Automations) candidates(
 
 	rows, err := c.Tx.Query(
 		ctx,
-		`SELECT p.id, p.priority, p.enabled, p.owner_membership_id, p.action, p.condition, p.timezone FROM control.automation_policies p
+		`SELECT p.id, p.priority, p.enabled, p.owner_membership_id, p.action, p.condition, p.timezone FROM
+			control.automation_policies p
 		JOIN control.automation_policy_units u ON u.policy_id = p.id WHERE u.unit_id = $1`,
 		unit,
 	)
@@ -437,6 +438,7 @@ func (m Automations) candidates(
 			extras:   nil,
 			tz:       "",
 		}
+
 		err := rows.Scan(
 			&x.id,
 			&x.priority,
@@ -461,7 +463,8 @@ func (m Automations) candidates(
 
 	rows, err = c.Tx.Query(
 		ctx,
-		`SELECT a.id, a.priority, a.enabled, a.owner_membership_id, a.kind, a.definition, a.timezone FROM control.automations a
+		`SELECT a.id, a.priority, a.enabled, a.owner_membership_id, a.kind, a.definition, a.timezone FROM control.automations
+			a
 		JOIN control.automation_units u ON u.automation_id = a.id WHERE u.unit_id = $1`,
 		unit,
 	)
@@ -488,6 +491,7 @@ func (m Automations) candidates(
 			kind string
 			raw  []byte
 		)
+
 		err := rows.Scan(
 			&x.id,
 			&x.priority,
@@ -815,7 +819,8 @@ func (m Automations) evaluate(
 
 				_, err := c.Tx.Exec(
 					ctx,
-					`INSERT INTO control.automation_runs (tenant_id, rule_kind, rule_id, unit_id, trigger_ref, outcome, skip_reason, occurred_at)
+					`INSERT INTO control.automation_runs (tenant_id, rule_kind, rule_id, unit_id, trigger_ref, outcome, skip_reason,
+						occurred_at)
 					VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, 'skipped', $5, $6) ON CONFLICT DO NOTHING`,
 					sk.cand.kind,
 					sk.cand.id,
@@ -833,7 +838,8 @@ func (m Automations) evaluate(
 		if fire && win != nil {
 			var earlier uuid.UUID
 
-			err := c.Tx.QueryRow(ctx, `SELECT command_id FROM control.automation_runs WHERE rule_id = $1 AND unit_id = $2 AND trigger_ref = $3 AND command_id IS NOT NULL`,
+			err := c.Tx.QueryRow(ctx, `SELECT command_id FROM control.automation_runs WHERE rule_id = $1 AND unit_id = $2 AND
+				trigger_ref = $3 AND command_id IS NOT NULL`,
 				win.id, u, ref).
 				Scan(&earlier)
 			switch {
@@ -848,11 +854,14 @@ func (m Automations) evaluate(
 				}
 
 				d.Decision, d.CommandID, d.fresh = "requested", &id, true
+
 				_, execErr := c.Tx.Exec(
 					ctx,
-					`INSERT INTO control.automation_runs (tenant_id, rule_kind, rule_id, unit_id, trigger_ref, outcome, command_id, occurred_at)
+					`INSERT INTO control.automation_runs (tenant_id, rule_kind, rule_id, unit_id, trigger_ref, outcome, command_id,
+						occurred_at)
 					VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, 'command_created', $5, $6)
-					ON CONFLICT (rule_id, unit_id, trigger_ref) DO UPDATE SET outcome = 'command_created', skip_reason = NULL, command_id = EXCLUDED.command_id
+					ON CONFLICT (rule_id, unit_id, trigger_ref) DO UPDATE SET outcome = 'command_created', skip_reason = NULL,
+					command_id = EXCLUDED.command_id
 					WHERE control.automation_runs.command_id IS NULL`,
 					win.kind,
 					win.id,
@@ -916,8 +925,10 @@ func (m Automations) automationCommand(
 
 	var id uuid.UUID
 
-	err = c.Tx.QueryRow(ctx, `INSERT INTO control.commands (tenant_id, unit_id, device_id, actor_membership_id, source, action, status, delivery, requested_at, sent_at, expires_at,
-		correlation_id, created_at, updated_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'automation', $4, 'requested', 'not_sent', $5, NULL, $6, $7, $5, $5) RETURNING id`,
+	err = c.Tx.QueryRow(ctx, `INSERT INTO control.commands (tenant_id, unit_id, device_id, actor_membership_id, source,
+		action, status, delivery, requested_at, sent_at, expires_at,
+		correlation_id, created_at, updated_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'automation', $4,
+		'requested', 'not_sent', $5, NULL, $6, $7, $5, $5) RETURNING id`,
 		unit, dev, win.owner, []byte(win.action), c.Now, c.Now.Add(CommandTTL), c.CorrelationID).
 		Scan(&id)
 	if err == nil {
@@ -947,27 +958,29 @@ func checkTick(c *ops.Call, in *EvaluationInput) error {
 	return nil
 }
 
-// @Summary		automations.simulate (read)
-// @ID				automations.simulate
-// @Description	Authorization: client:control.execute:self | admin:automation.policy.read | admin:alert.policy.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A11, DD-A12, DD-C04, DD-C05, DD-A05
-// @Tags			automations
-// @Accept			json
-// @Produce		json
-// @Param			request	body		EvaluationInput	true	"input"
-// @Success		200		{object}	ops.Envelope{data=Result}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/automations/simulate [post]
+// simulate serves automations.simulate.
+//
+//	@Summary		automations.simulate (read)
+//	@ID				automations.simulate
+//	@Description	Authorization: client:control.execute:self | admin:automation.policy.read | admin:alert.policy.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A11, DD-A12, DD-C04, DD-C05, DD-A05
+//	@Tags			automations
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		EvaluationInput	true	"input"
+//	@Success		200		{object}	ops.Envelope{data=Result}
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/automations/simulate [post]
 func (m Automations) simulate(
 	ctx context.Context,
 	c *ops.Call,
@@ -986,8 +999,10 @@ func (m Automations) simulate(
 //
 //	@Summary		automations.fire (write)
 //	@ID				automations.fire
-//	@Description	Authorization: client:control.execute:self | admin:automation.policy.write | admin:alert.policy.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR215 records skips whose own trigger held (reason in automation_runs)
+//	@Description	Authorization: client:control.execute:self | admin:automation.policy.write | \
+//	@Description	admin:alert.policy.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR215 records skips whose own trigger held (reason in automation_runs)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A11, DD-A12, DD-C04, DD-C05, DD-A05
 //	@Tags			automations
@@ -1027,7 +1042,8 @@ func (m Automations) fire(ctx context.Context, c *ops.Call, in *EvaluationInput)
 		storedHash string
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT input_hash, result FROM control.evaluation_events WHERE event_id = $1 AND phase = $2`, in.EventID, in.Phase).
+	err := c.Tx.QueryRow(ctx, `SELECT input_hash, result FROM control.evaluation_events WHERE event_id = $1 AND phase =
+		$2`, in.EventID, in.Phase).
 		Scan(&storedHash, &stored)
 	if err == nil {
 		if storedHash != hash {
@@ -1052,7 +1068,8 @@ func (m Automations) fire(ctx context.Context, c *ops.Call, in *EvaluationInput)
 	// one tick has one result (D02): the same input with another eventId reuses it; other input is CONFLICT
 	var storedPhase string
 
-	err = c.Tx.QueryRow(ctx, `SELECT input_hash, result, phase FROM control.evaluation_events WHERE date_trunc('minute', occurred_at) = date_trunc('minute', $1::timestamptz)
+	err = c.Tx.QueryRow(ctx, `SELECT input_hash, result, phase FROM control.evaluation_events WHERE date_trunc('minute',
+		occurred_at) = date_trunc('minute', $1::timestamptz)
 		ORDER BY created_at LIMIT 1`, in.OccurredAt).
 		Scan(&storedHash, &stored, &storedPhase)
 	if err == nil {
@@ -1078,9 +1095,11 @@ func (m Automations) fire(ctx context.Context, c *ops.Call, in *EvaluationInput)
 	}
 
 	raw, _ := json.Marshal(r)
+
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`INSERT INTO control.evaluation_events (tenant_id, event_id, phase, occurred_at, input_hash, result) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5)`,
+		`INSERT INTO control.evaluation_events (tenant_id, event_id, phase, occurred_at, input_hash, result) VALUES
+			(current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5)`,
 		in.EventID,
 		in.Phase,
 		in.OccurredAt,

@@ -174,10 +174,13 @@ func scopeSQL(
 	return unitscope.SQL(c, args, "u.id", unitscope.List)
 }
 
-const unitCols = `u.id, u.tenant_id, u.version, u.created_at, u.updated_at, u.customer_org_id, u.property_id, u.space_id, u.display_name,
-	u.model_id, u.type, u.installed_at, u.service_scope, u.warranty_ends_at, u.archived, u.capability_version, u.connection,
+const unitCols = `u.id, u.tenant_id, u.version, u.created_at, u.updated_at, u.customer_org_id, u.property_id, ` +
+	`u.space_id, u.display_name,
+	u.model_id, u.type, u.installed_at, u.service_scope, u.warranty_ends_at, u.archived, u.capability_version, ` +
+	`u.connection,
 	u.observed_state, u.observed_restriction, u.last_seen_at,
-	COALESCE((SELECT array_agg(policy_id ORDER BY policy_id) FROM assets.unit_alert_policies ap WHERE ap.unit_id = u.id), '{}')`
+	COALESCE((SELECT array_agg(policy_id ORDER BY policy_id) FROM assets.unit_alert_policies ap WHERE ap.unit_id = ` +
+	`u.id), '{}')`
 
 func (m *Module) query(
 	ctx context.Context,
@@ -188,6 +191,7 @@ func (m *Module) query(
 	limit, offset int,
 ) ([]Unit, int, error) {
 	var total int
+
 	err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM assets.units u WHERE "+where, args...).
 		Scan(&total)
 	if err != nil {
@@ -212,6 +216,7 @@ func (m *Module) query(
 			u     Unit
 			state []byte
 		)
+
 		err := rows.Scan(
 			&u.ID,
 			&u.TenantID,
@@ -326,39 +331,53 @@ func (m *Module) enrich(ctx context.Context, c *ops.Call, units []Unit) error {
 	return nil
 }
 
-// @Summary		units.list (read)
-// @ID				units.list
-// @Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:asset.read | admin:control.execute:scope-candidate-read-only | admin:device.read:scope-candidate-read-only | admin:job.read:scope-candidate-read-only | admin:contract.read:scope-candidate-read-only | admin:restriction.read:scope-candidate-read-only | admin:automation.policy.read:scope-candidate-read-only | admin:alert.policy.read:scope-candidate-read-only | admin:energy.read:scope-candidate-read-only | admin:mrv.read:scope-candidate-read-only | admin:offset.read:scope-candidate-read-only
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR62 unassignedOnly; IR213 latestMeasurements: latest reading per metric with read-time quality; [] before an external technician's work window
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A02, DD-C01, DD-C02, DD-C04, DD-C05, DD-C06, DD-C07, DD-C09, DD-C13, DD-T11, DD-A04, DD-A06, DD-A07, DD-A09, DD-A11, DD-A12, DD-A13, DD-A14, DD-A15, DD-A05, DD-C14, DD-C15, DD-C03, DD-T12, DD-P01, DD-P03, DD-P07, DD-T01, DD-T13, DD-C08 · Query: filters customerId,propertyId,status,spaceId,includeDescendants,connections,powerState,unitIds,organizationId,unassignedOnly · sort id,createdAt,updatedAt (default id asc)
-// @Tags			units
-// @Accept			json
-// @Produce		json
-// @Param			cursor				query		string		false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit				query		integer		false	"page size 1–100, default 25"
-// @Param			sort				query		string		false	"field:direction — fields id,createdAt,updatedAt; default id asc"
-// @Param			customerId			query		string		false	"filter → Customer.organizationId = ACUnit.customerOrgId"
-// @Param			propertyId			query		string		false	"filter → propertyId"
-// @Param			status				query		string		false	"filter → connection"
-// @Param			spaceId				query		string		false	"filter"
-// @Param			includeDescendants	query		boolean		false	"filter"
-// @Param			connections			query		[]string	false	"filter (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
-// @Param			powerState			query		string		false	"filter → SR27 effectivePowerState (not observedState.power)"
-// @Param			unitIds				query		[]string	false	"filter → id in unitIds (empty array returns zero) (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
-// @Param			organizationId		query		string		false	"filter → ACUnit.customerOrgId"
-// @Param			unassignedOnly		query		boolean		false	"filter → true => spaceId=null (combined with spaceId is VALIDATION)"
-// @Success		200					{object}	ops.Envelope{data=UnitPage}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/units [get]
+// unitsList serves units.list.
+//
+//	@Summary		units.list (read)
+//	@ID				units.list
+//	@Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | \
+//	@Description	admin:dashboard.read | admin:asset.read | admin:control.execute:scope-candidate-read-only | \
+//	@Description	admin:device.read:scope-candidate-read-only | admin:job.read:scope-candidate-read-only | \
+//	@Description	admin:contract.read:scope-candidate-read-only | admin:restriction.read:scope-candidate-read-only | \
+//	@Description	admin:automation.policy.read:scope-candidate-read-only | \
+//	@Description	admin:alert.policy.read:scope-candidate-read-only | admin:energy.read:scope-candidate-read-only | \
+//	@Description	admin:mrv.read:scope-candidate-read-only | admin:offset.read:scope-candidate-read-only
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR62 \
+//	@Description	unassignedOnly; IR213 latestMeasurements: latest reading per metric with read-time quality; [] \
+//	@Description	before an external technician's work window
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A02, DD-C01, DD-C02, DD-C04, DD-C05, DD-C06, DD-C07, DD-C09, DD-C13, DD-T11, DD-A04, \
+//	@Description	DD-A06, DD-A07, DD-A09, DD-A11, DD-A12, DD-A13, DD-A14, DD-A15, DD-A05, DD-C14, DD-C15, DD-C03, \
+//	@Description	DD-T12, DD-P01, DD-P03, DD-P07, DD-T01, DD-T13, DD-C08 · Query: filters \
+//	@Description	customerId,propertyId,status,spaceId,includeDescendants,connections,powerState,unitIds,\
+//	@Description	organizationId,unassignedOnly · sort id,createdAt,updatedAt (default id asc)
+//	@Tags			units
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor				query		string		false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit				query		integer		false	"page size 1–100, default 25"
+//	@Param			sort				query		string		false	"field:direction — fields id,createdAt,updatedAt; default id asc"
+//	@Param			customerId			query		string		false	"filter → Customer.organizationId = ACUnit.customerOrgId"
+//	@Param			propertyId			query		string		false	"filter → propertyId"
+//	@Param			status				query		string		false	"filter → connection"
+//	@Param			spaceId				query		string		false	"filter"
+//	@Param			includeDescendants	query		boolean		false	"filter"
+//	@Param			connections			query		[]string	false	"filter (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
+//	@Param			powerState			query		string		false	"filter → SR27 effectivePowerState (not observedState.power)"
+//	@Param			unitIds				query		[]string	false	"filter → id in unitIds (empty array returns zero) (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
+//	@Param			organizationId		query		string		false	"filter → ACUnit.customerOrgId"
+//	@Param			unassignedOnly		query		boolean		false	"filter → true => spaceId=null (combined with spaceId is VALIDATION)"
+//	@Success		200					{object}	ops.Envelope{data=UnitPage}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/units [get]
 func (m *Module) unitsList(
 	ctx context.Context,
 	c *ops.Call,
@@ -535,28 +554,40 @@ func (in *UnitGetInput) Validate() map[string]string {
 	return nil
 }
 
-// @Summary		units.get (read)
-// @ID				units.get
-// @Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:asset.read | admin:control.execute:scope-candidate-read-only | admin:device.read:scope-candidate-read-only | admin:job.read:scope-candidate-read-only | admin:contract.read:scope-candidate-read-only | admin:restriction.read:scope-candidate-read-only | admin:automation.policy.read:scope-candidate-read-only | admin:alert.policy.read:scope-candidate-read-only | admin:energy.read:scope-candidate-read-only | admin:mrv.read:scope-candidate-read-only | admin:offset.read:scope-candidate-read-only
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR76 technician before work window: work-not-started state; IR213 latestMeasurements: latest reading per metric with read-time quality (stale past the sensor limit)
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A02, DD-A12, DD-C03, DD-C07, DD-P04, DD-T02, DD-T10, DD-C04, DD-C05, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T11, DD-A04, DD-A09, DD-A11, DD-A05, DD-C14, DD-T12, DD-P05, DD-P10, DD-P02, DD-P03, DD-T13, DD-A06, DD-T07
-// @Tags			units
-// @Accept			json
-// @Produce		json
-// @Param			id		path		string	true	"input field id"
-// @Param			jobId	query		string	false	"input field jobId"
-// @Success		200		{object}	ops.Envelope{data=UnitDetail}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/units/{id} [get]
+// unitsGet serves units.get.
+//
+//	@Summary		units.get (read)
+//	@ID				units.get
+//	@Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | \
+//	@Description	admin:dashboard.read | admin:asset.read | admin:control.execute:scope-candidate-read-only | \
+//	@Description	admin:device.read:scope-candidate-read-only | admin:job.read:scope-candidate-read-only | \
+//	@Description	admin:contract.read:scope-candidate-read-only | admin:restriction.read:scope-candidate-read-only | \
+//	@Description	admin:automation.policy.read:scope-candidate-read-only | \
+//	@Description	admin:alert.policy.read:scope-candidate-read-only | admin:energy.read:scope-candidate-read-only | \
+//	@Description	admin:mrv.read:scope-candidate-read-only | admin:offset.read:scope-candidate-read-only
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR76 technician \
+//	@Description	before work window: work-not-started state; IR213 latestMeasurements: latest reading per metric with \
+//	@Description	read-time quality (stale past the sensor limit)
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A02, DD-A12, DD-C03, DD-C07, DD-P04, DD-T02, DD-T10, DD-C04, DD-C05, DD-T04, DD-T05, \
+//	@Description	DD-T06, DD-T08, DD-T09, DD-T11, DD-A04, DD-A09, DD-A11, DD-A05, DD-C14, DD-T12, DD-P05, DD-P10, \
+//	@Description	DD-P02, DD-P03, DD-T13, DD-A06, DD-T07
+//	@Tags			units
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		string	true	"input field id"
+//	@Param			jobId	query		string	false	"input field jobId"
+//	@Success		200		{object}	ops.Envelope{data=UnitDetail}
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/units/{id} [get]
 func (m *Module) unitsGet(ctx context.Context, c *ops.Call, in *UnitGetInput) (UnitDetail, error) {
 	var args []any
 

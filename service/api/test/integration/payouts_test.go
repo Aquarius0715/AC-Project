@@ -14,19 +14,23 @@ func TestPayouts(t *testing.T) {
 	tenant, org := seed.ID("tenant-a"), seed.ID("org-contractor-b")
 	owner(
 		t,
-		`DELETE FROM billing.payout_queries WHERE statement_id IN (SELECT id FROM billing.payout_statements WHERE contractor_org_id = $1)`,
+		`DELETE FROM billing.payout_queries WHERE statement_id IN (SELECT id FROM billing.payout_statements WHERE
+			contractor_org_id = $1)`,
 		org,
 	)
 	owner(t, `DELETE FROM billing.payout_statements WHERE contractor_org_id = $1`, org)
 	owner(t, `DELETE FROM maintenance.rate_cards WHERE contractor_org_id = $1`, org)
 	owner(
 		t,
-		`UPDATE maintenance.work_reports SET accepted_at = accepted_at - interval '3000 days' WHERE accepted_at >= '2026-06-01' AND accepted_at < '2026-09-01'`,
+		`UPDATE maintenance.work_reports SET accepted_at = accepted_at - interval '3000 days' WHERE accepted_at >=
+			'2026-06-01' AND accepted_at < '2026-09-01'`,
 	)
 	owner(
 		t,
-		`INSERT INTO maintenance.rate_cards (tenant_id, contractor_org_id, effective_from, currency, lines, version) VALUES ($1,$2,'2026-06-01','MYR',
-		'[{"workType":"periodic_inspection","amountMinor":30000,"note":null},{"workType":"repair_base","amountMinor":45000,"note":null},{"workType":"rework_deduction","amountMinor":5000,"note":null}]',1)`,
+		`INSERT INTO maintenance.rate_cards (tenant_id, contractor_org_id, effective_from, currency, lines, version) VALUES
+			($1,$2,'2026-06-01','MYR',
+		'[{"workType":"periodic_inspection","amountMinor":30000,"note":null},{"workType":"repair_base","amountMinor":45000,`+
+			`"note":null},{"workType":"rework_deduction","amountMinor":5000,"note":null}]',1)`,
 		tenant,
 		org,
 	)
@@ -35,7 +39,8 @@ func TestPayouts(t *testing.T) {
 		job, rep := uuid.NewString(), uuid.NewString()
 		owner(
 			t,
-			`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, type, status, origin, requested_slot, due_at, contractor_org_id, completed_at)
+			`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, type, status, origin, requested_slot, due_at,
+				contractor_org_id, completed_at)
 			VALUES ($1,$2,$3,$4,$5,'completed','client_request',tstzrange($6,$7),$7,$8,$7)`,
 			job,
 			tenant,
@@ -48,7 +53,8 @@ func TestPayouts(t *testing.T) {
 		)
 		owner(
 			t,
-			`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state, accepted_at) VALUES ($1, 2, $2, $3, $4, 'accepted', $5)`,
+			`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state, accepted_at) VALUES ($1, 2,
+				$2, $3, $4, 'accepted', $5)`,
 			rep,
 			tenant,
 			job,
@@ -59,7 +65,8 @@ func TestPayouts(t *testing.T) {
 		if returned {
 			owner(
 				t,
-				`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state) VALUES ($1, 1, $2, $3, $4, 'returned')`,
+				`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state) VALUES ($1, 1, $2, $3, $4,
+					'returned')`,
 				rep,
 				tenant,
 				job,
@@ -67,7 +74,8 @@ func TestPayouts(t *testing.T) {
 			)
 			owner(
 				t,
-				`INSERT INTO maintenance.report_reviews (tenant_id, report_id, report_version, reviewer_user_id, decision, reason, occurred_at) VALUES ($1,$2,1,$3,'return','redo',$4)`,
+				`INSERT INTO maintenance.report_reviews (tenant_id, report_id, report_version, reviewer_user_id, decision, reason,
+					occurred_at) VALUES ($1,$2,1,$3,'return','redo',$4)`,
 				tenant,
 				rep,
 				seed.ID("user-hq-operator"),
@@ -407,7 +415,8 @@ func TestPayoutWithoutRateCard(t *testing.T) {
 	job, rep := uuid.NewString(), uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, type, status, origin, requested_slot, due_at, contractor_org_id, completed_at)
+		`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, type, status, origin, requested_slot, due_at,
+			contractor_org_id, completed_at)
 		VALUES ($1,$2,$3,$4,'reactive','completed','client_request',tstzrange($5,$6),$6,$7,$6)`,
 		job,
 		tenant,
@@ -419,7 +428,8 @@ func TestPayoutWithoutRateCard(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state, accepted_at) VALUES ($1, 1, $2, $3, $4, 'accepted', $5)`,
+		`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state, accepted_at) VALUES ($1, 1,
+			$2, $3, $4, 'accepted', $5)`,
 		rep,
 		tenant,
 		job,

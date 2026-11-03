@@ -63,7 +63,9 @@ func (in *ListAttachmentsInput) Validate() map[string]string {
 //	@Summary		attachments.list (read)
 //	@ID				attachments.list
 //	@Description	Authorization: admin:mrv.write | admin:job.read
-//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR349 unitIds 1–500 distinct, from < to within 366 days; ready attachments of accepted work reports uploaded in [from, to)
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR349 unitIds \
+//	@Description	1–500 distinct, from < to within 366 days; ready attachments of accepted work reports uploaded in \
+//	@Description	[from, to)
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
 //	@Description	Design: DD-A14 · Query: filters none · sort id,createdAt,name (default createdAt desc;id asc)
 //	@Tags			attachments
@@ -98,7 +100,8 @@ func (m Files) list(
 
 	rows, err := c.Tx.Query(
 		ctx,
-		`SELECT a.id, a.tenant_id, a.created_at, a.updated_at, a.job_id, a.report_id, a.name, a.mime, a.size_bytes, a.status, j.unit_id, r.accepted_at
+		`SELECT a.id, a.tenant_id, a.created_at, a.updated_at, a.job_id, a.report_id, a.name, a.mime, a.size_bytes, a.status,
+			j.unit_id, r.accepted_at
 		FROM maintenance.attachments a
 		JOIN maintenance.work_reports r ON r.id = a.report_id AND r.state = 'accepted'
 		JOIN maintenance.jobs j ON j.id = a.job_id
@@ -115,6 +118,7 @@ func (m Files) list(
 
 	for rows.Next() {
 		var a EvidenceAttachment
+
 		err := rows.Scan(
 			&a.ID,
 			&a.TenantID,

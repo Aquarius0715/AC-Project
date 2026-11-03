@@ -136,19 +136,26 @@ func TestRateAndReportProblem(t *testing.T) {
 	for name, b := range map[string]string{
 		"short details": `"reasonCode":"same_problem","details":"short","photos":[],"preferredSlot":null`,
 		"bad code":      `"reasonCode":"angry","details":"still dripping water","photos":[],"preferredSlot":null`,
-		"bad mime":      `"reasonCode":"same_problem","details":"still dripping water","photos":[{"name":"a.gif","mime":"image/gif","size":` + size + `,"bytes":"` + png + `"}],"preferredSlot":null`,
-		"png as jpeg":   `"reasonCode":"same_problem","details":"still dripping water","photos":[{"name":"a.jpg","mime":"image/jpeg","size":` + size + `,"bytes":"` + png + `"}],"preferredSlot":null`,
-		"size mismatch": `"reasonCode":"same_problem","details":"still dripping water","photos":[{"name":"a.png","mime":"image/png","size":3,"bytes":"` + png + `"}],"preferredSlot":null`,
-		"pixel flood":   `"reasonCode":"same_problem","details":"still dripping water","photos":[` + blobJSON("flood.png", "image/png", flood, len(flood)) + `],"preferredSlot":null`,
-		"six photos":    `"reasonCode":"same_problem","details":"still dripping water","photos":[` + strings.Repeat(photo+",", 5) + photo + `],"preferredSlot":null`,
-		"today slot":    `"reasonCode":"same_problem","details":"still dripping water","photos":[],"preferredSlot":` + slotJSON(2, 1),
+		"bad mime": `"reasonCode":"same_problem","details":"still dripping water","photos":[{"name":"a.gif",` +
+			`"mime":"image/gif","size":` + size + `,"bytes":"` + png + `"}],"preferredSlot":null`,
+		"png as jpeg": `"reasonCode":"same_problem","details":"still dripping water","photos":[{"name":"a.jpg",` +
+			`"mime":"image/jpeg","size":` + size + `,"bytes":"` + png + `"}],"preferredSlot":null`,
+		"size mismatch": `"reasonCode":"same_problem","details":"still dripping water","photos":[{"name":"a.png",` +
+			`"mime":"image/png","size":3,"bytes":"` + png + `"}],"preferredSlot":null`,
+		"pixel flood": `"reasonCode":"same_problem","details":"still dripping water",` +
+			`"photos":[` + blobJSON("flood.png", "image/png", flood, len(flood)) + `],"preferredSlot":null`,
+		"six photos": `"reasonCode":"same_problem","details":"still dripping water",` +
+			`"photos":[` + strings.Repeat(photo+",", 5) + photo + `],"preferredSlot":null`,
+		"today slot": `"reasonCode":"same_problem","details":"still dripping water","photos":[],` +
+			`"preferredSlot":` + slotJSON(2, 1),
 	} {
 		code, m := prob(b, 3)
 		refusal(t, name, code, m, want[name])
 	}
 
 	code, m = prob(
-		`"reasonCode":"same_problem","details":"Still dripping water after the visit","photos":[`+photo+`],"preferredSlot":`+slotJSON(
+		`"reasonCode":"same_problem","details":"Still dripping water after the visit",`+
+			`"photos":[`+photo+`],"preferredSlot":`+slotJSON(
 			49,
 			2,
 		),
@@ -326,13 +333,15 @@ func TestRateAndReportProblem(t *testing.T) {
 func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 	s := server(t)
 	job := completedJob(t, s)
-	lines := `[{"kind":"estimate","amountMinor":5000,"currency":"MYR","description":" Parts ","visibility":"customer"},{"kind":"actual","amountMinor":800,"currency":"MYR","description":"Margin","visibility":"internal"}]`
+	lines := `[{"kind":"estimate","amountMinor":5000,"currency":"MYR","description":" Parts ","visibility":"customer"},` +
+		`{"kind":"actual","amountMinor":800,"currency":"MYR","description":"Margin","visibility":"internal"}]`
 
 	if code, m := write(
 		s,
 		&hq,
 		"jobs.saveCost",
-		`{"jobId":"`+job+`","costLines":[{"kind":"guess","amountMinor":1,"currency":"MYR","description":"x","visibility":"internal"}]}`,
+		`{"jobId":"`+job+`","costLines":[{"kind":"guess","amountMinor":1,"currency":"MYR","description":"x",`+
+			`"visibility":"internal"}]}`,
 		1,
 	); code != 422 ||
 		fields(m) != "costLines=error.invalid" {
@@ -343,7 +352,8 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 		s,
 		&hq,
 		"jobs.saveCost",
-		`{"jobId":"`+job+`","costLines":[{"kind":"actual","amountMinor":-1,"currency":"EUR","description":"","visibility":"internal"}]}`,
+		`{"jobId":"`+job+`","costLines":[{"kind":"actual","amountMinor":-1,"currency":"EUR","description":"",`+
+			`"visibility":"internal"}]}`,
 		1,
 	); code != 422 ||
 		fields(m) != "costLines=error.invalid" {
@@ -420,7 +430,8 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 		t.Errorf("HQ eventCursor %v, HQ events %d", got, len(hqEvents))
 	}
 	// warranty claims need a warranty that covers completion
-	claim := `{"jobId":"` + job + `","partLabel":"Compressor","amountMinor":12000,"currency":"MYR","reason":"failed in warranty"}`
+	claim := `{"jobId":"` + job + `","partLabel":"Compressor","amountMinor":12000,"currency":"MYR","reason":"failed in ` +
+		`warranty"}`
 
 	owner(
 		t,

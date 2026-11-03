@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-// TestIdempotencyKeyCountsCharacters: the key is 8–128 characters, as the contract says, not bytes; a key of 40 emoji is
-// 40 characters (160 bytes) and is accepted.
+// TestIdempotencyKeyCountsCharacters: the key is 8–128 characters, as the contract says, not bytes; a key of 40 emoji
+// is 40 characters (160 bytes) and is accepted.
 func TestIdempotencyKeyCountsCharacters(t *testing.T) {
 	cases := map[string]struct {
 		key string

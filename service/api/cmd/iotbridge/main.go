@@ -76,6 +76,7 @@ func main() {
 	if refreshErr != nil {
 		log.Fatalf("demo clock: %v", refreshErr)
 	}
+
 	go clock.keepRefreshing(ctx)
 
 	// the subscriptions are made on every connect: a clean session loses them when the broker restarts
@@ -83,7 +84,8 @@ func main() {
 		SetUsername(os.Getenv("MQTT_USER")).SetPassword(os.Getenv("MQTT_PASSWORD")).
 		SetAutoReconnect(true).SetConnectRetry(true).SetKeepAlive(60 * time.Second).
 		SetOnConnectHandler(func(c mqtt.Client) { subscribeDemo(c, resolver, clock, httpc, endpoint) }).
-		SetConnectionLostHandler(func(_ mqtt.Client, err error) { log.Printf("broker %s: connection lost: %v", *broker, err) })
+		SetConnectionLostHandler(
+			func(_ mqtt.Client, err error) { log.Printf("broker %s: connection lost: %v", *broker, err) })
 
 	client := mqtt.NewClient(opts)
 	if tok := client.Connect(); tok.Wait() && tok.Error() != nil {
@@ -138,6 +140,7 @@ func subscribeDemo(
 	// t/<tenantId>/d/<deviceId>/telemetry, every tenant and device
 	sub("t/+/d/+/telemetry", func(_ mqtt.Client, msg mqtt.Message) {
 		var b devicesim.Batch
+
 		err := json.Unmarshal(msg.Payload(), &b)
 		if err != nil {
 			log.Printf("telemetry on %s: %v", msg.Topic(), err)
@@ -164,6 +167,7 @@ func subscribeDemo(
 	// not is heard all the same (IR613)
 	sub("t/+/d/+/heartbeat", func(_ mqtt.Client, msg mqtt.Message) {
 		var hb devicesim.Heartbeat
+
 		err := json.Unmarshal(msg.Payload(), &hb)
 		if err != nil {
 			log.Printf("heartbeat on %s: %v", msg.Topic(), err)
@@ -186,6 +190,7 @@ func subscribeDemo(
 	// t/<tenantId>/d/<deviceId>/cmd/ack: a module's answer to a command the API sent
 	sub("t/+/d/+/cmd/ack", func(_ mqtt.Client, msg mqtt.Message) {
 		var a devicesim.Ack
+
 		err := json.Unmarshal(msg.Payload(), &a)
 		if err != nil {
 			log.Printf("ack on %s: %v", msg.Topic(), err)
@@ -217,9 +222,9 @@ func subscribeDemo(
 	})
 }
 
-// listenLive connects to the real sensor nodes' broker and records their readings on the live site (DEC-86, IR524).
-// The client leaves no will message, and its only publishes are liveControl's commands. The connection is not waited for — the
-// broker may be out of reach (another network) and the client keeps trying — and the subscription is made on every
+// listenLive connects to the real sensor nodes' broker and records their readings on the live site (DEC-86, IR524). The
+// client leaves no will message, and its only publishes are liveControl's commands. The connection is not waited for —
+// the broker may be out of reach (another network) and the client keeps trying — and the subscription is made on every
 // connect. Retained messages are old readings and are skipped; one message per node and scenario minute is recorded.
 func listenLive(
 	ctx context.Context,
@@ -230,6 +235,7 @@ func listenLive(
 	api liveAPI,
 ) mqtt.Client {
 	host := raw
+
 	u, err := url.Parse(raw)
 	if err == nil && u.Host != "" {
 		host = u.Host // never the credentials a URL may carry
@@ -309,7 +315,8 @@ func listenLive(
 
 			log.Printf("live broker %s: listening to %s", host, topic)
 		}).
-		SetConnectionLostHandler(func(_ mqtt.Client, err error) { log.Printf("live broker %s: connection lost: %v", host, err) })
+		SetConnectionLostHandler(
+			func(_ mqtt.Client, err error) { log.Printf("live broker %s: connection lost: %v", host, err) })
 	c := mqtt.NewClient(opts)
 	c.Connect() // not waited for: the client keeps trying while the broker is out of reach
 	log.Printf(
@@ -371,9 +378,10 @@ func envOr(key, def string) string {
 	return def
 }
 
-// demoClock keeps the bridge on the API's scenario clock. The demo runs its own clock (a fixed seed date that moves with
-// real time), and the API refuses a reading received after it, so the bridge stamps readings with the scenario time. The
-// offset comes from the snapshot time of the demo-only preview (it saves and sends nothing) and is refreshed every five minutes.
+// demoClock keeps the bridge on the API's scenario clock. The demo runs its own clock (a fixed seed date that moves
+// with real time), and the API refuses a reading received after it, so the bridge stamps readings with the scenario
+// time. The offset comes from the snapshot time of the demo-only preview (it saves and sends nothing) and is refreshed
+// every five minutes.
 type demoClock struct {
 	api string
 	c   *http.Client
@@ -505,6 +513,7 @@ func fetchWaiting(c *http.Client, api, token, tenant string) ([]iotbridge.Waitin
 	var out struct {
 		Data []iotbridge.Waiting `json:"data"`
 	}
+
 	decodeErr := json.NewDecoder(resp.Body).Decode(&out)
 	if decodeErr != nil {
 		return nil, decodeErr
@@ -547,10 +556,10 @@ func sendCommand(
 type liveAPI struct{ equipment, token, tenant string }
 
 // reportGap runs once a minute for the live module. Its connection follows the heartbeat gap (IR532): offline once a
-// node has been silent for 3 minutes, online again once every node is heard (device events of its binding, the open fault
-// read back from the API, so a restart of the bridge picks it up). Then it sends how long the module has gone unheard
-// (heartbeat_gap), so the default rule ac_offline alerts when the nodes stop or their broker is out of reach and
-// resolves when they are back (IR529).
+// node has been silent for 3 minutes, online again once every node is heard (device events of its binding, the open
+// fault read back from the API, so a restart of the bridge picks it up). Then it sends how long the module has gone
+// unheard (heartbeat_gap), so the default rule ac_offline alerts when the nodes stop or their broker is out of reach
+// and resolves when they are back (IR529).
 func reportGap(
 	ctx context.Context,
 	heard *iotbridge.LiveHeard,
@@ -640,6 +649,7 @@ func fetchConnectionFault(
 	var body struct {
 		Data iotbridge.ConnectionFault `json:"data"`
 	}
+
 	decodeErr := json.NewDecoder(resp.Body).Decode(&body)
 	if decodeErr != nil {
 		return out, decodeErr

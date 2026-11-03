@@ -93,6 +93,7 @@ func (Policies) Owners(
 			id uuid.UUID
 			o  PolicyOwner
 		)
+
 		err := rows.Scan(&id, &o.CustomerID, &o.Kind)
 		if err != nil {
 			return nil, err
@@ -348,8 +349,10 @@ func (p Policy) MarshalJSON() ([]byte, error) {
 	case "alert":
 		m["customerId"], m["recipientMembershipIds"], m["channels"] = p.CustomerID, p.RecipientMembershipIDs, p.Channels
 		m["escalateAfterMinutes"], m["cooldownMinutes"] = p.EscalateAfterMinutes, p.CooldownMinutes
-		m["metric"], m["operator"], m["threshold"], m["recoveryThreshold"] = p.Condition.Metric, p.Condition.Operator, p.Condition.Threshold, p.Condition.RecoveryThreshold
-		m["durationSeconds"], m["activeWindow"], m["severity"] = p.Condition.DurationSeconds, p.Condition.ActiveWindow, p.Condition.Severity
+		m["metric"], m["operator"] = p.Condition.Metric, p.Condition.Operator
+		m["threshold"], m["recoveryThreshold"] = p.Condition.Threshold, p.Condition.RecoveryThreshold
+		m["durationSeconds"], m["activeWindow"] = p.Condition.DurationSeconds, p.Condition.ActiveWindow
+		m["severity"] = p.Condition.Severity
 	case "default_alert":
 		m["customerId"], m["rules"], m["ruleSettings"] = nil, p.Rules, p.RuleSettings
 	case "automation":
@@ -359,8 +362,10 @@ func (p Policy) MarshalJSON() ([]byte, error) {
 	return json.Marshal(m)
 }
 
-const alertPolicyCols = `p.id, p.tenant_id, p.version, p.created_at, p.updated_at, p.kind, p.customer_id, p.name, p.owner_membership_id, p.created_by_user_id,
-	p.timezone, p.enabled, p.priority, p.condition, p.rules, p.recipient_membership_ids, p.channels, COALESCE(p.escalate_after_minutes, 0), COALESCE(p.cooldown_minutes, 0)`
+const alertPolicyCols = `p.id, p.tenant_id, p.version, p.created_at, p.updated_at, p.kind, p.customer_id, p.name, ` +
+	`p.owner_membership_id, p.created_by_user_id,
+	p.timezone, p.enabled, p.priority, p.condition, p.rules, p.recipient_membership_ids, p.channels, ` +
+	`COALESCE(p.escalate_after_minutes, 0), COALESCE(p.cooldown_minutes, 0)`
 
 func scanAlertPolicy(r pgx.Row) (Policy, error) {
 	var (
@@ -411,9 +416,11 @@ func scanAlertPolicy(r pgx.Row) (Policy, error) {
 	return p, nil
 }
 
-const autoPolicyCols = `p.id, p.tenant_id, p.version, p.created_at, p.updated_at, p.name, p.owner_membership_id, p.created_by_user_id, p.timezone, p.enabled,
+const autoPolicyCols = `p.id, p.tenant_id, p.version, p.created_at, p.updated_at, p.name, p.owner_membership_id, ` +
+	`p.created_by_user_id, p.timezone, p.enabled,
 	p.priority, p.disabled_reason, p.condition, p.action,
-	COALESCE((SELECT array_agg(u.unit_id ORDER BY u.unit_id) FROM control.automation_policy_units u WHERE u.policy_id = p.id), '{}')`
+	COALESCE((SELECT array_agg(u.unit_id ORDER BY u.unit_id) FROM control.automation_policy_units u WHERE u.policy_id = ` +
+	`p.id), '{}')`
 
 func scanAutoPolicy(r pgx.Row) (Policy, error) {
 	p := Policy{
@@ -537,7 +544,8 @@ func (m Policies) decorate(
 			continue
 		}
 
-		q := `SELECT id, tenant_id, version, created_at, updated_at, policy_id, rule_key, customer_id, enabled, changed_by_membership_id, reason
+		q := `SELECT id, tenant_id, version, created_at, updated_at, policy_id, rule_key, customer_id, enabled,
+			changed_by_membership_id, reason
 			FROM monitoring.default_rule_settings WHERE policy_id = $1`
 		args := []any{ps[i].ID}
 
@@ -554,6 +562,7 @@ func (m Policies) decorate(
 
 		for rows.Next() {
 			var s RuleSetting
+
 			err := rows.Scan(
 				&s.ID,
 				&s.TenantID,
@@ -591,34 +600,39 @@ func (m Policies) decorate(
 
 var kindRank = map[string]int{"default_alert": 0, "alert": 1, "automation": 2}
 
-// @Summary		policies.list (read)
-// @ID				policies.list
-// @Description	Authorization: client:self-customer:kind=alert-or-default_alert | admin:alert.policy.read:kind=alert-or-default_alert | admin:automation.policy.read:kind=automation
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A05, DD-A11, DD-A12, DD-C15, DD-C03, DD-A02 · Query: filters unitId,customerId,propertyId,kind,enabled · sort id,name,priority,createdAt,updatedAt (default kind (default_alert, alert, automation) asc;name asc;id asc)
-// @Tags			policies
-// @Accept			json
-// @Produce		json
-// @Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit		query		integer	false	"page size 1–100, default 25"
-// @Param			sort		query		string	false	"field:direction — fields id,name,priority,createdAt,updatedAt; default kind (default_alert, alert, automation) asc;name asc;id asc"
-// @Param			unitId		query		string	false	"filter → alert kind: id in ACUnit.alertPolicyIds of that unit plus the default policy"
-// @Param			customerId	query		string	false	"filter → alert kind: Policy.customerId (default policy always included)"
-// @Param			propertyId	query		string	false	"filter → attached or target units in the property"
-// @Param			kind		query		string	false	"filter → kind"
-// @Param			enabled		query		boolean	false	"filter → enabled"
-// @Success		200			{object}	ops.Envelope{data=PolicyPage}
-// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/policies [get]
+// list serves policies.list.
+//
+//	@Summary		policies.list (read)
+//	@ID				policies.list
+//	@Description	Authorization: client:self-customer:kind=alert-or-default_alert | \
+//	@Description	admin:alert.policy.read:kind=alert-or-default_alert | admin:automation.policy.read:kind=automation
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A05, DD-A11, DD-A12, DD-C15, DD-C03, DD-A02 · Query: filters \
+//	@Description	unitId,customerId,propertyId,kind,enabled · sort id,name,priority,createdAt,updatedAt (default kind \
+//	@Description	(default_alert, alert, automation) asc;name asc;id asc)
+//	@Tags			policies
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit		query		integer	false	"page size 1–100, default 25"
+//	@Param			sort		query		string	false	"field:direction — fields id,name,priority,createdAt,updatedAt; default kind (default_alert, alert, automation) asc;name asc;id asc"
+//	@Param			unitId		query		string	false	"filter → alert kind: id in ACUnit.alertPolicyIds of that unit plus the default policy"
+//	@Param			customerId	query		string	false	"filter → alert kind: Policy.customerId (default policy always included)"
+//	@Param			propertyId	query		string	false	"filter → attached or target units in the property"
+//	@Param			kind		query		string	false	"filter → kind"
+//	@Param			enabled		query		boolean	false	"filter → enabled"
+//	@Success		200			{object}	ops.Envelope{data=PolicyPage}
+//	@Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/policies [get]
 func (m Policies) list(
 	ctx context.Context,
 	c *ops.Call,
@@ -990,27 +1004,30 @@ func (m Policies) loadKinds(
 	return p, nil
 }
 
-// @Summary		policies.get (read)
-// @ID				policies.get
-// @Description	Authorization: client:self-customer:kind=alert-or-default_alert | admin:alert.policy.read:kind=alert-or-default_alert | admin:automation.policy.read:kind=automation
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A05, DD-A11, DD-A12, DD-C15
-// @Tags			policies
-// @Accept			json
-// @Produce		json
-// @Param			policyId	path		string	true	"input field policyId"
-// @Success		200			{object}	ops.Envelope{data=Policy}
-// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/policies/{policyId} [get]
+// get serves policies.get.
+//
+//	@Summary		policies.get (read)
+//	@ID				policies.get
+//	@Description	Authorization: client:self-customer:kind=alert-or-default_alert | \
+//	@Description	admin:alert.policy.read:kind=alert-or-default_alert | admin:automation.policy.read:kind=automation
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A05, DD-A11, DD-A12, DD-C15
+//	@Tags			policies
+//	@Accept			json
+//	@Produce		json
+//	@Param			policyId	path		string	true	"input field policyId"
+//	@Success		200			{object}	ops.Envelope{data=Policy}
+//	@Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/policies/{policyId} [get]
 func (m Policies) get(ctx context.Context, c *ops.Call, in *PolicyIDInput) (Policy, error) {
 	p, err := m.load(ctx, c, in.PolicyID, false)
 	if err != nil {
@@ -1029,6 +1046,7 @@ func (m Policies) get(ctx context.Context, c *ops.Call, in *PolicyIDInput) (Poli
 	}
 
 	ps := []Policy{p}
+
 	decorateErr := m.decorate(ctx, c, ps, settingsFor)
 	if decorateErr != nil {
 		return p, decorateErr
@@ -1228,28 +1246,32 @@ func hasDup(ids []uuid.UUID) bool {
 	return false
 }
 
-// @Summary		policies.save (write)
-// @ID				policies.save
-// @Description	Authorization: client:self-customer:kind=alert | admin:alert.policy.write:kind=alert-or-default_alert | admin:automation.policy.write:kind=automation
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR120 default_alert limits HQ-only
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A05, DD-A11, DD-A12, DD-C15
-// @Tags			policies
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		SaveInput	true	"input"
-// @Success		200				{object}	ops.Envelope{data=Policy}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/policies [post]
+// save serves policies.save.
+//
+//	@Summary		policies.save (write)
+//	@ID				policies.save
+//	@Description	Authorization: client:self-customer:kind=alert | \
+//	@Description	admin:alert.policy.write:kind=alert-or-default_alert | admin:automation.policy.write:kind=automation
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR120 default_alert limits HQ-only
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A05, DD-A11, DD-A12, DD-C15
+//	@Tags			policies
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		SaveInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Policy}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/policies [post]
 func (m Policies) save(ctx context.Context, c *ops.Call, in *SaveInput) (Policy, error) {
 	if !grantedKinds(c)[in.Kind] {
 		return Policy{}, apperr.E(apperr.Forbidden, "error.forbidden")
@@ -1280,9 +1302,11 @@ func (m Policies) saveDefault(ctx context.Context, c *ops.Call, in *SaveInput) (
 	}
 
 	rules, _ := json.Marshal(in.Rules)
+
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`UPDATE monitoring.alert_policies SET rules = $2, version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
+		`UPDATE monitoring.alert_policies SET rules = $2, version = version + 1, updated_at = platform.app_now() WHERE id =
+			$1`,
 		p.ID,
 		rules,
 	)
@@ -1343,10 +1367,13 @@ func (m Policies) saveAlert(ctx context.Context, c *ops.Call, in *SaveInput) (Po
 	if in.ID == nil {
 		var id uuid.UUID
 
-		err := c.Tx.QueryRow(ctx, `INSERT INTO monitoring.alert_policies (tenant_id, kind, customer_id, name, owner_membership_id, created_by_user_id, timezone,
+		err := c.Tx.QueryRow(ctx, `INSERT INTO monitoring.alert_policies (tenant_id, kind, customer_id, name,
+			owner_membership_id, created_by_user_id, timezone,
 			enabled, priority, condition, recipient_membership_ids, channels, escalate_after_minutes, cooldown_minutes)
-			VALUES (current_setting('app.tenant_id')::uuid, 'alert', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
-			*in.CustomerID, *in.Name, c.Principal.MembershipID, c.Principal.UserID, *in.Timezone, *in.Enabled, *in.Priority, condJSON,
+			VALUES (current_setting('app.tenant_id')::uuid, 'alert', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING
+			id`,
+			*in.CustomerID, *in.Name, c.Principal.MembershipID, c.Principal.UserID, *in.Timezone, *in.Enabled, *in.Priority,
+			condJSON,
 			in.RecipientMembershipIDs, in.Channels, *in.EscalateAfterMinutes, *in.CooldownMinutes).
 			Scan(&id)
 		if err != nil {
@@ -1376,7 +1403,8 @@ func (m Policies) saveAlert(ctx context.Context, c *ops.Call, in *SaveInput) (Po
 	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE monitoring.alert_policies SET name = $2, timezone = $3, enabled = $4, priority = $5, condition = $6,
-		recipient_membership_ids = $7, channels = $8, escalate_after_minutes = $9, cooldown_minutes = $10, version = version + 1, updated_at = platform.app_now()
+		recipient_membership_ids = $7, channels = $8, escalate_after_minutes = $9, cooldown_minutes = $10, version = version +
+		1, updated_at = platform.app_now()
 		WHERE id = $1`,
 		p.ID,
 		*in.Name,
@@ -1474,9 +1502,11 @@ func (m Policies) saveAutomation(ctx context.Context, c *ops.Call, in *SaveInput
 	var prev *int
 
 	if in.ID == nil {
-		err := c.Tx.QueryRow(ctx, `INSERT INTO control.automation_policies (tenant_id, name, owner_membership_id, created_by_user_id, timezone, enabled, priority, condition, action)
+		err := c.Tx.QueryRow(ctx, `INSERT INTO control.automation_policies (tenant_id, name, owner_membership_id,
+			created_by_user_id, timezone, enabled, priority, condition, action)
 			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-			*in.Name, c.Principal.MembershipID, c.Principal.UserID, *in.Timezone, *in.Enabled, *in.Priority, []byte(in.Condition), []byte(in.Action)).
+			*in.Name, c.Principal.MembershipID, c.Principal.UserID, *in.Timezone, *in.Enabled, *in.Priority,
+			[]byte(in.Condition), []byte(in.Action)).
 			Scan(&id)
 		if err != nil {
 			return Policy{}, err
@@ -1497,7 +1527,8 @@ func (m Policies) saveAutomation(ctx context.Context, c *ops.Call, in *SaveInput
 
 		_, execErr := c.Tx.Exec(
 			ctx,
-			`UPDATE control.automation_policies SET name = $2, timezone = $3, enabled = $4, priority = $5, condition = $6, action = $7,
+			`UPDATE control.automation_policies SET name = $2, timezone = $3, enabled = $4, priority = $5, condition = $6, action
+				= $7,
 			disabled_reason = NULL, version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
 			p.ID,
 			*in.Name,
@@ -1526,7 +1557,8 @@ func (m Policies) saveAutomation(ctx context.Context, c *ops.Call, in *SaveInput
 	for _, u := range in.UnitIDs {
 		_, err := c.Tx.Exec(
 			ctx,
-			`INSERT INTO control.automation_policy_units (tenant_id, policy_id, unit_id) VALUES (current_setting('app.tenant_id')::uuid, $1, $2)`,
+			`INSERT INTO control.automation_policy_units (tenant_id, policy_id, unit_id) VALUES
+				(current_setting('app.tenant_id')::uuid, $1, $2)`,
 			id,
 			u,
 		)
@@ -1584,32 +1616,37 @@ type Deleted struct {
 	Deleted bool      `json:"deleted"`
 }
 
-// @Summary		policies.delete (write)
-// @ID				policies.delete
-// @Description	Authorization: client:self-customer:kind=alert | admin:alert.policy.write:kind=alert | admin:automation.policy.write:kind=automation
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR108 detaches the policy from every unit first; default_alert cannot be deleted (VALIDATION)
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-C15, DD-A05, DD-A11
-// @Tags			policies
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string	true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer	true	"all: required (target policies, read policies.get)"
-// @Param			policyId			path		string	true	"input field policyId"
-// @Success		200					{object}	ops.Envelope{data=Deleted}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/policies/{policyId} [delete]
+// delete serves policies.delete.
+//
+//	@Summary		policies.delete (write)
+//	@ID				policies.delete
+//	@Description	Authorization: client:self-customer:kind=alert | admin:alert.policy.write:kind=alert | \
+//	@Description	admin:automation.policy.write:kind=automation
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR108 detaches the policy from every unit first; default_alert cannot be deleted (VALIDATION)
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-C15, DD-A05, DD-A11
+//	@Tags			policies
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string	true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer	true	"all: required (target policies, read policies.get)"
+//	@Param			policyId			path		string	true	"input field policyId"
+//	@Success		200					{object}	ops.Envelope{data=Deleted}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/policies/{policyId} [delete]
 func (m Policies) delete(ctx context.Context, c *ops.Call, in *PolicyIDInput) (Deleted, error) {
 	kinds := grantedKinds(c)
-	kinds["default_alert"] = kinds["alert"] // the default policy is visible to alert writers so its delete is VALIDATION (IR108)
+	// the default policy is visible to alert writers so its delete is VALIDATION (IR108)
+	kinds["default_alert"] = kinds["alert"]
 
 	p, err := m.loadKinds(ctx, c, in.PolicyID, true, kinds)
 	if err != nil {
@@ -1720,31 +1757,34 @@ func (in *SetDefaultRuleInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		policies.setDefaultRule (write)
-// @ID				policies.setDefaultRule
-// @Description	Authorization: client:self-customer:owner | admin:alert.policy.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR108 toggles one default rule for one customer; limits stay HQ-only
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-C15, DD-A05
-// @Tags			policies
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer				true	"all: required (target policies, read policies.get)"
-// @Param			policyId			path		string				true	"input field policyId"
-// @Param			ruleKey				path		string				true	"input field ruleKey"
-// @Param			request				body		SetDefaultRuleInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=RuleSetting}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/policies/{policyId}/default-rules/{ruleKey} [put]
+// setDefaultRule serves policies.setDefaultRule.
+//
+//	@Summary		policies.setDefaultRule (write)
+//	@ID				policies.setDefaultRule
+//	@Description	Authorization: client:self-customer:owner | admin:alert.policy.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR108 toggles one default rule for one customer; limits stay HQ-only
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-C15, DD-A05
+//	@Tags			policies
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer				true	"all: required (target policies, read policies.get)"
+//	@Param			policyId			path		string				true	"input field policyId"
+//	@Param			ruleKey				path		string				true	"input field ruleKey"
+//	@Param			request				body		SetDefaultRuleInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=RuleSetting}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/policies/{policyId}/default-rules/{ruleKey} [put]
 func (m Policies) setDefaultRule(
 	ctx context.Context,
 	c *ops.Call,
@@ -1790,7 +1830,8 @@ func (m Policies) setDefaultRule(
 
 	var cur int
 
-	err = c.Tx.QueryRow(ctx, `SELECT version FROM monitoring.default_rule_settings WHERE policy_id = $1 AND rule_key = $2 AND customer_id = $3 FOR UPDATE`,
+	err = c.Tx.QueryRow(ctx, `SELECT version FROM monitoring.default_rule_settings WHERE policy_id = $1 AND rule_key = $2
+		AND customer_id = $3 FOR UPDATE`,
 		in.PolicyID, in.RuleKey, in.CustomerID).
 		Scan(&cur)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -1803,13 +1844,17 @@ func (m Policies) setDefaultRule(
 
 	var s RuleSetting
 
-	err = c.Tx.QueryRow(ctx, `INSERT INTO monitoring.default_rule_settings (tenant_id, policy_id, rule_key, customer_id, enabled, changed_by_membership_id, reason)
+	err = c.Tx.QueryRow(ctx, `INSERT INTO monitoring.default_rule_settings (tenant_id, policy_id, rule_key, customer_id,
+		enabled, changed_by_membership_id, reason)
 		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, NULLIF($6, ''))
-		ON CONFLICT (policy_id, rule_key, customer_id) DO UPDATE SET enabled = EXCLUDED.enabled, changed_by_membership_id = EXCLUDED.changed_by_membership_id,
+		ON CONFLICT (policy_id, rule_key, customer_id) DO UPDATE SET enabled = EXCLUDED.enabled, changed_by_membership_id =
+		EXCLUDED.changed_by_membership_id,
 			reason = EXCLUDED.reason, version = monitoring.default_rule_settings.version + 1, updated_at = platform.app_now()
-		RETURNING id, tenant_id, version, created_at, updated_at, policy_id, rule_key, customer_id, enabled, changed_by_membership_id, reason`,
+		RETURNING id, tenant_id, version, created_at, updated_at, policy_id, rule_key, customer_id, enabled,
+		changed_by_membership_id, reason`,
 		in.PolicyID, in.RuleKey, in.CustomerID, *in.Enabled, c.Principal.MembershipID, deref(in.Reason)).
-		Scan(&s.ID, &s.TenantID, &s.Version, &s.CreatedAt, &s.UpdatedAt, &s.PolicyID, &s.RuleKey, &s.CustomerID, &s.Enabled, &s.ChangedByMembershipID, &s.Reason)
+		Scan(&s.ID, &s.TenantID, &s.Version, &s.CreatedAt, &s.UpdatedAt, &s.PolicyID, &s.RuleKey, &s.CustomerID, &s.Enabled,
+			&s.ChangedByMembershipID, &s.Reason)
 	if err != nil {
 		return s, err
 	}

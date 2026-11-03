@@ -23,7 +23,8 @@ var (
 //	@Summary		contractors.save (write) — update
 //	@ID				contractors.save.update
 //	@Description	Authorization: admin:job.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 organization kind=contractor; service areas at least one
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR111 organization kind=contractor; service areas at least one
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A21
 //	@Tags			contractors

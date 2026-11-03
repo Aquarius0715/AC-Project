@@ -51,31 +51,34 @@ func scanOrg(r pgx.Row) (Organization, error) {
 
 var orgKinds = map[string]bool{"customer": true, "contractor": true, "operator": true}
 
-// @Summary		organizations.list (read)
-// @ID				organizations.list
-// @Description	Authorization: admin:asset.read | admin:job.read | admin:identity.read | admin:mrv.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A02, DD-A06, DD-A03, DD-A14 · Query: filters kind,status · sort id,createdAt,updatedAt (default id asc)
-// @Tags			organizations
-// @Accept			json
-// @Produce		json
-// @Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit	query		integer	false	"page size 1–100, default 25"
-// @Param			sort	query		string	false	"field:direction — fields id,createdAt,updatedAt; default id asc"
-// @Param			kind	query		string	false	"filter → kind"
-// @Param			status	query		string	false	"filter → status"
-// @Success		200		{object}	ops.Envelope{data=OrganizationPage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/organizations [get]
+// organizationsList serves organizations.list.
+//
+//	@Summary		organizations.list (read)
+//	@ID				organizations.list
+//	@Description	Authorization: admin:asset.read | admin:job.read | admin:identity.read | admin:mrv.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A02, DD-A06, DD-A03, DD-A14 · Query: filters kind,status · sort id,createdAt,updatedAt \
+//	@Description	(default id asc)
+//	@Tags			organizations
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit	query		integer	false	"page size 1–100, default 25"
+//	@Param			sort	query		string	false	"field:direction — fields id,createdAt,updatedAt; default id asc"
+//	@Param			kind	query		string	false	"filter → kind"
+//	@Param			status	query		string	false	"filter → status"
+//	@Success		200		{object}	ops.Envelope{data=OrganizationPage}
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/organizations [get]
 func organizationsList(
 	ctx context.Context,
 	c *ops.Call,
@@ -143,6 +146,7 @@ func organizationsList(
 	where := strings.Join(conds, " AND ")
 
 	var total int
+
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM identity.organizations WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
@@ -217,7 +221,9 @@ func (in *OrganizationSave) Validate() map[string]string {
 // transaction, so NOT_FOUND and version conflicts come first and a duplicate rolls the write back.
 func uniqueName(ctx context.Context, c *ops.Call, id uuid.UUID) error {
 	var taken bool
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.organizations o, identity.organizations t WHERE t.id = $1
+
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.organizations o, identity.organizations t WHERE t.id =
+		$1
 		AND o.kind = t.kind AND o.id <> t.id AND lower(btrim(o.name)) = lower(btrim(t.name)))`, id).
 		Scan(&taken)
 	if err != nil {
@@ -231,28 +237,30 @@ func uniqueName(ctx context.Context, c *ops.Call, id uuid.UUID) error {
 	return nil
 }
 
-// @Summary		organizations.save (write)
-// @ID				organizations.save
-// @Description	Authorization: admin:asset.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A02, DD-A21
-// @Tags			organizations
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		OrganizationSave	true	"input"
-// @Success		200				{object}	ops.Envelope{data=Organization}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/organizations [post]
+// organizationsSave serves organizations.save.
+//
+//	@Summary		organizations.save (write)
+//	@ID				organizations.save
+//	@Description	Authorization: admin:asset.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A02, DD-A21
+//	@Tags			organizations
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		OrganizationSave	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Organization}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/organizations [post]
 func organizationsSave(
 	ctx context.Context,
 	c *ops.Call,
@@ -320,6 +328,7 @@ func organizationsSave(
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		var kind string
+
 		e := c.Tx.QueryRow(ctx, `SELECT kind FROM identity.organizations WHERE id = $1`, *in.ID).
 			Scan(&kind)
 		if e != nil {
@@ -457,6 +466,7 @@ func (Directory) SetGrant(
 	from, until time.Time,
 ) error {
 	var tenant uuid.UUID
+
 	err := c.Tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')::uuid`).
 		Scan(&tenant)
 	if err != nil {

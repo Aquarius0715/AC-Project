@@ -36,7 +36,8 @@ func (PayoutSource) AcceptedJobs(
 	rows, err := c.Tx.Query(ctx, `SELECT j.id, j.contractor_org_id, j.type, w.accepted_at,
 		EXISTS (SELECT 1 FROM maintenance.report_reviews rr WHERE rr.report_id = w.id AND rr.decision = 'return')
 		FROM maintenance.jobs j JOIN maintenance.work_reports w ON w.job_id = j.id AND w.state = 'accepted'
-		WHERE j.contractor_org_id IS NOT NULL AND w.accepted_at >= $1 AND w.accepted_at < $2 ORDER BY j.contractor_org_id, w.accepted_at, j.id`, from, to)
+		WHERE j.contractor_org_id IS NOT NULL AND w.accepted_at >= $1 AND w.accepted_at < $2 ORDER BY j.contractor_org_id,
+		w.accepted_at, j.id`, from, to)
 	if err != nil {
 		return nil, err
 	}
@@ -46,6 +47,7 @@ func (PayoutSource) AcceptedJobs(
 
 	for rows.Next() {
 		var a AcceptedJob
+
 		err := rows.Scan(
 			&a.JobID,
 			&a.ContractorOrgID,
@@ -75,7 +77,8 @@ func (PayoutSource) RateAt(
 		currency string
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT lines, currency FROM maintenance.rate_cards WHERE contractor_org_id = $1 AND effective_from <= $2 ORDER BY effective_from DESC LIMIT 1`,
+	err := c.Tx.QueryRow(ctx, `SELECT lines, currency FROM maintenance.rate_cards WHERE contractor_org_id = $1 AND
+		effective_from <= $2 ORDER BY effective_from DESC LIMIT 1`,
 		contractor, at).
 		Scan(&raw, &currency)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -87,6 +90,7 @@ func (PayoutSource) RateAt(
 	}
 
 	var lines []RateLine
+
 	unmarshalErr := json.Unmarshal(raw, &lines)
 	if unmarshalErr != nil {
 		return nil, "", false, unmarshalErr
@@ -106,6 +110,7 @@ func NoteHandlers() map[string]events.Handler {
 	return map[string]events.Handler{
 		events.JobNoteRequested: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var n events.JobNote
+
 			err := e.Decode(&n)
 			if err != nil {
 				return err
@@ -155,8 +160,11 @@ func (s PayoutSource) AddJobNote(
 	message string,
 ) error {
 	var note uuid.UUID
-	err := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.job_notes (tenant_id, job_id, author_id, visibility, message, created_at)
-		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, 'internal', $3, $4) RETURNING id`, job, c.Principal.UserID, message, c.Now).
+
+	err := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.job_notes (tenant_id, job_id, author_id, visibility, message,
+		created_at)
+		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, 'internal', $3, $4) RETURNING
+		id`, job, c.Principal.UserID, message, c.Now).
 		Scan(&note)
 	if err != nil {
 		return err

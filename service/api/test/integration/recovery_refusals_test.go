@@ -30,7 +30,9 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 		s,
 		&customerB,
 		"automations.save",
-		`{"name":"cool","unitIds":["`+u+`"],"timezone":"Asia/Kuala_Lumpur","enabled":true,"priority":10,"kind":"event","condition":{"type":"occupancy","occupied":true},"action":{"kind":"set_temperature","celsius":20}}`,
+		`{"name":"cool",`+
+			`"unitIds":["`+u+`"],"timezone":"Asia/Kuala_Lumpur","enabled":true,"priority":10,"kind":"event",`+
+			`"condition":{"type":"occupancy","occupied":true},"action":{"kind":"set_temperature","celsius":20}}`,
 		0,
 	); code != 200 {
 		t.Fatalf("rule: %d %v", code, m)
@@ -43,7 +45,9 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 			s,
 			&customerB,
 			"automations.simulate",
-			`{"eventId":"`+uuid.NewString()+`","occurredAt":"`+at+`","unitIds":["`+u+`"],"facts":[{"unitId":"`+u+`","metric":"occupied","value":true,"unit":"boolean","observedAt":"`+at+`","quality":"valid"}],"phase":"condition"}`,
+			`{"eventId":"`+uuid.NewString()+`","occurredAt":"`+at+`","unitIds":["`+u+`"],"facts":[{"unitId":"`+u+
+				`","metric":"occupied","value":true,"unit":"boolean","observedAt":"`+at+
+				`","quality":"valid"}],"phase":"condition"}`,
 		)
 		if code != 200 {
 			t.Fatalf("simulate: %d %v", code, m)
@@ -85,8 +89,11 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 	observe := func(observed string) {
 		t.Helper()
 
-		body := `{"scenarioId":"t","eventId":"` + uuid.NewString() + `","occurredAt":"` + at + `","eventType":"restriction_observation","restrictionId":"` + id + `","unitId":"` + u + `","observed":{"restrictionId":"` + observed +
-			`","rulesVersion":"rules-1","policy":{"kind":"temperature_limit","minimumCoolingSetpoint":24},"observedAt":"` + at + `"}}`
+		body := `{"scenarioId":"t",` +
+			`"eventId":"` + uuid.NewString() + `","occurredAt":"` + at + `","eventType":"restriction_observation",` +
+			`"restrictionId":"` + id + `","unitId":"` + u + `","observed":{"restrictionId":"` + observed +
+			`","rulesVersion":"rules-1","policy":{"kind":"temperature_limit","minimumCoolingSetpoint":24},` +
+			`"observedAt":"` + at + `"}}`
 		if code, m := write(s, &customerB, "demo.trigger", body, 0); code != 200 {
 			t.Fatalf("observation: %d %v", code, m)
 		}
@@ -147,7 +154,8 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 	op := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO devices.device_operations (id, tenant_id, device_id, unit_id, kind, status, expires_at) VALUES ($1,$2,$3,$4,'check','queued',$5)`,
+		`INSERT INTO devices.device_operations (id, tenant_id, device_id, unit_id, kind, status, expires_at) VALUES ($1,$2,$3,
+			$4,'check','queued',$5)`,
 		op,
 		seed.ID("tenant-a"),
 		dev,

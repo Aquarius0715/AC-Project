@@ -100,9 +100,12 @@ func (x Intent) MarshalJSON() ([]byte, error) {
 // the caller-readable not archived units placed directly in the matched spaces with their path labels.
 func (v Voice) candidates(ctx context.Context, c *ops.Call, room string) ([]Candidate, error) {
 	rows, err := c.Tx.Query(ctx, `WITH RECURSIVE path(id, label, parent) AS (
-			SELECT s.id, s.name, s.parent_space_id FROM assets.spaces s WHERE NOT s.archived AND lower(btrim(s.name)) = lower(btrim($1))
-			UNION ALL SELECT p.id, a.name || ' > ' || p.label, a.parent_space_id FROM path p JOIN assets.spaces a ON a.id = p.parent)
-		SELECT u.id, pr.name || ' > ' || p.label || ' > ' || u.display_name FROM path p JOIN assets.spaces s ON s.id = p.id JOIN assets.properties pr ON pr.id = s.property_id
+			SELECT s.id, s.name, s.parent_space_id FROM assets.spaces s WHERE NOT s.archived AND lower(btrim(s.name)) =
+			lower(btrim($1))
+			UNION ALL SELECT p.id, a.name || ' > ' || p.label, a.parent_space_id FROM path p JOIN assets.spaces a ON a.id =
+			p.parent)
+		SELECT u.id, pr.name || ' > ' || p.label || ' > ' || u.display_name FROM path p JOIN assets.spaces s ON s.id = p.id
+		JOIN assets.properties pr ON pr.id = s.property_id
 		JOIN assets.units u ON u.space_id = s.id AND NOT u.archived WHERE p.parent IS NULL ORDER BY 2, 1`, room)
 	if err != nil {
 		return nil, err
@@ -112,6 +115,7 @@ func (v Voice) candidates(ctx context.Context, c *ops.Call, room string) ([]Cand
 
 	for rows.Next() {
 		var x Candidate
+
 		err := rows.Scan(&x.UnitID, &x.PathLabel)
 		if err != nil {
 			rows.Close()
@@ -157,27 +161,30 @@ func (v Voice) candidates(ctx context.Context, c *ops.Call, room string) ([]Cand
 	return out, nil
 }
 
-// @Summary		voice.resolveIntent (read)
-// @ID				voice.resolveIntent
-// @Description	Authorization: client:control.execute | technician:control.diagnose | admin:control.execute
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR65 regex grammar and Space.name matching
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DDC-07
-// @Tags			voice
-// @Accept			json
-// @Produce		json
-// @Param			request	body		Input	true	"input"
-// @Success		200		{object}	ops.Envelope{data=Intent}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/voice/resolve-intent [post]
+// resolve serves voice.resolveIntent.
+//
+//	@Summary		voice.resolveIntent (read)
+//	@ID				voice.resolveIntent
+//	@Description	Authorization: client:control.execute | technician:control.diagnose | admin:control.execute
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR65 regex grammar \
+//	@Description	and Space.name matching
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DDC-07
+//	@Tags			voice
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		Input	true	"input"
+//	@Success		200		{object}	ops.Envelope{data=Intent}
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/voice/resolve-intent [post]
 func (v Voice) resolve(ctx context.Context, c *ops.Call, in *Input) (Intent, error) {
 	g := grammar[in.Locale]
 	if g.help.MatchString(in.Text) {

@@ -39,30 +39,33 @@ func (in *ExceptionInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		restrictions.defer (write)
-// @ID				restrictions.defer
-// @Description	Authorization: admin:restriction.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR87 reason 1-1000
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A10
-// @Tags			restrictions
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer			true	"all: required (target restrictions, read restrictions.get)"
-// @Param			restrictionId		path		string			true	"input field restrictionId"
-// @Param			request				body		ExceptionInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Restriction}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/restrictions/{restrictionId}/defer [post]
+// deferRestriction serves restrictions.defer.
+//
+//	@Summary		restrictions.defer (write)
+//	@ID				restrictions.defer
+//	@Description	Authorization: admin:restriction.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR87 reason 1-1000
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A10
+//	@Tags			restrictions
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer			true	"all: required (target restrictions, read restrictions.get)"
+//	@Param			restrictionId		path		string			true	"input field restrictionId"
+//	@Param			request				body		ExceptionInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=Restriction}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/restrictions/{restrictionId}/defer [post]
 func (m Restrictions) deferRestriction(
 	ctx context.Context,
 	c *ops.Call,
@@ -71,30 +74,33 @@ func (m Restrictions) deferRestriction(
 	return m.except(ctx, c, in, "restrictions.defer", `grace_until = $2, updated_at = $3`, in.Until)
 }
 
-// @Summary		restrictions.exempt (write)
-// @ID				restrictions.exempt
-// @Description	Authorization: admin:restriction.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR87 reason 1-1000
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A10
-// @Tags			restrictions
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer			true	"all: required (target restrictions, read restrictions.get)"
-// @Param			restrictionId		path		string			true	"input field restrictionId"
-// @Param			request				body		ExceptionInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Restriction}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/restrictions/{restrictionId}/exempt [post]
+// exempt serves restrictions.exempt.
+//
+//	@Summary		restrictions.exempt (write)
+//	@ID				restrictions.exempt
+//	@Description	Authorization: admin:restriction.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR87 reason 1-1000
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A10
+//	@Tags			restrictions
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer			true	"all: required (target restrictions, read restrictions.get)"
+//	@Param			restrictionId		path		string			true	"input field restrictionId"
+//	@Param			request				body		ExceptionInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=Restriction}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/restrictions/{restrictionId}/exempt [post]
 func (m Restrictions) exempt(
 	ctx context.Context,
 	c *ops.Call,
@@ -135,6 +141,7 @@ func (m Restrictions) except(
 	}
 
 	args = append([]any{x.ID, args[0], c.Now}, args[1:]...)
+
 	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE restrictions.restrictions SET `+set+`, version = version + 1 WHERE id = $1`,
@@ -194,30 +201,33 @@ func exempted(x Restriction, now time.Time) bool {
 		(x.GraceUntil != nil && now.Before(*x.GraceUntil))
 }
 
-// @Summary		restrictions.release (write)
-// @ID				restrictions.release
-// @Description	Authorization: admin:restriction.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR35 idempotent when release_requested
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A09
-// @Tags			restrictions
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer			true	"all: required (target restrictions, read restrictions.get)"
-// @Param			restrictionId		path		string			true	"input field restrictionId"
-// @Param			request				body		ReleaseInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Restriction}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/restrictions/{restrictionId}/release [post]
+// release serves restrictions.release.
+//
+//	@Summary		restrictions.release (write)
+//	@ID				restrictions.release
+//	@Description	Authorization: admin:restriction.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR35 idempotent when release_requested
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A09
+//	@Tags			restrictions
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer			true	"all: required (target restrictions, read restrictions.get)"
+//	@Param			restrictionId		path		string			true	"input field restrictionId"
+//	@Param			request				body		ReleaseInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=Restriction}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/restrictions/{restrictionId}/release [post]
 func (m Restrictions) release(
 	ctx context.Context,
 	c *ops.Call,
@@ -293,7 +303,8 @@ func (in *OverrideInput) Validate() map[string]string {
 //	@Summary		restrictions.override (write)
 //	@ID				restrictions.override
 //	@Description	Authorization: admin:restriction.override
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR87 reason 1-1000
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR87 reason 1-1000
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A10
 //	@Tags			restrictions
@@ -439,8 +450,10 @@ type observation struct {
 //
 //	@Summary		restrictions.reconcile (write)
 //	@ID				restrictions.reconcile
-//	@Description	Authorization: admin:restriction.write | admin:restriction.override:release-intent-or-terminal-recovery-only
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; SR26 terminal recovery-case handling
+//	@Description	Authorization: admin:restriction.write | \
+//	@Description	admin:restriction.override:release-intent-or-terminal-recovery-only
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	SR26 terminal recovery-case handling
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A09, DD-A10
 //	@Tags			restrictions
@@ -498,7 +511,9 @@ func (m Restrictions) reconcile(ctx context.Context, c *ops.Call, in *ReconcileI
 		}
 
 		var open bool
-		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_commands WHERE restriction_id = $1 AND unit_id = $2 AND status = 'requested')`, x.ID, u.UnitID).
+
+		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_commands WHERE restriction_id = $1
+			AND unit_id = $2 AND status = 'requested')`, x.ID, u.UnitID).
 			Scan(&open)
 		if err != nil {
 			return nil, err
@@ -535,7 +550,9 @@ func (m Restrictions) reconcile(ctx context.Context, c *ops.Call, in *ReconcileI
 		set := func(sql string, args ...any) error {
 			_, err := c.Tx.Exec(
 				ctx,
-				`UPDATE restrictions.restriction_units SET `+sql+`, observed_at = $3, pending_reason = NULL WHERE restriction_id = $1 AND unit_id = $2`,
+				`UPDATE restrictions.restriction_units SET
+					`+sql+`, observed_at = $3, pending_reason = NULL WHERE restriction_id `+
+					`= $1 AND unit_id = $2`,
 				append([]any{x.ID, u.UnitID, c.Now}, args...)...)
 
 			return err
@@ -586,7 +603,8 @@ func (m Restrictions) reconcile(ctx context.Context, c *ops.Call, in *ReconcileI
 	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE restrictions.restrictions r SET version = version + 1, updated_at = $2,
-		state = CASE WHEN r.state = 'requested' AND NOT EXISTS (SELECT 1 FROM restrictions.restriction_units ru WHERE ru.restriction_id = r.id AND ru.apply_state <> 'applied')
+		state = CASE WHEN r.state = 'requested' AND NOT EXISTS (SELECT 1 FROM restrictions.restriction_units ru WHERE
+		ru.restriction_id = r.id AND ru.apply_state <> 'applied')
 			THEN 'applied' ELSE r.state END WHERE r.id = $1`,
 		x.ID,
 		c.Now,
@@ -656,7 +674,8 @@ func (in *RetryInput) Validate() map[string]string {
 //
 //	@Summary		restrictions.retry (write)
 //	@ID				restrictions.retry
-//	@Description	Authorization: admin:restriction.write | admin:restriction.override:phase=release:release-intent-or-terminal-recovery-only
+//	@Description	Authorization: admin:restriction.write | \
+//	@Description	admin:restriction.override:phase=release:release-intent-or-terminal-recovery-only
 //	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A09, DD-A10
@@ -739,7 +758,9 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, in *RetryInput) (a
 
 	for _, u := range targets {
 		var open bool
-		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_commands WHERE restriction_id = $1 AND unit_id = $2 AND status = 'requested')`, x.ID, u.UnitID).
+
+		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_commands WHERE restriction_id = $1
+			AND unit_id = $2 AND status = 'requested')`, x.ID, u.UnitID).
 			Scan(&open)
 		if err != nil {
 			return nil, err
@@ -767,7 +788,8 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, in *RetryInput) (a
 
 			_, execErr := c.Tx.Exec(
 				ctx,
-				`UPDATE restrictions.restriction_units SET apply_state = $3, apply_command_ids = apply_command_ids || $4::uuid, pending_reason = $5
+				`UPDATE restrictions.restriction_units SET apply_state = $3, apply_command_ids = apply_command_ids || $4::uuid,
+					pending_reason = $5
 				WHERE restriction_id = $1 AND unit_id = $2`,
 				x.ID,
 				u.UnitID,
@@ -806,7 +828,8 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, in *RetryInput) (a
 
 		_, execErr := c.Tx.Exec(
 			ctx,
-			`UPDATE restrictions.restriction_units SET release_state = 'requested', release_command_ids = release_command_ids || $3::uuid, pending_reason = NULL
+			`UPDATE restrictions.restriction_units SET release_state = 'requested', release_command_ids = release_command_ids ||
+				$3::uuid, pending_reason = NULL
 			WHERE restriction_id = $1 AND unit_id = $2`,
 			x.ID,
 			u.UnitID,

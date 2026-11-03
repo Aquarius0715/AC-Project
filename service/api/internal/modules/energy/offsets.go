@@ -94,7 +94,8 @@ func (in *QuoteInput) Validate() map[string]string {
 	return fe
 }
 
-const quoteCols = `q.id, q.tenant_id, q.version, q.created_at, q.customer_id, q.purpose, q.amount_kg::float8, lower(q.period), upper(q.period), q.unit_ids,
+const quoteCols = `q.id, q.tenant_id, q.version, q.created_at, q.customer_id, q.purpose, q.amount_kg::float8, ` +
+	`lower(q.period), upper(q.period), q.unit_ids,
 	q.estimated_amount_minor, q.currency, q.expires_at, q.provider`
 
 func scanQuote(r pgx.Row) (Quote, error) {
@@ -127,7 +128,8 @@ func scanQuote(r pgx.Row) (Quote, error) {
 	return x, err
 }
 
-// customerOf resolves the target customer: clients use their own (a different customerId is NOT_FOUND); HQ must name it.
+// customerOf resolves the target customer: clients use their own (a different customerId is NOT_FOUND); HQ must name
+// it.
 func customerOf(ctx context.Context, c *ops.Call, given *uuid.UUID) (uuid.UUID, uuid.UUID, error) {
 	var (
 		id, org uuid.UUID
@@ -136,7 +138,8 @@ func customerOf(ctx context.Context, c *ops.Call, given *uuid.UUID) (uuid.UUID, 
 
 	switch {
 	case c.Principal.Role == "client":
-		err = c.Tx.QueryRow(ctx, `SELECT id, organization_id FROM energy.ref_customers WHERE organization_id = $1`, c.Principal.OrgID).
+		err = c.Tx.QueryRow(ctx, `SELECT id, organization_id FROM energy.ref_customers WHERE organization_id =
+			$1`, c.Principal.OrgID).
 			Scan(&id, &org)
 		if err == nil && given != nil && *given != id {
 			return id, org, apperr.E(apperr.NotFound, "error.notFound")
@@ -160,7 +163,8 @@ func customerOf(ctx context.Context, c *ops.Call, given *uuid.UUID) (uuid.UUID, 
 //	@Summary		offsets.preview (write)
 //	@ID				offsets.preview
 //	@Description	Authorization: client:self | admin:offset.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; new quote save needs no expectedVersion (write)
+//	@Description	Validation: D01; input constraints in the corresponding DD; new quote save needs no expectedVersion \
+//	@Description	(write)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A15, DD-C13
 //	@Tags			offsets
@@ -186,7 +190,9 @@ func previewQuote(ctx context.Context, c *ops.Call, in *QuoteInput) (Quote, erro
 	}
 
 	var inOrg int
-	scanErr := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND customer_org_id = $2 AND NOT archived`, in.UnitIDs, org).
+
+	scanErr := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND customer_org_id = $2 AND
+		NOT archived`, in.UnitIDs, org).
 		Scan(&inOrg)
 	if scanErr != nil {
 		return Quote{}, scanErr
@@ -201,7 +207,9 @@ func previewQuote(ctx context.Context, c *ops.Call, in *QuoteInput) (Quote, erro
 	}
 
 	var id uuid.UUID
-	scanErr = c.Tx.QueryRow(ctx, `INSERT INTO energy.offset_quotes (tenant_id, customer_id, purpose, amount_kg, period, unit_ids, expires_at, created_at)
+
+	scanErr = c.Tx.QueryRow(ctx, `INSERT INTO energy.offset_quotes (tenant_id, customer_id, purpose, amount_kg, period,
+		unit_ids, expires_at, created_at)
 		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, tstzrange($4, $5), $6, $7, $8) RETURNING id`,
 		customer, in.Purpose, in.AmountKg, in.Period.From, in.Period.To, in.UnitIDs, c.Now.Add(QuoteTTL), c.Now).
 		Scan(&id)
@@ -267,7 +275,8 @@ type Event struct {
 	Reason          *string            `json:"reason"`
 }
 
-const recordCols = `r.id, r.tenant_id, r.version, r.created_at, r.updated_at, r.quote_id, r.customer_id, r.amount_kg::float8, r.state, r.previous_state, r.purchase_ref,
+const recordCols = `r.id, r.tenant_id, r.version, r.created_at, r.updated_at, r.quote_id, r.customer_id, ` +
+	`r.amount_kg::float8, r.state, r.previous_state, r.purchase_ref,
 	r.retirement_ref, r.certificate_ref, cu.organization_id`
 
 const recordFrom = `energy.offset_records r JOIN energy.ref_customers cu ON cu.id = r.customer_id`
@@ -299,7 +308,8 @@ func scanRecord(row pgx.Row) (Record, error) {
 func decorateRecord(ctx context.Context, c *ops.Call, x *Record) error {
 	rows, err := c.Tx.Query(
 		ctx,
-		`SELECT id, stage, status, started_at, completed_at FROM energy.offset_attempts WHERE record_id = $1 ORDER BY started_at, id`,
+		`SELECT id, stage, status, started_at, completed_at FROM energy.offset_attempts WHERE record_id = $1 ORDER BY
+			started_at, id`,
 		x.ID,
 	)
 	if err != nil {
@@ -310,6 +320,7 @@ func decorateRecord(ctx context.Context, c *ops.Call, x *Record) error {
 
 	for rows.Next() {
 		var a Attempt
+
 		err := rows.Scan(&a.ID, &a.Stage, &a.Status, &a.StartedAt, &a.CompletedAt)
 		if err != nil {
 			rows.Close()
@@ -375,33 +386,36 @@ func loadRecord(ctx context.Context, c *ops.Call, id uuid.UUID, lock bool) (Reco
 	return x, decorateRecord(ctx, c, &x)
 }
 
-// @Summary		offsets.list (read)
-// @ID				offsets.list
-// @Description	Authorization: client:self | admin:offset.read; IR90 client only when all unitIds in scope
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A15, DD-C13 · Query: filters customerId,status,from,to · sort id,createdAt,updatedAt (default createdAt desc;id desc)
-// @Tags			offsets
-// @Accept			json
-// @Produce		json
-// @Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit		query		integer	false	"page size 1–100, default 25"
-// @Param			sort		query		string	false	"field:direction — fields id,createdAt,updatedAt; default createdAt desc;id desc"
-// @Param			customerId	query		string	false	"filter → OffsetQuote.customerId via quoteId"
-// @Param			status		query		string	false	"filter → state"
-// @Param			from		query		string	false	"filter → [from,to) on createdAt"
-// @Param			to			query		string	false	"filter → [from,to) on createdAt"
-// @Success		200			{object}	ops.Envelope{data=RecordPage}
-// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/offsets [get]
+// listRecords serves offsets.list.
+//
+//	@Summary		offsets.list (read)
+//	@ID				offsets.list
+//	@Description	Authorization: client:self | admin:offset.read; IR90 client only when all unitIds in scope
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A15, DD-C13 · Query: filters customerId,status,from,to · sort id,createdAt,updatedAt \
+//	@Description	(default createdAt desc;id desc)
+//	@Tags			offsets
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit		query		integer	false	"page size 1–100, default 25"
+//	@Param			sort		query		string	false	"field:direction — fields id,createdAt,updatedAt; default createdAt desc;id desc"
+//	@Param			customerId	query		string	false	"filter → OffsetQuote.customerId via quoteId"
+//	@Param			status		query		string	false	"filter → state"
+//	@Param			from		query		string	false	"filter → [from,to) on createdAt"
+//	@Param			to			query		string	false	"filter → [from,to) on createdAt"
+//	@Success		200			{object}	ops.Envelope{data=RecordPage}
+//	@Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/offsets [get]
 func listRecords(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Record], error) {
 	var f struct {
 		CustomerID *uuid.UUID `json:"customerId,omitempty"`
@@ -409,6 +423,7 @@ func listRecords(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 		From       *time.Time `json:"from,omitempty"`   // [from, to) on createdAt
 		To         *time.Time `json:"to,omitempty"`
 	}
+
 	err := decodeStrict(
 		in.Filters,
 		&f,
@@ -449,7 +464,8 @@ func listRecords(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 		conds = append(
 			conds,
 			"cu.organization_id = "+add(c.Principal.OrgID),
-			"NOT EXISTS (SELECT 1 FROM energy.offset_quotes q, unnest(q.unit_ids) uid LEFT JOIN energy.ref_units u ON u.id = uid WHERE q.id = r.quote_id AND u.customer_org_id IS DISTINCT FROM cu.organization_id)",
+			"NOT EXISTS (SELECT 1 FROM energy.offset_quotes q, unnest(q.unit_ids) uid LEFT JOIN energy.ref_units u ON u.id = "+
+				"uid WHERE q.id = r.quote_id AND u.customer_org_id IS DISTINCT FROM cu.organization_id)",
 		)
 	}
 
@@ -472,6 +488,7 @@ func listRecords(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 	where := strings.Join(conds, " AND ")
 
 	var total int
+
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM "+recordFrom+" WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
@@ -575,7 +592,8 @@ func (in *SimulateInput) Validate() map[string]string {
 func newAttempt(ctx context.Context, c *ops.Call, record uuid.UUID, stage string) error {
 	_, err := c.Tx.Exec(
 		ctx,
-		`INSERT INTO energy.offset_attempts (id, tenant_id, record_id, stage, status, started_at) VALUES ($4, current_setting('app.tenant_id')::uuid, $1, $2, 'pending', $3)`,
+		`INSERT INTO energy.offset_attempts (id, tenant_id, record_id, stage, status, started_at) VALUES ($4,
+			current_setting('app.tenant_id')::uuid, $1, $2, 'pending', $3)`,
 		record,
 		stage,
 		c.Now,
@@ -652,6 +670,7 @@ func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, erro
 		}
 
 		var used bool
+
 		scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM energy.offset_records WHERE quote_id = $1)`, q.ID).
 			Scan(&used)
 		if scanErr != nil {
@@ -663,8 +682,11 @@ func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, erro
 		}
 
 		var id uuid.UUID
-		scanErr = c.Tx.QueryRow(ctx, `INSERT INTO energy.offset_records (tenant_id, quote_id, customer_id, amount_kg, state, created_at, updated_at)
-			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'demo_requested', $4, $4) RETURNING id`, q.ID, q.CustomerID, q.AmountKg, c.Now).
+
+		scanErr = c.Tx.QueryRow(ctx, `INSERT INTO energy.offset_records (tenant_id, quote_id, customer_id, amount_kg, state,
+			created_at, updated_at)
+			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'demo_requested', $4, $4) RETURNING
+			id`, q.ID, q.CustomerID, q.AmountKg, c.Now).
 			Scan(&id)
 		if scanErr != nil {
 			return Record{}, scanErr
@@ -704,7 +726,8 @@ func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, erro
 			kind string
 		)
 
-		err := c.Tx.QueryRow(ctx, `SELECT id, completed_event FROM energy.offset_attempts WHERE completed_event_id = $1`, *in.EventID).
+		err := c.Tx.QueryRow(ctx, `SELECT id, completed_event FROM energy.offset_attempts WHERE completed_event_id =
+			$1`, *in.EventID).
 			Scan(&att, &kind)
 		if err == nil {
 			if att == *in.AttemptID && kind == in.Event {
@@ -731,7 +754,8 @@ func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, erro
 	finish := func(status string) error {
 		_, err := c.Tx.Exec(
 			ctx,
-			`UPDATE energy.offset_attempts SET status = $2, completed_at = $3, completed_event_id = $4, completed_event = $5 WHERE id = $1`,
+			`UPDATE energy.offset_attempts SET status = $2, completed_at = $3, completed_event_id = $4, completed_event = $5
+				WHERE id = $1`,
 			cur.ID,
 			status,
 			c.Now,
@@ -745,7 +769,8 @@ func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, erro
 		_, err := c.Tx.Exec(
 			ctx,
 			`UPDATE energy.offset_records SET previous_state = state, state = $2, purchase_ref = COALESCE($3, purchase_ref),
-			retirement_ref = COALESCE($4, retirement_ref), certificate_ref = COALESCE($5, certificate_ref), version = version + 1, updated_at = $6 WHERE id = $1`,
+			retirement_ref = COALESCE($4, retirement_ref), certificate_ref = COALESCE($5, certificate_ref), version = version +
+			1, updated_at = $6 WHERE id = $1`,
 			x.ID,
 			state,
 			purchase,
@@ -758,7 +783,8 @@ func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, erro
 	}
 
 	switch {
-	case in.Event == "purchase_confirm" && x.State == "demo_requested" && cur.Stage == "purchase" && cur.Status == "pending":
+	case in.Event == "purchase_confirm" && x.State == "demo_requested" && cur.Stage == "purchase" &&
+		cur.Status == "pending":
 		finishErr := finish("succeeded")
 		if finishErr != nil {
 			return x, finishErr

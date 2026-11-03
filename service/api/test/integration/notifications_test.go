@@ -38,7 +38,8 @@ func TestNotificationsInbox(t *testing.T) {
 	hidden := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type, template_key, target, params, severity, occurred_at)
+		`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type,
+			template_key, target, params, severity, occurred_at)
 		VALUES ($1,$2,$3,1,'fault','alert',$4,'{}','critical',$5)`,
 		hidden,
 		seed.ID("tenant-a"),
@@ -86,7 +87,10 @@ func TestNotificationsInbox(t *testing.T) {
 		"{\"filters\":{\"type\":\"spam\"}}":     "filters=error.invalid",
 	}
 
-	for _, b := range []string{`{"filters":{"severity":"high"}}`, `{"filters":{"kind":"x"}}`, `{"filters":{"type":"spam"}}`} {
+	for _, b := range []string{
+		`{"filters":{"severity":"high"}}`, `{"filters":{"kind":"x"}}`,
+		`{"filters":{"type":"spam"}}`,
+	} {
 		code, m := post(s, &customerB, "notifications.list", b)
 		refusal(t, b, code, m, want[b])
 	}
@@ -180,7 +184,8 @@ func TestMarkAllRead(t *testing.T) {
 		id := uuid.NewString()
 		owner(
 			t,
-			`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type, template_key, target, params, severity, occurred_at)
+			`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type,
+				template_key, target, params, severity, occurred_at)
 			VALUES ($1,$2,$3,1,'fault','alert',$4,'{}','warning',$5)`,
 			id,
 			seed.ID("tenant-a"),
@@ -293,7 +298,9 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 	_, inv := newInvoice(t, s)
 
 	body := func(channel string) string {
-		return `{"target":{"kind":"invoice","id":"` + inv + `"},"templateKey":"payment_reminder","channel":"` + channel + `","query":{}}`
+		return `{"target":{"kind":"invoice",` +
+			`"id":"` + inv + `"},"templateKey":"payment_reminder",` +
+			`"channel":"` + channel + `","query":{}}`
 	}
 	if code, _ := post(s, &hq, "notifications.recipients", body("inApp")); code != 409 {
 		t.Error("reminder recipients before due")
@@ -328,10 +335,18 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 	}
 
 	for b, want := range map[string]string{
-		`{"target":{"kind":"planet","id":"` + inv + `"},"templateKey":"payment","channel":"inApp","query":{}}`:                   "target=error.invalid",
-		`{"target":{"kind":"invoice","id":"` + inv + `"},"templateKey":"spam","channel":"sms","query":{}}`:                       "templateKey=error.invalid", // and the channel
-		`{"target":{"kind":"invoice","id":"` + inv + `"},"templateKey":"payment","channel":"inApp","role":"guest","query":{}}`:   "role=error.invalid",
-		`{"target":{"kind":"invoice","id":"` + inv + `"},"templateKey":"payment","channel":"inApp","query":{"filters":{"x":1}}}`: "x=error.notAllowed",
+		`{"target":{"kind":"planet",` +
+			`"id":"` + inv + `"},"templateKey":"payment","channel":"inApp",` +
+			`"query":{}}`: "target=error.invalid",
+		`{"target":{"kind":"invoice",` +
+			`"id":"` + inv + `"},"templateKey":"spam","channel":"sms",` +
+			`"query":{}}`: "templateKey=error.invalid", // and the channel
+		`{"target":{"kind":"invoice",` +
+			`"id":"` + inv + `"},"templateKey":"payment","channel":"inApp","role":"guest",` +
+			`"query":{}}`: "role=error.invalid",
+		`{"target":{"kind":"invoice",` +
+			`"id":"` + inv + `"},"templateKey":"payment","channel":"inApp",` +
+			`"query":{"filters":{"x":1}}}`: "x=error.notAllowed",
 	} {
 		code, m := post(s, &hq, "notifications.recipients", b)
 		refusal(t, b, code, m, want)
@@ -341,7 +356,9 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 		s,
 		&hq,
 		"notifications.recipients",
-		`{"target":{"kind":"invoice","id":"`+inv+`"},"templateKey":"payment","channel":"email","role":"admin","query":{"limit":1}}`,
+		`{"target":{"kind":"invoice",`+
+			`"id":"`+inv+`"},"templateKey":"payment","channel":"email","role":"admin",`+
+			`"query":{"limit":1}}`,
 	); len(
 		items(m),
 	) != 1 {
@@ -353,7 +370,9 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 			s,
 			&hq,
 			"notifications.preview",
-			`{"target":{"kind":"invoice","id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email","recipientMembershipId":"`+recipient+`","message":"Please pay"}`,
+			`{"target":{"kind":"invoice",`+
+				`"id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email",`+
+				`"recipientMembershipId":"`+recipient+`","message":"Please pay"}`,
 		)
 	}
 
@@ -389,7 +408,9 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 		"notifications.preview",
 		`{"target":{"kind":"job","id":"`+seed.ID("job-contractor-a").
 			String()+
-			`"},"templateKey":"payment_reminder","channel":"email","recipientMembershipId":"`+recipient+`","message":"Please pay"}`,
+			`"},"templateKey":"payment_reminder","channel":"email",`+
+			`"recipientMembershipId":"`+recipient+`","message":"Please `+
+			`pay"}`,
 	); code != 422 ||
 		m["fieldErrors"].(map[string]any)["target"] != "error.invalid" {
 		t.Errorf("a payment reminder about a job: %d %v", code, m)
@@ -399,7 +420,9 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 		s,
 		&hq,
 		"notifications.preview",
-		`{"target":{"kind":"invoice","id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email","recipientMembershipId":"`+recipient+`","message":" "}`,
+		`{"target":{"kind":"invoice",`+
+			`"id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email",`+
+			`"recipientMembershipId":"`+recipient+`","message":" "}`,
 	); code != 422 ||
 		fields(m) != "message=error.length" {
 		t.Errorf("blank message: %d %s", code, fields(m))
@@ -410,7 +433,9 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 		s,
 		&hq,
 		"notifications.preview",
-		`{"target":{"kind":"invoice","id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email","recipientMembershipId":"`+recipient+`","message":"`+long+`"}`,
+		`{"target":{"kind":"invoice",`+
+			`"id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email",`+
+			`"recipientMembershipId":"`+recipient+`","message":"`+long+`"}`,
 	); code != 200 {
 		t.Errorf("2000-character message: %d %v", code, m)
 	}
@@ -423,7 +448,9 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 			s,
 			&hq,
 			"notifications.preview",
-			`{"target":{"kind":"invoice","id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email","recipientMembershipId":"`+recipient+`",`+body+`}`,
+			`{"target":{"kind":"invoice",`+
+				`"id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email",`+
+				`"recipientMembershipId":"`+recipient+`",`+body+`}`,
 		); code != 422 ||
 			m["fieldErrors"].(map[string]any)[field] != "error.length" {
 			t.Errorf("%s too long: %d %v", field, code, m)
@@ -447,7 +474,9 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 			s,
 			&hq,
 			"notifications.preview",
-			`{"target":{"kind":"unit","id":"`+unit+`"},"templateKey":"alert","channel":"inApp","recipientMembershipId":"`+seed.ID("customer-a").
+			`{"target":{"kind":"unit",`+
+				`"id":"`+unit+`"},"templateKey":"alert","channel":"inApp",`+
+				`"recipientMembershipId":"`+seed.ID("customer-a").
 				String()+
 				`"`+extra+`}`,
 		)
@@ -477,7 +506,9 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 		s,
 		&hq,
 		"notifications.preview",
-		`{"target":{"kind":"invoice","id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email","recipientMembershipId":"`+recipient+`","message":"Please pay","severity":"critical"}`,
+		`{"target":{"kind":"invoice",`+
+			`"id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email",`+
+			`"recipientMembershipId":"`+recipient+`","message":"Please pay","severity":"critical"}`,
 	); code != 422 ||
 		fields(m) != "severity=error.notAllowed" {
 		t.Errorf("severity of a payment reminder: %d %s", code, fields(m))
@@ -496,7 +527,8 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 	assetOnly := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, valid_from) VALUES ($1,$2,$3,$4,'admin',$5)`,
+		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, valid_from) VALUES ($1,$2,$3,$4,
+			'admin',$5)`,
 		assetOnly,
 		seed.ID("tenant-a"),
 		newUser(t),
@@ -524,7 +556,9 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 			s,
 			&hq,
 			"notifications.recipients",
-			`{"target":{"kind":"unit","id":"`+unit+`"},"templateKey":"`+template+`","channel":"inApp","role":"admin","query":{"limit":100}}`,
+			`{"target":{"kind":"unit",`+
+				`"id":"`+unit+`"},"templateKey":"`+template+`","channel":"inApp","role":"admin",`+
+				`"query":{"limit":100}}`,
 		)
 		if code != 200 {
 			t.Fatalf("%s recipients: %d %v", template, code, m)
@@ -549,7 +583,9 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 		s,
 		&hq,
 		"notifications.preview",
-		`{"target":{"kind":"unit","id":"`+unit+`"},"templateKey":"alert","channel":"inApp","recipientMembershipId":"`+assetOnly+`"}`,
+		`{"target":{"kind":"unit",`+
+			`"id":"`+unit+`"},"templateKey":"alert","channel":"inApp",`+
+			`"recipientMembershipId":"`+assetOnly+`"}`,
 	); code != 422 ||
 		fields(m) != "recipientMembershipId=errors.recipient_ineligible" {
 		t.Errorf("alert preview for asset.read only: %d %s", code, fields(m))
@@ -574,7 +610,9 @@ func TestPreferencesAndConsents(t *testing.T) {
 		"{\"locale\":\"fr\",\"timezone\":\"Asia/Kuala_Lumpur\"}": "locale=error.invalid",
 	}
 
-	for _, b := range []string{`{"locale":"fr","timezone":"Asia/Kuala_Lumpur"}`, `{"locale":"en","timezone":"Mars/Base"}`, `{"locale":"en","timezone":"Local"}`} {
+	for _, b := range []string{`{"locale":"fr",` +
+		`"timezone":"Asia/Kuala_Lumpur"}`, `{"locale":"en",` +
+		`"timezone":"Mars/Base"}`, `{"locale":"en","timezone":"Local"}`} {
 		code, m := write(s, &customerB, "preferences.update", b, 0)
 		refusal(t, b, code, m, want[b])
 	}
@@ -618,7 +656,8 @@ func TestPreferencesAndConsents(t *testing.T) {
 
 	owner(
 		t,
-		`UPDATE identity.consents SET granted = false, granted_at = NULL, revoked_at = NULL, version = 1 WHERE membership_id = $1`,
+		`UPDATE identity.consents SET granted = false, granted_at = NULL, revoked_at = NULL, version = 1 WHERE membership_id =
+			$1`,
 		seed.ID("customer-b"),
 	)
 
@@ -690,8 +729,8 @@ func TestPreferencesAndConsents(t *testing.T) {
 	}
 }
 
-// TestTechnicianJobNotificationScope: a technician's notification about a job is listed and can be marked read only while
-// the assignment lets the technician open the job — active and its scheduled window not over (IR49, IR58, IR253).
+// TestTechnicianJobNotificationScope: a technician's notification about a job is listed and can be marked read only
+// while the assignment lets the technician open the job — active and its scheduled window not over (IR49, IR58, IR253).
 func TestTechnicianJobNotificationScope(t *testing.T) {
 	s := server(t)
 	tenant, tech, job := seed.ID(
@@ -704,7 +743,8 @@ func TestTechnicianJobNotificationScope(t *testing.T) {
 	nid, aid := uuid.NewString(), uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type, template_key, target, params, severity, occurred_at)
+		`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type,
+			template_key, target, params, severity, occurred_at)
 		VALUES ($1,$2,$3,1,'schedule_change','schedule_change',$4,'{}','normal',$5)`,
 		nid,
 		tenant,
@@ -714,7 +754,8 @@ func TestTechnicianJobNotificationScope(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO notify.ref_assignments (id, tenant_id, job_id, technician_membership_id, status, scheduled) VALUES ($1,$2,$3,$4,'active',tstzrange($5,$6))`,
+		`INSERT INTO notify.ref_assignments (id, tenant_id, job_id, technician_membership_id, status, scheduled) VALUES ($1,
+			$2,$3,$4,'active',tstzrange($5,$6))`,
 		aid,
 		tenant,
 		job,
@@ -757,7 +798,8 @@ func TestTechnicianJobNotificationScope(t *testing.T) {
 	hid, other := uuid.NewString(), uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO notify.ref_job_histories (id, tenant_id, job_id, owner_kind, owner_id) VALUES ($1,$2,$3,'membership',$4), ($5,$2,$3,'organization',$6)`,
+		`INSERT INTO notify.ref_job_histories (id, tenant_id, job_id, owner_kind, owner_id) VALUES ($1,$2,$3,'membership',$4),
+			($5,$2,$3,'organization',$6)`,
 		other,
 		tenant,
 		job,
@@ -824,7 +866,8 @@ func TestContractorInbox(t *testing.T) {
 		n := uuid.NewString()
 		owner(
 			t,
-			`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type, template_key, target, params, severity, occurred_at)
+			`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type,
+				template_key, target, params, severity, occurred_at)
 			VALUES ($1, $2, $3, 1, 'job_update', 'job_update', $4, '{}', 'normal', $5)`,
 			n,
 			seed.ID("tenant-a"),

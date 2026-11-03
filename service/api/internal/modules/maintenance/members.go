@@ -26,14 +26,17 @@ type Workforce struct {
 	Delivery Delivery
 }
 
-// technicians lists the active technician memberships the caller may plan (HQ: all, internal only when internalOnly; contractor: own).
+// technicians lists the active technician memberships the caller may plan (HQ: all, internal only when internalOnly;
+// contractor: own).
 func (m Workforce) technicians(
 	ctx context.Context,
 	c *ops.Call,
 	internalOnly bool,
 ) ([]identity.Member, error) {
-	q := `SELECT m.id, m.tenant_id, m.version, m.created_at, m.updated_at, m.user_id, m.organization_id, m.role, m.employment, m.scope_version, m.valid_from,
-		m.valid_until, m.client_role FROM maintenance.ref_memberships m WHERE m.role = 'technician' AND m.valid_from <= $1 AND (m.valid_until IS NULL OR m.valid_until > $1)`
+	q := `SELECT m.id, m.tenant_id, m.version, m.created_at, m.updated_at, m.user_id, m.organization_id, m.role,
+		m.employment, m.scope_version, m.valid_from,
+		m.valid_until, m.client_role FROM maintenance.ref_memberships m WHERE m.role = 'technician' AND m.valid_from <= $1 AND
+		(m.valid_until IS NULL OR m.valid_until > $1)`
 
 	args := []any{c.Now}
 	switch {
@@ -54,6 +57,7 @@ func (m Workforce) technicians(
 
 	for rows.Next() {
 		var x identity.Member
+
 		err := rows.Scan(
 			&x.ID,
 			&x.TenantID,
@@ -187,7 +191,8 @@ func unavailable(
 ) (string, bool, error) {
 	var typ string
 
-	err := c.Tx.QueryRow(ctx, `SELECT type FROM maintenance.unavailability WHERE (membership_id = $1 OR (membership_id IS NULL AND organization_id = $2))
+	err := c.Tx.QueryRow(ctx, `SELECT type FROM maintenance.unavailability WHERE (membership_id = $1 OR (membership_id IS
+		NULL AND organization_id = $2))
 		AND days && daterange($3::date, $4::date, '[]') ORDER BY created_at LIMIT 1`, membership, org, d1, d2).
 		Scan(&typ)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -221,35 +226,39 @@ func (in *EligibleInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		members.eligible (read)
-// @ID				members.eligible
-// @Description	Authorization: admin:identity.read | admin:job.read | contractor:partner.assign:own-company
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR94 role=technician only; scope includes Job.unitId
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A06, DD-P03 · Query: filters organizationId,qualification,activeOnly · sort id,createdAt,updatedAt (default id asc)
-// @Tags			members
-// @Accept			json
-// @Produce		json
-// @Param			jobId			query		string	false	"input field jobId"
-// @Param			startAt			query		string	false	"input field startAt"
-// @Param			endAt			query		string	false	"input field endAt"
-// @Param			cursor			query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit			query		integer	false	"page size 1–100, default 25"
-// @Param			sort			query		string	false	"field:direction — fields id,createdAt,updatedAt; default id asc"
-// @Param			organizationId	query		string	false	"filter → Membership.organizationId"
-// @Param			qualification	query		string	false	"filter → matching valid Membership.qualifications[].code (SR13)"
-// @Param			activeOnly		query		boolean	false	"filter → true => validFrom<=now<validUntil (null end infinite)"
-// @Success		200				{object}	ops.Envelope{data=MemberPage}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/members/eligible [get]
+// eligible serves members.eligible.
+//
+//	@Summary		members.eligible (read)
+//	@ID				members.eligible
+//	@Description	Authorization: admin:identity.read | admin:job.read | contractor:partner.assign:own-company
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR94 \
+//	@Description	role=technician only; scope includes Job.unitId
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A06, DD-P03 · Query: filters organizationId,qualification,activeOnly · sort \
+//	@Description	id,createdAt,updatedAt (default id asc)
+//	@Tags			members
+//	@Accept			json
+//	@Produce		json
+//	@Param			jobId			query		string	false	"input field jobId"
+//	@Param			startAt			query		string	false	"input field startAt"
+//	@Param			endAt			query		string	false	"input field endAt"
+//	@Param			cursor			query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit			query		integer	false	"page size 1–100, default 25"
+//	@Param			sort			query		string	false	"field:direction — fields id,createdAt,updatedAt; default id asc"
+//	@Param			organizationId	query		string	false	"filter → Membership.organizationId"
+//	@Param			qualification	query		string	false	"filter → matching valid Membership.qualifications[].code (SR13)"
+//	@Param			activeOnly		query		boolean	false	"filter → true => validFrom<=now<validUntil (null end infinite)"
+//	@Success		200				{object}	ops.Envelope{data=MemberPage}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/members/eligible [get]
 func (m Workforce) eligible(
 	ctx context.Context,
 	c *ops.Call,
@@ -304,7 +313,9 @@ func (m Workforce) eligible(
 		}
 
 		var busy bool
-		err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.assignments WHERE technician_membership_id = $1 AND status = 'active' AND job_id <> $2
+
+		err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.assignments WHERE technician_membership_id = $1 AND
+			status = 'active' AND job_id <> $2
 			AND scheduled && tstzrange($3, $4))`, t.ID, in.JobID, in.StartAt, in.EndAt).
 			Scan(&busy)
 		if err != nil {
@@ -363,33 +374,37 @@ type Capacity struct {
 	Unavailability   *string   `json:"unavailability"`
 }
 
-// @Summary		members.capacity (read)
-// @ID				members.capacity
-// @Description	Authorization: admin:identity.read | admin:job.read | contractor:partner.assign:own-company
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR94 role=technician only
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-P06, DD-P01, DD-P02, DD-P03 · Query: filters organizationId,qualification,activeOnly · sort id (default id asc)
-// @Tags			members
-// @Accept			json
-// @Produce		json
-// @Param			date			query		string	false	"input field date"
-// @Param			cursor			query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit			query		integer	false	"page size 1–100, default 25"
-// @Param			sort			query		string	false	"field:direction — fields id; default id asc"
-// @Param			organizationId	query		string	false	"filter → Membership.organizationId"
-// @Param			qualification	query		string	false	"filter → matching valid Membership.qualifications[].code (SR13)"
-// @Param			activeOnly		query		boolean	false	"filter → true => validFrom<=now<validUntil (null end infinite)"
-// @Success		200				{object}	ops.Envelope{data=CapacityPage}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/members/capacity [get]
+// capacity serves members.capacity.
+//
+//	@Summary		members.capacity (read)
+//	@ID				members.capacity
+//	@Description	Authorization: admin:identity.read | admin:job.read | contractor:partner.assign:own-company
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR94 \
+//	@Description	role=technician only
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-P06, DD-P01, DD-P02, DD-P03 · Query: filters organizationId,qualification,activeOnly · \
+//	@Description	sort id (default id asc)
+//	@Tags			members
+//	@Accept			json
+//	@Produce		json
+//	@Param			date			query		string	false	"input field date"
+//	@Param			cursor			query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit			query		integer	false	"page size 1–100, default 25"
+//	@Param			sort			query		string	false	"field:direction — fields id; default id asc"
+//	@Param			organizationId	query		string	false	"filter → Membership.organizationId"
+//	@Param			qualification	query		string	false	"filter → matching valid Membership.qualifications[].code (SR13)"
+//	@Param			activeOnly		query		boolean	false	"filter → true => validFrom<=now<validUntil (null end infinite)"
+//	@Success		200				{object}	ops.Envelope{data=CapacityPage}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/members/capacity [get]
 func (m Workforce) capacity(
 	ctx context.Context,
 	c *ops.Call,
@@ -447,7 +462,8 @@ func (m Workforce) capacity(
 
 		rows, err := c.Tx.Query(
 			ctx,
-			`SELECT lower(scheduled), upper(scheduled) FROM maintenance.assignments WHERE technician_membership_id = $1 AND status = 'active'
+			`SELECT lower(scheduled), upper(scheduled) FROM maintenance.assignments WHERE technician_membership_id = $1 AND
+				status = 'active'
 			AND scheduled && tstzrange($2, $3) ORDER BY lower(scheduled)`,
 			t.ID,
 			work.StartAt,
@@ -459,6 +475,7 @@ func (m Workforce) capacity(
 
 		for rows.Next() {
 			var s Slot
+
 			err := rows.Scan(&s.StartAt, &s.EndAt)
 			if err != nil {
 				rows.Close()
@@ -607,28 +624,31 @@ type Unavailability struct {
 	ConflictingAssignmentIDs []uuid.UUID `json:"conflictingAssignmentIds"`
 }
 
-// @Summary		members.setUnavailability (write)
-// @ID				members.setUnavailability
-// @Description	Authorization: contractor:partner.assign:own-company | admin:job.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 from<=to, at most 31 days; conflicting assignments are reported, not changed
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-P06
-// @Tags			members
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		UnavailabilityInput	true	"input"
-// @Success		200				{object}	ops.Envelope{data=Unavailability}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/members/unavailability [post]
+// setUnavailability serves members.setUnavailability.
+//
+//	@Summary		members.setUnavailability (write)
+//	@ID				members.setUnavailability
+//	@Description	Authorization: contractor:partner.assign:own-company | admin:job.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR111 from<=to, at most 31 days; conflicting assignments are reported, not changed
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-P06
+//	@Tags			members
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		UnavailabilityInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Unavailability}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/members/unavailability [post]
 func (m Workforce) setUnavailability(
 	ctx context.Context,
 	c *ops.Call,
@@ -650,7 +670,8 @@ func (m Workforce) setUnavailability(
 
 	f, _ := time.ParseInLocation("2006-01-02", in.From, kualaLumpur)
 	t, _ := time.ParseInLocation("2006-01-02", in.To, kualaLumpur)
-	q := `SELECT a.id FROM maintenance.assignments a JOIN maintenance.ref_memberships mb ON mb.id = a.technician_membership_id
+	q := `SELECT a.id FROM maintenance.assignments a JOIN maintenance.ref_memberships mb ON mb.id =
+		a.technician_membership_id
 		WHERE a.status = 'active' AND a.scheduled && tstzrange($1, $2) AND `
 	args := []any{f.UTC(), t.AddDate(0, 0, 1).UTC()}
 
@@ -673,6 +694,7 @@ func (m Workforce) setUnavailability(
 
 	for rows.Next() {
 		var id uuid.UUID
+
 		err := rows.Scan(&id)
 		if err != nil {
 			rows.Close()
@@ -703,8 +725,11 @@ func (m Workforce) setUnavailability(
 		Note:                     in.Note,
 		ConflictingAssignmentIDs: conflicts, ID: uuid.UUID{},
 	}
-	scanErr := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.unavailability (tenant_id, organization_id, membership_id, days, type, note, conflicting_assignment_ids, created_at, updated_at)
-		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, daterange($3::date, $4::date, '[]'), $5, $6, $7, $8, $8) RETURNING id`,
+
+	scanErr := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.unavailability (tenant_id, organization_id, membership_id, days,
+		type, note, conflicting_assignment_ids, created_at, updated_at)
+		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, daterange($3::date, $4::date, '[]'), $5, $6, $7, $8, $8)
+		RETURNING id`,
 		org, in.MembershipID, in.From, in.To, in.Type, in.Note, conflicts, c.Now).
 		Scan(&u.ID)
 	if scanErr != nil {
@@ -737,7 +762,8 @@ func (m Workforce) setUnavailability(
 }
 
 // unavailabilityCols are the columns scanUnavailability reads: the days as the first and the last day.
-const unavailabilityCols = `id, tenant_id, version, created_at, updated_at, organization_id, membership_id, lower(days), upper(days) - 1, type, note, conflicting_assignment_ids`
+const unavailabilityCols = `id, tenant_id, version, created_at, updated_at, organization_id, membership_id, ` +
+	`lower(days), upper(days) - 1, type, note, conflicting_assignment_ids`
 
 func scanUnavailability(row pgx.Row) (Unavailability, error) {
 	var (
@@ -772,7 +798,8 @@ func scanUnavailability(row pgx.Row) (Unavailability, error) {
 //	@Summary		members.unavailability (read)
 //	@ID				members.unavailability
 //	@Description	Authorization: admin:identity.read | admin:job.read | contractor:partner.assign:own-company
-//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR612 rows whose last Kuala Lumpur day is today or later; contractor sees own-company rows only
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR612 rows whose \
+//	@Description	last Kuala Lumpur day is today or later; contractor sees own-company rows only
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
 //	@Description	Design: DD-P06 · Query: filters organizationId,membershipId · sort id,from (default from asc;id asc)
 //	@Tags			members
@@ -835,7 +862,8 @@ func (m Workforce) unavailabilityList(
 		p := add(*f.MembershipID)
 		conds = append(
 			conds,
-			"(membership_id = "+p+" OR (membership_id IS NULL AND organization_id IN (SELECT organization_id FROM maintenance.ref_memberships WHERE id = "+p+")))",
+			"(membership_id = "+p+" OR (membership_id IS NULL AND organization_id IN (SELECT organization_id FROM "+
+				"maintenance.ref_memberships WHERE id = "+p+")))",
 		)
 	}
 
@@ -911,13 +939,17 @@ type UnavailabilityCleared struct {
 	Remaining *Unavailability `json:"remaining"`
 }
 
-// clearUnavailability clears a row's days from `from` (a Kuala Lumpur day, today or later) to its last day (IR612): from
-// on or before its first day removes the row; a later day keeps the earlier days, so days already passed stay recorded.
+// clearUnavailability clears a row's days from `from` (a Kuala Lumpur day, today or later) to its last day (IR612):
+// from on or before its first day removes the row; a later day keeps the earlier days, so days already passed stay
+// recorded.
 //
 //	@Summary		members.clearUnavailability (write)
 //	@ID				members.clearUnavailability
 //	@Description	Authorization: contractor:partner.assign:own-company | admin:job.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR612 from is a Kuala Lumpur day from today to the row's last day; from on or before its first day removes the row, a later day keeps the earlier days (new last day = from - 1); days before today stay recorded
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR612 from is a Kuala Lumpur day from today to the row's last day; from on or before its first day \
+//	@Description	removes the row, a later day keeps the earlier days (new last day = from - 1); days before today \
+//	@Description	stay recorded
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-P06
 //	@Tags			members
@@ -1006,9 +1038,11 @@ func (m Workforce) clearUnavailability(
 	from, _ := time.Parse("2006-01-02", in.From)
 
 	u.To, u.Version, u.UpdatedAt = from.AddDate(0, 0, -1).Format("2006-01-02"), u.Version+1, c.Now
+
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`UPDATE maintenance.unavailability SET days = daterange(lower(days), $2::date, '[)'), version = $3, updated_at = $4 WHERE id = $1`,
+		`UPDATE maintenance.unavailability SET days = daterange(lower(days), $2::date, '[)'), version = $3, updated_at = $4
+			WHERE id = $1`,
 		u.ID,
 		in.From,
 		u.Version,
@@ -1039,7 +1073,8 @@ func (m Workforce) clearUnavailability(
 	return UnavailabilityCleared{ID: u.ID, Remaining: &u}, nil
 }
 
-// RegisterWorkforce binds the IR132 maintenance-side member operations and the unavailable days' list and clear (IR612).
+// RegisterWorkforce binds the IR132 maintenance-side member operations and the unavailable days' list and clear
+// (IR612).
 func RegisterWorkforce(r *ops.Registry, m Workforce) {
 	ops.Register(r, "members.eligible", m.eligible)
 	ops.Register(r, "members.capacity", m.capacity)

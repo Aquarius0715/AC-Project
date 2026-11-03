@@ -32,7 +32,8 @@ func TestClientMembersAreNotOwners(t *testing.T) {
 		clock.Add(-24*time.Hour),
 	)
 	owner(t, `INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission)
-		SELECT tenant_id, $1, permission FROM identity.membership_permissions WHERE membership_id = $2 ON CONFLICT DO NOTHING`, member, seed.ID("customer-a"))
+		SELECT tenant_id, $1, permission FROM identity.membership_permissions WHERE membership_id = $2 ON CONFLICT DO
+		NOTHING`, member, seed.ID("customer-a"))
 	t.Cleanup(func() {
 		owner(t, `DELETE FROM identity.membership_permissions WHERE membership_id = $1`, member)
 		owner(t, `DELETE FROM identity.memberships WHERE id = $1`, member)
@@ -60,10 +61,13 @@ func TestClientMembersAreNotOwners(t *testing.T) {
 	}{
 		{"clientUsers.list", `{"limit":10}`, 0, false},
 		{"clientUsers.resendInvite", `{"id":"` + clientUser + `"}`, 0, true},
-		{"clientUsers.save", `{"customerId":"` + custA + `","email":"member.invite@example.com","clientRole":"member","displayName":"Invited Member"}`, 0, true},
+		{"clientUsers.save", `{"customerId":"` + custA + `","email":"member.invite@example.com","clientRole":"member",` +
+			`"displayName":"Invited Member"}`, 0, true},
 		{"clientUsers.remove", `{"id":"` + clientUser + `","reason":"left"}`, 1, true},
-		{"policies.setDefaultRule", `{"policyId":"` + defaultPolicyID(t) + `","ruleKey":"ventilation_co2","customerId":"` + custA + `","enabled":false,"reason":"quiet"}`, 97, true},
-		{"filterCare.saveSettings", `{"thresholdHours":100,"fallbackDays":14,"recipients":"all_users","channels":["inApp","email"]}`, 0, true},
+		{"policies.setDefaultRule", `{"policyId":"` + defaultPolicyID(t) + `","ruleKey":"ventilation_co2",` +
+			`"customerId":"` + custA + `","enabled":false,"reason":"quiet"}`, 97, true},
+		{"filterCare.saveSettings", `{"thresholdHours":100,"fallbackDays":14,"recipients":"all_users","channels":["inApp",` +
+			`"email"]}`, 0, true},
 	} {
 		var (
 			code int
@@ -143,9 +147,11 @@ func TestMembersSaveNewUser(t *testing.T) {
 
 	// a contractor's technician created by HQ: the company's user list shows them as not signed in yet, until the first
 	// sign-in
-	tech := `{"newUser":{"email":"hq-tech-` + uuid.NewString()[:8] + `@example.com","displayName":"HQ Tech"},"organizationId":"` + seed.ID("org-contractor-a").
+	tech := `{"newUser":{"email":"hq-tech-` + uuid.NewString()[:8] + `@example.com","displayName":"HQ Tech"},` +
+		`"organizationId":"` + seed.ID("org-contractor-a").
 		String() +
-		`","role":"technician","employment":"external","permissions":["alert.read"],"scopes":[{"kind":"unit","id":"` + seed.ID("unit-non-rto").
+		`","role":"technician","employment":"external","permissions":["alert.read"],"scopes":[{"kind":"unit",` +
+		`"id":"` + seed.ID("unit-non-rto").
 		String() +
 		`"}],"validFrom":"` + clock.Format(
 		time.RFC3339,
@@ -163,7 +169,8 @@ func TestMembersSaveNewUser(t *testing.T) {
 	var status, user string
 	ownerScan(
 		t,
-		`SELECT x.status, m.user_id::text FROM identity.partner_users x JOIN identity.memberships m ON m.id = x.membership_id WHERE m.id = $1`,
+		`SELECT x.status, m.user_id::text FROM identity.partner_users x JOIN identity.memberships m ON m.id = x.membership_id
+			WHERE m.id = $1`,
 		[]any{membership},
 		&status,
 		&user,

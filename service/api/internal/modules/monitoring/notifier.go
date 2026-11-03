@@ -108,9 +108,11 @@ func inWindow(w *ActiveWindow, at time.Time, tz string) bool {
 func policiesOf(ctx context.Context, c *ops.Call, unit, org uuid.UUID) ([]notifPolicy, error) {
 	rows, err := c.Tx.Query(
 		ctx,
-		`SELECT p.id, p.kind = 'default_alert', p.enabled, p.owner_membership_id, p.condition, p.rules, p.recipient_membership_ids, p.channels,
+		`SELECT p.id, p.kind = 'default_alert', p.enabled, p.owner_membership_id, p.condition, p.rules,
+			p.recipient_membership_ids, p.channels,
 		COALESCE(p.cooldown_minutes, 0), p.timezone FROM monitoring.alert_policies p
-		WHERE p.id IN (SELECT policy_id FROM assets.unit_alert_policies WHERE unit_id = $1) OR p.kind = 'default_alert' ORDER BY p.id`,
+		WHERE p.id IN (SELECT policy_id FROM assets.unit_alert_policies WHERE unit_id = $1) OR p.kind = 'default_alert' ORDER
+		BY p.id`,
 		unit,
 	)
 	if err != nil {
@@ -124,6 +126,7 @@ func policiesOf(ctx context.Context, c *ops.Call, unit, org uuid.UUID) ([]notifP
 			p           notifPolicy
 			cond, rules []byte
 		)
+
 		err := rows.Scan(
 			&p.id,
 			&p.isDefault,
@@ -345,9 +348,11 @@ func recoverAlert(
 
 	rows, err := c.Tx.Query(
 		ctx,
-		`UPDATE monitoring.alerts a SET status = 'resolved', resolved_at = $4, resolution_reason = $5, resolution_evidence_ids = ARRAY[$6::uuid],
+		`UPDATE monitoring.alerts a SET status = 'resolved', resolved_at = $4, resolution_reason = $5, resolution_evidence_ids
+			= ARRAY[$6::uuid],
 		version = version + 1, updated_at = $4
-		WHERE a.unit_id = $1 AND a.policy_id = $2 AND a.rule_key IS NOT DISTINCT FROM $3 AND a.type = 'sensor' AND a.status <> 'resolved' AND a.detected_at <= $4
+		WHERE a.unit_id = $1 AND a.policy_id = $2 AND a.rule_key IS NOT DISTINCT FROM $3 AND a.type = 'sensor' AND a.status <>
+		'resolved' AND a.detected_at <= $4
 		RETURNING a.id`,
 		unit,
 		policy,
@@ -364,6 +369,7 @@ func recoverAlert(
 
 	for rows.Next() {
 		var id uuid.UUID
+
 		err := rows.Scan(&id)
 		if err != nil {
 			rows.Close()
@@ -423,6 +429,7 @@ func (n Notifier) Evaluate(
 	}
 
 	var org uuid.UUID
+
 	err := c.Tx.QueryRow(ctx, `SELECT customer_org_id FROM assets.units WHERE id = $1`, unit).
 		Scan(&org)
 	if err != nil {
@@ -529,7 +536,9 @@ func (n Notifier) Evaluate(
 		if reason == "" &&
 			p.cooldown > 0 { // cooldown since the last created notification of this policy and unit
 			var last *time.Time
-			err := c.Tx.QueryRow(ctx, `SELECT max(occurred_at) FROM monitoring.alert_notifications WHERE policy_id = $1 AND unit_id = $2`, p.id, unit).
+
+			err := c.Tx.QueryRow(ctx, `SELECT max(occurred_at) FROM monitoring.alert_notifications WHERE policy_id = $1 AND
+				unit_id = $2`, p.id, unit).
 				Scan(&last)
 			if err != nil {
 				return nil, err
@@ -541,16 +550,21 @@ func (n Notifier) Evaluate(
 		}
 
 		if reason == "" &&
-			p.cooldown == 0 { // without a cooldown (the default policy) a policy notifies once per open alert: nothing more while the
-			// alert it notified about stays open; a recurrence after it resolved opens a new alert and notifies again (IR600, DEC-90)
+			p.cooldown == 0 {
+			// without a cooldown (the default policy) a policy notifies once per open alert: nothing more while the
+			// alert it notified about stays open; a recurrence after it resolved opens a new alert and notifies again (IR600,
+			// DEC-90)
 			var key *string
 			if hitKey != "" {
 				key = &hitKey
 			}
 
 			var told bool
-			err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM monitoring.alerts a JOIN monitoring.alert_notifications n ON n.alert_id = a.id AND n.policy_id = a.policy_id
-				WHERE a.unit_id = $1 AND a.policy_id = $2 AND a.rule_key IS NOT DISTINCT FROM $3 AND a.type = 'sensor' AND a.status <> 'resolved')`, unit, p.id, key).
+
+			err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM monitoring.alerts a JOIN monitoring.alert_notifications n ON
+				n.alert_id = a.id AND n.policy_id = a.policy_id
+				WHERE a.unit_id = $1 AND a.policy_id = $2 AND a.rule_key IS NOT DISTINCT FROM $3 AND a.type = 'sensor' AND a.status
+				<> 'resolved')`, unit, p.id, key).
 				Scan(&told)
 			if err != nil {
 				return nil, err
@@ -618,7 +632,8 @@ func (n Notifier) Evaluate(
 
 						_, execErr := c.Tx.Exec(
 							ctx,
-							`INSERT INTO monitoring.alert_notifications (tenant_id, notification_id, alert_id, policy_id, unit_id, occurred_at)
+							`INSERT INTO monitoring.alert_notifications (tenant_id, notification_id, alert_id, policy_id, unit_id,
+								occurred_at)
 							VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5)`,
 							id,
 							alert,
@@ -660,8 +675,8 @@ func (n Notifier) Evaluate(
 	return out, nil
 }
 
-// sourceAlert reuses the open Alert of the policy/rule on the unit or opens one (alerts_one_open_per_rule) linked to the
-// latest earlier Alert of the same policy / rule on the unit (a recurrence after it resolved, IR66).
+// sourceAlert reuses the open Alert of the policy/rule on the unit or opens one (alerts_one_open_per_rule) linked to
+// the latest earlier Alert of the same policy / rule on the unit (a recurrence after it resolved, IR66).
 func sourceAlert(
 	ctx context.Context,
 	c *ops.Call,
@@ -677,7 +692,8 @@ func sourceAlert(
 
 	var id uuid.UUID
 
-	err := c.Tx.QueryRow(ctx, `SELECT id FROM monitoring.alerts WHERE unit_id = $1 AND policy_id = $2 AND rule_key IS NOT DISTINCT FROM $3 AND type = 'sensor' AND status <> 'resolved'`,
+	err := c.Tx.QueryRow(ctx, `SELECT id FROM monitoring.alerts WHERE unit_id = $1 AND policy_id = $2 AND rule_key IS NOT
+		DISTINCT FROM $3 AND type = 'sensor' AND status <> 'resolved'`,
 		unit, policy, key).
 		Scan(&id)
 	if err == nil {
@@ -688,16 +704,21 @@ func sourceAlert(
 		return id, err
 	}
 
-	err = c.Tx.QueryRow(ctx, `INSERT INTO monitoring.alerts (tenant_id, unit_id, customer_org_id, policy_id, rule_key, type, severity, status, cause_code, evidence_kind, evidence_text,
-		observed_at, detected_at, created_at, updated_at, previous_alert_id) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, 'sensor', $5, 'open', 'unknown', 'demo_observation', $6, $7, $7, $7, $7,
-		(SELECT p.id FROM monitoring.alerts p WHERE p.unit_id = $1 AND p.policy_id = $3 AND p.rule_key IS NOT DISTINCT FROM $4 AND p.type = 'sensor' ORDER BY p.detected_at DESC, p.id DESC LIMIT 1))
-		ON CONFLICT DO NOTHING RETURNING id`, unit, org, policy, key, cnd.Severity, "Demo event: "+cnd.Metric+" "+cnd.Operator+" threshold", at).
+	err = c.Tx.QueryRow(ctx, `INSERT INTO monitoring.alerts (tenant_id, unit_id, customer_org_id, policy_id, rule_key,
+		type, severity, status, cause_code, evidence_kind, evidence_text,
+		observed_at, detected_at, created_at, updated_at, previous_alert_id) VALUES (current_setting('app.tenant_id')::uuid,
+		$1, $2, $3, $4, 'sensor', $5, 'open', 'unknown', 'demo_observation', $6, $7, $7, $7, $7,
+		(SELECT p.id FROM monitoring.alerts p WHERE p.unit_id = $1 AND p.policy_id = $3 AND p.rule_key IS NOT DISTINCT FROM $4
+		AND p.type = 'sensor' ORDER BY p.detected_at DESC, p.id DESC LIMIT 1))
+		ON CONFLICT DO NOTHING RETURNING
+		id`, unit, org, policy, key, cnd.Severity, "Demo event: "+cnd.Metric+" "+cnd.Operator+" threshold", at).
 		Scan(&id)
 	if errors.Is(
 		err,
 		pgx.ErrNoRows,
 	) { // a concurrent evaluation opened it first (alerts_one_open_per_rule)
-		err = c.Tx.QueryRow(ctx, `SELECT id FROM monitoring.alerts WHERE unit_id = $1 AND policy_id = $2 AND rule_key IS NOT DISTINCT FROM $3 AND type = 'sensor' AND status <> 'resolved'`,
+		err = c.Tx.QueryRow(ctx, `SELECT id FROM monitoring.alerts WHERE unit_id = $1 AND policy_id = $2 AND rule_key IS NOT
+			DISTINCT FROM $3 AND type = 'sensor' AND status <> 'resolved'`,
 			unit, policy, key).
 			Scan(&id)
 	}
@@ -713,6 +734,7 @@ func deliveryFailure(
 	at time.Time,
 ) (uuid.UUID, error) {
 	var raw []byte
+
 	scanErr := c.Tx.QueryRow(ctx, `SELECT delivery_failures FROM monitoring.alerts WHERE id = $1 FOR UPDATE`, alert).
 		Scan(&raw)
 	if scanErr != nil {

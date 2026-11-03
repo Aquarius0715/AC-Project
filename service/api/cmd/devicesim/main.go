@@ -107,7 +107,8 @@ func main() {
 		SetConnectRetry(true).
 		SetKeepAlive(60 * time.Second).
 		SetOnConnectHandler(func(c mqtt.Client) { subscribe(c, modules) }).
-		SetConnectionLostHandler(func(_ mqtt.Client, err error) { log.Printf("broker %s: connection lost: %v", *broker, err) })
+		SetConnectionLostHandler(
+			func(_ mqtt.Client, err error) { log.Printf("broker %s: connection lost: %v", *broker, err) })
 
 	client := mqtt.NewClient(opts)
 	if tok := client.Connect(); tok.Wait() && tok.Error() != nil {
@@ -183,9 +184,9 @@ func clientTag(tenant string) string {
 }
 
 // fixtureModule is the module of a fixture device and whether it sends heartbeats. It plays its device's connection in
-// the fixture, as the mock fleet does (IR613): an online device reports its sensors and beats; one that is offline sends
-// neither readings nor heartbeats and leaves commands unanswered, so the demo shows its last known values. A device
-// without a link is taken as online.
+// the fixture, as the mock fleet does (IR613): an online device reports its sensors and beats; one that is offline
+// sends neither readings nor heartbeats and leaves commands unanswered, so the demo shows its last known values. A
+// device without a link is taken as online.
 func fixtureModule(tenant, name, firmware string) (*devicesim.Module, bool) {
 	id := seed.ID(name).String()
 

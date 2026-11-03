@@ -56,8 +56,10 @@ type Member struct {
 	RevokedAt      *time.Time `json:"revokedAt"` // HQ ended the access: the sign-in is off, only HQ gives it back (IR508)
 }
 
-const memberCols = `m.id, m.tenant_id, m.version, m.created_at, m.updated_at, m.user_id, m.organization_id, m.role, m.employment, m.scope_version, m.valid_from,
-	m.valid_until, m.client_role, m.revoked_at, COALESCE((SELECT u.display_name FROM identity.users u WHERE u.id = m.user_id), '')`
+const memberCols = `m.id, m.tenant_id, m.version, m.created_at, m.updated_at, m.user_id, m.organization_id, m.role, ` +
+	`m.employment, m.scope_version, m.valid_from,
+	m.valid_until, m.client_role, m.revoked_at, COALESCE((SELECT u.display_name FROM identity.users u WHERE u.id = ` +
+	`m.user_id), '')`
 
 func scanMember(r pgx.Row) (Member, error) {
 	var x Member
@@ -112,7 +114,8 @@ func loadMembers(ctx context.Context, c *ops.Call, in *LoadMembersInput) ([]Memb
 	ms := in.Members
 	for i := range ms {
 		if ms[i].DisplayName == "" {
-			err := c.Tx.QueryRow(ctx, `SELECT COALESCE((SELECT display_name FROM identity.users WHERE id = $1), '')`, ms[i].UserID).
+			err := c.Tx.QueryRow(ctx, `SELECT COALESCE((SELECT display_name FROM identity.users WHERE id = $1),
+				'')`, ms[i].UserID).
 				Scan(&ms[i].DisplayName)
 			if err != nil {
 				return nil, err
@@ -163,8 +166,10 @@ func fillMembers(ctx context.Context, c *ops.Call, ms []Member) error {
 
 	if c.Principal.Role != "contractor" {
 		var p string
+
 		err := each(
-			`SELECT membership_id, permission FROM identity.membership_permissions WHERE membership_id = ANY($1) ORDER BY membership_id, permission`,
+			`SELECT membership_id, permission FROM identity.membership_permissions WHERE membership_id = ANY($1) ORDER BY
+				membership_id, permission`,
 			[]any{&p},
 			func(x *Member) { x.Permissions = append(x.Permissions, p) },
 		)
@@ -173,8 +178,10 @@ func fillMembers(ctx context.Context, c *ops.Call, ms []Member) error {
 		}
 
 		var s ScopeRef
+
 		err = each(
-			`SELECT membership_id, kind, ref_id FROM identity.membership_scopes WHERE membership_id = ANY($1) ORDER BY membership_id, kind, ref_id`,
+			`SELECT membership_id, kind, ref_id FROM identity.membership_scopes WHERE membership_id = ANY($1) ORDER BY
+				membership_id, kind, ref_id`,
 			[]any{&s.Kind, &s.ID},
 			func(x *Member) { x.Scopes = append(x.Scopes, s) },
 		)
@@ -186,7 +193,8 @@ func fillMembers(ctx context.Context, c *ops.Call, ms []Member) error {
 	var g Grant
 
 	return each(
-		`SELECT membership_id, code, valid_from, valid_until, revoked_at FROM identity.qualification_grants WHERE membership_id = ANY($1) ORDER BY membership_id, code`,
+		`SELECT membership_id, code, valid_from, valid_until, revoked_at FROM identity.qualification_grants WHERE
+			membership_id = ANY($1) ORDER BY membership_id, code`,
 		[]any{&g.Code, &g.ValidFrom, &g.ValidUntil, &g.RevokedAt},
 		func(x *Member) {
 			grant := g
@@ -202,39 +210,45 @@ func fillMembers(ctx context.Context, c *ops.Call, ms []Member) error {
 
 // ---- members.list ----
 
-// @Summary		members.list (read)
-// @ID				members.list
-// @Description	Authorization: admin:identity.read | admin:job.read | contractor:partner.assign:own-company
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR94 contractor sees own-company technicians only
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A03, DD-P06, DD-P05, DD-P01, DD-P02, DD-P03, DD-P07, DD-A06 · Query: filters role,organizationId,qualification,activeOnly · sort id,validFrom,createdAt,updatedAt (default id asc)
-// @Tags			members
-// @Accept			json
-// @Produce		json
-// @Param			cursor			query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit			query		integer	false	"page size 1–100, default 25"
-// @Param			sort			query		string	false	"field:direction — fields id,validFrom,createdAt,updatedAt; default id asc"
-// @Param			role			query		string	false	"filter → Membership.role (omitted: every role except client)"
-// @Param			organizationId	query		string	false	"filter → Membership.organizationId"
-// @Param			qualification	query		string	false	"filter → matching valid Membership.qualifications[].code (SR13)"
-// @Param			activeOnly		query		boolean	false	"filter → true => validFrom<=now<validUntil (null end infinite)"
-// @Success		200				{object}	ops.Envelope{data=MemberPage}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/members [get]
+// membersList serves members.list.
+//
+//	@Summary		members.list (read)
+//	@ID				members.list
+//	@Description	Authorization: admin:identity.read | admin:job.read | contractor:partner.assign:own-company
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR94 contractor \
+//	@Description	sees own-company technicians only
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A03, DD-P06, DD-P05, DD-P01, DD-P02, DD-P03, DD-P07, DD-A06 · Query: filters \
+//	@Description	role,organizationId,qualification,activeOnly · sort id,validFrom,createdAt,updatedAt (default id \
+//	@Description	asc)
+//	@Tags			members
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor			query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit			query		integer	false	"page size 1–100, default 25"
+//	@Param			sort			query		string	false	"field:direction — fields id,validFrom,createdAt,updatedAt; default id asc"
+//	@Param			role			query		string	false	"filter → Membership.role (omitted: every role except client)"
+//	@Param			organizationId	query		string	false	"filter → Membership.organizationId"
+//	@Param			qualification	query		string	false	"filter → matching valid Membership.qualifications[].code (SR13)"
+//	@Param			activeOnly		query		boolean	false	"filter → true => validFrom<=now<validUntil (null end infinite)"
+//	@Success		200				{object}	ops.Envelope{data=MemberPage}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/members [get]
 func membersList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Member], error) {
 	var f struct {
 		Role           *string    `json:"role,omitempty"`
 		OrganizationID *uuid.UUID `json:"organizationId,omitempty"`
 		Qualification  *string    `json:"qualification,omitempty"` // a grant of that code valid now (SR13)
-		ActiveOnly     *bool      `json:"activeOnly,omitempty"`    // true: validFrom <= now < validUntil; false: no validity filter
+		// true: validFrom <= now < validUntil; false: no validity filter
+		ActiveOnly *bool `json:"activeOnly,omitempty"`
 	}
 
 	if len(in.Filters) > 0 {
@@ -314,6 +328,7 @@ func membersList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 	where := strings.Join(conds, " AND ")
 
 	var total int
+
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM identity.memberships m WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
@@ -420,6 +435,7 @@ func (in *MemberInput) Validate() map[string]string {
 		), strings.TrimSpace(
 			in.NewUser.DisplayName,
 		)
+
 		a, err := mail.ParseAddress(
 			in.NewUser.Email,
 		)
@@ -444,7 +460,8 @@ func (in *MemberInput) Validate() map[string]string {
 	}
 
 	switch {
-	case in.Role == "technician" && (in.Employment == nil || (*in.Employment != "internal" && *in.Employment != "external")):
+	case in.Role == "technician" &&
+		(in.Employment == nil || (*in.Employment != "internal" && *in.Employment != "external")):
 		fe["employment"] = "error.required"
 	case in.Role != "technician" && in.Employment != nil:
 		fe["employment"] = "error.notAllowed"
@@ -479,7 +496,10 @@ func (in *MemberInput) Validate() map[string]string {
 		}
 	}
 
-	kinds := map[string][]string{"admin": {"tenant"}, "client": {"organization"}, "contractor": {"organization"}, "technician": {"unit", "property", "organization"}}[in.Role]
+	kinds := map[string][]string{
+		"admin": {"tenant"}, "client": {"organization"}, "contractor": {"organization"},
+		"technician": {"unit", "property", "organization"},
+	}[in.Role]
 	for _, sc := range in.Scopes {
 		if !slices.Contains(kinds, sc.Kind) {
 			fe["scopes"] = "error.invalid"
@@ -511,28 +531,35 @@ func (in *MemberInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		members.save (write)
-// @ID				members.save
-// @Description	Authorization: admin:identity.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR84 new client membership creates initial Consent granted=false; newUser creates the person with the membership instead of userId and sends a set-up e-mail (IR461; a person this tenant removed is taken back; for an existing user whose memberships here have all ended the sign-in account is pointed at the new one; IR462); the last active identity.write holder keeps the permission and stays valid — no end now and no later start (CONFLICT errors.last_identity_admin; IR472)
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A03
-// @Tags			members
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		MemberInput	true	"input"
-// @Success		200				{object}	ops.Envelope{data=Member}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/members [post]
+// membersSave serves members.save.
+//
+//	@Summary		members.save (write)
+//	@ID				members.save
+//	@Description	Authorization: admin:identity.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR84 new client membership creates initial Consent granted=false; newUser creates the person with \
+//	@Description	the membership instead of userId and sends a set-up e-mail (IR461; a person this tenant removed is \
+//	@Description	taken back; for an existing user whose memberships here have all ended the sign-in account is \
+//	@Description	pointed at the new one; IR462); the last active identity.write holder keeps the permission and stays \
+//	@Description	valid — no end now and no later start (CONFLICT errors.last_identity_admin; IR472)
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A03
+//	@Tags			members
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		MemberInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Member}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/members [post]
 func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, error) {
 	newPerson := in.NewUser != nil
 	if newPerson { // the person is created with the membership, or taken back if this tenant removed them (IR461, IR462)
@@ -549,6 +576,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 	}
 
 	var exists bool
+
 	scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.users WHERE id = $1)`, in.UserID).
 		Scan(&exists)
 	if scanErr != nil {
@@ -585,7 +613,8 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		case "tenant":
 			ok = sc.ID == c.Principal.TenantID
 		case "organization":
-			err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.organizations WHERE id = $1 AND (kind = 'customer' OR id = $2))`, sc.ID, in.OrganizationID).
+			err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.organizations WHERE id = $1 AND (kind = 'customer' OR
+				id = $2))`, sc.ID, in.OrganizationID).
 				Scan(&ok)
 			if in.Role != "technician" {
 				ok = ok && sc.ID == in.OrganizationID
@@ -615,7 +644,8 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 
 			had := false
 			if in.ID != nil {
-				err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.membership_permissions WHERE membership_id = $1 AND permission = $2)`, *in.ID, p).
+				err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.membership_permissions WHERE membership_id = $1 AND
+					permission = $2)`, *in.ID, p).
 					Scan(&had)
 				if err != nil {
 					return Member{}, err
@@ -633,8 +663,9 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		prev *int
 	)
 
-	account := false                // the sign-in account is opened or pointed at this new membership (IR461, IR462)
-	revoke, restore := false, false // HQ turns the sign-in off with the access, or on when it gives the access back (IR508)
+	account := false // the sign-in account is opened or pointed at this new membership (IR461, IR462)
+	// HQ turns the sign-in off with the access, or on when it gives the access back (IR508)
+	revoke, restore := false, false
 
 	if in.ID == nil {
 		var clientRole *string
@@ -644,7 +675,8 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 			clientRole = &cr
 		}
 
-		err := c.Tx.QueryRow(ctx, `INSERT INTO identity.memberships (tenant_id, user_id, organization_id, role, employment, client_role, valid_from, valid_until, created_at, updated_at)
+		err := c.Tx.QueryRow(ctx, `INSERT INTO identity.memberships (tenant_id, user_id, organization_id, role, employment,
+			client_role, valid_from, valid_until, created_at, updated_at)
 			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7, $8, $8) RETURNING id`,
 			in.UserID, in.OrganizationID, in.Role, in.Employment, clientRole, in.ValidFrom, in.ValidUntil, c.Now).
 			Scan(&id)
@@ -655,8 +687,10 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		// whose sign-in belongs to another tenant keeps it
 		account = newPerson
 		if !newPerson {
-			err := c.Tx.QueryRow(ctx, `SELECT (u.sign_in_membership_id IS NULL OR EXISTS (SELECT 1 FROM identity.memberships s WHERE s.id = u.sign_in_membership_id))
-				AND NOT EXISTS (SELECT 1 FROM identity.memberships m WHERE m.user_id = u.id AND m.id <> $2 AND (m.valid_until IS NULL OR m.valid_until > $3))
+			err := c.Tx.QueryRow(ctx, `SELECT (u.sign_in_membership_id IS NULL OR EXISTS (SELECT 1 FROM identity.memberships s
+				WHERE s.id = u.sign_in_membership_id))
+				AND NOT EXISTS (SELECT 1 FROM identity.memberships m WHERE m.user_id = u.id AND m.id <> $2 AND (m.valid_until IS
+				NULL OR m.valid_until > $3))
 				FROM identity.users u WHERE u.id = $1`, in.UserID, id, c.Now).
 				Scan(&account)
 			if err != nil {
@@ -672,7 +706,8 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		if in.Role == "client" { // IR84 initial Consent
 			_, err := c.Tx.Exec(
 				ctx,
-				`INSERT INTO identity.consents (tenant_id, membership_id, purpose, granted) VALUES (current_setting('app.tenant_id')::uuid, $1, 'location_automation', false)`,
+				`INSERT INTO identity.consents (tenant_id, membership_id, purpose, granted) VALUES
+					(current_setting('app.tenant_id')::uuid, $1, 'location_automation', false)`,
 				id,
 			)
 			if err != nil {
@@ -682,7 +717,8 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 			// created with it (IR461); an address already on the list keeps its row
 			_, err = c.Tx.Exec(
 				ctx,
-				`INSERT INTO identity.client_users (tenant_id, customer_id, membership_id, email, display_name, client_role, status, invited_at, invited_by_membership_id, created_at, updated_at)
+				`INSERT INTO identity.client_users (tenant_id, customer_id, membership_id, email, display_name, client_role, status,
+					invited_at, invited_by_membership_id, created_at, updated_at)
 				SELECT current_setting('app.tenant_id')::uuid, cu.id, $1, u.email, u.display_name, $6, $7, $3, $4, $3, $3
 				FROM notify.ref_customers cu, identity.users u WHERE cu.organization_id = $2 AND u.id = $5
 				ON CONFLICT (tenant_id, customer_id, email) DO NOTHING`,
@@ -703,7 +739,8 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		if in.Role == "contractor" || in.Role == "technician" {
 			_, err := c.Tx.Exec(
 				ctx,
-				`INSERT INTO identity.partner_users (tenant_id, organization_id, membership_id, email, display_name, partner_role, status, invited_at, invited_by_membership_id, created_at, updated_at)
+				`INSERT INTO identity.partner_users (tenant_id, organization_id, membership_id, email, display_name, partner_role,
+					status, invited_at, invited_by_membership_id, created_at, updated_at)
 				SELECT current_setting('app.tenant_id')::uuid, o.id, $1, u.email, u.display_name, $5, $7, $3, $4, $3, $3
 				FROM identity.organizations o, identity.users u WHERE o.id = $2 AND o.kind = 'contractor' AND u.id = $6
 				ON CONFLICT (tenant_id, organization_id, email) DO NOTHING`,
@@ -761,13 +798,15 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 				others int
 			)
 
-			err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.membership_permissions WHERE membership_id = $1 AND permission = 'identity.write')`, x.ID).
+			err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.membership_permissions WHERE membership_id = $1 AND
+				permission = 'identity.write')`, x.ID).
 				Scan(&holds)
 			if err != nil {
 				return Member{}, err
 			}
 
-			err = c.Tx.QueryRow(ctx, `SELECT count(*) FROM identity.memberships m JOIN identity.membership_permissions p ON p.membership_id = m.id AND p.permission = 'identity.write'
+			err = c.Tx.QueryRow(ctx, `SELECT count(*) FROM identity.memberships m JOIN identity.membership_permissions p ON
+				p.membership_id = m.id AND p.permission = 'identity.write'
 				WHERE m.id <> $1 AND m.valid_from <= $2 AND (m.valid_until IS NULL OR m.valid_until > $2)`, x.ID, c.Now).
 				Scan(&others)
 			if err != nil {
@@ -783,7 +822,9 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		until := in.ValidUntil
 
 		var disabled bool
-		scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.partner_users WHERE membership_id = $1 AND status = 'disabled')
+
+		scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.partner_users WHERE membership_id = $1 AND status
+			= 'disabled')
 			OR EXISTS (SELECT 1 FROM identity.client_users WHERE membership_id = $1 AND status = 'disabled')`, x.ID).
 			Scan(&disabled)
 		if scanErr != nil {
@@ -793,7 +834,8 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		if disabled && x.ValidUntil != nil && (until == nil || until.After(*x.ValidUntil)) {
 			_, err := c.Tx.Exec(
 				ctx,
-				`UPDATE identity.partner_users SET access_until = $2, version = version + 1, updated_at = $3 WHERE membership_id = $1`,
+				`UPDATE identity.partner_users SET access_until = $2, version = version + 1, updated_at = $3 WHERE membership_id =
+					$1`,
 				x.ID,
 				until,
 				c.Now,
@@ -823,7 +865,8 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 
 		_, execErr := c.Tx.Exec(
 			ctx,
-			`UPDATE identity.memberships SET employment = $2, valid_from = $3, valid_until = $4, revoked_at = $6, version = version + 1, updated_at = $5 WHERE id = $1`,
+			`UPDATE identity.memberships SET employment = $2, valid_from = $3, valid_until = $4, revoked_at = $6, version =
+				version + 1, updated_at = $5 WHERE id = $1`,
 			x.ID,
 			in.Employment,
 			in.ValidFrom,
@@ -860,6 +903,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 	}
 	if prev != nil {
 		ms := []Member{before}
+
 		err := LoadMembers(ctx, c, ms)
 		if err != nil {
 			return Member{}, err
@@ -880,7 +924,8 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 	for _, p := range in.Permissions {
 		_, err := c.Tx.Exec(
 			ctx,
-			`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES (current_setting('app.tenant_id')::uuid, $1, $2)`,
+			`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES
+				(current_setting('app.tenant_id')::uuid, $1, $2)`,
 			id,
 			p,
 		)
@@ -901,7 +946,8 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 	for _, sc := range in.Scopes {
 		_, err := c.Tx.Exec(
 			ctx,
-			`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3)
+			`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES
+				(current_setting('app.tenant_id')::uuid, $1, $2, $3)
 			ON CONFLICT DO NOTHING`,
 			id,
 			sc.Kind,
@@ -943,6 +989,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 	}
 
 	ms := []Member{x}
+
 	loadMembersErr := LoadMembers(ctx, c, ms)
 	if loadMembersErr != nil {
 		return x, loadMembersErr
@@ -1020,7 +1067,10 @@ var wallClock = func() time.Time { return time.Now().UTC() }
 //	@Summary		members.revokeSessions (write)
 //	@ID				members.revokeSessions
 //	@Description	Authorization: admin:identity.write | admin:asset.write:client-membership
-//	@Description	Validation: D01; input constraints in the corresponding DD; IR384 reason 1–1000; every membership of the target's user in the tenant records sessionsRevokedAt (wall clock); a token signed in before it is UNAUTHENTICATED errors.session_revoked; a client membership needs asset.write, any other identity.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; IR384 reason 1–1000; every membership of \
+//	@Description	the target's user in the tenant records sessionsRevokedAt (wall clock); a token signed in before it \
+//	@Description	is UNAUTHENTICATED errors.session_revoked; a client membership needs asset.write, any other \
+//	@Description	identity.write
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A03, DD-A17
 //	@Tags			members

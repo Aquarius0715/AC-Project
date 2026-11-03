@@ -20,7 +20,8 @@ func accountMembership(t *testing.T, org uuid.UUID, role string, clientRole any)
 	id := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from) VALUES ($1,
+			$2, $3, $4, $5, $6, $7)`,
 		id,
 		seed.ID("tenant-a"),
 		newUser(t),
@@ -106,7 +107,8 @@ func TestLastOwnerAtOnce(t *testing.T) {
 	var active []string
 	ownerScan(
 		t,
-		`SELECT COALESCE(array_agg(id::text), '{}') FROM identity.client_users WHERE customer_id = $1 AND client_role = 'owner' AND status = 'active'`,
+		`SELECT COALESCE(array_agg(id::text), '{}') FROM identity.client_users WHERE customer_id = $1 AND client_role =
+			'owner' AND status = 'active'`,
 		[]any{cust},
 		&active,
 	)
@@ -128,7 +130,8 @@ func TestLastOwnerAtOnce(t *testing.T) {
 		for _, id := range []string{a, b} {
 			owner(
 				t,
-				`INSERT INTO identity.client_users (id, tenant_id, customer_id, membership_id, email, client_role, status, invited_at, invited_by_membership_id)
+				`INSERT INTO identity.client_users (id, tenant_id, customer_id, membership_id, email, client_role, status,
+					invited_at, invited_by_membership_id)
 				VALUES ($1, $2, $3, $4, $5, 'owner', 'active', $6, $7)`,
 				id,
 				seed.ID("tenant-a"),
@@ -149,7 +152,8 @@ func TestLastOwnerAtOnce(t *testing.T) {
 					s,
 					&hq,
 					"clientUsers.save",
-					`{"id":"`+a+`","customerId":"`+cust.String()+`","email":"owner-`+a[:8]+`@example.com","clientRole":"member","status":"active","reason":"no longer an owner"}`,
+					`{"id":"`+a+`","customerId":"`+cust.String()+`","email":"owner-`+a[:8]+`@example.com","clientRole":"member",`+
+						`"status":"active","reason":"no longer an owner"}`,
 					1,
 				)
 			},
@@ -181,7 +185,8 @@ func TestLastContractorAtOnce(t *testing.T) {
 	var active []string
 	ownerScan(
 		t,
-		`SELECT COALESCE(array_agg(id::text), '{}') FROM identity.partner_users WHERE organization_id = $1 AND partner_role = 'contractor' AND status = 'active'`,
+		`SELECT COALESCE(array_agg(id::text), '{}') FROM identity.partner_users WHERE organization_id = $1 AND partner_role =
+			'contractor' AND status = 'active'`,
 		[]any{org},
 		&active,
 	)
@@ -203,7 +208,8 @@ func TestLastContractorAtOnce(t *testing.T) {
 		for _, id := range []string{a, b} {
 			owner(
 				t,
-				`INSERT INTO identity.partner_users (id, tenant_id, organization_id, membership_id, email, partner_role, status, invited_at, invited_by_membership_id)
+				`INSERT INTO identity.partner_users (id, tenant_id, organization_id, membership_id, email, partner_role, status,
+					invited_at, invited_by_membership_id)
 				VALUES ($1, $2, $3, $4, $5, 'contractor', 'active', $6, $7)`,
 				id,
 				seed.ID("tenant-a"),
@@ -224,7 +230,8 @@ func TestLastContractorAtOnce(t *testing.T) {
 					s,
 					&contrA,
 					"partnerUsers.save",
-					`{"id":"`+a+`","email":"boss-`+a[:8]+`@example.com","partnerRole":"contractor","status":"disabled","reason":"on leave"}`,
+					`{"id":"`+a+`","email":"boss-`+a[:8]+`@example.com","partnerRole":"contractor","status":"disabled","reason":"on `+
+						`leave"}`,
 					1,
 				)
 			},
@@ -254,14 +261,16 @@ func identityAdmins(t *testing.T) {
 	var others []string
 	ownerScan(
 		t,
-		`WITH d AS (DELETE FROM identity.membership_permissions WHERE permission = 'identity.write' AND NOT (membership_id = ANY($1::uuid[])) RETURNING membership_id)
+		`WITH d AS (DELETE FROM identity.membership_permissions WHERE permission = 'identity.write' AND NOT (membership_id =
+			ANY($1::uuid[])) RETURNING membership_id)
 		SELECT COALESCE(array_agg(membership_id::text), '{}') FROM d`,
 		[]any{pair},
 		&others,
 	)
 	t.Cleanup(func() {
 		owner(t, `INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission)
-			SELECT tenant_id, id, 'identity.write' FROM identity.memberships WHERE id = ANY($1::uuid[]) ON CONFLICT DO NOTHING`, append(others, pair...))
+			SELECT tenant_id, id, 'identity.write' FROM identity.memberships WHERE id = ANY($1::uuid[]) ON CONFLICT DO
+			NOTHING`, append(others, pair...))
 	})
 }
 
@@ -343,7 +352,8 @@ func TestLastIdentityAdminAtOnce(t *testing.T) {
 		var holders int
 		ownerScan(
 			t,
-			`SELECT count(*) FROM identity.membership_permissions WHERE membership_id = ANY($1::uuid[]) AND permission = 'identity.write'`,
+			`SELECT count(*) FROM identity.membership_permissions WHERE membership_id = ANY($1::uuid[]) AND permission =
+				'identity.write'`,
 			[]any{[]string{op, rm}},
 			&holders,
 		)
@@ -353,12 +363,13 @@ func TestLastIdentityAdminAtOnce(t *testing.T) {
 		}
 
 		owner(t, `INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission)
-			SELECT tenant_id, id, 'identity.write' FROM identity.memberships WHERE id = ANY($1::uuid[]) ON CONFLICT DO NOTHING`, []string{op, rm})
+			SELECT tenant_id, id, 'identity.write' FROM identity.memberships WHERE id = ANY($1::uuid[]) ON CONFLICT DO
+			NOTHING`, []string{op, rm})
 	}
 }
 
-// TestLastIdentityAdminStartLater (IR472): the last identity.write holder cannot move its own start later — it would stop
-// being valid now, like ending it; another holder can.
+// TestLastIdentityAdminStartLater (IR472): the last identity.write holder cannot move its own start later — it would
+// stop being valid now, like ending it; another holder can.
 func TestLastIdentityAdminStartLater(t *testing.T) {
 	s := server(t)
 	identityAdmins(t)
@@ -368,7 +379,8 @@ func TestLastIdentityAdminStartLater(t *testing.T) {
 	var opFrom, rmFrom time.Time
 	ownerScan(
 		t,
-		`SELECT (SELECT valid_from FROM identity.memberships WHERE id = $1), (SELECT valid_from FROM identity.memberships WHERE id = $2)`,
+		`SELECT (SELECT valid_from FROM identity.memberships WHERE id = $1), (SELECT valid_from FROM identity.memberships
+			WHERE id = $2)`,
 		[]any{op, rm},
 		&opFrom,
 		&rmFrom,
@@ -376,7 +388,8 @@ func TestLastIdentityAdminStartLater(t *testing.T) {
 	t.Cleanup(func() {
 		owner(
 			t,
-			`UPDATE identity.memberships SET valid_from = CASE id WHEN $1 THEN $2::timestamptz ELSE $4::timestamptz END WHERE id IN ($1, $3)`,
+			`UPDATE identity.memberships SET valid_from = CASE id WHEN $1 THEN $2::timestamptz ELSE $4::timestamptz END WHERE id
+				IN ($1, $3)`,
 			op,
 			opFrom,
 			rm,
@@ -405,7 +418,8 @@ func TestLastIdentityAdminStartLater(t *testing.T) {
 
 	owner(
 		t,
-		`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) SELECT tenant_id, id, 'identity.write' FROM identity.memberships WHERE id = $1`,
+		`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) SELECT tenant_id, id,
+			'identity.write' FROM identity.memberships WHERE id = $1`,
 		rm,
 	)
 

@@ -32,8 +32,8 @@ func (r notifyingRecorder) Record(ctx context.Context, tx pgx.Tx, c *ops.Call, o
 	return r.inner.Record(ctx, tx, c, op)
 }
 
-// RecordDenied passes a refused write's audit entry to the inner recorder (ops.DeniedRecorder, IR603); a refusal notifies
-// nobody.
+// RecordDenied passes a refused write's audit entry to the inner recorder (ops.DeniedRecorder, IR603); a refusal
+// notifies nobody.
 func (r notifyingRecorder) RecordDenied(
 	ctx context.Context,
 	tx pgx.Tx,
@@ -128,7 +128,8 @@ func (r notifyingRecorder) technician(
 	// the active assignment, or the one this very transition revoked (cancel / hold) or released (completion, IR234);
 	// maintenance's own rows
 	rows, err := c.Tx.Query(ctx, `SELECT a.technician_membership_id FROM maintenance.assignments a
-		WHERE a.job_id = $2 AND (a.status = 'active' OR (a.status IN ('revoked', 'completed') AND a.updated_at = $1))`, c.Now, job)
+		WHERE a.job_id = $2 AND (a.status = 'active' OR (a.status IN ('revoked', 'completed') AND a.updated_at =
+		$1))`, c.Now, job)
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +222,8 @@ func (r notifyingRecorder) dispatch(ctx context.Context, c *ops.Call, op string)
 		switch a.TargetKind {
 		case "job":
 			if op == "jobs.reportProblem" { // the audit names the reported job; the request is the follow-up it created (IR438)
-				err := c.Tx.QueryRow(ctx, `SELECT id FROM maintenance.jobs WHERE follow_up_of_job_id = $1 ORDER BY created_at DESC, id DESC LIMIT 1`, id).
+				err := c.Tx.QueryRow(ctx, `SELECT id FROM maintenance.jobs WHERE follow_up_of_job_id = $1 ORDER BY created_at DESC,
+					id DESC LIMIT 1`, id).
 					Scan(&id)
 				if err != nil {
 					return err
@@ -251,7 +253,9 @@ func (r notifyingRecorder) dispatch(ctx context.Context, c *ops.Call, op string)
 		}
 
 		var org, invoice uuid.UUID
-		err := c.Tx.QueryRow(ctx, `SELECT k.customer_org_id, i.id FROM billing.payments p JOIN billing.invoices i ON i.id = p.invoice_id
+
+		err := c.Tx.QueryRow(ctx, `SELECT k.customer_org_id, i.id FROM billing.payments p JOIN billing.invoices i ON i.id =
+			p.invoice_id
 			JOIN billing.contracts k ON k.id = i.contract_id AND k.version = i.contract_version WHERE p.id = $1`, e.AggregateID).
 			Scan(&org, &invoice)
 		if err != nil {
@@ -298,7 +302,8 @@ func (r notifyingRecorder) job(ctx context.Context, c *ops.Call, op string, job 
 		contractor *uuid.UUID
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT status, customer_org_id, contractor_org_id FROM maintenance.jobs WHERE id = $1`, job).
+	err := c.Tx.QueryRow(ctx, `SELECT status, customer_org_id, contractor_org_id FROM maintenance.jobs WHERE id =
+		$1`, job).
 		Scan(&status, &org, &contractor)
 	if err != nil {
 		return nil // not a job row (the audit target was resolved elsewhere)
@@ -311,7 +316,9 @@ func (r notifyingRecorder) job(ctx context.Context, c *ops.Call, op string, job 
 
 	if event == "offered" { // the contractor of the latest open offer
 		var offered uuid.UUID
-		err := c.Tx.QueryRow(ctx, `SELECT contractor_org_id FROM maintenance.offers WHERE job_id = $1 ORDER BY offered_at DESC, id DESC LIMIT 1`, job).
+
+		err := c.Tx.QueryRow(ctx, `SELECT contractor_org_id FROM maintenance.offers WHERE job_id = $1 ORDER BY offered_at
+			DESC, id DESC LIMIT 1`, job).
 			Scan(&offered)
 		if err == nil {
 			contractor = &offered
@@ -386,6 +393,7 @@ func (r notifyingRecorder) restriction(ctx context.Context, c *ops.Call, id uuid
 		state string
 		org   uuid.UUID
 	)
+
 	err := c.Tx.QueryRow(ctx, `SELECT r.state, k.customer_org_id FROM restrictions.restrictions r
 		JOIN billing.contracts k ON k.id = r.contract_id AND k.version = r.contract_version WHERE r.id = $1`, id).
 		Scan(&state, &org)

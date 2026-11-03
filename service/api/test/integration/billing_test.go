@@ -173,7 +173,8 @@ func TestContractsAndInvoices(t *testing.T) {
 	rid := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO restrictions.restrictions (id, tenant_id, contract_id, contract_version, customer_id, rules_version, notice_at, execute_after, reason, policy, state)
+		`INSERT INTO restrictions.restrictions (id, tenant_id, contract_id, contract_version, customer_id, rules_version,
+			notice_at, execute_after, reason, policy, state)
 		VALUES ($1,$2,$3,2,$4,'r',$5,$6,'demo','{"kind":"power_off"}','scheduled')`,
 		rid,
 		seed.ID("tenant-a"),

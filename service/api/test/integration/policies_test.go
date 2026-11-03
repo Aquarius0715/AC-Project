@@ -275,7 +275,8 @@ func TestPolicies(t *testing.T) {
 		fields(m) != "customerId=error.ownerFixed" {
 		t.Errorf("owner customer is fixed: %d %s", code, fields(m))
 	}
-	// the default policy cannot become an alert policy (upd always targets the customer's policy: it tested that one, stale)
+	// the default policy cannot become an alert policy (upd always targets the customer's policy: it tested that one,
+	// stale)
 	_, dp := post(s, &hq, "policies.get", `{"policyId":"`+def+`"}`)
 	if code, m := write(
 		s,
@@ -389,7 +390,8 @@ func TestPolicies(t *testing.T) {
 		"{\"sort\":{\"field\":\"metric\",\"direction\":\"asc\"}}": "sort.field=error.invalid",
 	}
 
-	for _, b := range []string{`{"filters":{"kind":"air_quality"}}`, `{"filters":{"x":1}}`, `{"sort":{"field":"metric","direction":"asc"}}`} {
+	for _, b := range []string{`{"filters":{"kind":"air_quality"}}`, `{"filters":{"x":1}}`, `{"sort":{"field":"metric",` +
+		`"direction":"asc"}}`} {
 		code, m := post(s, &hq, "policies.list", b)
 		refusal(t, b, code, m, want[b])
 	}
@@ -445,7 +447,8 @@ func TestPolicies(t *testing.T) {
 	}
 
 	for name, body := range map[string]string{
-		"reordered keys": swapped, "five rules": "[" + strings.Join(strings.SplitN(string(raw)[1:], "},", 6)[:5], "},") + "}]",
+		"reordered keys": swapped, "five rules": "[" + strings.Join(strings.SplitN(string(raw)[1:], "},", 6)[:5], "},") +
+			"}]",
 		"metric changed": string(wrongMetric),
 	} {
 		code, m := write(

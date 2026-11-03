@@ -44,21 +44,26 @@ type Config struct {
 	DatabaseReaderURL string
 	Addr              string
 	Clock             func() time.Time
-	DemoOps           bool                 // demo environment only: demo.advanceClock / demo.trigger (IR154)
-	DemoStart         time.Time            // demo scenario clock at start (fixture.clock, IR36); zero keeps the base clock
-	Logger            *slog.Logger         // Echo's application logger (Echo v5 uses log/slog); nil keeps Echo's default
-	Domains           []string             // business domains this service serves (IR180); empty = all (tests)
-	IdentityURL       string               // identity-api base URL for principals (IR181); empty = read identity tables
-	InternalToken     string               // shared token of internal service-to-service endpoints
-	ServiceURLs       map[string]string    // base URL per domain for internal queries of unserved domains (IR190)
-	PrincipalTTL      time.Duration        // principal cache of RemoteSource: 0 = 30 s, negative = no cache (IR181)
-	DemoClock         ScenarioClock        // shared scenario clock of several services in one binary (tests); overrides DemoStart
-	WriteLimit        ops.WriteLimiter     // writes per membership and minute (IR375); nil = no limit
-	DenyLimit         ops.WriteLimiter     // denied writes recorded per actor, operation and minute (IR603); nil = this process counts
-	IdentityProvider  identity.Provider    // ends sessions (IR386) and opens / turns off accounts (IR461) at the identity provider; nil = none
-	AccountApps       identity.AccountApps // the apps a new account's set-up e-mail returns to (IR461)
-	AccountsPerDay    int                  // accounts a contractor or customer owner adds per organization in 24 h (IR464); 0 = 30
-	WrapTx            func(pgx.Tx) pgx.Tx  // tests only: wraps each operation's transaction to inject database failures; nil = none
+	DemoOps           bool              // demo environment only: demo.advanceClock / demo.trigger (IR154)
+	DemoStart         time.Time         // demo scenario clock at start (fixture.clock, IR36); zero keeps the base clock
+	Logger            *slog.Logger      // Echo's application logger (Echo v5 uses log/slog); nil keeps Echo's default
+	Domains           []string          // business domains this service serves (IR180); empty = all (tests)
+	IdentityURL       string            // identity-api base URL for principals (IR181); empty = read identity tables
+	InternalToken     string            // shared token of internal service-to-service endpoints
+	ServiceURLs       map[string]string // base URL per domain for internal queries of unserved domains (IR190)
+	PrincipalTTL      time.Duration     // principal cache of RemoteSource: 0 = 30 s, negative = no cache (IR181)
+	// shared scenario clock of several services in one binary (tests); overrides DemoStart
+	DemoClock  ScenarioClock
+	WriteLimit ops.WriteLimiter // writes per membership and minute (IR375); nil = no limit
+	// denied writes recorded per actor, operation and minute (IR603); nil = this process counts
+	DenyLimit ops.WriteLimiter
+	// ends sessions (IR386) and opens / turns off accounts (IR461) at the identity provider; nil = none
+	IdentityProvider identity.Provider
+	AccountApps      identity.AccountApps // the apps a new account's set-up e-mail returns to (IR461)
+	// accounts a contractor or customer owner adds per organization in 24 h (IR464); 0 = 30
+	AccountsPerDay int
+	// tests only: wraps each operation's transaction to inject database failures; nil = none
+	WrapTx func(pgx.Tx) pgx.Tx
 }
 
 // Server is the assembled Core API.
@@ -76,7 +81,8 @@ func (s *Server) DrainEvents(ctx context.Context) error {
 
 		var errs []error
 
-		for _, c := range s.Consumers { // each on its own, as each runs its own loop: one failing does not hold the others (IR511)
+		for _, c := range s.Consumers {
+			// each on its own, as each runs its own loop: one failing does not hold the others (IR511)
 			n, err := c.Drain(ctx)
 			errs = append(errs, err)
 			applied += n
@@ -114,7 +120,8 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	reg.Limit = cfg.WriteLimit
 
 	reg.DenyLimit = cfg.DenyLimit
-	if reg.DenyLimit == nil { // without the shared store each process keeps its own minute counts (tests, a single instance)
+	if reg.DenyLimit == nil {
+		// without the shared store each process keeps its own minute counts (tests, a single instance)
 		reg.DenyLimit = &ratelimit.Window{
 			Store:  &ratelimit.Memory{},
 			Limit:  1,
@@ -136,7 +143,8 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	if cfg.DemoOps {
 		if cfg.DemoClock != nil {
 			dc = cfg.DemoClock
-		} else if !cfg.DemoStart.IsZero() { // starts at fixture.clock, runs in real time, shared with the workers (IR36, IR168)
+		} else if !cfg.DemoStart.IsZero() {
+			// starts at fixture.clock, runs in real time, shared with the workers (IR36, IR168)
 			shared, err := democlock.Open(ctx, m.Writer, reg.Clock, cfg.DemoStart)
 			if err != nil {
 				m.Close()

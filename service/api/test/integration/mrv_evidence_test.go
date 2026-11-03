@@ -25,7 +25,8 @@ func TestMRVEvidenceAttachments(t *testing.T) {
 		id := uuid.NewString()
 		owner(
 			t,
-			`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, type, status, origin, requested_slot, due_at, completed_at)
+			`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, type, status, origin, requested_slot, due_at,
+				completed_at)
 			VALUES ($1,$2,$3,$4,'reactive','completed','client_request',tstzrange($5,$6),$6,$6)`,
 			id,
 			tenant,
@@ -48,7 +49,8 @@ func TestMRVEvidenceAttachments(t *testing.T) {
 
 		owner(
 			t,
-			`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state, accepted_at) VALUES ($1, 1, $2, $3, $4, $5, $6)`,
+			`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state, accepted_at) VALUES ($1, 1,
+				$2, $3, $4, $5, $6)`,
 			id,
 			tenant,
 			j,
@@ -63,7 +65,8 @@ func TestMRVEvidenceAttachments(t *testing.T) {
 		id := uuid.NewString()
 		owner(
 			t,
-			`INSERT INTO maintenance.attachments (id, tenant_id, job_id, report_id, object_key, name, mime, size_bytes, status, uploaded_by, created_at, updated_at)
+			`INSERT INTO maintenance.attachments (id, tenant_id, job_id, report_id, object_key, name, mime, size_bytes, status,
+				uploaded_by, created_at, updated_at)
 			VALUES ($1,$2,$3,$4,$5,$6,'image/png',1,$7,$8,$9,$9)`,
 			id,
 			tenant,
@@ -163,12 +166,19 @@ func TestMRVEvidenceAttachments(t *testing.T) {
 	// the input rules, each refused for its field
 	day := 24 * time.Hour
 	for b, want := range map[string]string{
-		`{"unitIds":[],"from":"` + from.Format(time.RFC3339) + `","to":"` + to.Format(time.RFC3339) + `","query":{}}`:                              "unitIds=error.invalid",
-		`{"unitIds":["` + unit + `","` + unit + `"],"from":"` + from.Format(time.RFC3339) + `","to":"` + to.Format(time.RFC3339) + `","query":{}}`: "unitIds=error.invalid",
-		`{"unitIds":["` + unit + `"],"to":"` + to.Format(time.RFC3339) + `","query":{}}`:                                                           "from=error.required",
-		`{"unitIds":["` + unit + `"],"from":"` + from.Format(time.RFC3339) + `","query":{}}`:                                                       "to=error.required",
-		`{"unitIds":["` + unit + `"],"from":"` + to.Format(time.RFC3339) + `","to":"` + from.Format(time.RFC3339) + `","query":{}}`:                "to=error.range",
-		`{"unitIds":["` + unit + `"],"from":"` + from.Format(time.RFC3339) + `","to":"` + from.Add(367*day).Format(time.RFC3339) + `","query":{}}`: "to=error.range",
+		`{"unitIds":[],` +
+			`"from":"` + from.Format(time.RFC3339) + `","to":"` + to.Format(time.RFC3339) +
+			`","query":{}}`: "unitIds=error.invalid",
+		`{"unitIds":["` + unit + `","` + unit + `"],"from":"` + from.Format(time.RFC3339) + `","to":"` +
+			to.Format(time.RFC3339) + `","query":{}}`: "unitIds=error.invalid",
+		`{"unitIds":["` + unit + `"],"to":"` + to.Format(time.RFC3339) +
+			`","query":{}}`: "from=error.required",
+		`{"unitIds":["` + unit + `"],"from":"` + from.Format(time.RFC3339) +
+			`","query":{}}`: "to=error.required",
+		`{"unitIds":["` + unit + `"],"from":"` + to.Format(time.RFC3339) + `","to":"` + from.Format(time.RFC3339) +
+			`","query":{}}`: "to=error.range",
+		`{"unitIds":["` + unit + `"],"from":"` + from.Format(time.RFC3339) + `","to":"` +
+			from.Add(367*day).Format(time.RFC3339) + `","query":{}}`: "to=error.range",
 		body(`"filters":{"x":1}`, unit): "x=error.notAllowed",
 	} {
 		code, m := post(s, &hq, "attachments.list", b)

@@ -1,5 +1,6 @@
-// Command maintenance-api is a business-domain Core API service (IR180): maintenance jobs, offers, assignments, reports, partners and workforce.
-// It serves the REST routes of its domain's operations only (IR222); the gateway routes each route to its service.
+// Command maintenance-api is a business-domain Core API service (IR180): maintenance jobs, offers, assignments,
+// reports, partners and workforce. It serves the REST routes of its domain's operations only (IR222); the gateway
+// routes each route to its service.
 package main
 
 import (

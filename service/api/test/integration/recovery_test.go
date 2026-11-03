@@ -48,7 +48,8 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 			t.Fatalf("observation: %d %v", code, m)
 		}
 	}
-	old := `{"restrictionId":"` + id + `","rulesVersion":"rules-1","policy":{"kind":"temperature_limit","minimumCoolingSetpoint":24},"observedAt":"` + clock.Format(
+	old := `{"restrictionId":"` + id + `","rulesVersion":"rules-1","policy":{"kind":"temperature_limit",` +
+		`"minimumCoolingSetpoint":24},"observedAt":"` + clock.Format(
 		time.RFC3339,
 	) + `"}`
 	observe(old)

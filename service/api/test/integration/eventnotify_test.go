@@ -13,7 +13,8 @@ func countNotes(t *testing.T, target, recipient, template string) int {
 	var n int
 	ownerScan(
 		t,
-		`SELECT count(*) FROM notify.notifications WHERE target->>'id' = $1 AND recipient_membership_id = $2 AND template_key = $3`,
+		`SELECT count(*) FROM notify.notifications WHERE target->>'id' = $1 AND recipient_membership_id = $2 AND template_key
+			= $3`,
 		[]any{target, seed.ID(recipient), template},
 		&n,
 	)
@@ -117,7 +118,8 @@ func TestBusinessEventNotifications(t *testing.T) {
 		s,
 		&hq,
 		"payments.recordManual",
-		`{"invoiceId":"`+inv+`","paymentReference":"BANK-`+rid[:8]+`","confirmedAmountMinor":5000,"currency":"MYR","reason":"bank"}`,
+		`{"invoiceId":"`+inv+`","paymentReference":"BANK-`+rid[:8]+`","confirmedAmountMinor":5000,"currency":"MYR",`+
+			`"reason":"bank"}`,
 		1,
 	); code != 200 {
 		t.Fatalf("payment: %d %v", code, m)
@@ -136,7 +138,8 @@ func TestBusinessEventNotifications(t *testing.T) {
 	var sev string
 	ownerScan(
 		t,
-		`SELECT severity FROM notify.notifications WHERE target->>'id' = $1 AND template_key = 'restriction' ORDER BY created_at DESC LIMIT 1`,
+		`SELECT severity FROM notify.notifications WHERE target->>'id' = $1 AND template_key = 'restriction' ORDER BY
+			created_at DESC LIMIT 1`,
 		[]any{rid},
 		&sev,
 	)

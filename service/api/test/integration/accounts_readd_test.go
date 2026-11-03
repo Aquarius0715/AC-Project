@@ -144,7 +144,8 @@ func TestPersonAddedAgain(t *testing.T) {
 	)
 	ownerScan(
 		t,
-		`SELECT m.user_id::text, u.display_name, u.last_sign_in_at FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id WHERE m.id = $1`,
+		`SELECT m.user_id::text, u.display_name, u.last_sign_in_at FROM identity.memberships m JOIN identity.users u ON u.id =
+			m.user_id WHERE m.id = $1`,
 		[]any{membership},
 		&same,
 		&name,
@@ -223,7 +224,8 @@ func TestPersonOfAnotherTenant(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from) VALUES ($1,$2,$3,$4,'client','member',$5)`,
+		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from) VALUES ($1,
+			$2,$3,$4,'client','member',$5)`,
 		foreign,
 		seed.ID("tenant-b"),
 		user,
@@ -232,7 +234,8 @@ func TestPersonOfAnotherTenant(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, valid_from, valid_until) VALUES ($1,$2,$3,$4,'technician','external',$5,$6)`,
+		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, valid_from, valid_until)
+			VALUES ($1,$2,$3,$4,'technician','external',$5,$6)`,
 		local,
 		seed.ID("tenant-a"),
 		user,
@@ -259,8 +262,8 @@ func TestPersonOfAnotherTenant(t *testing.T) {
 	}
 }
 
-// TestAccountSwitchedByMembership (IR462): disabling a demo-style account — no provider subject stored — turns it off by
-// the person's ID; when the account signs in with another membership, enabling this one leaves it alone.
+// TestAccountSwitchedByMembership (IR462): disabling a demo-style account — no provider subject stored — turns it off
+// by the person's ID; when the account signs in with another membership, enabling this one leaves it alone.
 func TestAccountSwitchedByMembership(t *testing.T) {
 	fake := &fakeIdP{
 		mu:         sync.Mutex{},
@@ -289,7 +292,8 @@ func TestAccountSwitchedByMembership(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, valid_from, valid_until) VALUES ($1,$2,$3,$4,'technician','external',$5,$6)`,
+		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, valid_from, valid_until)
+			VALUES ($1,$2,$3,$4,'technician','external',$5,$6)`,
 		membership,
 		seed.ID("tenant-a"),
 		user,
@@ -301,7 +305,8 @@ func TestAccountSwitchedByMembership(t *testing.T) {
 	var id string
 	ownerScan(
 		t,
-		`INSERT INTO identity.partner_users (tenant_id, organization_id, membership_id, email, display_name, partner_role, status, invited_at, invited_by_membership_id, created_at, updated_at)
+		`INSERT INTO identity.partner_users (tenant_id, organization_id, membership_id, email, display_name, partner_role,
+			status, invited_at, invited_by_membership_id, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, 'Demo Tech', 'technician', 'active', $5, $6, $5, $5) RETURNING id::text`,
 		[]any{
 			seed.ID("tenant-a"),
@@ -490,7 +495,8 @@ func TestAccountProviderTrouble(t *testing.T) {
 			s,
 			&contrA,
 			"partnerUsers.save",
-			`{"email":"`+email+`","partnerRole":"technician","displayName":"Trouble Tech","accessUntil":"`+clock.Add(30*24*time.Hour).
+			`{"email":"`+email+`","partnerRole":"technician","displayName":"Trouble Tech",`+
+				`"accessUntil":"`+clock.Add(30*24*time.Hour).
 				Format(time.RFC3339)+
 				`"}`,
 			0,
@@ -505,7 +511,8 @@ func TestAccountProviderTrouble(t *testing.T) {
 		t.Helper()
 		ownerScan(
 			t,
-			`SELECT coalesce(u.cognito_sub, ''), coalesce(u.sign_in_membership_id::text, '') FROM identity.users u JOIN identity.memberships m ON m.user_id = u.id WHERE m.id = $1`,
+			`SELECT coalesce(u.cognito_sub, ''), coalesce(u.sign_in_membership_id::text, '') FROM identity.users u JOIN
+				identity.memberships m ON m.user_id = u.id WHERE m.id = $1`,
 			[]any{membership},
 			&sub,
 			&signIn,
@@ -577,9 +584,9 @@ func TestAccountProviderTrouble(t *testing.T) {
 	}
 }
 
-// TestAccountsPerOrgPerDay (IR464): a contractor or a customer owner adds at most identity.AccountsPerOrgPerDay accounts
-// to their organization in 24 hours — the next is RATE_LIMITED errors.too_many_accounts with the seconds until the
-// oldest of them is a day old; HQ is not limited.
+// TestAccountsPerOrgPerDay (IR464): a contractor or a customer owner adds at most identity.AccountsPerOrgPerDay
+// accounts to their organization in 24 hours — the next is RATE_LIMITED errors.too_many_accounts with the seconds until
+// the oldest of them is a day old; HQ is not limited.
 func TestAccountsPerOrgPerDay(t *testing.T) {
 	s := server(t)
 	filler := uuid.New()
@@ -604,7 +611,8 @@ func TestAccountsPerOrgPerDay(t *testing.T) {
 
 			owner(
 				t,
-				`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, client_role, valid_from, valid_until, created_at)
+				`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, client_role,
+					valid_from, valid_until, created_at)
 				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
 				id,
 				seed.ID("tenant-a"),
@@ -632,7 +640,8 @@ func TestAccountsPerOrgPerDay(t *testing.T) {
 		s,
 		&contrB,
 		"partnerUsers.save",
-		`{"email":"cap-`+uuid.NewString()[:8]+`@example.com","partnerRole":"technician","displayName":"Cap Tech","accessUntil":"`+clock.Add(24*time.Hour).
+		`{"email":"cap-`+uuid.NewString()[:8]+`@example.com","partnerRole":"technician","displayName":"Cap Tech",`+
+			`"accessUntil":"`+clock.Add(24*time.Hour).
 			Format(time.RFC3339)+
 			`"}`,
 		0,
@@ -651,7 +660,8 @@ func TestAccountsPerOrgPerDay(t *testing.T) {
 			s,
 			a,
 			"clientUsers.save",
-			`{"customerId":"`+cust+`","email":"cap-`+uuid.NewString()[:8]+`@example.com","clientRole":"member","displayName":"Cap Client"}`,
+			`{"customerId":"`+cust+`","email":"cap-`+uuid.NewString()[:8]+`@example.com","clientRole":"member",`+
+				`"displayName":"Cap Client"}`,
 			0,
 		)
 	}

@@ -18,10 +18,30 @@ func TestReminderEvidence(t *testing.T) {
 		st   FilterStatus
 		want string
 	}{
-		"hours since cleaning": {FilterStatus{RunHoursSinceCleaning: &hours, LastCleanedAt: &cleaned, UnitID: uuid.UUID{}, ThresholdHours: 0, FallbackDays: 0, LastCleanedBy: nil, LastCleaningJobID: nil, Status: ""}, "Cleaning due (412 h of run time since the last cleaning). Not a fault."},
-		"hours, never cleaned": {FilterStatus{RunHoursSinceCleaning: &hours, UnitID: uuid.UUID{}, ThresholdHours: 0, FallbackDays: 0, LastCleanedAt: nil, LastCleanedBy: nil, LastCleaningJobID: nil, Status: ""}, "Cleaning due (412 h of run time, no cleaning recorded). Not a fault."},
-		"days, no run time":    {FilterStatus{LastCleanedAt: &cleaned, UnitID: uuid.UUID{}, RunHoursSinceCleaning: nil, ThresholdHours: 0, FallbackDays: 0, LastCleanedBy: nil, LastCleaningJobID: nil, Status: ""}, "Cleaning due (95 days since the last cleaning, run time unknown). Not a fault."},
-		"nothing known":        {FilterStatus{UnitID: uuid.UUID{}, RunHoursSinceCleaning: nil, ThresholdHours: 0, FallbackDays: 0, LastCleanedAt: nil, LastCleanedBy: nil, LastCleaningJobID: nil, Status: ""}, "Cleaning due. Not a fault."},
+		"hours since cleaning": {
+			FilterStatus{
+				RunHoursSinceCleaning: &hours, LastCleanedAt: &cleaned, UnitID: uuid.UUID{}, ThresholdHours: 0,
+				FallbackDays: 0, LastCleanedBy: nil, LastCleaningJobID: nil, Status: "",
+			}, "Cleaning due (412 h of run time since the last cleaning). Not a fault.",
+		},
+		"hours, never cleaned": {
+			FilterStatus{
+				RunHoursSinceCleaning: &hours, UnitID: uuid.UUID{}, ThresholdHours: 0, FallbackDays: 0,
+				LastCleanedAt: nil, LastCleanedBy: nil, LastCleaningJobID: nil, Status: "",
+			}, "Cleaning due (412 h of run time, no cleaning recorded). Not a fault.",
+		},
+		"days, no run time": {
+			FilterStatus{
+				LastCleanedAt: &cleaned, UnitID: uuid.UUID{}, RunHoursSinceCleaning: nil, ThresholdHours: 0,
+				FallbackDays: 0, LastCleanedBy: nil, LastCleaningJobID: nil, Status: "",
+			}, "Cleaning due (95 days since the last cleaning, run time unknown). Not a fault.",
+		},
+		"nothing known": {
+			FilterStatus{
+				UnitID: uuid.UUID{}, RunHoursSinceCleaning: nil, ThresholdHours: 0, FallbackDays: 0, LastCleanedAt: nil,
+				LastCleanedBy: nil, LastCleaningJobID: nil, Status: "",
+			}, "Cleaning due. Not a fault.",
+		},
 	} {
 		if got := reminderEvidence(c.st, now); got != c.want {
 			t.Errorf("%s: %q", name, got)

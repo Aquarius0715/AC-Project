@@ -26,10 +26,12 @@ func TestClientUsers(t *testing.T) {
 	}
 
 	for name, b := range map[string]string{
-		"bad email":    `{"customerId":"` + cust + `","email":"not-an-email","clientRole":"member","displayName":"N"}`,
-		"bad role":     `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"admin","displayName":"N"}`,
-		"bad status":   `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"member","status":"invited","displayName":"N"}`,
-		"blank reason": `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"member","reason":" ","displayName":"N"}`,
+		"bad email": `{"customerId":"` + cust + `","email":"not-an-email","clientRole":"member","displayName":"N"}`,
+		"bad role":  `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"admin","displayName":"N"}`,
+		"bad status": `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"member","status":"invited",` +
+			`"displayName":"N"}`,
+		"blank reason": `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"member","reason":" ",` +
+			`"displayName":"N"}`,
 	} {
 		code, m := save(&hq, b, 0)
 		refusal(t, name, code, m, want[name])
@@ -160,7 +162,8 @@ func TestClientUsers(t *testing.T) {
 	upd := func(target map[string]any, role, status string, v int) (int, map[string]any) {
 		return save(
 			&hq,
-			`{"id":"`+target["id"].(string)+`","customerId":"`+cust+`","email":"`+target["email"].(string)+`","clientRole":"`+role+`","status":"`+status+`","reason":"admin change"}`,
+			`{"id":"`+target["id"].(string)+`","customerId":"`+cust+`","email":"`+target["email"].(string)+`","clientRole":"`+
+				role+`","status":"`+status+`","reason":"admin change"}`,
 			v,
 		)
 	}
@@ -314,7 +317,8 @@ func TestClientUserMembershipSync(t *testing.T) {
 	owner(
 		t,
 		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from)
-		SELECT $1, tenant_id, user_id, organization_id, 'client', 'member', valid_from FROM identity.memberships WHERE id = $2`,
+		SELECT $1, tenant_id, user_id, organization_id, 'client', 'member', valid_from FROM identity.memberships WHERE id =
+		$2`,
 		membership,
 		seed.ID("customer-b"),
 	)
@@ -322,7 +326,8 @@ func TestClientUserMembershipSync(t *testing.T) {
 	email := "signed-in-" + uuid.NewString()[:8] + "@example.com"
 	owner(
 		t,
-		`INSERT INTO identity.client_users (id, tenant_id, customer_id, membership_id, email, client_role, status, invited_at, invited_by_membership_id)
+		`INSERT INTO identity.client_users (id, tenant_id, customer_id, membership_id, email, client_role, status, invited_at,
+			invited_by_membership_id)
 		VALUES ($1,$2,$3,$4,$5,'member','active',$6,$7)`,
 		user,
 		seed.ID("tenant-a"),
@@ -338,7 +343,8 @@ func TestClientUserMembershipSync(t *testing.T) {
 			s,
 			&hq,
 			"clientUsers.save",
-			`{"id":"`+user+`","customerId":"`+customer+`","email":"`+email+`","clientRole":"member","status":"`+status+`","reason":"admin change"}`,
+			`{"id":"`+user+`","customerId":"`+customer+`","email":"`+email+`","clientRole":"member",`+
+				`"status":"`+status+`","reason":"admin change"}`,
 			v,
 		)
 	}
@@ -492,7 +498,8 @@ func TestClientUsersByOwner(t *testing.T) {
 
 	sv := int(self["version"].(float64))
 	if code, m := save(
-		`{"id":"`+self["id"].(string)+`","customerId":"`+cust+`","email":"`+self["email"].(string)+`","clientRole":"owner","status":"disabled","reason":"x"}`,
+		`{"id":"`+self["id"].(string)+`","customerId":"`+cust+`","email":"`+self["email"].(string)+`","clientRole":"owner",`+
+			`"status":"disabled","reason":"x"}`,
 		sv,
 	); code != 409 ||
 		m["messageKey"] != "errors.own_account" {
@@ -514,7 +521,8 @@ func TestClientUsersByOwner(t *testing.T) {
 	owner(
 		t,
 		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from)
-		SELECT $1, tenant_id, user_id, organization_id, 'client', 'member', valid_from FROM identity.memberships WHERE id = $2`,
+		SELECT $1, tenant_id, user_id, organization_id, 'client', 'member', valid_from FROM identity.memberships WHERE id =
+		$2`,
 		membership,
 		seed.ID("customer-b"),
 	)
@@ -522,7 +530,8 @@ func TestClientUsersByOwner(t *testing.T) {
 	memberEmail := "member-" + uuid.NewString()[:8] + "@example.com"
 	owner(
 		t,
-		`INSERT INTO identity.client_users (id, tenant_id, customer_id, membership_id, email, client_role, status, invited_at, invited_by_membership_id)
+		`INSERT INTO identity.client_users (id, tenant_id, customer_id, membership_id, email, client_role, status, invited_at,
+			invited_by_membership_id)
 		VALUES ($1,$2,$3,$4,$5,'member','active',$6,$7)`,
 		user,
 		seed.ID("tenant-a"),
@@ -542,7 +551,8 @@ func TestClientUsersByOwner(t *testing.T) {
 	}
 
 	if code, m := save(
-		`{"id":"`+user+`","customerId":"`+cust+`","email":"`+memberEmail+`","clientRole":"owner","status":"disabled","reason":"on leave"}`,
+		`{"id":"`+user+`","customerId":"`+cust+`","email":"`+memberEmail+`","clientRole":"owner","status":"disabled",`+
+			`"reason":"on leave"}`,
 		1,
 	); code != 200 || data(m)["clientRole"] != "owner" ||
 		data(m)["status"] != "disabled" {
@@ -582,7 +592,8 @@ func TestClientUsersByOwner(t *testing.T) {
 }
 
 // TestClientAccountCreated (IR417, IR461): an owner adds an owner: the person and an owner client membership of the
-// customer are created at once, with the client permissions and the customer's scope, and the user is listed as invited.
+// customer are created at once, with the client permissions and the customer's scope, and the user is listed as
+// invited.
 func TestClientAccountCreated(t *testing.T) {
 	s := server(t)
 	cust := seed.ID("cust-b").String()
@@ -617,8 +628,10 @@ func TestClientAccountCreated(t *testing.T) {
 	)
 	ownerScan(
 		t,
-		`SELECT m.role, m.client_role, m.organization_id::text, (SELECT count(*) FROM identity.membership_permissions p WHERE p.membership_id = m.id),
-		(SELECT count(*) FROM identity.membership_scopes s WHERE s.membership_id = m.id AND s.kind = 'organization' AND s.ref_id = m.organization_id) FROM identity.memberships m WHERE m.id = $1`,
+		`SELECT m.role, m.client_role, m.organization_id::text, (SELECT count(*) FROM identity.membership_permissions p WHERE
+			p.membership_id = m.id),
+		(SELECT count(*) FROM identity.membership_scopes s WHERE s.membership_id = m.id AND s.kind = 'organization' AND
+		s.ref_id = m.organization_id) FROM identity.memberships m WHERE m.id = $1`,
 		[]any{membership},
 		&role,
 		&clientRole,
@@ -686,7 +699,8 @@ func TestDisabledClientStaysClosed(t *testing.T) {
 		s,
 		&customerB,
 		"clientUsers.save",
-		`{"id":"`+id+`","customerId":"`+cust+`","email":"`+user+`@ac.local","clientRole":"member","status":"disabled","reason":"left"}`,
+		`{"id":"`+id+`","customerId":"`+cust+`","email":"`+user+`@ac.local","clientRole":"member","status":"disabled",`+
+			`"reason":"left"}`,
 		v,
 	); code != 200 {
 		t.Fatalf("disable: %d %v", code, m)
@@ -702,7 +716,8 @@ func TestDisabledClientStaysClosed(t *testing.T) {
 		"members.save",
 		`{"id":"`+membership+`","userId":"`+user+`","organizationId":"`+seed.ID("org-customer-b").
 			String()+
-			`","role":"client","permissions":[],"scopes":[],"validFrom":"`+from+`","validUntil":"`+later+`","reason":"contract"}`,
+			`","role":"client","permissions":[],"scopes":[],`+
+			`"validFrom":"`+from+`","validUntil":"`+later+`","reason":"contract"}`,
 		mv,
 	); code != 200 {
 		t.Fatalf("HQ change: %d %v", code, m)

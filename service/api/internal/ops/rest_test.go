@@ -109,6 +109,7 @@ func bind(
 	}
 
 	var obj map[string]any
+
 	unmarshalErr := json.Unmarshal(raw, &obj)
 	if unmarshalErr != nil {
 		t.Fatal(unmarshalErr)
@@ -518,15 +519,36 @@ func TestRESTBindingRules(t *testing.T) {
 		op *Operation
 		rt Route
 	}{
-		"GET for a write":        {restOp(Write, in), Route{Method: "GET", Path: "/v1/x", FixedField: "", FixedValue: ""}},
-		"DELETE for a read":      {restOp(Read, in), Route{Method: "DELETE", Path: "/v1/x", FixedField: "", FixedValue: ""}},
-		"unknown method":         {restOp(Write, in), Route{Method: "OPTIONS", Path: "/v1/x", FixedField: "", FixedValue: ""}},
-		"unknown path parameter": {restOp(Read, in), Route{Method: "GET", Path: "/v1/x/{nope}", FixedField: "", FixedValue: ""}},
-		"list path parameter":    {restOp(Read, in), Route{Method: "GET", Path: "/v1/x/{ids}", FixedField: "", FixedValue: ""}},
-		"filter path parameter":  {restOp(Read, in), Route{Method: "GET", Path: "/v1/x/{status}", FixedField: "", FixedValue: ""}},
-		"unknown fixed field":    {restOp(Write, in), Route{Method: "POST", Path: "/v1/x", FixedField: "nope", FixedValue: "a"}},
-		"objects in a query":     {restOp(Read, func() any { return new(restOpaque) }), Route{Method: "GET", Path: "/v1/x", FixedField: "", FixedValue: ""}},
-		"a parameter twice":      {restOp(Read, func() any { return new(restTwice) }), Route{Method: "GET", Path: "/v1/x", FixedField: "", FixedValue: ""}},
+		"GET for a write":   {restOp(Write, in), Route{Method: "GET", Path: "/v1/x", FixedField: "", FixedValue: ""}},
+		"DELETE for a read": {restOp(Read, in), Route{Method: "DELETE", Path: "/v1/x", FixedField: "", FixedValue: ""}},
+		"unknown method": {
+			restOp(Write, in),
+			Route{Method: "OPTIONS", Path: "/v1/x", FixedField: "", FixedValue: ""},
+		},
+		"unknown path parameter": {
+			restOp(Read, in),
+			Route{Method: "GET", Path: "/v1/x/{nope}", FixedField: "", FixedValue: ""},
+		},
+		"list path parameter": {
+			restOp(Read, in),
+			Route{Method: "GET", Path: "/v1/x/{ids}", FixedField: "", FixedValue: ""},
+		},
+		"filter path parameter": {
+			restOp(Read, in),
+			Route{Method: "GET", Path: "/v1/x/{status}", FixedField: "", FixedValue: ""},
+		},
+		"unknown fixed field": {
+			restOp(Write, in),
+			Route{Method: "POST", Path: "/v1/x", FixedField: "nope", FixedValue: "a"},
+		},
+		"objects in a query": {
+			restOp(Read, func() any { return new(restOpaque) }),
+			Route{Method: "GET", Path: "/v1/x", FixedField: "", FixedValue: ""},
+		},
+		"a parameter twice": {
+			restOp(Read, func() any { return new(restTwice) }),
+			Route{Method: "GET", Path: "/v1/x", FixedField: "", FixedValue: ""},
+		},
 	} {
 		_, err := NewBinding(c.op, c.rt)
 		if err == nil {
@@ -639,6 +661,7 @@ func TestRESTRoutes(t *testing.T) {
 	e := echo.New()
 
 	e.HTTPErrorHandler = HTTPErrorHandler
+
 	err := r.MountREST(e.Group("/v1"))
 	if err != nil {
 		t.Fatal(err)
@@ -652,7 +675,8 @@ func TestRESTRoutes(t *testing.T) {
 				"asset.read":      true,
 				"billing.payment": true,
 			}, ClientRole: "",
-		}, TenantID: uuid.UUID{}, MembershipID: uuid.UUID{}, UserID: uuid.UUID{}, OrgID: uuid.UUID{}, ScopeVersion: 0, Scopes: nil, Employment: "", Timezone: "", SessionsRevokedAt: nil,
+		}, TenantID: uuid.UUID{}, MembershipID: uuid.UUID{}, UserID: uuid.UUID{}, OrgID: uuid.UUID{}, ScopeVersion: 0,
+		Scopes: nil, Employment: "", Timezone: "", SessionsRevokedAt: nil,
 	}
 
 	call := func(p *Principal, method, target, body, key string, version string) (int, map[string]any, string) {
@@ -778,7 +802,10 @@ func TestRESTRoutes(t *testing.T) {
 		t.Fatalf("delete: %d %v", code, data)
 	}
 
-	for path, action := range map[string]string{"/v1/payouts/s1/approve": "approve", "/v1/payouts/s1/mark-paid": "mark_paid"} {
+	for path, action := range map[string]string{
+		"/v1/payouts/s1/approve":   "approve",
+		"/v1/payouts/s1/mark-paid": "mark_paid",
+	} {
 		if code, data, _ := call(
 			billing,
 			"POST",
@@ -815,7 +842,11 @@ func TestRESTRoutes(t *testing.T) {
 		t.Fatalf("reused key: %d", code)
 	}
 
-	for _, c := range []struct{ method, path string }{{"GET", "/v1/nope"}, {"PATCH", "/v1/units/u1"}, {"GET", "/v1/units"}} {
+	for _, c := range []struct{ method, path string }{
+		{"GET", "/v1/nope"},
+		{"PATCH", "/v1/units/u1"},
+		{"GET", "/v1/units"},
+	} {
 		if code, _, body := call(
 			billing,
 			c.method,

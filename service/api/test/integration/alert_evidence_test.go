@@ -25,7 +25,8 @@ func reading(
 	id := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit, origin, quality, received_at, event_id)
+		`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit,
+			origin, quality, received_at, event_id)
 		VALUES ($1, $2, $3, $4, $5, 1, $6, $7, 'measured', $8, $5, $9)`,
 		seed.ID("tenant-a"),
 		unit,
@@ -135,7 +136,8 @@ func TestAlertEvidence(t *testing.T) {
 	if it := byID(
 		m,
 		after,
-	); it["metric"] != "temperature" || it["value"].(float64) != 26 || it["unit"] != "°C" || it["origin"] != "measured" || it["quality"] != "valid" ||
+	); it["metric"] != "temperature" || it["value"].(float64) != 26 || it["unit"] != "°C" || it["origin"] != "measured" ||
+		it["quality"] != "valid" ||
 		it["eventType"] != nil {
 		t.Errorf("remeasurement fields: %v", it)
 	}
@@ -268,9 +270,11 @@ func TestAlertEvidence(t *testing.T) {
 	policy := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO monitoring.alert_policies (id, tenant_id, kind, customer_id, name, owner_membership_id, created_by_user_id, timezone, condition)
+		`INSERT INTO monitoring.alert_policies (id, tenant_id, kind, customer_id, name, owner_membership_id,
+			created_by_user_id, timezone, condition)
 		VALUES ($1, $2, 'alert', $3, 'Bedroom too hot', $4, $4, 'Asia/Kuala_Lumpur',
-		'{"metric":"temperature","operator":"gte","threshold":30,"recoveryThreshold":28,"durationSeconds":60,"activeWindow":null,"severity":"warning"}')`,
+		'{"metric":"temperature","operator":"gte","threshold":30,"recoveryThreshold":28,"durationSeconds":60,`+
+			`"activeWindow":null,"severity":"warning"}')`,
 		policy,
 		seed.ID("tenant-a"),
 		seed.ID("cust-b"),
@@ -280,7 +284,8 @@ func TestAlertEvidence(t *testing.T) {
 	ruled := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO monitoring.alerts (id, tenant_id, unit_id, customer_org_id, policy_id, type, severity, status, cause_code, evidence_kind, evidence_text, observed_at, detected_at)
+		`INSERT INTO monitoring.alerts (id, tenant_id, unit_id, customer_org_id, policy_id, type, severity, status,
+			cause_code, evidence_kind, evidence_text, observed_at, detected_at)
 		VALUES ($1, $2, $3, $4, $5, 'sensor', 'warning', 'open', 'unknown', 'demo_observation', 'demo', $6, $6)`,
 		ruled,
 		seed.ID("tenant-a"),

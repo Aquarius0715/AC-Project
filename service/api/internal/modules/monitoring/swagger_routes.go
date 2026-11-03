@@ -21,8 +21,10 @@ var (
 //
 //	@Summary		policies.save (write) — update
 //	@ID				policies.save.update
-//	@Description	Authorization: client:self-customer:kind=alert | admin:alert.policy.write:kind=alert-or-default_alert | admin:automation.policy.write:kind=automation
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR120 default_alert limits HQ-only
+//	@Description	Authorization: client:self-customer:kind=alert | \
+//	@Description	admin:alert.policy.write:kind=alert-or-default_alert | admin:automation.policy.write:kind=automation
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR120 default_alert limits HQ-only
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A05, DD-A11, DD-A12, DD-C15
 //	@Tags			policies

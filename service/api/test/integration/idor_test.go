@@ -109,8 +109,10 @@ func TestForeignTargets(t *testing.T) {
 	runW := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO control.diagnostic_runs (id, tenant_id, job_id, unit_id, actor_membership_id, start_action, end_action, duration_minutes, reason, state, start_command_id)
-		VALUES ($1,$2,$3,$4,$5,'{"kind":"set_power","power":true}','{"kind":"set_power","power":false}',10,'test','completed',$6)`,
+		`INSERT INTO control.diagnostic_runs (id, tenant_id, job_id, unit_id, actor_membership_id, start_action, end_action,
+			duration_minutes, reason, state, start_command_id)
+		VALUES ($1,$2,$3,$4,$5,'{"kind":"set_power","power":true}','{"kind":"set_power","power":false}',10,'test','completed',
+		$6)`,
 		runW,
 		seed.ID("tenant-a"),
 		jobW,
@@ -165,7 +167,8 @@ func TestForeignTargets(t *testing.T) {
 	stmtA, lineA := uuid.NewString(), uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO billing.payout_statements (id, tenant_id, contractor_org_id, period, status, currency, gross_minor, deductions_minor, net_minor, pay_date)
+		`INSERT INTO billing.payout_statements (id, tenant_id, contractor_org_id, period, status, currency, gross_minor,
+			deductions_minor, net_minor, pay_date)
 		VALUES ($1,$2,$3,'2001-01','approved','MYR',30000,0,30000,'2001-02-15')`,
 		stmtA,
 		seed.ID("tenant-a"),
@@ -173,7 +176,8 @@ func TestForeignTargets(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO billing.payout_lines (id, statement_id, tenant_id, job_id, work_type, amount_minor, kind) VALUES ($1,$2,$3,$4,'repair_base',30000,'charge')`,
+		`INSERT INTO billing.payout_lines (id, statement_id, tenant_id, job_id, work_type, amount_minor, kind) VALUES ($1,$2,
+			$3,$4,'repair_base',30000,'charge')`,
 		lineA,
 		stmtA,
 		seed.ID("tenant-a"),
@@ -342,7 +346,8 @@ func TestForeignTargets(t *testing.T) {
 		{
 			&customerB,
 			"clientUsers.save",
-			`{"id":"` + clientUserA + `","customerId":"` + custA + `","email":"new.member@example.com","clientRole":"member","status":"disabled","reason":"left"}`,
+			`{"id":"` + clientUserA + `","customerId":"` + custA + `","email":"new.member@example.com","clientRole":"member",` +
+				`"status":"disabled","reason":"left"}`,
 			1,
 		},
 		{&customerB, "automations.save", scheduleRule(unitA, nil), 0},
@@ -408,7 +413,9 @@ func TestForeignTargets(t *testing.T) {
 		{
 			&customerB,
 			"notifications.preview",
-			`{"target":{"kind":"unit","id":"` + unitA + `"},"templateKey":"alert","channel":"inApp","recipientMembershipId":"` + id(
+			`{"target":{"kind":"unit",` +
+				`"id":"` + unitA + `"},"templateKey":"alert","channel":"inApp",` +
+				`"recipientMembershipId":"` + id(
 				"customer-b",
 			) + `"}`,
 			0,
@@ -431,7 +438,8 @@ func TestForeignTargets(t *testing.T) {
 		{
 			&contrB,
 			"partnerUsers.save",
-			`{"id":"` + partnerUserA + `","email":"moved@example.com","partnerRole":"technician","status":"disabled","reason":"left"}`,
+			`{"id":"` + partnerUserA + `","email":"moved@example.com","partnerRole":"technician","status":"disabled",` +
+				`"reason":"left"}`,
 			1,
 		},
 		{&contrB, "partnerUsers.remove", `{"id":"` + partnerUserA + `","reason":"left"}`, 1},
@@ -611,7 +619,8 @@ func TestForeignTargets(t *testing.T) {
 		{
 			&techB,
 			"devices.calibrate",
-			`{"deviceId":"` + devA + `","sensorId":"` + sensorA + `","metric":"temperature","unit":"°C","referenceValue":25,"measuredValue":25.2,"calibratedAt":"2026-09-14T00:10:00Z","jobId":"` + jobW + `"}`,
+			`{"deviceId":"` + devA + `","sensorId":"` + sensorA + `","metric":"temperature","unit":"°C","referenceValue":25,` +
+				`"measuredValue":25.2,"calibratedAt":"2026-09-14T00:10:00Z","jobId":"` + jobW + `"}`,
 			1,
 		},
 		{&techB, "devices.calibrations", `{"deviceId":"` + devA + `","query":{"limit":5}}`, 0},
@@ -619,7 +628,8 @@ func TestForeignTargets(t *testing.T) {
 		{
 			&techB,
 			"devices.register",
-			`{"serial":"AX-` + uuid.NewString()[:8] + `","sensorTypes":["temperature"],"unitId":"` + unitW + `","jobId":"` + jobW + `"}`,
+			`{"serial":"AX-` + uuid.NewString()[:8] + `","sensorTypes":["temperature"],` +
+				`"unitId":"` + unitW + `","jobId":"` + jobW + `"}`,
 			0,
 		},
 		{
@@ -637,14 +647,17 @@ func TestForeignTargets(t *testing.T) {
 		{
 			&techB,
 			"diagnosticRuns.create",
-			`{"jobId":"` + jobW + `","unitId":"` + unitW + `","startAction":{"kind":"set_power","power":true},"endAction":{"kind":"set_power","power":false},"durationMinutes":10,"reason":"Check","expectedUnitVersion":1,"expectedJobVersion":3}`,
+			`{"jobId":"` + jobW + `","unitId":"` + unitW + `","startAction":{"kind":"set_power","power":true},` +
+				`"endAction":{"kind":"set_power","power":false},"durationMinutes":10,"reason":"Check","expectedUnitVersion":1,` +
+				`"expectedJobVersion":3}`,
 			0,
 		},
 		{&techB, "diagnosticRuns.get", `{"diagnosticRunId":"` + runW + `"}`, 0},
 		{
 			&techB,
 			"commands.create",
-			`{"unitId":"` + unitW + `","action":{"kind":"set_power","power":true},"jobId":"` + jobW + `","expectedUnitVersion":1}`,
+			`{"unitId":"` + unitW + `","action":{"kind":"set_power","power":true},` +
+				`"jobId":"` + jobW + `","expectedUnitVersion":1}`,
 			0,
 		},
 		{&techB, "commands.get", `{"id":"` + cmdA + `"}`, 0},
@@ -1172,7 +1185,8 @@ func TestTechnicianRebind(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO maintenance.assignments (tenant_id, job_id, technician_membership_id, valid_from, valid_until, scheduled, status)
+		`INSERT INTO maintenance.assignments (tenant_id, job_id, technician_membership_id, valid_from, valid_until, scheduled,
+			status)
 		VALUES ($1,$2,$3,$4,$5,tstzrange($6,$7),'active')`,
 		seed.ID("tenant-a"),
 		second,
@@ -1207,7 +1221,8 @@ func TestTechnicianRebind(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO maintenance.assignments (tenant_id, job_id, technician_membership_id, valid_from, valid_until, scheduled, status)
+		`INSERT INTO maintenance.assignments (tenant_id, job_id, technician_membership_id, valid_from, valid_until, scheduled,
+			status)
 		VALUES ($1,$2,$3,$4,$5,tstzrange($6,$7),'active')`,
 		seed.ID("tenant-a"),
 		freshJob,
@@ -1233,7 +1248,8 @@ func TestFireAuthorizesFirst(t *testing.T) {
 
 	unitA, now := seed.ID("unit-online-rto").String(), clock.Format(time.RFC3339)
 	body := func(event, facts string) string {
-		return `{"eventId":"` + event + `","occurredAt":"` + now + `","unitIds":["` + unitA + `"],"facts":[` + facts + `],"phase":"condition"}`
+		return `{"eventId":"` + event + `","occurredAt":"` + now + `","unitIds":["` + unitA + `"],"facts":[` + facts +
+			`],"phase":"condition"}`
 	}
 
 	event := uuid.NewString()
@@ -1241,7 +1257,8 @@ func TestFireAuthorizesFirst(t *testing.T) {
 		t.Fatalf("customer A's evaluation: %d %v", code, m)
 	}
 
-	occupied := `{"unitId":"` + unitA + `","metric":"occupied","value":true,"unit":"boolean","observedAt":"` + now + `","quality":"valid"}`
+	occupied := `{"unitId":"` + unitA + `","metric":"occupied","value":true,"unit":"boolean",` +
+		`"observedAt":"` + now + `","quality":"valid"}`
 	for name, b := range map[string]string{
 		"the same event":                 body(event, ""),
 		"the same input, another event":  body(uuid.NewString(), ""),

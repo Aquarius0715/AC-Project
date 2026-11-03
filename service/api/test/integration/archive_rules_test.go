@@ -66,7 +66,8 @@ func TestArchiveRulesD05(t *testing.T) {
 	k := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO billing.contracts (id, version, tenant_id, customer_id, customer_org_id, plan_type, term, price_minor, currency, restriction_eligible, created_by)
+		`INSERT INTO billing.contracts (id, version, tenant_id, customer_id, customer_org_id, plan_type, term, price_minor,
+			currency, restriction_eligible, created_by)
 		VALUES ($1,1,$2,$3,$4,'general',tstzrange($5,$6),5000,'MYR',false,$7)`,
 		k,
 		seed.ID("tenant-a"),
@@ -96,8 +97,9 @@ func TestArchiveRulesD05(t *testing.T) {
 	)
 	cb := items(c)[0]
 
-	body := `{"id":"` + cb["id"].(string) + `","name":"` + cb["name"].(string) + `","organizationId":"` + seed.ID("org-customer-b").
-		String() +
+	body := `{"id":"` + cb["id"].(string) + `","name":"` + cb["name"].(string) + `","organizationId":"` +
+		seed.ID("org-customer-b").
+			String() +
 		`","serviceProfile":"` + cb["serviceProfile"].(string) + `","status":"inactive"}`
 	if code, m := write(
 		s,
@@ -121,7 +123,8 @@ func TestArchiveRulesD05(t *testing.T) {
 	k2 := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO billing.contracts (id, version, tenant_id, customer_id, customer_org_id, plan_type, term, price_minor, currency, restriction_eligible, created_by)
+		`INSERT INTO billing.contracts (id, version, tenant_id, customer_id, customer_org_id, plan_type, term, price_minor,
+			currency, restriction_eligible, created_by)
 		VALUES ($1,1,$2,$3,$4,'general',tstzrange($5,$6),5000,'MYR',false,$7)`,
 		k2,
 		seed.ID("tenant-a"),
@@ -136,7 +139,9 @@ func TestArchiveRulesD05(t *testing.T) {
 		s,
 		&hq,
 		"customers.save",
-		`{"id":"`+data(nc)["id"].(string)+`","name":"Contract only","organizationId":"`+org+`","serviceProfile":"general","status":"inactive"}`,
+		`{"id":"`+data(nc)["id"].(string)+`","name":"Contract only",`+
+			`"organizationId":"`+org+`","serviceProfile":"general",`+
+			`"status":"inactive"}`,
 		1,
 	); code != 409 {
 		t.Errorf("deactivation with contract: %d", code)

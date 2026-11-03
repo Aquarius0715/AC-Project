@@ -55,7 +55,8 @@ func SQL(c *ops.Call, args *[]any, unitExpr string, mode Mode) string {
 		now := add(c.Now)
 
 		return "EXISTS (SELECT 1 FROM assets.unit_offer_access so WHERE so.unit_id = " + unitExpr +
-			" AND so.contractor_org_id = " + add(p.OrgID) + " AND so.access_valid_from <= " + now + " AND " + now + " < so.access_valid_until)"
+			" AND so.contractor_org_id = " + add(p.OrgID) + " AND so.access_valid_from <= " + now + " AND " + now +
+			" < so.access_valid_until)"
 	case "technician":
 	default:
 		return "FALSE"
@@ -95,13 +96,15 @@ func assignmentSQL(c *ops.Call, add func(any) string, unitExpr string, mode Mode
 	}
 
 	return "EXISTS (SELECT 1 FROM assets.unit_assignment_access sa" +
-		" JOIN assets.unit_offer_access so ON so.job_id = sa.job_id AND so.access_valid_from <= " + now + " AND " + now + " < so.access_valid_until" +
-		" WHERE sa.unit_id = " + unitExpr + " AND sa.active AND sa.technician_membership_id = " + add(c.Principal.MembershipID) +
+		" JOIN assets.unit_offer_access so ON so.job_id = sa.job_id AND so.access_valid_from <= " + now + " AND " + now +
+		" < so.access_valid_until" +
+		" WHERE sa.unit_id = " + unitExpr + " AND sa.active AND sa.technician_membership_id = " +
+		add(c.Principal.MembershipID) +
 		" AND " + from + " <= " + now + " AND " + now + " < upper(sa.scheduled))"
 }
 
-// EquipmentReadable returns the units (already visible in List mode) whose equipment data the caller may read now: all of
-// them except an external technician's units whose work window has not started (IR49(b)).
+// EquipmentReadable returns the units (already visible in List mode) whose equipment data the caller may read now: all
+// of them except an external technician's units whose work window has not started (IR49(b)).
 func EquipmentReadable(ctx context.Context, c *ops.Call, units []uuid.UUID) ([]uuid.UUID, error) {
 	p := c.Principal
 	if p.Role != "technician" || p.Employment == "internal" || len(units) == 0 {
@@ -138,6 +141,7 @@ func Gate(ctx context.Context, c *ops.Call, units []uuid.UUID) error {
 	) + ")"
 
 	var waiting int
+
 	err := c.Tx.QueryRow(ctx, q, args...).Scan(&waiting)
 	if err != nil {
 		return err

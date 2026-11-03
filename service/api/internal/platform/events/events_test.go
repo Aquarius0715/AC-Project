@@ -71,7 +71,8 @@ func emit(t *testing.T, m testRunner, tenant uuid.UUID, typ, payload string) uui
 	var id uuid.UUID
 
 	err := m.Run(context.Background(), false, nil, func(tx pgx.Tx) error {
-		return tx.QueryRow(context.Background(), `INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id)
+		return tx.QueryRow(context.Background(), `INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id,
+			event_type, payload, correlation_id)
 			VALUES ($1, 'test', $2, $3, $4, 'corr') RETURNING id`, tenant, uuid.New(), typ, payload).
 			Scan(&id)
 	})
@@ -111,12 +112,14 @@ func TestConsumerOrderDedupAndRetry(t *testing.T) {
 		Now:   func() time.Time { return clock },
 		Handlers: map[string]Handler{typ: func(ctx context.Context, tx pgx.Tx, e Event) error {
 			var p struct{ N int }
+
 			err := e.Decode(&p)
 			if err != nil {
 				return err
 			}
 
 			var got string
+
 			err = tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')`).
 				Scan(&got)
 			if err != nil ||
@@ -165,6 +168,7 @@ func TestConsumerOrderDedupAndRetry(t *testing.T) {
 			typ: func(context.Context, pgx.Tx, Event) error { return nil },
 		}, Batch: 0, Logf: nil, Now: nil, SplitFrom: "",
 	}
+
 	drainN, drainErr = other.Drain(ctx)
 	if drainErr != nil || drainN != 2 {
 		t.Fatalf("independent consumer: n=%d err=%v", drainN, drainErr)
@@ -264,8 +268,10 @@ func TestConsumerDeadLetters(t *testing.T) {
 		attempts int
 		dead     bool
 	)
+
 	err = m.Run(ctx, true, nil, func(tx pgx.Tx) error {
-		return tx.QueryRow(ctx, `SELECT attempts, dead_at IS NOT NULL FROM platform.event_failures WHERE consumer = $1 AND event_id = $2`, c.Name, poison).
+		return tx.QueryRow(ctx, `SELECT attempts, dead_at IS NOT NULL FROM platform.event_failures WHERE consumer = $1 AND
+			event_id = $2`, c.Name, poison).
 			Scan(&attempts, &dead)
 	})
 	if err != nil || attempts != MaxAttempts || !dead {
@@ -324,7 +330,8 @@ func TestHousekeep(t *testing.T) {
 	for _, id := range []uuid.UUID{applied, needed} {
 		exec(
 			nil,
-			`INSERT INTO platform.outbox (id, tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id, occurred_at)
+			`INSERT INTO platform.outbox (id, tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id,
+				occurred_at)
 			VALUES ($1, $2, 'test', $1, $3, '{}', 'corr', $4)`,
 			id,
 			tenant,
@@ -335,7 +342,8 @@ func TestHousekeep(t *testing.T) {
 
 	exec(
 		nil,
-		`INSERT INTO platform.processed_events (consumer, event_id, processed_at) VALUES ($1, $2, $4), ($3, $2, $4), ($1, $5, $4), ($1, $6, $7)`,
+		`INSERT INTO platform.processed_events (consumer, event_id, processed_at) VALUES ($1, $2, $4), ($3, $2, $4), ($1, $5,
+			$4), ($1, $6, $7)`,
 		a,
 		applied,
 		b,
@@ -346,7 +354,8 @@ func TestHousekeep(t *testing.T) {
 	) // b has not applied "needed"; "gone" left the outbox and is 19 days old
 	exec(
 		nil,
-		`INSERT INTO platform.event_failures (consumer, event_id, attempts, last_error, last_attempt_at) VALUES ($1, $2, 1, 'x', $3)`,
+		`INSERT INTO platform.event_failures (consumer, event_id, attempts, last_error, last_attempt_at) VALUES ($1, $2, 1,
+			'x', $3)`,
 		a,
 		gone,
 		day(10),
@@ -364,7 +373,8 @@ func TestHousekeep(t *testing.T) {
 			Timezone:          "",
 			SessionsRevokedAt: nil,
 		},
-		`INSERT INTO platform.idempotency_keys (tenant_id, membership_id, key, operation, request_hash, status, created_at, expires_at)
+		`INSERT INTO platform.idempotency_keys (tenant_id, membership_id, key, operation, request_hash, status, created_at,
+			expires_at)
 		VALUES ($1, $2, $3, 'test', '\x00', 'completed', $4, $5)`,
 		tenant,
 		uuid.New(),

@@ -85,7 +85,8 @@ func newPolicy(t *testing.T, customer, kind string) string {
 	if kind == "default_alert" { // one default policy per tenant: reuse it when it exists
 		owner(
 			t,
-			`INSERT INTO monitoring.alert_policies (id, tenant_id, kind, customer_id, name, owner_membership_id, created_by_user_id, timezone, condition, rules)
+			`INSERT INTO monitoring.alert_policies (id, tenant_id, kind, customer_id, name, owner_membership_id,
+				created_by_user_id, timezone, condition, rules)
 			SELECT $1,$2,'default_alert',NULL,'Default policy',$3,$4,'Asia/Kuala_Lumpur',NULL,'[]'
 			WHERE NOT EXISTS (SELECT 1 FROM monitoring.alert_policies WHERE tenant_id = $2 AND kind = 'default_alert')`,
 			id,
@@ -99,7 +100,8 @@ func newPolicy(t *testing.T, customer, kind string) string {
 
 	owner(
 		t,
-		`INSERT INTO monitoring.alert_policies (id, tenant_id, kind, customer_id, name, owner_membership_id, created_by_user_id, timezone, condition, rules)
+		`INSERT INTO monitoring.alert_policies (id, tenant_id, kind, customer_id, name, owner_membership_id,
+			created_by_user_id, timezone, condition, rules)
 		VALUES ($1,$2,$3,$4,'test policy',$5,$6,'Asia/Kuala_Lumpur',$7,$8)`,
 		id,
 		seed.ID("tenant-a"),
@@ -203,7 +205,9 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 			"units.save",
 			`{"customerOrgId":"`+seed.ID("org-customer-a").
 				String()+
-				`","propertyId":"`+prop+`","spaceId":null,"displayName":"Temp `+uuid.NewString()[:6]+`","modelId":"`+model+`","type":"split","installedAt":null,"serviceScope":["indoor"]}`,
+				`","propertyId":"`+prop+`","spaceId":null,`+
+				`"displayName":"Temp `+uuid.NewString()[:6]+`","modelId":"`+model+`","type":"split","installedAt":null,`+
+				`"serviceScope":["indoor"]}`,
 			0,
 		)
 		if code != 200 {
@@ -253,7 +257,8 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 	dev := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version) VALUES ($1,$2,$3,$4,$5,'v1')`,
+		`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version)
+			VALUES ($1,$2,$3,$4,$5,'v1')`,
 		dev,
 		seed.ID("tenant-a"),
 		"T-"+dev[:8],
@@ -262,7 +267,8 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO devices.device_bindings (tenant_id, device_id, unit_id, customer_org_id, bound_at, actor_membership_id) VALUES ($1,$2,$3,$4,now(),$5)`,
+		`INSERT INTO devices.device_bindings (tenant_id, device_id, unit_id, customer_org_id, bound_at, actor_membership_id)
+			VALUES ($1,$2,$3,$4,now(),$5)`,
 		seed.ID("tenant-a"),
 		dev,
 		u2,
@@ -312,7 +318,10 @@ func TestOrganizations(t *testing.T) {
 		"{\"sort\":{\"field\":\"name\",\"direction\":\"asc\"}}": "sort.field=error.invalid",
 	}
 
-	for _, f := range []string{`{"filters":{"kind":"x"}}`, `{"filters":{"status":"x"}}`, `{"filters":{"y":1}}`, `{"sort":{"field":"name","direction":"asc"}}`} {
+	for _, f := range []string{
+		`{"filters":{"kind":"x"}}`, `{"filters":{"status":"x"}}`, `{"filters":{"y":1}}`,
+		`{"sort":{"field":"name","direction":"asc"}}`,
+	} {
 		code, m := post(s, &hq, "organizations.list", f)
 		refusal(t, f, code, m, want[f])
 	}
@@ -335,7 +344,8 @@ func TestOrganizations(t *testing.T) {
 	}
 
 	id := data(m)["id"].(string)
-	// a second customer with the same billing name (trimmed, case-insensitive) is CONFLICT; other kinds may share it (IR208)
+	// a second customer with the same billing name (trimmed, case-insensitive) is CONFLICT; other kinds may share it
+	// (IR208)
 	if code, m := write(
 		s,
 		&hq,
@@ -424,7 +434,9 @@ func defaultPolicyID(t *testing.T) string {
 	defer conn.Close(ctx)
 
 	var id string
-	scanErr := conn.QueryRow(ctx, `SELECT id::text FROM monitoring.alert_policies WHERE tenant_id = $1 AND kind = 'default_alert'`, seed.ID("tenant-a")).
+
+	scanErr := conn.QueryRow(ctx, `SELECT id::text FROM monitoring.alert_policies WHERE tenant_id = $1 AND kind =
+		'default_alert'`, seed.ID("tenant-a")).
 		Scan(&id)
 	if scanErr != nil {
 		t.Fatal(scanErr)

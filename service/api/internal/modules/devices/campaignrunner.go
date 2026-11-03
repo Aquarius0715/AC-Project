@@ -162,7 +162,8 @@ func campaignChanged(c *ops.Call, id uuid.UUID, action, state string, v int, rea
 func (m *Module) campaignNotices(ctx context.Context, c *ops.Call) (int, error) {
 	rows, err := c.Tx.Query(
 		ctx,
-		`SELECT id, start_at, to_char(window_start_local, 'HH24:MI'), to_char(window_end_local, 'HH24:MI') FROM devices.firmware_campaigns
+		`SELECT id, start_at, to_char(window_start_local, 'HH24:MI'), to_char(window_end_local, 'HH24:MI') FROM
+			devices.firmware_campaigns
 		WHERE state = 'scheduled' AND notice_sent_at IS NULL AND start_at <= $1 ORDER BY start_at, id FOR UPDATE`,
 		c.Now.Add(noticeLead),
 	)
@@ -309,6 +310,7 @@ func waveCounts(ctx context.Context, c *ops.Call, id uuid.UUID, waves int) ([]wa
 			w, k   int
 			result string
 		)
+
 		err := rows.Scan(&w, &result, &k)
 		if err != nil {
 			return nil, err
@@ -334,7 +336,9 @@ func (m *Module) advanceCampaign(ctx context.Context, c *ops.Call, id uuid.UUID)
 		from, to, target string
 		autoPause        int
 	)
-	err := c.Tx.QueryRow(ctx, `SELECT waves, model_id, to_char(window_start_local, 'HH24:MI'), to_char(window_end_local, 'HH24:MI'), target_version, auto_pause_failure_percent
+
+	err := c.Tx.QueryRow(ctx, `SELECT waves, model_id, to_char(window_start_local, 'HH24:MI'), to_char(window_end_local,
+		'HH24:MI'), target_version, auto_pause_failure_percent
 		FROM devices.firmware_campaigns WHERE id = $1`, id).
 		Scan(&raw, &model, &from, &to, &target, &autoPause)
 	if err != nil {
@@ -342,6 +346,7 @@ func (m *Module) advanceCampaign(ctx context.Context, c *ops.Call, id uuid.UUID)
 	}
 
 	var waves []Wave
+
 	err = json.Unmarshal(raw, &waves)
 	if err != nil {
 		return 0, err
@@ -378,9 +383,11 @@ func (m *Module) advanceCampaign(ctx context.Context, c *ops.Call, id uuid.UUID)
 
 	for _, f := range done {
 		result, key := outcome(f.status, f.code)
+
 		_, err := c.Tx.Exec(
 			ctx,
-			`UPDATE devices.firmware_campaign_devices SET result = $3, detail = NULLIF($4, ''), result_at = $5 WHERE campaign_id = $1 AND device_id = $2`,
+			`UPDATE devices.firmware_campaign_devices SET result = $3, detail = NULLIF($4, ''), result_at = $5 WHERE campaign_id
+				= $1 AND device_id = $2`,
 			id,
 			f.device,
 			result,
@@ -414,7 +421,9 @@ func (m *Module) advanceCampaign(ctx context.Context, c *ops.Call, id uuid.UUID)
 			)
 
 			var v int
-			err := c.Tx.QueryRow(ctx, `UPDATE devices.firmware_campaigns SET state = 'paused', reason = $2, version = version + 1, updated_at = $3 WHERE id = $1 RETURNING version`,
+
+			err := c.Tx.QueryRow(ctx, `UPDATE devices.firmware_campaigns SET state = 'paused', reason = $2, version = version +
+				1, updated_at = $3 WHERE id = $1 RETURNING version`,
 				id, reason, c.Now).
 				Scan(&v)
 			if err != nil {
@@ -453,7 +462,9 @@ func (m *Module) advanceCampaign(ctx context.Context, c *ops.Call, id uuid.UUID)
 	}
 
 	var v int
-	scanErr := c.Tx.QueryRow(ctx, `UPDATE devices.firmware_campaigns SET state = 'completed', version = version + 1, updated_at = $2 WHERE id = $1 RETURNING version`,
+
+	scanErr := c.Tx.QueryRow(ctx, `UPDATE devices.firmware_campaigns SET state = 'completed', version = version + 1,
+		updated_at = $2 WHERE id = $1 RETURNING version`,
 		id, c.Now).
 		Scan(&v)
 	if scanErr != nil {
@@ -480,8 +491,10 @@ func (m *Module) dispatchWave(
 ) (int, error) {
 	rows, err := c.Tx.Query(
 		ctx,
-		`SELECT d.device_id, dv.unit_id, dv.connection, dv.tamper, dv.firmware_version FROM devices.firmware_campaign_devices d
-		JOIN devices.devices dv ON dv.id = d.device_id WHERE d.campaign_id = $1 AND d.wave = $2 AND d.result = 'pending' ORDER BY d.device_id FOR UPDATE OF dv`,
+		`SELECT d.device_id, dv.unit_id, dv.connection, dv.tamper, dv.firmware_version FROM devices.firmware_campaign_devices
+			d
+		JOIN devices.devices dv ON dv.id = d.device_id WHERE d.campaign_id = $1 AND d.wave = $2 AND d.result = 'pending' ORDER
+		BY d.device_id FOR UPDATE OF dv`,
 		id,
 		wave,
 	)
@@ -545,7 +558,9 @@ func (m *Module) dispatchWave(
 			}
 
 			var open bool // an operation of the device not finished yet, expired or not (one firmware operation per device)
-			scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE device_id = $1 AND status IN ('queued','running'))`, p.id).
+
+			scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE device_id = $1 AND status
+				IN ('queued','running'))`, p.id).
 				Scan(&open)
 			if scanErr != nil {
 				return 0, scanErr
@@ -578,9 +593,11 @@ func (m *Module) dispatchWave(
 		}
 
 		op := uuid.Must(uuid.NewV7())
+
 		_, err := c.Tx.Exec(
 			ctx,
-			`INSERT INTO devices.device_operations (id, tenant_id, device_id, unit_id, kind, status, target_version, campaign_id, expires_at)
+			`INSERT INTO devices.device_operations (id, tenant_id, device_id, unit_id, kind, status, target_version, campaign_id,
+				expires_at)
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, 'firmware', 'queued', $4, $5, $6)`,
 			op,
 			p.id,

@@ -89,11 +89,17 @@ func TestAssetWritesLifecycle(t *testing.T) {
 	}
 
 	for bad, field := range map[string]string{
-		`{"customerOrgId":"` + org + `","kind":"castle","name":"x","address":null,"accessInstructions":null}`:                              "kind",
-		`{"customerOrgId":"` + org + `","kind":"home","name":"","address":null,"accessInstructions":null}`:                                 "name",
-		`{"customerOrgId":"` + org + `","kind":"home","name":"` + strings.Repeat("x", 121) + `","address":null,"accessInstructions":null}`: "name",
-		`{"customerOrgId":"` + org + `","kind":"home","name":"x","address":"` + strings.Repeat("a", 501) + `","accessInstructions":null}`:  "address",
-		`{"kind":"home","name":"x","address":null,"accessInstructions":null}`:                                                              "customerOrgId",
+		`{"customerOrgId":"` + org + `","kind":"castle","name":"x","address":null,` +
+			`"accessInstructions":null}`: "kind",
+		`{"customerOrgId":"` + org + `","kind":"home","name":"","address":null,` +
+			`"accessInstructions":null}`: "name",
+		`{"customerOrgId":"` + org + `","kind":"home",` +
+			`"name":"` + strings.Repeat("x", 121) + `","address":null,` +
+			`"accessInstructions":null}`: "name",
+		`{"customerOrgId":"` + org + `","kind":"home","name":"x",` +
+			`"address":"` + strings.Repeat("a", 501) + `","accessInstructions":null}`: "address",
+		`{"kind":"home","name":"x","address":null,` +
+			`"accessInstructions":null}`: "customerOrgId",
 	} {
 		if code, m := write(
 			s,
@@ -125,7 +131,9 @@ func TestAssetWritesLifecycle(t *testing.T) {
 
 	renamed := "Renamed " + uuid.NewString()[:6]
 
-	upd := `{"id":"` + prop + `","customerOrgId":"` + org + `","kind":"office","name":"` + renamed + `","address":"1 Test Rd (fictional)","accessInstructions":null}`
+	upd := `{"id":"` + prop + `","customerOrgId":"` + org + `","kind":"office",` +
+		`"name":"` + renamed + `","address":"1 ` +
+		`Test Rd (fictional)","accessInstructions":null}`
 	if code, m := write(
 		s,
 		&hq,
@@ -230,7 +238,8 @@ func TestAssetWritesLifecycle(t *testing.T) {
 
 	for name, b := range map[string]string{
 		"floor at the root": `{"propertyId":"` + prop + `","parentSpaceId":null,"kind":"floor","name":"1f"}`,
-		"room on the floor": `{"propertyId":"` + prop + `","parentSpaceId":"` + floor + `","kind":"room","name":" server room a "}`,
+		"room on the floor": `{"propertyId":"` + prop + `","parentSpaceId":"` + floor + `","kind":"room","name":" server ` +
+			`room a "}`,
 	} {
 		if code, m := write(
 			s,
@@ -277,7 +286,9 @@ func TestAssetWritesLifecycle(t *testing.T) {
 			idf = `"id":"` + id + `",`
 		}
 
-		return `{` + idf + `"customerOrgId":"` + org + `","propertyId":"` + prop + `","spaceId":` + sp + `,"displayName":"Server AC","modelId":"` + model + `","type":"split","installedAt":null,"serviceScope":["indoor","outdoor"]` + extra + `}`
+		return `{` + idf + `"customerOrgId":"` + org + `","propertyId":"` + prop + `","spaceId":` + sp +
+			`,"displayName":"Server AC","modelId":"` + model +
+			`","type":"split","installedAt":null,"serviceScope":["indoor","outdoor"]` + extra + `}`
 	}
 
 	code, m = write(s, &hq, "units.save", unitBody("", room, ""), 0)
@@ -598,14 +609,17 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		Timezone:          "",
 		SessionsRevokedAt: nil,
 	}
+
 	err := s.DB.Run(t.Context(), true, p, func(tx pgx.Tx) error {
-		err := tx.QueryRow(t.Context(), `SELECT count(*) FROM audit.audit_log WHERE target_id = $1 AND result = 'success'`, prop).
+		err := tx.QueryRow(t.Context(), `SELECT count(*) FROM audit.audit_log WHERE target_id = $1 AND result =
+			'success'`, prop).
 			Scan(&audits)
 		if err != nil {
 			return err
 		}
 
-		return tx.QueryRow(t.Context(), `SELECT count(*) FROM platform.outbox WHERE aggregate_id = $1 AND event_type NOT LIKE 'RowChanged:%'`, prop).
+		return tx.QueryRow(t.Context(), `SELECT count(*) FROM platform.outbox WHERE aggregate_id = $1 AND event_type NOT LIKE
+			'RowChanged:%'`, prop).
 			Scan(&events)
 	})
 	if err != nil {

@@ -18,10 +18,10 @@ import (
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
 
-// TestRevokeSessions: HQ signs a user out everywhere (members.revokeSessions, IR384, Figma Admin 03-8). Every membership
-// of the user in the tenant records the revocation. A token signed in before it, or one that does not say when, is
-// UNAUTHENTICATED errors.session_revoked, in identity and in the other services; a sign-in after it works. The access
-// stays. A client membership needs asset.write, any other identity.write; a reason is required; another tenant's
+// TestRevokeSessions: HQ signs a user out everywhere (members.revokeSessions, IR384, Figma Admin 03-8). Every
+// membership of the user in the tenant records the revocation. A token signed in before it, or one that does not say
+// when, is UNAUTHENTICATED errors.session_revoked, in identity and in the other services; a sign-in after it works. The
+// access stays. A client membership needs asset.write, any other identity.write; a reason is required; another tenant's
 // membership is NOT_FOUND and keeps its sessions.
 func TestRevokeSessions(t *testing.T) {
 	s := server(t)
@@ -41,12 +41,14 @@ func TestRevokeSessions(t *testing.T) {
 
 	owner(
 		t,
-		`INSERT INTO identity.users (id, email, display_name) VALUES ($1, 'revoke.test@example.com', 'Revoke Test') ON CONFLICT DO NOTHING`,
+		`INSERT INTO identity.users (id, email, display_name) VALUES ($1, 'revoke.test@example.com', 'Revoke Test') ON
+			CONFLICT DO NOTHING`,
 		user,
 	)
 	owner(
 		t,
-		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, valid_from) VALUES ($1,$2,$3,$4,'technician','internal',$5) ON CONFLICT DO NOTHING`,
+		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, valid_from) VALUES ($1,
+			$2,$3,$4,'technician','internal',$5) ON CONFLICT DO NOTHING`,
 		tech,
 		tenantA,
 		user,
@@ -55,7 +57,8 @@ func TestRevokeSessions(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from) VALUES ($1,$2,$3,$4,'client','member',$5) ON CONFLICT DO NOTHING`,
+		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from) VALUES ($1,
+			$2,$3,$4,'client','member',$5) ON CONFLICT DO NOTHING`,
 		client,
 		tenantA,
 		user,
@@ -64,7 +67,8 @@ func TestRevokeSessions(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from) VALUES ($1,$2,$3,$4,'client','member',$5) ON CONFLICT DO NOTHING`,
+		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from) VALUES ($1,
+			$2,$3,$4,'client','member',$5) ON CONFLICT DO NOTHING`,
 		foreign,
 		tenantB,
 		user,
@@ -73,7 +77,8 @@ func TestRevokeSessions(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, valid_from) VALUES ($1,$2,$3,$4,'admin',$5) ON CONFLICT DO NOTHING`,
+		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, valid_from) VALUES ($1,$2,$3,$4,
+			'admin',$5) ON CONFLICT DO NOTHING`,
 		assets,
 		tenantA,
 		seed.ID("user-hq-override-only"),
@@ -83,18 +88,21 @@ func TestRevokeSessions(t *testing.T) {
 
 	for m, copyOf := range map[string]string{"test-revoke-tech": "tech-internal-a", "test-revoke-client": "customer-a"} {
 		owner(t, `INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission)
-			SELECT tenant_id, $1, permission FROM identity.membership_permissions WHERE membership_id = $2 ON CONFLICT DO NOTHING`, seed.ID(m), seed.ID(copyOf))
+			SELECT tenant_id, $1, permission FROM identity.membership_permissions WHERE membership_id = $2 ON CONFLICT DO
+			NOTHING`, seed.ID(m), seed.ID(copyOf))
 	}
 
 	owner(
 		t,
-		`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES ($1,$2,'asset.read'), ($1,$2,'asset.write') ON CONFLICT DO NOTHING`,
+		`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES ($1,$2,'asset.read'), ($1,
+			$2,'asset.write') ON CONFLICT DO NOTHING`,
 		tenantA,
 		assets,
 	)
 	owner(
 		t,
-		`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES ($1,$2,'unit',$3) ON CONFLICT DO NOTHING`,
+		`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES ($1,$2,'unit',$3) ON CONFLICT
+			DO NOTHING`,
 		tenantA,
 		tech,
 		seed.ID("unit-online-rto"),
@@ -169,7 +177,8 @@ func TestRevokeSessions(t *testing.T) {
 	}
 
 	// asset.write signs out a client membership's user: all of the user's memberships in the tenant
-	reason := "Phone reported lost " + uuid.NewString()[:8] // one per run: the test database keeps earlier runs' audit rows
+	// one per run: the test database keeps earlier runs' audit rows
+	reason := "Phone reported lost " + uuid.NewString()[:8]
 
 	code, m = write(s, &assetsOnly, "members.revokeSessions", body(client, reason), 0)
 	if code != 200 {
@@ -192,7 +201,12 @@ func TestRevokeSessions(t *testing.T) {
 	for _, c := range []struct {
 		who actor
 		op  string
-	}{{old, "session.get"}, {oldClient, "session.get"}, {actor{"tok-rv", "test-revoke-tech"}, "session.get"}, {oldClient, "units.list"}} {
+	}{
+		{old, "session.get"},
+		{oldClient, "session.get"},
+		{actor{"tok-rv", "test-revoke-tech"}, "session.get"},
+		{oldClient, "units.list"},
+	} {
 		if code, m := post(
 			s,
 			&c.who,
@@ -362,13 +376,15 @@ func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
 	user, member := seed.ID("user-test-revoke-idp"), seed.ID("test-revoke-idp-tech")
 	owner(
 		t,
-		`INSERT INTO identity.users (id, email, display_name) VALUES ($1, 'revoke.idp.test@example.com', 'Revoke IdP Test') ON CONFLICT DO NOTHING`,
+		`INSERT INTO identity.users (id, email, display_name) VALUES ($1, 'revoke.idp.test@example.com', 'Revoke IdP Test') ON
+			CONFLICT DO NOTHING`,
 		user,
 	)
 	owner(t, `UPDATE identity.users SET cognito_sub = NULL WHERE id = $1`, user)
 	owner(
 		t,
-		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, valid_from) VALUES ($1,$2,$3,$4,'technician','internal',$5) ON CONFLICT DO NOTHING`,
+		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, valid_from) VALUES ($1,
+			$2,$3,$4,'technician','internal',$5) ON CONFLICT DO NOTHING`,
 		member,
 		seed.ID("tenant-a"),
 		user,
@@ -423,6 +439,7 @@ func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
 	}
 
 	idp.err = nil
+
 	err = s.DrainEvents(context.Background())
 	if err != nil || len(idp.take()) != 0 {
 		t.Errorf("a failed provider call is retried and holds up the consumer: %v", err)

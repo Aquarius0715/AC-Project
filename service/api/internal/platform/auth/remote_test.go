@@ -89,6 +89,7 @@ func TestRemoteSource(t *testing.T) {
 	now = now.Add(31 * time.Second)
 
 	at := time.Date(2026, 9, 14, 0, 55, 0, 0, time.UTC)
+
 	_, principalErr = r.Principal(
 		ctx,
 		"sub-1",

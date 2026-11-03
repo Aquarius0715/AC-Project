@@ -12,6 +12,7 @@ func readings(t *testing.T, raw []byte) []map[string]any {
 	var b struct {
 		Measurements []map[string]any `json:"measurements"`
 	}
+
 	err := json.Unmarshal(raw, &b)
 	if err != nil {
 		t.Fatal(err)
@@ -90,6 +91,7 @@ func TestCommandBehaviours(t *testing.T) {
 		}
 
 		var a map[string]any
+
 		unmarshalErr := json.Unmarshal(raw, &a)
 		if unmarshalErr != nil {
 			t.Fatal(unmarshalErr)
@@ -137,9 +139,11 @@ func TestOnlyNarrowsTheReadings(t *testing.T) {
 	}
 }
 
-// TestAModuleWithoutSensorsOnlyBeats: a module narrowed to no sensor sends no readings, and still its heartbeat (IR613).
+// TestAModuleWithoutSensorsOnlyBeats: a module narrowed to no sensor sends no readings, and still its heartbeat
+// (IR613).
 func TestAModuleWithoutSensorsOnlyBeats(t *testing.T) {
 	m := NewModule(tenant, device, "v1", 1).Only()
+
 	raw, err := m.Telemetry(time.Now())
 	if err != nil || raw != nil {
 		t.Errorf("readings %s %v", raw, err)
@@ -163,6 +167,7 @@ func TestHeartbeatReportsTheState(t *testing.T) {
 		}
 
 		var h map[string]any
+
 		unmarshalErr := json.Unmarshal(raw, &h)
 		if unmarshalErr != nil {
 			t.Fatal(unmarshalErr)
@@ -202,6 +207,7 @@ func TestKeptSetpoint(t *testing.T) {
 	celsius, power := 24.0, true
 
 	m := NewModule("t", "d", "v1", 1).Reports(&power, &celsius, nil, nil)
+
 	_, _, err := m.Acknowledge(
 		[]byte(
 			`{"commandId":"c1","kind":"set_temperature","setpointCelsius":27,"expiresAt":"2099-01-01T00:00:00Z"}`,
@@ -220,6 +226,7 @@ func TestKeptSetpoint(t *testing.T) {
 	c2 := 24.0
 
 	again := NewModule("t", "d", "v1", 1).Reports(&power, &c2, nil, nil)
+
 	restoreErr := again.Restore(
 		kept,
 	)

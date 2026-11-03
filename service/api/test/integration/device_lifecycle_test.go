@@ -32,7 +32,8 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 		var d, un string
 		ownerScan(
 			t,
-			`SELECT d.connection, un.connection FROM devices.devices d JOIN assets.units un ON un.id = d.unit_id WHERE d.id = $1`,
+			`SELECT d.connection, un.connection FROM devices.devices d JOIN assets.units un ON un.id = d.unit_id WHERE d.id =
+				$1`,
 			[]any{dev},
 			&d,
 			&un,
@@ -252,7 +253,8 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 		id := uuid.NewString()
 		owner(
 			t,
-			`INSERT INTO control.commands (id, tenant_id, unit_id, device_id, actor_membership_id, source, action, status, delivery, requested_at, expires_at, correlation_id)
+			`INSERT INTO control.commands (id, tenant_id, unit_id, device_id, actor_membership_id, source, action, status,
+				delivery, requested_at, expires_at, correlation_id)
 			VALUES ($1,$2,$3,$4,$5,$6,'{"kind":"set_power","power":false}','requested',$7,$8,$9,'t')`,
 			id,
 			seed.ID("tenant-a"),
@@ -302,7 +304,8 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 	other := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO devices.device_operations (id, tenant_id, device_id, unit_id, kind, status, expires_at, created_at) VALUES ($1,$2,$3,$4,'calibrate','queued',$5,$6)`,
+		`INSERT INTO devices.device_operations (id, tenant_id, device_id, unit_id, kind, status, expires_at, created_at)
+			VALUES ($1,$2,$3,$4,'calibrate','queued',$5,$6)`,
 		other,
 		seed.ID("tenant-a"),
 		dev,
@@ -318,7 +321,10 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 
 	owner(t, `DELETE FROM devices.device_operations WHERE id = $1`, other)
 	// validation
-	for b, want := range map[string]string{`"operationId":"` + check + `","result":"done"`: "result=error.invalid", `"result":"succeeded"`: "operationId=error.required"} {
+	for b, want := range map[string]string{
+		`"operationId":"` + check + `","result":"done"`: "result=error.invalid",
+		`"result":"succeeded"`:                          "operationId=error.required",
+	} {
 		code, m := write(
 			s,
 			&customerB,
@@ -375,7 +381,8 @@ func TestDeviceEvents(t *testing.T) {
 		var conn, power, tamper, unitConn string
 		ownerScan(
 			t,
-			`SELECT d.connection, d.power_signal, d.tamper, un.connection FROM devices.devices d JOIN assets.units un ON un.id = d.unit_id WHERE d.id = $1`,
+			`SELECT d.connection, d.power_signal, d.tamper, un.connection FROM devices.devices d JOIN assets.units un ON un.id =
+				d.unit_id WHERE d.id = $1`,
 			[]any{dev},
 			&conn,
 			&power,

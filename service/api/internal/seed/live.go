@@ -142,7 +142,8 @@ func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 	// remote power only: no mode, fan or temperature setting (deterministic contracts: empty lists, null temperature)
 	exErr := ex(
 		"model",
-		`INSERT INTO devices.capabilities (id, version, tenant_id, manufacturer, model, control, mode_control, fan_control, temperature,
+		`INSERT INTO devices.capabilities (id, version, tenant_id, manufacturer, model, control, mode_control, fan_control,
+			temperature,
 		modes, fan_levels, ventilation, ventilation_levels, sensors, firmware_candidates, is_current)
 		VALUES ($1,1,$2,$3,$4,true,false,false,NULL,'{}','{}',false,'{}',$5,'{}',true) ON CONFLICT DO NOTHING`,
 		ID(s.Capability),
@@ -169,7 +170,8 @@ func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 
 	exErr = ex(
 		"floor",
-		`INSERT INTO assets.spaces (id, tenant_id, property_id, parent_space_id, kind, name) VALUES ($1,$2,$3,NULL,'floor','1F') ON CONFLICT DO NOTHING`,
+		`INSERT INTO assets.spaces (id, tenant_id, property_id, parent_space_id, kind, name) VALUES ($1,$2,$3,NULL,'floor',
+			'1F') ON CONFLICT DO NOTHING`,
 		ID(s.Floor),
 		tenant,
 		ID(s.Property),
@@ -180,7 +182,8 @@ func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 
 	exErr = ex(
 		"room",
-		`INSERT INTO assets.spaces (id, tenant_id, property_id, parent_space_id, kind, name) VALUES ($1,$2,$3,$4,'room','Sensor room') ON CONFLICT DO NOTHING`,
+		`INSERT INTO assets.spaces (id, tenant_id, property_id, parent_space_id, kind, name) VALUES ($1,$2,$3,$4,'room',
+			'Sensor room') ON CONFLICT DO NOTHING`,
 		ID(s.Room),
 		tenant,
 		ID(s.Property),
@@ -201,9 +204,11 @@ func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 	)
 
 	unit := ID(s.Unit)
+
 	exErr = ex(
 		"unit",
-		`INSERT INTO assets.units (id, tenant_id, customer_org_id, property_id, space_id, display_name, model_id, installed_at,
+		`INSERT INTO assets.units (id, tenant_id, customer_org_id, property_id, space_id, display_name, model_id,
+			installed_at,
 		service_scope, archived, capability_version, observed_state, observed_restriction, version, warranty_ends_at)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,NULL,'{indoor,outdoor,electrical}',false,1,$8,NULL,1,NULL) ON CONFLICT DO NOTHING`,
 		unit,
@@ -223,8 +228,10 @@ func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 
 	added, err := tx.Exec(
 		ctx,
-		`INSERT INTO devices.devices (id, tenant_id, serial, binding_id, unit_id, target_unit_id, created_by_membership_id, connection, last_seen_at,
-		firmware_version, power_signal, tamper) VALUES ($1,$2,$3,$4,$5,$5,$6,'online',$7,'external','unknown','clear') ON CONFLICT DO NOTHING`,
+		`INSERT INTO devices.devices (id, tenant_id, serial, binding_id, unit_id, target_unit_id, created_by_membership_id,
+			connection, last_seen_at,
+		firmware_version, power_signal, tamper) VALUES ($1,$2,$3,$4,$5,$5,$6,'online',$7,'external','unknown','clear') ON
+		CONFLICT DO NOTHING`,
 		device,
 		tenant,
 		s.Serial,
@@ -245,7 +252,8 @@ func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 
 		err := ex(
 			"sensor "+x.Metric,
-			`INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, boundary_id, stale_after_seconds, calibrated_at)
+			`INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, boundary_id, stale_after_seconds,
+				calibrated_at)
 			VALUES ($1,$2,$3,$4,$5,$6,120,NULL) ON CONFLICT DO NOTHING`,
 			ID(x.Name),
 			tenant,
@@ -261,7 +269,8 @@ func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 
 	exErr = ex(
 		"binding",
-		`INSERT INTO devices.device_bindings (id, tenant_id, device_id, unit_id, customer_org_id, bound_at, reason, actor_membership_id)
+		`INSERT INTO devices.device_bindings (id, tenant_id, device_id, unit_id, customer_org_id, bound_at, reason,
+			actor_membership_id)
 		VALUES ($1,$2,$3,$4,$5,$6,'live sensors',$7) ON CONFLICT DO NOTHING`,
 		binding,
 		tenant,
@@ -296,6 +305,7 @@ func liveOwner(ctx context.Context, tx pgx.Tx, tenant uuid.UUID, at time.Time) e
 	o, org, customer := LiveSite.Owner, ID(LiveSite.CustomerOrgID), ID(LiveSite.Customer)
 
 	user, membership := ID(o.User), ID(o.Membership)
+
 	_, err := tx.Exec(
 		ctx,
 		`INSERT INTO identity.users (id, email, display_name, status, created_at, updated_at) VALUES ($1,$2,$3,'active',$4,$4)
@@ -310,6 +320,7 @@ func liveOwner(ctx context.Context, tx pgx.Tx, tenant uuid.UUID, at time.Time) e
 	}
 
 	var holder uuid.UUID
+
 	err = tx.QueryRow(ctx, `SELECT id FROM identity.users WHERE email = $1`, o.Email).
 		Scan(&holder)
 	if err != nil {
@@ -322,7 +333,8 @@ func liveOwner(ctx context.Context, tx pgx.Tx, tenant uuid.UUID, at time.Time) e
 
 	added, err := tx.Exec(
 		ctx,
-		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from, created_at, updated_at)
+		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from, created_at,
+			updated_at)
 		VALUES ($1,$2,$3,$4,'client','owner',$5,$5,$5) ON CONFLICT DO NOTHING`,
 		membership,
 		tenant,
@@ -337,7 +349,8 @@ func liveOwner(ctx context.Context, tx pgx.Tx, tenant uuid.UUID, at time.Time) e
 	for _, p := range identity.DefaultPermissions("client") {
 		_, err := tx.Exec(
 			ctx,
-			`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
+			`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES ($1,$2,$3) ON CONFLICT DO
+				NOTHING`,
 			tenant,
 			membership,
 			p,
@@ -349,7 +362,8 @@ func liveOwner(ctx context.Context, tx pgx.Tx, tenant uuid.UUID, at time.Time) e
 
 	_, execErr := tx.Exec(
 		ctx,
-		`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES ($1,$2,'organization',$3) ON CONFLICT DO NOTHING`,
+		`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES ($1,$2,'organization',$3) ON
+			CONFLICT DO NOTHING`,
 		tenant,
 		membership,
 		org,
@@ -360,7 +374,8 @@ func liveOwner(ctx context.Context, tx pgx.Tx, tenant uuid.UUID, at time.Time) e
 
 	_, execErr = tx.Exec(
 		ctx,
-		`INSERT INTO identity.consents (tenant_id, membership_id, purpose, granted, created_at, updated_at) VALUES ($1,$2,'location_automation',false,$3,$3)
+		`INSERT INTO identity.consents (tenant_id, membership_id, purpose, granted, created_at, updated_at) VALUES ($1,$2,
+			'location_automation',false,$3,$3)
 		ON CONFLICT DO NOTHING`,
 		tenant,
 		membership,
@@ -372,8 +387,10 @@ func liveOwner(ctx context.Context, tx pgx.Tx, tenant uuid.UUID, at time.Time) e
 
 	_, execErr = tx.Exec(
 		ctx,
-		`INSERT INTO identity.client_users (id, tenant_id, customer_id, membership_id, email, display_name, client_role, status, invited_at,
-		invited_by_membership_id, last_invite_sent_at, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,'owner','invited',$7,$4,$7,$7,$7) ON CONFLICT DO NOTHING`,
+		`INSERT INTO identity.client_users (id, tenant_id, customer_id, membership_id, email, display_name, client_role,
+			status, invited_at,
+		invited_by_membership_id, last_invite_sent_at, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,'owner','invited',$7,
+		$4,$7,$7,$7) ON CONFLICT DO NOTHING`,
 		ID(o.ClientUser),
 		tenant,
 		customer,
@@ -392,8 +409,10 @@ func liveOwner(ctx context.Context, tx pgx.Tx, tenant uuid.UUID, at time.Time) e
 
 	_, err = tx.Exec(
 		ctx,
-		`INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id, occurred_at)
-		VALUES ($1, 'membership', $2, $3, jsonb_build_object('userId', $4::uuid::text, 'membershipId', $2::uuid::text, 'role', 'client'), 'seed-live-site', $5)`,
+		`INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id,
+			occurred_at)
+		VALUES ($1, 'membership', $2, $3, jsonb_build_object('userId', $4::uuid::text, 'membershipId', $2::uuid::text, 'role',
+		'client'), 'seed-live-site', $5)`,
 		tenant,
 		membership,
 		identity.EventAccountRequested,

@@ -104,7 +104,8 @@ func TestWorkReports(t *testing.T) {
 
 	bad := map[string]map[string]string{
 		"duplicate key": {
-			"items": `[{"componentGroup":"indoor","componentKey":"filter","result":null,"reason":null,"evidenceIds":[]},{"componentGroup":"indoor","componentKey":"filter","result":null,"reason":null,"evidenceIds":[]}]`,
+			"items": `[{"componentGroup":"indoor","componentKey":"filter","result":null,"reason":null,"evidenceIds":[]},` +
+				`{"componentGroup":"indoor","componentKey":"filter","result":null,"reason":null,"evidenceIds":[]}]`,
 		},
 		"wrong group": {
 			"items": `[{"componentGroup":"outdoor","componentKey":"filter","result":null,"reason":null,"evidenceIds":[]}]`,
@@ -113,20 +114,25 @@ func TestWorkReports(t *testing.T) {
 			"items": `[{"componentGroup":"indoor","componentKey":"filter","result":"ok","reason":null,"evidenceIds":[]}]`,
 		},
 		"measurement key": {
-			"items":        `[]`,
-			"measurements": `[{"componentKey":"filter","metric":"temperature","value":20,"unit":"°C","observedAt":"` + now + `"}]`,
+			"items": `[]`,
+			"measurements": `[{"componentKey":"filter","metric":"temperature","value":20,"unit":"°C",` +
+				`"observedAt":"` + now + `"}]`,
 		},
 		"bad symbol": {
-			"measurements": `[{"componentKey":"filter","metric":"temperature","value":20,"unit":"F","observedAt":"` + now + `"}]`,
+			"measurements": `[{"componentKey":"filter","metric":"temperature","value":20,"unit":"F",` +
+				`"observedAt":"` + now + `"}]`,
 		},
 		"part quantity": {
-			"parts": `[{"name":"Filter","quantity":1000,"catalogCode":null,"source":"van_stock","lotSerial":null,"replacesComponentKey":null,"oldPartDisposal":null,"receiptAttachmentId":null}]`,
+			"parts": `[{"name":"Filter","quantity":1000,"catalogCode":null,"source":"van_stock","lotSerial":null,` +
+				`"replacesComponentKey":null,"oldPartDisposal":null,"receiptAttachmentId":null}]`,
 		},
 		"part source": {
-			"parts": `[{"name":"Filter","quantity":1,"catalogCode":null,"source":"amazon","lotSerial":null,"replacesComponentKey":null,"oldPartDisposal":null,"receiptAttachmentId":null}]`,
+			"parts": `[{"name":"Filter","quantity":1,"catalogCode":null,"source":"amazon","lotSerial":null,` +
+				`"replacesComponentKey":null,"oldPartDisposal":null,"receiptAttachmentId":null}]`,
 		},
 		"refrigerant": {
-			"refrigerant": `[{"refrigerant":"R22","cylinderId":"C1","recoveredKg":0,"chargedKg":0,"leakCheck":"pass","leakCheckMethod":null}]`,
+			"refrigerant": `[{"refrigerant":"R22","cylinderId":"C1","recoveredKg":0,"chargedKg":0,"leakCheck":"pass",` +
+				`"leakCheckMethod":null}]`,
 		},
 		"work text":        {"workText": `"` + strings.Repeat("w", 4001) + `"`},
 		"next action":      {"nextAction": `{"kind":"later"}`},
@@ -167,8 +173,9 @@ func TestWorkReports(t *testing.T) {
 			job,
 			"",
 			map[string]string{
-				"reportId":     `"` + rep + `"`,
-				"measurements": `[{"id":"` + uuid.NewString() + `","componentKey":"filter","metric":"temperature","value":20,"unit":"°C","observedAt":"` + now + `"}]`,
+				"reportId": `"` + rep + `"`,
+				"measurements": `[{"id":"` + uuid.NewString() + `","componentKey":"filter","metric":"temperature","value":20,` +
+					`"unit":"°C","observedAt":"` + now + `"}]`,
 			},
 		),
 		1,
@@ -176,13 +183,17 @@ func TestWorkReports(t *testing.T) {
 		t.Error("unknown measurement id")
 	}
 	// second save: all normal, a mismatched measurement unit is stored as suspect; unchanged items keep id
-	meas := `[{"componentKey":"filter","metric":"temperature","value":20,"unit":"kPa","observedAt":"` + now + `"},{"componentKey":"compressor","metric":"vibration","value":null,"unit":"mm/s","observedAt":"` + now + `"}]`
+	meas := `[{"componentKey":"filter","metric":"temperature","value":20,"unit":"kPa",` +
+		`"observedAt":"` + now + `"},{"componentKey":"compressor","metric":"vibration","value":null,"unit":"mm/s",` +
+		`"observedAt":"` + now + `"}]`
 
 	code, m = write(s, &techInt, "jobs.saveDraft", draftBody(job, "normal", map[string]string{
 		"reportId":     `"` + rep + `"`,
 		"measurements": meas,
-		"parts":        `[{"name":" Filter ","quantity":1,"catalogCode":null,"source":"van_stock","lotSerial":null,"replacesComponentKey":"filter","oldPartDisposal":"returned","receiptAttachmentId":null}]`,
-		"refrigerant":  `[{"refrigerant":"R32","cylinderId":"C-1","recoveredKg":0.2,"chargedKg":0.3,"leakCheck":"pass","leakCheckMethod":"soap"}]`,
+		"parts": `[{"name":" Filter ","quantity":1,"catalogCode":null,"source":"van_stock","lotSerial":null,` +
+			`"replacesComponentKey":"filter","oldPartDisposal":"returned","receiptAttachmentId":null}]`,
+		"refrigerant": `[{"refrigerant":"R32","cylinderId":"C-1","recoveredKg":0.2,"chargedKg":0.3,"leakCheck":"pass",` +
+			`"leakCheckMethod":"soap"}]`,
 	}), 1)
 	if code != 200 || data(m)["version"].(float64) != 2 ||
 		data(m)["items"].([]any)[0].(map[string]any)["id"] != firstFilter["id"] {
@@ -438,7 +449,8 @@ func TestWorkReports(t *testing.T) {
 		6,
 	)
 	write(s, &techInt, "jobs.submit", `{"jobId":"`+job+`","reportVersion":7}`, 6)
-	// another job at the same time: the technician is busy while the assignment is active (DEC-73 checks it after completion)
+	// another job at the same time: the technician is busy while the assignment is active (DEC-73 checks it after
+	// completion)
 	_, m = write(
 		s,
 		&hq,
@@ -574,7 +586,8 @@ func TestWorkReports(t *testing.T) {
 	var notified int
 	ownerScan(
 		t,
-		`SELECT count(*) FROM notify.notifications WHERE recipient_membership_id = $1 AND template_key = 'completion' AND target->>'id' = $2`,
+		`SELECT count(*) FROM notify.notifications WHERE recipient_membership_id = $1 AND template_key = 'completion' AND
+			target->>'id' = $2`,
 		[]any{seed.ID("tech-internal-a"), job},
 		&notified,
 	)
@@ -686,7 +699,8 @@ func TestContractorReview(t *testing.T) {
 
 	owner(
 		t,
-		`UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3), created_at = $2 WHERE job_id = $1 AND status = 'active'`,
+		`UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3), created_at = $2
+			WHERE job_id = $1 AND status = 'active'`,
 		job,
 		clock.Add(-time.Hour),
 		clock.Add(time.Hour),

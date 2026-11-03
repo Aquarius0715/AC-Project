@@ -40,9 +40,12 @@ type ClientUser struct {
 	customerOrg           uuid.UUID
 }
 
-const clientUserCols = `x.id, x.tenant_id, x.version, x.created_at, x.updated_at, x.customer_id, x.membership_id, x.email::text, x.display_name, x.client_role, x.status,
-	(SELECT u.last_sign_in_at FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id WHERE m.id = x.membership_id), x.allowed_channels, x.invited_at,
-	x.invited_by_membership_id, (SELECT m.revoked_at FROM identity.memberships m WHERE m.id = x.membership_id), cu.organization_id`
+const clientUserCols = `x.id, x.tenant_id, x.version, x.created_at, x.updated_at, x.customer_id, x.membership_id, ` +
+	`x.email::text, x.display_name, x.client_role, x.status,
+	(SELECT u.last_sign_in_at FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id WHERE m.id = ` +
+	`x.membership_id), x.allowed_channels, x.invited_at,
+	x.invited_by_membership_id, (SELECT m.revoked_at FROM identity.memberships m WHERE m.id = x.membership_id), ` +
+	`cu.organization_id`
 
 const clientUserFrom = `identity.client_users x JOIN notify.ref_customers cu ON cu.id = x.customer_id`
 
@@ -81,33 +84,36 @@ func ownerOnly(c *ops.Call) error {
 	return nil
 }
 
-// @Summary		clientUsers.list (read)
-// @ID				clientUsers.list
-// @Description	Authorization: client:self-customer:owner | admin:asset.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A17, DD-C19 · Query: filters customerId,status,clientRole,search · sort id,name,email,invitedAt,createdAt,updatedAt (default name asc;id asc)
-// @Tags			clientUsers
-// @Accept			json
-// @Produce		json
-// @Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit		query		integer	false	"page size 1–100, default 25"
-// @Param			sort		query		string	false	"field:direction — fields id,name,email,invitedAt,createdAt,updatedAt; default name asc;id asc"
-// @Param			customerId	query		string	false	"filter → customerId"
-// @Param			status		query		string	false	"filter → status"
-// @Param			clientRole	query		string	false	"filter → clientRole"
-// @Param			search		query		string	false	"filter → email or displayName contains (case-insensitive)"
-// @Success		200			{object}	ops.Envelope{data=ClientUserPage}
-// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/client-users [get]
+// clientUsersList serves clientUsers.list.
+//
+//	@Summary		clientUsers.list (read)
+//	@ID				clientUsers.list
+//	@Description	Authorization: client:self-customer:owner | admin:asset.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A17, DD-C19 · Query: filters customerId,status,clientRole,search · sort \
+//	@Description	id,name,email,invitedAt,createdAt,updatedAt (default name asc;id asc)
+//	@Tags			clientUsers
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit		query		integer	false	"page size 1–100, default 25"
+//	@Param			sort		query		string	false	"field:direction — fields id,name,email,invitedAt,createdAt,updatedAt; default name asc;id asc"
+//	@Param			customerId	query		string	false	"filter → customerId"
+//	@Param			status		query		string	false	"filter → status"
+//	@Param			clientRole	query		string	false	"filter → clientRole"
+//	@Param			search		query		string	false	"filter → email or displayName contains (case-insensitive)"
+//	@Success		200			{object}	ops.Envelope{data=ClientUserPage}
+//	@Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/client-users [get]
 func clientUsersList(
 	ctx context.Context,
 	c *ops.Call,
@@ -192,6 +198,7 @@ func clientUsersList(
 	where := strings.Join(conds, " AND ")
 
 	var total int
+
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM "+clientUserFrom+" WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
@@ -274,6 +281,7 @@ func (in *ClientUserInput) Validate() map[string]string {
 	}
 
 	in.Email = strings.TrimSpace(in.Email)
+
 	a, err := mail.ParseAddress(
 		in.Email,
 	)
@@ -300,7 +308,8 @@ func (in *ClientUserInput) Validate() map[string]string {
 	if in.ID == nil { // a new user is named (IR461)
 		if in.DisplayName == nil {
 			fe["displayName"] = "error.required"
-		} else if *in.DisplayName = strings.TrimSpace(*in.DisplayName); utf8.RuneCountInString(*in.DisplayName) < 1 || utf8.RuneCountInString(*in.DisplayName) > 120 {
+		} else if *in.DisplayName = strings.TrimSpace(*in.DisplayName); utf8.RuneCountInString(*in.DisplayName) < 1 ||
+			utf8.RuneCountInString(*in.DisplayName) > 120 {
 			fe["displayName"] = "error.length"
 		}
 	} else if in.DisplayName != nil {
@@ -325,34 +334,43 @@ func otherActiveOwner(ctx context.Context, c *ops.Call, customer, except uuid.UU
 
 	var ok bool
 
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.client_users WHERE customer_id = $1 AND id <> $2 AND client_role = 'owner' AND status = 'active')`, customer, except).
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.client_users WHERE customer_id = $1 AND id <> $2 AND
+		client_role = 'owner' AND status = 'active')`, customer, except).
 		Scan(&ok)
 
 	return ok, err
 }
 
-// @Summary		clientUsers.save (write)
-// @ID				clientUsers.save
-// @Description	Authorization: client:self-customer:owner | admin:asset.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 email unique per customer and one account per person (errors.email_taken; a person this tenant removed is added again; IR462); at most 30 accounts a contractor or customer owner adds to the organization in 24 hours (RATE_LIMITED errors.too_many_accounts with retryAfterSeconds; HQ not limited; IR464); a new user needs displayName 1–120 and is created at once with a set-up e-mail (IR461); last active owner cannot be demoted or disabled (CONFLICT); an owner never changes the own account (IR417); the e-mail stays (IR422)
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A17, DD-C19
-// @Tags			clientUsers
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		ClientUserInput	true	"input"
-// @Success		200				{object}	ops.Envelope{data=ClientUser}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/client-users [post]
+// clientUsersSave serves clientUsers.save.
+//
+//	@Summary		clientUsers.save (write)
+//	@ID				clientUsers.save
+//	@Description	Authorization: client:self-customer:owner | admin:asset.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR111 email unique per customer and one account per person (errors.email_taken; a person this tenant \
+//	@Description	removed is added again; IR462); at most 30 accounts a contractor or customer owner adds to the \
+//	@Description	organization in 24 hours (RATE_LIMITED errors.too_many_accounts with retryAfterSeconds; HQ not \
+//	@Description	limited; IR464); a new user needs displayName 1–120 and is created at once with a set-up e-mail \
+//	@Description	(IR461); last active owner cannot be demoted or disabled (CONFLICT); an owner never changes the own \
+//	@Description	account (IR417); the e-mail stays (IR422)
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A17, DD-C19
+//	@Tags			clientUsers
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		ClientUserInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=ClientUser}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/client-users [post]
 func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (ClientUser, error) {
 	ownerOnlyErr := ownerOnly(c)
 	if ownerOnlyErr != nil {
@@ -380,7 +398,8 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 		self = *in.ID
 	}
 
-	scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.client_users WHERE customer_id = $1 AND email = $2::citext AND id <> $3)`, in.CustomerID, in.Email, self).
+	scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.client_users WHERE customer_id = $1 AND email =
+		$2::citext AND id <> $3)`, in.CustomerID, in.Email, self).
 		Scan(&dup)
 	if scanErr != nil {
 		return ClientUser{}, scanErr
@@ -390,7 +409,9 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 		return ClientUser{}, apperr.Fields(map[string]string{"email": "errors.email_taken"})
 	}
 
-	if in.ID == nil { // a new user: an owner (or HQ) adds members and owners, whose account is created now and gets the set-up e-mail (IR417, IR461)
+	if in.ID == nil {
+		// a new user: an owner (or HQ) adds members and owners, whose account is created now and gets the set-up e-mail
+		// (IR417, IR461)
 		if in.Status != nil {
 			return ClientUser{}, apperr.Fields(map[string]string{"status": "error.notAllowed"})
 		}
@@ -415,9 +436,11 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 		}
 
 		id := uuid.New()
+
 		_, execErr := c.Tx.Exec(
 			ctx,
-			`INSERT INTO identity.client_users (id, tenant_id, customer_id, membership_id, email, display_name, client_role, status, invited_at, invited_by_membership_id, last_invite_sent_at, created_at, updated_at)
+			`INSERT INTO identity.client_users (id, tenant_id, customer_id, membership_id, email, display_name, client_role,
+				status, invited_at, invited_by_membership_id, last_invite_sent_at, created_at, updated_at)
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, 'invited', $7, $8, $7, $7, $7)`,
 			id,
 			in.CustomerID,
@@ -507,7 +530,8 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`UPDATE identity.client_users SET email = $2, client_role = $3, status = $4, version = version + 1, updated_at = $5 WHERE id = $1`,
+		`UPDATE identity.client_users SET email = $2, client_role = $3, status = $4, version = version + 1, updated_at = $5
+			WHERE id = $1`,
 		x.ID,
 		in.Email,
 		in.ClientRole,
@@ -523,7 +547,8 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 		// an account created this instant (IR461) ends a second after it starts, as the membership's check requires
 		_, err := c.Tx.Exec(
 			ctx,
-			`UPDATE identity.memberships SET client_role = $2, valid_until = CASE WHEN $3 = 'disabled' THEN GREATEST($4::timestamptz, valid_from + interval '1 second') ELSE NULL END,
+			`UPDATE identity.memberships SET client_role = $2, valid_until = CASE WHEN $3 = 'disabled' THEN
+				GREATEST($4::timestamptz, valid_from + interval '1 second') ELSE NULL END,
 			scope_version = scope_version + 1, version = version + 1, updated_at = $4 WHERE id = $1`,
 			*x.MembershipID,
 			in.ClientRole,
@@ -582,30 +607,34 @@ type Deleted struct {
 	Deleted bool      `json:"deleted"`
 }
 
-// @Summary		clientUsers.remove (write)
-// @ID				clientUsers.remove
-// @Description	Authorization: client:self-customer:owner | admin:asset.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 reason 1–1000; last active owner cannot be removed (CONFLICT); an owner never removes the own account (IR417)
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A17, DD-C19
-// @Tags			clientUsers
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string	true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer	true	"all: required (target client_user, read clientUsers.list)"
-// @Param			id					path		string	true	"input field id"
-// @Param			reason				query		string	false	"input field reason"
-// @Success		200					{object}	ops.Envelope{data=Deleted}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/client-users/{id} [delete]
+// clientUsersRemove serves clientUsers.remove.
+//
+//	@Summary		clientUsers.remove (write)
+//	@ID				clientUsers.remove
+//	@Description	Authorization: client:self-customer:owner | admin:asset.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR111 reason 1–1000; last active owner cannot be removed (CONFLICT); an owner never removes the own \
+//	@Description	account (IR417)
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A17, DD-C19
+//	@Tags			clientUsers
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string	true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer	true	"all: required (target client_user, read clientUsers.list)"
+//	@Param			id					path		string	true	"input field id"
+//	@Param			reason				query		string	false	"input field reason"
+//	@Success		200					{object}	ops.Envelope{data=Deleted}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/client-users/{id} [delete]
 func clientUsersRemove(ctx context.Context, c *ops.Call, in *RemoveInput) (Deleted, error) {
 	err := ownerOnly(c)
 	if err != nil {
@@ -649,7 +678,8 @@ func clientUsersRemove(ctx context.Context, c *ops.Call, in *RemoveInput) (Delet
 	if x.MembershipID != nil {
 		_, err := c.Tx.Exec(
 			ctx,
-			`UPDATE identity.memberships SET valid_until = GREATEST($2::timestamptz, valid_from + interval '1 second'), scope_version = scope_version + 1, version = version + 1, updated_at = $2
+			`UPDATE identity.memberships SET valid_until = GREATEST($2::timestamptz, valid_from + interval '1 second'),
+				scope_version = scope_version + 1, version = version + 1, updated_at = $2
 			WHERE id = $1 AND (valid_until IS NULL OR valid_until > $2)`,
 			*x.MembershipID,
 			c.Now,
@@ -708,32 +738,37 @@ type InvitePreview struct {
 	Severity               string            `json:"severity"`
 	OccurredAt             time.Time         `json:"occurredAt"`
 	ReadAt                 *time.Time        `json:"readAt"`
-	TargetOpen             bool              `json:"targetOpen"` // Notification.targetOpen (IR602): the invitee's page opens
+	// Notification.targetOpen (IR602): the invitee's page opens
+	TargetOpen bool `json:"targetOpen"`
 }
 
-// @Summary		clientUsers.resendInvite (write)
-// @ID				clientUsers.resendInvite
-// @Description	Authorization: client:self-customer:owner | admin:asset.write
-// @Description	Validation: D01; input constraints in the corresponding DD; sends the set-up e-mail again (IR461; an invite from before IR461 queues the invitation e-mail; IR418); users not signed in yet only (CONFLICT); at most every 5 minutes per user (RATE_LIMITED retryAfterSeconds; IR423)
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A17, DD-C19
-// @Tags			clientUsers
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			id				path		string		true	"input field id"
-// @Param			request			body		ResendInput	true	"input; the path parameters come from the route"
-// @Success		200				{object}	ops.Envelope{data=InvitePreview}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/client-users/{id}/resend-invite [post]
+// clientUsersResend serves clientUsers.resendInvite.
+//
+//	@Summary		clientUsers.resendInvite (write)
+//	@ID				clientUsers.resendInvite
+//	@Description	Authorization: client:self-customer:owner | admin:asset.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; sends the set-up e-mail again (IR461; an \
+//	@Description	invite from before IR461 queues the invitation e-mail; IR418); users not signed in yet only \
+//	@Description	(CONFLICT); at most every 5 minutes per user (RATE_LIMITED retryAfterSeconds; IR423)
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A17, DD-C19
+//	@Tags			clientUsers
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			id				path		string		true	"input field id"
+//	@Param			request			body		ResendInput	true	"input; the path parameters come from the route"
+//	@Success		200				{object}	ops.Envelope{data=InvitePreview}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/client-users/{id}/resend-invite [post]
 func clientUsersResend(ctx context.Context, c *ops.Call, in *ResendInput) (InvitePreview, error) {
 	err := ownerOnly(c)
 	if err != nil {
@@ -755,6 +790,7 @@ func clientUsersResend(ctx context.Context, c *ops.Call, in *ResendInput) (Invit
 	}
 
 	var user uuid.UUID // the set-up e-mail again (IR461)
+
 	scanErr := c.Tx.QueryRow(ctx, `SELECT user_id FROM identity.memberships WHERE id = $1`, *x.MembershipID).
 		Scan(&user)
 	if scanErr != nil {

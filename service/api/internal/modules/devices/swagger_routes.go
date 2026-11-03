@@ -53,7 +53,8 @@ func swaggerCapabilitiesSaveUpdate() {}
 //	@Summary		firmwareCampaigns.control (write) — abort
 //	@ID				firmwareCampaigns.control.abort
 //	@Description	Authorization: admin:device.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 abort requires reason 1–1000; retry_device only for failed or skipped devices
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR111 abort requires reason 1–1000; retry_device only for failed or skipped devices
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A20 · This route sets action=abort
 //	@Tags			firmwareCampaigns
@@ -81,7 +82,8 @@ func swaggerFirmwareCampaignsControlAbort() {}
 //	@Summary		firmwareCampaigns.control (write) — resume
 //	@ID				firmwareCampaigns.control.resume
 //	@Description	Authorization: admin:device.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 abort requires reason 1–1000; retry_device only for failed or skipped devices
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR111 abort requires reason 1–1000; retry_device only for failed or skipped devices
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A20 · This route sets action=resume
 //	@Tags			firmwareCampaigns
@@ -109,7 +111,8 @@ func swaggerFirmwareCampaignsControlResume() {}
 //	@Summary		firmwareCampaigns.control (write) — retry device
 //	@ID				firmwareCampaigns.control.retry_device
 //	@Description	Authorization: admin:device.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 abort requires reason 1–1000; retry_device only for failed or skipped devices
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR111 abort requires reason 1–1000; retry_device only for failed or skipped devices
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A20 · This route sets action=retry_device
 //	@Tags			firmwareCampaigns

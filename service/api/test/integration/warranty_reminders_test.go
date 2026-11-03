@@ -36,6 +36,7 @@ func TestWarrantyReminders(t *testing.T) {
 		t.Helper()
 
 		tick++
+
 		_, err := schedTick(ctx, s, clock.Add(time.Duration(tick)*time.Minute))
 		if err != nil {
 			t.Fatal(err)
@@ -53,7 +54,8 @@ func TestWarrantyReminders(t *testing.T) {
 		var n int
 		ownerScan(
 			t,
-			`SELECT count(*) FROM assets.warranty_reminders r JOIN assets.units u ON u.id = r.unit_id AND u.warranty_ends_at = r.warranty_ends_at WHERE r.unit_id = $1`,
+			`SELECT count(*) FROM assets.warranty_reminders r JOIN assets.units u ON u.id = r.unit_id AND u.warranty_ends_at =
+				r.warranty_ends_at WHERE r.unit_id = $1`,
 			[]any{u},
 			&n,
 		)
@@ -62,9 +64,11 @@ func TestWarrantyReminders(t *testing.T) {
 		for i := range out {
 			ownerScan(
 				t,
-				`SELECT r.days_before, r.notifications, coalesce(string_agg(DISTINCT n.severity, ','), '') FROM assets.warranty_reminders r
+				`SELECT r.days_before, r.notifications, coalesce(string_agg(DISTINCT n.severity, ','), '') FROM
+					assets.warranty_reminders r
 				JOIN assets.units u ON u.id = r.unit_id AND u.warranty_ends_at = r.warranty_ends_at
-				LEFT JOIN notify.notifications n ON n.target->>'id' = r.unit_id::text AND n.type = 'warranty_expiring' AND n.template_key = 'warranty_expiring' AND n.occurred_at = r.sent_at
+				LEFT JOIN notify.notifications n ON n.target->>'id' = r.unit_id::text AND n.type = 'warranty_expiring' AND
+				n.template_key = 'warranty_expiring' AND n.occurred_at = r.sent_at
 				WHERE r.unit_id = $1 GROUP BY r.days_before, r.notifications ORDER BY r.days_before DESC OFFSET $2 LIMIT 1`,
 				[]any{u, i},
 				&out[i].days,
@@ -102,8 +106,10 @@ func TestWarrantyReminders(t *testing.T) {
 	var admins int
 	ownerScan(
 		t,
-		`SELECT count(*) FROM identity.memberships m WHERE m.role = 'admin' AND m.valid_from <= $1 AND (m.valid_until IS NULL OR m.valid_until > $1)
-		AND EXISTS (SELECT 1 FROM identity.membership_permissions p WHERE p.membership_id = m.id AND p.permission = 'asset.read') AND m.tenant_id = $2`,
+		`SELECT count(*) FROM identity.memberships m WHERE m.role = 'admin' AND m.valid_from <= $1 AND (m.valid_until IS NULL
+			OR m.valid_until > $1)
+		AND EXISTS (SELECT 1 FROM identity.membership_permissions p WHERE p.membership_id = m.id AND p.permission =
+		'asset.read') AND m.tenant_id = $2`,
 		[]any{clock.Add(time.Minute), seed.ID("tenant-a")},
 		&admins,
 	)
@@ -119,7 +125,10 @@ func TestWarrantyReminders(t *testing.T) {
 		t.Fatalf("20 days left: only the 30-day reminder: %+v", r)
 	}
 
-	for name, u := range map[string]string{"100 days": far, "ended": ended, "archived": archived, "covered by a contract": covered} {
+	for name, u := range map[string]string{
+		"100 days": far, "ended": ended, "archived": archived,
+		"covered by a contract": covered,
+	} {
 		if r := sent(u); len(r) != 0 {
 			t.Errorf("%s: %+v", name, r)
 		}
@@ -128,7 +137,8 @@ func TestWarrantyReminders(t *testing.T) {
 	var audits int
 	ownerScan(
 		t,
-		`SELECT count(*) FROM audit.audit_log WHERE action = 'units.remindWarranty' AND target_id = $1 AND reason = '90 days before the warranty ends'`,
+		`SELECT count(*) FROM audit.audit_log WHERE action = 'units.remindWarranty' AND target_id = $1 AND reason =
+			'90 days before the warranty ends'`,
 		[]any{soon},
 		&audits,
 	)

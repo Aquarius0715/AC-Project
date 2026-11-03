@@ -109,7 +109,8 @@ func swaggerSpacesSaveUpdate() {}
 //	@Summary		units.save (write) — update
 //	@ID				units.save.update
 //	@Description	Authorization: admin:asset.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR62 spaceId=null is property root; IR74 no tenantId input
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR62 spaceId=null is property root; IR74 no tenantId input
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A02
 //	@Tags			units

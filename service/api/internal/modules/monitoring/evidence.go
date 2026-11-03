@@ -53,7 +53,8 @@ const maxRemeasurements = 100
 
 // remeasurementSQL selects the valid readings of the alert's unit measured after its detection — measured or recorded
 // on site, never estimated; $3 is the rule's metric, or null for an alert without a rule (any metric).
-const remeasurementSQL = `FROM monitoring.measurements m WHERE m.unit_id = $1 AND m.observed_at > $2 AND m.quality = 'valid'
+const remeasurementSQL = `FROM monitoring.measurements m WHERE m.unit_id = $1 AND m.observed_at > $2 AND m.quality =
+	'valid'
 	AND m.origin IN ('measured', 'inspection') AND m.value IS NOT NULL AND ($3::text IS NULL OR m.metric = $3)`
 
 func ruleMetric(a Alert) *string {
@@ -65,8 +66,8 @@ func ruleMetric(a Alert) *string {
 }
 
 // candidates lists an alert's evidence candidates (IR327, DD-A05 item 6): its own evidence at detection, the unit's
-// valid measured or inspection remeasurements after detection (of the rule's metric when it has one) and the recovery events of the unit's
-// device linked to the alert, the newest first.
+// valid measured or inspection remeasurements after detection (of the rule's metric when it has one) and the recovery
+// events of the unit's device linked to the alert, the newest first.
 func (m Alerts) candidates(ctx context.Context, c *ops.Call, a Alert) ([]EvidenceCandidate, error) {
 	out := []EvidenceCandidate{}
 	for _, id := range a.EvidenceIDs {
@@ -105,6 +106,7 @@ func (m Alerts) candidates(ctx context.Context, c *ops.Call, a Alert) ([]Evidenc
 			x                             EvidenceCandidate
 			metric, unit, origin, quality string
 		)
+
 		err := rows.Scan(
 			&x.ID,
 			&x.ObservedAt,
@@ -169,7 +171,10 @@ func (m Alerts) isCandidate(ctx context.Context, c *ops.Call, a Alert, id uuid.U
 	}
 
 	var ok bool
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 `+remeasurementSQL+` AND m.event_id = $4)`, a.UnitID, a.DetectedAt, ruleMetric(a), id).
+
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1
+		`+remeasurementSQL+` AND m.event_id =
+		$4)`, a.UnitID, a.DetectedAt, ruleMetric(a), id).
 		Scan(&ok)
 	if err != nil ||
 		ok {
@@ -245,30 +250,32 @@ func (in *EvidenceInput) Validate() map[string]string {
 	return nil
 }
 
-// @Summary		alerts.evidence (read)
-// @ID				alerts.evidence
-// @Description	Authorization: technician:alert.resolve:assigned | admin:alert.resolve
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A05, DD-T07 · Query: filters none · sort id,observedAt (default observedAt desc;id asc)
-// @Tags			alerts
-// @Accept			json
-// @Produce		json
-// @Param			alertId	path		string	true	"input field alertId"
-// @Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit	query		integer	false	"page size 1–100, default 25"
-// @Param			sort	query		string	false	"field:direction — fields id,observedAt; default observedAt desc;id asc"
-// @Success		200		{object}	ops.Envelope{data=EvidenceCandidatePage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/alerts/{alertId}/evidence [get]
+// evidence serves alerts.evidence.
+//
+//	@Summary		alerts.evidence (read)
+//	@ID				alerts.evidence
+//	@Description	Authorization: technician:alert.resolve:assigned | admin:alert.resolve
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A05, DD-T07 · Query: filters none · sort id,observedAt (default observedAt desc;id asc)
+//	@Tags			alerts
+//	@Accept			json
+//	@Produce		json
+//	@Param			alertId	path		string	true	"input field alertId"
+//	@Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit	query		integer	false	"page size 1–100, default 25"
+//	@Param			sort	query		string	false	"field:direction — fields id,observedAt; default observedAt desc;id asc"
+//	@Success		200		{object}	ops.Envelope{data=EvidenceCandidatePage}
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/alerts/{alertId}/evidence [get]
 func (m Alerts) evidence(
 	ctx context.Context,
 	c *ops.Call,

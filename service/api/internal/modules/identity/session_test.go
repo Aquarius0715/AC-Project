@@ -33,6 +33,7 @@ func TestSessionGet(t *testing.T) {
 	e := echo.New()
 
 	e.HTTPErrorHandler = ops.HTTPErrorHandler
+
 	err := r.MountREST(e.Group("/v1"))
 	if err != nil {
 		t.Fatal(err)
@@ -60,6 +61,7 @@ func TestSessionGet(t *testing.T) {
 	e.ServeHTTP(w, req)
 
 	var res struct{ Data Session }
+
 	err = json.Unmarshal(w.Body.Bytes(), &res)
 	if err != nil || w.Code != 200 {
 		t.Fatalf("%d %s", w.Code, w.Body.String())

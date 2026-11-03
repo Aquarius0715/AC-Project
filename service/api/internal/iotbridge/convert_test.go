@@ -261,8 +261,8 @@ func TestToScenarioKeepsTheMinuteSlot(t *testing.T) {
 	}
 }
 
-// TestLinksFollowTheFixture: the links are the fixture contract's devices (demoSeed.devices), each with its unit and its
-// connection there, so the simulator runs every fixture module and plays the connection the seed gives it (IR613).
+// TestLinksFollowTheFixture: the links are the fixture contract's devices (demoSeed.devices), each with its unit and
+// its connection there, so the simulator runs every fixture module and plays the connection the seed gives it (IR613).
 func TestLinksFollowTheFixture(t *testing.T) {
 	f, err := seed.Load("../../../../docs/04-agentic-sdlc/fixture-contract.json")
 	if err != nil {

@@ -306,7 +306,9 @@ func (in *SummaryInput) Validate() map[string]string {
 func summary(ctx context.Context, c *ops.Call, in *SummaryInput) (Summary, error) {
 	if c.Principal.Role == "client" {
 		var mine int
-		err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND customer_org_id = $2`, in.UnitIDs, c.Principal.OrgID).
+
+		err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND customer_org_id =
+			$2`, in.UnitIDs, c.Principal.OrgID).
 			Scan(&mine)
 		if err != nil {
 			return Summary{}, err
@@ -318,6 +320,7 @@ func summary(ctx context.Context, c *ops.Call, in *SummaryInput) (Summary, error
 	}
 
 	var known int
+
 	err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND NOT archived`, in.UnitIDs).
 		Scan(&known)
 	if err != nil {
@@ -419,7 +422,8 @@ func ForecastFor(
 
 	rows, err := c.Tx.Query(
 		ctx,
-		`SELECT id FROM energy.baselines WHERE is_current AND method = 'demo_fixed' AND boundary_id = $1 AND baseline_kwh IS NOT NULL
+		`SELECT id FROM energy.baselines WHERE is_current AND method = 'demo_fixed' AND boundary_id = $1 AND baseline_kwh IS
+			NOT NULL
 		ORDER BY (SELECT min(created_at) FROM energy.baselines o WHERE o.id = baselines.id) DESC, id ASC`,
 		Boundary,
 	)
@@ -431,6 +435,7 @@ func ForecastFor(
 
 	for rows.Next() {
 		var id uuid.UUID
+
 		err := rows.Scan(&id)
 		if err != nil {
 			rows.Close()
@@ -473,7 +478,8 @@ func ForecastFor(
 		if minutes > 0 {
 			predBase = new(
 				big.Rat,
-			).Mul(new(big.Rat).Quo(new(big.Rat).SetFloat64(*chosen.BaselineKWh), big.NewRat(int64(len(units))*minutes, 1)), big.NewRat(int64(n.ExpectedSlots), 1))
+			).Mul(new(big.Rat).Quo(new(big.Rat).SetFloat64(*chosen.BaselineKWh), big.NewRat(int64(len(units))*minutes, 1)),
+				big.NewRat(int64(n.ExpectedSlots), 1))
 		}
 	}
 

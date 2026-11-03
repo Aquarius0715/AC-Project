@@ -21,7 +21,8 @@ func TestCommandCreateValidation(t *testing.T) {
 	)
 	owner(
 		t,
-		`UPDATE restrictions.restrictions SET state = 'cancelled' WHERE id IN (SELECT restriction_id FROM restrictions.restriction_units WHERE unit_id = $1)`,
+		`UPDATE restrictions.restrictions SET state = 'cancelled' WHERE id IN (SELECT restriction_id FROM
+			restrictions.restriction_units WHERE unit_id = $1)`,
 		unit,
 	)
 	_, m := post(s, &customerA, "units.get", `{"id":"`+unit+`"}`)
@@ -31,9 +32,13 @@ func TestCommandCreateValidation(t *testing.T) {
 		actor       *actor
 		body, field string
 	}{
-		"unit missing":    {&customerA, `{"action":{"kind":"set_power","power":true},"expectedUnitVersion":` + itoa(v) + `}`, "unitId"},
-		"version missing": {&customerA, `{"unitId":"` + unit + `","action":{"kind":"set_power","power":true}}`, "expectedUnitVersion"},
-		"reason too long": {&techInt, `{"unitId":"` + unit + `","jobId":"` + uuid.NewString() + `","action":{"kind":"set_power","power":true},"reason":"` + strings.Repeat("r", 1001) + `","expectedUnitVersion":` + itoa(v) + `}`, "reason"},
+		"unit missing": {&customerA, `{"action":{"kind":"set_power","power":true},` +
+			`"expectedUnitVersion":` + itoa(v) + `}`, "unitId"},
+		"version missing": {&customerA, `{"unitId":"` + unit + `","action":{"kind":"set_power",` +
+			`"power":true}}`, "expectedUnitVersion"},
+		"reason too long": {&techInt, `{"unitId":"` + unit + `","jobId":"` + uuid.NewString() +
+			`","action":{"kind":"set_power","power":true},"reason":"` + strings.Repeat("r", 1001) + `","expectedUnitVersion":` +
+			itoa(v) + `}`, "reason"},
 	} {
 		if code, m := write(
 			s,
@@ -70,7 +75,8 @@ func TestCommandCreateValidation(t *testing.T) {
 		s,
 		&techInt,
 		"commands.create",
-		`{"unitId":"`+jobUnit+`","jobId":"`+uuid.NewString()+`","action":{"kind":"set_power","power":true},"reason":"check","expectedUnitVersion":`+itoa(
+		`{"unitId":"`+jobUnit+`","jobId":"`+uuid.NewString()+`","action":{"kind":"set_power","power":true},`+
+			`"reason":"check","expectedUnitVersion":`+itoa(
 			ver(m),
 		)+`}`,
 		0,
@@ -114,13 +120,20 @@ func TestRestrictionInputValidation(t *testing.T) {
 
 	nilID, dup := uuid.Nil.String(), uuid.NewString()
 	for name, c := range map[string]struct{ op, body, field string }{
-		"release without id":   {"restrictions.release", `{"restrictionId":"` + nilID + `"}`, "restrictionId"},
-		"override without id":  {"restrictions.override", `{"restrictionId":"` + nilID + `","reason":"hardship"}`, "restrictionId"},
-		"defer without until":  {"restrictions.defer", `{"restrictionId":"` + nilID + `","reason":"plan"}`, "until"},
-		"reconcile duplicates": {"restrictions.reconcile", `{"restrictionId":"` + nilID + `","unitIds":["` + dup + `","` + dup + `"]}`, "unitIds"},
-		"retry bad phase":      {"restrictions.retry", `{"restrictionId":"` + dup + `","unitIds":["` + dup + `"],"phase":"again","confirmedRulesVersion":"rules-1"}`, "phase"},
-		"retry blank rules":    {"restrictions.retry", `{"restrictionId":"` + dup + `","unitIds":["` + dup + `","` + dup + `"],"phase":"apply","confirmedRulesVersion":"  "}`, "confirmedRulesVersion"},
-		"retry without id":     {"restrictions.retry", `{"restrictionId":"` + nilID + `","unitIds":[],"phase":"release","confirmedRulesVersion":"rules-1"}`, "restrictionId"},
+		"release without id": {"restrictions.release", `{"restrictionId":"` + nilID + `"}`, "restrictionId"},
+		"override without id": {
+			"restrictions.override", `{"restrictionId":"` + nilID + `","reason":"hardship"}`,
+			"restrictionId",
+		},
+		"defer without until": {"restrictions.defer", `{"restrictionId":"` + nilID + `","reason":"plan"}`, "until"},
+		"reconcile duplicates": {"restrictions.reconcile", `{"restrictionId":"` + nilID + `","unitIds":["` + dup + `","` +
+			dup + `"]}`, "unitIds"},
+		"retry bad phase": {"restrictions.retry", `{"restrictionId":"` + dup + `","unitIds":["` + dup +
+			`"],"phase":"again","confirmedRulesVersion":"rules-1"}`, "phase"},
+		"retry blank rules": {"restrictions.retry", `{"restrictionId":"` + dup + `","unitIds":["` + dup + `","` + dup +
+			`"],"phase":"apply","confirmedRulesVersion":"  "}`, "confirmedRulesVersion"},
+		"retry without id": {"restrictions.retry", `{"restrictionId":"` + nilID + `","unitIds":[],"phase":"release",` +
+			`"confirmedRulesVersion":"rules-1"}`, "restrictionId"},
 	} {
 		if code, m := write(
 			s,

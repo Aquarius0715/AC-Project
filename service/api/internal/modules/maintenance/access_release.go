@@ -141,7 +141,8 @@ var (
 func releaseAssignment(ctx context.Context, c *ops.Call, e released, why releaseCause) error {
 	_, err := c.Tx.Exec(
 		ctx,
-		`UPDATE maintenance.assignments SET status = 'revoked', reason = $3, version = version + 1, updated_at = $2 WHERE id = $1`,
+		`UPDATE maintenance.assignments SET status = 'revoked', reason = $3, version = version + 1, updated_at = $2 WHERE id =
+			$1`,
 		e.assignment,
 		c.Now,
 		why.reason,
@@ -157,7 +158,8 @@ func releaseAssignment(ctx context.Context, c *ops.Call, e released, why release
 
 	_, err = c.Tx.Exec(
 		ctx,
-		`UPDATE maintenance.jobs SET status = $2, assignment_id = NULL, scheduled_slot = NULL, version = version + 1, updated_at = $3 WHERE id = $1`,
+		`UPDATE maintenance.jobs SET status = $2, assignment_id = NULL, scheduled_slot = NULL, version = version + 1,
+			updated_at = $3 WHERE id = $1`,
 		e.job,
 		status,
 		c.Now,

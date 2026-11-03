@@ -84,7 +84,8 @@ func TestJobsCreate(t *testing.T) {
 	t.Cleanup(func() {
 		owner(
 			t,
-			`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES ($1, $2, 'job.write') ON CONFLICT DO NOTHING`,
+			`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES ($1, $2, 'job.write') ON
+				CONFLICT DO NOTHING`,
 			seed.ID("tenant-a"),
 			seed.ID("hq-restriction-manager"),
 		)
@@ -276,22 +277,34 @@ func TestJobsReadAndTransitions(t *testing.T) {
 	}
 
 	for body, n := range map[string]int{
-		`{"filters":{"unitId":"` + unit + `","severity":"warning"}}`:                                                                                                      1,
-		`{"filters":{"unitId":"` + unit + `","severity":"critical"}}`:                                                                                                     0,
-		`{"filters":{"unitIds":["` + unit + `"],"statuses":["requested","offered"]}}`:                                                                                     1,
-		`{"filters":{"unitId":"` + unit + `","status":"assigned"}}`:                                                                                                       0,
-		`{"filters":{"unitId":"` + unit + `","origin":"client_request","proposalPending":false}}`:                                                                         1,
-		`{"filters":{"unitId":"` + unit + `","proposalPending":true}}`:                                                                                                    0,
-		`{"filters":{"unitId":"` + unit + `","overdueOnly":true}}`:                                                                                                        0,
-		`{"filters":{"unitId":"` + unit + `","type":"reactive"}}`:                                                                                                         1, // IR290
-		`{"filters":{"unitId":"` + unit + `","type":"periodic"}}`:                                                                                                         0,
-		`{"filters":{"unitId":"` + unit + `","customerId":"` + seed.ID("cust-b").String() + `"}}`:                                                                         1,
-		`{"filters":{"unitId":"` + unit + `","propertyId":"` + seed.ID("property-home-b").String() + `"}}`:                                                                1,
-		`{"filters":{"unitId":"` + unit + `","organizationId":"` + seed.ID("org-operator-a").String() + `"}}`:                                                             1,
-		`{"filters":{"unitId":"` + unit + `","organizationId":"` + seed.ID("org-contractor-a").String() + `"}}`:                                                           0,
-		`{"filters":{"unitId":"` + unit + `","membershipId":"` + seed.ID("tech-internal-a").String() + `"}}`:                                                              0,
-		`{"filters":{"unitId":"` + unit + `","from":"` + clock.Add(24*time.Hour).Format(time.RFC3339) + `","to":"` + clock.Add(26*time.Hour).Format(time.RFC3339) + `"}}`: 1,
-		`{"filters":{"unitId":"` + unit + `","from":"` + clock.Add(26*time.Hour).Format(time.RFC3339) + `"}}`:                                                             0,
+		`{"filters":{"unitId":"` + unit + `","severity":"warning"}}`:  1,
+		`{"filters":{"unitId":"` + unit + `","severity":"critical"}}`: 0,
+		`{"filters":{"unitIds":["` + unit + `"],"statuses":["requested",` +
+			`"offered"]}}`: 1,
+		`{"filters":{"unitId":"` + unit + `","status":"assigned"}}`: 0,
+		`{"filters":{"unitId":"` + unit + `","origin":"client_request",` +
+			`"proposalPending":false}}`: 1,
+		`{"filters":{"unitId":"` + unit + `","proposalPending":true}}`: 0,
+		`{"filters":{"unitId":"` + unit + `","overdueOnly":true}}`:     0,
+		// IR290
+		`{"filters":{"unitId":"` + unit +
+			`","type":"reactive"}}`: 1,
+		`{"filters":{"unitId":"` + unit +
+			`","type":"periodic"}}`: 0,
+		`{"filters":{"unitId":"` + unit + `","customerId":"` + seed.ID("cust-b").String() +
+			`"}}`: 1,
+		`{"filters":{"unitId":"` + unit + `","propertyId":"` + seed.ID("property-home-b").String() +
+			`"}}`: 1,
+		`{"filters":{"unitId":"` + unit + `","organizationId":"` + seed.ID("org-operator-a").String() +
+			`"}}`: 1,
+		`{"filters":{"unitId":"` + unit + `","organizationId":"` + seed.ID("org-contractor-a").String() +
+			`"}}`: 0,
+		`{"filters":{"unitId":"` + unit + `","membershipId":"` + seed.ID("tech-internal-a").String() +
+			`"}}`: 0,
+		`{"filters":{"unitId":"` + unit + `","from":"` + clock.Add(24*time.Hour).Format(time.RFC3339) + `","to":"` +
+			clock.Add(26*time.Hour).Format(time.RFC3339) + `"}}`: 1,
+		`{"filters":{"unitId":"` + unit + `","from":"` + clock.Add(26*time.Hour).Format(time.RFC3339) +
+			`"}}`: 0,
 	} {
 		if code, m := post(s, &hq, "jobs.list", body); code != 200 || len(items(m)) != n {
 			t.Errorf("%s: %d want %d", body, len(items(m)), n)
@@ -312,9 +325,13 @@ func TestJobsReadAndTransitions(t *testing.T) {
 	}
 
 	for _, b := range []string{
-		`{"filters":{"status":"requested","statuses":["requested"]}}`, `{"filters":{"statuses":[]}}`, `{"filters":{"status":"done"}}`,
-		`{"filters":{"statuses":["done"]}}`, `{"filters":{"severity":"info"}}`, `{"filters":{"origin":"phone"}}`, `{"filters":{"type":"repair"}}`, `{"filters":{"x":1}}`,
-		`{"filters":{"from":"2026-09-15T00:00:00Z","to":"2026-09-14T00:00:00Z"}}`, `{"sort":{"field":"unitId","direction":"asc"}}`,
+		`{"filters":{"status":"requested",` +
+			`"statuses":["requested"]}}`, `{"filters":{"statuses":[]}}`, `{"filters":{"status":"done"}}`,
+		`{"filters":{"statuses":["done"]}}`, `{"filters":{"severity":"info"}}`, `{"filters":{"origin":"phone"}}`,
+		`{"filters":{"type":"repair"}}`, `{"filters":{"x":1}}`,
+		`{"filters":{"from":"2026-09-15T00:00:00Z",` +
+			`"to":"2026-09-14T00:00:00Z"}}`, `{"sort":{"field":"unitId",` +
+			`"direction":"asc"}}`,
 	} {
 		code, m := post(s, &hq, "jobs.list", b)
 		refusal(t, b, code, m, want[b])
@@ -457,7 +474,8 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		s,
 		&hq,
 		"jobs.events",
-		`{"jobId":"`+job+`","query":{"sort":{"field":"occurredAt","direction":"desc"},"filters":{"from":"`+clock.Add(-time.Hour).
+		`{"jobId":"`+job+`","query":{"sort":{"field":"occurredAt","direction":"desc"},`+
+			`"filters":{"from":"`+clock.Add(-time.Hour).
 			Format(time.RFC3339)+
 			`","to":"`+clock.Add(time.Hour).
 			Format(time.RFC3339)+
@@ -468,8 +486,9 @@ func TestJobsReadAndTransitions(t *testing.T) {
 	}
 
 	for b, want := range map[string]string{
-		`{"jobId":"` + job + `","query":{"filters":{"x":1}}}`:                                                     "x=error.notAllowed",
-		`{"jobId":"` + job + `","query":{"filters":{"from":"2026-09-15T00:00:00Z","to":"2026-09-14T00:00:00Z"}}}`: "query.filters.to=error.range",
+		`{"jobId":"` + job + `","query":{"filters":{"x":1}}}`: "x=error.notAllowed",
+		`{"jobId":"` + job + `","query":{"filters":{"from":"2026-09-15T00:00:00Z",` +
+			`"to":"2026-09-14T00:00:00Z"}}}`: "query.filters.to=error.range",
 		`{"query":{}}`: "jobId=error.invalid",
 	} {
 		code, m := post(s, &hq, "jobs.events", b)
@@ -650,7 +669,8 @@ func TestJobsReadAndTransitions(t *testing.T) {
 	owner(t, `UPDATE maintenance.jobs SET status = 'offered' WHERE id = $1`, j3)
 	owner(
 		t,
-		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at, offer_expires_at, access_valid_from, access_valid_until)
+		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at,
+			offer_expires_at, access_valid_from, access_valid_until)
 		VALUES ($1,$2,$3,'t1',tstzrange($4,$5),$4,$5,$4,$5)`,
 		seed.ID("tenant-a"),
 		j3,

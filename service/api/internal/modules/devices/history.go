@@ -76,7 +76,8 @@ func (m *Module) historyAccess(
 
 	var unit *uuid.UUID
 
-	err := c.Tx.QueryRow(ctx, "SELECT d.unit_id FROM devices.devices d WHERE d.id = $1 AND "+deviceScope(c, &args, unitscope.List), args...).
+	err := c.Tx.QueryRow(ctx, "SELECT d.unit_id FROM devices.devices d WHERE d.id = $1 AND "+
+		deviceScope(c, &args, unitscope.List), args...).
 		Scan(&unit)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", nil, apperr.E(apperr.NotFound, "error.notFound")
@@ -171,6 +172,7 @@ func historyPageOf[T any](
 	}
 
 	var total int
+
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) "+from+" WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
@@ -225,30 +227,34 @@ func orderFor(q paging.Query, prefix string) (string, error) {
 	)
 }
 
-// @Summary		devices.operations (read)
-// @ID				devices.operations
-// @Description	Authorization: technician:device.maintain:assigned-valid-job | admin:device.read; SR24 current-device AND occurrence-scope
-// @Description	Validation: D01; SR08/SR09
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-T11, DD-A04 · Query: filters none · sort id,createdAt,updatedAt (default createdAt desc;id asc)
-// @Tags			devices
-// @Accept			json
-// @Produce		json
-// @Param			deviceId	path		string	true	"input field deviceId"
-// @Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit		query		integer	false	"page size 1–100, default 25"
-// @Param			sort		query		string	false	"field:direction — fields id,createdAt,updatedAt; default createdAt desc;id asc"
-// @Success		200			{object}	ops.Envelope{data=DeviceOperationPage}
-// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/devices/{deviceId}/operations [get]
+// operations serves devices.operations.
+//
+//	@Summary		devices.operations (read)
+//	@ID				devices.operations
+//	@Description	Authorization: technician:device.maintain:assigned-valid-job | admin:device.read; SR24 \
+//	@Description	current-device AND occurrence-scope
+//	@Description	Validation: D01; SR08/SR09
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-T11, DD-A04 · Query: filters none · sort id,createdAt,updatedAt (default createdAt \
+//	@Description	desc;id asc)
+//	@Tags			devices
+//	@Accept			json
+//	@Produce		json
+//	@Param			deviceId	path		string	true	"input field deviceId"
+//	@Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit		query		integer	false	"page size 1–100, default 25"
+//	@Param			sort		query		string	false	"field:direction — fields id,createdAt,updatedAt; default createdAt desc;id asc"
+//	@Success		200			{object}	ops.Envelope{data=DeviceOperationPage}
+//	@Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/devices/{deviceId}/operations [get]
 func (m *Module) operations(
 	ctx context.Context,
 	c *ops.Call,
@@ -264,7 +270,8 @@ func (m *Module) operations(
 		return paging.Page[DeviceOperation]{}, err
 	}
 
-	from := ` FROM devices.device_operations o LEFT JOIN devices.device_bindings b ON b.device_id = o.device_id AND b.bound_at <= o.created_at
+	from := ` FROM devices.device_operations o LEFT JOIN devices.device_bindings b ON b.device_id = o.device_id AND
+		b.bound_at <= o.created_at
 		AND (b.unbound_at IS NULL OR b.unbound_at > o.created_at)`
 
 	return historyPage(
@@ -280,30 +287,34 @@ func (m *Module) operations(
 	)
 }
 
-// @Summary		devices.calibrations (read)
-// @ID				devices.calibrations
-// @Description	Authorization: technician:device.maintain:assigned-valid-job | admin:device.read; SR24 current-device AND occurrence-scope
-// @Description	Validation: D01; SR08/SR09
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-T11, DD-A04 · Query: filters none · sort id,createdAt,updatedAt (default createdAt desc;id asc)
-// @Tags			devices
-// @Accept			json
-// @Produce		json
-// @Param			deviceId	path		string	true	"input field deviceId"
-// @Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit		query		integer	false	"page size 1–100, default 25"
-// @Param			sort		query		string	false	"field:direction — fields id,createdAt,updatedAt; default createdAt desc;id asc"
-// @Success		200			{object}	ops.Envelope{data=CalibrationRecordPage}
-// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/devices/{deviceId}/calibrations [get]
+// calibrations serves devices.calibrations.
+//
+//	@Summary		devices.calibrations (read)
+//	@ID				devices.calibrations
+//	@Description	Authorization: technician:device.maintain:assigned-valid-job | admin:device.read; SR24 \
+//	@Description	current-device AND occurrence-scope
+//	@Description	Validation: D01; SR08/SR09
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-T11, DD-A04 · Query: filters none · sort id,createdAt,updatedAt (default createdAt \
+//	@Description	desc;id asc)
+//	@Tags			devices
+//	@Accept			json
+//	@Produce		json
+//	@Param			deviceId	path		string	true	"input field deviceId"
+//	@Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit		query		integer	false	"page size 1–100, default 25"
+//	@Param			sort		query		string	false	"field:direction — fields id,createdAt,updatedAt; default createdAt desc;id asc"
+//	@Success		200			{object}	ops.Envelope{data=CalibrationRecordPage}
+//	@Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/devices/{deviceId}/calibrations [get]
 func (m *Module) calibrations(
 	ctx context.Context,
 	c *ops.Call,
@@ -361,10 +372,12 @@ type DeviceEvent struct {
 	ResponseNotes             []ResponseNote `json:"responseNotes"`
 }
 
-const evCols = `e.id, e.tenant_id, e.version, e.created_at, e.created_at, b.id, e.unit_id, b.customer_org_id, e.alert_ids, e.device_id, e.event_type, e.recovery,
+const evCols = `e.id, e.tenant_id, e.version, e.created_at, e.created_at, b.id, e.unit_id, b.customer_org_id, ` +
+	`e.alert_ids, e.device_id, e.event_type, e.recovery,
 	e.evidence_source, e.sequence, e.occurred_at, e.restored_at`
 
-const evFrom = ` FROM devices.device_events e LEFT JOIN devices.device_bindings b ON b.device_id = e.device_id AND b.bound_at <= e.occurred_at
+const evFrom = ` FROM devices.device_events e LEFT JOIN devices.device_bindings b ON b.device_id = e.device_id AND
+	b.bound_at <= e.occurred_at
 	AND (b.unbound_at IS NULL OR b.unbound_at > e.occurred_at)`
 
 func (m *Module) scanEvent(ctx context.Context, c *ops.Call) func(pgx.Row) (DeviceEvent, error) {
@@ -416,7 +429,8 @@ func (m *Module) withNotes(ctx context.Context, c *ops.Call, evs []DeviceEvent) 
 
 	rows, err := c.Tx.Query(
 		ctx,
-		`SELECT event_id, actor_id, message, created_at FROM devices.device_event_notes WHERE event_id = ANY($1) ORDER BY event_id, created_at, id`,
+		`SELECT event_id, actor_id, message, created_at FROM devices.device_event_notes WHERE event_id = ANY($1) ORDER BY
+			event_id, created_at, id`,
 		ids,
 	)
 	if err != nil {
@@ -428,6 +442,7 @@ func (m *Module) withNotes(ctx context.Context, c *ops.Call, evs []DeviceEvent) 
 			event uuid.UUID
 			n     ResponseNote
 		)
+
 		err := rows.Scan(&event, &n.ActorID, &n.Message, &n.At)
 		if err != nil {
 			rows.Close()
@@ -445,32 +460,36 @@ func (m *Module) withNotes(ctx context.Context, c *ops.Call, evs []DeviceEvent) 
 	return rows.Err()
 }
 
-// @Summary		devices.events (read)
-// @ID				devices.events
-// @Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:device.read | admin:audit.read; SR24 current-device AND occurrence-scope
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A04, DD-A16, DD-T12, DD-T03 · Query: filters from,to · sort id,createdAt,updatedAt (default occurredAt desc;sequence desc;id asc)
-// @Tags			devices
-// @Accept			json
-// @Produce		json
-// @Param			id		path		string	true	"input field id"
-// @Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit	query		integer	false	"page size 1–100, default 25"
-// @Param			sort	query		string	false	"field:direction — fields id,createdAt,updatedAt; default occurredAt desc;sequence desc;id asc"
-// @Param			from	query		string	false	"filter → [from,to) on occurredAt"
-// @Param			to		query		string	false	"filter → [from,to) on occurredAt"
-// @Success		200		{object}	ops.Envelope{data=DeviceEventPage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/devices/{id}/events [get]
+// events serves devices.events.
+//
+//	@Summary		devices.events (read)
+//	@ID				devices.events
+//	@Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | \
+//	@Description	admin:device.read | admin:audit.read; SR24 current-device AND occurrence-scope
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A04, DD-A16, DD-T12, DD-T03 · Query: filters from,to · sort id,createdAt,updatedAt \
+//	@Description	(default occurredAt desc;sequence desc;id asc)
+//	@Tags			devices
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		string	true	"input field id"
+//	@Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit	query		integer	false	"page size 1–100, default 25"
+//	@Param			sort	query		string	false	"field:direction — fields id,createdAt,updatedAt; default occurredAt desc;sequence desc;id asc"
+//	@Param			from	query		string	false	"filter → [from,to) on occurredAt"
+//	@Param			to		query		string	false	"filter → [from,to) on occurredAt"
+//	@Success		200		{object}	ops.Envelope{data=DeviceEventPage}
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/devices/{id}/events [get]
 func (m *Module) events(
 	ctx context.Context,
 	c *ops.Call,
@@ -556,7 +575,8 @@ func (in *NoteInput) Validate() map[string]string {
 //	@Summary		devices.addResponseNote (write)
 //	@ID				devices.addResponseNote
 //	@Description	Authorization: technician:device.maintain:assigned-valid-job | admin:device.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed)
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR94 technician write table (assignment and work window, jobId required when typed)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-T12
 //	@Tags			devices
@@ -590,7 +610,8 @@ func (m *Module) addResponseNote(
 
 	var v int
 
-	err = c.Tx.QueryRow(ctx, "SELECT e.version "+evFrom+" WHERE e.id = $3 AND e.device_id = $1 AND "+scope+" FOR UPDATE OF e",
+	err = c.Tx.QueryRow(ctx, "SELECT e.version "+evFrom+" WHERE e.id = $3 AND e.device_id = $1 AND "+scope+
+		" FOR UPDATE OF e",
 		append(append([]any{in.DeviceID}, sargs...), in.EventID)...).
 		Scan(&v)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -610,7 +631,8 @@ func (m *Module) addResponseNote(
 
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`INSERT INTO devices.device_event_notes (tenant_id, event_id, actor_id, message) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3)`,
+		`INSERT INTO devices.device_event_notes (tenant_id, event_id, actor_id, message) VALUES
+			(current_setting('app.tenant_id')::uuid, $1, $2, $3)`,
 		in.EventID,
 		c.Principal.UserID,
 		in.ResponseNote,
@@ -619,7 +641,8 @@ func (m *Module) addResponseNote(
 		return DeviceEvent{}, execErr
 	}
 
-	scanErr := c.Tx.QueryRow(ctx, `UPDATE devices.device_events SET version = version + 1 WHERE id = $1 RETURNING version`, in.EventID).
+	scanErr := c.Tx.QueryRow(ctx, `UPDATE devices.device_events SET version = version + 1 WHERE id = $1 RETURNING
+		version`, in.EventID).
 		Scan(&v)
 	if scanErr != nil {
 		return DeviceEvent{}, scanErr

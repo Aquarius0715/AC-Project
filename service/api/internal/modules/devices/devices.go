@@ -74,7 +74,8 @@ type DeviceDetail struct {
 	ActiveOperation json.RawMessage `json:"activeOperation" swaggertype:"object"`
 }
 
-const devCols = `d.id, d.tenant_id, d.version, d.created_at, d.updated_at, d.binding_id, d.unit_id, d.target_unit_id, d.created_by_membership_id,
+const devCols = `d.id, d.tenant_id, d.version, d.created_at, d.updated_at, d.binding_id, d.unit_id, d.target_unit_id,` +
+	` d.created_by_membership_id,
 	d.serial, d.connection, d.last_seen_at, d.firmware_version, d.power_signal, d.tamper`
 
 // Module is the device register.
@@ -100,7 +101,8 @@ func deviceScope(c *ops.Call, args *[]any, mode unitscope.Mode) string {
 	case "admin":
 		return "TRUE"
 	case "client":
-		return "EXISTS (SELECT 1 FROM devices.device_bindings b WHERE b.device_id = d.id AND b.unbound_at IS NULL AND b.customer_org_id = " + add(
+		return "EXISTS (SELECT 1 FROM devices.device_bindings b WHERE b.device_id = d.id AND b.unbound_at IS NULL AND " +
+			"b.customer_org_id = " + add(
 			p.OrgID,
 		) + ")"
 	}
@@ -124,6 +126,7 @@ func (m *Module) load(
 	limit, offset int,
 ) ([]Device, int, error) {
 	var total int
+
 	err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM devices.devices d WHERE "+where, args...).
 		Scan(&total)
 	if err != nil {
@@ -149,6 +152,7 @@ func (m *Module) load(
 
 	for rows.Next() {
 		var d Device
+
 		err := rows.Scan(
 			&d.ID,
 			&d.TenantID,
@@ -204,6 +208,7 @@ func (m *Module) load(
 
 	for srows.Next() {
 		var s Sensor
+
 		err := srows.Scan(
 			&s.BoundaryID,
 			&s.ID,
@@ -234,31 +239,35 @@ func (m *Module) load(
 	return out, total, nil
 }
 
-// @Summary		devices.list (read)
-// @ID				devices.list
-// @Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:device.read | admin:audit.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A04, DD-T02, DD-T11, DD-A16, DD-A20, DD-T12 · Query: filters unitId,status · sort id,createdAt,updatedAt (default id asc)
-// @Tags			devices
-// @Accept			json
-// @Produce		json
-// @Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit	query		integer	false	"page size 1–100, default 25"
-// @Param			sort	query		string	false	"field:direction — fields id,createdAt,updatedAt; default id asc"
-// @Param			unitId	query		string	false	"filter → unitId"
-// @Param			status	query		string	false	"filter → connection"
-// @Success		200		{object}	ops.Envelope{data=DevicePage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/devices [get]
+// list serves devices.list.
+//
+//	@Summary		devices.list (read)
+//	@ID				devices.list
+//	@Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | \
+//	@Description	admin:device.read | admin:audit.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A04, DD-T02, DD-T11, DD-A16, DD-A20, DD-T12 · Query: filters unitId,status · sort \
+//	@Description	id,createdAt,updatedAt (default id asc)
+//	@Tags			devices
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit	query		integer	false	"page size 1–100, default 25"
+//	@Param			sort	query		string	false	"field:direction — fields id,createdAt,updatedAt; default id asc"
+//	@Param			unitId	query		string	false	"filter → unitId"
+//	@Param			status	query		string	false	"filter → connection"
+//	@Success		200		{object}	ops.Envelope{data=DevicePage}
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/devices [get]
 func (m *Module) list(
 	ctx context.Context,
 	c *ops.Call,
@@ -354,27 +363,30 @@ func (in *IDInput) Validate() map[string]string {
 	return nil
 }
 
-// @Summary		devices.get (read)
-// @ID				devices.get
-// @Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:device.read | admin:audit.read; SR24 current-device AND occurrence-scope
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-T11, DD-T12, DD-A04
-// @Tags			devices
-// @Accept			json
-// @Produce		json
-// @Param			id	path		string	true	"input field id"
-// @Success		200	{object}	ops.Envelope{data=DeviceDetail}
-// @Failure		401	{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403	{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404	{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409	{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422	{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429	{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503	{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504	{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/devices/{id} [get]
+// get serves devices.get.
+//
+//	@Summary		devices.get (read)
+//	@ID				devices.get
+//	@Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | \
+//	@Description	admin:device.read | admin:audit.read; SR24 current-device AND occurrence-scope
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-T11, DD-T12, DD-A04
+//	@Tags			devices
+//	@Accept			json
+//	@Produce		json
+//	@Param			id	path		string	true	"input field id"
+//	@Success		200	{object}	ops.Envelope{data=DeviceDetail}
+//	@Failure		401	{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403	{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404	{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409	{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422	{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429	{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503	{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504	{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/devices/{id} [get]
 func (m *Module) get(ctx context.Context, c *ops.Call, in *IDInput) (DeviceDetail, error) {
 	args := []any{in.ID}
 
@@ -416,6 +428,7 @@ func (m *Module) detail(
 
 	for rows.Next() {
 		var id uuid.UUID
+
 		err := rows.Scan(&id)
 		if err != nil {
 			rows.Close()
@@ -435,10 +448,13 @@ func (m *Module) detail(
 
 	var op []byte
 
-	err = c.Tx.QueryRow(ctx, `SELECT to_jsonb(o) FROM (SELECT id, tenant_id AS "tenantId", version, created_at AS "createdAt", updated_at AS "updatedAt",
-		device_id AS "deviceId", unit_id AS "unitId", job_id AS "jobId", kind, status, target_version AS "targetVersion", failure_code AS "failureCode",
+	err = c.Tx.QueryRow(ctx, `SELECT to_jsonb(o) FROM (SELECT id, tenant_id AS "tenantId", version, created_at AS
+		"createdAt", updated_at AS "updatedAt",
+		device_id AS "deviceId", unit_id AS "unitId", job_id AS "jobId", kind, status, target_version AS "targetVersion",
+		failure_code AS "failureCode",
 		started_at AS "startedAt", finished_at AS "finishedAt", expires_at AS "expiresAt"
-		FROM devices.device_operations WHERE device_id = $1 AND status IN ('queued','running') ORDER BY created_at DESC LIMIT 1) o`, d.ID).
+		FROM devices.device_operations WHERE device_id = $1 AND status IN ('queued','running') ORDER BY created_at DESC LIMIT
+		1) o`, d.ID).
 		Scan(&op)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return DeviceDetail{}, err
@@ -504,28 +520,31 @@ func (m *Module) technicianGate(
 	return m.Access.TechnicianJob(ctx, c, *jobID, unit)
 }
 
-// @Summary		devices.register (write)
-// @ID				devices.register
-// @Description	Authorization: technician:device.maintain:assigned-valid-job | admin:device.write
-// @Description	Validation: D01; input constraints in the corresponding DD; IR43 sensorTypes⊆Capability.sensors; IR94 technician write table (assignment and work window, jobId required when typed)
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-T11, DD-A04
-// @Tags			devices
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		RegisterInput	true	"input"
-// @Success		200				{object}	ops.Envelope{data=Device}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/devices [post]
+// register serves devices.register.
+//
+//	@Summary		devices.register (write)
+//	@ID				devices.register
+//	@Description	Authorization: technician:device.maintain:assigned-valid-job | admin:device.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; IR43 sensorTypes⊆Capability.sensors; \
+//	@Description	IR94 technician write table (assignment and work window, jobId required when typed)
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-T11, DD-A04
+//	@Tags			devices
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		RegisterInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Device}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/devices [post]
 func (m *Module) register(ctx context.Context, c *ops.Call, in *RegisterInput) (Device, error) {
 	d, err := m.registerDetail(ctx, c, in)
 
@@ -553,7 +572,9 @@ func (m *Module) registerDetail(
 	}
 
 	var sensorsRaw []byte
-	scanErr := c.Tx.QueryRow(ctx, `SELECT sensors FROM devices.capabilities WHERE id = $1 AND version = $2`, u.ModelID, u.CapabilityVersion).
+
+	scanErr := c.Tx.QueryRow(ctx, `SELECT sensors FROM devices.capabilities WHERE id = $1 AND version =
+		$2`, u.ModelID, u.CapabilityVersion).
 		Scan(&sensorsRaw)
 	if scanErr != nil {
 		return DeviceDetail{}, scanErr
@@ -577,6 +598,7 @@ func (m *Module) registerDetail(
 	}
 
 	var dup bool
+
 	scanErr = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.devices WHERE upper(serial) = $1)`, in.Serial).
 		Scan(&dup)
 	if scanErr != nil {
@@ -591,6 +613,7 @@ func (m *Module) registerDetail(
 	}
 	// D05: register reserves targetUnitId; unitId stays null until devices.bind
 	id := uuid.Must(uuid.NewV7())
+
 	_, execErr := c.Tx.Exec(
 		ctx,
 		`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version)
@@ -606,6 +629,7 @@ func (m *Module) registerDetail(
 
 	for _, mt := range in.SensorTypes {
 		s := byMetric[mt]
+
 		_, err := c.Tx.Exec(
 			ctx,
 			`INSERT INTO devices.sensors (tenant_id, device_id, metric, unit, boundary_id, stale_after_seconds)

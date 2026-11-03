@@ -39,7 +39,8 @@ type devState struct {
 func lockDevice(ctx context.Context, c *ops.Call, id uuid.UUID) (devState, error) {
 	var s devState
 
-	err := c.Tx.QueryRow(ctx, `SELECT unit_id, target_unit_id, created_by_membership_id, version, connection, tamper, firmware_version
+	err := c.Tx.QueryRow(ctx, `SELECT unit_id, target_unit_id, created_by_membership_id, version, connection, tamper,
+		firmware_version
 		FROM devices.devices WHERE id = $1 FOR UPDATE`, id).
 		Scan(&s.unit, &s.target, &s.creator, &s.version, &s.connection, &s.tamper, &s.firmware)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -65,7 +66,9 @@ func (s devState) current(c *ops.Call) error {
 // exclusive applies D05 on a unit: no queued/running DeviceOperation for its device and no in-flight control work.
 func (m *Module) exclusive(ctx context.Context, c *ops.Call, unit uuid.UUID) error {
 	var busy bool
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE unit_id = $1 AND status IN ('queued','running') AND expires_at > $2)`,
+
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE unit_id = $1 AND status IN
+		('queued','running') AND expires_at > $2)`,
 		unit, c.Now).
 		Scan(&busy)
 	if err != nil {
@@ -95,7 +98,8 @@ func (m *Module) exclusive(ctx context.Context, c *ops.Call, unit uuid.UUID) err
 func bumpDevice(ctx context.Context, c *ops.Call, id uuid.UUID) (int, error) {
 	var v int
 
-	err := c.Tx.QueryRow(ctx, `UPDATE devices.devices SET version = version + 1, updated_at = platform.app_now() WHERE id = $1 RETURNING version`, id).
+	err := c.Tx.QueryRow(ctx, `UPDATE devices.devices SET version = version + 1, updated_at = platform.app_now() WHERE id =
+		$1 RETURNING version`, id).
 		Scan(&v)
 
 	return v, err
@@ -135,7 +139,8 @@ func (in *BindInput) Validate() map[string]string {
 //	@Summary		devices.bind (write)
 //	@ID				devices.bind
 //	@Description	Authorization: technician:device.maintain:assigned-valid-job | admin:device.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed)
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR94 technician write table (assignment and work window, jobId required when typed)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-T11, DD-A04
 //	@Tags			devices
@@ -217,7 +222,9 @@ func (m *Module) bindDetail(ctx context.Context, c *ops.Call, in *BindInput) (De
 	}
 
 	var taken bool
-	scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_bindings WHERE unit_id = $1 AND unbound_at IS NULL)`, in.UnitID).
+
+	scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_bindings WHERE unit_id = $1 AND unbound_at
+		IS NULL)`, in.UnitID).
 		Scan(&taken)
 	if scanErr != nil {
 		return DeviceDetail{}, scanErr
@@ -251,9 +258,11 @@ func (m *Module) bindDetail(ctx context.Context, c *ops.Call, in *BindInput) (De
 	}
 
 	binding := uuid.Must(uuid.NewV7())
+
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`INSERT INTO devices.device_bindings (id, tenant_id, device_id, unit_id, customer_org_id, bound_at, reason, actor_membership_id)
+		`INSERT INTO devices.device_bindings (id, tenant_id, device_id, unit_id, customer_org_id, bound_at, reason,
+			actor_membership_id)
 		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7)`,
 		binding,
 		in.DeviceID,
@@ -268,7 +277,9 @@ func (m *Module) bindDetail(ctx context.Context, c *ops.Call, in *BindInput) (De
 	}
 
 	var v int
-	scanErr = c.Tx.QueryRow(ctx, `UPDATE devices.devices SET unit_id = $2, binding_id = $3, target_unit_id = $2, version = version + 1, updated_at = platform.app_now()
+
+	scanErr = c.Tx.QueryRow(ctx, `UPDATE devices.devices SET unit_id = $2, binding_id = $3, target_unit_id = $2, version =
+		version + 1, updated_at = platform.app_now()
 		WHERE id = $1 RETURNING version`, in.DeviceID, in.UnitID, binding).
 		Scan(&v)
 	if scanErr != nil {
@@ -319,7 +330,8 @@ type DeviceOperation struct {
 	ExpiresAt                 time.Time  `json:"expiresAt"`
 }
 
-const opCols = `o.id, o.tenant_id, o.version, o.created_at, o.updated_at, b.id, o.unit_id, b.customer_org_id, o.device_id, o.kind, o.status, o.target_version,
+const opCols = `o.id, o.tenant_id, o.version, o.created_at, o.updated_at, b.id, o.unit_id, b.customer_org_id, ` +
+	`o.device_id, o.kind, o.status, o.target_version,
 	o.failure_code, o.started_at, o.finished_at, o.expires_at`
 
 func scanOp(r pgx.Row) (DeviceOperation, error) {
@@ -381,7 +393,9 @@ func (m *Module) startOperation(
 		}
 
 		var candidates []string
-		scanErr := c.Tx.QueryRow(ctx, `SELECT firmware_candidates FROM devices.capabilities WHERE id = $1 AND version = $2`, u.ModelID, u.CapabilityVersion).
+
+		scanErr := c.Tx.QueryRow(ctx, `SELECT firmware_candidates FROM devices.capabilities WHERE id = $1 AND version =
+			$2`, u.ModelID, u.CapabilityVersion).
 			Scan(&candidates)
 		if scanErr != nil {
 			return DeviceOperation{}, scanErr
@@ -407,9 +421,11 @@ func (m *Module) startOperation(
 	}
 
 	id := uuid.Must(uuid.NewV7())
+
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`INSERT INTO devices.device_operations (id, tenant_id, device_id, unit_id, job_id, kind, status, target_version, expires_at, actor_membership_id)
+		`INSERT INTO devices.device_operations (id, tenant_id, device_id, unit_id, job_id, kind, status, target_version,
+			expires_at, actor_membership_id)
 		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, 'queued', $6, $7, $8)`,
 		id,
 		device,
@@ -452,7 +468,8 @@ func (m *Module) startOperation(
 	return scanOp(
 		c.Tx.QueryRow(
 			ctx,
-			`SELECT `+opCols+` FROM devices.device_operations o LEFT JOIN devices.device_bindings b ON b.device_id = o.device_id AND b.unbound_at IS NULL WHERE o.id = $1`,
+			`SELECT `+opCols+` FROM devices.device_operations o LEFT JOIN devices.device_bindings b ON b.device_id = o.device_id
+				AND b.unbound_at IS NULL WHERE o.id = $1`,
 			id,
 		),
 	)
@@ -473,30 +490,34 @@ func (in *CheckInput) Validate() map[string]string {
 	return nil
 }
 
-// @Summary		devices.check (write)
-// @ID				devices.check
-// @Description	Authorization: technician:device.maintain:assigned-valid-job | admin:device.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR67 queued→running after 1s tick; IR90 recheck failure CONFLICT; restriction commands not_sent while running; IR94 technician write table (assignment and work window, jobId required when typed)
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-T11, DD-A04
-// @Tags			devices
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer		true	"all: required (target device, read devices.get)"
-// @Param			id					path		string		true	"input field id"
-// @Param			request				body		CheckInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=DeviceOperation}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/devices/{id}/check [post]
+// check serves devices.check.
+//
+//	@Summary		devices.check (write)
+//	@ID				devices.check
+//	@Description	Authorization: technician:device.maintain:assigned-valid-job | admin:device.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR67 queued→running after 1s tick; IR90 recheck failure CONFLICT; restriction commands not_sent \
+//	@Description	while running; IR94 technician write table (assignment and work window, jobId required when typed)
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-T11, DD-A04
+//	@Tags			devices
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target device, read devices.get)"
+//	@Param			id					path		string		true	"input field id"
+//	@Param			request				body		CheckInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=DeviceOperation}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/devices/{id}/check [post]
 func (m *Module) check(ctx context.Context, c *ops.Call, in *CheckInput) (DeviceOperation, error) {
 	return m.startOperation(
 		ctx,
@@ -529,30 +550,35 @@ func (in *FirmwareInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		devices.updateFirmware (write)
-// @ID				devices.updateFirmware
-// @Description	Authorization: technician:device.maintain:assigned-valid-job | admin:device.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR67 queued→running after 1s tick; IR90 recheck failure CONFLICT; restriction commands not_sent while running; IR94 technician write table (assignment and work window, jobId required when typed); IR94 non-online at request: OFFLINE without operation
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-T11, DD-A04
-// @Tags			devices
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer			true	"all: required (target device, read devices.get)"
-// @Param			deviceId			path		string			true	"input field deviceId"
-// @Param			request				body		FirmwareInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=DeviceOperation}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/devices/{deviceId}/update-firmware [post]
+// updateFirmware serves devices.updateFirmware.
+//
+//	@Summary		devices.updateFirmware (write)
+//	@ID				devices.updateFirmware
+//	@Description	Authorization: technician:device.maintain:assigned-valid-job | admin:device.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR67 queued→running after 1s tick; IR90 recheck failure CONFLICT; restriction commands not_sent \
+//	@Description	while running; IR94 technician write table (assignment and work window, jobId required when typed); \
+//	@Description	IR94 non-online at request: OFFLINE without operation
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-T11, DD-A04
+//	@Tags			devices
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer			true	"all: required (target device, read devices.get)"
+//	@Param			deviceId			path		string			true	"input field deviceId"
+//	@Param			request				body		FirmwareInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=DeviceOperation}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/devices/{deviceId}/update-firmware [post]
 func (m *Module) updateFirmware(
 	ctx context.Context,
 	c *ops.Call,
@@ -624,30 +650,33 @@ func (in *CalibrateInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		devices.calibrate (write)
-// @ID				devices.calibrate
-// @Description	Authorization: technician:device.maintain:assigned-valid-job | admin:device.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed)
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-T11, DD-A04
-// @Tags			devices
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer			true	"all: required (target device, read devices.get)"
-// @Param			deviceId			path		string			true	"input field deviceId"
-// @Param			request				body		CalibrateInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=CalibrationRecord}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/devices/{deviceId}/calibrations [post]
+// calibrate serves devices.calibrate.
+//
+//	@Summary		devices.calibrate (write)
+//	@ID				devices.calibrate
+//	@Description	Authorization: technician:device.maintain:assigned-valid-job | admin:device.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR94 technician write table (assignment and work window, jobId required when typed)
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-T11, DD-A04
+//	@Tags			devices
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer			true	"all: required (target device, read devices.get)"
+//	@Param			deviceId			path		string			true	"input field deviceId"
+//	@Param			request				body		CalibrateInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=CalibrationRecord}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/devices/{deviceId}/calibrations [post]
 func (m *Module) calibrate(
 	ctx context.Context,
 	c *ops.Call,
@@ -678,7 +707,8 @@ func (m *Module) calibrate(
 
 	var metric, unit string
 
-	err = c.Tx.QueryRow(ctx, `SELECT metric, unit FROM devices.sensors WHERE id = $1 AND device_id = $2`, in.SensorID, in.DeviceID).
+	err = c.Tx.QueryRow(ctx, `SELECT metric, unit FROM devices.sensors WHERE id = $1 AND device_id =
+		$2`, in.SensorID, in.DeviceID).
 		Scan(&metric, &unit)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return CalibrationRecord{}, apperr.Fields(
@@ -702,9 +732,11 @@ func (m *Module) calibrate(
 	}
 
 	id := uuid.Must(uuid.NewV7())
+
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`INSERT INTO devices.calibration_records (id, tenant_id, device_id, sensor_id, metric, unit, reference_value, measured_value, calibrated_at, actor_id, job_id)
+		`INSERT INTO devices.calibration_records (id, tenant_id, device_id, sensor_id, metric, unit, reference_value,
+			measured_value, calibrated_at, actor_id, job_id)
 		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
 		id,
 		in.DeviceID,
@@ -757,7 +789,8 @@ func (m *Module) calibrate(
 	return m.calibration(ctx, c, id)
 }
 
-const calCols = `r.id, r.tenant_id, r.created_at, r.created_at, b.id, b.unit_id, b.customer_org_id, r.device_id, r.sensor_id, r.metric, r.unit,
+const calCols = `r.id, r.tenant_id, r.created_at, r.created_at, b.id, b.unit_id, b.customer_org_id, r.device_id, ` +
+	`r.sensor_id, r.metric, r.unit,
 	r.reference_value, r.measured_value, r.calibrated_at, r.actor_id`
 
 func scanCal(row pgx.Row) (CalibrationRecord, error) {

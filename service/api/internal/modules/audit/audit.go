@@ -22,13 +22,14 @@ const actorJoin = `LEFT JOIN identity.users u ON u.id::text = a.actor_id`
 
 // View is AuditView of service-contracts.ts.
 type View struct {
-	ID              uuid.UUID          `json:"id"`
-	TenantID        uuid.UUID          `json:"tenantId"`
-	Version         int                `json:"version"`
-	CreatedAt       time.Time          `json:"createdAt"`
-	UpdatedAt       time.Time          `json:"updatedAt"`
-	ActorID         string             `json:"actorId"`
-	ActorName       *string            `json:"actorName"` // the actor user's current display name; null for system actors and in client projections (IR305)
+	ID        uuid.UUID `json:"id"`
+	TenantID  uuid.UUID `json:"tenantId"`
+	Version   int       `json:"version"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+	ActorID   string    `json:"actorId"`
+	// the actor user's current display name; null for system actors and in client projections (IR305)
+	ActorName       *string            `json:"actorName"`
 	ActorRoleAtTime string             `json:"actorRoleAtTime"`
 	Action          string             `json:"action"`
 	TargetRef       map[string]string  `json:"targetRef"`
@@ -54,37 +55,41 @@ type Filter struct {
 	Action        *string    `json:"action,omitempty"`
 }
 
-// @Summary		audit.list (read)
-// @ID				audit.list
-// @Description	Authorization: admin:audit.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A04, DD-A10, DD-A16 · Query: filters actorId,targetKind,targetId,action,from,to,result,correlationId · sort id,occurredAt,createdAt,updatedAt (default occurredAt desc;id desc)
-// @Tags			audit
-// @Accept			json
-// @Produce		json
-// @Param			cursor			query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit			query		integer	false	"page size 1–100, default 25"
-// @Param			sort			query		string	false	"field:direction — fields id,occurredAt,createdAt,updatedAt; default occurredAt desc;id desc"
-// @Param			actorId			query		string	false	"filter → actorId"
-// @Param			targetKind		query		string	false	"filter → targetRef.kind"
-// @Param			targetId		query		string	false	"filter → targetRef.id"
-// @Param			action			query		string	false	"filter → action"
-// @Param			from			query		string	false	"filter → [from,to) on occurredAt"
-// @Param			to				query		string	false	"filter → [from,to) on occurredAt"
-// @Param			result			query		string	false	"filter → result"
-// @Param			correlationId	query		string	false	"filter → correlationId"
-// @Success		200				{object}	ops.Envelope{data=ViewPage}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/audit [get]
+// list serves audit.list.
+//
+//	@Summary		audit.list (read)
+//	@ID				audit.list
+//	@Description	Authorization: admin:audit.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A04, DD-A10, DD-A16 · Query: filters \
+//	@Description	actorId,targetKind,targetId,action,from,to,result,correlationId · sort \
+//	@Description	id,occurredAt,createdAt,updatedAt (default occurredAt desc;id desc)
+//	@Tags			audit
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor			query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit			query		integer	false	"page size 1–100, default 25"
+//	@Param			sort			query		string	false	"field:direction — fields id,occurredAt,createdAt,updatedAt; default occurredAt desc;id desc"
+//	@Param			actorId			query		string	false	"filter → actorId"
+//	@Param			targetKind		query		string	false	"filter → targetRef.kind"
+//	@Param			targetId		query		string	false	"filter → targetRef.id"
+//	@Param			action			query		string	false	"filter → action"
+//	@Param			from			query		string	false	"filter → [from,to) on occurredAt"
+//	@Param			to				query		string	false	"filter → [from,to) on occurredAt"
+//	@Param			result			query		string	false	"filter → result"
+//	@Param			correlationId	query		string	false	"filter → correlationId"
+//	@Success		200				{object}	ops.Envelope{data=ViewPage}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/audit [get]
 func list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[View], error) {
 	var f Filter
 
@@ -150,8 +155,9 @@ func list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[View]
 	conds := []string{"a.occurred_at >= $1", "a.occurred_at < $2"}
 
 	for col, v := range map[string]*string{
-		"a.actor_id": f.ActorID, "a.target_kind": f.TargetKind, "a.target_id": f.TargetID, "a.correlation_id": f.CorrelationID,
-		"a.result": f.Result, "a.action": f.Action,
+		"a.actor_id": f.ActorID, "a.target_kind": f.TargetKind, "a.target_id": f.TargetID,
+		"a.correlation_id": f.CorrelationID,
+		"a.result":         f.Result, "a.action": f.Action,
 	} {
 		if v != nil {
 			conds = append(conds, col+" = "+add(*v))
@@ -161,6 +167,7 @@ func list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[View]
 	where := strings.Join(conds, " AND ")
 
 	var total int
+
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM audit.audit_log a WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
@@ -170,8 +177,10 @@ func list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[View]
 	rows, err := c.Tx.Query(
 		ctx,
 		fmt.Sprintf(
-			`SELECT a.id, a.tenant_id, a.actor_id, u.display_name, a.actor_role_at_time, a.action, a.target_kind, a.target_id, a.previous_version, a.next_version,
-		a.occurred_at, a.correlation_id, a.result, a.masked_before, a.masked_after, a.reason FROM audit.audit_log a `+actorJoin+` WHERE %s ORDER BY %s LIMIT %d OFFSET %d`,
+			`SELECT a.id, a.tenant_id, a.actor_id, u.display_name, a.actor_role_at_time, a.action, a.target_kind, a.target_id,
+				a.previous_version, a.next_version,
+		a.occurred_at, a.correlation_id, a.result, a.masked_before, a.masked_after, a.reason FROM audit.audit_log a
+		`+actorJoin+` WHERE %s ORDER BY %s LIMIT %d OFFSET %d`,
 			where,
 			order,
 			w.Limit,
@@ -190,6 +199,7 @@ func list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[View]
 			x        View
 			kind, id string
 		)
+
 		err := rows.Scan(
 			&x.ID,
 			&x.TenantID,

@@ -133,9 +133,11 @@ type SiteAddresses interface {
 // offers returns the contractor's JobOfferSummary rows valid now (IR124 item 2); job limits the result to one job.
 func (m Jobs) offers(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]OfferSummary, error) {
 	q := `SELECT j.id, j.version, j.type, j.unit_id, lower(j.requested_slot), upper(j.requested_slot), j.due_at, j.origin,
-		o.id, o.decision, o.offer_expires_at, o.terms_version, lower(o.visit_slot), upper(o.visit_slot), o.offered_at, o.access_valid_from, o.access_valid_until
+		o.id, o.decision, o.offer_expires_at, o.terms_version, lower(o.visit_slot), upper(o.visit_slot), o.offered_at,
+		o.access_valid_from, o.access_valid_until
 		FROM maintenance.offers o JOIN maintenance.jobs j ON j.id = o.job_id
-		WHERE o.contractor_org_id = $1 AND ((o.decision IS NULL AND $2 < o.offer_expires_at AND j.status = 'offered') OR (o.decision = 'accept' AND $2 < o.access_valid_from))`
+		WHERE o.contractor_org_id = $1 AND ((o.decision IS NULL AND $2 < o.offer_expires_at AND j.status = 'offered') OR
+		(o.decision = 'accept' AND $2 < o.access_valid_from))`
 	args := []any{c.Principal.OrgID, c.Now}
 
 	if job != nil {
@@ -160,6 +162,7 @@ func (m Jobs) offers(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]OfferS
 			unit     uuid.UUID
 			decision *string
 		)
+
 		err := rows.Scan(
 			&o.JobID,
 			&o.JobVersion,
@@ -210,7 +213,8 @@ func (m Jobs) offers(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]OfferS
 		// the offer's latest time-change proposal (it was never filled before IR226)
 		var pp PartnerSlotProposal
 
-		err = c.Tx.QueryRow(ctx, `SELECT id, offer_id, lower(slot), upper(slot), technician_membership_id, reason, sent_at, status FROM maintenance.partner_slot_proposals
+		err = c.Tx.QueryRow(ctx, `SELECT id, offer_id, lower(slot), upper(slot), technician_membership_id, reason, sent_at,
+			status FROM maintenance.partner_slot_proposals
 			WHERE offer_id = $1 AND status <> 'withdrawn' ORDER BY sent_at DESC, id LIMIT 1`, out[i].OfferID).
 			Scan(&pp.ID, &pp.OfferID, &pp.Slot.StartAt, &pp.Slot.EndAt,
 				&pp.TechnicianMembershipID, &pp.Reason, &pp.SentAt, &pp.Status)
@@ -270,6 +274,7 @@ func (m Jobs) histories(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]His
 			acc string
 			ids []uuid.UUID
 		)
+
 		err := rows.Scan(
 			&h.JobID,
 			&h.AsOf,
@@ -363,8 +368,9 @@ func inPeriod(f *listFilters, t *time.Time) bool {
 	return (f.From == nil || !t.Before(*f.From)) && (f.To == nil || t.Before(*f.To))
 }
 
-// periodTime is the time a history counts at in a period (IR29, IR614): its frozen completion, or, without one (cancelled,
-// or ended unfinished), when its access ended — the snapshot's as-of — so recent ends fall in a recent period.
+// periodTime is the time a history counts at in a period (IR29, IR614): its frozen completion, or, without one
+// (cancelled, or ended unfinished), when its access ended — the snapshot's as-of — so recent ends fall in a recent
+// period.
 func periodTime(h History) *time.Time {
 	if h.CompletedAt != nil {
 		return h.CompletedAt
@@ -474,11 +480,14 @@ func FreezeEnded(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) {
 	// contractors: accepted Offers whose access window ended
 	tag, err := tx.Exec(
 		ctx,
-		`INSERT INTO maintenance.job_history_snapshots (tenant_id, job_id, owner_kind, owner_id, as_of, type, status, contractor_org_id,
+		`INSERT INTO maintenance.job_history_snapshots (tenant_id, job_id, owner_kind, owner_id, as_of, type, status,
+			contractor_org_id,
 			completed_at, has_report, acceptance, decision_event_ids)
-		SELECT j.tenant_id, j.id, 'organization', o.contractor_org_id, o.access_valid_until, j.type, j.status, j.contractor_org_id, j.completed_at,
+		SELECT j.tenant_id, j.id, 'organization', o.contractor_org_id, o.access_valid_until, j.type, j.status,
+		j.contractor_org_id, j.completed_at,
 			EXISTS (SELECT 1 FROM maintenance.work_reports r WHERE r.job_id = j.id AND r.state <> 'draft'),
-			CASE WHEN EXISTS (SELECT 1 FROM maintenance.work_reports r WHERE r.job_id = j.id AND r.state = 'accepted') THEN 'accepted' ELSE 'not_accepted' END,
+			CASE WHEN EXISTS (SELECT 1 FROM maintenance.work_reports r WHERE r.job_id = j.id AND r.state = 'accepted') THEN
+			'accepted' ELSE 'not_accepted' END,
 			COALESCE((SELECT array_agg(e.id ORDER BY e.occurred_at, e.id) FROM maintenance.job_events e
 				JOIN maintenance.ref_memberships mb ON mb.user_id = e.actor_user_id AND mb.organization_id = o.contractor_org_id
 				WHERE e.job_id = j.id AND e.action IN ('offer.accepted','offer.declined')), '{}')
@@ -501,17 +510,24 @@ func FreezeEnded(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) {
 // scheduled end passed, it was revoked after the work window started, or the job completed and released it (IR234);
 // job narrows it to one job.
 func freezeTechnicians(ctx context.Context, tx pgx.Tx, now time.Time, job *uuid.UUID) (int, error) {
-	q := `INSERT INTO maintenance.job_history_snapshots (tenant_id, job_id, owner_kind, owner_id, owner_user_id, as_of, type, status,
+	q := `INSERT INTO maintenance.job_history_snapshots (tenant_id, job_id, owner_kind, owner_id, owner_user_id, as_of,
+		type, status,
 			contractor_org_id, completed_at, has_report, acceptance)
-		SELECT DISTINCT ON (a.job_id, a.technician_membership_id) j.tenant_id, j.id, 'membership', a.technician_membership_id, mb.user_id,
-			CASE WHEN a.status IN ('revoked', 'completed') THEN a.updated_at ELSE upper(a.scheduled) END, j.type, j.status, j.contractor_org_id, j.completed_at,
+		SELECT DISTINCT ON (a.job_id, a.technician_membership_id) j.tenant_id, j.id, 'membership', a.technician_membership_id,
+		mb.user_id,
+			CASE WHEN a.status IN ('revoked', 'completed') THEN a.updated_at ELSE upper(a.scheduled) END, j.type, j.status,
+			j.contractor_org_id, j.completed_at,
 			EXISTS (SELECT 1 FROM maintenance.work_reports r WHERE r.job_id = j.id AND r.state <> 'draft'),
-			CASE WHEN EXISTS (SELECT 1 FROM maintenance.work_reports r WHERE r.job_id = j.id AND r.state = 'accepted') THEN 'accepted' ELSE 'not_accepted' END
-		FROM maintenance.assignments a JOIN maintenance.jobs j ON j.id = a.job_id JOIN maintenance.ref_memberships mb ON mb.id = a.technician_membership_id
-		WHERE ((a.status = 'active' AND upper(a.scheduled) <= $1) OR (a.status = 'revoked' AND lower(a.scheduled) <= a.updated_at AND a.updated_at <= $1)
+			CASE WHEN EXISTS (SELECT 1 FROM maintenance.work_reports r WHERE r.job_id = j.id AND r.state = 'accepted') THEN
+			'accepted' ELSE 'not_accepted' END
+		FROM maintenance.assignments a JOIN maintenance.jobs j ON j.id = a.job_id JOIN maintenance.ref_memberships mb ON mb.id
+		= a.technician_membership_id
+		WHERE ((a.status = 'active' AND upper(a.scheduled) <= $1) OR (a.status = 'revoked' AND lower(a.scheduled) <=
+		a.updated_at AND a.updated_at <= $1)
 			OR (a.status = 'completed' AND a.updated_at <= $1))
 			-- not while the same technician still holds an open window on the job (an extension or a new assignment, IR459)
-			AND NOT EXISTS (SELECT 1 FROM maintenance.assignments b WHERE b.job_id = a.job_id AND b.technician_membership_id = a.technician_membership_id
+			AND NOT EXISTS (SELECT 1 FROM maintenance.assignments b WHERE b.job_id = a.job_id AND b.technician_membership_id =
+			a.technician_membership_id
 				AND b.status = 'active' AND upper(b.scheduled) > $1)`
 	args := []any{now}
 
@@ -522,7 +538,8 @@ func freezeTechnicians(ctx context.Context, tx pgx.Tx, now time.Time, job *uuid.
 	}
 
 	tag, err := tx.Exec(ctx, q+`
-		ORDER BY a.job_id, a.technician_membership_id, CASE WHEN a.status IN ('revoked', 'completed') THEN a.updated_at ELSE upper(a.scheduled) END DESC, a.updated_at DESC
+		ORDER BY a.job_id, a.technician_membership_id, CASE WHEN a.status IN ('revoked', 'completed') THEN a.updated_at ELSE
+		upper(a.scheduled) END DESC, a.updated_at DESC
 		ON CONFLICT (job_id, owner_kind, owner_id) DO NOTHING`, args...)
 	if err != nil {
 		return 0, err
@@ -538,7 +555,8 @@ func freezeTechnicians(ctx context.Context, tx pgx.Tx, now time.Time, job *uuid.
 func ReleaseOnCompletion(ctx context.Context, tx pgx.Tx, job uuid.UUID, now time.Time) error {
 	_, execErr := tx.Exec(
 		ctx,
-		`UPDATE maintenance.assignments SET status = 'completed', reason = 'job_completed', version = version + 1, updated_at = $2
+		`UPDATE maintenance.assignments SET status = 'completed', reason = 'job_completed', version = version + 1, updated_at
+			= $2
 		WHERE job_id = $1 AND status = 'active'`,
 		job,
 		now,
@@ -553,12 +571,15 @@ func ReleaseOnCompletion(ctx context.Context, tx pgx.Tx, job uuid.UUID, now time
 }
 
 // ExpireOffers applies IR48: undecided Offers whose offerExpiresAt has passed return their job from offered to
-// requested (contractorOrgId cleared, version + 1, one offer_expired event by the system actor). Offer.decision stays null.
+// requested (contractorOrgId cleared, version + 1, one offer_expired event by the system actor). Offer.decision stays
+// null.
 func ExpireOffers(ctx context.Context, tx pgx.Tx, now time.Time, actor uuid.UUID) (int, error) {
 	rows, err := tx.Query(
 		ctx,
-		`UPDATE maintenance.jobs j SET status = 'requested', contractor_org_id = NULL, version = j.version + 1, updated_at = platform.app_now()
-		FROM maintenance.offers o WHERE o.job_id = j.id AND o.decision IS NULL AND o.expired_at IS NULL AND o.offer_expires_at <= $1 AND j.status = 'offered'
+		`UPDATE maintenance.jobs j SET status = 'requested', contractor_org_id = NULL, version = j.version + 1, updated_at =
+			platform.app_now()
+		FROM maintenance.offers o WHERE o.job_id = j.id AND o.decision IS NULL AND o.expired_at IS NULL AND o.offer_expires_at
+		<= $1 AND j.status = 'offered'
 		RETURNING j.id, j.tenant_id`,
 		now,
 	)
@@ -572,6 +593,7 @@ func ExpireOffers(ctx context.Context, tx pgx.Tx, now time.Time, actor uuid.UUID
 
 	for rows.Next() {
 		var h hit
+
 		err := rows.Scan(&h.job, &h.tenant)
 		if err != nil {
 			rows.Close()
@@ -588,8 +610,8 @@ func ExpireOffers(ctx context.Context, tx pgx.Tx, now time.Time, actor uuid.UUID
 	if rowsErr != nil {
 		return 0, rowsErr
 	}
-	// a contractor's time change still waiting for HQ ends with its expired offer (IR444); one sent to the client stays, as
-	// the client's acceptance offers the job to the contractor again (IR128)
+	// a contractor's time change still waiting for HQ ends with its expired offer (IR444); one sent to the client stays,
+	// as the client's acceptance offers the job to the contractor again (IR128)
 	_, execErr := tx.Exec(
 		ctx,
 		`UPDATE maintenance.partner_slot_proposals SET status = 'withdrawn' WHERE status = 'pending' AND offer_id IN
@@ -602,7 +624,8 @@ func ExpireOffers(ctx context.Context, tx pgx.Tx, now time.Time, actor uuid.UUID
 
 	_, execErr = tx.Exec(
 		ctx,
-		`UPDATE maintenance.offers SET expired_at = $1 WHERE decision IS NULL AND expired_at IS NULL AND offer_expires_at <= $1`,
+		`UPDATE maintenance.offers SET expired_at = $1 WHERE decision IS NULL AND expired_at IS NULL AND offer_expires_at <=
+			$1`,
 		now,
 	)
 	if execErr != nil {
@@ -612,7 +635,8 @@ func ExpireOffers(ctx context.Context, tx pgx.Tx, now time.Time, actor uuid.UUID
 	for _, h := range hits {
 		_, err := tx.Exec(
 			ctx,
-			`INSERT INTO maintenance.job_events (id, tenant_id, job_id, actor_user_id, action, occurred_at) VALUES ($1,$2,$3,$4,'offer_expired',$5)`,
+			`INSERT INTO maintenance.job_events (id, tenant_id, job_id, actor_user_id, action, occurred_at) VALUES ($1,$2,$3,$4,
+				'offer_expired',$5)`,
 			uuid.Must(uuid.NewV7()),
 			h.tenant,
 			h.job,

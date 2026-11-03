@@ -18,19 +18,39 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/logging"
 )
 
-// @title						AC Project Core API
-// @version					1.0
-// @description				Every operation of the operation catalog is served at its REST routes (IR222): reads with GET and their input in the path and the query string (cursor, limit, sort=field:direction, the catalogued filters by name; lists repeat the parameter or separate values with commas, an empty value is the empty list; nested fields as object.field); creates with POST on the collection, updates with PUT on the item, deletes with DELETE (input in the path and the query string); business commands with POST /v1/<resource>/{id}/<verb>. POST, PUT and PATCH take the handler's input type as a JSON body without query parameters; a path parameter or a fixed route field that the body repeats with another value is VALIDATION error.pathMismatch; unknown fields and parameters are VALIDATION; bodies above 1 MiB are rejected (8 MiB for photo uploads, 16 MiB for a sign-off). The caller is the BFF of one of the four web apps, which forwards the user's Keycloak access token; the gateway forwards each route to the domain service that owns its operation (identity, equipment, maintenance, billing, energy). The operation name stays the operation ID (catalog key, authorization, audit, meta.operation).
-// @description				Writes carry an Idempotency-Key (8–128 characters): the same key replays the stored response (D04). Writes with a version target carry X-Expected-Version (the write-version catalog says which) and answer CONFLICT error.versionConflict when it is stale.
-// @description				A success is {data, meta}; a failure is a ServiceError {code, messageKey, fieldErrors, correlationId, retryAfterSeconds} with the HTTP status of its code: VALIDATION 422, UNAUTHENTICATED 401, FORBIDDEN 403, NOT_FOUND 404, CONFLICT and OFFLINE 409, RATE_LIMITED 429, UNAVAILABLE 503, TIMEOUT 504.
-// @description				Built by `make swagger` from the swag annotations of the handlers (service/api/internal/modules, server); do not edit swagger.json by hand.
-// @BasePath					/
-// @schemes					http https
+// main runs the gateway. The annotations are the API's general information for swag (make swagger).
 //
-// @securityDefinitions.apikey	BearerAuth
-// @in							header
-// @name						Authorization
-// @description				Keycloak access token of the signed-in membership, forwarded by the BFF: "Bearer <token>"
+//	@title						AC Project Core API
+//	@version					1.0
+//	@description				Every operation of the operation catalog is served at its REST routes (IR222): reads with GET \
+//	@description				and their input in the path and the query string (cursor, limit, sort=field:direction, the \
+//	@description				catalogued filters by name; lists repeat the parameter or separate values with commas, an empty \
+//	@description				value is the empty list; nested fields as object.field); creates with POST on the collection, \
+//	@description				updates with PUT on the item, deletes with DELETE (input in the path and the query string); \
+//	@description				business commands with POST /v1/<resource>/{id}/<verb>. POST, PUT and PATCH take the handler's \
+//	@description				input type as a JSON body without query parameters; a path parameter or a fixed route field that \
+//	@description				the body repeats with another value is VALIDATION error.pathMismatch; unknown fields and \
+//	@description				parameters are VALIDATION; bodies above 1 MiB are rejected (8 MiB for photo uploads, 16 MiB for \
+//	@description				a sign-off). The caller is the BFF of one of the four web apps, which forwards the user's \
+//	@description				Keycloak access token; the gateway forwards each route to the domain service that owns its \
+//	@description				operation (identity, equipment, maintenance, billing, energy). The operation name stays the \
+//	@description				operation ID (catalog key, authorization, audit, meta.operation).
+//	@description				Writes carry an Idempotency-Key (8–128 characters): the same key replays the stored response \
+//	@description				(D04). Writes with a version target carry X-Expected-Version (the write-version catalog says \
+//	@description				which) and answer CONFLICT error.versionConflict when it is stale.
+//	@description				A success is {data, meta}; a failure is a ServiceError {code, messageKey, fieldErrors, \
+//	@description				correlationId, retryAfterSeconds} with the HTTP status of its code: VALIDATION 422, \
+//	@description				UNAUTHENTICATED 401, FORBIDDEN 403, NOT_FOUND 404, CONFLICT and OFFLINE 409, RATE_LIMITED 429, \
+//	@description				UNAVAILABLE 503, TIMEOUT 504.
+//	@description				Built by `make swagger` from the swag annotations of the handlers (service/api/internal/modules, \
+//	@description				server); do not edit swagger.json by hand.
+//	@BasePath					/
+//	@schemes					http https
+//
+//	@securityDefinitions.apikey	BearerAuth
+//	@in							header
+//	@name						Authorization
+//	@description				Keycloak access token of the signed-in membership, forwarded by the BFF: "Bearer <token>"
 func main() {
 	addr := os.Getenv("ADDR")
 	if addr == "" {
@@ -70,6 +90,7 @@ func main() {
 		OnShutdownError:  nil,
 		BeforeServeFunc:  nil,
 	}
+
 	startErr := sc.Start(
 		ctx,
 		gateway.New(targets, logger),

@@ -82,7 +82,8 @@ func get(ctx context.Context, c *ops.Call, in *Input) (Result, error) {
 	)
 
 	err := c.Tx.QueryRow(ctx, `SELECT status, response FROM platform.idempotency_keys
-		WHERE membership_id = $1 AND key = $2 AND operation = $3 AND expires_at > $4`, c.Principal.MembershipID, in.IdempotencyKey, in.Operation, c.Now).Scan(&status, &resp)
+		WHERE membership_id = $1 AND key = $2 AND operation = $3 AND expires_at >
+		$4`, c.Principal.MembershipID, in.IdempotencyKey, in.Operation, c.Now).Scan(&status, &resp)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Result{State: "not_received", Operation: "", ResourceIDs: nil, Result: nil}, nil
 	}
@@ -141,27 +142,29 @@ type ResetPreview struct {
 	DeliveryState string `json:"deliveryState"`
 }
 
-// @Summary		auth.previewPasswordReset (read)
-// @ID				auth.previewPasswordReset
-// @Description	Authorization: public:demo-only
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DDC-07
-// @Tags			auth
-// @Accept			json
-// @Produce		json
-// @Param			request	body		ResetInput	true	"input"
-// @Success		200		{object}	ops.Envelope{data=ResetPreview}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/auth/password-reset-preview [post]
+// previewReset serves auth.previewPasswordReset.
+//
+//	@Summary		auth.previewPasswordReset (read)
+//	@ID				auth.previewPasswordReset
+//	@Description	Authorization: public:demo-only
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DDC-07
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		ResetInput	true	"input"
+//	@Success		200		{object}	ops.Envelope{data=ResetPreview}
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/auth/password-reset-preview [post]
 func previewReset(_ context.Context, _ *ops.Call, _ *ResetInput) (ResetPreview, error) {
 	return ResetPreview{MessageKey: "auth.reset_generic", DeliveryState: "preview"}, nil
 }

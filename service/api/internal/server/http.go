@@ -72,7 +72,21 @@ func newEcho(
 			)
 
 			return nil
-		}, Skipper: nil, BeforeNextFunc: nil, LogProtocol: false, LogRemoteIP: false, LogHost: false, LogURIPath: false, LogRoutePath: false, LogReferer: false, LogUserAgent: false, LogContentLength: false, LogResponseSize: false, LogHeaders: nil, LogQueryParams: nil, LogFormValues: nil,
+		},
+		Skipper:          nil,
+		BeforeNextFunc:   nil,
+		LogProtocol:      false,
+		LogRemoteIP:      false,
+		LogHost:          false,
+		LogURIPath:       false,
+		LogRoutePath:     false,
+		LogReferer:       false,
+		LogUserAgent:     false,
+		LogContentLength: false,
+		LogResponseSize:  false,
+		LogHeaders:       nil,
+		LogQueryParams:   nil,
+		LogFormValues:    nil,
 	}))
 	e.Use(middleware.ContextTimeout(requestTimeout))
 
@@ -103,6 +117,7 @@ func newEcho(
 	}
 
 	v1 := e.Group("/v1", a.Middleware())
+
 	err := reg.MountREST(
 		v1,
 	)

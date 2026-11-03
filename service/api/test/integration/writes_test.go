@@ -48,7 +48,10 @@ func TestWritesGetResult(t *testing.T) {
 		a   *actor
 		op  string
 		key string
-	}{"other member": {&techA, "preferences.update", key}, "other operation": {&techB, "consents.update", key}, "unknown key": {&techB, "preferences.update", "nokey-" + uuid.NewString()}} {
+	}{
+		"other member": {&techA, "preferences.update", key}, "other operation": {&techB, "consents.update", key},
+		"unknown key": {&techB, "preferences.update", "nokey-" + uuid.NewString()},
+	} {
 		if _, m := get(tc.a, tc.op, tc.key); data(m)["state"] != "not_received" {
 			t.Errorf("%s: %v", name, m)
 		}

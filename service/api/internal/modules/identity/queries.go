@@ -54,7 +54,8 @@ type MembersInput struct {
 	Role           string      `json:"role,omitempty"`
 	OrganizationID *uuid.UUID  `json:"organizationId,omitempty"`
 	Permission     string      `json:"permission,omitempty"`
-	ClientRole     string      `json:"clientRole,omitempty"` // owner / member (filter cleaning reminders to the owners, IR239)
+	// owner / member (filter cleaning reminders to the owners, IR239)
+	ClientRole string `json:"clientRole,omitempty"`
 }
 
 // QueryConsent reports whether a membership granted a consent purpose (IR194: SR02 location automations).
@@ -90,7 +91,8 @@ func ConsentGranted(
 func consent(ctx context.Context, c *ops.Call, in *ConsentInput) (bool, error) {
 	var granted bool
 
-	err := c.Tx.QueryRow(ctx, `SELECT COALESCE((SELECT granted FROM identity.consents WHERE membership_id = $1 AND purpose = $2), false)`, in.MembershipID, in.Purpose).
+	err := c.Tx.QueryRow(ctx, `SELECT COALESCE((SELECT granted FROM identity.consents WHERE membership_id = $1 AND purpose
+		= $2), false)`, in.MembershipID, in.Purpose).
 		Scan(&granted)
 
 	return granted, err
@@ -108,9 +110,12 @@ type NotificationsStoredInput struct {
 }
 
 func members(ctx context.Context, c *ops.Call, in *MembersInput) ([]uuid.UUID, error) {
-	q := `SELECT m.id FROM identity.memberships m WHERE m.valid_from <= $1 AND (m.valid_until IS NULL OR m.valid_until > $1)
-		AND ($2::uuid[] IS NULL OR m.id = ANY($2)) AND ($3 = '' OR m.role = $3) AND ($4::uuid IS NULL OR m.organization_id = $4)
-		AND ($5 = '' OR EXISTS (SELECT 1 FROM identity.membership_permissions p WHERE p.membership_id = m.id AND p.permission = $5))
+	q := `SELECT m.id FROM identity.memberships m WHERE m.valid_from <= $1 AND (m.valid_until IS NULL OR m.valid_until >
+		$1)
+		AND ($2::uuid[] IS NULL OR m.id = ANY($2)) AND ($3 = '' OR m.role = $3) AND ($4::uuid IS NULL OR m.organization_id =
+		$4)
+		AND ($5 = '' OR EXISTS (SELECT 1 FROM identity.membership_permissions p WHERE p.membership_id = m.id AND p.permission
+		= $5))
 		AND ($6 = '' OR m.client_role = $6) ORDER BY m.id`
 
 	var ids []uuid.UUID
@@ -147,7 +152,8 @@ func notificationsStored(
 ) (int, error) {
 	var n int
 
-	err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM notify.notifications n WHERE n.id = ANY($1) AND n.target->>'id' = $2::text AND n.occurred_at = $3`,
+	err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM notify.notifications n WHERE n.id = ANY($1) AND n.target->>'id' =
+		$2::text AND n.occurred_at = $3`,
 		in.IDs, in.TargetID, in.OccurredAt).
 		Scan(&n)
 

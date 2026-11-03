@@ -172,15 +172,60 @@ func TestCustomerStatus(t *testing.T) {
 		m    Metrics
 		want string
 	}{
-		"all met":            {Metrics{ResponseWithinTarget: new(float64(100)), ArrivalInWindow: new(float64(95)), FirstTimeFix: new(float64(85)), AverageRating: nil, RatingCount: 0, OpenOverdue: 0}, "on_track"},
-		"nothing measured":   {Metrics{ResponseWithinTarget: nil, ArrivalInWindow: nil, FirstTimeFix: nil, AverageRating: nil, RatingCount: 0, OpenOverdue: 0}, "on_track"},
-		"arrival 5 below":    {Metrics{ResponseWithinTarget: new(float64(100)), ArrivalInWindow: new(float64(85)), FirstTimeFix: nil, AverageRating: nil, RatingCount: 0, OpenOverdue: 0}, "at_risk"},
-		"response 10 below":  {Metrics{ResponseWithinTarget: new(float64(90)), ArrivalInWindow: nil, FirstTimeFix: nil, AverageRating: nil, RatingCount: 0, OpenOverdue: 0}, "at_risk"},
-		"response 11 below":  {Metrics{ResponseWithinTarget: new(float64(89)), ArrivalInWindow: nil, FirstTimeFix: nil, AverageRating: nil, RatingCount: 0, OpenOverdue: 0}, "breached"},
-		"risk then breach":   {Metrics{ArrivalInWindow: new(float64(89)), FirstTimeFix: new(float64(70)), ResponseWithinTarget: nil, AverageRating: nil, RatingCount: 0, OpenOverdue: 0}, "breached"},
-		"breach then risk":   {Metrics{ResponseWithinTarget: new(float64(50)), FirstTimeFix: new(float64(80)), ArrivalInWindow: nil, AverageRating: nil, RatingCount: 0, OpenOverdue: 0}, "breached"},
-		"overdue, all met":   {Metrics{ResponseWithinTarget: new(float64(100)), OpenOverdue: 1, ArrivalInWindow: nil, FirstTimeFix: nil, AverageRating: nil, RatingCount: 0}, "breached"},
-		"first-time fix met": {Metrics{FirstTimeFix: new(float64(85)), ResponseWithinTarget: nil, ArrivalInWindow: nil, AverageRating: nil, RatingCount: 0, OpenOverdue: 0}, "on_track"},
+		"all met": {
+			Metrics{
+				ResponseWithinTarget: new(float64(100)), ArrivalInWindow: new(float64(95)), FirstTimeFix: new(float64(85)),
+				AverageRating: nil, RatingCount: 0, OpenOverdue: 0,
+			}, "on_track",
+		},
+		"nothing measured": {
+			Metrics{
+				ResponseWithinTarget: nil, ArrivalInWindow: nil, FirstTimeFix: nil, AverageRating: nil, RatingCount: 0,
+				OpenOverdue: 0,
+			}, "on_track",
+		},
+		"arrival 5 below": {
+			Metrics{
+				ResponseWithinTarget: new(float64(100)), ArrivalInWindow: new(float64(85)), FirstTimeFix: nil,
+				AverageRating: nil, RatingCount: 0, OpenOverdue: 0,
+			}, "at_risk",
+		},
+		"response 10 below": {
+			Metrics{
+				ResponseWithinTarget: new(float64(90)), ArrivalInWindow: nil, FirstTimeFix: nil, AverageRating: nil,
+				RatingCount: 0, OpenOverdue: 0,
+			}, "at_risk",
+		},
+		"response 11 below": {
+			Metrics{
+				ResponseWithinTarget: new(float64(89)), ArrivalInWindow: nil, FirstTimeFix: nil, AverageRating: nil,
+				RatingCount: 0, OpenOverdue: 0,
+			}, "breached",
+		},
+		"risk then breach": {
+			Metrics{
+				ArrivalInWindow: new(float64(89)), FirstTimeFix: new(float64(70)), ResponseWithinTarget: nil,
+				AverageRating: nil, RatingCount: 0, OpenOverdue: 0,
+			}, "breached",
+		},
+		"breach then risk": {
+			Metrics{
+				ResponseWithinTarget: new(float64(50)), FirstTimeFix: new(float64(80)), ArrivalInWindow: nil,
+				AverageRating: nil, RatingCount: 0, OpenOverdue: 0,
+			}, "breached",
+		},
+		"overdue, all met": {
+			Metrics{
+				ResponseWithinTarget: new(float64(100)), OpenOverdue: 1, ArrivalInWindow: nil, FirstTimeFix: nil,
+				AverageRating: nil, RatingCount: 0,
+			}, "breached",
+		},
+		"first-time fix met": {
+			Metrics{
+				FirstTimeFix: new(float64(85)), ResponseWithinTarget: nil, ArrivalInWindow: nil, AverageRating: nil,
+				RatingCount: 0, OpenOverdue: 0,
+			}, "on_track",
+		},
 	} {
 		if got := customerStatus(c.m, tgt); got != c.want {
 			t.Errorf("%s: %s, want %s", name, got, c.want)

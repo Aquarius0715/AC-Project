@@ -28,7 +28,8 @@ func TestDeviceHistory(t *testing.T) {
 		s,
 		&hq,
 		"devices.calibrate",
-		`{"deviceId":"`+dev+`","sensorId":"`+sensor+`","metric":"temperature","unit":"°C","referenceValue":25,"measuredValue":25.2,"calibratedAt":"2026-09-14T00:10:00Z"}`,
+		`{"deviceId":"`+dev+`","sensorId":"`+sensor+`","metric":"temperature","unit":"°C","referenceValue":25,`+
+			`"measuredValue":25.2,"calibratedAt":"2026-09-14T00:10:00Z"}`,
 		2,
 	)
 	write(s, &hq, "devices.check", `{"id":"`+dev+`"}`, 3)
@@ -36,7 +37,8 @@ func TestDeviceHistory(t *testing.T) {
 	ev := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO devices.device_events (id, tenant_id, device_id, unit_id, event_type, axis, evidence_source, sequence, occurred_at)
+		`INSERT INTO devices.device_events (id, tenant_id, device_id, unit_id, event_type, axis, evidence_source, sequence,
+			occurred_at)
 		VALUES ($1,$2,$3,$4,'tamper','tamper','tamper_signal',1,$5)`,
 		ev,
 		seed.ID("tenant-a"),
@@ -145,7 +147,8 @@ func TestDeviceHistory(t *testing.T) {
 	// technician needs an active assignment on the device's unit (IR94 without jobId)
 	owner(
 		t,
-		`DELETE FROM maintenance.assignments WHERE technician_membership_id = $1 AND job_id IN (SELECT id FROM maintenance.jobs WHERE unit_id = $2)`,
+		`DELETE FROM maintenance.assignments WHERE technician_membership_id = $1 AND job_id IN (SELECT id FROM
+			maintenance.jobs WHERE unit_id = $2)`,
 		seed.ID("tech-internal-a"),
 		u,
 	)
@@ -156,14 +159,16 @@ func TestDeviceHistory(t *testing.T) {
 
 	owner(
 		t,
-		`DELETE FROM maintenance.assignments WHERE technician_membership_id = $1 AND job_id IN (SELECT id FROM maintenance.jobs WHERE customer_org_id = $2)`,
+		`DELETE FROM maintenance.assignments WHERE technician_membership_id = $1 AND job_id IN (SELECT id FROM
+			maintenance.jobs WHERE customer_org_id = $2)`,
 		seed.ID("tech-internal-a"),
 		seed.ID("org-customer-b"),
 	)
 	assign(t, u, "tech-internal-a", clock.Add(-time.Hour), clock.Add(time.Hour), "active")
 	owner(
 		t,
-		`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES ($1,$2,'unit',$3) ON CONFLICT DO NOTHING`,
+		`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES ($1,$2,'unit',$3) ON CONFLICT
+			DO NOTHING`,
 		seed.ID("tenant-a"),
 		seed.ID("tech-internal-a"),
 		u,
@@ -174,7 +179,8 @@ func TestDeviceHistory(t *testing.T) {
 	}
 }
 
-// A unit holds one device at a time (error.unitHasDevice), and only a bound device is calibrated (error.deviceNotBound).
+// A unit holds one device at a time (error.unitHasDevice), and only a bound device is calibrated
+// (error.deviceNotBound).
 func TestDeviceBindingRefusals(t *testing.T) {
 	s := server(t)
 	u := newUnit(t, s, "Bind AC")
@@ -196,7 +202,8 @@ func TestDeviceBindingRefusals(t *testing.T) {
 		s,
 		&hq,
 		"devices.calibrate",
-		`{"deviceId":"`+second["id"].(string)+`","sensorId":"`+sensor+`","metric":"temperature","unit":"°C","referenceValue":25,"measuredValue":25.2,"calibratedAt":"2026-09-14T00:10:00Z"}`,
+		`{"deviceId":"`+second["id"].(string)+`","sensorId":"`+sensor+`","metric":"temperature","unit":"°C",`+
+			`"referenceValue":25,"measuredValue":25.2,"calibratedAt":"2026-09-14T00:10:00Z"}`,
 		1,
 	); code != 409 ||
 		m["messageKey"] != "error.deviceNotBound" {

@@ -25,7 +25,8 @@ func TestEffectivePowerSR27(t *testing.T) {
 
 		owner(
 			t,
-			`UPDATE assets.units SET connection = $2, observed_state = jsonb_build_object('power', true, 'celsius', 25, 'mode', 'cool', 'fanLevel', 'mid', 'observedAt', $3::timestamptz)
+			`UPDATE assets.units SET connection = $2, observed_state = jsonb_build_object('power', true, 'celsius', 25, 'mode',
+				'cool', 'fanLevel', 'mid', 'observedAt', $3::timestamptz)
 			WHERE id = $1`,
 			u,
 			connection,
@@ -33,7 +34,8 @@ func TestEffectivePowerSR27(t *testing.T) {
 		)
 		owner(
 			t,
-			`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version) VALUES ($1,$2,$3,$4,$5,'v1')`,
+			`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version)
+				VALUES ($1,$2,$3,$4,$5,'v1')`,
 			dev,
 			tenant,
 			"PW-"+dev[:8],
@@ -42,7 +44,8 @@ func TestEffectivePowerSR27(t *testing.T) {
 		)
 		owner(
 			t,
-			`INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, stale_after_seconds) VALUES ($1,$2,$3,'power','kW',120)`,
+			`INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, stale_after_seconds) VALUES ($1,$2,$3,'power',
+				'kW',120)`,
 			sensor,
 			tenant,
 			dev,
@@ -53,7 +56,8 @@ func TestEffectivePowerSR27(t *testing.T) {
 	reading := func(u, sensor string, ago time.Duration, seq int, origin, quality string, value any) {
 		owner(
 			t,
-			`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit, origin, quality, received_at, event_id)
+			`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit,
+				origin, quality, received_at, event_id)
 			VALUES ($1,$2,$3,'power',$4,$5,$6,'kW',$7,$8,$4,$9)`,
 			tenant,
 			u,

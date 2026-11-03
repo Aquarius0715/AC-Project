@@ -22,7 +22,8 @@ func poweredUnit(t *testing.T, name string, onAgo, offAgo time.Duration) string 
 	dev, sensor := uuid.NewString(), uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version) VALUES ($1,$2,$3,$4,$5,'v1')`,
+		`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version)
+			VALUES ($1,$2,$3,$4,$5,'v1')`,
 		dev,
 		tenant,
 		"FR-"+dev[:8],
@@ -31,7 +32,8 @@ func poweredUnit(t *testing.T, name string, onAgo, offAgo time.Duration) string 
 	)
 	owner(
 		t,
-		`INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, stale_after_seconds) VALUES ($1,$2,$3,'power','kW',1000000)`,
+		`INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, stale_after_seconds) VALUES ($1,$2,$3,'power',
+			'kW',1000000)`,
 		sensor,
 		tenant,
 		dev,
@@ -43,7 +45,8 @@ func poweredUnit(t *testing.T, name string, onAgo, offAgo time.Duration) string 
 	}{{onAgo, 1.2}, {offAgo, 0}} {
 		owner(
 			t,
-			`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit, origin, quality, received_at, event_id)
+			`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit,
+				origin, quality, received_at, event_id)
 			VALUES ($1,$2,$3,'power',$4,$5,$6,'kW','measured','valid',$4,$7)`,
 			tenant,
 			u,
@@ -66,7 +69,8 @@ func TestFilterReminders(t *testing.T) {
 	s := server(t)
 	ctx := context.Background()
 	tenant, org := seed.ID("tenant-a"), seed.ID("org-customer-b")
-	evaluate := func(at time.Time) { // the next tick evaluates the filters (the job runs every 15 minutes of business time)
+	evaluate := func(at time.Time) {
+		// the next tick evaluates the filters (the job runs every 15 minutes of business time)
 		t.Helper()
 		owner(t, `DELETE FROM maintenance.filter_reminder_watermarks WHERE tenant_id = $1`, tenant)
 
@@ -96,7 +100,8 @@ func TestFilterReminders(t *testing.T) {
 		for i := range out {
 			ownerScan(
 				t,
-				`SELECT id::text, status, severity, coalesce(rule_key, ''), evidence_text, coalesce(resolution_reason, ''), jsonb_array_length(delivery_failures)
+				`SELECT id::text, status, severity, coalesce(rule_key, ''), evidence_text, coalesce(resolution_reason, ''),
+					jsonb_array_length(delivery_failures)
 				FROM monitoring.alerts WHERE unit_id = $1 AND type = 'maintenance' ORDER BY created_at, id OFFSET $2 LIMIT 1`,
 				[]any{u, i},
 				&out[i].id,
@@ -115,7 +120,8 @@ func TestFilterReminders(t *testing.T) {
 		t.Helper()
 		ownerScan(
 			t,
-			`SELECT count(*), count(DISTINCT recipient_membership_id), count(*) FILTER (WHERE channel = 'email') FROM notify.notifications
+			`SELECT count(*), count(DISTINCT recipient_membership_id), count(*) FILTER (WHERE channel = 'email') FROM
+				notify.notifications
 			WHERE source_alert_id = $1 AND type = 'cleaning_due' AND template_key = 'alert' AND severity = 'normal'`,
 			[]any{alertID},
 			&total,
@@ -149,7 +155,8 @@ func TestFilterReminders(t *testing.T) {
 	t.Cleanup(func() { // later tests see neither the units nor their open reminders
 		owner(
 			t,
-			`UPDATE monitoring.alerts SET status = 'resolved', resolved_at = $2 WHERE unit_id = ANY($1::uuid[]) AND status <> 'resolved'`,
+			`UPDATE monitoring.alerts SET status = 'resolved', resolved_at = $2 WHERE unit_id = ANY($1::uuid[]) AND status <>
+				'resolved'`,
 			units,
 			clock,
 		)
@@ -242,7 +249,8 @@ func TestFilterReminders(t *testing.T) {
 	member, user := uuid.NewString(), newUser(t)
 	owner(
 		t,
-		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from) VALUES ($1,$2,$3,$4,'client','member',$5)`,
+		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from) VALUES ($1,
+			$2,$3,$4,'client','member',$5)`,
 		member,
 		tenant,
 		user,
@@ -277,7 +285,8 @@ func TestFilterReminders(t *testing.T) {
 	var clients int
 	ownerScan(
 		t,
-		`SELECT count(*) FROM identity.memberships WHERE organization_id = $1 AND role = 'client' AND valid_from <= $2 AND (valid_until IS NULL OR valid_until > $2)`,
+		`SELECT count(*) FROM identity.memberships WHERE organization_id = $1 AND role = 'client' AND valid_from <= $2 AND
+			(valid_until IS NULL OR valid_until > $2)`,
 		[]any{org, at},
 		&clients,
 	)
@@ -299,7 +308,8 @@ func TestFilterReminders(t *testing.T) {
 	job := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, type, status, origin, requested_slot, due_at, completed_at)
+		`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, type, status, origin, requested_slot, due_at,
+			completed_at)
 		VALUES ($1,$2,$3,$4,'preventive','completed','client_request',tstzrange($5,$6),$6,$6)`,
 		job,
 		tenant,
@@ -310,7 +320,8 @@ func TestFilterReminders(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state, items) VALUES ($1, 1, $2, $3, $4, 'accepted', '[{"componentKey":"filter","result":"normal"}]')`,
+		`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state, items) VALUES ($1, 1, $2, $3,
+			$4, 'accepted', '[{"componentKey":"filter","result":"normal"}]')`,
 		uuid.NewString(),
 		tenant,
 		job,
@@ -332,7 +343,8 @@ func TestFilterReminders(t *testing.T) {
 	units = append(units, offline)
 	owner(
 		t,
-		`INSERT INTO maintenance.filter_cleanings (tenant_id, unit_id, cleaned_at, marked_by_membership_id) VALUES ($1, $2, $3, $4)`,
+		`INSERT INTO maintenance.filter_cleanings (tenant_id, unit_id, cleaned_at, marked_by_membership_id) VALUES ($1, $2,
+			$3, $4)`,
 		tenant,
 		offline,
 		clock.Add(-40*24*time.Hour),

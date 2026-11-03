@@ -20,7 +20,11 @@ func TestConfigFromEnv(t *testing.T) {
 		"IDP_ADMIN_CLIENT_ID",
 		"IDP_ADMIN_CLIENT_SECRET",
 	}
-	for _, k := range append([]string{"RATE_LIMIT_URL", "WRITE_LIMIT_PER_MINUTE", "DEMO_OPS", "DEMO_CLOCK_START", "ADDR", "ENERGY_API_URL", "INTERNAL_API_TOKEN"}, idpEnv...) {
+	for _, k := range append(
+		[]string{
+			"RATE_LIMIT_URL", "WRITE_LIMIT_PER_MINUTE", "DEMO_OPS", "DEMO_CLOCK_START", "ADDR", "ENERGY_API_URL",
+			"INTERNAL_API_TOKEN",
+		}, idpEnv...) {
 		t.Setenv(k, "")
 	}
 

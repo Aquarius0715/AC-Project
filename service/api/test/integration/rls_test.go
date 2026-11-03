@@ -27,10 +27,13 @@ func TestTenantIsolationEverywhere(t *testing.T) {
 	rows, err := conn.Query(
 		ctx,
 		`SELECT n.nspname || '.' || c.relname, c.relispartition, c.relrowsecurity, c.relforcerowsecurity,
-		EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = n.nspname AND p.tablename = c.relname AND p.policyname = 'tenant_isolation')
+		EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = n.nspname AND p.tablename = c.relname AND p.policyname =
+		'tenant_isolation')
 		FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-		WHERE c.relkind IN ('r','p') AND n.nspname NOT IN ('pg_catalog','information_schema','platform') AND n.nspname NOT LIKE 'pg_%'
-		  AND EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = c.oid AND a.attname = 'tenant_id' AND NOT a.attisdropped)`,
+		WHERE c.relkind IN ('r','p') AND n.nspname NOT IN ('pg_catalog','information_schema','platform') AND n.nspname NOT
+		LIKE 'pg_%'
+		  AND EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = c.oid AND a.attname = 'tenant_id' AND NOT
+		  a.attisdropped)`,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -43,6 +46,7 @@ func TestTenantIsolationEverywhere(t *testing.T) {
 			name                          string
 			partition, rls, force, policy bool
 		)
+
 		err := rows.Scan(&name, &partition, &rls, &force, &policy)
 		if err != nil {
 			t.Fatal(err)
@@ -79,7 +83,8 @@ func TestTenantIsolationEverywhere(t *testing.T) {
 	event := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit, origin, quality, received_at, event_id)
+		`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit,
+			origin, quality, received_at, event_id)
 		VALUES ($1,$2,$3,'temperature',$4,1,21.5,'°C','measured','valid',$4,$5)`,
 		other,
 		seed.ID("unit-tenant-b"),
@@ -112,6 +117,7 @@ func TestTenantIsolationEverywhere(t *testing.T) {
 
 	for _, table := range []string{"monitoring.measurements", "monitoring.measurements_default"} {
 		var n int
+
 		err := tx.QueryRow(ctx, `SELECT count(*) FROM `+table+` WHERE event_id = $1`, event).
 			Scan(&n)
 		if err != nil {
@@ -133,8 +139,10 @@ func TestIdempotencyKeysIsolated(t *testing.T) {
 
 	var rls, force, policy bool
 	ownerScan(t, `SELECT c.relrowsecurity, c.relforcerowsecurity,
-		EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'platform' AND p.tablename = 'idempotency_keys' AND p.policyname = 'tenant_isolation')
-		FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'platform' AND c.relname = 'idempotency_keys'`, nil, &rls, &force, &policy)
+		EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'platform' AND p.tablename = 'idempotency_keys' AND
+		p.policyname = 'tenant_isolation')
+		FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'platform' AND c.relname =
+		'idempotency_keys'`, nil, &rls, &force, &policy)
 
 	if !rls || !force || !policy {
 		t.Errorf(
@@ -178,6 +186,7 @@ func TestIdempotencyKeysIsolated(t *testing.T) {
 	}
 
 	var n int
+
 	scanErr := tx.QueryRow(ctx, `SELECT count(*) FROM platform.idempotency_keys WHERE key = $1`, key).
 		Scan(&n)
 	if scanErr != nil {

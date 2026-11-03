@@ -63,7 +63,8 @@ func connectionFault(
 		return out, err
 	}
 
-	scanErr := c.Tx.QueryRow(ctx, `SELECT COALESCE(max(sequence), 0) FROM devices.device_events WHERE device_id = $1 AND binding_id IS NOT DISTINCT FROM $2
+	scanErr := c.Tx.QueryRow(ctx, `SELECT COALESCE(max(sequence), 0) FROM devices.device_events WHERE device_id = $1 AND
+		binding_id IS NOT DISTINCT FROM $2
 		AND axis = 'connection'`, in.DeviceID, out.BindingID).
 		Scan(&out.Sequence)
 	if scanErr != nil {
@@ -75,7 +76,8 @@ func connectionFault(
 		restored *time.Time
 	)
 
-	err = c.Tx.QueryRow(ctx, `SELECT id, restored_at FROM devices.device_events WHERE device_id = $1 AND binding_id IS NOT DISTINCT FROM $2
+	err = c.Tx.QueryRow(ctx, `SELECT id, restored_at FROM devices.device_events WHERE device_id = $1 AND binding_id IS NOT
+		DISTINCT FROM $2
 		AND axis = 'connection' AND event_type <> 'restored' ORDER BY sequence DESC LIMIT 1`, in.DeviceID, out.BindingID).
 		Scan(&id, &restored)
 	switch {

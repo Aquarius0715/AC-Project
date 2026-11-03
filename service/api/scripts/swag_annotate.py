@@ -103,6 +103,30 @@ def clean(text):
     return re.sub(r"\s+", " ", text.replace('"', "'")).strip()
 
 
+def describe(text, width=100):
+    """@Description lines of one paragraph, each at most `width` characters of text so the comment stays within the
+    line length the Go linter allows: a line ending in a backslash continues on the next one (swag joins them with no
+    line break, so swagger.json reads the paragraph unchanged). A word longer than a line (a list joined by commas) is
+    cut after a comma."""
+    pieces = []  # (text, separator before the next piece)
+    for word in text.split(" "):
+        while len(word) > width and "," in word[:width]:
+            cut = word.rindex(",", 0, width) + 1
+            pieces.append((word[:cut], ""))
+            word = word[cut:]
+        pieces.append((word, " "))
+    out, cur, sep = [], "", ""
+    for piece, after in pieces:
+        if cur and len(cur) + len(sep) + len(piece) > width:
+            out.append(cur + sep + "\\")
+            cur = piece
+        else:
+            cur = cur + sep + piece if cur else piece
+        sep = after
+    out.append(cur)
+    return [f"//\t@Description\t{line}" for line in out]
+
+
 def mapping_of(op, name):
     """The query catalog's filter_mapping entry of one filter ("unitId => unitId")."""
     for part in (queries.get(op, {}).get("filter_mapping") or "").split(";"):
@@ -153,9 +177,9 @@ def block(op, pkg, input_type, result_type, route, suffix=None):
     op_id = op if suffix is None else f"{op}.{suffix}"
     title = f"{op} ({mode})" if suffix is None else f"{op} ({mode}) — {suffix.replace('_', ' ')}"
     lines = [f"//\t@Summary\t\t{title}", f"//\t@ID\t\t\t{op_id}"]
-    lines.append(f"//\t@Description\tAuthorization: {clean(row['authorization'])}")
-    lines.append(f"//\t@Description\tValidation: {clean(row['ui_validation'])}")
-    lines.append(f"//\t@Description\tRecovery: {clean(row['ui_recovery'])}")
+    lines += describe(f"Authorization: {clean(row['authorization'])}")
+    lines += describe(f"Validation: {clean(row['ui_validation'])}")
+    lines += describe(f"Recovery: {clean(row['ui_recovery'])}")
     extra = [f"Design: {', '.join(row['design_ids'].split(';'))}"]
     q = queries.get(op)
     if q:
@@ -166,7 +190,7 @@ def block(op, pkg, input_type, result_type, route, suffix=None):
         extra.append("Input versions: " + "; ".join(inputs))
     if route.get("fixedField"):
         extra.append(f"This route sets {route['fixedField']}={route['fixedValue']}")
-    lines.append("//\t@Description\t" + " · ".join(extra))
+    lines += describe(" · ".join(extra))
     lines += [f"//\t@Tags\t\t\t{op.split('.')[0]}", "//\t@Accept\t\t\tjson", "//\t@Produce\t\tjson"]
     if {"id omitted", "id present"} <= {v["branch"] for v in vs}:  # a save: create on the collection, update on the item
         has_id = any(x["in"] == "path" and x["name"] == "id" for x in route["params"])
@@ -350,6 +374,9 @@ def main():
             while start > 0 and lines[start - 1].startswith("//"):
                 start -= 1
             doc = [l for l in lines[start:hi] if not re.match(r"^//\s*@", l) and l.strip() != "//"]
+            if not doc:  # a sentence first: an annotation block that opens the doc comment loses its tab layout to
+                # gofmt, and golangci-lint's swaggo check then misreports the file as unformatted
+                doc = [f"// {re.match(r'^func (?:\([^)]*\) )?(\w+)', lines[hi]).group(1)} serves {op}."]
             lines[start:hi] = doc + ["//"] + annotations
         p.write_text("\n".join(lines), encoding="utf-8")
     print(f"annotated {sum(len(b) for b in edits.values())} handlers in {len(edits)} files, {sum(len(e) for _, e in stubs.values())} route stubs; primitive results: {primitives}; unresolved: {sorted(set(missing))}")

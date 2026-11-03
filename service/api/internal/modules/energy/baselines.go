@@ -43,7 +43,8 @@ type Baseline struct {
 	Source      string          `json:"source"`
 }
 
-const baselineCols = `b.id, b.tenant_id, b.version, (SELECT min(created_at) FROM energy.baselines o WHERE o.id = b.id), b.created_at, b.unit_ids, lower(b.period), upper(b.period),
+const baselineCols = `b.id, b.tenant_id, b.version, (SELECT min(created_at) FROM energy.baselines o WHERE o.id = ` +
+	`b.id), b.created_at, b.unit_ids, lower(b.period), upper(b.period),
 	b.method, b.baseline_kwh, b.quality, b.boundary_id, b.boundary, b.assumptions, b.source`
 
 func scanBaseline(r pgx.Row) (Baseline, error) {
@@ -83,7 +84,8 @@ func clientUnits(c *ops.Call, args *[]any) string {
 	*args = append(*args, c.Principal.OrgID)
 
 	return fmt.Sprintf(
-		"NOT EXISTS (SELECT 1 FROM unnest(b.unit_ids) uid LEFT JOIN energy.ref_units u ON u.id = uid WHERE u.customer_org_id IS DISTINCT FROM $%d)",
+		"NOT EXISTS (SELECT 1 FROM unnest(b.unit_ids) uid LEFT JOIN energy.ref_units u ON u.id = uid WHERE "+
+			"u.customer_org_id IS DISTINCT FROM $%d)",
 		len(*args),
 	)
 }
@@ -110,37 +112,42 @@ func LoadBaseline(ctx context.Context, c *ops.Call, id uuid.UUID, version *int) 
 	return x, err
 }
 
-// @Summary		baselines.list (read)
-// @ID				baselines.list
-// @Description	Authorization: client:self | admin:energy.read | admin:mrv.read; IR90 client only when all unitIds in scope
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A13, DD-C06, DD-A14, DD-C01 · Query: filters unitId,unitIds,from,to,customerId,propertyId,method,boundaryId · sort id,createdAt,updatedAt,periodFrom (default createdAt desc;id desc)
-// @Tags			baselines
-// @Accept			json
-// @Produce		json
-// @Param			cursor		query		string		false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit		query		integer		false	"page size 1–100, default 25"
-// @Param			sort		query		string		false	"field:direction — fields id,createdAt,updatedAt,periodFrom; default createdAt desc;id desc"
-// @Param			unitId		query		string		false	"filter → unitIds contains"
-// @Param			unitIds		query		[]string	false	"filter → unitIds intersection nonempty (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
-// @Param			from		query		string		false	"filter → [from,to) on period.from"
-// @Param			to			query		string		false	"filter → [from,to) on period.from"
-// @Param			customerId	query		string		false	"filter → any of unitIds belongs to the customer"
-// @Param			propertyId	query		string		false	"filter → any of unitIds is in the property"
-// @Param			method		query		string		false	"filter → method"
-// @Param			boundaryId	query		string		false	"filter → boundaryId"
-// @Success		200			{object}	ops.Envelope{data=BaselinePage}
-// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/baselines [get]
+// listBaselines serves baselines.list.
+//
+//	@Summary		baselines.list (read)
+//	@ID				baselines.list
+//	@Description	Authorization: client:self | admin:energy.read | admin:mrv.read; IR90 client only when all unitIds \
+//	@Description	in scope
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A13, DD-C06, DD-A14, DD-C01 · Query: filters \
+//	@Description	unitId,unitIds,from,to,customerId,propertyId,method,boundaryId · sort \
+//	@Description	id,createdAt,updatedAt,periodFrom (default createdAt desc;id desc)
+//	@Tags			baselines
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor		query		string		false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit		query		integer		false	"page size 1–100, default 25"
+//	@Param			sort		query		string		false	"field:direction — fields id,createdAt,updatedAt,periodFrom; default createdAt desc;id desc"
+//	@Param			unitId		query		string		false	"filter → unitIds contains"
+//	@Param			unitIds		query		[]string	false	"filter → unitIds intersection nonempty (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
+//	@Param			from		query		string		false	"filter → [from,to) on period.from"
+//	@Param			to			query		string		false	"filter → [from,to) on period.from"
+//	@Param			customerId	query		string		false	"filter → any of unitIds belongs to the customer"
+//	@Param			propertyId	query		string		false	"filter → any of unitIds is in the property"
+//	@Param			method		query		string		false	"filter → method"
+//	@Param			boundaryId	query		string		false	"filter → boundaryId"
+//	@Success		200			{object}	ops.Envelope{data=BaselinePage}
+//	@Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/baselines [get]
 func listBaselines(
 	ctx context.Context,
 	c *ops.Call,
@@ -221,7 +228,8 @@ func listBaselines(
 	if f.CustomerID != nil {
 		conds = append(
 			conds,
-			"EXISTS (SELECT 1 FROM energy.ref_units u JOIN energy.ref_customers cu ON cu.organization_id = u.customer_org_id WHERE u.id = ANY(b.unit_ids) AND cu.id = "+add(
+			"EXISTS (SELECT 1 FROM energy.ref_units u JOIN energy.ref_customers cu ON cu.organization_id = u.customer_org_id "+
+				"WHERE u.id = ANY(b.unit_ids) AND cu.id = "+add(
 				*f.CustomerID,
 			)+")",
 		)
@@ -247,6 +255,7 @@ func listBaselines(
 	where := strings.Join(conds, " AND ")
 
 	var total int
+
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM energy.baselines b WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
@@ -388,7 +397,8 @@ const modeledQuality = `{"kind":"modeled","coverage":null,"expectedSlots":null,"
 //	@Summary		baselines.save (write)
 //	@ID				baselines.save
 //	@Description	Authorization: admin:energy.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; SR29 Repository computes measured quality; fixed is modeled
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	SR29 Repository computes measured quality; fixed is modeled
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A13
 //	@Tags			baselines
@@ -409,6 +419,7 @@ const modeledQuality = `{"kind":"modeled","coverage":null,"expectedSlots":null,"
 //	@Router			/v1/baselines [post]
 func saveBaseline(ctx context.Context, c *ops.Call, in *BaselineInput) (Baseline, error) {
 	var known int
+
 	err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND NOT archived`, in.UnitIDs).
 		Scan(&known)
 	if err != nil {
@@ -451,13 +462,14 @@ func saveBaseline(ctx context.Context, c *ops.Call, in *BaselineInput) (Baseline
 				n.ExpectedSlots,
 			),
 			SourceSnapshot: *new(struct {
-				Generation  int       "json:\"generation\""
-				EventCursor int       "json:\"eventCursor\""
-				SnapshotAt  time.Time "json:\"snapshotAt\""
+				Generation  int       `json:"generation"`
+				EventCursor int       `json:"eventCursor"`
+				SnapshotAt  time.Time `json:"snapshotAt"`
 			}),
 		}
 
 		q.SourceSnapshot.Generation, q.SourceSnapshot.SnapshotAt = 1, c.Now
+
 		scanErr := c.Tx.QueryRow(ctx, `SELECT count(*) FROM platform.outbox`).
 			Scan(&q.SourceSnapshot.EventCursor)
 		if scanErr != nil {
@@ -481,8 +493,10 @@ func saveBaseline(ctx context.Context, c *ops.Call, in *BaselineInput) (Baseline
 
 	_, err = c.Tx.Exec(
 		ctx,
-		`INSERT INTO energy.baselines (id, version, tenant_id, unit_ids, period, method, baseline_kwh, quality, boundary_id, boundary, assumptions, source, created_by, created_at)
-		VALUES ($1, $2, current_setting('app.tenant_id')::uuid, $3, tstzrange($4, $5), $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+		`INSERT INTO energy.baselines (id, version, tenant_id, unit_ids, period, method, baseline_kwh, quality, boundary_id,
+			boundary, assumptions, source, created_by, created_at)
+		VALUES ($1, $2, current_setting('app.tenant_id')::uuid, $3, tstzrange($4, $5), $6, $7, $8, $9, $10, $11, $12, $13,
+		$14)`,
 		id,
 		version,
 		in.UnitIDs,

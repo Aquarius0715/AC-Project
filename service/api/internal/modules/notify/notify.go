@@ -46,6 +46,7 @@ func (Store) Create(ctx context.Context, c *ops.Call, n New) (uuid.UUID, error) 
 	id := uuid.Must(uuid.NewV7())
 
 	var tenant uuid.UUID
+
 	err := c.Tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')::uuid`).
 		Scan(&tenant)
 	if err != nil {
@@ -82,6 +83,7 @@ func EventHandlers() map[string]events.Handler {
 	return map[string]events.Handler{
 		events.NotificationRequested: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.Notification
+
 			decodeErr := e.Decode(&p)
 			if decodeErr != nil {
 				return decodeErr
@@ -91,9 +93,11 @@ func EventHandlers() map[string]events.Handler {
 			params, _ := json.Marshal(p.Params)
 			_, err := tx.Exec(
 				ctx,
-				`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type, channel, template_key, target, params,
+				`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type, channel,
+					template_key, target, params,
 				source_alert_id, severity, occurred_at, created_at)
-				SELECT $1, $2, m.id, m.scope_version, $4, $5, $6, $7, $8, $9, $10, $11, $11 FROM identity.memberships m WHERE m.id = $3
+				SELECT $1, $2, m.id, m.scope_version, $4, $5, $6, $7, $8, $9, $10, $11, $11 FROM identity.memberships m WHERE m.id =
+				$3
 				ON CONFLICT (id) DO NOTHING`,
 				p.NotificationID,
 				e.TenantID,

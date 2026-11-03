@@ -181,7 +181,9 @@ func TestAutomationSchedules(t *testing.T) {
 		s,
 		&customerB,
 		"automations.save",
-		`{"id":"`+id+`","name":"x","unitIds":["`+u+`"],"timezone":"UTC","enabled":false,"priority":1,"kind":"event","condition":{"type":"occupancy","occupied":true},"action":{"kind":"set_power","power":false}}`,
+		`{"id":"`+id+`","name":"x",`+
+			`"unitIds":["`+u+`"],"timezone":"UTC","enabled":false,"priority":1,"kind":"event",`+
+			`"condition":{"type":"occupancy","occupied":true},"action":{"kind":"set_power","power":false}}`,
 		1,
 	); code != 422 ||
 		fields(m) != "kind=error.immutable" {
@@ -250,7 +252,9 @@ func TestAutomationEvents(t *testing.T) {
 	s := server(t)
 	u := newUnit(t, s, "Event AC")
 	rule := func(cond string) string {
-		return `{"name":"When home","unitIds":["` + u + `"],"timezone":"Asia/Kuala_Lumpur","enabled":true,"priority":10,"kind":"event","condition":` + cond + `,"action":{"kind":"set_temperature","celsius":24}}`
+		return `{"name":"When home",` +
+			`"unitIds":["` + u + `"],"timezone":"Asia/Kuala_Lumpur","enabled":true,"priority":10,` +
+			`"kind":"event","condition":` + cond + `,"action":{"kind":"set_temperature","celsius":24}}`
 	}
 	want := map[string]string{ // the field each case is refused for
 		"{\"type\":\"location\",\"event\":\"leave\"}":                                        "condition=error.invalid",
@@ -261,7 +265,9 @@ func TestAutomationEvents(t *testing.T) {
 	}
 
 	for _, c := range []string{
-		`{"type":"occupancy"}`, `{"type":"pattern","localTime":"25:00"}`, `{"type":"weather","metric":"temperature","operator":"eq","value":30}`,
+		`{"type":"occupancy"}`, `{"type":"pattern",` +
+			`"localTime":"25:00"}`, `{"type":"weather","metric":"temperature",` +
+			`"operator":"eq","value":30}`,
 		`{"type":"tariff","operator":"gt","value":1,"unit":"MYR_per_kWh"}`, `{"type":"location","event":"leave"}`,
 	} {
 		code, m := write(s, &customerB, "automations.save", rule(c), 0)

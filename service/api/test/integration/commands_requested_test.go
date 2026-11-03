@@ -23,7 +23,8 @@ func TestRequestedCommandsForTheGateway(t *testing.T) {
 	command := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO control.commands (id, tenant_id, unit_id, device_id, actor_membership_id, source, action, status, delivery, requested_at, expires_at, correlation_id, created_at, updated_at)
+		`INSERT INTO control.commands (id, tenant_id, unit_id, device_id, actor_membership_id, source, action, status,
+			delivery, requested_at, expires_at, correlation_id, created_at, updated_at)
 		VALUES ($1,$2,$3,$4,$5,'ui',$6,'requested','not_sent',$7,$8,'corr-requested',$7,$7)`,
 		command,
 		seed.ID("tenant-a"),

@@ -134,9 +134,12 @@ func TestFirmwareCampaigns(t *testing.T) {
 		}
 
 		refusal(t, name, code, m, map[string]string{
-			"start < 24 h": "startAt=error.atLeast24h", "waves not ascending": "waves[1]=error.ascending", "waves end < 100": "waves=error.mustEndAt100",
-			"auto pause 60": "autoPauseFailurePercent=error.range", "bad window": "window=error.invalid", "unsupported fw": "targetVersion=error.unsupportedFirmware",
-			"already on target": "deviceIds=error.alreadyOnTarget", "unknown device": "deviceIds=error.unknownDevice", "duplicate device": "deviceIds=error.duplicate",
+			"start < 24 h": "startAt=error.atLeast24h", "waves not ascending": "waves[1]=error.ascending",
+			"waves end < 100": "waves=error.mustEndAt100",
+			"auto pause 60":   "autoPauseFailurePercent=error.range", "bad window": "window=error.invalid",
+			"unsupported fw":    "targetVersion=error.unsupportedFirmware",
+			"already on target": "deviceIds=error.alreadyOnTarget", "unknown device": "deviceIds=error.unknownDevice",
+			"duplicate device": "deviceIds=error.duplicate",
 		}[name])
 	}
 	// list / get
@@ -206,7 +209,8 @@ func TestFirmwareCampaigns(t *testing.T) {
 
 	owner(
 		t,
-		`UPDATE devices.firmware_campaign_devices SET result = 'failed', detail = 'error.checksumMismatch' WHERE campaign_id = $1 AND device_id = $2`,
+		`UPDATE devices.firmware_campaign_devices SET result = 'failed', detail = 'error.checksumMismatch' WHERE campaign_id =
+			$1 AND device_id = $2`,
 		camp,
 		strings.Trim(devs[0], `"`),
 	)

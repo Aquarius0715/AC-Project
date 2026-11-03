@@ -87,7 +87,8 @@ type Command struct {
 	Source            string          `json:"source"` // ui | voice | automation | restriction | diagnostic | group (IR216)
 }
 
-const commandCols = `id, tenant_id, version, created_at, updated_at, unit_id, actor_membership_id, action, diagnostic_run_id, job_id, reason, status, delivery,
+const commandCols = `id, tenant_id, version, created_at, updated_at, unit_id, actor_membership_id, action, ` +
+	`diagnostic_run_id, job_id, reason, status, delivery,
 	requested_at, sent_at, acknowledged_at, expires_at, failure_code, correlation_id, source`
 
 func scanCommand(r pgx.Row) (Command, error) {
@@ -165,8 +166,9 @@ type CreateInput struct {
 	JobID               *uuid.UUID      `json:"jobId,omitempty"`
 	Reason              *string         `json:"reason,omitempty"`
 	ExpectedUnitVersion int             `json:"expectedUnitVersion"`
-	Source              string          `json:"source,omitempty"                         enums:"ui,voice"` // the channel the user chose; ui when omitted (IR306)
-	action              UnitAction
+	// the channel the user chose; ui when omitted (IR306)
+	Source string `enums:"ui,voice" json:"source,omitempty"`
+	action UnitAction
 }
 
 // Validate implements ops.Validator.
@@ -211,28 +213,36 @@ func inScope(p *ops.Principal, unit, property, org uuid.UUID) bool {
 	return has("unit", unit) || has("property", property) || has("organization", org)
 }
 
-// @Summary		commands.create (write)
-// @ID				commands.create
-// @Description	Authorization: client:control.execute | technician:control.diagnose:job-required | admin:control.execute
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR46 restriction action table; IR47 derived connection/powerSignal OFFLINE; IR74 client omits reason; IR94 technician write table (assignment and work window, jobId required when typed); IR109 group control sends one command per selected unit (owner only); IR306 source ui (default) or voice, voice only from a client (the assistant of the Client app)
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-C03, DD-T10, DD-A11 through automations.fire, DD-C04, DD-C05, DD-A02, DD-C14 · Input versions: expectedUnitVersion=UnitDetail.version
-// @Tags			commands
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		CreateInput	true	"input"
-// @Success		200				{object}	ops.Envelope{data=Command}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/commands [post]
+// create serves commands.create.
+//
+//	@Summary		commands.create (write)
+//	@ID				commands.create
+//	@Description	Authorization: client:control.execute | technician:control.diagnose:job-required | \
+//	@Description	admin:control.execute
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR46 restriction action table; IR47 derived connection/powerSignal OFFLINE; IR74 client omits \
+//	@Description	reason; IR94 technician write table (assignment and work window, jobId required when typed); IR109 \
+//	@Description	group control sends one command per selected unit (owner only); IR306 source ui (default) or voice, \
+//	@Description	voice only from a client (the assistant of the Client app)
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-C03, DD-T10, DD-A11 through automations.fire, DD-C04, DD-C05, DD-A02, DD-C14 · Input \
+//	@Description	versions: expectedUnitVersion=UnitDetail.version
+//	@Tags			commands
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		CreateInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Command}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/commands [post]
 func (m Commands) create(ctx context.Context, c *ops.Call, in *CreateInput) (Command, error) {
 	t, found, err := m.Units.Target(ctx, c, in.UnitID)
 	if err != nil {
@@ -313,9 +323,11 @@ func (m Commands) create(ctx context.Context, c *ops.Call, in *CreateInput) (Com
 	x, err := scanCommand(
 		c.Tx.QueryRow(
 			ctx,
-			`INSERT INTO control.commands (tenant_id, unit_id, device_id, actor_membership_id, source, action, job_id, reason, status, delivery,
+			`INSERT INTO control.commands (tenant_id, unit_id, device_id, actor_membership_id, source, action, job_id, reason,
+				status, delivery,
 		requested_at, sent_at, expires_at, correlation_id, created_at, updated_at)
-		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $10, $4, $5, $6, 'requested', 'not_sent', $7, NULL, $8, $9, $7, $7) RETURNING `+commandCols,
+		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $10, $4, $5, $6, 'requested', 'not_sent', $7, NULL, $8,
+		$9, $7, $7) RETURNING `+commandCols,
 			in.UnitID,
 			dev,
 			c.Principal.MembershipID,
@@ -418,27 +430,30 @@ func (in *GetInput) Validate() map[string]string {
 	return nil
 }
 
-// @Summary		commands.get (read)
-// @ID				commands.get
-// @Description	Authorization: client:self | technician:assigned | admin:control.execute | admin:restriction.read | admin:restriction.override | admin:automation.policy.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A09, DD-A12, DD-C03, DD-C12, DD-T10, DD-A02, DD-A16, DD-C14
-// @Tags			commands
-// @Accept			json
-// @Produce		json
-// @Param			id	path		string	true	"input field id"
-// @Success		200	{object}	ops.Envelope{data=Command}
-// @Failure		401	{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403	{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404	{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409	{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422	{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429	{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503	{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504	{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/commands/{id} [get]
+// get serves commands.get.
+//
+//	@Summary		commands.get (read)
+//	@ID				commands.get
+//	@Description	Authorization: client:self | technician:assigned | admin:control.execute | admin:restriction.read | \
+//	@Description	admin:restriction.override | admin:automation.policy.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A09, DD-A12, DD-C03, DD-C12, DD-T10, DD-A02, DD-A16, DD-C14
+//	@Tags			commands
+//	@Accept			json
+//	@Produce		json
+//	@Param			id	path		string	true	"input field id"
+//	@Success		200	{object}	ops.Envelope{data=Command}
+//	@Failure		401	{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403	{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404	{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409	{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422	{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429	{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503	{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504	{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/commands/{id} [get]
 func (m Commands) get(ctx context.Context, c *ops.Call, in *GetInput) (Command, error) {
 	x, err := scanCommand(
 		c.Tx.QueryRow(ctx, "SELECT "+commandCols+" FROM control.commands WHERE id = $1", in.ID),
@@ -458,7 +473,8 @@ func (m Commands) get(ctx context.Context, c *ops.Call, in *GetInput) (Command, 
 		}
 
 		ok := found &&
-			((c.Principal.Role == "client" && t.OrgID == c.Principal.OrgID) || (c.Principal.Role == "technician" && inScope(c.Principal, x.UnitID, t.PropertyID, t.OrgID)))
+			((c.Principal.Role == "client" && t.OrgID == c.Principal.OrgID) ||
+				(c.Principal.Role == "technician" && inScope(c.Principal, x.UnitID, t.PropertyID, t.OrgID)))
 		if !ok {
 			return Command{}, apperr.E(apperr.NotFound, "error.notFound")
 		}
@@ -490,8 +506,10 @@ func (in *ListInput) Validate() map[string]string {
 //
 //	@Summary		commands.list (read)
 //	@ID				commands.list
-//	@Description	Authorization: client:self | technician:control.diagnose:assigned-valid-job | admin:control.execute | admin:job.read
-//	@Description	Validation: D01; SR08/SR09; IR216 the unit's history newest first; a client sees others' reasons withheld; a technician sees one job it holds or held an Assignment of (jobId required)
+//	@Description	Authorization: client:self | technician:control.diagnose:assigned-valid-job | admin:control.execute \
+//	@Description	| admin:job.read
+//	@Description	Validation: D01; SR08/SR09; IR216 the unit's history newest first; a client sees others' reasons \
+//	@Description	withheld; a technician sees one job it holds or held an Assignment of (jobId required)
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
 //	@Description	Design: DD-C03, DD-T10 · Query: filters none · sort id,requestedAt (default requestedAt desc;id asc)
 //	@Tags			commands
@@ -560,7 +578,9 @@ func (m Commands) list(
 		}
 
 		var ok bool
-		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.unit_assignment_access WHERE job_id = $1 AND unit_id = $2 AND technician_membership_id = $3)`,
+
+		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.unit_assignment_access WHERE job_id = $1 AND unit_id =
+			$2 AND technician_membership_id = $3)`,
 			*in.JobID, in.UnitID, c.Principal.MembershipID).
 			Scan(&ok)
 		if err != nil {
@@ -585,6 +605,7 @@ func (m Commands) list(
 	}
 
 	var total int
+
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM control.commands WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
@@ -630,10 +651,10 @@ func (m Commands) list(
 	}, rows.Err()
 }
 
-// AuditResult appends the final result of a command that a person asked for (commands.create: source ui or voice) under the request's
-// correlation ID, after its pending entry: success when the device acknowledged it, failed when the device refused it
-// or its window passed, the failure code as the reason (IR90, IR604). actor is the system part that saw it. Commands of
-// a restriction, a diagnosis or an automation are recorded under their own operations.
+// AuditResult appends the final result of a command that a person asked for (commands.create: source ui or voice) under
+// the request's correlation ID, after its pending entry: success when the device acknowledged it, failed when the
+// device refused it or its window passed, the failure code as the reason (IR90, IR604). actor is the system part that
+// saw it. Commands of a restriction, a diagnosis or an automation are recorded under their own operations.
 func AuditResult(
 	ctx context.Context,
 	tx pgx.Tx,
@@ -646,6 +667,7 @@ func AuditResult(
 		corr   *string
 		source string
 	)
+
 	err := tx.QueryRow(ctx, `SELECT tenant_id, correlation_id, source FROM control.commands WHERE id = $1`, command).
 		Scan(&tenant, &corr, &source)
 	if err != nil {
@@ -800,7 +822,8 @@ func applyObserved(ctx context.Context, tx pgx.Tx, command uuid.UUID, at time.Ti
 			WHEN 'set_fan' THEN jsonb_build_object('fanLevel', c.action->'fanLevel')
 		END || jsonb_build_object('observedAt', $2::text)
 		FROM control.commands c
-		WHERE c.id = $1 AND u.id = c.unit_id AND c.action->>'kind' IN ('set_power', 'set_temperature', 'set_mode', 'set_fan')`,
+		WHERE c.id = $1 AND u.id = c.unit_id AND c.action->>'kind' IN ('set_power', 'set_temperature', 'set_mode',
+		'set_fan')`,
 		command,
 		at.UTC().Format(time.RFC3339Nano),
 	)
@@ -819,7 +842,8 @@ func Register(r *ops.Registry, m Commands) {
 func PendingCommands(ctx context.Context, c *ops.Call, unit uuid.UUID) ([]Command, error) {
 	rows, err := c.Tx.Query(
 		ctx,
-		"SELECT "+commandCols+" FROM control.commands WHERE unit_id = $1 AND status IN ('requested','sent') ORDER BY requested_at, id",
+		"SELECT "+commandCols+" FROM control.commands WHERE unit_id = $1 AND status IN ('requested','sent') ORDER BY "+
+			"requested_at, id",
 		unit,
 	)
 	if err != nil {

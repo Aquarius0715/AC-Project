@@ -3,7 +3,7 @@
 //
 //	expr        = alternative { "|" alternative }
 //	alternative = role ":" [ permission ":" ] predicate { ":" predicate }   (role-only "role:predicate" is allowed)
-//	            | "IR" digits ":" note { ":" note }                           (replay rule annotation, never grants access)
+//	            | "IR" digits ":" note { ":" note }                           (replay rule annotation: never grants)
 //
 // A permission is one of the 38 Permission values; anything else after the role is a named predicate. Predicates
 // are scope rules evaluated by the module with the target loaded (for example self, assigned-valid-job); the
@@ -30,7 +30,12 @@ var Roles = map[string]bool{
 var Permissions = map[string]bool{}
 
 func init() {
-	for p := range strings.SplitSeq("dashboard.read asset.read asset.write identity.read identity.write device.read device.write device.maintain control.execute control.diagnose alert.read alert.resolve alert.policy.read alert.policy.write job.read job.write contract.read contract.write billing.read billing.write billing.payment restriction.read restriction.write restriction.override automation.policy.read automation.policy.write energy.read energy.write mrv.read mrv.write mrv.review mrv.factors offset.read offset.write audit.read partner.accept partner.assign partner.review", " ") {
+	for p := range strings.SplitSeq("dashboard.read asset.read asset.write identity.read identity.write device.read "+
+		"device.write device.maintain control.execute control.diagnose alert.read alert.resolve alert.policy.read "+
+		"alert.policy.write job.read job.write contract.read contract.write billing.read billing.write billing.payment "+
+		"restriction.read restriction.write restriction.override automation.policy.read automation.policy.write "+
+		"energy.read energy.write mrv.read mrv.write mrv.review mrv.factors offset.read offset.write audit.read "+
+		"partner.accept partner.assign partner.review", " ") {
 		Permissions[p] = true
 	}
 }

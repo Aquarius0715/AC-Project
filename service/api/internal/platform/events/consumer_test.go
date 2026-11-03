@@ -32,6 +32,7 @@ func TestConsumerWithoutHandlers(t *testing.T) {
 		Now:       nil,
 		SplitFrom: "",
 	}
+
 	n, err := c.Drain(context.Background())
 	if n != 0 || err != nil {
 		t.Fatalf("Drain without handlers: %d %v", n, err)

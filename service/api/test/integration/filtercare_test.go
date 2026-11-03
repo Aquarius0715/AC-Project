@@ -23,7 +23,8 @@ func TestFilterCare(t *testing.T) {
 	dev, sensor := uuid.NewString(), uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version) VALUES ($1,$2,$3,$4,$5,'v1')`,
+		`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version)
+			VALUES ($1,$2,$3,$4,$5,'v1')`,
 		dev,
 		tenant,
 		"FC-"+dev[:8],
@@ -32,7 +33,8 @@ func TestFilterCare(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, stale_after_seconds) VALUES ($1,$2,$3,'power','kW',1000000)`,
+		`INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, stale_after_seconds) VALUES ($1,$2,$3,'power',
+			'kW',1000000)`,
 		sensor,
 		tenant,
 		dev,
@@ -41,7 +43,8 @@ func TestFilterCare(t *testing.T) {
 	reading := func(ago time.Duration, v float64, seq int) {
 		owner(
 			t,
-			`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit, origin, quality, received_at, event_id)
+			`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit,
+				origin, quality, received_at, event_id)
 			VALUES ($1,$2,$3,'power',$4,$5,$6,'kW','measured','valid',$4,$7)`,
 			tenant,
 			u,
@@ -214,7 +217,8 @@ func TestFilterCare(t *testing.T) {
 	job := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, type, status, origin, requested_slot, due_at, completed_at)
+		`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, type, status, origin, requested_slot, due_at,
+			completed_at)
 		VALUES ($1,$2,$3,$4,'preventive','completed','client_request',tstzrange($5,$6),$6,$6)`,
 		job,
 		tenant,
@@ -225,7 +229,8 @@ func TestFilterCare(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state, items) VALUES ($1, 1, $2, $3, $4, 'accepted', '[{"componentKey":"filter","result":"normal"}]')`,
+		`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state, items) VALUES ($1, 1, $2, $3,
+			$4, 'accepted', '[{"componentKey":"filter","result":"normal"}]')`,
 		uuid.NewString(),
 		tenant,
 		job,
@@ -278,7 +283,8 @@ func TestFilterCare(t *testing.T) {
 		"{\"sort\":{\"field\":\"runHours\",\"direction\":\"asc\"}}": "sort.field=error.invalid",
 	}
 
-	for _, b := range []string{`{"filters":{"status":"dirty"}}`, `{"filters":{"x":1}}`, `{"sort":{"field":"runHours","direction":"asc"}}`} {
+	for _, b := range []string{`{"filters":{"status":"dirty"}}`, `{"filters":{"x":1}}`, `{"sort":{"field":"runHours",` +
+		`"direction":"asc"}}`} {
 		code, m := post(s, &customerB, "filterCare.list", b)
 		refusal(t, b, code, m, want[b])
 	}

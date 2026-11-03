@@ -11,8 +11,10 @@ import (
 
 // The nodes' messages as they arrive (smarthome/ac/<node>/sensors): each fills what it does not measure with zeros.
 const (
-	node1Message = `{"device_id":"node_1","timestamp":"2026-10-30 13:52:21","temp":27.2,"humidity":50.9,"pressure":1010.4,"gas":65110.0,"approx_altitude":23.4,"voltage":0.0,"current":0.000,"power":0.0,"energy":0.000}`
-	node2Message = `{"device_id":"node_2","timestamp":"2026-10-30 13:52:22","temp":0.0,"humidity":0.0,"pressure":0.0,"gas":0.0,"approx_altitude":0.0,"voltage":229.8,"current":3.410,"power":742.0,"energy":12.345}`
+	node1Message = `{"device_id":"node_1","timestamp":"2026-10-30 13:52:21","temp":27.2,"humidity":50.9,` +
+		`"pressure":1010.4,"gas":65110.0,"approx_altitude":23.4,"voltage":0.0,"current":0.000,"power":0.0,"energy":0.000}`
+	node2Message = `{"device_id":"node_2","timestamp":"2026-10-30 13:52:22","temp":0.0,"humidity":0.0,"pressure":0.0,` +
+		`"gas":0.0,"approx_altitude":0.0,"voltage":229.8,"current":3.410,"power":742.0,"energy":12.345}`
 )
 
 var liveAt = time.Date(2026, 9, 20, 3, 15, 42, 0, time.UTC) // on the scenario clock
@@ -125,8 +127,8 @@ func TestLiveTriggersRoomNode(t *testing.T) {
 	}
 }
 
-// TestLiveTriggersPowerNode: node_2's power in W is recorded in kW on the same unit, with the module's heartbeat; a zero
-// power is a reading while the meter sees a voltage, and with no voltage the meter measured nothing.
+// TestLiveTriggersPowerNode: node_2's power in W is recorded in kW on the same unit, with the module's heartbeat; a
+// zero power is a reading while the meter sees a voltage, and with no voltage the meter measured nothing.
 func TestLiveTriggersPowerNode(t *testing.T) {
 	out, err := LiveTriggers("node_2", []byte(node2Message), liveAt)
 	if err != nil {
@@ -310,7 +312,9 @@ func TestLiveCommand(t *testing.T) {
 		)
 	}
 
-	for _, a := range []string{`{"kind":"set_temperature","celsius":24}`, `{"kind":"set_mode","mode":"cool"}`, `{"kind":"set_fan","fanLevel":"mid"}`, `{"kind":"set_power"}`} {
+	for _, a := range []string{`{"kind":"set_temperature",` +
+		`"celsius":24}`, `{"kind":"set_mode",` +
+		`"mode":"cool"}`, `{"kind":"set_fan","fanLevel":"mid"}`, `{"kind":"set_power"}`} {
 		payload, _, ok, err := LiveCommand(
 			json.RawMessage(a),
 		)

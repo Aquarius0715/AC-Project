@@ -19,7 +19,8 @@ type Releases interface {
 	OnInvoicePaid(ctx context.Context, c *ops.Call, invoice uuid.UUID) ([]uuid.UUID, error)
 }
 
-const paymentCols = `id, tenant_id, version, created_at, updated_at, amount_minor, currency, invoice_id, method, status, payment_reference, confirmed_at, confirmation_reason, event_ids`
+const paymentCols = `id, tenant_id, version, created_at, updated_at, amount_minor, currency, invoice_id, method, ` +
+	`status, payment_reference, confirmed_at, confirmation_reason, event_ids`
 
 func scanPayment(r pgx.Row) (Payment, error) {
 	var p Payment
@@ -95,7 +96,8 @@ func refOK(s *string) bool {
 func referenceFree(ctx context.Context, c *ops.Call, ref string, except uuid.UUID) (bool, error) {
 	var used bool
 
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM billing.payments WHERE payment_reference = $1 AND id <> $2)`, ref, except).
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM billing.payments WHERE payment_reference = $1 AND id <>
+		$2)`, ref, except).
 		Scan(&used)
 
 	return !used, err
@@ -215,29 +217,33 @@ func (in *SimulateInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		payments.simulate (write)
-// @ID				payments.simulate
-// @Description	Authorization: client:self:demo-event-only
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR59 single path for customer processing/confirm/fail; IR60 demo-only; initiate: one attempt in flight or the one confirmed payment per invoice (CONFLICT errors.invoice_has_payment; IR474)
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-C11
-// @Tags			payments
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer			true	"event=initiate|instructions: required (target invoice, read invoices.get); event=processing|confirm|fail: required (target payment, read invoices.get)"
-// @Param			request				body		SimulateInput	true	"input"
-// @Success		200					{object}	ops.Envelope
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/payments/simulate [post]
+// simulate serves payments.simulate.
+//
+//	@Summary		payments.simulate (write)
+//	@ID				payments.simulate
+//	@Description	Authorization: client:self:demo-event-only
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR59 single path for customer processing/confirm/fail; IR60 demo-only; initiate: one attempt in \
+//	@Description	flight or the one confirmed payment per invoice (CONFLICT errors.invoice_has_payment; IR474)
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-C11
+//	@Tags			payments
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer			true	"event=initiate|instructions: required (target invoice, read invoices.get); event=processing|confirm|fail: required (target payment, read invoices.get)"
+//	@Param			request				body		SimulateInput	true	"input"
+//	@Success		200					{object}	ops.Envelope
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/payments/simulate [post]
 func (m Billing) simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (any, error) {
 	if in.Event == "initiate" || in.Event == "instructions" {
 		inv, err := m.loadInvoice(ctx, c, *in.InvoiceID, true)
@@ -255,7 +261,9 @@ func (m Billing) simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (
 
 		if in.Event == "initiate" { // one attempt at a time, and a paid invoice is not paid again: full amount only (IR474)
 			var open bool
-			err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM billing.payments WHERE invoice_id = $1 AND status IN ('initiated','processing','confirmed'))`, inv.ID).
+
+			err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM billing.payments WHERE invoice_id = $1 AND status IN
+				('initiated','processing','confirmed'))`, inv.ID).
 				Scan(&open)
 			if err != nil {
 				return nil, err
@@ -298,8 +306,11 @@ func (m Billing) simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (
 		}
 
 		var id uuid.UUID
-		scanErr := c.Tx.QueryRow(ctx, `INSERT INTO billing.payments (tenant_id, invoice_id, amount_minor, currency, method, channel, status, created_at, updated_at)
-			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, 'demo', 'initiated', $5, $5) RETURNING id`, inv.ID, inv.AmountMinor, inv.Currency, *in.Method, c.Now).
+
+		scanErr := c.Tx.QueryRow(ctx, `INSERT INTO billing.payments (tenant_id, invoice_id, amount_minor, currency, method,
+			channel, status, created_at, updated_at)
+			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, 'demo', 'initiated', $5, $5) RETURNING
+			id`, inv.ID, inv.AmountMinor, inv.Currency, *in.Method, c.Now).
 			Scan(&id)
 		if scanErr != nil {
 			return nil, scanErr
@@ -365,7 +376,8 @@ func (m Billing) simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (
 
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`UPDATE billing.payments SET status = $2, payment_reference = COALESCE($3, payment_reference), confirmed_at = CASE WHEN $2 = 'confirmed' THEN $4::timestamptz END,
+		`UPDATE billing.payments SET status = $2, payment_reference = COALESCE($3, payment_reference), confirmed_at = CASE
+			WHEN $2 = 'confirmed' THEN $4::timestamptz END,
 		event_ids = array_append(event_ids, $5), version = version + 1, updated_at = $4 WHERE id = $1`,
 		p.ID,
 		next,
@@ -474,29 +486,31 @@ func amountOK(in PaymentEntry, inv Invoice) error {
 	return nil
 }
 
-// @Summary		payments.confirm (write)
-// @ID				payments.confirm
-// @Description	Authorization: admin:billing.payment
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A08
-// @Tags			payments
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer			true	"all: required (target payment, read invoices.get)"
-// @Param			request				body		ConfirmInput	true	"input"
-// @Success		200					{object}	ops.Envelope{data=Payment}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/payments/confirm [post]
+// confirm serves payments.confirm.
+//
+//	@Summary		payments.confirm (write)
+//	@ID				payments.confirm
+//	@Description	Authorization: admin:billing.payment
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A08
+//	@Tags			payments
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer			true	"all: required (target payment, read invoices.get)"
+//	@Param			request				body		ConfirmInput	true	"input"
+//	@Success		200					{object}	ops.Envelope{data=Payment}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/payments/confirm [post]
 func (m Billing) confirm(ctx context.Context, c *ops.Call, in *ConfirmInput) (Payment, error) {
 	p, inv, err := m.loadPayment(ctx, c, in.PaymentID)
 	if err != nil {
@@ -527,7 +541,8 @@ func (m Billing) confirm(ctx context.Context, c *ops.Call, in *ConfirmInput) (Pa
 
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`UPDATE billing.payments SET status = 'confirmed', payment_reference = $2, confirmed_at = $3, confirmation_reason = $4, recorded_by_membership_id = $5,
+		`UPDATE billing.payments SET status = 'confirmed', payment_reference = $2, confirmed_at = $3, confirmation_reason =
+			$4, recorded_by_membership_id = $5,
 		version = version + 1, updated_at = $3 WHERE id = $1`,
 		p.ID,
 		in.PaymentReference,
@@ -547,29 +562,31 @@ func (m Billing) confirm(ctx context.Context, c *ops.Call, in *ConfirmInput) (Pa
 	return m.paymentResult(ctx, c, p.ID, "payments.confirm", in.Reason)
 }
 
-// @Summary		payments.recordManual (write)
-// @ID				payments.recordManual
-// @Description	Authorization: admin:billing.payment
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A08
-// @Tags			payments
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer		true	"all: required (target invoice, read invoices.get)"
-// @Param			request				body		ManualInput	true	"input"
-// @Success		200					{object}	ops.Envelope{data=Payment}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/payments/manual [post]
+// recordManual serves payments.recordManual.
+//
+//	@Summary		payments.recordManual (write)
+//	@ID				payments.recordManual
+//	@Description	Authorization: admin:billing.payment
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A08
+//	@Tags			payments
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target invoice, read invoices.get)"
+//	@Param			request				body		ManualInput	true	"input"
+//	@Success		200					{object}	ops.Envelope{data=Payment}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/payments/manual [post]
 func (m Billing) recordManual(ctx context.Context, c *ops.Call, in *ManualInput) (Payment, error) {
 	inv, err := m.loadInvoice(ctx, c, in.InvoiceID, true)
 	if err != nil {
@@ -579,7 +596,8 @@ func (m Billing) recordManual(ctx context.Context, c *ops.Call, in *ManualInput)
 	existing, err := scanPayment(
 		c.Tx.QueryRow(
 			ctx,
-			"SELECT "+paymentCols+" FROM billing.payments WHERE invoice_id = $1 AND status = 'confirmed' AND payment_reference = $2 AND amount_minor = $3",
+			"SELECT "+paymentCols+" FROM billing.payments WHERE invoice_id = $1 AND status = 'confirmed' AND "+
+				"payment_reference = $2 AND amount_minor = $3",
 			inv.ID,
 			in.PaymentReference,
 			in.ConfirmedAmountMinor,
@@ -598,8 +616,10 @@ func (m Billing) recordManual(ctx context.Context, c *ops.Call, in *ManualInput)
 	}
 
 	var any bool
-	// a failed or expired attempt does not stop it: the customer may have paid another way (IR447); one still in flight does
-	scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM billing.payments WHERE invoice_id = $1 AND status IN ('initiated','processing','confirmed'))`, inv.ID).
+	// a failed or expired attempt does not stop it: the customer may have paid another way (IR447); one still in flight
+	// does
+	scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM billing.payments WHERE invoice_id = $1 AND status IN
+		('initiated','processing','confirmed'))`, inv.ID).
 		Scan(&any)
 	if scanErr != nil {
 		return Payment{}, scanErr
@@ -624,8 +644,11 @@ func (m Billing) recordManual(ctx context.Context, c *ops.Call, in *ManualInput)
 	}
 
 	var id uuid.UUID
-	scanErr = c.Tx.QueryRow(ctx, `INSERT INTO billing.payments (tenant_id, invoice_id, amount_minor, currency, method, channel, status, payment_reference, recorded_by_membership_id,
-		confirmed_at, confirmation_reason, created_at, updated_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, NULL, 'manual', 'confirmed', $4, $5, $6, $7, $6, $6) RETURNING id`,
+
+	scanErr = c.Tx.QueryRow(ctx, `INSERT INTO billing.payments (tenant_id, invoice_id, amount_minor, currency, method,
+		channel, status, payment_reference, recorded_by_membership_id,
+		confirmed_at, confirmation_reason, created_at, updated_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3,
+		NULL, 'manual', 'confirmed', $4, $5, $6, $7, $6, $6) RETURNING id`,
 		inv.ID, inv.AmountMinor, inv.Currency, in.PaymentReference, c.Principal.MembershipID, c.Now, in.Reason).
 		Scan(&id)
 	if scanErr != nil {

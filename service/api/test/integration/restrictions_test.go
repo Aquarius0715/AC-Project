@@ -25,7 +25,8 @@ func boundUnit(t *testing.T, s *apiserver.Server, connection string) string {
 	dev, binding := uuid.NewString(), uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO devices.devices (id, tenant_id, serial, binding_id, unit_id, target_unit_id, created_by_membership_id, connection, last_seen_at, firmware_version, power_signal)
+		`INSERT INTO devices.devices (id, tenant_id, serial, binding_id, unit_id, target_unit_id, created_by_membership_id,
+			connection, last_seen_at, firmware_version, power_signal)
 		VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,'1.0','on')`,
 		dev,
 		seed.ID("tenant-a"),
@@ -38,7 +39,8 @@ func boundUnit(t *testing.T, s *apiserver.Server, connection string) string {
 	)
 	owner(
 		t,
-		`INSERT INTO devices.device_bindings (id, tenant_id, device_id, unit_id, customer_org_id, bound_at, reason, actor_membership_id)
+		`INSERT INTO devices.device_bindings (id, tenant_id, device_id, unit_id, customer_org_id, bound_at, reason,
+			actor_membership_id)
 		VALUES ($1,$2,$3,$4,$5,$6,'test',$7)`,
 		binding,
 		seed.ID("tenant-a"),
@@ -203,11 +205,15 @@ func TestRestrictionLifecycle(t *testing.T) {
 		e    map[string]string
 		code int
 	}{
-		"notice under 24h":   {map[string]string{"executeAfter": `"` + clock.Add(23*time.Hour).Format(time.RFC3339) + `"`}, 422},
-		"missing cause":      {map[string]string{"causeInvoiceIds": `["` + uuid.NewString() + `"]`}, 422},
-		"rules mismatch":     {map[string]string{"rulesVersion": `"rules-2"`}, 422},
-		"setpoint too low":   {map[string]string{"policy": `{"kind":"temperature_limit","minimumCoolingSetpoint":15}`}, 422},
-		"setpoint off step":  {map[string]string{"policy": `{"kind":"temperature_limit","minimumCoolingSetpoint":24.5}`}, 422},
+		"notice under 24h": {
+			map[string]string{"executeAfter": `"` + clock.Add(23*time.Hour).Format(time.RFC3339) + `"`},
+			422,
+		},
+		"missing cause":    {map[string]string{"causeInvoiceIds": `["` + uuid.NewString() + `"]`}, 422},
+		"rules mismatch":   {map[string]string{"rulesVersion": `"rules-2"`}, 422},
+		"setpoint too low": {map[string]string{"policy": `{"kind":"temperature_limit","minimumCoolingSetpoint":15}`}, 422},
+		"setpoint off step": {map[string]string{"policy": `{"kind":"temperature_limit",` +
+			`"minimumCoolingSetpoint":24.5}`}, 422},
 		"power off setpoint": {map[string]string{"policy": `{"kind":"power_off","minimumCoolingSetpoint":24}`}, 422},
 		"unit not in deal":   {map[string]string{"unitIds": `["` + seed.ID("unit-online-rto").String() + `"]`}, 422},
 		"duplicate unit":     {map[string]string{"unitIds": `["` + online + `","` + online + `"]`}, 422},
@@ -600,7 +606,8 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 		s,
 		&restrMgr,
 		"payments.recordManual",
-		`{"invoiceId":"`+inv+`","paymentReference":"BANK-`+id[:8]+`","confirmedAmountMinor":5000,"currency":"MYR","reason":"bank transfer"}`,
+		`{"invoiceId":"`+inv+`","paymentReference":"BANK-`+id[:8]+`","confirmedAmountMinor":5000,"currency":"MYR",`+
+			`"reason":"bank transfer"}`,
 		1,
 	)
 	if code != 200 {
@@ -630,7 +637,8 @@ func TestRestrictionScheduleRecipients(t *testing.T) {
 	// accounts other tests added start at the clock (IR461): their start moves back too
 	owner(
 		t,
-		`UPDATE identity.memberships SET valid_from = LEAST(valid_from, $2 - interval '1 hour'), valid_until = $2 WHERE role = 'client' AND organization_id = $1 AND (valid_until IS NULL OR valid_until > $2)`,
+		`UPDATE identity.memberships SET valid_from = LEAST(valid_from, $2 - interval '1 hour'), valid_until = $2 WHERE role =
+			'client' AND organization_id = $1 AND (valid_until IS NULL OR valid_until > $2)`,
 		seed.ID("org-customer-b"),
 		clock.Add(-time.Minute),
 	)
@@ -875,7 +883,8 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 	for _, st := range [][2]string{{"waiting_reconcile", "applied"}, {"failed", "sent_unknown"}} {
 		owner(
 			t,
-			`UPDATE restrictions.restriction_units SET release_state = $3, apply_state = $4 WHERE restriction_id = $1 AND unit_id = $2`,
+			`UPDATE restrictions.restriction_units SET release_state = $3, apply_state = $4 WHERE restriction_id = $1 AND unit_id
+				= $2`,
 			id,
 			offline,
 			st[0],
@@ -895,7 +904,8 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 
 	owner(
 		t,
-		`UPDATE restrictions.restriction_units SET release_state = 'failed', apply_state = 'applied' WHERE restriction_id = $1 AND unit_id = $2`,
+		`UPDATE restrictions.restriction_units SET release_state = 'failed', apply_state = 'applied' WHERE restriction_id = $1
+			AND unit_id = $2`,
 		id,
 		offline,
 	)
@@ -1078,7 +1088,8 @@ func TestRestrictionOverrideReconcile(t *testing.T) {
 		s,
 		&overrider,
 		"restrictions.retry",
-		`{"restrictionId":"`+id+`","unitIds":["`+u+`"],"phase":"release","confirmedRulesVersion":"rules-1","reason":"retry remove"}`,
+		`{"restrictionId":"`+id+`","unitIds":["`+u+`"],"phase":"release","confirmedRulesVersion":"rules-1","reason":"retry `+
+			`remove"}`,
 		ver(get()),
 	)
 	if code != 200 || data(m)["projection"] != "release" ||
@@ -1266,7 +1277,8 @@ func TestRestrictionScheduleRefusals(t *testing.T) {
 	fanOnly := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO devices.capabilities (id, version, tenant_id, manufacturer, model, control, mode_control, fan_control, temperature)
+		`INSERT INTO devices.capabilities (id, version, tenant_id, manufacturer, model, control, mode_control, fan_control,
+			temperature)
 		VALUES ($1, 1, $2, 'Demo', 'Fan only', true, false, true, NULL)`,
 		fanOnly,
 		seed.ID("tenant-a"),
@@ -1567,7 +1579,8 @@ func TestRestrictionEndsWhenItsInvoicesArePaidAtOnce(t *testing.T) {
 
 		for _, inv := range []string{inv1, inv2} {
 			_, m := post(s, &hq, "invoices.get", `{"id":"`+inv+`"}`)
-			bodies[`{"invoiceId":"`+inv+`","paymentReference":"BANK-`+inv[:8]+`","confirmedAmountMinor":5000,"currency":"MYR","reason":"bank transfer seen"}`] = ver(
+			bodies[`{"invoiceId":"`+inv+`","paymentReference":"BANK-`+inv[:8]+`","confirmedAmountMinor":5000,"currency":"MYR",`+
+				`"reason":"bank transfer seen"}`] = ver(
 				m,
 			)
 		}

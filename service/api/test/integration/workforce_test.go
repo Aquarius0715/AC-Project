@@ -381,7 +381,8 @@ func TestUnavailabilityListAndClear(t *testing.T) {
 	var past, gone int
 	ownerScan(
 		t,
-		`SELECT count(*) FILTER (WHERE id = $1 AND days = daterange('2026-09-10', '2026-09-13', '[]')), count(*) FILTER (WHERE id = $2)
+		`SELECT count(*) FILTER (WHERE id = $1 AND days = daterange('2026-09-10', '2026-09-13', '[]')), count(*) FILTER (WHERE
+			id = $2)
 		FROM maintenance.unavailability`,
 		[]any{sick, leave},
 		&past,
@@ -395,7 +396,8 @@ func TestUnavailabilityListAndClear(t *testing.T) {
 	var audited int
 	ownerScan(
 		t,
-		`SELECT count(*) FROM audit.audit_log WHERE action = 'members.clearUnavailability' AND result = 'success' AND target_id IN ($1, $2)`,
+		`SELECT count(*) FROM audit.audit_log WHERE action = 'members.clearUnavailability' AND result = 'success' AND
+			target_id IN ($1, $2)`,
 		[]any{leave, sick},
 		&audited,
 	)

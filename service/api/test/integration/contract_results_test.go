@@ -14,7 +14,8 @@ import (
 // resultsDecidedAtRunTime are the operations whose result type cannot be held to the contract by its Go type: the
 // answer's shape is picked per request. Their tests check each shape.
 var resultsDecidedAtRunTime = map[string]string{
-	"jobs.get":                     "the IR42 projection of the job (detail, offer, history, summary): the role and the job pick it",
+	"jobs.get": "the IR42 projection of the job (detail, offer, history, summary): the role and the " +
+		"job pick it",
 	"jobs.list":                    "the IR42 projections of the listed jobs",
 	"restrictions.get":             "the SR03 projection: the whole restriction or the caller's units",
 	"restrictions.list":            "the SR03 projections of the listed restrictions",
@@ -55,6 +56,7 @@ func TestResultsMatchContract(t *testing.T) {
 		Fields []string  `json:"fields"`
 		Items  *[]string `json:"items"`
 	}
+
 	unmarshalErr := json.Unmarshal(raw, &contract)
 	if unmarshalErr != nil {
 		t.Fatal(unmarshalErr)

@@ -46,7 +46,9 @@ func setConnection(
 		unit *uuid.UUID
 		last *time.Time
 	)
-	scanErr := tx.QueryRow(ctx, `UPDATE devices.devices SET connection = $2, last_seen_at = COALESCE($3, last_seen_at), version = version + 1, updated_at = $4
+
+	scanErr := tx.QueryRow(ctx, `UPDATE devices.devices SET connection = $2, last_seen_at = COALESCE($3, last_seen_at),
+		version = version + 1, updated_at = $4
 		WHERE id = $1 RETURNING unit_id, last_seen_at`, device, conn, seen, now).
 		Scan(&unit, &last)
 	if scanErr != nil {
@@ -82,7 +84,8 @@ type Lifecycle struct {
 func (l Lifecycle) Advance(ctx context.Context, c *ops.Call) (int, error) {
 	rows, err := c.Tx.Query(
 		ctx,
-		`UPDATE devices.device_operations SET status = 'failed', failure_code = 'TIMEOUT', finished_at = expires_at, version = version + 1, updated_at = $1
+		`UPDATE devices.device_operations SET status = 'failed', failure_code = 'TIMEOUT', finished_at = expires_at, version =
+			version + 1, updated_at = $1
 		WHERE status IN ('queued','running') AND expires_at <= $1 RETURNING id, device_id, kind`,
 		c.Now,
 	)
@@ -155,7 +158,8 @@ func (l Lifecycle) Advance(ctx context.Context, c *ops.Call) (int, error) {
 		if failure != "" {
 			_, err := c.Tx.Exec(
 				ctx,
-				`UPDATE devices.device_operations SET status = 'failed', failure_code = $2, finished_at = $3, version = version + 1, updated_at = $3 WHERE id = $1`,
+				`UPDATE devices.device_operations SET status = 'failed', failure_code = $2, finished_at = $3, version = version + 1,
+					updated_at = $3 WHERE id = $1`,
 				o.id,
 				failure,
 				c.Now,
@@ -182,7 +186,8 @@ func (l Lifecycle) Advance(ctx context.Context, c *ops.Call) (int, error) {
 
 		_, execErr := c.Tx.Exec(
 			ctx,
-			`UPDATE devices.device_operations SET status = 'running', started_at = $2, version = version + 1, updated_at = $2 WHERE id = $1`,
+			`UPDATE devices.device_operations SET status = 'running', started_at = $2, version = version + 1, updated_at = $2
+				WHERE id = $1`,
 			o.id,
 			c.Now,
 		)
@@ -220,7 +225,9 @@ func (l Lifecycle) startFailure(
 ) (string, error) {
 	if unit != nil {
 		var other bool
-		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE unit_id = $1 AND id <> $2 AND status IN ('queued','running') AND expires_at > $3)`,
+
+		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE unit_id = $1 AND id <> $2 AND
+			status IN ('queued','running') AND expires_at > $3)`,
 			*unit, id, c.Now).
 			Scan(&other)
 		if err != nil {
@@ -243,6 +250,7 @@ func (l Lifecycle) startFailure(
 
 	if kind == "firmware" {
 		var conn string
+
 		err := c.Tx.QueryRow(ctx, `SELECT connection FROM devices.devices WHERE id = $1`, device).
 			Scan(&conn)
 		if err != nil {
@@ -275,7 +283,8 @@ func FinishOperation(
 		expires      time.Time
 	)
 
-	err := tx.QueryRow(ctx, `SELECT device_id, kind, status, target_version, expires_at FROM devices.device_operations WHERE id = $1 FOR UPDATE`, id).
+	err := tx.QueryRow(ctx, `SELECT device_id, kind, status, target_version, expires_at FROM devices.device_operations
+		WHERE id = $1 FOR UPDATE`, id).
 		Scan(&device, &kind, &status, &target, &expires)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return apperr.E(apperr.NotFound, "error.notFound")
@@ -298,7 +307,8 @@ func FinishOperation(
 
 	_, execErr := tx.Exec(
 		ctx,
-		`UPDATE devices.device_operations SET status = $2, failure_code = $3, finished_at = $4, version = version + 1, updated_at = $5 WHERE id = $1`,
+		`UPDATE devices.device_operations SET status = $2, failure_code = $3, finished_at = $4, version = version + 1,
+			updated_at = $5 WHERE id = $1`,
 		id,
 		result,
 		code,
@@ -397,7 +407,8 @@ func RecordSignal(
 		rec     []byte
 	}
 
-	err := tx.QueryRow(ctx, `SELECT device_id, event_type, binding_id, sequence, recovery FROM devices.device_events WHERE event_id = $1`, s.EventID).
+	err := tx.QueryRow(ctx, `SELECT device_id, event_type, binding_id, sequence, recovery FROM devices.device_events WHERE
+		event_id = $1`, s.EventID).
 		Scan(&seen.device, &seen.kind, &seen.binding, &seen.seq, &seen.rec)
 	if err == nil {
 		var prev *Recovery
@@ -439,7 +450,9 @@ func RecordSignal(
 	}
 
 	var latest *int64
-	scanErr := tx.QueryRow(ctx, `SELECT max(sequence) FROM devices.device_events WHERE device_id = $1 AND binding_id IS NOT DISTINCT FROM $2 AND axis = $3`,
+
+	scanErr := tx.QueryRow(ctx, `SELECT max(sequence) FROM devices.device_events WHERE device_id = $1 AND binding_id IS NOT
+		DISTINCT FROM $2 AND axis = $3`,
 		s.DeviceID, s.BindingID, axis).
 		Scan(&latest)
 	if scanErr != nil {
@@ -458,8 +471,10 @@ func RecordSignal(
 			restored *time.Time
 		)
 
-		err := tx.QueryRow(ctx, `SELECT id, restored_at, evidence_source, alert_ids FROM devices.device_events WHERE device_id = $1 AND binding_id IS NOT DISTINCT FROM $2
-			AND axis = $3 AND event_type <> 'restored' ORDER BY sequence DESC LIMIT 1 FOR UPDATE`, s.DeviceID, s.BindingID, axis).
+		err := tx.QueryRow(ctx, `SELECT id, restored_at, evidence_source, alert_ids FROM devices.device_events WHERE device_id
+			= $1 AND binding_id IS NOT DISTINCT FROM $2
+			AND axis = $3 AND event_type <> 'restored' ORDER BY sequence DESC LIMIT 1 FOR
+			UPDATE`, s.DeviceID, s.BindingID, axis).
 			Scan(&src, &restored, &evidence, &alertIDs)
 		if errors.Is(err, pgx.ErrNoRows) ||
 			(err == nil && (src != s.Recovery.SourceEventID || restored != nil)) {
@@ -483,6 +498,7 @@ func RecordSignal(
 
 	if s.Kind == "tamper" && unit != nil && binding != nil {
 		var org uuid.UUID
+
 		err := tx.QueryRow(ctx, `SELECT customer_org_id FROM devices.device_bindings WHERE id = $1`, *binding).
 			Scan(&org)
 		if err != nil {
@@ -506,8 +522,10 @@ func RecordSignal(
 
 	_, execErr := tx.Exec(
 		ctx,
-		`INSERT INTO devices.device_events (id, tenant_id, device_id, unit_id, binding_id, event_id, event_type, axis, evidence_source, recovery, alert_ids,
-		sequence, occurred_at, created_at) VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+		`INSERT INTO devices.device_events (id, tenant_id, device_id, unit_id, binding_id, event_id, event_type, axis,
+			evidence_source, recovery, alert_ids,
+		sequence, occurred_at, created_at) VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9,
+		$10, $11, $12, $13)`,
 		uuid.Must(
 			uuid.NewV7(),
 		),
@@ -535,7 +553,10 @@ func RecordSignal(
 	case axis == "connection":
 		err = setConnection(ctx, tx, s.DeviceID, "offline", nil, now)
 	default:
-		col, value := map[string]string{"power": "power_signal", "tamper": "tamper"}[axis], map[string]string{"power": "off", "tamper": "detected"}[axis]
+		col, value := map[string]string{"power": "power_signal", "tamper": "tamper"}[axis], map[string]string{
+			"power":  "off",
+			"tamper": "detected",
+		}[axis]
 		if restored {
 			value = RecoveredValue[axis]
 		}

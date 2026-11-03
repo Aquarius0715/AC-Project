@@ -21,7 +21,8 @@ type Session struct {
 	ScopeVersion int       `json:"scopeVersion"`
 	UserID       uuid.UUID `json:"userId"`
 	Role         string    `json:"role"`
-	ClientRole   *string   `json:"clientRole"` // owner / member for client sessions, otherwise null (the owner-only Users page, IR210)
+	// owner / member for client sessions, otherwise null (the owner-only Users page, IR210)
+	ClientRole *string `json:"clientRole"`
 	// DisplayName and OrganizationName name the signed-in user and the membership's organization in the shell (IR241);
 	// OrganizationID is that organization, so a screen can tell its own company from another one in a URL (IR276)
 	DisplayName      string    `json:"displayName"`
@@ -109,7 +110,8 @@ func sessionGet(ctx context.Context, c *ops.Call, _ *struct{}) (Session, error) 
 		return out, nil
 	}
 
-	err := c.Tx.QueryRow(ctx, `SELECT u.display_name, o.name FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id
+	err := c.Tx.QueryRow(ctx, `SELECT u.display_name, o.name FROM identity.memberships m JOIN identity.users u ON u.id =
+		m.user_id
 		JOIN identity.organizations o ON o.id = m.organization_id WHERE m.id = $1`, p.MembershipID).
 		Scan(&out.DisplayName, &out.OrganizationName)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -118,7 +120,8 @@ func sessionGet(ctx context.Context, c *ops.Call, _ *struct{}) (Session, error) 
 
 	if err == nil && p.Role == "client" { // identity's reference copy of the customers (IR188)
 		var id uuid.UUID
-		switch e := c.Tx.QueryRow(ctx, `SELECT c.id FROM notify.ref_customers c JOIN identity.memberships m ON m.organization_id = c.organization_id WHERE m.id = $1`,
+		switch e := c.Tx.QueryRow(ctx, `SELECT c.id FROM notify.ref_customers c JOIN identity.memberships m ON
+			m.organization_id = c.organization_id WHERE m.id = $1`,
 			p.MembershipID).Scan(&id); {
 		case e == nil:
 			out.CustomerID = &id

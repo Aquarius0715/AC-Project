@@ -66,6 +66,7 @@ func TestInputsMatchContract(t *testing.T) {
 	}
 
 	var contract map[string][]string
+
 	unmarshalErr := json.Unmarshal(raw, &contract)
 	if unmarshalErr != nil {
 		t.Fatal(unmarshalErr)

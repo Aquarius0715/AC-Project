@@ -65,9 +65,11 @@ type Automation struct {
 	EndAction         json.RawMessage `json:"endAction,omitempty"   swaggertype:"object"`
 	Condition         json.RawMessage `json:"condition,omitempty"   swaggertype:"object"`
 	Action            json.RawMessage `json:"action,omitempty"      swaggertype:"object"`
-	OnlyIf            json.RawMessage `json:"onlyIf"                swaggertype:"object"` // ExtraCondition[] (IR215), [] when none
-	LastRun           *LastRun        `json:"lastRun"`                                    // the latest automation_runs outcome of the rule (IR215)
-	customerOrg       uuid.UUID
+	// ExtraCondition[] (IR215), [] when none
+	OnlyIf json.RawMessage `json:"onlyIf" swaggertype:"object"`
+	// the latest automation_runs outcome of the rule (IR215)
+	LastRun     *LastRun `json:"lastRun"`
+	customerOrg uuid.UUID
 }
 
 // LastRun is AutomationRun of service-contracts.ts: the latest command or recorded skip of the rule.
@@ -91,10 +93,13 @@ type definition struct {
 	OnlyIf      json.RawMessage `json:"onlyIf,omitempty"      swaggertype:"object"`
 }
 
-const automationCols = `a.id, a.tenant_id, a.version, a.created_at, a.updated_at, a.name, a.owner_membership_id, a.created_by_user_id, a.timezone, a.enabled, a.priority,
+const automationCols = `a.id, a.tenant_id, a.version, a.created_at, a.updated_at, a.name, a.owner_membership_id, ` +
+	`a.created_by_user_id, a.timezone, a.enabled, a.priority,
 	a.disabled_reason, a.kind, a.definition, a.customer_org_id,
-	COALESCE((SELECT array_agg(u.unit_id ORDER BY u.unit_id) FROM control.automation_units u WHERE u.automation_id = a.id), '{}'),
-	(SELECT json_build_object('at', r.occurred_at, 'outcome', r.outcome, 'reason', r.skip_reason, 'commandId', r.command_id) FROM control.automation_runs r
+	COALESCE((SELECT array_agg(u.unit_id ORDER BY u.unit_id) FROM control.automation_units u WHERE u.automation_id = ` +
+	`a.id), '{}'),
+	(SELECT json_build_object('at', r.occurred_at, 'outcome', r.outcome, 'reason', r.skip_reason, 'commandId', ` +
+	`r.command_id) FROM control.automation_runs r
 		WHERE r.rule_id = a.id ORDER BY r.occurred_at DESC, r.seq DESC LIMIT 1)`
 
 func scanAutomation(r pgx.Row) (Automation, error) {
@@ -102,6 +107,7 @@ func scanAutomation(r pgx.Row) (Automation, error) {
 		x         Automation
 		def, last []byte
 	)
+
 	err := r.Scan(
 		&x.ID,
 		&x.TenantID,
@@ -137,6 +143,7 @@ func scanAutomation(r pgx.Row) (Automation, error) {
 
 	if len(last) > 0 {
 		var lr LastRun
+
 		err := json.Unmarshal(last, &lr)
 		if err == nil {
 			lr.At = lr.At.UTC()
@@ -166,32 +173,36 @@ func (m Automations) load(
 	return x, err
 }
 
-// @Summary		automations.list (read)
-// @ID				automations.list
-// @Description	Authorization: client:control.execute:self
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR215 lastRun = the latest run-log outcome (Command or skip with reason)
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-C04, DD-C01 · Query: filters unitId,enabled,kind · sort id,name,priority,createdAt,updatedAt (default createdAt desc;id desc)
-// @Tags			automations
-// @Accept			json
-// @Produce		json
-// @Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit	query		integer	false	"page size 1–100, default 25"
-// @Param			sort	query		string	false	"field:direction — fields id,name,priority,createdAt,updatedAt; default createdAt desc;id desc"
-// @Param			unitId	query		string	false	"filter → unitIds contains"
-// @Param			enabled	query		boolean	false	"filter → enabled"
-// @Param			kind	query		string	false	"filter → kind"
-// @Success		200		{object}	ops.Envelope{data=AutomationPage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/automations [get]
+// list serves automations.list.
+//
+//	@Summary		automations.list (read)
+//	@ID				automations.list
+//	@Description	Authorization: client:control.execute:self
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR215 lastRun = \
+//	@Description	the latest run-log outcome (Command or skip with reason)
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-C04, DD-C01 · Query: filters unitId,enabled,kind · sort \
+//	@Description	id,name,priority,createdAt,updatedAt (default createdAt desc;id desc)
+//	@Tags			automations
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit	query		integer	false	"page size 1–100, default 25"
+//	@Param			sort	query		string	false	"field:direction — fields id,name,priority,createdAt,updatedAt; default createdAt desc;id desc"
+//	@Param			unitId	query		string	false	"filter → unitIds contains"
+//	@Param			enabled	query		boolean	false	"filter → enabled"
+//	@Param			kind	query		string	false	"filter → kind"
+//	@Success		200		{object}	ops.Envelope{data=AutomationPage}
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/automations [get]
 func (m Automations) list(
 	ctx context.Context,
 	c *ops.Call,
@@ -262,6 +273,7 @@ func (m Automations) list(
 	where := strings.Join(conds, " AND ")
 
 	var total int
+
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM control.automations a WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
@@ -625,7 +637,10 @@ func occurrences(
 			bad = true
 		}
 
-		for _, dd := range []time.Duration{-2 * time.Hour, -time.Hour, -30 * time.Minute, 30 * time.Minute, time.Hour, 2 * time.Hour} {
+		for _, dd := range []time.Duration{
+			-2 * time.Hour, -time.Hour, -30 * time.Minute, 30 * time.Minute, time.Hour,
+			2 * time.Hour,
+		} {
 			u := t.Add(dd).In(loc)
 			if u.Year() == day.Year() && u.Month() == day.Month() && u.Day() == day.Day() &&
 				u.Hour() == h &&
@@ -681,28 +696,31 @@ type ScheduledOccurrence struct {
 	Action       json.RawMessage `json:"action"       swaggertype:"object"`
 }
 
-// @Summary		automations.save (write)
-// @ID				automations.save
-// @Description	Authorization: client:control.execute:self
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR215 onlyIf at most 3, distinct types, no weekday on a schedule, not the rule's own condition type
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-C04, DD-C05
-// @Tags			automations
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		AutomationInput	true	"input"
-// @Success		200				{object}	ops.Envelope{data=Automation}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/automations [post]
+// save serves automations.save.
+//
+//	@Summary		automations.save (write)
+//	@ID				automations.save
+//	@Description	Authorization: client:control.execute:self
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR215 onlyIf at most 3, distinct types, no weekday on a schedule, not the rule's own condition type
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-C04, DD-C05
+//	@Tags			automations
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		AutomationInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Automation}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/automations [post]
 func (m Automations) save(
 	ctx context.Context,
 	c *ops.Call,
@@ -719,6 +737,7 @@ func (m Automations) save(
 		}
 
 		var archived bool
+
 		scanErr := c.Tx.QueryRow(ctx, `SELECT archived FROM assets.units WHERE id = $1`, u).
 			Scan(&archived)
 		if scanErr != nil {
@@ -790,9 +809,12 @@ func (m Automations) save(
 	version := 1
 
 	if in.ID == nil {
-		err := c.Tx.QueryRow(ctx, `INSERT INTO control.automations (tenant_id, customer_org_id, kind, name, owner_membership_id, created_by_user_id, timezone, enabled, priority,
-			definition, created_at, updated_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10) RETURNING id`,
-			c.Principal.OrgID, in.Kind, in.Name, c.Principal.MembershipID, c.Principal.UserID, in.Timezone, in.Enabled, in.Priority, raw, c.Now).
+		err := c.Tx.QueryRow(ctx, `INSERT INTO control.automations (tenant_id, customer_org_id, kind, name,
+			owner_membership_id, created_by_user_id, timezone, enabled, priority,
+			definition, created_at, updated_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7, $8,
+			$9, $10, $10) RETURNING id`,
+			c.Principal.OrgID, in.Kind, in.Name, c.Principal.MembershipID, c.Principal.UserID, in.Timezone, in.Enabled,
+			in.Priority, raw, c.Now).
 			Scan(&id)
 		if err != nil {
 			return Automation{}, err
@@ -814,7 +836,8 @@ func (m Automations) save(
 		_, execErr := c.Tx.Exec(
 			ctx,
 			`UPDATE control.automations SET name = $2, timezone = $3, enabled = $4, priority = $5, definition = $6,
-			disabled_reason = CASE WHEN $4 THEN NULL ELSE disabled_reason END, version = version + 1, updated_at = $7 WHERE id = $1`,
+			disabled_reason = CASE WHEN $4 THEN NULL ELSE disabled_reason END, version = version + 1, updated_at = $7 WHERE id =
+			$1`,
 			cur.ID,
 			in.Name,
 			in.Timezone,
@@ -842,7 +865,8 @@ func (m Automations) save(
 	for _, u := range in.UnitIDs {
 		_, err := c.Tx.Exec(
 			ctx,
-			`INSERT INTO control.automation_units (tenant_id, automation_id, unit_id) VALUES (current_setting('app.tenant_id')::uuid, $1, $2)`,
+			`INSERT INTO control.automation_units (tenant_id, automation_id, unit_id) VALUES
+				(current_setting('app.tenant_id')::uuid, $1, $2)`,
 			id,
 			u,
 		)
@@ -925,7 +949,8 @@ func (in *NextRunsInput) Validate() map[string]string {
 //	@Summary		automations.nextRuns (read)
 //	@ID				automations.nextRuns
 //	@Description	Authorization: client:control.execute:self
-//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR214 draft preview validated like automations.save (nonexistent or ambiguous local time VALIDATION)
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR214 draft \
+//	@Description	preview validated like automations.save (nonexistent or ambiguous local time VALIDATION)
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
 //	@Description	Design: DD-C04, DD-C01
 //	@Tags			automations
@@ -1033,7 +1058,8 @@ type Deleted struct {
 //	@Summary		automations.delete (write)
 //	@ID				automations.delete
 //	@Description	Authorization: client:control.execute:self
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR214 removes the rule and its unit links, keeps its Commands and run log
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR214 removes the rule and its unit links, keeps its Commands and run log
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-C04
 //	@Tags			automations

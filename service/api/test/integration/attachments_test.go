@@ -48,12 +48,13 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 	}
 
 	for name, f := range map[string]string{
-		"gif":                    blobJSON("a.gif", "image/gif", img, len(img)),
-		"size mismatch":          blobJSON("a.png", "image/png", img, 3),
-		"pixel flood":            blobJSON("flood.png", "image/png", flood, len(flood)),
-		"empty":                  blobJSON("a.png", "image/png", nil, 0),
-		"no name":                blobJSON(" ", "image/png", img, len(img)),
-		"not a png":              blobJSON("a.png", "image/png", []byte("<svg onload=alert(1)>"), 21), // stored and served only as what it is (IR308)
+		"gif":           blobJSON("a.gif", "image/gif", img, len(img)),
+		"size mismatch": blobJSON("a.png", "image/png", img, 3),
+		"pixel flood":   blobJSON("flood.png", "image/png", flood, len(flood)),
+		"empty":         blobJSON("a.png", "image/png", nil, 0),
+		"no name":       blobJSON(" ", "image/png", img, len(img)),
+		// stored and served only as what it is (IR308)
+		"not a png":              blobJSON("a.png", "image/png", []byte("<svg onload=alert(1)>"), 21),
 		"png as jpeg":            blobJSON("a.jpg", "image/jpeg", img, len(img)),
 		"line break in the name": blobJSON(`a\r\nSet-Cookie: x.png`, "image/png", img, len(img)),
 		"path in the name":       blobJSON("../../a.png", "image/png", img, len(img)),
@@ -215,8 +216,10 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 	for range 9 {
 		owner(
 			t,
-			`INSERT INTO maintenance.attachments (tenant_id, job_id, report_id, object_key, name, mime, size_bytes, status, uploaded_by)
-			SELECT tenant_id, job_id, $1, $2, 'x.png', 'image/png', 1, 'ready', author_id FROM maintenance.work_reports WHERE id = $1 LIMIT 1`,
+			`INSERT INTO maintenance.attachments (tenant_id, job_id, report_id, object_key, name, mime, size_bytes, status,
+				uploaded_by)
+			SELECT tenant_id, job_id, $1, $2, 'x.png', 'image/png', 1, 'ready', author_id FROM maintenance.work_reports WHERE id
+			= $1 LIMIT 1`,
 			rep,
 			"test/"+uuid.NewString(),
 		)

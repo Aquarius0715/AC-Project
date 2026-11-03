@@ -63,7 +63,8 @@ func TestDiagnosticRuns(t *testing.T) {
 	clean := func() {
 		owner(
 			t,
-			`UPDATE control.diagnostic_runs SET state = 'completed' WHERE unit_id = $1 AND state IN ('awaiting_start','running','end_requested')`,
+			`UPDATE control.diagnostic_runs SET state = 'completed' WHERE unit_id = $1 AND state IN ('awaiting_start','running',
+				'end_requested')`,
 			unit,
 		)
 		owner(
@@ -73,7 +74,8 @@ func TestDiagnosticRuns(t *testing.T) {
 		)
 		owner(
 			t,
-			`UPDATE restrictions.restrictions SET state = 'cancelled' WHERE id IN (SELECT restriction_id FROM restrictions.restriction_units WHERE unit_id = $1)`,
+			`UPDATE restrictions.restrictions SET state = 'cancelled' WHERE id IN (SELECT restriction_id FROM
+				restrictions.restriction_units WHERE unit_id = $1)`,
 			unit,
 		)
 	}
@@ -174,6 +176,7 @@ func TestDiagnosticRuns(t *testing.T) {
 	}
 
 	ctx := context.Background()
+
 	_, err := schedTick(ctx, s, clock.Add(6*time.Minute))
 	if err != nil {
 		t.Fatal(err)
@@ -234,7 +237,8 @@ func TestDiagnosticRuns(t *testing.T) {
 	rid := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO restrictions.restrictions (id, tenant_id, contract_id, contract_version, customer_id, rules_version, notice_at, execute_after, reason, policy, state)
+		`INSERT INTO restrictions.restrictions (id, tenant_id, contract_id, contract_version, customer_id, rules_version,
+			notice_at, execute_after, reason, policy, state)
 		VALUES ($1,$2,$3,1,$4,'r',$5,$6,'demo','{"kind":"power_off"}','applied')`,
 		rid,
 		seed.ID("tenant-a"),
@@ -245,7 +249,8 @@ func TestDiagnosticRuns(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO restrictions.restriction_units (tenant_id, restriction_id, unit_id, apply_state, release_state) VALUES ($1,$2,$3,'applied','none')`,
+		`INSERT INTO restrictions.restriction_units (tenant_id, restriction_id, unit_id, apply_state, release_state) VALUES
+			($1,$2,$3,'applied','none')`,
 		seed.ID("tenant-a"),
 		rid,
 		unit,
@@ -303,7 +308,8 @@ func TestDiagnosticRuns(t *testing.T) {
 		s,
 		&techInt,
 		"commands.create",
-		`{"unitId":"`+unit+`","jobId":"`+job+`","action":`+on+`,"reason":"End of test run sent again: check cooling","expectedUnitVersion":`+itoa(
+		`{"unitId":"`+unit+`","jobId":"`+job+`","action":`+on+`,"reason":"End of test run sent again: check cooling",`+
+			`"expectedUnitVersion":`+itoa(
 			ver(m),
 		)+`}`,
 		0,

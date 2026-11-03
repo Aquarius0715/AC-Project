@@ -168,8 +168,11 @@ func (in *SetPoliciesInput) Validate() map[string]string {
 //
 //	@Summary		units.setAlertPolicies (write)
 //	@ID				units.setAlertPolicies
-//	@Description	Authorization: client:self-customer:own-customer-policies | admin:asset.write | admin:alert.policy.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR108 only policies of the unit customer; the default policy is implicit and cannot be listed or removed
+//	@Description	Authorization: client:self-customer:own-customer-policies | admin:asset.write | \
+//	@Description	admin:alert.policy.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR108 only policies of the unit customer; the default policy is implicit and cannot be listed or \
+//	@Description	removed
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-C03, DD-C15, DD-A02, DD-A05
 //	@Tags			units
@@ -211,7 +214,8 @@ func (m *Module) unitsSetAlertPoliciesUnit(
 		customerID *uuid.UUID
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT u.customer_org_id, (SELECT id FROM assets.customers WHERE organization_id = u.customer_org_id)
+	err := c.Tx.QueryRow(ctx, `SELECT u.customer_org_id, (SELECT id FROM assets.customers WHERE organization_id =
+		u.customer_org_id)
 		FROM assets.units u WHERE u.id = $1 AND NOT u.archived FOR UPDATE`, in.UnitID).
 		Scan(&org, &customerID)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -245,7 +249,8 @@ func (m *Module) unitsSetAlertPoliciesUnit(
 
 	var v int
 
-	err = c.Tx.QueryRow(ctx, `UPDATE assets.units SET version = version + 1, updated_at = platform.app_now() WHERE id = $1 AND version = $2 RETURNING version`,
+	err = c.Tx.QueryRow(ctx, `UPDATE assets.units SET version = version + 1, updated_at = platform.app_now() WHERE id = $1
+		AND version = $2 RETURNING version`,
 		in.UnitID, *c.ExpectedVersion).
 		Scan(&v)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -272,7 +277,8 @@ func (m *Module) unitsSetAlertPoliciesUnit(
 	for _, id := range ids {
 		_, err := c.Tx.Exec(
 			ctx,
-			`INSERT INTO assets.unit_alert_policies (tenant_id, unit_id, policy_id) VALUES (current_setting('app.tenant_id')::uuid, $1, $2)
+			`INSERT INTO assets.unit_alert_policies (tenant_id, unit_id, policy_id) VALUES
+				(current_setting('app.tenant_id')::uuid, $1, $2)
 			ON CONFLICT DO NOTHING`,
 			in.UnitID,
 			id,

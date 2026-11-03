@@ -35,7 +35,8 @@ func overdue(ctx context.Context, c *ops.Call, in *OverdueInput) ([]Overdue, err
 		ctx,
 		`SELECT i.currency, count(*), sum(i.amount_minor) FROM billing.invoices i
 		WHERE i.status = 'unpaid' AND i.due_at < $2
-		  AND EXISTS (SELECT 1 FROM billing.contract_units cu WHERE cu.contract_id = i.contract_id AND cu.contract_version = i.contract_version AND cu.unit_id = ANY($1))
+		  AND EXISTS (SELECT 1 FROM billing.contract_units cu WHERE cu.contract_id = i.contract_id AND cu.contract_version =
+		  i.contract_version AND cu.unit_id = ANY($1))
 		GROUP BY i.currency ORDER BY i.currency`,
 		in.UnitIDs,
 		c.Now,
@@ -49,6 +50,7 @@ func overdue(ctx context.Context, c *ops.Call, in *OverdueInput) ([]Overdue, err
 
 	for rows.Next() {
 		var o Overdue
+
 		err := rows.Scan(&o.Currency, &o.Count, &o.AmountMinor)
 		if err != nil {
 			return nil, err

@@ -15,7 +15,17 @@ func TestCompare(t *testing.T) {
 		op   string
 		a, b float64
 		want bool
-	}{{"gt", 2, 1, true}, {"gt", 1, 1, false}, {"gte", 1, 1, true}, {"gte", 0.5, 1, false}, {"lt", 0.5, 1, true}, {"lt", 1, 1, false}, {"lte", 1, 1, true}, {"lte", 2, 1, false}, {"other", 1, 2, true}} {
+	}{
+		{"gt", 2, 1, true},
+		{"gt", 1, 1, false},
+		{"gte", 1, 1, true},
+		{"gte", 0.5, 1, false},
+		{"lt", 0.5, 1, true},
+		{"lt", 1, 1, false},
+		{"lte", 1, 1, true},
+		{"lte", 2, 1, false},
+		{"other", 1, 2, true},
+	} {
 		if got := compare(c.op, c.a, c.b); got != c.want {
 			t.Errorf("compare(%s, %v, %v) = %v", c.op, c.a, c.b, got)
 		}
@@ -24,8 +34,12 @@ func TestCompare(t *testing.T) {
 
 func TestConditionMetric(t *testing.T) {
 	for cond, want := range map[string]string{
-		`{"type":"occupancy","occupied":true}`: "occupied", `{"type":"weather","operator":"gt","value":30}`: "weather_temperature", `{"type":"location","event":"arrival"}`: "location",
-		`{"type":"peak","active":true}`: "peak", `{"type":"tariff"}`: "tariff", `{"type":"solar"}`: "solar", `{"type":"battery"}`: "battery", `{"type":"pattern","localTime":"09:00"}`: "", `not json`: "",
+		`{"type":"occupancy",` +
+			`"occupied":true}`: "occupied", `{"type":"weather","operator":"gt",` +
+			`"value":30}`: "weather_temperature", `{"type":"location","event":"arrival"}`: "location",
+		`{"type":"peak",` +
+			`"active":true}`: "peak", `{"type":"tariff"}`: "tariff", `{"type":"solar"}`: "solar",
+		`{"type":"battery"}`: "battery", `{"type":"pattern","localTime":"09:00"}`: "", `not json`: "",
 	} {
 		if got := conditionMetric(json.RawMessage(cond)); got != want {
 			t.Errorf("conditionMetric(%s) = %q, want %q", cond, got, want)
@@ -86,8 +100,12 @@ func TestMatchConditions(t *testing.T) {
 	for cond, want := range map[string]string{
 		`{"type":"peak","active":true}`: "", `{"type":"peak","active":false}`: "no_match",
 		`{"type":"occupancy","occupied":true}`: "", `{"type":"occupancy","occupied":false}`: "no_match",
-		`{"type":"tariff","operator":"gte","value":0.5}`: "", `{"type":"tariff","operator":"gt","value":0.6}`: "no_match", `{"type":"tariff","operator":"lte","value":0.6}`: "",
-		`{"type":"solar","operator":"gt","value":2.5}`: "", `{"type":"battery","operator":"lt","value":1}`: "", `{"type":"battery","operator":"gte","value":1}`: "no_match",
+		`{"type":"tariff","operator":"gte",` +
+			`"value":0.5}`: "", `{"type":"tariff","operator":"gt",` +
+			`"value":0.6}`: "no_match", `{"type":"tariff","operator":"lte","value":0.6}`: "",
+		`{"type":"solar","operator":"gt",` +
+			`"value":2.5}`: "", `{"type":"battery","operator":"lt",` +
+			`"value":1}`: "", `{"type":"battery","operator":"gte","value":1}`: "no_match",
 		`{"type":"location","event":"arrival"}`: "", `{"type":"location","event":"departure"}`: "no_match",
 		`{"type":"pattern","localTime":"09:00"}`: "", `{"type":"pattern","localTime":"09:01"}`: "no_match",
 		`{"type":"weather","operator":"gt","value":30}`: "", `{"type":"weather","operator":"lt","value":30}`: "no_match",
@@ -155,8 +173,12 @@ func TestExtrasMatch(t *testing.T) {
 
 	facts := testFacts(unit, sunday)
 	for raw, want := range map[string]string{
-		`[{"type":"weekday","weekdays":[7]}]`: "", `[{"type":"weekday","weekdays":[1,6]}]`: "no_match", `[{"type":"weekday","weekdays":[7]},{"type":"occupancy","occupied":true}]`: "",
-		`[{"type":"occupancy","occupied":false}]`: "no_match", `[{"type":"weather","operator":"gt","value":30}]`: "", `[]`: "", `{"type":"weekday"}`: "",
+		`[{"type":"weekday",` +
+			`"weekdays":[7]}]`: "", `[{"type":"weekday","weekdays":[1,` +
+			`6]}]`: "no_match", `[{"type":"weekday","weekdays":[7]},{"type":"occupancy","occupied":true}]`: "",
+		`[{"type":"occupancy",` +
+			`"occupied":false}]`: "no_match", `[{"type":"weather","operator":"gt",` +
+			`"value":30}]`: "", `[]`: "", `{"type":"weekday"}`: "",
 	} {
 		if got := extrasMatch(json.RawMessage(raw), unit, facts, sunday, kl); got != want {
 			t.Errorf("extrasMatch(%s) = %q, want %q", raw, got, want)

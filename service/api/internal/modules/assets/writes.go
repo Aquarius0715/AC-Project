@@ -46,6 +46,7 @@ func versionedUpdate(
 	}
 
 	var exists bool
+
 	scanErr := c.Tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM "+table+" WHERE id = $1)", id).
 		Scan(&exists)
 	if scanErr != nil {
@@ -76,7 +77,8 @@ type Property struct {
 	Archived           bool      `json:"archived"`
 }
 
-const propertyCols = `id, tenant_id, version, created_at, updated_at, customer_org_id, kind, name, address, access_instructions, archived`
+const propertyCols = `id, tenant_id, version, created_at, updated_at, customer_org_id, kind, name, address, ` +
+	`access_instructions, archived`
 
 func scanProperty(row pgx.Row) (Property, error) {
 	var p Property
@@ -173,16 +175,22 @@ func dupSibling(err error) error {
 // case-insensitive name is CONFLICT. It runs after the write in the same transaction, so NOT_FOUND and version
 // conflicts come first and a duplicate rolls the write back.
 func siblingName(ctx context.Context, c *ops.Call, kind string, id uuid.UUID) error {
-	q := `SELECT 1 FROM assets.properties o, assets.properties t WHERE t.id = $1 AND o.customer_org_id = t.customer_org_id AND o.id <> t.id AND NOT o.archived AND lower(btrim(o.name)) = lower(btrim(t.name))`
+	q := `SELECT 1 FROM assets.properties o, assets.properties t WHERE t.id = $1 AND o.customer_org_id = t.customer_org_id
+		AND o.id <> t.id AND NOT o.archived AND lower(btrim(o.name)) = lower(btrim(t.name))`
 
 	switch kind {
 	case "space":
-		q = `SELECT 1 FROM assets.spaces o, assets.spaces t WHERE t.id = $1 AND o.property_id = t.property_id AND o.parent_space_id IS NOT DISTINCT FROM t.parent_space_id AND o.id <> t.id AND NOT o.archived AND lower(btrim(o.name)) = lower(btrim(t.name))`
+		q = `SELECT 1 FROM assets.spaces o, assets.spaces t WHERE t.id = $1 AND o.property_id = t.property_id AND
+			o.parent_space_id IS NOT DISTINCT FROM t.parent_space_id AND o.id <> t.id AND NOT o.archived AND lower(btrim(o.name))
+			= lower(btrim(t.name))`
 	case "unit":
-		q = `SELECT 1 FROM assets.units o, assets.units t WHERE t.id = $1 AND o.property_id = t.property_id AND o.space_id IS NOT DISTINCT FROM t.space_id AND o.id <> t.id AND NOT o.archived AND lower(btrim(o.display_name)) = lower(btrim(t.display_name))`
+		q = `SELECT 1 FROM assets.units o, assets.units t WHERE t.id = $1 AND o.property_id = t.property_id AND o.space_id IS
+			NOT DISTINCT FROM t.space_id AND o.id <> t.id AND NOT o.archived AND lower(btrim(o.display_name)) =
+			lower(btrim(t.display_name))`
 	}
 
 	var taken bool
+
 	err := c.Tx.QueryRow(ctx, "SELECT EXISTS ("+q+")", id).Scan(&taken)
 	if err != nil {
 		return err
@@ -195,28 +203,30 @@ func siblingName(ctx context.Context, c *ops.Call, kind string, id uuid.UUID) er
 	return nil
 }
 
-// @Summary		properties.save (write)
-// @ID				properties.save
-// @Description	Authorization: admin:asset.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A02
-// @Tags			properties
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		PropertySave	true	"input"
-// @Success		200				{object}	ops.Envelope{data=Property}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/properties [post]
+// propertiesSave serves properties.save.
+//
+//	@Summary		properties.save (write)
+//	@ID				properties.save
+//	@Description	Authorization: admin:asset.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A02
+//	@Tags			properties
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		PropertySave	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Property}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/properties [post]
 func (m *Module) propertiesSave(
 	ctx context.Context,
 	c *ops.Call,
@@ -419,7 +429,8 @@ func (m *Module) checkParent(
 		return nil
 	}
 
-	err := c.Tx.QueryRow(ctx, `SELECT 1 FROM assets.spaces WHERE id = $1 AND property_id = $2 AND NOT archived FOR SHARE`, *parent, property).
+	err := c.Tx.QueryRow(ctx, `SELECT 1 FROM assets.spaces WHERE id = $1 AND property_id = $2 AND NOT archived FOR
+		SHARE`, *parent, property).
 		Scan(new(int))
 
 		// IR478
@@ -436,8 +447,10 @@ func (m *Module) checkParent(
 	}
 
 	var cycle bool
+
 	scanErr := c.Tx.QueryRow(ctx, `WITH RECURSIVE d AS (SELECT id FROM assets.spaces WHERE parent_space_id = $1
-		UNION ALL SELECT s.id FROM assets.spaces s JOIN d ON s.parent_space_id = d.id) SELECT EXISTS (SELECT 1 FROM d WHERE id = $2)`, *self, *parent).
+		UNION ALL SELECT s.id FROM assets.spaces s JOIN d ON s.parent_space_id = d.id) SELECT EXISTS (SELECT 1 FROM d WHERE id
+		= $2)`, *self, *parent).
 		Scan(&cycle)
 	if scanErr != nil {
 		return scanErr
@@ -450,28 +463,30 @@ func (m *Module) checkParent(
 	return nil
 }
 
-// @Summary		spaces.save (write)
-// @ID				spaces.save
-// @Description	Authorization: admin:asset.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A02
-// @Tags			spaces
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		SpaceSave	true	"input"
-// @Success		200				{object}	ops.Envelope{data=Space}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/spaces [post]
+// spacesSave serves spaces.save.
+//
+//	@Summary		spaces.save (write)
+//	@ID				spaces.save
+//	@Description	Authorization: admin:asset.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A02
+//	@Tags			spaces
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		SpaceSave	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Space}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/spaces [post]
 func (m *Module) spacesSave(ctx context.Context, c *ops.Call, in *SpaceSave) (Space, error) {
 	err := m.activeProperty(ctx, c, in.PropertyID)
 	if err != nil {
@@ -535,7 +550,8 @@ func (m *Module) spacesSave(ctx context.Context, c *ops.Call, in *SpaceSave) (Sp
 	s, err := scanSpace(
 		c.Tx.QueryRow(
 			ctx,
-			`UPDATE assets.spaces SET parent_space_id=$3, kind=$4, name=$5, version = version + 1, updated_at = platform.app_now()
+			`UPDATE assets.spaces SET parent_space_id=$3, kind=$4, name=$5, version = version + 1, updated_at =
+				platform.app_now()
 		WHERE id = $1 AND version = $2 AND property_id = $6 AND NOT archived RETURNING `+spaceCols,
 			*in.ID,
 			*c.ExpectedVersion,
@@ -621,6 +637,7 @@ func (in *UnitSave) Validate() map[string]string {
 		in.warrantySet = true
 		if string(in.WarrantyEndsAt) != "null" {
 			var t time.Time
+
 			err := json.Unmarshal(in.WarrantyEndsAt, &t)
 			if err != nil {
 				fe["warrantyEndsAt"] = "error.invalid"
@@ -652,28 +669,31 @@ func (in *UnitSave) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		units.save (write)
-// @ID				units.save
-// @Description	Authorization: admin:asset.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR62 spaceId=null is property root; IR74 no tenantId input
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A02
-// @Tags			units
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		UnitSave	true	"input"
-// @Success		200				{object}	ops.Envelope{data=ACUnit}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/units [post]
+// unitsSave serves units.save.
+//
+//	@Summary		units.save (write)
+//	@ID				units.save
+//	@Description	Authorization: admin:asset.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR62 spaceId=null is property root; IR74 no tenantId input
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A02
+//	@Tags			units
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		UnitSave	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=ACUnit}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/units [post]
 func (m *Module) unitsSave(ctx context.Context, c *ops.Call, in *UnitSave) (ACUnit, error) {
 	u, err := m.unitsSaveUnit(ctx, c, in)
 
@@ -688,7 +708,8 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (
 
 	var propOrg uuid.UUID
 	// the property and the space are read with a share lock: their archive waits, or is waited for and seen (IR478)
-	err := c.Tx.QueryRow(ctx, `SELECT customer_org_id FROM assets.properties WHERE id = $1 AND NOT archived FOR SHARE`, in.PropertyID).
+	err := c.Tx.QueryRow(ctx, `SELECT customer_org_id FROM assets.properties WHERE id = $1 AND NOT archived FOR
+		SHARE`, in.PropertyID).
 		Scan(&propOrg)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Unit{}, notFound()
@@ -703,7 +724,8 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (
 	}
 
 	if in.SpaceID != nil {
-		err := c.Tx.QueryRow(ctx, `SELECT 1 FROM assets.spaces WHERE id = $1 AND property_id = $2 AND NOT archived FOR SHARE`, *in.SpaceID, in.PropertyID).
+		err := c.Tx.QueryRow(ctx, `SELECT 1 FROM assets.spaces WHERE id = $1 AND property_id = $2 AND NOT archived FOR
+			SHARE`, *in.SpaceID, in.PropertyID).
 			Scan(new(int))
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Unit{}, apperr.Fields(map[string]string{"spaceId": "error.otherProperty"})
@@ -730,9 +752,11 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (
 		}
 
 		id := uuid.Must(uuid.NewV7())
+
 		_, err = c.Tx.Exec(
 			ctx,
-			`INSERT INTO assets.units (id, tenant_id, customer_org_id, property_id, space_id, display_name, model_id, type, installed_at, service_scope, capability_version, warranty_ends_at)
+			`INSERT INTO assets.units (id, tenant_id, customer_org_id, property_id, space_id, display_name, model_id, type,
+				installed_at, service_scope, capability_version, warranty_ends_at)
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
 			id,
 			in.CustomerOrgID,
@@ -785,7 +809,8 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (
 		curWarranty  *time.Time
 	)
 
-	err = c.Tx.QueryRow(ctx, `SELECT property_id, space_id, display_name, model_id, installed_at, service_scope, warranty_ends_at FROM assets.units WHERE id = $1 AND customer_org_id = $2 AND NOT archived`,
+	err = c.Tx.QueryRow(ctx, `SELECT property_id, space_id, display_name, model_id, installed_at, service_scope,
+		warranty_ends_at FROM assets.units WHERE id = $1 AND customer_org_id = $2 AND NOT archived`,
 		*in.ID, in.CustomerOrgID).
 		Scan(&curProp, &curSpace, &curName, &curModel, &curInstalled, &curScope, &curWarranty)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -819,10 +844,12 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (
 
 	var v int
 
-	err = c.Tx.QueryRow(ctx, `UPDATE assets.units SET property_id=$3, space_id=$4, display_name=$5, model_id=$6, installed_at=$7, service_scope=$8,
+	err = c.Tx.QueryRow(ctx, `UPDATE assets.units SET property_id=$3, space_id=$4, display_name=$5, model_id=$6,
+		installed_at=$7, service_scope=$8,
 		capability_version=$9, warranty_ends_at=$10, version = version + 1, updated_at = platform.app_now()
 		WHERE id = $1 AND version = $2 AND NOT archived RETURNING version`,
-		*in.ID, *c.ExpectedVersion, in.PropertyID, in.SpaceID, in.DisplayName, in.ModelID, in.InstalledAt, in.ServiceScope, capVer, warranty).
+		*in.ID, *c.ExpectedVersion, in.PropertyID, in.SpaceID, in.DisplayName, in.ModelID, in.InstalledAt, in.ServiceScope,
+		capVer, warranty).
 		Scan(&v)
 	if err != nil {
 		return Unit{}, versionedUpdate(ctx, c, "assets.units", *in.ID, err)
@@ -947,7 +974,8 @@ func (m *Module) propertiesArchive(
 	return m.archive(
 		"property",
 		"assets.properties",
-		`SELECT EXISTS (SELECT 1 FROM assets.units WHERE property_id = $1 AND NOT archived) OR EXISTS (SELECT 1 FROM assets.spaces WHERE property_id = $1 AND NOT archived)`,
+		`SELECT EXISTS (SELECT 1 FROM assets.units WHERE property_id = $1 AND NOT archived) OR EXISTS (SELECT 1 FROM
+			assets.spaces WHERE property_id = $1 AND NOT archived)`,
 	)(
 		ctx,
 		c,
@@ -989,7 +1017,8 @@ func (m *Module) spacesArchive(
 	return m.archive(
 		"space",
 		"assets.spaces",
-		`SELECT EXISTS (SELECT 1 FROM assets.units WHERE space_id = $1 AND NOT archived) OR EXISTS (SELECT 1 FROM assets.spaces WHERE parent_space_id = $1 AND NOT archived)`,
+		`SELECT EXISTS (SELECT 1 FROM assets.units WHERE space_id = $1 AND NOT archived) OR EXISTS (SELECT 1 FROM
+			assets.spaces WHERE parent_space_id = $1 AND NOT archived)`,
 	)(
 		ctx,
 		c,
@@ -1014,6 +1043,7 @@ func (m *Module) archive(
 
 		if busySQL != "" {
 			var busy bool
+
 			err := c.Tx.QueryRow(ctx, busySQL, in.ID).Scan(&busy)
 			if err != nil {
 				return ArchivedResource{}, err
@@ -1026,7 +1056,8 @@ func (m *Module) archive(
 
 		var v int
 
-		err := c.Tx.QueryRow(ctx, "UPDATE "+table+` SET archived = true, version = version + 1, updated_at = platform.app_now()
+		err := c.Tx.QueryRow(ctx, "UPDATE "+table+` SET archived = true, version = version + 1, updated_at =
+			platform.app_now()
 			WHERE id = $1 AND version = $2 AND NOT archived RETURNING version`, in.ID, *c.ExpectedVersion).
 			Scan(&v)
 		if err != nil {
@@ -1078,6 +1109,7 @@ func (m *Module) MoveToCapabilityVersion(
 
 	for rows.Next() {
 		var id uuid.UUID
+
 		err := rows.Scan(&id)
 		if err != nil {
 			return n, err
@@ -1099,7 +1131,8 @@ func (m *Module) UnitInfo(
 ) (devices.UnitInfo, bool, error) {
 	var u devices.UnitInfo
 
-	err := c.Tx.QueryRow(ctx, `SELECT customer_org_id, property_id, model_id, capability_version FROM assets.units WHERE id = $1 AND NOT archived`, unit).
+	err := c.Tx.QueryRow(ctx, `SELECT customer_org_id, property_id, model_id, capability_version FROM assets.units WHERE id
+		= $1 AND NOT archived`, unit).
 		Scan(&u.OrgID, &u.PropertyID, &u.ModelID, &u.CapabilityVersion)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return u, false, nil
@@ -1170,6 +1203,7 @@ func (m *Module) UnitsOfProperty(
 
 	for rows.Next() {
 		var id uuid.UUID
+
 		err := rows.Scan(&id)
 		if err != nil {
 			return nil, err
@@ -1218,6 +1252,7 @@ func (m *Module) AttachedUnits(
 
 	for rows.Next() {
 		var p, u uuid.UUID
+
 		err := rows.Scan(&p, &u)
 		if err != nil {
 			return nil, err
@@ -1249,6 +1284,7 @@ func (m *Module) PoliciesOfUnits(
 
 	for rows.Next() {
 		var id uuid.UUID
+
 		err := rows.Scan(&id)
 		if err != nil {
 			return nil, err
@@ -1260,7 +1296,8 @@ func (m *Module) PoliciesOfUnits(
 	return out, rows.Err()
 }
 
-// DetachPolicy removes an alert policy from every unit and bumps the version of each changed unit (policies.delete, IR108).
+// DetachPolicy removes an alert policy from every unit and bumps the version of each changed unit (policies.delete,
+// IR108).
 func (m *Module) DetachPolicy(ctx context.Context, c *ops.Call, policy uuid.UUID) error {
 	rows, err := c.Tx.Query(
 		ctx,
@@ -1275,6 +1312,7 @@ func (m *Module) DetachPolicy(ctx context.Context, c *ops.Call, policy uuid.UUID
 
 	for rows.Next() {
 		var u uuid.UUID
+
 		err := rows.Scan(&u)
 		if err != nil {
 			rows.Close()
@@ -1332,6 +1370,7 @@ func (m *Module) OrgsOfUnits(
 
 	for rows.Next() {
 		var u, o uuid.UUID
+
 		err := rows.Scan(&u, &o)
 		if err != nil {
 			return nil, err
@@ -1421,6 +1460,7 @@ func (m *Module) unitIDs(
 
 	for rows.Next() {
 		var id uuid.UUID
+
 		err := rows.Scan(&id)
 		if err != nil {
 			return nil, err
@@ -1440,7 +1480,8 @@ func (m *Module) SpaceInfo(
 ) (uuid.UUID, []uuid.UUID, bool, error) {
 	var org uuid.UUID
 
-	err := c.Tx.QueryRow(ctx, `SELECT p.customer_org_id FROM assets.spaces s JOIN assets.properties p ON p.id = s.property_id WHERE s.id = $1`, space).
+	err := c.Tx.QueryRow(ctx, `SELECT p.customer_org_id FROM assets.spaces s JOIN assets.properties p ON p.id =
+		s.property_id WHERE s.id = $1`, space).
 		Scan(&org)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return org, nil, false, nil
@@ -1475,6 +1516,7 @@ func (m *Module) SpacesOfUnits(
 
 	for rows.Next() {
 		var id uuid.UUID
+
 		err := rows.Scan(&id)
 		if err != nil {
 			return nil, err
@@ -1510,6 +1552,7 @@ func (m *Module) SpacesOfOrg(ctx context.Context, c *ops.Call, org uuid.UUID) ([
 
 	for rows.Next() {
 		var id uuid.UUID
+
 		err := rows.Scan(&id)
 		if err != nil {
 			return nil, err
@@ -1569,7 +1612,8 @@ func (m *Module) SiteAddress(
 		scope []string
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT NULLIF(btrim(p.address), ''), u.service_scope FROM assets.units u JOIN assets.properties p ON p.id = u.property_id WHERE u.id = $1`, unit).
+	err := c.Tx.QueryRow(ctx, `SELECT NULLIF(btrim(p.address), ''), u.service_scope FROM assets.units u JOIN
+		assets.properties p ON p.id = u.property_id WHERE u.id = $1`, unit).
 		Scan(&addr, &scope)
 
 	return addr, scope, err
@@ -1613,6 +1657,7 @@ func (m *Module) CustomerProfiles(
 			org      uuid.UUID
 			id, prof string
 		)
+
 		err := rows.Scan(&org, &id, &prof)
 		if err != nil {
 			return nil, err
@@ -1624,7 +1669,8 @@ func (m *Module) CustomerProfiles(
 	return out, rows.Err()
 }
 
-// BriefUnits lists the caller-readable, not archived units matching the optional customer / property / space / unit filters.
+// BriefUnits lists the caller-readable, not archived units matching the optional customer / property / space / unit
+// filters.
 func (m *Module) BriefUnits(
 	ctx context.Context,
 	c *ops.Call,
@@ -1669,6 +1715,7 @@ func (m *Module) BriefUnits(
 
 	for rows.Next() {
 		var b ops.UnitBrief
+
 		err := rows.Scan(&b.ID, &b.OrgID, &b.Connection)
 		if err != nil {
 			return nil, err

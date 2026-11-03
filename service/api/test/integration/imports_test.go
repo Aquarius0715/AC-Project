@@ -23,7 +23,8 @@ func jsonStr2(v any) string {
 	return string(b)
 }
 
-const mapping = `{"property":"Property","floor":"Floor","room":"Room","unit_name":"Unit","model_code":"Model","serial":"Serial","installed_on":"Installed","warranty_end":"Warranty"}`
+const mapping = `{"property":"Property","floor":"Floor","room":"Room","unit_name":"Unit","model_code":"Model",` +
+	`"serial":"Serial","installed_on":"Installed","warranty_end":"Warranty"}`
 
 func TestUnitsImport(t *testing.T) {
 	s := server(t)
@@ -59,7 +60,8 @@ func TestUnitsImport(t *testing.T) {
 		s,
 		&hq,
 		"units.save",
-		`{"customerOrgId":"`+org+`","propertyId":"`+propID+`","spaceId":null,"displayName":"Bound AC","modelId":"`+seed.ID("ventilation-demo").
+		`{"customerOrgId":"`+org+`","propertyId":"`+propID+`","spaceId":null,"displayName":"Bound AC",`+
+			`"modelId":"`+seed.ID("ventilation-demo").
 			String()+
 			`","type":"split","installedAt":null,"serviceScope":["indoor"]}`,
 		0,
@@ -67,7 +69,8 @@ func TestUnitsImport(t *testing.T) {
 	boundUnit := data(um)["id"]
 	owner(
 		t,
-		`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version) VALUES ($1,$2,$3,$4,$5,'v1')`,
+		`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version)
+			VALUES ($1,$2,$3,$4,$5,'v1')`,
 		dev,
 		seed.ID("tenant-a"),
 		serial,
@@ -76,7 +79,8 @@ func TestUnitsImport(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO devices.device_bindings (tenant_id, device_id, unit_id, customer_org_id, bound_at, actor_membership_id) VALUES ($1,$2,$3,$4,now(),$5)`,
+		`INSERT INTO devices.device_bindings (tenant_id, device_id, unit_id, customer_org_id, bound_at, actor_membership_id)
+			VALUES ($1,$2,$3,$4,now(),$5)`,
 		seed.ID("tenant-a"),
 		dev,
 		boundUnit,
@@ -89,7 +93,8 @@ func TestUnitsImport(t *testing.T) {
 	freeDev := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version) VALUES ($1,$2,$3,$4,$5,'v1')`,
+		`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version)
+			VALUES ($1,$2,$3,$4,$5,'v1')`,
 		freeDev,
 		seed.ID("tenant-a"),
 		free,
@@ -164,12 +169,19 @@ func TestUnitsImport(t *testing.T) {
 	}
 
 	for name, b := range map[string]string{
-		"missing unit_name mapping": `{"customerId":"` + cust + `","fileName":"a.csv","csvText":"a,b\n1,2","mapping":{"property":"a","model_code":"b"}}`,
-		"unknown mapping key":       `{"customerId":"` + cust + `","fileName":"a.csv","csvText":"a,b\n1,2","mapping":{"property":"a","unit_name":"a","model_code":"b","color":"a"}}`,
-		"column not in header":      `{"customerId":"` + cust + `","fileName":"a.csv","csvText":"a,b\n1,2","mapping":{"property":"a","unit_name":"zz","model_code":"b"}}`,
-		"header only":               `{"customerId":"` + cust + `","fileName":"a.csv","csvText":"a,b\n","mapping":{"property":"a","unit_name":"a","model_code":"b"}}`,
-		"too many rows":             `{"customerId":"` + cust + `","fileName":"a.csv","csvText":` + jsonStr("p,u,m\n"+strings.Repeat("x,y,z\n", 1001)) + `,"mapping":{"property":"p","unit_name":"u","model_code":"m"}}`,
-		"bad quoting":               `{"customerId":"` + cust + `","fileName":"a.csv","csvText":` + jsonStr("p,u,m\n\"x,y\n") + `,"mapping":{"property":"p","unit_name":"u","model_code":"m"}}`,
+		"missing unit_name mapping": `{"customerId":"` + cust + `","fileName":"a.csv","csvText":"a,b\n1,2",` +
+			`"mapping":{"property":"a","model_code":"b"}}`,
+		"unknown mapping key": `{"customerId":"` + cust + `","fileName":"a.csv","csvText":"a,b\n1,2",` +
+			`"mapping":{"property":"a","unit_name":"a","model_code":"b","color":"a"}}`,
+		"column not in header": `{"customerId":"` + cust + `","fileName":"a.csv","csvText":"a,b\n1,2",` +
+			`"mapping":{"property":"a","unit_name":"zz","model_code":"b"}}`,
+		"header only": `{"customerId":"` + cust + `","fileName":"a.csv","csvText":"a,b\n",` +
+			`"mapping":{"property":"a","unit_name":"a","model_code":"b"}}`,
+		"too many rows": `{"customerId":"` + cust + `","fileName":"a.csv",` +
+			`"csvText":` + jsonStr("p,u,m\n"+strings.Repeat("x,y,z\n", 1001)) + `,"mapping":{"property":"p","unit_name":"u",` +
+			`"model_code":"m"}}`,
+		"bad quoting": `{"customerId":"` + cust + `","fileName":"a.csv",` +
+			`"csvText":` + jsonStr("p,u,m\n\"x,y\n") + `,"mapping":{"property":"p","unit_name":"u","model_code":"m"}}`,
 	} {
 		code, m := post(s, &hq, "units.importPreview", b)
 		refusal(t, name, code, m, want[name])
@@ -369,7 +381,8 @@ func TestUnitsImport(t *testing.T) {
 	unit := imp2["createdUnitIds"].([]any)[0].(string)
 	owner(
 		t,
-		`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit, origin, quality, received_at, event_id)
+		`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit,
+			origin, quality, received_at, event_id)
 		VALUES ($1,$2,$3,'temperature',$4,1,25,'°C','measured','valid',$4,$5)`,
 		seed.ID("tenant-a"),
 		unit,
@@ -469,7 +482,8 @@ func TestUnitsImportRefusals(t *testing.T) {
 	tampered := "TMP-" + uuid.NewString()[:8]
 	owner(
 		t,
-		`INSERT INTO devices.devices (tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version, tamper) VALUES ($1,$2,$3,$4,'v1','detected')`,
+		`INSERT INTO devices.devices (tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version, tamper)
+			VALUES ($1,$2,$3,$4,'v1','detected')`,
 		seed.ID("tenant-a"),
 		tampered,
 		newUnit(t, s, "Target AC"),
@@ -590,7 +604,8 @@ func TestUnitsImportRevalidation(t *testing.T) {
 	other := newUnit(t, s, "Took the device")
 	owner(
 		t,
-		`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version) VALUES ($1,$2,$3,$4,$5,'v1')`,
+		`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version)
+			VALUES ($1,$2,$3,$4,$5,'v1')`,
 		dev,
 		seed.ID("tenant-a"),
 		serial,
@@ -612,7 +627,8 @@ func TestUnitsImportRevalidation(t *testing.T) {
 
 	owner(
 		t,
-		`INSERT INTO devices.device_bindings (tenant_id, device_id, unit_id, customer_org_id, bound_at, actor_membership_id) VALUES ($1,$2,$3,$4,$5,$6)`,
+		`INSERT INTO devices.device_bindings (tenant_id, device_id, unit_id, customer_org_id, bound_at, actor_membership_id)
+			VALUES ($1,$2,$3,$4,$5,$6)`,
 		seed.ID("tenant-a"),
 		dev,
 		other,

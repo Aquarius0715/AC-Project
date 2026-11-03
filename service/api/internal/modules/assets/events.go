@@ -15,6 +15,7 @@ func EventHandlers() map[string]events.Handler {
 	return map[string]events.Handler{
 		events.UnitRestrictionApplied: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.UnitRestriction
+
 			decodeErr := e.Decode(&p)
 			if decodeErr != nil {
 				return decodeErr
@@ -31,6 +32,7 @@ func EventHandlers() map[string]events.Handler {
 		},
 		events.UnitRestrictionCleared: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.UnitRestriction
+
 			decodeErr := e.Decode(&p)
 			if decodeErr != nil {
 				return decodeErr
@@ -38,7 +40,8 @@ func EventHandlers() map[string]events.Handler {
 
 			_, err := tx.Exec(
 				ctx,
-				`UPDATE assets.units SET observed_restriction = NULL WHERE id = $1 AND observed_restriction->>'restrictionId' = $2::text`,
+				`UPDATE assets.units SET observed_restriction = NULL WHERE id = $1 AND observed_restriction->>'restrictionId' =
+					$2::text`,
 				p.UnitID,
 				p.RestrictionID,
 			)
@@ -47,6 +50,7 @@ func EventHandlers() map[string]events.Handler {
 		},
 		events.RecoveryCasesChanged: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.Units
+
 			decodeErr := e.Decode(&p)
 			if decodeErr != nil {
 				return decodeErr
@@ -62,6 +66,7 @@ func EventHandlers() map[string]events.Handler {
 		},
 		events.OfferAccessChanged: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.OfferAccess
+
 			decodeErr := e.Decode(&p)
 			if decodeErr != nil {
 				return decodeErr
@@ -80,9 +85,11 @@ func EventHandlers() map[string]events.Handler {
 
 			_, err := tx.Exec(
 				ctx,
-				`INSERT INTO assets.unit_offer_access (tenant_id, offer_id, job_id, unit_id, contractor_org_id, access_valid_from, access_valid_until)
+				`INSERT INTO assets.unit_offer_access (tenant_id, offer_id, job_id, unit_id, contractor_org_id, access_valid_from,
+					access_valid_until)
 				VALUES ($1, $2, $3, $4, $5, $6, $7)
-				ON CONFLICT (tenant_id, offer_id) DO UPDATE SET job_id = EXCLUDED.job_id, unit_id = EXCLUDED.unit_id, contractor_org_id = EXCLUDED.contractor_org_id,
+				ON CONFLICT (tenant_id, offer_id) DO UPDATE SET job_id = EXCLUDED.job_id, unit_id = EXCLUDED.unit_id,
+				contractor_org_id = EXCLUDED.contractor_org_id,
 				  access_valid_from = EXCLUDED.access_valid_from, access_valid_until = EXCLUDED.access_valid_until`,
 				e.TenantID,
 				p.OfferID,
@@ -97,6 +104,7 @@ func EventHandlers() map[string]events.Handler {
 		},
 		events.AssignmentAccessChanged: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.AssignmentAccess
+
 			decodeErr := e.Decode(&p)
 			if decodeErr != nil {
 				return decodeErr
@@ -115,10 +123,12 @@ func EventHandlers() map[string]events.Handler {
 
 			_, err := tx.Exec(
 				ctx,
-				`INSERT INTO assets.unit_assignment_access (tenant_id, assignment_id, job_id, unit_id, technician_membership_id, created_at, scheduled, active)
+				`INSERT INTO assets.unit_assignment_access (tenant_id, assignment_id, job_id, unit_id, technician_membership_id,
+					created_at, scheduled, active)
 				VALUES ($1, $2, $3, $4, $5, $6, tstzrange($7, $8), $9)
 				ON CONFLICT (tenant_id, assignment_id) DO UPDATE SET job_id = EXCLUDED.job_id, unit_id = EXCLUDED.unit_id,
-				  technician_membership_id = EXCLUDED.technician_membership_id, created_at = EXCLUDED.created_at, scheduled = EXCLUDED.scheduled, active = EXCLUDED.active`,
+				  technician_membership_id = EXCLUDED.technician_membership_id, created_at = EXCLUDED.created_at, scheduled =
+				  EXCLUDED.scheduled, active = EXCLUDED.active`,
 				e.TenantID,
 				p.AssignmentID,
 				p.JobID,

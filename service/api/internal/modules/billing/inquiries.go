@@ -37,7 +37,8 @@ type Inquiry struct {
 	customerOrg   uuid.UUID
 }
 
-const inquiryCols = `q.id, q.tenant_id, q.version, q.created_at, q.updated_at, q.customer_id, q.invoice_id, q.restriction_id, q.subject_type, q.message, q.state, q.reply, cu.organization_id`
+const inquiryCols = `q.id, q.tenant_id, q.version, q.created_at, q.updated_at, q.customer_id, q.invoice_id, ` +
+	`q.restriction_id, q.subject_type, q.message, q.state, q.reply, cu.organization_id`
 
 func scanInquiry(r pgx.Row) (Inquiry, error) {
 	var x Inquiry
@@ -142,28 +143,30 @@ func (m Billing) notifyMembers(
 	return nil
 }
 
-// @Summary		inquiries.create (write)
-// @ID				inquiries.create
-// @Description	Authorization: client:self
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-C12
-// @Tags			inquiries
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		InquiryInput	true	"input"
-// @Success		200				{object}	ops.Envelope{data=Inquiry}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/inquiries [post]
+// createInquiry serves inquiries.create.
+//
+//	@Summary		inquiries.create (write)
+//	@ID				inquiries.create
+//	@Description	Authorization: client:self
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-C12
+//	@Tags			inquiries
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		InquiryInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Inquiry}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/inquiries [post]
 func (m Billing) createInquiry(
 	ctx context.Context,
 	c *ops.Call,
@@ -181,7 +184,9 @@ func (m Billing) createInquiry(
 
 	if in.InvoiceID != nil {
 		var owned bool
-		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM billing.invoices WHERE id = $1 AND customer_id = $2)`, *in.InvoiceID, customer).
+
+		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM billing.invoices WHERE id = $1 AND customer_id =
+			$2)`, *in.InvoiceID, customer).
 			Scan(&owned)
 		if err != nil {
 			return Inquiry{}, err
@@ -194,8 +199,10 @@ func (m Billing) createInquiry(
 
 	if in.RestrictionID != nil {
 		var owned, cites bool
+
 		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restrictions WHERE id = $1 AND customer_id = $2),
-			$3::uuid IS NULL OR EXISTS (SELECT 1 FROM restrictions.restriction_invoices WHERE restriction_id = $1 AND invoice_id = $3)`, *in.RestrictionID, customer, in.InvoiceID).
+			$3::uuid IS NULL OR EXISTS (SELECT 1 FROM restrictions.restriction_invoices WHERE restriction_id = $1 AND invoice_id
+			= $3)`, *in.RestrictionID, customer, in.InvoiceID).
 			Scan(&owned, &cites)
 		if err != nil {
 			return Inquiry{}, err
@@ -213,9 +220,11 @@ func (m Billing) createInquiry(
 	}
 
 	id := uuid.New()
+
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`INSERT INTO billing.inquiries (id, tenant_id, customer_id, invoice_id, restriction_id, subject_type, message, state, created_by, created_at, updated_at)
+		`INSERT INTO billing.inquiries (id, tenant_id, customer_id, invoice_id, restriction_id, subject_type, message, state,
+			created_by, created_at, updated_at)
 		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, 'received', $7, $8, $8)`,
 		id,
 		customer,
@@ -275,7 +284,8 @@ func (m Billing) loadInquiry(
 	id uuid.UUID,
 	lock bool,
 ) (Inquiry, error) {
-	q := "SELECT " + inquiryCols + " FROM billing.inquiries q JOIN billing.ref_customers cu ON cu.id = q.customer_id WHERE q.id = $1"
+	q := "SELECT " + inquiryCols + " FROM billing.inquiries q JOIN billing.ref_customers cu ON cu.id = q.customer_id " +
+		"WHERE q.id = $1"
 	if lock {
 		q += " FOR UPDATE OF q"
 	}
@@ -288,34 +298,37 @@ func (m Billing) loadInquiry(
 	return x, err
 }
 
-// @Summary		inquiries.list (read)
-// @ID				inquiries.list
-// @Description	Authorization: client:self | admin:billing.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A08, DD-C12 · Query: filters invoiceId,restrictionId,status,subjectType,customerId · sort id,createdAt,updatedAt (default createdAt desc;id desc)
-// @Tags			inquiries
-// @Accept			json
-// @Produce		json
-// @Param			cursor			query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit			query		integer	false	"page size 1–100, default 25"
-// @Param			sort			query		string	false	"field:direction — fields id,createdAt,updatedAt; default createdAt desc;id desc"
-// @Param			invoiceId		query		string	false	"filter → invoiceId"
-// @Param			restrictionId	query		string	false	"filter → restrictionId"
-// @Param			status			query		string	false	"filter → state"
-// @Param			subjectType		query		string	false	"filter → subjectType"
-// @Param			customerId		query		string	false	"filter → customerId"
-// @Success		200				{object}	ops.Envelope{data=InquiryPage}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/inquiries [get]
+// listInquiries serves inquiries.list.
+//
+//	@Summary		inquiries.list (read)
+//	@ID				inquiries.list
+//	@Description	Authorization: client:self | admin:billing.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A08, DD-C12 · Query: filters invoiceId,restrictionId,status,subjectType,customerId · sort \
+//	@Description	id,createdAt,updatedAt (default createdAt desc;id desc)
+//	@Tags			inquiries
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor			query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit			query		integer	false	"page size 1–100, default 25"
+//	@Param			sort			query		string	false	"field:direction — fields id,createdAt,updatedAt; default createdAt desc;id desc"
+//	@Param			invoiceId		query		string	false	"filter → invoiceId"
+//	@Param			restrictionId	query		string	false	"filter → restrictionId"
+//	@Param			status			query		string	false	"filter → state"
+//	@Param			subjectType		query		string	false	"filter → subjectType"
+//	@Param			customerId		query		string	false	"filter → customerId"
+//	@Success		200				{object}	ops.Envelope{data=InquiryPage}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/inquiries [get]
 func (m Billing) listInquiries(
 	ctx context.Context,
 	c *ops.Call,
@@ -365,7 +378,10 @@ func (m Billing) listInquiries(
 	}
 	conds := []string{clientScope(c, "cu.organization_id", &args)}
 
-	for col, v := range map[string]any{"q.state": f.Status, "q.subject_type": f.SubjectType, "q.invoice_id": f.InvoiceID, "q.restriction_id": f.RestrictionID, "q.customer_id": f.CustomerID} {
+	for col, v := range map[string]any{
+		"q.state": f.Status, "q.subject_type": f.SubjectType, "q.invoice_id": f.InvoiceID,
+		"q.restriction_id": f.RestrictionID, "q.customer_id": f.CustomerID,
+	} {
 		switch x := v.(type) {
 		case *string:
 			if x != nil {
@@ -382,6 +398,7 @@ func (m Billing) listInquiries(
 	from := "billing.inquiries q JOIN billing.ref_customers cu ON cu.id = q.customer_id"
 
 	var total int
+
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM "+from+" WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
@@ -447,30 +464,32 @@ func (in *AnswerInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		inquiries.answer (write)
-// @ID				inquiries.answer
-// @Description	Authorization: admin:billing.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A08
-// @Tags			inquiries
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer		true	"all: required (target inquiries, read inquiries.list)"
-// @Param			inquiryId			path		string		true	"input field inquiryId"
-// @Param			request				body		AnswerInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Inquiry}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/inquiries/{inquiryId}/answer [post]
+// answerInquiry serves inquiries.answer.
+//
+//	@Summary		inquiries.answer (write)
+//	@ID				inquiries.answer
+//	@Description	Authorization: admin:billing.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A08
+//	@Tags			inquiries
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target inquiries, read inquiries.list)"
+//	@Param			inquiryId			path		string		true	"input field inquiryId"
+//	@Param			request				body		AnswerInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=Inquiry}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/inquiries/{inquiryId}/answer [post]
 func (m Billing) answerInquiry(ctx context.Context, c *ops.Call, in *AnswerInput) (Inquiry, error) {
 	x, err := m.loadInquiry(ctx, c, in.InquiryID, true)
 	if err != nil {
@@ -487,7 +506,8 @@ func (m Billing) answerInquiry(ctx context.Context, c *ops.Call, in *AnswerInput
 
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`UPDATE billing.inquiries SET state = 'answered', reply = $2, answered_by = $3, answered_at = $4, version = version + 1, updated_at = $4 WHERE id = $1`,
+		`UPDATE billing.inquiries SET state = 'answered', reply = $2, answered_by = $3, answered_at = $4, version = version +
+			1, updated_at = $4 WHERE id = $1`,
 		x.ID,
 		in.Reply,
 		c.Principal.MembershipID,

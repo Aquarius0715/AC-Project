@@ -25,9 +25,12 @@ func TestLoadSortsAndValidates(t *testing.T) {
 	}
 
 	for name, fsys := range map[string]fstest.MapFS{
-		"bad name":  {"init.sql": {Data: nil, Mode: 0, ModTime: time.Time{}, Sys: nil}},
-		"zero":      {"000000_zero.up.sql": {Data: nil, Mode: 0, ModTime: time.Time{}, Sys: nil}},
-		"duplicate": {"000001_a.up.sql": {Data: nil, Mode: 0, ModTime: time.Time{}, Sys: nil}, "1_b.up.sql": {Data: nil, Mode: 0, ModTime: time.Time{}, Sys: nil}},
+		"bad name": {"init.sql": {Data: nil, Mode: 0, ModTime: time.Time{}, Sys: nil}},
+		"zero":     {"000000_zero.up.sql": {Data: nil, Mode: 0, ModTime: time.Time{}, Sys: nil}},
+		"duplicate": {
+			"000001_a.up.sql": {Data: nil, Mode: 0, ModTime: time.Time{}, Sys: nil},
+			"1_b.up.sql":      {Data: nil, Mode: 0, ModTime: time.Time{}, Sys: nil},
+		},
 	} {
 		_, err := Load(fsys)
 		if err == nil {
@@ -74,6 +77,7 @@ func testDB(t *testing.T) *pgx.Conn {
 	t.Cleanup(func() { ac.Close(ctx) })
 
 	const name = "ac_migrate_test"
+
 	_, execErr := ac.Exec(ctx, "DROP DATABASE IF EXISTS "+name+" WITH (FORCE)")
 	if execErr != nil {
 		t.Fatal(execErr)
@@ -177,6 +181,7 @@ func TestFailedMigrationRollsBack(t *testing.T) {
 	}
 
 	var b *string
+
 	scanErr := c.QueryRow(ctx, "SELECT to_regclass('public.b')::text").
 		Scan(&b)
 	if scanErr != nil ||
@@ -218,6 +223,7 @@ func TestNoTxFailureLeavesDirty(t *testing.T) {
 	ok := []Migration{
 		{Version: 3, Name: "idx", SQL: noTxMarker + "\nCREATE TABLE public.t (id int)"},
 	}
+
 	got, err := Up(ctx, c, ok)
 	if err != nil || len(got) != 1 {
 		t.Fatalf("Up after force = %v, %v", got, err)

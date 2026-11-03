@@ -12,7 +12,8 @@ const (
 	device = "11111111-2222-3333-4444-555555555555"
 )
 
-// TestTopicsFollowTheDesign: the topics are t/<tenantId>/d/<deviceId>/<kind>, telemetry and heartbeat are the routine ones.
+// TestTopicsFollowTheDesign: the topics are t/<tenantId>/d/<deviceId>/<kind>, telemetry and heartbeat are the routine
+// ones.
 func TestTopicsFollowTheDesign(t *testing.T) {
 	m := NewModule(tenant, device, "v1", 1)
 	if got, want := m.TelemetryTopic(), "t/"+tenant+"/d/"+device+"/telemetry"; got != want {
@@ -35,6 +36,7 @@ func TestTelemetryBatchShape(t *testing.T) {
 	}
 
 	var b map[string]any
+
 	unmarshalErr := json.Unmarshal(raw, &b)
 	if unmarshalErr != nil {
 		t.Fatal(unmarshalErr)
@@ -86,6 +88,7 @@ func TestSequenceNeverRepeats(t *testing.T) {
 				Sequence float64 `json:"sequence"`
 			} `json:"measurements"`
 		}
+
 		unmarshalErr := json.Unmarshal(raw, &b)
 		if unmarshalErr != nil {
 			t.Fatal(unmarshalErr)
@@ -115,6 +118,7 @@ func TestHeartbeatCarriesFirmware(t *testing.T) {
 	}
 
 	var h map[string]any
+
 	unmarshalErr := json.Unmarshal(raw, &h)
 	if unmarshalErr != nil {
 		t.Fatal(unmarshalErr)
@@ -137,6 +141,7 @@ func TestAcknowledgeAppliesAndExpires(t *testing.T) {
 		}
 
 		var a map[string]any
+
 		unmarshalErr := json.Unmarshal(raw, &a)
 		if unmarshalErr != nil {
 			t.Fatal(unmarshalErr)
@@ -189,6 +194,7 @@ func TestCommandAndAckTopics(t *testing.T) {
 // command of an unknown kind is answered unsupported with the setpoint unchanged.
 func TestAcknowledgeRefusesMalformedAndKeepsUnknownKinds(t *testing.T) {
 	m := NewModule(tenant, device, "v1", 1)
+
 	_, _, err := m.Acknowledge([]byte(`{"commandId":`), time.Now())
 	if err == nil {
 		t.Error("a malformed command is accepted")
@@ -203,6 +209,7 @@ func TestAcknowledgeRefusesMalformedAndKeepsUnknownKinds(t *testing.T) {
 	}
 
 	var a map[string]any
+
 	unmarshalErr := json.Unmarshal(raw, &a)
 	if unmarshalErr != nil {
 		t.Fatal(unmarshalErr)

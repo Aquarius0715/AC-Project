@@ -15,7 +15,8 @@ func assignedNow(t *testing.T, s *apiserver.Server) string {
 	t.Helper()
 	owner(
 		t,
-		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND scheduled && tstzrange($2, $3)`,
+		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND
+			scheduled && tstzrange($2, $3)`,
 		seed.ID("tech-internal-a"),
 		clock.Add(-2*time.Hour),
 		clock.Add(30*time.Hour),
@@ -49,7 +50,8 @@ func assignedNow(t *testing.T, s *apiserver.Server) string {
 
 	owner(
 		t,
-		`UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3), created_at = $2 WHERE job_id = $1 AND status = 'active'`,
+		`UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3), created_at = $2
+			WHERE job_id = $1 AND status = 'active'`,
 		job,
 		clock.Add(-time.Hour),
 		clock.Add(time.Hour),
@@ -216,7 +218,8 @@ func TestOnSiteOperations(t *testing.T) {
 		"no qr":         `{"jobId":"` + job + `","method":"location_qr","distanceMeters":10,"qrUnitId":null}`,
 		"manual reason": `{"jobId":"` + job + `","method":"manual","distanceMeters":null,"qrUnitId":null,"reason":"  "}`,
 		"bad method":    `{"jobId":"` + job + `","method":"gps","distanceMeters":null,"qrUnitId":null}`,
-		"qr mismatch":   `{"jobId":"` + job + `","method":"location_qr","distanceMeters":10,"qrUnitId":"` + uuid.NewString() + `"}`,
+		"qr mismatch": `{"jobId":"` + job + `","method":"location_qr","distanceMeters":10,` +
+			`"qrUnitId":"` + uuid.NewString() + `"}`,
 	} {
 		code, m := write(s, &techInt, "jobs.checkIn", b, 4)
 		refusal(t, name, code, m, want[name])
@@ -316,7 +319,8 @@ func TestOnSiteOperations(t *testing.T) {
 	j3 := assignedNow(t, s)
 	owner(
 		t,
-		`UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3) WHERE job_id = $1 AND status = 'active'`,
+		`UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3) WHERE job_id = $1
+			AND status = 'active'`,
 		j3,
 		clock.Add(time.Hour),
 		clock.Add(2*time.Hour),
@@ -361,7 +365,8 @@ func TestOnSiteOperations(t *testing.T) {
 	// acknowledgement after the viewing window ended
 	owner(
 		t,
-		`UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3) WHERE job_id = $1 AND status = 'active'`,
+		`UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3) WHERE job_id = $1
+			AND status = 'active'`,
 		j3,
 		clock.Add(-3*time.Hour),
 		clock.Add(-2*time.Hour),
@@ -379,7 +384,8 @@ func TestOnSiteOperations(t *testing.T) {
 
 	owner(
 		t,
-		`UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3) WHERE job_id = $1 AND status = 'active'`,
+		`UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3) WHERE job_id = $1
+			AND status = 'active'`,
 		j3,
 		clock.Add(time.Hour),
 		clock.Add(2*time.Hour),

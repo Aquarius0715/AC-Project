@@ -102,9 +102,12 @@ func (m Delivery) load(ctx context.Context, c *ops.Call, id uuid.UUID) (jobRow, 
 		ss, se *time.Time
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT status, unit_id, contractor_org_id, plan_id, occurrence_at, lower(requested_slot), upper(requested_slot), preferred_slots,
-		lower(scheduled_slot), upper(scheduled_slot), assignment_id, version FROM maintenance.jobs WHERE id = $1 FOR UPDATE`, id).
-		Scan(&r.status, &r.unit, &r.contractor, &r.planID, &r.occurrence, &r.requested.StartAt, &r.requested.EndAt, &pref, &ss, &se, &r.assignment, &r.version)
+	err := c.Tx.QueryRow(ctx, `SELECT status, unit_id, contractor_org_id, plan_id, occurrence_at, lower(requested_slot),
+		upper(requested_slot), preferred_slots,
+		lower(scheduled_slot), upper(scheduled_slot), assignment_id, version FROM maintenance.jobs WHERE id = $1 FOR
+		UPDATE`, id).
+		Scan(&r.status, &r.unit, &r.contractor, &r.planID, &r.occurrence, &r.requested.StartAt, &r.requested.EndAt, &pref,
+			&ss, &se, &r.assignment, &r.version)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return r, apperr.E(apperr.NotFound, "error.notFound")
 	}
@@ -142,7 +145,9 @@ func (m Delivery) agreed(
 	}
 
 	var n int
-	err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM maintenance.slot_proposals WHERE job_id = $1 AND status = 'accepted' AND slot = tstzrange($2, $3)`,
+
+	err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM maintenance.slot_proposals WHERE job_id = $1 AND status = 'accepted'
+		AND slot = tstzrange($2, $3)`,
 		id, s.StartAt, s.EndAt).
 		Scan(&n)
 	if err != nil {
@@ -196,7 +201,8 @@ func (in *OfferInput) Validate() map[string]string {
 
 	if in.OfferExpiresAt.After(in.AccessValidUntil) {
 		fe["offerExpiresAt"] = "error.afterAccess"
-	} else if in.OfferExpiresAt.After(in.VisitSlot.StartAt) { // an answer after the visit began could not be worked (IR457)
+	} else if in.OfferExpiresAt.After(in.VisitSlot.StartAt) {
+		// an answer after the visit began could not be worked (IR457)
 		fe["offerExpiresAt"] = "error.afterVisit"
 	}
 
@@ -212,30 +218,35 @@ func (in *OfferInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		jobs.offer (write)
-// @ID				jobs.offer
-// @Description	Authorization: admin:job.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR48 requested only; offerExpiresAt<=accessValidUntil and <= visit start (IR457); expiry returns requested; IR113 visitSlot must be an agreed slot (preferred or accepted proposal; plan occurrence) else VALIDATION errors.slot_not_agreed; access window covers visitSlot
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A06
-// @Tags			jobs
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			jobId				path		string		true	"input field jobId"
-// @Param			request				body		OfferInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/jobs/{jobId}/offers [post]
+// offer serves jobs.offer.
+//
+//	@Summary		jobs.offer (write)
+//	@ID				jobs.offer
+//	@Description	Authorization: admin:job.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR48 requested only; offerExpiresAt<=accessValidUntil and <= visit start (IR457); expiry returns \
+//	@Description	requested; IR113 visitSlot must be an agreed slot (preferred or accepted proposal; plan occurrence) \
+//	@Description	else VALIDATION errors.slot_not_agreed; access window covers visitSlot
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A06
+//	@Tags			jobs
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
+//	@Param			jobId				path		string		true	"input field jobId"
+//	@Param			request				body		OfferInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=MaintenanceJob}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs/{jobId}/offers [post]
 func (m Delivery) offer(ctx context.Context, c *ops.Call, in *OfferInput) (MaintenanceJob, error) {
 	return written(m.offerJob(ctx, c, in))
 }
@@ -256,7 +267,9 @@ func (m Delivery) offerJob(ctx context.Context, c *ops.Call, in *OfferInput) (Jo
 	}
 
 	var suspended bool
-	scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id = $1 AND status = 'suspended')`, in.ContractorOrgID).
+
+	scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id = $1 AND
+		status = 'suspended')`, in.ContractorOrgID).
 		Scan(&suspended)
 	if scanErr != nil {
 		return Job{}, scanErr
@@ -286,8 +299,10 @@ func (m Delivery) offerJob(ctx context.Context, c *ops.Call, in *OfferInput) (Jo
 
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at, offer_expires_at,
-		access_valid_from, access_valid_until) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, tstzrange($4, $5), $6, $7, $8, $9)`,
+		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at,
+			offer_expires_at,
+		access_valid_from, access_valid_until) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, tstzrange($4, $5),
+		$6, $7, $8, $9)`,
 		in.JobID,
 		in.ContractorOrgID,
 		in.TermsVersion,
@@ -304,7 +319,8 @@ func (m Delivery) offerJob(ctx context.Context, c *ops.Call, in *OfferInput) (Jo
 
 	_, execErr = c.Tx.Exec(
 		ctx,
-		`UPDATE maintenance.jobs SET status = 'offered', contractor_org_id = $2, version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
+		`UPDATE maintenance.jobs SET status = 'offered', contractor_org_id = $2, version = version + 1, updated_at =
+			platform.app_now() WHERE id = $1`,
 		in.JobID,
 		in.ContractorOrgID,
 	)
@@ -390,7 +406,8 @@ func (m Delivery) decide(
 		decided *string
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT terms_version, offer_expires_at, decision FROM maintenance.offers WHERE id = $1 AND job_id = $2 AND contractor_org_id = $3 FOR UPDATE`,
+	err := c.Tx.QueryRow(ctx, `SELECT terms_version, offer_expires_at, decision FROM maintenance.offers WHERE id = $1 AND
+		job_id = $2 AND contractor_org_id = $3 FOR UPDATE`,
 		offer, job, c.Principal.OrgID).
 		Scan(&terms, &expires, &decided)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -423,7 +440,9 @@ func (m Delivery) decide(
 
 	if decision == "accept" {
 		var open bool
-		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.partner_slot_proposals WHERE offer_id = $1 AND status IN ('pending','sent_to_client'))`, offer).
+
+		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.partner_slot_proposals WHERE offer_id = $1 AND
+			status IN ('pending','sent_to_client'))`, offer).
 			Scan(&open)
 		if err != nil {
 			return Receipt{}, err
@@ -459,7 +478,8 @@ func (m Delivery) decide(
 		// this contractor: accepting it would offer the job again to the company that just declined it (IR445)
 		_, err := c.Tx.Exec(
 			ctx,
-			`UPDATE maintenance.partner_slot_proposals SET status = 'withdrawn' WHERE offer_id = $1 AND status IN ('pending','sent_to_client')`,
+			`UPDATE maintenance.partner_slot_proposals SET status = 'withdrawn' WHERE offer_id = $1 AND status IN ('pending',
+				'sent_to_client')`,
 			offer,
 		)
 		if err != nil {
@@ -480,14 +500,19 @@ func (m Delivery) decide(
 	}
 
 	var v int
-	scanErr := c.Tx.QueryRow(ctx, `UPDATE maintenance.jobs SET status = $2, contractor_org_id = `+contractor+`, version = version + 1, updated_at = platform.app_now()
+
+	scanErr := c.Tx.QueryRow(ctx, `UPDATE maintenance.jobs SET status = $2, contractor_org_id =
+		`+contractor+`, version `+
+		`= version + 1, updated_at = platform.app_now()
 		WHERE id = $1 RETURNING version`, job, next).
 		Scan(&v)
 	if scanErr != nil {
 		return Receipt{}, scanErr
 	}
 
-	done := map[string]string{"accept": "accepted", "decline": "declined"}[decision] // the past tense the history reads (offer.declined)
+	// the past tense the history reads (offer.declined)
+	done := map[string]string{"accept": "accepted", "decline": "declined"}[decision]
+
 	eventErr := m.Jobs.event(ctx, c, job, "offer."+done, nil)
 	if eventErr != nil {
 		return Receipt{}, eventErr
@@ -515,60 +540,70 @@ func (m Delivery) decide(
 	return Receipt{JobID: job, JobVersion: v, OfferID: offer, Decision: decision}, nil
 }
 
-// @Summary		jobs.accept (write)
-// @ID				jobs.accept
-// @Description	Authorization: contractor:partner.accept:own-valid-offer:first-attempt | IR01:same-key-receipt:original-user:current-own-membership
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR86 expired undecided own offer: CONFLICT errors.offer_expired
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent; IR01 own valid membership receipt after decline/offer expiry
-// @Description	Design: DD-P02 · Input versions: none; options.expectedVersion=JobOfferSummary.jobVersion
-// @Tags			jobs
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			jobId				path		string		true	"input field jobId"
-// @Param			offerId				path		string		true	"input field offerId"
-// @Param			request				body		AcceptInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Receipt}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/jobs/{jobId}/offers/{offerId}/accept [post]
+// accept serves jobs.accept.
+//
+//	@Summary		jobs.accept (write)
+//	@ID				jobs.accept
+//	@Description	Authorization: contractor:partner.accept:own-valid-offer:first-attempt | \
+//	@Description	IR01:same-key-receipt:original-user:current-own-membership
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR86 expired undecided own offer: CONFLICT errors.offer_expired
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent; IR01 own valid \
+//	@Description	membership receipt after decline/offer expiry
+//	@Description	Design: DD-P02 · Input versions: none; options.expectedVersion=JobOfferSummary.jobVersion
+//	@Tags			jobs
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
+//	@Param			jobId				path		string		true	"input field jobId"
+//	@Param			offerId				path		string		true	"input field offerId"
+//	@Param			request				body		AcceptInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=Receipt}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs/{jobId}/offers/{offerId}/accept [post]
 func (m Delivery) accept(ctx context.Context, c *ops.Call, in *AcceptInput) (Receipt, error) {
 	return m.decide(ctx, c, in.JobID, in.OfferID, "accept", in.TermsVersion, "")
 }
 
-// @Summary		jobs.decline (write)
-// @ID				jobs.decline
-// @Description	Authorization: contractor:partner.accept:own-valid-offer:first-attempt | IR01:same-key-receipt:original-user:current-own-membership
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR86 expired undecided own offer: CONFLICT errors.offer_expired
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent; IR01 own valid membership receipt after decline/offer expiry
-// @Description	Design: DD-P02 · Input versions: none; options.expectedVersion=JobOfferSummary.jobVersion
-// @Tags			jobs
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			jobId				path		string			true	"input field jobId"
-// @Param			offerId				path		string			true	"input field offerId"
-// @Param			request				body		DeclineInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Receipt}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/jobs/{jobId}/offers/{offerId}/decline [post]
+// decline serves jobs.decline.
+//
+//	@Summary		jobs.decline (write)
+//	@ID				jobs.decline
+//	@Description	Authorization: contractor:partner.accept:own-valid-offer:first-attempt | \
+//	@Description	IR01:same-key-receipt:original-user:current-own-membership
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR86 expired undecided own offer: CONFLICT errors.offer_expired
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent; IR01 own valid \
+//	@Description	membership receipt after decline/offer expiry
+//	@Description	Design: DD-P02 · Input versions: none; options.expectedVersion=JobOfferSummary.jobVersion
+//	@Tags			jobs
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get;jobs.list)"
+//	@Param			jobId				path		string			true	"input field jobId"
+//	@Param			offerId				path		string			true	"input field offerId"
+//	@Param			request				body		DeclineInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=Receipt}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs/{jobId}/offers/{offerId}/decline [post]
 func (m Delivery) decline(ctx context.Context, c *ops.Call, in *DeclineInput) (Receipt, error) {
 	return m.decide(ctx, c, in.JobID, in.OfferID, "decline", "", in.Reason)
 }
@@ -609,30 +644,36 @@ func (in *AssignInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		jobs.assign (write)
-// @ID				jobs.assign
-// @Description	Authorization: contractor:partner.assign:own-valid-offer | admin:job.write:internal-job
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR89 success updates Job.assignmentId/scheduledSlot and version; IR94 technician scope must include Job.unitId; IR113 client_request/periodic_plan: [startAt,endAt) must equal the agreed slot (offer visitSlot for contractors) else VALIDATION errors.slot_not_agreed; IR433 the technician's access must last until endAt else FORBIDDEN errors.technician_access_ends; creates acknowledgement=pending
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A06, DD-P03
-// @Tags			jobs
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			jobId				path		string		true	"input field jobId"
-// @Param			request				body		AssignInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/jobs/{jobId}/assign [post]
+// assign serves jobs.assign.
+//
+//	@Summary		jobs.assign (write)
+//	@ID				jobs.assign
+//	@Description	Authorization: contractor:partner.assign:own-valid-offer | admin:job.write:internal-job
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR89 success updates Job.assignmentId/scheduledSlot and version; IR94 technician scope must include \
+//	@Description	Job.unitId; IR113 client_request/periodic_plan: [startAt,endAt) must equal the agreed slot (offer \
+//	@Description	visitSlot for contractors) else VALIDATION errors.slot_not_agreed; IR433 the technician's access \
+//	@Description	must last until endAt else FORBIDDEN errors.technician_access_ends; creates acknowledgement=pending
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A06, DD-P03
+//	@Tags			jobs
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
+//	@Param			jobId				path		string		true	"input field jobId"
+//	@Param			request				body		AssignInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=MaintenanceJob}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs/{jobId}/assign [post]
 func (m Delivery) assign(
 	ctx context.Context,
 	c *ops.Call,
@@ -656,8 +697,10 @@ func (m Delivery) assignJob(ctx context.Context, c *ops.Call, in *AssignInput) (
 	if contractor {
 		var from, until time.Time
 
-		err := c.Tx.QueryRow(ctx, `SELECT lower(visit_slot), upper(visit_slot), access_valid_from, access_valid_until FROM maintenance.offers
-			WHERE job_id = $1 AND contractor_org_id = $2 AND decision = 'accept' ORDER BY decided_at DESC LIMIT 1`, in.JobID, c.Principal.OrgID).
+		err := c.Tx.QueryRow(ctx, `SELECT lower(visit_slot), upper(visit_slot), access_valid_from, access_valid_until FROM
+			maintenance.offers
+			WHERE job_id = $1 AND contractor_org_id = $2 AND decision = 'accept' ORDER BY decided_at DESC LIMIT
+			1`, in.JobID, c.Principal.OrgID).
 			Scan(&visit.StartAt, &visit.EndAt, &from, &until)
 		if errors.Is(err, pgx.ErrNoRows) || r.contractor == nil ||
 			*r.contractor != c.Principal.OrgID {
@@ -715,7 +758,8 @@ func (m Delivery) assignJob(ctx context.Context, c *ops.Call, in *AssignInput) (
 		if r.scheduled == nil || !sameSlot(*r.scheduled, slot) {
 			return Job{}, apperr.Fields(map[string]string{"startAt": "errors.slot_not_agreed"})
 		}
-	case r.status == "in_progress" || r.status == "rework_requested" || r.status == "on_hold": // D06 extension / reassignment
+	case r.status == "in_progress" || r.status == "rework_requested" || r.status == "on_hold":
+		// D06 extension / reassignment
 		if r.scheduled == nil || !slot.StartAt.Equal(r.scheduled.StartAt) ||
 			slot.EndAt.Before(r.scheduled.EndAt) {
 			return Job{}, apperr.Fields(map[string]string{"endAt": "errors.extension_only"})
@@ -901,7 +945,8 @@ func (m Delivery) createAssignment(
 ) error {
 	_, err := c.Tx.Exec(
 		ctx,
-		`UPDATE maintenance.assignments SET status = 'revoked', reason = COALESCE(NULLIF($2, ''), 'reassigned'), version = version + 1, updated_at = platform.app_now()
+		`UPDATE maintenance.assignments SET status = 'revoked', reason = COALESCE(NULLIF($2, ''), 'reassigned'), version =
+			version + 1, updated_at = platform.app_now()
 		WHERE job_id = $1 AND status = 'active'`,
 		job,
 		reason,
@@ -911,8 +956,11 @@ func (m Delivery) createAssignment(
 	}
 
 	var aid uuid.UUID
-	err = c.Tx.QueryRow(ctx, `INSERT INTO maintenance.assignments (tenant_id, job_id, technician_membership_id, valid_from, valid_until, scheduled, status, reason, created_at, updated_at)
-		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, tstzrange($3, $4), 'active', NULLIF($5, ''), $6, $6) RETURNING id`,
+
+	err = c.Tx.QueryRow(ctx, `INSERT INTO maintenance.assignments (tenant_id, job_id, technician_membership_id, valid_from,
+		valid_until, scheduled, status, reason, created_at, updated_at)
+		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, tstzrange($3, $4), 'active', NULLIF($5, ''), $6, $6)
+		RETURNING id`,
 		job, tech, slot.StartAt, slot.EndAt, reason, c.Now).
 		Scan(&aid)
 	if err != nil {
@@ -922,7 +970,8 @@ func (m Delivery) createAssignment(
 
 		return err
 	}
-	// a window of this technician that had ended was frozen into their history; it is frozen again when the new one ends (IR459)
+	// a window of this technician that had ended was frozen into their history; it is frozen again when the new one ends
+	// (IR459)
 	_, err = c.Tx.Exec(
 		ctx,
 		`DELETE FROM maintenance.job_history_snapshots WHERE job_id = $1 AND owner_kind = 'membership' AND owner_id = $2`,
@@ -936,7 +985,8 @@ func (m Delivery) createAssignment(
 	_, err = c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.jobs SET status = CASE WHEN status IN ('requested','accepted') THEN 'assigned' ELSE status END,
-		assignment_id = $2, scheduled_slot = tstzrange($3, $4), version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
+		assignment_id = $2, scheduled_slot = tstzrange($3, $4), version = version + 1, updated_at = platform.app_now() WHERE
+		id = $1`,
 		job,
 		aid,
 		slot.StartAt,

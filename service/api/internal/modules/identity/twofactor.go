@@ -46,7 +46,8 @@ func twoFactorStatus(ctx context.Context, c *ops.Call) (TwoFactorStatus, error) 
 		left int
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT enabled_at, cardinality(recovery_code_hashes) FROM identity.two_factor WHERE user_id = $1`, c.Principal.UserID).
+	err := c.Tx.QueryRow(ctx, `SELECT enabled_at, cardinality(recovery_code_hashes) FROM identity.two_factor WHERE user_id
+		= $1`, c.Principal.UserID).
 		Scan(&at, &left)
 	if errors.Is(err, pgx.ErrNoRows) {
 		k := setupKey(c)
@@ -85,28 +86,31 @@ func (in *CodeInput) Validate() map[string]string {
 	return nil
 }
 
-// @Summary		twoFactor.enable (write)
-// @ID				twoFactor.enable
-// @Description	Authorization: authenticated:own-session
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR112 demo: any 6 digits; shows 8 recovery codes once
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DDC-07
-// @Tags			twoFactor
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		CodeInput	true	"input"
-// @Success		200				{object}	ops.Envelope{data=TwoFactorEnabled}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/two-factor/enable [post]
+// enableTwoFactor serves twoFactor.enable.
+//
+//	@Summary		twoFactor.enable (write)
+//	@ID				twoFactor.enable
+//	@Description	Authorization: authenticated:own-session
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR112 demo: any 6 digits; shows 8 recovery codes once
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DDC-07
+//	@Tags			twoFactor
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		CodeInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=TwoFactorEnabled}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/two-factor/enable [post]
 func enableTwoFactor(ctx context.Context, c *ops.Call, in *CodeInput) (TwoFactorEnabled, error) {
 	st, err := twoFactorStatus(ctx, c)
 	if err != nil {
@@ -120,6 +124,7 @@ func enableTwoFactor(ctx context.Context, c *ops.Call, in *CodeInput) (TwoFactor
 	codes, hashes := make([]string, 8), make([]string, 8)
 	for i := range codes {
 		b := make([]byte, 5)
+
 		_, err := rand.Read(b)
 		if err != nil {
 			return TwoFactorEnabled{}, err
@@ -168,28 +173,31 @@ func enableTwoFactor(ctx context.Context, c *ops.Call, in *CodeInput) (TwoFactor
 	}, nil
 }
 
-// @Summary		twoFactor.disable (write)
-// @ID				twoFactor.disable
-// @Description	Authorization: authenticated:own-session
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR112 requires a current 6-digit code
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DDC-07
-// @Tags			twoFactor
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		CodeInput	true	"input"
-// @Success		200				{object}	ops.Envelope{data=TwoFactorStatus}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/two-factor/disable [post]
+// disableTwoFactor serves twoFactor.disable.
+//
+//	@Summary		twoFactor.disable (write)
+//	@ID				twoFactor.disable
+//	@Description	Authorization: authenticated:own-session
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR112 requires a current 6-digit code
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DDC-07
+//	@Tags			twoFactor
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		CodeInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=TwoFactorStatus}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/two-factor/disable [post]
 func disableTwoFactor(ctx context.Context, c *ops.Call, in *CodeInput) (TwoFactorStatus, error) {
 	tag, err := c.Tx.Exec(
 		ctx,

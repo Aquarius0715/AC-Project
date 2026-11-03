@@ -53,7 +53,8 @@ func TestSpaceArchiveRacesAUnitAdd(t *testing.T) {
 				"units.save",
 				`{"customerOrgId":"`+seed.ID("org-customer-b").
 					String()+
-					`","propertyId":"`+prop+`","spaceId":"`+space+`","displayName":"Race AC `+uuid.NewString()[:8]+`","modelId":"`+seed.ID("ventilation-demo").
+					`","propertyId":"`+prop+`","spaceId":"`+space+`","displayName":"Race `+
+					`AC `+uuid.NewString()[:8]+`","modelId":"`+seed.ID("ventilation-demo").
 					String()+
 					`","type":"split","installedAt":null,"serviceScope":["indoor"]}`,
 				0,

@@ -91,7 +91,8 @@ func f1(p *float64) string {
 //	@Summary		energy.exportReport (read)
 //	@ID				energy.exportReport
 //	@Description	Authorization: client:self
-//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR110 month YYYY-MM already ended; at least one section
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR110 month \
+//	@Description	YYYY-MM already ended; at least one section
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
 //	@Description	Design: DD-C16
 //	@Tags			energy
@@ -131,7 +132,9 @@ func exportReport(ctx context.Context, c *ops.Call, in *ExportInput) (ReportFile
 	}
 
 	var own int
-	scanErr := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_properties WHERE id = ANY($1) AND customer_org_id = $2 AND NOT archived`, in.PropertyIDs, c.Principal.OrgID).
+
+	scanErr := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_properties WHERE id = ANY($1) AND customer_org_id = $2
+		AND NOT archived`, in.PropertyIDs, c.Principal.OrgID).
 		Scan(&own)
 	if scanErr != nil {
 		return ReportFile{}, scanErr
@@ -204,8 +207,11 @@ func exportReport(ctx context.Context, c *ops.Call, in *ExportInput) (ReportFile
 			)
 		case "co2_offsets":
 			var retired float64
-			err := c.Tx.QueryRow(ctx, `SELECT COALESCE(sum(r.amount_kg), 0)::float8 FROM energy.offset_records r JOIN energy.ref_customers cu ON cu.id = r.customer_id
-				WHERE cu.organization_id = $1 AND r.state = 'demo_retired' AND r.updated_at >= $2 AND r.updated_at < $3`, c.Principal.OrgID, start, end).
+
+			err := c.Tx.QueryRow(ctx, `SELECT COALESCE(sum(r.amount_kg), 0)::float8 FROM energy.offset_records r JOIN
+				energy.ref_customers cu ON cu.id = r.customer_id
+				WHERE cu.organization_id = $1 AND r.state = 'demo_retired' AND r.updated_at >= $2 AND r.updated_at <
+				$3`, c.Principal.OrgID, start, end).
 				Scan(&retired)
 			if err != nil {
 				return ReportFile{}, err
@@ -219,8 +225,11 @@ func exportReport(ctx context.Context, c *ops.Call, in *ExportInput) (ReportFile
 			)
 		case "alerts_maintenance":
 			var alerts, jobs int
-			err := c.Tx.QueryRow(ctx, `SELECT (SELECT count(*) FROM energy.ref_alerts WHERE unit_id = ANY($1) AND detected_at >= $2 AND detected_at < $3),
-				(SELECT count(*) FROM energy.ref_jobs WHERE unit_id = ANY($1) AND status = 'completed' AND updated_at >= $2 AND updated_at < $3)`, units, start, end).
+
+			err := c.Tx.QueryRow(ctx, `SELECT (SELECT count(*) FROM energy.ref_alerts WHERE unit_id = ANY($1) AND detected_at >=
+				$2 AND detected_at < $3),
+				(SELECT count(*) FROM energy.ref_jobs WHERE unit_id = ANY($1) AND status = 'completed' AND updated_at >= $2 AND
+				updated_at < $3)`, units, start, end).
 				Scan(&alerts, &jobs)
 			if err != nil {
 				return ReportFile{}, err
@@ -237,7 +246,8 @@ func exportReport(ctx context.Context, c *ops.Call, in *ExportInput) (ReportFile
 
 	content, mime := b.String(), "text/csv"
 	if in.Format == "pdf" { // demo PDF: the same figures in a minimal one-page document
-		content, mime = "%PDF-1.4\n% Demo energy report "+in.Month+" (fictional values)\n"+content+"%%EOF\n", "application/pdf"
+		content, mime = "%PDF-1.4\n% Demo energy report "+in.Month+" (fictional values)\n"+content+
+			"%%EOF\n", "application/pdf"
 	}
 
 	return ReportFile{

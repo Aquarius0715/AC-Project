@@ -203,6 +203,7 @@ func runHousekeeping(ctx context.Context) {
 
 	for {
 		now := srv.Registry.Clock()
+
 		s, err := events.Housekeep(ctx, srv.DB, now, srv.Consumers)
 		if err != nil {
 			log.Printf("housekeeping: %v", err)

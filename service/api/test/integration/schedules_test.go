@@ -127,7 +127,8 @@ func TestScheduleAutomationsFire(t *testing.T) {
 	)
 	ownerScan(
 		t,
-		`SELECT count(*) FROM audit.audit_log WHERE action = 'automations.schedule' AND target_id = $1 AND actor_role_at_time = 'system'`,
+		`SELECT count(*) FROM audit.audit_log WHERE action = 'automations.schedule' AND target_id = $1 AND actor_role_at_time
+			= 'system'`,
 		[]any{id},
 		&audits,
 	)
@@ -253,7 +254,8 @@ func TestScheduleCatchUpRunsTheLastMinute(t *testing.T) {
 func TestScheduleDraftPreview(t *testing.T) {
 	s := server(t)
 	draft := func(extra string) string {
-		return `{"count":8,"draft":{"timezone":"Asia/Kuala_Lumpur","weekdays":[1,3],"startLocal":"18:00","endLocal":"22:00","endsNextDay":false,` +
+		return `{"count":8,"draft":{"timezone":"Asia/Kuala_Lumpur","weekdays":[1,3],"startLocal":"18:00",` +
+			`"endLocal":"22:00","endsNextDay":false,` +
 			`"startAction":{"kind":"set_temperature","celsius":25},"endAction":{"kind":"set_power","power":false}` + extra + `}}`
 	}
 	code, m := post(s, &customerA, "automations.nextRuns", draft(""))
@@ -295,7 +297,9 @@ func TestScheduleDraftPreview(t *testing.T) {
 		"overnight flag": strings2(draft(""), `"endLocal":"22:00"`, `"endLocal":"06:00"`),
 		"bad action":     strings2(draft(""), `{"kind":"set_power","power":false}`, `{"kind":"explode"}`),
 		"bad zone":       strings2(draft(""), `"Asia/Kuala_Lumpur"`, `"Moon/Base"`),
-		"nonexistent":    `{"count":8,"draft":{"timezone":"America/New_York","weekdays":[7],"startLocal":"02:30","endLocal":"05:00","endsNextDay":false,"startAction":{"kind":"set_power","power":true},"endAction":{"kind":"set_power","power":false}}}`,
+		"nonexistent": `{"count":8,"draft":{"timezone":"America/New_York","weekdays":[7],"startLocal":"02:30",` +
+			`"endLocal":"05:00","endsNextDay":false,"startAction":{"kind":"set_power","power":true},` +
+			`"endAction":{"kind":"set_power","power":false}}}`,
 	} {
 		code, m := post(s, &customerA, "automations.nextRuns", body)
 		refusal(t, name, code, m, want[name])
@@ -346,8 +350,11 @@ func TestConsentWithdrawalDisablesLocationRules(t *testing.T) {
 	}
 	unit := seed.ID("unit-online-rto").String()
 	rule := func(id string, version int, enabled bool, event string) (int, map[string]any) {
-		body := `{"name":"Arrive cool","unitIds":["` + unit + `"],"timezone":"Asia/Kuala_Lumpur","enabled":` + map[bool]string{true: "true", false: "false"}[enabled] +
-			`,"priority":50,"kind":"event","condition":{"type":"location","event":"` + event + `"},"action":{"kind":"set_temperature","celsius":24}`
+		body := `{"name":"Arrive cool",` +
+			`"unitIds":["` + unit + `"],"timezone":"Asia/Kuala_Lumpur",` +
+			`"enabled":` + map[bool]string{true: "true", false: "false"}[enabled] +
+			`,"priority":50,"kind":"event","condition":{"type":"location",` +
+			`"event":"` + event + `"},"action":{"kind":"set_temperature","celsius":24}`
 		if id != "" {
 			body += `,"id":"` + id + `"`
 		}
@@ -446,12 +453,16 @@ func TestAutomationExtraConditions(t *testing.T) {
 	s := server(t)
 	ctx := context.Background()
 	u := boundUnit(t, s, "online")
-	base := `{"name":"Hot afternoon","unitIds":["` + u + `"],"timezone":"Asia/Kuala_Lumpur","enabled":true,"priority":50,"kind":"event",` +
-		`"condition":{"type":"weather","metric":"temperature","operator":"gte","value":33},"action":{"kind":"set_temperature","celsius":24}`
+	base := `{"name":"Hot afternoon",` +
+		`"unitIds":["` + u + `"],"timezone":"Asia/Kuala_Lumpur","enabled":true,` +
+		`"priority":50,"kind":"event",` +
+		`"condition":{"type":"weather","metric":"temperature","operator":"gte","value":33},` +
+		`"action":{"kind":"set_temperature","celsius":24}`
 
 	weather := `{"type":"weather","metric":"temperature","operator":"gte","value":30}`
 	for name, extra := range map[string]string{
-		"four conditions":    `[{"type":"weekday","weekdays":[1]},{"type":"occupancy","occupied":true},{"type":"weekday","weekdays":[2]},{"type":"occupancy","occupied":false}]`,
+		"four conditions": `[{"type":"weekday","weekdays":[1]},{"type":"occupancy","occupied":true},{"type":"weekday",` +
+			`"weekdays":[2]},{"type":"occupancy","occupied":false}]`,
 		"same type twice":    `[{"type":"occupancy","occupied":true},{"type":"occupancy","occupied":false}]`,
 		"own condition type": `[` + weather + `]`,
 		"no weekdays":        `[{"type":"weekday","weekdays":[]}]`,
@@ -496,11 +507,13 @@ func TestAutomationExtraConditions(t *testing.T) {
 
 	id := data(m)["id"].(string)
 	fact := func(metric, value, unit string) string {
-		return `{"unitId":"` + u + `","metric":"` + metric + `","value":` + value + `,"unit":"` + unit + `","observedAt":"` + clock.Format(
-			time.RFC3339,
-		) + `","quality":"valid"}`
+		return `{"unitId":"` + u + `","metric":"` + metric + `","value":` + value + `,"unit":"` + unit + `","observedAt":"` +
+			clock.Format(
+				time.RFC3339,
+			) + `","quality":"valid"}`
 	}
-	fire := func(facts ...string) map[string]any { // one evaluation per tick (D02): clear the tick and the unit's pending commands first
+	fire := func(facts ...string) map[string]any {
+		// one evaluation per tick (D02): clear the tick and the unit's pending commands first
 		t.Helper()
 		owner(t, `DELETE FROM control.evaluation_events`)
 		owner(
@@ -730,7 +743,8 @@ func TestScheduleBoundaries(t *testing.T) {
 
 		rows, err := conn.Query(
 			ctx,
-			`SELECT rule_id::text, trigger_ref, outcome, COALESCE(skip_reason, '') FROM control.automation_runs WHERE rule_id = ANY($1) AND unit_id = $2 ORDER BY seq`,
+			`SELECT rule_id::text, trigger_ref, outcome, COALESCE(skip_reason, '') FROM control.automation_runs WHERE rule_id =
+				ANY($1) AND unit_id = $2 ORDER BY seq`,
 			rules,
 			u,
 		)
@@ -796,7 +810,8 @@ func TestScheduleBoundaries(t *testing.T) {
 	fanOnly := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO devices.capabilities (id, version, tenant_id, manufacturer, model, control, mode_control, fan_control, temperature)
+		`INSERT INTO devices.capabilities (id, version, tenant_id, manufacturer, model, control, mode_control, fan_control,
+			temperature)
 		VALUES ($1, 1, $2, 'Demo', $3, true, false, true, NULL)`,
 		fanOnly,
 		seed.ID("tenant-a"),

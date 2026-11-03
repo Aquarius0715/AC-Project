@@ -26,7 +26,8 @@ func TestCertificateReminders(t *testing.T) {
 		id := uuid.NewString()
 		owner(
 			t,
-			`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, valid_from, valid_until) VALUES ($1,$2,$3,$4,$5::text,
+			`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, valid_from,
+				valid_until) VALUES ($1,$2,$3,$4,$5::text,
 			CASE WHEN $5::text = 'technician' THEN 'external' END,$6,$7)`,
 			id,
 			tenant,
@@ -63,7 +64,8 @@ func TestCertificateReminders(t *testing.T) {
 		id := uuid.NewString()
 		owner(
 			t,
-			`INSERT INTO maintenance.certificates (id, tenant_id, membership_id, organization_id, code, name, number, issued_at, expires_at, status, renewal_of)
+			`INSERT INTO maintenance.certificates (id, tenant_id, membership_id, organization_id, code, name, number, issued_at,
+				expires_at, status, renewal_of)
 			VALUES ($1,$2,$3,$4,$5,'Indoor AC','N-1',$6,$7,$8,$9)`,
 			id,
 			tenant,
@@ -122,8 +124,10 @@ func TestCertificateReminders(t *testing.T) {
 		for i := range out {
 			ownerScan(
 				t,
-				`SELECT r.days_before, r.notifications, coalesce(string_agg(DISTINCT n.severity, ','), ''), coalesce(string_agg(n.recipient_membership_id::text, ','), '')
-				FROM maintenance.certificate_reminders r LEFT JOIN notify.notifications n ON n.target->>'id' = r.certificate_id::text AND n.type = 'certificate_expiry'
+				`SELECT r.days_before, r.notifications, coalesce(string_agg(DISTINCT n.severity, ','), ''),
+					coalesce(string_agg(n.recipient_membership_id::text, ','), '')
+				FROM maintenance.certificate_reminders r LEFT JOIN notify.notifications n ON n.target->>'id' =
+				r.certificate_id::text AND n.type = 'certificate_expiry'
 				  AND n.template_key = 'certificate_expiry' AND n.occurred_at = r.sent_at
 				WHERE r.certificate_id = $1 GROUP BY r.days_before, r.notifications ORDER BY r.days_before DESC OFFSET $2 LIMIT 1`,
 				[]any{id, i},
@@ -158,7 +162,8 @@ func TestCertificateReminders(t *testing.T) {
 	var audits int
 	ownerScan(
 		t,
-		`SELECT count(*) FROM audit.audit_log WHERE action = 'certificates.remind' AND target_id = $1 AND reason = '60 days before expiry'`,
+		`SELECT count(*) FROM audit.audit_log WHERE action = 'certificates.remind' AND target_id = $1 AND reason =
+			'60 days before expiry'`,
 		[]any{main},
 		&audits,
 	)
@@ -229,7 +234,10 @@ func TestCertificateReminders(t *testing.T) {
 		t.Errorf("approved late: %+v", r)
 	}
 
-	for name, id := range map[string]string{"pending": pending, "rejected": rejected, "expired": expired, "left": left, "renewed": renewed, "older": older} {
+	for name, id := range map[string]string{
+		"pending": pending, "rejected": rejected, "expired": expired, "left": left,
+		"renewed": renewed, "older": older,
+	} {
 		if r := sent(id); len(r) != 0 {
 			t.Errorf("%s: %+v", name, r)
 		}
@@ -291,8 +299,10 @@ func TestCertificateReminders(t *testing.T) {
 	stray := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type, template_key, target, params, severity, occurred_at)
-		VALUES ($1,$2,$3,1,'certificate_expiry','certificate_expiry',jsonb_build_object('kind','certificate','id',$4::text),'{}','normal',$5)`,
+		`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type,
+			template_key, target, params, severity, occurred_at)
+		VALUES ($1,$2,$3,1,'certificate_expiry','certificate_expiry',jsonb_build_object('kind','certificate','id',$4::text),
+		'{}','normal',$5)`,
 		stray,
 		tenant,
 		seed.ID("contractor-b"),

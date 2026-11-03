@@ -18,10 +18,11 @@ const Scenario = "iot-demo"
 
 // Link ties one fixture device to its unit and to its sensors, by the sensor names the simulator uses.
 type Link struct {
-	Device     string            // fixture ID, e.g. device-online-rto
-	Unit       string            // fixture ID of the unit the device is bound to
-	Sensors    map[string]string // simulator sensor name → fixture sensor ID
-	Connection string            // the device's connection in the fixture: a module that is not online sends nothing (IR613)
+	Device  string            // fixture ID, e.g. device-online-rto
+	Unit    string            // fixture ID of the unit the device is bound to
+	Sensors map[string]string // simulator sensor name → fixture sensor ID
+	// the device's connection in the fixture: a module that is not online sends nothing (IR613)
+	Connection string
 }
 
 // Links are the demo fixture's five devices with the sensors each has there (device-no-sensor has none: its module only
@@ -104,7 +105,8 @@ type Trigger struct {
 	Measurement *Measurement             `json:"measurement,omitempty"`
 	DeviceID    *uuid.UUID               `json:"deviceId,omitempty"` // state
 	State       *devicesim.ReportedState `json:"state,omitempty"`    // state
-	Event       *Evaluation              `json:"event,omitempty"`    // automation: the facts against the alert policies (IR529)
+	// automation: the facts against the alert policies (IR529)
+	Event *Evaluation `json:"event,omitempty"`
 	// device: a fault or recovery of the device's current binding (SR20, IR532)
 	BindingID *uuid.UUID `json:"bindingId,omitempty"`
 	Sequence  *int64     `json:"sequence,omitempty"`
@@ -184,8 +186,8 @@ func (r *Resolver) Triggers(b devicesim.Batch, received time.Time) ([]Trigger, e
 
 			continue
 		}
-		// the event ID is the reading itself (device, sensor, observed time): a simulator restart restarts its sequence, so the
-		// sequence cannot tell readings apart; a redelivered reading has the same time and so the same event
+		// the event ID is the reading itself (device, sensor, observed time): a simulator restart restarts its sequence, so
+		// the sequence cannot tell readings apart; a redelivered reading has the same time and so the same event
 		event := uuid.NewSHA1(
 			seed.Namespace,
 			[]byte(
@@ -223,7 +225,8 @@ func (r *Resolver) Triggers(b devicesim.Batch, received time.Time) ([]Trigger, e
 
 // CommandTrigger turns a module's acknowledgement into the demo trigger for the command it answers: applied is
 // command_ack, unsupported is command_fail (the device rejected it). An expired acknowledgement is not forwarded: the
-// backend decides a late acknowledgement by its own clock (common design §5), so the bridge does not change the command.
+// backend decides a late acknowledgement by its own clock (common design §5), so the bridge does not change the
+// command.
 func CommandTrigger(a devicesim.Ack, received time.Time) (Trigger, bool, error) {
 	cmd, err := uuid.Parse(a.CommandID)
 	if err != nil {
@@ -305,9 +308,9 @@ func FleetLinks(f devicesim.Fleet) []Link {
 }
 
 // ToScenario stamps a batch received at real time now on the API's scenario clock: each reading is put at the start of
-// the scenario minute it was received in (now + offset - margin), the slot energy counts (D07), so the newest reading is
-// never more than about a minute old there. What the module stamped beyond its own current minute (a reading from the
-// future) is kept as that many minutes ahead.
+// the scenario minute it was received in (now + offset - margin), the slot energy counts (D07), so the newest reading
+// is never more than about a minute old there. What the module stamped beyond its own current minute (a reading from
+// the future) is kept as that many minutes ahead.
 func ToScenario(b devicesim.Batch, now time.Time, offset, margin time.Duration) devicesim.Batch {
 	slot := now.Add(offset - margin).UTC().Truncate(time.Minute)
 	moduleMinute := now.UTC().Truncate(time.Minute)

@@ -20,7 +20,8 @@ func TestCertificatesAndParts(t *testing.T) {
 		time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC).
 			Format(time.RFC3339)
 	body := func(extra string) string {
-		return `{"membershipId":"` + tech + `","code":"demo_indoor","name":" Indoor AC ","number":"N-1","issuedAt":"` + issued + `","expiresAt":"` + expires + `","file":` + pdf + extra + `}`
+		return `{"membershipId":"` + tech + `","code":"demo_indoor","name":" Indoor AC ","number":"N-1",` +
+			`"issuedAt":"` + issued + `","expiresAt":"` + expires + `","file":` + pdf + extra + `}`
 	}
 	want := map[string]string{ // the field each case is refused for
 		"bad code":       "code=error.invalid",
@@ -33,12 +34,15 @@ func TestCertificatesAndParts(t *testing.T) {
 
 	flood := pngHeader(50000, 50000) // a scan as an image is held to the photo pixel limits (IR389)
 	for name, b := range map[string]string{
-		"bad code":       strings.Replace(body(""), `"demo_indoor"`, `"demo_roof"`, 1),
-		"blank name":     strings.Replace(body(""), `" Indoor AC "`, `" "`, 1),
-		"reversed dates": `{"membershipId":"` + tech + `","code":"demo_indoor","name":"x","number":"N","issuedAt":"` + expires + `","expiresAt":"` + issued + `","file":` + pdf + `}`,
-		"gif file":       `{"membershipId":"` + tech + `","code":"demo_indoor","name":"x","number":"N","issuedAt":"` + issued + `","expiresAt":"` + expires + `","file":` + blobJSON("a.gif", "image/gif", []byte("x"), 1) + `}`,
-		"not a pdf":      strings.Replace(body(""), pdf, blobJSON("cert.pdf", "application/pdf", []byte("<html>"), 6), 1),
-		"pixel flood":    strings.Replace(body(""), pdf, blobJSON("scan.png", "image/png", flood, len(flood)), 1),
+		"bad code":   strings.Replace(body(""), `"demo_indoor"`, `"demo_roof"`, 1),
+		"blank name": strings.Replace(body(""), `" Indoor AC "`, `" "`, 1),
+		"reversed dates": `{"membershipId":"` + tech + `","code":"demo_indoor","name":"x","number":"N",` +
+			`"issuedAt":"` + expires + `","expiresAt":"` + issued + `","file":` + pdf + `}`,
+		"gif file": `{"membershipId":"` + tech + `","code":"demo_indoor","name":"x","number":"N",` +
+			`"issuedAt":"` + issued + `","expiresAt":"` + expires + `","file":` +
+			blobJSON("a.gif", "image/gif", []byte("x"), 1) + `}`,
+		"not a pdf":   strings.Replace(body(""), pdf, blobJSON("cert.pdf", "application/pdf", []byte("<html>"), 6), 1),
+		"pixel flood": strings.Replace(body(""), pdf, blobJSON("scan.png", "image/png", flood, len(flood)), 1),
 	} {
 		code, m := write(s, &contrA, "certificates.submit", b, 0)
 		refusal(t, name, code, m, want[name])
@@ -319,7 +323,8 @@ func TestCertificateCreatesMissingGrant(t *testing.T) {
 	var from, until time.Time
 	ownerScan(
 		t,
-		`SELECT valid_from, valid_until FROM identity.qualification_grants WHERE membership_id = $1 AND code = 'demo_outdoor'`,
+		`SELECT valid_from, valid_until FROM identity.qualification_grants WHERE membership_id = $1 AND code =
+			'demo_outdoor'`,
 		[]any{tech},
 		&from,
 		&until,
@@ -332,7 +337,8 @@ func TestCertificateCreatesMissingGrant(t *testing.T) {
 	t.Cleanup(func() {
 		owner(
 			t,
-			`UPDATE identity.qualification_grants SET valid_from = $2, valid_until = $3 WHERE membership_id = $1 AND code = 'demo_outdoor'`,
+			`UPDATE identity.qualification_grants SET valid_from = $2, valid_until = $3 WHERE membership_id = $1 AND code =
+				'demo_outdoor'`,
 			tech,
 			from,
 			until,
@@ -371,7 +377,8 @@ func TestCertificateCreatesMissingGrant(t *testing.T) {
 	var got time.Time
 	ownerScan(
 		t,
-		`SELECT valid_until FROM identity.qualification_grants WHERE membership_id = $1 AND code = 'demo_outdoor' AND revoked_at IS NULL`,
+		`SELECT valid_until FROM identity.qualification_grants WHERE membership_id = $1 AND code = 'demo_outdoor' AND
+			revoked_at IS NULL`,
 		[]any{tech},
 		&got,
 	)

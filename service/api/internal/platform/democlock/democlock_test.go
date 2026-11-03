@@ -45,7 +45,8 @@ func scratch(t *testing.T) *pgxpool.Pool {
 
 	_, execErr := p.Exec(
 		ctx,
-		`CREATE SCHEMA platform; CREATE TABLE platform.demo_clock (id boolean PRIMARY KEY DEFAULT true CHECK (id), offset_ms bigint NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())`,
+		`CREATE SCHEMA platform; CREATE TABLE platform.demo_clock (id boolean PRIMARY KEY DEFAULT true CHECK (id), offset_ms
+			bigint NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())`,
 	)
 	if execErr != nil {
 		t.Fatal(execErr)

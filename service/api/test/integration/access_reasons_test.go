@@ -38,13 +38,15 @@ func TestTechnicianUnitAccessReasons(t *testing.T) {
 
 	owner(
 		t,
-		`DELETE FROM maintenance.assignments WHERE technician_membership_id = $1 AND job_id IN (SELECT id FROM maintenance.jobs WHERE unit_id = $2)`,
+		`DELETE FROM maintenance.assignments WHERE technician_membership_id = $1 AND job_id IN (SELECT id FROM
+			maintenance.jobs WHERE unit_id = $2)`,
 		seed.ID("tech-internal-a"),
 		u,
 	)
 	owner(
 		t,
-		`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES ($1,$2,'unit',$3) ON CONFLICT DO NOTHING`,
+		`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES ($1,$2,'unit',$3) ON CONFLICT
+			DO NOTHING`,
 		seed.ID("tenant-a"),
 		seed.ID("tech-internal-a"),
 		u,
@@ -62,7 +64,8 @@ func TestTechnicianUnitAccessReasons(t *testing.T) {
 	revokeOthers := func(from, to time.Time) { // other tests' assignments must not overlap (assignments_no_overlap)
 		owner(
 			t,
-			`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND scheduled && tstzrange($2, $3) AND job_id <> $4`,
+			`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND
+				scheduled && tstzrange($2, $3) AND job_id <> $4`,
 			seed.ID("tech-internal-a"),
 			from,
 			to,
@@ -72,7 +75,8 @@ func TestTechnicianUnitAccessReasons(t *testing.T) {
 	revokeOthers(clock.Add(-2*time.Hour), clock.Add(-time.Hour))
 	owner(
 		t,
-		`UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3) WHERE job_id = $1`,
+		`UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3) WHERE job_id =
+			$1`,
 		job,
 		clock.Add(-2*time.Hour),
 		clock.Add(-time.Hour),
@@ -85,7 +89,8 @@ func TestTechnicianUnitAccessReasons(t *testing.T) {
 	revokeOthers(clock.Add(-time.Hour), clock.Add(time.Hour))
 	owner(
 		t,
-		`UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3) WHERE job_id = $1`,
+		`UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3) WHERE job_id =
+			$1`,
 		job,
 		clock.Add(-time.Hour),
 		clock.Add(time.Hour),

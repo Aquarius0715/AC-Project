@@ -25,8 +25,10 @@ func (Usage) UnitInUse(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, 
 func (Usage) UnitActive(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, error) {
 	var b bool
 
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_bindings WHERE unit_id = $1 AND unbound_at IS NULL)
-		OR EXISTS (SELECT 1 FROM devices.device_operations WHERE unit_id = $1 AND status IN ('queued','running') AND expires_at > $2)`, unit, c.Now).
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_bindings WHERE unit_id = $1 AND unbound_at IS
+		NULL)
+		OR EXISTS (SELECT 1 FROM devices.device_operations WHERE unit_id = $1 AND status IN ('queued','running') AND
+		expires_at > $2)`, unit, c.Now).
 		Scan(&b)
 
 	return b, err

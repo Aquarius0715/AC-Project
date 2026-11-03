@@ -119,7 +119,12 @@ func testVerifier(t *testing.T) testTokens {
 
 	v := testTokens{}
 	for _, a := range f.Actors {
-		v["tok-"+map[string]string{"hq-operator": "hq", "customer-a": "a", "customer-b": "b", "tech-external-b": "tb", "tech-internal-a": "ti", "tech-external-a": "ta", "contractor-a": "ca", "contractor-b": "cb", "hq-restriction-manager": "rm", "hq-override-only": "oo"}[a.MembershipID]] = seed.ID(a.UserID).
+		v["tok-"+
+			map[string]string{
+				"hq-operator": "hq", "customer-a": "a", "customer-b": "b", "tech-external-b": "tb",
+				"tech-internal-a": "ti", "tech-external-a": "ta", "contractor-a": "ca", "contractor-b": "cb",
+				"hq-restriction-manager": "rm", "hq-override-only": "oo",
+			}[a.MembershipID]] = seed.ID(a.UserID).
 			String()
 	}
 
@@ -260,7 +265,8 @@ func TestSessionGet(t *testing.T) {
 	var user, org string // IR241: the shell names the user and the membership's organization
 	ownerScan(
 		t,
-		`SELECT u.display_name, o.name FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id JOIN identity.organizations o ON o.id = m.organization_id WHERE m.id = $1`,
+		`SELECT u.display_name, o.name FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id JOIN
+			identity.organizations o ON o.id = m.organization_id WHERE m.id = $1`,
 		[]any{seed.ID("hq-operator")},
 		&user,
 		&org,
@@ -423,7 +429,8 @@ func TestUnitsListScopes(t *testing.T) {
 	}
 
 	for body, want := range map[string]string{
-		`{"filters":{"unassignedOnly":true,"spaceId":"` + seed.ID("floor-1").String() + `"}}`: "filters.unassignedOnly=error.conflictsWithSpaceId",
+		`{"filters":{"unassignedOnly":true,` +
+			`"spaceId":"` + seed.ID("floor-1").String() + `"}}`: "filters.unassignedOnly=error.conflictsWithSpaceId",
 		`{"filters":{"status":"bogus"}}`:              "filters.status=error.invalid",
 		`{"filters":{"connections":["x"]}}`:           "filters.connections=error.invalid",
 		`{"filters":{"powerState":"x"}}`:              "filters.powerState=error.invalid",
@@ -436,8 +443,10 @@ func TestUnitsListScopes(t *testing.T) {
 	}
 
 	for _, body := range []string{
-		`{"filters":{"status":"online"}}`, `{"filters":{"connections":["online","offline"]}}`, `{"filters":{"unassignedOnly":true}}`,
-		`{"filters":{"organizationId":"` + seed.ID("org-customer-b").String() + `"}}`, `{"sort":{"field":"createdAt","direction":"desc"}}`,
+		`{"filters":{"status":"online"}}`, `{"filters":{"connections":["online",` +
+			`"offline"]}}`, `{"filters":{"unassignedOnly":true}}`,
+		`{"filters":{"organizationId":"` + seed.ID("org-customer-b").String() + `"}}`, `{"sort":{"field":"createdAt",` +
+			`"direction":"desc"}}`,
 	} {
 		if code, _ := post(s, &hq, "units.list", body); code != 200 {
 			t.Errorf("%s: %d", body, code)

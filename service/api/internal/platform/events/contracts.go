@@ -27,9 +27,11 @@ const (
 
 	// any domain → identity (IR191).
 	NotificationRequested = "NotificationRequested" // store one notification (ID assigned by the producer)
-	QualificationGranted  = "QualificationGranted"  // maintenance → identity: a verified certificate covers a grant (IR192)
-	JobNoteRequested      = "JobNoteRequested"      // billing → maintenance: an internal job note (payout questions, IR193)
-	AuditRecorded         = "AuditRecorded"         // any domain → identity: one audit log entry (IR196)
+	// maintenance → identity: a verified certificate covers a grant (IR192)
+	QualificationGranted = "QualificationGranted"
+	// billing → maintenance: an internal job note (payout questions, IR193)
+	JobNoteRequested = "JobNoteRequested"
+	AuditRecorded    = "AuditRecorded" // any domain → identity: one audit log entry (IR196)
 
 	// maintenance → equipment, written by row triggers on maintenance.offers / maintenance.assignments (IR186).
 	OfferAccessChanged      = "OfferAccessChanged"      // a contractor's access window to a unit (accepted Offers)
@@ -50,8 +52,9 @@ type FilterReminder struct {
 	UnitID        uuid.UUID `json:"unitId"`
 	CustomerOrgID uuid.UUID `json:"customerOrgId"`
 	Evidence      string    `json:"evidence,omitempty"`
-	NoRecipient   bool      `json:"noRecipient,omitempty"` // no active recipient: the Alert records a no_recipient DeliveryFailure (SR12)
-	At            time.Time `json:"at"`
+	// no active recipient: the Alert records a no_recipient DeliveryFailure (SR12)
+	NoRecipient bool      `json:"noRecipient,omitempty"`
+	At          time.Time `json:"at"`
 }
 
 // ConsentRevocation is the payload of ConsentRevoked.

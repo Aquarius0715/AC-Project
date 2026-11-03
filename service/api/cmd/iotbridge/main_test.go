@@ -30,7 +30,18 @@ func TestFetchWaitingReadsTheRequestedCommands(t *testing.T) {
 		}
 
 		_ = json.NewEncoder(w).
-			Encode(map[string]any{"data": []map[string]any{{"id": id, "deviceId": uuid.New(), "unitId": uuid.New(), "action": map[string]any{"kind": "set_temperature", "celsius": 26}, "expiresAt": time.Now().Add(time.Minute)}}})
+			Encode(
+				map[string]any{
+					"data": []map[string]any{
+						{
+							"id":        id,
+							"deviceId":  uuid.New(),
+							"unitId":    uuid.New(),
+							"action":    map[string]any{"kind": "set_temperature", "celsius": 26},
+							"expiresAt": time.Now().Add(time.Minute),
+						},
+					},
+				})
 	}))
 	defer srv.Close()
 
@@ -87,6 +98,7 @@ func TestDemoClockFollowsTheScenarioClock(t *testing.T) {
 		mu:  sync.Mutex{},
 		off: 0,
 	}
+
 	err := d.refresh()
 	if err != nil {
 		t.Fatal(err)
@@ -107,6 +119,7 @@ func TestDemoClockFollowsTheScenarioClock(t *testing.T) {
 	keep := d.offset()
 
 	d.api = empty.URL
+
 	err = d.refresh()
 	if err == nil {
 		t.Error("an answer without a snapshot time is accepted")
@@ -146,6 +159,7 @@ func TestSendReportsRefusals(t *testing.T) {
 		Kind:        "",
 		Recovery:    nil,
 	}
+
 	err := send(c, srv.URL, tr)
 	if err != nil {
 		t.Fatalf("accepted trigger: %v", err)
@@ -184,14 +198,15 @@ func TestSendReportsRefusals(t *testing.T) {
 	}
 }
 
-// TestSendCommandStopsBeforePublishingABadCommand: a command with no action kind is refused before anything is published
-// or reported sent.
+// TestSendCommandStopsBeforePublishingABadCommand: a command with no action kind is refused before anything is
+// published or reported sent.
 func TestSendCommandStopsBeforePublishingABadCommand(t *testing.T) {
 	w := iotbridge.Waiting{
 		ID:        uuid.New(),
 		Action:    json.RawMessage(`{"celsius":26}`),
 		ExpiresAt: time.Now().Add(time.Minute), DeviceID: uuid.UUID{}, UnitID: uuid.UUID{},
 	}
+
 	err := sendCommand(
 		nil,
 		&http.Client{Transport: nil, CheckRedirect: nil, Jar: nil, Timeout: 0},

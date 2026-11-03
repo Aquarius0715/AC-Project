@@ -39,6 +39,7 @@ func Handlers(replicas ...Replica) map[string]Handler {
 
 func (r Replica) handle(ctx context.Context, tx pgx.Tx, e Event) error {
 	var p RowChange
+
 	decodeErr := e.Decode(&p)
 	if decodeErr != nil {
 		return decodeErr

@@ -147,7 +147,8 @@ func bootstrapAdmin(ctx context.Context, conn *pgx.Conn, args []string) error {
 	}
 
 	log.Printf(
-		"bootstrap-admin: tenant %s (new %t), HQ organization %s (new %t), administrator %s, membership %s; the set-up e-mail goes to %s",
+		"bootstrap-admin: tenant %s (new %t), HQ organization %s (new %t), administrator %s, membership %s; the set-up "+
+			"e-mail goes to %s",
 		r.TenantID,
 		r.NewTenant,
 		r.OrganizationID,
@@ -170,7 +171,8 @@ func local(ctx context.Context, conn *pgx.Conn) error {
 
 		log.Printf("migrate: login role ac_app_login ready")
 
-		for _, d := range []string{"identity", "equipment", "maintenance", "billing", "energy"} { // one login per domain service (IR194)
+		for _, d := range []string{"identity", "equipment", "maintenance", "billing", "energy"} {
+			// one login per domain service (IR194)
 			err := migrate.EnsureLogin(
 				ctx,
 				conn,

@@ -36,6 +36,7 @@ func TestAccountConsumerApart(t *testing.T) {
 	)
 
 	ctx := context.Background()
+
 	err := s.DrainEvents(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -52,7 +53,8 @@ func TestAccountConsumerApart(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, valid_from, valid_until) VALUES ($1,$2,$3,$4,'technician','external',$5,$6)`,
+		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, valid_from, valid_until)
+			VALUES ($1,$2,$3,$4,'technician','external',$5,$6)`,
 		membership,
 		tenant,
 		user,
@@ -65,7 +67,8 @@ func TestAccountConsumerApart(t *testing.T) {
 		var id uuid.UUID
 		ownerScan(
 			t,
-			`INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id) VALUES ($1, 'membership', $2, $3, $4::jsonb, 'test-ir511') RETURNING id`,
+			`INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id) VALUES
+				($1, 'membership', $2, $3, $4::jsonb, 'test-ir511') RETURNING id`,
 			[]any{tenant, membership, kind, payload},
 			&id,
 		)
@@ -83,11 +86,13 @@ func TestAccountConsumerApart(t *testing.T) {
 	bad := uuid.New()
 	ownerScan(
 		t,
-		`INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id) VALUES ($1, 'audit', $2, 'AuditRecorded', $3::jsonb, 'test-ir511') RETURNING id`,
+		`INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id) VALUES
+			($1, 'audit', $2, 'AuditRecorded', $3::jsonb, 'test-ir511') RETURNING id`,
 		[]any{
 			tenant,
 			bad,
-			`{"id":"` + bad.String() + `","actorId":"split-test","actorRole":"nobody","action":"split.test","targetKind":"test","targetId":"x","occurredAt":"` + clock.Format(
+			`{"id":"` + bad.String() + `","actorId":"split-test","actorRole":"nobody","action":"split.test",` +
+				`"targetKind":"test","targetId":"x","occurredAt":"` + clock.Format(
 				time.RFC3339,
 			) + `","correlationId":"test-ir511","result":"success"}`,
 		},

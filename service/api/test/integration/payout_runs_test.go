@@ -21,7 +21,8 @@ func TestMonthlyPayoutDrafts(t *testing.T) {
 	job, rep := uuid.NewString(), uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, type, status, origin, requested_slot, due_at, contractor_org_id, completed_at)
+		`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, type, status, origin, requested_slot, due_at,
+			contractor_org_id, completed_at)
 		VALUES ($1,$2,$3,$4,'reactive','completed','client_request',tstzrange($5,$6),$6,$7,$6)`,
 		job,
 		tenant,
@@ -33,7 +34,8 @@ func TestMonthlyPayoutDrafts(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state, accepted_at) VALUES ($1, 1, $2, $3, $4, 'accepted', $5)`,
+		`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state, accepted_at) VALUES ($1, 1,
+			$2, $3, $4, 'accepted', $5)`,
 		rep,
 		tenant,
 		job,
@@ -43,7 +45,8 @@ func TestMonthlyPayoutDrafts(t *testing.T) {
 	t.Cleanup(func() { // later tests' payout lists stay as they were
 		owner(
 			t,
-			`DELETE FROM billing.payout_lines WHERE statement_id IN (SELECT id FROM billing.payout_statements WHERE contractor_org_id = $1)`,
+			`DELETE FROM billing.payout_lines WHERE statement_id IN (SELECT id FROM billing.payout_statements WHERE
+				contractor_org_id = $1)`,
 			org,
 		)
 		owner(t, `DELETE FROM billing.payout_statements WHERE contractor_org_id = $1`, org)
@@ -67,6 +70,7 @@ func TestMonthlyPayoutDrafts(t *testing.T) {
 		t.Helper()
 
 		tick++
+
 		_, err := schedTick(ctx, s, clock.Add(time.Duration(tick)*time.Minute))
 		if err != nil {
 			t.Fatal(err)
@@ -93,7 +97,8 @@ func TestMonthlyPayoutDrafts(t *testing.T) {
 		for i := range out {
 			ownerScan(
 				t,
-				`SELECT s.id::text, s.status, (SELECT count(*) FROM billing.payout_lines l WHERE l.statement_id = s.id) FROM billing.payout_statements s
+				`SELECT s.id::text, s.status, (SELECT count(*) FROM billing.payout_lines l WHERE l.statement_id = s.id) FROM
+					billing.payout_statements s
 				WHERE s.contractor_org_id = $1 AND s.period = '2026-08' ORDER BY s.created_at, s.id OFFSET $2 LIMIT 1`,
 				[]any{org, i},
 				&out[i].id,

@@ -85,7 +85,8 @@ func (m *Module) RemindWarranties(ctx context.Context, c *ops.Call) (int, error)
 			ctx,
 			`INSERT INTO assets.warranty_reminders (unit_id, warranty_ends_at, days_before, tenant_id, sent_at)
 			SELECT $1, $2, $3, current_setting('app.tenant_id')::uuid, $4
-			WHERE NOT EXISTS (SELECT 1 FROM assets.warranty_reminders WHERE unit_id = $1 AND warranty_ends_at = $2 AND days_before <= $3) ON CONFLICT DO NOTHING`,
+			WHERE NOT EXISTS (SELECT 1 FROM assets.warranty_reminders WHERE unit_id = $1 AND warranty_ends_at = $2 AND
+			days_before <= $3) ON CONFLICT DO NOTHING`,
 			d.id,
 			d.ends,
 			days,
@@ -143,7 +144,8 @@ func (m *Module) RemindWarranties(ctx context.Context, c *ops.Call) (int, error)
 
 		_, execErr := c.Tx.Exec(
 			ctx,
-			`UPDATE assets.warranty_reminders SET notifications = $4 WHERE unit_id = $1 AND warranty_ends_at = $2 AND days_before = $3`,
+			`UPDATE assets.warranty_reminders SET notifications = $4 WHERE unit_id = $1 AND warranty_ends_at = $2 AND days_before
+				= $3`,
 			d.id,
 			d.ends,
 			days,

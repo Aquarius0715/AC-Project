@@ -45,7 +45,10 @@ func TestVoiceAndExport(t *testing.T) {
 		t.Errorf("ms change: %v", m)
 	}
 
-	for text, kind := range map[string]string{"help": "help", "hello there": "unsupported", "temperature Lobby AC": "unsupported", "temperature garage": "unsupported"} {
+	for text, kind := range map[string]string{
+		"help": "help", "hello there": "unsupported",
+		"temperature Lobby AC": "unsupported", "temperature garage": "unsupported",
+	} {
 		if _, m := say(&customerA, text, "en", ""); data(m)["kind"] != kind {
 			t.Errorf("%s: %v", text, m)
 		}

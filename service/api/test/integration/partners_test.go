@@ -16,7 +16,8 @@ func TestContractorRegister(t *testing.T) {
 	owner(t, `DELETE FROM maintenance.contractors WHERE organization_id = $1`, org)
 
 	body := func(extra string) string {
-		return `{"organizationId":"` + org + `","registrationNo":" REG-1 ","serviceAreas":["Kuala Lumpur"," Selangor "],"contactEmail":"ops@partner.example","insuranceValidUntil":null` + extra + `}`
+		return `{"organizationId":"` + org + `","registrationNo":" REG-1 ","serviceAreas":["Kuala Lumpur"," Selangor "],` +
+			`"contactEmail":"ops@partner.example","insuranceValidUntil":null` + extra + `}`
 	}
 	want := map[string]string{ // the field each case is refused for
 		"bad email":      "contactEmail=error.invalid",
@@ -27,11 +28,16 @@ func TestContractorRegister(t *testing.T) {
 	}
 
 	for name, b := range map[string]string{
-		"no areas":       `{"organizationId":"` + org + `","registrationNo":"R","serviceAreas":[],"contactEmail":"a@b.example","insuranceValidUntil":null}`,
-		"duplicate area": `{"organizationId":"` + org + `","registrationNo":"R","serviceAreas":["KL","kl"],"contactEmail":"a@b.example","insuranceValidUntil":null}`,
-		"bad email":      `{"organizationId":"` + org + `","registrationNo":"R","serviceAreas":["KL"],"contactEmail":"not-an-email","insuranceValidUntil":null}`,
-		"blank reg":      `{"organizationId":"` + org + `","registrationNo":" ","serviceAreas":["KL"],"contactEmail":"a@b.example","insuranceValidUntil":null}`,
-		"customer org":   `{"organizationId":"` + seed.ID("org-customer-a").String() + `","registrationNo":"R","serviceAreas":["KL"],"contactEmail":"a@b.example","insuranceValidUntil":null}`,
+		"no areas": `{"organizationId":"` + org + `","registrationNo":"R","serviceAreas":[],` +
+			`"contactEmail":"a@b.example","insuranceValidUntil":null}`,
+		"duplicate area": `{"organizationId":"` + org + `","registrationNo":"R","serviceAreas":["KL","kl"],` +
+			`"contactEmail":"a@b.example","insuranceValidUntil":null}`,
+		"bad email": `{"organizationId":"` + org + `","registrationNo":"R","serviceAreas":["KL"],` +
+			`"contactEmail":"not-an-email","insuranceValidUntil":null}`,
+		"blank reg": `{"organizationId":"` + org + `","registrationNo":" ","serviceAreas":["KL"],` +
+			`"contactEmail":"a@b.example","insuranceValidUntil":null}`,
+		"customer org": `{"organizationId":"` + seed.ID("org-customer-a").String() + `","registrationNo":"R",` +
+			`"serviceAreas":["KL"],"contactEmail":"a@b.example","insuranceValidUntil":null}`,
 	} {
 		code, m := write(s, &hq, "contractors.save", b, 0)
 		refusal(t, name, code, m, want[name])
@@ -41,7 +47,8 @@ func TestContractorRegister(t *testing.T) {
 		s,
 		&hq,
 		"contractors.save",
-		`{"organizationId":"`+uuid.NewString()+`","registrationNo":"R","serviceAreas":["KL"],"contactEmail":"a@b.example","insuranceValidUntil":null}`,
+		`{"organizationId":"`+uuid.NewString()+`","registrationNo":"R","serviceAreas":["KL"],"contactEmail":"a@b.example",`+
+			`"insuranceValidUntil":null}`,
 		0,
 	); code != 404 {
 		t.Error("unknown organization")
@@ -68,7 +75,8 @@ func TestContractorRegister(t *testing.T) {
 		s,
 		&hq,
 		"contractors.save",
-		body(`,"id":"` + id + `"`)[:len(body(""))-len(`"insuranceValidUntil":null}`)]+`"insuranceValidUntil":"`+until+`","id":"`+id+`"}`,
+		body(`,"id":"` + id + `"`)[:len(body(""))-len(`"insuranceValidUntil":null}`)]+`"insuranceValidUntil":"`+until+
+			`","id":"`+id+`"}`,
 		1,
 	); code != 200 ||
 		data(m)["delegation"].(map[string]any)["to"] != until {
@@ -77,7 +85,8 @@ func TestContractorRegister(t *testing.T) {
 
 	other := `{"organizationId":"` + seed.ID("org-contractor-a").
 		String() +
-		`","registrationNo":"R","serviceAreas":["KL"],"contactEmail":"a@b.example","insuranceValidUntil":null,"id":"` + id + `"}`
+		`","registrationNo":"R","serviceAreas":["KL"],"contactEmail":"a@b.example","insuranceValidUntil":null,` +
+		`"id":"` + id + `"}`
 	if code, m := write(
 		s,
 		&hq,
@@ -218,9 +227,10 @@ func TestContractorRegister(t *testing.T) {
 	}
 
 	for name, tc := range map[string][2]string{
-		"past":         {clock.Add(-time.Hour).Format(time.RFC3339), line},
-		"no lines":     {until, `[]`},
-		"dup worktype": {until, `[{"workType":"emergency","amountMinor":1,"note":null},{"workType":"emergency","amountMinor":2,"note":null}]`},
+		"past":     {clock.Add(-time.Hour).Format(time.RFC3339), line},
+		"no lines": {until, `[]`},
+		"dup worktype": {until, `[{"workType":"emergency","amountMinor":1,"note":null},{"workType":"emergency",` +
+			`"amountMinor":2,"note":null}]`},
 		"bad worktype": {until, `[{"workType":"travel","amountMinor":1,"note":null}]`},
 		"negative":     {until, `[{"workType":"emergency","amountMinor":-1,"note":null}]`},
 	} {
@@ -290,7 +300,8 @@ func TestSLAScorecard(t *testing.T) {
 	// earlier runs leave jobs in the scorecard window (created_at set back by this test); move them out
 	owner(
 		t,
-		`UPDATE maintenance.jobs SET created_at = created_at - interval '1000 days' WHERE created_at >= $1 AND created_at < $2`,
+		`UPDATE maintenance.jobs SET created_at = created_at - interval '1000 days' WHERE created_at >= $1 AND created_at <
+			$2`,
 		clock.Add(-48*time.Hour),
 		clock,
 	)
@@ -304,11 +315,16 @@ func TestSLAScorecard(t *testing.T) {
 	}
 
 	for name, b := range map[string]string{
-		"arrival 120":  `{"planType":"general","responseHours":4,"arrivalInWindowPercent":120,"firstTimeFixPercent":80,"effectiveFrom":"` + clock.Format(time.RFC3339) + `"}`,
-		"response 0":   `{"planType":"general","responseHours":0,"arrivalInWindowPercent":90,"firstTimeFixPercent":80,"effectiveFrom":"` + clock.Format(time.RFC3339) + `"}`,
-		"response 169": `{"planType":"general","responseHours":169,"arrivalInWindowPercent":90,"firstTimeFixPercent":80,"effectiveFrom":"` + clock.Format(time.RFC3339) + `"}`,
-		"bad plan":     `{"planType":"vip","responseHours":4,"arrivalInWindowPercent":90,"firstTimeFixPercent":80,"effectiveFrom":"` + clock.Format(time.RFC3339) + `"}`,
-		"past":         `{"planType":"general","responseHours":4,"arrivalInWindowPercent":90,"firstTimeFixPercent":80,"effectiveFrom":"` + clock.Add(-time.Hour).Format(time.RFC3339) + `"}`,
+		"arrival 120": `{"planType":"general","responseHours":4,"arrivalInWindowPercent":120,"firstTimeFixPercent":80,` +
+			`"effectiveFrom":"` + clock.Format(time.RFC3339) + `"}`,
+		"response 0": `{"planType":"general","responseHours":0,"arrivalInWindowPercent":90,"firstTimeFixPercent":80,` +
+			`"effectiveFrom":"` + clock.Format(time.RFC3339) + `"}`,
+		"response 169": `{"planType":"general","responseHours":169,"arrivalInWindowPercent":90,"firstTimeFixPercent":80,` +
+			`"effectiveFrom":"` + clock.Format(time.RFC3339) + `"}`,
+		"bad plan": `{"planType":"vip","responseHours":4,"arrivalInWindowPercent":90,"firstTimeFixPercent":80,` +
+			`"effectiveFrom":"` + clock.Format(time.RFC3339) + `"}`,
+		"past": `{"planType":"general","responseHours":4,"arrivalInWindowPercent":90,"firstTimeFixPercent":80,` +
+			`"effectiveFrom":"` + clock.Add(-time.Hour).Format(time.RFC3339) + `"}`,
 	} {
 		code, m := write(s, &hq, "sla.saveTargets", b, 0)
 		refusal(t, name, code, m, want[name])
@@ -318,7 +334,8 @@ func TestSLAScorecard(t *testing.T) {
 		s,
 		&hq,
 		"sla.saveTargets",
-		`{"planType":"general","responseHours":2,"arrivalInWindowPercent":95,"firstTimeFixPercent":90,"effectiveFrom":"`+clock.Add(time.Hour).
+		`{"planType":"general","responseHours":2,"arrivalInWindowPercent":95,"firstTimeFixPercent":90,`+
+			`"effectiveFrom":"`+clock.Add(time.Hour).
 			Format(time.RFC3339)+
 			`"}`,
 		0,
@@ -331,7 +348,8 @@ func TestSLAScorecard(t *testing.T) {
 		s,
 		&hq,
 		"sla.saveTargets",
-		`{"planType":"general","responseHours":3,"arrivalInWindowPercent":90,"firstTimeFixPercent":85,"effectiveFrom":"`+clock.Add(time.Hour).
+		`{"planType":"general","responseHours":3,"arrivalInWindowPercent":90,"firstTimeFixPercent":85,`+
+			`"effectiveFrom":"`+clock.Add(time.Hour).
 			Format(time.RFC3339)+
 			`"}`,
 		0,
@@ -353,7 +371,8 @@ func TestSLAScorecard(t *testing.T) {
 	created := clock.Add(-10 * time.Hour)
 	owner(
 		t,
-		`UPDATE maintenance.jobs SET created_at = $2, status = 'completed', completed_at = $3, contractor_org_id = $4, rating = '{"stars":4}'::jsonb WHERE id = $1`,
+		`UPDATE maintenance.jobs SET created_at = $2, status = 'completed', completed_at = $3, contractor_org_id = $4, rating
+			= '{"stars":4}'::jsonb WHERE id = $1`,
 		job,
 		created,
 		clock.Add(-time.Hour),
@@ -361,7 +380,8 @@ func TestSLAScorecard(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at, offer_expires_at, access_valid_from, access_valid_until, decision, decided_at)
+		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at,
+			offer_expires_at, access_valid_from, access_valid_until, decision, decided_at)
 		VALUES ($1,$2,$3,'t',tstzrange($4,$5),$4,$5,$4,$5,'accept',$6)`,
 		seed.ID("tenant-a"),
 		job,
@@ -388,7 +408,8 @@ func TestSLAScorecard(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at, offer_expires_at, access_valid_from, access_valid_until, decision, decided_at)
+		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at,
+			offer_expires_at, access_valid_from, access_valid_until, decision, decided_at)
 		VALUES ($1,$2,$3,'t',tstzrange($4,$5),$4,$5,$4,$5,'accept',$6)`,
 		seed.ID("tenant-a"),
 		onTime,
@@ -436,7 +457,8 @@ func TestSLAScorecard(t *testing.T) {
 		)
 		owner(
 			t,
-			`INSERT INTO maintenance.job_events (id, tenant_id, job_id, action, occurred_at) VALUES (gen_random_uuid(), $1, $2, 'job.cancelled', $3)`,
+			`INSERT INTO maintenance.job_events (id, tenant_id, job_id, action, occurred_at) VALUES (gen_random_uuid(), $1, $2,
+				'job.cancelled', $3)`,
 			seed.ID("tenant-a"),
 			id,
 			clock.Add(-10*time.Hour+after),
@@ -569,8 +591,10 @@ func TestSLAScorecard(t *testing.T) {
 	// KPIs include the accepted offer and rating
 	owner(
 		t,
-		`INSERT INTO maintenance.contractors (tenant_id, organization_id, name, status, registration_no, contact_email, delegation)
-		SELECT $1, $2, 'A', 'active', 'R-A', 'a@partner.example', tstzrange($3, $4) WHERE NOT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id = $2)`,
+		`INSERT INTO maintenance.contractors (tenant_id, organization_id, name, status, registration_no, contact_email,
+			delegation)
+		SELECT $1, $2, 'A', 'active', 'R-A', 'a@partner.example', tstzrange($3, $4) WHERE NOT EXISTS (SELECT 1 FROM
+		maintenance.contractors WHERE organization_id = $2)`,
 		seed.ID(
 			"tenant-a",
 		),
@@ -606,7 +630,8 @@ func TestSLAScorecard(t *testing.T) {
 // TestContractorQualityMetrics covers the quality figures of a contractor's jobs (IR131 item 6, IR236): arrival in the
 // scheduled window, reports accepted the first time, rework follow-ups, and the customer status they give. Two
 // completed jobs of contractor B on two units: one on time and accepted at once, one late and returned once with a
-// rework visit. A later job on the same unit within 30 days also counts as not fixed the first time, so the units differ.
+// rework visit. A later job on the same unit within 30 days also counts as not fixed the first time, so the units
+// differ.
 func TestContractorQualityMetrics(t *testing.T) {
 	s := server(t)
 	units := []string{newUnit(t, s, "Quality AC"), newUnit(t, s, "Quality AC")}
@@ -616,8 +641,10 @@ func TestContractorQualityMetrics(t *testing.T) {
 		id := uuid.NewString()
 		owner(
 			t,
-			`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, contractor_org_id, type, status, origin, symptom, requested_slot, scheduled_slot,
-			due_at, created_at, completed_at, time_on_site) VALUES ($1,$2,$3,$4,$5,'reactive','completed','client_request','quality metrics',tstzrange($6,$7),tstzrange($6,$7),
+			`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, contractor_org_id, type, status, origin,
+				symptom, requested_slot, scheduled_slot,
+			due_at, created_at, completed_at, time_on_site) VALUES ($1,$2,$3,$4,$5,'reactive','completed','client_request',
+			'quality metrics',tstzrange($6,$7),tstzrange($6,$7),
 			$7,$8,$9,jsonb_build_object('arrivedAt', $10::timestamptz))`,
 			id,
 			tenant,
@@ -637,7 +664,8 @@ func TestContractorQualityMetrics(t *testing.T) {
 		report := uuid.NewString()
 		owner(
 			t,
-			`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state) VALUES ($1,$2,$3,$4,$5,'submitted')`,
+			`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state) VALUES ($1,$2,$3,$4,$5,
+				'submitted')`,
 			report,
 			version,
 			tenant,
@@ -646,7 +674,8 @@ func TestContractorQualityMetrics(t *testing.T) {
 		)
 		owner(
 			t,
-			`INSERT INTO maintenance.report_reviews (tenant_id, report_id, report_version, reviewer_user_id, decision, occurred_at) VALUES ($1,$2,$3,$4,$5,$6)`,
+			`INSERT INTO maintenance.report_reviews (tenant_id, report_id, report_version, reviewer_user_id, decision,
+				occurred_at) VALUES ($1,$2,$3,$4,$5,$6)`,
 			tenant,
 			report,
 			version,
@@ -661,7 +690,8 @@ func TestContractorQualityMetrics(t *testing.T) {
 	review(late, 2, "accept", at(-20))
 	owner(
 		t,
-		`INSERT INTO maintenance.jobs (tenant_id, unit_id, customer_org_id, type, status, origin, requested_slot, due_at, created_at, follow_up_of_job_id, follow_up_class)
+		`INSERT INTO maintenance.jobs (tenant_id, unit_id, customer_org_id, type, status, origin, requested_slot, due_at,
+			created_at, follow_up_of_job_id, follow_up_class)
 		VALUES ($1,$2,$3,'reactive','requested','client_request',tstzrange($4,$5),$5,$6,$7,'rework')`,
 		tenant,
 		units[1],
@@ -710,8 +740,10 @@ func TestContractorQualityMetrics(t *testing.T) {
 	// the contractor's 90-day KPIs count the same jobs
 	owner(
 		t,
-		`INSERT INTO maintenance.contractors (tenant_id, organization_id, name, status, registration_no, contact_email, delegation)
-		SELECT $1, $2, 'B', 'active', 'R-B', 'b@partner.example', tstzrange($3, $4) WHERE NOT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id = $2)`,
+		`INSERT INTO maintenance.contractors (tenant_id, organization_id, name, status, registration_no, contact_email,
+			delegation)
+		SELECT $1, $2, 'B', 'active', 'R-B', 'b@partner.example', tstzrange($3, $4) WHERE NOT EXISTS (SELECT 1 FROM
+		maintenance.contractors WHERE organization_id = $2)`,
 		tenant,
 		contractor,
 		at(-1),
@@ -782,7 +814,8 @@ func TestFirstTimeFixIgnoresPlanVisits(t *testing.T) {
 	visit := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, type, status, origin, requested_slot, due_at, created_at)
+		`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, type, status, origin, requested_slot, due_at,
+			created_at)
 		VALUES ($7, $1, $2, $3, 'periodic', 'requested', 'periodic_plan', tstzrange($4, $5), $5, $6)`,
 		tenant,
 		unit,
@@ -845,8 +878,10 @@ func TestOfferAcceptanceIgnoresCancelledJobs(t *testing.T) {
 	org := seed.ID("org-contractor-a")
 	owner(
 		t,
-		`INSERT INTO maintenance.contractors (tenant_id, organization_id, name, status, registration_no, contact_email, delegation)
-		SELECT $1, $2, 'A', 'active', 'R-A', 'a@partner.example', tstzrange($3, $4) WHERE NOT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id = $2)`,
+		`INSERT INTO maintenance.contractors (tenant_id, organization_id, name, status, registration_no, contact_email,
+			delegation)
+		SELECT $1, $2, 'A', 'active', 'R-A', 'a@partner.example', tstzrange($3, $4) WHERE NOT EXISTS (SELECT 1 FROM
+		maintenance.contractors WHERE organization_id = $2)`,
 		seed.ID("tenant-a"),
 		org,
 		clock.Add(-time.Hour),

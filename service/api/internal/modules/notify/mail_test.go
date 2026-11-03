@@ -41,7 +41,11 @@ func TestMailTexts(t *testing.T) {
 		t.Errorf("unknown template: %q", s)
 	}
 
-	for role, app := range map[string]string{"client": "http://c", "contractor": "http://p", "technician": "http://t", "admin": "http://a"} { // each role's own app
+	for role, app := range map[string]string{
+		"client": "http://c", "contractor": "http://p", "technician": "http://t",
+		"admin": "http://a",
+	} {
+		// each role's own app
 		if _, body := notificationMail(
 			"alert",
 			nil,
@@ -59,7 +63,10 @@ func TestMailTexts(t *testing.T) {
 // TestSMTPRefusesHeaderBreaks: an address or subject with a line break never reaches the SMTP server.
 func TestSMTPRefusesHeaderBreaks(t *testing.T) {
 	s := SMTP{Addr: "127.0.0.1:1", From: "x@example.com"}
-	for _, c := range [][2]string{{"a@example.com\r\nBcc: b@example.com", "Hi"}, {"a@example.com", "Hi\nBcc: b@example.com"}} {
+	for _, c := range [][2]string{
+		{"a@example.com\r\nBcc: b@example.com", "Hi"},
+		{"a@example.com", "Hi\nBcc: b@example.com"},
+	} {
 		_, err := s.Send(
 			context.Background(),
 			c[0],
@@ -148,6 +155,7 @@ func TestSMTPSends(t *testing.T) {
 	}()
 
 	s := SMTP{Addr: ln.Addr().String(), From: "AC Project <no-reply@ac-project.local>"}
+
 	_, sendErr := s.Send(
 		context.Background(),
 		"tan@example.com",

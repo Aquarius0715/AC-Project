@@ -33,6 +33,7 @@ func TestOIDCVerifier(t *testing.T) {
 			"exp": time.Now().Add(time.Hour).Unix(),
 		}
 	}
+
 	id, err := v.Verify(
 		context.Background(),
 		sign(key, base()),
@@ -44,7 +45,10 @@ func TestOIDCVerifier(t *testing.T) {
 	// IR510: the token names its app; HQ's app is the admin client (Keycloak azp, Cognito client_id)
 	v.AdminClient = "ac-admin-web"
 
-	for name, c := range map[string]jwt.MapClaims{"azp": {"azp": "ac-admin-web"}, "client_id": {"client_id": "ac-admin-web", "token_use": "access"}} {
+	for name, c := range map[string]jwt.MapClaims{
+		"azp":       {"azp": "ac-admin-web"},
+		"client_id": {"client_id": "ac-admin-web", "token_use": "access"},
+	} {
 		claims := base()
 		delete(claims, "azp")
 
@@ -73,6 +77,7 @@ func TestOIDCVerifier(t *testing.T) {
 	c := base()
 
 	c["auth_time"] = signedIn.Unix()
+
 	id, err = v.Verify(
 		context.Background(),
 		sign(key, c),
@@ -83,6 +88,7 @@ func TestOIDCVerifier(t *testing.T) {
 	}
 
 	c["auth_time"] = "yesterday"
+
 	id, err = v.Verify(
 		context.Background(),
 		sign(key, c),
@@ -96,6 +102,7 @@ func TestOIDCVerifier(t *testing.T) {
 	delete(c, "azp")
 
 	c["aud"] = "ac-admin-web"
+
 	_, err = v.Verify(context.Background(), sign(key, c))
 	if err != nil {
 		t.Fatalf("aud claim: %v", err)
@@ -105,6 +112,7 @@ func TestOIDCVerifier(t *testing.T) {
 	delete(c, "typ")
 
 	c["token_use"] = "access"
+
 	_, err = v.Verify(context.Background(), sign(key, c))
 	if err != nil {
 		t.Fatalf("Cognito access token: %v", err)
@@ -157,6 +165,7 @@ func TestOIDCVerifier(t *testing.T) {
 	}
 
 	hs, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, base()).SignedString([]byte("secret"))
+
 	_, err = v.Verify(context.Background(), hs)
 	if err == nil {
 		t.Error("HS256 must be rejected")

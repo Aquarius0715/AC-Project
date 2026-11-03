@@ -132,6 +132,7 @@ func checkTechnicianJob(ctx context.Context, c *ops.Call, jobID uuid.UUID, unit 
 
 	for rows.Next() {
 		var a assignment
+
 		err := rows.Scan(
 			&a.unit,
 			&a.status,
@@ -207,7 +208,8 @@ func checkTechnicianUnit(
 		COALESCE(bool_or(a.status = 'active' AND a.valid_from <= $3 AND $3 < a.valid_until), false),
 		COALESCE(bool_or(a.status = 'active' AND $3 < a.valid_from), false)
 		FROM maintenance.assignments a JOIN maintenance.jobs j ON j.id = a.job_id
-		WHERE j.unit_id = $1 AND a.technician_membership_id = $2`, unit, c.Principal.MembershipID, c.Now).Scan(&any, &inWindow, &notStarted)
+		WHERE j.unit_id = $1 AND a.technician_membership_id =
+		$2`, unit, c.Principal.MembershipID, c.Now).Scan(&any, &inWindow, &notStarted)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return err
 	}

@@ -16,7 +16,8 @@ func TestProposalRefusalsByState(t *testing.T) {
 	s := server(t)
 	owner(
 		t,
-		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = ANY($1) AND status = 'active' AND lower(scheduled) > $2`,
+		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = ANY($1) AND status = 'active'
+			AND lower(scheduled) > $2`,
 		[]uuid.UUID{seed.ID("tech-internal-a"), seed.ID("tech-external-a")},
 		clock.Add(2*time.Hour),
 	)

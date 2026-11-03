@@ -59,7 +59,8 @@ type Certificate struct {
 	TrainingRequestedAt    *time.Time `json:"trainingRequestedAt"`
 }
 
-const certCols = `id, tenant_id, version, created_at, updated_at, membership_id, organization_id, code, name, number, issued_at, expires_at, file_name, status,
+const certCols = `id, tenant_id, version, created_at, updated_at, membership_id, organization_id, code, name, number,` +
+	` issued_at, expires_at, file_name, status,
 	renewal_of, verified_by_membership_id, verified_at, training_requested_at`
 
 // readStatus is IR133 item 2.
@@ -211,28 +212,31 @@ func (in *SubmitCertInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		certificates.submit (write)
-// @ID				certificates.submit
-// @Description	Authorization: contractor:partner.assign:own-company
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 PDF/JPEG/PNG up to 10 MB; issuedAt < expiresAt
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-P09
-// @Tags			certificates
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		SubmitCertInput	true	"input"
-// @Success		200				{object}	ops.Envelope{data=Certificate}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/certificates [post]
+// submit serves certificates.submit.
+//
+//	@Summary		certificates.submit (write)
+//	@ID				certificates.submit
+//	@Description	Authorization: contractor:partner.assign:own-company
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR111 PDF/JPEG/PNG up to 10 MB; issuedAt < expiresAt
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-P09
+//	@Tags			certificates
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		SubmitCertInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Certificate}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/certificates [post]
 func (m Certificates) submit(
 	ctx context.Context,
 	c *ops.Call,
@@ -249,7 +253,9 @@ func (m Certificates) submit(
 
 	if in.RenewalOf != nil {
 		var ok bool
-		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.certificates WHERE id = $1 AND membership_id = $2 AND code = $3)`, *in.RenewalOf, in.MembershipID, in.Code).
+
+		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.certificates WHERE id = $1 AND membership_id = $2
+			AND code = $3)`, *in.RenewalOf, in.MembershipID, in.Code).
 			Scan(&ok)
 		if err != nil {
 			return Certificate{}, err
@@ -263,16 +269,20 @@ func (m Certificates) submit(
 	id := uuid.New()
 
 	key := "certificates/" + in.MembershipID.String() + "/" + id.String()
+
 	putErr := m.Blobs.Put(ctx, key, in.File.Mime, in.File.Bytes)
 	if putErr != nil {
 		return Certificate{}, putErr
 	}
 
 	name := strings.TrimSpace(in.File.Name)
+
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`INSERT INTO maintenance.certificates (id, tenant_id, membership_id, organization_id, code, name, number, issued_at, expires_at, object_key,
-		file_name, status, renewal_of, created_at, updated_at) VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending_verification', $11, $12, $12)`,
+		`INSERT INTO maintenance.certificates (id, tenant_id, membership_id, organization_id, code, name, number, issued_at,
+			expires_at, object_key,
+		file_name, status, renewal_of, created_at, updated_at) VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4,
+		$5, $6, $7, $8, $9, $10, 'pending_verification', $11, $12, $12)`,
 		id,
 		in.MembershipID,
 		t.OrgID,
@@ -351,30 +361,35 @@ func (in *VerifyInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		certificates.verify (write)
-// @ID				certificates.verify
-// @Description	Authorization: admin:job.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 only pending_verification; approve updates the Membership qualification validUntil; a not-started assignment on a unit that requires the code and that the approved window no longer covers is released (IR440)
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A21
-// @Tags			certificates
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer		true	"all: required (target certificate, read certificates.list)"
-// @Param			certificateId		path		string		true	"input field certificateId"
-// @Param			request				body		VerifyInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Certificate}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/certificates/{certificateId}/verify [post]
+// verify serves certificates.verify.
+//
+//	@Summary		certificates.verify (write)
+//	@ID				certificates.verify
+//	@Description	Authorization: admin:job.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR111 only pending_verification; approve updates the Membership qualification validUntil; a \
+//	@Description	not-started assignment on a unit that requires the code and that the approved window no longer \
+//	@Description	covers is released (IR440)
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A21
+//	@Tags			certificates
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target certificate, read certificates.list)"
+//	@Param			certificateId		path		string		true	"input field certificateId"
+//	@Param			request				body		VerifyInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=Certificate}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/certificates/{certificateId}/verify [post]
 func (m Certificates) verify(
 	ctx context.Context,
 	c *ops.Call,
@@ -392,7 +407,8 @@ func (m Certificates) verify(
 	if in.Decision == "approve" {
 		_, err := c.Tx.Exec(
 			ctx,
-			`UPDATE maintenance.certificates SET status = 'valid', verified_by_membership_id = $2, verified_at = $3, version = version + 1, updated_at = $3 WHERE id = $1`,
+			`UPDATE maintenance.certificates SET status = 'valid', verified_by_membership_id = $2, verified_at = $3, version =
+				version + 1, updated_at = $3 WHERE id = $1`,
 			x.ID,
 			c.Principal.MembershipID,
 			c.Now,
@@ -430,7 +446,8 @@ func (m Certificates) verify(
 	} else {
 		_, err := c.Tx.Exec(
 			ctx,
-			`UPDATE maintenance.certificates SET status = 'rejected', rejection_reason = $2, verified_by_membership_id = $3, verified_at = $4,
+			`UPDATE maintenance.certificates SET status = 'rejected', rejection_reason = $2, verified_by_membership_id = $3,
+				verified_at = $4,
 		version = version + 1, updated_at = $4 WHERE id = $1`,
 			x.ID,
 			*in.Reason,
@@ -489,30 +506,33 @@ func (in *TrainingInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		certificates.requestTraining (write)
-// @ID				certificates.requestTraining
-// @Description	Authorization: contractor:partner.assign:own-company
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 note 1–1000
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-P09
-// @Tags			certificates
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer			true	"all: required (target certificate, read certificates.list)"
-// @Param			certificateId		path		string			true	"input field certificateId"
-// @Param			request				body		TrainingInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Certificate}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/certificates/{certificateId}/request-training [post]
+// requestTraining serves certificates.requestTraining.
+//
+//	@Summary		certificates.requestTraining (write)
+//	@ID				certificates.requestTraining
+//	@Description	Authorization: contractor:partner.assign:own-company
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR111 note 1–1000
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-P09
+//	@Tags			certificates
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer			true	"all: required (target certificate, read certificates.list)"
+//	@Param			certificateId		path		string			true	"input field certificateId"
+//	@Param			request				body		TrainingInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=Certificate}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/certificates/{certificateId}/request-training [post]
 func (m Certificates) requestTraining(
 	ctx context.Context,
 	c *ops.Call,
@@ -525,7 +545,8 @@ func (m Certificates) requestTraining(
 
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`UPDATE maintenance.certificates SET training_requested_at = $2, training_request_note = $3, version = version + 1, updated_at = $2 WHERE id = $1`,
+		`UPDATE maintenance.certificates SET training_requested_at = $2, training_request_note = $3, version = version + 1,
+			updated_at = $2 WHERE id = $1`,
 		x.ID,
 		c.Now,
 		in.Note,
@@ -561,37 +582,8 @@ func (m Certificates) requestTraining(
 	return x, nil
 }
 
-// ---- certificates.list ----
+// ---- certificates.getContent, certificates.list ----
 
-//	@Summary		certificates.list (read)
-//	@ID				certificates.list
-//	@Description	Authorization: admin:job.read | contractor:partner.assign:own-company
-//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-//	@Description	Design: DD-A21, DD-P09 · Query: filters organizationId,membershipId,code,status,expiringWithinDays · sort id,expiresAt,status (default expiresAt asc;id asc)
-//	@Tags			certificates
-//	@Accept			json
-//	@Produce		json
-//	@Param			cursor				query		string	false	"page cursor: nextCursor of the previous page (D12)"
-//	@Param			limit				query		integer	false	"page size 1–100, default 25"
-//	@Param			sort				query		string	false	"field:direction — fields id,expiresAt,status; default expiresAt asc;id asc"
-//	@Param			organizationId		query		string	false	"filter → organizationId"
-//	@Param			membershipId		query		string	false	"filter → membershipId"
-//	@Param			code				query		string	false	"filter → code (QualificationCode or other)"
-//	@Param			status				query		string	false	"filter → status"
-//	@Param			expiringWithinDays	query		number	false	"filter → expiresAt within N days of now"
-//	@Success		200					{object}	ops.Envelope{data=CertificatePage}
-//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-//	@Security		BearerAuth
-//	@Router			/v1/certificates [get]
-//
 // CertificateContentInput is certificates.getContent input.
 type CertificateContentInput struct {
 	CertificateID uuid.UUID `json:"certificateId"`
@@ -631,7 +623,9 @@ func documentMime(b []byte) string {
 //	@Summary		certificates.getContent (read)
 //	@ID				certificates.getContent
 //	@Description	Authorization: admin:job.read | contractor:partner.assign:own-company
-//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; the uploaded document of a certificate so HQ sees what it verifies (IR436); another company's certificate is NOT_FOUND
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; the uploaded \
+//	@Description	document of a certificate so HQ sees what it verifies (IR436); another company's certificate is \
+//	@Description	NOT_FOUND
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
 //	@Description	Design: DD-A21, DD-P09
 //	@Tags			certificates
@@ -659,7 +653,8 @@ func (m Certificates) content(
 		org       uuid.UUID
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT object_key, file_name, organization_id FROM maintenance.certificates WHERE id = $1`, in.CertificateID).
+	err := c.Tx.QueryRow(ctx, `SELECT object_key, file_name, organization_id FROM maintenance.certificates WHERE id =
+		$1`, in.CertificateID).
 		Scan(&key, &name, &org)
 	if errors.Is(err, pgx.ErrNoRows) ||
 		(err == nil && c.Principal.Role == "contractor" && org != c.Principal.OrgID) {
@@ -694,34 +689,37 @@ func (m Certificates) content(
 	return out, nil
 }
 
-// @Summary		certificates.list (read)
-// @ID				certificates.list
-// @Description	Authorization: admin:job.read | contractor:partner.assign:own-company
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A21, DD-P09 · Query: filters organizationId,membershipId,code,status,expiringWithinDays · sort id,expiresAt,status (default expiresAt asc;id asc)
-// @Tags			certificates
-// @Accept			json
-// @Produce		json
-// @Param			cursor				query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit				query		integer	false	"page size 1–100, default 25"
-// @Param			sort				query		string	false	"field:direction — fields id,expiresAt,status; default expiresAt asc;id asc"
-// @Param			organizationId		query		string	false	"filter → organizationId"
-// @Param			membershipId		query		string	false	"filter → membershipId"
-// @Param			code				query		string	false	"filter → code (QualificationCode or other)"
-// @Param			status				query		string	false	"filter → status"
-// @Param			expiringWithinDays	query		number	false	"filter → expiresAt within N days of now"
-// @Success		200					{object}	ops.Envelope{data=CertificatePage}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/certificates [get]
+// list serves certificates.list.
+//
+//	@Summary		certificates.list (read)
+//	@ID				certificates.list
+//	@Description	Authorization: admin:job.read | contractor:partner.assign:own-company
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A21, DD-P09 · Query: filters organizationId,membershipId,code,status,expiringWithinDays · \
+//	@Description	sort id,expiresAt,status (default expiresAt asc;id asc)
+//	@Tags			certificates
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor				query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit				query		integer	false	"page size 1–100, default 25"
+//	@Param			sort				query		string	false	"field:direction — fields id,expiresAt,status; default expiresAt asc;id asc"
+//	@Param			organizationId		query		string	false	"filter → organizationId"
+//	@Param			membershipId		query		string	false	"filter → membershipId"
+//	@Param			code				query		string	false	"filter → code (QualificationCode or other)"
+//	@Param			status				query		string	false	"filter → status"
+//	@Param			expiringWithinDays	query		number	false	"filter → expiresAt within N days of now"
+//	@Success		200					{object}	ops.Envelope{data=CertificatePage}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/certificates [get]
 func (m Certificates) list(
 	ctx context.Context,
 	c *ops.Call,
@@ -837,39 +835,42 @@ type PartItem struct {
 	VanStockQuantity *int   `json:"vanStockQuantity"`
 }
 
-// @Summary		parts.list (read)
-// @ID				parts.list
-// @Description	Authorization: technician:assigned | admin:job.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-T14 · Query: filters search,membershipId · sort id,name (default name asc;id asc)
-// @Tags			parts
-// @Accept			json
-// @Produce		json
-// @Param			cursor			query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit			query		integer	false	"page size 1–100, default 25"
-// @Param			sort			query		string	false	"field:direction — fields id,name; default name asc;id asc"
-// @Param			search			query		string	false	"filter → code or name contains"
-// @Param			membershipId	query		string	false	"filter → van stock of that technician listed first"
-// @Success		200				{object}	ops.Envelope{data=PartItemPage}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/parts [get]
+// parts serves parts.list.
+//
+//	@Summary		parts.list (read)
+//	@ID				parts.list
+//	@Description	Authorization: technician:assigned | admin:job.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-T14 · Query: filters search,membershipId · sort id,name (default name asc;id asc)
+//	@Tags			parts
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor			query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit			query		integer	false	"page size 1–100, default 25"
+//	@Param			sort			query		string	false	"field:direction — fields id,name; default name asc;id asc"
+//	@Param			search			query		string	false	"filter → code or name contains"
+//	@Param			membershipId	query		string	false	"filter → van stock of that technician listed first"
+//	@Success		200				{object}	ops.Envelope{data=PartItemPage}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/parts [get]
 func (m Certificates) parts(
 	ctx context.Context,
 	c *ops.Call,
 	in *paging.Query,
 ) (paging.Page[PartItem], error) {
 	var f struct {
-		Search       *string    `json:"search,omitempty"`       // code or name contains, case-insensitive
-		MembershipID *uuid.UUID `json:"membershipId,omitempty"` // that technician's van stock first (van stock is not tracked yet)
+		Search *string `json:"search,omitempty"` // code or name contains, case-insensitive
+		// that technician's van stock first (van stock is not tracked yet)
+		MembershipID *uuid.UUID `json:"membershipId,omitempty"`
 	}
 
 	if len(in.Filters) > 0 {
@@ -903,6 +904,7 @@ func (m Certificates) parts(
 
 	for rows.Next() {
 		var p PartItem
+
 		err := rows.Scan(&p.Code, &p.Name)
 		if err != nil {
 			rows.Close()
@@ -957,9 +959,11 @@ func (m Certificates) Remind(ctx context.Context, c *ops.Call) (int, error) {
 	rows, err := c.Tx.Query(
 		ctx,
 		`SELECT c.id, c.organization_id, c.expires_at FROM maintenance.certificates c
-		JOIN maintenance.ref_memberships rm ON rm.id = c.membership_id AND rm.valid_from <= $1 AND (rm.valid_until IS NULL OR rm.valid_until > $1)
+		JOIN maintenance.ref_memberships rm ON rm.id = c.membership_id AND rm.valid_from <= $1 AND (rm.valid_until IS NULL OR
+		rm.valid_until > $1)
 		WHERE c.status = 'valid' AND c.expires_at > $1 AND c.expires_at <= $2
-		  AND NOT EXISTS (SELECT 1 FROM maintenance.certificates n WHERE n.membership_id = c.membership_id AND n.status = 'valid' AND n.expires_at > c.expires_at
+		  AND NOT EXISTS (SELECT 1 FROM maintenance.certificates n WHERE n.membership_id = c.membership_id AND n.status =
+		  'valid' AND n.expires_at > c.expires_at
 		    AND (n.renewal_of = c.id OR (n.code = c.code AND c.code <> 'other')))
 		ORDER BY c.expires_at, c.id`,
 		c.Now,
@@ -992,7 +996,8 @@ func (m Certificates) Remind(ctx context.Context, c *ops.Call) (int, error) {
 			ctx,
 			`INSERT INTO maintenance.certificate_reminders (certificate_id, days_before, tenant_id, sent_at)
 			SELECT $1, $2, current_setting('app.tenant_id')::uuid, $3
-			WHERE NOT EXISTS (SELECT 1 FROM maintenance.certificate_reminders WHERE certificate_id = $1 AND days_before <= $2) ON CONFLICT DO NOTHING`,
+			WHERE NOT EXISTS (SELECT 1 FROM maintenance.certificate_reminders WHERE certificate_id = $1 AND days_before <= $2) ON
+			CONFLICT DO NOTHING`,
 			d.id,
 			days,
 			c.Now,

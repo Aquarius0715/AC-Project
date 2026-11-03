@@ -22,7 +22,8 @@ func TestServesTheAPIDescription(t *testing.T) {
 	}
 	// IR371: the Swagger UI files are one pinned release, checked by their hashes, and the page runs no inline script
 	page, csp := w.Body.String(), w.Header().Get("Content-Security-Policy")
-	for _, want := range []string{`swagger-ui-dist@` + swaggerUIVersion + `/swagger-ui-bundle.js" integrity="sha384-`, `swagger-ui-dist@` + swaggerUIVersion + `/swagger-ui.css" integrity="sha384-`} {
+	for _, want := range []string{`swagger-ui-dist@` + swaggerUIVersion + `/swagger-ui-bundle.js" ` +
+		`integrity="sha384-`, `swagger-ui-dist@` + swaggerUIVersion + `/swagger-ui.css" integrity="sha384-`} {
 		if !strings.Contains(page, want) {
 			t.Errorf("/docs lacks %s", want)
 		}
@@ -63,6 +64,7 @@ func TestServesTheAPIDescription(t *testing.T) {
 			Responses   map[string]json.RawMessage  `json:"responses"`
 		} `json:"paths"`
 	}
+
 	err := json.Unmarshal(w.Body.Bytes(), &doc)
 	if err != nil || doc.Swagger != "2.0" {
 		t.Fatalf("swagger document: %v %q", err, doc.Swagger)

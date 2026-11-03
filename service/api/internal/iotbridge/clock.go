@@ -9,8 +9,8 @@ import (
 )
 
 // ScenarioNow reads the Core API's scenario clock: the snapshot time of the demo-only password-reset preview, which
-// saves and sends nothing. The demo runs its own clock (a seed date that moves with real time), and readings and history
-// must be stamped on it.
+// saves and sends nothing. The demo runs its own clock (a seed date that moves with real time), and readings and
+// history must be stamped on it.
 func ScenarioNow(c *http.Client, api string) (time.Time, error) {
 	req, err := http.NewRequest(
 		http.MethodPost,
@@ -34,6 +34,7 @@ func ScenarioNow(c *http.Client, api string) (time.Time, error) {
 			SnapshotAt time.Time `json:"snapshotAt"`
 		} `json:"meta"`
 	}
+
 	decodeErr := json.NewDecoder(resp.Body).Decode(&out)
 	if decodeErr != nil {
 		return time.Time{}, decodeErr

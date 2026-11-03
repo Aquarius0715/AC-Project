@@ -147,7 +147,8 @@ func TestDirectoryAcrossServices(t *testing.T) {
 	identitySrv, maint := cl.srv[ops.DomainIdentity], cl.srv[ops.DomainMaintenance]
 	tech := seed.ID("tech-external-a").String()
 	until := time.Date(2027, 3, 31, 0, 0, 0, 0, time.UTC)
-	body := `{"membershipId":"` + tech + `","code":"demo_electrical","name":"Electrical","number":"E-split","issuedAt":"` + clock.Add(-24*time.Hour).
+	body := `{"membershipId":"` + tech + `","code":"demo_electrical","name":"Electrical","number":"E-split",` +
+		`"issuedAt":"` + clock.Add(-24*time.Hour).
 		Format(time.RFC3339) +
 		`","expiresAt":"` + until.Format(
 		time.RFC3339,

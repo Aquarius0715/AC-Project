@@ -8,10 +8,10 @@ import (
 	"github.com/google/uuid"
 )
 
-// The less common paths of a work report (IR100, SR07): a draft or submission of a job that does not exist, an item that
-// cites an attachment of another report, an empty reason kept as none, a measurement corrected in place, a submission of
-// a stale job version or of a job not in progress, the time on site without the ended pauses, and the reads of a report
-// through another job.
+// The less common paths of a work report (IR100, SR07): a draft or submission of a job that does not exist, an item
+// that cites an attachment of another report, an empty reason kept as none, a measurement corrected in place, a
+// submission of a stale job version or of a job not in progress, the time on site without the ended pauses, and the
+// reads of a report through another job.
 func TestWorkReportEdges(t *testing.T) {
 	s := server(t)
 	job := assignedNow(t, s) // version 2
@@ -77,7 +77,8 @@ func TestWorkReportEdges(t *testing.T) {
 
 	rep := data(m)["id"].(string)
 
-	elsewhere := `[{"componentGroup":"indoor","componentKey":"filter","result":null,"reason":null,"evidenceIds":["` + uuid.NewString() + `"]}]`
+	elsewhere := `[{"componentGroup":"indoor","componentKey":"filter","result":null,"reason":null,` +
+		`"evidenceIds":["` + uuid.NewString() + `"]}]`
 	if code, m := write(
 		s,
 		&techInt,
@@ -91,8 +92,9 @@ func TestWorkReportEdges(t *testing.T) {
 	// an empty reason is no reason; a measurement saved again by its ID keeps it and counts a version
 	body := strings.Replace(
 		draftBody(job, "normal", map[string]string{
-			"reportId":     `"` + rep + `"`,
-			"measurements": `[{"componentKey":"filter","metric":"temperature","value":20,"unit":"°C","observedAt":"` + now + `"}]`,
+			"reportId": `"` + rep + `"`,
+			"measurements": `[{"componentKey":"filter","metric":"temperature","value":20,"unit":"°C",` +
+				`"observedAt":"` + now + `"}]`,
 		}),
 		`"componentKey":"filter","result":"normal","reason":null`,
 		`"componentKey":"filter","result":"normal","reason":""`,
@@ -113,8 +115,9 @@ func TestWorkReportEdges(t *testing.T) {
 	first := data(m)["measurements"].([]any)[0].(map[string]any)
 
 	code, m = write(s, &techInt, "jobs.saveDraft", draftBody(job, "normal", map[string]string{
-		"reportId":     `"` + rep + `"`,
-		"measurements": `[{"id":"` + first["id"].(string) + `","componentKey":"filter","metric":"temperature","value":21,"unit":"°C","observedAt":"` + now + `"}]`,
+		"reportId": `"` + rep + `"`,
+		"measurements": `[{"id":"` + first["id"].(string) + `","componentKey":"filter","metric":"temperature","value":21,` +
+			`"unit":"°C","observedAt":"` + now + `"}]`,
 	}), 2)
 	if code != 200 {
 		t.Fatalf("third draft: %d %v", code, m)
@@ -131,8 +134,10 @@ func TestWorkReportEdges(t *testing.T) {
 	// submission ends (IR448): 30 minutes
 	owner(
 		t,
-		`UPDATE maintenance.jobs SET time_on_site = jsonb_build_object('arrivedAt', $2::timestamptz, 'startedAt', $2::timestamptz, 'pauses',
-		jsonb_build_array(jsonb_build_object('from', $3::timestamptz, 'to', $4::timestamptz), jsonb_build_object('from', $5::timestamptz))) WHERE id = $1`,
+		`UPDATE maintenance.jobs SET time_on_site = jsonb_build_object('arrivedAt', $2::timestamptz, 'startedAt',
+			$2::timestamptz, 'pauses',
+		jsonb_build_array(jsonb_build_object('from', $3::timestamptz, 'to', $4::timestamptz), jsonb_build_object('from',
+		$5::timestamptz))) WHERE id = $1`,
 		job,
 		clock.Add(-time.Hour),
 		clock.Add(-40*time.Minute),
@@ -146,7 +151,8 @@ func TestWorkReportEdges(t *testing.T) {
 	}{{"job.held", -50 * time.Minute}, {"job.resumed", -45 * time.Minute}} {
 		owner(
 			t,
-			`INSERT INTO maintenance.job_events (id, tenant_id, job_id, action, occurred_at) SELECT gen_random_uuid(), tenant_id, id, $2, $3 FROM maintenance.jobs WHERE id = $1`,
+			`INSERT INTO maintenance.job_events (id, tenant_id, job_id, action, occurred_at) SELECT gen_random_uuid(), tenant_id,
+				id, $2, $3 FROM maintenance.jobs WHERE id = $1`,
 			job,
 			e.action,
 			clock.Add(e.at),

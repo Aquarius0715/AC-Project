@@ -16,7 +16,8 @@ func TestOfferAcceptAssign(t *testing.T) {
 	// earlier runs leave active assignments for these technicians in the same slots
 	owner(
 		t,
-		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = ANY($1) AND status = 'active' AND lower(scheduled) > $2`,
+		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = ANY($1) AND status = 'active'
+			AND lower(scheduled) > $2`,
 		[]uuid.UUID{seed.ID("tech-internal-a"), seed.ID("tech-external-a")},
 		clock.Add(2*time.Hour),
 	)
@@ -85,7 +86,8 @@ func TestOfferAcceptAssign(t *testing.T) {
 
 	owner(
 		t,
-		`INSERT INTO maintenance.contractors (tenant_id, organization_id, name, status, registration_no, contact_email, delegation)
+		`INSERT INTO maintenance.contractors (tenant_id, organization_id, name, status, registration_no, contact_email,
+			delegation)
 		VALUES ($1,$2,'B','suspended','R-1','b@example.com',tstzrange($3,$4))`,
 		seed.ID("tenant-a"),
 		seed.ID("org-contractor-b"),
@@ -196,8 +198,10 @@ func TestOfferAcceptAssign(t *testing.T) {
 	t.Cleanup(func() { // restore unless a test assignment now holds the window
 		owner(
 			t,
-			`UPDATE maintenance.assignments a SET status = 'active' WHERE a.id = $1 AND NOT EXISTS (SELECT 1 FROM maintenance.assignments b
-			WHERE b.id <> a.id AND b.status = 'active' AND b.technician_membership_id = a.technician_membership_id AND b.scheduled && a.scheduled)`,
+			`UPDATE maintenance.assignments a SET status = 'active' WHERE a.id = $1 AND NOT EXISTS (SELECT 1 FROM
+				maintenance.assignments b
+			WHERE b.id <> a.id AND b.status = 'active' AND b.technician_membership_id = a.technician_membership_id AND
+			b.scheduled && a.scheduled)`,
 			seed.ID("assignment-contractor-a"),
 		)
 	})
@@ -452,7 +456,8 @@ func TestOfferAcceptAssign(t *testing.T) {
 	var action string
 	ownerScan(
 		t,
-		`SELECT action FROM maintenance.job_events WHERE job_id = $1 AND action LIKE 'offer.%' ORDER BY occurred_at DESC, id DESC LIMIT 1`,
+		`SELECT action FROM maintenance.job_events WHERE job_id = $1 AND action LIKE 'offer.%' ORDER BY occurred_at DESC, id
+			DESC LIMIT 1`,
 		[]any{job},
 		&action,
 	)
@@ -479,7 +484,8 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 	s := server(t)
 	owner(
 		t,
-		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND lower(scheduled) > $2`,
+		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND
+			lower(scheduled) > $2`,
 		seed.ID("tech-internal-a"),
 		clock.Add(2*time.Hour),
 	)
@@ -523,7 +529,8 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 	plan, pj := uuid.NewString(), uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO maintenance.plans (id, tenant_id, unit_id, interval_months, anchor_day, next_due_at) VALUES ($1,$2,$3,3,8,$4)`,
+		`INSERT INTO maintenance.plans (id, tenant_id, unit_id, interval_months, anchor_day, next_due_at) VALUES ($1,$2,$3,3,
+			8,$4)`,
 		plan,
 		seed.ID("tenant-a"),
 		unit,
@@ -531,7 +538,8 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, plan_id, occurrence_at, type, status, origin, requested_slot, due_at)
+		`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, plan_id, occurrence_at, type, status, origin,
+			requested_slot, due_at)
 		VALUES ($1,$2,$3,$4,$5,$6,'periodic','requested','periodic_plan',tstzrange($6,$7),$7)`,
 		pj,
 		seed.ID("tenant-a"),
@@ -562,11 +570,14 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 		body   string
 		fields []string
 	}{
-		"jobs.offer": {`{"jobId":"` + job + `","contractorOrgId":"` + seed.ID("org-contractor-a").String() + `","visitSlot":{"startAt":"` + ts(3) + `","endAt":"` + ts(2) +
-			`"},"offerExpiresAt":"` + ts(5) + `","accessValidFrom":"` + ts(6) + `","accessValidUntil":"` + ts(4) + `","termsVersion":"t"}`, []string{"visitSlot", "accessValidUntil"}},
+		"jobs.offer": {`{"jobId":"` + job + `","contractorOrgId":"` + seed.ID("org-contractor-a").String() +
+			`","visitSlot":{"startAt":"` + ts(3) + `","endAt":"` + ts(2) +
+			`"},"offerExpiresAt":"` + ts(5) + `","accessValidFrom":"` + ts(6) + `","accessValidUntil":"` + ts(4) +
+			`","termsVersion":"t"}`, []string{"visitSlot", "accessValidUntil"}},
 		"jobs.accept":  {`{"jobId":"` + job + `","offerId":"` + uuid.NewString() + `","reason":"x"}`, []string{"_"}},
 		"jobs.decline": {`{"jobId":"` + job + `","offerId":"` + uuid.NewString() + `","termsVersion":"t"}`, []string{"_"}},
-		"jobs.assign":  {`{"jobId":"` + job + `","technicianMembershipId":"` + seed.ID("tech-internal-a").String() + `","startAt":"` + ts(3) + `","endAt":"` + ts(2) + `"}`, []string{"endAt"}},
+		"jobs.assign": {`{"jobId":"` + job + `","technicianMembershipId":"` + seed.ID("tech-internal-a").String() +
+			`","startAt":"` + ts(3) + `","endAt":"` + ts(2) + `"}`, []string{"endAt"}},
 	} {
 		a := &hq
 		if op == "jobs.accept" || op == "jobs.decline" {
@@ -595,8 +606,9 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 	}
 	// each decision takes only its own fields (service-contracts: accept termsVersion, decline reason)
 	for op, b := range map[string]string{
-		"jobs.accept":  `{"jobId":"` + job + `","offerId":"` + uuid.NewString() + `","termsVersion":"t","reason":"x"}`,
-		"jobs.decline": `{"jobId":"` + job + `","offerId":"` + uuid.NewString() + `","termsVersion":"t","reason":"no capacity"}`,
+		"jobs.accept": `{"jobId":"` + job + `","offerId":"` + uuid.NewString() + `","termsVersion":"t","reason":"x"}`,
+		"jobs.decline": `{"jobId":"` + job + `","offerId":"` + uuid.NewString() + `","termsVersion":"t","reason":"no ` +
+			`capacity"}`,
 	} {
 		if code, m := write(
 			s,
@@ -858,7 +870,8 @@ func TestReleaseEndedAccess(t *testing.T) {
 	)
 	ownerScan(
 		t,
-		`SELECT j.status, j.assignment_id::text, a.reason FROM maintenance.jobs j JOIN maintenance.assignments a ON a.job_id = j.id WHERE j.id = $1 ORDER BY a.created_at DESC LIMIT 1`,
+		`SELECT j.status, j.assignment_id::text, a.reason FROM maintenance.jobs j JOIN maintenance.assignments a ON a.job_id =
+			j.id WHERE j.id = $1 ORDER BY a.created_at DESC LIMIT 1`,
 		[]any{job},
 		&status,
 		&assignment,
@@ -913,8 +926,10 @@ func TestReleaseEndedAccessContractor(t *testing.T) {
 		)
 		owner(
 			t,
-			`UPDATE maintenance.assignments a SET status = 'active' WHERE a.id = $1 AND NOT EXISTS (SELECT 1 FROM maintenance.assignments b
-			WHERE b.id <> a.id AND b.status = 'active' AND b.technician_membership_id = a.technician_membership_id AND b.scheduled && a.scheduled)`,
+			`UPDATE maintenance.assignments a SET status = 'active' WHERE a.id = $1 AND NOT EXISTS (SELECT 1 FROM
+				maintenance.assignments b
+			WHERE b.id <> a.id AND b.status = 'active' AND b.technician_membership_id = a.technician_membership_id AND
+			b.scheduled && a.scheduled)`,
 			seed.ID("assignment-contractor-a"),
 		)
 	})
@@ -1023,7 +1038,8 @@ func TestReleaseEndedAccessContractor(t *testing.T) {
 	)
 	ownerScan(
 		t,
-		`SELECT j.status, j.assignment_id::text, a.reason FROM maintenance.jobs j JOIN maintenance.assignments a ON a.job_id = j.id WHERE j.id = $1 ORDER BY a.created_at DESC LIMIT 1`,
+		`SELECT j.status, j.assignment_id::text, a.reason FROM maintenance.jobs j JOIN maintenance.assignments a ON a.job_id =
+			j.id WHERE j.id = $1 ORDER BY a.created_at DESC LIMIT 1`,
 		[]any{job},
 		&status,
 		&assignment,
@@ -1071,15 +1087,18 @@ func TestReleaseQualificationEnded(t *testing.T) {
 	t.Cleanup(func() {
 		owner(
 			t,
-			`UPDATE identity.qualification_grants SET valid_from = $2, valid_until = $3 WHERE membership_id = $1 AND code = 'demo_indoor'`,
+			`UPDATE identity.qualification_grants SET valid_from = $2, valid_until = $3 WHERE membership_id = $1 AND code =
+				'demo_indoor'`,
 			tech,
 			from,
 			until,
 		)
 		owner(
 			t,
-			`UPDATE maintenance.assignments a SET status = 'active' WHERE a.id = $1 AND NOT EXISTS (SELECT 1 FROM maintenance.assignments b
-			WHERE b.id <> a.id AND b.status = 'active' AND b.technician_membership_id = a.technician_membership_id AND b.scheduled && a.scheduled)`,
+			`UPDATE maintenance.assignments a SET status = 'active' WHERE a.id = $1 AND NOT EXISTS (SELECT 1 FROM
+				maintenance.assignments b
+			WHERE b.id <> a.id AND b.status = 'active' AND b.technician_membership_id = a.technician_membership_id AND
+			b.scheduled && a.scheduled)`,
 			seed.ID("assignment-contractor-a"),
 		)
 	})
@@ -1185,7 +1204,8 @@ func TestReleaseQualificationEnded(t *testing.T) {
 	state := func() (status string, assignment *string, reason *string) {
 		ownerScan(
 			t,
-			`SELECT j.status, j.assignment_id::text, a.reason FROM maintenance.jobs j JOIN maintenance.assignments a ON a.job_id = j.id WHERE j.id = $1 ORDER BY a.created_at DESC LIMIT 1`,
+			`SELECT j.status, j.assignment_id::text, a.reason FROM maintenance.jobs j JOIN maintenance.assignments a ON a.job_id
+				= j.id WHERE j.id = $1 ORDER BY a.created_at DESC LIMIT 1`,
 			[]any{job},
 			&status,
 			&assignment,
@@ -1241,7 +1261,8 @@ func TestPastSlotsRefused(t *testing.T) {
 	// the client's preferred times have all passed
 	owner(
 		t,
-		`UPDATE maintenance.jobs SET preferred_slots = jsonb_build_array(jsonb_build_object('startAt', $2::timestamptz, 'endAt', $3::timestamptz)),
+		`UPDATE maintenance.jobs SET preferred_slots = jsonb_build_array(jsonb_build_object('startAt', $2::timestamptz,
+			'endAt', $3::timestamptz)),
 		requested_slot = tstzrange($2, $3) WHERE id = $1`,
 		job,
 		clock.Add(-3*time.Hour),
@@ -1349,7 +1370,8 @@ func TestExtensionRefreezesTechnicianHistory(t *testing.T) {
 	// the work started and its window ended an hour ago
 	owner(
 		t,
-		`UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3) WHERE job_id = $1 AND status = 'active'`,
+		`UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3) WHERE job_id = $1
+			AND status = 'active'`,
 		job,
 		clock.Add(-3*time.Hour),
 		clock.Add(-time.Hour),
@@ -1368,7 +1390,8 @@ func TestExtensionRefreezesTechnicianHistory(t *testing.T) {
 		var at *time.Time
 		ownerScan(
 			t,
-			`SELECT (SELECT as_of FROM maintenance.job_history_snapshots WHERE job_id = $1 AND owner_kind = 'membership' AND owner_id = $2)`,
+			`SELECT (SELECT as_of FROM maintenance.job_history_snapshots WHERE job_id = $1 AND owner_kind = 'membership' AND
+				owner_id = $2)`,
 			[]any{job, tech},
 			&at,
 		)

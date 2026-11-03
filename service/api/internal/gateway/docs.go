@@ -44,13 +44,15 @@ const swaggerUI = `<!doctype html>
 
 // swaggerInit starts Swagger UI on the API description.
 const swaggerInit = `window.onload = () => {
-  window.ui = SwaggerUIBundle({ url: "/swagger.json", dom_id: "#swagger-ui", deepLinking: true, persistAuthorization: true, defaultModelsExpandDepth: 0 });
+  window.ui = SwaggerUIBundle({ url: "/swagger.json", dom_id: "#swagger-ui", deepLinking: true, ` +
+	`persistAuthorization: true, defaultModelsExpandDepth: 0 });
 };
 `
 
 // docsCSP lets the page run only the pinned Swagger UI file and its own start script, call only this origin, and be
 // framed by no one. Swagger UI sets inline styles, so styles allow 'unsafe-inline' as well as the pinned sheet.
-const docsCSP = "default-src 'none'; script-src 'self' " + swaggerUIBundle + "; style-src " + swaggerUICSS + " 'unsafe-inline'; " +
+const docsCSP = "default-src 'none'; script-src 'self' " + swaggerUIBundle + "; style-src " + swaggerUICSS +
+	" 'unsafe-inline'; " +
 	"img-src 'self' data:; connect-src 'self'; font-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 
 // mountDocs serves the API description: GET /swagger.json (the document) and GET /docs (Swagger UI). The gateway is

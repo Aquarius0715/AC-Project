@@ -84,6 +84,7 @@ func Main(service string, domains ...string) {
 		OnShutdownError:  nil,
 		BeforeServeFunc:  nil,
 	}
+
 	startErr := sc.Start(ctx, s.Echo)
 	if startErr != nil && !errors.Is(startErr, http.ErrServerClosed) {
 		slog.Error("serve", "err", startErr)

@@ -16,6 +16,7 @@ func EventHandlers() map[string]events.Handler {
 	return map[string]events.Handler{
 		events.ConsentRevoked: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.ConsentRevocation
+
 			decodeErr := e.Decode(&p)
 			if decodeErr != nil || p.Purpose != "location_automation" {
 				return decodeErr
@@ -24,7 +25,8 @@ func EventHandlers() map[string]events.Handler {
 			// consent never re-enables them (an explicit save with enabled=true does, IR27)
 			_, err := tx.Exec(
 				ctx,
-				`UPDATE control.automations SET enabled = false, disabled_reason = 'consent_revoked', version = version + 1, updated_at = $2
+				`UPDATE control.automations SET enabled = false, disabled_reason = 'consent_revoked', version = version + 1,
+					updated_at = $2
 				WHERE owner_membership_id = $1 AND kind = 'event' AND definition->'condition'->>'type' = 'location' AND enabled`,
 				p.MembershipID,
 				p.At,
@@ -34,6 +36,7 @@ func EventHandlers() map[string]events.Handler {
 		},
 		events.RestrictionCommandRequested: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.RestrictionCommand
+
 			decodeErr := e.Decode(&p)
 			if decodeErr != nil {
 				return decodeErr
@@ -41,9 +44,11 @@ func EventHandlers() map[string]events.Handler {
 
 			_, err := tx.Exec(
 				ctx,
-				`INSERT INTO control.commands (id, tenant_id, unit_id, device_id, actor_membership_id, source, action, restriction_id, status, delivery,
+				`INSERT INTO control.commands (id, tenant_id, unit_id, device_id, actor_membership_id, source, action,
+					restriction_id, status, delivery,
 				requested_at, sent_at, expires_at, correlation_id, created_at, updated_at)
-				VALUES ($1, $2, $3, $4, $5, 'restriction', $6, $7, $8, $9, $10, $11, $12, $13, $10, $10) ON CONFLICT (id) DO NOTHING`,
+				VALUES ($1, $2, $3, $4, $5, 'restriction', $6, $7, $8, $9, $10, $11, $12, $13, $10, $10) ON CONFLICT (id) DO
+				NOTHING`,
 				p.CommandID,
 				e.TenantID,
 				p.UnitID,
@@ -63,6 +68,7 @@ func EventHandlers() map[string]events.Handler {
 		},
 		events.RestrictionCommandsCancelled: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.CommandsCancelled
+
 			decodeErr := e.Decode(&p)
 			if decodeErr != nil {
 				return decodeErr
@@ -106,7 +112,8 @@ func publishRestrictionCommands(
 
 	rows, err := tx.Query(
 		ctx,
-		`SELECT tenant_id, id, status FROM control.commands WHERE id = ANY($1) AND source = 'restriction' ORDER BY tenant_id, id`,
+		`SELECT tenant_id, id, status FROM control.commands WHERE id = ANY($1) AND source = 'restriction' ORDER BY tenant_id,
+			id`,
 		ids,
 	)
 	if err != nil {
@@ -123,6 +130,7 @@ func publishRestrictionCommands(
 			t, id  uuid.UUID
 			status string
 		)
+
 		err := rows.Scan(&t, &id, &status)
 		if err != nil {
 			rows.Close()

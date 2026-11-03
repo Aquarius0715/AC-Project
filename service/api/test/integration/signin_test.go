@@ -52,7 +52,10 @@ func TestLastSignIn(t *testing.T) {
 	t.Cleanup(reset)
 
 	earlier := clock.Add(-30 * 24 * time.Hour)
-	mark := func() { exec(`UPDATE identity.users SET last_sign_in_at = $2 WHERE id = $1`, user, earlier) } // to see whether a request writes
+	mark := func() {
+		exec(`UPDATE identity.users SET last_sign_in_at = $2 WHERE id =
+		$1`, user, earlier)
+	} // to see whether a request writes
 	signedIn := func(at time.Time) *actor { return &actor{fmt.Sprintf("tok-a@%d", at.Unix()), "customer-a"} }
 	request := func(a *actor, op string) {
 		t.Helper()

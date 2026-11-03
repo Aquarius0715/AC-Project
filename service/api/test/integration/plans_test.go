@@ -26,10 +26,14 @@ func TestPlans(t *testing.T) {
 	}
 
 	for name, b := range map[string]string{
-		"interval 0":  `{"unitId":"` + unit + `","recurrence":{"kind":"monthly","intervalMonths":0},"nextDueAt":"` + next.Format(time.RFC3339) + `"}`,
-		"interval 13": `{"unitId":"` + unit + `","recurrence":{"kind":"monthly","intervalMonths":13},"nextDueAt":"` + next.Format(time.RFC3339) + `"}`,
-		"weekly":      `{"unitId":"` + unit + `","recurrence":{"kind":"weekly","intervalMonths":1},"nextDueAt":"` + next.Format(time.RFC3339) + `"}`,
-		"past":        `{"unitId":"` + unit + `","recurrence":{"kind":"monthly","intervalMonths":3},"nextDueAt":"` + clock.Add(-time.Hour).Format(time.RFC3339) + `"}`,
+		"interval 0": `{"unitId":"` + unit + `","recurrence":{"kind":"monthly","intervalMonths":0},` +
+			`"nextDueAt":"` + next.Format(time.RFC3339) + `"}`,
+		"interval 13": `{"unitId":"` + unit + `","recurrence":{"kind":"monthly","intervalMonths":13},` +
+			`"nextDueAt":"` + next.Format(time.RFC3339) + `"}`,
+		"weekly": `{"unitId":"` + unit + `","recurrence":{"kind":"weekly","intervalMonths":1},` +
+			`"nextDueAt":"` + next.Format(time.RFC3339) + `"}`,
+		"past": `{"unitId":"` + unit + `","recurrence":{"kind":"monthly","intervalMonths":3},` +
+			`"nextDueAt":"` + clock.Add(-time.Hour).Format(time.RFC3339) + `"}`,
 	} {
 		code, m := write(s, &hq, "plans.save", b, 0)
 		refusal(t, name, code, m, want[name])

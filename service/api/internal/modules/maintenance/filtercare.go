@@ -92,7 +92,8 @@ func (m FilterCare) settings(
 		ThresholdHours: nil,
 	}
 
-	err := c.Tx.QueryRow(ctx, `SELECT id, version, updated_at, threshold_hours, fallback_days, recipients, channels FROM maintenance.filter_care_settings WHERE customer_id = $1`, customer).
+	err := c.Tx.QueryRow(ctx, `SELECT id, version, updated_at, threshold_hours, fallback_days, recipients, channels FROM
+		maintenance.filter_care_settings WHERE customer_id = $1`, customer).
 		Scan(&s.ID, &s.Version, &s.UpdatedAt, &s.ThresholdHours, &s.FallbackDays, &s.Recipients, &s.Channels)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return s, nil
@@ -139,8 +140,10 @@ func (m FilterCare) status(
 
 	var job uuid.UUID
 
-	err := c.Tx.QueryRow(ctx, `SELECT j.id, j.completed_at FROM maintenance.jobs j WHERE j.unit_id = $1 AND j.status = 'completed' AND EXISTS (
-		SELECT 1 FROM maintenance.work_reports w WHERE w.job_id = j.id AND w.state = 'accepted' AND w.items @> '[{"componentKey":"filter","result":"normal"}]')
+	err := c.Tx.QueryRow(ctx, `SELECT j.id, j.completed_at FROM maintenance.jobs j WHERE j.unit_id = $1 AND j.status =
+		'completed' AND EXISTS (
+		SELECT 1 FROM maintenance.work_reports w WHERE w.job_id = j.id AND w.state = 'accepted' AND w.items @>
+		'[{"componentKey":"filter","result":"normal"}]')
 		ORDER BY j.completed_at DESC LIMIT 1`, u.ID).
 		Scan(&job, &at)
 	switch {
@@ -186,34 +189,37 @@ func (m FilterCare) status(
 
 var filterRank = map[string]int{"unknown": 0, "ok": 1, "due_soon": 2, "overdue": 3}
 
-// @Summary		filterCare.list (read)
-// @ID				filterCare.list
-// @Description	Authorization: client:self | technician:assigned
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-C18 · Query: filters customerId,propertyId,spaceId,unitId,status · sort id,status (default status desc;id asc)
-// @Tags			filterCare
-// @Accept			json
-// @Produce		json
-// @Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit		query		integer	false	"page size 1–100, default 25"
-// @Param			sort		query		string	false	"field:direction — fields id,status; default status desc;id asc"
-// @Param			customerId	query		string	false	"filter → unit location"
-// @Param			propertyId	query		string	false	"filter → unit location"
-// @Param			spaceId		query		string	false	"filter → unit location"
-// @Param			unitId		query		string	false	"filter → unit location"
-// @Param			status		query		string	false	"filter → status"
-// @Success		200			{object}	ops.Envelope{data=FilterStatusPage}
-// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/filter-care [get]
+// list serves filterCare.list.
+//
+//	@Summary		filterCare.list (read)
+//	@ID				filterCare.list
+//	@Description	Authorization: client:self | technician:assigned
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-C18 · Query: filters customerId,propertyId,spaceId,unitId,status · sort id,status \
+//	@Description	(default status desc;id asc)
+//	@Tags			filterCare
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit		query		integer	false	"page size 1–100, default 25"
+//	@Param			sort		query		string	false	"field:direction — fields id,status; default status desc;id asc"
+//	@Param			customerId	query		string	false	"filter → unit location"
+//	@Param			propertyId	query		string	false	"filter → unit location"
+//	@Param			spaceId		query		string	false	"filter → unit location"
+//	@Param			unitId		query		string	false	"filter → unit location"
+//	@Param			status		query		string	false	"filter → status"
+//	@Success		200			{object}	ops.Envelope{data=FilterStatusPage}
+//	@Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/filter-care [get]
 func (m FilterCare) list(
 	ctx context.Context,
 	c *ops.Call,
@@ -317,29 +323,31 @@ func (in *MarkInput) Validate() map[string]string {
 	return nil
 }
 
-// @Summary		filterCare.markCleaned (write)
-// @ID				filterCare.markCleaned
-// @Description	Authorization: client:self
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-C18
-// @Tags			filterCare
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			unitId			path		string		true	"input field unitId"
-// @Param			request			body		MarkInput	true	"input; the path parameters come from the route"
-// @Success		200				{object}	ops.Envelope{data=FilterStatus}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/filter-care/{unitId}/mark-cleaned [post]
+// markCleaned serves filterCare.markCleaned.
+//
+//	@Summary		filterCare.markCleaned (write)
+//	@ID				filterCare.markCleaned
+//	@Description	Authorization: client:self
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-C18
+//	@Tags			filterCare
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			unitId			path		string		true	"input field unitId"
+//	@Param			request			body		MarkInput	true	"input; the path parameters come from the route"
+//	@Success		200				{object}	ops.Envelope{data=FilterStatus}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/filter-care/{unitId}/mark-cleaned [post]
 func (m FilterCare) markCleaned(
 	ctx context.Context,
 	c *ops.Call,
@@ -360,7 +368,8 @@ func (m FilterCare) markCleaned(
 
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`INSERT INTO maintenance.filter_cleanings (tenant_id, unit_id, cleaned_at, marked_by_membership_id) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3)`,
+		`INSERT INTO maintenance.filter_cleanings (tenant_id, unit_id, cleaned_at, marked_by_membership_id) VALUES
+			(current_setting('app.tenant_id')::uuid, $1, $2, $3)`,
 		in.UnitID,
 		c.Now,
 		c.Principal.MembershipID,
@@ -462,28 +471,31 @@ func (in *SettingsInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		filterCare.saveSettings (write)
-// @ID				filterCare.saveSettings
-// @Description	Authorization: client:self-customer:owner
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR110 thresholdHours 50–2000 or null (model default); fallbackDays 7–180
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-C18
-// @Tags			filterCare
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		SettingsInput	true	"input"
-// @Success		200				{object}	ops.Envelope{data=FilterSettings}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/filter-care/settings [put]
+// saveSettings serves filterCare.saveSettings.
+//
+//	@Summary		filterCare.saveSettings (write)
+//	@ID				filterCare.saveSettings
+//	@Description	Authorization: client:self-customer:owner
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR110 thresholdHours 50–2000 or null (model default); fallbackDays 7–180
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-C18
+//	@Tags			filterCare
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		SettingsInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=FilterSettings}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/filter-care/settings [put]
 func (m FilterCare) saveSettings(
 	ctx context.Context,
 	c *ops.Call,
@@ -504,10 +516,13 @@ func (m FilterCare) saveSettings(
 
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`INSERT INTO maintenance.filter_care_settings (tenant_id, customer_id, threshold_hours, fallback_days, recipients, channels, updated_at)
+		`INSERT INTO maintenance.filter_care_settings (tenant_id, customer_id, threshold_hours, fallback_days, recipients,
+			channels, updated_at)
 		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6)
-		ON CONFLICT (customer_id) DO UPDATE SET threshold_hours = EXCLUDED.threshold_hours, fallback_days = EXCLUDED.fallback_days, recipients = EXCLUDED.recipients,
-			channels = EXCLUDED.channels, version = maintenance.filter_care_settings.version + 1, updated_at = EXCLUDED.updated_at`,
+		ON CONFLICT (customer_id) DO UPDATE SET threshold_hours = EXCLUDED.threshold_hours, fallback_days =
+		EXCLUDED.fallback_days, recipients = EXCLUDED.recipients,
+			channels = EXCLUDED.channels, version = maintenance.filter_care_settings.version + 1, updated_at =
+			EXCLUDED.updated_at`,
 		cust,
 		in.ThresholdHours,
 		in.FallbackDays,
@@ -553,26 +568,29 @@ func (m FilterCare) saveSettings(
 // SettingsGetInput is filterCare.getSettings input: none, the caller's customer.
 type SettingsGetInput struct{}
 
-// @Summary		filterCare.getSettings (read)
-// @ID				filterCare.getSettings
-// @Description	Authorization: client:self
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR238 the customer's settings or the defaults (version 0)
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-C18
-// @Tags			filterCare
-// @Accept			json
-// @Produce		json
-// @Success		200	{object}	ops.Envelope{data=FilterSettings}
-// @Failure		401	{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403	{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404	{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409	{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422	{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429	{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503	{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504	{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/filter-care/settings [get]
+// getSettings serves filterCare.getSettings.
+//
+//	@Summary		filterCare.getSettings (read)
+//	@ID				filterCare.getSettings
+//	@Description	Authorization: client:self
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR238 the \
+//	@Description	customer's settings or the defaults (version 0)
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-C18
+//	@Tags			filterCare
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	ops.Envelope{data=FilterSettings}
+//	@Failure		401	{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403	{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404	{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409	{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422	{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429	{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503	{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504	{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/filter-care/settings [get]
 func (m FilterCare) getSettings(
 	ctx context.Context,
 	c *ops.Call,
@@ -603,7 +621,8 @@ const FilterRemindEvery = 15 * time.Minute
 func (m FilterCare) Remind(ctx context.Context, c *ops.Call) (int, error) {
 	var at time.Time
 
-	err := c.Tx.QueryRow(ctx, `SELECT evaluated_at FROM maintenance.filter_reminder_watermarks WHERE tenant_id = $1 FOR UPDATE`, c.Principal.TenantID).
+	err := c.Tx.QueryRow(ctx, `SELECT evaluated_at FROM maintenance.filter_reminder_watermarks WHERE tenant_id = $1 FOR
+		UPDATE`, c.Principal.TenantID).
 		Scan(&at)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
@@ -683,7 +702,8 @@ func clearReminders(
 ) (int, error) {
 	rows, err := c.Tx.Query(
 		ctx,
-		`UPDATE maintenance.filter_reminders SET cleared_at = $3 WHERE unit_id = $1 AND cleared_at IS NULL AND cycle_from IS DISTINCT FROM $2
+		`UPDATE maintenance.filter_reminders SET cleared_at = $3 WHERE unit_id = $1 AND cleared_at IS NULL AND cycle_from IS
+			DISTINCT FROM $2
 		RETURNING id, customer_org_id`,
 		unit,
 		last,

@@ -101,7 +101,8 @@ func TestHQRevokeTurnsSignInOff(t *testing.T) {
 			`{"id":"`+membership+`","userId":"`+user+`","organizationId":"`+seed.ID("org-contractor-a").
 				String()+
 				`","role":"technician","employment":"external",`+
-				`"permissions":["alert.read","alert.resolve","control.diagnose","device.maintain"],"scopes":[],"validFrom":"`+from+`","validUntil":`+until+`,"reason":"access review"}`,
+				`"permissions":["alert.read","alert.resolve","control.diagnose","device.maintain"],"scopes":[],`+
+				`"validFrom":"`+from+`","validUntil":`+until+`,"reason":"access review"}`,
 			v,
 		)
 	}
@@ -252,7 +253,8 @@ func TestHQRevokeOfAClientUser(t *testing.T) {
 	body := func(until string) string {
 		return `{"userId":"` + user + `","organizationId":"` + seed.ID("org-customer-b").
 			String() +
-			`","role":"client","permissions":[],"scopes":[],"validFrom":"` + from + `","validUntil":` + until + `,"reason":"access review"}`
+			`","role":"client","permissions":[],"scopes":[],` +
+			`"validFrom":"` + from + `","validUntil":` + until + `,"reason":"access review"}`
 	}
 
 	code, m := write(s, &hq, "members.save", body("null"), 0)
@@ -301,7 +303,8 @@ func TestHQRevokeOfAClientUser(t *testing.T) {
 			s,
 			&customerB,
 			"clientUsers.save",
-			`{"id":"`+id+`","customerId":"`+cust+`","email":"`+user+`@ac.local","clientRole":"`+role+`"`+st+`,"reason":"review"}`,
+			`{"id":"`+id+`","customerId":"`+cust+`","email":"`+user+`@ac.local",`+
+				`"clientRole":"`+role+`"`+st+`,"reason":"review"}`,
 			v,
 		)
 	}
@@ -360,7 +363,8 @@ func TestHQSaveOfAnEndedAccessIsNoRevoke(t *testing.T) {
 		s,
 		&contrA,
 		"partnerUsers.save",
-		`{"email":"`+email+`","partnerRole":"technician","displayName":"Ended Tech","accessUntil":"`+clock.Add(30*24*time.Hour).
+		`{"email":"`+email+`","partnerRole":"technician","displayName":"Ended Tech",`+
+			`"accessUntil":"`+clock.Add(30*24*time.Hour).
 			Format(time.RFC3339)+
 			`"}`,
 		0,

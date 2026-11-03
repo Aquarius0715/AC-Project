@@ -17,8 +17,10 @@ type Busy struct{}
 func (Busy) UnitBusy(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, error) {
 	var b bool
 
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM control.commands WHERE unit_id = $1 AND status IN ('requested','sent'))
-		OR EXISTS (SELECT 1 FROM control.diagnostic_runs WHERE unit_id = $1 AND state IN ('awaiting_start','running','end_requested'))`, unit).
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM control.commands WHERE unit_id = $1 AND status IN ('requested',
+		'sent'))
+		OR EXISTS (SELECT 1 FROM control.diagnostic_runs WHERE unit_id = $1 AND state IN ('awaiting_start','running',
+		'end_requested'))`, unit).
 		Scan(&b)
 
 	return b, err
@@ -29,8 +31,10 @@ func (Busy) UnitBusy(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, er
 func (Busy) OperationConflict(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, error) {
 	var b bool
 
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM control.commands WHERE unit_id = $1 AND status IN ('requested','sent') AND NOT (source = 'restriction' AND delivery = 'not_sent'))
-		OR EXISTS (SELECT 1 FROM control.diagnostic_runs WHERE unit_id = $1 AND state IN ('awaiting_start','running','end_requested'))`, unit).
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM control.commands WHERE unit_id = $1 AND status IN ('requested',
+		'sent') AND NOT (source = 'restriction' AND delivery = 'not_sent'))
+		OR EXISTS (SELECT 1 FROM control.diagnostic_runs WHERE unit_id = $1 AND state IN ('awaiting_start','running',
+		'end_requested'))`, unit).
 		Scan(&b)
 
 	return b, err

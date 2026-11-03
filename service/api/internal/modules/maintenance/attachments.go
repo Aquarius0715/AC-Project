@@ -68,6 +68,7 @@ func (m Files) store(
 	id := uuid.New()
 
 	key := "jobs/" + job.String() + "/reports/" + report.String() + "/" + id.String()
+
 	putErr := m.Blobs.Put(ctx, key, f.Mime, f.Bytes)
 	if putErr != nil {
 		return id, putErr
@@ -75,7 +76,8 @@ func (m Files) store(
 
 	_, err := c.Tx.Exec(
 		ctx,
-		`INSERT INTO maintenance.attachments (id, tenant_id, job_id, report_id, object_key, name, mime, size_bytes, status, uploaded_by, created_at, updated_at)
+		`INSERT INTO maintenance.attachments (id, tenant_id, job_id, report_id, object_key, name, mime, size_bytes, status,
+			uploaded_by, created_at, updated_at)
 		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, 'ready', $8, $9, $9)`,
 		id,
 		job,
@@ -114,31 +116,34 @@ func (in *AddInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		attachments.add (write)
-// @ID				attachments.add
-// @Description	Authorization: technician:assigned-valid-job
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed)
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-T09
-// @Tags			attachments
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer		true	"all: required (target report, read reports.get)"
-// @Param			jobId				path		string		true	"input field jobId"
-// @Param			reportId			path		string		true	"input field reportId"
-// @Param			request				body		AddInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=AttachmentRef}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/jobs/{jobId}/reports/{reportId}/attachments [post]
+// add serves attachments.add.
+//
+//	@Summary		attachments.add (write)
+//	@ID				attachments.add
+//	@Description	Authorization: technician:assigned-valid-job
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR94 technician write table (assignment and work window, jobId required when typed)
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-T09
+//	@Tags			attachments
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target report, read reports.get)"
+//	@Param			jobId				path		string		true	"input field jobId"
+//	@Param			reportId			path		string		true	"input field reportId"
+//	@Param			request				body		AddInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=AttachmentRef}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs/{jobId}/reports/{reportId}/attachments [post]
 func (m Files) add(ctx context.Context, c *ops.Call, in *AddInput) (AttachmentRef, error) {
 	draft, err := m.lockDraft(ctx, c, in.JobID, in.ReportID)
 	if err != nil {
@@ -150,6 +155,7 @@ func (m Files) add(ctx context.Context, c *ops.Call, in *AddInput) (AttachmentRe
 	}
 
 	var n int
+
 	scanErr := c.Tx.QueryRow(ctx, `SELECT count(*) FROM maintenance.attachments WHERE report_id = $1`, in.ReportID).
 		Scan(&n)
 	if scanErr != nil {
@@ -167,7 +173,8 @@ func (m Files) add(ctx context.Context, c *ops.Call, in *AddInput) (AttachmentRe
 
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`UPDATE maintenance.work_reports SET version = version + 1, sign_off = NULL, updated_at = $3 WHERE id = $1 AND version = $2`,
+		`UPDATE maintenance.work_reports SET version = version + 1, sign_off = NULL, updated_at = $3 WHERE id = $1 AND version
+			= $2`,
 		in.ReportID,
 		draft.Version,
 		c.Now,
@@ -274,31 +281,34 @@ type SignOff struct {
 	ReportVersion         int        `json:"reportVersion"`
 }
 
-// @Summary		reports.signOff (write)
-// @ID				reports.signOff
-// @Description	Authorization: technician:assigned-valid-job
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 signer 1–120; either signature or absentReason with sitePhoto
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-T15
-// @Tags			reports
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer			true	"all: required (target report, read reports.get)"
-// @Param			jobId				path		string			true	"input field jobId"
-// @Param			reportId			path		string			true	"input field reportId"
-// @Param			request				body		SignOffInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Report}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/jobs/{jobId}/reports/{reportId}/sign-off [post]
+// signOff serves reports.signOff.
+//
+//	@Summary		reports.signOff (write)
+//	@ID				reports.signOff
+//	@Description	Authorization: technician:assigned-valid-job
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR111 signer 1–120; either signature or absentReason with sitePhoto
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-T15
+//	@Tags			reports
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer			true	"all: required (target report, read reports.get)"
+//	@Param			jobId				path		string			true	"input field jobId"
+//	@Param			reportId			path		string			true	"input field reportId"
+//	@Param			request				body		SignOffInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=Report}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs/{jobId}/reports/{reportId}/sign-off [post]
 func (m Files) signOff(ctx context.Context, c *ops.Call, in *SignOffInput) (Report, error) {
 	draft, err := m.lockDraft(ctx, c, in.JobID, in.ReportID)
 	if err != nil {
@@ -332,6 +342,7 @@ func (m Files) signOff(ctx context.Context, c *ops.Call, in *SignOffInput) (Repo
 	}
 
 	raw, _ := json.Marshal(so)
+
 	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.work_reports SET sign_off = $3, updated_at = $4 WHERE id = $1 AND version = $2`,
@@ -398,30 +409,33 @@ type BlobOut struct {
 	Bytes []byte `json:"bytes"`
 }
 
-// @Summary		attachments.getContent (read)
-// @ID				attachments.getContent
-// @Description	Authorization: client:accepted-report-only | contractor:partner.review:submitted | technician:assigned-valid-job | admin:job.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A06, DD-C09, DD-P05, DD-T09
-// @Tags			attachments
-// @Accept			json
-// @Produce		json
-// @Param			jobId			path		string	true	"input field jobId"
-// @Param			reportId		path		string	true	"input field reportId"
-// @Param			attachmentId	path		string	true	"input field attachmentId"
-// @Param			reportVersion	query		integer	false	"input field reportVersion"
-// @Success		200				{object}	ops.Envelope{data=BlobOut}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/jobs/{jobId}/reports/{reportId}/attachments/{attachmentId}/content [get]
+// content serves attachments.getContent.
+//
+//	@Summary		attachments.getContent (read)
+//	@ID				attachments.getContent
+//	@Description	Authorization: client:accepted-report-only | contractor:partner.review:submitted | \
+//	@Description	technician:assigned-valid-job | admin:job.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A06, DD-C09, DD-P05, DD-T09
+//	@Tags			attachments
+//	@Accept			json
+//	@Produce		json
+//	@Param			jobId			path		string	true	"input field jobId"
+//	@Param			reportId		path		string	true	"input field reportId"
+//	@Param			attachmentId	path		string	true	"input field attachmentId"
+//	@Param			reportVersion	query		integer	false	"input field reportVersion"
+//	@Success		200				{object}	ops.Envelope{data=BlobOut}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs/{jobId}/reports/{reportId}/attachments/{attachmentId}/content [get]
 func (m Files) content(ctx context.Context, c *ops.Call, in *ContentInput) (BlobOut, error) {
 	_, getErr := m.Reports.get(
 		ctx,
@@ -437,7 +451,8 @@ func (m Files) content(ctx context.Context, c *ops.Call, in *ContentInput) (Blob
 		out BlobOut
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT object_key, name, mime, size_bytes FROM maintenance.attachments WHERE id = $1 AND report_id = $2 AND job_id = $3 AND status = 'ready'`,
+	err := c.Tx.QueryRow(ctx, `SELECT object_key, name, mime, size_bytes FROM maintenance.attachments WHERE id = $1 AND
+		report_id = $2 AND job_id = $3 AND status = 'ready'`,
 		in.AttachmentID, in.ReportID, in.JobID).
 		Scan(&key, &out.Name, &out.Mime, &out.Size)
 	if errors.Is(err, pgx.ErrNoRows) {

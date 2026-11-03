@@ -56,6 +56,7 @@ func RegisterQuery[I any, O any](
 		domain: domain,
 		handle: func(ctx context.Context, c *Call, raw json.RawMessage) (any, error) {
 			in := new(I)
+
 			err := json.Unmarshal(raw, in)
 			if err != nil {
 				return nil, apperr.Fields(map[string]string{"_": "error.malformedInput"})
@@ -241,6 +242,7 @@ func (h *HTTPQueries) Query(
 	var env struct {
 		Data json.RawMessage `json:"data" swaggertype:"object"`
 	}
+
 	unmarshalErr := json.Unmarshal(body, &env)
 	if unmarshalErr != nil {
 		return nil, unmarshalErr
@@ -317,6 +319,7 @@ func (r *Registry) serveQuery(c *echo.Context, token string, p *Principal, beare
 	}
 
 	now := r.Clock()
+
 	t, parseErr := time.Parse(
 		time.RFC3339Nano,
 		c.Request().Header.Get(BusinessNowHeader),
@@ -340,6 +343,7 @@ func (r *Registry) serveQuery(c *echo.Context, token string, p *Principal, beare
 
 	err = r.DB.Run(ctx, true, p, func(tx pgx.Tx) error {
 		call.Tx = r.txFor(tx)
+
 		_, err := tx.Exec(
 			ctx,
 			`SELECT set_config('app.now', $1, true)`,

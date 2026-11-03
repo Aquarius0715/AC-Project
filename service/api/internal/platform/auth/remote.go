@@ -197,6 +197,7 @@ func (r *RemoteSource) fetch(
 	switch res.StatusCode {
 	case http.StatusOK:
 		var d PrincipalDTO
+
 		err := json.NewDecoder(res.Body).Decode(&d)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrUnavailable, err)

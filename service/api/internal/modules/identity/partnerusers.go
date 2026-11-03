@@ -37,16 +37,20 @@ type PartnerUser struct {
 	AccessUntil           *time.Time `json:"accessUntil"`
 	InvitedAt             time.Time  `json:"invitedAt"`
 	InvitedByMembershipID uuid.UUID  `json:"invitedByMembershipId"`
-	Booked                bool       `json:"booked"`    // an active technician who holds an assigned job: not disabled or removed until reassigned (IR421, IR432)
-	RevokedAt             *time.Time `json:"revokedAt"` // HQ ended the access: only HQ gives it back (IR508)
-	accessKept            *time.Time // the access end kept while disabled
+	// an active technician who holds an assigned job: not disabled or removed until reassigned (IR421, IR432)
+	Booked     bool       `json:"booked"`
+	RevokedAt  *time.Time `json:"revokedAt"` // HQ ended the access: only HQ gives it back (IR508)
+	accessKept *time.Time // the access end kept while disabled
 }
 
 // accessUntil: the membership's access end, or the one kept while the account is disabled.
-const partnerUserCols = `x.id, x.tenant_id, x.version, x.created_at, x.updated_at, x.organization_id, x.membership_id, x.email::text, x.display_name, x.partner_role, x.status,
-	u.last_sign_in_at, CASE WHEN x.status = 'disabled' THEN x.access_until ELSE m.valid_until END, x.invited_at, x.invited_by_membership_id, m.revoked_at, x.access_until`
+const partnerUserCols = `x.id, x.tenant_id, x.version, x.created_at, x.updated_at, x.organization_id, ` +
+	`x.membership_id, x.email::text, x.display_name, x.partner_role, x.status,
+	u.last_sign_in_at, CASE WHEN x.status = 'disabled' THEN x.access_until ELSE m.valid_until END, x.invited_at, ` +
+	`x.invited_by_membership_id, m.revoked_at, x.access_until`
 
-const partnerUserFrom = `identity.partner_users x LEFT JOIN identity.memberships m ON m.id = x.membership_id LEFT JOIN identity.users u ON u.id = m.user_id`
+const partnerUserFrom = `identity.partner_users x LEFT JOIN identity.memberships m ON m.id = x.membership_id LEFT ` +
+	`JOIN identity.users u ON u.id = m.user_id`
 
 func scanPartnerUser(r pgx.Row) (PartnerUser, error) {
 	var x PartnerUser
@@ -81,7 +85,8 @@ func scanPartnerUser(r pgx.Row) (PartnerUser, error) {
 //	@Description	Authorization: contractor:own-company
 //	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; own company only
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-//	@Description	Design: DD-P11, DD-P06 · Query: filters status,partnerRole,search · sort id,name,email,invitedAt,createdAt,updatedAt (default name asc;id asc)
+//	@Description	Design: DD-P11, DD-P06 · Query: filters status,partnerRole,search · sort \
+//	@Description	id,name,email,invitedAt,createdAt,updatedAt (default name asc;id asc)
 //	@Tags			partnerUsers
 //	@Accept			json
 //	@Produce		json
@@ -171,6 +176,7 @@ func partnerUsersList(
 	where := strings.Join(conds, " AND ")
 
 	var total int
+
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM identity.partner_users x WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
@@ -297,6 +303,7 @@ func (in *PartnerUserInput) Validate() map[string]string {
 	fe := map[string]string{}
 
 	in.Email = strings.TrimSpace(in.Email)
+
 	a, err := mail.ParseAddress(
 		in.Email,
 	)
@@ -323,7 +330,8 @@ func (in *PartnerUserInput) Validate() map[string]string {
 	if in.ID == nil { // a new user is named (IR461)
 		if in.DisplayName == nil {
 			fe["displayName"] = "error.required"
-		} else if *in.DisplayName = strings.TrimSpace(*in.DisplayName); utf8.RuneCountInString(*in.DisplayName) < 1 || utf8.RuneCountInString(*in.DisplayName) > 120 {
+		} else if *in.DisplayName = strings.TrimSpace(*in.DisplayName); utf8.RuneCountInString(*in.DisplayName) < 1 ||
+			utf8.RuneCountInString(*in.DisplayName) > 120 {
 			fe["displayName"] = "error.length"
 		}
 
@@ -361,7 +369,8 @@ func otherActiveContractor(ctx context.Context, c *ops.Call, org, except uuid.UU
 
 	var ok bool
 
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.partner_users WHERE organization_id = $1 AND id <> $2 AND partner_role = 'contractor' AND status = 'active')`, org, except).
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.partner_users WHERE organization_id = $1 AND id <> $2
+		AND partner_role = 'contractor' AND status = 'active')`, org, except).
 		Scan(&ok)
 
 	return ok, err
@@ -375,6 +384,7 @@ const InviteResendGap = 5 * time.Minute
 // invitation e-mail (RATE_LIMITED with the seconds to wait).
 func inviteResendWait(ctx context.Context, c *ops.Call, table string, id uuid.UUID) error {
 	var last *time.Time
+
 	err := c.Tx.QueryRow(ctx, `SELECT last_invite_sent_at FROM identity.`+table+` WHERE id = $1 FOR UPDATE`, id).
 		Scan(&last)
 	if err != nil {
@@ -436,7 +446,14 @@ func notSelfOrLast(ctx context.Context, c *ops.Call, x PartnerUser) error {
 //	@Summary		partnerUsers.save (write)
 //	@ID				partnerUsers.save
 //	@Description	Authorization: contractor:own-company
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; email unique per company and one account per person (errors.email_taken; a person this tenant removed is added again; IR462); at most 30 accounts a contractor or customer owner adds to the organization in 24 hours (RATE_LIMITED errors.too_many_accounts with retryAfterSeconds; HQ not limited; IR464); a new user needs displayName 1–120 and is created at once with a set-up e-mail; a technician needs accessUntil at most a year ahead (IR461); email and role fixed; not the caller's own account; not the last active contractor; not a technician with an active assignment (CONFLICT; IR421)
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	email unique per company and one account per person (errors.email_taken; a person this tenant \
+//	@Description	removed is added again; IR462); at most 30 accounts a contractor or customer owner adds to the \
+//	@Description	organization in 24 hours (RATE_LIMITED errors.too_many_accounts with retryAfterSeconds; HQ not \
+//	@Description	limited; IR464); a new user needs displayName 1–120 and is created at once with a set-up e-mail; a \
+//	@Description	technician needs accessUntil at most a year ahead (IR461); email and role fixed; not the caller's \
+//	@Description	own account; not the last active contractor; not a technician with an active assignment (CONFLICT; \
+//	@Description	IR421)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-P11
 //	@Tags			partnerUsers
@@ -462,7 +479,9 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 	}
 
 	var dup bool
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.partner_users WHERE organization_id = $1 AND email = $2::citext AND id <> $3)`, c.Principal.OrgID, in.Email, self).
+
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.partner_users WHERE organization_id = $1 AND email =
+		$2::citext AND id <> $3)`, c.Principal.OrgID, in.Email, self).
 		Scan(&dup)
 	if err != nil {
 		return PartnerUser{}, err
@@ -509,9 +528,11 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 		}
 
 		id := uuid.New()
+
 		_, execErr := c.Tx.Exec(
 			ctx,
-			`INSERT INTO identity.partner_users (id, tenant_id, organization_id, membership_id, email, display_name, partner_role, status, invited_at, invited_by_membership_id, last_invite_sent_at, created_at, updated_at)
+			`INSERT INTO identity.partner_users (id, tenant_id, organization_id, membership_id, email, display_name,
+				partner_role, status, invited_at, invited_by_membership_id, last_invite_sent_at, created_at, updated_at)
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, 'invited', $7, $8, $7, $7, $7)`,
 			id,
 			c.Principal.OrgID,
@@ -568,7 +589,8 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 	}
 
 	if x.RevokedAt != nil &&
-		(x.Status == "disabled" && status != "disabled" || in.AccessUntil != nil) { // HQ ended the access: only HQ gives it back (IR508)
+		(x.Status == "disabled" && status != "disabled" || in.AccessUntil != nil) {
+		// HQ ended the access: only HQ gives it back (IR508)
 		return x, apperr.E(apperr.Conflict, "errors.revoked_by_hq")
 	}
 	// the account exists from the start (IR461): its e-mail and role are fixed; remove the user and add them again
@@ -591,9 +613,11 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 	if x.MembershipID != nil && status != x.Status {
 		if status == "disabled" { // keep the access end, and close the membership now
 			kept = x.AccessUntil
+
 			_, err := c.Tx.Exec(
 				ctx,
-				`UPDATE identity.memberships SET valid_until = GREATEST($2::timestamptz, valid_from + interval '1 second'), scope_version = scope_version + 1,
+				`UPDATE identity.memberships SET valid_until = GREATEST($2::timestamptz, valid_from + interval '1 second'),
+					scope_version = scope_version + 1,
 				version = version + 1, updated_at = $2 WHERE id = $1`,
 				*x.MembershipID,
 				c.Now,
@@ -608,7 +632,8 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 
 			_, err := c.Tx.Exec(
 				ctx,
-				`UPDATE identity.memberships SET valid_until = $2, scope_version = scope_version + 1, version = version + 1, updated_at = $3 WHERE id = $1`,
+				`UPDATE identity.memberships SET valid_until = $2, scope_version = scope_version + 1, version = version + 1,
+					updated_at = $3 WHERE id = $1`,
 				*x.MembershipID,
 				kept,
 				c.Now,
@@ -652,7 +677,8 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 		} else {
 			_, err := c.Tx.Exec(
 				ctx,
-				`UPDATE identity.memberships SET valid_until = $2, scope_version = scope_version + 1, version = version + 1, updated_at = $3 WHERE id = $1`,
+				`UPDATE identity.memberships SET valid_until = $2, scope_version = scope_version + 1, version = version + 1,
+					updated_at = $3 WHERE id = $1`,
 				*x.MembershipID,
 				*in.AccessUntil,
 				c.Now,
@@ -665,7 +691,8 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`UPDATE identity.partner_users SET email = $2, partner_role = $3, status = $4, access_until = $5, version = version + 1, updated_at = $6 WHERE id = $1`,
+		`UPDATE identity.partner_users SET email = $2, partner_role = $3, status = $4, access_until = $5, version = version +
+			1, updated_at = $6 WHERE id = $1`,
 		x.ID,
 		in.Email,
 		in.PartnerRole,
@@ -723,7 +750,9 @@ func (in *PartnerRemoveInput) Validate() map[string]string {
 //	@Summary		partnerUsers.remove (write)
 //	@ID				partnerUsers.remove
 //	@Description	Authorization: contractor:own-company
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; reason 1–1000; not the caller's own account; not the last active contractor; not a technician with an active assignment (CONFLICT; IR421)
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	reason 1–1000; not the caller's own account; not the last active contractor; not a technician with \
+//	@Description	an active assignment (CONFLICT; IR421)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-P11
 //	@Tags			partnerUsers
@@ -771,7 +800,8 @@ func partnerUsersRemove(ctx context.Context, c *ops.Call, in *PartnerRemoveInput
 	if x.MembershipID != nil {
 		_, err := c.Tx.Exec(
 			ctx,
-			`UPDATE identity.memberships SET valid_until = GREATEST($2::timestamptz, valid_from + interval '1 second'), scope_version = scope_version + 1,
+			`UPDATE identity.memberships SET valid_until = GREATEST($2::timestamptz, valid_from + interval '1 second'),
+				scope_version = scope_version + 1,
 			version = version + 1, updated_at = $2 WHERE id = $1 AND (valid_until IS NULL OR valid_until > $2)`,
 			*x.MembershipID,
 			c.Now,
@@ -815,7 +845,10 @@ func (in *PartnerResendInput) Validate() map[string]string {
 //	@Summary		partnerUsers.resendInvite (write)
 //	@ID				partnerUsers.resendInvite
 //	@Description	Authorization: contractor:own-company
-//	@Description	Validation: D01; input constraints in the corresponding DD; sends the set-up e-mail again (IR461; an invite from before IR461 queues the invitation e-mail; IR418); users not signed in yet only (CONFLICT); not once the access has ended (CONFLICT errors.access_expired; IR461); at most every 5 minutes per user (RATE_LIMITED retryAfterSeconds; IR423)
+//	@Description	Validation: D01; input constraints in the corresponding DD; sends the set-up e-mail again (IR461; an \
+//	@Description	invite from before IR461 queues the invitation e-mail; IR418); users not signed in yet only \
+//	@Description	(CONFLICT); not once the access has ended (CONFLICT errors.access_expired; IR461); at most every 5 \
+//	@Description	minutes per user (RATE_LIMITED retryAfterSeconds; IR423)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-P11
 //	@Tags			partnerUsers
@@ -860,6 +893,7 @@ func partnerUsersResend(
 	}
 
 	var user uuid.UUID // the set-up e-mail again (IR461)
+
 	scanErr := c.Tx.QueryRow(ctx, `SELECT user_id FROM identity.memberships WHERE id = $1`, *x.MembershipID).
 		Scan(&user)
 	if scanErr != nil {

@@ -18,7 +18,8 @@ func TestOffsets(t *testing.T) {
 			s,
 			a,
 			"offsets.preview",
-			`{"purpose":"Offset September usage","amountKg":12.5,"period":{"from":"2026-09-01T00:00:00Z","to":"2026-09-14T00:00:00Z"},"unitIds":["`+u+`"]`+extra+`}`,
+			`{"purpose":"Offset September usage","amountKg":12.5,"period":{"from":"2026-09-01T00:00:00Z",`+
+				`"to":"2026-09-14T00:00:00Z"},"unitIds":["`+u+`"]`+extra+`}`,
 			0,
 		)
 	}
@@ -105,7 +106,8 @@ func TestOffsets(t *testing.T) {
 	}
 
 	ev := func(event, attempt, eventID string) string {
-		return `{"event":"` + event + `","recordId":"` + rid + `","attemptId":"` + attempt + `","eventId":"` + eventID + `","demoConfirmed":true}`
+		return `{"event":"` + event + `","recordId":"` + rid + `","attemptId":"` + attempt + `","eventId":"` + eventID +
+			`","demoConfirmed":true}`
 	}
 	if code, _ := sim(&customerB, ev("purchase_confirm", att, uuid.NewString()), 1); code != 403 {
 		t.Error("client confirms purchase")
@@ -191,7 +193,8 @@ func TestOffsets(t *testing.T) {
 	)
 	rid2 := data(m)["id"].(string)
 	ev2 := func(event, attempt string) string {
-		return `{"event":"` + event + `","recordId":"` + rid2 + `","attemptId":"` + attempt + `","eventId":"` + uuid.NewString() + `","demoConfirmed":true}`
+		return `{"event":"` + event + `","recordId":"` + rid2 + `","attemptId":"` + attempt + `","eventId":"` +
+			uuid.NewString() + `","demoConfirmed":true}`
 	}
 	_, m = sim(&hq, ev2("purchase_confirm", data(m)["currentAttemptId"].(string)), 1)
 
@@ -235,7 +238,9 @@ func TestOffsets(t *testing.T) {
 
 	if code, _ := sim(
 		&hq,
-		`{"event":"fail","recordId":"`+uuid.NewString()+`","attemptId":"`+uuid.NewString()+`","eventId":"`+uuid.NewString()+`","demoConfirmed":true}`,
+		`{"event":"fail",`+
+			`"recordId":"`+uuid.NewString()+`","attemptId":"`+uuid.NewString()+`","eventId":"`+uuid.NewString()+
+			`","demoConfirmed":true}`,
 		1,
 	); code != 404 {
 		t.Error("event of an unknown record")

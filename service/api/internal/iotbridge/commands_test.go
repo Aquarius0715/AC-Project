@@ -10,8 +10,8 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/devicesim"
 )
 
-// TestCommandMessageFromTheStoredAction: a stored set-temperature action becomes the module's command with its setpoint and
-// expiry; an action without a kind is refused; the sent report names the command.
+// TestCommandMessageFromTheStoredAction: a stored set-temperature action becomes the module's command with its setpoint
+// and expiry; an action without a kind is refused; the sent report names the command.
 func TestCommandMessageFromTheStoredAction(t *testing.T) {
 	w := Waiting{
 		ID:        uuid.MustParse("9f67089f-44c9-5231-ba20-03d3b9a1be53"),
@@ -32,6 +32,7 @@ func TestCommandMessageFromTheStoredAction(t *testing.T) {
 	}
 
 	w.Action = json.RawMessage(`{"celsius":26}`)
+
 	_, commandMessageErr := CommandMessage(w, 0)
 	if commandMessageErr == nil {
 		t.Error("an action without a kind is accepted")
@@ -68,6 +69,7 @@ func TestCommandMessageRefusesBadActions(t *testing.T) {
 		UnitID:    uuid.UUID{},
 		ExpiresAt: time.Time{},
 	}
+
 	_, err := CommandMessage(w, 0)
 	if err == nil {
 		t.Error("an action that is not JSON is accepted")

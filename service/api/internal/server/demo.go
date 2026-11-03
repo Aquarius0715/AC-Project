@@ -91,28 +91,31 @@ type Generation struct {
 	Generation int `json:"generation"`
 }
 
-// @Summary		demo.advanceClock (write)
-// @ID				demo.advanceClock
-// @Description	Authorization: public:demo-panel-only
-// @Description	Validation: D01; IR36 forward jumps; set initial time only immediately after reset; shift Session expiry
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DDC-07
-// @Tags			demo
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		AdvanceInput	true	"input"
-// @Success		200				{object}	ops.Envelope{data=Generation}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/demo/advance-clock [post]
+// advance serves demo.advanceClock.
+//
+//	@Summary		demo.advanceClock (write)
+//	@ID				demo.advanceClock
+//	@Description	Authorization: public:demo-panel-only
+//	@Description	Validation: D01; IR36 forward jumps; set initial time only immediately after reset; shift Session \
+//	@Description	expiry
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DDC-07
+//	@Tags			demo
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		AdvanceInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Generation}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/demo/advance-clock [post]
 func (d *demoOps) advance(ctx context.Context, c *ops.Call, in *AdvanceInput) (Generation, error) {
 	if !d.enabled {
 		return Generation{}, demoOnly()
@@ -154,27 +157,29 @@ func (in *ResetInput) Validate() map[string]string {
 	return nil
 }
 
-// @Summary		demo.reset (write)
-// @ID				demo.reset
-// @Description	Authorization: public:demo-panel-only
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DDC-07
-// @Tags			demo
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string	true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Success		200				{object}	ops.Envelope{data=Generation}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/demo/reset [post]
+// reset serves demo.reset.
+//
+//	@Summary		demo.reset (write)
+//	@ID				demo.reset
+//	@Description	Authorization: public:demo-panel-only
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DDC-07
+//	@Tags			demo
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string	true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Success		200				{object}	ops.Envelope{data=Generation}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/demo/reset [post]
 func (d *demoOps) reset(context.Context, *ops.Call, *ResetInput) (Generation, error) {
 	if !d.enabled {
 		return Generation{}, demoOnly()
@@ -287,7 +292,9 @@ func (in *TriggerInput) Validate() map[string]string {
 		}
 
 		switch r := in.Recovery; {
-		case in.Kind == "restored" && (r == nil || r.SourceEventID == uuid.Nil || devices.RecoveredValue[r.Axis] == "" || devices.RecoveredValue[r.Axis] != r.Value):
+		case in.Kind == "restored" &&
+			(r == nil || r.SourceEventID == uuid.Nil || devices.RecoveredValue[r.Axis] == "" ||
+				devices.RecoveredValue[r.Axis] != r.Value):
 			fe["recovery"] = "error.invalid" // DeviceRecovery: connection → online, power → on, tamper → clear
 		case in.Kind != "restored" && devices.FaultAxis[in.Kind] == "":
 			fe["kind"] = "error.invalid"
@@ -399,6 +406,7 @@ func (d *demoOps) inTenant(
 			},
 			func(tx pgx.Tx) error {
 				var ok bool
+
 				err := tx.QueryRow(ctx, probe, id).Scan(&ok)
 				if err != nil || !ok {
 					return err
@@ -426,28 +434,36 @@ func (d *demoOps) inTenant(
 	return apperr.E(apperr.NotFound, "error.notFound")
 }
 
-// @Summary		demo.trigger (write)
-// @ID				demo.trigger
-// @Description	Authorization: public:demo-panel-only
-// @Description	Validation: D01; IR37 includes transport/network injection; IR45 simulator on/off; IR59 payment branch removed; IR77 telemetry sequence optional (latest+1); IR98 allergen/load_alert events; IR213 telemetry causes unit_mismatch → non_finite → out_of_range → invalid_time; IR217 device faults/recoveries (sequence per device/binding/axis; eventId repeat; current binding; tamper Alert) and operation results (running only); IR528 a state report with no settings moves last seen only; IR529 automation evaluates the event's facts (phase condition) against the alert policies only, deciding no automation
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DDC-07
-// @Tags			demo
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		TriggerInput	true	"input"
-// @Success		200				{object}	ops.Envelope{data=Event}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/demo/trigger [post]
+// trigger serves demo.trigger.
+//
+//	@Summary		demo.trigger (write)
+//	@ID				demo.trigger
+//	@Description	Authorization: public:demo-panel-only
+//	@Description	Validation: D01; IR37 includes transport/network injection; IR45 simulator on/off; IR59 payment \
+//	@Description	branch removed; IR77 telemetry sequence optional (latest+1); IR98 allergen/load_alert events; IR213 \
+//	@Description	telemetry causes unit_mismatch → non_finite → out_of_range → invalid_time; IR217 device \
+//	@Description	faults/recoveries (sequence per device/binding/axis; eventId repeat; current binding; tamper Alert) \
+//	@Description	and operation results (running only); IR528 a state report with no settings moves last seen only; \
+//	@Description	IR529 automation evaluates the event's facts (phase condition) against the alert policies only, \
+//	@Description	deciding no automation
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DDC-07
+//	@Tags			demo
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		TriggerInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Event}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/demo/trigger [post]
 func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (Event, error) {
 	if !d.enabled {
 		return Event{}, demoOnly()
@@ -464,7 +480,8 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 			func(tx pgx.Tx, _ uuid.UUID) error {
 				_, err := tx.Exec(
 					ctx,
-					`UPDATE control.commands SET status = 'sent', delivery = 'sent', sent_at = $2, version = version + 1, updated_at = $2 WHERE id = $1 AND status = 'requested'`,
+					`UPDATE control.commands SET status = 'sent', delivery = 'sent', sent_at = $2, version = version + 1, updated_at =
+						$2 WHERE id = $1 AND status = 'requested'`,
 					*in.CommandID,
 					in.OccurredAt,
 				)
@@ -493,7 +510,8 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 			func(tx pgx.Tx, _ uuid.UUID) error {
 				tag, err := tx.Exec(
 					ctx,
-					`UPDATE control.commands SET status = 'failed', failure_code = 'DEVICE_REJECTED', version = version + 1, updated_at = $2
+					`UPDATE control.commands SET status = 'failed', failure_code = 'DEVICE_REJECTED', version = version + 1, updated_at
+						= $2
 				WHERE id = $1 AND status IN ('requested','sent')`,
 					*in.CommandID,
 					in.OccurredAt,
@@ -613,6 +631,7 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 						SessionsRevokedAt: nil,
 					}, Bearer: "", ExpectedVersion: nil, Candidates: nil, Events: nil, Audits: nil,
 				}
+
 				_, err := d.notify(ctx, ic, ev)
 				if err != nil {
 					return err
@@ -628,7 +647,8 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 		)
 	}
 
-	if in.EventType == "state" { // the device's state report: the unit's observed settings and when the device was last heard
+	if in.EventType == "state" {
+		// the device's state report: the unit's observed settings and when the device was last heard
 		if in.OccurredAt.After(c.Now) {
 			return out, apperr.Fields(map[string]string{"occurredAt": "error.range"})
 		}
@@ -663,6 +683,7 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 							"observedAt": in.OccurredAt.UTC(),
 						},
 					)
+
 					_, err := tx.Exec(
 						ctx,
 						`UPDATE assets.units u SET observed_state = $2, last_seen_at = GREATEST(COALESCE(u.last_seen_at, $3), $3)
@@ -744,7 +765,9 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 				boundary     *string
 				bound        *uuid.UUID
 			)
-			scanErr := tx.QueryRow(ctx, `SELECT s.metric, s.unit, s.boundary_id, d.unit_id FROM devices.sensors s JOIN devices.devices d ON d.id = s.device_id WHERE s.id = $1`, r.SensorID).
+
+			scanErr := tx.QueryRow(ctx, `SELECT s.metric, s.unit, s.boundary_id, d.unit_id FROM devices.sensors s JOIN
+				devices.devices d ON d.id = s.device_id WHERE s.id = $1`, r.SensorID).
 				Scan(&metric, &unit, &boundary, &bound)
 			if scanErr != nil {
 				return scanErr
@@ -782,7 +805,8 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 			if r.Sequence != nil {
 				seq = *r.Sequence
 			} else {
-				err := tx.QueryRow(ctx, `SELECT COALESCE(max(sequence), 0) + 1 FROM monitoring.measurements WHERE sensor_id = $1`, r.SensorID).
+				err := tx.QueryRow(ctx, `SELECT COALESCE(max(sequence), 0) + 1 FROM monitoring.measurements WHERE sensor_id =
+					$1`, r.SensorID).
 					Scan(&seq)
 				if err != nil {
 					return err
@@ -790,6 +814,7 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 			}
 
 			var dup bool
+
 			scanErr = tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM monitoring.measurements WHERE event_id = $1)`, r.EventID).
 				Scan(&dup)
 			if scanErr != nil ||
@@ -799,7 +824,8 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 
 			_, err := tx.Exec(
 				ctx,
-				`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit, raw_unit, origin, quality, quality_reason,
+				`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit,
+					raw_unit, origin, quality, quality_reason,
 			boundary_id, received_at, event_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
 				t,
 				r.UnitID,
@@ -888,78 +914,84 @@ func demoSessionSignIn(ctx context.Context, c *ops.Call, in *demoSignIn) (struct
 	return demoSessionViaBFF(ctx, c, in)
 }
 
-// @Summary		demoSession.switchMembership (write)
-// @ID				demoSession.switchMembership
-// @Description	Authorization: authenticated:demo-account-switch; D09
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DDC-07
-// @Tags			demoSession
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		demoSwitch	true	"input"
-// @Success		200				{object}	ops.Envelope
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/demo-session/switch-membership [post]
+// demoSessionSwitch serves demoSession.switchMembership.
+//
+//	@Summary		demoSession.switchMembership (write)
+//	@ID				demoSession.switchMembership
+//	@Description	Authorization: authenticated:demo-account-switch; D09
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DDC-07
+//	@Tags			demoSession
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		demoSwitch	true	"input"
+//	@Success		200				{object}	ops.Envelope
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/demo-session/switch-membership [post]
 func demoSessionSwitch(ctx context.Context, c *ops.Call, in *demoSwitch) (struct{}, error) {
 	return demoSessionViaBFF(ctx, c, in)
 }
 
-// @Summary		demoSession.signOut (write)
-// @ID				demoSession.signOut
-// @Description	Authorization: authenticated:own-session
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DDC-07
-// @Tags			demoSession
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string	true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Success		200				{object}	ops.Envelope
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/demo-session [delete]
+// demoSessionSignOut serves demoSession.signOut.
+//
+//	@Summary		demoSession.signOut (write)
+//	@ID				demoSession.signOut
+//	@Description	Authorization: authenticated:own-session
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DDC-07
+//	@Tags			demoSession
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string	true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Success		200				{object}	ops.Envelope
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/demo-session [delete]
 func demoSessionSignOut(ctx context.Context, c *ops.Call, in *struct{}) (struct{}, error) {
 	return demoSessionViaBFF(ctx, c, in)
 }
 
-// @Summary		demoSession.extend (write)
-// @ID				demoSession.extend
-// @Description	Authorization: authenticated:own-session
-// @Description	Validation: IR55 valid session only; expiresAt=now+30min; no audit
-// @Description	Recovery: UNAUTHENTICATED after expiry: purge and /login
-// @Description	Design: DDC-07
-// @Tags			demoSession
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string	true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Success		200				{object}	ops.Envelope
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/demo-session/extend [post]
+// demoSessionExtend serves demoSession.extend.
+//
+//	@Summary		demoSession.extend (write)
+//	@ID				demoSession.extend
+//	@Description	Authorization: authenticated:own-session
+//	@Description	Validation: IR55 valid session only; expiresAt=now+30min; no audit
+//	@Description	Recovery: UNAUTHENTICATED after expiry: purge and /login
+//	@Description	Design: DDC-07
+//	@Tags			demoSession
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string	true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Success		200				{object}	ops.Envelope
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/demo-session/extend [post]
 func demoSessionExtend(ctx context.Context, c *ops.Call, in *struct{}) (struct{}, error) {
 	return demoSessionViaBFF(ctx, c, in)
 }

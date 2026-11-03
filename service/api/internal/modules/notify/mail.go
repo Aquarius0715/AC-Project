@@ -99,7 +99,8 @@ var subjects = map[string]string{
 	"warranty_expiring":  "Warranty ending: %s",
 }
 
-const footer = "\n\n— AC Project (demo). This message was sent by the demo stack; in development it only reaches the local Mailpit inbox.\n"
+const footer = "\n\n— AC Project (demo). This message was sent by the demo stack; in development it only reaches the " +
+	"local Mailpit inbox.\n"
 
 // notificationMail renders an e-mail notification: the subject from its template and target, the body with its details
 // and a link to the recipient's app.
@@ -146,7 +147,8 @@ const maxAttempts = 5
 
 // retryDue is the SQL condition for a failed e-mail whose next attempt is due at $3 (now): 1, 2, 4 and 8 minutes after
 // the attempts before (IR425), so an SMTP outage of a quarter of an hour loses nothing; the worker runs every 5 s.
-const retryDue = `%[1]s.attempts < $1 AND %[1]s.%[2]s <= $3::timestamptz - interval '1 minute' * power(2, %[1]s.attempts - 1)`
+const retryDue = `%[1]s.attempts < $1 AND %[1]s.%[2]s <= $3::timestamptz - interval '1 minute' * power(2, ` +
+	`%[1]s.attempts - 1)`
 
 // Deliver sends the tenant's pending e-mails in tx (the tenant is set on the transaction): the e-mail notifications
 // without a sent delivery. Each attempt is recorded; a failure is retried on a growing pause (retryDue) up to
@@ -171,8 +173,10 @@ func Deliver(
 
 	rows, err := tx.Query(
 		ctx,
-		`SELECT n.id, u.email::text, n.template_key, m.role, n.params, COALESCE(d.attempts, 0), m.valid_until IS NOT NULL AND m.valid_until <= $3
-		FROM notify.notifications n JOIN identity.memberships m ON m.id = n.recipient_membership_id JOIN identity.users u ON u.id = m.user_id
+		`SELECT n.id, u.email::text, n.template_key, m.role, n.params, COALESCE(d.attempts, 0), m.valid_until IS NOT NULL AND
+			m.valid_until <= $3
+		FROM notify.notifications n JOIN identity.memberships m ON m.id = n.recipient_membership_id JOIN identity.users u ON
+		u.id = m.user_id
 		LEFT JOIN notify.deliveries d ON d.notification_id = n.id AND d.channel = 'email'
 		WHERE n.channel = 'email' AND (d.id IS NULL OR (d.state = 'failed' AND `+fmt.Sprintf(
 			retryDue,
@@ -193,6 +197,7 @@ func Deliver(
 
 	for rows.Next() {
 		var p pending
+
 		err := rows.Scan(
 			&p.id,
 			&p.to,
@@ -245,9 +250,11 @@ func Deliver(
 
 		_, execErr := tx.Exec(
 			ctx,
-			`INSERT INTO notify.deliveries (tenant_id, notification_id, channel, state, provider_message_id, failure_reason, attempts, updated_at)
+			`INSERT INTO notify.deliveries (tenant_id, notification_id, channel, state, provider_message_id, failure_reason,
+				attempts, updated_at)
 			VALUES (current_setting('app.tenant_id')::uuid, $1, 'email', $2, NULLIF($3, ''), $4, $5, $6)
-			ON CONFLICT (notification_id, channel) DO UPDATE SET state = EXCLUDED.state, provider_message_id = EXCLUDED.provider_message_id,
+			ON CONFLICT (notification_id, channel) DO UPDATE SET state = EXCLUDED.state, provider_message_id =
+			EXCLUDED.provider_message_id,
 				failure_reason = EXCLUDED.failure_reason, attempts = EXCLUDED.attempts, updated_at = EXCLUDED.updated_at`,
 			p.id,
 			state,
@@ -282,6 +289,7 @@ func DeliverAll(
 
 	for rows.Next() {
 		var id uuid.UUID
+
 		err := rows.Scan(&id)
 		if err != nil {
 			rows.Close()

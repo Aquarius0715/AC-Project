@@ -41,7 +41,8 @@ func TestUnitsCoverage(t *testing.T) {
 	k := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO billing.contracts (id, version, tenant_id, customer_id, customer_org_id, plan_type, term, price_minor, currency, restriction_eligible, created_by)
+		`INSERT INTO billing.contracts (id, version, tenant_id, customer_id, customer_org_id, plan_type, term, price_minor,
+			currency, restriction_eligible, created_by)
 		VALUES ($1,1,$2,$3,$4,'rto',tstzrange($5,$6),12000,'MYR',true,$7)`,
 		k,
 		seed.ID("tenant-a"),
@@ -83,21 +84,25 @@ func TestUnitsCoverage(t *testing.T) {
 		len(lobby["contractIds"].([]any)) == 0 {
 		t.Fatalf("contract coverage: %v", lobby)
 	}
-	// a job completed under warranty whose accepted report lists replaced parts is claimable until a claim is filed (IR209)
+	// a job completed under warranty whose accepted report lists replaced parts is claimable until a claim is filed
+	// (IR209)
 	job := completedJob(t, s)
 	owner(
 		t,
-		`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state, parts, accepted_at) VALUES ($1, 1, $2, $3, $4, 'accepted', $5, $6)`,
+		`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state, parts, accepted_at) VALUES
+			($1, 1, $2, $3, $4, 'accepted', $5, $6)`,
 		uuid.New(),
 		seed.ID("tenant-a"),
 		job,
 		seed.ID("user-tech-internal-a"),
-		`[{"name":"Fan motor","quantity":1,"catalogCode":"FM-25","source":"hq_warehouse","lotSerial":null,"replacesComponentKey":"blower_motor","oldPartDisposal":"returned","receiptAttachmentId":null}]`,
+		`[{"name":"Fan motor","quantity":1,"catalogCode":"FM-25","source":"hq_warehouse","lotSerial":null,`+
+			`"replacesComponentKey":"blower_motor","oldPartDisposal":"returned","receiptAttachmentId":null}]`,
 		clock.Add(-time.Hour),
 	)
 
 	claimable := func() bool {
-		for _, j := range byUnit(`{"filters":{"customerId":"` + seed.ID("cust-a").String() + `"},"limit":100}`)[seed.ID("unit-non-rto").String()]["claimableJobIds"].([]any) {
+		for _, j := range byUnit(`{"filters":{"customerId":"` + seed.ID("cust-a").String() +
+			`"},"limit":100}`)[seed.ID("unit-non-rto").String()]["claimableJobIds"].([]any) {
 			if j == job {
 				return true
 			}
@@ -131,7 +136,8 @@ func TestUnitsCoverage(t *testing.T) {
 		s,
 		&hq,
 		"jobs.recordWarrantyClaim",
-		`{"jobId":"`+job+`","partLabel":"Fan motor FM-25 ×1","amountMinor":21000,"currency":"MYR","reason":"replaced under warranty"}`,
+		`{"jobId":"`+job+`","partLabel":"Fan motor FM-25 ×1","amountMinor":21000,"currency":"MYR","reason":"replaced under `+
+			`warranty"}`,
 		1,
 	); code != 200 {
 		t.Fatalf("claim: %d %v", code, m)
@@ -161,7 +167,9 @@ func TestUnitsCoverage(t *testing.T) {
 		t.Fatal("search by name")
 	}
 
-	for _, b := range []string{`{"sort":{"field":"name","direction":"desc"},"limit":100}`, `{"sort":{"field":"id","direction":"asc"},"limit":100}`, `{"sort":{"field":"dueAt","direction":"desc"},"limit":2}`} {
+	for _, b := range []string{`{"sort":{"field":"name","direction":"desc"},` +
+		`"limit":100}`, `{"sort":{"field":"id",` +
+		`"direction":"asc"},"limit":100}`, `{"sort":{"field":"dueAt","direction":"desc"},"limit":2}`} {
 		byUnit(b)
 	}
 
@@ -171,7 +179,10 @@ func TestUnitsCoverage(t *testing.T) {
 		"{\"sort\":{\"field\":\"status\",\"direction\":\"asc\"}}": "sort.field=error.invalid",
 	}
 
-	for _, b := range []string{`{"filters":{"coverage":"x"}}`, `{"filters":{"expiringWithinDays":0}}`, `{"sort":{"field":"status","direction":"asc"}}`} {
+	for _, b := range []string{
+		`{"filters":{"coverage":"x"}}`, `{"filters":{"expiringWithinDays":0}}`,
+		`{"sort":{"field":"status","direction":"asc"}}`,
+	} {
 		code, m := post(s, &hq, "units.coverage", b)
 		refusal(t, b, code, m, want[b])
 	}

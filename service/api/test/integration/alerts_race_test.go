@@ -30,13 +30,15 @@ func TestConcurrentAlertOpening(t *testing.T) {
 	unit, org, tenant := seed.ID("unit-online-rto"), seed.ID("org-customer-a"), seed.ID("tenant-a")
 	owner(
 		t,
-		`UPDATE monitoring.alerts SET status = 'resolved', resolved_at = now() WHERE unit_id = $1 AND type = 'tamper' AND status <> 'resolved'`,
+		`UPDATE monitoring.alerts SET status = 'resolved', resolved_at = now() WHERE unit_id = $1 AND type = 'tamper' AND
+			status <> 'resolved'`,
 		unit,
 	)
 	t.Cleanup(func() {
 		owner(
 			t,
-			`UPDATE monitoring.alerts SET status = 'resolved', resolved_at = now() WHERE unit_id = $1 AND type = 'tamper' AND status <> 'resolved'`,
+			`UPDATE monitoring.alerts SET status = 'resolved', resolved_at = now() WHERE unit_id = $1 AND type = 'tamper' AND
+				status <> 'resolved'`,
 			unit,
 		)
 	})

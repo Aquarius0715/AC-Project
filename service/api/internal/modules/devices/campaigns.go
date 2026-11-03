@@ -66,8 +66,10 @@ type Campaign struct {
 	CreatedByMembershipID   *uuid.UUID       `json:"createdByMembershipId"` // who scheduled it (IR344)
 }
 
-const campCols = `id, tenant_id, version, created_at, updated_at, model_id, from_versions, target_version, checksum, waves,
-	to_char(window_start_local, 'HH24:MI'), to_char(window_end_local, 'HH24:MI'), auto_pause_failure_percent, start_at, state, reason, created_by_membership_id`
+const campCols = `id, tenant_id, version, created_at, updated_at, model_id, from_versions, target_version, checksum, ` +
+	`waves,
+	to_char(window_start_local, 'HH24:MI'), to_char(window_end_local, 'HH24:MI'), auto_pause_failure_percent, start_at, ` +
+	`state, reason, created_by_membership_id`
 
 func scanCampaign(r pgx.Row) (Campaign, error) {
 	var (
@@ -124,7 +126,8 @@ func campaignDetail(ctx context.Context, c *ops.Call, id uuid.UUID) (Campaign, e
 
 	rows, err := c.Tx.Query(
 		ctx,
-		`SELECT device_id, wave, result, detail, operation_id, result_at FROM devices.firmware_campaign_devices WHERE campaign_id = $1 ORDER BY wave, device_id`,
+		`SELECT device_id, wave, result, detail, operation_id, result_at FROM devices.firmware_campaign_devices WHERE
+			campaign_id = $1 ORDER BY wave, device_id`,
 		id,
 	)
 	if err != nil {
@@ -134,6 +137,7 @@ func campaignDetail(ctx context.Context, c *ops.Call, id uuid.UUID) (Campaign, e
 
 	for rows.Next() {
 		var r CampaignResult
+
 		err := rows.Scan(
 			&r.DeviceID,
 			&r.WaveIndex,
@@ -154,31 +158,34 @@ func campaignDetail(ctx context.Context, c *ops.Call, id uuid.UUID) (Campaign, e
 	return x, rows.Err()
 }
 
-// @Summary		firmwareCampaigns.list (read)
-// @ID				firmwareCampaigns.list
-// @Description	Authorization: admin:device.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A20 · Query: filters modelId,status · sort id,createdAt,updatedAt,status (default createdAt desc;id asc)
-// @Tags			firmwareCampaigns
-// @Accept			json
-// @Produce		json
-// @Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit	query		integer	false	"page size 1–100, default 25"
-// @Param			sort	query		string	false	"field:direction — fields id,createdAt,updatedAt,status; default createdAt desc;id asc"
-// @Param			modelId	query		string	false	"filter → modelId"
-// @Param			status	query		string	false	"filter → state"
-// @Success		200		{object}	ops.Envelope{data=CampaignPage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/firmware-campaigns [get]
+// campaignsList serves firmwareCampaigns.list.
+//
+//	@Summary		firmwareCampaigns.list (read)
+//	@ID				firmwareCampaigns.list
+//	@Description	Authorization: admin:device.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A20 · Query: filters modelId,status · sort id,createdAt,updatedAt,status (default \
+//	@Description	createdAt desc;id asc)
+//	@Tags			firmwareCampaigns
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit	query		integer	false	"page size 1–100, default 25"
+//	@Param			sort	query		string	false	"field:direction — fields id,createdAt,updatedAt,status; default createdAt desc;id asc"
+//	@Param			modelId	query		string	false	"filter → modelId"
+//	@Param			status	query		string	false	"filter → state"
+//	@Success		200		{object}	ops.Envelope{data=CampaignPage}
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/firmware-campaigns [get]
 func campaignsList(
 	ctx context.Context,
 	c *ops.Call,
@@ -242,6 +249,7 @@ func campaignsList(
 	where := strings.Join(conds, " AND ")
 
 	var total int
+
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM devices.firmware_campaigns WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
@@ -266,6 +274,7 @@ func campaignsList(
 
 	for rows.Next() {
 		var id uuid.UUID
+
 		err := rows.Scan(&id)
 		if err != nil {
 			rows.Close()
@@ -302,27 +311,29 @@ func campaignsList(
 	}, nil
 }
 
-// @Summary		firmwareCampaigns.get (read)
-// @ID				firmwareCampaigns.get
-// @Description	Authorization: admin:device.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A20
-// @Tags			firmwareCampaigns
-// @Accept			json
-// @Produce		json
-// @Param			id	path		string	true	"input field id"
-// @Success		200	{object}	ops.Envelope{data=Campaign}
-// @Failure		401	{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403	{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404	{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409	{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422	{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429	{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503	{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504	{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/firmware-campaigns/{id} [get]
+// campaignsGet serves firmwareCampaigns.get.
+//
+//	@Summary		firmwareCampaigns.get (read)
+//	@ID				firmwareCampaigns.get
+//	@Description	Authorization: admin:device.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A20
+//	@Tags			firmwareCampaigns
+//	@Accept			json
+//	@Produce		json
+//	@Param			id	path		string	true	"input field id"
+//	@Success		200	{object}	ops.Envelope{data=Campaign}
+//	@Failure		401	{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403	{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404	{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409	{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422	{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429	{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503	{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504	{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/firmware-campaigns/{id} [get]
 func campaignsGet(ctx context.Context, c *ops.Call, in *IDInput) (Campaign, error) {
 	return campaignDetail(ctx, c, in.ID)
 }
@@ -401,28 +412,32 @@ func waveOf(i, n int, waves []Wave) int {
 	return len(waves) - 1
 }
 
-// @Summary		firmwareCampaigns.schedule (write)
-// @ID				firmwareCampaigns.schedule
-// @Description	Authorization: admin:device.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 signed target version from Capability.firmwareCandidates; startAt at least 24 h ahead; waves ascending ending at 100; autoPause 1–50 %
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A20
-// @Tags			firmwareCampaigns
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		ScheduleInput	true	"input"
-// @Success		200				{object}	ops.Envelope{data=Campaign}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/firmware-campaigns [post]
+// campaignsSchedule serves firmwareCampaigns.schedule.
+//
+//	@Summary		firmwareCampaigns.schedule (write)
+//	@ID				firmwareCampaigns.schedule
+//	@Description	Authorization: admin:device.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR111 signed target version from Capability.firmwareCandidates; startAt at least 24 h ahead; waves \
+//	@Description	ascending ending at 100; autoPause 1–50 %
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A20
+//	@Tags			firmwareCampaigns
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		ScheduleInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Campaign}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/firmware-campaigns [post]
 func (m *Module) campaignsSchedule(
 	ctx context.Context,
 	c *ops.Call,
@@ -434,7 +449,8 @@ func (m *Module) campaignsSchedule(
 
 	var candidates []string
 
-	err := c.Tx.QueryRow(ctx, `SELECT firmware_candidates FROM devices.capabilities WHERE id = $1 AND is_current`, in.ModelID).
+	err := c.Tx.QueryRow(ctx, `SELECT firmware_candidates FROM devices.capabilities WHERE id = $1 AND
+		is_current`, in.ModelID).
 		Scan(&candidates)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Campaign{}, apperr.E(apperr.NotFound, "error.notFound")
@@ -452,7 +468,8 @@ func (m *Module) campaignsSchedule(
 	// devices of the model (via their current unit's model), excluding open tamper
 	rows, err := c.Tx.Query(
 		ctx,
-		`SELECT d.id, d.firmware_version, d.tamper, COALESCE(d.unit_id, d.target_unit_id) FROM devices.devices d WHERE d.id = ANY($1)`,
+		`SELECT d.id, d.firmware_version, d.tamper, COALESCE(d.unit_id, d.target_unit_id) FROM devices.devices d WHERE d.id =
+			ANY($1)`,
 		in.DeviceIDs,
 	)
 	if err != nil {
@@ -471,6 +488,7 @@ func (m *Module) campaignsSchedule(
 			id uuid.UUID
 			x  dv
 		)
+
 		err := rows.Scan(&id, &x.fw, &x.tamper, &x.unit)
 		if err != nil {
 			rows.Close()
@@ -528,10 +546,13 @@ func (m *Module) campaignsSchedule(
 	id := uuid.Must(uuid.NewV7())
 
 	waves, _ := json.Marshal(in.Waves)
+
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`INSERT INTO devices.firmware_campaigns (id, tenant_id, model_id, from_versions, target_version, checksum, waves, window_start_local,
-		window_end_local, auto_pause_failure_percent, start_at, state, created_by_membership_id) VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7::time, $8::time, $9, $10, 'scheduled', $11)`,
+		`INSERT INTO devices.firmware_campaigns (id, tenant_id, model_id, from_versions, target_version, checksum, waves,
+			window_start_local,
+		window_end_local, auto_pause_failure_percent, start_at, state, created_by_membership_id) VALUES ($1,
+		current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7::time, $8::time, $9, $10, 'scheduled', $11)`,
 		id,
 		in.ModelID,
 		from,
@@ -551,7 +572,8 @@ func (m *Module) campaignsSchedule(
 	for i, d := range in.DeviceIDs {
 		_, err := c.Tx.Exec(
 			ctx,
-			`INSERT INTO devices.firmware_campaign_devices (campaign_id, device_id, tenant_id, wave) VALUES ($1, $2, current_setting('app.tenant_id')::uuid, $3)`,
+			`INSERT INTO devices.firmware_campaign_devices (campaign_id, device_id, tenant_id, wave) VALUES ($1, $2,
+				current_setting('app.tenant_id')::uuid, $3)`,
 			id,
 			d,
 			waveOf(i, len(in.DeviceIDs), in.Waves),
@@ -626,30 +648,33 @@ var transitions = map[string]map[string]string{
 	"abort":  {"scheduled": "aborted", "running": "aborted", "paused": "aborted"},
 }
 
-// @Summary		firmwareCampaigns.control (write)
-// @ID				firmwareCampaigns.control
-// @Description	Authorization: admin:device.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 abort requires reason 1–1000; retry_device only for failed or skipped devices
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A20 · This route sets action=pause
-// @Tags			firmwareCampaigns
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer			true	"all: required (target firmware_campaign, read firmwareCampaigns.get)"
-// @Param			campaignId			path		string			true	"input field campaignId"
-// @Param			request				body		ControlInput	true	"input; the path parameters and the fixed field come from the route"
-// @Success		200					{object}	ops.Envelope{data=Campaign}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/firmware-campaigns/{campaignId}/pause [post]
+// campaignsControl serves firmwareCampaigns.control.
+//
+//	@Summary		firmwareCampaigns.control (write)
+//	@ID				firmwareCampaigns.control
+//	@Description	Authorization: admin:device.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR111 abort requires reason 1–1000; retry_device only for failed or skipped devices
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A20 · This route sets action=pause
+//	@Tags			firmwareCampaigns
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer			true	"all: required (target firmware_campaign, read firmwareCampaigns.get)"
+//	@Param			campaignId			path		string			true	"input field campaignId"
+//	@Param			request				body		ControlInput	true	"input; the path parameters and the fixed field come from the route"
+//	@Success		200					{object}	ops.Envelope{data=Campaign}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/firmware-campaigns/{campaignId}/pause [post]
 func campaignsControl(ctx context.Context, c *ops.Call, in *ControlInput) (Campaign, error) {
 	var (
 		state string
@@ -657,7 +682,8 @@ func campaignsControl(ctx context.Context, c *ops.Call, in *ControlInput) (Campa
 		start time.Time
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT state, version, start_at FROM devices.firmware_campaigns WHERE id = $1 FOR UPDATE`, in.CampaignID).
+	err := c.Tx.QueryRow(ctx, `SELECT state, version, start_at FROM devices.firmware_campaigns WHERE id = $1 FOR
+		UPDATE`, in.CampaignID).
 		Scan(&state, &v, &start)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Campaign{}, apperr.E(apperr.NotFound, "error.notFound")
@@ -683,7 +709,8 @@ func campaignsControl(ctx context.Context, c *ops.Call, in *ControlInput) (Campa
 
 		tag, err := c.Tx.Exec(
 			ctx,
-			`UPDATE devices.firmware_campaign_devices SET result = 'pending', detail = NULL, operation_id = NULL, result_at = NULL
+			`UPDATE devices.firmware_campaign_devices SET result = 'pending', detail = NULL, operation_id = NULL, result_at =
+				NULL
 			WHERE campaign_id = $1 AND device_id = $2 AND result IN ('failed','skipped')`,
 			in.CampaignID,
 			*in.DeviceID,
@@ -718,7 +745,8 @@ func campaignsControl(ctx context.Context, c *ops.Call, in *ControlInput) (Campa
 		}
 	}
 
-	scanErr := c.Tx.QueryRow(ctx, `UPDATE devices.firmware_campaigns SET state = $2, reason = NULLIF(COALESCE($3, reason), ''), version = version + 1, updated_at = platform.app_now()
+	scanErr := c.Tx.QueryRow(ctx, `UPDATE devices.firmware_campaigns SET state = $2, reason = NULLIF(COALESCE($3, reason),
+		''), version = version + 1, updated_at = platform.app_now()
 		WHERE id = $1 RETURNING version`, in.CampaignID, next, reason).
 		Scan(&v)
 	if scanErr != nil {

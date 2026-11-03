@@ -106,7 +106,9 @@ func (c *Clock) Now() time.Time {
 // Advance moves the scenario clock forward by d for every process.
 func (c *Clock) Advance(ctx context.Context, d time.Duration) error {
 	var ms int64
-	err := c.pool.QueryRow(ctx, `UPDATE platform.demo_clock SET offset_ms = offset_ms + $1, updated_at = now() WHERE id RETURNING offset_ms`, d.Milliseconds()).
+
+	err := c.pool.QueryRow(ctx, `UPDATE platform.demo_clock SET offset_ms = offset_ms + $1, updated_at = now() WHERE id
+		RETURNING offset_ms`, d.Milliseconds()).
 		Scan(&ms)
 	if err != nil {
 		return err

@@ -40,6 +40,7 @@ func TestLiveSiteSeeds(t *testing.T) {
 	s := seed.LiveSite
 	count := func(sql string, args ...any) int {
 		var n int
+
 		err := tx.QueryRow(ctx, sql, args...).Scan(&n)
 		if err != nil {
 			t.Fatal(err)
@@ -62,8 +63,10 @@ func TestLiveSiteSeeds(t *testing.T) {
 
 	if n := count(
 		`SELECT count(*) FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id
-		JOIN identity.client_users x ON x.membership_id = m.id AND x.customer_id = $3 AND x.client_role = 'owner' AND x.status = 'invited'
-		WHERE m.id = $1 AND m.organization_id = $2 AND m.role = 'client' AND m.client_role = 'owner' AND m.valid_until IS NULL AND u.email = $4`,
+		JOIN identity.client_users x ON x.membership_id = m.id AND x.customer_id = $3 AND x.client_role = 'owner' AND x.status
+		= 'invited'
+		WHERE m.id = $1 AND m.organization_id = $2 AND m.role = 'client' AND m.client_role = 'owner' AND m.valid_until IS NULL
+		AND u.email = $4`,
 		owner,
 		org,
 		seed.ID(s.Customer),
@@ -110,7 +113,9 @@ func TestLiveSiteSeeds(t *testing.T) {
 		control, modeControl, fanControl, noTemperature bool
 		manufacturer, model                             string
 	)
-	scanErr := tx.QueryRow(ctx, `SELECT control, mode_control, fan_control, temperature IS NULL, manufacturer, model FROM devices.capabilities WHERE id = $1 AND is_current`,
+
+	scanErr := tx.QueryRow(ctx, `SELECT control, mode_control, fan_control, temperature IS NULL, manufacturer, model FROM
+		devices.capabilities WHERE id = $1 AND is_current`,
 		seed.ID(s.Capability),
 	).
 		Scan(&control, &modeControl, &fanControl, &noTemperature, &manufacturer, &model)
@@ -142,7 +147,8 @@ func TestLiveSiteSeeds(t *testing.T) {
 
 	if c := count(
 		`SELECT count(*) FROM assets.units u JOIN assets.properties p ON p.id = u.property_id
-		WHERE u.id = $1 AND u.customer_org_id = $2 AND p.customer_org_id = $2 AND u.space_id = $3 AND u.model_id = $4 AND u.display_name = $5 AND NOT u.archived`,
+		WHERE u.id = $1 AND u.customer_org_id = $2 AND p.customer_org_id = $2 AND u.space_id = $3 AND u.model_id = $4 AND
+		u.display_name = $5 AND NOT u.archived`,
 		seed.ID(s.Unit),
 		org,
 		seed.ID(s.Room),
@@ -160,7 +166,8 @@ func TestLiveSiteSeeds(t *testing.T) {
 	read := func() {
 		t.Helper()
 
-		err := tx.QueryRow(ctx, `SELECT d.connection, d.last_seen_at, u.connection, u.last_seen_at FROM devices.devices d JOIN assets.units u ON u.id = d.unit_id
+		err := tx.QueryRow(ctx, `SELECT d.connection, d.last_seen_at, u.connection, u.last_seen_at FROM devices.devices d JOIN
+			assets.units u ON u.id = d.unit_id
 			WHERE d.id = $1`, seed.ID(s.Device)).
 			Scan(&devConn, &devSeen, &unitConn, &unitSeen)
 		if err != nil {
@@ -203,7 +210,8 @@ func TestLiveSiteSeeds(t *testing.T) {
 	}
 
 	if c := count(
-		`SELECT count(*) FROM devices.sensors WHERE device_id = $1 AND metric = 'power' AND boundary_id = 'ac_input_electricity'`,
+		`SELECT count(*) FROM devices.sensors WHERE device_id = $1 AND metric = 'power' AND boundary_id =
+			'ac_input_electricity'`,
 		seed.ID(s.Device),
 	); c != 1 {
 		t.Error("the power sensor does not count the air conditioner's electricity")

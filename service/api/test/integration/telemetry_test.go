@@ -84,7 +84,8 @@ func TestTelemetry(t *testing.T) {
 		s,
 		&customerA,
 		"telemetry.series",
-		`{`+rng+`,"unitIds":["`+online+`","`+nonRTO+`"],"metric":"temperature","query":{"sort":{"field":"observedAt","direction":"desc"}}}`,
+		`{`+rng+`,"unitIds":["`+online+`","`+nonRTO+`"],"metric":"temperature","query":{"sort":{"field":"observedAt",`+
+			`"direction":"desc"}}}`,
 	)
 	if len(items(m)) != 2 {
 		t.Fatal("desc sort")
@@ -129,22 +130,30 @@ func TestTelemetry(t *testing.T) {
 		body string
 		code int
 	}{
-		"other customer's unit":   {&customerA, `{` + rng + `,"unitIds":["` + other + `"],"metric":"co2","query":{}}`, 404},
-		"other customer's space":  {&customerA, `{` + rng + `,"spaceId":"` + seed.ID("room-b-1").String() + `","metric":"co2","query":{}}`, 404},
+		"other customer's unit": {&customerA, `{` + rng + `,"unitIds":["` + other + `"],"metric":"co2","query":{}}`, 404},
+		"other customer's space": {&customerA, `{` + rng + `,"spaceId":"` + seed.ID("room-b-1").String() +
+			`","metric":"co2","query":{}}`, 404},
 		"technician in scope":     {&techInt, `{` + rng + `,"unitIds":["` + online + `"],"metric":"co2","query":{}}`, 200},
 		"technician out of scope": {&techInt, `{` + rng + `,"unitIds":["` + other + `"],"metric":"co2","query":{}}`, 404},
 		"external, no assignment": {&techB, `{` + rng + `,"unitIds":["` + other + `"],"metric":"co2","query":{}}`, 404},
-		"both targets":            {&hq, `{` + rng + `,"unitIds":["` + online + `"],"spaceId":"` + seed.ID("room-1").String() + `","metric":"co2","query":{}}`, 422},
-		"no target":               {&hq, `{` + rng + `,"metric":"co2","query":{}}`, 422},
-		"empty unitIds":           {&hq, `{` + rng + `,"unitIds":[],"metric":"co2","query":{}}`, 422},
-		"duplicate units":         {&hq, `{` + rng + `,"unitIds":["` + online + `","` + online + `"],"metric":"co2","query":{}}`, 422},
-		"bad metric":              {&hq, `{` + rng + `,"unitIds":["` + online + `"],"metric":"noise","query":{}}`, 422},
-		"reversed range":          {&hq, `{"from":"` + to + `","to":"` + from + `","unitIds":["` + online + `"],"metric":"co2","query":{}}`, 422},
-		"range > 35 days":         {&hq, `{"from":"2026-08-01T00:00:00Z","to":"` + to + `","unitIds":["` + online + `"],"metric":"co2","query":{}}`, 422},
-		"filters not allowed":     {&hq, `{` + rng + `,"unitIds":["` + online + `"],"metric":"co2","query":{"filters":{"x":1}}}`, 422},
-		"bad sort":                {&hq, `{` + rng + `,"unitIds":["` + online + `"],"metric":"co2","query":{"sort":{"field":"value","direction":"asc"}}}`, 422},
-		"missing from":            {&hq, `{"to":"` + to + `","unitIds":["` + online + `"],"metric":"co2","query":{}}`, 422},
-		"missing to":              {&hq, `{"from":"` + from + `","unitIds":["` + online + `"],"metric":"co2","query":{}}`, 422},
+		"both targets": {&hq, `{` + rng + `,"unitIds":["` + online + `"],"spaceId":"` +
+			seed.ID("room-1").String() + `","metric":"co2","query":{}}`, 422},
+		"no target":     {&hq, `{` + rng + `,"metric":"co2","query":{}}`, 422},
+		"empty unitIds": {&hq, `{` + rng + `,"unitIds":[],"metric":"co2","query":{}}`, 422},
+		"duplicate units": {&hq, `{` + rng + `,"unitIds":["` + online + `","` + online + `"],"metric":"co2",` +
+			`"query":{}}`, 422},
+		"bad metric": {&hq, `{` + rng + `,"unitIds":["` + online + `"],"metric":"noise","query":{}}`, 422},
+		"reversed range": {&hq, `{"from":"` + to + `","to":"` + from + `","unitIds":["` + online + `"],"metric":"co2",` +
+			`"query":{}}`, 422},
+		"range > 35 days": {&hq, `{"from":"2026-08-01T00:00:00Z",` +
+			`"to":"` + to + `","unitIds":["` + online + `"],"metric":"co2","query":{}}`, 422},
+		"filters not allowed": {&hq, `{` + rng + `,"unitIds":["` + online + `"],"metric":"co2",` +
+			`"query":{"filters":{"x":1}}}`, 422},
+		"bad sort": {&hq, `{` + rng + `,"unitIds":["` + online + `"],"metric":"co2",` +
+			`"query":{"sort":{"field":"value","direction":"asc"}}}`, 422},
+		"missing from": {&hq, `{"to":"` + to + `","unitIds":["` + online + `"],"metric":"co2","query":{}}`, 422},
+		"missing to": {&hq, `{"from":"` + from + `","unitIds":["` + online + `"],"metric":"co2",` +
+			`"query":{}}`, 422},
 	} {
 		code, m := post(s, tc.a, "telemetry.series", tc.body)
 		if w, ok := refused[name]; ok {
@@ -241,14 +250,16 @@ func TestVentilation(t *testing.T) {
 		body string
 		code int
 	}{
-		"duration 0":            {&customerA, `{"spaceId":"` + room1 + `","method":"other","durationMinutes":0}`, 422},
-		"duration 241":          {&customerA, `{"spaceId":"` + room1 + `","method":"other","durationMinutes":241}`, 422},
-		"bad method":            {&customerA, `{"spaceId":"` + room1 + `","method":"aircon","durationMinutes":5}`, 422},
-		"missing space":         {&customerA, `{"method":"other","durationMinutes":5}`, 422},
-		"unit not in space":     {&customerA, `{"spaceId":"` + room1 + `","unitId":"` + seed.ID("unit-non-rto").String() + `","method":"other","durationMinutes":5}`, 422},
+		"duration 0":    {&customerA, `{"spaceId":"` + room1 + `","method":"other","durationMinutes":0}`, 422},
+		"duration 241":  {&customerA, `{"spaceId":"` + room1 + `","method":"other","durationMinutes":241}`, 422},
+		"bad method":    {&customerA, `{"spaceId":"` + room1 + `","method":"aircon","durationMinutes":5}`, 422},
+		"missing space": {&customerA, `{"method":"other","durationMinutes":5}`, 422},
+		"unit not in space": {&customerA, `{"spaceId":"` + room1 + `","unitId":"` + seed.ID("unit-non-rto").String() +
+			`","method":"other","durationMinutes":5}`, 422},
 		"other customer's room": {&customerA, `{"spaceId":"` + roomB + `","method":"other","durationMinutes":5}`, 404},
-		"unknown room":          {&customerA, `{"spaceId":"` + uuid.NewString() + `","method":"other","durationMinutes":5}`, 404},
-		"hq cannot log":         {&hq, `{"spaceId":"` + room1 + `","method":"other","durationMinutes":5}`, 403},
+		"unknown room": {&customerA, `{"spaceId":"` + uuid.NewString() + `","method":"other",` +
+			`"durationMinutes":5}`, 404},
+		"hq cannot log": {&hq, `{"spaceId":"` + room1 + `","method":"other","durationMinutes":5}`, 403},
 	} {
 		code, m := logv(tc.a, tc.body)
 		if w, ok := refused[name]; ok {
@@ -326,7 +337,8 @@ func TestVentilation(t *testing.T) {
 		"{\"sort\":{\"field\":\"method\",\"direction\":\"asc\"}}": "sort.field=error.invalid",
 	}
 
-	for _, b := range []string{`{"filters":{"x":1}}`, `{"filters":{"from":"` + clock.Format(time.RFC3339) + `","to":"` + clock.Add(-time.Hour).Format(time.RFC3339) + `"}}`, `{"sort":{"field":"method","direction":"asc"}}`} {
+	for _, b := range []string{`{"filters":{"x":1}}`, `{"filters":{"from":"` + clock.Format(time.RFC3339) + `","to":"` +
+		clock.Add(-time.Hour).Format(time.RFC3339) + `"}}`, `{"sort":{"field":"method","direction":"asc"}}`} {
 		code, m := post(s, &hq, "ventilation.list", b)
 		refusal(t, b, code, m, want[b])
 	}
@@ -353,7 +365,8 @@ func TestLatestMeasurements(t *testing.T) {
 	dev := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version) VALUES ($1,$2,$3,$4,$5,'v1')`,
+		`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version)
+			VALUES ($1,$2,$3,$4,$5,'v1')`,
 		dev,
 		tenant,
 		"LM-"+dev[:8],
@@ -372,7 +385,8 @@ func TestLatestMeasurements(t *testing.T) {
 	for metric, id := range sensor {
 		owner(
 			t,
-			`INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, stale_after_seconds) VALUES ($1,$2,$3,$4,$5,120)`,
+			`INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, stale_after_seconds) VALUES ($1,$2,$3,$4,$5,
+				120)`,
 			id,
 			tenant,
 			dev,
@@ -384,7 +398,8 @@ func TestLatestMeasurements(t *testing.T) {
 	reading := func(metric, sensorID string, ago time.Duration, seq int, quality string, value any) {
 		owner(
 			t,
-			`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit, origin, quality, received_at, event_id)
+			`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit,
+				origin, quality, received_at, event_id)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'measured',$9,$5,$10)`,
 			tenant,
 			u,
@@ -548,9 +563,9 @@ func TestLatestMeasurements(t *testing.T) {
 	}
 }
 
-// TestBucketedSeries (IR605, DEC-90): with bucketMinutes the series answers the whole period in averages — every stretch
-// present, the average of its valid readings with their count, no value and 0 where none is valid — and no page of
-// readings; the total still counts every reading. Only 5 and 60 minutes are taken, at most 1000 stretches, and the
+// TestBucketedSeries (IR605, DEC-90): with bucketMinutes the series answers the whole period in averages — every
+// stretch present, the average of its valid readings with their count, no value and 0 where none is valid — and no page
+// of readings; the total still counts every reading. Only 5 and 60 minutes are taken, at most 1000 stretches, and the
 // unit must be readable as before.
 func TestBucketedSeries(t *testing.T) {
 	s := server(t)

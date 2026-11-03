@@ -148,27 +148,30 @@ type locKey struct {
 	name   string
 }
 
-// @Summary		units.importPreview (read)
-// @ID				units.importPreview
-// @Description	Authorization: admin:asset.write
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR111 CSV UTF-8, at most 1000 rows, 8 mapped columns; writes nothing
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A18
-// @Tags			units
-// @Accept			json
-// @Produce		json
-// @Param			request	body		ImportPreviewInput	true	"input"
-// @Success		200		{object}	ops.Envelope{data=ImportPreview}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/units/imports/preview [post]
+// unitsImportPreview serves units.importPreview.
+//
+//	@Summary		units.importPreview (read)
+//	@ID				units.importPreview
+//	@Description	Authorization: admin:asset.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR111 CSV UTF-8, \
+//	@Description	at most 1000 rows, 8 mapped columns; writes nothing
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A18
+//	@Tags			units
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		ImportPreviewInput	true	"input"
+//	@Success		200		{object}	ops.Envelope{data=ImportPreview}
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/units/imports/preview [post]
 func (m *Module) unitsImportPreview(
 	ctx context.Context,
 	c *ops.Call,
@@ -302,7 +305,8 @@ func (m *Module) unitsImportPreview(
 		}
 
 		if row.Result != "error" {
-			err := c.Tx.QueryRow(ctx, `SELECT id FROM assets.properties WHERE customer_org_id = $1 AND NOT archived AND lower(name) = lower($2) ORDER BY id LIMIT 1`,
+			err := c.Tx.QueryRow(ctx, `SELECT id FROM assets.properties WHERE customer_org_id = $1 AND NOT archived AND
+				lower(name) = lower($2) ORDER BY id LIMIT 1`,
 				org, row.PropertyName).
 				Scan(&row.PropertyID)
 			if errors.Is(
@@ -392,7 +396,8 @@ func (m *Module) unitsImportPreview(
 
 			var id uuid.UUID
 			// an existing location of any kind with this name under the parent is reused: names are unique per parent
-			err := c.Tx.QueryRow(ctx, `SELECT id FROM assets.spaces WHERE property_id = $1 AND parent_space_id IS NOT DISTINCT FROM $2
+			err := c.Tx.QueryRow(ctx, `SELECT id FROM assets.spaces WHERE property_id = $1 AND parent_space_id IS NOT DISTINCT
+				FROM $2
 				AND NOT archived AND lower(name) = lower($3) ORDER BY id LIMIT 1`, row.PropertyID, parentSpace, *lvl.name).
 				Scan(&id)
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -416,7 +421,9 @@ func (m *Module) unitsImportPreview(
 			key := parent.String() + "/" + strings.ToLower(row.UnitName)
 
 			var exists bool
-			err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.units WHERE property_id = $1 AND space_id IS NOT DISTINCT FROM $2
+
+			err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.units WHERE property_id = $1 AND space_id IS NOT
+				DISTINCT FROM $2
 				AND NOT archived AND lower(display_name) = lower($3))`, row.PropertyID, parentSpace, row.UnitName).
 				Scan(&exists)
 			if err != nil {
@@ -496,7 +503,8 @@ type UnitImport struct {
 	State              string      `json:"state"`
 }
 
-const importCols = `id, tenant_id, version, created_at, updated_at, customer_id, preview_id, created_property_ids, created_space_ids, created_unit_ids, skipped_row_numbers, undo_until, state`
+const importCols = `id, tenant_id, version, created_at, updated_at, customer_id, preview_id, created_property_ids, ` +
+	`created_space_ids, created_unit_ids, skipped_row_numbers, undo_until, state`
 
 func scanImport(r pgx.Row) (UnitImport, error) {
 	var x UnitImport
@@ -540,28 +548,32 @@ func (in *ImportCommitInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		units.importCommit (write)
-// @ID				units.importCommit
-// @Description	Authorization: admin:asset.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 preview must be unexpired and unchanged; imports ready and warning rows only, as one change set
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A18
-// @Tags			units
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		ImportCommitInput	true	"input"
-// @Success		200				{object}	ops.Envelope{data=UnitImport}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/units/imports [post]
+// unitsImportCommit serves units.importCommit.
+//
+//	@Summary		units.importCommit (write)
+//	@ID				units.importCommit
+//	@Description	Authorization: admin:asset.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR111 preview must be unexpired and unchanged; imports ready and warning rows only, as one change \
+//	@Description	set
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A18
+//	@Tags			units
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		ImportCommitInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=UnitImport}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/units/imports [post]
 func (m *Module) unitsImportCommit(
 	ctx context.Context,
 	c *ops.Call,
@@ -574,7 +586,8 @@ func (m *Module) unitsImportCommit(
 		customer uuid.UUID
 	)
 
-	err := c.Tx.QueryRow(ctx, `DELETE FROM assets.unit_import_previews WHERE id = $1 RETURNING rows, file_name, expires_at, customer_id`, in.PreviewID).
+	err := c.Tx.QueryRow(ctx, `DELETE FROM assets.unit_import_previews WHERE id = $1 RETURNING rows, file_name, expires_at,
+		customer_id`, in.PreviewID).
 		Scan(&raw, &fileName, &expires, &customer)
 	if errors.Is(err, pgx.ErrNoRows) ||
 		(err == nil && (!c.Now.Before(expires) || customer != in.CustomerID)) {
@@ -586,13 +599,16 @@ func (m *Module) unitsImportCommit(
 	}
 
 	var org uuid.UUID
-	scanErr := c.Tx.QueryRow(ctx, `SELECT organization_id FROM assets.customers WHERE id = $1 AND status = 'active'`, customer).
+
+	scanErr := c.Tx.QueryRow(ctx, `SELECT organization_id FROM assets.customers WHERE id = $1 AND status =
+		'active'`, customer).
 		Scan(&org)
 	if scanErr != nil {
 		return UnitImport{}, conflict("error.customerInactive")
 	}
 
 	var rows []storedRow
+
 	unmarshalErr := json.Unmarshal(raw, &rows)
 	if unmarshalErr != nil {
 		return UnitImport{}, unmarshalErr
@@ -613,7 +629,9 @@ func (m *Module) unitsImportCommit(
 		}
 
 		var taken bool // someone added the property since the preview: validate again
-		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.properties WHERE customer_org_id = $1 AND NOT archived AND lower(name) = lower($2))`,
+
+		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.properties WHERE customer_org_id = $1 AND NOT archived
+			AND lower(name) = lower($2))`,
 			org, row.PropertyName).
 			Scan(&taken)
 		if err != nil {
@@ -625,9 +643,11 @@ func (m *Module) unitsImportCommit(
 		}
 
 		id := uuid.Must(uuid.NewV7())
+
 		_, err = c.Tx.Exec(
 			ctx,
-			`INSERT INTO assets.properties (id, tenant_id, customer_org_id, kind, name) VALUES ($1, current_setting('app.tenant_id')::uuid, $2, 'office', $3)`,
+			`INSERT INTO assets.properties (id, tenant_id, customer_org_id, kind, name) VALUES ($1,
+				current_setting('app.tenant_id')::uuid, $2, 'office', $3)`,
 			id,
 			org,
 			row.PropertyName,
@@ -649,7 +669,9 @@ func (m *Module) unitsImportCommit(
 
 		return id, nil
 	}
-	resolve := func(propertyID uuid.UUID, placeholder *uuid.UUID, parent *uuid.UUID, kind, name string) (*uuid.UUID, error) {
+	resolve := func(propertyID uuid.UUID, placeholder *uuid.UUID, parent *uuid.UUID, kind, name string) (*uuid.UUID,
+		error,
+	) {
 		if placeholder == nil {
 			return nil, nil
 		}
@@ -659,6 +681,7 @@ func (m *Module) unitsImportCommit(
 		}
 
 		var ok bool
+
 		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.spaces WHERE id = $1 AND NOT archived)`, *placeholder).
 			Scan(&ok)
 		if err != nil {
@@ -670,6 +693,7 @@ func (m *Module) unitsImportCommit(
 		}
 
 		id := uuid.Must(uuid.NewV7())
+
 		_, err = c.Tx.Exec(
 			ctx,
 			`INSERT INTO assets.spaces (id, tenant_id, property_id, parent_space_id, kind, name)
@@ -747,10 +771,13 @@ func (m *Module) unitsImportCommit(
 		}
 
 		id := uuid.Must(uuid.NewV7())
+
 		_, execErr := c.Tx.Exec(
 			ctx,
-			`INSERT INTO assets.units (id, tenant_id, customer_org_id, property_id, space_id, display_name, model_id, installed_at,
-			warranty_ends_at, capability_version) VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9)`,
+			`INSERT INTO assets.units (id, tenant_id, customer_org_id, property_id, space_id, display_name, model_id,
+				installed_at,
+			warranty_ends_at, capability_version) VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8,
+			$9)`,
 			id,
 			org,
 			propertyID,
@@ -798,7 +825,8 @@ func (m *Module) unitsImportCommit(
 		c.Tx.QueryRow(
 			ctx,
 			`INSERT INTO assets.unit_imports (id, tenant_id, customer_id, preview_id, source_object_key, created_property_ids,
-		created_space_ids, created_unit_ids, skipped_row_numbers, undo_until, state) VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9, 'imported')
+		created_space_ids, created_unit_ids, skipped_row_numbers, undo_until, state) VALUES ($1,
+		current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9, 'imported')
 		RETURNING `+importCols,
 			id,
 			customer,
@@ -852,30 +880,33 @@ func (in *ImportUndoInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		units.importUndo (write)
-// @ID				units.importUndo
-// @Description	Authorization: admin:asset.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 only within undoUntil (24 h) and while no created unit has telemetry or jobs
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A18
-// @Tags			units
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer			true	"all: required (target unit_import, read none)"
-// @Param			importId			path		string			true	"input field importId"
-// @Param			request				body		ImportUndoInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=UnitImport}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/units/imports/{importId}/undo [post]
+// unitsImportUndo serves units.importUndo.
+//
+//	@Summary		units.importUndo (write)
+//	@ID				units.importUndo
+//	@Description	Authorization: admin:asset.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR111 only within undoUntil (24 h) and while no created unit has telemetry or jobs
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A18
+//	@Tags			units
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer			true	"all: required (target unit_import, read none)"
+//	@Param			importId			path		string			true	"input field importId"
+//	@Param			request				body		ImportUndoInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=UnitImport}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/units/imports/{importId}/undo [post]
 func (m *Module) unitsImportUndo(
 	ctx context.Context,
 	c *ops.Call,
@@ -931,10 +962,15 @@ func (m *Module) unitsImportUndo(
 	for _, q := range []struct {
 		table string
 		ids   []uuid.UUID
-	}{{"assets.units", x.CreatedUnitIDs}, {"assets.spaces", x.CreatedSpaceIDs}, {"assets.properties", x.CreatedPropertyIDs}} {
+	}{
+		{"assets.units", x.CreatedUnitIDs},
+		{"assets.spaces", x.CreatedSpaceIDs},
+		{"assets.properties", x.CreatedPropertyIDs},
+	} {
 		_, err := c.Tx.Exec(
 			ctx,
-			"UPDATE "+q.table+" SET archived = true, version = version + 1, updated_at = platform.app_now() WHERE id = ANY($1) AND NOT archived",
+			"UPDATE "+q.table+" SET archived = true, version = version + 1, updated_at = platform.app_now() WHERE id = "+
+				"ANY($1) AND NOT archived",
 			q.ids,
 		)
 		if err != nil {
@@ -945,7 +981,8 @@ func (m *Module) unitsImportUndo(
 	x, err = scanImport(
 		c.Tx.QueryRow(
 			ctx,
-			`UPDATE assets.unit_imports SET state = 'undone', version = version + 1, updated_at = platform.app_now() WHERE id = $1 RETURNING `+importCols,
+			`UPDATE assets.unit_imports SET state = 'undone', version = version + 1, updated_at = platform.app_now() WHERE id =
+				$1 RETURNING `+importCols,
 			in.ImportID,
 		),
 	)

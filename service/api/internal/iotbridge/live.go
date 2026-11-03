@@ -64,6 +64,7 @@ func LiveTriggers(node string, payload []byte, at time.Time) ([]Trigger, error) 
 	}
 
 	var msg map[string]any
+
 	err := json.Unmarshal(payload, &msg)
 	if err != nil {
 		return nil, fmt.Errorf("node %s: %w", node, err)
@@ -196,7 +197,8 @@ func liveEvaluation(key string, at time.Time, facts []Fact) Trigger {
 			UnitIDs:    []uuid.UUID{seed.ID(seed.LiveSite.Unit)},
 			Facts:      facts,
 			Phase:      "condition",
-		}, CommandID: nil, Measurement: nil, DeviceID: nil, State: nil, BindingID: nil, Sequence: nil, Kind: "", Recovery: nil,
+		}, CommandID: nil, Measurement: nil, DeviceID: nil, State: nil, BindingID: nil, Sequence: nil, Kind: "",
+		Recovery: nil,
 	}
 }
 
@@ -394,8 +396,8 @@ func (g *LiveGate) Release(node string, slot time.Time) {
 	}
 }
 
-// LiveCommandNode is the node whose infrared LED sends the commands by default (REAL_MQTT_COMMAND_NODE): both nodes have
-// one, and only one sends, so a command does not reach the air conditioner twice.
+// LiveCommandNode is the node whose infrared LED sends the commands by default (REAL_MQTT_COMMAND_NODE): both nodes
+// have one, and only one sends, so a command does not reach the air conditioner twice.
 const LiveCommandNode = "node_1"
 
 // LiveCommandTopic is a node's command topic, as its firmware subscribes to it.
@@ -412,6 +414,7 @@ func LiveCommand(
 		Kind  string `json:"kind"`
 		Power *bool  `json:"power"`
 	}
+
 	unmarshalErr := json.Unmarshal(action, &a)
 	if unmarshalErr != nil {
 		return "", nil, false, fmt.Errorf("live command action: %w", unmarshalErr)

@@ -27,7 +27,8 @@ func powerSeries(t *testing.T, unit string, start time.Time, origin string, kw .
 		at := start.Add(time.Duration(i) * time.Minute)
 		owner(
 			t,
-			`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit, origin, quality, boundary_id, received_at, event_id)
+			`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit,
+				origin, quality, boundary_id, received_at, event_id)
 			VALUES ($1,$2,$3,'power',$4,1,$5,'kW',$6,'valid','ac_input_electricity',$4,$7)`,
 			seed.ID("tenant-a"),
 			unit,
@@ -55,7 +56,8 @@ func TestFactors(t *testing.T) {
 	region := "Test region " + uuid.NewString()[:6]
 
 	body := func(extra string) string {
-		return `{"region":"` + region + `","year":2030,"kgCO2ePerKWh":0.42,"source":"demo test factor","isDemo":true` + extra + `}`
+		return `{"region":"` + region + `","year":2030,"kgCO2ePerKWh":0.42,"source":"demo test factor",` +
+			`"isDemo":true` + extra + `}`
 	}
 	for b, want := range map[string]string{
 		strings.Replace(body(""), `"year":2030`, `"year":1999`, 1):      "year=error.range",
@@ -130,7 +132,8 @@ func TestBaselines(t *testing.T) {
 		Format(time.RFC3339) +
 		`"}`
 	body := func(method, extra string) string {
-		return `{"unitIds":["` + u + `"],"period":` + period + `,"boundaryId":"ac_input_electricity","boundary":"AC input","assumptions":"demo","source":"test","method":"` + method + `"` + extra + `}`
+		return `{"unitIds":["` + u + `"],"period":` + period + `,"boundaryId":"ac_input_electricity","boundary":"AC input",` +
+			`"assumptions":"demo","source":"test","method":"` + method + `"` + extra + `}`
 	}
 	// the field each case is refused for
 	want := map[string]string{
@@ -145,14 +148,16 @@ func TestBaselines(t *testing.T) {
 	}
 
 	for name, b := range map[string]string{
-		"fixed without value":    body("demo_fixed", ""),
-		"negative fixed":         body("demo_fixed", `,"baselineKWh":-1`),
-		"comparison with value":  body("demo_period_comparison", `,"baselineKWh":5`),
-		"comparison on building": strings.Replace(body("demo_period_comparison", ""), "ac_input_electricity", "whole_building_electricity", 1),
-		"unaligned period":       strings.Replace(body("demo_fixed", `,"baselineKWh":1`), start.Format(time.RFC3339), start.Add(30*time.Second).Format(time.RFC3339), 1),
-		"no units":               strings.Replace(body("demo_fixed", `,"baselineKWh":1`), `["`+u+`"]`, `[]`, 1),
-		"unknown unit":           strings.Replace(body("demo_fixed", `,"baselineKWh":1`), u, uuid.NewString(), 1),
-		"bad method":             body("guess", ""),
+		"fixed without value":   body("demo_fixed", ""),
+		"negative fixed":        body("demo_fixed", `,"baselineKWh":-1`),
+		"comparison with value": body("demo_period_comparison", `,"baselineKWh":5`),
+		"comparison on building": strings.Replace(body("demo_period_comparison", ""), "ac_input_electricity",
+			"whole_building_electricity", 1),
+		"unaligned period": strings.Replace(body("demo_fixed", `,"baselineKWh":1`), start.Format(time.RFC3339),
+			start.Add(30*time.Second).Format(time.RFC3339), 1),
+		"no units":     strings.Replace(body("demo_fixed", `,"baselineKWh":1`), `["`+u+`"]`, `[]`, 1),
+		"unknown unit": strings.Replace(body("demo_fixed", `,"baselineKWh":1`), u, uuid.NewString(), 1),
+		"bad method":   body("guess", ""),
 	} {
 		code, m := write(s, &hq, "baselines.save", b, 0)
 		refusal(t, name, code, m, want[name])
@@ -275,7 +280,8 @@ func isolatedUnit(t *testing.T, s *apiserver.Server) (string, string) {
 	prop := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO assets.properties (id, tenant_id, customer_org_id, kind, name, address, archived) VALUES ($1,$2,$3,'home',$4,NULL,false)`,
+		`INSERT INTO assets.properties (id, tenant_id, customer_org_id, kind, name, address, archived) VALUES ($1,$2,$3,
+			'home',$4,NULL,false)`,
 		prop,
 		seed.ID("tenant-a"),
 		seed.ID("org-customer-b"),
@@ -322,9 +328,11 @@ func TestEnergySummary(t *testing.T) {
 			s,
 			&hq,
 			"baselines.save",
-			`{"unitIds":["`+u+`"],"period":{"from":"2026-08-01T00:00:00Z","to":"`+time.Date(2026, 8, 1, 0, minutes, 0, 0, time.UTC).
+			`{"unitIds":["`+u+`"],"period":{"from":"2026-08-01T00:00:00Z",`+
+				`"to":"`+time.Date(2026, 8, 1, 0, minutes, 0, 0, time.UTC).
 				Format(time.RFC3339)+
-				`"},"boundaryId":"ac_input_electricity","boundary":"AC input","assumptions":"demo","source":"test","method":"demo_fixed","baselineKWh":`+v+`}`,
+				`"},"boundaryId":"ac_input_electricity","boundary":"AC input","assumptions":"demo","source":"test",`+
+				`"method":"demo_fixed","baselineKWh":`+v+`}`,
 			0,
 		)
 
@@ -370,7 +378,8 @@ func TestEnergySummary(t *testing.T) {
 
 	owner(
 		t,
-		`UPDATE energy.emission_factors SET is_current = true WHERE id = $1 AND version = (SELECT max(version) FROM energy.emission_factors WHERE id = $1)`,
+		`UPDATE energy.emission_factors SET is_current = true WHERE id = $1 AND version = (SELECT max(version) FROM
+			energy.emission_factors WHERE id = $1)`,
 		energy.DefaultFactorID,
 	)
 
@@ -501,7 +510,9 @@ func TestAdminSummary(t *testing.T) {
 		s,
 		&hq,
 		"baselines.save",
-		`{"unitIds":["`+u+`"],"period":{"from":"2026-08-01T00:00:00Z","to":"2026-08-01T00:10:00Z"},"boundaryId":"ac_input_electricity","boundary":"AC input","assumptions":"demo","source":"test","method":"demo_fixed","baselineKWh":20}`,
+		`{"unitIds":["`+u+`"],"period":{"from":"2026-08-01T00:00:00Z","to":"2026-08-01T00:10:00Z"},`+
+			`"boundaryId":"ac_input_electricity","boundary":"AC input","assumptions":"demo","source":"test",`+
+			`"method":"demo_fixed","baselineKWh":20}`,
 		0,
 	)
 	_, m = q(&hq, `,"propertyId":"`+prop+`"`)

@@ -36,11 +36,18 @@ func TestRequiredInputs(t *testing.T) {
 		{"jobs.proposeSlot", `{}`, map[string]string{"jobId": req, "replyBy": req}},
 		{"jobs.withdrawProposal", `{}`, map[string]string{"jobId": req, "proposalId": req}},
 		{"jobs.withdrawPartnerSlot", `{}`, map[string]string{"jobId": req, "proposalId": req}},
-		{"jobs.respondProposal", `{"decision":"maybe","comment":` + long(2001) + `}`, map[string]string{"jobId": req, "proposalId": req, "decision": inv, "comment": length}},
+		{
+			"jobs.respondProposal", `{"decision":"maybe",` +
+				`"comment":` + long(2001) + `}`,
+			map[string]string{"jobId": req, "proposalId": req, "decision": inv, "comment": length},
+		},
 		{"jobs.requestReschedule", `{"comment":` + long(2001) + `}`, map[string]string{"jobId": req, "comment": length}},
 		{"jobs.proposePartnerSlot", `{}`, map[string]string{"jobId": req, "technicianMembershipId": req}},
 		{"jobs.resolvePartnerSlot", `{"decision":"maybe"}`, map[string]string{"proposalId": req, "decision": inv}},
-		{"jobs.offer", `{}`, map[string]string{"jobId": req, "contractorOrgId": req, "visitSlot": rng, "accessValidUntil": rng}},
+		{
+			"jobs.offer", `{}`,
+			map[string]string{"jobId": req, "contractorOrgId": req, "visitSlot": rng, "accessValidUntil": rng},
+		},
 		{"jobs.accept", `{"termsVersion":` + long(65) + `}`, map[string]string{"termsVersion": length}},
 		{"jobs.assign", `{}`, map[string]string{"jobId": req, "technicianMembershipId": req}},
 		{"members.eligible", `{}`, map[string]string{"jobId": req}},
@@ -50,9 +57,11 @@ func TestRequiredInputs(t *testing.T) {
 		{"jobs.checkIn", `{}`, map[string]string{"jobId": req}},
 		{"jobs.pauseWork", `{}`, map[string]string{"jobId": req}},
 		{"jobs.saveDraft", `{}`, map[string]string{"jobId": req, "draft": req}},
-		{"jobs.saveDraft", `{"items":[{"reason":` + long(1001) + `}],"measurements":[],"parts":[],"refrigerant":[],"attachmentIds":[],"nextAction":{}}`, map[string]string{"items": length, "nextAction": inv}},
+		{"jobs.saveDraft", `{"items":[{"reason":` + long(1001) + `}],"measurements":[],"parts":[],"refrigerant":[],` +
+			`"attachmentIds":[],"nextAction":{}}`, map[string]string{"items": length, "nextAction": inv}},
 		{"jobs.submit", `{}`, map[string]string{"jobId": req, "reportVersion": req}},
-		{"jobs.review", `{"decision":"maybe","reviewMode":"loud"}`, map[string]string{"jobId": req, "reportVersion": req, "decision": inv, "reviewMode": inv}},
+		{"jobs.review", `{"decision":"maybe",` +
+			`"reviewMode":"loud"}`, map[string]string{"jobId": req, "reportVersion": req, "decision": inv, "reviewMode": inv}},
 		{"reports.get", `{}`, map[string]string{"jobId": req, "reportId": req}},
 		{"reports.signOff", `{}`, map[string]string{"reportId": req}},
 		{"attachments.add", `{}`, map[string]string{"reportId": req}},
@@ -67,9 +76,17 @@ func TestRequiredInputs(t *testing.T) {
 		{"plans.generateNext", `{}`, map[string]string{"id": req, "occurrenceDate": req}},
 		{"contractors.save", `{}`, map[string]string{"organizationId": req}},
 		{"contractors.setOfferStatus", `{"status":"paused"}`, map[string]string{"contractorOrgId": req, "status": inv}},
-		{"rateCards.save", `{"currency":"XYZ","lines":[]}`, map[string]string{"contractorOrgId": req, "effectiveFrom": req, "currency": inv, "lines": "error.count"}},
-		{"rateCards.save", `{"currency":"MYR","lines":[{"workType":"emergency","amountMinor":100,"note":` + long(201) + `}]}`, map[string]string{"lines": length}},
-		{"sla.saveTargets", `{"firstTimeFixPercent":150}`, map[string]string{"firstTimeFixPercent": rng, "effectiveFrom": req}},
+		{
+			"rateCards.save", `{"currency":"XYZ",` +
+				`"lines":[]}`,
+			map[string]string{"contractorOrgId": req, "effectiveFrom": req, "currency": inv, "lines": "error.count"},
+		},
+		{"rateCards.save", `{"currency":"MYR","lines":[{"workType":"emergency","amountMinor":100,` +
+			`"note":` + long(201) + `}]}`, map[string]string{"lines": length}},
+		{
+			"sla.saveTargets", `{"firstTimeFixPercent":150}`,
+			map[string]string{"firstTimeFixPercent": rng, "effectiveFrom": req},
+		},
 		{"certificates.submit", `{}`, map[string]string{"membershipId": req}},
 		{"certificates.verify", `{"decision":"maybe"}`, map[string]string{"certificateId": req, "decision": inv}},
 		{"certificates.requestTraining", `{}`, map[string]string{"certificateId": req}},
@@ -81,27 +98,37 @@ func TestRequiredInputs(t *testing.T) {
 		{"payments.confirm", `{}`, map[string]string{"paymentId": req}},
 		{"payments.recordManual", `{}`, map[string]string{"invoiceId": req}},
 		{"payments.simulate", `{}`, map[string]string{"event": inv}},
-		{"payments.simulate", `{"event":"confirm","paymentReference":` + long(129) + `}`, map[string]string{"paymentId": req, "paymentReference": length}},
-		{"payments.simulate", `{"event":"instructions","method":"demo_credit_card"}`, map[string]string{"invoiceId": req, "method": "error.notAllowed"}},
-		{"payouts.transition", `{"reason":` + long(1001) + `}`, map[string]string{"statementId": req, "reason": length}}, // the route fixes the action
+		{"payments.simulate", `{"event":"confirm",` +
+			`"paymentReference":` + long(129) + `}`, map[string]string{"paymentId": req, "paymentReference": length}},
+		{"payments.simulate", `{"event":"instructions",` +
+			`"method":"demo_credit_card"}`, map[string]string{"invoiceId": req, "method": "error.notAllowed"}},
+		// the route fixes the action
+		{"payouts.transition", `{"reason":` + long(1001) + `}`, map[string]string{"statementId": req, "reason": length}},
 		{"payouts.query", `{"message":` + long(2001) + `}`, map[string]string{"lineId": req, "message": length}},
 		{"payouts.resolveQuery", `{"reply":` + long(2001) + `}`, map[string]string{"queryId": req, "reply": length}},
 		// control, monitoring, restrictions
 		{"automations.nextRuns", `{}`, map[string]string{"automationId": "error.exactlyOneTarget"}},
-		{"automations.nextRuns", `{"automationId":"00000000-0000-0000-0000-000000000000","count":8}`, map[string]string{"automationId": req}},
+		{"automations.nextRuns", `{"automationId":"00000000-0000-0000-0000-000000000000",` +
+			`"count":8}`, map[string]string{"automationId": req}},
 		{"diagnosticRuns.create", `{}`, map[string]string{"jobId": req, "expectedUnitVersion": req}},
 		{"alerts.resolve", `{}`, map[string]string{"alertId": req}},
 		{"policies.setDefaultRule", `{}`, map[string]string{"policyId": req, "customerId": req, "enabled": req}},
 		{"restrictions.cancel", `{}`, map[string]string{"restrictionId": req}},
 		{"restrictions.execute", `{}`, map[string]string{"restrictionId": req, "confirmedRulesVersion": req}},
-		{"restrictions.schedule", `{}`, map[string]string{"contractId": req, "expectedContractVersion": req, "executeAfter": req, "rulesVersion": req}},
+		{
+			"restrictions.schedule", `{}`,
+			map[string]string{"contractId": req, "expectedContractVersion": req, "executeAfter": req, "rulesVersion": req},
+		},
 		// assets
 		{"customers.save", `{}`, map[string]string{"organizationId": req}},
 		{"units.archive", `{}`, map[string]string{"id": req}},
 		{"units.save", `{}`, map[string]string{"customerOrgId": req, "propertyId": req, "modelId": req}},
 		{"spaces.save", `{"kind":"attic"}`, map[string]string{"propertyId": req, "kind": inv, "name": length}},
 		{"units.setAlertPolicies", `{}`, map[string]string{"unitId": req}},
-		{"units.importPreview", `{"fileName":` + long(256) + `}`, map[string]string{"customerId": req, "fileName": length, "csvText": req}},
+		{
+			"units.importPreview", `{"fileName":` + long(256) + `}`,
+			map[string]string{"customerId": req, "fileName": length, "csvText": req},
+		},
 		{"units.importCommit", `{}`, map[string]string{"previewId": req, "customerId": req}},
 		{"units.importUndo", `{"reason":` + long(1001) + `}`, map[string]string{"importId": req, "reason": length}},
 		// devices
@@ -113,9 +140,15 @@ func TestRequiredInputs(t *testing.T) {
 		{"firmwareCampaigns.schedule", `{}`, map[string]string{"modelId": req, "targetVersion": req, "deviceIds": req}},
 		{"firmwareCampaigns.control", `{}`, map[string]string{"campaignId": req}}, // the route fixes the action
 		// energy, identity, notifications, writes
-		{"mrv.recordReview", `{"reviewComment":` + long(4001) + `}`, map[string]string{"reportId": req, "reportVersion": req, "reviewComment": length}},
-		{"energy.exportReport", `{"propertyIds":[],"sections":[]}`, map[string]string{"propertyIds": inv, "sections": req, "month": inv, "format": inv}},
-		{"energy.exportReport", `{"propertyIds":["00000000-0000-0000-0000-000000000001","00000000-0000-0000-0000-000000000001"],"sections":["weather"]}`, map[string]string{"propertyIds": inv, "sections": inv}},
+		{
+			"mrv.recordReview", `{"reviewComment":` + long(4001) + `}`,
+			map[string]string{"reportId": req, "reportVersion": req, "reviewComment": length},
+		},
+		{"energy.exportReport", `{"propertyIds":[],` +
+			`"sections":[]}`, map[string]string{"propertyIds": inv, "sections": req, "month": inv, "format": inv}},
+		{"energy.exportReport", `{"propertyIds":["00000000-0000-0000-0000-000000000001",` +
+			`"00000000-0000-0000-0000-000000000001"],` +
+			`"sections":["weather"]}`, map[string]string{"propertyIds": inv, "sections": inv}},
 		{"members.save", `{}`, map[string]string{"userId": req, "organizationId": req, "role": inv, "validFrom": req}},
 		{"devices.events", `{}`, map[string]string{"id": req}}, // its own ID field (IR391)
 		{"devices.operations", `{}`, map[string]string{"deviceId": req}},
@@ -124,16 +157,25 @@ func TestRequiredInputs(t *testing.T) {
 		{"notifications.preview", `{}`, map[string]string{"recipientMembershipId": req}},
 		{"writes.getResult", `{}`, map[string]string{"operation": req}},
 		// the other branches of the same rules: wrong shapes, references inside lists, kind-specific fields
-		{"locations.rename", `{"target":{"kind":"space","id":"00000000-0000-0000-0000-000000000000"},"name":" "}`, map[string]string{"target.id": req, "name": length}},
+		{"locations.rename", `{"target":{"kind":"space","id":"00000000-0000-0000-0000-000000000000"},"name":" ` +
+			`"}`, map[string]string{"target.id": req, "name": length}},
 		{"properties.save", `{"accessInstructions":` + long(1001) + `}`, map[string]string{"accessInstructions": length}},
-		{"units.save", `{"warrantyEndsAt":"not a date","changeReason":""}`, map[string]string{"warrantyEndsAt": inv, "changeReason": length}},
-		{"automations.save", `{"unitIds":["00000000-0000-0000-0000-000000000000"],"kind":"weekly"}`, map[string]string{"unitIds": inv, "kind": inv}},
-		{"automations.save", `{"unitIds":[],"kind":"schedule","condition":{}}`, map[string]string{"unitIds": inv, "kind": inv}},
+		{"units.save", `{"warrantyEndsAt":"not a date",` +
+			`"changeReason":""}`, map[string]string{"warrantyEndsAt": inv, "changeReason": length}},
+		{"automations.save", `{"unitIds":["00000000-0000-0000-0000-000000000000"],` +
+			`"kind":"weekly"}`, map[string]string{"unitIds": inv, "kind": inv}},
+		{"automations.save", `{"unitIds":[],"kind":"schedule",` +
+			`"condition":{}}`, map[string]string{"unitIds": inv, "kind": inv}},
 		{"automations.save", `{"kind":"event","weekdays":[1]}`, map[string]string{"kind": inv}},
-		{"capabilities.save", `{"manufacturer":"","changeReason":" "}`, map[string]string{"manufacturer": length, "changeReason": length}},
-		{"baselines.save", `{"unitIds":["00000000-0000-0000-0000-000000000000"]}`, map[string]string{"unitIds": inv, "boundaryId": inv}},
+		{"capabilities.save", `{"manufacturer":"","changeReason":" ` +
+			`"}`, map[string]string{"manufacturer": length, "changeReason": length}},
+		{
+			"baselines.save", `{"unitIds":["00000000-0000-0000-0000-000000000000"]}`,
+			map[string]string{"unitIds": inv, "boundaryId": inv},
+		},
 		{"factors.save", `{}`, map[string]string{"region": length}},
-		{"offsets.preview", `{"unitIds":["00000000-0000-0000-0000-000000000000"],"period":{"from":"2026-09-02T00:00:00Z","to":"2026-09-01T00:00:00Z"}}`, map[string]string{"purpose": length, "period": rng, "unitIds": inv}},
+		{"offsets.preview", `{"unitIds":["00000000-0000-0000-0000-000000000000"],"period":{"from":"2026-09-02T00:00:00Z",` +
+			`"to":"2026-09-01T00:00:00Z"}}`, map[string]string{"purpose": length, "period": rng, "unitIds": inv}},
 		{"offsets.preview", `{"unitIds":[]}`, map[string]string{"unitIds": inv}},
 		{"offsets.simulate", `{}`, map[string]string{"event": inv, "demoConfirmed": req}},
 		{"offsets.simulate", `{"event":"request","demoConfirmed":true}`, map[string]string{"quoteId": inv}},
@@ -143,17 +185,27 @@ func TestRequiredInputs(t *testing.T) {
 		{"mrv.saveDraft", `{}`, map[string]string{"evidenceIds": inv}},
 		{"energy.summary", `{"unitIds":["00000000-0000-0000-0000-000000000000"]}`, map[string]string{"unitIds": inv}},
 		{"clientUsers.save", `{}`, map[string]string{"customerId": req}},
-		{"members.save", `{"role":"technician","scopes":[{"kind":"tenant","id":"00000000-0000-0000-0000-000000000001"}]}`, map[string]string{"scopes": inv}},
-		{"jobs.acknowledgeAssignment", `{"decision":"cant_make","reason":"busy","alternativeSlot":{"startAt":"2026-09-20T03:00:00Z","endAt":"2026-09-20T01:00:00Z"}}`, map[string]string{"alternativeSlot": rng}},
+		{"members.save", `{"role":"technician","scopes":[{"kind":"tenant",` +
+			`"id":"00000000-0000-0000-0000-000000000001"}]}`, map[string]string{"scopes": inv}},
+		{"jobs.acknowledgeAssignment", `{"decision":"cant_make","reason":"busy",` +
+			`"alternativeSlot":{"startAt":"2026-09-20T03:00:00Z",` +
+			`"endAt":"2026-09-20T01:00:00Z"}}`, map[string]string{"alternativeSlot": rng}},
 		{"jobs.checkIn", `{"method":"manual","distanceMeters":-1}`, map[string]string{"reason": req, "distanceMeters": rng}},
-		{"jobs.saveDraft", `{"items":[],"measurements":[],"parts":[],"refrigerant":[],"attachmentIds":[],"nextAction":{"kind":"follow_up"}}`, map[string]string{"nextAction": inv}},
-		{"reports.signOff", `{"signerName":"Tan","absentReason":"not at home","sitePhoto":{"name":"p.png","mime":"image/png","size":3,"bytes":"AAAA"}}`, map[string]string{"sitePhoto": "error.invalidFile"}},
+		{"jobs.saveDraft", `{"items":[],"measurements":[],"parts":[],"refrigerant":[],"attachmentIds":[],` +
+			`"nextAction":{"kind":"follow_up"}}`, map[string]string{"nextAction": inv}},
+		{"reports.signOff", `{"signerName":"Tan","absentReason":"not at home","sitePhoto":{"name":"p.png",` +
+			`"mime":"image/png","size":3,"bytes":"AAAA"}}`, map[string]string{"sitePhoto": "error.invalidFile"}},
 		{"policies.save", `{}`, map[string]string{"kind": inv}},
 		{"policies.save", `{"kind":"default_alert"}`, map[string]string{"id": req, "rules": "error.fixedRules"}},
-		{"policies.save", `{"kind":"alert"}`, map[string]string{"name": req, "timezone": req, "enabled": req, "priority": rng, "customerId": req}},
-		{"telemetry.series", `{"query":{"filters":{"x":"1"}}}`, map[string]string{"x": "error.notAllowed"}}, // the REST binding refuses an unknown query parameter first
+		{
+			"policies.save", `{"kind":"alert"}`,
+			map[string]string{"name": req, "timezone": req, "enabled": req, "priority": rng, "customerId": req},
+		},
+		// the REST binding refuses an unknown query parameter first
+		{"telemetry.series", `{"query":{"filters":{"x":"1"}}}`, map[string]string{"x": "error.notAllowed"}},
 	} {
 		body := map[string]any{}
+
 		err := json.Unmarshal([]byte(c.body), &body)
 		if err != nil {
 			t.Fatalf("%s: body %v", c.op, err)

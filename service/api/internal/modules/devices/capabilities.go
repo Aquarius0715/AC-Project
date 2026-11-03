@@ -53,7 +53,8 @@ type Capability struct {
 	FirmwareCandidates []string     `json:"firmwareCandidates"`
 }
 
-const capCols = `id, tenant_id, version, created_at, created_at, manufacturer, model, control, mode_control, fan_control, temperature, modes, fan_levels,
+const capCols = `id, tenant_id, version, created_at, created_at, manufacturer, model, control, mode_control, ` +
+	`fan_control, temperature, modes, fan_levels,
 	ventilation, ventilation_levels, sensors, firmware_candidates`
 
 func scanCap(r pgx.Row) (Capability, error) {
@@ -61,6 +62,7 @@ func scanCap(r pgx.Row) (Capability, error) {
 		c             Capability
 		temp, sensors []byte
 	)
+
 	err := r.Scan(
 		&c.ID,
 		&c.TenantID,
@@ -86,6 +88,7 @@ func scanCap(r pgx.Row) (Capability, error) {
 
 	if len(temp) > 0 {
 		c.Temperature = &TempRange{Min: 0, Max: 0, Step: 0}
+
 		err := json.Unmarshal(temp, c.Temperature)
 		if err != nil {
 			return c, err
@@ -103,29 +106,32 @@ func scanCap(r pgx.Row) (Capability, error) {
 	return c, nil
 }
 
-// @Summary		capabilities.list (read)
-// @ID				capabilities.list
-// @Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:device.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A02, DD-A04 · Query: filters none · sort id,createdAt,updatedAt (default id asc)
-// @Tags			capabilities
-// @Accept			json
-// @Produce		json
-// @Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit	query		integer	false	"page size 1–100, default 25"
-// @Param			sort	query		string	false	"field:direction — fields id,createdAt,updatedAt; default id asc"
-// @Success		200		{object}	ops.Envelope{data=CapabilityPage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/capabilities [get]
+// capabilitiesList serves capabilities.list.
+//
+//	@Summary		capabilities.list (read)
+//	@ID				capabilities.list
+//	@Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | \
+//	@Description	admin:dashboard.read | admin:device.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A02, DD-A04 · Query: filters none · sort id,createdAt,updatedAt (default id asc)
+//	@Tags			capabilities
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit	query		integer	false	"page size 1–100, default 25"
+//	@Param			sort	query		string	false	"field:direction — fields id,createdAt,updatedAt; default id asc"
+//	@Success		200		{object}	ops.Envelope{data=CapabilityPage}
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/capabilities [get]
 func capabilitiesList(
 	ctx context.Context,
 	c *ops.Call,
@@ -152,6 +158,7 @@ func capabilitiesList(
 	}
 
 	var total int
+
 	scanErr := c.Tx.QueryRow(ctx, `SELECT count(*) FROM devices.capabilities WHERE is_current`).
 		Scan(&total)
 	if scanErr != nil {
@@ -290,7 +297,8 @@ func (in *CapabilitySave) Validate() map[string]string {
 
 		seen[s.Metric] = true
 	}
-	// a candidate is 1–32 characters once trimmed, and no two candidates are the same after trimming (the "+ Add version" rule of the Admin device model editor)
+	// a candidate is 1–32 characters once trimmed, and no two candidates are the same after trimming (the "+ Add version"
+	// rule of the Admin device model editor)
 	seenFirmware := map[string]bool{}
 
 	for _, v := range in.FirmwareCandidates {
@@ -305,7 +313,8 @@ func (in *CapabilitySave) Validate() map[string]string {
 	switch { // DD-A04: a change reason is required on update and not taken on create
 	case in.ID != nil && in.ChangeReason == nil:
 		fe["changeReason"] = "error.required"
-	case in.ChangeReason != nil && (utf8.RuneCountInString(strings.TrimSpace(*in.ChangeReason)) < 1 || utf8.RuneCountInString(*in.ChangeReason) > 1000):
+	case in.ChangeReason != nil &&
+		(utf8.RuneCountInString(strings.TrimSpace(*in.ChangeReason)) < 1 || utf8.RuneCountInString(*in.ChangeReason) > 1000):
 		fe["changeReason"] = "error.length"
 	}
 
@@ -351,28 +360,30 @@ func nz(a []string) []string {
 	return a
 }
 
-// @Summary		capabilities.save (write)
-// @ID				capabilities.save
-// @Description	Authorization: admin:device.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A04
-// @Tags			capabilities
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		CapabilitySave	true	"input"
-// @Success		200				{object}	ops.Envelope{data=Capability}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/capabilities [post]
+// save serves capabilities.save.
+//
+//	@Summary		capabilities.save (write)
+//	@ID				capabilities.save
+//	@Description	Authorization: admin:device.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A04
+//	@Tags			capabilities
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		CapabilitySave	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Capability}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/capabilities [post]
 func (m Capabilities) save(
 	ctx context.Context,
 	c *ops.Call,
@@ -386,7 +397,9 @@ func (m Capabilities) save(
 	sensors, _ := json.Marshal(append([]SensorSpec{}, in.Sensors...))
 
 	var dup bool
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.capabilities WHERE is_current AND lower(manufacturer) = lower($1) AND lower(model) = lower($2)
+
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.capabilities WHERE is_current AND lower(manufacturer) =
+		lower($1) AND lower(model) = lower($2)
 		AND ($3::uuid IS NULL OR id <> $3))`, in.Manufacturer, in.Model, in.ID).
 		Scan(&dup)
 	if err != nil {
@@ -444,9 +457,11 @@ func (m Capabilities) save(
 	x, err := scanCap(
 		c.Tx.QueryRow(
 			ctx,
-			`INSERT INTO devices.capabilities (id, version, tenant_id, manufacturer, model, control, mode_control, fan_control, temperature,
+			`INSERT INTO devices.capabilities (id, version, tenant_id, manufacturer, model, control, mode_control, fan_control,
+				temperature,
 		modes, fan_levels, ventilation, ventilation_levels, sensors, firmware_candidates, is_current)
-		VALUES ($1,$2,current_setting('app.tenant_id')::uuid,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,true) RETURNING `+capCols,
+		VALUES ($1,$2,current_setting('app.tenant_id')::uuid,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,true) RETURNING
+		`+capCols,
 			id,
 			version,
 			in.Manufacturer,

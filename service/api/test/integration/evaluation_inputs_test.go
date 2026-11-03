@@ -15,7 +15,8 @@ func TestEvaluationInputValidation(t *testing.T) {
 	u := boundUnit(t, s, "online")
 	at := clock.Format(time.RFC3339)
 	fact := func(unit, metric, value, unitName, quality string) string {
-		return `{"unitId":"` + unit + `","metric":"` + metric + `","value":` + value + `,"unit":"` + unitName + `","observedAt":"` + at + `","quality":"` + quality + `"}`
+		return `{"unitId":"` + unit + `","metric":"` + metric + `","value":` + value + `,"unit":"` + unitName +
+			`","observedAt":"` + at + `","quality":"` + quality + `"}`
 	}
 	body := func(fields map[string]string) string {
 		f := map[string]string{
@@ -57,14 +58,25 @@ func TestEvaluationInputValidation(t *testing.T) {
 		"no units":           {map[string]string{"unitIds": "[]"}, "unitIds"},
 		"too many units":     {map[string]string{"unitIds": "[" + strings.Join(many, ",") + "]"}, "unitIds"},
 		"duplicate units":    {map[string]string{"unitIds": `["` + u + `","` + u + `"]`}, "unitIds"},
-		"number as text":     {map[string]string{"facts": "[" + fact(u, "temperature", `"hot"`, "°C", "valid") + "]"}, "facts"},
-		"boolean as number":  {map[string]string{"facts": "[" + fact(u, "occupied", "1", "boolean", "valid") + "]"}, "facts"},
-		"location event":     {map[string]string{"facts": "[" + fact(u, "location", `"home"`, "event", "valid") + "]"}, "facts"},
-		"unknown metric":     {map[string]string{"facts": "[" + fact(u, "noise", "1", "dB", "valid") + "]"}, "facts"},
-		"wrong unit":         {map[string]string{"facts": "[" + fact(u, "temperature", "25", "K", "valid") + "]"}, "facts"},
-		"bad quality":        {map[string]string{"facts": "[" + fact(u, "temperature", "25", "°C", "good") + "]"}, "facts"},
-		"fact of other unit": {map[string]string{"facts": "[" + fact(uuid.NewString(), "temperature", "25", "°C", "valid") + "]"}, "facts"},
-		"duplicate fact":     {map[string]string{"facts": "[" + fact(u, "temperature", "25", "°C", "valid") + "," + fact(u, "temperature", "26", "°C", "valid") + "]"}, "facts"},
+		"number as text": {
+			map[string]string{"facts": "[" + fact(u, "temperature", `"hot"`, "°C", "valid") + "]"},
+			"facts",
+		},
+		"boolean as number": {map[string]string{"facts": "[" + fact(u, "occupied", "1", "boolean", "valid") + "]"}, "facts"},
+		"location event": {
+			map[string]string{"facts": "[" + fact(u, "location", `"home"`, "event", "valid") + "]"},
+			"facts",
+		},
+		"unknown metric": {map[string]string{"facts": "[" + fact(u, "noise", "1", "dB", "valid") + "]"}, "facts"},
+		"wrong unit":     {map[string]string{"facts": "[" + fact(u, "temperature", "25", "K", "valid") + "]"}, "facts"},
+		"bad quality":    {map[string]string{"facts": "[" + fact(u, "temperature", "25", "°C", "good") + "]"}, "facts"},
+		"fact of other unit": {
+			map[string]string{"facts": "[" + fact(uuid.NewString(), "temperature", "25", "°C", "valid") + "]"}, "facts",
+		},
+		"duplicate fact": {
+			map[string]string{"facts": "[" + fact(u, "temperature", "25", "°C", "valid") + "," +
+				fact(u, "temperature", "26", "°C", "valid") + "]"}, "facts",
+		},
 	} {
 		code, m := post(s, &customerB, "automations.simulate", body(c.fields))
 		if code != 422 || m["fieldErrors"].(map[string]any)[c.field] == nil {
@@ -124,7 +136,9 @@ func TestEvaluationFireReplay(t *testing.T) {
 		s,
 		&customerB,
 		"automations.save",
-		`{"name":"replay","unitIds":["`+u+`"],"timezone":"Asia/Kuala_Lumpur","enabled":true,"priority":10,"kind":"event","condition":{"type":"occupancy","occupied":true},"action":{"kind":"set_temperature","celsius":24}}`,
+		`{"name":"replay",`+
+			`"unitIds":["`+u+`"],"timezone":"Asia/Kuala_Lumpur","enabled":true,"priority":10,"kind":"event",`+
+			`"condition":{"type":"occupancy","occupied":true},"action":{"kind":"set_temperature","celsius":24}}`,
 		0,
 	); code != 200 {
 		t.Fatalf("rule: %d %v", code, m)
@@ -132,7 +146,9 @@ func TestEvaluationFireReplay(t *testing.T) {
 
 	at := clock.Format(time.RFC3339)
 	input := func(event, occupied, occurred string) string {
-		return `{"eventId":"` + event + `","occurredAt":"` + occurred + `","unitIds":["` + u + `"],"facts":[{"unitId":"` + u + `","metric":"occupied","value":` + occupied + `,"unit":"boolean","observedAt":"` + at + `","quality":"valid"}],"phase":"condition"}`
+		return `{"eventId":"` + event + `","occurredAt":"` + occurred + `","unitIds":["` + u + `"],"facts":[{"unitId":"` + u +
+			`","metric":"occupied","value":` + occupied + `,"unit":"boolean","observedAt":"` + at +
+			`","quality":"valid"}],"phase":"condition"}`
 	}
 	decision := func(m map[string]any) map[string]any { return data(m)["results"].([]any)[0].(map[string]any) }
 	e1 := uuid.NewString()

@@ -16,14 +16,17 @@ func TestSearchIsLiteral(t *testing.T) {
 	// a part and a contractor whose names hold a % and an _ (the seed's do not)
 	owner(
 		t,
-		`INSERT INTO maintenance.parts_catalog (code, tenant_id, name) VALUES ('SEAL_50', $1, 'Seal kit 50% grade') ON CONFLICT DO NOTHING`,
+		`INSERT INTO maintenance.parts_catalog (code, tenant_id, name) VALUES ('SEAL_50', $1, 'Seal kit 50% grade') ON
+			CONFLICT DO NOTHING`,
 		seed.ID("tenant-a"),
 	)
 	org := seed.ID("org-test-search")
 	owner(
 		t,
-		`INSERT INTO maintenance.contractors (tenant_id, organization_id, name, status, registration_no, contact_email, delegation)
-		VALUES ($1, $2, 'Search Test 50%_Cooling', 'active', 'REG_TEST', 'search@partner.example', tstzrange($3, $4)) ON CONFLICT (organization_id) DO NOTHING`,
+		`INSERT INTO maintenance.contractors (tenant_id, organization_id, name, status, registration_no, contact_email,
+			delegation)
+		VALUES ($1, $2, 'Search Test 50%_Cooling', 'active', 'REG_TEST', 'search@partner.example', tstzrange($3, $4)) ON
+		CONFLICT (organization_id) DO NOTHING`,
 		seed.ID("tenant-a"),
 		org,
 		clock.Add(-time.Hour),
@@ -56,7 +59,10 @@ func TestSearchIsLiteral(t *testing.T) {
 
 	// each list: a term taken from its own first row finds that row, in other case; a lone wildcard character finds
 	// only the rows that contain it
-	for op, field := range map[string]string{"clientUsers.list": "email", "contractors.list": "name", "parts.list": "name", "units.coverage": "unitId"} {
+	for op, field := range map[string]string{
+		"clientUsers.list": "email", "contractors.list": "name", "parts.list": "name",
+		"units.coverage": "unitId",
+	} {
 		all := search(op, "")
 		if len(all) == 0 {
 			t.Fatalf("%s lists nothing to search", op)

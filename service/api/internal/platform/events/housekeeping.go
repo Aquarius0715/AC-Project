@@ -47,13 +47,15 @@ func Housekeep(
 		tag, err := tx.Exec(ctx, `DELETE FROM platform.outbox o WHERE o.occurred_at < $1
 			AND NOT EXISTS (SELECT 1 FROM unnest($2::text[], $3::text[]) AS sub(consumer, event_type)
 				WHERE sub.event_type = o.event_type
-				  AND NOT EXISTS (SELECT 1 FROM platform.processed_events p WHERE p.consumer = sub.consumer AND p.event_id = o.id))`,
+				  AND NOT EXISTS (SELECT 1 FROM platform.processed_events p WHERE p.consumer = sub.consumer AND p.event_id =
+				  o.id))`,
 			now.Add(-OutboxRetention), names, types)
 		if err != nil {
 			return err
 		}
 
 		s.Outbox = tag.RowsAffected()
+
 		tag, err = tx.Exec(
 			ctx,
 			`DELETE FROM platform.processed_events p WHERE p.processed_at < $1
@@ -65,6 +67,7 @@ func Housekeep(
 		}
 
 		s.Processed = tag.RowsAffected()
+
 		tag, err = tx.Exec(
 			ctx,
 			`DELETE FROM platform.event_failures f WHERE NOT EXISTS (SELECT 1 FROM platform.outbox o WHERE o.id = f.event_id)`,

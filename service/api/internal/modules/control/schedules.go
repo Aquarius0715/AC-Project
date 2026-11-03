@@ -38,12 +38,14 @@ func (m Automations) FireSchedules(ctx context.Context, c *ops.Call) (int, error
 
 	var since time.Time
 
-	err := c.Tx.QueryRow(ctx, `SELECT evaluated_until FROM control.schedule_watermarks WHERE tenant_id = $1 FOR UPDATE`, c.Principal.TenantID).
+	err := c.Tx.QueryRow(ctx, `SELECT evaluated_until FROM control.schedule_watermarks WHERE tenant_id = $1 FOR
+		UPDATE`, c.Principal.TenantID).
 		Scan(&since)
 	if errors.Is(err, pgx.ErrNoRows) {
 		_, err = c.Tx.Exec(
 			ctx,
-			`INSERT INTO control.schedule_watermarks (tenant_id, evaluated_until) VALUES ($1, $2) ON CONFLICT (tenant_id) DO NOTHING`,
+			`INSERT INTO control.schedule_watermarks (tenant_id, evaluated_until) VALUES ($1, $2) ON CONFLICT (tenant_id) DO
+				NOTHING`,
 			c.Principal.TenantID,
 			now,
 		)
@@ -70,7 +72,8 @@ func (m Automations) FireSchedules(ctx context.Context, c *ops.Call) (int, error
 	rows, err := c.Tx.Query(
 		ctx,
 		`SELECT a.definition, a.timezone, array_agg(u.unit_id ORDER BY u.unit_id) FROM control.automations a
-		JOIN control.automation_units u ON u.automation_id = a.id WHERE a.kind = 'schedule' AND a.enabled GROUP BY a.id ORDER BY a.id`,
+		JOIN control.automation_units u ON u.automation_id = a.id WHERE a.kind = 'schedule' AND a.enabled GROUP BY a.id ORDER
+		BY a.id`,
 	)
 	if err != nil {
 		return 0, err
@@ -84,6 +87,7 @@ func (m Automations) FireSchedules(ctx context.Context, c *ops.Call) (int, error
 			tz    string
 			units []uuid.UUID
 		)
+
 		err := rows.Scan(&raw, &tz, &units)
 		if err != nil {
 			rows.Close()

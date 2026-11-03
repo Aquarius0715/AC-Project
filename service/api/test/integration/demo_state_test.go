@@ -9,10 +9,10 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
-// TestDemoStateReport: a device's state report (DemoTrigger state, sent with each heartbeat) becomes its unit's observed
-// state, observed at the report time, and moves the unit's last-seen time; a report with no settings moves only the
-// last-seen time (IR528); a report without a state, with a mode the air conditioner has no word for, or from after the
-// scenario clock is refused.
+// TestDemoStateReport: a device's state report (DemoTrigger state, sent with each heartbeat) becomes its unit's
+// observed state, observed at the report time, and moves the unit's last-seen time; a report with no settings moves
+// only the last-seen time (IR528); a report without a state, with a mode the air conditioner has no word for, or from
+// after the scenario clock is refused.
 func TestDemoStateReport(t *testing.T) {
 	s := serverWith(t, true)
 	unit, device := seed.ID("unit-limited"), seed.ID("device-limited")
@@ -99,11 +99,15 @@ func TestDemoStateReport(t *testing.T) {
 		state string
 		want  string
 	}{
-		"no state":     {at, ``, "state=error.required"},
-		"unknown mode": {at, `,"state":{"power":true,"celsius":24,"mode":"heat","fanLevel":"mid"}`, "state.mode=error.invalid"},
-		"bad fan":      {at, `,"state":{"power":true,"celsius":24,"mode":"cool","fanLevel":"turbo"}`, "state.fanLevel=error.invalid"},
-		"hot":          {at, `,"state":{"power":true,"celsius":55,"mode":"cool","fanLevel":"mid"}`, "state.celsius=error.range"},
-		"future":       {clock.Add(time.Hour), `,"state":{"power":true,"celsius":24,"mode":"cool","fanLevel":"mid"}`, "occurredAt=error.range"},
+		"no state": {at, ``, "state=error.required"},
+		"unknown mode": {at, `,"state":{"power":true,"celsius":24,"mode":"heat",` +
+			`"fanLevel":"mid"}`, "state.mode=error.invalid"},
+		"bad fan": {at, `,"state":{"power":true,"celsius":24,"mode":"cool",` +
+			`"fanLevel":"turbo"}`, "state.fanLevel=error.invalid"},
+		"hot": {at, `,"state":{"power":true,"celsius":55,"mode":"cool",` +
+			`"fanLevel":"mid"}`, "state.celsius=error.range"},
+		"future": {clock.Add(time.Hour), `,"state":{"power":true,"celsius":24,"mode":"cool",` +
+			`"fanLevel":"mid"}`, "occurredAt=error.range"},
 	} {
 		code, m := report(c.at, c.state)
 		refusal(t, name, code, m, c.want)

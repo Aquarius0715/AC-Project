@@ -72,20 +72,23 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 	s := server(t)
 	owner(
 		t,
-		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND lower(scheduled) > $2`,
+		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND
+			lower(scheduled) > $2`,
 		seed.ID("tech-internal-a"),
 		clock.Add(2*time.Hour),
 	)
 	// earlier runs leave many offers / histories for contractor-a; retire them so the lists stay within one page
 	owner(
 		t,
-		`UPDATE maintenance.offers SET expired_at = $2 WHERE contractor_org_id = $1 AND decision IS NULL AND expired_at IS NULL`,
+		`UPDATE maintenance.offers SET expired_at = $2 WHERE contractor_org_id = $1 AND decision IS NULL AND expired_at IS
+			NULL`,
 		seed.ID("org-contractor-a"),
 		clock.Add(-time.Hour),
 	)
 	owner(
 		t,
-		`UPDATE maintenance.offers SET access_valid_until = $2, access_valid_from = LEAST(access_valid_from, $2::timestamptz - interval '1 hour') WHERE contractor_org_id = $1 AND decision = 'accept'`,
+		`UPDATE maintenance.offers SET access_valid_until = $2, access_valid_from = LEAST(access_valid_from, $2::timestamptz -
+			interval '1 hour') WHERE contractor_org_id = $1 AND decision = 'accept'`,
 		seed.ID("org-contractor-a"),
 		clock.Add(-time.Hour),
 	)
@@ -153,11 +156,12 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		`{"filters":{"status":"accepted"},"limit":100}`:                                                     false,
 		`{"filters":{"origin":"client_request","from":"` + ts(24) + `","to":"` + ts(26) + `"},"limit":100}`: true,
 		`{"filters":{"overdueOnly":true},"limit":100}`:                                                      false,
-		`{"filters":{"type":"reactive"},"limit":100}`:                                                       true, // the offer's public type (IR290)
-		`{"filters":{"type":"periodic"},"limit":100}`:                                                       false,
-		`{"sort":{"field":"severity","direction":"desc"},"limit":100}`:                                      true,
-		`{"sort":{"field":"dueAt","direction":"asc"},"limit":100}`:                                          true,
-		`{"sort":{"field":"id","direction":"desc"},"limit":100}`:                                            true,
+		`{"filters":{"type":"reactive"},` +
+			`"limit":100}`: true, // the offer's public type (IR290)
+		`{"filters":{"type":"periodic"},"limit":100}`:                  false,
+		`{"sort":{"field":"severity","direction":"desc"},"limit":100}`: true,
+		`{"sort":{"field":"dueAt","direction":"asc"},"limit":100}`:     true,
+		`{"sort":{"field":"id","direction":"desc"},"limit":100}`:       true,
 	} {
 		if code, m := post(
 			s,
@@ -310,7 +314,10 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		t.Error("history status filter")
 	}
 	// without a completion the history counts at its as-of, when the delegation ended (IR614)
-	for period, want := range map[string]bool{`"from":"` + ts(-100) + `"`: true, `"from":"` + ts(1) + `"`: false, `"to":"` + ts(-100) + `"`: false} {
+	for period, want := range map[string]bool{
+		`"from":"` + ts(-100) + `"`: true, `"from":"` + ts(1) + `"`: false,
+		`"to":"` + ts(-100) + `"`: false,
+	} {
 		if code, m := post(
 			s,
 			&contrA,
@@ -460,7 +467,8 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 
 	owner(
 		t,
-		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND job_id <> $2 AND scheduled && tstzrange($3, $4)`,
+		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND
+			job_id <> $2 AND scheduled && tstzrange($3, $4)`,
 		seed.ID("tech-internal-a"),
 		k,
 		clock.Add(-3*time.Hour),
@@ -468,7 +476,8 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 	)
 	owner(
 		t,
-		`UPDATE maintenance.assignments SET scheduled = tstzrange($2, $3), created_at = $2 WHERE job_id = $1 AND status = 'active'`,
+		`UPDATE maintenance.assignments SET scheduled = tstzrange($2, $3), created_at = $2 WHERE job_id = $1 AND status =
+			'active'`,
 		k,
 		clock.Add(-3*time.Hour),
 		clock.Add(-time.Hour),

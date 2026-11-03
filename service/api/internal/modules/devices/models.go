@@ -44,7 +44,8 @@ func (Models) ByCode(ctx context.Context, c *ops.Call, code string) (uuid.UUID, 
 		v  int
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT id, version FROM devices.capabilities WHERE lower(model) = lower($1) AND is_current ORDER BY id LIMIT 1`, code).
+	err := c.Tx.QueryRow(ctx, `SELECT id, version FROM devices.capabilities WHERE lower(model) = lower($1) AND is_current
+		ORDER BY id LIMIT 1`, code).
 		Scan(&id, &v)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return uuid.Nil, 0, false, nil
@@ -66,7 +67,8 @@ func (Models) SerialState(
 		tamper string
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT d.id, d.unit_id IS NOT NULL OR EXISTS (SELECT 1 FROM devices.device_bindings b WHERE b.device_id = d.id AND b.unbound_at IS NULL), d.tamper
+	err := c.Tx.QueryRow(ctx, `SELECT d.id, d.unit_id IS NOT NULL OR EXISTS (SELECT 1 FROM devices.device_bindings b WHERE
+		b.device_id = d.id AND b.unbound_at IS NULL), d.tamper
 		FROM devices.devices d WHERE upper(d.serial) = upper($1) ORDER BY d.id LIMIT 1`, serial).
 		Scan(&id, &bound, &tamper)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -99,7 +101,9 @@ func (Models) BindImported(
 		bound  bool
 		tamper string
 	)
-	err := c.Tx.QueryRow(ctx, `SELECT d.unit_id IS NOT NULL OR EXISTS (SELECT 1 FROM devices.device_bindings b WHERE b.device_id = d.id AND b.unbound_at IS NULL), d.tamper
+
+	err := c.Tx.QueryRow(ctx, `SELECT d.unit_id IS NOT NULL OR EXISTS (SELECT 1 FROM devices.device_bindings b WHERE
+		b.device_id = d.id AND b.unbound_at IS NULL), d.tamper
 		FROM devices.devices d WHERE d.id = $1 FOR UPDATE`, device).
 		Scan(&bound, &tamper)
 	if err != nil {
@@ -115,9 +119,11 @@ func (Models) BindImported(
 	}
 
 	binding := uuid.Must(uuid.NewV7())
+
 	_, err = c.Tx.Exec(
 		ctx,
-		`INSERT INTO devices.device_bindings (id, tenant_id, device_id, unit_id, customer_org_id, bound_at, reason, actor_membership_id)
+		`INSERT INTO devices.device_bindings (id, tenant_id, device_id, unit_id, customer_org_id, bound_at, reason,
+			actor_membership_id)
 		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7)`,
 		binding,
 		device,
@@ -132,7 +138,9 @@ func (Models) BindImported(
 	}
 
 	var v int
-	err = c.Tx.QueryRow(ctx, `UPDATE devices.devices SET unit_id = $2, binding_id = $3, target_unit_id = $2, version = version + 1, updated_at = platform.app_now()
+
+	err = c.Tx.QueryRow(ctx, `UPDATE devices.devices SET unit_id = $2, binding_id = $3, target_unit_id = $2, version =
+		version + 1, updated_at = platform.app_now()
 		WHERE id = $1 RETURNING version`, device, unit, binding).
 		Scan(&v)
 	if err != nil {
@@ -169,7 +177,8 @@ func (Models) UnbindUnits(
 ) error {
 	rows, err := c.Tx.Query(
 		ctx,
-		`UPDATE devices.device_bindings SET unbound_at = $2, reason = $3 WHERE unit_id = ANY($1) AND unbound_at IS NULL RETURNING device_id, unit_id`,
+		`UPDATE devices.device_bindings SET unbound_at = $2, reason = $3 WHERE unit_id = ANY($1) AND unbound_at IS NULL
+			RETURNING device_id, unit_id`,
 		units,
 		c.Now,
 		reason,
@@ -184,6 +193,7 @@ func (Models) UnbindUnits(
 
 	for rows.Next() {
 		var p pair
+
 		err := rows.Scan(&p.device, &p.unit)
 		if err != nil {
 			rows.Close()
@@ -203,7 +213,9 @@ func (Models) UnbindUnits(
 
 	for _, p := range ended {
 		var v int
-		err := c.Tx.QueryRow(ctx, `UPDATE devices.devices SET unit_id = NULL, binding_id = NULL, version = version + 1, updated_at = platform.app_now()
+
+		err := c.Tx.QueryRow(ctx, `UPDATE devices.devices SET unit_id = NULL, binding_id = NULL, version = version + 1,
+			updated_at = platform.app_now()
 			WHERE id = $1 RETURNING version`, p.device).
 			Scan(&v)
 		if err != nil {
@@ -281,7 +293,8 @@ func (Models) Caps(
 		HasTemperature:    false,
 	}
 	if x.Temperature != nil {
-		out.HasTemperature, out.TempMin, out.TempMax, out.TempStep = true, x.Temperature.Min, x.Temperature.Max, x.Temperature.Step
+		out.HasTemperature = true
+		out.TempMin, out.TempMax, out.TempStep = x.Temperature.Min, x.Temperature.Max, x.Temperature.Step
 	}
 
 	return out, true, nil
@@ -310,6 +323,7 @@ func (Models) StaleAfter(
 			id  uuid.UUID
 			sec int
 		)
+
 		err := rows.Scan(&id, &sec)
 		if err != nil {
 			return nil, err
@@ -332,7 +346,8 @@ func (Models) BoundDevice(
 		conn, power string
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT d.id, d.connection, d.power_signal FROM devices.device_bindings b JOIN devices.devices d ON d.id = b.device_id
+	err := c.Tx.QueryRow(ctx, `SELECT d.id, d.connection, d.power_signal FROM devices.device_bindings b JOIN
+		devices.devices d ON d.id = b.device_id
 		WHERE b.unit_id = $1 AND b.unbound_at IS NULL`, unit).
 		Scan(&id, &conn, &power)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -346,7 +361,8 @@ func (Models) BoundDevice(
 func (Models) OperationBusy(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, error) {
 	var b bool
 
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE unit_id = $1 AND status IN ('queued','running') AND expires_at > $2)`, unit, c.Now).
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE unit_id = $1 AND status IN
+		('queued','running') AND expires_at > $2)`, unit, c.Now).
 		Scan(&b)
 
 	return b, err
@@ -369,7 +385,8 @@ func (Models) AlertRecoveries(
 ) ([]AlertRecovery, error) {
 	rows, err := c.Tx.Query(
 		ctx,
-		`SELECT id, event_type, occurred_at FROM devices.device_events WHERE $1 = ANY(alert_ids) AND event_type = 'restored' AND occurred_at >= $2
+		`SELECT id, event_type, occurred_at FROM devices.device_events WHERE $1 = ANY(alert_ids) AND event_type = 'restored'
+			AND occurred_at >= $2
 		ORDER BY occurred_at DESC, id LIMIT 50`,
 		alert,
 		since,

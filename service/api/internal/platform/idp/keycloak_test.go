@@ -69,6 +69,7 @@ func TestKeycloakEndSessions(t *testing.T) {
 	}
 
 	ctx := context.Background()
+
 	err := k.EndSessions(ctx, "09f7f651-9f19-5407-b222-8730fe8fd5c3")
 	if err != nil {
 		t.Fatal(err)
@@ -82,7 +83,8 @@ func TestKeycloakEndSessions(t *testing.T) {
 	if got := strings.Join(
 		paths,
 		" ",
-	); got != "/admin/realms/ac/users/09f7f651-9f19-5407-b222-8730fe8fd5c3/logout /admin/realms/ac/users/..%2F..%2Fclients%2Fx/logout" {
+	); got != "/admin/realms/ac/users/09f7f651-9f19-5407-b222-8730fe8fd5c3/logout "+
+		"/admin/realms/ac/users/..%2F..%2Fclients%2Fx/logout" {
 		t.Errorf("paths %s", got)
 	}
 
@@ -134,6 +136,7 @@ func TestKeycloakEndSessions(t *testing.T) {
 		token:        "",
 		until:        time.Time{},
 	}
+
 	err = bad.EndSessions(ctx, "u-1")
 	if err == nil {
 		t.Error("a wrong client secret passes")
@@ -146,13 +149,15 @@ func TestKeycloakEndSessions(t *testing.T) {
 		ClientSecret: "test-secret",
 		Client:       srv.Client(), Now: nil, mu: sync.Mutex{}, token: "", until: time.Time{},
 	}
+
 	err = own.EndSessions(ctx, "u-1")
 	if err != nil {
 		t.Errorf("with its own client: %v", err)
 	}
 }
 
-// TestKeycloakTokenAnswers: a token endpoint that answers without a token, or with something else than JSON, ends nothing.
+// TestKeycloakTokenAnswers: a token endpoint that answers without a token, or with something else than JSON, ends
+// nothing.
 func TestKeycloakTokenAnswers(t *testing.T) {
 	for _, body := range []string{`{}`, `{"access_token":""}`, `not json`} {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -176,6 +181,7 @@ func TestKeycloakTokenAnswers(t *testing.T) {
 			token:        "",
 			until:        time.Time{},
 		}
+
 		err := k.EndSessions(context.Background(), "u-1")
 		if err == nil {
 			t.Errorf("token answer %s passes", body)

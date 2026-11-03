@@ -39,11 +39,23 @@ func TestTransitionInput(t *testing.T) {
 		in   TransitionInput
 		want map[string]string
 	}{
-		"approve":        {TransitionInput{StatementID: uuid.New(), Action: "approve", Reason: nil}, map[string]string{}},
-		"mark paid":      {TransitionInput{StatementID: uuid.New(), Action: "mark_paid", Reason: &blank}, map[string]string{}},
-		"unknown action": {TransitionInput{StatementID: uuid.New(), Action: "refund", Reason: nil}, map[string]string{"action": "error.invalid"}},
-		"no statement":   {TransitionInput{Action: "approve", StatementID: uuid.UUID{}, Reason: nil}, map[string]string{"statementId": "error.required"}},
-		"long reason":    {TransitionInput{StatementID: uuid.New(), Action: "approve", Reason: &long}, map[string]string{"reason": "error.length"}},
+		"approve": {TransitionInput{StatementID: uuid.New(), Action: "approve", Reason: nil}, map[string]string{}},
+		"mark paid": {
+			TransitionInput{StatementID: uuid.New(), Action: "mark_paid", Reason: &blank},
+			map[string]string{},
+		},
+		"unknown action": {
+			TransitionInput{StatementID: uuid.New(), Action: "refund", Reason: nil},
+			map[string]string{"action": "error.invalid"},
+		},
+		"no statement": {
+			TransitionInput{Action: "approve", StatementID: uuid.UUID{}, Reason: nil},
+			map[string]string{"statementId": "error.required"},
+		},
+		"long reason": {
+			TransitionInput{StatementID: uuid.New(), Action: "approve", Reason: &long},
+			map[string]string{"reason": "error.length"},
+		},
 	} {
 		in := c.in
 		if got := in.Validate(); !maps.Equal(got, c.want) {

@@ -24,7 +24,9 @@ func TestAutomationDecideReasons(t *testing.T) {
 			s,
 			&customerB,
 			"automations.save",
-			`{"name":"reason","unitIds":["`+u+`"],"timezone":"Asia/Kuala_Lumpur","enabled":true,"priority":10,"kind":"event","condition":`+cond+`,"action":`+action+`}`,
+			`{"name":"reason",`+
+				`"unitIds":["`+u+`"],"timezone":"Asia/Kuala_Lumpur","enabled":true,"priority":10,"kind":"event",`+
+				`"condition":`+cond+`,"action":`+action+`}`,
 			0,
 		)
 		if code != 200 {
@@ -53,7 +55,8 @@ func TestAutomationDecideReasons(t *testing.T) {
 			s,
 			&customerB,
 			"automations.simulate",
-			`{"eventId":"`+uuid.NewString()+`","occurredAt":"`+at+`","unitIds":["`+u+`"],"facts":[`+facts+`],"phase":"condition"}`,
+			`{"eventId":"`+uuid.NewString()+`","occurredAt":"`+at+`","unitIds":["`+u+`"],"facts":[`+facts+
+				`],"phase":"condition"}`,
 		)
 		if code != 200 {
 			t.Fatalf("simulate: %d %v", code, m)
@@ -69,7 +72,8 @@ func TestAutomationDecideReasons(t *testing.T) {
 		return r
 	}
 	fact := func(metric, value, unitName string) string {
-		return `{"unitId":"` + u + `","metric":"` + metric + `","value":` + value + `,"unit":"` + unitName + `","observedAt":"` + at + `","quality":"valid"}`
+		return `{"unitId":"` + u + `","metric":"` + metric + `","value":` + value + `,"unit":"` + unitName +
+			`","observedAt":"` + at + `","quality":"valid"}`
 	}
 	occupied := fact("occupied", "true", "boolean")
 
@@ -77,7 +81,8 @@ func TestAutomationDecideReasons(t *testing.T) {
 	id, v := rule(`{"type":"occupancy","occupied":true}`, `{"kind":"set_fan","fanLevel":"high"}`)
 	owner(
 		t,
-		`UPDATE control.automations SET definition = jsonb_set(definition, '{action}', '{"kind":"set_fan","fanLevel":"turbo"}') WHERE id = $1`,
+		`UPDATE control.automations SET definition = jsonb_set(definition, '{action}',
+			'{"kind":"set_fan","fanLevel":"turbo"}') WHERE id = $1`,
 		id,
 	)
 

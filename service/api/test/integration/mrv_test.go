@@ -30,7 +30,9 @@ func TestMRV(t *testing.T) {
 		s,
 		&hq,
 		"baselines.save",
-		`{"unitIds":["`+u+`"],"period":{"from":"2026-08-01T00:00:00Z","to":"2026-08-01T00:05:00Z"},"boundaryId":"ac_input_electricity","boundary":"AC input","assumptions":"demo","source":"test","method":"demo_fixed","baselineKWh":10}`,
+		`{"unitIds":["`+u+`"],"period":{"from":"2026-08-01T00:00:00Z","to":"2026-08-01T00:05:00Z"},`+
+			`"boundaryId":"ac_input_electricity","boundary":"AC input","assumptions":"demo","source":"test",`+
+			`"method":"demo_fixed","baselineKWh":10}`,
 		0,
 	)
 	base := data(m)["id"].(string)

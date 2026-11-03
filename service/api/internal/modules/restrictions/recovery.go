@@ -52,6 +52,7 @@ func loadCases(
 		state   string
 		version int
 	)
+
 	err := tx.QueryRow(ctx, q, id).Scan(&raw, &state, &version)
 	if err != nil {
 		return nil, "", 0, err
@@ -143,8 +144,11 @@ func Observe(
 		successor *uuid.UUID
 		s         uuid.UUID
 	)
-	scanErr := tx.QueryRow(ctx, `SELECT r.id FROM restrictions.restrictions r JOIN restrictions.restriction_units ru ON ru.restriction_id = r.id
-		WHERE ru.unit_id = $1 AND r.id <> $2 AND r.state NOT IN ('released','cancelled') ORDER BY r.created_at DESC LIMIT 1`, unit, observed.RestrictionID).
+
+	scanErr := tx.QueryRow(ctx, `SELECT r.id FROM restrictions.restrictions r JOIN restrictions.restriction_units ru ON
+		ru.restriction_id = r.id
+		WHERE ru.unit_id = $1 AND r.id <> $2 AND r.state NOT IN ('released','cancelled') ORDER BY r.created_at DESC LIMIT
+		1`, unit, observed.RestrictionID).
 		Scan(&s)
 	if scanErr == nil {
 		successor = &s
@@ -334,6 +338,7 @@ func resolveRecoveryAlerts(ctx context.Context, tx pgx.Tx, units []uuid.UUID, _ 
 	}
 
 	var tenant uuid.UUID
+
 	scanErr := tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')::uuid`).
 		Scan(&tenant)
 	if scanErr != nil {
@@ -459,6 +464,7 @@ func publish(
 	payload any,
 ) error {
 	var tenant uuid.UUID
+
 	err := tx.QueryRow(ctx, `SELECT tenant_id FROM restrictions.restrictions WHERE id = $1`, restriction).
 		Scan(&tenant)
 	if err != nil {

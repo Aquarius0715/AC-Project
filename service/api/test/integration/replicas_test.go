@@ -15,20 +15,23 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
-// IR188, IR189, IR192: every notify, energy and maintenance reference copy holds exactly the captured columns of its source rows, and follows updates and
-// deletes made by any write path.
+// IR188, IR189, IR192: every notify, energy and maintenance reference copy holds exactly the captured columns of its
+// source rows, and follows updates and deletes made by any write path.
 func TestReplicas(t *testing.T) {
 	_ = server(t)
 	same := func() {
 		t.Helper()
 		drainEvents(t)
 
-		for _, r := range append(append(append(append([]events.Replica{}, notify.Replicas...), energy.Replicas...), maintenance.Replicas...), billing.Replicas...) {
+		for _, r := range append(
+			append(append(append([]events.Replica{}, notify.Replicas...), energy.Replicas...), maintenance.Replicas...),
+			billing.Replicas...) {
 			cols := strings.Join(append(append([]string{}, r.Keys...), r.Cols...), ", ")
 
 			source := r.Source
 			if source == "monitoring.measurements" { // only minute-slot power samples are captured
-				source = "(SELECT * FROM monitoring.measurements WHERE metric = 'power' AND observed_at = date_trunc('minute', observed_at)) m"
+				source = "(SELECT * FROM monitoring.measurements WHERE metric = 'power' AND observed_at = date_trunc('minute', " +
+					"observed_at)) m"
 			}
 
 			var diff int
@@ -62,7 +65,8 @@ func TestReplicas(t *testing.T) {
 	rid := uuid.New()
 	owner(
 		t,
-		`INSERT INTO restrictions.restrictions (id, tenant_id, contract_id, contract_version, customer_id, rules_version, notice_at, execute_after, reason, policy, state)
+		`INSERT INTO restrictions.restrictions (id, tenant_id, contract_id, contract_version, customer_id, rules_version,
+			notice_at, execute_after, reason, policy, state)
 		VALUES ($1,$2,$3,1,$4,'r',$5,$6,'demo','{"kind":"power_off"}','applied')`,
 		rid,
 		seed.ID("tenant-a"),
@@ -73,7 +77,8 @@ func TestReplicas(t *testing.T) {
 	)
 	owner(
 		t,
-		`INSERT INTO restrictions.restriction_units (tenant_id, restriction_id, unit_id, apply_state, release_state) VALUES ($1,$2,$3,'applied','none')`,
+		`INSERT INTO restrictions.restriction_units (tenant_id, restriction_id, unit_id, apply_state, release_state) VALUES
+			($1,$2,$3,'applied','none')`,
 		seed.ID("tenant-a"),
 		rid,
 		unit,

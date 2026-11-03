@@ -21,17 +21,26 @@ import (
 // targetLateral resolves a notification target ({kind,id} in columns k / i) to its customer organization, display
 // name, unit and property (IR142), from notify's reference copies of the owners' rows (IR188).
 const targetLateral = `LATERAL (
-	SELECT u.customer_org_id AS org, u.display_name AS name, u.id AS unit_id, u.property_id FROM notify.ref_units u WHERE %[1]s = 'unit' AND u.id = %[2]s
-	UNION ALL SELECT j.customer_org_id, u.display_name, u.id, u.property_id FROM notify.ref_jobs j JOIN notify.ref_units u ON u.id = j.unit_id WHERE %[1]s = 'job' AND j.id = %[2]s
-	UNION ALL SELECT cu.organization_id, i.number, NULL, NULL FROM notify.ref_invoices i JOIN notify.ref_customers cu ON cu.id = i.customer_id
+	SELECT u.customer_org_id AS org, u.display_name AS name, u.id AS unit_id, u.property_id FROM notify.ref_units u ` +
+	`WHERE %[1]s = 'unit' AND u.id = %[2]s
+	UNION ALL SELECT j.customer_org_id, u.display_name, u.id, u.property_id FROM notify.ref_jobs j JOIN ` +
+	`notify.ref_units u ON u.id = j.unit_id WHERE %[1]s = 'job' AND j.id = %[2]s
+	UNION ALL SELECT cu.organization_id, i.number, NULL, NULL FROM notify.ref_invoices i JOIN notify.ref_customers cu ` +
+	`ON cu.id = i.customer_id
 		WHERE %[1]s = 'invoice' AND i.id = %[2]s
-	UNION ALL SELECT cu.organization_id, COALESCE((SELECT u.display_name FROM notify.ref_restriction_units ru JOIN notify.ref_units u ON u.id = ru.unit_id
+	UNION ALL SELECT cu.organization_id, COALESCE((SELECT u.display_name FROM notify.ref_restriction_units ru JOIN ` +
+	`notify.ref_units u ON u.id = ru.unit_id
 		WHERE ru.restriction_id = r.id ORDER BY u.display_name LIMIT 1), 'Restriction'), NULL, NULL
-		FROM notify.ref_restrictions r JOIN notify.ref_customers cu ON cu.id = r.customer_id WHERE %[1]s = 'restriction' AND r.id = %[2]s
-	UNION ALL SELECT u.customer_org_id, d.serial, u.id, u.property_id FROM notify.ref_devices d LEFT JOIN notify.ref_units u ON u.id = d.unit_id WHERE %[1]s = 'device' AND d.id = %[2]s
-	UNION ALL SELECT cu.organization_id, q.subject_type, NULL, NULL FROM notify.ref_inquiries q JOIN notify.ref_customers cu ON cu.id = q.customer_id WHERE %[1]s = 'inquiry' AND q.id = %[2]s
-	UNION ALL SELECT c.organization_id, COALESCE(us.display_name || ' · ', '') || c.name, NULL, NULL FROM notify.ref_certificates c
-		LEFT JOIN identity.memberships m ON m.id = c.membership_id LEFT JOIN identity.users us ON us.id = m.user_id WHERE %[1]s = 'certificate' AND c.id = %[2]s
+		FROM notify.ref_restrictions r JOIN notify.ref_customers cu ON cu.id = r.customer_id WHERE %[1]s = 'restriction' ` +
+	`AND r.id = %[2]s
+	UNION ALL SELECT u.customer_org_id, d.serial, u.id, u.property_id FROM notify.ref_devices d LEFT JOIN ` +
+	`notify.ref_units u ON u.id = d.unit_id WHERE %[1]s = 'device' AND d.id = %[2]s
+	UNION ALL SELECT cu.organization_id, q.subject_type, NULL, NULL FROM notify.ref_inquiries q JOIN ` +
+	`notify.ref_customers cu ON cu.id = q.customer_id WHERE %[1]s = 'inquiry' AND q.id = %[2]s
+	UNION ALL SELECT c.organization_id, COALESCE(us.display_name || ' · ', '') || c.name, NULL, NULL FROM ` +
+	`notify.ref_certificates c
+		LEFT JOIN identity.memberships m ON m.id = c.membership_id LEFT JOIN identity.users us ON us.id = m.user_id WHERE ` +
+	`%[1]s = 'certificate' AND c.id = %[2]s
 ) t`
 
 // adminKinds lists the target kinds an HQ membership can read and the permissions that grant each (IR142).
@@ -90,7 +99,8 @@ func readableSQL(p *ops.Principal, now time.Time, kind, id string, args *[]any) 
 	case "contractor":
 		org := add(p.OrgID)
 
-		return "((" + kind + " = 'job' AND EXISTS (SELECT 1 FROM notify.ref_offers o WHERE o.job_id = " + id + " AND o.contractor_org_id = " + org + ")) OR (" +
+		return "((" + kind + " = 'job' AND EXISTS (SELECT 1 FROM notify.ref_offers o WHERE o.job_id = " + id +
+			" AND o.contractor_org_id = " + org + ")) OR (" +
 			kind + " = 'certificate' AND t.org = " + org + "))"
 	default:
 		unitScope := "(t.unit_id = ANY(" + add(
@@ -102,11 +112,13 @@ func readableSQL(p *ops.Principal, now time.Time, kind, id string, args *[]any) 
 		) + "))"
 		me := add(p.MembershipID)
 
-		return "((" + kind + " = 'job' AND (EXISTS (SELECT 1 FROM notify.ref_assignments a WHERE a.job_id = " + id + " AND a.technician_membership_id = " + me +
+		return "((" + kind + " = 'job' AND (EXISTS (SELECT 1 FROM notify.ref_assignments a WHERE a.job_id = " + id +
+			" AND a.technician_membership_id = " + me +
 			" AND a.status = 'active' AND (a.scheduled IS NULL OR " + add(
 			now,
 		) + " < upper(a.scheduled)))" +
-			" OR EXISTS (SELECT 1 FROM notify.ref_job_histories h WHERE h.job_id = " + id + " AND h.owner_kind = 'membership' AND h.owner_id = " + me + "))) OR (" +
+			" OR EXISTS (SELECT 1 FROM notify.ref_job_histories h WHERE h.job_id = " + id + " AND h.owner_kind = 'membership' " +
+			"AND h.owner_id = " + me + "))) OR (" +
 			kind + " IN ('unit','device') AND " + unitScope + "))"
 	}
 }
@@ -130,7 +142,8 @@ type Notification struct {
 	Severity               string            `json:"severity"`
 	OccurredAt             time.Time         `json:"occurredAt"`
 	ReadAt                 *time.Time        `json:"readAt"`
-	TargetOpen             bool              `json:"targetOpen"` // the target's page opens for the reader, so the notice may link it (IR602)
+	// the target's page opens for the reader, so the notice may link it (IR602)
+	TargetOpen bool `json:"targetOpen"`
 }
 
 // Params is Notification.params: the stored params projected onto the canonical shape (IR142).
@@ -187,7 +200,8 @@ func projectParams(raw []byte, name string, occurred time.Time, typ string) Para
 	return p
 }
 
-const inboxCols = `n.id, n.tenant_id, n.version, n.created_at, n.source_alert_id, n.type, n.recipient_membership_id, n.scope_version_at_creation, n.target->>'kind',
+const inboxCols = `n.id, n.tenant_id, n.version, n.created_at, n.source_alert_id, n.type, n.recipient_membership_id, ` +
+	`n.scope_version_at_creation, n.target->>'kind',
 	n.target->>'id', n.template_key, n.params, n.channel, n.severity, n.occurred_at, n.read_at, t.name`
 
 func scanNotification(r pgx.Row) (Notification, error) {
@@ -249,6 +263,7 @@ func openTargets(ctx context.Context, c *ops.Call, items []Notification) error {
 	}
 
 	ids := []uuid.UUID{}
+
 	for _, x := range items {
 		id, err := uuid.Parse(
 			x.Target["id"],
@@ -309,34 +324,38 @@ var (
 	}
 )
 
-// @Summary		notifications.list (read)
-// @ID				notifications.list
-// @Description	Authorization: authenticated:recipient-only; current-target-scope
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR58 out-of-scope targets excluded from items/total; IR95 business event notification table
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-C08, DDC-07 · Query: filters unreadOnly,severity,type,from,to · sort id,createdAt,updatedAt,severity,occurredAt (default occurredAt desc;id desc)
-// @Tags			notifications
-// @Accept			json
-// @Produce		json
-// @Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit		query		integer	false	"page size 1–100, default 25"
-// @Param			sort		query		string	false	"field:direction — fields id,createdAt,updatedAt,severity,occurredAt; default occurredAt desc;id desc"
-// @Param			unreadOnly	query		boolean	false	"filter → true => readAt=null"
-// @Param			severity	query		string	false	"filter → severity"
-// @Param			type		query		string	false	"filter → type"
-// @Param			from		query		string	false	"filter → [from,to) on occurredAt"
-// @Param			to			query		string	false	"filter → [from,to) on occurredAt"
-// @Success		200			{object}	ops.Envelope{data=NotificationPage}
-// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/notifications [get]
+// list serves notifications.list.
+//
+//	@Summary		notifications.list (read)
+//	@ID				notifications.list
+//	@Description	Authorization: authenticated:recipient-only; current-target-scope
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR58 out-of-scope \
+//	@Description	targets excluded from items/total; IR95 business event notification table
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-C08, DDC-07 · Query: filters unreadOnly,severity,type,from,to · sort \
+//	@Description	id,createdAt,updatedAt,severity,occurredAt (default occurredAt desc;id desc)
+//	@Tags			notifications
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit		query		integer	false	"page size 1–100, default 25"
+//	@Param			sort		query		string	false	"field:direction — fields id,createdAt,updatedAt,severity,occurredAt; default occurredAt desc;id desc"
+//	@Param			unreadOnly	query		boolean	false	"filter → true => readAt=null"
+//	@Param			severity	query		string	false	"filter → severity"
+//	@Param			type		query		string	false	"filter → type"
+//	@Param			from		query		string	false	"filter → [from,to) on occurredAt"
+//	@Param			to			query		string	false	"filter → [from,to) on occurredAt"
+//	@Success		200			{object}	ops.Envelope{data=NotificationPage}
+//	@Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/notifications [get]
 func (Inbox) list(
 	ctx context.Context,
 	c *ops.Call,
@@ -419,6 +438,7 @@ func (Inbox) list(
 	where := strings.Join(conds, " AND ")
 
 	var total int
+
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM "+inboxFrom()+" WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
@@ -485,30 +505,32 @@ func (in *MarkReadInput) Validate() map[string]string {
 	return nil
 }
 
-// @Summary		notifications.markRead (write)
-// @ID				notifications.markRead
-// @Description	Authorization: authenticated:recipient-only
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-C08
-// @Tags			notifications
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer			true	"all: required (target notifications, read notifications.list)"
-// @Param			id					path		string			true	"input field id"
-// @Param			request				body		MarkReadInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Notification}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/notifications/{id}/mark-read [post]
+// markRead serves notifications.markRead.
+//
+//	@Summary		notifications.markRead (write)
+//	@ID				notifications.markRead
+//	@Description	Authorization: authenticated:recipient-only
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-C08
+//	@Tags			notifications
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer			true	"all: required (target notifications, read notifications.list)"
+//	@Param			id					path		string			true	"input field id"
+//	@Param			request				body		MarkReadInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=Notification}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/notifications/{id}/mark-read [post]
 func (Inbox) markRead(ctx context.Context, c *ops.Call, in *MarkReadInput) (Notification, error) {
 	args := []any{in.ID, c.Principal.MembershipID}
 	q := "SELECT " + inboxCols + " FROM " + inboxFrom() + " WHERE n.id = $1 AND n.recipient_membership_id = $2 AND " +
@@ -534,6 +556,7 @@ func (Inbox) markRead(ctx context.Context, c *ops.Call, in *MarkReadInput) (Noti
 	}
 
 	one := []Notification{x}
+
 	openTargetsErr := openTargets(ctx, c, one)
 	if openTargetsErr != nil {
 		return x, openTargetsErr
@@ -600,7 +623,9 @@ type Marked struct {
 //	@Summary		notifications.markAllRead (write)
 //	@ID				notifications.markAllRead
 //	@Description	Authorization: authenticated:recipient-only
-//	@Description	Validation: D01; input constraints in the corresponding DD; IR379 1–100 distinct IDs; the caller's unread notifications with a readable target are marked read, every other ID is skipped (never told apart); one write for the whole list
+//	@Description	Validation: D01; input constraints in the corresponding DD; IR379 1–100 distinct IDs; the caller's \
+//	@Description	unread notifications with a readable target are marked read, every other ID is skipped (never told \
+//	@Description	apart); one write for the whole list
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DDC-07, DD-C08
 //	@Tags			notifications
@@ -709,7 +734,8 @@ func resolve(ctx context.Context, c *ops.Call, in *TargetInput) (target, error) 
 
 	var t target
 
-	err := c.Tx.QueryRow(ctx, "SELECT t.org, t.name FROM "+fmt.Sprintf(targetLateral, "$1::text", "$2::uuid")+" WHERE "+readableSQL(c.Principal, c.Now, "$1::text", "$2::uuid", &args), args...).
+	err := c.Tx.QueryRow(ctx, "SELECT t.org, t.name FROM "+fmt.Sprintf(targetLateral, "$1::text", "$2::uuid")+" WHERE "+
+		readableSQL(c.Principal, c.Now, "$1::text", "$2::uuid", &args), args...).
 		Scan(&t.org, &t.name)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return t, apperr.E(apperr.NotFound, "error.notFound")
@@ -729,7 +755,9 @@ func resolve(ctx context.Context, c *ops.Call, in *TargetInput) (target, error) 
 		}
 
 		var ok bool
-		err := c.Tx.QueryRow(ctx, `SELECT status = 'unpaid' AND due_at < $2 FROM notify.ref_invoices WHERE id = $1`, in.Target.ID, c.Now).
+
+		err := c.Tx.QueryRow(ctx, `SELECT status = 'unpaid' AND due_at < $2 FROM notify.ref_invoices WHERE id =
+			$1`, in.Target.ID, c.Now).
 			Scan(&ok)
 		if err != nil {
 			return t, err
@@ -755,13 +783,17 @@ type Recipient struct {
 // organization; HQ members with a permission for the target kind; for jobs, contractor members of offered
 // organizations and assigned technicians. payment_reminder is limited to the customer's clients (IR04).
 const recipientsSQL = `SELECT m.id, m.role, u.display_name,
-		CASE WHEN m.role = 'client' AND u.phone IS NOT NULL THEN ARRAY['inApp','email','whatsapp'] ELSE ARRAY['inApp','email'] END
+		CASE WHEN m.role = 'client' AND u.phone IS NOT NULL THEN ARRAY['inApp','email','whatsapp'] ELSE ARRAY['inApp','email']
+		END
 	FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id
 	WHERE m.valid_from <= $1 AND (m.valid_until IS NULL OR m.valid_until > $1)
 	  AND ((m.role = 'client' AND m.organization_id = $2)
-	    OR (NOT $5 AND m.role = 'admin' AND EXISTS (SELECT 1 FROM identity.membership_permissions mp WHERE mp.membership_id = m.id AND mp.permission = ANY($6)))
-	    OR (NOT $5 AND $3 = 'job' AND m.role = 'contractor' AND m.organization_id IN (SELECT o.contractor_org_id FROM notify.ref_offers o WHERE o.job_id = $4))
-	    OR (NOT $5 AND $3 = 'job' AND m.role = 'technician' AND m.id IN (SELECT a.technician_membership_id FROM notify.ref_assignments a WHERE a.job_id = $4 AND a.status = 'active')))`
+	    OR (NOT $5 AND m.role = 'admin' AND EXISTS (SELECT 1 FROM identity.membership_permissions mp WHERE mp.membership_id
+	    = m.id AND mp.permission = ANY($6)))
+	    OR (NOT $5 AND $3 = 'job' AND m.role = 'contractor' AND m.organization_id IN (SELECT o.contractor_org_id FROM
+	    notify.ref_offers o WHERE o.job_id = $4))
+	    OR (NOT $5 AND $3 = 'job' AND m.role = 'technician' AND m.id IN (SELECT a.technician_membership_id FROM
+	    notify.ref_assignments a WHERE a.job_id = $4 AND a.status = 'active')))`
 
 // adminPerms are the permissions that make an HQ member a recipient: one that reads the target kind (IR142); for an
 // alert about a unit only alert.read, as for the recipients an alert policy may notify (IR120 item 3, IR345).
@@ -812,6 +844,7 @@ func recipients(
 
 	for rows.Next() {
 		var r Recipient
+
 		err := rows.Scan(&r.ID, &r.Role, &r.DisplayLabel, &r.AllowedChannels)
 		if err != nil {
 			return nil, err
@@ -843,34 +876,38 @@ func (in *RecipientsInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		notifications.recipients (read)
-// @ID				notifications.recipients
-// @Description	Authorization: authenticated:current-target-party; D08 recipient projection; payment_reminder:admin:billing.write:overdue-unpaid-only (IR20)
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A05, DD-A08, DD-C11, DD-P07, DD-A05, DD-A12 · Query: filters none · sort none (default role asc;displayLabel asc;id asc)
-// @Tags			notifications
-// @Accept			json
-// @Produce		json
-// @Param			target.kind	query		string	false	"input field target.kind"
-// @Param			target.id	query		string	false	"input field target.id"
-// @Param			templateKey	query		string	false	"input field templateKey"
-// @Param			channel		query		string	false	"input field channel"
-// @Param			role		query		string	false	"input field role"
-// @Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit		query		integer	false	"page size 1–100, default 25"
-// @Param			sort		query		string	false	"field:direction — fields none; default role asc;displayLabel asc;id asc"
-// @Success		200			{object}	ops.Envelope{data=RecipientPage}
-// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/notifications/recipients [get]
+// recipients serves notifications.recipients.
+//
+//	@Summary		notifications.recipients (read)
+//	@ID				notifications.recipients
+//	@Description	Authorization: authenticated:current-target-party; D08 recipient projection; \
+//	@Description	payment_reminder:admin:billing.write:overdue-unpaid-only (IR20)
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A05, DD-A08, DD-C11, DD-P07, DD-A05, DD-A12 · Query: filters none · sort none (default \
+//	@Description	role asc;displayLabel asc;id asc)
+//	@Tags			notifications
+//	@Accept			json
+//	@Produce		json
+//	@Param			target.kind	query		string	false	"input field target.kind"
+//	@Param			target.id	query		string	false	"input field target.id"
+//	@Param			templateKey	query		string	false	"input field templateKey"
+//	@Param			channel		query		string	false	"input field channel"
+//	@Param			role		query		string	false	"input field role"
+//	@Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit		query		integer	false	"page size 1–100, default 25"
+//	@Param			sort		query		string	false	"field:direction — fields none; default role asc;displayLabel asc;id asc"
+//	@Success		200			{object}	ops.Envelope{data=RecipientPage}
+//	@Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/notifications/recipients [get]
 func (Inbox) recipients(
 	ctx context.Context,
 	c *ops.Call,
@@ -960,7 +997,8 @@ func (in *PreviewInput) Validate() map[string]string {
 //
 //	@Summary		notifications.preview (read)
 //	@ID				notifications.preview
-//	@Description	Authorization: authenticated:recipient-or-current-target-party; D08 billing/internal projection; payment_reminder:admin:billing.write:overdue-unpaid-only (IR20)
+//	@Description	Authorization: authenticated:recipient-or-current-target-party; D08 billing/internal projection; \
+//	@Description	payment_reminder:admin:billing.write:overdue-unpaid-only (IR20)
 //	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
 //	@Description	Design: DD-A05, DD-A08, DD-C11, DD-P07
@@ -998,7 +1036,9 @@ func (Inbox) preview(ctx context.Context, c *ops.Call, in *PreviewInput) (Notifi
 	}
 
 	var scope int
-	scanErr := c.Tx.QueryRow(ctx, `SELECT scope_version FROM identity.memberships WHERE id = $1`, in.RecipientMembershipID).
+
+	scanErr := c.Tx.QueryRow(ctx, `SELECT scope_version FROM identity.memberships WHERE id =
+		$1`, in.RecipientMembershipID).
 		Scan(&scope)
 	if scanErr != nil {
 		return Notification{}, scanErr

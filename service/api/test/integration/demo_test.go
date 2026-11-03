@@ -30,7 +30,10 @@ func TestDemoOperations(t *testing.T) {
 		t.Fatalf("production demo ops: %d %v", code, m)
 	}
 	// sessions belong to the BFF and the identity provider in API mode: every demoSession operation says so
-	for op, body := range map[string]string{"demoSession.signIn": `{"demoActorId":"customer-a"}`, "demoSession.switchMembership": `{"demoMembershipId":"m-1"}`, "demoSession.signOut": `{}`, "demoSession.extend": `{}`} {
+	for op, body := range map[string]string{
+		"demoSession.signIn":           `{"demoActorId":"customer-a"}`,
+		"demoSession.switchMembership": `{"demoMembershipId":"m-1"}`, "demoSession.signOut": `{}`, "demoSession.extend": `{}`,
+	} {
 		if code, m := write(
 			plain,
 			&customerB,
@@ -52,7 +55,8 @@ func TestDemoOperations(t *testing.T) {
 	sensor := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, boundary_id, stale_after_seconds) VALUES ($1,$2,$3,'temperature','°C',NULL,120)`,
+		`INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, boundary_id, stale_after_seconds) VALUES ($1,$2,
+			$3,'temperature','°C',NULL,120)`,
 		sensor,
 		seed.ID("tenant-a"),
 		device,
@@ -62,7 +66,8 @@ func TestDemoOperations(t *testing.T) {
 		return `{"scenarioId":"t","eventId":"` + uuid.NewString() + `","occurredAt":"` + clock.Format(
 			time.RFC3339,
 		) + `","eventType":"telemetry","measurement":{"unitId":"` + u +
-			`","sensorId":"` + sens + `","metric":"temperature","value":` + value + `,"unit":"` + unitName + `","observedAt":"` + observed.Format(
+			`","sensorId":"` + sens + `","metric":"temperature",` +
+			`"value":` + value + `,"unit":"` + unitName + `","observedAt":"` + observed.Format(
 			time.RFC3339,
 		) +
 			`","receivedAt":"` + clock.Format(
@@ -105,7 +110,8 @@ func TestDemoOperations(t *testing.T) {
 
 		r, err := conn.Query(
 			context.Background(),
-			`SELECT quality, sequence, value, quality_reason, raw_unit FROM monitoring.measurements WHERE sensor_id = $1 ORDER BY sequence`,
+			`SELECT quality, sequence, value, quality_reason, raw_unit FROM monitoring.measurements WHERE sensor_id = $1 ORDER BY
+				sequence`,
 			sensor,
 		)
 		if err != nil {
@@ -114,6 +120,7 @@ func TestDemoOperations(t *testing.T) {
 
 		for r.Next() {
 			var x row
+
 			err := r.Scan(&x.quality, &x.seq, &x.value, &x.reason, &x.rawUn)
 			if err != nil {
 				t.Fatal(err)
@@ -196,13 +203,33 @@ func TestDemoOperations(t *testing.T) {
 	// the trigger's own rules (IR36): a known event type, its IDs, and a measurement of the sensor's metric and unit
 	now := clock.Format(time.RFC3339)
 	for name, c := range map[string]struct{ body, field, key string }{
-		"another type":          {`{"scenarioId":"t","eventId":"` + uuid.NewString() + `","occurredAt":"` + now + `","eventType":"network"}`, "eventType", "errors.trigger_unsupported"},
-		"no event ID":           {`{"scenarioId":"t","occurredAt":"` + now + `","eventType":"network"}`, "eventId", "error.required"},
-		"no time":               {`{"scenarioId":"t","eventId":"` + uuid.NewString() + `","eventType":"network"}`, "occurredAt", "error.required"},
-		"command without ID":    {`{"scenarioId":"t","eventId":"` + uuid.NewString() + `","occurredAt":"` + now + `","eventType":"command_ack"}`, "commandId", "error.required"},
-		"telemetry without one": {`{"scenarioId":"t","eventId":"` + uuid.NewString() + `","occurredAt":"` + now + `","eventType":"telemetry"}`, "measurement", "error.required"},
-		"observation, no unit":  {`{"scenarioId":"t","eventId":"` + uuid.NewString() + `","occurredAt":"` + now + `","eventType":"restriction_observation"}`, "unitId", "error.required"},
-		"device without one":    {`{"scenarioId":"t","eventId":"` + uuid.NewString() + `","occurredAt":"` + now + `","eventType":"device","kind":"tamper","sequence":1}`, "deviceId", "error.required"},
+		"another type": {
+			`{"scenarioId":"t",` +
+				`"eventId":"` + uuid.NewString() + `","occurredAt":"` + now + `","eventType":"network"}`, "eventType",
+			"errors.trigger_unsupported",
+		},
+		"no event ID": {`{"scenarioId":"t",` +
+			`"occurredAt":"` + now + `","eventType":"network"}`, "eventId", "error.required"},
+		"no time": {`{"scenarioId":"t",` +
+			`"eventId":"` + uuid.NewString() + `","eventType":"network"}`, "occurredAt", "error.required"},
+		"command without ID": {
+			`{"scenarioId":"t",` +
+				`"eventId":"` + uuid.NewString() + `","occurredAt":"` + now + `","eventType":"command_ack"}`, "commandId",
+			"error.required",
+		},
+		"telemetry without one": {
+			`{"scenarioId":"t",` +
+				`"eventId":"` + uuid.NewString() + `","occurredAt":"` + now + `","eventType":"telemetry"}`, "measurement",
+			"error.required",
+		},
+		"observation, no unit": {
+			`{"scenarioId":"t",` +
+				`"eventId":"` + uuid.NewString() + `","occurredAt":"` + now + `","eventType":"restriction_observation"}`, "unitId",
+			"error.required",
+		},
+		"device without one": {`{"scenarioId":"t",` +
+			`"eventId":"` + uuid.NewString() + `","occurredAt":"` + now + `","eventType":"device","kind":"tamper",` +
+			`"sequence":1}`, "deviceId", "error.required"},
 	} {
 		if code, m := trig(
 			s,
@@ -403,7 +430,11 @@ func commandTrail(t *testing.T, s *apiserver.Server, created map[string]any) []s
 			continue
 		}
 
-		e := a["result"].(string) + " " + map[bool]string{true: "customer-b", false: a["actorId"].(string)}[a["actorId"] == seed.ID("user-customer-b").String()]
+		e := a["result"].(string) + " " +
+			map[bool]string{
+				true:  "customer-b",
+				false: a["actorId"].(string),
+			}[a["actorId"] == seed.ID("user-customer-b").String()]
 		if a["result"] != "pending" {
 			reason, _ := a["reason"].(string)
 			e += " " + reason

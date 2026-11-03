@@ -14,8 +14,9 @@ import (
 )
 
 // TestQueryCatalogFilters checks every row of docs/02-design/query-catalog.csv against the API: each catalogued filter
-// key is accepted on its own (no VALIDATION on filters) and an unknown key is VALIDATION (SR06); each allowed sort field
-// sorts both ways and an unknown one is VALIDATION. It keeps the allowlists of the design and the handlers the same.
+// key is accepted on its own (no VALIDATION on filters) and an unknown key is VALIDATION (SR06); each allowed sort
+// field sorts both ways and an unknown one is VALIDATION. It keeps the allowlists of the design and the handlers the
+// same.
 func TestQueryCatalogFilters(t *testing.T) {
 	s := server(t)
 
@@ -68,7 +69,9 @@ func TestQueryCatalogFilters(t *testing.T) {
 		},
 		"mrv.versions": func(q string) string { return `{"id":"` + uuid.NewString() + `","query":` + q + `}` },
 		"notifications.recipients": func(q string) string {
-			return `{"target":{"kind":"invoice","id":"` + invoice + `"},"templateKey":"payment_reminder","channel":"email","query":` + q + `}`
+			return `{"target":{"kind":"invoice",` +
+				`"id":"` + invoice + `"},"templateKey":"payment_reminder","channel":"email",` +
+				`"query":` + q + `}`
 		},
 		"telemetry.series": func(q string) string {
 			return `{"from":"2026-09-13T00:00:00Z","to":"2026-09-14T00:00:00Z","unitIds":["` + seed.ID("unit-online-rto").

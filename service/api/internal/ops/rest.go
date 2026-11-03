@@ -568,6 +568,7 @@ func (r *Registry) restHandler(op *Operation, b *Binding) echo.HandlerFunc {
 
 		if b.Body {
 			var err error
+
 			body, err = readBody(c, op.Spec.Name)
 			if err != nil {
 				return fail(c, err, corr)

@@ -60,6 +60,7 @@ func principal(t *testing.T, m *TxManager) *ops.Principal {
 	}
 
 	p.Role = "admin"
+
 	_, err := m.Writer.Exec(
 		context.Background(),
 		`INSERT INTO platform.tenants (id, name) VALUES ($1, 'test')`,
@@ -79,6 +80,7 @@ func TestIdempotencyLifecycle(t *testing.T) {
 	s := Idempotency{M: m}
 
 	key, hash := "key-"+uuid.NewString()[:8], "0a0b"
+
 	got, err := s.Begin(ctx, p, "units.save", key, hash)
 	if err != nil || got != nil {
 		t.Fatalf("first begin: %v %s", err, got)
@@ -219,8 +221,10 @@ func TestRecorderAndRLS(t *testing.T) {
 		t.Fatalf("outbox rows %d", n)
 	}
 	// the audit entry is published for identity's consumer in the same transaction (IR196)
-	_ = m.Writer.QueryRow(ctx, `SELECT count(*) FROM platform.outbox WHERE event_type = 'AuditRecorded' AND tenant_id = $1 AND payload->>'targetId' = $2
-		AND payload->>'action' = 'units.save' AND payload->>'reason' = 'r' AND (payload->>'nextVersion')::int = 2`, p.TenantID, agg.String()).
+	_ = m.Writer.QueryRow(ctx, `SELECT count(*) FROM platform.outbox WHERE event_type = 'AuditRecorded' AND tenant_id = $1
+		AND payload->>'targetId' = $2
+		AND payload->>'action' = 'units.save' AND payload->>'reason' = 'r' AND (payload->>'nextVersion')::int =
+		2`, p.TenantID, agg.String()).
 		Scan(&n)
 	if n != 1 {
 		t.Fatalf("AuditRecorded events %d", n)
@@ -229,8 +233,10 @@ func TestRecorderAndRLS(t *testing.T) {
 	runErr = m.Run(ctx, false, p, func(tx pgx.Tx) error {
 		_, err := tx.Exec(
 			ctx,
-			`INSERT INTO audit.audit_log (tenant_id, actor_id, actor_role_at_time, action, target_kind, target_id, occurred_at, correlation_id, result)
-			VALUES (current_setting('app.tenant_id')::uuid, 'test', 'admin', 'units.save', 'unit', $1, now(), 'corr', 'success')`,
+			`INSERT INTO audit.audit_log (tenant_id, actor_id, actor_role_at_time, action, target_kind, target_id, occurred_at,
+				correlation_id, result)
+			VALUES (current_setting('app.tenant_id')::uuid, 'test', 'admin', 'units.save', 'unit', $1, now(), 'corr',
+			'success')`,
 			agg.String(),
 		)
 

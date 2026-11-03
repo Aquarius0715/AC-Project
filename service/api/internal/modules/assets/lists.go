@@ -57,6 +57,7 @@ func list[T any](
 	where := strings.Join(conds, " AND ")
 
 	var total int
+
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM "+table+" WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
@@ -152,32 +153,36 @@ func scanCustomer(r pgx.Row) (Customer, error) {
 
 var profiles = map[string]bool{"rto": true, "general": true, "energy": true, "environment": true}
 
-// @Summary		customers.list (read)
-// @ID				customers.list
-// @Description	Authorization: admin:asset.read | admin:contract.read:scope-candidate-read-only | admin:offset.read:scope-candidate-read-only
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A02, DD-A07, DD-A15, DD-A05, DD-A18, DD-A06, DD-A01 · Query: filters kind,status,organizationId · sort id,createdAt,updatedAt (default id asc)
-// @Tags			customers
-// @Accept			json
-// @Produce		json
-// @Param			cursor			query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit			query		integer	false	"page size 1–100, default 25"
-// @Param			sort			query		string	false	"field:direction — fields id,createdAt,updatedAt; default id asc"
-// @Param			kind			query		string	false	"filter → serviceProfile"
-// @Param			status			query		string	false	"filter → status"
-// @Param			organizationId	query		string	false	"filter → organizationId"
-// @Success		200				{object}	ops.Envelope{data=CustomerPage}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/customers [get]
+// customersList serves customers.list.
+//
+//	@Summary		customers.list (read)
+//	@ID				customers.list
+//	@Description	Authorization: admin:asset.read | admin:contract.read:scope-candidate-read-only | \
+//	@Description	admin:offset.read:scope-candidate-read-only
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A02, DD-A07, DD-A15, DD-A05, DD-A18, DD-A06, DD-A01 · Query: filters \
+//	@Description	kind,status,organizationId · sort id,createdAt,updatedAt (default id asc)
+//	@Tags			customers
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor			query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit			query		integer	false	"page size 1–100, default 25"
+//	@Param			sort			query		string	false	"field:direction — fields id,createdAt,updatedAt; default id asc"
+//	@Param			kind			query		string	false	"filter → serviceProfile"
+//	@Param			status			query		string	false	"filter → status"
+//	@Param			organizationId	query		string	false	"filter → organizationId"
+//	@Success		200				{object}	ops.Envelope{data=CustomerPage}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/customers [get]
 func (m *Module) customersList(
 	ctx context.Context,
 	c *ops.Call,
@@ -188,6 +193,7 @@ func (m *Module) customersList(
 		Status         *string    `json:"status,omitempty"`
 		OrganizationID *uuid.UUID `json:"organizationId,omitempty"`
 	}
+
 	err := decodeFilters(in.Filters, &f)
 	if err != nil {
 		return paging.Page[Customer]{}, err
@@ -267,28 +273,30 @@ func (in *CustomerSave) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		customers.save (write)
-// @ID				customers.save
-// @Description	Authorization: admin:asset.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A02
-// @Tags			customers
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		CustomerSave	true	"input"
-// @Success		200				{object}	ops.Envelope{data=Customer}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/customers [post]
+// customersSave serves customers.save.
+//
+//	@Summary		customers.save (write)
+//	@ID				customers.save
+//	@Description	Authorization: admin:asset.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A02
+//	@Tags			customers
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		CustomerSave	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Customer}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/customers [post]
 func (m *Module) customersSave(
 	ctx context.Context,
 	c *ops.Call,
@@ -340,7 +348,9 @@ func (m *Module) customersSave(
 
 	if in.Status == "inactive" { // D05: deactivation conflicts with active units, contracts or jobs
 		var units bool
-		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.units WHERE customer_org_id = $1 AND NOT archived)`, in.OrganizationID).
+
+		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.units WHERE customer_org_id = $1 AND NOT
+			archived)`, in.OrganizationID).
 			Scan(&units)
 		if err != nil {
 			return Customer{}, err
@@ -365,7 +375,8 @@ func (m *Module) customersSave(
 	x, err := scanCustomer(
 		c.Tx.QueryRow(
 			ctx,
-			`UPDATE assets.customers SET name=$3, status=$4, service_profile=$5, version = version + 1, updated_at = platform.app_now()
+			`UPDATE assets.customers SET name=$3, status=$4, service_profile=$5, version = version + 1, updated_at =
+				platform.app_now()
 		WHERE id = $1 AND version = $2 AND organization_id = $6 RETURNING `+customerCols,
 			*in.ID,
 			*c.ExpectedVersion,
@@ -402,31 +413,34 @@ func (m *Module) customersSave(
 
 // ---- properties / spaces lists ----
 
-// @Summary		properties.list (read)
-// @ID				properties.list
-// @Description	Authorization: client:self-customer | admin:asset.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A02, DD-C02, DD-C07, DD-C04, DD-A06, DD-C09, DD-C01, DD-C08, DD-A01 · Query: filters customerId,kind · sort id,createdAt,updatedAt (default id asc)
-// @Tags			properties
-// @Accept			json
-// @Produce		json
-// @Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit		query		integer	false	"page size 1–100, default 25"
-// @Param			sort		query		string	false	"field:direction — fields id,createdAt,updatedAt; default id asc"
-// @Param			customerId	query		string	false	"filter → Customer.organizationId = Property.customerOrgId"
-// @Param			kind		query		string	false	"filter → kind"
-// @Success		200			{object}	ops.Envelope{data=PropertyPage}
-// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/properties [get]
+// propertiesList serves properties.list.
+//
+//	@Summary		properties.list (read)
+//	@ID				properties.list
+//	@Description	Authorization: client:self-customer | admin:asset.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A02, DD-C02, DD-C07, DD-C04, DD-A06, DD-C09, DD-C01, DD-C08, DD-A01 · Query: filters \
+//	@Description	customerId,kind · sort id,createdAt,updatedAt (default id asc)
+//	@Tags			properties
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit		query		integer	false	"page size 1–100, default 25"
+//	@Param			sort		query		string	false	"field:direction — fields id,createdAt,updatedAt; default id asc"
+//	@Param			customerId	query		string	false	"filter → Customer.organizationId = Property.customerOrgId"
+//	@Param			kind		query		string	false	"filter → kind"
+//	@Success		200			{object}	ops.Envelope{data=PropertyPage}
+//	@Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/properties [get]
 func (m *Module) propertiesList(
 	ctx context.Context,
 	c *ops.Call,
@@ -436,6 +450,7 @@ func (m *Module) propertiesList(
 		CustomerID *uuid.UUID `json:"customerId,omitempty"`
 		Kind       *string    `json:"kind,omitempty"`
 	}
+
 	err := decodeFilters(in.Filters, &f)
 	if err != nil {
 		return paging.Page[Property]{}, err
@@ -472,31 +487,34 @@ func (m *Module) propertiesList(
 	return list(ctx, c, in, f, "assets.properties", propertyCols, conds, args, scanProperty)
 }
 
-// @Summary		spaces.list (read)
-// @ID				spaces.list
-// @Description	Authorization: client:self-customer | admin:asset.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A02, DD-C02, DD-C07, DD-C04, DD-C09, DD-C01, DD-C08 · Query: filters propertyId,kind · sort id,createdAt,updatedAt (default id asc)
-// @Tags			spaces
-// @Accept			json
-// @Produce		json
-// @Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit		query		integer	false	"page size 1–100, default 25"
-// @Param			sort		query		string	false	"field:direction — fields id,createdAt,updatedAt; default id asc"
-// @Param			propertyId	query		string	false	"filter → propertyId"
-// @Param			kind		query		string	false	"filter → kind"
-// @Success		200			{object}	ops.Envelope{data=SpacePage}
-// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/spaces [get]
+// spacesList serves spaces.list.
+//
+//	@Summary		spaces.list (read)
+//	@ID				spaces.list
+//	@Description	Authorization: client:self-customer | admin:asset.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A02, DD-C02, DD-C07, DD-C04, DD-C09, DD-C01, DD-C08 · Query: filters propertyId,kind · \
+//	@Description	sort id,createdAt,updatedAt (default id asc)
+//	@Tags			spaces
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit		query		integer	false	"page size 1–100, default 25"
+//	@Param			sort		query		string	false	"field:direction — fields id,createdAt,updatedAt; default id asc"
+//	@Param			propertyId	query		string	false	"filter → propertyId"
+//	@Param			kind		query		string	false	"filter → kind"
+//	@Success		200			{object}	ops.Envelope{data=SpacePage}
+//	@Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/spaces [get]
 func (m *Module) spacesList(
 	ctx context.Context,
 	c *ops.Call,
@@ -506,6 +524,7 @@ func (m *Module) spacesList(
 		PropertyID *uuid.UUID `json:"propertyId,omitempty"`
 		Kind       *string    `json:"kind,omitempty"`
 	}
+
 	err := decodeFilters(in.Filters, &f)
 	if err != nil {
 		return paging.Page[Space]{}, err
@@ -575,31 +594,34 @@ func (in *RenameInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		locations.rename (write)
-// @ID				locations.rename
-// @Description	Authorization: client:self-customer | admin:asset.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR109 name 1–120 characters, unique among siblings; structure fields are not accepted
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-C02, DD-C03, DD-A02
-// @Tags			locations
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer		true	"all: required (target property|space|unit, read properties.list;spaces.list;units.get)"
-// @Param			target.kind			path		string		true	"input field target.kind"
-// @Param			target.id			path		string		true	"input field target.id"
-// @Param			request				body		RenameInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/locations/{target.kind}/{target.id}/rename [post]
+// locationsRename serves locations.rename.
+//
+//	@Summary		locations.rename (write)
+//	@ID				locations.rename
+//	@Description	Authorization: client:self-customer | admin:asset.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR109 name 1–120 characters, unique among siblings; structure fields are not accepted
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-C02, DD-C03, DD-A02
+//	@Tags			locations
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target property|space|unit, read properties.list;spaces.list;units.get)"
+//	@Param			target.kind			path		string		true	"input field target.kind"
+//	@Param			target.id			path		string		true	"input field target.id"
+//	@Param			request				body		RenameInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/locations/{target.kind}/{target.id}/rename [post]
 func (m *Module) locationsRename(ctx context.Context, c *ops.Call, in *RenameInput) (any, error) {
 	name := strings.TrimSpace(in.Name)
 
@@ -608,13 +630,18 @@ func (m *Module) locationsRename(ctx context.Context, c *ops.Call, in *RenameInp
 	switch in.Target.Kind {
 	case "property":
 		table, col, org = "assets.properties", "name", "customer_org_id"
-		siblings = `SELECT 1 FROM assets.properties o, assets.properties t WHERE t.id = $1 AND o.customer_org_id = t.customer_org_id AND o.id <> t.id AND NOT o.archived AND lower(o.name) = lower($2)`
+		siblings = `SELECT 1 FROM assets.properties o, assets.properties t WHERE t.id = $1 AND o.customer_org_id =
+			t.customer_org_id AND o.id <> t.id AND NOT o.archived AND lower(o.name) = lower($2)`
 	case "space":
-		table, col, org = "assets.spaces", "name", "(SELECT customer_org_id FROM assets.properties p WHERE p.id = property_id)"
-		siblings = `SELECT 1 FROM assets.spaces o, assets.spaces t WHERE t.id = $1 AND o.property_id = t.property_id AND o.parent_space_id IS NOT DISTINCT FROM t.parent_space_id AND o.id <> t.id AND NOT o.archived AND lower(o.name) = lower($2)`
+		table, col, org = "assets.spaces", "name", "(SELECT customer_org_id FROM assets.properties p WHERE p.id = "+
+			"property_id)"
+		siblings = `SELECT 1 FROM assets.spaces o, assets.spaces t WHERE t.id = $1 AND o.property_id = t.property_id AND
+			o.parent_space_id IS NOT DISTINCT FROM t.parent_space_id AND o.id <> t.id AND NOT o.archived AND lower(o.name) =
+			lower($2)`
 	default:
 		table, col, org = "assets.units", "display_name", "customer_org_id"
-		siblings = `SELECT 1 FROM assets.units o, assets.units t WHERE t.id = $1 AND o.property_id = t.property_id AND o.space_id IS NOT DISTINCT FROM t.space_id AND o.id <> t.id AND NOT o.archived AND lower(o.display_name) = lower($2)`
+		siblings = `SELECT 1 FROM assets.units o, assets.units t WHERE t.id = $1 AND o.property_id = t.property_id AND
+			o.space_id IS NOT DISTINCT FROM t.space_id AND o.id <> t.id AND NOT o.archived AND lower(o.display_name) = lower($2)`
 	}
 
 	visArgs, updArgs := []any{in.Target.ID}, []any{in.Target.ID, *c.ExpectedVersion, name}
@@ -626,7 +653,9 @@ func (m *Module) locationsRename(ctx context.Context, c *ops.Call, in *RenameInp
 	}
 
 	var visible bool
-	scanErr := c.Tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM "+table+" WHERE id = $1 AND NOT archived AND "+visScope+")", visArgs...).
+
+	scanErr := c.Tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM "+table+" WHERE id = $1 AND NOT archived AND "+visScope+
+		")", visArgs...).
 		Scan(&visible)
 	if scanErr != nil {
 		return nil, scanErr
@@ -637,6 +666,7 @@ func (m *Module) locationsRename(ctx context.Context, c *ops.Call, in *RenameInp
 	}
 
 	var dup bool
+
 	scanErr = c.Tx.QueryRow(ctx, "SELECT EXISTS ("+siblings+")", in.Target.ID, name).
 		Scan(&dup)
 	if scanErr != nil {
@@ -649,7 +679,8 @@ func (m *Module) locationsRename(ctx context.Context, c *ops.Call, in *RenameInp
 
 	var v int
 
-	err := c.Tx.QueryRow(ctx, "UPDATE "+table+" SET "+col+" = $3, version = version + 1, updated_at = platform.app_now() WHERE id = $1 AND version = $2 AND NOT archived AND "+updScope+" RETURNING version", updArgs...).
+	err := c.Tx.QueryRow(ctx, "UPDATE "+table+" SET "+col+" = $3, version = version + 1, updated_at = "+
+		"platform.app_now() WHERE id = $1 AND version = $2 AND NOT archived AND "+updScope+" RETURNING version", updArgs...).
 		Scan(&v)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, conflict("error.versionConflict")

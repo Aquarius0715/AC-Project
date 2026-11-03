@@ -33,7 +33,9 @@ func ApplyFleetHistory(
 	}
 
 	var tenant string
-	err := tx.QueryRow(ctx, `SELECT tenant_id::text FROM assets.customers WHERE organization_id = $1`, ID(f.CustomerOrgID)).
+
+	err := tx.QueryRow(ctx, `SELECT tenant_id::text FROM assets.customers WHERE organization_id =
+		$1`, ID(f.CustomerOrgID)).
 		Scan(&tenant)
 	if err != nil {
 		return 0, fmt.Errorf("history customer %s: %w", f.CustomerOrgID, err)
@@ -93,22 +95,29 @@ func ApplyFleetHistory(
 			devicesim.SensorName(p, temperature),
 		)
 		// on: the KL schedule, and not in the switched-off window; jitter: a stable 0..1 per sensor and minute
-		const on = `((extract(isodow from t AT TIME ZONE 'Asia/Kuala_Lumpur') < 6 AND extract(hour from t AT TIME ZONE 'Asia/Kuala_Lumpur') BETWEEN 8 AND 21)
-			OR (extract(isodow from t AT TIME ZONE 'Asia/Kuala_Lumpur') >= 6 AND extract(hour from t AT TIME ZONE 'Asia/Kuala_Lumpur') BETWEEN 10 AND 22)) AND t < $6`
+		const on = `((extract(isodow from t AT TIME ZONE 'Asia/Kuala_Lumpur') < 6 AND extract(hour from t AT TIME ZONE ` +
+			`'Asia/Kuala_Lumpur') BETWEEN 8 AND 21)
+			OR (extract(isodow from t AT TIME ZONE 'Asia/Kuala_Lumpur') >= 6 AND extract(hour from t AT TIME ZONE ` +
+			`'Asia/Kuala_Lumpur') BETWEEN 10 AND 22)) AND t < $6`
 
 		const jitter = `(abs(hashtext($9 || t::text)) % 1000) / 1000.0` // $9: the sensor ID as text
 
 		tag, err := tx.Exec(ctx, `WITH s AS (
 				SELECT t, CASE WHEN t >= $7 THEN 0
-					WHEN `+on+` THEN round((0.9 + 0.35 * sin(pi() * ((extract(hour from t AT TIME ZONE 'Asia/Kuala_Lumpur') + extract(minute from t) / 60.0) - 8) / 14) + 0.15 * `+jitter+`)::numeric, 2)::float8
+					WHEN `+on+` THEN round((0.9 + 0.35 * sin(pi() * ((extract(hour from t AT TIME ZONE 'Asia/Kuala_Lumpur') + `+
+			`extract(minute from t) / 60.0) - 8) / 14) + 0.15 * `+jitter+`)::numeric, 2)::float8
 					ELSE round((0.02 + 0.01 * `+jitter+`)::numeric, 3)::float8 END AS v
 				FROM generate_series($4::timestamptz, $5::timestamptz, interval '1 minute') AS t
 				WHERE NOT EXISTS (SELECT 1 FROM monitoring.measurements x WHERE x.sensor_id = $2 AND x.observed_at = t)),
-			m AS (INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit, origin, quality, boundary_id, received_at, event_id)
-				SELECT $1, $3, $2, 'power', t, extract(epoch from t)::bigint / 60, v, 'kW', 'measured', 'valid', $8, t + interval '2 seconds', md5($9 || t::text)::uuid FROM s
+			m AS (INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, `+
+			`unit, origin, quality, boundary_id, received_at, event_id)
+				SELECT $1, $3, $2, 'power', t, extract(epoch from t)::bigint / 60, v, 'kW', 'measured', 'valid', $8, t + `+
+			`interval '2 seconds', md5($9 || t::text)::uuid FROM s
 				ON CONFLICT DO NOTHING)
-			INSERT INTO energy.ref_power_samples (sensor_id, observed_at, sequence, tenant_id, unit_id, value, unit, origin, quality, boundary_id, event_id)
-			SELECT $2, t, extract(epoch from t)::bigint / 60, $1, $3, v, 'kW', 'measured', 'valid', $8, md5($9 || t::text)::uuid FROM s
+			INSERT INTO energy.ref_power_samples (sensor_id, observed_at, sequence, tenant_id, unit_id, value, unit, origin, `+
+			`quality, boundary_id, event_id)
+			SELECT $2, t, extract(epoch from t)::bigint / 60, $1, $3, v, 'kW', 'measured', 'valid', $8, md5($9 || `+
+			`t::text)::uuid FROM s
 			ON CONFLICT DO NOTHING`,
 			tenant, powerID, unit, start, last, offFrom, zeroFrom, power.Boundary, powerID.String())
 		if err != nil {
@@ -119,14 +128,18 @@ func ApplyFleetHistory(
 
 		tag, err = tx.Exec(
 			ctx,
-			`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit, origin, quality, received_at, event_id)
+			`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit,
+				origin, quality, received_at, event_id)
 			SELECT $1, $3, $2, 'temperature', t, extract(epoch from t)::bigint / 60,
-				CASE WHEN `+on+` THEN round((24.2 + 0.6 * sin(pi() * extract(hour from t AT TIME ZONE 'Asia/Kuala_Lumpur') / 12) + 0.5 * `+strings.ReplaceAll(
+				CASE WHEN
+				`+on+` THEN round((24.2 + 0.6 * sin(pi() * extract(hour from t AT TIME ZONE 'Asia/Kuala_Lumpur') / 12) `+
+				`+ 0.5 * `+strings.ReplaceAll(
 				jitter,
 				"$9",
 				"$7",
 			)+`)::numeric, 1)::float8
-					ELSE round((28.0 + 1.0 * sin(pi() * (extract(hour from t AT TIME ZONE 'Asia/Kuala_Lumpur') - 6) / 12) + 0.5 * `+strings.ReplaceAll(
+					ELSE round((28.0 + 1.0 * sin(pi() * (extract(hour from t AT TIME ZONE 'Asia/Kuala_Lumpur') - 6) / 12) + 0.5 `+
+				`* `+strings.ReplaceAll(
 				jitter,
 				"$9",
 				"$7",
@@ -151,8 +164,10 @@ func ApplyFleetHistory(
 		// the other air readings every 15 minutes: humidity drops while the AC runs, CO2 follows the people in the room,
 		// PM2.5 drifts
 		for _, a := range []struct{ metric, unit, on, off string }{
-			{"humidity", "%", `52 + 4 * sin(pi() * extract(hour from t AT TIME ZONE 'Asia/Kuala_Lumpur') / 12) + 4 * j`, `66 + 5 * sin(pi() * (extract(hour from t AT TIME ZONE 'Asia/Kuala_Lumpur') - 6) / 12) + 4 * j`},
-			{"co2", "ppm", `600 + 350 * sin(pi() * ((extract(hour from t AT TIME ZONE 'Asia/Kuala_Lumpur') + extract(minute from t) / 60.0) - 8) / 14) + 80 * j`, `430 + 40 * j`},
+			{"humidity", "%", `52 + 4 * sin(pi() * extract(hour from t AT TIME ZONE 'Asia/Kuala_Lumpur') / 12) + 4 * ` +
+				`j`, `66 + 5 * sin(pi() * (extract(hour from t AT TIME ZONE 'Asia/Kuala_Lumpur') - 6) / 12) + 4 * j`},
+			{"co2", "ppm", `600 + 350 * sin(pi() * ((extract(hour from t AT TIME ZONE 'Asia/Kuala_Lumpur') + extract(minute ` +
+				`from t) / 60.0) - 8) / 14) + 80 * j`, `430 + 40 * j`},
 			{"pm25", "µg/m³", `12 + 10 * j`, `8 + 8 * j`},
 		} {
 			id := ID(
@@ -171,9 +186,12 @@ func ApplyFleetHistory(
 
 			tag, err = tx.Exec(
 				ctx,
-				`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit, origin, quality, received_at, event_id)
+				`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit,
+					origin, quality, received_at, event_id)
 				SELECT $1, $3, $2, $8, t, extract(epoch from t)::bigint / 60,
-					round((CASE WHEN `+on+` THEN `+a.on+` ELSE `+a.off+` END)::numeric, 1)::float8, $9, 'measured', 'valid', t + interval '2 seconds', md5($7 || t::text)::uuid
+					round((CASE WHEN
+					`+on+` THEN `+a.on+` ELSE `+a.off+` END)::numeric, 1)::float8, $9, 'measured', 'valid', t + `+
+					`interval '2 seconds', md5($7 || t::text)::uuid
 				FROM (SELECT t, `+strings.ReplaceAll(
 					jitter,
 					"$9",

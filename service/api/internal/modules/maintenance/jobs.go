@@ -155,11 +155,15 @@ type Job struct {
 // contract's MaintenanceJob (IR392).
 func written(j Job, err error) (MaintenanceJob, error) { return j.MaintenanceJob, err }
 
-const jobCols = `j.id, j.tenant_id, j.version, j.created_at, j.updated_at, j.plan_id, j.occurrence_at, j.unit_id, j.type, j.status, j.symptom, j.contact_window,
-	lower(j.requested_slot), upper(j.requested_slot), j.origin, j.preferred_slots, j.preference_round, lower(j.scheduled_slot), upper(j.scheduled_slot), j.due_at,
-	j.started_at, j.completed_at, j.contractor_org_id, j.assignment_id, j.costs, j.follow_up_of_job_id, j.follow_up_class, j.time_on_site, j.rating,
+const jobCols = `j.id, j.tenant_id, j.version, j.created_at, j.updated_at, j.plan_id, j.occurrence_at, j.unit_id, ` +
+	`j.type, j.status, j.symptom, j.contact_window,
+	lower(j.requested_slot), upper(j.requested_slot), j.origin, j.preferred_slots, j.preference_round, ` +
+	`lower(j.scheduled_slot), upper(j.scheduled_slot), j.due_at,
+	j.started_at, j.completed_at, j.contractor_org_id, j.assignment_id, j.costs, j.follow_up_of_job_id, ` +
+	`j.follow_up_class, j.time_on_site, j.rating,
 	j.customer_confirmed_at, j.warranty_claims, j.customer_org_id,
-	COALESCE((SELECT array_agg(ja.alert_id ORDER BY ja.alert_id) FROM maintenance.job_alerts ja WHERE ja.job_id = j.id), '{}')`
+	COALESCE((SELECT array_agg(ja.alert_id ORDER BY ja.alert_id) FROM maintenance.job_alerts ja WHERE ja.job_id = j.id),` +
+	` '{}')`
 
 func scanJob(r pgx.Row) (Job, error) {
 	var (
@@ -250,12 +254,14 @@ func jobScope(c *ops.Call, args *[]any) string {
 	case "technician": // IR49 viewing window; external technicians also inside the accepted Offer's access window (IR124)
 		now := add(c.Now)
 
-		q := "EXISTS (SELECT 1 FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status = 'active' AND a.technician_membership_id = " + add(
+		q := "EXISTS (SELECT 1 FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status = 'active' AND " +
+			"a.technician_membership_id = " + add(
 			p.MembershipID,
 		) +
 			" AND a.created_at <= " + now + " AND " + now + " < upper(a.scheduled))"
 		if p.Employment != "internal" {
-			q += " AND EXISTS (SELECT 1 FROM maintenance.offers o WHERE o.job_id = j.id AND o.decision = 'accept' AND o.access_valid_from <= " + now + " AND " + now + " < o.access_valid_until)"
+			q += " AND EXISTS (SELECT 1 FROM maintenance.offers o WHERE o.job_id = j.id AND o.decision = 'accept' AND " +
+				"o.access_valid_from <= " + now + " AND " + now + " < o.access_valid_until)"
 		}
 
 		return q
@@ -289,7 +295,8 @@ var jobTypes = map[string]bool{"periodic": true, "reactive": true, "preventive":
 
 var contactDigits = regexp.MustCompile(`\d{7,}`)
 
-// ContactWindowOK applies IR64: no '@' and no run of seven digits once spaces, hyphens, parentheses and '+' are removed.
+// ContactWindowOK applies IR64: no '@' and no run of seven digits once spaces, hyphens, parentheses and '+' are
+// removed.
 func ContactWindowOK(s string) bool {
 	if strings.Contains(s, "@") {
 		return false
@@ -347,7 +354,8 @@ var kualaLumpur = func() *time.Location {
 	return l
 }()
 
-// PreferredSlotsOK applies IR113 item 2: distinct, each 1–4 hours, starting on a later Kuala Lumpur calendar day than now.
+// PreferredSlotsOK applies IR113 item 2: distinct, each 1–4 hours, starting on a later Kuala Lumpur calendar day than
+// now.
 func PreferredSlotsOK(now time.Time, slots []Slot) bool {
 	today := now.In(kualaLumpur)
 	y, m, d := today.Date()
@@ -368,28 +376,32 @@ func PreferredSlotsOK(now time.Time, slots []Slot) bool {
 	return true
 }
 
-// @Summary		jobs.create (write)
-// @ID				jobs.create
-// @Description	Authorization: client:self | admin:job.write
-// @Description	Validation: D01; input constraints in the corresponding DD; IR38 dueAt only for job.write; defaults to requestedEnd; IR113 client: requested slot + exactly 2 alternativeSlots, 3 distinct future slots ≥1 day ahead; HQ on behalf: 0–2
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A06, DD-C09
-// @Tags			jobs
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		CreateInput	true	"input"
-// @Success		200				{object}	ops.Envelope{data=MaintenanceJob}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/jobs [post]
+// create serves jobs.create.
+//
+//	@Summary		jobs.create (write)
+//	@ID				jobs.create
+//	@Description	Authorization: client:self | admin:job.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; IR38 dueAt only for job.write; defaults \
+//	@Description	to requestedEnd; IR113 client: requested slot + exactly 2 alternativeSlots, 3 distinct future slots \
+//	@Description	≥1 day ahead; HQ on behalf: 0–2
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A06, DD-C09
+//	@Tags			jobs
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		CreateInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=MaintenanceJob}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs [post]
 func (m Jobs) create(ctx context.Context, c *ops.Call, in *CreateInput) (MaintenanceJob, error) {
 	return written(m.createJob(ctx, c, in))
 }
@@ -442,9 +454,12 @@ func (m Jobs) createJob(ctx context.Context, c *ops.Call, in *CreateInput) (Job,
 
 	var id uuid.UUID
 
-	err = c.Tx.QueryRow(ctx, `INSERT INTO maintenance.jobs (tenant_id, unit_id, customer_org_id, type, status, origin, symptom, contact_window, requested_slot,
-		preferred_slots, preference_round, due_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'requested', 'client_request', $4, $5,
-		tstzrange($6, $7), $8, 1, $9) RETURNING id`, in.UnitID, org, in.Type, in.Symptom, cw, in.RequestedStart, in.RequestedEnd, pref, due).
+	err = c.Tx.QueryRow(ctx, `INSERT INTO maintenance.jobs (tenant_id, unit_id, customer_org_id, type, status, origin,
+		symptom, contact_window, requested_slot,
+		preferred_slots, preference_round, due_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'requested',
+		'client_request', $4, $5,
+		tstzrange($6, $7), $8, 1, $9) RETURNING
+		id`, in.UnitID, org, in.Type, in.Symptom, cw, in.RequestedStart, in.RequestedEnd, pref, due).
 		Scan(&id)
 	if err != nil {
 		return Job{}, err
@@ -558,6 +573,7 @@ func (m Jobs) load(
 	}
 
 	j.Projection = "detail"
+
 	j.SlotProposal, err = m.pendingOrLastProposal(ctx, c, id)
 	if err != nil {
 		return j, err
@@ -570,10 +586,13 @@ func (m Jobs) load(
 
 	var pp PartnerSlotProposal
 
-	err = c.Tx.QueryRow(ctx, `SELECT p.id, p.offer_id, lower(p.slot), upper(p.slot), p.technician_membership_id, p.reason, p.sent_at, p.status
-		FROM maintenance.partner_slot_proposals p JOIN maintenance.offers o ON o.id = p.offer_id WHERE o.job_id = $1 AND p.status <> 'withdrawn'
+	err = c.Tx.QueryRow(ctx, `SELECT p.id, p.offer_id, lower(p.slot), upper(p.slot), p.technician_membership_id, p.reason,
+		p.sent_at, p.status
+		FROM maintenance.partner_slot_proposals p JOIN maintenance.offers o ON o.id = p.offer_id WHERE o.job_id = $1 AND
+		p.status <> 'withdrawn'
 		ORDER BY p.sent_at DESC, p.id LIMIT 1`, id).
-		Scan(&pp.ID, &pp.OfferID, &pp.Slot.StartAt, &pp.Slot.EndAt, &pp.TechnicianMembershipID, &pp.Reason, &pp.SentAt, &pp.Status)
+		Scan(&pp.ID, &pp.OfferID, &pp.Slot.StartAt, &pp.Slot.EndAt, &pp.TechnicianMembershipID, &pp.Reason, &pp.SentAt,
+			&pp.Status)
 	switch {
 	case err == nil && c.Principal.Role != "client" && c.Principal.Role != "technician":
 		j.PartnerSlotProposal, _ = json.Marshal(pp)
@@ -581,9 +600,11 @@ func (m Jobs) load(
 		return j, err
 	}
 
-	cursorSQL := `SELECT count(*) FROM maintenance.job_events e LEFT JOIN maintenance.job_notes n ON n.id = e.note_id WHERE e.job_id = $1`
+	cursorSQL := `SELECT count(*) FROM maintenance.job_events e LEFT JOIN maintenance.job_notes n ON n.id = e.note_id WHERE
+		e.job_id = $1`
 	if c.Principal.Role == "client" {
-		cursorSQL += clientEventFilter // the cursor counts what the client's jobs.events lists, so it reveals no hidden event (IR42, IR442)
+		// the cursor counts what the client's jobs.events lists, so it reveals no hidden event (IR42, IR442)
+		cursorSQL += clientEventFilter
 	}
 
 	scanErr := c.Tx.QueryRow(ctx, cursorSQL, id).Scan(&j.EventCursor)
@@ -611,6 +632,7 @@ func (m Jobs) load(
 			v     int
 			state string
 		)
+
 		err := rows.Scan(&rid, &v, &state)
 		if err != nil {
 			rows.Close()
@@ -665,7 +687,8 @@ type OfferView struct {
 func (m Jobs) project(ctx context.Context, c *ops.Call, j *Job) error {
 	role := c.Principal.Role
 	if role == "admin" || role == "contractor" {
-		q := `SELECT id, tenant_id, version, created_at, updated_at, job_id, contractor_org_id, terms_version, lower(visit_slot), upper(visit_slot), offered_at,
+		q := `SELECT id, tenant_id, version, created_at, updated_at, job_id, contractor_org_id, terms_version,
+			lower(visit_slot), upper(visit_slot), offered_at,
 			offer_expires_at, access_valid_from, access_valid_until, decision, decided_by, decided_at, decline_reason
 			FROM maintenance.offers WHERE job_id = $1 AND ((decision IS NULL AND expired_at IS NULL) OR decision = 'accept')`
 		args := []any{j.ID}
@@ -680,7 +703,8 @@ func (m Jobs) project(ctx context.Context, c *ops.Call, j *Job) error {
 
 		err := c.Tx.QueryRow(ctx, q+" ORDER BY offered_at DESC LIMIT 1", args...).
 			Scan(&o.ID, &o.TenantID, &o.Version, &o.CreatedAt, &o.UpdatedAt, &o.JobID,
-				&o.ContractorOrgID, &o.TermsVersion, &o.VisitSlot.StartAt, &o.VisitSlot.EndAt, &o.OfferedAt, &o.OfferExpiresAt, &o.AccessValidFrom, &o.AccessValidUntil,
+				&o.ContractorOrgID, &o.TermsVersion, &o.VisitSlot.StartAt, &o.VisitSlot.EndAt, &o.OfferedAt, &o.OfferExpiresAt,
+				&o.AccessValidFrom, &o.AccessValidUntil,
 				&o.Decision, &o.DecidedBy, &o.DecidedAt, &o.DeclineReason)
 		switch {
 		case err == nil:
@@ -700,7 +724,9 @@ func (m Jobs) project(ctx context.Context, c *ops.Call, j *Job) error {
 			j.Assignment.Reason = nil
 			if j.Assignment.Acknowledgement == "accepted" {
 				var user uuid.UUID
-				err := c.Tx.QueryRow(ctx, `SELECT user_id FROM maintenance.ref_memberships WHERE id = $1`, j.Assignment.TechnicianMembershipID).
+
+				err := c.Tx.QueryRow(ctx, `SELECT user_id FROM maintenance.ref_memberships WHERE id =
+					$1`, j.Assignment.TechnicianMembershipID).
 					Scan(&user)
 				if err == nil {
 					ms := []identity.Member{
@@ -725,6 +751,7 @@ func (m Jobs) project(ctx context.Context, c *ops.Call, j *Job) error {
 							RevokedAt:      nil,
 						},
 					}
+
 					err := identity.LoadMembers(ctx, c, ms)
 					if err != nil {
 						return err
@@ -772,9 +799,12 @@ func (m Jobs) pendingOrLastProposal(
 ) (*SlotProposal, error) {
 	var p SlotProposal
 
-	err := c.Tx.QueryRow(ctx, `SELECT id, source, lower(slot), upper(slot), hold, message, reply_by, status, decided_at, decline_reason, decline_comment
-		FROM maintenance.slot_proposals WHERE job_id = $1 ORDER BY (status = 'pending') DESC, created_at DESC, id LIMIT 1`, job).
-		Scan(&p.ID, &p.Source, &p.Slot.StartAt, &p.Slot.EndAt, &p.Hold, &p.Message, &p.ReplyBy, &p.Status, &p.DecidedAt, &p.DeclineReason, &p.DeclineComment)
+	err := c.Tx.QueryRow(ctx, `SELECT id, source, lower(slot), upper(slot), hold, message, reply_by, status, decided_at,
+		decline_reason, decline_comment
+		FROM maintenance.slot_proposals WHERE job_id = $1 ORDER BY (status = 'pending') DESC, created_at DESC, id LIMIT
+		1`, job).
+		Scan(&p.ID, &p.Source, &p.Slot.StartAt, &p.Slot.EndAt, &p.Hold, &p.Message, &p.ReplyBy, &p.Status, &p.DecidedAt,
+			&p.DeclineReason, &p.DeclineComment)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -816,11 +846,15 @@ func (m Jobs) assignmentWhere(
 		altStart, altEnd *time.Time
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT id, tenant_id, version, created_at, updated_at, job_id, technician_membership_id, valid_from, valid_until,
-		lower(scheduled), upper(scheduled), status, reason, acknowledgement, acknowledged_at, cant_make_reason, lower(alternative_slot), upper(alternative_slot)
+	err := c.Tx.QueryRow(ctx, `SELECT id, tenant_id, version, created_at, updated_at, job_id, technician_membership_id,
+		valid_from, valid_until,
+		lower(scheduled), upper(scheduled), status, reason, acknowledgement, acknowledged_at, cant_make_reason,
+		lower(alternative_slot), upper(alternative_slot)
 		FROM maintenance.assignments WHERE job_id = $1 AND `+cond, job).
-		Scan(&a.ID, &a.TenantID, &a.Version, &a.CreatedAt, &a.UpdatedAt, &a.JobID, &a.TechnicianMembershipID, &a.ValidFrom, &a.ValidUntil,
-			&a.ScheduledStart, &a.ScheduledEnd, &a.Status, &a.Reason, &a.Acknowledgement, &a.AcknowledgedAt, &a.CantMakeReason, &altStart, &altEnd)
+		Scan(&a.ID, &a.TenantID, &a.Version, &a.CreatedAt, &a.UpdatedAt, &a.JobID, &a.TechnicianMembershipID, &a.ValidFrom,
+			&a.ValidUntil,
+			&a.ScheduledStart, &a.ScheduledEnd, &a.Status, &a.Reason, &a.Acknowledgement, &a.AcknowledgedAt, &a.CantMakeReason,
+			&altStart, &altEnd)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -832,28 +866,6 @@ func (m Jobs) assignmentWhere(
 	return &a, err
 }
 
-//	@Summary		jobs.get (read)
-//	@ID				jobs.get
-//	@Description	Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read
-//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR86 expired unanswered offer: NOT_FOUND for contractor
-//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-//	@Description	Design: DD-A06, DD-C09, DD-P01, DD-P02, DD-P05, DD-P08, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T10, DD-C17, DD-T13, DD-P10, DD-P03, DD-T02, DD-T07
-//	@Tags			jobs
-//	@Accept			json
-//	@Produce		json
-//	@Param			jobId	path		string	true	"input field jobId"
-//	@Success		200		{object}	ops.Envelope
-//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
-//	@Security		BearerAuth
-//	@Router			/v1/jobs/{jobId} [get]
-//
 // JobAttachment is JobAttachment of service-contracts.ts: a problem photo of a follow-up job (IR437).
 type JobAttachment struct {
 	ID        uuid.UUID `json:"id"`
@@ -896,6 +908,7 @@ func problemPhotos(ctx context.Context, c *ops.Call, job uuid.UUID) ([]JobAttach
 			Size:      0,
 			Status:    "",
 		}
+
 		err := rows.Scan(
 			&a.ID,
 			&a.TenantID,
@@ -936,8 +949,10 @@ func (in *JobAttachmentInput) Validate() map[string]string {
 //
 //	@Summary		jobs.getAttachment (read)
 //	@ID				jobs.getAttachment
-//	@Description	Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read
-//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; a problem photo of a follow-up job (IR437) for whoever may read the job
+//	@Description	Authorization: client:self | contractor:offer-projection-or-delegated-history | \
+//	@Description	technician:assigned-history | admin:job.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; a problem photo of \
+//	@Description	a follow-up job (IR437) for whoever may read the job
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
 //	@Description	Design: DD-A06, DD-C17, DD-P02, DD-T04
 //	@Tags			jobs
@@ -971,7 +986,8 @@ func (m Jobs) getAttachment(
 		out BlobOut
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT object_key, name, mime, size_bytes FROM maintenance.attachments WHERE id = $1 AND job_id = $2 AND report_id IS NULL AND status = 'ready'`,
+	err := c.Tx.QueryRow(ctx, `SELECT object_key, name, mime, size_bytes FROM maintenance.attachments WHERE id = $1 AND
+		job_id = $2 AND report_id IS NULL AND status = 'ready'`,
 		in.AttachmentID, in.JobID).
 		Scan(&key, &out.Name, &out.Mime, &out.Size)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -992,27 +1008,32 @@ func (m Jobs) getAttachment(
 	return out, nil
 }
 
-// @Summary		jobs.get (read)
-// @ID				jobs.get
-// @Description	Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR86 expired unanswered offer: NOT_FOUND for contractor
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A06, DD-C09, DD-P01, DD-P02, DD-P05, DD-P08, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T10, DD-C17, DD-T13, DD-P10, DD-P03, DD-T02, DD-T07
-// @Tags			jobs
-// @Accept			json
-// @Produce		json
-// @Param			jobId	path		string	true	"input field jobId"
-// @Success		200		{object}	ops.Envelope
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/jobs/{jobId} [get]
+// get serves jobs.get.
+//
+//	@Summary		jobs.get (read)
+//	@ID				jobs.get
+//	@Description	Authorization: client:self | contractor:offer-projection-or-delegated-history | \
+//	@Description	technician:assigned-history | admin:job.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR86 expired \
+//	@Description	unanswered offer: NOT_FOUND for contractor
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A06, DD-C09, DD-P01, DD-P02, DD-P05, DD-P08, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, \
+//	@Description	DD-T10, DD-C17, DD-T13, DD-P10, DD-P03, DD-T02, DD-T07
+//	@Tags			jobs
+//	@Accept			json
+//	@Produce		json
+//	@Param			jobId	path		string	true	"input field jobId"
+//	@Success		200		{object}	ops.Envelope
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs/{jobId} [get]
 func (m Jobs) get(ctx context.Context, c *ops.Call, in *JobIDInput) (any, error) {
 	if c.Principal.Role == "contractor" || c.Principal.Role == "technician" {
 		v, _, err := m.projection(ctx, c, in.JobID)
@@ -1041,34 +1062,36 @@ type listFilters struct {
 	OverdueOnly     *bool        `json:"overdueOnly,omitempty"`
 	Origin          *string      `json:"origin,omitempty"`
 	ProposalPending *bool        `json:"proposalPending,omitempty"`
-	Type            *string      `json:"type,omitempty"` // MaintenanceJob.type; offer and history rows match their public type (IR290)
+	// MaintenanceJob.type; offer and history rows match their public type (IR290)
+	Type *string `json:"type,omitempty"`
 }
 
 // Summary is JobSummary of service-contracts.ts.
 type Summary struct {
-	Projection                string       `json:"projection"`
-	ID                        uuid.UUID    `json:"id"`
-	Version                   int          `json:"version"`
-	CreatedAt                 time.Time    `json:"createdAt"`
-	UnitID                    uuid.UUID    `json:"unitId"`
-	Type                      string       `json:"type"`
-	Status                    string       `json:"status"`
-	DueAt                     time.Time    `json:"dueAt"`
-	RequestedSlot             Slot         `json:"requestedSlot"`
-	ScheduledSlot             *Slot        `json:"scheduledSlot"`
-	AssignmentID              *uuid.UUID   `json:"assignmentId"`
-	Origin                    string       `json:"origin"`
-	PreferredSlots            []Slot       `json:"preferredSlots"`
-	Severity                  string       `json:"severity"`
-	IsDemo                    bool         `json:"isDemo"`
-	DisplayStatus             string       `json:"displayStatus"`
-	AssignmentAcknowledgement *string      `json:"assignmentAcknowledgement"`
-	TechnicianMembershipID    *uuid.UUID   `json:"technicianMembershipId"` // the active Assignment's technician (IR225)
-	AccessValidFrom           *time.Time   `json:"accessValidFrom"`        // the accepted Offer's access window (IR227)
-	AccessValidUntil          *time.Time   `json:"accessValidUntil"`
-	FollowUpOfJobID           *uuid.UUID   `json:"followUpOfJobId"` // a client's follow-up and its classification (IR114, IR338)
-	FollowUpClass             *string      `json:"followUpClass"`
-	EventSummary              EventSummary `json:"eventSummary"` // jobs.list fills it for the page (IR506)
+	Projection                string     `json:"projection"`
+	ID                        uuid.UUID  `json:"id"`
+	Version                   int        `json:"version"`
+	CreatedAt                 time.Time  `json:"createdAt"`
+	UnitID                    uuid.UUID  `json:"unitId"`
+	Type                      string     `json:"type"`
+	Status                    string     `json:"status"`
+	DueAt                     time.Time  `json:"dueAt"`
+	RequestedSlot             Slot       `json:"requestedSlot"`
+	ScheduledSlot             *Slot      `json:"scheduledSlot"`
+	AssignmentID              *uuid.UUID `json:"assignmentId"`
+	Origin                    string     `json:"origin"`
+	PreferredSlots            []Slot     `json:"preferredSlots"`
+	Severity                  string     `json:"severity"`
+	IsDemo                    bool       `json:"isDemo"`
+	DisplayStatus             string     `json:"displayStatus"`
+	AssignmentAcknowledgement *string    `json:"assignmentAcknowledgement"`
+	TechnicianMembershipID    *uuid.UUID `json:"technicianMembershipId"` // the active Assignment's technician (IR225)
+	AccessValidFrom           *time.Time `json:"accessValidFrom"`        // the accepted Offer's access window (IR227)
+	AccessValidUntil          *time.Time `json:"accessValidUntil"`
+	// a client's follow-up and its classification (IR114, IR338)
+	FollowUpOfJobID *uuid.UUID   `json:"followUpOfJobId"`
+	FollowUpClass   *string      `json:"followUpClass"`
+	EventSummary    EventSummary `json:"eventSummary"` // jobs.list fills it for the page (IR506)
 }
 
 var jobStatuses = []string{
@@ -1084,48 +1107,56 @@ var jobStatuses = []string{
 	"cancelled",
 }
 
-const statusRank = `array_position(ARRAY['requested','offered','accepted','assigned','in_progress','on_hold','submitted','rework_requested','completed','cancelled'], j.status)`
+const statusRank = `array_position(ARRAY['requested','offered','accepted','assigned','in_progress','on_hold',` +
+	`'submitted','rework_requested','completed','cancelled'], j.status)`
 
 var severityRank = map[string]int{"normal": 0, "warning": 1, "critical": 2}
 
-// @Summary		jobs.list (read)
-// @ID				jobs.list
-// @Description	Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR23: project before filters/sort/total
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A06, DD-C09, DD-P01, DD-P03, DD-P06, DD-T01, DD-T11, DD-T12, DD-P10, DD-P07, DD-T13, DD-T02 · Query: filters unitId,unitIds,status,severity,from,to,organizationId,membershipId,customerId,propertyId,statuses,overdueOnly,origin,proposalPending,type · sort id,severity,dueAt,status (default status asc;id asc)
-// @Tags			jobs
-// @Accept			json
-// @Produce		json
-// @Param			cursor			query		string		false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit			query		integer		false	"page size 1–100, default 25"
-// @Param			sort			query		string		false	"field:direction — fields id,severity,dueAt,status; default status asc;id asc"
-// @Param			unitId			query		string		false	"filter"
-// @Param			unitIds			query		[]string	false	"filter (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
-// @Param			status			query		string		false	"filter"
-// @Param			severity		query		string		false	"filter"
-// @Param			from			query		string		false	"filter → requestedSlot.startAt ≥ from and < to (IR245: the rule of admin.summary jobCounts)"
-// @Param			to				query		string		false	"filter → requestedSlot.startAt ≥ from and < to (IR245: the rule of admin.summary jobCounts)"
-// @Param			organizationId	query		string		false	"filter"
-// @Param			membershipId	query		string		false	"filter"
-// @Param			customerId		query		string		false	"filter"
-// @Param			propertyId		query		string		false	"filter"
-// @Param			statuses		query		[]string	false	"filter (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
-// @Param			overdueOnly		query		boolean		false	"filter"
-// @Param			origin			query		string		false	"filter"
-// @Param			proposalPending	query		boolean		false	"filter"
-// @Param			type			query		string		false	"filter"
-// @Success		200				{object}	ops.Envelope{data=anyPage}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/jobs [get]
+// list serves jobs.list.
+//
+//	@Summary		jobs.list (read)
+//	@ID				jobs.list
+//	@Description	Authorization: client:self | contractor:offer-projection-or-delegated-history | \
+//	@Description	technician:assigned-history | admin:job.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR23: project \
+//	@Description	before filters/sort/total
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A06, DD-C09, DD-P01, DD-P03, DD-P06, DD-T01, DD-T11, DD-T12, DD-P10, DD-P07, DD-T13, \
+//	@Description	DD-T02 · Query: filters \
+//	@Description	unitId,unitIds,status,severity,from,to,organizationId,membershipId,customerId,propertyId,statuses,\
+//	@Description	overdueOnly,origin,proposalPending,type · sort id,severity,dueAt,status (default status asc;id asc)
+//	@Tags			jobs
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor			query		string		false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit			query		integer		false	"page size 1–100, default 25"
+//	@Param			sort			query		string		false	"field:direction — fields id,severity,dueAt,status; default status asc;id asc"
+//	@Param			unitId			query		string		false	"filter"
+//	@Param			unitIds			query		[]string	false	"filter (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
+//	@Param			status			query		string		false	"filter"
+//	@Param			severity		query		string		false	"filter"
+//	@Param			from			query		string		false	"filter → requestedSlot.startAt ≥ from and < to (IR245: the rule of admin.summary jobCounts)"
+//	@Param			to				query		string		false	"filter → requestedSlot.startAt ≥ from and < to (IR245: the rule of admin.summary jobCounts)"
+//	@Param			organizationId	query		string		false	"filter"
+//	@Param			membershipId	query		string		false	"filter"
+//	@Param			customerId		query		string		false	"filter"
+//	@Param			propertyId		query		string		false	"filter"
+//	@Param			statuses		query		[]string	false	"filter (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
+//	@Param			overdueOnly		query		boolean		false	"filter"
+//	@Param			origin			query		string		false	"filter"
+//	@Param			proposalPending	query		boolean		false	"filter"
+//	@Param			type			query		string		false	"filter"
+//	@Success		200				{object}	ops.Envelope{data=anyPage}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs [get]
 func (m Jobs) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[any], error) {
 	var f listFilters
 
@@ -1284,7 +1315,8 @@ func (m Jobs) collect(ctx context.Context, c *ops.Call, fp *listFilters) ([]list
 	if f.MembershipID != nil {
 		conds = append(
 			conds,
-			"EXISTS (SELECT 1 FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status IN ('active', 'completed') AND a.technician_membership_id = "+add(
+			"EXISTS (SELECT 1 FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status IN ('active', 'completed') "+
+				"AND a.technician_membership_id = "+add(
 				*f.MembershipID,
 			)+")",
 		)
@@ -1341,8 +1373,10 @@ func (m Jobs) collect(ctx context.Context, c *ops.Call, fp *listFilters) ([]list
 		`SELECT j.id, j.version, j.unit_id, j.type, j.status, j.due_at, lower(j.requested_slot), upper(j.requested_slot),
 		lower(j.scheduled_slot), upper(j.scheduled_slot), j.assignment_id, j.origin, j.preferred_slots, `+statusRank+`,
 		EXISTS (SELECT 1 FROM maintenance.slot_proposals p WHERE p.job_id = j.id AND p.status = 'pending'),
-		(SELECT a.acknowledgement FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status IN ('active', 'completed') ORDER BY a.status = 'active' DESC, a.updated_at DESC LIMIT 1),
-		(SELECT a.technician_membership_id FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status IN ('active', 'completed') ORDER BY a.status = 'active' DESC, a.updated_at DESC LIMIT 1),
+		(SELECT a.acknowledgement FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status IN ('active', `+
+			`'completed') ORDER BY a.status = 'active' DESC, a.updated_at DESC LIMIT 1),
+		(SELECT a.technician_membership_id FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status IN ('active', `+
+			`'completed') ORDER BY a.status = 'active' DESC, a.updated_at DESC LIMIT 1),
 		ao.access_valid_from, ao.access_valid_until, j.created_at, j.follow_up_of_job_id, j.follow_up_class
 		FROM maintenance.jobs j LEFT JOIN LATERAL (SELECT o.access_valid_from, o.access_valid_until FROM maintenance.offers o
 			WHERE o.job_id = j.id AND o.decision = 'accept' ORDER BY o.decided_at DESC LIMIT 1) ao ON true
@@ -1372,6 +1406,7 @@ func (m Jobs) collect(ctx context.Context, c *ops.Call, fp *listFilters) ([]list
 			pref    []byte
 			pending bool
 		)
+
 		err := rows.Scan(
 			&r.s.ID,
 			&r.s.Version,
@@ -1509,36 +1544,10 @@ type Event struct {
 	ReportRef   any        `json:"reportRef"`
 }
 
-//	@Summary		jobs.events (read)
-//	@ID				jobs.events
-//	@Description	Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read
-//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-//	@Description	Design: DD-P07, DD-P01, DD-P02, DD-A06, DD-C09 · Query: filters from,to · sort id,occurredAt (default occurredAt asc;id asc)
-//	@Tags			jobs
-//	@Accept			json
-//	@Produce		json
-//	@Param			jobId	path		string	true	"input field jobId"
-//	@Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
-//	@Param			limit	query		integer	false	"page size 1–100, default 25"
-//	@Param			sort	query		string	false	"field:direction — fields id,occurredAt; default occurredAt asc;id asc"
-//	@Param			from	query		string	false	"filter → [from,to) on occurredAt"
-//	@Param			to		query		string	false	"filter → [from,to) on occurredAt"
-//	@Success		200		{object}	ops.Envelope{data=EventPage}
-//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
-//	@Security		BearerAuth
-//	@Router			/v1/jobs/{jobId}/events [get]
-//
-// clientHiddenActions are the job events of HQ's and the contractor's own handling that the client's history leaves out,
-// like internal notes (IR442): the costs and warranty records, and the contractor's time change while HQ alone decides
-// on it (the change sent to the client shows as the client's proposal). Constants, so the query lists them inline.
+// clientHiddenActions are the job events of HQ's and the contractor's own handling that the client's history leaves
+// out, like internal notes (IR442): the costs and warranty records, and the contractor's time change while HQ alone
+// decides on it (the change sent to the client shows as the client's proposal). Constants, so the query lists them
+// inline.
 var clientHiddenActions = []string{
 	"job.costs_saved",
 	"job.warranty_claim_filed",
@@ -1591,9 +1600,15 @@ func eventSummaries(
 
 	rows, err := c.Tx.Query(
 		ctx,
-		`SELECT e.job_id, count(*) FILTER (WHERE `+visible+`), count(*) FILTER (WHERE `+clientEventCond+`), count(n.id) FILTER (WHERE `+visible+`),
-		(array_agg(e.action ORDER BY e.occurred_at DESC, e.id DESC) FILTER (WHERE `+visible+`))[1], max(e.occurred_at) FILTER (WHERE `+visible+`)
-		FROM maintenance.job_events e LEFT JOIN maintenance.job_notes n ON n.id = e.note_id WHERE e.job_id = ANY($1) GROUP BY e.job_id`,
+		`SELECT e.job_id, count(*) FILTER (WHERE
+			`+visible+`), count(*) FILTER `+
+			`(WHERE `+clientEventCond+`), count(n.id) `+
+			`FILTER (WHERE `+visible+`),
+		(array_agg(e.action ORDER BY e.occurred_at DESC, e.id DESC) FILTER `+
+			`(WHERE `+visible+`))[1], max(e.occurred_at) `+
+			`FILTER (WHERE `+visible+`)
+		FROM maintenance.job_events e LEFT JOIN maintenance.job_notes n ON n.id = e.note_id WHERE e.job_id = ANY($1) GROUP `+
+			`BY e.job_id`,
 		jobs,
 	)
 	if err != nil {
@@ -1608,6 +1623,7 @@ func eventSummaries(
 			action *string
 			at     *time.Time
 		)
+
 		err := rows.Scan(
 			&job,
 			&s.Count,
@@ -1630,32 +1646,37 @@ func eventSummaries(
 	return out, rows.Err()
 }
 
-// @Summary		jobs.events (read)
-// @ID				jobs.events
-// @Description	Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; clients do not get HQ's and the contractor's own handling events (IR442)
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-P07, DD-P01, DD-P02, DD-A06, DD-C09 · Query: filters from,to · sort id,occurredAt (default occurredAt asc;id asc)
-// @Tags			jobs
-// @Accept			json
-// @Produce		json
-// @Param			jobId	path		string	true	"input field jobId"
-// @Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit	query		integer	false	"page size 1–100, default 25"
-// @Param			sort	query		string	false	"field:direction — fields id,occurredAt; default occurredAt asc;id asc"
-// @Param			from	query		string	false	"filter → [from,to) on occurredAt"
-// @Param			to		query		string	false	"filter → [from,to) on occurredAt"
-// @Success		200		{object}	ops.Envelope{data=EventPage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/jobs/{jobId}/events [get]
+// events serves jobs.events.
+//
+//	@Summary		jobs.events (read)
+//	@ID				jobs.events
+//	@Description	Authorization: client:self | contractor:offer-projection-or-delegated-history | \
+//	@Description	technician:assigned-history | admin:job.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; clients do not get \
+//	@Description	HQ's and the contractor's own handling events (IR442)
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-P07, DD-P01, DD-P02, DD-A06, DD-C09 · Query: filters from,to · sort id,occurredAt \
+//	@Description	(default occurredAt asc;id asc)
+//	@Tags			jobs
+//	@Accept			json
+//	@Produce		json
+//	@Param			jobId	path		string	true	"input field jobId"
+//	@Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit	query		integer	false	"page size 1–100, default 25"
+//	@Param			sort	query		string	false	"field:direction — fields id,occurredAt; default occurredAt asc;id asc"
+//	@Param			from	query		string	false	"filter → [from,to) on occurredAt"
+//	@Param			to		query		string	false	"filter → [from,to) on occurredAt"
+//	@Success		200		{object}	ops.Envelope{data=EventPage}
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs/{jobId}/events [get]
 func (m Jobs) events(
 	ctx context.Context,
 	c *ops.Call,
@@ -1723,13 +1744,15 @@ func (m Jobs) events(
 		where += clientEventFilter
 	}
 
-	if ownOnly { // the decision events of the caller's side: a contractor's organization, as its history snapshot stores them (IR506)
+	if ownOnly {
+		// the decision events of the caller's side: a contractor's organization, as its history snapshot stores them (IR506)
 		where += " AND e.action IN ('offer.accepted','offer.declined')"
 
 		if c.Principal.Role == "contractor" {
 			args = append(args, c.Principal.OrgID)
 			where += fmt.Sprintf(
-				" AND EXISTS (SELECT 1 FROM maintenance.ref_memberships mb WHERE mb.user_id = e.actor_user_id AND mb.organization_id = $%d)",
+				" AND EXISTS (SELECT 1 FROM maintenance.ref_memberships mb WHERE mb.user_id = e.actor_user_id AND "+
+					"mb.organization_id = $%d)",
 				len(args),
 			)
 		} else {
@@ -1749,7 +1772,9 @@ func (m Jobs) events(
 	}
 
 	var total int
-	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM maintenance.job_events e LEFT JOIN maintenance.job_notes n ON n.id = e.note_id WHERE "+where, args...).
+
+	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM maintenance.job_events e LEFT JOIN maintenance.job_notes n ON "+
+		"n.id = e.note_id WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
 		return paging.Page[Event]{}, scanErr
@@ -1787,7 +1812,8 @@ func (m Jobs) eventRows(
 		ctx,
 		fmt.Sprintf(
 			`SELECT e.id, e.tenant_id, e.job_id, e.actor_user_id, e.action, e.occurred_at, e.report_id, e.report_version,
-		n.id, n.author_id, n.visibility, n.message, n.created_at FROM maintenance.job_events e LEFT JOIN maintenance.job_notes n ON n.id = e.note_id
+		n.id, n.author_id, n.visibility, n.message, n.created_at FROM maintenance.job_events e LEFT JOIN maintenance.job_notes
+		n ON n.id = e.note_id
 		WHERE %s ORDER BY %s LIMIT %d OFFSET %d`,
 			where,
 			order,
@@ -1811,6 +1837,7 @@ func (m Jobs) eventRows(
 			vis, msg       *string
 			noteAt         *time.Time
 		)
+
 		err := rows.Scan(
 			&e.ID,
 			&e.TenantID,
@@ -1866,7 +1893,8 @@ func (m Jobs) lockJob(ctx context.Context, c *ops.Call, id uuid.UUID) (string, e
 		v      int
 	)
 
-	err := c.Tx.QueryRow(ctx, "SELECT j.status, j.version FROM maintenance.jobs j WHERE j.id = $1 AND "+jobScope(c, &args)+" FOR UPDATE", args...).
+	err := c.Tx.QueryRow(ctx, "SELECT j.status, j.version FROM maintenance.jobs j WHERE j.id = $1 AND "+jobScope(c, &args)+
+		" FOR UPDATE", args...).
 		Scan(&status, &v)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", apperr.E(apperr.NotFound, "error.notFound")
@@ -1977,30 +2005,33 @@ func (m Jobs) finishScoped(
 	return j, nil
 }
 
-// @Summary		jobs.cancel (write)
-// @ID				jobs.cancel
-// @Description	Authorization: client:self:requested-only | admin:job.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR56 state table
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A06, DD-C09
-// @Tags			jobs
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			jobId				path		string		true	"input field jobId"
-// @Param			request				body		CancelInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/jobs/{jobId}/cancel [post]
+// cancel serves jobs.cancel.
+//
+//	@Summary		jobs.cancel (write)
+//	@ID				jobs.cancel
+//	@Description	Authorization: client:self:requested-only | admin:job.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR56 state table
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A06, DD-C09
+//	@Tags			jobs
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
+//	@Param			jobId				path		string		true	"input field jobId"
+//	@Param			request				body		CancelInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=MaintenanceJob}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs/{jobId}/cancel [post]
 func (m Jobs) cancel(ctx context.Context, c *ops.Call, in *CancelInput) (MaintenanceJob, error) {
 	return written(m.cancelJob(ctx, c, in))
 }
@@ -2026,7 +2057,8 @@ func (m Jobs) cancelJob(ctx context.Context, c *ops.Call, in *CancelInput) (Job,
 
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`UPDATE maintenance.offers SET decision = 'decline', decided_by = $2, decided_at = $3, decline_reason = 'job_cancelled',
+		`UPDATE maintenance.offers SET decision = 'decline', decided_by = $2, decided_at = $3, decline_reason =
+			'job_cancelled',
 		version = version + 1, updated_at = platform.app_now() WHERE job_id = $1 AND decision IS NULL`,
 		in.JobID,
 		c.Principal.MembershipID,
@@ -2038,7 +2070,8 @@ func (m Jobs) cancelJob(ctx context.Context, c *ops.Call, in *CancelInput) (Job,
 
 	_, execErr = c.Tx.Exec(
 		ctx,
-		`UPDATE maintenance.assignments SET status = 'revoked', reason = 'job_cancelled', version = version + 1, updated_at = $2
+		`UPDATE maintenance.assignments SET status = 'revoked', reason = 'job_cancelled', version = version + 1, updated_at =
+			$2
 		WHERE job_id = $1 AND status = 'active'`,
 		in.JobID,
 		c.Now,
@@ -2050,7 +2083,8 @@ func (m Jobs) cancelJob(ctx context.Context, c *ops.Call, in *CancelInput) (Job,
 	// (BR-P08, IR588)
 	_, execErr = c.Tx.Exec(
 		ctx,
-		`UPDATE maintenance.offers SET access_valid_until = GREATEST(access_valid_from, $2), version = version + 1, updated_at = platform.app_now()
+		`UPDATE maintenance.offers SET access_valid_until = GREATEST(access_valid_from, $2), version = version + 1, updated_at
+			= platform.app_now()
 		WHERE job_id = $1 AND decision = 'accept' AND access_valid_until > $2`,
 		in.JobID,
 		c.Now,
@@ -2061,7 +2095,8 @@ func (m Jobs) cancelJob(ctx context.Context, c *ops.Call, in *CancelInput) (Job,
 
 	_, execErr = c.Tx.Exec(
 		ctx,
-		`UPDATE maintenance.slot_proposals SET status = 'withdrawn', decided_at = $2 WHERE job_id = $1 AND status = 'pending'`,
+		`UPDATE maintenance.slot_proposals SET status = 'withdrawn', decided_at = $2 WHERE job_id = $1 AND status =
+			'pending'`,
 		in.JobID,
 		c.Now,
 	)
@@ -2081,7 +2116,8 @@ func (m Jobs) cancelJob(ctx context.Context, c *ops.Call, in *CancelInput) (Job,
 
 	_, execErr = c.Tx.Exec(
 		ctx,
-		`UPDATE maintenance.jobs SET status = 'cancelled', hold_reason = NULL, version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
+		`UPDATE maintenance.jobs SET status = 'cancelled', hold_reason = NULL, version = version + 1, updated_at =
+			platform.app_now() WHERE id = $1`,
 		in.JobID,
 	)
 	if execErr != nil {
@@ -2114,30 +2150,32 @@ func (in *ReasonInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		jobs.hold (write)
-// @ID				jobs.hold
-// @Description	Authorization: admin:job.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A06
-// @Tags			jobs
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			jobId				path		string		true	"input field jobId"
-// @Param			request				body		ReasonInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/jobs/{jobId}/hold [post]
+// hold serves jobs.hold.
+//
+//	@Summary		jobs.hold (write)
+//	@ID				jobs.hold
+//	@Description	Authorization: admin:job.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A06
+//	@Tags			jobs
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
+//	@Param			jobId				path		string		true	"input field jobId"
+//	@Param			request				body		ReasonInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=MaintenanceJob}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs/{jobId}/hold [post]
 func (m Jobs) hold(ctx context.Context, c *ops.Call, in *ReasonInput) (MaintenanceJob, error) {
 	return written(m.holdJob(ctx, c, in))
 }
@@ -2155,7 +2193,8 @@ func (m Jobs) holdJob(ctx context.Context, c *ops.Call, in *ReasonInput) (Job, e
 
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`UPDATE maintenance.jobs SET status = 'on_hold', hold_reason = $2, version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
+		`UPDATE maintenance.jobs SET status = 'on_hold', hold_reason = $2, version = version + 1, updated_at =
+			platform.app_now() WHERE id = $1`,
 		in.JobID,
 		in.Reason,
 	)
@@ -2171,30 +2210,32 @@ func (m Jobs) holdJob(ctx context.Context, c *ops.Call, in *ReasonInput) (Job, e
 	return m.finish(ctx, c, in.JobID, "jobs.hold", "JobHeld", in.Reason)
 }
 
-// @Summary		jobs.resumeHold (write)
-// @ID				jobs.resumeHold
-// @Description	Authorization: admin:job.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A06
-// @Tags			jobs
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			jobId				path		string		true	"input field jobId"
-// @Param			request				body		ReasonInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/jobs/{jobId}/resume-hold [post]
+// resumeHold serves jobs.resumeHold.
+//
+//	@Summary		jobs.resumeHold (write)
+//	@ID				jobs.resumeHold
+//	@Description	Authorization: admin:job.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A06
+//	@Tags			jobs
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
+//	@Param			jobId				path		string		true	"input field jobId"
+//	@Param			request				body		ReasonInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=MaintenanceJob}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs/{jobId}/resume-hold [post]
 func (m Jobs) resumeHold(
 	ctx context.Context,
 	c *ops.Call,
@@ -2216,7 +2257,8 @@ func (m Jobs) resumeHoldJob(ctx context.Context, c *ops.Call, in *ReasonInput) (
 
 	_, execErr := c.Tx.Exec(
 		ctx,
-		`UPDATE maintenance.jobs SET status = 'in_progress', hold_reason = NULL, version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
+		`UPDATE maintenance.jobs SET status = 'in_progress', hold_reason = NULL, version = version + 1, updated_at =
+			platform.app_now() WHERE id = $1`,
 		in.JobID,
 	)
 	if execErr != nil {
@@ -2304,8 +2346,11 @@ func (m Jobs) addNote(ctx context.Context, c *ops.Call, in *NoteInput) (Note, er
 	}
 
 	var note uuid.UUID
-	scanErr := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.job_notes (tenant_id, job_id, author_id, visibility, message, created_at)
-		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5) RETURNING id`, in.JobID, c.Principal.UserID, in.Visibility, in.Message, c.Now).
+
+	scanErr := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.job_notes (tenant_id, job_id, author_id, visibility, message,
+		created_at)
+		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5) RETURNING
+		id`, in.JobID, c.Principal.UserID, in.Visibility, in.Message, c.Now).
 		Scan(&note)
 	if scanErr != nil {
 		return Note{}, scanErr

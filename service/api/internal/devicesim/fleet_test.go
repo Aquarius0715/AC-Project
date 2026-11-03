@@ -47,7 +47,8 @@ func TestMockFleetCoversEveryState(t *testing.T) {
 	for _, want := range []string{
 		"connection=online", "connection=offline", "connection=unknown", "connection=connecting", "connection=error",
 		"power=on", "power=off", "power=unknown", "tamper=clear", "tamper=detected",
-		"telemetry=normal", "telemetry=silent", "telemetry=unit_mismatch", "telemetry=out_of_range", "telemetry=missing", "telemetry=invalid_time",
+		"telemetry=normal", "telemetry=silent", "telemetry=unit_mismatch", "telemetry=out_of_range", "telemetry=missing",
+		"telemetry=invalid_time",
 		"commands=apply", "commands=reject", "commands=ignore", "commands=late",
 		"mode=cool", "mode=dry", "mode=fan", "fan=low", "fan=mid", "fan=high",
 		"switched off", "no module", "archived", "other firmware",
@@ -71,10 +72,10 @@ func TestFleetNames(t *testing.T) {
 		Archived:    false,
 		NoDevice:    false,
 		State: *new(struct {
-			Power    *bool    "json:\"power\""
-			Celsius  *float64 "json:\"celsius\""
-			Mode     *string  "json:\"mode\""
-			FanLevel *string  "json:\"fanLevel\""
+			Power    *bool    `json:"power"`
+			Celsius  *float64 `json:"celsius"`
+			Mode     *string  `json:"mode"`
+			FanLevel *string  `json:"fanLevel"`
 		}),
 		Telemetry: "",
 		Commands:  "",

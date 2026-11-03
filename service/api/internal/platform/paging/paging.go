@@ -161,8 +161,8 @@ func OrderBy(s *SortSpec, allowed map[string]string, def string) (string, error)
 	return col + " " + dir + ", " + tie + " ASC", nil
 }
 
-// Direction is the SQL keyword of a sort direction. Only asc and desc ever reach a query; anything else is VALIDATION on
-// sort.direction here, so no ORDER BY depends on Resolve having refused it first (IR365).
+// Direction is the SQL keyword of a sort direction. Only asc and desc ever reach a query; anything else is VALIDATION
+// on sort.direction here, so no ORDER BY depends on Resolve having refused it first (IR365).
 func Direction(s *SortSpec) (string, error) {
 	switch s.Direction {
 	case "asc":
@@ -174,11 +174,12 @@ func Direction(s *SortSpec) (string, error) {
 	return "", apperr.Fields(map[string]string{"sort.direction": "error.invalid"})
 }
 
-// likeEscape takes the LIKE wildcards of a search term literally; the backslash is PostgreSQL's default escape character.
+// likeEscape takes the LIKE wildcards of a search term literally; the backslash is PostgreSQL's default escape
+// character.
 var likeEscape = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 
-// Contains is the LIKE / ILIKE pattern of filters.search: the trimmed term anywhere in the value. A %, _ or \ in the term
-// is matched as itself, so "50%" finds "50%" and not every value with "50" in it (IR388).
+// Contains is the LIKE / ILIKE pattern of filters.search: the trimmed term anywhere in the value. A %, _ or \ in the
+// term is matched as itself, so "50%" finds "50%" and not every value with "50" in it (IR388).
 func Contains(search string) string {
 	return "%" + likeEscape.Replace(strings.TrimSpace(search)) + "%"
 }

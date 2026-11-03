@@ -22,7 +22,8 @@ var (
 //	@Summary		automations.save (write) — update
 //	@ID				automations.save.update
 //	@Description	Authorization: client:control.execute:self
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR215 onlyIf at most 3, distinct types, no weekday on a schedule, not the rule's own condition type
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR215 onlyIf at most 3, distinct types, no weekday on a schedule, not the rule's own condition type
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-C04, DD-C05
 //	@Tags			automations

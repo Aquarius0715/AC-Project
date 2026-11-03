@@ -53,12 +53,14 @@ func TestAutomationEvaluation(t *testing.T) {
 	)
 	at := clock.Format(time.RFC3339)
 	fact := func(unit, metric, value, unitName string, observed time.Time) string {
-		return `{"unitId":"` + unit + `","metric":"` + metric + `","value":` + value + `,"unit":"` + unitName + `","observedAt":"` + observed.Format(
+		return `{"unitId":"` + unit + `","metric":"` + metric + `","value":` + value + `,"unit":"` + unitName +
+			`","observedAt":"` + observed.Format(
 			time.RFC3339,
 		) + `","quality":"valid"}`
 	}
 	input := func(units, facts, phase string) string {
-		return `{"eventId":"` + uuid.NewString() + `","occurredAt":"` + at + `","unitIds":[` + units + `],"facts":[` + facts + `],"phase":"` + phase + `"}`
+		return `{"eventId":"` + uuid.NewString() + `","occurredAt":"` + at + `","unitIds":[` + units + `],"facts":[` + facts +
+			`],"phase":"` + phase + `"}`
 	}
 	decision := func(m map[string]any, unit string) map[string]any {
 		for _, r := range data(m)["results"].([]any) {
@@ -91,8 +93,10 @@ func TestAutomationEvaluation(t *testing.T) {
 	hqPolicy := uuid.NewString()
 	owner(
 		t,
-		`INSERT INTO control.automation_policies (id, tenant_id, name, owner_membership_id, created_by_user_id, timezone, enabled, priority, condition, action)
-		VALUES ($1,$2,'HQ occupancy',$3,$4,'Asia/Kuala_Lumpur',true,0,'{"type":"occupancy","occupied":true}','{"kind":"set_temperature","celsius":26}')`,
+		`INSERT INTO control.automation_policies (id, tenant_id, name, owner_membership_id, created_by_user_id, timezone,
+			enabled, priority, condition, action)
+		VALUES ($1,$2,'HQ occupancy',$3,$4,'Asia/Kuala_Lumpur',true,0,'{"type":"occupancy","occupied":true}',
+		'{"kind":"set_temperature","celsius":26}')`,
 		hqPolicy,
 		seed.ID("tenant-a"),
 		seed.ID("hq-operator"),
@@ -196,12 +200,16 @@ func TestAutomationEvaluation(t *testing.T) {
 	}
 	// validation and scope
 	for b, want := range map[string]string{
-		`{"eventId":"` + uuid.NewString() + `","occurredAt":"` + clock.Add(time.Hour).Format(time.RFC3339) + `","unitIds":["` + u + `"],"facts":[],"phase":"condition"}`: "occurredAt=errors.not_current_tick",
-		input(`"`+u+`","`+u+`"`, "", "condition"):                                      "unitIds=error.invalid",
-		input(`"`+u+`"`, fact(u, "occupied", "1", "boolean", clock), "condition"):      "facts=error.invalid", // a boolean fact of 1
-		input(`"`+u+`"`, fact(off, "occupied", "true", "boolean", clock), "condition"): "facts=error.invalid", // a unit outside the input
-		input(`"`+u+`"`, fact(u, "humidity", "50", "kPa", clock), "condition"):         "facts=error.invalid", // a unit symbol of another metric
-		input(`"`+u+`"`, "", "midnight"):                                               "phase=error.invalid",
+		`{"eventId":"` + uuid.NewString() + `","occurredAt":"` + clock.Add(time.Hour).Format(time.RFC3339) +
+			`","unitIds":["` + u + `"],"facts":[],"phase":"condition"}`: "occurredAt=errors.not_current_tick",
+		input(`"`+u+`","`+u+`"`, "", "condition"): "unitIds=error.invalid",
+		// a boolean fact of 1
+		input(`"`+u+`"`, fact(u, "occupied", "1", "boolean", clock), "condition"): "facts=error.invalid",
+		// a unit outside the input
+		input(`"`+u+`"`, fact(off, "occupied", "true", "boolean", clock), "condition"): "facts=error.invalid",
+		// a unit symbol of another metric
+		input(`"`+u+`"`, fact(u, "humidity", "50", "kPa", clock), "condition"): "facts=error.invalid",
+		input(`"`+u+`"`, "", "midnight"):                                       "phase=error.invalid",
 	} {
 		code, m := post(s, &customerB, "automations.simulate", b)
 		refusal(t, b, code, m, want)

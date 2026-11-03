@@ -32,7 +32,8 @@ type Factor struct {
 	IsDemo       bool      `json:"isDemo"`
 }
 
-const factorCols = `f.id, f.tenant_id, f.version, (SELECT min(created_at) FROM energy.emission_factors o WHERE o.id = f.id), f.created_at, f.region, f.year,
+const factorCols = `f.id, f.tenant_id, f.version, (SELECT min(created_at) FROM energy.emission_factors o WHERE o.id ` +
+	`= f.id), f.created_at, f.region, f.year,
 	f.kg_co2e_per_kwh::float8, f.source`
 
 func scanFactor(r pgx.Row) (Factor, error) {
@@ -74,31 +75,34 @@ func LoadFactor(ctx context.Context, c *ops.Call, id uuid.UUID, version *int) (F
 	return x, err
 }
 
-// @Summary		factors.list (read)
-// @ID				factors.list
-// @Description	Authorization: admin:mrv.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A14 · Query: filters region,year · sort id,year,region,createdAt,updatedAt (default year desc;region asc;id asc)
-// @Tags			factors
-// @Accept			json
-// @Produce		json
-// @Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit	query		integer	false	"page size 1–100, default 25"
-// @Param			sort	query		string	false	"field:direction — fields id,year,region,createdAt,updatedAt; default year desc;region asc;id asc"
-// @Param			region	query		string	false	"filter → region"
-// @Param			year	query		number	false	"filter → year"
-// @Success		200		{object}	ops.Envelope{data=FactorPage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/factors [get]
+// listFactors serves factors.list.
+//
+//	@Summary		factors.list (read)
+//	@ID				factors.list
+//	@Description	Authorization: admin:mrv.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A14 · Query: filters region,year · sort id,year,region,createdAt,updatedAt (default year \
+//	@Description	desc;region asc;id asc)
+//	@Tags			factors
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit	query		integer	false	"page size 1–100, default 25"
+//	@Param			sort	query		string	false	"field:direction — fields id,year,region,createdAt,updatedAt; default year desc;region asc;id asc"
+//	@Param			region	query		string	false	"filter → region"
+//	@Param			year	query		number	false	"filter → year"
+//	@Success		200		{object}	ops.Envelope{data=FactorPage}
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/factors [get]
 func listFactors(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Factor], error) {
 	var f struct {
 		Region *string `json:"region,omitempty"`
@@ -155,6 +159,7 @@ func listFactors(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 	where := strings.Join(conds, " AND ")
 
 	var total int
+
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM energy.emission_factors f WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
@@ -281,7 +286,9 @@ func saveFactor(ctx context.Context, c *ops.Call, in *FactorInput) (Factor, erro
 	}
 
 	var taken bool
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM energy.emission_factors WHERE is_current AND region = $1 AND year = $2 AND id <> $3)`, in.Region, in.Year, id).
+
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM energy.emission_factors WHERE is_current AND region = $1 AND
+		year = $2 AND id <> $3)`, in.Region, in.Year, id).
 		Scan(&taken)
 	if err != nil {
 		return Factor{}, err
@@ -304,7 +311,8 @@ func saveFactor(ctx context.Context, c *ops.Call, in *FactorInput) (Factor, erro
 
 	_, err = c.Tx.Exec(
 		ctx,
-		`INSERT INTO energy.emission_factors (id, version, tenant_id, region, year, kg_co2e_per_kwh, source, created_by, created_at)
+		`INSERT INTO energy.emission_factors (id, version, tenant_id, region, year, kg_co2e_per_kwh, source, created_by,
+			created_at)
 		VALUES ($1, $2, current_setting('app.tenant_id')::uuid, $3, $4, $5, $6, $7, $8)`,
 		id,
 		version,

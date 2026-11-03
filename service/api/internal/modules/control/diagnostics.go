@@ -50,7 +50,8 @@ type Run struct {
 	FailureCode       *string         `json:"failureCode"`
 }
 
-const runCols = `r.id, r.tenant_id, r.version, r.created_at, r.updated_at, r.job_id, r.unit_id, r.actor_membership_id, r.start_action, r.end_action, r.duration_minutes,
+const runCols = `r.id, r.tenant_id, r.version, r.created_at, r.updated_at, r.job_id, r.unit_id, ` +
+	`r.actor_membership_id, r.start_action, r.end_action, r.duration_minutes,
 	r.reason, r.state, r.start_command_id, r.end_command_id, r.started_at, r.end_at, r.failure_code`
 
 func scanRun(row pgx.Row) (Run, error) {
@@ -125,28 +126,32 @@ func (in *RunInput) Validate() map[string]string {
 	return fe
 }
 
-// @Summary		diagnosticRuns.create (write)
-// @ID				diagnosticRuns.create
-// @Description	Authorization: technician:control.diagnose:assigned-valid-job
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed)
-// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-T10 · Input versions: expectedUnitVersion=UnitDetail.version;expectedJobVersion=JobDetail.version
-// @Tags			diagnosticRuns
-// @Accept			json
-// @Produce		json
-// @Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		RunInput	true	"input"
-// @Success		200				{object}	ops.Envelope{data=Run}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/diagnostic-runs [post]
+// create serves diagnosticRuns.create.
+//
+//	@Summary		diagnosticRuns.create (write)
+//	@ID				diagnosticRuns.create
+//	@Description	Authorization: technician:control.diagnose:assigned-valid-job
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR94 technician write table (assignment and work window, jobId required when typed)
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-T10 · Input versions: \
+//	@Description	expectedUnitVersion=UnitDetail.version;expectedJobVersion=JobDetail.version
+//	@Tags			diagnosticRuns
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		RunInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Run}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/diagnostic-runs [post]
 func (m Diagnostics) create(ctx context.Context, c *ops.Call, in *RunInput) (Run, error) {
 	err := m.Commands.Access.TechnicianJob(ctx, c, in.JobID, in.UnitID)
 	if err != nil {
@@ -199,9 +204,14 @@ func (m Diagnostics) create(ctx context.Context, c *ops.Call, in *RunInput) (Run
 	runID := uuid.New()
 
 	var cmd uuid.UUID
-	scanErr := c.Tx.QueryRow(ctx, `INSERT INTO control.commands (tenant_id, unit_id, device_id, actor_membership_id, source, action, diagnostic_run_id, job_id, reason, status, delivery,
-		requested_at, sent_at, expires_at, correlation_id, created_at, updated_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'diagnostic', $4, $5, $6, $7, 'requested', 'not_sent',
-		$8, NULL, $9, $10, $8, $8) RETURNING id`, in.UnitID, dev, c.Principal.MembershipID, []byte(in.StartAction), runID, in.JobID, in.Reason, c.Now, c.Now.Add(CommandTTL), c.CorrelationID).
+
+	scanErr := c.Tx.QueryRow(ctx, `INSERT INTO control.commands (tenant_id, unit_id, device_id, actor_membership_id,
+		source, action, diagnostic_run_id, job_id, reason, status, delivery,
+		requested_at, sent_at, expires_at, correlation_id, created_at, updated_at) VALUES
+		(current_setting('app.tenant_id')::uuid, $1, $2, $3, 'diagnostic', $4, $5, $6, $7, 'requested', 'not_sent',
+		$8, NULL, $9, $10, $8, $8) RETURNING
+		id`, in.UnitID, dev, c.Principal.MembershipID, []byte(in.StartAction), runID, in.JobID, in.Reason, c.Now,
+		c.Now.Add(CommandTTL), c.CorrelationID).
 		Scan(&cmd)
 	if scanErr != nil {
 		return Run{}, scanErr
@@ -210,8 +220,10 @@ func (m Diagnostics) create(ctx context.Context, c *ops.Call, in *RunInput) (Run
 	x, err := scanRun(
 		c.Tx.QueryRow(
 			ctx,
-			`INSERT INTO control.diagnostic_runs AS r (id, tenant_id, job_id, unit_id, actor_membership_id, start_action, end_action, duration_minutes, reason, state,
-		start_command_id, created_at, updated_at) VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, 'awaiting_start', $9, $10, $10) RETURNING `+runCols,
+			`INSERT INTO control.diagnostic_runs AS r (id, tenant_id, job_id, unit_id, actor_membership_id, start_action,
+				end_action, duration_minutes, reason, state,
+		start_command_id, created_at, updated_at) VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7,
+		$8, 'awaiting_start', $9, $10, $10) RETURNING `+runCols,
 			runID,
 			in.JobID,
 			in.UnitID,
@@ -262,7 +274,8 @@ func visible(ctx context.Context, c *ops.Call, run Run) (bool, error) {
 
 	var ok bool
 
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.unit_assignment_access WHERE job_id = $1 AND technician_membership_id = $2)`, run.JobID, c.Principal.MembershipID).
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.unit_assignment_access WHERE job_id = $1 AND
+		technician_membership_id = $2)`, run.JobID, c.Principal.MembershipID).
 		Scan(&ok)
 
 	return ok, err
@@ -282,27 +295,30 @@ func (in *RunIDInput) Validate() map[string]string {
 	return nil
 }
 
-// @Summary		diagnosticRuns.get (read)
-// @ID				diagnosticRuns.get
-// @Description	Authorization: technician:control.diagnose:assigned-valid-job | admin:job.read | admin:control.execute
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-T10, DD-A02
-// @Tags			diagnosticRuns
-// @Accept			json
-// @Produce		json
-// @Param			diagnosticRunId	path		string	true	"input field diagnosticRunId"
-// @Success		200				{object}	ops.Envelope{data=Run}
-// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/diagnostic-runs/{diagnosticRunId} [get]
+// get serves diagnosticRuns.get.
+//
+//	@Summary		diagnosticRuns.get (read)
+//	@ID				diagnosticRuns.get
+//	@Description	Authorization: technician:control.diagnose:assigned-valid-job | admin:job.read | \
+//	@Description	admin:control.execute
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-T10, DD-A02
+//	@Tags			diagnosticRuns
+//	@Accept			json
+//	@Produce		json
+//	@Param			diagnosticRunId	path		string	true	"input field diagnosticRunId"
+//	@Success		200				{object}	ops.Envelope{data=Run}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/diagnostic-runs/{diagnosticRunId} [get]
 func (m Diagnostics) get(ctx context.Context, c *ops.Call, in *RunIDInput) (Run, error) {
 	x, err := scanRun(
 		c.Tx.QueryRow(
@@ -347,31 +363,34 @@ func (in *RunListInput) Validate() map[string]string {
 	return nil
 }
 
-// @Summary		diagnosticRuns.list (read)
-// @ID				diagnosticRuns.list
-// @Description	Authorization: technician:control.diagnose:assigned-valid-job | admin:job.read | admin:control.execute
-// @Description	Validation: D01; SR08/SR09
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-T10, DD-A02 · Query: filters none · sort id,createdAt (default createdAt desc;id asc)
-// @Tags			diagnosticRuns
-// @Accept			json
-// @Produce		json
-// @Param			unitId	query		string	false	"input field unitId"
-// @Param			jobId	query		string	false	"input field jobId"
-// @Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit	query		integer	false	"page size 1–100, default 25"
-// @Param			sort	query		string	false	"field:direction — fields id,createdAt; default createdAt desc;id asc"
-// @Success		200		{object}	ops.Envelope{data=RunPage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/diagnostic-runs [get]
+// list serves diagnosticRuns.list.
+//
+//	@Summary		diagnosticRuns.list (read)
+//	@ID				diagnosticRuns.list
+//	@Description	Authorization: technician:control.diagnose:assigned-valid-job | admin:job.read | \
+//	@Description	admin:control.execute
+//	@Description	Validation: D01; SR08/SR09
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-T10, DD-A02 · Query: filters none · sort id,createdAt (default createdAt desc;id asc)
+//	@Tags			diagnosticRuns
+//	@Accept			json
+//	@Produce		json
+//	@Param			unitId	query		string	false	"input field unitId"
+//	@Param			jobId	query		string	false	"input field jobId"
+//	@Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit	query		integer	false	"page size 1–100, default 25"
+//	@Param			sort	query		string	false	"field:direction — fields id,createdAt; default createdAt desc;id asc"
+//	@Success		200		{object}	ops.Envelope{data=RunPage}
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/diagnostic-runs [get]
 func (m Diagnostics) list(
 	ctx context.Context,
 	c *ops.Call,
@@ -410,12 +429,14 @@ func (m Diagnostics) list(
 	if c.Principal.Role == "technician" {
 		args = append(args, c.Principal.MembershipID)
 		where += fmt.Sprintf(
-			" AND EXISTS (SELECT 1 FROM assets.unit_assignment_access a WHERE a.job_id = r.job_id AND a.technician_membership_id = $%d)",
+			" AND EXISTS (SELECT 1 FROM assets.unit_assignment_access a WHERE a.job_id = r.job_id AND "+
+				"a.technician_membership_id = $%d)",
 			len(args),
 		)
 	}
 
 	var total int
+
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM control.diagnostic_runs r WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
@@ -461,7 +482,8 @@ func (m Diagnostics) list(
 func runAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, at time.Time) error {
 	_, execErr := tx.Exec(
 		ctx,
-		`UPDATE control.diagnostic_runs SET state = 'running', started_at = $2::timestamptz, end_at = $2::timestamptz + make_interval(mins => duration_minutes),
+		`UPDATE control.diagnostic_runs SET state = 'running', started_at = $2::timestamptz, end_at = $2::timestamptz +
+			make_interval(mins => duration_minutes),
 		version = version + 1, updated_at = $2 WHERE start_command_id = $1 AND state = 'awaiting_start'`,
 		command,
 		at,
@@ -472,7 +494,8 @@ func runAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, at time.
 
 	_, err := tx.Exec(
 		ctx,
-		`UPDATE control.diagnostic_runs SET state = 'completed', version = version + 1, updated_at = $2 WHERE end_command_id = $1 AND state = 'end_requested'`,
+		`UPDATE control.diagnostic_runs SET state = 'completed', version = version + 1, updated_at = $2 WHERE end_command_id =
+			$1 AND state = 'end_requested'`,
 		command,
 		at,
 	)
@@ -480,13 +503,15 @@ func runAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, at time.
 	return err
 }
 
-// AdvanceRuns is the worker step of IR139 item 2: failed starts / ends from expired commands, and end commands at endAt.
+// AdvanceRuns is the worker step of IR139 item 2: failed starts / ends from expired commands, and end commands at
+// endAt.
 func AdvanceRuns(ctx context.Context, c *ops.Call, m Commands) (int, error) {
 	n := 0
 
 	tag, err := c.Tx.Exec(
 		ctx,
-		`UPDATE control.diagnostic_runs r SET state = 'start_failed', failure_code = 'TIMEOUT', version = r.version + 1, updated_at = $1
+		`UPDATE control.diagnostic_runs r SET state = 'start_failed', failure_code = 'TIMEOUT', version = r.version + 1,
+			updated_at = $1
 		FROM control.commands k WHERE k.id = r.start_command_id AND k.status = 'expired' AND r.state = 'awaiting_start'`,
 		c.Now,
 	)
@@ -498,7 +523,8 @@ func AdvanceRuns(ctx context.Context, c *ops.Call, m Commands) (int, error) {
 
 	tag, err = c.Tx.Exec(
 		ctx,
-		`UPDATE control.diagnostic_runs r SET state = 'end_failed', failure_code = 'TIMEOUT', version = r.version + 1, updated_at = $1
+		`UPDATE control.diagnostic_runs r SET state = 'end_failed', failure_code = 'TIMEOUT', version = r.version + 1,
+			updated_at = $1
 		FROM control.commands k WHERE k.id = r.end_command_id AND k.status = 'expired' AND r.state = 'end_requested'`,
 		c.Now,
 	)
@@ -559,9 +585,13 @@ func AdvanceRuns(ctx context.Context, c *ops.Call, m Commands) (int, error) {
 				state, code = "end_failed", "OFFLINE"
 			} else {
 				var id uuid.UUID
-				err := c.Tx.QueryRow(ctx, `INSERT INTO control.commands (tenant_id, unit_id, device_id, actor_membership_id, source, action, diagnostic_run_id, job_id, reason, status, delivery,
-				requested_at, sent_at, expires_at, correlation_id, created_at, updated_at) VALUES ($1, $2, $3, $4, 'diagnostic', $5, $6, $7, $8, 'requested', 'not_sent', $9, NULL, $10, $11, $9, $9) RETURNING id`,
-					x.TenantID, x.UnitID, dev, x.ActorMembershipID, []byte(x.EndAction), x.ID, x.JobID, x.Reason, c.Now, c.Now.Add(CommandTTL), "tick-"+c.Now.Format(time.RFC3339)).
+
+				err := c.Tx.QueryRow(ctx, `INSERT INTO control.commands (tenant_id, unit_id, device_id, actor_membership_id, source,
+					action, diagnostic_run_id, job_id, reason, status, delivery,
+				requested_at, sent_at, expires_at, correlation_id, created_at, updated_at) VALUES ($1, $2, $3, $4, 'diagnostic', $5,
+				$6, $7, $8, 'requested', 'not_sent', $9, NULL, $10, $11, $9, $9) RETURNING id`,
+					x.TenantID, x.UnitID, dev, x.ActorMembershipID, []byte(x.EndAction), x.ID, x.JobID, x.Reason, c.Now,
+					c.Now.Add(CommandTTL), "tick-"+c.Now.Format(time.RFC3339)).
 					Scan(&id)
 				if err != nil {
 					return n, err
@@ -573,7 +603,8 @@ func AdvanceRuns(ctx context.Context, c *ops.Call, m Commands) (int, error) {
 
 		_, execErr := c.Tx.Exec(
 			ctx,
-			`UPDATE control.diagnostic_runs SET state = $2, failure_code = NULLIF($3, ''), end_command_id = COALESCE($4, end_command_id), version = version + 1, updated_at = $5
+			`UPDATE control.diagnostic_runs SET state = $2, failure_code = NULLIF($3, ''), end_command_id = COALESCE($4,
+				end_command_id), version = version + 1, updated_at = $5
 			WHERE id = $1`,
 			x.ID,
 			state,

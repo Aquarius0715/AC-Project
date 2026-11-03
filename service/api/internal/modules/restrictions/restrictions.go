@@ -149,10 +149,13 @@ type ReleaseView struct {
 	ReleaseIntent json.RawMessage `json:"releaseIntent" swaggertype:"object"`
 }
 
-const cols = `r.id, r.tenant_id, r.version, r.created_at, r.updated_at, r.recovery_cases, r.notice_notification_ids, r.contract_id, r.contract_version,
-	r.rules_version, r.notice_at, r.execute_after, r.reason, r.policy, r.state, r.exception_until, r.exception_reason, r.grace_until, r.release_intent,
+const cols = `r.id, r.tenant_id, r.version, r.created_at, r.updated_at, r.recovery_cases, r.notice_notification_ids, ` +
+	`r.contract_id, r.contract_version,
+	r.rules_version, r.notice_at, r.execute_after, r.reason, r.policy, r.state, r.exception_until, r.exception_reason, ` +
+	`r.grace_until, r.release_intent,
 	r.customer_id, (SELECT organization_id FROM billing.ref_customers cu WHERE cu.id = r.customer_id),
-	COALESCE((SELECT array_agg(invoice_id ORDER BY invoice_id) FROM restrictions.restriction_invoices ri WHERE ri.restriction_id = r.id), '{}')`
+	COALESCE((SELECT array_agg(invoice_id ORDER BY invoice_id) FROM restrictions.restriction_invoices ri WHERE ` +
+	`ri.restriction_id = r.id), '{}')`
 
 func scan(row pgx.Row) (Restriction, error) {
 	var (
@@ -202,7 +205,8 @@ func scan(row pgx.Row) (Restriction, error) {
 func decorate(ctx context.Context, c *ops.Call, x *Restriction) error {
 	rows, err := c.Tx.Query(
 		ctx,
-		`SELECT unit_id, apply_state, release_state, apply_command_ids, release_command_ids, observed_restriction, observed_at, evidence_id, pending_reason
+		`SELECT unit_id, apply_state, release_state, apply_command_ids, release_command_ids, observed_restriction,
+			observed_at, evidence_id, pending_reason
 		FROM restrictions.restriction_units WHERE restriction_id = $1 ORDER BY unit_id`,
 		x.ID,
 	)
@@ -217,6 +221,7 @@ func decorate(ctx context.Context, c *ops.Call, x *Restriction) error {
 			u   Unit
 			obs []byte
 		)
+
 		err := rows.Scan(
 			&u.UnitID,
 			&u.ApplyState,
@@ -383,27 +388,30 @@ func (in *GetInput) Validate() map[string]string {
 	return nil
 }
 
-// @Summary		restrictions.get (read)
-// @ID				restrictions.get
-// @Description	Authorization: admin:restriction.read | admin:restriction.override:release-projection; IR19:all-target-units-required
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A09, DD-A10
-// @Tags			restrictions
-// @Accept			json
-// @Produce		json
-// @Param			id	path		string	true	"input field id"
-// @Success		200	{object}	ops.Envelope
-// @Failure		401	{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403	{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404	{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409	{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422	{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429	{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503	{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504	{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/restrictions/{id} [get]
+// get serves restrictions.get.
+//
+//	@Summary		restrictions.get (read)
+//	@ID				restrictions.get
+//	@Description	Authorization: admin:restriction.read | admin:restriction.override:release-projection; \
+//	@Description	IR19:all-target-units-required
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A09, DD-A10
+//	@Tags			restrictions
+//	@Accept			json
+//	@Produce		json
+//	@Param			id	path		string	true	"input field id"
+//	@Success		200	{object}	ops.Envelope
+//	@Failure		401	{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403	{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404	{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409	{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422	{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429	{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503	{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504	{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/restrictions/{id} [get]
 func (m Restrictions) get(ctx context.Context, c *ops.Call, in *GetInput) (any, error) {
 	x, err := load(ctx, c, in.ID, false)
 	if err != nil {
@@ -485,6 +493,7 @@ func (m Restrictions) query(
 	where := strings.Join(conds, " AND ")
 
 	var total int
+
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM restrictions.restrictions r WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
@@ -551,38 +560,43 @@ func decodeFilter(raw json.RawMessage, f *listFilter) error {
 	return nil
 }
 
-// @Summary		restrictions.list (read)
-// @ID				restrictions.list
-// @Description	Authorization: admin:restriction.read | admin:restriction.override:release-projection; IR19:all-target-units-required
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A09, DD-A10 · Query: filters invoiceId,contractId,status · sort id,createdAt,updatedAt,executeAfter,noticeAt (default createdAt desc;id desc)
-// @Tags			restrictions
-// @Accept			json
-// @Produce		json
-// @Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit		query		integer	false	"page size 1–100, default 25"
-// @Param			sort		query		string	false	"field:direction — fields id,createdAt,updatedAt,executeAfter,noticeAt; default createdAt desc;id desc"
-// @Param			invoiceId	query		string	false	"filter → causeInvoiceIds contains"
-// @Param			contractId	query		string	false	"filter → contractId"
-// @Param			status		query		string	false	"filter → state"
-// @Success		200			{object}	ops.Envelope{data=anyPage}
-// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/restrictions [get]
+// list serves restrictions.list.
+//
+//	@Summary		restrictions.list (read)
+//	@ID				restrictions.list
+//	@Description	Authorization: admin:restriction.read | admin:restriction.override:release-projection; \
+//	@Description	IR19:all-target-units-required
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A09, DD-A10 · Query: filters invoiceId,contractId,status · sort \
+//	@Description	id,createdAt,updatedAt,executeAfter,noticeAt (default createdAt desc;id desc)
+//	@Tags			restrictions
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit		query		integer	false	"page size 1–100, default 25"
+//	@Param			sort		query		string	false	"field:direction — fields id,createdAt,updatedAt,executeAfter,noticeAt; default createdAt desc;id desc"
+//	@Param			invoiceId	query		string	false	"filter → causeInvoiceIds contains"
+//	@Param			contractId	query		string	false	"filter → contractId"
+//	@Param			status		query		string	false	"filter → state"
+//	@Success		200			{object}	ops.Envelope{data=anyPage}
+//	@Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/restrictions [get]
 func (m Restrictions) list(
 	ctx context.Context,
 	c *ops.Call,
 	in *paging.Query,
 ) (paging.Page[any], error) {
 	var f listFilter
+
 	err := decodeFilter(in.Filters, &f)
 	if err != nil {
 		return paging.Page[any]{}, err
@@ -625,32 +639,35 @@ func (in *ForInvoiceInput) Validate() map[string]string {
 	return nil
 }
 
-// @Summary		restrictions.forInvoice (read)
-// @ID				restrictions.forInvoice
-// @Description	Authorization: client:self | admin:restriction.read; IR19:all-target-units-required
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-C12 · Query: filters contractId,status · sort id,createdAt,updatedAt,executeAfter,noticeAt (default createdAt desc;id desc)
-// @Tags			restrictions
-// @Accept			json
-// @Produce		json
-// @Param			invoiceId	path		string	true	"input field invoiceId"
-// @Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit		query		integer	false	"page size 1–100, default 25"
-// @Param			sort		query		string	false	"field:direction — fields id,createdAt,updatedAt,executeAfter,noticeAt; default createdAt desc;id desc"
-// @Param			contractId	query		string	false	"filter → contractId"
-// @Param			status		query		string	false	"filter → state"
-// @Success		200			{object}	ops.Envelope{data=RestrictionPage}
-// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
-// @Security		BearerAuth
-// @Router			/v1/invoices/{invoiceId}/restrictions [get]
+// forInvoice serves restrictions.forInvoice.
+//
+//	@Summary		restrictions.forInvoice (read)
+//	@ID				restrictions.forInvoice
+//	@Description	Authorization: client:self | admin:restriction.read; IR19:all-target-units-required
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-C12 · Query: filters contractId,status · sort \
+//	@Description	id,createdAt,updatedAt,executeAfter,noticeAt (default createdAt desc;id desc)
+//	@Tags			restrictions
+//	@Accept			json
+//	@Produce		json
+//	@Param			invoiceId	path		string	true	"input field invoiceId"
+//	@Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit		query		integer	false	"page size 1–100, default 25"
+//	@Param			sort		query		string	false	"field:direction — fields id,createdAt,updatedAt,executeAfter,noticeAt; default createdAt desc;id desc"
+//	@Param			contractId	query		string	false	"filter → contractId"
+//	@Param			status		query		string	false	"filter → state"
+//	@Success		200			{object}	ops.Envelope{data=RestrictionPage}
+//	@Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/invoices/{invoiceId}/restrictions [get]
 func (m Restrictions) forInvoice(
 	ctx context.Context,
 	c *ops.Call,
@@ -658,7 +675,8 @@ func (m Restrictions) forInvoice(
 ) (paging.Page[Restriction], error) {
 	var org uuid.UUID
 
-	err := c.Tx.QueryRow(ctx, `SELECT k.customer_org_id FROM billing.invoices i JOIN billing.contracts k ON k.id = i.contract_id AND k.version = i.contract_version WHERE i.id = $1`, in.InvoiceID).
+	err := c.Tx.QueryRow(ctx, `SELECT k.customer_org_id FROM billing.invoices i JOIN billing.contracts k ON k.id =
+		i.contract_id AND k.version = i.contract_version WHERE i.id = $1`, in.InvoiceID).
 		Scan(&org)
 	if errors.Is(err, pgx.ErrNoRows) ||
 		(err == nil && c.Principal.Role == "client" && org != c.Principal.OrgID) {
@@ -670,12 +688,13 @@ func (m Restrictions) forInvoice(
 	}
 
 	var f listFilter
+
 	decodeFilterErr := decodeFilter(in.Query.Filters, &f)
 	if decodeFilterErr != nil {
 		return paging.Page[Restriction]{}, decodeFilterErr
 	}
-	// query catalog: input.invoiceId (the REST path) => causeInvoiceIds contains; contractId => contractId; status => state.
-	// invoiceId is no filter of this read: the REST binding refuses it as error.notAllowed
+	// query catalog: input.invoiceId (the REST path) => causeInvoiceIds contains; contractId => contractId; status =>
+	// state. invoiceId is no filter of this read: the REST binding refuses it as error.notAllowed
 	f.InvoiceID = &in.InvoiceID
 
 	xs, next, total, snap, err := m.query(ctx, c, in.Query, f)
