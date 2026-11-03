@@ -44,29 +44,31 @@ const targetLateral = `LATERAL (
 	`%[1]s = 'certificate' AND c.id = %[2]s
 ) t`
 
-// adminKinds lists the target kinds an HQ membership can read and the permissions that grant each (IR142).
-var adminKinds = map[string][]string{
-	targetUnit: {
-		"asset.read",
-		"alert.read",
-		"device.read",
-		"control.execute",
-	},
-	targetJob:     {"job.read", "job.write"},
-	targetInvoice: {"billing.read", "billing.write"},
-	targetRestriction: {
-		"restriction.read",
-		"restriction.write",
-		"restriction.override",
-	},
-	"device":      {"device.read", "device.write"},
-	targetInquiry: {"billing.read", "billing.write"},
+// adminPermissions lists the target kinds an HQ membership can read and the permissions that grant each (IR142).
+func adminPermissions() map[string][]string {
+	return map[string][]string{
+		targetUnit: {
+			"asset.read",
+			"alert.read",
+			"device.read",
+			"control.execute",
+		},
+		targetJob:     {"job.read", "job.write"},
+		targetInvoice: {"billing.read", "billing.write"},
+		targetRestriction: {
+			"restriction.read",
+			"restriction.write",
+			"restriction.override",
+		},
+		"device":      {"device.read", "device.write"},
+		targetInquiry: {"billing.read", "billing.write"},
+	}
 }
 
 func kindsFor(perms map[string]bool) []string {
 	out := []string{}
 
-	for k, ps := range adminKinds {
+	for k, ps := range adminPermissions() {
 		for _, p := range ps {
 			if perms[p] {
 				out = append(out, k)
@@ -111,15 +113,15 @@ func readableSQL(principal *ops.Principal, now time.Time, kind, id string, args 
 		) + ") OR t.org = ANY(" + add(
 			principal.Scopes["organization"],
 		) + "))"
-		me := add(principal.MembershipID)
+		membership := add(principal.MembershipID)
 
 		return "((" + kind + " = 'job' AND (EXISTS (SELECT 1 FROM notify.ref_assignments a WHERE a.job_id = " + id +
-			" AND a.technician_membership_id = " + me +
+			" AND a.technician_membership_id = " + membership +
 			" AND a.status = 'active' AND (a.scheduled IS NULL OR " + add(
 			now,
 		) + " < upper(a.scheduled)))" +
 			" OR EXISTS (SELECT 1 FROM notify.ref_job_histories h WHERE h.job_id = " + id + " AND h.owner_kind = 'membership' " +
-			"AND h.owner_id = " + me + "))) OR (" +
+			"AND h.owner_id = " + membership + "))) OR (" +
 			kind + " IN ('unit','device') AND " + unitScope + "))"
 	}
 }
@@ -168,7 +170,7 @@ func deliveryState(channel string) string {
 }
 
 func projectParams(raw []byte, name string, occurred time.Time, typ string) Params {
-	var s struct {
+	var decoded struct {
 		At          *time.Time `json:"at"`
 		Status      *string    `json:"status"`
 		Reason      *string    `json:"reason"`
@@ -178,24 +180,24 @@ func projectParams(raw []byte, name string, occurred time.Time, typ string) Para
 		Message     *string    `json:"message"`
 	}
 
-	_ = json.Unmarshal(raw, &s)
+	_ = json.Unmarshal(raw, &decoded)
 
 	params := Params{
 		TargetName:  name,
 		At:          occurred,
 		Status:      typ,
-		Reason:      s.Reason,
-		AmountMinor: s.AmountMinor,
-		Currency:    s.Currency,
-		Method:      s.Method,
-		Message:     s.Message,
+		Reason:      decoded.Reason,
+		AmountMinor: decoded.AmountMinor,
+		Currency:    decoded.Currency,
+		Method:      decoded.Method,
+		Message:     decoded.Message,
 	}
-	if s.At != nil {
-		params.At = *s.At
+	if decoded.At != nil {
+		params.At = *decoded.At
 	}
 
-	if s.Status != nil {
-		params.Status = *s.Status
+	if decoded.Status != nil {
+		params.Status = *decoded.Status
 	}
 
 	return params
@@ -305,9 +307,11 @@ func inboxFrom() string {
 	)
 }
 
-var (
-	severities = []string{"critical", "warning", severityNormal}
-	types      = []string{
+// severityLevels are the severities of a notification, and notificationTypes its types.
+func severityLevels() []string { return []string{"critical", "warning", severityNormal} }
+
+func notificationTypes() []string {
+	return []string{
 		"cleaning_due",
 		"fault",
 		noticeQuality,
@@ -323,7 +327,83 @@ var (
 		"certificate_expiry",
 		"warranty_expiring",
 	}
-)
+}
+
+// inboxFilter is the filters of notifications.list.
+type inboxFilter struct {
+	Severity   *string    `json:"severity,omitempty"`
+	UnreadOnly *bool      `json:"unreadOnly,omitempty"`
+	Type       *string    `json:"type,omitempty"`
+	From       *time.Time `json:"from,omitempty"` // [from, to) on occurredAt
+	To         *time.Time `json:"to,omitempty"`
+}
+
+// inboxFilterOf decodes and checks the filters of notifications.list: known fields only, a known severity and type,
+// and a range whose end comes after its start.
+func inboxFilterOf(raw json.RawMessage) (inboxFilter, error) {
+	var filter inboxFilter
+
+	if len(raw) == 0 {
+		return filter, nil
+	}
+
+	dec := json.NewDecoder(strings.NewReader(string(raw)))
+	dec.DisallowUnknownFields()
+
+	if dec.Decode(&filter) != nil ||
+		(filter.Severity != nil && !slices.Contains(severityLevels(), *filter.Severity)) ||
+		(filter.Type != nil && !slices.Contains(notificationTypes(), *filter.Type)) {
+		return inboxFilter{}, apperr.Fields(map[string]string{"filters": apperr.KeyInvalid})
+	}
+
+	if filter.From != nil && filter.To != nil && !filter.From.Before(*filter.To) {
+		return inboxFilter{}, apperr.Fields(map[string]string{"filters.to": apperr.KeyRange})
+	}
+
+	return filter, nil
+}
+
+// where is the filter's WHERE clause over the caller's readable notifications, with its arguments.
+func (filter inboxFilter) where(call *ops.Call) (string, []any) {
+	args := []any{call.Principal.MembershipID}
+	add := func(v any) string {
+		args = append(args, v)
+
+		return fmt.Sprintf("$%d", len(args))
+	}
+
+	conds := []string{
+		"n.recipient_membership_id = $1",
+		readableSQL(
+			call.Principal,
+			call.Now,
+			"(n.target->>'kind')",
+			"(n.target->>'id')::uuid",
+			&args,
+		),
+	}
+	if filter.Severity != nil {
+		conds = append(conds, "n.severity = "+add(*filter.Severity))
+	}
+
+	if filter.UnreadOnly != nil && *filter.UnreadOnly {
+		conds = append(conds, "n.read_at IS NULL")
+	}
+
+	if filter.Type != nil {
+		conds = append(conds, "n.type = "+add(*filter.Type))
+	}
+
+	if filter.From != nil {
+		conds = append(conds, "n.occurred_at >= "+add(*filter.From))
+	}
+
+	if filter.To != nil {
+		conds = append(conds, "n.occurred_at < "+add(*filter.To))
+	}
+
+	return strings.Join(conds, " AND "), args
+}
 
 // list serves notifications.list.
 //
@@ -362,31 +442,9 @@ func (Inbox) list(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[Notification], error) {
-	var f struct {
-		Severity   *string    `json:"severity,omitempty"`
-		UnreadOnly *bool      `json:"unreadOnly,omitempty"`
-		Type       *string    `json:"type,omitempty"`
-		From       *time.Time `json:"from,omitempty"` // [from, to) on occurredAt
-		To         *time.Time `json:"to,omitempty"`
-	}
-
-	if len(query.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
-		dec.DisallowUnknownFields()
-
-		if dec.Decode(&f) != nil ||
-			(f.Severity != nil && !slices.Contains(severities, *f.Severity)) ||
-			(f.Type != nil && !slices.Contains(types, *f.Type)) {
-			return paging.Page[Notification]{}, apperr.Fields(
-				map[string]string{"filters": apperr.KeyInvalid},
-			)
-		}
-
-		if f.From != nil && f.To != nil && !f.From.Before(*f.To) {
-			return paging.Page[Notification]{}, apperr.Fields(
-				map[string]string{"filters.to": apperr.KeyRange},
-			)
-		}
+	filter, err := inboxFilterOf(query.Filters)
+	if err != nil {
+		return paging.Page[Notification]{}, err
 	}
 
 	order, err := paging.OrderBy(query.Sort, map[string]string{
@@ -400,49 +458,12 @@ func (Inbox) list(
 		return paging.Page[Notification]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	window, err := paging.Resolve(*query, f, call.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, filter, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Notification]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
-	args := []any{call.Principal.MembershipID}
-	add := func(v any) string {
-		args = append(args, v)
-
-		return fmt.Sprintf("$%d", len(args))
-	}
-
-	conds := []string{
-		"n.recipient_membership_id = $1",
-		readableSQL(
-			call.Principal,
-			call.Now,
-			"(n.target->>'kind')",
-			"(n.target->>'id')::uuid",
-			&args,
-		),
-	}
-	if f.Severity != nil {
-		conds = append(conds, "n.severity = "+add(*f.Severity))
-	}
-
-	if f.UnreadOnly != nil && *f.UnreadOnly {
-		conds = append(conds, "n.read_at IS NULL")
-	}
-
-	if f.Type != nil {
-		conds = append(conds, "n.type = "+add(*f.Type))
-	}
-
-	if f.From != nil {
-		conds = append(conds, "n.occurred_at >= "+add(*f.From))
-	}
-
-	if f.To != nil {
-		conds = append(conds, "n.occurred_at < "+add(*f.To))
-	}
-
-	where := strings.Join(conds, " AND ")
+	where, args := filter.where(call)
 
 	var total int
 
@@ -544,7 +565,7 @@ func (Inbox) markRead(
 	in *MarkReadInput,
 ) (Notification, error) {
 	args := []any{in.ID, call.Principal.MembershipID}
-	q := "SELECT " + inboxCols + " FROM " + inboxFrom() + " WHERE n.id = $1 AND n.recipient_membership_id = $2 AND " +
+	stmt := "SELECT " + inboxCols + " FROM " + inboxFrom() + " WHERE n.id = $1 AND n.recipient_membership_id = $2 AND " +
 		readableSQL(
 			call.Principal,
 			call.Now,
@@ -553,7 +574,7 @@ func (Inbox) markRead(
 			&args,
 		) + " FOR UPDATE OF n"
 
-	notification, err := scanNotification(call.Tx.QueryRow(ctx, q, args...))
+	notification, err := scanNotification(call.Tx.QueryRow(ctx, stmt, args...))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return notification, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
@@ -598,13 +619,16 @@ type MarkAllReadInput struct {
 	IDs []uuid.UUID `json:"ids"`
 }
 
+// inboxPage is the size of one inbox page, the most IDs one notifications.markAllRead takes.
+const inboxPage = 100
+
 // Validate implements ops.Validator: 1–100 distinct IDs, the size of one inbox page.
 func (in *MarkAllReadInput) Validate() map[string]string {
 	if len(in.IDs) == 0 {
 		return map[string]string{keyIDs: apperr.KeyRequired}
 	}
 
-	if len(in.IDs) > 100 {
+	if len(in.IDs) > inboxPage {
 		return map[string]string{keyIDs: apperr.KeyCount}
 	}
 
@@ -658,10 +682,11 @@ type Marked struct {
 func (Inbox) markAllRead(
 	ctx context.Context,
 	call *ops.Call,
-	in *MarkAllReadInput,
+	markAllReadInput *MarkAllReadInput,
 ) (Marked, error) {
-	args := []any{in.IDs, call.Principal.MembershipID, call.Now}
-	q := "UPDATE notify.notifications x SET read_at = $3, version = x.version + 1 FROM (SELECT n.id FROM " + inboxFrom() +
+	args := []any{markAllReadInput.IDs, call.Principal.MembershipID, call.Now}
+	stmt := "UPDATE notify.notifications x SET read_at = $3, version = x.version + 1 FROM (SELECT n.id FROM " +
+		inboxFrom() +
 		" WHERE n.id = ANY($1) AND n.recipient_membership_id = $2 AND n.read_at IS NULL AND " +
 		readableSQL(
 			call.Principal,
@@ -671,7 +696,7 @@ func (Inbox) markAllRead(
 			&args,
 		) + ") r WHERE x.id = r.id RETURNING x.id"
 
-	rows, err := call.Tx.Query(ctx, q, args...)
+	rows, err := call.Tx.Query(ctx, stmt, args...)
 	if err != nil {
 		return Marked{}, apperr.Wrap(err, "update notify.notifications")
 	}
@@ -683,7 +708,7 @@ func (Inbox) markAllRead(
 
 	out := Marked{MarkedIDs: []uuid.UUID{}, SkippedIDs: []uuid.UUID{}}
 
-	for _, id := range in.IDs {
+	for _, id := range markAllReadInput.IDs {
 		if slices.Contains(ids, id) {
 			out.MarkedIDs = append(out.MarkedIDs, id)
 		} else {
@@ -704,8 +729,9 @@ type TargetInput struct {
 	Channel     string `json:"channel"`
 }
 
-var (
-	kinds = []string{
+// targetKinds are the kinds of a notification target.
+func targetKinds() []string {
+	return []string{
 		targetUnit,
 		targetJob,
 		targetInvoice,
@@ -713,7 +739,11 @@ var (
 		"device",
 		targetInquiry,
 	}
-	templates = []string{
+}
+
+// templateKeys are the templates a notification is written from.
+func templateKeys() []string {
+	return []string{
 		noticeAlert,
 		noticeQuality,
 		noticeScheduleChange,
@@ -726,25 +756,33 @@ var (
 		noticeJobUpdate,
 		noticeDeviceOperation,
 	}
-	channels = []string{channelInApp, "email", "whatsapp"}
-	roles    = []string{
+}
+
+// deliveryChannels are the channels a notification is delivered on.
+func deliveryChannels() []string {
+	return []string{channelInApp, "email", "whatsapp"}
+}
+
+// recipientRoles are the roles a notification recipient can have.
+func recipientRoles() []string {
+	return []string{
 		authz.RoleClient,
 		authz.RoleContractor,
 		authz.RoleTechnician,
 		authz.RoleAdmin,
 	}
-)
+}
 
 func (in *TargetInput) validate(fieldErrs map[string]string) {
-	if !slices.Contains(kinds, in.Target.Kind) || in.Target.ID == uuid.Nil {
+	if !slices.Contains(targetKinds(), in.Target.Kind) || in.Target.ID == uuid.Nil {
 		fieldErrs["target"] = apperr.KeyInvalid
 	}
 
-	if !slices.Contains(templates, in.TemplateKey) {
+	if !slices.Contains(templateKeys(), in.TemplateKey) {
 		fieldErrs["templateKey"] = apperr.KeyInvalid
 	}
 
-	if !slices.Contains(channels, in.Channel) {
+	if !slices.Contains(deliveryChannels(), in.Channel) {
 		fieldErrs["channel"] = apperr.KeyInvalid
 	}
 }
@@ -756,46 +794,46 @@ type target struct {
 
 // resolve loads the target and checks that the caller can read it (NOT_FOUND) and, for payment_reminder, the IR20
 // preconditions (billing.write FORBIDDEN, overdue unpaid invoice CONFLICT).
-func resolve(ctx context.Context, c *ops.Call, input *TargetInput) (target, error) {
+func resolve(ctx context.Context, call *ops.Call, input *TargetInput) (target, error) {
 	args := []any{input.Target.Kind, input.Target.ID}
 
-	var t target
+	var resolved target
 
-	err := c.Tx.QueryRow(ctx, "SELECT t.org, t.name FROM "+fmt.Sprintf(targetLateral, "$1::text", "$2::uuid")+" WHERE "+
-		readableSQL(c.Principal, c.Now, "$1::text", "$2::uuid", &args), args...).
-		Scan(&t.org, &t.name)
+	err := call.Tx.QueryRow(ctx, "SELECT t.org, t.name FROM "+fmt.Sprintf(targetLateral, "$1::text", "$2::uuid")+" WHERE "+
+		readableSQL(call.Principal, call.Now, "$1::text", "$2::uuid", &args), args...).
+		Scan(&resolved.org, &resolved.name)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return t, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+		return resolved, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
-		return t, apperr.Wrap(err, "select t.org")
+		return resolved, apperr.Wrap(err, "select t.org")
 	}
 
 	if input.TemplateKey == noticePaymentReminder {
-		if c.Principal.Role != authz.RoleAdmin || !c.Principal.Permissions["billing.write"] {
-			return t, apperr.E(apperr.Forbidden, apperr.KeyForbidden)
+		if call.Principal.Role != authz.RoleAdmin || !call.Principal.Permissions["billing.write"] {
+			return resolved, apperr.E(apperr.Forbidden, apperr.KeyForbidden)
 		}
 
 		if input.Target.Kind != targetInvoice {
-			return t, apperr.Fields(map[string]string{"target": apperr.KeyInvalid})
+			return resolved, apperr.Fields(map[string]string{"target": apperr.KeyInvalid})
 		}
 
 		var ok bool
 
-		err := c.Tx.QueryRow(ctx, `SELECT status = 'unpaid' AND due_at < $2 FROM notify.ref_invoices WHERE id =
-			$1`, input.Target.ID, c.Now).
+		err := call.Tx.QueryRow(ctx, `SELECT status = 'unpaid' AND due_at < $2 FROM notify.ref_invoices WHERE id =
+			$1`, input.Target.ID, call.Now).
 			Scan(&ok)
 		if err != nil {
-			return t, apperr.Wrap(err, "select notify.ref_invoices")
+			return resolved, apperr.Wrap(err, "select notify.ref_invoices")
 		}
 
 		if !ok {
-			return t, apperr.E(apperr.Conflict, "errors.reminder_not_due")
+			return resolved, apperr.E(apperr.Conflict, "errors.reminder_not_due")
 		}
 	}
 
-	return t, nil
+	return resolved, nil
 }
 
 // Recipient is NotificationRecipient.
@@ -829,7 +867,7 @@ func adminPerms(in *TargetInput) []string {
 		return []string{"alert.read"}
 	}
 
-	return adminKinds[in.Target.Kind]
+	return adminPermissions()[in.Target.Kind]
 }
 
 func recipients(
@@ -844,7 +882,9 @@ func recipients(
 		org = *t.org
 	}
 
-	q := "SELECT * FROM (" + recipientsSQL + ") r(id, role, label, channels) WHERE $7 = ANY(r.channels)"
+	stmt := "SELECT r.id, r.role, r.label, r.channels FROM (" + recipientsSQL +
+		") r(id, role, label, channels) WHERE $7 = " +
+		"ANY(r.channels)"
 	args := []any{
 		call.Now,
 		org,
@@ -856,12 +896,12 @@ func recipients(
 	}
 
 	if role != nil {
-		q += " AND r.role = $8"
+		stmt += " AND r.role = $8"
 
 		args = append(args, *role)
 	}
 
-	rows, err := call.Tx.Query(ctx, q+" ORDER BY r.role, r.label, r.id", args...)
+	rows, err := call.Tx.Query(ctx, stmt+" ORDER BY r.role, r.label, r.id", args...)
 	if err != nil {
 		return nil, apperr.Wrap(err, "query (recipients)")
 	}
@@ -901,7 +941,7 @@ func (in *RecipientsInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	in.validate(fieldErrs)
 
-	if in.Role != nil && !slices.Contains(roles, *in.Role) {
+	if in.Role != nil && !slices.Contains(recipientRoles(), *in.Role) {
 		fieldErrs["role"] = apperr.KeyInvalid
 	}
 
@@ -1007,18 +1047,18 @@ func (in *PreviewInput) Validate() map[string]string {
 		switch {
 		case in.TemplateKey != noticeAlert:
 			fieldErrs["severity"] = apperr.KeyNotAllowed
-		case !slices.Contains(severities, *in.Severity):
+		case !slices.Contains(severityLevels(), *in.Severity):
 			fieldErrs["severity"] = apperr.KeyInvalid
 		}
 	}
 	// the message carries a job note (1–2000, DD-P07) or a reminder text; the reason stays 1–1000 (IR228)
-	for k, f := range map[string]struct {
+	for k, field := range map[string]struct {
 		s   *string
 		max int
 	}{"message": {in.Message, 2000}, "reason": {in.Reason, 1000}} {
-		if f.s != nil {
-			*f.s = strings.TrimSpace(*f.s)
-			if n := utf8.RuneCountInString(*f.s); n < 1 || n > f.max {
+		if field.s != nil {
+			*field.s = strings.TrimSpace(*field.s)
+			if n := utf8.RuneCountInString(*field.s); n < 1 || n > field.max {
 				fieldErrs[k] = apperr.KeyLength
 			}
 		}
@@ -1052,13 +1092,17 @@ func (in *PreviewInput) Validate() map[string]string {
 //	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/notifications/preview [post]
-func (Inbox) preview(ctx context.Context, c *ops.Call, input *PreviewInput) (Notification, error) {
-	t, err := resolve(ctx, c, &input.TargetInput)
+func (Inbox) preview(
+	ctx context.Context,
+	call *ops.Call,
+	input *PreviewInput,
+) (Notification, error) {
+	resolved, err := resolve(ctx, call, &input.TargetInput)
 	if err != nil {
 		return Notification{}, err
 	}
 
-	all, err := recipients(ctx, c, &input.TargetInput, t, nil)
+	all, err := recipients(ctx, call, &input.TargetInput, resolved, nil)
 	if err != nil {
 		return Notification{}, err
 	}
@@ -1075,7 +1119,7 @@ func (Inbox) preview(ctx context.Context, c *ops.Call, input *PreviewInput) (Not
 
 	var scope int
 
-	scanErr := c.Tx.QueryRow(ctx, `SELECT scope_version FROM identity.memberships WHERE id =
+	scanErr := call.Tx.QueryRow(ctx, `SELECT scope_version FROM identity.memberships WHERE id =
 		$1`, input.RecipientMembershipID).
 		Scan(&scope)
 	if scanErr != nil {
@@ -1100,10 +1144,10 @@ func (Inbox) preview(ctx context.Context, c *ops.Call, input *PreviewInput) (Not
 
 	return Notification{
 		ID:                     uuid.New(),
-		TenantID:               c.Principal.TenantID,
+		TenantID:               call.Principal.TenantID,
 		Version:                1,
-		CreatedAt:              c.Now,
-		UpdatedAt:              c.Now,
+		CreatedAt:              call.Now,
+		UpdatedAt:              call.Now,
 		SourceAlertID:          input.SourceAlertID,
 		Type:                   typ,
 		RecipientMembershipID:  input.RecipientMembershipID,
@@ -1114,8 +1158,8 @@ func (Inbox) preview(ctx context.Context, c *ops.Call, input *PreviewInput) (Not
 		},
 		TemplateKey: input.TemplateKey,
 		Params: Params{
-			TargetName: t.name,
-			At:         c.Now,
+			TargetName: resolved.name,
+			At:         call.Now,
 			Status:     status,
 			Reason:     input.Reason,
 			Message:    input.Message, AmountMinor: nil, Currency: nil, Method: nil,
@@ -1123,7 +1167,7 @@ func (Inbox) preview(ctx context.Context, c *ops.Call, input *PreviewInput) (Not
 		Channel:       input.Channel,
 		DeliveryState: "preview",
 		Severity:      severity,
-		OccurredAt:    c.Now,
+		OccurredAt:    call.Now,
 		TargetOpen:    true, ReadAt: nil,
 	}, nil
 }

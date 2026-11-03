@@ -12,6 +12,8 @@ import (
 
 // TestMailTexts: a notification e-mail names its template and target and links to the recipient's app.
 func TestMailTexts(t *testing.T) {
+	t.Parallel()
+
 	apps := Apps{
 		Customer:   "http://c",
 		Partner:    "http://p",
@@ -30,22 +32,22 @@ func TestMailTexts(t *testing.T) {
 		t.Errorf("notification: %q %q", subject, body)
 	}
 
-	if s, _ := notificationMail(
+	if got, _ := notificationMail(
 		noticeAlert,
 		map[string]any{"targetName": "Bed\r\nroom AC"},
 		authz.RoleClient,
 		apps,
-	); s != "Alert: Bed room AC" { // a name with a line break
-		t.Errorf("subject on one line: %q", s)
+	); got != "Alert: Bed room AC" { // a name with a line break
+		t.Errorf("subject on one line: %q", got)
 	}
 
-	if s, _ := notificationMail(
+	if got, _ := notificationMail(
 		"unknown",
 		nil,
 		authz.RoleAdmin,
 		apps,
-	); s != "Notification: unknown" {
-		t.Errorf("unknown template: %q", s)
+	); got != "Notification: unknown" {
+		t.Errorf("unknown template: %q", got)
 	}
 
 	for role, app := range map[string]string{
@@ -69,20 +71,22 @@ func TestMailTexts(t *testing.T) {
 
 // TestSMTPRefusesHeaderBreaks: an address or subject with a line break never reaches the SMTP server.
 func TestSMTPRefusesHeaderBreaks(t *testing.T) {
+	t.Parallel()
+
 	s := SMTP{Addr: "127.0.0.1:1", From: "x@example.com"}
-	for _, c := range [][2]string{
+	for _, pair := range [][2]string{
 		{"a@example.com\r\nBcc: b@example.com", "Hi"},
 		{"a@example.com", "Hi\nBcc: b@example.com"},
 	} {
 		_, err := s.Send(
 			context.Background(),
-			c[0],
-			c[1],
+			pair[0],
+			pair[1],
 			"body",
 		)
 		if err == nil ||
 			!strings.Contains(err.Error(), "line break") {
-			t.Errorf("%q: %v", c, err)
+			t.Errorf("%q: %v", pair, err)
 		}
 	}
 }
@@ -90,11 +94,15 @@ func TestSMTPRefusesHeaderBreaks(t *testing.T) {
 // TestSMTPSends: a message reaches an SMTP server with the bare sender address in the envelope and the display name
 // in the From header, a Date, the non-ASCII subject RFC 2047 encoded and CRLF line ends in the body.
 func TestSMTPSends(t *testing.T) {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	t.Parallel()
+
+	var listenConfig net.ListenConfig
+
+	listener, err := listenConfig.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 
 	got := make(chan string, 1)
 
@@ -103,11 +111,11 @@ func TestSMTPSends(t *testing.T) {
 		if err != nil {
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 
 		reader := bufio.NewReader(conn)
-		w := func(s string) { _, _ = conn.Write([]byte(s + "\r\n")) }
-		w("220 test")
+		reply := func(s string) { _, _ = conn.Write([]byte(s + "\r\n")) }
+		reply("220 test")
 
 		var (
 			from string
@@ -126,7 +134,7 @@ func TestSMTPSends(t *testing.T) {
 				if line == ".\r\n" {
 					inData = false
 
-					w("250 ok")
+					reply("250 ok")
 
 					got <- from + "\n" + data.String()
 
@@ -140,23 +148,23 @@ func TestSMTPSends(t *testing.T) {
 
 			switch cmd := strings.ToUpper(strings.TrimSpace(line)); {
 			case strings.HasPrefix(cmd, "EHLO"), strings.HasPrefix(cmd, "HELO"):
-				w("250 test")
+				reply("250 test")
 			case strings.HasPrefix(cmd, "MAIL FROM:"):
 				from = strings.TrimSpace(line[len("MAIL FROM:"):])
 
-				w("250 ok")
+				reply("250 ok")
 			case strings.HasPrefix(cmd, "RCPT TO:"):
-				w("250 ok")
+				reply("250 ok")
 			case cmd == "DATA":
 				inData = true
 
-				w("354 go")
+				reply("354 go")
 			case cmd == "QUIT":
-				w("221 bye")
+				reply("221 bye")
 
 				return
 			default:
-				w("250 ok")
+				reply("250 ok")
 			}
 		}
 	}()
@@ -166,20 +174,20 @@ func TestSMTPSends(t *testing.T) {
 	_, sendErr := s.Send(
 		context.Background(),
 		"tan@example.com",
-		"Hello 陈",
+		"Hello 陈", //nolint:gosmopolitan // a Chinese name checks the UTF-8 encoding of the subject
 		"Body line\r\nsecond",
 	)
 	if sendErr != nil {
 		t.Fatal(sendErr)
 	}
 
-	m := <-got
-	if !strings.HasPrefix(m, "<no-reply@ac-project.local>") ||
-		!strings.Contains(m, "From: AC Project <no-reply@ac-project.local>") ||
-		!strings.Contains(m, "Subject: =?UTF-8?q?Hello_=E9=99=88?=\r\n") ||
-		!strings.Contains(m, "\r\nDate: ") ||
-		!strings.Contains(m, "Body line\r\nsecond") ||
-		strings.Contains(m, "\r\r\n") {
-		t.Errorf("received: %q", m)
+	message := <-got
+	if !strings.HasPrefix(message, "<no-reply@ac-project.local>") ||
+		!strings.Contains(message, "From: AC Project <no-reply@ac-project.local>") ||
+		!strings.Contains(message, "Subject: =?UTF-8?q?Hello_=E9=99=88?=\r\n") ||
+		!strings.Contains(message, "\r\nDate: ") ||
+		!strings.Contains(message, "Body line\r\nsecond") ||
+		strings.Contains(message, "\r\r\n") {
+		t.Errorf("received: %q", message)
 	}
 }

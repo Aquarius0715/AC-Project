@@ -82,10 +82,10 @@ func (Store) Create(ctx context.Context, call *ops.Call, n New) (uuid.UUID, erro
 // EventHandlers store requested notifications (consumer identity, IR191).
 func EventHandlers() map[string]events.Handler {
 	return map[string]events.Handler{
-		events.NotificationRequested: func(ctx context.Context, txn pgx.Tx, e events.Event) error {
+		events.NotificationRequested: func(ctx context.Context, txn pgx.Tx, event events.Event) error {
 			var notification events.Notification
 
-			decodeErr := e.Decode(&notification)
+			decodeErr := event.Decode(&notification)
 			if decodeErr != nil {
 				return apperr.Wrap(decodeErr, "events.Event.Decode")
 			}
@@ -101,7 +101,7 @@ func EventHandlers() map[string]events.Handler {
 				$3
 				ON CONFLICT (id) DO NOTHING`,
 				notification.NotificationID,
-				e.TenantID,
+				event.TenantID,
 				notification.RecipientMembershipID,
 				notification.Type,
 				notification.Channel,

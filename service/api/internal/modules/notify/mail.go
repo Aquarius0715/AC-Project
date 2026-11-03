@@ -36,8 +36,8 @@ type SMTP struct {
 }
 
 // Send implements Sender.
-func (s SMTP) Send(_ context.Context, to, subject, body string) (string, error) {
-	if strings.ContainsAny(to, "\r\n") ||
+func (s SMTP) Send(_ context.Context, recipient, subject, body string) (string, error) {
+	if strings.ContainsAny(recipient, "\r\n") ||
 		strings.ContainsAny(subject, "\r\n") { // no header injection
 		return "", errHeaderLineBreak
 	}
@@ -45,7 +45,7 @@ func (s SMTP) Send(_ context.Context, to, subject, body string) (string, error) 
 	id := uuid.NewString() + "@ac-project.local"
 	// RFC 5322 needs a Date; a subject with non-ASCII text (a customer's or unit's name) is RFC 2047 encoded, as headers
 	// are ASCII; the body's line ends become CRLF once
-	msg := "From: " + s.From + "\r\nTo: " + to + "\r\nSubject: " + mime.QEncoding.Encode(
+	msg := "From: " + s.From + "\r\nTo: " + recipient + "\r\nSubject: " + mime.QEncoding.Encode(
 		"UTF-8",
 		subject,
 	) + "\r\nDate: " + time.Now().
@@ -66,7 +66,7 @@ func (s SMTP) Send(_ context.Context, to, subject, body string) (string, error) 
 	}
 
 	return id, apperr.Wrap(
-		smtp.SendMail(s.Addr, nil, from.Address, []string{to}, []byte(msg)),
+		smtp.SendMail(s.Addr, nil, from.Address, []string{recipient}, []byte(msg)),
 		"smtp.SendMail",
 	)
 }
@@ -88,22 +88,25 @@ func (a Apps) of(role string) string {
 	}
 }
 
-// subjects of the notification e-mails by template key; the in-app texts of the web stay the reference.
-var subjects = map[string]string{
-	noticeAlert:           "Alert: %s",
-	noticeQuality:         "Report quality: %s",
-	noticeScheduleChange:  "Schedule change: %s",
-	noticeReportReturn:    "Report returned: %s",
-	noticeCompletion:      "Work completed: %s",
-	noticePayment:         "Payment: %s",
-	noticePaymentReminder: "Payment reminder: %s",
-	targetRestriction:     "Service restriction: %s",
-	targetInquiry:         "Inquiry: %s",
-	noticeJobUpdate:       "Job update: %s",
-	noticeDeviceOperation: "Device operation: %s",
-	"invite":              "Invitation: %s",
-	"certificate_expiry":  "Certificate expiring: %s",
-	"warranty_expiring":   "Warranty ending: %s",
+// subjectFormats are the subjects of the notification e-mails by template key; the in-app texts of the web stay the
+// reference.
+func subjectFormats() map[string]string {
+	return map[string]string{
+		noticeAlert:           "Alert: %s",
+		noticeQuality:         "Report quality: %s",
+		noticeScheduleChange:  "Schedule change: %s",
+		noticeReportReturn:    "Report returned: %s",
+		noticeCompletion:      "Work completed: %s",
+		noticePayment:         "Payment: %s",
+		noticePaymentReminder: "Payment reminder: %s",
+		targetRestriction:     "Service restriction: %s",
+		targetInquiry:         "Inquiry: %s",
+		noticeJobUpdate:       "Job update: %s",
+		noticeDeviceOperation: "Device operation: %s",
+		"invite":              "Invitation: %s",
+		"certificate_expiry":  "Certificate expiring: %s",
+		"warranty_expiring":   "Warranty ending: %s",
+	}
 }
 
 const footer = "\n\n— AC Project (demo). This message was sent by the demo stack; in development it only reaches the " +
@@ -122,7 +125,7 @@ func notificationMail(
 		name = templateKey
 	}
 
-	format, ok := subjects[templateKey]
+	format, ok := subjectFormats()[templateKey]
 	if !ok {
 		format = "Notification: %s"
 	}
@@ -168,16 +171,40 @@ func Deliver(
 	now time.Time,
 	limit int,
 ) (int, error) {
-	sent := 0
-
-	type pending struct {
-		id            uuid.UUID
-		to, key, role string
-		params        []byte
-		attempts      int
-		ended         bool // the recipient's membership has ended: the e-mail is suppressed, not sent
+	due, err := dueMails(ctx, txn, now, limit)
+	if err != nil {
+		return 0, err
 	}
 
+	sent := 0
+
+	for _, email := range due {
+		delivered, err := deliverOne(ctx, txn, sender, apps, now, email)
+		if err != nil {
+			return sent, err
+		}
+
+		if delivered {
+			sent++
+		}
+	}
+
+	return sent, nil
+}
+
+// pendingMail is one e-mail notification waiting to be sent: its recipient's address and role, its template and
+// parameters, the attempts so far, and whether the recipient's membership has ended.
+type pendingMail struct {
+	id            uuid.UUID
+	to, key, role string
+	params        []byte
+	attempts      int
+	ended         bool
+}
+
+// dueMails are the e-mails to send now, oldest first and at most limit: never delivered, or failed and due for a retry.
+// They are locked, and a second worker skips them, so no e-mail is sent twice.
+func dueMails(ctx context.Context, txn pgx.Tx, now time.Time, limit int) ([]pendingMail, error) {
 	rows, err := txn.Query(
 		ctx,
 		`SELECT n.id, u.email::text, n.template_key, m.role, n.params, COALESCE(d.attempts, 0), m.valid_until IS NOT NULL AND
@@ -197,85 +224,85 @@ func Deliver(
 		now,
 	) // a second worker takes other rows: no e-mail is sent twice
 	if err != nil {
-		return 0, apperr.Wrap(err, "select notify.notifications")
+		return nil, apperr.Wrap(err, "select notify.notifications")
 	}
+	defer rows.Close()
 
-	var ns []pending
+	var due []pendingMail
 
 	for rows.Next() {
-		var p pending
+		var email pendingMail
 
 		err := rows.Scan(
-			&p.id,
-			&p.to,
-			&p.key,
-			&p.role,
-			&p.params,
-			&p.attempts,
-			&p.ended,
+			&email.id,
+			&email.to,
+			&email.key,
+			&email.role,
+			&email.params,
+			&email.attempts,
+			&email.ended,
 		)
 		if err != nil {
-			rows.Close()
-
-			return 0, apperr.Wrap(err, "select notify.notifications")
+			return nil, apperr.Wrap(err, "select notify.notifications")
 		}
 
-		ns = append(ns, p)
+		due = append(due, email)
 	}
 
-	rows.Close()
+	return due, apperr.Wrap(rows.Err(), "select notify.notifications")
+}
 
-	rowsErr := rows.Err()
-	if rowsErr != nil {
-		return 0, apperr.Wrap(rowsErr, "select notify.notifications")
-	}
+// deliverOne sends one e-mail and records its delivery, and reports whether it was sent. A recipient whose membership
+// ended gets no more e-mails, and parameters that do not decode cannot be written: both are suppressed (recorded,
+// never retried). A sender's error fails the delivery, which is retried.
+func deliverOne(
+	ctx context.Context,
+	txn pgx.Tx,
+	sender Sender,
+	apps Apps,
+	now time.Time,
+	email pendingMail,
+) (bool, error) {
+	state, reason, msgID := "sent", (*string)(nil), ""
 
-	for _, p := range ns {
-		var params map[string]any
+	var params map[string]any
 
-		_ = json.Unmarshal(p.params, &params)
-		subject, body := notificationMail(p.key, params, p.role, apps)
+	switch {
+	case email.ended:
+		state, reason = "suppressed", new("membership ended")
+	case json.Unmarshal(email.params, &params) != nil:
+		state, reason = "suppressed", new("parameters do not decode")
+	default:
+		subject, body := notificationMail(email.key, params, email.role, apps)
 
-		var (
-			msgID string
-			err   error
-		)
+		var err error
 
-		state, reason := "sent", (*string)(nil)
-
-		switch {
-		case p.ended: // a disabled or removed account gets no more e-mails (recorded, never retried)
-			state, reason = "suppressed", new("membership ended")
-		default:
-			msgID, err = sender.Send(ctx, p.to, subject, body)
-			if err != nil {
-				state, reason = "failed", new(err.Error())
-			} else {
-				sent++
-			}
-		}
-
-		_, execErr := txn.Exec(
-			ctx,
-			`INSERT INTO notify.deliveries (tenant_id, notification_id, channel, state, provider_message_id, failure_reason,
-				attempts, updated_at)
-			VALUES (current_setting('app.tenant_id')::uuid, $1, 'email', $2, NULLIF($3, ''), $4, $5, $6)
-			ON CONFLICT (notification_id, channel) DO UPDATE SET state = EXCLUDED.state, provider_message_id =
-			EXCLUDED.provider_message_id,
-				failure_reason = EXCLUDED.failure_reason, attempts = EXCLUDED.attempts, updated_at = EXCLUDED.updated_at`,
-			p.id,
-			state,
-			msgID,
-			reason,
-			p.attempts+1,
-			now,
-		)
-		if execErr != nil {
-			return sent, apperr.Wrap(execErr, "insert notify.deliveries")
+		msgID, err = sender.Send(ctx, email.to, subject, body)
+		if err != nil {
+			state, reason = "failed", new(err.Error())
 		}
 	}
 
-	return sent, nil
+	_, err := txn.Exec(
+		ctx,
+		`INSERT INTO notify.deliveries (tenant_id, notification_id, channel, state, provider_message_id, failure_reason,
+			attempts, updated_at)
+		VALUES (current_setting('app.tenant_id')::uuid, $1, 'email', $2, NULLIF($3, ''), $4, $5, $6)
+		ON CONFLICT (notification_id, channel) DO UPDATE SET state = EXCLUDED.state, provider_message_id =
+		EXCLUDED.provider_message_id,
+			failure_reason = EXCLUDED.failure_reason, attempts = EXCLUDED.attempts, updated_at = EXCLUDED.updated_at`,
+		email.id,
+		state,
+		msgID,
+		reason,
+		email.attempts+1,
+		now,
+	)
+	if err != nil {
+		return false, apperr.Wrap(err, "insert notify.deliveries")
+	}
+
+	return state == "sent", nil
 }
 
 // DeliverAll runs Deliver for every tenant, each in its own transaction with the tenant set (row-level security).
