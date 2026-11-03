@@ -85,6 +85,72 @@ func ownerOnly(c *ops.Call) error {
 	return nil
 }
 
+// clientUserFilter is the filters of clientUsers.list.
+type clientUserFilter struct {
+	CustomerID *uuid.UUID `json:"customerId,omitempty"`
+	Status     *string    `json:"status,omitempty"`
+	ClientRole *string    `json:"clientRole,omitempty"`
+	Search     *string    `json:"search,omitempty"` // email or display name contains, case-insensitive
+}
+
+// clientUserFilterOf decodes and checks the filters of clientUsers.list.
+func clientUserFilterOf(raw json.RawMessage) (clientUserFilter, error) {
+	var filter clientUserFilter
+
+	if len(raw) == 0 {
+		return filter, nil
+	}
+
+	dec := json.NewDecoder(strings.NewReader(string(raw)))
+	dec.DisallowUnknownFields()
+
+	if dec.Decode(&filter) != nil ||
+		(filter.Status != nil &&
+			!slices.Contains([]string{statusInvited, statusActive, statusDisabled}, *filter.Status)) ||
+		(filter.ClientRole != nil && *filter.ClientRole != clientRoleOwner && *filter.ClientRole != clientRoleMember) {
+		return clientUserFilter{}, apperr.Fields(
+			map[string]string{keyFilters: apperr.KeyInvalid},
+		)
+	}
+
+	return filter, nil
+}
+
+// where is the filter's WHERE clause, with its arguments.
+func (filter clientUserFilter) where(call *ops.Call) (string, []any) {
+	var args []any
+
+	add := func(v any) string {
+		args = append(args, v)
+
+		return fmt.Sprintf("$%d", len(args))
+	}
+
+	conds := []string{everyRow}
+	if call.Principal.Role == authz.RoleClient {
+		conds = append(conds, "cu.organization_id = "+add(call.Principal.OrgID))
+	}
+
+	if filter.CustomerID != nil {
+		conds = append(conds, "x.customer_id = "+add(*filter.CustomerID))
+	}
+
+	if filter.Status != nil {
+		conds = append(conds, "x.status = "+add(*filter.Status))
+	}
+
+	if filter.ClientRole != nil {
+		conds = append(conds, "x.client_role = "+add(*filter.ClientRole))
+	}
+
+	if filter.Search != nil && strings.TrimSpace(*filter.Search) != "" {
+		p := add(paging.Contains(*filter.Search))
+		conds = append(conds, "(x.email ILIKE "+p+" OR x.display_name ILIKE "+p+")")
+	}
+
+	return strings.Join(conds, " AND "), args
+}
+
 // clientUsersList serves clientUsers.list.
 //
 //	@Summary		clientUsers.list (read)
@@ -125,25 +191,9 @@ func clientUsersList(
 		return paging.Page[ClientUser]{}, err
 	}
 
-	var filters struct {
-		CustomerID *uuid.UUID `json:"customerId,omitempty"`
-		Status     *string    `json:"status,omitempty"`
-		ClientRole *string    `json:"clientRole,omitempty"`
-		Search     *string    `json:"search,omitempty"` // email or display name contains, case-insensitive
-	}
-
-	if len(query.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
-		dec.DisallowUnknownFields()
-
-		if dec.Decode(&filters) != nil ||
-			(filters.Status != nil &&
-				!slices.Contains([]string{statusInvited, statusActive, statusDisabled}, *filters.Status)) ||
-			(filters.ClientRole != nil && *filters.ClientRole != clientRoleOwner && *filters.ClientRole != clientRoleMember) {
-			return paging.Page[ClientUser]{}, apperr.Fields(
-				map[string]string{keyFilters: apperr.KeyInvalid},
-			)
-		}
+	filters, err := clientUserFilterOf(query.Filters)
+	if err != nil {
+		return paging.Page[ClientUser]{}, err
 	}
 
 	order, err := paging.OrderBy(
@@ -167,37 +217,7 @@ func clientUsersList(
 		return paging.Page[ClientUser]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
-	var args []any
-
-	add := func(v any) string {
-		args = append(args, v)
-
-		return fmt.Sprintf("$%d", len(args))
-	}
-
-	conds := []string{everyRow}
-	if call.Principal.Role == authz.RoleClient {
-		conds = append(conds, "cu.organization_id = "+add(call.Principal.OrgID))
-	}
-
-	if filters.CustomerID != nil {
-		conds = append(conds, "x.customer_id = "+add(*filters.CustomerID))
-	}
-
-	if filters.Status != nil {
-		conds = append(conds, "x.status = "+add(*filters.Status))
-	}
-
-	if filters.ClientRole != nil {
-		conds = append(conds, "x.client_role = "+add(*filters.ClientRole))
-	}
-
-	if filters.Search != nil && strings.TrimSpace(*filters.Search) != "" {
-		p := add(paging.Contains(*filters.Search))
-		conds = append(conds, "(x.email ILIKE "+p+" OR x.display_name ILIKE "+p+")")
-	}
-
-	where := strings.Join(conds, " AND ")
+	where, args := filters.where(call)
 
 	var total int
 
@@ -383,161 +403,158 @@ func otherActiveOwner(
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/client-users [post]
-func clientUsersSave(ctx context.Context, call *ops.Call, in *ClientUserInput) (ClientUser, error) {
+func (a Accounts) clientUsersSave(
+	ctx context.Context,
+	call *ops.Call,
+	input *ClientUserInput,
+) (ClientUser, error) {
+	org, err := clientUserCustomer(ctx, call, input)
+	if err != nil {
+		return ClientUser{}, err
+	}
+
+	if input.ID == nil {
+		return a.addClientUser(ctx, call, input, org)
+	}
+
+	return updateClientUser(ctx, call, input)
+}
+
+// clientUserCustomer is the organization of the customer a user list row belongs to, after the checks every save
+// makes: an owner (or HQ) saves, the customer is the caller's own, and no other row of it has the address.
+func clientUserCustomer(
+	ctx context.Context,
+	call *ops.Call,
+	input *ClientUserInput,
+) (uuid.UUID, error) {
 	ownerOnlyErr := ownerOnly(call)
 	if ownerOnlyErr != nil {
-		return ClientUser{}, ownerOnlyErr
+		return uuid.Nil, ownerOnlyErr
 	}
 
 	var org uuid.UUID
 
-	err := call.Tx.QueryRow(ctx, `SELECT organization_id FROM notify.ref_customers WHERE id = $1`, in.CustomerID).
+	err := call.Tx.QueryRow(ctx, `SELECT organization_id FROM notify.ref_customers WHERE id = $1`, input.CustomerID).
 		Scan(&org)
 	if errors.Is(err, pgx.ErrNoRows) ||
 		(err == nil && call.Principal.Role == authz.RoleClient && org != call.Principal.OrgID) {
-		return ClientUser{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+		return uuid.Nil, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
-		return ClientUser{}, apperr.Wrap(err, "select notify.ref_customers")
+		return uuid.Nil, apperr.Wrap(err, "select notify.ref_customers")
 	}
 
 	var (
 		dup  bool
 		self uuid.UUID
 	)
-	if in.ID != nil {
-		self = *in.ID
+	if input.ID != nil {
+		self = *input.ID
 	}
 
 	scanErr := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.client_users WHERE customer_id = $1 AND email =
-		$2::citext AND id <> $3)`, in.CustomerID, in.Email, self).
+		$2::citext AND id <> $3)`, input.CustomerID, input.Email, self).
 		Scan(&dup)
 	if scanErr != nil {
-		return ClientUser{}, apperr.Wrap(scanErr, "select identity.client_users")
+		return uuid.Nil, apperr.Wrap(scanErr, "select identity.client_users")
 	}
 
 	if dup {
-		return ClientUser{}, apperr.Fields(map[string]string{keyEmail: keyEmailTaken})
+		return uuid.Nil, apperr.Fields(map[string]string{keyEmail: keyEmailTaken})
 	}
 
-	if in.ID == nil {
-		// a new user: an owner (or HQ) adds members and owners, whose account is created now and gets the set-up e-mail
-		// (IR417, IR461)
-		if in.Status != nil {
-			return ClientUser{}, apperr.Fields(map[string]string{keyStatus: apperr.KeyNotAllowed})
-		}
+	return org, nil
+}
 
-		role := in.ClientRole
-
-		_, membership, err := createAccount(ctx, call, newAccount{
-			Email:       in.Email,
-			DisplayName: *in.DisplayName,
-			Role:        authz.RoleClient,
-			OrgID:       org,
-			ClientRole:  &role,
-			Permissions: defaultPermissions[authz.RoleClient],
-			Scopes: []ScopeRef{
-				{Kind: scopeOrganization, ID: org},
-			},
-			Employment: nil,
-			ValidUntil: nil,
-		})
-		if err != nil {
-			return ClientUser{}, err
-		}
-
-		clientUserID := uuid.New()
-
-		_, execErr := call.Tx.Exec(
-			ctx,
-			`INSERT INTO identity.client_users (id, tenant_id, customer_id, membership_id, email, display_name, client_role,
-				status, invited_at, invited_by_membership_id, last_invite_sent_at, created_at, updated_at)
-			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, 'invited', $7, $8, $7, $7, $7)`,
-			clientUserID,
-			in.CustomerID,
-			membership,
-			in.Email,
-			*in.DisplayName,
-			in.ClientRole,
-			call.Now,
-			call.Principal.MembershipID,
-		)
-		if execErr != nil {
-			return ClientUser{}, apperr.Wrap(execErr, "insert identity.client_users")
-		}
-
-		version := 1
-		call.Audit(
-			ops.AuditEntry{
-				Action:          "clientUsers.save",
-				TargetKind:      targetClientUser,
-				TargetID:        clientUserID.String(),
-				NextVersion:     &version,
-				Reason:          "account created",
-				PreviousVersion: nil,
-				Result:          "",
-				Before:          nil,
-				After:           nil,
-			},
-		)
-
-		return loadClientUser(ctx, call, clientUserID, false)
+// addClientUser adds a user to a customer's list: an owner (or HQ) adds members and owners, whose account is created
+// now and gets the set-up e-mail (IR417, IR461).
+func (a Accounts) addClientUser(
+	ctx context.Context,
+	call *ops.Call,
+	input *ClientUserInput,
+	org uuid.UUID,
+) (ClientUser, error) {
+	if input.Status != nil {
+		return ClientUser{}, apperr.Fields(map[string]string{keyStatus: apperr.KeyNotAllowed})
 	}
 
-	clientUser, err := loadClientUser(ctx, call, *in.ID, true)
+	role := input.ClientRole
+
+	membership, err := createAccount(ctx, call, newAccount{
+		Email:       input.Email,
+		DisplayName: *input.DisplayName,
+		Role:        authz.RoleClient,
+		OrgID:       org,
+		ClientRole:  &role,
+		Permissions: DefaultPermissions(authz.RoleClient),
+		Scopes: []ScopeRef{
+			{Kind: scopeOrganization, ID: org},
+		},
+		Employment: nil,
+		ValidUntil: nil,
+	}, a.perOrgPerDay())
+	if err != nil {
+		return ClientUser{}, err
+	}
+
+	clientUserID := uuid.New()
+
+	_, execErr := call.Tx.Exec(
+		ctx,
+		`INSERT INTO identity.client_users (id, tenant_id, customer_id, membership_id, email, display_name, client_role,
+			status, invited_at, invited_by_membership_id, last_invite_sent_at, created_at, updated_at)
+		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, 'invited', $7, $8, $7, $7, $7)`,
+		clientUserID,
+		input.CustomerID,
+		membership,
+		input.Email,
+		*input.DisplayName,
+		input.ClientRole,
+		call.Now,
+		call.Principal.MembershipID,
+	)
+	if execErr != nil {
+		return ClientUser{}, apperr.Wrap(execErr, "insert identity.client_users")
+	}
+
+	version := 1
+	call.Audit(
+		ops.AuditEntry{
+			Action:          "clientUsers.save",
+			TargetKind:      targetClientUser,
+			TargetID:        clientUserID.String(),
+			NextVersion:     &version,
+			Reason:          "account created",
+			PreviousVersion: nil,
+			Result:          "",
+			Before:          nil,
+			After:           nil,
+		},
+	)
+
+	return loadClientUser(ctx, call, clientUserID, false)
+}
+
+// updateClientUser saves a change to a user of a customer's list at the version shown, keeping its membership in step.
+func updateClientUser(
+	ctx context.Context,
+	call *ops.Call,
+	input *ClientUserInput,
+) (ClientUser, error) {
+	clientUser, err := loadClientUser(ctx, call, *input.ID, true)
 	if err != nil {
 		return clientUser, err
 	}
 
-	if clientUser.Version != *call.ExpectedVersion {
-		return clientUser, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
-	}
-
-	if call.Principal.Role == authz.RoleClient && clientUser.MembershipID != nil &&
-		*clientUser.MembershipID == call.Principal.MembershipID { // an owner never changes the own account (IR417)
-		return clientUser, apperr.E(apperr.Conflict, "errors.own_account")
-	}
-	// the e-mail is the sign-in account's, created with the user (IR461): it stays, for HQ too (IR422)
-	if !strings.EqualFold(in.Email, clientUser.Email) {
-		return clientUser, apperr.Fields(map[string]string{keyEmail: apperr.KeyImmutable})
-	}
-
-	in.Email = clientUser.Email // the same address in other letter case keeps the stored spelling
-	if clientUser.CustomerID != in.CustomerID {
-		return clientUser, apperr.Fields(map[string]string{"customerId": apperr.KeyImmutable})
-	}
-
-	if in.Reason == nil {
-		return clientUser, apperr.Fields(map[string]string{keyReason: apperr.KeyRequired})
-	}
-
 	status := clientUser.Status
-	if in.Status != nil {
-		status = *in.Status
+	if input.Status != nil {
+		status = *input.Status
 	}
 
-	if status == statusActive && clientUser.Status == statusInvited ||
-		status == statusActive && clientUser.Status != statusActive &&
-			clientUser.MembershipID == nil { // an invite becomes active only on first sign-in
-		return clientUser, apperr.E(apperr.Conflict, "errors.invite_pending")
-	}
-
-	// HQ ended the access: a save would open the membership again, only HQ gives it back (IR508)
-	if clientUser.RevokedAt != nil && status != statusDisabled {
-		return clientUser, apperr.E(apperr.Conflict, "errors.revoked_by_hq")
-	}
-
-	if clientUser.ClientRole == clientRoleOwner && clientUser.Status == statusActive &&
-		(in.ClientRole != clientRoleOwner || status != statusActive) {
-		ok, err := otherActiveOwner(ctx, call, clientUser.CustomerID, clientUser.ID)
-		if err != nil {
-			return clientUser, err
-		}
-
-		if !ok {
-			return clientUser, apperr.E(apperr.Conflict, "errors.last_owner")
-		}
+	err = checkClientUserChange(ctx, call, input, clientUser, status)
+	if err != nil {
+		return clientUser, err
 	}
 
 	_, execErr := call.Tx.Exec(
@@ -545,8 +562,8 @@ func clientUsersSave(ctx context.Context, call *ops.Call, in *ClientUserInput) (
 		`UPDATE identity.client_users SET email = $2, client_role = $3, status = $4, version = version + 1, updated_at = $5
 			WHERE id = $1`,
 		clientUser.ID,
-		in.Email,
-		in.ClientRole,
+		input.Email,
+		input.ClientRole,
 		status,
 		call.Now,
 	)
@@ -554,26 +571,10 @@ func clientUsersSave(ctx context.Context, call *ops.Call, in *ClientUserInput) (
 		return clientUser, apperr.Wrap(execErr, "update identity.client_users")
 	}
 
-	if clientUser.MembershipID != nil { // keep the membership in step: role and access window
-		// $4 is cast: inside CASE … ELSE NULL the parameter's type would be taken as text
-		// an account created this instant (IR461) ends a second after it starts, as the membership's check requires
-		_, err := call.Tx.Exec(
-			ctx,
-			`UPDATE identity.memberships SET client_role = $2, valid_until = CASE WHEN $3 = 'disabled' THEN
-				GREATEST($4::timestamptz, valid_from + interval '1 second') ELSE NULL END,
-			scope_version = scope_version + 1, version = version + 1, updated_at = $4 WHERE id = $1`,
-			*clientUser.MembershipID,
-			in.ClientRole,
-			status,
-			call.Now,
-		)
+	if clientUser.MembershipID != nil {
+		err := syncClientMembership(ctx, call, input, clientUser, status)
 		if err != nil {
-			return clientUser, apperr.Wrap(err, "update identity.memberships")
-		}
-
-		if status != clientUser.Status &&
-			(status == statusDisabled || clientUser.Status == statusDisabled) { // the sign-in follows (IR461)
-			setAccountEnabled(call, *clientUser.MembershipID, status != statusDisabled)
+			return clientUser, err
 		}
 	}
 
@@ -585,11 +586,102 @@ func clientUsersSave(ctx context.Context, call *ops.Call, in *ClientUserInput) (
 			TargetID:        clientUser.ID.String(),
 			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &next,
-			Reason:          *in.Reason, Result: "", Before: nil, After: nil,
+			Reason:          *input.Reason, Result: "", Before: nil, After: nil,
 		},
 	)
 
 	return loadClientUser(ctx, call, clientUser.ID, false)
+}
+
+// checkClientUserChange checks a change to a user of a customer's list: at the version shown, never an owner's own
+// account (IR417), the e-mail and the customer fixed (IR461, IR422), a reason given, an invite active only at the first
+// sign-in, never an access HQ ended (IR508), and not the last active owner.
+func checkClientUserChange(
+	ctx context.Context,
+	call *ops.Call,
+	input *ClientUserInput,
+	clientUser ClientUser,
+	status string,
+) error {
+	if clientUser.Version != *call.ExpectedVersion {
+		return apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
+	}
+
+	if call.Principal.Role == authz.RoleClient && clientUser.MembershipID != nil &&
+		*clientUser.MembershipID == call.Principal.MembershipID { // an owner never changes the own account (IR417)
+		return apperr.E(apperr.Conflict, "errors.own_account")
+	}
+	// the e-mail is the sign-in account's, created with the user (IR461): it stays, for HQ too (IR422)
+	if !strings.EqualFold(input.Email, clientUser.Email) {
+		return apperr.Fields(map[string]string{keyEmail: apperr.KeyImmutable})
+	}
+
+	input.Email = clientUser.Email // the same address in other letter case keeps the stored spelling
+	if clientUser.CustomerID != input.CustomerID {
+		return apperr.Fields(map[string]string{"customerId": apperr.KeyImmutable})
+	}
+
+	if input.Reason == nil {
+		return apperr.Fields(map[string]string{keyReason: apperr.KeyRequired})
+	}
+
+	if status == statusActive && clientUser.Status == statusInvited ||
+		status == statusActive && clientUser.Status != statusActive &&
+			clientUser.MembershipID == nil { // an invite becomes active only on first sign-in
+		return apperr.E(apperr.Conflict, "errors.invite_pending")
+	}
+
+	// HQ ended the access: a save would open the membership again, only HQ gives it back (IR508)
+	if clientUser.RevokedAt != nil && status != statusDisabled {
+		return apperr.E(apperr.Conflict, "errors.revoked_by_hq")
+	}
+
+	if clientUser.ClientRole == clientRoleOwner && clientUser.Status == statusActive &&
+		(input.ClientRole != clientRoleOwner || status != statusActive) {
+		ok, err := otherActiveOwner(ctx, call, clientUser.CustomerID, clientUser.ID)
+		if err != nil {
+			return err
+		}
+
+		if !ok {
+			return apperr.E(apperr.Conflict, "errors.last_owner")
+		}
+	}
+
+	return nil
+}
+
+// syncClientMembership keeps the user's membership in step with the list: its client role and its access window, and
+// the sign-in follows a change to or from disabled (IR461).
+func syncClientMembership(
+	ctx context.Context,
+	call *ops.Call,
+	input *ClientUserInput,
+	clientUser ClientUser,
+	status string,
+) error {
+	// $4 is cast: inside CASE … ELSE NULL the parameter's type would be taken as text
+	// an account created this instant (IR461) ends a second after it starts, as the membership's check requires
+	_, err := call.Tx.Exec(
+		ctx,
+		`UPDATE identity.memberships SET client_role = $2, valid_until = CASE WHEN $3 = 'disabled' THEN
+			GREATEST($4::timestamptz, valid_from + interval '1 second') ELSE NULL END,
+		scope_version = scope_version + 1, version = version + 1, updated_at = $4 WHERE id = $1`,
+		*clientUser.MembershipID,
+		input.ClientRole,
+		status,
+		call.Now,
+	)
+	if err != nil {
+		return apperr.Wrap(err, "update identity.memberships")
+	}
+
+	if status != clientUser.Status &&
+		(status == statusDisabled || clientUser.Status == statusDisabled) { // the sign-in follows (IR461)
+		setAccountEnabled(call, *clientUser.MembershipID, status != statusDisabled)
+	}
+
+	return nil
 }
 
 // RemoveInput is clientUsers.remove input.
@@ -647,28 +739,28 @@ type Deleted struct {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/client-users/{id} [delete]
-func clientUsersRemove(ctx context.Context, c *ops.Call, input *RemoveInput) (Deleted, error) {
-	err := ownerOnly(c)
+func clientUsersRemove(ctx context.Context, call *ops.Call, input *RemoveInput) (Deleted, error) {
+	err := ownerOnly(call)
 	if err != nil {
 		return Deleted{}, err
 	}
 
-	clientUser, err := loadClientUser(ctx, c, input.ID, true)
+	clientUser, err := loadClientUser(ctx, call, input.ID, true)
 	if err != nil {
 		return Deleted{}, err
 	}
 
-	if clientUser.Version != *c.ExpectedVersion {
+	if clientUser.Version != *call.ExpectedVersion {
 		return Deleted{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
-	if c.Principal.Role == authz.RoleClient && clientUser.MembershipID != nil &&
-		*clientUser.MembershipID == c.Principal.MembershipID { // IR417
+	if call.Principal.Role == authz.RoleClient && clientUser.MembershipID != nil &&
+		*clientUser.MembershipID == call.Principal.MembershipID { // IR417
 		return Deleted{}, apperr.E(apperr.Conflict, "errors.own_account")
 	}
 
 	if clientUser.ClientRole == clientRoleOwner && clientUser.Status == statusActive {
-		ok, err := otherActiveOwner(ctx, c, clientUser.CustomerID, clientUser.ID)
+		ok, err := otherActiveOwner(ctx, call, clientUser.CustomerID, clientUser.ID)
 		if err != nil {
 			return Deleted{}, err
 		}
@@ -678,7 +770,7 @@ func clientUsersRemove(ctx context.Context, c *ops.Call, input *RemoveInput) (De
 		}
 	}
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`DELETE FROM identity.client_users WHERE id = $1`,
 		clientUser.ID,
@@ -688,27 +780,27 @@ func clientUsersRemove(ctx context.Context, c *ops.Call, input *RemoveInput) (De
 	}
 
 	if clientUser.MembershipID != nil {
-		_, err := c.Tx.Exec(
+		_, err := call.Tx.Exec(
 			ctx,
 			`UPDATE identity.memberships SET valid_until = GREATEST($2::timestamptz, valid_from + interval '1 second'),
 				scope_version = scope_version + 1, version = version + 1, updated_at = $2
 			WHERE id = $1 AND (valid_until IS NULL OR valid_until > $2)`,
 			*clientUser.MembershipID,
-			c.Now,
+			call.Now,
 		)
 		if err != nil {
 			return Deleted{}, apperr.Wrap(err, "update identity.memberships")
 		}
 
-		setAccountEnabled(c, *clientUser.MembershipID, false) // the sign-in ends too (IR461)
+		setAccountEnabled(call, *clientUser.MembershipID, false) // the sign-in ends too (IR461)
 	}
 
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "clientUsers.remove",
 			TargetKind:      targetClientUser,
 			TargetID:        clientUser.ID.String(),
-			PreviousVersion: c.ExpectedVersion,
+			PreviousVersion: call.ExpectedVersion,
 			Reason:          input.Reason, NextVersion: nil, Result: "", Before: nil, After: nil,
 		},
 	)
@@ -871,9 +963,9 @@ func clientUsersResend(
 }
 
 // RegisterClientUsers binds clientUsers.*.
-func RegisterClientUsers(r *ops.Registry) {
+func RegisterClientUsers(r *ops.Registry, accounts Accounts) {
 	ops.Register(r, "clientUsers.list", clientUsersList)
-	ops.Register(r, "clientUsers.save", clientUsersSave)
+	ops.Register(r, "clientUsers.save", accounts.clientUsersSave)
 	ops.Register(r, "clientUsers.remove", clientUsersRemove)
 	ops.Register(r, "clientUsers.resendInvite", clientUsersResend)
 }

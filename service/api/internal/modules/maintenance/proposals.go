@@ -109,12 +109,12 @@ func (m Proposals) checkHold(
 			return apperr.Fields(map[string]string{fieldHold: apperr.KeyInvalid})
 		}
 
-		kind, status, found, err := delivery.Directory.OrgState(ctx, call, *hold.ContractorOrgID)
+		org, err := delivery.Directory.OrgState(ctx, call, *hold.ContractorOrgID)
 		if err != nil {
 			return apperr.Wrap(err, "maintenance.Directory.OrgState")
 		}
 
-		if !found || kind != orgKindContractor || status != orgStatusActive {
+		if !org.Found || org.Kind != orgKindContractor || org.Status != orgStatusActive {
 			return apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -50,10 +51,68 @@ func scanOrg(r pgx.Row) (Organization, error) {
 	return organization, apperr.Wrap(err, "scan (scanOrg)")
 }
 
-var orgKinds = map[string]bool{
-	orgKindCustomer:   true,
-	orgKindContractor: true,
-	orgKindOperator:   true,
+// organizationKinds are the kinds of an organization.
+func organizationKinds() []string {
+	return []string{orgKindCustomer, orgKindContractor, orgKindOperator}
+}
+
+// organizationFilter is the filters of organizations.list.
+type organizationFilter struct {
+	Kind   *string `json:"kind,omitempty"`
+	Status *string `json:"status,omitempty"`
+}
+
+// organizationFilterOf decodes and checks the filters of organizations.list: known fields only, a known kind and a
+// known status.
+func organizationFilterOf(raw json.RawMessage) (organizationFilter, error) {
+	var filter organizationFilter
+
+	if len(raw) == 0 {
+		return filter, nil
+	}
+
+	dec := json.NewDecoder(strings.NewReader(string(raw)))
+	dec.DisallowUnknownFields()
+
+	if dec.Decode(&filter) != nil {
+		return organizationFilter{}, apperr.Fields(map[string]string{keyFilters: apperr.KeyInvalid})
+	}
+
+	if filter.Kind != nil && !slices.Contains(organizationKinds(), *filter.Kind) {
+		return organizationFilter{}, apperr.Fields(
+			map[string]string{"filters.kind": apperr.KeyInvalid},
+		)
+	}
+
+	if filter.Status != nil && *filter.Status != statusActive && *filter.Status != "inactive" {
+		return organizationFilter{}, apperr.Fields(
+			map[string]string{"filters.status": apperr.KeyInvalid},
+		)
+	}
+
+	return filter, nil
+}
+
+// where is the filter's WHERE clause, with its arguments.
+func (filter organizationFilter) where() (string, []any) {
+	var args []any
+
+	add := func(v any) string {
+		args = append(args, v)
+
+		return fmt.Sprintf("$%d", len(args))
+	}
+
+	conds := []string{everyRow}
+	if filter.Kind != nil {
+		conds = append(conds, "kind = "+add(*filter.Kind))
+	}
+
+	if filter.Status != nil {
+		conds = append(conds, "status = "+add(*filter.Status))
+	}
+
+	return strings.Join(conds, " AND "), args
 }
 
 // organizationsList serves organizations.list.
@@ -89,50 +148,12 @@ func organizationsList(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[Organization], error) {
-	var filters struct {
-		Kind   *string `json:"kind,omitempty"`
-		Status *string `json:"status,omitempty"`
+	filters, err := organizationFilterOf(query.Filters)
+	if err != nil {
+		return paging.Page[Organization]{}, err
 	}
 
-	if len(query.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
-		dec.DisallowUnknownFields()
-
-		if dec.Decode(&filters) != nil {
-			return paging.Page[Organization]{}, apperr.Fields(
-				map[string]string{keyFilters: apperr.KeyInvalid},
-			)
-		}
-	}
-
-	var args []any
-
-	add := func(v any) string {
-		args = append(args, v)
-
-		return fmt.Sprintf("$%d", len(args))
-	}
-	conds := []string{everyRow}
-
-	if filters.Kind != nil {
-		if !orgKinds[*filters.Kind] {
-			return paging.Page[Organization]{}, apperr.Fields(
-				map[string]string{"filters.kind": apperr.KeyInvalid},
-			)
-		}
-
-		conds = append(conds, "kind = "+add(*filters.Kind))
-	}
-
-	if filters.Status != nil {
-		if *filters.Status != statusActive && *filters.Status != "inactive" {
-			return paging.Page[Organization]{}, apperr.Fields(
-				map[string]string{"filters.status": apperr.KeyInvalid},
-			)
-		}
-
-		conds = append(conds, "status = "+add(*filters.Status))
-	}
+	where, args := filters.where()
 
 	order, err := paging.OrderBy(
 		query.Sort,
@@ -147,8 +168,6 @@ func organizationsList(
 	if err != nil {
 		return paging.Page[Organization]{}, apperr.Wrap(err, "paging.Resolve")
 	}
-
-	where := strings.Join(conds, " AND ")
 
 	var total int
 
@@ -210,7 +229,7 @@ func (in *OrganizationSave) Validate() map[string]string {
 		fieldErrs["name"] = apperr.KeyLength
 	}
 
-	if !orgKinds[in.Kind] {
+	if !slices.Contains(organizationKinds(), in.Kind) {
 		fieldErrs[keyKind] = apperr.KeyInvalid
 	}
 
@@ -271,89 +290,26 @@ func organizationsSave(
 	call *ops.Call,
 	input *OrganizationSave,
 ) (Organization, error) {
-	if input.ID == nil {
-		orgID := uuid.Must(uuid.NewV7())
-
-		organization, err := scanOrg(
-			call.Tx.QueryRow(
-				ctx,
-				`INSERT INTO identity.organizations (id, tenant_id, name, kind, status)
-			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4) RETURNING `+orgCols,
-				orgID,
-				input.Name,
-				input.Kind,
-				input.Status,
-			),
-		)
-		if err != nil {
-			return Organization{}, err
-		}
-
-		uniqueNameErr := uniqueName(ctx, call, orgID)
-		if uniqueNameErr != nil {
-			return Organization{}, uniqueNameErr
-		}
-
-		call.Audit(
-			ops.AuditEntry{
-				Action:          "organizations.save",
-				TargetKind:      scopeOrganization,
-				TargetID:        orgID.String(),
-				NextVersion:     &organization.Version,
-				PreviousVersion: nil,
-				Reason:          "",
-				Result:          "",
-				Before:          nil,
-				After:           nil,
-			},
-		)
-		call.Emit(
-			ops.Event{
-				AggregateType: scopeOrganization,
-				AggregateID:   orgID,
-				Type:          "OrganizationChanged",
-				Payload:       nil,
-			},
-		)
-
-		return organization, nil
-	}
-	// kind is fixed after creation
-	org, err := scanOrg(
-		call.Tx.QueryRow(
-			ctx,
-			`UPDATE identity.organizations SET name=$3, status=$4, version = version + 1, updated_at = platform.app_now()
-		WHERE id = $1 AND version = $2 AND kind = $5 RETURNING `+orgCols,
-			*input.ID,
-			*call.ExpectedVersion,
-			input.Name,
-			input.Status,
-			input.Kind,
-		),
+	var (
+		org  Organization
+		prev *int
+		err  error
 	)
-	if errors.Is(err, pgx.ErrNoRows) {
-		var kind string
 
-		e := call.Tx.QueryRow(ctx, `SELECT kind FROM identity.organizations WHERE id = $1`, *input.ID).
-			Scan(&kind)
-		if e != nil {
-			return Organization{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
-		}
-
-		if kind != input.Kind {
-			return Organization{}, apperr.Fields(map[string]string{keyKind: apperr.KeyImmutable})
-		}
-
-		return Organization{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
+	if input.ID == nil {
+		org, err = insertOrganization(ctx, call, input)
+	} else {
+		org, err = updateOrganization(ctx, call, input)
+		prev = call.ExpectedVersion
 	}
 
 	if err != nil {
 		return Organization{}, err
 	}
 
-	uniqueNameErr := uniqueName(ctx, call, org.ID)
-	if uniqueNameErr != nil {
-		return Organization{}, uniqueNameErr
+	err = uniqueName(ctx, call, org.ID)
+	if err != nil {
+		return Organization{}, err
 	}
 
 	call.Audit(
@@ -361,7 +317,7 @@ func organizationsSave(
 			Action:          "organizations.save",
 			TargetKind:      scopeOrganization,
 			TargetID:        org.ID.String(),
-			PreviousVersion: call.ExpectedVersion,
+			PreviousVersion: prev,
 			NextVersion:     &org.Version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
@@ -375,6 +331,64 @@ func organizationsSave(
 	)
 
 	return org, nil
+}
+
+// insertOrganization stores a new organization.
+func insertOrganization(
+	ctx context.Context,
+	call *ops.Call,
+	input *OrganizationSave,
+) (Organization, error) {
+	return scanOrg(
+		call.Tx.QueryRow(
+			ctx,
+			`INSERT INTO identity.organizations (id, tenant_id, name, kind, status)
+			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4) RETURNING `+orgCols,
+			uuid.Must(uuid.NewV7()),
+			input.Name,
+			input.Kind,
+			input.Status,
+		),
+	)
+}
+
+// updateOrganization stores a new version of an organization at the version shown; its kind is fixed after creation.
+// An update that matches no row tells why: an unknown organization, another kind, or a stale version.
+func updateOrganization(
+	ctx context.Context,
+	call *ops.Call,
+	input *OrganizationSave,
+) (Organization, error) {
+	org, err := scanOrg(
+		call.Tx.QueryRow(
+			ctx,
+			`UPDATE identity.organizations SET name=$3, status=$4, version = version + 1, updated_at = platform.app_now()
+		WHERE id = $1 AND version = $2 AND kind = $5 RETURNING `+orgCols,
+			*input.ID,
+			*call.ExpectedVersion,
+			input.Name,
+			input.Status,
+			input.Kind,
+		),
+	)
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return org, err
+	}
+
+	var kind string
+
+	err = call.Tx.QueryRow(ctx, `SELECT kind FROM identity.organizations WHERE id = $1`, *input.ID).
+		Scan(&kind)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return Organization{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	case err != nil:
+		return Organization{}, apperr.Wrap(err, "select identity.organizations")
+	case kind != input.Kind:
+		return Organization{}, apperr.Fields(map[string]string{keyKind: apperr.KeyImmutable})
+	}
+
+	return Organization{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 }
 
 // Directory answers membership questions for other modules. Every method is query-backed (IR192): callers in
@@ -400,15 +414,11 @@ func (Directory) NonReaders(
 	return out, apperr.Wrap(err, "delegate identity.nonReaders")
 }
 
-// OrgState returns the kind and status of an organization.
-func (Directory) OrgState(
-	ctx context.Context,
-	c *ops.Call,
-	org uuid.UUID,
-) (kind, status string, found bool, err error) {
+// OrgState returns the kind and status of an organization, and whether it exists.
+func (Directory) OrgState(ctx context.Context, c *ops.Call, org uuid.UUID) (OrgStateResult, error) {
 	st, err := ops.Delegate(ctx, c, QueryOrgState, OrgInput{OrgID: org}, orgState)
 
-	return st.Kind, st.Status, st.Found, apperr.Wrap(err, "delegate identity.orgState")
+	return st, apperr.Wrap(err, "delegate identity.orgState")
 }
 
 // Technician describes a role=technician membership for assignment checks.

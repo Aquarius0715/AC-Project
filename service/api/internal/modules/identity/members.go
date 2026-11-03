@@ -134,34 +134,34 @@ func loadMembers(ctx context.Context, call *ops.Call, in *LoadMembersInput) ([]M
 
 // fillMembers loads the permissions, scopes and qualification grants of the members with one query per table for all
 // of them (IR496: a query per member and table made a page of 100 members 300 round trips).
-func fillMembers(ctx context.Context, c *ops.Call, ms []Member) error {
-	if len(ms) == 0 {
+func fillMembers(ctx context.Context, call *ops.Call, members []Member) error {
+	if len(members) == 0 {
 		return nil
 	}
 
-	ids := make([]uuid.UUID, 0, len(ms))
+	ids := make([]uuid.UUID, 0, len(members))
 	positions := map[uuid.UUID][]int{}
 
-	for idx := range ms {
-		ms[idx].Permissions, ms[idx].Scopes, ms[idx].Qualifications = []string{}, []ScopeRef{}, []Grant{}
-		if _, seen := positions[ms[idx].ID]; !seen {
-			ids = append(ids, ms[idx].ID)
+	for idx := range members {
+		members[idx].Permissions, members[idx].Scopes, members[idx].Qualifications = []string{}, []ScopeRef{}, []Grant{}
+		if _, seen := positions[members[idx].ID]; !seen {
+			ids = append(ids, members[idx].ID)
 		}
 
-		positions[ms[idx].ID] = append(positions[ms[idx].ID], idx)
+		positions[members[idx].ID] = append(positions[members[idx].ID], idx)
 	}
 
 	var memberID uuid.UUID
 
 	each := func(sql string, scans []any, add func(x *Member)) error {
-		rows, err := c.Tx.Query(ctx, sql, ids)
+		rows, err := call.Tx.Query(ctx, sql, ids)
 		if err != nil {
 			return apperr.Wrap(err, "query (fillMembers)")
 		}
 
 		_, err = pgx.ForEachRow(rows, append([]any{&memberID}, scans...), func() error {
 			for _, i := range positions[memberID] {
-				add(&ms[i])
+				add(&members[i])
 			}
 
 			return nil
@@ -170,7 +170,7 @@ func fillMembers(ctx context.Context, c *ops.Call, ms []Member) error {
 		return apperr.Wrap(err, "query (fillMembers)")
 	}
 
-	if c.Principal.Role != authz.RoleContractor {
+	if call.Principal.Role != authz.RoleContractor {
 		var permission string
 
 		err := each(
@@ -222,6 +222,85 @@ func fillMembers(ctx context.Context, c *ops.Call, ms []Member) error {
 
 // ---- members.list ----
 
+// memberFilter is the filters of members.list.
+type memberFilter struct {
+	Role           *string    `json:"role,omitempty"`
+	OrganizationID *uuid.UUID `json:"organizationId,omitempty"`
+	Qualification  *string    `json:"qualification,omitempty"` // a grant of that code valid now (SR13)
+	// true: validFrom <= now < validUntil; false: no validity filter
+	ActiveOnly *bool `json:"activeOnly,omitempty"`
+}
+
+// memberFilterOf decodes and checks the filters of members.list.
+func memberFilterOf(raw json.RawMessage) (memberFilter, error) {
+	var filter memberFilter
+
+	if len(raw) == 0 {
+		return filter, nil
+	}
+
+	dec := json.NewDecoder(strings.NewReader(string(raw)))
+	dec.DisallowUnknownFields()
+
+	if dec.Decode(&filter) != nil ||
+		(filter.Role != nil && !slices.Contains(memberRoles(), *filter.Role)) ||
+		(filter.Qualification != nil && !slices.Contains(qualificationCodes(), *filter.Qualification)) {
+		return memberFilter{}, apperr.Fields(
+			map[string]string{keyFilters: apperr.KeyInvalid},
+		)
+	}
+
+	return filter, nil
+}
+
+// where is the filter's WHERE clause, with its arguments.
+func (filter memberFilter) where(call *ops.Call) (string, []any) {
+	var args []any
+
+	add := func(v any) string {
+		args = append(args, v)
+
+		return fmt.Sprintf("$%d", len(args))
+	}
+
+	conds := []string{everyRow}
+	if call.Principal.Role == authz.RoleContractor {
+		conds = append(
+			conds,
+			"m.role = 'technician' AND m.organization_id = "+add(call.Principal.OrgID),
+		)
+	}
+
+	if filter.Role != nil {
+		conds = append(conds, "m.role = "+add(*filter.Role))
+	} else {
+		conds = append(conds, "m.role <> 'client'")
+	}
+
+	if filter.OrganizationID != nil {
+		conds = append(conds, "m.organization_id = "+add(*filter.OrganizationID))
+	}
+
+	if filter.ActiveOnly != nil && *filter.ActiveOnly {
+		now := add(call.Now)
+		conds = append(
+			conds,
+			"(m.valid_from <= "+now+" AND (m.valid_until IS NULL OR m.valid_until > "+now+"))",
+		)
+	}
+
+	if filter.Qualification != nil {
+		code, now := add(*filter.Qualification), add(call.Now)
+		conds = append(
+			conds,
+			"EXISTS (SELECT 1 FROM identity.qualification_grants g WHERE g.membership_id = m.id AND g.code = "+code+
+				" AND g.valid_from <= "+now+" AND g.valid_until > "+now+" AND (g.revoked_at IS NULL OR g.revoked_at > "+now+"))",
+		)
+	}
+
+	return strings.Join(conds, " AND "), args
+}
+
 // membersList serves members.list.
 //
 //	@Summary		members.list (read)
@@ -259,25 +338,9 @@ func membersList(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[Member], error) {
-	var filters struct {
-		Role           *string    `json:"role,omitempty"`
-		OrganizationID *uuid.UUID `json:"organizationId,omitempty"`
-		Qualification  *string    `json:"qualification,omitempty"` // a grant of that code valid now (SR13)
-		// true: validFrom <= now < validUntil; false: no validity filter
-		ActiveOnly *bool `json:"activeOnly,omitempty"`
-	}
-
-	if len(query.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
-		dec.DisallowUnknownFields()
-
-		if dec.Decode(&filters) != nil ||
-			(filters.Role != nil && !slices.Contains(roles, *filters.Role)) ||
-			(filters.Qualification != nil && !slices.Contains(qualificationCodes, *filters.Qualification)) {
-			return paging.Page[Member]{}, apperr.Fields(
-				map[string]string{keyFilters: apperr.KeyInvalid},
-			)
-		}
+	filters, err := memberFilterOf(query.Filters)
+	if err != nil {
+		return paging.Page[Member]{}, err
 	}
 
 	order, err := paging.OrderBy(
@@ -299,50 +362,7 @@ func membersList(
 		return paging.Page[Member]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
-	var args []any
-
-	add := func(v any) string {
-		args = append(args, v)
-
-		return fmt.Sprintf("$%d", len(args))
-	}
-
-	conds := []string{everyRow}
-	if call.Principal.Role == authz.RoleContractor {
-		conds = append(
-			conds,
-			"m.role = 'technician' AND m.organization_id = "+add(call.Principal.OrgID),
-		)
-	}
-
-	if filters.Role != nil {
-		conds = append(conds, "m.role = "+add(*filters.Role))
-	} else {
-		conds = append(conds, "m.role <> 'client'")
-	}
-
-	if filters.OrganizationID != nil {
-		conds = append(conds, "m.organization_id = "+add(*filters.OrganizationID))
-	}
-
-	if filters.ActiveOnly != nil && *filters.ActiveOnly {
-		now := add(call.Now)
-		conds = append(
-			conds,
-			"(m.valid_from <= "+now+" AND (m.valid_until IS NULL OR m.valid_until > "+now+"))",
-		)
-	}
-
-	if filters.Qualification != nil {
-		code, now := add(*filters.Qualification), add(call.Now)
-		conds = append(
-			conds,
-			"EXISTS (SELECT 1 FROM identity.qualification_grants g WHERE g.membership_id = m.id AND g.code = "+code+
-				" AND g.valid_from <= "+now+" AND g.valid_until > "+now+" AND (g.revoked_at IS NULL OR g.revoked_at > "+now+"))",
-		)
-	}
-
-	where := strings.Join(conds, " AND ")
+	where, args := filters.where(call)
 
 	var total int
 
@@ -402,17 +422,35 @@ func membersList(
 
 // ---- members.save ----
 
-var roles = []string{authz.RoleClient, authz.RoleContractor, authz.RoleTechnician, authz.RoleAdmin}
+// memberRoles are the roles of a membership.
+func memberRoles() []string {
+	return []string{authz.RoleClient, authz.RoleContractor, authz.RoleTechnician, authz.RoleAdmin}
+}
 
 // qualificationCodes are the demo QualificationCode values (SR13).
-var qualificationCodes = []string{"demo_indoor", "demo_outdoor", "demo_electrical"}
+func qualificationCodes() []string { return []string{"demo_indoor", "demo_outdoor", "demo_electrical"} }
 
-// RolePermissions are the permissions each role may hold (IR132 item 1).
-var RolePermissions = map[string][]string{
-	authz.RoleContractor: {"partner.accept", "partner.assign", "partner.review"},
-	authz.RoleTechnician: {"alert.read", "alert.resolve", "control.diagnose", "device.maintain"},
-	authz.RoleClient:     {},
+// rolePermissions are the permissions a role may hold (IR132 item 1), and whether the role is limited to them (an
+// admin may hold any of the contract's permissions).
+func rolePermissions(role string) ([]string, bool) {
+	switch role {
+	case authz.RoleContractor:
+		return []string{"partner.accept", "partner.assign", "partner.review"}, true
+	case authz.RoleTechnician:
+		return []string{"alert.read", "alert.resolve", "control.diagnose", "device.maintain"}, true
+	case authz.RoleClient:
+		return []string{}, true
+	}
+
+	return nil, false
 }
+
+// The lengths a member's texts take: an e-mail address (RFC 5321), a display name and a reason.
+const (
+	maxEmail       = 254
+	maxDisplayName = 120
+	maxReasonText  = 1000
+)
 
 // MemberInput is members.save input. The display name is the user's own (IR172): a Membership result carries it, the
 // input does not (IR391).
@@ -442,37 +480,13 @@ type NewUserInput struct {
 func (in *MemberInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 
-	if in.NewUser != nil {
-		if in.UserID != uuid.Nil || in.ID != nil {
-			fieldErrs["newUser"] = apperr.KeyNotAllowed
-		}
-
-		in.NewUser.Email, in.NewUser.DisplayName = strings.TrimSpace(
-			in.NewUser.Email,
-		), strings.TrimSpace(
-			in.NewUser.DisplayName,
-		)
-
-		a, err := mail.ParseAddress(
-			in.NewUser.Email,
-		)
-		if err != nil || a.Address != in.NewUser.Email ||
-			len(in.NewUser.Email) > 254 {
-			fieldErrs["newUser.email"] = apperr.KeyInvalid
-		}
-
-		if n := utf8.RuneCountInString(in.NewUser.DisplayName); n < 1 || n > 120 {
-			fieldErrs["newUser.displayName"] = apperr.KeyLength
-		}
-	} else if in.UserID == uuid.Nil {
-		fieldErrs["userId"] = apperr.KeyRequired
-	}
+	in.validatePerson(fieldErrs)
 
 	if in.OrganizationID == uuid.Nil {
 		fieldErrs["organizationId"] = apperr.KeyRequired
 	}
 
-	if !slices.Contains(roles, in.Role) {
+	if !slices.Contains(memberRoles(), in.Role) {
 		fieldErrs[keyRole] = apperr.KeyInvalid
 	}
 
@@ -488,44 +502,8 @@ func (in *MemberInput) Validate() map[string]string {
 		fieldErrs["permissions"] = apperr.KeyRequired
 	}
 
-	seen := map[string]bool{}
-
-	for _, permission := range in.Permissions {
-		allowed := authz.IsPermission(permission)
-		if list, ok := RolePermissions[in.Role]; ok {
-			allowed = slices.Contains(list, permission)
-		}
-
-		if !allowed || seen[permission] {
-			fieldErrs["permissions"] = apperr.KeyInvalid
-		}
-
-		seen[permission] = true
-	}
-
-	for p := range seen {
-		if r, ok := strings.CutSuffix(
-			p,
-			".write",
-		); ok && authz.IsPermission(r+".read") &&
-			!seen[r+".read"] {
-			fieldErrs["permissions"] = "errors.write_needs_read"
-		}
-	}
-
-	kinds := map[string][]string{
-		authz.RoleAdmin: {"tenant"}, authz.RoleClient: {scopeOrganization}, authz.RoleContractor: {scopeOrganization},
-		authz.RoleTechnician: {"unit", "property", scopeOrganization},
-	}[in.Role]
-	for _, sc := range in.Scopes {
-		if !slices.Contains(kinds, sc.Kind) {
-			fieldErrs["scopes"] = apperr.KeyInvalid
-		}
-	}
-
-	if in.Role == authz.RoleAdmin && len(in.Scopes) > 1 {
-		fieldErrs["scopes"] = apperr.KeyInvalid
-	}
+	in.validatePermissions(fieldErrs)
+	in.validateScopes(fieldErrs)
 
 	if in.ValidFrom.IsZero() {
 		fieldErrs["validFrom"] = apperr.KeyRequired
@@ -542,11 +520,91 @@ func (in *MemberInput) Validate() map[string]string {
 	}
 
 	in.Reason = strings.TrimSpace(in.Reason)
-	if n := utf8.RuneCountInString(in.Reason); n < 1 || n > 1000 {
+	if n := utf8.RuneCountInString(in.Reason); n < 1 || n > maxReasonText {
 		fieldErrs[keyReason] = apperr.KeyLength
 	}
 
 	return fieldErrs
+}
+
+// validatePerson checks the person of a membership: an existing user, or a new one with an address and a display name
+// (only for a new membership).
+func (in *MemberInput) validatePerson(fieldErrs map[string]string) {
+	if in.NewUser == nil {
+		if in.UserID == uuid.Nil {
+			fieldErrs["userId"] = apperr.KeyRequired
+		}
+
+		return
+	}
+
+	if in.UserID != uuid.Nil || in.ID != nil {
+		fieldErrs["newUser"] = apperr.KeyNotAllowed
+	}
+
+	in.NewUser.Email, in.NewUser.DisplayName = strings.TrimSpace(
+		in.NewUser.Email,
+	), strings.TrimSpace(
+		in.NewUser.DisplayName,
+	)
+
+	address, err := mail.ParseAddress(in.NewUser.Email)
+	if err != nil || address.Address != in.NewUser.Email || len(in.NewUser.Email) > maxEmail {
+		fieldErrs["newUser.email"] = apperr.KeyInvalid
+	}
+
+	if n := utf8.RuneCountInString(in.NewUser.DisplayName); n < 1 || n > maxDisplayName {
+		fieldErrs["newUser.displayName"] = apperr.KeyLength
+	}
+}
+
+// validatePermissions checks a membership's permissions: those of its role (any of the contract's for an admin), each
+// once, and a write permission with its read one.
+func (in *MemberInput) validatePermissions(fieldErrs map[string]string) {
+	allowedForRole, limited := rolePermissions(in.Role)
+	seen := map[string]bool{}
+
+	for _, permission := range in.Permissions {
+		allowed := authz.IsPermission(permission)
+		if limited {
+			allowed = slices.Contains(allowedForRole, permission)
+		}
+
+		if !allowed || seen[permission] {
+			fieldErrs["permissions"] = apperr.KeyInvalid
+		}
+
+		seen[permission] = true
+	}
+
+	for permission := range seen {
+		if area, ok := strings.CutSuffix(
+			permission,
+			".write",
+		); ok &&
+			authz.IsPermission(area+".read") &&
+			!seen[area+".read"] {
+			fieldErrs["permissions"] = "errors.write_needs_read"
+		}
+	}
+}
+
+// validateScopes checks a membership's scopes by role: an admin the tenant (one scope at most), a client or contractor
+// an organization, a technician units, properties or organizations.
+func (in *MemberInput) validateScopes(fieldErrs map[string]string) {
+	kinds := map[string][]string{
+		authz.RoleAdmin: {"tenant"}, authz.RoleClient: {scopeOrganization}, authz.RoleContractor: {scopeOrganization},
+		authz.RoleTechnician: {"unit", "property", scopeOrganization},
+	}[in.Role]
+	for _, sc := range in.Scopes {
+		if !slices.Contains(kinds, sc.Kind) {
+			fieldErrs["scopes"] = apperr.KeyInvalid
+		}
+	}
+
+	if in.Role == authz.RoleAdmin && len(in.Scopes) > 1 {
+		fieldErrs["scopes"] = apperr.KeyInvalid
+	}
 }
 
 // membersSave serves members.save.
@@ -578,39 +636,157 @@ func (in *MemberInput) Validate() map[string]string {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/members [post]
-func membersSave(ctx context.Context, c *ops.Call, input *MemberInput) (Member, error) {
-	newPerson := input.NewUser != nil
-	if newPerson { // the person is created with the membership, or taken back if this tenant removed them (IR461, IR462)
-		var err error
+func membersSave(ctx context.Context, call *ops.Call, input *MemberInput) (Member, error) {
+	newPerson, err := resolvePerson(ctx, call, input)
+	if err != nil {
+		return Member{}, err
+	}
 
-		input.UserID, err = personFor(ctx, c, input.NewUser.Email, input.NewUser.DisplayName)
-		if errors.Is(err, errEmailTaken) {
-			return Member{}, apperr.Fields(map[string]string{"newUser.email": keyEmailTaken})
-		}
+	err = checkMemberTarget(ctx, call, input)
+	if err != nil {
+		return Member{}, err
+	}
 
+	err = checkScopes(ctx, call, input)
+	if err != nil {
+		return Member{}, err
+	}
+
+	err = checkSelfPromotion(ctx, call, input)
+	if err != nil {
+		return Member{}, err
+	}
+
+	var (
+		change membershipChange
+		prev   *int
+	)
+
+	if input.ID == nil {
+		change, err = createMembership(ctx, call, input, newPerson)
+	} else {
+		change, err = updateMembership(ctx, call, input)
+		prev = call.ExpectedVersion
+	}
+
+	if err != nil {
+		return Member{}, err
+	}
+
+	memberID := change.id
+
+	before, err := memberBefore(ctx, call, memberID, prev)
+	if err != nil {
+		return Member{}, err
+	}
+
+	err = replaceGrants(ctx, call, memberID, input)
+	if err != nil {
+		return Member{}, err
+	}
+
+	if prev != nil {
+		err = bumpScopeVersion(ctx, call, memberID, input, before)
 		if err != nil {
 			return Member{}, err
 		}
 	}
 
+	saved, err := reloadMember(ctx, call, memberID)
+	if err != nil {
+		return Member{}, err
+	}
+
+	call.Emit(
+		ops.Event{
+			AggregateType: kindMembership,
+			AggregateID:   memberID,
+			Type:          "MembershipSaved",
+			Payload:       map[string]any{keyRole: input.Role},
+		},
+	)
+
+	if change.account {
+		requestAccount(call, input.UserID, memberID, input.Role)
+	}
+
+	if change.revoke || change.restore {
+		setAccountEnabled(call, memberID, change.restore)
+	}
+
+	call.Audit(
+		ops.AuditEntry{
+			Action:          "members.save",
+			TargetKind:      kindMembership,
+			TargetID:        memberID.String(),
+			PreviousVersion: prev,
+			NextVersion:     &saved.Version,
+			Reason:          input.Reason, Result: "", Before: nil, After: nil,
+		},
+	)
+
+	return saved, nil
+}
+
+// reloadMember reads a saved membership back with its permissions, scopes and qualifications.
+func reloadMember(ctx context.Context, call *ops.Call, memberID uuid.UUID) (Member, error) {
+	saved, err := scanMember(
+		call.Tx.QueryRow(
+			ctx,
+			"SELECT "+memberCols+" FROM identity.memberships m WHERE m.id = $1",
+			memberID,
+		),
+	)
+	if err != nil {
+		return saved, err
+	}
+
+	memberList := []Member{saved}
+
+	err = LoadMembers(ctx, call, memberList)
+
+	return memberList[0], err
+}
+
+// resolvePerson finds or creates the person of a membership given as a new user (IR461, IR462), sets input.UserID, and
+// reports whether the person is new to this save.
+func resolvePerson(ctx context.Context, call *ops.Call, input *MemberInput) (bool, error) {
+	if input.NewUser == nil {
+		return false, nil
+	}
+
+	var err error
+
+	input.UserID, err = personFor(ctx, call, input.NewUser.Email, input.NewUser.DisplayName)
+	if errors.Is(err, errEmailTaken) {
+		return true, apperr.Fields(map[string]string{"newUser.email": keyEmailTaken})
+	}
+
+	return true, err
+}
+
+// checkMemberTarget checks the person and organization of a membership: both exist, and the organization is of the
+// kind the role needs (HQ for admins and internal technicians, a customer for clients, a contractor for contractors and
+// external technicians).
+func checkMemberTarget(ctx context.Context, call *ops.Call, input *MemberInput) error {
 	var exists bool
 
-	scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.users WHERE id = $1)`, input.UserID).
+	scanErr := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.users WHERE id = $1)`, input.UserID).
 		Scan(&exists)
 	if scanErr != nil {
-		return Member{}, apperr.Wrap(scanErr, "select identity.users")
+		return apperr.Wrap(scanErr, "select identity.users")
 	}
 
 	var kind string
 
-	err := c.Tx.QueryRow(ctx, `SELECT kind FROM identity.organizations WHERE id = $1`, input.OrganizationID).
+	err := call.Tx.QueryRow(ctx, `SELECT kind FROM identity.organizations WHERE id = $1`, input.OrganizationID).
 		Scan(&kind)
 	if !exists || errors.Is(err, pgx.ErrNoRows) {
-		return Member{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+		return apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
-		return Member{}, apperr.Wrap(err, "select identity.organizations")
+		return apperr.Wrap(err, "select identity.organizations")
 	}
 
 	want := map[string]string{
@@ -626,292 +802,425 @@ func membersSave(ctx context.Context, c *ops.Call, input *MemberInput) (Member, 
 	}
 
 	if kind != want {
-		return Member{}, apperr.Fields(
+		return apperr.Fields(
 			map[string]string{"organizationId": "errors.organization_kind"},
 		)
 	}
-	// scope references
+
+	return nil
+}
+
+// checkScopes checks the scope references of a membership: the tenant itself, a customer organization (or the
+// membership's own; a technician may also take customers), or a known property or unit.
+func checkScopes(ctx context.Context, call *ops.Call, input *MemberInput) error {
 	for _, scopeRef := range input.Scopes {
-		var valid bool
+		var (
+			valid bool
+			err   error
+		)
 
 		switch scopeRef.Kind {
 		case "tenant":
-			valid = scopeRef.ID == c.Principal.TenantID
+			valid = scopeRef.ID == call.Principal.TenantID
 		case scopeOrganization:
-			err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.organizations WHERE id = $1 AND (kind = 'customer' OR
+			err = call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.organizations WHERE id = $1 AND (kind = 'customer'
+				OR
 				id = $2))`, scopeRef.ID, input.OrganizationID).
 				Scan(&valid)
 			if input.Role != authz.RoleTechnician {
 				valid = valid && scopeRef.ID == input.OrganizationID
 			}
 		case "property":
-			err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM notify.ref_properties WHERE id = $1)`, scopeRef.ID).
+			err = call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM notify.ref_properties WHERE id = $1)`, scopeRef.ID).
 				Scan(&valid)
 		case "unit":
-			err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM notify.ref_units WHERE id = $1)`, scopeRef.ID).
+			err = call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM notify.ref_units WHERE id = $1)`, scopeRef.ID).
 				Scan(&valid)
 		}
 
 		if err != nil {
-			return Member{}, apperr.Wrap(err, "select notify.ref_units")
+			return apperr.Wrap(err, "select notify.ref_units")
 		}
 
 		if !valid {
-			return Member{}, apperr.Fields(map[string]string{"scopes": "errors.unknown_scope"})
-		}
-	}
-	// self promotion
-	if input.UserID == c.Principal.UserID { // granting identity.write / restriction.override to oneself (DD-A03)
-		for _, permission := range []string{"identity.write", "restriction.override"} {
-			if !slices.Contains(input.Permissions, permission) {
-				continue
-			}
-
-			had := false
-			if input.ID != nil {
-				err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.membership_permissions WHERE membership_id = $1 AND
-					permission = $2)`, *input.ID, permission).
-					Scan(&had)
-				if err != nil {
-					return Member{}, apperr.Wrap(err, "select identity.membership_permissions")
-				}
-			}
-
-			if !had {
-				return Member{}, apperr.E(apperr.Forbidden, "errors.self_promotion")
-			}
+			return apperr.Fields(map[string]string{"scopes": "errors.unknown_scope"})
 		}
 	}
 
+	return nil
+}
+
+// checkSelfPromotion refuses a user granting themselves identity.write or restriction.override they did not hold
+// already (DD-A03).
+func checkSelfPromotion(ctx context.Context, call *ops.Call, input *MemberInput) error {
+	if input.UserID != call.Principal.UserID {
+		return nil
+	}
+
+	for _, permission := range []string{"identity.write", "restriction.override"} {
+		if !slices.Contains(input.Permissions, permission) {
+			continue
+		}
+
+		had, err := heldBefore(ctx, call, input.ID, permission)
+		if err != nil {
+			return err
+		}
+
+		if !had {
+			return apperr.E(apperr.Forbidden, "errors.self_promotion")
+		}
+	}
+
+	return nil
+}
+
+// heldBefore is whether the membership being saved held a permission already; a new membership held none.
+func heldBefore(
+	ctx context.Context,
+	call *ops.Call,
+	membership *uuid.UUID,
+	permission string,
+) (bool, error) {
+	if membership == nil {
+		return false, nil
+	}
+
+	var had bool
+
+	err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.membership_permissions
+		WHERE membership_id = $1 AND permission = $2)`, *membership, permission).
+		Scan(&had)
+
+	return had, apperr.Wrap(err, "select identity.membership_permissions")
+}
+
+// membershipChange is what saving a membership changed: its ID, whether its sign-in account is opened or pointed at it
+// (IR461, IR462), and whether HQ turned its sign-in off or on with the access (IR508).
+type membershipChange struct {
+	id                       uuid.UUID
+	account, revoke, restore bool
+}
+
+// createMembership stores a new membership; a new person, or an existing one whose memberships here have all ended,
+// signs in with it from now on (IR462), while one whose sign-in belongs to another tenant keeps it. The membership is
+// then added to the customer's or company's user list.
+func createMembership(
+	ctx context.Context,
+	call *ops.Call,
+	input *MemberInput,
+	newPerson bool,
+) (membershipChange, error) {
 	var (
 		memberID uuid.UUID
-		prev     *int
+		account  bool
 	)
 
-	account := false // the sign-in account is opened or pointed at this new membership (IR461, IR462)
-	// HQ turns the sign-in off with the access, or on when it gives the access back (IR508)
-	revoke, restore := false, false
+	var clientRole *string
 
-	if input.ID == nil {
-		var clientRole *string
-
-		if input.Role == authz.RoleClient { // HQ adds a member; a customer owner adds owners in the customer app (IR417)
-			cr := clientRoleMember
-			clientRole = &cr
-		}
-
-		err := c.Tx.QueryRow(ctx, `INSERT INTO identity.memberships (tenant_id, user_id, organization_id, role, employment,
-			client_role, valid_from, valid_until, created_at, updated_at)
-			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7, $8, $8) RETURNING id`,
-			input.UserID, input.OrganizationID, input.Role, input.Employment, clientRole, input.ValidFrom, input.ValidUntil,
-			c.Now).
-			Scan(&memberID)
-		if err != nil {
-			return Member{}, apperr.Wrap(err, "insert identity.memberships")
-		}
-		// an existing person whose memberships here have all ended signs in with this one from now on (IR462); one
-		// whose sign-in belongs to another tenant keeps it
-		account = newPerson
-		if !newPerson {
-			err := c.Tx.QueryRow(ctx, `SELECT (u.sign_in_membership_id IS NULL OR EXISTS (SELECT 1 FROM identity.memberships s
-				WHERE s.id = u.sign_in_membership_id))
-				AND NOT EXISTS (SELECT 1 FROM identity.memberships m WHERE m.user_id = u.id AND m.id <> $2 AND (m.valid_until IS
-				NULL OR m.valid_until > $3))
-				FROM identity.users u WHERE u.id = $1`, input.UserID, memberID, c.Now).
-				Scan(&account)
-			if err != nil {
-				return Member{}, apperr.Wrap(err, "select identity.users")
-			}
-		}
-
-		listed := statusActive // the status the customer's or contractor's user list shows: invited until the first sign-in
-		if account {
-			listed = statusInvited
-		}
-
-		if input.Role == authz.RoleClient { // IR84 initial Consent
-			_, err := c.Tx.Exec(
-				ctx,
-				`INSERT INTO identity.consents (tenant_id, membership_id, purpose, granted) VALUES
-					(current_setting('app.tenant_id')::uuid, $1, 'location_automation', false)`,
-				memberID,
-			)
-			if err != nil {
-				return Member{}, apperr.Wrap(err, "insert identity.consents")
-			}
-			// IR144: the customer's user list includes the new member, listed as not signed in yet when the person was
-			// created with it (IR461); an address already on the list keeps its row
-			_, err = c.Tx.Exec(
-				ctx,
-				`INSERT INTO identity.client_users (tenant_id, customer_id, membership_id, email, display_name, client_role, status,
-					invited_at, invited_by_membership_id, created_at, updated_at)
-				SELECT current_setting('app.tenant_id')::uuid, cu.id, $1, u.email, u.display_name, $6, $7, $3, $4, $3, $3
-				FROM notify.ref_customers cu, identity.users u WHERE cu.organization_id = $2 AND u.id = $5
-				ON CONFLICT (tenant_id, customer_id, email) DO NOTHING`,
-				memberID,
-				input.OrganizationID,
-				c.Now,
-				c.Principal.MembershipID,
-				input.UserID,
-				*clientRole,
-				listed,
-			)
-			if err != nil {
-				return Member{}, apperr.Wrap(err, "insert identity.client_users")
-			}
-		}
-		// FR-P11: the contractor company's user list includes the new account, listed as not signed in yet when the
-		// person was created with it (IR461); an address already on the list keeps its row
-		if input.Role == authz.RoleContractor || input.Role == authz.RoleTechnician {
-			_, err := c.Tx.Exec(
-				ctx,
-				`INSERT INTO identity.partner_users (tenant_id, organization_id, membership_id, email, display_name, partner_role,
-					status, invited_at, invited_by_membership_id, created_at, updated_at)
-				SELECT current_setting('app.tenant_id')::uuid, o.id, $1, u.email, u.display_name, $5, $7, $3, $4, $3, $3
-				FROM identity.organizations o, identity.users u WHERE o.id = $2 AND o.kind = 'contractor' AND u.id = $6
-				ON CONFLICT (tenant_id, organization_id, email) DO NOTHING`,
-				memberID,
-				input.OrganizationID,
-				c.Now,
-				c.Principal.MembershipID,
-				input.Role,
-				input.UserID,
-				listed,
-			)
-			if err != nil {
-				return Member{}, apperr.Wrap(err, "insert identity.partner_users")
-			}
-		}
-	} else {
-		member, err := scanMember(
-			c.Tx.QueryRow(
-				ctx,
-				"SELECT "+memberCols+" FROM identity.memberships m WHERE m.id = $1 FOR UPDATE",
-				*input.ID,
-			),
-		)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return Member{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
-		}
-
-		if err != nil {
-			return Member{}, err
-		}
-
-		if member.UserID != input.UserID || member.OrganizationID != input.OrganizationID ||
-			member.Role != input.Role {
-			return Member{}, apperr.Fields(
-				map[string]string{keyRole: "errors.membership_fixed"},
-			)
-		}
-
-		if member.Version != *c.ExpectedVersion {
-			return Member{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
-		}
-		// last active identity.write holder: a membership that loses the permission or stops being valid now (ended, or
-		// its start moved later). The tenant's changes to holders wait for each other here, so two at once — each taking
-		// the permission from, or ending, the other of the last two — cannot both see the other still active (IR472).
-		ending := (input.ValidUntil != nil && !input.ValidUntil.After(c.Now)) ||
-			input.ValidFrom.After(c.Now)
-		if !slices.Contains(input.Permissions, "identity.write") || ending {
-			_, err := c.Tx.Exec(
-				ctx,
-				`SELECT pg_advisory_xact_lock(hashtext('identity.identity_admins:' || $1::text))`,
-				c.Principal.TenantID,
-			)
-			if err != nil {
-				return Member{}, apperr.Wrap(err, "select pg_advisory_xact_lock")
-			}
-
-			var (
-				holds  bool
-				others int
-			)
-
-			err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.membership_permissions WHERE membership_id = $1 AND
-				permission = 'identity.write')`, member.ID).
-				Scan(&holds)
-			if err != nil {
-				return Member{}, apperr.Wrap(err, "select identity.membership_permissions")
-			}
-
-			err = c.Tx.QueryRow(ctx, `SELECT count(*) FROM identity.memberships m JOIN identity.membership_permissions p ON
-				p.membership_id = m.id AND p.permission = 'identity.write'
-				WHERE m.id <> $1 AND m.valid_from <= $2 AND (m.valid_until IS NULL OR m.valid_until > $2)`, member.ID, c.Now).
-				Scan(&others)
-			if err != nil {
-				return Member{}, apperr.Wrap(err, "select identity.memberships")
-			}
-
-			if holds && others == 0 {
-				return Member{}, apperr.E(apperr.Conflict, "errors.last_identity_admin")
-			}
-		}
-		// an account its company or customer disabled (IR416, IR417) stays closed: the membership keeps its end, and a
-		// contractor account keeps HQ's new end for when it is enabled again (IR420)
-		until := input.ValidUntil
-
-		var disabled bool
-
-		scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.partner_users WHERE membership_id = $1 AND status
-			= 'disabled')
-			OR EXISTS (SELECT 1 FROM identity.client_users WHERE membership_id = $1 AND status = 'disabled')`, member.ID).
-			Scan(&disabled)
-		if scanErr != nil {
-			return Member{}, apperr.Wrap(scanErr, "select identity.partner_users")
-		}
-
-		if disabled && member.ValidUntil != nil &&
-			(until == nil || until.After(*member.ValidUntil)) {
-			_, err := c.Tx.Exec(
-				ctx,
-				`UPDATE identity.partner_users SET access_until = $2, version = version + 1, updated_at = $3 WHERE membership_id =
-					$1`,
-				member.ID,
-				until,
-				c.Now,
-			)
-			if err != nil {
-				return Member{}, apperr.Wrap(err, "update identity.partner_users")
-			}
-
-			until = member.ValidUntil
-		}
-		// HQ's revoke (IR508, DEC-83): a new end at or before now — on an open membership, or on one its company or
-		// customer disabled — turns the sign-in off, and only HQ gives the access back. The first revoke keeps its time.
-		// A later end (or none) clears it and turns the sign-in on, unless the company or the customer disabled it.
-		revoked := member.RevokedAt
-		// HQ's form sends whole minutes: an end it did not move (an access that ended by itself, or the time the company
-		// disabled the account) is no revoke when HQ saves other changes (IR514)
-		moved := input.ValidUntil != nil &&
-			(member.ValidUntil == nil || !input.ValidUntil.Truncate(time.Minute).Equal(member.ValidUntil.Truncate(time.Minute)))
-		switch {
-		case moved && !input.ValidUntil.After(c.Now):
-			if revoked == nil {
-				revoked, revoke = &c.Now, true
-			}
-		case member.RevokedAt != nil && (input.ValidUntil == nil || input.ValidUntil.After(c.Now)):
-			revoked, restore = nil, !disabled
-		}
-
-		_, execErr := c.Tx.Exec(
-			ctx,
-			`UPDATE identity.memberships SET employment = $2, valid_from = $3, valid_until = $4, revoked_at = $6, version =
-				version + 1, updated_at = $5 WHERE id = $1`,
-			member.ID,
-			input.Employment,
-			input.ValidFrom,
-			until,
-			c.Now,
-			revoked,
-		)
-		if execErr != nil {
-			return Member{}, apperr.Wrap(execErr, "update identity.memberships")
-		}
-
-		memberID, prev = member.ID, c.ExpectedVersion
+	if input.Role == authz.RoleClient { // HQ adds a member; a customer owner adds owners in the customer app (IR417)
+		cr := clientRoleMember
+		clientRole = &cr
 	}
 
+	err := call.Tx.QueryRow(ctx, `INSERT INTO identity.memberships (tenant_id, user_id, organization_id, role, employment,
+		client_role, valid_from, valid_until, created_at, updated_at)
+		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7, $8, $8) RETURNING id`,
+		input.UserID, input.OrganizationID, input.Role, input.Employment, clientRole, input.ValidFrom, input.ValidUntil,
+		call.Now).
+		Scan(&memberID)
+	if err != nil {
+		return membershipChange{}, apperr.Wrap(err, "insert identity.memberships")
+	}
+	// an existing person whose memberships here have all ended signs in with this one from now on (IR462); one
+	// whose sign-in belongs to another tenant keeps it
+	account = newPerson
+	if !newPerson {
+		err := call.Tx.QueryRow(ctx, `SELECT (u.sign_in_membership_id IS NULL OR EXISTS (SELECT 1 FROM identity.memberships s
+			WHERE s.id = u.sign_in_membership_id))
+			AND NOT EXISTS (SELECT 1 FROM identity.memberships m WHERE m.user_id = u.id AND m.id <> $2 AND (m.valid_until IS
+			NULL OR m.valid_until > $3))
+			FROM identity.users u WHERE u.id = $1`, input.UserID, memberID, call.Now).
+			Scan(&account)
+		if err != nil {
+			return membershipChange{}, apperr.Wrap(err, "select identity.users")
+		}
+	}
+
+	listed := statusActive // the status the customer's or contractor's user list shows: invited until the first sign-in
+	if account {
+		listed = statusInvited
+	}
+
+	err = addToUserLists(ctx, call, input, memberID, clientRole, listed)
+	if err != nil {
+		return membershipChange{}, err
+	}
+
+	return membershipChange{id: memberID, account: account, revoke: false, restore: false}, nil
+}
+
+// addToUserLists gives a new client membership its initial consent (IR84) and a row in the customer's user list
+// (IR144), and a new contractor or technician membership a row in the company's (FR-P11); listed is the status the
+// row shows, invited until the first sign-in when an account is opened (IR461). An address already on a list keeps its
+// row.
+func addToUserLists(
+	ctx context.Context,
+	call *ops.Call,
+	input *MemberInput,
+	memberID uuid.UUID,
+	clientRole *string,
+	listed string,
+) error {
+	if input.Role == authz.RoleClient { // IR84 initial Consent
+		_, err := call.Tx.Exec(
+			ctx,
+			`INSERT INTO identity.consents (tenant_id, membership_id, purpose, granted) VALUES
+				(current_setting('app.tenant_id')::uuid, $1, 'location_automation', false)`,
+			memberID,
+		)
+		if err != nil {
+			return apperr.Wrap(err, "insert identity.consents")
+		}
+		// IR144: the customer's user list includes the new member, listed as not signed in yet when the person was
+		// created with it (IR461); an address already on the list keeps its row
+		_, err = call.Tx.Exec(
+			ctx,
+			`INSERT INTO identity.client_users (tenant_id, customer_id, membership_id, email, display_name, client_role, status,
+				invited_at, invited_by_membership_id, created_at, updated_at)
+			SELECT current_setting('app.tenant_id')::uuid, cu.id, $1, u.email, u.display_name, $6, $7, $3, $4, $3, $3
+			FROM notify.ref_customers cu, identity.users u WHERE cu.organization_id = $2 AND u.id = $5
+			ON CONFLICT (tenant_id, customer_id, email) DO NOTHING`,
+			memberID,
+			input.OrganizationID,
+			call.Now,
+			call.Principal.MembershipID,
+			input.UserID,
+			*clientRole,
+			listed,
+		)
+		if err != nil {
+			return apperr.Wrap(err, "insert identity.client_users")
+		}
+	}
+	// FR-P11: the contractor company's user list includes the new account, listed as not signed in yet when the
+	// person was created with it (IR461); an address already on the list keeps its row
+	if input.Role == authz.RoleContractor || input.Role == authz.RoleTechnician {
+		_, err := call.Tx.Exec(
+			ctx,
+			`INSERT INTO identity.partner_users (tenant_id, organization_id, membership_id, email, display_name, partner_role,
+				status, invited_at, invited_by_membership_id, created_at, updated_at)
+			SELECT current_setting('app.tenant_id')::uuid, o.id, $1, u.email, u.display_name, $5, $7, $3, $4, $3, $3
+			FROM identity.organizations o, identity.users u WHERE o.id = $2 AND o.kind = 'contractor' AND u.id = $6
+			ON CONFLICT (tenant_id, organization_id, email) DO NOTHING`,
+			memberID,
+			input.OrganizationID,
+			call.Now,
+			call.Principal.MembershipID,
+			input.Role,
+			input.UserID,
+			listed,
+		)
+		if err != nil {
+			return apperr.Wrap(err, "insert identity.partner_users")
+		}
+	}
+
+	return nil
+}
+
+// updateMembership stores a new version of a membership at the version shown, whose person, organization and role
+// stay as they were. The last active identity.write holder keeps the permission (IR472); an account its company or
+// customer disabled keeps its end (IR416, IR417, IR420); and HQ's new end decides the sign-in (IR508).
+func updateMembership(
+	ctx context.Context,
+	call *ops.Call,
+	input *MemberInput,
+) (membershipChange, error) {
+	member, err := scanMember(
+		call.Tx.QueryRow(
+			ctx,
+			"SELECT "+memberCols+" FROM identity.memberships m WHERE m.id = $1 FOR UPDATE",
+			*input.ID,
+		),
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return membershipChange{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	}
+
+	if err != nil {
+		return membershipChange{}, err
+	}
+
+	if member.UserID != input.UserID || member.OrganizationID != input.OrganizationID ||
+		member.Role != input.Role {
+		return membershipChange{}, apperr.Fields(
+			map[string]string{keyRole: "errors.membership_fixed"},
+		)
+	}
+
+	if member.Version != *call.ExpectedVersion {
+		return membershipChange{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
+	}
+
+	err = checkLastIdentityAdmin(ctx, call, input, member)
+	if err != nil {
+		return membershipChange{}, err
+	}
+
+	until, disabled, err := keptEnd(ctx, call, input, member)
+	if err != nil {
+		return membershipChange{}, err
+	}
+
+	revoked, revoke, restore := revocation(input, member, disabled, call.Now)
+
+	_, execErr := call.Tx.Exec(
+		ctx,
+		`UPDATE identity.memberships SET employment = $2, valid_from = $3, valid_until = $4, revoked_at = $6, version =
+			version + 1, updated_at = $5 WHERE id = $1`,
+		member.ID,
+		input.Employment,
+		input.ValidFrom,
+		until,
+		call.Now,
+		revoked,
+	)
+	if execErr != nil {
+		return membershipChange{}, apperr.Wrap(execErr, "update identity.memberships")
+	}
+
+	return membershipChange{id: member.ID, account: false, revoke: revoke, restore: restore}, nil
+}
+
+// checkLastIdentityAdmin keeps the tenant's last active identity.write holder: a membership that loses the permission
+// or stops being valid now (ended, or its start moved later) is refused while it holds the permission and no other
+// active membership does. The tenant's changes to holders wait for each other here, so two at once, each taking the
+// permission from or ending the other of the last two, cannot both see the other still active (IR472).
+func checkLastIdentityAdmin(
+	ctx context.Context,
+	call *ops.Call,
+	input *MemberInput,
+	member Member,
+) error {
+	ending := (input.ValidUntil != nil && !input.ValidUntil.After(call.Now)) ||
+		input.ValidFrom.After(call.Now)
+	if !slices.Contains(input.Permissions, "identity.write") || ending {
+		_, err := call.Tx.Exec(
+			ctx,
+			`SELECT pg_advisory_xact_lock(hashtext('identity.identity_admins:' || $1::text))`,
+			call.Principal.TenantID,
+		)
+		if err != nil {
+			return apperr.Wrap(err, "select pg_advisory_xact_lock")
+		}
+
+		var (
+			holds  bool
+			others int
+		)
+
+		err = call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.membership_permissions WHERE membership_id = $1 AND
+			permission = 'identity.write')`, member.ID).
+			Scan(&holds)
+		if err != nil {
+			return apperr.Wrap(err, "select identity.membership_permissions")
+		}
+
+		err = call.Tx.QueryRow(ctx, `SELECT count(*) FROM identity.memberships m JOIN identity.membership_permissions p ON
+			p.membership_id = m.id AND p.permission = 'identity.write'
+			WHERE m.id <> $1 AND m.valid_from <= $2 AND (m.valid_until IS NULL OR m.valid_until > $2)`, member.ID, call.Now).
+			Scan(&others)
+		if err != nil {
+			return apperr.Wrap(err, "select identity.memberships")
+		}
+
+		if holds && others == 0 {
+			return apperr.E(apperr.Conflict, "errors.last_identity_admin")
+		}
+	}
+
+	return nil
+}
+
+// keptEnd is the end a membership gets, and whether its company or customer disabled the account. A disabled account
+// (IR416, IR417) stays closed: the membership keeps its end, and a contractor account keeps HQ's new end for when it is
+// enabled again (IR420).
+func keptEnd(
+	ctx context.Context,
+	call *ops.Call,
+	input *MemberInput,
+	member Member,
+) (*time.Time, bool, error) {
+	until := input.ValidUntil
+
+	var disabled bool
+
+	scanErr := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.partner_users WHERE membership_id = $1 AND
+		status
+		= 'disabled')
+		OR EXISTS (SELECT 1 FROM identity.client_users WHERE membership_id = $1 AND status = 'disabled')`, member.ID).
+		Scan(&disabled)
+	if scanErr != nil {
+		return nil, false, apperr.Wrap(scanErr, "select identity.partner_users")
+	}
+
+	if disabled && member.ValidUntil != nil &&
+		(until == nil || until.After(*member.ValidUntil)) {
+		_, err := call.Tx.Exec(
+			ctx,
+			`UPDATE identity.partner_users SET access_until = $2, version = version + 1, updated_at = $3 WHERE membership_id =
+				$1`,
+			member.ID,
+			until,
+			call.Now,
+		)
+		if err != nil {
+			return nil, false, apperr.Wrap(err, "update identity.partner_users")
+		}
+
+		until = member.ValidUntil
+	}
+
+	return until, disabled, nil
+}
+
+// revocation is the membership's revocation time after the save, and whether HQ turns the sign-in off or on (IR508,
+// DEC-83). A new end at or before now, on an open membership or on one its company or customer disabled, turns the
+// sign-in off, and only HQ gives the access back; the first revoke keeps its time. A later end, or none, clears it and
+// turns the sign-in on, unless the company or the customer disabled the account. HQ's form sends whole minutes, so an
+// end it did not move (an access that ended by itself, or the time the company disabled the account) is no revoke when
+// HQ saves other changes (IR514).
+func revocation(
+	input *MemberInput,
+	member Member,
+	disabled bool,
+	now time.Time,
+) (*time.Time, bool, bool) {
+	revoked := member.RevokedAt
+	moved := input.ValidUntil != nil &&
+		(member.ValidUntil == nil || !input.ValidUntil.Truncate(time.Minute).Equal(member.ValidUntil.Truncate(time.Minute)))
+
+	switch {
+	case moved && !input.ValidUntil.After(now):
+		if revoked == nil {
+			return &now, true, false
+		}
+	case member.RevokedAt != nil && (input.ValidUntil == nil || input.ValidUntil.After(now)):
+		return nil, false, !disabled
+	}
+
+	return revoked, false, false
+}
+
+// memberBefore is the membership as it was before an update (prev is the version the update replaced), for the scope
+// version check; a new membership has none.
+func memberBefore(
+	ctx context.Context,
+	call *ops.Call,
+	memberID uuid.UUID,
+	prev *int,
+) (Member, error) {
 	before := Member{
 		ID:             memberID,
 		TenantID:       uuid.UUID{},
@@ -935,25 +1244,35 @@ func membersSave(ctx context.Context, c *ops.Call, input *MemberInput) (Member, 
 	if prev != nil {
 		beforeList := []Member{before}
 
-		err := LoadMembers(ctx, c, beforeList)
+		err := LoadMembers(ctx, call, beforeList)
 		if err != nil {
-			return Member{}, err
+			return before, err
 		}
 
 		before = beforeList[0]
 	}
 
-	_, execErr := c.Tx.Exec(
+	return before, nil
+}
+
+// replaceGrants replaces the membership's permissions and scopes with the input's.
+func replaceGrants(
+	ctx context.Context,
+	call *ops.Call,
+	memberID uuid.UUID,
+	input *MemberInput,
+) error {
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`DELETE FROM identity.membership_permissions WHERE membership_id = $1`,
 		memberID,
 	)
 	if execErr != nil {
-		return Member{}, apperr.Wrap(execErr, "delete identity.membership_permissions")
+		return apperr.Wrap(execErr, "delete identity.membership_permissions")
 	}
 
 	for _, permission := range input.Permissions {
-		_, err := c.Tx.Exec(
+		_, err := call.Tx.Exec(
 			ctx,
 			`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES
 				(current_setting('app.tenant_id')::uuid, $1, $2)`,
@@ -961,21 +1280,21 @@ func membersSave(ctx context.Context, c *ops.Call, input *MemberInput) (Member, 
 			permission,
 		)
 		if err != nil {
-			return Member{}, apperr.Wrap(err, "insert identity.membership_permissions")
+			return apperr.Wrap(err, "insert identity.membership_permissions")
 		}
 	}
 
-	_, execErr = c.Tx.Exec(
+	_, execErr = call.Tx.Exec(
 		ctx,
 		`DELETE FROM identity.membership_scopes WHERE membership_id = $1`,
 		memberID,
 	)
 	if execErr != nil {
-		return Member{}, apperr.Wrap(execErr, "delete identity.membership_scopes")
+		return apperr.Wrap(execErr, "delete identity.membership_scopes")
 	}
 
 	for _, scopeRef := range input.Scopes {
-		_, err := c.Tx.Exec(
+		_, err := call.Tx.Exec(
 			ctx,
 			`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES
 				(current_setting('app.tenant_id')::uuid, $1, $2, $3)
@@ -985,81 +1304,45 @@ func membersSave(ctx context.Context, c *ops.Call, input *MemberInput) (Member, 
 			scopeRef.ID,
 		)
 		if err != nil {
-			return Member{}, apperr.Wrap(err, "insert identity.membership_scopes")
+			return apperr.Wrap(err, "insert identity.membership_scopes")
 		}
 	}
 
-	if prev != nil {
-		perms := slices.Clone(input.Permissions)
-		slices.Sort(perms)
+	return nil
+}
 
-		changed := !slices.Equal(perms, before.Permissions) ||
-			len(input.Scopes) != len(before.Scopes)
-		if !changed {
-			for _, sc := range input.Scopes {
-				changed = changed || !slices.Contains(before.Scopes, sc)
-			}
-		}
+// bumpScopeVersion moves the membership's scope version on when an update changed its permissions or scopes, so the
+// sessions and cursors scoped to the old ones end.
+func bumpScopeVersion(
+	ctx context.Context,
+	call *ops.Call,
+	memberID uuid.UUID,
+	input *MemberInput,
+	before Member,
+) error {
+	perms := slices.Clone(input.Permissions)
+	slices.Sort(perms)
 
-		if changed {
-			_, err := c.Tx.Exec(
-				ctx,
-				`UPDATE identity.memberships SET scope_version = scope_version + 1 WHERE id = $1`,
-				memberID,
-			)
-			if err != nil {
-				return Member{}, apperr.Wrap(err, "update identity.memberships")
-			}
+	changed := !slices.Equal(perms, before.Permissions) ||
+		len(input.Scopes) != len(before.Scopes)
+	if !changed {
+		for _, sc := range input.Scopes {
+			changed = changed || !slices.Contains(before.Scopes, sc)
 		}
 	}
 
-	saved, err := scanMember(
-		c.Tx.QueryRow(
+	if changed {
+		_, err := call.Tx.Exec(
 			ctx,
-			"SELECT "+memberCols+" FROM identity.memberships m WHERE m.id = $1",
+			`UPDATE identity.memberships SET scope_version = scope_version + 1 WHERE id = $1`,
 			memberID,
-		),
-	)
-	if err != nil {
-		return saved, err
+		)
+		if err != nil {
+			return apperr.Wrap(err, "update identity.memberships")
+		}
 	}
 
-	memberList := []Member{saved}
-
-	loadMembersErr := LoadMembers(ctx, c, memberList)
-	if loadMembersErr != nil {
-		return saved, loadMembersErr
-	}
-
-	c.Emit(
-		ops.Event{
-			AggregateType: kindMembership,
-			AggregateID:   memberID,
-			Type:          "MembershipSaved",
-			Payload:       map[string]any{keyRole: input.Role},
-		},
-	)
-
-	if account {
-		requestAccount(c, input.UserID, memberID, input.Role)
-	}
-
-	if revoke || restore {
-		setAccountEnabled(c, memberID, restore)
-	}
-
-	c.Audit(
-		ops.AuditEntry{
-			Action:          "members.save",
-			TargetKind:      kindMembership,
-			TargetID:        memberID.String(),
-			PreviousVersion: prev,
-			NextVersion:     &memberList[0].Version,
-			Reason:          input.Reason, Result: "", Before: nil, After: nil,
-		},
-	)
-
-	return memberList[0], nil
+	return nil
 }
 
 // RevokeSessionsInput is members.revokeSessions input (IR384).
@@ -1092,8 +1375,8 @@ type SessionsRevoked struct {
 }
 
 // wallClock is the time a revocation starts from: tokens carry the identity provider's auth_time, which is wall-clock
-// time, so the demo scenario clock would not compare (IR384). A variable, so tests can move it.
-var wallClock = func() time.Time { return time.Now().UTC() }
+// time, so the demo scenario clock would not compare (IR384).
+func wallClock() time.Time { return time.Now().UTC() }
 
 // membersRevokeSessions signs the membership's user out everywhere in this tenant (IR384, Figma Admin 03-8): every
 // membership of the user records the revocation time, and a token signed in before it is refused by every service.

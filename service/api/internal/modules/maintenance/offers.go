@@ -18,11 +18,7 @@ import (
 
 // Directory is what offers and assignments need from Identity & access.
 type Directory interface {
-	OrgState(
-		ctx context.Context,
-		c *ops.Call,
-		org uuid.UUID,
-	) (kind, status string, found bool, err error)
+	OrgState(ctx context.Context, c *ops.Call, org uuid.UUID) (identity.OrgStateResult, error)
 	Technician(
 		ctx context.Context,
 		c *ops.Call,
@@ -268,12 +264,12 @@ func (m Delivery) offerJob(ctx context.Context, call *ops.Call, input *OfferInpu
 		return Job{}, apperr.Fields(map[string]string{"offerExpiresAt": apperr.KeyPast})
 	}
 
-	kind, status, found, err := m.Directory.OrgState(ctx, call, input.ContractorOrgID)
+	org, err := m.Directory.OrgState(ctx, call, input.ContractorOrgID)
 	if err != nil {
 		return Job{}, apperr.Wrap(err, "maintenance.Directory.OrgState")
 	}
 
-	if !found || kind != orgKindContractor || status != orgStatusActive {
+	if !org.Found || org.Kind != orgKindContractor || org.Status != orgStatusActive {
 		return Job{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 

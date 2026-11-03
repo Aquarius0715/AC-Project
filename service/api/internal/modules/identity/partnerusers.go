@@ -79,6 +79,63 @@ func scanPartnerUser(r pgx.Row) (PartnerUser, error) {
 	return partnerUser, apperr.Wrap(err, "scan (scanPartnerUser)")
 }
 
+// partnerUserFilter is the filters of partnerUsers.list.
+type partnerUserFilter struct {
+	Status      *string `json:"status,omitempty"`
+	PartnerRole *string `json:"partnerRole,omitempty"`
+	Search      *string `json:"search,omitempty"` // email or display name contains, case-insensitive
+}
+
+// partnerUserFilterOf decodes and checks the filters of partnerUsers.list.
+func partnerUserFilterOf(raw json.RawMessage) (partnerUserFilter, error) {
+	var filter partnerUserFilter
+
+	if len(raw) == 0 {
+		return filter, nil
+	}
+
+	dec := json.NewDecoder(strings.NewReader(string(raw)))
+	dec.DisallowUnknownFields()
+
+	if dec.Decode(&filter) != nil ||
+		(filter.Status != nil &&
+			!slices.Contains([]string{statusInvited, statusActive, statusDisabled}, *filter.Status)) ||
+		(filter.PartnerRole != nil &&
+			*filter.PartnerRole != authz.RoleContractor && *filter.PartnerRole != authz.RoleTechnician) {
+		return partnerUserFilter{}, apperr.Fields(
+			map[string]string{keyFilters: apperr.KeyInvalid},
+		)
+	}
+
+	return filter, nil
+}
+
+// where is the filter's WHERE clause, with its arguments.
+func (filter partnerUserFilter) where(call *ops.Call) (string, []any) {
+	args := []any{call.Principal.OrgID}
+	add := func(v any) string {
+		args = append(args, v)
+
+		return fmt.Sprintf("$%d", len(args))
+	}
+
+	conds := []string{"x.organization_id = $1"}
+	if filter.Status != nil {
+		conds = append(conds, "x.status = "+add(*filter.Status))
+	}
+
+	if filter.PartnerRole != nil {
+		conds = append(conds, "x.partner_role = "+add(*filter.PartnerRole))
+	}
+
+	if filter.Search != nil && strings.TrimSpace(*filter.Search) != "" {
+		p := add(paging.Contains(*filter.Search))
+		conds = append(conds, "(x.email ILIKE "+p+" OR x.display_name ILIKE "+p+")")
+	}
+
+	return strings.Join(conds, " AND "), args
+}
+
 // partnerUsersList lists the caller's contractor company accounts and invites.
 //
 //	@Summary		partnerUsers.list (read)
@@ -113,25 +170,9 @@ func partnerUsersList(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[PartnerUser], error) {
-	var filters struct {
-		Status      *string `json:"status,omitempty"`
-		PartnerRole *string `json:"partnerRole,omitempty"`
-		Search      *string `json:"search,omitempty"` // email or display name contains, case-insensitive
-	}
-
-	if len(query.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
-		dec.DisallowUnknownFields()
-
-		if dec.Decode(&filters) != nil ||
-			(filters.Status != nil &&
-				!slices.Contains([]string{statusInvited, statusActive, statusDisabled}, *filters.Status)) ||
-			(filters.PartnerRole != nil &&
-				*filters.PartnerRole != authz.RoleContractor && *filters.PartnerRole != authz.RoleTechnician) {
-			return paging.Page[PartnerUser]{}, apperr.Fields(
-				map[string]string{keyFilters: apperr.KeyInvalid},
-			)
-		}
+	filters, err := partnerUserFilterOf(query.Filters)
+	if err != nil {
+		return paging.Page[PartnerUser]{}, err
 	}
 
 	order, err := paging.OrderBy(
@@ -155,28 +196,7 @@ func partnerUsersList(
 		return paging.Page[PartnerUser]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
-	args := []any{call.Principal.OrgID}
-	add := func(v any) string {
-		args = append(args, v)
-
-		return fmt.Sprintf("$%d", len(args))
-	}
-
-	conds := []string{"x.organization_id = $1"}
-	if filters.Status != nil {
-		conds = append(conds, "x.status = "+add(*filters.Status))
-	}
-
-	if filters.PartnerRole != nil {
-		conds = append(conds, "x.partner_role = "+add(*filters.PartnerRole))
-	}
-
-	if filters.Search != nil && strings.TrimSpace(*filters.Search) != "" {
-		p := add(paging.Contains(*filters.Search))
-		conds = append(conds, "(x.email ILIKE "+p+" OR x.display_name ILIKE "+p+")")
-	}
-
-	where := strings.Join(conds, " AND ")
+	where, args := filters.where(call)
 
 	var total int
 
@@ -414,8 +434,8 @@ func inviteResendWait(ctx context.Context, call *ops.Call, table string, id uuid
 
 // notSelfOrLast refuses a change to the caller's own account, one that would leave the company without an active
 // contractor, and closing a technician who still holds an active assignment (IR421: reassign the job first).
-func notSelfOrLast(ctx context.Context, c *ops.Call, partnerUser PartnerUser) error {
-	if partnerUser.MembershipID != nil && *partnerUser.MembershipID == c.Principal.MembershipID {
+func notSelfOrLast(ctx context.Context, call *ops.Call, partnerUser PartnerUser) error {
+	if partnerUser.MembershipID != nil && *partnerUser.MembershipID == call.Principal.MembershipID {
 		return apperr.E(apperr.Conflict, "errors.own_account")
 	}
 
@@ -423,7 +443,7 @@ func notSelfOrLast(ctx context.Context, c *ops.Call, partnerUser PartnerUser) er
 		partnerUser.MembershipID != nil {
 		booked, err := ops.Query[bool](
 			ctx,
-			c,
+			call,
 			"maintenance.technicianBooked",
 			map[string]any{keyMembershipID: *partnerUser.MembershipID},
 		)
@@ -437,7 +457,7 @@ func notSelfOrLast(ctx context.Context, c *ops.Call, partnerUser PartnerUser) er
 	}
 
 	if partnerUser.PartnerRole == authz.RoleContractor && partnerUser.Status == statusActive {
-		ok, err := otherActiveContractor(ctx, c, partnerUser.OrganizationID, partnerUser.ID)
+		ok, err := otherActiveContractor(ctx, call, partnerUser.OrganizationID, partnerUser.ID)
 		if err != nil {
 			return err
 		}
@@ -482,11 +502,25 @@ func notSelfOrLast(ctx context.Context, c *ops.Call, partnerUser PartnerUser) er
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/partner-users [post]
-func partnerUsersSave(
+func (a Accounts) partnerUsersSave(
 	ctx context.Context,
 	call *ops.Call,
 	input *PartnerUserInput,
 ) (PartnerUser, error) {
+	err := uniquePartnerEmail(ctx, call, input)
+	if err != nil {
+		return PartnerUser{}, err
+	}
+
+	if input.ID == nil { // a new user: the account is created now and gets the set-up e-mail (IR461)
+		return a.addPartnerUser(ctx, call, input)
+	}
+
+	return updatePartnerUser(ctx, call, input)
+}
+
+// uniquePartnerEmail refuses an address another user of the company's list has.
+func uniquePartnerEmail(ctx context.Context, call *ops.Call, input *PartnerUserInput) error {
 	var self uuid.UUID
 	if input.ID != nil {
 		self = *input.ID
@@ -499,104 +533,112 @@ func partnerUsersSave(
 		$2::citext AND id <> $3)`, call.Principal.OrgID, input.Email, self).
 		Scan(&dup)
 	if err != nil {
-		return PartnerUser{}, apperr.Wrap(err, "select identity.partner_users")
+		return apperr.Wrap(err, "select identity.partner_users")
 	}
 
 	if dup {
-		return PartnerUser{}, apperr.Fields(map[string]string{keyEmail: keyEmailTaken})
+		return apperr.Fields(map[string]string{keyEmail: keyEmailTaken})
 	}
 
-	if input.ID == nil { // a new user: the account is created now and gets the set-up e-mail (IR461)
-		if input.Status != nil {
+	return nil
+}
+
+// addPartnerUser adds a user to the company's list with a new account: a contractor with the company's scope, or an
+// external technician whose access ends when the contractor says.
+func (a Accounts) addPartnerUser(
+	ctx context.Context,
+	call *ops.Call,
+	input *PartnerUserInput,
+) (PartnerUser, error) {
+	if input.Status != nil {
+		return PartnerUser{}, apperr.Fields(
+			map[string]string{keyStatus: apperr.KeyNotAllowed},
+		)
+	}
+
+	if input.Reason != nil {
+		return PartnerUser{}, apperr.Fields(
+			map[string]string{keyReason: apperr.KeyNotAllowed},
+		)
+	}
+
+	acct := newAccount{
+		Email:       input.Email,
+		DisplayName: *input.DisplayName,
+		Role:        input.PartnerRole,
+		OrgID:       call.Principal.OrgID,
+		Permissions: DefaultPermissions(input.PartnerRole),
+		Employment:  nil,
+		ClientRole:  nil,
+		ValidUntil:  nil,
+		Scopes:      nil,
+	}
+	if input.PartnerRole == authz.RoleTechnician {
+		if !accessUntilOK(call.Now, *input.AccessUntil) {
 			return PartnerUser{}, apperr.Fields(
-				map[string]string{keyStatus: apperr.KeyNotAllowed},
+				map[string]string{"accessUntil": apperr.KeyRange},
 			)
 		}
 
-		if input.Reason != nil {
-			return PartnerUser{}, apperr.Fields(
-				map[string]string{keyReason: apperr.KeyNotAllowed},
-			)
-		}
-
-		acct := newAccount{
-			Email:       input.Email,
-			DisplayName: *input.DisplayName,
-			Role:        input.PartnerRole,
-			OrgID:       call.Principal.OrgID,
-			Permissions: defaultPermissions[input.PartnerRole],
-			Employment:  nil,
-			ClientRole:  nil,
-			ValidUntil:  nil,
-			Scopes:      nil,
-		}
-		if input.PartnerRole == authz.RoleTechnician {
-			if !accessUntilOK(call.Now, *input.AccessUntil) {
-				return PartnerUser{}, apperr.Fields(
-					map[string]string{"accessUntil": apperr.KeyRange},
-				)
-			}
-
-			ext := employmentExternal
-			acct.Employment, acct.ValidUntil, acct.Scopes = &ext, input.AccessUntil, []ScopeRef{}
-		} else {
-			acct.Scopes = []ScopeRef{{Kind: scopeOrganization, ID: call.Principal.OrgID}}
-		}
-
-		_, membership, err := createAccount(ctx, call, acct)
-		if err != nil {
-			return PartnerUser{}, err
-		}
-
-		partnerUserID := uuid.New()
-
-		_, execErr := call.Tx.Exec(
-			ctx,
-			`INSERT INTO identity.partner_users (id, tenant_id, organization_id, membership_id, email, display_name,
-				partner_role, status, invited_at, invited_by_membership_id, last_invite_sent_at, created_at, updated_at)
-			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, 'invited', $7, $8, $7, $7, $7)`,
-			partnerUserID,
-			call.Principal.OrgID,
-			membership,
-			input.Email,
-			*input.DisplayName,
-			input.PartnerRole,
-			call.Now,
-			call.Principal.MembershipID,
-		)
-		if execErr != nil {
-			return PartnerUser{}, apperr.Wrap(execErr, "insert identity.partner_users")
-		}
-
-		version := 1
-		call.Audit(
-			ops.AuditEntry{
-				Action:          "partnerUsers.save",
-				TargetKind:      targetPartnerUser,
-				TargetID:        partnerUserID.String(),
-				NextVersion:     &version,
-				Reason:          "account created",
-				PreviousVersion: nil,
-				Result:          "",
-				Before:          nil,
-				After:           nil,
-			},
-		)
-
-		return loadPartnerUser(ctx, call, partnerUserID, false)
+		ext := employmentExternal
+		acct.Employment, acct.ValidUntil, acct.Scopes = &ext, input.AccessUntil, []ScopeRef{}
+	} else {
+		acct.Scopes = []ScopeRef{{Kind: scopeOrganization, ID: call.Principal.OrgID}}
 	}
 
+	membership, err := createAccount(ctx, call, acct, a.perOrgPerDay())
+	if err != nil {
+		return PartnerUser{}, err
+	}
+
+	partnerUserID := uuid.New()
+
+	_, execErr := call.Tx.Exec(
+		ctx,
+		`INSERT INTO identity.partner_users (id, tenant_id, organization_id, membership_id, email, display_name,
+			partner_role, status, invited_at, invited_by_membership_id, last_invite_sent_at, created_at, updated_at)
+		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, 'invited', $7, $8, $7, $7, $7)`,
+		partnerUserID,
+		call.Principal.OrgID,
+		membership,
+		input.Email,
+		*input.DisplayName,
+		input.PartnerRole,
+		call.Now,
+		call.Principal.MembershipID,
+	)
+	if execErr != nil {
+		return PartnerUser{}, apperr.Wrap(execErr, "insert identity.partner_users")
+	}
+
+	version := 1
+	call.Audit(
+		ops.AuditEntry{
+			Action:          "partnerUsers.save",
+			TargetKind:      targetPartnerUser,
+			TargetID:        partnerUserID.String(),
+			NextVersion:     &version,
+			Reason:          "account created",
+			PreviousVersion: nil,
+			Result:          "",
+			Before:          nil,
+			After:           nil,
+		},
+	)
+
+	return loadPartnerUser(ctx, call, partnerUserID, false)
+}
+
+// updatePartnerUser saves a change to a user of the company's list at the version shown: its status, which the
+// membership and the sign-in follow, and a technician's access end.
+func updatePartnerUser(
+	ctx context.Context,
+	call *ops.Call,
+	input *PartnerUserInput,
+) (PartnerUser, error) {
 	partnerUser, err := loadPartnerUser(ctx, call, *input.ID, true)
 	if err != nil {
 		return partnerUser, err
-	}
-
-	if partnerUser.Version != *call.ExpectedVersion {
-		return partnerUser, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
-	}
-
-	if input.Reason == nil {
-		return partnerUser, apperr.Fields(map[string]string{keyReason: apperr.KeyRequired})
 	}
 
 	status := partnerUser.Status
@@ -604,113 +646,19 @@ func partnerUsersSave(
 		status = *input.Status
 	}
 
-	if partnerUser.Status == statusInvited && status != statusInvited &&
-		input.Status != nil { // active at the first sign-in (IR461)
-		return partnerUser, apperr.E(apperr.Conflict, "errors.invite_pending")
+	err = checkPartnerUserChange(ctx, call, input, partnerUser, status)
+	if err != nil {
+		return partnerUser, err
 	}
 
-	if partnerUser.RevokedAt != nil &&
-		(partnerUser.Status == statusDisabled && status != statusDisabled || input.AccessUntil != nil) {
-		// HQ ended the access: only HQ gives it back (IR508)
-		return partnerUser, apperr.E(apperr.Conflict, "errors.revoked_by_hq")
-	}
-	// the account exists from the start (IR461): its e-mail and role are fixed; remove the user and add them again
-	if !strings.EqualFold(input.Email, partnerUser.Email) {
-		return partnerUser, apperr.Fields(map[string]string{keyEmail: apperr.KeyImmutable})
-	} else if input.PartnerRole != partnerUser.PartnerRole {
-		return partnerUser, apperr.Fields(map[string]string{"partnerRole": apperr.KeyImmutable})
-	} else {
-		input.Email = partnerUser.Email // the same address in other letter case keeps the stored spelling
+	kept, err := statusAccess(ctx, call, partnerUser, status)
+	if err != nil {
+		return partnerUser, err
 	}
 
-	if partnerUser.Status != statusInvited && status != partnerUser.Status ||
-		partnerUser.PartnerRole != input.PartnerRole {
-		err := notSelfOrLast(ctx, call, partnerUser)
-		if err != nil {
-			return partnerUser, err
-		}
-	}
-
-	kept := partnerUser.accessKept
-	if partnerUser.MembershipID != nil && status != partnerUser.Status {
-		if status == statusDisabled { // keep the access end, and close the membership now
-			kept = partnerUser.AccessUntil
-
-			_, err := call.Tx.Exec(
-				ctx,
-				`UPDATE identity.memberships SET valid_until = GREATEST($2::timestamptz, valid_from + interval '1 second'),
-					scope_version = scope_version + 1,
-				version = version + 1, updated_at = $2 WHERE id = $1`,
-				*partnerUser.MembershipID,
-				call.Now,
-			)
-			if err != nil {
-				return partnerUser, apperr.Wrap(err, "update identity.memberships")
-			}
-		} else { // re-enabled: the kept access end comes back, if it has not passed
-			if kept != nil && !kept.After(call.Now) {
-				return partnerUser, apperr.E(apperr.Conflict, "errors.access_expired")
-			}
-
-			_, err := call.Tx.Exec(
-				ctx,
-				`UPDATE identity.memberships SET valid_until = $2, scope_version = scope_version + 1, version = version + 1,
-					updated_at = $3 WHERE id = $1`,
-				*partnerUser.MembershipID,
-				kept,
-				call.Now,
-			)
-			if err != nil {
-				return partnerUser, apperr.Wrap(err, "update identity.memberships")
-			}
-
-			kept = nil
-		}
-	}
-
-	if input.AccessUntil != nil { // a technician's access end, set by the contractor (IR461)
-		if !accessUntilOK(call.Now, *input.AccessUntil) {
-			return partnerUser, apperr.Fields(map[string]string{"accessUntil": apperr.KeyRange})
-		}
-
-		if partnerUser.MembershipID == nil {
-			return partnerUser, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
-		}
-
-		if partnerUser.AccessUntil != nil &&
-			input.AccessUntil.Before(
-				*partnerUser.AccessUntil,
-			) { // shortening: not while booked (IR421)
-			booked, err := ops.Query[bool](
-				ctx,
-				call,
-				"maintenance.technicianBooked",
-				map[string]any{keyMembershipID: *partnerUser.MembershipID},
-			)
-			if err != nil {
-				return partnerUser, err
-			}
-
-			if booked {
-				return partnerUser, apperr.E(apperr.Conflict, "errors.technician_booked")
-			}
-		}
-
-		if status == statusDisabled {
-			kept = input.AccessUntil // comes back when re-enabled
-		} else {
-			_, err := call.Tx.Exec(
-				ctx,
-				`UPDATE identity.memberships SET valid_until = $2, scope_version = scope_version + 1, version = version + 1,
-					updated_at = $3 WHERE id = $1`,
-				*partnerUser.MembershipID,
-				*input.AccessUntil,
-				call.Now,
-			)
-			if err != nil {
-				return partnerUser, apperr.Wrap(err, "update identity.memberships")
-			}
-		}
+	kept, err = setAccessUntil(ctx, call, input, partnerUser, status, kept)
+	if err != nil {
+		return partnerUser, err
 	}
 
 	_, execErr := call.Tx.Exec(
@@ -746,6 +694,155 @@ func partnerUsersSave(
 	)
 
 	return loadPartnerUser(ctx, call, partnerUser.ID, false)
+}
+
+// checkPartnerUserChange checks a change to a user of the company's list, and keeps the stored spelling of the
+// address: at the version shown, with a reason; an invite active only at the first sign-in (IR461); never an access HQ
+// ended (IR508); the e-mail and role fixed; and not the contractor's own or last account.
+func checkPartnerUserChange(
+	ctx context.Context,
+	call *ops.Call,
+	input *PartnerUserInput,
+	partnerUser PartnerUser,
+	status string,
+) error {
+	if partnerUser.Version != *call.ExpectedVersion {
+		return apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
+	}
+
+	if input.Reason == nil {
+		return apperr.Fields(map[string]string{keyReason: apperr.KeyRequired})
+	}
+
+	if partnerUser.Status == statusInvited && status != statusInvited &&
+		input.Status != nil { // active at the first sign-in (IR461)
+		return apperr.E(apperr.Conflict, "errors.invite_pending")
+	}
+
+	if partnerUser.RevokedAt != nil &&
+		(partnerUser.Status == statusDisabled && status != statusDisabled || input.AccessUntil != nil) {
+		// HQ ended the access: only HQ gives it back (IR508)
+		return apperr.E(apperr.Conflict, "errors.revoked_by_hq")
+	}
+	// the account exists from the start (IR461): its e-mail and role are fixed; remove the user and add them again
+	switch {
+	case !strings.EqualFold(input.Email, partnerUser.Email):
+		return apperr.Fields(map[string]string{keyEmail: apperr.KeyImmutable})
+	case input.PartnerRole != partnerUser.PartnerRole:
+		return apperr.Fields(map[string]string{"partnerRole": apperr.KeyImmutable})
+	}
+
+	input.Email = partnerUser.Email // the same address in other letter case keeps the stored spelling
+
+	if partnerUser.Status != statusInvited && status != partnerUser.Status ||
+		partnerUser.PartnerRole != input.PartnerRole {
+		err := notSelfOrLast(ctx, call, partnerUser)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// statusAccess follows a status change on the membership and returns the access end the list keeps: disabling closes
+// the membership now and keeps its access end; enabling brings the kept end back, unless it has passed.
+func statusAccess(
+	ctx context.Context,
+	call *ops.Call,
+	partnerUser PartnerUser,
+	status string,
+) (*time.Time, error) {
+	kept := partnerUser.accessKept
+	if partnerUser.MembershipID == nil || status == partnerUser.Status {
+		return kept, nil
+	}
+
+	if status == statusDisabled {
+		_, err := call.Tx.Exec(
+			ctx,
+			`UPDATE identity.memberships SET valid_until = GREATEST($2::timestamptz, valid_from + interval '1 second'),
+				scope_version = scope_version + 1,
+			version = version + 1, updated_at = $2 WHERE id = $1`,
+			*partnerUser.MembershipID,
+			call.Now,
+		)
+
+		return partnerUser.AccessUntil, apperr.Wrap(err, "update identity.memberships")
+	}
+
+	if kept != nil && !kept.After(call.Now) {
+		return kept, apperr.E(apperr.Conflict, "errors.access_expired")
+	}
+
+	_, err := call.Tx.Exec(
+		ctx,
+		`UPDATE identity.memberships SET valid_until = $2, scope_version = scope_version + 1, version = version + 1,
+			updated_at = $3 WHERE id = $1`,
+		*partnerUser.MembershipID,
+		kept,
+		call.Now,
+	)
+
+	return nil, apperr.Wrap(err, "update identity.memberships")
+}
+
+// setAccessUntil applies a technician's access end set by the contractor (IR461) and returns the access end the list
+// keeps: shortening it is refused while the technician is booked (IR421), and while the user is disabled the new end
+// is kept for when the user is enabled again.
+func setAccessUntil(
+	ctx context.Context,
+	call *ops.Call,
+	input *PartnerUserInput,
+	partnerUser PartnerUser,
+	status string,
+	kept *time.Time,
+) (*time.Time, error) {
+	if input.AccessUntil == nil {
+		return kept, nil
+	}
+
+	if !accessUntilOK(call.Now, *input.AccessUntil) {
+		return kept, apperr.Fields(map[string]string{"accessUntil": apperr.KeyRange})
+	}
+
+	if partnerUser.MembershipID == nil {
+		return kept, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
+	}
+
+	if partnerUser.AccessUntil != nil &&
+		input.AccessUntil.Before(
+			*partnerUser.AccessUntil,
+		) { // shortening: not while booked (IR421)
+		booked, err := ops.Query[bool](
+			ctx,
+			call,
+			"maintenance.technicianBooked",
+			map[string]any{keyMembershipID: *partnerUser.MembershipID},
+		)
+		if err != nil {
+			return kept, err
+		}
+
+		if booked {
+			return kept, apperr.E(apperr.Conflict, "errors.technician_booked")
+		}
+	}
+
+	if status == statusDisabled {
+		return input.AccessUntil, nil // comes back when re-enabled
+	}
+
+	_, err := call.Tx.Exec(
+		ctx,
+		`UPDATE identity.memberships SET valid_until = $2, scope_version = scope_version + 1, version = version + 1,
+			updated_at = $3 WHERE id = $1`,
+		*partnerUser.MembershipID,
+		*input.AccessUntil,
+		call.Now,
+	)
+
+	return kept, apperr.Wrap(err, "update identity.memberships")
 }
 
 // PartnerRemoveInput is partnerUsers.remove input.
@@ -988,9 +1085,9 @@ func partnerUsersResend(
 }
 
 // RegisterPartnerUsers binds partnerUsers.*.
-func RegisterPartnerUsers(r *ops.Registry) {
+func RegisterPartnerUsers(r *ops.Registry, accounts Accounts) {
 	ops.Register(r, "partnerUsers.list", partnerUsersList)
-	ops.Register(r, "partnerUsers.save", partnerUsersSave)
+	ops.Register(r, "partnerUsers.save", accounts.partnerUsersSave)
 	ops.Register(r, "partnerUsers.remove", partnerUsersRemove)
 	ops.Register(r, "partnerUsers.resendInvite", partnerUsersResend)
 }

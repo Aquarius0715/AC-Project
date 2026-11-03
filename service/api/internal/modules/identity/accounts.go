@@ -34,7 +34,8 @@ type Provider interface {
 // AccountApps are the apps a new account's set-up link returns to, by role.
 type AccountApps struct{ Customer, Partner, Technician, Admin string }
 
-func (a AccountApps) of(role string) (url, client string) {
+// of is the app a role's set-up link returns to: its URL and its client ID.
+func (a AccountApps) of(role string) (string, string) {
 	switch role {
 	case authz.RoleClient:
 		return a.Customer, appClientID
@@ -56,18 +57,21 @@ const (
 // TechnicianAccessMax is the longest access a contractor gives a technician it adds (IR461, the user's option 1).
 const TechnicianAccessMax = 366 * 24 * time.Hour
 
-// defaultPermissions and the scopes of an account a contractor or a customer owner adds: the sets the demo accounts of
-// each role hold. An external technician has no unit scope: the contractor assigns them only on its accepted offers.
-var defaultPermissions = map[string][]string{
-	authz.RoleClient:     {"control.execute"},
-	authz.RoleContractor: {"partner.accept", "partner.assign", "partner.review"},
-	authz.RoleTechnician: {"alert.read", "alert.resolve", "control.diagnose", "device.maintain"},
-}
-
-// DefaultPermissions are the permissions an account of the role gets when it is added (a copy): the development seed
-// gives the live site's owner a client's (seed.ApplyLive).
+// DefaultPermissions are the permissions an account of the role gets when a contractor or a customer owner adds it: the
+// sets the demo accounts of each role hold. The development seed gives the live site's owner a client's
+// (seed.ApplyLive). An external technician also has no unit scope: the contractor assigns them only on its accepted
+// offers.
 func DefaultPermissions(role string) []string {
-	return append([]string(nil), defaultPermissions[role]...)
+	switch role {
+	case authz.RoleClient:
+		return []string{"control.execute"}
+	case authz.RoleContractor:
+		return []string{"partner.accept", "partner.assign", "partner.review"}
+	case authz.RoleTechnician:
+		return []string{"alert.read", "alert.resolve", "control.diagnose", "device.maintain"}
+	}
+
+	return nil
 }
 
 // newAccount is a person with one membership to create.
@@ -80,15 +84,34 @@ type newAccount struct {
 	Scopes                   []ScopeRef
 }
 
-// AccountsPerOrgPerDay is how many accounts a contractor or a customer owner adds to their organization in 24 hours
-// (IR464): each one mails a set-up link to the address typed in, so a member cannot have the sign-in service mail
-// strangers in bulk. HQ is not limited. ACCOUNTS_PER_ORG_PER_DAY sets another value at start-up (server Config).
-var AccountsPerOrgPerDay = 30
+// DefaultAccountsPerOrgPerDay is how many accounts a contractor or a customer owner adds to their organization in 24
+// hours (IR464): each one mails a set-up link to the address typed in, so a member cannot have the sign-in service
+// mail strangers in bulk. HQ is not limited. ACCOUNTS_PER_ORG_PER_DAY sets another number (Accounts.PerOrgPerDay).
+const DefaultAccountsPerOrgPerDay = 30
 
-// addCap refuses an account beyond AccountsPerOrgPerDay with the seconds until the oldest of them is a day old. The
+// capWindow is the period the accounts an organization adds are counted over.
+const capWindow = 24 * time.Hour
+
+// Accounts are the account rules a server runs with.
+type Accounts struct {
+	// PerOrgPerDay is how many accounts a contractor or a customer owner adds to their organization in 24 hours; 0
+	// keeps DefaultAccountsPerOrgPerDay
+	PerOrgPerDay int
+}
+
+// perOrgPerDay is the number of accounts an organization adds in 24 hours.
+func (a Accounts) perOrgPerDay() int {
+	if a.PerOrgPerDay > 0 {
+		return a.PerOrgPerDay
+	}
+
+	return DefaultAccountsPerOrgPerDay
+}
+
+// addCap refuses an account beyond limit with the seconds until the oldest of them is a day old. The
 // organization row is locked so two adds at once count each other. Memberships dated after now (the seed's, written
 // on the wall clock ahead of the demo clock) do not count.
-func addCap(ctx context.Context, call *ops.Call, org uuid.UUID) error {
+func addCap(ctx context.Context, call *ops.Call, org uuid.UUID, limit int) error {
 	if call.Principal.Role == authz.RoleAdmin {
 		return nil
 	}
@@ -109,17 +132,17 @@ func addCap(ctx context.Context, call *ops.Call, org uuid.UUID) error {
 
 	err = call.Tx.QueryRow(ctx, `SELECT count(*), min(created_at) FROM (SELECT created_at FROM identity.memberships
 		WHERE organization_id = $1 AND created_at > $2 AND created_at <= $3 ORDER BY created_at DESC LIMIT $4) x`,
-		org, call.Now.Add(-24*time.Hour), call.Now, AccountsPerOrgPerDay).
+		org, call.Now.Add(-capWindow), call.Now, limit).
 		Scan(&count, &oldest)
 	if err != nil {
 		return apperr.Wrap(err, "select identity.memberships")
 	}
 
-	if count < AccountsPerOrgPerDay || oldest == nil {
+	if count < limit || oldest == nil {
 		return nil
 	}
 
-	wait := oldest.Add(24 * time.Hour).Sub(call.Now)
+	wait := oldest.Add(capWindow).Sub(call.Now)
 
 	return apperr.E(apperr.RateLimited, "errors.too_many_accounts").
 		RetryAfter(int((wait + time.Second - 1) / time.Second))
@@ -175,24 +198,28 @@ func personFor(ctx context.Context, call *ops.Call, email, name string) (uuid.UU
 
 // createAccount creates the person (or takes back one removed before, personFor), the membership with its permissions
 // and scopes, and asks the identity-accounts consumer to open or re-point the provider account and e-mail the set-up
-// link (IR461, IR462, IR511). An e-mail another person holds is a field error.
+// link (IR461, IR462, IR511). An e-mail another person holds is a field error. It returns the membership; limit is how
+// many accounts the organization adds in 24 hours.
 func createAccount(
 	ctx context.Context,
 	call *ops.Call,
 	account newAccount,
-) (user, membership uuid.UUID, err error) {
-	err = addCap(ctx, call, account.OrgID)
+	limit int,
+) (uuid.UUID, error) {
+	var membership uuid.UUID
+
+	err := addCap(ctx, call, account.OrgID, limit)
 	if err != nil {
-		return user, membership, err
+		return membership, err
 	}
 
-	user, err = personFor(ctx, call, account.Email, account.DisplayName)
+	user, err := personFor(ctx, call, account.Email, account.DisplayName)
 	if errors.Is(err, errEmailTaken) {
-		return user, membership, apperr.Fields(map[string]string{keyEmail: keyEmailTaken})
+		return membership, apperr.Fields(map[string]string{keyEmail: keyEmailTaken})
 	}
 
 	if err != nil {
-		return user, membership, err
+		return membership, err
 	}
 
 	if call.Principal.Role != authz.RoleAdmin {
@@ -204,11 +231,11 @@ func createAccount(
 			NULL)`, user).
 			Scan(&revoked)
 		if err != nil {
-			return user, membership, apperr.Wrap(err, "select identity.memberships")
+			return membership, apperr.Wrap(err, "select identity.memberships")
 		}
 
 		if revoked {
-			return user, membership, apperr.Fields(
+			return membership, apperr.Fields(
 				map[string]string{keyEmail: "errors.revoked_by_hq"},
 			)
 		}
@@ -220,7 +247,7 @@ func createAccount(
 		user, account.OrgID, account.Role, account.Employment, account.ClientRole, call.Now, account.ValidUntil).
 		Scan(&membership)
 	if err != nil {
-		return user, membership, apperr.Wrap(err, "insert identity.memberships")
+		return membership, apperr.Wrap(err, "insert identity.memberships")
 	}
 
 	for _, permission := range account.Permissions {
@@ -232,7 +259,7 @@ func createAccount(
 			permission,
 		)
 		if err != nil {
-			return user, membership, apperr.Wrap(err, "insert identity.membership_permissions")
+			return membership, apperr.Wrap(err, "insert identity.membership_permissions")
 		}
 	}
 
@@ -246,7 +273,7 @@ func createAccount(
 			scopeRef.ID,
 		)
 		if err != nil {
-			return user, membership, apperr.Wrap(err, "insert identity.membership_scopes")
+			return membership, apperr.Wrap(err, "insert identity.membership_scopes")
 		}
 	}
 
@@ -258,7 +285,7 @@ func createAccount(
 			membership,
 		)
 		if err != nil {
-			return user, membership, apperr.Wrap(err, "insert identity.consents")
+			return membership, apperr.Wrap(err, "insert identity.consents")
 		}
 	}
 
@@ -272,7 +299,7 @@ func createAccount(
 	)
 	requestAccount(call, user, membership, account.Role)
 
-	return user, membership, nil
+	return membership, nil
 }
 
 // requestAccount asks the identity-accounts consumer to open the provider account (if missing) or point it at this
@@ -313,155 +340,173 @@ func AccountHandlers(provider Provider, apps AccountApps) map[string]events.Hand
 		return nil
 	}
 
+	consumer := accountConsumer{provider: provider, apps: apps}
+
 	return map[string]events.Handler{
-		EventAccountRequested: func(ctx context.Context, txn pgx.Tx, event events.Event) error {
-			var input struct {
-				UserID       uuid.UUID `json:"userId"`
-				MembershipID uuid.UUID `json:"membershipId"`
-				Role         string    `json:"role"`
-			}
-
-			decodeErr := event.Decode(&input)
-			if decodeErr != nil {
-				return apperr.Wrap(decodeErr, "events.Event.Decode")
-			}
-
-			var (
-				email, name string
-				sub         *string
-			)
-
-			err := txn.QueryRow(ctx, `SELECT email, display_name, cognito_sub FROM identity.users WHERE id = $1`, input.UserID).
-				Scan(&email, &name, &sub)
-			if errors.Is(err, pgx.ErrNoRows) {
-				return nil
-			}
-
-			if err != nil {
-				return apperr.Wrap(err, "select identity.users")
-			}
-
-			url, client := apps.of(input.Role)
-			acct := idp.Account{
-				Email:       email,
-				DisplayName: name,
-				TenantID:    event.TenantID.String(),
-				Membership:  input.MembershipID.String(),
-				Role:        input.Role,
-				ClientID:    client,
-				RedirectURI: url + "/login",
-			}
-
-			cctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-			defer cancel()
-
-			subject := ""
-			if sub != nil { // a person added again (IR462), or the set-up e-mail once more: the claims name this membership
-				subject = *sub
-
-				err = provider.UpdateAccount(cctx, subject, acct)
-				if errors.Is(err, idp.ErrNoAccount) {
-					subject, err = "", nil
-				}
-
-				if err != nil {
-					slog.WarnContext(
-						ctx,
-						"identity: the provider account was not updated",
-						"user",
-						input.UserID,
-						"err",
-						err,
-					)
-
-					return nil
-				}
-			}
-
-			if subject == "" {
-				subject, err = provider.CreateAccount(cctx, acct)
-				if err != nil {
-					slog.WarnContext(
-						ctx,
-						"identity: the provider account was not created",
-						"user",
-						input.UserID,
-						"err",
-						err,
-					)
-
-					return nil
-				}
-			}
-
-			_, execErr := txn.Exec(
-				ctx,
-				`UPDATE identity.users SET cognito_sub = $2, sign_in_membership_id = $3 WHERE id = $1`,
-				input.UserID,
-				subject,
-				input.MembershipID,
-			)
-			if execErr != nil {
-				return apperr.Wrap(execErr, "update identity.users")
-			}
-
-			sendSetupErr := provider.SendSetup(cctx, subject, acct)
-			if sendSetupErr != nil {
-				slog.WarnContext(
-					ctx,
-					"identity: the set-up e-mail was not sent",
-					"user",
-					input.UserID,
-					"err",
-					sendSetupErr,
-				)
-			}
-
-			return nil
-		},
-		EventAccountEnabled: func(ctx context.Context, txn pgx.Tx, event events.Event) error {
-			var input struct {
-				MembershipID uuid.UUID `json:"membershipId"`
-				Enabled      bool      `json:"enabled"`
-			}
-
-			decodeErr := event.Decode(&input)
-			if decodeErr != nil {
-				return apperr.Wrap(decodeErr, "events.Event.Decode")
-			}
-			// the subject is the provider's, or the person's ID for the realm's demo accounts (auth accepts either); a
-			// membership the account does not sign in with leaves it alone (IR462)
-			var sub string
-
-			err := txn.QueryRow(ctx, `SELECT coalesce(u.cognito_sub, u.id::text) FROM identity.memberships m JOIN identity.users
-				u
-				ON u.id = m.user_id
-				WHERE m.id = $1 AND (u.sign_in_membership_id IS NULL OR u.sign_in_membership_id = m.id)`, input.MembershipID).
-				Scan(&sub)
-			if errors.Is(err, pgx.ErrNoRows) {
-				return nil
-			}
-
-			if err != nil {
-				return apperr.Wrap(err, "select identity.memberships")
-			}
-
-			cctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-			defer cancel()
-
-			setEnabledErr := provider.SetEnabled(cctx, sub, input.Enabled)
-			if setEnabledErr != nil {
-				slog.WarnContext(
-					ctx,
-					"identity: the provider account was not turned on or off",
-					kindMembership,
-					input.MembershipID,
-					"err",
-					setEnabledErr,
-				)
-			}
-
-			return nil
-		},
+		EventAccountRequested: consumer.requested,
+		EventAccountEnabled:   consumer.enabled,
 	}
+}
+
+// providerTimeout bounds one call to the identity provider.
+const providerTimeout = 10 * time.Second
+
+// accountConsumer applies the account events at the identity provider, returning to the apps of each role.
+type accountConsumer struct {
+	provider Provider
+	apps     AccountApps
+}
+
+// requested opens the person's provider account, or updates it for a person added again (IR462) or a set-up e-mail
+// sent once more, points the sign-in at the membership, and sends the set-up e-mail (IR461). A provider that fails is
+// logged and the event is done: HQ can send the set-up e-mail again.
+func (consumer accountConsumer) requested(
+	ctx context.Context,
+	txn pgx.Tx,
+	event events.Event,
+) error {
+	var input struct {
+		UserID       uuid.UUID `json:"userId"`
+		MembershipID uuid.UUID `json:"membershipId"`
+		Role         string    `json:"role"`
+	}
+
+	decodeErr := event.Decode(&input)
+	if decodeErr != nil {
+		return apperr.Wrap(decodeErr, "events.Event.Decode")
+	}
+
+	var (
+		email, name string
+		sub         *string
+	)
+
+	err := txn.QueryRow(ctx, `SELECT email, display_name, cognito_sub FROM identity.users WHERE id = $1`, input.UserID).
+		Scan(&email, &name, &sub)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+
+	if err != nil {
+		return apperr.Wrap(err, "select identity.users")
+	}
+
+	url, client := consumer.apps.of(input.Role)
+	acct := idp.Account{
+		Email:       email,
+		DisplayName: name,
+		TenantID:    event.TenantID.String(),
+		Membership:  input.MembershipID.String(),
+		Role:        input.Role,
+		ClientID:    client,
+		RedirectURI: url + "/login",
+	}
+
+	cctx, cancel := context.WithTimeout(ctx, providerTimeout)
+	defer cancel()
+
+	subject, err := consumer.openAccount(cctx, sub, acct)
+	if err != nil {
+		slog.WarnContext(
+			ctx,
+			"identity: the provider account was not opened",
+			"user",
+			input.UserID,
+			"err",
+			err,
+		)
+
+		return nil
+	}
+
+	_, execErr := txn.Exec(
+		ctx,
+		`UPDATE identity.users SET cognito_sub = $2, sign_in_membership_id = $3 WHERE id = $1`,
+		input.UserID,
+		subject,
+		input.MembershipID,
+	)
+	if execErr != nil {
+		return apperr.Wrap(execErr, "update identity.users")
+	}
+
+	sendSetupErr := consumer.provider.SendSetup(cctx, subject, acct)
+	if sendSetupErr != nil {
+		slog.WarnContext(
+			ctx,
+			"identity: the set-up e-mail was not sent",
+			"user",
+			input.UserID,
+			"err",
+			sendSetupErr,
+		)
+	}
+
+	return nil
+}
+
+// openAccount returns the subject of the person's provider account: the account they have (sub), updated for a person
+// added again (IR462) or a set-up e-mail sent once more, so the claims name this membership; or a new account when
+// they have none.
+func (consumer accountConsumer) openAccount(
+	ctx context.Context,
+	sub *string,
+	acct idp.Account,
+) (string, error) {
+	if sub != nil {
+		err := consumer.provider.UpdateAccount(ctx, *sub, acct)
+		if !errors.Is(err, idp.ErrNoAccount) {
+			return *sub, apperr.Wrap(err, "update the provider account")
+		}
+	}
+
+	subject, err := consumer.provider.CreateAccount(ctx, acct)
+
+	return subject, apperr.Wrap(err, "create the provider account")
+}
+
+// enabled turns the provider account on or off with the membership (IR461, IR508).
+func (consumer accountConsumer) enabled(ctx context.Context, txn pgx.Tx, event events.Event) error {
+	var input struct {
+		MembershipID uuid.UUID `json:"membershipId"`
+		Enabled      bool      `json:"enabled"`
+	}
+
+	decodeErr := event.Decode(&input)
+	if decodeErr != nil {
+		return apperr.Wrap(decodeErr, "events.Event.Decode")
+	}
+	// the subject is the provider's, or the person's ID for the realm's demo accounts (auth accepts either); a
+	// membership the account does not sign in with leaves it alone (IR462)
+	var sub string
+
+	err := txn.QueryRow(ctx, `SELECT coalesce(u.cognito_sub, u.id::text) FROM identity.memberships m JOIN identity.users
+		u
+		ON u.id = m.user_id
+		WHERE m.id = $1 AND (u.sign_in_membership_id IS NULL OR u.sign_in_membership_id = m.id)`, input.MembershipID).
+		Scan(&sub)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+
+	if err != nil {
+		return apperr.Wrap(err, "select identity.memberships")
+	}
+
+	cctx, cancel := context.WithTimeout(ctx, providerTimeout)
+	defer cancel()
+
+	setEnabledErr := consumer.provider.SetEnabled(cctx, sub, input.Enabled)
+	if setEnabledErr != nil {
+		slog.WarnContext(
+			ctx,
+			"identity: the provider account was not turned on or off",
+			kindMembership,
+			input.MembershipID,
+			"err",
+			setEnabledErr,
+		)
+	}
+
+	return nil
 }

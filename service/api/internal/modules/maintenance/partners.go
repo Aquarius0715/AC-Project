@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
@@ -23,11 +24,7 @@ import (
 
 // OrgNames resolves organization names (Identity).
 type OrgNames interface {
-	OrgState(
-		ctx context.Context,
-		c *ops.Call,
-		org uuid.UUID,
-	) (kind, status string, found bool, err error)
+	OrgState(ctx context.Context, c *ops.Call, org uuid.UUID) (identity.OrgStateResult, error)
 	OrgName(ctx context.Context, c *ops.Call, org uuid.UUID) (string, error)
 }
 
@@ -542,16 +539,16 @@ func (in *ProfileInput) Validate() map[string]string {
 //	@Security		BearerAuth
 //	@Router			/v1/contractors [post]
 func (m Partners) save(ctx context.Context, call *ops.Call, input *ProfileInput) (Profile, error) {
-	kind, _, found, err := m.Orgs.OrgState(ctx, call, input.OrganizationID)
+	org, err := m.Orgs.OrgState(ctx, call, input.OrganizationID)
 	if err != nil {
 		return Profile{}, apperr.Wrap(err, "maintenance.OrgNames.OrgState")
 	}
 
-	if !found {
+	if !org.Found {
 		return Profile{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
-	if kind != orgKindContractor {
+	if org.Kind != orgKindContractor {
 		return Profile{}, apperr.Fields(
 			map[string]string{fieldOrganizationID: "error.notContractor"},
 		)

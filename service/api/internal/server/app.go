@@ -98,7 +98,7 @@ func New(ctx context.Context, cfg Config, verifier auth.Verifier) (*Server, erro
 		return nil, err
 	}
 
-	registerModules(reg, txm, demo)
+	registerModules(reg, txm, demo, identity.Accounts{PerOrgPerDay: cfg.AccountsPerDay})
 
 	servesIdentity := len(cfg.Domains) == 0 || slices.Contains(cfg.Domains, ops.DomainIdentity)
 
@@ -177,8 +177,8 @@ func newDemoOps(
 	return demo, nil
 }
 
-// wiring is what the later registration steps share: the registry, the demo operations, and the equipment and
-// maintenance parts the first two steps made.
+// wiring is what the later registration steps share: the registry, the demo operations, the equipment and
+// maintenance parts the first two steps made, and the configured account cap.
 type wiring struct {
 	reg       *ops.Registry
 	demo      *demoOps
@@ -187,11 +187,17 @@ type wiring struct {
 	blobs     blob.Store
 	jobs      maintenance.Jobs
 	delivery  maintenance.Delivery
+	accounts  identity.Accounts // the daily cap on the accounts a contractor or customer owner adds (IR464)
 }
 
 // registerModules registers every module's operations, queries and scheduler jobs. The steps keep their order: the
 // scheduler runs each domain's jobs in the order they were added.
-func registerModules(reg *ops.Registry, txm *db.TxManager, demo *demoOps) {
+func registerModules(
+	reg *ops.Registry,
+	txm *db.TxManager,
+	demo *demoOps,
+	accounts identity.Accounts,
+) {
 	registerDemo(reg, demo)
 	identity.Register(reg)
 	identity.RegisterMembers(reg)
@@ -207,6 +213,7 @@ func registerModules(reg *ops.Registry, txm *db.TxManager, demo *demoOps) {
 		blobs:     blobs,
 		jobs:      jobs,
 		delivery:  delivery,
+		accounts:  accounts,
 	}
 	wired.registerControl()
 	wired.registerReads()
@@ -347,8 +354,8 @@ func (w *wiring) registerControl() {
 // models (IR190), the summaries and the notifications.
 func (w *wiring) registerReads() {
 	identity.RegisterPreferences(w.reg)
-	identity.RegisterClientUsers(w.reg)
-	identity.RegisterPartnerUsers(w.reg)
+	identity.RegisterClientUsers(w.reg, w.accounts)
+	identity.RegisterPartnerUsers(w.reg, w.accounts)
 	identity.RegisterTwoFactor(w.reg)
 	writes.Register(w.reg)
 	assets.RegisterQr(
@@ -542,10 +549,6 @@ func newRegistry(cfg Config, txm *db.TxManager) *ops.Registry {
 			Window: time.Minute,
 			Prefix: "ac:rl:denied:", Now: nil,
 		}
-	}
-
-	if cfg.AccountsPerDay > 0 {
-		identity.AccountsPerOrgPerDay = cfg.AccountsPerDay
 	}
 
 	if cfg.Clock != nil {

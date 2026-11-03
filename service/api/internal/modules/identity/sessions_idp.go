@@ -22,6 +22,9 @@ type SessionEnder interface {
 // EventSessionsRevoked is the event members.revokeSessions emits (IR384).
 const EventSessionsRevoked = "SessionsRevoked"
 
+// sessionEndTimeout bounds the call that ends a user's sessions at the identity provider.
+const sessionEndTimeout = 5 * time.Second
+
 // SessionHandlers ends the identity provider's sessions of the user HQ signed out everywhere: their refresh tokens and
 // single sign-on end, so the next sign-in asks for the password (IR386). It is best effort. The Core API already
 // refuses every earlier sign-in (IR384), and a retried event would hold up the identity-accounts consumer's later
@@ -54,7 +57,7 @@ func SessionHandlers(ender SessionEnder) map[string]events.Handler {
 				return apperr.Wrap(err, "select identity.users")
 			}
 
-			cctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			cctx, cancel := context.WithTimeout(ctx, sessionEndTimeout)
 			defer cancel()
 
 			endSessionsErr := ender.EndSessions(cctx, subject)

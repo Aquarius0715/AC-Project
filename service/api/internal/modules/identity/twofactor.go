@@ -33,6 +33,13 @@ type TwoFactorEnabled struct {
 
 var sixDigits = regexp.MustCompile(`^[0-9]{6}$`)
 
+// recoveryCodeCount is how many recovery codes enabling shows once (IR112), and recoveryCodeBytes the random bytes of
+// each: ten hex digits, shown as two groups of five.
+const (
+	recoveryCodeCount = 8
+	recoveryCodeBytes = 5
+)
+
 // setupKey is a stable demo base32 key derived from the user ID (no real TOTP secret is stored).
 func setupKey(c *ops.Call) string {
 	sum := sha256.Sum256([]byte("ac-demo-2fa:" + c.Principal.UserID.String()))
@@ -87,7 +94,8 @@ func (in *CodeInput) Validate() map[string]string {
 	return nil
 }
 
-// enableTwoFactor serves twoFactor.enable.
+// enableTwoFactor serves twoFactor.enable. The demo takes any six digits (IR112), which CodeInput.Validate checks, so
+// the code is not read here.
 //
 //	@Summary		twoFactor.enable (write)
 //	@ID				twoFactor.enable
@@ -112,7 +120,7 @@ func (in *CodeInput) Validate() map[string]string {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/two-factor/enable [post]
-func enableTwoFactor(ctx context.Context, call *ops.Call, in *CodeInput) (TwoFactorEnabled, error) {
+func enableTwoFactor(ctx context.Context, call *ops.Call, _ *CodeInput) (TwoFactorEnabled, error) {
 	st, err := twoFactorStatus(ctx, call)
 	if err != nil {
 		return TwoFactorEnabled{}, err
@@ -122,17 +130,17 @@ func enableTwoFactor(ctx context.Context, call *ops.Call, in *CodeInput) (TwoFac
 		return TwoFactorEnabled{}, apperr.E(apperr.Conflict, "errors.two_factor_enabled")
 	}
 
-	codes, hashes := make([]string, 8), make([]string, 8)
+	codes, hashes := make([]string, recoveryCodeCount), make([]string, recoveryCodeCount)
 	for idx := range codes {
-		b := make([]byte, 5)
+		random := make([]byte, recoveryCodeBytes)
 
-		_, err := rand.Read(b)
+		_, err := rand.Read(random)
 		if err != nil {
 			return TwoFactorEnabled{}, apperr.Wrap(err, "rand.Read")
 		}
 
-		s := hex.EncodeToString(b)
-		codes[idx] = s[:5] + "-" + s[5:]
+		s := hex.EncodeToString(random)
+		codes[idx] = s[:recoveryCodeBytes] + "-" + s[recoveryCodeBytes:] // a byte is two digits: half is the byte count
 		h := sha256.Sum256([]byte(codes[idx]))
 		hashes[idx] = hex.EncodeToString(h[:])
 	}
@@ -174,7 +182,8 @@ func enableTwoFactor(ctx context.Context, call *ops.Call, in *CodeInput) (TwoFac
 	}, nil
 }
 
-// disableTwoFactor serves twoFactor.disable.
+// disableTwoFactor serves twoFactor.disable. Like enabling, it takes any six digits (IR112), which
+// CodeInput.Validate checks.
 //
 //	@Summary		twoFactor.disable (write)
 //	@ID				twoFactor.disable
@@ -199,7 +208,7 @@ func enableTwoFactor(ctx context.Context, call *ops.Call, in *CodeInput) (TwoFac
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/two-factor/disable [post]
-func disableTwoFactor(ctx context.Context, call *ops.Call, in *CodeInput) (TwoFactorStatus, error) {
+func disableTwoFactor(ctx context.Context, call *ops.Call, _ *CodeInput) (TwoFactorStatus, error) {
 	tag, err := call.Tx.Exec(
 		ctx,
 		`DELETE FROM identity.two_factor WHERE user_id = $1`,

@@ -17,13 +17,18 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 )
 
+// noDB runs the transaction function without a database: session.get reads only the principal.
 type noDB struct{}
 
-func (noDB) Run(ctx context.Context, ro bool, p *ops.Principal, fn func(pgx.Tx) error) error {
+func (noDB) Run(_ context.Context, _ bool, _ *ops.Principal, fn func(pgx.Tx) error) error {
 	return fn(nil)
 }
 
+// TestSessionGet: the session names the principal's role, user, organization, scope version and granted permissions,
+// and ends SessionTTL after now.
 func TestSessionGet(t *testing.T) {
+	t.Parallel()
+
 	reg := ops.NewRegistry()
 	reg.DB = noDB{}
 	now := time.Date(2026, 9, 14, 1, 0, 0, 0, time.UTC)
@@ -55,15 +60,21 @@ func TestSessionGet(t *testing.T) {
 		OrgID:        uuid.New(),
 		ScopeVersion: 3, Scopes: nil, Employment: "", Timezone: "", SessionsRevokedAt: nil,
 	}
-	req := httptest.NewRequest(http.MethodGet, "/v1/session", nil)
-	req = req.WithContext(ops.WithPrincipal(req.Context(), principal))
+	req := httptest.NewRequestWithContext(
+		ops.WithPrincipal(t.Context(), principal),
+		http.MethodGet,
+		"/v1/session",
+		nil,
+	)
 	rec := httptest.NewRecorder()
 	app.ServeHTTP(rec, req)
 
-	var res struct{ Data Session }
+	var res struct {
+		Data Session `json:"data"`
+	}
 
 	err = json.Unmarshal(rec.Body.Bytes(), &res)
-	if err != nil || rec.Code != 200 {
+	if err != nil || rec.Code != http.StatusOK {
 		t.Fatalf("%d %s", rec.Code, rec.Body.String())
 	}
 

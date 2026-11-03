@@ -600,7 +600,7 @@ func TestAccountProviderTrouble(t *testing.T) {
 	}
 }
 
-// TestAccountsPerOrgPerDay (IR464): a contractor or a customer owner adds at most identity.AccountsPerOrgPerDay
+// TestAccountsPerOrgPerDay (IR464): a contractor or a customer owner adds at most identity.DefaultAccountsPerOrgPerDay
 // accounts to their organization in 24 hours — the next is RATE_LIMITED errors.too_many_accounts with the seconds until
 // the oldest of them is a day old; HQ is not limited.
 //
@@ -615,9 +615,9 @@ func TestAccountsPerOrgPerDay(t *testing.T) {
 		"cap-"+uuid.NewString()[:8]+"@example.com",
 	)
 
-	ids := make([]uuid.UUID, 0, 2*identity.AccountsPerOrgPerDay)
+	ids := make([]uuid.UUID, 0, 2*identity.DefaultAccountsPerOrgPerDay)
 	for _, org := range []string{"org-contractor-b", "org-customer-b"} {
-		for idx := range identity.AccountsPerOrgPerDay { // ended memberships added 1 h to 1 h 29 min ago
+		for idx := range identity.DefaultAccountsPerOrgPerDay { // ended memberships added 1 h to 1 h 29 min ago
 			membershipID := uuid.New()
 			ids = append(ids, membershipID)
 
