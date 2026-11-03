@@ -1,11 +1,15 @@
-package billing
+package billing_test
 
 import (
 	"testing"
 	"time"
+
+	"github.com/pradita/ac-project/service/api/internal/modules/billing"
 )
 
 func TestInvoiceNumber(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		from string
 		seq  int
@@ -22,7 +26,7 @@ func TestInvoiceNumber(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if got := InvoiceNumber(from, testCase.seq); got != testCase.want {
+		if got := billing.InvoiceNumber(from, testCase.seq); got != testCase.want {
 			t.Errorf(
 				"InvoiceNumber(%s, %d) = %s, want %s",
 				testCase.from,
