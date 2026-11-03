@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 )
 
 type echoIn struct {
@@ -37,7 +38,18 @@ func TestAskRoutesQueries(t *testing.T) {
 		},
 	)
 
-	c := &Call{Queries: r}
+	c := &Call{
+		Queries:         r,
+		Tx:              nil,
+		Principal:       nil,
+		Now:             time.Time{},
+		CorrelationID:   "",
+		Bearer:          "",
+		ExpectedVersion: nil,
+		Candidates:      nil,
+		Events:          nil,
+		Audits:          nil,
+	}
 	out, err := Ask[echoOut](
 		ctx,
 		r,
@@ -61,12 +73,12 @@ func TestAskRoutesQueries(t *testing.T) {
 		t.Errorf("undecodable input: %v", err)
 	}
 
-	_, err = Ask[echoOut](ctx, nil, c, "test.twice", echoIn{})
+	_, err = Ask[echoOut](ctx, nil, c, "test.twice", echoIn{N: 0})
 	if err == nil {
 		t.Error("a query outside a request")
 	}
 
-	_, err = Ask[echoOut](ctx, r, c, "test.nope", echoIn{})
+	_, err = Ask[echoOut](ctx, r, c, "test.nope", echoIn{N: 0})
 	if err == nil {
 		t.Error("an unknown query")
 	}
@@ -91,7 +103,18 @@ func TestAskRoutesQueries(t *testing.T) {
 	local := func(_ context.Context, _ *Call, in *echoIn) (echoOut, error) { return echoOut{Twice: in.N * 2}, nil }
 	out, err = Delegate(
 		ctx,
-		&Call{},
+		&Call{
+			Tx:              nil,
+			Principal:       nil,
+			Now:             time.Time{},
+			CorrelationID:   "",
+			Bearer:          "",
+			Queries:         nil,
+			ExpectedVersion: nil,
+			Candidates:      nil,
+			Events:          nil,
+			Audits:          nil,
+		},
 		"test.twice",
 		echoIn{N: 3},
 		local,
@@ -123,11 +146,33 @@ func TestHTTPQueries(t *testing.T) {
 	target, _ := url.Parse(srv.URL + "/")
 	h := &HTTPQueries{
 		Targets: map[string]*url.URL{DomainEquipment: target},
-		Token:   "internal-token",
+		Token:   "internal-token", Client: nil,
 	}
 	now := time.Date(2026, 9, 15, 1, 0, 0, 0, time.UTC)
-	p := &Principal{TenantID: uuid.New(), MembershipID: uuid.New()}
-	user := &Call{Principal: p, Bearer: "user-token", CorrelationID: "corr-1", Now: now}
+	p := &Principal{
+		TenantID:          uuid.New(),
+		MembershipID:      uuid.New(),
+		Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
+		UserID:            uuid.UUID{},
+		OrgID:             uuid.UUID{},
+		ScopeVersion:      0,
+		Scopes:            nil,
+		Employment:        "",
+		Timezone:          "",
+		SessionsRevokedAt: nil,
+	}
+	user := &Call{
+		Principal:       p,
+		Bearer:          "user-token",
+		CorrelationID:   "corr-1",
+		Now:             now,
+		Tx:              nil,
+		Queries:         nil,
+		ExpectedVersion: nil,
+		Candidates:      nil,
+		Events:          nil,
+		Audits:          nil,
+	}
 
 	out, err := h.Query(
 		ctx,
@@ -153,7 +198,18 @@ func TestHTTPQueries(t *testing.T) {
 		t.Errorf("request: %s %s %v", got.Method, got.URL.Path, got.Header)
 	}
 
-	worker := &Call{Principal: p, Now: now} // a scheduler job: no user, the tenant only (IR195)
+	worker := &Call{
+		Principal:       p,
+		Now:             now,
+		Tx:              nil,
+		CorrelationID:   "",
+		Bearer:          "",
+		Queries:         nil,
+		ExpectedVersion: nil,
+		Candidates:      nil,
+		Events:          nil,
+		Audits:          nil,
+	} // a scheduler job: no user, the tenant only (IR195)
 	_, queryErr := h.Query(
 		ctx,
 		worker,
@@ -204,7 +260,7 @@ func TestHTTPQueries(t *testing.T) {
 		t.Error("an undecodable envelope")
 	}
 
-	for name, c := range map[string]*Call{"no principal": {Bearer: "x"}} {
+	for name, c := range map[string]*Call{"no principal": {Bearer: "x", Tx: nil, Principal: nil, Now: time.Time{}, CorrelationID: "", Queries: nil, ExpectedVersion: nil, Candidates: nil, Events: nil, Audits: nil}} {
 		_, err := h.Query(
 			ctx,
 			c,

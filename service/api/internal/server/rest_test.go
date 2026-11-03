@@ -5,9 +5,11 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 )
 
@@ -15,7 +17,36 @@ import (
 // connects lazily): every catalog operation has a handler, every route binds to its input type, and a request on a
 // route — with IDs in the path — reaches that route's operation in the router, not a static or parameter neighbour.
 func TestRESTRoutesResolve(t *testing.T) {
-	srv, err := New(context.Background(), Config{DatabaseURL: "postgres://x:x@127.0.0.1:1/x"}, nil)
+	srv, err := New(
+		context.Background(),
+		Config{
+			DatabaseURL:       "postgres://x:x@127.0.0.1:1/x",
+			DatabaseReaderURL: "",
+			Addr:              "",
+			Clock:             nil,
+			DemoOps:           false,
+			DemoStart:         time.Time{},
+			Logger:            nil,
+			Domains:           nil,
+			IdentityURL:       "",
+			InternalToken:     "",
+			ServiceURLs:       nil,
+			PrincipalTTL:      0,
+			DemoClock:         nil,
+			WriteLimit:        nil,
+			DenyLimit:         nil,
+			IdentityProvider:  nil,
+			AccountApps: identity.AccountApps{
+				Customer:   "",
+				Partner:    "",
+				Technician: "",
+				Admin:      "",
+			},
+			AccountsPerDay: 0,
+			WrapTx:         nil,
+		},
+		nil,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -402,7 +402,7 @@ func (m *Module) detail(
 		return DeviceDetail{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
-	d := DeviceDetail{Device: items[0]}
+	d := DeviceDetail{Device: items[0], CalibrationRefs: nil, ActiveOperation: nil}
 	d.CalibrationRefs = []uuid.UUID{}
 
 	rows, err := c.Tx.Query(
@@ -633,10 +633,15 @@ func (m *Module) registerDetail(
 	)
 	c.Audit(
 		ops.AuditEntry{
-			Action:      "devices.register",
-			TargetKind:  "device",
-			TargetID:    id.String(),
-			NextVersion: &one,
+			Action:          "devices.register",
+			TargetKind:      "device",
+			TargetID:        id.String(),
+			NextVersion:     &one,
+			PreviousVersion: nil,
+			Reason:          "",
+			Result:          "",
+			Before:          nil,
+			After:           nil,
 		},
 	)
 

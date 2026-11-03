@@ -678,10 +678,15 @@ func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, erro
 		v := 1
 		c.Audit(
 			ops.AuditEntry{
-				Action:      "offsets.request",
-				TargetKind:  "offset_record",
-				TargetID:    id.String(),
-				NextVersion: &v,
+				Action:          "offsets.request",
+				TargetKind:      "offset_record",
+				TargetID:        id.String(),
+				NextVersion:     &v,
+				PreviousVersion: nil,
+				Reason:          "",
+				Result:          "",
+				Before:          nil,
+				After:           nil,
 			},
 		)
 
@@ -811,7 +816,7 @@ func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, erro
 			TargetKind:      "offset_record",
 			TargetID:        x.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &next,
+			NextVersion:     &next, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 

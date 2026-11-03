@@ -116,7 +116,27 @@ func (m Summaries) get(ctx context.Context, c *ops.Call, in *Input) (Summary, er
 		return Summary{}, apperr.E(apperr.Forbidden, "error.forbidden")
 	}
 
-	out := Summary{Kind: in.Kind, AsOf: c.Now}
+	out := Summary{
+		Kind: in.Kind,
+		AsOf: c.Now,
+		Counts: Counts{
+			Total:           0,
+			Online:          0,
+			Offline:         0,
+			Unknown:         0,
+			PowerOn:         0,
+			PowerOff:        0,
+			PowerUnknown:    0,
+			AlertCount:      0,
+			OfferCount:      0,
+			ActiveCount:     0,
+			ReviewCount:     0,
+			ScheduledCount:  0,
+			InProgressCount: 0,
+			OverdueCount:    0,
+			AssignedCount:   0,
+		},
+	}
 	if in.Kind == "customer" { // equipment metrics only; job conditions are VALIDATION (IR26)
 		var f struct {
 			CustomerID *uuid.UUID   `json:"customerId,omitempty"`
@@ -146,14 +166,21 @@ func (m Summaries) get(ctx context.Context, c *ops.Call, in *Input) (Summary, er
 		}
 
 		out.Counts = Counts{
-			Total:        n.Total,
-			Online:       n.Online,
-			Offline:      n.Offline,
-			Unknown:      n.Unknown,
-			PowerOn:      n.PowerOn,
-			PowerOff:     n.PowerOff,
-			PowerUnknown: n.PowerUnknown,
-			AlertCount:   n.AlertCount,
+			Total:           n.Total,
+			Online:          n.Online,
+			Offline:         n.Offline,
+			Unknown:         n.Unknown,
+			PowerOn:         n.PowerOn,
+			PowerOff:        n.PowerOff,
+			PowerUnknown:    n.PowerUnknown,
+			AlertCount:      n.AlertCount,
+			OfferCount:      0,
+			ActiveCount:     0,
+			ReviewCount:     0,
+			ScheduledCount:  0,
+			InProgressCount: 0,
+			OverdueCount:    0,
+			AssignedCount:   0,
 		}
 
 		return out, nil
@@ -178,6 +205,14 @@ func (m Summaries) get(ctx context.Context, c *ops.Call, in *Input) (Summary, er
 		InProgressCount: j.InProgress,
 		OverdueCount:    j.Overdue,
 		AssignedCount:   j.Assigned,
+		Total:           0,
+		Online:          0,
+		Offline:         0,
+		Unknown:         0,
+		PowerOn:         0,
+		PowerOff:        0,
+		PowerUnknown:    0,
+		AlertCount:      0,
 	}
 	if in.Kind == "technician" { // assigned-equipment counts deduplicate the units of current rows (IR26, IR49)
 		ids := j.Units

@@ -284,7 +284,7 @@ func (m Payouts) generate(
 
 	get := func(org uuid.UUID) *acc {
 		if per[org] == nil {
-			per[org] = &acc{currency: "MYR"}
+			per[org] = &acc{currency: "MYR", lines: nil}
 			order = append(order, org)
 		}
 
@@ -309,7 +309,7 @@ func (m Payouts) generate(
 			JobID:      j.JobID,
 			WorkType:   work,
 			AcceptedAt: &at,
-			Kind:       "charge",
+			Kind:       "charge", AmountMinor: 0, Note: nil,
 		}
 
 		if found {
@@ -330,7 +330,7 @@ func (m Payouts) generate(
 					WorkType:    "rework_deduction",
 					AcceptedAt:  &at,
 					AmountMinor: rates["rework_deduction"],
-					Kind:        "deduction",
+					Kind:        "deduction", Note: nil,
 				},
 			)
 		}
@@ -397,7 +397,7 @@ func (m Payouts) generate(
 				WorkType:    "repair_base",
 				AmountMinor: a.amount,
 				Kind:        "adjustment",
-				Note:        &note,
+				Note:        &note, AcceptedAt: nil,
 			},
 		)
 	}
@@ -501,10 +501,15 @@ func (m Payouts) generate(
 		)
 		c.Audit(
 			ops.AuditEntry{
-				Action:      "payouts.generate",
-				TargetKind:  "payout_statement",
-				TargetID:    sid.String(),
-				NextVersion: &x.Version,
+				Action:          "payouts.generate",
+				TargetKind:      "payout_statement",
+				TargetID:        sid.String(),
+				NextVersion:     &x.Version,
+				PreviousVersion: nil,
+				Reason:          "",
+				Result:          "",
+				Before:          nil,
+				After:           nil,
 			},
 		)
 	}
@@ -648,7 +653,7 @@ func (m Payouts) finish(
 			TargetID:        id.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &x.Version,
-			Reason:          reason,
+			Reason:          reason, Result: "", Before: nil, After: nil,
 		},
 	)
 

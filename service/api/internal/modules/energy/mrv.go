@@ -715,7 +715,7 @@ func saveDraft(ctx context.Context, c *ops.Call, in *SaveInput) (Report, error) 
 			TargetKind:      "mrv_report",
 			TargetID:        id.String(),
 			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &version,
+			NextVersion:     &version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -815,7 +815,13 @@ func recordReview(ctx context.Context, c *ops.Call, in *ReviewInput) (Report, er
 
 	next := latest + 1
 
-	p := Preview{Conditions: x.Conditions, Summary: x.Summary, Incomplete: x.Incomplete}
+	p := Preview{
+		Conditions: x.Conditions,
+		Summary:    x.Summary,
+		Incomplete: x.Incomplete,
+		Scope:      "",
+		IsDemo:     false,
+	}
 	insertReportErr := insertReport(ctx, c, x.ID, next, p, "demo_reviewed", x.EvidenceIDs)
 	if insertReportErr != nil {
 		return x, insertReportErr
@@ -828,7 +834,7 @@ func recordReview(ctx context.Context, c *ops.Call, in *ReviewInput) (Report, er
 			TargetID:        x.ID.String(),
 			PreviousVersion: &latest,
 			NextVersion:     &next,
-			Reason:          in.ReviewComment,
+			Reason:          in.ReviewComment, Result: "", Before: nil, After: nil,
 		},
 	)
 

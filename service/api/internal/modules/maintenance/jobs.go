@@ -470,10 +470,15 @@ func (m Jobs) createJob(ctx context.Context, c *ops.Call, in *CreateInput) (Job,
 	)
 	c.Audit(
 		ops.AuditEntry{
-			Action:      "jobs.create",
-			TargetKind:  "job",
-			TargetID:    id.String(),
-			NextVersion: &j.Version,
+			Action:          "jobs.create",
+			TargetKind:      "job",
+			TargetID:        id.String(),
+			NextVersion:     &j.Version,
+			PreviousVersion: nil,
+			Reason:          "",
+			Result:          "",
+			Before:          nil,
+			After:           nil,
 		},
 	)
 
@@ -698,7 +703,28 @@ func (m Jobs) project(ctx context.Context, c *ops.Call, j *Job) error {
 				err := c.Tx.QueryRow(ctx, `SELECT user_id FROM maintenance.ref_memberships WHERE id = $1`, j.Assignment.TechnicianMembershipID).
 					Scan(&user)
 				if err == nil {
-					ms := []identity.Member{{UserID: user}}
+					ms := []identity.Member{
+						{
+							UserID:         user,
+							ID:             uuid.UUID{},
+							TenantID:       uuid.UUID{},
+							Version:        0,
+							CreatedAt:      time.Time{},
+							UpdatedAt:      time.Time{},
+							DisplayName:    "",
+							OrganizationID: uuid.UUID{},
+							Role:           "",
+							Employment:     nil,
+							Permissions:    nil,
+							Scopes:         nil,
+							ScopeVersion:   0,
+							Qualifications: nil,
+							ValidFrom:      time.Time{},
+							ValidUntil:     nil,
+							ClientRole:     nil,
+							RevokedAt:      nil,
+						},
+					}
 					err := identity.LoadMembers(ctx, c, ms)
 					if err != nil {
 						return err
@@ -858,7 +884,18 @@ func problemPhotos(ctx context.Context, c *ops.Call, job uuid.UUID) ([]JobAttach
 	out := []JobAttachment{}
 
 	for rows.Next() {
-		a := JobAttachment{Version: 1}
+		a := JobAttachment{
+			Version:   1,
+			ID:        uuid.UUID{},
+			TenantID:  uuid.UUID{},
+			CreatedAt: time.Time{},
+			UpdatedAt: time.Time{},
+			JobID:     uuid.UUID{},
+			Name:      "",
+			Mime:      "",
+			Size:      0,
+			Status:    "",
+		}
 		err := rows.Scan(
 			&a.ID,
 			&a.TenantID,
@@ -1898,7 +1935,7 @@ func (m Jobs) finish(
 			TargetID:        id.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &j.Version,
-			Reason:          reason,
+			Reason:          reason, Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -1933,7 +1970,7 @@ func (m Jobs) finishScoped(
 			TargetID:        id.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &j.Version,
-			Reason:          reason,
+			Reason:          reason, Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -2301,7 +2338,7 @@ func (m Jobs) addNote(ctx context.Context, c *ops.Call, in *NoteInput) (Note, er
 		JobID:      in.JobID,
 		AuthorID:   c.Principal.UserID,
 		Visibility: in.Visibility,
-		Message:    in.Message,
+		Message:    in.Message, TenantID: uuid.UUID{},
 	}
 	err = c.Tx.QueryRow(ctx, `SELECT tenant_id, message FROM maintenance.job_notes WHERE id = $1`, note).
 		Scan(&x.TenantID, &x.Message)

@@ -51,14 +51,24 @@ func twoFactorStatus(ctx context.Context, c *ops.Call) (TwoFactorStatus, error) 
 	if errors.Is(err, pgx.ErrNoRows) {
 		k := setupKey(c)
 
-		return TwoFactorStatus{SetupKey: &k}, nil
+		return TwoFactorStatus{
+			SetupKey:          &k,
+			Enabled:           false,
+			EnabledAt:         nil,
+			RecoveryCodesLeft: nil,
+		}, nil
 	}
 
 	if err != nil {
 		return TwoFactorStatus{}, err
 	}
 
-	return TwoFactorStatus{Enabled: true, EnabledAt: &at, RecoveryCodesLeft: &left}, nil
+	return TwoFactorStatus{
+		Enabled:           true,
+		EnabledAt:         &at,
+		RecoveryCodesLeft: &left,
+		SetupKey:          nil,
+	}, nil
 }
 
 // CodeInput is twoFactor.enable / disable input.
@@ -134,9 +144,15 @@ func enableTwoFactor(ctx context.Context, c *ops.Call, in *CodeInput) (TwoFactor
 
 	c.Audit(
 		ops.AuditEntry{
-			Action:     "twoFactor.enable",
-			TargetKind: "user",
-			TargetID:   c.Principal.UserID.String(),
+			Action:          "twoFactor.enable",
+			TargetKind:      "user",
+			TargetID:        c.Principal.UserID.String(),
+			PreviousVersion: nil,
+			NextVersion:     nil,
+			Reason:          "",
+			Result:          "",
+			Before:          nil,
+			After:           nil,
 		},
 	)
 
@@ -146,7 +162,7 @@ func enableTwoFactor(ctx context.Context, c *ops.Call, in *CodeInput) (TwoFactor
 		TwoFactorStatus: TwoFactorStatus{
 			Enabled:           true,
 			EnabledAt:         &c.Now,
-			RecoveryCodesLeft: &left,
+			RecoveryCodesLeft: &left, SetupKey: nil,
 		},
 		RecoveryCodes: codes,
 	}, nil
@@ -190,9 +206,15 @@ func disableTwoFactor(ctx context.Context, c *ops.Call, in *CodeInput) (TwoFacto
 
 	c.Audit(
 		ops.AuditEntry{
-			Action:     "twoFactor.disable",
-			TargetKind: "user",
-			TargetID:   c.Principal.UserID.String(),
+			Action:          "twoFactor.disable",
+			TargetKind:      "user",
+			TargetID:        c.Principal.UserID.String(),
+			PreviousVersion: nil,
+			NextVersion:     nil,
+			Reason:          "",
+			Result:          "",
+			Before:          nil,
+			After:           nil,
 		},
 	)
 

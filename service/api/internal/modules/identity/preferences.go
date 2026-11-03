@@ -24,7 +24,13 @@ type Preferences struct {
 }
 
 func loadPreferences(ctx context.Context, c *ops.Call) (Preferences, error) {
-	p := Preferences{Locale: "en", Timezone: "Asia/Kuala_Lumpur", Currency: "MYR"}
+	p := Preferences{
+		Locale:             "en",
+		Timezone:           "Asia/Kuala_Lumpur",
+		Currency:           "MYR",
+		MonthlyReportEmail: false,
+		TwoFactorEnabled:   false,
+	}
 
 	err := c.Tx.QueryRow(ctx, `SELECT locale, timezone, currency, monthly_report_email FROM identity.preferences WHERE user_id = $1`, c.Principal.UserID).
 		Scan(&p.Locale, &p.Timezone, &p.Currency, &p.MonthlyReportEmail)
@@ -135,9 +141,15 @@ func updatePreferences(
 
 	c.Audit(
 		ops.AuditEntry{
-			Action:     "preferences.update",
-			TargetKind: "preferences",
-			TargetID:   c.Principal.UserID.String(),
+			Action:          "preferences.update",
+			TargetKind:      "preferences",
+			TargetID:        c.Principal.UserID.String(),
+			PreviousVersion: nil,
+			NextVersion:     nil,
+			Reason:          "",
+			Result:          "",
+			Before:          nil,
+			After:           nil,
 		},
 	)
 
@@ -315,7 +327,7 @@ func updateConsent(ctx context.Context, c *ops.Call, in *ConsentUpdateInput) (Co
 			TargetKind:      "consent",
 			TargetID:        x.ID,
 			PreviousVersion: &prev,
-			NextVersion:     &x.Version,
+			NextVersion:     &x.Version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 

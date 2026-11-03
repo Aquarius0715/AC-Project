@@ -102,7 +102,11 @@ func TestCandidatesAndAllowed(t *testing.T) {
 		t.Fatal("client owner rules")
 	}
 
-	admin := &Principal{Role: "admin", Permissions: map[string]bool{"alert.policy.read": true}}
+	admin := &Principal{
+		Role:        "admin",
+		Permissions: map[string]bool{"alert.policy.read": true},
+		ClientRole:  "",
+	}
 	if len(e.Candidates(admin)) != 0 {
 		t.Fatal("admin without write permission must not be a candidate")
 	}

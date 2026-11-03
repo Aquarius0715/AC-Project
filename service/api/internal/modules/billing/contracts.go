@@ -521,7 +521,7 @@ func (m Billing) saveContract(
 			PreviousVersion: prev,
 			NextVersion:     &x.Version,
 			Before:          b,
-			After:           a,
+			After:           a, Reason: "", Result: "",
 		},
 	)
 
@@ -740,10 +740,15 @@ func (m Billing) createInvoice(
 	)
 	c.Audit(
 		ops.AuditEntry{
-			Action:      "invoices.create",
-			TargetKind:  "invoice",
-			TargetID:    id.String(),
-			NextVersion: &x.Version,
+			Action:          "invoices.create",
+			TargetKind:      "invoice",
+			TargetID:        id.String(),
+			NextVersion:     &x.Version,
+			PreviousVersion: nil,
+			Reason:          "",
+			Result:          "",
+			Before:          nil,
+			After:           nil,
 		},
 	)
 
@@ -816,7 +821,7 @@ type InvoiceDetail struct {
 func (m Billing) getInvoice(ctx context.Context, c *ops.Call, in *IDInput) (InvoiceDetail, error) {
 	inv, err := m.loadInvoice(ctx, c, in.ID, false)
 
-	x := InvoiceDetail{Invoice: inv}
+	x := InvoiceDetail{Invoice: inv, PaymentRefs: nil, RestrictionIDs: nil}
 	if err != nil {
 		return x, err
 	}
@@ -1154,7 +1159,7 @@ func (m Billing) remind(ctx context.Context, c *ops.Call, in *RemindInput) (Rece
 			"amountMinor":   x.AmountMinor,
 			"currency":      x.Currency,
 		},
-		Severity: "warning",
+		Severity: "warning", SourceAlertID: nil,
 	})
 	if err != nil {
 		return Receipt{}, err
@@ -1182,7 +1187,7 @@ func (m Billing) remind(ctx context.Context, c *ops.Call, in *RemindInput) (Rece
 			TargetID:        x.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &v,
-			Reason:          in.Reason,
+			Reason:          in.Reason, Result: "", Before: nil, After: nil,
 		},
 	)
 

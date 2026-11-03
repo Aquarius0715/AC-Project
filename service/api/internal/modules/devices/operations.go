@@ -290,7 +290,7 @@ func (m *Module) bindDetail(ctx context.Context, c *ops.Call, in *BindInput) (De
 			TargetID:        in.DeviceID.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &v,
-			Reason:          in.Reason,
+			Reason:          in.Reason, Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -443,6 +443,10 @@ func (m *Module) startOperation(
 		TargetID:        device.String(),
 		PreviousVersion: c.ExpectedVersion,
 		NextVersion:     &v,
+		Reason:          "",
+		Result:          "",
+		Before:          nil,
+		After:           nil,
 	})
 
 	return scanOp(
@@ -738,10 +742,17 @@ func (m *Module) calibrate(
 			TargetKind:      "device",
 			TargetID:        in.DeviceID.String(),
 			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &v,
+			NextVersion:     &v, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
-	c.Emit(ops.Event{AggregateType: "device", AggregateID: in.DeviceID, Type: "DeviceCalibrated"})
+	c.Emit(
+		ops.Event{
+			AggregateType: "device",
+			AggregateID:   in.DeviceID,
+			Type:          "DeviceCalibrated",
+			Payload:       nil,
+		},
+	)
 
 	return m.calibration(ctx, c, id)
 }

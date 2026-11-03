@@ -166,17 +166,29 @@ func releaseAssignment(ctx context.Context, c *ops.Call, e released, why release
 		return err
 	}
 
-	err = (Jobs{}).event(ctx, c, e.job, why.event, nil)
+	err = (Jobs{Units: nil, Severity: nil, HQOrg: nil, Sites: nil, Blobs: nil}).event(
+		ctx,
+		c,
+		e.job,
+		why.event,
+		nil,
+	)
 	if err != nil {
 		return err
 	}
 
-	in := identity.MembersInput{Role: "admin", Permission: "job.write"}
+	in := identity.MembersInput{
+		Role:           "admin",
+		Permission:     "job.write",
+		IDs:            nil,
+		OrganizationID: nil,
+		ClientRole:     "",
+	}
 	if e.contractor != nil {
 		in = identity.MembersInput{
 			Role:           "contractor",
 			OrganizationID: e.contractor,
-			Permission:     "partner.assign",
+			Permission:     "partner.assign", IDs: nil, ClientRole: "",
 		}
 	}
 
@@ -193,7 +205,12 @@ func releaseAssignment(ctx context.Context, c *ops.Call, e released, why release
 			TargetKind:            "job",
 			TargetID:              e.job,
 			Severity:              "warning",
-			Params:                map[string]any{"status": status, "reason": why.notice},
+			Params: map[string]any{
+				"status": status,
+				"reason": why.notice,
+			},
+			Channel:       "",
+			SourceAlertID: nil,
 		})
 		if err != nil {
 			return err
@@ -202,10 +219,15 @@ func releaseAssignment(ctx context.Context, c *ops.Call, e released, why release
 
 	c.Audit(
 		ops.AuditEntry{
-			Action:     "jobs.releaseAssignment",
-			TargetKind: "job",
-			TargetID:   e.job.String(),
-			Reason:     why.audit,
+			Action:          "jobs.releaseAssignment",
+			TargetKind:      "job",
+			TargetID:        e.job.String(),
+			Reason:          why.audit,
+			PreviousVersion: nil,
+			NextVersion:     nil,
+			Result:          "",
+			Before:          nil,
+			After:           nil,
 		},
 	)
 

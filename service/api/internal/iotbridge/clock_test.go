@@ -25,7 +25,7 @@ func TestScenarioNowReadsThePreviewSnapshot(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := &http.Client{Timeout: 5 * time.Second}
+	c := &http.Client{Timeout: 5 * time.Second, Transport: nil, CheckRedirect: nil, Jar: nil}
 
 	got, err := ScenarioNow(c, srv.URL)
 	if err != nil || !got.Equal(scenario) {

@@ -231,7 +231,13 @@ func recipientsOf(
 			ctx,
 			c,
 			identity.QueryMembers,
-			identity.MembersInput{Role: "client", OrganizationID: &org},
+			identity.MembersInput{
+				Role:           "client",
+				OrganizationID: &org,
+				IDs:            nil,
+				Permission:     "",
+				ClientRole:     "",
+			},
 		)
 
 		return ids, []string{"inApp"}, err
@@ -245,7 +251,13 @@ func recipientsOf(
 		ctx,
 		c,
 		identity.QueryMembers,
-		identity.MembersInput{IDs: p.recipients, Role: "client", OrganizationID: &org},
+		identity.MembersInput{
+			IDs:            p.recipients,
+			Role:           "client",
+			OrganizationID: &org,
+			Permission:     "",
+			ClientRole:     "",
+		},
 	)
 	if err != nil {
 		return nil, nil, err
@@ -255,7 +267,13 @@ func recipientsOf(
 		ctx,
 		c,
 		identity.QueryMembers,
-		identity.MembersInput{IDs: p.recipients, Role: "admin", Permission: "alert.read"},
+		identity.MembersInput{
+			IDs:            p.recipients,
+			Role:           "admin",
+			Permission:     "alert.read",
+			OrganizationID: nil,
+			ClientRole:     "",
+		},
 	)
 	if err != nil {
 		return nil, nil, err
@@ -442,7 +460,14 @@ func (n Notifier) Evaluate(
 			}
 		}
 
-		o := Outcome{UnitID: unit, PolicyID: p.id}
+		o := Outcome{
+			UnitID:          unit,
+			PolicyID:        p.id,
+			Decision:        "",
+			Reason:          nil,
+			NotificationIDs: nil,
+			FailureIDs:      nil,
+		}
 		reason := ""
 
 		var hit *AlertCondition
@@ -484,7 +509,13 @@ func (n Notifier) Evaluate(
 				ctx,
 				c,
 				identity.QueryMembers,
-				identity.MembersInput{IDs: []uuid.UUID{p.owner}},
+				identity.MembersInput{
+					IDs:            []uuid.UUID{p.owner},
+					Role:           "",
+					OrganizationID: nil,
+					Permission:     "",
+					ClientRole:     "",
+				},
 			)
 			if err != nil {
 				return nil, err

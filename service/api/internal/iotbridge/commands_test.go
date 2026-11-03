@@ -17,7 +17,7 @@ func TestCommandMessageFromTheStoredAction(t *testing.T) {
 		ID:        uuid.MustParse("9f67089f-44c9-5231-ba20-03d3b9a1be53"),
 		DeviceID:  DeviceID("device-online-rto"),
 		Action:    json.RawMessage(`{"kind":"set_temperature","celsius":26}`),
-		ExpiresAt: time.Date(2026, 10, 13, 3, 0, 0, 0, time.UTC),
+		ExpiresAt: time.Date(2026, 10, 13, 3, 0, 0, 0, time.UTC), UnitID: uuid.UUID{},
 	}
 
 	cmd, err := CommandMessage(w, 0)
@@ -61,7 +61,13 @@ func TestCommandTopicOfTheDevice(t *testing.T) {
 
 // TestCommandMessageRefusesBadActions: an action that is not JSON is refused with the command named.
 func TestCommandMessageRefusesBadActions(t *testing.T) {
-	w := Waiting{ID: uuid.New(), Action: json.RawMessage(`{"kind":`)}
+	w := Waiting{
+		ID:        uuid.New(),
+		Action:    json.RawMessage(`{"kind":`),
+		DeviceID:  uuid.UUID{},
+		UnitID:    uuid.UUID{},
+		ExpiresAt: time.Time{},
+	}
 	_, err := CommandMessage(w, 0)
 	if err == nil {
 		t.Error("an action that is not JSON is accepted")
@@ -76,7 +82,7 @@ func TestCommandExpiryOnTheDeviceClock(t *testing.T) {
 	w := Waiting{
 		ID:        uuid.New(),
 		Action:    json.RawMessage(`{"kind":"set_temperature","celsius":26}`),
-		ExpiresAt: scenario,
+		ExpiresAt: scenario, DeviceID: uuid.UUID{}, UnitID: uuid.UUID{},
 	}
 
 	cmd, err := CommandMessage(w, offset)
@@ -100,7 +106,14 @@ func TestStateTriggerFromAHeartbeat(t *testing.T) {
 	tr, err := StateTrigger(
 		devicesim.Heartbeat{
 			DeviceID: dev.String(),
-			State:    &devicesim.ReportedState{Power: &on, Celsius: &c},
+			State: &devicesim.ReportedState{
+				Power:    &on,
+				Celsius:  &c,
+				Mode:     nil,
+				FanLevel: nil,
+			},
+			At:       time.Time{},
+			Firmware: "",
 		},
 		at,
 	)
@@ -111,15 +124,23 @@ func TestStateTriggerFromAHeartbeat(t *testing.T) {
 		t.Fatalf("state trigger %+v err=%v", tr, err)
 	}
 
-	tr, err = StateTrigger(devicesim.Heartbeat{DeviceID: dev.String()}, at)
+	tr, err = StateTrigger(
+		devicesim.Heartbeat{DeviceID: dev.String(), At: time.Time{}, Firmware: "", State: nil},
+		at,
+	)
 	if err != nil || tr.EventType != "state" || tr.State == nil ||
-		*tr.State != (devicesim.ReportedState{}) ||
+		*tr.State != (devicesim.ReportedState{Power: nil, Celsius: nil, Mode: nil, FanLevel: nil}) ||
 		!tr.OccurredAt.Equal(at) {
 		t.Errorf("a heartbeat without a state: %+v err=%v", tr, err)
 	}
 
 	_, stateTriggerErr := StateTrigger(
-		devicesim.Heartbeat{DeviceID: "nope", State: &devicesim.ReportedState{}},
+		devicesim.Heartbeat{
+			DeviceID: "nope",
+			State:    &devicesim.ReportedState{Power: nil, Celsius: nil, Mode: nil, FanLevel: nil},
+			At:       time.Time{},
+			Firmware: "",
+		},
 		at,
 	)
 	if stateTriggerErr == nil {

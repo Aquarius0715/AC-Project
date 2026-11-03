@@ -80,12 +80,26 @@ func (e *DomainError) StatusCode() int { return e.HTTPStatus() }
 
 // E creates a DomainError with an empty fieldErrors map.
 func E(c Code, messageKey string) *DomainError {
-	return &DomainError{Code: c, MessageKey: messageKey, FieldErrors: map[string]string{}}
+	return &DomainError{
+		Code:              c,
+		MessageKey:        messageKey,
+		FieldErrors:       map[string]string{},
+		CorrelationID:     "",
+		RetryAfterSeconds: nil,
+		cause:             nil,
+	}
 }
 
 // Fields creates a VALIDATION error with field messages.
 func Fields(fe map[string]string) *DomainError {
-	return &DomainError{Code: Validation, MessageKey: "error.validation", FieldErrors: fe}
+	return &DomainError{
+		Code:              Validation,
+		MessageKey:        "error.validation",
+		FieldErrors:       fe,
+		CorrelationID:     "",
+		RetryAfterSeconds: nil,
+		cause:             nil,
+	}
 }
 
 // RetryAfter sets retryAfterSeconds.

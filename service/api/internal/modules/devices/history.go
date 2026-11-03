@@ -631,7 +631,7 @@ func (m *Module) addResponseNote(
 			TargetKind:      "device_event",
 			TargetID:        in.EventID.String(),
 			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &v,
+			NextVersion:     &v, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 	c.Emit(

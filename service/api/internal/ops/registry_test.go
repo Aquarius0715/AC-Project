@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/labstack/echo/v5"
 
@@ -104,8 +105,8 @@ func setup(t *testing.T) (*Registry, *echo.Echo, *fakeRec, *fakeIdem, *bool) {
 	ro := new(bool)
 	r := NewRegistry()
 	r.DB = fakeDB{readOnly: ro}
-	rec := &fakeRec{}
-	idem := &fakeIdem{stored: map[string]json.RawMessage{}, hash: map[string]string{}}
+	rec := &fakeRec{n: 0, err: nil}
+	idem := &fakeIdem{stored: map[string]json.RawMessage{}, hash: map[string]string{}, aborted: 0}
 	r.Rec, r.Idem = rec, idem
 	r.Clock = func() time.Time { return time.Date(2026, 9, 14, 1, 0, 0, 0, time.UTC) }
 	calls := 0
@@ -121,8 +122,22 @@ func setup(t *testing.T) (*Registry, *echo.Echo, *fakeRec, *fakeIdem, *bool) {
 
 		calls++
 
-		c.Emit(Event{Type: "UnitChanged"})
-		c.Audit(AuditEntry{Action: "units.save"})
+		c.Emit(
+			Event{Type: "UnitChanged", AggregateType: "", AggregateID: uuid.UUID{}, Payload: nil},
+		)
+		c.Audit(
+			AuditEntry{
+				Action:          "units.save",
+				TargetKind:      "",
+				TargetID:        "",
+				PreviousVersion: nil,
+				NextVersion:     nil,
+				Reason:          "",
+				Result:          "",
+				Before:          nil,
+				After:           nil,
+			},
+		)
 
 		return out{OK: true, Name: in.Name, Calls: calls}, nil
 	})
@@ -135,7 +150,7 @@ func setup(t *testing.T) (*Registry, *echo.Echo, *fakeRec, *fakeIdem, *bool) {
 			return out{}, err
 		}
 
-		return out{OK: true}, nil
+		return out{OK: true, Name: "", Calls: 0}, nil
 	})
 	Register(r, "attachments.add", func(ctx context.Context, c *Call, in *struct {
 		JobID    string `json:"jobId"`
@@ -145,7 +160,7 @@ func setup(t *testing.T) (*Registry, *echo.Echo, *fakeRec, *fakeIdem, *bool) {
 		} `json:"file"`
 	},
 	) (out, error) {
-		return out{OK: true, Calls: len(in.File.Bytes)}, nil
+		return out{OK: true, Calls: len(in.File.Bytes), Name: ""}, nil
 	})
 
 	e := echo.New()
@@ -198,10 +213,25 @@ var (
 	admin = &Principal{
 		Principal: authz.Principal{
 			Role:        "admin",
-			Permissions: map[string]bool{"asset.write": true, "asset.read": true},
-		},
+			Permissions: map[string]bool{"asset.write": true, "asset.read": true}, ClientRole: "",
+		}, TenantID: uuid.UUID{}, MembershipID: uuid.UUID{}, UserID: uuid.UUID{}, OrgID: uuid.UUID{}, ScopeVersion: 0, Scopes: nil, Employment: "", Timezone: "", SessionsRevokedAt: nil,
 	}
-	client = &Principal{Principal: authz.Principal{Role: "client", Permissions: map[string]bool{}}}
+	client = &Principal{
+		Principal: authz.Principal{
+			Role:        "client",
+			Permissions: map[string]bool{},
+			ClientRole:  "",
+		},
+		TenantID:          uuid.UUID{},
+		MembershipID:      uuid.UUID{},
+		UserID:            uuid.UUID{},
+		OrgID:             uuid.UUID{},
+		ScopeVersion:      0,
+		Scopes:            nil,
+		Employment:        "",
+		Timezone:          "",
+		SessionsRevokedAt: nil,
+	}
 )
 
 func TestPipeline(t *testing.T) {
@@ -226,8 +256,8 @@ func TestPipeline(t *testing.T) {
 			&Principal{
 				Principal: authz.Principal{
 					Role:        "admin",
-					Permissions: map[string]bool{"asset.read": true},
-				},
+					Permissions: map[string]bool{"asset.read": true}, ClientRole: "",
+				}, TenantID: uuid.UUID{}, MembershipID: uuid.UUID{}, UserID: uuid.UUID{}, OrgID: uuid.UUID{}, ScopeVersion: 0, Scopes: nil, Employment: "", Timezone: "", SessionsRevokedAt: nil,
 			},
 			403,
 			"FORBIDDEN",
@@ -408,9 +438,28 @@ func mustPanic(t *testing.T, f func()) {
 }
 
 func TestExpectedVersionRules(t *testing.T) {
-	spec := Spec{Versions: []VersionRule{{"id omitted", "omit"}, {"id present", "required"}}}
+	spec := Spec{
+		Versions:      []VersionRule{{"id omitted", "omit"}, {"id present", "required"}},
+		Name:          "",
+		Mode:          0,
+		Module:        "",
+		Authorization: "",
+		DesignIDs:     "",
+		Routes:        nil,
+		Filters:       nil,
+	}
 	ev := Spec{
-		Versions: []VersionRule{{"event=request", "omit"}, {"event=retry|cancel", "required"}},
+		Versions: []VersionRule{
+			{"event=request", "omit"},
+			{"event=retry|cancel", "required"},
+		},
+		Name:          "",
+		Mode:          0,
+		Module:        "",
+		Authorization: "",
+		DesignIDs:     "",
+		Routes:        nil,
+		Filters:       nil,
 	}
 
 	cases := []struct {
@@ -431,8 +480,38 @@ func TestExpectedVersionRules(t *testing.T) {
 		{ev, `{"event":"retry"}`, "2", "", 2},
 		{ev, `{"event":"request"}`, "2", apperr.Validation, 0},
 		{ev, `{"event":"other"}`, "", "", 0},
-		{Spec{Versions: []VersionRule{{"all", "required"}}}, `{}`, "1", "", 1},
-		{Spec{Versions: []VersionRule{{"weird", "required"}}}, `{}`, "", "", 0},
+		{
+			Spec{
+				Versions:      []VersionRule{{"all", "required"}},
+				Name:          "",
+				Mode:          0,
+				Module:        "",
+				Authorization: "",
+				DesignIDs:     "",
+				Routes:        nil,
+				Filters:       nil,
+			},
+			`{}`,
+			"1",
+			"",
+			1,
+		},
+		{
+			Spec{
+				Versions:      []VersionRule{{"weird", "required"}},
+				Name:          "",
+				Mode:          0,
+				Module:        "",
+				Authorization: "",
+				DesignIDs:     "",
+				Routes:        nil,
+				Filters:       nil,
+			},
+			`{}`,
+			"",
+			"",
+			0,
+		},
 	}
 	for i, c := range cases {
 		got, err := expectedVersion(c.s, []byte(c.body), c.header)
@@ -466,7 +545,20 @@ func TestVersionHeader(t *testing.T) {
 func TestBodyLimits(t *testing.T) {
 	_, e, _, _, _ := setup(t)
 	tech := &Principal{
-		Principal: authz.Principal{Role: "technician", Permissions: map[string]bool{}},
+		Principal: authz.Principal{
+			Role:        "technician",
+			Permissions: map[string]bool{},
+			ClientRole:  "",
+		},
+		TenantID:          uuid.UUID{},
+		MembershipID:      uuid.UUID{},
+		UserID:            uuid.UUID{},
+		OrgID:             uuid.UUID{},
+		ScopeVersion:      0,
+		Scopes:            nil,
+		Employment:        "",
+		Timezone:          "",
+		SessionsRevokedAt: nil,
 	}
 
 	big := strings.Repeat("a", 2<<20)

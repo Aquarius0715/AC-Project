@@ -85,7 +85,7 @@ func scanCap(r pgx.Row) (Capability, error) {
 	}
 
 	if len(temp) > 0 {
-		c.Temperature = &TempRange{}
+		c.Temperature = &TempRange{Min: 0, Max: 0, Step: 0}
 		err := json.Unmarshal(temp, c.Temperature)
 		if err != nil {
 			return c, err
@@ -500,7 +500,7 @@ func (m Capabilities) save(
 			NextVersion:     &version,
 			Reason:          reason,
 			Before:          b,
-			After:           a,
+			After:           a, Result: "",
 		},
 	)
 

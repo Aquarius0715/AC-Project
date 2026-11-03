@@ -5,6 +5,7 @@ import (
 	"errors"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/auth"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/idp"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
@@ -564,7 +566,18 @@ func TestPartnerUserAccess(t *testing.T) {
 // opens the provider account and sends the set-up e-mail; the first sign-in makes the account active; the access end
 // moves within a year; removing the account turns its sign-in off.
 func TestPartnerAccountCreated(t *testing.T) {
-	fake := &fakeIdP{}
+	fake := &fakeIdP{
+		mu:         sync.Mutex{},
+		subjects:   nil,
+		err:        nil,
+		created:    nil,
+		updated:    nil,
+		setups:     nil,
+		switched:   nil,
+		failing:    false,
+		lost:       nil,
+		generation: 0,
+	}
 	s := serverCfg(
 		t,
 		func(c *apiserver.Config) { c.IdentityProvider = fake; c.Domains = ops.Domains },
@@ -664,12 +677,21 @@ func TestPartnerAccountCreated(t *testing.T) {
 		t.Errorf("subject stored: %q", sub)
 	}
 	// the first sign-in makes the account active
-	(&auth.Authenticator{DB: s.DB, Now: clockFunc}).RecordSignIn(
+	(&auth.Authenticator{DB: s.DB, Now: clockFunc, Verifier: nil, Source: nil}).RecordSignIn(
 		context.Background(),
 		&ops.Principal{
-			TenantID:     seed.ID("tenant-a"),
-			UserID:       uuid.MustParse(user),
-			MembershipID: uuid.MustParse(membership),
+			TenantID: seed.ID("tenant-a"),
+			UserID:   uuid.MustParse(user),
+			MembershipID: uuid.MustParse(
+				membership,
+			),
+			Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
+			OrgID:             uuid.UUID{},
+			ScopeVersion:      0,
+			Scopes:            nil,
+			Employment:        "",
+			Timezone:          "",
+			SessionsRevokedAt: nil,
 		},
 		clock,
 	)
@@ -746,12 +768,21 @@ func firstSignIn(t *testing.T, s *apiserver.Server, membership string) {
 		[]any{membership},
 		&user,
 	)
-	(&auth.Authenticator{DB: s.DB, Now: clockFunc}).RecordSignIn(
+	(&auth.Authenticator{DB: s.DB, Now: clockFunc, Verifier: nil, Source: nil}).RecordSignIn(
 		context.Background(),
 		&ops.Principal{
-			TenantID:     seed.ID("tenant-a"),
-			UserID:       uuid.MustParse(user),
-			MembershipID: uuid.MustParse(membership),
+			TenantID: seed.ID("tenant-a"),
+			UserID:   uuid.MustParse(user),
+			MembershipID: uuid.MustParse(
+				membership,
+			),
+			Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
+			OrgID:             uuid.UUID{},
+			ScopeVersion:      0,
+			Scopes:            nil,
+			Employment:        "",
+			Timezone:          "",
+			SessionsRevokedAt: nil,
 		},
 		clock,
 	)
@@ -950,7 +981,7 @@ func TestNotificationMailRetry(t *testing.T) {
 			context.Background(),
 			s.DB,
 			sender,
-			notify.Apps{Customer: "http://c"},
+			notify.Apps{Customer: "http://c", Partner: "", Technician: "", Admin: ""},
 			at,
 			500,
 		)
@@ -968,13 +999,13 @@ func TestNotificationMailRetry(t *testing.T) {
 
 		return n
 	}
-	deliver(&fakeMail{err: errors.New("smtp down")}, clock)
+	deliver(&fakeMail{err: errors.New("smtp down"), sent: nil}, clock)
 
 	if st, reason := state(); st != "failed" || reason != "smtp down" {
 		t.Fatalf("after a failing send: %s %s", st, reason)
 	}
 
-	sender := &fakeMail{}
+	sender := &fakeMail{err: nil, sent: nil}
 	if n := deliver(sender, clock.Add(59*time.Second)); n != 0 {
 		t.Fatalf("retried before the pause: %d", n)
 	}
@@ -1044,12 +1075,12 @@ func TestNotificationMail(t *testing.T) {
 	}
 	active, ended := note(member(clock.Add(time.Hour))), note(member(clock.Add(-time.Minute)))
 
-	sender := &fakeMail{}
+	sender := &fakeMail{err: nil, sent: nil}
 	_, err := notify.DeliverAll(
 		context.Background(),
 		s.DB,
 		sender,
-		notify.Apps{Customer: "http://c"},
+		notify.Apps{Customer: "http://c", Partner: "", Technician: "", Admin: ""},
 		clock,
 		500,
 	)

@@ -139,12 +139,29 @@ func Compute(
 			from,
 			to,
 		},
-		UnitIDs:         units,
-		Currency:        "MYR",
-		TariffVersion:   TariffVersion,
-		BoundaryID:      Boundary,
-		Boundary:        BoundaryText,
-		QualityWarnings: append([]string{}, n.Warnings...),
+		UnitIDs:       units,
+		Currency:      "MYR",
+		TariffVersion: TariffVersion,
+		BoundaryID:    Boundary,
+		Boundary:      BoundaryText,
+		QualityWarnings: append(
+			[]string{},
+			n.Warnings...),
+		Totals: Totals{
+			KWh:              nil,
+			AmountMinor:      nil,
+			SavedKWh:         nil,
+			DeltaKWh:         nil,
+			SavingPercentage: nil,
+			SavedAmountMinor: nil,
+			EmissionsKg:      nil,
+			SavedEmissionsKg: nil,
+		},
+		BaselineRef:      nil,
+		FactorRef:        nil,
+		BaselineSnapshot: nil,
+		FactorSnapshot:   nil,
+		Coverage:         nil,
 	}
 	if s.UnitIDs == nil {
 		s.UnitIDs = []uuid.UUID{}
@@ -364,10 +381,19 @@ func ForecastFor(
 	n Integration,
 ) (Forecast, error) {
 	f := Forecast{
-		Period:          Range{from, to},
-		UnitIDs:         units,
-		Basis:           "prorated_modeled_baseline",
-		QualityWarnings: []string{},
+		Period:                   Range{from, to},
+		UnitIDs:                  units,
+		Basis:                    "prorated_modeled_baseline",
+		QualityWarnings:          []string{},
+		BaselineRef:              nil,
+		BaselineSnapshot:         nil,
+		ExpectedUnitMinutes:      0,
+		ValidUnitMinutes:         0,
+		ActualKWhOnValidSlots:    nil,
+		PredictedBaselineKWh:     nil,
+		PredictedActualKWh:       nil,
+		ForecastSavedKWh:         nil,
+		ForecastSavingPercentage: nil,
 	}
 	if f.UnitIDs == nil {
 		f.UnitIDs = []uuid.UUID{}

@@ -72,7 +72,7 @@ type Window struct {
 
 // Resolve validates limit and cursor. conditions is the normalized filter+sort representation of the request.
 func Resolve(q Query, conditions any, scopeVersion, snapshot int) (Window, error) {
-	w := Window{Limit: DefaultLimit, Snapshot: snapshot, scope: scopeVersion}
+	w := Window{Limit: DefaultLimit, Snapshot: snapshot, scope: scopeVersion, Offset: 0, hash: ""}
 	if q.Limit != nil {
 		if *q.Limit < 1 || *q.Limit > MaxLimit {
 			return w, apperr.Fields(map[string]string{"limit": "error.range"})

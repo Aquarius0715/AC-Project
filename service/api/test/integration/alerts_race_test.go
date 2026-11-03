@@ -61,7 +61,18 @@ func TestConcurrentAlertOpening(t *testing.T) {
 	at := clock
 	tx1 := begin(c1)
 
-	first, err := monitoring.Alerts{}.TamperAlert(ctx, tx1, unit, org, "race 1", at)
+	first, err := monitoring.Alerts{
+		Units:   nil,
+		Access:  nil,
+		Devices: nil,
+	}.TamperAlert(
+		ctx,
+		tx1,
+		unit,
+		org,
+		"race 1",
+		at,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +86,18 @@ func TestConcurrentAlertOpening(t *testing.T) {
 
 	tx2 := begin(c2)
 	go func() { // waits on the first transaction's row in the unique index
-		id, err := monitoring.Alerts{}.TamperAlert(ctx, tx2, unit, org, "race 2", at)
+		id, err := monitoring.Alerts{
+			Units:   nil,
+			Access:  nil,
+			Devices: nil,
+		}.TamperAlert(
+			ctx,
+			tx2,
+			unit,
+			org,
+			"race 2",
+			at,
+		)
 		if err == nil {
 			err = tx2.Commit(ctx)
 		} else {

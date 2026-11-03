@@ -19,6 +19,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/logging"
 )
 
@@ -251,39 +252,55 @@ func (c *Consumer) pending(ctx context.Context, types []string, limit int) ([]Ev
 // first.
 func (c *Consumer) apply(ctx context.Context, e Event) (bool, error) {
 	done := false
-	err := c.DB.Run(ctx, false, &ops.Principal{TenantID: e.TenantID}, func(tx pgx.Tx) error {
-		tag, err := tx.Exec(
-			ctx,
-			`INSERT INTO platform.processed_events (consumer, event_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-			c.Name,
-			e.ID,
-		)
-		if err != nil {
-			return err
-		}
+	err := c.DB.Run(
+		ctx,
+		false,
+		&ops.Principal{
+			TenantID:          e.TenantID,
+			Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
+			MembershipID:      uuid.UUID{},
+			UserID:            uuid.UUID{},
+			OrgID:             uuid.UUID{},
+			ScopeVersion:      0,
+			Scopes:            nil,
+			Employment:        "",
+			Timezone:          "",
+			SessionsRevokedAt: nil,
+		},
+		func(tx pgx.Tx) error {
+			tag, err := tx.Exec(
+				ctx,
+				`INSERT INTO platform.processed_events (consumer, event_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+				c.Name,
+				e.ID,
+			)
+			if err != nil {
+				return err
+			}
 
-		if tag.RowsAffected() == 0 {
-			return nil // already applied
-		}
-		// the business time of the event (IR157): handlers' SQL defaults use the producer's clock
-		_, execErr := tx.Exec(
-			ctx,
-			`SELECT set_config('app.now', $1, true)`,
-			e.OccurredAt.UTC().Format(time.RFC3339Nano),
-		)
-		if execErr != nil {
-			return execErr
-		}
+			if tag.RowsAffected() == 0 {
+				return nil // already applied
+			}
+			// the business time of the event (IR157): handlers' SQL defaults use the producer's clock
+			_, execErr := tx.Exec(
+				ctx,
+				`SELECT set_config('app.now', $1, true)`,
+				e.OccurredAt.UTC().Format(time.RFC3339Nano),
+			)
+			if execErr != nil {
+				return execErr
+			}
 
-		handlersErr := c.Handlers[e.Type](ctx, tx, e)
-		if handlersErr != nil {
-			return handlersErr
-		}
+			handlersErr := c.Handlers[e.Type](ctx, tx, e)
+			if handlersErr != nil {
+				return handlersErr
+			}
 
-		done = true
+			done = true
 
-		return nil
-	})
+			return nil
+		},
+	)
 
 	return done, err
 }
@@ -293,7 +310,7 @@ func (c *Consumer) Run(ctx context.Context, every time.Duration) {
 	t := time.NewTicker(every)
 	defer t.Stop()
 
-	rep := &logging.Repeats{Logf: c.Logf}
+	rep := &logging.Repeats{Logf: c.Logf, Every: 0, Now: nil}
 	for {
 		n, err := c.Drain(ctx)
 		if err != nil && c.Logf != nil {

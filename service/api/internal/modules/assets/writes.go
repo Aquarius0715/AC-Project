@@ -252,13 +252,25 @@ func (m *Module) propertiesSave(
 			return Property{}, siblingNameErr
 		}
 
-		c.Emit(ops.Event{AggregateType: "property", AggregateID: id, Type: "LocationChanged"})
+		c.Emit(
+			ops.Event{
+				AggregateType: "property",
+				AggregateID:   id,
+				Type:          "LocationChanged",
+				Payload:       nil,
+			},
+		)
 		c.Audit(
 			ops.AuditEntry{
-				Action:      "properties.save",
-				TargetKind:  "property",
-				TargetID:    id.String(),
-				NextVersion: &p.Version,
+				Action:          "properties.save",
+				TargetKind:      "property",
+				TargetID:        id.String(),
+				NextVersion:     &p.Version,
+				PreviousVersion: nil,
+				Reason:          "",
+				Result:          "",
+				Before:          nil,
+				After:           nil,
 			},
 		)
 
@@ -289,14 +301,21 @@ func (m *Module) propertiesSave(
 		return Property{}, siblingNameErr
 	}
 
-	c.Emit(ops.Event{AggregateType: "property", AggregateID: p.ID, Type: "LocationChanged"})
+	c.Emit(
+		ops.Event{
+			AggregateType: "property",
+			AggregateID:   p.ID,
+			Type:          "LocationChanged",
+			Payload:       nil,
+		},
+	)
 	c.Audit(
 		ops.AuditEntry{
 			Action:          "properties.save",
 			TargetKind:      "property",
 			TargetID:        p.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &p.Version,
+			NextVersion:     &p.Version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -488,13 +507,25 @@ func (m *Module) spacesSave(ctx context.Context, c *ops.Call, in *SpaceSave) (Sp
 			return Space{}, siblingNameErr
 		}
 
-		c.Emit(ops.Event{AggregateType: "space", AggregateID: id, Type: "LocationChanged"})
+		c.Emit(
+			ops.Event{
+				AggregateType: "space",
+				AggregateID:   id,
+				Type:          "LocationChanged",
+				Payload:       nil,
+			},
+		)
 		c.Audit(
 			ops.AuditEntry{
-				Action:      "spaces.save",
-				TargetKind:  "space",
-				TargetID:    id.String(),
-				NextVersion: &s.Version,
+				Action:          "spaces.save",
+				TargetKind:      "space",
+				TargetID:        id.String(),
+				NextVersion:     &s.Version,
+				PreviousVersion: nil,
+				Reason:          "",
+				Result:          "",
+				Before:          nil,
+				After:           nil,
 			},
 		)
 
@@ -523,14 +554,16 @@ func (m *Module) spacesSave(ctx context.Context, c *ops.Call, in *SpaceSave) (Sp
 		return Space{}, siblingNameErr
 	}
 
-	c.Emit(ops.Event{AggregateType: "space", AggregateID: s.ID, Type: "LocationChanged"})
+	c.Emit(
+		ops.Event{AggregateType: "space", AggregateID: s.ID, Type: "LocationChanged", Payload: nil},
+	)
 	c.Audit(
 		ops.AuditEntry{
 			Action:          "spaces.save",
 			TargetKind:      "space",
 			TargetID:        s.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &s.Version,
+			NextVersion:     &s.Version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -722,15 +755,20 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (
 			return Unit{}, err
 		}
 
-		c.Emit(ops.Event{AggregateType: "unit", AggregateID: id, Type: "UnitChanged"})
+		c.Emit(ops.Event{AggregateType: "unit", AggregateID: id, Type: "UnitChanged", Payload: nil})
 
 		one := 1
 		c.Audit(
 			ops.AuditEntry{
-				Action:      "units.save",
-				TargetKind:  "unit",
-				TargetID:    id.String(),
-				NextVersion: &one,
+				Action:          "units.save",
+				TargetKind:      "unit",
+				TargetID:        id.String(),
+				NextVersion:     &one,
+				PreviousVersion: nil,
+				Reason:          "",
+				Result:          "",
+				Before:          nil,
+				After:           nil,
 			},
 		)
 
@@ -795,7 +833,7 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (
 		return Unit{}, siblingNameErr
 	}
 
-	c.Emit(ops.Event{AggregateType: "unit", AggregateID: *in.ID, Type: "UnitChanged"})
+	c.Emit(ops.Event{AggregateType: "unit", AggregateID: *in.ID, Type: "UnitChanged", Payload: nil})
 	// before/after keep the original location and values in the history (DD-A02 step 3)
 	before, after := ops.Changes(
 		map[string]any{
@@ -826,7 +864,7 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (
 			NextVersion:     &v,
 			Reason:          reason,
 			Before:          before,
-			After:           after,
+			After:           after, Result: "",
 		},
 	)
 
@@ -1000,7 +1038,7 @@ func (m *Module) archive(
 			typ = "UnitChanged"
 		}
 
-		c.Emit(ops.Event{AggregateType: kind, AggregateID: in.ID, Type: typ})
+		c.Emit(ops.Event{AggregateType: kind, AggregateID: in.ID, Type: typ, Payload: nil})
 		c.Audit(
 			ops.AuditEntry{
 				Action:          kind + "s.archive",
@@ -1008,7 +1046,7 @@ func (m *Module) archive(
 				TargetID:        in.ID.String(),
 				PreviousVersion: c.ExpectedVersion,
 				NextVersion:     &v,
-				Reason:          in.Reason,
+				Reason:          in.Reason, Result: "", Before: nil, After: nil,
 			},
 		)
 
@@ -1045,7 +1083,7 @@ func (m *Module) MoveToCapabilityVersion(
 			return n, err
 		}
 
-		c.Emit(ops.Event{AggregateType: "unit", AggregateID: id, Type: "UnitChanged"})
+		c.Emit(ops.Event{AggregateType: "unit", AggregateID: id, Type: "UnitChanged", Payload: nil})
 
 		n++
 	}
@@ -1268,7 +1306,7 @@ func (m *Module) DetachPolicy(ctx context.Context, c *ops.Call, policy uuid.UUID
 	}
 
 	for _, u := range units {
-		c.Emit(ops.Event{AggregateType: "unit", AggregateID: u, Type: "UnitChanged"})
+		c.Emit(ops.Event{AggregateType: "unit", AggregateID: u, Type: "UnitChanged", Payload: nil})
 	}
 
 	return nil

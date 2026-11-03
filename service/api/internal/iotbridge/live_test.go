@@ -110,7 +110,8 @@ func TestLiveTriggersRoomNode(t *testing.T) {
 		t.Errorf("heartbeat %+v", hb)
 	}
 
-	if hb.State == nil || *hb.State != (devicesim.ReportedState{}) {
+	if hb.State == nil ||
+		*hb.State != (devicesim.ReportedState{Power: nil, Celsius: nil, Mode: nil, FanLevel: nil}) {
 		t.Errorf("heartbeat state %+v, want no settings", hb.State)
 	}
 
@@ -331,7 +332,7 @@ func TestLiveSentTriggers(t *testing.T) {
 	w := Waiting{
 		ID:       seed.ID("cmd-live"),
 		DeviceID: seed.ID("device-live-ac"),
-		UnitID:   seed.ID("unit-live-ac"),
+		UnitID:   seed.ID("unit-live-ac"), Action: nil, ExpiresAt: time.Time{},
 	}
 	_, state, _, _ := LiveCommand(json.RawMessage(`{"kind":"set_power","power":true}`))
 
@@ -447,12 +448,16 @@ func TestLiveConnectionTrigger(t *testing.T) {
 	binding, fault := seed.ID("binding-live-ac"), seed.ID("fault-live")
 
 	at := liveAt
-	if _, ok := LiveConnectionTrigger(ConnectionFault{}, time.Hour, at); ok {
+	if _, ok := LiveConnectionTrigger(
+		ConnectionFault{BindingID: nil, FaultID: nil, Sequence: 0},
+		time.Hour,
+		at,
+	); ok {
 		t.Error("an unbound module was reported")
 	}
 
 	lost, ok := LiveConnectionTrigger(
-		ConnectionFault{BindingID: &binding, Sequence: 7},
+		ConnectionFault{BindingID: &binding, Sequence: 7, FaultID: nil},
 		4*time.Minute,
 		at,
 	)
@@ -466,7 +471,7 @@ func TestLiveConnectionTrigger(t *testing.T) {
 	}
 
 	again, _ := LiveConnectionTrigger(
-		ConnectionFault{BindingID: &binding, Sequence: 7},
+		ConnectionFault{BindingID: &binding, Sequence: 7, FaultID: nil},
 		5*time.Minute,
 		at.Add(time.Minute),
 	)
@@ -475,7 +480,11 @@ func TestLiveConnectionTrigger(t *testing.T) {
 	}
 
 	for _, gap := range []time.Duration{0, LiveOfflineAfter - time.Second} {
-		if tr, ok := LiveConnectionTrigger(ConnectionFault{BindingID: &binding}, gap, at); ok {
+		if tr, ok := LiveConnectionTrigger(
+			ConnectionFault{BindingID: &binding, FaultID: nil, Sequence: 0},
+			gap,
+			at,
+		); ok {
 			t.Errorf("gap %s took an online module offline: %+v", gap, tr)
 		}
 	}

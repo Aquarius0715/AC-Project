@@ -325,7 +325,7 @@ func saveFactor(ctx context.Context, c *ops.Call, in *FactorInput) (Factor, erro
 			TargetKind:      "emission_factor",
 			TargetID:        id.String(),
 			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &version,
+			NextVersion:     &version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 

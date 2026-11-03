@@ -180,7 +180,12 @@ func (r *RemoteSource) fetch(
 
 	client := r.Client
 	if client == nil {
-		client = &http.Client{Timeout: 5 * time.Second}
+		client = &http.Client{
+			Timeout:       5 * time.Second,
+			Transport:     nil,
+			CheckRedirect: nil,
+			Jar:           nil,
+		}
 	}
 
 	res, err := client.Do(req)

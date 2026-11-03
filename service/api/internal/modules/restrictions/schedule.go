@@ -357,7 +357,7 @@ func (m Restrictions) schedule(
 			Params: map[string]any{
 				"executeAfter": in.ExecuteAfter,
 				"policyKind":   in.policy.Kind,
-			},
+			}, Channel: "", SourceAlertID: nil,
 		})
 		if err != nil {
 			return Restriction{}, err
@@ -392,7 +392,7 @@ func (m Restrictions) schedule(
 			TargetKind:  "restriction",
 			TargetID:    id.String(),
 			NextVersion: &v,
-			Reason:      in.Reason,
+			Reason:      in.Reason, PreviousVersion: nil, Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -406,7 +406,13 @@ func noticeRecipients(ctx context.Context, c *ops.Call, org uuid.UUID) ([]uuid.U
 		ctx,
 		c,
 		identity.QueryMembers,
-		identity.MembersInput{Role: "client", OrganizationID: &org},
+		identity.MembersInput{
+			Role:           "client",
+			OrganizationID: &org,
+			IDs:            nil,
+			Permission:     "",
+			ClientRole:     "",
+		},
 	) // IR191
 }
 
@@ -571,7 +577,7 @@ func (m Restrictions) execute(
 				TargetID:        x.ID.String(),
 				PreviousVersion: c.ExpectedVersion,
 				NextVersion:     &next,
-				Reason:          "causes paid",
+				Reason:          "causes paid", Result: "", Before: nil, After: nil,
 			},
 		)
 
@@ -636,7 +642,7 @@ func (m Restrictions) execute(
 			TargetKind:      "restriction",
 			TargetID:        x.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &next,
+			NextVersion:     &next, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -841,7 +847,7 @@ func (m Restrictions) cancel(
 			TargetID:        x.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &next,
-			Reason:          in.Reason,
+			Reason:          in.Reason, Result: "", Before: nil, After: nil,
 		},
 	)
 

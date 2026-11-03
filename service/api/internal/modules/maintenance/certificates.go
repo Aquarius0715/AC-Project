@@ -305,10 +305,15 @@ func (m Certificates) submit(
 	)
 	c.Audit(
 		ops.AuditEntry{
-			Action:      "certificates.submit",
-			TargetKind:  "certificate",
-			TargetID:    id.String(),
-			NextVersion: &x.Version,
+			Action:          "certificates.submit",
+			TargetKind:      "certificate",
+			TargetID:        id.String(),
+			NextVersion:     &x.Version,
+			PreviousVersion: nil,
+			Reason:          "",
+			Result:          "",
+			Before:          nil,
+			After:           nil,
 		},
 	)
 
@@ -457,7 +462,7 @@ func (m Certificates) verify(
 			TargetID:        x.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &x.Version,
-			Reason:          deref(in.Reason),
+			Reason:          deref(in.Reason), Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -534,7 +539,14 @@ func (m Certificates) requestTraining(
 		return x, err
 	}
 
-	c.Emit(ops.Event{AggregateType: "certificate", AggregateID: x.ID, Type: "TrainingRequested"})
+	c.Emit(
+		ops.Event{
+			AggregateType: "certificate",
+			AggregateID:   x.ID,
+			Type:          "TrainingRequested",
+			Payload:       nil,
+		},
+	)
 	c.Audit(
 		ops.AuditEntry{
 			Action:          "certificates.requestTraining",
@@ -542,7 +554,7 @@ func (m Certificates) requestTraining(
 			TargetID:        x.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &x.Version,
-			Reason:          in.Note,
+			Reason:          in.Note, Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -665,7 +677,7 @@ func (m Certificates) content(
 		) // a certificate without an uploaded document
 	}
 
-	out := DocumentOut{Name: "certificate"}
+	out := DocumentOut{Name: "certificate", Mime: "", Size: 0, Bytes: nil}
 	if name != nil && *name != "" {
 		out.Name = *name
 	}
@@ -999,7 +1011,7 @@ func (m Certificates) Remind(ctx context.Context, c *ops.Call) (int, error) {
 			identity.MembersInput{
 				Role:           "contractor",
 				OrganizationID: &d.org,
-				Permission:     "partner.assign",
+				Permission:     "partner.assign", IDs: nil, ClientRole: "",
 			},
 		)
 		if err != nil {
@@ -1019,7 +1031,12 @@ func (m Certificates) Remind(ctx context.Context, c *ops.Call) (int, error) {
 				TargetKind:            "certificate",
 				TargetID:              d.id,
 				Severity:              severity,
-				Params:                map[string]any{"at": d.expires, "status": "expiring"},
+				Params: map[string]any{
+					"at":     d.expires,
+					"status": "expiring",
+				},
+				Channel:       "",
+				SourceAlertID: nil,
 			})
 			if err != nil {
 				return n, err
@@ -1042,7 +1059,15 @@ func (m Certificates) Remind(ctx context.Context, c *ops.Call) (int, error) {
 				Action:     "certificates.remind",
 				TargetKind: "certificate",
 				TargetID:   d.id.String(),
-				Reason:     fmt.Sprintf("%d days before expiry", days),
+				Reason: fmt.Sprintf(
+					"%d days before expiry",
+					days,
+				),
+				PreviousVersion: nil,
+				NextVersion:     nil,
+				Result:          "",
+				Before:          nil,
+				After:           nil,
 			},
 		)
 

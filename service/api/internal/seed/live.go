@@ -64,8 +64,8 @@ var LiveSite = struct {
 	Device:       "device-live-ac",
 	Binding:      "binding-live-ac",
 	Sensors: []LiveSensor{
-		{Name: "sensor-live-temperature", Metric: "temperature", Unit: "°C"},
-		{Name: "sensor-live-humidity", Metric: "humidity", Unit: "%"},
+		{Name: "sensor-live-temperature", Metric: "temperature", Unit: "°C", Boundary: ""},
+		{Name: "sensor-live-humidity", Metric: "humidity", Unit: "%", Boundary: ""},
 		{Name: "sensor-live-power", Metric: "power", Unit: "kW", Boundary: "ac_input_electricity"},
 	},
 }
@@ -127,7 +127,7 @@ func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 	var sensors []capSensor
 
 	for _, x := range s.Sensors {
-		cs := capSensor{Metric: x.Metric, Unit: x.Unit, StaleAfterSeconds: 120}
+		cs := capSensor{Metric: x.Metric, Unit: x.Unit, StaleAfterSeconds: 120, BoundaryID: nil}
 		if x.Boundary != "" {
 			cs.BoundaryID = &x.Boundary
 		}

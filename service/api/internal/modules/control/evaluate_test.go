@@ -47,7 +47,14 @@ func testFacts(unit uuid.UUID, at time.Time) map[string]Fact {
 	}
 
 	return map[string]Fact{
-		unit.String() + "/peak":     {}, // overwritten below to keep the literal readable
+		unit.String() + "/peak": {
+			UnitID:     uuid.UUID{},
+			Metric:     "",
+			Value:      nil,
+			Unit:       "",
+			ObservedAt: time.Time{},
+			Quality:    "",
+		}, // overwritten below to keep the literal readable
 		unit.String() + "/tariff":   f("tariff", "0.6", "MYR_per_kWh", at),
 		unit.String() + "/solar":    f("solar", "3", "kW", at),
 		unit.String() + "/battery":  f("battery", "0.5", "kW", at),

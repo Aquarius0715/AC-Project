@@ -46,7 +46,12 @@ func Integrate(
 	units []uuid.UUID,
 	from, to time.Time,
 ) (Integration, error) {
-	out := Integration{ExpectedSlots: len(units) * int(to.Sub(from)/time.Minute)}
+	out := Integration{
+		ExpectedSlots: len(units) * int(to.Sub(from)/time.Minute),
+		ValidSlots:    0,
+		KWh:           nil,
+		Warnings:      nil,
+	}
 	if len(units) == 0 {
 		return out, nil
 	}

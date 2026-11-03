@@ -33,7 +33,15 @@ func consumers(
 
 	add := func(domain, name string, handlers map[string]events.Handler) *events.Consumer {
 		if serves(domain) && len(handlers) > 0 {
-			c := &events.Consumer{Name: name, DB: m, Handlers: handlers}
+			c := &events.Consumer{
+				Name:      name,
+				DB:        m,
+				Handlers:  handlers,
+				Batch:     0,
+				Logf:      nil,
+				Now:       nil,
+				SplitFrom: "",
+			}
 			out = append(out, c)
 
 			return c

@@ -58,10 +58,17 @@ func main() {
 	defer stop()
 
 	sc := echo.StartConfig{
-		Address:         addr,
-		HideBanner:      true,
-		HidePort:        true,
-		GracefulTimeout: 25 * time.Second,
+		Address:          addr,
+		HideBanner:       true,
+		HidePort:         true,
+		GracefulTimeout:  25 * time.Second,
+		CertFilesystem:   nil,
+		TLSConfig:        nil,
+		Listener:         nil,
+		ListenerNetwork:  "",
+		ListenerAddrFunc: nil,
+		OnShutdownError:  nil,
+		BeforeServeFunc:  nil,
 	}
 	startErr := sc.Start(
 		ctx,

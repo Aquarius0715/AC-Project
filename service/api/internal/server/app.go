@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/url"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -104,7 +105,12 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 
 	reg := ops.NewRegistry()
 	reg.ServeDomains(cfg.Domains...)
-	reg.DB, reg.Rec, reg.Idem = m, notifyingRecorder{inner: db.Recorder{}}, db.Idempotency{M: m}
+	reg.DB, reg.Rec, reg.Idem = m, notifyingRecorder{
+		inner: db.Recorder{},
+		store: notify.Store{},
+	}, db.Idempotency{
+		M: m,
+	}
 	reg.Limit = cfg.WriteLimit
 
 	reg.DenyLimit = cfg.DenyLimit
@@ -113,7 +119,7 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 			Store:  &ratelimit.Memory{},
 			Limit:  1,
 			Window: time.Minute,
-			Prefix: "ac:rl:denied:",
+			Prefix: "ac:rl:denied:", Now: nil,
 		}
 	}
 
@@ -125,7 +131,7 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 		reg.Clock = cfg.Clock
 	}
 
-	var dc ScenarioClock = &demoClock{base: reg.Clock}
+	var dc ScenarioClock = &demoClock{base: reg.Clock, mu: sync.Mutex{}, offset: 0}
 
 	if cfg.DemoOps {
 		if cfg.DemoClock != nil {
@@ -144,24 +150,34 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 		reg.Clock = dc.Now
 	}
 
-	demo := &demoOps{inline: len(cfg.Domains) == 0, enabled: cfg.DemoOps, m: m, clock: dc, reg: reg}
+	demo := &demoOps{
+		inline:  len(cfg.Domains) == 0,
+		enabled: cfg.DemoOps,
+		m:       m,
+		clock:   dc,
+		reg:     reg,
+		notify:  nil,
+	}
 	registerDemo(reg, demo)
 	identity.Register(reg)
 	identity.RegisterMembers(reg)
 
 	am := &assets.Module{
 		Mon: monitorReads{
-			alerts:    monitoring.Alerts{},
-			telemetry: monitoring.Telemetry{Sensors: devices.Models{}},
+			alerts:    monitoring.Alerts{Units: nil, Access: nil, Devices: nil},
+			telemetry: monitoring.Telemetry{Sensors: devices.Models{}, Units: nil},
 		},
 		Models:    devices.Models{},
-		Policies:  monitoring.Policies{},
+		Policies:  monitoring.Policies{Units: nil, Recipients: nil, Caps: nil},
 		Usage:     []assets.UnitUsage{billing.Usage{}, maintenance.Usage{}, devices.Usage{}},
 		Contracts: billing.Usage{},
 		Claims:    maintenance.Usage{},
 		Import:    devices.Models{},
-		Activity:  []assets.UnitUsage{monitoring.Telemetry{}, maintenance.Usage{}},
-		Store:     m,
+		Activity: []assets.UnitUsage{
+			monitoring.Telemetry{Units: nil, Sensors: nil},
+			maintenance.Usage{},
+		},
+		Store: m,
 		Active: []assets.UnitActivity{
 			maintenance.Usage{},
 			devices.Usage{},
@@ -170,6 +186,7 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 			billing.Usage{},
 		},
 		OrgActive: []assets.OrgActivity{billing.Usage{}, maintenance.Usage{}},
+		Details:   nil,
 	}
 	am.Details = unitDetails{}
 	assets.Register(reg, am)
@@ -177,8 +194,8 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	reg.AddJob(ops.DomainEquipment, am.RemindWarranties)
 	eq := equipmentView{
 		am:     am,
-		alerts: monitoring.Alerts{},
-		tel:    monitoring.Telemetry{Sensors: devices.Models{}},
+		alerts: monitoring.Alerts{Units: nil, Access: nil, Devices: nil},
+		tel:    monitoring.Telemetry{Sensors: devices.Models{}, Units: nil},
 		models: devices.Models{},
 	} // other domains' view (IR193)
 	devices.Register(reg, devices.Capabilities{Units: am})
@@ -199,8 +216,8 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 		Blobs:    blobs,
 	}
 	maintenance.RegisterJobs(reg, jobs)
-	maintenance.RegisterOnSite(reg, maintenance.OnSite{Jobs: jobs})
-	reports := maintenance.Reports{Jobs: jobs, Units: eq}
+	maintenance.RegisterOnSite(reg, maintenance.OnSite{Jobs: jobs, Access: maintenance.Access{}})
+	reports := maintenance.Reports{Jobs: jobs, Units: eq, Access: maintenance.Access{}}
 	maintenance.RegisterFollowUps(
 		reg,
 		maintenance.FollowUps{Jobs: jobs, Blobs: blobs, Warranty: eq},
@@ -231,7 +248,7 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	automations := control.Automations{
 		Units:    controlTargets{am},
 		Cmd:      cmds,
-		Notifier: monitoring.Notifier{},
+		Notifier: monitoring.Notifier{Notify: notify.Store{}},
 	}
 	control.RegisterAutomations(reg, automations)
 	demo.notify = automations.Notify // demo.trigger automation: a gateway's facts against the alert policies (IR529)
@@ -267,13 +284,13 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	summaries.RegisterAdmin(reg, sums)
 	notify.Register(reg)
 
-	rm := restrictions.Restrictions{Units: eq, Devices: eq}
+	rm := restrictions.Restrictions{Units: eq, Devices: eq, Notify: notify.Store{}}
 	restrictions.Register(reg, rm)
 	bill := billing.Billing{
 		Customers:    eq,
 		Restrictions: restrictions.Busy{},
 		Recipients:   identity.Directory{},
-		Releases:     rm,
+		Releases:     rm, Notify: notify.Store{},
 	}
 	billing.Register(reg, bill)
 	billing.RegisterPayments(reg, bill)
@@ -317,8 +334,13 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 		monitoring.Policies{Units: am, Recipients: identity.Directory{}, Caps: unitCaps{am}},
 	)
 	dm := &devices.Module{
-		Units:     am,
-		Exclusion: []devices.Exclusion{control.Busy{}, restrictions.Busy{}},
+		Units: am,
+		Exclusion: []devices.Exclusion{
+			control.Busy{},
+			restrictions.Busy{},
+		},
+		Access:     nil,
+		UnitAccess: nil,
 	}
 	devices.RegisterDevices(reg, dm)
 	devices.RegisterCampaigns(reg, dm)
@@ -331,7 +353,7 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 		dm.AdvanceCampaigns,
 	) // IR339: campaign notices, starts, waves and completion (BR-A20), after the timeouts
 
-	authn := &auth.Authenticator{Verifier: v, DB: m, Now: reg.Clock}
+	authn := &auth.Authenticator{Verifier: v, DB: m, Now: reg.Clock, Source: nil}
 
 	servesIdentity := len(cfg.Domains) == 0 || slices.Contains(cfg.Domains, ops.DomainIdentity)
 	if cfg.IdentityURL != "" && !servesIdentity { // IR181 step 1: principals come from identity-api
@@ -343,7 +365,7 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 		authn.Source = &auth.RemoteSource{
 			BaseURL: cfg.IdentityURL,
 			Token:   cfg.InternalToken,
-			TTL:     ttl,
+			TTL:     ttl, Client: nil, Now: nil,
 		}
 	}
 
@@ -362,7 +384,7 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	}
 	if len(cfg.Domains) > 0 &&
 		len(cfg.ServiceURLs) > 0 { // read models ask the owning services (IR190)
-		q := &ops.HTTPQueries{Targets: map[string]*url.URL{}, Token: cfg.InternalToken}
+		q := &ops.HTTPQueries{Targets: map[string]*url.URL{}, Token: cfg.InternalToken, Client: nil}
 		for d, raw := range cfg.ServiceURLs {
 			u, err := url.Parse(raw)
 			if err != nil || u.Scheme == "" || u.Host == "" {

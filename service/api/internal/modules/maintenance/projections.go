@@ -422,7 +422,10 @@ func (m Jobs) extraProjections(
 			continue
 		}
 
-		out = append(out, listItem{rank: rankOf[h.Status], sev: -1, id: h.JobID.String(), item: h})
+		out = append(
+			out,
+			listItem{rank: rankOf[h.Status], sev: -1, id: h.JobID.String(), item: h, due: nil},
+		)
 	}
 
 	return out, nil

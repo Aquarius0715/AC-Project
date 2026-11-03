@@ -36,7 +36,7 @@ func (k *Keycloak) client() *http.Client {
 		return k.Client
 	}
 
-	return &http.Client{Timeout: 5 * time.Second}
+	return &http.Client{Timeout: 5 * time.Second, Transport: nil, CheckRedirect: nil, Jar: nil}
 }
 
 func (k *Keycloak) now() time.Time {

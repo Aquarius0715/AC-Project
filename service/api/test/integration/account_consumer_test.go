@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -17,7 +18,18 @@ import (
 // event the "identity" consumer cannot apply holds back only that consumer: an account is still turned off at once.
 // An account event "identity" applied before the split counts as applied and is not applied again.
 func TestAccountConsumerApart(t *testing.T) {
-	fake := &fakeIdP{}
+	fake := &fakeIdP{
+		mu:         sync.Mutex{},
+		subjects:   nil,
+		err:        nil,
+		created:    nil,
+		updated:    nil,
+		setups:     nil,
+		switched:   nil,
+		failing:    false,
+		lost:       nil,
+		generation: 0,
+	}
 	s := serverCfg(
 		t,
 		func(c *apiserver.Config) { c.IdentityProvider = fake; c.Domains = ops.Domains },

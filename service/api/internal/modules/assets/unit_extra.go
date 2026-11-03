@@ -120,14 +120,14 @@ func (m *Module) unitsDelete(
 		return DeletedResource{}, execErr
 	}
 
-	c.Emit(ops.Event{AggregateType: "unit", AggregateID: in.ID, Type: "UnitDeleted"})
+	c.Emit(ops.Event{AggregateType: "unit", AggregateID: in.ID, Type: "UnitDeleted", Payload: nil})
 	c.Audit(
 		ops.AuditEntry{
 			Action:          "units.delete",
 			TargetKind:      "unit",
 			TargetID:        in.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
-			Reason:          in.Reason,
+			Reason:          in.Reason, NextVersion: nil, Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -282,14 +282,16 @@ func (m *Module) unitsSetAlertPoliciesUnit(
 		}
 	}
 
-	c.Emit(ops.Event{AggregateType: "unit", AggregateID: in.UnitID, Type: "UnitChanged"})
+	c.Emit(
+		ops.Event{AggregateType: "unit", AggregateID: in.UnitID, Type: "UnitChanged", Payload: nil},
+	)
 	c.Audit(
 		ops.AuditEntry{
 			Action:          "units.setAlertPolicies",
 			TargetKind:      "unit",
 			TargetID:        in.UnitID.String(),
 			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &v,
+			NextVersion:     &v, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 

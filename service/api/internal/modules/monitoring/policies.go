@@ -146,7 +146,7 @@ func rule(
 			Threshold:         th,
 			RecoveryThreshold: rec,
 			DurationSeconds:   dur,
-			Severity:          sev,
+			Severity:          sev, ActiveWindow: nil,
 		},
 		RuleKey:  key,
 		Name:     name,
@@ -416,7 +416,40 @@ const autoPolicyCols = `p.id, p.tenant_id, p.version, p.created_at, p.updated_at
 	COALESCE((SELECT array_agg(u.unit_id ORDER BY u.unit_id) FROM control.automation_policy_units u WHERE u.policy_id = p.id), '{}')`
 
 func scanAutoPolicy(r pgx.Row) (Policy, error) {
-	p := Policy{Kind: "automation"}
+	p := Policy{
+		Kind:              "automation",
+		ID:                uuid.UUID{},
+		TenantID:          uuid.UUID{},
+		Version:           0,
+		CreatedAt:         time.Time{},
+		UpdatedAt:         time.Time{},
+		Name:              "",
+		UnitIDs:           nil,
+		OwnerMembershipID: uuid.UUID{},
+		CreatedByUserID:   uuid.UUID{},
+		Timezone:          "",
+		Enabled:           false,
+		Priority:          0,
+		DisabledReason:    nil,
+		CustomerID:        nil,
+		Condition: AlertCondition{
+			Metric:            "",
+			Operator:          "",
+			Threshold:         0,
+			RecoveryThreshold: 0,
+			DurationSeconds:   0,
+			ActiveWindow:      nil,
+			Severity:          "",
+		},
+		RecipientMembershipIDs: nil,
+		Channels:               nil,
+		EscalateAfterMinutes:   0,
+		CooldownMinutes:        0,
+		Rules:                  nil,
+		RuleSettings:           nil,
+		AutoCondition:          nil,
+		Action:                 nil,
+	}
 	err := r.Scan(
 		&p.ID,
 		&p.TenantID,
@@ -1536,7 +1569,7 @@ func (m Policies) finishSave(
 			TargetKind:      "policy",
 			TargetID:        p.ID.String(),
 			PreviousVersion: prev,
-			NextVersion:     &p.Version,
+			NextVersion:     &p.Version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -1631,6 +1664,11 @@ func (m Policies) delete(ctx context.Context, c *ops.Call, in *PolicyIDInput) (D
 			TargetKind:      "policy",
 			TargetID:        p.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
+			NextVersion:     nil,
+			Reason:          "",
+			Result:          "",
+			Before:          nil,
+			After:           nil,
 		},
 	)
 
@@ -1794,7 +1832,7 @@ func (m Policies) setDefaultRule(
 		TargetID:        s.ID.String(),
 		PreviousVersion: c.ExpectedVersion,
 		NextVersion:     &s.Version,
-		Reason:          deref(in.Reason),
+		Reason:          deref(in.Reason), Result: "", Before: nil, After: nil,
 	})
 
 	return s, nil

@@ -202,7 +202,7 @@ func (m Files) add(ctx context.Context, c *ops.Call, in *AddInput) (AttachmentRe
 			TargetKind:      "report",
 			TargetID:        in.ReportID.String(),
 			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &next,
+			NextVersion:     &next, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -313,7 +313,7 @@ func (m Files) signOff(ctx context.Context, c *ops.Call, in *SignOffInput) (Repo
 		SignerName:    in.SignerName,
 		SignedAt:      c.Now,
 		AbsentReason:  in.AbsentReason,
-		ReportVersion: draft.Version,
+		ReportVersion: draft.Version, SignatureAttachmentID: nil, SitePhotoAttachmentID: nil,
 	}
 	if in.Signature != nil {
 		id, err := m.store(ctx, c, in.JobID, in.ReportID, *in.Signature)
@@ -363,7 +363,7 @@ func (m Files) signOff(ctx context.Context, c *ops.Call, in *SignOffInput) (Repo
 			TargetKind:      "report",
 			TargetID:        in.ReportID.String(),
 			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &x.Version,
+			NextVersion:     &x.Version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 

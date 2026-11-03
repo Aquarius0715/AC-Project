@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -21,7 +22,18 @@ import (
 // errors.email_taken, for the company and for another one. HQ giving the removed person a membership points the
 // account at it too.
 func TestPersonAddedAgain(t *testing.T) {
-	fake := &fakeIdP{}
+	fake := &fakeIdP{
+		mu:         sync.Mutex{},
+		subjects:   nil,
+		err:        nil,
+		created:    nil,
+		updated:    nil,
+		setups:     nil,
+		switched:   nil,
+		failing:    false,
+		lost:       nil,
+		generation: 0,
+	}
 	s := serverCfg(
 		t,
 		func(c *apiserver.Config) { c.IdentityProvider = fake; c.Domains = ops.Domains },
@@ -250,7 +262,18 @@ func TestPersonOfAnotherTenant(t *testing.T) {
 // TestAccountSwitchedByMembership (IR462): disabling a demo-style account — no provider subject stored — turns it off by
 // the person's ID; when the account signs in with another membership, enabling this one leaves it alone.
 func TestAccountSwitchedByMembership(t *testing.T) {
-	fake := &fakeIdP{}
+	fake := &fakeIdP{
+		mu:         sync.Mutex{},
+		subjects:   nil,
+		err:        nil,
+		created:    nil,
+		updated:    nil,
+		setups:     nil,
+		switched:   nil,
+		failing:    false,
+		lost:       nil,
+		generation: 0,
+	}
 	s := serverCfg(
 		t,
 		func(c *apiserver.Config) { c.IdentityProvider = fake; c.Domains = ops.Domains },
@@ -339,7 +362,21 @@ func TestAccountSwitchedByMembership(t *testing.T) {
 func TestClientAddedAgain(t *testing.T) {
 	s := serverCfg(
 		t,
-		func(c *apiserver.Config) { c.IdentityProvider = &fakeIdP{}; c.Domains = ops.Domains },
+		func(c *apiserver.Config) {
+			c.IdentityProvider = &fakeIdP{
+				mu:         sync.Mutex{},
+				subjects:   nil,
+				err:        nil,
+				created:    nil,
+				updated:    nil,
+				setups:     nil,
+				switched:   nil,
+				failing:    false,
+				lost:       nil,
+				generation: 0,
+			}
+			c.Domains = ops.Domains
+		},
 	)
 	cust := seed.ID("cust-b").String()
 	email := "client-again-" + uuid.NewString()[:8] + "@example.com"
@@ -421,7 +458,18 @@ func TestClientAddedAgain(t *testing.T) {
 // nothing recorded; once it answers, the set-up e-mail sent again opens the account. An account the provider lost is
 // opened anew when the person is added again.
 func TestAccountProviderTrouble(t *testing.T) {
-	fake := &fakeIdP{failing: true}
+	fake := &fakeIdP{
+		failing:    true,
+		mu:         sync.Mutex{},
+		subjects:   nil,
+		err:        nil,
+		created:    nil,
+		updated:    nil,
+		setups:     nil,
+		switched:   nil,
+		lost:       nil,
+		generation: 0,
+	}
 	s := serverCfg(
 		t,
 		func(c *apiserver.Config) { c.IdentityProvider = fake; c.Domains = ops.Domains },

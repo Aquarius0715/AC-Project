@@ -51,7 +51,19 @@ type Plan struct {
 const planCols = `p.id, p.tenant_id, p.version, p.created_at, p.updated_at, p.unit_id, p.interval_months, p.anchor_day, p.next_due_at`
 
 func scanPlan(r pgx.Row) (Plan, error) {
-	p := Plan{Timezone: "UTC", Recurrence: Recurrence{Kind: "monthly"}}
+	p := Plan{
+		Timezone:             "UTC",
+		Recurrence:           Recurrence{Kind: "monthly", IntervalMonths: 0},
+		ID:                   uuid.UUID{},
+		TenantID:             uuid.UUID{},
+		Version:              0,
+		CreatedAt:            time.Time{},
+		UpdatedAt:            time.Time{},
+		UnitID:               uuid.UUID{},
+		AnchorDay:            0,
+		NextDueAt:            time.Time{},
+		GeneratedOccurrences: nil,
+	}
 	err := r.Scan(
 		&p.ID,
 		&p.TenantID,
@@ -479,7 +491,7 @@ func (m Plans) save(ctx context.Context, c *ops.Call, in *PlanSaveInput) (Plan, 
 			TargetKind:      "plan",
 			TargetID:        id.String(),
 			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &p.Version,
+			NextVersion:     &p.Version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -622,7 +634,7 @@ func (m Plans) generateNextJob(ctx context.Context, c *ops.Call, in *GenerateInp
 			TargetKind:      "plan",
 			TargetID:        p.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &nv,
+			NextVersion:     &nv, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 

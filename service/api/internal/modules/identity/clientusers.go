@@ -404,7 +404,11 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 			OrgID:       org,
 			ClientRole:  &role,
 			Permissions: defaultPermissions["client"],
-			Scopes:      []ScopeRef{{Kind: "organization", ID: org}},
+			Scopes: []ScopeRef{
+				{Kind: "organization", ID: org},
+			},
+			Employment: nil,
+			ValidUntil: nil,
 		})
 		if err != nil {
 			return ClientUser{}, err
@@ -431,11 +435,15 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 		v := 1
 		c.Audit(
 			ops.AuditEntry{
-				Action:      "clientUsers.save",
-				TargetKind:  "client_user",
-				TargetID:    id.String(),
-				NextVersion: &v,
-				Reason:      "account created",
+				Action:          "clientUsers.save",
+				TargetKind:      "client_user",
+				TargetID:        id.String(),
+				NextVersion:     &v,
+				Reason:          "account created",
+				PreviousVersion: nil,
+				Result:          "",
+				Before:          nil,
+				After:           nil,
 			},
 		)
 
@@ -540,7 +548,7 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 			TargetID:        x.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &next,
-			Reason:          *in.Reason,
+			Reason:          *in.Reason, Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -659,7 +667,7 @@ func clientUsersRemove(ctx context.Context, c *ops.Call, in *RemoveInput) (Delet
 			TargetKind:      "client_user",
 			TargetID:        x.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
-			Reason:          in.Reason,
+			Reason:          in.Reason, NextVersion: nil, Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -767,10 +775,15 @@ func clientUsersResend(ctx context.Context, c *ops.Call, in *ResendInput) (Invit
 
 	c.Audit(
 		ops.AuditEntry{
-			Action:     "clientUsers.resendInvite",
-			TargetKind: "client_user",
-			TargetID:   x.ID.String(),
-			Reason:     "set-up e-mail sent again",
+			Action:          "clientUsers.resendInvite",
+			TargetKind:      "client_user",
+			TargetID:        x.ID.String(),
+			Reason:          "set-up e-mail sent again",
+			PreviousVersion: nil,
+			NextVersion:     nil,
+			Result:          "",
+			Before:          nil,
+			After:           nil,
 		},
 	)
 
@@ -794,10 +807,14 @@ func clientUsersResend(ctx context.Context, c *ops.Call, in *ResendInput) (Invit
 			"method":      nil,
 			"message":     nil,
 		},
-		Channel:       "email",
-		DeliveryState: "queued",
-		Severity:      "normal",
-		OccurredAt:    c.Now,
+		Channel:                "email",
+		DeliveryState:          "queued",
+		Severity:               "normal",
+		OccurredAt:             c.Now,
+		SourceAlertID:          nil,
+		RecipientMembershipID:  nil,
+		ScopeVersionAtCreation: 0,
+		ReadAt:                 nil,
 	}, nil
 }
 

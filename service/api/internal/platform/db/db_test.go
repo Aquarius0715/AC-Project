@@ -12,6 +12,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 )
 
 // Integration tests run against the compose PostgreSQL (docker compose --profile schema up postgres db-schema).
@@ -46,7 +47,16 @@ func principal(t *testing.T, m *TxManager) *ops.Principal {
 	p := &ops.Principal{
 		TenantID:     uuid.Must(uuid.NewV7()),
 		MembershipID: uuid.Must(uuid.NewV7()),
-		UserID:       uuid.Must(uuid.NewV7()),
+		UserID: uuid.Must(
+			uuid.NewV7(),
+		),
+		Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
+		OrgID:             uuid.UUID{},
+		ScopeVersion:      0,
+		Scopes:            nil,
+		Employment:        "",
+		Timezone:          "",
+		SessionsRevokedAt: nil,
 	}
 
 	p.Role = "admin"
@@ -161,9 +171,16 @@ func TestRecorderAndRLS(t *testing.T) {
 	agg := uuid.Must(uuid.NewV7())
 	v := 2
 	c := &ops.Call{
-		Principal:     p,
-		Now:           time.Now().UTC(),
-		CorrelationID: "corr-test-" + agg.String()[:8],
+		Principal:       p,
+		Now:             time.Now().UTC(),
+		CorrelationID:   "corr-test-" + agg.String()[:8],
+		Tx:              nil,
+		Bearer:          "",
+		Queries:         nil,
+		ExpectedVersion: nil,
+		Candidates:      nil,
+		Events:          nil,
+		Audits:          nil,
 	}
 	c.Audit(
 		ops.AuditEntry{
@@ -171,7 +188,7 @@ func TestRecorderAndRLS(t *testing.T) {
 			TargetKind:  "unit",
 			TargetID:    agg.String(),
 			NextVersion: &v,
-			Reason:      "r",
+			Reason:      "r", PreviousVersion: nil, Result: "", Before: nil, After: nil,
 		},
 	)
 	c.Emit(
@@ -182,7 +199,7 @@ func TestRecorderAndRLS(t *testing.T) {
 			Payload:       map[string]int{"version": 2},
 		},
 	)
-	c.Emit(ops.Event{AggregateType: "unit", AggregateID: agg, Type: "UnitArchived"})
+	c.Emit(ops.Event{AggregateType: "unit", AggregateID: agg, Type: "UnitArchived", Payload: nil})
 
 	runErr := m.Run(
 		ctx,
@@ -253,7 +270,23 @@ func TestRecorderAndRLS(t *testing.T) {
 		t.Fatalf("read-only write: %v", err)
 	}
 
-	if (Recorder{}).Record(ctx, nil, &ops.Call{}, "x") != nil {
+	if (Recorder{}).Record(
+		ctx,
+		nil,
+		&ops.Call{
+			Tx:              nil,
+			Principal:       nil,
+			Now:             time.Time{},
+			CorrelationID:   "",
+			Bearer:          "",
+			Queries:         nil,
+			ExpectedVersion: nil,
+			Candidates:      nil,
+			Events:          nil,
+			Audits:          nil,
+		},
+		"x",
+	) != nil {
 		t.Fatal("anonymous record")
 	}
 	// audit log is append-only

@@ -96,7 +96,10 @@ func New(targets Targets, logger *slog.Logger) *echo.Echo {
 	e.Use(
 		middleware.RequestIDWithConfig(
 			middleware.RequestIDConfig{
-				Generator: func() string { return uuid.Must(uuid.NewV7()).String() },
+				Generator:        func() string { return uuid.Must(uuid.NewV7()).String() },
+				Skipper:          nil,
+				RequestIDHandler: nil,
+				TargetHeader:     "",
 			},
 		),
 	)
@@ -106,10 +109,11 @@ func New(targets Targets, logger *slog.Logger) *echo.Echo {
 
 	for d, u := range targets {
 		p := httputil.NewSingleHostReverseProxy(u)
-		p.Transport = &http.Transport{
-			ResponseHeaderTimeout: 35 * time.Second,
-			MaxIdleConnsPerHost:   64,
-		}
+		// set field by field: a literal would have to name every field, Dial and DialTLS too, which are deprecated
+		transport := new(http.Transport)
+		transport.ResponseHeaderTimeout = 35 * time.Second
+		transport.MaxIdleConnsPerHost = 64
+		p.Transport = transport
 		// the gateway's middleware sets the request ID and the two headers on every response; the upstream's copies of
 		// them are dropped here, or the proxy would add them a second time (IR407)
 		p.ModifyResponse = func(resp *http.Response) error {

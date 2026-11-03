@@ -658,12 +658,12 @@ func occurrences(
 			ScheduledOccurrence{
 				Phase:  "schedule_start",
 				At:     at(day, def.StartLocal).UTC(),
-				Action: def.StartAction,
+				Action: def.StartAction, AutomationID: nil,
 			},
 			ScheduledOccurrence{
 				Phase:  "schedule_end",
 				At:     at(end, def.EndLocal).UTC(),
-				Action: def.EndAction,
+				Action: def.EndAction, AutomationID: nil,
 			},
 		)
 	}
@@ -765,7 +765,7 @@ func (m Automations) save(
 		StartAction: in.StartAction,
 		EndAction:   in.EndAction,
 		Condition:   in.Condition,
-		Action:      in.Action,
+		Action:      in.Action, OnlyIf: nil,
 	}
 	if len(in.extras) > 0 {
 		def.OnlyIf, _ = json.Marshal(in.extras)
@@ -857,7 +857,7 @@ func (m Automations) save(
 			TargetKind:      "automation",
 			TargetID:        id.String(),
 			PreviousVersion: prev,
-			NextVersion:     &version,
+			NextVersion:     &version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -962,7 +962,7 @@ func (m Automations) nextRuns(
 			EndLocal:    d.EndLocal,
 			EndsNextDay: d.EndsNextDay,
 			StartAction: d.StartAction,
-			EndAction:   d.EndAction,
+			EndAction:   d.EndAction, Condition: nil, Action: nil, OnlyIf: nil,
 		}
 		tz = d.Timezone
 
@@ -988,7 +988,7 @@ func (m Automations) nextRuns(
 			EndLocal:    x.EndLocal,
 			EndsNextDay: x.EndsNextDay,
 			StartAction: x.StartAction,
-			EndAction:   x.EndAction,
+			EndAction:   x.EndAction, Condition: nil, Action: nil, OnlyIf: nil,
 		}
 		tz, id = x.Timezone, &x.ID
 	}
@@ -1090,6 +1090,11 @@ func (m Automations) delete(
 			TargetKind:      "automation",
 			TargetID:        cur.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
+			NextVersion:     nil,
+			Reason:          "",
+			Result:          "",
+			Before:          nil,
+			After:           nil,
 		},
 	)
 

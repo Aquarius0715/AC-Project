@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -63,7 +64,13 @@ func setup(t *testing.T) *Authenticator {
 		"tok-nobody": "no-such-subject",
 	}
 
-	return &Authenticator{Verifier: v, DB: m, Now: func() time.Time { return clock }}
+	return &Authenticator{
+		Verifier: v,
+		DB:       m,
+		Now:      func() time.Time { return clock },
+		Source:   nil,
+		signIns:  sync.Map{},
+	}
 }
 
 func call(a *Authenticator, hdr map[string]string) (*httptest.ResponseRecorder, *ops.Principal) {
@@ -312,7 +319,13 @@ func TestRecordSignIn(t *testing.T) {
 	earlier := clock.Add(-30 * 24 * time.Hour)
 	set(&earlier)
 
-	cold := &Authenticator{DB: a.DB, Now: a.Now} // another replica, nothing cached
+	cold := &Authenticator{
+		DB:       a.DB,
+		Now:      a.Now,
+		Verifier: nil,
+		Source:   nil,
+		signIns:  sync.Map{},
+	} // another replica, nothing cached
 	cold.RecordSignIn(ctx, p, t1)
 	cold.RecordSignIn(ctx, p, t1.Add(-time.Hour)) // the token of an older session
 

@@ -176,7 +176,7 @@ func Observe(
 			State:                  "pending",
 			ObservationEventID:     eventID,
 			CommandIDs:             []uuid.UUID{},
-			CreatedAt:              now,
+			CreatedAt:              now, ResolvedAt: nil,
 		})
 	}
 
@@ -253,7 +253,12 @@ func (m Restrictions) reconcileTerminal(
 
 		var o *Observation
 		if len(raw) > 0 {
-			o = &Observation{}
+			o = &Observation{
+				RestrictionID: uuid.UUID{},
+				RulesVersion:  "",
+				Policy:        nil,
+				ObservedAt:    time.Time{},
+			}
 			_ = json.Unmarshal(raw, o)
 		}
 
@@ -305,7 +310,7 @@ func (m Restrictions) reconcileTerminal(
 			TargetKind:      "restriction",
 			TargetID:        x.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &next,
+			NextVersion:     &next, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 	y, err := load(ctx, c, x.ID, false)
@@ -342,7 +347,7 @@ func resolveRecoveryAlerts(ctx context.Context, tx pgx.Tx, units []uuid.UUID, _ 
 		"unit",
 		done[0],
 		events.ReconciliationResolved,
-		events.Units{UnitIDs: done},
+		events.Units{UnitIDs: done, RestrictionID: uuid.UUID{}},
 	)
 }
 
@@ -379,7 +384,7 @@ func recoveryAcknowledged(
 		"unit",
 		unit,
 		events.UnitRestrictionCleared,
-		events.UnitRestriction{UnitID: unit, RestrictionID: restriction},
+		events.UnitRestriction{UnitID: unit, RestrictionID: restriction, Observed: nil},
 	)
 	if publishErr != nil {
 		return true, publishErr

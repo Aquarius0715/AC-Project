@@ -70,7 +70,20 @@ func ruleMetric(a Alert) *string {
 func (m Alerts) candidates(ctx context.Context, c *ops.Call, a Alert) ([]EvidenceCandidate, error) {
 	out := []EvidenceCandidate{}
 	for _, id := range a.EvidenceIDs {
-		out = append(out, EvidenceCandidate{ID: id, Kind: "detection", ObservedAt: a.ObservedAt})
+		out = append(
+			out,
+			EvidenceCandidate{
+				ID:         id,
+				Kind:       "detection",
+				ObservedAt: a.ObservedAt,
+				Metric:     nil,
+				Value:      nil,
+				Unit:       nil,
+				Origin:     nil,
+				Quality:    nil,
+				EventType:  nil,
+			},
+		)
 	}
 
 	rows, err := c.Tx.Query(
@@ -132,7 +145,7 @@ func (m Alerts) candidates(ctx context.Context, c *ops.Call, a Alert) ([]Evidenc
 					ID:         r.ID,
 					Kind:       "device_event",
 					ObservedAt: r.OccurredAt,
-					EventType:  &typ,
+					EventType:  &typ, Metric: nil, Value: nil, Unit: nil, Origin: nil, Quality: nil,
 				},
 			)
 		}

@@ -315,13 +315,25 @@ func (m *Module) customersSave(
 
 		c.Audit(
 			ops.AuditEntry{
-				Action:      "customers.save",
-				TargetKind:  "customer",
-				TargetID:    id.String(),
-				NextVersion: &x.Version,
+				Action:          "customers.save",
+				TargetKind:      "customer",
+				TargetID:        id.String(),
+				NextVersion:     &x.Version,
+				PreviousVersion: nil,
+				Reason:          "",
+				Result:          "",
+				Before:          nil,
+				After:           nil,
 			},
 		)
-		c.Emit(ops.Event{AggregateType: "customer", AggregateID: id, Type: "CustomerChanged"})
+		c.Emit(
+			ops.Event{
+				AggregateType: "customer",
+				AggregateID:   id,
+				Type:          "CustomerChanged",
+				Payload:       nil,
+			},
+		)
 
 		return x, nil
 	}
@@ -373,10 +385,17 @@ func (m *Module) customersSave(
 			TargetKind:      "customer",
 			TargetID:        x.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &x.Version,
+			NextVersion:     &x.Version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
-	c.Emit(ops.Event{AggregateType: "customer", AggregateID: x.ID, Type: "CustomerChanged"})
+	c.Emit(
+		ops.Event{
+			AggregateType: "customer",
+			AggregateID:   x.ID,
+			Type:          "CustomerChanged",
+			Payload:       nil,
+		},
+	)
 
 	return x, nil
 }
@@ -645,14 +664,21 @@ func (m *Module) locationsRename(ctx context.Context, c *ops.Call, in *RenameInp
 		typ = "UnitChanged"
 	}
 
-	c.Emit(ops.Event{AggregateType: in.Target.Kind, AggregateID: in.Target.ID, Type: typ})
+	c.Emit(
+		ops.Event{
+			AggregateType: in.Target.Kind,
+			AggregateID:   in.Target.ID,
+			Type:          typ,
+			Payload:       nil,
+		},
+	)
 	c.Audit(
 		ops.AuditEntry{
 			Action:          "locations.rename",
 			TargetKind:      in.Target.Kind,
 			TargetID:        in.Target.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &v,
+			NextVersion:     &v, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 

@@ -1039,13 +1039,13 @@ func (Inbox) preview(ctx context.Context, c *ops.Call, in *PreviewInput) (Notifi
 			At:         c.Now,
 			Status:     status,
 			Reason:     in.Reason,
-			Message:    in.Message,
+			Message:    in.Message, AmountMinor: nil, Currency: nil, Method: nil,
 		},
 		Channel:       in.Channel,
 		DeliveryState: "preview",
 		Severity:      severity,
 		OccurredAt:    c.Now,
-		TargetOpen:    true,
+		TargetOpen:    true, ReadAt: nil,
 	}, nil
 }
 

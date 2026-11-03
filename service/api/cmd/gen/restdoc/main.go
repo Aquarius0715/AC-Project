@@ -13,7 +13,9 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 
+	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/server"
 )
@@ -55,7 +57,32 @@ func typeName(p ops.Param) string {
 func main() {
 	srv, err := server.New(
 		context.Background(),
-		server.Config{DatabaseURL: "postgres://doc:doc@127.0.0.1:1/doc"},
+		server.Config{
+			DatabaseURL:       "postgres://doc:doc@127.0.0.1:1/doc",
+			DatabaseReaderURL: "",
+			Addr:              "",
+			Clock:             nil,
+			DemoOps:           false,
+			DemoStart:         time.Time{},
+			Logger:            nil,
+			Domains:           nil,
+			IdentityURL:       "",
+			InternalToken:     "",
+			ServiceURLs:       nil,
+			PrincipalTTL:      0,
+			DemoClock:         nil,
+			WriteLimit:        nil,
+			DenyLimit:         nil,
+			IdentityProvider:  nil,
+			AccountApps: identity.AccountApps{
+				Customer:   "",
+				Partner:    "",
+				Technician: "",
+				Admin:      "",
+			},
+			AccountsPerDay: 0,
+			WrapTx:         nil,
+		},
 		nil,
 	)
 	if err != nil {
@@ -90,7 +117,7 @@ func main() {
 						Type:     typeName(p),
 						Role:     "path",
 						Field:    strings.Join(p.At, "."),
-						Required: true,
+						Required: true, List: false,
 					},
 				)
 			}
@@ -115,7 +142,7 @@ func main() {
 							Type:  typeName(p),
 							List:  p.List,
 							Role:  p.Role,
-							Field: strings.Join(p.At, "."),
+							Field: strings.Join(p.At, "."), Required: false,
 						},
 					)
 				}

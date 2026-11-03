@@ -127,7 +127,12 @@ func (m Billing) notifyMembers(
 			TemplateKey:           "inquiry",
 			TargetKind:            "inquiry",
 			TargetID:              inquiry,
-			Params:                map[string]any{"status": status},
+			Params: map[string]any{
+				"status": status,
+			},
+			Channel:       "",
+			Severity:      "",
+			SourceAlertID: nil,
 		})
 		if err != nil {
 			return err
@@ -228,7 +233,13 @@ func (m Billing) createInquiry(
 	notifyMembersErr := m.notifyMembers(
 		ctx,
 		c,
-		identity.MembersInput{Role: "admin", Permission: "billing.write"},
+		identity.MembersInput{
+			Role:           "admin",
+			Permission:     "billing.write",
+			IDs:            nil,
+			OrganizationID: nil,
+			ClientRole:     "",
+		},
 		id,
 		"received",
 	)
@@ -251,7 +262,7 @@ func (m Billing) createInquiry(
 			Action:      "inquiries.create",
 			TargetKind:  "inquiry",
 			TargetID:    id.String(),
-			NextVersion: &v,
+			NextVersion: &v, PreviousVersion: nil, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -489,7 +500,13 @@ func (m Billing) answerInquiry(ctx context.Context, c *ops.Call, in *AnswerInput
 	notifyMembersErr := m.notifyMembers(
 		ctx,
 		c,
-		identity.MembersInput{Role: "client", OrganizationID: &x.customerOrg},
+		identity.MembersInput{
+			Role:           "client",
+			OrganizationID: &x.customerOrg,
+			IDs:            nil,
+			Permission:     "",
+			ClientRole:     "",
+		},
 		x.ID,
 		"answered",
 	)
@@ -498,14 +515,21 @@ func (m Billing) answerInquiry(ctx context.Context, c *ops.Call, in *AnswerInput
 	}
 
 	next := x.Version + 1
-	c.Emit(ops.Event{AggregateType: "inquiry", AggregateID: x.ID, Type: "InquiryAnswered"})
+	c.Emit(
+		ops.Event{
+			AggregateType: "inquiry",
+			AggregateID:   x.ID,
+			Type:          "InquiryAnswered",
+			Payload:       nil,
+		},
+	)
 	c.Audit(
 		ops.AuditEntry{
 			Action:          "inquiries.answer",
 			TargetKind:      "inquiry",
 			TargetID:        x.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &next,
+			NextVersion:     &next, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 

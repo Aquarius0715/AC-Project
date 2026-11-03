@@ -139,9 +139,14 @@ func NewVerifierFromEnv(ctx context.Context) (Verifier, error) {
 	// a service that started before the identity provider, or one whose provider was recreated with new keys,
 	// accepts tokens again within seconds instead of refusing every request for minutes (CI e2e, IR419)
 	k, err := keyfunc.NewDefaultOverrideCtx(ctx, []string{jwks}, keyfunc.Override{
-		RefreshUnknownKID: rate.NewLimiter(rate.Every(10*time.Second), 1),
-		RefreshInterval:   15 * time.Minute,
-		RateLimitWaitMax:  15 * time.Second,
+		RefreshUnknownKID:         rate.NewLimiter(rate.Every(10*time.Second), 1),
+		RefreshInterval:           15 * time.Minute,
+		RateLimitWaitMax:          15 * time.Second,
+		Client:                    nil,
+		HTTPTimeout:               0,
+		NoErrorReturnFirstHTTPReq: nil,
+		RefreshErrorHandlerFunc:   nil,
+		ValidationSkipAll:         false,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("jwks: %w", err)

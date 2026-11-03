@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -33,7 +34,7 @@ func TestFetchWaitingReadsTheRequestedCommands(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := &http.Client{Timeout: 5 * time.Second}
+	c := &http.Client{Timeout: 5 * time.Second, Transport: nil, CheckRedirect: nil, Jar: nil}
 
 	got, err := fetchWaiting(c, srv.URL, "tok", "t1")
 	if err != nil || len(got) != 1 || got[0].ID != id {
@@ -80,7 +81,12 @@ func TestDemoClockFollowsTheScenarioClock(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	d := &demoClock{api: srv.URL, c: &http.Client{Timeout: 5 * time.Second}}
+	d := &demoClock{
+		api: srv.URL,
+		c:   &http.Client{Timeout: 5 * time.Second, Transport: nil, CheckRedirect: nil, Jar: nil},
+		mu:  sync.Mutex{},
+		off: 0,
+	}
 	err := d.refresh()
 	if err != nil {
 		t.Fatal(err)
@@ -123,9 +129,23 @@ func TestSendReportsRefusals(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := &http.Client{Timeout: 5 * time.Second}
+	c := &http.Client{Timeout: 5 * time.Second, Transport: nil, CheckRedirect: nil, Jar: nil}
 
-	tr := iotbridge.Trigger{EventID: uuid.New(), EventType: "telemetry"}
+	tr := iotbridge.Trigger{
+		EventID:     uuid.New(),
+		EventType:   "telemetry",
+		ScenarioID:  "",
+		OccurredAt:  time.Time{},
+		CommandID:   nil,
+		Measurement: nil,
+		DeviceID:    nil,
+		State:       nil,
+		Event:       nil,
+		BindingID:   nil,
+		Sequence:    nil,
+		Kind:        "",
+		Recovery:    nil,
+	}
 	err := send(c, srv.URL, tr)
 	if err != nil {
 		t.Fatalf("accepted trigger: %v", err)
@@ -135,7 +155,25 @@ func TestSendReportsRefusals(t *testing.T) {
 		t.Errorf("idempotency key %q, want the event ID", key)
 	}
 
-	err = send(c, srv.URL, iotbridge.Trigger{EventID: uuid.Nil})
+	err = send(
+		c,
+		srv.URL,
+		iotbridge.Trigger{
+			EventID:     uuid.Nil,
+			ScenarioID:  "",
+			OccurredAt:  time.Time{},
+			EventType:   "",
+			CommandID:   nil,
+			Measurement: nil,
+			DeviceID:    nil,
+			State:       nil,
+			Event:       nil,
+			BindingID:   nil,
+			Sequence:    nil,
+			Kind:        "",
+			Recovery:    nil,
+		},
+	)
 	if err == nil {
 		t.Error("a refused trigger is not an error")
 	}
@@ -152,11 +190,11 @@ func TestSendCommandStopsBeforePublishingABadCommand(t *testing.T) {
 	w := iotbridge.Waiting{
 		ID:        uuid.New(),
 		Action:    json.RawMessage(`{"celsius":26}`),
-		ExpiresAt: time.Now().Add(time.Minute),
+		ExpiresAt: time.Now().Add(time.Minute), DeviceID: uuid.UUID{}, UnitID: uuid.UUID{},
 	}
 	err := sendCommand(
 		nil,
-		&http.Client{},
+		&http.Client{Transport: nil, CheckRedirect: nil, Jar: nil, Timeout: 0},
 		"http://127.0.0.1:1",
 		uuid.New().String(),
 		w,

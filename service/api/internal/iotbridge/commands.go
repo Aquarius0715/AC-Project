@@ -51,11 +51,19 @@ func SentTrigger(w Waiting, at time.Time) Trigger {
 	cmd := w.ID
 
 	return Trigger{
-		ScenarioID: Scenario,
-		EventID:    uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("%s/sent", cmd))),
-		OccurredAt: at.UTC(),
-		EventType:  "command_sent",
-		CommandID:  &cmd,
+		ScenarioID:  Scenario,
+		EventID:     uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("%s/sent", cmd))),
+		OccurredAt:  at.UTC(),
+		EventType:   "command_sent",
+		CommandID:   &cmd,
+		Measurement: nil,
+		DeviceID:    nil,
+		State:       nil,
+		Event:       nil,
+		BindingID:   nil,
+		Sequence:    nil,
+		Kind:        "",
+		Recovery:    nil,
 	}
 }
 
@@ -76,7 +84,7 @@ func StateTrigger(hb devicesim.Heartbeat, at time.Time) (Trigger, error) {
 
 	state := hb.State
 	if state == nil {
-		state = &devicesim.ReportedState{}
+		state = &devicesim.ReportedState{Power: nil, Celsius: nil, Mode: nil, FanLevel: nil}
 	}
 
 	at = at.UTC()
@@ -87,9 +95,16 @@ func StateTrigger(hb devicesim.Heartbeat, at time.Time) (Trigger, error) {
 			seed.Namespace,
 			[]byte(fmt.Sprintf("%s/state/%s", dev, at.Format(time.RFC3339Nano))),
 		),
-		OccurredAt: at,
-		EventType:  "state",
-		DeviceID:   &dev,
-		State:      state,
+		OccurredAt:  at,
+		EventType:   "state",
+		DeviceID:    &dev,
+		State:       state,
+		CommandID:   nil,
+		Measurement: nil,
+		Event:       nil,
+		BindingID:   nil,
+		Sequence:    nil,
+		Kind:        "",
+		Recovery:    nil,
 	}, nil
 }

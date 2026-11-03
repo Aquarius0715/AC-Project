@@ -70,11 +70,31 @@ func (r notifyingRecorder) clients(
 	c *ops.Call,
 	org uuid.UUID,
 ) ([]uuid.UUID, error) {
-	return members(ctx, c, identity.MembersInput{Role: "client", OrganizationID: &org})
+	return members(
+		ctx,
+		c,
+		identity.MembersInput{
+			Role:           "client",
+			OrganizationID: &org,
+			IDs:            nil,
+			Permission:     "",
+			ClientRole:     "",
+		},
+	)
 }
 
 func (r notifyingRecorder) hq(ctx context.Context, c *ops.Call, perm string) ([]uuid.UUID, error) {
-	return members(ctx, c, identity.MembersInput{Role: "admin", Permission: perm})
+	return members(
+		ctx,
+		c,
+		identity.MembersInput{
+			Role:           "admin",
+			Permission:     perm,
+			IDs:            nil,
+			OrganizationID: nil,
+			ClientRole:     "",
+		},
+	)
 }
 
 func (r notifyingRecorder) partners(
@@ -90,7 +110,13 @@ func (r notifyingRecorder) partners(
 	return members(
 		ctx,
 		c,
-		identity.MembersInput{Role: "contractor", OrganizationID: org, Permission: perm},
+		identity.MembersInput{
+			Role:           "contractor",
+			OrganizationID: org,
+			Permission:     perm,
+			IDs:            nil,
+			ClientRole:     "",
+		},
 	)
 }
 
@@ -112,7 +138,17 @@ func (r notifyingRecorder) technician(
 		return nil, err
 	}
 
-	return members(ctx, c, identity.MembersInput{IDs: ids})
+	return members(
+		ctx,
+		c,
+		identity.MembersInput{
+			IDs:            ids,
+			Role:           "",
+			OrganizationID: nil,
+			Permission:     "",
+			ClientRole:     "",
+		},
+	)
 }
 
 func (r notifyingRecorder) send(
@@ -135,7 +171,11 @@ func (r notifyingRecorder) send(
 			TargetKind:            kind,
 			TargetID:              target,
 			Severity:              severity,
-			Params:                map[string]any{"status": status},
+			Params: map[string]any{
+				"status": status,
+			},
+			Channel:       "",
+			SourceAlertID: nil,
 		})
 		if err != nil {
 			return err
@@ -218,7 +258,7 @@ func (r notifyingRecorder) dispatch(ctx context.Context, c *ops.Call, op string)
 			return err
 		}
 
-		set := &recipientSet{}
+		set := &recipientSet{ids: nil}
 
 		cl, err := r.clients(ctx, c, org)
 		if err != nil {
@@ -278,7 +318,7 @@ func (r notifyingRecorder) job(ctx context.Context, c *ops.Call, op string, job 
 		}
 	}
 
-	set := &recipientSet{}
+	set := &recipientSet{ids: nil}
 	add := func(ids []uuid.UUID, err error) error {
 		set.add(ids...)
 
@@ -353,7 +393,7 @@ func (r notifyingRecorder) restriction(ctx context.Context, c *ops.Call, id uuid
 		return err
 	}
 
-	set := &recipientSet{}
+	set := &recipientSet{ids: nil}
 
 	cl, err := r.clients(ctx, c, org)
 	if err != nil {

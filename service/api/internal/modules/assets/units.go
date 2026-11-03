@@ -581,7 +581,22 @@ func (m *Module) unitsGet(ctx context.Context, c *ops.Call, in *UnitGetInput) (U
 		return UnitDetail{}, gateErr
 	}
 
-	d := UnitDetail{Unit: units[0]}
+	d := UnitDetail{
+		Unit: units[0],
+		DetailExtras: DetailExtras{
+			Capabilities:           nil,
+			EffectiveControlPolicy: nil,
+			ControlAvailability:    nil,
+			Components:             nil,
+			PendingCommands:        nil,
+			PendingCommandIDs:      nil,
+			Location: Location{
+				PathLabels:         nil,
+				Address:            nil,
+				AccessInstructions: nil,
+			},
+		},
+	}
 	if m.Details != nil {
 		d.DetailExtras, err = m.Details.Detail(ctx, c, units[0])
 		if err != nil {

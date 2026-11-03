@@ -105,7 +105,7 @@ func orgState(ctx context.Context, c *ops.Call, in *OrgInput) (OrgStateResult, e
 	err := c.Tx.QueryRow(ctx, `SELECT kind, status FROM identity.organizations WHERE id = $1`, in.OrgID).
 		Scan(&r.Kind, &r.Status)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return OrgStateResult{}, nil
+		return OrgStateResult{Kind: "", Status: "", Found: false}, nil
 	}
 
 	r.Found = err == nil
@@ -136,7 +136,16 @@ func technician(ctx context.Context, c *ops.Call, in *MembershipInput) (Technici
 	err := c.Tx.QueryRow(ctx, `SELECT organization_id, employment, valid_from, valid_until FROM identity.memberships WHERE id = $1 AND role = 'technician'`, in.MembershipID).
 		Scan(&t.OrgID, &emp, &from, &until)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return TechnicianResult{}, nil
+		return TechnicianResult{
+			Technician: Technician{
+				OrgID:      uuid.UUID{},
+				Employment: "",
+				Active:     false,
+				ValidUntil: nil,
+				Scopes:     nil,
+			},
+			Found: false,
+		}, nil
 	}
 
 	if err != nil {

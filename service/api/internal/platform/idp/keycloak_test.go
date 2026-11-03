@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -61,6 +62,10 @@ func TestKeycloakEndSessions(t *testing.T) {
 		ClientID:     "svc",
 		ClientSecret: "test-secret",
 		Now:          func() time.Time { return now },
+		Client:       nil,
+		mu:           sync.Mutex{},
+		token:        "",
+		until:        time.Time{},
 	}
 
 	ctx := context.Background()
@@ -123,6 +128,11 @@ func TestKeycloakEndSessions(t *testing.T) {
 		AdminURL:     k.AdminURL,
 		ClientID:     "svc",
 		ClientSecret: "wrong",
+		Client:       nil,
+		Now:          nil,
+		mu:           sync.Mutex{},
+		token:        "",
+		until:        time.Time{},
 	}
 	err = bad.EndSessions(ctx, "u-1")
 	if err == nil {
@@ -134,7 +144,7 @@ func TestKeycloakEndSessions(t *testing.T) {
 		AdminURL:     k.AdminURL,
 		ClientID:     "svc",
 		ClientSecret: "test-secret",
-		Client:       srv.Client(),
+		Client:       srv.Client(), Now: nil, mu: sync.Mutex{}, token: "", until: time.Time{},
 	}
 	err = own.EndSessions(ctx, "u-1")
 	if err != nil {
@@ -160,6 +170,11 @@ func TestKeycloakTokenAnswers(t *testing.T) {
 			AdminURL:     srv.URL + "/admin/realms/ac",
 			ClientID:     "svc",
 			ClientSecret: "test-secret",
+			Client:       nil,
+			Now:          nil,
+			mu:           sync.Mutex{},
+			token:        "",
+			until:        time.Time{},
 		}
 		err := k.EndSessions(context.Background(), "u-1")
 		if err == nil {

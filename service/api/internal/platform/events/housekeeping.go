@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 )
 
 // The retention of the platform tables (database design §6, IR428).
@@ -97,16 +98,32 @@ func Housekeep(
 	}
 
 	for _, t := range tenants {
-		err := m.Run(ctx, false, &ops.Principal{TenantID: t}, func(tx pgx.Tx) error {
-			tag, err := tx.Exec(
-				ctx,
-				`DELETE FROM platform.idempotency_keys WHERE expires_at < $1`,
-				now,
-			)
-			s.IdempotencyKeys += tag.RowsAffected()
+		err := m.Run(
+			ctx,
+			false,
+			&ops.Principal{
+				TenantID:          t,
+				Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
+				MembershipID:      uuid.UUID{},
+				UserID:            uuid.UUID{},
+				OrgID:             uuid.UUID{},
+				ScopeVersion:      0,
+				Scopes:            nil,
+				Employment:        "",
+				Timezone:          "",
+				SessionsRevokedAt: nil,
+			},
+			func(tx pgx.Tx) error {
+				tag, err := tx.Exec(
+					ctx,
+					`DELETE FROM platform.idempotency_keys WHERE expires_at < $1`,
+					now,
+				)
+				s.IdempotencyKeys += tag.RowsAffected()
 
-			return err
-		})
+				return err
+			},
+		)
 		if err != nil {
 			return s, err
 		}

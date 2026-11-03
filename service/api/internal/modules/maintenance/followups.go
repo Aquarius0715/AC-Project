@@ -507,7 +507,7 @@ func (m FollowUps) reportProblemJob(
 			TargetKind:      "job",
 			TargetID:        in.JobID.String(),
 			PreviousVersion: c.ExpectedVersion,
-			Reason:          in.ReasonCode,
+			Reason:          in.ReasonCode, NextVersion: nil, Result: "", Before: nil, After: nil,
 		},
 	)
 

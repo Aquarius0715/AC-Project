@@ -417,10 +417,14 @@ func (m Workforce) capacity(
 
 	for _, t := range techs {
 		cp := Capacity{
-			MembershipID:   t.ID,
-			Date:           in.Date,
-			AvailableSlots: []Slot{},
-			AssignedSlots:  []Slot{},
+			MembershipID:     t.ID,
+			Date:             in.Date,
+			AvailableSlots:   []Slot{},
+			AssignedSlots:    []Slot{},
+			AvailableMinutes: nil,
+			AssignedMinutes:  0,
+			Utilization:      nil,
+			Unavailability:   nil,
 		}
 
 		typ, off, err := unavailable(ctx, c, t.ID, t.OrganizationID, in.Date, in.Date)
@@ -697,7 +701,7 @@ func (m Workforce) setUnavailability(
 		To:                       in.To,
 		Type:                     in.Type,
 		Note:                     in.Note,
-		ConflictingAssignmentIDs: conflicts,
+		ConflictingAssignmentIDs: conflicts, ID: uuid.UUID{},
 	}
 	scanErr := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.unavailability (tenant_id, organization_id, membership_id, days, type, note, conflicting_assignment_ids, created_at, updated_at)
 		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, daterange($3::date, $4::date, '[]'), $5, $6, $7, $8, $8) RETURNING id`,
@@ -717,10 +721,15 @@ func (m Workforce) setUnavailability(
 	)
 	c.Audit(
 		ops.AuditEntry{
-			Action:      "members.setUnavailability",
-			TargetKind:  "unavailability",
-			TargetID:    u.ID.String(),
-			NextVersion: &u.Version,
+			Action:          "members.setUnavailability",
+			TargetKind:      "unavailability",
+			TargetID:        u.ID.String(),
+			NextVersion:     &u.Version,
+			PreviousVersion: nil,
+			Reason:          "",
+			Result:          "",
+			Before:          nil,
+			After:           nil,
 		},
 	)
 
@@ -983,10 +992,15 @@ func (m Workforce) clearUnavailability(
 				TargetKind:      "unavailability",
 				TargetID:        u.ID.String(),
 				PreviousVersion: c.ExpectedVersion,
+				NextVersion:     nil,
+				Reason:          "",
+				Result:          "",
+				Before:          nil,
+				After:           nil,
 			},
 		)
 
-		return UnavailabilityCleared{ID: u.ID}, nil
+		return UnavailabilityCleared{ID: u.ID, Remaining: nil}, nil
 	}
 
 	from, _ := time.Parse("2006-01-02", in.From)
@@ -1018,7 +1032,7 @@ func (m Workforce) clearUnavailability(
 			TargetKind:      "unavailability",
 			TargetID:        u.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &u.Version,
+			NextVersion:     &u.Version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 

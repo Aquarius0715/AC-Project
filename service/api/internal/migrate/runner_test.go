@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -15,18 +16,18 @@ import (
 
 func TestLoadSortsAndValidates(t *testing.T) {
 	ms, err := Load(fstest.MapFS{
-		"000002_b.up.sql": {Data: []byte("SELECT 2")},
-		"000001_a.up.sql": {Data: []byte("SELECT 1")},
-		"README.md":       {Data: []byte("ignored")},
+		"000002_b.up.sql": {Data: []byte("SELECT 2"), Mode: 0, ModTime: time.Time{}, Sys: nil},
+		"000001_a.up.sql": {Data: []byte("SELECT 1"), Mode: 0, ModTime: time.Time{}, Sys: nil},
+		"README.md":       {Data: []byte("ignored"), Mode: 0, ModTime: time.Time{}, Sys: nil},
 	})
 	if err != nil || len(ms) != 2 || ms[0].Version != 1 || ms[1].Name != "b" {
 		t.Fatalf("Load = %+v, %v", ms, err)
 	}
 
 	for name, fsys := range map[string]fstest.MapFS{
-		"bad name":  {"init.sql": {}},
-		"zero":      {"000000_zero.up.sql": {}},
-		"duplicate": {"000001_a.up.sql": {}, "1_b.up.sql": {}},
+		"bad name":  {"init.sql": {Data: nil, Mode: 0, ModTime: time.Time{}, Sys: nil}},
+		"zero":      {"000000_zero.up.sql": {Data: nil, Mode: 0, ModTime: time.Time{}, Sys: nil}},
+		"duplicate": {"000001_a.up.sql": {Data: nil, Mode: 0, ModTime: time.Time{}, Sys: nil}, "1_b.up.sql": {Data: nil, Mode: 0, ModTime: time.Time{}, Sys: nil}},
 	} {
 		_, err := Load(fsys)
 		if err == nil {

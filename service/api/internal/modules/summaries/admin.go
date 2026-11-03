@@ -105,7 +105,39 @@ func collectIDs(rows pgx.Rows) ([]uuid.UUID, error) {
 //	@Security		BearerAuth
 //	@Router			/v1/admin/summary [get]
 func (m Summaries) admin(ctx context.Context, c *ops.Call, in *AdminInput) (AdminSummary, error) {
-	out := AdminSummary{AsOf: c.Now, JobCounts: map[string]int{}, BillingVisibility: "forbidden"}
+	out := AdminSummary{
+		AsOf:                c.Now,
+		JobCounts:           map[string]int{},
+		BillingVisibility:   "forbidden",
+		CustomerCount:       0,
+		Total:               0,
+		Online:              0,
+		Offline:             0,
+		Unknown:             0,
+		PowerOn:             0,
+		PowerOff:            0,
+		PowerUnknown:        0,
+		OperatingRate:       nil,
+		AlertCount:          0,
+		OverdueInvoiceCount: nil,
+		AmountsByCurrency:   nil,
+		EnergySummary:       nil,
+		EnergyForecast: energy.Forecast{
+			Period:                   energy.Range{From: time.Time{}, To: time.Time{}},
+			UnitIDs:                  nil,
+			Basis:                    "",
+			BaselineRef:              nil,
+			BaselineSnapshot:         nil,
+			ExpectedUnitMinutes:      0,
+			ValidUnitMinutes:         0,
+			ActualKWhOnValidSlots:    nil,
+			PredictedBaselineKWh:     nil,
+			PredictedActualKWh:       nil,
+			ForecastSavedKWh:         nil,
+			ForecastSavingPercentage: nil,
+			QualityWarnings:          nil,
+		},
+	}
 	for _, s := range jobStatuses {
 		out.JobCounts[s] = 0
 	}

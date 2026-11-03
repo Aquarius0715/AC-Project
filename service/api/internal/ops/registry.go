@@ -315,9 +315,21 @@ func (r *Registry) AddJob(domain string, j Job) {
 // NewRegistry creates an empty registry backed by the generated catalog.
 func NewRegistry() *Registry {
 	return &Registry{
-		ops:   map[string]*Operation{},
-		specs: SpecByName(),
-		Clock: func() time.Time { return time.Now().UTC() },
+		ops:            map[string]*Operation{},
+		specs:          SpecByName(),
+		Clock:          func() time.Time { return time.Now().UTC() },
+		DB:             nil,
+		Rec:            nil,
+		Idem:           nil,
+		DenyLimit:      nil,
+		domains:        nil,
+		AfterCommit:    nil,
+		BeforeDispatch: nil,
+		WrapTx:         nil,
+		Limit:          nil,
+		queries:        nil,
+		Remote:         nil,
+		Jobs:           nil,
 	}
 }
 
@@ -557,7 +569,18 @@ func (r *Registry) run(c *echo.Context, op *Operation, body []byte, corr string)
 		if op.Spec.Mode == Write {
 			r.recordDenied(
 				ctx,
-				&Call{Principal: p, Now: r.Clock(), CorrelationID: corr},
+				&Call{
+					Principal:       p,
+					Now:             r.Clock(),
+					CorrelationID:   corr,
+					Tx:              nil,
+					Bearer:          "",
+					Queries:         nil,
+					ExpectedVersion: nil,
+					Candidates:      nil,
+					Events:          nil,
+					Audits:          nil,
+				},
 				name,
 				in,
 				denied,
@@ -626,7 +649,7 @@ func (r *Registry) run(c *echo.Context, op *Operation, body []byte, corr string)
 		Candidates:      cands,
 		ExpectedVersion: ev,
 		Bearer:          bearer,
-		Queries:         r,
+		Queries:         r, Tx: nil, Events: nil, Audits: nil,
 	}
 
 	var (

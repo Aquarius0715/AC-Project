@@ -244,7 +244,7 @@ func scanReport(r pgx.Row) (Report, error) {
 	}
 
 	if len(next) > 0 && string(next) != "null" {
-		x.NextAction = &NextAction{}
+		x.NextAction = &NextAction{Kind: "", Date: nil, Note: nil}
 		err := json.Unmarshal(next, x.NextAction)
 		if err != nil {
 			return x, err
@@ -597,7 +597,28 @@ func (m Reports) saveDraft(ctx context.Context, c *ops.Call, in *DraftInput) (Re
 			return Report{}, apperr.E(apperr.Conflict, "errors.draft_exists")
 		}
 
-		prev = Report{ID: uuid.New(), Version: 0}
+		prev = Report{
+			ID:                 uuid.New(),
+			Version:            0,
+			TenantID:           uuid.UUID{},
+			CreatedAt:          time.Time{},
+			UpdatedAt:          time.Time{},
+			ReviewAvailability: nil,
+			JobID:              uuid.UUID{},
+			AuthorID:           uuid.UUID{},
+			Items:              nil,
+			Measurements:       nil,
+			Parts:              nil,
+			Refrigerant:        nil,
+			SignOff:            nil,
+			WorkText:           "",
+			NextAction:         nil,
+			AttachmentRefs:     nil,
+			SubmittedAt:        nil,
+			AcceptedAt:         nil,
+			ReviewHistory:      nil,
+			State:              "",
+		}
 	case draft == nil || draft.ID != *in.ReportID:
 		return Report{}, apperr.E(apperr.NotFound, "error.notFound")
 	case draft.Version != *c.ExpectedVersion:
@@ -699,23 +720,27 @@ func (m Reports) saveDraft(ctx context.Context, c *ops.Call, in *DraftInput) (Re
 
 	for i, x := range in.Measurements {
 		r := ReportMeasurement{
-			ID:           uuid.New(),
-			TenantID:     c.Principal.TenantID,
-			Version:      1,
-			CreatedAt:    c.Now,
-			UpdatedAt:    c.Now,
-			UnitID:       unit,
-			SensorID:     itemID[x.ComponentKey],
-			ComponentKey: x.ComponentKey,
-			Metric:       x.Metric,
-			Value:        x.Value,
-			Unit:         x.Unit,
-			ObservedAt:   x.ObservedAt,
-			ReceivedAt:   c.Now,
-			Origin:       "inspection",
-			Quality:      "valid",
-			IsDemo:       true,
-			Sequence:     i + 1,
+			ID:            uuid.New(),
+			TenantID:      c.Principal.TenantID,
+			Version:       1,
+			CreatedAt:     c.Now,
+			UpdatedAt:     c.Now,
+			UnitID:        unit,
+			SensorID:      itemID[x.ComponentKey],
+			ComponentKey:  x.ComponentKey,
+			Metric:        x.Metric,
+			Value:         x.Value,
+			Unit:          x.Unit,
+			ObservedAt:    x.ObservedAt,
+			ReceivedAt:    c.Now,
+			Origin:        "inspection",
+			Quality:       "valid",
+			IsDemo:        true,
+			Sequence:      i + 1,
+			BoundaryID:    nil,
+			QualityReason: nil,
+			RawUnit:       nil,
+			EventID:       uuid.UUID{},
 		}
 		if x.ID != nil {
 			o, ok := oldM[*x.ID]
@@ -830,7 +855,7 @@ func (m Reports) saveDraft(ctx context.Context, c *ops.Call, in *DraftInput) (Re
 			TargetKind:      "report",
 			TargetID:        x.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &x.Version,
+			NextVersion:     &x.Version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -1000,7 +1025,16 @@ func (m Reports) submitJob(ctx context.Context, c *ops.Call, in *SubmitInput) (J
 		return Job{}, scanErr
 	}
 
-	t := TimeOnSite{Pauses: []Pause{}}
+	t := TimeOnSite{
+		Pauses:        []Pause{},
+		ArrivedAt:     nil,
+		CheckInMethod: nil,
+		CheckInReason: nil,
+		Distance:      nil,
+		StartedAt:     nil,
+		FinishedAt:    nil,
+		OnSiteMinutes: nil,
+	}
 	if len(raw) > 0 && string(raw) != "null" {
 		_ = json.Unmarshal(raw, &t)
 	}

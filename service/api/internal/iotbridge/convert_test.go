@@ -14,7 +14,7 @@ var (
 )
 
 func batch(device string, seqs ...int64) devicesim.Batch {
-	b := devicesim.Batch{DeviceID: DeviceID(device).String()}
+	b := devicesim.Batch{DeviceID: DeviceID(device).String(), Measurements: nil}
 
 	for i, s := range seqs {
 		name := []string{"temperature", "power"}[i%2]
@@ -140,9 +140,11 @@ func TestCommandTriggerMapsTheAcknowledgement(t *testing.T) {
 	cmd := "9f67089f-44c9-5231-ba20-03d3b9a1be53"
 	ack := func(result string) devicesim.Ack {
 		return devicesim.Ack{
-			DeviceID:  DeviceID("device-online-rto").String(),
-			CommandID: cmd,
-			Result:    result,
+			DeviceID:   DeviceID("device-online-rto").String(),
+			CommandID:  cmd,
+			Result:     result,
+			ReceivedAt: time.Time{},
+			Observed:   devicesim.Observed{SetpointCelsius: 0},
 		}
 	}
 
@@ -163,7 +165,13 @@ func TestCommandTriggerMapsTheAcknowledgement(t *testing.T) {
 	}
 
 	_, _, commandTriggerErr := CommandTrigger(
-		devicesim.Ack{CommandID: "not-a-uuid", Result: "applied"},
+		devicesim.Ack{
+			CommandID:  "not-a-uuid",
+			Result:     "applied",
+			DeviceID:   "",
+			ReceivedAt: time.Time{},
+			Observed:   devicesim.Observed{SetpointCelsius: 0},
+		},
 		received,
 	)
 	if commandTriggerErr == nil {
@@ -173,7 +181,9 @@ func TestCommandTriggerMapsTheAcknowledgement(t *testing.T) {
 
 // TestBadDeviceIDIsRefused: a device ID in the message that is not a UUID converts to nothing.
 func TestBadDeviceIDIsRefused(t *testing.T) {
-	out, err := NewResolver(Links).Triggers(devicesim.Batch{DeviceID: "not-a-uuid"}, received)
+	out, err := NewResolver(
+		Links,
+	).Triggers(devicesim.Batch{DeviceID: "not-a-uuid", Measurements: nil}, received)
 	if err == nil || len(out) != 0 {
 		t.Fatalf("bad device ID: %d triggers, err %v", len(out), err)
 	}

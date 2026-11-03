@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/db"
 )
 
@@ -301,12 +302,28 @@ func DeliverAll(
 	total := 0
 
 	for _, t := range tenants {
-		err := m.Run(ctx, false, &ops.Principal{TenantID: t}, func(tx pgx.Tx) error {
-			n, err := Deliver(ctx, tx, s, apps, now, limit)
-			total += n
+		err := m.Run(
+			ctx,
+			false,
+			&ops.Principal{
+				TenantID:          t,
+				Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
+				MembershipID:      uuid.UUID{},
+				UserID:            uuid.UUID{},
+				OrgID:             uuid.UUID{},
+				ScopeVersion:      0,
+				Scopes:            nil,
+				Employment:        "",
+				Timezone:          "",
+				SessionsRevokedAt: nil,
+			},
+			func(tx pgx.Tx) error {
+				n, err := Deliver(ctx, tx, s, apps, now, limit)
+				total += n
 
-			return err
-		})
+				return err
+			},
+		)
 		if err != nil {
 			return total, err
 		}
@@ -357,12 +374,28 @@ func SweepAll(ctx context.Context, m *db.TxManager, now time.Time) (int64, error
 	var total int64
 
 	for _, t := range tenants {
-		err := m.Run(ctx, false, &ops.Principal{TenantID: t}, func(tx pgx.Tx) error {
-			n, err := Sweep(ctx, tx, now)
-			total += n
+		err := m.Run(
+			ctx,
+			false,
+			&ops.Principal{
+				TenantID:          t,
+				Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
+				MembershipID:      uuid.UUID{},
+				UserID:            uuid.UUID{},
+				OrgID:             uuid.UUID{},
+				ScopeVersion:      0,
+				Scopes:            nil,
+				Employment:        "",
+				Timezone:          "",
+				SessionsRevokedAt: nil,
+			},
+			func(tx pgx.Tx) error {
+				n, err := Sweep(ctx, tx, now)
+				total += n
 
-			return err
-		})
+				return err
+			},
+		)
 		if err != nil {
 			return total, err
 		}

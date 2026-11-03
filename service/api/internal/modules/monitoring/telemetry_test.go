@@ -18,13 +18,22 @@ func TestSeriesInputFilters(t *testing.T) {
 
 	in := func(filters string) *SeriesInput {
 		x := &SeriesInput{
-			From:    from,
-			To:      from.Add(time.Hour),
-			UnitIDs: []uuid.UUID{uuid.New()},
-			Metric:  "temperature",
+			From:          from,
+			To:            from.Add(time.Hour),
+			UnitIDs:       []uuid.UUID{uuid.New()},
+			Metric:        "temperature",
+			SpaceID:       nil,
+			SensorID:      nil,
+			BucketMinutes: nil,
+			Query:         paging.Query{Cursor: nil, Limit: nil, Sort: nil, Filters: nil},
 		}
 		if filters != "" {
-			x.Query = paging.Query{Filters: json.RawMessage(filters)}
+			x.Query = paging.Query{
+				Filters: json.RawMessage(filters),
+				Cursor:  nil,
+				Limit:   nil,
+				Sort:    nil,
+			}
 		}
 
 		return x

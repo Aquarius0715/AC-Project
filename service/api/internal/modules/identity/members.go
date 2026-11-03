@@ -838,7 +838,26 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		id, prev = x.ID, c.ExpectedVersion
 	}
 
-	before := Member{ID: id}
+	before := Member{
+		ID:             id,
+		TenantID:       uuid.UUID{},
+		Version:        0,
+		CreatedAt:      time.Time{},
+		UpdatedAt:      time.Time{},
+		UserID:         uuid.UUID{},
+		DisplayName:    "",
+		OrganizationID: uuid.UUID{},
+		Role:           "",
+		Employment:     nil,
+		Permissions:    nil,
+		Scopes:         nil,
+		ScopeVersion:   0,
+		Qualifications: nil,
+		ValidFrom:      time.Time{},
+		ValidUntil:     nil,
+		ClientRole:     nil,
+		RevokedAt:      nil,
+	}
 	if prev != nil {
 		ms := []Member{before}
 		err := LoadMembers(ctx, c, ms)
@@ -953,7 +972,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 			TargetID:        id.String(),
 			PreviousVersion: prev,
 			NextVersion:     &ms[0].Version,
-			Reason:          in.Reason,
+			Reason:          in.Reason, Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -1074,7 +1093,13 @@ func membersRevokeSessions(
 		TargetKind: "membership",
 		TargetID:   in.MembershipID.String(),
 		Reason:     in.Reason,
-		After:      map[string]*string{"sessionsRevokedAt": &when},
+		After: map[string]*string{
+			"sessionsRevokedAt": &when,
+		},
+		PreviousVersion: nil,
+		NextVersion:     nil,
+		Result:          "",
+		Before:          nil,
 	})
 	c.Emit(
 		ops.Event{

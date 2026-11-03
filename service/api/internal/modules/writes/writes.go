@@ -84,7 +84,7 @@ func get(ctx context.Context, c *ops.Call, in *Input) (Result, error) {
 	err := c.Tx.QueryRow(ctx, `SELECT status, response FROM platform.idempotency_keys
 		WHERE membership_id = $1 AND key = $2 AND operation = $3 AND expires_at > $4`, c.Principal.MembershipID, in.IdempotencyKey, in.Operation, c.Now).Scan(&status, &resp)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return Result{State: "not_received"}, nil
+		return Result{State: "not_received", Operation: "", ResourceIDs: nil, Result: nil}, nil
 	}
 
 	if err != nil {
@@ -92,7 +92,7 @@ func get(ctx context.Context, c *ops.Call, in *Input) (Result, error) {
 	}
 
 	if status != "completed" {
-		return Result{State: "pending"}, nil
+		return Result{State: "pending", Operation: "", ResourceIDs: nil, Result: nil}, nil
 	}
 
 	var stored struct {

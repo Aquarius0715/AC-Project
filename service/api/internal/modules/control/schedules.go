@@ -157,7 +157,7 @@ func (m Automations) FireSchedules(ctx context.Context, c *ops.Call) (int, error
 		in := &EvaluationInput{
 			EventID:    uuid.NewSHA1(c.Principal.TenantID, []byte(scheduleRef(t.phase, t.at))),
 			OccurredAt: t.at,
-			Phase:      t.phase,
+			Phase:      t.phase, UnitIDs: nil, Facts: nil,
 		}
 		for u := range t.units {
 			if !t.at.Equal(last[u]) {
@@ -187,10 +187,15 @@ func (m Automations) FireSchedules(ctx context.Context, c *ops.Call) (int, error
 
 				c.Audit(
 					ops.AuditEntry{
-						Action:     "automations.schedule",
-						TargetKind: "automation",
-						TargetID:   d.RuleID.String(),
-						Reason:     t.phase,
+						Action:          "automations.schedule",
+						TargetKind:      "automation",
+						TargetID:        d.RuleID.String(),
+						Reason:          t.phase,
+						PreviousVersion: nil,
+						NextVersion:     nil,
+						Result:          "",
+						Before:          nil,
+						After:           nil,
 					},
 				)
 			}

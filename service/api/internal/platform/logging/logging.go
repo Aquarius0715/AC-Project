@@ -65,6 +65,6 @@ func ReplaceAttr(_ []string, a slog.Attr) slog.Attr {
 
 // New is the JSON logger of one service, writing to w.
 func New(w io.Writer, service string) *slog.Logger {
-	return slog.New(slog.NewJSONHandler(w, &slog.HandlerOptions{ReplaceAttr: ReplaceAttr})).
+	return slog.New(slog.NewJSONHandler(w, &slog.HandlerOptions{ReplaceAttr: ReplaceAttr, AddSource: false, Level: nil})).
 		With("service", service)
 }

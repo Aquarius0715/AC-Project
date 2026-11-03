@@ -151,7 +151,7 @@ func campaignChanged(c *ops.Call, id uuid.UUID, action, state string, v int, rea
 			TargetKind:  "firmware_campaign",
 			TargetID:    id.String(),
 			NextVersion: &v,
-			Reason:      reason,
+			Reason:      reason, PreviousVersion: nil, Result: "", Before: nil, After: nil,
 		},
 	)
 }
@@ -222,7 +222,13 @@ func (m *Module) campaignNotices(ctx context.Context, c *ops.Call) (int, error) 
 			recipients, err := identity.Members(
 				ctx,
 				c,
-				identity.MembersInput{Role: "client", OrganizationID: &info.OrgID},
+				identity.MembersInput{
+					Role:           "client",
+					OrganizationID: &info.OrgID,
+					IDs:            nil,
+					Permission:     "",
+					ClientRole:     "",
+				},
 			)
 			if err != nil {
 				return 0, err
@@ -240,7 +246,7 @@ func (m *Module) campaignNotices(ctx context.Context, c *ops.Call) (int, error) 
 						"at":      d.start,
 						"status":  "scheduled",
 						"message": message,
-					},
+					}, Channel: "", SourceAlertID: nil,
 				})
 				if err != nil {
 					return 0, err
@@ -265,7 +271,15 @@ func (m *Module) campaignNotices(ctx context.Context, c *ops.Call) (int, error) 
 				Action:     "firmwareCampaigns.notice",
 				TargetKind: "firmware_campaign",
 				TargetID:   d.id.String(),
-				Reason:     fmt.Sprintf("%d customer notices", sent),
+				Reason: fmt.Sprintf(
+					"%d customer notices",
+					sent,
+				),
+				PreviousVersion: nil,
+				NextVersion:     nil,
+				Result:          "",
+				Before:          nil,
+				After:           nil,
 			},
 		)
 	}
@@ -598,10 +612,15 @@ func (m *Module) dispatchWave(
 		)
 		c.Audit(
 			ops.AuditEntry{
-				Action:     "firmwareCampaigns.install",
-				TargetKind: "device",
-				TargetID:   p.id.String(),
-				Reason:     "campaign " + id.String(),
+				Action:          "firmwareCampaigns.install",
+				TargetKind:      "device",
+				TargetID:        p.id.String(),
+				Reason:          "campaign " + id.String(),
+				PreviousVersion: nil,
+				NextVersion:     nil,
+				Result:          "",
+				Before:          nil,
+				After:           nil,
 			},
 		)
 	}

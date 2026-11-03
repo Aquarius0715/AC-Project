@@ -487,6 +487,10 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 			Role:        in.PartnerRole,
 			OrgID:       c.Principal.OrgID,
 			Permissions: defaultPermissions[in.PartnerRole],
+			Employment:  nil,
+			ClientRole:  nil,
+			ValidUntil:  nil,
+			Scopes:      nil,
 		}
 		if in.PartnerRole == "technician" {
 			if !accessUntilOK(c.Now, *in.AccessUntil) {
@@ -525,11 +529,15 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 		v := 1
 		c.Audit(
 			ops.AuditEntry{
-				Action:      "partnerUsers.save",
-				TargetKind:  "partner_user",
-				TargetID:    id.String(),
-				NextVersion: &v,
-				Reason:      "account created",
+				Action:          "partnerUsers.save",
+				TargetKind:      "partner_user",
+				TargetID:        id.String(),
+				NextVersion:     &v,
+				Reason:          "account created",
+				PreviousVersion: nil,
+				Result:          "",
+				Before:          nil,
+				After:           nil,
 			},
 		)
 
@@ -682,7 +690,7 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 			TargetID:        x.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &next,
-			Reason:          *in.Reason,
+			Reason:          *in.Reason, Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -781,7 +789,7 @@ func partnerUsersRemove(ctx context.Context, c *ops.Call, in *PartnerRemoveInput
 			TargetKind:      "partner_user",
 			TargetID:        x.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
-			Reason:          in.Reason,
+			Reason:          in.Reason, NextVersion: nil, Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -872,10 +880,15 @@ func partnerUsersResend(
 
 	c.Audit(
 		ops.AuditEntry{
-			Action:     "partnerUsers.resendInvite",
-			TargetKind: "partner_user",
-			TargetID:   x.ID.String(),
-			Reason:     "set-up e-mail sent again",
+			Action:          "partnerUsers.resendInvite",
+			TargetKind:      "partner_user",
+			TargetID:        x.ID.String(),
+			Reason:          "set-up e-mail sent again",
+			PreviousVersion: nil,
+			NextVersion:     nil,
+			Result:          "",
+			Before:          nil,
+			After:           nil,
 		},
 	)
 
@@ -899,10 +912,14 @@ func partnerUsersResend(
 			"method":      nil,
 			"message":     nil,
 		},
-		Channel:       "email",
-		DeliveryState: "queued",
-		Severity:      "normal",
-		OccurredAt:    c.Now,
+		Channel:                "email",
+		DeliveryState:          "queued",
+		Severity:               "normal",
+		OccurredAt:             c.Now,
+		SourceAlertID:          nil,
+		RecipientMembershipID:  nil,
+		ScopeVersionAtCreation: 0,
+		ReadAt:                 nil,
 	}, nil
 }
 

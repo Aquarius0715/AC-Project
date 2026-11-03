@@ -352,7 +352,7 @@ func (m Commands) create(ctx context.Context, c *ops.Call, in *CreateInput) (Com
 			TargetID:    x.ID.String(),
 			NextVersion: &x.Version,
 			Reason:      deref(in.Reason),
-			Result:      "pending",
+			Result:      "pending", PreviousVersion: nil, Before: nil, After: nil,
 		},
 	)
 
@@ -659,16 +659,21 @@ func AuditResult(
 	id := uuid.Must(uuid.NewV7())
 
 	return events.Publish(ctx, tx, tenant, "audit", id, events.AuditRecorded, events.Audit{
-		ID:            id,
-		ActorID:       actor,
-		ActorRole:     "system",
-		Action:        "commands.create",
-		TargetKind:    "command",
-		TargetID:      command.String(),
-		OccurredAt:    at,
-		CorrelationID: *corr,
-		Result:        result,
-		Reason:        reason,
+		ID:              id,
+		ActorID:         actor,
+		ActorRole:       "system",
+		Action:          "commands.create",
+		TargetKind:      "command",
+		TargetID:        command.String(),
+		OccurredAt:      at,
+		CorrelationID:   *corr,
+		Result:          result,
+		Reason:          reason,
+		MembershipID:    nil,
+		PreviousVersion: nil,
+		NextVersion:     nil,
+		MaskedBefore:    nil,
+		MaskedAfter:     nil,
 	})
 }
 

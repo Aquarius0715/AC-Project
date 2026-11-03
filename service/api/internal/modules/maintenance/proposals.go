@@ -1282,7 +1282,12 @@ func (m Proposals) resolvePartnerJob(
 			return Job{}, apperr.Fields(map[string]string{"replyBy": "error.range"})
 		}
 
-		hold := Hold{Kind: "contractor", ContractorOrgID: &org, TechnicianMembershipID: &tech}
+		hold := Hold{
+			Kind:                   "contractor",
+			ContractorOrgID:        &org,
+			TechnicianMembershipID: &tech,
+			MembershipID:           nil,
+		}
 		err = m.insertProposal(
 			ctx,
 			c,

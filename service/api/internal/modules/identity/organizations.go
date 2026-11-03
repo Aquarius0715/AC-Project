@@ -283,14 +283,24 @@ func organizationsSave(
 
 		c.Audit(
 			ops.AuditEntry{
-				Action:      "organizations.save",
-				TargetKind:  "organization",
-				TargetID:    id.String(),
-				NextVersion: &o.Version,
+				Action:          "organizations.save",
+				TargetKind:      "organization",
+				TargetID:        id.String(),
+				NextVersion:     &o.Version,
+				PreviousVersion: nil,
+				Reason:          "",
+				Result:          "",
+				Before:          nil,
+				After:           nil,
 			},
 		)
 		c.Emit(
-			ops.Event{AggregateType: "organization", AggregateID: id, Type: "OrganizationChanged"},
+			ops.Event{
+				AggregateType: "organization",
+				AggregateID:   id,
+				Type:          "OrganizationChanged",
+				Payload:       nil,
+			},
 		)
 
 		return o, nil
@@ -338,10 +348,17 @@ func organizationsSave(
 			TargetKind:      "organization",
 			TargetID:        o.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &o.Version,
+			NextVersion:     &o.Version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
-	c.Emit(ops.Event{AggregateType: "organization", AggregateID: o.ID, Type: "OrganizationChanged"})
+	c.Emit(
+		ops.Event{
+			AggregateType: "organization",
+			AggregateID:   o.ID,
+			Type:          "OrganizationChanged",
+			Payload:       nil,
+		},
+	)
 
 	return o, nil
 }
@@ -461,7 +478,13 @@ func (Directory) ActiveClientOf(
 		ctx,
 		c,
 		QueryMembers,
-		MembersInput{IDs: []uuid.UUID{membership}, Role: "client", OrganizationID: &org},
+		MembersInput{
+			IDs:            []uuid.UUID{membership},
+			Role:           "client",
+			OrganizationID: &org,
+			Permission:     "",
+			ClientRole:     "",
+		},
 	)
 
 	return len(ids) == 1, err

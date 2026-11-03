@@ -72,10 +72,17 @@ func Main(service string, domains ...string) {
 	}
 
 	sc := echo.StartConfig{
-		Address:         cfg.Addr,
-		HideBanner:      true,
-		HidePort:        true,
-		GracefulTimeout: 25 * time.Second,
+		Address:          cfg.Addr,
+		HideBanner:       true,
+		HidePort:         true,
+		GracefulTimeout:  25 * time.Second,
+		CertFilesystem:   nil,
+		TLSConfig:        nil,
+		Listener:         nil,
+		ListenerNetwork:  "",
+		ListenerAddrFunc: nil,
+		OnShutdownError:  nil,
+		BeforeServeFunc:  nil,
 	}
 	startErr := sc.Start(ctx, s.Echo)
 	if startErr != nil && !errors.Is(startErr, http.ErrServerClosed) {
@@ -97,6 +104,21 @@ func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 		IdentityURL:       os.Getenv("IDENTITY_INTERNAL_URL"),
 		InternalToken:     os.Getenv("INTERNAL_API_TOKEN"),
 		ServiceURLs:       map[string]string{},
+		Clock:             nil,
+		DemoStart:         time.Time{},
+		PrincipalTTL:      0,
+		DemoClock:         nil,
+		WriteLimit:        nil,
+		DenyLimit:         nil,
+		IdentityProvider:  nil,
+		AccountApps: identity.AccountApps{
+			Customer:   "",
+			Partner:    "",
+			Technician: "",
+			Admin:      "",
+		},
+		AccountsPerDay: 0,
+		WrapTx:         nil,
 	}
 	// outside the demo the service token must be a real secret: not short, and not the public local value of
 	// compose.yaml (IR430), which anyone could send to the internal endpoints
@@ -132,14 +154,14 @@ func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 			Store:  store,
 			Limit:  limit,
 			Window: time.Minute,
-			Prefix: "ac:rl:write:",
+			Prefix: "ac:rl:write:", Now: nil,
 		}
 		// denied writes recorded in the audit log: one per actor and operation a minute, across instances (IR603)
 		cfg.DenyLimit = &ratelimit.Window{
 			Store:  store,
 			Limit:  1,
 			Window: time.Minute,
-			Prefix: "ac:rl:denied:",
+			Prefix: "ac:rl:denied:", Now: nil,
 		}
 	}
 	// the accounts a contractor or customer owner adds per organization in 24 hours (IR464; 30 by default)
@@ -179,7 +201,7 @@ func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 			TokenURL:     v[0],
 			AdminURL:     strings.TrimRight(v[1], "/"),
 			ClientID:     v[2],
-			ClientSecret: v[3],
+			ClientSecret: v[3], Client: nil, Now: nil,
 		}
 	}
 

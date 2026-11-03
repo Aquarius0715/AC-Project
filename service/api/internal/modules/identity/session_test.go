@@ -52,7 +52,7 @@ func TestSessionGet(t *testing.T) {
 		MembershipID: uuid.New(),
 		UserID:       uuid.New(),
 		OrgID:        uuid.New(),
-		ScopeVersion: 3,
+		ScopeVersion: 3, Scopes: nil, Employment: "", Timezone: "", SessionsRevokedAt: nil,
 	}
 	req := httptest.NewRequest(http.MethodGet, "/v1/session", nil)
 	req = req.WithContext(ops.WithPrincipal(req.Context(), p))

@@ -119,8 +119,8 @@ func LiveTriggers(node string, payload []byte, at time.Time) ([]Trigger, error) 
 				ReceivedAt: at,
 				Origin:     "measured",
 				Quality:    "valid",
-				EventID:    event,
-			},
+				EventID:    event, Sequence: nil,
+			}, CommandID: nil, DeviceID: nil, State: nil, Event: nil, BindingID: nil, Sequence: nil, Kind: "", Recovery: nil,
 		})
 	}
 
@@ -163,7 +163,19 @@ func LiveTriggers(node string, payload []byte, at time.Time) ([]Trigger, error) 
 		OccurredAt: slot,
 		EventType:  "state",
 		DeviceID:   &dev,
-		State:      &devicesim.ReportedState{},
+		State: &devicesim.ReportedState{
+			Power:    nil,
+			Celsius:  nil,
+			Mode:     nil,
+			FanLevel: nil,
+		},
+		CommandID:   nil,
+		Measurement: nil,
+		Event:       nil,
+		BindingID:   nil,
+		Sequence:    nil,
+		Kind:        "",
+		Recovery:    nil,
 	})
 
 	return out, nil
@@ -184,7 +196,7 @@ func liveEvaluation(key string, at time.Time, facts []Fact) Trigger {
 			UnitIDs:    []uuid.UUID{seed.ID(seed.LiveSite.Unit)},
 			Facts:      facts,
 			Phase:      "condition",
-		},
+		}, CommandID: nil, Measurement: nil, DeviceID: nil, State: nil, BindingID: nil, Sequence: nil, Kind: "", Recovery: nil,
 	}
 }
 
@@ -234,18 +246,39 @@ type ConnectionFault struct {
 // sequence or the fault, so a repeat is one event.
 func LiveConnectionTrigger(f ConnectionFault, gap time.Duration, at time.Time) (Trigger, bool) {
 	if f.BindingID == nil {
-		return Trigger{}, false
+		return Trigger{
+			ScenarioID:  "",
+			EventID:     uuid.UUID{},
+			OccurredAt:  time.Time{},
+			EventType:   "",
+			CommandID:   nil,
+			Measurement: nil,
+			DeviceID:    nil,
+			State:       nil,
+			Event:       nil,
+			BindingID:   nil,
+			Sequence:    nil,
+			Kind:        "",
+			Recovery:    nil,
+		}, false
 	}
 
 	dev, seq := seed.ID(seed.LiveSite.Device), f.Sequence+1
 
 	tr := Trigger{
-		ScenarioID: Scenario,
-		OccurredAt: at.UTC(),
-		EventType:  "device",
-		DeviceID:   &dev,
-		BindingID:  f.BindingID,
-		Sequence:   &seq,
+		ScenarioID:  Scenario,
+		OccurredAt:  at.UTC(),
+		EventType:   "device",
+		DeviceID:    &dev,
+		BindingID:   f.BindingID,
+		Sequence:    &seq,
+		EventID:     uuid.UUID{},
+		CommandID:   nil,
+		Measurement: nil,
+		State:       nil,
+		Event:       nil,
+		Kind:        "",
+		Recovery:    nil,
 	}
 	switch {
 	case f.FaultID == nil && gap >= LiveOfflineAfter:
@@ -259,7 +292,21 @@ func LiveConnectionTrigger(f ConnectionFault, gap time.Duration, at time.Time) (
 		tr.Recovery = &Recovery{Axis: "connection", SourceEventID: *f.FaultID, Value: "online"}
 		tr.EventID = uuid.NewSHA1(seed.Namespace, []byte("live/restored/"+f.FaultID.String()))
 	default:
-		return Trigger{}, false
+		return Trigger{
+			ScenarioID:  "",
+			EventID:     uuid.UUID{},
+			OccurredAt:  time.Time{},
+			EventType:   "",
+			CommandID:   nil,
+			Measurement: nil,
+			DeviceID:    nil,
+			State:       nil,
+			Event:       nil,
+			BindingID:   nil,
+			Sequence:    nil,
+			Kind:        "",
+			Recovery:    nil,
+		}, false
 	}
 
 	return tr, true
@@ -276,7 +323,7 @@ type LiveHeard struct {
 
 // NewLiveHeard starts counting at start.
 func NewLiveHeard(start time.Time) *LiveHeard {
-	return &LiveHeard{start: start.Round(0), last: map[string]time.Time{}}
+	return &LiveHeard{start: start.Round(0), last: map[string]time.Time{}, mu: sync.Mutex{}}
 }
 
 // Heard notes a message of node at.
@@ -383,7 +430,7 @@ func LiveCommand(
 	return "COOL24", &devicesim.ReportedState{
 		Power:   &on,
 		Celsius: &celsius,
-		Mode:    &cool,
+		Mode:    &cool, FanLevel: nil,
 	}, true, nil // fan auto has no level
 }
 
@@ -403,19 +450,34 @@ func LiveSentTriggers(w Waiting, at, stateAt time.Time, state *devicesim.Reporte
 				seed.Namespace,
 				[]byte(fmt.Sprintf("%s/%s/command_ack", dev, cmd)),
 			),
-			OccurredAt: at,
-			EventType:  "command_ack",
-			CommandID:  &cmd,
+			OccurredAt:  at,
+			EventType:   "command_ack",
+			CommandID:   &cmd,
+			Measurement: nil,
+			DeviceID:    nil,
+			State:       nil,
+			Event:       nil,
+			BindingID:   nil,
+			Sequence:    nil,
+			Kind:        "",
+			Recovery:    nil,
 		},
 	}
 	if state != nil {
 		out = append(out, Trigger{
-			ScenarioID: Scenario,
-			EventID:    uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("%s/state/%s", dev, cmd))),
-			OccurredAt: stateAt.UTC(),
-			EventType:  "state",
-			DeviceID:   &dev,
-			State:      state,
+			ScenarioID:  Scenario,
+			EventID:     uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("%s/state/%s", dev, cmd))),
+			OccurredAt:  stateAt.UTC(),
+			EventType:   "state",
+			DeviceID:    &dev,
+			State:       state,
+			CommandID:   nil,
+			Measurement: nil,
+			Event:       nil,
+			BindingID:   nil,
+			Sequence:    nil,
+			Kind:        "",
+			Recovery:    nil,
 		})
 	}
 
@@ -433,8 +495,16 @@ func LiveRefusedTrigger(w Waiting, at time.Time) Trigger {
 			seed.Namespace,
 			[]byte(fmt.Sprintf("%s/%s/command_fail", seed.ID(seed.LiveSite.Device), cmd)),
 		),
-		OccurredAt: at.UTC(),
-		EventType:  "command_fail",
-		CommandID:  &cmd,
+		OccurredAt:  at.UTC(),
+		EventType:   "command_fail",
+		CommandID:   &cmd,
+		Measurement: nil,
+		DeviceID:    nil,
+		State:       nil,
+		Event:       nil,
+		BindingID:   nil,
+		Sequence:    nil,
+		Kind:        "",
+		Recovery:    nil,
 	}
 }

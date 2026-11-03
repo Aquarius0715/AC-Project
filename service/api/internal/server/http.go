@@ -39,7 +39,10 @@ func newEcho(
 	e.HTTPErrorHandler = ops.HTTPErrorHandler
 	e.Use(middleware.Recover())
 	e.Use(middleware.RequestIDWithConfig(middleware.RequestIDConfig{
-		Generator: func() string { return uuid.Must(uuid.NewV7()).String() }, // correlation IDs are UUIDv7 (D07)
+		Generator:        func() string { return uuid.Must(uuid.NewV7()).String() }, // correlation IDs are UUIDv7 (D07)
+		Skipper:          nil,
+		RequestIDHandler: nil,
+		TargetHeader:     "",
 	}))
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogStatus:    true,
@@ -69,7 +72,7 @@ func newEcho(
 			)
 
 			return nil
-		},
+		}, Skipper: nil, BeforeNextFunc: nil, LogProtocol: false, LogRemoteIP: false, LogHost: false, LogURIPath: false, LogRoutePath: false, LogReferer: false, LogUserAgent: false, LogContentLength: false, LogResponseSize: false, LogHeaders: nil, LogQueryParams: nil, LogFormValues: nil,
 	}))
 	e.Use(middleware.ContextTimeout(requestTimeout))
 

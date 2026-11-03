@@ -567,15 +567,20 @@ func (m *Module) campaignsSchedule(
 		ops.Event{
 			AggregateType: "firmware_campaign",
 			AggregateID:   id,
-			Type:          "FirmwareCampaignScheduled",
+			Type:          "FirmwareCampaignScheduled", Payload: nil,
 		},
 	)
 	c.Audit(
 		ops.AuditEntry{
-			Action:      "firmwareCampaigns.schedule",
-			TargetKind:  "firmware_campaign",
-			TargetID:    id.String(),
-			NextVersion: &one,
+			Action:          "firmwareCampaigns.schedule",
+			TargetKind:      "firmware_campaign",
+			TargetID:        id.String(),
+			NextVersion:     &one,
+			PreviousVersion: nil,
+			Reason:          "",
+			Result:          "",
+			Before:          nil,
+			After:           nil,
 		},
 	)
 
@@ -740,7 +745,7 @@ func campaignsControl(ctx context.Context, c *ops.Call, in *ControlInput) (Campa
 			TargetID:        in.CampaignID.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &v,
-			Reason:          r,
+			Reason:          r, Result: "", Before: nil, After: nil,
 		},
 	)
 

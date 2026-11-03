@@ -2,6 +2,7 @@ package logging
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 )
@@ -13,8 +14,13 @@ func TestRepeats(t *testing.T) {
 
 	now := time.Date(2026, 10, 14, 0, 0, 0, 0, time.UTC)
 	r := &Repeats{
-		Logf: func(f string, a ...any) { lines = append(lines, fmt.Sprintf(f, a...)) },
-		Now:  func() time.Time { return now },
+		Logf:     func(f string, a ...any) { lines = append(lines, fmt.Sprintf(f, a...)) },
+		Now:      func() time.Time { return now },
+		Every:    0,
+		mu:       sync.Mutex{},
+		last:     "",
+		loggedAt: time.Time{},
+		repeated: 0,
 	}
 	r.OK("tick") // nothing failed yet: nothing to say
 

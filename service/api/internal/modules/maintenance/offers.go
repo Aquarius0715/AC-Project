@@ -13,6 +13,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 )
 
 // Directory is what offers and assignments need from Identity & access.
@@ -507,7 +508,7 @@ func (m Delivery) decide(
 			TargetID:        job.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &v,
-			Reason:          reason,
+			Reason:          reason, Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -764,7 +765,7 @@ func (m Delivery) assignJob(ctx context.Context, c *ops.Call, in *AssignInput) (
 			TargetID:        in.JobID.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &j.Version,
-			Reason:          deref(in.Reason),
+			Reason:          deref(in.Reason), Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -825,7 +826,23 @@ func (m Delivery) checkTechnician(
 		return err
 	}
 
-	if !InScope(&ops.Principal{Scopes: tech.Scopes}, unit, prop, uorg) {
+	if !InScope(
+		&ops.Principal{
+			Scopes:            tech.Scopes,
+			Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
+			TenantID:          uuid.UUID{},
+			MembershipID:      uuid.UUID{},
+			UserID:            uuid.UUID{},
+			OrgID:             uuid.UUID{},
+			ScopeVersion:      0,
+			Employment:        "",
+			Timezone:          "",
+			SessionsRevokedAt: nil,
+		},
+		unit,
+		prop,
+		uorg,
+	) {
 		return apperr.E(apperr.Forbidden, "errors.technician_out_of_scope")
 	}
 

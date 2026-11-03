@@ -65,9 +65,21 @@ func (m *TxManager) Run(
 	p *ops.Principal,
 	fn func(pgx.Tx) error,
 ) error {
-	pool, opts := m.Writer, pgx.TxOptions{IsoLevel: pgx.ReadCommitted}
+	pool, opts := m.Writer, pgx.TxOptions{
+		IsoLevel:       pgx.ReadCommitted,
+		AccessMode:     "",
+		DeferrableMode: "",
+		BeginQuery:     "",
+		CommitQuery:    "",
+	}
 	if readOnly {
-		pool, opts = m.Reader, pgx.TxOptions{AccessMode: pgx.ReadOnly}
+		pool, opts = m.Reader, pgx.TxOptions{
+			AccessMode:     pgx.ReadOnly,
+			IsoLevel:       "",
+			DeferrableMode: "",
+			BeginQuery:     "",
+			CommitQuery:    "",
+		}
 	}
 
 	var err error
@@ -256,17 +268,21 @@ func (Recorder) RecordDenied(
 	}
 
 	return events.Publish(ctx, tx, p.TenantID, "audit", id, events.AuditRecorded, events.Audit{
-		ID:            id,
-		ActorID:       p.UserID.String(),
-		ActorRole:     p.Role,
-		MembershipID:  membership,
-		Action:        op,
-		TargetKind:    d.TargetKind,
-		TargetID:      d.TargetID,
-		OccurredAt:    c.Now,
-		CorrelationID: c.CorrelationID,
-		Result:        "denied",
-		Reason:        d.Reason,
+		ID:              id,
+		ActorID:         p.UserID.String(),
+		ActorRole:       p.Role,
+		MembershipID:    membership,
+		Action:          op,
+		TargetKind:      d.TargetKind,
+		TargetID:        d.TargetID,
+		OccurredAt:      c.Now,
+		CorrelationID:   c.CorrelationID,
+		Result:          "denied",
+		Reason:          d.Reason,
+		PreviousVersion: nil,
+		NextVersion:     nil,
+		MaskedBefore:    nil,
+		MaskedAfter:     nil,
 	})
 }
 

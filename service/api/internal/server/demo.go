@@ -32,7 +32,9 @@ type ScenarioClock interface {
 
 // NewScenarioClock is a process-local scenario clock over base; services of one binary can share it
 // (Config.DemoClock).
-func NewScenarioClock(base func() time.Time) ScenarioClock { return &demoClock{base: base} }
+func NewScenarioClock(base func() time.Time) ScenarioClock {
+	return &demoClock{base: base, mu: sync.Mutex{}, offset: 0}
+}
 
 // demoClock is the base clock plus a forward offset set by demo.advanceClock (IR36), local to this process.
 type demoClock struct {
@@ -380,26 +382,42 @@ func (d *demoOps) inTenant(
 	for _, t := range tenants {
 		found := false
 
-		err := d.m.Run(ctx, false, &ops.Principal{TenantID: t}, func(tx pgx.Tx) error {
-			var ok bool
-			err := tx.QueryRow(ctx, probe, id).Scan(&ok)
-			if err != nil || !ok {
-				return err
-			}
+		err := d.m.Run(
+			ctx,
+			false,
+			&ops.Principal{
+				TenantID:          t,
+				Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
+				MembershipID:      uuid.UUID{},
+				UserID:            uuid.UUID{},
+				OrgID:             uuid.UUID{},
+				ScopeVersion:      0,
+				Scopes:            nil,
+				Employment:        "",
+				Timezone:          "",
+				SessionsRevokedAt: nil,
+			},
+			func(tx pgx.Tx) error {
+				var ok bool
+				err := tx.QueryRow(ctx, probe, id).Scan(&ok)
+				if err != nil || !ok {
+					return err
+				}
 
-			found = true
+				found = true
 
-			_, err = tx.Exec(
-				ctx,
-				`SELECT set_config('app.now', $1, true)`,
-				now.UTC().Format(time.RFC3339Nano),
-			)
-			if err != nil { // column defaults on the demo clock
-				return err
-			}
+				_, err = tx.Exec(
+					ctx,
+					`SELECT set_config('app.now', $1, true)`,
+					now.UTC().Format(time.RFC3339Nano),
+				)
+				if err != nil { // column defaults on the demo clock
+					return err
+				}
 
-			return fn(tx, t)
-		})
+				return fn(tx, t)
+			},
+		)
 		if err != nil || found {
 			return err
 		}
@@ -525,7 +543,13 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 			`SELECT EXISTS (SELECT 1 FROM devices.devices WHERE id = $1)`,
 			*in.DeviceID,
 			func(tx pgx.Tx, _ uuid.UUID) error {
-				_, err := devices.RecordSignal(ctx, tx, s, c.Now, monitoring.Alerts{})
+				_, err := devices.RecordSignal(
+					ctx,
+					tx,
+					s,
+					c.Now,
+					monitoring.Alerts{Units: nil, Access: nil, Devices: nil},
+				)
 
 				return err
 			},
@@ -571,10 +595,23 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 					CorrelationID: uuid.NewString(),
 					Queries:       d.reg,
 					Principal: &ops.Principal{
-						Principal: authz.Principal{Role: "system"},
-						TenantID:  t,
-						UserID:    seed.ID("system-demo"),
-					},
+						Principal: authz.Principal{
+							Role:        "system",
+							Permissions: nil,
+							ClientRole:  "",
+						},
+						TenantID: t,
+						UserID: seed.ID(
+							"system-demo",
+						),
+						MembershipID:      uuid.UUID{},
+						OrgID:             uuid.UUID{},
+						ScopeVersion:      0,
+						Scopes:            nil,
+						Employment:        "",
+						Timezone:          "",
+						SessionsRevokedAt: nil,
+					}, Bearer: "", ExpectedVersion: nil, Candidates: nil, Events: nil, Audits: nil,
 				}
 				_, err := d.notify(ctx, ic, ev)
 				if err != nil {

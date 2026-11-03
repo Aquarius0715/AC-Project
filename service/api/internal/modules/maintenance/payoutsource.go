@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
 )
 
@@ -111,12 +112,37 @@ func NoteHandlers() map[string]events.Handler {
 			}
 
 			c := &ops.Call{
-				Tx:        tx,
-				Now:       n.At,
-				Principal: &ops.Principal{TenantID: e.TenantID, UserID: n.AuthorUserID},
+				Tx:  tx,
+				Now: n.At,
+				Principal: &ops.Principal{
+					TenantID:          e.TenantID,
+					UserID:            n.AuthorUserID,
+					Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
+					MembershipID:      uuid.UUID{},
+					OrgID:             uuid.UUID{},
+					ScopeVersion:      0,
+					Scopes:            nil,
+					Employment:        "",
+					Timezone:          "",
+					SessionsRevokedAt: nil,
+				},
+				CorrelationID:   "",
+				Bearer:          "",
+				Queries:         nil,
+				ExpectedVersion: nil,
+				Candidates:      nil,
+				Events:          nil,
+				Audits:          nil,
 			}
 
-			return PayoutSource{}.AddJobNote(ctx, c, n.JobID, n.Message)
+			return PayoutSource{
+				Jobs: Jobs{Units: nil, Severity: nil, HQOrg: nil, Sites: nil, Blobs: nil},
+			}.AddJobNote(
+				ctx,
+				c,
+				n.JobID,
+				n.Message,
+			)
 		},
 	}
 }

@@ -41,7 +41,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	now, err := iotbridge.ScenarioNow(&http.Client{Timeout: 10 * time.Second}, *api)
+	now, err := iotbridge.ScenarioNow(
+		&http.Client{Timeout: 10 * time.Second, Transport: nil, CheckRedirect: nil, Jar: nil},
+		*api,
+	)
 	if err != nil {
 		log.Fatalf("scenario clock: %v", err)
 	}

@@ -79,7 +79,7 @@ func PathParams(p string) []string {
 
 // NewBinding checks a route against its operation's input type.
 func NewBinding(op *Operation, rt Route) (*Binding, error) {
-	b := &Binding{Route: rt, Path: PathParams(rt.Path)}
+	b := &Binding{Route: rt, Path: PathParams(rt.Path), Body: false, Params: nil, Opaque: nil}
 	switch rt.Method {
 	case http.MethodGet, http.MethodDelete:
 	case http.MethodPost, http.MethodPut, http.MethodPatch:
@@ -192,7 +192,18 @@ func parameters(t reflect.Type, filters []string) (map[string]Param, []string, e
 			case name == "filters" && ft == rawType && !nested:
 				filterAt = append(filterAt, here)
 			case scalar(ft):
-				add(Param{Name: key, At: here, Kind: kindOf(ft), UUID: ft == uuidType})
+				add(
+					Param{
+						Name:  key,
+						At:    here,
+						Kind:  kindOf(ft),
+						UUID:  ft == uuidType,
+						List:  false,
+						Sort:  false,
+						Role:  "",
+						Order: 0,
+					},
+				)
 			case ft.Kind() == reflect.Slice && ft != rawType && scalar(deref(ft.Elem())):
 				add(
 					Param{
@@ -200,7 +211,7 @@ func parameters(t reflect.Type, filters []string) (map[string]Param, []string, e
 						At:   here,
 						Kind: kindOf(deref(ft.Elem())),
 						List: true,
-						UUID: deref(ft.Elem()) == uuidType,
+						UUID: deref(ft.Elem()) == uuidType, Sort: false, Role: "", Order: 0,
 					},
 				)
 			case ft.Kind() == reflect.Struct && !nested:
@@ -217,16 +228,38 @@ func parameters(t reflect.Type, filters []string) (map[string]Param, []string, e
 	}
 
 	for _, at := range queries {
-		add(Param{Name: "cursor", At: append(slices.Clone(at), "cursor"), Role: "cursor"})
+		add(
+			Param{
+				Name:  "cursor",
+				At:    append(slices.Clone(at), "cursor"),
+				Role:  "cursor",
+				Kind:  0,
+				List:  false,
+				Sort:  false,
+				UUID:  false,
+				Order: 0,
+			},
+		)
 		add(
 			Param{
 				Name: "limit",
 				At:   append(slices.Clone(at), "limit"),
 				Kind: KindInteger,
-				Role: "limit",
+				Role: "limit", List: false, Sort: false, UUID: false, Order: 0,
 			},
 		)
-		add(Param{Name: "sort", At: append(slices.Clone(at), "sort"), Sort: true, Role: "sort"})
+		add(
+			Param{
+				Name:  "sort",
+				At:    append(slices.Clone(at), "sort"),
+				Sort:  true,
+				Role:  "sort",
+				Kind:  0,
+				List:  false,
+				UUID:  false,
+				Order: 0,
+			},
+		)
 		filterAt = append(filterAt, append(slices.Clone(at), "filters"))
 	}
 
@@ -243,7 +276,7 @@ func parameters(t reflect.Type, filters []string) (map[string]Param, []string, e
 				Kind:  k.Kind,
 				List:  k.List,
 				Role:  "filter",
-				Order: len(ps),
+				Order: len(ps), Sort: false, UUID: false,
 			}
 		}
 	}
@@ -515,7 +548,7 @@ func (r *Registry) MountREST(g *echo.Group) error {
 					Method:  rt.Method,
 					Path:    "/" + EchoPath(path),
 					Name:    op.Spec.Name,
-					Handler: r.restHandler(op, b),
+					Handler: r.restHandler(op, b), Middlewares: nil,
 				},
 			)
 			if addRouteErr != nil {

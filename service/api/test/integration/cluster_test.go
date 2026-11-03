@@ -13,6 +13,7 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/gateway"
+	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/auth"
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
@@ -81,7 +82,11 @@ func buildCluster(t *testing.T, base apiserver.Config, v auth.Verifier, keep boo
 	}
 
 	for d, s := range cl.srv {
-		s.Registry.Remote = &ops.HTTPQueries{Targets: cl.targets(d), Token: "test-internal"}
+		s.Registry.Remote = &ops.HTTPQueries{
+			Targets: cl.targets(d),
+			Token:   "test-internal",
+			Client:  nil,
+		}
 	}
 
 	return cl
@@ -117,7 +122,37 @@ func newCluster(t *testing.T) splitCluster {
 	all := server(t) // seeds the fixture
 	_ = all
 
-	return buildCluster(t, apiserver.Config{Clock: clockFunc}, testVerifier(t), false)
+	return buildCluster(
+		t,
+		apiserver.Config{
+			Clock:             clockFunc,
+			DatabaseURL:       "",
+			DatabaseReaderURL: "",
+			Addr:              "",
+			DemoOps:           false,
+			DemoStart:         time.Time{},
+			Logger:            nil,
+			Domains:           nil,
+			IdentityURL:       "",
+			InternalToken:     "",
+			ServiceURLs:       nil,
+			PrincipalTTL:      0,
+			DemoClock:         nil,
+			WriteLimit:        nil,
+			DenyLimit:         nil,
+			IdentityProvider:  nil,
+			AccountApps: identity.AccountApps{
+				Customer:   "",
+				Partner:    "",
+				Technician: "",
+				Admin:      "",
+			},
+			AccountsPerDay: 0,
+			WrapTx:         nil,
+		},
+		testVerifier(t),
+		false,
+	)
 }
 
 // targets are the other services' URLs as seen from domain d.
@@ -182,7 +217,7 @@ func clusterFacade(t *testing.T, base apiserver.Config, v auth.Verifier) *apiser
 	}
 
 	gw := gateway.New(targets, nil)
-	f := &apiserver.Server{Registry: all.Registry, DB: all.DB, Consumers: cl.consumers()}
+	f := &apiserver.Server{Registry: all.Registry, DB: all.DB, Consumers: cl.consumers(), Echo: nil}
 	e := echo.New()
 	e.Any("/*", echo.WrapHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasPrefix(r.URL.Path, "/v1/") {
@@ -200,7 +235,7 @@ func clusterFacade(t *testing.T, base apiserver.Config, v auth.Verifier) *apiser
 			return
 		}
 
-		rec := &statusRecorder{ResponseWriter: w}
+		rec := &statusRecorder{ResponseWriter: w, status: 0}
 		gw.ServeHTTP(rec, r)
 
 		if r.URL.Path == "/v1/demo/advance-clock" && rec.status == http.StatusOK &&
@@ -250,7 +285,7 @@ func (cl splitCluster) tick(ctx context.Context, now time.Time) (scheduler.Resul
 		total.Jobs += r.Jobs
 	}
 
-	f := &apiserver.Server{Consumers: cl.consumers()}
+	f := &apiserver.Server{Consumers: cl.consumers(), Echo: nil, Registry: nil, DB: nil}
 
 	return total, f.DrainEvents(ctx)
 }

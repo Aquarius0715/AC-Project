@@ -67,11 +67,11 @@ func TestCompareAndRecover(t *testing.T) {
 	high, low := AlertCondition{
 		Operator:          "gte",
 		Threshold:         28,
-		RecoveryThreshold: 26,
+		RecoveryThreshold: 26, Metric: "", DurationSeconds: 0, ActiveWindow: nil, Severity: "",
 	}, AlertCondition{
 		Operator:          "lt",
 		Threshold:         16,
-		RecoveryThreshold: 18,
+		RecoveryThreshold: 18, Metric: "", DurationSeconds: 0, ActiveWindow: nil, Severity: "",
 	}
 	if !recovered(high, 25.9) || recovered(high, 26) || recovered(high, 27) {
 		t.Error("a high limit recovers below its recovery threshold only")

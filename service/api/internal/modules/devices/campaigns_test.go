@@ -97,15 +97,15 @@ func TestControlInput(t *testing.T) {
 		in   ControlInput
 		want map[string]string
 	}{
-		"pause":                {ControlInput{CampaignID: camp, Action: "pause"}, map[string]string{}},
-		"resume":               {ControlInput{CampaignID: camp, Action: "resume"}, map[string]string{}},
-		"abort":                {ControlInput{CampaignID: camp, Action: "abort", Reason: &reason}, map[string]string{}},
-		"abort without reason": {ControlInput{CampaignID: camp, Action: "abort"}, map[string]string{"reason": "error.length"}},
-		"abort blank reason":   {ControlInput{CampaignID: camp, Action: "abort", Reason: &blank}, map[string]string{"reason": "error.length"}},
-		"retry a device":       {ControlInput{CampaignID: camp, Action: "retry_device", DeviceID: &dev}, map[string]string{}},
-		"retry without device": {ControlInput{CampaignID: camp, Action: "retry_device"}, map[string]string{"deviceId": "error.required"}},
-		"unknown action":       {ControlInput{CampaignID: camp, Action: "restart"}, map[string]string{"action": "error.invalid"}},
-		"no campaign":          {ControlInput{Action: "pause"}, map[string]string{"campaignId": "error.required"}},
+		"pause":                {ControlInput{CampaignID: camp, Action: "pause", DeviceID: nil, Reason: nil}, map[string]string{}},
+		"resume":               {ControlInput{CampaignID: camp, Action: "resume", DeviceID: nil, Reason: nil}, map[string]string{}},
+		"abort":                {ControlInput{CampaignID: camp, Action: "abort", Reason: &reason, DeviceID: nil}, map[string]string{}},
+		"abort without reason": {ControlInput{CampaignID: camp, Action: "abort", DeviceID: nil, Reason: nil}, map[string]string{"reason": "error.length"}},
+		"abort blank reason":   {ControlInput{CampaignID: camp, Action: "abort", Reason: &blank, DeviceID: nil}, map[string]string{"reason": "error.length"}},
+		"retry a device":       {ControlInput{CampaignID: camp, Action: "retry_device", DeviceID: &dev, Reason: nil}, map[string]string{}},
+		"retry without device": {ControlInput{CampaignID: camp, Action: "retry_device", DeviceID: nil, Reason: nil}, map[string]string{"deviceId": "error.required"}},
+		"unknown action":       {ControlInput{CampaignID: camp, Action: "restart", DeviceID: nil, Reason: nil}, map[string]string{"action": "error.invalid"}},
+		"no campaign":          {ControlInput{Action: "pause", CampaignID: uuid.UUID{}, DeviceID: nil, Reason: nil}, map[string]string{"campaignId": "error.required"}},
 	} {
 		in := c.in
 		if got := in.Validate(); !maps.Equal(got, c.want) {

@@ -34,7 +34,7 @@ func Open(
 	base func() time.Time,
 	start time.Time,
 ) (*Clock, error) {
-	c := &Clock{pool: pool, base: base}
+	c := &Clock{pool: pool, base: base, mu: sync.Mutex{}, offset: 0, loadedAt: time.Time{}}
 
 	off := time.Duration(0)
 	if !start.IsZero() {

@@ -445,7 +445,16 @@ func saveBaseline(ctx context.Context, c *ops.Call, in *BaselineInput) (Baseline
 			Kind:          "measured",
 			ExpectedSlots: n.ExpectedSlots,
 			ValidSlots:    n.ValidSlots,
-			Coverage:      float64(n.ValidSlots) / float64(n.ExpectedSlots),
+			Coverage: float64(
+				n.ValidSlots,
+			) / float64(
+				n.ExpectedSlots,
+			),
+			SourceSnapshot: *new(struct {
+				Generation  int       "json:\"generation\""
+				EventCursor int       "json:\"eventCursor\""
+				SnapshotAt  time.Time "json:\"snapshotAt\""
+			}),
 		}
 
 		q.SourceSnapshot.Generation, q.SourceSnapshot.SnapshotAt = 1, c.Now
@@ -499,7 +508,7 @@ func saveBaseline(ctx context.Context, c *ops.Call, in *BaselineInput) (Baseline
 			TargetKind:      "baseline",
 			TargetID:        id.String(),
 			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &version,
+			NextVersion:     &version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 

@@ -3,7 +3,9 @@ package restrictions
 import (
 	"context"
 	"encoding/json"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
@@ -48,7 +50,12 @@ func EventHandlers() map[string]events.Handler {
 
 			var observed *Observation
 			if len(p.Observed) > 0 && string(p.Observed) != "null" {
-				observed = &Observation{}
+				observed = &Observation{
+					RestrictionID: uuid.UUID{},
+					RulesVersion:  "",
+					Policy:        nil,
+					ObservedAt:    time.Time{},
+				}
 				err := json.Unmarshal(p.Observed, observed)
 				if err != nil {
 					return err

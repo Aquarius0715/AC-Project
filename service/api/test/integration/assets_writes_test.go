@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
@@ -585,7 +586,18 @@ func TestAssetWritesLifecycle(t *testing.T) {
 	// denied entry (IR603), counted apart
 	var audits, events int
 
-	p := &ops.Principal{TenantID: seed.ID("tenant-a"), MembershipID: seed.ID("hq-operator")}
+	p := &ops.Principal{
+		TenantID:          seed.ID("tenant-a"),
+		MembershipID:      seed.ID("hq-operator"),
+		Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
+		UserID:            uuid.UUID{},
+		OrgID:             uuid.UUID{},
+		ScopeVersion:      0,
+		Scopes:            nil,
+		Employment:        "",
+		Timezone:          "",
+		SessionsRevokedAt: nil,
+	}
 	err := s.DB.Run(t.Context(), true, p, func(tx pgx.Tx) error {
 		err := tx.QueryRow(t.Context(), `SELECT count(*) FROM audit.audit_log WHERE target_id = $1 AND result = 'success'`, prop).
 			Scan(&audits)

@@ -67,10 +67,10 @@ func main() {
 	resolver := iotbridge.NewResolver(
 		append(append([]iotbridge.Link{}, iotbridge.Links...), iotbridge.FleetLinks(fleet)...),
 	)
-	httpc := &http.Client{Timeout: 10 * time.Second}
+	httpc := &http.Client{Timeout: 10 * time.Second, Transport: nil, CheckRedirect: nil, Jar: nil}
 	endpoint := *api + "/v1/demo/trigger"
 
-	clock := &demoClock{api: *api, c: httpc}
+	clock := &demoClock{api: *api, c: httpc, mu: sync.Mutex{}, off: 0}
 
 	refreshErr := clock.refresh()
 	if refreshErr != nil {
@@ -237,7 +237,11 @@ func listenLive(
 
 	gate := &iotbridge.LiveGate{}
 	heard := iotbridge.NewLiveHeard(time.Now())
-	rep := &logging.Repeats{Logf: log.Printf} // while the API is away, once a minute
+	rep := &logging.Repeats{
+		Logf:  log.Printf,
+		Every: 0,
+		Now:   nil,
+	} // while the API is away, once a minute
 
 	go reportGap(ctx, heard, clock, httpc, endpoint, api)
 
@@ -440,7 +444,7 @@ func pollCommands(
 	defer t.Stop()
 
 	rep := &logging.Repeats{
-		Logf: log.Printf,
+		Logf: log.Printf, Every: 0, Now: nil,
 	} // while the API is away, once a minute instead of every poll (IR429)
 
 	for {
@@ -558,7 +562,7 @@ func reportGap(
 	t := time.NewTicker(time.Minute)
 	defer t.Stop()
 
-	rep := &logging.Repeats{Logf: log.Printf}
+	rep := &logging.Repeats{Logf: log.Printf, Every: 0, Now: nil}
 
 	for {
 		select {

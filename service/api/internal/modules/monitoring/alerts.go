@@ -520,7 +520,7 @@ func (m Alerts) acknowledge(ctx context.Context, c *ops.Call, in *AckInput) (Ale
 			TargetKind:      "alert",
 			TargetID:        a.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &a.Version,
+			NextVersion:     &a.Version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -636,7 +636,7 @@ func (m Alerts) resolve(ctx context.Context, c *ops.Call, in *ResolveInput) (Ale
 			TargetID:        a.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &a.Version,
-			Reason:          in.ResolutionReason,
+			Reason:          in.ResolutionReason, Result: "", Before: nil, After: nil,
 		},
 	)
 

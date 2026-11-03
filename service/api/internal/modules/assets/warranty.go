@@ -103,7 +103,13 @@ func (m *Module) RemindWarranties(ctx context.Context, c *ops.Call) (int, error)
 			recipients, err = identity.Members(
 				ctx,
 				c,
-				identity.MembersInput{Role: "admin", Permission: "asset.read"},
+				identity.MembersInput{
+					Role:           "admin",
+					Permission:     "asset.read",
+					IDs:            nil,
+					OrganizationID: nil,
+					ClientRole:     "",
+				},
 			)
 			if err != nil {
 				return n, err
@@ -123,7 +129,12 @@ func (m *Module) RemindWarranties(ctx context.Context, c *ops.Call) (int, error)
 				TargetKind:            "unit",
 				TargetID:              d.id,
 				Severity:              severity,
-				Params:                map[string]any{"at": d.ends, "status": "expiring"},
+				Params: map[string]any{
+					"at":     d.ends,
+					"status": "expiring",
+				},
+				Channel:       "",
+				SourceAlertID: nil,
 			})
 			if err != nil {
 				return n, err
@@ -147,7 +158,15 @@ func (m *Module) RemindWarranties(ctx context.Context, c *ops.Call) (int, error)
 				Action:     "units.remindWarranty",
 				TargetKind: "unit",
 				TargetID:   d.id.String(),
-				Reason:     fmt.Sprintf("%d days before the warranty ends", days),
+				Reason: fmt.Sprintf(
+					"%d days before the warranty ends",
+					days,
+				),
+				PreviousVersion: nil,
+				NextVersion:     nil,
+				Result:          "",
+				Before:          nil,
+				After:           nil,
 			},
 		)
 

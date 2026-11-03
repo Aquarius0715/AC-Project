@@ -13,6 +13,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/auth"
 	"github.com/pradita/ac-project/service/api/internal/seed"
@@ -133,7 +134,32 @@ func testVerifier(t *testing.T) testTokens {
 func serverCfg(t *testing.T, opt func(*apiserver.Config)) *apiserver.Server {
 	t.Helper()
 	v := testVerifier(t)
-	cfg := apiserver.Config{DatabaseURL: testDB("ac_app_login"), Clock: clockFunc}
+	cfg := apiserver.Config{
+		DatabaseURL:       testDB("ac_app_login"),
+		Clock:             clockFunc,
+		DatabaseReaderURL: "",
+		Addr:              "",
+		DemoOps:           false,
+		DemoStart:         time.Time{},
+		Logger:            nil,
+		Domains:           nil,
+		IdentityURL:       "",
+		InternalToken:     "",
+		ServiceURLs:       nil,
+		PrincipalTTL:      0,
+		DemoClock:         nil,
+		WriteLimit:        nil,
+		DenyLimit:         nil,
+		IdentityProvider:  nil,
+		AccountApps: identity.AccountApps{
+			Customer:   "",
+			Partner:    "",
+			Technician: "",
+			Admin:      "",
+		},
+		AccountsPerDay: 0,
+		WrapTx:         nil,
+	}
 	opt(&cfg)
 
 	if clusterMode && len(cfg.Domains) == 0 &&

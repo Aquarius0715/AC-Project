@@ -213,7 +213,8 @@ func (r *Resolver) Triggers(b devicesim.Batch, received time.Time) ([]Trigger, e
 				Origin:     "measured",
 				Quality:    "valid",
 				EventID:    event, // no sequence: the API numbers the reading after the latest (IR77)
-			},
+				Sequence:   nil,
+			}, CommandID: nil, DeviceID: nil, State: nil, Event: nil, BindingID: nil, Sequence: nil, Kind: "", Recovery: nil,
 		})
 	}
 
@@ -237,7 +238,21 @@ func CommandTrigger(a devicesim.Ack, received time.Time) (Trigger, bool, error) 
 	case "unsupported":
 		kind = "command_fail"
 	default:
-		return Trigger{}, false, nil
+		return Trigger{
+			ScenarioID:  "",
+			EventID:     uuid.UUID{},
+			OccurredAt:  time.Time{},
+			EventType:   "",
+			CommandID:   nil,
+			Measurement: nil,
+			DeviceID:    nil,
+			State:       nil,
+			Event:       nil,
+			BindingID:   nil,
+			Sequence:    nil,
+			Kind:        "",
+			Recovery:    nil,
+		}, false, nil
 	}
 
 	return Trigger{
@@ -246,9 +261,17 @@ func CommandTrigger(a devicesim.Ack, received time.Time) (Trigger, bool, error) 
 			seed.Namespace,
 			[]byte(fmt.Sprintf("%s/%s/%s", a.DeviceID, a.CommandID, kind)),
 		),
-		OccurredAt: received.UTC(),
-		EventType:  kind,
-		CommandID:  &cmd,
+		OccurredAt:  received.UTC(),
+		EventType:   kind,
+		CommandID:   &cmd,
+		Measurement: nil,
+		DeviceID:    nil,
+		State:       nil,
+		Event:       nil,
+		BindingID:   nil,
+		Sequence:    nil,
+		Kind:        "",
+		Recovery:    nil,
 	}, true, nil
 }
 
@@ -269,7 +292,12 @@ func FleetLinks(f devicesim.Fleet) []Link {
 
 		out = append(
 			out,
-			Link{Device: devicesim.DeviceName(p), Unit: devicesim.UnitName(p), Sensors: sensors},
+			Link{
+				Device:     devicesim.DeviceName(p),
+				Unit:       devicesim.UnitName(p),
+				Sensors:    sensors,
+				Connection: "",
+			},
 		)
 	}
 

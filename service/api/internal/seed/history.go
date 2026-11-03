@@ -155,7 +155,19 @@ func ApplyFleetHistory(
 			{"co2", "ppm", `600 + 350 * sin(pi() * ((extract(hour from t AT TIME ZONE 'Asia/Kuala_Lumpur') + extract(minute from t) / 60.0) - 8) / 14) + 80 * j`, `430 + 40 * j`},
 			{"pm25", "µg/m³", `12 + 10 * j`, `8 + 8 * j`},
 		} {
-			id := ID(devicesim.SensorName(p, devicesim.Sensor{Metric: a.metric}))
+			id := ID(
+				devicesim.SensorName(
+					p,
+					devicesim.Sensor{
+						Metric:   a.metric,
+						ID:       "",
+						Unit:     "",
+						Base:     0,
+						Swing:    0,
+						Boundary: "",
+					},
+				),
+			)
 
 			tag, err = tx.Exec(
 				ctx,

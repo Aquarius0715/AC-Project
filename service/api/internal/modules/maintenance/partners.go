@@ -124,7 +124,15 @@ func pct(n, d int) *float64 {
 
 // kpis computes ContractorKpis for the 90 days ending now (IR131 item 6).
 func (m Partners) kpis(ctx context.Context, c *ops.Call, org uuid.UUID) (KPIs, error) {
-	k := KPIs{Period: Range{c.Now.Add(-90 * 24 * time.Hour), c.Now}}
+	k := KPIs{
+		Period:            Range{c.Now.Add(-90 * 24 * time.Hour), c.Now},
+		OfferAcceptance:   nil,
+		ArrivalInWindow:   nil,
+		FirstTimeAccepted: nil,
+		AverageRating:     nil,
+		RatingCount:       0,
+		ReworkRate:        nil,
+	}
 
 	var acc, dec int
 	// offers closed by HQ's cancellation or the client's reschedule were no decision of the contractor (IR452)
@@ -615,7 +623,7 @@ func (m Partners) save(ctx context.Context, c *ops.Call, in *ProfileInput) (Prof
 			TargetKind:      "contractor",
 			TargetID:        id.String(),
 			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &p.Version,
+			NextVersion:     &p.Version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -724,7 +732,7 @@ func (m Partners) setOfferStatus(
 			TargetID:        p.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &p.Version,
-			Reason:          in.Reason,
+			Reason:          in.Reason, Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -905,10 +913,15 @@ func (m Partners) saveRateCard(
 	)
 	c.Audit(
 		ops.AuditEntry{
-			Action:      "rateCards.save",
-			TargetKind:  "rate_card",
-			TargetID:    x.ID.String(),
-			NextVersion: &x.Version,
+			Action:          "rateCards.save",
+			TargetKind:      "rate_card",
+			TargetID:        x.ID.String(),
+			NextVersion:     &x.Version,
+			PreviousVersion: nil,
+			Reason:          "",
+			Result:          "",
+			Before:          nil,
+			After:           nil,
 		},
 	)
 
@@ -1029,7 +1042,18 @@ func (m Partners) listRateCards(
 var planTypes = []string{"rto", "general", "energy", "environment"}
 
 // DefaultSLA is the target used when no SlaTargets row applies (IR131 item 4).
-var DefaultSLA = SlaTargets{ResponseHours: 4, ArrivalInWindowPercent: 90, FirstTimeFixPercent: 85}
+var DefaultSLA = SlaTargets{
+	ResponseHours:          4,
+	ArrivalInWindowPercent: 90,
+	FirstTimeFixPercent:    85,
+	ID:                     uuid.UUID{},
+	TenantID:               uuid.UUID{},
+	Version:                0,
+	CreatedAt:              time.Time{},
+	UpdatedAt:              time.Time{},
+	PlanType:               "",
+	EffectiveFrom:          time.Time{},
+}
 
 // SlaTargets is SlaTargets of service-contracts.ts.
 type SlaTargets struct {
@@ -1138,10 +1162,15 @@ func (m Partners) saveTargets(
 	)
 	c.Audit(
 		ops.AuditEntry{
-			Action:      "sla.saveTargets",
-			TargetKind:  "sla_targets",
-			TargetID:    t.ID.String(),
-			NextVersion: &t.Version,
+			Action:          "sla.saveTargets",
+			TargetKind:      "sla_targets",
+			TargetID:        t.ID.String(),
+			NextVersion:     &t.Version,
+			PreviousVersion: nil,
+			Reason:          "",
+			Result:          "",
+			Before:          nil,
+			After:           nil,
 		},
 	)
 
@@ -1175,7 +1204,7 @@ func targetViews(all []SlaTargets, now time.Time) []TargetView {
 			ArrivalInWindowPercent: t.ArrivalInWindowPercent,
 			FirstTimeFixPercent:    t.FirstTimeFixPercent,
 			Version:                t.Version,
-			State:                  state,
+			State:                  state, EffectiveFrom: nil,
 		}
 		if state != "default" {
 			e := t.EffectiveFrom
@@ -1296,7 +1325,7 @@ func (t *tally) metrics() Metrics {
 		ArrivalInWindow:      pct(t.arrOK, t.arrN),
 		FirstTimeFix:         pct(t.ftfOK, t.ftfN),
 		RatingCount:          t.rated,
-		OpenOverdue:          t.overdue,
+		OpenOverdue:          t.overdue, AverageRating: nil,
 	}
 	if t.rated > 0 {
 		v := math.Round(float64(t.stars)*10/float64(t.rated)) / 10
@@ -1404,9 +1433,31 @@ func (m Partners) scorecard(
 		ContractorOrgID: in.ContractorOrgID,
 		Customers:       []CustomerMetrics{},
 		Breaches:        []Breach{},
-		Targets:         targetViews(targets, c.Now),
+		Targets: targetViews(
+			targets,
+			c.Now,
+		),
+		Totals: Metrics{
+			ResponseWithinTarget: nil,
+			ArrivalInWindow:      nil,
+			FirstTimeFix:         nil,
+			AverageRating:        nil,
+			RatingCount:          0,
+			OpenOverdue:          0,
+		},
 	}
-	total := &tally{}
+	total := &tally{
+		respN:   0,
+		respOK:  0,
+		arrN:    0,
+		arrOK:   0,
+		ftfN:    0,
+		ftfOK:   0,
+		stars:   0,
+		rated:   0,
+		overdue: 0,
+		jobs:    0,
+	}
 	per := map[uuid.UUID]*tally{}
 	planOf := map[uuid.UUID]string{}
 
@@ -1417,7 +1468,18 @@ func (m Partners) scorecard(
 
 		cust, _ := uuid.Parse(prof[0])
 		if per[cust] == nil {
-			per[cust] = &tally{}
+			per[cust] = &tally{
+				respN:   0,
+				respOK:  0,
+				arrN:    0,
+				arrOK:   0,
+				ftfN:    0,
+				ftfOK:   0,
+				stars:   0,
+				rated:   0,
+				overdue: 0,
+				jobs:    0,
+			}
 			planOf[cust] = prof[1]
 			order = append(order, cust)
 		}
@@ -1460,6 +1522,9 @@ func (m Partners) scorecard(
 						),
 						TookMinutes:  &took,
 						LimitMinutes: &limitMin,
+						JobID:        uuid.UUID{},
+						CustomerID:   uuid.UUID{},
+						at:           time.Time{},
 					},
 				)
 			}
@@ -1475,6 +1540,10 @@ func (m Partners) scorecard(
 					Kind:         "response",
 					Detail:       "no response within " + durationText(limit),
 					LimitMinutes: &limitMin,
+					JobID:        uuid.UUID{},
+					CustomerID:   uuid.UUID{},
+					TookMinutes:  nil,
+					at:           time.Time{},
 				},
 			)
 		}
@@ -1488,7 +1557,17 @@ func (m Partners) scorecard(
 			}
 
 			if !j.inWindow {
-				breach(Breach{Kind: "arrival", Detail: "arrival outside the scheduled window"})
+				breach(
+					Breach{
+						Kind:         "arrival",
+						Detail:       "arrival outside the scheduled window",
+						JobID:        uuid.UUID{},
+						CustomerID:   uuid.UUID{},
+						TookMinutes:  nil,
+						LimitMinutes: nil,
+						at:           time.Time{},
+					},
+				)
 			}
 		}
 
@@ -1503,7 +1582,17 @@ func (m Partners) scorecard(
 			}
 
 			if !ok {
-				breach(Breach{Kind: "first_time_fix", Detail: "not fixed the first time"})
+				breach(
+					Breach{
+						Kind:         "first_time_fix",
+						Detail:       "not fixed the first time",
+						JobID:        uuid.UUID{},
+						CustomerID:   uuid.UUID{},
+						TookMinutes:  nil,
+						LimitMinutes: nil,
+						at:           time.Time{},
+					},
+				)
 			}
 		}
 
@@ -1519,7 +1608,17 @@ func (m Partners) scorecard(
 				t.overdue++
 			}
 
-			breach(Breach{Kind: "overdue", Detail: "open past its due time"})
+			breach(
+				Breach{
+					Kind:         "overdue",
+					Detail:       "open past its due time",
+					JobID:        uuid.UUID{},
+					CustomerID:   uuid.UUID{},
+					TookMinutes:  nil,
+					LimitMinutes: nil,
+					at:           time.Time{},
+				},
+			)
 		}
 	}
 

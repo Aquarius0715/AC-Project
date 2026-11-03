@@ -3,7 +3,7 @@ package scheduler
 import "testing"
 
 func TestResultChanges(t *testing.T) {
-	if (Result{}).changes() != 0 {
+	if (Result{ExpiredOffers: 0, ExpiredCommands: 0, Runs: 0, Confirmed: 0, ExpiredProposals: 0, FrozenHistories: 0, Jobs: 0, Skipped: 0}).changes() != 0 {
 		t.Fatal("an empty tick changes nothing")
 	}
 
@@ -14,7 +14,7 @@ func TestResultChanges(t *testing.T) {
 		Confirmed:        4,
 		ExpiredProposals: 5,
 		FrozenHistories:  6,
-		Jobs:             7,
+		Jobs:             7, Skipped: 0,
 	}
 	if got := r.changes(); got != 28 {
 		t.Fatalf("changes() = %d, want the sum of every counter (28)", got)

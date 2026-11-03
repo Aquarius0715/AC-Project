@@ -6,12 +6,15 @@ import (
 	"errors"
 	"net/http/httptest"
 	"slices"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/bootstrap"
+	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/idp"
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
@@ -53,8 +56,8 @@ func TestBootstrapAdmin(t *testing.T) {
 		At:           clock,
 	}
 	for name, bad := range map[string]bootstrap.Input{
-		"no tenant": {Organization: "HQ", Email: in.Email, Name: in.Name}, "no address": {Tenant: in.Tenant, Organization: "HQ", Email: "nobody", Name: in.Name},
-		"no name": {Tenant: in.Tenant, Organization: "HQ", Email: in.Email},
+		"no tenant": {Organization: "HQ", Email: in.Email, Name: in.Name, Tenant: "", At: time.Time{}}, "no address": {Tenant: in.Tenant, Organization: "HQ", Email: "nobody", Name: in.Name, At: time.Time{}},
+		"no name": {Tenant: in.Tenant, Organization: "HQ", Email: in.Email, Name: "", At: time.Time{}},
 	} {
 		_, err := run(bad)
 		if err == nil {
@@ -130,17 +133,48 @@ func TestBootstrapAdmin(t *testing.T) {
 	)
 
 	// the identity consumer opens the account; the administrator then works in Access & roles
-	fake := &fakeIdP{}
+	fake := &fakeIdP{
+		mu:         sync.Mutex{},
+		subjects:   nil,
+		err:        nil,
+		created:    nil,
+		updated:    nil,
+		setups:     nil,
+		switched:   nil,
+		failing:    false,
+		lost:       nil,
+		generation: 0,
+	}
 	v := testVerifier(t)
 	v["tok-boot-"+tag] = r.UserID.String()
 
 	s, err := apiserver.New(
 		ctx,
 		apiserver.Config{
-			DatabaseURL:      testDB("ac_app_login"),
-			Clock:            clockFunc,
-			IdentityProvider: fake,
-			Domains:          ops.Domains,
+			DatabaseURL:       testDB("ac_app_login"),
+			Clock:             clockFunc,
+			IdentityProvider:  fake,
+			Domains:           ops.Domains,
+			DatabaseReaderURL: "",
+			Addr:              "",
+			DemoOps:           false,
+			DemoStart:         time.Time{},
+			Logger:            nil,
+			IdentityURL:       "",
+			InternalToken:     "",
+			ServiceURLs:       nil,
+			PrincipalTTL:      0,
+			DemoClock:         nil,
+			WriteLimit:        nil,
+			DenyLimit:         nil,
+			AccountApps: identity.AccountApps{
+				Customer:   "",
+				Partner:    "",
+				Technician: "",
+				Admin:      "",
+			},
+			AccountsPerDay: 0,
+			WrapTx:         nil,
 		},
 		v,
 	)

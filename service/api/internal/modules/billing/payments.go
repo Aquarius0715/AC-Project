@@ -113,7 +113,14 @@ func (m Billing) markPaid(ctx context.Context, c *ops.Call, invoice uuid.UUID) e
 		return execErr
 	}
 
-	c.Emit(ops.Event{AggregateType: "invoice", AggregateID: invoice, Type: "InvoicePaid"})
+	c.Emit(
+		ops.Event{
+			AggregateType: "invoice",
+			AggregateID:   invoice,
+			Type:          "InvoicePaid",
+			Payload:       nil,
+		},
+	)
 
 	if m.Releases == nil {
 		return nil
@@ -153,7 +160,7 @@ func (m Billing) paymentResult(
 			TargetID:        id.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &p.Version,
-			Reason:          reason,
+			Reason:          reason, Result: "", Before: nil, After: nil,
 		},
 	)
 

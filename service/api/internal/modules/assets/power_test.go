@@ -3,6 +3,8 @@ package assets
 import (
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func TestEffectivePower(t *testing.T) {
@@ -16,9 +18,34 @@ func TestEffectivePower(t *testing.T) {
 	mk := func(conn string, p *bool, obs *time.Time) *Unit {
 		return &Unit{
 			ACUnit: ACUnit{
-				Connection:    conn,
-				ObservedState: ObservedState{Power: p, ObservedAt: obs},
-			},
+				Connection: conn,
+				ObservedState: ObservedState{
+					Power:      p,
+					ObservedAt: obs,
+					Celsius:    nil,
+					Mode:       nil,
+					FanLevel:   nil,
+				},
+				ID:                  uuid.UUID{},
+				TenantID:            uuid.UUID{},
+				Version:             0,
+				CreatedAt:           time.Time{},
+				UpdatedAt:           time.Time{},
+				CustomerOrgID:       uuid.UUID{},
+				PropertyID:          uuid.UUID{},
+				SpaceID:             nil,
+				DisplayName:         "",
+				ModelID:             uuid.UUID{},
+				Type:                "",
+				InstalledAt:         nil,
+				ServiceScope:        nil,
+				WarrantyEndsAt:      nil,
+				AlertPolicyIDs:      nil,
+				Archived:            false,
+				CapabilityVersion:   0,
+				ObservedRestriction: nil,
+				LastSeenAt:          nil,
+			}, EffectivePowerState: "", LatestMeasurements: nil, ActiveAlertCount: 0,
 		}
 	}
 

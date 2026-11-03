@@ -240,7 +240,7 @@ func jobVersion(ctx context.Context, c *ops.Call, in *JobInput) (JobVersionResul
 	err := c.Tx.QueryRow(ctx, `SELECT version, unit_id FROM maintenance.jobs WHERE id = $1`, in.JobID).
 		Scan(&r.Version, &r.UnitID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return JobVersionResult{}, nil
+		return JobVersionResult{Version: 0, UnitID: uuid.UUID{}, Found: false}, nil
 	}
 
 	r.Found = err == nil

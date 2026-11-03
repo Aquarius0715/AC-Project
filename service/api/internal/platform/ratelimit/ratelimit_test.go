@@ -3,6 +3,7 @@ package ratelimit
 import (
 	"context"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -86,7 +87,7 @@ func TestWindow(t *testing.T) {
 }
 
 func TestMemory(t *testing.T) {
-	m := &Memory{}
+	m := &Memory{mu: sync.Mutex{}, n: nil}
 	for i := int64(1); i <= 2; i++ {
 		if n, _ := m.Incr(context.Background(), "k", time.Minute); n != i {
 			t.Fatalf("incr %d: %d", i, n)

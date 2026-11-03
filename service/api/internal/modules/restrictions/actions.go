@@ -168,7 +168,7 @@ func (m Restrictions) except(
 			TargetID:        x.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &next,
-			Reason:          in.Reason,
+			Reason:          in.Reason, Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -261,7 +261,7 @@ func (m Restrictions) release(
 			TargetKind:      "restriction",
 			TargetID:        x.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &next,
+			NextVersion:     &next, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -349,7 +349,7 @@ func (m Restrictions) override(
 			TargetID:        x.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &next,
-			Reason:          in.Reason,
+			Reason:          in.Reason, Result: "", Before: nil, After: nil,
 		},
 	)
 	x, err = load(ctx, c, x.ID, false)
@@ -607,7 +607,7 @@ func (m Restrictions) reconcile(ctx context.Context, c *ops.Call, in *ReconcileI
 			TargetKind:      "restriction",
 			TargetID:        x.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &next,
+			NextVersion:     &next, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 	x, err = load(ctx, c, x.ID, false)
@@ -841,7 +841,7 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, in *RetryInput) (a
 			TargetID:        x.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &next,
-			Reason:          in.Reason,
+			Reason:          in.Reason, Result: "", Before: nil, After: nil,
 		},
 	)
 	x, err = load(ctx, c, x.ID, false)

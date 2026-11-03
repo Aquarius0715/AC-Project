@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -48,8 +49,12 @@ func TestRemoteSource(t *testing.T) {
 			Permissions: []string{
 				"control.execute",
 			},
-			Scopes:       map[string][]uuid.UUID{"unit": {good}},
-			ScopeVersion: 3,
+			Scopes:            map[string][]uuid.UUID{"unit": {good}},
+			ScopeVersion:      3,
+			OrgID:             uuid.UUID{},
+			Employment:        "",
+			Timezone:          "",
+			SessionsRevokedAt: nil,
 		})
 	}))
 	defer srv.Close()
@@ -59,7 +64,7 @@ func TestRemoteSource(t *testing.T) {
 		BaseURL: srv.URL,
 		Token:   "internal",
 		TTL:     30 * time.Second,
-		Now:     func() time.Time { return now },
+		Now:     func() time.Time { return now }, Client: nil, mu: sync.Mutex{}, cache: nil,
 	}
 	ctx := context.Background()
 	none := time.Time{}

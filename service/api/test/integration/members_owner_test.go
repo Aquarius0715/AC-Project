@@ -9,6 +9,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/auth"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -172,12 +173,21 @@ func TestMembersSaveNewUser(t *testing.T) {
 		t.Errorf("listed before the first sign-in: %s", status)
 	}
 
-	(&auth.Authenticator{DB: s.DB, Now: clockFunc}).RecordSignIn(
+	(&auth.Authenticator{DB: s.DB, Now: clockFunc, Verifier: nil, Source: nil}).RecordSignIn(
 		context.Background(),
 		&ops.Principal{
-			TenantID:     seed.ID("tenant-a"),
-			UserID:       uuid.MustParse(user),
-			MembershipID: uuid.MustParse(membership),
+			TenantID: seed.ID("tenant-a"),
+			UserID:   uuid.MustParse(user),
+			MembershipID: uuid.MustParse(
+				membership,
+			),
+			Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
+			OrgID:             uuid.UUID{},
+			ScopeVersion:      0,
+			Scopes:            nil,
+			Employment:        "",
+			Timezone:          "",
+			SessionsRevokedAt: nil,
 		},
 		clock,
 	)

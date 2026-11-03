@@ -69,7 +69,16 @@ func (m OnSite) lockOwn(
 		return "", TimeOnSite{}, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 
-	t := TimeOnSite{Pauses: []Pause{}}
+	t := TimeOnSite{
+		Pauses:        []Pause{},
+		ArrivedAt:     nil,
+		CheckInMethod: nil,
+		CheckInReason: nil,
+		Distance:      nil,
+		StartedAt:     nil,
+		FinishedAt:    nil,
+		OnSiteMinutes: nil,
+	}
 	if len(raw) > 0 && string(raw) != "null" {
 		err := json.Unmarshal(raw, &t)
 		if err != nil {
@@ -131,7 +140,7 @@ func (m OnSite) save(
 			TargetID:        id.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &j.Version,
-			Reason:          reason,
+			Reason:          reason, Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -391,7 +400,7 @@ func (m OnSite) pauseJob(ctx context.Context, c *ops.Call, in *PauseInput) (Job,
 	case *in.Paused && open, !*in.Paused && !open:
 		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
 	case *in.Paused:
-		t.Pauses = append(t.Pauses, Pause{From: now})
+		t.Pauses = append(t.Pauses, Pause{From: now, To: nil})
 	default:
 		t.Pauses[len(t.Pauses)-1].To = &now
 	}
@@ -564,7 +573,7 @@ func (m OnSite) acknowledge(ctx context.Context, c *ops.Call, in *AckInput) (Ass
 			TargetID:        in.JobID.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &j.Version,
-			Reason:          deref(in.Reason),
+			Reason:          deref(in.Reason), Result: "", Before: nil, After: nil,
 		},
 	)
 

@@ -181,7 +181,17 @@ func (v Voice) candidates(ctx context.Context, c *ops.Call, room string) ([]Cand
 func (v Voice) resolve(ctx context.Context, c *ops.Call, in *Input) (Intent, error) {
 	g := grammar[in.Locale]
 	if g.help.MatchString(in.Text) {
-		return Intent{Kind: "help", MessageKey: "voice.help"}, nil
+		return Intent{
+			Kind:            "help",
+			MessageKey:      "voice.help",
+			Candidates:      nil,
+			UnitID:          nil,
+			Measurement:     nil,
+			Celsius:         nil,
+			Before:          nil,
+			ExpectedVersion: nil,
+			measurementNull: false,
+		}, nil
 	}
 
 	var (
@@ -195,7 +205,17 @@ func (v Voice) resolve(ctx context.Context, c *ops.Call, in *Input) (Intent, err
 	} else if m := g.temperature.FindStringSubmatch(in.Text); m != nil {
 		room = m[1]
 	} else {
-		return Intent{Kind: "unsupported"}, nil
+		return Intent{
+			Kind:            "unsupported",
+			MessageKey:      "",
+			Candidates:      nil,
+			UnitID:          nil,
+			Measurement:     nil,
+			Celsius:         nil,
+			Before:          nil,
+			ExpectedVersion: nil,
+			measurementNull: false,
+		}, nil
 	}
 
 	cands, err := v.candidates(ctx, c, room)
@@ -218,9 +238,29 @@ func (v Voice) resolve(ctx context.Context, c *ops.Call, in *Input) (Intent, err
 
 		unit = *in.SelectedUnitID
 	case len(cands) == 0:
-		return Intent{Kind: "unsupported"}, nil
+		return Intent{
+			Kind:            "unsupported",
+			MessageKey:      "",
+			Candidates:      nil,
+			UnitID:          nil,
+			Measurement:     nil,
+			Celsius:         nil,
+			Before:          nil,
+			ExpectedVersion: nil,
+			measurementNull: false,
+		}, nil
 	case len(cands) > 1:
-		return Intent{Kind: "candidates", Candidates: cands}, nil
+		return Intent{
+			Kind:            "candidates",
+			Candidates:      cands,
+			MessageKey:      "",
+			UnitID:          nil,
+			Measurement:     nil,
+			Celsius:         nil,
+			Before:          nil,
+			ExpectedVersion: nil,
+			measurementNull: false,
+		}, nil
 	default:
 		unit = cands[0].UnitID
 	}
@@ -236,6 +276,11 @@ func (v Voice) resolve(ctx context.Context, c *ops.Call, in *Input) (Intent, err
 			UnitID:          &unit,
 			Measurement:     meas,
 			measurementNull: meas == nil,
+			MessageKey:      "",
+			Candidates:      nil,
+			Celsius:         nil,
+			Before:          nil,
+			ExpectedVersion: nil,
 		}, nil
 	}
 
@@ -260,6 +305,10 @@ func (v Voice) resolve(ctx context.Context, c *ops.Call, in *Input) (Intent, err
 		Celsius:         celsius,
 		Before:          before,
 		ExpectedVersion: &version,
+		MessageKey:      "",
+		Candidates:      nil,
+		Measurement:     nil,
+		measurementNull: false,
 	}, nil
 }
 

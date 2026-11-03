@@ -204,7 +204,12 @@ func (h *HTTPQueries) Query(
 
 	client := h.Client
 	if client == nil {
-		client = &http.Client{Timeout: 20 * time.Second}
+		client = &http.Client{
+			Timeout:       20 * time.Second,
+			Transport:     nil,
+			CheckRedirect: nil,
+			Jar:           nil,
+		}
 	}
 
 	resp, err := client.Do(req)
@@ -219,7 +224,13 @@ func (h *HTTPQueries) Query(
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		de := &apperr.DomainError{}
+		de := &apperr.DomainError{
+			Code:              "",
+			MessageKey:        "",
+			FieldErrors:       nil,
+			CorrelationID:     "",
+			RetryAfterSeconds: nil,
+		}
 		if json.Unmarshal(body, de) == nil && de.Code != "" {
 			return nil, de
 		}
@@ -261,7 +272,22 @@ func (r *Registry) ServeSystemQuery(token string) echo.HandlerFunc {
 		return r.serveQuery(
 			c,
 			token,
-			&Principal{Principal: authz.Principal{Role: "system"}, TenantID: tenant},
+			&Principal{
+				Principal: authz.Principal{
+					Role:        "system",
+					Permissions: nil,
+					ClientRole:  "",
+				},
+				TenantID:          tenant,
+				MembershipID:      uuid.UUID{},
+				UserID:            uuid.UUID{},
+				OrgID:             uuid.UUID{},
+				ScopeVersion:      0,
+				Scopes:            nil,
+				Employment:        "",
+				Timezone:          "",
+				SessionsRevokedAt: nil,
+			},
 			"",
 		)
 	}
@@ -304,7 +330,7 @@ func (r *Registry) serveQuery(c *echo.Context, token string, p *Principal, beare
 		Now:           now,
 		CorrelationID: c.Response().Header().Get(echo.HeaderXRequestID),
 		Bearer:        bearer,
-		Queries:       r,
+		Queries:       r, Tx: nil, ExpectedVersion: nil, Candidates: nil, Events: nil, Audits: nil,
 	}
 	if r.BeforeDispatch != nil {
 		r.BeforeDispatch(ctx)

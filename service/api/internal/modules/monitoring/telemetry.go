@@ -76,7 +76,28 @@ const measurementCols = `m.event_id, m.tenant_id, m.received_at, m.boundary_id, 
 	m.unit, m.observed_at, m.origin, m.quality, m.sequence`
 
 func scanMeasurement(r pgx.Row) (Measurement, error) {
-	x := Measurement{Version: 1, IsDemo: true}
+	x := Measurement{
+		Version:       1,
+		IsDemo:        true,
+		ID:            uuid.UUID{},
+		TenantID:      uuid.UUID{},
+		CreatedAt:     time.Time{},
+		UpdatedAt:     time.Time{},
+		BoundaryID:    nil,
+		QualityReason: nil,
+		RawUnit:       nil,
+		UnitID:        uuid.UUID{},
+		SensorID:      uuid.UUID{},
+		Metric:        "",
+		Value:         nil,
+		Unit:          "",
+		ObservedAt:    time.Time{},
+		ReceivedAt:    time.Time{},
+		Origin:        "",
+		Quality:       "",
+		Sequence:      0,
+		EventID:       uuid.UUID{},
+	}
 	err := r.Scan(
 		&x.ID,
 		&x.TenantID,
@@ -322,7 +343,7 @@ func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (Ai
 			Items:           []Measurement{},
 			Total:           total,
 			SnapshotVersion: w.Snapshot,
-			Buckets:         buckets,
+			Buckets:         buckets, NextCursor: nil, AllergenObservation: nil,
 		}
 
 		if len(units) == 1 {
@@ -376,7 +397,7 @@ func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (Ai
 		Items:           items,
 		NextCursor:      w.Next(total),
 		Total:           total,
-		SnapshotVersion: w.Snapshot,
+		SnapshotVersion: w.Snapshot, AllergenObservation: nil, Buckets: nil,
 	}
 
 	if len(units) == 1 {
@@ -437,7 +458,7 @@ func bucketed(
 	for at := from; at.Before(to); at = at.Add(size) {
 		b, ok := got[at.UnixMilli()]
 		if !ok {
-			b = SeriesBucket{Start: at}
+			b = SeriesBucket{Start: at, Value: nil, Count: 0}
 		}
 
 		b.Start = at.UTC()
@@ -459,11 +480,27 @@ func allergen(ctx context.Context, c *ops.Call, unit uuid.UUID) (AllergenObserva
 		WHERE unit_id = $1 ORDER BY observed_at DESC NULLS LAST, created_at DESC, id ASC LIMIT 1`, unit).
 		Scan(&a.Availability, &a.Substance, &a.Value, &a.Unit, &a.SourceLabel, &a.ObservedAt, &a.EvidenceText)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return AllergenObservation{Availability: "not_measured"}, nil
+		return AllergenObservation{
+			Availability: "not_measured",
+			Substance:    nil,
+			Value:        nil,
+			Unit:         nil,
+			SourceLabel:  nil,
+			ObservedAt:   nil,
+			EvidenceText: nil,
+		}, nil
 	}
 
 	if a.Availability == "unsupported" {
-		a = AllergenObservation{Availability: "unsupported"}
+		a = AllergenObservation{
+			Availability: "unsupported",
+			Substance:    nil,
+			Value:        nil,
+			Unit:         nil,
+			SourceLabel:  nil,
+			ObservedAt:   nil,
+			EvidenceText: nil,
+		}
 	}
 
 	return a, err
@@ -554,7 +591,7 @@ func (m Telemetry) summary(
 	}
 	defer rows.Close()
 
-	out := TelemetrySummary{Measurements: []Measurement{}, AsOf: c.Now}
+	out := TelemetrySummary{Measurements: []Measurement{}, AsOf: c.Now, Energy: nil}
 
 	for rows.Next() {
 		x, err := scanMeasurement(rows)
@@ -734,10 +771,15 @@ func (m Telemetry) log(ctx context.Context, c *ops.Call, in *VentLogInput) (Vent
 	)
 	c.Audit(
 		ops.AuditEntry{
-			Action:      "ventilation.log",
-			TargetKind:  "ventilation_log",
-			TargetID:    v.ID.String(),
-			NextVersion: &v.Version,
+			Action:          "ventilation.log",
+			TargetKind:      "ventilation_log",
+			TargetID:        v.ID.String(),
+			NextVersion:     &v.Version,
+			PreviousVersion: nil,
+			Reason:          "",
+			Result:          "",
+			Before:          nil,
+			After:           nil,
 		},
 	)
 

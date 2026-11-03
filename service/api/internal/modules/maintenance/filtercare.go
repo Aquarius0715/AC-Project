@@ -83,7 +83,13 @@ func (m FilterCare) settings(
 		CustomerID:   customer,
 		FallbackDays: 30,
 		Recipients:   "owners",
-		Channels:     []string{"inApp"},
+		Channels: []string{
+			"inApp",
+		},
+		ID:             uuid.UUID{},
+		CreatedAt:      time.Time{},
+		UpdatedAt:      time.Time{},
+		ThresholdHours: nil,
 	}
 
 	err := c.Tx.QueryRow(ctx, `SELECT id, version, updated_at, threshold_hours, fallback_days, recipients, channels FROM maintenance.filter_care_settings WHERE customer_id = $1`, customer).
@@ -105,10 +111,14 @@ func (m FilterCare) status(
 	set FilterSettings,
 ) (FilterStatus, error) {
 	st := FilterStatus{
-		UnitID:         u.ID,
-		ThresholdHours: DefaultFilterHours,
-		FallbackDays:   set.FallbackDays,
-		Status:         "unknown",
+		UnitID:                u.ID,
+		ThresholdHours:        DefaultFilterHours,
+		FallbackDays:          set.FallbackDays,
+		Status:                "unknown",
+		RunHoursSinceCleaning: nil,
+		LastCleanedAt:         nil,
+		LastCleanedBy:         nil,
+		LastCleaningJobID:     nil,
 	}
 	if set.ThresholdHours != nil {
 		st.ThresholdHours = *set.ThresholdHours
@@ -389,12 +399,25 @@ func (m FilterCare) markCleaned(
 		return st, clearRemindersErr
 	}
 
-	c.Emit(ops.Event{AggregateType: "unit", AggregateID: in.UnitID, Type: "FilterCleaned"})
+	c.Emit(
+		ops.Event{
+			AggregateType: "unit",
+			AggregateID:   in.UnitID,
+			Type:          "FilterCleaned",
+			Payload:       nil,
+		},
+	)
 	c.Audit(
 		ops.AuditEntry{
-			Action:     "filterCare.markCleaned",
-			TargetKind: "unit",
-			TargetID:   in.UnitID.String(),
+			Action:          "filterCare.markCleaned",
+			TargetKind:      "unit",
+			TargetID:        in.UnitID.String(),
+			PreviousVersion: nil,
+			NextVersion:     nil,
+			Reason:          "",
+			Result:          "",
+			Before:          nil,
+			After:           nil,
 		},
 	)
 
@@ -505,15 +528,20 @@ func (m FilterCare) saveSettings(
 		ops.Event{
 			AggregateType: "filter_care_settings",
 			AggregateID:   s.ID,
-			Type:          "FilterCareSettingsSaved",
+			Type:          "FilterCareSettingsSaved", Payload: nil,
 		},
 	)
 	c.Audit(
 		ops.AuditEntry{
-			Action:      "filterCare.saveSettings",
-			TargetKind:  "filter_care_settings",
-			TargetID:    s.ID.String(),
-			NextVersion: &s.Version,
+			Action:          "filterCare.saveSettings",
+			TargetKind:      "filter_care_settings",
+			TargetID:        s.ID.String(),
+			NextVersion:     &s.Version,
+			PreviousVersion: nil,
+			Reason:          "",
+			Result:          "",
+			Before:          nil,
+			After:           nil,
 		},
 	)
 
@@ -681,7 +709,7 @@ func clearReminders(
 				AlertID:       e.id,
 				UnitID:        unit,
 				CustomerOrgID: e.org,
-				At:            c.Now,
+				At:            c.Now, Evidence: "", NoRecipient: false,
 			},
 		})
 	}
@@ -714,7 +742,13 @@ func remind(
 		return 0, err
 	}
 
-	f := identity.MembersInput{Role: "client", OrganizationID: &u.OrgID}
+	f := identity.MembersInput{
+		Role:           "client",
+		OrganizationID: &u.OrgID,
+		IDs:            nil,
+		Permission:     "",
+		ClientRole:     "",
+	}
 	if set.Recipients == "owners" {
 		f.ClientRole = "owner"
 	}
@@ -773,10 +807,15 @@ func remind(
 	})
 	c.Audit(
 		ops.AuditEntry{
-			Action:     "filterCare.remind",
-			TargetKind: "unit",
-			TargetID:   u.ID.String(),
-			Reason:     "cleaning due",
+			Action:          "filterCare.remind",
+			TargetKind:      "unit",
+			TargetID:        u.ID.String(),
+			Reason:          "cleaning due",
+			PreviousVersion: nil,
+			NextVersion:     nil,
+			Result:          "",
+			Before:          nil,
+			After:           nil,
 		},
 	)
 

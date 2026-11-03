@@ -60,7 +60,25 @@ func TestMockFleetCoversEveryState(t *testing.T) {
 
 // TestFleetNames: each pattern's records have their own fixture-style names.
 func TestFleetNames(t *testing.T) {
-	p := Pattern{Key: "cool-on"}
+	p := Pattern{
+		Key:         "cool-on",
+		Name:        "",
+		Room:        "",
+		Connection:  "",
+		PowerSignal: "",
+		Tamper:      "",
+		Firmware:    "",
+		Archived:    false,
+		NoDevice:    false,
+		State: *new(struct {
+			Power    *bool    "json:\"power\""
+			Celsius  *float64 "json:\"celsius\""
+			Mode     *string  "json:\"mode\""
+			FanLevel *string  "json:\"fanLevel\""
+		}),
+		Telemetry: "",
+		Commands:  "",
+	}
 	if UnitName(p) != "unit-mock-cool-on" || DeviceName(p) != "device-mock-cool-on" ||
 		BindingName(p) != "binding-mock-cool-on" ||
 		SensorName(p, Sensors[0]) != "sensor-mock-cool-on-temperature" {

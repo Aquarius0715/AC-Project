@@ -241,7 +241,28 @@ func (m *Module) unitsImportPreview(
 			return ImportPreview{}, apperr.Fields(map[string]string{"csvText": "error.tooManyRows"})
 		}
 
-		row := storedRow{ImportRow: ImportRow{RowNumber: n, Result: "ready"}}
+		row := storedRow{
+			ImportRow: ImportRow{
+				RowNumber:    n,
+				Result:       "ready",
+				PropertyName: "",
+				FloorName:    nil,
+				RoomName:     nil,
+				UnitName:     "",
+				ModelCode:    "",
+				Serial:       nil,
+				InstalledOn:  nil,
+				WarrantyEnd:  nil,
+				MessageKey:   nil,
+			},
+			NewProperty: false,
+			DeviceID:    nil,
+			PropertyID:  uuid.UUID{},
+			FloorID:     nil,
+			RoomID:      nil,
+			ModelID:     uuid.UUID{},
+			CapVersion:  0,
+		}
 		get := func(k string) *string { return cell(rec, idx, k) }
 		fail := func(key string) { row.Result, row.MessageKey = "error", new(key) }
 		warn := func(key string) {
@@ -420,7 +441,7 @@ func (m *Module) unitsImportPreview(
 		PreviewID:  uuid.Must(uuid.NewV7()),
 		CustomerID: in.CustomerID,
 		FileName:   in.FileName,
-		ExpiresAt:  c.Now.Add(previewTTL),
+		ExpiresAt:  c.Now.Add(previewTTL), Rows: nil, ReadyCount: 0, WarningCount: 0, ErrorCount: 0,
 	}
 	for _, s := range stored {
 		p.Rows = append(p.Rows, s.ImportRow)
@@ -617,7 +638,14 @@ func (m *Module) unitsImportCommit(
 
 		created[row.PropertyID] = id
 		properties = append(properties, id)
-		c.Emit(ops.Event{AggregateType: "property", AggregateID: id, Type: "LocationChanged"})
+		c.Emit(
+			ops.Event{
+				AggregateType: "property",
+				AggregateID:   id,
+				Type:          "LocationChanged",
+				Payload:       nil,
+			},
+		)
 
 		return id, nil
 	}
@@ -658,7 +686,14 @@ func (m *Module) unitsImportCommit(
 
 		created[*placeholder] = id
 		spaces = append(spaces, id)
-		c.Emit(ops.Event{AggregateType: "space", AggregateID: id, Type: "LocationChanged"})
+		c.Emit(
+			ops.Event{
+				AggregateType: "space",
+				AggregateID:   id,
+				Type:          "LocationChanged",
+				Payload:       nil,
+			},
+		)
 
 		return &id, nil
 	}
@@ -731,7 +766,7 @@ func (m *Module) unitsImportCommit(
 		}
 
 		units = append(units, id)
-		c.Emit(ops.Event{AggregateType: "unit", AggregateID: id, Type: "UnitChanged"})
+		c.Emit(ops.Event{AggregateType: "unit", AggregateID: id, Type: "UnitChanged", Payload: nil})
 
 		if row.DeviceID != nil { // the serial column binds the device (bound or tampered since the preview: validate again)
 			ok, err := m.Import.BindImported(ctx, c, *row.DeviceID, id, org, "CSV import "+fileName)
@@ -782,10 +817,15 @@ func (m *Module) unitsImportCommit(
 
 	c.Audit(
 		ops.AuditEntry{
-			Action:      "units.importCommit",
-			TargetKind:  "unit_import",
-			TargetID:    id.String(),
-			NextVersion: &x.Version,
+			Action:          "units.importCommit",
+			TargetKind:      "unit_import",
+			TargetID:        id.String(),
+			NextVersion:     &x.Version,
+			PreviousVersion: nil,
+			Reason:          "",
+			Result:          "",
+			Before:          nil,
+			After:           nil,
 		},
 	)
 
@@ -914,7 +954,7 @@ func (m *Module) unitsImportUndo(
 	}
 
 	for _, u := range x.CreatedUnitIDs {
-		c.Emit(ops.Event{AggregateType: "unit", AggregateID: u, Type: "UnitChanged"})
+		c.Emit(ops.Event{AggregateType: "unit", AggregateID: u, Type: "UnitChanged", Payload: nil})
 	}
 
 	c.Audit(
@@ -924,7 +964,7 @@ func (m *Module) unitsImportUndo(
 			TargetID:        x.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &x.Version,
-			Reason:          in.Reason,
+			Reason:          in.Reason, Result: "", Before: nil, After: nil,
 		},
 	)
 

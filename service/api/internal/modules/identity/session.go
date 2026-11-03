@@ -98,7 +98,12 @@ func sessionGet(ctx context.Context, c *ops.Call, _ *struct{}) (Session, error) 
 		Generation:     1,
 		ViewEpoch:      0,
 		IssuedAt:       c.Now,
-		ExpiresAt:      c.Now.Add(SessionTTL),
+		ExpiresAt: c.Now.Add(
+			SessionTTL,
+		),
+		DisplayName:      "",
+		OrganizationName: "",
+		CustomerID:       nil,
 	}
 	if c.Tx == nil { // a registry without a database (unit tests): no names
 		return out, nil

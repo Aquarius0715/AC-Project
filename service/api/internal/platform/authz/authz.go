@@ -77,7 +77,7 @@ func Parse(s string) (Expr, error) {
 			return e, fmt.Errorf("unknown role %q in %q", parts[0], s)
 		}
 
-		a := Alternative{Role: parts[0]}
+		a := Alternative{Role: parts[0], Permission: "", Predicates: nil}
 
 		rest := parts[1:]
 		if len(rest) > 0 && Permissions[rest[0]] {

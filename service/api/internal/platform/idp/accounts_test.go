@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 )
 
 // TestKeycloakAccounts (IR461, IR462, IR468): a created account carries the claim attributes and returns the new user's ID;
@@ -74,7 +76,7 @@ func TestKeycloakAccounts(t *testing.T) {
 		TokenURL:     srv.URL + "/token",
 		AdminURL:     srv.URL + "/admin",
 		ClientID:     "svc",
-		ClientSecret: "s",
+		ClientSecret: "s", Client: nil, Now: nil, mu: sync.Mutex{}, token: "", until: time.Time{},
 	}
 	ctx := context.Background()
 	a := Account{

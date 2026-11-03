@@ -246,7 +246,7 @@ func (m Diagnostics) create(ctx context.Context, c *ops.Call, in *RunInput) (Run
 			TargetKind:  "diagnostic_run",
 			TargetID:    runID.String(),
 			NextVersion: &x.Version,
-			Reason:      in.Reason,
+			Reason:      in.Reason, PreviousVersion: nil, Result: "", Before: nil, After: nil,
 		},
 	)
 

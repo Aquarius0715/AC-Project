@@ -23,7 +23,15 @@ func (failingRunner) Run(context.Context, bool, *ops.Principal, func(pgx.Tx) err
 
 // A consumer without handlers has nothing to poll: Drain applies nothing and Run only waits for its context.
 func TestConsumerWithoutHandlers(t *testing.T) {
-	c := &Consumer{Name: "idle"}
+	c := &Consumer{
+		Name:      "idle",
+		DB:        nil,
+		Handlers:  nil,
+		Batch:     0,
+		Logf:      nil,
+		Now:       nil,
+		SplitFrom: "",
+	}
 	n, err := c.Drain(context.Background())
 	if n != 0 || err != nil {
 		t.Fatalf("Drain without handlers: %d %v", n, err)
@@ -64,7 +72,7 @@ func TestConsumerRunLogsFailures(t *testing.T) {
 
 			logged = append(logged, fmt.Sprintf(f, a...))
 			mu.Unlock()
-		},
+		}, Batch: 0, Now: nil, SplitFrom: "",
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)

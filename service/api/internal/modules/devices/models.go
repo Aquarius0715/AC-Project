@@ -153,7 +153,7 @@ func (Models) BindImported(
 			TargetKind:  "device",
 			TargetID:    device.String(),
 			NextVersion: &v,
-			Reason:      reason,
+			Reason:      reason, PreviousVersion: nil, Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -224,7 +224,7 @@ func (Models) UnbindUnits(
 				TargetKind:  "device",
 				TargetID:    p.device.String(),
 				NextVersion: &v,
-				Reason:      reason,
+				Reason:      reason, PreviousVersion: nil, Result: "", Before: nil, After: nil,
 			},
 		)
 	}
@@ -248,7 +248,19 @@ func (Models) Caps(
 		),
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return control.Caps{}, false, nil
+		return control.Caps{
+			Control:           false,
+			ModeControl:       false,
+			FanControl:        false,
+			TempMin:           0,
+			TempMax:           0,
+			TempStep:          0,
+			HasTemperature:    false,
+			Modes:             nil,
+			FanLevels:         nil,
+			Ventilation:       false,
+			VentilationLevels: nil,
+		}, false, nil
 	}
 
 	if err != nil {
@@ -263,6 +275,10 @@ func (Models) Caps(
 		FanLevels:         x.FanLevels,
 		Ventilation:       x.Ventilation,
 		VentilationLevels: x.VentilationLevels,
+		TempMin:           0,
+		TempMax:           0,
+		TempStep:          0,
+		HasTemperature:    false,
 	}
 	if x.Temperature != nil {
 		out.HasTemperature, out.TempMin, out.TempMax, out.TempStep = true, x.Temperature.Min, x.Temperature.Max, x.Temperature.Step

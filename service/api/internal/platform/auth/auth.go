@@ -19,6 +19,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 )
 
 // Identity is what a verified token says about its holder: the subject (Cognito/Keycloak `sub`, or the user ID
@@ -43,7 +44,7 @@ type StaticVerifier map[string]string
 // Verify implements Verifier.
 func (s StaticVerifier) Verify(_ context.Context, token string) (Identity, error) {
 	if sub, ok := s[token]; ok {
-		return Identity{Subject: sub}, nil
+		return Identity{Subject: sub, SignedIn: time.Time{}, Client: "", AdminApp: false}, nil
 	}
 
 	return Identity{}, errors.New("unknown token")
@@ -248,7 +249,18 @@ func (a *Authenticator) Load(
 	subject string,
 	tenant, membership uuid.UUID,
 ) (*ops.Principal, error) {
-	p := &ops.Principal{TenantID: tenant, MembershipID: membership}
+	p := &ops.Principal{
+		TenantID:          tenant,
+		MembershipID:      membership,
+		Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
+		UserID:            uuid.UUID{},
+		OrgID:             uuid.UUID{},
+		ScopeVersion:      0,
+		Scopes:            nil,
+		Employment:        "",
+		Timezone:          "",
+		SessionsRevokedAt: nil,
+	}
 	now := a.now()
 
 	err := a.DB.Run(ctx, true, p, func(tx pgx.Tx) error {

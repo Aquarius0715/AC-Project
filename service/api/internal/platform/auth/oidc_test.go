@@ -16,7 +16,7 @@ func TestOIDCVerifier(t *testing.T) {
 	other, _ := rsa.GenerateKey(rand.Reader, 2048)
 	v := &OIDCVerifier{
 		Issuer: "http://localhost:8081/realms/ac", Audiences: []string{"ac-web", "ac-admin-web"},
-		Keyfunc: func(*jwt.Token) (any, error) { return &key.PublicKey, nil },
+		Keyfunc: func(*jwt.Token) (any, error) { return &key.PublicKey, nil }, AdminClient: "",
 	}
 	sign := func(k *rsa.PrivateKey, c jwt.MapClaims) string {
 		s, _ := jwt.NewWithClaims(jwt.SigningMethodRS256, c).SignedString(k)

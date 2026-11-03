@@ -119,7 +119,7 @@ func (m Restrictions) evaluateRelease(ctx context.Context, c *ops.Call, id uuid.
 				"restriction",
 				id,
 				events.RestrictionCommandsCancelled,
-				events.CommandsCancelled{RestrictionID: id, UnitID: &unit},
+				events.CommandsCancelled{RestrictionID: id, UnitID: &unit, CommandIDs: nil},
 			)
 			if publishErr != nil {
 				return publishErr
@@ -169,7 +169,11 @@ func (m Restrictions) evaluateRelease(ctx context.Context, c *ops.Call, id uuid.
 					"restriction",
 					id,
 					events.RestrictionCommandsCancelled,
-					events.CommandsCancelled{RestrictionID: id, CommandIDs: []uuid.UUID{cmd}},
+					events.CommandsCancelled{
+						RestrictionID: id,
+						CommandIDs:    []uuid.UUID{cmd},
+						UnitID:        nil,
+					},
 				)
 				if publishErr != nil {
 					return publishErr
@@ -321,7 +325,7 @@ func CommandAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, at t
 		"unit",
 		unit,
 		events.UnitRestrictionCleared,
-		events.UnitRestriction{UnitID: unit, RestrictionID: restriction},
+		events.UnitRestriction{UnitID: unit, RestrictionID: restriction, Observed: nil},
 	)
 	if publishErr != nil {
 		return publishErr

@@ -60,7 +60,7 @@ func unitRestriction(ctx context.Context, c *ops.Call, in *UnitInput) (UnitRestr
 		WHERE ru.unit_id = $1 AND r.state IN ('requested','applied','release_requested') ORDER BY r.created_at DESC LIMIT 1`, in.UnitID).
 		Scan(&r.Phase, &r.Policy)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return UnitRestriction{}, nil
+		return UnitRestriction{Phase: "", Policy: nil, Found: false}, nil
 	}
 
 	r.Found = err == nil
@@ -241,10 +241,15 @@ func (m Restrictions) OnInvoicePaid(
 
 		c.Audit(
 			ops.AuditEntry{
-				Action:     "payments.release",
-				TargetKind: "restriction",
-				TargetID:   id.String(),
-				Reason:     "cause invoices paid",
+				Action:          "payments.release",
+				TargetKind:      "restriction",
+				TargetID:        id.String(),
+				Reason:          "cause invoices paid",
+				PreviousVersion: nil,
+				NextVersion:     nil,
+				Result:          "",
+				Before:          nil,
+				After:           nil,
 			},
 		)
 	}

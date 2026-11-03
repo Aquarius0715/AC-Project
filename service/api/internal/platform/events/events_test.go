@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 )
 
 // testRunner is the minimal ops.Runner of these tests (the db package depends on events): one transaction with the
@@ -130,7 +131,7 @@ func TestConsumerOrderDedupAndRetry(t *testing.T) {
 			seen = append(seen, p.N)
 
 			return nil
-		}},
+		}}, Logf: nil, SplitFrom: "",
 	}
 
 	n, err := c.Drain(ctx)
@@ -162,7 +163,7 @@ func TestConsumerOrderDedupAndRetry(t *testing.T) {
 		DB:   m,
 		Handlers: map[string]Handler{
 			typ: func(context.Context, pgx.Tx, Event) error { return nil },
-		},
+		}, Batch: 0, Logf: nil, Now: nil, SplitFrom: "",
 	}
 	drainN, drainErr = other.Drain(ctx)
 	if drainErr != nil || drainN != 2 {
@@ -171,7 +172,19 @@ func TestConsumerOrderDedupAndRetry(t *testing.T) {
 	// replaying an event that is already recorded does nothing
 	done, applyErr := c.apply(
 		ctx,
-		Event{ID: first, TenantID: tenant, Type: typ, Payload: []byte(`{"n":9}`)},
+		Event{
+			ID:            first,
+			TenantID:      tenant,
+			Type:          typ,
+			Payload:       []byte(`{"n":9}`),
+			Seq:           0,
+			AggregateType: "",
+			AggregateID:   uuid.UUID{},
+			CorrelationID: "",
+			OccurredAt:    time.Time{},
+			failures:      0,
+			lastFailure:   nil,
+		},
 	)
 	if applyErr != nil || done ||
 		len(seen) != 2 {
@@ -221,7 +234,7 @@ func TestConsumerDeadLetters(t *testing.T) {
 			applied = append(applied, p.N)
 
 			return nil
-		}},
+		}}, Batch: 0, SplitFrom: "",
 	}
 
 	for i, pause := range []time.Duration{0, time.Minute, 2 * time.Minute, 4 * time.Minute} {
@@ -339,7 +352,18 @@ func TestHousekeep(t *testing.T) {
 		day(10),
 	)
 	exec(
-		&ops.Principal{TenantID: tenant},
+		&ops.Principal{
+			TenantID:          tenant,
+			Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
+			MembershipID:      uuid.UUID{},
+			UserID:            uuid.UUID{},
+			OrgID:             uuid.UUID{},
+			ScopeVersion:      0,
+			Scopes:            nil,
+			Employment:        "",
+			Timezone:          "",
+			SessionsRevokedAt: nil,
+		},
 		`INSERT INTO platform.idempotency_keys (tenant_id, membership_id, key, operation, request_hash, status, created_at, expires_at)
 		VALUES ($1, $2, $3, 'test', '\x00', 'completed', $4, $5)`,
 		tenant,
@@ -351,8 +375,24 @@ func TestHousekeep(t *testing.T) {
 
 	noop := func(context.Context, pgx.Tx, Event) error { return nil }
 	consumers := []*Consumer{
-		{Name: a, Handlers: map[string]Handler{typ: noop}},
-		{Name: b, Handlers: map[string]Handler{typ: noop}},
+		{
+			Name:      a,
+			Handlers:  map[string]Handler{typ: noop},
+			DB:        nil,
+			Batch:     0,
+			Logf:      nil,
+			Now:       nil,
+			SplitFrom: "",
+		},
+		{
+			Name:      b,
+			Handlers:  map[string]Handler{typ: noop},
+			DB:        nil,
+			Batch:     0,
+			Logf:      nil,
+			Now:       nil,
+			SplitFrom: "",
+		},
 	}
 
 	s, err := Housekeep(ctx, m, day(20), consumers)
@@ -409,7 +449,18 @@ func TestHousekeep(t *testing.T) {
 	}
 
 	if n := count(
-		&ops.Principal{TenantID: tenant},
+		&ops.Principal{
+			TenantID:          tenant,
+			Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
+			MembershipID:      uuid.UUID{},
+			UserID:            uuid.UUID{},
+			OrgID:             uuid.UUID{},
+			ScopeVersion:      0,
+			Scopes:            nil,
+			Employment:        "",
+			Timezone:          "",
+			SessionsRevokedAt: nil,
+		},
 		`SELECT count(*) FROM platform.idempotency_keys WHERE key = $1`,
 		key,
 	); n != 0 {

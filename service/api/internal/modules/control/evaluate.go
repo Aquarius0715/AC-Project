@@ -395,7 +395,7 @@ func ownerValid(
 
 	f := identity.MembersInput{
 		IDs:        []uuid.UUID{owner},
-		Permission: perm,
+		Permission: perm, Role: "", OrganizationID: nil, ClientRole: "",
 	} // identity's memberships (IR194)
 	if !hq {
 		f.OrganizationID = &org
@@ -425,7 +425,18 @@ func (m Automations) candidates(
 	}
 
 	for rows.Next() {
-		x := candidate{hq: true, kind: "automation_policy"}
+		x := candidate{
+			hq:       true,
+			kind:     "automation_policy",
+			id:       uuid.UUID{},
+			priority: 0,
+			enabled:  false,
+			owner:    uuid.UUID{},
+			action:   nil,
+			cond:     nil,
+			extras:   nil,
+			tz:       "",
+		}
 		err := rows.Scan(
 			&x.id,
 			&x.priority,
@@ -460,7 +471,18 @@ func (m Automations) candidates(
 	defer rows.Close()
 
 	for rows.Next() {
-		x := candidate{kind: "automation"}
+		x := candidate{
+			kind:     "automation",
+			hq:       false,
+			id:       uuid.UUID{},
+			priority: 0,
+			enabled:  false,
+			owner:    uuid.UUID{},
+			action:   nil,
+			cond:     nil,
+			extras:   nil,
+			tz:       "",
+		}
 
 		var (
 			kind string
@@ -571,7 +593,14 @@ func (m Automations) decide(
 				}
 			}
 
-			return Decision{UnitID: unit, Decision: "suppressed", Reason: &r}, nil, skips, nil
+			return Decision{
+				UnitID:    unit,
+				Decision:  "suppressed",
+				Reason:    &r,
+				RuleID:    nil,
+				CommandID: nil,
+				fresh:     false,
+			}, nil, skips, nil
 		}
 	}
 
@@ -661,7 +690,14 @@ func (m Automations) decide(
 		if reason == "" {
 			id := x.id
 
-			return Decision{UnitID: unit, Decision: "selected", RuleID: &id}, x, skips, nil
+			return Decision{
+				UnitID:    unit,
+				Decision:  "selected",
+				RuleID:    &id,
+				Reason:    nil,
+				CommandID: nil,
+				fresh:     false,
+			}, x, skips, nil
 		}
 
 		reasons[x.id] = reason
@@ -679,7 +715,14 @@ func (m Automations) decide(
 	if len(cands) == 0 {
 		r := "no_match"
 
-		return Decision{UnitID: unit, Decision: "suppressed", Reason: &r}, nil, nil, nil
+		return Decision{
+			UnitID:    unit,
+			Decision:  "suppressed",
+			Reason:    &r,
+			RuleID:    nil,
+			CommandID: nil,
+			fresh:     false,
+		}, nil, nil, nil
 	}
 
 	ids := make([]uuid.UUID, 0, len(reasons))
@@ -690,7 +733,14 @@ func (m Automations) decide(
 	sort.Slice(ids, func(i, j int) bool { return ids[i].String() < ids[j].String() })
 	r := reasons[ids[0]]
 
-	return Decision{UnitID: unit, Decision: "suppressed", Reason: &r}, nil, skips, nil
+	return Decision{
+		UnitID:    unit,
+		Decision:  "suppressed",
+		Reason:    &r,
+		RuleID:    nil,
+		CommandID: nil,
+		fresh:     false,
+	}, nil, skips, nil
 }
 
 // prepare authorizes the caller for every target unit (D02: out of scope NOT_FOUND) and merges the facts.
@@ -1046,7 +1096,14 @@ func (m Automations) fire(ctx context.Context, c *ops.Call, in *EvaluationInput)
 			Action:     "automations.fire",
 			TargetKind: "evaluation",
 			TargetID:   in.EventID.String(),
-			Reason:     strings.ToLower(in.Phase),
+			Reason: strings.ToLower(
+				in.Phase,
+			),
+			PreviousVersion: nil,
+			NextVersion:     nil,
+			Result:          "",
+			Before:          nil,
+			After:           nil,
 		},
 	)
 

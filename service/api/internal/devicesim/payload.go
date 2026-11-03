@@ -25,7 +25,7 @@ type Sensor struct {
 // Sensors are the ones a simulated AC module can report (the metrics and units of the capability register's sensors).
 // Temperature and power come first; a module reports the subset its device has (Only).
 var Sensors = []Sensor{
-	{ID: "temperature", Metric: "temperature", Unit: "°C", Base: 24, Swing: 2},
+	{ID: "temperature", Metric: "temperature", Unit: "°C", Base: 24, Swing: 2, Boundary: ""},
 	{
 		ID:       "power",
 		Metric:   "power",
@@ -34,9 +34,9 @@ var Sensors = []Sensor{
 		Swing:    0.4,
 		Boundary: "ac_input_electricity",
 	},
-	{ID: "humidity", Metric: "humidity", Unit: "%", Base: 60, Swing: 8},
-	{ID: "co2", Metric: "co2", Unit: "ppm", Base: 650, Swing: 250},
-	{ID: "pm25", Metric: "pm25", Unit: "µg/m³", Base: 14, Swing: 9},
+	{ID: "humidity", Metric: "humidity", Unit: "%", Base: 60, Swing: 8, Boundary: ""},
+	{ID: "co2", Metric: "co2", Unit: "ppm", Base: 650, Swing: 250, Boundary: ""},
+	{ID: "pm25", Metric: "pm25", Unit: "µg/m³", Base: 14, Swing: 9, Boundary: ""},
 }
 
 // Measurement is one reading in a telemetry batch.
@@ -90,11 +90,17 @@ type Module struct {
 // NewModule starts a module with its own random source, so each device drifts independently.
 func NewModule(tenantID, deviceID, firmware string, seed uint64) *Module {
 	return &Module{
-		TenantID: tenantID,
-		DeviceID: deviceID,
-		Firmware: firmware,
-		rng:      rand.New(rand.NewPCG(seed, seed^0x9e3779b97f4a7c15)),
-		setpoint: 24,
+		TenantID:  tenantID,
+		DeviceID:  deviceID,
+		Firmware:  firmware,
+		rng:       rand.New(rand.NewPCG(seed, seed^0x9e3779b97f4a7c15)),
+		setpoint:  24,
+		sequence:  0,
+		telemetry: "",
+		commands:  "",
+		powerOff:  false,
+		sensors:   nil,
+		state:     nil,
 	}
 }
 

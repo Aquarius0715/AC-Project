@@ -343,7 +343,18 @@ func (f *fakeIdP) take() []string {
 // The event is applied once. A provider that fails is logged and the event is still done, so it does not hold up
 // the identity consumer's other events; the Core API refuses the old sign-ins either way (IR384).
 func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
-	idp := &fakeIdP{}
+	idp := &fakeIdP{
+		mu:         sync.Mutex{},
+		subjects:   nil,
+		err:        nil,
+		created:    nil,
+		updated:    nil,
+		setups:     nil,
+		switched:   nil,
+		failing:    false,
+		lost:       nil,
+		generation: 0,
+	}
 	s := serverCfg(
 		t,
 		func(c *apiserver.Config) { c.IdentityProvider = idp; c.Domains = ops.Domains },

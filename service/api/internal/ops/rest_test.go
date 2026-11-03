@@ -61,11 +61,24 @@ type restEmbedded struct {
 func restOp(mode Mode, in func() any) *Operation {
 	return &Operation{
 		Spec: Spec{
-			Name:    "test.op",
-			Mode:    mode,
-			Filters: []string{"status", "unitIds", "overdueOnly", "jobId"},
+			Name: "test.op",
+			Mode: mode,
+			Filters: []string{
+				"status",
+				"unitIds",
+				"overdueOnly",
+				"jobId",
+			},
+			Module:        "",
+			Authorization: "",
+			Versions:      nil,
+			DesignIDs:     "",
+			Routes:        nil,
 		},
 		NewInput: in,
+		Expr:     authz.Expr{Alternatives: nil, Notes: nil, Remark: ""},
+		Result:   nil,
+		Handle:   nil,
 	}
 }
 
@@ -107,30 +120,147 @@ func bind(
 func TestRESTParameters(t *testing.T) {
 	b, err := NewBinding(
 		restOp(Read, func() any { return new(restIn) }),
-		Route{Method: "GET", Path: "/v1/jobs/{jobId}/things"},
+		Route{Method: "GET", Path: "/v1/jobs/{jobId}/things", FixedField: "", FixedValue: ""},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	want := map[string]Param{
-		"jobId":       {Name: "jobId", At: []string{"jobId"}, UUID: true},
-		"count":       {Name: "count", At: []string{"count"}, Kind: KindInteger},
-		"ratio":       {Name: "ratio", At: []string{"ratio"}, Kind: KindNumber},
-		"on":          {Name: "on", At: []string{"on"}, Kind: KindBool},
-		"ids":         {Name: "ids", At: []string{"ids"}, List: true, UUID: true},
-		"target.kind": {Name: "target.kind", At: []string{"target", "kind"}},
-		"target.id":   {Name: "target.id", At: []string{"target", "id"}, UUID: true},
-		"action":      {Name: "action", At: []string{"action"}},
-		"cursor":      {Name: "cursor", At: []string{"query", "cursor"}},
-		"limit":       {Name: "limit", At: []string{"query", "limit"}, Kind: KindInteger},
-		"sort":        {Name: "sort", At: []string{"query", "sort"}, Sort: true},
-		"status":      {Name: "status", At: []string{"query", "filters", "status"}},
-		"unitIds":     {Name: "unitIds", At: []string{"query", "filters", "unitIds"}, List: true},
+		"jobId": {
+			Name:  "jobId",
+			At:    []string{"jobId"},
+			UUID:  true,
+			Kind:  0,
+			List:  false,
+			Sort:  false,
+			Role:  "",
+			Order: 0,
+		},
+		"count": {
+			Name:  "count",
+			At:    []string{"count"},
+			Kind:  KindInteger,
+			List:  false,
+			Sort:  false,
+			UUID:  false,
+			Role:  "",
+			Order: 0,
+		},
+		"ratio": {
+			Name:  "ratio",
+			At:    []string{"ratio"},
+			Kind:  KindNumber,
+			List:  false,
+			Sort:  false,
+			UUID:  false,
+			Role:  "",
+			Order: 0,
+		},
+		"on": {
+			Name:  "on",
+			At:    []string{"on"},
+			Kind:  KindBool,
+			List:  false,
+			Sort:  false,
+			UUID:  false,
+			Role:  "",
+			Order: 0,
+		},
+		"ids": {
+			Name:  "ids",
+			At:    []string{"ids"},
+			List:  true,
+			UUID:  true,
+			Kind:  0,
+			Sort:  false,
+			Role:  "",
+			Order: 0,
+		},
+		"target.kind": {
+			Name:  "target.kind",
+			At:    []string{"target", "kind"},
+			Kind:  0,
+			List:  false,
+			Sort:  false,
+			UUID:  false,
+			Role:  "",
+			Order: 0,
+		},
+		"target.id": {
+			Name:  "target.id",
+			At:    []string{"target", "id"},
+			UUID:  true,
+			Kind:  0,
+			List:  false,
+			Sort:  false,
+			Role:  "",
+			Order: 0,
+		},
+		"action": {
+			Name:  "action",
+			At:    []string{"action"},
+			Kind:  0,
+			List:  false,
+			Sort:  false,
+			UUID:  false,
+			Role:  "",
+			Order: 0,
+		},
+		"cursor": {
+			Name:  "cursor",
+			At:    []string{"query", "cursor"},
+			Kind:  0,
+			List:  false,
+			Sort:  false,
+			UUID:  false,
+			Role:  "",
+			Order: 0,
+		},
+		"limit": {
+			Name:  "limit",
+			At:    []string{"query", "limit"},
+			Kind:  KindInteger,
+			List:  false,
+			Sort:  false,
+			UUID:  false,
+			Role:  "",
+			Order: 0,
+		},
+		"sort": {
+			Name:  "sort",
+			At:    []string{"query", "sort"},
+			Sort:  true,
+			Kind:  0,
+			List:  false,
+			UUID:  false,
+			Role:  "",
+			Order: 0,
+		},
+		"status": {
+			Name:  "status",
+			At:    []string{"query", "filters", "status"},
+			Kind:  0,
+			List:  false,
+			Sort:  false,
+			UUID:  false,
+			Role:  "",
+			Order: 0,
+		},
+		"unitIds": {
+			Name:  "unitIds",
+			At:    []string{"query", "filters", "unitIds"},
+			List:  true,
+			Kind:  0,
+			Sort:  false,
+			UUID:  false,
+			Role:  "",
+			Order: 0,
+		},
 		"overdueOnly": {
 			Name: "overdueOnly",
 			At:   []string{"query", "filters", "overdueOnly"},
-			Kind: KindBool,
+			Kind: KindBool, List: false, Sort: false, UUID: false, Role: "", Order: 0,
 		},
 	}
 	got := map[string]Param{}
@@ -160,7 +290,7 @@ func TestRESTParameters(t *testing.T) {
 	// a list read whose input is the paging query itself
 	q, err := NewBinding(
 		restOp(Read, func() any { return new(paging.Query) }),
-		Route{Method: "GET", Path: "/v1/things"},
+		Route{Method: "GET", Path: "/v1/things", FixedField: "", FixedValue: ""},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -176,7 +306,7 @@ func TestRESTParameters(t *testing.T) {
 func TestRESTQueryInput(t *testing.T) {
 	b, err := NewBinding(
 		restOp(Read, func() any { return new(restIn) }),
-		Route{Method: "GET", Path: "/v1/jobs/{jobId}/things"},
+		Route{Method: "GET", Path: "/v1/jobs/{jobId}/things", FixedField: "", FixedValue: ""},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -388,15 +518,15 @@ func TestRESTBindingRules(t *testing.T) {
 		op *Operation
 		rt Route
 	}{
-		"GET for a write":        {restOp(Write, in), Route{Method: "GET", Path: "/v1/x"}},
-		"DELETE for a read":      {restOp(Read, in), Route{Method: "DELETE", Path: "/v1/x"}},
-		"unknown method":         {restOp(Write, in), Route{Method: "OPTIONS", Path: "/v1/x"}},
-		"unknown path parameter": {restOp(Read, in), Route{Method: "GET", Path: "/v1/x/{nope}"}},
-		"list path parameter":    {restOp(Read, in), Route{Method: "GET", Path: "/v1/x/{ids}"}},
-		"filter path parameter":  {restOp(Read, in), Route{Method: "GET", Path: "/v1/x/{status}"}},
+		"GET for a write":        {restOp(Write, in), Route{Method: "GET", Path: "/v1/x", FixedField: "", FixedValue: ""}},
+		"DELETE for a read":      {restOp(Read, in), Route{Method: "DELETE", Path: "/v1/x", FixedField: "", FixedValue: ""}},
+		"unknown method":         {restOp(Write, in), Route{Method: "OPTIONS", Path: "/v1/x", FixedField: "", FixedValue: ""}},
+		"unknown path parameter": {restOp(Read, in), Route{Method: "GET", Path: "/v1/x/{nope}", FixedField: "", FixedValue: ""}},
+		"list path parameter":    {restOp(Read, in), Route{Method: "GET", Path: "/v1/x/{ids}", FixedField: "", FixedValue: ""}},
+		"filter path parameter":  {restOp(Read, in), Route{Method: "GET", Path: "/v1/x/{status}", FixedField: "", FixedValue: ""}},
 		"unknown fixed field":    {restOp(Write, in), Route{Method: "POST", Path: "/v1/x", FixedField: "nope", FixedValue: "a"}},
-		"objects in a query":     {restOp(Read, func() any { return new(restOpaque) }), Route{Method: "GET", Path: "/v1/x"}},
-		"a parameter twice":      {restOp(Read, func() any { return new(restTwice) }), Route{Method: "GET", Path: "/v1/x"}},
+		"objects in a query":     {restOp(Read, func() any { return new(restOpaque) }), Route{Method: "GET", Path: "/v1/x", FixedField: "", FixedValue: ""}},
+		"a parameter twice":      {restOp(Read, func() any { return new(restTwice) }), Route{Method: "GET", Path: "/v1/x", FixedField: "", FixedValue: ""}},
 	} {
 		_, err := NewBinding(c.op, c.rt)
 		if err == nil {
@@ -406,7 +536,7 @@ func TestRESTBindingRules(t *testing.T) {
 
 	_, err := NewBinding(
 		restOp(Write, func() any { return new(restOpaque) }),
-		Route{Method: "POST", Path: "/v1/x"},
+		Route{Method: "POST", Path: "/v1/x", FixedField: "", FixedValue: ""},
 	)
 	if err != nil {
 		t.Errorf("objects in a body: %v", err)
@@ -426,7 +556,7 @@ func TestRESTBindingRules(t *testing.T) {
 func TestRESTEmbeddedQuery(t *testing.T) {
 	b, err := NewBinding(
 		restOp(Read, func() any { return new(restEmbedded) }),
-		Route{Method: "GET", Path: "/v1/x"},
+		Route{Method: "GET", Path: "/v1/x", FixedField: "", FixedValue: ""},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -452,9 +582,9 @@ func TestRESTEmbeddedQuery(t *testing.T) {
 // ServiceResult) with the input taken from the path, the query string, the body and the fixed field.
 func TestRESTRoutes(t *testing.T) {
 	r := NewRegistry()
-	r.DB = fakeDB{}
-	idem := &fakeIdem{stored: map[string]json.RawMessage{}, hash: map[string]string{}}
-	r.Rec, r.Idem = &fakeRec{}, idem
+	r.DB = fakeDB{readOnly: nil}
+	idem := &fakeIdem{stored: map[string]json.RawMessage{}, hash: map[string]string{}, aborted: 0}
+	r.Rec, r.Idem = &fakeRec{n: 0, err: nil}, idem
 
 	type saveIn struct {
 		ID   *string `json:"id,omitempty"`
@@ -521,8 +651,8 @@ func TestRESTRoutes(t *testing.T) {
 				"asset.write":     true,
 				"asset.read":      true,
 				"billing.payment": true,
-			},
-		},
+			}, ClientRole: "",
+		}, TenantID: uuid.UUID{}, MembershipID: uuid.UUID{}, UserID: uuid.UUID{}, OrgID: uuid.UUID{}, ScopeVersion: 0, Scopes: nil, Employment: "", Timezone: "", SessionsRevokedAt: nil,
 	}
 
 	call := func(p *Principal, method, target, body, key string, version string) (int, map[string]any, string) {

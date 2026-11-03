@@ -128,138 +128,193 @@ func tick(
 	actor := seed.ID("system-demo")
 
 	for _, t := range tenants {
-		err := m.Run(ctx, false, &ops.Principal{TenantID: t}, func(tx pgx.Tx) error {
-			_, err := tx.Exec(
-				ctx,
-				`SELECT set_config('app.now', $1, true)`,
-				now.UTC().Format(time.RFC3339Nano),
-			)
-			if err != nil {
-				return err
-			}
-			// the domains this transaction ticks: those whose lock it holds, taken in the order of Domains (IR356)
-			held := map[string]bool{}
-
-			for _, d := range Domains {
-				if !serves(d) {
-					continue
-				}
-
-				if wait {
-					_, err := tx.Exec(ctx, lockSQL, d, t)
-					if err != nil {
-						return err
-					}
-
-					held[d] = true
-
-					continue
-				}
-
-				var ok bool
-				err := tx.QueryRow(ctx, tryLockSQL, d, t).Scan(&ok)
-				if err != nil {
-					return err
-				}
-
-				held[d] = ok
-				if !ok {
-					r.Skipped++
-				}
-			}
-
-			if held[ops.DomainEquipment] {
-				n, err := control.ExpireCommands(ctx, tx, now)
-				if err != nil {
-					return err
-				}
-
-				r.ExpiredCommands += n
-
-				c := &ops.Call{
-					Tx:        tx,
-					Now:       now,
-					Principal: &ops.Principal{TenantID: t},
-					Queries:   reg,
-				} // restriction policies come from billing
-				n, err = control.AdvanceRuns(
+		err := m.Run(
+			ctx,
+			false,
+			&ops.Principal{
+				TenantID:          t,
+				Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
+				MembershipID:      uuid.UUID{},
+				UserID:            uuid.UUID{},
+				OrgID:             uuid.UUID{},
+				ScopeVersion:      0,
+				Scopes:            nil,
+				Employment:        "",
+				Timezone:          "",
+				SessionsRevokedAt: nil,
+			},
+			func(tx pgx.Tx) error {
+				_, err := tx.Exec(
 					ctx,
-					c,
-					control.Commands{Devices: devices.Models{}, Restrictions: restrictions.Busy{}},
+					`SELECT set_config('app.now', $1, true)`,
+					now.UTC().Format(time.RFC3339Nano),
 				)
 				if err != nil {
 					return err
 				}
+				// the domains this transaction ticks: those whose lock it holds, taken in the order of Domains (IR356)
+				held := map[string]bool{}
 
-				r.Runs += n
-			}
-
-			if reg != nil { // the modules' jobs of the served domains, recorded like a write (events, audits)
 				for _, d := range Domains {
-					if !held[d] {
+					if !serves(d) {
 						continue
 					}
 
-					for _, job := range reg.Jobs[d] {
-						c := &ops.Call{
-							Tx:            tx,
-							Now:           now,
-							CorrelationID: uuid.NewString(),
-							Queries:       reg,
-							Principal: &ops.Principal{
-								Principal: authz.Principal{Role: "system"},
-								TenantID:  t,
-								UserID:    seed.ID("system-scheduler"),
-							},
-						}
-
-						n, err := job(ctx, c)
+					if wait {
+						_, err := tx.Exec(ctx, lockSQL, d, t)
 						if err != nil {
 							return err
 						}
 
-						r.Jobs += n
+						held[d] = true
 
-						if reg.Rec != nil {
-							err := reg.Rec.Record(ctx, tx, c, "scheduler")
+						continue
+					}
+
+					var ok bool
+					err := tx.QueryRow(ctx, tryLockSQL, d, t).Scan(&ok)
+					if err != nil {
+						return err
+					}
+
+					held[d] = ok
+					if !ok {
+						r.Skipped++
+					}
+				}
+
+				if held[ops.DomainEquipment] {
+					n, err := control.ExpireCommands(ctx, tx, now)
+					if err != nil {
+						return err
+					}
+
+					r.ExpiredCommands += n
+
+					c := &ops.Call{
+						Tx:  tx,
+						Now: now,
+						Principal: &ops.Principal{
+							TenantID: t,
+							Principal: authz.Principal{
+								Role:        "",
+								Permissions: nil,
+								ClientRole:  "",
+							},
+							MembershipID:      uuid.UUID{},
+							UserID:            uuid.UUID{},
+							OrgID:             uuid.UUID{},
+							ScopeVersion:      0,
+							Scopes:            nil,
+							Employment:        "",
+							Timezone:          "",
+							SessionsRevokedAt: nil,
+						},
+						Queries:         reg,
+						CorrelationID:   "",
+						Bearer:          "",
+						ExpectedVersion: nil,
+						Candidates:      nil,
+						Events:          nil,
+						Audits:          nil,
+					} // restriction policies come from billing
+					n, err = control.AdvanceRuns(
+						ctx,
+						c,
+						control.Commands{
+							Devices:      devices.Models{},
+							Restrictions: restrictions.Busy{},
+							Units:        nil,
+							Access:       nil,
+						},
+					)
+					if err != nil {
+						return err
+					}
+
+					r.Runs += n
+				}
+
+				if reg != nil { // the modules' jobs of the served domains, recorded like a write (events, audits)
+					for _, d := range Domains {
+						if !held[d] {
+							continue
+						}
+
+						for _, job := range reg.Jobs[d] {
+							c := &ops.Call{
+								Tx:            tx,
+								Now:           now,
+								CorrelationID: uuid.NewString(),
+								Queries:       reg,
+								Principal: &ops.Principal{
+									Principal: authz.Principal{
+										Role:        "system",
+										Permissions: nil,
+										ClientRole:  "",
+									},
+									TenantID: t,
+									UserID: seed.ID(
+										"system-scheduler",
+									),
+									MembershipID:      uuid.UUID{},
+									OrgID:             uuid.UUID{},
+									ScopeVersion:      0,
+									Scopes:            nil,
+									Employment:        "",
+									Timezone:          "",
+									SessionsRevokedAt: nil,
+								}, Bearer: "", ExpectedVersion: nil, Candidates: nil, Events: nil, Audits: nil,
+							}
+
+							n, err := job(ctx, c)
 							if err != nil {
 								return err
+							}
+
+							r.Jobs += n
+
+							if reg.Rec != nil {
+								err := reg.Rec.Record(ctx, tx, c, "scheduler")
+								if err != nil {
+									return err
+								}
 							}
 						}
 					}
 				}
-			}
 
-			if held[ops.DomainMaintenance] {
-				n, err := maintenance.ExpireOffers(ctx, tx, now, actor)
-				if err != nil {
-					return err
+				if held[ops.DomainMaintenance] {
+					n, err := maintenance.ExpireOffers(ctx, tx, now, actor)
+					if err != nil {
+						return err
+					}
+
+					r.ExpiredOffers += n
+					n, err = maintenance.ExpireProposals(ctx, tx, now)
+					if err != nil {
+						return err
+					}
+
+					r.ExpiredProposals += n
+					n, err = maintenance.ConfirmUnrated(ctx, tx, now)
+					if err != nil {
+						return err
+					}
+
+					r.Confirmed += n
+					// freeze after expiry so histories see the final state of the tick
+					n, err = maintenance.FreezeEnded(ctx, tx, now)
+					r.FrozenHistories += n
+
+					if err != nil {
+						return err
+					}
 				}
 
-				r.ExpiredOffers += n
-				n, err = maintenance.ExpireProposals(ctx, tx, now)
-				if err != nil {
-					return err
-				}
-
-				r.ExpiredProposals += n
-				n, err = maintenance.ConfirmUnrated(ctx, tx, now)
-				if err != nil {
-					return err
-				}
-
-				r.Confirmed += n
-				// freeze after expiry so histories see the final state of the tick
-				n, err = maintenance.FreezeEnded(ctx, tx, now)
-				r.FrozenHistories += n
-
-				if err != nil {
-					return err
-				}
-			}
-
-			return nil
-		})
+				return nil
+			},
+		)
 		if err != nil {
 			return r, err
 		}
@@ -282,7 +337,7 @@ func RunDomains(
 	defer t.Stop()
 
 	rep := &logging.Repeats{
-		Logf: logf,
+		Logf: logf, Every: 0, Now: nil,
 	} // a failure that repeats every second is logged once a minute (IR429)
 
 	for {

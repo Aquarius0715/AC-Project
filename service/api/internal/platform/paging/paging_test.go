@@ -18,7 +18,7 @@ func code(err error) apperr.Code {
 func TestResolveAndNext(t *testing.T) {
 	cond := map[string]any{"propertyId": "p1"}
 
-	w, err := Resolve(Query{}, cond, 1, 1)
+	w, err := Resolve(Query{Cursor: nil, Limit: nil, Sort: nil, Filters: nil}, cond, 1, 1)
 	if err != nil || w.Limit != 25 || w.Offset != 0 {
 		t.Fatalf("defaults: %+v %v", w, err)
 	}
@@ -27,21 +27,21 @@ func TestResolveAndNext(t *testing.T) {
 		t.Fatal("no next page at the end")
 	}
 
-	w, _ = Resolve(Query{Limit: new(2)}, cond, 1, 1)
+	w, _ = Resolve(Query{Limit: new(2), Cursor: nil, Sort: nil, Filters: nil}, cond, 1, 1)
 
 	next := w.Next(5)
 	if next == nil {
 		t.Fatal("next")
 	}
 
-	w2, err := Resolve(Query{Limit: new(2), Cursor: next}, cond, 1, 1)
+	w2, err := Resolve(Query{Limit: new(2), Cursor: next, Sort: nil, Filters: nil}, cond, 1, 1)
 	if err != nil || w2.Offset != 2 {
 		t.Fatalf("second page: %+v %v", w2, err)
 	}
 
 	if w3 := w2.Next(5); w3 == nil {
 		t.Fatal("third page")
-	} else if w4, _ := Resolve(Query{Limit: new(2), Cursor: w3}, cond, 1, 1); w4.Next(5) != nil || w4.Offset != 4 {
+	} else if w4, _ := Resolve(Query{Limit: new(2), Cursor: w3, Sort: nil, Filters: nil}, cond, 1, 1); w4.Next(5) != nil || w4.Offset != 4 {
 		t.Fatal("last page")
 	}
 
@@ -51,35 +51,50 @@ func TestResolveAndNext(t *testing.T) {
 		sv   int
 		want apperr.Code
 	}{
-		{Query{Limit: new(0)}, cond, 1, apperr.Validation},
-		{Query{Limit: new(101)}, cond, 1, apperr.Validation},
-		{Query{Sort: &SortSpec{Field: "id", Direction: "up"}}, cond, 1, apperr.Validation},
-		{Query{Limit: new(2), Cursor: new("!!")}, cond, 1, apperr.Validation},
+		{Query{Limit: new(0), Cursor: nil, Sort: nil, Filters: nil}, cond, 1, apperr.Validation},
+		{Query{Limit: new(101), Cursor: nil, Sort: nil, Filters: nil}, cond, 1, apperr.Validation},
 		{
-			Query{Limit: new(2), Cursor: new("e30")},
+			Query{
+				Sort:    &SortSpec{Field: "id", Direction: "up"},
+				Cursor:  nil,
+				Limit:   nil,
+				Filters: nil,
+			},
+			cond,
+			1,
+			apperr.Validation,
+		},
+		{
+			Query{Limit: new(2), Cursor: new("!!"), Sort: nil, Filters: nil},
+			cond,
+			1,
+			apperr.Validation,
+		},
+		{
+			Query{Limit: new(2), Cursor: new("e30"), Sort: nil, Filters: nil},
 			cond,
 			1,
 			apperr.Validation,
 		}, // {} → hash mismatch
 		{
-			Query{Limit: new(2), Cursor: next},
+			Query{Limit: new(2), Cursor: next, Sort: nil, Filters: nil},
 			map[string]any{"propertyId": "p2"},
 			1,
 			apperr.Validation,
 		}, // changed conditions
 		{
-			Query{Limit: new(3), Cursor: next},
+			Query{Limit: new(3), Cursor: next, Sort: nil, Filters: nil},
 			cond,
 			1,
 			apperr.Validation,
 		}, // changed limit
 		{
-			Query{Limit: new(2), Cursor: next},
+			Query{Limit: new(2), Cursor: next, Sort: nil, Filters: nil},
 			cond,
 			2,
 			apperr.Conflict,
 		}, // scope changed
-		{Query{Limit: new(2), Cursor: new("")}, cond, 1, ""},
+		{Query{Limit: new(2), Cursor: new(""), Sort: nil, Filters: nil}, cond, 1, ""},
 	}
 	for i, c := range cases {
 		_, err := Resolve(c.q, c.cond, c.sv, 1)
@@ -145,7 +160,7 @@ func TestOrderByDirection(t *testing.T) {
 		}
 	}
 
-	got, err := Direction(&SortSpec{Direction: "desc"})
+	got, err := Direction(&SortSpec{Direction: "desc", Field: ""})
 	if err != nil || got != "DESC" {
 		t.Errorf("Direction desc: %q %v", got, err)
 	}
