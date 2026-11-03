@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -15,13 +16,15 @@ import (
 )
 
 func TestLoadSortsAndValidates(t *testing.T) {
-	ms, err := Load(fstest.MapFS{
+	t.Parallel()
+
+	loaded, err := Load(fstest.MapFS{
 		"000002_b.up.sql": {Data: []byte("SELECT 2"), Mode: 0, ModTime: time.Time{}, Sys: nil},
 		"000001_a.up.sql": {Data: []byte("SELECT 1"), Mode: 0, ModTime: time.Time{}, Sys: nil},
 		"README.md":       {Data: []byte("ignored"), Mode: 0, ModTime: time.Time{}, Sys: nil},
 	})
-	if err != nil || len(ms) != 2 || ms[0].Version != 1 || ms[1].Name != "b" {
-		t.Fatalf("Load = %+v, %v", ms, err)
+	if err != nil || len(loaded) != 2 || loaded[0].Version != 1 || loaded[1].Name != "b" {
+		t.Fatalf("Load = %+v, %v", loaded, err)
 	}
 
 	for name, fsys := range map[string]fstest.MapFS{
@@ -41,6 +44,8 @@ func TestLoadSortsAndValidates(t *testing.T) {
 
 // The first migration is the design schema verbatim until the first release freezes it.
 func TestInitMatchesDesignSchema(t *testing.T) {
+	t.Parallel()
+
 	want, err := os.ReadFile("../../../../docs/02-design/db/schema.sql")
 	if err != nil {
 		t.Skip("design schema not available:", err)
@@ -64,31 +69,32 @@ func testDB(t *testing.T) *pgx.Conn {
 
 	ctx := context.Background()
 
-	admin := os.Getenv("MIGRATE_TEST_ADMIN_URL")
-	if admin == "" {
-		admin = "postgres://postgres:local@localhost:5432/postgres?sslmode=disable"
+	adminURL := os.Getenv("MIGRATE_TEST_ADMIN_URL")
+	if adminURL == "" {
+		//nolint:gosec // local test database password, not a secret
+		adminURL = "postgres://postgres:local@localhost:5432/postgres?sslmode=disable"
 	}
 
-	ac, err := pgx.Connect(ctx, admin)
+	admin, err := pgx.Connect(ctx, adminURL)
 	if err != nil {
 		t.Skip("postgres not available:", err)
 	}
 
-	t.Cleanup(func() { ac.Close(ctx) })
+	t.Cleanup(func() { _ = admin.Close(ctx) })
 
 	const name = "ac_migrate_test"
 
-	_, execErr := ac.Exec(ctx, "DROP DATABASE IF EXISTS "+name+" WITH (FORCE)")
+	_, execErr := admin.Exec(ctx, "DROP DATABASE IF EXISTS "+name+" WITH (FORCE)")
 	if execErr != nil {
 		t.Fatal(execErr)
 	}
 
-	_, execErr = ac.Exec(ctx, "CREATE DATABASE "+name)
+	_, execErr = admin.Exec(ctx, "CREATE DATABASE "+name)
 	if execErr != nil {
 		t.Fatal(execErr)
 	}
 
-	cfg, _ := pgx.ParseConfig(admin)
+	cfg, _ := pgx.ParseConfig(adminURL)
 	cfg.Database = name
 
 	conn, err := pgx.ConnectConfig(ctx, cfg)
@@ -97,25 +103,26 @@ func testDB(t *testing.T) *pgx.Conn {
 	}
 
 	t.Cleanup(func() {
-		conn.Close(ctx)
-		ac.Exec(ctx, "DROP DATABASE IF EXISTS "+name+" WITH (FORCE)") //nolint:errcheck
+		_ = conn.Close(ctx)
+		_, _ = admin.Exec(ctx, "DROP DATABASE IF EXISTS "+name+" WITH (FORCE)")
 	})
 
 	return conn
 }
 
+//nolint:paralleltest // every test rebuilds the same scratch database ac_migrate_test
 func TestUpAppliesOnceAndRecordsVersion(t *testing.T) {
 	ctx := context.Background()
 	conn := testDB(t)
 
-	ms, err := Load(migrations.FS)
+	loaded, err := Load(migrations.FS)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	extra := append(
-		ms,
-		Migration{Version: 900, Name: "probe", SQL: "CREATE TABLE public.probe (id int)"},
+	extra := slices.Concat(
+		loaded,
+		[]Migration{{Version: 900, Name: "probe", SQL: "CREATE TABLE public.probe (id int)"}},
 	)
 
 	got, err := Up(ctx, conn, extra)
@@ -142,6 +149,16 @@ func TestUpAppliesOnceAndRecordsVersion(t *testing.T) {
 		t.Fatalf("want ErrUnversioned, got %v", upErr)
 	}
 
+	checkForceAndLogins(t, conn)
+}
+
+// checkForceAndLogins records version 900 by force on a database without the fixture and creates the login role
+// twice.
+func checkForceAndLogins(t *testing.T, conn *pgx.Conn) {
+	t.Helper()
+
+	ctx := context.Background()
+
 	forceErr := Force(ctx, conn, 900)
 	if forceErr != nil {
 		t.Fatal(forceErr)
@@ -163,6 +180,7 @@ func TestUpAppliesOnceAndRecordsVersion(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // every test rebuilds the same scratch database ac_migrate_test
 func TestFailedMigrationRollsBack(t *testing.T) {
 	ctx := context.Background()
 	conn := testDB(t)
@@ -180,37 +198,38 @@ func TestFailedMigrationRollsBack(t *testing.T) {
 		t.Fatalf("version = %d dirty=%t", v, dirty)
 	}
 
-	var b *string
+	var table *string
 
 	scanErr := conn.QueryRow(ctx, "SELECT to_regclass('public.b')::text").
-		Scan(&b)
+		Scan(&table)
 	if scanErr != nil ||
-		b != nil {
-		t.Fatalf("table b must not exist: %v %v", b, scanErr)
+		table != nil {
+		t.Fatalf("table b must not exist: %v %v", table, scanErr)
 	}
 }
 
+//nolint:paralleltest // every test rebuilds the same scratch database ac_migrate_test
 func TestNoTxFailureLeavesDirty(t *testing.T) {
 	ctx := context.Background()
 	conn := testDB(t)
 
-	ms := []Migration{
+	failing := []Migration{
 		{
 			Version: 3,
 			Name:    "idx",
 			SQL:     noTxMarker + "\nCREATE INDEX CONCURRENTLY x ON public.missing (id)",
 		},
 	}
-	if !ms[0].NoTx() {
+	if !failing[0].NoTx() {
 		t.Fatal("marker not detected")
 	}
 
-	_, err := Up(ctx, conn, ms)
+	_, err := Up(ctx, conn, failing)
 	if err == nil {
 		t.Fatal("want error")
 	}
 
-	_, err = Up(ctx, conn, ms)
+	_, err = Up(ctx, conn, failing)
 	if !errors.Is(err, ErrDirty) {
 		t.Fatalf("want ErrDirty, got %v", err)
 	}
