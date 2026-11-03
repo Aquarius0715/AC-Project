@@ -1,17 +1,21 @@
-package maintenance
+package maintenance_test
 
 import (
 	"testing"
 	"time"
+
+	"github.com/pradita/ac-project/service/api/internal/modules/maintenance"
 )
 
 func TestNextOccurrence(t *testing.T) {
-	d := func(s string) time.Time {
+	t.Parallel()
+
+	parse := func(s string) time.Time {
 		v, _ := time.Parse(time.RFC3339, s)
 
 		return v
 	}
-	for _, c := range []struct {
+	for _, testCase := range []struct {
 		from     string
 		months   int
 		anchor   int
@@ -23,14 +27,20 @@ func TestNextOccurrence(t *testing.T) {
 		{"2026-11-15T09:30:00Z", 2, 15, "2027-01-15T09:30:00Z"},
 		{"2028-01-30T00:00:00Z", 1, 30, "2028-02-29T00:00:00Z"},
 	} {
-		if got := NextOccurrence(d(c.from), c.months, c.anchor); !got.Equal(d(c.expected)) {
+		if got := maintenance.NextOccurrence(
+			parse(testCase.from),
+			testCase.months,
+			testCase.anchor,
+		); !got.Equal(
+			parse(testCase.expected),
+		) {
 			t.Errorf(
 				"%s +%d (day %d): %s want %s",
-				c.from,
-				c.months,
-				c.anchor,
+				testCase.from,
+				testCase.months,
+				testCase.anchor,
 				got.Format(time.RFC3339),
-				c.expected,
+				testCase.expected,
 			)
 		}
 	}

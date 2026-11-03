@@ -33,22 +33,22 @@ func (m Workforce) technicians(
 	call *ops.Call,
 	internalOnly bool,
 ) ([]identity.Member, error) {
-	q := `SELECT m.id, m.tenant_id, m.version, m.created_at, m.updated_at, m.user_id, m.organization_id, m.role,
+	stmt := `SELECT m.id, m.tenant_id, m.version, m.created_at, m.updated_at, m.user_id, m.organization_id, m.role,
 		m.employment, m.scope_version, m.valid_from,
 		m.valid_until, m.client_role FROM maintenance.ref_memberships m WHERE m.role = 'technician' AND m.valid_from <= $1 AND
 		(m.valid_until IS NULL OR m.valid_until > $1)`
 
 	args := []any{call.Now}
 	switch {
-	case call.Principal.Role == "contractor":
-		q += " AND m.organization_id = $2"
+	case call.Principal.Role == roleContractor:
+		stmt += " AND m.organization_id = $2"
 
 		args = append(args, call.Principal.OrgID)
 	case internalOnly:
-		q += " AND m.employment = 'internal'"
+		stmt += " AND m.employment = 'internal'"
 	}
 
-	rows, err := call.Tx.Query(ctx, q+" ORDER BY m.id", args...)
+	rows, err := call.Tx.Query(ctx, stmt+" ORDER BY m.id", args...)
 	if err != nil {
 		return nil, apperr.Wrap(err, "query (technicians)")
 	}
@@ -97,20 +97,20 @@ type techFilter struct {
 }
 
 func decodeTechFilter(query paging.Query) (techFilter, error) {
-	var f techFilter
+	var filter techFilter
 	if len(query.Filters) == 0 {
-		return f, nil
+		return filter, nil
 	}
 
 	dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 	dec.DisallowUnknownFields()
 
-	if dec.Decode(&f) != nil ||
-		(f.Qualification != nil && (!certCodes[*f.Qualification] || *f.Qualification == "other")) {
-		return f, apperr.Fields(map[string]string{"filters": apperr.KeyInvalid})
+	if dec.Decode(&filter) != nil ||
+		(filter.Qualification != nil && (!certCodes()[*filter.Qualification] || *filter.Qualification == codeOther)) {
+		return filter, apperr.Fields(map[string]string{fieldFilters: apperr.KeyInvalid})
 	}
 
-	return f, nil
+	return filter, nil
 }
 
 // keep returns the technicians that match the filter; qualifications are loaded from identity only when needed.
@@ -187,14 +187,14 @@ func unavailable(
 	ctx context.Context,
 	call *ops.Call,
 	membership, org uuid.UUID,
-	d1, d2 string,
+	firstDay, lastDay string,
 ) (string, bool, error) {
 	var typ string
 
 	err := call.Tx.QueryRow(ctx, `SELECT type FROM maintenance.unavailability WHERE (membership_id = $1 OR (membership_id
 		IS
 		NULL AND organization_id = $2))
-		AND days && daterange($3::date, $4::date, '[]') ORDER BY created_at LIMIT 1`, membership, org, d1, d2).
+		AND days && daterange($3::date, $4::date, '[]') ORDER BY created_at LIMIT 1`, membership, org, firstDay, lastDay).
 		Scan(&typ)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", false, nil
@@ -217,7 +217,7 @@ type EligibleInput struct {
 func (in *EligibleInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = apperr.KeyRequired
+		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
 	if !in.StartAt.Before(in.EndAt) {
@@ -273,7 +273,7 @@ func (m Workforce) eligible(
 	err := call.Tx.QueryRow(ctx, `SELECT unit_id, contractor_org_id FROM maintenance.jobs WHERE id = $1`, input.JobID).
 		Scan(&unit, &contractor)
 	if errors.Is(err, pgx.ErrNoRows) ||
-		(err == nil && call.Principal.Role == "contractor" && (contractor == nil || *contractor != call.Principal.OrgID)) {
+		(err == nil && call.Principal.Role == roleContractor && (contractor == nil || *contractor != call.Principal.OrgID)) {
 		return paging.Page[identity.Member]{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
@@ -281,14 +281,14 @@ func (m Workforce) eligible(
 		return paging.Page[identity.Member]{}, apperr.Wrap(err, "select maintenance.jobs")
 	}
 
-	f, err := decodeTechFilter(input.Query)
+	filter, err := decodeTechFilter(input.Query)
 	if err != nil {
 		return paging.Page[identity.Member]{}, err
 	}
 
 	techs, err := m.technicians(ctx, call, true)
 	if err == nil {
-		techs, err = f.keep(ctx, call, techs)
+		techs, err = filter.keep(ctx, call, techs)
 	}
 
 	if err != nil {
@@ -296,17 +296,17 @@ func (m Workforce) eligible(
 	}
 
 	slot := Slot{input.StartAt, input.EndAt}
-	d1, d2 := klDates(input.StartAt, input.EndAt)
+	firstDay, lastDay := klDates(input.StartAt, input.EndAt)
 	out := []identity.Member{}
 
 	for _, member := range techs {
-		isContractor := call.Principal.Role == "contractor"
+		isContractor := call.Principal.Role == roleContractor
 		if m.Delivery.checkTechnician(ctx, call, unit, member.ID, isContractor, nil) != nil ||
 			m.Delivery.checkQualified(ctx, call, unit, member.ID, slot) != nil {
 			continue
 		}
 
-		_, off, err := unavailable(ctx, call, member.ID, member.OrganizationID, d1, d2)
+		_, off, err := unavailable(ctx, call, member.ID, member.OrganizationID, firstDay, lastDay)
 		if err != nil {
 			return paging.Page[identity.Member]{}, err
 		} else if off {
@@ -341,9 +341,9 @@ func (m Workforce) eligible(
 		out,
 		input.Query.Sort,
 		map[string]func(a, b identity.Member) int{
-			"id":        func(a, b identity.Member) int { return strings.Compare(a.ID.String(), b.ID.String()) },
-			"createdAt": func(a, b identity.Member) int { return a.CreatedAt.Compare(b.CreatedAt) },
-			"updatedAt": func(a, b identity.Member) int { return a.UpdatedAt.Compare(b.UpdatedAt) },
+			"id":           func(a, b identity.Member) int { return strings.Compare(a.ID.String(), b.ID.String()) },
+			fieldCreatedAt: func(a, b identity.Member) int { return a.CreatedAt.Compare(b.CreatedAt) },
+			fieldUpdatedAt: func(a, b identity.Member) int { return a.UpdatedAt.Compare(b.UpdatedAt) },
 		},
 	)
 	if sortSliceErr != nil {
@@ -423,14 +423,14 @@ func (m Workforce) capacity(
 	work := Slot{day.Add(9 * time.Hour).UTC(), day.Add(17 * time.Hour).UTC()}
 	weekend := day.Weekday() == time.Saturday || day.Weekday() == time.Sunday
 
-	f, err := decodeTechFilter(input.Query)
+	filter, err := decodeTechFilter(input.Query)
 	if err != nil {
 		return paging.Page[Capacity]{}, err
 	}
 
 	techs, err := m.technicians(ctx, call, false)
 	if err == nil {
-		techs, err = f.keep(ctx, call, techs)
+		techs, err = filter.keep(ctx, call, techs)
 	}
 
 	if err != nil {
@@ -546,26 +546,26 @@ func (m Workforce) capacity(
 
 // unionMinutes returns the minutes covered by the union of the slots.
 func unionMinutes(slots []Slot) int {
-	s := append([]Slot(nil), slots...)
-	sort.Slice(s, func(i, j int) bool { return s[i].StartAt.Before(s[j].StartAt) })
+	sorted := append([]Slot(nil), slots...)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].StartAt.Before(sorted[j].StartAt) })
 
 	var (
 		total time.Duration
 		cur   *Slot
 	)
 
-	for idx := range s {
+	for idx := range sorted {
 		switch {
 		case cur == nil:
-			c := s[idx]
+			c := sorted[idx]
 			cur = &c
-		case !s[idx].StartAt.After(cur.EndAt):
-			if s[idx].EndAt.After(cur.EndAt) {
-				cur.EndAt = s[idx].EndAt
+		case !sorted[idx].StartAt.After(cur.EndAt):
+			if sorted[idx].EndAt.After(cur.EndAt) {
+				cur.EndAt = sorted[idx].EndAt
 			}
 		default:
 			total += cur.EndAt.Sub(cur.StartAt)
-			c := s[idx]
+			c := sorted[idx]
 			cur = &c
 		}
 	}
@@ -593,7 +593,7 @@ var unavailabilityTypes = map[string]bool{
 	"training":       true,
 	"public_holiday": true,
 	"sick":           true,
-	"other":          true,
+	codeOther:        true,
 }
 
 // Validate implements ops.Validator.
@@ -678,7 +678,7 @@ func (m Workforce) setUnavailability(
 		}
 
 		if !found ||
-			(call.Principal.Role == "contractor" && technician.OrgID != call.Principal.OrgID) {
+			(call.Principal.Role == roleContractor && technician.OrgID != call.Principal.OrgID) {
 			return Unavailability{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 
@@ -687,22 +687,22 @@ func (m Workforce) setUnavailability(
 
 	f, _ := time.ParseInLocation("2006-01-02", input.From, kualaLumpur)
 	t, _ := time.ParseInLocation("2006-01-02", input.To, kualaLumpur)
-	q := `SELECT a.id FROM maintenance.assignments a JOIN maintenance.ref_memberships mb ON mb.id =
+	stmt := `SELECT a.id FROM maintenance.assignments a JOIN maintenance.ref_memberships mb ON mb.id =
 		a.technician_membership_id
 		WHERE a.status = 'active' AND a.scheduled && tstzrange($1, $2) AND `
 	args := []any{f.UTC(), t.AddDate(0, 0, 1).UTC()}
 
 	if input.MembershipID != nil {
-		q += "a.technician_membership_id = $3"
+		stmt += "a.technician_membership_id = $3"
 
 		args = append(args, *input.MembershipID)
 	} else {
-		q += "mb.organization_id = $3"
+		stmt += "mb.organization_id = $3"
 
 		args = append(args, org)
 	}
 
-	rows, err := call.Tx.Query(ctx, q+" ORDER BY a.id", args...)
+	rows, err := call.Tx.Query(ctx, stmt+" ORDER BY a.id", args...)
 	if err != nil {
 		return Unavailability{}, apperr.Wrap(err, "query (setUnavailability)")
 	}
@@ -710,16 +710,16 @@ func (m Workforce) setUnavailability(
 	conflicts := []uuid.UUID{}
 
 	for rows.Next() {
-		var id uuid.UUID
+		var assignmentID uuid.UUID
 
-		err := rows.Scan(&id)
+		err := rows.Scan(&assignmentID)
 		if err != nil {
 			rows.Close()
 
 			return Unavailability{}, apperr.Wrap(err, "query (setUnavailability)")
 		}
 
-		conflicts = append(conflicts, id)
+		conflicts = append(conflicts, assignmentID)
 	}
 
 	rows.Close()
@@ -755,25 +755,22 @@ func (m Workforce) setUnavailability(
 	}
 
 	call.Emit(
-		ops.Event{
-			AggregateType: "unavailability",
-			AggregateID:   unavailability.ID,
-			Type:          "UnavailabilitySet",
-			Payload:       map[string]any{"organizationId": org},
-		},
+		outboxEvent(
+			"unavailability",
+			unavailability.ID,
+			"UnavailabilitySet",
+			map[string]any{fieldOrganizationID: org},
+		),
 	)
 	call.Audit(
-		ops.AuditEntry{
-			Action:          "members.setUnavailability",
-			TargetKind:      "unavailability",
-			TargetID:        unavailability.ID.String(),
-			NextVersion:     &unavailability.Version,
-			PreviousVersion: nil,
-			Reason:          "",
-			Result:          "",
-			Before:          nil,
-			After:           nil,
-		},
+		auditEntry(
+			"members.setUnavailability",
+			"unavailability",
+			unavailability.ID,
+			nil,
+			&unavailability.Version,
+			"",
+		),
 	)
 
 	return unavailability, nil
@@ -844,7 +841,7 @@ func (m Workforce) unavailabilityList(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[Unavailability], error) {
-	var f struct {
+	var filters struct {
 		OrganizationID *uuid.UUID `json:"organizationId,omitempty"`
 		MembershipID   *uuid.UUID `json:"membershipId,omitempty"` // with the rows of the technician's whole company
 	}
@@ -853,9 +850,9 @@ func (m Workforce) unavailabilityList(
 		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
-		if dec.Decode(&f) != nil {
+		if dec.Decode(&filters) != nil {
 			return paging.Page[Unavailability]{}, apperr.Fields(
-				map[string]string{"filters": apperr.KeyInvalid},
+				map[string]string{fieldFilters: apperr.KeyInvalid},
 			)
 		}
 	}
@@ -868,16 +865,16 @@ func (m Workforce) unavailabilityList(
 	}
 
 	conds := []string{"upper(days) > $1::date"}
-	if call.Principal.Role == "contractor" {
+	if call.Principal.Role == roleContractor {
 		conds = append(conds, "organization_id = "+add(call.Principal.OrgID))
 	}
 
-	if f.OrganizationID != nil {
-		conds = append(conds, "organization_id = "+add(*f.OrganizationID))
+	if filters.OrganizationID != nil {
+		conds = append(conds, "organization_id = "+add(*filters.OrganizationID))
 	}
 
-	if f.MembershipID != nil {
-		p := add(*f.MembershipID)
+	if filters.MembershipID != nil {
+		p := add(*filters.MembershipID)
 		conds = append(
 			conds,
 			"(membership_id = "+p+" OR (membership_id IS NULL AND organization_id IN (SELECT organization_id FROM "+
@@ -920,14 +917,14 @@ func (m Workforce) unavailabilityList(
 	}
 
 	sortSliceErr := paging.SortSlice(all, query.Sort, map[string]func(a, b Unavailability) int{
-		"id":   func(a, b Unavailability) int { return strings.Compare(a.ID.String(), b.ID.String()) },
-		"from": func(a, b Unavailability) int { return strings.Compare(a.From, b.From) },
+		"id":      func(a, b Unavailability) int { return strings.Compare(a.ID.String(), b.ID.String()) },
+		fieldFrom: func(a, b Unavailability) int { return strings.Compare(a.From, b.From) },
 	})
 	if sortSliceErr != nil {
 		return paging.Page[Unavailability]{}, apperr.Wrap(sortSliceErr, "paging.SortSlice")
 	}
 
-	return pageOf(all, *query, f, call.Principal.ScopeVersion)
+	return pageOf(all, *query, filters, call.Principal.ScopeVersion)
 }
 
 // ---- members.clearUnavailability ----
@@ -947,7 +944,7 @@ func (in *ClearUnavailabilityInput) Validate() map[string]string {
 
 	_, err := time.Parse("2006-01-02", in.From)
 	if err != nil {
-		fieldErrs["from"] = apperr.KeyInvalid
+		fieldErrs[fieldFrom] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -1004,7 +1001,7 @@ func (m Workforce) clearUnavailability(
 		),
 	)
 	if errors.Is(err, pgx.ErrNoRows) ||
-		(err == nil && call.Principal.Role == "contractor" && unavailability.OrganizationID != call.Principal.OrgID) {
+		(err == nil && call.Principal.Role == roleContractor && unavailability.OrganizationID != call.Principal.OrgID) {
 		return UnavailabilityCleared{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
@@ -1018,10 +1015,13 @@ func (m Workforce) clearUnavailability(
 
 	if input.From < call.Now.In(kualaLumpur).Format("2006-01-02") ||
 		input.From > unavailability.To {
-		return UnavailabilityCleared{}, apperr.Fields(map[string]string{"from": apperr.KeyRange})
+		return UnavailabilityCleared{}, apperr.Fields(map[string]string{fieldFrom: apperr.KeyRange})
 	}
 
-	payload := map[string]any{"organizationId": unavailability.OrganizationID, "from": input.From}
+	payload := map[string]any{
+		fieldOrganizationID: unavailability.OrganizationID,
+		fieldFrom:           input.From,
+	}
 	if input.From <= unavailability.From {
 		_, err := call.Tx.Exec(
 			ctx,
@@ -1033,25 +1033,17 @@ func (m Workforce) clearUnavailability(
 		}
 
 		call.Emit(
-			ops.Event{
-				AggregateType: "unavailability",
-				AggregateID:   unavailability.ID,
-				Type:          "UnavailabilityCleared",
-				Payload:       payload,
-			},
+			outboxEvent("unavailability", unavailability.ID, "UnavailabilityCleared", payload),
 		)
 		call.Audit(
-			ops.AuditEntry{
-				Action:          "members.clearUnavailability",
-				TargetKind:      "unavailability",
-				TargetID:        unavailability.ID.String(),
-				PreviousVersion: call.ExpectedVersion,
-				NextVersion:     nil,
-				Reason:          "",
-				Result:          "",
-				Before:          nil,
-				After:           nil,
-			},
+			auditEntry(
+				"members.clearUnavailability",
+				"unavailability",
+				unavailability.ID,
+				call.ExpectedVersion,
+				nil,
+				"",
+			),
 		)
 
 		return UnavailabilityCleared{ID: unavailability.ID, Remaining: nil}, nil
@@ -1076,26 +1068,16 @@ func (m Workforce) clearUnavailability(
 		return UnavailabilityCleared{}, apperr.Wrap(execErr, "update maintenance.unavailability")
 	}
 
-	call.Emit(
-		ops.Event{
-			AggregateType: "unavailability",
-			AggregateID:   unavailability.ID,
-			Type:          "UnavailabilityCleared",
-			Payload:       payload,
-		},
-	)
+	call.Emit(outboxEvent("unavailability", unavailability.ID, "UnavailabilityCleared", payload))
 	call.Audit(
-		ops.AuditEntry{
-			Action:          "members.clearUnavailability",
-			TargetKind:      "unavailability",
-			TargetID:        unavailability.ID.String(),
-			PreviousVersion: call.ExpectedVersion,
-			NextVersion:     &unavailability.Version,
-			Reason:          "",
-			Result:          "",
-			Before:          nil,
-			After:           nil,
-		},
+		auditEntry(
+			"members.clearUnavailability",
+			"unavailability",
+			unavailability.ID,
+			call.ExpectedVersion,
+			&unavailability.Version,
+			"",
+		),
 	)
 
 	return UnavailabilityCleared{ID: unavailability.ID, Remaining: &unavailability}, nil

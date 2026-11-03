@@ -46,6 +46,13 @@ type ServiceUnits interface {
 	) (org, property uuid.UUID, scope []string, err error)
 }
 
+// The organization kind and status a contractor needs to be offered a job or to hold a proposed slot
+// (Directory.OrgState).
+const (
+	orgKindContractor = "contractor"
+	orgStatusActive   = "active"
+)
+
 // QualificationRequirements maps Unit.serviceScope entries to QualificationCodes (fixture qualificationRequirements).
 var QualificationRequirements = map[string]string{
 	"indoor":     "demo_indoor",
@@ -95,37 +102,37 @@ func (r jobRow) current(c *ops.Call) error {
 // load locks a job for update like lock, without the version. A handler whose scope check needs the row checks the
 // scope first and the version after it (current), so a caller outside the scope gets NOT_FOUND / FORBIDDEN for any
 // version and learns nothing of the job (IR366).
-func (m Delivery) load(ctx context.Context, call *ops.Call, id uuid.UUID) (jobRow, error) {
+func (m Delivery) load(ctx context.Context, call *ops.Call, jobID uuid.UUID) (jobRow, error) {
 	var (
-		r      jobRow
-		pref   []byte
-		ss, se *time.Time
+		job                  jobRow
+		pref                 []byte
+		schedStart, schedEnd *time.Time
 	)
 
 	err := call.Tx.QueryRow(ctx, `SELECT status, unit_id, contractor_org_id, plan_id, occurrence_at, lower(requested_slot),
 		upper(requested_slot), preferred_slots,
 		lower(scheduled_slot), upper(scheduled_slot), assignment_id, version FROM maintenance.jobs WHERE id = $1 FOR
-		UPDATE`, id).
-		Scan(&r.status, &r.unit, &r.contractor, &r.planID, &r.occurrence, &r.requested.StartAt, &r.requested.EndAt, &pref,
-			&ss, &se, &r.assignment, &r.version)
+		UPDATE`, jobID).
+		Scan(&job.status, &job.unit, &job.contractor, &job.planID, &job.occurrence, &job.requested.StartAt, &job.requested.EndAt, &pref,
+			&schedStart, &schedEnd, &job.assignment, &job.version)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return r, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+		return job, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
-		return r, apperr.Wrap(err, "select maintenance.jobs")
+		return job, apperr.Wrap(err, "select maintenance.jobs")
 	}
 
-	if ss != nil && se != nil {
-		r.scheduled = &Slot{*ss, *se}
+	if schedStart != nil && schedEnd != nil {
+		job.scheduled = &Slot{*schedStart, *schedEnd}
 	}
 
-	unmarshalSlotsErr := unmarshalSlots(pref, &r.preferred)
+	unmarshalSlotsErr := unmarshalSlots(pref, &job.preferred)
 	if unmarshalSlotsErr != nil {
-		return r, unmarshalSlotsErr
+		return job, unmarshalSlotsErr
 	}
 
-	return r, nil
+	return job, nil
 }
 
 func sameSlot(a, b Slot) bool { return a.StartAt.Equal(b.StartAt) && a.EndAt.Equal(b.EndAt) }
@@ -134,40 +141,43 @@ func sameSlot(a, b Slot) bool { return a.StartAt.Equal(b.StartAt) && a.EndAt.Equ
 func (m Delivery) agreed(
 	ctx context.Context,
 	call *ops.Call,
-	id uuid.UUID,
-	r jobRow,
+	jobID uuid.UUID,
+	job jobRow,
 	slot Slot,
 ) (bool, error) {
-	for _, p := range r.preferred {
+	for _, p := range job.preferred {
 		if sameSlot(p, slot) {
 			return true, nil
 		}
 	}
 
-	var n int
+	var count int
 
 	err := call.Tx.QueryRow(ctx, `SELECT count(*) FROM maintenance.slot_proposals WHERE job_id = $1 AND status = 'accepted'
 		AND slot = tstzrange($2, $3)`,
-		id, slot.StartAt, slot.EndAt).
-		Scan(&n)
+		jobID, slot.StartAt, slot.EndAt).
+		Scan(&count)
 	if err != nil {
 		return false, apperr.Wrap(err, "select maintenance.slot_proposals")
 	}
 
-	if n > 0 {
+	if count > 0 {
 		return true, nil
 	}
 
-	if r.planID != nil && r.occurrence != nil {
-		dur := r.requested.EndAt.Sub(r.requested.StartAt)
+	if job.planID != nil && job.occurrence != nil {
+		dur := job.requested.EndAt.Sub(job.requested.StartAt)
 
-		return sameSlot(Slot{*r.occurrence, r.occurrence.Add(dur)}, slot), nil
+		return sameSlot(Slot{*job.occurrence, job.occurrence.Add(dur)}, slot), nil
 	}
 
 	return false, nil
 }
 
 // ---- jobs.offer ----
+
+// keySlotNotAgreed refuses a visit or an assignment slot that is not an agreed slot of the job (IR113 item 3).
+const keySlotNotAgreed = "errors.slot_not_agreed"
 
 // OfferInput is jobs.offer input.
 type OfferInput struct {
@@ -184,7 +194,7 @@ type OfferInput struct {
 func (in *OfferInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = apperr.KeyRequired
+		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
 	if in.ContractorOrgID == uuid.Nil {
@@ -211,7 +221,7 @@ func (in *OfferInput) Validate() map[string]string {
 		fieldErrs["accessValidFrom"] = "error.accessMustCoverVisit"
 	}
 
-	if n := utf8.RuneCountInString(in.TermsVersion); n < 1 || n > 64 {
+	if n := utf8.RuneCountInString(in.TermsVersion); n < 1 || n > maxCodeLength {
 		fieldErrs["termsVersion"] = apperr.KeyLength
 	}
 
@@ -252,35 +262,35 @@ func (m Delivery) offer(ctx context.Context, c *ops.Call, in *OfferInput) (Maint
 }
 
 // offerJob is offer answering the job with its detail extras.
-func (m Delivery) offerJob(ctx context.Context, call *ops.Call, in *OfferInput) (Job, error) {
-	if !call.Now.Before(in.OfferExpiresAt) {
+func (m Delivery) offerJob(ctx context.Context, call *ops.Call, input *OfferInput) (Job, error) {
+	if !call.Now.Before(input.OfferExpiresAt) {
 		return Job{}, apperr.Fields(map[string]string{"offerExpiresAt": apperr.KeyPast})
 	}
 
-	kind, status, found, err := m.Directory.OrgState(ctx, call, in.ContractorOrgID)
+	kind, status, found, err := m.Directory.OrgState(ctx, call, input.ContractorOrgID)
 	if err != nil {
 		return Job{}, apperr.Wrap(err, "maintenance.Directory.OrgState")
 	}
 
-	if !found || kind != "contractor" || status != "active" {
+	if !found || kind != orgKindContractor || status != orgStatusActive {
 		return Job{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	var suspended bool
 
 	scanErr := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id = $1 AND
-		status = 'suspended')`, in.ContractorOrgID).
+		status = 'suspended')`, input.ContractorOrgID).
 		Scan(&suspended)
 	if scanErr != nil {
 		return Job{}, apperr.Wrap(scanErr, "select maintenance.contractors")
 	}
 
-	r, err := m.lock(ctx, call, in.JobID)
+	job, err := m.lock(ctx, call, input.JobID)
 	if err != nil {
 		return Job{}, err
 	}
 
-	if r.status != "requested" {
+	if job.status != statusRequested {
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
@@ -288,13 +298,13 @@ func (m Delivery) offerJob(ctx context.Context, call *ops.Call, in *OfferInput) 
 		return Job{}, apperr.E(apperr.Conflict, "errors.contractor_suspended")
 	}
 
-	ok, err := m.agreed(ctx, call, in.JobID, r, in.VisitSlot)
+	ok, err := m.agreed(ctx, call, input.JobID, job, input.VisitSlot)
 	if err != nil {
 		return Job{}, err
 	}
 
 	if !ok {
-		return Job{}, apperr.Fields(map[string]string{"visitSlot": "errors.slot_not_agreed"})
+		return Job{}, apperr.Fields(map[string]string{"visitSlot": keySlotNotAgreed})
 	}
 
 	_, execErr := call.Tx.Exec(
@@ -303,15 +313,15 @@ func (m Delivery) offerJob(ctx context.Context, call *ops.Call, in *OfferInput) 
 			offer_expires_at,
 		access_valid_from, access_valid_until) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, tstzrange($4, $5),
 		$6, $7, $8, $9)`,
-		in.JobID,
-		in.ContractorOrgID,
-		in.TermsVersion,
-		in.VisitSlot.StartAt,
-		in.VisitSlot.EndAt,
+		input.JobID,
+		input.ContractorOrgID,
+		input.TermsVersion,
+		input.VisitSlot.StartAt,
+		input.VisitSlot.EndAt,
 		call.Now,
-		in.OfferExpiresAt,
-		in.AccessValidFrom,
-		in.AccessValidUntil,
+		input.OfferExpiresAt,
+		input.AccessValidFrom,
+		input.AccessValidUntil,
 	)
 	if execErr != nil {
 		return Job{}, apperr.Wrap(execErr, "insert maintenance.offers")
@@ -321,22 +331,28 @@ func (m Delivery) offerJob(ctx context.Context, call *ops.Call, in *OfferInput) 
 		ctx,
 		`UPDATE maintenance.jobs SET status = 'offered', contractor_org_id = $2, version = version + 1, updated_at =
 			platform.app_now() WHERE id = $1`,
-		in.JobID,
-		in.ContractorOrgID,
+		input.JobID,
+		input.ContractorOrgID,
 	)
 	if execErr != nil {
 		return Job{}, apperr.Wrap(execErr, "update maintenance.jobs")
 	}
 
-	eventErr := m.Jobs.event(ctx, call, in.JobID, "job.offered", nil)
+	eventErr := m.Jobs.event(ctx, call, input.JobID, "job.offered", nil)
 	if eventErr != nil {
 		return Job{}, eventErr
 	}
 
-	return m.Jobs.finish(ctx, call, in.JobID, "jobs.offer", "JobOffered", "")
+	return m.Jobs.finish(ctx, call, input.JobID, "jobs.offer", "JobOffered", "")
 }
 
 // ---- jobs.accept / jobs.decline ----
+
+// The decisions on an offer, an assignment, a slot proposal and a work report review.
+const (
+	decisionAccept  = "accept"
+	decisionDecline = "decline"
+)
 
 // AcceptInput is jobs.accept input: the company takes the offer under the terms version it read.
 type AcceptInput struct {
@@ -350,7 +366,7 @@ func (in *AcceptInput) Validate() map[string]string {
 	fieldErrs := decisionRefs(in.JobID, in.OfferID)
 	if in.TermsVersion == "" {
 		fieldErrs["termsVersion"] = apperr.KeyRequired
-	} else if utf8.RuneCountInString(in.TermsVersion) > 64 {
+	} else if utf8.RuneCountInString(in.TermsVersion) > maxCodeLength {
 		fieldErrs["termsVersion"] = apperr.KeyLength
 	}
 
@@ -367,7 +383,7 @@ type DeclineInput struct {
 // Validate implements ops.Validator.
 func (in *DeclineInput) Validate() map[string]string {
 	fe := decisionRefs(in.JobID, in.OfferID)
-	trimmedReason(&in.Reason, 1000, "reason", fe)
+	trimmedReason(&in.Reason, maxReasonLength, fieldReason, fe)
 
 	return fe
 }
@@ -375,7 +391,7 @@ func (in *DeclineInput) Validate() map[string]string {
 func decisionRefs(job, offer uuid.UUID) map[string]string {
 	fieldErrs := map[string]string{}
 	if job == uuid.Nil {
-		fieldErrs["jobId"] = apperr.KeyRequired
+		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
 	if offer == uuid.Nil {
@@ -426,7 +442,7 @@ func (m Delivery) decide(
 		) // declined / decided offers are only reachable through the IR01 receipt
 	}
 
-	r, err := m.lock(ctx, call, job)
+	locked, err := m.lock(ctx, call, job)
 	if err != nil {
 		return Receipt{}, err
 	}
@@ -435,11 +451,11 @@ func (m Delivery) decide(
 		return Receipt{}, apperr.E(apperr.Conflict, "errors.offer_expired")
 	}
 
-	if r.status != "offered" {
+	if locked.status != statusOffered {
 		return Receipt{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
-	if decision == "accept" {
+	if decision == decisionAccept {
 		var open bool
 
 		err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.partner_slot_proposals WHERE offer_id = $1 AND
@@ -454,7 +470,7 @@ func (m Delivery) decide(
 		}
 	}
 
-	if decision == "accept" && readTerms != terms {
+	if decision == decisionAccept && readTerms != terms {
 		return Receipt{}, apperr.E(apperr.Conflict, "errors.terms_changed")
 	}
 
@@ -472,9 +488,9 @@ func (m Delivery) decide(
 		return Receipt{}, apperr.Wrap(execErr, "update maintenance.offers")
 	}
 
-	next, contractor := "accepted", "contractor_org_id"
-	if decision == "decline" {
-		next, contractor = "requested", "NULL"
+	next, contractor := statusAccepted, "contractor_org_id"
+	if decision == decisionDecline {
+		next, contractor = statusRequested, "NULL"
 		// the contractor's open time change ends with the declined offer (IR444), and so does a client proposal that holds
 		// this contractor: accepting it would offer the job again to the company that just declined it (IR445)
 		_, err := call.Tx.Exec(
@@ -500,19 +516,19 @@ func (m Delivery) decide(
 		}
 	}
 
-	var v int
+	var version int
 
 	scanErr := call.Tx.QueryRow(ctx, `UPDATE maintenance.jobs SET status = $2, contractor_org_id =
 		`+contractor+`, version `+
 		`= version + 1, updated_at = platform.app_now()
 		WHERE id = $1 RETURNING version`, job, next).
-		Scan(&v)
+		Scan(&version)
 	if scanErr != nil {
 		return Receipt{}, apperr.Wrap(scanErr, "update maintenance.jobs")
 	}
 
 	// the past tense the history reads (offer.declined)
-	done := map[string]string{"accept": "accepted", "decline": "declined"}[decision]
+	done := map[string]string{decisionAccept: "accepted", decisionDecline: "declined"}[decision]
 
 	eventErr := m.Jobs.event(ctx, call, job, "offer."+done, nil)
 	if eventErr != nil {
@@ -520,25 +536,16 @@ func (m Delivery) decide(
 	}
 
 	call.Emit(
-		ops.Event{
-			AggregateType: "job",
-			AggregateID:   job,
-			Type:          "Offer" + strings.ToUpper(done[:1]) + done[1:],
-			Payload:       map[string]any{"offerId": offer},
-		},
+		outboxEvent(
+			"job",
+			job,
+			"Offer"+strings.ToUpper(done[:1])+done[1:],
+			map[string]any{"offerId": offer},
+		),
 	)
-	call.Audit(
-		ops.AuditEntry{
-			Action:          "jobs." + decision,
-			TargetKind:      "job",
-			TargetID:        job.String(),
-			PreviousVersion: call.ExpectedVersion,
-			NextVersion:     &v,
-			Reason:          reason, Result: "", Before: nil, After: nil,
-		},
-	)
+	call.Audit(auditEntry("jobs."+decision, "job", job, call.ExpectedVersion, &version, reason))
 
-	return Receipt{JobID: job, JobVersion: v, OfferID: offer, Decision: decision}, nil
+	return Receipt{JobID: job, JobVersion: version, OfferID: offer, Decision: decision}, nil
 }
 
 // accept serves jobs.accept.
@@ -572,7 +579,7 @@ func (m Delivery) decide(
 //	@Security		BearerAuth
 //	@Router			/v1/jobs/{jobId}/offers/{offerId}/accept [post]
 func (m Delivery) accept(ctx context.Context, c *ops.Call, in *AcceptInput) (Receipt, error) {
-	return m.decide(ctx, c, in.JobID, in.OfferID, "accept", in.TermsVersion, "")
+	return m.decide(ctx, c, in.JobID, in.OfferID, decisionAccept, in.TermsVersion, "")
 }
 
 // decline serves jobs.decline.
@@ -606,7 +613,7 @@ func (m Delivery) accept(ctx context.Context, c *ops.Call, in *AcceptInput) (Rec
 //	@Security		BearerAuth
 //	@Router			/v1/jobs/{jobId}/offers/{offerId}/decline [post]
 func (m Delivery) decline(ctx context.Context, c *ops.Call, in *DeclineInput) (Receipt, error) {
-	return m.decide(ctx, c, in.JobID, in.OfferID, "decline", "", in.Reason)
+	return m.decide(ctx, c, in.JobID, in.OfferID, decisionDecline, "", in.Reason)
 }
 
 // ---- jobs.assign ----
@@ -624,7 +631,7 @@ type AssignInput struct {
 func (in *AssignInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = apperr.KeyRequired
+		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
 	if in.TechnicianMembershipID == uuid.Nil {
@@ -637,8 +644,8 @@ func (in *AssignInput) Validate() map[string]string {
 
 	if in.Reason != nil {
 		*in.Reason = strings.TrimSpace(*in.Reason)
-		if utf8.RuneCountInString(*in.Reason) > 1000 {
-			fieldErrs["reason"] = apperr.KeyLength
+		if utf8.RuneCountInString(*in.Reason) > maxReasonLength {
+			fieldErrs[fieldReason] = apperr.KeyLength
 		}
 	}
 
@@ -684,27 +691,27 @@ func (m Delivery) assign(
 }
 
 // assignJob is assign answering the job with its detail extras.
-func (m Delivery) assignJob(ctx context.Context, c *ops.Call, input *AssignInput) (Job, error) {
-	r, err := m.load(ctx, c, input.JobID)
+func (m Delivery) assignJob(ctx context.Context, call *ops.Call, input *AssignInput) (Job, error) {
+	locked, err := m.load(ctx, call, input.JobID)
 	if err != nil {
 		return Job{}, err
 	}
 
 	slot := Slot{input.StartAt, input.EndAt}
-	contractor := c.Principal.Role == "contractor"
+	contractor := call.Principal.Role == roleContractor
 	// scope: HQ internal jobs; contractor its accepted Offer within the access window
 	var visit Slot
 
 	if contractor {
 		var from, until time.Time
 
-		err := c.Tx.QueryRow(ctx, `SELECT lower(visit_slot), upper(visit_slot), access_valid_from, access_valid_until FROM
+		err := call.Tx.QueryRow(ctx, `SELECT lower(visit_slot), upper(visit_slot), access_valid_from, access_valid_until FROM
 			maintenance.offers
 			WHERE job_id = $1 AND contractor_org_id = $2 AND decision = 'accept' ORDER BY decided_at DESC LIMIT
-			1`, input.JobID, c.Principal.OrgID).
+			1`, input.JobID, call.Principal.OrgID).
 			Scan(&visit.StartAt, &visit.EndAt, &from, &until)
-		if errors.Is(err, pgx.ErrNoRows) || r.contractor == nil ||
-			*r.contractor != c.Principal.OrgID {
+		if errors.Is(err, pgx.ErrNoRows) || locked.contractor == nil ||
+			*locked.contractor != call.Principal.OrgID {
 			return Job{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 
@@ -712,22 +719,22 @@ func (m Delivery) assignJob(ctx context.Context, c *ops.Call, input *AssignInput
 			return Job{}, apperr.Wrap(err, "select maintenance.offers")
 		}
 
-		if c.Now.Before(from) || !c.Now.Before(until) {
+		if call.Now.Before(from) || !call.Now.Before(until) {
 			return Job{}, apperr.E(apperr.Forbidden, "errors.access_window")
 		}
-	} else if r.contractor != nil {
+	} else if locked.contractor != nil {
 		return Job{}, apperr.E(apperr.Forbidden, "errors.internal_job_only")
 	}
 
-	currentErr := r.current(c)
+	currentErr := locked.current(call)
 	if currentErr != nil {
 		return Job{}, currentErr
 	}
 
 	checkTechnicianErr := m.checkTechnician(
 		ctx,
-		c,
-		r.unit,
+		call,
+		locked.unit,
 		input.TechnicianMembershipID,
 		contractor,
 		nil,
@@ -737,50 +744,56 @@ func (m Delivery) assignJob(ctx context.Context, c *ops.Call, input *AssignInput
 	}
 	// state and slot rules (IR113 / IR49 / IR123 item 4)
 	switch {
-	case (r.status == "requested" && !contractor) || (r.status == "accepted" && contractor):
+	case (locked.status == statusRequested && !contractor) || (locked.status == statusAccepted && contractor):
 		if !slot.EndAt.After(
-			c.Now,
+			call.Now,
 		) { // a time already over cannot be worked (IR456): HQ proposes another
 			return Job{}, apperr.Fields(map[string]string{"endAt": apperr.KeyPast})
 		}
 
-		ok := contractor && sameSlot(visit, slot)
+		agreed := contractor && sameSlot(visit, slot)
 		if !contractor {
-			ok, err = m.agreed(ctx, c, input.JobID, r, slot)
+			agreed, err = m.agreed(ctx, call, input.JobID, locked, slot)
 			if err != nil {
 				return Job{}, err
 			}
 		}
 
-		if !ok {
-			return Job{}, apperr.Fields(map[string]string{"startAt": "errors.slot_not_agreed"})
+		if !agreed {
+			return Job{}, apperr.Fields(map[string]string{"startAt": keySlotNotAgreed})
 		}
-	case r.status == "assigned":
-		if r.scheduled == nil || !sameSlot(*r.scheduled, slot) {
-			return Job{}, apperr.Fields(map[string]string{"startAt": "errors.slot_not_agreed"})
+	case locked.status == statusAssigned:
+		if locked.scheduled == nil || !sameSlot(*locked.scheduled, slot) {
+			return Job{}, apperr.Fields(map[string]string{"startAt": keySlotNotAgreed})
 		}
-	case r.status == "in_progress" || r.status == "rework_requested" || r.status == "on_hold":
+	case locked.status == statusInProgress || locked.status == statusReworkRequested || locked.status == statusOnHold:
 		// D06 extension / reassignment
-		if r.scheduled == nil || !slot.StartAt.Equal(r.scheduled.StartAt) ||
-			slot.EndAt.Before(r.scheduled.EndAt) {
+		if locked.scheduled == nil || !slot.StartAt.Equal(locked.scheduled.StartAt) ||
+			slot.EndAt.Before(locked.scheduled.EndAt) {
 			return Job{}, apperr.Fields(map[string]string{"endAt": "errors.extension_only"})
 		}
 
 		if input.Reason == nil || *input.Reason == "" {
-			return Job{}, apperr.Fields(map[string]string{"reason": apperr.KeyRequired})
+			return Job{}, apperr.Fields(map[string]string{fieldReason: apperr.KeyRequired})
 		}
 	default:
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
-	checkQualifiedErr := m.checkQualified(ctx, c, r.unit, input.TechnicianMembershipID, slot)
+	checkQualifiedErr := m.checkQualified(
+		ctx,
+		call,
+		locked.unit,
+		input.TechnicianMembershipID,
+		slot,
+	)
 	if checkQualifiedErr != nil {
 		return Job{}, checkQualifiedErr
 	}
 
 	createAssignmentErr := m.createAssignment(
 		ctx,
-		c,
+		call,
 		input.JobID,
 		input.TechnicianMembershipID,
 		slot,
@@ -790,28 +803,28 @@ func (m Delivery) assignJob(ctx context.Context, c *ops.Call, input *AssignInput
 		return Job{}, createAssignmentErr
 	}
 
-	job, err := m.Jobs.scoped(ctx, c, input.JobID)
+	job, err := m.Jobs.scoped(ctx, call, input.JobID)
 	if err != nil {
 		return job, err
 	}
 
-	c.Emit(
-		ops.Event{
-			AggregateType: "job",
-			AggregateID:   input.JobID,
-			Type:          "JobAssigned",
-			Payload:       map[string]any{"technicianMembershipId": input.TechnicianMembershipID},
-		},
+	call.Emit(
+		outboxEvent(
+			"job",
+			input.JobID,
+			"JobAssigned",
+			map[string]any{"technicianMembershipId": input.TechnicianMembershipID},
+		),
 	)
-	c.Audit(
-		ops.AuditEntry{
-			Action:          "jobs.assign",
-			TargetKind:      "job",
-			TargetID:        input.JobID.String(),
-			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &job.Version,
-			Reason:          deref(input.Reason), Result: "", Before: nil, After: nil,
-		},
+	call.Audit(
+		auditEntry(
+			"jobs.assign",
+			"job",
+			input.JobID,
+			call.ExpectedVersion,
+			&job.Version,
+			deref(input.Reason),
+		),
 	)
 
 	return job, nil
@@ -856,7 +869,7 @@ func (m Delivery) checkTechnician(
 		own = *org
 	}
 
-	if (contractor && tech.OrgID != own) || (!contractor && tech.Employment != "internal") {
+	if (contractor && tech.OrgID != own) || (!contractor && tech.Employment != employmentInternal) {
 		return apperr.E(apperr.Forbidden, "errors.technician_not_allowed")
 	}
 
@@ -916,7 +929,7 @@ func (m Delivery) checkQualified(
 		return apperr.Wrap(err, "maintenance.ServiceUnits.UnitService")
 	}
 
-	ok, err := m.Directory.Qualified(
+	qualified, err := m.Directory.Qualified(
 		ctx,
 		call,
 		membership,
@@ -928,7 +941,7 @@ func (m Delivery) checkQualified(
 		return apperr.Wrap(err, "maintenance.Directory.Qualified")
 	}
 
-	if !ok {
+	if !qualified {
 		return apperr.E(apperr.Forbidden, "errors.qualification_missing")
 	}
 

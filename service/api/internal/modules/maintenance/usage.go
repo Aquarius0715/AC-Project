@@ -125,14 +125,14 @@ func bookedTechnicians(
 }
 
 func technicianBooked(ctx context.Context, c *ops.Call, in *MembershipInput) (bool, error) {
-	var b bool
+	var booked bool
 
 	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.assignments WHERE technician_membership_id = $1 AND
 		status = 'active' AND valid_until > $2)`,
 		in.MembershipID, c.Now).
-		Scan(&b)
+		Scan(&booked)
 
-	return b, apperr.Wrap(err, "select maintenance.assignments")
+	return booked, apperr.Wrap(err, "select maintenance.assignments")
 }
 
 func unitInUse(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
@@ -166,41 +166,41 @@ func claimableJobs(
 
 	for rows.Next() {
 		var (
-			u, j uuid.UUID
-			when time.Time
+			unit, job uuid.UUID
+			when      time.Time
 		)
 
-		err := rows.Scan(&u, &j, &when)
+		err := rows.Scan(&unit, &job, &when)
 		if err != nil {
 			return nil, apperr.Wrap(err, "select maintenance.jobs")
 		}
 
-		if out[u] == nil {
-			out[u] = map[uuid.UUID]time.Time{}
+		if out[unit] == nil {
+			out[unit] = map[uuid.UUID]time.Time{}
 		}
 
-		out[u][j] = when
+		out[unit][job] = when
 	}
 
 	return out, apperr.Wrap(rows.Err(), "select maintenance.jobs")
 }
 
 func unitActive(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
-	var b bool
+	var active bool
 
 	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.jobs WHERE unit_id = $1 AND status NOT IN
 		('completed','cancelled'))`, in.UnitID).
-		Scan(&b)
+		Scan(&active)
 
-	return b, apperr.Wrap(err, "select maintenance.jobs")
+	return active, apperr.Wrap(err, "select maintenance.jobs")
 }
 
 func orgActive(ctx context.Context, c *ops.Call, in *OrgInput) (bool, error) {
-	var b bool
+	var active bool
 
 	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.jobs WHERE customer_org_id = $1 AND status NOT IN
 		('completed','cancelled'))`, in.OrgID).
-		Scan(&b)
+		Scan(&active)
 
-	return b, apperr.Wrap(err, "select maintenance.jobs")
+	return active, apperr.Wrap(err, "select maintenance.jobs")
 }

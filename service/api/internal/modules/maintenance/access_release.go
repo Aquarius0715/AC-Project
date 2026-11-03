@@ -93,8 +93,8 @@ func releaseQualificationEnded(
 		return apperr.Wrap(err, "select maintenance.assignments")
 	}
 
-	for _, e := range list {
-		_, _, scope, err := units.UnitService(ctx, call, e.unit)
+	for _, target := range list {
+		_, _, scope, err := units.UnitService(ctx, call, target.unit)
 		if err != nil {
 			return apperr.Wrap(err, "maintenance.ServiceUnits.UnitService")
 		}
@@ -103,7 +103,7 @@ func releaseQualificationEnded(
 			continue
 		}
 
-		releaseAssignmentErr := releaseAssignment(ctx, call, e.released, qualificationEnded)
+		releaseAssignmentErr := releaseAssignment(ctx, call, target.released, qualificationEnded)
 		if releaseAssignmentErr != nil {
 			return releaseAssignmentErr
 		}
@@ -139,12 +139,17 @@ var (
 
 // releaseAssignment revokes the assignment and returns its job to be assigned again with its agreed visit (IR439):
 // accepted for a contractor's job, requested for HQ's own delivery. The job's assigners get a job_update notice.
-func releaseAssignment(ctx context.Context, call *ops.Call, e released, why releaseCause) error {
+func releaseAssignment(
+	ctx context.Context,
+	call *ops.Call,
+	target released,
+	why releaseCause,
+) error {
 	_, err := call.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.assignments SET status = 'revoked', reason = $3, version = version + 1, updated_at = $2 WHERE id =
 			$1`,
-		e.assignment,
+		target.assignment,
 		call.Now,
 		why.reason,
 	)
@@ -152,16 +157,16 @@ func releaseAssignment(ctx context.Context, call *ops.Call, e released, why rele
 		return apperr.Wrap(err, "update maintenance.assignments")
 	}
 
-	status := "requested" // HQ's own delivery assigns from requested
-	if e.contractor != nil {
-		status = "accepted" // the contractor assigns again on its accepted offer
+	status := statusRequested // HQ's own delivery assigns from requested
+	if target.contractor != nil {
+		status = statusAccepted // the contractor assigns again on its accepted offer
 	}
 
 	_, err = call.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.jobs SET status = $2, assignment_id = NULL, scheduled_slot = NULL, version = version + 1,
 			updated_at = $3 WHERE id = $1`,
-		e.job,
+		target.job,
 		status,
 		call.Now,
 	)
@@ -172,7 +177,7 @@ func releaseAssignment(ctx context.Context, call *ops.Call, e released, why rele
 	err = (Jobs{Units: nil, Severity: nil, HQOrg: nil, Sites: nil, Blobs: nil}).event(
 		ctx,
 		call,
-		e.job,
+		target.job,
 		why.event,
 		nil,
 	)
@@ -181,16 +186,16 @@ func releaseAssignment(ctx context.Context, call *ops.Call, e released, why rele
 	}
 
 	input := identity.MembersInput{
-		Role:           "admin",
+		Role:           roleAdmin,
 		Permission:     "job.write",
 		IDs:            nil,
 		OrganizationID: nil,
 		ClientRole:     "",
 	}
-	if e.contractor != nil {
+	if target.contractor != nil {
 		input = identity.MembersInput{
-			Role:           "contractor",
-			OrganizationID: e.contractor,
+			Role:           roleContractor,
+			OrganizationID: target.contractor,
 			Permission:     "partner.assign", IDs: nil, ClientRole: "",
 		}
 	}
@@ -206,11 +211,11 @@ func releaseAssignment(ctx context.Context, call *ops.Call, e released, why rele
 			Type:                  "job_update",
 			TemplateKey:           "job_update",
 			TargetKind:            "job",
-			TargetID:              e.job,
-			Severity:              "warning",
+			TargetID:              target.job,
+			Severity:              severityWarning,
 			Params: map[string]any{
-				"status": status,
-				"reason": why.notice,
+				fieldStatus: status,
+				fieldReason: why.notice,
 			},
 			Channel:       "",
 			SourceAlertID: nil,
@@ -220,19 +225,7 @@ func releaseAssignment(ctx context.Context, call *ops.Call, e released, why rele
 		}
 	}
 
-	call.Audit(
-		ops.AuditEntry{
-			Action:          "jobs.releaseAssignment",
-			TargetKind:      "job",
-			TargetID:        e.job.String(),
-			Reason:          why.audit,
-			PreviousVersion: nil,
-			NextVersion:     nil,
-			Result:          "",
-			Before:          nil,
-			After:           nil,
-		},
-	)
+	call.Audit(auditEntry("jobs.releaseAssignment", "job", target.job, nil, nil, why.audit))
 
 	return nil
 }

@@ -138,17 +138,17 @@ func checkTechnicianJob(
 		return apperr.Wrap(err, "select maintenance.assignments")
 	}
 
-	var as []assignment
+	var assignments []assignment
 
 	for rows.Next() {
-		var a assignment
+		var entry assignment
 
 		err := rows.Scan(
-			&a.unit,
-			&a.status,
-			&a.validFrom,
-			&a.validTil,
-			&a.jobStatus,
+			&entry.unit,
+			&entry.status,
+			&entry.validFrom,
+			&entry.validTil,
+			&entry.jobStatus,
 		)
 		if err != nil {
 			rows.Close()
@@ -156,7 +156,7 @@ func checkTechnicianJob(
 			return apperr.Wrap(err, "select maintenance.assignments")
 		}
 
-		as = append(as, a)
+		assignments = append(assignments, entry)
 	}
 
 	rows.Close()
@@ -170,23 +170,23 @@ func checkTechnicianJob(
 
 	var started bool
 
-	for _, a := range as {
-		if a.unit != unit {
+	for _, entry := range assignments {
+		if entry.unit != unit {
 			return notFound() // the job is for another unit
 		}
 
-		if a.status == "active" {
+		if entry.status == "active" {
 			switch {
-			case now.Before(a.validFrom):
+			case now.Before(entry.validFrom):
 				return forbidden("errors.assignment_not_started")
-			case now.Before(a.validTil):
+			case now.Before(entry.validTil):
 				return nil
 			default:
 				return forbidden("errors.assignment_ended")
 			}
 		}
 
-		if !now.Before(a.validFrom) {
+		if !now.Before(entry.validFrom) {
 			started = true // revoked after its window started
 		}
 	}

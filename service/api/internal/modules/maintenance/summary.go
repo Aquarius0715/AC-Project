@@ -27,23 +27,23 @@ func (m Jobs) CountJobs(
 	call *ops.Call,
 	raw json.RawMessage,
 ) (JobCounts, error) {
-	var f listFilters
+	var filters listFilters
 
-	if len(raw) > 0 && string(raw) != "null" {
+	if len(raw) > 0 && string(raw) != jsonNull {
 		dec := json.NewDecoder(strings.NewReader(string(raw)))
 		dec.DisallowUnknownFields()
 
-		if dec.Decode(&f) != nil {
-			return JobCounts{}, apperr.Fields(map[string]string{"filters": apperr.KeyInvalid})
+		if dec.Decode(&filters) != nil {
+			return JobCounts{}, apperr.Fields(map[string]string{fieldFilters: apperr.KeyInvalid})
 		}
 	}
 
-	err := f.check()
+	err := filters.check()
 	if err != nil {
 		return JobCounts{}, err
 	}
 
-	items, err := m.collect(ctx, call, &f)
+	items, err := m.collect(ctx, call, &filters)
 	if err != nil {
 		return JobCounts{}, err
 	}
@@ -55,22 +55,22 @@ func (m Jobs) CountJobs(
 	for _, it := range items {
 		switch x := it.item.(type) {
 		case OfferSummary:
-			if x.Status == "offered" {
+			if x.Status == statusOffered {
 				jobCounts.Offer++
 			}
 		case Summary:
-			if x.Status == "completed" || x.Status == "cancelled" {
+			if x.Status == statusCompleted || x.Status == statusCancelled {
 				continue
 			}
 
 			switch x.Status { // D07 / SR KPI definitions
-			case "accepted", "assigned":
+			case statusAccepted, statusAssigned:
 				jobCounts.Active++
 				jobCounts.Scheduled++
-			case "in_progress":
+			case statusInProgress:
 				jobCounts.Active++
 				jobCounts.InProgress++
-			case "submitted":
+			case statusSubmitted:
 				jobCounts.Review++
 			}
 

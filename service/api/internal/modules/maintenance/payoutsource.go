@@ -109,10 +109,10 @@ func (PayoutSource) RateAt(
 // authored by the requesting user at the request time.
 func NoteHandlers() map[string]events.Handler {
 	return map[string]events.Handler{
-		events.JobNoteRequested: func(ctx context.Context, txn pgx.Tx, e events.Event) error {
+		events.JobNoteRequested: func(ctx context.Context, txn pgx.Tx, event events.Event) error {
 			var jobNote events.JobNote
 
-			err := e.Decode(&jobNote)
+			err := event.Decode(&jobNote)
 			if err != nil {
 				return apperr.Wrap(err, "events.Event.Decode")
 			}
@@ -121,7 +121,7 @@ func NoteHandlers() map[string]events.Handler {
 				Tx:  txn,
 				Now: jobNote.At,
 				Principal: &ops.Principal{
-					TenantID:          e.TenantID,
+					TenantID:          event.TenantID,
 					UserID:            jobNote.AuthorUserID,
 					Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
 					MembershipID:      uuid.UUID{},
