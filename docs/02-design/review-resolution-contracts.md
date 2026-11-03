@@ -8725,3 +8725,21 @@ Found in the UX loop (UX-40, HQ's Access & roles). An identity administrator add
      - The revoke dialog focused its reason. After the revoke, the focus was on the membership's row, Revoked.
    - axe passed on the page and the dialog.
    - access, alert-policies, billing, contracts, customers, restrictions and keyboard e2e passed. One alert-policies case opened the live lab unit's open-window alert, the first in the dev list, and stopped there. Its afterEach removed the policy it had made. CI has no live unit.
+
+## IR623 A customer's alert policy names the field to fix, reads in words on the AC, and keeps the focus around saves — 2026-11-03
+
+Found in the UX loop (UX-41, the customer's alert policies). customer-a created "Bedroom too hot" for room temperature: ≥ 30 °C for 10 min, recovering below 28 °C. The owner attached it on Bedroom AC's page and deleted it again.
+
+1. **Refused saves.** A refused Save policy left the focus on the button. A recovery on the wrong side of the threshold showed its line, but the Recovery field was not marked, so assistive technology did not tie the two together. The save now takes the focus to the first field to fix: name, threshold, duration, recovery, then days and times (`POLICY_FIELDS`). The threshold, duration or recovery field the condition line is about is aria-invalid and described by that line.
+2. **The AC's page in words.** The attach dialog and "Alert policies on this AC" listed a policy as "temperature gte 30 for 600 s → Warning". They now read as the Alert policies tab does: "Room temperature ≥ 30 °C for 10 min → Warning" (`conditionText`).
+3. **The default policy's count.** The default policy's line on the AC's page was a fixed "5 of 6 rules on", whatever the owner had switched. It now counts this customer's rules that are on (`defaultRuleRows`).
+4. **Focus after a save or a delete.** The editor and the list are different views, so after Save policy the focus fell to the page. It now goes to the saved policy's title in the list. A delete took the card and its Delete button away, so the focus now goes to "Your policies".
+5. **Design.** DD-C15 says the same. The Malay dictionary follows: the count is a placeholder now, and the unused " for {n} s" is gone. Figma is unchanged.
+6. **Tests.**
+   - `customerPolicies.test.ts` holds every field `policyErrors` names in `POLICY_FIELDS`.
+   - `alert-policies.e2e.ts` checks the following: on the wrong recovery, the focused, aria-invalid and described Recovery field; after the save, the saved policy focused in the list; after the delete, "Your policies" focused.
+   - On the development stack, customer-a went through these steps at 1920 and 1280 with axe passing:
+     - An empty save focused Name; the wrong recovery focused Recovery.
+     - The save focused the new policy.
+     - Attaching it read in words; the focus went back to Attach policy.
+     - Delete named Bedroom AC and focused "Keep policy"; after the delete the focus was on the list.

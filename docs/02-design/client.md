@@ -559,7 +559,7 @@ Scope: FR-C15 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 4. Delete confirms with the attached AC names; `policies.delete` detaches from every unit and deletes (IR108).
 5. Queries to update: `policies / units / alerts`.
 
-**Boundary cases and failures**: Wrong recovery direction, mixed units, or empty channels → VALIDATION with input kept. CONFLICT on an old version shows the current policy. The default policy has no Edit/Delete.
+**Boundary cases and failures**: Wrong recovery direction, mixed units, or empty channels → VALIDATION with input kept. CONFLICT on an old version shows the current policy. The default policy has no Edit/Delete. A refused save takes the focus to the first field to fix; a wrong threshold, duration or recovery marks that field and the error line names it. After a save the focus goes to the saved policy in the list, and after a delete to the list. On an AC's page the policies read as the tab does ("Room temperature ≥ 30 °C for 10 min → Warning"), and the default policy says how many of its rules are on for the customer (IR623).
 
 **Verification**: Check the traceability entries under AT-C15 (N/E/B).
 

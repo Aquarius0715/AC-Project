@@ -44,11 +44,16 @@ test("a policy is created, edited, switched off and deleted", async ({ page }) =
   await page.getByLabel("Recovery").fill("31"); // above the threshold: not the safe side for "above"
   await page.getByRole("button", { name: "Save policy" }).click();
   await expect(page.getByRole("main")).toContainText("Recovery 31 must be below the 30 threshold");
+  // the field to fix takes the focus and is marked, the error line naming it (IR623)
+  await expect(page.getByLabel("Recovery")).toBeFocused();
+  await expect(page.getByLabel("Recovery")).toHaveAttribute("aria-invalid", "true");
+  await expect(page.getByLabel("Recovery")).toHaveAccessibleDescription(/Recovery 31 must be below the 30 threshold/);
   await page.getByLabel("Recovery").fill("28");
   await page.getByRole("checkbox", { name: "Email" }).check();
   await page.getByRole("button", { name: "Save policy" }).click();
   await expect(page.getByText(`“${NAME}” saved`)).toBeVisible();
   await expect(page.getByRole("switch", { name: NAME })).toHaveAttribute("aria-checked", "true");
+  await expect(page.locator(":focus")).toContainText(NAME); // back in the list, on the policy just saved (IR623)
 
   const card = page.locator('main section, main [data-slot="card"]', { has: page.getByRole("switch", { name: NAME }) }); // each policy is a Card
   await card.getByRole("link", { name: "Edit" }).click();
@@ -69,4 +74,5 @@ test("a policy is created, edited, switched off and deleted", async ({ page }) =
   await page.getByRole("dialog").getByRole("button", { name: "Delete policy" }).click();
   await expect(page.getByText(`“${NAME}” deleted`)).toBeVisible();
   await expect(page.getByRole("switch", { name: NAME })).toHaveCount(0);
+  await expect(page.locator("#your-policies")).toBeFocused(); // the card went with its Delete button: the list (IR623)
 });

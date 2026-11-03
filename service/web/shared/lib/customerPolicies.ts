@@ -120,6 +120,9 @@ const num = (v: string) => (v.trim() !== "" && Number.isFinite(Number(v)) ? Numb
 const seconds = (f: PolicyForm) => { const d = num(f.duration); return d === null ? null : Math.round(f.unit === "min" ? d * 60 : d); };
 /** The editor's checks (DD-C15; the API checks them again): name 1–120, numbers, the recovery direction, 1 s–24 h, a
  * window with days and different times. */
+/** The editor's checked fields, top to bottom, and their element ids: a refused save focuses the first one (IR623). */
+export const POLICY_FIELDS = ["name", "threshold", "duration", "recovery", "window"] as const;
+export const policyFieldId = (k: (typeof POLICY_FIELDS)[number]) => `policy-${k}`;
 export function policyErrors(f: PolicyForm, tr: T = en): Partial<Record<"name" | "threshold" | "recovery" | "duration" | "window", string>> {
   const e: Partial<Record<"name" | "threshold" | "recovery" | "duration" | "window", string>> = {};
   const name = f.name.trim();

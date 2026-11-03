@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  conditionText, defaultRuleRows, durationText, policyCards, policyErrors, policyForm, policyInput, policyRefusal, summaryText, toggledInput, windowText,
+  conditionText, defaultRuleRows, durationText, POLICY_FIELDS, policyCards, policyErrors, policyFieldId, policyForm, policyInput, policyRefusal, summaryText, toggledInput, windowText,
   type ApiAlertPolicy, type ApiDefaultPolicy,
 } from "@ac/web/lib/customerPolicies";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
@@ -68,5 +68,15 @@ describe("customer alert policies", () => {
     expect(policyErrors({ ...f, recovery: "1300", duration: "0" }, t)).toEqual({ recovery: "Pemulihan 1300 mesti di bawah ambang 1200 (arah untuk ≥)", duration: "Antara 1 s dan 24 j." });
     expect(policyCards([policy({ channels: ["inApp", "email"] })], () => "AC 1", t)[0]).toMatchObject({ badge: "Kualiti udara", then: "Peringatan · maklumkan melalui dalam aplikasi + e-mel", attachedText: "Dilampirkan pada 2 AC: AC 1, AC 1" });
     expect(policyRefusal({ code: "CONFLICT", messageKey: "", fieldErrors: {} }, t)).toBe("Tidak disimpan: polisi ini telah berubah — versi terkini dipaparkan.");
+  });
+});
+
+// IR623: a refused save focuses the first field to fix, so every field a check names has a place in the order
+describe("the editor's field order", () => {
+  it("holds every field policyErrors can name, top to bottom, each with its element id", () => {
+    const all = policyErrors({ ...policyForm(), name: " ", threshold: "x", recovery: "", duration: "0", windowOn: true, weekdays: [] });
+    expect(Object.keys(all).sort()).toEqual([...POLICY_FIELDS].sort());
+    expect(POLICY_FIELDS.find((k) => all[k])).toBe("name");
+    expect(policyFieldId("recovery")).toBe("policy-recovery");
   });
 });

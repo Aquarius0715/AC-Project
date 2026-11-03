@@ -231,7 +231,7 @@ export const ms: Record<string, string> = {
   "Alert policies on this AC": "Polisi amaran pada AC ini",
   "Limits that raise alerts for this AC. Policies are made in Alerts › Alert policies.": "Had yang mencetuskan amaran untuk AC ini. Polisi dibuat di Amaran › Polisi amaran.",
   "Default policy": "Polisi lalai",
-  "6 rules · ventilation (CO₂, PM2.5) + fault causes · Always attached · 5 of 6 rules on": "6 peraturan · pengudaraan (CO₂, PM2.5) + punca kerosakan · Sentiasa dilampirkan · 5 daripada 6 peraturan hidup",
+  "{n} rules · ventilation (CO₂, PM2.5) + fault causes · Always attached · {on} of {n} rules on": "{n} peraturan · pengudaraan (CO₂, PM2.5) + punca kerosakan · Sentiasa dilampirkan · {on} daripada {n} peraturan hidup",
   "Detached from this AC only": "Dilepaskan daripada AC ini sahaja",
   "Detach": "Lepaskan",
   "Detaching only removes it from this AC — the policy stays in your list.": "Melepaskan hanya mengeluarkannya daripada AC ini — polisi kekal dalam senarai anda.",
@@ -249,7 +249,6 @@ export const ms: Record<string, string> = {
   "{n} policy attached to this AC": "{n} polisi dilampirkan pada AC ini",
   "{n} policies attached to this AC": "{n} polisi dilampirkan pada AC ini",
   "Only your account’s policies are listed. The default policy is always attached.": "Hanya polisi akaun anda disenaraikan. Polisi lalai sentiasa dilampirkan.",
-  " for {n} s": " selama {n} s",
 
   // relative days (lib/i18n)
   "today {time}": "hari ini {time}",
