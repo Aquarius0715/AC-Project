@@ -42,6 +42,45 @@ type OIDCVerifier struct {
 	Keyfunc     jwt.Keyfunc
 }
 
+// NewVerifierFromEnv builds the OIDC verifier from the environment.
+func NewVerifierFromEnv(ctx context.Context) (*OIDCVerifier, error) {
+	iss := os.Getenv("OIDC_ISSUER")
+	jwks := os.Getenv("OIDC_JWKS_URL")
+
+	if iss == "" {
+		return nil, errNoIssuer
+	}
+
+	if jwks == "" {
+		jwks = strings.TrimRight(iss, "/") + "/protocol/openid-connect/certs"
+	}
+	// keys of a token with an unknown key ID are fetched again at most every 10 s (the library default is 5 min):
+	// a service that started before the identity provider, or one whose provider was recreated with new keys,
+	// accepts tokens again within seconds instead of refusing every request for minutes (CI e2e, IR419)
+	keys, err := keyfunc.NewDefaultOverrideCtx(ctx, []string{jwks}, keyfunc.Override{
+		RefreshUnknownKID:         rate.NewLimiter(rate.Every(jwksRefreshUnknownKID), 1),
+		RefreshInterval:           jwksRefreshInterval,
+		RateLimitWaitMax:          jwksRateLimitWaitMax,
+		Client:                    nil,
+		HTTPTimeout:               0,
+		NoErrorReturnFirstHTTPReq: nil,
+		RefreshErrorHandlerFunc:   nil,
+		ValidationSkipAll:         false,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("jwks: %w", err)
+	}
+
+	admin := os.Getenv("OIDC_ADMIN_CLIENT_ID")
+
+	return &OIDCVerifier{
+		Issuer:      iss,
+		Audiences:   []string{os.Getenv("OIDC_APP_CLIENT_ID"), admin},
+		AdminClient: admin,
+		Keyfunc:     keys.Keyfunc,
+	}, nil
+}
+
 // Verify implements Verifier and returns the `sub` claim with the `auth_time` claim, which Cognito and Keycloak put
 // in access tokens (IR268).
 func (v *OIDCVerifier) Verify(_ context.Context, token string) (Identity, error) {
@@ -144,43 +183,4 @@ func audienceOK(mapClaims jwt.MapClaims, allowed []string) bool {
 	}
 
 	return false
-}
-
-// NewVerifierFromEnv builds the OIDC verifier from the environment.
-func NewVerifierFromEnv(ctx context.Context) (*OIDCVerifier, error) {
-	iss := os.Getenv("OIDC_ISSUER")
-	jwks := os.Getenv("OIDC_JWKS_URL")
-
-	if iss == "" {
-		return nil, errNoIssuer
-	}
-
-	if jwks == "" {
-		jwks = strings.TrimRight(iss, "/") + "/protocol/openid-connect/certs"
-	}
-	// keys of a token with an unknown key ID are fetched again at most every 10 s (the library default is 5 min):
-	// a service that started before the identity provider, or one whose provider was recreated with new keys,
-	// accepts tokens again within seconds instead of refusing every request for minutes (CI e2e, IR419)
-	keys, err := keyfunc.NewDefaultOverrideCtx(ctx, []string{jwks}, keyfunc.Override{
-		RefreshUnknownKID:         rate.NewLimiter(rate.Every(jwksRefreshUnknownKID), 1),
-		RefreshInterval:           jwksRefreshInterval,
-		RateLimitWaitMax:          jwksRateLimitWaitMax,
-		Client:                    nil,
-		HTTPTimeout:               0,
-		NoErrorReturnFirstHTTPReq: nil,
-		RefreshErrorHandlerFunc:   nil,
-		ValidationSkipAll:         false,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("jwks: %w", err)
-	}
-
-	admin := os.Getenv("OIDC_ADMIN_CLIENT_ID")
-
-	return &OIDCVerifier{
-		Issuer:      iss,
-		Audiences:   []string{os.Getenv("OIDC_APP_CLIENT_ID"), admin},
-		AdminClient: admin,
-		Keyfunc:     keys.Keyfunc,
-	}, nil
 }

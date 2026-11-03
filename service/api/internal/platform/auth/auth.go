@@ -373,7 +373,11 @@ func loadMembership(
 }
 
 // loadPermissions reads the permissions of the membership.
-func loadPermissions(ctx context.Context, txn pgx.Tx, membership uuid.UUID) (map[string]bool, error) {
+func loadPermissions(
+	ctx context.Context,
+	txn pgx.Tx,
+	membership uuid.UUID,
+) (map[string]bool, error) {
 	rows, err := txn.Query(
 		ctx,
 		`SELECT permission FROM identity.membership_permissions WHERE membership_id = $1`,
@@ -405,7 +409,11 @@ func loadPermissions(ctx context.Context, txn pgx.Tx, membership uuid.UUID) (map
 }
 
 // loadScopes reads the scopes of the membership by kind.
-func loadScopes(ctx context.Context, txn pgx.Tx, membership uuid.UUID) (map[string][]uuid.UUID, error) {
+func loadScopes(
+	ctx context.Context,
+	txn pgx.Tx,
+	membership uuid.UUID,
+) (map[string][]uuid.UUID, error) {
 	scopes, err := txn.Query(
 		ctx,
 		`SELECT kind, ref_id FROM identity.membership_scopes WHERE membership_id = $1`,
@@ -431,5 +439,5 @@ func loadScopes(ctx context.Context, txn pgx.Tx, membership uuid.UUID) (map[stri
 		byKind[kind] = append(byKind[kind], ref)
 	}
 
-	return byKind, scopes.Err()
+	return byKind, apperr.Wrap(scopes.Err(), "select identity.membership_scopes")
 }
