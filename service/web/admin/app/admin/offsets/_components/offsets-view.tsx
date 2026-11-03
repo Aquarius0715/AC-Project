@@ -114,7 +114,7 @@ export function OffsetsView({ live }: { live: Live }) {
           <div className="flex flex-col gap-2 rounded-xl border border-line p-3">
             <div className="flex items-center gap-2"><b className="text-[13px]">{t("Demo quote {id} · v{version}", { id: quote.id.slice(0, 8), version: quote.version })}</b><DemoBadge /></div>
             <SummaryList items={[[t("Amount"), `${kg3(quote.amountKg)} kgCO₂e`], [t("Expires"), showTime(quote.expiresAt, i.display)], [t("Provider / scheme"), t("Not selected · {scheme}", { scheme: quote.scheme })], [t("Price"), t("none — no market price")], [t("Market concept"), conceptText(quote.marketConcept, t)]]} />
-            <Check label={t("I confirm no real transaction takes place (demoConfirmed).")} checked={confirmed} onChange={setConfirmed} />
+            <Check label={t("I confirm no real transaction takes place.")} checked={confirmed} onChange={setConfirmed} />
           </div>
         )}
       </Modal>

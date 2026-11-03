@@ -72,7 +72,7 @@ describe("HQ contractor register", () => {
     expect(rateCardErrors({ effectiveFrom: "2026-09-01T00:00:00Z", lines: [...lines, ...lines] }, NOW)).toEqual({ effectiveFrom: "Effective from a future date.", lines: "Each work type once." });
     expect(rateCardErrors({ effectiveFrom: "2026-10-01T00:00:00Z", lines: [{ workType: "emergency", amount: "-1", note: "" }] }, NOW).lines).toMatch(/non-negative/);
     expect(nextMonthStart(NOW)).toBe("2026-09-30T16:00:00.000Z"); // 2026-10-01 00:00 KL
-    expect(contractorRefusal({ code: "CONFLICT", messageKey: "errors.profile_exists", fieldErrors: {} })).toBe("Not saved (CONFLICT): this organization already has a contractor profile.");
+    expect(contractorRefusal({ code: "CONFLICT", messageKey: "errors.profile_exists", fieldErrors: {} })).toBe("Not saved: this organization already has a contractor profile.");
   });
 });
 

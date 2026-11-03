@@ -35,7 +35,7 @@ describe("technician alert evidence", () => {
     ]);
     expect(v.resolution).toEqual({
       info: "Automatic resolution needs a remeasurement < 28.0 °C for 60 s — or a reason below with alert.resolve.", done: null,
-      note: "Recurrence after resolution creates a new alert with previousAlertId linking back to this one.",
+      note: "If it recurs after it is resolved, a new alert is created that links back to this one.",
       forbidden: "Not resolved — you don’t have alert.resolve. The alert resolves automatically once a remeasurement stays < 28.0 °C for 60 s, or ask a permitted user.",
     });
     expect(v.history).toEqual([{ id: "raised", time: "today 9:12 am MYT", title: "Raised", sub: "temperature 30.4 °C · Temperature ≥ 30.0 °C for 60 s", badge: { text: "Observed (demo)", tone: "primary" } }]);
@@ -50,7 +50,7 @@ describe("technician alert evidence", () => {
     const v = alertView(done, { ...ctx, job: null, unit: null, canResolve: true }, NOW);
     expect([v.banner.sub, v.banner.tone, v.banner.state]).toEqual(["Suspected · no policy — it resolves only with a reason", "ok", "Resolved · today 9:30 am MYT"]);
     expect(v.cards).toHaveLength(1); // no rule: no latest reading of its metric
-    expect(v.resolution).toMatchObject({ info: null, done: "Resolved today 9:30 am MYT — Window closed. Acknowledged today 9:25 am MYT.", note: "Completing the job alone never resolves an alert. If the condition returns, a new alert is created with previousAlertId = alert-wi." });
+    expect(v.resolution).toMatchObject({ info: null, done: "Resolved today 9:30 am MYT — Window closed. Acknowledged today 9:25 am MYT.", note: "Completing the job alone never resolves an alert. If the condition returns, a new alert is created that links back to alert alert-wi." });
     expect(v.history.map((h) => h.title)).toEqual(["Resolved", "Acknowledged", "Raised"]);
     expect(v.related.map((r) => r[1])).toEqual(["—", "u1", "No policy", "—", "none", "done today 9:30 am MYT"]);
     expect(alertView({ ...base, rule: null }, { ...ctx, canResolve: false }, NOW).related[5][1]).toBe("no — ask a user with alert.resolve");

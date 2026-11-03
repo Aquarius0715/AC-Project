@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.494.0
+version: 0.495.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -287,6 +287,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.495.0: The four apps show no error codes, spec IDs, status codes or code names, and guards keep it so (IR626). Phase 1A unchanged.
 0.494.0: The technician's Add part and Refrigerant refuse under the field concerned; pausing keeps Time on site open and the focus on its button (IR625). Phase 1A unchanged.
 0.493.0: The partner schedule leaves former technicians and ended delegations out, and its assignment notes lose the Japanese term (IR624). Phase 1A unchanged.
 0.492.0: The customer's alert policy editor focuses and marks the field to fix; the AC page words policies and counts the default rules that are on (IR623). Phase 1A unchanged.

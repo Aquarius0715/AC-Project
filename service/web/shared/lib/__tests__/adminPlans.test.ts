@@ -42,9 +42,9 @@ describe("HQ maintenance plans", () => {
 
   it("explains a refused Generate job and the other refusals", () => {
     const after = plan({ nextDueAt: "2027-03-08T02:00:00Z", generatedOccurrences: [...plan({}).generatedOccurrences, { occurrenceAt: "2026-12-08T02:00:00Z", jobId: "job-c08-0000" }] });
-    expect(generateConflict(after, "2026-12-08T02:00:00Z")).toEqual({ title: "CONFLICT · 8 Dec 2026 already has a job", text: "A second “Generate job” for the same plan and date (another tab / double submit) was rejected. Still one job: job-c08-." });
-    expect(generateConflict(plan({}), "2026-11-08T02:00:00Z").title).toBe("CONFLICT · the plan changed meanwhile");
-    expect(planRefusal({ code: "CONFLICT", messageKey: "errors.next_date_past", fieldErrors: {} })).toBe("Not saved (CONFLICT): the next date has passed — move it forward and save the plan first.");
+    expect(generateConflict(after, "2026-12-08T02:00:00Z")).toEqual({ title: "8 Dec 2026 already has a job", text: "A second “Generate job” for the same plan and date (another tab / double submit) was rejected. Still one job: job-c08-." });
+    expect(generateConflict(plan({}), "2026-11-08T02:00:00Z").title).toBe("The plan changed meanwhile");
+    expect(planRefusal({ code: "CONFLICT", messageKey: "errors.next_date_past", fieldErrors: {} })).toBe("Not saved: the next date has passed — move it forward and save the plan first.");
     expect(planRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { nextDueAt: "error.past" } })).toBe("nextDueAt: must be in the future");
     expect(planRefusal({ code: "NOT_FOUND", messageKey: "error.notFound", fieldErrors: {} })).toBe("The plan or its unit no longer exists in your scope.");
   });

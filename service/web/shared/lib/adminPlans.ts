@@ -58,7 +58,7 @@ export function nextBox(p: ApiPlan, now: number, dirty: boolean, generated: { oc
   const { t } = i;
   const past = Date.parse(p.nextDueAt) <= now;
   const text = generated ? t("{date} was just generated as {job}. Next due advanced to {next}.", { date: planDate(generated.occurrenceAt, i.display), job: generated.jobId.slice(0, 8), next })
-    : past ? t("The next date has passed — move it forward and save the plan first (no automatic catch-up, D16).")
+    : past ? t("The next date has passed — move it forward and save the plan first (no automatic catch-up).")
     : t("Not generated yet. Generating creates one periodic job (requested) for this date — generating the same date again is rejected.");
   const why = past ? t("The next date has passed.") : dirty ? t("Save the plan first.") : null;
   return { title: t("Next occurrence · {date}", { date: next }), text, generate: !why, why };
@@ -71,8 +71,8 @@ export function generateConflict(p: ApiPlan, attempted: string, i: I18n = EN): {
   const date = planDate(attempted, i.display);
   const done = p.generatedOccurrences.find((o) => o.occurrenceAt === attempted);
   return done
-    ? { title: t("CONFLICT · {date} already has a job", { date }), text: t("A second “Generate job” for the same plan and date (another tab / double submit) was rejected. Still one job: {job}.", { job: done.jobId.slice(0, 8) }) }
-    : { title: t("CONFLICT · the plan changed meanwhile"), text: t("Nothing was generated for {date}; the latest plan is shown — check the next date and try again.", { date }) };
+    ? { title: t("{date} already has a job", { date }), text: t("A second “Generate job” for the same plan and date (another tab / double submit) was rejected. Still one job: {job}.", { job: done.jobId.slice(0, 8) }) }
+    : { title: t("The plan changed meanwhile"), text: t("Nothing was generated for {date}; the latest plan is shown — check the next date and try again.", { date }) };
 }
 
 /** Readable refusals of plans.save / plans.generateNext. */
@@ -88,7 +88,7 @@ export function planRefusal(f: { code: string; messageKey: string; fieldErrors: 
   const word = (k: string) => (keys[k] ? t(keys[k]) : k);
   const fields = Object.entries(f.fieldErrors ?? {}).map(([k, v]) => `${k}: ${word(v)}`);
   if (fields.length) return fields.join(" · ");
-  if (keys[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved (CONFLICT): {reason}.", { reason: word(f.messageKey) }) : `${word(f.messageKey)}.`;
+  if (keys[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved: {reason}.", { reason: word(f.messageKey) }) : `${word(f.messageKey)}.`;
   if (f.code === "NOT_FOUND") return t("The plan or its unit no longer exists in your scope.");
   return actionMessage({ ...f, fieldErrors: {} }, t); // the write limit's wait and other codes (IR380)
 }

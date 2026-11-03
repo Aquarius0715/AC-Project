@@ -46,7 +46,7 @@ export function PreferencesView({ live }: { live: PreferencesLive }) {
     <Page className="max-w-3xl">
       {failed && <Banner tone="crit">{t("Not saved: {reason}", { reason: failed })}</Banner>}
       <Card>
-        <Field label={t("Display language")} hint={t("Affects the screens, notifications and date/time display. Stored data stays UTC (NFR-08). Malay text is a draft under review; text not translated yet stays in English.")}>
+        <Field label={t("Display language")} hint={t("Affects the screens, notifications and date/time display. Stored data stays UTC. Malay text is a draft under review; text not translated yet stays in English.")}>
           <Choice value={locale} onChange={setLocale} options={[{ id: "en", label: t("English (default)") }, { id: "ms", label: "Bahasa Melayu" }]} />
         </Field>
         <div className="my-4 border-t border-line" />
@@ -75,7 +75,7 @@ export function PreferencesView({ live }: { live: PreferencesLive }) {
               <div><div className="text-[13px] font-semibold">{t("Security · Two-step verification")}</div><div className="text-xs text-muted-foreground">{t("Ask for a 6-digit code from an authenticator app when signing in on a new device")}{tf.enabled && tf.recoveryCodesLeft !== null ? t(" · {n} recovery codes left", { n: tf.recoveryCodesLeft }) : ""}.</div></div>
               <span className="flex items-center gap-2">{tf.enabled ? <><Badge tone="ok">{t("On")}</Badge><Btn size="sm" onClick={() => setModal("off")}>{t("Turn off")}</Btn></> : <><Badge>{t("Off")}</Badge><Btn size="sm" variant="primary" onClick={() => setModal("on")}>{t("Turn on")}</Btn></>}</span>
             </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">{t("Demo only — any 6 digits are accepted and the demo sign-in is unchanged (FR-X08).")}</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">{t("Demo only — any 6 digits are accepted and the demo sign-in is unchanged.")}</p>
           </>
         )}
         <div className="mt-5 flex justify-end gap-2"><Btn disabled={!dirty || pending} onClick={reset}>{t("Cancel")}</Btn><Btn variant="primary" disabled={!dirty || pending} onClick={save}><Icon name="check" />{t("Save preferences")}</Btn></div>

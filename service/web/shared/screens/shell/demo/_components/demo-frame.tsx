@@ -11,7 +11,7 @@ export function DemoFrame({ clock, scenario, reset, triggers, above }: { clock: 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-dashed border-[#fb923c] bg-warn-soft/60 px-3.5 py-2.5 text-[13px] font-semibold text-warn">
-        <span>{t("Visually separated from business screens. Nothing here reaches real devices, payments, notifications, or IoT connections (FR-X05).")}</span><DemoBadge />
+        <span>{t("Visually separated from business screens. Nothing here reaches real devices, payments, notifications, or IoT connections.")}</span><DemoBadge />
       </div>
       {above}
       <div className="grid-fluid" style={{ ["--min" as string]: "300px" }}>

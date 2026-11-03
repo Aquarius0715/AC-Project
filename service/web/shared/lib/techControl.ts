@@ -68,16 +68,16 @@ export function runBanner(r: ApiRun | null, i: I18n = EN): { tone: "primary" | "
     case "awaiting_start": return { tone: "primary", title: t("Starting — waiting for the device"), text: t("The start command ({action}) was sent; the run starts when the device acknowledges it.", { action: start }) };
     case "running": return {
       tone: "warn", title: t("Running — ends {end} (start acknowledged {start})", { end: clock(r.endAt, i), start: clock(r.startedAt, i) }),
-      text: t("DiagnosticRun running · endAt = startedAt + {n} min. The end command ({action}) is sent at {time}.", { n: r.durationMinutes, action: end, time: clock(r.endAt, i) }),
+      text: t("The test run ends {n} min after it started. The end command ({action}) is sent at {time}.", { n: r.durationMinutes, action: end, time: clock(r.endAt, i) }),
     };
     case "end_requested": return {
       tone: "warn", title: t("End requested {time} — awaiting device response", { time: clock(r.endAt, i) }),
-      text: t("end_requested · one end command ({action}) sent. Not shown as Stopped until the device confirms; a browser timer is not proof.", { action: actionCode(r.endAction) }),
+      text: t("One end command ({action}) sent. Not shown as Stopped until the device confirms; a browser timer is not proof.", { action: actionCode(r.endAction) }),
     };
     case "completed": return { tone: "ok", title: t("End acknowledged — test run completed"), text: t("The device confirmed {action}.", { action: end }) };
-    case "start_failed": return { tone: "crit", title: t("Start not acknowledged — the test run did not start"), text: r.failureCode ? t("start_failed ({code}) · no end command is needed.", { code: r.failureCode }) : t("start_failed · no end command is needed.") };
-    case "end_failed": return { tone: "crit", title: t("No end response — the end was not confirmed"), text: r.failureCode ? t("end_failed ({code}) · the unit may still be running; check it on site.", { code: r.failureCode }) : t("end_failed · the unit may still be running; check it on site.") };
-    default: return { tone: "crit", title: t("End blocked — authorization ended before the end time"), text: t("end_blocked · zero end commands were sent; the unit may still be running.") };
+    case "start_failed": return { tone: "crit", title: t("Start not acknowledged — the test run did not start"), text: r.failureCode ? t("The device reported {code} · no end command is needed.", { code: r.failureCode }) : t("No end command is needed.") };
+    case "end_failed": return { tone: "crit", title: t("No end response — the end was not confirmed"), text: r.failureCode ? t("The device reported {code} · the unit may still be running; check it on site.", { code: r.failureCode }) : t("The unit may still be running; check it on site.") };
+    default: return { tone: "crit", title: t("End blocked — authorization ended before the end time"), text: t("No end command was sent; the unit may still be running.") };
   }
 }
 export const runActive = (r: ApiRun | null) => !!r && (r.state === "awaiting_start" || r.state === "running" || r.state === "end_requested");

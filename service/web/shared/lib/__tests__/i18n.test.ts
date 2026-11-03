@@ -59,9 +59,8 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
     expect(Object.keys(ms).filter((key) => !dynamic.has(key) && !code.includes(JSON.stringify(key)))).toEqual([]);
   }, 30_000);
 
-  it("speaks to customers, contractors, technicians and HQ's customers & units, restrictions and access without error codes or spec IDs (IR584, IR585, IR587, IR590, IR591, IR595, IR622)", () => {
-    const lib = (name: RegExp) => readdirSync(join(root, "shared/lib")).filter((f) => name.test(f)).map((f) => join(root, "shared/lib", f));
-    const files = [...sources(join(root, "customer/app")), ...lib(/^client\w*\.ts$/), ...sources(join(root, "partner/app")), ...lib(/^partner\w*\.ts$/), ...sources(join(root, "technician/app")), ...lib(/^tech\w*\.ts$/), ...sources(join(root, "admin/app/admin/units")), ...lib(/^assets\.ts$/), ...sources(join(root, "admin/app/admin/restrictions")), ...lib(/^restrictions\.ts$/), ...sources(join(root, "admin/app/admin/settings")), ...lib(/^members\.ts$/)];
+  it("speaks to customers, contractors, technicians and HQ without error codes or spec IDs (IR584, IR585, IR587, IR590, IR591, IR595, IR622, IR626)", () => {
+    const files = ["customer/app", "partner/app", "technician/app", "admin/app", "shared/lib", "shared/components", "shared/screens"].flatMap((d) => sources(join(root, d)));
     const strings = files.flatMap((f) => [...readFileSync(f, "utf8").matchAll(/"((?:[^"\\\n]|\\.)*)"/g)].flatMap((m) => {
       try { return [JSON.parse(`"${m[1]}"`) as string]; } catch { return []; }
     }));
@@ -70,6 +69,19 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
     // screen IDs as well ("Access & roles (A03)")
     const coded = /\b(?:IR\d+|(?:FR|DD|BR|NFR|DEC|AT|SCR|DDC|REV)-[A-Z]*\d+|SR\d+|D\d{2,})\b|^(?:CONFLICT|NOT_FOUND|FORBIDDEN|UNAVAILABLE|VALIDATION|TIMEOUT|OFFLINE)\b|\((?:CONFLICT|NOT_FOUND|FORBIDDEN|UNAVAILABLE|VALIDATION|TIMEOUT|OFFLINE)\)|\([ACPTX]\d{2}[a-z]?\)/;
     expect(texts.filter((text) => coded.test(text))).toEqual([]);
+  });
+
+  // IR626: a status or event code ("release_requested", "end_failed") is said in words; dotted permissions such as
+  // restriction.read and {placeholders} are not codes of this kind
+  it("shows no snake_case status or event code in a text the apps translate", () => {
+    expect(Object.keys(ms).filter((text) => /(?<![\w./{-])[a-z]+_[a-z_]+(?![\w}])/.test(text))).toEqual([]);
+  });
+
+  // IR626: no field or operation name of the code ("previousAlertId", "jobs.saveCost") and no IR number either; units
+  // such as kWh and kgCO₂e and the {placeholders} are not names of this kind
+  it("shows no field name, operation name or IR number in a text the apps translate", () => {
+    const named = /\b(?!kWh\b|kgCO)[a-z]+[A-Z][a-z][A-Za-z]*\b|\b[a-z]+\.[a-z]+[A-Z][A-Za-z]*\b|\bIR\d+\b/;
+    expect(Object.keys(ms).filter((text) => named.test(text.replace(/\{\w+\}/g, "")))).toEqual([]);
   });
 
   // IR624: the apps speak English and Malay; a Japanese term of the specification ("受領") once reached the partner's schedule

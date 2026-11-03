@@ -55,11 +55,11 @@ describe("run banner and state", () => {
   it("follows the DiagnosticRun state", () => {
     expect(runBanner(null)).toBeNull();
     expect(runBanner(run({ state: "awaiting_start" }))).toMatchObject({ tone: "primary", title: "Starting — waiting for the device" });
-    expect(runBanner(run())).toMatchObject({ tone: "warn", title: "Running — ends 9:10 am MYT (start acknowledged 9:05 am MYT)", text: "DiagnosticRun running · endAt = startedAt + 5 min. The end command (Power OFF) is sent at 9:10 am MYT." });
+    expect(runBanner(run())).toMatchObject({ tone: "warn", title: "Running — ends 9:10 am MYT (start acknowledged 9:05 am MYT)", text: "The test run ends 5 min after it started. The end command (Power OFF) is sent at 9:10 am MYT." });
     expect(runBanner(run({ state: "end_requested" }))).toMatchObject({ tone: "warn", title: "End requested 9:10 am MYT — awaiting device response" });
     expect(runBanner(run({ state: "completed" }))).toMatchObject({ tone: "ok", title: "End acknowledged — test run completed", text: "The device confirmed Power OFF." });
-    expect(runBanner(run({ state: "start_failed", failureCode: "TIMEOUT" }))).toMatchObject({ tone: "crit", text: "start_failed (TIMEOUT) · no end command is needed." });
-    expect(runBanner(run({ state: "end_failed" }))?.text).toBe("end_failed · the unit may still be running; check it on site.");
+    expect(runBanner(run({ state: "start_failed", failureCode: "TIMEOUT" }))).toMatchObject({ tone: "crit", text: "The device reported TIMEOUT · no end command is needed." });
+    expect(runBanner(run({ state: "end_failed" }))?.text).toBe("The unit may still be running; check it on site.");
     expect(runBanner(run({ state: "end_blocked" }))?.title).toMatch(/^End blocked/);
     expect([null, run({ state: "completed" }), run({ state: "end_failed" })].map(runActive)).toEqual([false, false, false]);
     expect(["awaiting_start", "running", "end_requested"].map((s) => runActive(run({ state: s as ApiRun["state"] })))).toEqual([true, true, true]);

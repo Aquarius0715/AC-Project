@@ -71,7 +71,7 @@ export function AccessView({ live }: { live: Live }) {
     // a refused save takes the focus to the first field to fix, top to bottom: the form is long, and Save sits at its end (IR622)
     const bad = MEMBER_FIELDS.find((k) => errors[k]);
     if (bad) return focusField(memberFieldId(bad));
-    run(() => saveMember(memberInput(d, sel?.id, zone), sel?.version), sel ? t("Access saved — scopeVersion updated") : t("Membership created"), (m) => nav({ membershipId: m.id }));
+    run(() => saveMember(memberInput(d, sel?.id, zone), sel?.version), sel ? t("Access saved — open screens pick up the new scope on their next action") : t("Membership created"), (m) => nav({ membershipId: m.id }));
   };
   const doRevoke = () => sel && revoke !== null && revoke.trim() && run(
     () => revokeMember(memberInput({ ...d, permissions: sel.m.permissions, scopes: sel.m.scopes, reason: revoke.trim() }, sel.id, zone), sel.version), // ends now (IR492)
@@ -98,7 +98,7 @@ export function AccessView({ live }: { live: Live }) {
             {t("It does not exist, or the organization, role or status filter hides it.")}
           </EmptyState>
         ) : (
-        <Card title={sel ? sel.name : t("New membership")} sub={sel ? t("{validity} · scopeVersion {scope} · version {v}", { validity: sel.validity, scope: sel.m.scopeVersion, v: sel.version }) : t("For an existing user, or a new person whose account is created with it")}>
+        <Card title={sel ? sel.name : t("New membership")} sub={sel ? t("{validity} · scope version {scope} · version {v}", { validity: sel.validity, scope: sel.m.scopeVersion, v: sel.version }) : t("For an existing user, or a new person whose account is created with it")}>
           <div className="flex flex-col gap-5">
             {!live.canWrite && <Banner>{t("Read only — editing needs identity.write.")}</Banner>}
             {sel?.m.revokedAt && <Banner tone="warn">{t("Access revoked {date}: the sign-in is off, and their company or customer cannot extend or enable it again. Saving a later “Valid until” gives the access back and turns the sign-in on.", { date: showTime(sel.m.revokedAt, i.display) })}</Banner>}

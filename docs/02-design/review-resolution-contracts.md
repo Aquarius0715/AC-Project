@@ -8778,3 +8778,35 @@ Found in the UX loop (UX-43, the technician's parts, refrigerant and time on sit
      - After Resume work, Time on site stayed open with the focus on its button.
      - No sideways scroll; axe passed on the dialogs.
      - The temporary job was removed.
+
+## IR626 Every screen speaks in words: no error codes, spec IDs, status codes or code names — 2026-11-03
+
+Found in the UX loop: UX-40 listed 16 HQ texts that named codes, and UX-44 (HQ's billing) found more. The guard over displayed texts (IR584 onward) covered only some screens and only error codes and spec IDs. Wider checks found four kinds of developer words in what the four apps show:
+
+1. **Error codes and spec IDs (15 HQ texts).**
+   - "VALIDATION · 2 problems · nothing saved" is now "2 problems to fix · nothing saved".
+   - "CONFLICT · {date} already has a job" is now "{date} already has a job".
+   - "Not saved (CONFLICT): …" is now "Not saved: …".
+   - "CONFLICT — the invoice changed first…" loses its code.
+   - "(SR19)", "(SR29)", "(BR-A04)", "(D16)" and "(D08)" are gone.
+
+   These were in alert policies, billing, contracts, models, energy, plans, contractors and SLA. The shared screens also showed "(FR-X05)", "(FR-X08)", "(NFR-08)" and "(SR24)".
+2. **Status and event codes (17 texts).**
+   - "release_requested" is now "release requested".
+   - The technician's test-run lines no longer start with "end_failed ·", "start_failed ·", "end_blocked ·" or "end_requested ·". The banner's title already says what happened, and a device's code reads "The device reported {code}".
+   - "rework_requested", "capability_changed", "communication_lost" and "session_expired" are said in words, in the demo controls too.
+   - The tamper evidence reads "Device {serial} reported its cover opened while powered", without "(tamper_signal)".
+   - The server's stored reasons keep their form (for example "Recovered: … (D08)"). The web still matches the stored text and shows the words.
+3. **Field and operation names (12 texts).**
+   - "DiagnosticRun running · endAt = startedAt + {n} min" is now "The test run ends {n} min after it started".
+   - "previousAlertId = {id}" is now "links back to alert {id}".
+   - "(jobs.saveCost)", "(demoConfirmed)", "deliveryState", "scopeVersion" and the demo's "demoSeed", "(IR37)" and "(IR154)" are gone.
+4. **Guards.**
+   - The spec-ID and error-code guard now reads every text of the four apps, the shared libraries, components and screens.
+   - Three checks run over every text the apps translate. They reject a snake_case code, a field or operation name (units such as kWh are not names), and an IR number. IR624 added the check for Japanese terms.
+   - The Malay dictionary follows every change. A renamed "Not saved: {reason}." merged into the existing entry.
+5. **Design.** No design document quoted these texts. Figma is unchanged.
+6. **Tests.**
+   - The unit tests that expected the old texts now expect the words: plans, SLA, contractors, HQ jobs, the test run and alert evidence.
+   - The e2e expectations for alert policies and contracts follow.
+   - On the development stack, HQ's Billing showed the overdue invoice, the payment reminder form and the related restriction in words. axe passed, with no sideways scroll at 1920 or 1280.

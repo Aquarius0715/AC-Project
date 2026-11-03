@@ -252,7 +252,7 @@ export function hqRefusal(f: { code: string; messageKey: string; fieldErrors: Re
   const word = (k: string | undefined) => (k ? t(k) : undefined);
   const fields = Object.entries(f.fieldErrors ?? {}).map(([k, v]) => `${fieldName(k)}: ${word(HQ_FIELD_TEXT[`${k}:${v}`]) ?? word(HQ_REFUSAL_TEXT[v]) ?? v}`);
   if (fields.length) return fields.join(" · ");
-  if (HQ_REFUSAL_TEXT[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved (CONFLICT): {reason}.", { reason: t(HQ_REFUSAL_TEXT[f.messageKey]) }) : `${t(HQ_REFUSAL_TEXT[f.messageKey])}.`;
+  if (HQ_REFUSAL_TEXT[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved: {reason}.", { reason: t(HQ_REFUSAL_TEXT[f.messageKey]) }) : `${t(HQ_REFUSAL_TEXT[f.messageKey])}.`;
   if (f.code === "NOT_FOUND") return t("The job no longer exists in your scope.");
   return actionMessage({ ...f, fieldErrors: {} }, t); // the write limit's wait and other codes (IR380)
 }

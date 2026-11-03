@@ -47,7 +47,7 @@ export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, on
   const errors = errorsOf(rule);
   const broken = rules.filter((r) => Object.keys(errorsOf(r)).length);
   const changed = ruleChanges({ ...p, rules }, p);
-  const status = tried && broken.length ? t(broken.length === 1 ? "VALIDATION · 1 rule to fix · nothing saved: {names}" : "VALIDATION · {n} rules to fix · nothing saved: {names}", { n: broken.length, names: broken.map((r) => r.name).join(", ") })
+  const status = tried && broken.length ? t(broken.length === 1 ? "1 rule to fix · nothing saved: {names}" : "{n} rules to fix · nothing saved: {names}", { n: broken.length, names: broken.map((r) => r.name).join(", ") })
     : changed.length ? `${t(changed.length === 1 ? "1 rule changed" : "{n} rules changed", { n: changed.length })} · ${changed.join(", ")}` : t("No unsaved changes");
   const sorted = [...customers].sort((a, b) => a.name.localeCompare(b.name));
   const listed = [...sorted.slice(0, SHOWN), ...sorted.slice(SHOWN).filter((c) => more.includes(c.id))];

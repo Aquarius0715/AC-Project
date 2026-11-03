@@ -114,7 +114,7 @@ function PlanDetail({ d, now, notice, setNotice }: { d: Detail; now: number; not
           {dirty && <Btn disabled={pending} onClick={() => { setEvery(p.recurrence.intervalMonths); setNext(zonedInput(p.nextDueAt, zone)); }}>{t("Discard")}</Btn>}
           <Btn variant="primary" disabled={pending || !dirty || Object.keys(errors).length > 0} onClick={save}>{t("Save plan")}</Btn>
         </div>
-        <p className="mt-2 text-[11px] text-muted-foreground">{t("Generating creates one job for the saved next date only — no automatic generation or catch-up (D16). Saving does not change jobs already generated.")}</p>
+        <p className="mt-2 text-[11px] text-muted-foreground">{t("Generating creates one job for the saved next date only — no automatic generation or catch-up. Saving does not change jobs already generated.")}</p>
       </Card>
     </div>
   );

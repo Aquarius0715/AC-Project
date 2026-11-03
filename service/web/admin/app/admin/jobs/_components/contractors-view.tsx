@@ -163,7 +163,7 @@ function StatusModal({ d, onClose, onFail }: ModalProps & { d: Detail }) {
   return (
     <Modal open onClose={() => onClose()} title={t(suspend ? "Suspend offers to {name}" : "Resume offers to {name}", { name: p.name })} footer={<><Btn onClick={() => onClose()}>{t("Cancel")}</Btn><Btn variant={suspend ? "danger" : "primary"} disabled={pending} onClick={confirm}>{t(suspend ? "Suspend offers" : "Resume offers")}</Btn></>}>
       <Field label={t("Reason · required (1–1000)")} error={tried && !reason.trim() ? t("A reason is required") : undefined}><Textarea value={reason} maxLength={1000} onChange={(e) => setReason(e.target.value)} placeholder={t(suspend ? "Insurance certificate expired; offers paused until renewal." : "Insurance renewed.")} /></Field>
-      <Banner tone={suspend ? "warn" : undefined}>{t(suspend ? "New offers to this contractor are refused (CONFLICT). Open offers, accepted jobs and their assignments are unchanged." : "HQ can offer jobs to this contractor again.")}</Banner>
+      <Banner tone={suspend ? "warn" : undefined}>{t(suspend ? "New offers to this contractor are refused. Open offers, accepted jobs and their assignments are unchanged." : "HQ can offer jobs to this contractor again.")}</Banner>
     </Modal>
   );
 }

@@ -111,7 +111,7 @@ function Detail({ live, detail }: { live: HistoryLive; detail: Detail }) {
           <Card title={t("Previews on {id} ({n})", { id: r.short, n: previews.length })}>
             {previews.length === 0 && <p className="text-[13px] text-muted-foreground">{t("No previews yet in this session.")}</p>}
             {previews.map((p) => <div key={p.id} className="flex items-start justify-between gap-2 border-t border-line py-2 first:border-0"><span><b className="block text-[13px]">{p.title}</b><span className="text-[11px] text-muted-foreground">{p.sub}</span></span><Badge tone="primary">{t("preview")}</Badge></div>)}
-            <p className="mt-1 text-[11px] text-muted-foreground">{t("deliveryState stays “preview” — nothing is sent in phase 1A, and previews are not stored.")}</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">{t("A preview stays a preview — nothing is sent in phase 1A, and previews are not stored.")}</p>
           </Card>
         </div>
       </div>

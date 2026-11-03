@@ -45,7 +45,7 @@ test("HQ creates an alert policy for a customer, edits it and deletes it", async
   await expect(main).toContainText("Owner (customer) · fixed after creation");
   await expect(main).toContainText("New policy · not saved yet");
   await main.getByRole("button", { name: "Save policy" }).click(); // checked before anything is sent
-  await expect(main).toContainText("VALIDATION · 2 problems · nothing saved");
+  await expect(main).toContainText("2 problems to fix · nothing saved");
   await expect(main).toContainText("Add at least one recipient");
 
   await main.getByRole("textbox", { name: /^Name/ }).fill(name);

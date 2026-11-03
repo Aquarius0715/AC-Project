@@ -27,7 +27,7 @@ export function PreferencesDemo() {
   const [codes, setCodes] = useState<string[] | null>(null);
   return (
     <Page className="max-w-3xl">
-      <Card title={t("Display language")} sub={t("Affects the screens, notifications and date/time display. Stored data stays UTC (NFR-08). Malay text is a draft under review; text not translated yet stays in English.")}>
+      <Card title={t("Display language")} sub={t("Affects the screens, notifications and date/time display. Stored data stays UTC. Malay text is a draft under review; text not translated yet stays in English.")}>
         <Choice value={lang} onChange={(v) => { setStoredValue(LOCALE_KEY, v); toast(translate(v, "Language saved")); }} options={[{ id: "en", label: t("English (default)") }, { id: "ms", label: "Bahasa Melayu" }]} />
       </Card>
       <Card title={t("Display timezone")} sub={t("Booked times keep their meaning across timezone changes.")}>
@@ -35,7 +35,7 @@ export function PreferencesDemo() {
       </Card>
       <Card title={t("Currency")} sub={`${t("MYR — Malaysian Ringgit")} · ${t("read-only demo")}`}><Select disabled><option>{t("MYR — Malaysian Ringgit")}</option></Select></Card>
       <Card title={t("Security · Two-step verification")} sub={t("Ask for a 6-digit code from an authenticator app when signing in on a new device")} action={twoFa ? <span className="flex items-center gap-2"><Badge tone="ok">{t("On")}</Badge><Btn size="sm" onClick={() => { setTwoFa(false); toast(t("Two-step verification turned off"), "warn"); }}>{t("Turn off")}</Btn></span> : <span className="flex items-center gap-2"><Badge>{t("Off")}</Badge><Btn size="sm" variant="primary" onClick={() => { setModal(true); setCodes(null); setCode(""); }}>{t("Turn on")}</Btn></span>}>
-        <p className="text-xs text-muted-foreground">{t("Demo only — demo sign-in is unchanged (FR-X08).")}</p>
+        <p className="text-xs text-muted-foreground">{t("Demo only — demo sign-in is unchanged.")}</p>
       </Card>
       {role === "client" && (
         <Card title={t("Consent")}>

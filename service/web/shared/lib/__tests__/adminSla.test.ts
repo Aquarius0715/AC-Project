@@ -50,7 +50,7 @@ describe("HQ SLA by customer", () => {
     ]);
     expect(targetErrors({ responseHours: "4", arrival: "95", ftf: "85.5", effectiveFrom: new Date(NOW).toISOString() }, NOW)).toEqual({});
     expect(targetErrors({ responseHours: "0", arrival: "120", ftf: "x", effectiveFrom: "2026-09-01T00:00:00Z" }, NOW)).toEqual({ responseHours: "1–168 whole hours.", arrival: "0–100 %.", ftf: "0–100 %.", effectiveFrom: "Now or later." });
-    expect(slaRefusal({ code: "CONFLICT", messageKey: "errors.targets_exist", fieldErrors: {} })).toBe("Not saved (CONFLICT): targets for this plan already start at that time.");
+    expect(slaRefusal({ code: "CONFLICT", messageKey: "errors.targets_exist", fieldErrors: {} })).toBe("Not saved: targets for this plan already start at that time.");
   });
 });
 

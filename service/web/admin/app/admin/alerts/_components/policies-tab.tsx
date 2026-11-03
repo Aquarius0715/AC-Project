@@ -100,7 +100,7 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
   const problems = Object.keys(errors).length;
   const isNew = !!draft && !draft.id;
   const changes = draft && p && !isNew ? policyChanges(draft, p, t) : [];
-  const status = tried && problems ? t(problems === 1 ? "VALIDATION · 1 problem · nothing saved" : "VALIDATION · {n} problems · nothing saved", { n: problems })
+  const status = tried && problems ? t(problems === 1 ? "1 problem to fix · nothing saved" : "{n} problems to fix · nothing saved", { n: problems })
     : isNew ? t("New policy · not saved yet")
     : changes.length ? `${t(changes.length === 1 ? "1 unsaved change" : "{n} unsaved changes", { n: changes.length })} · ${changes.join(", ")}` : t("No unsaved changes");
   // the unit notifications.recipients and .preview are asked about: one the policy is attached to, else one of its

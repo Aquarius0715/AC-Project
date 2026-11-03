@@ -436,7 +436,7 @@ function ReviewModal({ d, report, decision, onClose, onFail }: Omit<ModalProps, 
         </fieldset>
       )}
       <Field label={t("Reason · required")} hint={t("1–1000 characters · shown to the technician and kept in the review history.")} error={tried ? error : undefined}><Textarea value={r} maxLength={1000} onChange={(e) => setR(e.target.value)} placeholder={t(decision === "return" ? "Airflow still low after cleaning; re-check the blower and attach an after photo." : "The contractor has not reviewed within the agreed time; HQ accepts on the evidence.")} /></Field>
-      <Banner tone={decision === "return" ? "warn" : undefined}>{t(decision === "return" ? "Status submitted → rework_requested. The same assignment continues; the technician submits a new report version. Completion does not resolve linked alerts." : "Status submitted → completed. The customer sees the accepted report; linked alerts stay open until they are resolved.")}</Banner>
+      <Banner tone={decision === "return" ? "warn" : undefined}>{t(decision === "return" ? "The job goes from submitted to returned for rework. The same assignment continues; the technician submits a new report version. Completion does not resolve linked alerts." : "Status submitted → completed. The customer sees the accepted report; linked alerts stay open until they are resolved.")}</Banner>
     </Modal>
   );
 }
@@ -455,7 +455,7 @@ function CostModal({ d, onClose, onFail }: Omit<ModalProps, "live">) {
   };
   return (
     <Modal open onClose={() => onClose()} title={t("Add cost line")} footer={<><Btn onClick={() => onClose()}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t("Save")}</Btn></>}>
-      <p className="text-xs text-muted-foreground">{j.id.slice(0, 8)} · {d.title} · {d.customer} — {t(d.costs.length === 1 ? "saved with the job’s other 1 line (jobs.saveCost)" : "saved with the job’s other {n} lines (jobs.saveCost)", { n: d.costs.length })}</p>
+      <p className="text-xs text-muted-foreground">{j.id.slice(0, 8)} · {d.title} · {d.customer} — {t(d.costs.length === 1 ? "saved with the job’s other 1 line" : "saved with the job’s other {n} lines", { n: d.costs.length })}</p>
       <Field label={t("Kind")}><Choice value={f.kind as CostLine["kind"]} onChange={(v) => setF({ ...f, kind: v })} options={[{ id: "estimate", label: t("Estimate") }, { id: "actual", label: t("Actual") }]} /></Field>
       <Field label={t("Description · required (1–200)")}><Input value={f.description} maxLength={200} onChange={(e) => setF({ ...f, description: e.target.value })} placeholder={t("Filter cleaning labour")} /></Field>
       <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>

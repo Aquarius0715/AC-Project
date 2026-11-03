@@ -80,9 +80,9 @@ describe("HQ maintenance jobs", () => {
     expect(hqRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { startAt: "errors.slot_not_agreed" } })).toBe("Start at: only one of the client’s preferred times (or an accepted proposal) can be booked");
     // in Malay, with the field named in words; every refusal text has a Malay entry (IR493)
     expect(hqRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { contactWindow: "error.length" } }, translator("ms"))).toBe("Contact window: sehingga 200 aksara");
-    expect(hqRefusal({ code: "CONFLICT", messageKey: "errors.proposal_pending", fieldErrors: {} }, translator("ms"))).toBe(`${ms["Not saved (CONFLICT): {reason}."].replace("{reason}", ms["a proposal is already waiting for the client — withdraw it first"])}`);
+    expect(hqRefusal({ code: "CONFLICT", messageKey: "errors.proposal_pending", fieldErrors: {} }, translator("ms"))).toBe(`${ms["Not saved: {reason}."].replace("{reason}", ms["a proposal is already waiting for the client — withdraw it first"])}`);
     expect(HQ_REFUSAL_KEYS.filter((k) => !(k in ms))).toEqual([]);
-    expect(hqRefusal({ code: "CONFLICT", messageKey: "errors.proposal_pending", fieldErrors: {} })).toBe("Not saved (CONFLICT): a proposal is already waiting for the client — withdraw it first.");
+    expect(hqRefusal({ code: "CONFLICT", messageKey: "errors.proposal_pending", fieldErrors: {} })).toBe("Not saved: a proposal is already waiting for the client — withdraw it first.");
     expect(hqRefusal({ code: "NOT_FOUND", messageKey: "error.notFound", fieldErrors: {} })).toBe("The job no longer exists in your scope.");
   });
 

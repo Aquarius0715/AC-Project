@@ -99,7 +99,7 @@ function Manager({ live }: { live: NonNullable<RestrictionsLive> }) {
             {live.full && (
               <Card title={t("Cause invoices")} action={<Link className="text-xs font-semibold text-primary" href="/admin/billing?overdueOnly=true">{t("Open in Billing")} <Icon name="arrowRight" /></Link>}>
                 {sel.causes.map((c) => <p key={c.id} className="text-[13px]"><Link className="font-semibold text-primary" href={`/admin/billing?invoiceId=${c.id}`}>{c.number}</Link> · {c.amountMinor === null ? "—" : amount(c.amountMinor, c.currency)} <Badge tone={c.paid ? "ok" : "warn"}>{c.paid ? t("paid") : t("unpaid")}</Badge></p>)}
-                <p className="mt-1 text-xs text-muted-foreground">{t("{unpaid} of {total} cause invoices unpaid. When every cause invoice is paid, a scheduled restriction is cancelled and an applied one moves to release_requested.", { unpaid: sel.causes.filter((c) => !c.paid).length, total: sel.causes.length })}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t("{unpaid} of {total} cause invoices unpaid. When every cause invoice is paid, a scheduled restriction is cancelled and an applied one moves to “release requested”.", { unpaid: sel.causes.filter((c) => !c.paid).length, total: sel.causes.length })}</p>
               </Card>
             )}
             <Card title={t("Units")}>

@@ -216,7 +216,7 @@ export function BillingView({ live }: { live?: BillingLive }) {
                   {(sel.st === "Unpaid" || sel.st === "Overdue") && (manualBlocked
                     ? <p className="mt-3 text-xs text-muted-foreground">{t("Manual recording waits while a payment is started ({method}). The customer can finish or retry the card payment.", { method: sel.method })}</p>
                     : <><p className="mt-3 text-xs text-muted-foreground">{t(hasPayment ? "The customer's card payment did not go through. Record a manual payment if it was received outside the app (e.g. bank transfer)." : "The customer has not started a payment. Record a manual payment if it was received outside the app (e.g. bank transfer).")}</p><div className="mt-2"><Btn onClick={() => openPayment("manual")}>{t("Record manual payment…")}</Btn></div></>)}
-                  {conflict && <div className="mt-3"><Banner tone="warn">{t("CONFLICT — the invoice changed first (for example a payment arrived), so the action was stopped. The screen shows the latest version.")}</Banner></div>}
+                  {conflict && <div className="mt-3"><Banner tone="warn">{t("The invoice changed first (for example a payment arrived), so the action was stopped. The screen shows the latest version.")}</Banner></div>}
                 </Card>
                 {sel.st === "Overdue" && <Card title={t("Payment reminder")} sub={t("Only overdue unpaid invoices can be reminded. If payment arrives first, the reminder is stopped. Delivery is simulated.")}>
                   {live && recipients.length === 0 ? <p className="text-xs text-muted-foreground">{t("No client of this customer can receive the reminder.")}</p> : <>
@@ -259,7 +259,7 @@ export function BillingView({ live }: { live?: BillingLive }) {
         {sel && <Field label={t("Amount (must equal invoice — full payment only)")} error={tried && Math.round(+m.amount * 100) !== sel.amountMinor ? t("Must equal {amount}", { amount: sel.amt }) : undefined}><Input type="number" value={m.amount} onChange={(e) => setM({ ...m, amount: e.target.value })} disabled={modal === "confirm"} /></Field>}
         <Field label={t("Reference")} error={tried && !m.ref.trim() ? t("Reference is required") : undefined}><Input value={m.ref} onChange={(e) => setM({ ...m, ref: e.target.value })} placeholder="manual-2026-0189" maxLength={128} /></Field>
         {live ? <Field label={t("Reason")} error={tried && !m.reason.trim() ? t("A reason is required") : undefined}><Input value={m.reason} onChange={(e) => setM({ ...m, reason: e.target.value })} placeholder={t("Bank transfer received")} maxLength={1000} /></Field> : <Field label={t("Paid on")}><Input type="date" value={m.paidAt} onChange={(e) => setM({ ...m, paidAt: e.target.value })} /></Field>}
-        {modal === "manual" && <p className="text-[11px] text-muted-foreground">{t("Marks the invoice paid; the payment method stays “not selected”. Related restrictions move to release_requested when all their cause invoices are paid. Resubmitting the same reference returns the same result.")}</p>}
+        {modal === "manual" && <p className="text-[11px] text-muted-foreground">{t("Marks the invoice paid; the payment method stays “not selected”. Related restrictions move to “release requested” when all their cause invoices are paid. Resubmitting the same reference returns the same result.")}</p>}
       </Modal>
       <Modal open={modal === "create"} onClose={close} title={t("Create invoice")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={create}>{t("Create")}</Btn></>}>
         <Field label={t("Contract")}><Select value={contract?.id ?? ""} onChange={(e) => setNw({ ...nw, contractId: e.target.value })}>{contracts.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</Select></Field>
@@ -284,8 +284,8 @@ function RelatedRestrictions({ ids }: { ids: string[] }) {
         <div className="flex flex-col gap-1.5">{ids.map((id) => (
           <p key={id} className="flex flex-wrap items-center justify-between gap-2 text-[13px]"><span className="font-mono font-semibold">{shortId(id)}</span><Link className="text-xs font-semibold text-primary" href={`/admin/restrictions?restrictionId=${id}`}>{t("Open restriction")} <Icon name="arrowRight" /></Link></p>
         ))}
-          <p className="text-xs text-muted-foreground">{t(ids.length > 1 ? "This invoice is a cause of these restrictions. Once all cause invoices of a restriction are paid, it moves to release_requested. State and units are shown on the Restrictions screen (restriction.read)."
-            : "This invoice is a cause of this restriction. Once all of its cause invoices are paid, it moves to release_requested. State and units are shown on the Restrictions screen (restriction.read).")}</p>
+          <p className="text-xs text-muted-foreground">{t(ids.length > 1 ? "This invoice is a cause of these restrictions. Once all cause invoices of a restriction are paid, it moves to “release requested”. Their states and units are on the Restrictions screen (restriction.read)."
+            : "This invoice is a cause of this restriction. Once all of its cause invoices are paid, it moves to “release requested”. Its state and units are on the Restrictions screen (restriction.read).")}</p>
         </div>
       )}
     </Card>
