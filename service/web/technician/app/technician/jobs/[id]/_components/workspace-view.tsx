@@ -11,7 +11,7 @@ import { zonedInstant, type T } from "@ac/web/lib/i18n";
 import { typeLabel } from "@ac/web/lib/partnerJobDetail";
 import { actionMessage, fieldErrorTexts, type ActionFailure } from "@ac/web/lib/actionMessage";
 import {
-  CHECK_IN_API_FIELDS, CHECK_IN_FIELDS, checkInErrors, componentLabel, draftFrom, draftInput, fmtOf, followUpText, groupLabel, itemPhotos, linkPhoto, progress, readingMetrics, submitIssues, timeRows, versionRows, windowState,
+  CHECK_IN_API_FIELDS, CHECK_IN_FIELDS, checkInErrors, componentLabel, PART_FIELDS, partErrors, REFRIGERANT_FIELDS, refrigerantErrors, draftFrom, draftInput, fmtOf, followUpText, groupLabel, itemPhotos, linkPhoto, progress, readingMetrics, submitIssues, timeRows, versionRows, windowState,
   type ApiTechReport, type CheckInField, type Draft, type DraftPart, type DraftRefrigerant, type Group, type Issue, type Known, type Result, type TimeOnSite,
 } from "@ac/web/lib/techJob";
 import { acknowledge, checkIn, pauseWork, resumeRework, saveDraft, signOff, submitReport, uploadPhoto } from "../actions";
@@ -74,15 +74,19 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
   // validated on the first submit attempt, then re-checked live so fixed rows and counts clear as the draft changes
   const [checked, setChecked] = useState(false);
   const [refused, setRefused] = useState<string | null>(null);
-  const [tab, setTab] = useState<Group>(live.components[0]?.group ?? "indoor");
-  const [view, setView] = useState<"readings" | "parts" | "time">("readings");
+  // the open checklist group and view outlive the remount a new job version causes (IR625)
+  const [tab, setTabState] = useState<Group>(openTab.get(live.job.id) ?? live.components[0]?.group ?? "indoor");
+  const [view, setViewState] = useState<View>(openView.get(live.job.id) ?? "readings");
+  const setTab = (g: Group) => { openTab.set(live.job.id, g); setTabState(g); };
+  const setView = (v: View) => { openView.set(live.job.id, v); setViewState(v); };
   const [modal, setModal] = useState<null | "checkin" | "cant" | "part" | "refrigerant" | "sign" | "submit">(null);
   const [checkInErr, setCheckInErr] = useState<CheckInErrors>({});
-  // after a check-in the view mounts again for the new job version: focus goes to the job's title, now "in progress"
+  // an action that moves the job on mounts the view again for the new version: the focus goes where it said (IR621, IR625)
   useEffect(() => {
-    if (titleFocusFor !== live.job.id) return;
-    titleFocusFor = null;
-    document.getElementById("job-title")?.focus();
+    if (remountFocus?.jobId !== live.job.id) return;
+    const id = remountFocus.id;
+    remountFocus = null;
+    document.getElementById(id)?.focus();
   }, [live.job.id]);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [linking, setLinking] = useState<string | null>(null); // the component whose “+ Link photo” list is open
@@ -207,13 +211,13 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
     <Page>
       {head}
       {refused && <Banner tone="crit">{refused}</Banner>}
-      {job.status === "assigned" && ack === "pending" && <Banner tone="primary" action={<span className="flex gap-2"><Btn size="sm" variant="primary" disabled={pending} onClick={() => run(() => acknowledge(job.id, job.version, "accept", null, null), t("Assignment accepted"), undefined, failed)}><Icon name="check" />{t("Accept assignment")}</Btn><Btn size="sm" disabled={pending} onClick={() => setModal("cant")}>{t("Can’t make this time…")}</Btn></span>}>{t("New assignment for {window}. Accepting tells your coordinator and HQ you will attend; the client then sees your name.", { window: visit })}</Banner>}
+      {job.status === "assigned" && ack === "pending" && <Banner tone="primary" action={<span className="flex gap-2"><Btn size="sm" variant="primary" disabled={pending} onClick={() => run(() => acknowledge(job.id, job.version, "accept", null, null), t("Assignment accepted"), () => { remountFocus = { jobId: job.id, id: "job-title" }; }, failed)}><Icon name="check" />{t("Accept assignment")}</Btn><Btn size="sm" disabled={pending} onClick={() => setModal("cant")}>{t("Can’t make this time…")}</Btn></span>}>{t("New assignment for {window}. Accepting tells your coordinator and HQ you will attend; the client then sees your name.", { window: visit })}</Banner>}
       {job.status === "assigned" && ack === "cant_make" && <Banner tone="warn">{job.assignment?.cantMakeReason ? t("You said you can’t make this time (“{reason}”). Your coordinator reassigns the job or asks the client for another time.", { reason: job.assignment.cantMakeReason }) : t("You said you can’t make this time. Your coordinator reassigns the job or asks the client for another time.")}</Banner>}
       {job.status === "assigned" && ack === "accepted" && <Banner tone={win.phase === "before" ? "primary" : "ok"} action={<Btn size="sm" variant="primary" disabled={pending || win.phase !== "open" && win.phase !== "ending"} onClick={() => { setCheckInErr({}); setModal("checkin"); }}>{t("Start job (check in)")}</Btn>}>{win.phase === "before" ? t("Read-only until the window opens at {time} — Start is disabled before then.", { time: opens }) : win.phase === "ended" ? t("The work window has ended — ask your coordinator to reschedule.") : t("On site: Start job opens Check in (location + unit QR); checking in starts the work.")}</Banner>}
       {job.status === "on_hold" && <Banner tone="warn">{t("On hold by HQ — saving and submitting are blocked. Your saved draft is kept; continue when HQ resumes the job.")}</Banner>}
       {job.status === "submitted" && <Banner tone="ok">{t("Submitted v{version} — read-only, awaiting quality review.", { version: job.reportRefs[job.reportRefs.length - 1]?.reportVersion ?? "" })}</Banner>}
       {job.status === "completed" && <Banner tone="ok">{t("Accepted — the job is completed and the report is visible to the customer.")}</Banner>}
-      {job.status === "rework_requested" && <Banner tone="warn" action={<Btn size="sm" variant="primary" disabled={pending || win.phase === "ended"} onClick={() => run(() => resumeRework(job.id, job.version), t("Rework resumed — continue in the new draft"), undefined, failed)}>{t("Resume rework")}</Btn>}>{live.report?.reviewHistory.at(-1)?.reason ? t("Returned for rework — “{reason}”. Resume to continue as a new draft version; the returned version stays as it was.", { reason: live.report.reviewHistory.at(-1)!.reason! }) : t("Returned for rework. Resume to continue as a new draft version; the returned version stays as it was.")}</Banner>}
+      {job.status === "rework_requested" && <Banner tone="warn" action={<Btn size="sm" variant="primary" disabled={pending || win.phase === "ended"} onClick={() => run(() => resumeRework(job.id, job.version), t("Rework resumed — continue in the new draft"), () => { remountFocus = { jobId: job.id, id: "job-title" }; }, failed)}>{t("Resume rework")}</Btn>}>{live.report?.reviewHistory.at(-1)?.reason ? t("Returned for rework — “{reason}”. Resume to continue as a new draft version; the returned version stays as it was.", { reason: live.report.reviewHistory.at(-1)!.reason! }) : t("Returned for rework. Resume to continue as a new draft version; the returned version stays as it was.")}</Banner>}
       {inWork && win.phase === "ended" && <Banner tone="crit">{t("The work window ended — unsaved input was discarded and the job can no longer be edited. Ask your coordinator.")}</Banner>}
       {live.reportRefused && <Banner tone="warn">{t("The report is not readable now ({reason}).", { reason: FORBIDDEN[live.reportRefused] ? t(FORBIDDEN[live.reportRefused]) : live.reportRefused.replace(/^errors?\./, "").replace(/_/g, " ") })}</Banner>}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
@@ -305,7 +309,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
             {view === "time" && (
               <div>
                 <SummaryList items={timeRows(job.timeOnSite, now, f)} />
-                {inWork && <div className="mt-3"><Btn size="sm" disabled={pending || !editable} onClick={() => withSaved(() => run(() => pauseWork(job.id, job.version, !paused), t(paused ? "Work resumed" : "Work paused"), undefined, failed))}>{t(paused ? "Resume work" : "Pause work")}</Btn></div>}
+                {inWork && <div className="mt-3"><Btn id="pause-toggle" size="sm" disabled={pending || !editable} onClick={() => withSaved(() => run(() => pauseWork(job.id, job.version, !paused), t(paused ? "Work resumed" : "Work paused"), () => { remountFocus = { jobId: job.id, id: "pause-toggle" }; }, failed))}>{t(paused ? "Resume work" : "Pause work")}</Btn></div>}
                 <p className="mt-2 text-[11px] text-muted-foreground">{t("Arrival inside the window counts toward the SLA. Times are part of the report and visible to the contractor and HQ.")}</p>
               </div>
             )}
@@ -362,8 +366,8 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
         </div>
       </div>
       <CheckInModal open={modal === "checkin"} unitId={job.unitId} pending={pending} errors={checkInErr} setErrors={setCheckInErr} onClose={() => setModal(null)}
-        onCheckIn={(method, distance, qr, reason) => run(() => checkIn(job.id, job.version, method, distance, qr, reason), t("Checked in — the job has started"), () => { titleFocusFor = job.id; setModal(null); }, (f) => {
-          // a refusal of a field (too far, another unit's label) shows under that field, which takes the focus (IR620)
+        onCheckIn={(method, distance, qr, reason) => run(() => checkIn(job.id, job.version, method, distance, qr, reason), t("Checked in — the job has started"), () => { remountFocus = { jobId: job.id, id: "job-title" }; setModal(null); }, (f) => {
+          // a refusal of a field (too far, another unit's label) shows under that field, which takes the focus (IR621)
           const fields = fieldErrorTexts(f, CHECK_IN_API_FIELDS, t);
           const first = CHECK_IN_FIELDS.find((k) => fields[k]);
           if (!first) return failed(f);
@@ -384,9 +388,14 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
 }
 
 type CheckInErrors = Partial<Record<CheckInField, string>>;
-/** The page keys the view by the job's version, so the check-in, which moves the job on, mounts it again and drops the
- * focus with Start job: the job id left here sends the focus to the title of that job's next view (IR620). */
-let titleFocusFor: string | null = null;
+/** The page keys the view by the job's version, so an action that moves the job on mounts it again and drops the focus:
+ * the check-in, accepting and resuming rework send it to the job's title, pausing to the same Pause / Resume button
+ * (IR621, IR625). The job's next view takes it. */
+let remountFocus: { jobId: string; id: string } | null = null;
+type View = "readings" | "parts" | "time";
+/** The checklist group and the view each job had open, for its next view after a remount (IR625). */
+const openTab = new Map<string, Group>();
+const openView = new Map<string, View>();
 /** The check-in form's fields by id: one dialog per page, and a refusal from the Core API focuses its field. */
 const CHECK_IN_IDS: Record<CheckInField, string> = { distance: "check-in-distance", qr: "check-in-qr", reason: "check-in-reason" };
 
@@ -400,7 +409,7 @@ function CheckInModal({ open, unitId, pending, errors, setErrors, onClose, onChe
   const go = () => {
     const e = checkInErrors(method, distance, qr, reason, t);
     setErrors(e);
-    // a refused check-in takes the focus to the first field to fix, top to bottom (IR586, IR620)
+    // a refused check-in takes the focus to the first field to fix, top to bottom (IR586, IR621)
     const bad = CHECK_IN_FIELDS.find((k) => e[k]);
     if (bad) return focusField(CHECK_IN_IDS[bad]);
     if (method === "manual") onCheckIn("manual", null, null, reason.trim());
@@ -452,21 +461,24 @@ function PartModal({ open, parts, components, onClose, onAdd }: { open: boolean;
   const [lot, setLot] = useState("");
   const [replaces, setReplaces] = useState("");
   const [disposal, setDisposal] = useState<"" | "disposed_on_site" | "returned">("");
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Partial<Record<(typeof PART_FIELDS)[number], string>>>({});
   const picked = parts.find((p) => p.code === code);
   const add = () => {
-    const n = Number(qty), label = (picked?.name ?? name).trim();
-    if (!label) return setError(t("Choose a catalog part or name it"));
-    if (!Number.isInteger(n) || n < 1 || n > 999) return setError(t("Quantity must be 1–999"));
-    onAdd({ name: label, quantity: n, catalogCode: picked?.code ?? null, source, lotSerial: lot.trim() || null, replacesComponentKey: replaces || null, oldPartDisposal: replaces ? (disposal || "disposed_on_site") : null, receiptAttachmentId: null });
-    setCode(""); setName(""); setQty("1"); setLot(""); setReplaces(""); setDisposal(""); setError(null);
+    const label = (picked?.name ?? name).trim();
+    const e = partErrors(label, qty, t);
+    setErrors(e);
+    // a refused part takes the focus to the field to fix (IR625, as IR621)
+    const bad = PART_FIELDS.find((k) => e[k]);
+    if (bad) return focusField(`part-${bad}`);
+    onAdd({ name: label, quantity: Number(qty), catalogCode: picked?.code ?? null, source, lotSerial: lot.trim() || null, replacesComponentKey: replaces || null, oldPartDisposal: replaces ? (disposal || "disposed_on_site") : null, receiptAttachmentId: null });
+    setCode(""); setName(""); setQty("1"); setLot(""); setReplaces(""); setDisposal("");
   };
   return (
     <Modal open={open} onClose={onClose} title={t("Add part")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" onClick={add}>{t("Add")}</Btn></>}>
       <Field label={t("Part (catalog)")}><Select value={code} onChange={(e) => setCode(e.target.value)}><option value="">{t("Not in the catalog…")}</option>{parts.map((p) => <option key={p.code} value={p.code}>{p.name} · {p.code}{p.vanStockQuantity !== null ? ` · ${t("{n} in van", { n: p.vanStockQuantity })}` : ""}</option>)}</Select></Field>
-      {!picked && <Field label={t("Part name")}><Input value={name} maxLength={120} onChange={(e) => setName(e.target.value)} /></Field>}
+      {!picked && <Field label={t("Part name")} error={errors.name}><Input id="part-name" value={name} maxLength={120} onChange={(e) => { setName(e.target.value); setErrors({ ...errors, name: undefined }); }} /></Field>}
       <div className="grid-fluid" style={{ ["--min" as string]: "130px" }}>
-        <Field label={t("Qty")}><Input inputMode="numeric" value={qty} onChange={(e) => setQty(e.target.value)} /></Field>
+        <Field label={t("Qty")} error={errors.qty}><Input id="part-qty" inputMode="numeric" value={qty} onChange={(e) => { setQty(e.target.value); setErrors({ ...errors, qty: undefined }); }} /></Field>
         <Field label={t("Source")}><Select value={source} onChange={(e) => setSource(e.target.value as DraftPart["source"])}>{sources.map((x) => <option key={x.id} value={x.id}>{t(x.label)}</option>)}</Select></Field>
         <Field label={t("Lot / serial")}><Input value={lot} onChange={(e) => setLot(e.target.value)} /></Field>
       </div>
@@ -475,7 +487,6 @@ function PartModal({ open, parts, components, onClose, onAdd }: { open: boolean;
         {replaces && <Field label={t("Old part")}><Select value={disposal} onChange={(e) => setDisposal(e.target.value as typeof disposal)}><option value="">{t("Disposed on site")}</option><option value="returned">{t("Returned")}</option></Select></Field>}
       </div>
       {source === "bought_locally" && <p className="text-[11px] text-muted-foreground">{t("Keep the receipt — attach a photo of it with the report photos.")}</p>}
-      {error && <Banner tone="crit">{error}</Banner>}
     </Modal>
   );
 }
@@ -488,27 +499,28 @@ function RefrigerantModal({ open, onClose, onAdd }: { open: boolean; onClose: ()
   const [charged, setCharged] = useState("0");
   const [leak, setLeak] = useState<DraftRefrigerant["leakCheck"]>("pass");
   const [method, setMethod] = useState("electronic detector");
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Partial<Record<(typeof REFRIGERANT_FIELDS)[number], string>>>({});
+  const clear = (k: (typeof REFRIGERANT_FIELDS)[number]) => setErrors((x) => ({ ...x, [k]: undefined }));
   const add = () => {
-    const r = Number(recovered), c = Number(charged);
-    if (!cylinder.trim()) return setError(t("The cylinder ID is required"));
-    if (!Number.isFinite(r) || !Number.isFinite(c) || r < 0 || c < 0) return setError(t("Amounts are kilograms of 0 or more"));
-    onAdd({ refrigerant: kind, cylinderId: cylinder.trim(), recoveredKg: r, chargedKg: c, leakCheck: leak, leakCheckMethod: leak === "not_done" ? null : method.trim() || null });
-    setError(null);
+    const e = refrigerantErrors(cylinder, recovered, charged, t);
+    setErrors(e);
+    // a refused line takes the focus to the field to fix (IR625, as IR621)
+    const bad = REFRIGERANT_FIELDS.find((k) => e[k]);
+    if (bad) return focusField(`refrigerant-${bad}`);
+    onAdd({ refrigerant: kind, cylinderId: cylinder.trim(), recoveredKg: Number(recovered), chargedKg: Number(charged), leakCheck: leak, leakCheckMethod: leak === "not_done" ? null : method.trim() || null });
   };
   return (
     <Modal open={open} onClose={onClose} title={t("Refrigerant")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" onClick={add}>{t("Add")}</Btn></>}>
       <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}>
         <Field label={t("Refrigerant")}><Select value={kind} onChange={(e) => setKind(e.target.value as DraftRefrigerant["refrigerant"])}><option>R32</option><option>R410A</option></Select></Field>
-        <Field label={t("Cylinder ID")}><Input value={cylinder} maxLength={64} placeholder="CYL-R32-0182" onChange={(e) => setCylinder(e.target.value)} /></Field>
-        <Field label={t("Recovered (kg)")}><Input inputMode="decimal" value={recovered} onChange={(e) => setRecovered(e.target.value)} /></Field>
-        <Field label={t("Charged (kg)")}><Input inputMode="decimal" value={charged} onChange={(e) => setCharged(e.target.value)} /></Field>
+        <Field label={t("Cylinder ID")} error={errors.cylinder}><Input id="refrigerant-cylinder" value={cylinder} maxLength={64} placeholder="CYL-R32-0182" onChange={(e) => { setCylinder(e.target.value); clear("cylinder"); }} /></Field>
+        <Field label={t("Recovered (kg)")} error={errors.recovered}><Input id="refrigerant-recovered" inputMode="decimal" value={recovered} onChange={(e) => { setRecovered(e.target.value); clear("recovered"); }} /></Field>
+        <Field label={t("Charged (kg)")} error={errors.charged}><Input id="refrigerant-charged" inputMode="decimal" value={charged} onChange={(e) => { setCharged(e.target.value); clear("charged"); }} /></Field>
       </div>
       <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
         <Field label={t("Leak check")}><Select value={leak} onChange={(e) => setLeak(e.target.value as DraftRefrigerant["leakCheck"])}><option value="pass">{t("Pass")}</option><option value="fail">{t("Fail")}</option><option value="not_done">{t("Not done")}</option></Select></Field>
         {leak !== "not_done" && <Field label={t("Method")}><Input value={method} onChange={(e) => setMethod(e.target.value)} /></Field>}
       </div>
-      {error && <Banner tone="crit">{error}</Banner>}
     </Modal>
   );
 }

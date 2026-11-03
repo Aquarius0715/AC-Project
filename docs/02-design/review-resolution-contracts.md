@@ -8759,3 +8759,22 @@ Found in the UX loop (UX-42, the contractor's Schedule & assignments). contracto
      - Three candidates and three week rows remained, and the 1920 page fit one screen.
      - Confirm assignment gave "Assigned · tech-external-a · awaiting acceptance", and the focus stayed on the button (IR622).
      - axe passed, with no sideways scroll at 1920 or 1280.
+
+## IR625 Parts and refrigerant name the field to fix, and pausing keeps the technician where they were — 2026-11-03
+
+Found in the UX loop (UX-43, the technician's parts, refrigerant and time on site on a phone). tech-internal-a, on a temporary job for Living room AC, checked in and opened Parts & refrigerant: Add part with no name and quantity 0, then a capacitor; Refrigerant with no cylinder and −1 kg, then 0.4 recovered and 0.6 charged; Time on site › Pause work and Resume work.
+
+1. **Errors under their fields.** Both dialogs showed every refusal in one red box at the bottom, and the focus stayed on Add. Each check now sits under its field and the first one to fix takes the focus, as the check-in does since IR621:
+   - Add part checks the part's name (when no catalog part is chosen) and a quantity of 1–999 (`partErrors`).
+   - Refrigerant checks the cylinder ID and the kilograms recovered and charged, each on its own field: 0 or more (`refrigerantErrors`). "Amounts are kilograms of 0 or more" becomes "Kilograms, 0 or more" under the field it concerns.
+2. **Pausing kept nothing.** Pause work and Resume work change the job's version. The page keys the workspace by that version, so it mounted again: the focus fell to the page, and the view went back to Readings, closing Time on site where the button was. The open checklist group and view are now kept per job across that remount (`openTab`, `openView`). The focus goes back to the same Pause / Resume button. IR621's focus after a remount (`remountFocus`) now also covers Accept assignment and Resume rework, which send the focus to the job's title.
+3. **Design.** DD-T14 says the same. The Malay dictionary follows. Figma is unchanged.
+4. **Tests.**
+   - `techJob.test.ts`: `partErrors` and `refrigerantErrors` per field, in English and Malay.
+   - `report-checks.e2e.ts`, which runs where the seed job's window is open, as on CI: a quantity of 0 focuses Part name and names the quantity's error; an empty Refrigerant focuses Cylinder ID; Cancel adds nothing.
+   - On the development stack at 390×844 with touch:
+     - Each refusal sat under its field with the focus there.
+     - Adding returned the focus to Add part or Refrigerant.
+     - After Resume work, Time on site stayed open with the focus on its button.
+     - No sideways scroll; axe passed on the dialogs.
+     - The temporary job was removed.

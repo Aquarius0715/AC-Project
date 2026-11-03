@@ -458,7 +458,7 @@ Scope: FR-T14 / Main display pattern: **UI-FORM**. Service boundary: `jobs.saveD
 3. Time on site shows arrivedAt (check-in), startedAt, pauses, finishedAt (on submit), and on-site minutes; Pause work calls `jobs.pauseWork`.
 4. Queries to update: `reports / jobs`.
 
-**Boundary cases and failures**: VALIDATION keeps the modal; after submit all fields are read-only.
+**Boundary cases and failures**: VALIDATION keeps the modal; after submit all fields are read-only. Add part and Refrigerant show each check under its field and focus the first one to fix: the part or its name and 1–999 pieces; the cylinder and the kilograms recovered and charged, 0 or more. Pausing or resuming keeps Time on site open, with the focus on the same button (IR625).
 
 **Verification**: Check the traceability entries under AT-T14 (N/E/B).
 

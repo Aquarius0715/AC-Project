@@ -2914,7 +2914,7 @@ export const ms: Record<string, string> = {
   "Disposed on site": "Dilupuskan di tapak",
   "Keep the receipt — attach a photo of it with the report photos.": "Simpan resit — lampirkan fotonya bersama foto laporan.",
   "The cylinder ID is required": "ID silinder diperlukan",
-  "Amounts are kilograms of 0 or more": "Jumlah dalam kilogram, 0 atau lebih",
+  "Kilograms, 0 or more": "Kilogram, 0 atau lebih",
   "Refrigerant": "Bahan pendingin",
   "Cylinder ID": "ID silinder",
   "Recovered (kg)": "Diperoleh semula (kg)",

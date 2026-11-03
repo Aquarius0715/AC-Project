@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkInErrors, CHECK_IN_API_FIELDS, componentsFor, draftFrom, draftInput, fmtOf, followUpText, groupOf, historyCard, itemPhotos, knownOf, linkPhoto, progress, submitIssues, timeRows, versionRows, warnAt, windowState, type ApiTechReport, type Draft } from "@ac/web/lib/techJob";
+import { checkInErrors, CHECK_IN_API_FIELDS, componentsFor, partErrors, refrigerantErrors, draftFrom, draftInput, fmtOf, followUpText, groupOf, historyCard, itemPhotos, knownOf, linkPhoto, progress, submitIssues, timeRows, versionRows, warnAt, windowState, type ApiTechReport, type Draft } from "@ac/web/lib/techJob";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
@@ -182,5 +182,20 @@ describe("check-in checks", () => {
   it("words them in Malay and maps the Core API's fields onto the form's", () => {
     expect(checkInErrors("manual", "", "", "", translator("ms")).reason).not.toBe("A reason is required for a manual check-in (1–1000 characters)");
     expect(CHECK_IN_API_FIELDS).toEqual({ distanceMeters: "distance", qrUnitId: "qr", reason: "reason" });
+  });
+});
+
+// IR625: Add part and Refrigerant name the field to fix, so the dialog shows the error there and focuses it
+describe("part and refrigerant checks", () => {
+  it("ask for a part and 1–999 pieces", () => {
+    expect(partErrors("Run capacitor 35 µF", "1")).toEqual({});
+    expect(partErrors(" ", "0")).toEqual({ name: "Choose a catalog part or name it", qty: "Quantity must be 1–999" });
+    expect(Object.keys(partErrors("Filter", "1.5"))).toEqual(["qty"]);
+  });
+  it("ask for the cylinder and kilograms of 0 or more, each on its own field", () => {
+    expect(refrigerantErrors("CYL-R32-0182", "0.4", "0.6")).toEqual({});
+    expect(refrigerantErrors(" ", "-1", "x")).toEqual({ cylinder: "The cylinder ID is required", recovered: "Kilograms, 0 or more", charged: "Kilograms, 0 or more" });
+    expect(refrigerantErrors("CYL", "0", "0")).toEqual({}); // nothing recovered or charged is a valid line
+    expect(refrigerantErrors(" ", "0", "0", translator("ms")).cylinder).toBe("ID silinder diperlukan");
   });
 });

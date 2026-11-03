@@ -176,6 +176,29 @@ export function checkInErrors(method: "location_qr" | "manual", distance: string
   return e;
 }
 
+/** Add part's fields and checks: a catalog part or a name, and 1–999 pieces. Each error belongs to its field, so the
+ * dialog shows it there and focuses it (IR625). */
+export type PartField = "name" | "qty";
+export const PART_FIELDS: PartField[] = ["name", "qty"];
+export function partErrors(label: string, qty: string, t: T = en): Partial<Record<PartField, string>> {
+  const e: Partial<Record<PartField, string>> = {};
+  if (!label.trim()) e.name = t("Choose a catalog part or name it");
+  const n = Number(qty);
+  if (!Number.isInteger(n) || n < 1 || n > 999) e.qty = t("Quantity must be 1–999");
+  return e;
+}
+/** Refrigerant's fields and checks: the cylinder, and the kilograms recovered and charged, 0 or more (IR625). */
+export type RefrigerantField = "cylinder" | "recovered" | "charged";
+export const REFRIGERANT_FIELDS: RefrigerantField[] = ["cylinder", "recovered", "charged"];
+export function refrigerantErrors(cylinder: string, recovered: string, charged: string, t: T = en): Partial<Record<RefrigerantField, string>> {
+  const e: Partial<Record<RefrigerantField, string>> = {};
+  if (!cylinder.trim()) e.cylinder = t("The cylinder ID is required");
+  const kg = (v: string) => Number.isFinite(Number(v)) && Number(v) >= 0;
+  if (!kg(recovered)) e.recovered = t("Kilograms, 0 or more");
+  if (!kg(charged)) e.charged = t("Kilograms, 0 or more");
+  return e;
+}
+
 export type WindowState = { phase: "none" | "before" | "open" | "ending" | "ended"; text: string; notice?: string };
 export const WARN_MINUTES = 15;
 /** The instant of the IR89 warning: 15 minutes before the window ends (formatted by the loader, IR282). */
