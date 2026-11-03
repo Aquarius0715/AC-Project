@@ -16,29 +16,29 @@ type Busy struct{}
 
 // UnitBusy implements devices.Exclusion.
 func (Busy) UnitBusy(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, error) {
-	var b bool
+	var busy bool
 
 	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM control.commands WHERE unit_id = $1 AND status IN ('requested',
 		'sent'))
 		OR EXISTS (SELECT 1 FROM control.diagnostic_runs WHERE unit_id = $1 AND state IN ('awaiting_start','running',
 		'end_requested'))`, unit).
-		Scan(&b)
+		Scan(&busy)
 
-	return b, apperr.Wrap(err, "select control.commands")
+	return busy, apperr.Wrap(err, "select control.commands")
 }
 
 // OperationConflict implements devices.OperationGuard (REV19-018): the start tick of a device operation fails on a
 // Command requested/sent other than an undelivered restriction Command, or an active DiagnosticRun.
 func (Busy) OperationConflict(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, error) {
-	var b bool
+	var conflict bool
 
 	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM control.commands WHERE unit_id = $1 AND status IN ('requested',
 		'sent') AND NOT (source = 'restriction' AND delivery = 'not_sent'))
 		OR EXISTS (SELECT 1 FROM control.diagnostic_runs WHERE unit_id = $1 AND state IN ('awaiting_start','running',
 		'end_requested'))`, unit).
-		Scan(&b)
+		Scan(&conflict)
 
-	return b, apperr.Wrap(err, "select control.commands")
+	return conflict, apperr.Wrap(err, "select control.commands")
 }
 
 // UnitActive implements assets.UnitActivity (same rule as UnitBusy).

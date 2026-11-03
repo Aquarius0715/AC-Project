@@ -78,6 +78,42 @@ const devCols = `d.id, d.tenant_id, d.version, d.created_at, d.updated_at, d.bin
 	` d.created_by_membership_id,
 	d.serial, d.connection, d.last_seen_at, d.firmware_version, d.power_signal, d.tamper`
 
+// The aggregate and audit target kind of a device, its connection states, the tamper state that blocks binding (D05),
+// and the roles the device scope tells apart.
+const (
+	entityDevice = "device"
+
+	connOnline     = "online"
+	connOffline    = "offline"
+	connConnecting = "connecting"
+	connError      = "error"
+	connUnknown    = "unknown"
+
+	tamperDetected = "detected"
+
+	roleAdmin      = "admin"
+	roleClient     = "client"
+	roleTechnician = "technician"
+)
+
+// JSON field names the module writes in more than one place: sort keys, field errors and event payloads.
+const (
+	fieldAction         = "action"
+	fieldCreatedAt      = "createdAt"
+	fieldDeviceIDs      = "deviceIds"
+	fieldFilters        = "filters"
+	fieldOperationID    = "operationId"
+	fieldPreviousUnitID = "previousUnitId"
+	fieldState          = "state"
+	fieldStatus         = "status"
+	fieldUnitID         = "unitId"
+	fieldUpdatedAt      = "updatedAt"
+)
+
+// colCreatedAt is the creation time column that the createdAt sort key orders by (and updatedAt, on rows that never
+// change).
+const colCreatedAt = "created_at"
+
 // Module is the device register.
 type Module struct {
 	Units      Units
@@ -98,9 +134,9 @@ func deviceScope(call *ops.Call, args *[]any, mode unitscope.Mode) string {
 	}
 
 	switch principal.Role {
-	case "admin":
+	case roleAdmin:
 		return "TRUE"
-	case "client":
+	case roleClient:
 		return "EXISTS (SELECT 1 FROM devices.device_bindings b WHERE b.device_id = d.id AND b.unbound_at IS NULL AND " +
 			"b.customer_org_id = " + add(
 			principal.OrgID,
@@ -150,6 +186,25 @@ func (m *Module) load(
 		return nil, 0, apperr.Wrap(err, "select devices.devices")
 	}
 
+	out, err := scanDevices(rows)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if len(out) == 0 {
+		return out, total, nil
+	}
+
+	err = withSensors(ctx, call, out)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return out, total, nil
+}
+
+// scanDevices reads a page of devices (devCols), each without sensors yet.
+func scanDevices(rows pgx.Rows) ([]Device, error) {
 	var out []Device
 
 	for rows.Next() {
@@ -175,7 +230,7 @@ func (m *Module) load(
 		if err != nil {
 			rows.Close()
 
-			return nil, 0, apperr.Wrap(err, "select devices.devices")
+			return nil, apperr.Wrap(err, "select devices.devices")
 		}
 
 		device.Sensors = []Sensor{}
@@ -184,34 +239,30 @@ func (m *Module) load(
 
 	rows.Close()
 
-	rowsErr := rows.Err()
-	if rowsErr != nil {
-		return nil, 0, apperr.Wrap(rowsErr, "select devices.devices")
+	return out, apperr.Wrap(rows.Err(), "select devices.devices")
+}
+
+// withSensors reads the sensors of the whole page in one query, not one per device (IR497).
+func withSensors(ctx context.Context, call *ops.Call, devices []Device) error {
+	ids, indexOf := make([]uuid.UUID, len(devices)), make(map[uuid.UUID]int, len(devices))
+	for i := range devices {
+		ids[i], indexOf[devices[i].ID] = devices[i].ID, i
 	}
 
-	if len(out) == 0 {
-		return out, total, nil
-	}
-	// the sensors of the whole page in one query, not one per device (IR497)
-	ids, at := make([]uuid.UUID, len(out)), make(map[uuid.UUID]int, len(out))
-	for i := range out {
-		ids[i], at[out[i].ID] = out[i].ID, i
-	}
-
-	srows, err := call.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT boundary_id, id, device_id, metric, unit, stale_after_seconds, calibrated_at FROM devices.sensors
 		WHERE device_id = ANY($1) ORDER BY device_id, metric`,
 		ids,
 	)
 	if err != nil {
-		return nil, 0, apperr.Wrap(err, "select devices.sensors")
+		return apperr.Wrap(err, "select devices.sensors")
 	}
 
-	for srows.Next() {
+	for rows.Next() {
 		var sensor Sensor
 
-		err := srows.Scan(
+		err := rows.Scan(
 			&sensor.BoundaryID,
 			&sensor.ID,
 			&sensor.DeviceID,
@@ -221,24 +272,19 @@ func (m *Module) load(
 			&sensor.CalibratedAt,
 		)
 		if err != nil {
-			srows.Close()
+			rows.Close()
 
-			return nil, 0, apperr.Wrap(err, "select devices.sensors")
+			return apperr.Wrap(err, "select devices.sensors")
 		}
 
-		if i, ok := at[sensor.DeviceID]; ok {
-			out[i].Sensors = append(out[i].Sensors, sensor)
+		if i, ok := indexOf[sensor.DeviceID]; ok {
+			devices[i].Sensors = append(devices[i].Sensors, sensor)
 		}
 	}
 
-	srows.Close()
+	rows.Close()
 
-	rowsErr = srows.Err()
-	if rowsErr != nil {
-		return nil, 0, apperr.Wrap(rowsErr, "select devices.sensors")
-	}
-
-	return out, total, nil
+	return apperr.Wrap(rows.Err(), "select devices.sensors")
 }
 
 // list serves devices.list.
@@ -275,61 +321,40 @@ func (m *Module) list(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[Device], error) {
-	var f struct {
-		UnitID *uuid.UUID `json:"unitId,omitempty"`
-		Status *string    `json:"status,omitempty"`
-	}
+	var filter deviceFilter
 
-	if len(query.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
-		dec.DisallowUnknownFields()
-
-		if dec.Decode(&f) != nil {
-			return paging.Page[Device]{}, apperr.Fields(
-				map[string]string{"filters": apperr.KeyInvalid},
-			)
-		}
+	err := decodeFilters(query, &filter)
+	if err != nil {
+		return paging.Page[Device]{}, err
 	}
 
 	order, err := paging.OrderBy(
 		query.Sort,
-		map[string]string{"id": "d.id", "createdAt": "d.created_at", "updatedAt": "d.updated_at"},
+		map[string]string{
+			"id":           "d.id",
+			fieldCreatedAt: "d.created_at",
+			fieldUpdatedAt: "d.updated_at",
+		},
 		"d.id ASC",
 	)
 	if err != nil {
 		return paging.Page[Device]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	window, err := paging.Resolve(*query, f, call.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, filter, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Device]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
-	var args []any
-
-	conds := []string{deviceScope(call, &args, unitscope.Equipment)}
-	if f.UnitID != nil {
-		args = append(args, *f.UnitID)
-		conds = append(conds, fmt.Sprintf("d.unit_id = $%d", len(args)))
-	}
-
-	if f.Status != nil {
-		switch *f.Status {
-		case "online", "offline", "unknown", "connecting", "error":
-		default:
-			return paging.Page[Device]{}, apperr.Fields(
-				map[string]string{"filters.status": apperr.KeyInvalid},
-			)
-		}
-
-		args = append(args, *f.Status)
-		conds = append(conds, fmt.Sprintf("d.connection = $%d", len(args)))
+	where, args, err := deviceConditions(call, filter)
+	if err != nil {
+		return paging.Page[Device]{}, err
 	}
 
 	items, total, err := m.load(
 		ctx,
 		call,
-		strings.Join(conds, " AND "),
+		where,
 		args,
 		order,
 		window.Limit,
@@ -349,6 +374,57 @@ func (m *Module) list(
 		Total:           total,
 		SnapshotVersion: window.Snapshot,
 	}, nil
+}
+
+// deviceFilter is the devices.list filters of the query catalog.
+type deviceFilter struct {
+	UnitID *uuid.UUID `json:"unitId,omitempty"`
+	Status *string    `json:"status,omitempty"`
+}
+
+// decodeFilters reads the query's filters into filter, a struct of the catalogued keys: another key is VALIDATION.
+func decodeFilters(query *paging.Query, filter any) error {
+	if len(query.Filters) == 0 {
+		return nil
+	}
+
+	dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
+	dec.DisallowUnknownFields()
+
+	if dec.Decode(filter) != nil {
+		return apperr.Fields(
+			map[string]string{fieldFilters: apperr.KeyInvalid},
+		)
+	}
+
+	return nil
+}
+
+// deviceConditions is the devices.list WHERE clause and its arguments: the caller's device scope and the filters (a
+// status that is no connection state is VALIDATION).
+func deviceConditions(call *ops.Call, filter deviceFilter) (string, []any, error) {
+	var args []any
+
+	conds := []string{deviceScope(call, &args, unitscope.Equipment)}
+	if filter.UnitID != nil {
+		args = append(args, *filter.UnitID)
+		conds = append(conds, fmt.Sprintf("d.unit_id = $%d", len(args)))
+	}
+
+	if filter.Status != nil {
+		switch *filter.Status {
+		case connOnline, connOffline, connUnknown, connConnecting, connError:
+		default:
+			return "", nil, apperr.Fields(
+				map[string]string{"filters.status": apperr.KeyInvalid},
+			)
+		}
+
+		args = append(args, *filter.Status)
+		conds = append(conds, fmt.Sprintf("d.connection = $%d", len(args)))
+	}
+
+	return strings.Join(conds, " AND "), args, nil
 }
 
 // IDInput is {id}.
@@ -417,57 +493,76 @@ func (m *Module) detail(
 	}
 
 	deviceDetail := DeviceDetail{Device: items[0], CalibrationRefs: nil, ActiveOperation: nil}
-	deviceDetail.CalibrationRefs = []uuid.UUID{}
+
+	deviceDetail.CalibrationRefs, err = calibrationRefs(ctx, call, deviceDetail.ID)
+	if err != nil {
+		return DeviceDetail{}, err
+	}
+
+	deviceDetail.ActiveOperation, err = activeOperation(ctx, call, deviceDetail.ID)
+	if err != nil {
+		return DeviceDetail{}, err
+	}
+
+	return deviceDetail, nil
+}
+
+// calibrationRefs lists the device's calibration records, the newest first.
+func calibrationRefs(ctx context.Context, call *ops.Call, device uuid.UUID) ([]uuid.UUID, error) {
+	refs := []uuid.UUID{}
 
 	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT id FROM devices.calibration_records WHERE device_id = $1 ORDER BY created_at DESC, id`,
-		deviceDetail.ID,
+		device,
 	)
 	if err != nil {
-		return DeviceDetail{}, apperr.Wrap(err, "select devices.calibration_records")
+		return nil, apperr.Wrap(err, "select devices.calibration_records")
 	}
 
 	for rows.Next() {
-		var id uuid.UUID
+		var recordID uuid.UUID
 
-		err := rows.Scan(&id)
+		err := rows.Scan(&recordID)
 		if err != nil {
 			rows.Close()
 
-			return DeviceDetail{}, apperr.Wrap(err, "select devices.calibration_records")
+			return nil, apperr.Wrap(err, "select devices.calibration_records")
 		}
 
-		deviceDetail.CalibrationRefs = append(deviceDetail.CalibrationRefs, id)
+		refs = append(refs, recordID)
 	}
 
 	rows.Close()
 
-	rowsErr := rows.Err()
-	if rowsErr != nil {
-		return DeviceDetail{}, apperr.Wrap(rowsErr, "select devices.calibration_records")
-	}
+	return refs, apperr.Wrap(rows.Err(), "select devices.calibration_records")
+}
 
-	var op []byte
+// activeOperation is the device's queued or running operation as DeviceOperation JSON, null when it has none.
+func activeOperation(
+	ctx context.Context,
+	call *ops.Call,
+	device uuid.UUID,
+) (json.RawMessage, error) {
+	var operationJSON []byte
 
-	err = call.Tx.QueryRow(ctx, `SELECT to_jsonb(o) FROM (SELECT id, tenant_id AS "tenantId", version, created_at AS
+	err := call.Tx.QueryRow(ctx, `SELECT to_jsonb(o) FROM (SELECT id, tenant_id AS "tenantId", version, created_at AS
 		"createdAt", updated_at AS "updatedAt",
 		device_id AS "deviceId", unit_id AS "unitId", job_id AS "jobId", kind, status, target_version AS "targetVersion",
 		failure_code AS "failureCode",
 		started_at AS "startedAt", finished_at AS "finishedAt", expires_at AS "expiresAt"
 		FROM devices.device_operations WHERE device_id = $1 AND status IN ('queued','running') ORDER BY created_at DESC LIMIT
-		1) o`, deviceDetail.ID).
-		Scan(&op)
+		1) o`, device).
+		Scan(&operationJSON)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return DeviceDetail{}, apperr.Wrap(err, "select devices.device_operations")
+		return nil, apperr.Wrap(err, "select devices.device_operations")
 	}
 
-	deviceDetail.ActiveOperation = json.RawMessage("null")
-	if len(op) > 0 {
-		deviceDetail.ActiveOperation = op
+	if len(operationJSON) > 0 {
+		return operationJSON, nil
 	}
 
-	return deviceDetail, nil
+	return json.RawMessage("null"), nil
 }
 
 var serialRe = regexp.MustCompile(`^[A-Z0-9-]{3,64}$`)
@@ -511,7 +606,7 @@ func (m *Module) technicianGate(
 	jobID *uuid.UUID,
 	unit uuid.UUID,
 ) error {
-	if call.Principal.Role != "technician" {
+	if call.Principal.Role != roleTechnician {
 		return nil
 	}
 
@@ -523,6 +618,24 @@ func (m *Module) technicianGate(
 		m.Access.TechnicianJob(ctx, call, *jobID, unit),
 		"devices.TechAccess.TechnicianJob",
 	)
+}
+
+// existingUnit is what Assets knows of a unit that must exist (NOT_FOUND).
+func (m *Module) existingUnit(
+	ctx context.Context,
+	call *ops.Call,
+	unit uuid.UUID,
+) (UnitInfo, error) {
+	unitInfo, found, err := m.Units.UnitInfo(ctx, call, unit)
+	if err != nil {
+		return UnitInfo{}, apperr.Wrap(err, "devices.Units.UnitInfo")
+	}
+
+	if !found {
+		return UnitInfo{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	}
+
+	return unitInfo, nil
 }
 
 // register serves devices.register.
@@ -567,96 +680,34 @@ func (m *Module) registerDetail(
 		return DeviceDetail{}, err
 	}
 
-	unitInfo, ok, err := m.Units.UnitInfo(ctx, call, input.UnitID)
+	unitInfo, err := m.existingUnit(ctx, call, input.UnitID)
 	if err != nil {
-		return DeviceDetail{}, apperr.Wrap(err, "devices.Units.UnitInfo")
+		return DeviceDetail{}, err
 	}
 
-	if !ok {
-		return DeviceDetail{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	byMetric, err := capabilitySensors(ctx, call, unitInfo, input.SensorTypes)
+	if err != nil {
+		return DeviceDetail{}, err
 	}
 
-	var sensorsRaw []byte
-
-	scanErr := call.Tx.QueryRow(ctx, `SELECT sensors FROM devices.capabilities WHERE id = $1 AND version =
-		$2`, unitInfo.ModelID, unitInfo.CapabilityVersion).
-		Scan(&sensorsRaw)
-	if scanErr != nil {
-		return DeviceDetail{}, apperr.Wrap(scanErr, "select devices.capabilities")
+	err = serialFree(ctx, call, input.Serial)
+	if err != nil {
+		return DeviceDetail{}, err
 	}
 
-	var specs []SensorSpec
+	deviceID := uuid.Must(uuid.NewV7())
 
-	_ = json.Unmarshal(sensorsRaw, &specs)
-
-	byMetric := map[string]SensorSpec{}
-	for _, s := range specs {
-		byMetric[s.Metric] = s
-	}
-
-	for _, mt := range input.SensorTypes {
-		if _, ok := byMetric[mt]; !ok {
-			return DeviceDetail{}, apperr.Fields(
-				map[string]string{"sensorTypes": "error.notInCapability"},
-			) // IR43
-		}
-	}
-
-	var dup bool
-
-	scanErr = call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.devices WHERE upper(serial) =
-		$1)`, input.Serial).
-		Scan(&dup)
-	if scanErr != nil {
-		return DeviceDetail{}, apperr.Wrap(scanErr, "select devices.devices")
-	}
-
-	if dup {
-		return DeviceDetail{}, apperr.E(
-			apperr.Conflict,
-			apperr.KeyDuplicateSerial,
-		) // tenant-wide after normalisation (D05)
-	}
-	// D05: register reserves targetUnitId; unitId stays null until devices.bind
-	id := uuid.Must(uuid.NewV7())
-
-	_, execErr := call.Tx.Exec(
-		ctx,
-		`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version)
-		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, 'v1')`,
-		id,
-		input.Serial,
-		input.UnitID,
-		call.Principal.MembershipID,
-	)
-	if execErr != nil {
-		return DeviceDetail{}, apperr.Wrap(execErr, "insert devices.devices")
-	}
-
-	for _, mt := range input.SensorTypes {
-		sensorSpec := byMetric[mt]
-
-		_, err := call.Tx.Exec(
-			ctx,
-			`INSERT INTO devices.sensors (tenant_id, device_id, metric, unit, boundary_id, stale_after_seconds)
-			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5)`,
-			id,
-			sensorSpec.Metric,
-			sensorSpec.Unit,
-			sensorSpec.BoundaryID,
-			sensorSpec.StaleAfterSeconds,
-		)
-		if err != nil {
-			return DeviceDetail{}, apperr.Wrap(err, "insert devices.sensors")
-		}
+	err = insertDevice(ctx, call, deviceID, input, byMetric)
+	if err != nil {
+		return DeviceDetail{}, err
 	}
 
 	one := 1
 
 	call.Emit(
 		ops.Event{
-			AggregateType: "device",
-			AggregateID:   id,
+			AggregateType: entityDevice,
+			AggregateID:   deviceID,
 			Type:          "DeviceRegistered",
 			Payload:       map[string]any{"targetUnitId": input.UnitID},
 		},
@@ -664,8 +715,8 @@ func (m *Module) registerDetail(
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "devices.register",
-			TargetKind:      "device",
-			TargetID:        id.String(),
+			TargetKind:      entityDevice,
+			TargetID:        deviceID.String(),
 			NextVersion:     &one,
 			PreviousVersion: nil,
 			Reason:          "",
@@ -679,12 +730,113 @@ func (m *Module) registerDetail(
 		ctx,
 		call,
 		"d.id = $1",
-		[]any{id},
+		[]any{deviceID},
 	) // own write result; read scope applies to later reads
 }
 
+// capabilitySensors is the sensor specs of the unit's model version by metric; each requested sensor type must be one
+// of them (IR43).
+func capabilitySensors(
+	ctx context.Context,
+	call *ops.Call,
+	unitInfo UnitInfo,
+	sensorTypes []string,
+) (map[string]SensorSpec, error) {
+	var sensorsRaw []byte
+
+	scanErr := call.Tx.QueryRow(ctx, `SELECT sensors FROM devices.capabilities WHERE id = $1 AND version =
+		$2`, unitInfo.ModelID, unitInfo.CapabilityVersion).
+		Scan(&sensorsRaw)
+	if scanErr != nil {
+		return nil, apperr.Wrap(scanErr, "select devices.capabilities")
+	}
+
+	var specs []SensorSpec
+
+	_ = json.Unmarshal(sensorsRaw, &specs)
+
+	byMetric := map[string]SensorSpec{}
+	for _, s := range specs {
+		byMetric[s.Metric] = s
+	}
+
+	for _, mt := range sensorTypes {
+		if _, ok := byMetric[mt]; !ok {
+			return nil, apperr.Fields(
+				map[string]string{"sensorTypes": "error.notInCapability"},
+			) // IR43
+		}
+	}
+
+	return byMetric, nil
+}
+
+// serialFree refuses a serial that another device has, tenant-wide after normalisation (D05).
+func serialFree(ctx context.Context, call *ops.Call, serial string) error {
+	var dup bool
+
+	scanErr := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.devices WHERE upper(serial) =
+		$1)`, serial).
+		Scan(&dup)
+	if scanErr != nil {
+		return apperr.Wrap(scanErr, "select devices.devices")
+	}
+
+	if dup {
+		return apperr.E(
+			apperr.Conflict,
+			apperr.KeyDuplicateSerial,
+		) // tenant-wide after normalisation (D05)
+	}
+
+	return nil
+}
+
+// insertDevice registers the device with one sensor per requested type, as its model version specifies it. D05:
+// register reserves targetUnitId; unitId stays null until devices.bind.
+func insertDevice(
+	ctx context.Context,
+	call *ops.Call,
+	device uuid.UUID,
+	input *RegisterInput,
+	byMetric map[string]SensorSpec,
+) error {
+	_, execErr := call.Tx.Exec(
+		ctx,
+		`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version)
+		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, 'v1')`,
+		device,
+		input.Serial,
+		input.UnitID,
+		call.Principal.MembershipID,
+	)
+	if execErr != nil {
+		return apperr.Wrap(execErr, "insert devices.devices")
+	}
+
+	for _, mt := range input.SensorTypes {
+		sensorSpec := byMetric[mt]
+
+		_, err := call.Tx.Exec(
+			ctx,
+			`INSERT INTO devices.sensors (tenant_id, device_id, metric, unit, boundary_id, stale_after_seconds)
+			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5)`,
+			device,
+			sensorSpec.Metric,
+			sensorSpec.Unit,
+			sensorSpec.BoundaryID,
+			sensorSpec.StaleAfterSeconds,
+		)
+		if err != nil {
+			return apperr.Wrap(err, "insert devices.sensors")
+		}
+	}
+
+	return nil
+}
+
 // RegisterDevices binds the device operations.
-func RegisterDevices(r *ops.Registry, module *Module) {
+func RegisterDevices(reg *ops.Registry, module *Module) {
 	if module.Access == nil {
 		module.Access = maintenance.Access{}
 	}
@@ -693,15 +845,15 @@ func RegisterDevices(r *ops.Registry, module *Module) {
 		module.UnitAccess = maintenance.Access{}
 	}
 
-	ops.Register(r, "devices.list", module.list)
-	ops.Register(r, "devices.get", module.get)
-	ops.Register(r, "devices.register", module.register)
-	ops.Register(r, "devices.bind", module.bind)
-	ops.Register(r, "devices.check", module.check)
-	ops.Register(r, "devices.updateFirmware", module.updateFirmware)
-	ops.Register(r, "devices.calibrate", module.calibrate)
-	ops.Register(r, "devices.operations", module.operations)
-	ops.Register(r, "devices.calibrations", module.calibrations)
-	ops.Register(r, "devices.events", module.events)
-	ops.Register(r, "devices.addResponseNote", module.addResponseNote)
+	ops.Register(reg, "devices.list", module.list)
+	ops.Register(reg, "devices.get", module.get)
+	ops.Register(reg, "devices.register", module.register)
+	ops.Register(reg, opBind, module.bind)
+	ops.Register(reg, "devices.check", module.check)
+	ops.Register(reg, "devices.updateFirmware", module.updateFirmware)
+	ops.Register(reg, "devices.calibrate", module.calibrate)
+	ops.Register(reg, "devices.operations", module.operations)
+	ops.Register(reg, "devices.calibrations", module.calibrations)
+	ops.Register(reg, "devices.events", module.events)
+	ops.Register(reg, "devices.addResponseNote", module.addResponseNote)
 }

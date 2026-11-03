@@ -174,16 +174,16 @@ type SeriesInput struct {
 // maxBuckets bounds one bucketed series (a 35-day period in 60-minute buckets is 840).
 const maxBuckets = 1000
 
-func validRange(from, until time.Time, max time.Duration, fe map[string]string) {
+func validRange(from, until time.Time, max time.Duration, fieldErrs map[string]string) {
 	switch {
 	case from.IsZero():
-		fe["from"] = apperr.KeyRequired
+		fieldErrs["from"] = apperr.KeyRequired
 	case until.IsZero():
-		fe["to"] = apperr.KeyRequired
+		fieldErrs["to"] = apperr.KeyRequired
 	case !from.Before(until):
-		fe["to"] = apperr.KeyRange
+		fieldErrs["to"] = apperr.KeyRange
 	case max > 0 && until.Sub(from) > max:
-		fe["to"] = "error.rangeTooLong"
+		fieldErrs["to"] = "error.rangeTooLong"
 	}
 }
 
@@ -283,12 +283,16 @@ type AirSeries struct {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/telemetry/series [get]
-func (m Telemetry) series(ctx context.Context, call *ops.Call, in *SeriesInput) (AirSeries, error) {
-	units := in.UnitIDs
-	if in.SpaceID != nil {
+func (m Telemetry) series(
+	ctx context.Context,
+	call *ops.Call,
+	input *SeriesInput,
+) (AirSeries, error) {
+	units := input.UnitIDs
+	if input.SpaceID != nil {
 		var err error
 
-		units, err = m.Units.UnitsInSpace(ctx, call, *in.SpaceID)
+		units, err = m.Units.UnitsInSpace(ctx, call, *input.SpaceID)
 		if err != nil {
 			return AirSeries{}, apperr.Wrap(err, "monitoring.TelemetryUnits.UnitsInSpace")
 		}
@@ -303,30 +307,30 @@ func (m Telemetry) series(ctx context.Context, call *ops.Call, in *SeriesInput) 
 		}
 	}
 
-	if in.Query.Sort != nil && in.Query.Sort.Field != "observedAt" {
+	if input.Query.Sort != nil && input.Query.Sort.Field != "observedAt" {
 		return AirSeries{}, apperr.Fields(map[string]string{"query.sort.field": apperr.KeyInvalid})
 	}
 
 	dir := "ASC"
-	if in.Query.Sort != nil && in.Query.Sort.Direction == "desc" {
+	if input.Query.Sort != nil && input.Query.Sort.Direction == "desc" {
 		dir = "DESC"
 	}
 
-	window, err := paging.Resolve(in.Query, struct {
+	window, err := paging.Resolve(input.Query, struct {
 		From, To time.Time
 		Units    []uuid.UUID
 		Metric   string
 		Sensor   *uuid.UUID
-	}{in.From, in.To, units, in.Metric, in.SensorID}, call.Principal.ScopeVersion, 1)
+	}{input.From, input.To, units, input.Metric, input.SensorID}, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return AirSeries{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
-	args := []any{units, in.Metric, in.From, in.To}
+	args := []any{units, input.Metric, input.From, input.To}
 	where := "m.unit_id = ANY($1) AND m.metric = $2 AND m.observed_at >= $3 AND m.observed_at < $4"
 
-	if in.SensorID != nil {
-		args = append(args, *in.SensorID)
+	if input.SensorID != nil {
+		args = append(args, *input.SensorID)
 		where += " AND m.sensor_id = $5"
 	}
 
@@ -338,15 +342,15 @@ func (m Telemetry) series(ctx context.Context, call *ops.Call, in *SeriesInput) 
 		return AirSeries{}, apperr.Wrap(scanErr, "select monitoring.measurements")
 	}
 
-	if in.BucketMinutes != nil { // the whole period in averages, every bucket present (IR605)
+	if input.BucketMinutes != nil { // the whole period in averages, every bucket present (IR605)
 		buckets, err := bucketed(
 			ctx,
 			call,
 			where,
 			args,
-			in.From,
-			in.To,
-			time.Duration(*in.BucketMinutes)*time.Minute,
+			input.From,
+			input.To,
+			time.Duration(*input.BucketMinutes)*time.Minute,
 		)
 		if err != nil {
 			return AirSeries{}, err
@@ -740,9 +744,9 @@ func (in *VentLogInput) Validate() map[string]string {
 func (m Telemetry) log(
 	ctx context.Context,
 	call *ops.Call,
-	in *VentLogInput,
+	input *VentLogInput,
 ) (VentilationLog, error) {
-	org, spaceUnits, found, err := m.Units.SpaceInfo(ctx, call, in.SpaceID)
+	org, spaceUnits, found, err := m.Units.SpaceInfo(ctx, call, input.SpaceID)
 	if err != nil {
 		return VentilationLog{}, apperr.Wrap(err, "monitoring.TelemetryUnits.SpaceInfo")
 	}
@@ -753,12 +757,12 @@ func (m Telemetry) log(
 
 	src := spaceUnits
 
-	if in.UnitID != nil {
-		input := *in.UnitID
+	if input.UnitID != nil {
+		unitID := *input.UnitID
 
 		ok := false
 		for _, u := range spaceUnits {
-			ok = ok || u == input
+			ok = ok || u == unitID
 		}
 
 		if !ok {
@@ -767,7 +771,7 @@ func (m Telemetry) log(
 			)
 		}
 
-		src = []uuid.UUID{input}
+		src = []uuid.UUID{unitID}
 	}
 
 	co2, err := m.currentCO2(ctx, call, src)
@@ -781,10 +785,10 @@ func (m Telemetry) log(
 			`INSERT INTO monitoring.ventilation_logs AS v (tenant_id, space_id, unit_id, method, duration_minutes, co2_at_log,
 		logged_by_membership_id, logged_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7)
 		RETURNING `+ventCols,
-			in.SpaceID,
-			in.UnitID,
-			in.Method,
-			in.DurationMinutes,
+			input.SpaceID,
+			input.UnitID,
+			input.Method,
+			input.DurationMinutes,
 			co2,
 			call.Principal.MembershipID,
 			call.Now,
@@ -880,7 +884,7 @@ func (m Telemetry) list(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[VentilationLog], error) {
-	var f struct {
+	var filters struct {
 		SpaceID *uuid.UUID `json:"spaceId,omitempty"`
 		UnitID  *uuid.UUID `json:"unitId,omitempty"`
 		From    *time.Time `json:"from,omitempty"`
@@ -891,7 +895,7 @@ func (m Telemetry) list(
 		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
-		err := dec.Decode(&f)
+		err := dec.Decode(&filters)
 		if err != nil {
 			return paging.Page[VentilationLog]{}, apperr.Fields(
 				map[string]string{"filters": apperr.KeyInvalid},
@@ -899,7 +903,7 @@ func (m Telemetry) list(
 		}
 	}
 
-	if f.From != nil && f.To != nil && !f.From.Before(*f.To) {
+	if filters.From != nil && filters.To != nil && !filters.From.Before(*filters.To) {
 		return paging.Page[VentilationLog]{}, apperr.Fields(
 			map[string]string{"filters.to": apperr.KeyRange},
 		)
@@ -914,7 +918,7 @@ func (m Telemetry) list(
 		return paging.Page[VentilationLog]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	window, err := paging.Resolve(*query, f, call.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, filters, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[VentilationLog]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -964,20 +968,20 @@ func (m Telemetry) list(
 		)
 	}
 
-	if f.SpaceID != nil {
-		conds = append(conds, "v.space_id = "+add(*f.SpaceID))
+	if filters.SpaceID != nil {
+		conds = append(conds, "v.space_id = "+add(*filters.SpaceID))
 	}
 
-	if f.UnitID != nil {
-		conds = append(conds, "v.unit_id = "+add(*f.UnitID))
+	if filters.UnitID != nil {
+		conds = append(conds, "v.unit_id = "+add(*filters.UnitID))
 	}
 
-	if f.From != nil {
-		conds = append(conds, "v.logged_at >= "+add(*f.From))
+	if filters.From != nil {
+		conds = append(conds, "v.logged_at >= "+add(*filters.From))
 	}
 
-	if f.To != nil {
-		conds = append(conds, "v.logged_at < "+add(*f.To))
+	if filters.To != nil {
+		conds = append(conds, "v.logged_at < "+add(*filters.To))
 	}
 
 	where := "TRUE"
@@ -1075,26 +1079,26 @@ func (m Telemetry) PowerMeasured(
 	}
 
 	var (
-		rs      []reading
-		sensors []uuid.UUID
+		readings []reading
+		sensors  []uuid.UUID
 	)
 
 	for rows.Next() {
 		var (
-			r               reading
+			latest          reading
 			origin, quality string
 			value           *float64
 		)
 
-		err := rows.Scan(&r.unit, &r.sensor, &origin, &quality, &value, &r.at)
+		err := rows.Scan(&latest.unit, &latest.sensor, &origin, &quality, &value, &latest.at)
 		if err != nil {
 			rows.Close()
 
 			return nil, apperr.Wrap(err, "select monitoring.measurements")
 		}
 
-		r.ok = origin == "measured" && quality == "valid" && value != nil
-		rs, sensors = append(rs, r), append(sensors, r.sensor)
+		latest.ok = origin == "measured" && quality == "valid" && value != nil
+		readings, sensors = append(readings, latest), append(sensors, latest.sensor)
 	}
 
 	rows.Close()
@@ -1111,7 +1115,7 @@ func (m Telemetry) PowerMeasured(
 
 	out := map[uuid.UUID]bool{}
 
-	for _, r := range rs {
+	for _, r := range readings {
 		limit, known := limits[r.sensor]
 		out[r.unit] = r.ok && known && call.Now.Sub(r.at) <= limit
 	}
@@ -1214,9 +1218,9 @@ func (m Telemetry) RunHours(
 	const cols = `SELECT sensor_id, observed_at, sequence, value, origin, quality FROM monitoring.measurements WHERE
 		unit_id = $1 AND metric = 'power' AND observed_at <= $2`
 
-	q, args := cols, []any{unit, call.Now}
+	stmt, args := cols, []any{unit, call.Now}
 	if since != nil {
-		q = `(` + cols + ` AND observed_at <= $3 ORDER BY observed_at DESC, sequence DESC LIMIT 1) UNION ALL
+		stmt = `(` + cols + ` AND observed_at <= $3 ORDER BY observed_at DESC, sequence DESC LIMIT 1) UNION ALL
 			(` + cols + ` AND observed_at > $3)`
 
 		args = append(args, *since)
@@ -1224,7 +1228,7 @@ func (m Telemetry) RunHours(
 
 	rows, err := call.Tx.Query(
 		ctx,
-		`SELECT sensor_id, observed_at, value, origin, quality FROM (`+q+`) r ORDER BY observed_at, sequence`,
+		`SELECT sensor_id, observed_at, value, origin, quality FROM (`+stmt+`) r ORDER BY observed_at, sequence`,
 		args...)
 	if err != nil {
 		return nil, apperr.Wrap(err, "select sensor_id")
@@ -1237,32 +1241,32 @@ func (m Telemetry) RunHours(
 	}
 
 	var (
-		rs      []r
-		sensors []uuid.UUID
+		readings []r
+		sensors  []uuid.UUID
 	)
 
 	for rows.Next() {
 		var (
-			x               r
-			v               *float64
+			reading         r
+			value           *float64
 			origin, quality string
 		)
 
-		err := rows.Scan(&x.sensor, &x.at, &v, &origin, &quality)
+		err := rows.Scan(&reading.sensor, &reading.at, &value, &origin, &quality)
 		if err != nil {
 			rows.Close()
 
 			return nil, apperr.Wrap(err, "select sensor_id")
 		}
 
-		x.on = origin == "measured" && quality == "valid" && v != nil && *v > 0
-		rs, sensors = append(rs, x), append(sensors, x.sensor)
+		reading.on = origin == "measured" && quality == "valid" && value != nil && *value > 0
+		readings, sensors = append(readings, reading), append(sensors, reading.sensor)
 	}
 
 	rows.Close()
 
 	rowsErr := rows.Err()
-	if rowsErr != nil || len(rs) == 0 {
+	if rowsErr != nil || len(readings) == 0 {
 		return nil, apperr.Wrap(rowsErr, "select sensor_id")
 	}
 
@@ -1273,21 +1277,21 @@ func (m Telemetry) RunHours(
 
 	var total time.Duration
 
-	for i, x := range rs {
-		if !x.on {
+	for idx, reading := range readings {
+		if !reading.on {
 			continue
 		}
 
 		end := call.Now
-		if i+1 < len(rs) {
-			end = rs[i+1].at
+		if idx+1 < len(readings) {
+			end = readings[idx+1].at
 		}
 
-		if lim, ok := limits[x.sensor]; ok && end.Sub(x.at) > lim {
-			end = x.at.Add(lim)
+		if lim, ok := limits[reading.sensor]; ok && end.Sub(reading.at) > lim {
+			end = reading.at.Add(lim)
 		}
 
-		start := x.at
+		start := reading.at
 		if since != nil && start.Before(*since) {
 			start = *since
 		}

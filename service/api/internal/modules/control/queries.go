@@ -46,14 +46,14 @@ func RegisterQueries(r *ops.Registry) {
 
 // requested reads the waiting commands of the tenant in the order they were requested. A command whose device is not
 // known is left out (it cannot be sent), and a command past its expiry is left for the expiry job.
-func requested(ctx context.Context, call *ops.Call, in *RequestedInput) ([]Requested, error) {
+func requested(ctx context.Context, call *ops.Call, input *RequestedInput) ([]Requested, error) {
 	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT id, device_id, unit_id, action, expires_at FROM control.commands
 		WHERE status = 'requested' AND delivery = 'not_sent' AND device_id IS NOT NULL AND expires_at > $1
 		ORDER BY requested_at, id LIMIT $2`,
 		call.Now,
-		in.Limit,
+		input.Limit,
 	)
 	if err != nil {
 		return nil, apperr.Wrap(err, "select control.commands")
@@ -64,17 +64,23 @@ func requested(ctx context.Context, call *ops.Call, in *RequestedInput) ([]Reque
 
 	for rows.Next() {
 		var (
-			x      Requested
-			action []byte
+			waiting Requested
+			action  []byte
 		)
 
-		err := rows.Scan(&x.ID, &x.DeviceID, &x.UnitID, &action, &x.ExpiresAt)
+		err := rows.Scan(
+			&waiting.ID,
+			&waiting.DeviceID,
+			&waiting.UnitID,
+			&action,
+			&waiting.ExpiresAt,
+		)
 		if err != nil {
 			return nil, apperr.Wrap(err, "select control.commands")
 		}
 
-		x.Action = action
-		out = append(out, x)
+		waiting.Action = action
+		out = append(out, waiting)
 	}
 
 	return out, apperr.Wrap(rows.Err(), "select control.commands")

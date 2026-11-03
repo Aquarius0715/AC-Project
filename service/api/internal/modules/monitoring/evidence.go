@@ -71,16 +71,16 @@ func ruleMetric(a Alert) *string {
 func (m Alerts) candidates(
 	ctx context.Context,
 	call *ops.Call,
-	a Alert,
+	alert Alert,
 ) ([]EvidenceCandidate, error) {
 	out := []EvidenceCandidate{}
-	for _, id := range a.EvidenceIDs {
+	for _, id := range alert.EvidenceIDs {
 		out = append(
 			out,
 			EvidenceCandidate{
 				ID:         id,
 				Kind:       "detection",
-				ObservedAt: a.ObservedAt,
+				ObservedAt: alert.ObservedAt,
 				Metric:     nil,
 				Value:      nil,
 				Unit:       nil,
@@ -97,9 +97,9 @@ func (m Alerts) candidates(
 		ORDER BY m.observed_at DESC, m.sequence DESC, m.event_id LIMIT `+strconv.Itoa(
 			maxRemeasurements,
 		),
-		a.UnitID,
-		a.DetectedAt,
-		ruleMetric(a),
+		alert.UnitID,
+		alert.DetectedAt,
+		ruleMetric(alert),
 	)
 	if err != nil {
 		return nil, apperr.Wrap(err, "select monitoring.measurements")
@@ -142,7 +142,7 @@ func (m Alerts) candidates(
 	}
 
 	if m.Devices != nil {
-		recs, err := m.Devices.AlertRecoveries(ctx, call, a.ID, a.DetectedAt)
+		recs, err := m.Devices.AlertRecoveries(ctx, call, alert.ID, alert.DetectedAt)
 		if err != nil {
 			return nil, apperr.Wrap(err, "monitoring.DeviceRecoveries.AlertRecoveries")
 		}
@@ -173,32 +173,37 @@ func (m Alerts) candidates(
 }
 
 // isCandidate reports whether one ID is an evidence candidate of the alert, without the list's bound.
-func (m Alerts) isCandidate(ctx context.Context, c *ops.Call, a Alert, id uuid.UUID) (bool, error) {
-	if slices.Contains(a.EvidenceIDs, id) {
+func (m Alerts) isCandidate(
+	ctx context.Context,
+	call *ops.Call,
+	alert Alert,
+	evidenceID uuid.UUID,
+) (bool, error) {
+	if slices.Contains(alert.EvidenceIDs, evidenceID) {
 		return true, nil
 	}
 
-	var ok bool
+	var found bool
 
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1
+	err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1
 		`+remeasurementSQL+` AND m.event_id =
-		$4)`, a.UnitID, a.DetectedAt, ruleMetric(a), id).
-		Scan(&ok)
+		$4)`, alert.UnitID, alert.DetectedAt, ruleMetric(alert), evidenceID).
+		Scan(&found)
 	if err != nil ||
-		ok {
-		return ok, apperr.Wrap(err, "select monitoring.measurements")
+		found {
+		return found, apperr.Wrap(err, "select monitoring.measurements")
 	}
 
 	if m.Devices == nil {
 		return false, nil
 	}
 
-	recs, err := m.Devices.AlertRecoveries(ctx, c, a.ID, a.DetectedAt)
+	recs, err := m.Devices.AlertRecoveries(ctx, call, alert.ID, alert.DetectedAt)
 	if err != nil {
 		return false, apperr.Wrap(err, "monitoring.DeviceRecoveries.AlertRecoveries")
 	}
 
-	return slices.ContainsFunc(recs, func(r DeviceRecovery) bool { return r.ID == id }), nil
+	return slices.ContainsFunc(recs, func(r DeviceRecovery) bool { return r.ID == evidenceID }), nil
 }
 
 func distinct(ids []uuid.UUID) bool {
@@ -218,7 +223,7 @@ func distinct(ids []uuid.UUID) bool {
 // every ID given must be one of the alert's candidates.
 func (m Alerts) checkEvidence(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	alert Alert,
 	ids []uuid.UUID,
 ) error {
@@ -233,7 +238,7 @@ func (m Alerts) checkEvidence(
 	}
 
 	for _, id := range ids {
-		ok, err := m.isCandidate(ctx, c, alert, id)
+		ok, err := m.isCandidate(ctx, call, alert, id)
 		if err != nil {
 			return err
 		}

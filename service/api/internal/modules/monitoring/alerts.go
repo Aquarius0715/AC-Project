@@ -181,7 +181,7 @@ func (m Alerts) list(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[Alert], error) {
-	var f struct {
+	var filters struct {
 		UnitID     *uuid.UUID   `json:"unitId,omitempty"`
 		UnitIDs    *[]uuid.UUID `json:"unitIds,omitempty"`
 		Severity   *string      `json:"severity,omitempty"`
@@ -196,7 +196,7 @@ func (m Alerts) list(
 		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
-		if dec.Decode(&f) != nil {
+		if dec.Decode(&filters) != nil {
 			return paging.Page[Alert]{}, apperr.Fields(
 				map[string]string{"filters": apperr.KeyInvalid},
 			)
@@ -204,15 +204,15 @@ func (m Alerts) list(
 	}
 
 	switch {
-	case f.Severity != nil && !severities[*f.Severity]:
+	case filters.Severity != nil && !severities[*filters.Severity]:
 		return paging.Page[Alert]{}, apperr.Fields(
 			map[string]string{"filters.severity": apperr.KeyInvalid},
 		)
-	case f.Status != nil && !alertStatuses[*f.Status]:
+	case filters.Status != nil && !alertStatuses[*filters.Status]:
 		return paging.Page[Alert]{}, apperr.Fields(
 			map[string]string{"filters.status": apperr.KeyInvalid},
 		)
-	case f.From != nil && f.To != nil && !f.From.Before(*f.To):
+	case filters.From != nil && filters.To != nil && !filters.From.Before(*filters.To):
 		return paging.Page[Alert]{}, apperr.Fields(map[string]string{"filters.to": apperr.KeyRange})
 	}
 	// default sort severity desc (critical → warning → normal), id asc; severity asc = normal, warning, critical
@@ -227,7 +227,7 @@ func (m Alerts) list(
 
 			order = severityRank + " " + dir + ", a.id ASC"
 		} else {
-			o, err := paging.OrderBy(
+			fieldOrder, err := paging.OrderBy(
 				query.Sort,
 				map[string]string{
 					"id":        "a.id",
@@ -240,11 +240,11 @@ func (m Alerts) list(
 				return paging.Page[Alert]{}, apperr.Wrap(err, "paging.OrderBy")
 			}
 
-			order = o
+			order = fieldOrder
 		}
 	}
 
-	window, err := paging.Resolve(*query, f, call.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, filters, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Alert]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -258,32 +258,32 @@ func (m Alerts) list(
 	}
 
 	conds := []string{alertScope(call, &args, unitscope.Equipment)}
-	if f.UnitID != nil {
-		conds = append(conds, "a.unit_id = "+add(*f.UnitID))
+	if filters.UnitID != nil {
+		conds = append(conds, "a.unit_id = "+add(*filters.UnitID))
 	}
 
-	if f.UnitIDs != nil {
-		conds = append(conds, "a.unit_id = ANY("+add(*f.UnitIDs)+")")
+	if filters.UnitIDs != nil {
+		conds = append(conds, "a.unit_id = ANY("+add(*filters.UnitIDs)+")")
 	}
 
-	if f.Severity != nil {
-		conds = append(conds, "a.severity = "+add(*f.Severity))
+	if filters.Severity != nil {
+		conds = append(conds, "a.severity = "+add(*filters.Severity))
 	}
 
-	if f.Status != nil {
-		conds = append(conds, "a.status = "+add(*f.Status))
+	if filters.Status != nil {
+		conds = append(conds, "a.status = "+add(*filters.Status))
 	}
 
-	if f.From != nil {
-		conds = append(conds, "a.observed_at >= "+add(*f.From))
+	if filters.From != nil {
+		conds = append(conds, "a.observed_at >= "+add(*filters.From))
 	}
 
-	if f.To != nil {
-		conds = append(conds, "a.observed_at < "+add(*f.To))
+	if filters.To != nil {
+		conds = append(conds, "a.observed_at < "+add(*filters.To))
 	}
 
-	if f.CustomerID != nil {
-		org, ok, err := m.Units.OrgOfCustomer(ctx, call, *f.CustomerID)
+	if filters.CustomerID != nil {
+		org, ok, err := m.Units.OrgOfCustomer(ctx, call, *filters.CustomerID)
 		if err != nil {
 			return paging.Page[Alert]{}, apperr.Wrap(err, "monitoring.UnitLocator.OrgOfCustomer")
 		}
@@ -295,8 +295,8 @@ func (m Alerts) list(
 		conds = append(conds, "a.customer_org_id = "+add(org))
 	}
 
-	if f.PropertyID != nil {
-		units, err := m.Units.UnitsOfProperty(ctx, call, *f.PropertyID)
+	if filters.PropertyID != nil {
+		units, err := m.Units.UnitsOfProperty(ctx, call, *filters.PropertyID)
 		if err != nil {
 			return paging.Page[Alert]{}, apperr.Wrap(err, "monitoring.UnitLocator.UnitsOfProperty")
 		}
@@ -424,14 +424,14 @@ func (m Alerts) lockAlert(
 	args := []any{id}
 
 	var (
-		status string
-		unit   uuid.UUID
-		v      int
+		status  string
+		unit    uuid.UUID
+		version int
 	)
 
 	err := call.Tx.QueryRow(ctx, "SELECT a.status, a.unit_id, a.version FROM monitoring.alerts a WHERE a.id = $1 AND "+
 		alertScope(call, &args, unitscope.List)+" FOR UPDATE", args...).
-		Scan(&status, &unit, &v)
+		Scan(&status, &unit, &version)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", unit, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
@@ -453,7 +453,7 @@ func (m Alerts) lockAlert(
 		}
 	}
 
-	if v != *call.ExpectedVersion {
+	if version != *call.ExpectedVersion {
 		return "", unit, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
@@ -501,8 +501,8 @@ func (in *AckInput) Validate() map[string]string {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/alerts/{alertId}/acknowledge [post]
-func (m Alerts) acknowledge(ctx context.Context, call *ops.Call, in *AckInput) (Alert, error) {
-	status, unit, err := m.lockAlert(ctx, call, in.AlertID)
+func (m Alerts) acknowledge(ctx context.Context, call *ops.Call, input *AckInput) (Alert, error) {
+	status, unit, err := m.lockAlert(ctx, call, input.AlertID)
 	if err != nil {
 		return Alert{}, err
 	}
@@ -516,7 +516,7 @@ func (m Alerts) acknowledge(ctx context.Context, call *ops.Call, in *AckInput) (
 			ctx,
 			`UPDATE monitoring.alerts a SET status = 'acknowledged', acknowledged_at = $2, acknowledged_by = $3,
 		version = version + 1, updated_at = platform.app_now() WHERE a.id = $1 RETURNING `+alertCols,
-			in.AlertID,
+			input.AlertID,
 			call.Now,
 			call.Principal.MembershipID,
 		),
@@ -603,8 +603,8 @@ func (in *ResolveInput) Validate() map[string]string {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/alerts/{alertId}/resolve [post]
-func (m Alerts) resolve(ctx context.Context, call *ops.Call, in *ResolveInput) (Alert, error) {
-	status, unit, err := m.lockAlert(ctx, call, in.AlertID)
+func (m Alerts) resolve(ctx context.Context, call *ops.Call, input *ResolveInput) (Alert, error) {
+	status, unit, err := m.lockAlert(ctx, call, input.AlertID)
 	if err != nil {
 		return Alert{}, err
 	}
@@ -617,14 +617,14 @@ func (m Alerts) resolve(ctx context.Context, call *ops.Call, in *ResolveInput) (
 		call.Tx.QueryRow(
 			ctx,
 			"SELECT "+alertCols+" FROM monitoring.alerts a WHERE a.id = $1",
-			in.AlertID,
+			input.AlertID,
 		),
 	)
 	if err != nil {
 		return Alert{}, err
 	}
 
-	checkEvidenceErr := m.checkEvidence(ctx, call, cur, in.ResolutionEvidenceIDs)
+	checkEvidenceErr := m.checkEvidence(ctx, call, cur, input.ResolutionEvidenceIDs)
 	if checkEvidenceErr != nil {
 		return Alert{}, checkEvidenceErr
 	}
@@ -635,11 +635,11 @@ func (m Alerts) resolve(ctx context.Context, call *ops.Call, in *ResolveInput) (
 			`UPDATE monitoring.alerts a SET status = 'resolved', resolved_at = $2, resolved_by = $3, resolution_reason = $4,
 		resolution_evidence_ids = $5, version = version + 1, updated_at = platform.app_now() WHERE a.id = $1 RETURNING
 		`+alertCols,
-			in.AlertID,
+			input.AlertID,
 			call.Now,
 			call.Principal.MembershipID,
-			in.ResolutionReason,
-			in.ResolutionEvidenceIDs,
+			input.ResolutionReason,
+			input.ResolutionEvidenceIDs,
 		),
 	)
 	if err != nil {
@@ -661,7 +661,7 @@ func (m Alerts) resolve(ctx context.Context, call *ops.Call, in *ResolveInput) (
 			TargetID:        alert.ID.String(),
 			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &alert.Version,
-			Reason:          in.ResolutionReason, Result: "", Before: nil, After: nil,
+			Reason:          input.ResolutionReason, Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -689,16 +689,16 @@ func (Alerts) ActiveAlertCounts(
 
 	for rows.Next() {
 		var (
-			u uuid.UUID
-			n int
+			unitID uuid.UUID
+			count  int
 		)
 
-		err := rows.Scan(&u, &n)
+		err := rows.Scan(&unitID, &count)
 		if err != nil {
 			return nil, apperr.Wrap(err, "select monitoring.alerts")
 		}
 
-		out[u] = n
+		out[unitID] = count
 	}
 
 	return out, apperr.Wrap(rows.Err(), "select monitoring.alerts")
@@ -734,16 +734,16 @@ func (Alerts) UnitSeverities(
 
 	for rows.Next() {
 		var (
-			u uuid.UUID
-			s string
+			unitID   uuid.UUID
+			severity string
 		)
 
-		err := rows.Scan(&u, &s)
+		err := rows.Scan(&unitID, &severity)
 		if err != nil {
 			return nil, apperr.Wrap(err, "select monitoring.alerts")
 		}
 
-		out[u] = s
+		out[unitID] = severity
 	}
 
 	return out, apperr.Wrap(rows.Err(), "select monitoring.alerts")

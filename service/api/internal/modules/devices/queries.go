@@ -72,7 +72,7 @@ func connectionFault(
 	}
 	// the newest fault of the axis, as RecordSignal's restored looks it up
 	var (
-		id       uuid.UUID
+		faultID  uuid.UUID
 		restored *time.Time
 	)
 
@@ -80,14 +80,14 @@ func connectionFault(
 		NOT
 		DISTINCT FROM $2
 		AND axis = 'connection' AND event_type <> 'restored' ORDER BY sequence DESC LIMIT 1`, input.DeviceID, out.BindingID).
-		Scan(&id, &restored)
+		Scan(&faultID, &restored)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		return out, nil
 	case err != nil:
 		return out, apperr.Wrap(err, "select devices.device_events")
 	case restored == nil:
-		out.FaultID = &id
+		out.FaultID = &faultID
 	}
 
 	return out, nil

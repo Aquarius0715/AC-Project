@@ -35,8 +35,6 @@ type HistoryInput struct {
 	Query    paging.Query `json:"query"`
 }
 
-func (in *HistoryInput) device() uuid.UUID { return in.DeviceID }
-
 // Validate implements ops.Validator.
 func (in *HistoryInput) Validate() map[string]string {
 	if in.DeviceID == uuid.Nil {
@@ -46,14 +44,14 @@ func (in *HistoryInput) Validate() map[string]string {
 	return nil // the filters are checked per operation (decodeHistory)
 }
 
+func (in *HistoryInput) device() uuid.UUID { return in.DeviceID }
+
 // EventsInput is the input of devices.events: {id, query}. Each history read takes only its own contract's ID field,
 // so the other one is an unknown field (IR391).
 type EventsInput struct {
 	ID    uuid.UUID    `json:"id"`
 	Query paging.Query `json:"query"`
 }
-
-func (in *EventsInput) device() uuid.UUID { return in.ID }
 
 // Validate implements ops.Validator.
 func (in *EventsInput) Validate() map[string]string {
@@ -63,6 +61,8 @@ func (in *EventsInput) Validate() map[string]string {
 
 	return nil
 }
+
+func (in *EventsInput) device() uuid.UUID { return in.ID }
 
 // historyAccess checks the current-device part of SR24 (device visible to the caller) and, for technicians, an
 // active assignment on the device's current unit. It returns the binding-time scope predicate for history rows:
@@ -88,7 +88,7 @@ func (m *Module) historyAccess(
 	}
 
 	switch call.Principal.Role {
-	case "technician":
+	case roleTechnician:
 		if unit == nil {
 			return "", nil, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
@@ -105,7 +105,7 @@ func (m *Module) historyAccess(
 		}
 
 		return "b.unit_id = $2", []any{*unit}, nil // only history of the current binding's unit
-	case "client":
+	case roleClient:
 		return "b.customer_org_id = $2", []any{call.Principal.OrgID}, nil
 	}
 
@@ -120,23 +120,23 @@ type historyFilter struct {
 }
 
 func decodeHistory(query paging.Query, period bool) (historyFilter, error) {
-	var f historyFilter
+	var filter historyFilter
 	if !query.HasFilters() {
-		return f, nil
+		return filter, nil
 	}
 
 	dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 	dec.DisallowUnknownFields()
 
-	if !period || dec.Decode(&f) != nil {
-		return f, apperr.Fields(map[string]string{"query.filters": apperr.KeyInvalid})
+	if !period || dec.Decode(&filter) != nil {
+		return filter, apperr.Fields(map[string]string{"query.filters": apperr.KeyInvalid})
 	}
 
-	if f.From != nil && f.To != nil && !f.From.Before(*f.To) {
-		return f, apperr.Fields(map[string]string{"query.filters.to": apperr.KeyRange})
+	if filter.From != nil && filter.To != nil && !filter.From.Before(*filter.To) {
+		return filter, apperr.Fields(map[string]string{"query.filters.to": apperr.KeyRange})
 	}
 
-	return f, nil
+	return filter, nil
 }
 
 func historyPage[T any](
@@ -160,13 +160,13 @@ func historyPageOf[T any](
 	ctx context.Context,
 	call *ops.Call,
 	query paging.Query,
-	f historyFilter,
+	filter historyFilter,
 	sel, from, where string,
 	args []any,
 	order string,
 	scan func(pgx.Row) (T, error),
 ) (paging.Page[T], error) {
-	window, err := paging.Resolve(query, f, call.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(query, filter, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[T]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -219,9 +219,9 @@ func orderFor(q paging.Query, prefix string) (string, error) {
 	out, err := paging.OrderBy(
 		q.Sort,
 		map[string]string{
-			"id":        prefix + "id",
-			"createdAt": prefix + "created_at",
-			"updatedAt": prefix + "created_at",
+			"id":           prefix + "id",
+			fieldCreatedAt: prefix + colCreatedAt,
+			fieldUpdatedAt: prefix + colCreatedAt,
 		},
 		prefix+"created_at DESC, "+prefix+"id ASC",
 	)
@@ -374,15 +374,15 @@ type DeviceEvent struct {
 	ResponseNotes             []ResponseNote `json:"responseNotes"`
 }
 
-const evCols = `e.id, e.tenant_id, e.version, e.created_at, e.created_at, b.id, e.unit_id, b.customer_org_id, ` +
-	`e.alert_ids, e.device_id, e.event_type, e.recovery,
+const evCols = `e.id, e.tenant_id, e.version, e.created_at, e.created_at AS updated_at, b.id, e.unit_id, ` +
+	`b.customer_org_id, e.alert_ids, e.device_id, e.event_type, e.recovery,
 	e.evidence_source, e.sequence, e.occurred_at, e.restored_at`
 
 const evFrom = ` FROM devices.device_events e LEFT JOIN devices.device_bindings b ON b.device_id = e.device_id AND
 	b.bound_at <= e.occurred_at
 	AND (b.unbound_at IS NULL OR b.unbound_at > e.occurred_at)`
 
-func (m *Module) scanEvent(ctx context.Context, c *ops.Call) func(pgx.Row) (DeviceEvent, error) {
+func (m *Module) scanEvent(_ context.Context, _ *ops.Call) func(pgx.Row) (DeviceEvent, error) {
 	return func(r pgx.Row) (DeviceEvent, error) {
 		var deviceEvent DeviceEvent
 
@@ -424,9 +424,9 @@ func (m *Module) withNotes(ctx context.Context, call *ops.Call, evs []DeviceEven
 		return nil
 	}
 
-	ids, at := make([]uuid.UUID, len(evs)), make(map[uuid.UUID]int, len(evs))
+	ids, indexOf := make([]uuid.UUID, len(evs)), make(map[uuid.UUID]int, len(evs))
 	for i := range evs {
-		ids[i], at[evs[i].ID] = evs[i].ID, i
+		ids[i], indexOf[evs[i].ID] = evs[i].ID, i
 	}
 
 	rows, err := call.Tx.Query(
@@ -452,7 +452,7 @@ func (m *Module) withNotes(ctx context.Context, call *ops.Call, evs []DeviceEven
 			return apperr.Wrap(err, "select devices.device_event_notes")
 		}
 
-		if i, ok := at[event]; ok {
+		if i, ok := indexOf[event]; ok {
 			evs[i].ResponseNotes = append(evs[i].ResponseNotes, responseNote)
 		}
 	}
@@ -504,26 +504,30 @@ func (m *Module) events(
 
 	order, err := paging.OrderBy(
 		input.Query.Sort,
-		map[string]string{"id": "e.id", "createdAt": "e.created_at", "updatedAt": "e.created_at"},
+		map[string]string{
+			"id":           "e.id",
+			fieldCreatedAt: "e.created_at",
+			fieldUpdatedAt: "e.created_at",
+		},
 		"e.occurred_at DESC, e.sequence DESC, e.id ASC",
 	)
 	if err != nil {
 		return paging.Page[DeviceEvent]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	f, err := decodeHistory(input.Query, true)
+	filter, err := decodeHistory(input.Query, true)
 	if err != nil {
 		return paging.Page[DeviceEvent]{}, err
 	}
 
 	where, args := "e.device_id = $1 AND "+scope, append([]any{input.device()}, sargs...)
-	if f.From != nil {
-		args = append(args, *f.From)
+	if filter.From != nil {
+		args = append(args, *filter.From)
 		where += fmt.Sprintf(" AND e.occurred_at >= $%d", len(args))
 	}
 
-	if f.To != nil {
-		args = append(args, *f.To)
+	if filter.To != nil {
+		args = append(args, *filter.To)
 		where += fmt.Sprintf(" AND e.occurred_at < $%d", len(args))
 	}
 
@@ -531,7 +535,7 @@ func (m *Module) events(
 		ctx,
 		call,
 		input.Query,
-		f,
+		filter,
 		evCols,
 		evFrom,
 		where,
@@ -610,44 +614,14 @@ func (m *Module) addResponseNote(
 		return DeviceEvent{}, err
 	}
 
-	var v int
-
-	err = call.Tx.QueryRow(ctx, "SELECT e.version "+evFrom+" WHERE e.id = $3 AND e.device_id = $1 AND "+scope+
-		" FOR UPDATE OF e",
-		append(append([]any{input.DeviceID}, sargs...), input.EventID)...).
-		Scan(&v)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return DeviceEvent{}, apperr.E(
-			apperr.NotFound,
-			apperr.KeyNotFound,
-		) // event outside the occurrence scope (SR24)
-	}
-
+	err = lockEvent(ctx, call, input, scope, sargs)
 	if err != nil {
-		return DeviceEvent{}, apperr.Wrap(err, "select devices.device_events")
+		return DeviceEvent{}, err
 	}
 
-	if v != *call.ExpectedVersion {
-		return DeviceEvent{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
-	}
-
-	_, execErr := call.Tx.Exec(
-		ctx,
-		`INSERT INTO devices.device_event_notes (tenant_id, event_id, actor_id, message) VALUES
-			(current_setting('app.tenant_id')::uuid, $1, $2, $3)`,
-		input.EventID,
-		call.Principal.UserID,
-		input.ResponseNote,
-	)
-	if execErr != nil {
-		return DeviceEvent{}, apperr.Wrap(execErr, "insert devices.device_event_notes")
-	}
-
-	scanErr := call.Tx.QueryRow(ctx, `UPDATE devices.device_events SET version = version + 1 WHERE id = $1 RETURNING
-		version`, input.EventID).
-		Scan(&v)
-	if scanErr != nil {
-		return DeviceEvent{}, apperr.Wrap(scanErr, "update devices.device_events")
+	version, err := insertNote(ctx, call, input)
+	if err != nil {
+		return DeviceEvent{}, err
 	}
 
 	call.Audit(
@@ -656,12 +630,12 @@ func (m *Module) addResponseNote(
 			TargetKind:      "device_event",
 			TargetID:        input.EventID.String(),
 			PreviousVersion: call.ExpectedVersion,
-			NextVersion:     &v, Reason: "", Result: "", Before: nil, After: nil,
+			NextVersion:     &version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 	call.Emit(
 		ops.Event{
-			AggregateType: "device",
+			AggregateType: entityDevice,
 			AggregateID:   input.DeviceID,
 			Type:          "DeviceEventNoted",
 			Payload:       map[string]any{"eventId": input.EventID},
@@ -681,4 +655,63 @@ func (m *Module) addResponseNote(
 	evs := []DeviceEvent{deviceEvent}
 
 	return evs[0], m.withNotes(ctx, call, evs)
+}
+
+// lockEvent locks the device event of a response note inside the caller's occurrence scope (NOT_FOUND, SR24) and
+// checks its expected version.
+func lockEvent(
+	ctx context.Context,
+	call *ops.Call,
+	input *NoteInput,
+	scope string,
+	sargs []any,
+) error {
+	var version int
+
+	err := call.Tx.QueryRow(ctx, "SELECT e.version "+evFrom+" WHERE e.id = $3 AND e.device_id = $1 AND "+scope+
+		" FOR UPDATE OF e",
+		append(append([]any{input.DeviceID}, sargs...), input.EventID)...).
+		Scan(&version)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return apperr.E(
+			apperr.NotFound,
+			apperr.KeyNotFound,
+		) // event outside the occurrence scope (SR24)
+	}
+
+	if err != nil {
+		return apperr.Wrap(err, "select devices.device_events")
+	}
+
+	if version != *call.ExpectedVersion {
+		return apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
+	}
+
+	return nil
+}
+
+// insertNote stores the response note and returns the event's new version.
+func insertNote(ctx context.Context, call *ops.Call, input *NoteInput) (int, error) {
+	_, execErr := call.Tx.Exec(
+		ctx,
+		`INSERT INTO devices.device_event_notes (tenant_id, event_id, actor_id, message) VALUES
+			(current_setting('app.tenant_id')::uuid, $1, $2, $3)`,
+		input.EventID,
+		call.Principal.UserID,
+		input.ResponseNote,
+	)
+	if execErr != nil {
+		return 0, apperr.Wrap(execErr, "insert devices.device_event_notes")
+	}
+
+	var version int
+
+	scanErr := call.Tx.QueryRow(ctx, `UPDATE devices.device_events SET version = version + 1 WHERE id = $1 RETURNING
+		version`, input.EventID).
+		Scan(&version)
+	if scanErr != nil {
+		return 0, apperr.Wrap(scanErr, "update devices.device_events")
+	}
+
+	return version, nil
 }

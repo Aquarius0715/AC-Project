@@ -53,8 +53,8 @@ type Capability struct {
 	FirmwareCandidates []string     `json:"firmwareCandidates"`
 }
 
-const capCols = `id, tenant_id, version, created_at, created_at, manufacturer, model, control, mode_control, ` +
-	`fan_control, temperature, modes, fan_levels,
+const capCols = `id, tenant_id, version, created_at, created_at AS updated_at, manufacturer, model, control, ` +
+	`mode_control, fan_control, temperature, modes, fan_levels,
 	ventilation, ventilation_levels, sensors, firmware_candidates`
 
 func scanCap(row pgx.Row) (Capability, error) {
@@ -139,13 +139,13 @@ func capabilitiesList(
 ) (paging.Page[Capability], error) {
 	if len(query.Filters) > 0 && string(query.Filters) != "{}" && string(query.Filters) != "null" {
 		return paging.Page[Capability]{}, apperr.Fields(
-			map[string]string{"filters": apperr.KeyInvalid},
+			map[string]string{fieldFilters: apperr.KeyInvalid},
 		) // query catalog: no filters
 	}
 
 	order, err := paging.OrderBy(
 		query.Sort,
-		map[string]string{"id": "id", "createdAt": "created_at", "updatedAt": "created_at"},
+		map[string]string{"id": "id", fieldCreatedAt: colCreatedAt, fieldUpdatedAt: colCreatedAt},
 		"id ASC",
 	)
 	if err != nil {
@@ -178,25 +178,33 @@ func capabilitiesList(
 	if err != nil {
 		return paging.Page[Capability]{}, apperr.Wrap(err, "select devices.capabilities")
 	}
-	defer rows.Close()
 
-	items := []Capability{}
-
-	for rows.Next() {
-		x, err := scanCap(rows)
-		if err != nil {
-			return paging.Page[Capability]{}, err
-		}
-
-		items = append(items, x)
-	}
+	items, err := scanCaps(rows)
 
 	return paging.Page[Capability]{
 		Items:           items,
 		NextCursor:      window.Next(total),
 		Total:           total,
 		SnapshotVersion: window.Snapshot,
-	}, apperr.Wrap(rows.Err(), "select devices.capabilities")
+	}, err
+}
+
+// scanCaps reads a page of capabilities.
+func scanCaps(rows pgx.Rows) ([]Capability, error) {
+	defer rows.Close()
+
+	items := []Capability{}
+
+	for rows.Next() {
+		capability, err := scanCap(rows)
+		if err != nil {
+			return nil, err
+		}
+
+		items = append(items, capability)
+	}
+
+	return items, apperr.Wrap(rows.Err(), "select devices.capabilities")
 }
 
 // CapabilitySave is capabilities.save input.
@@ -217,10 +225,15 @@ type CapabilitySave struct {
 	ChangeReason       *string      `json:"changeReason,omitempty"`
 }
 
-var (
-	modes      = map[string]bool{"cool": true, "dry": true, "fan": true}
-	fans       = map[string]bool{"low": true, "mid": true, "high": true}
-	metricUnit = map[string]string{
+// knownModes are the operating modes a model may support.
+func knownModes() map[string]bool { return map[string]bool{"cool": true, "dry": true, "fan": true} }
+
+// fanLevels are the fan (and ventilation) levels a model may support.
+func fanLevels() map[string]bool { return map[string]bool{"low": true, "mid": true, "high": true} }
+
+// metricUnits is the unit of each metric a sensor may measure.
+func metricUnits() map[string]string {
+	return map[string]string{
 		"temperature":          "°C",
 		"humidity":             "%",
 		"co2":                  "ppm",
@@ -232,8 +245,12 @@ var (
 		"airflow_drop":         "%",
 		"heartbeat_gap":        "min",
 	}
-	boundaries = map[string]bool{"ac_input_electricity": true, "whole_building_electricity": true}
-)
+}
+
+// boundaryIDs are the metering boundaries a power sensor may name.
+func boundaryIDs() map[string]bool {
+	return map[string]bool{"ac_input_electricity": true, "whole_building_electricity": true}
+}
 
 func uniqueIn(vals []string, allowed map[string]bool) bool {
 	seen := map[string]bool{}
@@ -259,6 +276,17 @@ func (in *CapabilitySave) Validate() map[string]string {
 		fieldErrs["model"] = apperr.KeyLength
 	}
 
+	in.validateControl(fieldErrs)
+	in.validateLevels(fieldErrs)
+	validateSensors(fieldErrs, in.Sensors)
+	validateFirmwareCandidates(fieldErrs, in.FirmwareCandidates)
+	in.validateChangeReason(fieldErrs)
+
+	return fieldErrs
+}
+
+// validateControl checks the temperature range and that mode, fan or temperature control comes with control.
+func (in *CapabilitySave) validateControl(fieldErrs map[string]string) {
 	if t := in.Temperature; t != nil && (t.Min >= t.Max || t.Step <= 0 || t.Step > t.Max-t.Min) {
 		fieldErrs["temperature"] = apperr.KeyRange
 	}
@@ -266,28 +294,48 @@ func (in *CapabilitySave) Validate() map[string]string {
 	if !in.Control && (in.ModeControl || in.FanControl || in.Temperature != nil) {
 		fieldErrs["control"] = "error.controlRequired" // mode/fan/temperature control needs control=true
 	}
+}
 
-	if !uniqueIn(in.Modes, modes) || (in.ModeControl && len(in.Modes) == 0) {
+// validateLevels checks the modes, fan levels and ventilation levels: known values, each once, and present when their
+// control is (absent without ventilation).
+func (in *CapabilitySave) validateLevels(fieldErrs map[string]string) {
+	if !uniqueIn(in.Modes, knownModes()) || (in.ModeControl && len(in.Modes) == 0) {
 		fieldErrs["modes"] = apperr.KeyInvalid
 	}
 
-	if !uniqueIn(in.FanLevels, fans) || (in.FanControl && len(in.FanLevels) == 0) {
+	if !uniqueIn(in.FanLevels, fanLevels()) || (in.FanControl && len(in.FanLevels) == 0) {
 		fieldErrs["fanLevels"] = apperr.KeyInvalid
 	}
 
-	if !uniqueIn(in.VentilationLevels, fans) || (!in.Ventilation && len(in.VentilationLevels) > 0) {
+	if !uniqueIn(in.VentilationLevels, fanLevels()) ||
+		(!in.Ventilation && len(in.VentilationLevels) > 0) {
 		fieldErrs["ventilationLevels"] = apperr.KeyInvalid
 	}
+}
 
-	seen := map[string]bool{}
+// validateChangeReason applies DD-A04: a change reason is required on update and not taken on create.
+func (in *CapabilitySave) validateChangeReason(fieldErrs map[string]string) {
+	switch {
+	case in.ID != nil && in.ChangeReason == nil:
+		fieldErrs["changeReason"] = apperr.KeyRequired
+	case in.ChangeReason != nil &&
+		(utf8.RuneCountInString(strings.TrimSpace(*in.ChangeReason)) < 1 || utf8.RuneCountInString(*in.ChangeReason) > 1000):
+		fieldErrs["changeReason"] = apperr.KeyLength
+	}
+}
 
-	for i, sensorSpec := range in.Sensors {
+// validateSensors checks each sensor spec: a known metric at most once, in its unit, a stale limit of 10 s–24 h, and a
+// boundary only on a power sensor.
+func validateSensors(fieldErrs map[string]string, sensors []SensorSpec) {
+	units, boundaries, seen := metricUnits(), boundaryIDs(), map[string]bool{}
+
+	for i, sensorSpec := range sensors {
 		key := fmt.Sprintf("sensors[%d]", i)
 
 		switch {
-		case metricUnit[sensorSpec.Metric] == "" || seen[sensorSpec.Metric]:
+		case units[sensorSpec.Metric] == "" || seen[sensorSpec.Metric]:
 			fieldErrs[key+".metric"] = apperr.KeyInvalid
-		case metricUnit[sensorSpec.Metric] != sensorSpec.Unit:
+		case units[sensorSpec.Metric] != sensorSpec.Unit:
 			fieldErrs[key+".unit"] = "error.unitMismatch"
 		case sensorSpec.StaleAfterSeconds < 10 || sensorSpec.StaleAfterSeconds > 86400:
 			fieldErrs[key+".staleAfterSeconds"] = apperr.KeyRange
@@ -297,11 +345,14 @@ func (in *CapabilitySave) Validate() map[string]string {
 
 		seen[sensorSpec.Metric] = true
 	}
-	// a candidate is 1–32 characters once trimmed, and no two candidates are the same after trimming (the "+ Add version"
-	// rule of the Admin device model editor)
+}
+
+// validateFirmwareCandidates checks the firmware candidates: a candidate is 1–32 characters once trimmed, and no two
+// candidates are the same after trimming (the "+ Add version" rule of the Admin device model editor).
+func validateFirmwareCandidates(fieldErrs map[string]string, candidates []string) {
 	seenFirmware := map[string]bool{}
 
-	for _, v := range in.FirmwareCandidates {
+	for _, v := range candidates {
 		x := strings.TrimSpace(v)
 		if n := utf8.RuneCountInString(x); n < 1 || n > 32 || seenFirmware[x] {
 			fieldErrs["firmwareCandidates"] = apperr.KeyInvalid
@@ -309,16 +360,6 @@ func (in *CapabilitySave) Validate() map[string]string {
 
 		seenFirmware[x] = true
 	}
-
-	switch { // DD-A04: a change reason is required on update and not taken on create
-	case in.ID != nil && in.ChangeReason == nil:
-		fieldErrs["changeReason"] = apperr.KeyRequired
-	case in.ChangeReason != nil &&
-		(utf8.RuneCountInString(strings.TrimSpace(*in.ChangeReason)) < 1 || utf8.RuneCountInString(*in.ChangeReason) > 1000):
-		fieldErrs["changeReason"] = apperr.KeyLength
-	}
-
-	return fieldErrs
 }
 
 // fields are the audited capability values (the before/after of capabilities.save).
@@ -389,16 +430,14 @@ func (m Capabilities) save(
 	call *ops.Call,
 	input *CapabilitySave,
 ) (Capability, error) {
-	var temp any
-	if input.Temperature != nil {
-		temp, _ = json.Marshal(input.Temperature)
+	temp, sensors, err := capabilityJSON(input)
+	if err != nil {
+		return Capability{}, err
 	}
-
-	sensors, _ := json.Marshal(append([]SensorSpec{}, input.Sensors...))
 
 	var dup bool
 
-	err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.capabilities WHERE is_current AND
+	err = call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.capabilities WHERE is_current AND
 		lower(manufacturer) =
 		lower($1) AND lower(model) = lower($2)
 		AND ($3::uuid IS NULL OR id <> $3))`, input.Manufacturer, input.Model, input.ID).
@@ -411,51 +450,41 @@ func (m Capabilities) save(
 		return Capability{}, apperr.E(apperr.Conflict, "error.duplicateModel")
 	}
 
-	id, version := uuid.Must(uuid.NewV7()), 1
-	reason := ""
+	revision, err := nextRevision(ctx, call, input)
+	if err != nil {
+		return Capability{}, err
+	}
 
-	var before map[string]any
+	capability, err := insertCapability(ctx, call, input, revision, temp, sensors)
+	if err != nil {
+		return Capability{}, err
+	}
 
-	if input.ID != nil {
-		old, err := scanCap(
-			call.Tx.QueryRow(
-				ctx,
-				`SELECT `+capCols+` FROM devices.capabilities WHERE id = $1 AND is_current FOR UPDATE`,
-				*input.ID,
-			),
-		)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return Capability{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
-		}
-
+	if revision.version > 1 && m.Units != nil {
+		_, err := m.Units.MoveToCapabilityVersion(ctx, call, revision.modelID, revision.version)
 		if err != nil {
-			return Capability{}, err
-		}
-
-		cur := old.Version
-		before = old.fields()
-
-		if cur != *call.ExpectedVersion {
-			return Capability{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
-		}
-
-		_, execErr := call.Tx.Exec(
-			ctx,
-			`UPDATE devices.capabilities SET is_current = false WHERE id = $1 AND version = $2`,
-			*input.ID,
-			cur,
-		)
-		if execErr != nil {
-			return Capability{}, apperr.Wrap(execErr, "update devices.capabilities")
-		}
-
-		id, version = *input.ID, cur+1
-		if input.ChangeReason != nil {
-			reason = *input.ChangeReason
+			return Capability{}, apperr.Wrap(
+				err,
+				"devices.UnitCapabilities.MoveToCapabilityVersion",
+			)
 		}
 	}
 
-	capability, err := scanCap(
+	capabilitySaved(call, revision, capability)
+
+	return capability, nil
+}
+
+// insertCapability stores the model version as the current row and returns it.
+func insertCapability(
+	ctx context.Context,
+	call *ops.Call,
+	input *CapabilitySave,
+	revision capabilityRevision,
+	temp any,
+	sensors []byte,
+) (Capability, error) {
+	return scanCap(
 		call.Tx.QueryRow(
 			ctx,
 			`INSERT INTO devices.capabilities (id, version, tenant_id, manufacturer, model, control, mode_control, fan_control,
@@ -463,8 +492,8 @@ func (m Capabilities) save(
 		modes, fan_levels, ventilation, ventilation_levels, sensors, firmware_candidates, is_current)
 		VALUES ($1,$2,current_setting('app.tenant_id')::uuid,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,true) RETURNING
 		`+capCols,
-			id,
-			version,
+			revision.modelID,
+			revision.version,
 			input.Manufacturer,
 			input.Model,
 			input.Control,
@@ -479,51 +508,125 @@ func (m Capabilities) save(
 			nz(input.FirmwareCandidates),
 		),
 	)
-	if err != nil {
-		return Capability{}, err
-	}
+}
 
-	if version > 1 && m.Units != nil {
-		_, err := m.Units.MoveToCapabilityVersion(ctx, call, id, version)
+// capabilityJSON is the temperature range (nil without one) and the sensor specs as their JSON columns store them.
+func capabilityJSON(input *CapabilitySave) (any, []byte, error) {
+	var temp any
+
+	if input.Temperature != nil {
+		tempJSON, err := json.Marshal(input.Temperature)
 		if err != nil {
-			return Capability{}, apperr.Wrap(
-				err,
-				"devices.UnitCapabilities.MoveToCapabilityVersion",
-			)
+			return nil, nil, apperr.Wrap(err, "json.Marshal")
 		}
+
+		temp = tempJSON
 	}
 
+	sensors, err := json.Marshal(append([]SensorSpec{}, input.Sensors...))
+	if err != nil {
+		return nil, nil, apperr.Wrap(err, "json.Marshal")
+	}
+
+	return temp, sensors, nil
+}
+
+// capabilityRevision is the model row a save writes: its ID and version, the change reason and the audited values
+// of the row it replaces.
+type capabilityRevision struct {
+	modelID uuid.UUID
+	version int
+	reason  string
+	before  map[string]any
+}
+
+// nextRevision is version 1 of a new model or, for an update, the next version of the current row, which it retires
+// after the expected-version check (the change reason is taken on update only).
+func nextRevision(
+	ctx context.Context,
+	call *ops.Call,
+	input *CapabilitySave,
+) (capabilityRevision, error) {
+	revision := capabilityRevision{
+		modelID: uuid.Must(uuid.NewV7()),
+		version: 1,
+		reason:  "",
+		before:  nil,
+	}
+	if input.ID == nil {
+		return revision, nil
+	}
+
+	old, err := scanCap(
+		call.Tx.QueryRow(
+			ctx,
+			`SELECT `+capCols+` FROM devices.capabilities WHERE id = $1 AND is_current FOR UPDATE`,
+			*input.ID,
+		),
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return revision, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	}
+
+	if err != nil {
+		return revision, err
+	}
+
+	revision.before = old.fields()
+
+	if old.Version != *call.ExpectedVersion {
+		return revision, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
+	}
+
+	_, execErr := call.Tx.Exec(
+		ctx,
+		`UPDATE devices.capabilities SET is_current = false WHERE id = $1 AND version = $2`,
+		*input.ID,
+		old.Version,
+	)
+	if execErr != nil {
+		return revision, apperr.Wrap(execErr, "update devices.capabilities")
+	}
+
+	revision.modelID, revision.version = *input.ID, old.Version+1
+	if input.ChangeReason != nil {
+		revision.reason = *input.ChangeReason
+	}
+
+	return revision, nil
+}
+
+// capabilitySaved emits CapabilityChanged and audits capabilities.save with the values it changed.
+func capabilitySaved(call *ops.Call, revision capabilityRevision, capability Capability) {
 	var prev *int
 
-	if version > 1 {
-		p := version - 1
+	if revision.version > 1 {
+		p := revision.version - 1
 		prev = &p
 	}
 
 	call.Emit(
 		ops.Event{
 			AggregateType: "capability",
-			AggregateID:   id,
+			AggregateID:   revision.modelID,
 			Type:          "CapabilityChanged",
-			Payload:       map[string]int{"version": version},
+			Payload:       map[string]int{"version": revision.version},
 		},
 	)
 
-	b, a := ops.Changes(before, capability.fields())
+	changedBefore, changedAfter := ops.Changes(revision.before, capability.fields())
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "capabilities.save",
 			TargetKind:      "capability",
-			TargetID:        id.String(),
+			TargetID:        revision.modelID.String(),
 			PreviousVersion: prev,
-			NextVersion:     &version,
-			Reason:          reason,
-			Before:          b,
-			After:           a, Result: "",
+			NextVersion:     &revision.version,
+			Reason:          revision.reason,
+			Before:          changedBefore,
+			After:           changedAfter, Result: "",
 		},
 	)
-
-	return capability, nil
 }
 
 // Register binds the Devices operations implemented so far.
@@ -536,14 +639,14 @@ func Register(r *ops.Registry, m Capabilities) {
 func LoadCapability(
 	ctx context.Context,
 	c *ops.Call,
-	id uuid.UUID,
+	modelID uuid.UUID,
 	version int,
 ) (Capability, bool, error) {
 	capability, err := scanCap(
 		c.Tx.QueryRow(
 			ctx,
 			`SELECT `+capCols+` FROM devices.capabilities WHERE id = $1 AND version = $2`,
-			id,
+			modelID,
 			version,
 		),
 	)

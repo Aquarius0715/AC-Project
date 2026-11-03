@@ -23,10 +23,10 @@ func (Models) CurrentVersion(
 	c *ops.Call,
 	modelID uuid.UUID,
 ) (int, bool, error) {
-	var v int
+	var version int
 
 	err := c.Tx.QueryRow(ctx, `SELECT version FROM devices.capabilities WHERE id = $1 AND is_current`, modelID).
-		Scan(&v)
+		Scan(&version)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return 0, false, nil
@@ -35,7 +35,7 @@ func (Models) CurrentVersion(
 		return 0, false, apperr.Wrap(err, "select devices.capabilities")
 	}
 
-	return v, true, nil
+	return version, true, nil
 }
 
 // ByCode resolves a model code (Capability.model, case-insensitive) to its ID and current version.
@@ -45,19 +45,19 @@ func (Models) ByCode(
 	code string,
 ) (uuid.UUID, int, bool, error) {
 	var (
-		id uuid.UUID
-		v  int
+		modelID uuid.UUID
+		version int
 	)
 
 	err := call.Tx.QueryRow(ctx, `SELECT id, version FROM devices.capabilities WHERE lower(model) = lower($1) AND
 		is_current
 		ORDER BY id LIMIT 1`, code).
-		Scan(&id, &v)
+		Scan(&modelID, &version)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return uuid.Nil, 0, false, nil
 	}
 
-	return id, v, err == nil, apperr.Wrap(err, "select devices.capabilities")
+	return modelID, version, err == nil, apperr.Wrap(err, "select devices.capabilities")
 }
 
 // SerialState is the device behind a serial for a CSV import row (DD-A18, case-insensitive): "unknown", "bound" (to
@@ -68,16 +68,16 @@ func (Models) SerialState(
 	serial string,
 ) (uuid.UUID, string, error) {
 	var (
-		id     uuid.UUID
-		bound  bool
-		tamper string
+		deviceID uuid.UUID
+		bound    bool
+		tamper   string
 	)
 
 	err := call.Tx.QueryRow(ctx, `SELECT d.id, d.unit_id IS NOT NULL OR EXISTS (SELECT 1 FROM devices.device_bindings b
 		WHERE
 		b.device_id = d.id AND b.unbound_at IS NULL), d.tamper
 		FROM devices.devices d WHERE upper(d.serial) = upper($1) ORDER BY d.id LIMIT 1`, serial).
-		Scan(&id, &bound, &tamper)
+		Scan(&deviceID, &bound, &tamper)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return uuid.Nil, "unknown", nil
 	}
@@ -88,12 +88,12 @@ func (Models) SerialState(
 
 	switch {
 	case bound:
-		return id, "bound", nil
-	case tamper == "detected":
-		return id, "tamper", nil
+		return deviceID, "bound", nil
+	case tamper == tamperDetected:
+		return deviceID, "tamper", nil
 	}
 
-	return id, "free", nil
+	return deviceID, "free", nil
 }
 
 // BindImported binds a free device to a unit the CSV import has just created, like devices.bind; false when the device
@@ -121,56 +121,16 @@ func (Models) BindImported(
 		return false, apperr.Wrap(err, "select devices.devices")
 	}
 
-	if bound || tamper == "detected" {
+	if bound || tamper == tamperDetected {
 		return false, nil
 	}
 
-	binding := uuid.Must(uuid.NewV7())
-
-	_, err = call.Tx.Exec(
-		ctx,
-		`INSERT INTO devices.device_bindings (id, tenant_id, device_id, unit_id, customer_org_id, bound_at, reason,
-			actor_membership_id)
-		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7)`,
-		binding,
-		device,
-		unit,
-		org,
-		call.Now,
-		reason,
-		call.Principal.MembershipID,
-	)
+	version, err := insertBinding(ctx, call, device, unit, org, reason)
 	if err != nil {
-		return false, apperr.Wrap(err, "insert devices.device_bindings")
+		return false, err
 	}
 
-	var v int
-
-	err = call.Tx.QueryRow(ctx, `UPDATE devices.devices SET unit_id = $2, binding_id = $3, target_unit_id = $2, version =
-		version + 1, updated_at = platform.app_now()
-		WHERE id = $1 RETURNING version`, device, unit, binding).
-		Scan(&v)
-	if err != nil {
-		return false, apperr.Wrap(err, "update devices.devices")
-	}
-
-	call.Emit(
-		ops.Event{
-			AggregateType: "device",
-			AggregateID:   device,
-			Type:          "DeviceBound",
-			Payload:       map[string]any{"unitId": unit, "previousUnitId": nil},
-		},
-	)
-	call.Audit(
-		ops.AuditEntry{
-			Action:      "devices.bind",
-			TargetKind:  "device",
-			TargetID:    device.String(),
-			NextVersion: &v,
-			Reason:      reason, PreviousVersion: nil, Result: "", Before: nil, After: nil,
-		},
-	)
+	recordBinding(call, device, unit, nil, nil, version, reason)
 
 	return true, nil
 }
@@ -199,16 +159,16 @@ func (Models) UnbindUnits(
 	var ended []pair
 
 	for rows.Next() {
-		var p pair
+		var binding pair
 
-		err := rows.Scan(&p.device, &p.unit)
+		err := rows.Scan(&binding.device, &binding.unit)
 		if err != nil {
 			rows.Close()
 
 			return apperr.Wrap(err, "update devices.device_bindings")
 		}
 
-		ended = append(ended, p)
+		ended = append(ended, binding)
 	}
 
 	rows.Close()
@@ -218,34 +178,18 @@ func (Models) UnbindUnits(
 		return apperr.Wrap(rowsErr, "update devices.device_bindings")
 	}
 
-	for _, p := range ended {
-		var v int
+	for _, binding := range ended {
+		var version int
 
 		err := call.Tx.QueryRow(ctx, `UPDATE devices.devices SET unit_id = NULL, binding_id = NULL, version = version + 1,
 			updated_at = platform.app_now()
-			WHERE id = $1 RETURNING version`, p.device).
-			Scan(&v)
+			WHERE id = $1 RETURNING version`, binding.device).
+			Scan(&version)
 		if err != nil {
 			return apperr.Wrap(err, "update devices.devices")
 		}
 
-		call.Emit(
-			ops.Event{
-				AggregateType: "device",
-				AggregateID:   p.device,
-				Type:          "DeviceBound",
-				Payload:       map[string]any{"unitId": nil, "previousUnitId": p.unit},
-			},
-		)
-		call.Audit(
-			ops.AuditEntry{
-				Action:      "devices.bind",
-				TargetKind:  "device",
-				TargetID:    p.device.String(),
-				NextVersion: &v,
-				Reason:      reason, PreviousVersion: nil, Result: "", Before: nil, After: nil,
-			},
-		)
+		recordBinding(call, binding.device, nil, binding.unit, nil, version, reason)
 	}
 
 	return nil
@@ -329,16 +273,16 @@ func (Models) StaleAfter(
 
 	for rows.Next() {
 		var (
-			id  uuid.UUID
-			sec int
+			sensorID uuid.UUID
+			sec      int
 		)
 
-		err := rows.Scan(&id, &sec)
+		err := rows.Scan(&sensorID, &sec)
 		if err != nil {
 			return nil, apperr.Wrap(err, "select devices.sensors")
 		}
 
-		out[id] = time.Duration(sec) * time.Second
+		out[sensorID] = time.Duration(sec) * time.Second
 	}
 
 	return out, apperr.Wrap(rows.Err(), "select devices.sensors")
@@ -351,30 +295,30 @@ func (Models) BoundDevice(
 	unit uuid.UUID,
 ) (uuid.UUID, string, string, bool, error) {
 	var (
-		id          uuid.UUID
+		deviceID    uuid.UUID
 		conn, power string
 	)
 
 	err := call.Tx.QueryRow(ctx, `SELECT d.id, d.connection, d.power_signal FROM devices.device_bindings b JOIN
 		devices.devices d ON d.id = b.device_id
 		WHERE b.unit_id = $1 AND b.unbound_at IS NULL`, unit).
-		Scan(&id, &conn, &power)
+		Scan(&deviceID, &conn, &power)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return id, "", "", false, nil
+		return deviceID, "", "", false, nil
 	}
 
-	return id, conn, power, err == nil, apperr.Wrap(err, "select devices.device_bindings")
+	return deviceID, conn, power, err == nil, apperr.Wrap(err, "select devices.device_bindings")
 }
 
 // OperationBusy reports a queued/running device operation on the unit (D04 mutual exclusion).
 func (Models) OperationBusy(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, error) {
-	var b bool
+	var busy bool
 
 	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE unit_id = $1 AND status IN
 		('queued','running') AND expires_at > $2)`, unit, c.Now).
-		Scan(&b)
+		Scan(&busy)
 
-	return b, apperr.Wrap(err, "select devices.device_operations")
+	return busy, apperr.Wrap(err, "select devices.device_operations")
 }
 
 // AlertRecovery is a recovery event of a device linked to an alert.

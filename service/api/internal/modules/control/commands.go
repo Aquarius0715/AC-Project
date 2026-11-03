@@ -126,20 +126,20 @@ func Allowed(unitAction UnitAction, policy []byte) bool {
 		return true
 	}
 
-	var p struct {
+	var restrictionPolicy struct {
 		Kind                   string   `json:"kind"`
 		MinimumCoolingSetpoint *float64 `json:"minimumCoolingSetpoint"`
 	}
-	if json.Unmarshal(policy, &p) != nil {
+	if json.Unmarshal(policy, &restrictionPolicy) != nil {
 		return false
 	}
 
-	if p.Kind == "power_off" {
+	if restrictionPolicy.Kind == "power_off" {
 		return unitAction.Kind == "set_power" && unitAction.Power != nil && !*unitAction.Power
 	}
 
-	if unitAction.Kind == "set_temperature" && p.MinimumCoolingSetpoint != nil {
-		return *unitAction.Celsius >= *p.MinimumCoolingSetpoint
+	if unitAction.Kind == "set_temperature" && restrictionPolicy.MinimumCoolingSetpoint != nil {
+		return *unitAction.Celsius >= *restrictionPolicy.MinimumCoolingSetpoint
 	}
 
 	return true
@@ -577,18 +577,18 @@ func (m Commands) list(
 			)
 		}
 
-		var ok bool
+		var assigned bool
 
 		err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.unit_assignment_access WHERE job_id = $1 AND unit_id
 			=
 			$2 AND technician_membership_id = $3)`,
 			*input.JobID, input.UnitID, call.Principal.MembershipID).
-			Scan(&ok)
+			Scan(&assigned)
 		if err != nil {
 			return paging.Page[Command]{}, apperr.Wrap(err, "select assets.unit_assignment_access")
 		}
 
-		if !ok {
+		if !assigned {
 			return paging.Page[Command]{}, notFound
 		}
 	default:

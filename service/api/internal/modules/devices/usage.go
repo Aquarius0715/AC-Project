@@ -24,13 +24,13 @@ func (Usage) UnitInUse(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, 
 
 // UnitActive reports an active binding or an in-flight device operation on the unit (blocks units.archive, D05).
 func (Usage) UnitActive(ctx context.Context, call *ops.Call, unit uuid.UUID) (bool, error) {
-	var b bool
+	var active bool
 
 	err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_bindings WHERE unit_id = $1 AND unbound_at IS
 		NULL)
 		OR EXISTS (SELECT 1 FROM devices.device_operations WHERE unit_id = $1 AND status IN ('queued','running') AND
 		expires_at > $2)`, unit, call.Now).
-		Scan(&b)
+		Scan(&active)
 
-	return b, apperr.Wrap(err, "select devices.device_bindings")
+	return active, apperr.Wrap(err, "select devices.device_bindings")
 }
