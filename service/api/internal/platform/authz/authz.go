@@ -11,33 +11,45 @@
 package authz
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 )
 
-// Roles of Membership.role plus the two pseudo roles used in the catalog.
-var Roles = map[string]bool{
-	"client":        true,
-	"contractor":    true,
-	"technician":    true,
-	"admin":         true,
-	"authenticated": true,
-	"public":        true,
+var (
+	errEmptyAlternative       = errors.New("empty alternative")
+	errUnknownRole            = errors.New("unknown role")
+	errBadPredicate           = errors.New("bad permission or predicate")
+	errAdminWithoutPermission = errors.New("admin alternative without permission")
+	errNoGrantingAlternative  = errors.New("no granting alternative")
+)
+
+// isRole reports whether name is a Membership.role or one of the two pseudo roles used in the catalog.
+func isRole(name string) bool {
+	switch name {
+	case "client", "contractor", "technician", "admin", "authenticated", "public":
+		return true
+	default:
+		return false
+	}
 }
 
 // Permissions is the Permission union of service-contracts.ts (38 values).
-var Permissions = map[string]bool{}
+var Permissions = permissionSet()
 
-func init() {
-	for p := range strings.SplitSeq("dashboard.read asset.read asset.write identity.read identity.write device.read "+
-		"device.write device.maintain control.execute control.diagnose alert.read alert.resolve alert.policy.read "+
-		"alert.policy.write job.read job.write contract.read contract.write billing.read billing.write billing.payment "+
-		"restriction.read restriction.write restriction.override automation.policy.read automation.policy.write "+
-		"energy.read energy.write mrv.read mrv.write mrv.review mrv.factors offset.read offset.write audit.read "+
-		"partner.accept partner.assign partner.review", " ") {
-		Permissions[p] = true
+func permissionSet() map[string]bool {
+	set := map[string]bool{}
+	for permission := range strings.SplitSeq("dashboard.read asset.read asset.write identity.read identity.write "+
+		"device.read device.write device.maintain control.execute control.diagnose alert.read alert.resolve "+
+		"alert.policy.read alert.policy.write job.read job.write contract.read contract.write billing.read "+
+		"billing.write billing.payment restriction.read restriction.write restriction.override automation.policy.read "+
+		"automation.policy.write energy.read energy.write mrv.read mrv.write mrv.review mrv.factors offset.read "+
+		"offset.write audit.read partner.accept partner.assign partner.review", " ") {
+		set[permission] = true
 	}
+
+	return set
 }
 
 var predicateRe = regexp.MustCompile(`^[a-z][a-z0-9_-]*(=[a-z0-9_-]+)?$`)
@@ -57,18 +69,18 @@ type Expr struct {
 }
 
 // Parse parses an authorization column value.
-func Parse(s string) (Expr, error) {
+func Parse(column string) (Expr, error) {
 	var expr Expr
 
-	main := s
-	if before, after, ok := strings.Cut(s, ";"); ok {
+	main := column
+	if before, after, ok := strings.Cut(column, ";"); ok {
 		main, expr.Remark = before, strings.TrimSpace(after)
 	}
 
 	for raw := range strings.SplitSeq(main, "|") {
 		alt := strings.TrimSpace(raw)
 		if alt == "" {
-			return expr, fmt.Errorf("empty alternative in %q", s)
+			return expr, fmt.Errorf("%w in %q", errEmptyAlternative, column)
 		}
 
 		parts := strings.Split(alt, ":")
@@ -78,37 +90,47 @@ func Parse(s string) (Expr, error) {
 			continue
 		}
 
-		if !Roles[parts[0]] {
-			return expr, fmt.Errorf("unknown role %q in %q", parts[0], s)
-		}
-
-		alternative := Alternative{Role: parts[0], Permission: "", Predicates: nil}
-
-		rest := parts[1:]
-		if len(rest) > 0 && Permissions[rest[0]] {
-			alternative.Permission, rest = rest[0], rest[1:]
-		}
-
-		for _, p := range rest {
-			if strings.Contains(p, ".") || !predicateRe.MatchString(p) {
-				return expr, fmt.Errorf("bad permission or predicate %q in %q", p, s)
-			}
-
-			alternative.Predicates = append(alternative.Predicates, p)
-		}
-
-		if alternative.Role == "admin" && alternative.Permission == "" {
-			return expr, fmt.Errorf("admin alternative without permission in %q", s)
+		alternative, err := parseAlternative(parts, column)
+		if err != nil {
+			return expr, err
 		}
 
 		expr.Alternatives = append(expr.Alternatives, alternative)
 	}
 
 	if len(expr.Alternatives) == 0 {
-		return expr, fmt.Errorf("no granting alternative in %q", s)
+		return expr, fmt.Errorf("%w in %q", errNoGrantingAlternative, column)
 	}
 
 	return expr, nil
+}
+
+// parseAlternative parses one granting alternative of the column: a role, an optional permission, then predicates.
+func parseAlternative(parts []string, column string) (Alternative, error) {
+	if !isRole(parts[0]) {
+		return Alternative{}, fmt.Errorf("%w %q in %q", errUnknownRole, parts[0], column)
+	}
+
+	alternative := Alternative{Role: parts[0], Permission: "", Predicates: nil}
+
+	rest := parts[1:]
+	if len(rest) > 0 && Permissions[rest[0]] {
+		alternative.Permission, rest = rest[0], rest[1:]
+	}
+
+	for _, predicate := range rest {
+		if strings.Contains(predicate, ".") || !predicateRe.MatchString(predicate) {
+			return Alternative{}, fmt.Errorf("%w %q in %q", errBadPredicate, predicate, column)
+		}
+
+		alternative.Predicates = append(alternative.Predicates, predicate)
+	}
+
+	if alternative.Role == "admin" && alternative.Permission == "" {
+		return Alternative{}, fmt.Errorf("%w in %q", errAdminWithoutPermission, column)
+	}
+
+	return alternative, nil
 }
 
 // Principal is the authenticated caller (selected Membership).
@@ -121,7 +143,7 @@ type Principal struct {
 // Candidates returns the alternatives whose role and permission the principal satisfies; predicates still have to
 // be checked by the handler. An empty result means FORBIDDEN.
 func (e Expr) Candidates(principal *Principal) []Alternative {
-	var out []Alternative
+	out := make([]Alternative, 0, len(e.Alternatives))
 
 	for _, alternative := range e.Alternatives {
 		switch alternative.Role {
@@ -153,17 +175,17 @@ type Facts map[string]bool
 // key=value are looked up verbatim (for example "kind=alert").
 func Allowed(cands []Alternative, f Facts) bool {
 	for _, a := range cands {
-		ok := true
+		matched := true
 
 		for _, pr := range a.Predicates {
 			if !f[pr] {
-				ok = false
+				matched = false
 
 				break
 			}
 		}
 
-		if ok {
+		if matched {
 			return true
 		}
 	}

@@ -68,6 +68,84 @@ type Consumer struct {
 // event that can never apply does not stop the consumer for every tenant.
 const MaxAttempts = 5
 
+// Drain applies every pending event once, in order, and returns how many were applied. It stops at the first
+// failing event, and at one still waiting for its retry, so events are never applied out of order; the failure is
+// returned. An event that failed MaxAttempts times is dead-lettered and the drain goes on (IR427).
+func (c *Consumer) Drain(ctx context.Context) (int, error) {
+	if len(c.Handlers) == 0 {
+		return 0, nil
+	}
+
+	types := make([]string, 0, len(c.Handlers))
+	for t := range c.Handlers {
+		types = append(types, t)
+	}
+
+	batch := c.Batch
+	if batch <= 0 {
+		batch = 100
+	}
+
+	applied := 0
+
+	for {
+		pending, err := c.pending(ctx, types, batch)
+		if err != nil {
+			return applied, err
+		}
+
+		if len(pending) == 0 {
+			return applied, nil
+		}
+
+		for _, event := range pending {
+			if c.retryWait(event) > 0 {
+				return applied, nil // its retry is not due: the events after it wait too
+			}
+
+			done, err := c.apply(ctx, event)
+			if err != nil {
+				stopErr := c.failure(ctx, event, err)
+				if stopErr != nil {
+					return applied, stopErr
+				}
+
+				continue
+			}
+
+			if done {
+				applied++
+			}
+		}
+
+		if len(pending) < batch {
+			return applied, nil
+		}
+	}
+}
+
+// Run polls until ctx ends. A failure that repeats is logged once a minute, and the recovery once (IR429).
+func (c *Consumer) Run(ctx context.Context, every time.Duration) {
+	ticker := time.NewTicker(every)
+	defer ticker.Stop()
+
+	rep := &logging.Repeats{Logf: c.Logf, Every: 0, Now: nil}
+	for {
+		n, err := c.Drain(ctx)
+		if err != nil && c.Logf != nil {
+			rep.Failed(fmt.Sprintf("consumer %s: %v (applied %d)", c.Name, err, n))
+		} else if err == nil && c.Logf != nil {
+			rep.OK("consumer " + c.Name)
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
 func (c *Consumer) now() time.Time {
 	if c.Now != nil {
 		return c.Now()
@@ -132,81 +210,36 @@ func (c *Consumer) failed(ctx context.Context, event Event, cause error) (bool, 
 	return dead, apperr.Wrap(err, "ops.Runner.Run")
 }
 
-// Drain applies every pending event once, in order, and returns how many were applied. It stops at the first
-// failing event, and at one still waiting for its retry, so events are never applied out of order; the failure is
-// returned. An event that failed MaxAttempts times is dead-lettered and the drain goes on (IR427).
-func (c *Consumer) Drain(ctx context.Context) (int, error) {
-	if len(c.Handlers) == 0 {
-		return 0, nil
+// failure records the failed attempt of the event. It returns the error that stops the drain, or nil once the event
+// is dead-lettered and the drain goes on.
+func (c *Consumer) failure(ctx context.Context, event Event, cause error) error {
+	dead, err := c.failed(ctx, event, cause)
+	if err != nil {
+		return errors.Join(cause, err)
 	}
 
-	types := make([]string, 0, len(c.Handlers))
-	for t := range c.Handlers {
-		types = append(types, t)
+	if !dead {
+		return fmt.Errorf(
+			"events: %s %s %s: %w",
+			c.Name,
+			event.Type,
+			event.ID,
+			cause,
+		)
 	}
 
-	batch := c.Batch
-	if batch <= 0 {
-		batch = 100
+	if c.Logf != nil {
+		c.Logf(
+			"consumer %s: dead-lettered %s %s after %d attempts: %v",
+			c.Name,
+			event.Type,
+			event.ID,
+			MaxAttempts,
+			cause,
+		)
 	}
 
-	applied := 0
-
-	for {
-		pending, err := c.pending(ctx, types, batch)
-		if err != nil {
-			return applied, err
-		}
-
-		if len(pending) == 0 {
-			return applied, nil
-		}
-
-		for _, event := range pending {
-			if c.retryWait(event) > 0 {
-				return applied, nil // its retry is not due: the events after it wait too
-			}
-
-			done, err := c.apply(ctx, event)
-			if err != nil {
-				dead, ferr := c.failed(ctx, event, err)
-				if ferr != nil {
-					return applied, errors.Join(err, ferr)
-				}
-
-				if !dead {
-					return applied, fmt.Errorf(
-						"events: %s %s %s: %w",
-						c.Name,
-						event.Type,
-						event.ID,
-						err,
-					)
-				}
-
-				if c.Logf != nil {
-					c.Logf(
-						"consumer %s: dead-lettered %s %s after %d attempts: %v",
-						c.Name,
-						event.Type,
-						event.ID,
-						MaxAttempts,
-						err,
-					)
-				}
-
-				continue
-			}
-
-			if done {
-				applied++
-			}
-		}
-
-		if len(pending) < batch {
-			return applied, nil
-		}
-	}
+	return nil
 }
 
 func (c *Consumer) pending(ctx context.Context, types []string, limit int) ([]Event, error) {
@@ -317,26 +350,4 @@ func (c *Consumer) apply(ctx context.Context, event Event) (bool, error) {
 	)
 
 	return done, apperr.Wrap(err, "ops.Runner.Run")
-}
-
-// Run polls until ctx ends. A failure that repeats is logged once a minute, and the recovery once (IR429).
-func (c *Consumer) Run(ctx context.Context, every time.Duration) {
-	ticker := time.NewTicker(every)
-	defer ticker.Stop()
-
-	rep := &logging.Repeats{Logf: c.Logf, Every: 0, Now: nil}
-	for {
-		n, err := c.Drain(ctx)
-		if err != nil && c.Logf != nil {
-			rep.Failed(fmt.Sprintf("consumer %s: %v (applied %d)", c.Name, err, n))
-		} else if err == nil && c.Logf != nil {
-			rep.OK("consumer " + c.Name)
-		}
-
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-		}
-	}
 }

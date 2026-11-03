@@ -58,6 +58,15 @@ func ReplaceAttr(_ []string, attr slog.Attr) slog.Attr {
 		if ok {
 			return slog.String(attr.Key, Mask(err.Error()))
 		}
+	case slog.KindBool,
+		slog.KindDuration,
+		slog.KindFloat64,
+		slog.KindInt64,
+		slog.KindTime,
+		slog.KindUint64,
+		slog.KindGroup,
+		slog.KindLogValuer:
+		// no text to mask (slog never passes a group or an unresolved LogValuer)
 	}
 
 	return attr

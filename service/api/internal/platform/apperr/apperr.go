@@ -12,8 +12,10 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+// Code is the ErrorCode union of service-contracts.ts.
 type Code string
 
+// The error codes, in the order of the ErrorCode union.
 const (
 	Validation      Code = "VALIDATION"
 	Unauthenticated Code = "UNAUTHENTICATED"
@@ -27,28 +29,18 @@ const (
 )
 
 // Codes lists every ErrorCode of service-contracts.ts in declaration order.
-var Codes = []Code{
-	Validation,
-	Unauthenticated,
-	Forbidden,
-	NotFound,
-	Conflict,
-	Offline,
-	Timeout,
-	RateLimited,
-	Unavailable,
-}
-
-var status = map[Code]int{
-	Validation:      http.StatusUnprocessableEntity,
-	Unauthenticated: http.StatusUnauthorized,
-	Forbidden:       http.StatusForbidden,
-	NotFound:        http.StatusNotFound,
-	Conflict:        http.StatusConflict,
-	Offline:         http.StatusConflict,
-	Timeout:         http.StatusGatewayTimeout,
-	RateLimited:     http.StatusTooManyRequests,
-	Unavailable:     http.StatusServiceUnavailable,
+func Codes() []Code {
+	return []Code{
+		Validation,
+		Unauthenticated,
+		Forbidden,
+		NotFound,
+		Conflict,
+		Offline,
+		Timeout,
+		RateLimited,
+		Unavailable,
+	}
 }
 
 // DomainError is the wire shape {code, messageKey, fieldErrors, correlationId, retryAfterSeconds}.
@@ -74,7 +66,28 @@ func caused(de *DomainError, err error) *DomainError {
 }
 
 // HTTPStatus returns the fixed status for the error code.
-func (e *DomainError) HTTPStatus() int { return status[e.Code] }
+func (e *DomainError) HTTPStatus() int {
+	switch e.Code {
+	case Validation:
+		return http.StatusUnprocessableEntity
+	case Unauthenticated:
+		return http.StatusUnauthorized
+	case Forbidden:
+		return http.StatusForbidden
+	case NotFound:
+		return http.StatusNotFound
+	case Conflict, Offline:
+		return http.StatusConflict
+	case Timeout:
+		return http.StatusGatewayTimeout
+	case RateLimited:
+		return http.StatusTooManyRequests
+	case Unavailable:
+		return http.StatusServiceUnavailable
+	}
+
+	return 0
+}
 
 // StatusCode implements echo.HTTPStatusCoder, so Echo's central error handler and the request logger see the status.
 func (e *DomainError) StatusCode() int { return e.HTTPStatus() }
@@ -127,8 +140,8 @@ func From(err error) *DomainError {
 		return nil
 	}
 
-	de, ok := errors.AsType[*DomainError](err)
-	if ok {
+	de, matched := errors.AsType[*DomainError](err)
+	if matched {
 		return de
 	}
 
@@ -140,33 +153,40 @@ func From(err error) *DomainError {
 		return caused(E(NotFound, KeyNotFound), err)
 	}
 
-	pgError, ok := errors.AsType[*pgconn.PgError](err)
-	if ok {
-		switch pgError.Code {
-		case "23514", "22P02", "22001", "22003", "22007", "22008":
-			return caused(E(Validation, KeyValidation), err)
-		case "42501":
-			if strings.HasPrefix(
-				pgError.Message,
-				"permission denied",
-			) { // a missing table privilege is a defect (IR194), not RLS
-				return caused(E(Unavailable, KeyUnavailable), err)
-			}
-
-			return caused(
-				E(NotFound, KeyNotFound),
-				err,
-			) // row-level security: never reveal other tenants
-		case "23503":
-			return caused(E(NotFound, KeyNotFound), err)
-		case "23505", "23P01":
-			return caused(E(Conflict, KeyConflict), err)
-		case "40001", "40P01":
-			return caused(E(Unavailable, KeyUnavailable).RetryAfter(1), err)
-		case "57014":
-			return caused(E(Timeout, KeyTimeout), err)
+	pgError, matched := errors.AsType[*pgconn.PgError](err)
+	if matched {
+		converted := fromPostgres(pgError)
+		if converted != nil {
+			return caused(converted, err)
 		}
 	}
 
 	return caused(E(Unavailable, KeyUnavailable), err)
+}
+
+// fromPostgres maps the PostgreSQL error codes with a meaning of their own; nil for any other code.
+func fromPostgres(pgError *pgconn.PgError) *DomainError {
+	switch pgError.Code {
+	case "23514", "22P02", "22001", "22003", "22007", "22008":
+		return E(Validation, KeyValidation)
+	case "42501":
+		if strings.HasPrefix(
+			pgError.Message,
+			"permission denied",
+		) { // a missing table privilege is a defect (IR194), not RLS
+			return E(Unavailable, KeyUnavailable)
+		}
+
+		return E(NotFound, KeyNotFound) // row-level security: never reveal other tenants
+	case "23503":
+		return E(NotFound, KeyNotFound)
+	case "23505", "23P01":
+		return E(Conflict, KeyConflict)
+	case "40001", "40P01":
+		return E(Unavailable, KeyUnavailable).RetryAfter(1)
+	case "57014":
+		return E(Timeout, KeyTimeout)
+	}
+
+	return nil
 }

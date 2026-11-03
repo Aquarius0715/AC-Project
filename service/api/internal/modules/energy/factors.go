@@ -56,18 +56,18 @@ func scanFactor(r pgx.Row) (Factor, error) {
 }
 
 // LoadFactor returns a factor version (current when version is nil).
-func LoadFactor(ctx context.Context, c *ops.Call, id uuid.UUID, version *int) (Factor, error) {
-	q, args := "SELECT "+factorCols+" FROM energy.emission_factors f WHERE f.id = $1 AND f.is_current", []any{
-		id,
+func LoadFactor(ctx context.Context, c *ops.Call, factorID uuid.UUID, version *int) (Factor, error) {
+	stmt, args := "SELECT "+factorCols+" FROM energy.emission_factors f WHERE f.id = $1 AND f.is_current", []any{
+		factorID,
 	}
 	if version != nil {
-		q, args = "SELECT "+factorCols+" FROM energy.emission_factors f WHERE f.id = $1 AND f.version = $2", []any{
-			id,
+		stmt, args = "SELECT "+factorCols+" FROM energy.emission_factors f WHERE f.id = $1 AND f.version = $2", []any{
+			factorID,
 			*version,
 		}
 	}
 
-	x, err := scanFactor(c.Tx.QueryRow(ctx, q, args...))
+	x, err := scanFactor(c.Tx.QueryRow(ctx, stmt, args...))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return x, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
@@ -106,18 +106,18 @@ func LoadFactor(ctx context.Context, c *ops.Call, id uuid.UUID, version *int) (F
 func listFactors(
 	ctx context.Context,
 	call *ops.Call,
-	in *paging.Query,
+	query *paging.Query,
 ) (paging.Page[Factor], error) {
-	var f struct {
+	var filter struct {
 		Region *string `json:"region,omitempty"`
 		Year   *int    `json:"year,omitempty"`
 	}
 
-	if len(in.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
+	if len(query.Filters) > 0 {
+		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
-		if dec.Decode(&f) != nil {
+		if dec.Decode(&filter) != nil {
 			return paging.Page[Factor]{}, apperr.Fields(
 				map[string]string{"filters": apperr.KeyInvalid},
 			)
@@ -125,7 +125,7 @@ func listFactors(
 	}
 
 	order, err := paging.OrderBy(
-		in.Sort,
+		query.Sort,
 		map[string]string{
 			"id":        "f.id",
 			"year":      "f.year",
@@ -139,7 +139,7 @@ func listFactors(
 		return paging.Page[Factor]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	window, err := paging.Resolve(*in, f, call.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, filter, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Factor]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -152,12 +152,12 @@ func listFactors(
 	}
 
 	conds := []string{"f.is_current"}
-	if f.Region != nil {
-		conds = append(conds, "f.region = "+add(*f.Region))
+	if filter.Region != nil {
+		conds = append(conds, "f.region = "+add(*filter.Region))
 	}
 
-	if f.Year != nil {
-		conds = append(conds, "f.year = "+add(*f.Year))
+	if filter.Year != nil {
+		conds = append(conds, "f.year = "+add(*filter.Year))
 	}
 
 	where := strings.Join(conds, " AND ")
@@ -273,11 +273,11 @@ func (in *FactorInput) Validate() map[string]string {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/factors [post]
-func saveFactor(ctx context.Context, call *ops.Call, in *FactorInput) (Factor, error) {
-	id, version := uuid.New(), 1
+func saveFactor(ctx context.Context, call *ops.Call, input *FactorInput) (Factor, error) {
+	factorID, version := uuid.New(), 1
 
-	if in.ID != nil {
-		cur, err := LoadFactor(ctx, call, *in.ID, nil)
+	if input.ID != nil {
+		cur, err := LoadFactor(ctx, call, *input.ID, nil)
 		if err != nil {
 			return cur, err
 		}
@@ -286,13 +286,13 @@ func saveFactor(ctx context.Context, call *ops.Call, in *FactorInput) (Factor, e
 			return cur, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 		}
 
-		id, version = cur.ID, cur.Version+1
+		factorID, version = cur.ID, cur.Version+1
 	}
 
 	var taken bool
 
 	err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM energy.emission_factors WHERE is_current AND region = $1 AND
-		year = $2 AND id <> $3)`, in.Region, in.Year, id).
+		year = $2 AND id <> $3)`, input.Region, input.Year, factorID).
 		Scan(&taken)
 	if err != nil {
 		return Factor{}, apperr.Wrap(err, "select energy.emission_factors")
@@ -306,7 +306,7 @@ func saveFactor(ctx context.Context, call *ops.Call, in *FactorInput) (Factor, e
 		_, err := call.Tx.Exec(
 			ctx,
 			`UPDATE energy.emission_factors SET is_current = false WHERE id = $1 AND is_current`,
-			id,
+			factorID,
 		)
 		if err != nil {
 			return Factor{}, apperr.Wrap(err, "update energy.emission_factors")
@@ -318,12 +318,12 @@ func saveFactor(ctx context.Context, call *ops.Call, in *FactorInput) (Factor, e
 		`INSERT INTO energy.emission_factors (id, version, tenant_id, region, year, kg_co2e_per_kwh, source, created_by,
 			created_at)
 		VALUES ($1, $2, current_setting('app.tenant_id')::uuid, $3, $4, $5, $6, $7, $8)`,
-		id,
+		factorID,
 		version,
-		in.Region,
-		in.Year,
-		in.KgCO2ePerKWh,
-		in.Source,
+		input.Region,
+		input.Year,
+		input.KgCO2ePerKWh,
+		input.Source,
 		call.Principal.MembershipID,
 		call.Now,
 	)
@@ -335,11 +335,11 @@ func saveFactor(ctx context.Context, call *ops.Call, in *FactorInput) (Factor, e
 		ops.AuditEntry{
 			Action:          "factors.save",
 			TargetKind:      "emission_factor",
-			TargetID:        id.String(),
+			TargetID:        factorID.String(),
 			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return LoadFactor(ctx, call, id, nil)
+	return LoadFactor(ctx, call, factorID, nil)
 }

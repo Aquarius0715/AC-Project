@@ -28,9 +28,20 @@ import (
 // Mode selects the external technician's window.
 type Mode int
 
+// The modes of SQL.
 const (
 	List      Mode = iota // unit lists and pickers: viewing window
 	Equipment             // equipment reads: work window
+)
+
+// The roles and the employment the scope tells apart.
+const (
+	roleAdmin          = "admin"
+	roleSystem         = "system"
+	roleClient         = "client"
+	roleContractor     = "contractor"
+	roleTechnician     = "technician"
+	employmentInternal = "internal"
 )
 
 // SQL returns a predicate that is true when the unit with id unitExpr (a column or placeholder of the outer query)
@@ -42,25 +53,34 @@ func SQL(call *ops.Call, args *[]any, unitExpr string, mode Mode) string {
 
 		return fmt.Sprintf("$%d", len(*args))
 	}
-	unit := func(cond string) string {
-		return "EXISTS (SELECT 1 FROM assets.units su WHERE su.id = " + unitExpr + " AND " + cond + ")"
-	}
 
 	switch principal.Role {
-	case "admin", "system":
+	case roleAdmin, roleSystem:
 		return "TRUE"
-	case "client":
-		return unit("su.customer_org_id = " + add(principal.OrgID))
-	case "contractor":
+	case roleClient:
+		return unitSQL(unitExpr, "su.customer_org_id = "+add(principal.OrgID))
+	case roleContractor:
 		now := add(call.Now)
 
 		return "EXISTS (SELECT 1 FROM assets.unit_offer_access so WHERE so.unit_id = " + unitExpr +
 			" AND so.contractor_org_id = " + add(principal.OrgID) + " AND so.access_valid_from <= " + now + " AND " + now +
 			" < so.access_valid_until)"
-	case "technician":
+	case roleTechnician:
+		return technicianSQL(call, add, unitExpr, mode)
 	default:
 		return "FALSE"
 	}
+}
+
+// unitSQL is true when the unit with id unitExpr meets cond (on assets.units su).
+func unitSQL(unitExpr, cond string) string {
+	return "EXISTS (SELECT 1 FROM assets.units su WHERE su.id = " + unitExpr + " AND " + cond + ")"
+}
+
+// technicianSQL is a technician's scope: the units of Membership.scopes, and for an external technician only those of
+// the current assignment.
+func technicianSQL(call *ops.Call, add func(any) string, unitExpr string, mode Mode) string {
+	principal := call.Principal
 
 	var parts []string
 	if ids := principal.Scopes["organization"]; len(ids) > 0 {
@@ -79,8 +99,8 @@ func SQL(call *ops.Call, args *[]any, unitExpr string, mode Mode) string {
 		return "FALSE"
 	}
 
-	scope := unit("(" + strings.Join(parts, " OR ") + ")")
-	if principal.Employment == "internal" {
+	scope := unitSQL(unitExpr, "("+strings.Join(parts, " OR ")+")")
+	if principal.Employment == employmentInternal {
 		return scope
 	}
 
@@ -111,7 +131,7 @@ func EquipmentReadable(
 	units []uuid.UUID,
 ) ([]uuid.UUID, error) {
 	p := call.Principal
-	if p.Role != "technician" || p.Employment == "internal" || len(units) == 0 {
+	if p.Role != roleTechnician || p.Employment == employmentInternal || len(units) == 0 {
 		return units, nil
 	}
 
@@ -134,12 +154,12 @@ func EquipmentReadable(
 // whose work window has not started gets FORBIDDEN errors.assignment_not_started. Everyone else passes.
 func Gate(ctx context.Context, call *ops.Call, units []uuid.UUID) error {
 	p := call.Principal
-	if p.Role != "technician" || p.Employment == "internal" || len(units) == 0 {
+	if p.Role != roleTechnician || p.Employment == employmentInternal || len(units) == 0 {
 		return nil
 	}
 
 	args := []any{units}
-	q := "SELECT count(*) FROM unnest($1::uuid[]) AS t(id) WHERE NOT (" + SQL(
+	stmt := "SELECT count(*) FROM unnest($1::uuid[]) AS t(id) WHERE NOT (" + SQL(
 		call,
 		&args,
 		"t.id",
@@ -148,7 +168,7 @@ func Gate(ctx context.Context, call *ops.Call, units []uuid.UUID) error {
 
 	var waiting int
 
-	err := call.Tx.QueryRow(ctx, q, args...).Scan(&waiting)
+	err := call.Tx.QueryRow(ctx, stmt, args...).Scan(&waiting)
 	if err != nil {
 		return apperr.Wrap(err, "select unnest")
 	}

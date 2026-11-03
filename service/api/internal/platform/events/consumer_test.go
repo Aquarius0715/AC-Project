@@ -1,4 +1,4 @@
-package events
+package events_test
 
 import (
 	"context"
@@ -12,18 +12,23 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/events"
 )
+
+var errNoDatabase = errors.New("no database")
 
 // failingRunner is an ops.Runner whose database is unreachable.
 type failingRunner struct{}
 
 func (failingRunner) Run(context.Context, bool, *ops.Principal, func(pgx.Tx) error) error {
-	return errors.New("no database")
+	return errNoDatabase
 }
 
 // A consumer without handlers has nothing to poll: Drain applies nothing and Run only waits for its context.
 func TestConsumerWithoutHandlers(t *testing.T) {
-	consumer := &Consumer{
+	t.Parallel()
+
+	consumer := &events.Consumer{
 		Name:      "idle",
 		DB:        nil,
 		Handlers:  nil,
@@ -57,16 +62,18 @@ func TestConsumerWithoutHandlers(t *testing.T) {
 
 // A failing poll is logged with the consumer name and does not stop the loop.
 func TestConsumerRunLogsFailures(t *testing.T) {
+	t.Parallel()
+
 	var (
 		mutex  sync.Mutex
 		logged []string
 	)
 
-	consumer := &Consumer{
+	consumer := &events.Consumer{
 		Name: "broken",
 		DB:   failingRunner{},
-		Handlers: map[string]Handler{
-			"X": func(context.Context, pgx.Tx, Event) error { return nil },
+		Handlers: map[string]events.Handler{
+			"X": func(context.Context, pgx.Tx, events.Event) error { return nil },
 		},
 		Logf: func(f string, a ...any) {
 			mutex.Lock()

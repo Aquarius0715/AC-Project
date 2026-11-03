@@ -11,6 +11,7 @@ import (
 // the affected data consumes them. Payloads are the only shared shape.
 const (
 	// billing (restrictions) → equipment.
+
 	UnitRestrictionApplied = "UnitRestrictionApplied" // set assets.units.observed_restriction
 	UnitRestrictionCleared = "UnitRestrictionCleared" // clear it when it still names the restriction
 	RecoveryCasesChanged   = "RecoveryCasesChanged"   // SR29: bump the version of the restriction's units
@@ -21,26 +22,37 @@ const (
 	RestrictionCommandsCancelled = "RestrictionCommandsCancelled" // cancel undelivered restriction commands
 
 	// equipment → billing (restrictions).
+
 	UnitRestrictionObserved = "UnitRestrictionObserved" // a device reported the restriction it enforces (SR26)
 	CommandAcknowledged     = "CommandAcknowledged"     // a restriction command was acknowledged in time
 	CommandsEnded           = "CommandsEnded"           // restriction commands failed or expired
 
 	// any domain → identity (IR191).
+
 	NotificationRequested = "NotificationRequested" // store one notification (ID assigned by the producer)
-	// maintenance → identity: a verified certificate covers a grant (IR192).
+
+	// maintenance → identity.
+
+	// QualificationGranted: a verified certificate covers a grant (IR192).
 	QualificationGranted = "QualificationGranted"
-	// billing → maintenance: an internal job note (payout questions, IR193).
+
+	// billing → maintenance.
+
+	// JobNoteRequested: an internal job note (payout questions, IR193).
 	JobNoteRequested = "JobNoteRequested"
 	AuditRecorded    = "AuditRecorded" // any domain → identity: one audit log entry (IR196)
 
 	// maintenance → equipment, written by row triggers on maintenance.offers / maintenance.assignments (IR186).
+
 	OfferAccessChanged      = "OfferAccessChanged"      // a contractor's access window to a unit (accepted Offers)
 	AssignmentAccessChanged = "AssignmentAccessChanged" // a technician's viewing and work window on a unit
 
 	// identity → equipment (IR53, IR214).
+
 	ConsentRevoked = "ConsentRevoked" // a membership withdrew location consent: disable its location automations
 
 	// maintenance → equipment: the source Alert of a filter cleaning reminder (IR134 item 5, IR239).
+
 	FilterCleaningDue     = "FilterCleaningDue"     // open the maintenance Alert of the unit's cleaning cycle
 	FilterCleaningCleared = "FilterCleaningCleared" // resolve it: a later cleaning ended the cycle
 )

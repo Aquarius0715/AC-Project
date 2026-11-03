@@ -10,23 +10,32 @@ import (
 	"github.com/alicebob/miniredis/v2"
 )
 
-// IR375: a fixed window per minute and key, on a store all instances share.
-func TestWindow(t *testing.T) {
-	mr := miniredis.RunT(t)
+// testWindow is a window of three calls a minute on a fresh miniredis, read at the time now points to.
+func testWindow(t *testing.T, now *time.Time) (*miniredis.Miniredis, *Window) {
+	t.Helper()
 
-	store, err := NewValkey("redis://" + mr.Addr())
+	redisServer := miniredis.RunT(t)
+
+	store, err := NewValkey("redis://" + redisServer.Addr())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	now := time.Date(2026, 10, 11, 9, 0, 15, 0, time.UTC)
-	window := &Window{
+	return redisServer, &Window{
 		Store:  store,
 		Limit:  3,
 		Window: time.Minute,
 		Prefix: "rl:w:",
-		Now:    func() time.Time { return now },
+		Now:    func() time.Time { return *now },
 	}
+}
+
+// IR375: a fixed window per minute and key, on a store all instances share.
+func TestWindow(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 10, 11, 9, 0, 15, 0, time.UTC)
+	redisServer, window := testWindow(t, &now)
 
 	ctx := context.Background()
 	for i := 1; i <= 3; i++ {
@@ -46,7 +55,7 @@ func TestWindow(t *testing.T) {
 	}
 	// a second instance on the same store sees the same count
 	other := &Window{
-		Store:  store,
+		Store:  window.Store,
 		Limit:  3,
 		Window: time.Minute,
 		Prefix: "rl:w:",
@@ -56,7 +65,7 @@ func TestWindow(t *testing.T) {
 		t.Error("another instance does not share the count")
 	}
 	// the counter expires: the key carries a TTL of two windows
-	if ttl := mr.TTL(
+	if ttl := redisServer.TTL(
 		"rl:w:t1:m1:" + strconv.FormatInt(now.Truncate(time.Minute).Unix(), 10),
 	); ttl != 2*time.Minute {
 		t.Errorf("ttl %v", ttl)
@@ -67,9 +76,16 @@ func TestWindow(t *testing.T) {
 	if wait, _ := window.Allow(ctx, "t1:m1"); wait != 0 {
 		t.Errorf("next minute waits %d", wait)
 	}
-	// at the very end of a window the wait is at least one second
-	now = time.Date(2026, 10, 11, 9, 2, 59, 999_000_000, time.UTC)
+}
 
+// At the very end of a window the wait is at least one second.
+func TestWindowLastInstant(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 10, 11, 9, 2, 59, 999_000_000, time.UTC)
+	_, window := testWindow(t, &now)
+
+	ctx := context.Background()
 	for range 3 {
 		_, _ = window.Allow(ctx, "t1:m3")
 	}
@@ -77,16 +93,26 @@ func TestWindow(t *testing.T) {
 	if wait, _ := window.Allow(ctx, "t1:m3"); wait != 1 {
 		t.Errorf("last instant: wait %d", wait)
 	}
-	// an unreachable store is an error: the caller decides (the Core API fails open)
-	mr.Close()
+}
 
-	_, allowErr = window.Allow(ctx, "t1:m1")
+// An unreachable store is an error: the caller decides (the Core API fails open).
+func TestWindowStoreDown(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 10, 11, 9, 0, 15, 0, time.UTC)
+	redisServer, window := testWindow(t, &now)
+
+	redisServer.Close()
+
+	_, allowErr := window.Allow(context.Background(), "t1:m1")
 	if allowErr == nil {
 		t.Error("closed store: no error")
 	}
 }
 
 func TestMemory(t *testing.T) {
+	t.Parallel()
+
 	m := &Memory{mu: sync.Mutex{}, n: nil}
 	for i := int64(1); i <= 2; i++ {
 		if n, _ := m.Incr(context.Background(), "k", time.Minute); n != i {

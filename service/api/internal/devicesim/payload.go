@@ -6,6 +6,7 @@ package devicesim
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"math/rand/v2"
@@ -25,21 +26,62 @@ type Sensor struct {
 	Boundary string
 }
 
+// The metrics the pattern's behaviour changes the readings of.
+const (
+	metricTemperature = "temperature"
+	metricPower       = "power"
+)
+
+// The value range each sensor simulates: a reading is its base, give or take up to its swing.
+const (
+	temperatureBaseCelsius  = 24
+	temperatureSwingCelsius = 2
+	powerBaseKW             = 1.2
+	powerSwingKW            = 0.4
+	humidityBasePercent     = 60
+	humiditySwingPercent    = 8
+	co2BasePPM              = 650
+	co2SwingPPM             = 250
+	pm25BaseMicrograms      = 14 // µg/m³
+	pm25SwingMicrograms     = 9
+)
+
 // Sensors are the ones a simulated AC module can report (the metrics and units of the capability register's sensors).
 // Temperature and power come first; a module reports the subset its device has (Only).
 var Sensors = []Sensor{
-	{ID: "temperature", Metric: "temperature", Unit: "°C", Base: 24, Swing: 2, Boundary: ""},
 	{
-		ID:       "power",
-		Metric:   "power",
+		ID:       metricTemperature,
+		Metric:   metricTemperature,
+		Unit:     "°C",
+		Base:     temperatureBaseCelsius,
+		Swing:    temperatureSwingCelsius,
+		Boundary: "",
+	},
+	{
+		ID:       metricPower,
+		Metric:   metricPower,
 		Unit:     "kW",
-		Base:     1.2,
-		Swing:    0.4,
+		Base:     powerBaseKW,
+		Swing:    powerSwingKW,
 		Boundary: "ac_input_electricity",
 	},
-	{ID: "humidity", Metric: "humidity", Unit: "%", Base: 60, Swing: 8, Boundary: ""},
-	{ID: "co2", Metric: "co2", Unit: "ppm", Base: 650, Swing: 250, Boundary: ""},
-	{ID: "pm25", Metric: "pm25", Unit: "µg/m³", Base: 14, Swing: 9, Boundary: ""},
+	{
+		ID:       "humidity",
+		Metric:   "humidity",
+		Unit:     "%",
+		Base:     humidityBasePercent,
+		Swing:    humiditySwingPercent,
+		Boundary: "",
+	},
+	{ID: "co2", Metric: "co2", Unit: "ppm", Base: co2BasePPM, Swing: co2SwingPPM, Boundary: ""},
+	{
+		ID:       "pm25",
+		Metric:   "pm25",
+		Unit:     "µg/m³",
+		Base:     pm25BaseMicrograms,
+		Swing:    pm25SwingMicrograms,
+		Boundary: "",
+	},
 }
 
 // Measurement is one reading in a telemetry batch.
@@ -90,14 +132,22 @@ type Module struct {
 	state               *ReportedState // reported with each heartbeat when set (Reports)
 }
 
+const (
+	// seedSpread is 2⁶⁴ divided by the golden ratio: it spreads a module's seed into the second word of its generator.
+	seedSpread = 0x9e3779b97f4a7c15
+	// initialSetpointCelsius is a module's setpoint until a command or its pattern's state sets another.
+	initialSetpointCelsius = 24
+)
+
 // NewModule starts a module with its own random source, so each device drifts independently.
 func NewModule(tenantID, deviceID, firmware string, seed uint64) *Module {
 	return &Module{
-		TenantID:  tenantID,
-		DeviceID:  deviceID,
-		Firmware:  firmware,
-		rng:       rand.New(rand.NewPCG(seed, seed^0x9e3779b97f4a7c15)),
-		setpoint:  24,
+		TenantID: tenantID,
+		DeviceID: deviceID,
+		Firmware: firmware,
+		//nolint:gosec // simulated readings: a predictable per-device generator is wanted, not a secure one
+		rng:       rand.New(rand.NewPCG(seed, seed^seedSpread)),
+		setpoint:  initialSetpointCelsius,
 		sequence:  0,
 		telemetry: "",
 		commands:  "",
@@ -152,8 +202,10 @@ func Topic(tenantID, deviceID, kind string) string {
 	return fmt.Sprintf("t/%s/d/%s/%s", tenantID, deviceID, kind)
 }
 
-// TelemetryTopic and HeartbeatTopic are the two topics the module publishes its routine messages on.
+// TelemetryTopic is one of the two topics the module publishes its routine messages on: its telemetry batches.
 func (m *Module) TelemetryTopic() string { return Topic(m.TenantID, m.DeviceID, "telemetry") }
+
+// HeartbeatTopic is the other routine topic: the module's heartbeats.
 func (m *Module) HeartbeatTopic() string { return Topic(m.TenantID, m.DeviceID, "heartbeat") }
 
 // Telemetry takes one reading of every sensor at the given time and returns it as a batch; each reading gets the
@@ -183,32 +235,7 @@ func (m *Module) Telemetry(at time.Time) ([]byte, error) {
 
 	batch := Batch{DeviceID: m.DeviceID, Measurements: make([]Measurement, 0, len(sensors))}
 	for _, sensor := range sensors {
-		m.sequence++
-		v := math.Round((sensor.Base+(m.rng.Float64()*2-1)*sensor.Swing)*100) / 100
-
-		unit := sensor.Unit
-		switch {
-		case sensor.Metric == "power" && m.powerOff:
-			v = 0
-		case sensor.Metric == "temperature" && m.telemetry == "unit_mismatch":
-			unit = "K"
-		case sensor.Metric == "temperature" && m.telemetry == "out_of_range":
-			v = 250
-		}
-
-		measurement := Measurement{
-			SensorID:   sensor.ID,
-			Metric:     sensor.Metric,
-			Value:      &v,
-			Unit:       unit,
-			ObservedAt: observed,
-			Sequence:   m.sequence,
-		}
-		if m.telemetry == "missing" {
-			measurement.Value = nil
-		}
-
-		batch.Measurements = append(batch.Measurements, measurement)
+		batch.Measurements = append(batch.Measurements, m.measure(sensor, observed))
 	}
 
 	out, err := json.Marshal(batch)
@@ -250,9 +277,21 @@ type Observed struct {
 	SetpointCelsius float64 `json:"setpointCelsius"`
 }
 
-// CommandTopic and AckTopic are the downward and upward topics of the command exchange.
+// CommandTopic is the downward topic of the command exchange: the module hears its commands on it.
 func (m *Module) CommandTopic() string { return Topic(m.TenantID, m.DeviceID, "cmd") }
-func (m *Module) AckTopic() string     { return Topic(m.TenantID, m.DeviceID, "cmd/ack") }
+
+// AckTopic is the upward topic of the command exchange: the module answers on it.
+func (m *Module) AckTopic() string { return Topic(m.TenantID, m.DeviceID, "cmd/ack") }
+
+// The results an acknowledgement reports.
+const (
+	resultApplied     = "applied"
+	resultExpired     = "expired"
+	resultUnsupported = "unsupported"
+)
+
+// lateAnswerDelay is how long after a command's expiry a module that answers late (pattern late) sends its answer.
+const lateAnswerDelay = 2 * time.Second
 
 // Acknowledge applies a command to the module and returns the acknowledgement and when to send it. A command the module
 // has already passed its expiry for is not applied; the acknowledgement says so, and the module keeps its state.
@@ -271,12 +310,12 @@ func (m *Module) Acknowledge(raw []byte, when time.Time) ([]byte, time.Time, err
 		return nil, when, nil
 	}
 
-	result, sendAt := "applied", when
+	result, sendAt := resultApplied, when
 	switch {
 	case !when.Before(command.ExpiresAt):
-		result = "expired"
+		result = resultExpired
 	case m.commands == "reject" || command.Kind != "set_temperature":
-		result = "unsupported"
+		result = resultUnsupported
 	case command.Setpoint != nil:
 		m.setpoint = *command.Setpoint
 		if m.state != nil {
@@ -285,8 +324,8 @@ func (m *Module) Acknowledge(raw []byte, when time.Time) ([]byte, time.Time, err
 		}
 	}
 
-	if m.commands == "late" && result == "applied" {
-		sendAt = command.ExpiresAt.Add(2 * time.Second)
+	if m.commands == "late" && result == resultApplied {
+		sendAt = command.ExpiresAt.Add(lateAnswerDelay)
 	}
 
 	raw, err = json.Marshal(
@@ -319,6 +358,9 @@ func (m *Module) Keep() ([]byte, error) {
 	return out, apperr.Wrap(err, "json.Marshal")
 }
 
+// errOutOfRange refuses a kept setpoint outside 16–30 °C.
+var errOutOfRange = errors.New("out of range")
+
 // Restore applies a kept state read back from the broker; a setpoint outside 16–30 °C is ignored.
 func (m *Module) Restore(raw []byte) error {
 	var kept Kept
@@ -329,7 +371,7 @@ func (m *Module) Restore(raw []byte) error {
 	}
 
 	if kept.SetpointCelsius < 16 || kept.SetpointCelsius > 30 {
-		return fmt.Errorf("kept setpoint %v out of range", kept.SetpointCelsius)
+		return fmt.Errorf("kept setpoint %v %w", kept.SetpointCelsius, errOutOfRange)
 	}
 
 	m.setpoint = kept.SetpointCelsius
@@ -339,4 +381,37 @@ func (m *Module) Restore(raw []byte) error {
 	}
 
 	return nil
+}
+
+// hundredths rounds a simulated reading to two decimals.
+const hundredths = 100
+
+// measure takes one reading of a sensor with the next sequence number, changed as the module's pattern says.
+func (m *Module) measure(sensor Sensor, observed time.Time) Measurement {
+	m.sequence++
+	value := math.Round((sensor.Base+(m.rng.Float64()*2-1)*sensor.Swing)*hundredths) / hundredths
+
+	unit := sensor.Unit
+	switch {
+	case sensor.Metric == metricPower && m.powerOff:
+		value = 0
+	case sensor.Metric == metricTemperature && m.telemetry == "unit_mismatch":
+		unit = "K"
+	case sensor.Metric == metricTemperature && m.telemetry == "out_of_range":
+		value = 250
+	}
+
+	measurement := Measurement{
+		SensorID:   sensor.ID,
+		Metric:     sensor.Metric,
+		Value:      &value,
+		Unit:       unit,
+		ObservedAt: observed,
+		Sequence:   m.sequence,
+	}
+	if m.telemetry == "missing" {
+		measurement.Value = nil
+	}
+
+	return measurement
 }

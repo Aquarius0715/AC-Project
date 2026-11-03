@@ -1,17 +1,24 @@
-package logging
+package logging_test
 
 import (
 	"bytes"
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/pradita/ac-project/service/api/internal/platform/logging"
 )
+
+// errConnect carries a connection URL with its password, as a driver error does.
+var errConnect = errors.New(`connect postgres://ac_app_login:hunter2@db:5432/ac failed`)
 
 // IR369: what must never reach a log line is masked, whatever the code passes; IDs, dates and paths stay readable.
 func TestMasking(t *testing.T) {
+	t.Parallel()
+
 	var buf bytes.Buffer
 
-	log := New(&buf, "test")
+	log := logging.New(&buf, "test")
 	log.Info(
 		"sign-in for aisha@example.com failed",
 		"access_token",
@@ -33,7 +40,7 @@ func TestMasking(t *testing.T) {
 		"latency_ms",
 		12,
 		"err",
-		errors.New(`connect postgres://ac_app_login:hunter2@db:5432/ac failed`),
+		errConnect,
 	)
 
 	out := buf.String()

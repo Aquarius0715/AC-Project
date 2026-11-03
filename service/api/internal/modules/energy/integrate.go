@@ -75,12 +75,12 @@ func Integrate(
 
 	for rows.Next() {
 		var (
-			v                     *float64
+			value                     *float64
 			unit, origin, quality string
 			boundary              *string
 		)
 
-		err := rows.Scan(&v, &unit, &origin, &quality, &boundary)
+		err := rows.Scan(&value, &unit, &origin, &quality, &boundary)
 		if err != nil {
 			return out, apperr.Wrap(err, "select energy.ref_power_samples")
 		}
@@ -90,11 +90,11 @@ func Integrate(
 			warn["non_measured_input"] = true
 		case boundary == nil || *boundary != Boundary:
 			warn["boundary_mismatch"] = true
-		case quality != "valid" || v == nil || unit != "kW":
+		case quality != "valid" || value == nil || unit != "kW":
 		default:
 			out.ValidSlots++
 
-			sum.Add(sum, new(big.Rat).Quo(new(big.Rat).SetFloat64(*v), big.NewRat(60, 1)))
+			sum.Add(sum, new(big.Rat).Quo(new(big.Rat).SetFloat64(*value), big.NewRat(60, 1)))
 		}
 	}
 

@@ -39,9 +39,16 @@ type Input struct {
 	Filters json.RawMessage `json:"filters" swaggertype:"object"`
 }
 
+// The summary kinds: one per signed-in role.
+const (
+	kindCustomer   = "customer"
+	kindPartner    = "partner"
+	kindTechnician = "technician"
+)
+
 // Validate implements ops.Validator.
 func (in *Input) Validate() map[string]string {
-	if in.Kind != "customer" && in.Kind != "partner" && in.Kind != "technician" {
+	if in.Kind != kindCustomer && in.Kind != kindPartner && in.Kind != kindTechnician {
 		return map[string]string{"kind": apperr.KeyInvalid}
 	}
 
@@ -74,10 +81,18 @@ type Summary struct {
 	AsOf   time.Time `json:"asOf"`
 }
 
-var roleKind = map[string]string{
-	"client":     "customer",
-	"contractor": "partner",
-	"technician": "technician",
+// kindOfRole is the summary kind the role reads.
+func kindOfRole(role string) string {
+	switch role {
+	case "client":
+		return kindCustomer
+	case "contractor":
+		return kindPartner
+	case "technician":
+		return kindTechnician
+	default:
+		return ""
+	}
 }
 
 // get serves summaries.get.
@@ -116,101 +131,100 @@ var roleKind = map[string]string{
 //	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/summaries/{kind} [get]
-func (m Summaries) get(ctx context.Context, call *ops.Call, in *Input) (Summary, error) {
-	if roleKind[call.Principal.Role] != in.Kind {
+func (m Summaries) get(ctx context.Context, call *ops.Call, input *Input) (Summary, error) {
+	if kindOfRole(call.Principal.Role) != input.Kind {
 		return Summary{}, apperr.E(apperr.Forbidden, apperr.KeyForbidden)
 	}
 
-	out := Summary{
-		Kind: in.Kind,
-		AsOf: call.Now,
-		Counts: Counts{
-			Total:           0,
-			Online:          0,
-			Offline:         0,
-			Unknown:         0,
-			PowerOn:         0,
-			PowerOff:        0,
-			PowerUnknown:    0,
-			AlertCount:      0,
-			OfferCount:      0,
-			ActiveCount:     0,
-			ReviewCount:     0,
-			ScheduledCount:  0,
-			InProgressCount: 0,
-			OverdueCount:    0,
-			AssignedCount:   0,
-		},
-	}
-	if in.Kind == "customer" { // equipment metrics only; job conditions are VALIDATION (IR26)
-		var f struct {
-			CustomerID *uuid.UUID   `json:"customerId,omitempty"`
-			PropertyID *uuid.UUID   `json:"propertyId,omitempty"`
-			UnitID     *uuid.UUID   `json:"unitId,omitempty"`
-			UnitIDs    *[]uuid.UUID `json:"unitIds,omitempty"`
-			From       *time.Time   `json:"from,omitempty"`
-			To         *time.Time   `json:"to,omitempty"`
-		}
+	var (
+		counts Counts
+		err    error
+	)
 
-		if len(in.Filters) > 0 && string(in.Filters) != "null" {
-			dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
-			dec.DisallowUnknownFields()
-
-			if dec.Decode(&f) != nil {
-				return Summary{}, apperr.Fields(map[string]string{"filters": apperr.KeyInvalid})
-			}
-		}
-
-		if f.From != nil && f.To != nil && !f.From.Before(*f.To) {
-			return Summary{}, apperr.Fields(map[string]string{"filters.to": apperr.KeyRange})
-		}
-
-		unitCounts, err := m.Units.CountUnits(
-			ctx,
-			call,
-			true,
-			f.UnitIDs,
-			f.CustomerID,
-			f.PropertyID,
-			f.UnitID,
-		)
-		if err != nil {
-			return Summary{}, apperr.Wrap(err, "summaries.Units.CountUnits")
-		}
-
-		out.Counts = Counts{
-			Total:           unitCounts.Total,
-			Online:          unitCounts.Online,
-			Offline:         unitCounts.Offline,
-			Unknown:         unitCounts.Unknown,
-			PowerOn:         unitCounts.PowerOn,
-			PowerOff:        unitCounts.PowerOff,
-			PowerUnknown:    unitCounts.PowerUnknown,
-			AlertCount:      unitCounts.AlertCount,
-			OfferCount:      0,
-			ActiveCount:     0,
-			ReviewCount:     0,
-			ScheduledCount:  0,
-			InProgressCount: 0,
-			OverdueCount:    0,
-			AssignedCount:   0,
-		}
-
-		return out, nil
+	if input.Kind == kindCustomer { // equipment metrics only; job conditions are VALIDATION (IR26)
+		counts, err = m.customerCounts(ctx, call, input.Filters)
+	} else {
+		counts, err = m.jobSummaryCounts(ctx, call, input)
 	}
 
+	if err != nil {
+		return Summary{}, err
+	}
+
+	return Summary{Kind: input.Kind, AsOf: call.Now, Counts: counts}, nil
+}
+
+// customerCounts counts the customer's equipment narrowed by the filters.
+func (m Summaries) customerCounts(ctx context.Context, call *ops.Call, filters json.RawMessage) (Counts, error) {
+	var filter struct {
+		CustomerID *uuid.UUID   `json:"customerId,omitempty"`
+		PropertyID *uuid.UUID   `json:"propertyId,omitempty"`
+		UnitID     *uuid.UUID   `json:"unitId,omitempty"`
+		UnitIDs    *[]uuid.UUID `json:"unitIds,omitempty"`
+		From       *time.Time   `json:"from,omitempty"`
+		To         *time.Time   `json:"to,omitempty"`
+	}
+
+	if len(filters) > 0 && string(filters) != "null" {
+		dec := json.NewDecoder(strings.NewReader(string(filters)))
+		dec.DisallowUnknownFields()
+
+		if dec.Decode(&filter) != nil {
+			return Counts{}, apperr.Fields(map[string]string{"filters": apperr.KeyInvalid})
+		}
+	}
+
+	if filter.From != nil && filter.To != nil && !filter.From.Before(*filter.To) {
+		return Counts{}, apperr.Fields(map[string]string{"filters.to": apperr.KeyRange})
+	}
+
+	unitCounts, err := m.Units.CountUnits(
+		ctx,
+		call,
+		true,
+		filter.UnitIDs,
+		filter.CustomerID,
+		filter.PropertyID,
+		filter.UnitID,
+	)
+	if err != nil {
+		return Counts{}, apperr.Wrap(err, "summaries.Units.CountUnits")
+	}
+
+	return Counts{
+		Total:           unitCounts.Total,
+		Online:          unitCounts.Online,
+		Offline:         unitCounts.Offline,
+		Unknown:         unitCounts.Unknown,
+		PowerOn:         unitCounts.PowerOn,
+		PowerOff:        unitCounts.PowerOff,
+		PowerUnknown:    unitCounts.PowerUnknown,
+		AlertCount:      unitCounts.AlertCount,
+		OfferCount:      0,
+		ActiveCount:     0,
+		ReviewCount:     0,
+		ScheduledCount:  0,
+		InProgressCount: 0,
+		OverdueCount:    0,
+		AssignedCount:   0,
+	}, nil
+}
+
+// jobSummaryCounts counts a partner's or technician's jobs (maintenance); a technician also gets the counts of the
+// assigned equipment.
+func (m Summaries) jobSummaryCounts(ctx context.Context, call *ops.Call, input *Input) (Counts, error) {
 	jobCounts, err := ops.Ask[maintenance.JobCounts](
 		ctx,
 		m.Registry,
 		call,
 		maintenance.QueryCountJobs,
-		maintenance.CountJobsInput{Filters: in.Filters},
+		maintenance.CountJobsInput{Filters: input.Filters},
 	)
 	if err != nil {
-		return Summary{}, err
+		return Counts{}, err
 	}
 
-	out.Counts = Counts{
+	counts := Counts{
 		OfferCount:      jobCounts.Offer,
 		ActiveCount:     jobCounts.Active,
 		ReviewCount:     jobCounts.Review,
@@ -227,21 +241,22 @@ func (m Summaries) get(ctx context.Context, call *ops.Call, in *Input) (Summary,
 		PowerUnknown:    0,
 		AlertCount:      0,
 	}
-	if in.Kind == "technician" { // assigned-equipment counts deduplicate the units of current rows (IR26, IR49)
+	if input.Kind == kindTechnician { // assigned-equipment counts deduplicate the units of current rows (IR26, IR49)
 		ids := jobCounts.Units
 		if ids == nil {
 			ids = []uuid.UUID{}
 		}
 
-		n, err := m.Units.CountUnits(ctx, call, false, &ids, nil, nil, nil)
+		equipment, err := m.Units.CountUnits(ctx, call, false, &ids, nil, nil, nil)
 		if err != nil {
-			return Summary{}, apperr.Wrap(err, "summaries.Units.CountUnits")
+			return Counts{}, apperr.Wrap(err, "summaries.Units.CountUnits")
 		}
 
-		out.Counts.Total, out.Counts.Online, out.Counts.Offline, out.Counts.Unknown = n.Total, n.Online, n.Offline, n.Unknown
+		counts.Total, counts.Online, counts.Offline, counts.Unknown = equipment.Total, equipment.Online,
+			equipment.Offline, equipment.Unknown
 	}
 
-	return out, nil
+	return counts, nil
 }
 
 // Register binds summaries.get.

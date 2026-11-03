@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
@@ -90,51 +91,19 @@ type Filter struct {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/audit [get]
-func list(ctx context.Context, call *ops.Call, in *paging.Query) (paging.Page[View], error) {
-	var filter Filter
-
-	bad := apperr.Fields(map[string]string{"filters": apperr.KeyInvalid})
-	if len(in.Filters) == 0 {
-		return paging.Page[View]{}, apperr.Fields(
-			map[string]string{"filters.from": apperr.KeyRequired, "filters.to": apperr.KeyRequired},
-		)
-	}
-
-	dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
-	dec.DisallowUnknownFields()
-
-	if dec.Decode(&filter) != nil ||
-		(filter.Result != nil && !slices.Contains([]string{"success", "denied", "failed", "pending"}, *filter.Result)) {
-		return paging.Page[View]{}, bad
-	}
-
-	if filter.From == nil ||
-		filter.To == nil { // the period is required: name the end that is missing
-		fieldErrs := map[string]string{}
-		if filter.From == nil {
-			fieldErrs["filters.from"] = apperr.KeyRequired
-		}
-
-		if filter.To == nil {
-			fieldErrs["filters.to"] = apperr.KeyRequired
-		}
-
-		return paging.Page[View]{}, apperr.Fields(fieldErrs)
-	}
-
-	if !filter.From.Before(*filter.To) || filter.To.Sub(*filter.From) > 366*24*time.Hour {
-		return paging.Page[View]{}, apperr.Fields(
-			map[string]string{"filters.to": "errors.period_range"},
-		)
+func list(ctx context.Context, call *ops.Call, query *paging.Query) (paging.Page[View], error) {
+	filter, err := decodeFilter(query.Filters)
+	if err != nil {
+		return paging.Page[View]{}, err
 	}
 
 	order, err := paging.OrderBy(
-		in.Sort,
+		query.Sort,
 		map[string]string{
 			"id":         "a.id",
-			"occurredAt": "a.occurred_at",
-			"createdAt":  "a.occurred_at",
-			"updatedAt":  "a.occurred_at",
+			"occurredAt": occurredAtCol,
+			"createdAt":  occurredAtCol,
+			"updatedAt":  occurredAtCol,
 		},
 		"a.occurred_at DESC, a.id DESC",
 	) // entries are immutable: created = updated = occurred
@@ -142,30 +111,12 @@ func list(ctx context.Context, call *ops.Call, in *paging.Query) (paging.Page[Vi
 		return paging.Page[View]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	window, err := paging.Resolve(*in, filter, call.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, filter, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[View]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
-	args := []any{*filter.From, *filter.To}
-	add := func(v any) string {
-		args = append(args, v)
-
-		return fmt.Sprintf("$%d", len(args))
-	}
-	conds := []string{"a.occurred_at >= $1", "a.occurred_at < $2"}
-
-	for col, v := range map[string]*string{
-		"a.actor_id": filter.ActorID, "a.target_kind": filter.TargetKind, "a.target_id": filter.TargetID,
-		"a.correlation_id": filter.CorrelationID,
-		"a.result":         filter.Result, "a.action": filter.Action,
-	} {
-		if v != nil {
-			conds = append(conds, col+" = "+add(*v))
-		}
-	}
-
-	where := strings.Join(conds, " AND ")
+	where, args := filterWhere(filter)
 
 	var total int
 
@@ -196,35 +147,11 @@ func list(ctx context.Context, call *ops.Call, in *paging.Query) (paging.Page[Vi
 	items := []View{}
 
 	for rows.Next() {
-		var (
-			view     View
-			kind, id string
-		)
-
-		err := rows.Scan(
-			&view.ID,
-			&view.TenantID,
-			&view.ActorID,
-			&view.ActorName,
-			&view.ActorRoleAtTime,
-			&view.Action,
-			&kind,
-			&id,
-			&view.PreviousVersion,
-			&view.NextVersion,
-			&view.OccurredAt,
-			&view.CorrelationID,
-			&view.Result,
-			&view.MaskedBefore,
-			&view.MaskedAfter,
-			&view.Reason,
-		)
+		view, err := scanView(rows)
 		if err != nil {
-			return paging.Page[View]{}, apperr.Wrap(err, "select audit.audit_log")
+			return paging.Page[View]{}, err
 		}
 
-		view.Version, view.CreatedAt, view.UpdatedAt = 1, view.OccurredAt, view.OccurredAt
-		view.TargetRef = map[string]string{"kind": kind, "id": id}
 		items = append(items, view)
 	}
 
@@ -239,6 +166,113 @@ func list(ctx context.Context, call *ops.Call, in *paging.Query) (paging.Page[Vi
 		Total:           total,
 		SnapshotVersion: window.Snapshot,
 	}, nil
+}
+
+// occurredAtCol orders by the entry time: entries are immutable, so it is also their created and updated time.
+const occurredAtCol = "a.occurred_at"
+
+// decodeFilter reads the audit.list filters: the period [from, to) is required and at most 366 days long.
+func decodeFilter(raw json.RawMessage) (Filter, error) {
+	var filter Filter
+
+	bad := apperr.Fields(map[string]string{"filters": apperr.KeyInvalid})
+	if len(raw) == 0 {
+		return filter, apperr.Fields(
+			map[string]string{"filters.from": apperr.KeyRequired, "filters.to": apperr.KeyRequired},
+		)
+	}
+
+	dec := json.NewDecoder(strings.NewReader(string(raw)))
+	dec.DisallowUnknownFields()
+
+	if dec.Decode(&filter) != nil ||
+		(filter.Result != nil && !slices.Contains([]string{"success", "denied", "failed", "pending"}, *filter.Result)) {
+		return filter, bad
+	}
+
+	if filter.From == nil ||
+		filter.To == nil { // the period is required: name the end that is missing
+		return filter, apperr.Fields(missingPeriodEnds(filter))
+	}
+
+	if !filter.From.Before(*filter.To) || filter.To.Sub(*filter.From) > 366*24*time.Hour {
+		return filter, apperr.Fields(
+			map[string]string{"filters.to": "errors.period_range"},
+		)
+	}
+
+	return filter, nil
+}
+
+func missingPeriodEnds(filter Filter) map[string]string {
+	fieldErrs := map[string]string{}
+	if filter.From == nil {
+		fieldErrs["filters.from"] = apperr.KeyRequired
+	}
+
+	if filter.To == nil {
+		fieldErrs["filters.to"] = apperr.KeyRequired
+	}
+
+	return fieldErrs
+}
+
+// filterWhere returns the condition of the filters and its arguments: the period ($1, $2), then each given equality
+// filter.
+func filterWhere(filter Filter) (string, []any) {
+	args := []any{*filter.From, *filter.To}
+	add := func(v any) string {
+		args = append(args, v)
+
+		return fmt.Sprintf("$%d", len(args))
+	}
+	conds := []string{"a.occurred_at >= $1", "a.occurred_at < $2"}
+
+	for col, value := range map[string]*string{
+		"a.actor_id": filter.ActorID, "a.target_kind": filter.TargetKind, "a.target_id": filter.TargetID,
+		"a.correlation_id": filter.CorrelationID,
+		"a.result":         filter.Result, "a.action": filter.Action,
+	} {
+		if value != nil {
+			conds = append(conds, col+" = "+add(*value))
+		}
+	}
+
+	return strings.Join(conds, " AND "), args
+}
+
+func scanView(rows pgx.Rows) (View, error) {
+	var (
+		view           View
+		kind, targetID string
+	)
+
+	err := rows.Scan(
+		&view.ID,
+		&view.TenantID,
+		&view.ActorID,
+		&view.ActorName,
+		&view.ActorRoleAtTime,
+		&view.Action,
+		&kind,
+		&targetID,
+		&view.PreviousVersion,
+		&view.NextVersion,
+		&view.OccurredAt,
+		&view.CorrelationID,
+		&view.Result,
+		&view.MaskedBefore,
+		&view.MaskedAfter,
+		&view.Reason,
+	)
+	if err != nil {
+		return view, apperr.Wrap(err, "select audit.audit_log")
+	}
+
+	view.Version, view.CreatedAt, view.UpdatedAt = 1, view.OccurredAt, view.OccurredAt
+	view.TargetRef = map[string]string{"kind": kind, "id": targetID}
+
+	return view, nil
 }
 
 // Register binds audit.list.
