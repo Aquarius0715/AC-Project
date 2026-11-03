@@ -475,7 +475,8 @@ func (m Commands) get(ctx context.Context, call *ops.Call, in *GetInput) (Comman
 
 		ok := found &&
 			((call.Principal.Role == authz.RoleClient && target.OrgID == call.Principal.OrgID) ||
-				(call.Principal.Role == authz.RoleTechnician && inScope(call.Principal, command.UnitID, target.PropertyID, target.OrgID)))
+				(call.Principal.Role == authz.RoleTechnician &&
+					inScope(call.Principal, command.UnitID, target.PropertyID, target.OrgID)))
 		if !ok {
 			return Command{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}

@@ -937,7 +937,10 @@ func (m Partners) saveRateCard(
 		return RateCard{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
-	lines, _ := json.Marshal(input.Lines)
+	lines, marshalErr := json.Marshal(input.Lines)
+	if marshalErr != nil {
+		return RateCard{}, apperr.Wrap(marshalErr, "json.Marshal")
+	}
 
 	rateCard, err := scanRateCard(
 		call.Tx.QueryRow(

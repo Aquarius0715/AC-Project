@@ -237,7 +237,10 @@ func (m FollowUps) rateJob(ctx context.Context, call *ops.Call, input *RateInput
 		rating.RatedAt, rating.EditableUntil = prev.RatedAt, prev.EditableUntil
 	}
 
-	raw, _ := json.Marshal(rating)
+	raw, marshalErr := json.Marshal(rating)
+	if marshalErr != nil {
+		return Job{}, apperr.Wrap(marshalErr, "json.Marshal")
+	}
 
 	bumpErr := m.bump(
 		ctx,
@@ -459,7 +462,10 @@ func (m FollowUps) reportProblemJob(
 		requested = Slot{start.UTC(), start.Add(3 * time.Hour).UTC()}
 	}
 
-	pref, _ := json.Marshal(preferred)
+	pref, marshalErr := json.Marshal(preferred)
+	if marshalErr != nil {
+		return Job{}, apperr.Wrap(marshalErr, "json.Marshal")
+	}
 
 	var followUpID uuid.UUID
 
@@ -735,7 +741,10 @@ func (m FollowUps) saveCostJob(ctx context.Context, call *ops.Call, input *CostI
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
-	raw, _ := json.Marshal(input.CostLines)
+	raw, marshalErr := json.Marshal(input.CostLines)
+	if marshalErr != nil {
+		return Job{}, apperr.Wrap(marshalErr, "json.Marshal")
+	}
 
 	bumpErr := m.bump(ctx, call, input.JobID, "costs = $2", raw)
 	if bumpErr != nil {
@@ -999,7 +1008,10 @@ func (m FollowUps) recordWarrantyClaimJob(
 		},
 	)
 
-	raw, _ := json.Marshal(claims)
+	raw, marshalErr := json.Marshal(claims)
+	if marshalErr != nil {
+		return Job{}, apperr.Wrap(marshalErr, "json.Marshal")
+	}
 
 	bumpErr := m.bump(ctx, call, input.JobID, "warranty_claims = $2", raw)
 	if bumpErr != nil {

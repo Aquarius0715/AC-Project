@@ -22,13 +22,16 @@ func (m Restrictions) RequestRelease(
 	restrictionID uuid.UUID,
 	source string,
 ) error {
-	intent, _ := json.Marshal(
+	intent, marshalErr := json.Marshal(
 		map[string]any{
 			keySource:           source,
 			"at":                call.Now,
 			"actorMembershipId": call.Principal.MembershipID,
 		},
 	)
+	if marshalErr != nil {
+		return apperr.Wrap(marshalErr, "json.Marshal")
+	}
 
 	_, err := call.Tx.Exec(
 		ctx,
@@ -101,13 +104,16 @@ func (m Restrictions) evaluateRelease(ctx context.Context, call *ops.Call, id uu
 		return apperr.Wrap(rowsErr, "select restrictions.restriction_units")
 	}
 
-	remove, _ := json.Marshal(
+	remove, marshalErr := json.Marshal(
 		map[string]any{
 			keyKind:          actionRemoveRestriction,
 			keyRestrictionID: id,
 			keyRulesVersion:  rules,
 		},
 	)
+	if marshalErr != nil {
+		return apperr.Wrap(marshalErr, "json.Marshal")
+	}
 
 	for _, pendingUnit := range units {
 		set := func(sql string, args ...any) error {

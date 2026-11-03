@@ -619,7 +619,10 @@ func membersSave(ctx context.Context, c *ops.Call, input *MemberInput) (Member, 
 		authz.RoleContractor: orgKindContractor,
 	}[input.Role]
 	if input.Role == authz.RoleTechnician {
-		want = map[string]string{employmentInternal: orgKindOperator, employmentExternal: orgKindContractor}[*input.Employment]
+		want = map[string]string{
+			employmentInternal: orgKindOperator,
+			employmentExternal: orgKindContractor,
+		}[*input.Employment]
 	}
 
 	if kind != want {

@@ -503,13 +503,16 @@ func (m Restrictions) reconcile(
 		return nil, err
 	}
 
-	remove, _ := json.Marshal(
+	remove, marshalErr := json.Marshal(
 		map[string]any{
 			keyKind:          actionRemoveRestriction,
 			keyRestrictionID: restriction.ID,
 			keyRulesVersion:  restriction.RulesVersion,
 		},
 	)
+	if marshalErr != nil {
+		return nil, apperr.Wrap(marshalErr, "json.Marshal")
+	}
 
 	for _, unit := range targets {
 		if unit.ApplyState != applySentUnknown {
@@ -748,7 +751,7 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, input *RetryInput)
 		return nil, apperr.E(apperr.Conflict, "errors.restriction_state")
 	}
 
-	action, _ := json.Marshal(
+	action, marshalErr := json.Marshal(
 		map[string]any{
 			keyKind:          actionApplyRestriction,
 			keyRestrictionID: restriction.ID,
@@ -756,14 +759,23 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, input *RetryInput)
 			keyPolicy:        restriction.Policy,
 		},
 	)
+	if marshalErr != nil {
+		return nil, apperr.Wrap(marshalErr, "json.Marshal")
+	}
+
 	if input.Phase == phaseRelease {
-		action, _ = json.Marshal(
+		marshaled, marshalErr := json.Marshal(
 			map[string]any{
 				keyKind:          actionRemoveRestriction,
 				keyRestrictionID: restriction.ID,
 				keyRulesVersion:  restriction.RulesVersion,
 			},
 		)
+		if marshalErr != nil {
+			return nil, apperr.Wrap(marshalErr, "json.Marshal")
+		}
+
+		action = marshaled
 	}
 
 	changed := false

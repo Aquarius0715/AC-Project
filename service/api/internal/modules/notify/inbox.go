@@ -1083,7 +1083,8 @@ func (Inbox) preview(ctx context.Context, c *ops.Call, input *PreviewInput) (Not
 	}
 
 	typ, status := input.TemplateKey, input.TemplateKey
-	if typ == noticeAlert { // as the notifier sends it: a fault of the policy's severity about an open alert (IR104, IR348)
+	// as the notifier sends it: a fault of the policy's severity about an open alert (IR104, IR348)
+	if typ == noticeAlert {
 		typ, status = "fault", "open"
 	}
 

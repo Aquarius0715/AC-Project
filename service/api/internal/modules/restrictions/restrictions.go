@@ -311,7 +311,13 @@ func maskForClient(restriction *Restriction) {
 		var ri map[string]any
 		if json.Unmarshal(restriction.ReleaseIntent, &ri) == nil {
 			ri["actorMembershipId"] = "masked"
-			restriction.ReleaseIntent, _ = json.Marshal(ri)
+
+			masked, err := json.Marshal(ri)
+			if err != nil {
+				masked = nil // never the unmasked intent
+			}
+
+			restriction.ReleaseIntent = masked
 		}
 	}
 }
@@ -321,7 +327,10 @@ func releaseView(restriction Restriction) ReleaseView {
 
 	var ri map[string]any
 	if json.Unmarshal(restriction.ReleaseIntent, &ri) == nil && ri != nil {
-		intent, _ = json.Marshal(map[string]any{keySource: ri[keySource], "at": ri["at"]})
+		view, err := json.Marshal(map[string]any{keySource: ri[keySource], "at": ri["at"]})
+		if err == nil {
+			intent = view
+		}
 	}
 
 	return ReleaseView{

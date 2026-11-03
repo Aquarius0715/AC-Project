@@ -137,7 +137,8 @@ func clientUsersList(
 		dec.DisallowUnknownFields()
 
 		if dec.Decode(&filters) != nil ||
-			(filters.Status != nil && !slices.Contains([]string{statusInvited, statusActive, statusDisabled}, *filters.Status)) ||
+			(filters.Status != nil &&
+				!slices.Contains([]string{statusInvited, statusActive, statusDisabled}, *filters.Status)) ||
 			(filters.ClientRole != nil && *filters.ClientRole != clientRoleOwner && *filters.ClientRole != clientRoleMember) {
 			return paging.Page[ClientUser]{}, apperr.Fields(
 				map[string]string{keyFilters: apperr.KeyInvalid},
@@ -522,8 +523,8 @@ func clientUsersSave(ctx context.Context, call *ops.Call, in *ClientUserInput) (
 		return clientUser, apperr.E(apperr.Conflict, "errors.invite_pending")
 	}
 
-	if clientUser.RevokedAt != nil &&
-		status != statusDisabled { // HQ ended the access: a save would open the membership again, only HQ gives it back (IR508)
+	// HQ ended the access: a save would open the membership again, only HQ gives it back (IR508)
+	if clientUser.RevokedAt != nil && status != statusDisabled {
 		return clientUser, apperr.E(apperr.Conflict, "errors.revoked_by_hq")
 	}
 

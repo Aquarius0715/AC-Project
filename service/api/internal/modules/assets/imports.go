@@ -472,7 +472,10 @@ func (m *Module) unitsImportPreview(
 		}
 	}
 
-	rows, _ := json.Marshal(stored)
+	rows, marshalErr := json.Marshal(stored)
+	if marshalErr != nil {
+		return ImportPreview{}, apperr.Wrap(marshalErr, "json.Marshal")
+	}
 	// the preview is not business data: stored outside the operation's read-only transaction
 	runErr := m.Store.Run(ctx, false, call.Principal, func(tx pgx.Tx) error {
 		_, err := tx.Exec(

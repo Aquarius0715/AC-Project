@@ -124,8 +124,10 @@ func partnerUsersList(
 		dec.DisallowUnknownFields()
 
 		if dec.Decode(&filters) != nil ||
-			(filters.Status != nil && !slices.Contains([]string{statusInvited, statusActive, statusDisabled}, *filters.Status)) ||
-			(filters.PartnerRole != nil && *filters.PartnerRole != authz.RoleContractor && *filters.PartnerRole != authz.RoleTechnician) {
+			(filters.Status != nil &&
+				!slices.Contains([]string{statusInvited, statusActive, statusDisabled}, *filters.Status)) ||
+			(filters.PartnerRole != nil &&
+				*filters.PartnerRole != authz.RoleContractor && *filters.PartnerRole != authz.RoleTechnician) {
 			return paging.Page[PartnerUser]{}, apperr.Fields(
 				map[string]string{keyFilters: apperr.KeyInvalid},
 			)

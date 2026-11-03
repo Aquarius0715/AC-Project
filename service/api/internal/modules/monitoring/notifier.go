@@ -667,15 +667,26 @@ func (n Notifier) Evaluate(
 				outcome.NotificationIDs, outcome.FailureIDs = []uuid.UUID{}, []uuid.UUID{}
 			}
 
-			raw, _ = json.Marshal(struct {
+			marshaled, marshalErr := json.Marshal(struct {
 				Outcome
 
 				NotificationIDs []uuid.UUID `json:"notificationIds"`
 				FailureIDs      []uuid.UUID `json:"failureIds"`
 			}{outcome, outcome.NotificationIDs, outcome.FailureIDs})
+			if marshalErr != nil {
+				return nil, apperr.Wrap(marshalErr, "json.Marshal")
+			}
+
+			raw = marshaled
 		} else {
 			outcome.NotificationIDs, outcome.FailureIDs = nil, nil
-			raw, _ = json.Marshal(outcome)
+
+			marshaled, marshalErr := json.Marshal(outcome)
+			if marshalErr != nil {
+				return nil, apperr.Wrap(marshalErr, "json.Marshal")
+			}
+
+			raw = marshaled
 		}
 
 		out = append(out, raw)
@@ -775,7 +786,12 @@ func deliveryFailure(
 			"deliveryState": outcomeFailed,
 		},
 	)
-	b, _ := json.Marshal(failures)
+
+	b, marshalErr := json.Marshal(failures)
+	if marshalErr != nil {
+		return uuid.Nil, apperr.Wrap(marshalErr, "json.Marshal")
+	}
+
 	_, err := call.Tx.Exec(
 		ctx,
 		`UPDATE monitoring.alerts SET delivery_failures = $2, updated_at = $3 WHERE id = $1`,

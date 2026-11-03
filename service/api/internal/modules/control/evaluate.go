@@ -439,7 +439,11 @@ func (m Automations) Notify(
 	units := append([]uuid.UUID{}, input.UnitIDs...)
 	sort.Slice(units, func(i, j int) bool { return units[i].String() < units[j].String() })
 
-	facts, _ := json.Marshal(input.Facts)
+	facts, marshalErr := json.Marshal(input.Facts)
+	if marshalErr != nil {
+		return nil, apperr.Wrap(marshalErr, "json.Marshal")
+	}
+
 	for _, u := range units {
 		ns, err := m.Notifier.Evaluate(ctx, call, u, facts, input.OccurredAt, input.EventID, true)
 		if err != nil {
@@ -924,7 +928,10 @@ func (m Automations) evaluate(
 
 		if notify &&
 			m.Notifier != nil { // notification results are independent of the control decision (SR21/SR25)
-			factsJSON, _ := json.Marshal(input.Facts)
+			factsJSON, marshalErr := json.Marshal(input.Facts)
+			if marshalErr != nil {
+				return Result{}, apperr.Wrap(marshalErr, "json.Marshal")
+			}
 
 			notifications, err := m.Notifier.Evaluate(
 				ctx,
@@ -1079,11 +1086,15 @@ func (m Automations) fire(
 		return Result{}, targetsErr
 	}
 
-	norm, _ := json.Marshal(struct {
+	norm, marshalErr := json.Marshal(struct {
 		O time.Time
 		U []uuid.UUID
 		F []Fact
 	}{input.OccurredAt.UTC(), input.UnitIDs, input.Facts})
+	if marshalErr != nil {
+		return Result{}, apperr.Wrap(marshalErr, "json.Marshal")
+	}
+
 	sum := sha256.Sum256(norm)
 	hash := hex.EncodeToString(sum[:])
 
@@ -1144,7 +1155,10 @@ func (m Automations) fire(
 		return result, err
 	}
 
-	raw, _ := json.Marshal(result)
+	raw, marshalErr := json.Marshal(result)
+	if marshalErr != nil {
+		return Result{}, apperr.Wrap(marshalErr, "json.Marshal")
+	}
 
 	_, execErr := call.Tx.Exec(
 		ctx,

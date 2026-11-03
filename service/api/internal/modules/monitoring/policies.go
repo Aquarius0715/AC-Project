@@ -1334,7 +1334,10 @@ func (m Policies) saveDefault(
 		return policy, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
-	rules, _ := json.Marshal(input.Rules)
+	rules, marshalErr := json.Marshal(input.Rules)
+	if marshalErr != nil {
+		return Policy{}, apperr.Wrap(marshalErr, "json.Marshal")
+	}
 
 	_, execErr := call.Tx.Exec(
 		ctx,
@@ -1395,7 +1398,10 @@ func (m Policies) saveAlert(ctx context.Context, call *ops.Call, input *SaveInpu
 		)
 	}
 
-	condJSON, _ := json.Marshal(cond)
+	condJSON, marshalErr := json.Marshal(cond)
+	if marshalErr != nil {
+		return Policy{}, apperr.Wrap(marshalErr, "json.Marshal")
+	}
 
 	if input.ID == nil {
 		var policyID uuid.UUID

@@ -653,8 +653,18 @@ func insertReport(
 	status string,
 	evidence []uuid.UUID,
 ) error {
-	cond, _ := json.Marshal(content.Conditions)
-	res, _ := json.Marshal(stored{Summary: content.Summary, Incomplete: content.Incomplete})
+	cond, marshalErr := json.Marshal(content.Conditions)
+	if marshalErr != nil {
+		return apperr.Wrap(marshalErr, "json.Marshal")
+	}
+
+	res, marshalErr := json.Marshal(
+		stored{Summary: content.Summary, Incomplete: content.Incomplete},
+	)
+	if marshalErr != nil {
+		return apperr.Wrap(marshalErr, "json.Marshal")
+	}
+
 	_, err := call.Tx.Exec(
 		ctx,
 		`INSERT INTO energy.mrv_reports (id, version, tenant_id, organization_id, period, status, conditions, results,

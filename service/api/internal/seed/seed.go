@@ -943,10 +943,15 @@ func ids(v any) []uuid.UUID {
 	return out
 }
 
+// raw is v as JSON. Fixture values come from the fixture's own JSON, so they always encode again; one that did not
+// would go in as SQL NULL, which the NOT NULL columns refuse, so the seed stops.
 func raw(v any) []byte {
-	b, _ := json.Marshal(v)
+	encoded, err := json.Marshal(v)
+	if err != nil {
+		return nil
+	}
 
-	return b
+	return encoded
 }
 
 // fixtureIDs replaces fixture IDs inside an action / policy object by their database UUIDs.
@@ -1436,7 +1441,10 @@ func applyBusiness(ex func(string, ...any) error, fixture *Fixture) error {
 
 	for _, r := range fixture.DemoSeed.RateCards {
 		// contractor rate cards (FR-A22 / FR-P10): the payout prices of a contractor
-		lines, _ := json.Marshal(r["lines"])
+		lines, marshalErr := json.Marshal(r["lines"])
+		if marshalErr != nil {
+			return apperr.Wrap(marshalErr, "json.Marshal")
+		}
 
 		err := ex(
 			`INSERT INTO maintenance.rate_cards (id, tenant_id, contractor_org_id, effective_from, currency, lines, version,

@@ -72,7 +72,10 @@ func saveCases(
 	cases []RecoveryCase,
 	now time.Time,
 ) error {
-	raw, _ := json.Marshal(cases)
+	raw, marshalErr := json.Marshal(cases)
+	if marshalErr != nil {
+		return apperr.Wrap(marshalErr, "json.Marshal")
+	}
 
 	_, err := txn.Exec(
 		ctx,
@@ -276,13 +279,16 @@ func (m Restrictions) reconcileTerminal(
 			recoveryCase.State, recoveryCase.ResolvedAt = caseResolved, &call.Now
 		case observed.RestrictionID == recoveryCase.ObservedRestrictionID &&
 			observed.RulesVersion == recoveryCase.ObservedRulesVersion:
-			remove, _ := json.Marshal(
+			remove, marshalErr := json.Marshal(
 				map[string]any{
 					keyKind:          actionRemoveRestriction,
 					keyRestrictionID: restriction.ID,
 					keyRulesVersion:  recoveryCase.ObservedRulesVersion,
 				},
 			)
+			if marshalErr != nil {
+				return nil, apperr.Wrap(marshalErr, "json.Marshal")
+			}
 
 			cmd, delivered, _, err := m.send(ctx, call, restriction.ID, unitID, remove)
 			if err != nil {

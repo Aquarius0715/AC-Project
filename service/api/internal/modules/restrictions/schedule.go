@@ -314,7 +314,10 @@ func (m Restrictions) schedule(
 
 	restrictionID := uuid.New()
 
-	policy, _ := json.Marshal(input.policy)
+	policy, marshalErr := json.Marshal(input.policy)
+	if marshalErr != nil {
+		return Restriction{}, apperr.Wrap(marshalErr, "json.Marshal")
+	}
 
 	_, execErr = call.Tx.Exec(
 		ctx,
@@ -612,7 +615,7 @@ func (m Restrictions) execute(
 		return load(ctx, call, restriction.ID, false)
 	}
 
-	action, _ := json.Marshal(
+	action, marshalErr := json.Marshal(
 		map[string]any{
 			keyKind:          actionApplyRestriction,
 			keyRestrictionID: restriction.ID,
@@ -620,6 +623,10 @@ func (m Restrictions) execute(
 			keyPolicy:        restriction.Policy,
 		},
 	)
+	if marshalErr != nil {
+		return Restriction{}, apperr.Wrap(marshalErr, "json.Marshal")
+	}
+
 	for _, unit := range restriction.PerUnit {
 		cmd, delivered, reason, err := m.send(ctx, call, restriction.ID, unit.UnitID, action)
 		if err != nil {

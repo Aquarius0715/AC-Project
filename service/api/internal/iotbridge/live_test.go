@@ -98,8 +98,14 @@ func TestLiveTriggersRoomNode(t *testing.T) {
 	}
 
 	for idx, want := range []iotbridge.Fact{
-		{UnitID: seed.ID("unit-live-ac"), Metric: sensorTemperature, Value: 27.2, Unit: "°C", ObservedAt: slot, Quality: qualityValid},
-		{UnitID: seed.ID("unit-live-ac"), Metric: sensorHumidity, Value: 50.9, Unit: "%", ObservedAt: slot, Quality: qualityValid},
+		{
+			UnitID: seed.ID("unit-live-ac"), Metric: sensorTemperature, Value: 27.2, Unit: "°C",
+			ObservedAt: slot, Quality: qualityValid,
+		},
+		{
+			UnitID: seed.ID("unit-live-ac"), Metric: sensorHumidity, Value: 50.9, Unit: "%",
+			ObservedAt: slot, Quality: qualityValid,
+		},
 	} {
 		if f := ev.Event.Facts[idx]; f.UnitID != want.UnitID || f.Metric != want.Metric ||
 			f.Value != want.Value ||
@@ -122,7 +128,10 @@ func TestLiveTriggersRoomNode(t *testing.T) {
 		t.Errorf("heartbeat state %+v, want no settings", heartbeat.State)
 	}
 
-	raw, _ := json.Marshal(heartbeat)
+	raw, marshalErr := json.Marshal(heartbeat)
+	if marshalErr != nil {
+		t.Fatal(marshalErr)
+	}
 
 	var body map[string]any
 
@@ -240,9 +249,17 @@ func TestLiveEventIDIsOnePerMinute(t *testing.T) {
 	}
 
 	p, _ := iotbridge.LiveTriggers("node_2", []byte(node2Message), liveAt.Add(10*time.Second))
-	h1, _ := json.Marshal(a[len(a)-1])
 
-	h2, _ := json.Marshal(p[len(p)-1])
+	h1, marshalErr := json.Marshal(a[len(a)-1])
+	if marshalErr != nil {
+		t.Fatal(marshalErr)
+	}
+
+	h2, marshalErr := json.Marshal(p[len(p)-1])
+	if marshalErr != nil {
+		t.Fatal(marshalErr)
+	}
+
 	if string(h1) != string(h2) {
 		t.Errorf("the nodes' heartbeats of one minute differ:\n%s\n%s", h1, h2)
 	}
@@ -533,7 +550,10 @@ func TestLiveConnectionTrigger(t *testing.T) {
 		}
 	}
 
-	raw, _ := json.Marshal(back)
+	raw, marshalErr := json.Marshal(back)
+	if marshalErr != nil {
+		t.Fatal(marshalErr)
+	}
 
 	var body map[string]any
 

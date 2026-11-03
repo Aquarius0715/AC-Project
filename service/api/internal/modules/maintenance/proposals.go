@@ -316,7 +316,11 @@ func (m Proposals) insertProposal(
 	msg string,
 	replyBy time.Time,
 ) error {
-	holdJSON, _ := json.Marshal(hold)
+	holdJSON, marshalErr := json.Marshal(hold)
+	if marshalErr != nil {
+		return apperr.Wrap(marshalErr, "json.Marshal")
+	}
+
 	_, err := call.Tx.Exec(
 		ctx,
 		`INSERT INTO maintenance.slot_proposals (tenant_id, job_id, source, slot, hold, message, reply_by, status, created_at)
@@ -618,7 +622,10 @@ func (m Proposals) respondJob(
 		}
 
 		if len(input.PreferredSlots) == 3 {
-			raw, _ := json.Marshal(input.PreferredSlots)
+			raw, marshalErr := json.Marshal(input.PreferredSlots)
+			if marshalErr != nil {
+				return Job{}, apperr.Wrap(marshalErr, "json.Marshal")
+			}
 
 			_, err := call.Tx.Exec(
 				ctx,
@@ -966,7 +973,10 @@ func (m Proposals) requestRescheduleJob(
 		}
 	}
 
-	raw, _ := json.Marshal(input.PreferredSlots)
+	raw, marshalErr := json.Marshal(input.PreferredSlots)
+	if marshalErr != nil {
+		return Job{}, apperr.Wrap(marshalErr, "json.Marshal")
+	}
 
 	_, execErr := call.Tx.Exec(
 		ctx,

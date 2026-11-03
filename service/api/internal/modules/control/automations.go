@@ -802,7 +802,12 @@ func (m Automations) save(
 		Action:      input.Action, OnlyIf: nil,
 	}
 	if len(input.extras) > 0 {
-		def.OnlyIf, _ = json.Marshal(input.extras)
+		marshaled, marshalErr := json.Marshal(input.extras)
+		if marshalErr != nil {
+			return Automation{}, apperr.Wrap(marshalErr, "json.Marshal")
+		}
+
+		def.OnlyIf = marshaled
 	}
 
 	if input.Kind == kindSchedule {
@@ -814,7 +819,10 @@ func (m Automations) save(
 		}
 	}
 
-	raw, _ := json.Marshal(def)
+	raw, marshalErr := json.Marshal(def)
+	if marshalErr != nil {
+		return Automation{}, apperr.Wrap(marshalErr, "json.Marshal")
+	}
 
 	var (
 		automationID uuid.UUID

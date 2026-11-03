@@ -198,7 +198,7 @@ func ApplyLive(ctx context.Context, txn pgx.Tx, at time.Time) error {
 		return exErr
 	}
 	// the air conditioner's settings are unknown until a command sets them (the nodes report none)
-	state, _ := json.Marshal(
+	state, marshalErr := json.Marshal(
 		map[string]any{
 			keyPower:      nil,
 			"celsius":     nil,
@@ -207,6 +207,9 @@ func ApplyLive(ctx context.Context, txn pgx.Tx, at time.Time) error {
 			keyObservedAt: at.UTC(),
 		},
 	)
+	if marshalErr != nil {
+		return apperr.Wrap(marshalErr, "json.Marshal")
+	}
 
 	unit := ID(s.Unit)
 

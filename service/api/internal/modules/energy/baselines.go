@@ -484,7 +484,12 @@ func saveBaseline(ctx context.Context, call *ops.Call, input *BaselineInput) (Ba
 			return Baseline{}, apperr.Wrap(scanErr, "select platform.outbox")
 		}
 
-		quality, _ = json.Marshal(measured)
+		marshaled, marshalErr := json.Marshal(measured)
+		if marshalErr != nil {
+			return Baseline{}, apperr.Wrap(marshalErr, "json.Marshal")
+		}
+
+		quality = marshaled
 		value = Float(integration.KWh)
 	}
 

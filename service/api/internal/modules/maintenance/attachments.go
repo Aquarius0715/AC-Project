@@ -339,7 +339,10 @@ func (m Files) signOff(ctx context.Context, call *ops.Call, input *SignOffInput)
 		signOff.SitePhotoAttachmentID = &id
 	}
 
-	raw, _ := json.Marshal(signOff)
+	raw, marshalErr := json.Marshal(signOff)
+	if marshalErr != nil {
+		return Report{}, apperr.Wrap(marshalErr, "json.Marshal")
+	}
 
 	_, execErr := call.Tx.Exec(
 		ctx,

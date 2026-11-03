@@ -808,15 +808,27 @@ func (m Reports) saveDraft(ctx context.Context, call *ops.Call, input *DraftInpu
 		input.Parts[i].Name = strings.TrimSpace(input.Parts[i].Name)
 	}
 
-	enc := func(v any) []byte {
-		b, _ := json.Marshal(v)
+	// the report's JSON columns, encoded once for either statement
+	var cols [4][]byte
 
-		return b
+	for i, v := range []any{items, meas, input.Parts, input.Refrigerant} {
+		encoded, marshalErr := json.Marshal(v)
+		if marshalErr != nil {
+			return Report{}, apperr.Wrap(marshalErr, "json.Marshal")
+		}
+
+		cols[i] = encoded
 	}
 
 	var next any
+
 	if input.NextAction != nil {
-		next = enc(input.NextAction)
+		encoded, marshalErr := json.Marshal(input.NextAction)
+		if marshalErr != nil {
+			return Report{}, apperr.Wrap(marshalErr, "json.Marshal")
+		}
+
+		next = encoded
 	}
 
 	if input.ReportID == nil {
@@ -829,10 +841,10 @@ func (m Reports) saveDraft(ctx context.Context, call *ops.Call, input *DraftInpu
 			prev.ID,
 			input.JobID,
 			call.Principal.UserID,
-			enc(items),
-			enc(meas),
-			enc(input.Parts),
-			enc(input.Refrigerant),
+			cols[0],
+			cols[1],
+			cols[2],
+			cols[3],
 			input.WorkText,
 			next,
 			call.Now,
@@ -845,10 +857,10 @@ func (m Reports) saveDraft(ctx context.Context, call *ops.Call, input *DraftInpu
 			next_action = $8, sign_off = NULL, updated_at = $9 WHERE id = $1 AND version = $2`,
 			prev.ID,
 			prev.Version,
-			enc(items),
-			enc(meas),
-			enc(input.Parts),
-			enc(input.Refrigerant),
+			cols[0],
+			cols[1],
+			cols[2],
+			cols[3],
 			input.WorkText,
 			next,
 			call.Now,
@@ -1111,7 +1123,10 @@ func (m Reports) submitJob(ctx context.Context, call *ops.Call, input *SubmitInp
 		timeOnSite.OnSiteMinutes = &mins
 	}
 
-	tos, _ := json.Marshal(timeOnSite)
+	tos, marshalErr := json.Marshal(timeOnSite)
+	if marshalErr != nil {
+		return Job{}, apperr.Wrap(marshalErr, "json.Marshal")
+	}
 
 	_, execErr = call.Tx.Exec(
 		ctx,
