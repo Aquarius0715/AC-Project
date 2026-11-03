@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -24,7 +24,9 @@ func TestLastSignIn(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Cleanup(func() { owner.Close(ctx) }) // registered first, so it closes after the reset below
+	t.Cleanup(
+		func() { _ = owner.Close(ctx) },
+	) // registered first, so it closes after the reset below
 
 	user := seed.ID("user-customer-a")
 	exec := func(sql string, args ...any) {
@@ -51,7 +53,7 @@ func TestLastSignIn(t *testing.T) {
 	reset()
 	t.Cleanup(reset)
 
-	earlier := clock.Add(-30 * 24 * time.Hour)
+	earlier := clock().Add(-30 * 24 * time.Hour)
 	mark := func() {
 		exec(`UPDATE identity.users SET last_sign_in_at = $2 WHERE id =
 		$1`, user, earlier)
@@ -66,18 +68,18 @@ func TestLastSignIn(t *testing.T) {
 		}
 	}
 
-	t1 := clock.Add(-2 * time.Hour)
+	t1 := clock().Add(-2 * time.Hour)
 	request(signedIn(t1), "session.get")
 
 	last, auth := read()
-	if last == nil || last.Before(clock) || auth == nil || !auth.Equal(t1) {
+	if last == nil || last.Before(clock()) || auth == nil || !auth.Equal(t1) {
 		t.Fatalf("first sign-in: last %v, auth_time %v", last, auth)
 	}
 
-	_, m := post(srv, &customerA, "clientUsers.list", `{"limit":100}`)
+	_, m := post(srv, customerA(), "clientUsers.list", `{"limit":100}`)
 	shown := ""
 
-	for _, it := range items(m) {
+	for _, it := range items(t, m) {
 		if it["membershipId"] == seed.ID("customer-a").String() {
 			shown, _ = it["lastSignInAt"].(string)
 		}
@@ -91,7 +93,7 @@ func TestLastSignIn(t *testing.T) {
 	mark()
 	request(signedIn(t1), "session.get")                 // the same sign-in again
 	request(signedIn(t1.Add(-time.Hour)), "session.get") // an older session's token
-	request(&customerA, "session.get")                   // a token without a sign-in time
+	request(customerA(), "session.get")                  // a token without a sign-in time
 
 	if last, _ := read(); last == nil || !last.Equal(earlier) {
 		t.Fatalf("must not move: %v", last)

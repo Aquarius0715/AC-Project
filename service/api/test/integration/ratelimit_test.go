@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -44,18 +44,20 @@ func TestWriteLimit(t *testing.T) {
 
 	prefs := `{"locale":"ms","timezone":"Asia/Singapore","monthlyReportEmail":true}`
 	for i := 1; i <= 3; i++ {
-		if code, m := write(srv, &customerB, "preferences.update", prefs, 0); code != 200 {
+		if code, m := write(srv, customerB(), "preferences.update", prefs, 0); code != 200 {
 			t.Fatalf("write %d: %d %v", i, code, m)
 		}
 	}
 	// the fourth write of the minute, of any operation, waits until the minute ends (40 s after 09:00:20)
-	req := httptest.NewRequest(
-		ops.ClientRequest("consents.update", `{"purpose":"location_automation","granted":false}`),
+	method, target, reqBody := ops.ClientRequest(
+		"consents.update",
+		`{"purpose":"location_automation","granted":false}`,
 	)
+	req := httptest.NewRequestWithContext(t.Context(), method, target, reqBody)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+customerB.token)
+	req.Header.Set("Authorization", "Bearer "+customerB().token)
 	req.Header.Set("X-Tenant-Id", seed.ID("tenant-a").String())
-	req.Header.Set("X-Membership-Id", seed.ID(customerB.membership).String())
+	req.Header.Set("X-Membership-Id", seed.ID(customerB().membership).String())
 	req.Header.Set("Idempotency-Key", "test-"+uuid.NewString())
 	req.Header.Set("X-Expected-Version", "1")
 
@@ -73,7 +75,7 @@ func TestWriteLimit(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&customerB,
+		customerB(),
 		"preferences.update",
 		prefs,
 		0,
@@ -82,13 +84,13 @@ func TestWriteLimit(t *testing.T) {
 		t.Errorf("RATE_LIMITED body: %d %v", code, res)
 	}
 	// reads and other members go on
-	if code, _ := post(srv, &customerB, "session.get", `{}`); code != 200 {
+	if code, _ := post(srv, customerB(), "session.get", `{}`); code != 200 {
 		t.Errorf("read while limited: %d", code)
 	}
 
 	if code, res := write(
 		srv,
-		&customerA,
+		customerA(),
 		"preferences.update",
 		`{"locale":"en","timezone":"Asia/Kuala_Lumpur","monthlyReportEmail":true}`,
 		0,
@@ -98,13 +100,13 @@ func TestWriteLimit(t *testing.T) {
 	// the next minute is a new window
 	now = now.Add(time.Minute)
 
-	if code, m := write(srv, &customerB, "preferences.update", prefs, 0); code != 200 {
+	if code, m := write(srv, customerB(), "preferences.update", prefs, 0); code != 200 {
 		t.Errorf("next minute: %d %v", code, m)
 	}
 	// a counter store that does not answer lets writes through (the edge limits still hold)
 	down := limited(downStore{})
 	for i := 1; i <= 5; i++ {
-		if code, m := write(down, &customerB, "preferences.update", prefs, 0); code != 200 {
+		if code, m := write(down, customerB(), "preferences.update", prefs, 0); code != 200 {
 			t.Fatalf("store down, write %d: %d %v", i, code, m)
 		}
 	}

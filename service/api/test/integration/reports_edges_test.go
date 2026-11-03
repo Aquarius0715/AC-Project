@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"strings"
@@ -17,11 +17,11 @@ import (
 func TestWorkReportEdges(t *testing.T) {
 	srv := server(t)
 	job := assignedNow(t, srv) // version 2
-	now := clock.Format(time.RFC3339)
+	now := clock().Format(time.RFC3339)
 
 	if code, resp := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.submit",
 		`{"jobId":"`+job+`","reportVersion":1}`,
 		2,
@@ -32,7 +32,7 @@ func TestWorkReportEdges(t *testing.T) {
 
 	if code, resp := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.start",
 		`{"jobId":"`+job+`","startConfirmed":true}`,
 		2,
@@ -43,7 +43,7 @@ func TestWorkReportEdges(t *testing.T) {
 	unknown := uuid.NewString()
 	if code, _ := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.saveDraft",
 		draftBody(unknown, "", nil),
 		0,
@@ -53,7 +53,7 @@ func TestWorkReportEdges(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.submit",
 		`{"jobId":"`+unknown+`","reportVersion":1}`,
 		1,
@@ -63,7 +63,7 @@ func TestWorkReportEdges(t *testing.T) {
 
 	if code, resp := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.submit",
 		`{"jobId":"`+job+`","reportVersion":1}`,
 		2,
@@ -72,7 +72,7 @@ func TestWorkReportEdges(t *testing.T) {
 		t.Errorf("submit of a stale job version: %d %v", code, resp)
 	}
 
-	code, res := write(srv, &techInt, "jobs.saveDraft", draftBody(job, "", nil), 0)
+	code, res := write(srv, techInt(), "jobs.saveDraft", draftBody(job, "", nil), 0)
 	if code != 200 {
 		t.Fatalf("first draft: %d %v", code, res)
 	}
@@ -83,7 +83,7 @@ func TestWorkReportEdges(t *testing.T) {
 		`"evidenceIds":["` + uuid.NewString() + `"]}]`
 	if code, resp := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.saveDraft",
 		draftBody(job, "", map[string]string{"reportId": `"` + rep + `"`, "items": elsewhere}),
 		1,
@@ -103,7 +103,7 @@ func TestWorkReportEdges(t *testing.T) {
 		1,
 	)
 
-	code, res = write(srv, &techInt, "jobs.saveDraft", body, 1)
+	code, res = write(srv, techInt(), "jobs.saveDraft", body, 1)
 	if code != 200 {
 		t.Fatalf("second draft: %d %v", code, res)
 	}
@@ -116,7 +116,7 @@ func TestWorkReportEdges(t *testing.T) {
 
 	first := asObj(t, asArr(t, data(res)["measurements"])[0])
 
-	code, res = write(srv, &techInt, "jobs.saveDraft", draftBody(job, "normal", map[string]string{
+	code, res = write(srv, techInt(), "jobs.saveDraft", draftBody(job, "normal", map[string]string{
 		"reportId": `"` + rep + `"`,
 		"measurements": `[{"id":"` + asStr(
 			t,
@@ -144,10 +144,10 @@ func TestWorkReportEdges(t *testing.T) {
 		jsonb_build_array(jsonb_build_object('from', $3::timestamptz, 'to', $4::timestamptz), jsonb_build_object('from',
 		$5::timestamptz))) WHERE id = $1`,
 		job,
-		clock.Add(-time.Hour),
-		clock.Add(-40*time.Minute),
-		clock.Add(-30*time.Minute),
-		clock.Add(-20*time.Minute),
+		clock().Add(-time.Hour),
+		clock().Add(-40*time.Minute),
+		clock().Add(-30*time.Minute),
+		clock().Add(-20*time.Minute),
 	)
 	// and HQ held the job for 5 minutes in between (IR449): 25 minutes
 	for _, e := range []struct {
@@ -160,11 +160,11 @@ func TestWorkReportEdges(t *testing.T) {
 				id, $2, $3 FROM maintenance.jobs WHERE id = $1`,
 			job,
 			e.action,
-			clock.Add(e.at),
+			clock().Add(e.at),
 		)
 	}
 
-	code, res = write(srv, &techInt, "jobs.submit", `{"jobId":"`+job+`","reportVersion":3}`, 3)
+	code, res = write(srv, techInt(), "jobs.submit", `{"jobId":"`+job+`","reportVersion":3}`, 3)
 	if code != 200 {
 		t.Fatalf("submit: %d %v", code, res)
 	}
@@ -177,7 +177,7 @@ func TestWorkReportEdges(t *testing.T) {
 	// the report is read through its own job only; reviewing a job that does not exist says so
 	if code, _ := post(
 		srv,
-		&hq,
+		hq(),
 		"reports.get",
 		`{"jobId":"`+unknown+`","reportId":"`+rep+`","reportVersion":3}`,
 	); code != 404 {
@@ -187,7 +187,7 @@ func TestWorkReportEdges(t *testing.T) {
 	other := assignedNow(t, srv)
 	if code, _ := post(
 		srv,
-		&hq,
+		hq(),
 		"reports.get",
 		`{"jobId":"`+other+`","reportId":"`+rep+`","reportVersion":3}`,
 	); code != 404 {
@@ -196,7 +196,7 @@ func TestWorkReportEdges(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.review",
 		`{"jobId":"`+unknown+`","reportVersion":3,"decision":"accept","reviewMode":"normal"}`,
 		1,

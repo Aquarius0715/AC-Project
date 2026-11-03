@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -28,8 +28,8 @@ func TestCommands(t *testing.T) {
 			restrictions.restriction_units WHERE unit_id = $1)`,
 		unit,
 	)
-	_, resp := post(srv, &customerA, "units.get", `{"id":"`+unit+`"}`)
-	v := ver(resp)
+	_, resp := post(srv, customerA(), "units.get", `{"id":"`+unit+`"}`)
+	v := ver(t, resp)
 	cmd := func(a *actor, action, extra string, uv int) (int, map[string]any) {
 		return write(
 			srv,
@@ -56,16 +56,16 @@ func TestCommands(t *testing.T) {
 		extra  string
 		code   int
 	}{
-		"bad action":         {&customerA, `{"kind":"set_temperature"}`, "", 422},
-		"out of range":       {&customerA, `{"kind":"set_temperature","celsius":35}`, "", 422},
-		"client reason":      {&customerA, `{"kind":"set_power","power":true}`, `,"reason":"x"`, 422},
-		"hq without reason":  {&hq, `{"kind":"set_power","power":true}`, "", 422},
-		"other customer":     {&customerB, `{"kind":"set_power","power":true}`, "", 404},
-		"technician no job":  {&techInt, `{"kind":"set_power","power":true}`, `,"reason":"test"`, 422},
-		"stale unit version": {&customerA, `{"kind":"set_power","power":true}`, "", 409},
-		"unknown source":     {&customerA, `{"kind":"set_power","power":true}`, `,"source":"automation"`, 422},
-		"hq voice":           {&hq, `{"kind":"set_power","power":true}`, `,"reason":"check","source":"voice"`, 422},
-		"technician voice": {&techInt, `{"kind":"set_power",` +
+		"bad action":         {customerA(), `{"kind":"set_temperature"}`, "", 422},
+		"out of range":       {customerA(), `{"kind":"set_temperature","celsius":35}`, "", 422},
+		"client reason":      {customerA(), `{"kind":"set_power","power":true}`, `,"reason":"x"`, 422},
+		"hq without reason":  {hq(), `{"kind":"set_power","power":true}`, "", 422},
+		"other customer":     {customerB(), `{"kind":"set_power","power":true}`, "", 404},
+		"technician no job":  {techInt(), `{"kind":"set_power","power":true}`, `,"reason":"test"`, 422},
+		"stale unit version": {customerA(), `{"kind":"set_power","power":true}`, "", 409},
+		"unknown source":     {customerA(), `{"kind":"set_power","power":true}`, `,"source":"automation"`, 422},
+		"hq voice":           {hq(), `{"kind":"set_power","power":true}`, `,"reason":"check","source":"voice"`, 422},
+		"technician voice": {techInt(), `{"kind":"set_power",` +
 			`"power":true}`, `,"reason":"test",` +
 			`"jobId":"` + uuid.NewString() + `","source":"voice"`, 422},
 	} {
@@ -82,18 +82,23 @@ func TestCommands(t *testing.T) {
 		}
 	}
 	// the assistant's confirmed change (IR306): the same command, labelled voice
-	code, resp := cmd(&customerA, `{"kind":"set_temperature","celsius":24}`, `,"source":"voice"`, v)
+	code, resp := cmd(
+		customerA(),
+		`{"kind":"set_temperature","celsius":24}`,
+		`,"source":"voice"`,
+		v,
+	)
 	if code != 200 || data(resp)["status"] != "requested" || data(resp)["delivery"] != "not_sent" ||
 		data(resp)["sentAt"] != nil ||
 		data(resp)["source"] != "voice" ||
-		data(resp)["expiresAt"] != clock.Add(30*time.Second).Format(time.RFC3339) {
+		data(resp)["expiresAt"] != clock().Add(30*time.Second).Format(time.RFC3339) {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
 	id := asStr(t, data(resp)["id"])
 
 	if code, res := cmd(
-		&hq,
+		hq(),
 		`{"kind":"set_power","power":false}`,
 		`,"reason":"check"`,
 		v,
@@ -102,19 +107,19 @@ func TestCommands(t *testing.T) {
 		t.Errorf("busy: %d %v", code, res)
 	}
 
-	if code, _ := post(srv, &customerA, "commands.get", `{"id":"`+id+`"}`); code != 200 {
+	if code, _ := post(srv, customerA(), "commands.get", `{"id":"`+id+`"}`); code != 200 {
 		t.Error("client get")
 	}
 
-	if code, _ := post(srv, &customerB, "commands.get", `{"id":"`+id+`"}`); code != 404 {
+	if code, _ := post(srv, customerB(), "commands.get", `{"id":"`+id+`"}`); code != 404 {
 		t.Error("other customer get")
 	}
 
-	if code, _ := post(srv, &techB, "commands.get", `{"id":"`+id+`"}`); code != 404 {
+	if code, _ := post(srv, techB(), "commands.get", `{"id":"`+id+`"}`); code != 404 {
 		t.Error("out-of-scope technician get")
 	}
 
-	if code, _ := post(srv, &hq, "commands.get", `{"id":"`+uuid.NewString()+`"}`); code != 404 {
+	if code, _ := post(srv, hq(), "commands.get", `{"id":"`+uuid.NewString()+`"}`); code != 404 {
 		t.Error("unknown command")
 	}
 	// the IoT gateway sends the requested command and reports it sent (demo trigger command_sent, the same update)
@@ -122,7 +127,7 @@ func TestCommands(t *testing.T) {
 		t,
 		`UPDATE control.commands SET status = 'sent', delivery = 'sent', sent_at = $2 WHERE id = $1 AND status = 'requested'`,
 		id,
-		clock,
+		clock(),
 	)
 	// acknowledgement before expiry; late acknowledgement is only recorded
 	ctx := context.Background()
@@ -131,14 +136,14 @@ func TestCommands(t *testing.T) {
 	if err != nil {
 		t.Skip(err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	var ok bool
 
 	keepObserved(t, id)
 
 	beginFuncErr := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
-		ok, err = control.Acknowledge(ctx, tx, uuid.MustParse(id), clock.Add(5*time.Second))
+		ok, err = control.Acknowledge(ctx, tx, uuid.MustParse(id), clock().Add(5*time.Second))
 
 		return apperr.Wrap(err, "control.Acknowledge")
 	})
@@ -148,14 +153,14 @@ func TestCommands(t *testing.T) {
 
 	if _, m := post(
 		srv,
-		&hq,
+		hq(),
 		"commands.get",
 		`{"id":"`+id+`"}`,
 	); data(m)["status"] != "acknowledged" {
 		t.Fatal("acknowledged")
 	}
 	// expiry by the worker
-	code, resp = cmd(&hq, `{"kind":"set_mode","mode":"dry"}`, `,"reason":"check"`, v)
+	code, resp = cmd(hq(), `{"kind":"set_mode","mode":"dry"}`, `,"reason":"check"`, v)
 	if code != 200 {
 		t.Fatalf("second command: %d %v", code, resp)
 	}
@@ -163,19 +168,19 @@ func TestCommands(t *testing.T) {
 	id2 := asStr(t, data(resp)["id"])
 	// IR453: a tick just after expiresAt leaves the command for an acknowledgement still on its way; the grace after
 	// it expires the command
-	_, schedTickErr := schedTick(ctx, srv, clock.Add(32*time.Second))
+	_, schedTickErr := schedTick(ctx, srv, clock().Add(32*time.Second))
 	if schedTickErr != nil {
 		t.Fatal(schedTickErr)
 	}
 
-	if _, m := post(srv, &hq, "commands.get", `{"id":"`+id2+`"}`); data(m)["status"] == "expired" {
+	if _, m := post(srv, hq(), "commands.get", `{"id":"`+id2+`"}`); data(m)["status"] == "expired" {
 		t.Fatalf("expired within the grace: %v", m)
 	}
 
 	_, schedTickErr = schedTick(
 		ctx,
 		srv,
-		clock.Add(30*time.Second+control.ExpireGrace+time.Second),
+		clock().Add(30*time.Second+control.ExpireGrace+time.Second),
 	)
 	if schedTickErr != nil {
 		t.Fatal(schedTickErr)
@@ -183,7 +188,7 @@ func TestCommands(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&hq,
+		hq(),
 		"commands.get",
 		`{"id":"`+id2+`"}`,
 	); data(res)["status"] != "expired" ||
@@ -194,7 +199,7 @@ func TestCommands(t *testing.T) {
 	keepObserved(t, id2)
 
 	beginFuncErr = pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
-		ok, err = control.Acknowledge(ctx, tx, uuid.MustParse(id2), clock.Add(40*time.Second))
+		ok, err = control.Acknowledge(ctx, tx, uuid.MustParse(id2), clock().Add(40*time.Second))
 
 		return apperr.Wrap(err, "control.Acknowledge")
 	})
@@ -212,8 +217,8 @@ func TestCommands(t *testing.T) {
 		seed.ID("tenant-a"),
 		uuid.New(),
 		seed.ID("cust-a"),
-		clock,
-		clock.Add(25*time.Hour),
+		clock(),
+		clock().Add(25*time.Hour),
 	)
 	owner(
 		t,
@@ -228,7 +233,7 @@ func TestCommands(t *testing.T) {
 	)
 
 	if code, res := cmd(
-		&customerA,
+		customerA(),
 		`{"kind":"set_temperature","celsius":24}`,
 		"",
 		v,
@@ -251,7 +256,7 @@ func TestCommands(t *testing.T) {
 	})
 
 	if code, res := cmd(
-		&customerA,
+		customerA(),
 		`{"kind":"set_temperature","celsius":27}`,
 		"",
 		v,
@@ -283,7 +288,7 @@ func TestCommands(t *testing.T) {
 	missing := uuid.NewString()
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"commands.create",
 		`{"unitId":"`+missing+`","action":{"kind":"set_power","power":true},"reason":"check","expectedUnitVersion":1}`,
 		0,
@@ -293,7 +298,7 @@ func TestCommands(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&techInt,
+		techInt(),
 		"commands.create",
 		`{"unitId":"`+missing+`","jobId":"`+uuid.NewString()+`","action":{"kind":"set_power","power":true},`+
 			`"reason":"check","expectedUnitVersion":1}`,
@@ -304,7 +309,7 @@ func TestCommands(t *testing.T) {
 
 	if code, _ := post(
 		srv,
-		&hq,
+		hq(),
 		"commands.list",
 		`{"unitId":"`+missing+`","query":{}}`,
 	); code != 404 {
@@ -338,12 +343,12 @@ func TestCommandHistory(t *testing.T) {
 		unit,
 	)
 	job := assignedNow(t, srv)
-	_, resp := post(srv, &hq, "units.get", `{"id":"`+unit+`"}`)
-	uv := ver(resp)
+	_, resp := post(srv, hq(), "units.get", `{"id":"`+unit+`"}`)
+	uv := ver(t, resp)
 
 	code, resp := write(
 		srv,
-		&techInt,
+		techInt(),
 		"commands.create",
 		`{"unitId":"`+unit+`","jobId":"`+job+`","action":{"kind":"set_mode","mode":"cool"},"reason":"airflow check",`+
 			`"expectedUnitVersion":`+itoa(
@@ -361,7 +366,7 @@ func TestCommandHistory(t *testing.T) {
 
 	code, resp = write(
 		srv,
-		&customerA,
+		customerA(),
 		"commands.create",
 		`{"unitId":"`+unit+`","action":{"kind":"set_power","power":true},"expectedUnitVersion":`+itoa(
 			uv,
@@ -381,11 +386,11 @@ func TestCommandHistory(t *testing.T) {
 		t.Helper()
 
 		code, res := post(srv, a, "commands.list", body)
-		rows := items(res)
+		rows := items(t, res)
 		byID := map[string]map[string]any{}
 
 		for page := 0; ; page++ {
-			for _, it := range items(res) {
+			for _, it := range items(t, res) {
 				byID[asStr(t, it["id"])] = it
 			}
 
@@ -405,14 +410,14 @@ func TestCommandHistory(t *testing.T) {
 
 			q["cursor"] = next
 			input["query"] = q
-			b, _ := json.Marshal(input)
+			b := jsonBytes(t, input)
 			code, res = post(srv, a, "commands.list", string(b))
 		}
 
 		return code, byID, rows
 	}
 
-	code, got, rows := list(&customerA, `{"unitId":"`+unit+`","query":{"limit":100}}`)
+	code, got, rows := list(customerA(), `{"unitId":"`+unit+`","query":{"limit":100}}`)
 	if code != 200 || got[tech] == nil || got[own] == nil || got[tech]["reason"] != nil ||
 		got[tech]["status"] != "expired" {
 		t.Fatalf("client history: %d %v", code, got[tech])
@@ -424,17 +429,17 @@ func TestCommandHistory(t *testing.T) {
 		}
 	}
 	// the next page of a history (limit 1): the cursor binds the unit and job, not the paging fields (IR223 fix)
-	_, resp = post(srv, &customerA, "commands.list", `{"unitId":"`+unit+`","query":{"limit":1}}`)
+	_, resp = post(srv, customerA(), "commands.list", `{"unitId":"`+unit+`","query":{"limit":1}}`)
 	if next, _ := data(resp)["nextCursor"].(string); next == "" {
 		t.Fatal("history of one per page has a next page")
-	} else if code, m := post(srv, &customerA, "commands.list", `{"unitId":"`+unit+`","query":{"limit":1,`+
-		`"cursor":"`+next+`"}}`); code != 200 || len(items(m)) != 1 {
+	} else if code, m := post(srv, customerA(), "commands.list", `{"unitId":"`+unit+`","query":{"limit":1,`+
+		`"cursor":"`+next+`"}}`); code != 200 || len(items(t, m)) != 1 {
 		t.Fatalf("second page: %d %v", code, m)
 	}
 
 	if code, res := post(
 		srv,
-		&techInt,
+		techInt(),
 		"commands.list",
 		`{"unitId":"`+unit+`","query":{}}`,
 	); code != 422 ||
@@ -442,25 +447,25 @@ func TestCommandHistory(t *testing.T) {
 		t.Errorf("technician without a job: %d %s", code, fields(res))
 	}
 
-	code, got, _ = list(&techInt, `{"unitId":"`+unit+`","jobId":"`+job+`","query":{"limit":100}}`)
+	code, got, _ = list(techInt(), `{"unitId":"`+unit+`","jobId":"`+job+`","query":{"limit":100}}`)
 	if code != 200 || got[tech] == nil || got[tech]["reason"] != "airflow check" ||
 		got[own] != nil {
 		t.Fatalf("technician job history: %d %v", code, got)
 	}
 
 	if code, _, _ := list(
-		&techInt,
+		techInt(),
 		`{"unitId":"`+unit+`","jobId":"`+uuid.NewString()+`","query":{}}`,
 	); code != 404 {
 		t.Errorf("technician, a job it does not hold: %d", code)
 	}
 
-	if code, _, _ := list(&customerB, `{"unitId":"`+unit+`","query":{}}`); code != 404 {
+	if code, _, _ := list(customerB(), `{"unitId":"`+unit+`","query":{}}`); code != 404 {
 		t.Errorf("another customer: %d", code)
 	}
 
 	if _, got, _ := list(
-		&hq,
+		hq(),
 		`{"unitId":"`+unit+`","query":{"limit":100}}`,
 	); got[tech]["reason"] != "airflow check" ||
 		got[own] == nil {
@@ -469,12 +474,12 @@ func TestCommandHistory(t *testing.T) {
 
 	for q, want := range map[string]string{`{"sort":{"field":"status",` +
 		`"direction":"asc"}}`: "sort.field=error.invalid", `{"filters":{"status":"sent"}}`: "status=error.notAllowed"} {
-		code, m := post(srv, &hq, "commands.list", `{"unitId":"`+unit+`","query":`+q+`}`)
+		code, m := post(srv, hq(), "commands.list", `{"unitId":"`+unit+`","query":`+q+`}`)
 		refusal(t, q, code, m, want)
 	}
 
 	if code, _, _ := list(
-		&hq,
+		hq(),
 		`{"unitId":"`+unit+`","query":{"sort":{"field":"requestedAt","direction":"asc"}}}`,
 	); code != 200 {
 		t.Errorf("requestedAt asc: %d", code)
@@ -486,14 +491,14 @@ func TestCommandHistory(t *testing.T) {
 func TestCommandExpiryAudited(t *testing.T) {
 	srv := server(t)
 	unit := boundUnit(t, srv, "online")
-	_, g := post(srv, &customerB, "units.get", `{"id":"`+unit+`"}`)
+	_, g := post(srv, customerB(), "units.get", `{"id":"`+unit+`"}`)
 
 	code, res := write(
 		srv,
-		&customerB,
+		customerB(),
 		"commands.create",
 		`{"unitId":"`+unit+`","action":{"kind":"set_power","power":true},"expectedUnitVersion":`+itoa(
-			ver(g),
+			ver(t, g),
 		)+`}`,
 		0,
 	)
@@ -506,7 +511,7 @@ func TestCommandExpiryAudited(t *testing.T) {
 		`UPDATE control.commands SET expires_at = requested_at + interval '1 second' WHERE id = $1`,
 		data(res)["id"],
 	)
-	expireAt(t, clock.Add(time.Minute)) // the window passed with no answer
+	expireAt(t, clock().Add(time.Minute)) // the window passed with no answer
 
 	if trail := commandTrail(
 		t,

@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -18,13 +18,13 @@ import (
 func completedJob(t *testing.T, s *apiserver.Server) string {
 	t.Helper()
 
-	_, m := write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	_, m := write(s, customerA(), "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
 	job := asStr(t, data(m)["id"])
 	owner(
 		t,
 		`UPDATE maintenance.jobs SET status = 'completed', completed_at = $2 WHERE id = $1`,
 		job,
-		clock.Add(-time.Hour),
+		clock().Add(-time.Hour),
 	)
 
 	return job
@@ -53,15 +53,15 @@ func TestRateAndReportProblem(t *testing.T) {
 		"long comment":  `"stars":4,"tags":[],"comment":"` + strings.Repeat("c", 1001) + `"`,
 		"no tags":       `"stars":4`,
 	} {
-		code, m := rate(&customerA, b, 1)
+		code, m := rate(customerA(), b, 1)
 		refusal(t, name, code, m, want[name])
 	}
 
-	if code, _ := rate(&customerB, `"stars":5,"tags":[]`, 1); code != 404 {
+	if code, _ := rate(customerB(), `"stars":5,"tags":[]`, 1); code != 404 {
 		t.Error("other customer rates")
 	}
 
-	code, resp := rate(&customerA, `"stars":2,"tags":["On time"],"comment":"  slow  "`, 1)
+	code, resp := rate(customerA(), `"stars":2,"tags":["On time"],"comment":"  slow  "`, 1)
 
 	r, _ := data(resp)["rating"].(map[string]any)
 	if code != 200 || asNum(t, r["stars"]) != 2 || r["comment"] != "slow" ||
@@ -70,7 +70,7 @@ func TestRateAndReportProblem(t *testing.T) {
 	}
 
 	if code, res := rate(
-		&customerA,
+		customerA(),
 		`"stars":3,"tags":[]`,
 		1,
 	); code != 409 ||
@@ -79,7 +79,7 @@ func TestRateAndReportProblem(t *testing.T) {
 	}
 
 	if code, res := rate(
-		&customerA,
+		customerA(),
 		`"stars":3,"tags":[],"comment":"   "`,
 		2,
 	); code != 200 ||
@@ -97,7 +97,7 @@ func TestRateAndReportProblem(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&customerA,
+		customerA(),
 		"jobs.rate",
 		`{"jobId":"`+open+`","stars":5,"tags":[]}`,
 		1,
@@ -110,10 +110,10 @@ func TestRateAndReportProblem(t *testing.T) {
 		t,
 		`UPDATE maintenance.jobs SET rating = jsonb_set(rating, '{editableUntil}', to_jsonb($2::text)) WHERE id = $1`,
 		job,
-		clock.Format(time.RFC3339),
+		clock().Format(time.RFC3339),
 	)
 
-	if code, _ := rate(&customerA, `"stars":4,"tags":[]`, 3); code != 409 {
+	if code, _ := rate(customerA(), `"stars":4,"tags":[]`, 3); code != 409 {
 		t.Error("rating locked after 7 days")
 	}
 	// report a problem → follow-up job
@@ -121,7 +121,7 @@ func TestRateAndReportProblem(t *testing.T) {
 	png, size := base64.StdEncoding.EncodeToString(img), strconv.Itoa(len(img))
 	photo := `{"name":"leak.png","mime":"image/png","size":` + size + `,"bytes":"` + png + `"}`
 	prob := func(body string, v int) (int, map[string]any) {
-		return write(srv, &customerA, "jobs.reportProblem", `{"jobId":"`+job+`",`+body+`}`, v)
+		return write(srv, customerA(), "jobs.reportProblem", `{"jobId":"`+job+`",`+body+`}`, v)
 	}
 	want = map[string]string{ // the field each case is refused for
 		"bad code":      "reasonCode=error.invalid",
@@ -187,7 +187,7 @@ func TestRateAndReportProblem(t *testing.T) {
 		t.Errorf("HQ notifications of the follow-up: %d", n)
 	}
 	// the photo is listed with the follow-up and opens for HQ and the customer (IR437)
-	_, g := post(srv, &hq, "jobs.get", `{"jobId":"`+follow+`"}`)
+	_, g := post(srv, hq(), "jobs.get", `{"jobId":"`+follow+`"}`)
 
 	photos, _ := data(g)["problemPhotos"].([]any)
 	if len(photos) != 1 || asObj(t, photos[0])["name"] != "leak.png" {
@@ -195,7 +195,7 @@ func TestRateAndReportProblem(t *testing.T) {
 	}
 
 	pid := asStr(t, asObj(t, photos[0])["id"])
-	for _, a := range []*actor{&hq, &customerA} {
+	for _, a := range []*actor{hq(), customerA()} {
 		if code, res := post(
 			srv,
 			a,
@@ -209,7 +209,7 @@ func TestRateAndReportProblem(t *testing.T) {
 
 	if code, _ := post(
 		srv,
-		&customerB,
+		customerB(),
 		"jobs.getAttachment",
 		`{"jobId":"`+follow+`","attachmentId":"`+pid+`"}`,
 	); code != 404 {
@@ -228,7 +228,7 @@ func TestRateAndReportProblem(t *testing.T) {
 		t,
 		`UPDATE maintenance.jobs SET completed_at = $2 WHERE id = $1`,
 		job,
-		clock.Add(-8*24*time.Hour),
+		clock().Add(-8*24*time.Hour),
 	)
 
 	if code, _ := prob(
@@ -252,7 +252,7 @@ func TestRateAndReportProblem(t *testing.T) {
 					String()+
 					`","status":"requested"},"limit":100`+cursor+`}`,
 			)
-			for _, it := range items(res) {
+			for _, it := range items(t, res) {
 				if it["id"] == follow {
 					return it
 				}
@@ -274,7 +274,7 @@ func TestRateAndReportProblem(t *testing.T) {
 	var created time.Time
 	ownerScan(t, `SELECT created_at FROM maintenance.jobs WHERE id = $1`, []any{follow}, &created)
 
-	for name, a := range map[string]*actor{"hq": &hq, "client": &customerA} {
+	for name, a := range map[string]*actor{"hq": hq(), "client": customerA()} {
 		row := summary(a)
 
 		at, _ := time.Parse(time.RFC3339, asStr(t, row["createdAt"]))
@@ -287,7 +287,7 @@ func TestRateAndReportProblem(t *testing.T) {
 	// HQ classifies once
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.classifyFollowUp",
 		`{"jobId":"`+follow+`","classification":"redo","reason":"x"}`,
 		1,
@@ -298,7 +298,7 @@ func TestRateAndReportProblem(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.classifyFollowUp",
 		`{"jobId":"`+follow+`","classification":"rework","reason":"same fault"}`,
 		1,
@@ -307,13 +307,13 @@ func TestRateAndReportProblem(t *testing.T) {
 		t.Fatalf("classify: %d %v", code, res)
 	}
 
-	if row := summary(&hq); row["followUpClass"] != "rework" || row["followUpOfJobId"] != job {
+	if row := summary(hq()); row["followUpClass"] != "rework" || row["followUpOfJobId"] != job {
 		t.Errorf("classified row: %v", row)
 	}
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.classifyFollowUp",
 		`{"jobId":"`+follow+`","classification":"new_request","reason":"again"}`,
 		2,
@@ -323,7 +323,7 @@ func TestRateAndReportProblem(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&customerA,
+		customerA(),
 		"jobs.classifyFollowUp",
 		`{"jobId":"`+follow+`","classification":"rework","reason":"x"}`,
 		2,
@@ -340,7 +340,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.saveCost",
 		`{"jobId":"`+job+`","costLines":[{"kind":"guess","amountMinor":1,"currency":"MYR","description":"x",`+
 			`"visibility":"internal"}]}`,
@@ -352,7 +352,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.saveCost",
 		`{"jobId":"`+job+`","costLines":[{"kind":"actual","amountMinor":-1,"currency":"EUR","description":"",`+
 			`"visibility":"internal"}]}`,
@@ -364,7 +364,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.saveCost",
 		`{"jobId":"`+job+`","costLines":`+lines+`}`,
 		1,
@@ -375,7 +375,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 	// IR42: clients see customer lines only
 	if _, res := post(
 		srv,
-		&customerA,
+		customerA(),
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
 	); len(asArr(t, data(res)["costs"])) != 1 ||
@@ -399,15 +399,15 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 		return out, asNum(t, data(res)["total"])
 	}
 	if got, total := actions(
-		&customerA,
+		customerA(),
 	); slices.Contains(got, "job.costs_saved") ||
 		int(total) != len(got) {
 		t.Errorf("client history: %v (total %v)", got, total)
 	}
 
-	clientEvents, clientTotal := actions(&customerA)
+	clientEvents, clientTotal := actions(customerA())
 
-	hqEvents, _ := actions(&hq)
+	hqEvents, _ := actions(hq())
 	if !slices.Contains(hqEvents, "job.costs_saved") {
 		t.Errorf("HQ history lacks the cost record: %v", hqEvents)
 	}
@@ -419,7 +419,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 
 		return asNum(t, data(m)["eventCursor"])
 	}
-	if got := cursor(&customerA); got != clientTotal || len(clientEvents) >= len(hqEvents) {
+	if got := cursor(customerA()); got != clientTotal || len(clientEvents) >= len(hqEvents) {
 		t.Errorf(
 			"client eventCursor %v, client events %d, HQ events %d",
 			got,
@@ -428,7 +428,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 		)
 	}
 
-	if got := cursor(&hq); int(got) != len(hqEvents) {
+	if got := cursor(hq()); int(got) != len(hqEvents) {
 		t.Errorf("HQ eventCursor %v, HQ events %d", got, len(hqEvents))
 	}
 	// warranty claims need a warranty that covers completion
@@ -443,7 +443,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.recordWarrantyClaim",
 		claim,
 		2,
@@ -456,7 +456,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 		t,
 		`UPDATE assets.units SET warranty_ends_at = $2 WHERE id = $1`,
 		seed.ID("unit-non-rto"),
-		clock.Add(30*24*time.Hour),
+		clock().Add(30*24*time.Hour),
 	)
 	t.Cleanup(func() {
 		owner(
@@ -468,7 +468,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.recordWarrantyClaim",
 		`{"jobId":"`+job+`","partLabel":"","amountMinor":0,"currency":"JPY","reason":""}`,
 		2,
@@ -481,7 +481,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.recordWarrantyClaim",
 		claim,
 		2,
@@ -494,7 +494,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.saveCost",
 		`{"jobId":"`+job+`","costLines":[]}`,
 		3,
@@ -502,19 +502,19 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 		t.Error("cost on cancelled job")
 	}
 
-	if code, _ := write(srv, &hq, "jobs.recordWarrantyClaim", claim, 3); code != 409 {
+	if code, _ := write(srv, hq(), "jobs.recordWarrantyClaim", claim, 3); code != 409 {
 		t.Error("claim on non-completed job")
 	}
 
 	// extend access of an accepted offer; JobDetail.offer per role
 	unit := seed.ID("unit-non-rto").String()
-	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
-	_, m := write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
+	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	_, m := write(srv, customerA(), "jobs.create", jobBody(unit, nil), 0)
 
 	j2 := asStr(t, data(m)["id"])
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.extendAccess",
 		`{"jobId":"`+j2+`","accessValidUntil":"`+stamp(200)+`","reason":"x"}`,
 		1,
@@ -524,7 +524,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 
 	write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.offer",
 		`{"jobId":"`+j2+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
@@ -544,7 +544,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&hq,
+		hq(),
 		"jobs.get",
 		`{"jobId":"`+j2+`"}`,
 	); data(res)["offer"] == nil ||
@@ -561,7 +561,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 	)
 	write(
 		srv,
-		&contrA,
+		contrA(),
 		"jobs.accept",
 		`{"jobId":"`+j2+`","offerId":"`+offer+`","termsVersion":"t"}`,
 		2,
@@ -569,7 +569,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.extendAccess",
 		`{"jobId":"`+j2+`","accessValidUntil":"`+stamp(50)+`","reason":"x"}`,
 		3,
@@ -580,7 +580,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.extendAccess",
 		`{"jobId":"`+j2+`","accessValidUntil":"`+stamp(200)+`","reason":" "}`,
 		3,
@@ -591,7 +591,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.extendAccess",
 		`{"jobId":"`+j2+`","accessValidUntil":"`+stamp(200)+`","reason":"parts delayed"}`,
 		3,
@@ -601,7 +601,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&hq,
+		hq(),
 		"jobs.get",
 		`{"jobId":"`+j2+`"}`,
 	); asObj(t, data(res)["offer"])["accessValidUntil"] != stamp(
@@ -612,7 +612,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&contrA,
+		contrA(),
 		"jobs.get",
 		`{"jobId":"`+j2+`"}`,
 	); data(res)["offer"] == nil ||
@@ -622,7 +622,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&customerA,
+		customerA(),
 		"jobs.get",
 		`{"jobId":"`+j2+`"}`,
 	); code != 200 ||
@@ -638,17 +638,17 @@ func TestWorkerConfirmsUnratedJobs(t *testing.T) {
 		t,
 		`UPDATE maintenance.jobs SET completed_at = $2 WHERE id = $1`,
 		job,
-		clock.Add(-7*24*time.Hour),
+		clock().Add(-7*24*time.Hour),
 	)
 
-	_, err := schedTick(context.Background(), srv, clock)
+	_, err := schedTick(context.Background(), srv, clock())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if _, res := post(
 		srv,
-		&customerA,
+		customerA(),
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
 	); data(res)["customerConfirmedAt"] == nil ||
@@ -662,13 +662,19 @@ func TestWorkerConfirmsUnratedJobs(t *testing.T) {
 func TestExtendAccessRefreezesHistory(t *testing.T) {
 	srv := server(t)
 	ctx := context.Background()
-	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
-	_, m := write(srv, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	_, m := write(
+		srv,
+		customerA(),
+		"jobs.create",
+		jobBody(seed.ID("unit-non-rto").String(), nil),
+		0,
+	)
 
 	job := asStr(t, data(m)["id"])
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
@@ -698,7 +704,7 @@ func TestExtendAccessRefreezesHistory(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"jobs.accept",
 		`{"jobId":"`+job+`","offerId":"`+offer+`","termsVersion":"t"}`,
 		2,
@@ -710,8 +716,8 @@ func TestExtendAccessRefreezesHistory(t *testing.T) {
 		t,
 		`UPDATE maintenance.offers SET access_valid_from = $2, access_valid_until = $3 WHERE id = $1`,
 		offer,
-		clock.Add(-5*time.Hour),
-		clock.Add(-time.Hour),
+		clock().Add(-5*time.Hour),
+		clock().Add(-time.Hour),
 	)
 
 	asOf := func() *time.Time {
@@ -728,12 +734,12 @@ func TestExtendAccessRefreezesHistory(t *testing.T) {
 		return at
 	}
 
-	_, err := schedTick(ctx, srv, clock)
+	_, err := schedTick(ctx, srv, clock())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if at := asOf(); at == nil || !at.Equal(clock.Add(-time.Hour)) {
+	if at := asOf(); at == nil || !at.Equal(clock().Add(-time.Hour)) {
 		t.Fatalf("frozen at the first end: %v", at)
 	}
 
@@ -742,7 +748,7 @@ func TestExtendAccessRefreezesHistory(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.extendAccess",
 		`{"jobId":"`+job+`","accessValidUntil":"`+stamp(2)+`","reason":"parts arrived late"}`,
 		v,
@@ -754,12 +760,12 @@ func TestExtendAccessRefreezesHistory(t *testing.T) {
 		t.Errorf("the old snapshot stays while the access is open again: %v", at)
 	}
 
-	_, err = schedTick(ctx, srv, clock.Add(3*time.Hour))
+	_, err = schedTick(ctx, srv, clock().Add(3*time.Hour))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if at := asOf(); at == nil || !at.Equal(clock.Add(2*time.Hour)) {
+	if at := asOf(); at == nil || !at.Equal(clock().Add(2*time.Hour)) {
 		t.Errorf("frozen again at the new end: %v", at)
 	}
 }

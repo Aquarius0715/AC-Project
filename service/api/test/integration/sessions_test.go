@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -37,7 +37,7 @@ func TestRevokeSessions(t *testing.T) {
 	assets := seed.ID(
 		"test-revoke-assets",
 	) // an HQ membership with asset.write but not identity.write
-	from := clock.Add(-24 * time.Hour)
+	from := clock().Add(-24 * time.Hour)
 
 	owner(
 		t,
@@ -130,11 +130,11 @@ func TestRevokeSessions(t *testing.T) {
 	}
 
 	// the input and who may
-	code, resp := write(srv, &hq, "members.revokeSessions", body(tech, "   "), 0)
+	code, resp := write(srv, hq(), "members.revokeSessions", body(tech, "   "), 0)
 	refusal(t, "an empty reason", code, resp, "reason=error.length")
 	code, resp = write(
 		srv,
-		&hq,
+		hq(),
 		"members.revokeSessions",
 		body("00000000-0000-0000-0000-000000000000", "Phone lost"),
 		0,
@@ -143,7 +143,7 @@ func TestRevokeSessions(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&overrider,
+		overrider(),
 		"members.revokeSessions",
 		body(tech, "Phone lost"),
 		0,
@@ -164,7 +164,7 @@ func TestRevokeSessions(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"members.revokeSessions",
 		body(foreign, "Phone lost"),
 		0,
@@ -389,7 +389,7 @@ func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
 		seed.ID("tenant-a"),
 		user,
 		seed.ID("org-operator-a"),
-		clock.Add(-24*time.Hour),
+		clock().Add(-24*time.Hour),
 	)
 	t.Cleanup(func() { owner(t, `DELETE FROM identity.memberships WHERE id = $1`, member) })
 
@@ -398,7 +398,7 @@ func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
 
 		if code, res := write(
 			srv,
-			&hq,
+			hq(),
 			"members.revokeSessions",
 			fmt.Sprintf(`{"membershipId":"%s","reason":"Laptop stolen"}`, member),
 			0,

@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -21,21 +21,21 @@ import (
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
 
-var clock = time.Date(2026, 9, 14, 1, 0, 0, 0, time.UTC)
+// clock is the test servers' business time.
+func clock() time.Time { return time.Date(2026, 9, 14, 1, 0, 0, 0, time.UTC) }
 
 type actor struct{ token, membership string }
 
-var (
-	hq        = actor{"tok-hq", "hq-operator"}
-	customerA = actor{"tok-a", "customer-a"}
-	customerB = actor{"tok-b", "customer-b"}
-	techB     = actor{"tok-tb", "tech-external-b"}
-	techA     = actor{"tok-ta", "tech-external-a"}
-	contrA    = actor{"tok-ca", "contractor-a"}
-	contrB    = actor{"tok-cb", "contractor-b"}
-	restrMgr  = actor{"tok-rm", "hq-restriction-manager"}
-	overrider = actor{"tok-oo", "hq-override-only"}
-)
+// The fixture users: the static test token of each and the membership it acts in.
+func hq() *actor        { return &actor{"tok-hq", "hq-operator"} }
+func customerA() *actor { return &actor{"tok-a", "customer-a"} }
+func customerB() *actor { return &actor{"tok-b", "customer-b"} }
+func techB() *actor     { return &actor{"tok-tb", "tech-external-b"} }
+func techA() *actor     { return &actor{"tok-ta", "tech-external-a"} }
+func contrA() *actor    { return &actor{"tok-ca", "contractor-a"} }
+func contrB() *actor    { return &actor{"tok-cb", "contractor-b"} }
+func restrMgr() *actor  { return &actor{"tok-rm", "hq-restriction-manager"} }
+func overrider() *actor { return &actor{"tok-oo", "hq-override-only"} }
 
 func server(t *testing.T) *apiserver.Server {
 	t.Helper()
@@ -48,8 +48,6 @@ func serverWith(t *testing.T, demo bool) *apiserver.Server {
 
 	return serverCfg(t, func(c *apiserver.Config) { c.DemoOps = demo })
 }
-
-func clockFunc() time.Time { return clock }
 
 // testDB is the URL of the test database for a login role: AC_TEST_DB names the database (ac_test by default;
 // make test-cluster uses ac_test_cluster, so both suites can run at the same time).
@@ -72,7 +70,7 @@ func seedFixture(t *testing.T) *seed.Fixture {
 	if err != nil {
 		t.Skip("database not available:", err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	fixture, err := seed.Load("../../../../docs/04-agentic-sdlc/fixture-contract.json")
 	if err != nil {
@@ -142,7 +140,7 @@ func serverCfg(t *testing.T, opt func(*apiserver.Config)) *apiserver.Server {
 	v := testVerifier(t)
 	cfg := apiserver.Config{
 		DatabaseURL:       testDB("ac_app_login"),
-		Clock:             clockFunc,
+		Clock:             clock,
 		DatabaseReaderURL: "",
 		Addr:              "",
 		DemoOps:           false,
@@ -168,7 +166,7 @@ func serverCfg(t *testing.T, opt func(*apiserver.Config)) *apiserver.Server {
 	}
 	opt(&cfg)
 
-	if clusterMode && len(cfg.Domains) == 0 &&
+	if clusterMode() && len(cfg.Domains) == 0 &&
 		cfg.WrapTx == nil { // a failing transaction is injected in-process only
 		f := clusterFacade(t, cfg, v)
 		lastServer = f
@@ -191,23 +189,33 @@ func serverCfg(t *testing.T, opt func(*apiserver.Config)) *apiserver.Server {
 }
 
 // lastServer is the most recent all-domain test server; drainEvents applies its pending events (IR183/IR184).
+//
+//nolint:gochecknoglobals // shared state: serverCfg sets it and drainEvents reads it
 var lastServer *apiserver.Server
 
 func drainEvents(t *testing.T) {
+	t.Helper()
+
+	drainEventsContext(context.Background(), t)
+}
+
+// drainEventsContext is drainEvents on the caller's context.
+func drainEventsContext(ctx context.Context, t *testing.T) {
 	t.Helper()
 
 	if lastServer == nil {
 		return
 	}
 
-	err := lastServer.DrainEvents(context.Background())
+	err := lastServer.DrainEvents(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
 func post(srv *apiserver.Server, a *actor, op, body string) (int, map[string]any) {
-	req := httptest.NewRequest(ops.ClientRequest(op, body))
+	method, target, reqBody := ops.ClientRequest(op, body)
+	req := httptest.NewRequestWithContext(context.Background(), method, target, reqBody)
 	req.Header.Set("Content-Type", "application/json")
 
 	if a != nil {
@@ -226,13 +234,15 @@ func post(srv *apiserver.Server, a *actor, op, body string) (int, map[string]any
 	return rec.Code, m
 }
 
-func items(m map[string]any) []map[string]any {
+func items(t *testing.T, m map[string]any) []map[string]any {
+	t.Helper()
+
 	d, _ := m["data"].(map[string]any)
 	raw, _ := d["items"].([]any)
 
-	var out []map[string]any
+	out := make([]map[string]any, 0, len(raw))
 	for _, r := range raw {
-		out = append(out, r.(map[string]any))
+		out = append(out, asObj(t, r))
 	}
 
 	return out
@@ -243,7 +253,7 @@ func TestHealth(t *testing.T) {
 
 	for _, p := range []string{"/healthz", "/readyz"} {
 		w := httptest.NewRecorder()
-		s.Echo.ServeHTTP(w, httptest.NewRequest(http.MethodGet, p, nil))
+		s.Echo.ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, p, nil))
 
 		if w.Code != 200 || w.Header().Get("X-Request-ID") == "" {
 			t.Fatalf("%s: %d", p, w.Code)
@@ -253,7 +263,7 @@ func TestHealth(t *testing.T) {
 
 func TestSessionGet(t *testing.T) {
 	srv := server(t)
-	code, res := post(srv, &hq, "session.get", `{}`)
+	code, res := post(srv, hq(), "session.get", `{}`)
 
 	doc := asObj(t, res["data"])
 	if code != 200 || doc["role"] != "admin" ||
@@ -279,7 +289,7 @@ func TestSessionGet(t *testing.T) {
 
 	if _, c := post(
 		srv,
-		&contrA,
+		contrA(),
 		"session.get",
 		`{}`,
 	); asObj(t, c["data"])["organizationId"] != seed.ID("org-contractor-a").
@@ -289,7 +299,7 @@ func TestSessionGet(t *testing.T) {
 
 	if _, c := post(
 		srv,
-		&customerA,
+		customerA(),
 		"session.get",
 		`{}`,
 	); asObj(t, c["data"])["clientRole"] != "owner" ||
@@ -304,7 +314,7 @@ func TestSessionGet(t *testing.T) {
 	}
 
 	meta := asObj(t, res["meta"]) // Meta of service-contracts.ts
-	if meta["snapshotAt"] != clock.Format(time.RFC3339) || meta["correlationId"] == "" ||
+	if meta["snapshotAt"] != clock().Format(time.RFC3339) || meta["correlationId"] == "" ||
 		meta["eventCursor"] == nil {
 		t.Errorf("meta: %v", meta)
 	}
@@ -316,23 +326,23 @@ func TestSessionGet(t *testing.T) {
 
 func TestUnitsListScopes(t *testing.T) {
 	srv := server(t)
-	_, res := post(srv, &hq, "units.list", `{"limit":100}`)
-	all := items(res)
-	_, res = post(srv, &customerA, "units.list", `{"limit":100}`)
-	mine := items(res)
-	_, res = post(srv, &customerB, "units.list", `{"limit":100}`)
-	other := items(res)
-	_, res = post(srv, &techInt, "units.list", `{"limit":100}`)
-	tech := items(res)
-	_, res = post(srv, &techB, "units.list", `{"limit":100}`)
-	external := items(res)
+	_, res := post(srv, hq(), "units.list", `{"limit":100}`)
+	all := items(t, res)
+	_, res = post(srv, customerA(), "units.list", `{"limit":100}`)
+	mine := items(t, res)
+	_, res = post(srv, customerB(), "units.list", `{"limit":100}`)
+	other := items(t, res)
+	_, res = post(srv, techInt(), "units.list", `{"limit":100}`)
+	tech := items(t, res)
+	_, res = post(srv, techB(), "units.list", `{"limit":100}`)
+	external := items(t, res)
 	total := func(a *actor) int {
 		_, m := post(srv, a, "units.list", `{"limit":1}`)
 
 		return int(asNum(t, asObj(t, m["data"])["total"]))
 	}
 
-	hqN, aN, bN := total(&hq), total(&customerA), total(&customerB)
+	hqN, aN, bN := total(hq()), total(customerA()), total(customerB())
 	if len(all) == 0 || len(mine) == 0 || aN+bN > hqN || aN >= hqN {
 		t.Fatalf("hq %d, a %d, b %d", hqN, aN, bN)
 	}
@@ -372,42 +382,42 @@ func TestUnitsListScopes(t *testing.T) {
 		t.Fatalf("external technician without an Assignment sees %d units", len(external))
 	}
 	// paging
-	code, res := post(srv, &hq, "units.list", `{"limit":2}`)
+	code, res := post(srv, hq(), "units.list", `{"limit":2}`)
 
 	doc := asObj(t, res["data"])
-	if code != 200 || len(items(res)) != 2 || doc["nextCursor"] == nil ||
+	if code != 200 || len(items(t, res)) != 2 || doc["nextCursor"] == nil ||
 		int(asNum(t, doc["total"])) != hqN {
 		t.Fatalf("page 1: %d %v", code, doc)
 	}
 
 	code, res = post(
 		srv,
-		&hq,
+		hq(),
 		"units.list",
 		`{"limit":2,"cursor":"`+asStr(t, doc["nextCursor"])+`"}`,
 	)
-	if code != 200 || len(items(res)) == 0 {
+	if code != 200 || len(items(t, res)) == 0 {
 		t.Fatalf("page 2: %d", code)
 	}
 	// filters
 	_, res = post(
 		srv,
-		&hq,
+		hq(),
 		"units.list",
 		`{"filters":{"unitIds":["`+seed.ID("unit-online-rto").String()+`"]}}`,
 	)
-	if got := items(res); len(got) != 1 || got[0]["displayName"] != "Bedroom AC" {
+	if got := items(t, res); len(got) != 1 || got[0]["displayName"] != "Bedroom AC" {
 		t.Fatalf("unitIds filter: %v", got)
 	}
 
-	_, res = post(srv, &hq, "units.list", `{"filters":{"unitIds":[]}}`)
-	if len(items(res)) != 0 {
+	_, res = post(srv, hq(), "units.list", `{"filters":{"unitIds":[]}}`)
+	if len(items(t, res)) != 0 {
 		t.Fatal("empty unitIds returns zero")
 	}
 
 	_, res = post(
 		srv,
-		&hq,
+		hq(),
 		"units.list",
 		`{"filters":{"propertyId":"`+seed.ID("property-home-a").
 			String()+
@@ -415,22 +425,22 @@ func TestUnitsListScopes(t *testing.T) {
 			String()+
 			`","includeDescendants":true}}`,
 	)
-	if len(items(res)) == 0 {
+	if len(items(t, res)) == 0 {
 		t.Fatal("includeDescendants under floor-1")
 	}
 
 	_, res = post(
 		srv,
-		&hq,
+		hq(),
 		"units.list",
 		`{"filters":{"customerId":"`+seed.ID("cust-a").String()+`"},"limit":100}`,
 	)
-	if len(items(res)) != len(mine) {
+	if len(items(t, res)) != len(mine) {
 		t.Fatal("customerId filter equals customer-a's own view")
 	}
 
-	_, res = post(srv, &hq, "units.list", `{"filters":{"powerState":"unknown"},"limit":1}`)
-	if len(items(res)) != 1 {
+	_, res = post(srv, hq(), "units.list", `{"filters":{"powerState":"unknown"},"limit":1}`)
+	if len(items(t, res)) != 1 {
 		t.Fatal("derived powerState filter")
 	}
 
@@ -444,7 +454,7 @@ func TestUnitsListScopes(t *testing.T) {
 		`{"sort":{"field":"name","direction":"asc"}}`: "sort.field=error.invalid",
 		`{"limit":500}`:                               "limit=error.range",
 	} {
-		code, m := post(srv, &hq, "units.list", body)
+		code, m := post(srv, hq(), "units.list", body)
 		refusal(t, body, code, m, want)
 	}
 
@@ -454,7 +464,7 @@ func TestUnitsListScopes(t *testing.T) {
 		`{"filters":{"organizationId":"` + seed.ID("org-customer-b").String() + `"}}`, `{"sort":{"field":"createdAt",` +
 			`"direction":"desc"}}`,
 	} {
-		if code, _ := post(srv, &hq, "units.list", body); code != 200 {
+		if code, _ := post(srv, hq(), "units.list", body); code != 200 {
 			t.Errorf("%s: %d", body, code)
 		}
 	}
@@ -466,7 +476,7 @@ func TestUnitsGet(t *testing.T) {
 	id := seed.ID("unit-online-rto").String()
 	if code, res := post(
 		srv,
-		&customerA,
+		customerA(),
 		"units.get",
 		`{"id":"`+id+`"}`,
 	); code != 200 ||
@@ -476,7 +486,7 @@ func TestUnitsGet(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"units.get",
 		`{"id":"`+id+`"}`,
 	); code != 404 ||
@@ -486,7 +496,7 @@ func TestUnitsGet(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"units.get",
 		`{}`,
 	); code != 404 ||

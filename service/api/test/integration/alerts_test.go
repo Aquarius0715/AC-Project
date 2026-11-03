@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"fmt"
@@ -12,6 +12,8 @@ import (
 )
 
 func newAlert(t *testing.T, unit, org, severity string, when time.Time) string {
+	t.Helper()
+
 	id := uuid.NewString()
 	// one open alert per unit / policy / rule / type (alerts_one_open_per_rule): use the severity as the rule key
 	owner(
@@ -34,27 +36,27 @@ func TestAlerts(t *testing.T) {
 	srv := server(t)
 	unit := newUnit(t, srv, "Alert AC")
 	org := seed.ID("org-customer-b").String()
-	crit := newAlert(t, unit, org, "critical", clock.Add(-10*time.Minute))
-	warn := newAlert(t, unit, org, "warning", clock.Add(-5*time.Minute))
-	norm := newAlert(t, unit, org, "normal", clock.Add(-time.Minute))
+	crit := newAlert(t, unit, org, "critical", clock().Add(-10*time.Minute))
+	warn := newAlert(t, unit, org, "warning", clock().Add(-5*time.Minute))
+	norm := newAlert(t, unit, org, "normal", clock().Add(-time.Minute))
 
 	ids := func(m map[string]any) []string {
 		out := []string{}
-		for _, it := range items(m) {
+		for _, it := range items(t, m) {
 			out = append(out, asStr(t, it["id"]))
 		}
 
 		return out
 	}
 
-	_, resp := post(srv, &hq, "alerts.list", `{"filters":{"unitId":"`+unit+`"}}`)
+	_, resp := post(srv, hq(), "alerts.list", `{"filters":{"unitId":"`+unit+`"}}`)
 	if got := ids(resp); strings.Join(got, ",") != strings.Join([]string{crit, warn, norm}, ",") {
 		t.Fatalf("default severity desc: %v", got)
 	}
 
 	_, resp = post(
 		srv,
-		&hq,
+		hq(),
 		"alerts.list",
 		`{"filters":{"unitId":"`+unit+`"},"sort":{"field":"severity","direction":"asc"}}`,
 	)
@@ -65,8 +67,8 @@ func TestAlerts(t *testing.T) {
 	for body, n := range map[string]int{
 		`{"filters":{"unitIds":["` + unit + `"],"severity":"warning"}}`: 1,
 		`{"filters":{"unitId":"` + unit + `","status":"open"}}`:         3,
-		`{"filters":{"unitId":"` + unit + `","from":"` + clock.Add(-6*time.Minute).Format(time.RFC3339) + `","to":"` +
-			clock.Format(time.RFC3339) + `"}}`: 2,
+		`{"filters":{"unitId":"` + unit + `","from":"` + clock().Add(-6*time.Minute).Format(time.RFC3339) + `","to":"` +
+			clock().Format(time.RFC3339) + `"}}`: 2,
 		`{"filters":{"unitId":"` + unit + `","customerId":"` + seed.ID("cust-b").String() +
 			`"}}`: 3,
 		`{"filters":{"propertyId":"` + seed.ID("property-home-b").String() + `","unitId":"` + unit +
@@ -74,8 +76,8 @@ func TestAlerts(t *testing.T) {
 		`{"filters":{"unitId":"` + unit + `","customerId":"` + uuid.NewString() +
 			`"}}`: 0,
 	} {
-		if code, m := post(srv, &hq, "alerts.list", body); code != 200 || len(items(m)) != n {
-			t.Errorf("%s: %d want %d", body, len(items(m)), n)
+		if code, m := post(srv, hq(), "alerts.list", body); code != 200 || len(items(t, m)) != n {
+			t.Errorf("%s: %d want %d", body, len(items(t, m)), n)
 		}
 	}
 
@@ -92,26 +94,26 @@ func TestAlerts(t *testing.T) {
 		`{"filters":{"from":"2026-09-14T01:00:00Z","to":"2026-09-14T00:00:00Z"}}`, `{"filters":{"z":1}}`,
 		`{"sort":{"field":"title","direction":"asc"}}`,
 	} {
-		code, m := post(srv, &hq, "alerts.list", b)
+		code, m := post(srv, hq(), "alerts.list", b)
 		refusal(t, b, code, m, want[b])
 	}
 	// scope: customer-b sees, customer-a does not; units.list shows the active count
-	if code, _ := post(srv, &customerB, "alerts.get", `{"id":"`+crit+`"}`); code != 200 {
+	if code, _ := post(srv, customerB(), "alerts.get", `{"id":"`+crit+`"}`); code != 200 {
 		t.Error("customer-b reads its alert")
 	}
 
-	if code, _ := post(srv, &customerA, "alerts.get", `{"id":"`+crit+`"}`); code != 404 {
+	if code, _ := post(srv, customerA(), "alerts.get", `{"id":"`+crit+`"}`); code != 404 {
 		t.Error("customer-a must not read customer-b's alert")
 	}
 
-	_, g := post(srv, &hq, "units.get", `{"id":"`+unit+`"}`)
+	_, g := post(srv, hq(), "units.get", `{"id":"`+unit+`"}`)
 	if asNum(t, data(g)["activeAlertCount"]) != 2 { // IR51: normal alerts are not counted
 		t.Fatalf("activeAlertCount: %v", data(g)["activeAlertCount"])
 	}
 	// acknowledge → resolve, with state and version rules
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"alerts.acknowledge",
 		`{"alertId":"`+crit+`"}`,
 		1,
@@ -120,13 +122,13 @@ func TestAlerts(t *testing.T) {
 		t.Fatalf("ack: %d %v", code, res)
 	}
 
-	if code, _ := write(srv, &hq, "alerts.acknowledge", `{"alertId":"`+crit+`"}`, 2); code != 409 {
+	if code, _ := write(srv, hq(), "alerts.acknowledge", `{"alertId":"`+crit+`"}`, 2); code != 409 {
 		t.Error("ack twice")
 	}
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"alerts.resolve",
 		`{"alertId":"`+crit+`","resolutionReason":"   ","resolutionEvidenceIds":[]}`,
 		2,
@@ -137,7 +139,7 @@ func TestAlerts(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"alerts.resolve",
 		`{"alertId":"`+crit+`","resolutionReason":"`+strings.Repeat(
 			"r",
@@ -151,7 +153,7 @@ func TestAlerts(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"alerts.resolve",
 		`{"alertId":"`+crit+`","resolutionReason":"fixed"}`,
 		2,
@@ -160,10 +162,10 @@ func TestAlerts(t *testing.T) {
 		t.Errorf("evidence ids required: %d %s", code, fields(res))
 	}
 	// an alert without a policy cites a candidate (IR66, IR327): here a remeasurement after detection
-	back := reading(t, unit, "temperature", 25, "°C", clock.Add(-2*time.Minute), "valid")
+	back := reading(t, unit, "temperature", 25, "°C", clock().Add(-2*time.Minute), "valid")
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"alerts.resolve",
 		`{"alertId":"`+crit+`","resolutionReason":" window closed ","resolutionEvidenceIds":["`+back+`"]}`,
 		2,
@@ -174,7 +176,7 @@ func TestAlerts(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"alerts.resolve",
 		`{"alertId":"`+crit+`","resolutionReason":"again","resolutionEvidenceIds":[]}`,
 		3,
@@ -184,7 +186,7 @@ func TestAlerts(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"alerts.resolve",
 		`{"alertId":"`+warn+`","resolutionReason":"direct","resolutionEvidenceIds":["`+back+`"]}`,
 		1,
@@ -193,13 +195,13 @@ func TestAlerts(t *testing.T) {
 		t.Fatalf("resolve from open: %d %v", code, res)
 	}
 
-	if code, _ := write(srv, &hq, "alerts.acknowledge", `{"alertId":"`+norm+`"}`, 5); code != 409 {
+	if code, _ := write(srv, hq(), "alerts.acknowledge", `{"alertId":"`+norm+`"}`, 5); code != 409 {
 		t.Error("stale version")
 	}
 
 	if code, _ := write(
 		srv,
-		&customerB,
+		customerB(),
 		"alerts.acknowledge",
 		`{"alertId":"`+norm+`"}`,
 		1,
@@ -209,7 +211,7 @@ func TestAlerts(t *testing.T) {
 	// technician without an assignment on the unit
 	if code, _ := write(
 		srv,
-		&techInt,
+		techInt(),
 		"alerts.acknowledge",
 		`{"alertId":"`+norm+`"}`,
 		1,
@@ -217,7 +219,7 @@ func TestAlerts(t *testing.T) {
 		t.Error("technician outside scope → NOT_FOUND")
 	}
 
-	_, g = post(srv, &hq, "units.get", `{"id":"`+unit+`"}`)
+	_, g = post(srv, hq(), "units.get", `{"id":"`+unit+`"}`)
 	if asNum(t, data(g)["activeAlertCount"]) != 0 { // only the normal alert is left open (IR51)
 		t.Fatal("resolved alerts are not active")
 	}
@@ -266,7 +268,7 @@ func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
 			policy,
 			ruleKey,
 			typ,
-			clock.Add(-10*time.Minute),
+			clock().Add(-10*time.Minute),
 		)
 
 		return id
@@ -301,13 +303,13 @@ func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
 		"recoveryThreshold": 28.0,
 		"durationSeconds":   60.0,
 	}
-	for _, a := range []*actor{&hq, &customerB} {
+	for _, a := range []*actor{hq(), customerB()} {
 		if got, _ := rule(a, own).(map[string]any); fmt.Sprint(got) != fmt.Sprint(want) {
 			t.Errorf("the policy's condition: %v", got)
 		}
 	}
 
-	if got, _ := rule(&hq, viaDefault).(map[string]any); got["name"] != "Ventilation" ||
+	if got, _ := rule(hq(), viaDefault).(map[string]any); got["name"] != "Ventilation" ||
 		got["metric"] != "co2" ||
 		got["threshold"] != 1000.0 ||
 		got["recoveryThreshold"] != 900.0 ||
@@ -315,17 +317,17 @@ func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
 		t.Errorf("the default rule of the rule key: %v", got)
 	}
 
-	if got := rule(&hq, none); got != nil {
+	if got := rule(hq(), none); got != nil {
 		t.Errorf("no policy, no rule: %v", got)
 	}
 
 	if _, res := post(
 		srv,
-		&hq,
+		hq(),
 		"alerts.list",
 		`{"filters":{"unitId":"`+unit+`"}}`,
-	); len(items(res)) != 3 ||
-		items(res)[0]["rule"] == nil && items(res)[1]["rule"] == nil {
+	); len(items(t, res)) != 3 ||
+		items(t, res)[0]["rule"] == nil && items(t, res)[1]["rule"] == nil {
 		t.Errorf("alerts.list carries the rule: %v", res)
 	}
 	// a technician on the unit without alert.resolve acknowledges (alert.read) but does not resolve (DD-T07)
@@ -344,7 +346,7 @@ func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
 		seed.ID("tech-internal-a"),
 		unit,
 	)
-	assign(t, unit, "tech-internal-a", clock.Add(-time.Hour), clock.Add(time.Hour), "active")
+	assign(t, unit, "tech-internal-a", clock().Add(-time.Hour), clock().Add(time.Hour), "active")
 	owner(
 		t,
 		`DELETE FROM identity.membership_permissions WHERE membership_id = $1 AND permission = 'alert.resolve'`,
@@ -362,7 +364,7 @@ func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&techInt,
+		techInt(),
 		"alerts.acknowledge",
 		`{"alertId":"`+own+`"}`,
 		1,
@@ -373,7 +375,7 @@ func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&techInt,
+		techInt(),
 		"alerts.resolve",
 		`{"alertId":"`+own+`","resolutionReason":"filter replaced","resolutionEvidenceIds":[]}`,
 		2,
@@ -391,7 +393,7 @@ func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&techInt,
+		techInt(),
 		"alerts.resolve",
 		`{"alertId":"`+own+`","resolutionReason":"filter replaced","resolutionEvidenceIds":[]}`,
 		2,

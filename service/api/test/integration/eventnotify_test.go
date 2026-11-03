@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -33,7 +33,7 @@ func TestBusinessEventNotifications(t *testing.T) {
 
 	code, resp := write(
 		srv,
-		&customerA,
+		customerA(),
 		"jobs.create",
 		jobBody(seed.ID("unit-non-rto").String(), nil),
 		0,
@@ -52,10 +52,10 @@ func TestBusinessEventNotifications(t *testing.T) {
 		)
 	}
 	// job.assigned: technician and client get schedule_change; the acting HQ member does not
-	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.assign",
 		`{"jobId":"`+job+`","technicianMembershipId":"`+seed.ID("tech-internal-a").
 			String()+
@@ -76,13 +76,13 @@ func TestBusinessEventNotifications(t *testing.T) {
 		t.Error("job.assigned recipients")
 	}
 	// job.cancelled
-	_, g := post(srv, &hq, "jobs.get", `{"jobId":"`+job+`"}`)
+	_, g := post(srv, hq(), "jobs.get", `{"jobId":"`+job+`"}`)
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.cancel",
 		`{"jobId":"`+job+`","cancelReason":"no longer needed"}`,
-		ver(g),
+		ver(t, g),
 	); code != 200 {
 		t.Fatalf("cancel: %d %v", code, res)
 	}
@@ -116,7 +116,7 @@ func TestBusinessEventNotifications(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"payments.recordManual",
 		`{"invoiceId":"`+inv+`","paymentReference":"BANK-`+rid[:8]+`","confirmedAmountMinor":5000,"currency":"MYR",`+
 			`"reason":"bank"}`,

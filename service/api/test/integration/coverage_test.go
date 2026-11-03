@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -16,13 +16,13 @@ func TestUnitsCoverage(t *testing.T) {
 		t,
 		`UPDATE assets.units SET warranty_ends_at = $2 WHERE id = $1`,
 		seed.ID("unit-online-rto"),
-		clock.Add(30*24*time.Hour),
+		clock().Add(30*24*time.Hour),
 	)
 	owner(
 		t,
 		`UPDATE assets.units SET warranty_ends_at = $2 WHERE id = $1`,
 		seed.ID("unit-non-rto"),
-		clock.Add(200*24*time.Hour),
+		clock().Add(200*24*time.Hour),
 	)
 	// the seed contracts would cover these units: end them for this test (restored afterwards)
 	owner(
@@ -48,8 +48,8 @@ func TestUnitsCoverage(t *testing.T) {
 		seed.ID("tenant-a"),
 		seed.ID("cust-a"),
 		seed.ID("org-customer-a"),
-		clock.Add(-24*time.Hour),
-		clock.Add(365*24*time.Hour),
+		clock().Add(-24*time.Hour),
+		clock().Add(365*24*time.Hour),
 		seed.ID("hq-operator"),
 	)
 	owner(
@@ -61,13 +61,13 @@ func TestUnitsCoverage(t *testing.T) {
 	)
 
 	byUnit := func(body string) map[string]map[string]any {
-		code, res := post(srv, &hq, "units.coverage", body)
+		code, res := post(srv, hq(), "units.coverage", body)
 		if code != 200 {
 			t.Fatalf("%s: %d %v", body, code, res)
 		}
 
 		out := map[string]map[string]any{}
-		for _, it := range items(res) {
+		for _, it := range items(t, res) {
 			out[asStr(t, it["unitId"])] = it
 		}
 
@@ -97,7 +97,7 @@ func TestUnitsCoverage(t *testing.T) {
 		seed.ID("user-tech-internal-a"),
 		`[{"name":"Fan motor","quantity":1,"catalogCode":"FM-25","source":"hq_warehouse","lotSerial":null,`+
 			`"replacesComponentKey":"blower_motor","oldPartDisposal":"returned","receiptAttachmentId":null}]`,
-		clock.Add(-time.Hour),
+		clock().Add(-time.Hour),
 	)
 
 	claimable := func() bool {
@@ -118,7 +118,7 @@ func TestUnitsCoverage(t *testing.T) {
 		t,
 		`UPDATE assets.units SET warranty_ends_at = $2 WHERE id = $1`,
 		seed.ID("unit-non-rto"),
-		clock.Add(-2*time.Hour),
+		clock().Add(-2*time.Hour),
 	)
 
 	if claimable() {
@@ -129,12 +129,12 @@ func TestUnitsCoverage(t *testing.T) {
 		t,
 		`UPDATE assets.units SET warranty_ends_at = $2 WHERE id = $1`,
 		seed.ID("unit-non-rto"),
-		clock.Add(200*24*time.Hour),
+		clock().Add(200*24*time.Hour),
 	)
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.recordWarrantyClaim",
 		`{"jobId":"`+job+`","partLabel":"Fan motor FM-25 ×1","amountMinor":21000,"currency":"MYR","reason":"replaced under `+
 			`warranty"}`,
@@ -183,11 +183,11 @@ func TestUnitsCoverage(t *testing.T) {
 		`{"filters":{"coverage":"x"}}`, `{"filters":{"expiringWithinDays":0}}`,
 		`{"sort":{"field":"status","direction":"asc"}}`,
 	} {
-		code, m := post(srv, &hq, "units.coverage", b)
+		code, m := post(srv, hq(), "units.coverage", b)
 		refusal(t, b, code, m, want[b])
 	}
 
-	if code, _ := post(srv, &customerA, "units.coverage", `{}`); code != 403 {
+	if code, _ := post(srv, customerA(), "units.coverage", `{}`); code != 403 {
 		t.Error("client cannot read coverage")
 	}
 }

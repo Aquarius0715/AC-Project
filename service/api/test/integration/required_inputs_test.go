@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"encoding/json"
@@ -225,8 +225,8 @@ func TestRequiredInputs(t *testing.T) {
 			}
 		}
 
-		b, _ := json.Marshal(body)
-		code, m := write(srv, &hq, c.op, string(b), 0)
+		b := jsonBytes(t, body)
+		code, m := write(srv, hq(), c.op, string(b), 0)
 
 		fe, _ := m["fieldErrors"].(map[string]any)
 		for field, key := range c.want {

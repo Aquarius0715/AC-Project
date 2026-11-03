@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -40,13 +40,13 @@ func TestContractorRegister(t *testing.T) {
 		"customer org": `{"organizationId":"` + seed.ID("org-customer-a").String() + `","registrationNo":"R",` +
 			`"serviceAreas":["KL"],"contactEmail":"a@b.example","insuranceValidUntil":null}`,
 	} {
-		code, m := write(srv, &hq, "contractors.save", b, 0)
+		code, m := write(srv, hq(), "contractors.save", b, 0)
 		refusal(t, name, code, m, want[name])
 	}
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"contractors.save",
 		`{"organizationId":"`+uuid.NewString()+`","registrationNo":"R","serviceAreas":["KL"],"contactEmail":"a@b.example",`+
 			`"insuranceValidUntil":null}`,
@@ -55,7 +55,7 @@ func TestContractorRegister(t *testing.T) {
 		t.Error("unknown organization")
 	}
 
-	code, resp := write(srv, &hq, "contractors.save", body(""), 0)
+	code, resp := write(srv, hq(), "contractors.save", body(""), 0)
 
 	p := data(resp)
 	if code != 200 || p["status"] != "active" || p["registrationNo"] != "REG-1" ||
@@ -67,14 +67,14 @@ func TestContractorRegister(t *testing.T) {
 
 	id := asStr(t, p["id"])
 
-	if code, _ := write(srv, &hq, "contractors.save", body(""), 0); code != 409 {
+	if code, _ := write(srv, hq(), "contractors.save", body(""), 0); code != 409 {
 		t.Error("second profile")
 	}
 
-	until := clock.Add(200 * 24 * time.Hour).Format(time.RFC3339)
+	until := clock().Add(200 * 24 * time.Hour).Format(time.RFC3339)
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"contractors.save",
 		body(`,"id":"` + id + `"`)[:len(body(""))-len(`"insuranceValidUntil":null}`)]+`"insuranceValidUntil":"`+until+
 			`","id":"`+id+`"}`,
@@ -90,7 +90,7 @@ func TestContractorRegister(t *testing.T) {
 		`"id":"` + id + `"}`
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"contractors.save",
 		other,
 		2,
@@ -101,7 +101,7 @@ func TestContractorRegister(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"contractors.save",
 		body(`,"id":"`+id+`"`),
 		1,
@@ -112,7 +112,7 @@ func TestContractorRegister(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"contractors.save",
 		body(`,"id":"`+uuid.NewString()+`"`),
 		1,
@@ -122,7 +122,7 @@ func TestContractorRegister(t *testing.T) {
 	// suspension
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"contractors.setOfferStatus",
 		`{"contractorOrgId":"`+org+`","status":"suspended","reason":"insurance lapsed"}`,
 		1,
@@ -133,7 +133,7 @@ func TestContractorRegister(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"contractors.setOfferStatus",
 		`{"contractorOrgId":"`+uuid.NewString()+`","status":"suspended","reason":"insurance lapsed"}`,
 		1,
@@ -143,7 +143,7 @@ func TestContractorRegister(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"contractors.setOfferStatus",
 		`{"contractorOrgId":"`+org+`","status":"suspended","reason":" "}`,
 		2,
@@ -154,7 +154,7 @@ func TestContractorRegister(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"contractors.setOfferStatus",
 		`{"contractorOrgId":"`+org+`","status":"suspended","reason":"insurance lapsed"}`,
 		2,
@@ -165,7 +165,7 @@ func TestContractorRegister(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"contractors.setOfferStatus",
 		`{"contractorOrgId":"`+org+`","status":"suspended","reason":"again"}`,
 		3,
@@ -173,10 +173,10 @@ func TestContractorRegister(t *testing.T) {
 		t.Error("suspend twice")
 	}
 
-	_, resp = post(srv, &hq, "contractors.list", `{"filters":{"status":"suspended"},"limit":100}`)
+	_, resp = post(srv, hq(), "contractors.list", `{"filters":{"status":"suspended"},"limit":100}`)
 
 	found := false
-	for _, it := range items(resp) {
+	for _, it := range items(t, resp) {
 		found = found || it["id"] == id
 	}
 
@@ -186,7 +186,7 @@ func TestContractorRegister(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"contractors.setOfferStatus",
 		`{"contractorOrgId":"`+org+`","status":"active","reason":"renewed"}`,
 		3,
@@ -197,7 +197,7 @@ func TestContractorRegister(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"contractors.list",
 		`{"filters":{"status":"x"}}`,
 	); code != 422 ||
@@ -205,14 +205,14 @@ func TestContractorRegister(t *testing.T) {
 		t.Errorf("bad status filter: %d %s", code, fields(res))
 	}
 
-	if code, _ := post(srv, &contrA, "contractors.list", `{}`); code != 403 {
+	if code, _ := post(srv, contrA(), "contractors.list", `{}`); code != 403 {
 		t.Error("contractor lists register")
 	}
 	// rate cards
 	rc := func(from string, lines string) (int, map[string]any) {
 		return write(
 			srv,
-			&hq,
+			hq(),
 			"rateCards.save",
 			`{"contractorOrgId":"`+org+`","effectiveFrom":"`+from+`","currency":"MYR","lines":`+lines+`}`,
 			0,
@@ -228,7 +228,7 @@ func TestContractorRegister(t *testing.T) {
 	}
 
 	for name, tc := range map[string][2]string{
-		"past":     {clock.Add(-time.Hour).Format(time.RFC3339), line},
+		"past":     {clock().Add(-time.Hour).Format(time.RFC3339), line},
 		"no lines": {until, `[]`},
 		"dup worktype": {until, `[{"workType":"emergency","amountMinor":1,"note":null},{"workType":"emergency",` +
 			`"amountMinor":2,"note":null}]`},
@@ -239,14 +239,14 @@ func TestContractorRegister(t *testing.T) {
 		refusal(t, name, code, m, want[name])
 	}
 
-	code, resp = rc(clock.Add(24*time.Hour).Format(time.RFC3339), line)
+	code, resp = rc(clock().Add(24*time.Hour).Format(time.RFC3339), line)
 	if code != 200 || asNum(t, data(resp)["version"]) != 1 ||
 		asObj(t, asArr(t, data(resp)["lines"])[0])["note"] != "base" {
 		t.Fatalf("rate card: %d %v", code, resp)
 	}
 
 	if code, res := rc(
-		clock.Add(48*time.Hour).Format(time.RFC3339),
+		clock().Add(48*time.Hour).Format(time.RFC3339),
 		`[{"workType":"repair_base","amountMinor":45000,"note":"   "}]`,
 	); code != 200 ||
 		asNum(t, data(res)["version"]) != 2 ||
@@ -256,7 +256,7 @@ func TestContractorRegister(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"rateCards.save",
 		`{"contractorOrgId":"`+uuid.NewString()+`","effectiveFrom":"`+until+`","currency":"MYR","lines":`+line+`}`,
 		0,
@@ -266,27 +266,27 @@ func TestContractorRegister(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&hq,
+		hq(),
 		"rateCards.list",
 		`{"filters":{"contractorOrgId":"`+org+`"}}`,
-	); len(items(res)) != 2 ||
-		asNum(t, items(res)[0]["version"]) != 2 {
+	); len(items(t, res)) != 2 ||
+		asNum(t, items(t, res)[0]["version"]) != 2 {
 		t.Fatalf("rate card list: %v", res)
 	}
 
 	if code, res := post(
 		srv,
-		&contrA,
+		contrA(),
 		"rateCards.list",
 		`{"filters":{"contractorOrgId":"`+org+`"}}`,
 	); code != 200 ||
-		len(items(res)) != 0 && items(res)[0]["contractorOrgId"] == org {
+		len(items(t, res)) != 0 && items(t, res)[0]["contractorOrgId"] == org {
 		t.Error("contractor sees another company's rate cards")
 	}
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"rateCards.list",
 		`{"filters":{"x":1}}`,
 	); code != 422 ||
@@ -303,8 +303,8 @@ func TestSLAScorecard(t *testing.T) {
 		t,
 		`UPDATE maintenance.jobs SET created_at = created_at - interval '1000 days' WHERE created_at >= $1 AND created_at <
 			$2`,
-		clock.Add(-48*time.Hour),
-		clock,
+		clock().Add(-48*time.Hour),
+		clock(),
 	)
 
 	want := map[string]string{ // the field each case is refused for
@@ -317,26 +317,26 @@ func TestSLAScorecard(t *testing.T) {
 
 	for name, b := range map[string]string{
 		"arrival 120": `{"planType":"general","responseHours":4,"arrivalInWindowPercent":120,"firstTimeFixPercent":80,` +
-			`"effectiveFrom":"` + clock.Format(time.RFC3339) + `"}`,
+			`"effectiveFrom":"` + clock().Format(time.RFC3339) + `"}`,
 		"response 0": `{"planType":"general","responseHours":0,"arrivalInWindowPercent":90,"firstTimeFixPercent":80,` +
-			`"effectiveFrom":"` + clock.Format(time.RFC3339) + `"}`,
+			`"effectiveFrom":"` + clock().Format(time.RFC3339) + `"}`,
 		"response 169": `{"planType":"general","responseHours":169,"arrivalInWindowPercent":90,"firstTimeFixPercent":80,` +
-			`"effectiveFrom":"` + clock.Format(time.RFC3339) + `"}`,
+			`"effectiveFrom":"` + clock().Format(time.RFC3339) + `"}`,
 		"bad plan": `{"planType":"vip","responseHours":4,"arrivalInWindowPercent":90,"firstTimeFixPercent":80,` +
-			`"effectiveFrom":"` + clock.Format(time.RFC3339) + `"}`,
+			`"effectiveFrom":"` + clock().Format(time.RFC3339) + `"}`,
 		"past": `{"planType":"general","responseHours":4,"arrivalInWindowPercent":90,"firstTimeFixPercent":80,` +
-			`"effectiveFrom":"` + clock.Add(-time.Hour).Format(time.RFC3339) + `"}`,
+			`"effectiveFrom":"` + clock().Add(-time.Hour).Format(time.RFC3339) + `"}`,
 	} {
-		code, m := write(srv, &hq, "sla.saveTargets", b, 0)
+		code, m := write(srv, hq(), "sla.saveTargets", b, 0)
 		refusal(t, name, code, m, want[name])
 	}
 
 	if code, resp := write(
 		srv,
-		&hq,
+		hq(),
 		"sla.saveTargets",
 		`{"planType":"general","responseHours":2,"arrivalInWindowPercent":95,"firstTimeFixPercent":90,`+
-			`"effectiveFrom":"`+clock.Add(time.Hour).
+			`"effectiveFrom":"`+clock().Add(time.Hour).
 			Format(time.RFC3339)+
 			`"}`,
 		0,
@@ -347,10 +347,10 @@ func TestSLAScorecard(t *testing.T) {
 
 	if code, resp := write(
 		srv,
-		&hq,
+		hq(),
 		"sla.saveTargets",
 		`{"planType":"general","responseHours":3,"arrivalInWindowPercent":90,"firstTimeFixPercent":85,`+
-			`"effectiveFrom":"`+clock.Add(time.Hour).
+			`"effectiveFrom":"`+clock().Add(time.Hour).
 			Format(time.RFC3339)+
 			`"}`,
 		0,
@@ -363,20 +363,20 @@ func TestSLAScorecard(t *testing.T) {
 	unit := seed.ID("unit-non-rto").String()
 	_, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.create",
 		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
 		0,
 	)
 	job := asStr(t, data(res)["id"])
-	created := clock.Add(-10 * time.Hour)
+	created := clock().Add(-10 * time.Hour)
 	owner(
 		t,
 		`UPDATE maintenance.jobs SET created_at = $2, status = 'completed', completed_at = $3, contractor_org_id = $4, rating
 			= '{"stars":4}'::jsonb WHERE id = $1`,
 		job,
 		created,
-		clock.Add(-time.Hour),
+		clock().Add(-time.Hour),
 		seed.ID("org-contractor-a"),
 	)
 	owner(
@@ -388,13 +388,13 @@ func TestSLAScorecard(t *testing.T) {
 		job,
 		seed.ID("org-contractor-a"),
 		created,
-		clock,
+		clock(),
 		created.Add(6*time.Hour+10*time.Minute),
 	)
 	// a job accepted 1 h after its creation answered within the default 4 h: counted within the target, no breach
 	_, res = write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.create",
 		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
 		0,
@@ -416,13 +416,13 @@ func TestSLAScorecard(t *testing.T) {
 		onTime,
 		seed.ID("org-contractor-a"),
 		created,
-		clock,
+		clock(),
 		created.Add(time.Hour),
 	)
 	// an open overdue job
 	_, res = write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.create",
 		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
 		0,
@@ -432,8 +432,8 @@ func TestSLAScorecard(t *testing.T) {
 		t,
 		`UPDATE maintenance.jobs SET created_at = $2, due_at = $3 WHERE id = $1`,
 		overdue,
-		clock.Add(-5*time.Hour),
-		clock.Add(-time.Hour),
+		clock().Add(-5*time.Hour),
+		clock().Add(-time.Hour),
 	)
 
 	// IR291: a job cancelled before its response was due is neither within the target nor a miss; one cancelled later
@@ -443,7 +443,7 @@ func TestSLAScorecard(t *testing.T) {
 	for _, after := range []time.Duration{time.Hour, 6 * time.Hour} {
 		_, res = write(
 			srv,
-			&hq,
+			hq(),
 			"jobs.create",
 			jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
 			0,
@@ -454,7 +454,7 @@ func TestSLAScorecard(t *testing.T) {
 			t,
 			`UPDATE maintenance.jobs SET created_at = $2, status = 'cancelled' WHERE id = $1`,
 			id,
-			clock.Add(-10*time.Hour),
+			clock().Add(-10*time.Hour),
 		)
 		owner(
 			t,
@@ -462,17 +462,17 @@ func TestSLAScorecard(t *testing.T) {
 				'job.cancelled', $3)`,
 			seed.ID("tenant-a"),
 			id,
-			clock.Add(-10*time.Hour+after),
+			clock().Add(-10*time.Hour+after),
 		)
 	}
 
-	period := `{"period":{"from":"` + clock.Add(-48*time.Hour).
+	period := `{"period":{"from":"` + clock().Add(-48*time.Hour).
 		Format(time.RFC3339) +
-		`","to":"` + clock.Format(
+		`","to":"` + clock().Format(
 		time.RFC3339,
 	) + `"}`
 
-	code, res := post(srv, &hq, "sla.scorecard", period+`}`)
+	code, res := post(srv, hq(), "sla.scorecard", period+`}`)
 	if code != 200 {
 		t.Fatalf("scorecard: %d %v", code, res)
 	}
@@ -562,7 +562,7 @@ func TestSLAScorecard(t *testing.T) {
 	// contractor filter
 	_, res = post(
 		srv,
-		&hq,
+		hq(),
 		"sla.scorecard",
 		period+`,"contractorOrgId":"`+seed.ID("org-contractor-b").String()+`"}`,
 	)
@@ -574,11 +574,11 @@ func TestSLAScorecard(t *testing.T) {
 
 	if code, resp := post(
 		srv,
-		&hq,
+		hq(),
 		"sla.scorecard",
-		`{"period":{"from":"`+clock.Format(
+		`{"period":{"from":"`+clock().Format(
 			time.RFC3339,
-		)+`","to":"`+clock.Add(-time.Hour).
+		)+`","to":"`+clock().Add(-time.Hour).
 			Format(time.RFC3339)+
 			`"}}`,
 	); code != 422 ||
@@ -586,7 +586,7 @@ func TestSLAScorecard(t *testing.T) {
 		t.Errorf("reversed period: %d %s", code, fields(resp))
 	}
 
-	if code, _ := post(srv, &customerA, "sla.scorecard", period+`}`); code != 403 {
+	if code, _ := post(srv, customerA(), "sla.scorecard", period+`}`); code != 403 {
 		t.Error("client scorecard")
 	}
 	// KPIs include the accepted offer and rating
@@ -600,8 +600,8 @@ func TestSLAScorecard(t *testing.T) {
 			"tenant-a",
 		),
 		seed.ID("org-contractor-a"),
-		clock.Add(-time.Hour),
-		clock.Add(1000*time.Hour),
+		clock().Add(-time.Hour),
+		clock().Add(1000*time.Hour),
 	)
 	owner(
 		t,
@@ -609,10 +609,10 @@ func TestSLAScorecard(t *testing.T) {
 		seed.ID("org-contractor-a"),
 	)
 
-	_, res = post(srv, &hq, "contractors.list", `{"limit":100}`)
+	_, res = post(srv, hq(), "contractors.list", `{"limit":100}`)
 	seen := false
 
-	for _, it := range items(res) {
+	for _, it := range items(t, res) {
 		if it["organizationId"] == seed.ID("org-contractor-a").String() {
 			seen = true
 
@@ -636,7 +636,7 @@ func TestSLAScorecard(t *testing.T) {
 func TestContractorQualityMetrics(t *testing.T) {
 	srv := server(t)
 	units := []string{newUnit(t, srv, "Quality AC"), newUnit(t, srv, "Quality AC")}
-	at := func(h int) time.Time { return clock.Add(time.Duration(h) * time.Hour) }
+	at := func(h int) time.Time { return clock().Add(time.Duration(h) * time.Hour) }
 	tenant, contractor := seed.ID("tenant-a"), seed.ID("org-contractor-b")
 	job := func(unit string, arrived time.Time) string {
 		id := uuid.NewString()
@@ -705,7 +705,7 @@ func TestContractorQualityMetrics(t *testing.T) {
 
 	_, res := post(
 		srv,
-		&hq,
+		hq(),
 		"sla.scorecard",
 		`{"period":{"from":"`+at(
 			-26,
@@ -751,8 +751,8 @@ func TestContractorQualityMetrics(t *testing.T) {
 		at(1000),
 	)
 
-	_, res = post(srv, &hq, "contractors.list", `{"limit":100}`)
-	for _, it := range items(res) {
+	_, res = post(srv, hq(), "contractors.list", `{"limit":100}`)
+	for _, it := range items(t, res) {
 		if it["organizationId"] != contractor.String() {
 			continue
 		}
@@ -788,7 +788,7 @@ func TestFirstTimeFixIgnoresPlanVisits(t *testing.T) {
 	unit := newUnit(t, srv, "FTF AC")
 	_, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.create",
 		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
 		0,
@@ -798,8 +798,8 @@ func TestFirstTimeFixIgnoresPlanVisits(t *testing.T) {
 		t,
 		`UPDATE maintenance.jobs SET created_at = $2, status = 'completed', completed_at = $3 WHERE id = $1`,
 		job,
-		clock.Add(-10*time.Hour),
-		clock.Add(-9*time.Hour),
+		clock().Add(-10*time.Hour),
+		clock().Add(-9*time.Hour),
 	)
 
 	var tenant, org string
@@ -821,9 +821,9 @@ func TestFirstTimeFixIgnoresPlanVisits(t *testing.T) {
 		tenant,
 		unit,
 		org,
-		clock.Add(90*24*time.Hour),
-		clock.Add(90*24*time.Hour+time.Hour),
-		clock.Add(-7*time.Hour-30*time.Minute),
+		clock().Add(90*24*time.Hour),
+		clock().Add(90*24*time.Hour+time.Hour),
+		clock().Add(-7*time.Hour-30*time.Minute),
 		visit,
 	)
 
@@ -832,11 +832,11 @@ func TestFirstTimeFixIgnoresPlanVisits(t *testing.T) {
 
 		code, resp := post(
 			srv,
-			&hq,
+			hq(),
 			"sla.scorecard",
-			`{"period":{"from":"`+clock.Add(-48*time.Hour).
+			`{"period":{"from":"`+clock().Add(-48*time.Hour).
 				Format(time.RFC3339)+
-				`","to":"`+clock.Format(
+				`","to":"`+clock().Format(
 				time.RFC3339,
 			)+`"}}`,
 		)
@@ -863,7 +863,7 @@ func TestFirstTimeFixIgnoresPlanVisits(t *testing.T) {
 		t.Error("the plan's next visit made the job a first-time-fix miss")
 	}
 
-	if code, m := write(srv, &customerB, "jobs.create", jobBody(unit, nil), 0); code != 200 {
+	if code, m := write(srv, customerB(), "jobs.create", jobBody(unit, nil), 0); code != 200 {
 		t.Fatalf("client request: %d %v", code, m)
 	}
 
@@ -885,16 +885,16 @@ func TestOfferAcceptanceIgnoresCancelledJobs(t *testing.T) {
 		maintenance.contractors WHERE organization_id = $2)`,
 		seed.ID("tenant-a"),
 		org,
-		clock.Add(-time.Hour),
-		clock.Add(1000*time.Hour),
+		clock().Add(-time.Hour),
+		clock().Add(1000*time.Hour),
 	)
 	owner(t, `UPDATE maintenance.contractors SET status = 'active' WHERE organization_id = $1`, org)
 
 	acceptance := func() any {
 		t.Helper()
 
-		_, m := post(srv, &hq, "contractors.list", `{"limit":100}`)
-		for _, it := range items(m) {
+		_, m := post(srv, hq(), "contractors.list", `{"limit":100}`)
+		for _, it := range items(t, m) {
 			if it["organizationId"] == org.String() {
 				return asObj(t, it["kpis"])["offerAcceptance"]
 			}
@@ -905,11 +905,11 @@ func TestOfferAcceptanceIgnoresCancelledJobs(t *testing.T) {
 		return nil
 	}
 	// one accepted offer, so the share is defined
-	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	offer := func() string {
 		_, resp := write(
 			srv,
-			&customerA,
+			customerA(),
 			"jobs.create",
 			jobBody(seed.ID("unit-non-rto").String(), nil),
 			0,
@@ -918,7 +918,7 @@ func TestOfferAcceptanceIgnoresCancelledJobs(t *testing.T) {
 		job := asStr(t, data(resp)["id"])
 		if code, res := write(
 			srv,
-			&hq,
+			hq(),
 			"jobs.offer",
 			`{"jobId":"`+job+`","contractorOrgId":"`+org.String()+`","visitSlot":`+slotJSON(49, 2)+
 				`,"offerExpiresAt":"`+stamp(12)+`","accessValidFrom":"`+stamp(0)+`","accessValidUntil":"`+stamp(100)+
@@ -948,7 +948,7 @@ func TestOfferAcceptanceIgnoresCancelledJobs(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"jobs.accept",
 		`{"jobId":"`+accepted+`","offerId":"`+oid+`","termsVersion":"t"}`,
 		2,
@@ -964,7 +964,7 @@ func TestOfferAcceptanceIgnoresCancelledJobs(t *testing.T) {
 	cancelled := offer()
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.cancel",
 		`{"jobId":"`+cancelled+`","cancelReason":"client moved out"}`,
 		2,
@@ -984,13 +984,19 @@ func TestOfferAcceptanceIgnoresCancelledJobs(t *testing.T) {
 // may grant contractor-a the same unit.
 func TestCancelEndsContractorAccess(t *testing.T) {
 	srv := server(t)
-	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
-	_, m := write(srv, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	_, m := write(
+		srv,
+		customerA(),
+		"jobs.create",
+		jobBody(seed.ID("unit-non-rto").String(), nil),
+		0,
+	)
 
 	job := asStr(t, data(m)["id"])
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
@@ -1020,7 +1026,7 @@ func TestCancelEndsContractorAccess(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"jobs.accept",
 		`{"jobId":"`+job+`","offerId":"`+offer+`","termsVersion":"t"}`,
 		2,
@@ -1041,14 +1047,14 @@ func TestCancelEndsContractorAccess(t *testing.T) {
 		return until
 	}
 
-	planned := clock.Add(60 * time.Hour)
+	planned := clock().Add(60 * time.Hour)
 	if until := access(); !until.Equal(planned) {
 		t.Fatalf("the accepted offer's access in the unit scope: until %v, want %v", until, planned)
 	}
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.cancel",
 		`{"jobId":"`+job+`","cancelReason":"the customer withdrew"}`,
 		3,
@@ -1070,7 +1076,7 @@ func TestCancelEndsContractorAccess(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&contrA,
+		contrA(),
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
 	); code != 200 || data(res)["projection"] != "history" ||

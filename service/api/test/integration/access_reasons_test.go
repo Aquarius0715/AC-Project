@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -18,7 +18,7 @@ func TestTechnicianUnitAccessReasons(t *testing.T) {
 	unit := newUnit(t, srv, "Access AC")
 	_, res := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.register",
 		`{"serial":"AX-`+uuid.NewString()[:8]+`","sensorTypes":["temperature"],"unitId":"`+unit+`"}`,
 		0,
@@ -26,7 +26,7 @@ func TestTechnicianUnitAccessReasons(t *testing.T) {
 	dev := asStr(t, data(res)["id"])
 	write(
 		srv,
-		&hq,
+		hq(),
 		"devices.bind",
 		`{"deviceId":"`+dev+`","unitId":"`+unit+`","reason":"install"}`,
 		1,
@@ -38,7 +38,7 @@ func TestTechnicianUnitAccessReasons(t *testing.T) {
 
 		return code, key
 	}
-	if code, _ := events(&techA); code != 404 {
+	if code, _ := events(techA()); code != 404 {
 		t.Errorf("external technician without a delegation: %d", code)
 	}
 
@@ -58,7 +58,7 @@ func TestTechnicianUnitAccessReasons(t *testing.T) {
 		unit,
 	)
 
-	if code, key := events(&techInt); code != 403 || key != "errors.assignment_required" {
+	if code, key := events(techInt()); code != 403 || key != "errors.assignment_required" {
 		t.Errorf("internal technician in scope without an assignment: %d %s", code, key)
 	}
 
@@ -66,11 +66,11 @@ func TestTechnicianUnitAccessReasons(t *testing.T) {
 		t,
 		unit,
 		"tech-internal-a",
-		clock.Add(time.Hour),
-		clock.Add(2*time.Hour),
+		clock().Add(time.Hour),
+		clock().Add(2*time.Hour),
 		"active",
 	)
-	if code, key := events(&techInt); code != 403 || key != "errors.assignment_not_started" {
+	if code, key := events(techInt()); code != 403 || key != "errors.assignment_not_started" {
 		t.Errorf("assignment starting later: %d %s", code, key)
 	}
 
@@ -85,31 +85,31 @@ func TestTechnicianUnitAccessReasons(t *testing.T) {
 			job,
 		)
 	}
-	revokeOthers(clock.Add(-2*time.Hour), clock.Add(-time.Hour))
+	revokeOthers(clock().Add(-2*time.Hour), clock().Add(-time.Hour))
 	owner(
 		t,
 		`UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3) WHERE job_id =
 			$1`,
 		job,
-		clock.Add(-2*time.Hour),
-		clock.Add(-time.Hour),
+		clock().Add(-2*time.Hour),
+		clock().Add(-time.Hour),
 	)
 
-	if code, key := events(&techInt); code != 403 || key != "errors.assignment_ended" {
+	if code, key := events(techInt()); code != 403 || key != "errors.assignment_ended" {
 		t.Errorf("assignment window ended: %d %s", code, key)
 	}
 
-	revokeOthers(clock.Add(-time.Hour), clock.Add(time.Hour))
+	revokeOthers(clock().Add(-time.Hour), clock().Add(time.Hour))
 	owner(
 		t,
 		`UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3) WHERE job_id =
 			$1`,
 		job,
-		clock.Add(-time.Hour),
-		clock.Add(time.Hour),
+		clock().Add(-time.Hour),
+		clock().Add(time.Hour),
 	)
 
-	if code, key := events(&techInt); code != 200 {
+	if code, key := events(techInt()); code != 200 {
 		t.Errorf("inside the window: %d %s", code, key)
 	}
 }

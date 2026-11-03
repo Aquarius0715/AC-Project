@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -51,11 +51,11 @@ func TestHQRevokeTurnsSignInOff(t *testing.T) {
 		return slices.Contains(fake.switched, want)
 	}
 	email := "revoked-" + uuid.NewString()[:8] + "@example.com"
-	access := clock.Add(30 * 24 * time.Hour).Format(time.RFC3339)
+	access := clock().Add(30 * 24 * time.Hour).Format(time.RFC3339)
 
 	code, resp := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.save",
 		`{"email":"`+email+`","partnerRole":"technician","displayName":"Revoked Tech","accessUntil":"`+access+`"}`,
 		0,
@@ -73,7 +73,7 @@ func TestHQRevokeTurnsSignInOff(t *testing.T) {
 		t,
 		`UPDATE identity.memberships SET valid_from = $2::timestamptz - interval '1 hour' WHERE id = $1`,
 		membership,
-		clock,
+		clock(),
 	)
 
 	var user string
@@ -84,7 +84,7 @@ func TestHQRevokeTurnsSignInOff(t *testing.T) {
 		&user,
 	)
 
-	from := clock.Add(-time.Hour).Format(time.RFC3339)
+	from := clock().Add(-time.Hour).Format(time.RFC3339)
 	hqSave := func(until string) (int, map[string]any) {
 		var v int
 		ownerScan(
@@ -96,7 +96,7 @@ func TestHQRevokeTurnsSignInOff(t *testing.T) {
 
 		return write(
 			srv,
-			&hq,
+			hq(),
 			"members.save",
 			`{"id":"`+membership+`","userId":"`+user+`","organizationId":"`+seed.ID("org-contractor-a").
 				String()+
@@ -112,7 +112,7 @@ func TestHQRevokeTurnsSignInOff(t *testing.T) {
 
 		return write(
 			srv,
-			&contrA,
+			contrA(),
 			"partnerUsers.save",
 			`{"id":"`+id+`","email":"`+email+`","partnerRole":"technician",`+body+`,"reason":"back on the team"}`,
 			v,
@@ -121,8 +121,8 @@ func TestHQRevokeTurnsSignInOff(t *testing.T) {
 	listed := func() map[string]any {
 		t.Helper()
 
-		_, res := post(srv, &contrA, "partnerUsers.list", `{"limit":100}`)
-		for _, it := range items(res) {
+		_, res := post(srv, contrA(), "partnerUsers.list", `{"limit":100}`)
+		for _, it := range items(t, res) {
 			if it["id"] == id {
 				return it
 			}
@@ -134,7 +134,7 @@ func TestHQRevokeTurnsSignInOff(t *testing.T) {
 	}
 
 	// HQ revokes: the access ends now, the sign-in goes off, and the company's list says so
-	code, resp = hqSave(`"` + clock.Format(time.RFC3339) + `"`)
+	code, resp = hqSave(`"` + clock().Format(time.RFC3339) + `"`)
 	if code != 200 || data(resp)["revokedAt"] == nil {
 		t.Fatalf("revoke: %d %v", code, resp)
 	}
@@ -167,10 +167,10 @@ func TestHQRevokeTurnsSignInOff(t *testing.T) {
 		t.Errorf("enable: %d %v", code, m)
 	}
 	// saving again keeps the first revoke (the test clock stands still: the first is moved a minute back)
-	first := clock.Add(-time.Minute)
+	first := clock().Add(-time.Minute)
 	owner(t, `UPDATE identity.memberships SET revoked_at = $2 WHERE id = $1`, membership, first)
 
-	if code, m := hqSave(`"` + clock.Format(time.RFC3339) + `"`); code != 200 {
+	if code, m := hqSave(`"` + clock().Format(time.RFC3339) + `"`); code != 200 {
 		t.Fatalf("save again: %d %v", code, m)
 	}
 
@@ -187,7 +187,7 @@ func TestHQRevokeTurnsSignInOff(t *testing.T) {
 	}
 
 	// HQ gives the access back: the revoke is cleared, the account stays off while the company keeps it disabled ...
-	later := clock.Add(10 * 24 * time.Hour).Format(time.RFC3339)
+	later := clock().Add(10 * 24 * time.Hour).Format(time.RFC3339)
 	if code, m := hqSave(`"` + later + `"`); code != 200 || data(m)["revokedAt"] != nil {
 		t.Fatalf("give back: %d %v", code, m)
 	}
@@ -212,7 +212,7 @@ func TestHQRevokeTurnsSignInOff(t *testing.T) {
 	}
 
 	// revoked again and removed: the person cannot come back as a new account of any company
-	if code, m := hqSave(`"` + clock.Format(time.RFC3339) + `"`); code != 200 {
+	if code, m := hqSave(`"` + clock().Format(time.RFC3339) + `"`); code != 200 {
 		t.Fatalf("revoke again: %d %v", code, m)
 	}
 
@@ -221,7 +221,7 @@ func TestHQRevokeTurnsSignInOff(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.remove",
 		`{"id":"`+id+`","reason":"left"}`,
 		v,
@@ -229,7 +229,7 @@ func TestHQRevokeTurnsSignInOff(t *testing.T) {
 		t.Fatalf("remove: %d %v", code, res)
 	}
 
-	for name, a := range map[string]*actor{"the same company": &contrA, "another company": &contrB} {
+	for name, a := range map[string]*actor{"the same company": contrA(), "another company": contrB()} {
 		if code, res := write(
 			srv,
 			a,
@@ -249,7 +249,7 @@ func TestHQRevokeOfAClientUser(t *testing.T) {
 	srv := server(t)
 	user := newUser(t)
 	cust := seed.ID("cust-b").String()
-	from := clock.Add(-time.Hour).Format(time.RFC3339)
+	from := clock().Add(-time.Hour).Format(time.RFC3339)
 	body := func(until string) string {
 		return `{"userId":"` + user + `","organizationId":"` + seed.ID("org-customer-b").
 			String() +
@@ -257,7 +257,7 @@ func TestHQRevokeOfAClientUser(t *testing.T) {
 			`"validFrom":"` + from + `","validUntil":` + until + `,"reason":"access review"}`
 	}
 
-	code, m := write(srv, &hq, "members.save", body("null"), 0)
+	code, m := write(srv, hq(), "members.save", body("null"), 0)
 	if code != 200 {
 		t.Fatalf("members.save: %d %v", code, m)
 	}
@@ -267,10 +267,10 @@ func TestHQRevokeOfAClientUser(t *testing.T) {
 	var mv int
 	ownerScan(t, `SELECT version FROM identity.memberships WHERE id = $1`, []any{membership}, &mv)
 
-	revoke := `{"id":"` + membership + `",` + body(`"` + clock.Format(time.RFC3339) + `"`)[1:]
+	revoke := `{"id":"` + membership + `",` + body(`"` + clock().Format(time.RFC3339) + `"`)[1:]
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"members.save",
 		revoke,
 		mv,
@@ -301,7 +301,7 @@ func TestHQRevokeOfAClientUser(t *testing.T) {
 
 		return write(
 			srv,
-			&customerB,
+			customerB(),
 			"clientUsers.save",
 			`{"id":"`+id+`","customerId":"`+cust+`","email":"`+user+`@ac.local",`+
 				`"clientRole":"`+role+`"`+st+`,"reason":"review"}`,
@@ -332,7 +332,7 @@ func TestHQRevokeOfAClientUser(t *testing.T) {
 		&end,
 	)
 
-	if end.After(clock) {
+	if end.After(clock()) {
 		t.Errorf("the membership opened again: %v", end)
 	}
 }
@@ -361,10 +361,10 @@ func TestHQSaveOfAnEndedAccessIsNoRevoke(t *testing.T) {
 
 	code, resp := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.save",
 		`{"email":"`+email+`","partnerRole":"technician","displayName":"Ended Tech",`+
-			`"accessUntil":"`+clock.Add(30*24*time.Hour).
+			`"accessUntil":"`+clock().Add(30*24*time.Hour).
 			Format(time.RFC3339)+
 			`"}`,
 		0,
@@ -380,7 +380,7 @@ func TestHQSaveOfAnEndedAccessIsNoRevoke(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ended := clock.Add(-time.Hour).
+	ended := clock().Add(-time.Hour).
 		Truncate(time.Minute).
 		Add(59 * time.Second)
 		// the last second of a minute, an hour ago
@@ -389,7 +389,7 @@ func TestHQSaveOfAnEndedAccessIsNoRevoke(t *testing.T) {
 		t,
 		`UPDATE identity.memberships SET valid_from = $2, valid_until = $3 WHERE id = $1`,
 		membership,
-		clock.Add(-48*time.Hour),
+		clock().Add(-48*time.Hour),
 		ended,
 	)
 
@@ -407,12 +407,12 @@ func TestHQSaveOfAnEndedAccessIsNoRevoke(t *testing.T) {
 
 	code, resp = write(
 		srv,
-		&hq,
+		hq(),
 		"members.save",
 		`{"id":"`+membership+`","userId":"`+user+`","organizationId":"`+seed.ID("org-contractor-a").
 			String()+
 			`","role":"technician","employment":"external",`+
-			`"permissions":["alert.read"],"scopes":[],"validFrom":"`+clock.Add(-48*time.Hour).
+			`"permissions":["alert.read"],"scopes":[],"validFrom":"`+clock().Add(-48*time.Hour).
 			Format(time.RFC3339)+
 			`","validUntil":"`+ended.Truncate(time.Minute).
 			Format(time.RFC3339)+
@@ -443,9 +443,9 @@ func TestHQSaveOfAnEndedAccessIsNoRevoke(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.save",
-		`{"id":"`+id+`","email":"`+email+`","partnerRole":"technician","accessUntil":"`+clock.Add(20*24*time.Hour).
+		`{"id":"`+id+`","email":"`+email+`","partnerRole":"technician","accessUntil":"`+clock().Add(20*24*time.Hour).
 			Format(time.RFC3339)+
 			`","reason":"back"}`,
 		v,

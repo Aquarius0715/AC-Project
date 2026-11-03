@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -49,7 +49,7 @@ func TestFilterCare(t *testing.T) {
 			tenant,
 			unit,
 			sensor,
-			clock.Add(-ago),
+			clock().Add(-ago),
 			seq,
 			v,
 			uuid.NewString(),
@@ -60,14 +60,14 @@ func TestFilterCare(t *testing.T) {
 
 	statusOf := func(a *actor) map[string]any {
 		_, m := post(srv, a, "filterCare.list", `{"filters":{"unitId":"`+unit+`"}}`)
-		if len(items(m)) != 1 {
+		if len(items(t, m)) != 1 {
 			t.Fatalf("list: %v", m)
 		}
 
-		return items(m)[0]
+		return items(t, m)[0]
 	}
 
-	st := statusOf(&customerB)
+	st := statusOf(customerB())
 	if asNum(t, st["runHoursSinceCleaning"]) != 200 || st["status"] != "due_soon" ||
 		asNum(t, st["thresholdHours"]) != 250 ||
 		st["lastCleanedAt"] != nil {
@@ -89,13 +89,13 @@ func TestFilterCare(t *testing.T) {
 		"whatsapp":      `{"thresholdHours":null,"fallbackDays":30,"recipients":"owners","channels":["inApp","whatsapp"]}`,
 		"bad recipient": `{"thresholdHours":null,"fallbackDays":30,"recipients":"everyone","channels":["inApp"]}`,
 	} {
-		code, m := write(srv, &customerB, "filterCare.saveSettings", b, 0)
+		code, m := write(srv, customerB(), "filterCare.saveSettings", b, 0)
 		refusal(t, name, code, m, want[name])
 	}
 	// IR238: the settings read back — the defaults (version 0) before the first save
 	if code, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"filterCare.getSettings",
 		`{}`,
 	); code != 200 || asNum(t, data(res)["version"]) != 0 || data(res)["thresholdHours"] != nil ||
@@ -106,7 +106,7 @@ func TestFilterCare(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&customerB,
+		customerB(),
 		"filterCare.saveSettings",
 		`{"thresholdHours":100,"fallbackDays":14,"recipients":"all_users","channels":["inApp","email"]}`,
 		0,
@@ -117,7 +117,7 @@ func TestFilterCare(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"filterCare.getSettings",
 		`{}`,
 	); asNum(t, data(res)["version"]) != 1 || asNum(t, data(res)["thresholdHours"]) != 100 ||
@@ -126,12 +126,12 @@ func TestFilterCare(t *testing.T) {
 		t.Fatalf("saved settings: %v", res)
 	}
 
-	if code, _ := post(srv, &techInt, "filterCare.getSettings", `{}`); code != 403 {
+	if code, _ := post(srv, techInt(), "filterCare.getSettings", `{}`); code != 403 {
 		t.Error("a technician reads the customer's settings")
 	}
 
 	if st := statusOf(
-		&customerB,
+		customerB(),
 	); st["status"] != "overdue" ||
 		asNum(t, st["thresholdHours"]) != 100 {
 		t.Fatalf("overdue: %v", st)
@@ -145,7 +145,7 @@ func TestFilterCare(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&customerB,
+		customerB(),
 		"filterCare.saveSettings",
 		`{"thresholdHours":null,"fallbackDays":30,"recipients":"owners","channels":["inApp"]}`,
 		0,
@@ -161,7 +161,7 @@ func TestFilterCare(t *testing.T) {
 	// mark cleaned → the counter restarts at 0 h: the reading in force (off since 10 h) has not run since (IR238)
 	if code, _ := write(
 		srv,
-		&customerA,
+		customerA(),
 		"filterCare.markCleaned",
 		`{"unitId":"`+unit+`"}`,
 		0,
@@ -169,7 +169,7 @@ func TestFilterCare(t *testing.T) {
 		t.Error("other customer marks cleaned")
 	}
 
-	code, resp := write(srv, &customerB, "filterCare.markCleaned", `{"unitId":"`+unit+`"}`, 0)
+	code, resp := write(srv, customerB(), "filterCare.markCleaned", `{"unitId":"`+unit+`"}`, 0)
 	if code != 200 || data(resp)["lastCleanedBy"] != "customer" || data(resp)["status"] != "ok" ||
 		data(resp)["runHoursSinceCleaning"] != float64(0) {
 		t.Fatalf("mark cleaned: %d %v", code, resp)
@@ -179,11 +179,11 @@ func TestFilterCare(t *testing.T) {
 		t,
 		`UPDATE maintenance.filter_cleanings SET cleaned_at = $2 WHERE unit_id = $1`,
 		unit,
-		clock.Add(-100*time.Hour),
+		clock().Add(-100*time.Hour),
 	)
 
 	if st := statusOf(
-		&customerB,
+		customerB(),
 	); st["status"] != "due_soon" ||
 		asNum(t, st["runHoursSinceCleaning"]) != 90 {
 		t.Fatalf("run time since a cleaning while running: %v", st)
@@ -193,11 +193,11 @@ func TestFilterCare(t *testing.T) {
 		t,
 		`UPDATE maintenance.filter_cleanings SET cleaned_at = $2 WHERE unit_id = $1`,
 		unit,
-		clock.Add(-12*24*time.Hour),
+		clock().Add(-12*24*time.Hour),
 	)
 
 	if st := statusOf(
-		&customerB,
+		customerB(),
 	); st["status"] != "overdue" ||
 		asNum(t, st["runHoursSinceCleaning"]) != 200 {
 		t.Fatalf("run time since an older cleaning: %v", st)
@@ -206,7 +206,7 @@ func TestFilterCare(t *testing.T) {
 	owner(t, `UPDATE assets.units SET connection = 'offline' WHERE id = $1`, unit)
 
 	if st := statusOf(
-		&customerB,
+		customerB(),
 	); st["status"] != "due_soon" ||
 		st["runHoursSinceCleaning"] != nil { // offline: 12 of 14 days
 		t.Fatalf("fallback days: %v", st)
@@ -224,8 +224,8 @@ func TestFilterCare(t *testing.T) {
 		tenant,
 		unit,
 		seed.ID("org-customer-b"),
-		clock.Add(-3*time.Hour),
-		clock.Add(-2*time.Hour),
+		clock().Add(-3*time.Hour),
+		clock().Add(-2*time.Hour),
 	)
 	owner(
 		t,
@@ -238,7 +238,7 @@ func TestFilterCare(t *testing.T) {
 	)
 
 	if st := statusOf(
-		&customerB,
+		customerB(),
 	); st["lastCleanedBy"] != "technician" || st["lastCleaningJobId"] != job ||
 		st["status"] != "ok" {
 		t.Fatalf("technician cleaning: %v", st)
@@ -248,31 +248,31 @@ func TestFilterCare(t *testing.T) {
 
 	_, resp = post(
 		srv,
-		&customerB,
+		customerB(),
 		"filterCare.list",
 		`{"filters":{"unitId":"`+u2+`","status":"unknown"}}`,
 	)
-	if len(items(resp)) != 1 || items(resp)[0]["runHoursSinceCleaning"] != nil {
+	if len(items(t, resp)) != 1 || items(t, resp)[0]["runHoursSinceCleaning"] != nil {
 		t.Fatalf("unknown: %v", resp)
 	}
 
 	if code, res := post(
 		srv,
-		&customerA,
+		customerA(),
 		"filterCare.list",
 		`{"filters":{"unitId":"`+unit+`"}}`,
 	); code != 200 ||
-		len(items(res)) != 0 {
+		len(items(t, res)) != 0 {
 		t.Error("customer-a sees customer-b's unit")
 	}
 
 	if _, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"filterCare.list",
 		`{"sort":{"field":"status","direction":"desc"},"limit":100}`,
 	); len(
-		items(res),
+		items(t, res),
 	) < 2 {
 		t.Error("sorted list")
 	}
@@ -285,7 +285,7 @@ func TestFilterCare(t *testing.T) {
 
 	for _, b := range []string{`{"filters":{"status":"dirty"}}`, `{"filters":{"x":1}}`, `{"sort":{"field":"runHours",` +
 		`"direction":"asc"}}`} {
-		code, m := post(srv, &customerB, "filterCare.list", b)
+		code, m := post(srv, customerB(), "filterCare.list", b)
 		refusal(t, b, code, m, want[b])
 	}
 
@@ -293,7 +293,7 @@ func TestFilterCare(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&customerB,
+		customerB(),
 		"filterCare.markCleaned",
 		`{"unitId":"`+u2+`"}`,
 		0,

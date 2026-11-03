@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"strconv"
@@ -32,7 +32,7 @@ func TestOffsets(t *testing.T) {
 	for name, b := range map[string]string{"zero kg": `,"amountKg":0`, "4 decimals": `,"amountKg":1.2345`} {
 		code, res := write(
 			srv,
-			&customerB,
+			customerB(),
 			"offsets.preview",
 			`{"purpose":"x","period":{"from":"2026-09-01T00:00:00Z","to":"2026-09-14T00:00:00Z"},"unitIds":["`+unit+`"]`+b+`}`,
 			0,
@@ -40,15 +40,15 @@ func TestOffsets(t *testing.T) {
 		refusal(t, name, code, res, want[name])
 	}
 
-	if code, _ := quote(&customerA, ""); code != 404 {
+	if code, _ := quote(customerA(), ""); code != 404 {
 		t.Error("client quotes another customer's unit")
 	}
 
-	if code, m := quote(&hq, ""); code != 422 || fields(m) != "customerId=error.required" {
+	if code, m := quote(hq(), ""); code != 422 || fields(m) != "customerId=error.required" {
 		t.Errorf("HQ quote without customerId: %d %s", code, fields(m))
 	}
 
-	code, resp := quote(&customerB, "")
+	code, resp := quote(customerB(), "")
 	if code != 200 || data(resp)["provider"] != "unselected" ||
 		data(resp)["estimatedAmountMinor"] != nil ||
 		asObj(t, data(resp)["marketConcept"])["stage"] != "future_concept" {
@@ -61,7 +61,7 @@ func TestOffsets(t *testing.T) {
 		return write(srv, a, "offsets.simulate", body, v)
 	}
 	if code, res := sim(
-		&customerB,
+		customerB(),
 		`{"event":"request","quoteId":"`+qid+`","quoteVersion":1,"demoConfirmed":false}`,
 		0,
 	); code != 422 ||
@@ -70,7 +70,7 @@ func TestOffsets(t *testing.T) {
 	}
 
 	if code, _ := sim(
-		&customerB,
+		customerB(),
 		`{"event":"request","quoteId":"`+qid+`","quoteVersion":2,"demoConfirmed":true}`,
 		0,
 	); code != 409 {
@@ -78,7 +78,7 @@ func TestOffsets(t *testing.T) {
 	}
 
 	if code, _ := sim(
-		&customerA,
+		customerA(),
 		`{"event":"request","quoteId":"`+qid+`","quoteVersion":1,"demoConfirmed":true}`,
 		0,
 	); code != 404 {
@@ -86,7 +86,7 @@ func TestOffsets(t *testing.T) {
 	}
 
 	code, resp = sim(
-		&customerB,
+		customerB(),
 		`{"event":"request","quoteId":"`+qid+`","quoteVersion":1,"demoConfirmed":true}`,
 		0,
 	)
@@ -99,7 +99,7 @@ func TestOffsets(t *testing.T) {
 	att := asStr(t, data(resp)["currentAttemptId"])
 
 	if code, _ := sim(
-		&customerB,
+		customerB(),
 		`{"event":"request","quoteId":"`+qid+`","quoteVersion":1,"demoConfirmed":true}`,
 		0,
 	); code != 409 {
@@ -110,34 +110,34 @@ func TestOffsets(t *testing.T) {
 		return `{"event":"` + event + `","recordId":"` + rid + `","attemptId":"` + attempt + `","eventId":"` + eventID +
 			`","demoConfirmed":true}`
 	}
-	if code, _ := sim(&customerB, ev("purchase_confirm", att, uuid.NewString()), 1); code != 403 {
+	if code, _ := sim(customerB(), ev("purchase_confirm", att, uuid.NewString()), 1); code != 403 {
 		t.Error("client confirms purchase")
 	}
 	// purchase fails → retry → purchase → retire
 	failID := uuid.NewString()
 
-	code, resp = sim(&hq, ev("fail", att, failID), 1)
+	code, resp = sim(hq(), ev("fail", att, failID), 1)
 	if code != 200 || data(resp)["state"] != "failed" ||
 		data(resp)["previousState"] != "demo_requested" ||
 		data(resp)["currentAttemptId"] != att {
 		t.Fatalf("fail: %d %v", code, resp)
 	}
 
-	if code, m := sim(&hq, ev("fail", att, failID), 2); code != 200 || ver(m) != 2 {
+	if code, m := sim(hq(), ev("fail", att, failID), 2); code != 200 || ver(t, m) != 2 {
 		t.Error("same eventId replays")
 	}
 
-	if code, _ := sim(&hq, ev("purchase_confirm", att, failID), 2); code != 409 {
+	if code, _ := sim(hq(), ev("purchase_confirm", att, failID), 2); code != 409 {
 		t.Error("same eventId with other content")
 	}
 
-	if code, _ := sim(&hq, ev("purchase_confirm", att, uuid.NewString()), 2); code != 409 {
+	if code, _ := sim(hq(), ev("purchase_confirm", att, uuid.NewString()), 2); code != 409 {
 		t.Error("late success while failed")
 	}
 
 	retry := func(attempt string, v int) (int, map[string]any) {
 		return sim(
-			&customerB,
+			customerB(),
 			`{"event":"retry","recordId":"`+rid+`","attemptId":"`+attempt+`","demoConfirmed":true}`,
 			v,
 		)
@@ -155,21 +155,21 @@ func TestOffsets(t *testing.T) {
 
 	att2 := asStr(t, data(resp)["currentAttemptId"])
 
-	if code, _ := sim(&hq, ev("purchase_confirm", att, uuid.NewString()), 3); code != 409 {
+	if code, _ := sim(hq(), ev("purchase_confirm", att, uuid.NewString()), 3); code != 409 {
 		t.Error("old attempt")
 	}
 
-	code, resp = sim(&hq, ev("purchase_confirm", att2, uuid.NewString()), 3)
+	code, resp = sim(hq(), ev("purchase_confirm", att2, uuid.NewString()), 3)
 	if code != 200 || data(resp)["state"] != "demo_purchased" || data(resp)["purchaseRef"] == nil {
 		t.Fatalf("purchase: %d %v", code, resp)
 	}
 
 	att3 := asStr(t, data(resp)["currentAttemptId"])
-	if code, _ := sim(&hq, ev("purchase_confirm", att3, uuid.NewString()), 4); code != 409 {
+	if code, _ := sim(hq(), ev("purchase_confirm", att3, uuid.NewString()), 4); code != 409 {
 		t.Error("wrong stage")
 	}
 
-	code, resp = sim(&hq, ev("retire", att3, uuid.NewString()), 4)
+	code, resp = sim(hq(), ev("retire", att3, uuid.NewString()), 4)
 	if code != 200 || data(resp)["state"] != "demo_retired" || data(resp)["retirementRef"] == nil ||
 		data(resp)["demoCertificateRef"] == nil ||
 		data(resp)["currentAttemptId"] != nil {
@@ -186,10 +186,10 @@ func TestOffsets(t *testing.T) {
 		t.Error("retry a retired record")
 	}
 	// a failed retirement retries the retirement: back to demo_purchased with a new retirement attempt, then retired
-	_, resp = quote(&customerB, "")
+	_, resp = quote(customerB(), "")
 	q2 := asStr(t, data(resp)["id"])
 	_, resp = sim(
-		&customerB,
+		customerB(),
 		`{"event":"request","quoteId":"`+q2+`","quoteVersion":1,"demoConfirmed":true}`,
 		0,
 	)
@@ -198,11 +198,11 @@ func TestOffsets(t *testing.T) {
 		return `{"event":"` + event + `","recordId":"` + rid2 + `","attemptId":"` + attempt + `","eventId":"` +
 			uuid.NewString() + `","demoConfirmed":true}`
 	}
-	_, resp = sim(&hq, ev2("purchase_confirm", asStr(t, data(resp)["currentAttemptId"])), 1)
+	_, resp = sim(hq(), ev2("purchase_confirm", asStr(t, data(resp)["currentAttemptId"])), 1)
 
 	retirement := asStr(t, data(resp)["currentAttemptId"])
 	if code, res := sim(
-		&hq,
+		hq(),
 		ev2("fail", retirement),
 		2,
 	); code != 200 || data(res)["state"] != "failed" ||
@@ -211,7 +211,7 @@ func TestOffsets(t *testing.T) {
 	}
 
 	code, resp = sim(
-		&customerB,
+		customerB(),
 		`{"event":"retry","recordId":"`+rid2+`","attemptId":"`+retirement+`","demoConfirmed":true}`,
 		3,
 	)
@@ -222,7 +222,7 @@ func TestOffsets(t *testing.T) {
 	}
 
 	if code, res := sim(
-		&hq,
+		hq(),
 		ev2("retire", asStr(t, data(resp)["currentAttemptId"])),
 		4,
 	); code != 200 || data(res)["state"] != "demo_retired" ||
@@ -231,7 +231,7 @@ func TestOffsets(t *testing.T) {
 	}
 	// what is not there, or not the customer's, is NOT_FOUND
 	if code, _ := sim(
-		&customerB,
+		customerB(),
 		`{"event":"request","quoteId":"`+uuid.NewString()+`","quoteVersion":1,"demoConfirmed":true}`,
 		0,
 	); code != 404 {
@@ -239,7 +239,7 @@ func TestOffsets(t *testing.T) {
 	}
 
 	if code, _ := sim(
-		&hq,
+		hq(),
 		`{"event":"fail",`+
 			`"recordId":"`+uuid.NewString()+`","attemptId":"`+uuid.NewString()+`","eventId":"`+uuid.NewString()+
 			`","demoConfirmed":true}`,
@@ -248,21 +248,24 @@ func TestOffsets(t *testing.T) {
 		t.Error("event of an unknown record")
 	}
 
-	if code, _ := quote(&customerB, `,"customerId":"`+seed.ID("cust-a").String()+`"`); code != 404 {
+	if code, _ := quote(
+		customerB(),
+		`,"customerId":"`+seed.ID("cust-a").String()+`"`,
+	); code != 404 {
 		t.Error("client quotes for another customer")
 	}
 	// lists
 	_, resp = post(
 		srv,
-		&customerB,
+		customerB(),
 		"offsets.list",
 		`{"filters":{"status":"demo_retired"},"limit":100}`,
 	)
-	if len(items(resp)) == 0 {
+	if len(items(t, resp)) == 0 {
 		t.Error("client list")
 	}
 
-	for _, it := range items(resp) { // a customer never sees an actor's name (IR305)
+	for _, it := range items(t, resp) { // a customer never sees an actor's name (IR305)
 		for _, e := range asArr(t, it["eventHistory"]) {
 			if asObj(t, e)["actorName"] != nil {
 				t.Errorf("client event history shows a name: %v", e)
@@ -270,8 +273,8 @@ func TestOffsets(t *testing.T) {
 		}
 	}
 
-	if _, m := post(srv, &customerA, "offsets.list", `{"limit":100}`); func() bool {
-		for _, it := range items(m) {
+	if _, m := post(srv, customerA(), "offsets.list", `{"limit":100}`); func() bool {
+		for _, it := range items(t, m) {
 			if it["id"] == rid {
 				return true
 			}
@@ -284,7 +287,7 @@ func TestOffsets(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"offsets.list",
 		`{"filters":{"from":"2026-09-14T00:00:00Z","to":"2026-09-01T00:00:00Z"}}`,
 	); code != 422 ||
@@ -294,17 +297,17 @@ func TestOffsets(t *testing.T) {
 
 	_, resp = post(
 		srv,
-		&hq,
+		hq(),
 		"offsets.list",
 		`{"filters":{"customerId":"`+seed.ID("cust-b").String()+`"},"limit":100}`,
 	)
-	if len(items(resp)) == 0 {
+	if len(items(t, resp)) == 0 {
 		t.Error("HQ list")
 	}
 
 	named := false // HQ sees who acted
 
-	for _, it := range items(resp) {
+	for _, it := range items(t, resp) {
 		for _, e := range asArr(t, it["eventHistory"]) {
 			named = named || asObj(t, e)["actorName"] != nil
 		}
@@ -316,7 +319,7 @@ func TestOffsets(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"offsets.list",
 		`{"filters":{"status":"sold"}}`,
 	); code != 422 ||
@@ -324,7 +327,7 @@ func TestOffsets(t *testing.T) {
 		t.Errorf("bad state filter: %d %s", code, fields(res))
 	}
 	// expired quotes cannot be requested; HQ quotes need the customer's units
-	code, resp = quote(&hq, `,"customerId":"`+seed.ID("cust-b").String()+`"`)
+	code, resp = quote(hq(), `,"customerId":"`+seed.ID("cust-b").String()+`"`)
 	if code != 200 {
 		t.Fatalf("HQ quote: %d %v", code, resp)
 	}
@@ -333,11 +336,11 @@ func TestOffsets(t *testing.T) {
 		t,
 		`UPDATE energy.offset_quotes SET expires_at = $2 WHERE id = $1`,
 		data(resp)["id"],
-		clock.Add(-time.Minute),
+		clock().Add(-time.Minute),
 	)
 
 	if code, _ := sim(
-		&hq,
+		hq(),
 		`{"event":"request","quoteId":"`+asStr(
 			t,
 			data(resp)["id"],
@@ -348,7 +351,7 @@ func TestOffsets(t *testing.T) {
 	}
 
 	if code, m := quote(
-		&hq,
+		hq(),
 		`,"customerId":"`+seed.ID("cust-a").String()+`"`,
 	); code != 422 ||
 		fields(m) != "unitIds=errors.units_outside_customer" {

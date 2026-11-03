@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -15,7 +15,7 @@ func TestEffectivePowerSR27(t *testing.T) {
 	srv := server(t)
 	tenant := seed.ID("tenant-a")
 	power := func(u string) string {
-		_, m := post(srv, &hq, "units.get", `{"id":"`+u+`"}`)
+		_, m := post(srv, hq(), "units.get", `{"id":"`+u+`"}`)
 
 		return asStr(t, data(m)["effectivePowerState"])
 	}
@@ -30,7 +30,7 @@ func TestEffectivePowerSR27(t *testing.T) {
 			WHERE id = $1`,
 			unit,
 			connection,
-			clock.Add(-observedAgo),
+			clock().Add(-observedAgo),
 		)
 		owner(
 			t,
@@ -62,7 +62,7 @@ func TestEffectivePowerSR27(t *testing.T) {
 			tenant,
 			unit,
 			sensor,
-			clock.Add(-ago),
+			clock().Add(-ago),
 			seq,
 			value,
 			origin,

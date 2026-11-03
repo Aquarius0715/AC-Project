@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -22,7 +22,7 @@ func TestTenantIsolationEverywhere(t *testing.T) {
 	if err != nil {
 		t.Skip(err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	rows, err := conn.Query(
 		ctx,
@@ -98,13 +98,13 @@ func TestTenantIsolationEverywhere(t *testing.T) {
 	if err != nil {
 		t.Skip(err)
 	}
-	defer app.Close(ctx)
+	defer func() { _ = app.Close(ctx) }()
 
 	txn, err := app.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer txn.Rollback(ctx)
+	defer func() { _ = txn.Rollback(ctx) }()
 
 	_, execErr := txn.Exec(
 		ctx,
@@ -168,13 +168,13 @@ func TestIdempotencyKeysIsolated(t *testing.T) {
 	if err != nil {
 		t.Skip(err)
 	}
-	defer app.Close(ctx)
+	defer func() { _ = app.Close(ctx) }()
 
 	txn, err := app.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer txn.Rollback(ctx)
+	defer func() { _ = txn.Rollback(ctx) }()
 
 	_, execErr := txn.Exec(
 		ctx,

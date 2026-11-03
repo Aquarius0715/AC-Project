@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -22,7 +22,7 @@ func TestConcurrentAlertOpening(t *testing.T) {
 			t.Skip(err)
 		}
 
-		t.Cleanup(func() { conn.Close(ctx) })
+		t.Cleanup(func() { _ = conn.Close(ctx) })
 
 		return conn
 	}
@@ -60,7 +60,7 @@ func TestConcurrentAlertOpening(t *testing.T) {
 
 		return txn
 	}
-	when := clock
+	when := clock()
 	tx1 := begin(c1)
 
 	first, err := monitoring.Alerts{

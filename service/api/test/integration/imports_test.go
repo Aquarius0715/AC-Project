@@ -1,7 +1,6 @@
-package integration
+package integration_test
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -12,16 +11,16 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
-func jsonStr(s string) string {
-	b, _ := json.Marshal(s)
+func jsonStr(t *testing.T, s string) string {
+	t.Helper()
 
-	return string(b)
+	return string(jsonBytes(t, s))
 }
 
-func jsonStr2(v any) string {
-	b, _ := json.Marshal(v)
+func jsonStr2(t *testing.T, v any) string {
+	t.Helper()
 
-	return string(b)
+	return string(jsonBytes(t, v))
 }
 
 const mapping = `{"property":"Property","floor":"Floor","room":"Room","unit_name":"Unit","model_code":"Model",` +
@@ -35,7 +34,7 @@ func TestUnitsImport(t *testing.T) {
 
 	code, resp := write(
 		srv,
-		&hq,
+		hq(),
 		"properties.save",
 		`{"customerOrgId":"`+org+`","kind":"office","name":"`+prop+`","address":null,"accessInstructions":null}`,
 		0,
@@ -47,7 +46,7 @@ func TestUnitsImport(t *testing.T) {
 	propID := asStr(t, data(resp)["id"])
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"spaces.save",
 		`{"propertyId":"`+propID+`","parentSpaceId":null,"kind":"floor","name":"1F"}`,
 		0,
@@ -59,7 +58,7 @@ func TestUnitsImport(t *testing.T) {
 	dev := uuid.NewString()
 	_, um := write(
 		srv,
-		&hq,
+		hq(),
 		"units.save",
 		`{"customerOrgId":"`+org+`","propertyId":"`+propID+`","spaceId":null,"displayName":"Bound AC",`+
 			`"modelId":"`+seed.ID("ventilation-demo").
@@ -119,11 +118,11 @@ func TestUnitsImport(t *testing.T) {
 		prop + ",,,Serial AC,SPL-100," + strings.ToLower(free) + ",,\n" + // ready: binds the free device
 		prop + ",,,Serial AC 2,SPL-100," + free + ",,\n" + // error: the same serial twice in the file
 		prop + ",,,Ghost AC,SPL-100,NO-SUCH-" + free + ",,\n" // error: unknown serial
-	body := `{"customerId":"` + cust + `","fileName":"units.csv","csvText":` + jsonStr(
+	body := `{"customerId":"` + cust + `","fileName":"units.csv","csvText":` + jsonStr(t,
 		csv,
 	) + `,"mapping":` + mapping + `}`
 
-	code, resp = post(srv, &hq, "units.importPreview", body)
+	code, resp = post(srv, hq(), "units.importPreview", body)
 	if code != 200 {
 		t.Fatalf("preview: %d %v", code, resp)
 	}
@@ -179,18 +178,18 @@ func TestUnitsImport(t *testing.T) {
 		"header only": `{"customerId":"` + cust + `","fileName":"a.csv","csvText":"a,b\n",` +
 			`"mapping":{"property":"a","unit_name":"a","model_code":"b"}}`,
 		"too many rows": `{"customerId":"` + cust + `","fileName":"a.csv",` +
-			`"csvText":` + jsonStr("p,u,m\n"+strings.Repeat("x,y,z\n", 1001)) + `,"mapping":{"property":"p","unit_name":"u",` +
+			`"csvText":` + jsonStr(t, "p,u,m\n"+strings.Repeat("x,y,z\n", 1001)) + `,"mapping":{"property":"p","unit_name":"u",` +
 			`"model_code":"m"}}`,
 		"bad quoting": `{"customerId":"` + cust + `","fileName":"a.csv",` +
-			`"csvText":` + jsonStr("p,u,m\n\"x,y\n") + `,"mapping":{"property":"p","unit_name":"u","model_code":"m"}}`,
+			`"csvText":` + jsonStr(t, "p,u,m\n\"x,y\n") + `,"mapping":{"property":"p","unit_name":"u","model_code":"m"}}`,
 	} {
-		code, m := post(srv, &hq, "units.importPreview", b)
+		code, m := post(srv, hq(), "units.importPreview", b)
 		refusal(t, name, code, m, want[name])
 	}
 
 	if code, _ := post(
 		srv,
-		&hq,
+		hq(),
 		"units.importPreview",
 		strings.Replace(body, cust, uuid.NewString(), 1),
 	); code != 404 {
@@ -200,7 +199,7 @@ func TestUnitsImport(t *testing.T) {
 	// commit with another customer → CONFLICT (re-validate); then the real commit
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"units.importCommit",
 		`{"previewId":"`+previewID+`","customerId":"`+seed.ID("cust-a").String()+`"}`,
 		0,
@@ -208,7 +207,7 @@ func TestUnitsImport(t *testing.T) {
 		t.Fatalf("wrong customer: %d", code)
 	}
 
-	code, resp = post(srv, &hq, "units.importPreview", body)
+	code, resp = post(srv, hq(), "units.importPreview", body)
 	if code != 200 {
 		t.Fatalf("preview again: %d %v", code, resp)
 	}
@@ -217,7 +216,7 @@ func TestUnitsImport(t *testing.T) {
 
 	code, resp = write(
 		srv,
-		&hq,
+		hq(),
 		"units.importCommit",
 		`{"previewId":"`+previewID+`","customerId":"`+cust+`"}`,
 		0,
@@ -236,7 +235,7 @@ func TestUnitsImport(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"units.importCommit",
 		`{"previewId":"`+previewID+`","customerId":"`+cust+`"}`,
 		0,
@@ -244,16 +243,16 @@ func TestUnitsImport(t *testing.T) {
 		t.Error("a preview is used once")
 	}
 	// the created units exist under the new room
-	_, resp = post(srv, &hq, "units.list", `{"filters":{"propertyId":"`+propID+`"},"limit":100}`)
+	_, resp = post(srv, hq(), "units.list", `{"filters":{"propertyId":"`+propID+`"},"limit":100}`)
 	if len(
-		items(resp),
+		items(t, resp),
 	) != 5 { // 4 imported here + the bound unit (the fifth went to the new property)
-		t.Fatalf("units after import: %d", len(items(resp)))
+		t.Fatalf("units after import: %d", len(items(t, resp)))
 	}
 
 	var desk, serialUnit string
 
-	for _, u := range items(resp) {
+	for _, u := range items(t, resp) {
 		switch u["displayName"] {
 		case "Desk AC 1":
 			desk = asStr(t, u["id"])
@@ -264,7 +263,7 @@ func TestUnitsImport(t *testing.T) {
 	// CSV dates are Kuala Lumpur calendar dates
 	if _, g := post(
 		srv,
-		&hq,
+		hq(),
 		"units.get",
 		`{"id":"`+desk+`"}`,
 	); data(g)["installedAt"] != "2026-01-09T16:00:00Z" {
@@ -273,21 +272,21 @@ func TestUnitsImport(t *testing.T) {
 
 	if _, doc := post(
 		srv,
-		&hq,
+		hq(),
 		"devices.list",
 		`{"filters":{"unitId":"`+serialUnit+`"}}`,
-	); len(items(doc)) != 1 ||
-		items(doc)[0]["id"] != freeDev {
+	); len(items(t, doc)) != 1 ||
+		items(t, doc)[0]["id"] != freeDev {
 		t.Fatalf("the serial binds the device: %v", doc)
 	}
 
 	if _, pl := post(
 		srv,
-		&hq,
+		hq(),
 		"properties.list",
 		`{"filters":{"customerId":"`+cust+`"},"limit":100}`,
 	); !strings.Contains(
-		jsonStr2(pl),
+		jsonStr2(t, pl),
 		nowhere,
 	) {
 		t.Fatal("the new property exists")
@@ -297,7 +296,7 @@ func TestUnitsImport(t *testing.T) {
 	importID := asStr(t, imp["id"])
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"units.importUndo",
 		`{"importId":"`+importID+`","reason":"wrong file"}`,
 		2,
@@ -307,7 +306,7 @@ func TestUnitsImport(t *testing.T) {
 
 	code, resp = write(
 		srv,
-		&hq,
+		hq(),
 		"units.importUndo",
 		`{"importId":"`+importID+`","reason":"wrong file"}`,
 		1,
@@ -316,29 +315,29 @@ func TestUnitsImport(t *testing.T) {
 		t.Fatalf("undo: %d %v", code, resp)
 	}
 
-	_, resp = post(srv, &hq, "units.list", `{"filters":{"propertyId":"`+propID+`"}}`)
-	if len(items(resp)) != 1 {
+	_, resp = post(srv, hq(), "units.list", `{"filters":{"propertyId":"`+propID+`"}}`)
+	if len(items(t, resp)) != 1 {
 		t.Fatal("undo archives created units")
 	}
 
 	if _, doc := post(
 		srv,
-		&hq,
+		hq(),
 		"devices.list",
 		`{"filters":{"unitId":"`+serialUnit+`"}}`,
 	); len(
-		items(doc),
+		items(t, doc),
 	) != 0 {
 		t.Fatalf("undo releases the device: %v", doc)
 	}
 
 	if _, pl := post(
 		srv,
-		&hq,
+		hq(),
 		"properties.list",
 		`{"filters":{"customerId":"`+cust+`"},"limit":100}`,
 	); strings.Contains(
-		jsonStr2(pl),
+		jsonStr2(t, pl),
 		nowhere,
 	) {
 		t.Fatal("undo archives the created property")
@@ -346,7 +345,7 @@ func TestUnitsImport(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"units.importUndo",
 		`{"importId":"`+importID+`","reason":"again"}`,
 		2,
@@ -356,7 +355,7 @@ func TestUnitsImport(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"units.importUndo",
 		`{"importId":"`+uuid.NewString()+`","reason":"x"}`,
 		1,
@@ -367,15 +366,15 @@ func TestUnitsImport(t *testing.T) {
 	// undo blocked by telemetry, and after the 24 h window
 	_, resp = post(
 		srv,
-		&hq,
+		hq(),
 		"units.importPreview",
-		`{"customerId":"`+cust+`","fileName":"b.csv","csvText":`+jsonStr(
+		`{"customerId":"`+cust+`","fileName":"b.csv","csvText":`+jsonStr(t,
 			"Property,Unit,Model\n"+prop+",Telemetry AC "+uuid.NewString()[:4]+",SPL-100\n",
 		)+`,"mapping":{"property":"Property","unit_name":"Unit","model_code":"Model"}}`,
 	)
 	_, resp = write(
 		srv,
-		&hq,
+		hq(),
 		"units.importCommit",
 		`{"previewId":"`+asStr(t, data(resp)["previewId"])+`","customerId":"`+cust+`"}`,
 		0,
@@ -390,13 +389,13 @@ func TestUnitsImport(t *testing.T) {
 		seed.ID("tenant-a"),
 		unit,
 		uuid.New(),
-		clock,
+		clock(),
 		uuid.New(),
 	)
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"units.importUndo",
 		`{"importId":"`+asStr(t, imp2["id"])+`","reason":"x"}`,
 		1,
@@ -409,12 +408,12 @@ func TestUnitsImport(t *testing.T) {
 		t,
 		`UPDATE assets.unit_imports SET undo_until = $2 WHERE id = $1`,
 		imp2["id"],
-		clock.Add(-time.Minute),
+		clock().Add(-time.Minute),
 	)
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"units.importUndo",
 		`{"importId":"`+asStr(t, imp2["id"])+`","reason":"x"}`,
 		1,
@@ -423,17 +422,17 @@ func TestUnitsImport(t *testing.T) {
 		t.Fatalf("undo window: %d %v", code, res)
 	}
 	// expired preview
-	_, resp = post(srv, &hq, "units.importPreview", body)
+	_, resp = post(srv, hq(), "units.importPreview", body)
 	owner(
 		t,
 		`UPDATE assets.unit_import_previews SET expires_at = $2 WHERE id = $1`,
 		data(resp)["previewId"],
-		clock.Add(-time.Second),
+		clock().Add(-time.Second),
 	)
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"units.importCommit",
 		`{"previewId":"`+asStr(t, data(resp)["previewId"])+`","customerId":"`+cust+`"}`,
 		0,
@@ -441,7 +440,7 @@ func TestUnitsImport(t *testing.T) {
 		t.Error("expired preview")
 	}
 
-	if code, _ := post(srv, &customerB, "units.importPreview", body); code != 403 {
+	if code, _ := post(srv, customerB(), "units.importPreview", body); code != 403 {
 		t.Error("client cannot import")
 	}
 }
@@ -455,9 +454,9 @@ func TestUnitsImportRefusals(t *testing.T) {
 	preview := func(csv string) (int, map[string]any) {
 		return post(
 			srv,
-			&hq,
+			hq(),
 			"units.importPreview",
-			`{"customerId":"`+cust.String()+`","fileName":"units.csv","csvText":`+jsonStr(
+			`{"customerId":"`+cust.String()+`","fileName":"units.csv","csvText":`+jsonStr(t,
 				csv,
 			)+`,"mapping":`+mapping+`}`,
 		)
@@ -526,7 +525,7 @@ func TestUnitsImportRefusals(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"properties.save",
 		`{"customerOrgId":"`+seed.ID("org-customer-b").
 			String()+
@@ -538,7 +537,7 @@ func TestUnitsImportRefusals(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"units.importCommit",
 		`{"previewId":"`+stale+`","customerId":"`+cust.String()+`"}`,
 		0,
@@ -555,7 +554,7 @@ func TestUnitsImportRefusals(t *testing.T) {
 	owner(t, `UPDATE assets.customers SET status = 'inactive' WHERE id = $1`, cust)
 	code, resp = write(
 		srv,
-		&hq,
+		hq(),
 		"units.importCommit",
 		`{"previewId":"`+asStr(t, data(resp)["previewId"])+`","customerId":"`+cust.String()+`"}`,
 		0,
@@ -575,15 +574,15 @@ func TestUnitsImportRevalidation(t *testing.T) {
 	commit := func(csv string) (int, map[string]any, map[string]any) {
 		_, pm := post(
 			srv,
-			&hq,
+			hq(),
 			"units.importPreview",
-			`{"customerId":"`+cust+`","fileName":"units.csv","csvText":`+jsonStr(
+			`{"customerId":"`+cust+`","fileName":"units.csv","csvText":`+jsonStr(t,
 				csv,
 			)+`,"mapping":`+mapping+`}`,
 		)
 		code, res := write(
 			srv,
-			&hq,
+			hq(),
 			"units.importCommit",
 			`{"previewId":"`+asStr(t, data(pm)["previewId"])+`","customerId":"`+cust+`"}`,
 			0,
@@ -619,9 +618,9 @@ func TestUnitsImportRevalidation(t *testing.T) {
 
 	_, pm := post(
 		srv,
-		&hq,
+		hq(),
 		"units.importPreview",
-		`{"customerId":"`+cust+`","fileName":"units.csv","csvText":`+jsonStr(
+		`{"customerId":"`+cust+`","fileName":"units.csv","csvText":`+jsonStr(t,
 			header+twin+",,,Late AC,SPL-100,"+serial+",,\n",
 		)+`,"mapping":`+mapping+`}`,
 	)
@@ -637,14 +636,14 @@ func TestUnitsImportRevalidation(t *testing.T) {
 		dev,
 		other,
 		org,
-		clock,
+		clock(),
 		seed.ID("hq-operator"),
 	)
 	owner(t, `UPDATE devices.devices SET unit_id = $2 WHERE id = $1`, dev, other)
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"units.importCommit",
 		`{"previewId":"`+asStr(t, data(pm)["previewId"])+`","customerId":"`+cust+`"}`,
 		0,
@@ -654,12 +653,12 @@ func TestUnitsImportRevalidation(t *testing.T) {
 	}
 	// nothing imported: units.list has no search filter, so look through the customer's units (IR388: the earlier
 	// check sent one, got VALIDATION and passed on an empty list)
-	code, resp = post(srv, &hq, "units.list", `{"filters":{"customerId":"`+cust+`"},"limit":100}`)
+	code, resp = post(srv, hq(), "units.list", `{"filters":{"customerId":"`+cust+`"},"limit":100}`)
 	if code != 200 {
 		t.Fatalf("units.list: %d %v", code, resp)
 	}
 
-	for _, u := range items(resp) {
+	for _, u := range items(t, resp) {
 		if u["displayName"] == "Late AC" {
 			t.Errorf("imported after all: %v", u)
 		}

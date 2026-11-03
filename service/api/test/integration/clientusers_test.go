@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"strings"
@@ -34,12 +34,12 @@ func TestClientUsers(t *testing.T) {
 		"blank reason": `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"member","reason":" ",` +
 			`"displayName":"N"}`,
 	} {
-		code, m := save(&hq, b, 0)
+		code, m := save(hq(), b, 0)
 		refusal(t, name, code, m, want[name])
 	}
 
 	if code, res := save(
-		&hq,
+		hq(),
 		`{"customerId":"`+cust+`","email":"`+email+`","clientRole":"member","status":"active","displayName":"N"}`,
 		0,
 	); code != 422 ||
@@ -47,11 +47,11 @@ func TestClientUsers(t *testing.T) {
 		t.Errorf("status on invite: %d %s", code, fields(res))
 	}
 
-	if code, _ := save(&customerA, invite, 0); code != 404 {
+	if code, _ := save(customerA(), invite, 0); code != 404 {
 		t.Error("client invites into another customer")
 	}
 
-	code, resp := save(&customerB, invite, 0)
+	code, resp := save(customerB(), invite, 0)
 	if code != 200 || data(resp)["status"] != "invited" || data(resp)["membershipId"] == nil ||
 		data(resp)["invitedByMembershipId"] != seed.ID("customer-b").String() {
 		t.Fatalf("invite: %d %v", code, resp)
@@ -60,7 +60,7 @@ func TestClientUsers(t *testing.T) {
 	id := asStr(t, data(resp)["id"])
 
 	if code, res := save(
-		&hq,
+		hq(),
 		strings.Replace(invite, email, strings.ToUpper(email[:1])+email[1:], 1),
 		0,
 	); code != 422 ||
@@ -68,11 +68,11 @@ func TestClientUsers(t *testing.T) {
 		t.Errorf("duplicate email (case-insensitive): %d %s", code, fields(res))
 	}
 
-	_, resp = post(srv, &customerB, "clientUsers.list", `{"limit":100}`)
+	_, resp = post(srv, customerB(), "clientUsers.list", `{"limit":100}`)
 
 	var seedOwner map[string]any
 
-	for _, it := range items(resp) {
+	for _, it := range items(t, resp) {
 		if it["membershipId"] == seed.ID("customer-b").String() {
 			seedOwner = it
 		}
@@ -84,18 +84,18 @@ func TestClientUsers(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&hq,
+		hq(),
 		"clientUsers.list",
 		`{"filters":{"customerId":"`+cust+`","status":"invited","clientRole":"member"},"limit":100}`,
 	); len(
-		items(res),
+		items(t, res),
 	) == 0 {
 		t.Error("HQ filtered list")
 	}
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"clientUsers.list",
 		`{"filters":{"status":"gone"}}`,
 	); code != 422 ||
@@ -105,17 +105,17 @@ func TestClientUsers(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&customerA,
+		customerA(),
 		"clientUsers.list",
 		`{"limit":100}`,
-	); len(items(res)) == 0 ||
-		items(res)[0]["customerId"] != seed.ID("cust-a").String() {
+	); len(items(t, res)) == 0 ||
+		items(t, res)[0]["customerId"] != seed.ID("cust-a").String() {
 		t.Error("client list scoped to own customer")
 	}
 	// resend: not sooner than 5 minutes after the last invitation e-mail (IR423), then queued again (IR418)
 	if code, res := write(
 		srv,
-		&customerB,
+		customerB(),
 		"clientUsers.resendInvite",
 		`{"id":"`+id+`"}`,
 		0,
@@ -132,7 +132,7 @@ func TestClientUsers(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&customerB,
+		customerB(),
 		"clientUsers.resendInvite",
 		`{"id":"`+id+`"}`,
 		0,
@@ -143,7 +143,7 @@ func TestClientUsers(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&customerB,
+		customerB(),
 		"clientUsers.resendInvite",
 		`{"id":"`+asStr(t, seedOwner["id"])+`"}`,
 		0,
@@ -153,7 +153,7 @@ func TestClientUsers(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&customerA,
+		customerA(),
 		"clientUsers.resendInvite",
 		`{"id":"`+id+`"}`,
 		0,
@@ -163,7 +163,7 @@ func TestClientUsers(t *testing.T) {
 	// updates are HQ only; the last active owner is protected
 	upd := func(target map[string]any, role, status string, v int) (int, map[string]any) {
 		return save(
-			&hq,
+			hq(),
 			`{"id":"`+asStr(
 				t,
 				target["id"],
@@ -184,7 +184,7 @@ func TestClientUsers(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"clientUsers.remove",
 		`{"id":"`+asStr(t, seedOwner["id"])+`","reason":"leaving"}`,
 		ov,
@@ -193,7 +193,7 @@ func TestClientUsers(t *testing.T) {
 	}
 
 	if code, res := save(
-		&hq,
+		hq(),
 		`{"id":"`+id+`","customerId":"`+cust+`","email":"`+email+`","clientRole":"member"}`,
 		1,
 	); code != 422 ||
@@ -221,13 +221,13 @@ func TestClientUsers(t *testing.T) {
 
 	code, resp = upd(map[string]any{"id": id, "email": email}, "owner", "disabled", 1)
 	if code != 200 || data(resp)["status"] != "disabled" || data(resp)["clientRole"] != "owner" ||
-		ver(resp) != 2 {
+		ver(t, resp) != 2 {
 		t.Fatalf("update: %d %v", code, resp)
 	}
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"clientUsers.remove",
 		`{"id":"`+id+`","reason":"no longer with the company"}`,
 		2,
@@ -238,7 +238,7 @@ func TestClientUsers(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"clientUsers.remove",
 		`{"id":"`+id+`","reason":"again"}`,
 		2,
@@ -255,7 +255,7 @@ func TestTwoFactor(t *testing.T) {
 		seed.ID("tech-external-b"),
 	)
 
-	code, resp := post(srv, &techB, "twoFactor.get", `{}`)
+	code, resp := post(srv, techB(), "twoFactor.get", `{}`)
 	if code != 200 || data(resp)["enabled"] != false || data(resp)["setupKey"] == nil ||
 		data(resp)["recoveryCodesLeft"] != nil {
 		t.Fatalf("get: %d %v", code, resp)
@@ -268,27 +268,27 @@ func TestTwoFactor(t *testing.T) {
 	}
 
 	for _, b := range []string{`{"code":"12345"}`, `{"code":"abcdef"}`, `{}`} {
-		code, m := write(srv, &techB, "twoFactor.enable", b, 0)
+		code, m := write(srv, techB(), "twoFactor.enable", b, 0)
 		refusal(t, b, code, m, want[b])
 	}
 
-	if code, _ := write(srv, &techB, "twoFactor.disable", `{"code":"123456"}`, 0); code != 409 {
+	if code, _ := write(srv, techB(), "twoFactor.disable", `{"code":"123456"}`, 0); code != 409 {
 		t.Error("disable when off")
 	}
 
-	code, resp = write(srv, &techB, "twoFactor.enable", `{"code":"123456"}`, 0)
+	code, resp = write(srv, techB(), "twoFactor.enable", `{"code":"123456"}`, 0)
 	if code != 200 || len(asArr(t, data(resp)["recoveryCodes"])) != 8 ||
 		asNum(t, data(resp)["recoveryCodesLeft"]) != 8 {
 		t.Fatalf("enable: %d %v", code, resp)
 	}
 
-	if code, _ := write(srv, &techB, "twoFactor.enable", `{"code":"654321"}`, 0); code != 409 {
+	if code, _ := write(srv, techB(), "twoFactor.enable", `{"code":"654321"}`, 0); code != 409 {
 		t.Error("enable twice")
 	}
 
 	if _, res := post(
 		srv,
-		&techB,
+		techB(),
 		"twoFactor.get",
 		`{}`,
 	); data(res)["enabled"] != true ||
@@ -296,13 +296,13 @@ func TestTwoFactor(t *testing.T) {
 		t.Errorf("enabled status: %v", res)
 	}
 
-	if _, m := post(srv, &techB, "preferences.get", `{}`); data(m)["twoFactorEnabled"] != true {
+	if _, m := post(srv, techB(), "preferences.get", `{}`); data(m)["twoFactorEnabled"] != true {
 		t.Error("preferences.twoFactorEnabled")
 	}
 
 	if code, res := write(
 		srv,
-		&techB,
+		techB(),
 		"twoFactor.disable",
 		`{"code":"000000"}`,
 		0,
@@ -339,14 +339,14 @@ func TestClientUserMembershipSync(t *testing.T) {
 		cust,
 		membership,
 		email,
-		clock.Add(-time.Hour),
+		clock().Add(-time.Hour),
 		seed.ID("customer-b"),
 	)
 
 	save := func(customer, status string, v int) (int, map[string]any) {
 		return write(
 			srv,
-			&hq,
+			hq(),
 			"clientUsers.save",
 			`{"id":"`+user+`","customerId":"`+customer+`","email":"`+email+`","clientRole":"member",`+
 				`"status":"`+status+`","reason":"admin change"}`,
@@ -380,7 +380,7 @@ func TestClientUserMembershipSync(t *testing.T) {
 	// the e-mail of a signed-in user is the sign-in identity's: HQ cannot change it either (IR422)
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"clientUsers.save",
 		`{"id":"`+user+`","customerId":"`+cust+`","email":"other-`+email+`","clientRole":"member","reason":"admin change"}`,
 		1,
@@ -393,7 +393,7 @@ func TestClientUserMembershipSync(t *testing.T) {
 		t.Fatalf("disable: %d %v", code, m)
 	}
 
-	if until, scope := access(); until == nil || !until.Equal(clock) || scope != 2 {
+	if until, scope := access(); until == nil || !until.Equal(clock()) || scope != 2 {
 		t.Errorf("membership after disabling: %v %d", until, scope)
 	}
 
@@ -407,7 +407,7 @@ func TestClientUserMembershipSync(t *testing.T) {
 	// the same address in capitals is no change: the stored spelling stays
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"clientUsers.save",
 		`{"id":"`+user+`","customerId":"`+cust+`","email":"`+strings.ToUpper(
 			email,
@@ -420,7 +420,7 @@ func TestClientUserMembershipSync(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"clientUsers.remove",
 		`{"id":"`+user+`","reason":"left the company"}`,
 		3,
@@ -431,7 +431,7 @@ func TestClientUserMembershipSync(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"clientUsers.remove",
 		`{"id":"`+user+`","reason":"left the company"}`,
 		4,
@@ -440,7 +440,7 @@ func TestClientUserMembershipSync(t *testing.T) {
 		t.Fatalf("remove: %d %v", code, res)
 	}
 
-	if until, _ := access(); until == nil || !until.Equal(clock) {
+	if until, _ := access(); until == nil || !until.Equal(clock()) {
 		t.Errorf("membership after removal: %v", until)
 	}
 }
@@ -453,7 +453,7 @@ func TestClientUsersByOwner(t *testing.T) {
 	cust := seed.ID("cust-b").String()
 	email := "owner-" + uuid.NewString()[:8] + "@example.com"
 	save := func(body string, v int) (int, map[string]any) {
-		return write(srv, &customerB, "clientUsers.save", body, v)
+		return write(srv, customerB(), "clientUsers.save", body, v)
 	}
 
 	code, resp := save(
@@ -491,11 +491,11 @@ func TestClientUsersByOwner(t *testing.T) {
 		t.Errorf("activate an invite: %d %v", code, m)
 	}
 	// the owner's own row
-	_, resp = post(srv, &customerB, "clientUsers.list", `{"limit":100}`)
+	_, resp = post(srv, customerB(), "clientUsers.list", `{"limit":100}`)
 
 	var self map[string]any
 
-	for _, it := range items(resp) {
+	for _, it := range items(t, resp) {
 		if it["membershipId"] == seed.ID("customer-b").String() {
 			self = it
 		}
@@ -519,7 +519,7 @@ func TestClientUsersByOwner(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&customerB,
+		customerB(),
 		"clientUsers.remove",
 		`{"id":"`+asStr(t, self["id"])+`","reason":"x"}`,
 		sv,
@@ -549,7 +549,7 @@ func TestClientUsersByOwner(t *testing.T) {
 		cust,
 		membership,
 		memberEmail,
-		clock.Add(-time.Hour),
+		clock().Add(-time.Hour),
 		seed.ID("customer-b"),
 	)
 
@@ -572,7 +572,7 @@ func TestClientUsersByOwner(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&customerA,
+		customerA(),
 		"clientUsers.remove",
 		`{"id":"`+user+`","reason":"x"}`,
 		2,
@@ -582,7 +582,7 @@ func TestClientUsersByOwner(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&customerB,
+		customerB(),
 		"clientUsers.remove",
 		`{"id":"`+user+`","reason":"left"}`,
 		2,
@@ -593,7 +593,7 @@ func TestClientUsersByOwner(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&customerB,
+		customerB(),
 		"clientUsers.remove",
 		`{"id":"`+id+`","reason":"withdrawn"}`,
 		2,
@@ -612,7 +612,7 @@ func TestClientAccountCreated(t *testing.T) {
 
 	code, res := write(
 		srv,
-		&customerB,
+		customerB(),
 		"clientUsers.save",
 		`{"customerId":"`+cust+`","email":"`+email+`","clientRole":"owner","displayName":"Added Owner"}`,
 		0,
@@ -628,8 +628,8 @@ func TestClientAccountCreated(t *testing.T) {
 			t,
 			`UPDATE identity.memberships SET valid_from = $2, valid_until = $3 WHERE id = $1`,
 			membership,
-			clock.Add(-time.Hour),
-			clock.Add(-30*time.Minute),
+			clock().Add(-time.Hour),
+			clock().Add(-30*time.Minute),
 		)
 	})
 
@@ -659,7 +659,7 @@ func TestClientAccountCreated(t *testing.T) {
 
 	if code, resp := write(
 		srv,
-		&customerB,
+		customerB(),
 		"clientUsers.save",
 		`{"customerId":"`+cust+`","email":"`+strings.ToUpper(
 			email,
@@ -677,11 +677,11 @@ func TestDisabledClientStaysClosed(t *testing.T) {
 	srv := server(t)
 	user := newUser(t)
 	cust := seed.ID("cust-b").String()
-	from := clock.Add(-time.Hour).Format(time.RFC3339)
+	from := clock().Add(-time.Hour).Format(time.RFC3339)
 
 	code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"members.save",
 		`{"userId":"`+user+`","organizationId":"`+seed.ID("org-customer-b").
 			String()+
@@ -708,7 +708,7 @@ func TestDisabledClientStaysClosed(t *testing.T) {
 
 	if code, resp := write(
 		srv,
-		&customerB,
+		customerB(),
 		"clientUsers.save",
 		`{"id":"`+id+`","customerId":"`+cust+`","email":"`+user+`@ac.local","clientRole":"member","status":"disabled",`+
 			`"reason":"left"}`,
@@ -720,10 +720,10 @@ func TestDisabledClientStaysClosed(t *testing.T) {
 	var mv int
 	ownerScan(t, `SELECT version FROM identity.memberships WHERE id = $1`, []any{membership}, &mv)
 
-	later := clock.Add(90 * 24 * time.Hour).Format(time.RFC3339)
+	later := clock().Add(90 * 24 * time.Hour).Format(time.RFC3339)
 	if code, resp := write(
 		srv,
-		&hq,
+		hq(),
 		"members.save",
 		`{"id":"`+membership+`","userId":"`+user+`","organizationId":"`+seed.ID("org-customer-b").
 			String()+
@@ -742,11 +742,11 @@ func TestDisabledClientStaysClosed(t *testing.T) {
 		&end,
 	)
 
-	if !end.Equal(clock) {
+	if !end.Equal(clock()) {
 		t.Errorf(
 			"disabled client user's membership after HQ's change: %v, want still closed at %v",
 			end,
-			clock,
+			clock(),
 		)
 	}
 }

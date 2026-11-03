@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -13,21 +13,21 @@ func TestHoldRollsBackWhenTheStatusCannotBeWritten(t *testing.T) {
 	srv := server(t)
 	_, res := write(
 		srv,
-		&customerA,
+		customerA(),
 		"jobs.create",
 		jobBody(seed.ID("unit-non-rto").String(), nil),
 		0,
 	)
 	job := asStr(t, data(res)["id"])
 	owner(t, `UPDATE maintenance.jobs SET status = 'in_progress' WHERE id = $1`, job)
-	_, res = post(srv, &hq, "jobs.get", `{"jobId":"`+job+`"}`)
-	version := ver(res)
+	_, res = post(srv, hq(), "jobs.get", `{"jobId":"`+job+`"}`)
+	version := ver(t, res)
 
 	broken := injectAt(t, "UPDATE maintenance.jobs SET status = 'on_hold'")
 
 	code, res := write(
 		broken,
-		&hq,
+		hq(),
 		"jobs.hold",
 		`{"jobId":"`+job+`","reason":"waiting for parts"}`,
 		version,
@@ -36,9 +36,9 @@ func TestHoldRollsBackWhenTheStatusCannotBeWritten(t *testing.T) {
 		t.Fatalf("hold with a failing status write: %d %v, want a server error", code, res)
 	}
 
-	_, res = post(srv, &hq, "jobs.get", `{"jobId":"`+job+`"}`)
+	_, res = post(srv, hq(), "jobs.get", `{"jobId":"`+job+`"}`)
 	if data(res)["status"] != "in_progress" || data(res)["holdReason"] != nil ||
-		ver(res) != version {
+		ver(t, res) != version {
 		t.Errorf("a failed hold changed the job: %v", res)
 	}
 }

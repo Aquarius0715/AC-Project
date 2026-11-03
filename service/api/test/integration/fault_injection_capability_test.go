@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"strings"
@@ -14,8 +14,8 @@ func TestCapabilityVersionRollsBackWhenThePreviousVersionCannotBeRetired(t *test
 	s := server(t)
 	model := "FI-" + uuid.NewString()[:8]
 
-	code, res := write(s, &hq, "capabilities.save", capBody("", model, ""), 0)
-	if code != 200 || ver(res) != 1 {
+	code, res := write(s, hq(), "capabilities.save", capBody("", model, ""), 0)
+	if code != 200 || ver(t, res) != 1 {
 		t.Fatalf("create: %d %v", code, res)
 	}
 
@@ -43,7 +43,7 @@ func TestCapabilityVersionRollsBackWhenThePreviousVersionCannotBeRetired(t *test
 		1,
 	)
 
-	code, res = write(broken, &hq, "capabilities.save", body, 1)
+	code, res = write(broken, hq(), "capabilities.save", body, 1)
 	if code < 500 {
 		t.Fatalf("new version with a failing retire: %d %v, want a server error", code, res)
 	}

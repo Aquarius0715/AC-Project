@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -12,21 +12,21 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 	unit := boundUnit(t, srv, "online")
 	key, inv := overdueContract(t, srv, unit)
 	id, res := executed(t, srv, key, inv, []string{unit})
-	ackCommand(t, cmdOf(res, unit, "applyCommandIds"), clock.Add(time.Second))
+	ackCommand(t, cmdOf(t, res, unit, "applyCommandIds"), clock().Add(time.Second))
 
 	get := func() map[string]any {
-		_, m := post(srv, &restrMgr, "restrictions.get", `{"id":"`+id+`"}`)
+		_, m := post(srv, restrMgr(), "restrictions.get", `{"id":"`+id+`"}`)
 
 		return m
 	}
 	_, res = write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.cancel",
 		`{"restrictionId":"`+id+`","reason":"plan agreed"}`,
-		ver(get()),
+		ver(t, get()),
 	)
-	ackCommand(t, cmdOf(res, unit, "releaseCommandIds"), clock.Add(2*time.Second))
+	ackCommand(t, cmdOf(t, res, unit, "releaseCommandIds"), clock().Add(2*time.Second))
 
 	if data(get())["state"] != "released" {
 		t.Fatal("released")
@@ -37,9 +37,9 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 
 		if code, resp := write(
 			srv,
-			&customerB,
+			customerB(),
 			"demo.trigger",
-			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Format(
+			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock().Format(
 				time.RFC3339,
 			)+
 				`","eventType":"restriction_observation","restrictionId":"`+id+`","unitId":"`+unit+`","observed":`+observed+`}`,
@@ -49,9 +49,10 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 		}
 	}
 	old := `{"restrictionId":"` + id + `","rulesVersion":"rules-1","policy":{"kind":"temperature_limit",` +
-		`"minimumCoolingSetpoint":24},"observedAt":"` + clock.Format(
+		`"minimumCoolingSetpoint":24},"observedAt":"` + clock().Format(
 		time.RFC3339,
-	) + `"}`
+	) +
+		`"}`
 	observe(old)
 
 	res = get()
@@ -82,7 +83,7 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.schedule",
 		scheduleBody(key, inv, []string{unit}, nil),
 		0,
@@ -92,20 +93,20 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 
 	if _, resp := post(
 		srv,
-		&hq,
+		hq(),
 		"units.get",
 		`{"id":"`+unit+`"}`,
 	); asObj(t, data(resp)["controlAvailability"])["state"] != "blocked" {
 		t.Errorf("control blocked while a case is open: %v", data(resp)["controlAvailability"])
 	}
 
-	if _, g := post(srv, &hq, "units.get", `{"id":"`+unit+`"}`); true {
+	if _, g := post(srv, hq(), "units.get", `{"id":"`+unit+`"}`); true {
 		if code, resp := write(
 			srv,
-			&hq,
+			hq(),
 			"commands.create",
 			`{"unitId":"`+unit+`","action":{"kind":"set_power","power":true},"expectedUnitVersion":`+itoa(
-				ver(g),
+				ver(t, g),
 			)+`,"reason":"check"}`,
 			0,
 		); code != 409 ||
@@ -120,14 +121,14 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 			a,
 			"restrictions.reconcile",
 			`{"restrictionId":"`+id+`","unitIds":["`+unit+`"]}`,
-			ver(get()),
+			ver(t, get()),
 		)
 	}
-	if code, _ := reconcile(&hq); code != 403 {
+	if code, _ := reconcile(hq()); code != 403 {
 		t.Error("reconcile without restriction permissions")
 	}
 
-	code, res := reconcile(&overrider) // override-only may handle terminal recovery (IR03)
+	code, res := reconcile(overrider()) // override-only may handle terminal recovery (IR03)
 
 	c0, _ := data(res)["recoveryCases"].([]any)
 	if code != 200 || len(c0) != 1 || asObj(t, c0[0])["state"] != "removing" ||
@@ -135,14 +136,14 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 		t.Fatalf("reconcile terminal: %d %v", code, res)
 	}
 
-	if code, _ := reconcile(&restrMgr); code != 409 {
+	if code, _ := reconcile(restrMgr()); code != 409 {
 		t.Error("removing case waits for its command")
 	}
 
 	ackCommand(
 		t,
 		asStr(t, asArr(t, asObj(t, c0[0])["commandIds"])[0]),
-		clock.Add(3*time.Second),
+		clock().Add(3*time.Second),
 	)
 
 	if st := asObj(t, asArr(t, data(get())["recoveryCases"])[0])["state"]; st != "resolved" {
@@ -163,7 +164,7 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 	observe(old)
 	observe("null")
 
-	code, res = reconcile(&restrMgr)
+	code, res = reconcile(restrMgr())
 
 	cs := asArr(t, data(res)["recoveryCases"])
 	if code != 200 || len(cs) != 2 || asObj(t, cs[1])["state"] != "resolved" ||
@@ -172,7 +173,7 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 	}
 
 	if code, m := reconcile(
-		&restrMgr,
+		restrMgr(),
 	); code != 422 ||
 		fields(m) != "unitIds=errors.reconcile_not_needed" {
 		t.Errorf("nothing left to reconcile: %d %s", code, fields(m))
@@ -180,7 +181,7 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 
 	if _, m := post(
 		srv,
-		&hq,
+		hq(),
 		"units.get",
 		`{"id":"`+unit+`"}`,
 	); asObj(t, data(m)["controlAvailability"])["state"] != "available" {
@@ -189,7 +190,7 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.schedule",
 		scheduleBody(key, inv, []string{unit}, nil),
 		0,

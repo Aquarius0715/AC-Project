@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"maps"
@@ -15,7 +15,7 @@ func TestContractsAndInvoices(t *testing.T) {
 	srv := server(t)
 	unit := newUnit(t, srv, "Billing AC")
 	cust := seed.ID("cust-b").String()
-	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	body := func(extra map[string]string) string {
 		f := map[string]string{
 			"customerId":          `"` + cust + `"`,
@@ -61,13 +61,13 @@ func TestContractsAndInvoices(t *testing.T) {
 		"other customer unit": {"unitIds": `["` + seed.ID("unit-non-rto").String() + `"]`},
 		"duplicate unit":      {"unitIds": `["` + unit + `","` + unit + `"]`},
 	} {
-		code, m := write(srv, &hq, "contracts.save", body(e), 0)
+		code, m := write(srv, hq(), "contracts.save", body(e), 0)
 		refusal(t, name, code, m, want[name])
 	}
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"contracts.save",
 		body(map[string]string{"customerId": `"` + uuid.NewString() + `"`}),
 		0,
@@ -75,7 +75,7 @@ func TestContractsAndInvoices(t *testing.T) {
 		t.Error("unknown customer")
 	}
 
-	code, resp := write(srv, &hq, "contracts.save", body(nil), 0)
+	code, resp := write(srv, hq(), "contracts.save", body(nil), 0)
 	if code != 200 || asNum(t, data(resp)["version"]) != 1 ||
 		len(asArr(t, data(resp)["unitIds"])) != 1 ||
 		data(resp)["customerOrgId"] != seed.ID("org-customer-b").String() {
@@ -85,7 +85,7 @@ func TestContractsAndInvoices(t *testing.T) {
 	key := asStr(t, data(resp)["id"])
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"contracts.save",
 		body(map[string]string{"id": `"` + key + `"`, "priceMinor": "15000"}),
 		1,
@@ -94,18 +94,18 @@ func TestContractsAndInvoices(t *testing.T) {
 		t.Fatalf("revise: %d %v", code, res)
 	}
 
-	day := `"from":"` + clock.Add(-time.Hour).
+	day := `"from":"` + clock().Add(-time.Hour).
 		Format(time.RFC3339) +
-		`","to":"` + clock.Add(time.Hour).
+		`","to":"` + clock().Add(time.Hour).
 		Format(time.RFC3339) +
 		`"`
 	if _, am := post(
 		srv,
-		&hq,
+		hq(),
 		"audit.list",
 		`{"filters":{`+day+`,"targetKind":"contract","targetId":"`+key+`"},"limit":10}`,
 	); !hasChange(
-		items(am),
+		items(t, am),
 		2,
 		"priceMinor",
 		"12000",
@@ -116,7 +116,7 @@ func TestContractsAndInvoices(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"contracts.save",
 		body(map[string]string{"id": `"` + key + `"`}),
 		1,
@@ -126,7 +126,7 @@ func TestContractsAndInvoices(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"contracts.save",
 		body(
 			map[string]string{
@@ -143,27 +143,27 @@ func TestContractsAndInvoices(t *testing.T) {
 	// lists
 	if _, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"contracts.list",
 		`{"filters":{"unitId":"`+unit+`"}}`,
-	); len(items(res)) != 1 ||
-		asNum(t, items(res)[0]["priceMinor"]) != 15000 {
+	); len(items(t, res)) != 1 ||
+		asNum(t, items(t, res)[0]["priceMinor"]) != 15000 {
 		t.Fatalf("client contracts: %v", res)
 	}
 
 	if code, res := post(
 		srv,
-		&customerA,
+		customerA(),
 		"contracts.list",
 		`{"filters":{"unitId":"`+unit+`"}}`,
 	); code != 200 ||
-		len(items(res)) != 0 {
+		len(items(t, res)) != 0 {
 		t.Error("other customer's contract")
 	}
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"contracts.list",
 		`{"filters":{"kind":"vip"}}`,
 	); code != 422 ||
@@ -181,24 +181,24 @@ func TestContractsAndInvoices(t *testing.T) {
 		seed.ID("tenant-a"),
 		key,
 		cust,
-		clock,
-		clock.Add(25*time.Hour),
+		clock(),
+		clock().Add(25*time.Hour),
 	)
 
 	if _, res := post(
 		srv,
-		&hq,
+		hq(),
 		"contracts.list",
 		`{"filters":{"customerId":"`+cust+`","unitId":"`+unit+`"}}`,
 	); len(
-		asArr(t, items(res)[0]["activeRestrictionIds"]),
+		asArr(t, items(t, res)[0]["activeRestrictionIds"]),
 	) != 1 {
 		t.Fatal("active restriction listed")
 	}
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"contracts.save",
 		body(map[string]string{"id": `"` + key + `"`}),
 		2,
@@ -229,7 +229,7 @@ func TestContractsAndInvoices(t *testing.T) {
 			parts = append(parts, `"`+kk+`":`+v)
 		}
 
-		return write(srv, &hq, "invoices.create", "{"+strings.Join(parts, ",")+"}", 0)
+		return write(srv, hq(), "invoices.create", "{"+strings.Join(parts, ",")+"}", 0)
 	}
 	refused := map[string]string{ // the field each VALIDATION case is refused for
 		"due in the past": "dueAt=error.past",
@@ -281,7 +281,7 @@ func TestContractsAndInvoices(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"invoices.get",
 		`{"id":"`+invoice+`"}`,
 	); code != 200 ||
@@ -289,34 +289,34 @@ func TestContractsAndInvoices(t *testing.T) {
 		t.Fatalf("client invoice detail: %d %v", code, res)
 	}
 
-	if code, _ := post(srv, &customerA, "invoices.get", `{"id":"`+invoice+`"}`); code != 404 {
+	if code, _ := post(srv, customerA(), "invoices.get", `{"id":"`+invoice+`"}`); code != 404 {
 		t.Error("other customer's invoice")
 	}
 
 	if _, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"invoices.list",
 		`{"filters":{"contractId":"`+key+`","status":"unpaid"}}`,
 	); len(
-		items(res),
+		items(t, res),
 	) != 1 {
 		t.Error("client invoice list")
 	}
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"invoices.list",
 		`{"filters":{"contractId":"`+key+`","overdueOnly":true}}`,
 	); code != 200 ||
-		len(items(res)) != 0 {
+		len(items(t, res)) != 0 {
 		t.Error("not yet overdue")
 	}
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"invoices.list",
 		`{"filters":{"status":"late"}}`,
 	); code != 422 ||
@@ -336,18 +336,18 @@ func TestContractsAndInvoices(t *testing.T) {
 	} {
 		if code, res := post(
 			srv,
-			&hq,
+			hq(),
 			"invoices.list",
 			`{"filters":{"contractId":"`+key+`",`+tc.f+`}}`,
 		); code != 200 ||
-			len(items(res)) != tc.n {
+			len(items(t, res)) != tc.n {
 			t.Errorf("invoice filter %s: %v", name, res)
 		}
 	}
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"invoices.list",
 		`{"filters":{"from":"`+stamp(1)+`","to":"`+stamp(1)+`"}}`,
 	); code != 422 ||
@@ -358,7 +358,7 @@ func TestContractsAndInvoices(t *testing.T) {
 	remind := func(recipient, channel string, v int) (int, map[string]any) {
 		return write(
 			srv,
-			&hq,
+			hq(),
 			"invoices.remind",
 			`{"invoiceId":"`+invoice+`","recipientMembershipId":"`+recipient+`","channel":"`+channel+`","reason":"overdue"}`,
 			v,
@@ -372,7 +372,7 @@ func TestContractsAndInvoices(t *testing.T) {
 		t,
 		`UPDATE billing.invoices SET due_at = $2 WHERE id = $1`,
 		invoice,
-		clock.Add(-time.Hour),
+		clock().Add(-time.Hour),
 	)
 
 	if code, res := remind(
@@ -417,11 +417,11 @@ func TestContractsAndInvoices(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&hq,
+		hq(),
 		"invoices.list",
 		`{"filters":{"contractId":"`+key+`","overdueOnly":true}}`,
 	); len(
-		items(res),
+		items(t, res),
 	) != 1 {
 		t.Error("overdue list")
 	}

@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -24,15 +24,15 @@ func TestLiveSiteSeeds(t *testing.T) {
 	if err != nil {
 		t.Skip(err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	txn, err := conn.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer txn.Rollback(ctx) //nolint:errcheck // the test never commits
+	defer func() { _ = txn.Rollback(ctx) }() // the test never commits
 
-	applyLiveErr := seed.ApplyLive(ctx, txn, clock)
+	applyLiveErr := seed.ApplyLive(ctx, txn, clock())
 	if applyLiveErr != nil {
 		t.Fatalf("apply: %v", applyLiveErr)
 	}
@@ -178,15 +178,15 @@ func TestLiveSiteSeeds(t *testing.T) {
 	read()
 
 	if devConn != "online" || unitConn != "online" || devSeen == nil || unitSeen == nil ||
-		!devSeen.Equal(clock) ||
-		!unitSeen.Equal(clock) {
+		!devSeen.Equal(clock()) ||
+		!unitSeen.Equal(clock()) {
 		t.Errorf(
 			"module %s seen %v, unit %s seen %v; want both online, seen at %s",
 			devConn,
 			devSeen,
 			unitConn,
 			unitSeen,
-			clock,
+			clock(),
 		)
 	}
 
@@ -245,14 +245,14 @@ func TestLiveSiteSeeds(t *testing.T) {
 		t.Fatal(execErr)
 	}
 
-	applyLiveErr = seed.ApplyLive(ctx, txn, clock.Add(time.Hour))
+	applyLiveErr = seed.ApplyLive(ctx, txn, clock().Add(time.Hour))
 	if applyLiveErr != nil {
 		t.Fatalf("second apply: %v", applyLiveErr)
 	}
 
 	read()
 
-	if devConn != "offline" || unitConn != "offline" || !unitSeen.Equal(clock) {
+	if devConn != "offline" || unitConn != "offline" || !unitSeen.Equal(clock()) {
 		t.Errorf(
 			"the second start changed the module to %s, the unit to %s seen %v",
 			devConn,
@@ -307,13 +307,13 @@ func TestLiveSiteRefusesATakenAddress(t *testing.T) {
 	if err != nil {
 		t.Skip(err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	txn, err := conn.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer txn.Rollback(ctx) //nolint:errcheck // the test never commits
+	defer func() { _ = txn.Rollback(ctx) }() // the test never commits
 
 	_, execErr := txn.Exec(
 		ctx,
@@ -324,7 +324,7 @@ func TestLiveSiteRefusesATakenAddress(t *testing.T) {
 		t.Fatal(execErr)
 	}
 
-	applyLiveErr := seed.ApplyLive(ctx, txn, clock)
+	applyLiveErr := seed.ApplyLive(ctx, txn, clock())
 	if applyLiveErr == nil {
 		t.Fatal("the seed took an address another person holds")
 	}

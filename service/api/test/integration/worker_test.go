@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -16,12 +16,12 @@ import (
 func TestWorkerTickExpiresOffers(t *testing.T) {
 	srv := server(t)
 	unit := seed.ID("unit-non-rto").String()
-	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
-	_, res := write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
+	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	_, res := write(srv, customerA(), "jobs.create", jobBody(unit, nil), 0)
 	job := asStr(t, data(res)["id"])
 	write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
@@ -39,21 +39,21 @@ func TestWorkerTickExpiresOffers(t *testing.T) {
 		1,
 	)
 	// before the deadline nothing changes
-	_, err := schedTick(context.Background(), srv, clock)
+	_, err := schedTick(context.Background(), srv, clock())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, m := post(srv, &hq, "jobs.get", `{"jobId":"`+job+`"}`); data(m)["status"] != "offered" {
+	if _, m := post(srv, hq(), "jobs.get", `{"jobId":"`+job+`"}`); data(m)["status"] != "offered" {
 		t.Fatal("offer still open before its deadline")
 	}
 
-	r, err := schedTick(context.Background(), srv, clock.Add(time.Hour))
+	r, err := schedTick(context.Background(), srv, clock().Add(time.Hour))
 	if err != nil || r.ExpiredOffers < 1 {
 		t.Fatalf("tick: %+v %v", r, err)
 	}
 
-	_, res = post(srv, &hq, "jobs.get", `{"jobId":"`+job+`"}`)
+	_, res = post(srv, hq(), "jobs.get", `{"jobId":"`+job+`"}`)
 	if data(res)["status"] != "requested" || data(res)["contractorOrgId"] != nil ||
 		asNum(t, data(res)["version"]) != 3 {
 		t.Fatalf("expired: %v", res)
@@ -61,18 +61,18 @@ func TestWorkerTickExpiresOffers(t *testing.T) {
 
 	_, res = post(
 		srv,
-		&hq,
+		hq(),
 		"jobs.events",
 		`{"jobId":"`+job+`","query":{"sort":{"field":"occurredAt","direction":"desc"}}}`,
 	)
-	if items(res)[0]["action"] != "offer_expired" ||
-		items(res)[0]["actorUserId"] != seed.ID("system-demo").String() {
-		t.Fatalf("expiry event: %v", items(res)[0])
+	if items(t, res)[0]["action"] != "offer_expired" ||
+		items(t, res)[0]["actorUserId"] != seed.ID("system-demo").String() {
+		t.Fatalf("expiry event: %v", items(t, res)[0])
 	}
 	// HQ may offer again (same contractor allowed)
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
@@ -95,7 +95,7 @@ func TestWorkerTickExpiresOffers(t *testing.T) {
 	schedTickR, schedTickErr := schedTick(
 		context.Background(),
 		srv,
-		clock.Add(time.Hour),
+		clock().Add(time.Hour),
 	)
 	if schedTickErr != nil ||
 		schedTickR.ExpiredOffers != 0 {
@@ -116,7 +116,7 @@ func TestWorkerRunStopsOnCancel(t *testing.T) {
 			ctx,
 			srv.DB,
 			10*time.Millisecond,
-			func() time.Time { return clock.Add(1000 * time.Hour) },
+			func() time.Time { return clock().Add(1000 * time.Hour) },
 			func(string, ...any) { logs++ },
 			nil,
 			nil,
@@ -148,14 +148,14 @@ func TestSchedulerInstancesShareTheWork(t *testing.T) {
 
 	maint := []string{ops.DomainMaintenance}
 	unit, tenant := seed.ID("unit-non-rto").String(), seed.ID("tenant-a").String()
-	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	offered := func() string {
-		_, m := write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
+		_, m := write(srv, customerA(), "jobs.create", jobBody(unit, nil), 0)
 
 		job := asStr(t, data(m)["id"])
 		if code, res := write(
 			srv,
-			&hq,
+			hq(),
 			"jobs.offer",
 			`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 				String()+
@@ -178,15 +178,15 @@ func TestSchedulerInstancesShareTheWork(t *testing.T) {
 		return job
 	}
 	status := func(job string) any {
-		_, m := post(srv, &hq, "jobs.get", `{"jobId":"`+job+`"}`)
+		_, m := post(srv, hq(), "jobs.get", `{"jobId":"`+job+`"}`)
 
 		return data(m)["status"]
 	}
 	expiries := func(job string) int {
-		_, m := post(srv, &hq, "jobs.events", `{"jobId":"`+job+`","query":{"limit":100}}`)
+		_, m := post(srv, hq(), "jobs.events", `{"jobId":"`+job+`","query":{"limit":100}}`)
 		n := 0
 
-		for _, e := range items(m) {
+		for _, e := range items(t, m) {
 			if e["action"] == "offer_expired" {
 				n++
 			}
@@ -199,7 +199,7 @@ func TestSchedulerInstancesShareTheWork(t *testing.T) {
 	if err != nil {
 		t.Skip(err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 	// another instance holds the maintenance lock of tenant-a
 	job := offered()
 
@@ -217,7 +217,7 @@ func TestSchedulerInstancesShareTheWork(t *testing.T) {
 		t.Fatal(execErr)
 	}
 
-	r, err := scheduler.TryTickDomains(ctx, ms.DB, clock.Add(time.Hour), maint, ms.Registry)
+	r, err := scheduler.TryTickDomains(ctx, ms.DB, clock().Add(time.Hour), maint, ms.Registry)
 	if err != nil || r.Skipped < 1 || r.ExpiredOffers != 0 || status(job) != "offered" {
 		t.Fatalf("the background tick skips the held tenant: %+v %v %v", r, err, status(job))
 	}
@@ -225,7 +225,7 @@ func TestSchedulerInstancesShareTheWork(t *testing.T) {
 	done := make(chan scheduler.Result, 1)
 
 	go func() {
-		r, err := scheduler.TickDomains(ctx, ms.DB, clock.Add(time.Hour), maint, ms.Registry)
+		r, err := scheduler.TickDomains(ctx, ms.DB, clock().Add(time.Hour), maint, ms.Registry)
 		if err != nil {
 			t.Error(err)
 		}
@@ -261,7 +261,7 @@ func TestSchedulerInstancesShareTheWork(t *testing.T) {
 			result, err := scheduler.TryTickDomains(
 				ctx,
 				ms.DB,
-				clock.Add(time.Hour),
+				clock().Add(time.Hour),
 				maint,
 				ms.Registry,
 			)
@@ -285,7 +285,7 @@ func TestSchedulerInstancesShareTheWork(t *testing.T) {
 	_, schedTickErr := schedTick(
 		ctx,
 		srv,
-		clock.Add(time.Hour),
+		clock().Add(time.Hour),
 	)
 	if schedTickErr != nil { // apply the ticks' events as the consumers would
 		t.Fatal(schedTickErr)

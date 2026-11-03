@@ -1,7 +1,6 @@
-package integration
+package integration_test
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -18,7 +17,7 @@ func TestReadModelsAcrossServices(t *testing.T) {
 	cl := newCluster(t)
 	urls := cl.urls
 	equipment := cl.srv[ops.DomainEquipment]
-	from := clock.Add(-24 * time.Hour).Truncate(time.Minute)
+	from := clock().Add(-24 * time.Hour).Truncate(time.Minute)
 
 	cases := []struct {
 		who  *actor
@@ -26,24 +25,24 @@ func TestReadModelsAcrossServices(t *testing.T) {
 		body string
 	}{
 		{
-			&hq,
+			hq(),
 			"admin.summary",
 			`{"from":"` + from.Format(
 				time.RFC3339,
-			) + `","to":"` + clock.Truncate(time.Minute).
+			) + `","to":"` + clock().Truncate(time.Minute).
 				Format(time.RFC3339) +
 				`"}`,
 		},
-		{&contrA, "summaries.get", `{"kind":"partner","filters":{}}`},
-		{&techA, "summaries.get", `{"kind":"technician","filters":{}}`},
-		{&customerA, "summaries.get", `{"kind":"customer","filters":{}}`},
+		{contrA(), "summaries.get", `{"kind":"partner","filters":{}}`},
+		{techA(), "summaries.get", `{"kind":"technician","filters":{}}`},
+		{customerA(), "summaries.get", `{"kind":"customer","filters":{}}`},
 	}
 	for _, tc := range cases {
 		code1, want := post(all, tc.who, tc.op, tc.body)
 		code2, got := post(equipment, tc.who, tc.op, tc.body)
-		w, _ := json.Marshal(want["data"])
+		w := jsonBytes(t, want["data"])
 
-		g, _ := json.Marshal(got["data"])
+		g := jsonBytes(t, got["data"])
 		if code1 != 200 || code2 != 200 || string(w) != string(g) {
 			t.Fatalf(
 				"%s %s: single %d %s\nsplit %d %s",
@@ -58,14 +57,15 @@ func TestReadModelsAcrossServices(t *testing.T) {
 	}
 	// the internal endpoint needs the internal token, and serves only the service's own domain
 	ask := func(base, name, token string) int {
-		req, _ := http.NewRequest(
+		req, _ := http.NewRequestWithContext(
+			t.Context(),
 			http.MethodPost,
 			base+"/internal/v1/queries/"+name,
 			strings.NewReader(`{"unitIds":[]}`),
 		)
-		req.Header.Set("Authorization", "Bearer "+hq.token)
+		req.Header.Set("Authorization", "Bearer "+hq().token)
 		req.Header.Set("X-Tenant-Id", seed.ID("tenant-a").String())
-		req.Header.Set("X-Membership-Id", seed.ID(hq.membership).String())
+		req.Header.Set("X-Membership-Id", seed.ID(hq().membership).String())
 
 		if token != "" {
 			req.Header.Set(ops.InternalTokenHeader, token)
@@ -76,7 +76,7 @@ func TestReadModelsAcrossServices(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		resp.Body.Close()
+		_ = resp.Body.Close()
 
 		return resp.StatusCode
 	}
@@ -104,7 +104,7 @@ func TestNotificationsAcrossServices(t *testing.T) {
 
 	code, res := write(
 		billingSrv,
-		&customerB,
+		customerB(),
 		"inquiries.create",
 		`{"subjectType":"payment","invoiceId":"`+inv+`","message":"split services"}`,
 		0,
@@ -148,7 +148,7 @@ func TestDirectoryAcrossServices(t *testing.T) {
 	tech := seed.ID("tech-external-a").String()
 	until := time.Date(2027, 3, 31, 0, 0, 0, 0, time.UTC)
 	body := `{"membershipId":"` + tech + `","code":"demo_electrical","name":"Electrical","number":"E-split",` +
-		`"issuedAt":"` + clock.Add(-24*time.Hour).
+		`"issuedAt":"` + clock().Add(-24*time.Hour).
 		Format(time.RFC3339) +
 		`","expiresAt":"` + until.Format(
 		time.RFC3339,
@@ -159,19 +159,19 @@ func TestDirectoryAcrossServices(t *testing.T) {
 		14,
 	) + `}`
 
-	code, res := write(maint, &contrA, "certificates.submit", body, 0)
+	code, res := write(maint, contrA(), "certificates.submit", body, 0)
 	if code != 200 {
 		t.Fatalf("submit on maintenance-api: %d %v", code, res)
 	}
 
-	if code, m := write(maint, &contrB, "certificates.submit", body, 0); code != 404 {
+	if code, m := write(maint, contrB(), "certificates.submit", body, 0); code != 404 {
 		t.Fatalf("another contractor's technician (identity.technician over HTTP): %d %v", code, m)
 	}
 
 	cert := asStr(t, data(res)["id"])
 	if code, resp := write(
 		maint,
-		&hq,
+		hq(),
 		"certificates.verify",
 		`{"certificateId":"`+cert+`","decision":"approve"}`,
 		1,
@@ -202,7 +202,8 @@ func TestSystemQueries(t *testing.T) {
 	cl := newCluster(t)
 	unit := seed.ID("unit-online-rto").String()
 	ask := func(token, tenant string) int {
-		req, _ := http.NewRequest(
+		req, _ := http.NewRequestWithContext(
+			t.Context(),
 			http.MethodPost,
 			cl.urls[ops.DomainBilling]+"/internal/v1/system/queries/restrictions.unitPolicy",
 			strings.NewReader(`{"unitId":"`+unit+`"}`),
@@ -220,7 +221,7 @@ func TestSystemQueries(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		resp.Body.Close()
+		_ = resp.Body.Close()
 
 		return resp.StatusCode
 	}

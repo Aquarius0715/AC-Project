@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"sort"
@@ -25,7 +25,7 @@ func TestInternalTechnicianScopeKinds(t *testing.T) {
 			seed.ID("tenant-a"),
 			seed.ID("user-tech-internal-a"),
 			seed.ID("org-operator-a"),
-			clock.Add(-24*time.Hour),
+			clock().Add(-24*time.Hour),
 		)
 		owner(t, `INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission)
 			SELECT tenant_id, $1, permission FROM identity.membership_permissions WHERE membership_id = $2 ON CONFLICT DO
@@ -84,7 +84,7 @@ func TestInternalTechnicianScopeKinds(t *testing.T) {
 		}
 
 		var got []string
-		for _, it := range items(res) {
+		for _, it := range items(t, res) {
 			got = append(got, name[asStr(t, it["id"])])
 		}
 

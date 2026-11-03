@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -50,7 +50,7 @@ func TestPersonAddedAgain(t *testing.T) {
 	add := func(a *actor, role, name string) (int, map[string]any) {
 		access := ""
 		if role == "technician" {
-			access = `,"accessUntil":"` + clock.Add(30*24*time.Hour).Format(time.RFC3339) + `"`
+			access = `,"accessUntil":"` + clock().Add(30*24*time.Hour).Format(time.RFC3339) + `"`
 		}
 
 		return write(
@@ -68,7 +68,7 @@ func TestPersonAddedAgain(t *testing.T) {
 
 		if code, res := write(
 			srv,
-			&contrA,
+			contrA(),
 			"partnerUsers.remove",
 			`{"id":"`+id+`","reason":"added with the wrong role"}`,
 			1,
@@ -81,7 +81,7 @@ func TestPersonAddedAgain(t *testing.T) {
 			t,
 			`UPDATE identity.memberships SET valid_from = $2::timestamptz - interval '1 hour', valid_until = $2 WHERE id = $1`,
 			membership,
-			clock,
+			clock(),
 		)
 	}
 	updatedTo := func(membership string) bool {
@@ -94,7 +94,7 @@ func TestPersonAddedAgain(t *testing.T) {
 		)
 	}
 
-	code, resp := add(&contrA, "technician", "First Name")
+	code, resp := add(contrA(), "technician", "First Name")
 	if code != 200 {
 		t.Fatalf("add: %d %v", code, resp)
 	}
@@ -114,10 +114,10 @@ func TestPersonAddedAgain(t *testing.T) {
 		t,
 		`UPDATE identity.users SET last_sign_in_at = $2 WHERE id = $1`,
 		user,
-		clock,
+		clock(),
 	) // as if they had signed in
 
-	for name, a := range map[string]*actor{"the same company": &contrA, "another company": &contrB} {
+	for name, a := range map[string]*actor{"the same company": contrA(), "another company": contrB()} {
 		if code, res := add(
 			a,
 			"contractor",
@@ -130,7 +130,7 @@ func TestPersonAddedAgain(t *testing.T) {
 
 	remove(first, firstMembership)
 
-	code, resp = add(&contrA, "contractor", "Second Name")
+	code, resp = add(contrA(), "contractor", "Second Name")
 	if code != 200 || data(resp)["status"] != "invited" ||
 		data(resp)["membershipId"] == firstMembership {
 		t.Fatalf("added again: %d %v", code, resp)
@@ -174,17 +174,17 @@ func TestPersonAddedAgain(t *testing.T) {
 
 	code, resp = write(
 		srv,
-		&hq,
+		hq(),
 		"members.save",
 		`{"userId":"`+user+`","organizationId":"`+seed.ID("org-contractor-b").
 			String()+
 			`","role":"technician","employment":"external",`+
 			`"permissions":["alert.read"],"scopes":[{"kind":"unit","id":"`+seed.ID("unit-non-rto").
 			String()+
-			`"}],"validFrom":"`+clock.Format(
+			`"}],"validFrom":"`+clock().Format(
 			time.RFC3339,
 		)+
-			`","validUntil":"`+clock.Add(30*24*time.Hour).
+			`","validUntil":"`+clock().Add(30*24*time.Hour).
 			Format(time.RFC3339)+
 			`","reason":"joins contractor B"}`,
 		0,
@@ -231,7 +231,7 @@ func TestPersonOfAnotherTenant(t *testing.T) {
 		seed.ID("tenant-b"),
 		user,
 		seed.ID("org-customer-tb"),
-		clock.Add(-48*time.Hour),
+		clock().Add(-48*time.Hour),
 	)
 	owner(
 		t,
@@ -241,8 +241,8 @@ func TestPersonOfAnotherTenant(t *testing.T) {
 		seed.ID("tenant-a"),
 		user,
 		seed.ID("org-contractor-a"),
-		clock.Add(-48*time.Hour),
-		clock.Add(-24*time.Hour),
+		clock().Add(-48*time.Hour),
+		clock().Add(-24*time.Hour),
 	)
 	t.Cleanup(func() {
 		owner(t, `DELETE FROM identity.memberships WHERE id = ANY($1)`, []uuid.UUID{foreign, local})
@@ -251,9 +251,9 @@ func TestPersonOfAnotherTenant(t *testing.T) {
 
 	code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.save",
-		`{"email":"`+email+`","partnerRole":"technician","displayName":"Foreign","accessUntil":"`+clock.Add(24*time.Hour).
+		`{"email":"`+email+`","partnerRole":"technician","displayName":"Foreign","accessUntil":"`+clock().Add(24*time.Hour).
 			Format(time.RFC3339)+
 			`"}`,
 		0,
@@ -299,8 +299,8 @@ func TestAccountSwitchedByMembership(t *testing.T) {
 		seed.ID("tenant-a"),
 		user,
 		seed.ID("org-contractor-b"),
-		clock.Add(-24*time.Hour),
-		clock.Add(10*24*time.Hour),
+		clock().Add(-24*time.Hour),
+		clock().Add(10*24*time.Hour),
 	)
 
 	var id string
@@ -314,7 +314,7 @@ func TestAccountSwitchedByMembership(t *testing.T) {
 			seed.ID("org-contractor-b"),
 			membership,
 			email,
-			clock.Add(-24 * time.Hour),
+			clock().Add(-24 * time.Hour),
 			seed.ID("contractor-b"),
 		},
 		&id,
@@ -330,7 +330,7 @@ func TestAccountSwitchedByMembership(t *testing.T) {
 
 		if code, res := write(
 			srv,
-			&contrB,
+			contrB(),
 			"partnerUsers.save",
 			`{"id":"`+id+`","email":"`+email+`","partnerRole":"technician","status":"`+status+`","reason":"on leave"}`,
 			v,
@@ -389,7 +389,7 @@ func TestClientAddedAgain(t *testing.T) {
 	add := func(role string) (int, map[string]any) {
 		return write(
 			srv,
-			&customerB,
+			customerB(),
 			"clientUsers.save",
 			`{"customerId":"`+cust+`","email":"`+email+`","clientRole":"`+role+`","displayName":"Client Again"}`,
 			0,
@@ -410,7 +410,7 @@ func TestClientAddedAgain(t *testing.T) {
 
 	if code, resp := write(
 		srv,
-		&customerB,
+		customerB(),
 		"clientUsers.remove",
 		`{"id":"`+asStr(t, data(res)["id"])+`","reason":"should be an owner"}`,
 		1,
@@ -422,7 +422,7 @@ func TestClientAddedAgain(t *testing.T) {
 		t,
 		`UPDATE identity.memberships SET valid_from = $2::timestamptz - interval '1 hour', valid_until = $2 WHERE id = $1`,
 		first,
-		clock,
+		clock(),
 	)
 
 	code, res = add("owner")
@@ -437,8 +437,8 @@ func TestClientAddedAgain(t *testing.T) {
 			t,
 			`UPDATE identity.memberships SET valid_from = $2, valid_until = $3 WHERE id = $1`,
 			again,
-			clock.Add(-time.Hour),
-			clock.Add(-30*time.Minute),
+			clock().Add(-time.Hour),
+			clock().Add(-30*time.Minute),
 		)
 	})
 
@@ -494,10 +494,10 @@ func TestAccountProviderTrouble(t *testing.T) {
 
 		code, res := write(
 			srv,
-			&contrA,
+			contrA(),
 			"partnerUsers.save",
 			`{"email":"`+email+`","partnerRole":"technician","displayName":"Trouble Tech",`+
-				`"accessUntil":"`+clock.Add(30*24*time.Hour).
+				`"accessUntil":"`+clock().Add(30*24*time.Hour).
 				Format(time.RFC3339)+
 				`"}`,
 			0,
@@ -540,7 +540,7 @@ func TestAccountProviderTrouble(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.resendInvite",
 		`{"id":"`+id+`"}`,
 		0,
@@ -557,7 +557,7 @@ func TestAccountProviderTrouble(t *testing.T) {
 	// removed, then added again while the provider no longer knows the account: a new one is opened
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.remove",
 		`{"id":"`+id+`","reason":"left"}`,
 		1,
@@ -570,7 +570,7 @@ func TestAccountProviderTrouble(t *testing.T) {
 		t,
 		`UPDATE identity.memberships SET valid_from = $2::timestamptz - interval '1 hour', valid_until = $2 WHERE id = $1`,
 		membership,
-		clock,
+		clock(),
 	) // removed after the adding
 	fake.mu.Lock()
 	fake.lost, fake.generation = map[string]bool{"sub-" + email: true}, 2
@@ -622,11 +622,11 @@ func TestAccountsPerOrgPerDay(t *testing.T) {
 				role,
 				employment,
 				clientRole,
-				clock.Add(
+				clock().Add(
 					-3*time.Hour,
 				),
-				clock.Add(-2*time.Hour),
-				clock.Add(-time.Hour-time.Duration(idx)*time.Minute),
+				clock().Add(-2*time.Hour),
+				clock().Add(-time.Hour-time.Duration(idx)*time.Minute),
 			)
 		}
 	}
@@ -639,10 +639,10 @@ func TestAccountsPerOrgPerDay(t *testing.T) {
 	// (other tests may have added to contractor B since, which only shortens it)
 	code, res := write(
 		srv,
-		&contrB,
+		contrB(),
 		"partnerUsers.save",
 		`{"email":"cap-`+uuid.NewString()[:8]+`@example.com","partnerRole":"technician","displayName":"Cap Tech",`+
-			`"accessUntil":"`+clock.Add(24*time.Hour).
+			`"accessUntil":"`+clock().Add(24*time.Hour).
 			Format(time.RFC3339)+
 			`"}`,
 		0,
@@ -666,18 +666,18 @@ func TestAccountsPerOrgPerDay(t *testing.T) {
 			0,
 		)
 	}
-	if code, m := add(&customerB); code != 429 || m["messageKey"] != "errors.too_many_accounts" {
+	if code, m := add(customerB()); code != 429 || m["messageKey"] != "errors.too_many_accounts" {
 		t.Errorf("customer owner over the cap: %d %v", code, m)
 	}
 
-	code, res = add(&hq)
+	code, res = add(hq())
 	if code != 200 {
 		t.Fatalf("HQ is not limited: %d %v", code, res)
 	}
 
 	if code, resp := write(
 		srv,
-		&hq,
+		hq(),
 		"clientUsers.remove",
 		`{"id":"`+asStr(t, data(res)["id"])+`","reason":"cap test"}`,
 		1,

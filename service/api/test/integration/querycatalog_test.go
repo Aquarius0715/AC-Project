@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"encoding/csv"
@@ -25,7 +25,7 @@ func TestQueryCatalogFilters(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	rows, err := csv.NewReader(file).ReadAll()
 	if err != nil {
@@ -43,7 +43,7 @@ func TestQueryCatalogFilters(t *testing.T) {
 		newUnit(t, srv, "Query catalog AC"),
 		seed.ID("org-customer-b").String(),
 		"warning",
-		clock.Add(-time.Hour),
+		clock().Add(-time.Hour),
 	) // the seed has no alerts
 	// input wraps the Query of operations whose input is not a bare Query
 	input := map[string]func(q string) string{
@@ -178,7 +178,7 @@ func TestQueryCatalogFilters(t *testing.T) {
 	}
 	// operations whose parent record does not exist here: the filter checks still run first
 	missingParent := map[string]bool{"mrv.versions": true}
-	callers := []*actor{&hq, &restrMgr, &contrA, &techA, &customerA}
+	callers := []*actor{hq(), restrMgr(), contrA(), techA(), customerA()}
 
 	for _, row := range rows[1:] {
 		operation := row[0]

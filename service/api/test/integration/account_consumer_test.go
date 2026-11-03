@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -59,8 +59,8 @@ func TestAccountConsumerApart(t *testing.T) {
 		tenant,
 		user,
 		seed.ID("org-contractor-b"),
-		clock.Add(-24*time.Hour),
-		clock.Add(10*24*time.Hour),
+		clock().Add(-24*time.Hour),
+		clock().Add(10*24*time.Hour),
 	)
 
 	emit := func(kind, payload string) uuid.UUID {
@@ -92,9 +92,10 @@ func TestAccountConsumerApart(t *testing.T) {
 			tenant,
 			bad,
 			`{"id":"` + bad.String() + `","actorId":"split-test","actorRole":"nobody","action":"split.test",` +
-				`"targetKind":"test","targetId":"x","occurredAt":"` + clock.Format(
+				`"targetKind":"test","targetId":"x","occurredAt":"` + clock().Format(
 				time.RFC3339,
-			) + `","correlationId":"test-ir511","result":"success"}`,
+			) +
+				`","correlationId":"test-ir511","result":"success"}`,
 		},
 		&bad,
 	)

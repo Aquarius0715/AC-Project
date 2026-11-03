@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"slices"
@@ -50,7 +50,7 @@ func TestAlertEvidence(t *testing.T) {
 	srv := server(t)
 	unit := newUnit(t, srv, "Evidence AC")
 	org := seed.ID("org-customer-b").String()
-	free := newAlert(t, unit, org, "critical", clock.Add(-30*time.Minute)) // no policy
+	free := newAlert(t, unit, org, "critical", clock().Add(-30*time.Minute)) // no policy
 	detected := uuid.NewString()
 	owner(
 		t,
@@ -64,28 +64,28 @@ func TestAlertEvidence(t *testing.T) {
 		"temperature",
 		31,
 		"°C",
-		clock.Add(-40*time.Minute),
+		clock().Add(-40*time.Minute),
 		"valid",
 	) // before the detection
-	after := reading(t, unit, "temperature", 26, "°C", clock.Add(-5*time.Minute), "valid")
+	after := reading(t, unit, "temperature", 26, "°C", clock().Add(-5*time.Minute), "valid")
 	twin := reading(
 		t,
 		unit,
 		"humidity",
 		55,
 		"%",
-		clock.Add(-5*time.Minute),
+		clock().Add(-5*time.Minute),
 		"valid",
 	) // observed with it: the ID decides
-	suspect := reading(t, unit, "temperature", 99, "°C", clock.Add(-4*time.Minute), "suspect")
-	co2 := reading(t, unit, "co2", 650, "ppm", clock.Add(-3*time.Minute), "valid")
+	suspect := reading(t, unit, "temperature", 99, "°C", clock().Add(-4*time.Minute), "suspect")
+	co2 := reading(t, unit, "co2", 650, "ppm", clock().Add(-3*time.Minute), "valid")
 	estimate := reading(
 		t,
 		unit,
 		"temperature",
 		25,
 		"°C",
-		clock.Add(-2*time.Minute),
+		clock().Add(-2*time.Minute),
 		"valid",
 	) // estimated, not a remeasurement
 	owner(
@@ -103,21 +103,21 @@ func TestAlertEvidence(t *testing.T) {
 		return post(srv, a, "alerts.evidence", `{"alertId":"`+alert+`","query":{}}`)
 	}
 
-	code, resp := evidence(&hq, free)
+	code, resp := evidence(hq(), free)
 	if code != 200 {
 		t.Fatalf("evidence: %d %v", code, resp)
 	}
 
 	kinds := func(m map[string]any) string {
 		got := []string{}
-		for _, it := range items(m) {
+		for _, it := range items(t, m) {
 			got = append(got, asStr(t, it["kind"])+":"+asStr(t, it["id"]))
 		}
 
 		return strings.Join(got, ",")
 	}
 	byID := func(m map[string]any, id string) map[string]any {
-		for _, it := range items(m) {
+		for _, it := range items(t, m) {
 			if it["id"] == id {
 				return it
 			}
@@ -153,17 +153,17 @@ func TestAlertEvidence(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"alerts.evidence",
 		`{"alertId":"`+free+`","query":{"limit":1}}`,
-	); code != 200 || len(items(res)) != 1 || asNum(t, data(res)["total"]) != 4 ||
+	); code != 200 || len(items(t, res)) != 1 || asNum(t, data(res)["total"]) != 4 ||
 		data(res)["nextCursor"] == nil {
 		t.Errorf("paged: %d %v", code, res)
 	}
 	// the allowed sorts: observedAt (oldest first: the detection) and id
 	if _, res := post(
 		srv,
-		&hq,
+		hq(),
 		"alerts.evidence",
 		`{"alertId":"`+free+`","query":{"sort":{"field":"observedAt","direction":"asc"}}}`,
 	); !strings.HasPrefix(kinds(res), "detection:"+detected+",") ||
@@ -176,17 +176,17 @@ func TestAlertEvidence(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&hq,
+		hq(),
 		"alerts.evidence",
 		`{"alertId":"`+free+`","query":{"sort":{"field":"id","direction":"desc"}}}`,
-	); items(res)[0]["id"] != all[3] ||
-		items(res)[3]["id"] != all[0] {
+	); items(t, res)[0]["id"] != all[3] ||
+		items(t, res)[3]["id"] != all[0] {
 		t.Errorf("id desc: %s", kinds(res))
 	}
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"alerts.evidence",
 		`{"alertId":"00000000-0000-0000-0000-000000000000","query":{}}`,
 	); code != 422 ||
@@ -196,7 +196,7 @@ func TestAlertEvidence(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"alerts.evidence",
 		`{"alertId":"`+free+`","query":{"filters":{"kind":"x"}}}`,
 	); code != 422 ||
@@ -204,11 +204,11 @@ func TestAlertEvidence(t *testing.T) {
 		t.Errorf("no filters: %d %s", code, fields(res))
 	}
 
-	if code, _ := evidence(&customerB, free); code != 403 {
+	if code, _ := evidence(customerB(), free); code != 403 {
 		t.Errorf("clients do not resolve: %d", code)
 	}
 
-	if code, _ := evidence(&hq, uuid.NewString()); code != 404 {
+	if code, _ := evidence(hq(), uuid.NewString()); code != 404 {
 		t.Error("unknown alert")
 	}
 
@@ -230,7 +230,7 @@ func TestAlertEvidence(t *testing.T) {
 
 		return write(
 			srv,
-			&hq,
+			hq(),
 			"alerts.resolve",
 			`{"alertId":"`+alert+`","resolutionReason":"window closed","resolutionEvidenceIds":`+list+`}`,
 			v,
@@ -293,11 +293,11 @@ func TestAlertEvidence(t *testing.T) {
 		unit,
 		org,
 		policy,
-		clock.Add(-20*time.Minute),
+		clock().Add(-20*time.Minute),
 	)
 
-	_, resp = evidence(&hq, ruled)
-	if len(items(resp)) != 1 || items(resp)[0]["id"] != after {
+	_, resp = evidence(hq(), ruled)
+	if len(items(t, resp)) != 1 || items(t, resp)[0]["id"] != after {
 		t.Errorf("rule alert: temperature readings only: %v", resp)
 	}
 

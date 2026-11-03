@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -10,7 +10,7 @@ func TestUnitDetail(t *testing.T) {
 	srv := server(t)
 	code, res := post(
 		srv,
-		&customerA,
+		customerA(),
 		"units.get",
 		`{"id":"`+seed.ID("unit-online-rto").String()+`"}`,
 	)
@@ -36,7 +36,7 @@ func TestUnitDetail(t *testing.T) {
 		t.Error("pendingCommandIds array")
 	}
 	// the seeded applied temperature limit restricts the Lobby AC (IR46)
-	_, res = post(srv, &customerA, "units.get", `{"id":"`+seed.ID("unit-limited").String()+`"}`)
+	_, res = post(srv, customerA(), "units.get", `{"id":"`+seed.ID("unit-limited").String()+`"}`)
 
 	p := asObj(t, data(res)["effectiveControlPolicy"])
 	if p["state"] != "restricted" || p["phase"] != "applied" ||

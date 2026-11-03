@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -32,7 +32,7 @@ func TestBootstrapAdmin(t *testing.T) {
 	if err != nil {
 		t.Skip(err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	run := func(req bootstrap.Input) (bootstrap.Result, error) {
 		var r bootstrap.Result
@@ -54,7 +54,7 @@ func TestBootstrapAdmin(t *testing.T) {
 		Organization: "HQ " + tag,
 		Email:        "first-admin-" + tag + "@example.com",
 		Name:         "First Admin",
-		At:           clock,
+		At:           clock(),
 	}
 	for name, bad := range map[string]bootstrap.Input{
 		"no tenant":  {Organization: "HQ", Email: input.Email, Name: input.Name, Tenant: "", At: time.Time{}},
@@ -157,7 +157,7 @@ func TestBootstrapAdmin(t *testing.T) {
 		ctx,
 		apiserver.Config{
 			DatabaseURL:       testDB("ac_app_login"),
-			Clock:             clockFunc,
+			Clock:             clock,
 			IdentityProvider:  fake,
 			Domains:           ops.Domains,
 			DatabaseReaderURL: "",
@@ -206,8 +206,12 @@ func TestBootstrapAdmin(t *testing.T) {
 		t.Fatalf("the sign-in account: %+v", fake.created)
 	}
 
-	req := httptest.NewRequest(
-		ops.ClientRequest("members.list", `{"limit":100}`),
+	method, target, reqBody := ops.ClientRequest("members.list", `{"limit":100}`)
+	req := httptest.NewRequestWithContext(
+		t.Context(),
+		method,
+		target,
+		reqBody,
 	) // the new tenant's headers, not tenant-a's
 	req.Header.Set("Authorization", "Bearer tok-boot-"+tag)
 	req.Header.Set("X-Tenant-Id", result.TenantID.String())
@@ -219,8 +223,9 @@ func TestBootstrapAdmin(t *testing.T) {
 	var m map[string]any
 
 	_ = json.Unmarshal(rec.Body.Bytes(), &m)
-	if rec.Code != 200 || len(items(m)) != 1 || items(m)[0]["id"] != result.MembershipID.String() ||
-		!slices.Contains(toStrings(items(m)[0]["permissions"]), "identity.write") {
+	if rec.Code != 200 || len(items(t, m)) != 1 ||
+		items(t, m)[0]["id"] != result.MembershipID.String() ||
+		!slices.Contains(toStrings(items(t, m)[0]["permissions"]), "identity.write") {
 		t.Fatalf("the administrator lists the tenant's memberships: %d %v", rec.Code, m)
 	}
 }

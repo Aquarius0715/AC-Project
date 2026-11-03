@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -14,9 +14,9 @@ import (
 // A refusal of the input (VALIDATION) and a refused read leave none.
 func TestDeniedWritesAudited(t *testing.T) {
 	srv := server(t)
-	day := `"from":"` + clock.Add(-24*time.Hour).
+	day := `"from":"` + clock().Add(-24*time.Hour).
 		Format(time.RFC3339) +
-		`","to":"` + clock.Add(time.Hour).
+		`","to":"` + clock().Add(time.Hour).
 		Format(time.RFC3339) +
 		`"`
 	denied := func(action, actor string) []map[string]any {
@@ -25,13 +25,13 @@ func TestDeniedWritesAudited(t *testing.T) {
 
 		_, res := post(
 			srv,
-			&hq,
+			hq(),
 			"audit.list",
 			`{"filters":{`+day+`,"result":"denied","actorId":"`+actor+`"},"limit":100}`,
 		)
 		out := []map[string]any{}
 
-		for _, a := range items(res) {
+		for _, a := range items(t, res) {
 			if a["action"] == action {
 				out = append(out, a)
 			}
@@ -52,7 +52,7 @@ func TestDeniedWritesAudited(t *testing.T) {
 	for range 2 {
 		if code, res := write(
 			srv,
-			&contrA,
+			contrA(),
 			"units.archive",
 			`{"id":"`+unit+`","reason":"probe"}`,
 			1,
@@ -87,12 +87,18 @@ func TestDeniedWritesAudited(t *testing.T) {
 	}
 
 	// scope: a contractor reviewing a job HQ keeps in-house (NOT_FOUND) — the job it asked for is the target
-	_, m := write(srv, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	_, m := write(
+		srv,
+		customerA(),
+		"jobs.create",
+		jobBody(seed.ID("unit-non-rto").String(), nil),
+		0,
+	)
 
 	job := asStr(t, data(m)["id"])
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"jobs.review",
 		`{"jobId":"`+job+`","reportVersion":1,"decision":"accept","reviewMode":"normal"}`,
 		1,
@@ -112,7 +118,7 @@ func TestDeniedWritesAudited(t *testing.T) {
 		t.Errorf("the scope refusal records the job asked for: %v", target)
 	}
 	// a refused read is not audited
-	if code, _ := post(srv, &contrA, "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
+	if code, _ := post(srv, contrA(), "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
 		t.Errorf("a contractor reads an in-house job: %d", code)
 	}
 
@@ -122,7 +128,7 @@ func TestDeniedWritesAudited(t *testing.T) {
 	// the input's own refusal is not a denial
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"units.archive",
 		`{"id":"`+unit+`","reason":""}`,
 		1,

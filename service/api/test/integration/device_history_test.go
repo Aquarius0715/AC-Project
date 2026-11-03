@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"strings"
@@ -16,7 +16,7 @@ func TestDeviceHistory(t *testing.T) {
 	unit := newUnit(t, srv, "Hist AC")
 	_, resp := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.register",
 		`{"serial":"HI-`+uuid.NewString()[:8]+`","sensorTypes":["temperature"],"unitId":"`+unit+`"}`,
 		0,
@@ -26,20 +26,20 @@ func TestDeviceHistory(t *testing.T) {
 
 	write(
 		srv,
-		&hq,
+		hq(),
 		"devices.bind",
 		`{"deviceId":"`+dev+`","unitId":"`+unit+`","reason":"install"}`,
 		1,
 	)
 	write(
 		srv,
-		&hq,
+		hq(),
 		"devices.calibrate",
 		`{"deviceId":"`+dev+`","sensorId":"`+sensor+`","metric":"temperature","unit":"°C","referenceValue":25,`+
 			`"measuredValue":25.2,"calibratedAt":"2026-09-14T00:10:00Z"}`,
 		2,
 	)
-	write(srv, &hq, "devices.check", `{"id":"`+dev+`"}`, 3)
+	write(srv, hq(), "devices.check", `{"id":"`+dev+`"}`, 3)
 
 	ev := uuid.NewString()
 	owner(
@@ -51,38 +51,38 @@ func TestDeviceHistory(t *testing.T) {
 		seed.ID("tenant-a"),
 		dev,
 		unit,
-		clock,
+		clock(),
 	) // after the binding (bound at the test clock)
 
 	for _, operation := range []string{"devices.operations", "devices.calibrations"} {
-		code, m := post(srv, &hq, operation, `{"deviceId":"`+dev+`","query":{}}`)
-		if code != 200 || len(items(m)) != 1 {
+		code, m := post(srv, hq(), operation, `{"deviceId":"`+dev+`","query":{}}`)
+		if code != 200 || len(items(t, m)) != 1 {
 			t.Fatalf("%s: %d %v", operation, code, m)
 		}
 
-		if items(m)[0]["unitIdAtOccurrence"] != unit {
+		if items(t, m)[0]["unitIdAtOccurrence"] != unit {
 			t.Errorf("%s: occurrence scope missing", operation)
 		}
 	}
 
-	code, resp := post(srv, &hq, "devices.events", `{"id":"`+dev+`","query":{"limit":10}}`)
-	if code != 200 || len(items(resp)) != 1 || items(resp)[0]["eventType"] != "tamper" {
+	code, resp := post(srv, hq(), "devices.events", `{"id":"`+dev+`","query":{"limit":10}}`)
+	if code != 200 || len(items(t, resp)) != 1 || items(t, resp)[0]["eventType"] != "tamper" {
 		t.Fatalf("events: %d %v", code, resp)
 	}
 	// customer-b (owner of the bound unit) reads events; customer-a gets NOT_FOUND
 	if code, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"devices.events",
 		`{"id":"`+dev+`","query":{}}`,
 	); code != 200 ||
-		len(items(res)) != 1 {
+		len(items(t, res)) != 1 {
 		t.Error("customer-b sees events of its binding")
 	}
 
 	if code, _ := post(
 		srv,
-		&customerA,
+		customerA(),
 		"devices.events",
 		`{"id":"`+dev+`","query":{}}`,
 	); code != 404 {
@@ -91,7 +91,7 @@ func TestDeviceHistory(t *testing.T) {
 
 	if code, _ := post(
 		srv,
-		&customerB,
+		customerB(),
 		"devices.operations",
 		`{"deviceId":"`+dev+`","query":{}}`,
 	); code != 403 {
@@ -103,7 +103,7 @@ func TestDeviceHistory(t *testing.T) {
 		`{"query":{}}`: "deviceId=error.invalid",
 		`{"deviceId":"` + dev + `","query":{"sort":{"field":"kind","direction":"asc"}}}`: "sort.field=error.invalid",
 	} {
-		code, m := post(srv, &hq, "devices.operations", b)
+		code, m := post(srv, hq(), "devices.operations", b)
 		refusal(t, b, code, m, want)
 	}
 	// response notes (DeviceEvent.version)
@@ -117,7 +117,7 @@ func TestDeviceHistory(t *testing.T) {
 		)
 	}
 	if code, res := note(
-		&hq,
+		hq(),
 		"  cover reattached  ",
 		1,
 	); code != 200 || len(asArr(t, data(res)["responseNotes"])) != 1 ||
@@ -125,16 +125,16 @@ func TestDeviceHistory(t *testing.T) {
 		t.Fatalf("note: %d %v", code, res)
 	}
 
-	if code, _ := note(&hq, "again", 1); code != 409 {
+	if code, _ := note(hq(), "again", 1); code != 409 {
 		t.Error("stale event version")
 	}
 
-	if code, m := note(&hq, "   ", 2); code != 422 || fields(m) != "responseNote=error.length" {
+	if code, m := note(hq(), "   ", 2); code != 422 || fields(m) != "responseNote=error.length" {
 		t.Errorf("blank note: %d %s", code, fields(m))
 	}
 
 	if code, res := note(
-		&hq,
+		hq(),
 		strings.Repeat("x", 1001),
 		2,
 	); code != 422 ||
@@ -144,7 +144,7 @@ func TestDeviceHistory(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.addResponseNote",
 		`{"deviceId":"`+dev+`","eventId":"`+uuid.NewString()+`","responseNote":"x"}`,
 		1,
@@ -160,7 +160,7 @@ func TestDeviceHistory(t *testing.T) {
 		unit,
 	)
 
-	if code, _ := note(&techInt, "tech note", 2); code != 404 && code != 403 {
+	if code, _ := note(techInt(), "tech note", 2); code != 404 && code != 403 {
 		t.Errorf("technician without assignment: %d", code)
 	}
 
@@ -171,7 +171,7 @@ func TestDeviceHistory(t *testing.T) {
 		seed.ID("tech-internal-a"),
 		seed.ID("org-customer-b"),
 	)
-	assign(t, unit, "tech-internal-a", clock.Add(-time.Hour), clock.Add(time.Hour), "active")
+	assign(t, unit, "tech-internal-a", clock().Add(-time.Hour), clock().Add(time.Hour), "active")
 	owner(
 		t,
 		`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES ($1,$2,'unit',$3) ON CONFLICT
@@ -181,7 +181,7 @@ func TestDeviceHistory(t *testing.T) {
 		unit,
 	)
 
-	if code, m := note(&techInt, "tech note", 2); code != 200 {
+	if code, m := note(techInt(), "tech note", 2); code != 200 {
 		t.Fatalf("assigned technician note: %d %v", code, m)
 	}
 }
@@ -194,7 +194,7 @@ func TestDeviceBindingRefusals(t *testing.T) {
 	register := func(prefix string) map[string]any {
 		_, res := write(
 			srv,
-			&hq,
+			hq(),
 			"devices.register",
 			`{"serial":"`+prefix+`-`+uuid.NewString()[:8]+`","sensorTypes":["temperature"],"unitId":"`+unit+`"}`,
 			0,
@@ -207,7 +207,7 @@ func TestDeviceBindingRefusals(t *testing.T) {
 	sensor := asStr(t, asObj(t, asArr(t, second["sensors"])[0])["id"])
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.calibrate",
 		`{"deviceId":"`+asStr(
 			t,
@@ -222,7 +222,7 @@ func TestDeviceBindingRefusals(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.bind",
 		`{"deviceId":"`+asStr(t, first["id"])+`","unitId":"`+unit+`","reason":"install"}`,
 		1,
@@ -232,7 +232,7 @@ func TestDeviceBindingRefusals(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.bind",
 		`{"deviceId":"`+asStr(t, second["id"])+`","unitId":"`+unit+`","reason":"install"}`,
 		1,

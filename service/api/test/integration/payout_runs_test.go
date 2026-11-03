@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -71,7 +71,7 @@ func TestMonthlyPayoutDrafts(t *testing.T) {
 
 		tick++
 
-		_, err := schedTick(ctx, srv, clock.Add(time.Duration(tick)*time.Minute))
+		_, err := schedTick(ctx, srv, clock().Add(time.Duration(tick)*time.Minute))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -149,7 +149,7 @@ func TestMonthlyPayoutDrafts(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"payouts.transition",
 		`{"statementId":"`+draft+`","action":"approve"}`,
 		v,

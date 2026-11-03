@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"maps"
@@ -22,7 +22,7 @@ func TestFirmwareCampaigns(t *testing.T) {
 		u := newUnit(t, srv, "FW AC")
 		_, res := write(
 			srv,
-			&hq,
+			hq(),
 			"devices.register",
 			`{"serial":"FW-`+uuid.NewString()[:8]+`","sensorTypes":[],"unitId":"`+u+`"}`,
 			0,
@@ -30,7 +30,7 @@ func TestFirmwareCampaigns(t *testing.T) {
 		devs = append(devs, `"`+asStr(t, data(res)["id"])+`"`)
 	}
 
-	start := clock.Add(48 * time.Hour).Format(time.RFC3339)
+	start := clock().Add(48 * time.Hour).Format(time.RFC3339)
 	body := func(extra map[string]string) string {
 		f := map[string]string{
 			"modelId":                 `"` + model + `"`,
@@ -51,7 +51,7 @@ func TestFirmwareCampaigns(t *testing.T) {
 		return "{" + strings.Join(parts, ",") + "}"
 	}
 
-	code, resp := write(srv, &hq, "firmwareCampaigns.schedule", body(nil), 0)
+	code, resp := write(srv, hq(), "firmwareCampaigns.schedule", body(nil), 0)
 	if code != 200 || data(resp)["state"] != "scheduled" ||
 		len(asArr(t, data(resp)["results"])) != 3 ||
 		!strings.HasPrefix(asStr(t, data(resp)["checksum"]), "sha256:") ||
@@ -68,7 +68,7 @@ func TestFirmwareCampaigns(t *testing.T) {
 	tu := newUnit(t, srv, "FW AC")
 	_, tm := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.register",
 		`{"serial":"FW-`+uuid.NewString()[:8]+`","sensorTypes":[],"unitId":"`+tu+`"}`,
 		0,
@@ -78,7 +78,7 @@ func TestFirmwareCampaigns(t *testing.T) {
 
 	_, om := write(
 		srv,
-		&hq,
+		hq(),
 		"units.save",
 		`{"customerOrgId":"`+seed.ID("org-customer-b").
 			String()+
@@ -92,7 +92,7 @@ func TestFirmwareCampaigns(t *testing.T) {
 
 	_, od := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.register",
 		`{"serial":"FW-`+uuid.NewString()[:8]+`","sensorTypes":[],"unitId":"`+asStr(
 			t,
@@ -106,7 +106,7 @@ func TestFirmwareCampaigns(t *testing.T) {
 	} {
 		if code, res := write(
 			srv,
-			&hq,
+			hq(),
 			"firmwareCampaigns.schedule",
 			body(map[string]string{"deviceIds": `["` + c.device + `"]`}),
 			0,
@@ -117,7 +117,7 @@ func TestFirmwareCampaigns(t *testing.T) {
 	}
 
 	bad := map[string]map[string]string{
-		"start < 24 h":        {"startAt": `"` + clock.Add(time.Hour).Format(time.RFC3339) + `"`},
+		"start < 24 h":        {"startAt": `"` + clock().Add(time.Hour).Format(time.RFC3339) + `"`},
 		"waves not ascending": {"waves": `[{"label":"A","percent":50},{"label":"B","percent":40}]`},
 		"waves end < 100":     {"waves": `[{"label":"A","percent":50}]`},
 		"auto pause 60":       {"autoPauseFailurePercent": "60"},
@@ -129,7 +129,7 @@ func TestFirmwareCampaigns(t *testing.T) {
 		"unknown model":       {"modelId": `"` + seed.ID("ventilation-demo-b").String() + `"`},
 	}
 	for name, e := range bad {
-		code, res := write(srv, &hq, "firmwareCampaigns.schedule", body(e), 0)
+		code, res := write(srv, hq(), "firmwareCampaigns.schedule", body(e), 0)
 		if name == "unknown model" { // not a VALIDATION: the model is NOT_FOUND
 			if code != 404 {
 				t.Errorf("%s: %d", name, code)
@@ -150,17 +150,17 @@ func TestFirmwareCampaigns(t *testing.T) {
 	// list / get
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"firmwareCampaigns.list",
 		`{"filters":{"modelId":"`+model+`","status":"scheduled"},"limit":100}`,
 	); code != 200 ||
-		len(items(res)) == 0 {
+		len(items(t, res)) == 0 {
 		t.Fatalf("list: %d", code)
 	}
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"firmwareCampaigns.list",
 		`{"filters":{"status":"x"}}`,
 	); code != 422 ||
@@ -170,21 +170,21 @@ func TestFirmwareCampaigns(t *testing.T) {
 
 	if code, _ := post(
 		srv,
-		&hq,
+		hq(),
 		"firmwareCampaigns.get",
 		`{"id":"`+uuid.NewString()+`"}`,
 	); code != 404 {
 		t.Error("unknown campaign")
 	}
 
-	if code, _ := post(srv, &customerA, "firmwareCampaigns.list", `{}`); code != 403 {
+	if code, _ := post(srv, customerA(), "firmwareCampaigns.list", `{}`); code != 403 {
 		t.Error("client")
 	}
 	// control transitions
 	ctl := func(action, extra string, v int) (int, map[string]any) {
 		return write(
 			srv,
-			&hq,
+			hq(),
 			"firmwareCampaigns.control",
 			`{"campaignId":"`+camp+`","action":"`+action+`"`+extra+`}`,
 			v,
@@ -256,7 +256,7 @@ func TestFirmwareCampaigns(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"firmwareCampaigns.control",
 		`{"campaignId":"`+uuid.NewString()+`","action":"pause"}`,
 		1,

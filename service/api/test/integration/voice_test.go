@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -20,7 +20,7 @@ func TestVoiceAndExport(t *testing.T) {
 	}
 	bedroomA := seed.ID("unit-online-rto").String()
 
-	code, res := say(&customerA, "  Temperature BEDROOM ", "en", "")
+	code, res := say(customerA(), "  Temperature BEDROOM ", "en", "")
 	if code != 200 || data(res)["kind"] != "temperature" || data(res)["unitId"] != bedroomA {
 		t.Fatalf("temperature: %d %v", code, res)
 	}
@@ -29,7 +29,7 @@ func TestVoiceAndExport(t *testing.T) {
 		t.Error("measurement key present (object or null)")
 	}
 
-	code, res = say(&customerA, "set living room to 24 degrees", "en", "")
+	code, res = say(customerA(), "set living room to 24 degrees", "en", "")
 	if code != 200 || data(res)["kind"] != "change" || asNum(t, data(res)["celsius"]) != 24 ||
 		data(res)["expectedVersion"] == nil ||
 		data(res)["unitId"] != seed.ID("unit-non-rto").String() {
@@ -37,7 +37,7 @@ func TestVoiceAndExport(t *testing.T) {
 	}
 
 	if _, resp := say(
-		&customerA,
+		customerA(),
 		"tetapkan living room kepada 25 darjah",
 		"ms",
 		"",
@@ -49,13 +49,13 @@ func TestVoiceAndExport(t *testing.T) {
 		"help": "help", "hello there": "unsupported",
 		"temperature Lobby AC": "unsupported", "temperature garage": "unsupported",
 	} {
-		if _, m := say(&customerA, text, "en", ""); data(m)["kind"] != kind {
+		if _, m := say(customerA(), text, "en", ""); data(m)["kind"] != kind {
 			t.Errorf("%s: %v", text, m)
 		}
 	}
 
 	if _, resp := say(
-		&customerA,
+		customerA(),
 		"bantuan",
 		"ms",
 		"",
@@ -64,11 +64,11 @@ func TestVoiceAndExport(t *testing.T) {
 		t.Errorf("bantuan: %v", resp)
 	}
 
-	if _, m := say(&customerA, "help", "ms", ""); data(m)["kind"] != "unsupported" {
+	if _, m := say(customerA(), "help", "ms", ""); data(m)["kind"] != "unsupported" {
 		t.Error("English help in Malay grammar")
 	}
 	// HQ sees both customers' bedrooms → candidates, then a selection
-	code, res = say(&hq, "temperature bedroom", "en", "")
+	code, res = say(hq(), "temperature bedroom", "en", "")
 	if code != 200 || data(res)["kind"] != "candidates" ||
 		len(asArr(t, data(res)["candidates"])) < 2 {
 		t.Fatalf("candidates: %d %v", code, res)
@@ -80,7 +80,7 @@ func TestVoiceAndExport(t *testing.T) {
 	}
 
 	if _, resp := say(
-		&hq,
+		hq(),
 		"temperature bedroom",
 		"en",
 		`,"selectedUnitId":"`+bedroomA+`"`,
@@ -90,7 +90,7 @@ func TestVoiceAndExport(t *testing.T) {
 	}
 
 	if code, _ := say(
-		&hq,
+		hq(),
 		"temperature bedroom",
 		"en",
 		`,"selectedUnitId":"`+uuid.NewString()+`"`,
@@ -98,12 +98,12 @@ func TestVoiceAndExport(t *testing.T) {
 		t.Error("selection outside the candidates")
 	}
 
-	if code, m := say(&customerA, " ", "en", ""); code != 422 || fields(m) != "text=error.length" {
+	if code, m := say(customerA(), " ", "en", ""); code != 422 || fields(m) != "text=error.length" {
 		t.Errorf("blank text: %d %s", code, fields(m))
 	}
 
 	if code, resp := say(
-		&customerA,
+		customerA(),
 		"help",
 		"jp",
 		"",
@@ -112,7 +112,7 @@ func TestVoiceAndExport(t *testing.T) {
 		t.Errorf("bad locale: %d %s", code, fields(resp))
 	}
 
-	if code, _ := say(&contrA, "help", "en", ""); code != 403 {
+	if code, _ := say(contrA(), "help", "en", ""); code != 403 {
 		t.Error("contractor voice")
 	}
 
@@ -128,7 +128,7 @@ func TestVoiceAndExport(t *testing.T) {
 	homeA := `"` + seed.ID("property-home-a").String() + `"`
 	all := `"energy_cost","month_comparison","co2_offsets","alerts_maintenance"`
 
-	code, res = exp(&customerA, "2026-08", homeA, all, "csv")
+	code, res = exp(customerA(), "2026-08", homeA, all, "csv")
 	if code != 200 || data(res)["fileName"] != "energy-report-2026-08.csv" ||
 		data(res)["mime"] != "text/csv" ||
 		asNum(t, data(res)["size"]) <= 0 {
@@ -136,7 +136,7 @@ func TestVoiceAndExport(t *testing.T) {
 	}
 
 	if _, resp := exp(
-		&customerA,
+		customerA(),
 		"2026-08",
 		homeA,
 		`"energy_cost"`,
@@ -159,7 +159,7 @@ func TestVoiceAndExport(t *testing.T) {
 		"bad format":      {"2026-08", homeA, all, "xlsx", "422"},
 		"other customer":  {"2026-08", `"` + seed.ID("property-home-b").String() + `"`, all, "csv", "404"},
 	} {
-		code, m := exp(&customerA, tc[0], tc[1], tc[2], tc[3])
+		code, m := exp(customerA(), tc[0], tc[1], tc[2], tc[3])
 		if w, ok := refused[name]; ok {
 			refusal(t, name, code, m, w)
 		} else if itoa(code) != tc[4] {
@@ -167,7 +167,7 @@ func TestVoiceAndExport(t *testing.T) {
 		}
 	}
 
-	if code, _ := exp(&hq, "2026-08", homeA, all, "csv"); code != 403 {
+	if code, _ := exp(hq(), "2026-08", homeA, all, "csv"); code != 403 {
 		t.Error("HQ export")
 	}
 }

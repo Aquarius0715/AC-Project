@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"sync"
@@ -19,7 +19,7 @@ func TestSpaceArchiveRacesAUnitAdd(t *testing.T) {
 	for round := range 8 {
 		code, res := write(
 			srv,
-			&hq,
+			hq(),
 			"spaces.save",
 			`{"propertyId":"`+prop+`","parentSpaceId":null,"kind":"room","name":"Race `+uuid.NewString()[:8]+`"}`,
 			0,
@@ -42,7 +42,7 @@ func TestSpaceArchiveRacesAUnitAdd(t *testing.T) {
 
 			archived, _ = write(
 				srv,
-				&hq,
+				hq(),
 				"spaces.archive",
 				`{"id":"`+space+`","reason":"closed"}`,
 				1,
@@ -55,7 +55,7 @@ func TestSpaceArchiveRacesAUnitAdd(t *testing.T) {
 
 			added, resp = write(
 				srv,
-				&hq,
+				hq(),
 				"units.save",
 				`{"customerOrgId":"`+seed.ID("org-customer-b").
 					String()+
@@ -66,7 +66,7 @@ func TestSpaceArchiveRacesAUnitAdd(t *testing.T) {
 				0,
 			)
 			if added == 200 {
-				unit = data(resp)["id"].(string)
+				unit, _ = data(resp)["id"].(string) // for the failure message only: no t.Fatal off the test goroutine
 			}
 		}()
 

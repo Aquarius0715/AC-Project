@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -69,7 +69,7 @@ func checkJobEventTitles() error {
 	if err != nil {
 		return nil // no database: the suite skipped its database tests too
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	rows, err := conn.Query(ctx, `SELECT DISTINCT action FROM maintenance.job_events`)
 	if err != nil {

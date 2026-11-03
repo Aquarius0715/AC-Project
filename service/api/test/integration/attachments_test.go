@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"encoding/base64"
@@ -19,15 +19,15 @@ func blobJSON(name, mime string, data []byte, size int) string {
 func TestAttachmentsAndSignOff(t *testing.T) {
 	srv := server(t)
 	job := assignedNow(t, srv)
-	write(srv, &techInt, "jobs.start", `{"jobId":"`+job+`","startConfirmed":true}`, 2)
-	_, res := write(srv, &techInt, "jobs.saveDraft", draftBody(job, "normal", nil), 0)
+	write(srv, techInt(), "jobs.start", `{"jobId":"`+job+`","startConfirmed":true}`, 2)
+	_, res := write(srv, techInt(), "jobs.saveDraft", draftBody(job, "normal", nil), 0)
 	rep := asStr(t, data(res)["id"])
 	img, jpg := tinyPNG(t), tinyJPEG(t)
 	flood := pngHeader(50000, 50000) // 2.5 gigapixels declared in a few dozen bytes (IR389)
 	add := func(file string, v int) (int, map[string]any) {
 		return write(
 			srv,
-			&techInt,
+			techInt(),
 			"attachments.add",
 			`{"jobId":"`+job+`","reportId":"`+rep+`","file":`+file+`}`,
 			v,
@@ -70,7 +70,7 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&techInt,
+		techInt(),
 		"attachments.add",
 		`{"jobId":"`+job+`","reportId":"`+uuid.NewString()+`","file":`+blobJSON(
 			"a.png",
@@ -101,7 +101,7 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		1,
 	)
 
-	code, res = write(srv, &techInt, "jobs.saveDraft", body, 2)
+	code, res = write(srv, techInt(), "jobs.saveDraft", body, 2)
 	if code != 200 || len(asArr(t, data(res)["attachmentRefs"])) != 1 {
 		t.Fatalf("draft with attachment: %d %v", code, res)
 	}
@@ -117,7 +117,7 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 	sign := func(extra string, v, rv int) (int, map[string]any) {
 		return write(
 			srv,
-			&techInt,
+			techInt(),
 			"reports.signOff",
 			`{"jobId":"`+job+`","reportId":"`+rep+`","reportVersion":`+itoa(
 				rv,
@@ -183,19 +183,19 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		)
 	}
 
-	code, res = get(&techInt, 3)
+	code, res = get(techInt(), 3)
 	if code != 200 || data(res)["bytes"] != base64.StdEncoding.EncodeToString(img) ||
 		data(res)["mime"] != "image/png" {
 		t.Fatalf("getContent: %d %v", code, res)
 	}
 
-	if code, _ := get(&customerA, 3); code != 404 {
+	if code, _ := get(customerA(), 3); code != 404 {
 		t.Error("client before acceptance")
 	}
 
 	if code, _ := post(
 		srv,
-		&hq,
+		hq(),
 		"attachments.getContent",
 		`{"jobId":"`+job+`","reportId":"`+rep+`","reportVersion":3,"attachmentId":"`+uuid.NewString()+`"}`,
 	); code != 404 {
@@ -204,7 +204,7 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 	// saving the draft clears the sign-off
 	if code, resp := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.saveDraft",
 		body,
 		3,

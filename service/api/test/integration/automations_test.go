@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"strings"
@@ -77,13 +77,13 @@ func TestAutomationSchedules(t *testing.T) {
 		"event fields":         {"condition": `{"type":"occupancy","occupied":true}`},
 		"unsupported action":   {"startAction": `{"kind":"set_temperature","celsius":40}`},
 	} {
-		code, m := write(srv, &customerB, "automations.save", scheduleRule(unit, e), 0)
+		code, m := write(srv, customerB(), "automations.save", scheduleRule(unit, e), 0)
 		refusal(t, name, code, m, want[name])
 	}
 
 	if code, _ := write(
 		srv,
-		&customerA,
+		customerA(),
 		"automations.save",
 		scheduleRule(unit, nil),
 		0,
@@ -99,7 +99,7 @@ func TestAutomationSchedules(t *testing.T) {
 	for _, hm := range []string{`"02:30"`, `"01:30"`} {
 		code, res := write(
 			srv,
-			&customerB,
+			customerB(),
 			"automations.save",
 			scheduleRule(
 				unit,
@@ -117,7 +117,7 @@ func TestAutomationSchedules(t *testing.T) {
 
 	code, resp := write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.save",
 		scheduleRule(
 			unit,
@@ -137,7 +137,7 @@ func TestAutomationSchedules(t *testing.T) {
 	id := asStr(t, data(resp)["id"])
 	code, resp = post(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.nextRuns",
 		`{"automationId":"`+id+`","count":8}`,
 	)
@@ -156,7 +156,7 @@ func TestAutomationSchedules(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.nextRuns",
 		`{"automationId":"`+id+`","count":5}`,
 	); code != 422 ||
@@ -166,7 +166,7 @@ func TestAutomationSchedules(t *testing.T) {
 
 	if code, _ := post(
 		srv,
-		&customerA,
+		customerA(),
 		"automations.nextRuns",
 		`{"automationId":"`+id+`","count":8}`,
 	); code != 404 {
@@ -181,7 +181,7 @@ func TestAutomationSchedules(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.save",
 		scheduleRule(unit, map[string]string{"id": `"` + id + `"`}),
 		2,
@@ -191,7 +191,7 @@ func TestAutomationSchedules(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.save",
 		`{"id":"`+id+`","name":"x",`+
 			`"unitIds":["`+unit+`"],"timezone":"UTC","enabled":false,"priority":1,"kind":"event",`+
@@ -204,18 +204,18 @@ func TestAutomationSchedules(t *testing.T) {
 
 	code, resp = write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.save",
 		scheduleRule(unit, map[string]string{"id": `"` + id + `"`, "name": `"Edited"`}),
 		1,
 	)
-	if code != 200 || ver(resp) != 2 || data(resp)["disabledReason"] != "capability_changed" {
+	if code != 200 || ver(t, resp) != 2 || data(resp)["disabledReason"] != "capability_changed" {
 		t.Fatalf("edit while disabled keeps the reason: %d %v", code, resp)
 	}
 
 	code, resp = write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.save",
 		scheduleRule(unit, map[string]string{"id": `"` + id + `"`, "enabled": "true"}),
 		2,
@@ -226,28 +226,28 @@ func TestAutomationSchedules(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.list",
 		`{"filters":{"unitId":"`+unit+`","kind":"schedule","enabled":true}}`,
 	); len(
-		items(res),
+		items(t, res),
 	) != 1 {
 		t.Errorf("list: %v", res)
 	}
 
 	if code, res := post(
 		srv,
-		&customerA,
+		customerA(),
 		"automations.list",
 		`{"filters":{"unitId":"`+unit+`"}}`,
 	); code != 200 ||
-		len(items(res)) != 0 {
+		len(items(t, res)) != 0 {
 		t.Error("another customer's list")
 	}
 
 	if code, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.list",
 		`{"filters":{"kind":"cron"}}`,
 	); code != 422 ||
@@ -255,7 +255,7 @@ func TestAutomationSchedules(t *testing.T) {
 		t.Errorf("bad kind filter: %d %s", code, fields(res))
 	}
 
-	if code, _ := post(srv, &hq, "automations.list", `{}`); code != 403 {
+	if code, _ := post(srv, hq(), "automations.list", `{}`); code != 403 {
 		t.Error("HQ lists customer rules")
 	}
 }
@@ -282,13 +282,13 @@ func TestAutomationEvents(t *testing.T) {
 			`"operator":"eq","value":30}`,
 		`{"type":"tariff","operator":"gt","value":1,"unit":"MYR_per_kWh"}`, `{"type":"location","event":"leave"}`,
 	} {
-		code, m := write(srv, &customerB, "automations.save", rule(c), 0)
+		code, m := write(srv, customerB(), "automations.save", rule(c), 0)
 		refusal(t, c, code, m, want[c])
 	}
 
 	if code, resp := write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.save",
 		rule(`{"type":"weather","metric":"temperature","operator":"gte","value":30}`),
 		0,
@@ -297,7 +297,7 @@ func TestAutomationEvents(t *testing.T) {
 		t.Fatalf("weather rule: %d %v", code, resp)
 	} else if code, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.nextRuns",
 		`{"automationId":"`+asStr(t, data(resp)["id"])+`","count":8}`,
 	); code != 422 ||
@@ -313,7 +313,7 @@ func TestAutomationEvents(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.save",
 		rule(`{"type":"location","event":"arrival"}`),
 		0,
@@ -326,7 +326,7 @@ func TestAutomationEvents(t *testing.T) {
 		t,
 		`UPDATE identity.consents SET granted = true, granted_at = $2 WHERE membership_id = $1`,
 		seed.ID("customer-b"),
-		clock,
+		clock(),
 	)
 	t.Cleanup(func() {
 		owner(
@@ -338,7 +338,7 @@ func TestAutomationEvents(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.save",
 		rule(`{"type":"location","event":"arrival"}`),
 		0,
@@ -356,7 +356,7 @@ func TestAutomationOnArchivedUnit(t *testing.T) {
 	unit := newUnit(t, srv, "Archived AC") // customer B's
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"units.archive",
 		`{"id":"`+unit+`","reason":"decommission"}`,
 		1,
@@ -372,7 +372,7 @@ func TestAutomationOnArchivedUnit(t *testing.T) {
 		&before,
 	)
 
-	code, m := write(srv, &customerB, "automations.save", scheduleRule(unit, nil), 0)
+	code, m := write(srv, customerB(), "automations.save", scheduleRule(unit, nil), 0)
 	if code != 404 || m["messageKey"] != apperr.KeyNotFound {
 		t.Fatalf("an archived unit: %d %v", code, m)
 	}

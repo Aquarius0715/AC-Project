@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -14,7 +14,7 @@ import (
 func TestOtherTechnicianCannotReadAJob(t *testing.T) {
 	srv := server(t)
 	unit := seed.ID("unit-non-rto").String()
-	from, until := clock.Add(30*time.Hour), clock.Add(32*time.Hour)
+	from, until := clock().Add(30*time.Hour), clock().Add(32*time.Hour)
 	job := assign(t, unit, "tech-external-b", from, until, "revoked")
 	owner(
 		t,
@@ -22,7 +22,7 @@ func TestOtherTechnicianCannotReadAJob(t *testing.T) {
 		job,
 	)
 
-	code, m := post(srv, &techA, "jobs.get", `{"jobId":"`+job+`"}`)
+	code, m := post(srv, techA(), "jobs.get", `{"jobId":"`+job+`"}`)
 	if code != 404 || m["messageKey"] != apperr.KeyNotFound {
 		t.Fatalf("another technician reads a job: %d %v, want 404 NOT_FOUND", code, m)
 	}

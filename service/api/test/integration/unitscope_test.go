@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -19,9 +19,9 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 	listed := func(a *actor) bool {
 		_, m := post(srv, a, "units.list", `{"limit":100,"filters":{"unitIds":["`+unit+`"]}}`)
 
-		return len(items(m)) == 1
+		return len(items(t, m)) == 1
 	}
-	if listed(&techB) || listed(&contrA) {
+	if listed(techB()) || listed(contrA()) {
 		t.Fatal("no Assignment / Offer yet: the unit is hidden")
 	}
 	// assignment created an hour ago, work window starts in an hour; no Offer yet
@@ -29,18 +29,18 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 		t,
 		unit,
 		"tech-external-b",
-		clock.Add(time.Hour),
-		clock.Add(3*time.Hour),
+		clock().Add(time.Hour),
+		clock().Add(3*time.Hour),
 		"active",
 	)
 	owner(
 		t,
 		`UPDATE maintenance.assignments SET created_at = $2 WHERE job_id = $1`,
 		job,
-		clock.Add(-time.Hour),
+		clock().Add(-time.Hour),
 	)
 
-	if listed(&techB) {
+	if listed(techB()) {
 		t.Fatal("external technician needs the accepted Offer's access window too")
 	}
 
@@ -54,26 +54,26 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 		),
 		job,
 		seed.ID("org-contractor-a"),
-		clock.Add(time.Hour),
-		clock.Add(3*time.Hour),
-		clock.Add(-2*time.Hour),
+		clock().Add(time.Hour),
+		clock().Add(3*time.Hour),
+		clock().Add(-2*time.Hour),
 	)
 
-	if !listed(&techB) {
+	if !listed(techB()) {
 		t.Fatal("inside the viewing window and the access window the unit is listed")
 	}
 
-	if !listed(&contrA) {
+	if !listed(contrA()) {
 		t.Fatal("contractor with an accepted Offer in its access window sees the unit")
 	}
 
-	if listed(&contrB) {
+	if listed(contrB()) {
 		t.Fatal("another contractor never sees it")
 	}
 
 	if code, res := post(
 		srv,
-		&techB,
+		techB(),
 		"units.get",
 		`{"id":"`+unit+`"}`,
 	); code != 403 ||
@@ -89,14 +89,14 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 		seed.ID("tenant-a"),
 		unit,
 		uuid.NewString(),
-		clock.Add(-time.Minute),
+		clock().Add(-time.Minute),
 		uuid.NewString(),
 	)
 
 	readings := func() int {
-		_, m := post(srv, &techB, "units.list", `{"limit":100,"filters":{"unitIds":["`+unit+`"]}}`)
+		_, m := post(srv, techB(), "units.list", `{"limit":100,"filters":{"unitIds":["`+unit+`"]}}`)
 
-		return len(asArr(t, items(m)[0]["latestMeasurements"]))
+		return len(asArr(t, items(t, m)[0]["latestMeasurements"]))
 	}
 	if n := readings(); n != 0 {
 		t.Fatalf("latestMeasurements before the work window: %d", n)
@@ -107,19 +107,19 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 		`UPDATE monitoring.alerts SET status = 'resolved', resolved_at = $2 WHERE unit_id = $1 AND rule_key = 'warning' AND
 			status <> 'resolved'`,
 		unit,
-		clock,
+		clock(),
 	)
 	alert := newAlert(
 		t,
 		unit,
 		seed.ID("org-customer-b").String(),
 		"warning",
-		clock.Add(-time.Minute),
+		clock().Add(-time.Minute),
 	)
 
 	alertListed := func() bool {
-		_, m := post(srv, &techB, "alerts.list", `{"limit":100,"filters":{"unitId":"`+unit+`"}}`)
-		for _, it := range items(m) {
+		_, m := post(srv, techB(), "alerts.list", `{"limit":100,"filters":{"unitId":"`+unit+`"}}`)
+		for _, it := range items(t, m) {
 			if it["id"] == alert {
 				return true
 			}
@@ -133,7 +133,7 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&techB,
+		techB(),
 		"alerts.get",
 		`{"id":"`+alert+`"}`,
 	); code != 403 ||
@@ -141,14 +141,14 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 		t.Fatalf("alerts.get before the work window: %d %v", code, res)
 	}
 
-	series := `{"from":"` + clock.Add(-time.Hour).
+	series := `{"from":"` + clock().Add(-time.Hour).
 		Format(time.RFC3339) +
-		`","to":"` + clock.Format(
+		`","to":"` + clock().Format(
 		time.RFC3339,
 	) + `","unitIds":["` + unit + `"],"metric":"temperature","query":{}}`
 	if code, res := post(
 		srv,
-		&techB,
+		techB(),
 		"telemetry.series",
 		series,
 	); code != 403 ||
@@ -156,11 +156,11 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 		t.Fatalf("telemetry before the work window: %d %v", code, res)
 	}
 
-	if code, _ := post(srv, &contrA, "alerts.get", `{"id":"`+alert+`"}`); code != 200 {
+	if code, _ := post(srv, contrA(), "alerts.get", `{"id":"`+alert+`"}`); code != 200 {
 		t.Fatalf("contractor reads the alert of its accepted job: %d", code)
 	}
 
-	if code, _ := post(srv, &contrA, "units.get", `{"id":"`+unit+`"}`); code != 200 {
+	if code, _ := post(srv, contrA(), "units.get", `{"id":"`+unit+`"}`); code != 200 {
 		t.Fatalf("contractor units.get: %d", code)
 	}
 	// work window running → equipment reads allowed; internal technicians never depend on assignments
@@ -170,18 +170,18 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 			job_id <> $2 AND scheduled && tstzrange($3, $4)`,
 		seed.ID("tech-external-b"),
 		job,
-		clock.Add(-time.Minute),
-		clock.Add(time.Hour),
+		clock().Add(-time.Minute),
+		clock().Add(time.Hour),
 	)
 	owner(
 		t,
 		`UPDATE maintenance.assignments SET scheduled = tstzrange($2, $3) WHERE job_id = $1`,
 		job,
-		clock.Add(-time.Minute),
-		clock.Add(time.Hour),
+		clock().Add(-time.Minute),
+		clock().Add(time.Hour),
 	)
 
-	if code, m := post(srv, &techB, "units.get", `{"id":"`+unit+`"}`); code != 200 {
+	if code, m := post(srv, techB(), "units.get", `{"id":"`+unit+`"}`); code != 200 {
 		t.Fatalf("inside the work window: %d %v", code, m)
 	}
 
@@ -189,7 +189,7 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 		t.Fatal("alerts.list inside the work window")
 	}
 
-	if code, _ := post(srv, &techB, "telemetry.series", series); code != 200 {
+	if code, _ := post(srv, techB(), "telemetry.series", series); code != 200 {
 		t.Fatalf("telemetry inside the work window: %d", code)
 	}
 
@@ -199,7 +199,7 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 
 	owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE job_id = $1`, job)
 
-	if listed(&techB) {
+	if listed(techB()) {
 		t.Fatal("revoked Assignment hides the unit again")
 	}
 
@@ -207,10 +207,10 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 		t,
 		`UPDATE maintenance.offers SET access_valid_until = $2 WHERE job_id = $1`,
 		job,
-		clock.Add(-time.Minute),
+		clock().Add(-time.Minute),
 	)
 
-	if listed(&contrA) {
+	if listed(contrA()) {
 		t.Fatal("ended access window hides the unit from the contractor")
 	}
 }
@@ -224,8 +224,8 @@ func TestUnitAccessProjection(t *testing.T) {
 		t,
 		unit.String(),
 		"tech-external-b",
-		clock.Add(time.Hour),
-		clock.Add(2*time.Hour),
+		clock().Add(time.Hour),
+		clock().Add(2*time.Hour),
 		"active",
 	)
 	owner(
@@ -238,9 +238,9 @@ func TestUnitAccessProjection(t *testing.T) {
 		),
 		job,
 		seed.ID("org-contractor-a"),
-		clock.Add(time.Hour),
-		clock.Add(2*time.Hour),
-		clock.Add(-time.Hour),
+		clock().Add(time.Hour),
+		clock().Add(2*time.Hour),
+		clock().Add(-time.Hour),
 	)
 
 	count := func(table string) (n int) {

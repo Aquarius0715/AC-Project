@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -33,7 +33,7 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 
 	code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"firmwareCampaigns.schedule",
 		`{"modelId":"`+seed.ID("ventilation-demo").
 			String()+
@@ -43,7 +43,7 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 		)+
 			`"],"waves":[{"label":"Pilot","percent":34},{"label":"All","percent":100}],"window":{"startLocal":"01:00",`+
 			`"endLocal":"05:00"},"autoPauseFailurePercent":20,"startAt":"`+
-			clock.Add(30*24*time.Hour).
+			clock().Add(30*24*time.Hour).
 				Format(time.RFC3339)+
 			`"}`,
 		0,
@@ -139,7 +139,7 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 		operation := results()[i].op
 		if code, resp := write(
 			srv,
-			&customerB,
+			customerB(),
 			"demo.trigger",
 			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+base.Add(duration).
 				Format(time.RFC3339Nano)+
@@ -173,7 +173,7 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 
 		if code, resp := write(
 			srv,
-			&hq,
+			hq(),
 			"firmwareCampaigns.control",
 			`{"campaignId":"`+camp+`","action":"`+action+`"`+extra+`}`,
 			v,
@@ -216,13 +216,13 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 
 	_, res = post(
 		srv,
-		&customerB,
+		customerB(),
 		"notifications.list",
 		`{"filters":{"type":"device_operation"},"limit":100}`,
 	)
 
 	seen := false
-	for _, it := range items(res) {
+	for _, it := range items(t, res) {
 		seen = seen || asObj(t, it["target"])["id"] == units[0]
 	}
 
@@ -356,7 +356,7 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 		t.Fatalf("complete: %s %s", st, statuses())
 	}
 	// the campaign as HQ reads it: every result has its time
-	_, res = post(srv, &hq, "firmwareCampaigns.get", `{"id":"`+camp+`"}`)
+	_, res = post(srv, hq(), "firmwareCampaigns.get", `{"id":"`+camp+`"}`)
 	for _, r := range asArr(t, data(res)["results"]) {
 		if asObj(t, r)["at"] == nil {
 			t.Errorf("result without a time: %v", r)
@@ -388,7 +388,7 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 
 	code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"firmwareCampaigns.schedule",
 		`{"modelId":"`+seed.ID("ventilation-demo").
 			String()+
@@ -398,7 +398,7 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 		)+
 			`"],"waves":[{"label":"All","percent":100}],"window":{"startLocal":"00:00","endLocal":"23:59"},`+
 			`"autoPauseFailurePercent":50,"startAt":"`+
-			clock.Add(30*24*time.Hour).
+			clock().Add(30*24*time.Hour).
 				Format(time.RFC3339)+
 			`"}`,
 		0,
@@ -429,7 +429,7 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 
 	_, om := write(
 		srv,
-		&hq,
+		hq(),
 		"units.save",
 		`{"customerOrgId":"`+seed.ID("org-customer-b").
 			String()+

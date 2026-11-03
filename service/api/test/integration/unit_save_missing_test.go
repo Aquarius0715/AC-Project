@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -22,7 +22,7 @@ func TestSaveOfAMissingUnitIsNotFound(t *testing.T) {
 		String() +
 		`","type":"split","installedAt":null,"serviceScope":["indoor"]}`
 
-	code, m := write(srv, &hq, "units.save", body, 1)
+	code, m := write(srv, hq(), "units.save", body, 1)
 	if code != 404 || m["messageKey"] != apperr.KeyNotFound {
 		t.Fatalf("update of a missing unit: %d %v, want 404 NOT_FOUND", code, m)
 	}

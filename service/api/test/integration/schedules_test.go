@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -21,7 +21,7 @@ func automationCommands(t *testing.T, unit string) []string {
 	if err != nil {
 		t.Skip(err)
 	}
-	defer conn.Close(context.Background())
+	defer func() { _ = conn.Close(context.Background()) }()
 
 	rows, err := conn.Query(
 		context.Background(),
@@ -63,7 +63,7 @@ func TestScheduleAutomationsFire(t *testing.T) {
 	}
 	unit := boundUnit(t, srv, "online")
 
-	code, res := write(srv, &customerB, "automations.save", scheduleRule(unit, map[string]string{
+	code, res := write(srv, customerB(), "automations.save", scheduleRule(unit, map[string]string{
 		"weekdays": "[1]", "startLocal": `"09:30"`, "endLocal": `"10:00"`, "enabled": "true",
 		"startAction": `{"kind":"set_temperature","celsius":25}`,
 	}), 0)
@@ -77,14 +77,14 @@ func TestScheduleAutomationsFire(t *testing.T) {
 		t.Fatalf("saving sends no command: %d", n)
 	}
 
-	setWatermark(t, clock)
-	tick(clock.Add(20 * time.Minute)) // before the start
+	setWatermark(t, clock())
+	tick(clock().Add(20 * time.Minute)) // before the start
 
 	if n := len(automationCommands(t, unit)); n != 0 {
 		t.Fatalf("before the start: %d", n)
 	}
 
-	tick(clock.Add(31 * time.Minute))
+	tick(clock().Add(31 * time.Minute))
 
 	cs := automationCommands(t, unit)
 
@@ -97,18 +97,18 @@ func TestScheduleAutomationsFire(t *testing.T) {
 		t.Fatalf("start command: %v", cs)
 	}
 
-	tick(clock.Add(31 * time.Minute)) // the same window again
+	tick(clock().Add(31 * time.Minute)) // the same window again
 	setWatermark(
 		t,
-		clock,
+		clock(),
 	) // even a replayed window creates no second Command (automation_runs)
-	tick(clock.Add(32 * time.Minute))
+	tick(clock().Add(32 * time.Minute))
 
 	if n := len(automationCommands(t, unit)); n != 1 {
 		t.Fatalf("one Command per occurrence: %d", n)
 	}
 
-	tick(clock.Add(61 * time.Minute))
+	tick(clock().Add(61 * time.Minute))
 
 	if cs = automationCommands(
 		t,
@@ -137,7 +137,7 @@ func TestScheduleAutomationsFire(t *testing.T) {
 		t.Fatalf("runs %d, audits %d", runs, audits)
 	}
 	// disabled: the next Monday's start creates nothing
-	code, res = write(srv, &customerB, "automations.save", scheduleRule(unit, map[string]string{
+	code, res = write(srv, customerB(), "automations.save", scheduleRule(unit, map[string]string{
 		"id": `"` + id + `"`, "weekdays": "[1]", "startLocal": `"09:30"`, "endLocal": `"10:00"`,
 		"enabled": "false", "startAction": `{"kind":"set_temperature","celsius":25}`,
 	}), 1)
@@ -145,36 +145,36 @@ func TestScheduleAutomationsFire(t *testing.T) {
 		t.Fatalf("disable: %d %v", code, res)
 	}
 
-	tick(clock.Add(7*24*time.Hour + 31*time.Minute))
+	tick(clock().Add(7*24*time.Hour + 31*time.Minute))
 
 	if n := len(automationCommands(t, unit)); n != 2 {
 		t.Fatalf("disabled rule fired: %d", n)
 	}
 	// delete (Figma 03g–03i): version checked, the rule is gone, its Commands stay
-	if code, _ := write(srv, &customerB, "automations.delete", `{"id":"`+id+`"}`, 1); code != 409 {
+	if code, _ := write(srv, customerB(), "automations.delete", `{"id":"`+id+`"}`, 1); code != 409 {
 		t.Fatalf("stale version: %d", code)
 	}
 
-	if code, _ := write(srv, &customerA, "automations.delete", `{"id":"`+id+`"}`, 2); code != 404 {
+	if code, _ := write(srv, customerA(), "automations.delete", `{"id":"`+id+`"}`, 2); code != 404 {
 		t.Fatalf("other customer: %d", code)
 	}
 
-	code, res = write(srv, &customerB, "automations.delete", `{"id":"`+id+`"}`, 2)
+	code, res = write(srv, customerB(), "automations.delete", `{"id":"`+id+`"}`, 2)
 	if code != 200 || data(res)["deleted"] != true || data(res)["id"] != id {
 		t.Fatalf("delete: %d %v", code, res)
 	}
 
 	if code, resp := post(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.list",
 		`{"filters":{"unitId":"`+unit+`"}}`,
 	); code != 200 ||
-		len(items(resp)) != 0 {
-		t.Fatalf("deleted rule listed: %v", items(resp))
+		len(items(t, resp)) != 0 {
+		t.Fatalf("deleted rule listed: %v", items(t, resp))
 	}
 
-	if code, _ := write(srv, &customerB, "automations.delete", `{"id":"`+id+`"}`, 3); code != 404 {
+	if code, _ := write(srv, customerB(), "automations.delete", `{"id":"`+id+`"}`, 3); code != 404 {
 		t.Fatalf("already deleted: %d", code)
 	}
 
@@ -192,7 +192,7 @@ func TestScheduleCatchUpRunsTheLastMinute(t *testing.T) {
 	ctx := context.Background()
 	unit := boundUnit(t, srv, "online")
 
-	code, res := write(srv, &customerB, "automations.save", scheduleRule(unit, map[string]string{
+	code, res := write(srv, customerB(), "automations.save", scheduleRule(unit, map[string]string{
 		"weekdays": "[1]", "startLocal": `"09:30"`, "endLocal": `"10:00"`, "enabled": "true",
 		"startAction": `{"kind":"set_temperature","celsius":25}`,
 	}), 0)
@@ -202,13 +202,13 @@ func TestScheduleCatchUpRunsTheLastMinute(t *testing.T) {
 
 	id := asStr(t, data(res)["id"])
 
-	t.Cleanup(func() { write(srv, &customerB, "automations.delete", `{"id":"`+id+`"}`, 1) })
-	setWatermark(t, clock)
+	t.Cleanup(func() { write(srv, customerB(), "automations.delete", `{"id":"`+id+`"}`, 1) })
+	setWatermark(t, clock())
 
 	_, err := schedTick(
 		ctx,
 		srv,
-		clock.Add(61*time.Minute),
+		clock().Add(61*time.Minute),
 	)
 	if err != nil { // past the start and the end
 		t.Fatal(err)
@@ -234,9 +234,9 @@ func TestScheduleCatchUpRunsTheLastMinute(t *testing.T) {
 		t.Fatalf("the passed-over start leaves no run: %d", runs)
 	}
 	// a week later, two windows passed at once: still the last end only
-	setWatermark(t, clock.Add(61*time.Minute))
+	setWatermark(t, clock().Add(61*time.Minute))
 
-	_, err = schedTick(ctx, srv, clock.Add(14*24*time.Hour+61*time.Minute))
+	_, err = schedTick(ctx, srv, clock().Add(14*24*time.Hour+61*time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,7 +258,7 @@ func TestScheduleDraftPreview(t *testing.T) {
 			`"endLocal":"22:00","endsNextDay":false,` +
 			`"startAction":{"kind":"set_temperature","celsius":25},"endAction":{"kind":"set_power","power":false}` + extra + `}}`
 	}
-	code, res := post(srv, &customerA, "automations.nextRuns", draft(""))
+	code, res := post(srv, customerA(), "automations.nextRuns", draft(""))
 
 	list, _ := res["data"].([]any)
 	if code != 200 {
@@ -301,7 +301,7 @@ func TestScheduleDraftPreview(t *testing.T) {
 			`"endLocal":"05:00","endsNextDay":false,"startAction":{"kind":"set_power","power":true},` +
 			`"endAction":{"kind":"set_power","power":false}}}`,
 	} {
-		code, m := post(srv, &customerA, "automations.nextRuns", body)
+		code, m := post(srv, customerA(), "automations.nextRuns", body)
 		refusal(t, name, code, m, want[name])
 	}
 }
@@ -324,9 +324,9 @@ func TestConsentWithdrawalDisablesLocationRules(t *testing.T) {
 	consent := func() (bool, int) {
 		t.Helper()
 
-		_, m := post(srv, &customerA, "consents.get", `{"purpose":"location_automation"}`)
+		_, m := post(srv, customerA(), "consents.get", `{"purpose":"location_automation"}`)
 
-		return data(m)["granted"] == true, ver(m)
+		return data(m)["granted"] == true, ver(t, m)
 	}
 	set := func(granted bool) {
 		t.Helper()
@@ -338,7 +338,7 @@ func TestConsentWithdrawalDisablesLocationRules(t *testing.T) {
 
 		if code, res := write(
 			srv,
-			&customerA,
+			customerA(),
 			"consents.update",
 			`{"purpose":"location_automation","granted":`+map[bool]string{true: "true", false: "false"}[granted]+`}`,
 			v,
@@ -359,7 +359,7 @@ func TestConsentWithdrawalDisablesLocationRules(t *testing.T) {
 			body += `,"id":"` + id + `"`
 		}
 
-		return write(srv, &customerA, "automations.save", body+"}", version)
+		return write(srv, customerA(), "automations.save", body+"}", version)
 	}
 
 	set(true)
@@ -373,7 +373,7 @@ func TestConsentWithdrawalDisablesLocationRules(t *testing.T) {
 
 	code, resp = write(
 		srv,
-		&customerA,
+		customerA(),
 		"automations.save",
 		scheduleRule(unit, map[string]string{"enabled": "true", "weekdays": "[6]"}),
 		0,
@@ -388,11 +388,11 @@ func TestConsentWithdrawalDisablesLocationRules(t *testing.T) {
 
 		_, res := post(
 			srv,
-			&customerA,
+			customerA(),
 			"automations.list",
 			`{"limit":100,"filters":{"unitId":"`+unit+`"}}`,
 		)
-		for _, it := range items(res) {
+		for _, it := range items(t, res) {
 			if it["id"] == id {
 				return it
 			}
@@ -435,7 +435,7 @@ func TestConsentWithdrawalDisablesLocationRules(t *testing.T) {
 	for id, v := range map[string]int{loc: 3, sched: 1} {
 		if code, _ := write(
 			srv,
-			&customerA,
+			customerA(),
 			"automations.delete",
 			`{"id":"`+id+`"}`,
 			v,
@@ -473,7 +473,7 @@ func TestAutomationExtraConditions(t *testing.T) {
 	} {
 		if code, resp := write(
 			srv,
-			&customerB,
+			customerB(),
 			"automations.save",
 			base+`,"onlyIf":`+extra+`}`,
 			0,
@@ -485,7 +485,7 @@ func TestAutomationExtraConditions(t *testing.T) {
 
 	if code, resp := write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.save",
 		scheduleRule(unitID, map[string]string{"onlyIf": `[{"type":"weekday","weekdays":[1]}]`}),
 		0,
@@ -496,7 +496,7 @@ func TestAutomationExtraConditions(t *testing.T) {
 
 	code, res := write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.save",
 		base+`,"onlyIf":[{"type":"weekday","weekdays":[1]},{"type":"occupancy","occupied":true}]}`,
 		0,
@@ -509,9 +509,10 @@ func TestAutomationExtraConditions(t *testing.T) {
 	fact := func(metric, value, unit string) string {
 		return `{"unitId":"` + unitID + `","metric":"` + metric + `","value":` + value + `,"unit":"` + unit +
 			`","observedAt":"` +
-			clock.Format(
+			clock().Format(
 				time.RFC3339,
-			) + `","quality":"valid"}`
+			) +
+			`","quality":"valid"}`
 	}
 	fire := func(facts ...string) map[string]any {
 		// one evaluation per tick (D02): clear the tick and the unit's pending commands first
@@ -525,9 +526,9 @@ func TestAutomationExtraConditions(t *testing.T) {
 
 		code, resp := write(
 			srv,
-			&customerB,
+			customerB(),
 			"automations.fire",
-			`{"eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Format(
+			`{"eventId":"`+uuid.NewString()+`","occurredAt":"`+clock().Format(
 				time.RFC3339,
 			)+`","unitIds":["`+unitID+`"],"facts":[`+
 				strings.Join(
@@ -547,11 +548,11 @@ func TestAutomationExtraConditions(t *testing.T) {
 
 		_, m := post(
 			srv,
-			&customerB,
+			customerB(),
 			"automations.list",
 			`{"limit":10,"filters":{"unitId":"`+unitID+`"}}`,
 		)
-		for _, it := range items(m) {
+		for _, it := range items(t, m) {
 			if it["id"] == id {
 				lr, _ := it["lastRun"].(map[string]any)
 
@@ -584,7 +585,7 @@ func TestAutomationExtraConditions(t *testing.T) {
 	}
 
 	if lr := last(); lr == nil || lr["outcome"] != "command_created" || lr["commandId"] == nil ||
-		lr["at"] != clock.Format(time.RFC3339) {
+		lr["at"] != clock().Format(time.RFC3339) {
 		t.Fatalf("lastRun after a command: %v", lr)
 	}
 	// hot, but nobody home: the extra condition fails and is logged
@@ -609,9 +610,10 @@ func TestAutomationExtraConditions(t *testing.T) {
 	}
 	// its own data arrived incomplete: logged; an event that is not for the rule (no weather): no trace
 	if d := fire(
-		`{"unitId":"` + unitID + `","metric":"weather_temperature","value":null,"unit":"°C","observedAt":"` + clock.Format(
+		`{"unitId":"` + unitID + `","metric":"weather_temperature","value":null,"unit":"°C","observedAt":"` + clock().Format(
 			time.RFC3339,
-		) + `","quality":"missing"}`,
+		) +
+			`","quality":"missing"}`,
 	); d["reason"] != "missing_data" {
 		t.Fatalf("null weather: %v", d)
 	}
@@ -626,7 +628,7 @@ func TestAutomationExtraConditions(t *testing.T) {
 	// not a selected weekday
 	code, res = write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.save",
 		base+`,"id":"`+id+`","onlyIf":[{"type":"weekday","weekdays":[6,7]}]}`,
 		1,
@@ -642,7 +644,7 @@ func TestAutomationExtraConditions(t *testing.T) {
 		t.Fatalf("Monday is not a weekend: %v", d)
 	}
 	// a schedule that needs someone home skips at its start for want of occupancy data (the scheduler has none)
-	code, res = write(srv, &customerB, "automations.save", scheduleRule(unitID, map[string]string{
+	code, res = write(srv, customerB(), "automations.save", scheduleRule(unitID, map[string]string{
 		"weekdays": "[1]", "startLocal": `"09:30"`, "endLocal": `"10:00"`, "enabled": "true",
 		"onlyIf": `[{"type":"occupancy","occupied":true}]`,
 	}), 0)
@@ -652,9 +654,9 @@ func TestAutomationExtraConditions(t *testing.T) {
 
 	sid := asStr(t, data(res)["id"])
 	before := len(automationCommands(t, unitID))
-	setWatermark(t, clock)
+	setWatermark(t, clock())
 
-	_, err := schedTick(ctx, srv, clock.Add(31*time.Minute))
+	_, err := schedTick(ctx, srv, clock().Add(31*time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -676,7 +678,7 @@ func TestAutomationExtraConditions(t *testing.T) {
 	for rid, v := range map[string]int{id: 2, sid: 1} { // leave no rule behind
 		if code, _ := write(
 			srv,
-			&customerB,
+			customerB(),
 			"automations.delete",
 			`{"id":"`+rid+`"}`,
 			v,
@@ -704,7 +706,7 @@ func TestScheduleBoundaries(t *testing.T) {
 	save := func(u, start, end, action string) string {
 		t.Helper()
 
-		code, res := write(srv, &customerB, "automations.save", scheduleRule(u, map[string]string{
+		code, res := write(srv, customerB(), "automations.save", scheduleRule(u, map[string]string{
 			"weekdays":    "[1]",
 			"startLocal":  `"` + start + `"`,
 			"endLocal":    `"` + end + `"`,
@@ -724,8 +726,8 @@ func TestScheduleBoundaries(t *testing.T) {
 
 	owner(t, `UPDATE assets.units SET archived = true WHERE id = $1`, archived)
 	owner(t, `UPDATE control.automations SET timezone = 'Mars/Olympus_Mons' WHERE id = $1`, zone)
-	setWatermark(t, clock)
-	tick(clock.Add(31 * time.Minute))
+	setWatermark(t, clock())
+	tick(clock().Add(31 * time.Minute))
 	owner(t, `UPDATE assets.units SET archived = false WHERE id = $1`, archived)
 
 	if a, b := len(
@@ -746,7 +748,7 @@ func TestScheduleBoundaries(t *testing.T) {
 		if err != nil {
 			t.Skip(err)
 		}
-		defer conn.Close(ctx)
+		defer func() { _ = conn.Close(ctx) }()
 
 		rows, err := conn.Query(
 			ctx,
@@ -776,8 +778,8 @@ func TestScheduleBoundaries(t *testing.T) {
 	first := save(unitID, "09:30", "10:00", `{"kind":"set_temperature","celsius":25}`)
 	second := save(unitID, "10:00", "10:30", `{"kind":"set_temperature","celsius":22}`)
 
-	setWatermark(t, clock.Add(59*time.Minute))
-	tick(clock.Add(61 * time.Minute))
+	setWatermark(t, clock().Add(59*time.Minute))
+	tick(clock().Add(61 * time.Minute))
 
 	end, start := "schedule:schedule_end:2026-09-14T02:00:00Z", "schedule:schedule_start:2026-09-14T02:00:00Z"
 	if got := runs(
@@ -830,8 +832,8 @@ func TestScheduleBoundaries(t *testing.T) {
 		v,
 		fanOnly,
 	)
-	setWatermark(t, clock.Add(74*time.Minute))
-	tick(clock.Add(76 * time.Minute))
+	setWatermark(t, clock().Add(74*time.Minute))
+	tick(clock().Add(76 * time.Minute))
 	owner(
 		t,
 		`UPDATE assets.units SET model_id = $2, capability_version = $3 WHERE id = $1`,

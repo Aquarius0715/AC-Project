@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"strings"
@@ -16,7 +16,7 @@ import (
 func TestContractUpdateOfAMissingContractIsNotFound(t *testing.T) {
 	srv := server(t)
 	u := newUnit(t, srv, "Missing contract AC")
-	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	body := strings.Join([]string{
 		`"id":"` + uuid.NewString() + `"`,
 		`"customerId":"` + seed.ID("cust-b").String() + `"`,
@@ -30,7 +30,7 @@ func TestContractUpdateOfAMissingContractIsNotFound(t *testing.T) {
 		`"rulesVersion":"rules-demo-1"`,
 	}, ",")
 
-	code, m := write(srv, &hq, "contracts.save", "{"+body+"}", 1)
+	code, m := write(srv, hq(), "contracts.save", "{"+body+"}", 1)
 	if code != 404 || m["messageKey"] != apperr.KeyNotFound {
 		t.Fatalf("revision of a missing contract: %d %v, want 404 NOT_FOUND", code, m)
 	}

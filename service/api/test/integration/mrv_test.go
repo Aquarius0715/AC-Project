@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"maps"
@@ -28,7 +28,7 @@ func TestMRV(t *testing.T) {
 	)
 	_, resp := write(
 		srv,
-		&hq,
+		hq(),
 		"baselines.save",
 		`{"unitIds":["`+unit+`"],"period":{"from":"2026-08-01T00:00:00Z","to":"2026-08-01T00:05:00Z"},`+
 			`"boundaryId":"ac_input_electricity","boundary":"AC input","assumptions":"demo","source":"test",`+
@@ -62,7 +62,7 @@ func TestMRV(t *testing.T) {
 		return "{" + strings.Join(parts, ",") + "}"
 	}
 
-	code, resp := post(srv, &hq, "mrv.preview", cond(nil))
+	code, resp := post(srv, hq(), "mrv.preview", cond(nil))
 	if code != 200 || data(resp)["incomplete"] != false || data(resp)["scope"] != "scope_2" ||
 		asNum(t, asObj(t, asObj(t, data(resp)["summary"])["totals"])["savedKWh"]) != 5 ||
 		asNum(t, asObj(t, asObj(t, data(resp)["summary"])["totals"])["emissionsKg"]) != 2.5 {
@@ -71,7 +71,7 @@ func TestMRV(t *testing.T) {
 
 	if _, m := post(
 		srv,
-		&hq,
+		hq(),
 		"mrv.preview",
 		cond(map[string]string{"boundaryId": `"whole_building_electricity"`}),
 	); data(m)["incomplete"] != true {
@@ -96,7 +96,7 @@ func TestMRV(t *testing.T) {
 		"blank boundary":       {map[string]string{"boundary": `" "`}, 422},
 		"unaligned":            {map[string]string{"from": `"` + start.Add(time.Second).Format(time.RFC3339) + `"`}, 422},
 	} {
-		code, m := post(srv, &hq, "mrv.preview", cond(tc.e))
+		code, m := post(srv, hq(), "mrv.preview", cond(tc.e))
 		if w, ok := refused[name]; ok {
 			refusal(t, name, code, m, w)
 		} else if code != tc.code {
@@ -106,7 +106,7 @@ func TestMRV(t *testing.T) {
 	// drafts, review, versions
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"mrv.saveDraft",
 		`{"conditions":`+cond(nil)+`,"evidenceIds":["`+uuid.NewString()+`"]}`,
 		0,
@@ -117,12 +117,12 @@ func TestMRV(t *testing.T) {
 
 	code, resp = write(
 		srv,
-		&hq,
+		hq(),
 		"mrv.saveDraft",
 		`{"conditions":`+cond(nil)+`,"evidenceIds":[]}`,
 		0,
 	)
-	if code != 200 || data(resp)["status"] != "draft" || ver(resp) != 1 ||
+	if code != 200 || data(resp)["status"] != "draft" || ver(t, resp) != 1 ||
 		data(resp)["isDemo"] != true {
 		t.Fatalf("draft: %d %v", code, resp)
 	}
@@ -132,7 +132,7 @@ func TestMRV(t *testing.T) {
 	review := func(rv, v int) (int, map[string]any) {
 		return write(
 			srv,
-			&hq,
+			hq(),
 			"mrv.recordReview",
 			`{"reportId":"`+id+`","reportVersion":`+itoa(
 				rv,
@@ -145,7 +145,7 @@ func TestMRV(t *testing.T) {
 	}
 
 	code, resp = review(1, 1)
-	if code != 200 || data(resp)["status"] != "demo_reviewed" || ver(resp) != 2 ||
+	if code != 200 || data(resp)["status"] != "demo_reviewed" || ver(t, resp) != 2 ||
 		len(asArr(t, data(resp)["reviewHistory"])) != 1 ||
 		asNum(t, asObj(t, asArr(t, data(resp)["reviewHistory"])[0])["reportVersion"]) != 1 {
 		t.Fatalf("review: %d %v", code, resp)
@@ -157,7 +157,7 @@ func TestMRV(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"mrv.saveDraft",
 		`{"id":"`+id+`","conditions":`+cond(nil)+`,"evidenceIds":[]}`,
 		1,
@@ -167,13 +167,13 @@ func TestMRV(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"mrv.saveDraft",
 		`{"id":"`+id+`","conditions":`+cond(
 			map[string]string{"boundaryId": `"whole_building_electricity"`},
 		)+`,"evidenceIds":[]}`,
 		2,
-	); code != 200 || ver(res) != 3 ||
+	); code != 200 || ver(t, res) != 3 ||
 		data(res)["incomplete"] != true {
 		t.Fatalf("new draft version: %d %v", code, res)
 	}
@@ -184,17 +184,17 @@ func TestMRV(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&hq,
+		hq(),
 		"mrv.versions",
 		`{"id":"`+id+`","query":{}}`,
-	); len(items(res)) != 3 || asNum(t, items(res)[0]["version"]) != 1 ||
-		items(res)[1]["status"] != "demo_reviewed" {
+	); len(items(t, res)) != 3 || asNum(t, items(t, res)[0]["version"]) != 1 ||
+		items(t, res)[1]["status"] != "demo_reviewed" {
 		t.Errorf("versions: %v", res)
 	}
 
 	if _, res := post(
 		srv,
-		&hq,
+		hq(),
 		"mrv.get",
 		`{"id":"`+id+`","reportVersion":1}`,
 	); data(res)["status"] != "draft" ||
@@ -202,27 +202,27 @@ func TestMRV(t *testing.T) {
 		t.Errorf("old version: %v", res)
 	}
 
-	if _, m := post(srv, &hq, "mrv.get", `{"id":"`+id+`"}`); ver(m) != 3 {
+	if _, m := post(srv, hq(), "mrv.get", `{"id":"`+id+`"}`); ver(t, m) != 3 {
 		t.Error("latest by default")
 	}
 
-	if code, _ := post(srv, &hq, "mrv.get", `{"id":"`+uuid.NewString()+`"}`); code != 404 {
+	if code, _ := post(srv, hq(), "mrv.get", `{"id":"`+uuid.NewString()+`"}`); code != 404 {
 		t.Error("unknown report")
 	}
 
 	if _, res := post(
 		srv,
-		&hq,
+		hq(),
 		"mrv.list",
 		`{"filters":{"organizationId":"`+org+`","unitId":"`+unit+`","status":"draft"}}`,
-	); len(items(res)) != 1 ||
-		ver(map[string]any{"data": items(res)[0]}) != 3 {
+	); len(items(t, res)) != 1 ||
+		ver(t, map[string]any{"data": items(t, res)[0]}) != 3 {
 		t.Errorf("list: %v", res)
 	}
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"mrv.list",
 		`{"filters":{"status":"reviewed"}}`,
 	); code != 422 ||
@@ -230,7 +230,7 @@ func TestMRV(t *testing.T) {
 		t.Errorf("bad status filter: %d %s", code, fields(res))
 	}
 
-	if code, _ := post(srv, &customerB, "mrv.list", `{}`); code != 403 {
+	if code, _ := post(srv, customerB(), "mrv.list", `{}`); code != 403 {
 		t.Error("client MRV")
 	}
 }

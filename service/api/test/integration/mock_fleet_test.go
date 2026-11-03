@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -28,20 +28,20 @@ func TestMockFleetSeeds(t *testing.T) {
 	if err != nil {
 		t.Skip(err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	txn, err := conn.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer txn.Rollback(ctx) //nolint:errcheck // the test never commits
+	defer func() { _ = txn.Rollback(ctx) }() // the test never commits
 
-	n, applyFleetErr := seed.ApplyFleet(ctx, txn, fleet, clock)
+	n, applyFleetErr := seed.ApplyFleet(ctx, txn, fleet, clock())
 	if applyFleetErr != nil || n != len(fleet.Patterns) {
 		t.Fatalf("apply: %d units, err %v", n, applyFleetErr)
 	}
 
-	n, applyFleetErr = seed.ApplyFleet(ctx, txn, fleet, clock)
+	n, applyFleetErr = seed.ApplyFleet(ctx, txn, fleet, clock())
 	if applyFleetErr != nil || n != len(fleet.Patterns) {
 		t.Fatalf("second apply: %d, err %v", n, applyFleetErr)
 	}
@@ -167,15 +167,15 @@ func TestMockFleetHistory(t *testing.T) {
 	if err != nil {
 		t.Skip(err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	txn, err := conn.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer txn.Rollback(ctx) //nolint:errcheck // the test never commits
+	defer func() { _ = txn.Rollback(ctx) }() // the test never commits
 
-	_, applyFleetErr := seed.ApplyFleet(ctx, txn, fleet, clock)
+	_, applyFleetErr := seed.ApplyFleet(ctx, txn, fleet, clock())
 	if applyFleetErr != nil {
 		t.Fatal(applyFleetErr)
 	}

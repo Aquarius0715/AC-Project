@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"encoding/base64"
@@ -16,7 +16,7 @@ func TestCertificatesAndParts(t *testing.T) {
 	srv := server(t)
 	tech := seed.ID("tech-external-a").String()
 	pdf := blobJSON("cert.pdf", "application/pdf", []byte("%PDF-1.4 demo"), 13)
-	issued, expires := clock.Add(-10*24*time.Hour).
+	issued, expires := clock().Add(-10*24*time.Hour).
 		Format(time.RFC3339),
 		time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC).
 			Format(time.RFC3339)
@@ -45,17 +45,17 @@ func TestCertificatesAndParts(t *testing.T) {
 		"not a pdf":   strings.Replace(body(""), pdf, blobJSON("cert.pdf", "application/pdf", []byte("<html>"), 6), 1),
 		"pixel flood": strings.Replace(body(""), pdf, blobJSON("scan.png", "image/png", flood, len(flood)), 1),
 	} {
-		code, m := write(srv, &contrA, "certificates.submit", b, 0)
+		code, m := write(srv, contrA(), "certificates.submit", b, 0)
 		refusal(t, name, code, m, want[name])
 	}
 
-	if code, _ := write(srv, &contrB, "certificates.submit", body(""), 0); code != 404 {
+	if code, _ := write(srv, contrB(), "certificates.submit", body(""), 0); code != 404 {
 		t.Error("other contractor's technician")
 	}
 
 	if code, _ := write(
 		srv,
-		&contrA,
+		contrA(),
 		"certificates.submit",
 		body(`,"renewalOf":"`+uuid.NewString()+`"`),
 		0,
@@ -68,7 +68,7 @@ func TestCertificatesAndParts(t *testing.T) {
 		make([]byte, 3<<20)...) // IR277: a scan above the ordinary 1 MiB body limit
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"certificates.submit",
 		strings.Replace(body(""), pdf, blobJSON("scan.pdf", "application/pdf", big, len(big)), 1),
 		0,
@@ -80,7 +80,7 @@ func TestCertificatesAndParts(t *testing.T) {
 	tooBig := make([]byte, 10*1000*1000+1)
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"certificates.submit",
 		strings.Replace(
 			body(""),
@@ -94,7 +94,7 @@ func TestCertificatesAndParts(t *testing.T) {
 		t.Fatalf("a file over 10 MB is a field error, not a body error: %d %v", code, res)
 	}
 
-	code, resp := write(srv, &contrA, "certificates.submit", body(""), 0)
+	code, resp := write(srv, contrA(), "certificates.submit", body(""), 0)
 	if code != 200 || data(resp)["status"] != "pending_verification" ||
 		data(resp)["fileName"] != "cert.pdf" ||
 		data(resp)["name"] != "Indoor AC" {
@@ -103,7 +103,7 @@ func TestCertificatesAndParts(t *testing.T) {
 
 	cert := asStr(t, data(resp)["id"])
 	// the uploaded document opens for HQ and for the company that sent it, before it is verified (IR436)
-	for _, a := range []*actor{&hq, &contrA} {
+	for _, a := range []*actor{hq(), contrA()} {
 		code, res := post(srv, a, "certificates.getContent", `{"certificateId":"`+cert+`"}`)
 
 		d := data(res)
@@ -116,7 +116,7 @@ func TestCertificatesAndParts(t *testing.T) {
 
 	if code, _ := post(
 		srv,
-		&hq,
+		hq(),
 		"certificates.getContent",
 		`{"certificateId":"`+uuid.NewString()+`"}`,
 	); code != 404 {
@@ -125,7 +125,7 @@ func TestCertificatesAndParts(t *testing.T) {
 	// verify
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"certificates.verify",
 		`{"certificateId":"`+cert+`","decision":"reject"}`,
 		1,
@@ -136,7 +136,7 @@ func TestCertificatesAndParts(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&contrA,
+		contrA(),
 		"certificates.verify",
 		`{"certificateId":"`+cert+`","decision":"approve"}`,
 		1,
@@ -146,7 +146,7 @@ func TestCertificatesAndParts(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"certificates.verify",
 		`{"certificateId":"`+cert+`","decision":"approve"}`,
 		1,
@@ -169,7 +169,7 @@ func TestCertificatesAndParts(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"certificates.verify",
 		`{"certificateId":"`+cert+`","decision":"approve"}`,
 		2,
@@ -177,7 +177,7 @@ func TestCertificatesAndParts(t *testing.T) {
 		t.Error("verify twice")
 	}
 	// a renewal can be rejected; training request
-	code, resp = write(srv, &contrA, "certificates.submit", body(`,"renewalOf":"`+cert+`"`), 0)
+	code, resp = write(srv, contrA(), "certificates.submit", body(`,"renewalOf":"`+cert+`"`), 0)
 	if code != 200 || data(resp)["renewalOf"] != cert {
 		t.Fatalf("renewal: %d %v", code, resp)
 	}
@@ -185,7 +185,7 @@ func TestCertificatesAndParts(t *testing.T) {
 	renewal := asStr(t, data(resp)["id"])
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"certificates.verify",
 		`{"certificateId":"`+renewal+`","decision":"reject","reason":"blurry scan"}`,
 		1,
@@ -196,7 +196,7 @@ func TestCertificatesAndParts(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"certificates.requestTraining",
 		`{"certificateId":"`+cert+`","note":" "}`,
 		2,
@@ -207,7 +207,7 @@ func TestCertificatesAndParts(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"certificates.requestTraining",
 		`{"certificateId":"`+cert+`","note":"refresher course"}`,
 		2,
@@ -218,7 +218,7 @@ func TestCertificatesAndParts(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&contrB,
+		contrB(),
 		"certificates.requestTraining",
 		`{"certificateId":"`+cert+`","note":"x"}`,
 		3,
@@ -230,14 +230,14 @@ func TestCertificatesAndParts(t *testing.T) {
 		t,
 		`UPDATE maintenance.certificates SET expires_at = $2 WHERE id = $1`,
 		cert,
-		clock.Add(10*24*time.Hour),
+		clock().Add(10*24*time.Hour),
 	)
 
 	ids := func(body string, a *actor) map[string]string {
 		_, m := post(srv, a, "certificates.list", body)
 
 		out := map[string]string{}
-		for _, it := range items(m) {
+		for _, it := range items(t, m) {
 			out[asStr(t, it["id"])] = asStr(t, it["status"])
 		}
 
@@ -245,7 +245,7 @@ func TestCertificatesAndParts(t *testing.T) {
 	}
 	if got := ids(
 		`{"filters":{"membershipId":"`+tech+`"},"limit":100}`,
-		&hq,
+		hq(),
 	); got[cert] != "expiring" ||
 		got[renewal] != "rejected" {
 		t.Fatalf("statuses: %v", got)
@@ -253,19 +253,19 @@ func TestCertificatesAndParts(t *testing.T) {
 
 	if got := ids(
 		`{"filters":{"status":"expiring","code":"demo_indoor"},"limit":100}`,
-		&contrA,
+		contrA(),
 	); got[renewal] != "" ||
 		got[cert] != "expiring" {
 		t.Fatalf("status filter: %v", got)
 	}
 
-	if got := ids(`{"limit":100}`, &contrB); got[cert] != "" {
+	if got := ids(`{"limit":100}`, contrB()); got[cert] != "" {
 		t.Error("contractor-b sees contractor-a's certificates")
 	}
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"certificates.list",
 		`{"filters":{"code":"x"}}`,
 	); code != 422 ||
@@ -289,10 +289,10 @@ func TestCertificatesAndParts(t *testing.T) {
 		seed.ID("tenant-a"),
 	)
 
-	_, resp = post(srv, &hq, "parts.list", `{"filters":{"search":"filter MESH"},"limit":100}`)
+	_, resp = post(srv, hq(), "parts.list", `{"filters":{"search":"filter MESH"},"limit":100}`)
 
 	found := false
-	for _, it := range items(resp) {
+	for _, it := range items(t, resp) {
 		found = found || (it["code"] == code1 && it["vanStockQuantity"] == nil)
 	}
 
@@ -300,13 +300,13 @@ func TestCertificatesAndParts(t *testing.T) {
 		t.Fatalf("parts: %v", resp)
 	}
 
-	if code, _ := post(srv, &techInt, "parts.list", `{}`); code != 200 {
+	if code, _ := post(srv, techInt(), "parts.list", `{}`); code != 200 {
 		t.Error("technician parts")
 	}
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"parts.list",
 		`{"filters":{"x":1}}`,
 	); code != 422 ||
@@ -351,10 +351,10 @@ func TestCertificateCreatesMissingGrant(t *testing.T) {
 
 	code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"certificates.submit",
 		`{"membershipId":"`+tech.String()+`","code":"demo_outdoor","name":"Outdoor AC","number":"N-2","issuedAt":"`+
-			clock.Add(-24*time.Hour).
+			clock().Add(-24*time.Hour).
 				Format(time.RFC3339)+
 			`","expiresAt":"`+expires.Format(
 			time.RFC3339,
@@ -367,7 +367,7 @@ func TestCertificateCreatesMissingGrant(t *testing.T) {
 
 	if code, resp := write(
 		srv,
-		&hq,
+		hq(),
 		"certificates.verify",
 		`{"certificateId":"`+asStr(t, data(res)["id"])+`","decision":"approve"}`,
 		1,

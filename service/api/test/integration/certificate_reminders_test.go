@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -40,12 +40,12 @@ func TestCertificateReminders(t *testing.T) {
 
 		return id
 	}
-	tech := member("technician", clock.Add(-30*day), clock.Add(365*day))
-	gone := member("technician", clock.Add(-30*day), clock.Add(-time.Hour)) // left the company
+	tech := member("technician", clock().Add(-30*day), clock().Add(365*day))
+	gone := member("technician", clock().Add(-30*day), clock().Add(-time.Hour)) // left the company
 	viewer := member(
 		"contractor",
-		clock.Add(-30*day),
-		clock.Add(365*day),
+		clock().Add(-30*day),
+		clock().Add(365*day),
 	) // a contractor member without partner.assign
 	// later tests see neither the memberships nor their reminders
 	t.Cleanup(func() {
@@ -72,7 +72,7 @@ func TestCertificateReminders(t *testing.T) {
 			membership,
 			org,
 			code,
-			clock.Add(-365*day),
+			clock().Add(-365*day),
 			expires,
 			status,
 			renewalOf,
@@ -96,9 +96,9 @@ func TestCertificateReminders(t *testing.T) {
 
 		tick++
 
-		drainEvents(t)
+		drainEventsContext(ctx, t)
 
-		_, err := schedTick(ctx, srv, clock.Add(time.Duration(tick)*time.Minute))
+		_, err := schedTick(ctx, srv, clock().Add(time.Duration(tick)*time.Minute))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -143,8 +143,8 @@ func TestCertificateReminders(t *testing.T) {
 	admin := seed.ID("contractor-a").String()
 
 	// 60 days before: one reminder, to the contractor admin only
-	main := cert(tech, "demo_indoor", "valid", clock.Add(59*day), nil)
-	far := cert(tech, "demo_outdoor", "valid", clock.Add(61*day), nil)
+	main := cert(tech, "demo_indoor", "valid", clock().Add(59*day), nil)
+	far := cert(tech, "demo_outdoor", "valid", clock().Add(61*day), nil)
 
 	evaluate()
 
@@ -182,14 +182,14 @@ func TestCertificateReminders(t *testing.T) {
 		t,
 		`UPDATE maintenance.certificates SET expires_at = $2 WHERE id = $1`,
 		main,
-		clock.Add(29*day),
+		clock().Add(29*day),
 	)
 	evaluate()
 	owner(
 		t,
 		`UPDATE maintenance.certificates SET expires_at = $2 WHERE id = $1`,
 		main,
-		clock.Add(6*day),
+		clock().Add(6*day),
 	)
 	evaluate()
 	evaluate()
@@ -205,7 +205,7 @@ func TestCertificateReminders(t *testing.T) {
 		t,
 		`UPDATE maintenance.certificates SET expires_at = $2 WHERE id = $1`,
 		main,
-		clock.Add(59*day),
+		clock().Add(59*day),
 	)
 	evaluate()
 
@@ -214,19 +214,19 @@ func TestCertificateReminders(t *testing.T) {
 	}
 
 	// a certificate approved with 20 days left gets the 30-day reminder only
-	late := cert(tech, "demo_electrical", "valid", clock.Add(20*day), nil)
+	late := cert(tech, "demo_electrical", "valid", clock().Add(20*day), nil)
 	// none for a pending, rejected or expired certificate, a replaced one or a technician who left
-	pending := cert(tech, "other", "pending_verification", clock.Add(20*day), nil)
-	rejected := cert(tech, "other", "rejected", clock.Add(20*day), nil)
-	expired := cert(tech, "other", "valid", clock, nil)
-	left := cert(gone, "demo_indoor", "valid", clock.Add(20*day), nil)
-	renewed := cert(tech, "other", "valid", clock.Add(10*day), nil)
-	cert(tech, "other", "valid", clock.Add(400*day), renewed)          // its approved renewal
-	older := cert(tech, "demo_indoor", "valid", clock.Add(3*day), nil) // main expires later
+	pending := cert(tech, "other", "pending_verification", clock().Add(20*day), nil)
+	rejected := cert(tech, "other", "rejected", clock().Add(20*day), nil)
+	expired := cert(tech, "other", "valid", clock(), nil)
+	left := cert(gone, "demo_indoor", "valid", clock().Add(20*day), nil)
+	renewed := cert(tech, "other", "valid", clock().Add(10*day), nil)
+	cert(tech, "other", "valid", clock().Add(400*day), renewed)          // its approved renewal
+	older := cert(tech, "demo_indoor", "valid", clock().Add(3*day), nil) // main expires later
 	// a pending renewal does not stop the reminders; another "other" certificate is not a renewal
-	waiting := cert(tech, "other", "valid", clock.Add(25*day), nil)
-	cert(tech, "other", "pending_verification", clock.Add(400*day), waiting)
-	unrelated := cert(tech, "other", "valid", clock.Add(5*day), nil)
+	waiting := cert(tech, "other", "valid", clock().Add(25*day), nil)
+	cert(tech, "other", "pending_verification", clock().Add(400*day), waiting)
+	unrelated := cert(tech, "other", "valid", clock().Add(5*day), nil)
 
 	evaluate()
 
@@ -254,7 +254,7 @@ func TestCertificateReminders(t *testing.T) {
 	// the contractor's inbox: titled by the certificate, its expiry in params.at; contractor-b reads none of them
 	code, res := post(
 		srv,
-		&contrA,
+		contrA(),
 		"notifications.list",
 		`{"filters":{"type":"certificate_expiry"},"limit":100}`,
 	)
@@ -264,7 +264,7 @@ func TestCertificateReminders(t *testing.T) {
 
 	var mine map[string]any
 
-	for _, it := range items(res) {
+	for _, it := range items(t, res) {
 		if target := asObj(t, it["target"]); target["kind"] == "certificate" &&
 			target["id"] == late {
 			mine = it
@@ -279,7 +279,7 @@ func TestCertificateReminders(t *testing.T) {
 	if at, _ := time.Parse(
 		time.RFC3339,
 		asStr(t, params["at"]),
-	); params["targetName"] != "Test user · Indoor AC" || !at.Equal(clock.Add(20*day)) || params["status"] != "expiring" ||
+	); params["targetName"] != "Test user · Indoor AC" || !at.Equal(clock().Add(20*day)) || params["status"] != "expiring" ||
 		mine["severity"] != "normal" ||
 		mine["templateKey"] != "certificate_expiry" {
 		t.Errorf("notification: %v", mine)
@@ -287,7 +287,7 @@ func TestCertificateReminders(t *testing.T) {
 
 	if code, resp := write(
 		srv,
-		&contrA,
+		contrA(),
 		"notifications.markRead",
 		`{"id":"`+asStr(t, mine["id"])+`"}`,
 		int(asNum(t, mine["version"])),
@@ -307,17 +307,17 @@ func TestCertificateReminders(t *testing.T) {
 		tenant,
 		seed.ID("contractor-b"),
 		late,
-		clock,
+		clock(),
 	)
 	t.Cleanup(func() { owner(t, `DELETE FROM notify.notifications WHERE id = $1`, stray) })
 
 	_, res = post(
 		srv,
-		&contrB,
+		contrB(),
 		"notifications.list",
 		`{"filters":{"type":"certificate_expiry"},"limit":100}`,
 	)
-	for _, it := range items(res) {
+	for _, it := range items(t, res) {
 		if it["id"] == stray {
 			t.Error("contractor-b reads contractor-a's certificate")
 		}
@@ -325,7 +325,7 @@ func TestCertificateReminders(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&contrB,
+		contrB(),
 		"notifications.markRead",
 		`{"id":"`+stray+`"}`,
 		1,

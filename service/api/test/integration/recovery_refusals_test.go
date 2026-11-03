@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -19,7 +19,7 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 	key, inv := overdueContract(t, srv, unit)
 	_, sess := post(
 		srv,
-		&customerB,
+		customerB(),
 		"session.get",
 		`{}`,
 	) // the business time of the server (a shared demo cluster may run ahead of clock)
@@ -28,7 +28,7 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 
 	if code, resp := write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.save",
 		`{"name":"cool",`+
 			`"unitIds":["`+unit+`"],"timezone":"Asia/Kuala_Lumpur","enabled":true,"priority":10,"kind":"event",`+
@@ -43,7 +43,7 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 
 		code, resp := post(
 			srv,
-			&customerB,
+			customerB(),
 			"automations.simulate",
 			`{"eventId":"`+uuid.NewString()+`","occurredAt":"`+at+`","unitIds":["`+unit+`"],"facts":[{"unitId":"`+unit+
 				`","metric":"occupied","value":true,"unit":"boolean","observedAt":"`+at+
@@ -58,10 +58,10 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 		return r
 	}
 	id, res := executed(t, srv, key, inv, []string{unit})
-	ackCommand(t, cmdOf(res, unit, "applyCommandIds"), clock.Add(time.Second))
+	ackCommand(t, cmdOf(t, res, unit, "applyCommandIds"), clock().Add(time.Second))
 
 	get := func() map[string]any {
-		_, m := post(srv, &restrMgr, "restrictions.get", `{"id":"`+id+`"}`)
+		_, m := post(srv, restrMgr(), "restrictions.get", `{"id":"`+id+`"}`)
 
 		return m
 	}
@@ -75,12 +75,12 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 
 	_, res = write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.cancel",
 		`{"restrictionId":"`+id+`","reason":"plan agreed"}`,
-		ver(get()),
+		ver(t, get()),
 	)
-	ackCommand(t, cmdOf(res, unit, "releaseCommandIds"), clock.Add(2*time.Second))
+	ackCommand(t, cmdOf(t, res, unit, "releaseCommandIds"), clock().Add(2*time.Second))
 
 	if data(get())["state"] != "released" {
 		t.Fatal("released")
@@ -94,7 +94,7 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 			`"restrictionId":"` + id + `","unitId":"` + unit + `","observed":{"restrictionId":"` + observed +
 			`","rulesVersion":"rules-1","policy":{"kind":"temperature_limit","minimumCoolingSetpoint":24},` +
 			`"observedAt":"` + at + `"}}`
-		if code, m := write(srv, &customerB, "demo.trigger", body, 0); code != 200 {
+		if code, m := write(srv, customerB(), "demo.trigger", body, 0); code != 200 {
 			t.Fatalf("observation: %d %v", code, m)
 		}
 	}
@@ -117,10 +117,10 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 	reconcile := func() (int, map[string]any) {
 		return write(
 			srv,
-			&restrMgr,
+			restrMgr(),
 			"restrictions.reconcile",
 			`{"restrictionId":"`+id+`","unitIds":["`+unit+`"]}`,
-			ver(get()),
+			ver(t, get()),
 		)
 	}
 
@@ -186,9 +186,9 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 	cmd := asStr(t, cmds[len(cmds)-1])
 	if code, resp := write(
 		srv,
-		&customerB,
+		customerB(),
 		"demo.trigger",
-		`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Add(3*time.Second).
+		`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock().Add(3*time.Second).
 			Format(time.RFC3339)+
 			`","eventType":"command_fail","commandId":"`+cmd+`"}`,
 		0,
@@ -209,7 +209,7 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 	}
 
 	cmds = asArr(t, asObj(t, cases[len(cases)-1])["commandIds"])
-	ackCommand(t, asStr(t, cmds[len(cmds)-1]), clock.Add(5*time.Second))
+	ackCommand(t, asStr(t, cmds[len(cmds)-1]), clock().Add(5*time.Second))
 
 	if caseState() != "resolved" {
 		t.Fatalf("resolved after the acknowledgement: %v", get())

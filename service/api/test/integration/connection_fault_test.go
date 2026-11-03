@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"encoding/json"
@@ -33,14 +33,15 @@ func TestConnectionFaultForTheGateway(t *testing.T) {
 
 	_, sess := post(
 		srv,
-		&customerB,
+		customerB(),
 		"session.get",
 		`{}`,
 	) // the business time of the server (a shared demo cluster may run ahead of clock)
 	now, _ := time.Parse(time.RFC3339Nano, asStr(t, asObj(t, sess["meta"])["snapshotAt"]))
 
 	ask := func(token, input string) (int, map[string]any) {
-		req, _ := http.NewRequest(
+		req, _ := http.NewRequestWithContext(
+			t.Context(),
 			http.MethodPost,
 			cluster.urls[ops.DomainEquipment]+"/internal/v1/system/queries/devices.connectionFault",
 			strings.NewReader(input),
@@ -57,7 +58,7 @@ func TestConnectionFaultForTheGateway(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		var body struct {
 			Data map[string]any `json:"data"`
@@ -82,7 +83,7 @@ func TestConnectionFaultForTheGateway(t *testing.T) {
 
 		if code, res := write(
 			srv,
-			&customerB,
+			customerB(),
 			"demo.trigger",
 			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+now.Format(
 				time.RFC3339,

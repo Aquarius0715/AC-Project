@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -17,14 +17,14 @@ import (
 func TestDemoOperations(t *testing.T) {
 	plain := server(t)
 	trig := func(s *apiserver.Server, body string) (int, map[string]any) {
-		return write(s, &customerB, "demo.trigger", body, 0)
+		return write(s, customerB(), "demo.trigger", body, 0)
 	}
 
 	if code, resp := write(
 		plain,
-		&customerB,
+		customerB(),
 		"demo.advanceClock",
-		`{"to":"`+clock.Add(time.Hour).Format(time.RFC3339)+`"}`,
+		`{"to":"`+clock().Add(time.Hour).Format(time.RFC3339)+`"}`,
 		0,
 	); code != 503 ||
 		resp["messageKey"] != "errors.demo_only" {
@@ -37,7 +37,7 @@ func TestDemoOperations(t *testing.T) {
 	} {
 		if code, resp := write(
 			plain,
-			&customerB,
+			customerB(),
 			operation,
 			body,
 			0,
@@ -64,20 +64,22 @@ func TestDemoOperations(t *testing.T) {
 	)
 
 	teleAt := func(value, unitName string, sens string, observed time.Time) string {
-		return `{"scenarioId":"t","eventId":"` + uuid.NewString() + `","occurredAt":"` + clock.Format(
+		return `{"scenarioId":"t","eventId":"` + uuid.NewString() + `","occurredAt":"` + clock().Format(
 			time.RFC3339,
-		) + `","eventType":"telemetry","measurement":{"unitId":"` + unit +
+		) +
+			`","eventType":"telemetry","measurement":{"unitId":"` + unit +
 			`","sensorId":"` + sens + `","metric":"temperature",` +
 			`"value":` + value + `,"unit":"` + unitName + `","observedAt":"` + observed.Format(
 			time.RFC3339,
 		) +
-			`","receivedAt":"` + clock.Format(
+			`","receivedAt":"` + clock().Format(
 			time.RFC3339,
-		) + `","origin":"measured","quality":"valid","eventId":"` + uuid.NewString() + `"}}`
+		) +
+			`","origin":"measured","quality":"valid","eventId":"` + uuid.NewString() + `"}}`
 	}
 
 	tele := func(value, unitName string, sens string) string {
-		return teleAt(value, unitName, sens, clock.Add(-10*time.Second))
+		return teleAt(value, unitName, sens, clock().Add(-10*time.Second))
 	}
 	if code, m := trig(
 		srv,
@@ -91,7 +93,7 @@ func TestDemoOperations(t *testing.T) {
 	trig(srv, tele("25", "K", sensor))
 	trig(srv, tele("null", "°C", sensor))
 	trig(srv, tele("null", "kelvin-degrees-with-a-very-long-unit-name", sensor))
-	trig(srv, teleAt("24", "°C", sensor, clock.Add(time.Minute)))
+	trig(srv, teleAt("24", "°C", sensor, clock().Add(time.Minute)))
 
 	type row struct {
 		quality       string
@@ -107,7 +109,7 @@ func TestDemoOperations(t *testing.T) {
 		if err != nil {
 			t.Skip(err)
 		}
-		defer conn.Close(context.Background())
+		defer func() { _ = conn.Close(context.Background()) }()
 
 		r, err := conn.Query(
 			context.Background(),
@@ -181,7 +183,7 @@ func TestDemoOperations(t *testing.T) {
 
 	if code, resp := trig(
 		srv,
-		`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Format(
+		`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock().Format(
 			time.RFC3339,
 		)+`","eventType":"network","bogus":false}`,
 	); code != 422 ||
@@ -195,14 +197,14 @@ func TestDemoOperations(t *testing.T) {
 	} {
 		code, resp := trig(
 			srv,
-			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Format(
+			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock().Format(
 				time.RFC3339,
 			)+`","eventType":"network",`+extra+`}`,
 		)
 		refusal(t, "contract-shaped "+extra, code, resp, "eventType=errors.trigger_unsupported")
 	}
 	// the trigger's own rules (IR36): a known event type, its IDs, and a measurement of the sensor's metric and unit
-	now := clock.Format(time.RFC3339)
+	now := clock().Format(time.RFC3339)
 	for name, c := range map[string]struct{ body, field, key string }{
 		"another type": {
 			`{"scenarioId":"t",` +
@@ -278,14 +280,14 @@ func TestDemoOperations(t *testing.T) {
 		t.Errorf("own sequence kept: %d", top)
 	}
 	// command acknowledgement through the demo trigger
-	_, g := post(srv, &customerB, "units.get", `{"id":"`+unit+`"}`)
+	_, g := post(srv, customerB(), "units.get", `{"id":"`+unit+`"}`)
 
 	code, res := write(
 		srv,
-		&customerB,
+		customerB(),
 		"commands.create",
 		`{"unitId":"`+unit+`","action":{"kind":"set_power","power":true},"expectedUnitVersion":`+itoa(
-			ver(g),
+			ver(t, g),
 		)+`}`,
 		0,
 	)
@@ -302,7 +304,7 @@ func TestDemoOperations(t *testing.T) {
 		cmd,
 	)
 
-	sentAt := clock.Add(500 * time.Millisecond)
+	sentAt := clock().Add(500 * time.Millisecond)
 	if code, resp := trig(
 		srv,
 		`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+sentAt.Format(
@@ -314,7 +316,7 @@ func TestDemoOperations(t *testing.T) {
 
 	if _, resp := post(
 		srv,
-		&customerB,
+		customerB(),
 		"commands.get",
 		`{"id":"`+cmd+`"}`,
 	); data(resp)["status"] != "sent" || data(resp)["delivery"] != "sent" ||
@@ -324,7 +326,7 @@ func TestDemoOperations(t *testing.T) {
 
 	if code, _ := trig(
 		srv,
-		`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Add(time.Second).
+		`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock().Add(time.Second).
 			Format(time.RFC3339)+
 			`","eventType":"command_ack","commandId":"`+cmd+`","sequence":2}`,
 	); code != 200 {
@@ -333,7 +335,7 @@ func TestDemoOperations(t *testing.T) {
 
 	if _, resp := post(
 		srv,
-		&customerB,
+		customerB(),
 		"commands.get",
 		`{"id":"`+cmd+`"}`,
 	); data(resp)["status"] != "acknowledged" {
@@ -349,21 +351,21 @@ func TestDemoOperations(t *testing.T) {
 		t.Errorf("the command's audit trail: %v", trail)
 	}
 	// the acknowledged setting becomes the observed state without a unit version change
-	_, g2 := post(srv, &customerB, "units.get", `{"id":"`+unit+`"}`)
+	_, g2 := post(srv, customerB(), "units.get", `{"id":"`+unit+`"}`)
 	if obs := asObj(t, data(g2)["observedState"]); obs["power"] != true ||
-		obs["observedAt"] != clock.Add(time.Second).Format(time.RFC3339Nano) {
+		obs["observedAt"] != clock().Add(time.Second).Format(time.RFC3339Nano) {
 		t.Errorf("observedState after ack: %v", obs)
 	}
 
-	if ver(g2) != ver(g) {
-		t.Errorf("unit version changed by ack: %d → %d", ver(g), ver(g2))
+	if ver(t, g2) != ver(t, g) {
+		t.Errorf("unit version changed by ack: %d → %d", ver(t, g), ver(t, g2))
 	}
 	// the clock only moves forward; deadlines are processed by the jump
 	if code, resp := write(
 		srv,
-		&customerB,
+		customerB(),
 		"demo.advanceClock",
-		`{"to":"`+clock.Add(-time.Hour).Format(time.RFC3339)+`"}`,
+		`{"to":"`+clock().Add(-time.Hour).Format(time.RFC3339)+`"}`,
 		0,
 	); code != 422 ||
 		fields(resp) != "to=errors.clock_backwards" {
@@ -372,9 +374,9 @@ func TestDemoOperations(t *testing.T) {
 
 	if code, resp := write(
 		srv,
-		&customerB,
+		customerB(),
 		"demo.advanceClock",
-		`{"to":"`+clock.Add(time.Hour).Format(time.RFC3339)+`"}`,
+		`{"to":"`+clock().Add(time.Hour).Format(time.RFC3339)+`"}`,
 		0,
 	); code != 200 ||
 		asNum(t, data(resp)["generation"]) != 1 {
@@ -383,20 +385,20 @@ func TestDemoOperations(t *testing.T) {
 	// rows created after the jump carry the scenario clock (platform.app_now, IR157)
 	code, res = write(
 		srv,
-		&customerB,
+		customerB(),
 		"clientUsers.save",
 		`{"customerId":"`+seed.ID("cust-b").
 			String()+
 			`","email":"clock-`+uuid.NewString()[:8]+`@example.com","clientRole":"member","displayName":"Clock Member"}`,
 		0,
 	)
-	if code != 200 || data(res)["createdAt"] != clock.Add(time.Hour).Format(time.RFC3339) {
+	if code != 200 || data(res)["createdAt"] != clock().Add(time.Hour).Format(time.RFC3339) {
 		t.Errorf("created after the jump: %d %v", code, res)
 	}
 
 	if code, resp := write(
 		srv,
-		&customerB,
+		customerB(),
 		"demo.reset",
 		`{"confirmation":true}`,
 		0,
@@ -413,20 +415,20 @@ func commandTrail(t *testing.T, srv *apiserver.Server, created map[string]any) [
 	drainEvents(t)
 
 	corr := asStr(t, asObj(t, created["meta"])["correlationId"])
-	day := `"from":"` + clock.Add(-24*time.Hour).
+	day := `"from":"` + clock().Add(-24*time.Hour).
 		Format(time.RFC3339) +
-		`","to":"` + clock.Add(24*time.Hour).
+		`","to":"` + clock().Add(24*time.Hour).
 		Format(time.RFC3339) +
 		`"`
 	_, res := post(
 		srv,
-		&hq,
+		hq(),
 		"audit.list",
 		`{"filters":{`+day+`,"correlationId":"`+corr+`"},"limit":10}`,
 	)
 	out := []string{}
 
-	for _, a := range items(res) {
+	for _, a := range items(t, res) {
 		if a["action"] != "commands.create" {
 			continue
 		}

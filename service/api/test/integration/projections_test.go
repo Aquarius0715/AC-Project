@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -22,7 +22,7 @@ func freeze(t *testing.T, now time.Time) {
 	if err != nil {
 		t.Skip(err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	beginFuncErr := pgx.BeginFunc(
 		ctx,
@@ -38,8 +38,10 @@ func freeze(t *testing.T, now time.Time) {
 	}
 }
 
-func byJob(m map[string]any, job string) map[string]any {
-	for _, it := range items(m) {
+func byJob(t *testing.T, m map[string]any, job string) map[string]any {
+	t.Helper()
+
+	for _, it := range items(t, m) {
 		if it["id"] == job || it["jobId"] == job {
 			return it
 		}
@@ -50,11 +52,13 @@ func byJob(m map[string]any, job string) map[string]any {
 
 // listJob pages through the caller's jobs.list and returns the job's row (nil when it is not listed): the shared test
 // database keeps other tests' jobs, so a job can be beyond the first page.
-func listJob(s *apiserver.Server, a *actor, job string) map[string]any {
+func listJob(t *testing.T, s *apiserver.Server, a *actor, job string) map[string]any {
+	t.Helper()
+
 	body := `{"limit":100}`
 	for range 50 {
 		_, m := post(s, a, "jobs.list", body)
-		if row := byJob(m, job); row != nil {
+		if row := byJob(t, m, job); row != nil {
 			return row
 		}
 
@@ -76,7 +80,7 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND
 			lower(scheduled) > $2`,
 		seed.ID("tech-internal-a"),
-		clock.Add(2*time.Hour),
+		clock().Add(2*time.Hour),
 	)
 	// earlier runs leave many offers / histories for contractor-a; retire them so the lists stay within one page
 	owner(
@@ -84,14 +88,14 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		`UPDATE maintenance.offers SET expired_at = $2 WHERE contractor_org_id = $1 AND decision IS NULL AND expired_at IS
 			NULL`,
 		seed.ID("org-contractor-a"),
-		clock.Add(-time.Hour),
+		clock().Add(-time.Hour),
 	)
 	owner(
 		t,
 		`UPDATE maintenance.offers SET access_valid_until = $2, access_valid_from = LEAST(access_valid_from, $2::timestamptz -
 			interval '1 hour') WHERE contractor_org_id = $1 AND decision = 'accept'`,
 		seed.ID("org-contractor-a"),
-		clock.Add(-time.Hour),
+		clock().Add(-time.Hour),
 	)
 	owner(
 		t,
@@ -99,12 +103,12 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		[]any{seed.ID("org-contractor-a"), seed.ID("tech-internal-a")},
 	)
 	unit := seed.ID("unit-non-rto").String()
-	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
-	_, res := write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
+	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	_, res := write(srv, customerA(), "jobs.create", jobBody(unit, nil), 0)
 	job := asStr(t, data(res)["id"])
 	write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
@@ -131,7 +135,7 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 	)
 
 	// offer projection before acceptance
-	o := listJob(srv, &contrA, job)
+	o := listJob(t, srv, contrA(), job)
 	if o == nil || o["projection"] != "offer" || o["status"] != "offered" || o["severity"] != nil ||
 		len(asArr(t, o["requiredQualifications"])) == 0 ||
 		o["unitId"] != nil {
@@ -140,7 +144,7 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 
 	if code, resp := post(
 		srv,
-		&contrA,
+		contrA(),
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
 	); code != 200 || data(resp)["projection"] != "offer" ||
@@ -166,26 +170,26 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 	} {
 		if code, resp := post(
 			srv,
-			&contrA,
+			contrA(),
 			"jobs.list",
 			body,
 		); code != 200 ||
-			(byJob(resp, job) != nil) != want {
+			(byJob(t, resp, job) != nil) != want {
 			t.Errorf("%s: want %v", body, want)
 		}
 	}
 
-	if listJob(srv, &contrB, job) != nil {
+	if listJob(t, srv, contrB(), job) != nil {
 		t.Error("other contractor sees the offer")
 	}
 
-	if code, _ := post(srv, &contrB, "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
+	if code, _ := post(srv, contrB(), "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
 		t.Error("other contractor get")
 	}
 	// accepted before the access window: still the offer projection with public status accepted
 	write(
 		srv,
-		&contrA,
+		contrA(),
 		"jobs.accept",
 		`{"jobId":"`+job+`","offerId":"`+offer+`","termsVersion":"t"}`,
 		2,
@@ -193,7 +197,7 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 
 	if _, resp := post(
 		srv,
-		&contrA,
+		contrA(),
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
 	); data(resp)["projection"] != "offer" ||
@@ -203,11 +207,11 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 
 	if _, resp := post(
 		srv,
-		&contrA,
+		contrA(),
 		"jobs.events",
 		`{"jobId":"`+job+`","query":{}}`,
-	); len(items(resp)) != 1 ||
-		items(resp)[0]["action"] != "offer.accepted" {
+	); len(items(t, resp)) != 1 ||
+		items(t, resp)[0]["action"] != "offer.accepted" {
 		t.Fatalf("own decision events only: %v", resp)
 	}
 	// inside the access window: summary / detail and all events
@@ -215,32 +219,32 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		t,
 		`UPDATE maintenance.offers SET access_valid_from = $2 WHERE id = $1`,
 		offer,
-		clock.Add(-time.Hour),
+		clock().Add(-time.Hour),
 	)
 
 	if _, resp := post(
 		srv,
-		&contrA,
+		contrA(),
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
 	); data(resp)["projection"] != "detail" {
 		t.Fatalf("detail in window: %v", resp)
 	}
 
-	if row := listJob(srv, &contrA, job); row["projection"] != "summary" {
+	if row := listJob(t, srv, contrA(), job); row["projection"] != "summary" {
 		t.Fatal("summary in window")
-	} else if row["accessValidFrom"] != clock.Add(-time.Hour).Format(time.RFC3339) ||
+	} else if row["accessValidFrom"] != clock().Add(-time.Hour).Format(time.RFC3339) ||
 		row["accessValidUntil"] != stamp(100) {
 		t.Fatalf("the summary carries the accepted offer's access window (IR227): %v", row)
 	}
 
 	if _, resp := post(
 		srv,
-		&contrA,
+		contrA(),
 		"jobs.events",
 		`{"jobId":"`+job+`","query":{}}`,
 	); len(
-		items(resp),
+		items(t, resp),
 	) < 3 {
 		t.Fatalf("all events in window: %v", resp)
 	}
@@ -248,21 +252,21 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 	// internal note is the contractor's to read, not the customer's
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.addNote",
 		`{"jobId":"`+job+`","message":"Check parts stock","visibility":"internal"}`,
-		int(asNum(t, listJob(srv, &contrA, job)["version"])),
+		int(asNum(t, listJob(t, srv, contrA(), job)["version"])),
 	); code != 200 {
 		t.Fatalf("internal note: %d", code)
 	}
 
-	_, all := post(srv, &contrA, "jobs.events", `{"jobId":"`+job+`","query":{"limit":100}}`)
-	_, seen := post(srv, &customerA, "jobs.events", `{"jobId":"`+job+`","query":{"limit":100}}`)
-	es := asObj(t, listJob(srv, &contrA, job)["eventSummary"])
+	_, all := post(srv, contrA(), "jobs.events", `{"jobId":"`+job+`","query":{"limit":100}}`)
+	_, seen := post(srv, customerA(), "jobs.events", `{"jobId":"`+job+`","query":{"limit":100}}`)
+	es := asObj(t, listJob(t, srv, contrA(), job)["eventSummary"])
 
-	newest := items(all)[len(items(all))-1]
-	if es["count"] != float64(len(items(all))) ||
-		es["customerVisible"] != float64(len(items(seen))) ||
+	newest := items(t, all)[len(items(t, all))-1]
+	if es["count"] != float64(len(items(t, all))) ||
+		es["customerVisible"] != float64(len(items(t, seen))) ||
 		es["customerVisible"] == es["count"] ||
 		es["notes"] != float64(1) ||
 		asObj(t, es["latest"])["action"] != newest["action"] ||
@@ -270,13 +274,13 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		t.Fatalf(
 			"event summary: %v (contractor reads %d, customer %d)",
 			es,
-			len(items(all)),
-			len(items(seen)),
+			len(items(t, all)),
+			len(items(t, seen)),
 		)
 	}
 
-	if cs := asObj(t, listJob(srv, &customerA, job)["eventSummary"]); cs["count"] != float64(
-		len(items(seen)),
+	if cs := asObj(t, listJob(t, srv, customerA(), job)["eventSummary"]); cs["count"] != float64(
+		len(items(t, seen)),
 	) ||
 		cs["count"] != cs["customerVisible"] ||
 		cs["notes"] != float64(0) {
@@ -287,17 +291,17 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		t,
 		`UPDATE maintenance.offers SET access_valid_until = $2 WHERE id = $1`,
 		offer,
-		clock.Add(-time.Minute),
+		clock().Add(-time.Minute),
 	)
 
-	if code, _ := post(srv, &contrA, "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
+	if code, _ := post(srv, contrA(), "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
 		t.Error("ended window before freeze")
 	}
 
-	freeze(t, clock)
-	freeze(t, clock) // idempotent
+	freeze(t, clock())
+	freeze(t, clock()) // idempotent
 
-	code, res := post(srv, &contrA, "jobs.get", `{"jobId":"`+job+`"}`)
+	code, res := post(srv, contrA(), "jobs.get", `{"jobId":"`+job+`"}`)
 
 	h := data(res)
 	if code != 200 || h["projection"] != "history" || h["dueAt"] != nil || h["severity"] != nil ||
@@ -308,11 +312,11 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 
 	if code, resp := post(
 		srv,
-		&contrA,
+		contrA(),
 		"jobs.list",
 		`{"filters":{"status":"assigned"},"limit":100}`,
 	); code != 200 ||
-		byJob(resp, job) != nil {
+		byJob(t, resp, job) != nil {
 		t.Error("history status filter")
 	}
 	// without a completion the history counts at its as-of, when the delegation ended (IR614)
@@ -322,23 +326,23 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 	} {
 		if code, resp := post(
 			srv,
-			&contrA,
+			contrA(),
 			"jobs.list",
 			`{"filters":{`+period+`},"limit":100}`,
 		); code != 200 ||
-			(byJob(resp, job) != nil) != want {
+			(byJob(t, resp, job) != nil) != want {
 			t.Errorf("history period filter {%s} on null completedAt: want %v", period, want)
 		}
 	}
 
 	if _, resp := post(
 		srv,
-		&contrA,
+		contrA(),
 		"jobs.list",
 		`{"filters":{"status":"accepted","organizationId":"`+seed.ID("org-contractor-a").
 			String()+
 			`"},"limit":100}`,
-	); byJob(
+	); byJob(t,
 		resp,
 		job,
 	) == nil {
@@ -348,32 +352,32 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 	for typ, want := range map[string]bool{"reactive": true, "preventive": false} { // the history's public type (IR290)
 		if code, resp := post(
 			srv,
-			&contrA,
+			contrA(),
 			"jobs.list",
 			`{"filters":{"type":"`+typ+`"},"limit":100}`,
 		); code != 200 ||
-			(byJob(resp, job) != nil) != want {
+			(byJob(t, resp, job) != nil) != want {
 			t.Errorf("history type filter %s: want %v", typ, want)
 		}
 	}
 
 	if _, resp := post(
 		srv,
-		&contrA,
+		contrA(),
 		"jobs.events",
 		`{"jobId":"`+job+`","query":{}}`,
 	); len(
-		items(resp),
+		items(t, resp),
 	) != 1 {
 		t.Error("history events are own decisions only")
 	}
 
 	// expired unanswered offers disappear
-	_, res = write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
+	_, res = write(srv, customerA(), "jobs.create", jobBody(unit, nil), 0)
 	j2 := asStr(t, data(res)["id"])
 	write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.offer",
 		`{"jobId":"`+j2+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
@@ -390,16 +394,16 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		)+`","termsVersion":"t"}`,
 		1,
 	)
-	owner(t, `UPDATE maintenance.offers SET offer_expires_at = $2 WHERE job_id = $1`, j2, clock)
+	owner(t, `UPDATE maintenance.offers SET offer_expires_at = $2 WHERE job_id = $1`, j2, clock())
 
-	if listJob(srv, &contrA, j2) != nil {
+	if listJob(t, srv, contrA(), j2) != nil {
 		t.Error("expired offer listed")
 	}
 
 	// technician: detail during the viewing window, history after it
 	_, res = write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.create",
 		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
 		0,
@@ -407,7 +411,7 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 	key := asStr(t, data(res)["id"])
 	write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.assign",
 		`{"jobId":"`+key+`","technicianMembershipId":"`+seed.ID("tech-internal-a").
 			String()+
@@ -421,7 +425,7 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 
 	if code, resp := post(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.get",
 		`{"jobId":"`+key+`"}`,
 	); code != 200 ||
@@ -431,15 +435,15 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 
 	if _, resp := post(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.list",
 		`{"filters":{"unitId":"`+unit+`"},"limit":100}`,
-	); byJob(
+	); byJob(t,
 		resp,
 		key,
 	) == nil {
 		t.Fatal("technician summary")
-	} else if row := byJob(
+	} else if row := byJob(t,
 		resp,
 		key,
 	); row["technicianMembershipId"] != seed.ID("tech-internal-a").String() ||
@@ -449,21 +453,21 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 
 	if _, resp := post(
 		srv,
-		&hq,
+		hq(),
 		"jobs.list",
 		`{"filters":{"unitId":"`+unit+`"},"limit":100}`,
-	); byJob(resp, job)["technicianMembershipId"] != nil {
-		t.Errorf("a job without an active assignment has no technician: %v", byJob(resp, job))
-	} else if byJob(resp, key)["accessValidFrom"] != nil || byJob(resp, key)["accessValidUntil"] != nil ||
-		byJob(resp, job)["accessValidUntil"] == nil {
+	); byJob(t, resp, job)["technicianMembershipId"] != nil {
+		t.Errorf("a job without an active assignment has no technician: %v", byJob(t, resp, job))
+	} else if byJob(t, resp, key)["accessValidFrom"] != nil || byJob(t, resp, key)["accessValidUntil"] != nil ||
+		byJob(t, resp, job)["accessValidUntil"] == nil {
 		t.Errorf(
 			"an internal job has no access window, a delegated one keeps its offer's: %v / %v",
-			byJob(resp, key),
-			byJob(resp, job),
+			byJob(t, resp, key),
+			byJob(t, resp, job),
 		)
 	}
 
-	if code, _ := post(srv, &techA, "jobs.get", `{"jobId":"`+key+`"}`); code != 404 {
+	if code, _ := post(srv, techA(), "jobs.get", `{"jobId":"`+key+`"}`); code != 404 {
 		t.Error("another technician")
 	}
 
@@ -473,27 +477,27 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 			job_id <> $2 AND scheduled && tstzrange($3, $4)`,
 		seed.ID("tech-internal-a"),
 		key,
-		clock.Add(-3*time.Hour),
-		clock.Add(-time.Hour),
+		clock().Add(-3*time.Hour),
+		clock().Add(-time.Hour),
 	)
 	owner(
 		t,
 		`UPDATE maintenance.assignments SET scheduled = tstzrange($2, $3), created_at = $2 WHERE job_id = $1 AND status =
 			'active'`,
 		key,
-		clock.Add(-3*time.Hour),
-		clock.Add(-time.Hour),
+		clock().Add(-3*time.Hour),
+		clock().Add(-time.Hour),
 	)
 
-	if code, _ := post(srv, &techInt, "jobs.get", `{"jobId":"`+key+`"}`); code != 404 {
+	if code, _ := post(srv, techInt(), "jobs.get", `{"jobId":"`+key+`"}`); code != 404 {
 		t.Error("ended viewing window before freeze")
 	}
 
-	freeze(t, clock)
+	freeze(t, clock())
 
 	if code, resp := post(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.get",
 		`{"jobId":"`+key+`"}`,
 	); code != 200 || data(resp)["projection"] != "history" ||
@@ -501,7 +505,7 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		t.Fatalf("technician history: %d %v", code, resp)
 	}
 
-	if listJob(srv, &techInt, key) == nil {
+	if listJob(t, srv, techInt(), key) == nil {
 		t.Error("technician history listed")
 	}
 }

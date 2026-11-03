@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -26,9 +26,11 @@ import (
 // server per business domain connected with its own least-privilege database role, principals from identity-api,
 // internal queries over HTTP, all behind the gateway. Pending events of every service are applied before and after
 // each request, so the suite keeps its single-process expectations while every cross-domain table access fails.
-var clusterMode = os.Getenv("AC_TEST_CLUSTER") == "1"
+func clusterMode() bool { return os.Getenv("AC_TEST_CLUSTER") == "1" }
 
 // facades caches one cluster per DemoOps setting for the whole test binary.
+//
+//nolint:gochecknoglobals // shared state: one cluster serves every test of the binary
 var facades = map[bool]*apiserver.Server{}
 
 // splitCluster is one server per business domain wired to each other like the compose services.
@@ -131,7 +133,7 @@ func newCluster(t *testing.T) splitCluster {
 	return buildCluster(
 		t,
 		apiserver.Config{
-			Clock:             clockFunc,
+			Clock:             clock,
 			DatabaseURL:       "",
 			DatabaseReaderURL: "",
 			Addr:              "",
@@ -275,6 +277,8 @@ func clusterFacade(t *testing.T, base apiserver.Config, verifier auth.Verifier) 
 }
 
 // clusters maps a facade to its services (schedTick).
+//
+//nolint:gochecknoglobals // shared state: schedTick finds a facade's services here
 var clusters = map[*apiserver.Server]splitCluster{}
 
 // tick runs each domain's scheduler with that domain's role and registry (IR195), then applies the events.

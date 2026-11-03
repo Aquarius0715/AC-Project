@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"strings"
@@ -16,7 +16,7 @@ func TestMRVEvidenceAttachments(t *testing.T) {
 	srv := server(t)
 	tenant := seed.ID("tenant-a")
 	unit, other := newUnit(t, srv, "MRV evidence AC"), newUnit(t, srv, "MRV other AC")
-	from, until := clock.Add(-48*time.Hour), clock.Add(-24*time.Hour)
+	from, until := clock().Add(-48*time.Hour), clock().Add(-24*time.Hour)
 	input := from.Add(2 * time.Hour)
 
 	var jobs []string
@@ -126,14 +126,14 @@ func TestMRVEvidenceAttachments(t *testing.T) {
 	}
 	ids := func(m map[string]any) []string {
 		out := []string{}
-		for _, it := range items(m) {
+		for _, it := range items(t, m) {
 			out = append(out, asStr(t, it["id"]))
 		}
 
 		return out
 	}
 
-	code, resp := post(srv, &hq, "attachments.list", body("", unit))
+	code, resp := post(srv, hq(), "attachments.list", body("", unit))
 	if code != 200 {
 		t.Fatalf("list: %d %v", code, resp)
 	}
@@ -142,7 +142,7 @@ func TestMRVEvidenceAttachments(t *testing.T) {
 		t.Fatalf("candidates: %v (panel %s, meter %s)", got, panel, meter)
 	}
 
-	first := items(resp)[1]
+	first := items(t, resp)[1]
 	if first["unitId"] != unit || first["reportId"] == nil || first["acceptedAt"] == nil ||
 		first["status"] != "ready" ||
 		first["name"] != "Meter.png" ||
@@ -152,7 +152,7 @@ func TestMRVEvidenceAttachments(t *testing.T) {
 	// both units; by name (case-insensitive) and a page of one
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"attachments.list",
 		body(`"sort":{"field":"name","direction":"asc"}`, unit, other),
 	); code != 200 ||
@@ -162,10 +162,10 @@ func TestMRVEvidenceAttachments(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"attachments.list",
 		body(`"limit":1`, unit, other),
-	); code != 200 || len(items(res)) != 1 || data(res)["total"] != float64(3) ||
+	); code != 200 || len(items(t, res)) != 1 || data(res)["total"] != float64(3) ||
 		data(res)["nextCursor"] == nil {
 		t.Errorf("first page: %d %v", code, res)
 	}
@@ -187,11 +187,11 @@ func TestMRVEvidenceAttachments(t *testing.T) {
 			from.Add(367*day).Format(time.RFC3339) + `","query":{}}`: "to=error.range",
 		body(`"filters":{"x":1}`, unit): "x=error.notAllowed",
 	} {
-		code, m := post(srv, &hq, "attachments.list", b)
+		code, m := post(srv, hq(), "attachments.list", b)
 		refusal(t, b, code, m, want)
 	}
 	// only HQ: a client and a contractor are refused
-	for _, a := range []*actor{&customerB, &contrA} {
+	for _, a := range []*actor{customerB(), contrA()} {
 		if code, _ := post(srv, a, "attachments.list", body("", unit)); code != 403 {
 			t.Errorf("%s lists evidence: %d", a.membership, code)
 		}

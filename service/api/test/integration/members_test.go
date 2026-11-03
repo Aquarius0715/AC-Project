@@ -1,7 +1,6 @@
-package integration
+package integration_test
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +11,8 @@ import (
 )
 
 func newUser(t *testing.T) string {
+	t.Helper()
+
 	id := uuid.NewString()
 	owner(
 		t,
@@ -33,8 +34,8 @@ func TestMembersSave(t *testing.T) {
 		seed.ID("org-customer-a").
 			String()
 	unit := seed.ID("unit-non-rto").String()
-	from := clock.Add(-time.Hour).Format(time.RFC3339)
-	until := clock.Add(30 * 24 * time.Hour).Format(time.RFC3339)
+	from := clock().Add(-time.Hour).Format(time.RFC3339)
+	until := clock().Add(30 * 24 * time.Hour).Format(time.RFC3339)
 	body := func(f map[string]string) string {
 		base := map[string]string{
 			"userId":         `"` + user + `"`,
@@ -107,7 +108,7 @@ func TestMembersSave(t *testing.T) {
 			422,
 		},
 		"until before from": {
-			map[string]string{"validUntil": `"` + clock.Add(-2*time.Hour).Format(time.RFC3339) + `"`},
+			map[string]string{"validUntil": `"` + clock().Add(-2*time.Hour).Format(time.RFC3339) + `"`},
 			422,
 		},
 		"blank reason":           {map[string]string{"reason": `" "`}, 422},
@@ -117,7 +118,7 @@ func TestMembersSave(t *testing.T) {
 		"unknown user":           {map[string]string{"userId": `"` + uuid.NewString() + `"`}, 404},
 		"unknown organization":   {map[string]string{"organizationId": `"` + uuid.NewString() + `"`}, 404},
 	} {
-		code, m := write(srv, &hq, "members.save", body(tc.f), 0)
+		code, m := write(srv, hq(), "members.save", body(tc.f), 0)
 		if w, ok := refused[name]; ok {
 			refusal(t, name, code, m, w)
 		} else if code != tc.code {
@@ -125,7 +126,7 @@ func TestMembersSave(t *testing.T) {
 		}
 	}
 
-	code, resp := write(srv, &hq, "members.save", body(nil), 0)
+	code, resp := write(srv, hq(), "members.save", body(nil), 0)
 	if code != 200 || data(resp)["role"] != "technician" ||
 		len(asArr(t, data(resp)["scopes"])) != 1 ||
 		asNum(t, data(resp)["scopeVersion"]) != 1 {
@@ -136,7 +137,7 @@ func TestMembersSave(t *testing.T) {
 	// update: permissions change bumps scopeVersion; role is fixed
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"members.save",
 		body(
 			map[string]string{
@@ -154,7 +155,7 @@ func TestMembersSave(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"members.save",
 		body(
 			map[string]string{
@@ -171,7 +172,7 @@ func TestMembersSave(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"members.save",
 		body(
 			map[string]string{
@@ -190,7 +191,7 @@ func TestMembersSave(t *testing.T) {
 	// a technician may also be scoped to a whole property (the identity copy of the property, IR186)
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"members.save",
 		body(
 			map[string]string{
@@ -211,7 +212,7 @@ func TestMembersSave(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"members.save",
 		body(map[string]string{"id": `"` + id + `"`}),
 		1,
@@ -219,7 +220,7 @@ func TestMembersSave(t *testing.T) {
 		t.Error("stale membership version")
 	}
 	// client memberships get clientRole=member and the initial consent
-	code, resp = write(srv, &hq, "members.save", body(map[string]string{
+	code, resp = write(srv, hq(), "members.save", body(map[string]string{
 		"organizationId": `"` + customer + `"`,
 		"role":           `"client"`,
 		"employment":     "null",
@@ -242,22 +243,22 @@ func TestMembersSave(t *testing.T) {
 		t.Error("initial consent")
 	}
 
-	if code, _ := write(srv, &customerA, "members.save", body(nil), 0); code != 403 {
+	if code, _ := write(srv, customerA(), "members.save", body(nil), 0); code != 403 {
 		t.Error("client manages members")
 	}
 
 	// self promotion and the last identity.write holder
-	_, resp = post(srv, &hq, "members.list", `{"filters":{"role":"admin"},"limit":100}`)
+	_, resp = post(srv, hq(), "members.list", `{"filters":{"role":"admin"},"limit":100}`)
 
 	var me map[string]any
 
-	for _, it := range items(resp) {
+	for _, it := range items(t, resp) {
 		if it["id"] == seed.ID("hq-operator").String() {
 			me = it
 		}
 	}
 
-	perms, _ := json.Marshal(me["permissions"])
+	perms := jsonBytes(t, me["permissions"])
 	selfBody := func(p string) string {
 		return `{"id":"` + asStr(
 			t,
@@ -275,7 +276,7 @@ func TestMembersSave(t *testing.T) {
 	withOverride := strings.Replace(string(perms), `[`, `["restriction.override",`, 1)
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"members.save",
 		selfBody(withOverride),
 		int(asNum(t, me["version"])),
@@ -287,7 +288,7 @@ func TestMembersSave(t *testing.T) {
 		t,
 		`UPDATE identity.memberships SET valid_until = $2 WHERE id = $1`,
 		seed.ID("hq-restriction-manager"),
-		clock.Add(-time.Minute),
+		clock().Add(-time.Minute),
 	)
 	t.Cleanup(func() {
 		owner(
@@ -303,8 +304,8 @@ func TestMembersSave(t *testing.T) {
 			FROM identity.membership_permissions WHERE permission = 'identity.write')
 		AND created_at > $3 AND tenant_id = $4`,
 		seed.ID("hq-operator"),
-		clock.Add(-time.Minute),
-		clock.Add(-24*time.Hour),
+		clock().Add(-time.Minute),
+		clock().Add(-24*time.Hour),
 		seed.ID("tenant-a"),
 	)
 
@@ -316,7 +317,7 @@ func TestMembersSave(t *testing.T) {
 	)
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"members.save",
 		selfBody(withoutIdentity),
 		int(asNum(t, me["version"])),
@@ -328,19 +329,19 @@ func TestMembersSave(t *testing.T) {
 func TestMembersList(t *testing.T) {
 	srv := server(t)
 
-	_, resp := post(srv, &hq, "members.list", `{"limit":100}`)
-	for _, it := range items(resp) {
+	_, resp := post(srv, hq(), "members.list", `{"limit":100}`)
+	for _, it := range items(t, resp) {
 		if it["role"] == "client" {
 			t.Fatal("clients excluded by default")
 		}
 	}
 	// IR172: every membership carries its user's display name (contractors list their technicians by name)
-	_, resp = post(srv, &contrA, "members.list", `{"limit":100}`)
-	if len(items(resp)) == 0 {
+	_, resp = post(srv, contrA(), "members.list", `{"limit":100}`)
+	if len(items(t, resp)) == 0 {
 		t.Fatal("contractor sees its technicians")
 	}
 
-	for _, it := range items(resp) {
+	for _, it := range items(t, resp) {
 		if name, _ := it["displayName"].(string); name == "" {
 			t.Fatalf("displayName missing: %v", it["id"])
 		}
@@ -348,31 +349,31 @@ func TestMembersList(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&hq,
+		hq(),
 		"members.list",
 		`{"filters":{"role":"client"},"limit":100}`,
 	); len(
-		items(res),
+		items(t, res),
 	) < 2 {
 		t.Error("role=client")
 	}
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"members.list",
 		`{"filters":{"activeOnly":false,"organizationId":"`+uuid.NewString()+`"}}`,
 	); code != 200 ||
-		len(items(res)) != 0 {
+		len(items(t, res)) != 0 {
 		t.Error("filters")
 	}
 
-	_, resp = post(srv, &contrA, "members.list", `{"limit":100}`)
-	if len(items(resp)) == 0 {
+	_, resp = post(srv, contrA(), "members.list", `{"limit":100}`)
+	if len(items(t, resp)) == 0 {
 		t.Fatal("contractor sees its technicians")
 	}
 
-	for _, it := range items(resp) {
+	for _, it := range items(t, resp) {
 		if it["role"] != "technician" ||
 			it["organizationId"] != seed.ID("org-contractor-a").String() ||
 			len(asArr(t, it["permissions"])) != 0 ||
@@ -389,11 +390,11 @@ func TestMembersList(t *testing.T) {
 
 	for _, b := range []string{`{"filters":{"role":"guest"}}`, `{"filters":{"x":1}}`, `{"sort":{"field":"name",` +
 		`"direction":"asc"}}`} {
-		code, m := post(srv, &hq, "members.list", b)
+		code, m := post(srv, hq(), "members.list", b)
 		refusal(t, b, code, m, want[b])
 	}
 
-	if code, _ := post(srv, &customerA, "members.list", `{}`); code != 403 {
+	if code, _ := post(srv, customerA(), "members.list", `{}`); code != 403 {
 		t.Error("client lists members")
 	}
 }
@@ -458,13 +459,13 @@ func TestMembersListCarriesEachMembersOwn(t *testing.T) {
 
 	_, res := post(
 		srv,
-		&hq,
+		hq(),
 		"members.list",
 		`{"filters":{"role":"technician","activeOnly":false},"limit":100}`,
 	)
 	grants := map[string]map[string]string{} // member → test grant code → revokedAt
 
-	for _, it := range items(res) {
+	for _, it := range items(t, res) {
 		id := asStr(t, it["id"])
 		for _, q := range asArr(t, it["qualifications"]) {
 			g := asObj(t, q)

@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"strings"
@@ -12,7 +12,7 @@ import (
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
 
-var techInt = actor{"tok-ti", "tech-internal-a"}
+func techInt() *actor { return &actor{"tok-ti", "tech-internal-a"} }
 
 // newUnit creates a unit for customer-b's home (fresh per test run).
 func newUnit(t *testing.T, s *apiserver.Server, name string) string {
@@ -20,7 +20,7 @@ func newUnit(t *testing.T, s *apiserver.Server, name string) string {
 
 	code, res := write(
 		s,
-		&hq,
+		hq(),
 		"units.save",
 		`{"customerOrgId":"`+seed.ID("org-customer-b").
 			String()+
@@ -40,6 +40,8 @@ func newUnit(t *testing.T, s *apiserver.Server, name string) string {
 
 // assign creates a job on unit with an assignment for membership whose window is [from, until).
 func assign(t *testing.T, unit, membership string, from, until time.Time, status string) string {
+	t.Helper()
+
 	job := uuid.NewString()
 
 	if status == "active" { // isolate from active assignments other tests left in the same window
@@ -95,7 +97,7 @@ func TestDevicesRegisterListGet(t *testing.T) {
 
 	code, resp := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.register",
 		body("  "+serial+" ", unit, `["temperature","power"]`, ""),
 		0,
@@ -116,13 +118,13 @@ func TestDevicesRegisterListGet(t *testing.T) {
 	}
 
 	dev := asStr(t, doc["id"])
-	if code, _ := post(srv, &customerB, "devices.get", `{"id":"`+dev+`"}`); code != 404 {
+	if code, _ := post(srv, customerB(), "devices.get", `{"id":"`+dev+`"}`); code != 404 {
 		t.Error("unbound devices are visible only to the creator and HQ")
 	}
 
 	code, resp = write(
 		srv,
-		&hq,
+		hq(),
 		"devices.bind",
 		`{"deviceId":"`+dev+`","unitId":"`+unit+`","reason":"installed"}`,
 		1,
@@ -133,7 +135,7 @@ func TestDevicesRegisterListGet(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.register",
 		body(strings.ToUpper(serial), newUnit(t, srv, "Dup"), `[]`, ""),
 		0,
@@ -143,7 +145,7 @@ func TestDevicesRegisterListGet(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.register",
 		body("X-"+uuid.NewString()[:6], newUnit(t, srv, "Cap"), `["vibration"]`, ""),
 		0,
@@ -158,13 +160,13 @@ func TestDevicesRegisterListGet(t *testing.T) {
 		body("OK-123", unit, `["power","power"]`, ""): "sensorTypes=error.duplicate",
 		`{"serial":"OK-1","unitId":"` + unit + `"}`:   "sensorTypes=error.required",
 	} {
-		code, m := write(srv, &hq, "devices.register", b, 0)
+		code, m := write(srv, hq(), "devices.register", b, 0)
 		refusal(t, b, code, m, want)
 	}
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.register",
 		body("UNK-"+uuid.NewString()[:6], uuid.NewString(), `[]`, ""),
 		0,
@@ -174,7 +176,7 @@ func TestDevicesRegisterListGet(t *testing.T) {
 	// reads: HQ sees it, customer-b (owner of the unit) sees it, customer-a does not
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"devices.get",
 		`{"id":"`+dev+`"}`,
 	); code != 200 ||
@@ -182,16 +184,21 @@ func TestDevicesRegisterListGet(t *testing.T) {
 		t.Fatalf("get: %d", code)
 	}
 
-	if code, _ := post(srv, &customerB, "devices.get", `{"id":"`+dev+`"}`); code != 200 {
+	if code, _ := post(srv, customerB(), "devices.get", `{"id":"`+dev+`"}`); code != 200 {
 		t.Error("customer-b reads its device")
 	}
 
-	if code, _ := post(srv, &customerA, "devices.get", `{"id":"`+dev+`"}`); code != 404 {
+	if code, _ := post(srv, customerA(), "devices.get", `{"id":"`+dev+`"}`); code != 404 {
 		t.Error("customer-a must not see customer-b's device")
 	}
 
-	_, resp = post(srv, &hq, "devices.list", `{"filters":{"unitId":"`+unit+`","status":"unknown"}}`)
-	if len(items(resp)) != 1 {
+	_, resp = post(
+		srv,
+		hq(),
+		"devices.list",
+		`{"filters":{"unitId":"`+unit+`","status":"unknown"}}`,
+	)
+	if len(items(t, resp)) != 1 {
 		t.Fatalf("list by unit: %v", resp)
 	}
 
@@ -201,12 +208,12 @@ func TestDevicesRegisterListGet(t *testing.T) {
 	}
 
 	for _, b := range []string{`{"filters":{"status":"x"}}`, `{"filters":{"y":1}}`} {
-		code, m := post(srv, &hq, "devices.list", b)
+		code, m := post(srv, hq(), "devices.list", b)
 		refusal(t, b, code, m, want[b])
 	}
 
-	_, resp = post(srv, &customerA, "devices.list", `{"limit":100}`)
-	for _, it := range items(resp) {
+	_, resp = post(srv, customerA(), "devices.list", `{"limit":100}`)
+	for _, it := range items(t, resp) {
 		if it["id"] == dev {
 			t.Fatal("client list leaks another customer's device")
 		}
@@ -233,7 +240,7 @@ func TestTechnicianWriteTable(t *testing.T) {
 
 		return write(
 			srv,
-			&techInt,
+			techInt(),
 			"devices.register",
 			`{"serial":"T-`+uuid.NewString()[:8]+`","sensorTypes":[],"unitId":"`+unit+`"`+j+`}`,
 			0,
@@ -253,8 +260,8 @@ func TestTechnicianWriteTable(t *testing.T) {
 		t,
 		u1,
 		"tech-internal-a",
-		clock.Add(time.Hour),
-		clock.Add(3*time.Hour),
+		clock().Add(time.Hour),
+		clock().Add(3*time.Hour),
 		"active",
 	)
 	if code, m := reg(
@@ -271,8 +278,8 @@ func TestTechnicianWriteTable(t *testing.T) {
 		t,
 		u2,
 		"tech-internal-a",
-		clock.Add(-3*time.Hour),
-		clock.Add(-time.Hour),
+		clock().Add(-3*time.Hour),
+		clock().Add(-time.Hour),
 		"active",
 	)
 	if code, m := reg(u2, ended); code != 403 || m["messageKey"] != "errors.assignment_ended" {
@@ -285,8 +292,8 @@ func TestTechnicianWriteTable(t *testing.T) {
 		t,
 		u3,
 		"tech-internal-a",
-		clock.Add(-time.Hour),
-		clock.Add(time.Hour),
+		clock().Add(-time.Hour),
+		clock().Add(time.Hour),
 		"revoked",
 	)
 	if code, m := reg(u3, revoked); code != 403 || m["messageKey"] != "errors.assignment_ended" {
@@ -299,8 +306,8 @@ func TestTechnicianWriteTable(t *testing.T) {
 		t,
 		u4,
 		"tech-internal-a",
-		clock.Add(time.Hour),
-		clock.Add(2*time.Hour),
+		clock().Add(time.Hour),
+		clock().Add(2*time.Hour),
 		"revoked",
 	)
 	if code, _ := reg(u4, revokedEarly); code != 404 {
@@ -313,8 +320,8 @@ func TestTechnicianWriteTable(t *testing.T) {
 		t,
 		u5,
 		"tech-internal-a",
-		clock.Add(-time.Hour),
-		clock.Add(time.Hour),
+		clock().Add(-time.Hour),
+		clock().Add(time.Hour),
 		"active",
 	)
 	if code, _ := reg(u1, active); code != 404 {
@@ -329,8 +336,8 @@ func TestTechnicianWriteTable(t *testing.T) {
 		t,
 		newUnit(t, srv, "Other"),
 		"tech-external-a",
-		clock.Add(-time.Hour),
-		clock.Add(time.Hour),
+		clock().Add(-time.Hour),
+		clock().Add(time.Hour),
 		"active",
 	)
 	if code, _ := reg(u5, other); code != 404 {
@@ -343,7 +350,7 @@ func TestDeviceBindAndOperations(t *testing.T) {
 	u1, u2 := newUnit(t, srv, "Op AC"), newUnit(t, srv, "Op AC2")
 	_, resp := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.register",
 		`{"serial":"OP-`+uuid.NewString()[:8]+`","sensorTypes":["temperature"],"unitId":"`+u1+`"}`,
 		0,
@@ -351,13 +358,13 @@ func TestDeviceBindAndOperations(t *testing.T) {
 	dev := asStr(t, data(resp)["id"])
 	sensor := asStr(t, asObj(t, asArr(t, data(resp)["sensors"])[0])["id"])
 
-	if code, _ := write(srv, &hq, "devices.check", `{"id":"`+dev+`"}`, 1); code != 409 {
+	if code, _ := write(srv, hq(), "devices.check", `{"id":"`+dev+`"}`, 1); code != 409 {
 		t.Error("operations need a bound device")
 	}
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.bind",
 		`{"deviceId":"`+dev+`","unitId":"`+u1+`","reason":""}`,
 		1,
@@ -368,16 +375,16 @@ func TestDeviceBindAndOperations(t *testing.T) {
 
 	_, resp = write(
 		srv,
-		&hq,
+		hq(),
 		"devices.bind",
 		`{"deviceId":"`+dev+`","unitId":"`+u1+`","reason":"install"}`,
 		1,
 	)
 
-	v := ver(resp)
+	v := ver(t, resp)
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.bind",
 		`{"deviceId":"`+dev+`","unitId":"`+u1+`","reason":"again"}`,
 		v,
@@ -387,7 +394,7 @@ func TestDeviceBindAndOperations(t *testing.T) {
 	// calibrate (synchronous history), check (queued), exclusion
 	code, resp := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.calibrate",
 		`{"deviceId":"`+dev+`","sensorId":"`+sensor+`","metric":"temperature","unit":"°C","referenceValue":25,`+
 			`"measuredValue":25.4,"calibratedAt":"2026-09-14T00:30:00Z"}`,
@@ -415,11 +422,11 @@ func TestDeviceBindAndOperations(t *testing.T) {
 		"metric differs": `{"deviceId":"` + dev + `","sensorId":"` + sensor + `","metric":"humidity","unit":"%",` +
 			`"referenceValue":1,"measuredValue":1,"calibratedAt":"2026-09-14T00:30:00Z"}`,
 	} {
-		code, m := write(srv, &hq, "devices.calibrate", b, v)
+		code, m := write(srv, hq(), "devices.calibrate", b, v)
 		refusal(t, name, code, m, want[name])
 	}
 
-	code, resp = write(srv, &hq, "devices.check", `{"id":"`+dev+`"}`, v)
+	code, resp = write(srv, hq(), "devices.check", `{"id":"`+dev+`"}`, v)
 	if code != 200 || data(resp)["status"] != "queued" || data(resp)["kind"] != "check" {
 		t.Fatalf("check: %d %v", code, resp)
 	}
@@ -428,7 +435,7 @@ func TestDeviceBindAndOperations(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"devices.get",
 		`{"id":"`+dev+`"}`,
 	); code != 200 ||
@@ -436,13 +443,13 @@ func TestDeviceBindAndOperations(t *testing.T) {
 		t.Fatal("activeOperation shown")
 	}
 
-	if code, _ := write(srv, &hq, "devices.check", `{"id":"`+dev+`"}`, v); code != 409 {
+	if code, _ := write(srv, hq(), "devices.check", `{"id":"`+dev+`"}`, v); code != 409 {
 		t.Error("D05: one operation at a time")
 	}
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.bind",
 		`{"deviceId":"`+dev+`","unitId":"`+u2+`","reason":"move"}`,
 		v,
@@ -452,7 +459,7 @@ func TestDeviceBindAndOperations(t *testing.T) {
 	// firmware: offline → OFFLINE, unsupported → VALIDATION
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.updateFirmware",
 		`{"deviceId":"`+dev+`","firmwareVersion":"v2"}`,
 		v,
@@ -466,7 +473,7 @@ func TestDeviceBindAndOperations(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.updateFirmware",
 		`{"deviceId":"`+dev+`","firmwareVersion":"v9"}`,
 		v,
@@ -477,7 +484,7 @@ func TestDeviceBindAndOperations(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.updateFirmware",
 		`{"deviceId":"`+dev+`","firmwareVersion":"v1"}`,
 		v,
@@ -488,7 +495,7 @@ func TestDeviceBindAndOperations(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.updateFirmware",
 		`{"deviceId":"`+dev+`","firmwareVersion":"v2"}`,
 		v,
@@ -503,7 +510,7 @@ func TestDeviceBindAndOperations(t *testing.T) {
 	// rebind to another unit: old binding ends, new sensors
 	code, resp = write(
 		srv,
-		&hq,
+		hq(),
 		"devices.bind",
 		`{"deviceId":"`+dev+`","unitId":"`+u2+`","reason":"moved"}`,
 		v,
@@ -518,7 +525,7 @@ func TestDeviceBindAndOperations(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.bind",
 		`{"deviceId":"`+dev+`","unitId":"`+u1+`","reason":"back"}`,
 		v,
@@ -529,7 +536,7 @@ func TestDeviceBindAndOperations(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.bind",
 		`{"deviceId":"`+dev+`","unitId":"`+u1+`","reason":"back"}`,
 		v-1,
@@ -539,7 +546,7 @@ func TestDeviceBindAndOperations(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.check",
 		`{"id":"`+uuid.NewString()+`"}`,
 		1,

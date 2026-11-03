@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"strings"
@@ -72,8 +72,8 @@ func TestReplicas(t *testing.T) {
 		seed.ID("tenant-a"),
 		uuid.New(),
 		seed.ID("cust-a"),
-		clock,
-		clock.Add(25*time.Hour),
+		clock(),
+		clock().Add(25*time.Hour),
 	)
 	owner(
 		t,
@@ -86,7 +86,7 @@ func TestReplicas(t *testing.T) {
 	powerSeries(
 		t,
 		unit.String(),
-		clock.Add(-10*time.Minute),
+		clock().Add(-10*time.Minute),
 		"measured",
 		new(float64(1)),
 		new(float64(2)),

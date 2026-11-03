@@ -1,8 +1,7 @@
-package integration
+package integration_test
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 	"time"
 
@@ -19,7 +18,7 @@ func TestAutomationNotifications(t *testing.T) {
 	cust := seed.ID("cust-b")
 	policy := func(unit string, recipients []uuid.UUID) string {
 		id := uuid.NewString()
-		cond, _ := json.Marshal(
+		cond := jsonBytes(t,
 			map[string]any{
 				"metric":            "co2",
 				"operator":          "gte",
@@ -66,7 +65,7 @@ func TestAutomationNotifications(t *testing.T) {
 		) + `","quality":"` + quality + `"}`
 	}
 	input := func(facts string) string {
-		return `{"eventId":"` + uuid.NewString() + `","occurredAt":"` + clock.Format(
+		return `{"eventId":"` + uuid.NewString() + `","occurredAt":"` + clock().Format(
 			time.RFC3339,
 		) + `","unitIds":["` + unitID + `","` + lonely + `"],"facts":[` + facts + `],"phase":"condition"}`
 	}
@@ -79,9 +78,9 @@ func TestAutomationNotifications(t *testing.T) {
 
 		return nil
 	}
-	high := fact(unitID, "1200", clock, "valid") + "," + fact(lonely, "1200", clock, "valid")
+	high := fact(unitID, "1200", clock(), "valid") + "," + fact(lonely, "1200", clock(), "valid")
 
-	code, resp := post(srv, &customerB, "automations.simulate", input(high))
+	code, resp := post(srv, customerB(), "automations.simulate", input(high))
 	if code != 200 || outcome(resp, unitID, withRecipient)["decision"] != "selected" ||
 		outcome(resp, unitID, def)["decision"] != "selected" ||
 		outcome(resp, lonely, noRecipient)["reason"] != "no_recipient" {
@@ -96,18 +95,18 @@ func TestAutomationNotifications(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.simulate",
-		input(fact(unitID, "500", clock, "valid")),
+		input(fact(unitID, "500", clock(), "valid")),
 	); outcome(res, unitID, withRecipient)["reason"] != "not_due" {
 		t.Errorf("below threshold: %v", res)
 	}
 
 	if _, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.simulate",
-		input(fact(unitID, "1200", clock, "suspect")),
+		input(fact(unitID, "1200", clock(), "suspect")),
 	); outcome(res, unitID, withRecipient)["reason"] != "quality" {
 		t.Errorf("quality: %v", res)
 	}
@@ -124,7 +123,7 @@ func TestAutomationNotifications(t *testing.T) {
 		t.Fatal("simulate saved notifications")
 	}
 
-	code, resp = write(srv, &customerB, "automations.fire", input(high), 0)
+	code, resp = write(srv, customerB(), "automations.fire", input(high), 0)
 
 	created := outcome(resp, unitID, withRecipient)
 	if code != 200 || created["decision"] != "created" ||
@@ -167,14 +166,14 @@ func TestAutomationNotifications(t *testing.T) {
 
 	code, resp = write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.fire",
-		`{"eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Format(
+		`{"eventId":"`+uuid.NewString()+`","occurredAt":"`+clock().Format(
 			time.RFC3339,
 		)+`","unitIds":["`+lonely+`"],"facts":[`+fact(
 			lonely,
 			"1300",
-			clock,
+			clock(),
 			"valid",
 		)+`],"phase":"condition"}`,
 		0,
@@ -217,7 +216,7 @@ func TestAutomationNotifications(t *testing.T) {
 	// so its alert of the unit, still open, sends nothing more either (IR600)
 	if _, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.simulate",
 		input(high),
 	); outcome(res, unitID, withRecipient)["reason"] != "cooldown" ||
@@ -227,11 +226,11 @@ func TestAutomationNotifications(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"notifications.list",
 		`{"filters":{"type":"fault"},"limit":100}`,
 	); len(
-		items(res),
+		items(t, res),
 	) == 0 {
 		t.Error("customer receives the alert notification")
 	}
@@ -240,7 +239,7 @@ func TestAutomationNotifications(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.simulate",
 		input(high),
 	); outcome(res, unitID, withRecipient)["reason"] != "disabled" {
@@ -256,7 +255,7 @@ func TestAutomationNotifications(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.simulate",
 		input(high),
 	); outcome(res, unitID, withRecipient)["reason"] != "owner_forbidden" {
@@ -275,7 +274,7 @@ func TestAutomationNotifications(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.simulate",
 		input(high),
 	); code != 200 ||
@@ -302,7 +301,7 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 	owner(t, `DELETE FROM control.evaluation_events`)
 	unit := newUnit(t, srv, "Recovery AC")
 	pol := uuid.NewString()
-	cond, _ := json.Marshal(
+	cond := jsonBytes(t,
 		map[string]any{
 			"metric":            "co2",
 			"operator":          "gte",
@@ -345,7 +344,7 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 		seed.ID("tenant-a"),
 		unit,
 		seed.ID("org-customer-b"),
-		clock.Add(-time.Hour),
+		clock().Add(-time.Hour),
 	)
 
 	fire := func(value, quality string, simulate bool) string {
@@ -355,19 +354,19 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 		) // one result per tick (D02): each call stands for a later tick of the fixed test clock
 
 		ev := uuid.NewString()
-		body := `{"eventId":"` + ev + `","occurredAt":"` + clock.Format(
+		body := `{"eventId":"` + ev + `","occurredAt":"` + clock().Format(
 			time.RFC3339,
 		) + `","unitIds":["` + unit + `"],"facts":[{"unitId":"` + unit + `","metric":"co2","value":` + value +
-			`,"unit":"ppm","observedAt":"` + clock.Format(
+			`,"unit":"ppm","observedAt":"` + clock().Format(
 			time.RFC3339,
 		) + `","quality":"` + quality + `"}],"phase":"condition"}`
 
 		operation, code := "automations.fire", 0
 		if simulate {
 			operation = "automations.simulate"
-			code, _ = post(srv, &customerB, operation, body)
+			code, _ = post(srv, customerB(), operation, body)
 		} else {
-			code, _ = write(srv, &customerB, operation, body, 0)
+			code, _ = write(srv, customerB(), operation, body, 0)
 		}
 
 		if code != 200 {
@@ -391,7 +390,7 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 		if err != nil {
 			t.Skip(err)
 		}
-		defer conn.Close(ctx)
+		defer func() { _ = conn.Close(ctx) }()
 		// the test clock stands still, so a recurrence has its predecessor's times: the one it links to comes first
 		rows, err := conn.Query(
 			ctx,
@@ -492,7 +491,7 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 		t.Errorf("the default rule's alert recovers too: %+v", d)
 	}
 
-	_, res := post(srv, &customerB, "alerts.get", `{"id":"`+manual+`"}`)
+	_, res := post(srv, customerB(), "alerts.get", `{"id":"`+manual+`"}`)
 	if data(res)["status"] != "open" {
 		t.Errorf("an alert without a policy stays open: %v", data(res)["status"])
 	}
@@ -509,7 +508,7 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 		t.Errorf("the recurrence notifies again: policy %d, default %d", told(pol), told(def))
 	}
 
-	_, res = post(srv, &customerB, "alerts.get", `{"id":"`+again[1].id+`"}`)
+	_, res = post(srv, customerB(), "alerts.get", `{"id":"`+again[1].id+`"}`)
 	if data(res)["previousAlertId"] != first[0].id {
 		t.Errorf("alerts.get shows the link: %v", data(res)["previousAlertId"])
 	}
@@ -524,14 +523,14 @@ func TestDemoAutomationNotifiesOnly(t *testing.T) {
 	unitID := newUnit(t, srv, "Gateway AC")
 	_, sess := post(
 		srv,
-		&customerB,
+		customerB(),
 		"session.get",
 		`{}`,
 	) // the business time of the server (a shared demo cluster may run ahead of clock)
 	now, _ := time.Parse(time.RFC3339Nano, asStr(t, asObj(t, sess["meta"])["snapshotAt"]))
 	tenant, cust := seed.ID("tenant-a"), seed.ID("cust-b")
 	pol := uuid.NewString()
-	cond, _ := json.Marshal(
+	cond := jsonBytes(t,
 		map[string]any{
 			"metric":            "temperature",
 			"operator":          "gte",
@@ -566,7 +565,7 @@ func TestDemoAutomationNotifiesOnly(t *testing.T) {
 	// HQ's automation on the same unit sets it to 26 °C while the tariff is 0.5 MYR/kWh or more (reported below)
 	if code, resp := write(
 		srv,
-		&hq,
+		hq(),
 		"policies.save",
 		autoPolicyBody(map[string]string{"unitIds": `["` + unitID + `"]`}),
 		0,
@@ -622,7 +621,7 @@ func TestDemoAutomationNotifiesOnly(t *testing.T) {
 
 		return write(
 			srv,
-			&customerB,
+			customerB(),
 			"demo.trigger",
 			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+at.Format(
 				time.RFC3339,
@@ -729,7 +728,7 @@ func TestDemoAutomationNotifiesOnly(t *testing.T) {
 	refusal(t, "schedule phase", code, res, "event.phase=error.invalid")
 	code, res = write(
 		srv,
-		&customerB,
+		customerB(),
 		"demo.trigger",
 		`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+when.Format(
 			time.RFC3339,
@@ -747,7 +746,7 @@ func TestDemoAutomationNotifiesOnly(t *testing.T) {
 
 	if code, resp := write(
 		srv,
-		&hq,
+		hq(),
 		"automations.fire",
 		`{"eventId":"`+uuid.NewString()+`","occurredAt":"`+now.Format(
 			time.RFC3339,

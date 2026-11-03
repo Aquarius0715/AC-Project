@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -14,9 +14,15 @@ import (
 func TestArchiveRulesD05(t *testing.T) {
 	srv := server(t)
 	archive := func(unit string) (int, map[string]any) {
-		_, g := post(srv, &hq, "units.get", `{"id":"`+unit+`"}`)
+		_, g := post(srv, hq(), "units.get", `{"id":"`+unit+`"}`)
 
-		return write(srv, &hq, "units.archive", `{"id":"`+unit+`","reason":"decommission"}`, ver(g))
+		return write(
+			srv,
+			hq(),
+			"units.archive",
+			`{"id":"`+unit+`","reason":"decommission"}`,
+			ver(t, g),
+		)
 	}
 	// open job
 	unitID := newUnit(t, srv, "Arch job")
@@ -29,8 +35,8 @@ func TestArchiveRulesD05(t *testing.T) {
 		seed.ID("tenant-a"),
 		unitID,
 		seed.ID("org-customer-b"),
-		clock,
-		clock.Add(time.Hour),
+		clock(),
+		clock().Add(time.Hour),
 	)
 
 	if code, m := archive(unitID); code != 409 || m["messageKey"] != "error.unitActive" {
@@ -46,14 +52,14 @@ func TestArchiveRulesD05(t *testing.T) {
 	u2 := newUnit(t, srv, "Arch dev")
 	_, res := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.register",
 		`{"serial":"AR-`+uuid.NewString()[:8]+`","sensorTypes":[],"unitId":"`+u2+`"}`,
 		0,
 	)
 	write(
 		srv,
-		&hq,
+		hq(),
 		"devices.bind",
 		`{"deviceId":"`+asStr(t, data(res)["id"])+`","unitId":"`+u2+`","reason":"install"}`,
 		1,
@@ -74,8 +80,8 @@ func TestArchiveRulesD05(t *testing.T) {
 		seed.ID("tenant-a"),
 		seed.ID("cust-b"),
 		seed.ID("org-customer-b"),
-		clock.Add(-24*time.Hour),
-		clock.Add(24*time.Hour),
+		clock().Add(-24*time.Hour),
+		clock().Add(24*time.Hour),
 		seed.ID("hq-operator"),
 	)
 	owner(
@@ -92,11 +98,11 @@ func TestArchiveRulesD05(t *testing.T) {
 	// customer deactivation with active units
 	_, c := post(
 		srv,
-		&hq,
+		hq(),
 		"customers.list",
 		`{"filters":{"organizationId":"`+seed.ID("org-customer-b").String()+`"}}`,
 	)
-	cb := items(c)[0]
+	cb := items(t, c)[0]
 
 	body := `{"id":"` + asStr(
 		t,
@@ -113,7 +119,7 @@ func TestArchiveRulesD05(t *testing.T) {
 	) + `","status":"inactive"}`
 	if code, resp := write(
 		srv,
-		&hq,
+		hq(),
 		"customers.save",
 		body,
 		int(asNum(t, cb["version"])),
@@ -125,7 +131,7 @@ func TestArchiveRulesD05(t *testing.T) {
 	org := uuid.NewString()
 	_, nc := write(
 		srv,
-		&hq,
+		hq(),
 		"customers.save",
 		`{"name":"Contract only","organizationId":"`+org+`","serviceProfile":"general","status":"active"}`,
 		0,
@@ -140,14 +146,14 @@ func TestArchiveRulesD05(t *testing.T) {
 		seed.ID("tenant-a"),
 		data(nc)["id"],
 		org,
-		clock.Add(-time.Hour),
-		clock.Add(time.Hour),
+		clock().Add(-time.Hour),
+		clock().Add(time.Hour),
 		seed.ID("hq-operator"),
 	)
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"customers.save",
 		`{"id":"`+asStr(t, data(nc)["id"])+`","name":"Contract only",`+
 			`"organizationId":"`+org+`","serviceProfile":"general",`+

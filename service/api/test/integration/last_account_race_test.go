@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"encoding/json"
@@ -28,14 +28,14 @@ func accountMembership(t *testing.T, org uuid.UUID, role string, clientRole any)
 		org,
 		role,
 		clientRole,
-		clock.Add(-time.Hour),
+		clock().Add(-time.Hour),
 	)
 	t.Cleanup(func() {
 		owner(
 			t,
 			`UPDATE identity.memberships SET valid_until = $2 WHERE id = $1 AND (valid_until IS NULL OR valid_until > $2)`,
 			id,
-			clock.Add(-time.Minute),
+			clock().Add(-time.Minute),
 		)
 	})
 
@@ -138,7 +138,7 @@ func TestLastOwnerAtOnce(t *testing.T) {
 				cust,
 				accountMembership(t, seed.ID("org-customer-b"), "client", "owner"),
 				"owner-"+id[:8]+"@example.com",
-				clock,
+				clock(),
 				seed.ID("customer-b"),
 			)
 		}
@@ -150,7 +150,7 @@ func TestLastOwnerAtOnce(t *testing.T) {
 			func() (int, map[string]any) {
 				return write(
 					srv,
-					&hq,
+					hq(),
 					"clientUsers.save",
 					`{"id":"`+a+`","customerId":"`+cust.String()+`","email":"owner-`+a[:8]+`@example.com","clientRole":"member",`+
 						`"status":"active","reason":"no longer an owner"}`,
@@ -160,7 +160,7 @@ func TestLastOwnerAtOnce(t *testing.T) {
 			func() (int, map[string]any) {
 				return write(
 					srv,
-					&hq,
+					hq(),
 					"clientUsers.remove",
 					`{"id":"`+b+`","reason":"left the company"}`,
 					1,
@@ -216,7 +216,7 @@ func TestLastContractorAtOnce(t *testing.T) {
 				org,
 				accountMembership(t, org, "contractor", nil),
 				"boss-"+id[:8]+"@example.com",
-				clock,
+				clock(),
 				seed.ID("contractor-a"),
 			)
 		}
@@ -228,7 +228,7 @@ func TestLastContractorAtOnce(t *testing.T) {
 			func() (int, map[string]any) {
 				return write(
 					srv,
-					&contrA,
+					contrA(),
 					"partnerUsers.save",
 					`{"id":"`+a+`","email":"boss-`+a[:8]+`@example.com","partnerRole":"contractor","status":"disabled","reason":"on `+
 						`leave"}`,
@@ -238,7 +238,7 @@ func TestLastContractorAtOnce(t *testing.T) {
 			func() (int, map[string]any) {
 				return write(
 					srv,
-					&contrA,
+					contrA(),
 					"partnerUsers.remove",
 					`{"id":"`+b+`","reason":"left the company"}`,
 					1,
@@ -283,8 +283,8 @@ func adminSave(
 ) (string, int) {
 	t.Helper()
 
-	_, m := post(srv, &hq, "members.list", `{"filters":{"role":"admin"},"limit":100}`)
-	for _, it := range items(m) {
+	_, m := post(srv, hq(), "members.list", `{"filters":{"role":"admin"},"limit":100}`)
+	for _, it := range items(t, m) {
 		if it["id"] != id {
 			continue
 		}
@@ -317,10 +317,12 @@ func adminSave(
 }
 
 // withoutIdentityWrite takes identity.write from the body's permissions.
-func withoutIdentityWrite(b map[string]any) {
+func withoutIdentityWrite(t *testing.T, b map[string]any) {
+	t.Helper()
+
 	var kept []any
 
-	for _, p := range b["permissions"].([]any) {
+	for _, p := range asArr(t, b["permissions"]) {
 		if p != "identity.write" {
 			kept = append(kept, p)
 		}
@@ -337,16 +339,17 @@ func TestLastIdentityAdminAtOnce(t *testing.T) {
 	identityAdmins(t)
 
 	op, rm := seed.ID("hq-operator").String(), seed.ID("hq-restriction-manager").String()
+	dropIdentityWrite := func(b map[string]any) { withoutIdentityWrite(t, b) }
 	for round := range 5 {
-		opBody, opVer := adminSave(t, srv, op, withoutIdentityWrite)
-		rmBody, rmVer := adminSave(t, srv, rm, withoutIdentityWrite)
+		opBody, opVer := adminSave(t, srv, op, dropIdentityWrite)
+		rmBody, rmVer := adminSave(t, srv, rm, dropIdentityWrite)
 		raceRefused(
 			t,
 			round,
 			"errors.last_identity_admin",
 			true, // each caller is one of the two: the second may have lost its right already
-			func() (int, map[string]any) { return write(srv, &hq, "members.save", rmBody, rmVer) },
-			func() (int, map[string]any) { return write(srv, &restrMgr, "members.save", opBody, opVer) },
+			func() (int, map[string]any) { return write(srv, hq(), "members.save", rmBody, rmVer) },
+			func() (int, map[string]any) { return write(srv, restrMgr(), "members.save", opBody, opVer) },
 		)
 
 		var holders int
@@ -402,12 +405,12 @@ func TestLastIdentityAdminStartLater(t *testing.T) {
 		rm,
 	)
 
-	later := func(b map[string]any) { b["validFrom"] = clock.Add(time.Hour).Format(time.RFC3339) }
+	later := func(b map[string]any) { b["validFrom"] = clock().Add(time.Hour).Format(time.RFC3339) }
 
 	body, v := adminSave(t, srv, operation, later)
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"members.save",
 		body,
 		v,
@@ -424,7 +427,7 @@ func TestLastIdentityAdminStartLater(t *testing.T) {
 	)
 
 	body, v = adminSave(t, srv, rm, later)
-	if code, m := write(srv, &hq, "members.save", body, v); code != 200 {
+	if code, m := write(srv, hq(), "members.save", body, v); code != 200 {
 		t.Fatalf("another holder starts later: %d %v", code, m)
 	}
 }

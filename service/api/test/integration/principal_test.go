@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"encoding/json"
@@ -24,7 +24,8 @@ func TestPrincipalFromIdentityService(t *testing.T) {
 	defer idSrv.Close()
 
 	get := func(token, subject, membership string) (int, map[string]any) {
-		req, _ := http.NewRequest(
+		req, _ := http.NewRequestWithContext(
+			t.Context(),
 			http.MethodGet,
 			idSrv.URL+auth.PrincipalPath+"?subject="+subject+"&tenant="+seed.ID("tenant-a").
 				String()+
@@ -37,7 +38,7 @@ func TestPrincipalFromIdentityService(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer res.Body.Close()
+		defer func() { _ = res.Body.Close() }()
 
 		var m map[string]any
 
@@ -72,11 +73,11 @@ func TestPrincipalFromIdentityService(t *testing.T) {
 		c.InternalToken = "test-internal"
 		c.ServiceURLs = cluster.others(ops.DomainBilling)
 	})
-	if code, m := post(billing, &customerA, "invoices.list", `{"limit":1}`); code != 200 {
+	if code, m := post(billing, customerA(), "invoices.list", `{"limit":1}`); code != 200 {
 		t.Fatalf("billing-api with remote principal: %d %v", code, m)
 	}
 
-	if code, _ := post(billing, &customerB, "invoices.list", `{"limit":1}`); code != 200 {
+	if code, _ := post(billing, customerB(), "invoices.list", `{"limit":1}`); code != 200 {
 		t.Fatalf("second member: %d", code)
 	}
 
@@ -90,7 +91,7 @@ func TestPrincipalFromIdentityService(t *testing.T) {
 	})
 	if code, res := post(
 		down,
-		&customerA,
+		customerA(),
 		"invoices.list",
 		`{"limit":1}`,
 	); code != 503 ||

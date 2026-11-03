@@ -1,7 +1,6 @@
-package integration
+package integration_test
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -29,8 +28,8 @@ func TestSearchIsLiteral(t *testing.T) {
 		CONFLICT (organization_id) DO NOTHING`,
 		seed.ID("tenant-a"),
 		org,
-		clock.Add(-time.Hour),
-		clock.Add(1000*time.Hour),
+		clock().Add(-time.Hour),
+		clock().Add(1000*time.Hour),
 	)
 	t.Cleanup(func() {
 		owner(t, `DELETE FROM maintenance.parts_catalog WHERE code = 'SEAL_50'`)
@@ -40,19 +39,19 @@ func TestSearchIsLiteral(t *testing.T) {
 	search := func(operation, term string) []map[string]any {
 		t.Helper()
 
-		b, _ := json.Marshal(
+		b := jsonBytes(t,
 			map[string]any{"filters": map[string]any{"search": term}, "limit": 100},
 		)
 
-		code, m := post(srv, &hq, operation, string(b))
+		code, m := post(srv, hq(), operation, string(b))
 		if code != 200 {
 			t.Fatalf("%s search %q: %d %v", operation, term, code, m)
 		}
 
-		return items(m)
+		return items(t, m)
 	}
 	text := func(item map[string]any) string {
-		b, _ := json.Marshal(item)
+		b := jsonBytes(t, item)
 
 		return strings.ToLower(string(b))
 	}

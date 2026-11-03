@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"strings"
@@ -26,18 +26,18 @@ func TestCommandCreateValidation(t *testing.T) {
 			restrictions.restriction_units WHERE unit_id = $1)`,
 		unit,
 	)
-	_, res := post(srv, &customerA, "units.get", `{"id":"`+unit+`"}`)
+	_, res := post(srv, customerA(), "units.get", `{"id":"`+unit+`"}`)
 
-	v := ver(res)
+	v := ver(t, res)
 	for name, c := range map[string]struct {
 		actor       *actor
 		body, field string
 	}{
-		"unit missing": {&customerA, `{"action":{"kind":"set_power","power":true},` +
+		"unit missing": {customerA(), `{"action":{"kind":"set_power","power":true},` +
 			`"expectedUnitVersion":` + itoa(v) + `}`, "unitId"},
-		"version missing": {&customerA, `{"unitId":"` + unit + `","action":{"kind":"set_power",` +
+		"version missing": {customerA(), `{"unitId":"` + unit + `","action":{"kind":"set_power",` +
 			`"power":true}}`, "expectedUnitVersion"},
-		"reason too long": {&techInt, `{"unitId":"` + unit + `","jobId":"` + uuid.NewString() +
+		"reason too long": {techInt(), `{"unitId":"` + unit + `","jobId":"` + uuid.NewString() +
 			`","action":{"kind":"set_power","power":true},"reason":"` + strings.Repeat("r", 1001) + `","expectedUnitVersion":` +
 			itoa(v) + `}`, "reason"},
 	} {
@@ -58,13 +58,13 @@ func TestCommandCreateValidation(t *testing.T) {
 	var jobUnit string
 	ownerScan(t, `SELECT unit_id::text FROM maintenance.jobs WHERE id = $1`, []any{job}, &jobUnit)
 
-	_, res = post(srv, &techInt, "units.get", `{"id":"`+jobUnit+`"}`)
+	_, res = post(srv, techInt(), "units.get", `{"id":"`+jobUnit+`"}`)
 	if code, resp := write(
 		srv,
-		&techInt,
+		techInt(),
 		"commands.create",
 		`{"unitId":"`+jobUnit+`","jobId":"`+job+`","action":{"kind":"set_power","power":true},"expectedUnitVersion":`+itoa(
-			ver(res),
+			ver(t, res),
 		)+`}`,
 		0,
 	); code != 422 ||
@@ -74,11 +74,11 @@ func TestCommandCreateValidation(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&techInt,
+		techInt(),
 		"commands.create",
 		`{"unitId":"`+jobUnit+`","jobId":"`+uuid.NewString()+`","action":{"kind":"set_power","power":true},`+
 			`"reason":"check","expectedUnitVersion":`+itoa(
-			ver(res),
+			ver(t, res),
 		)+`}`,
 		0,
 	); code != 404 {
@@ -87,7 +87,7 @@ func TestCommandCreateValidation(t *testing.T) {
 	// pendingCommands of units.get lists the open command
 	code, res := write(
 		srv,
-		&customerA,
+		customerA(),
 		"commands.create",
 		`{"unitId":"`+unit+`","action":{"kind":"set_power","power":true},"expectedUnitVersion":`+itoa(
 			v,
@@ -99,7 +99,7 @@ func TestCommandCreateValidation(t *testing.T) {
 	}
 
 	id := data(res)["id"]
-	_, res = post(srv, &customerA, "units.get", `{"id":"`+unit+`"}`)
+	_, res = post(srv, customerA(), "units.get", `{"id":"`+unit+`"}`)
 
 	pending := asArr(t, data(res)["pendingCommands"])
 	if len(pending) != 1 || asObj(t, pending[0])["id"] != id ||
@@ -138,7 +138,7 @@ func TestRestrictionInputValidation(t *testing.T) {
 	} {
 		if code, res := write(
 			srv,
-			&restrMgr,
+			restrMgr(),
 			c.op,
 			c.body,
 			1,

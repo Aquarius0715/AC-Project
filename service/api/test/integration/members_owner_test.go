@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -29,7 +29,7 @@ func TestClientMembersAreNotOwners(t *testing.T) {
 		seed.ID("tenant-a"),
 		seed.ID("user-customer-a"),
 		seed.ID("org-customer-a"),
-		clock.Add(-24*time.Hour),
+		clock().Add(-24*time.Hour),
 	)
 	owner(t, `INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission)
 		SELECT tenant_id, $1, permission FROM identity.membership_permissions WHERE membership_id = $2 ON CONFLICT DO
@@ -84,7 +84,7 @@ func TestClientMembersAreNotOwners(t *testing.T) {
 		}
 	}
 	// the owner of the same customer may
-	if code, res := post(srv, &customerA, "clientUsers.list", `{"limit":10}`); code != 200 {
+	if code, res := post(srv, customerA(), "clientUsers.list", `{"limit":10}`); code != 200 {
 		t.Errorf("the owner's list: %d %v", code, res)
 	}
 }
@@ -100,7 +100,7 @@ func TestMembersSaveNewUser(t *testing.T) {
 			`","role":"admin","permissions":["job.read"],"scopes":[{"kind":"tenant","id":"` +
 			seed.ID("tenant-a").
 				String() +
-			`"}],"validFrom":"` + clock.Format(
+			`"}],"validFrom":"` + clock().Format(
 			time.RFC3339,
 		) + `","validUntil":null,"reason":"new colleague"}`
 	}
@@ -108,7 +108,7 @@ func TestMembersSaveNewUser(t *testing.T) {
 	newUser := `"newUser":{"email":"` + email + `","displayName":"New Colleague"},`
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"members.save",
 		body(`"userId":"`+seed.ID("user-customer-a").String()+`",`+newUser),
 		0,
@@ -117,7 +117,7 @@ func TestMembersSaveNewUser(t *testing.T) {
 		t.Errorf("newUser with userId: %d %s", code, fields(res))
 	}
 
-	code, resp := write(srv, &hq, "members.save", body(newUser), 0)
+	code, resp := write(srv, hq(), "members.save", body(newUser), 0)
 	if code != 200 || data(resp)["role"] != "admin" {
 		t.Fatalf("create with a new person: %d %v", code, resp)
 	}
@@ -136,7 +136,7 @@ func TestMembersSaveNewUser(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"members.save",
 		body(newUser),
 		0,
@@ -153,13 +153,14 @@ func TestMembersSaveNewUser(t *testing.T) {
 		`","role":"technician","employment":"external","permissions":["alert.read"],"scopes":[{"kind":"unit",` +
 		`"id":"` + seed.ID("unit-non-rto").
 		String() +
-		`"}],"validFrom":"` + clock.Format(
+		`"}],"validFrom":"` + clock().Format(
 		time.RFC3339,
-	) + `","validUntil":"` + clock.Add(30*24*time.Hour).
+	) +
+		`","validUntil":"` + clock().Add(30*24*time.Hour).
 		Format(time.RFC3339) +
 		`","reason":"new field technician"}`
 
-	code, resp = write(srv, &hq, "members.save", tech, 0)
+	code, resp = write(srv, hq(), "members.save", tech, 0)
 	if code != 200 {
 		t.Fatalf("a new technician: %d %v", code, resp)
 	}
@@ -180,7 +181,7 @@ func TestMembersSaveNewUser(t *testing.T) {
 		t.Errorf("listed before the first sign-in: %s", status)
 	}
 
-	(&auth.Authenticator{DB: srv.DB, Now: clockFunc, Verifier: nil, Source: nil}).RecordSignIn(
+	(&auth.Authenticator{DB: srv.DB, Now: clock, Verifier: nil, Source: nil}).RecordSignIn(
 		context.Background(),
 		&ops.Principal{
 			TenantID: seed.ID("tenant-a"),
@@ -196,7 +197,7 @@ func TestMembersSaveNewUser(t *testing.T) {
 			Timezone:          "",
 			SessionsRevokedAt: nil,
 		},
-		clock,
+		clock(),
 	)
 	ownerScan(
 		t,

@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"strings"
@@ -12,7 +12,7 @@ import (
 
 // slotJSON returns a Slot starting h hours after the fixture clock lasting d hours.
 func slotJSON(h, d int) string {
-	s := clock.Add(time.Duration(h) * time.Hour)
+	s := clock().Add(time.Duration(h) * time.Hour)
 
 	return `{"startAt":"` + s.Format(
 		time.RFC3339,
@@ -27,10 +27,10 @@ func jobBody(unit string, extra map[string]string) string {
 		"unitId":  `"` + unit + `"`,
 		"type":    `"reactive"`,
 		"symptom": `"Water dripping from the indoor unit"`,
-		"requestedStart": `"` + clock.Add(25*time.Hour).
+		"requestedStart": `"` + clock().Add(25*time.Hour).
 			Format(time.RFC3339) +
 			`"`,
-		"requestedEnd":     `"` + clock.Add(27*time.Hour).Format(time.RFC3339) + `"`,
+		"requestedEnd":     `"` + clock().Add(27*time.Hour).Format(time.RFC3339) + `"`,
 		"alternativeSlots": "[" + slotJSON(49, 2) + "," + slotJSON(73, 1) + "]",
 	}
 
@@ -57,7 +57,7 @@ func TestJobsCreate(t *testing.T) {
 	unit := seed.ID("unit-non-rto").String()
 	code, resp := write(
 		srv,
-		&customerA,
+		customerA(),
 		"jobs.create",
 		jobBody(unit, map[string]string{"contactWindow": `" Weekdays 09:00-18:00 "`}),
 		0,
@@ -66,7 +66,7 @@ func TestJobsCreate(t *testing.T) {
 	j := data(resp)
 	if code != 200 || j["status"] != "requested" || j["origin"] != "client_request" ||
 		len(asArr(t, j["preferredSlots"])) != 3 ||
-		j["dueAt"] != clock.Add(27*time.Hour).Format(time.RFC3339) ||
+		j["dueAt"] != clock().Add(27*time.Hour).Format(time.RFC3339) ||
 		j["contactWindow"] != "Weekdays 09:00-18:00" ||
 		asNum(t, j["preferenceRound"]) != 1 {
 		t.Fatalf("create: %d %v", code, resp)
@@ -93,7 +93,7 @@ func TestJobsCreate(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"jobs.get",
 		`{"jobId":"`+asStr(t, j["id"])+`"}`,
 	); code != 200 ||
@@ -103,19 +103,19 @@ func TestJobsCreate(t *testing.T) {
 	// HQ on behalf: 0 alternatives, explicit dueAt
 	code, resp = write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.create",
 		jobBody(
 			unit,
 			map[string]string{
 				"alternativeSlots": "[]",
-				"dueAt":            `"` + clock.Add(48*time.Hour).Format(time.RFC3339) + `"`,
+				"dueAt":            `"` + clock().Add(48*time.Hour).Format(time.RFC3339) + `"`,
 			},
 		),
 		0,
 	)
 	if code != 200 || len(asArr(t, data(resp)["preferredSlots"])) != 1 ||
-		data(resp)["dueAt"] != clock.Add(48*time.Hour).Format(time.RFC3339) {
+		data(resp)["dueAt"] != clock().Add(48*time.Hour).Format(time.RFC3339) {
 		t.Fatalf("hq create: %d %v", code, resp)
 	}
 
@@ -124,20 +124,20 @@ func TestJobsCreate(t *testing.T) {
 		extra map[string]string
 		code  int
 	}{
-		"symptom 9": {&customerA, map[string]string{"symptom": `"too short"`}, 422},
+		"symptom 9": {customerA(), map[string]string{"symptom": `"too short"`}, 422},
 		"symptom 2001": {
-			&customerA,
+			customerA(),
 			map[string]string{"symptom": `"` + strings.Repeat("s", 2001) + `"`},
 			422,
 		},
-		"bad type": {&customerA, map[string]string{"type": `"emergency"`}, 422},
+		"bad type": {customerA(), map[string]string{"type": `"emergency"`}, 422},
 		"client one alternative": {
-			&customerA,
+			customerA(),
 			map[string]string{"alternativeSlots": "[" + slotJSON(49, 2) + "]"},
 			422,
 		},
 		"hq three alternatives": {
-			&hq,
+			hq(),
 			map[string]string{
 				"alternativeSlots": "[" + slotJSON(
 					49,
@@ -153,60 +153,60 @@ func TestJobsCreate(t *testing.T) {
 			422,
 		},
 		"today (KL)": {
-			&customerA,
+			customerA(),
 			map[string]string{
-				"requestedStart": `"` + clock.Add(5*time.Hour).Format(time.RFC3339) + `"`,
-				"requestedEnd":   `"` + clock.Add(7*time.Hour).Format(time.RFC3339) + `"`,
+				"requestedStart": `"` + clock().Add(5*time.Hour).Format(time.RFC3339) + `"`,
+				"requestedEnd":   `"` + clock().Add(7*time.Hour).Format(time.RFC3339) + `"`,
 			},
 			422,
 		},
 		"slot 5 hours": {
-			&customerA,
+			customerA(),
 			map[string]string{
 				"alternativeSlots": "[" + slotJSON(49, 5) + "," + slotJSON(73, 1) + "]",
 			},
 			422,
 		},
 		"duplicate slots": {
-			&customerA,
+			customerA(),
 			map[string]string{
 				"alternativeSlots": "[" + slotJSON(25, 2) + "," + slotJSON(73, 1) + "]",
 			},
 			422,
 		},
 		"client dueAt": {
-			&customerA,
-			map[string]string{"dueAt": `"` + clock.Add(48*time.Hour).Format(time.RFC3339) + `"`},
+			customerA(),
+			map[string]string{"dueAt": `"` + clock().Add(48*time.Hour).Format(time.RFC3339) + `"`},
 			422,
 		},
 		"hq dueAt before end": {
-			&hq,
-			map[string]string{"dueAt": `"` + clock.Add(26*time.Hour).Format(time.RFC3339) + `"`},
+			hq(),
+			map[string]string{"dueAt": `"` + clock().Add(26*time.Hour).Format(time.RFC3339) + `"`},
 			422,
 		},
 		"contact email": {
-			&customerA,
+			customerA(),
 			map[string]string{"contactWindow": `"call me at a@b.c"`},
 			422,
 		},
 		"contact phone": {
-			&customerA,
+			customerA(),
 			map[string]string{"contactWindow": `"+60 (12) 345-6789"`},
 			422,
 		},
 		"contact 201": {
-			&customerA,
+			customerA(),
 			map[string]string{"contactWindow": `"` + strings.Repeat("w", 201) + `"`},
 			422,
 		},
-		"other customer's unit": {&customerB, nil, 404},
+		"other customer's unit": {customerB(), nil, 404},
 		"unknown unit": {
-			&hq,
+			hq(),
 			map[string]string{"unitId": `"` + uuid.NewString() + `"`},
 			404,
 		},
-		"missing alternatives": {&customerA, map[string]string{"alternativeSlots": ""}, 422},
-		"technician":           {&techB, nil, 403},
+		"missing alternatives": {customerA(), map[string]string{"alternativeSlots": ""}, 422},
+		"technician":           {techB(), nil, 403},
 	}
 	refused := map[string]string{ // the field each VALIDATION case is refused for
 		"bad type":               "type=error.invalid",
@@ -239,7 +239,7 @@ func TestJobsCreate(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.create",
 		jobBody(archived, nil),
 		0,
@@ -254,25 +254,25 @@ func TestJobsReadAndTransitions(t *testing.T) {
 	unit := newUnit(t, srv, "Job AC")
 	_, resp := write(
 		srv,
-		&customerB,
+		customerB(),
 		"jobs.create",
 		jobBody(unit, map[string]string{"contactWindow": `"Mornings"`}),
 		0,
 	)
 	job := asStr(t, data(resp)["id"])
 
-	newAlert(t, unit, seed.ID("org-customer-b").String(), "warning", clock.Add(-time.Minute))
+	newAlert(t, unit, seed.ID("org-customer-b").String(), "warning", clock().Add(-time.Minute))
 
 	// list: summary projection with severity, display status, filters
-	_, resp = post(srv, &customerB, "jobs.list", `{"filters":{"unitId":"`+unit+`"}}`)
-	if len(items(resp)) != 1 || items(resp)[0]["projection"] != "summary" ||
-		items(resp)[0]["severity"] != "warning" ||
-		items(resp)[0]["displayStatus"] != "requested" {
+	_, resp = post(srv, customerB(), "jobs.list", `{"filters":{"unitId":"`+unit+`"}}`)
+	if len(items(t, resp)) != 1 || items(t, resp)[0]["projection"] != "summary" ||
+		items(t, resp)[0]["severity"] != "warning" ||
+		items(t, resp)[0]["displayStatus"] != "requested" {
 		t.Fatalf("list: %v", resp)
 	}
 
-	_, resp = post(srv, &customerA, "jobs.list", `{"filters":{"unitId":"`+unit+`"}}`)
-	if len(items(resp)) != 0 {
+	_, resp = post(srv, customerA(), "jobs.list", `{"filters":{"unitId":"`+unit+`"}}`)
+	if len(items(t, resp)) != 0 {
 		t.Fatal("customer-a sees customer-b's job")
 	}
 
@@ -301,13 +301,13 @@ func TestJobsReadAndTransitions(t *testing.T) {
 			`"}}`: 0,
 		`{"filters":{"unitId":"` + unit + `","membershipId":"` + seed.ID("tech-internal-a").String() +
 			`"}}`: 0,
-		`{"filters":{"unitId":"` + unit + `","from":"` + clock.Add(24*time.Hour).Format(time.RFC3339) + `","to":"` +
-			clock.Add(26*time.Hour).Format(time.RFC3339) + `"}}`: 1,
-		`{"filters":{"unitId":"` + unit + `","from":"` + clock.Add(26*time.Hour).Format(time.RFC3339) +
+		`{"filters":{"unitId":"` + unit + `","from":"` + clock().Add(24*time.Hour).Format(time.RFC3339) + `","to":"` +
+			clock().Add(26*time.Hour).Format(time.RFC3339) + `"}}`: 1,
+		`{"filters":{"unitId":"` + unit + `","from":"` + clock().Add(26*time.Hour).Format(time.RFC3339) +
 			`"}}`: 0,
 	} {
-		if code, m := post(srv, &hq, "jobs.list", body); code != 200 || len(items(m)) != n {
-			t.Errorf("%s: %d want %d", body, len(items(m)), n)
+		if code, m := post(srv, hq(), "jobs.list", body); code != 200 || len(items(t, m)) != n {
+			t.Errorf("%s: %d want %d", body, len(items(t, m)), n)
 		}
 	}
 	// the field each case is refused for
@@ -333,7 +333,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 			`"to":"2026-09-14T00:00:00Z"}}`, `{"sort":{"field":"unitId",` +
 			`"direction":"asc"}}`,
 	} {
-		code, m := post(srv, &hq, "jobs.list", b)
+		code, m := post(srv, hq(), "jobs.list", b)
 		refusal(t, b, code, m, want[b])
 	}
 
@@ -341,7 +341,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		for _, d := range []string{"asc", "desc"} {
 			if code, _ := post(
 				srv,
-				&hq,
+				hq(),
 				"jobs.list",
 				`{"sort":{"field":"`+f+`","direction":"`+d+`"},"limit":5}`,
 			); code != 200 {
@@ -350,7 +350,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		}
 	}
 	// status rank order (default sort): requested before cancelled
-	_, resp = post(srv, &hq, "jobs.list", `{"limit":100}`)
+	_, resp = post(srv, hq(), "jobs.list", `{"limit":100}`)
 	last := -1
 
 	rank := map[string]int{
@@ -365,7 +365,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		"completed":        8,
 		"cancelled":        9,
 	}
-	for _, it := range items(resp) {
+	for _, it := range items(t, resp) {
 		if r := rank[asStr(t, it["status"])]; r < last {
 			t.Fatal("status rank order")
 		} else {
@@ -376,7 +376,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 	// get / contact window visibility
 	if code, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
 	); code != 200 ||
@@ -384,18 +384,18 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		t.Fatalf("get: %d %v", code, res)
 	}
 
-	if code, _ := post(srv, &customerA, "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
+	if code, _ := post(srv, customerA(), "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
 		t.Error("other customer get")
 	}
 
-	if code, _ := post(srv, &techB, "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
+	if code, _ := post(srv, techB(), "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
 		t.Error("unassigned technician")
 	}
 
 	// notes and events
 	if code, _ := write(
 		srv,
-		&customerB,
+		customerB(),
 		"jobs.addNote",
 		`{"jobId":"`+job+`","message":"internal?","visibility":"internal"}`,
 		1,
@@ -405,7 +405,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&customerB,
+		customerB(),
 		"jobs.addNote",
 		`{"jobId":"`+job+`","message":"  Please call before arriving  ","visibility":"customer"}`,
 		1,
@@ -416,7 +416,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.addNote",
 		`{"jobId":"`+job+`","message":"Check parts stock","visibility":"internal"}`,
 		2,
@@ -426,7 +426,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.addNote",
 		`{"jobId":"`+job+`","message":"   ","visibility":"internal"}`,
 		3,
@@ -437,7 +437,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.addNote",
 		`{"jobId":"`+job+`","message":"x","visibility":"public"}`,
 		3,
@@ -448,7 +448,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.addNote",
 		`{"jobId":"`+job+`","message":"stale","visibility":"internal"}`,
 		1,
@@ -456,10 +456,10 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		t.Error("stale note")
 	}
 
-	_, resp = post(srv, &customerB, "jobs.events", `{"jobId":"`+job+`","query":{}}`)
+	_, resp = post(srv, customerB(), "jobs.events", `{"jobId":"`+job+`","query":{}}`)
 
 	acts := []string{}
-	for _, e := range items(resp) {
+	for _, e := range items(t, resp) {
 		acts = append(acts, asStr(t, e["action"]))
 		if n, ok := e["note"].(map[string]any); ok && n["visibility"] == "internal" {
 			t.Fatal("client sees internal note")
@@ -472,16 +472,17 @@ func TestJobsReadAndTransitions(t *testing.T) {
 
 	_, resp = post(
 		srv,
-		&hq,
+		hq(),
 		"jobs.events",
 		`{"jobId":"`+job+`","query":{"sort":{"field":"occurredAt","direction":"desc"},`+
-			`"filters":{"from":"`+clock.Add(-time.Hour).
+			`"filters":{"from":"`+clock().Add(-time.Hour).
 			Format(time.RFC3339)+
-			`","to":"`+clock.Add(time.Hour).
+			`","to":"`+clock().Add(time.Hour).
 			Format(time.RFC3339)+
 			`"}}}`,
 	)
-	if len(items(resp)) != 3 || items(resp)[0]["createdAt"] != items(resp)[0]["occurredAt"] {
+	if len(items(t, resp)) != 3 ||
+		items(t, resp)[0]["createdAt"] != items(t, resp)[0]["occurredAt"] {
 		t.Fatalf("hq events: %v", resp)
 	}
 
@@ -491,13 +492,13 @@ func TestJobsReadAndTransitions(t *testing.T) {
 			`"to":"2026-09-14T00:00:00Z"}}}`: "query.filters.to=error.range",
 		`{"query":{}}`: "jobId=error.invalid",
 	} {
-		code, m := post(srv, &hq, "jobs.events", b)
+		code, m := post(srv, hq(), "jobs.events", b)
 		refusal(t, b, code, m, want)
 	}
 
 	if code, _ := post(
 		srv,
-		&customerA,
+		customerA(),
 		"jobs.events",
 		`{"jobId":"`+job+`","query":{}}`,
 	); code != 404 {
@@ -507,7 +508,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 	// hold / resume / cancel state table
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.hold",
 		`{"jobId":"`+uuid.NewString()+`","reason":"parts"}`,
 		1,
@@ -517,7 +518,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.hold",
 		`{"jobId":"`+job+`","reason":"parts"}`,
 		3,
@@ -529,7 +530,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&customerB,
+		customerB(),
 		"jobs.cancel",
 		`{"jobId":"`+job+`","cancelReason":"no longer needed"}`,
 		3,
@@ -539,7 +540,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.hold",
 		`{"jobId":"`+job+`","reason":" waiting for parts "}`,
 		3,
@@ -550,7 +551,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.hold",
 		`{"jobId":"`+job+`","reason":"again"}`,
 		4,
@@ -560,7 +561,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.resumeHold",
 		`{"jobId":"`+job+`","reason":"parts arrived"}`,
 		4,
@@ -571,7 +572,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.resumeHold",
 		`{"jobId":"`+job+`","reason":"x"}`,
 		5,
@@ -581,7 +582,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.cancel",
 		`{"jobId":"`+job+`","cancelReason":"x"}`,
 		5,
@@ -591,7 +592,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.hold",
 		`{"jobId":"`+job+`","reason":""}`,
 		5,
@@ -600,11 +601,11 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		t.Errorf("blank hold reason: %d %s", code, fields(res))
 	}
 
-	write(srv, &hq, "jobs.hold", `{"jobId":"`+job+`","reason":"stop"}`, 5)
+	write(srv, hq(), "jobs.hold", `{"jobId":"`+job+`","reason":"stop"}`, 5)
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.cancel",
 		`{"jobId":"`+job+`","cancelReason":"customer withdrew"}`,
 		6,
@@ -615,7 +616,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.addNote",
 		`{"jobId":"`+job+`","message":"late","visibility":"internal"}`,
 		7,
@@ -625,7 +626,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.cancel",
 		`{"jobId":"`+job+`","cancelReason":"again"}`,
 		7,
@@ -634,12 +635,12 @@ func TestJobsReadAndTransitions(t *testing.T) {
 	}
 
 	// client cancels a requested job; offers and assignments of an offered job are closed by HQ cancel
-	_, resp = write(srv, &customerB, "jobs.create", jobBody(unit, nil), 0)
+	_, resp = write(srv, customerB(), "jobs.create", jobBody(unit, nil), 0)
 
 	j2 := asStr(t, data(resp)["id"])
 	if code, res := write(
 		srv,
-		&customerB,
+		customerB(),
 		"jobs.cancel",
 		`{"jobId":"`+j2+`","cancelReason":"   "}`,
 		1,
@@ -650,7 +651,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&customerB,
+		customerB(),
 		"jobs.cancel",
 		`{"jobId":"`+j2+`","cancelReason":"fixed itself"}`,
 		1,
@@ -660,7 +661,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 
 	_, resp = write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.create",
 		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
 		0,
@@ -675,13 +676,13 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		seed.ID("tenant-a"),
 		j3,
 		seed.ID("org-contractor-a"),
-		clock,
-		clock.Add(time.Hour),
+		clock(),
+		clock().Add(time.Hour),
 	)
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.cancel",
 		`{"jobId":"`+j3+`","cancelReason":"duplicate"}`,
 		1,
@@ -691,7 +692,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&techB,
+		techB(),
 		"jobs.cancel",
 		`{"jobId":"`+j3+`","cancelReason":"x"}`,
 		2,

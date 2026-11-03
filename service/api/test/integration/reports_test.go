@@ -1,7 +1,7 @@
-package integration
+package integration_test
 
 import (
-	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -65,12 +65,12 @@ func draftBody(job, result string, extra map[string]string) string {
 func TestWorkReports(t *testing.T) {
 	srv := server(t)
 	job := assignedNow(t, srv)
-	write(srv, &techInt, "jobs.start", `{"jobId":"`+job+`","startConfirmed":true}`, 2)
+	write(srv, techInt(), "jobs.start", `{"jobId":"`+job+`","startConfirmed":true}`, 2)
 
-	now := clock.Format("2006-01-02T15:04:05Z")
+	now := clock().Format("2006-01-02T15:04:05Z")
 
 	// first draft (all results null)
-	code, resp := write(srv, &techInt, "jobs.saveDraft", draftBody(job, "", nil), 0)
+	code, resp := write(srv, techInt(), "jobs.saveDraft", draftBody(job, "", nil), 0)
 	if code != 200 || asNum(t, data(resp)["version"]) != 1 ||
 		len(asArr(t, data(resp)["items"])) != 18 {
 		t.Fatalf("first draft: %d %v", code, resp)
@@ -79,13 +79,13 @@ func TestWorkReports(t *testing.T) {
 	rep := asStr(t, data(resp)["id"])
 	firstFilter := asObj(t, asArr(t, data(resp)["items"])[0])
 
-	if code, _ := write(srv, &techInt, "jobs.saveDraft", draftBody(job, "", nil), 0); code != 409 {
+	if code, _ := write(srv, techInt(), "jobs.saveDraft", draftBody(job, "", nil), 0); code != 409 {
 		t.Error("second draft without reportId")
 	}
 
 	if code, _ := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.saveDraft",
 		draftBody(job, "", map[string]string{"reportId": `"` + rep + `"`}),
 		2,
@@ -95,7 +95,7 @@ func TestWorkReports(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.saveDraft",
 		draftBody(job, "", map[string]string{"reportId": `"` + uuid.NewString() + `"`}),
 		1,
@@ -162,13 +162,13 @@ func TestWorkReports(t *testing.T) {
 
 	for name, e := range bad {
 		e["reportId"] = `"` + rep + `"`
-		code, m := write(srv, &techInt, "jobs.saveDraft", draftBody(job, "", e), 1)
+		code, m := write(srv, techInt(), "jobs.saveDraft", draftBody(job, "", e), 1)
 		refusal(t, name, code, m, want[name])
 	}
 
 	if code, _ := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.saveDraft",
 		draftBody(
 			job,
@@ -188,7 +188,7 @@ func TestWorkReports(t *testing.T) {
 		`"observedAt":"` + now + `"},{"componentKey":"compressor","metric":"vibration","value":null,"unit":"mm/s",` +
 		`"observedAt":"` + now + `"}]`
 
-	code, resp = write(srv, &techInt, "jobs.saveDraft", draftBody(job, "normal", map[string]string{
+	code, resp = write(srv, techInt(), "jobs.saveDraft", draftBody(job, "normal", map[string]string{
 		"reportId":     `"` + rep + `"`,
 		"measurements": meas,
 		"parts": `[{"name":" Filter ","quantity":1,"catalogCode":null,"source":"van_stock","lotSerial":null,` +
@@ -214,7 +214,7 @@ func TestWorkReports(t *testing.T) {
 	// submit: unit mismatch and version checks
 	if code, res := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.submit",
 		`{"jobId":"`+job+`","reportVersion":2}`,
 		3,
@@ -225,7 +225,7 @@ func TestWorkReports(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.submit",
 		`{"jobId":"`+job+`","reportVersion":1}`,
 		3,
@@ -241,13 +241,13 @@ func TestWorkReports(t *testing.T) {
 	)
 
 	reasonItems = strings.Replace(reasonItems, "{", `{"reportId":"`+rep+`",`, 1)
-	if code, _ := write(srv, &techInt, "jobs.saveDraft", reasonItems, 2); code != 200 {
+	if code, _ := write(srv, techInt(), "jobs.saveDraft", reasonItems, 2); code != 200 {
 		t.Fatal("save attention item")
 	}
 
 	if code, res := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.submit",
 		`{"jobId":"`+job+`","reportVersion":3}`,
 		3,
@@ -258,7 +258,7 @@ func TestWorkReports(t *testing.T) {
 
 	write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.saveDraft",
 		draftBody(
 			job,
@@ -274,7 +274,7 @@ func TestWorkReports(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.submit",
 		`{"jobId":"`+job+`","reportVersion":4}`,
 		3,
@@ -285,13 +285,13 @@ func TestWorkReports(t *testing.T) {
 
 	write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.saveDraft",
 		draftBody(job, "normal", map[string]string{"reportId": `"` + rep + `"`}),
 		4,
 	)
 
-	code, resp = write(srv, &techInt, "jobs.submit", `{"jobId":"`+job+`","reportVersion":5}`, 3)
+	code, resp = write(srv, techInt(), "jobs.submit", `{"jobId":"`+job+`","reportVersion":5}`, 3)
 	if code != 200 || data(resp)["status"] != "submitted" ||
 		asObj(t, data(resp)["timeOnSite"])["finishedAt"] == nil ||
 		len(asArr(t, data(resp)["reportRefs"])) != 1 {
@@ -307,7 +307,7 @@ func TestWorkReports(t *testing.T) {
 		)
 	}
 	if code, m := getRep(
-		&hq,
+		hq(),
 		5,
 	); code != 200 ||
 		asObj(t, data(m)["reviewAvailability"])["allowed"] != true {
@@ -315,7 +315,7 @@ func TestWorkReports(t *testing.T) {
 	}
 
 	if code, m := getRep(
-		&techInt,
+		techInt(),
 		5,
 	); code != 200 ||
 		asObj(t, data(m)["reviewAvailability"])["reason"] != "permission_denied" {
@@ -337,7 +337,7 @@ func TestWorkReports(t *testing.T) {
 	)
 
 	if code, m := getRep(
-		&hq,
+		hq(),
 		5,
 	); code != 200 || asObj(t, data(m)["reviewAvailability"])["allowed"] != false ||
 		asObj(t, data(m)["reviewAvailability"])["reason"] != "self_authored" {
@@ -351,17 +351,17 @@ func TestWorkReports(t *testing.T) {
 		author,
 	)
 
-	if code, _ := getRep(&customerA, 5); code != 404 {
+	if code, _ := getRep(customerA(), 5); code != 404 {
 		t.Error("client reads submitted (not accepted) report")
 	}
 
-	if code, _ := getRep(&hq, 9); code != 404 {
+	if code, _ := getRep(hq(), 9); code != 404 {
 		t.Error("unknown version")
 	}
 	// review: escalation mode is for outsourced jobs; return needs a reason
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.review",
 		`{"jobId":"`+job+`","reportVersion":5,"decision":"accept","reviewMode":"hq_escalation","reason":"x"}`,
 		4,
@@ -371,7 +371,7 @@ func TestWorkReports(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.review",
 		`{"jobId":"`+job+`","reportVersion":5,"decision":"return","reviewMode":"normal"}`,
 		4,
@@ -382,7 +382,7 @@ func TestWorkReports(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.review",
 		`{"jobId":"`+job+`","reportVersion":4,"decision":"accept","reviewMode":"normal"}`,
 		4,
@@ -392,7 +392,7 @@ func TestWorkReports(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.review",
 		`{"jobId":"`+job+`","reportVersion":5,"decision":"return","reviewMode":"normal","reason":"photo missing"}`,
 		4,
@@ -403,7 +403,7 @@ func TestWorkReports(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.saveDraft",
 		draftBody(job, "normal", map[string]string{"reportId": `"` + rep + `"`}),
 		5,
@@ -413,7 +413,7 @@ func TestWorkReports(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.resumeRework",
 		`{"jobId":"`+job+`"}`,
 		5,
@@ -423,12 +423,18 @@ func TestWorkReports(t *testing.T) {
 		t.Fatalf("resumeRework: %d %v", code, res)
 	}
 
-	if code, _ := write(srv, &techInt, "jobs.resumeRework", `{"jobId":"`+job+`"}`, 6); code != 409 {
+	if code, _ := write(
+		srv,
+		techInt(),
+		"jobs.resumeRework",
+		`{"jobId":"`+job+`"}`,
+		6,
+	); code != 409 {
 		t.Error("resume twice")
 	}
 
 	if _, m := getRep(
-		&hq,
+		hq(),
 		5,
 	); len(asArr(t, data(m)["reviewHistory"])) != 1 ||
 		asObj(t, data(m)["reviewAvailability"])["reason"] != "not_current" {
@@ -437,7 +443,7 @@ func TestWorkReports(t *testing.T) {
 
 	write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.saveDraft",
 		draftBody(
 			job,
@@ -449,12 +455,12 @@ func TestWorkReports(t *testing.T) {
 		),
 		6,
 	)
-	write(srv, &techInt, "jobs.submit", `{"jobId":"`+job+`","reportVersion":7}`, 6)
+	write(srv, techInt(), "jobs.submit", `{"jobId":"`+job+`","reportVersion":7}`, 6)
 	// another job at the same time: the technician is busy while the assignment is active (DEC-73 checks it after
 	// completion)
 	_, resp = write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.create",
 		jobBody(seed.ID("unit-non-rto").String(), map[string]string{"alternativeSlots": "[]"}),
 		0,
@@ -464,15 +470,15 @@ func TestWorkReports(t *testing.T) {
 	free := func() bool {
 		_, res := post(
 			srv,
-			&hq,
+			hq(),
 			"members.eligible",
-			`{"jobId":"`+other+`","startAt":"`+clock.Add(-30*time.Minute).
+			`{"jobId":"`+other+`","startAt":"`+clock().Add(-30*time.Minute).
 				Format(time.RFC3339)+
-				`","endAt":"`+clock.Add(30*time.Minute).
+				`","endAt":"`+clock().Add(30*time.Minute).
 				Format(time.RFC3339)+
 				`","query":{"limit":50}}`,
 		)
-		for _, it := range items(res) {
+		for _, it := range items(t, res) {
 			if it["id"] == seed.ID("tech-internal-a").String() {
 				return true
 			}
@@ -493,7 +499,7 @@ func TestWorkReports(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.review",
 		`{"jobId":"`+job+`","reportVersion":7,"decision":"accept","reviewMode":"normal"}`,
 		7,
@@ -510,7 +516,7 @@ func TestWorkReports(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.review",
 		`{"jobId":"`+job+`","reportVersion":7,"decision":"accept","reviewMode":"normal"}`,
 		7,
@@ -540,7 +546,7 @@ func TestWorkReports(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
 	); code != 200 || data(res)["assignment"] == nil ||
@@ -550,22 +556,22 @@ func TestWorkReports(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&hq,
+		hq(),
 		"jobs.list",
 		`{"filters":{"membershipId":"`+seed.ID("tech-internal-a").
 			String()+
 			`","status":"completed"},"limit":100}`,
-	); byJob(res, job) == nil ||
-		byJob(res, job)["technicianMembershipId"] != seed.ID("tech-internal-a").String() {
+	); byJob(t, res, job) == nil ||
+		byJob(t, res, job)["technicianMembershipId"] != seed.ID("tech-internal-a").String() {
 		t.Errorf(
 			"the assignee filter and the summary keep the completed job's technician: %v",
-			byJob(res, job),
+			byJob(t, res, job),
 		)
 	}
 
 	if code, res := post(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
 	); code != 200 || data(res)["projection"] != "history" ||
@@ -575,7 +581,7 @@ func TestWorkReports(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.saveDraft",
 		draftBody(job, "normal", map[string]string{"reportId": `"` + rep + `"`}),
 		7,
@@ -597,17 +603,17 @@ func TestWorkReports(t *testing.T) {
 		t.Errorf("completion notification to the technician: %d", notified)
 	}
 
-	if code, m := getRep(&customerA, 7); code != 200 || data(m)["acceptedAt"] == nil {
+	if code, m := getRep(customerA(), 7); code != 200 || data(m)["acceptedAt"] == nil {
 		t.Fatalf("client reads the accepted report: %d %v", code, m)
 	}
 
-	if code, _ := getRep(&customerB, 7); code != 404 {
+	if code, _ := getRep(customerB(), 7); code != 404 {
 		t.Error("other client")
 	}
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.review",
 		`{"jobId":"`+job+`","reportVersion":7,"decision":"accept","reviewMode":"normal"}`,
 		8,
@@ -615,11 +621,11 @@ func TestWorkReports(t *testing.T) {
 		t.Error("review completed job")
 	}
 
-	_, resp = post(srv, &hq, "jobs.events", `{"jobId":"`+job+`","query":{"limit":100}}`)
+	_, resp = post(srv, hq(), "jobs.events", `{"jobId":"`+job+`","query":{"limit":100}}`)
 
 	var refs int
 
-	for _, e := range items(resp) {
+	for _, e := range items(t, resp) {
 		if e["reportRef"] != nil {
 			refs++
 		}
@@ -631,9 +637,7 @@ func TestWorkReports(t *testing.T) {
 }
 
 func itoa(n int) string {
-	b, _ := json.Marshal(n)
-
-	return string(b)
+	return strconv.Itoa(n)
 }
 
 func TestContractorReview(t *testing.T) {
@@ -644,12 +648,12 @@ func TestContractorReview(t *testing.T) {
 		seed.ID("tech-external-a"),
 	)
 	unit := seed.ID("unit-non-rto").String()
-	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
-	_, res := write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
+	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	_, res := write(srv, customerA(), "jobs.create", jobBody(unit, nil), 0)
 	job := asStr(t, data(res)["id"])
 	write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
@@ -676,7 +680,7 @@ func TestContractorReview(t *testing.T) {
 	)
 	write(
 		srv,
-		&contrA,
+		contrA(),
 		"jobs.accept",
 		`{"jobId":"`+job+`","offerId":"`+offer+`","termsVersion":"t"}`,
 		2,
@@ -684,7 +688,7 @@ func TestContractorReview(t *testing.T) {
 
 	if code, resp := write(
 		srv,
-		&contrA,
+		contrA(),
 		"jobs.assign",
 		`{"jobId":"`+job+`","technicianMembershipId":"`+seed.ID("tech-external-a").
 			String()+
@@ -703,17 +707,17 @@ func TestContractorReview(t *testing.T) {
 		`UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3), created_at = $2
 			WHERE job_id = $1 AND status = 'active'`,
 		job,
-		clock.Add(-time.Hour),
-		clock.Add(time.Hour),
+		clock().Add(-time.Hour),
+		clock().Add(time.Hour),
 	)
-	write(srv, &techA, "jobs.start", `{"jobId":"`+job+`","startConfirmed":true}`, 4)
-	_, res = write(srv, &techA, "jobs.saveDraft", draftBody(job, "normal", nil), 0)
+	write(srv, techA(), "jobs.start", `{"jobId":"`+job+`","startConfirmed":true}`, 4)
+	_, res = write(srv, techA(), "jobs.saveDraft", draftBody(job, "normal", nil), 0)
 
 	rep := asStr(t, data(res)["id"])
 
 	if code, resp := write(
 		srv,
-		&techA,
+		techA(),
 		"jobs.submit",
 		`{"jobId":"`+job+`","reportVersion":1}`,
 		5,
@@ -723,7 +727,7 @@ func TestContractorReview(t *testing.T) {
 
 	if code, resp := post(
 		srv,
-		&contrA,
+		contrA(),
 		"reports.get",
 		`{"jobId":"`+job+`","reportId":"`+rep+`","reportVersion":1}`,
 	); code != 200 ||
@@ -733,7 +737,7 @@ func TestContractorReview(t *testing.T) {
 
 	if code, _ := post(
 		srv,
-		&contrB,
+		contrB(),
 		"reports.get",
 		`{"jobId":"`+job+`","reportId":"`+rep+`","reportVersion":1}`,
 	); code != 404 {
@@ -756,13 +760,13 @@ func TestContractorReview(t *testing.T) {
 
 		return code
 	}
-	if code := review(&contrB, "normal", ""); code != 404 {
+	if code := review(contrB(), "normal", ""); code != 404 {
 		t.Errorf("other contractor review: %d", code)
 	}
 
 	if code, resp := write(
 		srv,
-		&contrA,
+		contrA(),
 		"jobs.review",
 		`{"jobId":"`+job+`","reportVersion":1,"decision":"accept","reviewMode":"hq_escalation","reason":"x"}`,
 		6,
@@ -771,13 +775,13 @@ func TestContractorReview(t *testing.T) {
 		t.Errorf("contractor escalation mode: %d %s", code, fields(resp))
 	}
 
-	if code := review(&hq, "normal", ""); code != 403 {
+	if code := review(hq(), "normal", ""); code != 403 {
 		t.Errorf("HQ normal review of outsourced job: %d", code)
 	}
 
 	if code, resp := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.review",
 		`{"jobId":"`+job+`","reportVersion":1,"decision":"accept","reviewMode":"hq_escalation"}`,
 		6,
@@ -786,7 +790,7 @@ func TestContractorReview(t *testing.T) {
 		t.Errorf("escalation without reason: %d %s", code, fields(resp))
 	}
 
-	if code := review(&contrA, "normal", ""); code != 200 {
+	if code := review(contrA(), "normal", ""); code != 200 {
 		t.Fatalf("contractor accepts: %d", code)
 	}
 
@@ -804,7 +808,7 @@ func TestContractorReview(t *testing.T) {
 
 	if code, resp := post(
 		srv,
-		&techA,
+		techA(),
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
 	); code != 200 ||

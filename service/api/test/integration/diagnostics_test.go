@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -22,7 +22,7 @@ func ackCommand(t *testing.T, id string, when time.Time) bool {
 	if err != nil {
 		t.Skip(err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	keepObserved(t, id)
 	// the gateway sends a requested command and reports it sent (command_sent) before the device answers
@@ -83,10 +83,10 @@ func TestDiagnosticRuns(t *testing.T) {
 	clean()
 	t.Cleanup(clean)
 	job := assignedNow(t, srv)
-	_, resp := post(srv, &hq, "units.get", `{"id":"`+unit+`"}`)
-	uv := ver(resp)
-	_, resp = post(srv, &hq, "jobs.get", `{"jobId":"`+job+`"}`)
-	jv := ver(resp)
+	_, resp := post(srv, hq(), "units.get", `{"id":"`+unit+`"}`)
+	uv := ver(t, resp)
+	_, resp = post(srv, hq(), "jobs.get", `{"jobId":"`+job+`"}`)
+	jv := ver(t, resp)
 	run := func(a *actor, start, end string, mins, u, j int) (int, map[string]any) {
 		return write(
 			srv,
@@ -121,7 +121,7 @@ func TestDiagnosticRuns(t *testing.T) {
 		"stale job":      {on, off, 5, uv, jv + 3, 409},
 		"bad end action": {on, `{"kind":"dance"}`, 5, uv, jv, 422},
 	} {
-		code, m := run(&techInt, tc.start, tc.end, tc.mins, tc.u, tc.j)
+		code, m := run(techInt(), tc.start, tc.end, tc.mins, tc.u, tc.j)
 		if w, ok := refused[name]; ok {
 			refusal(t, name, code, m, w)
 		} else if code != tc.code {
@@ -130,7 +130,7 @@ func TestDiagnosticRuns(t *testing.T) {
 	}
 
 	if code, res := run(
-		&techInt,
+		techInt(),
 		on,
 		`{"kind":"ventilate","level":"low"}`,
 		5,
@@ -141,11 +141,11 @@ func TestDiagnosticRuns(t *testing.T) {
 		t.Errorf("an end action the unit does not support: %d %v", code, res)
 	}
 
-	if code, _ := run(&hq, on, off, 5, uv, jv); code != 403 {
+	if code, _ := run(hq(), on, off, 5, uv, jv); code != 403 {
 		t.Error("HQ creates runs")
 	}
 
-	code, resp := run(&techInt, on, off, 5, uv, jv)
+	code, resp := run(techInt(), on, off, 5, uv, jv)
 	if code != 200 || data(resp)["state"] != "awaiting_start" {
 		t.Fatalf("create: %d %v", code, resp)
 	}
@@ -156,7 +156,7 @@ func TestDiagnosticRuns(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&techInt,
+		techInt(),
 		"commands.create",
 		`{"unitId":"`+unit+`","jobId":"`+job+`","action":`+off+`,"reason":"x","expectedUnitVersion":`+itoa(
 			uv,
@@ -167,24 +167,24 @@ func TestDiagnosticRuns(t *testing.T) {
 		t.Errorf("busy during run: %d %v", code, res)
 	}
 
-	if !ackCommand(t, start, clock.Add(5*time.Second)) {
+	if !ackCommand(t, start, clock().Add(5*time.Second)) {
 		t.Fatal("start ack")
 	}
 
-	_, resp = post(srv, &techInt, "diagnosticRuns.get", `{"diagnosticRunId":"`+r1+`"}`)
+	_, resp = post(srv, techInt(), "diagnosticRuns.get", `{"diagnosticRunId":"`+r1+`"}`)
 	if data(resp)["state"] != "running" ||
-		data(resp)["endAt"] != clock.Add(5*time.Second+5*time.Minute).Format(time.RFC3339) {
+		data(resp)["endAt"] != clock().Add(5*time.Second+5*time.Minute).Format(time.RFC3339) {
 		t.Fatalf("running: %v", resp)
 	}
 
 	ctx := context.Background()
 
-	_, err := schedTick(ctx, srv, clock.Add(6*time.Minute))
+	_, err := schedTick(ctx, srv, clock().Add(6*time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, resp = post(srv, &hq, "diagnosticRuns.get", `{"diagnosticRunId":"`+r1+`"}`)
+	_, resp = post(srv, hq(), "diagnosticRuns.get", `{"diagnosticRunId":"`+r1+`"}`)
 	if data(resp)["state"] != "end_requested" || data(resp)["endCommandId"] == nil {
 		t.Fatalf("end requested: %v", resp)
 	}
@@ -192,21 +192,21 @@ func TestDiagnosticRuns(t *testing.T) {
 	if !ackCommand(
 		t,
 		asStr(t, data(resp)["endCommandId"]),
-		clock.Add(6*time.Minute+3*time.Second),
+		clock().Add(6*time.Minute+3*time.Second),
 	) {
 		t.Fatal("end ack")
 	}
 
 	if _, res := post(
 		srv,
-		&hq,
+		hq(),
 		"diagnosticRuns.get",
 		`{"diagnosticRunId":"`+r1+`"}`,
 	); data(res)["state"] != "completed" {
 		t.Fatalf("completed: %v", res)
 	}
 	// start never acknowledged → start_failed
-	code, resp = run(&techInt, on, off, 5, uv, jv)
+	code, resp = run(techInt(), on, off, 5, uv, jv)
 	if code != 200 {
 		t.Fatalf("second run: %d %v", code, resp)
 	}
@@ -216,7 +216,7 @@ func TestDiagnosticRuns(t *testing.T) {
 	_, err = schedTick(
 		ctx,
 		srv,
-		clock.Add(36*time.Second),
+		clock().Add(36*time.Second),
 	)
 	if err != nil { // 30 s window + the 5 s grace (IR453)
 		t.Fatal(err)
@@ -224,7 +224,7 @@ func TestDiagnosticRuns(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&hq,
+		hq(),
 		"diagnosticRuns.get",
 		`{"diagnosticRunId":"`+r2+`"}`,
 	); data(res)["state"] != "start_failed" ||
@@ -232,13 +232,13 @@ func TestDiagnosticRuns(t *testing.T) {
 		t.Fatalf("start failed: %v", res)
 	}
 	// a restriction at the end blocks the end action
-	code, resp = run(&techInt, off, on, 1, uv, jv)
+	code, resp = run(techInt(), off, on, 1, uv, jv)
 	if code != 200 {
 		t.Fatalf("third run: %d %v", code, resp)
 	}
 
 	r3 := asStr(t, data(resp)["id"])
-	ackCommand(t, asStr(t, data(resp)["startCommandId"]), clock.Add(time.Second))
+	ackCommand(t, asStr(t, data(resp)["startCommandId"]), clock().Add(time.Second))
 
 	rid := uuid.NewString()
 	owner(
@@ -250,8 +250,8 @@ func TestDiagnosticRuns(t *testing.T) {
 		seed.ID("tenant-a"),
 		uuid.New(),
 		seed.ID("cust-a"),
-		clock,
-		clock.Add(25*time.Hour),
+		clock(),
+		clock().Add(25*time.Hour),
 	)
 	owner(
 		t,
@@ -262,18 +262,18 @@ func TestDiagnosticRuns(t *testing.T) {
 		unit,
 	)
 
-	if code, _ := run(&techInt, on, off, 5, uv, jv); code != 403 && code != 409 {
+	if code, _ := run(techInt(), on, off, 5, uv, jv); code != 403 && code != 409 {
 		t.Errorf("start action prohibited or busy: %d", code)
 	}
 
-	_, err = schedTick(ctx, srv, clock.Add(2*time.Minute))
+	_, err = schedTick(ctx, srv, clock().Add(2*time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if _, res := post(
 		srv,
-		&hq,
+		hq(),
 		"diagnosticRuns.get",
 		`{"diagnosticRunId":"`+r3+`"}`,
 	); data(res)["state"] != "end_blocked" {
@@ -282,16 +282,16 @@ func TestDiagnosticRuns(t *testing.T) {
 	// the device offline at the end: the end action fails with OFFLINE and sends nothing
 	owner(t, `UPDATE restrictions.restrictions SET state = 'cancelled' WHERE id = $1`, rid)
 
-	code, resp = run(&techInt, off, on, 1, uv, jv)
+	code, resp = run(techInt(), off, on, 1, uv, jv)
 	if code != 200 {
 		t.Fatalf("fourth run: %d %v", code, resp)
 	}
 
 	r4 := asStr(t, data(resp)["id"])
-	ackCommand(t, asStr(t, data(resp)["startCommandId"]), clock.Add(time.Second))
+	ackCommand(t, asStr(t, data(resp)["startCommandId"]), clock().Add(time.Second))
 	owner(t, `UPDATE devices.devices SET connection = 'offline' WHERE unit_id = $1`, unit)
 
-	_, err = schedTick(ctx, srv, clock.Add(3*time.Minute))
+	_, err = schedTick(ctx, srv, clock().Add(3*time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -300,7 +300,7 @@ func TestDiagnosticRuns(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&hq,
+		hq(),
 		"diagnosticRuns.get",
 		`{"diagnosticRunId":"`+r4+`"}`,
 	); data(res)["state"] != "end_failed" || data(res)["failureCode"] != "OFFLINE" ||
@@ -309,14 +309,14 @@ func TestDiagnosticRuns(t *testing.T) {
 	}
 	// the retry of the end (Figma Technician 425:474, IR351): once the device is back, the technician sends the end action
 	// again as an ordinary command of the job (commands.create); the run stays end_failed
-	_, resp = post(srv, &hq, "units.get", `{"id":"`+unit+`"}`)
+	_, resp = post(srv, hq(), "units.get", `{"id":"`+unit+`"}`)
 	if code, res := write(
 		srv,
-		&techInt,
+		techInt(),
 		"commands.create",
 		`{"unitId":"`+unit+`","jobId":"`+job+`","action":`+on+`,"reason":"End of test run sent again: check cooling",`+
 			`"expectedUnitVersion":`+itoa(
-			ver(resp),
+			ver(t, resp),
 		)+`}`,
 		0,
 	); code != 200 || data(res)["source"] != "ui" || data(res)["jobId"] != job ||
@@ -326,7 +326,7 @@ func TestDiagnosticRuns(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&hq,
+		hq(),
 		"diagnosticRuns.get",
 		`{"diagnosticRunId":"`+r4+`"}`,
 	); data(res)["state"] != "end_failed" {
@@ -335,18 +335,18 @@ func TestDiagnosticRuns(t *testing.T) {
 	// reads
 	if _, res := post(
 		srv,
-		&techInt,
+		techInt(),
 		"diagnosticRuns.list",
 		`{"unitId":"`+unit+`","jobId":"`+job+`","query":{}}`,
 	); len(
-		items(res),
+		items(t, res),
 	) != 4 {
-		t.Errorf("list: %d", len(items(res)))
+		t.Errorf("list: %d", len(items(t, res)))
 	}
 	// pages of two: the cursor binds unit and job, so the second page reads the third and fourth runs (IR223 fix)
 	_, resp = post(
 		srv,
-		&techInt,
+		techInt(),
 		"diagnosticRuns.list",
 		`{"unitId":"`+unit+`","jobId":"`+job+`","query":{"limit":2}}`,
 	)
@@ -354,11 +354,11 @@ func TestDiagnosticRuns(t *testing.T) {
 	next, _ := data(resp)["nextCursor"].(string)
 	if code, res := post(
 		srv,
-		&techInt,
+		techInt(),
 		"diagnosticRuns.list",
 		`{"unitId":"`+unit+`","jobId":"`+job+`","query":{"limit":2,"cursor":"`+next+`"}}`,
 	); next == "" || code != 200 ||
-		len(items(res)) != 2 {
+		len(items(t, res)) != 2 {
 		t.Errorf("second page: %d %v", code, res)
 	}
 	// a revoked Assignment keeps the runs of the job visible (IR139, IR187)
@@ -366,18 +366,18 @@ func TestDiagnosticRuns(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&techInt,
+		techInt(),
 		"diagnosticRuns.list",
 		`{"unitId":"`+unit+`","jobId":"`+job+`","query":{}}`,
 	); len(
-		items(res),
+		items(t, res),
 	) != 4 {
-		t.Errorf("list after revoke: %d", len(items(res)))
+		t.Errorf("list after revoke: %d", len(items(t, res)))
 	}
 
 	if code, _ := post(
 		srv,
-		&techInt,
+		techInt(),
 		"diagnosticRuns.get",
 		`{"diagnosticRunId":"`+r1+`"}`,
 	); code != 200 {
@@ -386,17 +386,17 @@ func TestDiagnosticRuns(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&techB,
+		techB(),
 		"diagnosticRuns.list",
 		`{"unitId":"`+unit+`","query":{}}`,
 	); code != 200 ||
-		len(items(res)) != 0 {
+		len(items(t, res)) != 0 {
 		t.Error("other technician lists runs")
 	}
 
 	if code, _ := post(
 		srv,
-		&techB,
+		techB(),
 		"diagnosticRuns.get",
 		`{"diagnosticRunId":"`+r1+`"}`,
 	); code != 404 &&
@@ -406,7 +406,7 @@ func TestDiagnosticRuns(t *testing.T) {
 
 	if code, _ := post(
 		srv,
-		&hq,
+		hq(),
 		"diagnosticRuns.get",
 		`{"diagnosticRunId":"`+uuid.NewString()+`"}`,
 	); code != 404 {
@@ -415,7 +415,7 @@ func TestDiagnosticRuns(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"diagnosticRuns.list",
 		`{"query":{}}`,
 	); code != 422 ||

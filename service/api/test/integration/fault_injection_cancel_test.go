@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -14,7 +14,7 @@ func TestCancelRollsBackWhenTheStatusCannotBeWritten(t *testing.T) {
 	srv := server(t)
 	_, res := write(
 		srv,
-		&customerA,
+		customerA(),
 		"jobs.create",
 		jobBody(seed.ID("unit-non-rto").String(), nil),
 		0,
@@ -25,14 +25,14 @@ func TestCancelRollsBackWhenTheStatusCannotBeWritten(t *testing.T) {
 		`UPDATE maintenance.jobs SET status = 'on_hold', hold_reason = 'parts' WHERE id = $1`,
 		job,
 	)
-	_, res = post(srv, &hq, "jobs.get", `{"jobId":"`+job+`"}`)
-	version := ver(res)
+	_, res = post(srv, hq(), "jobs.get", `{"jobId":"`+job+`"}`)
+	version := ver(t, res)
 
 	broken := injectAt(t, "UPDATE maintenance.jobs SET status = 'cancelled'")
 
 	code, res := write(
 		broken,
-		&hq,
+		hq(),
 		"jobs.cancel",
 		`{"jobId":"`+job+`","cancelReason":"customer withdrew"}`,
 		version,
@@ -41,8 +41,8 @@ func TestCancelRollsBackWhenTheStatusCannotBeWritten(t *testing.T) {
 		t.Fatalf("cancel with a failing status write: %d %v, want a server error", code, res)
 	}
 
-	_, res = post(srv, &hq, "jobs.get", `{"jobId":"`+job+`"}`)
-	if data(res)["status"] != "on_hold" || ver(res) != version {
+	_, res = post(srv, hq(), "jobs.get", `{"jobId":"`+job+`"}`)
+	if data(res)["status"] != "on_hold" || ver(t, res) != version {
 		t.Errorf("a failed cancel changed the job: %v", res)
 	}
 }

@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"encoding/json"
@@ -16,15 +16,16 @@ import (
 func TestWritesGetResult(t *testing.T) {
 	srv := server(t)
 	key := "wr-" + uuid.NewString()
-	req := httptest.NewRequest(
+	req := httptest.NewRequestWithContext(
+		t.Context(),
 		http.MethodPut,
 		"/v1/preferences",
 		strings.NewReader(`{"locale":"en","timezone":"Asia/Kuala_Lumpur"}`),
 	)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+techB.token)
+	req.Header.Set("Authorization", "Bearer "+techB().token)
 	req.Header.Set("X-Tenant-Id", seed.ID("tenant-a").String())
-	req.Header.Set("X-Membership-Id", seed.ID(techB.membership).String())
+	req.Header.Set("X-Membership-Id", seed.ID(techB().membership).String())
 	req.Header.Set("Idempotency-Key", key)
 
 	rec := httptest.NewRecorder()
@@ -38,7 +39,7 @@ func TestWritesGetResult(t *testing.T) {
 		return post(srv, a, "writes.getResult", `{"operation":"`+op+`","idempotencyKey":"`+k+`"}`)
 	}
 
-	code, m := get(&techB, "preferences.update", key)
+	code, m := get(techB(), "preferences.update", key)
 	if code != 200 || data(m)["state"] != "succeeded" ||
 		asObj(t, data(m)["result"])["locale"] != "en" {
 		t.Fatalf("succeeded: %d %v", code, m)
@@ -49,8 +50,8 @@ func TestWritesGetResult(t *testing.T) {
 		op  string
 		key string
 	}{
-		"other member": {&techA, "preferences.update", key}, "other operation": {&techB, "consents.update", key},
-		"unknown key": {&techB, "preferences.update", "nokey-" + uuid.NewString()},
+		"other member": {techA(), "preferences.update", key}, "other operation": {techB(), "consents.update", key},
+		"unknown key": {techB(), "preferences.update", "nokey-" + uuid.NewString()},
 	} {
 		if _, m := get(tc.a, tc.op, tc.key); data(m)["state"] != "not_received" {
 			t.Errorf("%s: %v", name, m)
@@ -58,7 +59,7 @@ func TestWritesGetResult(t *testing.T) {
 	}
 
 	if code, res := get(
-		&techB,
+		techB(),
 		"no.such",
 		key,
 	); code != 422 ||
@@ -67,7 +68,7 @@ func TestWritesGetResult(t *testing.T) {
 	}
 
 	if code, res := get(
-		&techB,
+		techB(),
 		"preferences.update",
 		"short",
 	); code != 422 ||
@@ -77,11 +78,12 @@ func TestWritesGetResult(t *testing.T) {
 
 	owner(t, `UPDATE platform.idempotency_keys SET status = 'in_progress' WHERE key = $1`, key)
 
-	if _, m := get(&techB, "preferences.update", key); data(m)["state"] != "pending" {
+	if _, m := get(techB(), "preferences.update", key); data(m)["state"] != "pending" {
 		t.Errorf("pending: %v", m)
 	}
 	// password reset preview is public and generic
-	req = httptest.NewRequest(
+	req = httptest.NewRequestWithContext(
+		t.Context(),
 		http.MethodPost,
 		"/v1/auth/password-reset-preview",
 		strings.NewReader(`{"demoEmail":"nobody@example.com"}`),
@@ -117,13 +119,20 @@ func TestResolveQr(t *testing.T) {
 	ownerScan(t, `SELECT serial FROM devices.devices WHERE unit_id = $1`, []any{unit}, &serial)
 
 	qr := func(code string) (int, map[string]any) {
-		return post(srv, &techB, "units.resolveQr", `{"code":"`+code+`"}`)
+		return post(srv, techB(), "units.resolveQr", `{"code":"`+code+`"}`)
 	}
 	if code, _ := qr(unit); code != 404 {
 		t.Error("unit outside assignments")
 	}
 
-	job := assign(t, unit, "tech-external-b", clock.Add(-time.Hour), clock.Add(time.Hour), "active")
+	job := assign(
+		t,
+		unit,
+		"tech-external-b",
+		clock().Add(-time.Hour),
+		clock().Add(time.Hour),
+		"active",
+	)
 	for _, c := range []string{unit, "AC-UNIT:" + unit, strings.ToLower(serial)} {
 		code, m := qr(c)
 		if code != 200 || data(m)["unitId"] != unit || data(m)["jobId"] != job {
@@ -145,7 +154,7 @@ func TestResolveQr(t *testing.T) {
 		t.Errorf("blank code: %d %s", code, fields(m))
 	}
 
-	if code, _ := post(srv, &customerB, "units.resolveQr", `{"code":"`+unit+`"}`); code != 403 {
+	if code, _ := post(srv, customerB(), "units.resolveQr", `{"code":"`+unit+`"}`); code != 403 {
 		t.Error("client resolves QR")
 	}
 }

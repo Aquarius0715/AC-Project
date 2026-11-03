@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -14,13 +14,13 @@ func TestDomainServiceServesOnlyItsOperations(t *testing.T) {
 	cluster := newCluster(t)
 
 	billing := cluster.srv[ops.DomainBilling]
-	if code, m := post(billing, &customerA, "invoices.list", `{"limit":1}`); code != 200 {
+	if code, m := post(billing, customerA(), "invoices.list", `{"limit":1}`); code != 200 {
 		t.Fatalf("billing-api invoices.list: %d %v", code, m)
 	}
 
 	if code, res := post(
 		billing,
-		&customerA,
+		customerA(),
 		"units.list",
 		`{"limit":1}`,
 	); code != 404 ||
@@ -39,11 +39,11 @@ func TestDomainServiceServesOnlyItsOperations(t *testing.T) {
 			ops.DomainEnergy:      cluster.urls[ops.DomainEnergy],
 		}
 	})
-	if code, _ := post(two, &customerA, "units.list", `{"limit":1}`); code != 200 {
+	if code, _ := post(two, customerA(), "units.list", `{"limit":1}`); code != 200 {
 		t.Fatalf("two domains units.list: %d", code)
 	}
 
-	if code, _ := post(two, &customerA, "jobs.list", `{"limit":1}`); code != 404 {
+	if code, _ := post(two, customerA(), "jobs.list", `{"limit":1}`); code != 404 {
 		t.Fatalf("two domains jobs.list: %d", code)
 	}
 }

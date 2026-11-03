@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -16,13 +16,13 @@ import (
 func TestAutomationDecideReasons(t *testing.T) {
 	srv := server(t)
 	unit := boundUnit(t, srv, "online")
-	at := clock.Format(time.RFC3339)
+	at := clock().Format(time.RFC3339)
 	rule := func(cond, action string) (string, int) {
 		t.Helper()
 
 		code, res := write(
 			srv,
-			&customerB,
+			customerB(),
 			"automations.save",
 			`{"name":"reason",`+
 				`"unitIds":["`+unit+`"],"timezone":"Asia/Kuala_Lumpur","enabled":true,"priority":10,"kind":"event",`+
@@ -33,14 +33,14 @@ func TestAutomationDecideReasons(t *testing.T) {
 			t.Fatalf("rule: %d %v", code, res)
 		}
 
-		return asStr(t, data(res)["id"]), ver(res)
+		return asStr(t, data(res)["id"]), ver(t, res)
 	}
 	remove := func(id string, v int) {
 		t.Helper()
 
 		if code, res := write(
 			srv,
-			&customerB,
+			customerB(),
 			"automations.delete",
 			`{"id":"`+id+`"}`,
 			v,
@@ -53,7 +53,7 @@ func TestAutomationDecideReasons(t *testing.T) {
 
 		code, res := post(
 			srv,
-			&customerB,
+			customerB(),
 			"automations.simulate",
 			`{"eventId":"`+uuid.NewString()+`","occurredAt":"`+at+`","unitIds":["`+unit+`"],"facts":[`+facts+
 				`],"phase":"condition"}`,
@@ -114,14 +114,14 @@ func TestAutomationDecideReasons(t *testing.T) {
 	remove(id, v)
 
 	// consent_revoked: a location rule saved with consent whose consent row was flipped without the withdrawal event
-	_, c := post(srv, &customerB, "consents.get", `{"purpose":"location_automation"}`)
+	_, c := post(srv, customerB(), "consents.get", `{"purpose":"location_automation"}`)
 	if data(c)["granted"] != true {
 		if code, res := write(
 			srv,
-			&customerB,
+			customerB(),
 			"consents.update",
 			`{"purpose":"location_automation","granted":true}`,
-			ver(c),
+			ver(t, c),
 		); code != 200 {
 			t.Fatalf("consent: %d %v", code, res)
 		}

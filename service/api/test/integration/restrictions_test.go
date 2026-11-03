@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -36,7 +36,7 @@ func boundUnit(t *testing.T, s *apiserver.Server, connection string) string {
 		unit,
 		seed.ID("hq-operator"),
 		connection,
-		clock,
+		clock(),
 	)
 	owner(
 		t,
@@ -48,7 +48,7 @@ func boundUnit(t *testing.T, s *apiserver.Server, connection string) string {
 		dev,
 		unit,
 		seed.ID("org-customer-b"),
-		clock.Add(-time.Hour),
+		clock().Add(-time.Hour),
 		seed.ID("hq-operator"),
 	)
 	owner(t, `UPDATE assets.units SET connection = $2 WHERE id = $1`, unit, connection)
@@ -60,11 +60,11 @@ func boundUnit(t *testing.T, s *apiserver.Server, connection string) string {
 func overdueContract(t *testing.T, srv *apiserver.Server, units ...string) (string, string) {
 	t.Helper()
 
-	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 
 	code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"contracts.save",
 		`{"customerId":"`+seed.ID("cust-b").
 			String()+
@@ -87,7 +87,7 @@ func overdueContract(t *testing.T, srv *apiserver.Server, units ...string) (stri
 
 	code, res = write(
 		srv,
-		&hq,
+		hq(),
 		"invoices.create",
 		`{"amountMinor":5000,"currency":"MYR","contractId":"`+key+`","contractVersion":1,"period":{"from":"`+stamp(
 			-24*14,
@@ -103,7 +103,7 @@ func overdueContract(t *testing.T, srv *apiserver.Server, units ...string) (stri
 	}
 
 	inv := asStr(t, data(res)["id"])
-	owner(t, `UPDATE billing.invoices SET due_at = $2 WHERE id = $1`, inv, clock.Add(-time.Hour))
+	owner(t, `UPDATE billing.invoices SET due_at = $2 WHERE id = $1`, inv, clock().Add(-time.Hour))
 
 	return key, inv
 }
@@ -115,7 +115,7 @@ func scheduleBody(k, inv string, units []string, extra map[string]string) string
 		"causeInvoiceIds":         `["` + inv + `"]`,
 		"unitIds":                 `["` + strings.Join(units, `","`) + `"]`,
 		"policy":                  `{"kind":"temperature_limit","minimumCoolingSetpoint":24}`,
-		"executeAfter":            `"` + clock.Add(25*time.Hour).Format(time.RFC3339) + `"`,
+		"executeAfter":            `"` + clock().Add(25*time.Hour).Format(time.RFC3339) + `"`,
 		"reason":                  `"Invoice overdue"`,
 		"rulesVersion":            `"rules-1"`,
 	}
@@ -131,24 +131,27 @@ func scheduleBody(k, inv string, units []string, extra map[string]string) string
 
 // due moves a scheduled restriction's notice into the past so it can be executed.
 func due(t *testing.T, id string) {
+	t.Helper()
 	owner(
 		t,
 		`UPDATE restrictions.restrictions SET notice_at = $2, execute_after = $3 WHERE id = $1`,
 		id,
-		clock.Add(-26*time.Hour),
-		clock.Add(-time.Hour),
+		clock().Add(-26*time.Hour),
+		clock().Add(-time.Hour),
 	)
 	owner(
 		t,
 		`UPDATE notify.notifications SET occurred_at = $2 WHERE target->>'id' = $1`,
 		id,
-		clock.Add(-26*time.Hour),
+		clock().Add(-26*time.Hour),
 	)
 }
 
-func unitState(m map[string]any, unit string) map[string]any {
-	for _, u := range data(m)["perUnit"].([]any) {
-		if x := u.(map[string]any); x["unitId"] == unit {
+func unitState(t *testing.T, m map[string]any, unit string) map[string]any {
+	t.Helper()
+
+	for _, u := range asArr(t, data(m)["perUnit"]) {
+		if x := asObj(t, u); x["unitId"] == unit {
 			return x
 		}
 	}
@@ -165,7 +168,7 @@ func expireAt(t *testing.T, now time.Time) {
 	if err != nil {
 		t.Skip(err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	beginFuncErr := pgx.BeginFunc(
 		ctx,
@@ -207,7 +210,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 		code int
 	}{
 		"notice under 24h": {
-			map[string]string{"executeAfter": `"` + clock.Add(23*time.Hour).Format(time.RFC3339) + `"`},
+			map[string]string{"executeAfter": `"` + clock().Add(23*time.Hour).Format(time.RFC3339) + `"`},
 			422,
 		},
 		"missing cause":    {map[string]string{"causeInvoiceIds": `["` + uuid.NewString() + `"]`}, 422},
@@ -224,7 +227,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 	} {
 		code, res := write(
 			srv,
-			&restrMgr,
+			restrMgr(),
 			"restrictions.schedule",
 			scheduleBody(key, inv, units, tc.e),
 			0,
@@ -238,7 +241,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"restrictions.schedule",
 		scheduleBody(key, inv, units, nil),
 		0,
@@ -248,14 +251,14 @@ func TestRestrictionLifecycle(t *testing.T) {
 
 	code, resp := write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.schedule",
 		scheduleBody(key, inv, units, nil),
 		0,
 	)
 	if code != 200 || data(resp)["state"] != "scheduled" ||
 		len(asArr(t, data(resp)["noticeNotificationIds"])) == 0 ||
-		data(resp)["noticeAt"] != clock.Format(time.RFC3339) {
+		data(resp)["noticeAt"] != clock().Format(time.RFC3339) {
 		t.Fatalf("schedule: %d %v", code, resp)
 	}
 
@@ -263,7 +266,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.schedule",
 		scheduleBody(key, inv, []string{online}, nil),
 		0,
@@ -274,13 +277,13 @@ func TestRestrictionLifecycle(t *testing.T) {
 	notice := asArr(t, data(resp)["noticeNotificationIds"])
 	nc, inbox := post(
 		srv,
-		&customerB,
+		customerB(),
 		"notifications.list",
 		`{"filters":{"type":"restriction"},"limit":100}`,
 	)
 	found := 0
 
-	for _, it := range items(inbox) {
+	for _, it := range items(t, inbox) {
 		if slices.Contains(notice, it["id"]) {
 			found++
 		}
@@ -298,7 +301,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 	exec := func(rules string, v int) (int, map[string]any) {
 		return write(
 			srv,
-			&restrMgr,
+			restrMgr(),
 			"restrictions.execute",
 			`{"restrictionId":"`+id+`","confirmedRulesVersion":"`+rules+`"}`,
 			v,
@@ -327,7 +330,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 		t.Fatalf("execute: %d %v", code, resp)
 	}
 
-	on, off := unitState(resp, online), unitState(resp, offline)
+	on, off := unitState(t, resp, online), unitState(t, resp, offline)
 	if on["applyState"] != "sent_unknown" || off["applyState"] != "not_sent" ||
 		off["pendingReason"] != "offline" ||
 		len(asArr(t, off["applyCommandIds"])) != 1 {
@@ -351,13 +354,14 @@ func TestRestrictionLifecycle(t *testing.T) {
 		t.Error("execute twice")
 	}
 
-	if !ackCommand(t, asStr(t, asArr(t, on["applyCommandIds"])[0]), clock.Add(time.Second)) {
+	if !ackCommand(t, asStr(t, asArr(t, on["applyCommandIds"])[0]), clock().Add(time.Second)) {
 		t.Fatal("ack apply")
 	}
 
-	_, resp = post(srv, &restrMgr, "restrictions.get", `{"id":"`+id+`"}`)
-	if data(resp)["state"] != "requested" || unitState(resp, online)["applyState"] != "applied" ||
-		unitState(resp, online)["observedRestriction"] == nil {
+	_, resp = post(srv, restrMgr(), "restrictions.get", `{"id":"`+id+`"}`)
+	if data(resp)["state"] != "requested" ||
+		unitState(t, resp, online)["applyState"] != "applied" ||
+		unitState(t, resp, online)["observedRestriction"] == nil {
 		t.Fatalf("after ack: %v", resp)
 	}
 
@@ -376,7 +380,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 	// projections
 	if code, res := post(
 		srv,
-		&overrider,
+		overrider(),
 		"restrictions.get",
 		`{"id":"`+id+`"}`,
 	); code != 200 || data(res)["projection"] != "release" ||
@@ -386,7 +390,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 
 	if code, _ := post(
 		srv,
-		&overrider,
+		overrider(),
 		"restrictions.list",
 		`{"filters":{"contractId":"`+key+`"}}`,
 	); code != 403 {
@@ -395,27 +399,27 @@ func TestRestrictionLifecycle(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&overrider,
+		overrider(),
 		"restrictions.list",
 		`{"filters":{"status":"requested"},"limit":100}`,
-	); len(items(res)) == 0 ||
-		items(res)[0]["projection"] != "release" {
+	); len(items(t, res)) == 0 ||
+		items(t, res)[0]["projection"] != "release" {
 		t.Error("override-only list")
 	}
 
 	if _, res := post(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.list",
 		`{"filters":{"contractId":"`+key+`","invoiceId":"`+inv+`"}}`,
-	); len(items(res)) != 1 ||
-		len(asArr(t, items(res)[0]["events"])) < 2 {
+	); len(items(t, res)) != 1 ||
+		len(asArr(t, items(t, res)[0]["events"])) < 2 {
 		t.Fatalf("manager list: %v", res)
 	}
 
 	if code, res := post(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.list",
 		`{"filters":{"status":"paused"}}`,
 	); code != 422 ||
@@ -423,16 +427,21 @@ func TestRestrictionLifecycle(t *testing.T) {
 		t.Errorf("bad state filter: %d %s", code, fields(res))
 	}
 
-	if code, _ := post(srv, &customerB, "restrictions.get", `{"id":"`+id+`"}`); code != 403 {
+	if code, _ := post(srv, customerB(), "restrictions.get", `{"id":"`+id+`"}`); code != 403 {
 		t.Error("client get")
 	}
 
-	_, resp = post(srv, &customerB, "restrictions.forInvoice", `{"invoiceId":"`+inv+`","query":{}}`)
-	if len(items(resp)) != 1 {
+	_, resp = post(
+		srv,
+		customerB(),
+		"restrictions.forInvoice",
+		`{"invoiceId":"`+inv+`","query":{}}`,
+	)
+	if len(items(t, resp)) != 1 {
 		t.Fatalf("client forInvoice: %v", resp)
 	}
 
-	for _, e := range asArr(t, items(resp)[0]["events"]) {
+	for _, e := range asArr(t, items(t, resp)[0]["events"]) {
 		if ev := asObj(t, e); ev["actorId"] != "masked" || ev["actorName"] != nil ||
 			ev["reason"] != nil {
 			t.Errorf("unmasked event %v", ev)
@@ -441,7 +450,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 
 	if code, _ := post(
 		srv,
-		&customerA,
+		customerA(),
 		"restrictions.forInvoice",
 		`{"invoiceId":"`+inv+`","query":{}}`,
 	); code != 404 {
@@ -450,7 +459,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 
 	if code, _ := post(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.get",
 		`{"id":"`+uuid.NewString()+`"}`,
 	); code != 404 {
@@ -461,7 +470,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 	cancel := func(v int) (int, map[string]any) {
 		return write(
 			srv,
-			&restrMgr,
+			restrMgr(),
 			"restrictions.cancel",
 			`{"restrictionId":"`+id+`","reason":"customer agreed plan"}`,
 			v,
@@ -474,7 +483,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 		t.Fatalf("cancel: %d %v", code, resp)
 	}
 
-	on, off = unitState(resp, online), unitState(resp, offline)
+	on, off = unitState(t, resp, online), unitState(t, resp, offline)
 	if on["releaseState"] != "requested" || len(asArr(t, on["releaseCommandIds"])) != 1 ||
 		off["applyState"] != "not_applied" ||
 		off["releaseState"] != "not_required" {
@@ -492,21 +501,22 @@ func TestRestrictionLifecycle(t *testing.T) {
 		t.Errorf("undelivered apply %s", status)
 	}
 
-	v := ver(resp)
-	if code, m := cancel(v); code != 200 || ver(m) != v {
+	v := ver(t, resp)
+	if code, m := cancel(v); code != 200 || ver(t, m) != v {
 		t.Error("cancel idempotent while release_requested")
 	}
 
-	if !ackCommand(t, asStr(t, asArr(t, on["releaseCommandIds"])[0]), clock.Add(2*time.Second)) {
+	if !ackCommand(t, asStr(t, asArr(t, on["releaseCommandIds"])[0]), clock().Add(2*time.Second)) {
 		t.Fatal("ack remove")
 	}
 
-	_, resp = post(srv, &restrMgr, "restrictions.get", `{"id":"`+id+`"}`)
-	if data(resp)["state"] != "released" || unitState(resp, online)["releaseState"] != "released" {
+	_, resp = post(srv, restrMgr(), "restrictions.get", `{"id":"`+id+`"}`)
+	if data(resp)["state"] != "released" ||
+		unitState(t, resp, online)["releaseState"] != "released" {
 		t.Fatalf("released: %v", resp)
 	}
 
-	if code, _ := cancel(ver(resp)); code != 409 {
+	if code, _ := cancel(ver(t, resp)); code != 409 {
 		t.Error("cancel released")
 	}
 }
@@ -518,7 +528,7 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 	// a scheduled restriction is cancelled without commands
 	_, resp := write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.schedule",
 		scheduleBody(key, inv, []string{unit}, map[string]string{"policy": `{"kind":"power_off"}`}),
 		0,
@@ -527,7 +537,7 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 	id := asStr(t, data(resp)["id"])
 	if code, res := write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.cancel",
 		`{"restrictionId":"`+id+`","reason":"mistake"}`,
 		1,
@@ -538,24 +548,29 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 	// all causes paid right before execution: cancelled with no apply request
 	_, resp = write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.schedule",
 		scheduleBody(key, inv, []string{unit}, nil),
 		0,
 	)
 	id = asStr(t, data(resp)["id"])
 	due(t, id)
-	owner(t, `UPDATE billing.invoices SET status = 'paid', paid_at = $2 WHERE id = $1`, inv, clock)
+	owner(
+		t,
+		`UPDATE billing.invoices SET status = 'paid', paid_at = $2 WHERE id = $1`,
+		inv,
+		clock(),
+	)
 
 	if code, res := write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.execute",
 		`{"restrictionId":"`+id+`","confirmedRulesVersion":"rules-1"}`,
 		1,
 	); code != 200 ||
 		data(res)["state"] != "cancelled" ||
-		len(asArr(t, unitState(res, unit)["applyCommandIds"])) != 0 {
+		len(asArr(t, unitState(t, res, unit)["applyCommandIds"])) != 0 {
 		t.Fatalf("execute after payment: %d %v", code, res)
 	}
 
@@ -563,7 +578,7 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 	// exemption blocks execution; no recipients blocks schedule
 	_, resp = write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.schedule",
 		scheduleBody(key, inv, []string{unit}, nil),
 		0,
@@ -574,12 +589,12 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 		t,
 		`UPDATE restrictions.restrictions SET grace_until = $2 WHERE id = $1`,
 		id,
-		clock.Add(time.Hour),
+		clock().Add(time.Hour),
 	)
 
 	if code, _ := write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.execute",
 		`{"restrictionId":"`+id+`","confirmedRulesVersion":"rules-1"}`,
 		1,
@@ -592,12 +607,12 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 		t,
 		`UPDATE notify.notifications SET occurred_at = $2 WHERE target->>'id' = $1`,
 		id,
-		clock.Add(-25*time.Hour),
+		clock().Add(-25*time.Hour),
 	)
 
 	if code, _ := write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.execute",
 		`{"restrictionId":"`+id+`","confirmedRulesVersion":"rules-1"}`,
 		1,
@@ -608,22 +623,22 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 	due(t, id)
 	_, resp = write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.execute",
 		`{"restrictionId":"`+id+`","confirmedRulesVersion":"rules-1"}`,
 		1,
 	)
-	cmd := asStr(t, asArr(t, unitState(resp, unit)["applyCommandIds"])[0])
-	ackCommand(t, cmd, clock.Add(time.Second))
+	cmd := asStr(t, asArr(t, unitState(t, resp, unit)["applyCommandIds"])[0])
+	ackCommand(t, cmd, clock().Add(time.Second))
 
-	_, resp = post(srv, &restrMgr, "restrictions.get", `{"id":"`+id+`"}`)
+	_, resp = post(srv, restrMgr(), "restrictions.get", `{"id":"`+id+`"}`)
 	if data(resp)["state"] != "applied" {
 		t.Fatalf("applied: %v", resp)
 	}
 	// payment of all causes → release_requested with a remove command (IR35 ①); expiry → release failed
 	code, resp := write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"payments.recordManual",
 		`{"invoiceId":"`+inv+`","paymentReference":"BANK-`+id[:8]+`","confirmedAmountMinor":5000,"currency":"MYR",`+
 			`"reason":"bank transfer"}`,
@@ -633,18 +648,18 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 		t.Fatalf("record manual: %d %v", code, resp)
 	}
 
-	_, resp = post(srv, &restrMgr, "restrictions.get", `{"id":"`+id+`"}`)
+	_, resp = post(srv, restrMgr(), "restrictions.get", `{"id":"`+id+`"}`)
 	if data(resp)["state"] != "release_requested" ||
-		unitState(resp, unit)["releaseState"] != "requested" ||
+		unitState(t, resp, unit)["releaseState"] != "requested" ||
 		asObj(t, data(resp)["releaseIntent"])["source"] != "payment" {
 		t.Fatalf("payment release: %v", resp)
 	}
 
-	expireAt(t, clock.Add(time.Minute))
+	expireAt(t, clock().Add(time.Minute))
 
-	_, resp = post(srv, &restrMgr, "restrictions.get", `{"id":"`+id+`"}`)
+	_, resp = post(srv, restrMgr(), "restrictions.get", `{"id":"`+id+`"}`)
 	if data(resp)["state"] != "release_requested" ||
-		unitState(resp, unit)["releaseState"] != "failed" {
+		unitState(t, resp, unit)["releaseState"] != "failed" {
 		t.Fatalf("remove expired: %v", resp)
 	}
 
@@ -661,7 +676,7 @@ func TestRestrictionScheduleRecipients(t *testing.T) {
 		`UPDATE identity.memberships SET valid_from = LEAST(valid_from, $2 - interval '1 hour'), valid_until = $2 WHERE role =
 			'client' AND organization_id = $1 AND (valid_until IS NULL OR valid_until > $2)`,
 		seed.ID("org-customer-b"),
-		clock.Add(-time.Minute),
+		clock().Add(-time.Minute),
 	)
 	t.Cleanup(func() {
 		owner(
@@ -673,7 +688,7 @@ func TestRestrictionScheduleRecipients(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.schedule",
 		scheduleBody(key, inv, []string{unit}, nil),
 		0,
@@ -692,7 +707,13 @@ func executed(
 ) (string, map[string]any) {
 	t.Helper()
 
-	code, res := write(srv, &restrMgr, "restrictions.schedule", scheduleBody(k, inv, units, nil), 0)
+	code, res := write(
+		srv,
+		restrMgr(),
+		"restrictions.schedule",
+		scheduleBody(k, inv, units, nil),
+		0,
+	)
 	if code != 200 {
 		t.Fatalf("schedule: %d %v", code, res)
 	}
@@ -702,7 +723,7 @@ func executed(
 
 	code, res = write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.execute",
 		`{"restrictionId":"`+id+`","confirmedRulesVersion":"rules-1"}`,
 		1,
@@ -714,10 +735,12 @@ func executed(
 	return id, res
 }
 
-func cmdOf(m map[string]any, unit, field string) string {
-	ids := unitState(m, unit)[field].([]any)
+func cmdOf(t *testing.T, m map[string]any, unit, field string) string {
+	t.Helper()
 
-	return ids[len(ids)-1].(string)
+	ids := asArr(t, unitState(t, m, unit)[field])
+
+	return asStr(t, ids[len(ids)-1])
 }
 
 func TestRestrictionExceptionReleaseRetry(t *testing.T) {
@@ -726,7 +749,7 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 	k, inv := overdueContract(t, srv, online, offline)
 	id, resp := executed(t, srv, k, inv, []string{online, offline})
 	get := func() map[string]any {
-		_, m := post(srv, &restrMgr, "restrictions.get", `{"id":"`+id+`"}`)
+		_, m := post(srv, restrMgr(), "restrictions.get", `{"id":"`+id+`"}`)
 
 		return m
 	}
@@ -739,24 +762,24 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 				units,
 				`","`,
 			)+`"],"phase":"`+phase+`","confirmedRulesVersion":"`+rules+`","reason":"device back"}`,
-			ver(get()),
+			ver(t, get()),
 		)
 	}
 
-	ackCommand(t, cmdOf(resp, online, "applyCommandIds"), clock.Add(time.Second))
+	ackCommand(t, cmdOf(t, resp, online, "applyCommandIds"), clock().Add(time.Second))
 
-	if code, _ := retry(&restrMgr, "apply", "rules-1", offline); code != 409 {
+	if code, _ := retry(restrMgr(), "apply", "rules-1", offline); code != 409 {
 		t.Error("retry while the intent is open")
 	}
 
-	expireAt(t, clock.Add(time.Minute))
+	expireAt(t, clock().Add(time.Minute))
 
-	if st := unitState(get(), offline); st["applyState"] != "not_sent" {
+	if st := unitState(t, get(), offline); st["applyState"] != "not_sent" {
 		t.Fatalf("expired intent: %v", st)
 	}
 
 	if code, res := retry(
-		&restrMgr,
+		restrMgr(),
 		"apply",
 		"rules-9",
 		offline,
@@ -765,16 +788,16 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 		t.Errorf("retry with another rules version: %d %s", code, fields(res))
 	}
 
-	if code, _ := retry(&restrMgr, "release", "rules-1", offline); code != 409 {
+	if code, _ := retry(restrMgr(), "release", "rules-1", offline); code != 409 {
 		t.Error("retry release while requested")
 	}
 
-	if code, _ := retry(&overrider, "apply", "rules-1", offline); code != 403 {
+	if code, _ := retry(overrider(), "apply", "rules-1", offline); code != 403 {
 		t.Error("override-only apply retry")
 	}
 
 	if code, res := retry(
-		&restrMgr,
+		restrMgr(),
 		"apply",
 		"rules-1",
 		uuid.NewString(),
@@ -783,15 +806,15 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 		t.Errorf("retry unknown unit: %d %s", code, fields(res))
 	}
 
-	v := ver(get())
-	if code, m := retry(&restrMgr, "apply", "rules-1", online); code != 200 || ver(m) != v {
+	v := ver(t, get())
+	if code, m := retry(restrMgr(), "apply", "rules-1", online); code != 200 || ver(t, m) != v {
 		t.Error("retry of an applied unit returns the existing result")
 	}
 	// SR26: with every cause invoice paid there is nothing left to apply
 	owner(t, `UPDATE billing.invoices SET status = 'paid' WHERE id = $1`, inv)
 
 	if code, res := retry(
-		&restrMgr,
+		restrMgr(),
 		"apply",
 		"rules-1",
 		offline,
@@ -803,20 +826,20 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 	owner(t, `UPDATE billing.invoices SET status = 'unpaid' WHERE id = $1`, inv)
 	owner(t, `UPDATE devices.devices SET connection = 'online' WHERE unit_id = $1`, offline)
 
-	code, resp := retry(&restrMgr, "apply", "rules-1", offline)
-	if code != 200 || unitState(resp, offline)["applyState"] != "sent_unknown" ||
-		len(asArr(t, unitState(resp, offline)["applyCommandIds"])) != 2 {
+	code, resp := retry(restrMgr(), "apply", "rules-1", offline)
+	if code != 200 || unitState(t, resp, offline)["applyState"] != "sent_unknown" ||
+		len(asArr(t, unitState(t, resp, offline)["applyCommandIds"])) != 2 {
 		t.Fatalf("retry apply: %d %v", code, resp)
 	}
 
-	ackCommand(t, cmdOf(resp, offline, "applyCommandIds"), clock.Add(2*time.Second))
+	ackCommand(t, cmdOf(t, resp, offline, "applyCommandIds"), clock().Add(2*time.Second))
 
 	if data(get())["state"] != "applied" {
 		t.Fatal("applied after retry")
 	}
 
 	if code, res := retry(
-		&restrMgr,
+		restrMgr(),
 		"apply",
 		"rules-1",
 		offline,
@@ -827,10 +850,10 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 	// explicit release needs payment or an exception
 	if code, _ := write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.release",
 		`{"restrictionId":"`+id+`"}`,
-		ver(get()),
+		ver(t, get()),
 	); code != 403 {
 		t.Error("release while unpaid")
 	}
@@ -842,10 +865,10 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 	}
 	if code, res := write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.defer",
-		deferBody(clock.Add(-time.Hour)),
-		ver(get()),
+		deferBody(clock().Add(-time.Hour)),
+		ver(t, get()),
 	); code != 422 ||
 		fields(res) != "until=errors.until_range" {
 		t.Errorf("past grace: %d %s", code, fields(res))
@@ -853,10 +876,10 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.defer",
-		deferBody(clock.Add(100*24*time.Hour)),
-		ver(get()),
+		deferBody(clock().Add(100*24*time.Hour)),
+		ver(t, get()),
 	); code != 422 ||
 		fields(res) != "until=errors.until_range" {
 		t.Errorf("grace beyond 90 days: %d %s", code, fields(res))
@@ -864,41 +887,41 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 
 	code, resp = write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.defer",
-		deferBody(clock.Add(48*time.Hour)),
-		ver(get()),
+		deferBody(clock().Add(48*time.Hour)),
+		ver(t, get()),
 	)
 	if code != 200 || data(resp)["state"] != "release_requested" ||
 		data(resp)["graceUntil"] == nil ||
 		asObj(t, data(resp)["releaseIntent"])["source"] != "exception" ||
-		unitState(resp, online)["releaseState"] != "requested" ||
-		unitState(resp, offline)["releaseState"] != "requested" {
+		unitState(t, resp, online)["releaseState"] != "requested" ||
+		unitState(t, resp, offline)["releaseState"] != "requested" {
 		t.Fatalf("defer: %d %v", code, resp)
 	}
 
 	if code, m2 := write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.release",
 		`{"restrictionId":"`+id+`"}`,
-		ver(resp),
+		ver(t, resp),
 	); code != 200 ||
-		ver(m2) != ver(resp) {
+		ver(t, m2) != ver(t, resp) {
 		t.Error("release idempotent while release_requested")
 	}
 
-	ackCommand(t, cmdOf(resp, online, "releaseCommandIds"), clock.Add(3*time.Second))
-	expireAt(t, clock.Add(time.Minute))
+	ackCommand(t, cmdOf(t, resp, online, "releaseCommandIds"), clock().Add(3*time.Second))
+	expireAt(t, clock().Add(time.Minute))
 
 	resp = get()
 	if data(resp)["state"] != "release_requested" ||
-		unitState(resp, offline)["releaseState"] != "failed" ||
-		unitState(resp, online)["releaseState"] != "released" {
+		unitState(t, resp, offline)["releaseState"] != "failed" ||
+		unitState(t, resp, online)["releaseState"] != "released" {
 		t.Fatalf("partial release: %v", resp)
 	}
 
-	if code, _ := retry(&overrider, "release", "rules-1", offline); code != 403 {
+	if code, _ := retry(overrider(), "release", "rules-1", offline); code != 403 {
 		t.Error("override-only retry of a non-override release")
 	}
 	// SR26: a unit waiting for reconciliation, or never confirmed applied, is reconciled, not retried
@@ -914,7 +937,7 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 		)
 
 		if code, res := retry(
-			&restrMgr,
+			restrMgr(),
 			"release",
 			"rules-1",
 			offline,
@@ -934,7 +957,7 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 	owner(t, `UPDATE devices.devices SET connection = 'offline' WHERE unit_id = $1`, offline)
 
 	if code, res := retry(
-		&restrMgr,
+		restrMgr(),
 		"release",
 		"rules-1",
 		offline,
@@ -945,16 +968,16 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 
 	owner(t, `UPDATE devices.devices SET connection = 'online' WHERE unit_id = $1`, offline)
 
-	code, resp = retry(&restrMgr, "release", "rules-1", offline, online)
-	if code != 200 || unitState(resp, offline)["releaseState"] != "requested" {
+	code, resp = retry(restrMgr(), "release", "rules-1", offline, online)
+	if code != 200 || unitState(t, resp, offline)["releaseState"] != "requested" {
 		t.Fatalf("retry release: %d %v", code, resp)
 	}
 
-	if code, _ := retry(&restrMgr, "release", "rules-1", offline); code != 409 {
+	if code, _ := retry(restrMgr(), "release", "rules-1", offline); code != 409 {
 		t.Error("retry release with an unfinished remove")
 	}
 
-	ackCommand(t, cmdOf(resp, offline, "releaseCommandIds"), clock.Add(4*time.Second))
+	ackCommand(t, cmdOf(t, resp, offline, "releaseCommandIds"), clock().Add(4*time.Second))
 
 	if data(get())["state"] != "released" {
 		t.Fatal("released after retry")
@@ -963,10 +986,10 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 	for _, operation := range []string{"restrictions.defer", "restrictions.exempt"} {
 		if code, _ := write(
 			srv,
-			&restrMgr,
+			restrMgr(),
 			operation,
-			deferBody(clock.Add(time.Hour)),
-			ver(get()),
+			deferBody(clock().Add(time.Hour)),
+			ver(t, get()),
 		); code != 409 {
 			t.Errorf("%s on released", operation)
 		}
@@ -974,20 +997,20 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.override",
 		`{"restrictionId":"`+id+`","reason":"x"}`,
-		ver(get()),
+		ver(t, get()),
 	); code != 409 {
 		t.Error("override released")
 	}
 
 	if code, _ := write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.release",
 		`{"restrictionId":"`+id+`"}`,
-		ver(get()),
+		ver(t, get()),
 	); code != 409 {
 		t.Error("release released")
 	}
@@ -999,7 +1022,7 @@ func TestRestrictionOverrideReconcile(t *testing.T) {
 	k, inv := overdueContract(t, srv, unit)
 	id, _ := executed(t, srv, k, inv, []string{unit})
 	get := func() map[string]any {
-		_, m := post(srv, &restrMgr, "restrictions.get", `{"id":"`+id+`"}`)
+		_, m := post(srv, restrMgr(), "restrictions.get", `{"id":"`+id+`"}`)
 
 		return m
 	}
@@ -1010,26 +1033,26 @@ func TestRestrictionOverrideReconcile(t *testing.T) {
 			a,
 			"restrictions.reconcile",
 			`{"restrictionId":"`+id+`","unitIds":["`+unit+`"]}`,
-			ver(get()),
+			ver(t, get()),
 		)
 	}
-	if code, _ := reconcile(&restrMgr); code != 409 {
+	if code, _ := reconcile(restrMgr()); code != 409 {
 		t.Error("reconcile while the apply is pending")
 	}
 
-	expireAt(t, clock.Add(time.Minute))
+	expireAt(t, clock().Add(time.Minute))
 
 	if code, _ := write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.retry",
 		`{"restrictionId":"`+id+`","unitIds":["`+unit+`"],"phase":"apply","confirmedRulesVersion":"rules-1","reason":"r"}`,
-		ver(get()),
+		ver(t, get()),
 	); code != 409 {
 		t.Error("retry apply of sent_unknown")
 	}
 
-	if code, _ := reconcile(&overrider); code != 403 {
+	if code, _ := reconcile(overrider()); code != 403 {
 		t.Error("override-only reconcile during application")
 	}
 
@@ -1037,10 +1060,10 @@ func TestRestrictionOverrideReconcile(t *testing.T) {
 		t,
 		`UPDATE assets.units SET last_seen_at = $2 WHERE id = $1`,
 		unit,
-		clock.Add(-time.Minute),
+		clock().Add(-time.Minute),
 	)
 
-	if code, m := reconcile(&restrMgr); code == 200 || m["code"] != "TIMEOUT" {
+	if code, m := reconcile(restrMgr()); code == 200 || m["code"] != "TIMEOUT" {
 		t.Errorf("stale observation: %d %v", code, m)
 	}
 
@@ -1048,11 +1071,11 @@ func TestRestrictionOverrideReconcile(t *testing.T) {
 		t,
 		`UPDATE assets.units SET last_seen_at = $2, observed_restriction = $3 WHERE id = $1`,
 		unit,
-		clock,
+		clock(),
 		`{"restrictionId":"`+uuid.NewString()+`","rulesVersion":"rules-1"}`,
 	)
 
-	if code, _ := reconcile(&restrMgr); code != 409 {
+	if code, _ := reconcile(restrMgr()); code != 409 {
 		t.Error("another restriction observed")
 	}
 
@@ -1064,34 +1087,34 @@ func TestRestrictionOverrideReconcile(t *testing.T) {
 	)
 	owner(t, `UPDATE devices.devices SET connection = 'offline' WHERE unit_id = $1`, unit)
 
-	if code, m := reconcile(&restrMgr); code == 200 || m["code"] != "OFFLINE" {
+	if code, m := reconcile(restrMgr()); code == 200 || m["code"] != "OFFLINE" {
 		t.Errorf("offline reconcile: %d %v", code, m)
 	}
 
 	owner(t, `UPDATE devices.devices SET connection = 'online' WHERE unit_id = $1`, unit)
 
-	code, res := reconcile(&restrMgr)
+	code, res := reconcile(restrMgr())
 	if code != 200 || data(res)["state"] != "applied" ||
-		unitState(res, unit)["applyState"] != "applied" {
+		unitState(t, res, unit)["applyState"] != "applied" {
 		t.Fatalf("reconcile applied: %d %v", code, res)
 	}
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"restrictions.override",
 		`{"restrictionId":"`+id+`","reason":"hardship"}`,
-		ver(get()),
+		ver(t, get()),
 	); code != 403 {
 		t.Error("override without permission")
 	}
 
 	code, res = write(
 		srv,
-		&overrider,
+		overrider(),
 		"restrictions.override",
 		`{"restrictionId":"`+id+`","reason":"medical hardship"}`,
-		ver(get()),
+		ver(t, get()),
 	)
 	if code != 200 || data(res)["projection"] != "release" ||
 		data(res)["state"] != "release_requested" ||
@@ -1101,32 +1124,32 @@ func TestRestrictionOverrideReconcile(t *testing.T) {
 
 	if code, m2 := write(
 		srv,
-		&overrider,
+		overrider(),
 		"restrictions.override",
 		`{"restrictionId":"`+id+`","reason":"again"}`,
-		ver(res),
+		ver(t, res),
 	); code != 200 ||
-		ver(m2) != ver(res) {
+		ver(t, m2) != ver(t, res) {
 		t.Error("override idempotent")
 	}
 
-	expireAt(t, clock.Add(time.Minute))
+	expireAt(t, clock().Add(time.Minute))
 
 	code, res = write(
 		srv,
-		&overrider,
+		overrider(),
 		"restrictions.retry",
 		`{"restrictionId":"`+id+`","unitIds":["`+unit+`"],"phase":"release","confirmedRulesVersion":"rules-1",`+
 			`"reason":"retry `+
 			`remove"}`,
-		ver(get()),
+		ver(t, get()),
 	)
 	if code != 200 || data(res)["projection"] != "release" ||
-		unitState(res, unit)["releaseState"] != "requested" {
+		unitState(t, res, unit)["releaseState"] != "requested" {
 		t.Fatalf("override-only retry release: %d %v", code, res)
 	}
 
-	ackCommand(t, cmdOf(res, unit, "releaseCommandIds"), clock.Add(time.Second))
+	ackCommand(t, cmdOf(t, res, unit, "releaseCommandIds"), clock().Add(time.Second))
 
 	if data(get())["state"] != "released" {
 		t.Fatal("released after override")
@@ -1146,62 +1169,62 @@ func TestRestrictionReconcileNotApplied(t *testing.T) {
 	key, inv := overdueContract(t, srv, unit)
 	id, _ := executed(t, srv, key, inv, []string{unit})
 	get := func() map[string]any {
-		_, m := post(srv, &restrMgr, "restrictions.get", `{"id":"`+id+`"}`)
+		_, m := post(srv, restrMgr(), "restrictions.get", `{"id":"`+id+`"}`)
 
 		return m
 	}
 
-	expireAt(t, clock.Add(time.Minute))
+	expireAt(t, clock().Add(time.Minute))
 
 	code, resp := write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.exempt",
-		`{"restrictionId":"`+id+`","until":"`+clock.Add(time.Hour).
+		`{"restrictionId":"`+id+`","until":"`+clock().Add(time.Hour).
 			Format(time.RFC3339)+
 			`","reason":"hospital"}`,
-		ver(get()),
+		ver(t, get()),
 	)
 	if code != 200 || asObj(t, data(resp)["exception"])["reason"] != "hospital" ||
-		unitState(resp, unit)["releaseState"] != "waiting_reconcile" {
+		unitState(t, resp, unit)["releaseState"] != "waiting_reconcile" {
 		t.Fatalf("exempt: %d %v", code, resp)
 	}
 
 	if _, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"restrictions.forInvoice",
 		`{"invoiceId":"`+inv+`","query":{"filters":{"status":"release_requested"}}}`,
-	); len(items(res)) != 1 ||
-		asObj(t, items(res)[0]["exception"])["reason"] != nil ||
-		asObj(t, items(res)[0]["releaseIntent"])["actorMembershipId"] != "masked" {
+	); len(items(t, res)) != 1 ||
+		asObj(t, items(t, res)[0]["exception"])["reason"] != nil ||
+		asObj(t, items(t, res)[0]["releaseIntent"])["actorMembershipId"] != "masked" {
 		t.Fatalf("client mask: %v", res)
 	}
 	// query catalog: contractId => contractId, status => state; the invoice is the path, not a filter
 	if _, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"restrictions.forInvoice",
 		`{"invoiceId":"`+inv+`","query":{"filters":{"contractId":"`+key+`"}}}`,
 	); len(
-		items(res),
+		items(t, res),
 	) != 1 {
 		t.Errorf("forInvoice contract filter: %v", res)
 	}
 
 	if code, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"restrictions.forInvoice",
 		`{"invoiceId":"`+inv+`","query":{"filters":{"contractId":"`+uuid.NewString()+`"}}}`,
 	); code != 200 ||
-		len(items(res)) != 0 {
+		len(items(t, res)) != 0 {
 		t.Errorf("forInvoice other contract: %v", res)
 	}
 
 	code, resp = post(
 		srv,
-		&customerB,
+		customerB(),
 		"restrictions.forInvoice",
 		`{"invoiceId":"`+inv+`","query":{"filters":{"invoiceId":"`+uuid.NewString()+`"}}}`,
 	)
@@ -1210,19 +1233,19 @@ func TestRestrictionReconcileNotApplied(t *testing.T) {
 		t,
 		`UPDATE assets.units SET last_seen_at = $2, observed_restriction = NULL WHERE id = $1`,
 		unit,
-		clock,
+		clock(),
 	)
 
 	code, resp = write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.reconcile",
 		`{"restrictionId":"`+id+`","unitIds":["`+unit+`"]}`,
-		ver(get()),
+		ver(t, get()),
 	)
 	if code != 200 || data(resp)["state"] != "released" ||
-		unitState(resp, unit)["releaseState"] != "not_required" ||
-		unitState(resp, unit)["applyState"] != "not_applied" {
+		unitState(t, resp, unit)["releaseState"] != "not_required" ||
+		unitState(t, resp, unit)["applyState"] != "not_applied" {
 		t.Fatalf("reconcile not applied: %d %v", code, resp)
 	}
 	// the client reads the state changes only: the reconcile stays HQ's record (IR42)
@@ -1235,16 +1258,16 @@ func TestRestrictionReconcileNotApplied(t *testing.T) {
 		return out
 	}
 
-	_, cm := post(srv, &customerB, "restrictions.forInvoice", `{"invoiceId":"`+inv+`","query":{}}`)
+	_, cm := post(srv, customerB(), "restrictions.forInvoice", `{"invoiceId":"`+inv+`","query":{}}`)
 	if hq := actions(
 		asArr(t, data(get())["events"]),
 	); !hq["restrictions.reconcile"] ||
-		len(items(cm)) != 1 {
+		len(items(t, cm)) != 1 {
 		t.Fatalf("HQ history and client read: %v %v", hq, cm)
 	}
 
 	if client := actions(
-		asArr(t, items(cm)[0]["events"]),
+		asArr(t, items(t, cm)[0]["events"]),
 	); client["restrictions.reconcile"] ||
 		!client["restrictions.exempt"] {
 		t.Errorf("client history: %v", client)
@@ -1261,7 +1284,7 @@ func TestRestrictionScheduleRefusals(t *testing.T) {
 	schedule := func() (int, map[string]any) {
 		return write(
 			s,
-			&restrMgr,
+			restrMgr(),
 			"restrictions.schedule",
 			scheduleBody(key, inv, []string{unit}, nil),
 			0,
@@ -1276,13 +1299,18 @@ func TestRestrictionScheduleRefusals(t *testing.T) {
 	}
 
 	owner(t, `UPDATE billing.contracts SET restriction_eligible = true WHERE id = $1`, key)
-	owner(t, `UPDATE billing.invoices SET due_at = $2 WHERE id = $1`, inv, clock.Add(48*time.Hour))
+	owner(
+		t,
+		`UPDATE billing.invoices SET due_at = $2 WHERE id = $1`,
+		inv,
+		clock().Add(48*time.Hour),
+	)
 
 	if code, m := schedule(); code != 409 || m["messageKey"] != "errors.no_overdue_invoice" {
 		t.Errorf("nothing overdue: %d %v", code, m)
 	}
 
-	owner(t, `UPDATE billing.invoices SET due_at = $2 WHERE id = $1`, inv, clock.Add(-time.Hour))
+	owner(t, `UPDATE billing.invoices SET due_at = $2 WHERE id = $1`, inv, clock().Add(-time.Hour))
 	owner(t, `UPDATE assets.units SET archived = true WHERE id = $1`, unit)
 
 	if code, m := schedule(); code != 409 || m["messageKey"] != "errors.unit_archived" {
@@ -1347,7 +1375,7 @@ func TestRestrictionReconcilePaths(t *testing.T) {
 	reconcile := func(id, u string, v int) (int, map[string]any) {
 		return write(
 			srv,
-			&restrMgr,
+			restrMgr(),
 			"restrictions.reconcile",
 			`{"restrictionId":"`+id+`","unitIds":["`+u+`"]}`,
 			v,
@@ -1355,7 +1383,7 @@ func TestRestrictionReconcilePaths(t *testing.T) {
 	}
 	getter := func(id string) func() map[string]any {
 		return func() map[string]any {
-			_, m := post(srv, &restrMgr, "restrictions.get", `{"id":"`+id+`"}`)
+			_, m := post(srv, restrMgr(), "restrictions.get", `{"id":"`+id+`"}`)
 
 			return m
 		}
@@ -1365,7 +1393,7 @@ func TestRestrictionReconcilePaths(t *testing.T) {
 	k1, inv1 := overdueContract(t, srv, u1)
 	_, resp := write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.schedule",
 		scheduleBody(k1, inv1, []string{u1}, nil),
 		0,
@@ -1375,7 +1403,7 @@ func TestRestrictionReconcilePaths(t *testing.T) {
 	if code, res := reconcile(
 		scheduled,
 		u1,
-		ver(getter(scheduled)()),
+		ver(t, getter(scheduled)()),
 	); code != 409 ||
 		res["messageKey"] != "errors.restriction_state" {
 		t.Errorf("reconcile a scheduled restriction: %d %v", code, res)
@@ -1386,27 +1414,27 @@ func TestRestrictionReconcilePaths(t *testing.T) {
 	id2, _ := executed(t, srv, k2, inv2, []string{u2})
 	get2 := getter(id2)
 
-	expireAt(t, clock.Add(time.Minute))
+	expireAt(t, clock().Add(time.Minute))
 	owner(
 		t,
 		`UPDATE assets.units SET last_seen_at = $2, observed_restriction = NULL WHERE id = $1`,
 		u2,
-		clock,
+		clock(),
 	)
 
 	if code, res := reconcile(
 		id2,
 		u2,
-		ver(get2()),
-	); code != 200 || unitState(res, u2)["applyState"] != "not_applied" ||
-		unitState(res, u2)["observedRestriction"] != nil {
+		ver(t, get2()),
+	); code != 200 || unitState(t, res, u2)["applyState"] != "not_applied" ||
+		unitState(t, res, u2)["observedRestriction"] != nil {
 		t.Fatalf("reconcile, nothing observed: %d %v", code, res)
 	}
 
 	if code, res := reconcile(
 		id2,
 		u2,
-		ver(get2()),
+		ver(t, get2()),
 	); code != 422 ||
 		asObj(t, res["fieldErrors"])["unitIds"] != "errors.reconcile_not_needed" {
 		t.Errorf("reconcile twice: %d %v", code, res)
@@ -1417,18 +1445,18 @@ func TestRestrictionReconcilePaths(t *testing.T) {
 	id3, _ := executed(t, srv, k3, inv3, []string{u3})
 	get3 := getter(id3)
 
-	expireAt(t, clock.Add(time.Minute))
+	expireAt(t, clock().Add(time.Minute))
 
 	if code, res := write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.exempt",
-		`{"restrictionId":"`+id3+`","until":"`+clock.Add(time.Hour).
+		`{"restrictionId":"`+id3+`","until":"`+clock().Add(time.Hour).
 			Format(time.RFC3339)+
 			`","reason":"hospital"}`,
-		ver(get3()),
+		ver(t, get3()),
 	); code != 200 ||
-		unitState(res, u3)["releaseState"] != "waiting_reconcile" {
+		unitState(t, res, u3)["releaseState"] != "waiting_reconcile" {
 		t.Fatalf("exempt: %d %v", code, res)
 	}
 
@@ -1436,18 +1464,18 @@ func TestRestrictionReconcilePaths(t *testing.T) {
 		t,
 		`UPDATE assets.units SET last_seen_at = $2, observed_restriction = $3 WHERE id = $1`,
 		u3,
-		clock,
+		clock(),
 		`{"restrictionId":"`+id3+`","rulesVersion":"rules-1"}`,
 	)
 
-	code, resp := reconcile(id3, u3, ver(get3()))
-	if code != 200 || unitState(resp, u3)["applyState"] != "applied" ||
-		unitState(resp, u3)["releaseState"] != "requested" ||
-		len(asArr(t, unitState(resp, u3)["releaseCommandIds"])) != 1 {
+	code, resp := reconcile(id3, u3, ver(t, get3()))
+	if code != 200 || unitState(t, resp, u3)["applyState"] != "applied" ||
+		unitState(t, resp, u3)["releaseState"] != "requested" ||
+		len(asArr(t, unitState(t, resp, u3)["releaseCommandIds"])) != 1 {
 		t.Fatalf("reconcile while releasing: %d %v", code, resp)
 	}
 
-	ackCommand(t, cmdOf(resp, u3, "releaseCommandIds"), clock.Add(2*time.Second))
+	ackCommand(t, cmdOf(t, resp, u3, "releaseCommandIds"), clock().Add(2*time.Second))
 
 	if data(get3())["state"] != "released" {
 		t.Errorf("released after the remove: %v", data(get3())["state"])
@@ -1462,12 +1490,12 @@ func TestRestrictionExplicitRelease(t *testing.T) {
 	k, inv := overdueContract(t, srv, u)
 	id, _ := executed(t, srv, k, inv, []string{u})
 	get := func() map[string]any {
-		_, m := post(srv, &restrMgr, "restrictions.get", `{"id":"`+id+`"}`)
+		_, m := post(srv, restrMgr(), "restrictions.get", `{"id":"`+id+`"}`)
 
 		return m
 	}
 	release := func(v int) (int, map[string]any) {
-		return write(srv, &restrMgr, "restrictions.release", `{"restrictionId":"`+id+`"}`, v)
+		return write(srv, restrMgr(), "restrictions.release", `{"restrictionId":"`+id+`"}`, v)
 	}
 
 	owner(
@@ -1476,7 +1504,7 @@ func TestRestrictionExplicitRelease(t *testing.T) {
 		inv,
 	) // paid outside the payment flow, which would release by itself
 
-	v := ver(get())
+	v := ver(t, get())
 	if code, m := release(v + 1); code != 409 || m["messageKey"] != apperr.KeyVersionConflict {
 		t.Errorf("release on a stale version: %d %v", code, m)
 	}
@@ -1484,24 +1512,24 @@ func TestRestrictionExplicitRelease(t *testing.T) {
 	if code, m := release(
 		v,
 	); code != 200 || data(m)["state"] != "release_requested" ||
-		ver(m) != v+1 {
+		ver(t, m) != v+1 {
 		t.Fatalf("release with the causes paid: %d %v", code, m)
 	}
 
-	day := `"from":"` + clock.Add(-time.Hour).
+	day := `"from":"` + clock().Add(-time.Hour).
 		Format(time.RFC3339) +
-		`","to":"` + clock.Add(time.Hour).
+		`","to":"` + clock().Add(time.Hour).
 		Format(time.RFC3339) +
 		`"`
 
 	_, res := post(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"audit.list",
 		`{"filters":{`+day+`,"action":"restrictions.release","targetKind":"restriction","targetId":"`+id+`"},"limit":10}`,
 	)
-	if len(items(res)) != 1 {
-		t.Errorf("audit of the release: %v", items(res))
+	if len(items(t, res)) != 1 {
+		t.Errorf("audit of the release: %v", items(t, res))
 	}
 }
 
@@ -1524,7 +1552,7 @@ func TestRestrictionOnePerUnitAtOnce(t *testing.T) {
 
 				code, res := write(
 					srv,
-					&restrMgr,
+					restrMgr(),
 					"restrictions.schedule",
 					scheduleBody(key, inv, []string{unit}, nil),
 					0,
@@ -1556,7 +1584,7 @@ func TestRestrictionOnePerUnitAtOnce(t *testing.T) {
 // customer stayed restricted after paying everything. Five rounds of two manual payments sent at once.
 func TestRestrictionEndsWhenItsInvoicesArePaidAtOnce(t *testing.T) {
 	srv := server(t)
-	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 
 	for round := range 5 {
 		unit := boundUnit(t, srv, "online")
@@ -1564,7 +1592,7 @@ func TestRestrictionEndsWhenItsInvoicesArePaidAtOnce(t *testing.T) {
 
 		code, res := write(
 			srv,
-			&hq,
+			hq(),
 			"invoices.create",
 			`{"amountMinor":5000,"currency":"MYR","contractId":"`+key+`","contractVersion":1,"period":{"from":"`+stamp(
 				24*16,
@@ -1584,12 +1612,12 @@ func TestRestrictionEndsWhenItsInvoicesArePaidAtOnce(t *testing.T) {
 			t,
 			`UPDATE billing.invoices SET due_at = $2 WHERE id = $1`,
 			inv2,
-			clock.Add(-time.Hour),
+			clock().Add(-time.Hour),
 		)
 
 		code, res = write(
 			srv,
-			&restrMgr,
+			restrMgr(),
 			"restrictions.schedule",
 			scheduleBody(
 				key,
@@ -1607,9 +1635,10 @@ func TestRestrictionEndsWhenItsInvoicesArePaidAtOnce(t *testing.T) {
 		bodies := map[string]int{}
 
 		for _, inv := range []string{inv1, inv2} {
-			_, m := post(srv, &hq, "invoices.get", `{"id":"`+inv+`"}`)
+			_, m := post(srv, hq(), "invoices.get", `{"id":"`+inv+`"}`)
 			bodies[`{"invoiceId":"`+inv+`","paymentReference":"BANK-`+inv[:8]+`","confirmedAmountMinor":5000,"currency":"MYR",`+
 				`"reason":"bank transfer seen"}`] = ver(
+				t,
 				m,
 			)
 		}
@@ -1617,7 +1646,7 @@ func TestRestrictionEndsWhenItsInvoicesArePaidAtOnce(t *testing.T) {
 		var group sync.WaitGroup
 		for body, v := range bodies {
 			group.Go(func() {
-				if code, m := write(srv, &hq, "payments.recordManual", body, v); code != 200 {
+				if code, m := write(srv, hq(), "payments.recordManual", body, v); code != 200 {
 					t.Errorf("round %d: payment: %d %v", round, code, m)
 				}
 			})
@@ -1650,7 +1679,7 @@ func TestRestrictionAppliedWhenTwoUnitsAnswerAtOnce(t *testing.T) {
 	k, inv := overdueContract(t, srv, u1, u2)
 	_, res := write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.schedule",
 		scheduleBody(k, inv, []string{u1, u2}, nil),
 		0,
@@ -1660,7 +1689,7 @@ func TestRestrictionAppliedWhenTwoUnitsAnswerAtOnce(t *testing.T) {
 
 	code, res := write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.execute",
 		`{"restrictionId":"`+id+`","confirmedRulesVersion":"rules-1"}`,
 		1,
@@ -1673,7 +1702,7 @@ func TestRestrictionAppliedWhenTwoUnitsAnswerAtOnce(t *testing.T) {
 	for _, u := range []string{u1, u2} {
 		applies = append(
 			applies,
-			uuid.MustParse(asStr(t, asArr(t, unitState(res, u)["applyCommandIds"])[0])),
+			uuid.MustParse(asStr(t, asArr(t, unitState(t, res, u)["applyCommandIds"])[0])),
 		)
 	}
 
@@ -1683,12 +1712,12 @@ func TestRestrictionAppliedWhenTwoUnitsAnswerAtOnce(t *testing.T) {
 			t.Skip(err)
 		}
 
-		t.Cleanup(func() { conn.Close(ctx) })
+		t.Cleanup(func() { _ = conn.Close(ctx) })
 
 		return conn
 	}
 	c1, c2 := conn(), conn()
-	when := clock.Add(time.Second)
+	when := clock().Add(time.Second)
 
 	tx1, err := c1.Begin(ctx)
 	if err != nil {

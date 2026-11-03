@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -15,13 +15,18 @@ import (
 func owner(t *testing.T, sql string, args ...any) {
 	t.Helper()
 
-	ctx := context.Background()
+	ownerContext(context.Background(), t, sql, args...)
+}
+
+// ownerContext is owner on the caller's context.
+func ownerContext(ctx context.Context, t *testing.T, sql string, args ...any) {
+	t.Helper()
 
 	conn, err := pgx.Connect(ctx, testDB("postgres"))
 	if err != nil {
 		t.Skip(err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	_, execErr := conn.Exec(ctx, sql, args...)
 	if execErr != nil {
@@ -60,7 +65,7 @@ func ownerScan(t *testing.T, sql string, args []any, dest ...any) {
 	if err != nil {
 		t.Skip(err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	scanErr := conn.QueryRow(ctx, sql, args...).Scan(dest...)
 	if scanErr != nil {
@@ -69,6 +74,8 @@ func ownerScan(t *testing.T, sql string, args []any, dest ...any) {
 }
 
 func newPolicy(t *testing.T, customer, kind string) string {
+	t.Helper()
+
 	id := uuid.NewString()
 
 	var cust any = seed.ID(customer)
@@ -134,8 +141,8 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 	)
 	def := newPolicy(t, "cust-a", "default_alert")
 	unit := seed.ID("unit-non-rto").String()
-	_, resp := post(srv, &customerA, "units.get", `{"id":"`+unit+`"}`)
-	v := ver(resp)
+	_, resp := post(srv, customerA(), "units.get", `{"id":"`+unit+`"}`)
+	v := ver(t, resp)
 	set := func(a *actor, ids string, version int) (int, map[string]any) {
 		return write(
 			srv,
@@ -146,14 +153,14 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 		)
 	}
 
-	code, resp := set(&customerA, `"`+pA+`","`+pA2+`"`, v)
+	code, resp := set(customerA(), `"`+pA+`","`+pA2+`"`, v)
 	if code != 200 || len(asArr(t, data(resp)["alertPolicyIds"])) != 2 {
 		t.Fatalf("attach: %d %v", code, resp)
 	}
 
 	v++
 	if code, m := set(
-		&customerA,
+		customerA(),
 		`"`+pA2+`"`,
 		v,
 	); code != 200 ||
@@ -177,7 +184,7 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 		"unknown policy":          {`"` + uuid.NewString() + `"`, 404},
 		"duplicate":               {`"` + pA + `","` + pA + `"`, 422},
 	} {
-		code, m := set(&customerA, tc.ids, v)
+		code, m := set(customerA(), tc.ids, v)
 		if w, ok := refused[name]; ok {
 			refusal(t, name, code, m, w)
 		} else if code != tc.code {
@@ -185,15 +192,15 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 		}
 	}
 
-	if code, _ := set(&customerB, `"`+pB+`"`, v); code != 404 {
+	if code, _ := set(customerB(), `"`+pB+`"`, v); code != 404 {
 		t.Error("customer-b cannot touch customer-a's unit")
 	}
 
-	if code, _ := set(&customerA, ``, v-1); code != 409 {
+	if code, _ := set(customerA(), ``, v-1); code != 409 {
 		t.Error("stale version")
 	}
 
-	if code, m := set(&hq, ``, v); code != 200 || len(asArr(t, data(m)["alertPolicyIds"])) != 0 {
+	if code, m := set(hq(), ``, v); code != 200 || len(asArr(t, data(m)["alertPolicyIds"])) != 0 {
 		t.Fatalf("detach all: %d", code)
 	}
 
@@ -202,7 +209,7 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 	mk := func() string {
 		code, res := write(
 			srv,
-			&hq,
+			hq(),
 			"units.save",
 			`{"customerOrgId":"`+seed.ID("org-customer-a").
 				String()+
@@ -221,7 +228,7 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 	u1 := mk()
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"units.delete",
 		`{"id":"`+u1+`","reason":"created by mistake"}`,
 		2,
@@ -231,7 +238,7 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"units.delete",
 		`{"id":"`+u1+`","reason":"created by mistake"}`,
 		1,
@@ -240,13 +247,13 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 		t.Fatalf("delete: %d %v", code, res)
 	}
 
-	if code, _ := post(srv, &hq, "units.get", `{"id":"`+u1+`"}`); code != 404 {
+	if code, _ := post(srv, hq(), "units.get", `{"id":"`+u1+`"}`); code != 404 {
 		t.Error("deleted unit is gone")
 	}
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"units.delete",
 		`{"id":"`+u1+`","reason":"again"}`,
 		1,
@@ -279,7 +286,7 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"units.delete",
 		`{"id":"`+u2+`","reason":"x"}`,
 		1,
@@ -290,7 +297,7 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&customerA,
+		customerA(),
 		"units.delete",
 		`{"id":"`+u2+`","reason":"x"}`,
 		1,
@@ -304,11 +311,11 @@ func TestOrganizations(t *testing.T) {
 
 	code, resp := post(
 		srv,
-		&hq,
+		hq(),
 		"organizations.list",
 		`{"filters":{"kind":"customer","status":"active"}}`,
 	)
-	if code != 200 || len(items(resp)) < 2 {
+	if code != 200 || len(items(t, resp)) < 2 {
 		t.Fatalf("list: %d %v", code, resp)
 	}
 
@@ -323,11 +330,11 @@ func TestOrganizations(t *testing.T) {
 		`{"filters":{"kind":"x"}}`, `{"filters":{"status":"x"}}`, `{"filters":{"y":1}}`,
 		`{"sort":{"field":"name","direction":"asc"}}`,
 	} {
-		code, m := post(srv, &hq, "organizations.list", f)
+		code, m := post(srv, hq(), "organizations.list", f)
 		refusal(t, f, code, m, want[f])
 	}
 
-	if code, _ := post(srv, &customerA, "organizations.list", `{}`); code != 403 {
+	if code, _ := post(srv, customerA(), "organizations.list", `{}`); code != 403 {
 		t.Error("client cannot list organizations")
 	}
 
@@ -335,12 +342,12 @@ func TestOrganizations(t *testing.T) {
 
 	code, resp = write(
 		srv,
-		&hq,
+		hq(),
 		"organizations.save",
 		`{"name":"Chong Family Office `+suffix+`","kind":"customer","status":"active"}`,
 		0,
 	)
-	if code != 200 || ver(resp) != 1 {
+	if code != 200 || ver(t, resp) != 1 {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
@@ -349,7 +356,7 @@ func TestOrganizations(t *testing.T) {
 	// (IR208)
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"organizations.save",
 		`{"name":" chong family office `+suffix+`","kind":"customer","status":"active"}`,
 		0,
@@ -360,7 +367,7 @@ func TestOrganizations(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"organizations.save",
 		`{"id":"`+id+`","name":"Demo Customer A","kind":"customer","status":"active"}`,
 		1,
@@ -371,7 +378,7 @@ func TestOrganizations(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"organizations.save",
 		`{"id":"`+id+`","name":"Chong Office `+suffix+`","kind":"customer","status":"inactive"}`,
 		1,
@@ -382,7 +389,7 @@ func TestOrganizations(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"organizations.save",
 		`{"id":"`+id+`","name":"x","kind":"contractor","status":"active"}`,
 		2,
@@ -393,7 +400,7 @@ func TestOrganizations(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"organizations.save",
 		`{"id":"`+id+`","name":"x","kind":"customer","status":"active"}`,
 		1,
@@ -403,7 +410,7 @@ func TestOrganizations(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"organizations.save",
 		`{"id":"`+uuid.NewString()+`","name":"x","kind":"customer","status":"active"}`,
 		1,
@@ -413,7 +420,7 @@ func TestOrganizations(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"organizations.save",
 		`{"name":"","kind":"bank","status":"maybe"}`,
 		0,
@@ -432,7 +439,7 @@ func defaultPolicyID(t *testing.T) string {
 	if err != nil {
 		t.Skip(err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	var id string
 

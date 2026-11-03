@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -38,7 +38,7 @@ func TestDemoStateReport(t *testing.T) {
 	report := func(at time.Time, st string) (int, map[string]any) {
 		return write(
 			srv,
-			&customerB,
+			customerB(),
 			"demo.trigger",
 			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+at.Format(
 				time.RFC3339,
@@ -48,7 +48,7 @@ func TestDemoStateReport(t *testing.T) {
 		)
 	}
 
-	when := clock.Add(-30 * time.Second)
+	when := clock().Add(-30 * time.Second)
 	if code, m := report(
 		when,
 		`,"state":{"power":false,"celsius":27,"mode":"dry","fanLevel":"high"}`,
@@ -56,7 +56,7 @@ func TestDemoStateReport(t *testing.T) {
 		t.Fatalf("state report: %d %v", code, m)
 	}
 
-	_, res := post(srv, &hq, "units.get", `{"id":"`+unit.String()+`"}`)
+	_, res := post(srv, hq(), "units.get", `{"id":"`+unit.String()+`"}`)
 
 	o := asObj(t, data(res)["observedState"])
 	if o["power"] != false || o["celsius"] != 27.0 || o["mode"] != "dry" ||
@@ -72,7 +72,7 @@ func TestDemoStateReport(t *testing.T) {
 		t.Errorf("last seen %v, want at least %v", last, when)
 	}
 	// a report with no settings (a module that reports none, IR528) is heard only: the observed state stays
-	later := clock.Add(-10 * time.Second)
+	later := clock().Add(-10 * time.Second)
 	if code, m := report(
 		later,
 		`,"state":{"power":null,"celsius":null,"mode":null,"fanLevel":null}`,
@@ -80,7 +80,7 @@ func TestDemoStateReport(t *testing.T) {
 		t.Fatalf("heard-only report: %d %v", code, m)
 	}
 
-	_, res = post(srv, &hq, "units.get", `{"id":"`+unit.String()+`"}`)
+	_, res = post(srv, hq(), "units.get", `{"id":"`+unit.String()+`"}`)
 	if o := asObj(t, data(res)["observedState"]); o["power"] != false ||
 		o["celsius"] != 27.0 ||
 		o["mode"] != "dry" ||
@@ -106,7 +106,7 @@ func TestDemoStateReport(t *testing.T) {
 			`"fanLevel":"turbo"}`, "state.fanLevel=error.invalid"},
 		"hot": {when, `,"state":{"power":true,"celsius":55,"mode":"cool",` +
 			`"fanLevel":"mid"}`, "state.celsius=error.range"},
-		"future": {clock.Add(time.Hour), `,"state":{"power":true,"celsius":24,"mode":"cool",` +
+		"future": {clock().Add(time.Hour), `,"state":{"power":true,"celsius":24,"mode":"cool",` +
 			`"fanLevel":"mid"}`, "occurredAt=error.range"},
 	} {
 		code, m := report(c.at, c.state)

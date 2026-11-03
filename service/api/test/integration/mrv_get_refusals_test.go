@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -15,13 +15,13 @@ func TestMRVReadRefusals(t *testing.T) {
 	srv := server(t)
 	missing := uuid.NewString()
 
-	code, res := post(srv, &hq, "mrv.get", `{"id":"`+missing+`"}`)
+	code, res := post(srv, hq(), "mrv.get", `{"id":"`+missing+`"}`)
 	if code != 404 || res["messageKey"] != apperr.KeyNotFound {
 		t.Fatalf("mrv.get of a missing report: %d %v, want 404 NOT_FOUND", code, res)
 	}
 
-	code, res = post(srv, &hq, "mrv.get", `{"id":"`+missing+`","reportVersion":0}`)
+	code, res = post(srv, hq(), "mrv.get", `{"id":"`+missing+`","reportVersion":0}`)
 	refusal(t, "mrv.get reportVersion 0", code, res, "id=error.invalid")
-	code, res = post(srv, &hq, "mrv.versions", `{"id":"00000000-0000-0000-0000-000000000000"}`)
+	code, res = post(srv, hq(), "mrv.versions", `{"id":"00000000-0000-0000-0000-000000000000"}`)
 	refusal(t, "mrv.versions nil id", code, res, "id=error.required")
 }

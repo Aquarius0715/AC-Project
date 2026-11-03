@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -64,7 +64,7 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 	result := func(id, r string, at time.Time) (int, map[string]any) {
 		return write(
 			srv,
-			&customerB,
+			customerB(),
 			"demo.trigger",
 			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+at.Format(
 				time.RFC3339Nano,
@@ -84,7 +84,7 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 			body = `{"deviceId":"` + dev + `","firmwareVersion":"v2"}`
 		}
 
-		code, resp := write(srv, &hq, "devices."+kind, body, version())
+		code, resp := write(srv, hq(), "devices."+kind, body, version())
 		if code != 200 || data(resp)["status"] != "queued" {
 			t.Fatalf("%s: %d %v", kind, code, resp)
 		}
@@ -224,7 +224,7 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 
 	code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.updateFirmware",
 		`{"deviceId":"`+dev+`","firmwareVersion":"v1"}`,
 		version(),
@@ -327,9 +327,9 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 	} {
 		code, resp := write(
 			srv,
-			&customerB,
+			customerB(),
 			"demo.trigger",
-			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Format(
+			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock().Format(
 				time.RFC3339,
 			)+`","eventType":"operation",`+b+`}`,
 			0,
@@ -337,7 +337,7 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 		refusal(t, b, code, resp, want)
 	}
 
-	if code, _ := result(uuid.NewString(), "succeeded", clock); code != 404 {
+	if code, _ := result(uuid.NewString(), "succeeded", clock()); code != 404 {
 		t.Error("unknown operation")
 	}
 }
@@ -357,7 +357,7 @@ func TestDeviceEvents(t *testing.T) {
 		&binding,
 	)
 
-	at := func(sec int) string { return clock.Add(time.Duration(sec) * time.Second).Format(time.RFC3339) }
+	at := func(sec int) string { return clock().Add(time.Duration(sec) * time.Second).Format(time.RFC3339) }
 	signal := func(event, kind string, seq int, recovery string, sec int) (int, map[string]any) {
 		r := ""
 		if recovery != "" {
@@ -366,7 +366,7 @@ func TestDeviceEvents(t *testing.T) {
 
 		return write(
 			srv,
-			&customerB,
+			customerB(),
 			"demo.trigger",
 			`{"scenarioId":"t12","eventId":"`+event+`","occurredAt":"`+at(
 				sec,
@@ -520,7 +520,7 @@ func TestDeviceEvents(t *testing.T) {
 	if _, _, restored, _ := eventOf(
 		lost,
 	); restored == nil ||
-		!restored.Equal(clock.Add(10*time.Second)) {
+		!restored.Equal(clock().Add(10*time.Second)) {
 		t.Errorf("restoredAt on the fault: %v", restored)
 	}
 
@@ -586,11 +586,11 @@ func TestDeviceEvents(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&hq,
+		hq(),
 		"alerts.evidence",
 		`{"alertId":"`+alert+`","query":{"limit":100}}`,
 	); !slices.ContainsFunc(
-		items(res),
+		items(t, res),
 		func(it map[string]any) bool {
 			return it["id"] == clearID && it["kind"] == "device_event" &&
 				it["eventType"] == "restored" &&
@@ -624,7 +624,7 @@ func TestDeviceEvents(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"alerts.resolve",
 		`{"alertId":"`+alert+`","resolutionReason":"Cover closed on site","resolutionEvidenceIds":["`+clearID+`"]}`,
 		version,
@@ -649,8 +649,8 @@ func TestDeviceEvents(t *testing.T) {
 		t.Errorf("recurrence links the resolved alert: %v %v", a, previous)
 	}
 	// devices.events shows the events with their alerts and recovery
-	code, m := post(srv, &hq, "devices.events", `{"id":"`+dev+`","query":{"limit":50}}`)
-	if code != 200 || len(items(m)) != count() {
+	code, m := post(srv, hq(), "devices.events", `{"id":"`+dev+`","query":{"limit":50}}`)
+	if code != 200 || len(items(t, m)) != count() {
 		t.Fatalf("events: %d %v", code, m)
 	}
 	// validation and refusals
@@ -672,13 +672,13 @@ func TestDeviceEvents(t *testing.T) {
 		body := `{"scenarioId":"t","eventId":"` + uuid.NewString() + `","occurredAt":"` + at(
 			60,
 		) + `","eventType":"device","deviceId":"` + dev + `","bindingId":"` + binding + `",` + b + `}`
-		code, m := write(srv, &customerB, "demo.trigger", body, 0)
+		code, m := write(srv, customerB(), "demo.trigger", body, 0)
 		refusal(t, name, code, m, want[name])
 	}
 
 	if code, res := write(
 		srv,
-		&customerB,
+		customerB(),
 		"demo.trigger",
 		`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+at(
 			60,
@@ -692,7 +692,7 @@ func TestDeviceEvents(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&customerB,
+		customerB(),
 		"demo.trigger",
 		`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+at(
 			60,
