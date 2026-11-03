@@ -66,8 +66,14 @@ const (
 	roleFilter  = "filter"
 )
 
-// fieldFilters names the filters object of the paging query and of an input that has its own (raw JSON).
-const fieldFilters = "filters"
+// The fields of the paging query (paging.Query) in the input: the query itself as an input field, its filters
+// object (an input can also have its own, as raw JSON) and the keys of its sort object.
+const (
+	fieldQuery       = "query"
+	fieldFilters     = "filters"
+	sortKeyField     = "field"
+	sortKeyDirection = "direction"
+)
 
 var (
 	errRouteMethod    = errors.New("unsupported method")
@@ -489,7 +495,7 @@ func sortValue(values []string) (any, bool) {
 		return nil, false
 	}
 
-	return map[string]any{"field": field, "direction": dir}, true
+	return map[string]any{sortKeyField: field, sortKeyDirection: dir}, true
 }
 
 // listValue reads a list parameter: repeated, or its values separated by commas.

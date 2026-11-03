@@ -18,6 +18,23 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
 
+// The input fields, values and paths of the REST binding tests.
+const (
+	fieldStatus      = "status"
+	fieldOverdueOnly = "overdueOnly"
+	fieldCount       = "count"
+	fieldRatio       = "ratio"
+	fieldIDs         = "ids"
+	fieldTarget      = "target"
+	fieldTargetKind  = "target.kind"
+	fieldTargetID    = "target.id"
+	fieldAction      = "action"
+	statusOpen       = "open"
+	actionApprove    = "approve"
+	pathX            = "/v1/x"
+	pathJobThings    = "/v1/jobs/{jobId}/things"
+)
+
 type restTarget struct {
 	Kind string    `json:"kind"`
 	ID   uuid.UUID `json:"id"`
@@ -40,10 +57,11 @@ type restOpaque struct {
 	} `json:"lines"`
 }
 
-// restTwice names one parameter twice: its own field and the embedded struct's.
+// restTwice names one parameter twice: the embedded struct's field and its own.
 type restTwice struct {
-	Name string `json:"name"`
 	RestInner
+
+	Name string `json:"name"`
 }
 
 // RestInner is exported, so the binding walks it as an embedded struct.
@@ -64,10 +82,10 @@ func restOp(mode Mode, input func() any) *Operation {
 			Name: "test.op",
 			Mode: mode,
 			Filters: []string{
-				"status",
-				"unitIds",
-				"overdueOnly",
-				"jobId",
+				fieldStatus,
+				fieldUnitIDs,
+				fieldOverdueOnly,
+				fieldJobID,
 			},
 			Module:        "",
 			Authorization: "",
@@ -91,10 +109,10 @@ func bind(
 ) (map[string]any, map[string]string) {
 	t.Helper()
 
-	req := httptest.NewRequest(method, target, strings.NewReader(body))
+	req := httptest.NewRequestWithContext(t.Context(), method, target, strings.NewReader(body))
 	ectx := echo.New().NewContext(req, httptest.NewRecorder())
 
-	var pathValues echo.PathValues
+	pathValues := make(echo.PathValues, 0, len(binding.Path))
 	for _, name := range binding.Path {
 		pathValues = append(pathValues, echo.PathValue{Name: name, Value: path[name]})
 	}
@@ -118,314 +136,250 @@ func bind(
 	return obj, nil
 }
 
-func TestRESTParameters(t *testing.T) {
-	jobBinding, err := NewBinding(
+// object is value as a JSON object; anything else fails the test.
+func object(t *testing.T, value any) map[string]any {
+	t.Helper()
+
+	obj, ok := value.(map[string]any)
+	if !ok {
+		t.Fatalf("not an object: %v", value)
+	}
+
+	return obj
+}
+
+// jobThingsBinding is the binding of GET /v1/jobs/{jobId}/things for a restIn read.
+func jobThingsBinding(t *testing.T) *Binding {
+	t.Helper()
+
+	binding, err := NewBinding(
 		restOp(Read, func() any { return new(restIn) }),
-		Route{Method: "GET", Path: "/v1/jobs/{jobId}/things", FixedField: "", FixedValue: ""},
+		Route{Method: http.MethodGet, Path: pathJobThings, FixedField: "", FixedValue: ""},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	want := map[string]Param{
-		"jobId": {
-			Name:  "jobId",
-			At:    []string{"jobId"},
-			UUID:  true,
-			Kind:  0,
-			List:  false,
-			Sort:  false,
-			Role:  "",
-			Order: 0,
-		},
-		"count": {
-			Name:  "count",
-			At:    []string{"count"},
-			Kind:  KindInteger,
-			List:  false,
-			Sort:  false,
-			UUID:  false,
-			Role:  "",
-			Order: 0,
-		},
-		"ratio": {
-			Name:  "ratio",
-			At:    []string{"ratio"},
-			Kind:  KindNumber,
-			List:  false,
-			Sort:  false,
-			UUID:  false,
-			Role:  "",
-			Order: 0,
-		},
-		"on": {
-			Name:  "on",
-			At:    []string{"on"},
-			Kind:  KindBool,
-			List:  false,
-			Sort:  false,
-			UUID:  false,
-			Role:  "",
-			Order: 0,
-		},
-		"ids": {
-			Name:  "ids",
-			At:    []string{"ids"},
-			List:  true,
-			UUID:  true,
-			Kind:  0,
-			Sort:  false,
-			Role:  "",
-			Order: 0,
-		},
-		"target.kind": {
-			Name:  "target.kind",
-			At:    []string{"target", "kind"},
-			Kind:  0,
-			List:  false,
-			Sort:  false,
-			UUID:  false,
-			Role:  "",
-			Order: 0,
-		},
-		"target.id": {
-			Name:  "target.id",
-			At:    []string{"target", "id"},
-			UUID:  true,
-			Kind:  0,
-			List:  false,
-			Sort:  false,
-			Role:  "",
-			Order: 0,
-		},
-		"action": {
-			Name:  "action",
-			At:    []string{"action"},
-			Kind:  0,
-			List:  false,
-			Sort:  false,
-			UUID:  false,
-			Role:  "",
-			Order: 0,
-		},
-		"cursor": {
-			Name:  "cursor",
-			At:    []string{"query", "cursor"},
-			Kind:  0,
-			List:  false,
-			Sort:  false,
-			UUID:  false,
-			Role:  "",
-			Order: 0,
-		},
-		"limit": {
-			Name:  "limit",
-			At:    []string{"query", "limit"},
-			Kind:  KindInteger,
-			List:  false,
-			Sort:  false,
-			UUID:  false,
-			Role:  "",
-			Order: 0,
-		},
-		"sort": {
-			Name:  "sort",
-			At:    []string{"query", "sort"},
-			Sort:  true,
-			Kind:  0,
-			List:  false,
-			UUID:  false,
-			Role:  "",
-			Order: 0,
-		},
-		"status": {
-			Name:  "status",
-			At:    []string{"query", "filters", "status"},
-			Kind:  0,
-			List:  false,
-			Sort:  false,
-			UUID:  false,
-			Role:  "",
-			Order: 0,
-		},
-		"unitIds": {
-			Name:  "unitIds",
-			At:    []string{"query", "filters", "unitIds"},
-			List:  true,
-			Kind:  0,
-			Sort:  false,
-			UUID:  false,
-			Role:  "",
-			Order: 0,
-		},
-		"overdueOnly": {
-			Name: "overdueOnly",
-			At:   []string{"query", "filters", "overdueOnly"},
-			Kind: KindBool, List: false, Sort: false, UUID: false, Role: "", Order: 0,
-		},
+	return binding
+}
+
+// wantParam is an expected parameter, without its role and order.
+func wantParam(name string, kind ParamKind, list, isUUID bool, at ...string) Param {
+	return Param{
+		Name:  name,
+		At:    at,
+		Kind:  kind,
+		List:  list,
+		UUID:  isUUID,
+		Sort:  false,
+		Role:  "",
+		Order: 0,
 	}
+}
+
+// wantRESTParams are the parameters of a restIn read, without their roles and order.
+func wantRESTParams() map[string]Param {
+	sort := wantParam(paramSort, KindString, false, false, fieldQuery, paramSort)
+	sort.Sort = true
+
+	return map[string]Param{
+		fieldJobID:      wantParam(fieldJobID, KindString, false, true, fieldJobID),
+		fieldCount:      wantParam(fieldCount, KindInteger, false, false, fieldCount),
+		fieldRatio:      wantParam(fieldRatio, KindNumber, false, false, fieldRatio),
+		"on":            wantParam("on", KindBool, false, false, "on"),
+		fieldIDs:        wantParam(fieldIDs, KindString, true, true, fieldIDs),
+		fieldTargetKind: wantParam(fieldTargetKind, KindString, false, false, fieldTarget, "kind"),
+		fieldTargetID:   wantParam(fieldTargetID, KindString, false, true, fieldTarget, "id"),
+		fieldAction:     wantParam(fieldAction, KindString, false, false, fieldAction),
+		paramCursor:     wantParam(paramCursor, KindString, false, false, fieldQuery, paramCursor),
+		paramLimit:      wantParam(paramLimit, KindInteger, false, false, fieldQuery, paramLimit),
+		paramSort:       sort,
+		fieldStatus: wantParam(
+			fieldStatus, KindString, false, false, fieldQuery, fieldFilters, fieldStatus,
+		),
+		fieldUnitIDs: wantParam(
+			fieldUnitIDs, KindString, true, false, fieldQuery, fieldFilters, fieldUnitIDs,
+		),
+		fieldOverdueOnly: wantParam(
+			fieldOverdueOnly, KindBool, false, false, fieldQuery, fieldFilters, fieldOverdueOnly,
+		),
+	}
+}
+
+func TestRESTParameters(t *testing.T) {
+	t.Parallel()
+
+	jobBinding := jobThingsBinding(t)
+
 	got := map[string]Param{}
 
-	for name, p := range jobBinding.Params {
-		p.Role, p.Order = "", 0
-		got[name] = p
+	for name, param := range jobBinding.Params {
+		param.Role, param.Order = "", 0
+		got[name] = param
 	}
 
-	if jobBinding.Params["status"].Role != "filter" || jobBinding.Params["sort"].Role != "sort" ||
-		jobBinding.Params["count"].Role != "field" ||
-		jobBinding.Params["jobId"].Order != 0 ||
-		jobBinding.Params["overdueOnly"].Order <= jobBinding.Params["sort"].Order {
+	if jobBinding.Params[fieldStatus].Role != roleFilter ||
+		jobBinding.Params[paramSort].Role != paramSort ||
+		jobBinding.Params[fieldCount].Role != roleField ||
+		jobBinding.Params[fieldJobID].Order != 0 ||
+		jobBinding.Params[fieldOverdueOnly].Order <= jobBinding.Params[paramSort].Order {
 		t.Fatalf("roles and order: %+v", jobBinding.Params)
 	}
 
 	if !reflect.DeepEqual(
 		got,
-		want,
+		wantRESTParams(),
 	) { // the filter jobId is left out: the input field jobId owns the name
-		t.Fatalf("params\n got %+v\nwant %+v", got, want)
+		t.Fatalf("params\n got %+v\nwant %+v", got, wantRESTParams())
 	}
 
-	if !reflect.DeepEqual(jobBinding.Path, []string{"jobId"}) || jobBinding.Body {
+	if !reflect.DeepEqual(jobBinding.Path, []string{fieldJobID}) || jobBinding.Body {
 		t.Fatalf("path %v body %v", jobBinding.Path, jobBinding.Body)
 	}
-	// a list read whose input is the paging query itself
+}
+
+// TestRESTPagingQueryParameters: a list read whose input is the paging query itself.
+func TestRESTPagingQueryParameters(t *testing.T) {
+	t.Parallel()
+
 	binding, err := NewBinding(
 		restOp(Read, func() any { return new(paging.Query) }),
-		Route{Method: "GET", Path: "/v1/things", FixedField: "", FixedValue: ""},
+		Route{Method: http.MethodGet, Path: "/v1/things", FixedField: "", FixedValue: ""},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if p := binding.Params["sort"]; !p.Sort || !reflect.DeepEqual(p.At, []string{"sort"}) ||
-		binding.Params["status"].At[0] != "filters" ||
+	if param := binding.Params[paramSort]; !param.Sort ||
+		!reflect.DeepEqual(param.At, []string{paramSort}) ||
+		binding.Params[fieldStatus].At[0] != fieldFilters ||
 		len(binding.Params) != 7 {
 		t.Fatalf("paging query params %+v", binding.Params)
 	}
 }
 
 func TestRESTQueryInput(t *testing.T) {
-	binding, err := NewBinding(
-		restOp(Read, func() any { return new(restIn) }),
-		Route{Method: "GET", Path: "/v1/jobs/{jobId}/things", FixedField: "", FixedValue: ""},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	t.Parallel()
 
+	binding := jobThingsBinding(t)
 	job, firstID, secondID := uuid.NewString(), uuid.NewString(), uuid.NewString()
 	params := url.Values{
-		"count": {
+		fieldCount: {
 			"3",
 		},
-		"ratio":       {"1.50"},
-		"on":          {"true"},
-		"ids":         {firstID + "," + secondID, firstID},
-		"target.kind": {"unit"},
-		"sort":        {"dueAt:desc"},
-		"limit": {
+		fieldRatio:      {"1.50"},
+		"on":            {"true"},
+		fieldIDs:        {firstID + "," + secondID, firstID},
+		fieldTargetKind: {kindUnit},
+		paramSort:       {"dueAt:desc"},
+		paramLimit: {
 			"10",
 		},
-		"cursor":      {""},
-		"status":      {"open"},
-		"unitIds":     {secondID},
-		"overdueOnly": {"false"},
+		paramCursor:      {""},
+		fieldStatus:      {statusOpen},
+		fieldUnitIDs:     {secondID},
+		fieldOverdueOnly: {"false"},
 	}
 
 	got, problems := bind(
 		t,
 		binding,
-		"GET",
+		http.MethodGet,
 		"/v1/jobs/"+job+"/things?"+params.Encode(),
 		"",
-		map[string]string{"jobId": job},
+		map[string]string{fieldJobID: job},
 	)
 	if problems != nil {
 		t.Fatal(problems)
 	}
 
 	want := map[string]any{
-		"jobId":  job,
-		"count":  3.0,
-		"ratio":  1.5,
-		"on":     true,
-		"ids":    []any{firstID, secondID, firstID},
-		"target": map[string]any{"kind": "unit"},
-		"query": map[string]any{
-			"sort":  map[string]any{"field": "dueAt", "direction": "desc"},
-			"limit": 10.0,
-			"filters": map[string]any{
-				"status":      "open",
-				"unitIds":     []any{secondID},
-				"overdueOnly": false,
+		fieldJobID:  job,
+		fieldCount:  3.0,
+		fieldRatio:  1.5,
+		"on":        true,
+		fieldIDs:    []any{firstID, secondID, firstID},
+		fieldTarget: map[string]any{"kind": kindUnit},
+		fieldQuery: map[string]any{
+			paramSort:  map[string]any{sortKeyField: "dueAt", sortKeyDirection: "desc"},
+			paramLimit: 10.0,
+			fieldFilters: map[string]any{
+				fieldStatus:      statusOpen,
+				fieldUnitIDs:     []any{secondID},
+				fieldOverdueOnly: false,
 			},
 		},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("input\n got %v\nwant %v", got, want)
 	}
-	// sort without a direction is ascending; an empty value is absent
-	got, _ = bind(
-		t,
-		binding,
-		"GET",
-		"/v1/jobs/"+job+"/things?sort=name&count=",
-		"",
-		map[string]string{"jobId": job},
-	)
-	if s := got["query"].(map[string]any)["sort"]; !reflect.DeepEqual(
-		s,
-		map[string]any{"field": "name", "direction": "asc"},
+}
+
+// TestRESTQueryDefaults: sort without a direction is ascending, an empty value is absent, an empty sort is no sort,
+// and an empty list parameter is the empty list, not an absent field.
+func TestRESTQueryDefaults(t *testing.T) {
+	t.Parallel()
+
+	binding := jobThingsBinding(t)
+	job := uuid.NewString()
+	path := map[string]string{fieldJobID: job}
+
+	got, _ := bind(t, binding, http.MethodGet, "/v1/jobs/"+job+"/things?sort=name&count=", "", path)
+	if sort := object(t, got[fieldQuery])[paramSort]; !reflect.DeepEqual(
+		sort,
+		map[string]any{sortKeyField: fieldName, sortKeyDirection: "asc"},
 	) ||
-		got["count"] != nil {
+		got[fieldCount] != nil {
 		t.Fatalf("defaults: %v", got)
 	}
-	// an empty sort is no sort
+
 	if got, fieldErrs := bind(
 		t,
 		binding,
-		"GET",
+		http.MethodGet,
 		"/v1/jobs/"+job+"/things?sort=",
 		"",
-		map[string]string{"jobId": job},
+		path,
 	); fieldErrs != nil ||
-		got["query"] != nil {
+		got[fieldQuery] != nil {
 		t.Fatalf("empty sort: %v %v", got, fieldErrs)
 	}
-	// an empty list parameter is the empty list, not an absent field
-	got, _ = bind(
-		t,
-		binding,
-		"GET",
-		"/v1/jobs/"+job+"/things?ids=&unitIds=,",
-		"",
-		map[string]string{"jobId": job},
-	)
-	if !reflect.DeepEqual(got["ids"], []any{}) ||
+
+	got, _ = bind(t, binding, http.MethodGet, "/v1/jobs/"+job+"/things?ids=&unitIds=,", "", path)
+	if !reflect.DeepEqual(got[fieldIDs], []any{}) ||
 		!reflect.DeepEqual(
-			got["query"].(map[string]any)["filters"],
-			map[string]any{"unitIds": []any{}},
+			object(t, got[fieldQuery])[fieldFilters],
+			map[string]any{fieldUnitIDs: []any{}},
 		) {
 		t.Fatalf("empty lists: %v", got)
 	}
+}
+
+// TestRESTQueryRefusals: a bad or repeated value, an unknown parameter, a path parameter or an object in the query,
+// and an empty path parameter are VALIDATION; an ID in the path that is not a UUID names no resource.
+func TestRESTQueryRefusals(t *testing.T) {
+	t.Parallel()
+
+	binding := jobThingsBinding(t)
+	job := uuid.NewString()
 
 	for target, wantFE := range map[string]map[string]string{
-		"?count=x":          {"count": apperr.KeyInvalid},
-		"?count=1&count=2":  {"count": apperr.KeyInvalid},
+		"?count=x":          {fieldCount: apperr.KeyInvalid},
+		"?count=1&count=2":  {fieldCount: apperr.KeyInvalid},
 		"?on=yes":           {"on": apperr.KeyInvalid},
-		"?ratio=NaN":        {"ratio": apperr.KeyInvalid},
-		"?sort=:asc":        {"sort": apperr.KeyInvalid},
+		"?ratio=NaN":        {fieldRatio: apperr.KeyInvalid},
+		"?sort=:asc":        {paramSort: apperr.KeyInvalid},
 		"?nope=1":           {"nope": apperr.KeyNotAllowed},
-		"?jobId=" + job:     {"jobId": apperr.KeyNotAllowed}, // a path parameter is not repeated in the query
-		"?limit=2&target=x": {"target": apperr.KeyNotAllowed},
+		"?jobId=" + job:     {fieldJobID: apperr.KeyNotAllowed}, // a path parameter is not repeated in the query
+		"?limit=2&target=x": {fieldTarget: apperr.KeyNotAllowed},
 	} {
 		if _, fieldErrs := bind(
 			t,
 			binding,
-			"GET",
+			http.MethodGet,
 			"/v1/jobs/"+job+"/things"+target,
 			"",
-			map[string]string{"jobId": job},
+			map[string]string{fieldJobID: job},
 		); !reflect.DeepEqual(
 			fieldErrs,
 			wantFE,
@@ -437,62 +391,76 @@ func TestRESTQueryInput(t *testing.T) {
 	if _, fieldErrs := bind(
 		t,
 		binding,
-		"GET",
+		http.MethodGet,
 		"/v1/jobs/x/things",
 		"",
-		map[string]string{"jobId": ""},
-	); fieldErrs["jobId"] != apperr.KeyInvalid {
+		map[string]string{fieldJobID: ""},
+	); fieldErrs[fieldJobID] != apperr.KeyInvalid {
 		t.Errorf("empty path parameter: %v", fieldErrs)
 	}
-	// an ID in the path that is not a UUID names no resource
-	c := echo.New().
-		NewContext(httptest.NewRequest(http.MethodGet, "/v1/jobs/invoice-a/things", nil), httptest.NewRecorder())
-	c.SetPathValues(echo.PathValues{{Name: "jobId", Value: "invoice-a"}})
 
-	_, inputErr := binding.Input(c, nil)
+	ectx := echo.New().NewContext(
+		httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/jobs/invoice-a/things", nil),
+		httptest.NewRecorder(),
+	)
+	ectx.SetPathValues(echo.PathValues{{Name: fieldJobID, Value: "invoice-a"}})
+
+	_, inputErr := binding.Input(ectx, nil)
 	if apperr.From(inputErr).Code != apperr.NotFound {
 		t.Errorf("malformed ID: %v", inputErr)
 	}
 }
 
-func TestRESTBodyInput(t *testing.T) {
+// approveBinding is the binding of POST /v1/things/{jobId}/{target.kind}/approve, which fixes action=approve.
+func approveBinding(t *testing.T) *Binding {
+	t.Helper()
+
 	binding, err := NewBinding(
 		restOp(Write, func() any { return new(restIn) }),
 		Route{
-			Method:     "POST",
+			Method:     http.MethodPost,
 			Path:       "/v1/things/{jobId}/{target.kind}/approve",
-			FixedField: "action",
-			FixedValue: "approve",
+			FixedField: fieldAction,
+			FixedValue: actionApprove,
 		},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	job, other := uuid.NewString(), uuid.NewString()
-	path := map[string]string{"jobId": job, "target.kind": "space%20a"}
+	return binding
+}
 
-	got, fe := bind(
+func TestRESTBodyInput(t *testing.T) {
+	t.Parallel()
+
+	binding := approveBinding(t)
+	job := uuid.NewString()
+	path := map[string]string{fieldJobID: job, fieldTargetKind: "space%20a"}
+
+	got, fieldErrs := bind(
 		t,
 		binding,
-		"POST",
+		http.MethodPost,
 		"/",
 		`{"ratio": 12345678901234567890, "jobId": "`+job+`"}`,
 		path,
 	)
-	if fe != nil {
-		t.Fatal(fe)
+	if fieldErrs != nil {
+		t.Fatal(fieldErrs)
 	}
 
-	if got["action"] != "approve" || got["jobId"] != job ||
-		got["target"].(map[string]any)["kind"] != "space a" {
+	if got[fieldAction] != actionApprove || got[fieldJobID] != job ||
+		object(t, got[fieldTarget])["kind"] != "space a" {
 		t.Fatalf("body input %v", got)
 	}
 
-	ectx := echo.New().
-		NewContext(httptest.NewRequest(http.MethodPost, "/", nil), httptest.NewRecorder())
+	ectx := echo.New().NewContext(
+		httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/", nil),
+		httptest.NewRecorder(),
+	)
 	ectx.SetPathValues(
-		echo.PathValues{{Name: "jobId", Value: job}, {Name: "target.kind", Value: "unit"}},
+		echo.PathValues{{Name: fieldJobID, Value: job}, {Name: fieldTargetKind, Value: kindUnit}},
 	)
 
 	raw, inputErr := binding.Input(
@@ -503,72 +471,110 @@ func TestRESTBodyInput(t *testing.T) {
 		!strings.Contains(string(raw), "12345678901234567890") { // numbers keep their text
 		t.Fatalf("number changed: %s %v", raw, inputErr)
 	}
+}
+
+// TestRESTBodyRefusals: a body that names a path parameter or the fixed field with another value, a body that is not
+// one JSON object, and query parameters on a body route are VALIDATION.
+func TestRESTBodyRefusals(t *testing.T) {
+	t.Parallel()
+
+	binding := approveBinding(t)
+	job, other := uuid.NewString(), uuid.NewString()
+	path := map[string]string{fieldJobID: job, fieldTargetKind: "space%20a"}
 
 	for body, wantFE := range map[string]map[string]string{
-		`{"jobId":"` + other + `"}`:     {"jobId": apperr.KeyPathMismatch},
-		`{"action":"mark_paid"}`:        {"action": apperr.KeyPathMismatch},
-		`{"target":"unit"}`:             {"target.kind": apperr.KeyPathMismatch},
+		`{"jobId":"` + other + `"}`:     {fieldJobID: apperr.KeyPathMismatch},
+		`{"action":"mark_paid"}`:        {fieldAction: apperr.KeyPathMismatch},
+		`{"target":"unit"}`:             {fieldTargetKind: apperr.KeyPathMismatch},
 		`[1]`:                           {"_": apperr.KeyMalformedInput},
 		`null`:                          {"_": apperr.KeyMalformedInput},
 		`{"a":1} {"b":2}`:               {"_": apperr.KeyMalformedInput},
 		`{"action":"approve"}`:          nil,
 		`{"target":{"kind":"space a"}}`: nil,
 	} {
-		if _, fe := bind(t, binding, "POST", "/", body, path); !reflect.DeepEqual(fe, wantFE) {
-			t.Errorf("%s: %v, want %v", body, fe, wantFE)
+		if _, fieldErrs := bind(
+			t,
+			binding,
+			http.MethodPost,
+			"/",
+			body,
+			path,
+		); !reflect.DeepEqual(
+			fieldErrs,
+			wantFE,
+		) {
+			t.Errorf("%s: %v, want %v", body, fieldErrs, wantFE)
 		}
 	}
 
 	if _, fieldErrs := bind(
 		t,
 		binding,
-		"POST",
+		http.MethodPost,
 		"/?ratio=1",
 		`{}`,
 		path,
-	); fieldErrs["ratio"] != apperr.KeyNotAllowed {
+	); fieldErrs[fieldRatio] != apperr.KeyNotAllowed {
 		t.Errorf("query on a body route: %v", fieldErrs)
 	}
 }
 
-func TestRESTBindingRules(t *testing.T) {
+// refusedRoute is a route NewBinding refuses for its operation.
+type refusedRoute struct {
+	op    *Operation
+	route Route
+}
+
+// refusedRoutes are routes that do not fit their operation: a method against the mode, an unknown method, a path
+// parameter or fixed field that is no scalar input field, objects in a query string and a parameter named twice.
+func refusedRoutes() map[string]refusedRoute {
 	input := func() any { return new(restIn) }
-	for name, testCase := range map[string]struct {
-		op *Operation
-		rt Route
-	}{
-		"GET for a write":   {restOp(Write, input), Route{Method: "GET", Path: "/v1/x", FixedField: "", FixedValue: ""}},
-		"DELETE for a read": {restOp(Read, input), Route{Method: "DELETE", Path: "/v1/x", FixedField: "", FixedValue: ""}},
+
+	return map[string]refusedRoute{
+		"GET for a write": {
+			restOp(Write, input),
+			Route{Method: http.MethodGet, Path: pathX, FixedField: "", FixedValue: ""},
+		},
+		"DELETE for a read": {
+			restOp(Read, input),
+			Route{Method: http.MethodDelete, Path: pathX, FixedField: "", FixedValue: ""},
+		},
 		"unknown method": {
 			restOp(Write, input),
-			Route{Method: "OPTIONS", Path: "/v1/x", FixedField: "", FixedValue: ""},
+			Route{Method: "OPTIONS", Path: pathX, FixedField: "", FixedValue: ""},
 		},
 		"unknown path parameter": {
 			restOp(Read, input),
-			Route{Method: "GET", Path: "/v1/x/{nope}", FixedField: "", FixedValue: ""},
+			Route{Method: http.MethodGet, Path: "/v1/x/{nope}", FixedField: "", FixedValue: ""},
 		},
 		"list path parameter": {
 			restOp(Read, input),
-			Route{Method: "GET", Path: "/v1/x/{ids}", FixedField: "", FixedValue: ""},
+			Route{Method: http.MethodGet, Path: "/v1/x/{ids}", FixedField: "", FixedValue: ""},
 		},
 		"filter path parameter": {
 			restOp(Read, input),
-			Route{Method: "GET", Path: "/v1/x/{status}", FixedField: "", FixedValue: ""},
+			Route{Method: http.MethodGet, Path: "/v1/x/{status}", FixedField: "", FixedValue: ""},
 		},
 		"unknown fixed field": {
 			restOp(Write, input),
-			Route{Method: "POST", Path: "/v1/x", FixedField: "nope", FixedValue: "a"},
+			Route{Method: http.MethodPost, Path: pathX, FixedField: "nope", FixedValue: "a"},
 		},
 		"objects in a query": {
 			restOp(Read, func() any { return new(restOpaque) }),
-			Route{Method: "GET", Path: "/v1/x", FixedField: "", FixedValue: ""},
+			Route{Method: http.MethodGet, Path: pathX, FixedField: "", FixedValue: ""},
 		},
 		"a parameter twice": {
 			restOp(Read, func() any { return new(restTwice) }),
-			Route{Method: "GET", Path: "/v1/x", FixedField: "", FixedValue: ""},
+			Route{Method: http.MethodGet, Path: pathX, FixedField: "", FixedValue: ""},
 		},
-	} {
-		_, err := NewBinding(testCase.op, testCase.rt)
+	}
+}
+
+func TestRESTBindingRules(t *testing.T) {
+	t.Parallel()
+
+	for name, testCase := range refusedRoutes() {
+		_, err := NewBinding(testCase.op, testCase.route)
 		if err == nil {
 			t.Errorf("%s: accepted", name)
 		}
@@ -576,7 +582,7 @@ func TestRESTBindingRules(t *testing.T) {
 
 	_, err := NewBinding(
 		restOp(Write, func() any { return new(restOpaque) }),
-		Route{Method: "POST", Path: "/v1/x", FixedField: "", FixedValue: ""},
+		Route{Method: http.MethodPost, Path: pathX, FixedField: "", FixedValue: ""},
 	)
 	if err != nil {
 		t.Errorf("objects in a body: %v", err)
@@ -585,7 +591,7 @@ func TestRESTBindingRules(t *testing.T) {
 	if EchoPath("/v1/jobs/{jobId}/offers/{offerId}") != "/v1/jobs/:jobId/offers/:offerId" ||
 		!reflect.DeepEqual(
 			PathParams("/v1/l/{target.kind}/{target.id}"),
-			[]string{"target.kind", "target.id"},
+			[]string{fieldTargetKind, fieldTargetID},
 		) {
 		t.Error("path helpers")
 	}
@@ -594,38 +600,64 @@ func TestRESTBindingRules(t *testing.T) {
 // TestRESTEmbeddedQuery: an embedded paging query binds its cursor, limit, sort and filters at the top of the input,
 // and a field without a JSON name is named as Go names it.
 func TestRESTEmbeddedQuery(t *testing.T) {
+	t.Parallel()
+
 	binding, err := NewBinding(
 		restOp(Read, func() any { return new(restEmbedded) }),
-		Route{Method: "GET", Path: "/v1/x", FixedField: "", FixedValue: ""},
+		Route{Method: http.MethodGet, Path: pathX, FixedField: "", FixedValue: ""},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	got, fe := bind(t, binding, "GET", "/v1/x?limit=5&sort=name:desc&Note=hi&status=open", "", nil)
-	if fe != nil {
-		t.Fatal(fe)
+	got, fieldErrs := bind(
+		t,
+		binding,
+		http.MethodGet,
+		"/v1/x?limit=5&sort=name:desc&Note=hi&status=open",
+		"",
+		nil,
+	)
+	if fieldErrs != nil {
+		t.Fatal(fieldErrs)
 	}
 
 	want := map[string]any{
-		"limit":   5.0,
-		"sort":    map[string]any{"field": "name", "direction": "desc"},
-		"Note":    "hi",
-		"filters": map[string]any{"status": "open"},
+		paramLimit:   5.0,
+		paramSort:    map[string]any{sortKeyField: fieldName, sortKeyDirection: "desc"},
+		"Note":       "hi",
+		fieldFilters: map[string]any{fieldStatus: statusOpen},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("input\n got %v\nwant %v", got, want)
 	}
 }
 
-// TestRESTRoutes drives catalog routes end to end through the shared pipeline (authorization, idempotency,
-// ServiceResult) with the input taken from the path, the query string, the body and the fixed field.
-func TestRESTRoutes(t *testing.T) {
+// restRoutesApp serves units.save, units.get, units.delete and payouts.transition through the shared pipeline over
+// the fakes.
+func restRoutesApp(t *testing.T) *echo.Echo {
+	t.Helper()
+
 	reg := NewRegistry()
 	reg.DB = fakeDB{readOnly: nil}
 	idem := &fakeIdem{stored: map[string]json.RawMessage{}, hash: map[string]string{}, aborted: 0}
 	reg.Rec, reg.Idem = &fakeRec{n: 0, err: nil}, idem
+	registerRouteOperations(reg)
 
+	app := echo.New()
+
+	app.HTTPErrorHandler = HTTPErrorHandler
+
+	err := reg.MountREST(app.Group("/v1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return app
+}
+
+// registerRouteOperations registers the handlers of TestRESTRoutes: each answers with its input.
+func registerRouteOperations(reg *Registry) {
 	type saveIn struct {
 		ID   *string `json:"id,omitempty"`
 		Name string  `json:"name"`
@@ -648,61 +680,48 @@ func TestRESTRoutes(t *testing.T) {
 
 	Register(
 		reg,
-		"units.save",
-		func(ctx context.Context, c *Call, in *saveIn) (map[string]any, error) {
-			return map[string]any{"id": in.ID, "name": in.Name}, nil
+		opUnitsSave,
+		func(_ context.Context, _ *Call, in *saveIn) (map[string]any, error) {
+			return map[string]any{"id": in.ID, fieldName: in.Name}, nil
 		},
 	)
 	Register(
 		reg,
-		"units.get",
-		func(ctx context.Context, c *Call, input *getIn) (map[string]any, error) {
-			err := c.Require(authz.Facts{"self": input.ID == "mine"})
+		opUnitsGet,
+		func(_ context.Context, call *Call, input *getIn) (map[string]any, error) {
+			err := call.Require(authz.Facts{"self": input.ID == ownUnit})
 			if err != nil {
 				return nil, err
 			}
 
-			return map[string]any{"id": input.ID, "jobId": input.JobID}, nil
+			return map[string]any{"id": input.ID, fieldJobID: input.JobID}, nil
 		},
 	)
 	Register(
 		reg,
 		"units.delete",
-		func(ctx context.Context, c *Call, in *deleteIn) (map[string]any, error) {
+		func(_ context.Context, _ *Call, in *deleteIn) (map[string]any, error) {
 			return map[string]any{"id": in.ID, "reason": in.Reason}, nil
 		},
 	)
 	Register(
 		reg,
 		"payouts.transition",
-		func(ctx context.Context, c *Call, in *transitionIn) (map[string]any, error) {
-			return map[string]any{"statementId": in.StatementID, "action": in.Action}, nil
+		func(_ context.Context, _ *Call, in *transitionIn) (map[string]any, error) {
+			return map[string]any{"statementId": in.StatementID, fieldAction: in.Action}, nil
 		},
 	)
+}
 
-	app := echo.New()
+// routeSender sends one request of a principal with an Idempotency-Key and an expected version (none when empty) and
+// returns the status, the result data and the error code followed by the body.
+type routeSender func(principal *Principal, method, target, body, key, version string) (int, map[string]any, string)
 
-	app.HTTPErrorHandler = HTTPErrorHandler
+func newRouteSender(t *testing.T, app *echo.Echo) routeSender {
+	t.Helper()
 
-	err := reg.MountREST(app.Group("/v1"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	billing := &Principal{
-		Principal: authz.Principal{
-			Role: "admin",
-			Permissions: map[string]bool{
-				"asset.write":     true,
-				"asset.read":      true,
-				"billing.payment": true,
-			}, ClientRole: "",
-		}, TenantID: uuid.UUID{}, MembershipID: uuid.UUID{}, UserID: uuid.UUID{}, OrgID: uuid.UUID{}, ScopeVersion: 0,
-		Scopes: nil, Employment: "", Timezone: "", SessionsRevokedAt: nil,
-	}
-
-	call := func(principal *Principal, method, target, body, key string, version string) (int, map[string]any, string) {
-		req := httptest.NewRequest(method, target, strings.NewReader(body))
+	return func(principal *Principal, method, target, body, key, version string) (int, map[string]any, string) {
+		req := httptest.NewRequestWithContext(t.Context(), method, target, strings.NewReader(body))
 		if key != "" {
 			req.Header.Set("Idempotency-Key", key)
 		}
@@ -728,21 +747,75 @@ func TestRESTRoutes(t *testing.T) {
 
 		return rec.Code, res.Data, res.Code + rec.Body.String()
 	}
-	if code, data, _ := call(
+}
+
+// billingPrincipal is an HQ admin who writes assets and payouts.
+func billingPrincipal() *Principal {
+	return &Principal{
+		Principal: authz.Principal{
+			Role: roleAdmin,
+			Permissions: map[string]bool{
+				"asset.write":     true,
+				permAssetRead:     true,
+				"billing.payment": true,
+			}, ClientRole: "",
+		}, TenantID: uuid.UUID{}, MembershipID: uuid.UUID{}, UserID: uuid.UUID{}, OrgID: uuid.UUID{}, ScopeVersion: 0,
+		Scopes: nil, Employment: "", Timezone: "", SessionsRevokedAt: nil,
+	}
+}
+
+// TestRESTRoutes drives catalog routes end to end through the shared pipeline (authorization, idempotency,
+// ServiceResult) with the input taken from the path, the query string, the body and the fixed field.
+func TestRESTRoutes(t *testing.T) {
+	t.Parallel()
+
+	send := newRouteSender(t, restRoutesApp(t))
+	billing := billingPrincipal()
+
+	checkRouteWrites(t, send, billing)
+	checkRouteReads(t, send)
+	checkRouteDeleteAndVerbs(t, send, billing)
+	checkRouteReplay(t, send, billing)
+
+	for _, testCase := range []struct{ method, path string }{
+		{http.MethodGet, "/v1/nope"},
+		{http.MethodPatch, "/v1/units/u1"},
+		{http.MethodGet, "/v1/units"},
+	} {
+		if code, _, body := send(
+			billing,
+			testCase.method,
+			testCase.path,
+			"",
+			"",
+			"",
+		); code != 404 ||
+			!strings.Contains(body, string(apperr.NotFound)) {
+			t.Errorf("%s %s: %d %s", testCase.method, testCase.path, code, body)
+		}
+	}
+}
+
+// checkRouteWrites: a create on the collection, an update on the item, an item ID the body contradicts, and a write
+// without a key.
+func checkRouteWrites(t *testing.T, send routeSender, billing *Principal) {
+	t.Helper()
+
+	if code, data, _ := send(
 		billing,
-		"POST",
+		http.MethodPost,
 		"/v1/units",
-		`{"name":"a"}`,
+		bodyNameA,
 		"key-create-1",
 		"",
-	); code != 200 || data["name"] != "a" ||
+	); code != 200 || data[fieldName] != "a" ||
 		data["id"] != nil {
 		t.Fatalf("create: %d %v", code, data)
 	}
 
-	if code, data, _ := call(
+	if code, data, _ := send(
 		billing,
-		"PUT",
+		http.MethodPut,
 		"/v1/units/u1",
 		`{"name":"b"}`,
 		"key-update-1",
@@ -752,9 +825,9 @@ func TestRESTRoutes(t *testing.T) {
 		t.Fatalf("update: %d %v", code, data)
 	}
 
-	if code, _, body := call(
+	if code, _, body := send(
 		billing,
-		"PUT",
+		http.MethodPut,
 		"/v1/units/u1",
 		`{"id":"u2","name":"b"}`,
 		"key-update-2",
@@ -764,9 +837,9 @@ func TestRESTRoutes(t *testing.T) {
 		t.Fatalf("update mismatch: %d %s", code, body)
 	}
 
-	if code, _, body := call(
+	if code, _, body := send(
 		billing,
-		"PUT",
+		http.MethodPut,
 		"/v1/units/u1",
 		`{"name":"b"}`,
 		"",
@@ -775,22 +848,28 @@ func TestRESTRoutes(t *testing.T) {
 		!strings.Contains(body, "Idempotency-Key") {
 		t.Fatalf("write without key: %d %s", code, body)
 	}
+}
 
-	if code, data, _ := call(
-		client,
-		"GET",
+// checkRouteReads: a read with a query parameter, a unit outside the scope reads as absent, and an unknown parameter
+// is VALIDATION.
+func checkRouteReads(t *testing.T, send routeSender) {
+	t.Helper()
+
+	if code, data, _ := send(
+		clientPrincipal(),
+		http.MethodGet,
 		"/v1/units/mine?jobId=j1",
 		"",
 		"",
 		"",
-	); code != 200 || data["id"] != "mine" ||
-		data["jobId"] != "j1" {
+	); code != 200 || data["id"] != ownUnit ||
+		data[fieldJobID] != "j1" {
 		t.Fatalf("get: %d %v", code, data)
 	}
 
-	if code, _, body := call(
-		client,
-		"GET",
+	if code, _, body := send(
+		clientPrincipal(),
+		http.MethodGet,
 		"/v1/units/other",
 		"",
 		"",
@@ -800,9 +879,9 @@ func TestRESTRoutes(t *testing.T) {
 		t.Fatalf("get other: %d %s", code, body)
 	}
 
-	if code, _, body := call(
-		client,
-		"GET",
+	if code, _, body := send(
+		clientPrincipal(),
+		http.MethodGet,
 		"/v1/units/mine?x=1",
 		"",
 		"",
@@ -811,10 +890,16 @@ func TestRESTRoutes(t *testing.T) {
 		!strings.Contains(body, apperr.KeyNotAllowed) {
 		t.Fatalf("unknown parameter: %d %s", code, body)
 	}
+}
 
-	if code, data, _ := call(
+// checkRouteDeleteAndVerbs: a DELETE takes its input from the query string, and the verb routes of
+// payouts.transition fix the action.
+func checkRouteDeleteAndVerbs(t *testing.T, send routeSender, billing *Principal) {
+	t.Helper()
+
+	if code, data, _ := send(
 		billing,
-		"DELETE",
+		http.MethodDelete,
 		"/v1/units/u1?reason=duplicate%20entry",
 		"",
 		"key-delete-1",
@@ -825,60 +910,47 @@ func TestRESTRoutes(t *testing.T) {
 	}
 
 	for path, action := range map[string]string{
-		"/v1/payouts/s1/approve":   "approve",
+		"/v1/payouts/s1/approve":   actionApprove,
 		"/v1/payouts/s1/mark-paid": "mark_paid",
 	} {
-		if code, data, _ := call(
+		if code, data, _ := send(
 			billing,
-			"POST",
+			http.MethodPost,
 			path,
 			``,
 			"key-"+action,
 			"2",
-		); code != 200 || data["action"] != action ||
+		); code != 200 || data[fieldAction] != action ||
 			data["statementId"] != "s1" {
 			t.Fatalf("%s: %d %v", path, code, data)
 		}
 	}
-	// the same key and input replays the stored result; the same key with other input is CONFLICT
-	if code, data, _ := call(
+}
+
+// checkRouteReplay: the same key and input replays the stored result; the same key with other input is CONFLICT.
+func checkRouteReplay(t *testing.T, send routeSender, billing *Principal) {
+	t.Helper()
+
+	if code, data, _ := send(
 		billing,
-		"POST",
+		http.MethodPost,
 		"/v1/units",
-		`{"name":"a"}`,
+		bodyNameA,
 		"key-create-1",
 		"",
 	); code != 200 ||
-		data["name"] != "a" {
+		data[fieldName] != "a" {
 		t.Fatalf("replay: %d %v", code, data)
 	}
 
-	if code, _, _ := call(
+	if code, _, _ := send(
 		billing,
-		"POST",
+		http.MethodPost,
 		"/v1/units",
 		`{"name":"z"}`,
 		"key-create-1",
 		"",
 	); code != 409 {
 		t.Fatalf("reused key: %d", code)
-	}
-
-	for _, testCase := range []struct{ method, path string }{
-		{"GET", "/v1/nope"},
-		{"PATCH", "/v1/units/u1"},
-		{"GET", "/v1/units"},
-	} {
-		if code, _, body := call(
-			billing,
-			testCase.method,
-			testCase.path,
-			"",
-			"",
-			"",
-		); code != 404 ||
-			!strings.Contains(body, "NOT_FOUND") {
-			t.Errorf("%s %s: %d %s", testCase.method, testCase.path, code, body)
-		}
 	}
 }

@@ -19,11 +19,28 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 )
 
+// The operations, fields and values the registry and REST tests share.
+const (
+	opUnitsSave   = "units.save"
+	opUnitsGet    = "units.get"
+	fieldName     = "name"
+	fieldJobID    = "jobId"
+	fieldUnitIDs  = "unitIds"
+	ownUnit       = "mine" // the unit id units.get treats as the caller's own
+	roleAdmin     = "admin"
+	permAssetRead = "asset.read"
+	kindUnit      = "unit"
+	bodyNameA     = `{"name":"a"}`
+	bodyIDX       = `{"id":"x"}`
+)
+
+var errBoom = errors.New("boom")
+
 type fakeDB struct{ readOnly *bool }
 
-func (f fakeDB) Run(ctx context.Context, ro bool, p *Principal, fn func(pgx.Tx) error) error {
+func (f fakeDB) Run(_ context.Context, readOnly bool, _ *Principal, fn func(pgx.Tx) error) error {
 	if f.readOnly != nil {
-		*f.readOnly = ro
+		*f.readOnly = readOnly
 	}
 
 	return fn(nil)
@@ -34,7 +51,7 @@ type fakeRec struct {
 	err error
 }
 
-func (f *fakeRec) Record(ctx context.Context, tx pgx.Tx, c *Call, op string) error {
+func (f *fakeRec) Record(context.Context, pgx.Tx, *Call, string) error {
 	f.n++
 
 	return f.err
@@ -47,9 +64,9 @@ type fakeIdem struct {
 }
 
 func (f *fakeIdem) Begin(
-	ctx context.Context,
-	p *Principal,
-	op, key, hash string,
+	_ context.Context,
+	_ *Principal,
+	_, key, hash string,
 ) (json.RawMessage, error) {
 	if h, ok := f.hash[key]; ok {
 		if h != hash {
@@ -65,9 +82,9 @@ func (f *fakeIdem) Begin(
 }
 
 func (f *fakeIdem) Complete(
-	ctx context.Context,
-	p *Principal,
-	op, key string,
+	_ context.Context,
+	_ *Principal,
+	_, key string,
 	resp json.RawMessage,
 ) error {
 	f.stored[key] = resp
@@ -75,7 +92,7 @@ func (f *fakeIdem) Complete(
 	return nil
 }
 
-func (f *fakeIdem) Abort(ctx context.Context, p *Principal, op, key string) {
+func (f *fakeIdem) Abort(_ context.Context, _ *Principal, _, key string) {
 	f.aborted++
 	delete(f.hash, key)
 }
@@ -87,7 +104,7 @@ type unitIn struct {
 
 func (u *unitIn) Validate() map[string]string {
 	if u.Name == "bad" {
-		return map[string]string{"name": apperr.KeyInvalid}
+		return map[string]string{fieldName: apperr.KeyInvalid}
 	}
 
 	return nil
@@ -99,7 +116,16 @@ type out struct {
 	Calls int    `json:"calls"`
 }
 
-func setup(t *testing.T) (*Registry, *echo.Echo, *fakeRec, *fakeIdem, *bool) {
+// rig is the registry of the pipeline tests with its fakes and its Echo app.
+type rig struct {
+	reg      *Registry
+	app      *echo.Echo
+	rec      *fakeRec
+	idem     *fakeIdem
+	readOnly *bool
+}
+
+func setup(t *testing.T) rig {
 	t.Helper()
 
 	readOnly := new(bool)
@@ -109,11 +135,28 @@ func setup(t *testing.T) (*Registry, *echo.Echo, *fakeRec, *fakeIdem, *bool) {
 	idem := &fakeIdem{stored: map[string]json.RawMessage{}, hash: map[string]string{}, aborted: 0}
 	reg.Rec, reg.Idem = rec, idem
 	reg.Clock = func() time.Time { return time.Date(2026, 9, 14, 1, 0, 0, 0, time.UTC) }
+	registerTestOperations(reg)
+
+	app := echo.New()
+
+	app.HTTPErrorHandler = HTTPErrorHandler
+
+	err := reg.MountREST(app.Group("/v1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return rig{reg: reg, app: app, rec: rec, idem: idem, readOnly: readOnly}
+}
+
+// registerTestOperations registers units.save (a handler error for the name boom, a conflict for conflict),
+// units.get (only the caller's own unit) and attachments.add (a file in the body).
+func registerTestOperations(reg *Registry) {
 	calls := 0
 
-	Register(reg, "units.save", func(ctx context.Context, call *Call, input *unitIn) (out, error) {
+	Register(reg, opUnitsSave, func(_ context.Context, call *Call, input *unitIn) (out, error) {
 		if input.Name == "boom" {
-			return out{}, errors.New("boom")
+			return out{}, errBoom
 		}
 
 		if input.Name == "conflict" {
@@ -127,7 +170,7 @@ func setup(t *testing.T) (*Registry, *echo.Echo, *fakeRec, *fakeIdem, *bool) {
 		)
 		call.Audit(
 			AuditEntry{
-				Action:          "units.save",
+				Action:          opUnitsSave,
 				TargetKind:      "",
 				TargetID:        "",
 				PreviousVersion: nil,
@@ -141,18 +184,18 @@ func setup(t *testing.T) (*Registry, *echo.Echo, *fakeRec, *fakeIdem, *bool) {
 
 		return out{OK: true, Name: input.Name, Calls: calls}, nil
 	})
-	Register(reg, "units.get", func(ctx context.Context, c *Call, in *struct {
+	Register(reg, opUnitsGet, func(_ context.Context, call *Call, input *struct {
 		ID string `json:"id"`
 	},
 	) (out, error) {
-		err := c.Require(authz.Facts{"self": in.ID == "mine"})
+		err := call.Require(authz.Facts{"self": input.ID == ownUnit})
 		if err != nil {
 			return out{}, err
 		}
 
 		return out{OK: true, Name: "", Calls: 0}, nil
 	})
-	Register(reg, "attachments.add", func(ctx context.Context, c *Call, input *struct {
+	Register(reg, "attachments.add", func(_ context.Context, _ *Call, input *struct {
 		JobID    string `json:"jobId"`
 		ReportID string `json:"reportId"`
 		File     struct {
@@ -162,22 +205,19 @@ func setup(t *testing.T) (*Registry, *echo.Echo, *fakeRec, *fakeIdem, *bool) {
 	) (out, error) {
 		return out{OK: true, Calls: len(input.File.Bytes), Name: ""}, nil
 	})
-
-	app := echo.New()
-
-	app.HTTPErrorHandler = HTTPErrorHandler
-
-	err := reg.MountREST(app.Group("/v1"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return reg, app, rec, idem, readOnly
 }
 
 // do sends one operation call at its REST route (ClientRequest).
-func do(app *echo.Echo, principal *Principal, op, body, key string) *httptest.ResponseRecorder {
-	req := httptest.NewRequest(ClientRequest(op, body))
+func do(
+	t *testing.T,
+	app *echo.Echo,
+	principal *Principal,
+	op, body, key string,
+) *httptest.ResponseRecorder {
+	t.Helper()
+
+	method, target, reqBody := ClientRequest(op, body)
+	req := httptest.NewRequestWithContext(t.Context(), method, target, reqBody)
 	req.Header.Set("Content-Type", "application/json")
 
 	if key != "" {
@@ -188,13 +228,13 @@ func do(app *echo.Echo, principal *Principal, op, body, key string) *httptest.Re
 		req = req.WithContext(WithPrincipal(req.Context(), principal))
 	}
 
-	w := httptest.NewRecorder()
-	app.ServeHTTP(w, req)
+	recorder := httptest.NewRecorder()
+	app.ServeHTTP(recorder, req)
 
-	return w
+	return recorder
 }
 
-func errCode(t *testing.T, rec *httptest.ResponseRecorder) string {
+func errCode(t *testing.T, rec *httptest.ResponseRecorder) apperr.Code {
 	t.Helper()
 
 	var domainError apperr.DomainError
@@ -208,18 +248,23 @@ func errCode(t *testing.T, rec *httptest.ResponseRecorder) string {
 		t.Fatal("correlationId missing")
 	}
 
-	return string(domainError.Code)
+	return domainError.Code
 }
 
-var (
-	admin = &Principal{
+// adminPrincipal is an HQ admin who reads and writes assets.
+func adminPrincipal() *Principal {
+	return &Principal{
 		Principal: authz.Principal{
-			Role:        "admin",
-			Permissions: map[string]bool{"asset.write": true, "asset.read": true}, ClientRole: "",
+			Role:        roleAdmin,
+			Permissions: map[string]bool{"asset.write": true, permAssetRead: true}, ClientRole: "",
 		}, TenantID: uuid.UUID{}, MembershipID: uuid.UUID{}, UserID: uuid.UUID{}, OrgID: uuid.UUID{}, ScopeVersion: 0,
 		Scopes: nil, Employment: "", Timezone: "", SessionsRevokedAt: nil,
 	}
-	client = &Principal{
+}
+
+// clientPrincipal is a client without permissions.
+func clientPrincipal() *Principal {
+	return &Principal{
 		Principal: authz.Principal{
 			Role:        "client",
 			Permissions: map[string]bool{},
@@ -235,107 +280,163 @@ var (
 		Timezone:          "",
 		SessionsRevokedAt: nil,
 	}
-)
+}
 
-func TestPipeline(t *testing.T) {
-	_, app, rec, idem, ro := setup(t)
+// technicianPrincipal is a technician without permissions.
+func technicianPrincipal() *Principal {
+	return &Principal{
+		Principal: authz.Principal{
+			Role:        "technician",
+			Permissions: map[string]bool{},
+			ClientRole:  "",
+		},
+		TenantID:          uuid.UUID{},
+		MembershipID:      uuid.UUID{},
+		UserID:            uuid.UUID{},
+		OrgID:             uuid.UUID{},
+		ScopeVersion:      0,
+		Scopes:            nil,
+		Employment:        "",
+		Timezone:          "",
+		SessionsRevokedAt: nil,
+	}
+}
 
-	cases := []struct {
-		name, op, body, key string
-		p                   *Principal
-		status              int
-		code                string
-	}{
-		{"unknown op", "nope.nope", `{}`, "", admin, 404, "NOT_FOUND"},
-		{"malformed", "units.save", `{`, "k", admin, 422, "VALIDATION"},
-		{"unknown field", "units.save", `{"x":1}`, "k", admin, 422, "VALIDATION"},
-		{"field rule", "units.save", `{"name":"bad"}`, "k", admin, 422, "VALIDATION"},
-		{"anonymous", "units.save", `{"name":"a"}`, "k", nil, 401, "UNAUTHENTICATED"},
+// refusal is a call the pipeline refuses, with the status and the error code it answers.
+type refusal struct {
+	name, op, body, key string
+	principal           *Principal
+	status              int
+	code                apperr.Code
+}
+
+func refusals() []refusal {
+	return []refusal{
+		{"unknown op", "nope.nope", `{}`, "", adminPrincipal(), 404, apperr.NotFound},
+		{"malformed", opUnitsSave, `{`, "k", adminPrincipal(), 422, apperr.Validation},
+		{"unknown field", opUnitsSave, `{"x":1}`, "k", adminPrincipal(), 422, apperr.Validation},
+		{
+			"field rule",
+			opUnitsSave,
+			`{"name":"bad"}`,
+			"k",
+			adminPrincipal(),
+			422,
+			apperr.Validation,
+		},
+		{"anonymous", opUnitsSave, bodyNameA, "k", nil, 401, apperr.Unauthenticated},
 		{
 			"no permission",
-			"units.save",
-			`{"name":"a"}`,
+			opUnitsSave,
+			bodyNameA,
 			"k",
 			&Principal{
 				Principal: authz.Principal{
-					Role:        "admin",
-					Permissions: map[string]bool{"asset.read": true}, ClientRole: "",
+					Role:        roleAdmin,
+					Permissions: map[string]bool{permAssetRead: true}, ClientRole: "",
 				}, TenantID: uuid.UUID{}, MembershipID: uuid.UUID{}, UserID: uuid.UUID{}, OrgID: uuid.UUID{}, ScopeVersion: 0,
 				Scopes: nil, Employment: "", Timezone: "", SessionsRevokedAt: nil,
 			},
 			403,
-			"FORBIDDEN",
+			apperr.Forbidden,
 		},
-		{"missing key", "units.save", `{"name":"a"}`, "", admin, 422, "VALIDATION"},
+		{"missing key", opUnitsSave, bodyNameA, "", adminPrincipal(), 422, apperr.Validation},
 		{
 			"key too long",
-			"units.save",
-			`{"name":"a"}`,
+			opUnitsSave,
+			bodyNameA,
 			strings.Repeat("k", 129),
-			admin,
+			adminPrincipal(),
 			422,
-			"VALIDATION",
+			apperr.Validation,
 		},
-		{"handler error", "units.save", `{"name":"boom"}`, "key-boom", admin, 503, "UNAVAILABLE"},
+		{
+			"handler error",
+			opUnitsSave,
+			`{"name":"boom"}`,
+			"key-boom",
+			adminPrincipal(),
+			503,
+			apperr.Unavailable,
+		},
 		{
 			"domain conflict",
-			"units.save",
+			opUnitsSave,
 			`{"name":"conflict"}`,
 			"key-conf",
-			admin,
+			adminPrincipal(),
 			409,
-			"CONFLICT",
+			apperr.Conflict,
 		},
-		{"out of scope", "units.get", `{"id":"other"}`, "", client, 404, "NOT_FOUND"},
+		{"out of scope", opUnitsGet, `{"id":"other"}`, "", clientPrincipal(), 404, apperr.NotFound},
 	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			w := do(app, c.p, c.op, c.body, c.key)
-			if w.Code != c.status || errCode(t, w) != c.code {
-				t.Fatalf("got %d %s", w.Code, w.Body.String())
-			}
-		})
+}
+
+func TestPipeline(t *testing.T) {
+	t.Parallel()
+
+	testRig := setup(t)
+
+	// one after the other: the cases share the registry and its fake key store, whose aborts are counted below
+	for _, testCase := range refusals() {
+		recorder := do(
+			t,
+			testRig.app,
+			testCase.principal,
+			testCase.op,
+			testCase.body,
+			testCase.key,
+		)
+		if recorder.Code != testCase.status || errCode(t, recorder) != testCase.code {
+			t.Errorf("%s: got %d %s", testCase.name, recorder.Code, recorder.Body.String())
+		}
 	}
 
-	if idem.aborted != 2 {
-		t.Fatalf("failed writes must abort their key, got %d", idem.aborted)
+	if testRig.idem.aborted != 2 {
+		t.Fatalf("failed writes must abort their key, got %d", testRig.idem.aborted)
 	}
 
-	// success + idempotent replay + key reuse with another body
-	saved := do(app, admin, "units.save", `{"name":"a"}`, "key-0001")
+	checkWriteReplay(t, testRig)
+	checkRead(t, testRig)
+	checkBodies(t, testRig)
+}
+
+// checkWriteReplay: a write succeeds read-write, its idempotent replay returns the stored response, and the same key
+// with another body conflicts.
+func checkWriteReplay(t *testing.T, testRig rig) {
+	t.Helper()
+
+	saved := do(t, testRig.app, adminPrincipal(), opUnitsSave, bodyNameA, "key-0001")
 	if saved.Code != 200 || !strings.Contains(saved.Body.String(), `"calls":1`) {
 		t.Fatalf("save: %d %s", saved.Code, saved.Body.String())
 	}
 
-	if *ro {
+	if *testRig.readOnly {
 		t.Fatal("writes must run read-write")
 	}
 
-	w2 := do(app, admin, "units.save", `{"name":"a"}`, "key-0001")
-	if w2.Body.String() != saved.Body.String() {
+	replayed := do(t, testRig.app, adminPrincipal(), opUnitsSave, bodyNameA, "key-0001")
+	if replayed.Body.String() != saved.Body.String() {
 		t.Fatal("replay must return the stored response")
 	}
 
-	if w3 := do(
-		app,
-		admin,
-		"units.save",
-		`{"name":"b"}`,
-		"key-0001",
-	); errCode(
-		t,
-		w3,
-	) != "CONFLICT" {
+	reused := do(t, testRig.app, adminPrincipal(), opUnitsSave, `{"name":"b"}`, "key-0001")
+	if errCode(t, reused) != apperr.Conflict {
 		t.Fatal("reused key with another body must conflict")
 	}
 
-	if rec.n != 1 {
-		t.Fatalf("recorder runs once per successful write, got %d", rec.n)
+	if testRig.rec.n != 1 {
+		t.Fatalf("recorder runs once per successful write, got %d", testRig.rec.n)
 	}
-	// reads run read-only and do not need a key
-	saved = do(app, client, "units.get", `{"id":"mine"}`, "")
-	if saved.Code != 200 || !*ro {
-		t.Fatalf("read: %d %s ro=%v", saved.Code, saved.Body.String(), *ro)
+}
+
+// checkRead: reads run read-only, need no key and carry the operation and the correlation ID in meta.
+func checkRead(t *testing.T, testRig rig) {
+	t.Helper()
+
+	recorder := do(t, testRig.app, clientPrincipal(), opUnitsGet, `{"id":"mine"}`, "")
+	if recorder.Code != 200 || !*testRig.readOnly {
+		t.Fatalf("read: %d %s ro=%v", recorder.Code, recorder.Body.String(), *testRig.readOnly)
 	}
 
 	var res struct {
@@ -343,26 +444,33 @@ func TestPipeline(t *testing.T) {
 		Meta map[string]any `json:"meta"`
 	}
 
-	_ = json.Unmarshal(saved.Body.Bytes(), &res)
-	if res.Meta["operation"] != "units.get" || res.Meta["correlationId"] == "" {
+	_ = json.Unmarshal(recorder.Body.Bytes(), &res)
+	if res.Meta["operation"] != opUnitsGet || res.Meta[metaCorrelationID] == "" {
 		t.Fatalf("meta: %v", res.Meta)
 	}
-	// an empty body counts as {}
+}
+
+// checkBodies: an empty body counts as {}, and a body above the limit is refused.
+func checkBodies(t *testing.T, testRig rig) {
+	t.Helper()
+
 	if recorder := do(
-		app,
-		admin,
-		"units.save",
+		t,
+		testRig.app,
+		adminPrincipal(),
+		opUnitsSave,
 		``,
 		"key-empty1",
 	); recorder.Code != 200 ||
 		!strings.Contains(recorder.Body.String(), `"name":""`) {
 		t.Fatalf("empty body: %d %s", recorder.Code, recorder.Body.String())
 	}
-	// oversize body
+
 	if recorder := do(
-		app,
-		admin,
-		"units.save",
+		t,
+		testRig.app,
+		adminPrincipal(),
+		opUnitsSave,
 		`{"name":"`+strings.Repeat("x", 1<<20)+`"}`,
 		"key-big1",
 	); recorder.Code != 422 {
@@ -371,23 +479,27 @@ func TestPipeline(t *testing.T) {
 }
 
 func TestRecorderFailureRollsBack(t *testing.T) {
-	r, e, rec, idem, _ := setup(t)
-	rec.err = apperr.E(apperr.Unavailable, apperr.KeyUnavailable)
-	_ = r
+	t.Parallel()
+
+	testRig := setup(t)
+	testRig.rec.err = apperr.E(apperr.Unavailable, apperr.KeyUnavailable)
 
 	if recorder := do(
-		e,
-		admin,
-		"units.save",
-		`{"name":"a"}`,
+		t,
+		testRig.app,
+		adminPrincipal(),
+		opUnitsSave,
+		bodyNameA,
 		"key-0009",
 	); recorder.Code != 503 ||
-		idem.aborted != 1 {
-		t.Fatalf("%d aborted=%d", recorder.Code, idem.aborted)
+		testRig.idem.aborted != 1 {
+		t.Fatalf("%d aborted=%d", recorder.Code, testRig.idem.aborted)
 	}
 }
 
 func TestRegisterGuards(t *testing.T) {
+	t.Parallel()
+
 	reg := NewRegistry()
 
 	mustPanic(
@@ -427,6 +539,8 @@ func TestRegisterGuards(t *testing.T) {
 }
 
 func TestCatalogShape(t *testing.T) {
+	t.Parallel()
+
 	if len(
 		Catalog,
 	) != 212 {
@@ -448,7 +562,7 @@ func TestCatalogShape(t *testing.T) {
 	}
 }
 
-func mustPanic(t *testing.T, fn func()) {
+func mustPanic(t *testing.T, register func()) {
 	t.Helper()
 
 	defer func() {
@@ -457,138 +571,108 @@ func mustPanic(t *testing.T, fn func()) {
 		}
 	}()
 
-	fn()
+	register()
+}
+
+// versionSpec is a catalog entry with only the given write version rules.
+func versionSpec(rules ...VersionRule) Spec {
+	return Spec{
+		Versions:      rules,
+		Name:          "",
+		Mode:          0,
+		Module:        "",
+		Authorization: "",
+		DesignIDs:     "",
+		Routes:        nil,
+		Filters:       nil,
+	}
 }
 
 func TestExpectedVersionRules(t *testing.T) {
-	spec := Spec{
-		Versions:      []VersionRule{{"id omitted", "omit"}, {"id present", "required"}},
-		Name:          "",
-		Mode:          0,
-		Module:        "",
-		Authorization: "",
-		DesignIDs:     "",
-		Routes:        nil,
-		Filters:       nil,
-	}
-	eventSpec := Spec{
-		Versions: []VersionRule{
-			{"event=request", "omit"},
-			{"event=retry|cancel", "required"},
-		},
-		Name:          "",
-		Mode:          0,
-		Module:        "",
-		Authorization: "",
-		DesignIDs:     "",
-		Routes:        nil,
-		Filters:       nil,
-	}
+	t.Parallel()
 
-	cases := []struct {
-		s      Spec
-		body   string
-		header string
-		want   apperr.Code
-		v      int
+	idSpec := versionSpec(
+		VersionRule{"id omitted", "omit"},
+		VersionRule{"id present", ruleRequired},
+	)
+	eventSpec := versionSpec(
+		VersionRule{"event=request", "omit"},
+		VersionRule{"event=retry|cancel", ruleRequired},
+	)
+
+	for index, testCase := range []struct {
+		spec    Spec
+		body    string
+		header  string
+		want    apperr.Code
+		version int
 	}{
-		{spec, `{}`, "", "", 0},
-		{spec, `{"id":null}`, "", "", 0},
-		{spec, `{}`, "3", apperr.Validation, 0},
-		{spec, `{"id":"x"}`, "", apperr.Validation, 0},
-		{spec, `{"id":"x"}`, "3", "", 3},
-		{spec, `{"id":"x"}`, "0", "", 0},
-		{spec, `{"id":"x"}`, "-1", apperr.Validation, 0},
-		{spec, `{"id":"x"}`, "abc", apperr.Validation, 0},
+		{idSpec, `{}`, "", "", 0},
+		{idSpec, `{"id":null}`, "", "", 0},
+		{idSpec, `{}`, "3", apperr.Validation, 0},
+		{idSpec, bodyIDX, "", apperr.Validation, 0},
+		{idSpec, bodyIDX, "3", "", 3},
+		{idSpec, bodyIDX, "0", "", 0},
+		{idSpec, bodyIDX, "-1", apperr.Validation, 0},
+		{idSpec, bodyIDX, "abc", apperr.Validation, 0},
 		{eventSpec, `{"event":"retry"}`, "2", "", 2},
 		{eventSpec, `{"event":"request"}`, "2", apperr.Validation, 0},
 		{eventSpec, `{"event":"other"}`, "", "", 0},
-		{
-			Spec{
-				Versions:      []VersionRule{{"all", "required"}},
-				Name:          "",
-				Mode:          0,
-				Module:        "",
-				Authorization: "",
-				DesignIDs:     "",
-				Routes:        nil,
-				Filters:       nil,
-			},
-			`{}`,
-			"1",
-			"",
-			1,
-		},
-		{
-			Spec{
-				Versions:      []VersionRule{{"weird", "required"}},
-				Name:          "",
-				Mode:          0,
-				Module:        "",
-				Authorization: "",
-				DesignIDs:     "",
-				Routes:        nil,
-				Filters:       nil,
-			},
-			`{}`,
-			"",
-			"",
-			0,
-		},
-	}
-	for i, testCase := range cases {
-		got, present, err := expectedVersion(testCase.s, []byte(testCase.body), testCase.header)
+		{versionSpec(VersionRule{branchAll, ruleRequired}), `{}`, "1", "", 1},
+		{versionSpec(VersionRule{"weird", ruleRequired}), `{}`, "", "", 0},
+	} {
+		got, present, err := expectedVersion(testCase.spec, []byte(testCase.body), testCase.header)
 
 		var code apperr.Code
 		if err != nil {
 			code = apperr.From(err).Code
 		}
 
-		if code != testCase.want || (testCase.v != 0 && (!present || got != testCase.v)) {
-			t.Errorf("case %d: %v %v %v", i, got, present, err)
+		if code != testCase.want ||
+			(testCase.version != 0 && (!present || got != testCase.version)) {
+			t.Errorf("case %d: %v %v %v", index, got, present, err)
 		}
 	}
 }
 
 func TestVersionHeader(t *testing.T) {
-	_, app, _, _, _ := setup(t)
-	req := httptest.NewRequest(http.MethodPost, "/v1/units", strings.NewReader(`{"name":"a"}`))
+	t.Parallel()
+
+	testRig := setup(t)
+	req := httptest.NewRequestWithContext(
+		t.Context(),
+		http.MethodPost,
+		"/v1/units",
+		strings.NewReader(bodyNameA),
+	)
 	req.Header.Set("Idempotency-Key", "key-ver-0001")
 	req.Header.Set("X-Expected-Version", "4")
-	req = req.WithContext(WithPrincipal(req.Context(), admin))
-	w := httptest.NewRecorder()
-	app.ServeHTTP(w, req)
+	req = req.WithContext(WithPrincipal(req.Context(), adminPrincipal()))
+	recorder := httptest.NewRecorder()
+	testRig.app.ServeHTTP(recorder, req)
 
-	if w.Code != 422 || !strings.Contains(w.Body.String(), "expectedVersion") {
-		t.Fatalf("version on a create must be rejected: %d %s", w.Code, w.Body.String())
+	if recorder.Code != 422 || !strings.Contains(recorder.Body.String(), fieldExpectedVersion) {
+		t.Fatalf(
+			"version on a create must be rejected: %d %s",
+			recorder.Code,
+			recorder.Body.String(),
+		)
 	}
 }
 
 // IR221: ordinary operations keep the 1 MiB body limit; operations with BlobInput files accept their larger bodies.
 func TestBodyLimits(t *testing.T) {
-	_, app, _, _, _ := setup(t)
-	tech := &Principal{
-		Principal: authz.Principal{
-			Role:        "technician",
-			Permissions: map[string]bool{},
-			ClientRole:  "",
-		},
-		TenantID:          uuid.UUID{},
-		MembershipID:      uuid.UUID{},
-		UserID:            uuid.UUID{},
-		OrgID:             uuid.UUID{},
-		ScopeVersion:      0,
-		Scopes:            nil,
-		Employment:        "",
-		Timezone:          "",
-		SessionsRevokedAt: nil,
-	}
+	t.Parallel()
+
+	testRig := setup(t)
+	tech := technicianPrincipal()
 
 	big := strings.Repeat("a", 2<<20)
 	if recorder := do(
-		app,
-		admin,
-		"units.save",
+		t,
+		testRig.app,
+		adminPrincipal(),
+		opUnitsSave,
 		`{"name":"`+big+`"}`,
 		"key-12345678",
 	); recorder.Code != http.StatusUnprocessableEntity ||
@@ -604,9 +688,41 @@ func TestBodyLimits(t *testing.T) {
 		make([]byte, 4<<20),
 	) // a 4 MiB photo is about 5.3 MiB in JSON
 
+	rec := do(
+		t,
+		testRig.app,
+		tech,
+		"attachments.add",
+		`{"jobId":"j1","reportId":"r1","file":{"bytes":"`+photo+`"}}`,
+		"key-23456789",
+	)
+	if rec.Code == http.StatusUnprocessableEntity &&
+		strings.Contains(rec.Body.String(), apperr.KeyBodyTooLarge) {
+		t.Fatalf("a 4 MiB photo must pass the body limit: %d", rec.Code)
+	}
+
+	huge := base64.StdEncoding.EncodeToString(make([]byte, 7<<20))
+	if recorder := do(
+		t,
+		testRig.app,
+		tech,
+		"attachments.add",
+		`{"jobId":"j1","reportId":"r1","file":{"bytes":"`+huge+`"}}`,
+		"key-34567890",
+	); recorder.Code != http.StatusUnprocessableEntity ||
+		!strings.Contains(recorder.Body.String(), apperr.KeyBodyTooLarge) {
+		t.Fatalf("a body above the file limit: %d", recorder.Code)
+	}
+}
+
+// TestBodyLimitByOperation: the file operations take more than 1 MiB, a sign-off at least as much as an attachment,
+// and certificates.submit a 10 MB file in JSON (IR277).
+func TestBodyLimitByOperation(t *testing.T) {
+	t.Parallel()
+
 	if bodyLimit("attachments.add") <= 1<<20 ||
 		bodyLimit("reports.signOff") < bodyLimit("attachments.add") ||
-		bodyLimit("units.save") != 1<<20 {
+		bodyLimit(opUnitsSave) != 1<<20 {
 		t.Fatal("limits by operation")
 	}
 
@@ -621,37 +737,15 @@ func TestBodyLimits(t *testing.T) {
 			cert,
 		)
 	}
-
-	rec := do(
-		app,
-		tech,
-		"attachments.add",
-		`{"jobId":"j1","reportId":"r1","file":{"bytes":"`+photo+`"}}`,
-		"key-23456789",
-	)
-	if rec.Code == http.StatusUnprocessableEntity &&
-		strings.Contains(rec.Body.String(), apperr.KeyBodyTooLarge) {
-		t.Fatalf("a 4 MiB photo must pass the body limit: %d", rec.Code)
-	}
-
-	huge := base64.StdEncoding.EncodeToString(make([]byte, 7<<20))
-	if recorder := do(
-		app,
-		tech,
-		"attachments.add",
-		`{"jobId":"j1","reportId":"r1","file":{"bytes":"`+huge+`"}}`,
-		"key-34567890",
-	); recorder.Code != http.StatusUnprocessableEntity ||
-		!strings.Contains(recorder.Body.String(), apperr.KeyBodyTooLarge) {
-		t.Fatalf("a body above the file limit: %d", recorder.Code)
-	}
 }
 
 // TestDeniedTarget: a refused write records the target it asked for — the input's id under the kind its resource's
 // successful writes use, else its <kind>Id, else another …Id holding a UUID named by that field; nothing else of the
 // input (IR603).
 func TestDeniedTarget(t *testing.T) {
-	const a, b = "11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"
+	t.Parallel()
+
+	const firstID, secondID = "11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"
 
 	type review struct {
 		JobID         string `json:"jobId"`
@@ -662,15 +756,25 @@ func TestDeniedTarget(t *testing.T) {
 		in       any
 		kind, id string
 	}{
-		{"jobs.review", review{JobID: a, ReportVersion: 2}, "job", a},
-		{"units.save", map[string]any{"id": a, "customerOrgId": b}, "unit", a},
-		{"members.revokeSessions", map[string]any{"membershipId": b}, "membership", b},
-		{"members.clearUnavailability", map[string]any{"id": a, "from": "2026-09-20"}, "unavailability", a},
-		{"jobs.offer", map[string]any{"contractorOrgId": b, "jobId": a}, "job", a},
-		{"policies.delete", map[string]any{"policyId": "not-a-uuid"}, "policy", "—"},
-		{"offsets.request", map[string]any{"quoteId": a, "unitIds": []string{b}}, "quote", a},
-		{"spaces.save", map[string]any{"propertyId": a, "parentSpaceId": nil, "name": "2F"}, "property", a},
-		{"restrictions.override", map[string]any{}, "restriction", "—"},
+		{"jobs.review", review{JobID: firstID, ReportVersion: 2}, "job", firstID},
+		{opUnitsSave, map[string]any{"id": firstID, "customerOrgId": secondID}, kindUnit, firstID},
+		{"members.revokeSessions", map[string]any{"membershipId": secondID}, "membership", secondID},
+		{
+			"members.clearUnavailability",
+			map[string]any{"id": firstID, "from": "2026-09-20"},
+			"unavailability",
+			firstID,
+		},
+		{"jobs.offer", map[string]any{"contractorOrgId": secondID, fieldJobID: firstID}, "job", firstID},
+		{"policies.delete", map[string]any{"policyId": "not-a-uuid"}, "policy", noTargetID},
+		{"offsets.request", map[string]any{"quoteId": firstID, fieldUnitIDs: []string{secondID}}, "quote", firstID},
+		{
+			"spaces.save",
+			map[string]any{"propertyId": firstID, "parentSpaceId": nil, fieldName: "2F"},
+			"property",
+			firstID,
+		},
+		{"restrictions.override", map[string]any{}, "restriction", noTargetID},
 	} {
 		if kind, id := deniedTarget(
 			testCase.op,

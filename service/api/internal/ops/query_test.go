@@ -1,4 +1,4 @@
-package ops
+package ops_test
 
 import (
 	"context"
@@ -12,9 +12,13 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 )
+
+// queryTwice is the internal query of the tests: twice its input.
+const queryTwice = "test.twice"
 
 type echoIn struct {
 	N int `json:"n"`
@@ -23,22 +27,24 @@ type echoOut struct {
 	Twice int `json:"twice"`
 }
 
-// TestAskRoutesQueries covers how an internal query runs (IR192): in the caller's process when it serves the owner's
-// domain (a result of another type goes through JSON), UNAVAILABLE without a transport for another domain, local for
-// a call without a registry, and the errors of a missing registry, an unknown name and an undecodable input.
-func TestAskRoutesQueries(t *testing.T) {
-	ctx := context.Background()
-	reg := NewRegistry()
-	RegisterQuery(
+// twiceRegistry registers test.twice in the equipment domain, with a result of another type than echoOut.
+func twiceRegistry() *ops.Registry {
+	reg := ops.NewRegistry()
+	ops.RegisterQuery(
 		reg,
-		DomainEquipment,
-		"test.twice",
-		func(_ context.Context, _ *Call, in *echoIn) (map[string]int, error) {
+		ops.DomainEquipment,
+		queryTwice,
+		func(_ context.Context, _ *ops.Call, in *echoIn) (map[string]int, error) {
 			return map[string]int{"twice": in.N * 2}, nil
 		},
 	)
 
-	call := &Call{
+	return reg
+}
+
+// callOf is a call whose internal queries go through reg (none for nil: the scheduler worker).
+func callOf(reg *ops.Registry) *ops.Call {
+	return &ops.Call{
 		Queries:         reg,
 		Tx:              nil,
 		Principal:       nil,
@@ -50,12 +56,23 @@ func TestAskRoutesQueries(t *testing.T) {
 		Events:          nil,
 		Audits:          nil,
 	}
+}
 
-	out, err := Ask[echoOut](
+// TestAskRoutesQueries covers how an internal query runs (IR192): in the caller's process when it serves the owner's
+// domain (a result of another type goes through JSON), and the errors of an undecodable input, a missing registry and
+// an unknown name.
+func TestAskRoutesQueries(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	reg := twiceRegistry()
+	call := callOf(reg)
+
+	out, err := ops.Ask[echoOut](
 		ctx,
 		reg,
 		call,
-		"test.twice",
+		queryTwice,
 		echoIn{N: 4},
 	)
 	if err != nil ||
@@ -63,36 +80,42 @@ func TestAskRoutesQueries(t *testing.T) {
 		t.Fatalf("served domain: %v %v", out, err)
 	}
 
-	_, err = Ask[echoOut](
+	_, err = ops.Ask[echoOut](
 		ctx,
 		reg,
 		call,
-		"test.twice",
+		queryTwice,
 		"not an object",
 	)
 	if apperr.From(err).FieldErrors["_"] != apperr.KeyMalformedInput {
 		t.Errorf("undecodable input: %v", err)
 	}
 
-	_, err = Ask[echoOut](ctx, nil, call, "test.twice", echoIn{N: 0})
+	_, err = ops.Ask[echoOut](ctx, nil, call, queryTwice, echoIn{N: 0})
 	if err == nil {
 		t.Error("a query outside a request")
 	}
 
-	_, err = Ask[echoOut](ctx, reg, call, "test.nope", echoIn{N: 0})
+	_, err = ops.Ask[echoOut](ctx, reg, call, "test.nope", echoIn{N: 0})
 	if err == nil {
 		t.Error("an unknown query")
 	}
+}
 
+// TestAskAnotherDomain: a query of a domain another service serves is UNAVAILABLE without a transport.
+func TestAskAnotherDomain(t *testing.T) {
+	t.Parallel()
+
+	reg := twiceRegistry()
 	reg.ServeDomains(
-		DomainMaintenance,
+		ops.DomainMaintenance,
 	) // equipment is now another service's domain, and there is no transport
 
-	_, err = Ask[echoOut](
-		ctx,
+	_, err := ops.Ask[echoOut](
+		t.Context(),
 		reg,
-		call,
-		"test.twice",
+		callOf(reg),
+		queryTwice,
 		echoIn{N: 1},
 	)
 	if apperr.From(
@@ -100,24 +123,20 @@ func TestAskRoutesQueries(t *testing.T) {
 	).Code != apperr.Unavailable {
 		t.Errorf("another domain without a transport: %v", err)
 	}
+}
 
-	local := func(_ context.Context, _ *Call, in *echoIn) (echoOut, error) { return echoOut{Twice: in.N * 2}, nil }
+// TestDelegateRunsLocally: a call without a registry (the scheduler worker) runs the local handler.
+func TestDelegateRunsLocally(t *testing.T) {
+	t.Parallel()
 
-	out, err = Delegate(
-		ctx,
-		&Call{
-			Tx:              nil,
-			Principal:       nil,
-			Now:             time.Time{},
-			CorrelationID:   "",
-			Bearer:          "",
-			Queries:         nil,
-			ExpectedVersion: nil,
-			Candidates:      nil,
-			Events:          nil,
-			Audits:          nil,
-		},
-		"test.twice",
+	local := func(_ context.Context, _ *ops.Call, in *echoIn) (echoOut, error) {
+		return echoOut{Twice: in.N * 2}, nil
+	}
+
+	out, err := ops.Delegate(
+		t.Context(),
+		callOf(nil),
+		queryTwice,
 		echoIn{N: 3},
 		local,
 	)
@@ -127,31 +146,55 @@ func TestAskRoutesQueries(t *testing.T) {
 	}
 }
 
+// owner is the owning service of the transport tests: it answers every query with status and body and keeps the
+// request it got.
+type owner struct {
+	srv    *httptest.Server
+	got    *http.Request
+	status int
+	body   string
+}
+
+func newOwner(t *testing.T) *owner {
+	t.Helper()
+
+	fake := &owner{srv: nil, got: nil, status: http.StatusOK, body: `{"data":{"twice":8}}`}
+	fake.srv = httptest.NewServer(
+		http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			fake.got = request
+
+			writer.WriteHeader(fake.status)
+			_, _ = writer.Write([]byte(fake.body))
+		}),
+	)
+	t.Cleanup(fake.srv.Close)
+
+	return fake
+}
+
+// answer sets the owner's next answer.
+func (o *owner) answer(status int, body string) { o.status, o.body = status, body }
+
+// transport is the HTTP transport to the owner as the equipment domain's service.
+func (o *owner) transport() *ops.HTTPQueries {
+	target, _ := url.Parse(o.srv.URL + "/")
+
+	return &ops.HTTPQueries{
+		Targets: map[string]*url.URL{ops.DomainEquipment: target},
+		Token:   "internal-token", Client: nil,
+	}
+}
+
 // TestHTTPQueries covers the transport between domain services: the caller's tenant, membership and token, the
 // internal token, correlation ID and business time on the request; the system path for a worker without a user;
 // a DomainError passed through; anything else UNAVAILABLE.
 func TestHTTPQueries(t *testing.T) {
-	ctx := context.Background()
+	t.Parallel()
 
-	var got *http.Request
-
-	status, body := http.StatusOK, `{"data":{"twice":8}}`
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		got = r
-
-		w.WriteHeader(status)
-		_, _ = w.Write([]byte(body))
-	}))
-	defer srv.Close()
-
-	target, _ := url.Parse(srv.URL + "/")
-	httpQueries := &HTTPQueries{
-		Targets: map[string]*url.URL{DomainEquipment: target},
-		Token:   "internal-token", Client: nil,
-	}
+	fake := newOwner(t)
+	httpQueries := fake.transport()
 	now := time.Date(2026, 9, 15, 1, 0, 0, 0, time.UTC)
-	principal := &Principal{
+	principal := &ops.Principal{
 		TenantID:          uuid.New(),
 		MembershipID:      uuid.New(),
 		Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
@@ -163,10 +206,10 @@ func TestHTTPQueries(t *testing.T) {
 		Timezone:          "",
 		SessionsRevokedAt: nil,
 	}
-	user := &Call{
+	user := &ops.Call{
 		Principal:       principal,
 		Bearer:          "user-token",
-		CorrelationID:   "corr-1",
+		CorrelationID:   correlation,
 		Now:             now,
 		Tx:              nil,
 		Queries:         nil,
@@ -177,9 +220,9 @@ func TestHTTPQueries(t *testing.T) {
 	}
 
 	out, err := httpQueries.Query(
-		ctx,
+		t.Context(),
 		user,
-		DomainEquipment,
+		ops.DomainEquipment,
 		"assets.unitState",
 		json.RawMessage(`{"unitId":"u1"}`),
 	)
@@ -187,20 +230,23 @@ func TestHTTPQueries(t *testing.T) {
 		t.Fatalf("query: %s %v", out, err)
 	}
 
-	if got.Method != http.MethodPost || got.URL.Path != "/internal/v1/queries/assets.unitState" ||
-		got.Header.Get(
-			"X-Tenant-Id",
-		) != principal.TenantID.String() || got.Header.Get("X-Membership-Id") != principal.MembershipID.String() ||
-		got.Header.Get(
-			"Authorization",
-		) != "Bearer user-token" || got.Header.Get(InternalTokenHeader) != "internal-token" ||
-		got.Header.Get(
-			"X-Request-ID",
-		) != "corr-1" || got.Header.Get(BusinessNowHeader) != now.Format(time.RFC3339Nano) {
-		t.Errorf("request: %s %s %v", got.Method, got.URL.Path, got.Header)
-	}
+	checkUserRequest(t, fake.got, principal, now)
 
-	worker := &Call{
+	checkSystemQuery(t, fake, httpQueries, principal, now)
+	checkQueryFailures(t, fake, httpQueries, user)
+}
+
+// checkSystemQuery: a scheduler job's query has no user, the tenant only (IR195), and goes to the system path.
+func checkSystemQuery(
+	t *testing.T,
+	fake *owner,
+	httpQueries *ops.HTTPQueries,
+	principal *ops.Principal,
+	now time.Time,
+) {
+	t.Helper()
+
+	worker := &ops.Call{
 		Principal:       principal,
 		Now:             now,
 		Tx:              nil,
@@ -214,99 +260,89 @@ func TestHTTPQueries(t *testing.T) {
 	} // a scheduler job: no user, the tenant only (IR195)
 
 	_, queryErr := httpQueries.Query(
-		ctx,
+		t.Context(),
 		worker,
-		DomainEquipment,
+		ops.DomainEquipment,
 		"assets.unitState",
 		nil,
 	)
-	if queryErr != nil || got.URL.Path != "/internal/v1/system/queries/assets.unitState" ||
-		got.Header.Get("Authorization") != "" ||
-		got.Header.Get("X-Membership-Id") != "" {
-		t.Errorf("system query: %v %s %v", queryErr, got.URL.Path, got.Header)
+	if queryErr != nil || fake.got.URL.Path != "/internal/v1/system/queries/assets.unitState" ||
+		fake.got.Header.Get("Authorization") != "" ||
+		fake.got.Header.Get("X-Membership-Id") != "" {
+		t.Errorf("system query: %v %s %v", queryErr, fake.got.URL.Path, fake.got.Header)
 	}
+}
 
-	status, body = http.StatusNotFound, `{"code":"NOT_FOUND","messageKey":"error.notFound","fieldErrors":{}}`
+// checkUserRequest: the caller's tenant, membership and token, the internal token, the correlation ID and the
+// business time reach the owner.
+func checkUserRequest(t *testing.T, got *http.Request, principal *ops.Principal, now time.Time) {
+	t.Helper()
 
-	_, queryErr = httpQueries.Query(
-		ctx,
-		user,
-		DomainEquipment,
-		"q",
-		nil,
+	if got.Method != http.MethodPost || got.URL.Path != "/internal/v1/queries/assets.unitState" ||
+		got.Header.Get(
+			"X-Tenant-Id",
+		) != principal.TenantID.String() || got.Header.Get("X-Membership-Id") != principal.MembershipID.String() ||
+		got.Header.Get(
+			"Authorization",
+		) != "Bearer user-token" || got.Header.Get(ops.InternalTokenHeader) != "internal-token" ||
+		got.Header.Get(
+			"X-Request-ID",
+		) != correlation || got.Header.Get(ops.BusinessNowHeader) != now.Format(time.RFC3339Nano) {
+		t.Errorf("request: %s %s %v", got.Method, got.URL.Path, got.Header)
+	}
+}
+
+// checkQueryFailures: a DomainError from the owner passes through; an answer that is no DomainError, a call without a
+// principal, a domain without a target and an owner that is down are UNAVAILABLE; an undecodable envelope fails.
+func checkQueryFailures(t *testing.T, fake *owner, httpQueries *ops.HTTPQueries, user *ops.Call) {
+	t.Helper()
+
+	ctx := t.Context()
+
+	fake.answer(
+		http.StatusNotFound,
+		`{"code":"NOT_FOUND","messageKey":"error.notFound","fieldErrors":{}}`,
 	)
-	if apperr.From(
-		queryErr,
-	).Code != apperr.NotFound {
-		t.Errorf("a DomainError from the owner: %v", queryErr)
+
+	_, err := httpQueries.Query(ctx, user, ops.DomainEquipment, "q", nil)
+	if apperr.From(err).Code != apperr.NotFound {
+		t.Errorf("a DomainError from the owner: %v", err)
 	}
 
-	status, body = http.StatusBadGateway, `<html>proxy error</html>`
+	fake.answer(http.StatusBadGateway, `<html>proxy error</html>`)
 
-	_, queryErr = httpQueries.Query(
-		ctx,
-		user,
-		DomainEquipment,
-		"q",
-		nil,
-	)
-	if apperr.From(
-		queryErr,
-	).Code != apperr.Unavailable {
-		t.Errorf("an answer that is no DomainError: %v", queryErr)
+	_, err = httpQueries.Query(ctx, user, ops.DomainEquipment, "q", nil)
+	if apperr.From(err).Code != apperr.Unavailable {
+		t.Errorf("an answer that is no DomainError: %v", err)
 	}
 
-	status, body = http.StatusOK, `not json`
+	fake.answer(http.StatusOK, `not json`)
 
-	_, queryErr = httpQueries.Query(ctx, user, DomainEquipment, "q", nil)
-	if queryErr == nil {
+	_, err = httpQueries.Query(ctx, user, ops.DomainEquipment, "q", nil)
+	if err == nil {
 		t.Error("an undecodable envelope")
 	}
 
-	for name, call := range map[string]*Call{
-		"no principal": {
-			Bearer: "x", Tx: nil, Principal: nil, Now: time.Time{}, CorrelationID: "", Queries: nil,
-			ExpectedVersion: nil, Candidates: nil, Events: nil, Audits: nil,
-		},
-	} {
-		_, err := httpQueries.Query(
-			ctx,
-			call,
-			DomainEquipment,
-			"q",
-			nil,
-		)
-		if apperr.From(
-			err,
-		).Code != apperr.Unavailable {
-			t.Errorf("%s: %v", name, err)
-		}
+	noPrincipal := &ops.Call{
+		Bearer: "x", Tx: nil, Principal: nil, Now: time.Time{}, CorrelationID: "", Queries: nil,
+		ExpectedVersion: nil, Candidates: nil, Events: nil, Audits: nil,
 	}
 
-	_, queryErr = httpQueries.Query(
-		ctx,
-		user,
-		DomainBilling,
-		"q",
-		nil,
-	)
-	if apperr.From(
-		queryErr,
-	).Code != apperr.Unavailable {
-		t.Errorf("a domain without a target: %v", queryErr)
+	_, err = httpQueries.Query(ctx, noPrincipal, ops.DomainEquipment, "q", nil)
+	if apperr.From(err).Code != apperr.Unavailable {
+		t.Errorf("no principal: %v", err)
 	}
 
-	srv.Close()
+	_, err = httpQueries.Query(ctx, user, ops.DomainBilling, "q", nil)
+	if apperr.From(err).Code != apperr.Unavailable {
+		t.Errorf("a domain without a target: %v", err)
+	}
 
-	_, queryErr = httpQueries.Query(
-		ctx,
-		user,
-		DomainEquipment,
-		"q",
-		nil,
-	)
-	if apperr.From(queryErr).Code != apperr.Unavailable ||
-		errors.Is(queryErr, context.Canceled) {
-		t.Errorf("the owner is down: %v", queryErr)
+	fake.srv.Close()
+
+	_, err = httpQueries.Query(ctx, user, ops.DomainEquipment, "q", nil)
+	if apperr.From(err).Code != apperr.Unavailable ||
+		errors.Is(err, context.Canceled) {
+		t.Errorf("the owner is down: %v", err)
 	}
 }

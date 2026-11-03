@@ -204,10 +204,10 @@ func flattenQuery(params url.Values, prefix string, obj map[string]any, top bool
 // field:direction, any other object as object.field.
 func flattenObject(params url.Values, prefix, key string, obj map[string]any, top bool) {
 	switch {
-	case top && (key == "query" || key == "filters"):
+	case top && (key == fieldQuery || key == fieldFilters):
 		flattenQuery(params, "", obj, true)
 	case key == paramSort:
-		params.Set(paramSort, paramText(obj["field"])+":"+paramText(obj["direction"]))
+		params.Set(paramSort, paramText(obj[sortKeyField])+":"+paramText(obj[sortKeyDirection]))
 	default:
 		flattenQuery(params, prefix+key+".", obj, false)
 	}
