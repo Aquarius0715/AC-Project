@@ -25,6 +25,7 @@ func (in *RequestedInput) Validate() map[string]string {
 	if in.Limit < 1 || in.Limit > 100 {
 		return map[string]string{"limit": "error.range"}
 	}
+
 	return nil
 }
 
@@ -45,22 +46,33 @@ func RegisterQueries(r *ops.Registry) {
 // requested reads the waiting commands of the tenant in the order they were requested. A command whose device is not
 // known is left out (it cannot be sent), and a command past its expiry is left for the expiry job.
 func requested(ctx context.Context, c *ops.Call, in *RequestedInput) ([]Requested, error) {
-	rows, err := c.Tx.Query(ctx, `SELECT id, device_id, unit_id, action, expires_at FROM control.commands
+	rows, err := c.Tx.Query(
+		ctx,
+		`SELECT id, device_id, unit_id, action, expires_at FROM control.commands
 		WHERE status = 'requested' AND delivery = 'not_sent' AND device_id IS NOT NULL AND expires_at > $1
-		ORDER BY requested_at, id LIMIT $2`, c.Now, in.Limit)
+		ORDER BY requested_at, id LIMIT $2`,
+		c.Now,
+		in.Limit,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
+
 	out := []Requested{}
+
 	for rows.Next() {
-		var x Requested
-		var action []byte
+		var (
+			x      Requested
+			action []byte
+		)
 		if err := rows.Scan(&x.ID, &x.DeviceID, &x.UnitID, &action, &x.ExpiresAt); err != nil {
 			return nil, err
 		}
+
 		x.Action = action
 		out = append(out, x)
 	}
+
 	return out, rows.Err()
 }

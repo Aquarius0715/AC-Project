@@ -45,18 +45,26 @@ func RegisterQueries(r *ops.Registry) {
 }
 
 // UnitRestriction returns the newest restriction that currently restricts the unit (unit detail, IR46).
-func (Busy) UnitRestriction(ctx context.Context, c *ops.Call, unit uuid.UUID) (UnitRestriction, error) {
+func (Busy) UnitRestriction(
+	ctx context.Context,
+	c *ops.Call,
+	unit uuid.UUID,
+) (UnitRestriction, error) {
 	return ops.Delegate(ctx, c, QueryUnitRestriction, UnitInput{UnitID: unit}, unitRestriction)
 }
 
 func unitRestriction(ctx context.Context, c *ops.Call, in *UnitInput) (UnitRestriction, error) {
 	var r UnitRestriction
+
 	err := c.Tx.QueryRow(ctx, `SELECT r.state, r.policy FROM restrictions.restriction_units ru JOIN restrictions.restrictions r ON r.id = ru.restriction_id
-		WHERE ru.unit_id = $1 AND r.state IN ('requested','applied','release_requested') ORDER BY r.created_at DESC LIMIT 1`, in.UnitID).Scan(&r.Phase, &r.Policy)
+		WHERE ru.unit_id = $1 AND r.state IN ('requested','applied','release_requested') ORDER BY r.created_at DESC LIMIT 1`, in.UnitID).
+		Scan(&r.Phase, &r.Policy)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return UnitRestriction{}, nil
 	}
+
 	r.Found = err == nil
+
 	return r, err
 }
 
@@ -68,8 +76,11 @@ func (Busy) UnitRecovering(ctx context.Context, c *ops.Call, unit uuid.UUID) (bo
 
 func unitRecovering(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
 	var blocked bool
+
 	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restrictions r, jsonb_array_elements(r.recovery_cases) k
-		WHERE k->>'unitId' = $1::text AND k->>'state' <> 'resolved')`, in.UnitID).Scan(&blocked)
+		WHERE k->>'unitId' = $1::text AND k->>'state' <> 'resolved')`, in.UnitID).
+		Scan(&blocked)
+
 	return blocked, err
 }
 
@@ -80,8 +91,11 @@ func (Busy) UnitBusy(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, er
 
 func unitBusy(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
 	var b bool
+
 	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_units ru JOIN restrictions.restrictions r ON r.id = ru.restriction_id
-		WHERE ru.unit_id = $1 AND r.state IN ('requested','applied','release_requested'))`, in.UnitID).Scan(&b)
+		WHERE ru.unit_id = $1 AND r.state IN ('requested','applied','release_requested'))`, in.UnitID).
+		Scan(&b)
+
 	return b, err
 }
 
@@ -91,55 +105,87 @@ func (b Busy) UnitActive(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool
 }
 
 // ContractState returns the contract's active restrictions and whether a recovery case is unresolved (IR135 item 1).
-func (Busy) ContractState(ctx context.Context, c *ops.Call, contract uuid.UUID) ([]uuid.UUID, bool, error) {
-	rows, err := c.Tx.Query(ctx, `SELECT id, state IN ('scheduled','requested','applied','release_requested'),
-		jsonb_path_exists(recovery_cases, '$[*] ? (@.status != "resolved")') FROM restrictions.restrictions WHERE contract_id = $1 ORDER BY id`, contract)
+func (Busy) ContractState(
+	ctx context.Context,
+	c *ops.Call,
+	contract uuid.UUID,
+) ([]uuid.UUID, bool, error) {
+	rows, err := c.Tx.Query(
+		ctx,
+		`SELECT id, state IN ('scheduled','requested','applied','release_requested'),
+		jsonb_path_exists(recovery_cases, '$[*] ? (@.status != "resolved")') FROM restrictions.restrictions WHERE contract_id = $1 ORDER BY id`,
+		contract,
+	)
 	if err != nil {
 		return nil, false, err
 	}
 	defer rows.Close()
+
 	active, unresolved := []uuid.UUID{}, false
+
 	for rows.Next() {
-		var id uuid.UUID
-		var isActive, open bool
+		var (
+			id             uuid.UUID
+			isActive, open bool
+		)
 		if err := rows.Scan(&id, &isActive, &open); err != nil {
 			return nil, false, err
 		}
+
 		if isActive {
 			active = append(active, id)
 		}
+
 		unresolved = unresolved || open
 	}
+
 	return active, unresolved, rows.Err()
 }
 
 // ForInvoice returns the restrictions citing an invoice.
 func (Busy) ForInvoice(ctx context.Context, c *ops.Call, invoice uuid.UUID) ([]uuid.UUID, error) {
-	rows, err := c.Tx.Query(ctx, `SELECT DISTINCT restriction_id FROM restrictions.restriction_invoices WHERE invoice_id = $1 ORDER BY restriction_id`, invoice)
+	rows, err := c.Tx.Query(
+		ctx,
+		`SELECT DISTINCT restriction_id FROM restrictions.restriction_invoices WHERE invoice_id = $1 ORDER BY restriction_id`,
+		invoice,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
+
 	out := []uuid.UUID{}
+
 	for rows.Next() {
 		var id uuid.UUID
 		if err := rows.Scan(&id); err != nil {
 			return nil, err
 		}
+
 		out = append(out, id)
 	}
+
 	return out, rows.Err()
 }
 
 // OnInvoicePaid applies IR35 route ①: restrictions citing the invoice whose cause invoices are all paid move scheduled →
 // cancelled and requested/applied → release_requested with a payment release intent. It returns the changed IDs.
-func (m Restrictions) OnInvoicePaid(ctx context.Context, c *ops.Call, invoice uuid.UUID) ([]uuid.UUID, error) {
+func (m Restrictions) OnInvoicePaid(
+	ctx context.Context,
+	c *ops.Call,
+	invoice uuid.UUID,
+) ([]uuid.UUID, error) {
 	// the restrictions citing the invoice are locked first, in ID order, so the payments of their other cause invoices
 	// wait for each other: two at once each saw the other invoice still unpaid and both left the restriction (IR476)
-	if _, err := c.Tx.Exec(ctx, `SELECT 1 FROM restrictions.restrictions r WHERE r.state IN ('scheduled','requested','applied')
-		AND EXISTS (SELECT 1 FROM restrictions.restriction_invoices ri WHERE ri.restriction_id = r.id AND ri.invoice_id = $1) ORDER BY r.id FOR UPDATE OF r`, invoice); err != nil {
+	if _, err := c.Tx.Exec(
+		ctx,
+		`SELECT 1 FROM restrictions.restrictions r WHERE r.state IN ('scheduled','requested','applied')
+		AND EXISTS (SELECT 1 FROM restrictions.restriction_invoices ri WHERE ri.restriction_id = r.id AND ri.invoice_id = $1) ORDER BY r.id FOR UPDATE OF r`,
+		invoice,
+	); err != nil {
 		return nil, err
 	}
+
 	rows, err := c.Tx.Query(ctx, `UPDATE restrictions.restrictions r SET
 			state = CASE WHEN r.state = 'scheduled' THEN 'cancelled' ELSE 'release_requested' END,
 			release_intent = CASE WHEN r.state = 'scheduled' THEN r.release_intent ELSE jsonb_build_object('source', 'payment', 'at', $2::timestamptz, 'actorMembershipId', $3::uuid) END,
@@ -153,24 +199,50 @@ func (m Restrictions) OnInvoicePaid(ctx context.Context, c *ops.Call, invoice uu
 		return nil, err
 	}
 	defer rows.Close()
+
 	out := []uuid.UUID{}
+
 	for rows.Next() {
 		var id uuid.UUID
 		if err := rows.Scan(&id); err != nil {
 			return nil, err
 		}
+
 		out = append(out, id)
 	}
+
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+
 	for _, id := range out {
-		c.Emit(ops.Event{AggregateType: "restriction", AggregateID: id, Type: "RestrictionReleaseRequested", Payload: map[string]any{"source": "payment", "invoiceId": invoice}})
-		if err := m.evaluateRelease(ctx, c, id); err != nil { // D03 release evaluation in the same transition (IR35 ①)
+		c.Emit(
+			ops.Event{
+				AggregateType: "restriction",
+				AggregateID:   id,
+				Type:          "RestrictionReleaseRequested",
+				Payload:       map[string]any{"source": "payment", "invoiceId": invoice},
+			},
+		)
+
+		if err := m.evaluateRelease(
+			ctx,
+			c,
+			id,
+		); err != nil { // D03 release evaluation in the same transition (IR35 ①)
 			return nil, err
 		}
-		c.Audit(ops.AuditEntry{Action: "payments.release", TargetKind: "restriction", TargetID: id.String(), Reason: "cause invoices paid"})
+
+		c.Audit(
+			ops.AuditEntry{
+				Action:     "payments.release",
+				TargetKind: "restriction",
+				TargetID:   id.String(),
+				Reason:     "cause invoices paid",
+			},
+		)
 	}
+
 	return out, nil
 }
 
@@ -182,10 +254,13 @@ func (Busy) UnitPolicy(ctx context.Context, c *ops.Call, unit uuid.UUID) ([]byte
 
 func unitPolicy(ctx context.Context, c *ops.Call, in *UnitInput) ([]byte, error) {
 	var p []byte
+
 	err := c.Tx.QueryRow(ctx, `SELECT r.policy FROM restrictions.restriction_units ru JOIN restrictions.restrictions r ON r.id = ru.restriction_id
-		WHERE ru.unit_id = $1 AND r.state IN ('requested','applied','release_requested') ORDER BY r.created_at DESC LIMIT 1`, in.UnitID).Scan(&p)
+		WHERE ru.unit_id = $1 AND r.state IN ('requested','applied','release_requested') ORDER BY r.created_at DESC LIMIT 1`, in.UnitID).
+		Scan(&p)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
+
 	return p, err
 }

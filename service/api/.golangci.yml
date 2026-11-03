@@ -1,0 +1,55 @@
+# golangci-lint v2 for the Go backend: every linter and every formatter, at their default settings ("全部入り",
+# user request 2026-11-03). Only the deprecated linters are off — their successors exhaustruct_v5, gomodguard_v2 and
+# wsl_v5 stay on. A linter that needs the project's own facts gets them below (the modules depguard allows); nolint
+# directives must name the linter and say why.
+version: "2"
+run:
+  timeout: 15m
+  tests: true
+linters:
+  default: all
+  disable:
+    - exhaustruct # deprecated: exhaustruct_v5
+    - gomodguard # deprecated: gomodguard_v2
+    - wsl # deprecated: wsl_v5
+  settings:
+    depguard:
+      rules:
+        main:
+          list-mode: strict
+          allow:
+            - $gostd
+            - github.com/pradita/ac-project/service/api
+            - github.com/MicahParks/keyfunc/v3
+            - github.com/alicebob/miniredis/v2
+            - github.com/eclipse/paho.mqtt.golang
+            - github.com/golang-jwt/jwt/v5
+            - github.com/google/uuid
+            - github.com/jackc/pgx/v5
+            - github.com/labstack/echo/v5
+            - github.com/redis/go-redis/v9
+            - golang.org/x/time
+    godot:
+      exclude:
+        - "^ *@" # swag annotations (@Router, @Param …) are read by swag: a period would change the route
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+      allow-unused: false
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+    - golines
+    - swaggo
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/pradita/ac-project)
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

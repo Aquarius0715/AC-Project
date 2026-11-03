@@ -9,6 +9,7 @@ import (
 // stored status other than valid reads as stored (IR133 item 2).
 func TestReadStatus(t *testing.T) {
 	now := time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC)
+
 	day := 24 * time.Hour
 	for name, c := range map[string]struct {
 		stored  string
@@ -33,6 +34,7 @@ func TestReadStatus(t *testing.T) {
 // from that very instant — and none earlier than 60 days (IR336).
 func TestReminderStage(t *testing.T) {
 	now := time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC)
+
 	day := 24 * time.Hour
 	for name, c := range map[string]struct {
 		expires time.Time
@@ -57,7 +59,16 @@ func TestReminderStage(t *testing.T) {
 // TestContentMatches: a file is what its leading bytes say — the PNG signature, the JPEG start of image, the PDF
 // header — and a type outside the three never matches (IR308).
 func TestContentMatches(t *testing.T) {
-	png, jpeg, pdf := []byte("\x89PNG\r\n\x1a\nrest"), []byte{0xFF, 0xD8, 0xFF, 0xE0}, []byte("%PDF-1.7")
+	png, jpeg, pdf := []byte(
+		"\x89PNG\r\n\x1a\nrest",
+	), []byte{
+		0xFF,
+		0xD8,
+		0xFF,
+		0xE0,
+	}, []byte(
+		"%PDF-1.7",
+	)
 	for name, c := range map[string]struct {
 		mime string
 		b    []byte

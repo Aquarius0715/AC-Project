@@ -18,10 +18,18 @@ func TestHoldRollsBackWhenTheStatusCannotBeWritten(t *testing.T) {
 	version := ver(m)
 
 	broken := injectAt(t, "UPDATE maintenance.jobs SET status = 'on_hold'")
-	code, m := write(broken, &hq, "jobs.hold", `{"jobId":"`+job+`","reason":"waiting for parts"}`, version)
+
+	code, m := write(
+		broken,
+		&hq,
+		"jobs.hold",
+		`{"jobId":"`+job+`","reason":"waiting for parts"}`,
+		version,
+	)
 	if code < 500 {
 		t.Fatalf("hold with a failing status write: %d %v, want a server error", code, m)
 	}
+
 	_, m = post(s, &hq, "jobs.get", `{"jobId":"`+job+`"}`)
 	if data(m)["status"] != "in_progress" || data(m)["holdReason"] != nil || ver(m) != version {
 		t.Errorf("a failed hold changed the job: %v", m)

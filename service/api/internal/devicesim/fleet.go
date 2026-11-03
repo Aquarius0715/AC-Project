@@ -59,8 +59,22 @@ type Room struct {
 
 // Telemetry and command behaviours a pattern may name.
 var (
-	telemetryKinds = map[string]bool{"": true, "normal": true, "silent": true, "unit_mismatch": true, "out_of_range": true, "missing": true, "invalid_time": true}
-	commandKinds   = map[string]bool{"": true, "apply": true, "reject": true, "ignore": true, "late": true}
+	telemetryKinds = map[string]bool{
+		"":              true,
+		"normal":        true,
+		"silent":        true,
+		"unit_mismatch": true,
+		"out_of_range":  true,
+		"missing":       true,
+		"invalid_time":  true,
+	}
+	commandKinds = map[string]bool{
+		"":       true,
+		"apply":  true,
+		"reject": true,
+		"ignore": true,
+		"late":   true,
+	}
 )
 
 // MockFleet reads the embedded fleet and checks it: unique keys, known behaviours, and a module for every pattern
@@ -72,29 +86,41 @@ func parseFleet(raw []byte) (Fleet, error) {
 	if err := json.Unmarshal(raw, &f); err != nil {
 		return f, fmt.Errorf("fleet: %w", err)
 	}
+
 	rooms := map[string]bool{}
+
 	for _, fl := range f.Floors {
 		for _, r := range fl.Rooms {
 			if r.Key == "" || rooms[r.Key] || r.Key == fl.Key {
 				return f, fmt.Errorf("fleet: room key %q is empty or repeated", r.Key)
 			}
+
 			rooms[r.Key] = true
 		}
 	}
+
 	seen := map[string]bool{}
+
 	for _, p := range f.Patterns {
 		switch {
 		case p.Key == "" || seen[p.Key]:
 			return f, fmt.Errorf("fleet: pattern key %q is empty or repeated", p.Key)
 		case !telemetryKinds[p.Telemetry] || !commandKinds[p.Commands]:
-			return f, fmt.Errorf("fleet: pattern %s has an unknown behaviour (%q, %q)", p.Key, p.Telemetry, p.Commands)
+			return f, fmt.Errorf(
+				"fleet: pattern %s has an unknown behaviour (%q, %q)",
+				p.Key,
+				p.Telemetry,
+				p.Commands,
+			)
 		case len(rooms) > 0 && !rooms[p.Room]:
 			return f, fmt.Errorf("fleet: pattern %s is in no known room (%q)", p.Key, p.Room)
 		case p.NoDevice && (p.Telemetry != "" || p.Commands != ""):
 			return f, fmt.Errorf("fleet: pattern %s has no module but a behaviour", p.Key)
 		}
+
 		seen[p.Key] = true
 	}
+
 	return f, nil
 }
 
@@ -103,6 +129,7 @@ func (f Fleet) FirmwareOf(p Pattern) string {
 	if p.Firmware != "" {
 		return p.Firmware
 	}
+
 	return f.Firmware
 }
 

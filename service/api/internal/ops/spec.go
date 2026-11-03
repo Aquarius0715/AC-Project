@@ -16,6 +16,7 @@ func (m Mode) String() string {
 	if m == Write {
 		return "write"
 	}
+
 	return "read"
 }
 
@@ -70,6 +71,7 @@ func SpecByName() map[string]Spec {
 	for _, s := range Catalog {
 		m[s.Name] = s
 	}
+
 	return m
 }
 

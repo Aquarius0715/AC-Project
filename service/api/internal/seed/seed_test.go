@@ -13,22 +13,32 @@ const fixturePath = "../../../../docs/04-agentic-sdlc/fixture-contract.json"
 
 func ownerConn(t *testing.T) *pgx.Conn {
 	t.Helper()
+
 	url := os.Getenv("AC_TEST_OWNER_DATABASE_URL")
 	if url == "" {
 		url = "postgres://postgres:local@localhost:5432/ac_test?sslmode=disable"
 	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
+
 	c, err := pgx.Connect(ctx, url)
 	if err != nil {
 		t.Skip("database not available:", err)
 	}
+
 	t.Cleanup(func() { c.Close(context.Background()) })
+
 	return c
 }
 
 func TestIDDeterministic(t *testing.T) {
-	if a, b := ID("unit-online-rto"), ID("unit-online-rto"); a != b || ID("a") == ID("b") || ID("x").Version() != 5 { // the same name maps to the same ID
+	if a, b := ID(
+		"unit-online-rto",
+	), ID(
+		"unit-online-rto",
+	); a != b || ID("a") == ID("b") ||
+		ID("x").Version() != 5 { // the same name maps to the same ID
 		t.Fatal("UUIDv5 mapping")
 	}
 }
@@ -37,7 +47,9 @@ func TestLoadErrors(t *testing.T) {
 	if _, err := Load("nope.json"); err == nil {
 		t.Fatal("missing file")
 	}
+
 	p := t.TempDir() + "/bad.json"
+
 	_ = os.WriteFile(p, []byte("{"), 0o600)
 	if _, err := Load(p); err == nil {
 		t.Fatal("bad json")
@@ -51,14 +63,18 @@ func TestActorNamesUnique(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	seen := map[string]string{}
+
 	for _, a := range f.Actors {
 		if a.DisplayName == "" {
 			t.Errorf("%s has no display name", a.MembershipID)
 		}
+
 		if other, ok := seen[a.DisplayName]; ok {
 			t.Errorf("%s and %s share the display name %q", other, a.MembershipID, a.DisplayName)
 		}
+
 		seen[a.DisplayName] = a.MembershipID
 	}
 }
@@ -69,61 +85,101 @@ func TestApplyFixture(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	c := ownerConn(t)
 	ctx := context.Background()
+
 	tx, err := c.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer tx.Rollback(ctx)
-	for i := 0; i < 2; i++ {
+
+	for i := range 2 {
 		if err := Apply(ctx, tx, f); err != nil {
 			t.Fatalf("apply %d: %v", i, err)
 		}
 	}
+
 	ids := func(n int, get func(int) string) []any {
 		out := make([]any, n)
 		for i := range out {
 			out[i] = ID(get(i))
 		}
+
 		return out
 	}
+
 	counts := map[string][]any{
-		"identity.memberships":         ids(len(f.Actors), func(i int) string { return f.Actors[i].MembershipID }),
-		"assets.customers":             ids(len(f.DemoSeed.Customers), func(i int) string { return f.DemoSeed.Customers[i].ID }),
-		"assets.properties":            ids(len(f.DemoSeed.Properties), func(i int) string { return f.DemoSeed.Properties[i].ID }),
-		"assets.spaces":                ids(len(f.DemoSeed.Spaces), func(i int) string { return f.DemoSeed.Spaces[i].ID }),
-		"assets.units":                 ids(len(f.DemoSeed.Units), func(i int) string { return f.DemoSeed.Units[i].ID }),
-		"devices.capabilities":         ids(len(f.DemoSeed.Capabilities), func(i int) string { return f.DemoSeed.Capabilities[i].ID }),
-		"maintenance.filter_cleanings": ids(len(f.DemoSeed.FilterCleanings), func(i int) string { return str(f.DemoSeed.FilterCleanings[i], "id") }),
+		"identity.memberships": ids(
+			len(f.Actors),
+			func(i int) string { return f.Actors[i].MembershipID },
+		),
+		"assets.customers": ids(
+			len(f.DemoSeed.Customers),
+			func(i int) string { return f.DemoSeed.Customers[i].ID },
+		),
+		"assets.properties": ids(
+			len(f.DemoSeed.Properties),
+			func(i int) string { return f.DemoSeed.Properties[i].ID },
+		),
+		"assets.spaces": ids(
+			len(f.DemoSeed.Spaces),
+			func(i int) string { return f.DemoSeed.Spaces[i].ID },
+		),
+		"assets.units": ids(
+			len(f.DemoSeed.Units),
+			func(i int) string { return f.DemoSeed.Units[i].ID },
+		),
+		"devices.capabilities": ids(
+			len(f.DemoSeed.Capabilities),
+			func(i int) string { return f.DemoSeed.Capabilities[i].ID },
+		),
+		"maintenance.filter_cleanings": ids(
+			len(f.DemoSeed.FilterCleanings),
+			func(i int) string { return str(f.DemoSeed.FilterCleanings[i], "id") },
+		),
 	}
 	for table, want := range counts {
 		var got int
-		if err := tx.QueryRow(ctx, "SELECT count(DISTINCT id) FROM "+table+" WHERE id = ANY($1::uuid[])", want).Scan(&got); err != nil {
+		if err := tx.QueryRow(ctx, "SELECT count(DISTINCT id) FROM "+table+" WHERE id = ANY($1::uuid[])", want).
+			Scan(&got); err != nil {
 			t.Fatal(err)
 		}
+
 		if got != len(want) || got == 0 {
 			t.Errorf("%s: got %d want %d", table, got, len(want))
 		}
 	}
+
 	var perms int
-	_ = tx.QueryRow(ctx, `SELECT count(*) FROM identity.membership_permissions WHERE membership_id=$1`, ID("hq-operator")).Scan(&perms)
+
+	_ = tx.QueryRow(ctx, `SELECT count(*) FROM identity.membership_permissions WHERE membership_id=$1`, ID("hq-operator")).
+		Scan(&perms)
 	if perms == 0 {
 		t.Error("hq-operator has no permissions")
 	}
+
 	var name string
-	if err := tx.QueryRow(ctx, `SELECT display_name FROM assets.units WHERE id=$1`, ID("unit-online-rto")).Scan(&name); err != nil || name != "Bedroom AC" {
+	if err := tx.QueryRow(ctx, `SELECT display_name FROM assets.units WHERE id=$1`, ID("unit-online-rto")).
+		Scan(&name); err != nil ||
+		name != "Bedroom AC" {
 		t.Fatalf("unit-online-rto: %v %q", err, name)
 	}
 	// IR91 item 2: rows without createdAt carry fixture.seedCreatedAt, not the wall clock (IR318); explicit ones keep theirs
 	for _, table := range []string{"identity.organizations", "identity.users", "identity.memberships", "devices.capabilities", "assets.customers", "assets.properties", "assets.spaces", "assets.units", "devices.devices", "monitoring.alert_policies", "billing.invoices"} {
 		var later int
-		if err := tx.QueryRow(ctx, "SELECT count(*) FROM "+table+" WHERE created_at <> $1", f.SeedCreatedAt).Scan(&later); err != nil || later != 0 {
+		if err := tx.QueryRow(ctx, "SELECT count(*) FROM "+table+" WHERE created_at <> $1", f.SeedCreatedAt).
+			Scan(&later); err != nil ||
+			later != 0 {
 			t.Errorf("%s: %d rows not created at seedCreatedAt (%v)", table, later, err)
 		}
 	}
+
 	var now time.Time
-	if err := tx.QueryRow(ctx, `SELECT platform.app_now()`).Scan(&now); err != nil || now.Equal(f.SeedCreatedAt) {
+	if err := tx.QueryRow(ctx, `SELECT platform.app_now()`).
+		Scan(&now); err != nil ||
+		now.Equal(f.SeedCreatedAt) {
 		t.Errorf("app.now stays the seed time after Apply: %v %v", now, err)
 	}
 }

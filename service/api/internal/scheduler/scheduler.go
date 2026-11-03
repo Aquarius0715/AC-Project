@@ -58,13 +58,25 @@ func Tick(ctx context.Context, m *db.TxManager, now time.Time, reg *ops.Registry
 // TickDomains runs the transitions of the given domains (nil: all) once per tenant, waiting while another instance
 // ticks the same domain and tenant. reg (may be nil) answers the internal queries of other domains, so a domain
 // scheduler needs only its own role.
-func TickDomains(ctx context.Context, m *db.TxManager, now time.Time, domains []string, reg *ops.Registry) (Result, error) {
+func TickDomains(
+	ctx context.Context,
+	m *db.TxManager,
+	now time.Time,
+	domains []string,
+	reg *ops.Registry,
+) (Result, error) {
 	return tick(ctx, m, now, domains, reg, true)
 }
 
 // TryTickDomains is the background tick: a domain and tenant that another instance is ticking is skipped this time
 // (Result.Skipped), never waited for (IR356).
-func TryTickDomains(ctx context.Context, m *db.TxManager, now time.Time, domains []string, reg *ops.Registry) (Result, error) {
+func TryTickDomains(
+	ctx context.Context,
+	m *db.TxManager,
+	now time.Time,
+	domains []string,
+	reg *ops.Registry,
+) (Result, error) {
 	return tick(ctx, m, now, domains, reg, false)
 }
 
@@ -75,79 +87,133 @@ const (
 	tryLockSQL = `SELECT pg_try_advisory_xact_lock(hashtext('scheduler:' || $1), hashtext($2::text))`
 )
 
-func tick(ctx context.Context, m *db.TxManager, now time.Time, domains []string, reg *ops.Registry, wait bool) (Result, error) {
+func tick(
+	ctx context.Context,
+	m *db.TxManager,
+	now time.Time,
+	domains []string,
+	reg *ops.Registry,
+	wait bool,
+) (Result, error) {
 	serves := func(d string) bool { return domains == nil || slices.Contains(domains, d) }
+
 	var tenants []uuid.UUID
+
 	rows, err := m.Writer.Query(ctx, `SELECT id FROM platform.tenants ORDER BY id`)
 	if err != nil {
 		return Result{}, err
 	}
+
 	for rows.Next() {
 		var id uuid.UUID
 		if err := rows.Scan(&id); err != nil {
 			rows.Close()
+
 			return Result{}, err
 		}
+
 		tenants = append(tenants, id)
 	}
+
 	rows.Close()
+
 	if err := rows.Err(); err != nil {
 		return Result{}, err
 	}
+
 	var r Result
+
 	actor := seed.ID("system-demo")
+
 	for _, t := range tenants {
 		err := m.Run(ctx, false, &ops.Principal{TenantID: t}, func(tx pgx.Tx) error {
-			if _, err := tx.Exec(ctx, `SELECT set_config('app.now', $1, true)`, now.UTC().Format(time.RFC3339Nano)); err != nil {
+			if _, err := tx.Exec(
+				ctx,
+				`SELECT set_config('app.now', $1, true)`,
+				now.UTC().Format(time.RFC3339Nano),
+			); err != nil {
 				return err
 			}
 			// the domains this transaction ticks: those whose lock it holds, taken in the order of Domains (IR356)
 			held := map[string]bool{}
+
 			for _, d := range Domains {
 				if !serves(d) {
 					continue
 				}
+
 				if wait {
 					if _, err := tx.Exec(ctx, lockSQL, d, t); err != nil {
 						return err
 					}
+
 					held[d] = true
+
 					continue
 				}
+
 				var ok bool
 				if err := tx.QueryRow(ctx, tryLockSQL, d, t).Scan(&ok); err != nil {
 					return err
 				}
+
 				held[d] = ok
 				if !ok {
 					r.Skipped++
 				}
 			}
+
 			if held[ops.DomainEquipment] {
 				n, err := control.ExpireCommands(ctx, tx, now)
 				if err != nil {
 					return err
 				}
+
 				r.ExpiredCommands += n
-				c := &ops.Call{Tx: tx, Now: now, Principal: &ops.Principal{TenantID: t}, Queries: reg} // restriction policies come from billing
-				if n, err = control.AdvanceRuns(ctx, c, control.Commands{Devices: devices.Models{}, Restrictions: restrictions.Busy{}}); err != nil {
+
+				c := &ops.Call{
+					Tx:        tx,
+					Now:       now,
+					Principal: &ops.Principal{TenantID: t},
+					Queries:   reg,
+				} // restriction policies come from billing
+				if n, err = control.AdvanceRuns(
+					ctx,
+					c,
+					control.Commands{Devices: devices.Models{}, Restrictions: restrictions.Busy{}},
+				); err != nil {
 					return err
 				}
+
 				r.Runs += n
 			}
+
 			if reg != nil { // the modules' jobs of the served domains, recorded like a write (events, audits)
 				for _, d := range Domains {
 					if !held[d] {
 						continue
 					}
+
 					for _, job := range reg.Jobs[d] {
-						c := &ops.Call{Tx: tx, Now: now, CorrelationID: uuid.NewString(), Queries: reg,
-							Principal: &ops.Principal{Principal: authz.Principal{Role: "system"}, TenantID: t, UserID: seed.ID("system-scheduler")}}
+						c := &ops.Call{
+							Tx:            tx,
+							Now:           now,
+							CorrelationID: uuid.NewString(),
+							Queries:       reg,
+							Principal: &ops.Principal{
+								Principal: authz.Principal{Role: "system"},
+								TenantID:  t,
+								UserID:    seed.ID("system-scheduler"),
+							},
+						}
+
 						n, err := job(ctx, c)
 						if err != nil {
 							return err
 						}
+
 						r.Jobs += n
+
 						if reg.Rec != nil {
 							if err := reg.Rec.Record(ctx, tx, c, "scheduler"); err != nil {
 								return err
@@ -156,50 +222,71 @@ func tick(ctx context.Context, m *db.TxManager, now time.Time, domains []string,
 					}
 				}
 			}
+
 			if held[ops.DomainMaintenance] {
 				n, err := maintenance.ExpireOffers(ctx, tx, now, actor)
 				if err != nil {
 					return err
 				}
+
 				r.ExpiredOffers += n
 				if n, err = maintenance.ExpireProposals(ctx, tx, now); err != nil {
 					return err
 				}
+
 				r.ExpiredProposals += n
 				if n, err = maintenance.ConfirmUnrated(ctx, tx, now); err != nil {
 					return err
 				}
+
 				r.Confirmed += n
 				// freeze after expiry so histories see the final state of the tick
 				n, err = maintenance.FreezeEnded(ctx, tx, now)
 				r.FrozenHistories += n
+
 				if err != nil {
 					return err
 				}
 			}
+
 			return nil
 		})
 		if err != nil {
 			return r, err
 		}
 	}
+
 	return r, nil
 }
 
 // RunDomains ticks the given domains (every domain when domains is nil) every interval until ctx is cancelled.
-func RunDomains(ctx context.Context, m *db.TxManager, interval time.Duration, clock func() time.Time, logf func(string, ...any), domains []string, reg *ops.Registry) {
+func RunDomains(
+	ctx context.Context,
+	m *db.TxManager,
+	interval time.Duration,
+	clock func() time.Time,
+	logf func(string, ...any),
+	domains []string,
+	reg *ops.Registry,
+) {
 	t := time.NewTicker(interval)
 	defer t.Stop()
-	rep := &logging.Repeats{Logf: logf} // a failure that repeats every second is logged once a minute (IR429)
+
+	rep := &logging.Repeats{
+		Logf: logf,
+	} // a failure that repeats every second is logged once a minute (IR429)
+
 	for {
 		if r, err := TryTickDomains(ctx, m, clock(), domains, reg); err != nil {
 			rep.Failed(fmt.Sprintf("worker tick failed: %v", err))
 		} else {
 			rep.OK("worker tick")
+
 			if r.changes() > 0 {
 				logf("worker tick: %+v", r)
 			}
 		}
+
 		select {
 		case <-ctx.Done():
 			return

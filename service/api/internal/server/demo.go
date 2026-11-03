@@ -7,8 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pradita/ac-project/service/api/internal/platform/events"
-
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
@@ -20,6 +18,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/db"
+	"github.com/pradita/ac-project/service/api/internal/platform/events"
 	"github.com/pradita/ac-project/service/api/internal/scheduler"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
@@ -45,6 +44,7 @@ type demoClock struct {
 func (d *demoClock) Now() time.Time {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+
 	return d.base().Add(d.offset)
 }
 
@@ -52,6 +52,7 @@ func (d *demoClock) Advance(_ context.Context, by time.Duration) error {
 	d.mu.Lock()
 	d.offset += by
 	d.mu.Unlock()
+
 	return nil
 }
 
@@ -79,6 +80,7 @@ func (in *AdvanceInput) Validate() map[string]string {
 	if in.To.IsZero() {
 		return map[string]string{"to": "error.required"}
 	}
+
 	return nil
 }
 
@@ -113,9 +115,11 @@ func (d *demoOps) advance(ctx context.Context, c *ops.Call, in *AdvanceInput) (G
 	if !d.enabled {
 		return Generation{}, demoOnly()
 	}
+
 	if in.To.Before(c.Now) { // only forward jumps in the API demo (IR36)
 		return Generation{}, apperr.Fields(map[string]string{"to": "errors.clock_backwards"})
 	}
+
 	if err := d.clock.Advance(ctx, in.To.Sub(c.Now)); err != nil {
 		return Generation{}, apperr.From(err)
 	}
@@ -124,9 +128,11 @@ func (d *demoOps) advance(ctx context.Context, c *ops.Call, in *AdvanceInput) (G
 	if !d.inline {
 		return Generation{Generation: 1}, nil
 	}
+
 	if _, err := scheduler.Tick(ctx, d.m, in.To, d.reg); err != nil {
 		return Generation{}, err
 	}
+
 	return Generation{Generation: 1}, nil
 }
 
@@ -140,6 +146,7 @@ func (in *ResetInput) Validate() map[string]string {
 	if !in.Confirmation {
 		return map[string]string{"confirmation": "error.required"}
 	}
+
 	return nil
 }
 
@@ -247,9 +254,11 @@ func (in *TriggerInput) Validate() map[string]string {
 	if in.EventID == uuid.Nil {
 		fe["eventId"] = "error.required"
 	}
+
 	if in.OccurredAt.IsZero() {
 		fe["occurredAt"] = "error.required"
 	}
+
 	switch in.EventType {
 	case "command_sent", "command_ack", "command_fail":
 		if in.CommandID == nil || in.Measurement != nil {
@@ -260,16 +269,19 @@ func (in *TriggerInput) Validate() map[string]string {
 			fe["measurement"] = "error.required"
 		}
 	case "restriction_observation":
-		if in.RestrictionID == nil || in.UnitID == nil || in.CommandID != nil || in.Measurement != nil {
+		if in.RestrictionID == nil || in.UnitID == nil || in.CommandID != nil ||
+			in.Measurement != nil {
 			fe["unitId"] = "error.required"
 		}
 	case "device":
 		if in.DeviceID == nil {
 			fe["deviceId"] = "error.required"
 		}
+
 		if in.Sequence == nil || *in.Sequence < 0 {
 			fe["sequence"] = "error.required"
 		}
+
 		switch r := in.Recovery; {
 		case in.Kind == "restored" && (r == nil || r.SourceEventID == uuid.Nil || devices.RecoveredValue[r.Axis] == "" || devices.RecoveredValue[r.Axis] != r.Value):
 			fe["recovery"] = "error.invalid" // DeviceRecovery: connection → online, power → on, tamper → clear
@@ -282,6 +294,7 @@ func (in *TriggerInput) Validate() map[string]string {
 		if in.DeviceID == nil {
 			fe["deviceId"] = "error.required"
 		}
+
 		switch st := in.State; {
 		case st == nil:
 			fe["state"] = "error.required"
@@ -307,12 +320,14 @@ func (in *TriggerInput) Validate() map[string]string {
 		if in.OperationID == nil {
 			fe["operationId"] = "error.required"
 		}
+
 		if in.Result != "succeeded" && in.Result != "failed" {
 			fe["result"] = "error.invalid"
 		}
 	default:
 		fe["eventType"] = "errors.trigger_unsupported"
 	}
+
 	return fe
 }
 
@@ -328,36 +343,64 @@ type Event struct {
 var metricUnits = map[string]struct {
 	unit     string
 	min, max float64
-}{"temperature": {"°C", -50, 100}, "humidity": {"%", 0, 100}, "co2": {"ppm", 0, 10000}, "pm25": {"µg/m³", 0, 1000}, "power": {"kW", 0, 100},
-	"vibration": {"mm/s", 0, 100}, "refrigerant_pressure": {"kPa", 0, 5000}}
+}{
+	"temperature": {
+		"°C",
+		-50,
+		100,
+	},
+	"humidity":             {"%", 0, 100},
+	"co2":                  {"ppm", 0, 10000},
+	"pm25":                 {"µg/m³", 0, 1000},
+	"power":                {"kW", 0, 100},
+	"vibration":            {"mm/s", 0, 100},
+	"refrigerant_pressure": {"kPa", 0, 5000},
+}
 
 // inTenant runs fn in the tenant that owns the row found by probe (demo triggers are anonymous, RLS needs a tenant).
-func (d *demoOps) inTenant(ctx context.Context, now time.Time, probe string, id uuid.UUID, fn func(pgx.Tx, uuid.UUID) error) error {
+func (d *demoOps) inTenant(
+	ctx context.Context,
+	now time.Time,
+	probe string,
+	id uuid.UUID,
+	fn func(pgx.Tx, uuid.UUID) error,
+) error {
 	rows, err := d.m.Writer.Query(ctx, `SELECT id FROM platform.tenants ORDER BY id`)
 	if err != nil {
 		return err
 	}
+
 	tenants, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 	if err != nil {
 		return err
 	}
+
 	for _, t := range tenants {
 		found := false
+
 		err := d.m.Run(ctx, false, &ops.Principal{TenantID: t}, func(tx pgx.Tx) error {
 			var ok bool
 			if err := tx.QueryRow(ctx, probe, id).Scan(&ok); err != nil || !ok {
 				return err
 			}
+
 			found = true
-			if _, err := tx.Exec(ctx, `SELECT set_config('app.now', $1, true)`, now.UTC().Format(time.RFC3339Nano)); err != nil { // column defaults on the demo clock
+
+			if _, err := tx.Exec(
+				ctx,
+				`SELECT set_config('app.now', $1, true)`,
+				now.UTC().Format(time.RFC3339Nano),
+			); err != nil { // column defaults on the demo clock
 				return err
 			}
+
 			return fn(tx, t)
 		})
 		if err != nil || found {
 			return err
 		}
 	}
+
 	return apperr.E(apperr.NotFound, "error.notFound")
 }
 
@@ -387,151 +430,345 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 	if !d.enabled {
 		return Event{}, demoOnly()
 	}
+
 	out := Event{EventID: in.EventID, Generation: 1, OccurredAt: in.OccurredAt, Type: in.EventType}
 	switch in.EventType {
 	case "command_sent":
-		return out, d.inTenant(ctx, c.Now, `SELECT EXISTS (SELECT 1 FROM control.commands WHERE id = $1)`, *in.CommandID, func(tx pgx.Tx, _ uuid.UUID) error {
-			_, err := tx.Exec(ctx, `UPDATE control.commands SET status = 'sent', delivery = 'sent', sent_at = $2, version = version + 1, updated_at = $2 WHERE id = $1 AND status = 'requested'`,
-				*in.CommandID, in.OccurredAt)
-			return err
-		})
+		return out, d.inTenant(
+			ctx,
+			c.Now,
+			`SELECT EXISTS (SELECT 1 FROM control.commands WHERE id = $1)`,
+			*in.CommandID,
+			func(tx pgx.Tx, _ uuid.UUID) error {
+				_, err := tx.Exec(
+					ctx,
+					`UPDATE control.commands SET status = 'sent', delivery = 'sent', sent_at = $2, version = version + 1, updated_at = $2 WHERE id = $1 AND status = 'requested'`,
+					*in.CommandID,
+					in.OccurredAt,
+				)
+
+				return err
+			},
+		)
 	case "command_ack":
-		return out, d.inTenant(ctx, c.Now, `SELECT EXISTS (SELECT 1 FROM control.commands WHERE id = $1)`, *in.CommandID, func(tx pgx.Tx, _ uuid.UUID) error {
-			_, err := control.Acknowledge(ctx, tx, *in.CommandID, in.OccurredAt)
-			return err
-		})
+		return out, d.inTenant(
+			ctx,
+			c.Now,
+			`SELECT EXISTS (SELECT 1 FROM control.commands WHERE id = $1)`,
+			*in.CommandID,
+			func(tx pgx.Tx, _ uuid.UUID) error {
+				_, err := control.Acknowledge(ctx, tx, *in.CommandID, in.OccurredAt)
+
+				return err
+			},
+		)
 	case "command_fail":
-		return out, d.inTenant(ctx, c.Now, `SELECT EXISTS (SELECT 1 FROM control.commands WHERE id = $1)`, *in.CommandID, func(tx pgx.Tx, _ uuid.UUID) error {
-			tag, err := tx.Exec(ctx, `UPDATE control.commands SET status = 'failed', failure_code = 'DEVICE_REJECTED', version = version + 1, updated_at = $2
-				WHERE id = $1 AND status IN ('requested','sent')`, *in.CommandID, in.OccurredAt)
-			if err != nil || tag.RowsAffected() == 0 {
-				return err
-			}
-			if err := control.AuditResult(ctx, tx, *in.CommandID, "system-iot", "failed", "DEVICE_REJECTED", in.OccurredAt); err != nil {
-				return err
-			}
-			return control.EndRestrictionCommands(ctx, tx, []uuid.UUID{*in.CommandID}, in.OccurredAt)
-		})
+		return out, d.inTenant(
+			ctx,
+			c.Now,
+			`SELECT EXISTS (SELECT 1 FROM control.commands WHERE id = $1)`,
+			*in.CommandID,
+			func(tx pgx.Tx, _ uuid.UUID) error {
+				tag, err := tx.Exec(
+					ctx,
+					`UPDATE control.commands SET status = 'failed', failure_code = 'DEVICE_REJECTED', version = version + 1, updated_at = $2
+				WHERE id = $1 AND status IN ('requested','sent')`,
+					*in.CommandID,
+					in.OccurredAt,
+				)
+				if err != nil || tag.RowsAffected() == 0 {
+					return err
+				}
+
+				if err := control.AuditResult(
+					ctx,
+					tx,
+					*in.CommandID,
+					"system-iot",
+					"failed",
+					"DEVICE_REJECTED",
+					in.OccurredAt,
+				); err != nil {
+					return err
+				}
+
+				return control.EndRestrictionCommands(
+					ctx,
+					tx,
+					[]uuid.UUID{*in.CommandID},
+					in.OccurredAt,
+				)
+			},
+		)
 	}
+
 	switch in.EventType {
 	case "device": // SR20 faults and recoveries, SR23 tamper Alert
-		s := devices.Signal{EventID: in.EventID, DeviceID: *in.DeviceID, BindingID: in.BindingID, Sequence: int64(*in.Sequence), Kind: in.Kind, Recovery: in.Recovery, OccurredAt: in.OccurredAt}
-		return out, d.inTenant(ctx, c.Now, `SELECT EXISTS (SELECT 1 FROM devices.devices WHERE id = $1)`, *in.DeviceID, func(tx pgx.Tx, _ uuid.UUID) error {
-			_, err := devices.RecordSignal(ctx, tx, s, c.Now, monitoring.Alerts{})
-			return err
-		})
+		s := devices.Signal{
+			EventID:    in.EventID,
+			DeviceID:   *in.DeviceID,
+			BindingID:  in.BindingID,
+			Sequence:   int64(*in.Sequence),
+			Kind:       in.Kind,
+			Recovery:   in.Recovery,
+			OccurredAt: in.OccurredAt,
+		}
+
+		return out, d.inTenant(
+			ctx,
+			c.Now,
+			`SELECT EXISTS (SELECT 1 FROM devices.devices WHERE id = $1)`,
+			*in.DeviceID,
+			func(tx pgx.Tx, _ uuid.UUID) error {
+				_, err := devices.RecordSignal(ctx, tx, s, c.Now, monitoring.Alerts{})
+
+				return err
+			},
+		)
 	case "operation": // IR67: the result of a running check / firmware operation
-		return out, d.inTenant(ctx, c.Now, `SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE id = $1)`, *in.OperationID, func(tx pgx.Tx, _ uuid.UUID) error {
-			return devices.FinishOperation(ctx, tx, *in.OperationID, in.Result == "succeeded", in.OccurredAt, c.Now)
-		})
+		return out, d.inTenant(
+			ctx,
+			c.Now,
+			`SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE id = $1)`,
+			*in.OperationID,
+			func(tx pgx.Tx, _ uuid.UUID) error {
+				return devices.FinishOperation(
+					ctx,
+					tx,
+					*in.OperationID,
+					in.Result == "succeeded",
+					in.OccurredAt,
+					c.Now,
+				)
+			},
+		)
 	}
+
 	if in.EventType == "automation" { // a gateway's facts: the alert policies of the units, never an automation (IR529)
 		ev := in.Event
 		if ev.OccurredAt.After(c.Now) {
 			return out, apperr.Fields(map[string]string{"event.occurredAt": "error.range"})
 		}
+
 		if d.notify == nil {
 			return out, apperr.E(apperr.Unavailable, "errors.demo_only")
 		}
-		return out, d.inTenant(ctx, c.Now, `SELECT EXISTS (SELECT 1 FROM assets.units WHERE id = $1)`, ev.UnitIDs[0], func(tx pgx.Tx, t uuid.UUID) error {
-			ic := &ops.Call{Tx: tx, Now: c.Now, CorrelationID: uuid.NewString(), Queries: d.reg,
-				Principal: &ops.Principal{Principal: authz.Principal{Role: "system"}, TenantID: t, UserID: seed.ID("system-demo")}}
-			if _, err := d.notify(ctx, ic, ev); err != nil {
-				return err
-			}
-			if d.reg != nil && d.reg.Rec != nil { // the alerts' and notifications' events and audits, as a scheduler job's
-				return d.reg.Rec.Record(ctx, tx, ic, "demo.trigger")
-			}
-			return nil
-		})
+
+		return out, d.inTenant(
+			ctx,
+			c.Now,
+			`SELECT EXISTS (SELECT 1 FROM assets.units WHERE id = $1)`,
+			ev.UnitIDs[0],
+			func(tx pgx.Tx, t uuid.UUID) error {
+				ic := &ops.Call{
+					Tx:            tx,
+					Now:           c.Now,
+					CorrelationID: uuid.NewString(),
+					Queries:       d.reg,
+					Principal: &ops.Principal{
+						Principal: authz.Principal{Role: "system"},
+						TenantID:  t,
+						UserID:    seed.ID("system-demo"),
+					},
+				}
+				if _, err := d.notify(ctx, ic, ev); err != nil {
+					return err
+				}
+
+				if d.reg != nil &&
+					d.reg.Rec != nil { // the alerts' and notifications' events and audits, as a scheduler job's
+					return d.reg.Rec.Record(ctx, tx, ic, "demo.trigger")
+				}
+
+				return nil
+			},
+		)
 	}
+
 	if in.EventType == "state" { // the device's state report: the unit's observed settings and when the device was last heard
 		if in.OccurredAt.After(c.Now) {
 			return out, apperr.Fields(map[string]string{"occurredAt": "error.range"})
 		}
-		return out, d.inTenant(ctx, c.Now, `SELECT EXISTS (SELECT 1 FROM devices.devices WHERE id = $1 AND unit_id IS NOT NULL)`, *in.DeviceID, func(tx pgx.Tx, _ uuid.UUID) error {
-			st := in.State
-			if st.Power == nil && st.Celsius == nil && st.Mode == nil && st.FanLevel == nil {
-				// a report with no settings (a module that reports none, IR528) is heard only: the settings that acknowledged
-				// commands set stay
-				if _, err := tx.Exec(ctx, `UPDATE assets.units u SET last_seen_at = GREATEST(COALESCE(u.last_seen_at, $2), $2)
-					FROM devices.devices d WHERE d.id = $1 AND u.id = d.unit_id`, *in.DeviceID, in.OccurredAt); err != nil {
-					return err
+
+		return out, d.inTenant(
+			ctx,
+			c.Now,
+			`SELECT EXISTS (SELECT 1 FROM devices.devices WHERE id = $1 AND unit_id IS NOT NULL)`,
+			*in.DeviceID,
+			func(tx pgx.Tx, _ uuid.UUID) error {
+				st := in.State
+				if st.Power == nil && st.Celsius == nil && st.Mode == nil && st.FanLevel == nil {
+					// a report with no settings (a module that reports none, IR528) is heard only: the settings that acknowledged
+					// commands set stay
+					if _, err := tx.Exec(
+						ctx,
+						`UPDATE assets.units u SET last_seen_at = GREATEST(COALESCE(u.last_seen_at, $2), $2)
+					FROM devices.devices d WHERE d.id = $1 AND u.id = d.unit_id`,
+						*in.DeviceID,
+						in.OccurredAt,
+					); err != nil {
+						return err
+					}
+				} else {
+					state, _ := json.Marshal(
+						map[string]any{
+							"power":      st.Power,
+							"celsius":    st.Celsius,
+							"mode":       st.Mode,
+							"fanLevel":   st.FanLevel,
+							"observedAt": in.OccurredAt.UTC(),
+						},
+					)
+					if _, err := tx.Exec(
+						ctx,
+						`UPDATE assets.units u SET observed_state = $2, last_seen_at = GREATEST(COALESCE(u.last_seen_at, $3), $3)
+					FROM devices.devices d WHERE d.id = $1 AND u.id = d.unit_id`,
+						*in.DeviceID,
+						state,
+						in.OccurredAt,
+					); err != nil {
+						return err
+					}
 				}
-			} else {
-				state, _ := json.Marshal(map[string]any{"power": st.Power, "celsius": st.Celsius, "mode": st.Mode, "fanLevel": st.FanLevel, "observedAt": in.OccurredAt.UTC()})
-				if _, err := tx.Exec(ctx, `UPDATE assets.units u SET observed_state = $2, last_seen_at = GREATEST(COALESCE(u.last_seen_at, $3), $3)
-					FROM devices.devices d WHERE d.id = $1 AND u.id = d.unit_id`, *in.DeviceID, state, in.OccurredAt); err != nil {
-					return err
-				}
-			}
-			_, err := tx.Exec(ctx, `UPDATE devices.devices SET last_seen_at = GREATEST(COALESCE(last_seen_at, $2), $2) WHERE id = $1`, *in.DeviceID, in.OccurredAt)
-			return err
-		})
+
+				_, err := tx.Exec(
+					ctx,
+					`UPDATE devices.devices SET last_seen_at = GREATEST(COALESCE(last_seen_at, $2), $2) WHERE id = $1`,
+					*in.DeviceID,
+					in.OccurredAt,
+				)
+
+				return err
+			},
+		)
 	}
+
 	if in.EventType == "restriction_observation" { // SR26: a device reports which restriction it enforces
-		return out, d.inTenant(ctx, c.Now, `SELECT EXISTS (SELECT 1 FROM assets.units WHERE id = $1)`, *in.UnitID, func(tx pgx.Tx, _ uuid.UUID) error {
-			var obsRaw any // the device observation itself (equipment data); restrictions reacts to it
-			if in.Observed != nil {
-				obsRaw, _ = json.Marshal(in.Observed)
-			}
-			if _, err := tx.Exec(ctx, `UPDATE assets.units SET observed_restriction = $2, last_seen_at = $3 WHERE id = $1`, *in.UnitID, obsRaw, c.Now); err != nil {
+		return out, d.inTenant(
+			ctx,
+			c.Now,
+			`SELECT EXISTS (SELECT 1 FROM assets.units WHERE id = $1)`,
+			*in.UnitID,
+			func(tx pgx.Tx, _ uuid.UUID) error {
+				var obsRaw any // the device observation itself (equipment data); restrictions reacts to it
+				if in.Observed != nil {
+					obsRaw, _ = json.Marshal(in.Observed)
+				}
+
+				if _, err := tx.Exec(
+					ctx,
+					`UPDATE assets.units SET observed_restriction = $2, last_seen_at = $3 WHERE id = $1`,
+					*in.UnitID,
+					obsRaw,
+					c.Now,
+				); err != nil {
+					return err
+				}
+
+				raw, _ := json.Marshal(in.Observed) // "null" when the device enforces none
+
+				return events.Publish(
+					ctx,
+					tx,
+					c.Principal.TenantID,
+					"unit",
+					*in.UnitID,
+					events.UnitRestrictionObserved,
+					events.Observation{
+						UnitID:   *in.UnitID,
+						Observed: raw,
+						EventID:  in.EventID,
+						At:       c.Now,
+					},
+				) // billing updates recovery cases (IR185)
+			},
+		)
+	}
+
+	r := in.Measurement // telemetry: D07 / IR12 normalization, IR77 sequence latest+1, IR11 boundary from the sensor
+
+	return out, d.inTenant(
+		ctx,
+		c.Now,
+		`SELECT EXISTS (SELECT 1 FROM devices.sensors s JOIN devices.devices d ON d.id = s.device_id WHERE s.id = $1)`,
+		r.SensorID,
+		func(tx pgx.Tx, t uuid.UUID) error {
+			var (
+				metric, unit string
+				boundary     *string
+				bound        *uuid.UUID
+			)
+			if err := tx.QueryRow(ctx, `SELECT s.metric, s.unit, s.boundary_id, d.unit_id FROM devices.sensors s JOIN devices.devices d ON d.id = s.device_id WHERE s.id = $1`, r.SensorID).
+				Scan(&metric, &unit, &boundary, &bound); err != nil {
 				return err
 			}
-			raw, _ := json.Marshal(in.Observed) // "null" when the device enforces none
-			return events.Publish(ctx, tx, c.Principal.TenantID, "unit", *in.UnitID, events.UnitRestrictionObserved,
-				events.Observation{UnitID: *in.UnitID, Observed: raw, EventID: in.EventID, At: c.Now}) // billing updates recovery cases (IR185)
-		})
-	}
-	r := in.Measurement // telemetry: D07 / IR12 normalization, IR77 sequence latest+1, IR11 boundary from the sensor
-	return out, d.inTenant(ctx, c.Now, `SELECT EXISTS (SELECT 1 FROM devices.sensors s JOIN devices.devices d ON d.id = s.device_id WHERE s.id = $1)`, r.SensorID, func(tx pgx.Tx, t uuid.UUID) error {
-		var metric, unit string
-		var boundary *string
-		var bound *uuid.UUID
-		if err := tx.QueryRow(ctx, `SELECT s.metric, s.unit, s.boundary_id, d.unit_id FROM devices.sensors s JOIN devices.devices d ON d.id = s.device_id WHERE s.id = $1`, r.SensorID).
-			Scan(&metric, &unit, &boundary, &bound); err != nil {
-			return err
-		}
-		if metric != r.Metric || bound == nil || *bound != r.UnitID {
-			return apperr.Fields(map[string]string{"measurement": "errors.sensor_mismatch"})
-		}
-		// IR12 causes in priority order unit_mismatch → non_finite → out_of_range → invalid_time; a cause keeps a null
-		// input suspect (D07), the value itself is never stored for the first three; otherwise null is missing
-		quality, value, reason := r.Quality, r.Value, (*string)(nil)
-		spec, known := metricUnits[r.Metric]
-		suspect := func(why string, drop bool) {
-			quality, reason = "suspect", &why
-			if drop {
-				value = nil
+
+			if metric != r.Metric || bound == nil || *bound != r.UnitID {
+				return apperr.Fields(map[string]string{"measurement": "errors.sensor_mismatch"})
 			}
-		}
-		switch {
-		case !known || r.Unit != spec.unit:
-			suspect("unit_mismatch", true)
-		case value != nil && (math.IsNaN(*value) || math.IsInf(*value, 0)):
-			suspect("non_finite", true)
-		case value != nil && (*value < spec.min || *value > spec.max):
-			suspect("out_of_range", true)
-		case r.ObservedAt.After(r.ReceivedAt) || r.ReceivedAt.After(c.Now):
-			suspect("invalid_time", false)
-		case value == nil:
-			quality = "missing"
-		}
-		seq := int64(0)
-		if r.Sequence != nil {
-			seq = *r.Sequence
-		} else if err := tx.QueryRow(ctx, `SELECT COALESCE(max(sequence), 0) + 1 FROM monitoring.measurements WHERE sensor_id = $1`, r.SensorID).Scan(&seq); err != nil {
-			return err
-		}
-		var dup bool
-		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM monitoring.measurements WHERE event_id = $1)`, r.EventID).Scan(&dup); err != nil || dup {
-			return err
-		}
-		_, err := tx.Exec(ctx, `INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit, raw_unit, origin, quality, quality_reason,
+			// IR12 causes in priority order unit_mismatch → non_finite → out_of_range → invalid_time; a cause keeps a null
+			// input suspect (D07), the value itself is never stored for the first three; otherwise null is missing
+			quality, value, reason := r.Quality, r.Value, (*string)(nil)
+			spec, known := metricUnits[r.Metric]
+			suspect := func(why string, drop bool) {
+				quality, reason = "suspect", &why
+
+				if drop {
+					value = nil
+				}
+			}
+
+			switch {
+			case !known || r.Unit != spec.unit:
+				suspect("unit_mismatch", true)
+			case value != nil && (math.IsNaN(*value) || math.IsInf(*value, 0)):
+				suspect("non_finite", true)
+			case value != nil && (*value < spec.min || *value > spec.max):
+				suspect("out_of_range", true)
+			case r.ObservedAt.After(r.ReceivedAt) || r.ReceivedAt.After(c.Now):
+				suspect("invalid_time", false)
+			case value == nil:
+				quality = "missing"
+			}
+
+			seq := int64(0)
+			if r.Sequence != nil {
+				seq = *r.Sequence
+			} else if err := tx.QueryRow(ctx, `SELECT COALESCE(max(sequence), 0) + 1 FROM monitoring.measurements WHERE sensor_id = $1`, r.SensorID).Scan(&seq); err != nil {
+				return err
+			}
+
+			var dup bool
+			if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM monitoring.measurements WHERE event_id = $1)`, r.EventID).
+				Scan(&dup); err != nil ||
+				dup {
+				return err
+			}
+
+			_, err := tx.Exec(
+				ctx,
+				`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit, raw_unit, origin, quality, quality_reason,
 			boundary_id, received_at, event_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
-			t, r.UnitID, r.SensorID, r.Metric, r.ObservedAt, seq, value, unit, rawUnit(r.Unit, unit), r.Origin, quality, reason, boundary, r.ReceivedAt, r.EventID)
-		return err
-	})
+				t,
+				r.UnitID,
+				r.SensorID,
+				r.Metric,
+				r.ObservedAt,
+				seq,
+				value,
+				unit,
+				rawUnit(r.Unit, unit),
+				r.Origin,
+				quality,
+				reason,
+				boundary,
+				r.ReceivedAt,
+				r.EventID,
+			)
+
+			return err
+		},
+	)
 }
 
 // rawUnit keeps a received unit that differs from the sensor's (IR12: at most 32 characters as evidence).
@@ -539,9 +776,11 @@ func rawUnit(got, want string) *string {
 	if got == want {
 		return nil
 	}
+
 	if r := []rune(got); len(r) > 32 {
 		got = string(r[:32])
 	}
+
 	return &got
 }
 

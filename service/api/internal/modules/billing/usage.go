@@ -42,7 +42,11 @@ func (Usage) UnitInUse(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, 
 }
 
 // ActiveContracts returns, per unit, the IDs of current contracts whose term contains now (coverage, DD-A19).
-func (Usage) ActiveContracts(ctx context.Context, c *ops.Call, units []uuid.UUID) (map[uuid.UUID][]uuid.UUID, error) {
+func (Usage) ActiveContracts(
+	ctx context.Context,
+	c *ops.Call,
+	units []uuid.UUID,
+) (map[uuid.UUID][]uuid.UUID, error) {
 	return ops.Delegate(ctx, c, QueryActiveContracts, UnitsInput{UnitIDs: units}, activeContracts)
 }
 
@@ -65,12 +69,20 @@ func registerUsage(r *ops.Registry) {
 
 func unitInUse(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
 	var b bool
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM billing.contract_units WHERE unit_id = $1)`, in.UnitID).Scan(&b)
+
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM billing.contract_units WHERE unit_id = $1)`, in.UnitID).
+		Scan(&b)
+
 	return b, err
 }
 
-func activeContracts(ctx context.Context, c *ops.Call, in *UnitsInput) (map[uuid.UUID][]uuid.UUID, error) {
+func activeContracts(
+	ctx context.Context,
+	c *ops.Call,
+	in *UnitsInput,
+) (map[uuid.UUID][]uuid.UUID, error) {
 	out := map[uuid.UUID][]uuid.UUID{}
+
 	rows, err := c.Tx.Query(ctx, `SELECT cu.unit_id, k.id FROM billing.contract_units cu
 		JOIN billing.contracts k ON k.id = cu.contract_id AND k.version = cu.contract_version
 		WHERE k.is_current AND k.term @> $2::timestamptz AND cu.unit_id = ANY($1) ORDER BY k.id`, in.UnitIDs, c.Now)
@@ -78,25 +90,34 @@ func activeContracts(ctx context.Context, c *ops.Call, in *UnitsInput) (map[uuid
 		return nil, err
 	}
 	defer rows.Close()
+
 	for rows.Next() {
 		var u, k uuid.UUID
 		if err := rows.Scan(&u, &k); err != nil {
 			return nil, err
 		}
+
 		out[u] = append(out[u], k)
 	}
+
 	return out, rows.Err()
 }
 
 func unitActive(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
 	var b bool
+
 	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM billing.contract_units cu JOIN billing.contracts k ON k.id = cu.contract_id AND k.version = cu.contract_version
-		WHERE cu.unit_id = $1 AND k.is_current AND upper(k.term) > $2)`, in.UnitID, c.Now).Scan(&b)
+		WHERE cu.unit_id = $1 AND k.is_current AND upper(k.term) > $2)`, in.UnitID, c.Now).
+		Scan(&b)
+
 	return b, err
 }
 
 func orgActive(ctx context.Context, c *ops.Call, in *OrgInput) (bool, error) {
 	var b bool
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM billing.contracts WHERE customer_org_id = $1 AND is_current AND upper(term) > $2)`, in.OrgID, c.Now).Scan(&b)
+
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM billing.contracts WHERE customer_org_id = $1 AND is_current AND upper(term) > $2)`, in.OrgID, c.Now).
+		Scan(&b)
+
 	return b, err
 }

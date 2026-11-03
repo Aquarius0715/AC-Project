@@ -22,6 +22,7 @@ func TestInquiries(t *testing.T) {
 		"payment without invoice":  "invoiceId=error.required",
 		"restriction without id":   "restrictionId=error.required",
 	}
+
 	for name, tc := range map[string]struct {
 		body string
 		code int
@@ -42,60 +43,147 @@ func TestInquiries(t *testing.T) {
 			t.Errorf("%s: %d want %d %v", name, code, tc.code, m)
 		}
 	}
-	if code, _ := write(s, &customerA, "inquiries.create", `{"subjectType":"payment","invoiceId":"`+inv+`","message":"why"}`, 0); code != 404 {
+
+	if code, _ := write(
+		s,
+		&customerA,
+		"inquiries.create",
+		`{"subjectType":"payment","invoiceId":"`+inv+`","message":"why"}`,
+		0,
+	); code != 404 {
 		t.Error("other customer's invoice")
 	}
-	if code, _ := write(s, &hq, "inquiries.create", `{"subjectType":"payment","invoiceId":"`+inv+`","message":"why"}`, 0); code != 403 {
+
+	if code, _ := write(
+		s,
+		&hq,
+		"inquiries.create",
+		`{"subjectType":"payment","invoiceId":"`+inv+`","message":"why"}`,
+		0,
+	); code != 403 {
 		t.Error("HQ creates inquiry")
 	}
-	code, m := write(s, &customerB, "inquiries.create", `{"subjectType":"restriction","restrictionId":"`+rid+`","invoiceId":"`+inv+`","message":"I paid yesterday"}`, 0)
-	if code != 200 || data(m)["state"] != "received" || data(m)["reply"] != nil || data(m)["customerId"] != seed.ID("cust-b").String() {
+
+	code, m := write(
+		s,
+		&customerB,
+		"inquiries.create",
+		`{"subjectType":"restriction","restrictionId":"`+rid+`","invoiceId":"`+inv+`","message":"I paid yesterday"}`,
+		0,
+	)
+	if code != 200 || data(m)["state"] != "received" || data(m)["reply"] != nil ||
+		data(m)["customerId"] != seed.ID("cust-b").String() {
 		t.Fatalf("create: %d %v", code, m)
 	}
+
 	id := data(m)["id"].(string)
+
 	var received int
-	ownerScan(t, `SELECT count(*) FROM notify.notifications WHERE target->>'id' = $1 AND recipient_membership_id = $2`, []any{id, seed.ID("hq-operator")}, &received)
+	ownerScan(
+		t,
+		`SELECT count(*) FROM notify.notifications WHERE target->>'id' = $1 AND recipient_membership_id = $2`,
+		[]any{id, seed.ID("hq-operator")},
+		&received,
+	)
+
 	if received != 1 {
 		t.Error("HQ notified of the inquiry")
 	}
-	if _, m := post(s, &customerB, "inquiries.list", `{"filters":{"restrictionId":"`+rid+`"}}`); len(items(m)) != 1 {
+
+	if _, m := post(
+		s,
+		&customerB,
+		"inquiries.list",
+		`{"filters":{"restrictionId":"`+rid+`"}}`,
+	); len(
+		items(m),
+	) != 1 {
 		t.Error("client list")
 	}
-	if code, m := post(s, &customerA, "inquiries.list", `{"filters":{"restrictionId":"`+rid+`"}}`); code != 200 || len(items(m)) != 0 {
+
+	if code, m := post(
+		s,
+		&customerA,
+		"inquiries.list",
+		`{"filters":{"restrictionId":"`+rid+`"}}`,
+	); code != 200 ||
+		len(items(m)) != 0 {
 		t.Error("other customer's inquiries")
 	}
-	if _, m := post(s, &hq, "inquiries.list", `{"filters":{"status":"received","subjectType":"restriction","invoiceId":"`+inv+`"},"limit":100}`); len(items(m)) != 1 {
+
+	if _, m := post(
+		s,
+		&hq,
+		"inquiries.list",
+		`{"filters":{"status":"received","subjectType":"restriction","invoiceId":"`+inv+`"},"limit":100}`,
+	); len(
+		items(m),
+	) != 1 {
 		t.Errorf("HQ list: %v", m)
 	}
-	if code, m := post(s, &hq, "inquiries.list", `{"filters":{"status":"open"}}`); code != 422 || fields(m) != "filters=error.invalid" {
+
+	if code, m := post(
+		s,
+		&hq,
+		"inquiries.list",
+		`{"filters":{"status":"open"}}`,
+	); code != 422 ||
+		fields(m) != "filters=error.invalid" {
 		t.Errorf("bad state filter: %d %s", code, fields(m))
 	}
+
 	if code, _ := post(s, &techB, "inquiries.list", `{}`); code != 403 {
 		t.Error("technician inquiries")
 	}
+
 	answer := func(reply string, v int) (int, map[string]any) {
 		return write(s, &hq, "inquiries.answer", `{"inquiryId":"`+id+`","reply":"`+reply+`"}`, v)
 	}
 	if code, m := answer(" ", 1); code != 422 || fields(m) != "reply=error.length" {
 		t.Errorf("blank reply: %d %s", code, fields(m))
 	}
+
 	if code, _ := answer("ok", 2); code != 409 {
 		t.Error("stale inquiry")
 	}
-	if code, _ := write(s, &customerB, "inquiries.answer", `{"inquiryId":"`+id+`","reply":"x"}`, 1); code != 403 {
+
+	if code, _ := write(
+		s,
+		&customerB,
+		"inquiries.answer",
+		`{"inquiryId":"`+id+`","reply":"x"}`,
+		1,
+	); code != 403 {
 		t.Error("client answers")
 	}
+
 	code, m = answer("Payment received, restriction will be lifted", 1)
 	if code != 200 || data(m)["state"] != "answered" || ver(m) != 2 {
 		t.Fatalf("answer: %d %v", code, m)
 	}
+
 	if code, _ := answer("again", 2); code != 409 {
 		t.Error("answer twice")
 	}
-	if _, m := post(s, &customerB, "notifications.list", `{"filters":{"type":"inquiry"},"limit":100}`); len(items(m)) == 0 {
+
+	if _, m := post(
+		s,
+		&customerB,
+		"notifications.list",
+		`{"filters":{"type":"inquiry"},"limit":100}`,
+	); len(
+		items(m),
+	) == 0 {
 		t.Error("client notified of the answer")
 	}
-	if code, _ := write(s, &hq, "inquiries.answer", `{"inquiryId":"`+uuid.NewString()+`","reply":"x"}`, 1); code != 404 {
+
+	if code, _ := write(
+		s,
+		&hq,
+		"inquiries.answer",
+		`{"inquiryId":"`+uuid.NewString()+`","reply":"x"}`,
+		1,
+	); code != 404 {
 		t.Error("unknown inquiry")
 	}
 }
@@ -107,27 +195,71 @@ func TestAuditList(t *testing.T) {
 		return `"from":"` + from.Format(time.RFC3339) + `","to":"` + to.Format(time.RFC3339) + `"`
 	}
 	day := period(clock.Add(-time.Hour), clock.Add(time.Hour))
-	_, m := post(s, &hq, "audit.list", `{"filters":{`+day+`,"targetKind":"invoice","targetId":"`+inv+`"}}`)
-	if len(items(m)) != 1 || items(m)[0]["action"] != "invoices.create" || items(m)[0]["result"] != "success" {
+
+	_, m := post(
+		s,
+		&hq,
+		"audit.list",
+		`{"filters":{`+day+`,"targetKind":"invoice","targetId":"`+inv+`"}}`,
+	)
+	if len(items(m)) != 1 || items(m)[0]["action"] != "invoices.create" ||
+		items(m)[0]["result"] != "success" {
 		t.Fatalf("invoice audit: %v", m)
 	}
+
 	if items(m)[0]["actorName"] != "hq-operator" { // the actor user's display name (IR305)
 		t.Errorf("actor name: %v", items(m)[0]["actorName"])
 	}
+
 	sys := uuid.NewString() // a system actor matches no user, so it has no name
-	owner(t, `INSERT INTO audit.audit_log (tenant_id, actor_id, actor_role_at_time, action, target_kind, target_id, occurred_at, correlation_id, result)
-		VALUES ($1, 'system-demo', 'system', 'demo.tick', 'test', $2, $3, $4, 'success')`, seed.ID("tenant-a"), sys, clock, uuid.NewString())
-	if _, m := post(s, &hq, "audit.list", `{"filters":{`+day+`,"targetKind":"test","targetId":"`+sys+`"}}`); len(items(m)) != 1 || items(m)[0]["actorName"] != nil || items(m)[0]["actorId"] != "system-demo" {
+	owner(
+		t,
+		`INSERT INTO audit.audit_log (tenant_id, actor_id, actor_role_at_time, action, target_kind, target_id, occurred_at, correlation_id, result)
+		VALUES ($1, 'system-demo', 'system', 'demo.tick', 'test', $2, $3, $4, 'success')`,
+		seed.ID("tenant-a"),
+		sys,
+		clock,
+		uuid.NewString(),
+	)
+
+	if _, m := post(
+		s,
+		&hq,
+		"audit.list",
+		`{"filters":{`+day+`,"targetKind":"test","targetId":"`+sys+`"}}`,
+	); len(items(m)) != 1 || items(m)[0]["actorName"] != nil ||
+		items(m)[0]["actorId"] != "system-demo" {
 		t.Errorf("system actor: %v", m)
 	}
+
 	corr := items(m)[0]["correlationId"].(string)
-	if _, m := post(s, &hq, "audit.list", `{"filters":{`+day+`,"correlationId":"`+corr+`"},"limit":100}`); len(items(m)) < 1 {
+	if _, m := post(
+		s,
+		&hq,
+		"audit.list",
+		`{"filters":{`+day+`,"correlationId":"`+corr+`"},"limit":100}`,
+	); len(
+		items(m),
+	) < 1 {
 		t.Error("by correlation")
 	}
-	if code, m := post(s, &hq, "audit.list", `{"filters":{`+day+`,"correlationId":"`+uuid.NewString()+`"}}`); code != 200 || len(items(m)) != 0 {
+
+	if code, m := post(
+		s,
+		&hq,
+		"audit.list",
+		`{"filters":{`+day+`,"correlationId":"`+uuid.NewString()+`"}}`,
+	); code != 200 ||
+		len(items(m)) != 0 {
 		t.Error("unknown correlation is empty")
 	}
-	if _, m := post(s, &hq, "audit.list", `{"filters":{`+day+`,"result":"denied"},"sort":{"field":"occurredAt","direction":"asc"},"limit":2}`); m["data"] == nil {
+
+	if _, m := post(
+		s,
+		&hq,
+		"audit.list",
+		`{"filters":{`+day+`,"result":"denied"},"sort":{"field":"occurredAt","direction":"asc"},"limit":2}`,
+	); m["data"] == nil {
 		t.Error("result filter")
 	}
 	// the period is required (both ends named when missing), from < to and at most 366 days
@@ -141,17 +273,21 @@ func TestAuditList(t *testing.T) {
 		`{"filters":{` + day + `,"x":1}}`:                                   {"x": "error.notAllowed"},
 	} {
 		code, m := post(s, &hq, "audit.list", b)
+
 		fe, _ := m["fieldErrors"].(map[string]any)
 		if code != 422 || len(fe) != len(want) {
 			t.Errorf("%s: %d %v, want %v", b, code, fe, want)
+
 			continue
 		}
+
 		for k, v := range want {
 			if fe[k] != v {
 				t.Errorf("%s: %v, want %v", b, fe, want)
 			}
 		}
 	}
+
 	if code, _ := post(s, &customerB, "audit.list", `{"filters":{`+day+`}}`); code != 403 {
 		t.Error("client audit")
 	}

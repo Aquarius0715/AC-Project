@@ -15,47 +15,105 @@ import (
 func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 	s := server(t)
 	unit := seed.ID("unit-other-customer").String()
+
 	listed := func(a *actor) bool {
 		_, m := post(s, a, "units.list", `{"limit":100,"filters":{"unitIds":["`+unit+`"]}}`)
+
 		return len(items(m)) == 1
 	}
 	if listed(&techB) || listed(&contrA) {
 		t.Fatal("no Assignment / Offer yet: the unit is hidden")
 	}
 	// assignment created an hour ago, work window starts in an hour; no Offer yet
-	job := assign(t, unit, "tech-external-b", clock.Add(time.Hour), clock.Add(3*time.Hour), "active")
-	owner(t, `UPDATE maintenance.assignments SET created_at = $2 WHERE job_id = $1`, job, clock.Add(-time.Hour))
+	job := assign(
+		t,
+		unit,
+		"tech-external-b",
+		clock.Add(time.Hour),
+		clock.Add(3*time.Hour),
+		"active",
+	)
+	owner(
+		t,
+		`UPDATE maintenance.assignments SET created_at = $2 WHERE job_id = $1`,
+		job,
+		clock.Add(-time.Hour),
+	)
+
 	if listed(&techB) {
 		t.Fatal("external technician needs the accepted Offer's access window too")
 	}
-	owner(t, `INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at, offer_expires_at, access_valid_from, access_valid_until, decision, decided_at)
+
+	owner(
+		t,
+		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at, offer_expires_at, access_valid_from, access_valid_until, decision, decided_at)
 		VALUES ($1,$2,$3,'v1',tstzrange($4,$5),$6,$5,$6,$5,'accept',$6)`,
-		seed.ID("tenant-a"), job, seed.ID("org-contractor-a"), clock.Add(time.Hour), clock.Add(3*time.Hour), clock.Add(-2*time.Hour))
+		seed.ID(
+			"tenant-a",
+		),
+		job,
+		seed.ID("org-contractor-a"),
+		clock.Add(time.Hour),
+		clock.Add(3*time.Hour),
+		clock.Add(-2*time.Hour),
+	)
+
 	if !listed(&techB) {
 		t.Fatal("inside the viewing window and the access window the unit is listed")
 	}
+
 	if !listed(&contrA) {
 		t.Fatal("contractor with an accepted Offer in its access window sees the unit")
 	}
+
 	if listed(&contrB) {
 		t.Fatal("another contractor never sees it")
 	}
-	if code, m := post(s, &techB, "units.get", `{"id":"`+unit+`"}`); code != 403 || m["messageKey"] != "errors.assignment_not_started" {
+
+	if code, m := post(
+		s,
+		&techB,
+		"units.get",
+		`{"id":"`+unit+`"}`,
+	); code != 403 ||
+		m["messageKey"] != "errors.assignment_not_started" {
 		t.Fatalf("before the work window: %d %v", code, m)
 	}
 	// the unit list carries no telemetry before the work window (latestMeasurements is an equipment read, IR213)
-	owner(t, `INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit, origin, quality, received_at, event_id)
-		VALUES ($1,$2,$3,'temperature',$4,1,26.5,'°C','measured','valid',$4,$5)`, seed.ID("tenant-a"), unit, uuid.NewString(), clock.Add(-time.Minute), uuid.NewString())
+	owner(
+		t,
+		`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit, origin, quality, received_at, event_id)
+		VALUES ($1,$2,$3,'temperature',$4,1,26.5,'°C','measured','valid',$4,$5)`,
+		seed.ID("tenant-a"),
+		unit,
+		uuid.NewString(),
+		clock.Add(-time.Minute),
+		uuid.NewString(),
+	)
+
 	readings := func() int {
 		_, m := post(s, &techB, "units.list", `{"limit":100,"filters":{"unitIds":["`+unit+`"]}}`)
+
 		return len(items(m)[0]["latestMeasurements"].([]any))
 	}
 	if n := readings(); n != 0 {
 		t.Fatalf("latestMeasurements before the work window: %d", n)
 	}
 	// equipment reads (IR49(b)): lists omit the unit, single reads answer FORBIDDEN until the work window starts
-	owner(t, `UPDATE monitoring.alerts SET status = 'resolved', resolved_at = $2 WHERE unit_id = $1 AND rule_key = 'warning' AND status <> 'resolved'`, unit, clock)
-	alert := newAlert(t, unit, seed.ID("org-customer-b").String(), "warning", clock.Add(-time.Minute))
+	owner(
+		t,
+		`UPDATE monitoring.alerts SET status = 'resolved', resolved_at = $2 WHERE unit_id = $1 AND rule_key = 'warning' AND status <> 'resolved'`,
+		unit,
+		clock,
+	)
+	alert := newAlert(
+		t,
+		unit,
+		seed.ID("org-customer-b").String(),
+		"warning",
+		clock.Add(-time.Minute),
+	)
+
 	alertListed := func() bool {
 		_, m := post(s, &techB, "alerts.list", `{"limit":100,"filters":{"unitId":"`+unit+`"}}`)
 		for _, it := range items(m) {
@@ -63,45 +121,91 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 				return true
 			}
 		}
+
 		return false
 	}
 	if alertListed() {
 		t.Fatal("alerts.list before the work window")
 	}
-	if code, m := post(s, &techB, "alerts.get", `{"id":"`+alert+`"}`); code != 403 || m["messageKey"] != "errors.assignment_not_started" {
+
+	if code, m := post(
+		s,
+		&techB,
+		"alerts.get",
+		`{"id":"`+alert+`"}`,
+	); code != 403 ||
+		m["messageKey"] != "errors.assignment_not_started" {
 		t.Fatalf("alerts.get before the work window: %d %v", code, m)
 	}
-	series := `{"from":"` + clock.Add(-time.Hour).Format(time.RFC3339) + `","to":"` + clock.Format(time.RFC3339) + `","unitIds":["` + unit + `"],"metric":"temperature","query":{}}`
-	if code, m := post(s, &techB, "telemetry.series", series); code != 403 || m["messageKey"] != "errors.assignment_not_started" {
+
+	series := `{"from":"` + clock.Add(-time.Hour).
+		Format(time.RFC3339) +
+		`","to":"` + clock.Format(
+		time.RFC3339,
+	) + `","unitIds":["` + unit + `"],"metric":"temperature","query":{}}`
+	if code, m := post(
+		s,
+		&techB,
+		"telemetry.series",
+		series,
+	); code != 403 ||
+		m["messageKey"] != "errors.assignment_not_started" {
 		t.Fatalf("telemetry before the work window: %d %v", code, m)
 	}
+
 	if code, _ := post(s, &contrA, "alerts.get", `{"id":"`+alert+`"}`); code != 200 {
 		t.Fatalf("contractor reads the alert of its accepted job: %d", code)
 	}
+
 	if code, _ := post(s, &contrA, "units.get", `{"id":"`+unit+`"}`); code != 200 {
 		t.Fatalf("contractor units.get: %d", code)
 	}
 	// work window running → equipment reads allowed; internal technicians never depend on assignments
-	owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND job_id <> $2 AND scheduled && tstzrange($3, $4)`,
-		seed.ID("tech-external-b"), job, clock.Add(-time.Minute), clock.Add(time.Hour))
-	owner(t, `UPDATE maintenance.assignments SET scheduled = tstzrange($2, $3) WHERE job_id = $1`, job, clock.Add(-time.Minute), clock.Add(time.Hour))
+	owner(
+		t,
+		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND job_id <> $2 AND scheduled && tstzrange($3, $4)`,
+		seed.ID("tech-external-b"),
+		job,
+		clock.Add(-time.Minute),
+		clock.Add(time.Hour),
+	)
+	owner(
+		t,
+		`UPDATE maintenance.assignments SET scheduled = tstzrange($2, $3) WHERE job_id = $1`,
+		job,
+		clock.Add(-time.Minute),
+		clock.Add(time.Hour),
+	)
+
 	if code, m := post(s, &techB, "units.get", `{"id":"`+unit+`"}`); code != 200 {
 		t.Fatalf("inside the work window: %d %v", code, m)
 	}
+
 	if !alertListed() {
 		t.Fatal("alerts.list inside the work window")
 	}
+
 	if code, _ := post(s, &techB, "telemetry.series", series); code != 200 {
 		t.Fatalf("telemetry inside the work window: %d", code)
 	}
+
 	if n := readings(); n == 0 { // the inserted temperature, plus readings other tests left on this unit
 		t.Fatal("latestMeasurements inside the work window")
 	}
+
 	owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE job_id = $1`, job)
+
 	if listed(&techB) {
 		t.Fatal("revoked Assignment hides the unit again")
 	}
-	owner(t, `UPDATE maintenance.offers SET access_valid_until = $2 WHERE job_id = $1`, job, clock.Add(-time.Minute))
+
+	owner(
+		t,
+		`UPDATE maintenance.offers SET access_valid_until = $2 WHERE job_id = $1`,
+		job,
+		clock.Add(-time.Minute),
+	)
+
 	if listed(&contrA) {
 		t.Fatal("ended access window hides the unit from the contractor")
 	}
@@ -112,34 +216,72 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 func TestUnitAccessProjection(t *testing.T) {
 	_ = server(t)
 	unit := seed.ID("unit-other-customer")
-	job := assign(t, unit.String(), "tech-external-b", clock.Add(time.Hour), clock.Add(2*time.Hour), "active")
-	owner(t, `INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at, offer_expires_at, access_valid_from, access_valid_until)
+	job := assign(
+		t,
+		unit.String(),
+		"tech-external-b",
+		clock.Add(time.Hour),
+		clock.Add(2*time.Hour),
+		"active",
+	)
+	owner(
+		t,
+		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at, offer_expires_at, access_valid_from, access_valid_until)
 		VALUES ($1,$2,$3,'v1',tstzrange($4,$5),$6,$5,$6,$5)`,
-		seed.ID("tenant-a"), job, seed.ID("org-contractor-a"), clock.Add(time.Hour), clock.Add(2*time.Hour), clock.Add(-time.Hour))
+		seed.ID(
+			"tenant-a",
+		),
+		job,
+		seed.ID("org-contractor-a"),
+		clock.Add(time.Hour),
+		clock.Add(2*time.Hour),
+		clock.Add(-time.Hour),
+	)
+
 	count := func(table string) (n int) {
 		drainEvents(t)
-		ownerScan(t, `SELECT count(*) FROM assets.`+table+` WHERE job_id = $1 AND unit_id = $2`, []any{job, unit}, &n)
+		ownerScan(
+			t,
+			`SELECT count(*) FROM assets.`+table+` WHERE job_id = $1 AND unit_id = $2`,
+			[]any{job, unit},
+			&n,
+		)
+
 		return n
 	}
 	if count("unit_assignment_access") != 1 || count("unit_offer_access") != 0 {
 		t.Fatal("active assignment projected, undecided offer not")
 	}
+
 	owner(t, `UPDATE maintenance.offers SET decision = 'accept' WHERE job_id = $1`, job)
+
 	if count("unit_offer_access") != 1 {
 		t.Fatal("accepted offer projected")
 	}
+
 	owner(t, `UPDATE maintenance.offers SET decision = 'decline' WHERE job_id = $1`, job)
 	owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE job_id = $1`, job)
+
 	var active bool
+
 	if count("unit_offer_access") != 0 || count("unit_assignment_access") != 1 {
 		t.Fatal("declined offer leaves the projection, revoked assignment stays (IR187)")
 	}
-	ownerScan(t, `SELECT active FROM assets.unit_assignment_access WHERE job_id = $1`, []any{job}, &active)
+
+	ownerScan(
+		t,
+		`SELECT active FROM assets.unit_assignment_access WHERE job_id = $1`,
+		[]any{job},
+		&active,
+	)
+
 	if active {
 		t.Fatal("revoked assignment is inactive")
 	}
+
 	owner(t, `UPDATE maintenance.assignments SET status = 'active' WHERE job_id = $1`, job)
 	owner(t, `DELETE FROM maintenance.assignments WHERE job_id = $1`, job)
+
 	if count("unit_assignment_access") != 0 {
 		t.Fatal("deleted assignment leaves the projection")
 	}

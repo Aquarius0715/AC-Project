@@ -19,16 +19,44 @@ func newInvoice(t *testing.T, s *apiserver.Server) (string, string) {
 	t.Helper()
 	u := newUnit(t, s, "Pay AC")
 	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
-	code, m := write(s, &hq, "contracts.save", `{"customerId":"`+seed.ID("cust-b").String()+`","unitIds":["`+u+`"],"planType":"rto","startAt":"`+ts(-24*30)+`","endAt":"`+ts(24*365)+
-		`","priceMinor":5000,"currency":"MYR","restrictionEligible":true,"rulesVersion":"rules-1"}`, 0)
+
+	code, m := write(
+		s,
+		&hq,
+		"contracts.save",
+		`{"customerId":"`+seed.ID("cust-b").
+			String()+
+			`","unitIds":["`+u+`"],"planType":"rto","startAt":"`+ts(
+			-24*30,
+		)+`","endAt":"`+ts(
+			24*365,
+		)+
+			`","priceMinor":5000,"currency":"MYR","restrictionEligible":true,"rulesVersion":"rules-1"}`,
+		0,
+	)
 	if code != 200 {
 		t.Fatalf("contract: %d %v", code, m)
 	}
+
 	k := data(m)["id"].(string)
-	code, m = write(s, &hq, "invoices.create", `{"amountMinor":5000,"currency":"MYR","contractId":"`+k+`","contractVersion":1,"period":{"from":"`+ts(-24*14)+`","to":"`+ts(24*16)+`"},"dueAt":"`+ts(48)+`"}`, 0)
+
+	code, m = write(
+		s,
+		&hq,
+		"invoices.create",
+		`{"amountMinor":5000,"currency":"MYR","contractId":"`+k+`","contractVersion":1,"period":{"from":"`+ts(
+			-24*14,
+		)+`","to":"`+ts(
+			24*16,
+		)+`"},"dueAt":"`+ts(
+			48,
+		)+`"}`,
+		0,
+	)
 	if code != 200 {
 		t.Fatalf("invoice: %d %v", code, m)
 	}
+
 	return k, data(m)["id"].(string)
 }
 
@@ -43,6 +71,7 @@ func TestPaymentSimulation(t *testing.T) {
 		"bad method":    "method=error.invalid",
 		"not confirmed": "invoiceId=error.required",
 	}
+
 	for name, b := range map[string]string{
 		"bad method":    `{"event":"initiate","invoiceId":"` + inv + `","method":"cash","demoConfirmed":true}`,
 		"not confirmed": `{"event":"initiate","invoiceId":"` + inv + `","method":"demo_credit_card","demoConfirmed":false}`,
@@ -51,82 +80,186 @@ func TestPaymentSimulation(t *testing.T) {
 		code, m := sim(b, 1)
 		refusal(t, name, code, m, want[name])
 	}
-	if code, m := sim(`{"event":"instructions","invoiceId":"`+inv+`","demoConfirmed":true}`, 1); code != 200 || data(m)["deliveryState"] != "preview" {
+
+	if code, m := sim(
+		`{"event":"instructions","invoiceId":"`+inv+`","demoConfirmed":true}`,
+		1,
+	); code != 200 ||
+		data(m)["deliveryState"] != "preview" {
 		t.Fatalf("instructions: %d %v", code, m)
 	}
-	if code, _ := write(s, &customerA, "payments.simulate", `{"event":"initiate","invoiceId":"`+inv+`","method":"demo_credit_card","demoConfirmed":true}`, 1); code != 404 {
+
+	if code, _ := write(
+		s,
+		&customerA,
+		"payments.simulate",
+		`{"event":"initiate","invoiceId":"`+inv+`","method":"demo_credit_card","demoConfirmed":true}`,
+		1,
+	); code != 404 {
 		t.Error("other customer pays")
 	}
-	if code, m := sim(`{"event":"initiate","invoiceId":"`+inv+`","method":"demo_credit_card","demoConfirmed":true}`, 9); code != 409 || m["messageKey"] != "error.versionConflict" {
+
+	if code, m := sim(
+		`{"event":"initiate","invoiceId":"`+inv+`","method":"demo_credit_card","demoConfirmed":true}`,
+		9,
+	); code != 409 ||
+		m["messageKey"] != "error.versionConflict" {
 		t.Errorf("initiate on a stale invoice version: %d %v", code, m)
 	}
-	code, m := sim(`{"event":"initiate","invoiceId":"`+inv+`","method":"demo_debit_card","demoConfirmed":true}`, 1)
+
+	code, m := sim(
+		`{"event":"initiate","invoiceId":"`+inv+`","method":"demo_debit_card","demoConfirmed":true}`,
+		1,
+	)
 	if code != 200 || data(m)["status"] != "initiated" || data(m)["method"] != "demo_debit_card" {
 		t.Fatalf("initiate: %d %v", code, m)
 	}
+
 	pay := data(m)["id"].(string)
+
 	ev := func(event string) string {
 		return `,"eventId":"` + uuid.NewString() + `","paymentReference":"REF-` + pay[:8] + `"`
 	}
-	if code, _ := sim(`{"event":"confirm","paymentId":"`+pay+`"`+ev("confirm")+`}`, 1); code != 409 {
+	if code, _ := sim(
+		`{"event":"confirm","paymentId":"`+pay+`"`+ev("confirm")+`}`,
+		1,
+	); code != 409 {
 		t.Error("confirm before processing")
 	}
+
 	e1 := uuid.NewString()
-	code, m = sim(`{"event":"processing","paymentId":"`+pay+`","eventId":"`+e1+`","paymentReference":"REF-`+pay[:8]+`"}`, 1)
+
+	code, m = sim(
+		`{"event":"processing","paymentId":"`+pay+`","eventId":"`+e1+`","paymentReference":"REF-`+pay[:8]+`"}`,
+		1,
+	)
 	if code != 200 || data(m)["status"] != "processing" {
 		t.Fatalf("processing: %d %v", code, m)
 	}
-	if code, m := sim(`{"event":"processing","paymentId":"`+pay+`","eventId":"`+e1+`","paymentReference":"REF-`+pay[:8]+`"}`, 2); code != 200 || data(m)["version"].(float64) != 2 {
+
+	if code, m := sim(
+		`{"event":"processing","paymentId":"`+pay+`","eventId":"`+e1+`","paymentReference":"REF-`+pay[:8]+`"}`,
+		2,
+	); code != 200 ||
+		data(m)["version"].(float64) != 2 {
 		t.Fatalf("same event replay: %d %v", code, m)
 	}
-	if code, m := sim(`{"event":"processing","paymentId":"`+pay+`"`+ev("processing")+`}`, 2); code != 409 || m["messageKey"] != "error.invalidState" {
+
+	if code, m := sim(
+		`{"event":"processing","paymentId":"`+pay+`"`+ev("processing")+`}`,
+		2,
+	); code != 409 ||
+		m["messageKey"] != "error.invalidState" {
 		t.Errorf("a second processing event: %d %v", code, m)
 	}
-	if code, m := sim(`{"event":"fail","paymentId":"`+pay+`"`+ev("fail")+`}`, 1); code != 409 || m["messageKey"] != "error.versionConflict" {
+
+	if code, m := sim(
+		`{"event":"fail","paymentId":"`+pay+`"`+ev("fail")+`}`,
+		1,
+	); code != 409 ||
+		m["messageKey"] != "error.versionConflict" {
 		t.Errorf("an event on a stale payment version: %d %v", code, m)
 	}
-	if _, m := post(s, &hq, "invoices.get", `{"id":"`+inv+`"}`); data(m)["status"] != "processing" || data(m)["paymentMethod"] != "demo_debit_card" {
+
+	if _, m := post(
+		s,
+		&hq,
+		"invoices.get",
+		`{"id":"`+inv+`"}`,
+	); data(m)["status"] != "processing" ||
+		data(m)["paymentMethod"] != "demo_debit_card" {
 		t.Fatalf("invoice processing: %v", m)
 	}
-	if code, m := sim(`{"event":"fail","paymentId":"`+pay+`"`+ev("fail")+`}`, 2); code != 200 || data(m)["status"] != "failed" {
+
+	if code, m := sim(
+		`{"event":"fail","paymentId":"`+pay+`"`+ev("fail")+`}`,
+		2,
+	); code != 200 ||
+		data(m)["status"] != "failed" {
 		t.Fatalf("fail: %d %v", code, m)
 	}
-	if code, _ := sim(`{"event":"confirm","paymentId":"`+pay+`"`+ev("confirm")+`}`, 3); code != 409 {
+
+	if code, _ := sim(
+		`{"event":"confirm","paymentId":"`+pay+`"`+ev("confirm")+`}`,
+		3,
+	); code != 409 {
 		t.Error("confirm after failure")
 	}
-	if _, m := post(s, &hq, "invoices.get", `{"id":"`+inv+`"}`); data(m)["status"] != "unpaid" || data(m)["paymentStatus"] != "failed" {
+
+	if _, m := post(
+		s,
+		&hq,
+		"invoices.get",
+		`{"id":"`+inv+`"}`,
+	); data(m)["status"] != "unpaid" ||
+		data(m)["paymentStatus"] != "failed" {
 		t.Fatalf("invoice after failure: %v", m)
 	}
 	// second attempt confirms; the invoice becomes paid
 	_, m = post(s, &hq, "invoices.get", `{"id":"`+inv+`"}`)
-	code, m = sim(`{"event":"initiate","invoiceId":"`+inv+`","method":"demo_credit_card","demoConfirmed":true}`, ver(m))
+
+	code, m = sim(
+		`{"event":"initiate","invoiceId":"`+inv+`","method":"demo_credit_card","demoConfirmed":true}`,
+		ver(m),
+	)
 	if code != 200 {
 		t.Fatalf("second initiate: %d %v", code, m)
 	}
+
 	pay = data(m)["id"].(string)
 	sim(`{"event":"processing","paymentId":"`+pay+`"`+ev("processing")+`}`, 1)
-	if code, m := sim(`{"event":"confirm","paymentId":"`+pay+`"`+ev("confirm")+`}`, 2); code != 200 || data(m)["status"] != "confirmed" || data(m)["paymentReference"] == nil {
+
+	if code, m := sim(
+		`{"event":"confirm","paymentId":"`+pay+`"`+ev("confirm")+`}`,
+		2,
+	); code != 200 || data(m)["status"] != "confirmed" ||
+		data(m)["paymentReference"] == nil {
 		t.Fatalf("confirm: %d %v", code, m)
 	}
+
 	if code, _ := sim(`{"event":"fail","paymentId":"`+pay+`"`+ev("fail")+`}`, 3); code != 409 {
 		t.Error("fail after confirmed")
 	}
-	if _, m := post(s, &customerB, "invoices.get", `{"id":"`+inv+`"}`); data(m)["status"] != "paid" || len(data(m)["paymentRefs"].([]any)) != 2 {
+
+	if _, m := post(
+		s,
+		&customerB,
+		"invoices.get",
+		`{"id":"`+inv+`"}`,
+	); data(m)["status"] != "paid" ||
+		len(data(m)["paymentRefs"].([]any)) != 2 {
 		t.Fatalf("paid: %v", m)
 	}
+
 	_, m = post(s, &hq, "invoices.get", `{"id":"`+inv+`"}`)
-	if code, _ := sim(`{"event":"initiate","invoiceId":"`+inv+`","method":"demo_credit_card","demoConfirmed":true}`, ver(m)); code != 409 {
+	if code, _ := sim(
+		`{"event":"initiate","invoiceId":"`+inv+`","method":"demo_credit_card","demoConfirmed":true}`,
+		ver(m),
+	); code != 409 {
 		t.Error("pay a paid invoice")
 	}
 	// the confirmed payment's reference cannot confirm another invoice's payment
 	_, inv2 := newInvoice(t, s)
-	code, m = sim(`{"event":"initiate","invoiceId":"`+inv2+`","method":"demo_credit_card","demoConfirmed":true}`, 1)
+
+	code, m = sim(
+		`{"event":"initiate","invoiceId":"`+inv2+`","method":"demo_credit_card","demoConfirmed":true}`,
+		1,
+	)
 	if code != 200 {
 		t.Fatalf("initiate another invoice: %d %v", code, m)
 	}
+
 	pay2 := data(m)["id"].(string)
-	sim(`{"event":"processing","paymentId":"`+pay2+`","eventId":"`+uuid.NewString()+`","paymentReference":"P-`+pay2[:8]+`"}`, 1)
-	if code, m := sim(`{"event":"confirm","paymentId":"`+pay2+`","eventId":"`+uuid.NewString()+`","paymentReference":"REF-`+pay[:8]+`"}`, 2); code != 409 || m["messageKey"] != "errors.reference_used" {
+	sim(
+		`{"event":"processing","paymentId":"`+pay2+`","eventId":"`+uuid.NewString()+`","paymentReference":"P-`+pay2[:8]+`"}`,
+		1,
+	)
+
+	if code, m := sim(
+		`{"event":"confirm","paymentId":"`+pay2+`","eventId":"`+uuid.NewString()+`","paymentReference":"REF-`+pay[:8]+`"}`,
+		2,
+	); code != 409 ||
+		m["messageKey"] != "errors.reference_used" {
 		t.Errorf("confirm with a used reference: %d %v", code, m)
 	}
 }
@@ -136,23 +269,77 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 	k, inv := newInvoice(t, s)
 	// a restriction caused by this invoice
 	rid := uuid.NewString()
-	owner(t, `INSERT INTO restrictions.restrictions (id, tenant_id, contract_id, contract_version, customer_id, rules_version, notice_at, execute_after, reason, policy, state)
-		VALUES ($1,$2,$3,1,$4,'rules-1',$5,$6,'unpaid','{"kind":"power_off"}','applied')`, rid, seed.ID("tenant-a"), k, seed.ID("cust-b"), clock, clock.Add(25*time.Hour))
-	owner(t, `INSERT INTO restrictions.restriction_invoices (tenant_id, restriction_id, invoice_id) VALUES ($1,$2,$3)`, seed.ID("tenant-a"), rid, inv)
+	owner(
+		t,
+		`INSERT INTO restrictions.restrictions (id, tenant_id, contract_id, contract_version, customer_id, rules_version, notice_at, execute_after, reason, policy, state)
+		VALUES ($1,$2,$3,1,$4,'rules-1',$5,$6,'unpaid','{"kind":"power_off"}','applied')`,
+		rid,
+		seed.ID("tenant-a"),
+		k,
+		seed.ID("cust-b"),
+		clock,
+		clock.Add(25*time.Hour),
+	)
+	owner(
+		t,
+		`INSERT INTO restrictions.restriction_invoices (tenant_id, restriction_id, invoice_id) VALUES ($1,$2,$3)`,
+		seed.ID("tenant-a"),
+		rid,
+		inv,
+	)
+
 	var unit string
-	ownerScan(t, `SELECT unit_id::text FROM billing.contract_units WHERE contract_id = $1`, []any{k}, &unit)
-	owner(t, `INSERT INTO restrictions.restriction_units (tenant_id, restriction_id, unit_id, apply_state, release_state) VALUES ($1,$2,$3,'applied','none')`, seed.ID("tenant-a"), rid, unit)
+	ownerScan(
+		t,
+		`SELECT unit_id::text FROM billing.contract_units WHERE contract_id = $1`,
+		[]any{k},
+		&unit,
+	)
+	owner(
+		t,
+		`INSERT INTO restrictions.restriction_units (tenant_id, restriction_id, unit_id, apply_state, release_state) VALUES ($1,$2,$3,'applied','none')`,
+		seed.ID("tenant-a"),
+		rid,
+		unit,
+	)
+
 	ref := "BANK-" + uuid.NewString()[:8]
+
 	manual := func(amount string, v int) (int, map[string]any) {
-		return write(s, &hq, "payments.recordManual", `{"invoiceId":"`+inv+`","paymentReference":"`+ref+`","confirmedAmountMinor":`+amount+`,"currency":"MYR","reason":"bank transfer seen"}`, v)
+		return write(
+			s,
+			&hq,
+			"payments.recordManual",
+			`{"invoiceId":"`+inv+`","paymentReference":"`+ref+`","confirmedAmountMinor":`+amount+`,"currency":"MYR","reason":"bank transfer seen"}`,
+			v,
+		)
 	}
-	if code, m := manual("4000", 1); code != 422 || fields(m) != "confirmedAmountMinor=errors.full_amount_only" {
+	if code, m := manual(
+		"4000",
+		1,
+	); code != 422 ||
+		fields(m) != "confirmedAmountMinor=errors.full_amount_only" {
 		t.Errorf("partial amount: %d %s", code, fields(m))
 	}
-	if code, m := write(s, &hq, "payments.recordManual", `{"invoiceId":"`+inv+`","paymentReference":" ","confirmedAmountMinor":5000,"currency":"MYR","reason":"x"}`, 1); code != 422 || fields(m) != "paymentReference=error.length" {
+
+	if code, m := write(
+		s,
+		&hq,
+		"payments.recordManual",
+		`{"invoiceId":"`+inv+`","paymentReference":" ","confirmedAmountMinor":5000,"currency":"MYR","reason":"x"}`,
+		1,
+	); code != 422 ||
+		fields(m) != "paymentReference=error.length" {
 		t.Errorf("blank reference: %d %s", code, fields(m))
 	}
-	if code, _ := write(s, &customerB, "payments.recordManual", `{"invoiceId":"`+inv+`","paymentReference":"X","confirmedAmountMinor":5000,"currency":"MYR","reason":"x"}`, 1); code != 403 {
+
+	if code, _ := write(
+		s,
+		&customerB,
+		"payments.recordManual",
+		`{"invoiceId":"`+inv+`","paymentReference":"X","confirmedAmountMinor":5000,"currency":"MYR","reason":"x"}`,
+		1,
+	); code != 403 {
 		t.Error("client records payment")
 	}
 	// each operation takes its own ID only (IR390): the other one is an unknown field, and recordManual names invoiceId
@@ -166,63 +353,128 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 		code, m := write(s, &hq, c.op, c.body, 1)
 		refusal(t, c.op+" "+c.body, code, m, c.want)
 	}
+
 	if code, m := manual("5000", 9); code != 409 || m["messageKey"] != "error.versionConflict" {
 		t.Errorf("manual on a stale invoice version: %d %v", code, m)
 	}
+
 	code, m := manual("5000", 1)
 	if code != 200 || data(m)["status"] != "confirmed" || data(m)["method"] != nil {
 		t.Fatalf("manual: %d %v", code, m)
 	}
+
 	if code, m2 := manual("5000", 1); code != 200 || data(m2)["id"] != data(m)["id"] {
 		t.Errorf("repeat manual returns the same payment: %d", code)
 	}
 	// HQ sees the confirmation reason (DD-A08); the client does not
 	reason := func(who *actor) any {
 		_, d := post(s, who, "invoices.get", `{"id":"`+inv+`"}`)
+
 		return data(d)["paymentRefs"].([]any)[0].(map[string]any)["confirmationReason"]
 	}
 	if r := reason(&hq); r != "bank transfer seen" {
 		t.Errorf("hq confirmation reason %v", r)
 	}
+
 	if r := reason(&customerB); r != nil {
 		t.Errorf("client sees the confirmation reason %v", r)
 	}
-	var state string
-	var pending *string
-	ownerScan(t, `SELECT r.state, ru.pending_reason FROM restrictions.restrictions r JOIN restrictions.restriction_units ru ON ru.restriction_id = r.id WHERE r.id = $1`, []any{rid}, &state, &pending)
+
+	var (
+		state   string
+		pending *string
+	)
+	ownerScan(
+		t,
+		`SELECT r.state, ru.pending_reason FROM restrictions.restrictions r JOIN restrictions.restriction_units ru ON ru.restriction_id = r.id WHERE r.id = $1`,
+		[]any{rid},
+		&state,
+		&pending,
+	)
+
 	if state != "release_requested" || pending == nil || *pending != "offline" {
 		t.Errorf("restriction after payment: %s %v", state, pending)
 	}
+
 	owner(t, `UPDATE restrictions.restrictions SET state = 'released' WHERE id = $1`, rid)
 	// the reference cannot be reused on another invoice; confirm needs a processing payment
 	_, inv2 := newInvoice(t, s)
-	if code, _ := write(s, &hq, "payments.recordManual", `{"invoiceId":"`+inv2+`","paymentReference":"`+ref+`","confirmedAmountMinor":5000,"currency":"MYR","reason":"dup"}`, 1); code != 409 {
+	if code, _ := write(
+		s,
+		&hq,
+		"payments.recordManual",
+		`{"invoiceId":"`+inv2+`","paymentReference":"`+ref+`","confirmedAmountMinor":5000,"currency":"MYR","reason":"dup"}`,
+		1,
+	); code != 409 {
 		t.Error("reference reuse")
 	}
-	code, m = write(s, &customerB, "payments.simulate", `{"event":"initiate","invoiceId":"`+inv2+`","method":"demo_credit_card","demoConfirmed":true}`, 1)
+
+	code, m = write(
+		s,
+		&customerB,
+		"payments.simulate",
+		`{"event":"initiate","invoiceId":"`+inv2+`","method":"demo_credit_card","demoConfirmed":true}`,
+		1,
+	)
 	if code != 200 {
 		t.Fatalf("initiate: %d %v", code, m)
 	}
+
 	pay := data(m)["id"].(string)
+
 	confirm := func(v int) (int, map[string]any) {
-		return write(s, &hq, "payments.confirm", `{"paymentId":"`+pay+`","paymentReference":"HQ-`+pay[:8]+`","confirmedAmountMinor":5000,"currency":"MYR","reason":"checked"}`, v)
+		return write(
+			s,
+			&hq,
+			"payments.confirm",
+			`{"paymentId":"`+pay+`","paymentReference":"HQ-`+pay[:8]+`","confirmedAmountMinor":5000,"currency":"MYR","reason":"checked"}`,
+			v,
+		)
 	}
 	if code, _ := confirm(1); code != 409 {
 		t.Error("confirm an initiated payment")
 	}
-	write(s, &customerB, "payments.simulate", `{"event":"processing","paymentId":"`+pay+`","eventId":"`+uuid.NewString()+`","paymentReference":"P-`+pay[:8]+`"}`, 1)
-	if code, _ := write(s, &hq, "payments.recordManual", `{"invoiceId":"`+inv2+`","paymentReference":"M-`+pay[:8]+`","confirmedAmountMinor":5000,"currency":"MYR","reason":"x"}`, 3); code != 409 {
+
+	write(
+		s,
+		&customerB,
+		"payments.simulate",
+		`{"event":"processing","paymentId":"`+pay+`","eventId":"`+uuid.NewString()+`","paymentReference":"P-`+pay[:8]+`"}`,
+		1,
+	)
+
+	if code, _ := write(
+		s,
+		&hq,
+		"payments.recordManual",
+		`{"invoiceId":"`+inv2+`","paymentReference":"M-`+pay[:8]+`","confirmedAmountMinor":5000,"currency":"MYR","reason":"x"}`,
+		3,
+	); code != 409 {
 		t.Error("manual on an invoice with a payment")
 	}
+
 	if code, m := confirm(9); code != 409 || m["messageKey"] != "error.versionConflict" {
 		t.Errorf("hq confirm on a stale version: %d %v", code, m)
 	}
-	if code, m := write(s, &hq, "payments.confirm", `{"paymentId":"`+pay+`","paymentReference":"`+ref+`","confirmedAmountMinor":5000,"currency":"MYR","reason":"checked"}`, 2); code != 409 || m["messageKey"] != "errors.reference_used" {
+
+	if code, m := write(
+		s,
+		&hq,
+		"payments.confirm",
+		`{"paymentId":"`+pay+`","paymentReference":"`+ref+`","confirmedAmountMinor":5000,"currency":"MYR","reason":"checked"}`,
+		2,
+	); code != 409 ||
+		m["messageKey"] != "errors.reference_used" {
 		t.Errorf("hq confirm with the manual payment's reference: %d %v", code, m)
 	}
-	if code, m := confirm(2); code != 200 || data(m)["status"] != "confirmed" || data(m)["method"] != "demo_credit_card" {
+
+	if code, m := confirm(
+		2,
+	); code != 200 || data(m)["status"] != "confirmed" ||
+		data(m)["method"] != "demo_credit_card" {
 		t.Fatalf("hq confirm: %d %v", code, m)
 	}
+
 	if code, _ := confirm(3); code != 409 {
 		t.Error("confirm twice")
 	}
@@ -236,24 +488,43 @@ func TestManualAfterFailedPayment(t *testing.T) {
 	sim := func(body string, v int) (int, map[string]any) {
 		return write(s, &customerB, "payments.simulate", body, v)
 	}
-	code, m := sim(`{"event":"initiate","invoiceId":"`+inv+`","method":"demo_credit_card","demoConfirmed":true}`, 1)
+
+	code, m := sim(
+		`{"event":"initiate","invoiceId":"`+inv+`","method":"demo_credit_card","demoConfirmed":true}`,
+		1,
+	)
 	if code != 200 {
 		t.Fatalf("initiate: %d %v", code, m)
 	}
+
 	pay := data(m)["id"].(string)
+
 	manual := func(v int) (int, map[string]any) {
-		return write(s, &hq, "payments.recordManual", `{"invoiceId":"`+inv+`","paymentReference":"BANK-`+pay[:8]+`","confirmedAmountMinor":5000,"currency":"MYR","reason":"bank transfer seen"}`, v)
+		return write(
+			s,
+			&hq,
+			"payments.recordManual",
+			`{"invoiceId":"`+inv+`","paymentReference":"BANK-`+pay[:8]+`","confirmedAmountMinor":5000,"currency":"MYR","reason":"bank transfer seen"}`,
+			v,
+		)
 	}
 	if code, m := manual(2); code != 409 || m["messageKey"] != "errors.invoice_has_payment" {
 		t.Errorf("manual while a card payment is in flight: %d %v", code, m)
 	}
-	if code, m := sim(`{"event":"fail","paymentId":"`+pay+`","eventId":"`+uuid.NewString()+`","paymentReference":"REF-`+pay[:8]+`"}`, 1); code != 200 || data(m)["status"] != "failed" {
+
+	if code, m := sim(
+		`{"event":"fail","paymentId":"`+pay+`","eventId":"`+uuid.NewString()+`","paymentReference":"REF-`+pay[:8]+`"}`,
+		1,
+	); code != 200 ||
+		data(m)["status"] != "failed" {
 		t.Fatalf("fail: %d %v", code, m)
 	}
+
 	_, m = post(s, &hq, "invoices.get", `{"id":"`+inv+`"}`)
 	if code, m := manual(ver(m)); code != 200 || data(m)["status"] != "confirmed" {
 		t.Fatalf("manual after the failed card payment: %d %v", code, m)
 	}
+
 	if _, m := post(s, &hq, "invoices.get", `{"id":"`+inv+`"}`); data(m)["status"] != "paid" {
 		t.Errorf("invoice after the manual payment: %v", data(m)["status"])
 	}
@@ -271,30 +542,50 @@ func TestInvoiceOnePaymentAtATime(t *testing.T) {
 	}
 	invoiceVersion := func() int {
 		_, m := post(s, &customerB, "invoices.get", `{"id":"`+inv+`"}`)
+
 		return ver(m)
 	}
 	initiate := `{"event":"initiate","invoiceId":"` + inv + `","method":"demo_credit_card","demoConfirmed":true}`
+
 	code, m := sim(initiate, invoiceVersion())
 	if code != 200 {
 		t.Fatalf("initiate: %d %v", code, m)
 	}
+
 	pay := data(m)["id"].(string)
-	if code, m := sim(initiate, invoiceVersion()); code != 409 || m["messageKey"] != "errors.invoice_has_payment" {
+	if code, m := sim(
+		initiate,
+		invoiceVersion(),
+	); code != 409 ||
+		m["messageKey"] != "errors.invoice_has_payment" {
 		t.Fatalf("a second attempt while one is initiated: %d %v", code, m)
 	}
+
 	conn, err := pgx.Connect(context.Background(), testDB("postgres"))
 	if err != nil {
 		t.Skip(err)
 	}
 	defer conn.Close(context.Background())
-	_, err = conn.Exec(context.Background(), `INSERT INTO billing.payments (tenant_id, invoice_id, amount_minor, currency, method, channel, status, created_at, updated_at)
-		SELECT tenant_id, id, amount_minor, currency, 'demo_credit_card', 'demo', 'processing', $2, $2 FROM billing.invoices WHERE id = $1`, inv, clock)
+
+	_, err = conn.Exec(
+		context.Background(),
+		`INSERT INTO billing.payments (tenant_id, invoice_id, amount_minor, currency, method, channel, status, created_at, updated_at)
+		SELECT tenant_id, id, amount_minor, currency, 'demo_credit_card', 'demo', 'processing', $2, $2 FROM billing.invoices WHERE id = $1`,
+		inv,
+		clock,
+	)
 	if pe := (*pgconn.PgError)(nil); !errors.As(err, &pe) || pe.Code != "23505" {
 		t.Fatalf("a second open payment in the database: %v", err)
 	}
-	if code, m := sim(`{"event":"fail","paymentId":"`+pay+`","eventId":"`+uuid.NewString()+`","paymentReference":"REF-`+pay[:8]+`"}`, 1); code != 200 || data(m)["status"] != "failed" {
+
+	if code, m := sim(
+		`{"event":"fail","paymentId":"`+pay+`","eventId":"`+uuid.NewString()+`","paymentReference":"REF-`+pay[:8]+`"}`,
+		1,
+	); code != 200 ||
+		data(m)["status"] != "failed" {
 		t.Fatalf("fail: %d %v", code, m)
 	}
+
 	if code, m := sim(initiate, invoiceVersion()); code != 200 {
 		t.Fatalf("a new attempt after a failed one: %d %v", code, m)
 	}

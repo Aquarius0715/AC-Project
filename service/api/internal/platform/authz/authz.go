@@ -17,13 +17,20 @@ import (
 )
 
 // Roles of Membership.role plus the two pseudo roles used in the catalog.
-var Roles = map[string]bool{"client": true, "contractor": true, "technician": true, "admin": true, "authenticated": true, "public": true}
+var Roles = map[string]bool{
+	"client":        true,
+	"contractor":    true,
+	"technician":    true,
+	"admin":         true,
+	"authenticated": true,
+	"public":        true,
+}
 
 // Permissions is the Permission union of service-contracts.ts (38 values).
 var Permissions = map[string]bool{}
 
 func init() {
-	for _, p := range strings.Split("dashboard.read asset.read asset.write identity.read identity.write device.read device.write device.maintain control.execute control.diagnose alert.read alert.resolve alert.policy.read alert.policy.write job.read job.write contract.read contract.write billing.read billing.write billing.payment restriction.read restriction.write restriction.override automation.policy.read automation.policy.write energy.read energy.write mrv.read mrv.write mrv.review mrv.factors offset.read offset.write audit.read partner.accept partner.assign partner.review", " ") {
+	for p := range strings.SplitSeq("dashboard.read asset.read asset.write identity.read identity.write device.read device.write device.maintain control.execute control.diagnose alert.read alert.resolve alert.policy.read alert.policy.write job.read job.write contract.read contract.write billing.read billing.write billing.payment restriction.read restriction.write restriction.override automation.policy.read automation.policy.write energy.read energy.write mrv.read mrv.write mrv.review mrv.factors offset.read offset.write audit.read partner.accept partner.assign partner.review", " ") {
 		Permissions[p] = true
 	}
 }
@@ -47,42 +54,55 @@ type Expr struct {
 // Parse parses an authorization column value.
 func Parse(s string) (Expr, error) {
 	var e Expr
+
 	main := s
-	if i := strings.Index(s, ";"); i >= 0 {
-		main, e.Remark = s[:i], strings.TrimSpace(s[i+1:])
+	if before, after, ok := strings.Cut(s, ";"); ok {
+		main, e.Remark = before, strings.TrimSpace(after)
 	}
-	for _, raw := range strings.Split(main, "|") {
+
+	for raw := range strings.SplitSeq(main, "|") {
 		alt := strings.TrimSpace(raw)
 		if alt == "" {
 			return e, fmt.Errorf("empty alternative in %q", s)
 		}
+
 		parts := strings.Split(alt, ":")
 		if regexp.MustCompile(`^IR\d+$`).MatchString(parts[0]) {
 			e.Notes = append(e.Notes, alt)
+
 			continue
 		}
+
 		if !Roles[parts[0]] {
 			return e, fmt.Errorf("unknown role %q in %q", parts[0], s)
 		}
+
 		a := Alternative{Role: parts[0]}
+
 		rest := parts[1:]
 		if len(rest) > 0 && Permissions[rest[0]] {
 			a.Permission, rest = rest[0], rest[1:]
 		}
+
 		for _, p := range rest {
 			if strings.Contains(p, ".") || !predicateRe.MatchString(p) {
 				return e, fmt.Errorf("bad permission or predicate %q in %q", p, s)
 			}
+
 			a.Predicates = append(a.Predicates, p)
 		}
+
 		if a.Role == "admin" && a.Permission == "" {
 			return e, fmt.Errorf("admin alternative without permission in %q", s)
 		}
+
 		e.Alternatives = append(e.Alternatives, a)
 	}
+
 	if len(e.Alternatives) == 0 {
 		return e, fmt.Errorf("no granting alternative in %q", s)
 	}
+
 	return e, nil
 }
 
@@ -97,6 +117,7 @@ type Principal struct {
 // be checked by the handler. An empty result means FORBIDDEN.
 func (e Expr) Candidates(p *Principal) []Alternative {
 	var out []Alternative
+
 	for _, a := range e.Alternatives {
 		switch a.Role {
 		case "public":
@@ -108,12 +129,15 @@ func (e Expr) Candidates(p *Principal) []Alternative {
 			if p == nil || p.Role != a.Role {
 				continue
 			}
+
 			if a.Permission != "" && !p.Permissions[a.Permission] {
 				continue
 			}
 		}
+
 		out = append(out, a)
 	}
+
 	return out
 }
 
@@ -125,15 +149,19 @@ type Facts map[string]bool
 func Allowed(cands []Alternative, f Facts) bool {
 	for _, a := range cands {
 		ok := true
+
 		for _, pr := range a.Predicates {
 			if !f[pr] {
 				ok = false
+
 				break
 			}
 		}
+
 		if ok {
 			return true
 		}
 	}
+
 	return false
 }

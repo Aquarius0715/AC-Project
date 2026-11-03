@@ -29,6 +29,7 @@ func secretKey(k string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -36,6 +37,7 @@ func secretKey(k string) bool {
 func Mask(s string) string {
 	s = userURL.ReplaceAllString(s, "${1}"+Masked+"@")
 	s = email.ReplaceAllString(s, Masked)
+
 	return phone.ReplaceAllString(s, Masked)
 }
 
@@ -45,6 +47,7 @@ func ReplaceAttr(_ []string, a slog.Attr) slog.Attr {
 	if secretKey(a.Key) {
 		return slog.String(a.Key, Masked)
 	}
+
 	switch a.Value.Kind() {
 	case slog.KindString:
 		if s := a.Value.String(); Mask(s) != s {
@@ -55,10 +58,12 @@ func ReplaceAttr(_ []string, a slog.Attr) slog.Attr {
 			return slog.String(a.Key, Mask(err.Error()))
 		}
 	}
+
 	return a
 }
 
 // New is the JSON logger of one service, writing to w.
 func New(w io.Writer, service string) *slog.Logger {
-	return slog.New(slog.NewJSONHandler(w, &slog.HandlerOptions{ReplaceAttr: ReplaceAttr})).With("service", service)
+	return slog.New(slog.NewJSONHandler(w, &slog.HandlerOptions{ReplaceAttr: ReplaceAttr})).
+		With("service", service)
 }

@@ -25,15 +25,20 @@ type Preferences struct {
 
 func loadPreferences(ctx context.Context, c *ops.Call) (Preferences, error) {
 	p := Preferences{Locale: "en", Timezone: "Asia/Kuala_Lumpur", Currency: "MYR"}
+
 	err := c.Tx.QueryRow(ctx, `SELECT locale, timezone, currency, monthly_report_email FROM identity.preferences WHERE user_id = $1`, c.Principal.UserID).
 		Scan(&p.Locale, &p.Timezone, &p.Currency, &p.MonthlyReportEmail)
 	if errors.Is(err, pgx.ErrNoRows) {
 		err = nil
 	}
+
 	if err != nil {
 		return p, err
 	}
-	err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.two_factor WHERE user_id = $1)`, c.Principal.UserID).Scan(&p.TwoFactorEnabled)
+
+	err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.two_factor WHERE user_id = $1)`, c.Principal.UserID).
+		Scan(&p.TwoFactorEnabled)
+
 	return p, err
 }
 
@@ -49,7 +54,9 @@ func ValidTimezone(tz string) bool {
 	if tz != "UTC" && !strings.Contains(tz, "/") {
 		return false
 	}
+
 	_, err := time.LoadLocation(tz)
+
 	return err == nil
 }
 
@@ -59,9 +66,11 @@ func (in *PreferencesInput) Validate() map[string]string {
 	if in.Locale != "en" && in.Locale != "ms" {
 		fe["locale"] = "error.invalid"
 	}
+
 	if !ValidTimezone(in.Timezone) {
 		fe["timezone"] = "error.invalid"
 	}
+
 	return fe
 }
 
@@ -89,25 +98,50 @@ func (in *PreferencesInput) Validate() map[string]string {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/preferences [put]
-func updatePreferences(ctx context.Context, c *ops.Call, in *PreferencesInput) (Preferences, error) {
+func updatePreferences(
+	ctx context.Context,
+	c *ops.Call,
+	in *PreferencesInput,
+) (Preferences, error) {
 	if in.MonthlyReportEmail != nil && c.Principal.Role != "client" {
-		return Preferences{}, apperr.Fields(map[string]string{"monthlyReportEmail": "error.notAllowed"})
+		return Preferences{}, apperr.Fields(
+			map[string]string{"monthlyReportEmail": "error.notAllowed"},
+		)
 	}
+
 	cur, err := loadPreferences(ctx, c)
 	if err != nil {
 		return cur, err
 	}
+
 	monthly := cur.MonthlyReportEmail
 	if in.MonthlyReportEmail != nil {
 		monthly = *in.MonthlyReportEmail
 	}
-	if _, err := c.Tx.Exec(ctx, `INSERT INTO identity.preferences (user_id, locale, timezone, monthly_report_email, updated_at) VALUES ($1, $2, $3, $4, $5)
+
+	if _, err := c.Tx.Exec(
+		ctx,
+		`INSERT INTO identity.preferences (user_id, locale, timezone, monthly_report_email, updated_at) VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (user_id) DO UPDATE SET locale = $2, timezone = $3, monthly_report_email = $4, version = identity.preferences.version + 1, updated_at = $5`,
-		c.Principal.UserID, in.Locale, in.Timezone, monthly, c.Now); err != nil {
+		c.Principal.UserID,
+		in.Locale,
+		in.Timezone,
+		monthly,
+		c.Now,
+	); err != nil {
 		return cur, err
 	}
-	c.Audit(ops.AuditEntry{Action: "preferences.update", TargetKind: "preferences", TargetID: c.Principal.UserID.String()})
+
+	c.Audit(
+		ops.AuditEntry{
+			Action:     "preferences.update",
+			TargetKind: "preferences",
+			TargetID:   c.Principal.UserID.String(),
+		},
+	)
+
 	cur.Locale, cur.Timezone, cur.MonthlyReportEmail = in.Locale, in.Timezone, monthly
+
 	return cur, nil
 }
 
@@ -135,6 +169,7 @@ func (in *ConsentGetInput) Validate() map[string]string {
 	if in.Purpose != "location_automation" {
 		return map[string]string{"purpose": "error.invalid"}
 	}
+
 	return nil
 }
 
@@ -144,11 +179,15 @@ func loadConsent(ctx context.Context, c *ops.Call, purpose string, lock bool) (C
 	if lock {
 		q += " FOR UPDATE"
 	}
+
 	var x Consent
-	err := c.Tx.QueryRow(ctx, q, c.Principal.MembershipID, purpose).Scan(&x.ID, &x.TenantID, &x.Version, &x.CreatedAt, &x.UpdatedAt, &x.MembershipID, &x.Purpose, &x.Granted, &x.GrantedAt, &x.RevokedAt)
+
+	err := c.Tx.QueryRow(ctx, q, c.Principal.MembershipID, purpose).
+		Scan(&x.ID, &x.TenantID, &x.Version, &x.CreatedAt, &x.UpdatedAt, &x.MembershipID, &x.Purpose, &x.Granted, &x.GrantedAt, &x.RevokedAt)
 	if errors.Is(err, pgx.ErrNoRows) { // IR84: a missing record is a fixture defect
 		return x, apperr.E(apperr.NotFound, "error.notFound")
 	}
+
 	return x, err
 }
 
@@ -188,6 +227,7 @@ func (in *ConsentUpdateInput) Validate() map[string]string {
 	if in.Purpose != "location_automation" {
 		return map[string]string{"purpose": "error.invalid"}
 	}
+
 	return nil
 }
 
@@ -223,29 +263,60 @@ func updateConsent(ctx context.Context, c *ops.Call, in *ConsentUpdateInput) (Co
 	if err != nil {
 		return x, err
 	}
+
 	if x.Version != *c.ExpectedVersion {
 		return x, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
+
 	if x.Granted == in.Granted {
 		return x, nil
 	}
+
 	if in.Granted {
 		x.GrantedAt, x.RevokedAt = &c.Now, nil
 	} else {
 		x.RevokedAt = &c.Now
 	}
-	if _, err := c.Tx.Exec(ctx, `UPDATE identity.consents SET granted = $2, granted_at = $3, revoked_at = $4, version = version + 1, updated_at = $5 WHERE id = $1::uuid`,
-		x.ID, in.Granted, x.GrantedAt, x.RevokedAt, c.Now); err != nil {
+
+	if _, err := c.Tx.Exec(
+		ctx,
+		`UPDATE identity.consents SET granted = $2, granted_at = $3, revoked_at = $4, version = version + 1, updated_at = $5 WHERE id = $1::uuid`,
+		x.ID,
+		in.Granted,
+		x.GrantedAt,
+		x.RevokedAt,
+		c.Now,
+	); err != nil {
 		return x, err
 	}
+
 	prev := x.Version
+
 	x.Granted, x.Version, x.UpdatedAt = in.Granted, x.Version+1, c.Now
 	if !in.Granted { // equipment disables the membership's location automations (IR53; another domain, so an event)
 		id, _ := uuid.Parse(x.ID)
-		c.Emit(ops.Event{AggregateType: "consent", AggregateID: id, Type: events.ConsentRevoked,
-			Payload: events.ConsentRevocation{MembershipID: c.Principal.MembershipID, Purpose: in.Purpose, At: c.Now}})
+		c.Emit(ops.Event{
+			AggregateType: "consent",
+			AggregateID:   id,
+			Type:          events.ConsentRevoked,
+			Payload: events.ConsentRevocation{
+				MembershipID: c.Principal.MembershipID,
+				Purpose:      in.Purpose,
+				At:           c.Now,
+			},
+		})
 	}
-	c.Audit(ops.AuditEntry{Action: "consents.update", TargetKind: "consent", TargetID: x.ID, PreviousVersion: &prev, NextVersion: &x.Version})
+
+	c.Audit(
+		ops.AuditEntry{
+			Action:          "consents.update",
+			TargetKind:      "consent",
+			TargetID:        x.ID,
+			PreviousVersion: &prev,
+			NextVersion:     &x.Version,
+		},
+	)
+
 	return x, nil
 }
 

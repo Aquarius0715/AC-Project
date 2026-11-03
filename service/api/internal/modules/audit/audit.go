@@ -87,72 +87,144 @@ type Filter struct {
 // @Router			/v1/audit [get]
 func list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[View], error) {
 	var f Filter
+
 	bad := apperr.Fields(map[string]string{"filters": "error.invalid"})
 	if len(in.Filters) == 0 {
-		return paging.Page[View]{}, apperr.Fields(map[string]string{"filters.from": "error.required", "filters.to": "error.required"})
+		return paging.Page[View]{}, apperr.Fields(
+			map[string]string{"filters.from": "error.required", "filters.to": "error.required"},
+		)
 	}
+
 	dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
 	dec.DisallowUnknownFields()
-	if dec.Decode(&f) != nil || (f.Result != nil && !slices.Contains([]string{"success", "denied", "failed", "pending"}, *f.Result)) {
+
+	if dec.Decode(&f) != nil ||
+		(f.Result != nil && !slices.Contains([]string{"success", "denied", "failed", "pending"}, *f.Result)) {
 		return paging.Page[View]{}, bad
 	}
+
 	if f.From == nil || f.To == nil { // the period is required: name the end that is missing
 		fe := map[string]string{}
 		if f.From == nil {
 			fe["filters.from"] = "error.required"
 		}
+
 		if f.To == nil {
 			fe["filters.to"] = "error.required"
 		}
+
 		return paging.Page[View]{}, apperr.Fields(fe)
 	}
+
 	if !f.From.Before(*f.To) || f.To.Sub(*f.From) > 366*24*time.Hour {
-		return paging.Page[View]{}, apperr.Fields(map[string]string{"filters.to": "errors.period_range"})
+		return paging.Page[View]{}, apperr.Fields(
+			map[string]string{"filters.to": "errors.period_range"},
+		)
 	}
-	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "a.id", "occurredAt": "a.occurred_at", "createdAt": "a.occurred_at", "updatedAt": "a.occurred_at"}, "a.occurred_at DESC, a.id DESC") // entries are immutable: created = updated = occurred
+
+	order, err := paging.OrderBy(
+		in.Sort,
+		map[string]string{
+			"id":         "a.id",
+			"occurredAt": "a.occurred_at",
+			"createdAt":  "a.occurred_at",
+			"updatedAt":  "a.occurred_at",
+		},
+		"a.occurred_at DESC, a.id DESC",
+	) // entries are immutable: created = updated = occurred
 	if err != nil {
 		return paging.Page[View]{}, err
 	}
+
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[View]{}, err
 	}
+
 	args := []any{*f.From, *f.To}
-	add := func(v any) string { args = append(args, v); return fmt.Sprintf("$%d", len(args)) }
+	add := func(v any) string {
+		args = append(args, v)
+
+		return fmt.Sprintf("$%d", len(args))
+	}
 	conds := []string{"a.occurred_at >= $1", "a.occurred_at < $2"}
-	for col, v := range map[string]*string{"a.actor_id": f.ActorID, "a.target_kind": f.TargetKind, "a.target_id": f.TargetID, "a.correlation_id": f.CorrelationID,
-		"a.result": f.Result, "a.action": f.Action} {
+
+	for col, v := range map[string]*string{
+		"a.actor_id": f.ActorID, "a.target_kind": f.TargetKind, "a.target_id": f.TargetID, "a.correlation_id": f.CorrelationID,
+		"a.result": f.Result, "a.action": f.Action,
+	} {
 		if v != nil {
 			conds = append(conds, col+" = "+add(*v))
 		}
 	}
+
 	where := strings.Join(conds, " AND ")
+
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM audit.audit_log a WHERE "+where, args...).Scan(&total); err != nil {
+	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM audit.audit_log a WHERE "+where, args...).
+		Scan(&total); err != nil {
 		return paging.Page[View]{}, err
 	}
-	rows, err := c.Tx.Query(ctx, fmt.Sprintf(`SELECT a.id, a.tenant_id, a.actor_id, u.display_name, a.actor_role_at_time, a.action, a.target_kind, a.target_id, a.previous_version, a.next_version,
-		a.occurred_at, a.correlation_id, a.result, a.masked_before, a.masked_after, a.reason FROM audit.audit_log a `+actorJoin+` WHERE %s ORDER BY %s LIMIT %d OFFSET %d`, where, order, w.Limit, w.Offset), args...)
+
+	rows, err := c.Tx.Query(
+		ctx,
+		fmt.Sprintf(
+			`SELECT a.id, a.tenant_id, a.actor_id, u.display_name, a.actor_role_at_time, a.action, a.target_kind, a.target_id, a.previous_version, a.next_version,
+		a.occurred_at, a.correlation_id, a.result, a.masked_before, a.masked_after, a.reason FROM audit.audit_log a `+actorJoin+` WHERE %s ORDER BY %s LIMIT %d OFFSET %d`,
+			where,
+			order,
+			w.Limit,
+			w.Offset,
+		),
+		args...)
 	if err != nil {
 		return paging.Page[View]{}, err
 	}
 	defer rows.Close()
+
 	items := []View{}
+
 	for rows.Next() {
-		var x View
-		var kind, id string
-		if err := rows.Scan(&x.ID, &x.TenantID, &x.ActorID, &x.ActorName, &x.ActorRoleAtTime, &x.Action, &kind, &id, &x.PreviousVersion, &x.NextVersion, &x.OccurredAt, &x.CorrelationID,
-			&x.Result, &x.MaskedBefore, &x.MaskedAfter, &x.Reason); err != nil {
+		var (
+			x        View
+			kind, id string
+		)
+		if err := rows.Scan(
+			&x.ID,
+			&x.TenantID,
+			&x.ActorID,
+			&x.ActorName,
+			&x.ActorRoleAtTime,
+			&x.Action,
+			&kind,
+			&id,
+			&x.PreviousVersion,
+			&x.NextVersion,
+			&x.OccurredAt,
+			&x.CorrelationID,
+			&x.Result,
+			&x.MaskedBefore,
+			&x.MaskedAfter,
+			&x.Reason,
+		); err != nil {
 			return paging.Page[View]{}, err
 		}
+
 		x.Version, x.CreatedAt, x.UpdatedAt = 1, x.OccurredAt, x.OccurredAt
 		x.TargetRef = map[string]string{"kind": kind, "id": id}
 		items = append(items, x)
 	}
+
 	if err := rows.Err(); err != nil {
 		return paging.Page[View]{}, err
 	}
-	return paging.Page[View]{Items: items, NextCursor: w.Next(total), Total: total, SnapshotVersion: w.Snapshot}, nil
+
+	return paging.Page[View]{
+		Items:           items,
+		NextCursor:      w.Next(total),
+		Total:           total,
+		SnapshotVersion: w.Snapshot,
+	}, nil
 }
 
 // Register binds audit.list.

@@ -29,6 +29,7 @@ func SessionHandlers(ender SessionEnder) map[string]events.Handler {
 	if ender == nil {
 		return nil
 	}
+
 	return map[string]events.Handler{
 		EventSessionsRevoked: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p struct {
@@ -37,19 +38,33 @@ func SessionHandlers(ender SessionEnder) map[string]events.Handler {
 			if err := e.Decode(&p); err != nil {
 				return err
 			}
+
 			var subject string // the provider's subject: Cognito's sub, or locally the user ID itself
-			err := tx.QueryRow(ctx, `SELECT COALESCE(cognito_sub, id::text) FROM identity.users WHERE id = $1`, p.UserID).Scan(&subject)
+
+			err := tx.QueryRow(ctx, `SELECT COALESCE(cognito_sub, id::text) FROM identity.users WHERE id = $1`, p.UserID).
+				Scan(&subject)
 			if errors.Is(err, pgx.ErrNoRows) {
 				return nil
 			}
+
 			if err != nil {
 				return err
 			}
+
 			cctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
+
 			if err := ender.EndSessions(cctx, subject); err != nil {
-				slog.WarnContext(ctx, "identity: the identity provider's sessions were not ended", "user", p.UserID, "err", err)
+				slog.WarnContext(
+					ctx,
+					"identity: the identity provider's sessions were not ended",
+					"user",
+					p.UserID,
+					"err",
+					err,
+				)
 			}
+
 			return nil
 		},
 	}

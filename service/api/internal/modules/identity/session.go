@@ -71,27 +71,46 @@ func Register(r *ops.Registry) {
 //	@Router			/v1/session [get]
 func sessionGet(ctx context.Context, c *ops.Call, _ *struct{}) (Session, error) {
 	p := c.Principal
+
 	perms := make([]string, 0, len(p.Permissions))
 	for k, ok := range p.Permissions {
 		if ok {
 			perms = append(perms, k)
 		}
 	}
+
 	sort.Strings(perms)
+
 	var clientRole *string
 	if p.Role == "client" && p.ClientRole != "" {
 		clientRole = &p.ClientRole
 	}
-	out := Session{TenantID: p.TenantID, MembershipID: p.MembershipID, ScopeVersion: p.ScopeVersion, UserID: p.UserID, OrganizationID: p.OrgID,
-		Role: p.Role, ClientRole: clientRole, Permissions: perms, Generation: 1, ViewEpoch: 0, IssuedAt: c.Now, ExpiresAt: c.Now.Add(SessionTTL)}
+
+	out := Session{
+		TenantID:       p.TenantID,
+		MembershipID:   p.MembershipID,
+		ScopeVersion:   p.ScopeVersion,
+		UserID:         p.UserID,
+		OrganizationID: p.OrgID,
+		Role:           p.Role,
+		ClientRole:     clientRole,
+		Permissions:    perms,
+		Generation:     1,
+		ViewEpoch:      0,
+		IssuedAt:       c.Now,
+		ExpiresAt:      c.Now.Add(SessionTTL),
+	}
 	if c.Tx == nil { // a registry without a database (unit tests): no names
 		return out, nil
 	}
+
 	err := c.Tx.QueryRow(ctx, `SELECT u.display_name, o.name FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id
-		JOIN identity.organizations o ON o.id = m.organization_id WHERE m.id = $1`, p.MembershipID).Scan(&out.DisplayName, &out.OrganizationName)
+		JOIN identity.organizations o ON o.id = m.organization_id WHERE m.id = $1`, p.MembershipID).
+		Scan(&out.DisplayName, &out.OrganizationName)
 	if errors.Is(err, pgx.ErrNoRows) {
 		err = nil
 	}
+
 	if err == nil && p.Role == "client" { // identity's reference copy of the customers (IR188)
 		var id uuid.UUID
 		switch e := c.Tx.QueryRow(ctx, `SELECT c.id FROM notify.ref_customers c JOIN identity.memberships m ON m.organization_id = c.organization_id WHERE m.id = $1`,
@@ -102,5 +121,6 @@ func sessionGet(ctx context.Context, c *ops.Call, _ *struct{}) (Session, error) 
 			err = e
 		}
 	}
+
 	return out, err
 }

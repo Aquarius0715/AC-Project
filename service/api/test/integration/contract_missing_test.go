@@ -28,6 +28,7 @@ func TestContractUpdateOfAMissingContractIsNotFound(t *testing.T) {
 		`"restrictionEligible":true`,
 		`"rulesVersion":"rules-demo-1"`,
 	}, ",")
+
 	code, m := write(s, &hq, "contracts.save", "{"+body+"}", 1)
 	if code != 404 || m["messageKey"] != "error.notFound" {
 		t.Fatalf("revision of a missing contract: %d %v, want 404 NOT_FOUND", code, m)

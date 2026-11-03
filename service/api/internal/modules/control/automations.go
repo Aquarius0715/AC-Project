@@ -30,7 +30,15 @@ type Automations struct {
 
 // Notifier evaluates alert-policy notifications per unit (Monitoring, SR21/SR25).
 type Notifier interface {
-	Evaluate(ctx context.Context, c *ops.Call, unit uuid.UUID, facts []byte, at time.Time, eventID uuid.UUID, fire bool) ([]json.RawMessage, error)
+	Evaluate(
+		ctx context.Context,
+		c *ops.Call,
+		unit uuid.UUID,
+		facts []byte,
+		at time.Time,
+		eventID uuid.UUID,
+		fire bool,
+	) ([]json.RawMessage, error)
 }
 
 // Automation is Automation of service-contracts.ts (RuleBase + the kind's definition fields).
@@ -54,11 +62,11 @@ type Automation struct {
 	EndLocal          string          `json:"endLocal,omitempty"`
 	EndsNextDay       *bool           `json:"endsNextDay,omitempty"`
 	StartAction       json.RawMessage `json:"startAction,omitempty" swaggertype:"object"`
-	EndAction         json.RawMessage `json:"endAction,omitempty" swaggertype:"object"`
-	Condition         json.RawMessage `json:"condition,omitempty" swaggertype:"object"`
-	Action            json.RawMessage `json:"action,omitempty" swaggertype:"object"`
-	OnlyIf            json.RawMessage `json:"onlyIf" swaggertype:"object"` // ExtraCondition[] (IR215), [] when none
-	LastRun           *LastRun        `json:"lastRun"`                     // the latest automation_runs outcome of the rule (IR215)
+	EndAction         json.RawMessage `json:"endAction,omitempty"   swaggertype:"object"`
+	Condition         json.RawMessage `json:"condition,omitempty"   swaggertype:"object"`
+	Action            json.RawMessage `json:"action,omitempty"      swaggertype:"object"`
+	OnlyIf            json.RawMessage `json:"onlyIf"                swaggertype:"object"` // ExtraCondition[] (IR215), [] when none
+	LastRun           *LastRun        `json:"lastRun"`                                    // the latest automation_runs outcome of the rule (IR215)
 	customerOrg       uuid.UUID
 }
 
@@ -77,10 +85,10 @@ type definition struct {
 	EndLocal    string          `json:"endLocal,omitempty"`
 	EndsNextDay *bool           `json:"endsNextDay,omitempty"`
 	StartAction json.RawMessage `json:"startAction,omitempty" swaggertype:"object"`
-	EndAction   json.RawMessage `json:"endAction,omitempty" swaggertype:"object"`
-	Condition   json.RawMessage `json:"condition,omitempty" swaggertype:"object"`
-	Action      json.RawMessage `json:"action,omitempty" swaggertype:"object"`
-	OnlyIf      json.RawMessage `json:"onlyIf,omitempty" swaggertype:"object"`
+	EndAction   json.RawMessage `json:"endAction,omitempty"   swaggertype:"object"`
+	Condition   json.RawMessage `json:"condition,omitempty"   swaggertype:"object"`
+	Action      json.RawMessage `json:"action,omitempty"      swaggertype:"object"`
+	OnlyIf      json.RawMessage `json:"onlyIf,omitempty"      swaggertype:"object"`
 }
 
 const automationCols = `a.id, a.tenant_id, a.version, a.created_at, a.updated_at, a.name, a.owner_membership_id, a.created_by_user_id, a.timezone, a.enabled, a.priority,
@@ -90,19 +98,42 @@ const automationCols = `a.id, a.tenant_id, a.version, a.created_at, a.updated_at
 		WHERE r.rule_id = a.id ORDER BY r.occurred_at DESC, r.seq DESC LIMIT 1)`
 
 func scanAutomation(r pgx.Row) (Automation, error) {
-	var x Automation
-	var def, last []byte
-	if err := r.Scan(&x.ID, &x.TenantID, &x.Version, &x.CreatedAt, &x.UpdatedAt, &x.Name, &x.OwnerMembershipID, &x.CreatedByUserID, &x.Timezone, &x.Enabled, &x.Priority,
-		&x.DisabledReason, &x.Kind, &def, &x.customerOrg, &x.UnitIDs, &last); err != nil {
+	var (
+		x         Automation
+		def, last []byte
+	)
+	if err := r.Scan(
+		&x.ID,
+		&x.TenantID,
+		&x.Version,
+		&x.CreatedAt,
+		&x.UpdatedAt,
+		&x.Name,
+		&x.OwnerMembershipID,
+		&x.CreatedByUserID,
+		&x.Timezone,
+		&x.Enabled,
+		&x.Priority,
+		&x.DisabledReason,
+		&x.Kind,
+		&def,
+		&x.customerOrg,
+		&x.UnitIDs,
+		&last,
+	); err != nil {
 		return x, err
 	}
+
 	var d definition
+
 	_ = json.Unmarshal(def, &d)
+
 	x.Weekdays, x.StartLocal, x.EndLocal, x.EndsNextDay, x.StartAction, x.EndAction, x.Condition, x.Action, x.OnlyIf =
 		d.Weekdays, d.StartLocal, d.EndLocal, d.EndsNextDay, d.StartAction, d.EndAction, d.Condition, d.Action, d.OnlyIf
 	if len(x.OnlyIf) == 0 {
 		x.OnlyIf = json.RawMessage("[]")
 	}
+
 	if len(last) > 0 {
 		var lr LastRun
 		if err := json.Unmarshal(last, &lr); err == nil {
@@ -110,18 +141,26 @@ func scanAutomation(r pgx.Row) (Automation, error) {
 			x.LastRun = &lr
 		}
 	}
+
 	return x, nil
 }
 
-func (m Automations) load(ctx context.Context, c *ops.Call, id uuid.UUID, lock bool) (Automation, error) {
+func (m Automations) load(
+	ctx context.Context,
+	c *ops.Call,
+	id uuid.UUID,
+	lock bool,
+) (Automation, error) {
 	q := "SELECT " + automationCols + " FROM control.automations a WHERE a.id = $1"
 	if lock {
 		q += " FOR UPDATE OF a"
 	}
+
 	x, err := scanAutomation(c.Tx.QueryRow(ctx, q, id))
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && x.customerOrg != c.Principal.OrgID) {
 		return Automation{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
+
 	return x, err
 }
 
@@ -151,61 +190,118 @@ func (m Automations) load(ctx context.Context, c *ops.Call, id uuid.UUID, lock b
 // @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/automations [get]
-func (m Automations) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Automation], error) {
+func (m Automations) list(
+	ctx context.Context,
+	c *ops.Call,
+	in *paging.Query,
+) (paging.Page[Automation], error) {
 	var f struct {
 		Kind    *string    `json:"kind,omitempty"`
 		Enabled *bool      `json:"enabled,omitempty"`
 		UnitID  *uuid.UUID `json:"unitId,omitempty"`
 	}
+
 	if len(in.Filters) > 0 {
 		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
 		dec.DisallowUnknownFields()
+
 		if dec.Decode(&f) != nil || (f.Kind != nil && *f.Kind != "schedule" && *f.Kind != "event") {
-			return paging.Page[Automation]{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
+			return paging.Page[Automation]{}, apperr.Fields(
+				map[string]string{"filters": "error.invalid"},
+			)
 		}
 	}
-	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "a.id", "name": "a.name", "priority": "a.priority", "createdAt": "a.created_at", "updatedAt": "a.updated_at"}, "a.created_at DESC, a.id DESC")
+
+	order, err := paging.OrderBy(
+		in.Sort,
+		map[string]string{
+			"id":        "a.id",
+			"name":      "a.name",
+			"priority":  "a.priority",
+			"createdAt": "a.created_at",
+			"updatedAt": "a.updated_at",
+		},
+		"a.created_at DESC, a.id DESC",
+	)
 	if err != nil {
 		return paging.Page[Automation]{}, err
 	}
+
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Automation]{}, err
 	}
+
 	args := []any{c.Principal.OrgID}
-	add := func(v any) string { args = append(args, v); return fmt.Sprintf("$%d", len(args)) }
+	add := func(v any) string {
+		args = append(args, v)
+
+		return fmt.Sprintf("$%d", len(args))
+	}
+
 	conds := []string{"a.customer_org_id = $1"}
 	if f.Kind != nil {
 		conds = append(conds, "a.kind = "+add(*f.Kind))
 	}
+
 	if f.Enabled != nil {
 		conds = append(conds, "a.enabled = "+add(*f.Enabled))
 	}
+
 	if f.UnitID != nil {
-		conds = append(conds, "EXISTS (SELECT 1 FROM control.automation_units u WHERE u.automation_id = a.id AND u.unit_id = "+add(*f.UnitID)+")")
+		conds = append(
+			conds,
+			"EXISTS (SELECT 1 FROM control.automation_units u WHERE u.automation_id = a.id AND u.unit_id = "+add(
+				*f.UnitID,
+			)+")",
+		)
 	}
+
 	where := strings.Join(conds, " AND ")
+
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM control.automations a WHERE "+where, args...).Scan(&total); err != nil {
+	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM control.automations a WHERE "+where, args...).
+		Scan(&total); err != nil {
 		return paging.Page[Automation]{}, err
 	}
-	rows, err := c.Tx.Query(ctx, fmt.Sprintf("SELECT %s FROM control.automations a WHERE %s ORDER BY %s LIMIT %d OFFSET %d", automationCols, where, order, w.Limit, w.Offset), args...)
+
+	rows, err := c.Tx.Query(
+		ctx,
+		fmt.Sprintf(
+			"SELECT %s FROM control.automations a WHERE %s ORDER BY %s LIMIT %d OFFSET %d",
+			automationCols,
+			where,
+			order,
+			w.Limit,
+			w.Offset,
+		),
+		args...)
 	if err != nil {
 		return paging.Page[Automation]{}, err
 	}
 	defer rows.Close()
+
 	items := []Automation{}
+
 	for rows.Next() {
 		x, err := scanAutomation(rows)
 		if err != nil {
 			return paging.Page[Automation]{}, err
 		}
+
 		items = append(items, x)
 	}
+
 	if err := rows.Err(); err != nil {
 		return paging.Page[Automation]{}, err
 	}
-	return paging.Page[Automation]{Items: items, NextCursor: w.Next(total), Total: total, SnapshotVersion: w.Snapshot}, nil
+
+	return paging.Page[Automation]{
+		Items:           items,
+		NextCursor:      w.Next(total),
+		Total:           total,
+		SnapshotVersion: w.Snapshot,
+	}, nil
 }
 
 // AutomationInput is automations.save input.
@@ -222,10 +318,10 @@ type AutomationInput struct {
 	EndLocal    string          `json:"endLocal,omitempty"`
 	EndsNextDay *bool           `json:"endsNextDay,omitempty"`
 	StartAction json.RawMessage `json:"startAction,omitempty" swaggertype:"object"`
-	EndAction   json.RawMessage `json:"endAction,omitempty" swaggertype:"object"`
-	Condition   json.RawMessage `json:"condition,omitempty" swaggertype:"object"`
-	Action      json.RawMessage `json:"action,omitempty" swaggertype:"object"`
-	OnlyIf      json.RawMessage `json:"onlyIf,omitempty" swaggertype:"object"`
+	EndAction   json.RawMessage `json:"endAction,omitempty"   swaggertype:"object"`
+	Condition   json.RawMessage `json:"condition,omitempty"   swaggertype:"object"`
+	Action      json.RawMessage `json:"action,omitempty"      swaggertype:"object"`
+	OnlyIf      json.RawMessage `json:"onlyIf,omitempty"      swaggertype:"object"`
 	actions     []UnitAction
 	condition   condition
 	extras      []extraCondition
@@ -248,48 +344,64 @@ func parseExtras(raw json.RawMessage, kind, conditionType string) ([]extraCondit
 	if len(raw) == 0 || string(raw) == "null" {
 		return out, ""
 	}
+
 	dec := json.NewDecoder(strings.NewReader(string(raw)))
 	dec.DisallowUnknownFields()
+
 	if dec.Decode(&out) != nil || len(out) > 3 {
 		return nil, "error.invalid"
 	}
+
 	seen := map[string]bool{}
 	for _, x := range out {
 		if seen[x.Type] {
 			return nil, "errors.duplicate_condition"
 		}
+
 		seen[x.Type] = true
 		switch x.Type {
 		case "weekday":
 			if kind == "schedule" {
 				return nil, "errors.weekday_on_schedule"
 			}
+
 			days := map[int]bool{}
 			for _, d := range x.Weekdays {
 				if d < 1 || d > 7 || days[d] {
 					return nil, "error.invalid"
 				}
+
 				days[d] = true
 			}
-			if len(x.Weekdays) == 0 || x.Occupied != nil || x.Metric != nil || x.Operator != nil || x.Value != nil {
+
+			if len(x.Weekdays) == 0 || x.Occupied != nil || x.Metric != nil || x.Operator != nil ||
+				x.Value != nil {
 				return nil, "error.invalid"
 			}
 		case "occupancy":
-			if x.Occupied == nil || x.Weekdays != nil || x.Metric != nil || x.Operator != nil || x.Value != nil {
+			if x.Occupied == nil || x.Weekdays != nil || x.Metric != nil || x.Operator != nil ||
+				x.Value != nil {
 				return nil, "error.invalid"
 			}
 		case "weather":
-			if x.Metric == nil || *x.Metric != "temperature" || x.Operator == nil || !slices.Contains([]string{"gt", "gte", "lt", "lte"}, *x.Operator) ||
-				x.Value == nil || *x.Value < -50 || *x.Value > 100 || x.Weekdays != nil || x.Occupied != nil {
+			if x.Metric == nil || *x.Metric != "temperature" || x.Operator == nil ||
+				!slices.Contains([]string{"gt", "gte", "lt", "lte"}, *x.Operator) ||
+				x.Value == nil ||
+				*x.Value < -50 ||
+				*x.Value > 100 ||
+				x.Weekdays != nil ||
+				x.Occupied != nil {
 				return nil, "error.invalid"
 			}
 		default:
 			return nil, "error.invalid"
 		}
+
 		if x.Type == conditionType {
 			return nil, "errors.duplicate_condition"
 		}
 	}
+
 	return out, ""
 }
 
@@ -308,22 +420,43 @@ type condition struct {
 
 func parseCondition(raw json.RawMessage) (condition, bool) {
 	var x condition
+
 	dec := json.NewDecoder(strings.NewReader(string(raw)))
 	dec.DisallowUnknownFields()
+
 	if len(raw) == 0 || dec.Decode(&x) != nil {
 		return x, false
 	}
+
 	switch x.Type {
 	case "occupancy":
-		return x, x.Occupied != nil && x.Event == nil && x.LocalTime == nil && x.Metric == nil && x.Operator == nil && x.Value == nil
+		return x, x.Occupied != nil && x.Event == nil && x.LocalTime == nil && x.Metric == nil &&
+			x.Operator == nil &&
+			x.Value == nil
 	case "location":
-		return x, x.Event != nil && (*x.Event == "arrival" || *x.Event == "departure") && x.Occupied == nil && x.LocalTime == nil && x.Metric == nil && x.Operator == nil && x.Value == nil
+		return x, x.Event != nil && (*x.Event == "arrival" || *x.Event == "departure") &&
+			x.Occupied == nil &&
+			x.LocalTime == nil &&
+			x.Metric == nil &&
+			x.Operator == nil &&
+			x.Value == nil
 	case "pattern":
-		return x, x.LocalTime != nil && hhmm.MatchString(*x.LocalTime) && x.Occupied == nil && x.Event == nil && x.Metric == nil && x.Operator == nil && x.Value == nil
+		return x, x.LocalTime != nil && hhmm.MatchString(*x.LocalTime) && x.Occupied == nil &&
+			x.Event == nil &&
+			x.Metric == nil &&
+			x.Operator == nil &&
+			x.Value == nil
 	case "weather":
-		return x, x.Metric != nil && *x.Metric == "temperature" && x.Operator != nil && slices.Contains([]string{"gt", "gte", "lt", "lte"}, *x.Operator) &&
-			x.Value != nil && *x.Value >= -50 && *x.Value <= 100 && x.Occupied == nil && x.Event == nil && x.LocalTime == nil
+		return x, x.Metric != nil && *x.Metric == "temperature" && x.Operator != nil &&
+			slices.Contains([]string{"gt", "gte", "lt", "lte"}, *x.Operator) &&
+			x.Value != nil &&
+			*x.Value >= -50 &&
+			*x.Value <= 100 &&
+			x.Occupied == nil &&
+			x.Event == nil &&
+			x.LocalTime == nil
 	}
+
 	return x, false
 }
 
@@ -336,92 +469,124 @@ func validTimezone(tz string) bool {
 	if tz != "UTC" && !strings.Contains(tz, "/") {
 		return false
 	}
+
 	_, err := time.LoadLocation(tz)
+
 	return err == nil
 }
 
 // Validate implements ops.Validator (DD-C04 / DD-C05 / D09).
 func (in *AutomationInput) Validate() map[string]string {
 	fe := map[string]string{}
+
 	in.Name = strings.TrimSpace(in.Name)
 	if n := utf8.RuneCountInString(in.Name); n < 1 || n > 120 {
 		fe["name"] = "error.length"
 	}
+
 	seen := map[uuid.UUID]bool{}
 	for _, u := range in.UnitIDs {
 		if u == uuid.Nil || seen[u] {
 			fe["unitIds"] = "error.invalid"
 		}
+
 		seen[u] = true
 	}
+
 	if len(in.UnitIDs) == 0 || len(in.UnitIDs) > 50 {
 		fe["unitIds"] = "error.invalid"
 	}
+
 	if !validTimezone(in.Timezone) {
 		fe["timezone"] = "error.invalid"
 	}
+
 	if in.Priority < 0 || in.Priority > 100 {
 		fe["priority"] = "error.range"
 	}
+
 	action := func(k string, raw json.RawMessage) {
 		a, ok := ParseAction(raw)
 		if !ok {
 			fe[k] = "error.invalid"
+
 			return
 		}
+
 		in.actions = append(in.actions, a)
 	}
+
 	switch in.Kind {
 	case "schedule":
 		if in.Condition != nil || in.Action != nil {
 			fe["kind"] = "error.invalid"
 		}
+
 		validSchedule(fe, in.Weekdays, in.StartLocal, in.EndLocal, in.EndsNextDay)
 		action("startAction", in.StartAction)
 		action("endAction", in.EndAction)
 	case "event":
-		if in.Weekdays != nil || in.StartLocal != "" || in.EndLocal != "" || in.EndsNextDay != nil || in.StartAction != nil || in.EndAction != nil {
+		if in.Weekdays != nil || in.StartLocal != "" || in.EndLocal != "" ||
+			in.EndsNextDay != nil ||
+			in.StartAction != nil ||
+			in.EndAction != nil {
 			fe["kind"] = "error.invalid"
 		}
+
 		cnd, ok := parseCondition(in.Condition)
 		if !ok {
 			fe["condition"] = "error.invalid"
 		}
+
 		in.condition = cnd
 		action("action", in.Action)
 	default:
 		fe["kind"] = "error.invalid"
 	}
+
 	extras, why := parseExtras(in.OnlyIf, in.Kind, in.condition.Type)
 	if why != "" {
 		fe["onlyIf"] = why
 	}
+
 	in.extras = extras
+
 	return fe
 }
 
 // validSchedule checks the schedule fields (DD-C04): ISO weekdays of the start day without duplicates, HH:mm times
 // that differ, an end at or before the start only as an overnight schedule and never beyond 24 hours.
-func validSchedule(fe map[string]string, weekdays []int, startLocal, endLocal string, endsNextDay *bool) {
+func validSchedule(
+	fe map[string]string,
+	weekdays []int,
+	startLocal, endLocal string,
+	endsNextDay *bool,
+) {
 	days := map[int]bool{}
 	for _, d := range weekdays {
 		if d < 1 || d > 7 || days[d] {
 			fe["weekdays"] = "error.invalid"
 		}
+
 		days[d] = true
 	}
+
 	if len(weekdays) == 0 {
 		fe["weekdays"] = "error.required"
 	}
+
 	if !hhmm.MatchString(startLocal) {
 		fe["startLocal"] = "error.invalid"
 	}
+
 	if !hhmm.MatchString(endLocal) {
 		fe["endLocal"] = "error.invalid"
 	}
+
 	if endsNextDay == nil {
 		fe["endsNextDay"] = "error.required"
 	}
+
 	if fe["startLocal"] == "" && fe["endLocal"] == "" && endsNextDay != nil {
 		s, e := minutesOf(startLocal), minutesOf(endLocal)
 		switch {
@@ -437,41 +602,70 @@ func validSchedule(fe map[string]string, weekdays []int, startLocal, endLocal st
 
 // occurrences lists the schedule's start/end instants from the start day d0 for days days, with the wall time
 // problems found (nonexistent or ambiguous local times, D09).
-func occurrences(def definition, loc *time.Location, d0 time.Time, days int) ([]ScheduledOccurrence, bool) {
+func occurrences(
+	def definition,
+	loc *time.Location,
+	d0 time.Time,
+	days int,
+) ([]ScheduledOccurrence, bool) {
 	var out []ScheduledOccurrence
+
 	bad := false
+
 	at := func(day time.Time, hm string) time.Time {
 		h, mi := minutesOf(hm)/60, minutesOf(hm)%60
 		t := time.Date(day.Year(), day.Month(), day.Day(), h, mi, 0, 0, loc)
+
 		lt := t.In(loc)
 		if lt.Hour() != h || lt.Minute() != mi || lt.Day() != day.Day() { // nonexistent
 			bad = true
 		}
+
 		for _, dd := range []time.Duration{-2 * time.Hour, -time.Hour, -30 * time.Minute, 30 * time.Minute, time.Hour, 2 * time.Hour} {
 			u := t.Add(dd).In(loc)
-			if u.Year() == day.Year() && u.Month() == day.Month() && u.Day() == day.Day() && u.Hour() == h && u.Minute() == mi { // ambiguous
+			if u.Year() == day.Year() && u.Month() == day.Month() && u.Day() == day.Day() &&
+				u.Hour() == h &&
+				u.Minute() == mi { // ambiguous
 				bad = true
 			}
 		}
+
 		return t
 	}
-	for i := 0; i < days; i++ {
+	for i := range days {
 		day := time.Date(d0.Year(), d0.Month(), d0.Day()+i, 12, 0, 0, 0, loc)
+
 		wd := int(day.Weekday())
 		if wd == 0 {
 			wd = 7
 		}
+
 		if !slices.Contains(def.Weekdays, wd) {
 			continue
 		}
+
 		end := day
 		if def.EndsNextDay != nil && *def.EndsNextDay {
 			end = time.Date(day.Year(), day.Month(), day.Day()+1, 12, 0, 0, 0, loc)
 		}
-		out = append(out, ScheduledOccurrence{Phase: "schedule_start", At: at(day, def.StartLocal).UTC(), Action: def.StartAction},
-			ScheduledOccurrence{Phase: "schedule_end", At: at(end, def.EndLocal).UTC(), Action: def.EndAction})
+
+		out = append(
+			out,
+			ScheduledOccurrence{
+				Phase:  "schedule_start",
+				At:     at(day, def.StartLocal).UTC(),
+				Action: def.StartAction,
+			},
+			ScheduledOccurrence{
+				Phase:  "schedule_end",
+				At:     at(end, def.EndLocal).UTC(),
+				Action: def.EndAction,
+			},
+		)
 	}
+
 	sort.SliceStable(out, func(i, j int) bool { return out[i].At.Before(out[j].At) })
+
 	return out, bad
 }
 
@@ -480,7 +674,7 @@ type ScheduledOccurrence struct {
 	AutomationID *uuid.UUID      `json:"automationId"` // null for a draft preview
 	Phase        string          `json:"phase"`
 	At           time.Time       `json:"at"`
-	Action       json.RawMessage `json:"action" swaggertype:"object"`
+	Action       json.RawMessage `json:"action"       swaggertype:"object"`
 }
 
 // @Summary		automations.save (write)
@@ -505,56 +699,96 @@ type ScheduledOccurrence struct {
 // @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/automations [post]
-func (m Automations) save(ctx context.Context, c *ops.Call, in *AutomationInput) (Automation, error) {
+func (m Automations) save(
+	ctx context.Context,
+	c *ops.Call,
+	in *AutomationInput,
+) (Automation, error) {
 	for _, u := range in.UnitIDs { // own, not archived units whose capabilities support every action
 		t, found, err := m.Units.Target(ctx, c, u)
 		if err != nil {
 			return Automation{}, err
 		}
+
 		if !found || t.OrgID != c.Principal.OrgID {
 			return Automation{}, apperr.E(apperr.NotFound, "error.notFound")
 		}
+
 		var archived bool
-		if err := c.Tx.QueryRow(ctx, `SELECT archived FROM assets.units WHERE id = $1`, u).Scan(&archived); err != nil {
+		if err := c.Tx.QueryRow(ctx, `SELECT archived FROM assets.units WHERE id = $1`, u).
+			Scan(&archived); err != nil {
 			return Automation{}, err
 		}
+
 		if archived {
 			return Automation{}, apperr.E(apperr.Conflict, "errors.unit_archived")
 		}
+
 		for _, a := range in.actions {
 			if !a.Supports(t.Caps) {
-				return Automation{}, apperr.Fields(map[string]string{"unitIds": "error.unsupportedAction"})
+				return Automation{}, apperr.Fields(
+					map[string]string{"unitIds": "error.unsupportedAction"},
+				)
 			}
 		}
 	}
-	if in.Kind == "event" && in.condition.Type == "location" { // location conditions need the owner's consent (SR02)
-		granted, err := identity.ConsentGranted(ctx, c, c.Principal.MembershipID, "location_automation") // identity's record (IR194)
+
+	if in.Kind == "event" &&
+		in.condition.Type == "location" { // location conditions need the owner's consent (SR02)
+		granted, err := identity.ConsentGranted(
+			ctx,
+			c,
+			c.Principal.MembershipID,
+			"location_automation",
+		) // identity's record (IR194)
 		if err != nil {
 			return Automation{}, err
 		}
+
 		if !granted {
-			return Automation{}, apperr.Fields(map[string]string{"condition": "errors.consent_required"})
+			return Automation{}, apperr.Fields(
+				map[string]string{"condition": "errors.consent_required"},
+			)
 		}
 	}
-	def := definition{Weekdays: in.Weekdays, StartLocal: in.StartLocal, EndLocal: in.EndLocal, EndsNextDay: in.EndsNextDay, StartAction: in.StartAction, EndAction: in.EndAction,
-		Condition: in.Condition, Action: in.Action}
+
+	def := definition{
+		Weekdays:    in.Weekdays,
+		StartLocal:  in.StartLocal,
+		EndLocal:    in.EndLocal,
+		EndsNextDay: in.EndsNextDay,
+		StartAction: in.StartAction,
+		EndAction:   in.EndAction,
+		Condition:   in.Condition,
+		Action:      in.Action,
+	}
 	if len(in.extras) > 0 {
 		def.OnlyIf, _ = json.Marshal(in.extras)
 	}
+
 	if in.Kind == "schedule" {
 		loc, _ := time.LoadLocation(in.Timezone)
 		if _, bad := occurrences(def, loc, c.Now.In(loc), 367); bad {
-			return Automation{}, apperr.Fields(map[string]string{"startLocal": "errors.local_time_invalid"})
+			return Automation{}, apperr.Fields(
+				map[string]string{"startLocal": "errors.local_time_invalid"},
+			)
 		}
 	}
+
 	raw, _ := json.Marshal(def)
-	var id uuid.UUID
-	var prev *int
+
+	var (
+		id   uuid.UUID
+		prev *int
+	)
+
 	version := 1
+
 	if in.ID == nil {
 		if err := c.Tx.QueryRow(ctx, `INSERT INTO control.automations (tenant_id, customer_org_id, kind, name, owner_membership_id, created_by_user_id, timezone, enabled, priority,
 			definition, created_at, updated_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10) RETURNING id`,
-			c.Principal.OrgID, in.Kind, in.Name, c.Principal.MembershipID, c.Principal.UserID, in.Timezone, in.Enabled, in.Priority, raw, c.Now).Scan(&id); err != nil {
+			c.Principal.OrgID, in.Kind, in.Name, c.Principal.MembershipID, c.Principal.UserID, in.Timezone, in.Enabled, in.Priority, raw, c.Now).
+			Scan(&id); err != nil {
 			return Automation{}, err
 		}
 	} else {
@@ -562,29 +796,62 @@ func (m Automations) save(ctx context.Context, c *ops.Call, in *AutomationInput)
 		if err != nil {
 			return cur, err
 		}
+
 		if cur.Version != *c.ExpectedVersion {
 			return cur, apperr.E(apperr.Conflict, "error.versionConflict")
 		}
+
 		if cur.Kind != in.Kind {
 			return cur, apperr.Fields(map[string]string{"kind": "error.immutable"})
 		}
 		// IR27: explicit enabling rechecks (done above) and clears the stop reason; editing while disabled keeps it
-		if _, err := c.Tx.Exec(ctx, `UPDATE control.automations SET name = $2, timezone = $3, enabled = $4, priority = $5, definition = $6,
+		if _, err := c.Tx.Exec(
+			ctx,
+			`UPDATE control.automations SET name = $2, timezone = $3, enabled = $4, priority = $5, definition = $6,
 			disabled_reason = CASE WHEN $4 THEN NULL ELSE disabled_reason END, version = version + 1, updated_at = $7 WHERE id = $1`,
-			cur.ID, in.Name, in.Timezone, in.Enabled, in.Priority, raw, c.Now); err != nil {
+			cur.ID,
+			in.Name,
+			in.Timezone,
+			in.Enabled,
+			in.Priority,
+			raw,
+			c.Now,
+		); err != nil {
 			return cur, err
 		}
-		if _, err := c.Tx.Exec(ctx, `DELETE FROM control.automation_units WHERE automation_id = $1`, cur.ID); err != nil {
+
+		if _, err := c.Tx.Exec(
+			ctx,
+			`DELETE FROM control.automation_units WHERE automation_id = $1`,
+			cur.ID,
+		); err != nil {
 			return cur, err
 		}
+
 		id, prev, version = cur.ID, c.ExpectedVersion, cur.Version+1
 	}
+
 	for _, u := range in.UnitIDs {
-		if _, err := c.Tx.Exec(ctx, `INSERT INTO control.automation_units (tenant_id, automation_id, unit_id) VALUES (current_setting('app.tenant_id')::uuid, $1, $2)`, id, u); err != nil {
+		if _, err := c.Tx.Exec(
+			ctx,
+			`INSERT INTO control.automation_units (tenant_id, automation_id, unit_id) VALUES (current_setting('app.tenant_id')::uuid, $1, $2)`,
+			id,
+			u,
+		); err != nil {
 			return Automation{}, err
 		}
 	}
-	c.Audit(ops.AuditEntry{Action: "automations.save", TargetKind: "automation", TargetID: id.String(), PreviousVersion: prev, NextVersion: &version})
+
+	c.Audit(
+		ops.AuditEntry{
+			Action:          "automations.save",
+			TargetKind:      "automation",
+			TargetID:        id.String(),
+			PreviousVersion: prev,
+			NextVersion:     &version,
+		},
+	)
+
 	return m.load(ctx, c, id, false)
 }
 
@@ -596,7 +863,7 @@ type ScheduleDraft struct {
 	EndLocal    string          `json:"endLocal"`
 	EndsNextDay *bool           `json:"endsNextDay"`
 	StartAction json.RawMessage `json:"startAction" swaggertype:"object"`
-	EndAction   json.RawMessage `json:"endAction" swaggertype:"object"`
+	EndAction   json.RawMessage `json:"endAction"   swaggertype:"object"`
 }
 
 // NextRunsInput is automations.nextRuns input: a saved schedule rule or an unsaved draft.
@@ -609,6 +876,7 @@ type NextRunsInput struct {
 // Validate implements ops.Validator (count is fixed to 8; a draft is checked like automations.save, IR214).
 func (in *NextRunsInput) Validate() map[string]string {
 	fe := map[string]string{}
+
 	switch {
 	case (in.AutomationID == nil) == (in.Draft == nil):
 		fe["automationId"] = "error.exactlyOneTarget"
@@ -619,20 +887,25 @@ func (in *NextRunsInput) Validate() map[string]string {
 		if !validTimezone(d.Timezone) {
 			fe["draft.timezone"] = "error.invalid"
 		}
+
 		sub := map[string]string{}
 		validSchedule(sub, d.Weekdays, d.StartLocal, d.EndLocal, d.EndsNextDay)
+
 		for k, v := range sub {
 			fe["draft."+k] = v
 		}
+
 		for k, raw := range map[string]json.RawMessage{"draft.startAction": d.StartAction, "draft.endAction": d.EndAction} {
 			if _, ok := ParseAction(raw); !ok {
 				fe[k] = "error.invalid"
 			}
 		}
 	}
+
 	if in.Count != 8 {
 		fe["count"] = "error.invalid"
 	}
+
 	return fe
 }
 
@@ -661,31 +934,59 @@ func (in *NextRunsInput) Validate() map[string]string {
 //	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/automations/next-runs [post]
-func (m Automations) nextRuns(ctx context.Context, c *ops.Call, in *NextRunsInput) ([]ScheduledOccurrence, error) {
-	var id *uuid.UUID
-	var def definition
-	var tz string
+func (m Automations) nextRuns(
+	ctx context.Context,
+	c *ops.Call,
+	in *NextRunsInput,
+) ([]ScheduledOccurrence, error) {
+	var (
+		id  *uuid.UUID
+		def definition
+		tz  string
+	)
+
 	if in.Draft != nil {
 		d := in.Draft
-		def = definition{Weekdays: d.Weekdays, StartLocal: d.StartLocal, EndLocal: d.EndLocal, EndsNextDay: d.EndsNextDay, StartAction: d.StartAction, EndAction: d.EndAction}
+		def = definition{
+			Weekdays:    d.Weekdays,
+			StartLocal:  d.StartLocal,
+			EndLocal:    d.EndLocal,
+			EndsNextDay: d.EndsNextDay,
+			StartAction: d.StartAction,
+			EndAction:   d.EndAction,
+		}
 		tz = d.Timezone
+
 		loc, _ := time.LoadLocation(tz)
 		if _, bad := occurrences(def, loc, c.Now.In(loc), 367); bad {
-			return nil, apperr.Fields(map[string]string{"draft.startLocal": "errors.local_time_invalid"})
+			return nil, apperr.Fields(
+				map[string]string{"draft.startLocal": "errors.local_time_invalid"},
+			)
 		}
 	} else {
 		x, err := m.load(ctx, c, *in.AutomationID, false)
 		if err != nil {
 			return nil, err
 		}
+
 		if x.Kind != "schedule" {
 			return nil, apperr.Fields(map[string]string{"automationId": "errors.not_schedule"})
 		}
-		def = definition{Weekdays: x.Weekdays, StartLocal: x.StartLocal, EndLocal: x.EndLocal, EndsNextDay: x.EndsNextDay, StartAction: x.StartAction, EndAction: x.EndAction}
+
+		def = definition{
+			Weekdays:    x.Weekdays,
+			StartLocal:  x.StartLocal,
+			EndLocal:    x.EndLocal,
+			EndsNextDay: x.EndsNextDay,
+			StartAction: x.StartAction,
+			EndAction:   x.EndAction,
+		}
 		tz, id = x.Timezone, &x.ID
 	}
+
 	loc, _ := time.LoadLocation(tz)
 	occ, _ := occurrences(def, loc, c.Now.In(loc).AddDate(0, 0, -1), 30)
+
 	out := []ScheduledOccurrence{}
 	for _, o := range occ {
 		if o.At.After(c.Now) && len(out) < in.Count {
@@ -693,6 +994,7 @@ func (m Automations) nextRuns(ctx context.Context, c *ops.Call, in *NextRunsInpu
 			out = append(out, o)
 		}
 	}
+
 	return out, nil
 }
 
@@ -706,6 +1008,7 @@ func (in *AutomationIDInput) Validate() map[string]string {
 	if in.ID == uuid.Nil {
 		return map[string]string{"id": "error.required"}
 	}
+
 	return nil
 }
 
@@ -741,19 +1044,45 @@ type Deleted struct {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/automations/{id} [delete]
-func (m Automations) delete(ctx context.Context, c *ops.Call, in *AutomationIDInput) (Deleted, error) {
+func (m Automations) delete(
+	ctx context.Context,
+	c *ops.Call,
+	in *AutomationIDInput,
+) (Deleted, error) {
 	cur, err := m.load(ctx, c, in.ID, true)
 	if err != nil {
 		return Deleted{}, err
 	}
+
 	if cur.Version != *c.ExpectedVersion {
 		return Deleted{}, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
-	if _, err := c.Tx.Exec(ctx, `DELETE FROM control.automations WHERE id = $1`, cur.ID); err != nil { // units follow (cascade)
+
+	if _, err := c.Tx.Exec(
+		ctx,
+		`DELETE FROM control.automations WHERE id = $1`,
+		cur.ID,
+	); err != nil { // units follow (cascade)
 		return Deleted{}, err
 	}
-	c.Emit(ops.Event{AggregateType: "automation", AggregateID: cur.ID, Type: "AutomationDeleted", Payload: map[string]any{"kind": cur.Kind}})
-	c.Audit(ops.AuditEntry{Action: "automations.delete", TargetKind: "automation", TargetID: cur.ID.String(), PreviousVersion: c.ExpectedVersion})
+
+	c.Emit(
+		ops.Event{
+			AggregateType: "automation",
+			AggregateID:   cur.ID,
+			Type:          "AutomationDeleted",
+			Payload:       map[string]any{"kind": cur.Kind},
+		},
+	)
+	c.Audit(
+		ops.AuditEntry{
+			Action:          "automations.delete",
+			TargetKind:      "automation",
+			TargetID:        cur.ID.String(),
+			PreviousVersion: c.ExpectedVersion,
+		},
+	)
+
 	return Deleted{ID: cur.ID, Deleted: true}, nil
 }
 

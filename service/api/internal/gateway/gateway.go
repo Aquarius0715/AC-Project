@@ -27,18 +27,23 @@ type Targets map[string]*url.URL
 // TargetsFromEnv reads <DOMAIN>_API_URL for every domain (IDENTITY_API_URL, EQUIPMENT_API_URL, …).
 func TargetsFromEnv(getenv func(string) string) (Targets, error) {
 	t := Targets{}
+
 	for _, d := range ops.Domains {
 		key := envKey(d)
+
 		raw := getenv(key)
 		if raw == "" {
 			return nil, fmt.Errorf("gateway: %s is required", key)
 		}
+
 		u, err := url.Parse(raw)
 		if err != nil || u.Scheme == "" || u.Host == "" {
 			return nil, fmt.Errorf("gateway: %s is not an absolute URL", key)
 		}
+
 		t[d] = u
 	}
+
 	return t, nil
 }
 
@@ -49,6 +54,7 @@ func envKey(domain string) string {
 			b[i] = c - 32
 		}
 	}
+
 	return string(b) + "_API_URL"
 }
 
@@ -64,6 +70,7 @@ func setNotSniffedOrCached(h http.Header) {
 func notSniffedOrCached(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c *echo.Context) error {
 		setNotSniffedOrCached(c.Response().Header())
+
 		return next(c)
 	}
 }
@@ -74,6 +81,7 @@ func New(targets Targets, logger *slog.Logger) *echo.Echo {
 	if logger != nil {
 		e.Logger = logger
 	}
+
 	e.HTTPErrorHandler = ops.HTTPErrorHandler
 	e.Use(middleware.Recover())
 	// the request ID is the gateway's own: one a client sends is dropped, so no caller chooses the correlation ID the
@@ -81,41 +89,68 @@ func New(targets Targets, logger *slog.Logger) *echo.Echo {
 	e.Pre(func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
 			c.Request().Header.Del(echo.HeaderXRequestID)
+
 			return next(c)
 		}
 	})
-	e.Use(middleware.RequestIDWithConfig(middleware.RequestIDConfig{Generator: func() string { return uuid.Must(uuid.NewV7()).String() }}))
+	e.Use(
+		middleware.RequestIDWithConfig(
+			middleware.RequestIDConfig{
+				Generator: func() string { return uuid.Must(uuid.NewV7()).String() },
+			},
+		),
+	)
 	e.Use(notSniffedOrCached)
+
 	proxies := map[string]*httputil.ReverseProxy{}
+
 	for d, u := range targets {
 		p := httputil.NewSingleHostReverseProxy(u)
-		p.Transport = &http.Transport{ResponseHeaderTimeout: 35 * time.Second, MaxIdleConnsPerHost: 64}
+		p.Transport = &http.Transport{
+			ResponseHeaderTimeout: 35 * time.Second,
+			MaxIdleConnsPerHost:   64,
+		}
 		// the gateway's middleware sets the request ID and the two headers on every response; the upstream's copies of
 		// them are dropped here, or the proxy would add them a second time (IR407)
 		p.ModifyResponse = func(resp *http.Response) error {
 			resp.Header.Del(echo.HeaderXRequestID)
 			resp.Header.Del("X-Content-Type-Options")
 			resp.Header.Del("Cache-Control")
+
 			return nil
 		}
 		p.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
 			e.Logger.Error("upstream failed", "domain", d, "error", err)
+
 			de := apperr.E(apperr.Unavailable, "error.unavailable")
 			de.CorrelationID = w.Header().Get(echo.HeaderXRequestID)
 			w.Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 			w.WriteHeader(de.HTTPStatus())
-			_, _ = fmt.Fprintf(w, `{"code":%q,"messageKey":%q,"fieldErrors":{},"correlationId":%q,"retryAfterSeconds":null}`, de.Code, de.MessageKey, de.CorrelationID)
+			_, _ = fmt.Fprintf(
+				w,
+				`{"code":%q,"messageKey":%q,"fieldErrors":{},"correlationId":%q,"retryAfterSeconds":null}`,
+				de.Code,
+				de.MessageKey,
+				de.CorrelationID,
+			)
 		}
 		proxies[d] = p
 	}
+
 	e.GET("/healthz", func(c *echo.Context) error { return c.NoContent(http.StatusOK) })
-	mountDocs(e)                    // /docs and /swagger.json (IR220)
+	mountDocs(e) // /docs and /swagger.json (IR220)
+
 	for _, s := range ops.Catalog { // REST routes go to the owning service unchanged (IR222)
 		p := proxies[ops.DomainOf(s.Name)]
 		for _, rt := range s.Routes {
-			e.Add(rt.Method, ops.EchoPath(rt.Path), func(c *echo.Context) error { return forward(c, p) })
+			e.Add(
+				rt.Method,
+				ops.EchoPath(rt.Path),
+				func(c *echo.Context) error { return forward(c, p) },
+			)
 		}
 	}
+
 	return e
 }
 
@@ -126,5 +161,6 @@ func forward(c *echo.Context, p *httputil.ReverseProxy) error {
 	// the services keep the correlation ID: forward the one this request got
 	c.Request().Header.Set(echo.HeaderXRequestID, c.Response().Header().Get(echo.HeaderXRequestID))
 	p.ServeHTTP(c.Response(), c.Request())
+
 	return nil
 }

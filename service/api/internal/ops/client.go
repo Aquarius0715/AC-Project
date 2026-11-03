@@ -26,21 +26,33 @@ func ClientRequest(operation, input string) (string, string, io.Reader) {
 	if !ok || len(spec.Routes) == 0 {
 		return http.MethodPost, "/v1/" + operation, strings.NewReader(input)
 	}
+
 	var in map[string]any
+
 	dec := json.NewDecoder(strings.NewReader(input))
 	dec.UseNumber()
+
 	parsed := strings.TrimSpace(input) == "" || dec.Decode(&in) == nil && in != nil && !dec.More()
 	if in == nil {
 		in = map[string]any{}
 	}
+
 	rt := pickRoute(spec.Routes, in)
+
 	path := rt.Path
 	for _, p := range PathParams(rt.Path) {
-		path = strings.Replace(path, "{"+p+"}", url.PathEscape(paramText(takeAt(in, strings.Split(p, ".")))), 1)
+		path = strings.Replace(
+			path,
+			"{"+p+"}",
+			url.PathEscape(paramText(takeAt(in, strings.Split(p, ".")))),
+			1,
+		)
 	}
+
 	if f := rt.FixedField; f != "" && paramText(in[f]) == rt.FixedValue {
 		delete(in, f)
 	}
+
 	if rt.Method == http.MethodGet || rt.Method == http.MethodDelete {
 		q := url.Values{}
 		if parsed {
@@ -48,15 +60,20 @@ func ClientRequest(operation, input string) (string, string, io.Reader) {
 		} else {
 			q.Set("_", input)
 		}
+
 		if len(q) > 0 {
 			path += "?" + q.Encode()
 		}
+
 		return rt.Method, path, nil
 	}
+
 	if !parsed {
 		return rt.Method, path, strings.NewReader(input)
 	}
+
 	b, _ := json.Marshal(in)
+
 	return rt.Method, path, bytes.NewReader(b)
 }
 
@@ -67,18 +84,24 @@ func pickRoute(routes []Route, in map[string]any) Route {
 		if rt.FixedField != "" && paramText(in[rt.FixedField]) != rt.FixedValue {
 			continue
 		}
+
 		n := 0
+
 		for _, p := range PathParams(rt.Path) {
 			if lookupAt(in, strings.Split(p, ".")) == nil {
 				n = -1
+
 				break
 			}
+
 			n++
 		}
+
 		if n > score {
 			best, score = rt, n
 		}
 	}
+
 	return best
 }
 
@@ -88,8 +111,10 @@ func lookupAt(obj map[string]any, at []string) any {
 		if !ok {
 			return nil
 		}
+
 		obj = next
 	}
+
 	return obj[at[len(at)-1]]
 }
 
@@ -99,10 +124,13 @@ func takeAt(obj map[string]any, at []string) any {
 		if !ok {
 			return nil
 		}
+
 		obj = next
 	}
+
 	v := obj[at[len(at)-1]]
 	delete(obj, at[len(at)-1])
+
 	return v
 }
 
@@ -116,11 +144,14 @@ func paramText(v any) string {
 		if x {
 			return "true"
 		}
+
 		return "false"
 	case json.Number:
 		return x.String()
 	}
+
 	b, _ := json.Marshal(v)
+
 	return string(b)
 }
 
@@ -141,6 +172,7 @@ func flattenQuery(q url.Values, prefix string, obj map[string]any, top bool) {
 			if len(x) == 0 { // the empty list
 				q.Add(prefix+k, "")
 			}
+
 			for _, e := range x {
 				q.Add(prefix+k, paramText(e))
 			}

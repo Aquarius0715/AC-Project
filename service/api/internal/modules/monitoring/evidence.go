@@ -27,7 +27,12 @@ type DeviceRecovery struct {
 
 // DeviceRecoveries reads the recovery events of the devices linked to an alert since a time (devices, IR327).
 type DeviceRecoveries interface {
-	AlertRecoveries(ctx context.Context, c *ops.Call, alert uuid.UUID, since time.Time) ([]DeviceRecovery, error)
+	AlertRecoveries(
+		ctx context.Context,
+		c *ops.Call,
+		alert uuid.UUID,
+		since time.Time,
+	) ([]DeviceRecovery, error)
 }
 
 // EvidenceCandidate is EvidenceCandidate of service-contracts.ts: a record that may support an alert's resolution.
@@ -55,6 +60,7 @@ func ruleMetric(a Alert) *string {
 	if a.Rule == nil || a.Rule.Metric == "" {
 		return nil
 	}
+
 	return &a.Rule.Metric
 }
 
@@ -66,41 +72,78 @@ func (m Alerts) candidates(ctx context.Context, c *ops.Call, a Alert) ([]Evidenc
 	for _, id := range a.EvidenceIDs {
 		out = append(out, EvidenceCandidate{ID: id, Kind: "detection", ObservedAt: a.ObservedAt})
 	}
-	rows, err := c.Tx.Query(ctx, `SELECT m.event_id, m.observed_at, m.metric, m.value, m.unit, m.origin, m.quality `+remeasurementSQL+`
-		ORDER BY m.observed_at DESC, m.sequence DESC, m.event_id LIMIT `+strconv.Itoa(maxRemeasurements), a.UnitID, a.DetectedAt, ruleMetric(a))
+
+	rows, err := c.Tx.Query(
+		ctx,
+		`SELECT m.event_id, m.observed_at, m.metric, m.value, m.unit, m.origin, m.quality `+remeasurementSQL+`
+		ORDER BY m.observed_at DESC, m.sequence DESC, m.event_id LIMIT `+strconv.Itoa(
+			maxRemeasurements,
+		),
+		a.UnitID,
+		a.DetectedAt,
+		ruleMetric(a),
+	)
 	if err != nil {
 		return nil, err
 	}
+
 	for rows.Next() {
-		var x EvidenceCandidate
-		var metric, unit, origin, quality string
-		if err := rows.Scan(&x.ID, &x.ObservedAt, &metric, &x.Value, &unit, &origin, &quality); err != nil {
+		var (
+			x                             EvidenceCandidate
+			metric, unit, origin, quality string
+		)
+		if err := rows.Scan(
+			&x.ID,
+			&x.ObservedAt,
+			&metric,
+			&x.Value,
+			&unit,
+			&origin,
+			&quality,
+		); err != nil {
 			rows.Close()
+
 			return nil, err
 		}
+
 		x.Kind, x.Metric, x.Unit, x.Origin, x.Quality = "remeasurement", &metric, &unit, &origin, &quality
 		out = append(out, x)
 	}
+
 	rows.Close()
+
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+
 	if m.Devices != nil {
 		recs, err := m.Devices.AlertRecoveries(ctx, c, a.ID, a.DetectedAt)
 		if err != nil {
 			return nil, err
 		}
+
 		for _, r := range recs {
 			typ := r.EventType
-			out = append(out, EvidenceCandidate{ID: r.ID, Kind: "device_event", ObservedAt: r.OccurredAt, EventType: &typ})
+			out = append(
+				out,
+				EvidenceCandidate{
+					ID:         r.ID,
+					Kind:       "device_event",
+					ObservedAt: r.OccurredAt,
+					EventType:  &typ,
+				},
+			)
 		}
 	}
+
 	slices.SortStableFunc(out, func(x, y EvidenceCandidate) int {
 		if c := y.ObservedAt.Compare(x.ObservedAt); c != 0 {
 			return c
 		}
+
 		return strings.Compare(x.ID.String(), y.ID.String())
 	})
+
 	return out, nil
 }
 
@@ -109,17 +152,23 @@ func (m Alerts) isCandidate(ctx context.Context, c *ops.Call, a Alert, id uuid.U
 	if slices.Contains(a.EvidenceIDs, id) {
 		return true, nil
 	}
+
 	var ok bool
-	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 `+remeasurementSQL+` AND m.event_id = $4)`, a.UnitID, a.DetectedAt, ruleMetric(a), id).Scan(&ok); err != nil || ok {
+	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 `+remeasurementSQL+` AND m.event_id = $4)`, a.UnitID, a.DetectedAt, ruleMetric(a), id).
+		Scan(&ok); err != nil ||
+		ok {
 		return ok, err
 	}
+
 	if m.Devices == nil {
 		return false, nil
 	}
+
 	recs, err := m.Devices.AlertRecoveries(ctx, c, a.ID, a.DetectedAt)
 	if err != nil {
 		return false, err
 	}
+
 	return slices.ContainsFunc(recs, func(r DeviceRecovery) bool { return r.ID == id }), nil
 }
 
@@ -129,8 +178,10 @@ func distinct(ids []uuid.UUID) bool {
 		if seen[id] {
 			return false
 		}
+
 		seen[id] = true
 	}
+
 	return true
 }
 
@@ -139,19 +190,27 @@ func distinct(ids []uuid.UUID) bool {
 func (m Alerts) checkEvidence(ctx context.Context, c *ops.Call, a Alert, ids []uuid.UUID) error {
 	if len(ids) == 0 {
 		if a.PolicyID == nil {
-			return apperr.Fields(map[string]string{"resolutionEvidenceIds": "errors.evidence_required"})
+			return apperr.Fields(
+				map[string]string{"resolutionEvidenceIds": "errors.evidence_required"},
+			)
 		}
+
 		return nil
 	}
+
 	for _, id := range ids {
 		ok, err := m.isCandidate(ctx, c, a, id)
 		if err != nil {
 			return err
 		}
+
 		if !ok {
-			return apperr.Fields(map[string]string{"resolutionEvidenceIds": "errors.evidence_unknown"})
+			return apperr.Fields(
+				map[string]string{"resolutionEvidenceIds": "errors.evidence_unknown"},
+			)
 		}
 	}
+
 	return nil
 }
 
@@ -166,6 +225,7 @@ func (in *EvidenceInput) Validate() map[string]string {
 	if in.AlertID == uuid.Nil {
 		return map[string]string{"alertId": "error.required"}
 	}
+
 	return nil
 }
 
@@ -193,38 +253,65 @@ func (in *EvidenceInput) Validate() map[string]string {
 // @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/alerts/{alertId}/evidence [get]
-func (m Alerts) evidence(ctx context.Context, c *ops.Call, in *EvidenceInput) (paging.Page[EvidenceCandidate], error) {
+func (m Alerts) evidence(
+	ctx context.Context,
+	c *ops.Call,
+	in *EvidenceInput,
+) (paging.Page[EvidenceCandidate], error) {
 	if err := paging.NoFilters(in.Query, "query.filters"); err != nil {
 		return paging.Page[EvidenceCandidate]{}, err
 	}
+
 	args := []any{in.AlertID}
-	a, err := scanAlert(c.Tx.QueryRow(ctx, "SELECT "+alertCols+" FROM monitoring.alerts a WHERE a.id = $1 AND "+alertScope(c, &args, unitscope.List), args...))
+
+	a, err := scanAlert(
+		c.Tx.QueryRow(
+			ctx,
+			"SELECT "+alertCols+" FROM monitoring.alerts a WHERE a.id = $1 AND "+alertScope(
+				c,
+				&args,
+				unitscope.List,
+			),
+			args...),
+	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return paging.Page[EvidenceCandidate]{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
+
 	if err != nil {
 		return paging.Page[EvidenceCandidate]{}, err
 	}
+
 	if err := unitscope.Gate(ctx, c, []uuid.UUID{a.UnitID}); err != nil {
 		return paging.Page[EvidenceCandidate]{}, err
 	}
+
 	all, err := m.candidates(ctx, c, a)
 	if err != nil {
 		return paging.Page[EvidenceCandidate]{}, err
 	}
+
 	if err := paging.SortSlice(all, in.Query.Sort, map[string]func(x, y EvidenceCandidate) int{
 		"id":         func(x, y EvidenceCandidate) int { return strings.Compare(x.ID.String(), y.ID.String()) },
 		"observedAt": func(x, y EvidenceCandidate) int { return x.ObservedAt.Compare(y.ObservedAt) },
 	}); err != nil {
 		return paging.Page[EvidenceCandidate]{}, err
 	}
+
 	w, err := paging.Resolve(in.Query, in.AlertID, c.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[EvidenceCandidate]{}, err
 	}
+
 	items := []EvidenceCandidate{}
 	for i := w.Offset; i < len(all) && i < w.Offset+w.Limit; i++ {
 		items = append(items, all[i])
 	}
-	return paging.Page[EvidenceCandidate]{Items: items, NextCursor: w.Next(len(all)), Total: len(all), SnapshotVersion: w.Snapshot}, nil
+
+	return paging.Page[EvidenceCandidate]{
+		Items:           items,
+		NextCursor:      w.Next(len(all)),
+		Total:           len(all),
+		SnapshotVersion: w.Snapshot,
+	}, nil
 }

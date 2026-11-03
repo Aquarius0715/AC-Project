@@ -14,11 +14,21 @@ import (
 func TestSearchIsLiteral(t *testing.T) {
 	s := server(t)
 	// a part and a contractor whose names hold a % and an _ (the seed's do not)
-	owner(t, `INSERT INTO maintenance.parts_catalog (code, tenant_id, name) VALUES ('SEAL_50', $1, 'Seal kit 50% grade') ON CONFLICT DO NOTHING`, seed.ID("tenant-a"))
+	owner(
+		t,
+		`INSERT INTO maintenance.parts_catalog (code, tenant_id, name) VALUES ('SEAL_50', $1, 'Seal kit 50% grade') ON CONFLICT DO NOTHING`,
+		seed.ID("tenant-a"),
+	)
 	org := seed.ID("org-test-search")
-	owner(t, `INSERT INTO maintenance.contractors (tenant_id, organization_id, name, status, registration_no, contact_email, delegation)
+	owner(
+		t,
+		`INSERT INTO maintenance.contractors (tenant_id, organization_id, name, status, registration_no, contact_email, delegation)
 		VALUES ($1, $2, 'Search Test 50%_Cooling', 'active', 'REG_TEST', 'search@partner.example', tstzrange($3, $4)) ON CONFLICT (organization_id) DO NOTHING`,
-		seed.ID("tenant-a"), org, clock.Add(-time.Hour), clock.Add(1000*time.Hour))
+		seed.ID("tenant-a"),
+		org,
+		clock.Add(-time.Hour),
+		clock.Add(1000*time.Hour),
+	)
 	t.Cleanup(func() {
 		owner(t, `DELETE FROM maintenance.parts_catalog WHERE code = 'SEAL_50'`)
 		owner(t, `DELETE FROM maintenance.contractors WHERE organization_id = $1`, org)
@@ -26,14 +36,23 @@ func TestSearchIsLiteral(t *testing.T) {
 
 	search := func(op, term string) []map[string]any {
 		t.Helper()
-		b, _ := json.Marshal(map[string]any{"filters": map[string]any{"search": term}, "limit": 100})
+
+		b, _ := json.Marshal(
+			map[string]any{"filters": map[string]any{"search": term}, "limit": 100},
+		)
+
 		code, m := post(s, &hq, op, string(b))
 		if code != 200 {
 			t.Fatalf("%s search %q: %d %v", op, term, code, m)
 		}
+
 		return items(m)
 	}
-	text := func(item map[string]any) string { b, _ := json.Marshal(item); return strings.ToLower(string(b)) }
+	text := func(item map[string]any) string {
+		b, _ := json.Marshal(item)
+
+		return strings.ToLower(string(b))
+	}
 
 	// each list: a term taken from its own first row finds that row, in other case; a lone wildcard character finds
 	// only the rows that contain it
@@ -42,13 +61,16 @@ func TestSearchIsLiteral(t *testing.T) {
 		if len(all) == 0 {
 			t.Fatalf("%s lists nothing to search", op)
 		}
+
 		value, _ := all[0][field].(string)
 		if len(value) < 3 {
 			t.Fatalf("%s: no %s to search in %v", op, field, all[0])
 		}
+
 		if got := search(op, strings.ToUpper(value[1:len(value)-1])); len(got) == 0 {
 			t.Errorf("%s: the middle of %q in other case finds nothing", op, value)
 		}
+
 		for _, wildcard := range []string{"%", "_", `\`} {
 			for _, item := range search(op, wildcard) {
 				if !strings.Contains(text(item), strings.ToLower(wildcard)) {
@@ -63,6 +85,7 @@ func TestSearchIsLiteral(t *testing.T) {
 		for _, item := range search(op, term) {
 			out = append(out, item[field].(string))
 		}
+
 		return out
 	}
 	for _, c := range []struct{ op, field, term, want string }{

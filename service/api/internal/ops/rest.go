@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"net/http"
 	"net/url"
 	"reflect"
 	"regexp"
@@ -72,6 +73,7 @@ func PathParams(p string) []string {
 	for _, m := range pathParam.FindAllStringSubmatch(p, -1) {
 		names = append(names, m[1])
 	}
+
 	return names
 }
 
@@ -79,35 +81,54 @@ func PathParams(p string) []string {
 func NewBinding(op *Operation, rt Route) (*Binding, error) {
 	b := &Binding{Route: rt, Path: PathParams(rt.Path)}
 	switch rt.Method {
-	case "GET", "DELETE":
-	case "POST", "PUT", "PATCH":
+	case http.MethodGet, http.MethodDelete:
+	case http.MethodPost, http.MethodPut, http.MethodPatch:
 		b.Body = true
 	default:
 		return nil, fmt.Errorf("ops: %s: method %s", op.Spec.Name, rt.Method)
 	}
-	if rt.Method == "GET" && op.Spec.Mode != Read || rt.Method == "DELETE" && op.Spec.Mode != Write {
-		return nil, fmt.Errorf("ops: %s: %s does not fit a %s", op.Spec.Name, rt.Method, op.Spec.Mode)
+
+	if rt.Method == http.MethodGet && op.Spec.Mode != Read ||
+		rt.Method == http.MethodDelete && op.Spec.Mode != Write {
+		return nil, fmt.Errorf(
+			"ops: %s: %s does not fit a %s",
+			op.Spec.Name,
+			rt.Method,
+			op.Spec.Mode,
+		)
 	}
+
 	t := reflect.TypeOf(op.NewInput())
 	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
+
 	params, opaque, err := parameters(t, op.Spec.Filters)
 	if err != nil {
 		return nil, fmt.Errorf("ops: %s: %w", op.Spec.Name, err)
 	}
+
 	b.Params, b.Opaque = params, opaque
 	for _, name := range append(slices.Clone(b.Path), rt.FixedField) {
 		if name == "" {
 			continue
 		}
+
 		if p, ok := params[name]; !ok || p.List || p.Sort || slices.Contains(p.At, "filters") {
 			return nil, fmt.Errorf("ops: %s: %s is not a scalar input field", op.Spec.Name, name)
 		}
 	}
+
 	if !b.Body && len(opaque) > 0 {
-		return nil, fmt.Errorf("ops: %s: %s %s cannot carry %s in a query string", op.Spec.Name, rt.Method, rt.Path, strings.Join(opaque, ", "))
+		return nil, fmt.Errorf(
+			"ops: %s: %s %s cannot carry %s in a query string",
+			op.Spec.Name,
+			rt.Method,
+			rt.Path,
+			strings.Join(opaque, ", "),
+		)
 	}
+
 	return b, nil
 }
 
@@ -116,30 +137,39 @@ func NewBinding(op *Operation, rt Route) (*Binding, error) {
 // sort, and the catalogued filters by their own names (a filter named like an input field is left out).
 func parameters(t reflect.Type, filters []string) (map[string]Param, []string, error) {
 	ps := map[string]Param{}
-	var opaque []string
-	var queries, filterAt [][]string
-	var err error
+
+	var (
+		opaque            []string
+		queries, filterAt [][]string
+		err               error
+	)
+
 	add := func(p Param) {
 		if _, dup := ps[p.Name]; dup && err == nil {
 			err = fmt.Errorf("parameter %s twice", p.Name)
 		}
+
 		if p.Role == "" {
 			p.Role = "field"
 		}
+
 		p.Order = len(ps)
 		ps[p.Name] = p
 	}
+
 	var walk func(t reflect.Type, at []string, prefix string, nested bool)
+
 	walk = func(t reflect.Type, at []string, prefix string, nested bool) {
-		for i := 0; i < t.NumField(); i++ {
-			f := t.Field(i)
+		for f := range t.Fields() {
 			if !f.IsExported() {
 				continue
 			}
+
 			name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
 			if name == "-" {
 				continue
 			}
+
 			ft := deref(f.Type)
 			if f.Anonymous && name == "" {
 				if ft == queryType {
@@ -147,11 +177,14 @@ func parameters(t reflect.Type, filters []string) (map[string]Param, []string, e
 				} else if ft.Kind() == reflect.Struct {
 					walk(ft, at, prefix, nested)
 				}
+
 				continue
 			}
+
 			if name == "" {
 				name = f.Name
 			}
+
 			key, here := prefix+name, append(slices.Clone(at), name)
 			switch {
 			case ft == queryType && !nested:
@@ -161,7 +194,15 @@ func parameters(t reflect.Type, filters []string) (map[string]Param, []string, e
 			case scalar(ft):
 				add(Param{Name: key, At: here, Kind: kindOf(ft), UUID: ft == uuidType})
 			case ft.Kind() == reflect.Slice && ft != rawType && scalar(deref(ft.Elem())):
-				add(Param{Name: key, At: here, Kind: kindOf(deref(ft.Elem())), List: true, UUID: deref(ft.Elem()) == uuidType})
+				add(
+					Param{
+						Name: key,
+						At:   here,
+						Kind: kindOf(deref(ft.Elem())),
+						List: true,
+						UUID: deref(ft.Elem()) == uuidType,
+					},
+				)
 			case ft.Kind() == reflect.Struct && !nested:
 				walk(ft, here, key+".", true)
 			default:
@@ -174,21 +215,39 @@ func parameters(t reflect.Type, filters []string) (map[string]Param, []string, e
 	} else {
 		walk(t, nil, "", false)
 	}
+
 	for _, at := range queries {
 		add(Param{Name: "cursor", At: append(slices.Clone(at), "cursor"), Role: "cursor"})
-		add(Param{Name: "limit", At: append(slices.Clone(at), "limit"), Kind: KindInteger, Role: "limit"})
+		add(
+			Param{
+				Name: "limit",
+				At:   append(slices.Clone(at), "limit"),
+				Kind: KindInteger,
+				Role: "limit",
+			},
+		)
 		add(Param{Name: "sort", At: append(slices.Clone(at), "sort"), Sort: true, Role: "sort"})
 		filterAt = append(filterAt, append(slices.Clone(at), "filters"))
 	}
+
 	for _, at := range filterAt {
 		for _, name := range filters {
 			if _, taken := ps[name]; taken {
 				continue
 			}
+
 			k := FilterKinds[name]
-			ps[name] = Param{Name: name, At: append(slices.Clone(at), name), Kind: k.Kind, List: k.List, Role: "filter", Order: len(ps)}
+			ps[name] = Param{
+				Name:  name,
+				At:    append(slices.Clone(at), name),
+				Kind:  k.Kind,
+				List:  k.List,
+				Role:  "filter",
+				Order: len(ps),
+			}
 		}
 	}
+
 	return ps, opaque, err
 }
 
@@ -196,6 +255,7 @@ func deref(t reflect.Type) reflect.Type {
 	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
+
 	return t
 }
 
@@ -203,11 +263,25 @@ func scalar(t reflect.Type) bool {
 	if t == timeType || t == uuidType {
 		return true
 	}
+
 	switch t.Kind() {
-	case reflect.String, reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Float32, reflect.Float64:
+	case reflect.String,
+		reflect.Bool,
+		reflect.Int,
+		reflect.Int8,
+		reflect.Int16,
+		reflect.Int32,
+		reflect.Int64,
+		reflect.Uint,
+		reflect.Uint8,
+		reflect.Uint16,
+		reflect.Uint32,
+		reflect.Uint64,
+		reflect.Float32,
+		reflect.Float64:
 		return true
 	}
+
 	return false
 }
 
@@ -215,14 +289,25 @@ func kindOf(t reflect.Type) ParamKind {
 	if t == timeType || t == uuidType {
 		return KindString
 	}
+
 	switch t.Kind() {
 	case reflect.Bool:
 		return KindBool
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+	case reflect.Int,
+		reflect.Int8,
+		reflect.Int16,
+		reflect.Int32,
+		reflect.Int64,
+		reflect.Uint,
+		reflect.Uint8,
+		reflect.Uint16,
+		reflect.Uint32,
+		reflect.Uint64:
 		return KindInteger
 	case reflect.Float32, reflect.Float64:
 		return KindNumber
 	}
+
 	return KindString
 }
 
@@ -232,40 +317,52 @@ func (p Param) value(values []string) (any, bool) {
 		if len(values) != 1 || values[0] == "" {
 			return nil, len(values) == 1
 		}
+
 		field, dir, _ := strings.Cut(values[0], ":")
 		if dir == "" {
 			dir = "asc"
 		}
+
 		if field == "" {
 			return nil, false
 		}
+
 		return map[string]any{"field": field, "direction": dir}, true
 	}
+
 	if p.List {
 		var items []any
+
 		for _, v := range values {
-			for _, s := range strings.Split(v, ",") {
+			for s := range strings.SplitSeq(v, ",") {
 				if s = strings.TrimSpace(s); s == "" {
 					continue
 				}
+
 				x, ok := convert(p.Kind, s)
 				if !ok {
 					return nil, false
 				}
+
 				items = append(items, x)
 			}
 		}
+
 		if items == nil { // a list parameter with only empty values is the empty list (unitIds= → [])
 			return []any{}, true
 		}
+
 		return items, true
 	}
+
 	if len(values) != 1 {
 		return nil, false
 	}
+
 	if values[0] == "" {
 		return nil, true
 	}
+
 	return convert(p.Kind, values[0])
 }
 
@@ -273,12 +370,14 @@ func convert(k ParamKind, s string) (any, bool) {
 	switch k {
 	case KindInteger:
 		n, err := strconv.ParseInt(s, 10, 64)
+
 		return json.Number(strconv.FormatInt(n, 10)), err == nil
 	case KindNumber:
 		f, err := strconv.ParseFloat(s, 64)
 		if err != nil || math.IsInf(f, 0) || math.IsNaN(f) {
 			return nil, false
 		}
+
 		return json.Number(strconv.FormatFloat(f, 'g', -1, 64)), true
 	case KindBool:
 		switch s {
@@ -287,8 +386,10 @@ func convert(k ParamKind, s string) (any, bool) {
 		case "false":
 			return false, true
 		}
+
 		return nil, false
 	}
+
 	return s, true
 }
 
@@ -300,19 +401,25 @@ func place(obj map[string]any, at []string, v any) bool {
 			m := map[string]any{}
 			obj[key] = m
 			obj = m
+
 			continue
 		}
+
 		if obj, ok = next.(map[string]any); !ok {
 			return false
 		}
 	}
+
 	leaf := at[len(at)-1]
 	if old, ok := obj[leaf]; ok && old != nil {
 		a, _ := json.Marshal(old)
 		b, _ := json.Marshal(v)
+
 		return bytes.Equal(a, b)
 	}
+
 	obj[leaf] = v
+
 	return true
 }
 
@@ -321,14 +428,17 @@ func (b *Binding) Input(c *echo.Context, body []byte) ([]byte, error) {
 	obj := map[string]any{}
 	fe := map[string]string{}
 	query := c.QueryParams()
+
 	if b.Body {
 		if len(bytes.TrimSpace(body)) > 0 {
 			dec := json.NewDecoder(bytes.NewReader(body))
 			dec.UseNumber()
+
 			if err := dec.Decode(&obj); err != nil || obj == nil || dec.More() {
 				return nil, apperr.Fields(map[string]string{"_": "error.malformedInput"})
 			}
 		}
+
 		for name := range query {
 			fe[name] = "error.notAllowed" // a body route reads its input from the body
 		}
@@ -337,8 +447,10 @@ func (b *Binding) Input(c *echo.Context, body []byte) ([]byte, error) {
 			p, ok := b.Params[name]
 			if !ok || slices.Contains(b.Path, name) || name == b.Route.FixedField {
 				fe[name] = "error.notAllowed"
+
 				continue
 			}
+
 			v, ok := p.value(values)
 			if !ok {
 				fe[name] = "error.invalid"
@@ -347,13 +459,17 @@ func (b *Binding) Input(c *echo.Context, body []byte) ([]byte, error) {
 			}
 		}
 	}
+
 	for _, name := range b.Path {
 		raw, err := url.PathUnescape(c.Param(name))
 		if p := b.Params[name]; p.UUID && err == nil && raw != "" {
-			if _, perr := uuid.Parse(raw); perr != nil { // no resource has this ID: the path names nothing
+			if _, perr := uuid.Parse(
+				raw,
+			); perr != nil { // no resource has this ID: the path names nothing
 				return nil, apperr.E(apperr.NotFound, "error.notFound")
 			}
 		}
+
 		v, ok := convert(b.Params[name].Kind, raw)
 		switch {
 		case err != nil || raw == "" || !ok:
@@ -362,12 +478,15 @@ func (b *Binding) Input(c *echo.Context, body []byte) ([]byte, error) {
 			fe[name] = "error.pathMismatch"
 		}
 	}
+
 	if f := b.Route.FixedField; f != "" && !place(obj, b.Params[f].At, b.Route.FixedValue) {
 		fe[f] = "error.pathMismatch"
 	}
+
 	if len(fe) > 0 {
 		return nil, apperr.Fields(fe)
 	}
+
 	return json.Marshal(obj)
 }
 
@@ -377,37 +496,52 @@ func (r *Registry) MountREST(g *echo.Group) error {
 		if !r.serves(op.Spec.Name) {
 			continue
 		}
+
 		for _, rt := range op.Spec.Routes {
 			b, err := NewBinding(op, rt)
 			if err != nil {
 				return err
 			}
+
 			path, ok := strings.CutPrefix(rt.Path, "/v1/")
 			if !ok {
 				return fmt.Errorf("ops: %s: route %s outside /v1", op.Spec.Name, rt.Path)
 			}
-			if _, err := g.AddRoute(echo.Route{Method: rt.Method, Path: "/" + EchoPath(path), Name: op.Spec.Name, Handler: r.restHandler(op, b)}); err != nil {
+
+			if _, err := g.AddRoute(
+				echo.Route{
+					Method:  rt.Method,
+					Path:    "/" + EchoPath(path),
+					Name:    op.Spec.Name,
+					Handler: r.restHandler(op, b),
+				},
+			); err != nil {
 				return fmt.Errorf("ops: %s: %w", op.Spec.Name, err)
 			}
 		}
 	}
+
 	return nil
 }
 
 func (r *Registry) restHandler(op *Operation, b *Binding) echo.HandlerFunc {
 	return func(c *echo.Context) error {
 		corr := correlationID(c)
+
 		var body []byte
+
 		if b.Body {
 			var err error
 			if body, err = readBody(c, op.Spec.Name); err != nil {
 				return fail(c, err, corr)
 			}
 		}
+
 		in, err := b.Input(c, body)
 		if err != nil {
 			return fail(c, err, corr)
 		}
+
 		return r.run(c, op, in, corr)
 	}
 }

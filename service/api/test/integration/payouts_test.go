@@ -12,29 +12,79 @@ import (
 func TestPayouts(t *testing.T) {
 	s := server(t)
 	tenant, org := seed.ID("tenant-a"), seed.ID("org-contractor-b")
-	owner(t, `DELETE FROM billing.payout_queries WHERE statement_id IN (SELECT id FROM billing.payout_statements WHERE contractor_org_id = $1)`, org)
+	owner(
+		t,
+		`DELETE FROM billing.payout_queries WHERE statement_id IN (SELECT id FROM billing.payout_statements WHERE contractor_org_id = $1)`,
+		org,
+	)
 	owner(t, `DELETE FROM billing.payout_statements WHERE contractor_org_id = $1`, org)
 	owner(t, `DELETE FROM maintenance.rate_cards WHERE contractor_org_id = $1`, org)
-	owner(t, `UPDATE maintenance.work_reports SET accepted_at = accepted_at - interval '3000 days' WHERE accepted_at >= '2026-06-01' AND accepted_at < '2026-09-01'`)
-	owner(t, `INSERT INTO maintenance.rate_cards (tenant_id, contractor_org_id, effective_from, currency, lines, version) VALUES ($1,$2,'2026-06-01','MYR',
-		'[{"workType":"periodic_inspection","amountMinor":30000,"note":null},{"workType":"repair_base","amountMinor":45000,"note":null},{"workType":"rework_deduction","amountMinor":5000,"note":null}]',1)`, tenant, org)
+	owner(
+		t,
+		`UPDATE maintenance.work_reports SET accepted_at = accepted_at - interval '3000 days' WHERE accepted_at >= '2026-06-01' AND accepted_at < '2026-09-01'`,
+	)
+	owner(
+		t,
+		`INSERT INTO maintenance.rate_cards (tenant_id, contractor_org_id, effective_from, currency, lines, version) VALUES ($1,$2,'2026-06-01','MYR',
+		'[{"workType":"periodic_inspection","amountMinor":30000,"note":null},{"workType":"repair_base","amountMinor":45000,"note":null},{"workType":"rework_deduction","amountMinor":5000,"note":null}]',1)`,
+		tenant,
+		org,
+	)
 	unit := newUnit(t, s, "Payout AC")
 	accepted := func(typ string, at time.Time, returned bool) string {
 		job, rep := uuid.NewString(), uuid.NewString()
-		owner(t, `INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, type, status, origin, requested_slot, due_at, contractor_org_id, completed_at)
-			VALUES ($1,$2,$3,$4,$5,'completed','client_request',tstzrange($6,$7),$7,$8,$7)`, job, tenant, unit, seed.ID("org-customer-b"), typ, at.Add(-2*time.Hour), at, org)
-		owner(t, `INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state, accepted_at) VALUES ($1, 2, $2, $3, $4, 'accepted', $5)`, rep, tenant, job, seed.ID("user-tech-external-b"), at)
+		owner(
+			t,
+			`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, type, status, origin, requested_slot, due_at, contractor_org_id, completed_at)
+			VALUES ($1,$2,$3,$4,$5,'completed','client_request',tstzrange($6,$7),$7,$8,$7)`,
+			job,
+			tenant,
+			unit,
+			seed.ID("org-customer-b"),
+			typ,
+			at.Add(-2*time.Hour),
+			at,
+			org,
+		)
+		owner(
+			t,
+			`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state, accepted_at) VALUES ($1, 2, $2, $3, $4, 'accepted', $5)`,
+			rep,
+			tenant,
+			job,
+			seed.ID("user-tech-external-b"),
+			at,
+		)
+
 		if returned {
-			owner(t, `INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state) VALUES ($1, 1, $2, $3, $4, 'returned')`, rep, tenant, job, seed.ID("user-tech-external-b"))
-			owner(t, `INSERT INTO maintenance.report_reviews (tenant_id, report_id, report_version, reviewer_user_id, decision, reason, occurred_at) VALUES ($1,$2,1,$3,'return','redo',$4)`,
-				tenant, rep, seed.ID("user-hq-operator"), at.Add(-time.Hour))
+			owner(
+				t,
+				`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state) VALUES ($1, 1, $2, $3, $4, 'returned')`,
+				rep,
+				tenant,
+				job,
+				seed.ID("user-tech-external-b"),
+			)
+			owner(
+				t,
+				`INSERT INTO maintenance.report_reviews (tenant_id, report_id, report_version, reviewer_user_id, decision, reason, occurred_at) VALUES ($1,$2,1,$3,'return','redo',$4)`,
+				tenant,
+				rep,
+				seed.ID("user-hq-operator"),
+				at.Add(-time.Hour),
+			)
 		}
+
 		return job
 	}
 	julyJob := accepted("reactive", time.Date(2026, 7, 20, 3, 0, 0, 0, time.UTC), false)
 	accepted("periodic", time.Date(2026, 8, 10, 3, 0, 0, 0, time.UTC), true)
 	accepted("reactive", time.Date(2026, 8, 20, 3, 0, 0, 0, time.UTC), false)
-	accepted("reactive", time.Date(2026, 9, 2, 3, 0, 0, 0, time.UTC), false) // not yet in a closed month
+	accepted(
+		"reactive",
+		time.Date(2026, 9, 2, 3, 0, 0, 0, time.UTC),
+		false,
+	) // not yet in a closed month
 
 	gen := func(period string) (int, map[string]any) {
 		return write(s, &hq, "payouts.generate", `{"period":"`+period+`"}`, 0)
@@ -42,96 +92,216 @@ func TestPayouts(t *testing.T) {
 	if code, m := gen("2026-09"); code != 422 || fields(m) != "period=errors.period_not_ended" {
 		t.Errorf("month not ended: %d %s", code, fields(m))
 	}
+
 	if code, m := gen("2026/07"); code != 422 || fields(m) != "period=error.invalid" {
 		t.Errorf("bad period: %d %s", code, fields(m))
 	}
+
 	stmtOf := func(m map[string]any) map[string]any {
 		for _, x := range m["data"].([]any) {
 			if x.(map[string]any)["contractorOrgId"] == org.String() {
 				return x.(map[string]any)
 			}
 		}
+
 		return nil
 	}
 	_, m := gen("2026-07")
+
 	july := stmtOf(m)
-	if july == nil || july["netMinor"].(float64) != 45000 || july["payDate"] != "2026-08-15T00:00:00Z" {
+	if july == nil || july["netMinor"].(float64) != 45000 ||
+		july["payDate"] != "2026-08-15T00:00:00Z" {
 		t.Fatalf("july: %v", m)
 	}
+
 	jid := july["id"].(string)
 	if code, _ := post(s, &contrB, "payouts.get", `{"id":"`+jid+`"}`); code != 404 {
 		t.Error("contractor sees a draft")
 	}
-	if code, m := write(s, &hq, "payouts.transition", `{"statementId":"`+jid+`","action":"approve"}`, 1); code != 200 || data(m)["status"] != "approved" {
+
+	if code, m := write(
+		s,
+		&hq,
+		"payouts.transition",
+		`{"statementId":"`+jid+`","action":"approve"}`,
+		1,
+	); code != 200 ||
+		data(m)["status"] != "approved" {
 		t.Fatalf("approve: %d %v", code, m)
 	}
-	if code, m := write(s, &hq, "payouts.transition", `{"statementId":"`+jid+`","action":"approve"}`, 1); code != 409 || m["messageKey"] != "error.versionConflict" {
+
+	if code, m := write(
+		s,
+		&hq,
+		"payouts.transition",
+		`{"statementId":"`+jid+`","action":"approve"}`,
+		1,
+	); code != 409 ||
+		m["messageKey"] != "error.versionConflict" {
 		t.Errorf("approve on a stale version: %d %v", code, m)
 	}
-	if code, m := write(s, &hq, "payouts.transition", `{"statementId":"`+jid+`","action":"approve"}`, 2); code != 409 || m["messageKey"] != "error.invalidState" {
+
+	if code, m := write(
+		s,
+		&hq,
+		"payouts.transition",
+		`{"statementId":"`+jid+`","action":"approve"}`,
+		2,
+	); code != 409 ||
+		m["messageKey"] != "error.invalidState" {
 		t.Errorf("approve twice: %d %v", code, m)
 	}
 	// question on the July line, answered with an adjustment
 	line := july["lines"].([]any)[0].(map[string]any)["id"].(string)
-	if code, _ := write(s, &contrB, "payouts.query", `{"statementId":"`+jid+`","lineId":"`+uuid.NewString()+`","topic":"amount","message":"why"}`, 2); code != 404 {
+
+	if code, _ := write(
+		s,
+		&contrB,
+		"payouts.query",
+		`{"statementId":"`+jid+`","lineId":"`+uuid.NewString()+`","topic":"amount","message":"why"}`,
+		2,
+	); code != 404 {
 		t.Error("unknown line")
 	}
-	if code, m := write(s, &contrB, "payouts.query", `{"statementId":"`+jid+`","lineId":"`+line+`","topic":"price","message":"why"}`, 2); code != 422 || fields(m) != "topic=error.invalid" {
+
+	if code, m := write(
+		s,
+		&contrB,
+		"payouts.query",
+		`{"statementId":"`+jid+`","lineId":"`+line+`","topic":"price","message":"why"}`,
+		2,
+	); code != 422 ||
+		fields(m) != "topic=error.invalid" {
 		t.Errorf("bad topic: %d %s", code, fields(m))
 	}
-	if code, m := write(s, &contrB, "payouts.query", `{"statementId":"`+jid+`","lineId":"`+line+`","topic":"amount","message":"why"}`, 1); code != 409 || m["messageKey"] != "error.versionConflict" {
+
+	if code, m := write(
+		s,
+		&contrB,
+		"payouts.query",
+		`{"statementId":"`+jid+`","lineId":"`+line+`","topic":"amount","message":"why"}`,
+		1,
+	); code != 409 ||
+		m["messageKey"] != "error.versionConflict" {
 		t.Errorf("question on a stale version: %d %v", code, m)
 	}
-	if code, m := write(s, &contrB, "payouts.query", `{"statementId":"`+jid+`","lineId":"`+line+`","topic":"amount","message":"Travel was not included"}`, 2); code != 200 ||
+
+	if code, m := write(
+		s,
+		&contrB,
+		"payouts.query",
+		`{"statementId":"`+jid+`","lineId":"`+line+`","topic":"amount","message":"Travel was not included"}`,
+		2,
+	); code != 200 ||
 		data(m)["queries"].([]any)[0].(map[string]any)["state"] != "open" {
 		t.Fatalf("query: %d %v", code, m)
 	}
-	if code, _ := write(s, &contrA, "payouts.query", `{"statementId":"`+jid+`","lineId":"`+line+`","topic":"amount","message":"x"}`, 3); code != 404 {
+
+	if code, _ := write(
+		s,
+		&contrA,
+		"payouts.query",
+		`{"statementId":"`+jid+`","lineId":"`+line+`","topic":"amount","message":"x"}`,
+		3,
+	); code != 404 {
 		t.Error("other contractor asks")
 	}
+
 	_, m = post(s, &hq, "payouts.get", `{"id":"`+jid+`"}`)
+
 	q := data(m)["queries"].([]any)[0].(map[string]any)["id"].(string)
-	if code, m := write(s, &hq, "payouts.resolveQuery", `{"statementId":"`+jid+`","queryId":"`+q+`","reply":"ok","adjustmentMinor":0}`, 3); code != 422 || fields(m) != "adjustmentMinor=error.nonZero" {
+	if code, m := write(
+		s,
+		&hq,
+		"payouts.resolveQuery",
+		`{"statementId":"`+jid+`","queryId":"`+q+`","reply":"ok","adjustmentMinor":0}`,
+		3,
+	); code != 422 ||
+		fields(m) != "adjustmentMinor=error.nonZero" {
 		t.Errorf("zero adjustment: %d %s", code, fields(m))
 	}
-	if code, m := write(s, &hq, "payouts.resolveQuery", `{"statementId":"`+jid+`","queryId":"`+q+`","reply":"Added travel","adjustmentMinor":12000}`, 2); code != 409 || m["messageKey"] != "error.versionConflict" {
+
+	if code, m := write(
+		s,
+		&hq,
+		"payouts.resolveQuery",
+		`{"statementId":"`+jid+`","queryId":"`+q+`","reply":"Added travel","adjustmentMinor":12000}`,
+		2,
+	); code != 409 ||
+		m["messageKey"] != "error.versionConflict" {
 		t.Errorf("answer on a stale version: %d %v", code, m)
 	}
-	if code, m := write(s, &hq, "payouts.resolveQuery", `{"statementId":"`+jid+`","queryId":"`+q+`","reply":"Added travel","adjustmentMinor":12000}`, 3); code != 200 ||
+
+	if code, m := write(
+		s,
+		&hq,
+		"payouts.resolveQuery",
+		`{"statementId":"`+jid+`","queryId":"`+q+`","reply":"Added travel","adjustmentMinor":12000}`,
+		3,
+	); code != 200 ||
 		data(m)["queries"].([]any)[0].(map[string]any)["state"] != "adjusted" {
 		t.Fatalf("resolve: %d %v", code, m)
 	}
-	if code, _ := write(s, &hq, "payouts.resolveQuery", `{"statementId":"`+jid+`","queryId":"`+q+`","reply":"again"}`, 4); code != 409 {
+
+	if code, _ := write(
+		s,
+		&hq,
+		"payouts.resolveQuery",
+		`{"statementId":"`+jid+`","queryId":"`+q+`","reply":"again"}`,
+		4,
+	); code != 409 {
 		t.Error("resolve twice")
 	}
+
 	_, m = post(s, &hq, "jobs.events", `{"jobId":"`+julyJob+`","query":{"limit":100}}`)
 	notes := 0
+
 	for _, e := range items(m) {
 		if e["action"] == "note.added" {
 			notes++
 		}
 	}
+
 	if notes != 2 {
 		t.Errorf("question and reply in job history: %d", notes)
 	}
 	// a second question answered with a reduction: a negative adjustment is a deduction of the next statement
-	if code, m := write(s, &contrB, "payouts.query", `{"statementId":"`+jid+`","lineId":"`+line+`","topic":"amount","message":"Parts were charged twice"}`, 4); code != 200 {
+	if code, m := write(
+		s,
+		&contrB,
+		"payouts.query",
+		`{"statementId":"`+jid+`","lineId":"`+line+`","topic":"amount","message":"Parts were charged twice"}`,
+		4,
+	); code != 200 {
 		t.Fatalf("second query: %d %v", code, m)
 	}
+
 	_, m = post(s, &hq, "payouts.get", `{"id":"`+jid+`"}`)
+
 	var q2 string
+
 	for _, x := range data(m)["queries"].([]any) { // both were asked at the test clock: pick the open one
 		if x := x.(map[string]any); x["state"] == "open" {
 			q2 = x["id"].(string)
 		}
 	}
-	if code, m := write(s, &hq, "payouts.resolveQuery", `{"statementId":"`+jid+`","queryId":"`+q2+`","reply":"Refund the double charge","adjustmentMinor":-3000}`, 5); code != 200 {
+
+	if code, m := write(
+		s,
+		&hq,
+		"payouts.resolveQuery",
+		`{"statementId":"`+jid+`","queryId":"`+q2+`","reply":"Refund the double charge","adjustmentMinor":-3000}`,
+		5,
+	); code != 200 {
 		t.Fatalf("resolve with a reduction: %d %v", code, m)
 	}
 	// August draft: periodic + rework deduction + repair + the July adjustments (+12000, −3000)
 	_, m = gen("2026-08")
+
 	aug := stmtOf(m)
-	if aug == nil || aug["grossMinor"].(float64) != 30000+45000+12000 || aug["deductionsMinor"].(float64) != 5000+3000 || len(aug["lines"].([]any)) != 5 {
+	if aug == nil || aug["grossMinor"].(float64) != 30000+45000+12000 ||
+		aug["deductionsMinor"].(float64) != 5000+3000 ||
+		len(aug["lines"].([]any)) != 5 {
 		t.Fatalf("august: %v", aug)
 	}
 	// regenerating keeps the approved July statement and replaces the August draft
@@ -139,6 +309,7 @@ func TestPayouts(t *testing.T) {
 	if stmtOf(m) != nil {
 		t.Error("approved statement regenerated")
 	}
+
 	_, m = gen("2026-08")
 	if a2 := stmtOf(m); a2 == nil || a2["id"] == aug["id"] || a2["grossMinor"].(float64) != 87000 {
 		t.Fatalf("august regenerated: %v", a2)
@@ -146,15 +317,38 @@ func TestPayouts(t *testing.T) {
 	// paying: not before the pay date, not a draft
 	_, m = post(s, &hq, "payouts.get", `{"id":"`+jid+`"}`)
 	owner(t, `UPDATE billing.payout_statements SET pay_date = '2026-09-20' WHERE id = $1`, jid)
-	if code, _ := write(s, &hq, "payouts.transition", `{"statementId":"`+jid+`","action":"mark_paid"}`, ver(m)); code != 409 {
+
+	if code, _ := write(
+		s,
+		&hq,
+		"payouts.transition",
+		`{"statementId":"`+jid+`","action":"mark_paid"}`,
+		ver(m),
+	); code != 409 {
 		t.Error("mark paid before the pay date")
 	}
+
 	owner(t, `UPDATE billing.payout_statements SET pay_date = '2026-09-14' WHERE id = $1`, jid)
-	code, m := write(s, &hq, "payouts.transition", `{"statementId":"`+jid+`","action":"mark_paid","reason":"bank transfer"}`, ver(m))
+
+	code, m := write(
+		s,
+		&hq,
+		"payouts.transition",
+		`{"statementId":"`+jid+`","action":"mark_paid","reason":"bank transfer"}`,
+		ver(m),
+	)
 	if code != 200 || data(m)["paidAt"] == nil {
 		t.Fatalf("mark paid: %d %v", code, m)
 	}
-	if code, m := write(s, &contrB, "payouts.query", `{"statementId":"`+jid+`","lineId":"`+line+`","topic":"amount","message":"late question"}`, ver(m)); code != 409 || m["messageKey"] != "error.invalidState" {
+
+	if code, m := write(
+		s,
+		&contrB,
+		"payouts.query",
+		`{"statementId":"`+jid+`","lineId":"`+line+`","topic":"amount","message":"late question"}`,
+		ver(m),
+	); code != 409 ||
+		m["messageKey"] != "error.invalidState" {
 		t.Errorf("question on a paid statement: %d %v", code, m)
 	}
 	// contractor sees approved/paid only
@@ -164,16 +358,40 @@ func TestPayouts(t *testing.T) {
 			t.Fatalf("contractor list: %v", it)
 		}
 	}
+
 	if len(items(m)) == 0 {
 		t.Error("contractor list empty")
 	}
-	if _, m := post(s, &hq, "payouts.list", `{"filters":{"period":"2026-08","status":"draft","contractorOrgId":"`+org.String()+`"}}`); len(items(m)) != 1 {
+
+	if _, m := post(
+		s,
+		&hq,
+		"payouts.list",
+		`{"filters":{"period":"2026-08","status":"draft","contractorOrgId":"`+org.String()+`"}}`,
+	); len(
+		items(m),
+	) != 1 {
 		t.Error("hq list filters")
 	}
-	if code, m := post(s, &hq, "payouts.list", `{"filters":{"status":"void"}}`); code != 422 || fields(m) != "filters=error.invalid" {
+
+	if code, m := post(
+		s,
+		&hq,
+		"payouts.list",
+		`{"filters":{"status":"void"}}`,
+	); code != 422 ||
+		fields(m) != "filters=error.invalid" {
 		t.Errorf("bad status filter: %d %s", code, fields(m))
 	}
-	if code, m := write(s, &hq, "payouts.transition", `{"statementId":"`+jid+`","action":"refund"}`, 6); code != 422 || fields(m) != "action=error.pathMismatch" {
+
+	if code, m := write(
+		s,
+		&hq,
+		"payouts.transition",
+		`{"statementId":"`+jid+`","action":"refund"}`,
+		6,
+	); code != 422 ||
+		fields(m) != "action=error.pathMismatch" {
 		t.Errorf("bad action: %d %s", code, fields(m))
 	}
 }
@@ -182,26 +400,53 @@ func TestPayouts(t *testing.T) {
 // with each line noted "no rate card" and no amount, for HQ to settle by hand.
 func TestPayoutWithoutRateCard(t *testing.T) {
 	s := server(t)
-	tenant, org := seed.ID("tenant-a"), uuid.New() // a contractor organization without any rate card
+	tenant, org := seed.ID(
+		"tenant-a",
+	), uuid.New() // a contractor organization without any rate card
 	at := time.Date(2026, 5, 20, 3, 0, 0, 0, time.UTC)
 	job, rep := uuid.NewString(), uuid.NewString()
-	owner(t, `INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, type, status, origin, requested_slot, due_at, contractor_org_id, completed_at)
-		VALUES ($1,$2,$3,$4,'reactive','completed','client_request',tstzrange($5,$6),$6,$7,$6)`, job, tenant, newUnit(t, s, "No rate AC"), seed.ID("org-customer-b"), at.Add(-2*time.Hour), at, org)
-	owner(t, `INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state, accepted_at) VALUES ($1, 1, $2, $3, $4, 'accepted', $5)`, rep, tenant, job, uuid.New(), at)
+	owner(
+		t,
+		`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, type, status, origin, requested_slot, due_at, contractor_org_id, completed_at)
+		VALUES ($1,$2,$3,$4,'reactive','completed','client_request',tstzrange($5,$6),$6,$7,$6)`,
+		job,
+		tenant,
+		newUnit(t, s, "No rate AC"),
+		seed.ID("org-customer-b"),
+		at.Add(-2*time.Hour),
+		at,
+		org,
+	)
+	owner(
+		t,
+		`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state, accepted_at) VALUES ($1, 1, $2, $3, $4, 'accepted', $5)`,
+		rep,
+		tenant,
+		job,
+		uuid.New(),
+		at,
+	)
+
 	code, m := write(s, &hq, "payouts.generate", `{"period":"2026-05"}`, 0)
 	if code != 200 {
 		t.Fatalf("generate: %d %v", code, m)
 	}
+
 	for _, x := range m["data"].([]any) {
 		st := x.(map[string]any)
 		if st["contractorOrgId"] != org.String() {
 			continue
 		}
+
 		lines := st["lines"].([]any)
-		if l := lines[0].(map[string]any); len(lines) != 1 || l["note"] != "no rate card" || l["amountMinor"].(float64) != 0 || st["netMinor"].(float64) != 0 {
+		if l := lines[0].(map[string]any); len(lines) != 1 || l["note"] != "no rate card" ||
+			l["amountMinor"].(float64) != 0 ||
+			st["netMinor"].(float64) != 0 {
 			t.Errorf("statement without a rate card: %v", st)
 		}
+
 		return
 	}
+
 	t.Errorf("no statement for the contractor: %v", m["data"])
 }

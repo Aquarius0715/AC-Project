@@ -45,6 +45,7 @@ func (s StaticVerifier) Verify(_ context.Context, token string) (Identity, error
 	if sub, ok := s[token]; ok {
 		return Identity{Subject: sub}, nil
 	}
+
 	return Identity{}, errors.New("unknown token")
 }
 
@@ -56,6 +57,7 @@ func Revoked(p *ops.Principal, signedIn time.Time) bool {
 	if p == nil || p.SessionsRevokedAt == nil {
 		return false
 	}
+
 	return signedIn.IsZero() || !signedIn.After(p.SessionsRevokedAt.Truncate(time.Second))
 }
 
@@ -63,7 +65,12 @@ func Revoked(p *ops.Principal, signedIn time.Time) bool {
 // identity-api reads its own tables (DB), every other service asks identity-api (RemoteSource). signedIn is the
 // token's sign-in time (zero: none), which identity records as the user's last sign-in (IR268).
 type PrincipalSource interface {
-	Principal(ctx context.Context, subject string, tenant, membership uuid.UUID, signedIn time.Time) (*ops.Principal, error)
+	Principal(
+		ctx context.Context,
+		subject string,
+		tenant, membership uuid.UUID,
+		signedIn time.Time,
+	) (*ops.Principal, error)
 }
 
 // ErrUnavailable means the principal could not be resolved because identity-api did not answer.
@@ -83,6 +90,7 @@ func (a *Authenticator) now() time.Time {
 	if a.Now != nil {
 		return a.Now()
 	}
+
 	return time.Now().UTC()
 }
 
@@ -90,6 +98,7 @@ func (a *Authenticator) now() time.Time {
 func unauth(c *echo.Context, key string) error {
 	de := apperr.E(apperr.Unauthenticated, key)
 	de.CorrelationID = c.Response().Header().Get(echo.HeaderXRequestID)
+
 	return de
 }
 
@@ -101,53 +110,86 @@ func (a *Authenticator) Middleware() echo.MiddlewareFunc {
 			if h == "" {
 				return next(c)
 			}
+
 			token, ok := strings.CutPrefix(h, "Bearer ")
 			if !ok || token == "" {
 				return unauth(c, "error.unauthenticated")
 			}
+
 			id, err := a.Verifier.Verify(c.Request().Context(), token)
 			if err != nil {
 				// why, never the token: an expired one, an unknown signing key or another issuer or client
 				slog.InfoContext(c.Request().Context(), "auth: token refused", "err", err)
+
 				return unauth(c, "error.unauthenticated")
 			}
+
 			tenant, err1 := uuid.Parse(c.Request().Header.Get("X-Tenant-Id"))
+
 			membership, err2 := uuid.Parse(c.Request().Header.Get("X-Membership-Id"))
 			if err1 != nil || err2 != nil {
 				return unauth(c, "error.membershipRequired")
 			}
-			p, err := a.principal(c.Request().Context(), id.Subject, tenant, membership, id.SignedIn)
+
+			p, err := a.principal(
+				c.Request().Context(),
+				id.Subject,
+				tenant,
+				membership,
+				id.SignedIn,
+			)
 			if errors.Is(err, ErrUnavailable) {
 				return apperr.E(apperr.Unavailable, "error.unavailable")
 			}
+
 			if err != nil {
 				return unauth(c, "error.membershipInvalid")
 			}
-			if Revoked(p, id.SignedIn) { // HQ signed this user out everywhere after this sign-in (IR384)
+
+			if Revoked(
+				p,
+				id.SignedIn,
+			) { // HQ signed this user out everywhere after this sign-in (IR384)
 				return unauth(c, "errors.session_revoked")
 			}
-			if p.Role == "admin" && id.Client != "" && !id.AdminApp { // HQ works through its own app, signed in with the code (DEC-85, IR510)
+
+			if p.Role == "admin" && id.Client != "" &&
+				!id.AdminApp { // HQ works through its own app, signed in with the code (DEC-85, IR510)
 				return apperr.E(apperr.Forbidden, "errors.hq_app_required")
 			}
+
 			c.SetRequest(c.Request().WithContext(ops.WithPrincipal(c.Request().Context(), p)))
+
 			return next(c)
 		}
 	}
 }
 
-func (a *Authenticator) principal(ctx context.Context, subject string, tenant, membership uuid.UUID, signedIn time.Time) (*ops.Principal, error) {
+func (a *Authenticator) principal(
+	ctx context.Context,
+	subject string,
+	tenant, membership uuid.UUID,
+	signedIn time.Time,
+) (*ops.Principal, error) {
 	if a.Source != nil {
 		return a.Source.Principal(ctx, subject, tenant, membership, signedIn)
 	}
+
 	return a.Principal(ctx, subject, tenant, membership, signedIn)
 }
 
 // Principal implements PrincipalSource with the identity tables (identity-api) and records a new sign-in.
-func (a *Authenticator) Principal(ctx context.Context, subject string, tenant, membership uuid.UUID, signedIn time.Time) (*ops.Principal, error) {
+func (a *Authenticator) Principal(
+	ctx context.Context,
+	subject string,
+	tenant, membership uuid.UUID,
+	signedIn time.Time,
+) (*ops.Principal, error) {
 	p, err := a.Load(ctx, subject, tenant, membership)
 	if err == nil {
 		a.RecordSignIn(ctx, p, signedIn)
 	}
+
 	return p, err
 }
 
@@ -159,91 +201,140 @@ func (a *Authenticator) RecordSignIn(ctx context.Context, p *ops.Principal, sign
 	if p == nil || signedIn.IsZero() {
 		return
 	}
+
 	signedIn = signedIn.UTC().Truncate(time.Second)
 	if last, ok := a.signIns.Load(p.UserID); ok && !signedIn.After(last.(time.Time)) {
 		return
 	}
+
 	err := a.DB.Run(ctx, false, p, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, `UPDATE identity.users SET last_sign_in_at = $3, sign_in_auth_time = $2
-			WHERE id = $1 AND (sign_in_auth_time IS NULL OR sign_in_auth_time < $2)`, p.UserID, signedIn, a.now()); err != nil {
+		if _, err := tx.Exec(
+			ctx,
+			`UPDATE identity.users SET last_sign_in_at = $3, sign_in_auth_time = $2
+			WHERE id = $1 AND (sign_in_auth_time IS NULL OR sign_in_auth_time < $2)`,
+			p.UserID,
+			signedIn,
+			a.now(),
+		); err != nil {
 			return err
 		}
 		// an account HQ, a contractor or a customer owner added is listed as invited until its first sign-in (IR461)
-		for _, q := range []string{`UPDATE identity.partner_users SET status = 'active', version = version + 1, updated_at = $2 WHERE membership_id = $1 AND status = 'invited'`,
-			`UPDATE identity.client_users SET status = 'active', version = version + 1, updated_at = $2 WHERE membership_id = $1 AND status = 'invited'`} {
+		for _, q := range []string{
+			`UPDATE identity.partner_users SET status = 'active', version = version + 1, updated_at = $2 WHERE membership_id = $1 AND status = 'invited'`,
+			`UPDATE identity.client_users SET status = 'active', version = version + 1, updated_at = $2 WHERE membership_id = $1 AND status = 'invited'`,
+		} {
 			if _, err := tx.Exec(ctx, q, p.MembershipID, a.now()); err != nil {
 				return err
 			}
 		}
+
 		return nil
 	})
 	if err != nil {
 		slog.WarnContext(ctx, "auth: sign-in not recorded", "user", p.UserID, "err", err)
+
 		return
 	}
+
 	a.signIns.Store(p.UserID, signedIn)
 }
 
 // Load reads the Membership for subject in tenant; it fails when the membership does not belong to the subject,
 // is outside its validity window, or the user is not active.
-func (a *Authenticator) Load(ctx context.Context, subject string, tenant, membership uuid.UUID) (*ops.Principal, error) {
+func (a *Authenticator) Load(
+	ctx context.Context,
+	subject string,
+	tenant, membership uuid.UUID,
+) (*ops.Principal, error) {
 	p := &ops.Principal{TenantID: tenant, MembershipID: membership}
 	now := a.now()
+
 	err := a.DB.Run(ctx, true, p, func(tx pgx.Tx) error {
-		var clientRole, employment, timezone *string
-		var validUntil *time.Time
-		var validFrom time.Time
-		var status string
+		var (
+			clientRole, employment, timezone *string
+			validUntil                       *time.Time
+			validFrom                        time.Time
+			status                           string
+		)
 		if err := tx.QueryRow(ctx, `SELECT m.user_id, m.organization_id, m.role, m.client_role, m.employment, m.scope_version, m.valid_from, m.valid_until, m.sessions_revoked_at, u.status, pf.timezone
 			FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id LEFT JOIN identity.preferences pf ON pf.user_id = u.id
 			WHERE m.id = $1 AND (u.cognito_sub = $2 OR u.id::text = $2)`, membership, subject).
 			Scan(&p.UserID, &p.OrgID, &p.Role, &clientRole, &employment, &p.ScopeVersion, &validFrom, &validUntil, &p.SessionsRevokedAt, &status, &timezone); err != nil {
 			return err
 		}
-		if status != "active" || now.Before(validFrom) || (validUntil != nil && !now.Before(*validUntil)) {
-			return apperr.E(apperr.NotFound, "error.membershipInvalid") // inactive user or outside the validity window
+
+		if status != "active" || now.Before(validFrom) ||
+			(validUntil != nil && !now.Before(*validUntil)) {
+			return apperr.E(
+				apperr.NotFound,
+				"error.membershipInvalid",
+			) // inactive user or outside the validity window
 		}
+
 		if clientRole != nil {
 			p.ClientRole = *clientRole
 		}
+
 		if employment != nil {
 			p.Employment = *employment
 		}
+
 		if timezone != nil {
 			p.Timezone = *timezone
 		}
-		rows, err := tx.Query(ctx, `SELECT permission FROM identity.membership_permissions WHERE membership_id = $1`, membership)
+
+		rows, err := tx.Query(
+			ctx,
+			`SELECT permission FROM identity.membership_permissions WHERE membership_id = $1`,
+			membership,
+		)
 		if err != nil {
 			return err
 		}
+
 		p.Permissions = map[string]bool{}
+
 		for rows.Next() {
 			var perm string
 			if err := rows.Scan(&perm); err != nil {
 				return err
 			}
+
 			p.Permissions[perm] = true
 		}
+
 		if err := rows.Err(); err != nil {
 			return err
 		}
-		scopes, err := tx.Query(ctx, `SELECT kind, ref_id FROM identity.membership_scopes WHERE membership_id = $1`, membership)
+
+		scopes, err := tx.Query(
+			ctx,
+			`SELECT kind, ref_id FROM identity.membership_scopes WHERE membership_id = $1`,
+			membership,
+		)
 		if err != nil {
 			return err
 		}
+
 		p.Scopes = map[string][]uuid.UUID{}
+
 		for scopes.Next() {
-			var kind string
-			var ref uuid.UUID
+			var (
+				kind string
+				ref  uuid.UUID
+			)
 			if err := scopes.Scan(&kind, &ref); err != nil {
 				return err
 			}
+
 			p.Scopes[kind] = append(p.Scopes[kind], ref)
 		}
+
 		return scopes.Err()
 	})
 	if err != nil {
 		return nil, err
 	}
+
 	return p, nil
 }

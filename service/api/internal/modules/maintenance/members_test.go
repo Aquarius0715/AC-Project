@@ -9,8 +9,12 @@ import (
 // touching slots count once, gaps do not count, and the order of the slots does not matter.
 func TestUnionMinutes(t *testing.T) {
 	base := time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC)
+
 	slot := func(fromMin, toMin int) Slot {
-		return Slot{StartAt: base.Add(time.Duration(fromMin) * time.Minute), EndAt: base.Add(time.Duration(toMin) * time.Minute)}
+		return Slot{
+			StartAt: base.Add(time.Duration(fromMin) * time.Minute),
+			EndAt:   base.Add(time.Duration(toMin) * time.Minute),
+		}
 	}
 	for name, c := range map[string]struct {
 		slots []Slot

@@ -3,7 +3,6 @@ package integration
 import (
 	"context"
 	"encoding/base64"
-	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 	"slices"
 	"strconv"
 	"strings"
@@ -11,14 +10,22 @@ import (
 	"time"
 
 	"github.com/pradita/ac-project/service/api/internal/seed"
+	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
 
 // completedJob creates a customer-a job completed one hour before the fixture clock.
 func completedJob(t *testing.T, s *apiserver.Server) string {
 	t.Helper()
+
 	_, m := write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
 	job := data(m)["id"].(string)
-	owner(t, `UPDATE maintenance.jobs SET status = 'completed', completed_at = $2 WHERE id = $1`, job, clock.Add(-time.Hour))
+	owner(
+		t,
+		`UPDATE maintenance.jobs SET status = 'completed', completed_at = $2 WHERE id = $1`,
+		job,
+		clock.Add(-time.Hour),
+	)
+
 	return job
 }
 
@@ -36,6 +43,7 @@ func TestRateAndReportProblem(t *testing.T) {
 		"stars 6":       "stars=error.range",
 		"unknown tag":   "tags=error.invalid",
 	}
+
 	for name, b := range map[string]string{
 		"stars 0":       `"stars":0,"tags":[]`,
 		"stars 6":       `"stars":6,"tags":[]`,
@@ -47,27 +55,63 @@ func TestRateAndReportProblem(t *testing.T) {
 		code, m := rate(&customerA, b, 1)
 		refusal(t, name, code, m, want[name])
 	}
+
 	if code, _ := rate(&customerB, `"stars":5,"tags":[]`, 1); code != 404 {
 		t.Error("other customer rates")
 	}
+
 	code, m := rate(&customerA, `"stars":2,"tags":["On time"],"comment":"  slow  "`, 1)
+
 	r, _ := data(m)["rating"].(map[string]any)
-	if code != 200 || r["stars"].(float64) != 2 || r["comment"] != "slow" || data(m)["customerConfirmedAt"] == nil {
+	if code != 200 || r["stars"].(float64) != 2 || r["comment"] != "slow" ||
+		data(m)["customerConfirmedAt"] == nil {
 		t.Fatalf("rate: %d %v", code, m)
 	}
-	if code, m := rate(&customerA, `"stars":3,"tags":[]`, 1); code != 409 || m["messageKey"] != "error.versionConflict" {
+
+	if code, m := rate(
+		&customerA,
+		`"stars":3,"tags":[]`,
+		1,
+	); code != 409 ||
+		m["messageKey"] != "error.versionConflict" {
 		t.Errorf("re-rate a stale version: %d %v", code, m)
 	}
-	if code, m := rate(&customerA, `"stars":3,"tags":[],"comment":"   "`, 2); code != 200 || data(m)["rating"].(map[string]any)["ratedAt"] != r["ratedAt"] ||
+
+	if code, m := rate(
+		&customerA,
+		`"stars":3,"tags":[],"comment":"   "`,
+		2,
+	); code != 200 ||
+		data(m)["rating"].(map[string]any)["ratedAt"] != r["ratedAt"] ||
 		data(m)["rating"].(map[string]any)["comment"] != nil {
 		t.Fatalf("re-rate keeps ratedAt, a blank comment is none: %d %v", code, m)
 	}
+
 	open := completedJob(t, s)
-	owner(t, `UPDATE maintenance.jobs SET status = 'in_progress', completed_at = NULL WHERE id = $1`, open)
-	if code, m := write(s, &customerA, "jobs.rate", `{"jobId":"`+open+`","stars":5,"tags":[]}`, 1); code != 409 || m["messageKey"] != "error.invalidState" {
+	owner(
+		t,
+		`UPDATE maintenance.jobs SET status = 'in_progress', completed_at = NULL WHERE id = $1`,
+		open,
+	)
+
+	if code, m := write(
+		s,
+		&customerA,
+		"jobs.rate",
+		`{"jobId":"`+open+`","stars":5,"tags":[]}`,
+		1,
+	); code != 409 ||
+		m["messageKey"] != "error.invalidState" {
 		t.Errorf("rate a job not completed: %d %v", code, m)
 	}
-	owner(t, `UPDATE maintenance.jobs SET rating = jsonb_set(rating, '{editableUntil}', to_jsonb($2::text)) WHERE id = $1`, job, clock.Format(time.RFC3339))
+
+	owner(
+		t,
+		`UPDATE maintenance.jobs SET rating = jsonb_set(rating, '{editableUntil}', to_jsonb($2::text)) WHERE id = $1`,
+		job,
+		clock.Format(time.RFC3339),
+	)
+
 	if code, _ := rate(&customerA, `"stars":4,"tags":[]`, 3); code != 409 {
 		t.Error("rating locked after 7 days")
 	}
@@ -88,6 +132,7 @@ func TestRateAndReportProblem(t *testing.T) {
 		"pixel flood":   "photos=error.invalidFile",
 		"today slot":    "preferredSlot=error.slotRules",
 	}
+
 	for name, b := range map[string]string{
 		"short details": `"reasonCode":"same_problem","details":"short","photos":[],"preferredSlot":null`,
 		"bad code":      `"reasonCode":"angry","details":"still dripping water","photos":[],"preferredSlot":null`,
@@ -101,13 +146,30 @@ func TestRateAndReportProblem(t *testing.T) {
 		code, m := prob(b, 3)
 		refusal(t, name, code, m, want[name])
 	}
-	code, m = prob(`"reasonCode":"same_problem","details":"Still dripping water after the visit","photos":[`+photo+`],"preferredSlot":`+slotJSON(49, 2), 3)
-	if code != 200 || data(m)["followUpOfJobId"] != job || data(m)["followUpClass"] != "pending" || data(m)["status"] != "requested" || len(data(m)["preferredSlots"].([]any)) != 1 {
+
+	code, m = prob(
+		`"reasonCode":"same_problem","details":"Still dripping water after the visit","photos":[`+photo+`],"preferredSlot":`+slotJSON(
+			49,
+			2,
+		),
+		3,
+	)
+	if code != 200 || data(m)["followUpOfJobId"] != job || data(m)["followUpClass"] != "pending" ||
+		data(m)["status"] != "requested" ||
+		len(data(m)["preferredSlots"].([]any)) != 1 {
 		t.Fatalf("reportProblem: %d %v", code, m)
 	}
+
 	follow := data(m)["id"].(string)
+
 	var attachments int
-	ownerScan(t, `SELECT count(*) FROM maintenance.attachments WHERE job_id = $1 AND status = 'ready'`, []any{follow}, &attachments)
+	ownerScan(
+		t,
+		`SELECT count(*) FROM maintenance.attachments WHERE job_id = $1 AND status = 'ready'`,
+		[]any{follow},
+		&attachments,
+	)
+
 	if attachments != 1 {
 		t.Errorf("photos stored: %d", attachments)
 	}
@@ -117,70 +179,146 @@ func TestRateAndReportProblem(t *testing.T) {
 	}
 	// the photo is listed with the follow-up and opens for HQ and the customer (IR437)
 	_, g := post(s, &hq, "jobs.get", `{"jobId":"`+follow+`"}`)
+
 	photos, _ := data(g)["problemPhotos"].([]any)
 	if len(photos) != 1 || photos[0].(map[string]any)["name"] != "leak.png" {
 		t.Fatalf("problemPhotos: %v", data(g)["problemPhotos"])
 	}
+
 	pid := photos[0].(map[string]any)["id"].(string)
 	for _, a := range []*actor{&hq, &customerA} {
-		if code, m := post(s, a, "jobs.getAttachment", `{"jobId":"`+follow+`","attachmentId":"`+pid+`"}`); code != 200 || data(m)["mime"] != "image/png" || data(m)["bytes"] != png {
+		if code, m := post(
+			s,
+			a,
+			"jobs.getAttachment",
+			`{"jobId":"`+follow+`","attachmentId":"`+pid+`"}`,
+		); code != 200 || data(m)["mime"] != "image/png" ||
+			data(m)["bytes"] != png {
 			t.Errorf("jobs.getAttachment: %d %v", code, m)
 		}
 	}
-	if code, _ := post(s, &customerB, "jobs.getAttachment", `{"jobId":"`+follow+`","attachmentId":"`+pid+`"}`); code != 404 {
+
+	if code, _ := post(
+		s,
+		&customerB,
+		"jobs.getAttachment",
+		`{"jobId":"`+follow+`","attachmentId":"`+pid+`"}`,
+	); code != 404 {
 		t.Errorf("another customer opens the photo: %d", code)
 	}
-	if code, m := prob(`"reasonCode":"other","details":"Another issue with the louver","photos":[],"preferredSlot":null`, 4); code != 200 || len(data(m)["preferredSlots"].([]any)) != 0 {
+
+	if code, m := prob(
+		`"reasonCode":"other","details":"Another issue with the louver","photos":[],"preferredSlot":null`,
+		4,
+	); code != 200 ||
+		len(data(m)["preferredSlots"].([]any)) != 0 {
 		t.Fatalf("reportProblem without slot: %d %v", code, m)
 	}
-	owner(t, `UPDATE maintenance.jobs SET completed_at = $2 WHERE id = $1`, job, clock.Add(-8*24*time.Hour))
-	if code, _ := prob(`"reasonCode":"other","details":"Too late to report this","photos":[],"preferredSlot":null`, 5); code != 409 {
+
+	owner(
+		t,
+		`UPDATE maintenance.jobs SET completed_at = $2 WHERE id = $1`,
+		job,
+		clock.Add(-8*24*time.Hour),
+	)
+
+	if code, _ := prob(
+		`"reasonCode":"other","details":"Too late to report this","photos":[],"preferredSlot":null`,
+		5,
+	); code != 409 {
 		t.Error("problem after 7 days")
 	}
 	// the list rows name the follow-up, its class and when it was created: HQ's classify-by time (IR114, IR338), and
 	// the client's own row
 	summary := func(a *actor) map[string]any { // a follow-up stays requested (IR114); later tests' jobs may fill pages
 		t.Helper()
+
 		cursor := ""
 		for range 50 {
-			_, m := post(s, a, "jobs.list", `{"filters":{"unitId":"`+seed.ID("unit-non-rto").String()+`","status":"requested"},"limit":100`+cursor+`}`)
+			_, m := post(
+				s,
+				a,
+				"jobs.list",
+				`{"filters":{"unitId":"`+seed.ID("unit-non-rto").
+					String()+
+					`","status":"requested"},"limit":100`+cursor+`}`,
+			)
 			for _, it := range items(m) {
 				if it["id"] == follow {
 					return it
 				}
 			}
+
 			next, _ := data(m)["nextCursor"].(string)
 			if next == "" {
 				break
 			}
+
 			cursor = `,"cursor":"` + next + `"`
 		}
+
 		t.Fatal("follow-up not listed")
+
 		return nil
 	}
+
 	var created time.Time
 	ownerScan(t, `SELECT created_at FROM maintenance.jobs WHERE id = $1`, []any{follow}, &created)
+
 	for name, a := range map[string]*actor{"hq": &hq, "client": &customerA} {
 		row := summary(a)
+
 		at, _ := time.Parse(time.RFC3339, row["createdAt"].(string))
-		if row["projection"] != "summary" || row["followUpOfJobId"] != job || row["followUpClass"] != "pending" || !at.Equal(created) {
+		if row["projection"] != "summary" || row["followUpOfJobId"] != job ||
+			row["followUpClass"] != "pending" ||
+			!at.Equal(created) {
 			t.Errorf("%s row: %v", name, row)
 		}
 	}
 	// HQ classifies once
-	if code, m := write(s, &hq, "jobs.classifyFollowUp", `{"jobId":"`+follow+`","classification":"redo","reason":"x"}`, 1); code != 422 || fields(m) != "classification=error.invalid" {
+	if code, m := write(
+		s,
+		&hq,
+		"jobs.classifyFollowUp",
+		`{"jobId":"`+follow+`","classification":"redo","reason":"x"}`,
+		1,
+	); code != 422 ||
+		fields(m) != "classification=error.invalid" {
 		t.Errorf("bad classification: %d %s", code, fields(m))
 	}
-	if code, m := write(s, &hq, "jobs.classifyFollowUp", `{"jobId":"`+follow+`","classification":"rework","reason":"same fault"}`, 1); code != 200 || data(m)["followUpClass"] != "rework" {
+
+	if code, m := write(
+		s,
+		&hq,
+		"jobs.classifyFollowUp",
+		`{"jobId":"`+follow+`","classification":"rework","reason":"same fault"}`,
+		1,
+	); code != 200 ||
+		data(m)["followUpClass"] != "rework" {
 		t.Fatalf("classify: %d %v", code, m)
 	}
+
 	if row := summary(&hq); row["followUpClass"] != "rework" || row["followUpOfJobId"] != job {
 		t.Errorf("classified row: %v", row)
 	}
-	if code, _ := write(s, &hq, "jobs.classifyFollowUp", `{"jobId":"`+follow+`","classification":"new_request","reason":"again"}`, 2); code != 409 {
+
+	if code, _ := write(
+		s,
+		&hq,
+		"jobs.classifyFollowUp",
+		`{"jobId":"`+follow+`","classification":"new_request","reason":"again"}`,
+		2,
+	); code != 409 {
 		t.Error("classify twice")
 	}
-	if code, _ := write(s, &customerA, "jobs.classifyFollowUp", `{"jobId":"`+follow+`","classification":"rework","reason":"x"}`, 2); code != 403 {
+
+	if code, _ := write(
+		s,
+		&customerA,
+		"jobs.classifyFollowUp",
+		`{"jobId":"`+follow+`","classification":"rework","reason":"x"}`,
+		2,
+	); code != 403 {
 		t.Error("client classifies")
 	}
 }
@@ -189,36 +327,74 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 	s := server(t)
 	job := completedJob(t, s)
 	lines := `[{"kind":"estimate","amountMinor":5000,"currency":"MYR","description":" Parts ","visibility":"customer"},{"kind":"actual","amountMinor":800,"currency":"MYR","description":"Margin","visibility":"internal"}]`
-	if code, m := write(s, &hq, "jobs.saveCost", `{"jobId":"`+job+`","costLines":[{"kind":"guess","amountMinor":1,"currency":"MYR","description":"x","visibility":"internal"}]}`, 1); code != 422 || fields(m) != "costLines=error.invalid" {
+
+	if code, m := write(
+		s,
+		&hq,
+		"jobs.saveCost",
+		`{"jobId":"`+job+`","costLines":[{"kind":"guess","amountMinor":1,"currency":"MYR","description":"x","visibility":"internal"}]}`,
+		1,
+	); code != 422 ||
+		fields(m) != "costLines=error.invalid" {
 		t.Errorf("bad cost line: %d %s", code, fields(m))
 	}
-	if code, m := write(s, &hq, "jobs.saveCost", `{"jobId":"`+job+`","costLines":[{"kind":"actual","amountMinor":-1,"currency":"EUR","description":"","visibility":"internal"}]}`, 1); code != 422 || fields(m) != "costLines=error.invalid" {
+
+	if code, m := write(
+		s,
+		&hq,
+		"jobs.saveCost",
+		`{"jobId":"`+job+`","costLines":[{"kind":"actual","amountMinor":-1,"currency":"EUR","description":"","visibility":"internal"}]}`,
+		1,
+	); code != 422 ||
+		fields(m) != "costLines=error.invalid" {
 		t.Errorf("bad amount/currency: %d %s", code, fields(m))
 	}
-	if code, m := write(s, &hq, "jobs.saveCost", `{"jobId":"`+job+`","costLines":`+lines+`}`, 1); code != 200 || len(data(m)["costs"].([]any)) != 2 {
+
+	if code, m := write(
+		s,
+		&hq,
+		"jobs.saveCost",
+		`{"jobId":"`+job+`","costLines":`+lines+`}`,
+		1,
+	); code != 200 ||
+		len(data(m)["costs"].([]any)) != 2 {
 		t.Fatalf("saveCost: %d %v", code, m)
 	}
 	// IR42: clients see customer lines only
-	if _, m := post(s, &customerA, "jobs.get", `{"jobId":"`+job+`"}`); len(data(m)["costs"].([]any)) != 1 || data(m)["costs"].([]any)[0].(map[string]any)["description"] != "Parts" {
+	if _, m := post(
+		s,
+		&customerA,
+		"jobs.get",
+		`{"jobId":"`+job+`"}`,
+	); len(data(m)["costs"].([]any)) != 1 ||
+		data(m)["costs"].([]any)[0].(map[string]any)["description"] != "Parts" {
 		t.Fatalf("client costs: %v", data(m)["costs"])
 	}
 	// IR442: the client's history leaves out HQ's cost record (counted out of total too); HQ sees it
 	actions := func(a *actor) ([]string, float64) {
 		t.Helper()
+
 		code, m := post(s, a, "jobs.events", `{"jobId":"`+job+`","query":{"limit":100}}`)
 		if code != 200 {
 			t.Fatalf("jobs.events: %d %v", code, m)
 		}
+
 		var out []string
 		for _, e := range data(m)["items"].([]any) {
 			out = append(out, e.(map[string]any)["action"].(string))
 		}
+
 		return out, data(m)["total"].(float64)
 	}
-	if got, total := actions(&customerA); slices.Contains(got, "job.costs_saved") || int(total) != len(got) {
+	if got, total := actions(
+		&customerA,
+	); slices.Contains(got, "job.costs_saved") ||
+		int(total) != len(got) {
 		t.Errorf("client history: %v (total %v)", got, total)
 	}
+
 	clientEvents, clientTotal := actions(&customerA)
+
 	hqEvents, _ := actions(&hq)
 	if !slices.Contains(hqEvents, "job.costs_saved") {
 		t.Errorf("HQ history lacks the cost record: %v", hqEvents)
@@ -226,35 +402,93 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 	// the detail's event cursor counts only what the caller's history lists, so it reveals no hidden event
 	cursor := func(a *actor) float64 {
 		t.Helper()
+
 		_, m := post(s, a, "jobs.get", `{"jobId":"`+job+`"}`)
+
 		return data(m)["eventCursor"].(float64)
 	}
 	if got := cursor(&customerA); got != clientTotal || len(clientEvents) >= len(hqEvents) {
-		t.Errorf("client eventCursor %v, client events %d, HQ events %d", got, len(clientEvents), len(hqEvents))
+		t.Errorf(
+			"client eventCursor %v, client events %d, HQ events %d",
+			got,
+			len(clientEvents),
+			len(hqEvents),
+		)
 	}
+
 	if got := cursor(&hq); int(got) != len(hqEvents) {
 		t.Errorf("HQ eventCursor %v, HQ events %d", got, len(hqEvents))
 	}
 	// warranty claims need a warranty that covers completion
 	claim := `{"jobId":"` + job + `","partLabel":"Compressor","amountMinor":12000,"currency":"MYR","reason":"failed in warranty"}`
-	owner(t, `UPDATE assets.units SET warranty_ends_at = NULL WHERE id = $1`, seed.ID("unit-non-rto"))
-	if code, m := write(s, &hq, "jobs.recordWarrantyClaim", claim, 2); code != 422 || fields(m) != "jobId=errors.outside_warranty" {
+
+	owner(
+		t,
+		`UPDATE assets.units SET warranty_ends_at = NULL WHERE id = $1`,
+		seed.ID("unit-non-rto"),
+	)
+
+	if code, m := write(
+		s,
+		&hq,
+		"jobs.recordWarrantyClaim",
+		claim,
+		2,
+	); code != 422 ||
+		fields(m) != "jobId=errors.outside_warranty" {
 		t.Errorf("no warranty: %d %s", code, fields(m))
 	}
-	owner(t, `UPDATE assets.units SET warranty_ends_at = $2 WHERE id = $1`, seed.ID("unit-non-rto"), clock.Add(30*24*time.Hour))
+
+	owner(
+		t,
+		`UPDATE assets.units SET warranty_ends_at = $2 WHERE id = $1`,
+		seed.ID("unit-non-rto"),
+		clock.Add(30*24*time.Hour),
+	)
 	t.Cleanup(func() {
-		owner(t, `UPDATE assets.units SET warranty_ends_at = NULL WHERE id = $1`, seed.ID("unit-non-rto"))
+		owner(
+			t,
+			`UPDATE assets.units SET warranty_ends_at = NULL WHERE id = $1`,
+			seed.ID("unit-non-rto"),
+		)
 	})
-	if code, m := write(s, &hq, "jobs.recordWarrantyClaim", `{"jobId":"`+job+`","partLabel":"","amountMinor":0,"currency":"JPY","reason":""}`, 2); code != 422 || fields(m) != "amountMinor=error.range,currency=error.invalid,partLabel=error.length,reason=error.length" {
+
+	if code, m := write(
+		s,
+		&hq,
+		"jobs.recordWarrantyClaim",
+		`{"jobId":"`+job+`","partLabel":"","amountMinor":0,"currency":"JPY","reason":""}`,
+		2,
+	); code != 422 ||
+		fields(
+			m,
+		) != "amountMinor=error.range,currency=error.invalid,partLabel=error.length,reason=error.length" {
 		t.Errorf("bad claim input: %d %s", code, fields(m))
 	}
-	if code, m := write(s, &hq, "jobs.recordWarrantyClaim", claim, 2); code != 200 || data(m)["warrantyClaims"].([]any)[0].(map[string]any)["state"] != "filed" {
+
+	if code, m := write(
+		s,
+		&hq,
+		"jobs.recordWarrantyClaim",
+		claim,
+		2,
+	); code != 200 ||
+		data(m)["warrantyClaims"].([]any)[0].(map[string]any)["state"] != "filed" {
 		t.Fatalf("claim: %d %v", code, m)
 	}
+
 	owner(t, `UPDATE maintenance.jobs SET status = 'cancelled' WHERE id = $1`, job)
-	if code, _ := write(s, &hq, "jobs.saveCost", `{"jobId":"`+job+`","costLines":[]}`, 3); code != 409 {
+
+	if code, _ := write(
+		s,
+		&hq,
+		"jobs.saveCost",
+		`{"jobId":"`+job+`","costLines":[]}`,
+		3,
+	); code != 409 {
 		t.Error("cost on cancelled job")
 	}
+
 	if code, _ := write(s, &hq, "jobs.recordWarrantyClaim", claim, 3); code != 409 {
 		t.Error("claim on non-completed job")
 	}
@@ -263,34 +497,123 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 	unit := seed.ID("unit-non-rto").String()
 	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	_, m := write(s, &customerA, "jobs.create", jobBody(unit, nil), 0)
+
 	j2 := data(m)["id"].(string)
-	if code, _ := write(s, &hq, "jobs.extendAccess", `{"jobId":"`+j2+`","accessValidUntil":"`+ts(200)+`","reason":"x"}`, 1); code != 409 {
+	if code, _ := write(
+		s,
+		&hq,
+		"jobs.extendAccess",
+		`{"jobId":"`+j2+`","accessValidUntil":"`+ts(200)+`","reason":"x"}`,
+		1,
+	); code != 409 {
 		t.Error("extend without accepted offer")
 	}
-	write(s, &hq, "jobs.offer", `{"jobId":"`+j2+`","contractorOrgId":"`+seed.ID("org-contractor-a").String()+`","visitSlot":`+slotJSON(49, 2)+
-		`,"offerExpiresAt":"`+ts(12)+`","accessValidFrom":"`+ts(-1)+`","accessValidUntil":"`+ts(100)+`","termsVersion":"t"}`, 1)
-	if _, m := post(s, &hq, "jobs.get", `{"jobId":"`+j2+`"}`); data(m)["offer"] == nil || data(m)["offer"].(map[string]any)["decision"] != nil {
+
+	write(
+		s,
+		&hq,
+		"jobs.offer",
+		`{"jobId":"`+j2+`","contractorOrgId":"`+seed.ID("org-contractor-a").
+			String()+
+			`","visitSlot":`+slotJSON(
+			49,
+			2,
+		)+
+			`,"offerExpiresAt":"`+ts(
+			12,
+		)+`","accessValidFrom":"`+ts(
+			-1,
+		)+`","accessValidUntil":"`+ts(
+			100,
+		)+`","termsVersion":"t"}`,
+		1,
+	)
+
+	if _, m := post(
+		s,
+		&hq,
+		"jobs.get",
+		`{"jobId":"`+j2+`"}`,
+	); data(m)["offer"] == nil ||
+		data(m)["offer"].(map[string]any)["decision"] != nil {
 		t.Fatal("hq sees the open offer")
 	}
+
 	var offer string
-	ownerScan(t, `SELECT id::text FROM maintenance.offers WHERE job_id = $1 AND decision IS NULL`, []any{j2}, &offer)
-	write(s, &contrA, "jobs.accept", `{"jobId":"`+j2+`","offerId":"`+offer+`","termsVersion":"t"}`, 2)
-	if code, m := write(s, &hq, "jobs.extendAccess", `{"jobId":"`+j2+`","accessValidUntil":"`+ts(50)+`","reason":"x"}`, 3); code != 422 || fields(m) != "accessValidUntil=error.mustExtend" {
+	ownerScan(
+		t,
+		`SELECT id::text FROM maintenance.offers WHERE job_id = $1 AND decision IS NULL`,
+		[]any{j2},
+		&offer,
+	)
+	write(
+		s,
+		&contrA,
+		"jobs.accept",
+		`{"jobId":"`+j2+`","offerId":"`+offer+`","termsVersion":"t"}`,
+		2,
+	)
+
+	if code, m := write(
+		s,
+		&hq,
+		"jobs.extendAccess",
+		`{"jobId":"`+j2+`","accessValidUntil":"`+ts(50)+`","reason":"x"}`,
+		3,
+	); code != 422 ||
+		fields(m) != "accessValidUntil=error.mustExtend" {
 		t.Errorf("extension must be later: %d %s", code, fields(m))
 	}
-	if code, m := write(s, &hq, "jobs.extendAccess", `{"jobId":"`+j2+`","accessValidUntil":"`+ts(200)+`","reason":" "}`, 3); code != 422 || fields(m) != "reason=error.length" {
+
+	if code, m := write(
+		s,
+		&hq,
+		"jobs.extendAccess",
+		`{"jobId":"`+j2+`","accessValidUntil":"`+ts(200)+`","reason":" "}`,
+		3,
+	); code != 422 ||
+		fields(m) != "reason=error.length" {
 		t.Errorf("extension reason: %d %s", code, fields(m))
 	}
-	if code, m := write(s, &hq, "jobs.extendAccess", `{"jobId":"`+j2+`","accessValidUntil":"`+ts(200)+`","reason":"parts delayed"}`, 3); code != 200 {
+
+	if code, m := write(
+		s,
+		&hq,
+		"jobs.extendAccess",
+		`{"jobId":"`+j2+`","accessValidUntil":"`+ts(200)+`","reason":"parts delayed"}`,
+		3,
+	); code != 200 {
 		t.Fatalf("extend: %d %v", code, m)
 	}
-	if _, m := post(s, &hq, "jobs.get", `{"jobId":"`+j2+`"}`); data(m)["offer"].(map[string]any)["accessValidUntil"] != ts(200) { // the write answers MaintenanceJob (IR392)
+
+	if _, m := post(
+		s,
+		&hq,
+		"jobs.get",
+		`{"jobId":"`+j2+`"}`,
+	); data(m)["offer"].(map[string]any)["accessValidUntil"] != ts(
+		200,
+	) { // the write answers MaintenanceJob (IR392)
 		t.Fatalf("extended access: %v", data(m)["offer"])
 	}
-	if _, m := post(s, &contrA, "jobs.get", `{"jobId":"`+j2+`"}`); data(m)["offer"] == nil || len(data(m)["costs"].([]any)) != 0 {
+
+	if _, m := post(
+		s,
+		&contrA,
+		"jobs.get",
+		`{"jobId":"`+j2+`"}`,
+	); data(m)["offer"] == nil ||
+		len(data(m)["costs"].([]any)) != 0 {
 		t.Fatalf("contractor detail: %v", m)
 	}
-	if code, m := post(s, &customerA, "jobs.get", `{"jobId":"`+j2+`"}`); code != 200 || data(m)["offer"] != nil {
+
+	if code, m := post(
+		s,
+		&customerA,
+		"jobs.get",
+		`{"jobId":"`+j2+`"}`,
+	); code != 200 ||
+		data(m)["offer"] != nil {
 		t.Fatal("client sees the offer")
 	}
 }
@@ -298,11 +621,24 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 func TestWorkerConfirmsUnratedJobs(t *testing.T) {
 	s := server(t)
 	job := completedJob(t, s)
-	owner(t, `UPDATE maintenance.jobs SET completed_at = $2 WHERE id = $1`, job, clock.Add(-7*24*time.Hour))
+	owner(
+		t,
+		`UPDATE maintenance.jobs SET completed_at = $2 WHERE id = $1`,
+		job,
+		clock.Add(-7*24*time.Hour),
+	)
+
 	if _, err := schedTick(context.Background(), s, clock); err != nil {
 		t.Fatal(err)
 	}
-	if _, m := post(s, &customerA, "jobs.get", `{"jobId":"`+job+`"}`); data(m)["customerConfirmedAt"] == nil || data(m)["rating"] != nil {
+
+	if _, m := post(
+		s,
+		&customerA,
+		"jobs.get",
+		`{"jobId":"`+job+`"}`,
+	); data(m)["customerConfirmedAt"] == nil ||
+		data(m)["rating"] != nil {
 		t.Fatalf("auto confirm: %v", m)
 	}
 }
@@ -314,41 +650,99 @@ func TestExtendAccessRefreezesHistory(t *testing.T) {
 	ctx := context.Background()
 	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	_, m := write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+
 	job := data(m)["id"].(string)
-	if code, m := write(s, &hq, "jobs.offer", `{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").String()+`","visitSlot":`+slotJSON(49, 2)+
-		`,"offerExpiresAt":"`+ts(12)+`","accessValidFrom":"`+ts(0)+`","accessValidUntil":"`+ts(100)+`","termsVersion":"t"}`, 1); code != 200 {
+	if code, m := write(
+		s,
+		&hq,
+		"jobs.offer",
+		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
+			String()+
+			`","visitSlot":`+slotJSON(
+			49,
+			2,
+		)+
+			`,"offerExpiresAt":"`+ts(
+			12,
+		)+`","accessValidFrom":"`+ts(
+			0,
+		)+`","accessValidUntil":"`+ts(
+			100,
+		)+`","termsVersion":"t"}`,
+		1,
+	); code != 200 {
 		t.Fatalf("offer: %d %v", code, m)
 	}
+
 	var offer string
-	ownerScan(t, `SELECT id::text FROM maintenance.offers WHERE job_id = $1 AND decision IS NULL`, []any{job}, &offer)
-	if code, m := write(s, &contrA, "jobs.accept", `{"jobId":"`+job+`","offerId":"`+offer+`","termsVersion":"t"}`, 2); code != 200 {
+	ownerScan(
+		t,
+		`SELECT id::text FROM maintenance.offers WHERE job_id = $1 AND decision IS NULL`,
+		[]any{job},
+		&offer,
+	)
+
+	if code, m := write(
+		s,
+		&contrA,
+		"jobs.accept",
+		`{"jobId":"`+job+`","offerId":"`+offer+`","termsVersion":"t"}`,
+		2,
+	); code != 200 {
 		t.Fatalf("accept: %d %v", code, m)
 	}
 	// the access window ended an hour ago and the worker froze the contractor's history
-	owner(t, `UPDATE maintenance.offers SET access_valid_from = $2, access_valid_until = $3 WHERE id = $1`, offer, clock.Add(-5*time.Hour), clock.Add(-time.Hour))
+	owner(
+		t,
+		`UPDATE maintenance.offers SET access_valid_from = $2, access_valid_until = $3 WHERE id = $1`,
+		offer,
+		clock.Add(-5*time.Hour),
+		clock.Add(-time.Hour),
+	)
+
 	asOf := func() *time.Time {
 		t.Helper()
+
 		var at *time.Time
-		ownerScan(t, `SELECT (SELECT as_of FROM maintenance.job_history_snapshots WHERE job_id = $1 AND owner_kind = 'organization')`, []any{job}, &at)
+		ownerScan(
+			t,
+			`SELECT (SELECT as_of FROM maintenance.job_history_snapshots WHERE job_id = $1 AND owner_kind = 'organization')`,
+			[]any{job},
+			&at,
+		)
+
 		return at
 	}
+
 	if _, err := schedTick(ctx, s, clock); err != nil {
 		t.Fatal(err)
 	}
+
 	if at := asOf(); at == nil || !at.Equal(clock.Add(-time.Hour)) {
 		t.Fatalf("frozen at the first end: %v", at)
 	}
+
 	var v int
 	ownerScan(t, `SELECT version FROM maintenance.jobs WHERE id = $1`, []any{job}, &v)
-	if code, m := write(s, &hq, "jobs.extendAccess", `{"jobId":"`+job+`","accessValidUntil":"`+ts(2)+`","reason":"parts arrived late"}`, v); code != 200 {
+
+	if code, m := write(
+		s,
+		&hq,
+		"jobs.extendAccess",
+		`{"jobId":"`+job+`","accessValidUntil":"`+ts(2)+`","reason":"parts arrived late"}`,
+		v,
+	); code != 200 {
 		t.Fatalf("extend: %d %v", code, m)
 	}
+
 	if at := asOf(); at != nil {
 		t.Errorf("the old snapshot stays while the access is open again: %v", at)
 	}
+
 	if _, err := schedTick(ctx, s, clock.Add(3*time.Hour)); err != nil {
 		t.Fatal(err)
 	}
+
 	if at := asOf(); at == nil || !at.Equal(clock.Add(2*time.Hour)) {
 		t.Errorf("frozen again at the new end: %v", at)
 	}

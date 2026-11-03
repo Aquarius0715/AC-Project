@@ -39,23 +39,39 @@ var (
 // ParseAction decodes a UnitAction strictly: exactly the fields of its kind (error key "error.invalid").
 func ParseAction(raw json.RawMessage) (UnitAction, bool) {
 	var a UnitAction
+
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.DisallowUnknownFields()
+
 	if len(raw) == 0 || dec.Decode(&a) != nil {
 		return a, false
 	}
+
 	set := func(b bool) int {
 		if b {
 			return 1
 		}
+
 		return 0
 	}
-	n := set(a.Power != nil) + set(a.Celsius != nil) + set(a.Mode != nil) + set(a.FanLevel != nil) + set(a.Level != nil)
+
+	n := set(
+		a.Power != nil,
+	) + set(
+		a.Celsius != nil,
+	) + set(
+		a.Mode != nil,
+	) + set(
+		a.FanLevel != nil,
+	) + set(
+		a.Level != nil,
+	)
 	switch a.Kind {
 	case "set_power":
 		return a, n == 1 && a.Power != nil
 	case "set_temperature":
-		return a, n == 1 && a.Celsius != nil && !math.IsNaN(*a.Celsius) && !math.IsInf(*a.Celsius, 0)
+		return a, n == 1 && a.Celsius != nil && !math.IsNaN(*a.Celsius) &&
+			!math.IsInf(*a.Celsius, 0)
 	case "set_mode":
 		return a, n == 1 && a.Mode != nil && slices.Contains(modes, *a.Mode)
 	case "set_fan":
@@ -63,6 +79,7 @@ func ParseAction(raw json.RawMessage) (UnitAction, bool) {
 	case "ventilate":
 		return a, n == 1 && a.Level != nil && slices.Contains(fans, *a.Level)
 	}
+
 	return a, false
 }
 
@@ -76,10 +93,13 @@ func (a UnitAction) Supports(c Caps) bool {
 		if !c.Control || !c.HasTemperature || *a.Celsius < c.TempMin || *a.Celsius > c.TempMax {
 			return false
 		}
+
 		if c.TempStep > 0 {
 			k := (*a.Celsius - c.TempMin) / c.TempStep
+
 			return math.Abs(k-math.Round(k)) < 1e-9
 		}
+
 		return true
 	case "set_mode":
 		return c.Control && c.ModeControl && slices.Contains(c.Modes, *a.Mode)
@@ -88,5 +108,6 @@ func (a UnitAction) Supports(c Caps) bool {
 	case "ventilate":
 		return c.Ventilation && slices.Contains(c.VentilationLevels, *a.Level)
 	}
+
 	return false
 }

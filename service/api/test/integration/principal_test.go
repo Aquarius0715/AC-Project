@@ -19,33 +19,53 @@ func TestPrincipalFromIdentityService(t *testing.T) {
 		c.Domains = []string{ops.DomainIdentity}
 		c.InternalToken = "test-internal"
 	})
+
 	idSrv := httptest.NewServer(identity.Echo)
 	defer idSrv.Close()
 
 	get := func(token, subject, membership string) (int, map[string]any) {
-		req, _ := http.NewRequest(http.MethodGet, idSrv.URL+auth.PrincipalPath+"?subject="+subject+"&tenant="+seed.ID("tenant-a").String()+"&membership="+membership, nil)
+		req, _ := http.NewRequest(
+			http.MethodGet,
+			idSrv.URL+auth.PrincipalPath+"?subject="+subject+"&tenant="+seed.ID("tenant-a").
+				String()+
+				"&membership="+membership,
+			nil,
+		)
 		req.Header.Set("Authorization", "Bearer "+token)
+
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer res.Body.Close()
+
 		var m map[string]any
+
 		_ = json.NewDecoder(res.Body).Decode(&m)
+
 		return res.StatusCode, m
 	}
+
 	user := seed.ID("user-customer-a").String()
-	if code, m := get("test-internal", user, seed.ID("customer-a").String()); code != 200 || m["role"] != "client" || m["clientRole"] != "owner" {
+	if code, m := get(
+		"test-internal",
+		user,
+		seed.ID("customer-a").String(),
+	); code != 200 || m["role"] != "client" ||
+		m["clientRole"] != "owner" {
 		t.Fatalf("principal: %d %v", code, m)
 	}
+
 	if code, _ := get("wrong", user, seed.ID("customer-a").String()); code != 401 {
 		t.Fatalf("wrong internal token: %d", code)
 	}
+
 	if code, _ := get("test-internal", user, seed.ID("customer-b").String()); code != 404 {
 		t.Fatalf("another user's membership: %d", code)
 	}
 
 	cl := newCluster(t) // billing asks equipment for customers (IR193)
+
 	billing := serverCfg(t, func(c *apiserver.Config) {
 		c.Domains = []string{ops.DomainBilling}
 		c.IdentityURL = idSrv.URL
@@ -55,17 +75,26 @@ func TestPrincipalFromIdentityService(t *testing.T) {
 	if code, m := post(billing, &customerA, "invoices.list", `{"limit":1}`); code != 200 {
 		t.Fatalf("billing-api with remote principal: %d %v", code, m)
 	}
+
 	if code, _ := post(billing, &customerB, "invoices.list", `{"limit":1}`); code != 200 {
 		t.Fatalf("second member: %d", code)
 	}
+
 	idSrv.Close()
+
 	down := serverCfg(t, func(c *apiserver.Config) {
 		c.Domains = []string{ops.DomainBilling}
 		c.IdentityURL = idSrv.URL
 		c.InternalToken = "test-internal"
 		c.ServiceURLs = cl.others(ops.DomainBilling)
 	})
-	if code, m := post(down, &customerA, "invoices.list", `{"limit":1}`); code != 503 || m["code"] != "UNAVAILABLE" {
+	if code, m := post(
+		down,
+		&customerA,
+		"invoices.list",
+		`{"limit":1}`,
+	); code != 503 ||
+		m["code"] != "UNAVAILABLE" {
 		t.Fatalf("identity down: %d %v", code, m)
 	}
 }

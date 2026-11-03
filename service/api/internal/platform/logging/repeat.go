@@ -23,6 +23,7 @@ func (r *Repeats) now() time.Time {
 	if r.Now != nil {
 		return r.Now()
 	}
+
 	return time.Now()
 }
 
@@ -30,20 +31,25 @@ func (r *Repeats) now() time.Time {
 func (r *Repeats) Failed(msg string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
 	every := r.Every
 	if every <= 0 {
 		every = time.Minute
 	}
+
 	now := r.now()
 	if msg == r.last && now.Sub(r.loggedAt) < every {
 		r.repeated++
+
 		return
 	}
+
 	if msg == r.last && r.repeated > 0 {
 		r.Logf("%s (repeated %d times)", msg, r.repeated)
 	} else {
 		r.Logf("%s", msg)
 	}
+
 	r.last, r.loggedAt, r.repeated = msg, now, 0
 }
 
@@ -51,9 +57,11 @@ func (r *Repeats) Failed(msg string) {
 func (r *Repeats) OK(what string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
 	if r.last == "" {
 		return
 	}
+
 	r.Logf("%s recovered", what)
 	r.last, r.repeated = "", 0
 }

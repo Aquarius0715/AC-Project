@@ -22,17 +22,25 @@ type QrAssignmentResult struct {
 
 // QrAssignment reports the caller's active Assignment on the unit and the open job whose scheduled window ends first
 // after now.
-func (QrAccess) QrAssignment(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, *uuid.UUID, error) {
+func (QrAccess) QrAssignment(
+	ctx context.Context,
+	c *ops.Call,
+	unit uuid.UUID,
+) (bool, *uuid.UUID, error) {
 	r, err := ops.Delegate(ctx, c, QueryQrAssignment, UnitInput{UnitID: unit}, qrAssignment)
+
 	return r.Assigned, r.JobID, err
 }
 
 func qrAssignment(ctx context.Context, c *ops.Call, in *UnitInput) (QrAssignmentResult, error) {
 	var r QrAssignmentResult
+
 	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.assignments a JOIN maintenance.jobs j ON j.id = a.job_id
 			WHERE j.unit_id = $1 AND a.technician_membership_id = $2 AND a.status = 'active'),
 		(SELECT j.id FROM maintenance.assignments a JOIN maintenance.jobs j ON j.id = a.job_id
 			WHERE j.unit_id = $1 AND a.technician_membership_id = $2 AND a.status = 'active' AND j.status IN ('assigned','in_progress','on_hold','rework_requested')
-			  AND upper(a.scheduled) > $3 ORDER BY upper(a.scheduled), j.id LIMIT 1)`, in.UnitID, c.Principal.MembershipID, c.Now).Scan(&r.Assigned, &r.JobID)
+			  AND upper(a.scheduled) > $3 ORDER BY upper(a.scheduled), j.id LIMIT 1)`, in.UnitID, c.Principal.MembershipID, c.Now).
+		Scan(&r.Assigned, &r.JobID)
+
 	return r, err
 }

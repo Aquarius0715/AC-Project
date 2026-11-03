@@ -28,23 +28,46 @@ func History(ctx context.Context, c *ops.Call, kind, id string) ([]View, error) 
 }
 
 func history(ctx context.Context, c *ops.Call, in *HistoryInput) ([]View, error) {
-	rows, err := c.Tx.Query(ctx, `SELECT a.id, a.tenant_id, a.actor_id, u.display_name, a.actor_role_at_time, a.action, a.previous_version, a.next_version, a.occurred_at, a.correlation_id, a.result,
-		a.masked_before, a.masked_after, a.reason FROM audit.audit_log a `+actorJoin+` WHERE a.target_kind = $1 AND a.target_id = $2 ORDER BY a.occurred_at, a.correlation_id, a.id`, in.TargetKind, in.TargetID)
+	rows, err := c.Tx.Query(
+		ctx,
+		`SELECT a.id, a.tenant_id, a.actor_id, u.display_name, a.actor_role_at_time, a.action, a.previous_version, a.next_version, a.occurred_at, a.correlation_id, a.result,
+		a.masked_before, a.masked_after, a.reason FROM audit.audit_log a `+actorJoin+` WHERE a.target_kind = $1 AND a.target_id = $2 ORDER BY a.occurred_at, a.correlation_id, a.id`,
+		in.TargetKind,
+		in.TargetID,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
+
 	out := []View{}
+
 	for rows.Next() {
 		var x View
-		if err := rows.Scan(&x.ID, &x.TenantID, &x.ActorID, &x.ActorName, &x.ActorRoleAtTime, &x.Action, &x.PreviousVersion, &x.NextVersion, &x.OccurredAt, &x.CorrelationID, &x.Result,
-			&x.MaskedBefore, &x.MaskedAfter, &x.Reason); err != nil {
+		if err := rows.Scan(
+			&x.ID,
+			&x.TenantID,
+			&x.ActorID,
+			&x.ActorName,
+			&x.ActorRoleAtTime,
+			&x.Action,
+			&x.PreviousVersion,
+			&x.NextVersion,
+			&x.OccurredAt,
+			&x.CorrelationID,
+			&x.Result,
+			&x.MaskedBefore,
+			&x.MaskedAfter,
+			&x.Reason,
+		); err != nil {
 			return nil, err
 		}
+
 		x.Version, x.CreatedAt, x.UpdatedAt = 1, x.OccurredAt, x.OccurredAt
 		x.TargetRef = map[string]string{"kind": in.TargetKind, "id": in.TargetID}
 		out = append(out, x)
 	}
+
 	return out, rows.Err()
 }
 
@@ -61,18 +84,39 @@ func EventHandlers() map[string]events.Handler {
 			if err := e.Decode(&a); err != nil {
 				return err
 			}
+
 			before, after := a.MaskedBefore, a.MaskedAfter
 			if before == nil {
 				before = map[string]*string{}
 			}
+
 			if after == nil {
 				after = map[string]*string{}
 			}
-			_, err := tx.Exec(ctx, `INSERT INTO audit.audit_log (id, tenant_id, actor_id, actor_role_at_time, membership_id, action, target_kind, target_id,
+
+			_, err := tx.Exec(
+				ctx,
+				`INSERT INTO audit.audit_log (id, tenant_id, actor_id, actor_role_at_time, membership_id, action, target_kind, target_id,
 				previous_version, next_version, occurred_at, correlation_id, result, reason, masked_before, masked_after)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NULLIF($14, ''), $15, $16) ON CONFLICT (id, occurred_at) DO NOTHING`,
-				a.ID, e.TenantID, a.ActorID, a.ActorRole, a.MembershipID, a.Action, a.TargetKind, a.TargetID, a.PreviousVersion, a.NextVersion, a.OccurredAt,
-				a.CorrelationID, a.Result, a.Reason, before, after)
+				a.ID,
+				e.TenantID,
+				a.ActorID,
+				a.ActorRole,
+				a.MembershipID,
+				a.Action,
+				a.TargetKind,
+				a.TargetID,
+				a.PreviousVersion,
+				a.NextVersion,
+				a.OccurredAt,
+				a.CorrelationID,
+				a.Result,
+				a.Reason,
+				before,
+				after,
+			)
+
 			return err
 		},
 	}

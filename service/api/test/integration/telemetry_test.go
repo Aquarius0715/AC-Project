@@ -12,42 +12,100 @@ import (
 
 func TestTelemetry(t *testing.T) {
 	s := server(t)
-	online, nonRTO, other := seed.ID("unit-online-rto").String(), seed.ID("unit-non-rto").String(), seed.ID("unit-other-customer").String()
+	online, nonRTO, other := seed.ID("unit-online-rto").
+		String(),
+		seed.ID("unit-non-rto").
+			String(),
+		seed.ID("unit-other-customer").
+			String()
 	from, to := clock.Add(-24*time.Hour).Format(time.RFC3339), clock.Format(time.RFC3339)
 	rng := `"from":"` + from + `","to":"` + to + `"`
 
 	// series by unit: one unit → allergen observation (available); seeded reading id = fixture event id
-	code, m := post(s, &customerA, "telemetry.series", `{`+rng+`,"unitIds":["`+online+`"],"metric":"co2","query":{}}`)
-	if code != 200 || len(items(m)) != 1 || items(m)[0]["value"].(float64) != 800 || items(m)[0]["id"] != seed.ID("m-sensor-online-co2-1").String() ||
-		items(m)[0]["id"] != items(m)[0]["eventId"] || items(m)[0]["isDemo"] != true {
+	code, m := post(
+		s,
+		&customerA,
+		"telemetry.series",
+		`{`+rng+`,"unitIds":["`+online+`"],"metric":"co2","query":{}}`,
+	)
+	if code != 200 || len(items(m)) != 1 || items(m)[0]["value"].(float64) != 800 ||
+		items(m)[0]["id"] != seed.ID("m-sensor-online-co2-1").String() ||
+		items(m)[0]["id"] != items(m)[0]["eventId"] ||
+		items(m)[0]["isDemo"] != true {
 		t.Fatalf("series: %d %v", code, m)
 	}
-	if a := data(m)["allergenObservation"].(map[string]any); a["availability"] != "available" || a["substance"] == nil {
+
+	if a := data(m)["allergenObservation"].(map[string]any); a["availability"] != "available" ||
+		a["substance"] == nil {
 		t.Fatalf("allergen: %v", a)
 	}
-	_, m = post(s, &customerA, "telemetry.series", `{`+rng+`,"unitIds":["`+nonRTO+`"],"metric":"co2","query":{}}`)
-	if a := data(m)["allergenObservation"].(map[string]any); a["availability"] != "unsupported" || a["substance"] != nil || len(items(m)) != 0 {
+
+	_, m = post(
+		s,
+		&customerA,
+		"telemetry.series",
+		`{`+rng+`,"unitIds":["`+nonRTO+`"],"metric":"co2","query":{}}`,
+	)
+	if a := data(m)["allergenObservation"].(map[string]any); a["availability"] != "unsupported" ||
+		a["substance"] != nil ||
+		len(items(m)) != 0 {
 		t.Fatalf("unsupported allergen: %v", m)
 	}
-	_, m = post(s, &customerA, "telemetry.series", `{`+rng+`,"unitIds":["`+seed.ID("unit-limited").String()+`"],"metric":"temperature","query":{}}`)
-	if a := data(m)["allergenObservation"].(map[string]any); a["availability"] != "not_measured" || len(items(m)) != 1 {
+
+	_, m = post(
+		s,
+		&customerA,
+		"telemetry.series",
+		`{`+rng+`,"unitIds":["`+seed.ID("unit-limited").
+			String()+
+			`"],"metric":"temperature","query":{}}`,
+	)
+	if a := data(m)["allergenObservation"].(map[string]any); a["availability"] != "not_measured" ||
+		len(items(m)) != 1 {
 		t.Fatalf("not measured: %v", m)
 	}
 	// several units: no allergen, ordered by observedAt
-	_, m = post(s, &customerA, "telemetry.series", `{`+rng+`,"unitIds":["`+online+`","`+nonRTO+`","`+seed.ID("unit-offline-rto").String()+`"],"metric":"temperature","query":{"limit":2}}`)
-	if data(m)["allergenObservation"] != nil || len(items(m)) != 2 || data(m)["total"].(float64) != 3 || items(m)[0]["value"].(float64) != 29 || data(m)["nextCursor"] == nil {
+	_, m = post(
+		s,
+		&customerA,
+		"telemetry.series",
+		`{`+rng+`,"unitIds":["`+online+`","`+nonRTO+`","`+seed.ID("unit-offline-rto").
+			String()+
+			`"],"metric":"temperature","query":{"limit":2}}`,
+	)
+	if data(m)["allergenObservation"] != nil || len(items(m)) != 2 ||
+		data(m)["total"].(float64) != 3 ||
+		items(m)[0]["value"].(float64) != 29 ||
+		data(m)["nextCursor"] == nil {
 		t.Fatalf("multi-unit: %v", m)
 	}
-	_, m = post(s, &customerA, "telemetry.series", `{`+rng+`,"unitIds":["`+online+`","`+nonRTO+`"],"metric":"temperature","query":{"sort":{"field":"observedAt","direction":"desc"}}}`)
+
+	_, m = post(
+		s,
+		&customerA,
+		"telemetry.series",
+		`{`+rng+`,"unitIds":["`+online+`","`+nonRTO+`"],"metric":"temperature","query":{"sort":{"field":"observedAt","direction":"desc"}}}`,
+	)
 	if len(items(m)) != 2 {
 		t.Fatal("desc sort")
 	}
 	// by space and by sensor
-	_, m = post(s, &customerA, "telemetry.series", `{`+rng+`,"spaceId":"`+seed.ID("room-1").String()+`","metric":"humidity","query":{}}`)
+	_, m = post(
+		s,
+		&customerA,
+		"telemetry.series",
+		`{`+rng+`,"spaceId":"`+seed.ID("room-1").String()+`","metric":"humidity","query":{}}`,
+	)
 	if len(items(m)) != 1 || data(m)["allergenObservation"] == nil {
 		t.Fatalf("space: %v", m)
 	}
-	_, m = post(s, &hq, "telemetry.series", `{`+rng+`,"unitIds":["`+online+`"],"metric":"temperature","sensorId":"`+uuid.NewString()+`","query":{}}`)
+
+	_, m = post(
+		s,
+		&hq,
+		"telemetry.series",
+		`{`+rng+`,"unitIds":["`+online+`"],"metric":"temperature","sensorId":"`+uuid.NewString()+`","query":{}}`,
+	)
 	if len(items(m)) != 0 {
 		t.Fatal("sensor filter")
 	}
@@ -65,6 +123,7 @@ func TestTelemetry(t *testing.T) {
 		"range > 35 days":     "to=error.rangeTooLong",
 		"reversed range":      "to=error.range",
 	}
+
 	for name, tc := range map[string]struct {
 		a    *actor
 		body string
@@ -96,14 +155,27 @@ func TestTelemetry(t *testing.T) {
 	}
 
 	// summary: latest per unit and metric
-	code, m = post(s, &customerA, "telemetry.summary", `{`+rng+`,"unitIds":["`+online+`","`+nonRTO+`"]}`)
-	if code != 200 || len(data(m)["measurements"].([]any)) != 8 || data(m)["energy"] != nil || data(m)["asOf"] != to {
+	code, m = post(
+		s,
+		&customerA,
+		"telemetry.summary",
+		`{`+rng+`,"unitIds":["`+online+`","`+nonRTO+`"]}`,
+	)
+	if code != 200 || len(data(m)["measurements"].([]any)) != 8 || data(m)["energy"] != nil ||
+		data(m)["asOf"] != to {
 		t.Fatalf("summary: %d %v", code, m)
 	}
-	_, m = post(s, &customerA, "telemetry.summary", `{`+rng+`,"unitIds":["`+online+`"],"metric":"power"}`)
+
+	_, m = post(
+		s,
+		&customerA,
+		"telemetry.summary",
+		`{`+rng+`,"unitIds":["`+online+`"],"metric":"power"}`,
+	)
 	if len(data(m)["measurements"].([]any)) != 1 {
 		t.Fatal("summary metric")
 	}
+
 	for b, want := range map[string]string{
 		`{` + rng + `,"unitIds":[]}`:                                             "unitIds=error.invalid",
 		`{` + rng + `,"unitIds":["` + online + `"],"metric":"x"}`:                "metric=error.invalid",
@@ -112,26 +184,50 @@ func TestTelemetry(t *testing.T) {
 		code, m := post(s, &customerA, "telemetry.summary", b)
 		refusal(t, b, code, m, want)
 	}
-	if code, _ := post(s, &customerA, "telemetry.summary", `{`+rng+`,"unitIds":["`+other+`"]}`); code != 404 {
+
+	if code, _ := post(
+		s,
+		&customerA,
+		"telemetry.summary",
+		`{`+rng+`,"unitIds":["`+other+`"]}`,
+	); code != 404 {
 		t.Error("summary scope")
 	}
 }
 
 func TestVentilation(t *testing.T) {
 	s := server(t)
-	room1, room2, roomB := seed.ID("room-1").String(), seed.ID("room-2").String(), seed.ID("room-b-1").String()
+	room1, room2, roomB := seed.ID("room-1").
+		String(),
+		seed.ID("room-2").
+			String(),
+		seed.ID("room-b-1").
+			String()
 	logv := func(a *actor, body string) (int, map[string]any) { return write(s, a, "ventilation.log", body, 0) }
 
-	code, m := logv(&customerA, `{"spaceId":"`+room1+`","method":"window_opened","durationMinutes":15}`)
+	code, m := logv(
+		&customerA,
+		`{"spaceId":"`+room1+`","method":"window_opened","durationMinutes":15}`,
+	)
+
 	co2, _ := data(m)["co2AtLog"].(map[string]any)
-	if code != 200 || co2 == nil || co2["value"].(float64) != 800 || co2["unit"] != "ppm" || data(m)["loggedAt"] != clock.Format(time.RFC3339) {
+	if code != 200 || co2 == nil || co2["value"].(float64) != 800 || co2["unit"] != "ppm" ||
+		data(m)["loggedAt"] != clock.Format(time.RFC3339) {
 		t.Fatalf("log: %d %v", code, m)
 	}
+
 	first := data(m)["id"].(string)
-	code, m = logv(&customerA, `{"spaceId":"`+room2+`","unitId":"`+seed.ID("unit-non-rto").String()+`","method":"ventilation_fan","durationMinutes":240}`)
+
+	code, m = logv(
+		&customerA,
+		`{"spaceId":"`+room2+`","unitId":"`+seed.ID("unit-non-rto").
+			String()+
+			`","method":"ventilation_fan","durationMinutes":240}`,
+	)
 	if code != 200 || data(m)["co2AtLog"] != nil {
 		t.Fatalf("no co2 sensor → null: %d %v", code, m)
 	}
+
 	refused := map[string]string{ // the field each VALIDATION case is refused for
 		"bad method":        "method=error.invalid",
 		"duration 0":        "durationMinutes=error.range",
@@ -139,6 +235,7 @@ func TestVentilation(t *testing.T) {
 		"missing space":     "spaceId=error.required",
 		"unit not in space": "unitId=error.unitNotInSpace",
 	}
+
 	for name, tc := range map[string]struct {
 		a    *actor
 		body string
@@ -160,6 +257,7 @@ func TestVentilation(t *testing.T) {
 			t.Errorf("%s: %d want %d", name, code, tc.code)
 		}
 	}
+
 	logv(&customerB, `{"spaceId":"`+roomB+`","method":"door_opened","durationMinutes":5}`)
 
 	ids := func(m map[string]any) map[string]bool {
@@ -170,45 +268,78 @@ func TestVentilation(t *testing.T) {
 				out["roomB"] = true
 			}
 		}
+
 		return out
 	}
-	_, m = post(s, &customerA, "ventilation.list", `{"filters":{"spaceId":"`+room1+`"},"limit":100}`)
+
+	_, m = post(
+		s,
+		&customerA,
+		"ventilation.list",
+		`{"filters":{"spaceId":"`+room1+`"},"limit":100}`,
+	)
 	if !ids(m)[first] {
 		t.Fatal("list by space")
 	}
+
 	_, m = post(s, &customerA, "ventilation.list", `{"limit":100}`)
 	if ids(m)["roomB"] {
 		t.Fatal("customer-a sees customer-b's log")
 	}
+
 	_, m = post(s, &techInt, "ventilation.list", `{"limit":100}`)
+
 	got := ids(m)
 	if got["roomB"] || !got[first] {
 		t.Fatalf("technician scope: %v", got)
 	}
+
 	if _, m = post(s, &techB, "ventilation.list", `{"limit":100}`); len(items(m)) != 0 {
 		t.Fatalf("external technician without an Assignment: %v", ids(m))
 	}
-	_, m = post(s, &hq, "ventilation.list", `{"filters":{"unitId":"`+seed.ID("unit-non-rto").String()+`","from":"`+clock.Add(-time.Minute).Format(time.RFC3339)+`","to":"`+clock.Add(time.Minute).Format(time.RFC3339)+`"},"limit":100}`)
+
+	_, m = post(
+		s,
+		&hq,
+		"ventilation.list",
+		`{"filters":{"unitId":"`+seed.ID("unit-non-rto").
+			String()+
+			`","from":"`+clock.Add(-time.Minute).
+			Format(time.RFC3339)+
+			`","to":"`+clock.Add(time.Minute).
+			Format(time.RFC3339)+
+			`"},"limit":100}`,
+	)
 	for _, it := range items(m) {
 		if it["unitId"] != seed.ID("unit-non-rto").String() {
 			t.Fatal("unit filter")
 		}
 	}
+
 	if len(items(m)) == 0 {
 		t.Fatal("hq list by unit")
 	}
+
 	want := map[string]string{ // the field each case is refused for
 		"{\"filters\":{\"from\":\"2026-09-14T01:00:00Z\",\"to\":\"2026-09-14T00:00:00Z\"}}": "filters.to=error.range",
 		"{\"filters\":{\"x\":1}}":                                 "x=error.notAllowed",
 		"{\"sort\":{\"field\":\"method\",\"direction\":\"asc\"}}": "sort.field=error.invalid",
 	}
+
 	for _, b := range []string{`{"filters":{"x":1}}`, `{"filters":{"from":"` + clock.Format(time.RFC3339) + `","to":"` + clock.Add(-time.Hour).Format(time.RFC3339) + `"}}`, `{"sort":{"field":"method","direction":"asc"}}`} {
 		code, m := post(s, &hq, "ventilation.list", b)
 		refusal(t, b, code, m, want[b])
 	}
-	if code, _ := post(s, &hq, "ventilation.list", `{"sort":{"field":"createdAt","direction":"asc"}}`); code != 200 {
+
+	if code, _ := post(
+		s,
+		&hq,
+		"ventilation.list",
+		`{"sort":{"field":"createdAt","direction":"asc"}}`,
+	); code != 200 {
 		t.Error("sort createdAt")
 	}
+
 	_ = strings.TrimSpace
 }
 
@@ -220,77 +351,193 @@ func TestLatestMeasurements(t *testing.T) {
 	tenant := seed.ID("tenant-a")
 	u := newUnit(t, s, "Latest AC")
 	dev := uuid.NewString()
-	owner(t, `INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version) VALUES ($1,$2,$3,$4,$5,'v1')`,
-		dev, tenant, "LM-"+dev[:8], u, seed.ID("hq-operator"))
-	sensor := map[string]string{"co2": uuid.NewString(), "humidity": uuid.NewString(), "temperature": uuid.NewString(), "pm25": uuid.NewString()}
+	owner(
+		t,
+		`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version) VALUES ($1,$2,$3,$4,$5,'v1')`,
+		dev,
+		tenant,
+		"LM-"+dev[:8],
+		u,
+		seed.ID("hq-operator"),
+	)
+
+	sensor := map[string]string{
+		"co2":         uuid.NewString(),
+		"humidity":    uuid.NewString(),
+		"temperature": uuid.NewString(),
+		"pm25":        uuid.NewString(),
+	}
+
 	units := map[string]string{"co2": "ppm", "humidity": "%", "temperature": "°C", "pm25": "µg/m³"}
 	for metric, id := range sensor {
-		owner(t, `INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, stale_after_seconds) VALUES ($1,$2,$3,$4,$5,120)`, id, tenant, dev, metric, units[metric])
+		owner(
+			t,
+			`INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, stale_after_seconds) VALUES ($1,$2,$3,$4,$5,120)`,
+			id,
+			tenant,
+			dev,
+			metric,
+			units[metric],
+		)
 	}
+
 	reading := func(metric, sensorID string, ago time.Duration, seq int, quality string, value any) {
-		owner(t, `INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit, origin, quality, received_at, event_id)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'measured',$9,$5,$10)`, tenant, u, sensorID, metric, clock.Add(-ago), seq, value, units[metric], quality, uuid.NewString())
+		owner(
+			t,
+			`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit, origin, quality, received_at, event_id)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'measured',$9,$5,$10)`,
+			tenant,
+			u,
+			sensorID,
+			metric,
+			clock.Add(-ago),
+			seq,
+			value,
+			units[metric],
+			quality,
+			uuid.NewString(),
+		)
 	}
 	reading("co2", sensor["co2"], 10*time.Minute, 1, "valid", 700.0)
 	reading("co2", sensor["co2"], 30*time.Second, 2, "valid", 1000.0)
-	reading("co2", sensor["co2"], -time.Minute, 3, "valid", 1500.0)                  // future reading: ignored
-	reading("humidity", sensor["humidity"], 2*time.Minute, 1, "valid", 55.0)         // exactly at the 120 s limit: still valid
-	reading("humidity", sensor["humidity"], 20*time.Second, 2, "missing", nil)       // newer null: no fallback to the older value
-	reading("temperature", sensor["temperature"], 121*time.Second, 1, "valid", 28.0) // older than 120 s → stale
-	reading("pm25", uuid.NewString(), 10*time.Second, 1, "valid", 12.0)              // unknown sensor → stale
+	reading(
+		"co2",
+		sensor["co2"],
+		-time.Minute,
+		3,
+		"valid",
+		1500.0,
+	) // future reading: ignored
+	reading(
+		"humidity",
+		sensor["humidity"],
+		2*time.Minute,
+		1,
+		"valid",
+		55.0,
+	) // exactly at the 120 s limit: still valid
+	reading(
+		"humidity",
+		sensor["humidity"],
+		20*time.Second,
+		2,
+		"missing",
+		nil,
+	) // newer null: no fallback to the older value
+	reading(
+		"temperature",
+		sensor["temperature"],
+		121*time.Second,
+		1,
+		"valid",
+		28.0,
+	) // older than 120 s → stale
+	reading(
+		"pm25",
+		uuid.NewString(),
+		10*time.Second,
+		1,
+		"valid",
+		12.0,
+	) // unknown sensor → stale
+
 	latest := func(op, body string) []map[string]any {
 		t.Helper()
+
 		code, m := post(s, &customerB, op, body)
 		if code != 200 {
 			t.Fatalf("%s: %d %v", op, code, m)
 		}
+
 		d := data(m)
 		if op == "units.list" {
 			d = items(m)[0]
 		}
+
 		var out []map[string]any
 		for _, x := range d["latestMeasurements"].([]any) {
 			out = append(out, x.(map[string]any))
 		}
+
 		return out
 	}
 	got := latest("units.get", `{"id":"`+u+`"}`)
+
 	var seen []string
 	for _, x := range got {
 		seen = append(seen, x["metric"].(string)+"="+x["quality"].(string))
 	}
-	if strings.Join(seen, ",") != "co2=valid,humidity=missing,pm25=stale,temperature=stale" || got[0]["value"].(float64) != 1000 || got[1]["value"] != nil ||
-		got[3]["value"].(float64) != 28 || got[0]["unitId"] != u {
+
+	if strings.Join(seen, ",") != "co2=valid,humidity=missing,pm25=stale,temperature=stale" ||
+		got[0]["value"].(float64) != 1000 ||
+		got[1]["value"] != nil ||
+		got[3]["value"].(float64) != 28 ||
+		got[0]["unitId"] != u {
 		t.Fatalf("latest: %v", got)
 	}
-	if l := latest("units.list", `{"limit":10,"filters":{"unitIds":["`+u+`"]}}`); len(l) != 4 || l[0]["value"].(float64) != 1000 {
+
+	if l := latest(
+		"units.list",
+		`{"limit":10,"filters":{"unitIds":["`+u+`"]}}`,
+	); len(l) != 4 ||
+		l[0]["value"].(float64) != 1000 {
 		t.Fatalf("units.list carries the same readings: %v", l)
 	}
 	// history keeps the stored quality
-	_, m := post(s, &customerB, "telemetry.series", `{"from":"`+clock.Add(-time.Hour).Format(time.RFC3339)+`","to":"`+clock.Format(time.RFC3339)+`","unitIds":["`+u+`"],"metric":"temperature","query":{}}`)
+	_, m := post(
+		s,
+		&customerB,
+		"telemetry.series",
+		`{"from":"`+clock.Add(-time.Hour).
+			Format(time.RFC3339)+
+			`","to":"`+clock.Format(
+			time.RFC3339,
+		)+`","unitIds":["`+u+`"],"metric":"temperature","query":{}}`,
+	)
 	if len(items(m)) != 1 || items(m)[0]["quality"] != "valid" {
 		t.Fatalf("series quality: %v", m)
 	}
 	// co2AtLog (IR110/IR213) is the unit's latest CO₂ reading when it is valid; a newer null reading gives null, never an
 	// older valid value
-	code, m := write(s, &hq, "spaces.save", `{"propertyId":"`+seed.ID("property-home-b").String()+`","parentSpaceId":null,"kind":"room","name":"Vent `+uuid.NewString()[:6]+`"}`, 0)
+	code, m := write(
+		s,
+		&hq,
+		"spaces.save",
+		`{"propertyId":"`+seed.ID("property-home-b").
+			String()+
+			`","parentSpaceId":null,"kind":"room","name":"Vent `+uuid.NewString()[:6]+`"}`,
+		0,
+	)
 	if code != 200 {
 		t.Fatalf("room: %d %v", code, m)
 	}
+
 	room := data(m)["id"].(string)
 	owner(t, `UPDATE assets.units SET space_id = $2 WHERE id = $1`, u, room)
+
 	vent := func() any {
 		t.Helper()
-		code, m := write(s, &customerB, "ventilation.log", `{"spaceId":"`+room+`","unitId":"`+u+`","method":"window_opened","durationMinutes":15}`, 0)
+
+		code, m := write(
+			s,
+			&customerB,
+			"ventilation.log",
+			`{"spaceId":"`+room+`","unitId":"`+u+`","method":"window_opened","durationMinutes":15}`,
+			0,
+		)
 		if code != 200 {
 			t.Fatalf("log: %d %v", code, m)
 		}
+
 		return data(m)["co2AtLog"]
 	}
-	if co2, _ := vent().(map[string]any); co2 == nil || co2["value"].(float64) != 1000 || co2["observedAt"] != clock.Add(-30*time.Second).Format(time.RFC3339) {
+	if co2, _ := vent().(map[string]any); co2 == nil || co2["value"].(float64) != 1000 ||
+		co2["observedAt"] != clock.Add(-30*time.Second).Format(time.RFC3339) {
 		t.Fatalf("co2AtLog: %v", co2)
 	}
+
 	reading("co2", sensor["co2"], 10*time.Second, 4, "missing", nil)
+
 	if co2 := vent(); co2 != nil {
 		t.Fatalf("newer null reading: %v", co2)
 	}
@@ -308,48 +555,117 @@ func TestLatestMeasurements(t *testing.T) {
 func TestBucketedSeries(t *testing.T) {
 	s := server(t)
 	u := newUnit(t, s, "Bucket AC") // customer B's
+
 	from := clock.Add(-time.Hour)
 	for i, v := range []float64{20, 21, 22, 23, 24} {
 		reading(t, u, "temperature", v, "°C", from.Add(time.Duration(i)*time.Minute), "valid")
 	}
-	reading(t, u, "temperature", 99, "°C", from.Add(5*time.Minute), "suspect") // left out of the average
+
+	reading(
+		t,
+		u,
+		"temperature",
+		99,
+		"°C",
+		from.Add(5*time.Minute),
+		"suspect",
+	) // left out of the average
 	reading(t, u, "temperature", 25, "°C", from.Add(6*time.Minute), "valid")
-	reading(t, u, "temperature", 30, "°C", from.Add(11*time.Minute), "stale") // a stretch of invalid readings only
+	reading(
+		t,
+		u,
+		"temperature",
+		30,
+		"°C",
+		from.Add(11*time.Minute),
+		"stale",
+	) // a stretch of invalid readings only
+
 	body := func(extra string) string {
-		return `{"from":"` + from.Format(time.RFC3339) + `","to":"` + clock.Format(time.RFC3339) + `","unitIds":["` + u + `"],"metric":"temperature","query":{}` + extra + `}`
+		return `{"from":"` + from.Format(
+			time.RFC3339,
+		) + `","to":"` + clock.Format(
+			time.RFC3339,
+		) + `","unitIds":["` + u + `"],"metric":"temperature","query":{}` + extra + `}`
 	}
+
 	code, m := post(s, &customerB, "telemetry.series", body(`,"bucketMinutes":5`))
 	if code != 200 {
 		t.Fatalf("bucketed series: %d %v", code, m)
 	}
+
 	d := data(m)
+
 	bs, _ := d["buckets"].([]any)
 	if len(bs) != 12 || len(items(m)) != 0 || d["total"] != 8.0 || d["nextCursor"] != nil {
-		t.Fatalf("12 five-minute stretches, no page, every reading counted: %d buckets, %d items, total %v", len(bs), len(items(m)), d["total"])
+		t.Fatalf(
+			"12 five-minute stretches, no page, every reading counted: %d buckets, %d items, total %v",
+			len(bs),
+			len(items(m)),
+			d["total"],
+		)
 	}
+
 	b := func(i int) map[string]any { return bs[i].(map[string]any) }
-	if b(0)["start"] != from.UTC().Format(time.RFC3339) || b(0)["value"] != 22.0 || b(0)["count"] != 5.0 {
+	if b(0)["start"] != from.UTC().Format(time.RFC3339) || b(0)["value"] != 22.0 ||
+		b(0)["count"] != 5.0 {
 		t.Errorf("the first stretch averages its five valid readings: %v", b(0))
 	}
+
 	if b(1)["value"] != 25.0 || b(1)["count"] != 1.0 {
 		t.Errorf("a suspect reading is left out of the average: %v", b(1))
 	}
-	if b(2)["value"] != nil || b(2)["count"] != 0.0 || b(11)["value"] != nil || b(11)["count"] != 0.0 {
+
+	if b(2)["value"] != nil || b(2)["count"] != 0.0 || b(11)["value"] != nil ||
+		b(11)["count"] != 0.0 {
 		t.Errorf("stretches without a valid reading stay, empty: %v / %v", b(2), b(11))
 	}
-	if code, m := post(s, &customerB, "telemetry.series", body(`,"bucketMinutes":60`)); code != 200 || len(data(m)["buckets"].([]any)) != 1 || data(m)["buckets"].([]any)[0].(map[string]any)["count"] != 6.0 {
+
+	if code, m := post(
+		s,
+		&customerB,
+		"telemetry.series",
+		body(`,"bucketMinutes":60`),
+	); code != 200 || len(data(m)["buckets"].([]any)) != 1 ||
+		data(m)["buckets"].([]any)[0].(map[string]any)["count"] != 6.0 {
 		t.Errorf("one hourly stretch of six valid readings: %d %v", code, m)
 	}
-	if code, m := post(s, &customerB, "telemetry.series", body(``)); code != 200 || data(m)["buckets"] != nil || len(items(m)) == 0 {
+
+	if code, m := post(
+		s,
+		&customerB,
+		"telemetry.series",
+		body(``),
+	); code != 200 || data(m)["buckets"] != nil ||
+		len(items(m)) == 0 {
 		t.Errorf("without bucketMinutes the page of readings as before: %d %v", code, m)
 	}
-	if code, m := post(s, &customerB, "telemetry.series", body(`,"bucketMinutes":7`)); code != 422 || fields(m) != "bucketMinutes=error.invalid" {
+
+	if code, m := post(
+		s,
+		&customerB,
+		"telemetry.series",
+		body(`,"bucketMinutes":7`),
+	); code != 422 ||
+		fields(m) != "bucketMinutes=error.invalid" {
 		t.Errorf("a stretch other than 5 or 60 minutes: %d %s", code, fields(m))
 	}
-	long := `{"from":"` + clock.Add(-30*24*time.Hour).Format(time.RFC3339) + `","to":"` + clock.Format(time.RFC3339) + `","unitIds":["` + u + `"],"metric":"temperature","query":{},"bucketMinutes":5}`
-	if code, m := post(s, &customerB, "telemetry.series", long); code != 422 || fields(m) != "bucketMinutes=error.range" {
+
+	long := `{"from":"` + clock.Add(-30*24*time.Hour).
+		Format(time.RFC3339) +
+		`","to":"` + clock.Format(
+		time.RFC3339,
+	) + `","unitIds":["` + u + `"],"metric":"temperature","query":{},"bucketMinutes":5}`
+	if code, m := post(
+		s,
+		&customerB,
+		"telemetry.series",
+		long,
+	); code != 422 ||
+		fields(m) != "bucketMinutes=error.range" {
 		t.Errorf("more than 1000 stretches: %d %s", code, fields(m))
 	}
+
 	if code, _ := post(s, &customerA, "telemetry.series", body(`,"bucketMinutes":5`)); code != 404 {
 		t.Errorf("another customer's unit in buckets: %d", code)
 	}

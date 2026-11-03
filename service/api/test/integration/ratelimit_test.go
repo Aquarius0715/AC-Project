@@ -31,10 +31,17 @@ func TestWriteLimit(t *testing.T) {
 			// one process for every domain, also in cluster mode: the cached split facade would not take this limit, and
 			// the shared store, not the split, is what spans the services
 			c.Domains = ops.Domains
-			c.WriteLimit = &ratelimit.Window{Store: store, Limit: 3, Window: time.Minute, Prefix: "test:" + uuid.NewString() + ":", Now: func() time.Time { return now }}
+			c.WriteLimit = &ratelimit.Window{
+				Store:  store,
+				Limit:  3,
+				Window: time.Minute,
+				Prefix: "test:" + uuid.NewString() + ":",
+				Now:    func() time.Time { return now },
+			}
 		})
 	}
 	s := limited(&ratelimit.Memory{})
+
 	prefs := `{"locale":"ms","timezone":"Asia/Singapore","monthlyReportEmail":true}`
 	for i := 1; i <= 3; i++ {
 		if code, m := write(s, &customerB, "preferences.update", prefs, 0); code != 200 {
@@ -42,30 +49,55 @@ func TestWriteLimit(t *testing.T) {
 		}
 	}
 	// the fourth write of the minute, of any operation, waits until the minute ends (40 s after 09:00:20)
-	req := httptest.NewRequest(ops.ClientRequest("consents.update", `{"purpose":"location_automation","granted":false}`))
+	req := httptest.NewRequest(
+		ops.ClientRequest("consents.update", `{"purpose":"location_automation","granted":false}`),
+	)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+customerB.token)
 	req.Header.Set("X-Tenant-Id", seed.ID("tenant-a").String())
 	req.Header.Set("X-Membership-Id", seed.ID(customerB.membership).String())
 	req.Header.Set("Idempotency-Key", "test-"+uuid.NewString())
 	req.Header.Set("X-Expected-Version", "1")
+
 	w := httptest.NewRecorder()
 	s.Echo.ServeHTTP(w, req)
+
 	if w.Code != 429 || w.Header().Get("Retry-After") != "40" {
-		t.Fatalf("over the limit: %d Retry-After=%q %s", w.Code, w.Header().Get("Retry-After"), w.Body.String())
+		t.Fatalf(
+			"over the limit: %d Retry-After=%q %s",
+			w.Code,
+			w.Header().Get("Retry-After"),
+			w.Body.String(),
+		)
 	}
-	if code, m := write(s, &customerB, "preferences.update", prefs, 0); code != 429 || m["code"] != "RATE_LIMITED" || m["messageKey"] != "error.rateLimited" || m["retryAfterSeconds"] != float64(40) {
+
+	if code, m := write(
+		s,
+		&customerB,
+		"preferences.update",
+		prefs,
+		0,
+	); code != 429 || m["code"] != "RATE_LIMITED" || m["messageKey"] != "error.rateLimited" ||
+		m["retryAfterSeconds"] != float64(40) {
 		t.Errorf("RATE_LIMITED body: %d %v", code, m)
 	}
 	// reads and other members go on
 	if code, _ := post(s, &customerB, "session.get", `{}`); code != 200 {
 		t.Errorf("read while limited: %d", code)
 	}
-	if code, m := write(s, &customerA, "preferences.update", `{"locale":"en","timezone":"Asia/Kuala_Lumpur","monthlyReportEmail":true}`, 0); code != 200 {
+
+	if code, m := write(
+		s,
+		&customerA,
+		"preferences.update",
+		`{"locale":"en","timezone":"Asia/Kuala_Lumpur","monthlyReportEmail":true}`,
+		0,
+	); code != 200 {
 		t.Errorf("another member: %d %v", code, m)
 	}
 	// the next minute is a new window
 	now = now.Add(time.Minute)
+
 	if code, m := write(s, &customerB, "preferences.update", prefs, 0); code != 200 {
 		t.Errorf("next minute: %d %v", code, m)
 	}

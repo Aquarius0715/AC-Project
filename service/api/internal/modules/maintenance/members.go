@@ -27,32 +27,58 @@ type Workforce struct {
 }
 
 // technicians lists the active technician memberships the caller may plan (HQ: all, internal only when internalOnly; contractor: own).
-func (m Workforce) technicians(ctx context.Context, c *ops.Call, internalOnly bool) ([]identity.Member, error) {
+func (m Workforce) technicians(
+	ctx context.Context,
+	c *ops.Call,
+	internalOnly bool,
+) ([]identity.Member, error) {
 	q := `SELECT m.id, m.tenant_id, m.version, m.created_at, m.updated_at, m.user_id, m.organization_id, m.role, m.employment, m.scope_version, m.valid_from,
 		m.valid_until, m.client_role FROM maintenance.ref_memberships m WHERE m.role = 'technician' AND m.valid_from <= $1 AND (m.valid_until IS NULL OR m.valid_until > $1)`
+
 	args := []any{c.Now}
 	switch {
 	case c.Principal.Role == "contractor":
 		q += " AND m.organization_id = $2"
+
 		args = append(args, c.Principal.OrgID)
 	case internalOnly:
 		q += " AND m.employment = 'internal'"
 	}
+
 	rows, err := c.Tx.Query(ctx, q+" ORDER BY m.id", args...)
 	if err != nil {
 		return nil, err
 	}
+
 	var out []identity.Member
+
 	for rows.Next() {
 		var x identity.Member
-		if err := rows.Scan(&x.ID, &x.TenantID, &x.Version, &x.CreatedAt, &x.UpdatedAt, &x.UserID, &x.OrganizationID, &x.Role, &x.Employment, &x.ScopeVersion,
-			&x.ValidFrom, &x.ValidUntil, &x.ClientRole); err != nil {
+		if err := rows.Scan(
+			&x.ID,
+			&x.TenantID,
+			&x.Version,
+			&x.CreatedAt,
+			&x.UpdatedAt,
+			&x.UserID,
+			&x.OrganizationID,
+			&x.Role,
+			&x.Employment,
+			&x.ScopeVersion,
+			&x.ValidFrom,
+			&x.ValidUntil,
+			&x.ClientRole,
+		); err != nil {
 			rows.Close()
+
 			return nil, err
 		}
+
 		out = append(out, x)
 	}
+
 	rows.Close()
+
 	return out, rows.Err()
 }
 
@@ -70,41 +96,56 @@ func decodeTechFilter(q paging.Query) (techFilter, error) {
 	if len(q.Filters) == 0 {
 		return f, nil
 	}
+
 	dec := json.NewDecoder(strings.NewReader(string(q.Filters)))
 	dec.DisallowUnknownFields()
-	if dec.Decode(&f) != nil || (f.Qualification != nil && (!certCodes[*f.Qualification] || *f.Qualification == "other")) {
+
+	if dec.Decode(&f) != nil ||
+		(f.Qualification != nil && (!certCodes[*f.Qualification] || *f.Qualification == "other")) {
 		return f, apperr.Fields(map[string]string{"filters": "error.invalid"})
 	}
+
 	return f, nil
 }
 
 // keep returns the technicians that match the filter; qualifications are loaded from identity only when needed.
-func (f techFilter) keep(ctx context.Context, c *ops.Call, techs []identity.Member) ([]identity.Member, error) {
+func (f techFilter) keep(
+	ctx context.Context,
+	c *ops.Call,
+	techs []identity.Member,
+) ([]identity.Member, error) {
 	if f.Qualification != nil {
 		if err := identity.LoadMembers(ctx, c, techs); err != nil {
 			return nil, err
 		}
 	}
+
 	out := []identity.Member{}
+
 	for _, t := range techs {
 		if f.OrganizationID != nil && t.OrganizationID != *f.OrganizationID {
 			continue
 		}
+
 		if f.Qualification != nil && !holds(t, *f.Qualification, c.Now) {
 			continue
 		}
+
 		out = append(out, t)
 	}
+
 	return out, nil
 }
 
 // holds reports whether the member has a grant of code valid at now: [validFrom, validUntil) and not revoked.
 func holds(m identity.Member, code string, now time.Time) bool {
 	for _, g := range m.Qualifications {
-		if g.Code == code && !g.ValidFrom.After(now) && now.Before(g.ValidUntil) && (g.RevokedAt == nil || now.Before(*g.RevokedAt)) {
+		if g.Code == code && !g.ValidFrom.After(now) && now.Before(g.ValidUntil) &&
+			(g.RevokedAt == nil || now.Before(*g.RevokedAt)) {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -113,25 +154,44 @@ func pageOf[T any](all []T, q paging.Query, hashOf any, scopeVersion int) (pagin
 	if err != nil {
 		return paging.Page[T]{}, err
 	}
+
 	items := []T{}
 	for i := w.Offset; i < len(all) && i < w.Offset+w.Limit; i++ {
 		items = append(items, all[i])
 	}
-	return paging.Page[T]{Items: items, NextCursor: w.Next(len(all)), Total: len(all), SnapshotVersion: w.Snapshot}, nil
+
+	return paging.Page[T]{
+		Items:           items,
+		NextCursor:      w.Next(len(all)),
+		Total:           len(all),
+		SnapshotVersion: w.Snapshot,
+	}, nil
 }
 
 func klDates(from, to time.Time) (string, string) {
-	return from.In(kualaLumpur).Format("2006-01-02"), to.Add(-time.Nanosecond).In(kualaLumpur).Format("2006-01-02")
+	return from.In(kualaLumpur).
+			Format("2006-01-02"),
+		to.Add(-time.Nanosecond).
+			In(kualaLumpur).
+			Format("2006-01-02")
 }
 
 // unavailable reports whether a membership (or its whole organization) is unavailable on any date in [d1, d2].
-func unavailable(ctx context.Context, c *ops.Call, membership, org uuid.UUID, d1, d2 string) (string, bool, error) {
+func unavailable(
+	ctx context.Context,
+	c *ops.Call,
+	membership, org uuid.UUID,
+	d1, d2 string,
+) (string, bool, error) {
 	var typ string
+
 	err := c.Tx.QueryRow(ctx, `SELECT type FROM maintenance.unavailability WHERE (membership_id = $1 OR (membership_id IS NULL AND organization_id = $2))
-		AND days && daterange($3::date, $4::date, '[]') ORDER BY created_at LIMIT 1`, membership, org, d1, d2).Scan(&typ)
+		AND days && daterange($3::date, $4::date, '[]') ORDER BY created_at LIMIT 1`, membership, org, d1, d2).
+		Scan(&typ)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", false, nil
 	}
+
 	return typ, err == nil, err
 }
 
@@ -151,9 +211,11 @@ func (in *EligibleInput) Validate() map[string]string {
 	if in.JobID == uuid.Nil {
 		fe["jobId"] = "error.required"
 	}
+
 	if !in.StartAt.Before(in.EndAt) {
 		fe["endAt"] = "error.range"
 	}
+
 	return fe
 }
 
@@ -186,52 +248,74 @@ func (in *EligibleInput) Validate() map[string]string {
 // @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/members/eligible [get]
-func (m Workforce) eligible(ctx context.Context, c *ops.Call, in *EligibleInput) (paging.Page[identity.Member], error) {
-	var unit uuid.UUID
-	var contractor *uuid.UUID
-	err := c.Tx.QueryRow(ctx, `SELECT unit_id, contractor_org_id FROM maintenance.jobs WHERE id = $1`, in.JobID).Scan(&unit, &contractor)
-	if errors.Is(err, pgx.ErrNoRows) || (err == nil && c.Principal.Role == "contractor" && (contractor == nil || *contractor != c.Principal.OrgID)) {
+func (m Workforce) eligible(
+	ctx context.Context,
+	c *ops.Call,
+	in *EligibleInput,
+) (paging.Page[identity.Member], error) {
+	var (
+		unit       uuid.UUID
+		contractor *uuid.UUID
+	)
+
+	err := c.Tx.QueryRow(ctx, `SELECT unit_id, contractor_org_id FROM maintenance.jobs WHERE id = $1`, in.JobID).
+		Scan(&unit, &contractor)
+	if errors.Is(err, pgx.ErrNoRows) ||
+		(err == nil && c.Principal.Role == "contractor" && (contractor == nil || *contractor != c.Principal.OrgID)) {
 		return paging.Page[identity.Member]{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
+
 	if err != nil {
 		return paging.Page[identity.Member]{}, err
 	}
+
 	f, err := decodeTechFilter(in.Query)
 	if err != nil {
 		return paging.Page[identity.Member]{}, err
 	}
+
 	techs, err := m.technicians(ctx, c, true)
 	if err == nil {
 		techs, err = f.keep(ctx, c, techs)
 	}
+
 	if err != nil {
 		return paging.Page[identity.Member]{}, err
 	}
+
 	slot := Slot{in.StartAt, in.EndAt}
 	d1, d2 := klDates(in.StartAt, in.EndAt)
 	out := []identity.Member{}
+
 	for _, t := range techs {
 		isContractor := c.Principal.Role == "contractor"
-		if m.Delivery.checkTechnician(ctx, c, unit, t.ID, isContractor, nil) != nil || m.Delivery.checkQualified(ctx, c, unit, t.ID, slot) != nil {
+		if m.Delivery.checkTechnician(ctx, c, unit, t.ID, isContractor, nil) != nil ||
+			m.Delivery.checkQualified(ctx, c, unit, t.ID, slot) != nil {
 			continue
 		}
+
 		if _, off, err := unavailable(ctx, c, t.ID, t.OrganizationID, d1, d2); err != nil {
 			return paging.Page[identity.Member]{}, err
 		} else if off {
 			continue
 		}
+
 		var busy bool
 		if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.assignments WHERE technician_membership_id = $1 AND status = 'active' AND job_id <> $2
-			AND scheduled && tstzrange($3, $4))`, t.ID, in.JobID, in.StartAt, in.EndAt).Scan(&busy); err != nil {
+			AND scheduled && tstzrange($3, $4))`, t.ID, in.JobID, in.StartAt, in.EndAt).
+			Scan(&busy); err != nil {
 			return paging.Page[identity.Member]{}, err
 		}
+
 		if !busy {
 			out = append(out, t)
 		}
 	}
+
 	if err := identity.LoadMembers(ctx, c, out); err != nil {
 		return paging.Page[identity.Member]{}, err
 	}
+
 	if err := paging.SortSlice(out, in.Query.Sort, map[string]func(a, b identity.Member) int{
 		"id":        func(a, b identity.Member) int { return strings.Compare(a.ID.String(), b.ID.String()) },
 		"createdAt": func(a, b identity.Member) int { return a.CreatedAt.Compare(b.CreatedAt) },
@@ -239,6 +323,7 @@ func (m Workforce) eligible(ctx context.Context, c *ops.Call, in *EligibleInput)
 	}); err != nil {
 		return paging.Page[identity.Member]{}, err
 	}
+
 	return pageOf(out, in.Query, in, c.Principal.ScopeVersion)
 }
 
@@ -255,6 +340,7 @@ func (in *CapacityInput) Validate() map[string]string {
 	if _, err := time.ParseInLocation("2006-01-02", in.Date, kualaLumpur); err != nil {
 		return map[string]string{"date": "error.invalid"}
 	}
+
 	return nil
 }
 
@@ -297,75 +383,117 @@ type Capacity struct {
 // @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/members/capacity [get]
-func (m Workforce) capacity(ctx context.Context, c *ops.Call, in *CapacityInput) (paging.Page[Capacity], error) {
+func (m Workforce) capacity(
+	ctx context.Context,
+	c *ops.Call,
+	in *CapacityInput,
+) (paging.Page[Capacity], error) {
 	day, _ := time.ParseInLocation("2006-01-02", in.Date, kualaLumpur)
 	work := Slot{day.Add(9 * time.Hour).UTC(), day.Add(17 * time.Hour).UTC()}
 	weekend := day.Weekday() == time.Saturday || day.Weekday() == time.Sunday
+
 	f, err := decodeTechFilter(in.Query)
 	if err != nil {
 		return paging.Page[Capacity]{}, err
 	}
+
 	techs, err := m.technicians(ctx, c, false)
 	if err == nil {
 		techs, err = f.keep(ctx, c, techs)
 	}
+
 	if err != nil {
 		return paging.Page[Capacity]{}, err
 	}
+
 	out := []Capacity{}
+
 	for _, t := range techs {
-		cp := Capacity{MembershipID: t.ID, Date: in.Date, AvailableSlots: []Slot{}, AssignedSlots: []Slot{}}
+		cp := Capacity{
+			MembershipID:   t.ID,
+			Date:           in.Date,
+			AvailableSlots: []Slot{},
+			AssignedSlots:  []Slot{},
+		}
+
 		typ, off, err := unavailable(ctx, c, t.ID, t.OrganizationID, in.Date, in.Date)
 		if err != nil {
 			return paging.Page[Capacity]{}, err
 		}
+
 		if off {
 			cp.Unavailability = &typ
 		}
+
 		avail := 0
+
 		if !weekend && !off {
 			cp.AvailableSlots = []Slot{work}
 			avail = int(work.EndAt.Sub(work.StartAt) / time.Minute)
 		}
+
 		cp.AvailableMinutes = &avail
-		rows, err := c.Tx.Query(ctx, `SELECT lower(scheduled), upper(scheduled) FROM maintenance.assignments WHERE technician_membership_id = $1 AND status = 'active'
-			AND scheduled && tstzrange($2, $3) ORDER BY lower(scheduled)`, t.ID, work.StartAt, work.EndAt)
+
+		rows, err := c.Tx.Query(
+			ctx,
+			`SELECT lower(scheduled), upper(scheduled) FROM maintenance.assignments WHERE technician_membership_id = $1 AND status = 'active'
+			AND scheduled && tstzrange($2, $3) ORDER BY lower(scheduled)`,
+			t.ID,
+			work.StartAt,
+			work.EndAt,
+		)
 		if err != nil {
 			return paging.Page[Capacity]{}, err
 		}
+
 		for rows.Next() {
 			var s Slot
 			if err := rows.Scan(&s.StartAt, &s.EndAt); err != nil {
 				rows.Close()
+
 				return paging.Page[Capacity]{}, err
 			}
+
 			if s.StartAt.Before(work.StartAt) {
 				s.StartAt = work.StartAt
 			}
+
 			if s.EndAt.After(work.EndAt) {
 				s.EndAt = work.EndAt
 			}
+
 			cp.AssignedSlots = append(cp.AssignedSlots, s)
 		}
+
 		rows.Close()
+
 		if err := rows.Err(); err != nil {
 			return paging.Page[Capacity]{}, err
 		}
+
 		if len(cp.AvailableSlots) > 0 {
 			cp.AssignedMinutes = unionMinutes(cp.AssignedSlots)
 		}
+
 		if avail > 0 {
 			u := math.Round(float64(cp.AssignedMinutes)*1000/float64(avail)) / 10
 			cp.Utilization = &u
 		}
+
 		out = append(out, cp)
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].MembershipID.String() < out[j].MembershipID.String() })
+
+	sort.Slice(
+		out,
+		func(i, j int) bool { return out[i].MembershipID.String() < out[j].MembershipID.String() },
+	)
+
 	if err := paging.SortSlice(out, in.Query.Sort, map[string]func(a, b Capacity) int{
 		"id": func(a, b Capacity) int { return strings.Compare(a.MembershipID.String(), b.MembershipID.String()) },
 	}); err != nil {
 		return paging.Page[Capacity]{}, err
 	}
+
 	return pageOf(out, in.Query, in.Date, c.Principal.ScopeVersion)
 }
 
@@ -373,8 +501,12 @@ func (m Workforce) capacity(ctx context.Context, c *ops.Call, in *CapacityInput)
 func unionMinutes(slots []Slot) int {
 	s := append([]Slot(nil), slots...)
 	sort.Slice(s, func(i, j int) bool { return s[i].StartAt.Before(s[j].StartAt) })
-	var total time.Duration
-	var cur *Slot
+
+	var (
+		total time.Duration
+		cur   *Slot
+	)
+
 	for i := range s {
 		switch {
 		case cur == nil:
@@ -390,9 +522,11 @@ func unionMinutes(slots []Slot) int {
 			cur = &c
 		}
 	}
+
 	if cur != nil {
 		total += cur.EndAt.Sub(cur.StartAt)
 	}
+
 	return int(total / time.Minute)
 }
 
@@ -407,28 +541,39 @@ type UnavailabilityInput struct {
 	Note         *string    `json:"note,omitempty"`
 }
 
-var unavailabilityTypes = map[string]bool{"annual_leave": true, "training": true, "public_holiday": true, "sick": true, "other": true}
+var unavailabilityTypes = map[string]bool{
+	"annual_leave":   true,
+	"training":       true,
+	"public_holiday": true,
+	"sick":           true,
+	"other":          true,
+}
 
 // Validate implements ops.Validator.
 func (in *UnavailabilityInput) Validate() map[string]string {
 	fe := map[string]string{}
 	f, err1 := time.Parse("2006-01-02", in.From)
+
 	t, err2 := time.Parse("2006-01-02", in.To)
 	if err1 != nil || err2 != nil || t.Before(f) || t.Sub(f) > 30*24*time.Hour {
 		fe["to"] = "error.range"
 	}
+
 	if !unavailabilityTypes[in.Type] {
 		fe["type"] = "error.invalid"
 	}
+
 	if in.Note != nil {
 		*in.Note = strings.TrimSpace(*in.Note)
 		if utf8.RuneCountInString(*in.Note) > 500 {
 			fe["note"] = "error.length"
 		}
+
 		if *in.Note == "" {
 			in.Note = nil
 		}
 	}
+
 	return fe
 }
 
@@ -470,56 +615,102 @@ type Unavailability struct {
 // @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/members/unavailability [post]
-func (m Workforce) setUnavailability(ctx context.Context, c *ops.Call, in *UnavailabilityInput) (Unavailability, error) {
+func (m Workforce) setUnavailability(
+	ctx context.Context,
+	c *ops.Call,
+	in *UnavailabilityInput,
+) (Unavailability, error) {
 	org := c.Principal.OrgID
 	if in.MembershipID != nil {
 		t, found, err := m.Delivery.Directory.Technician(ctx, c, *in.MembershipID)
 		if err != nil {
 			return Unavailability{}, err
 		}
+
 		if !found || (c.Principal.Role == "contractor" && t.OrgID != c.Principal.OrgID) {
 			return Unavailability{}, apperr.E(apperr.NotFound, "error.notFound")
 		}
+
 		org = t.OrgID
 	}
+
 	f, _ := time.ParseInLocation("2006-01-02", in.From, kualaLumpur)
 	t, _ := time.ParseInLocation("2006-01-02", in.To, kualaLumpur)
 	q := `SELECT a.id FROM maintenance.assignments a JOIN maintenance.ref_memberships mb ON mb.id = a.technician_membership_id
 		WHERE a.status = 'active' AND a.scheduled && tstzrange($1, $2) AND `
 	args := []any{f.UTC(), t.AddDate(0, 0, 1).UTC()}
+
 	if in.MembershipID != nil {
 		q += "a.technician_membership_id = $3"
+
 		args = append(args, *in.MembershipID)
 	} else {
 		q += "mb.organization_id = $3"
+
 		args = append(args, org)
 	}
+
 	rows, err := c.Tx.Query(ctx, q+" ORDER BY a.id", args...)
 	if err != nil {
 		return Unavailability{}, err
 	}
+
 	conflicts := []uuid.UUID{}
+
 	for rows.Next() {
 		var id uuid.UUID
 		if err := rows.Scan(&id); err != nil {
 			rows.Close()
+
 			return Unavailability{}, err
 		}
+
 		conflicts = append(conflicts, id)
 	}
+
 	rows.Close()
+
 	if err := rows.Err(); err != nil {
 		return Unavailability{}, err
 	}
-	u := Unavailability{TenantID: c.Principal.TenantID, Version: 1, CreatedAt: c.Now, UpdatedAt: c.Now, OrganizationID: org, MembershipID: in.MembershipID,
-		From: in.From, To: in.To, Type: in.Type, Note: in.Note, ConflictingAssignmentIDs: conflicts}
+
+	u := Unavailability{
+		TenantID:                 c.Principal.TenantID,
+		Version:                  1,
+		CreatedAt:                c.Now,
+		UpdatedAt:                c.Now,
+		OrganizationID:           org,
+		MembershipID:             in.MembershipID,
+		From:                     in.From,
+		To:                       in.To,
+		Type:                     in.Type,
+		Note:                     in.Note,
+		ConflictingAssignmentIDs: conflicts,
+	}
 	if err := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.unavailability (tenant_id, organization_id, membership_id, days, type, note, conflicting_assignment_ids, created_at, updated_at)
 		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, daterange($3::date, $4::date, '[]'), $5, $6, $7, $8, $8) RETURNING id`,
-		org, in.MembershipID, in.From, in.To, in.Type, in.Note, conflicts, c.Now).Scan(&u.ID); err != nil {
+		org, in.MembershipID, in.From, in.To, in.Type, in.Note, conflicts, c.Now).
+		Scan(&u.ID); err != nil {
 		return u, err
 	}
-	c.Emit(ops.Event{AggregateType: "unavailability", AggregateID: u.ID, Type: "UnavailabilitySet", Payload: map[string]any{"organizationId": org}})
-	c.Audit(ops.AuditEntry{Action: "members.setUnavailability", TargetKind: "unavailability", TargetID: u.ID.String(), NextVersion: &u.Version})
+
+	c.Emit(
+		ops.Event{
+			AggregateType: "unavailability",
+			AggregateID:   u.ID,
+			Type:          "UnavailabilitySet",
+			Payload:       map[string]any{"organizationId": org},
+		},
+	)
+	c.Audit(
+		ops.AuditEntry{
+			Action:      "members.setUnavailability",
+			TargetKind:  "unavailability",
+			TargetID:    u.ID.String(),
+			NextVersion: &u.Version,
+		},
+	)
+
 	return u, nil
 }
 
@@ -527,10 +718,27 @@ func (m Workforce) setUnavailability(ctx context.Context, c *ops.Call, in *Unava
 const unavailabilityCols = `id, tenant_id, version, created_at, updated_at, organization_id, membership_id, lower(days), upper(days) - 1, type, note, conflicting_assignment_ids`
 
 func scanUnavailability(row pgx.Row) (Unavailability, error) {
-	var u Unavailability
-	var first, last time.Time
-	err := row.Scan(&u.ID, &u.TenantID, &u.Version, &u.CreatedAt, &u.UpdatedAt, &u.OrganizationID, &u.MembershipID, &first, &last, &u.Type, &u.Note, &u.ConflictingAssignmentIDs)
+	var (
+		u           Unavailability
+		first, last time.Time
+	)
+
+	err := row.Scan(
+		&u.ID,
+		&u.TenantID,
+		&u.Version,
+		&u.CreatedAt,
+		&u.UpdatedAt,
+		&u.OrganizationID,
+		&u.MembershipID,
+		&first,
+		&last,
+		&u.Type,
+		&u.Note,
+		&u.ConflictingAssignmentIDs,
+	)
 	u.From, u.To = first.Format("2006-01-02"), last.Format("2006-01-02")
+
 	return u, err
 }
 
@@ -564,54 +772,88 @@ func scanUnavailability(row pgx.Row) (Unavailability, error) {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/members/unavailability [get]
-func (m Workforce) unavailabilityList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Unavailability], error) {
+func (m Workforce) unavailabilityList(
+	ctx context.Context,
+	c *ops.Call,
+	in *paging.Query,
+) (paging.Page[Unavailability], error) {
 	var f struct {
 		OrganizationID *uuid.UUID `json:"organizationId,omitempty"`
 		MembershipID   *uuid.UUID `json:"membershipId,omitempty"` // with the rows of the technician's whole company
 	}
+
 	if len(in.Filters) > 0 {
 		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
 		dec.DisallowUnknownFields()
+
 		if dec.Decode(&f) != nil {
-			return paging.Page[Unavailability]{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
+			return paging.Page[Unavailability]{}, apperr.Fields(
+				map[string]string{"filters": "error.invalid"},
+			)
 		}
 	}
+
 	args := []any{c.Now.In(kualaLumpur).Format("2006-01-02")}
-	add := func(v any) string { args = append(args, v); return "$" + strconv.Itoa(len(args)) }
+	add := func(v any) string {
+		args = append(args, v)
+
+		return "$" + strconv.Itoa(len(args))
+	}
+
 	conds := []string{"upper(days) > $1::date"}
 	if c.Principal.Role == "contractor" {
 		conds = append(conds, "organization_id = "+add(c.Principal.OrgID))
 	}
+
 	if f.OrganizationID != nil {
 		conds = append(conds, "organization_id = "+add(*f.OrganizationID))
 	}
+
 	if f.MembershipID != nil {
 		p := add(*f.MembershipID)
-		conds = append(conds, "(membership_id = "+p+" OR (membership_id IS NULL AND organization_id IN (SELECT organization_id FROM maintenance.ref_memberships WHERE id = "+p+")))")
+		conds = append(
+			conds,
+			"(membership_id = "+p+" OR (membership_id IS NULL AND organization_id IN (SELECT organization_id FROM maintenance.ref_memberships WHERE id = "+p+")))",
+		)
 	}
-	rows, err := c.Tx.Query(ctx, "SELECT "+unavailabilityCols+" FROM maintenance.unavailability WHERE "+strings.Join(conds, " AND ")+" ORDER BY lower(days), id", args...)
+
+	rows, err := c.Tx.Query(
+		ctx,
+		"SELECT "+unavailabilityCols+" FROM maintenance.unavailability WHERE "+strings.Join(
+			conds,
+			" AND ",
+		)+" ORDER BY lower(days), id",
+		args...)
 	if err != nil {
 		return paging.Page[Unavailability]{}, err
 	}
+
 	all := []Unavailability{}
+
 	for rows.Next() {
 		u, err := scanUnavailability(rows)
 		if err != nil {
 			rows.Close()
+
 			return paging.Page[Unavailability]{}, err
 		}
+
 		all = append(all, u)
 	}
+
 	rows.Close()
+
 	if err := rows.Err(); err != nil {
 		return paging.Page[Unavailability]{}, err
 	}
+
 	if err := paging.SortSlice(all, in.Sort, map[string]func(a, b Unavailability) int{
 		"id":   func(a, b Unavailability) int { return strings.Compare(a.ID.String(), b.ID.String()) },
 		"from": func(a, b Unavailability) int { return strings.Compare(a.From, b.From) },
 	}); err != nil {
 		return paging.Page[Unavailability]{}, err
 	}
+
 	return pageOf(all, *in, f, c.Principal.ScopeVersion)
 }
 
@@ -629,9 +871,11 @@ func (in *ClearUnavailabilityInput) Validate() map[string]string {
 	if in.ID == uuid.Nil {
 		fe["id"] = "error.required"
 	}
+
 	if _, err := time.Parse("2006-01-02", in.From); err != nil {
 		fe["from"] = "error.invalid"
 	}
+
 	return fe
 }
 
@@ -669,37 +913,97 @@ type UnavailabilityCleared struct {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/members/unavailability/{id}/clear [post]
-func (m Workforce) clearUnavailability(ctx context.Context, c *ops.Call, in *ClearUnavailabilityInput) (UnavailabilityCleared, error) {
-	u, err := scanUnavailability(c.Tx.QueryRow(ctx, `SELECT `+unavailabilityCols+` FROM maintenance.unavailability WHERE id = $1 FOR UPDATE`, in.ID))
-	if errors.Is(err, pgx.ErrNoRows) || (err == nil && c.Principal.Role == "contractor" && u.OrganizationID != c.Principal.OrgID) {
+func (m Workforce) clearUnavailability(
+	ctx context.Context,
+	c *ops.Call,
+	in *ClearUnavailabilityInput,
+) (UnavailabilityCleared, error) {
+	u, err := scanUnavailability(
+		c.Tx.QueryRow(
+			ctx,
+			`SELECT `+unavailabilityCols+` FROM maintenance.unavailability WHERE id = $1 FOR UPDATE`,
+			in.ID,
+		),
+	)
+	if errors.Is(err, pgx.ErrNoRows) ||
+		(err == nil && c.Principal.Role == "contractor" && u.OrganizationID != c.Principal.OrgID) {
 		return UnavailabilityCleared{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
+
 	if err != nil {
 		return UnavailabilityCleared{}, err
 	}
+
 	if u.Version != *c.ExpectedVersion {
 		return UnavailabilityCleared{}, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
+
 	if in.From < c.Now.In(kualaLumpur).Format("2006-01-02") || in.From > u.To {
 		return UnavailabilityCleared{}, apperr.Fields(map[string]string{"from": "error.range"})
 	}
+
 	payload := map[string]any{"organizationId": u.OrganizationID, "from": in.From}
 	if in.From <= u.From {
-		if _, err := c.Tx.Exec(ctx, `DELETE FROM maintenance.unavailability WHERE id = $1`, u.ID); err != nil {
+		if _, err := c.Tx.Exec(
+			ctx,
+			`DELETE FROM maintenance.unavailability WHERE id = $1`,
+			u.ID,
+		); err != nil {
 			return UnavailabilityCleared{}, err
 		}
-		c.Emit(ops.Event{AggregateType: "unavailability", AggregateID: u.ID, Type: "UnavailabilityCleared", Payload: payload})
-		c.Audit(ops.AuditEntry{Action: "members.clearUnavailability", TargetKind: "unavailability", TargetID: u.ID.String(), PreviousVersion: c.ExpectedVersion})
+
+		c.Emit(
+			ops.Event{
+				AggregateType: "unavailability",
+				AggregateID:   u.ID,
+				Type:          "UnavailabilityCleared",
+				Payload:       payload,
+			},
+		)
+		c.Audit(
+			ops.AuditEntry{
+				Action:          "members.clearUnavailability",
+				TargetKind:      "unavailability",
+				TargetID:        u.ID.String(),
+				PreviousVersion: c.ExpectedVersion,
+			},
+		)
+
 		return UnavailabilityCleared{ID: u.ID}, nil
 	}
+
 	from, _ := time.Parse("2006-01-02", in.From)
+
 	u.To, u.Version, u.UpdatedAt = from.AddDate(0, 0, -1).Format("2006-01-02"), u.Version+1, c.Now
-	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.unavailability SET days = daterange(lower(days), $2::date, '[)'), version = $3, updated_at = $4 WHERE id = $1`,
-		u.ID, in.From, u.Version, c.Now); err != nil {
+	if _, err := c.Tx.Exec(
+		ctx,
+		`UPDATE maintenance.unavailability SET days = daterange(lower(days), $2::date, '[)'), version = $3, updated_at = $4 WHERE id = $1`,
+		u.ID,
+		in.From,
+		u.Version,
+		c.Now,
+	); err != nil {
 		return UnavailabilityCleared{}, err
 	}
-	c.Emit(ops.Event{AggregateType: "unavailability", AggregateID: u.ID, Type: "UnavailabilityCleared", Payload: payload})
-	c.Audit(ops.AuditEntry{Action: "members.clearUnavailability", TargetKind: "unavailability", TargetID: u.ID.String(), PreviousVersion: c.ExpectedVersion, NextVersion: &u.Version})
+
+	c.Emit(
+		ops.Event{
+			AggregateType: "unavailability",
+			AggregateID:   u.ID,
+			Type:          "UnavailabilityCleared",
+			Payload:       payload,
+		},
+	)
+	c.Audit(
+		ops.AuditEntry{
+			Action:          "members.clearUnavailability",
+			TargetKind:      "unavailability",
+			TargetID:        u.ID.String(),
+			PreviousVersion: c.ExpectedVersion,
+			NextVersion:     &u.Version,
+		},
+	)
+
 	return UnavailabilityCleared{ID: u.ID, Remaining: &u}, nil
 }
 

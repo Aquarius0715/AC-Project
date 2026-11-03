@@ -28,6 +28,7 @@ func NewDirFromEnv() Dir {
 	if d := os.Getenv("BLOB_DIR"); d != "" {
 		return Dir(d)
 	}
+
 	return Dir(filepath.Join(os.TempDir(), "ac-blobs"))
 }
 
@@ -35,6 +36,7 @@ func (d Dir) path(key string) (string, error) {
 	if key == "" || strings.Contains(key, "..") || strings.HasPrefix(key, "/") {
 		return "", fmt.Errorf("blob: invalid key %q", key)
 	}
+
 	return filepath.Join(string(d), filepath.FromSlash(key)), nil
 }
 
@@ -44,9 +46,11 @@ func (d Dir) Put(_ context.Context, key, _ string, data []byte) error {
 	if err != nil {
 		return err
 	}
+
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
 		return err
 	}
+
 	return os.WriteFile(p, data, 0o600)
 }
 
@@ -56,9 +60,11 @@ func (d Dir) Get(_ context.Context, key string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	b, err := os.ReadFile(p)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, fmt.Errorf("%w: %s", ErrNotFound, key)
 	}
+
 	return b, err
 }

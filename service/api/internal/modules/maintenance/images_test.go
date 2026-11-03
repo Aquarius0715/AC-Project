@@ -13,19 +13,23 @@ import (
 // tinyPNG and tinyJPEG are real one-pixel images.
 func tinyPNG(t *testing.T) []byte {
 	t.Helper()
+
 	var b bytes.Buffer
 	if err := png.Encode(&b, image.NewGray(image.Rect(0, 0, 1, 1))); err != nil {
 		t.Fatal(err)
 	}
+
 	return b.Bytes()
 }
 
 func tinyJPEG(t *testing.T) []byte {
 	t.Helper()
+
 	var b bytes.Buffer
 	if err := jpeg.Encode(&b, image.NewGray(image.Rect(0, 0, 1, 1)), nil); err != nil {
 		t.Fatal(err)
 	}
+
 	return b.Bytes()
 }
 
@@ -34,6 +38,7 @@ func pngHeader(w, h uint32) []byte {
 	ihdr := binary.BigEndian.AppendUint32(binary.BigEndian.AppendUint32([]byte("IHDR"), w), h)
 	ihdr = append(ihdr, 8, 0, 0, 0, 0) // 8-bit gray, no interlace
 	out := binary.BigEndian.AppendUint32([]byte("\x89PNG\r\n\x1a\n"), 13)
+
 	return binary.BigEndian.AppendUint32(append(out, ihdr...), crc32.ChecksumIEEE(ihdr))
 }
 
@@ -41,12 +46,15 @@ func pngHeader(w, h uint32) []byte {
 func jpegSized(t *testing.T, w, h uint16) []byte {
 	t.Helper()
 	b := tinyJPEG(t)
+
 	i := bytes.Index(b, []byte{0xFF, 0xC0})
 	if i < 0 {
 		t.Fatal("no SOF0 marker")
 	}
+
 	binary.BigEndian.PutUint16(b[i+5:], h)
 	binary.BigEndian.PutUint16(b[i+7:], w)
+
 	return b
 }
 
@@ -75,7 +83,10 @@ func TestImageSizeOK(t *testing.T) {
 	}
 	// ValidBlob applies it: a few hundred bytes that declare a pixel flood are refused
 	flood := pngHeader(50000, 50000)
-	if ValidBlob(BlobInput{Name: "flood.png", Mime: "image/png", Size: len(flood), Bytes: flood}, 5<<20) {
+	if ValidBlob(
+		BlobInput{Name: "flood.png", Mime: "image/png", Size: len(flood), Bytes: flood},
+		5<<20,
+	) {
 		t.Error("a PNG declaring 2.5 gigapixels passes")
 	}
 }

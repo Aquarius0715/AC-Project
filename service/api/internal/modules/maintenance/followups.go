@@ -35,7 +35,13 @@ type FollowUps struct {
 }
 
 // RatingTags are the allowed JobRating tags (DD-C17).
-var RatingTags = []string{"On time", "Clean work", "Explained clearly", "Polite", "Fixed the problem"}
+var RatingTags = []string{
+	"On time",
+	"Clean work",
+	"Explained clearly",
+	"Polite",
+	"Fixed the problem",
+}
 
 // Rating is JobRating.
 type Rating struct {
@@ -56,34 +62,58 @@ type jobState struct {
 }
 
 func (m FollowUps) lock(ctx context.Context, c *ops.Call, id uuid.UUID) (jobState, error) {
-	var s jobState
-	var v int
+	var (
+		s jobState
+		v int
+	)
+
 	err := c.Tx.QueryRow(ctx, `SELECT status, customer_org_id, unit_id, completed_at, rating, follow_up_class, warranty_claims, version FROM maintenance.jobs WHERE id = $1 FOR UPDATE`, id).
 		Scan(&s.status, &s.org, &s.unit, &s.completedAt, &s.rating, &s.followUp, &s.claims, &v)
-	if errors.Is(err, pgx.ErrNoRows) || (err == nil && c.Principal.Role == "client" && s.org != c.Principal.OrgID) {
+	if errors.Is(err, pgx.ErrNoRows) ||
+		(err == nil && c.Principal.Role == "client" && s.org != c.Principal.OrgID) {
 		return s, apperr.E(apperr.NotFound, "error.notFound")
 	}
+
 	if err != nil {
 		return s, err
 	}
+
 	if v != *c.ExpectedVersion {
 		return s, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
+
 	return s, nil
 }
 
-func (m FollowUps) bump(ctx context.Context, c *ops.Call, id uuid.UUID, set string, args ...any) error {
+func (m FollowUps) bump(
+	ctx context.Context,
+	c *ops.Call,
+	id uuid.UUID,
+	set string,
+	args ...any,
+) error {
 	if set != "" {
 		set += ", "
 	}
-	_, err := c.Tx.Exec(ctx, `UPDATE maintenance.jobs SET `+set+`version = version + 1, updated_at = platform.app_now() WHERE id = $1`, append([]any{id}, args...)...)
+
+	_, err := c.Tx.Exec(
+		ctx,
+		`UPDATE maintenance.jobs SET `+set+`version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
+		append([]any{id}, args...)...)
+
 	return err
 }
 
-func (m FollowUps) done(ctx context.Context, c *ops.Call, id uuid.UUID, action, op, event, reason string) (Job, error) {
+func (m FollowUps) done(
+	ctx context.Context,
+	c *ops.Call,
+	id uuid.UUID,
+	action, op, event, reason string,
+) (Job, error) {
 	if err := m.Jobs.event(ctx, c, id, action, nil); err != nil {
 		return Job{}, err
 	}
+
 	return m.Jobs.finish(ctx, c, id, op, event, reason)
 }
 
@@ -103,28 +133,36 @@ func (in *RateInput) Validate() map[string]string {
 	if in.JobID == uuid.Nil {
 		fe["jobId"] = "error.required"
 	}
+
 	if in.Stars < 1 || in.Stars > 5 {
 		fe["stars"] = "error.range"
 	}
+
 	seen := map[string]bool{}
+
 	if in.Tags == nil {
 		fe["tags"] = "error.required"
 	}
+
 	for _, t := range in.Tags {
 		if !slices.Contains(RatingTags, t) || seen[t] {
 			fe["tags"] = "error.invalid"
 		}
+
 		seen[t] = true
 	}
+
 	if in.Comment != nil {
 		*in.Comment = strings.TrimSpace(*in.Comment)
 		if utf8.RuneCountInString(*in.Comment) > 1000 {
 			fe["comment"] = "error.length"
 		}
+
 		if *in.Comment == "" {
 			in.Comment = nil
 		}
 	}
+
 	return fe
 }
 
@@ -162,25 +200,45 @@ func (m FollowUps) rateJob(ctx context.Context, c *ops.Call, in *RateInput) (Job
 	if err != nil {
 		return Job{}, err
 	}
+
 	if s.status != "completed" {
 		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
 	}
-	r := Rating{Stars: in.Stars, Tags: in.Tags, Comment: in.Comment, RatedAt: c.Now, EditableUntil: c.Now.Add(7 * 24 * time.Hour)}
+
+	r := Rating{
+		Stars:         in.Stars,
+		Tags:          in.Tags,
+		Comment:       in.Comment,
+		RatedAt:       c.Now,
+		EditableUntil: c.Now.Add(7 * 24 * time.Hour),
+	}
+
 	first := len(s.rating) == 0 || string(s.rating) == "null"
 	if !first {
 		var prev Rating
 		if err := json.Unmarshal(s.rating, &prev); err != nil {
 			return Job{}, err
 		}
+
 		if !c.Now.Before(prev.EditableUntil) {
 			return Job{}, apperr.E(apperr.Conflict, "errors.rating_locked")
 		}
+
 		r.RatedAt, r.EditableUntil = prev.RatedAt, prev.EditableUntil
 	}
+
 	raw, _ := json.Marshal(r)
-	if err := m.bump(ctx, c, in.JobID, "rating = $2, customer_confirmed_at = COALESCE(customer_confirmed_at, $3)", raw, c.Now); err != nil {
+	if err := m.bump(
+		ctx,
+		c,
+		in.JobID,
+		"rating = $2, customer_confirmed_at = COALESCE(customer_confirmed_at, $3)",
+		raw,
+		c.Now,
+	); err != nil {
 		return Job{}, err
 	}
+
 	return m.done(ctx, c, in.JobID, "job.rated", "jobs.rate", "JobRated", "")
 }
 
@@ -203,13 +261,22 @@ type ProblemInput struct {
 	PreferredSlot *Slot       `json:"preferredSlot"`
 }
 
-var problemCodes = map[string]bool{"same_problem": true, "new_damage": true, "not_completed": true, "other": true}
+var problemCodes = map[string]bool{
+	"same_problem":  true,
+	"new_damage":    true,
+	"not_completed": true,
+	"other":         true,
+}
 
 // ValidBlob checks one image upload (a valid name, JPEG/PNG whose bytes are that type, 1 byte – max bytes, size equal
 // to the payload, and a header within the pixel limits).
 func ValidBlob(b BlobInput, max int) bool {
-	return ValidFileName(b.Name) && (b.Mime == "image/jpeg" || b.Mime == "image/png") && b.Size == len(b.Bytes) && b.Size >= 1 && b.Size <= max &&
-		ContentMatches(b.Mime, b.Bytes) && ImageSizeOK(b.Mime, b.Bytes)
+	return ValidFileName(b.Name) && (b.Mime == "image/jpeg" || b.Mime == "image/png") &&
+		b.Size == len(b.Bytes) &&
+		b.Size >= 1 &&
+		b.Size <= max &&
+		ContentMatches(b.Mime, b.Bytes) &&
+		ImageSizeOK(b.Mime, b.Bytes)
 }
 
 // The pixel limits of an uploaded image (IR389): at most 16,384 pixels a side and 50 megapixels, more than a phone
@@ -227,7 +294,10 @@ func ImageSizeOK(mime string, b []byte) bool {
 	if err != nil || "image/"+format != mime {
 		return false
 	}
-	return cfg.Width >= 1 && cfg.Height >= 1 && cfg.Width <= maxImageSide && cfg.Height <= maxImageSide && cfg.Width*cfg.Height <= maxImagePixels
+
+	return cfg.Width >= 1 && cfg.Height >= 1 && cfg.Width <= maxImageSide &&
+		cfg.Height <= maxImageSide &&
+		cfg.Width*cfg.Height <= maxImagePixels
 }
 
 // ValidFileName checks the name of an upload. The apps show it, and offer it as the file name when a photo is opened.
@@ -239,17 +309,20 @@ func ValidFileName(name string) bool {
 	if n := utf8.RuneCountInString(name); n < 1 || n > 200 {
 		return false
 	}
+
 	for _, r := range name {
 		if unicode.IsControl(r) || r == '/' || r == '\\' || bidiFormat(r) {
 			return false
 		}
 	}
+
 	return true
 }
 
 // bidiFormat reports the Unicode bidirectional formatting characters: marks, embeddings, overrides and isolates.
 func bidiFormat(r rune) bool {
-	return r == '\u200e' || r == '\u200f' || r == '\u061c' || (r >= '\u202a' && r <= '\u202e') || (r >= '\u2066' && r <= '\u2069')
+	return r == '\u200e' || r == '\u200f' || r == '\u061c' || (r >= '\u202a' && r <= '\u202e') ||
+		(r >= '\u2066' && r <= '\u2069')
 }
 
 // ContentMatches reports whether a file's leading bytes are of its declared type — the PNG signature, the JPEG start
@@ -263,6 +336,7 @@ func ContentMatches(mime string, b []byte) bool {
 	case "application/pdf":
 		return bytes.HasPrefix(b, []byte("%PDF-"))
 	}
+
 	return false
 }
 
@@ -272,21 +346,26 @@ func (in *ProblemInput) Validate() map[string]string {
 	if in.JobID == uuid.Nil {
 		fe["jobId"] = "error.required"
 	}
+
 	if !problemCodes[in.ReasonCode] {
 		fe["reasonCode"] = "error.invalid"
 	}
+
 	in.Details = strings.TrimSpace(in.Details)
 	if n := utf8.RuneCountInString(in.Details); n < 10 || n > 2000 {
 		fe["details"] = "error.length"
 	}
+
 	if in.Photos == nil || len(in.Photos) > 5 {
 		fe["photos"] = "error.count"
 	}
+
 	for _, p := range in.Photos {
 		if !ValidBlob(p, 5<<20) {
 			fe["photos"] = "error.invalidFile"
 		}
 	}
+
 	return fe
 }
 
@@ -314,64 +393,115 @@ func (in *ProblemInput) Validate() map[string]string {
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/report-problem [post]
-func (m FollowUps) reportProblem(ctx context.Context, c *ops.Call, in *ProblemInput) (MaintenanceJob, error) {
+func (m FollowUps) reportProblem(
+	ctx context.Context,
+	c *ops.Call,
+	in *ProblemInput,
+) (MaintenanceJob, error) {
 	return written(m.reportProblemJob(ctx, c, in))
 }
 
 // reportProblemJob is reportProblem answering the job with its detail extras.
-func (m FollowUps) reportProblemJob(ctx context.Context, c *ops.Call, in *ProblemInput) (Job, error) {
+func (m FollowUps) reportProblemJob(
+	ctx context.Context,
+	c *ops.Call,
+	in *ProblemInput,
+) (Job, error) {
 	s, err := m.lock(ctx, c, in.JobID)
 	if err != nil {
 		return Job{}, err
 	}
-	if s.status != "completed" || s.completedAt == nil || !c.Now.Before(s.completedAt.Add(7*24*time.Hour)) {
+
+	if s.status != "completed" || s.completedAt == nil ||
+		!c.Now.Before(s.completedAt.Add(7*24*time.Hour)) {
 		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
 	}
+
 	var requested Slot
+
 	preferred := []Slot{}
+
 	if in.PreferredSlot != nil {
 		if !PreferredSlotsOK(c.Now, []Slot{*in.PreferredSlot}) {
 			return Job{}, apperr.Fields(map[string]string{"preferredSlot": "error.slotRules"})
 		}
+
 		requested, preferred = *in.PreferredSlot, []Slot{*in.PreferredSlot}
 	} else {
 		y, mo, d := c.Now.In(kualaLumpur).Date()
 		start := time.Date(y, mo, d+1, 9, 0, 0, 0, kualaLumpur)
 		requested = Slot{start.UTC(), start.Add(3 * time.Hour).UTC()}
 	}
+
 	pref, _ := json.Marshal(preferred)
+
 	var id uuid.UUID
 	if err := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.jobs (tenant_id, unit_id, customer_org_id, type, status, origin, symptom, requested_slot, preferred_slots,
 		preference_round, due_at, follow_up_of_job_id, follow_up_class) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, 'reactive', 'requested', 'client_request',
-		$3, tstzrange($4, $5), $6, 1, $5, $7, 'pending') RETURNING id`, s.unit, s.org, in.Details, requested.StartAt, requested.EndAt, pref, in.JobID).Scan(&id); err != nil {
+		$3, tstzrange($4, $5), $6, 1, $5, $7, 'pending') RETURNING id`, s.unit, s.org, in.Details, requested.StartAt, requested.EndAt, pref, in.JobID).
+		Scan(&id); err != nil {
 		return Job{}, err
 	}
+
 	for _, p := range in.Photos {
 		aid := uuid.New()
+
 		key := "jobs/" + id.String() + "/" + aid.String()
 		if err := m.Blobs.Put(ctx, key, p.Mime, p.Bytes); err != nil {
 			return Job{}, err
 		}
-		if _, err := c.Tx.Exec(ctx, `INSERT INTO maintenance.attachments (id, tenant_id, job_id, object_key, name, mime, size_bytes, status, uploaded_by)
-			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, 'ready', $7)`, aid, id, key, strings.TrimSpace(p.Name), p.Mime, p.Size, c.Principal.UserID); err != nil {
+
+		if _, err := c.Tx.Exec(
+			ctx,
+			`INSERT INTO maintenance.attachments (id, tenant_id, job_id, object_key, name, mime, size_bytes, status, uploaded_by)
+			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, 'ready', $7)`,
+			aid,
+			id,
+			key,
+			strings.TrimSpace(p.Name),
+			p.Mime,
+			p.Size,
+			c.Principal.UserID,
+		); err != nil {
 			return Job{}, err
 		}
 	}
+
 	if err := m.Jobs.event(ctx, c, id, "job.created", nil); err != nil {
 		return Job{}, err
 	}
+
 	if err := m.bump(ctx, c, in.JobID, ""); err != nil {
 		return Job{}, err
 	}
+
 	if err := m.Jobs.event(ctx, c, in.JobID, "job.problem_reported", nil); err != nil {
 		return Job{}, err
 	}
+
 	j, err := m.Jobs.detail(ctx, c, id)
 	if err != nil {
 		return j, err
 	}
-	c.Emit(ops.Event{AggregateType: "job", AggregateID: id, Type: "JobCreated", Payload: map[string]any{"followUpOfJobId": in.JobID, "reasonCode": in.ReasonCode}})
-	c.Audit(ops.AuditEntry{Action: "jobs.reportProblem", TargetKind: "job", TargetID: in.JobID.String(), PreviousVersion: c.ExpectedVersion, Reason: in.ReasonCode})
+
+	c.Emit(
+		ops.Event{
+			AggregateType: "job",
+			AggregateID:   id,
+			Type:          "JobCreated",
+			Payload:       map[string]any{"followUpOfJobId": in.JobID, "reasonCode": in.ReasonCode},
+		},
+	)
+	c.Audit(
+		ops.AuditEntry{
+			Action:          "jobs.reportProblem",
+			TargetKind:      "job",
+			TargetID:        in.JobID.String(),
+			PreviousVersion: c.ExpectedVersion,
+			Reason:          in.ReasonCode,
+		},
+	)
+
 	return j, nil
 }
 
@@ -390,10 +520,13 @@ func (in *ClassifyInput) Validate() map[string]string {
 	if in.JobID == uuid.Nil {
 		fe["jobId"] = "error.required"
 	}
+
 	if in.Classification != "rework" && in.Classification != "new_request" {
 		fe["classification"] = "error.invalid"
 	}
+
 	trimmedReason(&in.Reason, 1000, "reason", fe)
+
 	return fe
 }
 
@@ -421,7 +554,11 @@ func (in *ClassifyInput) Validate() map[string]string {
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/classify-follow-up [post]
-func (m FollowUps) classify(ctx context.Context, c *ops.Call, in *ClassifyInput) (MaintenanceJob, error) {
+func (m FollowUps) classify(
+	ctx context.Context,
+	c *ops.Call,
+	in *ClassifyInput,
+) (MaintenanceJob, error) {
 	return written(m.classifyJob(ctx, c, in))
 }
 
@@ -431,13 +568,31 @@ func (m FollowUps) classifyJob(ctx context.Context, c *ops.Call, in *ClassifyInp
 	if err != nil {
 		return Job{}, err
 	}
+
 	if s.followUp == nil || *s.followUp != "pending" {
 		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
 	}
-	if err := m.bump(ctx, c, in.JobID, "follow_up_class = $2, follow_up_reason = $3", in.Classification, in.Reason); err != nil {
+
+	if err := m.bump(
+		ctx,
+		c,
+		in.JobID,
+		"follow_up_class = $2, follow_up_reason = $3",
+		in.Classification,
+		in.Reason,
+	); err != nil {
 		return Job{}, err
 	}
-	return m.done(ctx, c, in.JobID, "job.follow_up_classified", "jobs.classifyFollowUp", "FollowUpClassified", in.Reason)
+
+	return m.done(
+		ctx,
+		c,
+		in.JobID,
+		"job.follow_up_classified",
+		"jobs.classifyFollowUp",
+		"FollowUpClassified",
+		in.Reason,
+	)
 }
 
 // ---- jobs.saveCost ----
@@ -463,18 +618,25 @@ func (in *CostInput) Validate() map[string]string {
 	if in.JobID == uuid.Nil {
 		fe["jobId"] = "error.required"
 	}
+
 	if in.CostLines == nil || len(in.CostLines) > 50 {
 		fe["costLines"] = "error.count"
 	}
+
 	for i := range in.CostLines {
 		l := &in.CostLines[i]
 		l.Description = strings.TrimSpace(l.Description)
+
 		n := utf8.RuneCountInString(l.Description)
-		if l.AmountMinor < 0 || (l.Currency != "MYR" && l.Currency != "USD") || (l.Kind != "estimate" && l.Kind != "actual") || n < 1 || n > 200 ||
+		if l.AmountMinor < 0 || (l.Currency != "MYR" && l.Currency != "USD") ||
+			(l.Kind != "estimate" && l.Kind != "actual") ||
+			n < 1 ||
+			n > 200 ||
 			(l.Visibility != "internal" && l.Visibility != "customer") {
 			fe["costLines"] = "error.invalid"
 		}
 	}
+
 	return fe
 }
 
@@ -502,7 +664,11 @@ func (in *CostInput) Validate() map[string]string {
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/cost-lines [put]
-func (m FollowUps) saveCost(ctx context.Context, c *ops.Call, in *CostInput) (MaintenanceJob, error) {
+func (m FollowUps) saveCost(
+	ctx context.Context,
+	c *ops.Call,
+	in *CostInput,
+) (MaintenanceJob, error) {
 	return written(m.saveCostJob(ctx, c, in))
 }
 
@@ -512,13 +678,16 @@ func (m FollowUps) saveCostJob(ctx context.Context, c *ops.Call, in *CostInput) 
 	if err != nil {
 		return Job{}, err
 	}
+
 	if s.status == "cancelled" {
 		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
 	}
+
 	raw, _ := json.Marshal(in.CostLines)
 	if err := m.bump(ctx, c, in.JobID, "costs = $2", raw); err != nil {
 		return Job{}, err
 	}
+
 	return m.done(ctx, c, in.JobID, "job.costs_saved", "jobs.saveCost", "JobCostsSaved", "")
 }
 
@@ -537,10 +706,13 @@ func (in *ExtendInput) Validate() map[string]string {
 	if in.JobID == uuid.Nil {
 		fe["jobId"] = "error.required"
 	}
+
 	if in.AccessValidUntil.IsZero() {
 		fe["accessValidUntil"] = "error.required"
 	}
+
 	trimmedReason(&in.Reason, 1000, "reason", fe)
+
 	return fe
 }
 
@@ -568,7 +740,11 @@ func (in *ExtendInput) Validate() map[string]string {
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/extend-access [post]
-func (m FollowUps) extendAccess(ctx context.Context, c *ops.Call, in *ExtendInput) (MaintenanceJob, error) {
+func (m FollowUps) extendAccess(
+	ctx context.Context,
+	c *ops.Call,
+	in *ExtendInput,
+) (MaintenanceJob, error) {
 	return written(m.extendAccessJob(ctx, c, in))
 }
 
@@ -577,30 +753,57 @@ func (m FollowUps) extendAccessJob(ctx context.Context, c *ops.Call, in *ExtendI
 	if _, err := m.lock(ctx, c, in.JobID); err != nil {
 		return Job{}, err
 	}
-	var offer, contractor uuid.UUID
-	var until time.Time
+
+	var (
+		offer, contractor uuid.UUID
+		until             time.Time
+	)
+
 	err := c.Tx.QueryRow(ctx, `SELECT id, access_valid_until, contractor_org_id FROM maintenance.offers WHERE job_id = $1 AND decision = 'accept' ORDER BY decided_at DESC LIMIT 1 FOR UPDATE`, in.JobID).
 		Scan(&offer, &until, &contractor)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Job{}, apperr.E(apperr.Conflict, "errors.no_accepted_offer")
 	}
+
 	if err != nil {
 		return Job{}, err
 	}
+
 	if !in.AccessValidUntil.After(until) || !in.AccessValidUntil.After(c.Now) {
 		return Job{}, apperr.Fields(map[string]string{"accessValidUntil": "error.mustExtend"})
 	}
-	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.offers SET access_valid_until = $2, version = version + 1, updated_at = platform.app_now() WHERE id = $1`, offer, in.AccessValidUntil); err != nil {
+
+	if _, err := c.Tx.Exec(
+		ctx,
+		`UPDATE maintenance.offers SET access_valid_until = $2, version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
+		offer,
+		in.AccessValidUntil,
+	); err != nil {
 		return Job{}, err
 	}
 	// a window that had already ended was frozen into the contractor's history; it is frozen again at the new end (IR458)
-	if _, err := c.Tx.Exec(ctx, `DELETE FROM maintenance.job_history_snapshots WHERE job_id = $1 AND owner_kind = 'organization' AND owner_id = $2`, in.JobID, contractor); err != nil {
+	if _, err := c.Tx.Exec(
+		ctx,
+		`DELETE FROM maintenance.job_history_snapshots WHERE job_id = $1 AND owner_kind = 'organization' AND owner_id = $2`,
+		in.JobID,
+		contractor,
+	); err != nil {
 		return Job{}, err
 	}
+
 	if err := m.bump(ctx, c, in.JobID, ""); err != nil {
 		return Job{}, err
 	}
-	return m.done(ctx, c, in.JobID, "offer.access_extended", "jobs.extendAccess", "AccessExtended", in.Reason)
+
+	return m.done(
+		ctx,
+		c,
+		in.JobID,
+		"offer.access_extended",
+		"jobs.extendAccess",
+		"AccessExtended",
+		in.Reason,
+	)
 }
 
 // ---- jobs.recordWarrantyClaim ----
@@ -620,14 +823,19 @@ func (in *ClaimInput) Validate() map[string]string {
 	if in.JobID == uuid.Nil {
 		fe["jobId"] = "error.required"
 	}
+
 	trimmedReason(&in.PartLabel, 120, "partLabel", fe)
+
 	if in.AmountMinor < 1 {
 		fe["amountMinor"] = "error.range"
 	}
+
 	if in.Currency != "MYR" && in.Currency != "USD" {
 		fe["currency"] = "error.invalid"
 	}
+
 	trimmedReason(&in.Reason, 1000, "reason", fe)
+
 	return fe
 }
 
@@ -666,45 +874,84 @@ type WarrantyClaim struct {
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/warranty-claims [post]
-func (m FollowUps) recordWarrantyClaim(ctx context.Context, c *ops.Call, in *ClaimInput) (MaintenanceJob, error) {
+func (m FollowUps) recordWarrantyClaim(
+	ctx context.Context,
+	c *ops.Call,
+	in *ClaimInput,
+) (MaintenanceJob, error) {
 	return written(m.recordWarrantyClaimJob(ctx, c, in))
 }
 
 // recordWarrantyClaimJob is recordWarrantyClaim answering the job with its detail extras.
-func (m FollowUps) recordWarrantyClaimJob(ctx context.Context, c *ops.Call, in *ClaimInput) (Job, error) {
+func (m FollowUps) recordWarrantyClaimJob(
+	ctx context.Context,
+	c *ops.Call,
+	in *ClaimInput,
+) (Job, error) {
 	s, err := m.lock(ctx, c, in.JobID)
 	if err != nil {
 		return Job{}, err
 	}
+
 	if s.status != "completed" || s.completedAt == nil {
 		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
 	}
+
 	end, err := m.Warranty.WarrantyEnd(ctx, c, s.unit)
 	if err != nil {
 		return Job{}, err
 	}
+
 	if end == nil || end.Before(*s.completedAt) {
 		return Job{}, apperr.Fields(map[string]string{"jobId": "errors.outside_warranty"})
 	}
+
 	claims := []WarrantyClaim{}
 	if len(s.claims) > 0 {
 		if err := json.Unmarshal(s.claims, &claims); err != nil {
 			return Job{}, err
 		}
 	}
+
 	now := c.Now
-	claims = append(claims, WarrantyClaim{ID: uuid.New(), PartLabel: in.PartLabel, AmountMinor: in.AmountMinor, Currency: in.Currency, State: "filed", FiledAt: &now, Reason: &in.Reason})
+	claims = append(
+		claims,
+		WarrantyClaim{
+			ID:          uuid.New(),
+			PartLabel:   in.PartLabel,
+			AmountMinor: in.AmountMinor,
+			Currency:    in.Currency,
+			State:       "filed",
+			FiledAt:     &now,
+			Reason:      &in.Reason,
+		},
+	)
+
 	raw, _ := json.Marshal(claims)
 	if err := m.bump(ctx, c, in.JobID, "warranty_claims = $2", raw); err != nil {
 		return Job{}, err
 	}
-	return m.done(ctx, c, in.JobID, "job.warranty_claim_filed", "jobs.recordWarrantyClaim", "WarrantyClaimFiled", in.Reason)
+
+	return m.done(
+		ctx,
+		c,
+		in.JobID,
+		"job.warranty_claim_filed",
+		"jobs.recordWarrantyClaim",
+		"WarrantyClaimFiled",
+		in.Reason,
+	)
 }
 
 // ConfirmUnrated applies IR110: completed jobs without a rating are confirmed 7 days after completedAt.
 func ConfirmUnrated(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) {
-	tag, err := tx.Exec(ctx, `UPDATE maintenance.jobs SET customer_confirmed_at = completed_at + interval '7 days', version = version + 1, updated_at = platform.app_now()
-		WHERE status = 'completed' AND customer_confirmed_at IS NULL AND rating IS NULL AND completed_at + interval '7 days' <= $1`, now)
+	tag, err := tx.Exec(
+		ctx,
+		`UPDATE maintenance.jobs SET customer_confirmed_at = completed_at + interval '7 days', version = version + 1, updated_at = platform.app_now()
+		WHERE status = 'completed' AND customer_confirmed_at IS NULL AND rating IS NULL AND completed_at + interval '7 days' <= $1`,
+		now,
+	)
+
 	return int(tag.RowsAffected()), err
 }
 

@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 
@@ -47,54 +48,91 @@ func typeName(p ops.Param) string {
 	case p.Kind == ops.KindBool:
 		return "boolean"
 	}
+
 	return "string"
 }
 
 func main() {
-	srv, err := server.New(context.Background(), server.Config{DatabaseURL: "postgres://doc:doc@127.0.0.1:1/doc"}, nil)
+	srv, err := server.New(
+		context.Background(),
+		server.Config{DatabaseURL: "postgres://doc:doc@127.0.0.1:1/doc"},
+		nil,
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer srv.DB.Close()
+
 	out := map[string][]route{}
+
 	for _, op := range srv.Registry.Operations() {
 		for _, rt := range op.Spec.Routes {
 			b, err := ops.NewBinding(op, rt)
 			if err != nil {
 				log.Fatal(err)
 			}
-			r := route{Method: rt.Method, Path: rt.Path, Body: b.Body, FixedField: rt.FixedField, FixedValue: rt.FixedValue, Params: []param{}}
+
+			r := route{
+				Method:     rt.Method,
+				Path:       rt.Path,
+				Body:       b.Body,
+				FixedField: rt.FixedField,
+				FixedValue: rt.FixedValue,
+				Params:     []param{},
+			}
 			for _, name := range b.Path {
 				p := b.Params[name]
-				r.Params = append(r.Params, param{Name: name, In: "path", Type: typeName(p), Role: "path", Field: strings.Join(p.At, "."), Required: true})
+				r.Params = append(
+					r.Params,
+					param{
+						Name:     name,
+						In:       "path",
+						Type:     typeName(p),
+						Role:     "path",
+						Field:    strings.Join(p.At, "."),
+						Required: true,
+					},
+				)
 			}
+
 			if !b.Body {
 				var query []ops.Param
+
 				for name, p := range b.Params {
 					if name != rt.FixedField && !contains(b.Path, name) {
 						query = append(query, p)
 					}
 				}
+
 				sort.Slice(query, func(i, j int) bool { return query[i].Order < query[j].Order })
+
 				for _, p := range query {
-					r.Params = append(r.Params, param{Name: p.Name, In: "query", Type: typeName(p), List: p.List, Role: p.Role, Field: strings.Join(p.At, ".")})
+					r.Params = append(
+						r.Params,
+						param{
+							Name:  p.Name,
+							In:    "query",
+							Type:  typeName(p),
+							List:  p.List,
+							Role:  p.Role,
+							Field: strings.Join(p.At, "."),
+						},
+					)
 				}
 			}
+
 			out[op.Spec.Name] = append(out[op.Spec.Name], r)
 		}
 	}
+
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", " ")
+
 	if err := enc.Encode(out); err != nil {
 		log.Fatal(err)
 	}
 }
 
 func contains(list []string, s string) bool {
-	for _, x := range list {
-		if x == s {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(list, s)
 }

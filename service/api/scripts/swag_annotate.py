@@ -40,6 +40,24 @@ REGISTER = re.compile(r'ops\.Register\(\s*\w+\s*,\s*"([\w.]+)"\s*,\s*([\w.]+)\s*
 FUNC_HEAD = re.compile(r"^func (?:\((?:(\w+) )?\*?([\w.]+)\) )?(\w+)\((.*)\) \((.+), error\) \{$")
 
 
+def joined(lines, i):
+    """Line i with the lines it continues on joined to it, as one line: golines wraps a long signature or call over
+    several lines (one parameter per line), and the matching below reads them whole. A func header runs to the line
+    that opens its body; an ops.Register call to its closing parenthesis."""
+    text, j = lines[i], i
+    if text.startswith("func ") and not text.rstrip().endswith("{"):
+        while j + 1 < len(lines) and not lines[j].rstrip().endswith("{"):
+            j += 1
+            text += " " + lines[j].strip()
+    elif "ops.Register(" in text and text.count("(") > text.count(")"):
+        while j + 1 < len(lines) and text.count("(") > text.count(")"):
+            j += 1
+            text += " " + lines[j].strip()
+    text = re.sub(r"\(\s+", "(", text)
+    text = re.sub(r",\s*\)", ")", text)
+    return re.sub(r"(?<=\S)[ \t]+", " ", text)
+
+
 def package_of(src):
     return re.search(r"^package (\w+)", src, re.M).group(1)
 
@@ -54,8 +72,9 @@ def find_handler(pkg_dir, recv_type, name):
     for p in go_files:
         if p.parent != pkg_dir:
             continue
-        for i, line in enumerate(sources[p].split("\n")):
-            m = FUNC_HEAD.match(line)
+        lines = sources[p].split("\n")
+        for i, line in enumerate(lines):
+            m = FUNC_HEAD.match(joined(lines, i)) if line.startswith("func ") else None
             if m and m.group(3) == name and (recv_type is None) == (m.group(2) is None) and (recv_type is None or m.group(2) == recv_type):
                 return p, i, m
     return None, None, None
@@ -64,8 +83,9 @@ def find_handler(pkg_dir, recv_type, name):
 def param_maps(src):
     """line index → {var: type} of the enclosing Register function (its parameters)."""
     out, current = {}, {}
-    for i, line in enumerate(src.split("\n")):
-        m = re.match(r"^func \w*[Rr]egister\w*\((.*)\) \{", line)
+    lines = src.split("\n")
+    for i, line in enumerate(lines):
+        m = re.match(r"^func \w*[Rr]egister\w*\((.*)\) \{", joined(lines, i)) if line.startswith("func ") else None
         if m:
             current = {}
             for part in m.group(1).split(","):
@@ -261,8 +281,9 @@ def main():
     for p in go_files:
         src = sources[p]
         maps = param_maps(src)
-        for i, line in enumerate(src.split("\n")):
-            for m in REGISTER.finditer(line):
+        src_lines = src.split("\n")
+        for i, line in enumerate(src_lines):
+            for m in REGISTER.finditer(joined(src_lines, i)):
                 op, handler = m.group(1), m.group(2)
                 if op not in catalog:
                     print(f"{p}:{i + 1}: {op} is not in the operation catalog", file=sys.stderr)

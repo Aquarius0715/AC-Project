@@ -26,7 +26,17 @@ const (
 )
 
 // Codes lists every ErrorCode of service-contracts.ts in declaration order.
-var Codes = []Code{Validation, Unauthenticated, Forbidden, NotFound, Conflict, Offline, Timeout, RateLimited, Unavailable}
+var Codes = []Code{
+	Validation,
+	Unauthenticated,
+	Forbidden,
+	NotFound,
+	Conflict,
+	Offline,
+	Timeout,
+	RateLimited,
+	Unavailable,
+}
 
 var status = map[Code]int{
 	Validation:      http.StatusUnprocessableEntity,
@@ -56,7 +66,11 @@ func (e *DomainError) Error() string { return string(e.Code) + ": " + e.MessageK
 // Cause returns the error this DomainError was converted from (nil for errors created by E / Fields).
 func (e *DomainError) Cause() error { return e.cause }
 
-func caused(de *DomainError, err error) *DomainError { de.cause = err; return de }
+func caused(de *DomainError, err error) *DomainError {
+	de.cause = err
+
+	return de
+}
 
 // HTTPStatus returns the fixed status for the error code.
 func (e *DomainError) HTTPStatus() int { return status[e.Code] }
@@ -75,33 +89,46 @@ func Fields(fe map[string]string) *DomainError {
 }
 
 // RetryAfter sets retryAfterSeconds.
-func (e *DomainError) RetryAfter(s int) *DomainError { e.RetryAfterSeconds = &s; return e }
+func (e *DomainError) RetryAfter(s int) *DomainError {
+	e.RetryAfterSeconds = &s
+
+	return e
+}
 
 // From converts any error into a DomainError (PostgreSQL errors, deadlines, unknown errors).
 func From(err error) *DomainError {
 	if err == nil {
 		return nil
 	}
-	var de *DomainError
-	if errors.As(err, &de) {
+
+	if de, ok := errors.AsType[*DomainError](err); ok {
 		return de
 	}
+
 	if errors.Is(err, context.DeadlineExceeded) {
 		return caused(E(Timeout, "error.timeout"), err)
 	}
+
 	if errors.Is(err, pgx.ErrNoRows) {
 		return caused(E(NotFound, "error.notFound"), err)
 	}
-	var pg *pgconn.PgError
-	if errors.As(err, &pg) {
+
+	if pg, ok := errors.AsType[*pgconn.PgError](err); ok {
 		switch pg.Code {
 		case "23514", "22P02", "22001", "22003", "22007", "22008":
 			return caused(E(Validation, "error.validation"), err)
 		case "42501":
-			if strings.HasPrefix(pg.Message, "permission denied") { // a missing table privilege is a defect (IR194), not RLS
+			if strings.HasPrefix(
+				pg.Message,
+				"permission denied",
+			) { // a missing table privilege is a defect (IR194), not RLS
 				return caused(E(Unavailable, "error.unavailable"), err)
 			}
-			return caused(E(NotFound, "error.notFound"), err) // row-level security: never reveal other tenants
+
+			return caused(
+				E(NotFound, "error.notFound"),
+				err,
+			) // row-level security: never reveal other tenants
 		case "23503":
 			return caused(E(NotFound, "error.notFound"), err)
 		case "23505", "23P01":
@@ -112,5 +139,6 @@ func From(err error) *DomainError {
 			return caused(E(Timeout, "error.timeout"), err)
 		}
 	}
+
 	return caused(E(Unavailable, "error.unavailable"), err)
 }

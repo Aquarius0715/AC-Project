@@ -17,6 +17,7 @@ import (
 // the report's acceptance time.
 type EvidenceAttachment struct {
 	AttachmentRef
+
 	UnitID     uuid.UUID `json:"unitId"`
 	AcceptedAt time.Time `json:"acceptedAt"`
 }
@@ -33,14 +34,17 @@ type ListAttachmentsInput struct {
 func (in *ListAttachmentsInput) Validate() map[string]string {
 	fe := map[string]string{}
 	seen := map[uuid.UUID]bool{}
+
 	ok := len(in.UnitIDs) >= 1 && len(in.UnitIDs) <= 500
 	for _, u := range in.UnitIDs {
 		ok = ok && u != uuid.Nil && !seen[u]
 		seen[u] = true
 	}
+
 	if !ok {
 		fe["unitIds"] = "error.invalid"
 	}
+
 	switch {
 	case in.From.IsZero():
 		fe["from"] = "error.required"
@@ -49,6 +53,7 @@ func (in *ListAttachmentsInput) Validate() map[string]string {
 	case !in.To.After(in.From) || in.To.Sub(in.From) > 366*24*time.Hour:
 		fe["to"] = "error.range"
 	}
+
 	return fe
 }
 
@@ -81,36 +86,68 @@ func (in *ListAttachmentsInput) Validate() map[string]string {
 //	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/attachments [get]
-func (m Files) list(ctx context.Context, c *ops.Call, in *ListAttachmentsInput) (paging.Page[EvidenceAttachment], error) {
+func (m Files) list(
+	ctx context.Context,
+	c *ops.Call,
+	in *ListAttachmentsInput,
+) (paging.Page[EvidenceAttachment], error) {
 	if err := paging.NoFilters(in.Query, "query.filters"); err != nil {
 		return paging.Page[EvidenceAttachment]{}, err
 	}
-	rows, err := c.Tx.Query(ctx, `SELECT a.id, a.tenant_id, a.created_at, a.updated_at, a.job_id, a.report_id, a.name, a.mime, a.size_bytes, a.status, j.unit_id, r.accepted_at
+
+	rows, err := c.Tx.Query(
+		ctx,
+		`SELECT a.id, a.tenant_id, a.created_at, a.updated_at, a.job_id, a.report_id, a.name, a.mime, a.size_bytes, a.status, j.unit_id, r.accepted_at
 		FROM maintenance.attachments a
 		JOIN maintenance.work_reports r ON r.id = a.report_id AND r.state = 'accepted'
 		JOIN maintenance.jobs j ON j.id = a.job_id
-		WHERE a.status = 'ready' AND j.unit_id = ANY($1) AND a.created_at >= $2 AND a.created_at < $3`, in.UnitIDs, in.From, in.To)
+		WHERE a.status = 'ready' AND j.unit_id = ANY($1) AND a.created_at >= $2 AND a.created_at < $3`,
+		in.UnitIDs,
+		in.From,
+		in.To,
+	)
 	if err != nil {
 		return paging.Page[EvidenceAttachment]{}, err
 	}
+
 	all := []EvidenceAttachment{}
+
 	for rows.Next() {
 		var a EvidenceAttachment
-		if err := rows.Scan(&a.ID, &a.TenantID, &a.CreatedAt, &a.UpdatedAt, &a.JobID, &a.ReportID, &a.Name, &a.Mime, &a.Size, &a.Status, &a.UnitID, &a.AcceptedAt); err != nil {
+		if err := rows.Scan(
+			&a.ID,
+			&a.TenantID,
+			&a.CreatedAt,
+			&a.UpdatedAt,
+			&a.JobID,
+			&a.ReportID,
+			&a.Name,
+			&a.Mime,
+			&a.Size,
+			&a.Status,
+			&a.UnitID,
+			&a.AcceptedAt,
+		); err != nil {
 			rows.Close()
+
 			return paging.Page[EvidenceAttachment]{}, err
 		}
+
 		a.Version, a.BlobID = 1, a.ID
 		all = append(all, a)
 	}
+
 	rows.Close()
+
 	if err := rows.Err(); err != nil {
 		return paging.Page[EvidenceAttachment]{}, err
 	}
+
 	sort := in.Query.Sort
 	if sort == nil {
 		sort = &paging.SortSpec{Field: "createdAt", Direction: "desc"}
 	}
+
 	if err := paging.SortSlice(all, sort, map[string]func(x, y EvidenceAttachment) int{
 		"id":        func(x, y EvidenceAttachment) int { return strings.Compare(x.ID.String(), y.ID.String()) },
 		"createdAt": func(x, y EvidenceAttachment) int { return x.CreatedAt.Compare(y.CreatedAt) },
@@ -120,6 +157,7 @@ func (m Files) list(ctx context.Context, c *ops.Call, in *ListAttachmentsInput) 
 	}); err != nil {
 		return paging.Page[EvidenceAttachment]{}, err
 	}
+
 	w, err := paging.Resolve(in.Query, struct {
 		U    []uuid.UUID
 		F, T time.Time
@@ -127,9 +165,16 @@ func (m Files) list(ctx context.Context, c *ops.Call, in *ListAttachmentsInput) 
 	if err != nil {
 		return paging.Page[EvidenceAttachment]{}, err
 	}
+
 	items := []EvidenceAttachment{}
 	for i := w.Offset; i < len(all) && i < w.Offset+w.Limit; i++ {
 		items = append(items, all[i])
 	}
-	return paging.Page[EvidenceAttachment]{Items: items, NextCursor: w.Next(len(all)), Total: len(all), SnapshotVersion: w.Snapshot}, nil
+
+	return paging.Page[EvidenceAttachment]{
+		Items:           items,
+		NextCursor:      w.Next(len(all)),
+		Total:           len(all),
+		SnapshotVersion: w.Snapshot,
+	}, nil
 }

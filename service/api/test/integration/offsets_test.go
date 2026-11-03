@@ -14,48 +14,96 @@ func TestOffsets(t *testing.T) {
 	s := server(t)
 	u := newUnit(t, s, "Offset AC")
 	quote := func(a *actor, extra string) (int, map[string]any) {
-		return write(s, a, "offsets.preview", `{"purpose":"Offset September usage","amountKg":12.5,"period":{"from":"2026-09-01T00:00:00Z","to":"2026-09-14T00:00:00Z"},"unitIds":["`+u+`"]`+extra+`}`, 0)
+		return write(
+			s,
+			a,
+			"offsets.preview",
+			`{"purpose":"Offset September usage","amountKg":12.5,"period":{"from":"2026-09-01T00:00:00Z","to":"2026-09-14T00:00:00Z"},"unitIds":["`+u+`"]`+extra+`}`,
+			0,
+		)
 	}
 	want := map[string]string{ // the field each case is refused for
 		"4 decimals": "amountKg=error.range",
 		"zero kg":    "amountKg=error.range",
 	}
+
 	for name, b := range map[string]string{"zero kg": `,"amountKg":0`, "4 decimals": `,"amountKg":1.2345`} {
-		code, m := write(s, &customerB, "offsets.preview", `{"purpose":"x","period":{"from":"2026-09-01T00:00:00Z","to":"2026-09-14T00:00:00Z"},"unitIds":["`+u+`"]`+b+`}`, 0)
+		code, m := write(
+			s,
+			&customerB,
+			"offsets.preview",
+			`{"purpose":"x","period":{"from":"2026-09-01T00:00:00Z","to":"2026-09-14T00:00:00Z"},"unitIds":["`+u+`"]`+b+`}`,
+			0,
+		)
 		refusal(t, name, code, m, want[name])
 	}
+
 	if code, _ := quote(&customerA, ""); code != 404 {
 		t.Error("client quotes another customer's unit")
 	}
+
 	if code, m := quote(&hq, ""); code != 422 || fields(m) != "customerId=error.required" {
 		t.Errorf("HQ quote without customerId: %d %s", code, fields(m))
 	}
+
 	code, m := quote(&customerB, "")
-	if code != 200 || data(m)["provider"] != "unselected" || data(m)["estimatedAmountMinor"] != nil || data(m)["marketConcept"].(map[string]any)["stage"] != "future_concept" {
+	if code != 200 || data(m)["provider"] != "unselected" ||
+		data(m)["estimatedAmountMinor"] != nil ||
+		data(m)["marketConcept"].(map[string]any)["stage"] != "future_concept" {
 		t.Fatalf("quote: %d %v", code, m)
 	}
+
 	qid := data(m)["id"].(string)
+
 	sim := func(a *actor, body string, v int) (int, map[string]any) {
 		return write(s, a, "offsets.simulate", body, v)
 	}
-	if code, m := sim(&customerB, `{"event":"request","quoteId":"`+qid+`","quoteVersion":1,"demoConfirmed":false}`, 0); code != 422 || fields(m) != "demoConfirmed=error.required" {
+	if code, m := sim(
+		&customerB,
+		`{"event":"request","quoteId":"`+qid+`","quoteVersion":1,"demoConfirmed":false}`,
+		0,
+	); code != 422 ||
+		fields(m) != "demoConfirmed=error.required" {
 		t.Errorf("not demo confirmed: %d %s", code, fields(m))
 	}
-	if code, _ := sim(&customerB, `{"event":"request","quoteId":"`+qid+`","quoteVersion":2,"demoConfirmed":true}`, 0); code != 409 {
+
+	if code, _ := sim(
+		&customerB,
+		`{"event":"request","quoteId":"`+qid+`","quoteVersion":2,"demoConfirmed":true}`,
+		0,
+	); code != 409 {
 		t.Error("stale quote version")
 	}
-	if code, _ := sim(&customerA, `{"event":"request","quoteId":"`+qid+`","quoteVersion":1,"demoConfirmed":true}`, 0); code != 404 {
+
+	if code, _ := sim(
+		&customerA,
+		`{"event":"request","quoteId":"`+qid+`","quoteVersion":1,"demoConfirmed":true}`,
+		0,
+	); code != 404 {
 		t.Error("another customer's quote")
 	}
-	code, m = sim(&customerB, `{"event":"request","quoteId":"`+qid+`","quoteVersion":1,"demoConfirmed":true}`, 0)
-	if code != 200 || data(m)["state"] != "demo_requested" || len(data(m)["attempts"].([]any)) != 1 {
+
+	code, m = sim(
+		&customerB,
+		`{"event":"request","quoteId":"`+qid+`","quoteVersion":1,"demoConfirmed":true}`,
+		0,
+	)
+	if code != 200 || data(m)["state"] != "demo_requested" ||
+		len(data(m)["attempts"].([]any)) != 1 {
 		t.Fatalf("request: %d %v", code, m)
 	}
+
 	rid := data(m)["id"].(string)
 	att := data(m)["currentAttemptId"].(string)
-	if code, _ := sim(&customerB, `{"event":"request","quoteId":"`+qid+`","quoteVersion":1,"demoConfirmed":true}`, 0); code != 409 {
+
+	if code, _ := sim(
+		&customerB,
+		`{"event":"request","quoteId":"`+qid+`","quoteVersion":1,"demoConfirmed":true}`,
+		0,
+	); code != 409 {
 		t.Error("second request for one quote")
 	}
+
 	ev := func(event, attempt, eventID string) string {
 		return `{"event":"` + event + `","recordId":"` + rid + `","attemptId":"` + attempt + `","eventId":"` + eventID + `","demoConfirmed":true}`
 	}
@@ -64,78 +112,135 @@ func TestOffsets(t *testing.T) {
 	}
 	// purchase fails → retry → purchase → retire
 	failID := uuid.NewString()
+
 	code, m = sim(&hq, ev("fail", att, failID), 1)
-	if code != 200 || data(m)["state"] != "failed" || data(m)["previousState"] != "demo_requested" || data(m)["currentAttemptId"] != att {
+	if code != 200 || data(m)["state"] != "failed" ||
+		data(m)["previousState"] != "demo_requested" ||
+		data(m)["currentAttemptId"] != att {
 		t.Fatalf("fail: %d %v", code, m)
 	}
+
 	if code, m := sim(&hq, ev("fail", att, failID), 2); code != 200 || ver(m) != 2 {
 		t.Error("same eventId replays")
 	}
+
 	if code, _ := sim(&hq, ev("purchase_confirm", att, failID), 2); code != 409 {
 		t.Error("same eventId with other content")
 	}
+
 	if code, _ := sim(&hq, ev("purchase_confirm", att, uuid.NewString()), 2); code != 409 {
 		t.Error("late success while failed")
 	}
+
 	retry := func(attempt string, v int) (int, map[string]any) {
-		return sim(&customerB, `{"event":"retry","recordId":"`+rid+`","attemptId":"`+attempt+`","demoConfirmed":true}`, v)
+		return sim(
+			&customerB,
+			`{"event":"retry","recordId":"`+rid+`","attemptId":"`+attempt+`","demoConfirmed":true}`,
+			v,
+		)
 	}
 	if code, _ := retry(att, 1); code != 409 {
 		t.Error("retry with a stale version")
 	}
+
 	code, m = retry(att, 2)
-	if code != 200 || data(m)["state"] != "demo_requested" || data(m)["currentAttemptId"] == att || len(data(m)["attempts"].([]any)) != 2 {
+	if code != 200 || data(m)["state"] != "demo_requested" || data(m)["currentAttemptId"] == att ||
+		len(data(m)["attempts"].([]any)) != 2 {
 		t.Fatalf("retry: %d %v", code, m)
 	}
+
 	att2 := data(m)["currentAttemptId"].(string)
+
 	if code, _ := sim(&hq, ev("purchase_confirm", att, uuid.NewString()), 3); code != 409 {
 		t.Error("old attempt")
 	}
+
 	code, m = sim(&hq, ev("purchase_confirm", att2, uuid.NewString()), 3)
 	if code != 200 || data(m)["state"] != "demo_purchased" || data(m)["purchaseRef"] == nil {
 		t.Fatalf("purchase: %d %v", code, m)
 	}
+
 	att3 := data(m)["currentAttemptId"].(string)
 	if code, _ := sim(&hq, ev("purchase_confirm", att3, uuid.NewString()), 4); code != 409 {
 		t.Error("wrong stage")
 	}
+
 	code, m = sim(&hq, ev("retire", att3, uuid.NewString()), 4)
-	if code != 200 || data(m)["state"] != "demo_retired" || data(m)["retirementRef"] == nil || data(m)["demoCertificateRef"] == nil || data(m)["currentAttemptId"] != nil {
+	if code != 200 || data(m)["state"] != "demo_retired" || data(m)["retirementRef"] == nil ||
+		data(m)["demoCertificateRef"] == nil ||
+		data(m)["currentAttemptId"] != nil {
 		t.Fatalf("retire: %d %v", code, m)
 	}
-	if h := data(m)["eventHistory"].([]any); len(h) != 4 || h[0].(map[string]any)["action"] != "offsets.request" || h[3].(map[string]any)["action"] != "offsets.purchase_confirm" {
+
+	if h := data(m)["eventHistory"].([]any); len(h) != 4 ||
+		h[0].(map[string]any)["action"] != "offsets.request" ||
+		h[3].(map[string]any)["action"] != "offsets.purchase_confirm" {
 		t.Errorf("event history (the retire audit is written with the response): %v", h)
 	}
+
 	if code, _ := retry(att3, 5); code != 409 {
 		t.Error("retry a retired record")
 	}
 	// a failed retirement retries the retirement: back to demo_purchased with a new retirement attempt, then retired
 	_, m = quote(&customerB, "")
 	q2 := data(m)["id"].(string)
-	_, m = sim(&customerB, `{"event":"request","quoteId":"`+q2+`","quoteVersion":1,"demoConfirmed":true}`, 0)
+	_, m = sim(
+		&customerB,
+		`{"event":"request","quoteId":"`+q2+`","quoteVersion":1,"demoConfirmed":true}`,
+		0,
+	)
 	rid2 := data(m)["id"].(string)
 	ev2 := func(event, attempt string) string {
 		return `{"event":"` + event + `","recordId":"` + rid2 + `","attemptId":"` + attempt + `","eventId":"` + uuid.NewString() + `","demoConfirmed":true}`
 	}
 	_, m = sim(&hq, ev2("purchase_confirm", data(m)["currentAttemptId"].(string)), 1)
+
 	retirement := data(m)["currentAttemptId"].(string)
-	if code, m := sim(&hq, ev2("fail", retirement), 2); code != 200 || data(m)["state"] != "failed" || data(m)["previousState"] != "demo_purchased" {
+	if code, m := sim(
+		&hq,
+		ev2("fail", retirement),
+		2,
+	); code != 200 || data(m)["state"] != "failed" ||
+		data(m)["previousState"] != "demo_purchased" {
 		t.Fatalf("the retirement fails: %d %v", code, m)
 	}
-	code, m = sim(&customerB, `{"event":"retry","recordId":"`+rid2+`","attemptId":"`+retirement+`","demoConfirmed":true}`, 3)
-	if code != 200 || data(m)["state"] != "demo_purchased" || data(m)["currentAttemptId"] == retirement || len(data(m)["attempts"].([]any)) != 3 {
+
+	code, m = sim(
+		&customerB,
+		`{"event":"retry","recordId":"`+rid2+`","attemptId":"`+retirement+`","demoConfirmed":true}`,
+		3,
+	)
+	if code != 200 || data(m)["state"] != "demo_purchased" ||
+		data(m)["currentAttemptId"] == retirement ||
+		len(data(m)["attempts"].([]any)) != 3 {
 		t.Fatalf("retry the retirement: %d %v", code, m)
 	}
-	if code, m := sim(&hq, ev2("retire", data(m)["currentAttemptId"].(string)), 4); code != 200 || data(m)["state"] != "demo_retired" || data(m)["purchaseRef"] == nil {
+
+	if code, m := sim(
+		&hq,
+		ev2("retire", data(m)["currentAttemptId"].(string)),
+		4,
+	); code != 200 || data(m)["state"] != "demo_retired" ||
+		data(m)["purchaseRef"] == nil {
 		t.Errorf("retired after the retry: %d %v", code, m)
 	}
 	// what is not there, or not the customer's, is NOT_FOUND
-	if code, _ := sim(&customerB, `{"event":"request","quoteId":"`+uuid.NewString()+`","quoteVersion":1,"demoConfirmed":true}`, 0); code != 404 {
+	if code, _ := sim(
+		&customerB,
+		`{"event":"request","quoteId":"`+uuid.NewString()+`","quoteVersion":1,"demoConfirmed":true}`,
+		0,
+	); code != 404 {
 		t.Error("request of an unknown quote")
 	}
-	if code, _ := sim(&hq, `{"event":"fail","recordId":"`+uuid.NewString()+`","attemptId":"`+uuid.NewString()+`","eventId":"`+uuid.NewString()+`","demoConfirmed":true}`, 1); code != 404 {
+
+	if code, _ := sim(
+		&hq,
+		`{"event":"fail","recordId":"`+uuid.NewString()+`","attemptId":"`+uuid.NewString()+`","eventId":"`+uuid.NewString()+`","demoConfirmed":true}`,
+		1,
+	); code != 404 {
 		t.Error("event of an unknown record")
 	}
+
 	if code, _ := quote(&customerB, `,"customerId":"`+seed.ID("cust-a").String()+`"`); code != 404 {
 		t.Error("client quotes for another customer")
 	}
@@ -144,6 +249,7 @@ func TestOffsets(t *testing.T) {
 	if len(items(m)) == 0 {
 		t.Error("client list")
 	}
+
 	for _, it := range items(m) { // a customer never sees an actor's name (IR305)
 		for _, e := range it["eventHistory"].([]any) {
 			if e.(map[string]any)["actorName"] != nil {
@@ -151,33 +257,58 @@ func TestOffsets(t *testing.T) {
 			}
 		}
 	}
+
 	if _, m := post(s, &customerA, "offsets.list", `{"limit":100}`); func() bool {
 		for _, it := range items(m) {
 			if it["id"] == rid {
 				return true
 			}
 		}
+
 		return false
 	}() {
 		t.Error("other customer sees the record")
 	}
-	if code, m := post(s, &hq, "offsets.list", `{"filters":{"from":"2026-09-14T00:00:00Z","to":"2026-09-01T00:00:00Z"}}`); code != 422 || m["fieldErrors"].(map[string]any)["filters.to"] != "error.range" {
+
+	if code, m := post(
+		s,
+		&hq,
+		"offsets.list",
+		`{"filters":{"from":"2026-09-14T00:00:00Z","to":"2026-09-01T00:00:00Z"}}`,
+	); code != 422 ||
+		m["fieldErrors"].(map[string]any)["filters.to"] != "error.range" {
 		t.Errorf("a reversed created period: %d %v", code, m)
 	}
-	_, m = post(s, &hq, "offsets.list", `{"filters":{"customerId":"`+seed.ID("cust-b").String()+`"},"limit":100}`)
+
+	_, m = post(
+		s,
+		&hq,
+		"offsets.list",
+		`{"filters":{"customerId":"`+seed.ID("cust-b").String()+`"},"limit":100}`,
+	)
 	if len(items(m)) == 0 {
 		t.Error("HQ list")
 	}
+
 	named := false // HQ sees who acted
+
 	for _, it := range items(m) {
 		for _, e := range it["eventHistory"].([]any) {
 			named = named || e.(map[string]any)["actorName"] != nil
 		}
 	}
+
 	if !named {
 		t.Error("HQ event history has no actor names")
 	}
-	if code, m := post(s, &hq, "offsets.list", `{"filters":{"status":"sold"}}`); code != 422 || fields(m) != "filters=error.invalid" {
+
+	if code, m := post(
+		s,
+		&hq,
+		"offsets.list",
+		`{"filters":{"status":"sold"}}`,
+	); code != 422 ||
+		fields(m) != "filters=error.invalid" {
 		t.Errorf("bad state filter: %d %s", code, fields(m))
 	}
 	// expired quotes cannot be requested; HQ quotes need the customer's units
@@ -185,12 +316,29 @@ func TestOffsets(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("HQ quote: %d %v", code, m)
 	}
-	owner(t, `UPDATE energy.offset_quotes SET expires_at = $2 WHERE id = $1`, data(m)["id"], clock.Add(-time.Minute))
-	if code, _ := sim(&hq, `{"event":"request","quoteId":"`+data(m)["id"].(string)+`","quoteVersion":1,"demoConfirmed":true}`, 0); code != 409 {
+
+	owner(
+		t,
+		`UPDATE energy.offset_quotes SET expires_at = $2 WHERE id = $1`,
+		data(m)["id"],
+		clock.Add(-time.Minute),
+	)
+
+	if code, _ := sim(
+		&hq,
+		`{"event":"request","quoteId":"`+data(m)["id"].(string)+`","quoteVersion":1,"demoConfirmed":true}`,
+		0,
+	); code != 409 {
 		t.Error("expired quote")
 	}
-	if code, m := quote(&hq, `,"customerId":"`+seed.ID("cust-a").String()+`"`); code != 422 || fields(m) != "unitIds=errors.units_outside_customer" {
+
+	if code, m := quote(
+		&hq,
+		`,"customerId":"`+seed.ID("cust-a").String()+`"`,
+	); code != 422 ||
+		fields(m) != "unitIds=errors.units_outside_customer" {
 		t.Errorf("HQ quote with another customer's unit: %d %s", code, fields(m))
 	}
+
 	_ = strconv.Itoa
 }

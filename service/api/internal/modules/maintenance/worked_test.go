@@ -10,6 +10,7 @@ func TestWorkedFor(t *testing.T) {
 	at := func(m int) time.Time {
 		return time.Date(2026, 9, 14, 9, 0, 0, 0, time.UTC).Add(time.Duration(m) * time.Minute)
 	}
+
 	iv := func(a, b int) [2]time.Time { return [2]time.Time{at(a), at(b)} }
 	for name, c := range map[string]struct {
 		off  [][2]time.Time

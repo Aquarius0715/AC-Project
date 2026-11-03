@@ -29,25 +29,46 @@ func TestSessionGet(t *testing.T) {
 	now := time.Date(2026, 9, 14, 1, 0, 0, 0, time.UTC)
 	r.Clock = func() time.Time { return now }
 	Register(r)
+
 	e := echo.New()
+
 	e.HTTPErrorHandler = ops.HTTPErrorHandler
 	if err := r.MountREST(e.Group("/v1")); err != nil {
 		t.Fatal(err)
 	}
-	p := &ops.Principal{Principal: authz.Principal{Role: "client", ClientRole: "owner",
-		Permissions: map[string]bool{"control.execute": true, "alert.read": true, "unused": false}},
-		TenantID: uuid.New(), MembershipID: uuid.New(), UserID: uuid.New(), OrgID: uuid.New(), ScopeVersion: 3}
+
+	p := &ops.Principal{
+		Principal: authz.Principal{
+			Role:       "client",
+			ClientRole: "owner",
+			Permissions: map[string]bool{
+				"control.execute": true,
+				"alert.read":      true,
+				"unused":          false,
+			},
+		},
+		TenantID:     uuid.New(),
+		MembershipID: uuid.New(),
+		UserID:       uuid.New(),
+		OrgID:        uuid.New(),
+		ScopeVersion: 3,
+	}
 	req := httptest.NewRequest(http.MethodGet, "/v1/session", nil)
 	req = req.WithContext(ops.WithPrincipal(req.Context(), p))
 	w := httptest.NewRecorder()
 	e.ServeHTTP(w, req)
+
 	var res struct{ Data Session }
 	if err := json.Unmarshal(w.Body.Bytes(), &res); err != nil || w.Code != 200 {
 		t.Fatalf("%d %s", w.Code, w.Body.String())
 	}
+
 	s := res.Data
-	if s.Role != "client" || s.ScopeVersion != 3 || s.UserID != p.UserID || strings.Join(s.Permissions, ",") != "alert.read,control.execute" ||
-		!s.ExpiresAt.Equal(now.Add(SessionTTL)) || s.Generation != 1 || s.OrganizationID != p.OrgID {
+	if s.Role != "client" || s.ScopeVersion != 3 || s.UserID != p.UserID ||
+		strings.Join(s.Permissions, ",") != "alert.read,control.execute" ||
+		!s.ExpiresAt.Equal(now.Add(SessionTTL)) ||
+		s.Generation != 1 ||
+		s.OrganizationID != p.OrgID {
 		t.Fatalf("%+v", s)
 	}
 }

@@ -24,39 +24,62 @@ import (
 )
 
 func main() {
-	role := flag.String("role", "scheduler", "worker role (compose.yaml): scheduler runs the clock-driven transitions")
-	domain := flag.String("domain", "", "scheduler of one business domain (equipment, maintenance, billing); empty runs every domain")
+	role := flag.String(
+		"role",
+		"scheduler",
+		"worker role (compose.yaml): scheduler runs the clock-driven transitions",
+	)
+	domain := flag.String(
+		"domain",
+		"",
+		"scheduler of one business domain (equipment, maintenance, billing); empty runs every domain",
+	)
+
 	flag.Parse()
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
 	if os.Getenv("DATABASE_URL") == "" {
 		log.Fatal("DATABASE_URL is required")
 	}
+
 	if *role == "notification" {
 		runMail(ctx)
+
 		return
 	}
+
 	if *role == "outbox" {
 		runHousekeeping(ctx)
+
 		return
 	}
+
 	if *role != "scheduler" {
 		log.Printf("worker role %q has no jobs yet; idling", *role)
 		<-ctx.Done()
+
 		return
 	}
+
 	var domains []string // nil: every domain on an all-domain role (single-process development)
+
 	if *domain != "" {
 		if !slices.Contains(scheduler.Domains, *domain) {
 			log.Fatalf("no scheduler for domain %q (want one of %v)", *domain, scheduler.Domains)
 		}
+
 		domains = []string{*domain}
 	}
+
 	name := "scheduler"
 	if *domain != "" {
 		name = *domain + "-scheduler"
 	}
+
 	logger := logging.New(os.Stdout, name)
+
 	cfg, err := server.ConfigFromEnv(logger, domains)
 	if err != nil {
 		log.Fatal(err)
@@ -68,7 +91,16 @@ func main() {
 		log.Fatal(err)
 	}
 	defer srv.DB.Close()
-	scheduler.RunDomains(ctx, srv.DB, time.Second, srv.Registry.Clock, log.Printf, domains, srv.Registry)
+
+	scheduler.RunDomains(
+		ctx,
+		srv.DB,
+		time.Second,
+		srv.Registry.Clock,
+		log.Printf,
+		domains,
+		srv.Registry,
+	)
 }
 
 // runMail sends the pending e-mails of every tenant every five seconds (IR418). Without MAIL_SMTP_ADDR it idles:
@@ -78,30 +110,59 @@ func runMail(ctx context.Context) {
 	if addr == "" {
 		log.Print("notification worker: MAIL_SMTP_ADDR is not set; e-mails stay previews")
 		<-ctx.Done()
+
 		return
 	}
+
 	logger := logging.New(os.Stdout, "notification")
+
 	cfg, err := server.ConfigFromEnv(logger, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	srv, err := server.New(ctx, cfg, auth.StaticVerifier{})
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer srv.DB.Close()
-	sender := notify.SMTP{Addr: addr, From: envOr("MAIL_FROM", "AC Project <no-reply@ac-project.local>")}
-	apps := notify.Apps{Customer: envOr("APP_URL_CUSTOMER", "http://localhost:3000"), Partner: envOr("APP_URL_PARTNER", "http://localhost:3001"),
-		Technician: envOr("APP_URL_TECHNICIAN", "http://localhost:3002"), Admin: envOr("APP_URL_ADMIN", "http://localhost:3003")}
+
+	sender := notify.SMTP{
+		Addr: addr,
+		From: envOr("MAIL_FROM", "AC Project <no-reply@ac-project.local>"),
+	}
+	apps := notify.Apps{
+		Customer: envOr(
+			"APP_URL_CUSTOMER",
+			"http://localhost:3000",
+		),
+		Partner: envOr("APP_URL_PARTNER", "http://localhost:3001"),
+		Technician: envOr(
+			"APP_URL_TECHNICIAN",
+			"http://localhost:3002",
+		),
+		Admin: envOr("APP_URL_ADMIN", "http://localhost:3003"),
+	}
+
 	log.Printf("notification worker: sending e-mails through %s", addr)
+
 	t := time.NewTicker(5 * time.Second)
 	defer t.Stop()
+
 	for {
-		if n, err := notify.DeliverAll(ctx, srv.DB, sender, apps, srv.Registry.Clock(), 50); err != nil {
+		if n, err := notify.DeliverAll(
+			ctx,
+			srv.DB,
+			sender,
+			apps,
+			srv.Registry.Clock(),
+			50,
+		); err != nil {
 			log.Printf("notification worker: %v", err)
 		} else if n > 0 {
 			log.Printf("notification worker: %d e-mail(s) sent", n)
 		}
+
 		select {
 		case <-ctx.Done():
 			return
@@ -114,6 +175,7 @@ func envOr(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
 	}
+
 	return def
 }
 
@@ -123,29 +185,48 @@ func envOr(key, def string) string {
 // it knows every consumer's subscriptions; the outbox relay to SNS joins this role later.
 func runHousekeeping(ctx context.Context) {
 	logger := logging.New(os.Stdout, "outbox")
+
 	cfg, err := server.ConfigFromEnv(logger, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	srv, err := server.New(ctx, cfg, auth.StaticVerifier{})
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer srv.DB.Close()
+
 	t := time.NewTicker(time.Hour)
 	defer t.Stop()
+
 	for {
 		now := srv.Registry.Clock()
 		if s, err := events.Housekeep(ctx, srv.DB, now, srv.Consumers); err != nil {
 			log.Printf("housekeeping: %v", err)
 		} else {
-			log.Printf("housekeeping: removed %d outbox events, %d processed-event records, %d failure records, %d idempotency keys", s.Outbox, s.Processed, s.Failures, s.IdempotencyKeys)
+			log.Printf(
+				"housekeeping: removed %d outbox events, %d processed-event records, %d failure records, %d idempotency keys",
+				s.Outbox,
+				s.Processed,
+				s.Failures,
+				s.IdempotencyKeys,
+			)
 		}
-		if n, err := notify.SweepAll(ctx, srv.DB, now); err != nil { // notifications and sent e-mails older than 2 years
+
+		if n, err := notify.SweepAll(
+			ctx,
+			srv.DB,
+			now,
+		); err != nil { // notifications and sent e-mails older than 2 years
 			log.Printf("housekeeping: notifications: %v", err)
 		} else if n > 0 {
-			log.Printf("housekeeping: removed %d notification and e-mail rows older than 2 years", n)
+			log.Printf(
+				"housekeeping: removed %d notification and e-mail rows older than 2 years",
+				n,
+			)
 		}
+
 		select {
 		case <-ctx.Done():
 			return

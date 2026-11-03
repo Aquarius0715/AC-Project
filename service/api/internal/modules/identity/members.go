@@ -61,8 +61,25 @@ const memberCols = `m.id, m.tenant_id, m.version, m.created_at, m.updated_at, m.
 
 func scanMember(r pgx.Row) (Member, error) {
 	var x Member
-	err := r.Scan(&x.ID, &x.TenantID, &x.Version, &x.CreatedAt, &x.UpdatedAt, &x.UserID, &x.OrganizationID, &x.Role, &x.Employment, &x.ScopeVersion,
-		&x.ValidFrom, &x.ValidUntil, &x.ClientRole, &x.RevokedAt, &x.DisplayName)
+
+	err := r.Scan(
+		&x.ID,
+		&x.TenantID,
+		&x.Version,
+		&x.CreatedAt,
+		&x.UpdatedAt,
+		&x.UserID,
+		&x.OrganizationID,
+		&x.Role,
+		&x.Employment,
+		&x.ScopeVersion,
+		&x.ValidFrom,
+		&x.ValidUntil,
+		&x.ClientRole,
+		&x.RevokedAt,
+		&x.DisplayName,
+	)
+
 	return x, err
 }
 
@@ -80,11 +97,14 @@ func LoadMembers(ctx context.Context, c *ops.Call, ms []Member) error {
 	if len(ms) == 0 {
 		return nil
 	}
+
 	out, err := ops.Delegate(ctx, c, QueryLoadMembers, LoadMembersInput{Members: ms}, loadMembers)
 	if err != nil {
 		return err
 	}
+
 	copy(ms, out)
+
 	return nil
 }
 
@@ -92,11 +112,13 @@ func loadMembers(ctx context.Context, c *ops.Call, in *LoadMembersInput) ([]Memb
 	ms := in.Members
 	for i := range ms {
 		if ms[i].DisplayName == "" {
-			if err := c.Tx.QueryRow(ctx, `SELECT COALESCE((SELECT display_name FROM identity.users WHERE id = $1), '')`, ms[i].UserID).Scan(&ms[i].DisplayName); err != nil {
+			if err := c.Tx.QueryRow(ctx, `SELECT COALESCE((SELECT display_name FROM identity.users WHERE id = $1), '')`, ms[i].UserID).
+				Scan(&ms[i].DisplayName); err != nil {
 				return nil, err
 			}
 		}
 	}
+
 	return ms, fillMembers(ctx, c, ms)
 }
 
@@ -106,51 +128,73 @@ func fillMembers(ctx context.Context, c *ops.Call, ms []Member) error {
 	if len(ms) == 0 {
 		return nil
 	}
+
 	ids := make([]uuid.UUID, 0, len(ms))
 	at := map[uuid.UUID][]int{}
+
 	for i := range ms {
 		ms[i].Permissions, ms[i].Scopes, ms[i].Qualifications = []string{}, []ScopeRef{}, []Grant{}
 		if _, seen := at[ms[i].ID]; !seen {
 			ids = append(ids, ms[i].ID)
 		}
+
 		at[ms[i].ID] = append(at[ms[i].ID], i)
 	}
+
 	var id uuid.UUID
+
 	each := func(sql string, scans []any, add func(x *Member)) error {
 		rows, err := c.Tx.Query(ctx, sql, ids)
 		if err != nil {
 			return err
 		}
+
 		_, err = pgx.ForEachRow(rows, append([]any{&id}, scans...), func() error {
 			for _, i := range at[id] {
 				add(&ms[i])
 			}
+
 			return nil
 		})
+
 		return err
 	}
+
 	if c.Principal.Role != "contractor" {
 		var p string
-		if err := each(`SELECT membership_id, permission FROM identity.membership_permissions WHERE membership_id = ANY($1) ORDER BY membership_id, permission`,
-			[]any{&p}, func(x *Member) { x.Permissions = append(x.Permissions, p) }); err != nil {
+		if err := each(
+			`SELECT membership_id, permission FROM identity.membership_permissions WHERE membership_id = ANY($1) ORDER BY membership_id, permission`,
+			[]any{&p},
+			func(x *Member) { x.Permissions = append(x.Permissions, p) },
+		); err != nil {
 			return err
 		}
+
 		var s ScopeRef
-		if err := each(`SELECT membership_id, kind, ref_id FROM identity.membership_scopes WHERE membership_id = ANY($1) ORDER BY membership_id, kind, ref_id`,
-			[]any{&s.Kind, &s.ID}, func(x *Member) { x.Scopes = append(x.Scopes, s) }); err != nil {
+		if err := each(
+			`SELECT membership_id, kind, ref_id FROM identity.membership_scopes WHERE membership_id = ANY($1) ORDER BY membership_id, kind, ref_id`,
+			[]any{&s.Kind, &s.ID},
+			func(x *Member) { x.Scopes = append(x.Scopes, s) },
+		); err != nil {
 			return err
 		}
 	}
+
 	var g Grant
-	return each(`SELECT membership_id, code, valid_from, valid_until, revoked_at FROM identity.qualification_grants WHERE membership_id = ANY($1) ORDER BY membership_id, code`,
-		[]any{&g.Code, &g.ValidFrom, &g.ValidUntil, &g.RevokedAt}, func(x *Member) {
+
+	return each(
+		`SELECT membership_id, code, valid_from, valid_until, revoked_at FROM identity.qualification_grants WHERE membership_id = ANY($1) ORDER BY membership_id, code`,
+		[]any{&g.Code, &g.ValidFrom, &g.ValidUntil, &g.RevokedAt},
+		func(x *Member) {
 			grant := g
 			if g.RevokedAt != nil { // the scan target is shared by every row: each grant keeps its own revocation time
 				at := *g.RevokedAt
 				grant.RevokedAt = &at
 			}
+
 			x.Qualifications = append(x.Qualifications, grant)
-		})
+		},
+	)
 }
 
 // ---- members.list ----
@@ -189,70 +233,133 @@ func membersList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 		Qualification  *string    `json:"qualification,omitempty"` // a grant of that code valid now (SR13)
 		ActiveOnly     *bool      `json:"activeOnly,omitempty"`    // true: validFrom <= now < validUntil; false: no validity filter
 	}
+
 	if len(in.Filters) > 0 {
 		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
 		dec.DisallowUnknownFields()
-		if dec.Decode(&f) != nil || (f.Role != nil && !slices.Contains(roles, *f.Role)) || (f.Qualification != nil && !slices.Contains(qualificationCodes, *f.Qualification)) {
-			return paging.Page[Member]{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
+
+		if dec.Decode(&f) != nil || (f.Role != nil && !slices.Contains(roles, *f.Role)) ||
+			(f.Qualification != nil && !slices.Contains(qualificationCodes, *f.Qualification)) {
+			return paging.Page[Member]{}, apperr.Fields(
+				map[string]string{"filters": "error.invalid"},
+			)
 		}
 	}
-	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "m.id", "validFrom": "m.valid_from", "createdAt": "m.created_at", "updatedAt": "m.updated_at"}, "m.id ASC")
+
+	order, err := paging.OrderBy(
+		in.Sort,
+		map[string]string{
+			"id":        "m.id",
+			"validFrom": "m.valid_from",
+			"createdAt": "m.created_at",
+			"updatedAt": "m.updated_at",
+		},
+		"m.id ASC",
+	)
 	if err != nil {
 		return paging.Page[Member]{}, err
 	}
+
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Member]{}, err
 	}
+
 	var args []any
-	add := func(v any) string { args = append(args, v); return fmt.Sprintf("$%d", len(args)) }
+
+	add := func(v any) string {
+		args = append(args, v)
+
+		return fmt.Sprintf("$%d", len(args))
+	}
+
 	conds := []string{"TRUE"}
 	if c.Principal.Role == "contractor" {
-		conds = append(conds, "m.role = 'technician' AND m.organization_id = "+add(c.Principal.OrgID))
+		conds = append(
+			conds,
+			"m.role = 'technician' AND m.organization_id = "+add(c.Principal.OrgID),
+		)
 	}
+
 	if f.Role != nil {
 		conds = append(conds, "m.role = "+add(*f.Role))
 	} else {
 		conds = append(conds, "m.role <> 'client'")
 	}
+
 	if f.OrganizationID != nil {
 		conds = append(conds, "m.organization_id = "+add(*f.OrganizationID))
 	}
+
 	if f.ActiveOnly != nil && *f.ActiveOnly {
 		now := add(c.Now)
-		conds = append(conds, "(m.valid_from <= "+now+" AND (m.valid_until IS NULL OR m.valid_until > "+now+"))")
+		conds = append(
+			conds,
+			"(m.valid_from <= "+now+" AND (m.valid_until IS NULL OR m.valid_until > "+now+"))",
+		)
 	}
+
 	if f.Qualification != nil {
 		code, now := add(*f.Qualification), add(c.Now)
-		conds = append(conds, "EXISTS (SELECT 1 FROM identity.qualification_grants g WHERE g.membership_id = m.id AND g.code = "+code+
-			" AND g.valid_from <= "+now+" AND g.valid_until > "+now+" AND (g.revoked_at IS NULL OR g.revoked_at > "+now+"))")
+		conds = append(
+			conds,
+			"EXISTS (SELECT 1 FROM identity.qualification_grants g WHERE g.membership_id = m.id AND g.code = "+code+
+				" AND g.valid_from <= "+now+" AND g.valid_until > "+now+" AND (g.revoked_at IS NULL OR g.revoked_at > "+now+"))",
+		)
 	}
+
 	where := strings.Join(conds, " AND ")
+
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM identity.memberships m WHERE "+where, args...).Scan(&total); err != nil {
+	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM identity.memberships m WHERE "+where, args...).
+		Scan(&total); err != nil {
 		return paging.Page[Member]{}, err
 	}
-	rows, err := c.Tx.Query(ctx, fmt.Sprintf("SELECT %s FROM identity.memberships m WHERE %s ORDER BY %s LIMIT %d OFFSET %d", memberCols, where, order, w.Limit, w.Offset), args...)
+
+	rows, err := c.Tx.Query(
+		ctx,
+		fmt.Sprintf(
+			"SELECT %s FROM identity.memberships m WHERE %s ORDER BY %s LIMIT %d OFFSET %d",
+			memberCols,
+			where,
+			order,
+			w.Limit,
+			w.Offset,
+		),
+		args...)
 	if err != nil {
 		return paging.Page[Member]{}, err
 	}
+
 	items := []Member{}
+
 	for rows.Next() {
 		x, err := scanMember(rows)
 		if err != nil {
 			rows.Close()
+
 			return paging.Page[Member]{}, err
 		}
+
 		items = append(items, x)
 	}
+
 	rows.Close()
+
 	if err := rows.Err(); err != nil {
 		return paging.Page[Member]{}, err
 	}
+
 	if err := LoadMembers(ctx, c, items); err != nil {
 		return paging.Page[Member]{}, err
 	}
-	return paging.Page[Member]{Items: items, NextCursor: w.Next(total), Total: total, SnapshotVersion: w.Snapshot}, nil
+
+	return paging.Page[Member]{
+		Items:           items,
+		NextCursor:      w.Next(total),
+		Total:           total,
+		SnapshotVersion: w.Snapshot,
+	}, nil
 }
 
 // ---- members.save ----
@@ -296,73 +403,104 @@ type NewUserInput struct {
 // Validate implements ops.Validator for the lookup-free rules.
 func (in *MemberInput) Validate() map[string]string {
 	fe := map[string]string{}
+
 	if in.NewUser != nil {
 		if in.UserID != uuid.Nil || in.ID != nil {
 			fe["newUser"] = "error.notAllowed"
 		}
-		in.NewUser.Email, in.NewUser.DisplayName = strings.TrimSpace(in.NewUser.Email), strings.TrimSpace(in.NewUser.DisplayName)
-		if a, err := mail.ParseAddress(in.NewUser.Email); err != nil || a.Address != in.NewUser.Email || len(in.NewUser.Email) > 254 {
+
+		in.NewUser.Email, in.NewUser.DisplayName = strings.TrimSpace(
+			in.NewUser.Email,
+		), strings.TrimSpace(
+			in.NewUser.DisplayName,
+		)
+		if a, err := mail.ParseAddress(
+			in.NewUser.Email,
+		); err != nil || a.Address != in.NewUser.Email ||
+			len(in.NewUser.Email) > 254 {
 			fe["newUser.email"] = "error.invalid"
 		}
+
 		if n := utf8.RuneCountInString(in.NewUser.DisplayName); n < 1 || n > 120 {
 			fe["newUser.displayName"] = "error.length"
 		}
 	} else if in.UserID == uuid.Nil {
 		fe["userId"] = "error.required"
 	}
+
 	if in.OrganizationID == uuid.Nil {
 		fe["organizationId"] = "error.required"
 	}
+
 	if !slices.Contains(roles, in.Role) {
 		fe["role"] = "error.invalid"
 	}
+
 	switch {
 	case in.Role == "technician" && (in.Employment == nil || (*in.Employment != "internal" && *in.Employment != "external")):
 		fe["employment"] = "error.required"
 	case in.Role != "technician" && in.Employment != nil:
 		fe["employment"] = "error.notAllowed"
 	}
+
 	if in.Permissions == nil || in.Scopes == nil {
 		fe["permissions"] = "error.required"
 	}
+
 	seen := map[string]bool{}
+
 	for _, p := range in.Permissions {
 		allowed := authz.Permissions[p]
 		if list, ok := RolePermissions[in.Role]; ok {
 			allowed = slices.Contains(list, p)
 		}
+
 		if !allowed || seen[p] {
 			fe["permissions"] = "error.invalid"
 		}
+
 		seen[p] = true
 	}
+
 	for p := range seen {
-		if r, ok := strings.CutSuffix(p, ".write"); ok && authz.Permissions[r+".read"] && !seen[r+".read"] {
+		if r, ok := strings.CutSuffix(
+			p,
+			".write",
+		); ok && authz.Permissions[r+".read"] &&
+			!seen[r+".read"] {
 			fe["permissions"] = "errors.write_needs_read"
 		}
 	}
+
 	kinds := map[string][]string{"admin": {"tenant"}, "client": {"organization"}, "contractor": {"organization"}, "technician": {"unit", "property", "organization"}}[in.Role]
 	for _, sc := range in.Scopes {
 		if !slices.Contains(kinds, sc.Kind) {
 			fe["scopes"] = "error.invalid"
 		}
 	}
+
 	if in.Role == "admin" && len(in.Scopes) > 1 {
 		fe["scopes"] = "error.invalid"
 	}
+
 	if in.ValidFrom.IsZero() {
 		fe["validFrom"] = "error.required"
 	}
+
 	if in.ValidUntil != nil && !in.ValidFrom.Before(*in.ValidUntil) {
 		fe["validUntil"] = "error.range"
 	}
-	if in.Role == "technician" && in.Employment != nil && *in.Employment == "external" && in.ValidUntil == nil {
+
+	if in.Role == "technician" && in.Employment != nil && *in.Employment == "external" &&
+		in.ValidUntil == nil {
 		fe["validUntil"] = "errors.external_needs_end"
 	}
+
 	in.Reason = strings.TrimSpace(in.Reason)
 	if n := utf8.RuneCountInString(in.Reason); n < 1 || n > 1000 {
 		fe["reason"] = "error.length"
 	}
+
 	return fe
 }
 
@@ -392,52 +530,70 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 	newPerson := in.NewUser != nil
 	if newPerson { // the person is created with the membership, or taken back if this tenant removed them (IR461, IR462)
 		var err error
+
 		in.UserID, err = personFor(ctx, c, in.NewUser.Email, in.NewUser.DisplayName)
 		if errors.Is(err, errEmailTaken) {
 			return Member{}, apperr.Fields(map[string]string{"newUser.email": "errors.email_taken"})
 		}
+
 		if err != nil {
 			return Member{}, err
 		}
 	}
+
 	var exists bool
-	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.users WHERE id = $1)`, in.UserID).Scan(&exists); err != nil {
+	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.users WHERE id = $1)`, in.UserID).
+		Scan(&exists); err != nil {
 		return Member{}, err
 	}
+
 	var kind string
-	err := c.Tx.QueryRow(ctx, `SELECT kind FROM identity.organizations WHERE id = $1`, in.OrganizationID).Scan(&kind)
+
+	err := c.Tx.QueryRow(ctx, `SELECT kind FROM identity.organizations WHERE id = $1`, in.OrganizationID).
+		Scan(&kind)
 	if !exists || errors.Is(err, pgx.ErrNoRows) {
 		return Member{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
+
 	if err != nil {
 		return Member{}, err
 	}
+
 	want := map[string]string{"admin": "operator", "client": "customer", "contractor": "contractor"}[in.Role]
 	if in.Role == "technician" {
 		want = map[string]string{"internal": "operator", "external": "contractor"}[*in.Employment]
 	}
+
 	if kind != want {
-		return Member{}, apperr.Fields(map[string]string{"organizationId": "errors.organization_kind"})
+		return Member{}, apperr.Fields(
+			map[string]string{"organizationId": "errors.organization_kind"},
+		)
 	}
 	// scope references
 	for _, sc := range in.Scopes {
 		var ok bool
+
 		switch sc.Kind {
 		case "tenant":
 			ok = sc.ID == c.Principal.TenantID
 		case "organization":
-			err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.organizations WHERE id = $1 AND (kind = 'customer' OR id = $2))`, sc.ID, in.OrganizationID).Scan(&ok)
+			err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.organizations WHERE id = $1 AND (kind = 'customer' OR id = $2))`, sc.ID, in.OrganizationID).
+				Scan(&ok)
 			if in.Role != "technician" {
 				ok = ok && sc.ID == in.OrganizationID
 			}
 		case "property":
-			err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM notify.ref_properties WHERE id = $1)`, sc.ID).Scan(&ok)
+			err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM notify.ref_properties WHERE id = $1)`, sc.ID).
+				Scan(&ok)
 		case "unit":
-			err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM notify.ref_units WHERE id = $1)`, sc.ID).Scan(&ok)
+			err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM notify.ref_units WHERE id = $1)`, sc.ID).
+				Scan(&ok)
 		}
+
 		if err != nil {
 			return Member{}, err
 		}
+
 		if !ok {
 			return Member{}, apperr.Fields(map[string]string{"scopes": "errors.unknown_scope"})
 		}
@@ -448,30 +604,41 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 			if !slices.Contains(in.Permissions, p) {
 				continue
 			}
+
 			had := false
 			if in.ID != nil {
-				if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.membership_permissions WHERE membership_id = $1 AND permission = $2)`, *in.ID, p).Scan(&had); err != nil {
+				if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.membership_permissions WHERE membership_id = $1 AND permission = $2)`, *in.ID, p).
+					Scan(&had); err != nil {
 					return Member{}, err
 				}
 			}
+
 			if !had {
 				return Member{}, apperr.E(apperr.Forbidden, "errors.self_promotion")
 			}
 		}
 	}
-	var id uuid.UUID
-	var prev *int
+
+	var (
+		id   uuid.UUID
+		prev *int
+	)
+
 	account := false                // the sign-in account is opened or pointed at this new membership (IR461, IR462)
 	revoke, restore := false, false // HQ turns the sign-in off with the access, or on when it gives the access back (IR508)
+
 	if in.ID == nil {
 		var clientRole *string
+
 		if in.Role == "client" { // HQ adds a member; a customer owner adds owners in the customer app (IR417)
 			cr := "member"
 			clientRole = &cr
 		}
+
 		if err := c.Tx.QueryRow(ctx, `INSERT INTO identity.memberships (tenant_id, user_id, organization_id, role, employment, client_role, valid_from, valid_until, created_at, updated_at)
 			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7, $8, $8) RETURNING id`,
-			in.UserID, in.OrganizationID, in.Role, in.Employment, clientRole, in.ValidFrom, in.ValidUntil, c.Now).Scan(&id); err != nil {
+			in.UserID, in.OrganizationID, in.Role, in.Employment, clientRole, in.ValidFrom, in.ValidUntil, c.Now).
+			Scan(&id); err != nil {
 			return Member{}, err
 		}
 		// an existing person whose memberships here have all ended signs in with this one from now on (IR462); one
@@ -480,48 +647,84 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		if !newPerson {
 			if err := c.Tx.QueryRow(ctx, `SELECT (u.sign_in_membership_id IS NULL OR EXISTS (SELECT 1 FROM identity.memberships s WHERE s.id = u.sign_in_membership_id))
 				AND NOT EXISTS (SELECT 1 FROM identity.memberships m WHERE m.user_id = u.id AND m.id <> $2 AND (m.valid_until IS NULL OR m.valid_until > $3))
-				FROM identity.users u WHERE u.id = $1`, in.UserID, id, c.Now).Scan(&account); err != nil {
+				FROM identity.users u WHERE u.id = $1`, in.UserID, id, c.Now).
+				Scan(&account); err != nil {
 				return Member{}, err
 			}
 		}
+
 		listed := "active" // the status the customer's or contractor's user list shows: invited until the first sign-in
 		if account {
 			listed = "invited"
 		}
+
 		if in.Role == "client" { // IR84 initial Consent
-			if _, err := c.Tx.Exec(ctx, `INSERT INTO identity.consents (tenant_id, membership_id, purpose, granted) VALUES (current_setting('app.tenant_id')::uuid, $1, 'location_automation', false)`, id); err != nil {
+			if _, err := c.Tx.Exec(
+				ctx,
+				`INSERT INTO identity.consents (tenant_id, membership_id, purpose, granted) VALUES (current_setting('app.tenant_id')::uuid, $1, 'location_automation', false)`,
+				id,
+			); err != nil {
 				return Member{}, err
 			}
 			// IR144: the customer's user list includes the new member, listed as not signed in yet when the person was
 			// created with it (IR461); an address already on the list keeps its row
-			if _, err := c.Tx.Exec(ctx, `INSERT INTO identity.client_users (tenant_id, customer_id, membership_id, email, display_name, client_role, status, invited_at, invited_by_membership_id, created_at, updated_at)
+			if _, err := c.Tx.Exec(
+				ctx,
+				`INSERT INTO identity.client_users (tenant_id, customer_id, membership_id, email, display_name, client_role, status, invited_at, invited_by_membership_id, created_at, updated_at)
 				SELECT current_setting('app.tenant_id')::uuid, cu.id, $1, u.email, u.display_name, $6, $7, $3, $4, $3, $3
 				FROM notify.ref_customers cu, identity.users u WHERE cu.organization_id = $2 AND u.id = $5
-				ON CONFLICT (tenant_id, customer_id, email) DO NOTHING`, id, in.OrganizationID, c.Now, c.Principal.MembershipID, in.UserID, *clientRole, listed); err != nil {
+				ON CONFLICT (tenant_id, customer_id, email) DO NOTHING`,
+				id,
+				in.OrganizationID,
+				c.Now,
+				c.Principal.MembershipID,
+				in.UserID,
+				*clientRole,
+				listed,
+			); err != nil {
 				return Member{}, err
 			}
 		}
 		// FR-P11: the contractor company's user list includes the new account, listed as not signed in yet when the
 		// person was created with it (IR461); an address already on the list keeps its row
 		if in.Role == "contractor" || in.Role == "technician" {
-			if _, err := c.Tx.Exec(ctx, `INSERT INTO identity.partner_users (tenant_id, organization_id, membership_id, email, display_name, partner_role, status, invited_at, invited_by_membership_id, created_at, updated_at)
+			if _, err := c.Tx.Exec(
+				ctx,
+				`INSERT INTO identity.partner_users (tenant_id, organization_id, membership_id, email, display_name, partner_role, status, invited_at, invited_by_membership_id, created_at, updated_at)
 				SELECT current_setting('app.tenant_id')::uuid, o.id, $1, u.email, u.display_name, $5, $7, $3, $4, $3, $3
 				FROM identity.organizations o, identity.users u WHERE o.id = $2 AND o.kind = 'contractor' AND u.id = $6
-				ON CONFLICT (tenant_id, organization_id, email) DO NOTHING`, id, in.OrganizationID, c.Now, c.Principal.MembershipID, in.Role, in.UserID, listed); err != nil {
+				ON CONFLICT (tenant_id, organization_id, email) DO NOTHING`,
+				id,
+				in.OrganizationID,
+				c.Now,
+				c.Principal.MembershipID,
+				in.Role,
+				in.UserID,
+				listed,
+			); err != nil {
 				return Member{}, err
 			}
 		}
 	} else {
-		x, err := scanMember(c.Tx.QueryRow(ctx, "SELECT "+memberCols+" FROM identity.memberships m WHERE m.id = $1 FOR UPDATE", *in.ID))
+		x, err := scanMember(
+			c.Tx.QueryRow(
+				ctx,
+				"SELECT "+memberCols+" FROM identity.memberships m WHERE m.id = $1 FOR UPDATE",
+				*in.ID,
+			),
+		)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Member{}, apperr.E(apperr.NotFound, "error.notFound")
 		}
+
 		if err != nil {
 			return Member{}, err
 		}
+
 		if x.UserID != in.UserID || x.OrganizationID != in.OrganizationID || x.Role != in.Role {
 			return Member{}, apperr.Fields(map[string]string{"role": "errors.membership_fixed"})
 		}
+
 		if x.Version != *c.ExpectedVersion {
 			return Member{}, apperr.E(apperr.Conflict, "error.versionConflict")
 		}
@@ -530,18 +733,30 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		// the permission from, or ending, the other of the last two — cannot both see the other still active (IR472).
 		ending := (in.ValidUntil != nil && !in.ValidUntil.After(c.Now)) || in.ValidFrom.After(c.Now)
 		if !slices.Contains(in.Permissions, "identity.write") || ending {
-			if _, err := c.Tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext('identity.identity_admins:' || $1::text))`, c.Principal.TenantID); err != nil {
+			if _, err := c.Tx.Exec(
+				ctx,
+				`SELECT pg_advisory_xact_lock(hashtext('identity.identity_admins:' || $1::text))`,
+				c.Principal.TenantID,
+			); err != nil {
 				return Member{}, err
 			}
-			var holds bool
-			var others int
-			if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.membership_permissions WHERE membership_id = $1 AND permission = 'identity.write')`, x.ID).Scan(&holds); err != nil {
+
+			var (
+				holds  bool
+				others int
+			)
+
+			if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.membership_permissions WHERE membership_id = $1 AND permission = 'identity.write')`, x.ID).
+				Scan(&holds); err != nil {
 				return Member{}, err
 			}
+
 			if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM identity.memberships m JOIN identity.membership_permissions p ON p.membership_id = m.id AND p.permission = 'identity.write'
-				WHERE m.id <> $1 AND m.valid_from <= $2 AND (m.valid_until IS NULL OR m.valid_until > $2)`, x.ID, c.Now).Scan(&others); err != nil {
+				WHERE m.id <> $1 AND m.valid_from <= $2 AND (m.valid_until IS NULL OR m.valid_until > $2)`, x.ID, c.Now).
+				Scan(&others); err != nil {
 				return Member{}, err
 			}
+
 			if holds && others == 0 {
 				return Member{}, apperr.E(apperr.Conflict, "errors.last_identity_admin")
 			}
@@ -549,15 +764,25 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		// an account its company or customer disabled (IR416, IR417) stays closed: the membership keeps its end, and a
 		// contractor account keeps HQ's new end for when it is enabled again (IR420)
 		until := in.ValidUntil
+
 		var disabled bool
 		if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.partner_users WHERE membership_id = $1 AND status = 'disabled')
-			OR EXISTS (SELECT 1 FROM identity.client_users WHERE membership_id = $1 AND status = 'disabled')`, x.ID).Scan(&disabled); err != nil {
+			OR EXISTS (SELECT 1 FROM identity.client_users WHERE membership_id = $1 AND status = 'disabled')`, x.ID).
+			Scan(&disabled); err != nil {
 			return Member{}, err
 		}
+
 		if disabled && x.ValidUntil != nil && (until == nil || until.After(*x.ValidUntil)) {
-			if _, err := c.Tx.Exec(ctx, `UPDATE identity.partner_users SET access_until = $2, version = version + 1, updated_at = $3 WHERE membership_id = $1`, x.ID, until, c.Now); err != nil {
+			if _, err := c.Tx.Exec(
+				ctx,
+				`UPDATE identity.partner_users SET access_until = $2, version = version + 1, updated_at = $3 WHERE membership_id = $1`,
+				x.ID,
+				until,
+				c.Now,
+			); err != nil {
 				return Member{}, err
 			}
+
 			until = x.ValidUntil
 		}
 		// HQ's revoke (IR508, DEC-83): a new end at or before now — on an open membership, or on one its company or
@@ -566,7 +791,8 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		revoked := x.RevokedAt
 		// HQ's form sends whole minutes: an end it did not move (an access that ended by itself, or the time the company
 		// disabled the account) is no revoke when HQ saves other changes (IR514)
-		moved := in.ValidUntil != nil && (x.ValidUntil == nil || !in.ValidUntil.Truncate(time.Minute).Equal(x.ValidUntil.Truncate(time.Minute)))
+		moved := in.ValidUntil != nil &&
+			(x.ValidUntil == nil || !in.ValidUntil.Truncate(time.Minute).Equal(x.ValidUntil.Truncate(time.Minute)))
 		switch {
 		case moved && !in.ValidUntil.After(c.Now):
 			if revoked == nil {
@@ -575,68 +801,135 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		case x.RevokedAt != nil && (in.ValidUntil == nil || in.ValidUntil.After(c.Now)):
 			revoked, restore = nil, !disabled
 		}
-		if _, err := c.Tx.Exec(ctx, `UPDATE identity.memberships SET employment = $2, valid_from = $3, valid_until = $4, revoked_at = $6, version = version + 1, updated_at = $5 WHERE id = $1`,
-			x.ID, in.Employment, in.ValidFrom, until, c.Now, revoked); err != nil {
+
+		if _, err := c.Tx.Exec(
+			ctx,
+			`UPDATE identity.memberships SET employment = $2, valid_from = $3, valid_until = $4, revoked_at = $6, version = version + 1, updated_at = $5 WHERE id = $1`,
+			x.ID,
+			in.Employment,
+			in.ValidFrom,
+			until,
+			c.Now,
+			revoked,
+		); err != nil {
 			return Member{}, err
 		}
+
 		id, prev = x.ID, c.ExpectedVersion
 	}
+
 	before := Member{ID: id}
 	if prev != nil {
 		ms := []Member{before}
 		if err := LoadMembers(ctx, c, ms); err != nil {
 			return Member{}, err
 		}
+
 		before = ms[0]
 	}
-	if _, err := c.Tx.Exec(ctx, `DELETE FROM identity.membership_permissions WHERE membership_id = $1`, id); err != nil {
+
+	if _, err := c.Tx.Exec(
+		ctx,
+		`DELETE FROM identity.membership_permissions WHERE membership_id = $1`,
+		id,
+	); err != nil {
 		return Member{}, err
 	}
+
 	for _, p := range in.Permissions {
-		if _, err := c.Tx.Exec(ctx, `INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES (current_setting('app.tenant_id')::uuid, $1, $2)`, id, p); err != nil {
+		if _, err := c.Tx.Exec(
+			ctx,
+			`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES (current_setting('app.tenant_id')::uuid, $1, $2)`,
+			id,
+			p,
+		); err != nil {
 			return Member{}, err
 		}
 	}
-	if _, err := c.Tx.Exec(ctx, `DELETE FROM identity.membership_scopes WHERE membership_id = $1`, id); err != nil {
+
+	if _, err := c.Tx.Exec(
+		ctx,
+		`DELETE FROM identity.membership_scopes WHERE membership_id = $1`,
+		id,
+	); err != nil {
 		return Member{}, err
 	}
+
 	for _, sc := range in.Scopes {
-		if _, err := c.Tx.Exec(ctx, `INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3)
-			ON CONFLICT DO NOTHING`, id, sc.Kind, sc.ID); err != nil {
+		if _, err := c.Tx.Exec(
+			ctx,
+			`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3)
+			ON CONFLICT DO NOTHING`,
+			id,
+			sc.Kind,
+			sc.ID,
+		); err != nil {
 			return Member{}, err
 		}
 	}
+
 	if prev != nil {
 		perms := slices.Clone(in.Permissions)
 		slices.Sort(perms)
+
 		changed := !slices.Equal(perms, before.Permissions) || len(in.Scopes) != len(before.Scopes)
 		if !changed {
 			for _, sc := range in.Scopes {
 				changed = changed || !slices.Contains(before.Scopes, sc)
 			}
 		}
+
 		if changed {
-			if _, err := c.Tx.Exec(ctx, `UPDATE identity.memberships SET scope_version = scope_version + 1 WHERE id = $1`, id); err != nil {
+			if _, err := c.Tx.Exec(
+				ctx,
+				`UPDATE identity.memberships SET scope_version = scope_version + 1 WHERE id = $1`,
+				id,
+			); err != nil {
 				return Member{}, err
 			}
 		}
 	}
-	x, err := scanMember(c.Tx.QueryRow(ctx, "SELECT "+memberCols+" FROM identity.memberships m WHERE m.id = $1", id))
+
+	x, err := scanMember(
+		c.Tx.QueryRow(ctx, "SELECT "+memberCols+" FROM identity.memberships m WHERE m.id = $1", id),
+	)
 	if err != nil {
 		return x, err
 	}
+
 	ms := []Member{x}
 	if err := LoadMembers(ctx, c, ms); err != nil {
 		return x, err
 	}
-	c.Emit(ops.Event{AggregateType: "membership", AggregateID: id, Type: "MembershipSaved", Payload: map[string]any{"role": in.Role}})
+
+	c.Emit(
+		ops.Event{
+			AggregateType: "membership",
+			AggregateID:   id,
+			Type:          "MembershipSaved",
+			Payload:       map[string]any{"role": in.Role},
+		},
+	)
+
 	if account {
 		requestAccount(c, in.UserID, id, in.Role)
 	}
+
 	if revoke || restore {
 		setAccountEnabled(c, id, restore)
 	}
-	c.Audit(ops.AuditEntry{Action: "members.save", TargetKind: "membership", TargetID: id.String(), PreviousVersion: prev, NextVersion: &ms[0].Version, Reason: in.Reason})
+
+	c.Audit(
+		ops.AuditEntry{
+			Action:          "members.save",
+			TargetKind:      "membership",
+			TargetID:        id.String(),
+			PreviousVersion: prev,
+			NextVersion:     &ms[0].Version,
+			Reason:          in.Reason,
+		},
+	)
+
 	return ms[0], nil
 }
 
@@ -652,10 +945,12 @@ func (in *RevokeSessionsInput) Validate() map[string]string {
 	if in.MembershipID == uuid.Nil {
 		fe["membershipId"] = "error.required"
 	}
+
 	in.Reason = strings.TrimSpace(in.Reason)
 	if n := utf8.RuneCountInString(in.Reason); n < 1 || n > 1000 {
 		fe["reason"] = "error.length"
 	}
+
 	return fe
 }
 
@@ -699,34 +994,75 @@ var wallClock = func() time.Time { return time.Now().UTC() }
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/members/{membershipId}/revoke-sessions [post]
-func membersRevokeSessions(ctx context.Context, c *ops.Call, in *RevokeSessionsInput) (SessionsRevoked, error) {
-	var user uuid.UUID
-	var role string
-	err := c.Tx.QueryRow(ctx, `SELECT user_id, role FROM identity.memberships WHERE id = $1`, in.MembershipID).Scan(&user, &role)
+func membersRevokeSessions(
+	ctx context.Context,
+	c *ops.Call,
+	in *RevokeSessionsInput,
+) (SessionsRevoked, error) {
+	var (
+		user uuid.UUID
+		role string
+	)
+
+	err := c.Tx.QueryRow(ctx, `SELECT user_id, role FROM identity.memberships WHERE id = $1`, in.MembershipID).
+		Scan(&user, &role)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return SessionsRevoked{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
+
 	if err != nil {
 		return SessionsRevoked{}, err
 	}
+
 	if err := c.Require(authz.Facts{"client-membership": role == "client"}); err != nil {
 		return SessionsRevoked{}, err
 	}
+
 	at := wallClock()
-	rows, err := c.Tx.Query(ctx, `UPDATE identity.memberships SET sessions_revoked_at = $2 WHERE user_id = $1 RETURNING id`, user, at)
+
+	rows, err := c.Tx.Query(
+		ctx,
+		`UPDATE identity.memberships SET sessions_revoked_at = $2 WHERE user_id = $1 RETURNING id`,
+		user,
+		at,
+	)
 	if err != nil {
 		return SessionsRevoked{}, err
 	}
+
 	ids, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 	if err != nil {
 		return SessionsRevoked{}, err
 	}
-	slices.SortFunc(ids, func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) })
+
+	slices.SortFunc(
+		ids,
+		func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) },
+	)
+
 	when := at.Format(time.RFC3339)
-	c.Audit(ops.AuditEntry{Action: "members.revokeSessions", TargetKind: "membership", TargetID: in.MembershipID.String(), Reason: in.Reason,
-		After: map[string]*string{"sessionsRevokedAt": &when}})
-	c.Emit(ops.Event{AggregateType: "membership", AggregateID: in.MembershipID, Type: EventSessionsRevoked, Payload: map[string]any{"userId": user, "revokedAt": at}}) // the identity provider's sessions end too (IR386)
-	return SessionsRevoked{MembershipID: in.MembershipID, UserID: user, RevokedAt: at, MembershipIDs: ids}, nil
+	c.Audit(ops.AuditEntry{
+		Action:     "members.revokeSessions",
+		TargetKind: "membership",
+		TargetID:   in.MembershipID.String(),
+		Reason:     in.Reason,
+		After:      map[string]*string{"sessionsRevokedAt": &when},
+	})
+	c.Emit(
+		ops.Event{
+			AggregateType: "membership",
+			AggregateID:   in.MembershipID,
+			Type:          EventSessionsRevoked,
+			Payload:       map[string]any{"userId": user, "revokedAt": at},
+		},
+	) // the identity provider's sessions end too (IR386)
+
+	return SessionsRevoked{
+		MembershipID:  in.MembershipID,
+		UserID:        user,
+		RevokedAt:     at,
+		MembershipIDs: ids,
+	}, nil
 }
 
 // RegisterMembers binds members.list / members.save / members.revokeSessions.

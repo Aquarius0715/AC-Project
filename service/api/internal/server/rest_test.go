@@ -20,24 +20,34 @@ func TestRESTRoutesResolve(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer srv.DB.Close()
+
 	if n := len(srv.Registry.Operations()); n != len(ops.Catalog) {
 		t.Fatalf("%d handlers for %d catalog operations", n, len(ops.Catalog))
 	}
+
 	routes := 0
+
 	for _, s := range ops.Catalog {
 		for _, rt := range s.Routes {
 			routes++
+
 			path := rt.Path
 			for range ops.PathParams(rt.Path) {
 				path = path[:strings.Index(path, "{")] + uuid.NewString() + path[strings.Index(path, "}")+1:]
 			}
-			c := srv.Echo.NewContext(httptest.NewRequest(rt.Method, path, nil), httptest.NewRecorder())
+
+			c := srv.Echo.NewContext(
+				httptest.NewRequest(rt.Method, path, nil),
+				httptest.NewRecorder(),
+			)
 			srv.Echo.Router().Route(c)
+
 			if got := c.RouteInfo().Name; got != s.Name {
 				t.Errorf("%s %s resolves to %q, want %s", rt.Method, path, got, s.Name)
 			}
 		}
 	}
+
 	if routes != 233 {
 		t.Fatalf("%d routes, want 233", routes)
 	}

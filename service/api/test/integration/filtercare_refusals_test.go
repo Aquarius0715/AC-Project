@@ -8,7 +8,13 @@ import (
 // unit or the customer is looked up (filterCare.markCleaned; MarkInput.Validate).
 func TestFilterCareMarkNeedsAUnit(t *testing.T) {
 	s := server(t)
-	code, m := write(s, &customerB, "filterCare.markCleaned", `{"unitId":"00000000-0000-0000-0000-000000000000"}`, 0)
+	code, m := write(
+		s,
+		&customerB,
+		"filterCare.markCleaned",
+		`{"unitId":"00000000-0000-0000-0000-000000000000"}`,
+		0,
+	)
 	refusal(t, "markCleaned nil unit", code, m, "unitId=error.required")
 }
 
@@ -19,7 +25,14 @@ func TestFilterCareSettingsAreForCustomersOnly(t *testing.T) {
 	if code, _ := post(s, &hq, "filterCare.getSettings", `{}`); code != 403 {
 		t.Errorf("hq reads filter care settings: %d, want 403", code)
 	}
-	if code, _ := write(s, &hq, "filterCare.saveSettings", `{"thresholdHours":null,"fallbackDays":30,"recipients":"owners","channels":["inApp"]}`, 0); code != 403 {
+
+	if code, _ := write(
+		s,
+		&hq,
+		"filterCare.saveSettings",
+		`{"thresholdHours":null,"fallbackDays":30,"recipients":"owners","channels":["inApp"]}`,
+		0,
+	); code != 403 {
 		t.Errorf("hq saves filter care settings: %d, want 403", code)
 	}
 }

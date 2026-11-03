@@ -27,15 +27,41 @@ type Link struct {
 // Links are the demo fixture's five devices with the sensors each has there (device-no-sensor has none: its module only
 // beats) and their connection.
 var Links = []Link{
-	{Device: "device-online-rto", Unit: "unit-online-rto", Sensors: map[string]string{"temperature": "sensor-online-temperature", "power": "sensor-online-power",
-		"humidity": "sensor-online-humidity", "co2": "sensor-online-co2", "pm25": "sensor-online-pm25"}, Connection: "online"},
-	{Device: "device-tamper", Unit: "unit-non-rto", Sensors: map[string]string{"temperature": "sensor-tamper-temperature", "power": "sensor-tamper-power",
-		"humidity": "sensor-tamper-humidity"}, Connection: "online"},
-	{Device: "device-offline-rto", Unit: "unit-offline-rto", Sensors: map[string]string{"temperature": "sensor-offline-temperature", "power": "sensor-offline-power"},
-		Connection: "offline"},
-	{Device: "device-limited", Unit: "unit-limited", Sensors: map[string]string{"temperature": "sensor-limited-temperature", "power": "sensor-limited-power"},
-		Connection: "online"},
-	{Device: "device-no-sensor", Unit: "unit-other-customer", Sensors: map[string]string{}, Connection: "online"},
+	{Device: "device-online-rto", Unit: "unit-online-rto", Sensors: map[string]string{
+		"temperature": "sensor-online-temperature",
+		"power":       "sensor-online-power",
+		"humidity":    "sensor-online-humidity",
+		"co2":         "sensor-online-co2",
+		"pm25":        "sensor-online-pm25",
+	}, Connection: "online"},
+	{Device: "device-tamper", Unit: "unit-non-rto", Sensors: map[string]string{
+		"temperature": "sensor-tamper-temperature", "power": "sensor-tamper-power",
+		"humidity": "sensor-tamper-humidity",
+	}, Connection: "online"},
+	{
+		Device: "device-offline-rto",
+		Unit:   "unit-offline-rto",
+		Sensors: map[string]string{
+			"temperature": "sensor-offline-temperature",
+			"power":       "sensor-offline-power",
+		},
+		Connection: "offline",
+	},
+	{
+		Device: "device-limited",
+		Unit:   "unit-limited",
+		Sensors: map[string]string{
+			"temperature": "sensor-limited-temperature",
+			"power":       "sensor-limited-power",
+		},
+		Connection: "online",
+	},
+	{
+		Device:     "device-no-sensor",
+		Unit:       "unit-other-customer",
+		Sensors:    map[string]string{},
+		Connection: "online",
+	},
 }
 
 // target is one link resolved to the IDs the API uses.
@@ -52,13 +78,16 @@ type Resolver struct {
 // NewResolver builds the lookup from the links, deriving every ID the way the seed does.
 func NewResolver(links []Link) *Resolver {
 	r := &Resolver{byDevice: map[uuid.UUID]target{}}
+
 	for _, l := range links {
 		t := target{unit: seed.ID(l.Unit), sensors: map[string]uuid.UUID{}}
 		for name, fixture := range l.Sensors {
 			t.sensors[name] = seed.ID(fixture)
 		}
+
 		r.byDevice[seed.ID(l.Device)] = t
 	}
+
 	return r
 }
 
@@ -136,35 +165,58 @@ func (r *Resolver) Triggers(b devicesim.Batch, received time.Time) ([]Trigger, e
 	if err != nil {
 		return nil, fmt.Errorf("device %q: %w", b.DeviceID, err)
 	}
+
 	t, ok := r.byDevice[dev]
 	if !ok {
 		return nil, fmt.Errorf("device %s is not a demo link", b.DeviceID)
 	}
+
 	var out []Trigger
+
 	var first error // the first reading that could not convert; the rest of the batch still converts
+
 	for _, m := range b.Measurements {
 		sensor, ok := t.sensors[m.SensorID]
 		if !ok {
 			if first == nil {
 				first = fmt.Errorf("device %s has no sensor %q", b.DeviceID, m.SensorID)
 			}
+
 			continue
 		}
 		// the event ID is the reading itself (device, sensor, observed time): a simulator restart restarts its sequence, so the
 		// sequence cannot tell readings apart; a redelivered reading has the same time and so the same event
-		event := uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("%s/%s/%s", b.DeviceID, m.SensorID, m.ObservedAt.UTC().Format(time.RFC3339Nano))))
+		event := uuid.NewSHA1(
+			seed.Namespace,
+			[]byte(
+				fmt.Sprintf(
+					"%s/%s/%s",
+					b.DeviceID,
+					m.SensorID,
+					m.ObservedAt.UTC().Format(time.RFC3339Nano),
+				),
+			),
+		)
 		out = append(out, Trigger{
 			ScenarioID: Scenario,
 			EventID:    event,
 			OccurredAt: m.ObservedAt,
 			EventType:  "telemetry",
 			Measurement: &Measurement{
-				UnitID: t.unit, SensorID: sensor, Metric: m.Metric, Value: m.Value, Unit: m.Unit, // nil: the API stores the reading missing
-				ObservedAt: m.ObservedAt, ReceivedAt: received.UTC(), Origin: "measured", Quality: "valid",
-				EventID: event, // no sequence: the API numbers the reading after the latest (IR77)
+				UnitID:     t.unit,
+				SensorID:   sensor,
+				Metric:     m.Metric,
+				Value:      m.Value,
+				Unit:       m.Unit, // nil: the API stores the reading missing
+				ObservedAt: m.ObservedAt,
+				ReceivedAt: received.UTC(),
+				Origin:     "measured",
+				Quality:    "valid",
+				EventID:    event, // no sequence: the API numbers the reading after the latest (IR77)
 			},
 		})
 	}
+
 	return out, first
 }
 
@@ -176,7 +228,9 @@ func CommandTrigger(a devicesim.Ack, received time.Time) (Trigger, bool, error) 
 	if err != nil {
 		return Trigger{}, false, fmt.Errorf("command %q: %w", a.CommandID, err)
 	}
+
 	var kind string
+
 	switch a.Result {
 	case "applied":
 		kind = "command_ack"
@@ -185,9 +239,13 @@ func CommandTrigger(a devicesim.Ack, received time.Time) (Trigger, bool, error) 
 	default:
 		return Trigger{}, false, nil
 	}
+
 	return Trigger{
 		ScenarioID: Scenario,
-		EventID:    uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("%s/%s/%s", a.DeviceID, a.CommandID, kind))),
+		EventID: uuid.NewSHA1(
+			seed.Namespace,
+			[]byte(fmt.Sprintf("%s/%s/%s", a.DeviceID, a.CommandID, kind)),
+		),
 		OccurredAt: received.UTC(),
 		EventType:  kind,
 		CommandID:  &cmd,
@@ -198,16 +256,23 @@ func CommandTrigger(a devicesim.Ack, received time.Time) (Trigger, bool, error) 
 // temperature and power sensors on its own unit.
 func FleetLinks(f devicesim.Fleet) []Link {
 	var out []Link
+
 	for _, p := range f.Patterns {
 		if p.NoDevice {
 			continue
 		}
+
 		sensors := map[string]string{}
 		for _, s := range devicesim.Sensors {
 			sensors[s.ID] = devicesim.SensorName(p, s)
 		}
-		out = append(out, Link{Device: devicesim.DeviceName(p), Unit: devicesim.UnitName(p), Sensors: sensors})
+
+		out = append(
+			out,
+			Link{Device: devicesim.DeviceName(p), Unit: devicesim.UnitName(p), Sensors: sensors},
+		)
 	}
+
 	return out
 }
 
@@ -219,14 +284,14 @@ func ToScenario(b devicesim.Batch, now time.Time, offset, margin time.Duration) 
 	slot := now.Add(offset - margin).UTC().Truncate(time.Minute)
 	moduleMinute := now.UTC().Truncate(time.Minute)
 	out := b
+
 	out.Measurements = make([]devicesim.Measurement, len(b.Measurements))
 	for i, m := range b.Measurements {
-		ahead := m.ObservedAt.Sub(moduleMinute).Round(time.Minute)
-		if ahead < 0 {
-			ahead = 0
-		}
+		ahead := max(m.ObservedAt.Sub(moduleMinute).Round(time.Minute), 0)
+
 		m.ObservedAt = slot.Add(ahead)
 		out.Measurements[i] = m
 	}
+
 	return out
 }

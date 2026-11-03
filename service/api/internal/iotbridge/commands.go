@@ -32,15 +32,23 @@ func CommandMessage(w Waiting, offset time.Duration) (devicesim.Command, error) 
 	if err := json.Unmarshal(w.Action, &a); err != nil {
 		return devicesim.Command{}, fmt.Errorf("command %s action: %w", w.ID, err)
 	}
+
 	if a.Kind == "" {
 		return devicesim.Command{}, fmt.Errorf("command %s has no action kind", w.ID)
 	}
-	return devicesim.Command{CommandID: w.ID.String(), Kind: a.Kind, Setpoint: a.Celsius, ExpiresAt: w.ExpiresAt.Add(-offset).UTC()}, nil
+
+	return devicesim.Command{
+		CommandID: w.ID.String(),
+		Kind:      a.Kind,
+		Setpoint:  a.Celsius,
+		ExpiresAt: w.ExpiresAt.Add(-offset).UTC(),
+	}, nil
 }
 
 // SentTrigger reports a command sent to its device: the demo trigger command_sent moves it requested → sent.
 func SentTrigger(w Waiting, at time.Time) Trigger {
 	cmd := w.ID
+
 	return Trigger{
 		ScenarioID: Scenario,
 		EventID:    uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("%s/sent", cmd))),
@@ -64,14 +72,20 @@ func StateTrigger(hb devicesim.Heartbeat, at time.Time) (Trigger, error) {
 	if err != nil {
 		return Trigger{}, fmt.Errorf("device %q: %w", hb.DeviceID, err)
 	}
+
 	state := hb.State
 	if state == nil {
 		state = &devicesim.ReportedState{}
 	}
+
 	at = at.UTC()
+
 	return Trigger{
 		ScenarioID: Scenario,
-		EventID:    uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("%s/state/%s", dev, at.Format(time.RFC3339Nano)))),
+		EventID: uuid.NewSHA1(
+			seed.Namespace,
+			[]byte(fmt.Sprintf("%s/state/%s", dev, at.Format(time.RFC3339Nano))),
+		),
 		OccurredAt: at,
 		EventType:  "state",
 		DeviceID:   &dev,

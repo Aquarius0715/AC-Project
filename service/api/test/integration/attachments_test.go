@@ -9,7 +9,11 @@ import (
 )
 
 func blobJSON(name, mime string, data []byte, size int) string {
-	return `{"name":"` + name + `","mime":"` + mime + `","size":` + itoa(size) + `,"bytes":"` + base64.StdEncoding.EncodeToString(data) + `"}`
+	return `{"name":"` + name + `","mime":"` + mime + `","size":` + itoa(
+		size,
+	) + `,"bytes":"` + base64.StdEncoding.EncodeToString(
+		data,
+	) + `"}`
 }
 
 func TestAttachmentsAndSignOff(t *testing.T) {
@@ -21,7 +25,13 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 	img, jpg := tinyPNG(t), tinyJPEG(t)
 	flood := pngHeader(50000, 50000) // 2.5 gigapixels declared in a few dozen bytes (IR389)
 	add := func(file string, v int) (int, map[string]any) {
-		return write(s, &techInt, "attachments.add", `{"jobId":"`+job+`","reportId":"`+rep+`","file":`+file+`}`, v)
+		return write(
+			s,
+			&techInt,
+			"attachments.add",
+			`{"jobId":"`+job+`","reportId":"`+rep+`","file":`+file+`}`,
+			v,
+		)
 	}
 	want := map[string]string{ // the field each case is refused for
 		"empty":         "file=error.invalidFile",
@@ -36,6 +46,7 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		"path in the name":       "file=error.invalidFile",
 		"override in the name":   "file=error.invalidFile",
 	}
+
 	for name, f := range map[string]string{
 		"gif":                    blobJSON("a.gif", "image/gif", img, len(img)),
 		"size mismatch":          blobJSON("a.png", "image/png", img, 3),
@@ -51,20 +62,44 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		code, m := add(f, 1)
 		refusal(t, name, code, m, want[name])
 	}
+
 	if code, _ := add(blobJSON("a.png", "image/png", img, len(img)), 2); code != 409 {
 		t.Error("stale report version")
 	}
-	if code, _ := write(s, &techInt, "attachments.add", `{"jobId":"`+job+`","reportId":"`+uuid.NewString()+`","file":`+blobJSON("a.png", "image/png", img, len(img))+`}`, 1); code != 409 {
+
+	if code, _ := write(
+		s,
+		&techInt,
+		"attachments.add",
+		`{"jobId":"`+job+`","reportId":"`+uuid.NewString()+`","file":`+blobJSON(
+			"a.png",
+			"image/png",
+			img,
+			len(img),
+		)+`}`,
+		1,
+	); code != 409 {
 		t.Error("other report")
 	}
+
 	code, m := add(blobJSON(" leak.png ", "image/png", img, len(img)), 1)
 	if code != 200 || data(m)["status"] != "ready" || data(m)["name"] != "leak.png" {
 		t.Fatalf("add: %d %v", code, m)
 	}
+
 	att := data(m)["id"].(string)
 	// the draft moved to version 2; link the photo as evidence
-	body := strings.Replace(draftBody(job, "normal", map[string]string{"reportId": `"` + rep + `"`, "attachmentIds": `["` + att + `"]`}),
-		`"componentKey":"filter","result":"normal","reason":null,"evidenceIds":[]`, `"componentKey":"filter","result":"normal","reason":null,"evidenceIds":["`+att+`"]`, 1)
+	body := strings.Replace(
+		draftBody(
+			job,
+			"normal",
+			map[string]string{"reportId": `"` + rep + `"`, "attachmentIds": `["` + att + `"]`},
+		),
+		`"componentKey":"filter","result":"normal","reason":null,"evidenceIds":[]`,
+		`"componentKey":"filter","result":"normal","reason":null,"evidenceIds":["`+att+`"]`,
+		1,
+	)
+
 	code, m = write(s, &techInt, "jobs.saveDraft", body, 2)
 	if code != 200 || len(data(m)["attachmentRefs"].([]any)) != 1 {
 		t.Fatalf("draft with attachment: %d %v", code, m)
@@ -79,7 +114,15 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 	}
 	// sign-off
 	sign := func(extra string, v, rv int) (int, map[string]any) {
-		return write(s, &techInt, "reports.signOff", `{"jobId":"`+job+`","reportId":"`+rep+`","reportVersion":`+itoa(rv)+`,"signerName":" Aisha "`+extra+`}`, v)
+		return write(
+			s,
+			&techInt,
+			"reports.signOff",
+			`{"jobId":"`+job+`","reportId":"`+rep+`","reportVersion":`+itoa(
+				rv,
+			)+`,"signerName":" Aisha "`+extra+`}`,
+			v,
+		)
 	}
 	sig := blobJSON("sig.png", "image/png", img, len(img))
 	want = map[string]string{ // the field each case is refused for
@@ -89,6 +132,7 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		"jpeg signature":       "signature=error.invalidFile",
 		"neither":              "signature=errors.signature_or_absence",
 	}
+
 	for name, extra := range map[string]string{
 		"neither":              `,"signature":null`,
 		"both":                 `,"signature":` + sig + `,"absentReason":"out","sitePhoto":` + sig,
@@ -99,41 +143,85 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		code, m := sign(extra, 3, 3)
 		refusal(t, name, code, m, want[name])
 	}
+
 	if code, _ := sign(`,"signature":`+sig, 3, 2); code != 409 {
 		t.Error("signOff of an old version")
 	}
+
 	code, m = sign(`,"signature":`+sig, 3, 3)
+
 	so, _ := data(m)["signOff"].(map[string]any)
-	if code != 200 || so["signerName"] != "Aisha" || so["signatureAttachmentId"] == nil || so["reportVersion"].(float64) != 3 || data(m)["version"].(float64) != 3 {
+	if code != 200 || so["signerName"] != "Aisha" || so["signatureAttachmentId"] == nil ||
+		so["reportVersion"].(float64) != 3 ||
+		data(m)["version"].(float64) != 3 {
 		t.Fatalf("signOff: %d %v", code, m)
 	}
-	if code, m := sign(`,"signature":null,"absentReason":"Customer out","sitePhoto":`+blobJSON("door.jpg", "image/jpeg", jpg, len(jpg)), 3, 3); code != 200 ||
+
+	if code, m := sign(
+		`,"signature":null,"absentReason":"Customer out","sitePhoto":`+blobJSON(
+			"door.jpg",
+			"image/jpeg",
+			jpg,
+			len(jpg),
+		),
+		3,
+		3,
+	); code != 200 ||
 		data(m)["signOff"].(map[string]any)["sitePhotoAttachmentId"] == nil {
 		t.Fatalf("absent sign-off: %d %v", code, m)
 	}
 	// getContent
 	get := func(a *actor, v int) (int, map[string]any) {
-		return post(s, a, "attachments.getContent", `{"jobId":"`+job+`","reportId":"`+rep+`","reportVersion":`+itoa(v)+`,"attachmentId":"`+att+`"}`)
+		return post(
+			s,
+			a,
+			"attachments.getContent",
+			`{"jobId":"`+job+`","reportId":"`+rep+`","reportVersion":`+itoa(
+				v,
+			)+`,"attachmentId":"`+att+`"}`,
+		)
 	}
+
 	code, m = get(&techInt, 3)
-	if code != 200 || data(m)["bytes"] != base64.StdEncoding.EncodeToString(img) || data(m)["mime"] != "image/png" {
+	if code != 200 || data(m)["bytes"] != base64.StdEncoding.EncodeToString(img) ||
+		data(m)["mime"] != "image/png" {
 		t.Fatalf("getContent: %d %v", code, m)
 	}
+
 	if code, _ := get(&customerA, 3); code != 404 {
 		t.Error("client before acceptance")
 	}
-	if code, _ := post(s, &hq, "attachments.getContent", `{"jobId":"`+job+`","reportId":"`+rep+`","reportVersion":3,"attachmentId":"`+uuid.NewString()+`"}`); code != 404 {
+
+	if code, _ := post(
+		s,
+		&hq,
+		"attachments.getContent",
+		`{"jobId":"`+job+`","reportId":"`+rep+`","reportVersion":3,"attachmentId":"`+uuid.NewString()+`"}`,
+	); code != 404 {
 		t.Error("unknown attachment")
 	}
 	// saving the draft clears the sign-off
-	if code, m := write(s, &techInt, "jobs.saveDraft", body, 3); code != 200 || data(m)["signOff"] != nil {
+	if code, m := write(
+		s,
+		&techInt,
+		"jobs.saveDraft",
+		body,
+		3,
+	); code != 200 ||
+		data(m)["signOff"] != nil {
 		t.Fatal("saveDraft clears the sign-off")
 	}
 	// limit of 10 per report
-	for i := 0; i < 9; i++ {
-		owner(t, `INSERT INTO maintenance.attachments (tenant_id, job_id, report_id, object_key, name, mime, size_bytes, status, uploaded_by)
-			SELECT tenant_id, job_id, $1, $2, 'x.png', 'image/png', 1, 'ready', author_id FROM maintenance.work_reports WHERE id = $1 LIMIT 1`, rep, "test/"+uuid.NewString())
+	for range 9 {
+		owner(
+			t,
+			`INSERT INTO maintenance.attachments (tenant_id, job_id, report_id, object_key, name, mime, size_bytes, status, uploaded_by)
+			SELECT tenant_id, job_id, $1, $2, 'x.png', 'image/png', 1, 'ready', author_id FROM maintenance.work_reports WHERE id = $1 LIMIT 1`,
+			rep,
+			"test/"+uuid.NewString(),
+		)
 	}
+
 	if code, _ := add(blobJSON("11.png", "image/png", img, len(img)), 4); code != 409 {
 		t.Error("eleventh attachment")
 	}

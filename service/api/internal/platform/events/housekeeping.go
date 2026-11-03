@@ -26,14 +26,22 @@ type Swept struct{ Outbox, Processed, Failures, IdempotencyKeys int64 }
 //   - processed-event records and failure records of events that are no longer in the outbox, the former once they
 //     are older than ProcessedRetention, so an event is never delivered twice;
 //   - idempotency keys past their expiry, tenant by tenant (the table has row-level security).
-func Housekeep(ctx context.Context, m ops.Runner, now time.Time, consumers []*Consumer) (Swept, error) {
+func Housekeep(
+	ctx context.Context,
+	m ops.Runner,
+	now time.Time,
+	consumers []*Consumer,
+) (Swept, error) {
 	var s Swept
+
 	var names, types []string // one row per (consumer, subscribed type)
+
 	for _, c := range consumers {
 		for t := range c.Handlers {
 			names, types = append(names, c.Name), append(types, t)
 		}
 	}
+
 	err := m.Run(ctx, false, nil, func(tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx, `DELETE FROM platform.outbox o WHERE o.occurred_at < $1
 			AND NOT EXISTS (SELECT 1 FROM unnest($2::text[], $3::text[]) AS sub(consumer, event_type)
@@ -43,40 +51,62 @@ func Housekeep(ctx context.Context, m ops.Runner, now time.Time, consumers []*Co
 		if err != nil {
 			return err
 		}
+
 		s.Outbox = tag.RowsAffected()
-		if tag, err = tx.Exec(ctx, `DELETE FROM platform.processed_events p WHERE p.processed_at < $1
-			AND NOT EXISTS (SELECT 1 FROM platform.outbox o WHERE o.id = p.event_id)`, now.Add(-ProcessedRetention)); err != nil {
+		if tag, err = tx.Exec(
+			ctx,
+			`DELETE FROM platform.processed_events p WHERE p.processed_at < $1
+			AND NOT EXISTS (SELECT 1 FROM platform.outbox o WHERE o.id = p.event_id)`,
+			now.Add(-ProcessedRetention),
+		); err != nil {
 			return err
 		}
+
 		s.Processed = tag.RowsAffected()
-		if tag, err = tx.Exec(ctx, `DELETE FROM platform.event_failures f WHERE NOT EXISTS (SELECT 1 FROM platform.outbox o WHERE o.id = f.event_id)`); err != nil {
+		if tag, err = tx.Exec(
+			ctx,
+			`DELETE FROM platform.event_failures f WHERE NOT EXISTS (SELECT 1 FROM platform.outbox o WHERE o.id = f.event_id)`,
+		); err != nil {
 			return err
 		}
+
 		s.Failures = tag.RowsAffected()
+
 		return nil
 	})
 	if err != nil {
 		return s, err
 	}
+
 	var tenants []uuid.UUID
+
 	if err := m.Run(ctx, true, nil, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `SELECT id FROM platform.tenants ORDER BY id`)
 		if err != nil {
 			return err
 		}
+
 		tenants, err = pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+
 		return err
 	}); err != nil {
 		return s, err
 	}
+
 	for _, t := range tenants {
 		if err := m.Run(ctx, false, &ops.Principal{TenantID: t}, func(tx pgx.Tx) error {
-			tag, err := tx.Exec(ctx, `DELETE FROM platform.idempotency_keys WHERE expires_at < $1`, now)
+			tag, err := tx.Exec(
+				ctx,
+				`DELETE FROM platform.idempotency_keys WHERE expires_at < $1`,
+				now,
+			)
 			s.IdempotencyKeys += tag.RowsAffected()
+
 			return err
 		}); err != nil {
 			return s, err
 		}
 	}
+
 	return s, nil
 }

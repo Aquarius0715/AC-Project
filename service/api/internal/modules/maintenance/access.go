@@ -56,20 +56,50 @@ func registerAccess(r *ops.Registry) {
 }
 
 // TechnicianJob checks a technician write that names jobId (see technicianJob).
-func (Access) TechnicianJob(ctx context.Context, c *ops.Call, jobID uuid.UUID, unit uuid.UUID) error {
-	_, err := ops.Delegate(ctx, c, QueryTechnicianJob, TechnicianJobInput{JobID: jobID, UnitID: unit}, technicianJob)
+func (Access) TechnicianJob(
+	ctx context.Context,
+	c *ops.Call,
+	jobID uuid.UUID,
+	unit uuid.UUID,
+) error {
+	_, err := ops.Delegate(
+		ctx,
+		c,
+		QueryTechnicianJob,
+		TechnicianJobInput{JobID: jobID, UnitID: unit},
+		technicianJob,
+	)
+
 	return err
 }
 
 // TechnicianUnit checks a technician write without jobId (see technicianUnit).
-func (Access) TechnicianUnit(ctx context.Context, c *ops.Call, unit uuid.UUID, inScope bool, internal bool) error {
-	_, err := ops.Delegate(ctx, c, QueryTechnicianUnit, TechnicianUnitInput{UnitID: unit, InScope: inScope, Internal: internal}, technicianUnit)
+func (Access) TechnicianUnit(
+	ctx context.Context,
+	c *ops.Call,
+	unit uuid.UUID,
+	inScope bool,
+	internal bool,
+) error {
+	_, err := ops.Delegate(
+		ctx,
+		c,
+		QueryTechnicianUnit,
+		TechnicianUnitInput{UnitID: unit, InScope: inScope, Internal: internal},
+		technicianUnit,
+	)
+
 	return err
 }
 
 // JobVersion returns a job's version and unit (Control diagnostic runs).
-func (Access) JobVersion(ctx context.Context, c *ops.Call, job uuid.UUID) (int, uuid.UUID, bool, error) {
+func (Access) JobVersion(
+	ctx context.Context,
+	c *ops.Call,
+	job uuid.UUID,
+) (int, uuid.UUID, bool, error) {
 	r, err := ops.Delegate(ctx, c, QueryJobVersion, JobInput{JobID: job}, jobVersion)
+
 	return r.Version, r.UnitID, r.Found, err
 }
 
@@ -97,25 +127,41 @@ func checkTechnicianJob(ctx context.Context, c *ops.Call, jobID uuid.UUID, unit 
 	if err != nil {
 		return err
 	}
+
 	var as []assignment
+
 	for rows.Next() {
 		var a assignment
-		if err := rows.Scan(&a.unit, &a.status, &a.validFrom, &a.validTil, &a.jobStatus); err != nil {
+		if err := rows.Scan(
+			&a.unit,
+			&a.status,
+			&a.validFrom,
+			&a.validTil,
+			&a.jobStatus,
+		); err != nil {
 			rows.Close()
+
 			return err
 		}
+
 		as = append(as, a)
 	}
+
 	rows.Close()
+
 	if err := rows.Err(); err != nil {
 		return err
 	}
+
 	now := c.Now
+
 	var started bool
+
 	for _, a := range as {
 		if a.unit != unit {
 			return notFound() // the job is for another unit
 		}
+
 		if a.status == "active" {
 			switch {
 			case now.Before(a.validFrom):
@@ -126,13 +172,16 @@ func checkTechnicianJob(ctx context.Context, c *ops.Call, jobID uuid.UUID, unit 
 				return forbidden("errors.assignment_ended")
 			}
 		}
+
 		if !now.Before(a.validFrom) {
 			started = true // revoked after its window started
 		}
 	}
+
 	if started {
 		return forbidden("errors.assignment_ended")
 	}
+
 	return notFound()
 }
 
@@ -143,8 +192,15 @@ func technicianUnit(ctx context.Context, c *ops.Call, in *TechnicianUnitInput) (
 	return struct{}{}, checkTechnicianUnit(ctx, c, in.UnitID, in.InScope, in.Internal)
 }
 
-func checkTechnicianUnit(ctx context.Context, c *ops.Call, unit uuid.UUID, inScope bool, internal bool) error {
+func checkTechnicianUnit(
+	ctx context.Context,
+	c *ops.Call,
+	unit uuid.UUID,
+	inScope bool,
+	internal bool,
+) error {
 	var any, inWindow, notStarted bool
+
 	err := c.Tx.QueryRow(ctx, `SELECT count(*) > 0,
 		COALESCE(bool_or(a.status = 'active' AND a.valid_from <= $3 AND $3 < a.valid_until), false),
 		COALESCE(bool_or(a.status = 'active' AND $3 < a.valid_from), false)
@@ -153,6 +209,7 @@ func checkTechnicianUnit(ctx context.Context, c *ops.Call, unit uuid.UUID, inSco
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return err
 	}
+
 	switch {
 	case inWindow:
 		return nil
@@ -163,21 +220,28 @@ func checkTechnicianUnit(ctx context.Context, c *ops.Call, unit uuid.UUID, inSco
 	case internal && inScope:
 		return forbidden("errors.assignment_required")
 	}
+
 	return notFound()
 }
 
 // InScope reports whether the unit is inside the membership scopes (organization, property or unit IDs); the caller
 // passes the unit's organization and property.
 func InScope(p *ops.Principal, unit, property, org uuid.UUID) bool {
-	return slices.Contains(p.Scopes["unit"], unit) || slices.Contains(p.Scopes["property"], property) || slices.Contains(p.Scopes["organization"], org)
+	return slices.Contains(p.Scopes["unit"], unit) ||
+		slices.Contains(p.Scopes["property"], property) ||
+		slices.Contains(p.Scopes["organization"], org)
 }
 
 func jobVersion(ctx context.Context, c *ops.Call, in *JobInput) (JobVersionResult, error) {
 	var r JobVersionResult
-	err := c.Tx.QueryRow(ctx, `SELECT version, unit_id FROM maintenance.jobs WHERE id = $1`, in.JobID).Scan(&r.Version, &r.UnitID)
+
+	err := c.Tx.QueryRow(ctx, `SELECT version, unit_id FROM maintenance.jobs WHERE id = $1`, in.JobID).
+		Scan(&r.Version, &r.UnitID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return JobVersionResult{}, nil
 	}
+
 	r.Found = err == nil
+
 	return r, err
 }

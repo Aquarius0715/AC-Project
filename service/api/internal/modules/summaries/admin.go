@@ -3,6 +3,7 @@ package summaries
 import (
 	"context"
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 
@@ -29,6 +30,7 @@ func (in *AdminInput) Validate() map[string]string {
 	if energy.CheckRange(in.From, in.To) != nil {
 		return map[string]string{"from": "errors.energy_range"}
 	}
+
 	return nil
 }
 
@@ -59,7 +61,18 @@ type AdminSummary struct {
 	AsOf                time.Time       `json:"asOf"`
 }
 
-var jobStatuses = []string{"requested", "offered", "accepted", "assigned", "in_progress", "submitted", "completed", "rework_requested", "cancelled", "on_hold"}
+var jobStatuses = []string{
+	"requested",
+	"offered",
+	"accepted",
+	"assigned",
+	"in_progress",
+	"submitted",
+	"completed",
+	"rework_requested",
+	"cancelled",
+	"on_hold",
+}
 
 func collectIDs(rows pgx.Rows) ([]uuid.UUID, error) {
 	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
@@ -98,27 +111,47 @@ func (m Summaries) admin(ctx context.Context, c *ops.Call, in *AdminInput) (Admi
 	}
 	// target units U: not archived, matching the filters
 	var args []any
-	add := func(v any) string { args = append(args, v); return fmt.Sprintf("$%d", len(args)) }
+
+	add := func(v any) string {
+		args = append(args, v)
+
+		return fmt.Sprintf("$%d", len(args))
+	}
+
 	conds := []string{"NOT u.archived"}
 	if in.CustomerID != nil {
-		conds = append(conds, "u.customer_org_id = (SELECT organization_id FROM assets.customers WHERE id = "+add(*in.CustomerID)+")")
+		conds = append(
+			conds,
+			"u.customer_org_id = (SELECT organization_id FROM assets.customers WHERE id = "+add(
+				*in.CustomerID,
+			)+")",
+		)
 	}
+
 	if in.PropertyID != nil {
 		conds = append(conds, "u.property_id = "+add(*in.PropertyID))
 	}
-	rows, err := c.Tx.Query(ctx, "SELECT u.id FROM assets.units u WHERE "+strings.Join(conds, " AND ")+" ORDER BY u.id", args...)
+
+	rows, err := c.Tx.Query(
+		ctx,
+		"SELECT u.id FROM assets.units u WHERE "+strings.Join(conds, " AND ")+" ORDER BY u.id",
+		args...)
 	if err != nil {
 		return out, err
 	}
+
 	units, err := collectIDs(rows)
 	if err != nil {
 		return out, err
 	}
+
 	n, err := m.Units.CountUnits(ctx, c, true, nil, in.CustomerID, in.PropertyID, nil)
 	if err != nil {
 		return out, err
 	}
+
 	out.Total, out.Online, out.Offline, out.Unknown = n.Total, n.Online, n.Offline, n.Unknown
+
 	out.PowerOn, out.PowerOff, out.PowerUnknown, out.AlertCount = n.PowerOn, n.PowerOff, n.PowerUnknown, n.AlertCount
 	if d := n.PowerOn + n.PowerOff; d > 0 { // unknown power never counts as inactive (DD-A01)
 		r := float64(n.PowerOn) / float64(d) * 100
@@ -127,26 +160,53 @@ func (m Summaries) admin(ctx context.Context, c *ops.Call, in *AdminInput) (Admi
 	// customers: Customer and Organization both active (IR40; organization status from identity); filters narrow to the
 	// matching customer
 	cargs := []any{}
-	cadd := func(v any) string { cargs = append(cargs, v); return fmt.Sprintf("$%d", len(cargs)) }
+	cadd := func(v any) string {
+		cargs = append(cargs, v)
+
+		return fmt.Sprintf("$%d", len(cargs))
+	}
+
 	cconds := []string{"cu.status = 'active'"}
 	if in.CustomerID != nil {
 		cconds = append(cconds, "cu.id = "+cadd(*in.CustomerID))
 	}
+
 	if in.PropertyID != nil {
-		cconds = append(cconds, "cu.organization_id = (SELECT customer_org_id FROM assets.properties WHERE id = "+cadd(*in.PropertyID)+")")
+		cconds = append(
+			cconds,
+			"cu.organization_id = (SELECT customer_org_id FROM assets.properties WHERE id = "+cadd(
+				*in.PropertyID,
+			)+")",
+		)
 	}
-	rows, err = c.Tx.Query(ctx, "SELECT DISTINCT cu.organization_id FROM assets.customers cu WHERE "+strings.Join(cconds, " AND "), cargs...)
+
+	rows, err = c.Tx.Query(
+		ctx,
+		"SELECT DISTINCT cu.organization_id FROM assets.customers cu WHERE "+strings.Join(
+			cconds,
+			" AND ",
+		),
+		cargs...)
 	if err != nil {
 		return out, err
 	}
+
 	orgs, err := collectIDs(rows)
 	if err != nil {
 		return out, err
 	}
-	active, err := ops.Ask[[]uuid.UUID](ctx, m.Registry, c, identity.QueryActiveOrganizations, identity.OrganizationsInput{IDs: orgs})
+
+	active, err := ops.Ask[[]uuid.UUID](
+		ctx,
+		m.Registry,
+		c,
+		identity.QueryActiveOrganizations,
+		identity.OrganizationsInput{IDs: orgs},
+	)
 	if err != nil {
 		return out, err
 	}
+
 	if len(active) > 0 {
 		if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM assets.customers cu WHERE cu.organization_id = ANY("+cadd(active)+") AND "+strings.Join(cconds, " AND "), cargs...).
 			Scan(&out.CustomerCount); err != nil {
@@ -154,33 +214,58 @@ func (m Summaries) admin(ctx context.Context, c *ops.Call, in *AdminInput) (Admi
 		}
 	}
 	// jobs whose requested slot starts in the period, by status (maintenance)
-	counts, err := ops.Ask[map[string]int](ctx, m.Registry, c, maintenance.QueryStatusCounts, maintenance.StatusCountsInput{UnitIDs: units, From: in.From, To: in.To})
+	counts, err := ops.Ask[map[string]int](
+		ctx,
+		m.Registry,
+		c,
+		maintenance.QueryStatusCounts,
+		maintenance.StatusCountsInput{UnitIDs: units, From: in.From, To: in.To},
+	)
 	if err != nil {
 		return out, err
 	}
-	for st, k := range counts {
-		out.JobCounts[st] = k
-	}
+
+	maps.Copy(out.JobCounts, counts)
 	// billing (billing.read; IR115): unpaid invoices past due on contracts covering the units
 	if c.Principal.Permissions["billing.read"] {
-		overdue, err := ops.Ask[[]billing.Overdue](ctx, m.Registry, c, billing.QueryOverdue, billing.OverdueInput{UnitIDs: units})
+		overdue, err := ops.Ask[[]billing.Overdue](
+			ctx,
+			m.Registry,
+			c,
+			billing.QueryOverdue,
+			billing.OverdueInput{UnitIDs: units},
+		)
 		if err != nil {
 			return out, err
 		}
+
 		out.BillingVisibility, out.AmountsByCurrency = "allowed", []Money{}
+
 		total := 0
 		for _, o := range overdue {
 			total += o.Count
-			out.AmountsByCurrency = append(out.AmountsByCurrency, Money{AmountMinor: o.AmountMinor, Currency: o.Currency})
+			out.AmountsByCurrency = append(
+				out.AmountsByCurrency,
+				Money{AmountMinor: o.AmountMinor, Currency: o.Currency},
+			)
 		}
+
 		out.OverdueInvoiceCount = &total
 	}
 	// energy: actuals only (no baseline) and the IR78 forecast
-	en, err := ops.Ask[energy.Actuals](ctx, m.Registry, c, energy.QueryActuals, energy.ActualsInput{UnitIDs: units, From: in.From, To: in.To})
+	en, err := ops.Ask[energy.Actuals](
+		ctx,
+		m.Registry,
+		c,
+		energy.QueryActuals,
+		energy.ActualsInput{UnitIDs: units, From: in.From, To: in.To},
+	)
 	if err != nil {
 		return out, err
 	}
+
 	out.EnergySummary, out.EnergyForecast = &en.Summary, en.Forecast
+
 	return out, nil
 }
 

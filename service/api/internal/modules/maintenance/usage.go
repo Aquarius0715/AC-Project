@@ -61,7 +61,11 @@ func (Usage) UnitInUse(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, 
 
 // ClaimableJobs returns, per unit, the completed jobs whose accepted work report lists parts and that have no filed warranty
 // claim yet, each with its completion time: Assets keeps those completed while the warranty ran (DD-A19, IR209).
-func (Usage) ClaimableJobs(ctx context.Context, c *ops.Call, units []uuid.UUID) (map[uuid.UUID]map[uuid.UUID]time.Time, error) {
+func (Usage) ClaimableJobs(
+	ctx context.Context,
+	c *ops.Call,
+	units []uuid.UUID,
+) (map[uuid.UUID]map[uuid.UUID]time.Time, error) {
 	return ops.Delegate(ctx, c, QueryClaimableJobs, UnitsInput{UnitIDs: units}, claimableJobs)
 }
 
@@ -84,63 +88,101 @@ func registerUsage(r *ops.Registry) {
 	ops.RegisterQuery(r, ops.DomainMaintenance, QueryBookedTechnicians, bookedTechnicians)
 }
 
-func bookedTechnicians(ctx context.Context, c *ops.Call, in *MembershipsInput) ([]uuid.UUID, error) {
+func bookedTechnicians(
+	ctx context.Context,
+	c *ops.Call,
+	in *MembershipsInput,
+) ([]uuid.UUID, error) {
 	out := []uuid.UUID{}
 	if len(in.MembershipIDs) == 0 {
 		return out, nil
 	}
-	rows, err := c.Tx.Query(ctx, `SELECT DISTINCT technician_membership_id FROM maintenance.assignments
-		WHERE technician_membership_id = ANY($1) AND status = 'active' AND valid_until > $2`, in.MembershipIDs, c.Now)
+
+	rows, err := c.Tx.Query(
+		ctx,
+		`SELECT DISTINCT technician_membership_id FROM maintenance.assignments
+		WHERE technician_membership_id = ANY($1) AND status = 'active' AND valid_until > $2`,
+		in.MembershipIDs,
+		c.Now,
+	)
 	if err != nil {
 		return nil, err
 	}
+
 	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 }
 
 func technicianBooked(ctx context.Context, c *ops.Call, in *MembershipInput) (bool, error) {
 	var b bool
+
 	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.assignments WHERE technician_membership_id = $1 AND status = 'active' AND valid_until > $2)`,
-		in.MembershipID, c.Now).Scan(&b)
+		in.MembershipID, c.Now).
+		Scan(&b)
+
 	return b, err
 }
 
 func unitInUse(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
 	var b bool
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.jobs WHERE unit_id = $1)`, in.UnitID).Scan(&b)
+
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.jobs WHERE unit_id = $1)`, in.UnitID).
+		Scan(&b)
+
 	return b, err
 }
 
-func claimableJobs(ctx context.Context, c *ops.Call, in *UnitsInput) (map[uuid.UUID]map[uuid.UUID]time.Time, error) {
+func claimableJobs(
+	ctx context.Context,
+	c *ops.Call,
+	in *UnitsInput,
+) (map[uuid.UUID]map[uuid.UUID]time.Time, error) {
 	out := map[uuid.UUID]map[uuid.UUID]time.Time{}
-	rows, err := c.Tx.Query(ctx, `SELECT j.unit_id, j.id, j.completed_at FROM maintenance.jobs j WHERE j.unit_id = ANY($1) AND j.status = 'completed'
+
+	rows, err := c.Tx.Query(
+		ctx,
+		`SELECT j.unit_id, j.id, j.completed_at FROM maintenance.jobs j WHERE j.unit_id = ANY($1) AND j.status = 'completed'
 		AND j.completed_at IS NOT NULL AND EXISTS (SELECT 1 FROM maintenance.work_reports r WHERE r.job_id = j.id AND r.state = 'accepted' AND jsonb_array_length(r.parts) > 0)
-		AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(j.warranty_claims) w WHERE w->>'state' = 'filed')`, in.UnitIDs)
+		AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(j.warranty_claims) w WHERE w->>'state' = 'filed')`,
+		in.UnitIDs,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
+
 	for rows.Next() {
-		var u, j uuid.UUID
-		var at time.Time
+		var (
+			u, j uuid.UUID
+			at   time.Time
+		)
 		if err := rows.Scan(&u, &j, &at); err != nil {
 			return nil, err
 		}
+
 		if out[u] == nil {
 			out[u] = map[uuid.UUID]time.Time{}
 		}
+
 		out[u][j] = at
 	}
+
 	return out, rows.Err()
 }
 
 func unitActive(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
 	var b bool
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.jobs WHERE unit_id = $1 AND status NOT IN ('completed','cancelled'))`, in.UnitID).Scan(&b)
+
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.jobs WHERE unit_id = $1 AND status NOT IN ('completed','cancelled'))`, in.UnitID).
+		Scan(&b)
+
 	return b, err
 }
 
 func orgActive(ctx context.Context, c *ops.Call, in *OrgInput) (bool, error) {
 	var b bool
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.jobs WHERE customer_org_id = $1 AND status NOT IN ('completed','cancelled'))`, in.OrgID).Scan(&b)
+
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.jobs WHERE customer_org_id = $1 AND status NOT IN ('completed','cancelled'))`, in.OrgID).
+		Scan(&b)
+
 	return b, err
 }

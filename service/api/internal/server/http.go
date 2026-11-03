@@ -23,25 +23,51 @@ const requestTimeout = 30 * time.Second
 // newEcho assembles the HTTP layer following the Echo guide: one Echo instance, the Recover / RequestID /
 // RequestLogger / ContextTimeout middleware chain, a versioned route group, and a central HTTPErrorHandler that
 // turns every returned error into the DomainError body of service-contracts.ts.
-func newEcho(reg *ops.Registry, m *db.TxManager, a *auth.Authenticator, logger *slog.Logger, internalToken string, servesIdentity bool) (*echo.Echo, error) {
+func newEcho(
+	reg *ops.Registry,
+	m *db.TxManager,
+	a *auth.Authenticator,
+	logger *slog.Logger,
+	internalToken string,
+	servesIdentity bool,
+) (*echo.Echo, error) {
 	e := echo.New()
 	if logger != nil {
 		e.Logger = logger
 	}
+
 	e.HTTPErrorHandler = ops.HTTPErrorHandler
 	e.Use(middleware.Recover())
 	e.Use(middleware.RequestIDWithConfig(middleware.RequestIDConfig{
 		Generator: func() string { return uuid.Must(uuid.NewV7()).String() }, // correlation IDs are UUIDv7 (D07)
 	}))
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
-		LogStatus: true, LogMethod: true, LogURI: true, LogRequestID: true, LogLatency: true, HandleError: true,
+		LogStatus:    true,
+		LogMethod:    true,
+		LogURI:       true,
+		LogRequestID: true,
+		LogLatency:   true,
+		HandleError:  true,
 		LogValuesFunc: func(c *echo.Context, v middleware.RequestLoggerValues) error {
 			level := slog.LevelInfo
 			if v.Status >= http.StatusInternalServerError {
 				level = slog.LevelError
 			}
-			e.Logger.LogAttrs(c.Request().Context(), level, "request", slog.String("method", v.Method), slog.String("uri", v.URI),
-				slog.Int("status", v.Status), slog.String("request_id", v.RequestID), slog.Duration("latency", v.Latency))
+
+			e.Logger.LogAttrs(
+				c.Request().Context(),
+				level,
+				"request",
+				slog.String("method", v.Method),
+				slog.String("uri", v.URI),
+				slog.Int(
+					"status",
+					v.Status,
+				),
+				slog.String("request_id", v.RequestID),
+				slog.Duration("latency", v.Latency),
+			)
+
 			return nil
 		},
 	}))
@@ -52,19 +78,33 @@ func newEcho(reg *ops.Registry, m *db.TxManager, a *auth.Authenticator, logger *
 		if err := m.Writer.Ping(c.Request().Context()); err != nil {
 			return apperr.E(apperr.Unavailable, "error.unavailable")
 		}
+
 		return c.NoContent(http.StatusOK)
 	})
+
 	if internalToken != "" && servesIdentity {
-		e.GET(auth.PrincipalPath, principalHandler(a, internalToken)) // IR181 step 1; not routed by the gateway
+		e.GET(
+			auth.PrincipalPath,
+			principalHandler(a, internalToken),
+		) // IR181 step 1; not routed by the gateway
 	}
+
 	if internalToken != "" { // internal queries between the services (IR190, IR195); not routed by the gateway
-		e.Group("/internal/v1", a.Middleware()).POST("/queries/:query", reg.ServeQuery(internalToken))
-		e.POST(ops.SystemQueryPath, reg.ServeSystemQuery(internalToken)) // worker calls without a user
+		e.Group("/internal/v1", a.Middleware()).
+			POST("/queries/:query", reg.ServeQuery(internalToken))
+		e.POST(
+			ops.SystemQueryPath,
+			reg.ServeSystemQuery(internalToken),
+		) // worker calls without a user
 	}
+
 	v1 := e.Group("/v1", a.Middleware())
-	if err := reg.MountREST(v1); err != nil { // the catalog's REST routes of the served operations (IR222)
+	if err := reg.MountREST(
+		v1,
+	); err != nil { // the catalog's REST routes of the served operations (IR222)
 		return nil, err
 	}
+
 	return e, nil
 }
 
@@ -77,24 +117,32 @@ func principalHandler(a *auth.Authenticator, token string) echo.HandlerFunc {
 		if subtle.ConstantTimeCompare([]byte(got), []byte(token)) != 1 {
 			return apperr.E(apperr.Unauthenticated, "error.unauthenticated")
 		}
+
 		q := c.QueryParams()
 		tenant, err1 := uuid.Parse(q.Get("tenant"))
 		membership, err2 := uuid.Parse(q.Get("membership"))
-		var signedIn time.Time
-		var err3 error
+
+		var (
+			signedIn time.Time
+			err3     error
+		)
 		if raw := q.Get("signedIn"); raw != "" {
 			signedIn, err3 = time.Parse(time.RFC3339, raw)
 		}
+
 		if err1 != nil || err2 != nil || err3 != nil || q.Get("subject") == "" {
 			return apperr.Fields(map[string]string{"_": "error.malformedInput"})
 		}
+
 		p, err := a.Principal(c.Request().Context(), q.Get("subject"), tenant, membership, signedIn)
 		if err != nil {
 			if de := apperr.From(err); de.Code == apperr.NotFound {
 				return apperr.E(apperr.NotFound, "error.membershipInvalid")
 			}
+
 			return err
 		}
+
 		return c.JSON(http.StatusOK, auth.ToDTO(p))
 	}
 }

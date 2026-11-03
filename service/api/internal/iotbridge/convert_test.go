@@ -15,11 +15,23 @@ var (
 
 func batch(device string, seqs ...int64) devicesim.Batch {
 	b := devicesim.Batch{DeviceID: DeviceID(device).String()}
+
 	for i, s := range seqs {
 		name := []string{"temperature", "power"}[i%2]
 		v := 24.5
-		b.Measurements = append(b.Measurements, devicesim.Measurement{SensorID: name, Metric: name, Value: &v, Unit: "°C", ObservedAt: at, Sequence: s})
+		b.Measurements = append(
+			b.Measurements,
+			devicesim.Measurement{
+				SensorID:   name,
+				Metric:     name,
+				Value:      &v,
+				Unit:       "°C",
+				ObservedAt: at,
+				Sequence:   s,
+			},
+		)
 	}
+
 	return b
 }
 
@@ -27,25 +39,34 @@ func batch(device string, seqs ...int64) devicesim.Batch {
 // measured and valid, with the scenario label and the receiving time.
 func TestTriggersUseTheFixtureIDs(t *testing.T) {
 	r := NewResolver(Links)
+
 	out, err := r.Triggers(batch("device-online-rto", 1, 2), received)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if len(out) != 2 {
 		t.Fatalf("%d triggers, want 2", len(out))
 	}
+
 	tr := out[0]
-	if tr.ScenarioID != Scenario || tr.EventType != "telemetry" || tr.Measurement.Origin != "measured" {
+	if tr.ScenarioID != Scenario || tr.EventType != "telemetry" ||
+		tr.Measurement.Origin != "measured" {
 		t.Errorf("trigger %+v", tr)
 	}
-	if tr.Measurement.UnitID != seed.ID("unit-online-rto") || tr.Measurement.SensorID != seed.ID("sensor-online-temperature") {
+
+	if tr.Measurement.UnitID != seed.ID("unit-online-rto") ||
+		tr.Measurement.SensorID != seed.ID("sensor-online-temperature") {
 		t.Errorf("unit or sensor ID %v %v", tr.Measurement.UnitID, tr.Measurement.SensorID)
 	}
-	if tr.Measurement.Value == nil || *tr.Measurement.Value != 24.5 || !tr.Measurement.ReceivedAt.Equal(received) {
+
+	if tr.Measurement.Value == nil || *tr.Measurement.Value != 24.5 ||
+		!tr.Measurement.ReceivedAt.Equal(received) {
 		t.Errorf("value or receipt time %+v", tr.Measurement)
 	}
 	// the API keys a repeat on the measurement's own event ID and the scenario sequence: both must be the reading's
-	if tr.Measurement.Quality != "valid" || tr.Measurement.EventID != tr.EventID || tr.Measurement.Sequence != nil {
+	if tr.Measurement.Quality != "valid" || tr.Measurement.EventID != tr.EventID ||
+		tr.Measurement.Sequence != nil {
 		t.Errorf("quality, event ID or sequence of the measurement: %+v", tr.Measurement)
 	}
 }
@@ -57,17 +78,22 @@ func TestEventIDIsOnePerReading(t *testing.T) {
 	a, _ := r.Triggers(batch("device-online-rto", 7), received)
 	b, _ := r.Triggers(batch("device-online-rto", 7), received.Add(time.Minute))
 	next := batch("device-online-rto", 8)
-	next.Measurements[0].ObservedAt = at.Add(time.Minute) // the next reading of the sensor is another reading
+	next.Measurements[0].ObservedAt = at.Add(
+		time.Minute,
+	) // the next reading of the sensor is another reading
 	c, _ := r.Triggers(next, received)
+
 	if a[0].EventID != b[0].EventID {
 		t.Error("a redelivered reading has a new event ID")
 	}
+
 	if a[0].EventID == c[0].EventID {
 		t.Error("two readings share an event ID")
 	}
 	// a restarted simulator starts its sequence again: the same sequence at a later time is another reading
 	later := batch("device-online-rto", 7)
 	later.Measurements[0].ObservedAt = at.Add(time.Hour)
+
 	d, _ := r.Triggers(later, received)
 	if d[0].EventID == a[0].EventID {
 		t.Error("a restarted sequence at a later time is the same event")
@@ -86,11 +112,23 @@ func TestUnknownDeviceIsRefused(t *testing.T) {
 // batch still convert.
 func TestUnknownSensorSkipsOnlyThatReading(t *testing.T) {
 	b := batch("device-offline-rto", 1, 2)
-	b.Measurements = append(b.Measurements, devicesim.Measurement{SensorID: "humidity", Metric: "humidity", Value: ptr(50), Unit: "%", ObservedAt: at, Sequence: 3})
+	b.Measurements = append(
+		b.Measurements,
+		devicesim.Measurement{
+			SensorID:   "humidity",
+			Metric:     "humidity",
+			Value:      new(float64(50)),
+			Unit:       "%",
+			ObservedAt: at,
+			Sequence:   3,
+		},
+	)
+
 	out, err := NewResolver(Links).Triggers(b, received)
 	if err == nil {
 		t.Error("an unknown sensor is not reported")
 	}
+
 	if len(out) != 2 {
 		t.Errorf("%d triggers, want the two known readings", len(out))
 	}
@@ -101,20 +139,33 @@ func TestUnknownSensorSkipsOnlyThatReading(t *testing.T) {
 func TestCommandTriggerMapsTheAcknowledgement(t *testing.T) {
 	cmd := "9f67089f-44c9-5231-ba20-03d3b9a1be53"
 	ack := func(result string) devicesim.Ack {
-		return devicesim.Ack{DeviceID: DeviceID("device-online-rto").String(), CommandID: cmd, Result: result}
+		return devicesim.Ack{
+			DeviceID:  DeviceID("device-online-rto").String(),
+			CommandID: cmd,
+			Result:    result,
+		}
 	}
+
 	tr, ok, err := CommandTrigger(ack("applied"), received)
-	if err != nil || !ok || tr.EventType != "command_ack" || tr.CommandID == nil || tr.CommandID.String() != cmd || tr.Measurement != nil {
+	if err != nil || !ok || tr.EventType != "command_ack" || tr.CommandID == nil ||
+		tr.CommandID.String() != cmd ||
+		tr.Measurement != nil {
 		t.Fatalf("applied: %+v ok=%v err=%v", tr, ok, err)
 	}
+
 	tr, ok, _ = CommandTrigger(ack("unsupported"), received)
 	if !ok || tr.EventType != "command_fail" {
 		t.Errorf("unsupported: %+v ok=%v", tr, ok)
 	}
+
 	if _, ok, _ := CommandTrigger(ack("expired"), received); ok {
 		t.Error("an expired acknowledgement is forwarded")
 	}
-	if _, _, err := CommandTrigger(devicesim.Ack{CommandID: "not-a-uuid", Result: "applied"}, received); err == nil {
+
+	if _, _, err := CommandTrigger(
+		devicesim.Ack{CommandID: "not-a-uuid", Result: "applied"},
+		received,
+	); err == nil {
 		t.Error("a command ID that is not a UUID is accepted")
 	}
 }
@@ -127,8 +178,6 @@ func TestBadDeviceIDIsRefused(t *testing.T) {
 	}
 }
 
-func ptr(v float64) *float64 { return &v }
-
 // TestFleetLinksResolve: a mock fleet module's reading converts onto its own unit and sensor, and a unit without a
 // module has no link.
 func TestFleetLinksResolve(t *testing.T) {
@@ -136,18 +185,24 @@ func TestFleetLinksResolve(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	links := FleetLinks(f)
 	if len(links) != 18 {
 		t.Fatalf("%d fleet links, want one per pattern with a module (18)", len(links))
 	}
+
 	r := NewResolver(append(append([]Link{}, Links...), links...))
+
 	out, err := r.Triggers(batch("device-mock-tamper", 1, 2), received)
 	if err != nil || len(out) != 2 {
 		t.Fatalf("fleet reading: %d triggers, err %v", len(out), err)
 	}
-	if out[0].Measurement.UnitID != seed.ID("unit-mock-tamper") || out[0].Measurement.SensorID != seed.ID("sensor-mock-tamper-temperature") {
+
+	if out[0].Measurement.UnitID != seed.ID("unit-mock-tamper") ||
+		out[0].Measurement.SensorID != seed.ID("sensor-mock-tamper-temperature") {
 		t.Errorf("fleet IDs %v %v", out[0].Measurement.UnitID, out[0].Measurement.SensorID)
 	}
+
 	if _, err := r.Triggers(batch("device-mock-no-module", 1), received); err == nil {
 		t.Error("a unit without a module has a link")
 	}
@@ -164,21 +219,30 @@ func TestToScenarioKeepsTheMinuteSlot(t *testing.T) {
 	b.Measurements[0].ObservedAt = now.Truncate(time.Minute)
 	b.Measurements[1].ObservedAt = now.Truncate(time.Minute).Add(time.Hour)
 	got := ToScenario(b, now, offset, margin)
+
 	slot := now.Add(offset - margin).Truncate(time.Minute)
 	if !got.Measurements[0].ObservedAt.Equal(slot) {
 		t.Errorf("reading at %v, want the received minute %v", got.Measurements[0].ObservedAt, slot)
 	}
+
 	if !got.Measurements[1].ObservedAt.Equal(slot.Add(time.Hour)) {
-		t.Errorf("future reading at %v, want %v", got.Measurements[1].ObservedAt, slot.Add(time.Hour))
+		t.Errorf(
+			"future reading at %v, want %v",
+			got.Measurements[1].ObservedAt,
+			slot.Add(time.Hour),
+		)
 	}
+
 	if !b.Measurements[0].ObservedAt.Equal(now.Truncate(time.Minute)) {
 		t.Error("the given batch was changed")
 	}
+
 	if received := now.Add(offset - margin); got.Measurements[0].ObservedAt.After(received) {
 		t.Error("a reading is observed after it was received")
 	}
 	// a batch the module stamped a minute earlier (sent late) still lands in the minute it was received in
 	late := batch("device-online-rto", 3)
+
 	late.Measurements[0].ObservedAt = now.Truncate(time.Minute).Add(-time.Minute)
 	if got := ToScenario(late, now, offset, margin); !got.Measurements[0].ObservedAt.Equal(slot) {
 		t.Errorf("late reading at %v, want %v", got.Measurements[0].ObservedAt, slot)
@@ -192,20 +256,24 @@ func TestLinksFollowTheFixture(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	devices := map[string]struct{ unit, connection string }{}
 	for _, d := range f.DemoSeed.Devices {
 		unit := ""
 		if d.UnitID != nil {
 			unit = *d.UnitID
 		}
+
 		devices[d.ID] = struct{ unit, connection string }{unit, d.Connection}
 	}
+
 	for _, l := range Links {
 		d, ok := devices[l.Device]
 		if !ok || d.unit != l.Unit || d.connection != l.Connection {
 			t.Errorf("%s: link %s/%s, fixture %+v", l.Device, l.Unit, l.Connection, d)
 		}
 	}
+
 	if len(Links) != len(devices) {
 		t.Errorf("%d links for %d fixture devices", len(Links), len(devices))
 	}

@@ -34,20 +34,46 @@ func (Store) Create(ctx context.Context, c *ops.Call, n New) (uuid.UUID, error) 
 	if n.Params == nil {
 		n.Params = map[string]any{}
 	}
+
 	if n.Severity == "" {
 		n.Severity = "normal"
 	}
+
 	if n.Channel == "" {
 		n.Channel = "inApp"
 	}
+
 	id := uuid.Must(uuid.NewV7())
+
 	var tenant uuid.UUID
-	if err := c.Tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')::uuid`).Scan(&tenant); err != nil {
+	if err := c.Tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')::uuid`).
+		Scan(&tenant); err != nil {
 		return id, err
 	}
-	return id, events.Publish(ctx, c.Tx, tenant, "notification", id, events.NotificationRequested, events.Notification{
-		NotificationID: id, RecipientMembershipID: n.RecipientMembershipID, Channel: n.Channel, Type: n.Type, TemplateKey: n.TemplateKey,
-		Target: events.Target{Kind: n.TargetKind, ID: n.TargetID}, Params: n.Params, Severity: n.Severity, SourceAlertID: n.SourceAlertID, OccurredAt: c.Now})
+
+	return id, events.Publish(
+		ctx,
+		c.Tx,
+		tenant,
+		"notification",
+		id,
+		events.NotificationRequested,
+		events.Notification{
+			NotificationID:        id,
+			RecipientMembershipID: n.RecipientMembershipID,
+			Channel:               n.Channel,
+			Type:                  n.Type,
+			TemplateKey:           n.TemplateKey,
+			Target: events.Target{
+				Kind: n.TargetKind,
+				ID:   n.TargetID,
+			},
+			Params:        n.Params,
+			Severity:      n.Severity,
+			SourceAlertID: n.SourceAlertID,
+			OccurredAt:    c.Now,
+		},
+	)
 }
 
 // EventHandlers store requested notifications (consumer identity, IR191).
@@ -58,13 +84,28 @@ func EventHandlers() map[string]events.Handler {
 			if err := e.Decode(&p); err != nil {
 				return err
 			}
+
 			target, _ := json.Marshal(p.Target)
 			params, _ := json.Marshal(p.Params)
-			_, err := tx.Exec(ctx, `INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type, channel, template_key, target, params,
+			_, err := tx.Exec(
+				ctx,
+				`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type, channel, template_key, target, params,
 				source_alert_id, severity, occurred_at, created_at)
 				SELECT $1, $2, m.id, m.scope_version, $4, $5, $6, $7, $8, $9, $10, $11, $11 FROM identity.memberships m WHERE m.id = $3
 				ON CONFLICT (id) DO NOTHING`,
-				p.NotificationID, e.TenantID, p.RecipientMembershipID, p.Type, p.Channel, p.TemplateKey, target, params, p.SourceAlertID, p.Severity, p.OccurredAt)
+				p.NotificationID,
+				e.TenantID,
+				p.RecipientMembershipID,
+				p.Type,
+				p.Channel,
+				p.TemplateKey,
+				target,
+				params,
+				p.SourceAlertID,
+				p.Severity,
+				p.OccurredAt,
+			)
+
 			return err
 		},
 	}
@@ -74,17 +115,82 @@ func EventHandlers() map[string]events.Handler {
 // RowChanged events: targets (units, jobs, invoices, restrictions, devices, inquiries, certificates) and job parties
 // (offers, assignments, the job histories frozen for them) for the IR142 read scope and recipients.
 var Replicas = []events.Replica{
-	{Source: "assets.units", Table: "notify.ref_units", Keys: []string{"id"}, Cols: []string{"tenant_id", "customer_org_id", "property_id", "display_name"}},
-	{Source: "assets.customers", Table: "notify.ref_customers", Keys: []string{"id"}, Cols: []string{"tenant_id", "organization_id"}},
-	{Source: "maintenance.jobs", Table: "notify.ref_jobs", Keys: []string{"id"}, Cols: []string{"tenant_id", "unit_id", "customer_org_id"}},
-	{Source: "maintenance.offers", Table: "notify.ref_offers", Keys: []string{"id"}, Cols: []string{"tenant_id", "job_id", "contractor_org_id"}},
-	{Source: "maintenance.assignments", Table: "notify.ref_assignments", Keys: []string{"id"}, Cols: []string{"tenant_id", "job_id", "technician_membership_id", "status", "scheduled"}},
-	{Source: "billing.invoices", Table: "notify.ref_invoices", Keys: []string{"id"}, Cols: []string{"tenant_id", "number", "customer_id", "status", "due_at"}},
-	{Source: "billing.inquiries", Table: "notify.ref_inquiries", Keys: []string{"id"}, Cols: []string{"tenant_id", "customer_id", "subject_type"}},
-	{Source: "restrictions.restrictions", Table: "notify.ref_restrictions", Keys: []string{"id"}, Cols: []string{"tenant_id", "customer_id"}},
-	{Source: "restrictions.restriction_units", Table: "notify.ref_restriction_units", Keys: []string{"restriction_id", "unit_id"}, Cols: []string{"tenant_id"}},
-	{Source: "devices.devices", Table: "notify.ref_devices", Keys: []string{"id"}, Cols: []string{"tenant_id", "serial", "unit_id"}},
-	{Source: "assets.properties", Table: "notify.ref_properties", Keys: []string{"id"}, Cols: []string{"tenant_id", "customer_org_id"}},                                     // identity scopes (IR194)
-	{Source: "maintenance.certificates", Table: "notify.ref_certificates", Keys: []string{"id"}, Cols: []string{"tenant_id", "organization_id", "membership_id", "name"}},   // IR336
-	{Source: "maintenance.job_history_snapshots", Table: "notify.ref_job_histories", Keys: []string{"id"}, Cols: []string{"tenant_id", "job_id", "owner_kind", "owner_id"}}, // IR601
+	{
+		Source: "assets.units",
+		Table:  "notify.ref_units",
+		Keys:   []string{"id"},
+		Cols:   []string{"tenant_id", "customer_org_id", "property_id", "display_name"},
+	},
+	{
+		Source: "assets.customers",
+		Table:  "notify.ref_customers",
+		Keys:   []string{"id"},
+		Cols:   []string{"tenant_id", "organization_id"},
+	},
+	{
+		Source: "maintenance.jobs",
+		Table:  "notify.ref_jobs",
+		Keys:   []string{"id"},
+		Cols:   []string{"tenant_id", "unit_id", "customer_org_id"},
+	},
+	{
+		Source: "maintenance.offers",
+		Table:  "notify.ref_offers",
+		Keys:   []string{"id"},
+		Cols:   []string{"tenant_id", "job_id", "contractor_org_id"},
+	},
+	{
+		Source: "maintenance.assignments",
+		Table:  "notify.ref_assignments",
+		Keys:   []string{"id"},
+		Cols:   []string{"tenant_id", "job_id", "technician_membership_id", "status", "scheduled"},
+	},
+	{
+		Source: "billing.invoices",
+		Table:  "notify.ref_invoices",
+		Keys:   []string{"id"},
+		Cols:   []string{"tenant_id", "number", "customer_id", "status", "due_at"},
+	},
+	{
+		Source: "billing.inquiries",
+		Table:  "notify.ref_inquiries",
+		Keys:   []string{"id"},
+		Cols:   []string{"tenant_id", "customer_id", "subject_type"},
+	},
+	{
+		Source: "restrictions.restrictions",
+		Table:  "notify.ref_restrictions",
+		Keys:   []string{"id"},
+		Cols:   []string{"tenant_id", "customer_id"},
+	},
+	{
+		Source: "restrictions.restriction_units",
+		Table:  "notify.ref_restriction_units",
+		Keys:   []string{"restriction_id", "unit_id"},
+		Cols:   []string{"tenant_id"},
+	},
+	{
+		Source: "devices.devices",
+		Table:  "notify.ref_devices",
+		Keys:   []string{"id"},
+		Cols:   []string{"tenant_id", "serial", "unit_id"},
+	},
+	{
+		Source: "assets.properties",
+		Table:  "notify.ref_properties",
+		Keys:   []string{"id"},
+		Cols:   []string{"tenant_id", "customer_org_id"},
+	}, // identity scopes (IR194)
+	{
+		Source: "maintenance.certificates",
+		Table:  "notify.ref_certificates",
+		Keys:   []string{"id"},
+		Cols:   []string{"tenant_id", "organization_id", "membership_id", "name"},
+	}, // IR336
+	{
+		Source: "maintenance.job_history_snapshots",
+		Table:  "notify.ref_job_histories",
+		Keys:   []string{"id"},
+		Cols:   []string{"tenant_id", "job_id", "owner_kind", "owner_id"},
+	}, // IR601
 }

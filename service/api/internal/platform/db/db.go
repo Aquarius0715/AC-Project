@@ -33,20 +33,25 @@ func Open(ctx context.Context, writerURL, readerURL string) (*TxManager, error) 
 	if err != nil {
 		return nil, err
 	}
+
 	if readerURL == "" || readerURL == writerURL {
 		return &TxManager{Writer: w, Reader: w}, nil
 	}
+
 	r, err := newPool(ctx, readerURL)
 	if err != nil {
 		w.Close()
+
 		return nil, err
 	}
+
 	return &TxManager{Writer: w, Reader: r}, nil
 }
 
 // Close closes the pools.
 func (m *TxManager) Close() {
 	m.Writer.Close()
+
 	if m.Reader != m.Writer {
 		m.Reader.Close()
 	}
@@ -54,30 +59,44 @@ func (m *TxManager) Close() {
 
 // Run implements ops.Runner: RLS context via set_config(..., true) and up to three attempts on serialization
 // failure or deadlock.
-func (m *TxManager) Run(ctx context.Context, readOnly bool, p *ops.Principal, fn func(pgx.Tx) error) error {
+func (m *TxManager) Run(
+	ctx context.Context,
+	readOnly bool,
+	p *ops.Principal,
+	fn func(pgx.Tx) error,
+) error {
 	pool, opts := m.Writer, pgx.TxOptions{IsoLevel: pgx.ReadCommitted}
 	if readOnly {
 		pool, opts = m.Reader, pgx.TxOptions{AccessMode: pgx.ReadOnly}
 	}
+
 	var err error
-	for attempt := 0; attempt < 3; attempt++ {
+	for range 3 {
 		err = pgx.BeginTxFunc(ctx, pool, opts, func(tx pgx.Tx) error {
 			if p != nil {
-				if _, err := tx.Exec(ctx, "SELECT set_config('app.tenant_id', $1, true), set_config('app.membership_id', $2, true)",
-					p.TenantID.String(), p.MembershipID.String()); err != nil {
+				if _, err := tx.Exec(
+					ctx,
+					"SELECT set_config('app.tenant_id', $1, true), set_config('app.membership_id', $2, true)",
+					p.TenantID.String(),
+					p.MembershipID.String(),
+				); err != nil {
 					return err
 				}
 			}
+
 			return fn(tx)
 		})
+
 		var pg *pgconn.PgError
 		if !(errors.As(err, &pg) && (pg.Code == "40001" || pg.Code == "40P01")) {
 			break
 		}
 	}
+
 	if err != nil {
 		return apperr.From(err)
 	}
+
 	return nil
 }
 
@@ -89,58 +108,106 @@ func (s Idempotency) tx(ctx context.Context, p *ops.Principal, fn func(pgx.Tx) e
 }
 
 // Begin claims a key or returns the stored response.
-func (s Idempotency) Begin(ctx context.Context, p *ops.Principal, op, key, hash string) (json.RawMessage, error) {
+func (s Idempotency) Begin(
+	ctx context.Context,
+	p *ops.Principal,
+	op, key, hash string,
+) (json.RawMessage, error) {
 	if p == nil {
 		return nil, nil // public demo operations are not keyed per membership
 	}
+
 	h, err := hex.DecodeString(hash)
 	if err != nil {
 		return nil, fmt.Errorf("hash: %w", err)
 	}
+
 	var stored json.RawMessage
+
 	err = s.tx(ctx, p, func(tx pgx.Tx) error {
-		tag, err := tx.Exec(ctx, `INSERT INTO platform.idempotency_keys (tenant_id, membership_id, key, operation, request_hash, status)
-			VALUES ($1,$2,$3,$4,$5,'in_progress') ON CONFLICT DO NOTHING`, p.TenantID, p.MembershipID, key, op, h)
+		tag, err := tx.Exec(
+			ctx,
+			`INSERT INTO platform.idempotency_keys (tenant_id, membership_id, key, operation, request_hash, status)
+			VALUES ($1,$2,$3,$4,$5,'in_progress') ON CONFLICT DO NOTHING`,
+			p.TenantID,
+			p.MembershipID,
+			key,
+			op,
+			h,
+		)
 		if err != nil {
 			return err
 		}
+
 		if tag.RowsAffected() == 1 {
 			return nil
 		}
-		var gotOp, status string
-		var gotHash []byte
-		var resp []byte
-		var expired bool
+
+		var (
+			gotOp, status string
+			gotHash       []byte
+			resp          []byte
+			expired       bool
+		)
 		if err := tx.QueryRow(ctx, `SELECT operation, request_hash, status, response, expires_at < platform.app_now() FROM platform.idempotency_keys
-			WHERE tenant_id=$1 AND membership_id=$2 AND key=$3 FOR UPDATE`, p.TenantID, p.MembershipID, key).Scan(&gotOp, &gotHash, &status, &resp, &expired); err != nil {
+			WHERE tenant_id=$1 AND membership_id=$2 AND key=$3 FOR UPDATE`, p.TenantID, p.MembershipID, key).
+			Scan(&gotOp, &gotHash, &status, &resp, &expired); err != nil {
 			return err
 		}
+
 		if expired {
-			_, err := tx.Exec(ctx, `UPDATE platform.idempotency_keys SET operation=$4, request_hash=$5, status='in_progress', response=NULL,
+			_, err := tx.Exec(
+				ctx,
+				`UPDATE platform.idempotency_keys SET operation=$4, request_hash=$5, status='in_progress', response=NULL,
 				created_at=platform.app_now(), expires_at=platform.app_now()+interval '24 hours' WHERE tenant_id=$1 AND membership_id=$2 AND key=$3`,
-				p.TenantID, p.MembershipID, key, op, h)
+				p.TenantID,
+				p.MembershipID,
+				key,
+				op,
+				h,
+			)
+
 			return err
 		}
+
 		if gotOp != op || hex.EncodeToString(gotHash) != hash {
 			return apperr.E(apperr.Conflict, "error.idempotencyKeyReused")
 		}
+
 		if status == "in_progress" {
 			return apperr.E(apperr.Conflict, "error.requestInProgress").RetryAfter(1)
 		}
+
 		stored = resp
+
 		return nil
 	})
+
 	return stored, err
 }
 
 // Complete stores the response.
-func (s Idempotency) Complete(ctx context.Context, p *ops.Principal, op, key string, resp json.RawMessage) error {
+func (s Idempotency) Complete(
+	ctx context.Context,
+	p *ops.Principal,
+	op, key string,
+	resp json.RawMessage,
+) error {
 	if p == nil {
 		return nil
 	}
+
 	return s.tx(ctx, p, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `UPDATE platform.idempotency_keys SET status='completed', http_status=200, response=$4
-			WHERE tenant_id=$1 AND membership_id=$2 AND key=$3`, p.TenantID, p.MembershipID, key, resp)
+		_, err := tx.Exec(
+			ctx,
+			`UPDATE platform.idempotency_keys SET status='completed', http_status=200, response=$4
+			WHERE tenant_id=$1 AND membership_id=$2 AND key=$3`,
+			p.TenantID,
+			p.MembershipID,
+			key,
+			resp,
+		)
+
 		return err
 	})
 }
@@ -150,9 +217,16 @@ func (s Idempotency) Abort(ctx context.Context, p *ops.Principal, op, key string
 	if p == nil {
 		return
 	}
+
 	_ = s.tx(ctx, p, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `DELETE FROM platform.idempotency_keys WHERE tenant_id=$1 AND membership_id=$2 AND key=$3 AND status='in_progress'`,
-			p.TenantID, p.MembershipID, key)
+		_, err := tx.Exec(
+			ctx,
+			`DELETE FROM platform.idempotency_keys WHERE tenant_id=$1 AND membership_id=$2 AND key=$3 AND status='in_progress'`,
+			p.TenantID,
+			p.MembershipID,
+			key,
+		)
+
 		return err
 	})
 }
@@ -162,17 +236,36 @@ type Recorder struct{}
 
 // RecordDenied implements ops.DeniedRecorder: the audit entry of a refused write, result denied — the actor, the
 // operation, the target it asked for and the refusal's message key as the reason; no input values (IR603).
-func (Recorder) RecordDenied(ctx context.Context, tx pgx.Tx, c *ops.Call, op string, d ops.Denial) error {
+func (Recorder) RecordDenied(
+	ctx context.Context,
+	tx pgx.Tx,
+	c *ops.Call,
+	op string,
+	d ops.Denial,
+) error {
 	p := c.Principal
 	id := uuid.Must(uuid.NewV7())
+
 	var membership *uuid.UUID
+
 	if p.MembershipID != uuid.Nil {
 		m := p.MembershipID
 		membership = &m
 	}
-	return events.Publish(ctx, tx, p.TenantID, "audit", id, events.AuditRecorded, events.Audit{ID: id, ActorID: p.UserID.String(), ActorRole: p.Role,
-		MembershipID: membership, Action: op, TargetKind: d.TargetKind, TargetID: d.TargetID, OccurredAt: c.Now, CorrelationID: c.CorrelationID,
-		Result: "denied", Reason: d.Reason})
+
+	return events.Publish(ctx, tx, p.TenantID, "audit", id, events.AuditRecorded, events.Audit{
+		ID:            id,
+		ActorID:       p.UserID.String(),
+		ActorRole:     p.Role,
+		MembershipID:  membership,
+		Action:        op,
+		TargetKind:    d.TargetKind,
+		TargetID:      d.TargetID,
+		OccurredAt:    c.Now,
+		CorrelationID: c.CorrelationID,
+		Result:        "denied",
+		Reason:        d.Reason,
+	})
 }
 
 // Record implements ops.Recorder.
@@ -181,36 +274,77 @@ func (Recorder) Record(ctx context.Context, tx pgx.Tx, c *ops.Call, op string) e
 	if p == nil {
 		return nil
 	}
+
 	for _, a := range c.Audits { // the audit log is identity's: published in this transaction, stored by its consumer (IR196)
 		id := uuid.Must(uuid.NewV7())
+
 		result := a.Result
 		if result == "" {
 			result = "success"
 		}
+
 		var membership *uuid.UUID
+
 		if p.MembershipID != uuid.Nil {
 			m := p.MembershipID
 			membership = &m
 		}
-		if err := events.Publish(ctx, tx, p.TenantID, "audit", id, events.AuditRecorded, events.Audit{ID: id, ActorID: p.UserID.String(), ActorRole: p.Role,
-			MembershipID: membership, Action: a.Action, TargetKind: a.TargetKind, TargetID: a.TargetID, PreviousVersion: a.PreviousVersion, NextVersion: a.NextVersion,
-			OccurredAt: c.Now, CorrelationID: c.CorrelationID, Result: result, Reason: a.Reason, MaskedBefore: ops.Masked(a.Before), MaskedAfter: ops.Masked(a.After)}); err != nil {
+
+		if err := events.Publish(
+			ctx,
+			tx,
+			p.TenantID,
+			"audit",
+			id,
+			events.AuditRecorded,
+			events.Audit{
+				ID:              id,
+				ActorID:         p.UserID.String(),
+				ActorRole:       p.Role,
+				MembershipID:    membership,
+				Action:          a.Action,
+				TargetKind:      a.TargetKind,
+				TargetID:        a.TargetID,
+				PreviousVersion: a.PreviousVersion,
+				NextVersion:     a.NextVersion,
+				OccurredAt:      c.Now,
+				CorrelationID:   c.CorrelationID,
+				Result:          result,
+				Reason:          a.Reason,
+				MaskedBefore:    ops.Masked(a.Before),
+				MaskedAfter:     ops.Masked(a.After),
+			},
+		); err != nil {
 			return err
 		}
 	}
+
 	for _, e := range c.Events {
 		payload, err := json.Marshal(e.Payload)
 		if err != nil {
 			return err
 		}
+
 		if e.Payload == nil {
 			payload = []byte("{}")
 		}
-		if _, err := tx.Exec(ctx, `INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id, occurred_at)
-			VALUES ($1,$2,$3,$4,$5,$6,$7)`, p.TenantID, e.AggregateType, e.AggregateID, e.Type, payload, c.CorrelationID, c.Now); err != nil {
+
+		if _, err := tx.Exec(
+			ctx,
+			`INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id, occurred_at)
+			VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+			p.TenantID,
+			e.AggregateType,
+			e.AggregateID,
+			e.Type,
+			payload,
+			c.CorrelationID,
+			c.Now,
+		); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -221,9 +355,13 @@ func newPool(ctx context.Context, url string) (*pgxpool.Pool, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	cfg.AfterConnect = func(_ context.Context, conn *pgx.Conn) error {
-		conn.TypeMap().RegisterType(&pgtype.Type{Name: "timestamptz", OID: pgtype.TimestamptzOID, Codec: &pgtype.TimestamptzCodec{ScanLocation: time.UTC}})
+		conn.TypeMap().
+			RegisterType(&pgtype.Type{Name: "timestamptz", OID: pgtype.TimestamptzOID, Codec: &pgtype.TimestamptzCodec{ScanLocation: time.UTC}})
+
 		return nil
 	}
+
 	return pgxpool.NewWithConfig(ctx, cfg)
 }

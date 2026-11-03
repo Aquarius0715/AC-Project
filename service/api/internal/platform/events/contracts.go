@@ -10,7 +10,7 @@ import (
 // Event contracts between business-domain services (IR184). Producers publish these types; the owning service of
 // the affected data consumes them. Payloads are the only shared shape.
 const (
-	// billing (restrictions) → equipment
+	// billing (restrictions) → equipment.
 	UnitRestrictionApplied = "UnitRestrictionApplied" // set assets.units.observed_restriction
 	UnitRestrictionCleared = "UnitRestrictionCleared" // clear it when it still names the restriction
 	RecoveryCasesChanged   = "RecoveryCasesChanged"   // SR29: bump the version of the restriction's units
@@ -20,25 +20,25 @@ const (
 	RestrictionCommandRequested  = "RestrictionCommandRequested"  // create the device command billing decided (IR185)
 	RestrictionCommandsCancelled = "RestrictionCommandsCancelled" // cancel undelivered restriction commands
 
-	// equipment → billing (restrictions)
+	// equipment → billing (restrictions).
 	UnitRestrictionObserved = "UnitRestrictionObserved" // a device reported the restriction it enforces (SR26)
 	CommandAcknowledged     = "CommandAcknowledged"     // a restriction command was acknowledged in time
 	CommandsEnded           = "CommandsEnded"           // restriction commands failed or expired
 
-	// any domain → identity (IR191)
+	// any domain → identity (IR191).
 	NotificationRequested = "NotificationRequested" // store one notification (ID assigned by the producer)
 	QualificationGranted  = "QualificationGranted"  // maintenance → identity: a verified certificate covers a grant (IR192)
 	JobNoteRequested      = "JobNoteRequested"      // billing → maintenance: an internal job note (payout questions, IR193)
 	AuditRecorded         = "AuditRecorded"         // any domain → identity: one audit log entry (IR196)
 
-	// maintenance → equipment, written by row triggers on maintenance.offers / maintenance.assignments (IR186)
+	// maintenance → equipment, written by row triggers on maintenance.offers / maintenance.assignments (IR186).
 	OfferAccessChanged      = "OfferAccessChanged"      // a contractor's access window to a unit (accepted Offers)
 	AssignmentAccessChanged = "AssignmentAccessChanged" // a technician's viewing and work window on a unit
 
-	// identity → equipment (IR53, IR214)
+	// identity → equipment (IR53, IR214).
 	ConsentRevoked = "ConsentRevoked" // a membership withdrew location consent: disable its location automations
 
-	// maintenance → equipment: the source Alert of a filter cleaning reminder (IR134 item 5, IR239)
+	// maintenance → equipment: the source Alert of a filter cleaning reminder (IR134 item 5, IR239).
 	FilterCleaningDue     = "FilterCleaningDue"     // open the maintenance Alert of the unit's cleaning cycle
 	FilterCleaningCleared = "FilterCleaningCleared" // resolve it: a later cleaning ended the cycle
 )
@@ -106,7 +106,7 @@ type RestrictionCommand struct {
 	UnitID        uuid.UUID       `json:"unitId"`
 	DeviceID      *uuid.UUID      `json:"deviceId"`
 	ActorID       uuid.UUID       `json:"actorMembershipId"`
-	Action        json.RawMessage `json:"action" swaggertype:"object"`
+	Action        json.RawMessage `json:"action"            swaggertype:"object"`
 	RestrictionID uuid.UUID       `json:"restrictionId"`
 	Status        string          `json:"status"`
 	Delivery      string          `json:"delivery"`

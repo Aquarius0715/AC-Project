@@ -37,21 +37,40 @@ const factorCols = `f.id, f.tenant_id, f.version, (SELECT min(created_at) FROM e
 
 func scanFactor(r pgx.Row) (Factor, error) {
 	var x Factor
-	err := r.Scan(&x.ID, &x.TenantID, &x.Version, &x.CreatedAt, &x.UpdatedAt, &x.Region, &x.Year, &x.KgCO2ePerKWh, &x.Source)
+
+	err := r.Scan(
+		&x.ID,
+		&x.TenantID,
+		&x.Version,
+		&x.CreatedAt,
+		&x.UpdatedAt,
+		&x.Region,
+		&x.Year,
+		&x.KgCO2ePerKWh,
+		&x.Source,
+	)
 	x.IsDemo = true
+
 	return x, err
 }
 
 // LoadFactor returns a factor version (current when version is nil).
 func LoadFactor(ctx context.Context, c *ops.Call, id uuid.UUID, version *int) (Factor, error) {
-	q, args := "SELECT "+factorCols+" FROM energy.emission_factors f WHERE f.id = $1 AND f.is_current", []any{id}
-	if version != nil {
-		q, args = "SELECT "+factorCols+" FROM energy.emission_factors f WHERE f.id = $1 AND f.version = $2", []any{id, *version}
+	q, args := "SELECT "+factorCols+" FROM energy.emission_factors f WHERE f.id = $1 AND f.is_current", []any{
+		id,
 	}
+	if version != nil {
+		q, args = "SELECT "+factorCols+" FROM energy.emission_factors f WHERE f.id = $1 AND f.version = $2", []any{
+			id,
+			*version,
+		}
+	}
+
 	x, err := scanFactor(c.Tx.QueryRow(ctx, q, args...))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return x, apperr.E(apperr.NotFound, "error.notFound")
 	}
+
 	return x, err
 }
 
@@ -85,52 +104,99 @@ func listFactors(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 		Region *string `json:"region,omitempty"`
 		Year   *int    `json:"year,omitempty"`
 	}
+
 	if len(in.Filters) > 0 {
 		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
 		dec.DisallowUnknownFields()
+
 		if dec.Decode(&f) != nil {
-			return paging.Page[Factor]{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
+			return paging.Page[Factor]{}, apperr.Fields(
+				map[string]string{"filters": "error.invalid"},
+			)
 		}
 	}
-	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "f.id", "year": "f.year", "region": "f.region", "createdAt": "f.created_at", "updatedAt": "f.created_at"}, "f.year DESC, f.region ASC, f.id ASC")
+
+	order, err := paging.OrderBy(
+		in.Sort,
+		map[string]string{
+			"id":        "f.id",
+			"year":      "f.year",
+			"region":    "f.region",
+			"createdAt": "f.created_at",
+			"updatedAt": "f.created_at",
+		},
+		"f.year DESC, f.region ASC, f.id ASC",
+	)
 	if err != nil {
 		return paging.Page[Factor]{}, err
 	}
+
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Factor]{}, err
 	}
+
 	args := []any{}
-	add := func(v any) string { args = append(args, v); return fmt.Sprintf("$%d", len(args)) }
+	add := func(v any) string {
+		args = append(args, v)
+
+		return fmt.Sprintf("$%d", len(args))
+	}
+
 	conds := []string{"f.is_current"}
 	if f.Region != nil {
 		conds = append(conds, "f.region = "+add(*f.Region))
 	}
+
 	if f.Year != nil {
 		conds = append(conds, "f.year = "+add(*f.Year))
 	}
+
 	where := strings.Join(conds, " AND ")
+
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM energy.emission_factors f WHERE "+where, args...).Scan(&total); err != nil {
+	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM energy.emission_factors f WHERE "+where, args...).
+		Scan(&total); err != nil {
 		return paging.Page[Factor]{}, err
 	}
-	rows, err := c.Tx.Query(ctx, fmt.Sprintf("SELECT %s FROM energy.emission_factors f WHERE %s ORDER BY %s LIMIT %d OFFSET %d", factorCols, where, order, w.Limit, w.Offset), args...)
+
+	rows, err := c.Tx.Query(
+		ctx,
+		fmt.Sprintf(
+			"SELECT %s FROM energy.emission_factors f WHERE %s ORDER BY %s LIMIT %d OFFSET %d",
+			factorCols,
+			where,
+			order,
+			w.Limit,
+			w.Offset,
+		),
+		args...)
 	if err != nil {
 		return paging.Page[Factor]{}, err
 	}
 	defer rows.Close()
+
 	items := []Factor{}
+
 	for rows.Next() {
 		x, err := scanFactor(rows)
 		if err != nil {
 			return paging.Page[Factor]{}, err
 		}
+
 		items = append(items, x)
 	}
+
 	if err := rows.Err(); err != nil {
 		return paging.Page[Factor]{}, err
 	}
-	return paging.Page[Factor]{Items: items, NextCursor: w.Next(total), Total: total, SnapshotVersion: w.Snapshot}, nil
+
+	return paging.Page[Factor]{
+		Items:           items,
+		NextCursor:      w.Next(total),
+		Total:           total,
+		SnapshotVersion: w.Snapshot,
+	}, nil
 }
 
 // FactorInput is factors.save input (Save<EmissionFactor>).
@@ -146,22 +212,28 @@ type FactorInput struct {
 // Validate implements ops.Validator (DD-A14, IR147 item 1).
 func (in *FactorInput) Validate() map[string]string {
 	fe := map[string]string{}
+
 	in.Region, in.Source = strings.TrimSpace(in.Region), strings.TrimSpace(in.Source)
 	if n := utf8.RuneCountInString(in.Region); n < 1 || n > 120 {
 		fe["region"] = "error.length"
 	}
+
 	if in.Year < 2000 || in.Year > 2100 {
 		fe["year"] = "error.range"
 	}
+
 	if math.IsNaN(in.KgCO2ePerKWh) || in.KgCO2ePerKWh <= 0 || in.KgCO2ePerKWh > 10 {
 		fe["kgCO2ePerKWh"] = "error.range"
 	}
+
 	if n := utf8.RuneCountInString(in.Source); n < 1 || n > 500 {
 		fe["source"] = "error.length"
 	}
+
 	if !in.IsDemo {
 		fe["isDemo"] = "error.invalid"
 	}
+
 	return fe
 }
 
@@ -192,32 +264,65 @@ func (in *FactorInput) Validate() map[string]string {
 //	@Router			/v1/factors [post]
 func saveFactor(ctx context.Context, c *ops.Call, in *FactorInput) (Factor, error) {
 	id, version := uuid.New(), 1
+
 	if in.ID != nil {
 		cur, err := LoadFactor(ctx, c, *in.ID, nil)
 		if err != nil {
 			return cur, err
 		}
+
 		if cur.Version != *c.ExpectedVersion {
 			return cur, apperr.E(apperr.Conflict, "error.versionConflict")
 		}
+
 		id, version = cur.ID, cur.Version+1
 	}
+
 	var taken bool
-	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM energy.emission_factors WHERE is_current AND region = $1 AND year = $2 AND id <> $3)`, in.Region, in.Year, id).Scan(&taken); err != nil {
+	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM energy.emission_factors WHERE is_current AND region = $1 AND year = $2 AND id <> $3)`, in.Region, in.Year, id).
+		Scan(&taken); err != nil {
 		return Factor{}, err
 	}
+
 	if taken {
 		return Factor{}, apperr.Fields(map[string]string{"region": "errors.factor_exists"})
 	}
+
 	if version > 1 {
-		if _, err := c.Tx.Exec(ctx, `UPDATE energy.emission_factors SET is_current = false WHERE id = $1 AND is_current`, id); err != nil {
+		if _, err := c.Tx.Exec(
+			ctx,
+			`UPDATE energy.emission_factors SET is_current = false WHERE id = $1 AND is_current`,
+			id,
+		); err != nil {
 			return Factor{}, err
 		}
 	}
-	if _, err := c.Tx.Exec(ctx, `INSERT INTO energy.emission_factors (id, version, tenant_id, region, year, kg_co2e_per_kwh, source, created_by, created_at)
-		VALUES ($1, $2, current_setting('app.tenant_id')::uuid, $3, $4, $5, $6, $7, $8)`, id, version, in.Region, in.Year, in.KgCO2ePerKWh, in.Source, c.Principal.MembershipID, c.Now); err != nil {
+
+	if _, err := c.Tx.Exec(
+		ctx,
+		`INSERT INTO energy.emission_factors (id, version, tenant_id, region, year, kg_co2e_per_kwh, source, created_by, created_at)
+		VALUES ($1, $2, current_setting('app.tenant_id')::uuid, $3, $4, $5, $6, $7, $8)`,
+		id,
+		version,
+		in.Region,
+		in.Year,
+		in.KgCO2ePerKWh,
+		in.Source,
+		c.Principal.MembershipID,
+		c.Now,
+	); err != nil {
 		return Factor{}, err
 	}
-	c.Audit(ops.AuditEntry{Action: "factors.save", TargetKind: "emission_factor", TargetID: id.String(), PreviousVersion: c.ExpectedVersion, NextVersion: &version})
+
+	c.Audit(
+		ops.AuditEntry{
+			Action:          "factors.save",
+			TargetKind:      "emission_factor",
+			TargetID:        id.String(),
+			PreviousVersion: c.ExpectedVersion,
+			NextVersion:     &version,
+		},
+	)
+
 	return LoadFactor(ctx, c, id, nil)
 }

@@ -16,7 +16,9 @@ func HTTPErrorHandler(c *echo.Context, err error) {
 	if r, uerr := echo.UnwrapResponse(c.Response()); uerr == nil && r.Committed {
 		return
 	}
+
 	var de *apperr.DomainError
+
 	var sc echo.HTTPStatusCoder // Echo's own errors (route not found, method not allowed, body limit) carry a status
 	switch {
 	case errors.As(err, &de):
@@ -34,19 +36,27 @@ func HTTPErrorHandler(c *echo.Context, err error) {
 	default:
 		de = apperr.From(err)
 	}
+
 	if de.CorrelationID == "" {
-		de.CorrelationID = correlationID(c) // every ServiceError carries one, also for unknown routes (D07)
+		de.CorrelationID = correlationID(
+			c,
+		) // every ServiceError carries one, also for unknown routes (D07)
 	}
+
 	if de.HTTPStatus() >= http.StatusInternalServerError {
 		cause := err
 		if de.Cause() != nil {
 			cause = de.Cause()
 		}
+
 		c.Logger().Error("request failed", "error", cause, "request_id", de.CorrelationID)
 	}
+
 	if c.Request().Method == http.MethodHead {
 		_ = c.NoContent(de.HTTPStatus())
+
 		return
 	}
+
 	_ = c.JSON(de.HTTPStatus(), de)
 }

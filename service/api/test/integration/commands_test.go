@@ -16,12 +16,26 @@ import (
 func TestCommands(t *testing.T) {
 	s := server(t)
 	unit := seed.ID("unit-online-rto").String()
-	owner(t, `UPDATE control.commands SET status = 'expired' WHERE unit_id = $1 AND status IN ('requested','sent')`, unit)
-	owner(t, `UPDATE restrictions.restrictions SET state = 'cancelled' WHERE id IN (SELECT restriction_id FROM restrictions.restriction_units WHERE unit_id = $1)`, unit)
+	owner(
+		t,
+		`UPDATE control.commands SET status = 'expired' WHERE unit_id = $1 AND status IN ('requested','sent')`,
+		unit,
+	)
+	owner(
+		t,
+		`UPDATE restrictions.restrictions SET state = 'cancelled' WHERE id IN (SELECT restriction_id FROM restrictions.restriction_units WHERE unit_id = $1)`,
+		unit,
+	)
 	_, m := post(s, &customerA, "units.get", `{"id":"`+unit+`"}`)
 	v := ver(m)
 	cmd := func(a *actor, action, extra string, uv int) (int, map[string]any) {
-		return write(s, a, "commands.create", `{"unitId":"`+unit+`","action":`+action+`,"expectedUnitVersion":`+itoa(uv)+extra+`}`, 0)
+		return write(
+			s,
+			a,
+			"commands.create",
+			`{"unitId":"`+unit+`","action":`+action+`,"expectedUnitVersion":`+itoa(uv)+extra+`}`,
+			0,
+		)
 	}
 	refused := map[string]string{ // the field each VALIDATION case is refused for
 		"bad action":        "action=error.invalid",
@@ -33,6 +47,7 @@ func TestCommands(t *testing.T) {
 		"technician voice":  "source=error.notAllowed",
 		"unknown source":    "source=error.invalid",
 	}
+
 	for name, tc := range map[string]struct {
 		a      *actor
 		action string
@@ -54,6 +69,7 @@ func TestCommands(t *testing.T) {
 		if name == "stale unit version" {
 			uv = v + 5
 		}
+
 		code, m := cmd(tc.a, tc.action, tc.extra, uv)
 		if w, ok := refused[name]; ok {
 			refusal(t, name, code, m, w)
@@ -63,43 +79,73 @@ func TestCommands(t *testing.T) {
 	}
 	// the assistant's confirmed change (IR306): the same command, labelled voice
 	code, m := cmd(&customerA, `{"kind":"set_temperature","celsius":24}`, `,"source":"voice"`, v)
-	if code != 200 || data(m)["status"] != "requested" || data(m)["delivery"] != "not_sent" || data(m)["sentAt"] != nil || data(m)["source"] != "voice" || data(m)["expiresAt"] != clock.Add(30*time.Second).Format(time.RFC3339) {
+	if code != 200 || data(m)["status"] != "requested" || data(m)["delivery"] != "not_sent" ||
+		data(m)["sentAt"] != nil ||
+		data(m)["source"] != "voice" ||
+		data(m)["expiresAt"] != clock.Add(30*time.Second).Format(time.RFC3339) {
 		t.Fatalf("create: %d %v", code, m)
 	}
+
 	id := data(m)["id"].(string)
-	if code, m := cmd(&hq, `{"kind":"set_power","power":false}`, `,"reason":"check"`, v); code != 409 || m["messageKey"] != "errors.unit_busy" {
+	if code, m := cmd(
+		&hq,
+		`{"kind":"set_power","power":false}`,
+		`,"reason":"check"`,
+		v,
+	); code != 409 ||
+		m["messageKey"] != "errors.unit_busy" {
 		t.Errorf("busy: %d %v", code, m)
 	}
+
 	if code, _ := post(s, &customerA, "commands.get", `{"id":"`+id+`"}`); code != 200 {
 		t.Error("client get")
 	}
+
 	if code, _ := post(s, &customerB, "commands.get", `{"id":"`+id+`"}`); code != 404 {
 		t.Error("other customer get")
 	}
+
 	if code, _ := post(s, &techB, "commands.get", `{"id":"`+id+`"}`); code != 404 {
 		t.Error("out-of-scope technician get")
 	}
+
 	if code, _ := post(s, &hq, "commands.get", `{"id":"`+uuid.NewString()+`"}`); code != 404 {
 		t.Error("unknown command")
 	}
 	// the IoT gateway sends the requested command and reports it sent (demo trigger command_sent, the same update)
-	owner(t, `UPDATE control.commands SET status = 'sent', delivery = 'sent', sent_at = $2 WHERE id = $1 AND status = 'requested'`, id, clock)
+	owner(
+		t,
+		`UPDATE control.commands SET status = 'sent', delivery = 'sent', sent_at = $2 WHERE id = $1 AND status = 'requested'`,
+		id,
+		clock,
+	)
 	// acknowledgement before expiry; late acknowledgement is only recorded
 	ctx := context.Background()
+
 	conn, err := pgx.Connect(ctx, testDB("postgres"))
 	if err != nil {
 		t.Skip(err)
 	}
 	defer conn.Close(ctx)
+
 	var ok bool
+
 	keepObserved(t, id)
+
 	if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
 		ok, err = control.Acknowledge(ctx, tx, uuid.MustParse(id), clock.Add(5*time.Second))
+
 		return err
 	}); err != nil || !ok {
 		t.Fatalf("ack: %v %v", ok, err)
 	}
-	if _, m := post(s, &hq, "commands.get", `{"id":"`+id+`"}`); data(m)["status"] != "acknowledged" {
+
+	if _, m := post(
+		s,
+		&hq,
+		"commands.get",
+		`{"id":"`+id+`"}`,
+	); data(m)["status"] != "acknowledged" {
 		t.Fatal("acknowledged")
 	}
 	// expiry by the worker
@@ -107,42 +153,99 @@ func TestCommands(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("second command: %d %v", code, m)
 	}
+
 	id2 := data(m)["id"].(string)
 	// IR453: a tick just after expiresAt leaves the command for an acknowledgement still on its way; the grace after
 	// it expires the command
 	if _, err := schedTick(ctx, s, clock.Add(32*time.Second)); err != nil {
 		t.Fatal(err)
 	}
+
 	if _, m := post(s, &hq, "commands.get", `{"id":"`+id2+`"}`); data(m)["status"] == "expired" {
 		t.Fatalf("expired within the grace: %v", m)
 	}
-	if _, err := schedTick(ctx, s, clock.Add(30*time.Second+control.ExpireGrace+time.Second)); err != nil {
+
+	if _, err := schedTick(
+		ctx,
+		s,
+		clock.Add(30*time.Second+control.ExpireGrace+time.Second),
+	); err != nil {
 		t.Fatal(err)
 	}
-	if _, m := post(s, &hq, "commands.get", `{"id":"`+id2+`"}`); data(m)["status"] != "expired" || data(m)["failureCode"] != "TIMEOUT" {
+
+	if _, m := post(
+		s,
+		&hq,
+		"commands.get",
+		`{"id":"`+id2+`"}`,
+	); data(m)["status"] != "expired" ||
+		data(m)["failureCode"] != "TIMEOUT" {
 		t.Fatalf("expired: %v", m)
 	}
+
 	keepObserved(t, id2)
+
 	if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
 		ok, err = control.Acknowledge(ctx, tx, uuid.MustParse(id2), clock.Add(40*time.Second))
+
 		return err
 	}); err != nil || ok {
 		t.Fatalf("late ack must not succeed: %v %v", ok, err)
 	}
 	// restriction table and offline delivery
 	rid := uuid.NewString()
-	owner(t, `INSERT INTO restrictions.restrictions (id, tenant_id, contract_id, contract_version, customer_id, rules_version, notice_at, execute_after, reason, policy, state)
-		VALUES ($1,$2,$3,1,$4,'r',$5,$6,'demo','{"kind":"temperature_limit","minimumCoolingSetpoint":26}','applied')`, rid, seed.ID("tenant-a"), uuid.New(), seed.ID("cust-a"), clock, clock.Add(25*time.Hour))
-	owner(t, `INSERT INTO restrictions.restriction_units (tenant_id, restriction_id, unit_id, apply_state, release_state) VALUES ($1,$2,$3,'applied','none')`, seed.ID("tenant-a"), rid, unit)
-	t.Cleanup(func() { owner(t, `UPDATE restrictions.restrictions SET state = 'cancelled' WHERE id = $1`, rid) })
-	if code, m := cmd(&customerA, `{"kind":"set_temperature","celsius":24}`, "", v); code != 403 || m["messageKey"] != "errors.restriction_active" {
+	owner(
+		t,
+		`INSERT INTO restrictions.restrictions (id, tenant_id, contract_id, contract_version, customer_id, rules_version, notice_at, execute_after, reason, policy, state)
+		VALUES ($1,$2,$3,1,$4,'r',$5,$6,'demo','{"kind":"temperature_limit","minimumCoolingSetpoint":26}','applied')`,
+		rid,
+		seed.ID("tenant-a"),
+		uuid.New(),
+		seed.ID("cust-a"),
+		clock,
+		clock.Add(25*time.Hour),
+	)
+	owner(
+		t,
+		`INSERT INTO restrictions.restriction_units (tenant_id, restriction_id, unit_id, apply_state, release_state) VALUES ($1,$2,$3,'applied','none')`,
+		seed.ID("tenant-a"),
+		rid,
+		unit,
+	)
+	t.Cleanup(
+		func() { owner(t, `UPDATE restrictions.restrictions SET state = 'cancelled' WHERE id = $1`, rid) },
+	)
+
+	if code, m := cmd(
+		&customerA,
+		`{"kind":"set_temperature","celsius":24}`,
+		"",
+		v,
+	); code != 403 ||
+		m["messageKey"] != "errors.restriction_active" {
 		t.Errorf("restricted temperature: %d %v", code, m)
 	}
-	owner(t, `UPDATE devices.devices SET power_signal = 'off' WHERE id = $1`, seed.ID("device-online-rto"))
+
+	owner(
+		t,
+		`UPDATE devices.devices SET power_signal = 'off' WHERE id = $1`,
+		seed.ID("device-online-rto"),
+	)
 	t.Cleanup(func() {
-		owner(t, `UPDATE devices.devices SET power_signal = 'on' WHERE id = $1`, seed.ID("device-online-rto"))
+		owner(
+			t,
+			`UPDATE devices.devices SET power_signal = 'on' WHERE id = $1`,
+			seed.ID("device-online-rto"),
+		)
 	})
-	if code, m := cmd(&customerA, `{"kind":"set_temperature","celsius":27}`, "", v); code != 409 || m["code"] != "OFFLINE" || m["messageKey"] != "errors.device_power_lost" {
+
+	if code, m := cmd(
+		&customerA,
+		`{"kind":"set_temperature","celsius":27}`,
+		"",
+		v,
+	); code != 409 || m["code"] != "OFFLINE" ||
+		m["messageKey"] != "errors.device_power_lost" {
 		t.Errorf("power lost: %d %v", code, m)
 	}
 	// IR46 table
@@ -167,13 +270,32 @@ func TestCommands(t *testing.T) {
 	}
 	// a unit that does not exist is NOT_FOUND to HQ and to a technician, for a command and for the history
 	missing := uuid.NewString()
-	if code, _ := write(s, &hq, "commands.create", `{"unitId":"`+missing+`","action":{"kind":"set_power","power":true},"reason":"check","expectedUnitVersion":1}`, 0); code != 404 {
+	if code, _ := write(
+		s,
+		&hq,
+		"commands.create",
+		`{"unitId":"`+missing+`","action":{"kind":"set_power","power":true},"reason":"check","expectedUnitVersion":1}`,
+		0,
+	); code != 404 {
 		t.Errorf("HQ command for an unknown unit: %d", code)
 	}
-	if code, _ := write(s, &techInt, "commands.create", `{"unitId":"`+missing+`","jobId":"`+uuid.NewString()+`","action":{"kind":"set_power","power":true},"reason":"check","expectedUnitVersion":1}`, 0); code != 404 {
+
+	if code, _ := write(
+		s,
+		&techInt,
+		"commands.create",
+		`{"unitId":"`+missing+`","jobId":"`+uuid.NewString()+`","action":{"kind":"set_power","power":true},"reason":"check","expectedUnitVersion":1}`,
+		0,
+	); code != 404 {
 		t.Errorf("technician command for an unknown unit: %d", code)
 	}
-	if code, _ := post(s, &hq, "commands.list", `{"unitId":"`+missing+`","query":{}}`); code != 404 {
+
+	if code, _ := post(
+		s,
+		&hq,
+		"commands.list",
+		`{"unitId":"`+missing+`","query":{}}`,
+	); code != 404 {
 		t.Errorf("history of an unknown unit: %d", code)
 	}
 }
@@ -184,58 +306,103 @@ func TestCommandHistory(t *testing.T) {
 	s := server(t)
 	unit := seed.ID("unit-non-rto").String()
 	free := func() {
-		owner(t, `UPDATE control.commands SET status = 'expired' WHERE unit_id = $1 AND status IN ('requested','sent')`, unit)
+		owner(
+			t,
+			`UPDATE control.commands SET status = 'expired' WHERE unit_id = $1 AND status IN ('requested','sent')`,
+			unit,
+		)
 	}
 	free()
-	owner(t, `UPDATE restrictions.restrictions SET state = 'cancelled' WHERE id IN (SELECT restriction_id FROM restrictions.restriction_units WHERE unit_id = $1)`, unit)
-	owner(t, `UPDATE control.diagnostic_runs SET state = 'completed' WHERE unit_id = $1 AND state IN ('awaiting_start','running','end_requested')`, unit)
+	owner(
+		t,
+		`UPDATE restrictions.restrictions SET state = 'cancelled' WHERE id IN (SELECT restriction_id FROM restrictions.restriction_units WHERE unit_id = $1)`,
+		unit,
+	)
+	owner(
+		t,
+		`UPDATE control.diagnostic_runs SET state = 'completed' WHERE unit_id = $1 AND state IN ('awaiting_start','running','end_requested')`,
+		unit,
+	)
 	job := assignedNow(t, s)
 	_, m := post(s, &hq, "units.get", `{"id":"`+unit+`"}`)
 	uv := ver(m)
-	code, m := write(s, &techInt, "commands.create", `{"unitId":"`+unit+`","jobId":"`+job+`","action":{"kind":"set_mode","mode":"cool"},"reason":"airflow check","expectedUnitVersion":`+itoa(uv)+`}`, 0)
+
+	code, m := write(
+		s,
+		&techInt,
+		"commands.create",
+		`{"unitId":"`+unit+`","jobId":"`+job+`","action":{"kind":"set_mode","mode":"cool"},"reason":"airflow check","expectedUnitVersion":`+itoa(
+			uv,
+		)+`}`,
+		0,
+	)
 	if code != 200 || data(m)["source"] != "ui" || data(m)["jobId"] != job {
 		t.Fatalf("technician command: %d %v", code, m)
 	}
+
 	tech := data(m)["id"].(string)
+
 	free()
-	code, m = write(s, &customerA, "commands.create", `{"unitId":"`+unit+`","action":{"kind":"set_power","power":true},"expectedUnitVersion":`+itoa(uv)+`}`, 0)
+
+	code, m = write(
+		s,
+		&customerA,
+		"commands.create",
+		`{"unitId":"`+unit+`","action":{"kind":"set_power","power":true},"expectedUnitVersion":`+itoa(
+			uv,
+		)+`}`,
+		0,
+	)
 	if code != 200 || data(m)["source"] != "ui" {
 		t.Fatalf("client command: %d %v", code, m)
 	}
+
 	own := data(m)["id"].(string)
+
 	free()
 	// list reads the unit's history: rows is the first page (ordering checks), byID every page — the test database
 	// keeps other tests' commands on this unit, some at later business times, which can push these off page one
 	list := func(a *actor, body string) (int, map[string]map[string]any, []map[string]any) {
 		t.Helper()
+
 		code, m := post(s, a, "commands.list", body)
 		rows := items(m)
 		byID := map[string]map[string]any{}
+
 		for page := 0; ; page++ {
 			for _, it := range items(m) {
 				byID[it["id"].(string)] = it
 			}
+
 			next, _ := data(m)["nextCursor"].(string)
 			if code != 200 || next == "" || page == 50 {
 				break
 			}
+
 			var in map[string]any
+
 			_ = json.Unmarshal([]byte(body), &in)
+
 			q, _ := in["query"].(map[string]any)
 			if q == nil {
 				q = map[string]any{}
 			}
+
 			q["cursor"] = next
 			in["query"] = q
 			b, _ := json.Marshal(in)
 			code, m = post(s, a, "commands.list", string(b))
 		}
+
 		return code, byID, rows
 	}
+
 	code, got, rows := list(&customerA, `{"unitId":"`+unit+`","query":{"limit":100}}`)
-	if code != 200 || got[tech] == nil || got[own] == nil || got[tech]["reason"] != nil || got[tech]["status"] != "expired" {
+	if code != 200 || got[tech] == nil || got[own] == nil || got[tech]["reason"] != nil ||
+		got[tech]["status"] != "expired" {
 		t.Fatalf("client history: %d %v", code, got[tech])
 	}
+
 	for i := 1; i < len(rows); i++ {
 		if rows[i-1]["requestedAt"].(string) < rows[i]["requestedAt"].(string) {
 			t.Fatalf("newest first: %v before %v", rows[i-1]["requestedAt"], rows[i]["requestedAt"])
@@ -248,27 +415,51 @@ func TestCommandHistory(t *testing.T) {
 	} else if code, m := post(s, &customerA, "commands.list", `{"unitId":"`+unit+`","query":{"limit":1,"cursor":"`+next+`"}}`); code != 200 || len(items(m)) != 1 {
 		t.Fatalf("second page: %d %v", code, m)
 	}
-	if code, m := post(s, &techInt, "commands.list", `{"unitId":"`+unit+`","query":{}}`); code != 422 || fields(m) != "jobId=error.required" {
+
+	if code, m := post(
+		s,
+		&techInt,
+		"commands.list",
+		`{"unitId":"`+unit+`","query":{}}`,
+	); code != 422 ||
+		fields(m) != "jobId=error.required" {
 		t.Errorf("technician without a job: %d %s", code, fields(m))
 	}
+
 	code, got, _ = list(&techInt, `{"unitId":"`+unit+`","jobId":"`+job+`","query":{"limit":100}}`)
-	if code != 200 || got[tech] == nil || got[tech]["reason"] != "airflow check" || got[own] != nil {
+	if code != 200 || got[tech] == nil || got[tech]["reason"] != "airflow check" ||
+		got[own] != nil {
 		t.Fatalf("technician job history: %d %v", code, got)
 	}
-	if code, _, _ := list(&techInt, `{"unitId":"`+unit+`","jobId":"`+uuid.NewString()+`","query":{}}`); code != 404 {
+
+	if code, _, _ := list(
+		&techInt,
+		`{"unitId":"`+unit+`","jobId":"`+uuid.NewString()+`","query":{}}`,
+	); code != 404 {
 		t.Errorf("technician, a job it does not hold: %d", code)
 	}
+
 	if code, _, _ := list(&customerB, `{"unitId":"`+unit+`","query":{}}`); code != 404 {
 		t.Errorf("another customer: %d", code)
 	}
-	if _, got, _ := list(&hq, `{"unitId":"`+unit+`","query":{"limit":100}}`); got[tech]["reason"] != "airflow check" || got[own] == nil {
+
+	if _, got, _ := list(
+		&hq,
+		`{"unitId":"`+unit+`","query":{"limit":100}}`,
+	); got[tech]["reason"] != "airflow check" ||
+		got[own] == nil {
 		t.Errorf("HQ history: %v", got[tech])
 	}
+
 	for q, want := range map[string]string{`{"sort":{"field":"status","direction":"asc"}}`: "sort.field=error.invalid", `{"filters":{"status":"sent"}}`: "status=error.notAllowed"} {
 		code, m := post(s, &hq, "commands.list", `{"unitId":"`+unit+`","query":`+q+`}`)
 		refusal(t, q, code, m, want)
 	}
-	if code, _, _ := list(&hq, `{"unitId":"`+unit+`","query":{"sort":{"field":"requestedAt","direction":"asc"}}}`); code != 200 {
+
+	if code, _, _ := list(
+		&hq,
+		`{"unitId":"`+unit+`","query":{"sort":{"field":"requestedAt","direction":"asc"}}}`,
+	); code != 200 {
 		t.Errorf("requestedAt asc: %d", code)
 	}
 }
@@ -279,13 +470,33 @@ func TestCommandExpiryAudited(t *testing.T) {
 	s := server(t)
 	u := boundUnit(t, s, "online")
 	_, g := post(s, &customerB, "units.get", `{"id":"`+u+`"}`)
-	code, m := write(s, &customerB, "commands.create", `{"unitId":"`+u+`","action":{"kind":"set_power","power":true},"expectedUnitVersion":`+itoa(ver(g))+`}`, 0)
+
+	code, m := write(
+		s,
+		&customerB,
+		"commands.create",
+		`{"unitId":"`+u+`","action":{"kind":"set_power","power":true},"expectedUnitVersion":`+itoa(
+			ver(g),
+		)+`}`,
+		0,
+	)
 	if code != 200 {
 		t.Fatalf("command: %d %v", code, m)
 	}
-	owner(t, `UPDATE control.commands SET expires_at = requested_at + interval '1 second' WHERE id = $1`, data(m)["id"])
+
+	owner(
+		t,
+		`UPDATE control.commands SET expires_at = requested_at + interval '1 second' WHERE id = $1`,
+		data(m)["id"],
+	)
 	expireAt(t, clock.Add(time.Minute)) // the window passed with no answer
-	if trail := commandTrail(t, s, m); len(trail) != 2 || trail[0] != "pending customer-b" || trail[1] != "failed system-scheduler TIMEOUT" {
+
+	if trail := commandTrail(
+		t,
+		s,
+		m,
+	); len(trail) != 2 || trail[0] != "pending customer-b" ||
+		trail[1] != "failed system-scheduler TIMEOUT" {
 		t.Errorf("the expired command's audit trail: %v", trail)
 	}
 }

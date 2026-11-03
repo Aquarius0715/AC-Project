@@ -28,6 +28,7 @@ func (in *ConnectionFaultInput) Validate() map[string]string {
 	if in.DeviceID == uuid.Nil {
 		return map[string]string{"deviceId": "error.required"}
 	}
+
 	return nil
 }
 
@@ -45,24 +46,37 @@ func RegisterQueries(r *ops.Registry) {
 	ops.RegisterQuery(r, ops.DomainEquipment, QueryConnectionFault, connectionFault)
 }
 
-func connectionFault(ctx context.Context, c *ops.Call, in *ConnectionFaultInput) (ConnectionFault, error) {
+func connectionFault(
+	ctx context.Context,
+	c *ops.Call,
+	in *ConnectionFaultInput,
+) (ConnectionFault, error) {
 	var out ConnectionFault
-	err := c.Tx.QueryRow(ctx, `SELECT binding_id FROM devices.devices WHERE id = $1`, in.DeviceID).Scan(&out.BindingID)
+
+	err := c.Tx.QueryRow(ctx, `SELECT binding_id FROM devices.devices WHERE id = $1`, in.DeviceID).
+		Scan(&out.BindingID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return out, apperr.E(apperr.NotFound, "error.notFound")
 	}
+
 	if err != nil {
 		return out, err
 	}
+
 	if err := c.Tx.QueryRow(ctx, `SELECT COALESCE(max(sequence), 0) FROM devices.device_events WHERE device_id = $1 AND binding_id IS NOT DISTINCT FROM $2
-		AND axis = 'connection'`, in.DeviceID, out.BindingID).Scan(&out.Sequence); err != nil {
+		AND axis = 'connection'`, in.DeviceID, out.BindingID).
+		Scan(&out.Sequence); err != nil {
 		return out, err
 	}
 	// the newest fault of the axis, as RecordSignal's restored looks it up
-	var id uuid.UUID
-	var restored *time.Time
+	var (
+		id       uuid.UUID
+		restored *time.Time
+	)
+
 	err = c.Tx.QueryRow(ctx, `SELECT id, restored_at FROM devices.device_events WHERE device_id = $1 AND binding_id IS NOT DISTINCT FROM $2
-		AND axis = 'connection' AND event_type <> 'restored' ORDER BY sequence DESC LIMIT 1`, in.DeviceID, out.BindingID).Scan(&id, &restored)
+		AND axis = 'connection' AND event_type <> 'restored' ORDER BY sequence DESC LIMIT 1`, in.DeviceID, out.BindingID).
+		Scan(&id, &restored)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		return out, nil
@@ -71,5 +85,6 @@ func connectionFault(ctx context.Context, c *ops.Call, in *ConnectionFaultInput)
 	case restored == nil:
 		out.FaultID = &id
 	}
+
 	return out, nil
 }

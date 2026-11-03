@@ -21,8 +21,14 @@ func EventHandlers() map[string]events.Handler {
 			}
 			// IR53: every enabled location rule of the membership stops with consent_revoked (version + 1); renewed
 			// consent never re-enables them (an explicit save with enabled=true does, IR27)
-			_, err := tx.Exec(ctx, `UPDATE control.automations SET enabled = false, disabled_reason = 'consent_revoked', version = version + 1, updated_at = $2
-				WHERE owner_membership_id = $1 AND kind = 'event' AND definition->'condition'->>'type' = 'location' AND enabled`, p.MembershipID, p.At)
+			_, err := tx.Exec(
+				ctx,
+				`UPDATE control.automations SET enabled = false, disabled_reason = 'consent_revoked', version = version + 1, updated_at = $2
+				WHERE owner_membership_id = $1 AND kind = 'event' AND definition->'condition'->>'type' = 'location' AND enabled`,
+				p.MembershipID,
+				p.At,
+			)
+
 			return err
 		},
 		events.RestrictionCommandRequested: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
@@ -30,10 +36,27 @@ func EventHandlers() map[string]events.Handler {
 			if err := e.Decode(&p); err != nil {
 				return err
 			}
-			_, err := tx.Exec(ctx, `INSERT INTO control.commands (id, tenant_id, unit_id, device_id, actor_membership_id, source, action, restriction_id, status, delivery,
+
+			_, err := tx.Exec(
+				ctx,
+				`INSERT INTO control.commands (id, tenant_id, unit_id, device_id, actor_membership_id, source, action, restriction_id, status, delivery,
 				requested_at, sent_at, expires_at, correlation_id, created_at, updated_at)
 				VALUES ($1, $2, $3, $4, $5, 'restriction', $6, $7, $8, $9, $10, $11, $12, $13, $10, $10) ON CONFLICT (id) DO NOTHING`,
-				p.CommandID, e.TenantID, p.UnitID, p.DeviceID, p.ActorID, []byte(p.Action), p.RestrictionID, p.Status, p.Delivery, p.RequestedAt, p.SentAt, p.ExpiresAt, p.CorrelationID)
+				p.CommandID,
+				e.TenantID,
+				p.UnitID,
+				p.DeviceID,
+				p.ActorID,
+				[]byte(p.Action),
+				p.RestrictionID,
+				p.Status,
+				p.Delivery,
+				p.RequestedAt,
+				p.SentAt,
+				p.ExpiresAt,
+				p.CorrelationID,
+			)
+
 			return err
 		},
 		events.RestrictionCommandsCancelled: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
@@ -41,56 +64,101 @@ func EventHandlers() map[string]events.Handler {
 			if err := e.Decode(&p); err != nil {
 				return err
 			}
+
 			if len(p.CommandIDs) > 0 {
-				_, err := tx.Exec(ctx, `UPDATE control.commands SET status = 'cancelled', version = version + 1, updated_at = platform.app_now()
-					WHERE id = ANY($1) AND status IN ('requested','sent')`, p.CommandIDs)
+				_, err := tx.Exec(
+					ctx,
+					`UPDATE control.commands SET status = 'cancelled', version = version + 1, updated_at = platform.app_now()
+					WHERE id = ANY($1) AND status IN ('requested','sent')`,
+					p.CommandIDs,
+				)
+
 				return err
 			}
-			_, err := tx.Exec(ctx, `UPDATE control.commands SET status = 'cancelled', version = version + 1, updated_at = platform.app_now()
-				WHERE restriction_id = $1 AND unit_id = $2 AND status = 'requested' AND delivery = 'not_sent'`, p.RestrictionID, p.UnitID)
+
+			_, err := tx.Exec(
+				ctx,
+				`UPDATE control.commands SET status = 'cancelled', version = version + 1, updated_at = platform.app_now()
+				WHERE restriction_id = $1 AND unit_id = $2 AND status = 'requested' AND delivery = 'not_sent'`,
+				p.RestrictionID,
+				p.UnitID,
+			)
+
 			return err
 		},
 	}
 }
 
 // publishRestrictionCommands tells billing about restriction commands among ids (other commands are equipment-only).
-func publishRestrictionCommands(ctx context.Context, tx pgx.Tx, eventType string, ids []uuid.UUID, at time.Time) error {
+func publishRestrictionCommands(
+	ctx context.Context,
+	tx pgx.Tx,
+	eventType string,
+	ids []uuid.UUID,
+	at time.Time,
+) error {
 	if len(ids) == 0 {
 		return nil
 	}
-	rows, err := tx.Query(ctx, `SELECT tenant_id, id, status FROM control.commands WHERE id = ANY($1) AND source = 'restriction' ORDER BY tenant_id, id`, ids)
+
+	rows, err := tx.Query(
+		ctx,
+		`SELECT tenant_id, id, status FROM control.commands WHERE id = ANY($1) AND source = 'restriction' ORDER BY tenant_id, id`,
+		ids,
+	)
 	if err != nil {
 		return err
 	}
+
 	byTenant := map[uuid.UUID][]uuid.UUID{}
 	statuses := map[uuid.UUID]string{}
+
 	var order []uuid.UUID
+
 	for rows.Next() {
-		var t, id uuid.UUID
-		var status string
+		var (
+			t, id  uuid.UUID
+			status string
+		)
 		if err := rows.Scan(&t, &id, &status); err != nil {
 			rows.Close()
+
 			return err
 		}
+
 		if _, ok := byTenant[t]; !ok {
 			order = append(order, t)
 		}
+
 		byTenant[t] = append(byTenant[t], id)
 		statuses[id] = status
 	}
+
 	rows.Close()
+
 	if err := rows.Err(); err != nil {
 		return err
 	}
+
 	for _, t := range order {
 		st := map[uuid.UUID]string{}
 		for _, id := range byTenant[t] {
 			st[id] = statuses[id]
 		}
-		if err := events.Publish(ctx, tx, t, "command", byTenant[t][0], eventType, events.Commands{CommandIDs: byTenant[t], At: at, Statuses: st}); err != nil {
+
+		if err := events.Publish(
+			ctx,
+			tx,
+			t,
+			"command",
+			byTenant[t][0],
+			eventType,
+			events.Commands{CommandIDs: byTenant[t], At: at, Statuses: st},
+		); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 

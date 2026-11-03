@@ -4,6 +4,7 @@ package voice
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"regexp"
 	"sort"
 	"strconv"
@@ -38,19 +39,30 @@ type Input struct {
 // Validate implements ops.Validator: 1–200 code points after trim, locale en|ms.
 func (in *Input) Validate() map[string]string {
 	fe := map[string]string{}
+
 	in.Text = strings.TrimSpace(in.Text)
 	if n := utf8.RuneCountInString(in.Text); n < 1 || n > 200 {
 		fe["text"] = "error.length"
 	}
+
 	if in.Locale != "en" && in.Locale != "ms" {
 		fe["locale"] = "error.invalid"
 	}
+
 	return fe
 }
 
 var grammar = map[string]struct{ temperature, set, help *regexp.Regexp }{
-	"en": {regexp.MustCompile(`(?i)^temperature (.+)$`), regexp.MustCompile(`(?i)^set (.+) to (\d{1,3}) degrees$`), regexp.MustCompile(`(?i)^help$`)},
-	"ms": {regexp.MustCompile(`(?i)^suhu (.+)$`), regexp.MustCompile(`(?i)^tetapkan (.+) kepada (\d{1,3}) darjah$`), regexp.MustCompile(`(?i)^bantuan$`)},
+	"en": {
+		regexp.MustCompile(`(?i)^temperature (.+)$`),
+		regexp.MustCompile(`(?i)^set (.+) to (\d{1,3}) degrees$`),
+		regexp.MustCompile(`(?i)^help$`),
+	},
+	"ms": {
+		regexp.MustCompile(`(?i)^suhu (.+)$`),
+		regexp.MustCompile(`(?i)^tetapkan (.+) kepada (\d{1,3}) darjah$`),
+		regexp.MustCompile(`(?i)^bantuan$`),
+	},
 }
 
 // Candidate is a ResolvedIntent candidate.
@@ -67,7 +79,7 @@ type Intent struct {
 	UnitID          *uuid.UUID              `json:"unitId,omitempty"`
 	Measurement     *monitoring.Measurement `json:"measurement,omitempty"`
 	Celsius         *int                    `json:"celsius,omitempty"`
-	Before          json.RawMessage         `json:"before,omitempty" swaggertype:"object"`
+	Before          json.RawMessage         `json:"before,omitempty"          swaggertype:"object"`
 	ExpectedVersion *int                    `json:"expectedVersion,omitempty"`
 	measurementNull bool
 }
@@ -75,10 +87,12 @@ type Intent struct {
 // MarshalJSON keeps measurement:null for a temperature intent without readings.
 func (x Intent) MarshalJSON() ([]byte, error) {
 	type plain Intent
+
 	b, err := json.Marshal(plain(x))
 	if err != nil || !x.measurementNull {
 		return b, err
 	}
+
 	return append(b[:len(b)-1], []byte(`,"measurement":null}`)...), nil
 }
 
@@ -93,38 +107,51 @@ func (v Voice) candidates(ctx context.Context, c *ops.Call, room string) ([]Cand
 	if err != nil {
 		return nil, err
 	}
+
 	var all []Candidate
+
 	for rows.Next() {
 		var x Candidate
 		if err := rows.Scan(&x.UnitID, &x.PathLabel); err != nil {
 			rows.Close()
+
 			return nil, err
 		}
+
 		all = append(all, x)
 	}
+
 	rows.Close()
+
 	if err := rows.Err(); err != nil || len(all) == 0 {
 		return []Candidate{}, err
 	}
+
 	ids := make([]uuid.UUID, len(all))
 	for i, x := range all {
 		ids[i] = x.UnitID
 	}
+
 	visible, err := v.Units.VisibleUnits(ctx, c, ids)
 	if err != nil {
 		return nil, err
 	}
+
 	keep := map[uuid.UUID]bool{}
 	for _, id := range visible {
 		keep[id] = true
 	}
+
 	out := []Candidate{}
+
 	for _, x := range all {
 		if keep[x.UnitID] {
 			out = append(out, x)
 		}
 	}
+
 	sort.SliceStable(out, func(i, j int) bool { return out[i].PathLabel < out[j].PathLabel })
+
 	return out, nil
 }
 
@@ -154,8 +181,12 @@ func (v Voice) resolve(ctx context.Context, c *ops.Call, in *Input) (Intent, err
 	if g.help.MatchString(in.Text) {
 		return Intent{Kind: "help", MessageKey: "voice.help"}, nil
 	}
-	var room string
-	var celsius *int
+
+	var (
+		room    string
+		celsius *int
+	)
+
 	if m := g.set.FindStringSubmatch(in.Text); m != nil {
 		n, _ := strconv.Atoi(m[2])
 		room, celsius = m[1], &n
@@ -164,20 +195,25 @@ func (v Voice) resolve(ctx context.Context, c *ops.Call, in *Input) (Intent, err
 	} else {
 		return Intent{Kind: "unsupported"}, nil
 	}
+
 	cands, err := v.candidates(ctx, c, room)
 	if err != nil {
 		return Intent{}, err
 	}
+
 	var unit uuid.UUID
+
 	switch {
 	case in.SelectedUnitID != nil: // must be one of the candidates of this request (IR65)
 		found := false
 		for _, x := range cands {
 			found = found || x.UnitID == *in.SelectedUnitID
 		}
+
 		if !found {
 			return Intent{}, apperr.E(apperr.NotFound, "error.notFound")
 		}
+
 		unit = *in.SelectedUnitID
 	case len(cands) == 0:
 		return Intent{Kind: "unsupported"}, nil
@@ -186,23 +222,43 @@ func (v Voice) resolve(ctx context.Context, c *ops.Call, in *Input) (Intent, err
 	default:
 		unit = cands[0].UnitID
 	}
+
 	if celsius == nil {
 		meas, err := monitoring.LatestMeasurement(ctx, c, unit, "temperature")
 		if err != nil {
 			return Intent{}, err
 		}
-		return Intent{Kind: "temperature", UnitID: &unit, Measurement: meas, measurementNull: meas == nil}, nil
+
+		return Intent{
+			Kind:            "temperature",
+			UnitID:          &unit,
+			Measurement:     meas,
+			measurementNull: meas == nil,
+		}, nil
 	}
-	var before []byte
-	var version int
-	err = c.Tx.QueryRow(ctx, `SELECT observed_state, version FROM assets.units WHERE id = $1`, unit).Scan(&before, &version)
-	if err == pgx.ErrNoRows {
+
+	var (
+		before  []byte
+		version int
+	)
+
+	err = c.Tx.QueryRow(ctx, `SELECT observed_state, version FROM assets.units WHERE id = $1`, unit).
+		Scan(&before, &version)
+	if errors.Is(err, pgx.ErrNoRows) {
 		return Intent{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
+
 	if err != nil {
 		return Intent{}, err
 	}
-	return Intent{Kind: "change", UnitID: &unit, Celsius: celsius, Before: before, ExpectedVersion: &version}, nil
+
+	return Intent{
+		Kind:            "change",
+		UnitID:          &unit,
+		Celsius:         celsius,
+		Before:          before,
+		ExpectedVersion: &version,
+	}, nil
 }
 
 // Register binds voice.resolveIntent.

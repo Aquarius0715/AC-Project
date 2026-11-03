@@ -11,10 +11,12 @@ import (
 func TestMRVReadRefusals(t *testing.T) {
 	s := server(t)
 	missing := uuid.NewString()
+
 	code, m := post(s, &hq, "mrv.get", `{"id":"`+missing+`"}`)
 	if code != 404 || m["messageKey"] != "error.notFound" {
 		t.Fatalf("mrv.get of a missing report: %d %v, want 404 NOT_FOUND", code, m)
 	}
+
 	code, m = post(s, &hq, "mrv.get", `{"id":"`+missing+`","reportVersion":0}`)
 	refusal(t, "mrv.get reportVersion 0", code, m, "id=error.invalid")
 	code, m = post(s, &hq, "mrv.versions", `{"id":"00000000-0000-0000-0000-000000000000"}`)

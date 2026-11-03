@@ -10,8 +10,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/pradita/ac-project/service/api/internal/platform/events"
-
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/labstack/echo/v5"
@@ -35,6 +33,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/blob"
 	"github.com/pradita/ac-project/service/api/internal/platform/db"
 	"github.com/pradita/ac-project/service/api/internal/platform/democlock"
+	"github.com/pradita/ac-project/service/api/internal/platform/events"
 	"github.com/pradita/ac-project/service/api/internal/platform/ratelimit"
 )
 
@@ -71,18 +70,22 @@ type Server struct {
 
 // DrainEvents applies every pending event of this server's consumers (inline mode and tests).
 func (s *Server) DrainEvents(ctx context.Context) error {
-	for pass := 0; pass < 10; pass++ { // events can trigger further events: repeat until nothing is pending
+	for range 10 { // events can trigger further events: repeat until nothing is pending
 		applied := 0
+
 		var errs []error
+
 		for _, c := range s.Consumers { // each on its own, as each runs its own loop: one failing does not hold the others (IR511)
 			n, err := c.Drain(ctx)
 			errs = append(errs, err)
 			applied += n
 		}
+
 		if err := errors.Join(errs...); err != nil || applied == 0 {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -92,24 +95,36 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if err := ops.CheckDomains(); err != nil {
 		return nil, err
 	}
+
 	reg := ops.NewRegistry()
 	reg.ServeDomains(cfg.Domains...)
 	reg.DB, reg.Rec, reg.Idem = m, notifyingRecorder{inner: db.Recorder{}}, db.Idempotency{M: m}
 	reg.Limit = cfg.WriteLimit
+
 	reg.DenyLimit = cfg.DenyLimit
 	if reg.DenyLimit == nil { // without the shared store each process keeps its own minute counts (tests, a single instance)
-		reg.DenyLimit = &ratelimit.Window{Store: &ratelimit.Memory{}, Limit: 1, Window: time.Minute, Prefix: "ac:rl:denied:"}
+		reg.DenyLimit = &ratelimit.Window{
+			Store:  &ratelimit.Memory{},
+			Limit:  1,
+			Window: time.Minute,
+			Prefix: "ac:rl:denied:",
+		}
 	}
+
 	if cfg.AccountsPerDay > 0 {
 		identity.AccountsPerOrgPerDay = cfg.AccountsPerDay
 	}
+
 	if cfg.Clock != nil {
 		reg.Clock = cfg.Clock
 	}
+
 	var dc ScenarioClock = &demoClock{base: reg.Clock}
+
 	if cfg.DemoOps {
 		if cfg.DemoClock != nil {
 			dc = cfg.DemoClock
@@ -117,57 +132,124 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 			shared, err := democlock.Open(ctx, m.Writer, reg.Clock, cfg.DemoStart)
 			if err != nil {
 				m.Close()
+
 				return nil, err
 			}
+
 			dc = shared
 		}
+
 		reg.Clock = dc.Now
 	}
+
 	demo := &demoOps{inline: len(cfg.Domains) == 0, enabled: cfg.DemoOps, m: m, clock: dc, reg: reg}
 	registerDemo(reg, demo)
 	identity.Register(reg)
 	identity.RegisterMembers(reg)
-	am := &assets.Module{Mon: monitorReads{alerts: monitoring.Alerts{}, telemetry: monitoring.Telemetry{Sensors: devices.Models{}}}, Models: devices.Models{}, Policies: monitoring.Policies{},
+
+	am := &assets.Module{
+		Mon: monitorReads{
+			alerts:    monitoring.Alerts{},
+			telemetry: monitoring.Telemetry{Sensors: devices.Models{}},
+		},
+		Models:    devices.Models{},
+		Policies:  monitoring.Policies{},
 		Usage:     []assets.UnitUsage{billing.Usage{}, maintenance.Usage{}, devices.Usage{}},
-		Contracts: billing.Usage{}, Claims: maintenance.Usage{}, Import: devices.Models{},
-		Activity: []assets.UnitUsage{monitoring.Telemetry{}, maintenance.Usage{}}, Store: m,
-		Active:    []assets.UnitActivity{maintenance.Usage{}, devices.Usage{}, restrictions.Busy{}, control.Busy{}, billing.Usage{}},
-		OrgActive: []assets.OrgActivity{billing.Usage{}, maintenance.Usage{}}}
+		Contracts: billing.Usage{},
+		Claims:    maintenance.Usage{},
+		Import:    devices.Models{},
+		Activity:  []assets.UnitUsage{monitoring.Telemetry{}, maintenance.Usage{}},
+		Store:     m,
+		Active: []assets.UnitActivity{
+			maintenance.Usage{},
+			devices.Usage{},
+			restrictions.Busy{},
+			control.Busy{},
+			billing.Usage{},
+		},
+		OrgActive: []assets.OrgActivity{billing.Usage{}, maintenance.Usage{}},
+	}
 	am.Details = unitDetails{}
 	assets.Register(reg, am)
 	// IR340: warranty reminders to HQ (BR-A19)
 	reg.AddJob(ops.DomainEquipment, am.RemindWarranties)
-	eq := equipmentView{am: am, alerts: monitoring.Alerts{}, tel: monitoring.Telemetry{Sensors: devices.Models{}}, models: devices.Models{}} // other domains' view (IR193)
+	eq := equipmentView{
+		am:     am,
+		alerts: monitoring.Alerts{},
+		tel:    monitoring.Telemetry{Sensors: devices.Models{}},
+		models: devices.Models{},
+	} // other domains' view (IR193)
 	devices.Register(reg, devices.Capabilities{Units: am})
-	devices.RegisterQueries(reg) // internal: a device's open connection fault for the IoT gateway (IR532 system query)
-	monitoring.RegisterAlerts(reg, monitoring.Alerts{Units: am, Access: maintenance.Access{}, Devices: deviceRecoveries{}})
+	devices.RegisterQueries(
+		reg,
+	) // internal: a device's open connection fault for the IoT gateway (IR532 system query)
+	monitoring.RegisterAlerts(
+		reg,
+		monitoring.Alerts{Units: am, Access: maintenance.Access{}, Devices: deviceRecoveries{}},
+	)
+
 	blobs := blob.NewDirFromEnv()
-	jobs := maintenance.Jobs{Units: eq, Severity: eq, HQOrg: func(c *ops.Call) uuid.UUID { return c.Principal.OrgID }, Sites: eq, Blobs: blobs}
+	jobs := maintenance.Jobs{
+		Units:    eq,
+		Severity: eq,
+		HQOrg:    func(c *ops.Call) uuid.UUID { return c.Principal.OrgID },
+		Sites:    eq,
+		Blobs:    blobs,
+	}
 	maintenance.RegisterJobs(reg, jobs)
 	maintenance.RegisterOnSite(reg, maintenance.OnSite{Jobs: jobs})
 	reports := maintenance.Reports{Jobs: jobs, Units: eq}
-	maintenance.RegisterFollowUps(reg, maintenance.FollowUps{Jobs: jobs, Blobs: blobs, Warranty: eq})
+	maintenance.RegisterFollowUps(
+		reg,
+		maintenance.FollowUps{Jobs: jobs, Blobs: blobs, Warranty: eq},
+	)
 	maintenance.RegisterReports(reg, reports)
 	maintenance.RegisterPlans(reg, maintenance.Plans{Jobs: jobs})
-	maintenance.RegisterPartners(reg, maintenance.Partners{Orgs: identity.Directory{}, Customers: eq})
+	maintenance.RegisterPartners(
+		reg,
+		maintenance.Partners{Orgs: identity.Directory{}, Customers: eq},
+	)
 	maintenance.RegisterFiles(reg, maintenance.Files{Reports: reports, Blobs: blobs})
+
 	delivery := maintenance.Delivery{Jobs: jobs, Directory: identity.Directory{}, Units: eq}
 	maintenance.RegisterDelivery(reg, delivery)
 	maintenance.RegisterProposals(reg, maintenance.Proposals{Delivery: delivery})
-	cmds := control.Commands{Units: controlTargets{am}, Devices: devices.Models{}, Restrictions: restrictions.Busy{}, Access: maintenance.Access{}}
+
+	cmds := control.Commands{
+		Units:        controlTargets{am},
+		Devices:      devices.Models{},
+		Restrictions: restrictions.Busy{},
+		Access:       maintenance.Access{},
+	}
 	control.Register(reg, cmds)
-	control.RegisterQueries(reg) // internal: the commands the IoT gateway sends (IR195 system query)
-	automations := control.Automations{Units: controlTargets{am}, Cmd: cmds, Notifier: monitoring.Notifier{}}
+	control.RegisterQueries(
+		reg,
+	) // internal: the commands the IoT gateway sends (IR195 system query)
+
+	automations := control.Automations{
+		Units:    controlTargets{am},
+		Cmd:      cmds,
+		Notifier: monitoring.Notifier{},
+	}
 	control.RegisterAutomations(reg, automations)
-	demo.notify = automations.Notify                           // demo.trigger automation: a gateway's facts against the alert policies (IR529)
-	reg.AddJob(ops.DomainEquipment, automations.FireSchedules) // IR54: schedule occurrences fire from the equipment scheduler
-	control.RegisterDiagnostics(reg, control.Diagnostics{Commands: cmds, Jobs: maintenance.Access{}})
+	demo.notify = automations.Notify // demo.trigger automation: a gateway's facts against the alert policies (IR529)
+	reg.AddJob(
+		ops.DomainEquipment,
+		automations.FireSchedules,
+	) // IR54: schedule occurrences fire from the equipment scheduler
+	control.RegisterDiagnostics(
+		reg,
+		control.Diagnostics{Commands: cmds, Jobs: maintenance.Access{}},
+	)
 	identity.RegisterPreferences(reg)
 	identity.RegisterClientUsers(reg)
 	identity.RegisterPartnerUsers(reg)
 	identity.RegisterTwoFactor(reg)
 	writes.Register(reg)
-	assets.RegisterQr(reg, maintenance.QrAccess{}) // an Assets operation; maintenance answers the assignment (IR194)
+	assets.RegisterQr(
+		reg,
+		maintenance.QrAccess{},
+	) // an Assets operation; maintenance answers the assignment (IR194)
 	energy.Register(reg)
 	voice.Register(reg, voice.Voice{Units: am})
 	energy.RegisterMRV(reg)
@@ -182,62 +264,119 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	summaries.Register(reg, sums)
 	summaries.RegisterAdmin(reg, sums)
 	notify.Register(reg)
+
 	rm := restrictions.Restrictions{Units: eq, Devices: eq}
 	restrictions.Register(reg, rm)
-	bill := billing.Billing{Customers: eq, Restrictions: restrictions.Busy{}, Recipients: identity.Directory{}, Releases: rm}
+	bill := billing.Billing{
+		Customers:    eq,
+		Restrictions: restrictions.Busy{},
+		Recipients:   identity.Directory{},
+		Releases:     rm,
+	}
 	billing.Register(reg, bill)
 	billing.RegisterPayments(reg, bill)
 	billing.RegisterInquiries(reg, bill)
 	audit.Register(reg)
+
 	mv := maintenanceView{src: maintenance.PayoutSource{Jobs: jobs}}
 	payouts := billing.Payouts{Source: mv}
 	billing.RegisterPayouts(reg, payouts)
-	reg.AddJob(ops.DomainBilling, payouts.GenerateMonthly) // IR341: the payout drafts of the month that ended, on the 1st (BR-A23)
+	reg.AddJob(
+		ops.DomainBilling,
+		payouts.GenerateMonthly,
+	) // IR341: the payout drafts of the month that ended, on the 1st (BR-A23)
 	registerCrossDomain(reg, eq, mv)
 	maintenance.RegisterWorkforce(reg, maintenance.Workforce{Delivery: delivery})
+
 	filters := maintenance.FilterCare{Units: eq, Run: eq}
 	maintenance.RegisterFilterCare(reg, filters)
-	reg.AddJob(ops.DomainMaintenance, filters.Remind) // IR239: filter cleaning reminders from the maintenance scheduler
-	certs := maintenance.Certificates{Delivery: delivery, Grants: identity.Directory{}, Blobs: blobs}
+	reg.AddJob(
+		ops.DomainMaintenance,
+		filters.Remind,
+	) // IR239: filter cleaning reminders from the maintenance scheduler
+
+	certs := maintenance.Certificates{
+		Delivery: delivery,
+		Grants:   identity.Directory{},
+		Blobs:    blobs,
+	}
 	maintenance.RegisterCertificates(reg, certs)
-	reg.AddJob(ops.DomainMaintenance, certs.Remind)            // IR336: certificate expiry reminders (BR-P09)
-	reg.AddJob(ops.DomainMaintenance, jobs.ReleaseEndedAccess) // IR439: a technician whose access ends before the visit is released (OPEN-BE-09)
+	reg.AddJob(
+		ops.DomainMaintenance,
+		certs.Remind,
+	) // IR336: certificate expiry reminders (BR-P09)
+	reg.AddJob(
+		ops.DomainMaintenance,
+		jobs.ReleaseEndedAccess,
+	) // IR439: a technician whose access ends before the visit is released (OPEN-BE-09)
 	monitoring.RegisterTelemetry(reg, monitoring.Telemetry{Units: am, Sensors: devices.Models{}})
-	monitoring.RegisterPolicies(reg, monitoring.Policies{Units: am, Recipients: identity.Directory{}, Caps: unitCaps{am}})
-	dm := &devices.Module{Units: am, Exclusion: []devices.Exclusion{control.Busy{}, restrictions.Busy{}}}
+	monitoring.RegisterPolicies(
+		reg,
+		monitoring.Policies{Units: am, Recipients: identity.Directory{}, Caps: unitCaps{am}},
+	)
+	dm := &devices.Module{
+		Units:     am,
+		Exclusion: []devices.Exclusion{control.Busy{}, restrictions.Busy{}},
+	}
 	devices.RegisterDevices(reg, dm)
 	devices.RegisterCampaigns(reg, dm)
-	reg.AddJob(ops.DomainEquipment, devices.Lifecycle{Guard: control.Busy{}}.Advance) // IR67: operations start and time out on the equipment scheduler
-	reg.AddJob(ops.DomainEquipment, dm.AdvanceCampaigns)                              // IR339: campaign notices, starts, waves and completion (BR-A20), after the timeouts
+	reg.AddJob(
+		ops.DomainEquipment,
+		devices.Lifecycle{Guard: control.Busy{}}.Advance,
+	) // IR67: operations start and time out on the equipment scheduler
+	reg.AddJob(
+		ops.DomainEquipment,
+		dm.AdvanceCampaigns,
+	) // IR339: campaign notices, starts, waves and completion (BR-A20), after the timeouts
 
 	authn := &auth.Authenticator{Verifier: v, DB: m, Now: reg.Clock}
+
 	servesIdentity := len(cfg.Domains) == 0 || slices.Contains(cfg.Domains, ops.DomainIdentity)
 	if cfg.IdentityURL != "" && !servesIdentity { // IR181 step 1: principals come from identity-api
 		ttl := cfg.PrincipalTTL
 		if ttl == 0 {
 			ttl = 30 * time.Second
 		}
-		authn.Source = &auth.RemoteSource{BaseURL: cfg.IdentityURL, Token: cfg.InternalToken, TTL: ttl}
+
+		authn.Source = &auth.RemoteSource{
+			BaseURL: cfg.IdentityURL,
+			Token:   cfg.InternalToken,
+			TTL:     ttl,
+		}
 	}
+
 	e, err := newEcho(reg, m, authn, cfg.Logger, cfg.InternalToken, servesIdentity)
 	if err != nil {
 		m.Close()
+
 		return nil, err
 	}
-	srv := &Server{Echo: e, Registry: reg, DB: m, Consumers: consumers(m, cfg.Domains, cfg.IdentityProvider, cfg.AccountApps)}
-	if len(cfg.Domains) > 0 && len(cfg.ServiceURLs) > 0 { // read models ask the owning services (IR190)
+
+	srv := &Server{
+		Echo:      e,
+		Registry:  reg,
+		DB:        m,
+		Consumers: consumers(m, cfg.Domains, cfg.IdentityProvider, cfg.AccountApps),
+	}
+	if len(cfg.Domains) > 0 &&
+		len(cfg.ServiceURLs) > 0 { // read models ask the owning services (IR190)
 		q := &ops.HTTPQueries{Targets: map[string]*url.URL{}, Token: cfg.InternalToken}
 		for d, raw := range cfg.ServiceURLs {
 			u, err := url.Parse(raw)
 			if err != nil || u.Scheme == "" || u.Host == "" {
 				return nil, fmt.Errorf("server: service URL of %s is not absolute", d)
 			}
+
 			q.Targets[d] = u
 		}
+
 		reg.Remote = q
 	}
+
 	reg.WrapTx = cfg.WrapTx
-	if len(cfg.Domains) == 0 { // one process serves every domain: apply events inline after each write
+	if len(
+		cfg.Domains,
+	) == 0 { // one process serves every domain: apply events inline after each write
 		reg.AfterCommit = func(ctx context.Context) {
 			if err := srv.DrainEvents(context.WithoutCancel(ctx)); err != nil && cfg.Logger != nil {
 				cfg.Logger.Error("inline events", "error", err)
@@ -245,6 +384,7 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 		}
 		reg.BeforeDispatch = reg.AfterCommit
 	}
+
 	return srv, nil
 }
 
@@ -252,12 +392,23 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 // deviceRecoveries hands the devices' recovery events of an alert to the alert resolution (IR327).
 type deviceRecoveries struct{}
 
-func (deviceRecoveries) AlertRecoveries(ctx context.Context, c *ops.Call, alert uuid.UUID, since time.Time) ([]monitoring.DeviceRecovery, error) {
+func (deviceRecoveries) AlertRecoveries(
+	ctx context.Context,
+	c *ops.Call,
+	alert uuid.UUID,
+	since time.Time,
+) ([]monitoring.DeviceRecovery, error) {
 	rs, err := devices.Models{}.AlertRecoveries(ctx, c, alert, since)
+
 	out := make([]monitoring.DeviceRecovery, len(rs))
 	for i, r := range rs {
-		out[i] = monitoring.DeviceRecovery{ID: r.ID, EventType: r.EventType, OccurredAt: r.OccurredAt}
+		out[i] = monitoring.DeviceRecovery{
+			ID:         r.ID,
+			EventType:  r.EventType,
+			OccurredAt: r.OccurredAt,
+		}
 	}
+
 	return out, err
 }
 
@@ -266,64 +417,108 @@ type monitorReads struct {
 	telemetry monitoring.Telemetry
 }
 
-func (m monitorReads) PowerMeasured(ctx context.Context, c *ops.Call, units []uuid.UUID) (map[uuid.UUID]bool, error) {
+func (m monitorReads) PowerMeasured(
+	ctx context.Context,
+	c *ops.Call,
+	units []uuid.UUID,
+) (map[uuid.UUID]bool, error) {
 	return m.telemetry.PowerMeasured(ctx, c, units)
 }
 
-func (m monitorReads) ActiveAlertCounts(ctx context.Context, c *ops.Call, units []uuid.UUID) (map[uuid.UUID]int, error) {
+func (m monitorReads) ActiveAlertCounts(
+	ctx context.Context,
+	c *ops.Call,
+	units []uuid.UUID,
+) (map[uuid.UUID]int, error) {
 	return m.alerts.ActiveAlertCounts(ctx, c, units)
 }
 
-func (m monitorReads) LatestMeasurements(ctx context.Context, c *ops.Call, units []uuid.UUID) (map[uuid.UUID][]any, error) {
+func (m monitorReads) LatestMeasurements(
+	ctx context.Context,
+	c *ops.Call,
+	units []uuid.UUID,
+) (map[uuid.UUID][]any, error) {
 	latest, err := m.telemetry.LatestMeasurements(ctx, c, units)
+
 	out := make(map[uuid.UUID][]any, len(latest))
 	for u, ms := range latest {
 		for _, x := range ms {
 			out[u] = append(out[u], x)
 		}
 	}
+
 	return out, err
 }
 
 // unitCaps joins the unit's model version (Assets) with its Capability (Devices) for UnitAction checks.
 type unitCaps struct{ am *assets.Module }
 
-func (u unitCaps) UnitCaps(ctx context.Context, c *ops.Call, unit uuid.UUID) (control.Caps, bool, error) {
+func (u unitCaps) UnitCaps(
+	ctx context.Context,
+	c *ops.Call,
+	unit uuid.UUID,
+) (control.Caps, bool, error) {
 	info, ok, err := u.am.UnitInfo(ctx, c, unit)
 	if err != nil || !ok {
 		return control.Caps{}, false, err
 	}
+
 	return devices.Models{}.Caps(ctx, c, info.ModelID, info.CapabilityVersion)
 }
 
 // restrictionTargets joins Assets (organization, archived) with the unit's capability for Restrictions.
 type restrictionTargets struct{ am *assets.Module }
 
-func (t restrictionTargets) RestrictionTarget(ctx context.Context, c *ops.Call, unit uuid.UUID) (restrictions.UnitCaps, bool, error) {
+func (t restrictionTargets) RestrictionTarget(
+	ctx context.Context,
+	c *ops.Call,
+	unit uuid.UUID,
+) (restrictions.UnitCaps, bool, error) {
 	ct, ok, err := controlTargets(t).Target(ctx, c, unit)
 	if err != nil || !ok {
 		return restrictions.UnitCaps{}, false, err
 	}
+
 	org, archived, _, err := t.am.UnitState(ctx, c, unit)
 	if err != nil {
 		return restrictions.UnitCaps{}, false, err
 	}
-	return restrictions.UnitCaps{OrgID: org, Archived: archived, Control: ct.Caps.Control, HasTemperature: ct.Caps.HasTemperature,
-		TempMin: ct.Caps.TempMin, TempMax: ct.Caps.TempMax, Step: ct.Caps.TempStep}, true, nil
+
+	return restrictions.UnitCaps{
+		OrgID:          org,
+		Archived:       archived,
+		Control:        ct.Caps.Control,
+		HasTemperature: ct.Caps.HasTemperature,
+		TempMin:        ct.Caps.TempMin,
+		TempMax:        ct.Caps.TempMax,
+		Step:           ct.Caps.TempStep,
+	}, true, nil
 }
 
 // controlTargets joins Assets (organization, property, version) with the unit's capability for Control.
 type controlTargets struct{ am *assets.Module }
 
-func (t controlTargets) Target(ctx context.Context, c *ops.Call, unit uuid.UUID) (control.Target, bool, error) {
+func (t controlTargets) Target(
+	ctx context.Context,
+	c *ops.Call,
+	unit uuid.UUID,
+) (control.Target, bool, error) {
 	info, ok, err := t.am.UnitInfo(ctx, c, unit)
 	if err != nil || !ok {
 		return control.Target{}, false, err
 	}
+
 	v, err := t.am.UnitVersion(ctx, c, unit)
 	if err != nil {
 		return control.Target{}, false, err
 	}
+
 	caps, _, err := devices.Models{}.Caps(ctx, c, info.ModelID, info.CapabilityVersion)
-	return control.Target{OrgID: info.OrgID, PropertyID: info.PropertyID, Version: v, Caps: caps}, true, err
+
+	return control.Target{
+		OrgID:      info.OrgID,
+		PropertyID: info.PropertyID,
+		Version:    v,
+		Caps:       caps,
+	}, true, err
 }

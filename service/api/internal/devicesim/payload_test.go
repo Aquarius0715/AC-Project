@@ -18,6 +18,7 @@ func TestTopicsFollowTheDesign(t *testing.T) {
 	if got, want := m.TelemetryTopic(), "t/"+tenant+"/d/"+device+"/telemetry"; got != want {
 		t.Errorf("telemetry topic %q, want %q", got, want)
 	}
+
 	if got, want := m.HeartbeatTopic(), "t/"+tenant+"/d/"+device+"/heartbeat"; got != want {
 		t.Errorf("heartbeat topic %q, want %q", got, want)
 	}
@@ -27,21 +28,26 @@ func TestTopicsFollowTheDesign(t *testing.T) {
 func TestTelemetryBatchShape(t *testing.T) {
 	m := NewModule(tenant, device, "v1", 7)
 	at := time.Date(2026, 10, 13, 2, 0, 0, 0, time.UTC)
+
 	raw, err := m.Telemetry(at)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	var b map[string]any
 	if err := json.Unmarshal(raw, &b); err != nil {
 		t.Fatal(err)
 	}
+
 	if b["deviceId"] != device {
 		t.Errorf("deviceId %v", b["deviceId"])
 	}
+
 	ms := b["measurements"].([]any)
 	if len(ms) != len(Sensors) {
 		t.Fatalf("%d measurements, want %d", len(ms), len(Sensors))
 	}
+
 	for i, x := range ms {
 		row := x.(map[string]any)
 		for _, k := range []string{"sensorId", "metric", "value", "unit", "observedAt", "sequence"} {
@@ -49,11 +55,14 @@ func TestTelemetryBatchShape(t *testing.T) {
 				t.Errorf("measurement %d lacks %s", i, k)
 			}
 		}
+
 		s := Sensors[i]
+
 		v := row["value"].(float64)
 		if math.Abs(v-s.Base) > s.Swing+0.01 {
 			t.Errorf("%s value %v outside %v±%v", s.ID, v, s.Base, s.Swing)
 		}
+
 		if row["observedAt"] != "2026-10-13T02:00:00Z" {
 			t.Errorf("observedAt %v", row["observedAt"])
 		}
@@ -64,11 +73,13 @@ func TestTelemetryBatchShape(t *testing.T) {
 func TestSequenceNeverRepeats(t *testing.T) {
 	m := NewModule(tenant, device, "v1", 3)
 	seen := map[float64]bool{}
-	for i := 0; i < 3; i++ {
+
+	for range 3 {
 		raw, err := m.Telemetry(time.Now())
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		var b struct {
 			Measurements []struct {
 				Sequence float64 `json:"sequence"`
@@ -77,13 +88,16 @@ func TestSequenceNeverRepeats(t *testing.T) {
 		if err := json.Unmarshal(raw, &b); err != nil {
 			t.Fatal(err)
 		}
+
 		for _, x := range b.Measurements {
 			if seen[x.Sequence] {
 				t.Fatalf("sequence %v repeated", x.Sequence)
 			}
+
 			seen[x.Sequence] = true
 		}
 	}
+
 	if len(seen) != 3*len(Sensors) {
 		t.Errorf("%d distinct sequences, want %d", len(seen), 3*len(Sensors))
 	}
@@ -92,14 +106,17 @@ func TestSequenceNeverRepeats(t *testing.T) {
 // TestHeartbeatCarriesFirmware: the heartbeat names the device, its time in UTC and its firmware.
 func TestHeartbeatCarriesFirmware(t *testing.T) {
 	m := NewModule(tenant, device, "v2.1", 1)
+
 	raw, err := m.Beat(time.Date(2026, 10, 13, 10, 0, 0, 0, time.FixedZone("MYT", 8*3600)))
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	var h map[string]any
 	if err := json.Unmarshal(raw, &h); err != nil {
 		t.Fatal(err)
 	}
+
 	if h["deviceId"] != device || h["firmware"] != "v2.1" || h["at"] != "2026-10-13T02:00:00Z" {
 		t.Errorf("heartbeat %v", h)
 	}
@@ -115,24 +132,37 @@ func TestAcknowledgeAppliesAndExpires(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		var a map[string]any
 		if err := json.Unmarshal(raw, &a); err != nil {
 			t.Fatal(err)
 		}
+
 		return a
 	}
-	a := ack(`{"commandId":"c1","kind":"set_temperature","setpointCelsius":26,"expiresAt":"2026-10-13T02:05:00Z"}`, now)
-	if a["result"] != "applied" || a["commandId"] != "c1" || a["observed"].(map[string]any)["setpointCelsius"] != 26.0 {
+
+	a := ack(
+		`{"commandId":"c1","kind":"set_temperature","setpointCelsius":26,"expiresAt":"2026-10-13T02:05:00Z"}`,
+		now,
+	)
+	if a["result"] != "applied" || a["commandId"] != "c1" ||
+		a["observed"].(map[string]any)["setpointCelsius"] != 26.0 {
 		t.Fatalf("applied: %v", a)
 	}
-	a = ack(`{"commandId":"c2","kind":"set_temperature","setpointCelsius":18,"expiresAt":"2026-10-13T02:05:00Z"}`, now.Add(10*time.Minute))
+
+	a = ack(
+		`{"commandId":"c2","kind":"set_temperature","setpointCelsius":18,"expiresAt":"2026-10-13T02:05:00Z"}`,
+		now.Add(10*time.Minute),
+	)
 	if a["result"] != "expired" || a["observed"].(map[string]any)["setpointCelsius"] != 26.0 {
 		t.Fatalf("expired command changed the setpoint: %v", a)
 	}
+
 	a = ack(`{"commandId":"c3","kind":"reboot","expiresAt":"2026-10-13T02:05:00Z"}`, now)
 	if a["result"] != "unsupported" {
 		t.Fatalf("unsupported: %v", a)
 	}
+
 	if _, _, err := m.Acknowledge([]byte(`not json`), now); err == nil {
 		t.Error("a malformed command is accepted")
 	}
@@ -144,6 +174,7 @@ func TestCommandAndAckTopics(t *testing.T) {
 	if got, want := m.CommandTopic(), "t/"+tenant+"/d/"+device+"/cmd"; got != want {
 		t.Errorf("command topic %q, want %q", got, want)
 	}
+
 	if got, want := m.AckTopic(), "t/"+tenant+"/d/"+device+"/cmd/ack"; got != want {
 		t.Errorf("ack topic %q, want %q", got, want)
 	}
@@ -156,14 +187,20 @@ func TestAcknowledgeRefusesMalformedAndKeepsUnknownKinds(t *testing.T) {
 	if _, _, err := m.Acknowledge([]byte(`{"commandId":`), time.Now()); err == nil {
 		t.Error("a malformed command is accepted")
 	}
-	raw, _, err := m.Acknowledge([]byte(`{"commandId":"c9","kind":"reboot","expiresAt":"2030-01-01T00:00:00Z"}`), time.Now())
+
+	raw, _, err := m.Acknowledge(
+		[]byte(`{"commandId":"c9","kind":"reboot","expiresAt":"2030-01-01T00:00:00Z"}`),
+		time.Now(),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	var a map[string]any
 	if err := json.Unmarshal(raw, &a); err != nil {
 		t.Fatal(err)
 	}
+
 	if a["result"] != "unsupported" || a["observed"].(map[string]any)["setpointCelsius"] != 24.0 {
 		t.Errorf("unknown kind: %v", a)
 	}

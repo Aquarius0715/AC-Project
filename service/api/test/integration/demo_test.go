@@ -2,7 +2,6 @@ package integration
 
 import (
 	"context"
-	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/seed"
+	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
 
 func TestDemoOperations(t *testing.T) {
@@ -18,30 +18,66 @@ func TestDemoOperations(t *testing.T) {
 	trig := func(s *apiserver.Server, body string) (int, map[string]any) {
 		return write(s, &customerB, "demo.trigger", body, 0)
 	}
-	if code, m := write(plain, &customerB, "demo.advanceClock", `{"to":"`+clock.Add(time.Hour).Format(time.RFC3339)+`"}`, 0); code != 503 || m["messageKey"] != "errors.demo_only" {
+
+	if code, m := write(
+		plain,
+		&customerB,
+		"demo.advanceClock",
+		`{"to":"`+clock.Add(time.Hour).Format(time.RFC3339)+`"}`,
+		0,
+	); code != 503 ||
+		m["messageKey"] != "errors.demo_only" {
 		t.Fatalf("production demo ops: %d %v", code, m)
 	}
 	// sessions belong to the BFF and the identity provider in API mode: every demoSession operation says so
 	for op, body := range map[string]string{"demoSession.signIn": `{"demoActorId":"customer-a"}`, "demoSession.switchMembership": `{"demoMembershipId":"m-1"}`, "demoSession.signOut": `{}`, "demoSession.extend": `{}`} {
-		if code, m := write(plain, &customerB, op, body, 0); code != 503 || m["messageKey"] != "errors.session_via_bff" {
+		if code, m := write(
+			plain,
+			&customerB,
+			op,
+			body,
+			0,
+		); code != 503 ||
+			m["messageKey"] != "errors.session_via_bff" {
 			t.Errorf("%s: %d %v", op, code, m)
 		}
 	}
+
 	s := serverWith(t, true)
 	u := boundUnit(t, s, "online")
+
 	var device string
 	ownerScan(t, `SELECT id::text FROM devices.devices WHERE unit_id = $1`, []any{u}, &device)
+
 	sensor := uuid.NewString()
-	owner(t, `INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, boundary_id, stale_after_seconds) VALUES ($1,$2,$3,'temperature','°C',NULL,120)`, sensor, seed.ID("tenant-a"), device)
+	owner(
+		t,
+		`INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, boundary_id, stale_after_seconds) VALUES ($1,$2,$3,'temperature','°C',NULL,120)`,
+		sensor,
+		seed.ID("tenant-a"),
+		device,
+	)
+
 	teleAt := func(value, unitName string, sens string, observed time.Time) string {
-		return `{"scenarioId":"t","eventId":"` + uuid.NewString() + `","occurredAt":"` + clock.Format(time.RFC3339) + `","eventType":"telemetry","measurement":{"unitId":"` + u +
-			`","sensorId":"` + sens + `","metric":"temperature","value":` + value + `,"unit":"` + unitName + `","observedAt":"` + observed.Format(time.RFC3339) +
-			`","receivedAt":"` + clock.Format(time.RFC3339) + `","origin":"measured","quality":"valid","eventId":"` + uuid.NewString() + `"}}`
+		return `{"scenarioId":"t","eventId":"` + uuid.NewString() + `","occurredAt":"` + clock.Format(
+			time.RFC3339,
+		) + `","eventType":"telemetry","measurement":{"unitId":"` + u +
+			`","sensorId":"` + sens + `","metric":"temperature","value":` + value + `,"unit":"` + unitName + `","observedAt":"` + observed.Format(
+			time.RFC3339,
+		) +
+			`","receivedAt":"` + clock.Format(
+			time.RFC3339,
+		) + `","origin":"measured","quality":"valid","eventId":"` + uuid.NewString() + `"}}`
 	}
+
 	tele := func(value, unitName string, sens string) string {
 		return teleAt(value, unitName, sens, clock.Add(-10*time.Second))
 	}
-	if code, m := trig(s, tele("25", "°C", sensor)); code != 200 || data(m)["type"] != "telemetry" || data(m)["generation"].(float64) != 1 {
+	if code, m := trig(
+		s,
+		tele("25", "°C", sensor),
+	); code != 200 || data(m)["type"] != "telemetry" ||
+		data(m)["generation"].(float64) != 1 {
 		t.Fatalf("telemetry: %d %v", code, m)
 	}
 	// IR12 normalization: causes in priority order, a cause keeps a null input suspect, otherwise null is missing
@@ -50,65 +86,109 @@ func TestDemoOperations(t *testing.T) {
 	trig(s, tele("null", "°C", sensor))
 	trig(s, tele("null", "kelvin-degrees-with-a-very-long-unit-name", sensor))
 	trig(s, teleAt("24", "°C", sensor, clock.Add(time.Minute)))
+
 	type row struct {
 		quality       string
 		seq           int64
 		value         *float64
 		reason, rawUn *string
 	}
+
 	var rows []row
+
 	func() {
 		conn, err := pgx.Connect(context.Background(), testDB("postgres"))
 		if err != nil {
 			t.Skip(err)
 		}
 		defer conn.Close(context.Background())
-		r, err := conn.Query(context.Background(), `SELECT quality, sequence, value, quality_reason, raw_unit FROM monitoring.measurements WHERE sensor_id = $1 ORDER BY sequence`, sensor)
+
+		r, err := conn.Query(
+			context.Background(),
+			`SELECT quality, sequence, value, quality_reason, raw_unit FROM monitoring.measurements WHERE sensor_id = $1 ORDER BY sequence`,
+			sensor,
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		for r.Next() {
 			var x row
 			if err := r.Scan(&x.quality, &x.seq, &x.value, &x.reason, &x.rawUn); err != nil {
 				t.Fatal(err)
 			}
+
 			rows = append(rows, x)
 		}
+
 		if err := r.Err(); err != nil {
 			t.Fatal(err)
 		}
 	}()
+
 	str := func(p *string) string {
 		if p == nil {
 			return "-"
 		}
+
 		return *p
 	}
+
 	want := []struct {
 		quality, reason, raw string
 		value                bool
 	}{
-		{"valid", "-", "-", true}, {"suspect", "out_of_range", "-", false}, {"suspect", "unit_mismatch", "K", false}, {"missing", "-", "-", false},
-		{"suspect", "unit_mismatch", "kelvin-degrees-with-a-very-long-", false}, {"suspect", "invalid_time", "-", true},
+		{"valid", "-", "-", true},
+		{"suspect", "out_of_range", "-", false},
+		{"suspect", "unit_mismatch", "K", false},
+		{"missing", "-", "-", false},
+		{"suspect", "unit_mismatch", "kelvin-degrees-with-a-very-long-", false},
+		{"suspect", "invalid_time", "-", true},
 	}
 	if len(rows) != len(want) || rows[2].seq != 3 {
 		t.Fatalf("telemetry rows: %v", rows)
 	}
+
 	for i, w := range want {
-		if r := rows[i]; r.quality != w.quality || str(r.reason) != w.reason || str(r.rawUn) != w.raw || (r.value != nil) != w.value {
-			t.Errorf("row %d: %s %s %s %v, want %v", i, r.quality, str(r.reason), str(r.rawUn), r.value, w)
+		if r := rows[i]; r.quality != w.quality || str(r.reason) != w.reason ||
+			str(r.rawUn) != w.raw ||
+			(r.value != nil) != w.value {
+			t.Errorf(
+				"row %d: %s %s %s %v, want %v",
+				i,
+				r.quality,
+				str(r.reason),
+				str(r.rawUn),
+				r.value,
+				w,
+			)
 		}
 	}
+
 	if code, _ := trig(s, tele("25", "°C", uuid.NewString())); code != 404 {
 		t.Error("unknown sensor")
 	}
-	if code, m := trig(s, `{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Format(time.RFC3339)+`","eventType":"network","bogus":false}`); code != 422 || fields(m) != "_=error.malformedInput" {
+
+	if code, m := trig(
+		s,
+		`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Format(
+			time.RFC3339,
+		)+`","eventType":"network","bogus":false}`,
+	); code != 422 ||
+		fields(m) != "_=error.malformedInput" {
 		t.Errorf("a trigger with a field no type has: %d %s", code, fields(m))
 	}
 	// a trigger of the browser demo's types, shaped by the contract, is refused as unsupported (IR391)
-	for _, extra := range []string{`"connected":false`, `"enabled":true`, `"membershipId":"` + uuid.NewString() + `","qualification":"demo_indoor"`,
-		`"operation":"units.list","outcome":"TIMEOUT","retryAfterSeconds":null,"delayMs":null,"remainingCalls":1`} {
-		code, m := trig(s, `{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Format(time.RFC3339)+`","eventType":"network",`+extra+`}`)
+	for _, extra := range []string{
+		`"connected":false`, `"enabled":true`, `"membershipId":"` + uuid.NewString() + `","qualification":"demo_indoor"`,
+		`"operation":"units.list","outcome":"TIMEOUT","retryAfterSeconds":null,"delayMs":null,"remainingCalls":1`,
+	} {
+		code, m := trig(
+			s,
+			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Format(
+				time.RFC3339,
+			)+`","eventType":"network",`+extra+`}`,
+		)
 		refusal(t, "contract-shaped "+extra, code, m, "eventType=errors.trigger_unsupported")
 	}
 	// the trigger's own rules (IR36): a known event type, its IDs, and a measurement of the sensor's metric and unit
@@ -122,70 +202,176 @@ func TestDemoOperations(t *testing.T) {
 		"observation, no unit":  {`{"scenarioId":"t","eventId":"` + uuid.NewString() + `","occurredAt":"` + now + `","eventType":"restriction_observation"}`, "unitId", "error.required"},
 		"device without one":    {`{"scenarioId":"t","eventId":"` + uuid.NewString() + `","occurredAt":"` + now + `","eventType":"device","kind":"tamper","sequence":1}`, "deviceId", "error.required"},
 	} {
-		if code, m := trig(s, c.body); code != 422 || m["fieldErrors"].(map[string]any)[c.field] != c.key {
+		if code, m := trig(
+			s,
+			c.body,
+		); code != 422 ||
+			m["fieldErrors"].(map[string]any)[c.field] != c.key {
 			t.Errorf("%s: %d %v", name, code, m)
 		}
 	}
-	if code, m := trig(s, strings.Replace(tele("55", "%", sensor), `"metric":"temperature"`, `"metric":"humidity"`, 1)); code != 422 || m["fieldErrors"].(map[string]any)["measurement"] != "errors.sensor_mismatch" {
+
+	if code, m := trig(
+		s,
+		strings.Replace(
+			tele("55", "%", sensor),
+			`"metric":"temperature"`,
+			`"metric":"humidity"`,
+			1,
+		),
+	); code != 422 ||
+		m["fieldErrors"].(map[string]any)["measurement"] != "errors.sensor_mismatch" {
 		t.Errorf("another metric than the sensor's: %d %v", code, m)
 	}
 	// IR77: a measurement's own sequence is kept; without one it is the sensor's latest + 1
-	if code, m := trig(s, strings.Replace(tele("26", "°C", sensor), `"quality":"valid"`, `"quality":"valid","sequence":100`, 1)); code != 200 {
+	if code, m := trig(
+		s,
+		strings.Replace(
+			tele("26", "°C", sensor),
+			`"quality":"valid"`,
+			`"quality":"valid","sequence":100`,
+			1,
+		),
+	); code != 200 {
 		t.Fatalf("own sequence: %d %v", code, m)
 	}
+
 	var top int64
-	ownerScan(t, `SELECT max(sequence) FROM monitoring.measurements WHERE sensor_id = $1`, []any{sensor}, &top)
+	ownerScan(
+		t,
+		`SELECT max(sequence) FROM monitoring.measurements WHERE sensor_id = $1`,
+		[]any{sensor},
+		&top,
+	)
+
 	if top != 100 {
 		t.Errorf("own sequence kept: %d", top)
 	}
 	// command acknowledgement through the demo trigger
 	_, g := post(s, &customerB, "units.get", `{"id":"`+u+`"}`)
-	code, m := write(s, &customerB, "commands.create", `{"unitId":"`+u+`","action":{"kind":"set_power","power":true},"expectedUnitVersion":`+itoa(ver(g))+`}`, 0)
+
+	code, m := write(
+		s,
+		&customerB,
+		"commands.create",
+		`{"unitId":"`+u+`","action":{"kind":"set_power","power":true},"expectedUnitVersion":`+itoa(
+			ver(g),
+		)+`}`,
+		0,
+	)
 	if code != 200 {
 		t.Fatalf("command: %d %v", code, m)
 	}
+
 	cmd := data(m)["id"].(string)
 	keepObserved(t, cmd)
 	// a requested command is marked sent by the device's sent event (commands.create sends at once, so set it back)
-	owner(t, `UPDATE control.commands SET status = 'requested', delivery = 'not_sent', sent_at = NULL WHERE id = $1`, cmd)
+	owner(
+		t,
+		`UPDATE control.commands SET status = 'requested', delivery = 'not_sent', sent_at = NULL WHERE id = $1`,
+		cmd,
+	)
+
 	sentAt := clock.Add(500 * time.Millisecond)
-	if code, m := trig(s, `{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+sentAt.Format(time.RFC3339Nano)+`","eventType":"command_sent","commandId":"`+cmd+`","sequence":1}`); code != 200 {
+	if code, m := trig(
+		s,
+		`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+sentAt.Format(
+			time.RFC3339Nano,
+		)+`","eventType":"command_sent","commandId":"`+cmd+`","sequence":1}`,
+	); code != 200 {
 		t.Fatalf("sent trigger: %d %v", code, m)
 	}
-	if _, m := post(s, &customerB, "commands.get", `{"id":"`+cmd+`"}`); data(m)["status"] != "sent" || data(m)["delivery"] != "sent" || data(m)["sentAt"] != sentAt.Format(time.RFC3339Nano) {
+
+	if _, m := post(
+		s,
+		&customerB,
+		"commands.get",
+		`{"id":"`+cmd+`"}`,
+	); data(m)["status"] != "sent" || data(m)["delivery"] != "sent" ||
+		data(m)["sentAt"] != sentAt.Format(time.RFC3339Nano) {
 		t.Errorf("sent: %v", data(m))
 	}
-	if code, _ := trig(s, `{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Add(time.Second).Format(time.RFC3339)+`","eventType":"command_ack","commandId":"`+cmd+`","sequence":2}`); code != 200 {
+
+	if code, _ := trig(
+		s,
+		`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Add(time.Second).
+			Format(time.RFC3339)+
+			`","eventType":"command_ack","commandId":"`+cmd+`","sequence":2}`,
+	); code != 200 {
 		t.Fatal("ack trigger")
 	}
-	if _, m := post(s, &customerB, "commands.get", `{"id":"`+cmd+`"}`); data(m)["status"] != "acknowledged" {
+
+	if _, m := post(
+		s,
+		&customerB,
+		"commands.get",
+		`{"id":"`+cmd+`"}`,
+	); data(m)["status"] != "acknowledged" {
 		t.Errorf("acknowledged: %v", m)
 	}
 	// the request was audited pending; the acknowledgement appends its result under the same correlation ID (IR90, IR604)
-	if trail := commandTrail(t, s, m); len(trail) != 2 || trail[0] != "pending customer-b" || trail[1] != "success system-iot " {
+	if trail := commandTrail(
+		t,
+		s,
+		m,
+	); len(trail) != 2 || trail[0] != "pending customer-b" ||
+		trail[1] != "success system-iot " {
 		t.Errorf("the command's audit trail: %v", trail)
 	}
 	// the acknowledged setting becomes the observed state without a unit version change
 	_, g2 := post(s, &customerB, "units.get", `{"id":"`+u+`"}`)
-	if obs := data(g2)["observedState"].(map[string]any); obs["power"] != true || obs["observedAt"] != clock.Add(time.Second).Format(time.RFC3339Nano) {
+	if obs := data(g2)["observedState"].(map[string]any); obs["power"] != true ||
+		obs["observedAt"] != clock.Add(time.Second).Format(time.RFC3339Nano) {
 		t.Errorf("observedState after ack: %v", obs)
 	}
+
 	if ver(g2) != ver(g) {
 		t.Errorf("unit version changed by ack: %d → %d", ver(g), ver(g2))
 	}
 	// the clock only moves forward; deadlines are processed by the jump
-	if code, m := write(s, &customerB, "demo.advanceClock", `{"to":"`+clock.Add(-time.Hour).Format(time.RFC3339)+`"}`, 0); code != 422 || fields(m) != "to=errors.clock_backwards" {
+	if code, m := write(
+		s,
+		&customerB,
+		"demo.advanceClock",
+		`{"to":"`+clock.Add(-time.Hour).Format(time.RFC3339)+`"}`,
+		0,
+	); code != 422 ||
+		fields(m) != "to=errors.clock_backwards" {
 		t.Errorf("backwards jump: %d %s", code, fields(m))
 	}
-	if code, m := write(s, &customerB, "demo.advanceClock", `{"to":"`+clock.Add(time.Hour).Format(time.RFC3339)+`"}`, 0); code != 200 || data(m)["generation"].(float64) != 1 {
+
+	if code, m := write(
+		s,
+		&customerB,
+		"demo.advanceClock",
+		`{"to":"`+clock.Add(time.Hour).Format(time.RFC3339)+`"}`,
+		0,
+	); code != 200 ||
+		data(m)["generation"].(float64) != 1 {
 		t.Fatalf("advance: %d %v", code, m)
 	}
 	// rows created after the jump carry the scenario clock (platform.app_now, IR157)
-	code, m = write(s, &customerB, "clientUsers.save", `{"customerId":"`+seed.ID("cust-b").String()+`","email":"clock-`+uuid.NewString()[:8]+`@example.com","clientRole":"member","displayName":"Clock Member"}`, 0)
+	code, m = write(
+		s,
+		&customerB,
+		"clientUsers.save",
+		`{"customerId":"`+seed.ID("cust-b").
+			String()+
+			`","email":"clock-`+uuid.NewString()[:8]+`@example.com","clientRole":"member","displayName":"Clock Member"}`,
+		0,
+	)
 	if code != 200 || data(m)["createdAt"] != clock.Add(time.Hour).Format(time.RFC3339) {
 		t.Errorf("created after the jump: %d %v", code, m)
 	}
-	if code, m := write(s, &customerB, "demo.reset", `{"confirmation":true}`, 0); code != 503 || m["messageKey"] != "errors.demo_reset_offline" {
+
+	if code, m := write(
+		s,
+		&customerB,
+		"demo.reset",
+		`{"confirmation":true}`,
+		0,
+	); code != 503 ||
+		m["messageKey"] != "errors.demo_reset_offline" {
 		t.Errorf("reset: %d %v", code, m)
 	}
 }
@@ -195,20 +381,34 @@ func TestDemoOperations(t *testing.T) {
 func commandTrail(t *testing.T, s *apiserver.Server, created map[string]any) []string {
 	t.Helper()
 	drainEvents(t)
+
 	corr := created["meta"].(map[string]any)["correlationId"].(string)
-	day := `"from":"` + clock.Add(-24*time.Hour).Format(time.RFC3339) + `","to":"` + clock.Add(24*time.Hour).Format(time.RFC3339) + `"`
-	_, m := post(s, &hq, "audit.list", `{"filters":{`+day+`,"correlationId":"`+corr+`"},"limit":10}`)
+	day := `"from":"` + clock.Add(-24*time.Hour).
+		Format(time.RFC3339) +
+		`","to":"` + clock.Add(24*time.Hour).
+		Format(time.RFC3339) +
+		`"`
+	_, m := post(
+		s,
+		&hq,
+		"audit.list",
+		`{"filters":{`+day+`,"correlationId":"`+corr+`"},"limit":10}`,
+	)
 	out := []string{}
+
 	for _, a := range items(m) {
 		if a["action"] != "commands.create" {
 			continue
 		}
+
 		e := a["result"].(string) + " " + map[bool]string{true: "customer-b", false: a["actorId"].(string)}[a["actorId"] == seed.ID("user-customer-b").String()]
 		if a["result"] != "pending" {
 			reason, _ := a["reason"].(string)
 			e += " " + reason
 		}
+
 		out = append([]string{e}, out...) // the list is newest first
 	}
+
 	return out
 }

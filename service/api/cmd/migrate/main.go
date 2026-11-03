@@ -14,6 +14,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -40,10 +41,12 @@ func run(ctx context.Context, args []string) error {
 	if len(args) > 0 {
 		cmd = args[0]
 	}
+
 	url := os.Getenv("DATABASE_URL")
 	if url == "" {
 		url = "postgres://postgres:local@localhost:5432/ac?sslmode=disable"
 	}
+
 	conn, err := pgx.Connect(ctx, url)
 	if err != nil {
 		return err
@@ -56,35 +59,44 @@ func run(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
+
 		applied, err := migrate.Up(ctx, conn, ms)
 		if err != nil {
 			return err
 		}
+
 		v, _, err := migrate.Version(ctx, conn)
 		if err != nil {
 			return err
 		}
+
 		log.Printf("migrate: applied %d migration(s); version %d", len(applied), v)
+
 		return local(ctx, conn)
 	case "version":
 		v, dirty, err := migrate.Version(ctx, conn)
 		if err != nil {
 			return err
 		}
+
 		fmt.Printf("%d dirty=%t\n", v, dirty)
+
 		return nil
 	case "force":
 		if len(args) < 2 {
-			return fmt.Errorf("usage: migrate force VERSION")
+			return errors.New("usage: migrate force VERSION")
 		}
+
 		v, err := strconv.ParseInt(args[1], 10, 64)
 		if err != nil {
 			return err
 		}
+
 		return migrate.Force(ctx, conn, v)
 	case "bootstrap-admin":
 		return bootstrapAdmin(ctx, conn, args[1:])
 	}
+
 	return fmt.Errorf("unknown command %q (want up, version, force or bootstrap-admin)", cmd)
 }
 
@@ -93,24 +105,55 @@ func run(ctx context.Context, args []string) error {
 // set-up link (in development to the local Mailpit inbox).
 func bootstrapAdmin(ctx context.Context, conn *pgx.Conn, args []string) error {
 	fs := flag.NewFlagSet("bootstrap-admin", flag.ContinueOnError)
+
 	var in bootstrap.Input
-	fs.StringVar(&in.Tenant, "tenant", "", "the tenant's name (an existing tenant of that name, or a new one)")
-	fs.StringVar(&in.Organization, "organization", "HQ", "the HQ organization's name, when the tenant has none")
-	fs.StringVar(&in.Email, "email", "", "the administrator's e-mail address (the set-up link goes there)")
+	fs.StringVar(
+		&in.Tenant,
+		"tenant",
+		"",
+		"the tenant's name (an existing tenant of that name, or a new one)",
+	)
+	fs.StringVar(
+		&in.Organization,
+		"organization",
+		"HQ",
+		"the HQ organization's name, when the tenant has none",
+	)
+	fs.StringVar(
+		&in.Email,
+		"email",
+		"",
+		"the administrator's e-mail address (the set-up link goes there)",
+	)
 	fs.StringVar(&in.Name, "name", "", "the administrator's display name")
+
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+
 	var r bootstrap.Result
+
 	if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
 		var err error
+
 		r, err = bootstrap.Admin(ctx, tx, in)
+
 		return err
 	}); err != nil {
 		return fmt.Errorf("bootstrap-admin: %w", err)
 	}
-	log.Printf("bootstrap-admin: tenant %s (new %t), HQ organization %s (new %t), administrator %s, membership %s; the set-up e-mail goes to %s",
-		r.TenantID, r.NewTenant, r.OrganizationID, r.NewOrganization, r.UserID, r.MembershipID, in.Email)
+
+	log.Printf(
+		"bootstrap-admin: tenant %s (new %t), HQ organization %s (new %t), administrator %s, membership %s; the set-up e-mail goes to %s",
+		r.TenantID,
+		r.NewTenant,
+		r.OrganizationID,
+		r.NewOrganization,
+		r.UserID,
+		r.MembershipID,
+		in.Email,
+	)
+
 	return nil
 }
 
@@ -120,32 +163,50 @@ func local(ctx context.Context, conn *pgx.Conn) error {
 		if err := migrate.EnsureLogin(ctx, conn, "ac_app_login", pw, "ac_app"); err != nil {
 			return err
 		}
+
 		log.Printf("migrate: login role ac_app_login ready")
+
 		for _, d := range []string{"identity", "equipment", "maintenance", "billing", "energy"} { // one login per domain service (IR194)
-			if err := migrate.EnsureLogin(ctx, conn, "ac_"+d+"_login", pw, "ac_svc_"+d); err != nil {
+			if err := migrate.EnsureLogin(
+				ctx,
+				conn,
+				"ac_"+d+"_login",
+				pw,
+				"ac_svc_"+d,
+			); err != nil {
 				return err
 			}
 		}
+
 		log.Printf("migrate: domain service logins ready")
 	}
+
 	path := os.Getenv("SEED_FIXTURE")
 	if path == "" {
 		return nil
 	}
+
 	done, err := migrate.Seeded(ctx, conn)
 	if err != nil {
 		return err
 	}
+
 	f, err := seed.Load(path)
 	if err != nil {
 		return err
 	}
+
 	if done {
 		log.Printf("migrate: fixture already loaded")
 	} else {
-		if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error { return seed.Apply(ctx, tx, f) }); err != nil {
+		if err := pgx.BeginFunc(
+			ctx,
+			conn,
+			func(tx pgx.Tx) error { return seed.Apply(ctx, tx, f) },
+		); err != nil {
 			return err
 		}
+
 		log.Printf("migrate: seeded %d actors, %d units", len(f.Actors), len(f.DemoSeed.Units))
 	}
 	// SEED_MOCK_FLEET=1 (development only): one air conditioner and IoT module per state pattern, on the fixture's clock
@@ -154,22 +215,37 @@ func local(ctx context.Context, conn *pgx.Conn) error {
 		if err != nil {
 			return err
 		}
+
 		var n int
+
 		if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
 			var err error
+
 			n, err = seed.ApplyFleet(ctx, tx, fleet, f.SeedCreatedAt)
+
 			return err
 		}); err != nil {
 			return err
 		}
+
 		log.Printf("migrate: mock fleet of %d units ready", n)
 	}
 	// SEED_LIVE_SENSORS=1 (development only): the live site that real sensor nodes report to (DEC-86, IR524)
 	if os.Getenv("SEED_LIVE_SENSORS") == "1" {
-		if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error { return seed.ApplyLive(ctx, tx, f.SeedCreatedAt) }); err != nil {
+		if err := pgx.BeginFunc(
+			ctx,
+			conn,
+			func(tx pgx.Tx) error { return seed.ApplyLive(ctx, tx, f.SeedCreatedAt) },
+		); err != nil {
 			return err
 		}
-		log.Printf("migrate: live sensor site of %s ready (%s)", seed.LiveSite.CustomerName, seed.LiveSite.UnitName)
+
+		log.Printf(
+			"migrate: live sensor site of %s ready (%s)",
+			seed.LiveSite.CustomerName,
+			seed.LiveSite.UnitName,
+		)
 	}
+
 	return nil
 }

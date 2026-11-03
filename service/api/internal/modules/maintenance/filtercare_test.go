@@ -10,6 +10,7 @@ import (
 // neither — always "not a fault".
 func TestReminderEvidence(t *testing.T) {
 	now := time.Date(2026, 9, 15, 1, 0, 0, 0, time.UTC)
+
 	hours, cleaned := 412.4, now.AddDate(0, 0, -95)
 	for name, c := range map[string]struct {
 		st   FilterStatus

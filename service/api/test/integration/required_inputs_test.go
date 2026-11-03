@@ -15,6 +15,7 @@ import (
 func TestRequiredInputs(t *testing.T) {
 	s := server(t)
 	long := func(n int) string { return `"` + strings.Repeat("x", n) + `"` }
+
 	req, inv, length, rng := "error.required", "error.invalid", "error.length", "error.range"
 	for _, c := range []struct {
 		op   string
@@ -156,22 +157,28 @@ func TestRequiredInputs(t *testing.T) {
 		if err := json.Unmarshal([]byte(c.body), &body); err != nil {
 			t.Fatalf("%s: body %v", c.op, err)
 		}
+
 		spec, ok := ops.SpecByName()[c.op]
 		if !ok || len(spec.Routes) == 0 {
 			t.Errorf("%s: not in the catalog", c.op)
+
 			continue
 		}
+
 		for _, p := range ops.PathParams(spec.Routes[0].Path) {
 			if _, set := body[p]; !set && !strings.Contains(p, ".") {
 				body[p] = "00000000-0000-0000-0000-000000000000"
 			}
 		}
+
 		b, _ := json.Marshal(body)
 		code, m := write(s, &hq, c.op, string(b), 0)
+
 		fe, _ := m["fieldErrors"].(map[string]any)
 		for field, key := range c.want {
 			if code != 422 || fe[field] != key {
 				t.Errorf("%s: %s want %s, got %d %v", c.op, field, key, code, fe)
+
 				break
 			}
 		}

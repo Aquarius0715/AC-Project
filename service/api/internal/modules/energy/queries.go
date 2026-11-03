@@ -27,16 +27,24 @@ type Actuals struct {
 
 // RegisterQueries binds energy's internal queries.
 func RegisterQueries(r *ops.Registry) {
-	ops.RegisterQuery(r, ops.DomainEnergy, QueryActuals, func(ctx context.Context, c *ops.Call, in *ActualsInput) (Actuals, error) {
-		f, err := DefaultFactor(ctx, c)
-		if err != nil {
-			return Actuals{}, err
-		}
-		s, integ, err := Compute(ctx, c, in.UnitIDs, in.From, in.To, f, nil)
-		if err != nil {
-			return Actuals{}, err
-		}
-		fc, err := ForecastFor(ctx, c, in.UnitIDs, in.From, in.To, integ)
-		return Actuals{Summary: s, Forecast: fc}, err
-	})
+	ops.RegisterQuery(
+		r,
+		ops.DomainEnergy,
+		QueryActuals,
+		func(ctx context.Context, c *ops.Call, in *ActualsInput) (Actuals, error) {
+			f, err := DefaultFactor(ctx, c)
+			if err != nil {
+				return Actuals{}, err
+			}
+
+			s, integ, err := Compute(ctx, c, in.UnitIDs, in.From, in.To, f, nil)
+			if err != nil {
+				return Actuals{}, err
+			}
+
+			fc, err := ForecastFor(ctx, c, in.UnitIDs, in.From, in.To, integ)
+
+			return Actuals{Summary: s, Forecast: fc}, err
+		},
+	)
 }

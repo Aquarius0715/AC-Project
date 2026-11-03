@@ -26,7 +26,14 @@ type Sensor struct {
 // Temperature and power come first; a module reports the subset its device has (Only).
 var Sensors = []Sensor{
 	{ID: "temperature", Metric: "temperature", Unit: "°C", Base: 24, Swing: 2},
-	{ID: "power", Metric: "power", Unit: "kW", Base: 1.2, Swing: 0.4, Boundary: "ac_input_electricity"},
+	{
+		ID:       "power",
+		Metric:   "power",
+		Unit:     "kW",
+		Base:     1.2,
+		Swing:    0.4,
+		Boundary: "ac_input_electricity",
+	},
 	{ID: "humidity", Metric: "humidity", Unit: "%", Base: 60, Swing: 8},
 	{ID: "co2", Metric: "co2", Unit: "ppm", Base: 650, Swing: 250},
 	{ID: "pm25", Metric: "pm25", Unit: "µg/m³", Base: 14, Swing: 9},
@@ -82,7 +89,13 @@ type Module struct {
 
 // NewModule starts a module with its own random source, so each device drifts independently.
 func NewModule(tenantID, deviceID, firmware string, seed uint64) *Module {
-	return &Module{TenantID: tenantID, DeviceID: deviceID, Firmware: firmware, rng: rand.New(rand.NewPCG(seed, seed^0x9e3779b97f4a7c15)), setpoint: 24}
+	return &Module{
+		TenantID: tenantID,
+		DeviceID: deviceID,
+		Firmware: firmware,
+		rng:      rand.New(rand.NewPCG(seed, seed^0x9e3779b97f4a7c15)),
+		setpoint: 24,
+	}
 }
 
 // Only narrows the module to the sensors its device has, by sensor name; unknown names are ignored. A device with none
@@ -92,13 +105,17 @@ func (m *Module) Only(names ...string) *Module {
 	for _, n := range names {
 		keep[n] = true
 	}
+
 	out := []Sensor{}
+
 	for _, s := range Sensors {
 		if keep[s.ID] {
 			out = append(out, s)
 		}
 	}
+
 	m.sensors = out
+
 	return m
 }
 
@@ -109,6 +126,7 @@ func (m *Module) Reports(power *bool, celsius *float64, mode, fanLevel *string) 
 	if celsius != nil {
 		m.setpoint = *celsius
 	}
+
 	return m
 }
 
@@ -116,6 +134,7 @@ func (m *Module) Reports(power *bool, celsius *float64, mode, fanLevel *string) 
 // (Commands), and whether its air conditioner draws no power (switched off or power signal off).
 func (m *Module) Behave(telemetry, commands string, powerOff bool) *Module {
 	m.telemetry, m.commands, m.powerOff = telemetry, commands, powerOff
+
 	return m
 }
 
@@ -143,17 +162,21 @@ func (m *Module) Telemetry(at time.Time) ([]byte, error) {
 	if m.telemetry == "invalid_time" {
 		observed = observed.Add(time.Hour)
 	}
+
 	sensors := m.sensors
 	if sensors == nil {
 		sensors = Sensors
 	}
+
 	if len(sensors) == 0 { // a module without sensors sends only its heartbeat
 		return nil, nil
 	}
+
 	b := Batch{DeviceID: m.DeviceID, Measurements: make([]Measurement, 0, len(sensors))}
 	for _, s := range sensors {
 		m.sequence++
 		v := math.Round((s.Base+(m.rng.Float64()*2-1)*s.Swing)*100) / 100
+
 		unit := s.Unit
 		switch {
 		case s.Metric == "power" && m.powerOff:
@@ -163,18 +186,30 @@ func (m *Module) Telemetry(at time.Time) ([]byte, error) {
 		case s.Metric == "temperature" && m.telemetry == "out_of_range":
 			v = 250
 		}
-		x := Measurement{SensorID: s.ID, Metric: s.Metric, Value: &v, Unit: unit, ObservedAt: observed, Sequence: m.sequence}
+
+		x := Measurement{
+			SensorID:   s.ID,
+			Metric:     s.Metric,
+			Value:      &v,
+			Unit:       unit,
+			ObservedAt: observed,
+			Sequence:   m.sequence,
+		}
 		if m.telemetry == "missing" {
 			x.Value = nil
 		}
+
 		b.Measurements = append(b.Measurements, x)
 	}
+
 	return json.Marshal(b)
 }
 
 // Beat returns the heartbeat at the given time.
 func (m *Module) Beat(at time.Time) ([]byte, error) {
-	return json.Marshal(Heartbeat{DeviceID: m.DeviceID, At: at.UTC(), Firmware: m.Firmware, State: m.state})
+	return json.Marshal(
+		Heartbeat{DeviceID: m.DeviceID, At: at.UTC(), Firmware: m.Firmware, State: m.state},
+	)
 }
 
 // Command is a control command the backend sends down on /cmd. ExpiresAt is when the command stops being valid; the
@@ -215,9 +250,11 @@ func (m *Module) Acknowledge(raw []byte, at time.Time) ([]byte, time.Time, error
 	if err := json.Unmarshal(raw, &c); err != nil {
 		return nil, at, fmt.Errorf("command: %w", err)
 	}
+
 	if m.commands == "ignore" {
 		return nil, at, nil
 	}
+
 	result, sendAt := "applied", at
 	switch {
 	case !at.Before(c.ExpiresAt):
@@ -231,10 +268,21 @@ func (m *Module) Acknowledge(raw []byte, at time.Time) ([]byte, time.Time, error
 			m.state.Celsius = &sp
 		}
 	}
+
 	if m.commands == "late" && result == "applied" {
 		sendAt = c.ExpiresAt.Add(2 * time.Second)
 	}
-	raw, err := json.Marshal(Ack{DeviceID: m.DeviceID, CommandID: c.CommandID, ReceivedAt: at.UTC(), Result: result, Observed: Observed{SetpointCelsius: m.setpoint}})
+
+	raw, err := json.Marshal(
+		Ack{
+			DeviceID:   m.DeviceID,
+			CommandID:  c.CommandID,
+			ReceivedAt: at.UTC(),
+			Result:     result,
+			Observed:   Observed{SetpointCelsius: m.setpoint},
+		},
+	)
+
 	return raw, sendAt, err
 }
 
@@ -257,13 +305,16 @@ func (m *Module) Restore(raw []byte) error {
 	if err := json.Unmarshal(raw, &k); err != nil {
 		return fmt.Errorf("kept state: %w", err)
 	}
+
 	if k.SetpointCelsius < 16 || k.SetpointCelsius > 30 {
 		return fmt.Errorf("kept setpoint %v out of range", k.SetpointCelsius)
 	}
+
 	m.setpoint = k.SetpointCelsius
 	if m.state != nil {
 		sp := m.setpoint
 		m.state.Celsius = &sp
 	}
+
 	return nil
 }

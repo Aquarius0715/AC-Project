@@ -11,6 +11,7 @@ func TestInWindow(t *testing.T) {
 	day := &ActiveWindow{Weekdays: []int{1, 2, 3, 4, 5}, StartLocal: "08:00", EndLocal: "19:00"}
 	night := &ActiveWindow{Weekdays: []int{1}, StartLocal: "22:00", EndLocal: "06:00"}
 	sunday := &ActiveWindow{Weekdays: []int{7}, StartLocal: "23:00", EndLocal: "01:00"}
+
 	cases := []struct {
 		name string
 		w    *ActiveWindow
@@ -34,6 +35,7 @@ func TestInWindow(t *testing.T) {
 			t.Errorf("%s: %v, want %v", c.name, got, c.want)
 		}
 	}
+
 	if inWindow(day, at(14, 9, 0), "Nowhere/Unknown") {
 		t.Error("an unknown time zone never matches")
 	}
@@ -52,17 +54,29 @@ func TestCompareAndRecover(t *testing.T) {
 		if c.op == "lt" || c.op == "lte" {
 			past = 27.0
 		}
+
 		if got := cmp(c.op, 28, 28); got != c.at {
 			t.Errorf("%s at the threshold: %v", c.op, got)
 		}
+
 		if got := cmp(c.op, past, 28); got != c.beyond {
 			t.Errorf("%s past the threshold: %v", c.op, got)
 		}
 	}
-	high, low := AlertCondition{Operator: "gte", Threshold: 28, RecoveryThreshold: 26}, AlertCondition{Operator: "lt", Threshold: 16, RecoveryThreshold: 18}
+
+	high, low := AlertCondition{
+		Operator:          "gte",
+		Threshold:         28,
+		RecoveryThreshold: 26,
+	}, AlertCondition{
+		Operator:          "lt",
+		Threshold:         16,
+		RecoveryThreshold: 18,
+	}
 	if !recovered(high, 25.9) || recovered(high, 26) || recovered(high, 27) {
 		t.Error("a high limit recovers below its recovery threshold only")
 	}
+
 	if !recovered(low, 18.1) || recovered(low, 18) || recovered(low, 17) {
 		t.Error("a low limit recovers above its recovery threshold only")
 	}

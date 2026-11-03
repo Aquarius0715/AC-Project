@@ -15,11 +15,18 @@ import (
 // so this rule guards the other callers of the operation.
 func TestSeriesInputFilters(t *testing.T) {
 	from := time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC)
+
 	in := func(filters string) *SeriesInput {
-		x := &SeriesInput{From: from, To: from.Add(time.Hour), UnitIDs: []uuid.UUID{uuid.New()}, Metric: "temperature"}
+		x := &SeriesInput{
+			From:    from,
+			To:      from.Add(time.Hour),
+			UnitIDs: []uuid.UUID{uuid.New()},
+			Metric:  "temperature",
+		}
 		if filters != "" {
 			x.Query = paging.Query{Filters: json.RawMessage(filters)}
 		}
+
 		return x
 	}
 	for _, ok := range []string{"", "{}", "null"} {
@@ -27,7 +34,11 @@ func TestSeriesInputFilters(t *testing.T) {
 			t.Errorf("filters %q: %v", ok, fe)
 		}
 	}
-	if fe := in(`{"unitId":"x"}`).Validate(); len(fe) != 1 || fe["query.filters"] != "error.invalid" {
+
+	if fe := in(
+		`{"unitId":"x"}`,
+	).Validate(); len(fe) != 1 ||
+		fe["query.filters"] != "error.invalid" {
 		t.Errorf("a filter: %v", fe)
 	}
 }

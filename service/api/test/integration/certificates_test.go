@@ -15,7 +15,10 @@ func TestCertificatesAndParts(t *testing.T) {
 	s := server(t)
 	tech := seed.ID("tech-external-a").String()
 	pdf := blobJSON("cert.pdf", "application/pdf", []byte("%PDF-1.4 demo"), 13)
-	issued, expires := clock.Add(-10*24*time.Hour).Format(time.RFC3339), time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC).Format(time.RFC3339)
+	issued, expires := clock.Add(-10*24*time.Hour).
+		Format(time.RFC3339),
+		time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC).
+			Format(time.RFC3339)
 	body := func(extra string) string {
 		return `{"membershipId":"` + tech + `","code":"demo_indoor","name":" Indoor AC ","number":"N-1","issuedAt":"` + issued + `","expiresAt":"` + expires + `","file":` + pdf + extra + `}`
 	}
@@ -27,6 +30,7 @@ func TestCertificatesAndParts(t *testing.T) {
 		"pixel flood":    "file=error.invalidFile",
 		"reversed dates": "expiresAt=error.range",
 	}
+
 	flood := pngHeader(50000, 50000) // a scan as an image is held to the photo pixel limits (IR389)
 	for name, b := range map[string]string{
 		"bad code":       strings.Replace(body(""), `"demo_indoor"`, `"demo_roof"`, 1),
@@ -39,52 +43,132 @@ func TestCertificatesAndParts(t *testing.T) {
 		code, m := write(s, &contrA, "certificates.submit", b, 0)
 		refusal(t, name, code, m, want[name])
 	}
+
 	if code, _ := write(s, &contrB, "certificates.submit", body(""), 0); code != 404 {
 		t.Error("other contractor's technician")
 	}
-	if code, _ := write(s, &contrA, "certificates.submit", body(`,"renewalOf":"`+uuid.NewString()+`"`), 0); code != 404 {
+
+	if code, _ := write(
+		s,
+		&contrA,
+		"certificates.submit",
+		body(`,"renewalOf":"`+uuid.NewString()+`"`),
+		0,
+	); code != 404 {
 		t.Error("unknown renewal")
 	}
-	big := append([]byte("%PDF-1.4 "), make([]byte, 3<<20)...) // IR277: a scan above the ordinary 1 MiB body limit
-	if code, m := write(s, &contrA, "certificates.submit", strings.Replace(body(""), pdf, blobJSON("scan.pdf", "application/pdf", big, len(big)), 1), 0); code != 200 || data(m)["fileName"] != "scan.pdf" {
+
+	big := append(
+		[]byte("%PDF-1.4 "),
+		make([]byte, 3<<20)...) // IR277: a scan above the ordinary 1 MiB body limit
+	if code, m := write(
+		s,
+		&contrA,
+		"certificates.submit",
+		strings.Replace(body(""), pdf, blobJSON("scan.pdf", "application/pdf", big, len(big)), 1),
+		0,
+	); code != 200 ||
+		data(m)["fileName"] != "scan.pdf" {
 		t.Fatalf("a 3 MiB certificate: %d %v", code, m)
 	}
+
 	tooBig := make([]byte, 10*1000*1000+1)
-	if code, m := write(s, &contrA, "certificates.submit", strings.Replace(body(""), pdf, blobJSON("huge.pdf", "application/pdf", tooBig, len(tooBig)), 1), 0); code != 422 || m["fieldErrors"].(map[string]any)["file"] != "error.invalidFile" {
+	if code, m := write(
+		s,
+		&contrA,
+		"certificates.submit",
+		strings.Replace(
+			body(""),
+			pdf,
+			blobJSON("huge.pdf", "application/pdf", tooBig, len(tooBig)),
+			1,
+		),
+		0,
+	); code != 422 ||
+		m["fieldErrors"].(map[string]any)["file"] != "error.invalidFile" {
 		t.Fatalf("a file over 10 MB is a field error, not a body error: %d %v", code, m)
 	}
+
 	code, m := write(s, &contrA, "certificates.submit", body(""), 0)
-	if code != 200 || data(m)["status"] != "pending_verification" || data(m)["fileName"] != "cert.pdf" || data(m)["name"] != "Indoor AC" {
+	if code != 200 || data(m)["status"] != "pending_verification" ||
+		data(m)["fileName"] != "cert.pdf" ||
+		data(m)["name"] != "Indoor AC" {
 		t.Fatalf("submit: %d %v", code, m)
 	}
+
 	cert := data(m)["id"].(string)
 	// the uploaded document opens for HQ and for the company that sent it, before it is verified (IR436)
 	for _, a := range []*actor{&hq, &contrA} {
 		code, m := post(s, a, "certificates.getContent", `{"certificateId":"`+cert+`"}`)
+
 		d := data(m)
-		if code != 200 || d["name"] != "cert.pdf" || d["mime"] != "application/pdf" || d["size"] != float64(13) || d["bytes"] != base64.StdEncoding.EncodeToString([]byte("%PDF-1.4 demo")) {
+		if code != 200 || d["name"] != "cert.pdf" || d["mime"] != "application/pdf" ||
+			d["size"] != float64(13) ||
+			d["bytes"] != base64.StdEncoding.EncodeToString([]byte("%PDF-1.4 demo")) {
 			t.Fatalf("certificates.getContent: %d %v", code, m)
 		}
 	}
-	if code, _ := post(s, &hq, "certificates.getContent", `{"certificateId":"`+uuid.NewString()+`"}`); code != 404 {
+
+	if code, _ := post(
+		s,
+		&hq,
+		"certificates.getContent",
+		`{"certificateId":"`+uuid.NewString()+`"}`,
+	); code != 404 {
 		t.Errorf("an unknown certificate: %d", code)
 	}
 	// verify
-	if code, m := write(s, &hq, "certificates.verify", `{"certificateId":"`+cert+`","decision":"reject"}`, 1); code != 422 || fields(m) != "reason=error.required" {
+	if code, m := write(
+		s,
+		&hq,
+		"certificates.verify",
+		`{"certificateId":"`+cert+`","decision":"reject"}`,
+		1,
+	); code != 422 ||
+		fields(m) != "reason=error.required" {
 		t.Errorf("reject without reason: %d %s", code, fields(m))
 	}
-	if code, _ := write(s, &contrA, "certificates.verify", `{"certificateId":"`+cert+`","decision":"approve"}`, 1); code != 403 {
+
+	if code, _ := write(
+		s,
+		&contrA,
+		"certificates.verify",
+		`{"certificateId":"`+cert+`","decision":"approve"}`,
+		1,
+	); code != 403 {
 		t.Error("contractor verifies")
 	}
-	if code, m := write(s, &hq, "certificates.verify", `{"certificateId":"`+cert+`","decision":"approve"}`, 1); code != 200 || data(m)["status"] != "valid" || data(m)["verifiedAt"] == nil {
+
+	if code, m := write(
+		s,
+		&hq,
+		"certificates.verify",
+		`{"certificateId":"`+cert+`","decision":"approve"}`,
+		1,
+	); code != 200 || data(m)["status"] != "valid" ||
+		data(m)["verifiedAt"] == nil {
 		t.Fatalf("approve: %d %v", code, m)
 	}
+
 	var until time.Time
-	ownerScan(t, `SELECT valid_until FROM identity.qualification_grants WHERE membership_id = $1 AND code = 'demo_indoor'`, []any{tech}, &until)
+	ownerScan(
+		t,
+		`SELECT valid_until FROM identity.qualification_grants WHERE membership_id = $1 AND code = 'demo_indoor'`,
+		[]any{tech},
+		&until,
+	)
+
 	if !until.Equal(time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC)) {
 		t.Errorf("grant extended to %v", until)
 	}
-	if code, _ := write(s, &hq, "certificates.verify", `{"certificateId":"`+cert+`","decision":"approve"}`, 2); code != 409 {
+
+	if code, _ := write(
+		s,
+		&hq,
+		"certificates.verify",
+		`{"certificateId":"`+cert+`","decision":"approve"}`,
+		2,
+	); code != 409 {
 		t.Error("verify twice")
 	}
 	// a renewal can be rejected; training request
@@ -92,58 +176,136 @@ func TestCertificatesAndParts(t *testing.T) {
 	if code != 200 || data(m)["renewalOf"] != cert {
 		t.Fatalf("renewal: %d %v", code, m)
 	}
+
 	renewal := data(m)["id"].(string)
-	if code, m := write(s, &hq, "certificates.verify", `{"certificateId":"`+renewal+`","decision":"reject","reason":"blurry scan"}`, 1); code != 200 || data(m)["status"] != "rejected" {
+	if code, m := write(
+		s,
+		&hq,
+		"certificates.verify",
+		`{"certificateId":"`+renewal+`","decision":"reject","reason":"blurry scan"}`,
+		1,
+	); code != 200 ||
+		data(m)["status"] != "rejected" {
 		t.Fatalf("reject: %d %v", code, m)
 	}
-	if code, m := write(s, &contrA, "certificates.requestTraining", `{"certificateId":"`+cert+`","note":" "}`, 2); code != 422 || fields(m) != "note=error.length" {
+
+	if code, m := write(
+		s,
+		&contrA,
+		"certificates.requestTraining",
+		`{"certificateId":"`+cert+`","note":" "}`,
+		2,
+	); code != 422 ||
+		fields(m) != "note=error.length" {
 		t.Errorf("blank note: %d %s", code, fields(m))
 	}
-	if code, m := write(s, &contrA, "certificates.requestTraining", `{"certificateId":"`+cert+`","note":"refresher course"}`, 2); code != 200 || data(m)["trainingRequestedAt"] == nil {
+
+	if code, m := write(
+		s,
+		&contrA,
+		"certificates.requestTraining",
+		`{"certificateId":"`+cert+`","note":"refresher course"}`,
+		2,
+	); code != 200 ||
+		data(m)["trainingRequestedAt"] == nil {
 		t.Fatalf("training: %d %v", code, m)
 	}
-	if code, _ := write(s, &contrB, "certificates.requestTraining", `{"certificateId":"`+cert+`","note":"x"}`, 3); code != 404 {
+
+	if code, _ := write(
+		s,
+		&contrB,
+		"certificates.requestTraining",
+		`{"certificateId":"`+cert+`","note":"x"}`,
+		3,
+	); code != 404 {
 		t.Error("other contractor training")
 	}
 	// expiring / expired read status
-	owner(t, `UPDATE maintenance.certificates SET expires_at = $2 WHERE id = $1`, cert, clock.Add(10*24*time.Hour))
+	owner(
+		t,
+		`UPDATE maintenance.certificates SET expires_at = $2 WHERE id = $1`,
+		cert,
+		clock.Add(10*24*time.Hour),
+	)
+
 	ids := func(body string, a *actor) map[string]string {
 		_, m := post(s, a, "certificates.list", body)
+
 		out := map[string]string{}
 		for _, it := range items(m) {
 			out[it["id"].(string)] = it["status"].(string)
 		}
+
 		return out
 	}
-	if got := ids(`{"filters":{"membershipId":"`+tech+`"},"limit":100}`, &hq); got[cert] != "expiring" || got[renewal] != "rejected" {
+	if got := ids(
+		`{"filters":{"membershipId":"`+tech+`"},"limit":100}`,
+		&hq,
+	); got[cert] != "expiring" ||
+		got[renewal] != "rejected" {
 		t.Fatalf("statuses: %v", got)
 	}
-	if got := ids(`{"filters":{"status":"expiring","code":"demo_indoor"},"limit":100}`, &contrA); got[renewal] != "" || got[cert] != "expiring" {
+
+	if got := ids(
+		`{"filters":{"status":"expiring","code":"demo_indoor"},"limit":100}`,
+		&contrA,
+	); got[renewal] != "" ||
+		got[cert] != "expiring" {
 		t.Fatalf("status filter: %v", got)
 	}
+
 	if got := ids(`{"limit":100}`, &contrB); got[cert] != "" {
 		t.Error("contractor-b sees contractor-a's certificates")
 	}
-	if code, m := post(s, &hq, "certificates.list", `{"filters":{"code":"x"}}`); code != 422 || fields(m) != "filters=error.invalid" {
+
+	if code, m := post(
+		s,
+		&hq,
+		"certificates.list",
+		`{"filters":{"code":"x"}}`,
+	); code != 422 ||
+		fields(m) != "filters=error.invalid" {
 		t.Errorf("bad code filter: %d %s", code, fields(m))
 	}
-	owner(t, `UPDATE maintenance.certificates SET expires_at = $2 WHERE id = $1`, cert, time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC))
+
+	owner(
+		t,
+		`UPDATE maintenance.certificates SET expires_at = $2 WHERE id = $1`,
+		cert,
+		time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC),
+	)
 
 	// parts catalog
 	code1 := "TST-" + uuid.NewString()[:6]
-	owner(t, `INSERT INTO maintenance.parts_catalog (code, tenant_id, name) VALUES ($1, $2, 'Test filter mesh')`, code1, seed.ID("tenant-a"))
+	owner(
+		t,
+		`INSERT INTO maintenance.parts_catalog (code, tenant_id, name) VALUES ($1, $2, 'Test filter mesh')`,
+		code1,
+		seed.ID("tenant-a"),
+	)
+
 	_, m = post(s, &hq, "parts.list", `{"filters":{"search":"filter MESH"},"limit":100}`)
+
 	found := false
 	for _, it := range items(m) {
 		found = found || (it["code"] == code1 && it["vanStockQuantity"] == nil)
 	}
+
 	if !found {
 		t.Fatalf("parts: %v", m)
 	}
+
 	if code, _ := post(s, &techInt, "parts.list", `{}`); code != 200 {
 		t.Error("technician parts")
 	}
-	if code, m := post(s, &hq, "parts.list", `{"filters":{"x":1}}`); code != 422 || fields(m) != "x=error.notAllowed" {
+
+	if code, m := post(
+		s,
+		&hq,
+		"parts.list",
+		`{"filters":{"x":1}}`,
+	); code != 422 ||
+		fields(m) != "x=error.notAllowed" {
 		t.Errorf("bad parts filter: %d %s", code, fields(m))
 	}
 }
@@ -153,24 +315,67 @@ func TestCertificatesAndParts(t *testing.T) {
 func TestCertificateCreatesMissingGrant(t *testing.T) {
 	s := server(t)
 	tech := seed.ID("tech-external-a")
+
 	var from, until time.Time
-	ownerScan(t, `SELECT valid_from, valid_until FROM identity.qualification_grants WHERE membership_id = $1 AND code = 'demo_outdoor'`, []any{tech}, &from, &until)
-	owner(t, `DELETE FROM identity.qualification_grants WHERE membership_id = $1 AND code = 'demo_outdoor'`, tech)
+	ownerScan(
+		t,
+		`SELECT valid_from, valid_until FROM identity.qualification_grants WHERE membership_id = $1 AND code = 'demo_outdoor'`,
+		[]any{tech},
+		&from,
+		&until,
+	)
+	owner(
+		t,
+		`DELETE FROM identity.qualification_grants WHERE membership_id = $1 AND code = 'demo_outdoor'`,
+		tech,
+	)
 	t.Cleanup(func() {
-		owner(t, `UPDATE identity.qualification_grants SET valid_from = $2, valid_until = $3 WHERE membership_id = $1 AND code = 'demo_outdoor'`, tech, from, until)
+		owner(
+			t,
+			`UPDATE identity.qualification_grants SET valid_from = $2, valid_until = $3 WHERE membership_id = $1 AND code = 'demo_outdoor'`,
+			tech,
+			from,
+			until,
+		)
 	})
+
 	expires := time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC)
 	pdf := blobJSON("outdoor.pdf", "application/pdf", []byte("%PDF-1.4 outdoor"), 16)
-	code, m := write(s, &contrA, "certificates.submit", `{"membershipId":"`+tech.String()+`","code":"demo_outdoor","name":"Outdoor AC","number":"N-2","issuedAt":"`+
-		clock.Add(-24*time.Hour).Format(time.RFC3339)+`","expiresAt":"`+expires.Format(time.RFC3339)+`","file":`+pdf+`}`, 0)
+
+	code, m := write(
+		s,
+		&contrA,
+		"certificates.submit",
+		`{"membershipId":"`+tech.String()+`","code":"demo_outdoor","name":"Outdoor AC","number":"N-2","issuedAt":"`+
+			clock.Add(-24*time.Hour).
+				Format(time.RFC3339)+
+			`","expiresAt":"`+expires.Format(
+			time.RFC3339,
+		)+`","file":`+pdf+`}`,
+		0,
+	)
 	if code != 200 {
 		t.Fatalf("submit: %d %v", code, m)
 	}
-	if code, m := write(s, &hq, "certificates.verify", `{"certificateId":"`+data(m)["id"].(string)+`","decision":"approve"}`, 1); code != 200 {
+
+	if code, m := write(
+		s,
+		&hq,
+		"certificates.verify",
+		`{"certificateId":"`+data(m)["id"].(string)+`","decision":"approve"}`,
+		1,
+	); code != 200 {
 		t.Fatalf("approve: %d %v", code, m)
 	}
+
 	var got time.Time
-	ownerScan(t, `SELECT valid_until FROM identity.qualification_grants WHERE membership_id = $1 AND code = 'demo_outdoor' AND revoked_at IS NULL`, []any{tech}, &got)
+	ownerScan(
+		t,
+		`SELECT valid_until FROM identity.qualification_grants WHERE membership_id = $1 AND code = 'demo_outdoor' AND revoked_at IS NULL`,
+		[]any{tech},
+		&got,
+	)
+
 	if !got.Equal(expires) {
 		t.Errorf("the new grant: until %v", got)
 	}

@@ -21,6 +21,7 @@ func TestInvoiceNumber(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		if got := InvoiceNumber(from, tc.seq); got != tc.want {
 			t.Errorf("InvoiceNumber(%s, %d) = %s, want %s", tc.from, tc.seq, got, tc.want)
 		}

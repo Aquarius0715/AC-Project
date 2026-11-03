@@ -31,7 +31,11 @@ type OrgActivity interface {
 
 // PolicyReader is what Assets needs from Monitoring for units.setAlertPolicies.
 type PolicyReader interface {
-	Owners(ctx context.Context, c *ops.Call, ids []uuid.UUID) (map[uuid.UUID]monitoring.PolicyOwner, error)
+	Owners(
+		ctx context.Context,
+		c *ops.Call,
+		ids []uuid.UUID,
+	) (map[uuid.UUID]monitoring.PolicyOwner, error)
 }
 
 // DeleteInput is units.delete input.
@@ -70,35 +74,61 @@ type DeletedResource struct {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/units/{id} [delete]
-func (m *Module) unitsDelete(ctx context.Context, c *ops.Call, in *DeleteInput) (DeletedResource, error) {
+func (m *Module) unitsDelete(
+	ctx context.Context,
+	c *ops.Call,
+	in *DeleteInput,
+) (DeletedResource, error) {
 	var v int
-	err := c.Tx.QueryRow(ctx, `SELECT version FROM assets.units WHERE id = $1 FOR UPDATE`, in.ID).Scan(&v)
+
+	err := c.Tx.QueryRow(ctx, `SELECT version FROM assets.units WHERE id = $1 FOR UPDATE`, in.ID).
+		Scan(&v)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return DeletedResource{}, notFound()
 	}
+
 	if err != nil {
 		return DeletedResource{}, err
 	}
+
 	if v != *c.ExpectedVersion {
 		return DeletedResource{}, conflict("error.versionConflict")
 	}
+
 	for _, u := range m.Usage {
 		busy, err := u.UnitInUse(ctx, c, in.ID)
 		if err != nil {
 			return DeletedResource{}, err
 		}
+
 		if busy {
 			return DeletedResource{}, conflict("error.unitInUse")
 		}
 	}
-	if _, err := c.Tx.Exec(ctx, `DELETE FROM assets.unit_alert_policies WHERE unit_id = $1`, in.ID); err != nil {
+
+	if _, err := c.Tx.Exec(
+		ctx,
+		`DELETE FROM assets.unit_alert_policies WHERE unit_id = $1`,
+		in.ID,
+	); err != nil {
 		return DeletedResource{}, err
 	}
+
 	if _, err := c.Tx.Exec(ctx, `DELETE FROM assets.units WHERE id = $1`, in.ID); err != nil {
 		return DeletedResource{}, err
 	}
+
 	c.Emit(ops.Event{AggregateType: "unit", AggregateID: in.ID, Type: "UnitDeleted"})
-	c.Audit(ops.AuditEntry{Action: "units.delete", TargetKind: "unit", TargetID: in.ID.String(), PreviousVersion: c.ExpectedVersion, Reason: in.Reason})
+	c.Audit(
+		ops.AuditEntry{
+			Action:          "units.delete",
+			TargetKind:      "unit",
+			TargetID:        in.ID.String(),
+			PreviousVersion: c.ExpectedVersion,
+			Reason:          in.Reason,
+		},
+	)
+
 	return DeletedResource{ID: in.ID, Deleted: true}, nil
 }
 
@@ -114,16 +144,20 @@ func (in *SetPoliciesInput) Validate() map[string]string {
 	if in.UnitID == uuid.Nil {
 		fe["unitId"] = "error.required"
 	}
+
 	if in.AlertPolicyIDs == nil {
 		fe["alertPolicyIds"] = "error.required"
 	}
+
 	seen := map[uuid.UUID]bool{}
 	for _, id := range in.AlertPolicyIDs {
 		if seen[id] {
 			fe["alertPolicyIds"] = "error.duplicate"
 		}
+
 		seen[id] = true
 	}
+
 	return fe
 }
 
@@ -154,60 +188,106 @@ func (in *SetPoliciesInput) Validate() map[string]string {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/units/{unitId}/alert-policies [put]
-func (m *Module) unitsSetAlertPolicies(ctx context.Context, c *ops.Call, in *SetPoliciesInput) (ACUnit, error) {
+func (m *Module) unitsSetAlertPolicies(
+	ctx context.Context,
+	c *ops.Call,
+	in *SetPoliciesInput,
+) (ACUnit, error) {
 	u, err := m.unitsSetAlertPoliciesUnit(ctx, c, in)
+
 	return u.ACUnit, err
 }
 
 // unitsSetAlertPoliciesUnit is unitsSetAlertPolicies answering the unit with its summary fields.
-func (m *Module) unitsSetAlertPoliciesUnit(ctx context.Context, c *ops.Call, in *SetPoliciesInput) (Unit, error) {
-	var org uuid.UUID
-	var customerID *uuid.UUID
+func (m *Module) unitsSetAlertPoliciesUnit(
+	ctx context.Context,
+	c *ops.Call,
+	in *SetPoliciesInput,
+) (Unit, error) {
+	var (
+		org        uuid.UUID
+		customerID *uuid.UUID
+	)
+
 	err := c.Tx.QueryRow(ctx, `SELECT u.customer_org_id, (SELECT id FROM assets.customers WHERE organization_id = u.customer_org_id)
-		FROM assets.units u WHERE u.id = $1 AND NOT u.archived FOR UPDATE`, in.UnitID).Scan(&org, &customerID)
+		FROM assets.units u WHERE u.id = $1 AND NOT u.archived FOR UPDATE`, in.UnitID).
+		Scan(&org, &customerID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Unit{}, notFound()
 	}
+
 	if err != nil {
 		return Unit{}, err
 	}
+
 	if c.Principal.Role == "client" && org != c.Principal.OrgID {
 		return Unit{}, notFound()
 	}
+
 	owners, err := m.Policies.Owners(ctx, c, in.AlertPolicyIDs)
 	if err != nil {
 		return Unit{}, err
 	}
+
 	for _, id := range in.AlertPolicyIDs {
 		o, ok := owners[id]
 		switch { // IR108 / IR120 item 8
 		case ok && o.Kind != "alert":
-			return Unit{}, apperr.Fields(map[string]string{"alertPolicyIds": "error.defaultPolicyImplicit"})
+			return Unit{}, apperr.Fields(
+				map[string]string{"alertPolicyIds": "error.defaultPolicyImplicit"},
+			)
 		case !ok || o.CustomerID == nil || customerID == nil || *o.CustomerID != *customerID:
 			return Unit{}, apperr.E(apperr.NotFound, "error.notFound")
 		}
 	}
+
 	var v int
+
 	err = c.Tx.QueryRow(ctx, `UPDATE assets.units SET version = version + 1, updated_at = platform.app_now() WHERE id = $1 AND version = $2 RETURNING version`,
-		in.UnitID, *c.ExpectedVersion).Scan(&v)
+		in.UnitID, *c.ExpectedVersion).
+		Scan(&v)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Unit{}, conflict("error.versionConflict")
 	}
+
 	if err != nil {
 		return Unit{}, err
 	}
-	if _, err := c.Tx.Exec(ctx, `DELETE FROM assets.unit_alert_policies WHERE unit_id = $1 AND NOT (policy_id = ANY($2))`, in.UnitID, in.AlertPolicyIDs); err != nil {
+
+	if _, err := c.Tx.Exec(
+		ctx,
+		`DELETE FROM assets.unit_alert_policies WHERE unit_id = $1 AND NOT (policy_id = ANY($2))`,
+		in.UnitID,
+		in.AlertPolicyIDs,
+	); err != nil {
 		return Unit{}, err
 	}
+
 	ids := append([]uuid.UUID(nil), in.AlertPolicyIDs...)
 	sort.Slice(ids, func(i, j int) bool { return ids[i].String() < ids[j].String() })
+
 	for _, id := range ids {
-		if _, err := c.Tx.Exec(ctx, `INSERT INTO assets.unit_alert_policies (tenant_id, unit_id, policy_id) VALUES (current_setting('app.tenant_id')::uuid, $1, $2)
-			ON CONFLICT DO NOTHING`, in.UnitID, id); err != nil {
+		if _, err := c.Tx.Exec(
+			ctx,
+			`INSERT INTO assets.unit_alert_policies (tenant_id, unit_id, policy_id) VALUES (current_setting('app.tenant_id')::uuid, $1, $2)
+			ON CONFLICT DO NOTHING`,
+			in.UnitID,
+			id,
+		); err != nil {
 			return Unit{}, err
 		}
 	}
+
 	c.Emit(ops.Event{AggregateType: "unit", AggregateID: in.UnitID, Type: "UnitChanged"})
-	c.Audit(ops.AuditEntry{Action: "units.setAlertPolicies", TargetKind: "unit", TargetID: in.UnitID.String(), PreviousVersion: c.ExpectedVersion, NextVersion: &v})
+	c.Audit(
+		ops.AuditEntry{
+			Action:          "units.setAlertPolicies",
+			TargetKind:      "unit",
+			TargetID:        in.UnitID.String(),
+			PreviousVersion: c.ExpectedVersion,
+			NextVersion:     &v,
+		},
+	)
+
 	return m.load(ctx, c, in.UnitID)
 }

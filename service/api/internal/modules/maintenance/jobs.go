@@ -24,7 +24,11 @@ import (
 
 // JobUnits is what the job operations need from Assets.
 type JobUnits interface {
-	UnitState(ctx context.Context, c *ops.Call, unit uuid.UUID) (org uuid.UUID, archived bool, found bool, err error)
+	UnitState(
+		ctx context.Context,
+		c *ops.Call,
+		unit uuid.UUID,
+	) (org uuid.UUID, archived bool, found bool, err error)
 	UnitsOfProperty(ctx context.Context, c *ops.Call, property uuid.UUID) ([]uuid.UUID, error)
 	OrgOfCustomer(ctx context.Context, c *ops.Call, customer uuid.UUID) (uuid.UUID, bool, error)
 	UnitsOfOrg(ctx context.Context, c *ops.Call, org uuid.UUID) ([]uuid.UUID, error)
@@ -32,7 +36,11 @@ type JobUnits interface {
 
 // UnitSeverity returns the IR23 job severity per unit (highest open/acknowledged alert, normal without one).
 type UnitSeverity interface {
-	UnitSeverities(ctx context.Context, c *ops.Call, units []uuid.UUID) (map[uuid.UUID]string, error)
+	UnitSeverities(
+		ctx context.Context,
+		c *ops.Call,
+		units []uuid.UUID,
+	) (map[uuid.UUID]string, error)
 }
 
 // Jobs is the job operation set.
@@ -57,7 +65,7 @@ type SlotProposal struct {
 	ID             uuid.UUID       `json:"id"`
 	Source         string          `json:"source"`
 	Slot           Slot            `json:"slot"`
-	Hold           json.RawMessage `json:"hold" swaggertype:"object"`
+	Hold           json.RawMessage `json:"hold"           swaggertype:"object"`
 	Message        string          `json:"message"`
 	ReplyBy        time.Time       `json:"replyBy"`
 	Status         string          `json:"status"`
@@ -119,18 +127,19 @@ type MaintenanceJob struct {
 	AssignmentID        *uuid.UUID      `json:"assignmentId"`
 	DraftReportRef      any             `json:"draftReportRef"`
 	ReportRefs          []any           `json:"reportRefs"`
-	Costs               json.RawMessage `json:"costs" swaggertype:"object"`
+	Costs               json.RawMessage `json:"costs"               swaggertype:"object"`
 	FollowUpOfJobID     *uuid.UUID      `json:"followUpOfJobId"`
 	FollowUpClass       *string         `json:"followUpClass"`
-	TimeOnSite          json.RawMessage `json:"timeOnSite" swaggertype:"object"`
-	Rating              json.RawMessage `json:"rating" swaggertype:"object"`
+	TimeOnSite          json.RawMessage `json:"timeOnSite"          swaggertype:"object"`
+	Rating              json.RawMessage `json:"rating"              swaggertype:"object"`
 	CustomerConfirmedAt *time.Time      `json:"customerConfirmedAt"`
-	WarrantyClaims      json.RawMessage `json:"warrantyClaims" swaggertype:"object"`
+	WarrantyClaims      json.RawMessage `json:"warrantyClaims"      swaggertype:"object"`
 }
 
 // Job is a MaintenanceJob with the JobDetail / JobSummary extras, as jobs.get and the job projections read it.
 type Job struct {
 	MaintenanceJob
+
 	// detail
 	Projection  string      `json:"projection"`
 	Assignment  *Assignment `json:"assignment"`
@@ -153,30 +162,70 @@ const jobCols = `j.id, j.tenant_id, j.version, j.created_at, j.updated_at, j.pla
 	COALESCE((SELECT array_agg(ja.alert_id ORDER BY ja.alert_id) FROM maintenance.job_alerts ja WHERE ja.job_id = j.id), '{}')`
 
 func scanJob(r pgx.Row) (Job, error) {
-	var j Job
-	var preferred []byte
-	var schedStart, schedEnd *time.Time
-	err := r.Scan(&j.ID, &j.TenantID, &j.Version, &j.CreatedAt, &j.UpdatedAt, &j.PlanID, &j.OccurrenceAt, &j.UnitID, &j.Type, &j.Status, &j.Symptom, &j.ContactWindow,
-		&j.RequestedSlot.StartAt, &j.RequestedSlot.EndAt, &j.Origin, &preferred, &j.PreferenceRound, &schedStart, &schedEnd, &j.DueAt,
-		&j.StartedAt, &j.CompletedAt, &j.ContractorOrgID, &j.AssignmentID, &j.Costs, &j.FollowUpOfJobID, &j.FollowUpClass, &j.TimeOnSite, &j.Rating,
-		&j.CustomerConfirmedAt, &j.WarrantyClaims, &j.customerOrg, &j.AlertIDs)
+	var (
+		j                    Job
+		preferred            []byte
+		schedStart, schedEnd *time.Time
+	)
+
+	err := r.Scan(
+		&j.ID,
+		&j.TenantID,
+		&j.Version,
+		&j.CreatedAt,
+		&j.UpdatedAt,
+		&j.PlanID,
+		&j.OccurrenceAt,
+		&j.UnitID,
+		&j.Type,
+		&j.Status,
+		&j.Symptom,
+		&j.ContactWindow,
+		&j.RequestedSlot.StartAt,
+		&j.RequestedSlot.EndAt,
+		&j.Origin,
+		&preferred,
+		&j.PreferenceRound,
+		&schedStart,
+		&schedEnd,
+		&j.DueAt,
+		&j.StartedAt,
+		&j.CompletedAt,
+		&j.ContractorOrgID,
+		&j.AssignmentID,
+		&j.Costs,
+		&j.FollowUpOfJobID,
+		&j.FollowUpClass,
+		&j.TimeOnSite,
+		&j.Rating,
+		&j.CustomerConfirmedAt,
+		&j.WarrantyClaims,
+		&j.customerOrg,
+		&j.AlertIDs,
+	)
 	if err != nil {
 		return j, err
 	}
+
 	if schedStart != nil && schedEnd != nil {
 		j.ScheduledSlot = &Slot{*schedStart, *schedEnd}
 	}
+
 	if err := unmarshalSlots(preferred, &j.PreferredSlots); err != nil {
 		return j, err
 	}
+
 	if j.TimeOnSite == nil {
 		j.TimeOnSite = json.RawMessage("null")
 	}
+
 	if j.Rating == nil {
 		j.Rating = json.RawMessage("null")
 	}
+
 	j.PartnerSlotProposal = json.RawMessage("null")
 	j.ReportRefs = []any{}
+
 	return j, nil
 }
 
@@ -186,7 +235,12 @@ func scanJob(r pgx.Row) (Job, error) {
 // Contractor offer projections and technician assignment views are served by their own paths (IR23).
 func jobScope(c *ops.Call, args *[]any) string {
 	p := c.Principal
-	add := func(v any) string { *args = append(*args, v); return fmt.Sprintf("$%d", len(*args)) }
+	add := func(v any) string {
+		*args = append(*args, v)
+
+		return fmt.Sprintf("$%d", len(*args))
+	}
+
 	switch p.Role {
 	case "admin":
 		return "TRUE"
@@ -194,17 +248,25 @@ func jobScope(c *ops.Call, args *[]any) string {
 		return "j.customer_org_id = " + add(p.OrgID)
 	case "technician": // IR49 viewing window; external technicians also inside the accepted Offer's access window (IR124)
 		now := add(c.Now)
-		q := "EXISTS (SELECT 1 FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status = 'active' AND a.technician_membership_id = " + add(p.MembershipID) +
+
+		q := "EXISTS (SELECT 1 FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status = 'active' AND a.technician_membership_id = " + add(
+			p.MembershipID,
+		) +
 			" AND a.created_at <= " + now + " AND " + now + " < upper(a.scheduled))"
 		if p.Employment != "internal" {
 			q += " AND EXISTS (SELECT 1 FROM maintenance.offers o WHERE o.job_id = j.id AND o.decision = 'accept' AND o.access_valid_from <= " + now + " AND " + now + " < o.access_valid_until)"
 		}
+
 		return q
 	case "contractor": // accepted Offer inside its access window (IR23 summary projection)
 		now := add(c.Now)
-		return "EXISTS (SELECT 1 FROM maintenance.offers o WHERE o.job_id = j.id AND o.contractor_org_id = " + add(p.OrgID) +
+
+		return "EXISTS (SELECT 1 FROM maintenance.offers o WHERE o.job_id = j.id AND o.contractor_org_id = " + add(
+			p.OrgID,
+		) +
 			" AND o.decision = 'accept' AND o.access_valid_from <= " + now + " AND " + now + " < o.access_valid_until)"
 	}
+
 	return "FALSE"
 }
 
@@ -231,12 +293,15 @@ func ContactWindowOK(s string) bool {
 	if strings.Contains(s, "@") {
 		return false
 	}
+
 	stripped := strings.Map(func(r rune) rune {
 		if r == ' ' || r == '-' || r == '(' || r == ')' || r == '+' || r == '\t' {
 			return -1
 		}
+
 		return r
 	}, s)
+
 	return !contactDigits.MatchString(stripped)
 }
 
@@ -246,16 +311,20 @@ func (in *CreateInput) Validate() map[string]string {
 	if in.UnitID == uuid.Nil {
 		fe["unitId"] = "error.required"
 	}
+
 	if !jobTypes[in.Type] {
 		fe["type"] = "error.invalid"
 	}
+
 	in.Symptom = strings.TrimSpace(in.Symptom)
 	if n := utf8.RuneCountInString(in.Symptom); n < 10 || n > 2000 {
 		fe["symptom"] = "error.length"
 	}
+
 	if in.AlternativeSlots == nil {
 		fe["alternativeSlots"] = "error.required"
 	}
+
 	if in.ContactWindow != nil {
 		*in.ContactWindow = strings.TrimSpace(*in.ContactWindow)
 		if utf8.RuneCountInString(*in.ContactWindow) > 200 {
@@ -264,6 +333,7 @@ func (in *CreateInput) Validate() map[string]string {
 			fe["contactWindow"] = "errors.contact_details_forbidden"
 		}
 	}
+
 	return fe
 }
 
@@ -272,6 +342,7 @@ var kualaLumpur = func() *time.Location {
 	if err != nil {
 		return time.FixedZone("MYT", 8*3600)
 	}
+
 	return l
 }()
 
@@ -281,14 +352,18 @@ func PreferredSlotsOK(now time.Time, slots []Slot) bool {
 	y, m, d := today.Date()
 	tomorrow := time.Date(y, m, d+1, 0, 0, 0, 0, kualaLumpur)
 	seen := map[[2]int64]bool{}
+
 	for _, s := range slots {
 		dur := s.EndAt.Sub(s.StartAt)
+
 		key := [2]int64{s.StartAt.UnixNano(), s.EndAt.UnixNano()}
 		if dur < time.Hour || dur > 4*time.Hour || s.StartAt.Before(tomorrow) || seen[key] {
 			return false
 		}
+
 		seen[key] = true
 	}
+
 	return true
 }
 
@@ -323,59 +398,106 @@ func (m Jobs) createJob(ctx context.Context, c *ops.Call, in *CreateInput) (Job,
 	if c.Principal.Role == "client" && in.DueAt != nil {
 		return Job{}, apperr.Fields(map[string]string{"dueAt": "error.notAllowed"})
 	}
+
 	org, archived, found, err := m.Units.UnitState(ctx, c, in.UnitID)
 	if err != nil {
 		return Job{}, err
 	}
+
 	if !found || (c.Principal.Role == "client" && org != c.Principal.OrgID) {
 		return Job{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
+
 	if archived {
 		return Job{}, apperr.Fields(map[string]string{"unitId": "error.unitArchived"})
 	}
+
 	slots := append([]Slot{{in.RequestedStart, in.RequestedEnd}}, in.AlternativeSlots...)
+
 	alts := len(in.AlternativeSlots)
 	if (c.Principal.Role == "client" && alts != 2) || alts > 2 {
 		return Job{}, apperr.Fields(map[string]string{"alternativeSlots": "error.count"})
 	}
+
 	if !PreferredSlotsOK(c.Now, slots) {
 		return Job{}, apperr.Fields(map[string]string{"alternativeSlots": "error.slotRules"})
 	}
+
 	due := in.RequestedEnd
 	if in.DueAt != nil {
 		if in.DueAt.Before(in.RequestedEnd) {
 			return Job{}, apperr.Fields(map[string]string{"dueAt": "error.beforeRequestedEnd"})
 		}
+
 		due = *in.DueAt
 	}
+
 	var cw *string
 	if in.ContactWindow != nil && *in.ContactWindow != "" {
 		cw = in.ContactWindow
 	}
+
 	pref, _ := json.Marshal(slots)
+
 	var id uuid.UUID
+
 	err = c.Tx.QueryRow(ctx, `INSERT INTO maintenance.jobs (tenant_id, unit_id, customer_org_id, type, status, origin, symptom, contact_window, requested_slot,
 		preferred_slots, preference_round, due_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'requested', 'client_request', $4, $5,
-		tstzrange($6, $7), $8, 1, $9) RETURNING id`, in.UnitID, org, in.Type, in.Symptom, cw, in.RequestedStart, in.RequestedEnd, pref, due).Scan(&id)
+		tstzrange($6, $7), $8, 1, $9) RETURNING id`, in.UnitID, org, in.Type, in.Symptom, cw, in.RequestedStart, in.RequestedEnd, pref, due).
+		Scan(&id)
 	if err != nil {
 		return Job{}, err
 	}
+
 	if err := m.event(ctx, c, id, "job.created", nil); err != nil {
 		return Job{}, err
 	}
+
 	j, err := m.detail(ctx, c, id)
 	if err != nil {
 		return j, err
 	}
-	c.Emit(ops.Event{AggregateType: "job", AggregateID: id, Type: "JobCreated", Payload: map[string]any{"unitId": in.UnitID, "customerOrgId": org}})
-	c.Audit(ops.AuditEntry{Action: "jobs.create", TargetKind: "job", TargetID: id.String(), NextVersion: &j.Version})
+
+	c.Emit(
+		ops.Event{
+			AggregateType: "job",
+			AggregateID:   id,
+			Type:          "JobCreated",
+			Payload:       map[string]any{"unitId": in.UnitID, "customerOrgId": org},
+		},
+	)
+	c.Audit(
+		ops.AuditEntry{
+			Action:      "jobs.create",
+			TargetKind:  "job",
+			TargetID:    id.String(),
+			NextVersion: &j.Version,
+		},
+	)
+
 	return j, nil
 }
 
-func (m Jobs) event(ctx context.Context, c *ops.Call, job uuid.UUID, action string, note *uuid.UUID) error {
+func (m Jobs) event(
+	ctx context.Context,
+	c *ops.Call,
+	job uuid.UUID,
+	action string,
+	note *uuid.UUID,
+) error {
 	// UUIDv7 IDs keep events of the same instant in write order (sort occurredAt asc, id asc)
-	_, err := c.Tx.Exec(ctx, `INSERT INTO maintenance.job_events (id, tenant_id, job_id, actor_user_id, action, note_id, occurred_at)
-		VALUES ($6, current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5)`, job, c.Principal.UserID, action, note, c.Now, uuid.Must(uuid.NewV7()))
+	_, err := c.Tx.Exec(
+		ctx,
+		`INSERT INTO maintenance.job_events (id, tenant_id, job_id, actor_user_id, action, note_id, occurred_at)
+		VALUES ($6, current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5)`,
+		job,
+		c.Principal.UserID,
+		action,
+		note,
+		c.Now,
+		uuid.Must(uuid.NewV7()),
+	)
+
 	return err
 }
 
@@ -391,12 +513,14 @@ func (in *JobIDInput) Validate() map[string]string {
 	if in.JobID == uuid.Nil {
 		return map[string]string{"jobId": "error.required"}
 	}
+
 	return nil
 }
 
 // detail loads the JobDetail projection in the caller's scope; contactWindow follows IR64.
 func (m Jobs) detail(ctx context.Context, c *ops.Call, id uuid.UUID) (Job, error) {
 	args := []any{id}
+
 	return m.load(ctx, c, id, jobScope(c, &args), args)
 }
 
@@ -405,54 +529,85 @@ func (m Jobs) scoped(ctx context.Context, c *ops.Call, id uuid.UUID) (Job, error
 	return m.load(ctx, c, id, "TRUE", []any{id})
 }
 
-func (m Jobs) load(ctx context.Context, c *ops.Call, id uuid.UUID, scope string, args []any) (Job, error) {
-	j, err := scanJob(c.Tx.QueryRow(ctx, "SELECT "+jobCols+" FROM maintenance.jobs j WHERE j.id = $1 AND "+scope, args...))
+func (m Jobs) load(
+	ctx context.Context,
+	c *ops.Call,
+	id uuid.UUID,
+	scope string,
+	args []any,
+) (Job, error) {
+	j, err := scanJob(
+		c.Tx.QueryRow(
+			ctx,
+			"SELECT "+jobCols+" FROM maintenance.jobs j WHERE j.id = $1 AND "+scope,
+			args...),
+	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return j, apperr.E(apperr.NotFound, "error.notFound")
 	}
+
 	if err != nil {
 		return j, err
 	}
+
 	j.Projection = "detail"
 	if j.SlotProposal, err = m.pendingOrLastProposal(ctx, c, id); err != nil {
 		return j, err
 	}
+
 	if j.Assignment, err = m.shownAssignment(ctx, c, id); err != nil {
 		return j, err
 	}
+
 	var pp PartnerSlotProposal
+
 	err = c.Tx.QueryRow(ctx, `SELECT p.id, p.offer_id, lower(p.slot), upper(p.slot), p.technician_membership_id, p.reason, p.sent_at, p.status
 		FROM maintenance.partner_slot_proposals p JOIN maintenance.offers o ON o.id = p.offer_id WHERE o.job_id = $1 AND p.status <> 'withdrawn'
-		ORDER BY p.sent_at DESC, p.id LIMIT 1`, id).Scan(&pp.ID, &pp.OfferID, &pp.Slot.StartAt, &pp.Slot.EndAt, &pp.TechnicianMembershipID, &pp.Reason, &pp.SentAt, &pp.Status)
+		ORDER BY p.sent_at DESC, p.id LIMIT 1`, id).
+		Scan(&pp.ID, &pp.OfferID, &pp.Slot.StartAt, &pp.Slot.EndAt, &pp.TechnicianMembershipID, &pp.Reason, &pp.SentAt, &pp.Status)
 	switch {
 	case err == nil && c.Principal.Role != "client" && c.Principal.Role != "technician":
 		j.PartnerSlotProposal, _ = json.Marshal(pp)
 	case err != nil && !errors.Is(err, pgx.ErrNoRows):
 		return j, err
 	}
+
 	cursorSQL := `SELECT count(*) FROM maintenance.job_events e LEFT JOIN maintenance.job_notes n ON n.id = e.note_id WHERE e.job_id = $1`
 	if c.Principal.Role == "client" {
 		cursorSQL += clientEventFilter // the cursor counts what the client's jobs.events lists, so it reveals no hidden event (IR42, IR442)
 	}
+
 	if err := c.Tx.QueryRow(ctx, cursorSQL, id).Scan(&j.EventCursor); err != nil {
 		return j, err
 	}
+
 	if j.ProblemPhotos, err = problemPhotos(ctx, c, id); err != nil {
 		return j, err
 	}
-	rows, err := c.Tx.Query(ctx, `SELECT id, version, state FROM maintenance.work_reports WHERE job_id = $1 ORDER BY version`, id)
+
+	rows, err := c.Tx.Query(
+		ctx,
+		`SELECT id, version, state FROM maintenance.work_reports WHERE job_id = $1 ORDER BY version`,
+		id,
+	)
 	if err != nil {
 		return j, err
 	}
+
 	for rows.Next() {
-		var rid uuid.UUID
-		var v int
-		var state string
+		var (
+			rid   uuid.UUID
+			v     int
+			state string
+		)
 		if err := rows.Scan(&rid, &v, &state); err != nil {
 			rows.Close()
+
 			return j, err
 		}
+
 		ref := map[string]any{"reportId": rid, "reportVersion": v}
+
 		switch {
 		case state == "draft":
 			if c.Principal.Role != "client" { // IR42
@@ -462,10 +617,13 @@ func (m Jobs) load(ctx context.Context, c *ops.Call, id uuid.UUID, scope string,
 			j.ReportRefs = append(j.ReportRefs, ref)
 		}
 	}
+
 	rows.Close()
+
 	if err := rows.Err(); err != nil {
 		return j, err
 	}
+
 	return j, m.project(ctx, c, &j)
 }
 
@@ -498,85 +656,130 @@ func (m Jobs) project(ctx context.Context, c *ops.Call, j *Job) error {
 			offer_expires_at, access_valid_from, access_valid_until, decision, decided_by, decided_at, decline_reason
 			FROM maintenance.offers WHERE job_id = $1 AND ((decision IS NULL AND expired_at IS NULL) OR decision = 'accept')`
 		args := []any{j.ID}
+
 		if role == "contractor" {
 			q += " AND contractor_org_id = $2"
+
 			args = append(args, c.Principal.OrgID)
 		}
+
 		var o OfferView
-		err := c.Tx.QueryRow(ctx, q+" ORDER BY offered_at DESC LIMIT 1", args...).Scan(&o.ID, &o.TenantID, &o.Version, &o.CreatedAt, &o.UpdatedAt, &o.JobID,
-			&o.ContractorOrgID, &o.TermsVersion, &o.VisitSlot.StartAt, &o.VisitSlot.EndAt, &o.OfferedAt, &o.OfferExpiresAt, &o.AccessValidFrom, &o.AccessValidUntil,
-			&o.Decision, &o.DecidedBy, &o.DecidedAt, &o.DeclineReason)
+
+		err := c.Tx.QueryRow(ctx, q+" ORDER BY offered_at DESC LIMIT 1", args...).
+			Scan(&o.ID, &o.TenantID, &o.Version, &o.CreatedAt, &o.UpdatedAt, &o.JobID,
+				&o.ContractorOrgID, &o.TermsVersion, &o.VisitSlot.StartAt, &o.VisitSlot.EndAt, &o.OfferedAt, &o.OfferExpiresAt, &o.AccessValidFrom, &o.AccessValidUntil,
+				&o.Decision, &o.DecidedBy, &o.DecidedAt, &o.DeclineReason)
 		switch {
 		case err == nil:
 			if role == "contractor" {
 				o.DeclineReason = nil
 			}
+
 			j.Offer = o
 		case !errors.Is(err, pgx.ErrNoRows):
 			return err
 		}
 	}
+
 	switch role {
 	case "client":
 		if j.Assignment != nil {
 			j.Assignment.Reason = nil
 			if j.Assignment.Acknowledgement == "accepted" {
 				var user uuid.UUID
-				if err := c.Tx.QueryRow(ctx, `SELECT user_id FROM maintenance.ref_memberships WHERE id = $1`, j.Assignment.TechnicianMembershipID).Scan(&user); err == nil {
+				if err := c.Tx.QueryRow(ctx, `SELECT user_id FROM maintenance.ref_memberships WHERE id = $1`, j.Assignment.TechnicianMembershipID).
+					Scan(&user); err == nil {
 					ms := []identity.Member{{UserID: user}}
 					if err := identity.LoadMembers(ctx, c, ms); err != nil {
 						return err
 					}
+
 					if ms[0].DisplayName != "" {
 						j.Assignment.TechnicianName = &ms[0].DisplayName
 					}
-				} else if !errors.Is(err, pgx.ErrNoRows) {
+				} else if !errors.Is(
+					err,
+					pgx.ErrNoRows,
+				) {
 					return err
 				}
 			}
 		}
+
 		var lines []map[string]any
+
 		_ = json.Unmarshal(j.Costs, &lines)
 		kept := []map[string]any{}
+
 		for _, l := range lines {
 			if l["visibility"] == "customer" {
 				kept = append(kept, l)
 			}
 		}
+
 		j.Costs, _ = json.Marshal(kept)
 	case "technician", "contractor":
 		j.Costs = json.RawMessage("[]")
-		if role == "technician" && j.Assignment != nil && j.Assignment.TechnicianMembershipID != c.Principal.MembershipID {
+		if role == "technician" && j.Assignment != nil &&
+			j.Assignment.TechnicianMembershipID != c.Principal.MembershipID {
 			j.Assignment.Reason = nil
 		}
 	}
+
 	return nil
 }
 
-func (m Jobs) pendingOrLastProposal(ctx context.Context, c *ops.Call, job uuid.UUID) (*SlotProposal, error) {
+func (m Jobs) pendingOrLastProposal(
+	ctx context.Context,
+	c *ops.Call,
+	job uuid.UUID,
+) (*SlotProposal, error) {
 	var p SlotProposal
+
 	err := c.Tx.QueryRow(ctx, `SELECT id, source, lower(slot), upper(slot), hold, message, reply_by, status, decided_at, decline_reason, decline_comment
 		FROM maintenance.slot_proposals WHERE job_id = $1 ORDER BY (status = 'pending') DESC, created_at DESC, id LIMIT 1`, job).
 		Scan(&p.ID, &p.Source, &p.Slot.StartAt, &p.Slot.EndAt, &p.Hold, &p.Message, &p.ReplyBy, &p.Status, &p.DecidedAt, &p.DeclineReason, &p.DeclineComment)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
+
 	return &p, err
 }
 
-func (m Jobs) activeAssignment(ctx context.Context, c *ops.Call, job uuid.UUID) (*Assignment, error) {
+func (m Jobs) activeAssignment(
+	ctx context.Context,
+	c *ops.Call,
+	job uuid.UUID,
+) (*Assignment, error) {
 	return m.assignmentWhere(ctx, c, job, "status = 'active'")
 }
 
 // shownAssignment is the job's Assignment for its projections: the active one, or for a completed job the one its
 // completion released (IR234), so the detail still says who did the work.
-func (m Jobs) shownAssignment(ctx context.Context, c *ops.Call, job uuid.UUID) (*Assignment, error) {
-	return m.assignmentWhere(ctx, c, job, "status IN ('active', 'completed') ORDER BY status = 'active' DESC, updated_at DESC LIMIT 1")
+func (m Jobs) shownAssignment(
+	ctx context.Context,
+	c *ops.Call,
+	job uuid.UUID,
+) (*Assignment, error) {
+	return m.assignmentWhere(
+		ctx,
+		c,
+		job,
+		"status IN ('active', 'completed') ORDER BY status = 'active' DESC, updated_at DESC LIMIT 1",
+	)
 }
 
-func (m Jobs) assignmentWhere(ctx context.Context, c *ops.Call, job uuid.UUID, cond string) (*Assignment, error) {
-	var a Assignment
-	var altStart, altEnd *time.Time
+func (m Jobs) assignmentWhere(
+	ctx context.Context,
+	c *ops.Call,
+	job uuid.UUID,
+	cond string,
+) (*Assignment, error) {
+	var (
+		a                Assignment
+		altStart, altEnd *time.Time
+	)
+
 	err := c.Tx.QueryRow(ctx, `SELECT id, tenant_id, version, created_at, updated_at, job_id, technician_membership_id, valid_from, valid_until,
 		lower(scheduled), upper(scheduled), status, reason, acknowledgement, acknowledged_at, cant_make_reason, lower(alternative_slot), upper(alternative_slot)
 		FROM maintenance.assignments WHERE job_id = $1 AND `+cond, job).
@@ -585,9 +788,11 @@ func (m Jobs) assignmentWhere(ctx context.Context, c *ops.Call, job uuid.UUID, c
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
+
 	if altStart != nil && altEnd != nil {
 		a.AlternativeSlot = &Slot{*altStart, *altEnd}
 	}
+
 	return &a, err
 }
 
@@ -629,20 +834,38 @@ type JobAttachment struct {
 
 // problemPhotos lists the job's own attachments: those without a work report, which jobs.reportProblem stores.
 func problemPhotos(ctx context.Context, c *ops.Call, job uuid.UUID) ([]JobAttachment, error) {
-	rows, err := c.Tx.Query(ctx, `SELECT id, tenant_id, created_at, updated_at, job_id, name, mime, size_bytes, status FROM maintenance.attachments
-		WHERE job_id = $1 AND report_id IS NULL ORDER BY created_at, id`, job)
+	rows, err := c.Tx.Query(
+		ctx,
+		`SELECT id, tenant_id, created_at, updated_at, job_id, name, mime, size_bytes, status FROM maintenance.attachments
+		WHERE job_id = $1 AND report_id IS NULL ORDER BY created_at, id`,
+		job,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
+
 	out := []JobAttachment{}
+
 	for rows.Next() {
 		a := JobAttachment{Version: 1}
-		if err := rows.Scan(&a.ID, &a.TenantID, &a.CreatedAt, &a.UpdatedAt, &a.JobID, &a.Name, &a.Mime, &a.Size, &a.Status); err != nil {
+		if err := rows.Scan(
+			&a.ID,
+			&a.TenantID,
+			&a.CreatedAt,
+			&a.UpdatedAt,
+			&a.JobID,
+			&a.Name,
+			&a.Mime,
+			&a.Size,
+			&a.Status,
+		); err != nil {
 			return nil, err
 		}
+
 		out = append(out, a)
 	}
+
 	return out, rows.Err()
 }
 
@@ -657,6 +880,7 @@ func (in *JobAttachmentInput) Validate() map[string]string {
 	if in.JobID == uuid.Nil || in.AttachmentID == uuid.Nil {
 		return map[string]string{"attachmentId": "error.required"}
 	}
+
 	return nil
 }
 
@@ -684,25 +908,37 @@ func (in *JobAttachmentInput) Validate() map[string]string {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/jobs/{jobId}/attachments/{attachmentId}/content [get]
-func (m Jobs) getAttachment(ctx context.Context, c *ops.Call, in *JobAttachmentInput) (BlobOut, error) {
+func (m Jobs) getAttachment(
+	ctx context.Context,
+	c *ops.Call,
+	in *JobAttachmentInput,
+) (BlobOut, error) {
 	if _, err := m.get(ctx, c, &JobIDInput{JobID: in.JobID}); err != nil {
 		return BlobOut{}, err
 	}
-	var key string
-	var out BlobOut
+
+	var (
+		key string
+		out BlobOut
+	)
+
 	err := c.Tx.QueryRow(ctx, `SELECT object_key, name, mime, size_bytes FROM maintenance.attachments WHERE id = $1 AND job_id = $2 AND report_id IS NULL AND status = 'ready'`,
-		in.AttachmentID, in.JobID).Scan(&key, &out.Name, &out.Mime, &out.Size)
+		in.AttachmentID, in.JobID).
+		Scan(&key, &out.Name, &out.Mime, &out.Size)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return out, apperr.E(apperr.NotFound, "error.notFound")
 	}
+
 	if err != nil {
 		return out, err
 	}
+
 	if out.Bytes, err = m.Blobs.Get(ctx, key); errors.Is(err, blob.ErrNotFound) {
 		return out, apperr.E(apperr.NotFound, "error.notFound")
 	} else if err != nil {
 		return out, err
 	}
+
 	return out, nil
 }
 
@@ -730,8 +966,10 @@ func (m Jobs) getAttachment(ctx context.Context, c *ops.Call, in *JobAttachmentI
 func (m Jobs) get(ctx context.Context, c *ops.Call, in *JobIDInput) (any, error) {
 	if c.Principal.Role == "contractor" || c.Principal.Role == "technician" {
 		v, _, err := m.projection(ctx, c, in.JobID)
+
 		return v, err
 	}
+
 	return m.detail(ctx, c, in.JobID)
 }
 
@@ -783,7 +1021,18 @@ type Summary struct {
 	EventSummary              EventSummary `json:"eventSummary"` // jobs.list fills it for the page (IR506)
 }
 
-var jobStatuses = []string{"requested", "offered", "accepted", "assigned", "in_progress", "on_hold", "submitted", "rework_requested", "completed", "cancelled"}
+var jobStatuses = []string{
+	"requested",
+	"offered",
+	"accepted",
+	"assigned",
+	"in_progress",
+	"on_hold",
+	"submitted",
+	"rework_requested",
+	"completed",
+	"cancelled",
+}
 
 const statusRank = `array_position(ARRAY['requested','offered','accepted','assigned','in_progress','on_hold','submitted','rework_requested','completed','cancelled'], j.status)`
 
@@ -829,53 +1078,76 @@ var severityRank = map[string]int{"normal": 0, "warning": 1, "critical": 2}
 // @Router			/v1/jobs [get]
 func (m Jobs) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[any], error) {
 	var f listFilters
+
 	if len(in.Filters) > 0 {
 		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
 		dec.DisallowUnknownFields()
+
 		if dec.Decode(&f) != nil {
 			return paging.Page[any]{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
 		}
 	}
+
 	if err := f.check(); err != nil {
 		return paging.Page[any]{}, err
 	}
+
 	sortField, desc := "status", false
+
 	if in.Sort != nil {
 		if !slices.Contains([]string{"id", "severity", "dueAt", "status"}, in.Sort.Field) {
-			return paging.Page[any]{}, apperr.Fields(map[string]string{"sort.field": "error.invalid"})
+			return paging.Page[any]{}, apperr.Fields(
+				map[string]string{"sort.field": "error.invalid"},
+			)
 		}
+
 		sortField, desc = in.Sort.Field, in.Sort.Direction == "desc"
 	}
+
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[any]{}, err
 	}
+
 	merged, err := m.collect(ctx, c, &f)
 	if err != nil {
 		return paging.Page[any]{}, err
 	}
+
 	sortItems(merged, sortField, desc)
 	total := len(merged)
 	page := merged[min(w.Offset, total):min(w.Offset+w.Limit, total)]
+
 	var jobs []uuid.UUID
+
 	for _, x := range page {
 		if s, ok := x.item.(Summary); ok {
 			jobs = append(jobs, s.ID)
 		}
 	}
+
 	sums, err := eventSummaries(ctx, c, jobs) // the page's event counts in one query (IR506)
 	if err != nil {
 		return paging.Page[any]{}, err
 	}
+
 	items := []any{}
+
 	for _, x := range page {
 		if s, ok := x.item.(Summary); ok {
 			s.EventSummary = sums[s.ID]
 			x.item = s
 		}
+
 		items = append(items, x.item)
 	}
-	return paging.Page[any]{Items: items, NextCursor: w.Next(total), Total: total, SnapshotVersion: w.Snapshot}, nil
+
+	return paging.Page[any]{
+		Items:           items,
+		NextCursor:      w.Next(total),
+		Total:           total,
+		SnapshotVersion: w.Snapshot,
+	}, nil
 }
 
 // check validates the shared job filters (IR26).
@@ -883,6 +1155,7 @@ func (f *listFilters) check() error {
 	bad := func(k string) error {
 		return apperr.Fields(map[string]string{"filters." + k: "error.invalid"})
 	}
+
 	switch {
 	case f.Status != nil && f.Statuses != nil:
 		return bad("statuses")
@@ -899,6 +1172,7 @@ func (f *listFilters) check() error {
 	case f.From != nil && f.To != nil && !f.From.Before(*f.To):
 		return apperr.Fields(map[string]string{"filters.to": "error.range"})
 	}
+
 	if f.Statuses != nil {
 		for _, s := range *f.Statuses {
 			if !slices.Contains(jobStatuses, s) {
@@ -906,6 +1180,7 @@ func (f *listFilters) check() error {
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -913,27 +1188,40 @@ func (f *listFilters) check() error {
 // summaries.get, IR26).
 func (m Jobs) collect(ctx context.Context, c *ops.Call, fp *listFilters) ([]listItem, error) {
 	f := *fp
+
 	var args []any
-	add := func(v any) string { args = append(args, v); return fmt.Sprintf("$%d", len(args)) }
+
+	add := func(v any) string {
+		args = append(args, v)
+
+		return fmt.Sprintf("$%d", len(args))
+	}
+
 	conds := []string{jobScope(c, &args)}
 	if f.UnitID != nil {
 		conds = append(conds, "j.unit_id = "+add(*f.UnitID))
 	}
+
 	if f.UnitIDs != nil {
 		conds = append(conds, "j.unit_id = ANY("+add(*f.UnitIDs)+")")
 	}
+
 	if f.Status != nil {
 		conds = append(conds, "j.status = "+add(*f.Status))
 	}
+
 	if f.Statuses != nil {
 		conds = append(conds, "j.status = ANY("+add(*f.Statuses)+")")
 	}
+
 	if f.From != nil {
 		conds = append(conds, "lower(j.requested_slot) >= "+add(*f.From))
 	}
+
 	if f.To != nil {
 		conds = append(conds, "lower(j.requested_slot) < "+add(*f.To))
 	}
+
 	if f.OrganizationID != nil {
 		if c.Principal.Role == "admin" && m.HQOrg != nil && *f.OrganizationID == m.HQOrg(c) {
 			conds = append(conds, "j.contractor_org_id IS NULL")
@@ -941,43 +1229,65 @@ func (m Jobs) collect(ctx context.Context, c *ops.Call, fp *listFilters) ([]list
 			conds = append(conds, "j.contractor_org_id = "+add(*f.OrganizationID))
 		}
 	}
+
 	if f.MembershipID != nil {
-		conds = append(conds, "EXISTS (SELECT 1 FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status IN ('active', 'completed') AND a.technician_membership_id = "+add(*f.MembershipID)+")")
+		conds = append(
+			conds,
+			"EXISTS (SELECT 1 FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status IN ('active', 'completed') AND a.technician_membership_id = "+add(
+				*f.MembershipID,
+			)+")",
+		)
 	}
+
 	if f.CustomerID != nil {
 		org, ok, err := m.Units.OrgOfCustomer(ctx, c, *f.CustomerID)
 		if err != nil {
 			return nil, err
 		}
+
 		if !ok {
 			org = uuid.Nil
 		}
+
 		conds = append(conds, "j.customer_org_id = "+add(org))
 	}
+
 	if f.PropertyID != nil {
 		units, err := m.Units.UnitsOfProperty(ctx, c, *f.PropertyID)
 		if err != nil {
 			return nil, err
 		}
+
 		conds = append(conds, "j.unit_id = ANY("+add(units)+")")
 	}
+
 	if f.OverdueOnly != nil && *f.OverdueOnly {
-		conds = append(conds, "j.due_at < "+add(c.Now)+" AND j.status NOT IN ('completed','cancelled')")
+		conds = append(
+			conds,
+			"j.due_at < "+add(c.Now)+" AND j.status NOT IN ('completed','cancelled')",
+		)
 	}
+
 	if f.Origin != nil {
 		conds = append(conds, "j.origin = "+add(*f.Origin))
 	}
+
 	if f.Type != nil {
 		conds = append(conds, "j.type = "+add(*f.Type))
 	}
+
 	if f.ProposalPending != nil {
 		q := "EXISTS (SELECT 1 FROM maintenance.slot_proposals p WHERE p.job_id = j.id AND p.status = 'pending')"
 		if !*f.ProposalPending {
 			q = "NOT " + q
 		}
+
 		conds = append(conds, q)
 	}
-	rows, err := c.Tx.Query(ctx, `SELECT j.id, j.version, j.unit_id, j.type, j.status, j.due_at, lower(j.requested_slot), upper(j.requested_slot),
+
+	rows, err := c.Tx.Query(
+		ctx,
+		`SELECT j.id, j.version, j.unit_id, j.type, j.status, j.due_at, lower(j.requested_slot), upper(j.requested_slot),
 		lower(j.scheduled_slot), upper(j.scheduled_slot), j.assignment_id, j.origin, j.preferred_slots, `+statusRank+`,
 		EXISTS (SELECT 1 FROM maintenance.slot_proposals p WHERE p.job_id = j.id AND p.status = 'pending'),
 		(SELECT a.acknowledgement FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status IN ('active', 'completed') ORDER BY a.status = 'active' DESC, a.updated_at DESC LIMIT 1),
@@ -985,64 +1295,119 @@ func (m Jobs) collect(ctx context.Context, c *ops.Call, fp *listFilters) ([]list
 		ao.access_valid_from, ao.access_valid_until, j.created_at, j.follow_up_of_job_id, j.follow_up_class
 		FROM maintenance.jobs j LEFT JOIN LATERAL (SELECT o.access_valid_from, o.access_valid_until FROM maintenance.offers o
 			WHERE o.job_id = j.id AND o.decision = 'accept' ORDER BY o.decided_at DESC LIMIT 1) ao ON true
-		WHERE `+strings.Join(conds, " AND "), args...)
+		WHERE `+strings.Join(
+			conds,
+			" AND ",
+		),
+		args...)
 	if err != nil {
 		return nil, err
 	}
+
 	type row struct {
 		s    Summary
 		rank int
 	}
-	var all []row
-	var units []uuid.UUID
+
+	var (
+		all   []row
+		units []uuid.UUID
+	)
+
 	for rows.Next() {
-		var r row
-		var ss, se *time.Time
-		var pref []byte
-		var pending bool
-		if err := rows.Scan(&r.s.ID, &r.s.Version, &r.s.UnitID, &r.s.Type, &r.s.Status, &r.s.DueAt, &r.s.RequestedSlot.StartAt, &r.s.RequestedSlot.EndAt,
-			&ss, &se, &r.s.AssignmentID, &r.s.Origin, &pref, &r.rank, &pending, &r.s.AssignmentAcknowledgement, &r.s.TechnicianMembershipID,
-			&r.s.AccessValidFrom, &r.s.AccessValidUntil, &r.s.CreatedAt, &r.s.FollowUpOfJobID, &r.s.FollowUpClass); err != nil {
+		var (
+			r       row
+			ss, se  *time.Time
+			pref    []byte
+			pending bool
+		)
+		if err := rows.Scan(
+			&r.s.ID,
+			&r.s.Version,
+			&r.s.UnitID,
+			&r.s.Type,
+			&r.s.Status,
+			&r.s.DueAt,
+			&r.s.RequestedSlot.StartAt,
+			&r.s.RequestedSlot.EndAt,
+			&ss,
+			&se,
+			&r.s.AssignmentID,
+			&r.s.Origin,
+			&pref,
+			&r.rank,
+			&pending,
+			&r.s.AssignmentAcknowledgement,
+			&r.s.TechnicianMembershipID,
+			&r.s.AccessValidFrom,
+			&r.s.AccessValidUntil,
+			&r.s.CreatedAt,
+			&r.s.FollowUpOfJobID,
+			&r.s.FollowUpClass,
+		); err != nil {
 			rows.Close()
+
 			return nil, err
 		}
+
 		if ss != nil && se != nil {
 			r.s.ScheduledSlot = &Slot{*ss, *se}
 		}
+
 		r.s.PreferredSlots = []Slot{}
 		_ = json.Unmarshal(pref, &r.s.PreferredSlots)
+
 		r.s.Projection, r.s.IsDemo, r.s.DisplayStatus = "summary", true, r.s.Status
 		if pending {
 			r.s.DisplayStatus = "time_proposed"
 		}
+
 		all, units = append(all, r), append(units, r.s.UnitID)
 	}
+
 	rows.Close()
+
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+
 	sev, err := m.Severity.UnitSeverities(ctx, c, units)
 	if err != nil {
 		return nil, err
 	}
+
 	var merged []listItem
+
 	for _, r := range all {
 		r.s.Severity = sev[r.s.UnitID]
 		if r.s.Severity == "" {
 			r.s.Severity = "normal"
 		}
+
 		if f.Severity == nil || r.s.Severity == *f.Severity {
 			due := r.s.DueAt
-			merged = append(merged, listItem{rank: r.rank, sev: severityRank[r.s.Severity], due: &due, id: r.s.ID.String(), item: r.s})
+			merged = append(
+				merged,
+				listItem{
+					rank: r.rank,
+					sev:  severityRank[r.s.Severity],
+					due:  &due,
+					id:   r.s.ID.String(),
+					item: r.s,
+				},
+			)
 		}
 	}
+
 	if c.Principal.Role == "contractor" || c.Principal.Role == "technician" {
 		extra, err := m.extraProjections(ctx, c, &f)
 		if err != nil {
 			return nil, err
 		}
+
 		merged = append(merged, extra...)
 	}
+
 	return merged, nil
 }
 
@@ -1059,6 +1424,7 @@ func (in *EventsInput) Validate() map[string]string {
 	if in.JobID == uuid.Nil {
 		return map[string]string{"jobId": "error.required"}
 	}
+
 	return nil
 }
 
@@ -1120,11 +1486,20 @@ type Event struct {
 // clientHiddenActions are the job events of HQ's and the contractor's own handling that the client's history leaves out,
 // like internal notes (IR442): the costs and warranty records, and the contractor's time change while HQ alone decides
 // on it (the change sent to the client shows as the client's proposal). Constants, so the query lists them inline.
-var clientHiddenActions = []string{"job.costs_saved", "job.warranty_claim_filed", "partner_proposal.sent", "partner_proposal.withdrawn", "partner_proposal.kept"}
+var clientHiddenActions = []string{
+	"job.costs_saved",
+	"job.warranty_claim_filed",
+	"partner_proposal.sent",
+	"partner_proposal.withdrawn",
+	"partner_proposal.kept",
+}
 
 // clientEventCond is the condition on job_events e (joined to job_notes n) of what a client may see: no internal note
 // (IR42) and no hidden action. clientEventFilter appends it to a WHERE clause.
-var clientEventCond = "(n.id IS NULL OR n.visibility = 'customer') AND e.action NOT IN ('" + strings.Join(clientHiddenActions, "','") + "')"
+var clientEventCond = "(n.id IS NULL OR n.visibility = 'customer') AND e.action NOT IN ('" + strings.Join(
+	clientHiddenActions,
+	"','",
+) + "')"
 
 var clientEventFilter = " AND " + clientEventCond
 
@@ -1146,35 +1521,58 @@ type LatestEvent struct {
 // eventSummaries counts the events of the jobs in one query, with the caller's jobs.events visibility: a client's
 // lists leave out internal notes and hidden actions; the other roles read the summaries of their summary projections,
 // whose jobs.events lists every event (IR124 item 5).
-func eventSummaries(ctx context.Context, c *ops.Call, jobs []uuid.UUID) (map[uuid.UUID]EventSummary, error) {
+func eventSummaries(
+	ctx context.Context,
+	c *ops.Call,
+	jobs []uuid.UUID,
+) (map[uuid.UUID]EventSummary, error) {
 	out := map[uuid.UUID]EventSummary{}
 	if len(jobs) == 0 {
 		return out, nil
 	}
+
 	visible := "true"
 	if c.Principal.Role == "client" {
 		visible = clientEventCond
 	}
-	rows, err := c.Tx.Query(ctx, `SELECT e.job_id, count(*) FILTER (WHERE `+visible+`), count(*) FILTER (WHERE `+clientEventCond+`), count(n.id) FILTER (WHERE `+visible+`),
+
+	rows, err := c.Tx.Query(
+		ctx,
+		`SELECT e.job_id, count(*) FILTER (WHERE `+visible+`), count(*) FILTER (WHERE `+clientEventCond+`), count(n.id) FILTER (WHERE `+visible+`),
 		(array_agg(e.action ORDER BY e.occurred_at DESC, e.id DESC) FILTER (WHERE `+visible+`))[1], max(e.occurred_at) FILTER (WHERE `+visible+`)
-		FROM maintenance.job_events e LEFT JOIN maintenance.job_notes n ON n.id = e.note_id WHERE e.job_id = ANY($1) GROUP BY e.job_id`, jobs)
+		FROM maintenance.job_events e LEFT JOIN maintenance.job_notes n ON n.id = e.note_id WHERE e.job_id = ANY($1) GROUP BY e.job_id`,
+		jobs,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
+
 	for rows.Next() {
-		var job uuid.UUID
-		var s EventSummary
-		var action *string
-		var at *time.Time
-		if err := rows.Scan(&job, &s.Count, &s.CustomerVisible, &s.Notes, &action, &at); err != nil {
+		var (
+			job    uuid.UUID
+			s      EventSummary
+			action *string
+			at     *time.Time
+		)
+		if err := rows.Scan(
+			&job,
+			&s.Count,
+			&s.CustomerVisible,
+			&s.Notes,
+			&action,
+			&at,
+		); err != nil {
 			return nil, err
 		}
+
 		if action != nil && at != nil {
 			s.Latest = &LatestEvent{Action: *action, OccurredAt: *at}
 		}
+
 		out[job] = s
 	}
+
 	return out, rows.Err()
 }
 
@@ -1204,35 +1602,55 @@ func eventSummaries(ctx context.Context, c *ops.Call, jobs []uuid.UUID) (map[uui
 // @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/events [get]
-func (m Jobs) events(ctx context.Context, c *ops.Call, in *EventsInput) (paging.Page[Event], error) {
+func (m Jobs) events(
+	ctx context.Context,
+	c *ops.Call,
+	in *EventsInput,
+) (paging.Page[Event], error) {
 	ownOnly := false
+
 	if c.Principal.Role == "contractor" || c.Principal.Role == "technician" {
 		_, kind, err := m.projection(ctx, c, in.JobID)
 		if err != nil {
 			return paging.Page[Event]{}, err
 		}
+
 		ownOnly = kind != "detail" // offer / history: only the decision events of the caller's side (IR124 item 5)
 	} else if _, err := m.detail(ctx, c, in.JobID); err != nil {
 		return paging.Page[Event]{}, err
 	}
+
 	var f struct {
 		From *time.Time `json:"from,omitempty"`
 		To   *time.Time `json:"to,omitempty"`
 	}
+
 	if len(in.Query.Filters) > 0 {
 		dec := json.NewDecoder(strings.NewReader(string(in.Query.Filters)))
 		dec.DisallowUnknownFields()
+
 		if dec.Decode(&f) != nil {
-			return paging.Page[Event]{}, apperr.Fields(map[string]string{"query.filters": "error.invalid"})
+			return paging.Page[Event]{}, apperr.Fields(
+				map[string]string{"query.filters": "error.invalid"},
+			)
 		}
 	}
+
 	if f.From != nil && f.To != nil && !f.From.Before(*f.To) {
-		return paging.Page[Event]{}, apperr.Fields(map[string]string{"query.filters.to": "error.range"})
+		return paging.Page[Event]{}, apperr.Fields(
+			map[string]string{"query.filters.to": "error.range"},
+		)
 	}
-	order, err := paging.OrderBy(in.Query.Sort, map[string]string{"id": "e.id", "occurredAt": "e.occurred_at"}, "e.occurred_at ASC, e.id ASC")
+
+	order, err := paging.OrderBy(
+		in.Query.Sort,
+		map[string]string{"id": "e.id", "occurredAt": "e.occurred_at"},
+		"e.occurred_at ASC, e.id ASC",
+	)
 	if err != nil {
 		return paging.Page[Event]{}, err
 	}
+
 	w, err := paging.Resolve(in.Query, struct {
 		Job uuid.UUID
 		F   any
@@ -1240,74 +1658,141 @@ func (m Jobs) events(ctx context.Context, c *ops.Call, in *EventsInput) (paging.
 	if err != nil {
 		return paging.Page[Event]{}, err
 	}
+
 	args := []any{in.JobID}
+
 	where := "e.job_id = $1"
 	if c.Principal.Role == "client" {
 		where += clientEventFilter
 	}
+
 	if ownOnly { // the decision events of the caller's side: a contractor's organization, as its history snapshot stores them (IR506)
 		where += " AND e.action IN ('offer.accepted','offer.declined')"
+
 		if c.Principal.Role == "contractor" {
 			args = append(args, c.Principal.OrgID)
-			where += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM maintenance.ref_memberships mb WHERE mb.user_id = e.actor_user_id AND mb.organization_id = $%d)", len(args))
+			where += fmt.Sprintf(
+				" AND EXISTS (SELECT 1 FROM maintenance.ref_memberships mb WHERE mb.user_id = e.actor_user_id AND mb.organization_id = $%d)",
+				len(args),
+			)
 		} else {
 			args = append(args, c.Principal.UserID)
 			where += fmt.Sprintf(" AND e.actor_user_id = $%d", len(args))
 		}
 	}
+
 	if f.From != nil {
 		args = append(args, *f.From)
 		where += fmt.Sprintf(" AND e.occurred_at >= $%d", len(args))
 	}
+
 	if f.To != nil {
 		args = append(args, *f.To)
 		where += fmt.Sprintf(" AND e.occurred_at < $%d", len(args))
 	}
+
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM maintenance.job_events e LEFT JOIN maintenance.job_notes n ON n.id = e.note_id WHERE "+where, args...).Scan(&total); err != nil {
+	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM maintenance.job_events e LEFT JOIN maintenance.job_notes n ON n.id = e.note_id WHERE "+where, args...).
+		Scan(&total); err != nil {
 		return paging.Page[Event]{}, err
 	}
+
 	items, err := m.eventRows(ctx, c, where, args, order, w.Limit, w.Offset)
 	if err != nil {
 		return paging.Page[Event]{}, err
 	}
+
 	if ownOnly {
 		for i := range items {
 			items[i].Note, items[i].ReportRef = nil, nil
 		}
 	}
-	return paging.Page[Event]{Items: items, NextCursor: w.Next(total), Total: total, SnapshotVersion: w.Snapshot}, nil
+
+	return paging.Page[Event]{
+		Items:           items,
+		NextCursor:      w.Next(total),
+		Total:           total,
+		SnapshotVersion: w.Snapshot,
+	}, nil
 }
 
 // eventRows loads JobEvents (with their notes) matching where.
-func (m Jobs) eventRows(ctx context.Context, c *ops.Call, where string, args []any, order string, limit, offset int) ([]Event, error) {
-	rows, err := c.Tx.Query(ctx, fmt.Sprintf(`SELECT e.id, e.tenant_id, e.job_id, e.actor_user_id, e.action, e.occurred_at, e.report_id, e.report_version,
+func (m Jobs) eventRows(
+	ctx context.Context,
+	c *ops.Call,
+	where string,
+	args []any,
+	order string,
+	limit, offset int,
+) ([]Event, error) {
+	rows, err := c.Tx.Query(
+		ctx,
+		fmt.Sprintf(
+			`SELECT e.id, e.tenant_id, e.job_id, e.actor_user_id, e.action, e.occurred_at, e.report_id, e.report_version,
 		n.id, n.author_id, n.visibility, n.message, n.created_at FROM maintenance.job_events e LEFT JOIN maintenance.job_notes n ON n.id = e.note_id
-		WHERE %s ORDER BY %s LIMIT %d OFFSET %d`, where, order, limit, offset), args...)
+		WHERE %s ORDER BY %s LIMIT %d OFFSET %d`,
+			where,
+			order,
+			limit,
+			offset,
+		),
+		args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
+
 	items := []Event{}
+
 	for rows.Next() {
-		var e Event
-		var reportID *uuid.UUID
-		var reportVersion *int
-		var noteID, author *uuid.UUID
-		var vis, msg *string
-		var noteAt *time.Time
-		if err := rows.Scan(&e.ID, &e.TenantID, &e.JobID, &e.ActorUserID, &e.Action, &e.OccurredAt, &reportID, &reportVersion, &noteID, &author, &vis, &msg, &noteAt); err != nil {
+		var (
+			e              Event
+			reportID       *uuid.UUID
+			reportVersion  *int
+			noteID, author *uuid.UUID
+			vis, msg       *string
+			noteAt         *time.Time
+		)
+		if err := rows.Scan(
+			&e.ID,
+			&e.TenantID,
+			&e.JobID,
+			&e.ActorUserID,
+			&e.Action,
+			&e.OccurredAt,
+			&reportID,
+			&reportVersion,
+			&noteID,
+			&author,
+			&vis,
+			&msg,
+			&noteAt,
+		); err != nil {
 			return nil, err
 		}
+
 		e.Version, e.CreatedAt, e.UpdatedAt = 1, e.OccurredAt, e.OccurredAt
 		if reportID != nil && reportVersion != nil {
 			e.ReportRef = map[string]any{"reportId": *reportID, "reportVersion": *reportVersion}
 		}
+
 		if noteID != nil {
-			e.Note = &Note{ID: *noteID, TenantID: e.TenantID, Version: 1, CreatedAt: *noteAt, UpdatedAt: *noteAt, JobID: e.JobID, AuthorID: *author, Visibility: *vis, Message: *msg}
+			e.Note = &Note{
+				ID:         *noteID,
+				TenantID:   e.TenantID,
+				Version:    1,
+				CreatedAt:  *noteAt,
+				UpdatedAt:  *noteAt,
+				JobID:      e.JobID,
+				AuthorID:   *author,
+				Visibility: *vis,
+				Message:    *msg,
+			}
 		}
+
 		items = append(items, e)
 	}
+
 	return items, rows.Err()
 }
 
@@ -1316,18 +1801,26 @@ func (m Jobs) eventRows(ctx context.Context, c *ops.Call, where string, args []a
 // lockJob loads a job in scope for update and checks the expected version.
 func (m Jobs) lockJob(ctx context.Context, c *ops.Call, id uuid.UUID) (string, error) {
 	args := []any{id}
-	var status string
-	var v int
-	err := c.Tx.QueryRow(ctx, "SELECT j.status, j.version FROM maintenance.jobs j WHERE j.id = $1 AND "+jobScope(c, &args)+" FOR UPDATE", args...).Scan(&status, &v)
+
+	var (
+		status string
+		v      int
+	)
+
+	err := c.Tx.QueryRow(ctx, "SELECT j.status, j.version FROM maintenance.jobs j WHERE j.id = $1 AND "+jobScope(c, &args)+" FOR UPDATE", args...).
+		Scan(&status, &v)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", apperr.E(apperr.NotFound, "error.notFound")
 	}
+
 	if err != nil {
 		return "", err
 	}
+
 	if v != *c.ExpectedVersion {
 		return status, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
+
 	return status, nil
 }
 
@@ -1350,28 +1843,78 @@ func (in *CancelInput) Validate() map[string]string {
 	if in.JobID == uuid.Nil {
 		fe["jobId"] = "error.required"
 	}
+
 	trimmedReason(&in.CancelReason, 1000, "cancelReason", fe)
+
 	return fe
 }
 
-func (m Jobs) finish(ctx context.Context, c *ops.Call, id uuid.UUID, action, event string, reason string) (Job, error) {
+func (m Jobs) finish(
+	ctx context.Context,
+	c *ops.Call,
+	id uuid.UUID,
+	action, event string,
+	reason string,
+) (Job, error) {
 	j, err := m.detail(ctx, c, id)
 	if err != nil {
 		return j, err
 	}
-	c.Emit(ops.Event{AggregateType: "job", AggregateID: id, Type: event, Payload: map[string]any{"status": j.Status, "unitId": j.UnitID}})
-	c.Audit(ops.AuditEntry{Action: action, TargetKind: "job", TargetID: id.String(), PreviousVersion: c.ExpectedVersion, NextVersion: &j.Version, Reason: reason})
+
+	c.Emit(
+		ops.Event{
+			AggregateType: "job",
+			AggregateID:   id,
+			Type:          event,
+			Payload:       map[string]any{"status": j.Status, "unitId": j.UnitID},
+		},
+	)
+	c.Audit(
+		ops.AuditEntry{
+			Action:          action,
+			TargetKind:      "job",
+			TargetID:        id.String(),
+			PreviousVersion: c.ExpectedVersion,
+			NextVersion:     &j.Version,
+			Reason:          reason,
+		},
+	)
+
 	return j, nil
 }
 
 // finishScoped is finish for callers whose access was checked by the operation (technician / contractor writes).
-func (m Jobs) finishScoped(ctx context.Context, c *ops.Call, id uuid.UUID, action, event string, reason string) (Job, error) {
+func (m Jobs) finishScoped(
+	ctx context.Context,
+	c *ops.Call,
+	id uuid.UUID,
+	action, event string,
+	reason string,
+) (Job, error) {
 	j, err := m.scoped(ctx, c, id)
 	if err != nil {
 		return j, err
 	}
-	c.Emit(ops.Event{AggregateType: "job", AggregateID: id, Type: event, Payload: map[string]any{"status": j.Status, "unitId": j.UnitID}})
-	c.Audit(ops.AuditEntry{Action: action, TargetKind: "job", TargetID: id.String(), PreviousVersion: c.ExpectedVersion, NextVersion: &j.Version, Reason: reason})
+
+	c.Emit(
+		ops.Event{
+			AggregateType: "job",
+			AggregateID:   id,
+			Type:          event,
+			Payload:       map[string]any{"status": j.Status, "unitId": j.UnitID},
+		},
+	)
+	c.Audit(
+		ops.AuditEntry{
+			Action:          action,
+			TargetKind:      "job",
+			TargetID:        id.String(),
+			PreviousVersion: c.ExpectedVersion,
+			NextVersion:     &j.Version,
+			Reason:          reason,
+		},
+	)
+
 	return j, nil
 }
 
@@ -1409,41 +1952,81 @@ func (m Jobs) cancelJob(ctx context.Context, c *ops.Call, in *CancelInput) (Job,
 	if err != nil {
 		return Job{}, err
 	}
+
 	allowed := status == "requested"
 	if c.Principal.Role == "admin" {
-		allowed = slices.Contains([]string{"requested", "offered", "accepted", "assigned", "on_hold", "rework_requested"}, status)
+		allowed = slices.Contains(
+			[]string{"requested", "offered", "accepted", "assigned", "on_hold", "rework_requested"},
+			status,
+		)
 	}
+
 	if !allowed {
 		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
 	}
-	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.offers SET decision = 'decline', decided_by = $2, decided_at = $3, decline_reason = 'job_cancelled',
-		version = version + 1, updated_at = platform.app_now() WHERE job_id = $1 AND decision IS NULL`, in.JobID, c.Principal.MembershipID, c.Now); err != nil {
+
+	if _, err := c.Tx.Exec(
+		ctx,
+		`UPDATE maintenance.offers SET decision = 'decline', decided_by = $2, decided_at = $3, decline_reason = 'job_cancelled',
+		version = version + 1, updated_at = platform.app_now() WHERE job_id = $1 AND decision IS NULL`,
+		in.JobID,
+		c.Principal.MembershipID,
+		c.Now,
+	); err != nil {
 		return Job{}, err
 	}
-	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.assignments SET status = 'revoked', reason = 'job_cancelled', version = version + 1, updated_at = $2
-		WHERE job_id = $1 AND status = 'active'`, in.JobID, c.Now); err != nil {
+
+	if _, err := c.Tx.Exec(
+		ctx,
+		`UPDATE maintenance.assignments SET status = 'revoked', reason = 'job_cancelled', version = version + 1, updated_at = $2
+		WHERE job_id = $1 AND status = 'active'`,
+		in.JobID,
+		c.Now,
+	); err != nil {
 		return Job{}, err
 	}
 	// the contractor's access to the unit ends with the job, as on a reschedule: a cancelled job leaves only its history
 	// (BR-P08, IR588)
-	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.offers SET access_valid_until = GREATEST(access_valid_from, $2), version = version + 1, updated_at = platform.app_now()
-		WHERE job_id = $1 AND decision = 'accept' AND access_valid_until > $2`, in.JobID, c.Now); err != nil {
+	if _, err := c.Tx.Exec(
+		ctx,
+		`UPDATE maintenance.offers SET access_valid_until = GREATEST(access_valid_from, $2), version = version + 1, updated_at = platform.app_now()
+		WHERE job_id = $1 AND decision = 'accept' AND access_valid_until > $2`,
+		in.JobID,
+		c.Now,
+	); err != nil {
 		return Job{}, err
 	}
-	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.slot_proposals SET status = 'withdrawn', decided_at = $2 WHERE job_id = $1 AND status = 'pending'`, in.JobID, c.Now); err != nil {
+
+	if _, err := c.Tx.Exec(
+		ctx,
+		`UPDATE maintenance.slot_proposals SET status = 'withdrawn', decided_at = $2 WHERE job_id = $1 AND status = 'pending'`,
+		in.JobID,
+		c.Now,
+	); err != nil {
 		return Job{}, err
 	}
 	// the contractor's open time change ends with the job (IR444)
-	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.partner_slot_proposals SET status = 'withdrawn' WHERE status IN ('pending','sent_to_client')
-		AND offer_id IN (SELECT id FROM maintenance.offers WHERE job_id = $1)`, in.JobID); err != nil {
+	if _, err := c.Tx.Exec(
+		ctx,
+		`UPDATE maintenance.partner_slot_proposals SET status = 'withdrawn' WHERE status IN ('pending','sent_to_client')
+		AND offer_id IN (SELECT id FROM maintenance.offers WHERE job_id = $1)`,
+		in.JobID,
+	); err != nil {
 		return Job{}, err
 	}
-	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.jobs SET status = 'cancelled', hold_reason = NULL, version = version + 1, updated_at = platform.app_now() WHERE id = $1`, in.JobID); err != nil {
+
+	if _, err := c.Tx.Exec(
+		ctx,
+		`UPDATE maintenance.jobs SET status = 'cancelled', hold_reason = NULL, version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
+		in.JobID,
+	); err != nil {
 		return Job{}, err
 	}
+
 	if err := m.event(ctx, c, in.JobID, "job.cancelled", nil); err != nil {
 		return Job{}, err
 	}
+
 	return m.finish(ctx, c, in.JobID, "jobs.cancel", "JobCancelled", in.CancelReason)
 }
 
@@ -1459,7 +2042,9 @@ func (in *ReasonInput) Validate() map[string]string {
 	if in.JobID == uuid.Nil {
 		fe["jobId"] = "error.required"
 	}
+
 	trimmedReason(&in.Reason, 1000, "reason", fe)
+
 	return fe
 }
 
@@ -1497,15 +2082,24 @@ func (m Jobs) holdJob(ctx context.Context, c *ops.Call, in *ReasonInput) (Job, e
 	if err != nil {
 		return Job{}, err
 	}
+
 	if status != "in_progress" && status != "submitted" {
 		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
 	}
-	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.jobs SET status = 'on_hold', hold_reason = $2, version = version + 1, updated_at = platform.app_now() WHERE id = $1`, in.JobID, in.Reason); err != nil {
+
+	if _, err := c.Tx.Exec(
+		ctx,
+		`UPDATE maintenance.jobs SET status = 'on_hold', hold_reason = $2, version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
+		in.JobID,
+		in.Reason,
+	); err != nil {
 		return Job{}, err
 	}
+
 	if err := m.event(ctx, c, in.JobID, "job.held", nil); err != nil {
 		return Job{}, err
 	}
+
 	return m.finish(ctx, c, in.JobID, "jobs.hold", "JobHeld", in.Reason)
 }
 
@@ -1533,7 +2127,11 @@ func (m Jobs) holdJob(ctx context.Context, c *ops.Call, in *ReasonInput) (Job, e
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/resume-hold [post]
-func (m Jobs) resumeHold(ctx context.Context, c *ops.Call, in *ReasonInput) (MaintenanceJob, error) {
+func (m Jobs) resumeHold(
+	ctx context.Context,
+	c *ops.Call,
+	in *ReasonInput,
+) (MaintenanceJob, error) {
 	return written(m.resumeHoldJob(ctx, c, in))
 }
 
@@ -1543,18 +2141,31 @@ func (m Jobs) resumeHoldJob(ctx context.Context, c *ops.Call, in *ReasonInput) (
 	if err != nil {
 		return Job{}, err
 	}
+
 	if status != "on_hold" {
 		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
 	}
-	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.jobs SET status = 'in_progress', hold_reason = NULL, version = version + 1, updated_at = platform.app_now() WHERE id = $1`, in.JobID); err != nil {
+
+	if _, err := c.Tx.Exec(
+		ctx,
+		`UPDATE maintenance.jobs SET status = 'in_progress', hold_reason = NULL, version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
+		in.JobID,
+	); err != nil {
 		return Job{}, err
 	}
-	if err := NewDraftFromLatest(ctx, c, in.JobID); err != nil { // a submitted report stays; work continues on a new draft (D06)
+
+	if err := NewDraftFromLatest(
+		ctx,
+		c,
+		in.JobID,
+	); err != nil { // a submitted report stays; work continues on a new draft (D06)
 		return Job{}, err
 	}
+
 	if err := m.event(ctx, c, in.JobID, "job.resumed", nil); err != nil {
 		return Job{}, err
 	}
+
 	return m.finish(ctx, c, in.JobID, "jobs.resumeHold", "JobResumed", in.Reason)
 }
 
@@ -1571,10 +2182,13 @@ func (in *NoteInput) Validate() map[string]string {
 	if in.JobID == uuid.Nil {
 		fe["jobId"] = "error.required"
 	}
+
 	trimmedReason(&in.Message, 2000, "message", fe)
+
 	if in.Visibility != "internal" && in.Visibility != "customer" {
 		fe["visibility"] = "error.invalid"
 	}
+
 	return fe
 }
 
@@ -1608,29 +2222,52 @@ func (m Jobs) addNote(ctx context.Context, c *ops.Call, in *NoteInput) (Note, er
 	if c.Principal.Role == "client" && in.Visibility != "customer" {
 		return Note{}, apperr.E(apperr.Forbidden, "error.forbidden")
 	}
+
 	status, err := m.lockJob(ctx, c, in.JobID)
 	if err != nil {
 		return Note{}, err
 	}
+
 	if status == "completed" || status == "cancelled" {
 		return Note{}, apperr.E(apperr.Conflict, "error.invalidState")
 	}
+
 	var note uuid.UUID
 	if err := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.job_notes (tenant_id, job_id, author_id, visibility, message, created_at)
-		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5) RETURNING id`, in.JobID, c.Principal.UserID, in.Visibility, in.Message, c.Now).Scan(&note); err != nil {
+		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5) RETURNING id`, in.JobID, c.Principal.UserID, in.Visibility, in.Message, c.Now).
+		Scan(&note); err != nil {
 		return Note{}, err
 	}
-	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.jobs SET version = version + 1, updated_at = platform.app_now() WHERE id = $1`, in.JobID); err != nil {
+
+	if _, err := c.Tx.Exec(
+		ctx,
+		`UPDATE maintenance.jobs SET version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
+		in.JobID,
+	); err != nil {
 		return Note{}, err
 	}
+
 	if err := m.event(ctx, c, in.JobID, "note.added", &note); err != nil {
 		return Note{}, err
 	}
+
 	if _, err := m.finish(ctx, c, in.JobID, "jobs.addNote", "JobNoteAdded", ""); err != nil {
 		return Note{}, err
 	}
-	x := Note{ID: note, Version: 1, CreatedAt: c.Now, UpdatedAt: c.Now, JobID: in.JobID, AuthorID: c.Principal.UserID, Visibility: in.Visibility, Message: in.Message}
-	err = c.Tx.QueryRow(ctx, `SELECT tenant_id, message FROM maintenance.job_notes WHERE id = $1`, note).Scan(&x.TenantID, &x.Message)
+
+	x := Note{
+		ID:         note,
+		Version:    1,
+		CreatedAt:  c.Now,
+		UpdatedAt:  c.Now,
+		JobID:      in.JobID,
+		AuthorID:   c.Principal.UserID,
+		Visibility: in.Visibility,
+		Message:    in.Message,
+	}
+	err = c.Tx.QueryRow(ctx, `SELECT tenant_id, message FROM maintenance.job_notes WHERE id = $1`, note).
+		Scan(&x.TenantID, &x.Message)
+
 	return x, err
 }
 
@@ -1651,29 +2288,43 @@ func RegisterJobs(r *ops.Registry, m Jobs) {
 // jobsOpen serves notify's QueryJobsOpen: of the jobs of one page of notices, those whose page opens for the caller —
 // jobs.get answers them, live or as the caller's history (IR602). Only a contractor's and a technician's job pages
 // can close while their notices stay readable; for the other roles every job is passed through.
-func (m Jobs) jobsOpen(ctx context.Context, c *ops.Call, in *notify.JobsOpenInput) ([]uuid.UUID, error) {
+func (m Jobs) jobsOpen(
+	ctx context.Context,
+	c *ops.Call,
+	in *notify.JobsOpenInput,
+) ([]uuid.UUID, error) {
 	if len(in.JobIDs) > 100 {
 		return nil, apperr.Fields(map[string]string{"jobIds": "error.range"})
 	}
+
 	out := []uuid.UUID{}
+
 	for _, id := range in.JobIDs {
 		if c.Principal.Role == "contractor" || c.Principal.Role == "technician" {
 			if _, _, err := m.projection(ctx, c, id); err != nil {
-				if code := apperr.From(err).Code; code == apperr.NotFound || code == apperr.Forbidden {
+				if code := apperr.From(
+					err,
+				).Code; code == apperr.NotFound ||
+					code == apperr.Forbidden {
 					continue
 				}
+
 				return nil, err
 			}
 		}
+
 		out = append(out, id)
 	}
+
 	return out, nil
 }
 
 func unmarshalSlots(raw []byte, out *[]Slot) error {
 	*out = []Slot{}
+
 	if len(raw) == 0 {
 		return nil
 	}
+
 	return json.Unmarshal(raw, out)
 }

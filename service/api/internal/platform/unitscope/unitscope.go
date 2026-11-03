@@ -37,10 +37,15 @@ const (
 // is readable by the caller. Arguments are appended to args.
 func SQL(c *ops.Call, args *[]any, unitExpr string, mode Mode) string {
 	p := c.Principal
-	add := func(v any) string { *args = append(*args, v); return fmt.Sprintf("$%d", len(*args)) }
+	add := func(v any) string {
+		*args = append(*args, v)
+
+		return fmt.Sprintf("$%d", len(*args))
+	}
 	unit := func(cond string) string {
 		return "EXISTS (SELECT 1 FROM assets.units su WHERE su.id = " + unitExpr + " AND " + cond + ")"
 	}
+
 	switch p.Role {
 	case "admin", "system":
 		return "TRUE"
@@ -48,38 +53,47 @@ func SQL(c *ops.Call, args *[]any, unitExpr string, mode Mode) string {
 		return unit("su.customer_org_id = " + add(p.OrgID))
 	case "contractor":
 		now := add(c.Now)
+
 		return "EXISTS (SELECT 1 FROM assets.unit_offer_access so WHERE so.unit_id = " + unitExpr +
 			" AND so.contractor_org_id = " + add(p.OrgID) + " AND so.access_valid_from <= " + now + " AND " + now + " < so.access_valid_until)"
 	case "technician":
 	default:
 		return "FALSE"
 	}
+
 	var parts []string
 	if ids := p.Scopes["organization"]; len(ids) > 0 {
 		parts = append(parts, "su.customer_org_id = ANY("+add(ids)+")")
 	}
+
 	if ids := p.Scopes["property"]; len(ids) > 0 {
 		parts = append(parts, "su.property_id = ANY("+add(ids)+")")
 	}
+
 	if ids := p.Scopes["unit"]; len(ids) > 0 {
 		parts = append(parts, "su.id = ANY("+add(ids)+")")
 	}
+
 	if len(parts) == 0 {
 		return "FALSE"
 	}
+
 	scope := unit("(" + strings.Join(parts, " OR ") + ")")
 	if p.Employment == "internal" {
 		return scope
 	}
+
 	return scope + " AND " + assignmentSQL(c, add, unitExpr, mode)
 }
 
 func assignmentSQL(c *ops.Call, add func(any) string, unitExpr string, mode Mode) string {
 	now := add(c.Now)
+
 	from := "sa.created_at"
 	if mode == Equipment {
 		from = "lower(sa.scheduled)"
 	}
+
 	return "EXISTS (SELECT 1 FROM assets.unit_assignment_access sa" +
 		" JOIN assets.unit_offer_access so ON so.job_id = sa.job_id AND so.access_valid_from <= " + now + " AND " + now + " < so.access_valid_until" +
 		" WHERE sa.unit_id = " + unitExpr + " AND sa.active AND sa.technician_membership_id = " + add(c.Principal.MembershipID) +
@@ -93,11 +107,17 @@ func EquipmentReadable(ctx context.Context, c *ops.Call, units []uuid.UUID) ([]u
 	if p.Role != "technician" || p.Employment == "internal" || len(units) == 0 {
 		return units, nil
 	}
+
 	args := []any{units}
-	rows, err := c.Tx.Query(ctx, "SELECT t.id FROM unnest($1::uuid[]) AS t(id) WHERE "+SQL(c, &args, "t.id", Equipment), args...)
+
+	rows, err := c.Tx.Query(
+		ctx,
+		"SELECT t.id FROM unnest($1::uuid[]) AS t(id) WHERE "+SQL(c, &args, "t.id", Equipment),
+		args...)
 	if err != nil {
 		return nil, err
 	}
+
 	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 }
 
@@ -108,14 +128,23 @@ func Gate(ctx context.Context, c *ops.Call, units []uuid.UUID) error {
 	if p.Role != "technician" || p.Employment == "internal" || len(units) == 0 {
 		return nil
 	}
+
 	args := []any{units}
-	q := "SELECT count(*) FROM unnest($1::uuid[]) AS t(id) WHERE NOT (" + SQL(c, &args, "t.id", Equipment) + ")"
+	q := "SELECT count(*) FROM unnest($1::uuid[]) AS t(id) WHERE NOT (" + SQL(
+		c,
+		&args,
+		"t.id",
+		Equipment,
+	) + ")"
+
 	var waiting int
 	if err := c.Tx.QueryRow(ctx, q, args...).Scan(&waiting); err != nil {
 		return err
 	}
+
 	if waiting > 0 {
 		return apperr.E(apperr.Forbidden, "errors.assignment_not_started")
 	}
+
 	return nil
 }

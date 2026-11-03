@@ -32,6 +32,7 @@ func CheckRange(from, to time.Time) error {
 		!from.Equal(from.Truncate(time.Minute)) || !to.Equal(to.Truncate(time.Minute)) {
 		return apperr.Fields(map[string]string{"period": "errors.energy_range"})
 	}
+
 	return nil
 }
 
@@ -39,27 +40,44 @@ func CheckRange(from, to time.Time) error {
 // then lowest ID) counts only when measured, valid, in kW and on the ac_input_electricity boundary; its value / 60
 // is the slot energy. Later samples within a slot are never substituted. The samples are energy's copy of the
 // minute-slot power measurements (IR189).
-func Integrate(ctx context.Context, c *ops.Call, units []uuid.UUID, from, to time.Time) (Integration, error) {
+func Integrate(
+	ctx context.Context,
+	c *ops.Call,
+	units []uuid.UUID,
+	from, to time.Time,
+) (Integration, error) {
 	out := Integration{ExpectedSlots: len(units) * int(to.Sub(from)/time.Minute)}
 	if len(units) == 0 {
 		return out, nil
 	}
-	rows, err := c.Tx.Query(ctx, `SELECT DISTINCT ON (unit_id, observed_at) value, unit, origin, quality, boundary_id
+
+	rows, err := c.Tx.Query(
+		ctx,
+		`SELECT DISTINCT ON (unit_id, observed_at) value, unit, origin, quality, boundary_id
 		FROM energy.ref_power_samples WHERE unit_id = ANY($1) AND observed_at >= $2 AND observed_at < $3
-		ORDER BY unit_id, observed_at, sequence DESC, event_id::text ASC`, units, from, to)
+		ORDER BY unit_id, observed_at, sequence DESC, event_id::text ASC`,
+		units,
+		from,
+		to,
+	)
 	if err != nil {
 		return out, err
 	}
 	defer rows.Close()
+
 	sum := new(big.Rat)
 	warn := map[string]bool{}
+
 	for rows.Next() {
-		var v *float64
-		var unit, origin, quality string
-		var boundary *string
+		var (
+			v                     *float64
+			unit, origin, quality string
+			boundary              *string
+		)
 		if err := rows.Scan(&v, &unit, &origin, &quality, &boundary); err != nil {
 			return out, err
 		}
+
 		switch {
 		case origin != "measured":
 			warn["non_measured_input"] = true
@@ -68,23 +86,29 @@ func Integrate(ctx context.Context, c *ops.Call, units []uuid.UUID, from, to tim
 		case quality != "valid" || v == nil || unit != "kW":
 		default:
 			out.ValidSlots++
+
 			sum.Add(sum, new(big.Rat).Quo(new(big.Rat).SetFloat64(*v), big.NewRat(60, 1)))
 		}
 	}
+
 	if err := rows.Err(); err != nil {
 		return out, err
 	}
+
 	if out.ValidSlots > 0 {
 		out.KWh = sum
 	}
+
 	if out.ValidSlots < out.ExpectedSlots {
 		warn["partial_coverage"] = true
 	}
+
 	for _, k := range []string{"non_measured_input", "boundary_mismatch", "partial_coverage"} {
 		if warn[k] {
 			out.Warnings = append(out.Warnings, k)
 		}
 	}
+
 	return out, nil
 }
 
@@ -93,6 +117,8 @@ func Float(r *big.Rat) *float64 {
 	if r == nil {
 		return nil
 	}
+
 	f, _ := r.Float64()
+
 	return &f
 }

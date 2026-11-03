@@ -35,14 +35,18 @@ func (w *Window) Allow(ctx context.Context, key string) (int, error) {
 	if w.Now != nil {
 		now = w.Now()
 	}
+
 	start := now.Truncate(w.Window)
+
 	n, err := w.Store.Incr(ctx, fmt.Sprintf("%s%s:%d", w.Prefix, key, start.Unix()), 2*w.Window)
 	if err != nil {
 		return 0, err
 	}
+
 	if n <= int64(w.Limit) {
 		return 0, nil
 	}
+
 	return max(1, int(math.Ceil(start.Add(w.Window).Sub(now).Seconds()))), nil
 }
 
@@ -55,7 +59,9 @@ func NewValkey(url string) (Valkey, error) {
 	if err != nil {
 		return Valkey{}, err
 	}
+
 	opt.DialTimeout, opt.ReadTimeout, opt.WriteTimeout = time.Second, 500*time.Millisecond, 500*time.Millisecond
+
 	return Valkey{Client: redis.NewClient(opt)}, nil
 }
 
@@ -64,9 +70,11 @@ func (v Valkey) Incr(ctx context.Context, key string, ttl time.Duration) (int64,
 	pipe := v.Client.TxPipeline()
 	n := pipe.Incr(ctx, key)
 	pipe.Expire(ctx, key, ttl)
+
 	if _, err := pipe.Exec(ctx); err != nil {
 		return 0, err
 	}
+
 	return n.Val(), nil
 }
 
@@ -80,9 +88,12 @@ type Memory struct {
 func (m *Memory) Incr(_ context.Context, key string, _ time.Duration) (int64, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
 	if m.n == nil {
 		m.n = map[string]int64{}
 	}
+
 	m.n[key]++
+
 	return m.n[key], nil
 }

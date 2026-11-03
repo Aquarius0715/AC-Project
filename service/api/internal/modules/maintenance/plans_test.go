@@ -6,7 +6,11 @@ import (
 )
 
 func TestNextOccurrence(t *testing.T) {
-	d := func(s string) time.Time { v, _ := time.Parse(time.RFC3339, s); return v }
+	d := func(s string) time.Time {
+		v, _ := time.Parse(time.RFC3339, s)
+
+		return v
+	}
 	for _, c := range []struct {
 		from     string
 		months   int
@@ -20,7 +24,14 @@ func TestNextOccurrence(t *testing.T) {
 		{"2028-01-30T00:00:00Z", 1, 30, "2028-02-29T00:00:00Z"},
 	} {
 		if got := NextOccurrence(d(c.from), c.months, c.anchor); !got.Equal(d(c.expected)) {
-			t.Errorf("%s +%d (day %d): %s want %s", c.from, c.months, c.anchor, got.Format(time.RFC3339), c.expected)
+			t.Errorf(
+				"%s +%d (day %d): %s want %s",
+				c.from,
+				c.months,
+				c.anchor,
+				got.Format(time.RFC3339),
+				c.expected,
+			)
 		}
 	}
 }

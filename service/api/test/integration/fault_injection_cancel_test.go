@@ -14,15 +14,27 @@ func TestCancelRollsBackWhenTheStatusCannotBeWritten(t *testing.T) {
 	s := server(t)
 	_, m := write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
 	job := data(m)["id"].(string)
-	owner(t, `UPDATE maintenance.jobs SET status = 'on_hold', hold_reason = 'parts' WHERE id = $1`, job)
+	owner(
+		t,
+		`UPDATE maintenance.jobs SET status = 'on_hold', hold_reason = 'parts' WHERE id = $1`,
+		job,
+	)
 	_, m = post(s, &hq, "jobs.get", `{"jobId":"`+job+`"}`)
 	version := ver(m)
 
 	broken := injectAt(t, "UPDATE maintenance.jobs SET status = 'cancelled'")
-	code, m := write(broken, &hq, "jobs.cancel", `{"jobId":"`+job+`","cancelReason":"customer withdrew"}`, version)
+
+	code, m := write(
+		broken,
+		&hq,
+		"jobs.cancel",
+		`{"jobId":"`+job+`","cancelReason":"customer withdrew"}`,
+		version,
+	)
 	if code < 500 {
 		t.Fatalf("cancel with a failing status write: %d %v, want a server error", code, m)
 	}
+
 	_, m = post(s, &hq, "jobs.get", `{"jobId":"`+job+`"}`)
 	if data(m)["status"] != "on_hold" || ver(m) != version {
 		t.Errorf("a failed cancel changed the job: %v", m)

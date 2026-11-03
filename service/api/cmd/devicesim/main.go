@@ -25,79 +25,123 @@ import (
 
 func main() {
 	broker := flag.String("broker", envOr("MQTT_URL", "tcp://localhost:1883"), "MQTT broker URL")
-	tenant := flag.String("tenant", seed.ID("tenant-a").String(), "tenant ID the devices belong to (the demo tenant by default)")
-	names := flag.String("devices", strings.Join(demoDevices(), ","), "comma-separated fixture device IDs (demoSeed.devices); their API IDs are derived with seed.ID")
+	tenant := flag.String(
+		"tenant",
+		seed.ID("tenant-a").String(),
+		"tenant ID the devices belong to (the demo tenant by default)",
+	)
+	names := flag.String(
+		"devices",
+		strings.Join(demoDevices(), ","),
+		"comma-separated fixture device IDs (demoSeed.devices); their API IDs are derived with seed.ID",
+	)
 	firmware := flag.String("firmware", "v1", "firmware version the modules report")
-	interval := flag.Duration("telemetry-interval", time.Minute, "time between telemetry batches (design: every minute)")
-	beat := flag.Duration("heartbeat-interval", time.Minute, "time between heartbeats (design: every 60 seconds)")
-	withFleet := flag.Bool("fleet", true, "also run the mock fleet (internal/devicesim/fleet.json): one module per state pattern")
+	interval := flag.Duration(
+		"telemetry-interval",
+		time.Minute,
+		"time between telemetry batches (design: every minute)",
+	)
+	beat := flag.Duration(
+		"heartbeat-interval",
+		time.Minute,
+		"time between heartbeats (design: every 60 seconds)",
+	)
+	withFleet := flag.Bool(
+		"fleet",
+		true,
+		"also run the mock fleet (internal/devicesim/fleet.json): one module per state pattern",
+	)
+
 	flag.Parse()
+
 	if *names == "" {
 		log.Fatal("--devices must name at least one device")
 	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	var modules []*devicesim.Module
+
 	beats := map[*devicesim.Module]bool{} // modules that send heartbeats (a module that is not online sends none)
-	for _, name := range strings.Split(*names, ",") {
+
+	for name := range strings.SplitSeq(*names, ",") {
 		name = strings.TrimSpace(name)
 		if name == "" {
 			continue
 		}
+
 		m, beating := fixtureModule(*tenant, name, *firmware)
 		modules = append(modules, m)
 		beats[m] = beating
 	}
+
 	if *withFleet {
 		fleet, err := devicesim.MockFleet()
 		if err != nil {
 			log.Fatal(err)
 		}
+
 		for _, p := range fleet.Patterns {
 			if p.NoDevice {
 				continue
 			}
+
 			id := seed.ID(devicesim.DeviceName(p)).String()
 			powerOff := p.PowerSignal == "off" || (p.State.Power != nil && !*p.State.Power)
-			m := devicesim.NewModule(*tenant, id, fleet.FirmwareOf(p), seedOf(id)).Behave(p.Telemetry, p.Commands, powerOff).
-				Reports(p.State.Power, p.State.Celsius, p.State.Mode, p.State.FanLevel) // the fleet's units show their state live
+			m := devicesim.NewModule(*tenant, id, fleet.FirmwareOf(p), seedOf(id)).
+				Behave(p.Telemetry, p.Commands, powerOff).
+				Reports(p.State.Power, p.State.Celsius, p.State.Mode, p.State.FanLevel)
+				// the fleet's units show their state live
 			modules = append(modules, m)
 			beats[m] = p.Connection == "online"
 		}
 	}
 	// the subscriptions are made on every connect: a clean session loses them when the broker restarts
-	opts := mqtt.NewClientOptions().AddBroker(*broker).SetClientID("devicesim-" + clientTag(*tenant)).
-		SetUsername(os.Getenv("MQTT_USER")).SetPassword(os.Getenv("MQTT_PASSWORD")).
-		SetAutoReconnect(true).SetConnectRetry(true).SetKeepAlive(60 * time.Second).
+	opts := mqtt.NewClientOptions().
+		AddBroker(*broker).
+		SetClientID("devicesim-" + clientTag(*tenant)).
+		SetUsername(os.Getenv("MQTT_USER")).
+		SetPassword(os.Getenv("MQTT_PASSWORD")).
+		SetAutoReconnect(true).
+		SetConnectRetry(true).
+		SetKeepAlive(60 * time.Second).
 		SetOnConnectHandler(func(c mqtt.Client) { subscribe(c, modules) }).
 		SetConnectionLostHandler(func(_ mqtt.Client, err error) { log.Printf("broker %s: connection lost: %v", *broker, err) })
+
 	client := mqtt.NewClient(opts)
 	if tok := client.Connect(); tok.Wait() && tok.Error() != nil {
 		log.Fatalf("connect %s: %v", *broker, tok.Error())
 	}
 	defer client.Disconnect(500)
+
 	log.Printf("devicesim: %d modules on %s", len(modules), *broker)
 
 	telemetry := time.NewTicker(*interval)
 	heartbeat := time.NewTicker(*beat)
+
 	defer telemetry.Stop()
 	defer heartbeat.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			log.Print("devicesim: stopping")
+
 			return
 		case now := <-telemetry.C:
 			for _, m := range modules {
 				raw, err := m.Telemetry(now)
 				if err != nil {
 					log.Printf("telemetry %s: %v", m.DeviceID, err)
+
 					continue
 				}
+
 				if raw == nil { // a silent pattern reports nothing
 					continue
 				}
+
 				publish(client, m.TelemetryTopic(), raw)
 			}
 		case now := <-heartbeat.C:
@@ -105,11 +149,14 @@ func main() {
 				if !beats[m] {
 					continue
 				}
+
 				raw, err := m.Beat(now)
 				if err != nil {
 					log.Printf("heartbeat %s: %v", m.DeviceID, err)
+
 					continue
 				}
+
 				publish(client, m.HeartbeatTopic(), raw)
 			}
 		}
@@ -120,6 +167,7 @@ func main() {
 func publish(c mqtt.Client, topic string, payload []byte) {
 	tok := c.Publish(topic, 1, false, payload)
 	tok.Wait()
+
 	if tok.Error() != nil {
 		log.Printf("publish %s: %v", topic, tok.Error())
 	}
@@ -130,6 +178,7 @@ func clientTag(tenant string) string {
 	if len(tenant) > 8 {
 		return tenant[:8]
 	}
+
 	return tenant
 }
 
@@ -139,12 +188,14 @@ func clientTag(tenant string) string {
 // without a link is taken as online.
 func fixtureModule(tenant, name, firmware string) (*devicesim.Module, bool) {
 	id := seed.ID(name).String()
+
 	m := devicesim.NewModule(tenant, id, firmware, seedOf(id)).Only(sensorsOf(name)...)
 	for _, l := range iotbridge.Links {
 		if l.Device == name && l.Connection != "online" {
 			return m.Behave("silent", "ignore", false), false
 		}
 	}
+
 	return m, true
 }
 
@@ -156,9 +207,11 @@ func sensorsOf(device string) []string {
 			for name := range l.Sensors {
 				out = append(out, name)
 			}
+
 			return out
 		}
 	}
+
 	return nil
 }
 
@@ -168,6 +221,7 @@ func demoDevices() []string {
 	for _, l := range iotbridge.Links {
 		out = append(out, l.Device)
 	}
+
 	return out
 }
 
@@ -175,6 +229,7 @@ func demoDevices() []string {
 func seedOf(id string) uint64 {
 	h := fnv.New64a()
 	_, _ = h.Write([]byte(id))
+
 	return h.Sum64()
 }
 
@@ -182,6 +237,7 @@ func envOr(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
 	}
+
 	return def
 }
 
@@ -191,7 +247,6 @@ func envOr(key, def string) string {
 // logged, and the next reconnect tries again.
 func subscribe(client mqtt.Client, modules []*devicesim.Module) {
 	for _, m := range modules {
-		m := m
 		tok := client.Subscribe(m.KeptTopic(), 1, func(_ mqtt.Client, msg mqtt.Message) {
 			if err := m.Restore(msg.Payload()); err != nil {
 				log.Printf("kept %s: %v", m.DeviceID, err)
@@ -201,26 +256,40 @@ func subscribe(client mqtt.Client, modules []*devicesim.Module) {
 			log.Printf("subscribe %s: %v", m.KeptTopic(), tok.Error())
 		}
 	}
+
 	for _, m := range modules {
-		m := m
 		tok := client.Subscribe(m.CommandTopic(), 1, func(_ mqtt.Client, msg mqtt.Message) {
 			raw, sendAt, err := m.Acknowledge(msg.Payload(), time.Now())
 			if err != nil {
 				log.Printf("command %s: %v", m.DeviceID, err)
+
 				return
 			}
+
 			if kept, err := m.Keep(); err == nil { // retained, so the next start reads it back
-				if tok := client.Publish(m.KeptTopic(), 1, true, kept); tok.Wait() && tok.Error() != nil {
+				if tok := client.Publish(
+					m.KeptTopic(),
+					1,
+					true,
+					kept,
+				); tok.Wait() &&
+					tok.Error() != nil {
 					log.Printf("publish %s: %v", m.KeptTopic(), tok.Error())
 				}
 			}
+
 			if raw == nil { // the pattern never answers
 				return
 			}
-			if wait := time.Until(sendAt); wait > 0 { // the pattern answers after the command expired
+
+			if wait := time.Until(
+				sendAt,
+			); wait > 0 { // the pattern answers after the command expired
 				time.AfterFunc(wait, func() { publish(client, m.AckTopic(), raw) })
+
 				return
 			}
+
 			publish(client, m.AckTopic(), raw)
 		})
 		if tok.Wait() && tok.Error() != nil {

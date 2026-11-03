@@ -35,6 +35,7 @@ type Query struct {
 // HasFilters reports whether the query carries any filter (an empty object and null carry none).
 func (q Query) HasFilters() bool {
 	raw := strings.TrimSpace(string(q.Filters))
+
 	return raw != "" && raw != "null" && raw != "{}"
 }
 
@@ -43,6 +44,7 @@ func NoFilters(q Query, field string) error {
 	if q.HasFilters() {
 		return apperr.Fields(map[string]string{field: "error.invalid"})
 	}
+
 	return nil
 }
 
@@ -75,35 +77,45 @@ func Resolve(q Query, conditions any, scopeVersion, snapshot int) (Window, error
 		if *q.Limit < 1 || *q.Limit > MaxLimit {
 			return w, apperr.Fields(map[string]string{"limit": "error.range"})
 		}
+
 		w.Limit = *q.Limit
 	}
+
 	if q.Sort != nil {
 		if q.Sort.Direction != "asc" && q.Sort.Direction != "desc" {
 			return w, apperr.Fields(map[string]string{"sort.direction": "error.invalid"})
 		}
 	}
+
 	b, _ := json.Marshal(struct {
 		C any       `json:"c"`
 		S *SortSpec `json:"s"`
 		L int       `json:"l"`
 	}{conditions, q.Sort, w.Limit})
 	sum := sha256.Sum256(b)
+
 	w.hash = hex.EncodeToString(sum[:8])
 	if q.Cursor == nil || *q.Cursor == "" {
 		return w, nil
 	}
+
 	raw, err := base64.RawURLEncoding.DecodeString(*q.Cursor)
+
 	var c cursor
 	if err != nil || json.Unmarshal(raw, &c) != nil || c.Offset < 0 {
 		return w, apperr.Fields(map[string]string{"cursor": "error.invalid"})
 	}
+
 	if c.Hash != w.hash {
 		return w, apperr.Fields(map[string]string{"cursor": "error.queryChanged"})
 	}
+
 	if c.Scope != scopeVersion || c.Snapshot != snapshot {
 		return w, apperr.E(apperr.Conflict, "error.cursorExpired")
 	}
+
 	w.Offset = c.Offset
+
 	return w, nil
 }
 
@@ -112,8 +124,12 @@ func (w Window) Next(total int) *string {
 	if w.Offset+w.Limit >= total {
 		return nil
 	}
-	b, _ := json.Marshal(cursor{Hash: w.hash, Scope: w.scope, Snapshot: w.Snapshot, Offset: w.Offset + w.Limit})
+
+	b, _ := json.Marshal(
+		cursor{Hash: w.hash, Scope: w.scope, Snapshot: w.Snapshot, Offset: w.Offset + w.Limit},
+	)
 	s := base64.RawURLEncoding.EncodeToString(b)
+
 	return &s
 }
 
@@ -122,21 +138,26 @@ func OrderBy(s *SortSpec, allowed map[string]string, def string) (string, error)
 	if s == nil {
 		return def, nil
 	}
+
 	col, ok := allowed[s.Field]
 	if !ok {
 		return "", apperr.Fields(map[string]string{"sort.field": "error.invalid"})
 	}
+
 	dir, err := Direction(s)
 	if err != nil {
 		return "", err
 	}
+
 	if s.Field == "id" {
 		return col + " " + dir, nil
 	}
+
 	tie := "id"
 	if idCol, ok := allowed["id"]; ok {
 		tie = idCol // qualified tie-breaker, unambiguous in joins
 	}
+
 	return col + " " + dir + ", " + tie + " ASC", nil
 }
 
@@ -149,6 +170,7 @@ func Direction(s *SortSpec) (string, error) {
 	case "desc":
 		return "DESC", nil
 	}
+
 	return "", apperr.Fields(map[string]string{"sort.direction": "error.invalid"})
 }
 
@@ -168,23 +190,30 @@ func SortSlice[T any](items []T, s *SortSpec, keys map[string]func(a, b T) int) 
 	if s == nil {
 		return nil
 	}
+
 	cmp, ok := keys[s.Field]
 	if !ok {
 		return apperr.Fields(map[string]string{"sort.field": "error.invalid"})
 	}
+
 	if s.Direction != "asc" && s.Direction != "desc" {
 		return apperr.Fields(map[string]string{"sort.direction": "error.invalid"})
 	}
+
 	id := keys["id"]
+
 	slices.SortStableFunc(items, func(a, b T) int {
 		c := cmp(a, b)
 		if s.Direction == "desc" {
 			c = -c
 		}
+
 		if c == 0 && id != nil && s.Field != "id" {
 			c = id(a, b)
 		}
+
 		return c
 	})
+
 	return nil
 }

@@ -16,42 +16,84 @@ import (
 func TestDemoStateReport(t *testing.T) {
 	s := serverWith(t, true)
 	unit, device := seed.ID("unit-limited"), seed.ID("device-limited")
+
 	var state, seen string
-	ownerScan(t, `SELECT observed_state::text, COALESCE(last_seen_at::text, '') FROM assets.units WHERE id = $1`, []any{unit}, &state, &seen)
+	ownerScan(
+		t,
+		`SELECT observed_state::text, COALESCE(last_seen_at::text, '') FROM assets.units WHERE id = $1`,
+		[]any{unit},
+		&state,
+		&seen,
+	)
 	t.Cleanup(func() {
-		owner(t, `UPDATE assets.units SET observed_state = $2::jsonb, last_seen_at = NULLIF($3, '')::timestamptz WHERE id = $1`, unit, state, seen)
+		owner(
+			t,
+			`UPDATE assets.units SET observed_state = $2::jsonb, last_seen_at = NULLIF($3, '')::timestamptz WHERE id = $1`,
+			unit,
+			state,
+			seen,
+		)
 	})
+
 	report := func(at time.Time, st string) (int, map[string]any) {
-		return write(s, &customerB, "demo.trigger", `{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+at.Format(time.RFC3339)+
-			`","eventType":"state","deviceId":"`+device.String()+`"`+st+`}`, 0)
+		return write(
+			s,
+			&customerB,
+			"demo.trigger",
+			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+at.Format(
+				time.RFC3339,
+			)+
+				`","eventType":"state","deviceId":"`+device.String()+`"`+st+`}`,
+			0,
+		)
 	}
+
 	at := clock.Add(-30 * time.Second)
-	if code, m := report(at, `,"state":{"power":false,"celsius":27,"mode":"dry","fanLevel":"high"}`); code != 200 {
+	if code, m := report(
+		at,
+		`,"state":{"power":false,"celsius":27,"mode":"dry","fanLevel":"high"}`,
+	); code != 200 {
 		t.Fatalf("state report: %d %v", code, m)
 	}
+
 	_, m := post(s, &hq, "units.get", `{"id":"`+unit.String()+`"}`)
+
 	o := data(m)["observedState"].(map[string]any)
-	if o["power"] != false || o["celsius"] != 27.0 || o["mode"] != "dry" || o["fanLevel"] != "high" || o["observedAt"] != at.Format(time.RFC3339) {
+	if o["power"] != false || o["celsius"] != 27.0 || o["mode"] != "dry" ||
+		o["fanLevel"] != "high" ||
+		o["observedAt"] != at.Format(time.RFC3339) {
 		t.Errorf("observed state %v", o)
 	}
+
 	var last time.Time
 	ownerScan(t, `SELECT last_seen_at FROM assets.units WHERE id = $1`, []any{unit}, &last)
+
 	if !last.Equal(at) && last.Before(at) {
 		t.Errorf("last seen %v, want at least %v", last, at)
 	}
 	// a report with no settings (a module that reports none, IR528) is heard only: the observed state stays
 	later := clock.Add(-10 * time.Second)
-	if code, m := report(later, `,"state":{"power":null,"celsius":null,"mode":null,"fanLevel":null}`); code != 200 {
+	if code, m := report(
+		later,
+		`,"state":{"power":null,"celsius":null,"mode":null,"fanLevel":null}`,
+	); code != 200 {
 		t.Fatalf("heard-only report: %d %v", code, m)
 	}
+
 	_, m = post(s, &hq, "units.get", `{"id":"`+unit.String()+`"}`)
-	if o := data(m)["observedState"].(map[string]any); o["power"] != false || o["celsius"] != 27.0 || o["mode"] != "dry" || o["observedAt"] != at.Format(time.RFC3339) {
+	if o := data(m)["observedState"].(map[string]any); o["power"] != false ||
+		o["celsius"] != 27.0 ||
+		o["mode"] != "dry" ||
+		o["observedAt"] != at.Format(time.RFC3339) {
 		t.Errorf("a report with no settings changed the observed state: %v", o)
 	}
+
 	ownerScan(t, `SELECT last_seen_at FROM assets.units WHERE id = $1`, []any{unit}, &last)
+
 	if last.Before(later) {
 		t.Errorf("last seen %v after a report at %v", last, later)
 	}
+
 	for name, c := range map[string]struct {
 		at    time.Time
 		state string

@@ -31,21 +31,30 @@ func RegisterQueries(r *ops.Registry) {
 
 // overdue sums unpaid invoices past due on contracts covering the units, by currency.
 func overdue(ctx context.Context, c *ops.Call, in *OverdueInput) ([]Overdue, error) {
-	rows, err := c.Tx.Query(ctx, `SELECT i.currency, count(*), sum(i.amount_minor) FROM billing.invoices i
+	rows, err := c.Tx.Query(
+		ctx,
+		`SELECT i.currency, count(*), sum(i.amount_minor) FROM billing.invoices i
 		WHERE i.status = 'unpaid' AND i.due_at < $2
 		  AND EXISTS (SELECT 1 FROM billing.contract_units cu WHERE cu.contract_id = i.contract_id AND cu.contract_version = i.contract_version AND cu.unit_id = ANY($1))
-		GROUP BY i.currency ORDER BY i.currency`, in.UnitIDs, c.Now)
+		GROUP BY i.currency ORDER BY i.currency`,
+		in.UnitIDs,
+		c.Now,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
+
 	out := []Overdue{}
+
 	for rows.Next() {
 		var o Overdue
 		if err := rows.Scan(&o.Currency, &o.Count, &o.AmountMinor); err != nil {
 			return nil, err
 		}
+
 		out = append(out, o)
 	}
+
 	return out, rows.Err()
 }

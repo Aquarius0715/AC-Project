@@ -48,6 +48,7 @@ type MembershipInput struct {
 // TechnicianResult is QueryTechnician output.
 type TechnicianResult struct {
 	Technician
+
 	Found bool `json:"found"`
 }
 
@@ -75,82 +76,115 @@ func nonReaders(ctx context.Context, c *ops.Call, in *NonReadersInput) ([]uuid.U
 	if err != nil {
 		return nil, err
 	}
+
 	ok := map[uuid.UUID]bool{}
+
 	readers, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 	if err != nil {
 		return nil, err
 	}
+
 	for _, id := range readers {
 		ok[id] = true
 	}
+
 	bad := []uuid.UUID{}
+
 	for _, id := range in.IDs {
 		if !ok[id] {
 			bad = append(bad, id)
 		}
 	}
+
 	return bad, nil
 }
 
 func orgState(ctx context.Context, c *ops.Call, in *OrgInput) (OrgStateResult, error) {
 	var r OrgStateResult
-	err := c.Tx.QueryRow(ctx, `SELECT kind, status FROM identity.organizations WHERE id = $1`, in.OrgID).Scan(&r.Kind, &r.Status)
+
+	err := c.Tx.QueryRow(ctx, `SELECT kind, status FROM identity.organizations WHERE id = $1`, in.OrgID).
+		Scan(&r.Kind, &r.Status)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return OrgStateResult{}, nil
 	}
+
 	r.Found = err == nil
+
 	return r, err
 }
 
 func orgName(ctx context.Context, c *ops.Call, in *OrgInput) (string, error) {
 	var name string
-	err := c.Tx.QueryRow(ctx, `SELECT name FROM identity.organizations WHERE id = $1`, in.OrgID).Scan(&name)
+
+	err := c.Tx.QueryRow(ctx, `SELECT name FROM identity.organizations WHERE id = $1`, in.OrgID).
+		Scan(&name)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", apperr.E(apperr.NotFound, "error.notFound")
 	}
+
 	return name, err
 }
 
 func technician(ctx context.Context, c *ops.Call, in *MembershipInput) (TechnicianResult, error) {
-	var t TechnicianResult
-	var emp *string
-	var from time.Time
-	var until *time.Time
+	var (
+		t     TechnicianResult
+		emp   *string
+		from  time.Time
+		until *time.Time
+	)
+
 	err := c.Tx.QueryRow(ctx, `SELECT organization_id, employment, valid_from, valid_until FROM identity.memberships WHERE id = $1 AND role = 'technician'`, in.MembershipID).
 		Scan(&t.OrgID, &emp, &from, &until)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return TechnicianResult{}, nil
 	}
+
 	if err != nil {
 		return t, err
 	}
+
 	if emp != nil {
 		t.Employment = *emp
 	}
+
 	t.Active = !from.After(c.Now) && (until == nil || until.After(c.Now))
 	t.ValidUntil = until
 	t.Scopes = map[string][]uuid.UUID{}
-	rows, err := c.Tx.Query(ctx, `SELECT kind, ref_id FROM identity.membership_scopes WHERE membership_id = $1`, in.MembershipID)
+
+	rows, err := c.Tx.Query(
+		ctx,
+		`SELECT kind, ref_id FROM identity.membership_scopes WHERE membership_id = $1`,
+		in.MembershipID,
+	)
 	if err != nil {
 		return t, err
 	}
 	defer rows.Close()
+
 	for rows.Next() {
-		var k string
-		var id uuid.UUID
+		var (
+			k  string
+			id uuid.UUID
+		)
 		if err := rows.Scan(&k, &id); err != nil {
 			return t, err
 		}
+
 		t.Scopes[k] = append(t.Scopes[k], id)
 	}
+
 	t.Found = true
+
 	return t, rows.Err()
 }
 
 func qualified(ctx context.Context, c *ops.Call, in *QualifiedInput) (bool, error) {
 	var n int
+
 	err := c.Tx.QueryRow(ctx, `SELECT count(DISTINCT code) FROM identity.qualification_grants WHERE membership_id = $1 AND code = ANY($2)
-		AND valid_from <= $3 AND valid_until >= $4 AND revoked_at IS NULL`, in.MembershipID, in.Codes, in.Start, in.End).Scan(&n)
+		AND valid_from <= $3 AND valid_until >= $4 AND revoked_at IS NULL`, in.MembershipID, in.Codes, in.Start, in.End).
+		Scan(&n)
+
 	return n == len(in.Codes), err
 }
 
@@ -163,13 +197,29 @@ func GrantHandlers() map[string]events.Handler {
 			if err := e.Decode(&g); err != nil {
 				return err
 			}
-			tag, err := tx.Exec(ctx, `UPDATE identity.qualification_grants SET valid_from = $3, valid_until = $4, revoked_at = NULL WHERE membership_id = $1 AND code = $2`,
-				g.MembershipID, g.Code, g.ValidFrom, g.ValidUntil)
+
+			tag, err := tx.Exec(
+				ctx,
+				`UPDATE identity.qualification_grants SET valid_from = $3, valid_until = $4, revoked_at = NULL WHERE membership_id = $1 AND code = $2`,
+				g.MembershipID,
+				g.Code,
+				g.ValidFrom,
+				g.ValidUntil,
+			)
 			if err != nil || tag.RowsAffected() > 0 {
 				return err
 			}
-			_, err = tx.Exec(ctx, `INSERT INTO identity.qualification_grants (tenant_id, membership_id, code, valid_from, valid_until) VALUES ($1, $2, $3, $4, $5)`,
-				e.TenantID, g.MembershipID, g.Code, g.ValidFrom, g.ValidUntil)
+
+			_, err = tx.Exec(
+				ctx,
+				`INSERT INTO identity.qualification_grants (tenant_id, membership_id, code, valid_from, valid_until) VALUES ($1, $2, $3, $4, $5)`,
+				e.TenantID,
+				g.MembershipID,
+				g.Code,
+				g.ValidFrom,
+				g.ValidUntil,
+			)
+
 			return err
 		},
 	}

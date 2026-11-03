@@ -33,7 +33,9 @@ var resultsDecidedAtRunTime = map[string]string{
 
 // resultFieldsNeverAnswered are contract fields an operation never answers, with the reason.
 var resultFieldsNeverAnswered = map[string]map[string]string{
-	"writes.getResult": {"error": "the failed variant: a rejected write leaves no record, so it reads as not_received (IR118)"},
+	"writes.getResult": {
+		"error": "the failed variant: a rejected write leaves no record, so it reads as not_received (IR118)",
+	},
 }
 
 // TestResultsMatchContract: every operation's result type answers exactly the fields of its contract result (IR392),
@@ -43,10 +45,12 @@ var resultFieldsNeverAnswered = map[string]map[string]string{
 // follows the contract.
 func TestResultsMatchContract(t *testing.T) {
 	s := serverCfg(t, func(c *apiserver.Config) { c.Domains = ops.Domains })
+
 	raw, err := os.ReadFile("../../../web/shared/lib/contractResults.gen.json")
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	var contract map[string]struct {
 		Fields []string  `json:"fields"`
 		Items  *[]string `json:"items"`
@@ -54,78 +58,114 @@ func TestResultsMatchContract(t *testing.T) {
 	if err := json.Unmarshal(raw, &contract); err != nil {
 		t.Fatal(err)
 	}
-	marshaler := reflect.TypeOf((*json.Marshaler)(nil)).Elem()
+
+	marshaler := reflect.TypeFor[json.Marshaler]()
 	plain := func(rt reflect.Type) bool {
 		for rt.Kind() == reflect.Pointer {
 			rt = rt.Elem()
 		}
-		return rt.Kind() != reflect.Interface && !rt.Implements(marshaler) && !reflect.PointerTo(rt).Implements(marshaler)
+
+		return rt.Kind() != reflect.Interface && !rt.Implements(marshaler) &&
+			!reflect.PointerTo(rt).Implements(marshaler)
 	}
 	compare := func(what string, rt reflect.Type, want []string, never map[string]string) {
 		got := map[string]bool{}
 		inputFields(rt, got)
+
 		var extra, missing []string
+
 		for f := range got {
 			if !slices.Contains(want, f) {
 				extra = append(extra, f)
 			}
 		}
+
 		for _, f := range want {
 			if _, ok := never[f]; !got[f] && !ok {
 				missing = append(missing, f)
 			}
 		}
+
 		slices.Sort(extra)
 		slices.Sort(missing)
+
 		if len(extra) > 0 {
 			t.Errorf("%s (%s) answers fields outside the contract: %v", what, rt, extra)
 		}
+
 		if len(missing) > 0 {
 			t.Errorf("%s (%s) never answers contract fields: %v", what, rt, missing)
 		}
 	}
 	checked := 0
+
 	for _, op := range s.Registry.Operations() {
 		name := op.Spec.Name
+
 		want, ok := contract[name]
 		if !ok {
 			t.Errorf("%s is registered but not in the contract", name)
+
 			continue
 		}
+
 		if _, ok := resultsDecidedAtRunTime[name]; ok {
 			continue
 		}
+
 		rt := op.Result
 		for rt.Kind() == reflect.Pointer {
 			rt = rt.Elem()
 		}
+
 		if !plain(rt) {
-			t.Errorf("%s answers %s, whose fields are decided at run time: give it a plain result type or list it with the reason", name, rt)
+			t.Errorf(
+				"%s answers %s, whose fields are decided at run time: give it a plain result type or list it with the reason",
+				name,
+				rt,
+			)
+
 			continue
 		}
+
 		checked++
+
 		if rt.Kind() == reflect.Slice {
 			if want.Items == nil {
 				t.Errorf("%s answers an array, the contract does not", name)
+
 				continue
 			}
+
 			compare(name+" items", rt.Elem(), *want.Items, nil)
+
 			continue
 		}
+
 		compare(name, rt, want.Fields, resultFieldsNeverAnswered[name])
+
 		if want.Items != nil {
 			f, ok := rt.FieldByName("Items")
 			if !ok || f.Type.Kind() != reflect.Slice {
 				t.Errorf("%s (%s) has no items, the contract's result does", name, rt)
+
 				continue
 			}
+
 			if !plain(f.Type.Elem()) {
-				t.Errorf("%s lists %s, whose fields are decided at run time: list the operation with the reason", name, f.Type.Elem())
+				t.Errorf(
+					"%s lists %s, whose fields are decided at run time: list the operation with the reason",
+					name,
+					f.Type.Elem(),
+				)
+
 				continue
 			}
+
 			compare(name+" items", f.Type.Elem(), *want.Items, nil)
 		}
 	}
+
 	if checked < 180 {
 		t.Fatalf("only %d operations checked", checked)
 	}

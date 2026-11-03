@@ -33,6 +33,7 @@ func TestEndedPeriod(t *testing.T) {
 // other callers of the operation.
 func TestTransitionInput(t *testing.T) {
 	long := strings.Repeat("x", 1001)
+
 	blank := "  ok  "
 	for name, c := range map[string]struct {
 		in   TransitionInput
@@ -49,6 +50,7 @@ func TestTransitionInput(t *testing.T) {
 			t.Errorf("%s: %v, want %v", name, got, c.want)
 		}
 	}
+
 	in := TransitionInput{StatementID: uuid.New(), Action: "approve", Reason: &blank}
 	if in.Validate(); *in.Reason != "ok" {
 		t.Errorf("the reason is trimmed: %q", *in.Reason)

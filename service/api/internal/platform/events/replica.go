@@ -33,6 +33,7 @@ func Handlers(replicas ...Replica) map[string]Handler {
 	for _, r := range replicas {
 		out[RowChanged+r.Source] = r.handle
 	}
+
 	return out
 }
 
@@ -41,25 +42,50 @@ func (r Replica) handle(ctx context.Context, tx pgx.Tx, e Event) error {
 	if err := e.Decode(&p); err != nil {
 		return err
 	}
+
 	keyMatch := make([]string, len(r.Keys))
 	for i, k := range r.Keys {
 		keyMatch[i] = fmt.Sprintf("t.%[1]s = s.%[1]s", k)
 	}
+
 	if p.Op == "DELETE" {
-		_, err := tx.Exec(ctx, fmt.Sprintf(`DELETE FROM %[1]s t USING jsonb_populate_record(NULL::%[1]s, $1) s WHERE %[2]s`, r.Table, strings.Join(keyMatch, " AND ")), []byte(p.Row))
+		_, err := tx.Exec(
+			ctx,
+			fmt.Sprintf(
+				`DELETE FROM %[1]s t USING jsonb_populate_record(NULL::%[1]s, $1) s WHERE %[2]s`,
+				r.Table,
+				strings.Join(keyMatch, " AND "),
+			),
+			[]byte(p.Row),
+		)
+
 		return err
 	}
+
 	all := append(append([]string{}, r.Keys...), r.Cols...)
+
 	set := make([]string, len(r.Cols))
 	for i, c := range r.Cols {
 		set[i] = c + " = EXCLUDED." + c
 	}
+
 	conflict := "DO NOTHING"
 	if len(set) > 0 {
 		conflict = "DO UPDATE SET " + strings.Join(set, ", ")
 	}
+
 	cols := strings.Join(all, ", ")
-	_, err := tx.Exec(ctx, fmt.Sprintf(`INSERT INTO %[1]s (%[2]s) SELECT %[2]s FROM jsonb_populate_record(NULL::%[1]s, $1) ON CONFLICT (%[3]s) %[4]s`,
-		r.Table, cols, strings.Join(r.Keys, ", "), conflict), []byte(p.Row))
+	_, err := tx.Exec(
+		ctx,
+		fmt.Sprintf(
+			`INSERT INTO %[1]s (%[2]s) SELECT %[2]s FROM jsonb_populate_record(NULL::%[1]s, $1) ON CONFLICT (%[3]s) %[4]s`,
+			r.Table,
+			cols,
+			strings.Join(r.Keys, ", "),
+			conflict,
+		),
+		[]byte(p.Row),
+	)
+
 	return err
 }

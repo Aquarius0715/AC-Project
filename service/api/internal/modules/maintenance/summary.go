@@ -24,22 +24,29 @@ type JobCounts struct {
 // completed/cancelled, assigned = rows with an active Assignment.
 func (m Jobs) CountJobs(ctx context.Context, c *ops.Call, raw json.RawMessage) (JobCounts, error) {
 	var f listFilters
+
 	if len(raw) > 0 && string(raw) != "null" {
 		dec := json.NewDecoder(strings.NewReader(string(raw)))
 		dec.DisallowUnknownFields()
+
 		if dec.Decode(&f) != nil {
 			return JobCounts{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
 		}
 	}
+
 	if err := f.check(); err != nil {
 		return JobCounts{}, err
 	}
+
 	items, err := m.collect(ctx, c, &f)
 	if err != nil {
 		return JobCounts{}, err
 	}
+
 	var n JobCounts
+
 	seen := map[uuid.UUID]bool{}
+
 	for _, it := range items {
 		switch x := it.item.(type) {
 		case OfferSummary:
@@ -50,6 +57,7 @@ func (m Jobs) CountJobs(ctx context.Context, c *ops.Call, raw json.RawMessage) (
 			if x.Status == "completed" || x.Status == "cancelled" {
 				continue
 			}
+
 			switch x.Status { // D07 / SR KPI definitions
 			case "accepted", "assigned":
 				n.Active++
@@ -60,17 +68,21 @@ func (m Jobs) CountJobs(ctx context.Context, c *ops.Call, raw json.RawMessage) (
 			case "submitted":
 				n.Review++
 			}
+
 			if x.DueAt.Before(c.Now) {
 				n.Overdue++
 			}
+
 			if x.AssignmentID != nil {
 				n.Assigned++
 			}
+
 			if !seen[x.UnitID] {
 				seen[x.UnitID] = true
 				n.Units = append(n.Units, x.UnitID)
 			}
 		}
 	}
+
 	return n, nil
 }

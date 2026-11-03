@@ -17,7 +17,11 @@ import (
 // restriction parts come from billing's queries.
 type unitDetails struct{}
 
-func (unitDetails) Detail(ctx context.Context, c *ops.Call, u assets.Unit) (assets.DetailExtras, error) {
+func (unitDetails) Detail(
+	ctx context.Context,
+	c *ops.Call,
+	u assets.Unit,
+) (assets.DetailExtras, error) {
 	var d assets.DetailExtras
 	if cp, ok, err := devices.LoadCapability(ctx, c, u.ModelID, u.CapabilityVersion); err != nil {
 		return d, err
@@ -33,22 +37,34 @@ func (unitDetails) Detail(ctx context.Context, c *ops.Call, u assets.Unit) (asse
 	case !r.Found:
 		d.EffectiveControlPolicy = map[string]any{"state": "unrestricted"}
 	default:
-		d.EffectiveControlPolicy = map[string]any{"state": "restricted", "phase": r.Phase, "policy": r.Policy, "reasonKey": "control.restriction_active"}
+		d.EffectiveControlPolicy = map[string]any{
+			"state":     "restricted",
+			"phase":     r.Phase,
+			"policy":    r.Policy,
+			"reasonKey": "control.restriction_active",
+		}
 	}
 	// controlAvailability: blocked while any terminal-restriction recovery case of the unit is unresolved (SR26)
 	blocked, err := restrictions.Busy{}.UnitRecovering(ctx, c, u.ID)
 	if err != nil {
 		return d, err
 	}
+
 	d.ControlAvailability = map[string]any{"state": "available"}
 	if blocked {
-		d.ControlAvailability = map[string]any{"state": "blocked", "reasonKey": "control.reconciliation_required"}
+		d.ControlAvailability = map[string]any{
+			"state":     "blocked",
+			"reasonKey": "control.reconciliation_required",
+		}
 	}
+
 	d.Components = maintenance.Components(u.ServiceScope)
+
 	cmds, err := control.PendingCommands(ctx, c, u.ID)
 	if err != nil {
 		return d, err
 	}
+
 	d.PendingCommands, d.PendingCommandIDs = cmds, []uuid.UUID{}
 	for _, x := range cmds {
 		d.PendingCommandIDs = append(d.PendingCommandIDs, x.ID)
@@ -62,5 +78,6 @@ func (unitDetails) Detail(ctx context.Context, c *ops.Call, u assets.Unit) (asse
 		FROM assets.properties p WHERE p.id = $1`, u.PropertyID, u.SpaceID).Scan(&d.Location.PathLabels, &d.Location.Address, &d.Location.AccessInstructions); err != nil {
 		return d, err
 	}
+
 	return d, nil
 }

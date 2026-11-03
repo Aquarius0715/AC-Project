@@ -9,7 +9,12 @@ import (
 
 func TestCoverageStatus(t *testing.T) {
 	now := time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC)
-	d := func(days int) *time.Time { x := now.Add(time.Duration(days) * 24 * time.Hour); return &x }
+	d := func(days int) *time.Time {
+		x := now.Add(time.Duration(days) * 24 * time.Hour)
+
+		return &x
+	}
+
 	cases := []struct {
 		ends      *time.Time
 		contracts int
@@ -34,15 +39,22 @@ func TestCoverageStatus(t *testing.T) {
 func TestClaimable(t *testing.T) {
 	now := time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC)
 	a, b, c := uuid.New(), uuid.New(), uuid.New()
-	jobs := map[uuid.UUID]time.Time{a: now.Add(-time.Hour), b: now.Add(-48 * time.Hour), c: now.Add(time.Hour)}
+	jobs := map[uuid.UUID]time.Time{
+		a: now.Add(-time.Hour),
+		b: now.Add(-48 * time.Hour),
+		c: now.Add(time.Hour),
+	}
 	ends := now
+
 	got := claimable(jobs, &ends)
 	if len(got) != 2 || got[0] != b || got[1] != a {
 		t.Fatalf("completed while the warranty ran, earliest first: %v", got)
 	}
+
 	if got := claimable(jobs, nil); len(got) != 0 {
 		t.Fatalf("no warranty → nothing claimable: %v", got)
 	}
+
 	exact := now.Add(-time.Hour)
 	if got := claimable(map[uuid.UUID]time.Time{a: exact}, &exact); len(got) != 1 {
 		t.Fatalf("completion on the last warranty instant counts: %v", got)
@@ -53,6 +65,7 @@ func TestClaimable(t *testing.T) {
 // very instant — and none earlier than 90 days (IR340).
 func TestWarrantyStage(t *testing.T) {
 	now := time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC)
+
 	day := 24 * time.Hour
 	for name, c := range map[string]struct {
 		ends time.Time

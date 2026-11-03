@@ -26,9 +26,14 @@ func (in *Input) Validate() map[string]string {
 	if strings.TrimSpace(in.Operation) == "" {
 		fe["operation"] = "error.required"
 	}
-	if n := utf8.RuneCountInString(in.IdempotencyKey); n < 8 || n > 128 { // 8–128 characters (review-resolution-contracts writes.getResult)
+
+	if n := utf8.RuneCountInString(
+		in.IdempotencyKey,
+	); n < 8 ||
+		n > 128 { // 8–128 characters (review-resolution-contracts writes.getResult)
 		fe["idempotencyKey"] = "error.invalid"
 	}
+
 	return fe
 }
 
@@ -37,7 +42,7 @@ type Result struct {
 	State       string          `json:"state"`
 	Operation   string          `json:"operation,omitempty"`
 	ResourceIDs []string        `json:"resourceIds,omitempty"`
-	Result      json.RawMessage `json:"result,omitempty" swaggertype:"object"`
+	Result      json.RawMessage `json:"result,omitempty"      swaggertype:"object"`
 }
 
 // get returns the caller's own stored write (IR145): absent, expired or another operation → not_received;
@@ -70,31 +75,48 @@ func get(ctx context.Context, c *ops.Call, in *Input) (Result, error) {
 	if _, ok := ops.SpecByName()[in.Operation]; !ok {
 		return Result{}, apperr.Fields(map[string]string{"operation": "error.invalid"})
 	}
-	var status string
-	var resp []byte
+
+	var (
+		status string
+		resp   []byte
+	)
+
 	err := c.Tx.QueryRow(ctx, `SELECT status, response FROM platform.idempotency_keys
 		WHERE membership_id = $1 AND key = $2 AND operation = $3 AND expires_at > $4`, c.Principal.MembershipID, in.IdempotencyKey, in.Operation, c.Now).Scan(&status, &resp)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Result{State: "not_received"}, nil
 	}
+
 	if err != nil {
 		return Result{}, err
 	}
+
 	if status != "completed" {
 		return Result{State: "pending"}, nil
 	}
+
 	var stored struct {
 		Data json.RawMessage `json:"data" swaggertype:"object"`
 	}
+
 	_ = json.Unmarshal(resp, &stored)
+
 	var ids struct {
 		ID string `json:"id"`
 	}
+
 	_ = json.Unmarshal(stored.Data, &ids)
-	out := Result{State: "succeeded", Operation: in.Operation, ResourceIDs: []string{}, Result: stored.Data}
+
+	out := Result{
+		State:       "succeeded",
+		Operation:   in.Operation,
+		ResourceIDs: []string{},
+		Result:      stored.Data,
+	}
 	if ids.ID != "" {
 		out.ResourceIDs = []string{ids.ID}
 	}
+
 	return out, nil
 }
 
@@ -109,6 +131,7 @@ func (in *ResetInput) Validate() map[string]string {
 	if !strings.Contains(in.DemoEmail, "@") || len(in.DemoEmail) > 254 {
 		return map[string]string{"demoEmail": "error.invalid"}
 	}
+
 	return nil
 }
 

@@ -10,32 +10,40 @@ func TestMockFleetCoversEveryState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	has := map[string]bool{}
 	for _, p := range f.Patterns {
 		has["connection="+p.Connection] = true
 		has["power="+p.PowerSignal] = true
 		has["tamper="+p.Tamper] = true
 		has["telemetry="+p.Telemetry] = true
+
 		has["commands="+p.Commands] = true
 		if p.State.Mode != nil {
 			has["mode="+*p.State.Mode] = true
 		}
+
 		if p.State.FanLevel != nil {
 			has["fan="+*p.State.FanLevel] = true
 		}
+
 		if p.State.Power != nil && !*p.State.Power {
 			has["switched off"] = true
 		}
+
 		if p.NoDevice {
 			has["no module"] = true
 		}
+
 		if p.Archived {
 			has["archived"] = true
 		}
+
 		if f.FirmwareOf(p) != f.Firmware {
 			has["other firmware"] = true
 		}
 	}
+
 	for _, want := range []string{
 		"connection=online", "connection=offline", "connection=unknown", "connection=connecting", "connection=error",
 		"power=on", "power=off", "power=unknown", "tamper=clear", "tamper=detected",
@@ -53,9 +61,16 @@ func TestMockFleetCoversEveryState(t *testing.T) {
 // TestFleetNames: each pattern's records have their own fixture-style names.
 func TestFleetNames(t *testing.T) {
 	p := Pattern{Key: "cool-on"}
-	if UnitName(p) != "unit-mock-cool-on" || DeviceName(p) != "device-mock-cool-on" || BindingName(p) != "binding-mock-cool-on" ||
+	if UnitName(p) != "unit-mock-cool-on" || DeviceName(p) != "device-mock-cool-on" ||
+		BindingName(p) != "binding-mock-cool-on" ||
 		SensorName(p, Sensors[0]) != "sensor-mock-cool-on-temperature" {
-		t.Errorf("names %s %s %s %s", UnitName(p), DeviceName(p), BindingName(p), SensorName(p, Sensors[0]))
+		t.Errorf(
+			"names %s %s %s %s",
+			UnitName(p),
+			DeviceName(p),
+			BindingName(p),
+			SensorName(p, Sensors[0]),
+		)
 	}
 }
 
@@ -84,18 +99,23 @@ func TestEveryUnitIsInARoom(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	rooms := map[string]int{}
+
 	for _, fl := range f.Floors {
 		for _, r := range fl.Rooms {
 			rooms[r.Key] = 0
 		}
 	}
+
 	for _, p := range f.Patterns {
 		if _, ok := rooms[p.Room]; !ok {
 			t.Errorf("%s is in no room (%q)", p.Key, p.Room)
 		}
+
 		rooms[p.Room]++
 	}
+
 	if len(f.Floors) != 3 || len(rooms) != 10 || SpaceName("lab") != "space-mock-lab" {
 		t.Errorf("%d floors, %d rooms, space name %s", len(f.Floors), len(rooms), SpaceName("lab"))
 	}

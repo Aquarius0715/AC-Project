@@ -12,20 +12,35 @@ import (
 func TestSubmitErrors(t *testing.T) {
 	now := time.Date(2026, 9, 15, 1, 0, 0, 0, time.UTC)
 	str := func(s string) *string { return &s }
-	at := func(h int) *time.Time { v := now.Add(time.Duration(h) * time.Hour); return &v }
+	at := func(h int) *time.Time {
+		v := now.Add(time.Duration(h) * time.Hour)
+
+		return &v
+	}
 	components := []string{"filter", "drain"}
+
 	valid := func() Report {
 		return Report{
-			Items:          []Item{{ComponentKey: "filter", Result: str("normal")}, {ComponentKey: "drain", Result: str("attention"), Reason: str("slow flow")}},
+			Items: []Item{
+				{ComponentKey: "filter", Result: str("normal")},
+				{ComponentKey: "drain", Result: str("attention"), Reason: str("slow flow")},
+			},
 			WorkText:       "Cleaned the filter and checked the drain.",
 			NextAction:     &NextAction{Kind: "none"},
 			Parts:          []Part{{Name: "Filter", Quantity: 1}},
 			AttachmentRefs: []AttachmentRef{{Status: "ready"}},
 		}
 	}
-	if fe := submitErrors(&Report{Items: valid().Items, WorkText: valid().WorkText, NextAction: valid().NextAction}, components, now); len(fe) != 0 {
+	if fe := submitErrors(
+		&Report{Items: valid().Items, WorkText: valid().WorkText, NextAction: valid().NextAction},
+		components,
+		now,
+	); len(
+		fe,
+	) != 0 {
 		t.Fatalf("a complete draft: %v", fe)
 	}
+
 	for name, c := range map[string]struct {
 		change func(*Report)
 		want   map[string]string
@@ -45,12 +60,19 @@ func TestSubmitErrors(t *testing.T) {
 	} {
 		r := valid()
 		c.change(&r)
+
 		if fe := submitErrors(&r, components, now); !maps.Equal(fe, c.want) {
 			t.Errorf("%s: %v want %v", name, fe, c.want)
 		}
 	}
+
 	follow := valid()
-	follow.NextAction = &NextAction{Kind: "follow_up", Date: at(48), Note: str("replace the drain pan")}
+
+	follow.NextAction = &NextAction{
+		Kind: "follow_up",
+		Date: at(48),
+		Note: str("replace the drain pan"),
+	}
 	if fe := submitErrors(&follow, components, now); len(fe) != 0 {
 		t.Errorf("a follow-up with a date and a note: %v", fe)
 	}

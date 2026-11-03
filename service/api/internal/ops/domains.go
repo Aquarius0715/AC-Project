@@ -17,7 +17,13 @@ const (
 )
 
 // Domains lists every domain in a stable order.
-var Domains = []string{DomainIdentity, DomainEquipment, DomainMaintenance, DomainBilling, DomainEnergy}
+var Domains = []string{
+	DomainIdentity,
+	DomainEquipment,
+	DomainMaintenance,
+	DomainBilling,
+	DomainEnergy,
+}
 
 // moduleDomain maps operation-catalog modules to their owning domain.
 var moduleDomain = map[string]string{
@@ -42,6 +48,7 @@ func DomainOf(operation string) string {
 	if !ok {
 		return ""
 	}
+
 	return moduleDomain[s.Module]
 }
 
@@ -51,16 +58,21 @@ func CheckDomains() error {
 	for _, d := range Domains {
 		known[d] = true
 	}
+
 	var missing []string
+
 	for _, s := range SpecByName() {
 		if !known[moduleDomain[s.Module]] {
 			missing = append(missing, s.Module)
 		}
 	}
+
 	if len(missing) > 0 {
 		sort.Strings(missing)
+
 		return fmt.Errorf("ops: catalog modules without a domain: %v", missing)
 	}
+
 	return nil
 }
 
@@ -69,8 +81,10 @@ func CheckDomains() error {
 func (r *Registry) ServeDomains(domains ...string) {
 	if len(domains) == 0 {
 		r.domains = nil
+
 		return
 	}
+
 	r.domains = map[string]bool{}
 	for _, d := range domains {
 		r.domains[d] = true

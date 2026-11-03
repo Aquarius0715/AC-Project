@@ -125,113 +125,215 @@ const (
 	qOperationBusy     = "devices.operationBusy"
 )
 
-func (v equipmentView) UnitState(ctx context.Context, c *ops.Call, unit uuid.UUID) (uuid.UUID, bool, bool, error) {
+func (v equipmentView) UnitState(
+	ctx context.Context,
+	c *ops.Call,
+	unit uuid.UUID,
+) (uuid.UUID, bool, bool, error) {
 	r, err := ops.Delegate(ctx, c, qUnitState, unitIn{unit}, v.unitState)
+
 	return r.OrgID, r.Archived, r.Found, err
 }
 
-func (v equipmentView) unitState(ctx context.Context, c *ops.Call, in *unitIn) (unitStateOut, error) {
+func (v equipmentView) unitState(
+	ctx context.Context,
+	c *ops.Call,
+	in *unitIn,
+) (unitStateOut, error) {
 	org, archived, found, err := v.am.UnitState(ctx, c, in.UnitID)
+
 	return unitStateOut{org, archived, found}, err
 }
 
-func (v equipmentView) UnitsOfProperty(ctx context.Context, c *ops.Call, property uuid.UUID) ([]uuid.UUID, error) {
+func (v equipmentView) UnitsOfProperty(
+	ctx context.Context,
+	c *ops.Call,
+	property uuid.UUID,
+) ([]uuid.UUID, error) {
 	return ops.Delegate(ctx, c, qUnitsOfProperty, propertyIn{property}, v.unitsOfProperty)
 }
 
-func (v equipmentView) unitsOfProperty(ctx context.Context, c *ops.Call, in *propertyIn) ([]uuid.UUID, error) {
+func (v equipmentView) unitsOfProperty(
+	ctx context.Context,
+	c *ops.Call,
+	in *propertyIn,
+) ([]uuid.UUID, error) {
 	return v.am.UnitsOfProperty(ctx, c, in.PropertyID)
 }
 
-func (v equipmentView) OrgOfCustomer(ctx context.Context, c *ops.Call, customer uuid.UUID) (uuid.UUID, bool, error) {
+func (v equipmentView) OrgOfCustomer(
+	ctx context.Context,
+	c *ops.Call,
+	customer uuid.UUID,
+) (uuid.UUID, bool, error) {
 	r, err := ops.Delegate(ctx, c, qOrgOfCustomer, customerIn{customer}, v.orgOfCustomer)
+
 	return r.ID, r.Found, err
 }
 
-func (v equipmentView) orgOfCustomer(ctx context.Context, c *ops.Call, in *customerIn) (idFound, error) {
+func (v equipmentView) orgOfCustomer(
+	ctx context.Context,
+	c *ops.Call,
+	in *customerIn,
+) (idFound, error) {
 	id, found, err := v.am.OrgOfCustomer(ctx, c, in.CustomerID)
+
 	return idFound{id, found}, err
 }
 
-func (v equipmentView) UnitsOfOrg(ctx context.Context, c *ops.Call, org uuid.UUID) ([]uuid.UUID, error) {
+func (v equipmentView) UnitsOfOrg(
+	ctx context.Context,
+	c *ops.Call,
+	org uuid.UUID,
+) ([]uuid.UUID, error) {
 	return ops.Delegate(ctx, c, qUnitsOfOrg, orgIn{org}, v.unitsOfOrg)
 }
 
-func (v equipmentView) unitsOfOrg(ctx context.Context, c *ops.Call, in *orgIn) ([]uuid.UUID, error) {
+func (v equipmentView) unitsOfOrg(
+	ctx context.Context,
+	c *ops.Call,
+	in *orgIn,
+) ([]uuid.UUID, error) {
 	return v.am.UnitsOfOrg(ctx, c, in.OrgID)
 }
 
-func (v equipmentView) UnitService(ctx context.Context, c *ops.Call, unit uuid.UUID) (uuid.UUID, uuid.UUID, []string, error) {
+func (v equipmentView) UnitService(
+	ctx context.Context,
+	c *ops.Call,
+	unit uuid.UUID,
+) (uuid.UUID, uuid.UUID, []string, error) {
 	r, err := ops.Delegate(ctx, c, qUnitService, unitIn{unit}, v.unitService)
+
 	return r.OrgID, r.PropertyID, r.Scope, err
 }
 
-func (v equipmentView) unitService(ctx context.Context, c *ops.Call, in *unitIn) (unitServiceOut, error) {
+func (v equipmentView) unitService(
+	ctx context.Context,
+	c *ops.Call,
+	in *unitIn,
+) (unitServiceOut, error) {
 	org, prop, scope, err := v.am.UnitService(ctx, c, in.UnitID)
+
 	return unitServiceOut{org, prop, scope}, err
 }
 
-func (v equipmentView) CustomerProfiles(ctx context.Context, c *ops.Call, orgs []uuid.UUID) (map[uuid.UUID][2]string, error) {
+func (v equipmentView) CustomerProfiles(
+	ctx context.Context,
+	c *ops.Call,
+	orgs []uuid.UUID,
+) (map[uuid.UUID][2]string, error) {
 	return ops.Delegate(ctx, c, qCustomerProfiles, orgsIn{orgs}, v.customerProfiles)
 }
 
-func (v equipmentView) customerProfiles(ctx context.Context, c *ops.Call, in *orgsIn) (map[uuid.UUID][2]string, error) {
+func (v equipmentView) customerProfiles(
+	ctx context.Context,
+	c *ops.Call,
+	in *orgsIn,
+) (map[uuid.UUID][2]string, error) {
 	return v.am.CustomerProfiles(ctx, c, in.OrgIDs)
 }
 
-func (v equipmentView) SiteAddress(ctx context.Context, c *ops.Call, unit uuid.UUID) (*string, []string, error) {
+func (v equipmentView) SiteAddress(
+	ctx context.Context,
+	c *ops.Call,
+	unit uuid.UUID,
+) (*string, []string, error) {
 	r, err := ops.Delegate(ctx, c, qSiteAddress, unitIn{unit}, v.siteAddress)
+
 	return r.Address, r.Scope, err
 }
 
 func (v equipmentView) siteAddress(ctx context.Context, c *ops.Call, in *unitIn) (siteOut, error) {
 	addr, scope, err := v.am.SiteAddress(ctx, c, in.UnitID)
+
 	return siteOut{addr, scope}, err
 }
 
-func (v equipmentView) WarrantyEnd(ctx context.Context, c *ops.Call, unit uuid.UUID) (*time.Time, error) {
+func (v equipmentView) WarrantyEnd(
+	ctx context.Context,
+	c *ops.Call,
+	unit uuid.UUID,
+) (*time.Time, error) {
 	return ops.Delegate(ctx, c, qWarrantyEnd, unitIn{unit}, v.warrantyEnd)
 }
 
-func (v equipmentView) warrantyEnd(ctx context.Context, c *ops.Call, in *unitIn) (*time.Time, error) {
+func (v equipmentView) warrantyEnd(
+	ctx context.Context,
+	c *ops.Call,
+	in *unitIn,
+) (*time.Time, error) {
 	return v.am.WarrantyEnd(ctx, c, in.UnitID)
 }
 
-func (v equipmentView) BriefUnits(ctx context.Context, c *ops.Call, customer, property, space, unit *uuid.UUID) ([]ops.UnitBrief, error) {
+func (v equipmentView) BriefUnits(
+	ctx context.Context,
+	c *ops.Call,
+	customer, property, space, unit *uuid.UUID,
+) ([]ops.UnitBrief, error) {
 	return ops.Delegate(ctx, c, qBriefUnits, briefIn{customer, property, space, unit}, v.briefUnits)
 }
 
-func (v equipmentView) briefUnits(ctx context.Context, c *ops.Call, in *briefIn) ([]ops.UnitBrief, error) {
+func (v equipmentView) briefUnits(
+	ctx context.Context,
+	c *ops.Call,
+	in *briefIn,
+) ([]ops.UnitBrief, error) {
 	return v.am.BriefUnits(ctx, c, in.CustomerID, in.PropertyID, in.SpaceID, in.UnitID)
 }
 
-func (v equipmentView) CustomerOfOrg(ctx context.Context, c *ops.Call, org uuid.UUID) (uuid.UUID, bool, error) {
+func (v equipmentView) CustomerOfOrg(
+	ctx context.Context,
+	c *ops.Call,
+	org uuid.UUID,
+) (uuid.UUID, bool, error) {
 	r, err := ops.Delegate(ctx, c, qCustomerOfOrg, orgIn{org}, v.customerOfOrg)
+
 	return r.ID, r.Found, err
 }
 
 func (v equipmentView) customerOfOrg(ctx context.Context, c *ops.Call, in *orgIn) (idFound, error) {
 	id, found, err := v.am.CustomerOfOrg(ctx, c, in.OrgID)
+
 	return idFound{id, found}, err
 }
 
-func (v equipmentView) CustomerState(ctx context.Context, c *ops.Call, customer uuid.UUID) (uuid.UUID, bool, bool, error) {
+func (v equipmentView) CustomerState(
+	ctx context.Context,
+	c *ops.Call,
+	customer uuid.UUID,
+) (uuid.UUID, bool, bool, error) {
 	r, err := ops.Delegate(ctx, c, qCustomerState, customerIn{customer}, v.customerState)
+
 	return r.OrgID, r.Active, r.Found, err
 }
 
-func (v equipmentView) customerState(ctx context.Context, c *ops.Call, in *customerIn) (customerStateOut, error) {
+func (v equipmentView) customerState(
+	ctx context.Context,
+	c *ops.Call,
+	in *customerIn,
+) (customerStateOut, error) {
 	org, active, found, err := v.am.CustomerState(ctx, c, in.CustomerID)
+
 	return customerStateOut{org, active, found}, err
 }
 
-func (v equipmentView) RestrictionTarget(ctx context.Context, c *ops.Call, unit uuid.UUID) (restrictions.UnitCaps, bool, error) {
+func (v equipmentView) RestrictionTarget(
+	ctx context.Context,
+	c *ops.Call,
+	unit uuid.UUID,
+) (restrictions.UnitCaps, bool, error) {
 	r, err := ops.Delegate(ctx, c, qRestrictionTarget, unitIn{unit}, v.restrictionTarget)
+
 	return r.Caps, r.Found, err
 }
 
-func (v equipmentView) restrictionTarget(ctx context.Context, c *ops.Call, in *unitIn) (targetOut, error) {
+func (v equipmentView) restrictionTarget(
+	ctx context.Context,
+	c *ops.Call,
+	in *unitIn,
+) (targetOut, error) {
 	caps, found, err := restrictionTargets{v.am}.RestrictionTarget(ctx, c, in.UnitID)
+
 	return targetOut{caps, found}, err
 }
 
@@ -240,44 +342,87 @@ type observationOut struct {
 	LastSeenAt *time.Time `json:"lastSeenAt"`
 }
 
-func (v equipmentView) Observation(ctx context.Context, c *ops.Call, unit uuid.UUID) ([]byte, *time.Time, error) {
+func (v equipmentView) Observation(
+	ctx context.Context,
+	c *ops.Call,
+	unit uuid.UUID,
+) ([]byte, *time.Time, error) {
 	r, err := ops.Delegate(ctx, c, qUnitObservation, unitIn{unit}, v.observation)
+
 	return r.Observed, r.LastSeenAt, err
 }
 
-func (v equipmentView) observation(ctx context.Context, c *ops.Call, in *unitIn) (observationOut, error) {
+func (v equipmentView) observation(
+	ctx context.Context,
+	c *ops.Call,
+	in *unitIn,
+) (observationOut, error) {
 	var r observationOut
-	err := c.Tx.QueryRow(ctx, `SELECT observed_restriction, last_seen_at FROM assets.units WHERE id = $1`, in.UnitID).Scan(&r.Observed, &r.LastSeenAt)
+
+	err := c.Tx.QueryRow(ctx, `SELECT observed_restriction, last_seen_at FROM assets.units WHERE id = $1`, in.UnitID).
+		Scan(&r.Observed, &r.LastSeenAt)
+
 	return r, err
 }
 
-func (v equipmentView) UnitSeverities(ctx context.Context, c *ops.Call, units []uuid.UUID) (map[uuid.UUID]string, error) {
+func (v equipmentView) UnitSeverities(
+	ctx context.Context,
+	c *ops.Call,
+	units []uuid.UUID,
+) (map[uuid.UUID]string, error) {
 	return ops.Delegate(ctx, c, qUnitSeverities, unitsIn{units}, v.unitSeverities)
 }
 
-func (v equipmentView) unitSeverities(ctx context.Context, c *ops.Call, in *unitsIn) (map[uuid.UUID]string, error) {
+func (v equipmentView) unitSeverities(
+	ctx context.Context,
+	c *ops.Call,
+	in *unitsIn,
+) (map[uuid.UUID]string, error) {
 	return v.alerts.UnitSeverities(ctx, c, in.UnitIDs)
 }
 
-func (v equipmentView) RunHours(ctx context.Context, c *ops.Call, unit uuid.UUID, since *time.Time) (*float64, error) {
+func (v equipmentView) RunHours(
+	ctx context.Context,
+	c *ops.Call,
+	unit uuid.UUID,
+	since *time.Time,
+) (*float64, error) {
 	return ops.Delegate(ctx, c, qRunHours, runHoursIn{unit, since}, v.runHours)
 }
 
-func (v equipmentView) runHours(ctx context.Context, c *ops.Call, in *runHoursIn) (*float64, error) {
+func (v equipmentView) runHours(
+	ctx context.Context,
+	c *ops.Call,
+	in *runHoursIn,
+) (*float64, error) {
 	return v.tel.RunHours(ctx, c, in.UnitID, in.Since)
 }
 
-func (v equipmentView) BoundDevice(ctx context.Context, c *ops.Call, unit uuid.UUID) (uuid.UUID, string, string, bool, error) {
+func (v equipmentView) BoundDevice(
+	ctx context.Context,
+	c *ops.Call,
+	unit uuid.UUID,
+) (uuid.UUID, string, string, bool, error) {
 	r, err := ops.Delegate(ctx, c, qBoundDevice, unitIn{unit}, v.boundDevice)
+
 	return r.ID, r.Connection, r.PowerSignal, r.Found, err
 }
 
-func (v equipmentView) boundDevice(ctx context.Context, c *ops.Call, in *unitIn) (deviceOut, error) {
+func (v equipmentView) boundDevice(
+	ctx context.Context,
+	c *ops.Call,
+	in *unitIn,
+) (deviceOut, error) {
 	id, conn, signal, found, err := v.models.BoundDevice(ctx, c, in.UnitID)
+
 	return deviceOut{id, conn, signal, found}, err
 }
 
-func (v equipmentView) OperationBusy(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, error) {
+func (v equipmentView) OperationBusy(
+	ctx context.Context,
+	c *ops.Call,
+	unit uuid.UUID,
+) (bool, error) {
 	return ops.Delegate(ctx, c, qOperationBusy, unitIn{unit}, v.operationBusy)
 }
 
@@ -311,31 +456,53 @@ const (
 	qRateAt       = "maintenance.rateAt"
 )
 
-func (v maintenanceView) AcceptedJobs(ctx context.Context, c *ops.Call, from, to time.Time) ([]maintenance.AcceptedJob, error) {
+func (v maintenanceView) AcceptedJobs(
+	ctx context.Context,
+	c *ops.Call,
+	from, to time.Time,
+) ([]maintenance.AcceptedJob, error) {
 	return ops.Delegate(ctx, c, qAcceptedJobs, acceptedIn{from, to}, v.acceptedJobs)
 }
 
-func (v maintenanceView) acceptedJobs(ctx context.Context, c *ops.Call, in *acceptedIn) ([]maintenance.AcceptedJob, error) {
+func (v maintenanceView) acceptedJobs(
+	ctx context.Context,
+	c *ops.Call,
+	in *acceptedIn,
+) ([]maintenance.AcceptedJob, error) {
 	return v.src.AcceptedJobs(ctx, c, in.From, in.To)
 }
 
-func (v maintenanceView) RateAt(ctx context.Context, c *ops.Call, contractor uuid.UUID, at time.Time) (map[string]int64, string, bool, error) {
+func (v maintenanceView) RateAt(
+	ctx context.Context,
+	c *ops.Call,
+	contractor uuid.UUID,
+	at time.Time,
+) (map[string]int64, string, bool, error) {
 	r, err := ops.Delegate(ctx, c, qRateAt, rateIn{contractor, at}, v.rateAt)
+
 	return r.Lines, r.Currency, r.Found, err
 }
 
 func (v maintenanceView) rateAt(ctx context.Context, c *ops.Call, in *rateIn) (rateOut, error) {
 	lines, currency, found, err := v.src.RateAt(ctx, c, in.ContractorOrgID, in.At)
+
 	return rateOut{lines, currency, found}, err
 }
 
 // AddJobNote is a write into maintenance: billing publishes JobNoteRequested and maintenance's consumer adds the note
 // and its note.added event (IR193).
-func (v maintenanceView) AddJobNote(ctx context.Context, c *ops.Call, job uuid.UUID, message string) error {
+func (v maintenanceView) AddJobNote(
+	ctx context.Context,
+	c *ops.Call,
+	job uuid.UUID,
+	message string,
+) error {
 	var tenant uuid.UUID
-	if err := c.Tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')::uuid`).Scan(&tenant); err != nil {
+	if err := c.Tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')::uuid`).
+		Scan(&tenant); err != nil {
 		return err
 	}
+
 	return events.Publish(ctx, c.Tx, tenant, "job", job, events.JobNoteRequested,
 		events.JobNote{JobID: job, AuthorUserID: c.Principal.UserID, Message: message, At: c.Now})
 }

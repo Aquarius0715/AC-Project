@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"maps"
 	"strings"
 	"testing"
 	"time"
@@ -14,37 +15,74 @@ func TestMRV(t *testing.T) {
 	s := server(t)
 	u, _ := isolatedUnit(t, s)
 	start := time.Date(2026, 9, 12, 8, 0, 0, 0, time.UTC)
-	powerSeries(t, u, start, "measured", kw(60), kw(60), kw(60), kw(60), kw(60))
-	_, m := write(s, &hq, "baselines.save", `{"unitIds":["`+u+`"],"period":{"from":"2026-08-01T00:00:00Z","to":"2026-08-01T00:05:00Z"},"boundaryId":"ac_input_electricity","boundary":"AC input","assumptions":"demo","source":"test","method":"demo_fixed","baselineKWh":10}`, 0)
+	powerSeries(
+		t,
+		u,
+		start,
+		"measured",
+		new(float64(60)),
+		new(float64(60)),
+		new(float64(60)),
+		new(float64(60)),
+		new(float64(60)),
+	)
+	_, m := write(
+		s,
+		&hq,
+		"baselines.save",
+		`{"unitIds":["`+u+`"],"period":{"from":"2026-08-01T00:00:00Z","to":"2026-08-01T00:05:00Z"},"boundaryId":"ac_input_electricity","boundary":"AC input","assumptions":"demo","source":"test","method":"demo_fixed","baselineKWh":10}`,
+		0,
+	)
 	base := data(m)["id"].(string)
 	org := seed.ID("org-customer-b").String()
 	cond := func(extra map[string]string) string {
-		f := map[string]string{"from": `"` + start.Format(time.RFC3339) + `"`, "to": `"` + start.Add(5*time.Minute).Format(time.RFC3339) + `"`, "unitIds": `["` + u + `"]`,
-			"baselineId": `"` + base + `"`, "baselineVersion": "1", "factorId": `"` + seed.ID("factor-demo-2026").String() + `"`, "factorVersion": "1",
-			"boundaryId": `"ac_input_electricity"`, "boundary": `"AC input electricity"`, "organizationId": `"` + org + `"`}
-		for k, v := range extra {
-			f[k] = v
+		f := map[string]string{
+			"from": `"` + start.Format(
+				time.RFC3339,
+			) + `"`,
+			"to":              `"` + start.Add(5*time.Minute).Format(time.RFC3339) + `"`,
+			"unitIds":         `["` + u + `"]`,
+			"baselineId":      `"` + base + `"`,
+			"baselineVersion": "1",
+			"factorId":        `"` + seed.ID("factor-demo-2026").String() + `"`,
+			"factorVersion":   "1",
+			"boundaryId":      `"ac_input_electricity"`,
+			"boundary":        `"AC input electricity"`,
+			"organizationId":  `"` + org + `"`,
 		}
+		maps.Copy(f, extra)
+
 		parts := []string{}
 		for k, v := range f {
 			parts = append(parts, `"`+k+`":`+v)
 		}
+
 		return "{" + strings.Join(parts, ",") + "}"
 	}
+
 	code, m := post(s, &hq, "mrv.preview", cond(nil))
-	if code != 200 || data(m)["incomplete"] != false || data(m)["scope"] != "scope_2" || data(m)["summary"].(map[string]any)["totals"].(map[string]any)["savedKWh"].(float64) != 5 ||
+	if code != 200 || data(m)["incomplete"] != false || data(m)["scope"] != "scope_2" ||
+		data(m)["summary"].(map[string]any)["totals"].(map[string]any)["savedKWh"].(float64) != 5 ||
 		data(m)["summary"].(map[string]any)["totals"].(map[string]any)["emissionsKg"].(float64) != 2.5 {
 		t.Fatalf("preview: %d %v", code, m)
 	}
-	if _, m := post(s, &hq, "mrv.preview", cond(map[string]string{"boundaryId": `"whole_building_electricity"`})); data(m)["incomplete"] != true {
+
+	if _, m := post(
+		s,
+		&hq,
+		"mrv.preview",
+		cond(map[string]string{"boundaryId": `"whole_building_electricity"`}),
+	); data(m)["incomplete"] != true {
 		t.Error("boundary mismatch is incomplete")
 	}
+
 	refused := map[string]string{ // the field each VALIDATION case is refused for
 		"blank boundary":      "boundary=error.length",
 		"non-customer org":    "organizationId=error.invalid",
 		"unaligned":           "from=errors.energy_range",
 		"unit of another org": "unitIds=errors.units_outside_organization",
 	}
+
 	for name, tc := range map[string]struct {
 		e    map[string]string
 		code int
@@ -64,55 +102,125 @@ func TestMRV(t *testing.T) {
 		}
 	}
 	// drafts, review, versions
-	if code, m := write(s, &hq, "mrv.saveDraft", `{"conditions":`+cond(nil)+`,"evidenceIds":["`+uuid.NewString()+`"]}`, 0); code != 422 || fields(m) != "evidenceIds=errors.evidence_unknown" {
+	if code, m := write(
+		s,
+		&hq,
+		"mrv.saveDraft",
+		`{"conditions":`+cond(nil)+`,"evidenceIds":["`+uuid.NewString()+`"]}`,
+		0,
+	); code != 422 ||
+		fields(m) != "evidenceIds=errors.evidence_unknown" {
 		t.Errorf("unknown evidence: %d %s", code, fields(m))
 	}
+
 	code, m = write(s, &hq, "mrv.saveDraft", `{"conditions":`+cond(nil)+`,"evidenceIds":[]}`, 0)
 	if code != 200 || data(m)["status"] != "draft" || ver(m) != 1 || data(m)["isDemo"] != true {
 		t.Fatalf("draft: %d %v", code, m)
 	}
+
 	id := data(m)["id"].(string)
+
 	review := func(rv, v int) (int, map[string]any) {
-		return write(s, &hq, "mrv.recordReview", `{"reportId":"`+id+`","reportVersion":`+itoa(rv)+`,"reviewComment":"Checked demo inputs"}`, v)
+		return write(
+			s,
+			&hq,
+			"mrv.recordReview",
+			`{"reportId":"`+id+`","reportVersion":`+itoa(
+				rv,
+			)+`,"reviewComment":"Checked demo inputs"}`,
+			v,
+		)
 	}
 	if code, _ := review(2, 1); code != 409 {
 		t.Error("review of a non-latest version")
 	}
+
 	code, m = review(1, 1)
-	if code != 200 || data(m)["status"] != "demo_reviewed" || ver(m) != 2 || len(data(m)["reviewHistory"].([]any)) != 1 ||
+	if code != 200 || data(m)["status"] != "demo_reviewed" || ver(m) != 2 ||
+		len(data(m)["reviewHistory"].([]any)) != 1 ||
 		data(m)["reviewHistory"].([]any)[0].(map[string]any)["reportVersion"].(float64) != 1 {
 		t.Fatalf("review: %d %v", code, m)
 	}
+
 	if code, _ := review(2, 2); code != 409 {
 		t.Error("review twice")
 	}
-	if code, _ := write(s, &hq, "mrv.saveDraft", `{"id":"`+id+`","conditions":`+cond(nil)+`,"evidenceIds":[]}`, 1); code != 409 {
+
+	if code, _ := write(
+		s,
+		&hq,
+		"mrv.saveDraft",
+		`{"id":"`+id+`","conditions":`+cond(nil)+`,"evidenceIds":[]}`,
+		1,
+	); code != 409 {
 		t.Error("stale draft")
 	}
-	if code, m := write(s, &hq, "mrv.saveDraft", `{"id":"`+id+`","conditions":`+cond(map[string]string{"boundaryId": `"whole_building_electricity"`})+`,"evidenceIds":[]}`, 2); code != 200 || ver(m) != 3 || data(m)["incomplete"] != true {
+
+	if code, m := write(
+		s,
+		&hq,
+		"mrv.saveDraft",
+		`{"id":"`+id+`","conditions":`+cond(
+			map[string]string{"boundaryId": `"whole_building_electricity"`},
+		)+`,"evidenceIds":[]}`,
+		2,
+	); code != 200 || ver(m) != 3 ||
+		data(m)["incomplete"] != true {
 		t.Fatalf("new draft version: %d %v", code, m)
 	}
+
 	if code, _ := review(3, 3); code != 409 {
 		t.Error("review of an incomplete version")
 	}
-	if _, m := post(s, &hq, "mrv.versions", `{"id":"`+id+`","query":{}}`); len(items(m)) != 3 || items(m)[0]["version"].(float64) != 1 || items(m)[1]["status"] != "demo_reviewed" {
+
+	if _, m := post(
+		s,
+		&hq,
+		"mrv.versions",
+		`{"id":"`+id+`","query":{}}`,
+	); len(items(m)) != 3 || items(m)[0]["version"].(float64) != 1 ||
+		items(m)[1]["status"] != "demo_reviewed" {
 		t.Errorf("versions: %v", m)
 	}
-	if _, m := post(s, &hq, "mrv.get", `{"id":"`+id+`","reportVersion":1}`); data(m)["status"] != "draft" || len(data(m)["reviewHistory"].([]any)) != 0 {
+
+	if _, m := post(
+		s,
+		&hq,
+		"mrv.get",
+		`{"id":"`+id+`","reportVersion":1}`,
+	); data(m)["status"] != "draft" ||
+		len(data(m)["reviewHistory"].([]any)) != 0 {
 		t.Errorf("old version: %v", m)
 	}
+
 	if _, m := post(s, &hq, "mrv.get", `{"id":"`+id+`"}`); ver(m) != 3 {
 		t.Error("latest by default")
 	}
+
 	if code, _ := post(s, &hq, "mrv.get", `{"id":"`+uuid.NewString()+`"}`); code != 404 {
 		t.Error("unknown report")
 	}
-	if _, m := post(s, &hq, "mrv.list", `{"filters":{"organizationId":"`+org+`","unitId":"`+u+`","status":"draft"}}`); len(items(m)) != 1 || ver(map[string]any{"data": items(m)[0]}) != 3 {
+
+	if _, m := post(
+		s,
+		&hq,
+		"mrv.list",
+		`{"filters":{"organizationId":"`+org+`","unitId":"`+u+`","status":"draft"}}`,
+	); len(items(m)) != 1 ||
+		ver(map[string]any{"data": items(m)[0]}) != 3 {
 		t.Errorf("list: %v", m)
 	}
-	if code, m := post(s, &hq, "mrv.list", `{"filters":{"status":"reviewed"}}`); code != 422 || fields(m) != "filters=error.invalid" {
+
+	if code, m := post(
+		s,
+		&hq,
+		"mrv.list",
+		`{"filters":{"status":"reviewed"}}`,
+	); code != 422 ||
+		fields(m) != "filters=error.invalid" {
 		t.Errorf("bad status filter: %d %s", code, fields(m))
 	}
+
 	if code, _ := post(s, &customerB, "mrv.list", `{}`); code != 403 {
 		t.Error("client MRV")
 	}

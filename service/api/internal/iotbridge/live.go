@@ -46,6 +46,7 @@ func LiveNode(topic string) string {
 	if len(parts) < 2 || parts[len(parts)-1] != "sensors" {
 		return ""
 	}
+
 	return parts[len(parts)-2]
 }
 
@@ -61,44 +62,67 @@ func LiveTriggers(node string, payload []byte, at time.Time) ([]Trigger, error) 
 	if !ok {
 		return nil, fmt.Errorf("node %q is not a live-site node", node)
 	}
+
 	var msg map[string]any
 	if err := json.Unmarshal(payload, &msg); err != nil {
 		return nil, fmt.Errorf("node %s: %w", node, err)
 	}
+
 	num := func(k string) (float64, bool) {
 		v, ok := msg[k].(float64)
+
 		return v, ok
 	}
 	at = at.UTC()
 	slot := at.Truncate(time.Minute)
+
 	units := map[string]seed.LiveSensor{}
 	for _, s := range seed.LiveSite.Sensors {
 		units[s.Name] = s
 	}
+
 	var out []Trigger
+
 	for _, f := range fields {
 		g, ok := num(f.Gate)
+
 		v, has := num(f.Field)
 		if !ok || g == 0 || !has {
 			continue
 		}
+
 		s, ok := units[f.Sensor]
 		if !ok {
 			return nil, fmt.Errorf("node %s: the live module has no sensor %s", node, f.Sensor)
 		}
+
 		value := v * f.Scale
-		event := uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("live/%s/%s/%s", node, f.Field, slot.Format(time.RFC3339))))
+		event := uuid.NewSHA1(
+			seed.Namespace,
+			[]byte(fmt.Sprintf("live/%s/%s/%s", node, f.Field, slot.Format(time.RFC3339))),
+		)
 		out = append(out, Trigger{
 			ScenarioID: Scenario,
 			EventID:    event,
 			OccurredAt: slot,
 			EventType:  "telemetry",
 			Measurement: &Measurement{
-				UnitID: seed.ID(seed.LiveSite.Unit), SensorID: seed.ID(s.Name), Metric: s.Metric, Value: &value, Unit: s.Unit,
-				ObservedAt: slot, ReceivedAt: at, Origin: "measured", Quality: "valid", EventID: event,
+				UnitID: seed.ID(
+					seed.LiveSite.Unit,
+				),
+				SensorID:   seed.ID(s.Name),
+				Metric:     s.Metric,
+				Value:      &value,
+				Unit:       s.Unit,
+				ObservedAt: slot,
+				ReceivedAt: at,
+				Origin:     "measured",
+				Quality:    "valid",
+				EventID:    event,
 			},
 		})
 	}
+
 	if len(out) == 0 {
 		return nil, nil
 	}
@@ -106,31 +130,60 @@ func LiveTriggers(node string, payload []byte, at time.Time) ([]Trigger, error) 
 	facts := make([]Fact, 0, len(out))
 	for _, tr := range out {
 		m := tr.Measurement
-		facts = append(facts, Fact{UnitID: m.UnitID, Metric: m.Metric, Value: *m.Value, Unit: m.Unit, ObservedAt: slot, Quality: "valid"})
+		facts = append(
+			facts,
+			Fact{
+				UnitID:     m.UnitID,
+				Metric:     m.Metric,
+				Value:      *m.Value,
+				Unit:       m.Unit,
+				ObservedAt: slot,
+				Quality:    "valid",
+			},
+		)
 	}
-	out = append(out, liveEvaluation(fmt.Sprintf("live/%s/automation/%s", node, slot.Format(time.RFC3339)), slot, facts))
+
+	out = append(
+		out,
+		liveEvaluation(
+			fmt.Sprintf("live/%s/automation/%s", node, slot.Format(time.RFC3339)),
+			slot,
+			facts,
+		),
+	)
 	dev := seed.ID(seed.LiveSite.Device)
 	out = append(out, Trigger{
 		ScenarioID: Scenario,
 		// one a minute for the module, whichever node is heard first: both nodes send the same body
-		EventID:    uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("%s/state/%s", dev, slot.Format(time.RFC3339)))),
+		EventID: uuid.NewSHA1(
+			seed.Namespace,
+			[]byte(fmt.Sprintf("%s/state/%s", dev, slot.Format(time.RFC3339))),
+		),
 		OccurredAt: slot,
 		EventType:  "state",
 		DeviceID:   &dev,
 		State:      &devicesim.ReportedState{},
 	})
+
 	return out, nil
 }
 
 // liveEvaluation is a demo automation trigger of the live unit's facts, with an event ID from key.
 func liveEvaluation(key string, at time.Time, facts []Fact) Trigger {
 	event := uuid.NewSHA1(seed.Namespace, []byte(key))
+
 	return Trigger{
 		ScenarioID: Scenario,
 		EventID:    event,
 		OccurredAt: at,
 		EventType:  "automation",
-		Event:      &Evaluation{EventID: event, OccurredAt: at, UnitIDs: []uuid.UUID{seed.ID(seed.LiveSite.Unit)}, Facts: facts, Phase: "condition"},
+		Event: &Evaluation{
+			EventID:    event,
+			OccurredAt: at,
+			UnitIDs:    []uuid.UUID{seed.ID(seed.LiveSite.Unit)},
+			Facts:      facts,
+			Phase:      "condition",
+		},
 	}
 }
 
@@ -140,8 +193,21 @@ func liveEvaluation(key string, at time.Time, facts []Fact) Trigger {
 func LiveGapTrigger(gap time.Duration, slot time.Time) Trigger {
 	slot = slot.UTC()
 	minutes := math.Floor(gap.Minutes()*10) / 10
-	return liveEvaluation("live/gap/"+slot.Format(time.RFC3339), slot,
-		[]Fact{{UnitID: seed.ID(seed.LiveSite.Unit), Metric: "heartbeat_gap", Value: minutes, Unit: "min", ObservedAt: slot, Quality: "valid"}})
+
+	return liveEvaluation(
+		"live/gap/"+slot.Format(time.RFC3339),
+		slot,
+		[]Fact{
+			{
+				UnitID:     seed.ID(seed.LiveSite.Unit),
+				Metric:     "heartbeat_gap",
+				Value:      minutes,
+				Unit:       "min",
+				ObservedAt: slot,
+				Quality:    "valid",
+			},
+		},
+	)
 }
 
 // The live module goes offline once a node has gone unheard for LiveOfflineAfter and comes back once every node has
@@ -169,12 +235,24 @@ func LiveConnectionTrigger(f ConnectionFault, gap time.Duration, at time.Time) (
 	if f.BindingID == nil {
 		return Trigger{}, false
 	}
+
 	dev, seq := seed.ID(seed.LiveSite.Device), f.Sequence+1
-	tr := Trigger{ScenarioID: Scenario, OccurredAt: at.UTC(), EventType: "device", DeviceID: &dev, BindingID: f.BindingID, Sequence: &seq}
+
+	tr := Trigger{
+		ScenarioID: Scenario,
+		OccurredAt: at.UTC(),
+		EventType:  "device",
+		DeviceID:   &dev,
+		BindingID:  f.BindingID,
+		Sequence:   &seq,
+	}
 	switch {
 	case f.FaultID == nil && gap >= LiveOfflineAfter:
 		tr.Kind = "communication_lost"
-		tr.EventID = uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("live/lost/%s/%d", f.BindingID, seq)))
+		tr.EventID = uuid.NewSHA1(
+			seed.Namespace,
+			[]byte(fmt.Sprintf("live/lost/%s/%d", f.BindingID, seq)),
+		)
 	case f.FaultID != nil && gap < LiveOnlineWithin:
 		tr.Kind = "restored"
 		tr.Recovery = &Recovery{Axis: "connection", SourceEventID: *f.FaultID, Value: "online"}
@@ -182,6 +260,7 @@ func LiveConnectionTrigger(f ConnectionFault, gap time.Duration, at time.Time) (
 	default:
 		return Trigger{}, false
 	}
+
 	return tr, true
 }
 
@@ -203,6 +282,7 @@ func NewLiveHeard(start time.Time) *LiveHeard {
 func (h *LiveHeard) Heard(node string, at time.Time) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+
 	if at = at.Round(0); at.After(h.last[node]) { // Round(0) drops the monotonic reading
 		h.last[node] = at
 	}
@@ -212,17 +292,22 @@ func (h *LiveHeard) Heard(node string, at time.Time) {
 func (h *LiveHeard) Gap(now time.Time) time.Duration {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+
 	now = now.Round(0)
+
 	var gap time.Duration
+
 	for node := range LiveNodes {
 		last, ok := h.last[node]
 		if !ok {
 			last = h.start
 		}
+
 		if d := now.Sub(last); d > gap {
 			gap = d
 		}
 	}
+
 	return gap
 }
 
@@ -237,13 +322,17 @@ type LiveGate struct {
 func (g *LiveGate) Claim(node string, slot time.Time) bool {
 	g.mu.Lock()
 	defer g.mu.Unlock()
+
 	if g.sent == nil {
 		g.sent = map[string]time.Time{}
 	}
+
 	if !slot.After(g.sent[node]) {
 		return false
 	}
+
 	g.sent[node] = slot
+
 	return true
 }
 
@@ -251,6 +340,7 @@ func (g *LiveGate) Claim(node string, slot time.Time) bool {
 func (g *LiveGate) Release(node string, slot time.Time) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
+
 	if g.sent[node].Equal(slot) {
 		delete(g.sent, node)
 	}
@@ -267,7 +357,9 @@ func LiveCommandTopic(node string) string { return "smarthome/ac/" + node + "/co
 // The firmware takes ON, OFF and COOL24 (on, cooling, 24 °C, fan auto). Power on sends COOL24: ON resumes whatever the
 // board sent last, after a restart the infrared library's default, which need not be cooling. Power off sends OFF and
 // leaves the other settings as they were (state nil). Any other action is one the firmware does not take (ok false).
-func LiveCommand(action json.RawMessage) (payload string, state *devicesim.ReportedState, ok bool, err error) {
+func LiveCommand(
+	action json.RawMessage,
+) (payload string, state *devicesim.ReportedState, ok bool, err error) {
 	var a struct {
 		Kind  string `json:"kind"`
 		Power *bool  `json:"power"`
@@ -275,14 +367,22 @@ func LiveCommand(action json.RawMessage) (payload string, state *devicesim.Repor
 	if err := json.Unmarshal(action, &a); err != nil {
 		return "", nil, false, fmt.Errorf("live command action: %w", err)
 	}
+
 	if a.Kind != "set_power" || a.Power == nil {
 		return "", nil, false, nil
 	}
+
 	if !*a.Power {
 		return "OFF", nil, true, nil
 	}
+
 	on, celsius, cool := true, 24.0, "cool"
-	return "COOL24", &devicesim.ReportedState{Power: &on, Celsius: &celsius, Mode: &cool}, true, nil // fan auto has no level
+
+	return "COOL24", &devicesim.ReportedState{
+		Power:   &on,
+		Celsius: &celsius,
+		Mode:    &cool,
+	}, true, nil // fan auto has no level
 }
 
 // LiveSentTriggers report a command the bridge published to the command node at `at`: sent, then acknowledged at once
@@ -292,13 +392,20 @@ func LiveCommand(action json.RawMessage) (payload string, state *devicesim.Repor
 func LiveSentTriggers(w Waiting, at, stateAt time.Time, state *devicesim.ReportedState) []Trigger {
 	at = at.UTC()
 	cmd, dev := w.ID, seed.ID(seed.LiveSite.Device)
-	out := []Trigger{SentTrigger(w, at), {
-		ScenarioID: Scenario,
-		EventID:    uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("%s/%s/command_ack", dev, cmd))),
-		OccurredAt: at,
-		EventType:  "command_ack",
-		CommandID:  &cmd,
-	}}
+
+	out := []Trigger{
+		SentTrigger(w, at),
+		{
+			ScenarioID: Scenario,
+			EventID: uuid.NewSHA1(
+				seed.Namespace,
+				[]byte(fmt.Sprintf("%s/%s/command_ack", dev, cmd)),
+			),
+			OccurredAt: at,
+			EventType:  "command_ack",
+			CommandID:  &cmd,
+		},
+	}
 	if state != nil {
 		out = append(out, Trigger{
 			ScenarioID: Scenario,
@@ -309,6 +416,7 @@ func LiveSentTriggers(w Waiting, at, stateAt time.Time, state *devicesim.Reporte
 			State:      state,
 		})
 	}
+
 	return out
 }
 
@@ -316,9 +424,13 @@ func LiveSentTriggers(w Waiting, at, stateAt time.Time, state *devicesim.Reporte
 // command while sending to the nodes is off (REAL_MQTT_COMMANDS).
 func LiveRefusedTrigger(w Waiting, at time.Time) Trigger {
 	cmd := w.ID
+
 	return Trigger{
 		ScenarioID: Scenario,
-		EventID:    uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("%s/%s/command_fail", seed.ID(seed.LiveSite.Device), cmd))),
+		EventID: uuid.NewSHA1(
+			seed.Namespace,
+			[]byte(fmt.Sprintf("%s/%s/command_fail", seed.ID(seed.LiveSite.Device), cmd)),
+		),
 		OccurredAt: at.UTC(),
 		EventType:  "command_fail",
 		CommandID:  &cmd,

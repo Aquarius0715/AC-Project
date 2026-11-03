@@ -13,11 +13,13 @@ func TestGeneratedFilesAreCurrent(t *testing.T) {
 	if n != 212 {
 		t.Fatalf("%d operations", n)
 	}
+
 	for path, want := range map[string][]byte{"../../../internal/ops/catalog_gen.go": src, "../../../../web/shared/lib/routes.gen.ts": ts, "../../../../web/shared/lib/contracts.gen.ts": ct} {
 		got, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		if !bytes.Equal(got, want) {
 			t.Errorf("%s is stale: run make gen", path)
 		}

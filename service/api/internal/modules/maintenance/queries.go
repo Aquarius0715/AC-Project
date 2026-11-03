@@ -30,9 +30,14 @@ type StatusCountsInput struct {
 
 // RegisterQueries binds maintenance's internal queries.
 func RegisterQueries(r *ops.Registry, m Jobs) {
-	ops.RegisterQuery(r, ops.DomainMaintenance, QueryCountJobs, func(ctx context.Context, c *ops.Call, in *CountJobsInput) (JobCounts, error) {
-		return m.CountJobs(ctx, c, in.Filters)
-	})
+	ops.RegisterQuery(
+		r,
+		ops.DomainMaintenance,
+		QueryCountJobs,
+		func(ctx context.Context, c *ops.Call, in *CountJobsInput) (JobCounts, error) {
+			return m.CountJobs(ctx, c, in.Filters)
+		},
+	)
 	ops.RegisterQuery(r, ops.DomainMaintenance, QueryStatusCounts, statusCounts)
 	registerUsage(r)
 	registerAccess(r)
@@ -42,19 +47,30 @@ func RegisterQueries(r *ops.Registry, m Jobs) {
 // statusCounts counts the jobs of the units whose requested slot starts in [from, to), by status (admin.summary).
 func statusCounts(ctx context.Context, c *ops.Call, in *StatusCountsInput) (map[string]int, error) {
 	out := map[string]int{}
-	rows, err := c.Tx.Query(ctx, `SELECT status, count(*) FROM maintenance.jobs WHERE unit_id = ANY($1) AND lower(requested_slot) >= $2 AND lower(requested_slot) < $3 GROUP BY status`,
-		in.UnitIDs, in.From, in.To)
+
+	rows, err := c.Tx.Query(
+		ctx,
+		`SELECT status, count(*) FROM maintenance.jobs WHERE unit_id = ANY($1) AND lower(requested_slot) >= $2 AND lower(requested_slot) < $3 GROUP BY status`,
+		in.UnitIDs,
+		in.From,
+		in.To,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
+
 	for rows.Next() {
-		var s string
-		var k int
+		var (
+			s string
+			k int
+		)
 		if err := rows.Scan(&s, &k); err != nil {
 			return nil, err
 		}
+
 		out[s] = k
 	}
+
 	return out, rows.Err()
 }
