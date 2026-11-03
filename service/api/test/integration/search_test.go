@@ -1,7 +1,6 @@
-package integration
+package integration_test
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +10,8 @@ import (
 
 // TestSearchIsLiteral: filters.search finds the term as written, anywhere and in any case, in every list that has it
 // (IR388). A %, _ or \ in the term is not a wildcard: "%" alone finds only values with a "%" in them, not every row.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestSearchIsLiteral(t *testing.T) {
 	srv := server(t)
 	// a part and a contractor whose names hold a % and an _ (the seed's do not)
@@ -29,8 +30,8 @@ func TestSearchIsLiteral(t *testing.T) {
 		CONFLICT (organization_id) DO NOTHING`,
 		seed.ID("tenant-a"),
 		org,
-		clock.Add(-time.Hour),
-		clock.Add(1000*time.Hour),
+		clock().Add(-time.Hour),
+		clock().Add(1000*time.Hour),
 	)
 	t.Cleanup(func() {
 		owner(t, `DELETE FROM maintenance.parts_catalog WHERE code = 'SEAL_50'`)
@@ -40,19 +41,19 @@ func TestSearchIsLiteral(t *testing.T) {
 	search := func(operation, term string) []map[string]any {
 		t.Helper()
 
-		b, _ := json.Marshal(
-			map[string]any{"filters": map[string]any{"search": term}, "limit": 100},
+		b := jsonBytes(t,
+			map[string]any{fieldFilters: map[string]any{"search": term}, "limit": 100},
 		)
 
-		code, m := post(srv, &hq, operation, string(b))
+		code, m := post(srv, hq(), operation, string(b))
 		if code != 200 {
 			t.Fatalf("%s search %q: %d %v", operation, term, code, m)
 		}
 
-		return items(m)
+		return items(t, m)
 	}
 	text := func(item map[string]any) string {
-		b, _ := json.Marshal(item)
+		b := jsonBytes(t, item)
 
 		return strings.ToLower(string(b))
 	}
@@ -60,8 +61,8 @@ func TestSearchIsLiteral(t *testing.T) {
 	// each list: a term taken from its own first row finds that row, in other case; a lone wildcard character finds
 	// only the rows that contain it
 	for operation, field := range map[string]string{
-		"clientUsers.list": "email", "contractors.list": "name", "parts.list": "name",
-		"units.coverage": "unitId",
+		opClientUsersList: fieldEmail, opContractorsList: fieldName, opPartsList: fieldName,
+		"units.coverage": fieldUnitID,
 	} {
 		all := search(operation, "")
 		if len(all) == 0 {
@@ -87,26 +88,29 @@ func TestSearchIsLiteral(t *testing.T) {
 	}
 
 	// the term's own % and _ are matched as written
-	found := func(op, field, term string) (out []string) {
-		for _, item := range search(op, term) {
+	found := func(op, field, term string) []string {
+		rows := search(op, term)
+
+		out := make([]string, 0, len(rows))
+		for _, item := range rows {
 			out = append(out, asStr(t, item[field]))
 		}
 
 		return out
 	}
-	for _, c := range []struct{ op, field, term, want string }{
-		{"parts.list", "code", "50% grade", "SEAL_50"},
-		{"parts.list", "code", "l_5", "SEAL_50"},
-		{"parts.list", "code", "SEAL%", ""},
-		{"parts.list", "code", "seal_kit", ""},
-		{"parts.list", "code", "50%%", ""},
-		{"contractors.list", "name", "50%_c", "Search Test 50%_Cooling"},
-		{"contractors.list", "name", "50%c", ""},
-		{"contractors.list", "name", "s_arch", ""},
-		{"contractors.list", "name", "reg_t", "Search Test 50%_Cooling"},
+	for _, testCase := range []struct{ op, field, term, want string }{
+		{opPartsList, fieldCode, "50% grade", "SEAL_50"},
+		{opPartsList, fieldCode, "l_5", "SEAL_50"},
+		{opPartsList, fieldCode, "SEAL%", ""},
+		{opPartsList, fieldCode, "seal_kit", ""},
+		{opPartsList, fieldCode, "50%%", ""},
+		{opContractorsList, fieldName, "50%_c", "Search Test 50%_Cooling"},
+		{opContractorsList, fieldName, "50%c", ""},
+		{opContractorsList, fieldName, "s_arch", ""},
+		{opContractorsList, fieldName, "reg_t", "Search Test 50%_Cooling"},
 	} {
-		if got := strings.Join(found(c.op, c.field, c.term), ","); got != c.want {
-			t.Errorf("%s search %q: %q, want %q", c.op, c.term, got, c.want)
+		if got := strings.Join(found(testCase.op, testCase.field, testCase.term), ","); got != testCase.want {
+			t.Errorf("%s search %q: %q, want %q", testCase.op, testCase.term, got, testCase.want)
 		}
 	}
 }

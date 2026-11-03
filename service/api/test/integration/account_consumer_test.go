@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -17,8 +17,10 @@ import (
 // TestAccountConsumerApart (IR511): the sign-in accounts and sessions have their own consumer, "identity-accounts". An
 // event the "identity" consumer cannot apply holds back only that consumer: an account is still turned off at once.
 // An account event "identity" applied before the split counts as applied and is not applied again.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAccountConsumerApart(t *testing.T) {
-	fake := &fakeIdP{
+	fake := &fakeIDP{
 		mu:         sync.Mutex{},
 		subjects:   nil,
 		err:        nil,
@@ -59,21 +61,21 @@ func TestAccountConsumerApart(t *testing.T) {
 		tenant,
 		user,
 		seed.ID("org-contractor-b"),
-		clock.Add(-24*time.Hour),
-		clock.Add(10*24*time.Hour),
+		clock().Add(-24*time.Hour),
+		clock().Add(10*24*time.Hour),
 	)
 
 	emit := func(kind, payload string) uuid.UUID {
-		var id uuid.UUID
+		var outboxID uuid.UUID
 		ownerScan(
 			t,
 			`INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id) VALUES
 				($1, 'membership', $2, $3, $4::jsonb, 'test-ir511') RETURNING id`,
 			[]any{tenant, membership, kind, payload},
-			&id,
+			&outboxID,
 		)
 
-		return id
+		return outboxID
 	}
 	// applied by "identity" before the split: not again
 	before := emit("AccountEnabled", `{"membershipId":"`+membership.String()+`","enabled":true}`)
@@ -92,9 +94,10 @@ func TestAccountConsumerApart(t *testing.T) {
 			tenant,
 			bad,
 			`{"id":"` + bad.String() + `","actorId":"split-test","actorRole":"nobody","action":"split.test",` +
-				`"targetKind":"test","targetId":"x","occurredAt":"` + clock.Format(
+				`"targetKind":"test","targetId":"x","occurredAt":"` + clock().Format(
 				time.RFC3339,
-			) + `","correlationId":"test-ir511","result":"success"}`,
+			) +
+				`","correlationId":"test-ir511","result":"success"}`,
 		},
 		&bad,
 	)

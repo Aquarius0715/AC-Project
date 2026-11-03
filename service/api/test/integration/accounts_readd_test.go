@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -21,8 +21,10 @@ import (
 // the new name holds and no sign-in shows yet. While the person still holds an open membership the address stays
 // errors.email_taken, for the company and for another one. HQ giving the removed person a membership points the
 // account at it too.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPersonAddedAgain(t *testing.T) {
-	fake := &fakeIdP{
+	fake := &fakeIDP{
 		mu:         sync.Mutex{},
 		subjects:   nil,
 		err:        nil,
@@ -47,15 +49,15 @@ func TestPersonAddedAgain(t *testing.T) {
 		}
 	}
 	email := "again-" + uuid.NewString()[:8] + "@example.com"
-	add := func(a *actor, role, name string) (int, map[string]any) {
+	add := func(who *actor, role, name string) (int, map[string]any) {
 		access := ""
-		if role == "technician" {
-			access = `,"accessUntil":"` + clock.Add(30*24*time.Hour).Format(time.RFC3339) + `"`
+		if role == roleTechnician {
+			access = `,"accessUntil":"` + clock().Add(30*24*time.Hour).Format(time.RFC3339) + `"`
 		}
 
 		return write(
 			srv,
-			a,
+			who,
 			"partnerUsers.save",
 			`{"email":"`+email+`","partnerRole":"`+role+`","displayName":"`+name+`"`+access+`}`,
 			0,
@@ -63,14 +65,14 @@ func TestPersonAddedAgain(t *testing.T) {
 	}
 	// removed: the membership ends now. The test clock stands still, so the adding was "now" too and the end is a second
 	// later; the removal is moved to when it would be, after the adding.
-	remove := func(id, membership string) {
+	remove := func(partnerUserID, membership string) {
 		t.Helper()
 
 		if code, res := write(
 			srv,
-			&contrA,
+			contrA(),
 			"partnerUsers.remove",
-			`{"id":"`+id+`","reason":"added with the wrong role"}`,
+			`{"id":"`+partnerUserID+`","reason":"added with the wrong role"}`,
 			1,
 		); code != 200 {
 			t.Fatalf("remove: %d %v", code, res)
@@ -81,7 +83,7 @@ func TestPersonAddedAgain(t *testing.T) {
 			t,
 			`UPDATE identity.memberships SET valid_from = $2::timestamptz - interval '1 hour', valid_until = $2 WHERE id = $1`,
 			membership,
-			clock,
+			clock(),
 		)
 	}
 	updatedTo := func(membership string) bool {
@@ -94,7 +96,7 @@ func TestPersonAddedAgain(t *testing.T) {
 		)
 	}
 
-	code, resp := add(&contrA, "technician", "First Name")
+	code, resp := add(contrA(), "technician", "First Name")
 	if code != 200 {
 		t.Fatalf("add: %d %v", code, resp)
 	}
@@ -114,24 +116,24 @@ func TestPersonAddedAgain(t *testing.T) {
 		t,
 		`UPDATE identity.users SET last_sign_in_at = $2 WHERE id = $1`,
 		user,
-		clock,
+		clock(),
 	) // as if they had signed in
 
-	for name, a := range map[string]*actor{"the same company": &contrA, "another company": &contrB} {
+	for name, a := range map[string]*actor{"the same company": contrA(), "another company": contrB()} {
 		if code, res := add(
 			a,
 			"contractor",
 			"X",
 		); code != 422 ||
-			fields(res) != "email=errors.email_taken" {
+			fields(res) != refusedEmailTaken {
 			t.Errorf("%s while the person is a user: %d %s", name, code, fields(res))
 		}
 	}
 
 	remove(first, firstMembership)
 
-	code, resp = add(&contrA, "contractor", "Second Name")
-	if code != 200 || data(resp)["status"] != "invited" ||
+	code, resp = add(contrA(), "contractor", "Second Name")
+	if code != 200 || data(resp)["status"] != statusInvited ||
 		data(resp)["membershipId"] == firstMembership {
 		t.Fatalf("added again: %d %v", code, resp)
 	}
@@ -174,17 +176,17 @@ func TestPersonAddedAgain(t *testing.T) {
 
 	code, resp = write(
 		srv,
-		&hq,
+		hq(),
 		"members.save",
 		`{"userId":"`+user+`","organizationId":"`+seed.ID("org-contractor-b").
 			String()+
 			`","role":"technician","employment":"external",`+
 			`"permissions":["alert.read"],"scopes":[{"kind":"unit","id":"`+seed.ID("unit-non-rto").
 			String()+
-			`"}],"validFrom":"`+clock.Format(
+			`"}],"validFrom":"`+clock().Format(
 			time.RFC3339,
 		)+
-			`","validUntil":"`+clock.Add(30*24*time.Hour).
+			`","validUntil":"`+clock().Add(30*24*time.Hour).
 			Format(time.RFC3339)+
 			`","reason":"joins contractor B"}`,
 		0,
@@ -205,13 +207,15 @@ func TestPersonAddedAgain(t *testing.T) {
 		&listed,
 	)
 
-	if !updatedTo(hqMembership) || listed != "invited" {
+	if !updatedTo(hqMembership) || listed != statusInvited {
 		t.Errorf("HQ's membership: listed %q, updated %+v", listed, fake.updated)
 	}
 }
 
 // TestPersonOfAnotherTenant (IR462): an address whose person signs in with another tenant's membership is
 // errors.email_taken, though their membership here has ended.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPersonOfAnotherTenant(t *testing.T) {
 	srv := server(t)
 	email := "foreign-" + uuid.NewString()[:8] + "@example.com"
@@ -231,7 +235,7 @@ func TestPersonOfAnotherTenant(t *testing.T) {
 		seed.ID("tenant-b"),
 		user,
 		seed.ID("org-customer-tb"),
-		clock.Add(-48*time.Hour),
+		clock().Add(-48*time.Hour),
 	)
 	owner(
 		t,
@@ -241,8 +245,8 @@ func TestPersonOfAnotherTenant(t *testing.T) {
 		seed.ID("tenant-a"),
 		user,
 		seed.ID("org-contractor-a"),
-		clock.Add(-48*time.Hour),
-		clock.Add(-24*time.Hour),
+		clock().Add(-48*time.Hour),
+		clock().Add(-24*time.Hour),
 	)
 	t.Cleanup(func() {
 		owner(t, `DELETE FROM identity.memberships WHERE id = ANY($1)`, []uuid.UUID{foreign, local})
@@ -251,22 +255,24 @@ func TestPersonOfAnotherTenant(t *testing.T) {
 
 	code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.save",
-		`{"email":"`+email+`","partnerRole":"technician","displayName":"Foreign","accessUntil":"`+clock.Add(24*time.Hour).
+		`{"email":"`+email+`","partnerRole":"technician","displayName":"Foreign","accessUntil":"`+clock().Add(24*time.Hour).
 			Format(time.RFC3339)+
 			`"}`,
 		0,
 	)
-	if code != 422 || fields(res) != "email=errors.email_taken" {
+	if code != 422 || fields(res) != refusedEmailTaken {
 		t.Errorf("another tenant's person: %d %s", code, fields(res))
 	}
 }
 
 // TestAccountSwitchedByMembership (IR462): disabling a demo-style account — no provider subject stored — turns it off
 // by the person's ID; when the account signs in with another membership, enabling this one leaves it alone.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAccountSwitchedByMembership(t *testing.T) {
-	fake := &fakeIdP{
+	fake := &fakeIDP{
 		mu:         sync.Mutex{},
 		subjects:   nil,
 		err:        nil,
@@ -299,11 +305,11 @@ func TestAccountSwitchedByMembership(t *testing.T) {
 		seed.ID("tenant-a"),
 		user,
 		seed.ID("org-contractor-b"),
-		clock.Add(-24*time.Hour),
-		clock.Add(10*24*time.Hour),
+		clock().Add(-24*time.Hour),
+		clock().Add(10*24*time.Hour),
 	)
 
-	var id string
+	var partnerUserID string
 	ownerScan(
 		t,
 		`INSERT INTO identity.partner_users (tenant_id, organization_id, membership_id, email, display_name, partner_role,
@@ -314,26 +320,26 @@ func TestAccountSwitchedByMembership(t *testing.T) {
 			seed.ID("org-contractor-b"),
 			membership,
 			email,
-			clock.Add(-24 * time.Hour),
+			clock().Add(-24 * time.Hour),
 			seed.ID("contractor-b"),
 		},
-		&id,
+		&partnerUserID,
 	)
 	t.Cleanup(func() {
-		owner(t, `DELETE FROM identity.partner_users WHERE id = $1`, id)
+		owner(t, `DELETE FROM identity.partner_users WHERE id = $1`, partnerUserID)
 		owner(t, `DELETE FROM identity.memberships WHERE id = $1`, membership)
 		owner(t, `DELETE FROM identity.users WHERE id = $1`, user)
 	})
 
-	set := func(status string, v int) {
+	set := func(status string, version int) {
 		t.Helper()
 
 		if code, res := write(
 			srv,
-			&contrB,
+			contrB(),
 			"partnerUsers.save",
-			`{"id":"`+id+`","email":"`+email+`","partnerRole":"technician","status":"`+status+`","reason":"on leave"}`,
-			v,
+			`{"id":"`+partnerUserID+`","email":"`+email+`","partnerRole":"technician","status":"`+status+`","reason":"on leave"}`,
+			version,
 		); code != 200 {
 			t.Fatalf("%s: %d %v", status, code, res)
 		}
@@ -365,11 +371,13 @@ func TestAccountSwitchedByMembership(t *testing.T) {
 // TestClientAddedAgain (IR462): a customer owner removes a member and adds the same address again as an owner: the same
 // person, a new client membership with the new role. (Only a person whose account the provider opened for this tenant
 // is taken back, hence the provider and the drained events.)
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestClientAddedAgain(t *testing.T) {
 	srv := serverCfg(
 		t,
 		func(config *apiserver.Config) {
-			config.IdentityProvider = &fakeIdP{
+			config.IdentityProvider = &fakeIDP{
 				mu:         sync.Mutex{},
 				subjects:   nil,
 				err:        nil,
@@ -389,7 +397,7 @@ func TestClientAddedAgain(t *testing.T) {
 	add := func(role string) (int, map[string]any) {
 		return write(
 			srv,
-			&customerB,
+			customerB(),
 			"clientUsers.save",
 			`{"customerId":"`+cust+`","email":"`+email+`","clientRole":"`+role+`","displayName":"Client Again"}`,
 			0,
@@ -410,7 +418,7 @@ func TestClientAddedAgain(t *testing.T) {
 
 	if code, resp := write(
 		srv,
-		&customerB,
+		customerB(),
 		"clientUsers.remove",
 		`{"id":"`+asStr(t, data(res)["id"])+`","reason":"should be an owner"}`,
 		1,
@@ -422,11 +430,11 @@ func TestClientAddedAgain(t *testing.T) {
 		t,
 		`UPDATE identity.memberships SET valid_from = $2::timestamptz - interval '1 hour', valid_until = $2 WHERE id = $1`,
 		first,
-		clock,
+		clock(),
 	)
 
 	code, res = add("owner")
-	if code != 200 || data(res)["clientRole"] != "owner" {
+	if code != 200 || data(res)["clientRole"] != clientRoleOwner {
 		t.Fatalf("added again: %d %v", code, res)
 	}
 
@@ -437,8 +445,8 @@ func TestClientAddedAgain(t *testing.T) {
 			t,
 			`UPDATE identity.memberships SET valid_from = $2, valid_until = $3 WHERE id = $1`,
 			again,
-			clock.Add(-time.Hour),
-			clock.Add(-30*time.Minute),
+			clock().Add(-time.Hour),
+			clock().Add(-30*time.Minute),
 		)
 	})
 
@@ -463,8 +471,10 @@ func TestClientAddedAgain(t *testing.T) {
 // TestAccountProviderTrouble (IR461–IR463): a provider that does not answer leaves the person without an account and
 // nothing recorded; once it answers, the set-up e-mail sent again opens the account. An account the provider lost is
 // opened anew when the person is added again.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAccountProviderTrouble(t *testing.T) {
-	fake := &fakeIdP{
+	fake := &fakeIDP{
 		failing:    true,
 		mu:         sync.Mutex{},
 		subjects:   nil,
@@ -494,10 +504,10 @@ func TestAccountProviderTrouble(t *testing.T) {
 
 		code, res := write(
 			srv,
-			&contrA,
+			contrA(),
 			"partnerUsers.save",
 			`{"email":"`+email+`","partnerRole":"technician","displayName":"Trouble Tech",`+
-				`"accessUntil":"`+clock.Add(30*24*time.Hour).
+				`"accessUntil":"`+clock().Add(30*24*time.Hour).
 				Format(time.RFC3339)+
 				`"}`,
 			0,
@@ -508,8 +518,11 @@ func TestAccountProviderTrouble(t *testing.T) {
 
 		return asStr(t, data(res)["id"]), asStr(t, data(res)["membershipId"])
 	}
-	account := func(membership string) (sub, signIn string) {
+	account := func(membership string) (string, string) {
 		t.Helper()
+
+		var sub, signIn string
+
 		ownerScan(
 			t,
 			`SELECT coalesce(u.cognito_sub, ''), coalesce(u.sign_in_membership_id::text, '') FROM identity.users u JOIN
@@ -519,9 +532,9 @@ func TestAccountProviderTrouble(t *testing.T) {
 			&signIn,
 		)
 
-		return
+		return sub, signIn
 	}
-	id, membership := add()
+	partnerUserID, membership := add()
 
 	drain()
 
@@ -535,14 +548,14 @@ func TestAccountProviderTrouble(t *testing.T) {
 	owner(
 		t,
 		`UPDATE identity.partner_users SET last_invite_sent_at = NULL WHERE id = $1`,
-		id,
+		partnerUserID,
 	) // past the 5-minute wait (IR423)
 
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.resendInvite",
-		`{"id":"`+id+`"}`,
+		`{"id":"`+partnerUserID+`"}`,
 		0,
 	); code != 200 {
 		t.Fatalf("resend: %d %v", code, res)
@@ -557,9 +570,9 @@ func TestAccountProviderTrouble(t *testing.T) {
 	// removed, then added again while the provider no longer knows the account: a new one is opened
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.remove",
-		`{"id":"`+id+`","reason":"left"}`,
+		`{"id":"`+partnerUserID+`","reason":"left"}`,
 		1,
 	); code != 200 {
 		t.Fatalf("remove: %d %v", code, res)
@@ -570,7 +583,7 @@ func TestAccountProviderTrouble(t *testing.T) {
 		t,
 		`UPDATE identity.memberships SET valid_from = $2::timestamptz - interval '1 hour', valid_until = $2 WHERE id = $1`,
 		membership,
-		clock,
+		clock(),
 	) // removed after the adding
 	fake.mu.Lock()
 	fake.lost, fake.generation = map[string]bool{"sub-" + email: true}, 2
@@ -588,6 +601,8 @@ func TestAccountProviderTrouble(t *testing.T) {
 // TestAccountsPerOrgPerDay (IR464): a contractor or a customer owner adds at most identity.AccountsPerOrgPerDay
 // accounts to their organization in 24 hours — the next is RATE_LIMITED errors.too_many_accounts with the seconds until
 // the oldest of them is a day old; HQ is not limited.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAccountsPerOrgPerDay(t *testing.T) {
 	srv := server(t)
 	filler := uuid.New()
@@ -598,16 +613,15 @@ func TestAccountsPerOrgPerDay(t *testing.T) {
 		"cap-"+uuid.NewString()[:8]+"@example.com",
 	)
 
-	var ids []uuid.UUID
-
+	ids := make([]uuid.UUID, 0, 2*identity.AccountsPerOrgPerDay)
 	for _, org := range []string{"org-contractor-b", "org-customer-b"} {
 		for idx := range identity.AccountsPerOrgPerDay { // ended memberships added 1 h to 1 h 29 min ago
-			id := uuid.New()
-			ids = append(ids, id)
+			membershipID := uuid.New()
+			ids = append(ids, membershipID)
 
-			role, employment, clientRole := "technician", any("external"), any(nil)
+			role, employment, clientRole := roleTechnician, any("external"), any(nil)
 			if org == "org-customer-b" {
-				role, employment, clientRole = "client", nil, "member"
+				role, employment, clientRole = roleClient, nil, clientRoleMember
 			}
 
 			owner(
@@ -615,18 +629,18 @@ func TestAccountsPerOrgPerDay(t *testing.T) {
 				`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, client_role,
 					valid_from, valid_until, created_at)
 				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-				id,
+				membershipID,
 				seed.ID("tenant-a"),
 				filler,
 				seed.ID(org),
 				role,
 				employment,
 				clientRole,
-				clock.Add(
+				clock().Add(
 					-3*time.Hour,
 				),
-				clock.Add(-2*time.Hour),
-				clock.Add(-time.Hour-time.Duration(idx)*time.Minute),
+				clock().Add(-2*time.Hour),
+				clock().Add(-time.Hour-time.Duration(idx)*time.Minute),
 			)
 		}
 	}
@@ -639,10 +653,10 @@ func TestAccountsPerOrgPerDay(t *testing.T) {
 	// (other tests may have added to contractor B since, which only shortens it)
 	code, res := write(
 		srv,
-		&contrB,
+		contrB(),
 		"partnerUsers.save",
 		`{"email":"cap-`+uuid.NewString()[:8]+`@example.com","partnerRole":"technician","displayName":"Cap Tech",`+
-			`"accessUntil":"`+clock.Add(24*time.Hour).
+			`"accessUntil":"`+clock().Add(24*time.Hour).
 			Format(time.RFC3339)+
 			`"}`,
 		0,
@@ -666,18 +680,18 @@ func TestAccountsPerOrgPerDay(t *testing.T) {
 			0,
 		)
 	}
-	if code, m := add(&customerB); code != 429 || m["messageKey"] != "errors.too_many_accounts" {
+	if code, m := add(customerB()); code != 429 || m["messageKey"] != "errors.too_many_accounts" {
 		t.Errorf("customer owner over the cap: %d %v", code, m)
 	}
 
-	code, res = add(&hq)
+	code, res = add(hq())
 	if code != 200 {
 		t.Fatalf("HQ is not limited: %d %v", code, res)
 	}
 
 	if code, resp := write(
 		srv,
-		&hq,
+		hq(),
 		"clientUsers.remove",
 		`{"id":"`+asStr(t, data(res)["id"])+`","reason":"cap test"}`,
 		1,

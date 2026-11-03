@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -15,6 +15,8 @@ import (
 // customer's Users list shows it. Further requests of that sign-in and the token of an older session leave it alone;
 // a later sign-in moves it — directly on identity (session.get) and through another service, whose principal comes
 // from identity-api in cluster mode (units.list).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestLastSignIn(t *testing.T) {
 	srv := server(t)
 	ctx := context.Background()
@@ -24,7 +26,9 @@ func TestLastSignIn(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Cleanup(func() { owner.Close(ctx) }) // registered first, so it closes after the reset below
+	t.Cleanup(
+		func() { _ = owner.Close(ctx) },
+	) // registered first, so it closes after the reset below
 
 	user := seed.ID("user-customer-a")
 	exec := func(sql string, args ...any) {
@@ -33,7 +37,9 @@ func TestLastSignIn(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	read := func() (last, auth *time.Time) {
+	read := func() (*time.Time, *time.Time) {
+		var last, auth *time.Time
+
 		err := owner.QueryRow(ctx, `SELECT last_sign_in_at, sign_in_auth_time FROM identity.users WHERE id = $1`, user).
 			Scan(&last, &auth)
 		if err != nil {
@@ -51,33 +57,33 @@ func TestLastSignIn(t *testing.T) {
 	reset()
 	t.Cleanup(reset)
 
-	earlier := clock.Add(-30 * 24 * time.Hour)
+	earlier := clock().Add(-30 * 24 * time.Hour)
 	mark := func() {
 		exec(`UPDATE identity.users SET last_sign_in_at = $2 WHERE id =
 		$1`, user, earlier)
 	} // to see whether a request writes
-	signedIn := func(at time.Time) *actor { return &actor{fmt.Sprintf("tok-a@%d", at.Unix()), "customer-a"} }
+	signedIn := func(at time.Time) *actor { return &actor{fmt.Sprintf("tok-a@%d", at.Unix()), membershipCustomerA} }
 	request := func(a *actor, op string) {
 		t.Helper()
 
-		body := map[string]string{"session.get": `{}`, "units.list": `{"limit":1}`}[op]
+		body := map[string]string{opSessionGet: `{}`, opUnitsList: `{"limit":1}`}[op]
 		if code, m := post(srv, a, op, body); code != 200 {
 			t.Fatalf("%s: %d %v", op, code, m)
 		}
 	}
 
-	t1 := clock.Add(-2 * time.Hour)
-	request(signedIn(t1), "session.get")
+	signedAt := clock().Add(-2 * time.Hour)
+	request(signedIn(signedAt), "session.get")
 
 	last, auth := read()
-	if last == nil || last.Before(clock) || auth == nil || !auth.Equal(t1) {
+	if last == nil || last.Before(clock()) || auth == nil || !auth.Equal(signedAt) {
 		t.Fatalf("first sign-in: last %v, auth_time %v", last, auth)
 	}
 
-	_, m := post(srv, &customerA, "clientUsers.list", `{"limit":100}`)
+	_, m := post(srv, customerA(), "clientUsers.list", `{"limit":100}`)
 	shown := ""
 
-	for _, it := range items(m) {
+	for _, it := range items(t, m) {
 		if it["membershipId"] == seed.ID("customer-a").String() {
 			shown, _ = it["lastSignInAt"].(string)
 		}
@@ -89,30 +95,30 @@ func TestLastSignIn(t *testing.T) {
 	}
 
 	mark()
-	request(signedIn(t1), "session.get")                 // the same sign-in again
-	request(signedIn(t1.Add(-time.Hour)), "session.get") // an older session's token
-	request(&customerA, "session.get")                   // a token without a sign-in time
+	request(signedIn(signedAt), "session.get")                 // the same sign-in again
+	request(signedIn(signedAt.Add(-time.Hour)), "session.get") // an older session's token
+	request(customerA(), "session.get")                  // a token without a sign-in time
 
 	if last, _ := read(); last == nil || !last.Equal(earlier) {
 		t.Fatalf("must not move: %v", last)
 	}
 
-	t2 := t1.Add(time.Hour)
-	request(signedIn(t2), "session.get")
+	secondSignIn := signedAt.Add(time.Hour)
+	request(signedIn(secondSignIn), "session.get")
 
-	if last, auth := read(); last == nil || last.Equal(earlier) || auth == nil || !auth.Equal(t2) {
+	if last, auth := read(); last == nil || last.Equal(earlier) || auth == nil || !auth.Equal(secondSignIn) {
 		t.Fatalf("a later sign-in: %v %v", last, auth)
 	}
 
 	mark()
 
-	t3 := t2.Add(time.Minute)
+	thirdSignIn := secondSignIn.Add(time.Minute)
 	request(
-		signedIn(t3),
+		signedIn(thirdSignIn),
 		"units.list",
 	) // another service: identity-api records it through the principal call
 
-	if last, auth := read(); last == nil || last.Equal(earlier) || auth == nil || !auth.Equal(t3) {
+	if last, auth := read(); last == nil || last.Equal(earlier) || auth == nil || !auth.Equal(thirdSignIn) {
 		t.Fatalf("through another service: %v %v", last, auth)
 	}
 }

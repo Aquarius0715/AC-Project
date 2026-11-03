@@ -1,7 +1,6 @@
-package integration
+package integration_test
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -13,12 +12,14 @@ import (
 
 // IR190: in the split services the read models of equipment-api ask maintenance, billing, energy and identity over
 // the internal query endpoint; the answers equal the single-process composition.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestReadModelsAcrossServices(t *testing.T) {
 	all := server(t)
 	cl := newCluster(t)
 	urls := cl.urls
 	equipment := cl.srv[ops.DomainEquipment]
-	from := clock.Add(-24 * time.Hour).Truncate(time.Minute)
+	from := clock().Add(-24 * time.Hour).Truncate(time.Minute)
 
 	cases := []struct {
 		who  *actor
@@ -26,46 +27,47 @@ func TestReadModelsAcrossServices(t *testing.T) {
 		body string
 	}{
 		{
-			&hq,
+			hq(),
 			"admin.summary",
 			`{"from":"` + from.Format(
 				time.RFC3339,
-			) + `","to":"` + clock.Truncate(time.Minute).
+			) + `","to":"` + clock().Truncate(time.Minute).
 				Format(time.RFC3339) +
 				`"}`,
 		},
-		{&contrA, "summaries.get", `{"kind":"partner","filters":{}}`},
-		{&techA, "summaries.get", `{"kind":"technician","filters":{}}`},
-		{&customerA, "summaries.get", `{"kind":"customer","filters":{}}`},
+		{contrA(), opSummariesGet, `{"kind":"partner","filters":{}}`},
+		{techA(), opSummariesGet, `{"kind":"technician","filters":{}}`},
+		{customerA(), opSummariesGet, `{"kind":"customer","filters":{}}`},
 	}
-	for _, tc := range cases {
-		code1, want := post(all, tc.who, tc.op, tc.body)
-		code2, got := post(equipment, tc.who, tc.op, tc.body)
-		w, _ := json.Marshal(want["data"])
+	for _, testCase := range cases {
+		code1, want := post(all, testCase.who, testCase.op, testCase.body)
+		code2, got := post(equipment, testCase.who, testCase.op, testCase.body)
+		wantJSON := jsonBytes(t, want["data"])
 
-		g, _ := json.Marshal(got["data"])
-		if code1 != 200 || code2 != 200 || string(w) != string(g) {
+		gotJSON := jsonBytes(t, got["data"])
+		if code1 != 200 || code2 != 200 || string(wantJSON) != string(gotJSON) {
 			t.Fatalf(
 				"%s %s: single %d %s\nsplit %d %s",
-				tc.op,
-				tc.who.membership,
+				testCase.op,
+				testCase.who.membership,
 				code1,
-				w,
+				wantJSON,
 				code2,
-				g,
+				gotJSON,
 			)
 		}
 	}
 	// the internal endpoint needs the internal token, and serves only the service's own domain
 	ask := func(base, name, token string) int {
-		req, _ := http.NewRequest(
+		req, _ := http.NewRequestWithContext(
+			t.Context(),
 			http.MethodPost,
 			base+"/internal/v1/queries/"+name,
 			strings.NewReader(`{"unitIds":[]}`),
 		)
-		req.Header.Set("Authorization", "Bearer "+hq.token)
+		req.Header.Set("Authorization", "Bearer "+hq().token)
 		req.Header.Set("X-Tenant-Id", seed.ID("tenant-a").String())
-		req.Header.Set("X-Membership-Id", seed.ID(hq.membership).String())
+		req.Header.Set("X-Membership-Id", seed.ID(hq().membership).String())
 
 		if token != "" {
 			req.Header.Set(ops.InternalTokenHeader, token)
@@ -76,7 +78,7 @@ func TestReadModelsAcrossServices(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		resp.Body.Close()
+		_ = resp.Body.Close()
 
 		return resp.StatusCode
 	}
@@ -95,6 +97,8 @@ func TestReadModelsAcrossServices(t *testing.T) {
 
 // IR191: billing-api alone notifies through identity — recipients come from identity.members over HTTP and the
 // notification is stored by identity-api's consumer from NotificationRequested.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestNotificationsAcrossServices(t *testing.T) {
 	s := server(t)
 	u := boundUnit(t, s, "online")
@@ -104,7 +108,7 @@ func TestNotificationsAcrossServices(t *testing.T) {
 
 	code, res := write(
 		billingSrv,
-		&customerB,
+		customerB(),
 		"inquiries.create",
 		`{"subjectType":"payment","invoiceId":"`+inv+`","message":"split services"}`,
 		0,
@@ -113,17 +117,19 @@ func TestNotificationsAcrossServices(t *testing.T) {
 		t.Fatalf("create on billing-api: %d %v", code, res)
 	}
 
-	id := asStr(t, data(res)["id"])
+	inquiryID := asStr(t, data(res)["id"])
 
-	count := func() (n int) {
+	count := func() int {
+		var total int
+
 		ownerScan(
 			t,
 			`SELECT count(*) FROM notify.notifications WHERE target->>'id' = $1 AND recipient_membership_id = $2`,
-			[]any{id, seed.ID("hq-operator")},
-			&n,
+			[]any{inquiryID, seed.ID("hq-operator")},
+			&total,
 		)
 
-		return n
+		return total
 	}
 	if count() != 0 {
 		t.Fatal("billing-api must not store notifications itself")
@@ -141,6 +147,8 @@ func TestNotificationsAcrossServices(t *testing.T) {
 
 // IR192: maintenance-api alone checks technicians through identity.technician over HTTP, and a verified certificate
 // reaches identity's qualification grants through QualificationGranted.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestDirectoryAcrossServices(t *testing.T) {
 	_ = server(t)
 	cl := newCluster(t)
@@ -148,7 +156,7 @@ func TestDirectoryAcrossServices(t *testing.T) {
 	tech := seed.ID("tech-external-a").String()
 	until := time.Date(2027, 3, 31, 0, 0, 0, 0, time.UTC)
 	body := `{"membershipId":"` + tech + `","code":"demo_electrical","name":"Electrical","number":"E-split",` +
-		`"issuedAt":"` + clock.Add(-24*time.Hour).
+		`"issuedAt":"` + clock().Add(-24*time.Hour).
 		Format(time.RFC3339) +
 		`","expiresAt":"` + until.Format(
 		time.RFC3339,
@@ -159,19 +167,19 @@ func TestDirectoryAcrossServices(t *testing.T) {
 		14,
 	) + `}`
 
-	code, res := write(maint, &contrA, "certificates.submit", body, 0)
+	code, res := write(maint, contrA(), "certificates.submit", body, 0)
 	if code != 200 {
 		t.Fatalf("submit on maintenance-api: %d %v", code, res)
 	}
 
-	if code, m := write(maint, &contrB, "certificates.submit", body, 0); code != 404 {
+	if code, m := write(maint, contrB(), "certificates.submit", body, 0); code != 404 {
 		t.Fatalf("another contractor's technician (identity.technician over HTTP): %d %v", code, m)
 	}
 
 	cert := asStr(t, data(res)["id"])
 	if code, resp := write(
 		maint,
-		&hq,
+		hq(),
 		"certificates.verify",
 		`{"certificateId":"`+cert+`","decision":"approve"}`,
 		1,
@@ -198,13 +206,16 @@ func TestDirectoryAcrossServices(t *testing.T) {
 }
 
 // IR195: workers ask other domains without a user through the system route: internal token and tenant only.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestSystemQueries(t *testing.T) {
-	cl := newCluster(t)
+	cluster := newCluster(t)
 	unit := seed.ID("unit-online-rto").String()
 	ask := func(token, tenant string) int {
-		req, _ := http.NewRequest(
+		req, _ := http.NewRequestWithContext(
+			t.Context(),
 			http.MethodPost,
-			cl.urls[ops.DomainBilling]+"/internal/v1/system/queries/restrictions.unitPolicy",
+			cluster.urls[ops.DomainBilling]+"/internal/v1/system/queries/restrictions.unitPolicy",
 			strings.NewReader(`{"unitId":"`+unit+`"}`),
 		)
 		if token != "" {
@@ -220,7 +231,7 @@ func TestSystemQueries(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		resp.Body.Close()
+		_ = resp.Body.Close()
 
 		return resp.StatusCode
 	}

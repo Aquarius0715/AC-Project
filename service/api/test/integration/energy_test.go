@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"slices"
@@ -19,8 +19,8 @@ func powerSeries(t *testing.T, unit string, start time.Time, origin string, kw .
 
 	sensor := uuid.NewString()
 
-	for i, v := range kw {
-		if v == nil {
+	for i, kilowatts := range kw {
+		if kilowatts == nil {
 			continue
 		}
 
@@ -34,22 +34,23 @@ func powerSeries(t *testing.T, unit string, start time.Time, origin string, kw .
 			unit,
 			sensor,
 			when,
-			*v,
+			*kilowatts,
 			origin,
 			uuid.NewString(),
 		)
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestFactors(t *testing.T) {
 	srv := server(t)
 	if _, resp := post(
 		srv,
-		&hq,
+		hq(),
 		"factors.list",
 		`{"filters":{"year":2026}}`,
-	); len(items(resp)) == 0 ||
-		items(resp)[0]["isDemo"] != true {
+	); len(items(t, resp)) == 0 ||
+		items(t, resp)[0]["isDemo"] != true {
 		t.Fatalf("seed factor: %v", resp)
 	}
 
@@ -59,26 +60,26 @@ func TestFactors(t *testing.T) {
 		return `{"region":"` + region + `","year":2030,"kgCO2ePerKWh":0.42,"source":"demo test factor",` +
 			`"isDemo":true` + extra + `}`
 	}
-	for b, want := range map[string]string{
+	for payload, want := range map[string]string{
 		strings.Replace(body(""), `"year":2030`, `"year":1999`, 1):      "year=error.range",
 		strings.Replace(body(""), `0.42`, `0`, 1):                       "kgCO2ePerKWh=error.range",
 		strings.Replace(body(""), `"isDemo":true`, `"isDemo":false`, 1): "isDemo=error.invalid",
 		strings.Replace(body(""), `"demo test factor"`, `" "`, 1):       "source=error.length",
 	} {
-		code, m := write(srv, &hq, "factors.save", b, 0)
-		refusal(t, b, code, m, want)
+		code, m := write(srv, hq(), "factors.save", payload, 0)
+		refusal(t, payload, code, m, want)
 	}
 
-	code, res := write(srv, &hq, "factors.save", body(""), 0)
-	if code != 200 || ver(res) != 1 {
+	code, res := write(srv, hq(), "factors.save", body(""), 0)
+	if code != 200 || ver(t, res) != 1 {
 		t.Fatalf("create: %d %v", code, res)
 	}
 
-	id := asStr(t, data(res)["id"])
+	factorID := asStr(t, data(res)["id"])
 
 	if code, resp := write(
 		srv,
-		&hq,
+		hq(),
 		"factors.save",
 		body(""),
 		0,
@@ -89,42 +90,43 @@ func TestFactors(t *testing.T) {
 
 	code, res = write(
 		srv,
-		&hq,
+		hq(),
 		"factors.save",
-		strings.Replace(body(`,"id":"`+id+`"`), "0.42", "0.40", 1),
+		strings.Replace(body(`,"id":"`+factorID+`"`), "0.42", "0.40", 1),
 		1,
 	)
-	if code != 200 || ver(res) != 2 || asNum(t, data(res)["kgCO2ePerKWh"]) != 0.40 {
+	if code != 200 || ver(t, res) != 2 || asNum(t, data(res)["kgCO2ePerKWh"]) != 0.40 {
 		t.Fatalf("new version: %d %v", code, res)
 	}
 
-	if code, _ := write(srv, &hq, "factors.save", body(`,"id":"`+id+`"`), 1); code != 409 {
+	if code, _ := write(srv, hq(), "factors.save", body(`,"id":"`+factorID+`"`), 1); code != 409 {
 		t.Error("stale factor version")
 	}
 
-	if code, _ := write(srv, &customerA, "factors.save", body(""), 0); code != 403 {
+	if code, _ := write(srv, customerA(), "factors.save", body(""), 0); code != 403 {
 		t.Error("client saves factor")
 	}
 
-	if code, _ := post(srv, &customerA, "factors.list", `{}`); code != 403 {
+	if code, _ := post(srv, customerA(), "factors.list", `{}`); code != 403 {
 		t.Error("client lists factors")
 	}
 
 	if code, resp := post(
 		srv,
-		&hq,
+		hq(),
 		"factors.list",
 		`{"filters":{"x":1}}`,
 	); code != 422 ||
-		fields(resp) != "x=error.notAllowed" {
+		fields(resp) != refusedUnknownFieldX {
 		t.Errorf("bad factor filter: %d %s", code, fields(resp))
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestBaselines(t *testing.T) {
 	srv := server(t)
 	unit := newUnit(t, srv, "Energy AC")
-	start := clock.Add(-3 * time.Hour).Truncate(time.Minute)
+	start := clock().Add(-3 * time.Hour).Truncate(time.Minute)
 	powerSeries(
 		t,
 		unit,
@@ -148,17 +150,17 @@ func TestBaselines(t *testing.T) {
 	}
 	// the field each case is refused for
 	want := map[string]string{
-		"bad method":             "method=error.invalid",
+		caseBadMethod:            refusedMethodInvalid,
 		"comparison on building": "boundaryId=errors.boundary_not_measurable",
 		"comparison with value":  "baselineKWh=error.notAllowed",
 		"fixed without value":    "baselineKWh=error.range",
 		"negative fixed":         "baselineKWh=error.range",
-		"no units":               "unitIds=error.invalid",
+		caseNoUnits:              refusedUnitIDsInvalid,
 		"unaligned period":       "period=errors.energy_range",
-		"unknown unit":           "unitIds=errors.unit_unknown",
+		caseUnknownUnit:          "unitIds=errors.unit_unknown",
 	}
 
-	for name, b := range map[string]string{
+	for name, payload := range map[string]string{
 		"fixed without value":   body("demo_fixed", ""),
 		"negative fixed":        body("demo_fixed", `,"baselineKWh":-1`),
 		"comparison with value": body("demo_period_comparison", `,"baselineKWh":5`),
@@ -166,15 +168,15 @@ func TestBaselines(t *testing.T) {
 			"whole_building_electricity", 1),
 		"unaligned period": strings.Replace(body("demo_fixed", `,"baselineKWh":1`), start.Format(time.RFC3339),
 			start.Add(30*time.Second).Format(time.RFC3339), 1),
-		"no units":     strings.Replace(body("demo_fixed", `,"baselineKWh":1`), `["`+unit+`"]`, `[]`, 1),
-		"unknown unit": strings.Replace(body("demo_fixed", `,"baselineKWh":1`), unit, uuid.NewString(), 1),
-		"bad method":   body("guess", ""),
+		caseNoUnits:     strings.Replace(body("demo_fixed", `,"baselineKWh":1`), `["`+unit+`"]`, `[]`, 1),
+		caseUnknownUnit: strings.Replace(body("demo_fixed", `,"baselineKWh":1`), unit, uuid.NewString(), 1),
+		caseBadMethod:   body("guess", ""),
 	} {
-		code, m := write(srv, &hq, "baselines.save", b, 0)
+		code, m := write(srv, hq(), "baselines.save", payload, 0)
 		refusal(t, name, code, m, want[name])
 	}
 
-	code, resp := write(srv, &hq, "baselines.save", body("demo_period_comparison", ""), 0)
+	code, resp := write(srv, hq(), "baselines.save", body("demo_period_comparison", ""), 0)
 
 	q, _ := data(resp)["quality"].(map[string]any)
 	if code != 200 || q["kind"] != "measured" || asNum(t, q["expectedSlots"]) != 5 ||
@@ -183,16 +185,16 @@ func TestBaselines(t *testing.T) {
 		t.Fatalf("measured baseline: %d %v", code, resp)
 	}
 
-	id := asStr(t, data(resp)["id"])
+	baselineID := asStr(t, data(resp)["id"])
 
 	code, resp = write(
 		srv,
-		&hq,
+		hq(),
 		"baselines.save",
-		body("demo_fixed", `,"id":"`+id+`","baselineKWh":7.5`),
+		body("demo_fixed", `,"id":"`+baselineID+`","baselineKWh":7.5`),
 		1,
 	)
-	if code != 200 || ver(resp) != 2 ||
+	if code != 200 || ver(t, resp) != 2 ||
 		asObj(t, data(resp)["quality"])["kind"] != "modeled" ||
 		asNum(t, data(resp)["baselineKWh"]) != 7.5 {
 		t.Fatalf("modeled version: %d %v", code, resp)
@@ -200,9 +202,9 @@ func TestBaselines(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"baselines.save",
-		body("demo_fixed", `,"id":"`+id+`","baselineKWh":1`),
+		body("demo_fixed", `,"id":"`+baselineID+`","baselineKWh":1`),
 		1,
 	); code != 409 {
 		t.Error("stale baseline")
@@ -223,7 +225,7 @@ func TestBaselines(t *testing.T) {
 	)
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"baselines.save",
 		empty,
 		0,
@@ -234,49 +236,49 @@ func TestBaselines(t *testing.T) {
 	// lists: HQ all; the customer only when every unit is theirs
 	if _, res := post(
 		srv,
-		&hq,
+		hq(),
 		"baselines.list",
 		`{"filters":{"unitId":"`+unit+`","method":"demo_fixed"}}`,
 	); len(
-		items(res),
+		items(t, res),
 	) != 1 {
 		t.Errorf("HQ list: %v", res)
 	}
 
 	if _, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"baselines.list",
 		`{"filters":{"unitId":"`+unit+`"},"limit":100}`,
 	); len(
-		items(res),
+		items(t, res),
 	) != 2 {
 		t.Errorf("client list: %v", res)
 	}
 
 	if code, res := post(
 		srv,
-		&customerA,
+		customerA(),
 		"baselines.list",
 		`{"limit":100}`,
 	); code != 200 ||
-		len(items(res)) != 0 {
+		len(items(t, res)) != 0 {
 		t.Error("seed baseline spans two customers: not visible to customer-a")
 	}
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"baselines.list",
 		`{"filters":{"method":"magic"}}`,
 	); code != 422 ||
-		fields(res) != "filters=error.invalid" {
+		fields(res) != refusedFiltersInvalid {
 		t.Errorf("bad baseline filter: %d %s", code, fields(res))
 	}
 
 	if code, _ := write(
 		srv,
-		&customerB,
+		customerB(),
 		"baselines.save",
 		body("demo_fixed", `,"baselineKWh":1`),
 		0,
@@ -302,7 +304,7 @@ func isolatedUnit(t *testing.T, srv *apiserver.Server) (string, string) {
 
 	code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"units.save",
 		`{"customerOrgId":"`+seed.ID("org-customer-b").
 			String()+
@@ -319,6 +321,7 @@ func isolatedUnit(t *testing.T, srv *apiserver.Server) (string, string) {
 	return asStr(t, data(res)["id"]), prop
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestEnergySummary(t *testing.T) {
 	srv := server(t)
 	unit := newUnit(t, srv, "Summary AC")
@@ -335,16 +338,16 @@ func TestEnergySummary(t *testing.T) {
 		new(float64(60)),
 	)
 
-	fixed := func(v string, minutes int) string {
+	fixed := func(value string, minutes int) string {
 		_, res := write(
 			srv,
-			&hq,
+			hq(),
 			"baselines.save",
 			`{"unitIds":["`+unit+`"],"period":{"from":"2026-08-01T00:00:00Z",`+
 				`"to":"`+time.Date(2026, 8, 1, 0, minutes, 0, 0, time.UTC).
 				Format(time.RFC3339)+
 				`"},"boundaryId":"ac_input_electricity","boundary":"AC input","assumptions":"demo","source":"test",`+
-				`"method":"demo_fixed","baselineKWh":`+v+`}`,
+				`"method":"demo_fixed","baselineKWh":`+value+`}`,
 			0,
 		)
 
@@ -360,7 +363,7 @@ func TestEnergySummary(t *testing.T) {
 	end := start.Add(5 * time.Minute)
 	code, resp := post(
 		srv,
-		&customerB,
+		customerB(),
 		"energy.summary",
 		body(end, `,"baselineId":"`+fixed("10", 5)+`","tariffVersion":"tariff-demo-1"`),
 	)
@@ -386,7 +389,7 @@ func TestEnergySummary(t *testing.T) {
 		energy.DefaultFactorID,
 	)
 
-	_, resp = post(srv, &hq, "energy.summary", body(end, ""))
+	_, resp = post(srv, hq(), "energy.summary", body(end, ""))
 
 	owner(
 		t,
@@ -402,7 +405,7 @@ func TestEnergySummary(t *testing.T) {
 		t.Errorf("factor missing: %v", resp)
 	}
 	// an increase is signed negative (IR68)
-	_, resp = post(srv, &hq, "energy.summary", body(end, `,"baselineId":"`+fixed("4", 5)+`"`))
+	_, resp = post(srv, hq(), "energy.summary", body(end, `,"baselineId":"`+fixed("4", 5)+`"`))
 	if tot := asObj(t, data(resp)["totals"]); asNum(t, tot["savedKWh"]) != -1 ||
 		asNum(t, tot["savingPercentage"]) != -25 {
 		t.Errorf("increase: %v", tot)
@@ -410,7 +413,7 @@ func TestEnergySummary(t *testing.T) {
 	// partial coverage or another minute count: actuals only
 	_, resp = post(
 		srv,
-		&hq,
+		hq(),
 		"energy.summary",
 		body(start.Add(6*time.Minute), `,"baselineId":"`+fixed("10", 6)+`"`),
 	)
@@ -420,14 +423,14 @@ func TestEnergySummary(t *testing.T) {
 		t.Errorf("partial: %v", resp)
 	}
 
-	_, resp = post(srv, &hq, "energy.summary", body(end, `,"baselineId":"`+fixed("10", 7)+`"`))
+	_, resp = post(srv, hq(), "energy.summary", body(end, `,"baselineId":"`+fixed("10", 7)+`"`))
 	if asObj(t, data(resp)["totals"])["savedKWh"] != nil {
 		t.Error("minute count mismatch must not compare")
 	}
 	// nothing measured: null actuals, coverage 0; no units: coverage null
 	_, resp = post(
 		srv,
-		&hq,
+		hq(),
 		"energy.summary",
 		`{"from":"2026-09-01T00:00:00Z","to":"2026-09-01T00:10:00Z","unitIds":["`+unit+`"]}`,
 	)
@@ -439,7 +442,7 @@ func TestEnergySummary(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"energy.summary",
 		`{"from":"2026-09-01T00:00:00Z","to":"2026-09-01T00:10:00Z","unitIds":[]}`,
 	); code != 200 ||
@@ -447,23 +450,23 @@ func TestEnergySummary(t *testing.T) {
 		t.Errorf("no units: %v", res)
 	}
 
-	for b, want := range map[string]string{
+	for payload, want := range map[string]string{
 		body(end, `,"tariffVersion":"tariff-x"`):                      "tariffVersion=error.invalid",
-		body(start.Add(90*time.Second), ""):                           "from=errors.energy_range", // not whole minutes
-		body(start, ""):                                               "from=errors.energy_range", // empty
-		`{"from":"2026-09-01T00:00:00Z","to":"2026-09-01T00:10:00Z"}`: "unitIds=error.invalid",
+		body(start.Add(90*time.Second), ""):                           refusedEnergyRange, // not whole minutes
+		body(start, ""):                                               refusedEnergyRange, // empty
+		`{"from":"2026-09-01T00:00:00Z","to":"2026-09-01T00:10:00Z"}`: refusedUnitIDsInvalid,
 	} {
-		code, m := post(srv, &hq, "energy.summary", b)
-		refusal(t, b, code, m, want)
+		code, m := post(srv, hq(), "energy.summary", payload)
+		refusal(t, payload, code, m, want)
 	}
 
-	if code, _ := post(srv, &customerA, "energy.summary", body(end, "")); code != 404 {
+	if code, _ := post(srv, customerA(), "energy.summary", body(end, "")); code != 404 {
 		t.Error("other customer's units")
 	}
 
 	if code, _ := post(
 		srv,
-		&hq,
+		hq(),
 		"energy.summary",
 		body(end, `,"baselineId":"`+uuid.NewString()+`"`),
 	); code != 404 {
@@ -471,6 +474,7 @@ func TestEnergySummary(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAdminSummary(t *testing.T) {
 	srv := server(t)
 	unit, prop := isolatedUnit(t, srv)
@@ -487,7 +491,7 @@ func TestAdminSummary(t *testing.T) {
 		new(float64(60)),
 	)
 
-	q := func(a *actor, extra string) (int, map[string]any) {
+	adminSummary := func(a *actor, extra string) (int, map[string]any) {
 		return post(
 			srv,
 			a,
@@ -499,18 +503,18 @@ func TestAdminSummary(t *testing.T) {
 				`"`+extra+`}`,
 		)
 	}
-	code, res := q(&hq, `,"propertyId":"`+prop+`"`)
+	code, res := adminSummary(hq(), `,"propertyId":"`+prop+`"`)
 
-	fc, _ := data(res)["energyForecast"].(map[string]any)
+	forecast, _ := data(res)["energyForecast"].(map[string]any)
 	if code != 200 || asNum(t, data(res)["total"]) != 1 ||
 		asNum(t, data(res)["customerCount"]) != 1 ||
 		len(asObj(t, data(res)["jobCounts"])) != 10 ||
 		data(res)["billingVisibility"] != "allowed" ||
-		fc["predictedBaselineKWh"] != nil {
+		forecast["predictedBaselineKWh"] != nil {
 		t.Fatalf("admin summary: %d %v", code, res)
 	}
 
-	if w := asArr(t, fc["qualityWarnings"]); len(w) != 1 || w[0] != "baseline_unavailable" {
+	if w := asArr(t, forecast["qualityWarnings"]); len(w) != 1 || w[0] != "baseline_unavailable" {
 		t.Errorf("forecast warnings: %v", w)
 	}
 
@@ -522,39 +526,39 @@ func TestAdminSummary(t *testing.T) {
 	// a fixed baseline for exactly U is prorated (IR78): 20 kWh over 10 unit-minutes → 10 kWh expected for 5
 	write(
 		srv,
-		&hq,
+		hq(),
 		"baselines.save",
 		`{"unitIds":["`+unit+`"],"period":{"from":"2026-08-01T00:00:00Z","to":"2026-08-01T00:10:00Z"},`+
 			`"boundaryId":"ac_input_electricity","boundary":"AC input","assumptions":"demo","source":"test",`+
 			`"method":"demo_fixed","baselineKWh":20}`,
 		0,
 	)
-	_, res = q(&hq, `,"propertyId":"`+prop+`"`)
+	_, res = adminSummary(hq(), `,"propertyId":"`+prop+`"`)
 
-	fc = asObj(t, data(res)["energyForecast"])
-	if asNum(t, fc["predictedBaselineKWh"]) != 10 || asNum(t, fc["predictedActualKWh"]) != 5 ||
-		asNum(t, fc["forecastSavedKWh"]) != 5 ||
-		asNum(t, fc["forecastSavingPercentage"]) != 50 ||
-		asNum(t, fc["expectedUnitMinutes"]) != 5 ||
-		asNum(t, fc["validUnitMinutes"]) != 5 {
-		t.Fatalf("forecast: %v", fc)
+	forecast = asObj(t, data(res)["energyForecast"])
+	if asNum(t, forecast["predictedBaselineKWh"]) != 10 || asNum(t, forecast["predictedActualKWh"]) != 5 ||
+		asNum(t, forecast["forecastSavedKWh"]) != 5 ||
+		asNum(t, forecast["forecastSavingPercentage"]) != 50 ||
+		asNum(t, forecast["expectedUnitMinutes"]) != 5 ||
+		asNum(t, forecast["validUnitMinutes"]) != 5 {
+		t.Fatalf("forecast: %v", forecast)
 	}
 
-	if w := asArr(t, fc["qualityWarnings"]); len(w) != 2 || w[0] != "modeled_baseline" ||
+	if w := asArr(t, forecast["qualityWarnings"]); len(w) != 2 || w[0] != "modeled_baseline" ||
 		w[1] != "prorated_forecast" {
 		t.Errorf("forecast warnings: %v", w)
 	}
 
-	if _, m := q(
-		&hq,
+	if _, m := adminSummary(
+		hq(),
 		`,"propertyId":"`+uuid.NewString()+`"`,
 	); asArr(t, asObj(t, data(m)["energyForecast"])["qualityWarnings"])[0] != "no_units" ||
 		data(m)["operatingRate"] != nil {
 		t.Errorf("no units: %v", m)
 	}
 
-	if _, m := q(
-		&hq,
+	if _, m := adminSummary(
+		hq(),
 		`,"customerId":"`+seed.ID("cust-b").String()+`"`,
 	); asNum(t, data(m)["customerCount"]) != 1 ||
 		data(m)["overdueInvoiceCount"] == nil {
@@ -563,16 +567,16 @@ func TestAdminSummary(t *testing.T) {
 
 	if code, resp := post(
 		srv,
-		&hq,
+		hq(),
 		"admin.summary",
 		`{"from":"2026-09-13T12:00:30Z","to":"2026-09-13T12:05:00Z"}`,
 	); code != 422 ||
-		fields(resp) != "from=errors.energy_range" {
+		fields(resp) != refusedEnergyRange {
 		t.Errorf("unaligned period: %d %s", code, fields(resp))
 	}
 
-	for _, a := range []*actor{&customerA, &overrider} {
-		if code, _ := q(a, ""); code != 403 {
+	for _, a := range []*actor{customerA(), overrider()} {
+		if code, _ := adminSummary(a, ""); code != 403 {
 			t.Errorf("%s admin.summary: %d", a.membership, code)
 		}
 	}
@@ -580,13 +584,15 @@ func TestAdminSummary(t *testing.T) {
 
 // TestForecastWithoutReadings: a unit set without any valid reading has no actual to forecast from (IR78), so the
 // forecast says so instead of predicting zero.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestForecastWithoutReadings(t *testing.T) {
 	s := server(t)
 	_, prop := isolatedUnit(t, s)
 	start := time.Date(2026, 9, 13, 12, 0, 0, 0, time.UTC)
 	_, res := post(
 		s,
-		&hq,
+		hq(),
 		"admin.summary",
 		`{"from":"`+start.Format(
 			time.RFC3339,
@@ -594,26 +600,30 @@ func TestForecastWithoutReadings(t *testing.T) {
 			Format(time.RFC3339)+
 			`","propertyId":"`+prop+`"}`,
 	)
-	fc, _ := data(res)["energyForecast"].(map[string]any)
+	forecast, _ := data(res)["energyForecast"].(map[string]any)
 
-	warnings := []string{}
-	for _, w := range asArr(t, fc["qualityWarnings"]) {
+	raw := asArr(t, forecast["qualityWarnings"])
+
+	warnings := make([]string, 0, len(raw))
+	for _, w := range raw {
 		warnings = append(warnings, asStr(t, w))
 	}
 
-	if !slices.Contains(warnings, "actual_unavailable") || fc["predictedActualKWh"] != nil ||
-		asNum(t, fc["validUnitMinutes"]) != 0 {
-		t.Errorf("forecast without readings: %v", fc)
+	if !slices.Contains(warnings, "actual_unavailable") || forecast["predictedActualKWh"] != nil ||
+		asNum(t, forecast["validUnitMinutes"]) != 0 {
+		t.Errorf("forecast without readings: %v", forecast)
 	}
 }
 
 // IR110 / IR153: the monthly report states the month's figures — 5 kWh at the demo tariff is "5.0" and "2.50 MYR" —
 // and "n/a" for a month without readings; only the file's metadata is returned, so its size tells the two apart.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestEnergyReportFigures(t *testing.T) {
 	srv := server(t)
 	_, resp := write(
 		srv,
-		&hq,
+		hq(),
 		"properties.save",
 		`{"customerOrgId":"`+seed.ID("org-customer-b").
 			String()+
@@ -624,7 +634,7 @@ func TestEnergyReportFigures(t *testing.T) {
 
 	code, resp := write(
 		srv,
-		&hq,
+		hq(),
 		"units.save",
 		`{"customerOrgId":"`+seed.ID("org-customer-b").
 			String()+
@@ -652,7 +662,7 @@ func TestEnergyReportFigures(t *testing.T) {
 	size := func(month string) int {
 		code, res := post(
 			srv,
-			&customerB,
+			customerB(),
 			"energy.exportReport",
 			`{"month":"`+month+`","propertyIds":["`+prop+`"],"sections":["energy_cost"],"format":"csv"}`,
 		)

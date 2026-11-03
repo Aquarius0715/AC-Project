@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -6,9 +6,13 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+const refusedFactsInvalid = "facts=" + apperr.KeyInvalid
+
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAutomationEvaluation(t *testing.T) {
 	srv := server(t)
 	owner(t, `DELETE FROM control.evaluation_events`)
@@ -28,7 +32,7 @@ func TestAutomationEvaluation(t *testing.T) {
 	rule := func(units, cond, action string, priority int) string {
 		_, res := write(
 			srv,
-			&customerB,
+			customerB(),
 			"automations.save",
 			`{"name":"r","unitIds":[`+units+`],"timezone":"Asia/Kuala_Lumpur","enabled":true,"priority":`+itoa(
 				priority,
@@ -51,7 +55,7 @@ func TestAutomationEvaluation(t *testing.T) {
 		`{"kind":"set_power","power":false}`,
 		90,
 	)
-	at := clock.Format(time.RFC3339)
+	stamp := clock().Format(time.RFC3339)
 	fact := func(unit, metric, value, unitName string, observed time.Time) string {
 		return `{"unitId":"` + unit + `","metric":"` + metric + `","value":` + value + `,"unit":"` + unitName +
 			`","observedAt":"` + observed.Format(
@@ -59,7 +63,7 @@ func TestAutomationEvaluation(t *testing.T) {
 		) + `","quality":"valid"}`
 	}
 	input := func(units, facts, phase string) string {
-		return `{"eventId":"` + uuid.NewString() + `","occurredAt":"` + at + `","unitIds":[` + units + `],"facts":[` + facts +
+		return `{"eventId":"` + uuid.NewString() + `","occurredAt":"` + stamp + `","unitIds":[` + units + `],"facts":[` + facts +
 			`],"phase":"` + phase + `"}`
 	}
 	decision := func(m map[string]any, unit string) map[string]any {
@@ -71,15 +75,15 @@ func TestAutomationEvaluation(t *testing.T) {
 
 		return nil
 	}
-	occupied := fact(unitID, "occupied", "true", "boolean", clock)
+	occupied := fact(unitID, "occupied", "true", "boolean", clock())
 
 	code, resp := post(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.simulate",
 		input(`"`+unitID+`"`, occupied, "condition"),
 	)
-	if code != 200 || decision(resp, unitID)["decision"] != "selected" ||
+	if code != 200 || decision(resp, unitID)["decision"] != decisionSelected ||
 		decision(resp, unitID)["ruleId"] != pattern {
 		t.Fatalf("priority: %d %v", code, resp)
 	}
@@ -88,7 +92,7 @@ func TestAutomationEvaluation(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.simulate",
 		input(`"`+unitID+`"`, occupied, "condition"),
 	); decision(res, unitID)["ruleId"] != occ {
@@ -120,7 +124,7 @@ func TestAutomationEvaluation(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.simulate",
 		input(`"`+unitID+`"`, occupied, "condition"),
 	); decision(res, unitID)["ruleId"] != hqPolicy {
@@ -129,57 +133,57 @@ func TestAutomationEvaluation(t *testing.T) {
 	// data quality and other exclusions
 	if _, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.simulate",
 		input(
 			`"`+unitID+`"`,
-			fact(unitID, "occupied", "true", "boolean", clock.Add(-10*time.Minute)),
+			fact(unitID, "occupied", "true", "boolean", clock().Add(-10*time.Minute)),
 			"condition",
 		),
 	); decision(res, unitID)["reason"] != "stale" &&
-		decision(res, unitID)["reason"] != "disabled" {
+		decision(res, unitID)["reason"] != reasonDisabled {
 		t.Errorf("stale: %v", res)
 	}
 
 	if _, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.simulate",
-		input(`"`+unitID+`"`, fact(unitID, "occupied", "false", "boolean", clock), "condition"),
-	); decision(res, unitID)["decision"] != "suppressed" {
+		input(`"`+unitID+`"`, fact(unitID, "occupied", "false", "boolean", clock()), "condition"),
+	); decision(res, unitID)["decision"] != decisionSuppressed {
 		t.Errorf("no match: %v", res)
 	}
 
 	if _, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.simulate",
-		input(`"`+off+`"`, fact(off, "occupied", "true", "boolean", clock), "condition"),
-	); decision(res, off)["reason"] != "offline" {
+		input(`"`+off+`"`, fact(off, "occupied", "true", "boolean", clock()), "condition"),
+	); decision(res, off)["reason"] != reasonOffline {
 		t.Errorf("offline: %v", res)
 	}
 
 	nobody := newUnit(t, srv, "No rules")
 	if _, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.simulate",
 		input(`"`+nobody+`"`, "", "condition"),
-	); decision(res, nobody)["reason"] != "no_match" {
+	); decision(res, nobody)["reason"] != reasonNoMatch {
 		t.Errorf("no candidates: %v", res)
 	}
 	// schedules are due only at their phase and tick (Monday 09:00 KL = clock)
 	_, resp = write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.save",
 		scheduleRule(
 			sched,
 			map[string]string{
-				"enabled":    "true",
-				"weekdays":   "[1]",
-				"startLocal": `"09:00"`,
-				"endLocal":   `"10:00"`,
+				fieldEnabled:    jsonTrue,
+				fieldWeekdays:   jsonMondays,
+				fieldStartLocal: `"09:00"`,
+				fieldEndLocal:   jsonTenOClock,
 			},
 		),
 		0,
@@ -188,7 +192,7 @@ func TestAutomationEvaluation(t *testing.T) {
 	sid := asStr(t, data(resp)["id"])
 	if _, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.simulate",
 		input(`"`+sched+`"`, "", "schedule_start"),
 	); decision(res, sched)["ruleId"] != sid {
@@ -197,32 +201,32 @@ func TestAutomationEvaluation(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.simulate",
 		input(`"`+sched+`"`, "", "schedule_end"),
-	); decision(res, sched)["reason"] != "no_match" {
+	); decision(res, sched)["reason"] != reasonNoMatch {
 		t.Errorf("schedule end not due: %v", res)
 	}
 	// validation and scope
-	for b, want := range map[string]string{
-		`{"eventId":"` + uuid.NewString() + `","occurredAt":"` + clock.Add(time.Hour).Format(time.RFC3339) +
+	for body, want := range map[string]string{
+		`{"eventId":"` + uuid.NewString() + `","occurredAt":"` + clock().Add(time.Hour).Format(time.RFC3339) +
 			`","unitIds":["` + unitID + `"],"facts":[],"phase":"condition"}`: "occurredAt=errors.not_current_tick",
-		input(`"`+unitID+`","`+unitID+`"`, "", "condition"): "unitIds=error.invalid",
+		input(`"`+unitID+`","`+unitID+`"`, "", "condition"): refusedUnitIDsInvalid,
 		// a boolean fact of 1
-		input(`"`+unitID+`"`, fact(unitID, "occupied", "1", "boolean", clock), "condition"): "facts=error.invalid",
+		input(`"`+unitID+`"`, fact(unitID, "occupied", "1", "boolean", clock()), "condition"): refusedFactsInvalid,
 		// a unit outside the input
-		input(`"`+unitID+`"`, fact(off, "occupied", "true", "boolean", clock), "condition"): "facts=error.invalid",
+		input(`"`+unitID+`"`, fact(off, "occupied", "true", "boolean", clock()), "condition"): refusedFactsInvalid,
 		// a unit symbol of another metric
-		input(`"`+unitID+`"`, fact(unitID, "humidity", "50", "kPa", clock), "condition"): "facts=error.invalid",
-		input(`"`+unitID+`"`, "", "midnight"):                                            "phase=error.invalid",
+		input(`"`+unitID+`"`, fact(unitID, "humidity", "50", "kPa", clock()), "condition"): refusedFactsInvalid,
+		input(`"`+unitID+`"`, "", "midnight"):                                              "phase=error.invalid",
 	} {
-		code, m := post(srv, &customerB, "automations.simulate", b)
-		refusal(t, b, code, m, want)
+		code, m := post(srv, customerB(), "automations.simulate", body)
+		refusal(t, body, code, m, want)
 	}
 
 	if code, _ := post(
 		srv,
-		&customerA,
+		customerA(),
 		"automations.simulate",
 		input(`"`+unitID+`"`, "", "condition"),
 	); code != 404 {
@@ -231,7 +235,7 @@ func TestAutomationEvaluation(t *testing.T) {
 
 	if code, _ := post(
 		srv,
-		&techB,
+		techB(),
 		"automations.simulate",
 		input(`"`+unitID+`"`, "", "condition"),
 	); code != 403 {
@@ -246,8 +250,8 @@ func TestAutomationEvaluation(t *testing.T) {
 	)
 	body := input(`"`+unitID+`"`, occupied, "condition")
 
-	code, resp = write(srv, &customerB, "automations.fire", body, 0)
-	if code != 200 || decision(resp, unitID)["decision"] != "requested" ||
+	code, resp = write(srv, customerB(), "automations.fire", body, 0)
+	if code != 200 || decision(resp, unitID)["decision"] != decisionRequested ||
 		decision(resp, unitID)["commandId"] == nil {
 		t.Fatalf("fire: %d %v", code, resp)
 	}
@@ -263,13 +267,13 @@ func TestAutomationEvaluation(t *testing.T) {
 		&actor,
 	)
 
-	if source != "automation" || actor != seed.ID("customer-b").String() {
+	if source != kindAutomation || actor != seed.ID("customer-b").String() {
 		t.Errorf("command: %s %s", source, actor)
 	}
 
 	if code, res := write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.fire",
 		body,
 		0,
@@ -280,7 +284,7 @@ func TestAutomationEvaluation(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.fire",
 		body[:len(body)-len(`"condition"}`)]+`"schedule_start"}`,
 		0,
@@ -290,23 +294,23 @@ func TestAutomationEvaluation(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.fire",
-		input(`"`+unitID+`"`, fact(unitID, "occupied", "false", "boolean", clock), "condition"),
+		input(`"`+unitID+`"`, fact(unitID, "occupied", "false", "boolean", clock()), "condition"),
 		0,
 	); code != 409 {
 		t.Error("different facts in the same tick")
 	}
 
-	var n int
+	var total int
 	ownerScan(
 		t,
 		`SELECT count(*) FROM control.commands WHERE unit_id = $1 AND source = 'automation'`,
 		[]any{unitID},
-		&n,
+		&total,
 	)
 
-	if n != 1 {
-		t.Errorf("commands created: %d", n)
+	if total != 1 {
+		t.Errorf("commands created: %d", total)
 	}
 }

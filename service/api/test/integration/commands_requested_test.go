@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"encoding/json"
@@ -15,6 +15,8 @@ import (
 
 // TestRequestedCommandsForTheGateway: the IoT gateway reads the commands waiting to be sent with the internal service
 // token and the tenant; a command leaves the list once it is reported sent, and a request without the token is refused.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestRequestedCommandsForTheGateway(t *testing.T) {
 	cluster := newCluster(t)
 	tenant := seed.ID("tenant-a").String()
@@ -32,12 +34,13 @@ func TestRequestedCommandsForTheGateway(t *testing.T) {
 		device,
 		seed.ID("hq-operator"),
 		`{"kind":"set_temperature","celsius":26}`,
-		clock,
-		clock.Add(5*time.Minute),
+		clock(),
+		clock().Add(5*time.Minute),
 	)
 
 	askBody := func(token, input string) (int, []map[string]any) {
-		req, _ := http.NewRequest(
+		req, _ := http.NewRequestWithContext(
+			t.Context(),
 			http.MethodPost,
 			cluster.urls[ops.DomainEquipment]+"/internal/v1/system/queries/control.requestedCommands",
 			strings.NewReader(input),
@@ -54,7 +57,7 @@ func TestRequestedCommandsForTheGateway(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		var body struct {
 			Data []map[string]any `json:"data"`
@@ -100,7 +103,7 @@ func TestRequestedCommandsForTheGateway(t *testing.T) {
 		t,
 		`UPDATE control.commands SET status = 'sent', delivery = 'sent', sent_at = $2 WHERE id = $1`,
 		command,
-		clock,
+		clock(),
 	)
 
 	if _, rows = ask("test-internal"); find(rows) != nil {

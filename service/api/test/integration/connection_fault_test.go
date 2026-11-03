@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"encoding/json"
@@ -17,6 +17,8 @@ import (
 // (devices.connectionFault, IR532): no open fault at first; after a communication_lost the fault's DeviceEvent ID and
 // sequence, which a restored names to bring the device back online; after it no open fault and the newer sequence.
 // A request without the token, without a device or for an unknown one is refused.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestConnectionFaultForTheGateway(t *testing.T) {
 	srv := serverWith(t, true)
 	cluster := newCluster(t)
@@ -33,14 +35,15 @@ func TestConnectionFaultForTheGateway(t *testing.T) {
 
 	_, sess := post(
 		srv,
-		&customerB,
+		customerB(),
 		"session.get",
 		`{}`,
 	) // the business time of the server (a shared demo cluster may run ahead of clock)
 	now, _ := time.Parse(time.RFC3339Nano, asStr(t, asObj(t, sess["meta"])["snapshotAt"]))
 
 	ask := func(token, input string) (int, map[string]any) {
-		req, _ := http.NewRequest(
+		req, _ := http.NewRequestWithContext(
+			t.Context(),
 			http.MethodPost,
 			cluster.urls[ops.DomainEquipment]+"/internal/v1/system/queries/devices.connectionFault",
 			strings.NewReader(input),
@@ -57,7 +60,7 @@ func TestConnectionFaultForTheGateway(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		var body struct {
 			Data map[string]any `json:"data"`
@@ -82,7 +85,7 @@ func TestConnectionFaultForTheGateway(t *testing.T) {
 
 		if code, res := write(
 			srv,
-			&customerB,
+			customerB(),
 			"demo.trigger",
 			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+now.Format(
 				time.RFC3339,
@@ -109,17 +112,17 @@ func TestConnectionFaultForTheGateway(t *testing.T) {
 
 	f := fault()
 
-	id, _ := f["faultId"].(string)
-	if id == "" || asNum(t, f["sequence"]) != 10 || connection() != "offline" {
+	faultID, _ := f["faultId"].(string)
+	if faultID == "" || asNum(t, f["sequence"]) != 10 || connection() != connectionOffline {
 		t.Fatalf("after the loss: %v, connection %s", f, connection())
 	}
 
 	trigger(
-		`"sequence":11,"kind":"restored","recovery":{"axis":"connection","sourceEventId":"` + id + `","value":"online"}`,
+		`"sequence":11,"kind":"restored","recovery":{"axis":"connection","sourceEventId":"` + faultID + `","value":"online"}`,
 	)
 
 	if f := fault(); f["faultId"] != nil || asNum(t, f["sequence"]) != 11 ||
-		connection() != "online" {
+		connection() != connectionOnline {
 		t.Fatalf("after the recovery: %v, connection %s", f, connection())
 	}
 

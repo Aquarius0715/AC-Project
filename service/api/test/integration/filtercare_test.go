@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -9,6 +9,9 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+const statusDueSoon = "due_soon"
+
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestFilterCare(t *testing.T) {
 	srv := server(t)
 	tenant := seed.ID("tenant-a")
@@ -40,7 +43,7 @@ func TestFilterCare(t *testing.T) {
 		dev,
 	)
 
-	reading := func(ago time.Duration, v float64, seq int) {
+	reading := func(ago time.Duration, value float64, seq int) {
 		owner(
 			t,
 			`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit,
@@ -49,9 +52,9 @@ func TestFilterCare(t *testing.T) {
 			tenant,
 			unit,
 			sensor,
-			clock.Add(-ago),
+			clock().Add(-ago),
 			seq,
-			v,
+			value,
 			uuid.NewString(),
 		)
 	}
@@ -60,15 +63,15 @@ func TestFilterCare(t *testing.T) {
 
 	statusOf := func(a *actor) map[string]any {
 		_, m := post(srv, a, "filterCare.list", `{"filters":{"unitId":"`+unit+`"}}`)
-		if len(items(m)) != 1 {
+		if len(items(t, m)) != 1 {
 			t.Fatalf("list: %v", m)
 		}
 
-		return items(m)[0]
+		return items(t, m)[0]
 	}
 
-	st := statusOf(&customerB)
-	if asNum(t, st["runHoursSinceCleaning"]) != 200 || st["status"] != "due_soon" ||
+	st := statusOf(customerB())
+	if asNum(t, st["runHoursSinceCleaning"]) != 200 || st["status"] != statusDueSoon ||
 		asNum(t, st["thresholdHours"]) != 250 ||
 		st["lastCleanedAt"] != nil {
 		t.Fatalf("due soon: %v", st)
@@ -77,25 +80,25 @@ func TestFilterCare(t *testing.T) {
 	want := map[string]string{ // the field each case is refused for
 		"bad recipient": "recipients=error.invalid",
 		"fallback 181":  "fallbackDays=error.range",
-		"no inApp":      "channels=error.invalid",
+		"no inApp":      refusedChannelsInvalid,
 		"threshold 49":  "thresholdHours=error.range",
-		"whatsapp":      "channels=error.invalid",
+		"whatsapp":      refusedChannelsInvalid,
 	}
 
-	for name, b := range map[string]string{
+	for name, body := range map[string]string{
 		"threshold 49":  `{"thresholdHours":49,"fallbackDays":30,"recipients":"owners","channels":["inApp"]}`,
 		"fallback 181":  `{"thresholdHours":null,"fallbackDays":181,"recipients":"owners","channels":["inApp"]}`,
 		"no inApp":      `{"thresholdHours":null,"fallbackDays":30,"recipients":"owners","channels":["email"]}`,
 		"whatsapp":      `{"thresholdHours":null,"fallbackDays":30,"recipients":"owners","channels":["inApp","whatsapp"]}`,
 		"bad recipient": `{"thresholdHours":null,"fallbackDays":30,"recipients":"everyone","channels":["inApp"]}`,
 	} {
-		code, m := write(srv, &customerB, "filterCare.saveSettings", b, 0)
+		code, m := write(srv, customerB(), "filterCare.saveSettings", body, 0)
 		refusal(t, name, code, m, want[name])
 	}
 	// IR238: the settings read back — the defaults (version 0) before the first save
 	if code, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"filterCare.getSettings",
 		`{}`,
 	); code != 200 || asNum(t, data(res)["version"]) != 0 || data(res)["thresholdHours"] != nil ||
@@ -106,7 +109,7 @@ func TestFilterCare(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&customerB,
+		customerB(),
 		"filterCare.saveSettings",
 		`{"thresholdHours":100,"fallbackDays":14,"recipients":"all_users","channels":["inApp","email"]}`,
 		0,
@@ -117,7 +120,7 @@ func TestFilterCare(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"filterCare.getSettings",
 		`{}`,
 	); asNum(t, data(res)["version"]) != 1 || asNum(t, data(res)["thresholdHours"]) != 100 ||
@@ -126,12 +129,12 @@ func TestFilterCare(t *testing.T) {
 		t.Fatalf("saved settings: %v", res)
 	}
 
-	if code, _ := post(srv, &techInt, "filterCare.getSettings", `{}`); code != 403 {
+	if code, _ := post(srv, techInt(), "filterCare.getSettings", `{}`); code != 403 {
 		t.Error("a technician reads the customer's settings")
 	}
 
 	if st := statusOf(
-		&customerB,
+		customerB(),
 	); st["status"] != "overdue" ||
 		asNum(t, st["thresholdHours"]) != 100 {
 		t.Fatalf("overdue: %v", st)
@@ -145,7 +148,7 @@ func TestFilterCare(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&customerB,
+		customerB(),
 		"filterCare.saveSettings",
 		`{"thresholdHours":null,"fallbackDays":30,"recipients":"owners","channels":["inApp"]}`,
 		0,
@@ -161,7 +164,7 @@ func TestFilterCare(t *testing.T) {
 	// mark cleaned → the counter restarts at 0 h: the reading in force (off since 10 h) has not run since (IR238)
 	if code, _ := write(
 		srv,
-		&customerA,
+		customerA(),
 		"filterCare.markCleaned",
 		`{"unitId":"`+unit+`"}`,
 		0,
@@ -169,7 +172,7 @@ func TestFilterCare(t *testing.T) {
 		t.Error("other customer marks cleaned")
 	}
 
-	code, resp := write(srv, &customerB, "filterCare.markCleaned", `{"unitId":"`+unit+`"}`, 0)
+	code, resp := write(srv, customerB(), "filterCare.markCleaned", `{"unitId":"`+unit+`"}`, 0)
 	if code != 200 || data(resp)["lastCleanedBy"] != "customer" || data(resp)["status"] != "ok" ||
 		data(resp)["runHoursSinceCleaning"] != float64(0) {
 		t.Fatalf("mark cleaned: %d %v", code, resp)
@@ -179,12 +182,12 @@ func TestFilterCare(t *testing.T) {
 		t,
 		`UPDATE maintenance.filter_cleanings SET cleaned_at = $2 WHERE unit_id = $1`,
 		unit,
-		clock.Add(-100*time.Hour),
+		clock().Add(-100*time.Hour),
 	)
 
 	if st := statusOf(
-		&customerB,
-	); st["status"] != "due_soon" ||
+		customerB(),
+	); st["status"] != statusDueSoon ||
 		asNum(t, st["runHoursSinceCleaning"]) != 90 {
 		t.Fatalf("run time since a cleaning while running: %v", st)
 	}
@@ -193,11 +196,11 @@ func TestFilterCare(t *testing.T) {
 		t,
 		`UPDATE maintenance.filter_cleanings SET cleaned_at = $2 WHERE unit_id = $1`,
 		unit,
-		clock.Add(-12*24*time.Hour),
+		clock().Add(-12*24*time.Hour),
 	)
 
 	if st := statusOf(
-		&customerB,
+		customerB(),
 	); st["status"] != "overdue" ||
 		asNum(t, st["runHoursSinceCleaning"]) != 200 {
 		t.Fatalf("run time since an older cleaning: %v", st)
@@ -206,8 +209,8 @@ func TestFilterCare(t *testing.T) {
 	owner(t, `UPDATE assets.units SET connection = 'offline' WHERE id = $1`, unit)
 
 	if st := statusOf(
-		&customerB,
-	); st["status"] != "due_soon" ||
+		customerB(),
+	); st["status"] != statusDueSoon ||
 		st["runHoursSinceCleaning"] != nil { // offline: 12 of 14 days
 		t.Fatalf("fallback days: %v", st)
 	}
@@ -224,8 +227,8 @@ func TestFilterCare(t *testing.T) {
 		tenant,
 		unit,
 		seed.ID("org-customer-b"),
-		clock.Add(-3*time.Hour),
-		clock.Add(-2*time.Hour),
+		clock().Add(-3*time.Hour),
+		clock().Add(-2*time.Hour),
 	)
 	owner(
 		t,
@@ -238,67 +241,67 @@ func TestFilterCare(t *testing.T) {
 	)
 
 	if st := statusOf(
-		&customerB,
-	); st["lastCleanedBy"] != "technician" || st["lastCleaningJobId"] != job ||
+		customerB(),
+	); st["lastCleanedBy"] != roleTechnician || st["lastCleaningJobId"] != job ||
 		st["status"] != "ok" {
 		t.Fatalf("technician cleaning: %v", st)
 	}
 	// offline without a cleaning date → unknown
-	u2 := newUnit(t, srv, "Filter AC 2")
+	unit2 := newUnit(t, srv, "Filter AC 2")
 
 	_, resp = post(
 		srv,
-		&customerB,
+		customerB(),
 		"filterCare.list",
-		`{"filters":{"unitId":"`+u2+`","status":"unknown"}}`,
+		`{"filters":{"unitId":"`+unit2+`","status":"unknown"}}`,
 	)
-	if len(items(resp)) != 1 || items(resp)[0]["runHoursSinceCleaning"] != nil {
+	if len(items(t, resp)) != 1 || items(t, resp)[0]["runHoursSinceCleaning"] != nil {
 		t.Fatalf("unknown: %v", resp)
 	}
 
 	if code, res := post(
 		srv,
-		&customerA,
+		customerA(),
 		"filterCare.list",
 		`{"filters":{"unitId":"`+unit+`"}}`,
 	); code != 200 ||
-		len(items(res)) != 0 {
+		len(items(t, res)) != 0 {
 		t.Error("customer-a sees customer-b's unit")
 	}
 
 	if _, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"filterCare.list",
 		`{"sort":{"field":"status","direction":"desc"},"limit":100}`,
 	); len(
-		items(res),
+		items(t, res),
 	) < 2 {
 		t.Error("sorted list")
 	}
 
 	want = map[string]string{ // the field each case is refused for
-		"{\"filters\":{\"status\":\"dirty\"}}":                      "filters=error.invalid",
-		"{\"filters\":{\"x\":1}}":                                   "x=error.notAllowed",
-		"{\"sort\":{\"field\":\"runHours\",\"direction\":\"asc\"}}": "sort.field=error.invalid",
+		"{\"filters\":{\"status\":\"dirty\"}}":                      refusedFiltersInvalid,
+		bodyUnknownFilter:                                           refusedUnknownFieldX,
+		"{\"sort\":{\"field\":\"runHours\",\"direction\":\"asc\"}}": refusedSortFieldInvalid,
 	}
 
-	for _, b := range []string{`{"filters":{"status":"dirty"}}`, `{"filters":{"x":1}}`, `{"sort":{"field":"runHours",` +
+	for _, b := range []string{`{"filters":{"status":"dirty"}}`, bodyUnknownFilter, `{"sort":{"field":"runHours",` +
 		`"direction":"asc"}}`} {
-		code, m := post(srv, &customerB, "filterCare.list", b)
+		code, m := post(srv, customerB(), "filterCare.list", b)
 		refusal(t, b, code, m, want[b])
 	}
 
-	owner(t, `UPDATE assets.units SET archived = true WHERE id = $1`, u2)
+	owner(t, `UPDATE assets.units SET archived = true WHERE id = $1`, unit2)
 
 	if code, res := write(
 		srv,
-		&customerB,
+		customerB(),
 		"filterCare.markCleaned",
-		`{"unitId":"`+u2+`"}`,
+		`{"unitId":"`+unit2+`"}`,
 		0,
 	); code != 422 ||
-		fields(res) != "unitId=error.unitArchived" {
+		fields(res) != refusedUnitArchived {
 		t.Errorf("archived unit: %d %s", code, fields(res))
 	}
 }

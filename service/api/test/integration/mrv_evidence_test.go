@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"strings"
@@ -12,38 +12,40 @@ import (
 
 // IR349: attachments.list offers the evidence an MRV report may cite (DD-A14 item 6, IR203): the ready attachments of
 // accepted work reports on the units, uploaded in [from, to), newest first; HQ with mrv.write or job.read only.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestMRVEvidenceAttachments(t *testing.T) {
 	srv := server(t)
 	tenant := seed.ID("tenant-a")
 	unit, other := newUnit(t, srv, "MRV evidence AC"), newUnit(t, srv, "MRV other AC")
-	from, until := clock.Add(-48*time.Hour), clock.Add(-24*time.Hour)
+	from, until := clock().Add(-48*time.Hour), clock().Add(-24*time.Hour)
 	input := from.Add(2 * time.Hour)
 
 	var jobs []string
 
 	job := func(unitID string) string {
-		id := uuid.NewString()
+		jobID := uuid.NewString()
 		owner(
 			t,
 			`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, type, status, origin, requested_slot, due_at,
 				completed_at)
 			VALUES ($1,$2,$3,$4,'reactive','completed','client_request',tstzrange($5,$6),$6,$6)`,
-			id,
+			jobID,
 			tenant,
 			unitID,
 			seed.ID("org-customer-b"),
 			input.Add(-time.Hour),
 			input,
 		)
-		jobs = append(jobs, id)
+		jobs = append(jobs, jobID)
 
-		return id
+		return jobID
 	}
-	report := func(j, state string) string {
-		id := uuid.NewString()
+	report := func(jobID, state string) string {
+		reportID := uuid.NewString()
 
 		var accepted any
-		if state == "accepted" {
+		if state == statusAccepted {
 			accepted = input.Add(time.Hour)
 		}
 
@@ -51,35 +53,35 @@ func TestMRVEvidenceAttachments(t *testing.T) {
 			t,
 			`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state, accepted_at) VALUES ($1, 1,
 				$2, $3, $4, $5, $6)`,
-			id,
+			reportID,
 			tenant,
-			j,
+			jobID,
 			uuid.New(),
 			state,
 			accepted,
 		)
 
-		return id
+		return reportID
 	}
-	attach := func(j, r, name, status string, when time.Time) string {
-		id := uuid.NewString()
+	attach := func(jobID, reportID, name, status string, when time.Time) string {
+		attachmentID := uuid.NewString()
 		owner(
 			t,
 			`INSERT INTO maintenance.attachments (id, tenant_id, job_id, report_id, object_key, name, mime, size_bytes, status,
 				uploaded_by, created_at, updated_at)
 			VALUES ($1,$2,$3,$4,$5,$6,'image/png',1,$7,$8,$9,$9)`,
-			id,
+			attachmentID,
 			tenant,
-			j,
-			r,
-			"test/"+id,
+			jobID,
+			reportID,
+			"test/"+attachmentID,
 			name,
 			status,
 			uuid.New(),
 			when,
 		)
 
-		return id
+		return attachmentID
 	}
 
 	t.Cleanup(func() { // later tests see none of these jobs
@@ -88,15 +90,15 @@ func TestMRVEvidenceAttachments(t *testing.T) {
 		owner(t, `DELETE FROM maintenance.jobs WHERE id = ANY($1::uuid[])`, jobs)
 	})
 
-	j1 := job(unit)
-	r1 := report(j1, "accepted")
-	meter := attach(j1, r1, "Meter.png", "ready", input)
-	panel := attach(j1, r1, "panel.png", "ready", input.Add(30*time.Minute))
-	attach(j1, r1, "scanning.png", "processing", input.Add(10*time.Minute)) // not ready
-	attach(j1, r1, "old.png", "ready", from.Add(-time.Minute))              // before the period
+	job1 := job(unit)
+	report1 := report(job1, "accepted")
+	meter := attach(job1, report1, "Meter.png", "ready", input)
+	panel := attach(job1, report1, "panel.png", "ready", input.Add(30*time.Minute))
+	attach(job1, report1, "scanning.png", "processing", input.Add(10*time.Minute)) // not ready
+	attach(job1, report1, "old.png", "ready", from.Add(-time.Minute))              // before the period
 	attach(
-		j1,
-		r1,
+		job1,
+		report1,
 		"edge.png",
 		"ready",
 		until,
@@ -125,15 +127,17 @@ func TestMRVEvidenceAttachments(t *testing.T) {
 		) + `","query":{` + extra + `}}`
 	}
 	ids := func(m map[string]any) []string {
-		out := []string{}
-		for _, it := range items(m) {
+		rows := items(t, m)
+
+		out := make([]string, 0, len(rows))
+		for _, it := range rows {
 			out = append(out, asStr(t, it["id"]))
 		}
 
 		return out
 	}
 
-	code, resp := post(srv, &hq, "attachments.list", body("", unit))
+	code, resp := post(srv, hq(), "attachments.list", body("", unit))
 	if code != 200 {
 		t.Fatalf("list: %d %v", code, resp)
 	}
@@ -142,17 +146,17 @@ func TestMRVEvidenceAttachments(t *testing.T) {
 		t.Fatalf("candidates: %v (panel %s, meter %s)", got, panel, meter)
 	}
 
-	first := items(resp)[1]
+	first := items(t, resp)[1]
 	if first["unitId"] != unit || first["reportId"] == nil || first["acceptedAt"] == nil ||
 		first["status"] != "ready" ||
 		first["name"] != "Meter.png" ||
-		first["mime"] != "image/png" {
+		first["mime"] != mimePNG {
 		t.Errorf("candidate fields: %v", first)
 	}
 	// both units; by name (case-insensitive) and a page of one
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"attachments.list",
 		body(`"sort":{"field":"name","direction":"asc"}`, unit, other),
 	); code != 200 ||
@@ -162,36 +166,36 @@ func TestMRVEvidenceAttachments(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"attachments.list",
 		body(`"limit":1`, unit, other),
-	); code != 200 || len(items(res)) != 1 || data(res)["total"] != float64(3) ||
+	); code != 200 || len(items(t, res)) != 1 || data(res)["total"] != float64(3) ||
 		data(res)["nextCursor"] == nil {
 		t.Errorf("first page: %d %v", code, res)
 	}
 	// the input rules, each refused for its field
 	day := 24 * time.Hour
-	for b, want := range map[string]string{
+	for payload, want := range map[string]string{
 		`{"unitIds":[],` +
 			`"from":"` + from.Format(time.RFC3339) + `","to":"` + until.Format(time.RFC3339) +
-			`","query":{}}`: "unitIds=error.invalid",
+			`","query":{}}`: refusedUnitIDsInvalid,
 		`{"unitIds":["` + unit + `","` + unit + `"],"from":"` + from.Format(time.RFC3339) + `","to":"` +
-			until.Format(time.RFC3339) + `","query":{}}`: "unitIds=error.invalid",
+			until.Format(time.RFC3339) + `","query":{}}`: refusedUnitIDsInvalid,
 		`{"unitIds":["` + unit + `"],"to":"` + until.Format(time.RFC3339) +
 			`","query":{}}`: "from=error.required",
 		`{"unitIds":["` + unit + `"],"from":"` + from.Format(time.RFC3339) +
 			`","query":{}}`: "to=error.required",
 		`{"unitIds":["` + unit + `"],"from":"` + until.Format(time.RFC3339) + `","to":"` + from.Format(time.RFC3339) +
-			`","query":{}}`: "to=error.range",
+			`","query":{}}`: refusedToRange,
 		`{"unitIds":["` + unit + `"],"from":"` + from.Format(time.RFC3339) + `","to":"` +
-			from.Add(367*day).Format(time.RFC3339) + `","query":{}}`: "to=error.range",
-		body(`"filters":{"x":1}`, unit): "x=error.notAllowed",
+			from.Add(367*day).Format(time.RFC3339) + `","query":{}}`: refusedToRange,
+		body(`"filters":{"x":1}`, unit): refusedUnknownFieldX,
 	} {
-		code, m := post(srv, &hq, "attachments.list", b)
-		refusal(t, b, code, m, want)
+		code, m := post(srv, hq(), "attachments.list", payload)
+		refusal(t, payload, code, m, want)
 	}
 	// only HQ: a client and a contractor are refused
-	for _, a := range []*actor{&customerB, &contrA} {
+	for _, a := range []*actor{customerB(), contrA()} {
 		if code, _ := post(srv, a, "attachments.list", body("", unit)); code != 403 {
 			t.Errorf("%s lists evidence: %d", a.membership, code)
 		}

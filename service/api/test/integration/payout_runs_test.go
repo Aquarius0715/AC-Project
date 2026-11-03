@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -13,6 +13,8 @@ import (
 // BR-A23 / BR-P10 / IR341: the billing scheduler generates the drafts of the month that ended (August for the
 // September clock), once per month. A later tick regenerates nothing, and a run after HQ approved the statement
 // leaves it as it is.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestMonthlyPayoutDrafts(t *testing.T) {
 	srv := server(t)
 	ctx := context.Background()
@@ -71,7 +73,7 @@ func TestMonthlyPayoutDrafts(t *testing.T) {
 
 		tick++
 
-		_, err := schedTick(ctx, srv, clock.Add(time.Duration(tick)*time.Minute))
+		_, err := schedTick(ctx, srv, clock().Add(time.Duration(tick)*time.Minute))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -85,15 +87,15 @@ func TestMonthlyPayoutDrafts(t *testing.T) {
 	august := func() []statement {
 		t.Helper()
 
-		var n int
+		var total int
 		ownerScan(
 			t,
 			`SELECT count(*) FROM billing.payout_statements WHERE contractor_org_id = $1 AND period = '2026-08'`,
 			[]any{org},
-			&n,
+			&total,
 		)
 
-		out := make([]statement, n)
+		out := make([]statement, total)
 		for idx := range out {
 			ownerScan(
 				t,
@@ -114,7 +116,7 @@ func TestMonthlyPayoutDrafts(t *testing.T) {
 	evaluate()
 
 	got := august()
-	if len(got) != 1 || got[0].status != "draft" || got[0].lines != 1 {
+	if len(got) != 1 || got[0].status != statusDraft || got[0].lines != 1 {
 		t.Fatalf("the August draft: %+v", got)
 	}
 
@@ -144,15 +146,15 @@ func TestMonthlyPayoutDrafts(t *testing.T) {
 		t.Fatalf("regenerated: %+v", got)
 	}
 	// HQ approves; a later run of August leaves the approved statement
-	var v int
-	ownerScan(t, `SELECT version FROM billing.payout_statements WHERE id = $1`, []any{draft}, &v)
+	var version int
+	ownerScan(t, `SELECT version FROM billing.payout_statements WHERE id = $1`, []any{draft}, &version)
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"payouts.transition",
 		`{"statementId":"`+draft+`","action":"approve"}`,
-		v,
+		version,
 	); code != 200 {
 		t.Fatalf("approve: %d %v", code, res)
 	}

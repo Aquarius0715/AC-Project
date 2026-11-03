@@ -1,8 +1,9 @@
-package integration
+package integration_test
 
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +14,14 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+const (
+	jsonHalfPastNine      = `"09:30"`
+	outcomeCommandCreated = "command_created"
+	outcomeSkipped        = "skipped"
+	reasonMissingData     = "missing_data"
+	storedPowerOff        = `{"kind": "set_power", "power": false}`
+)
+
 // automationCommands returns the actions of the unit's automation Commands, oldest first.
 func automationCommands(t *testing.T, unit string) []string {
 	t.Helper()
@@ -21,7 +30,7 @@ func automationCommands(t *testing.T, unit string) []string {
 	if err != nil {
 		t.Skip(err)
 	}
-	defer conn.Close(context.Background())
+	defer func() { _ = conn.Close(context.Background()) }()
 
 	rows, err := conn.Query(
 		context.Background(),
@@ -50,6 +59,8 @@ func setWatermark(t *testing.T, at time.Time) {
 // IR54 / IR214 / AT-C04-N: the equipment scheduler fires a schedule rule at its start and end minutes — once per
 // occurrence, re-authorizing the owner, audited — and a disabled or deleted rule creates nothing. clock is Monday
 // 2026-09-14 09:00 Kuala Lumpur.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestScheduleAutomationsFire(t *testing.T) {
 	srv := server(t)
 	ctx := context.Background()
@@ -63,73 +74,76 @@ func TestScheduleAutomationsFire(t *testing.T) {
 	}
 	unit := boundUnit(t, srv, "online")
 
-	code, res := write(srv, &customerB, "automations.save", scheduleRule(unit, map[string]string{
-		"weekdays": "[1]", "startLocal": `"09:30"`, "endLocal": `"10:00"`, "enabled": "true",
-		"startAction": `{"kind":"set_temperature","celsius":25}`,
+	code, res := write(srv, customerB(), "automations.save", scheduleRule(unit, map[string]string{
+		fieldWeekdays:    jsonMondays,
+		fieldStartLocal:  jsonHalfPastNine,
+		fieldEndLocal:    jsonTenOClock,
+		fieldEnabled:     jsonTrue,
+		fieldStartAction: actionCoolTo25,
 	}), 0)
 	if code != 200 {
 		t.Fatalf("save: %d %v", code, res)
 	}
 
-	id := asStr(t, data(res)["id"])
+	automationID := asStr(t, data(res)["id"])
 
 	if n := len(automationCommands(t, unit)); n != 0 {
 		t.Fatalf("saving sends no command: %d", n)
 	}
 
-	setWatermark(t, clock)
-	tick(clock.Add(20 * time.Minute)) // before the start
+	setWatermark(t, clock())
+	tick(clock().Add(20 * time.Minute)) // before the start
 
 	if n := len(automationCommands(t, unit)); n != 0 {
 		t.Fatalf("before the start: %d", n)
 	}
 
-	tick(clock.Add(31 * time.Minute))
+	tick(clock().Add(31 * time.Minute))
 
-	cs := automationCommands(t, unit)
+	commands := automationCommands(t, unit)
 
 	var a map[string]any
-	if len(cs) == 1 {
-		_ = json.Unmarshal([]byte(cs[0]), &a)
+	if len(commands) == 1 {
+		_ = json.Unmarshal([]byte(commands[0]), &a)
 	}
 
-	if len(cs) != 1 || a["kind"] != "set_temperature" || asNum(t, a["celsius"]) != 25 {
-		t.Fatalf("start command: %v", cs)
+	if len(commands) != 1 || a["kind"] != "set_temperature" || asNum(t, a["celsius"]) != 25 {
+		t.Fatalf("start command: %v", commands)
 	}
 
-	tick(clock.Add(31 * time.Minute)) // the same window again
+	tick(clock().Add(31 * time.Minute)) // the same window again
 	setWatermark(
 		t,
-		clock,
+		clock(),
 	) // even a replayed window creates no second Command (automation_runs)
-	tick(clock.Add(32 * time.Minute))
+	tick(clock().Add(32 * time.Minute))
 
 	if n := len(automationCommands(t, unit)); n != 1 {
 		t.Fatalf("one Command per occurrence: %d", n)
 	}
 
-	tick(clock.Add(61 * time.Minute))
+	tick(clock().Add(61 * time.Minute))
 
-	if cs = automationCommands(
+	if commands = automationCommands(
 		t,
 		unit,
-	); len(cs) != 2 ||
-		cs[1] != `{"kind": "set_power", "power": false}` {
-		t.Fatalf("end command: %v", cs)
+	); len(commands) != 2 ||
+		commands[1] != storedPowerOff {
+		t.Fatalf("end command: %v", commands)
 	}
 
 	var runs, audits int
 	ownerScan(
 		t,
 		`SELECT count(*) FROM control.automation_runs WHERE rule_id = $1 AND trigger_ref LIKE 'schedule:%'`,
-		[]any{id},
+		[]any{automationID},
 		&runs,
 	)
 	ownerScan(
 		t,
 		`SELECT count(*) FROM audit.audit_log WHERE action = 'automations.schedule' AND target_id = $1 AND actor_role_at_time
 			= 'system'`,
-		[]any{id},
+		[]any{automationID},
 		&audits,
 	)
 
@@ -137,44 +151,48 @@ func TestScheduleAutomationsFire(t *testing.T) {
 		t.Fatalf("runs %d, audits %d", runs, audits)
 	}
 	// disabled: the next Monday's start creates nothing
-	code, res = write(srv, &customerB, "automations.save", scheduleRule(unit, map[string]string{
-		"id": `"` + id + `"`, "weekdays": "[1]", "startLocal": `"09:30"`, "endLocal": `"10:00"`,
-		"enabled": "false", "startAction": `{"kind":"set_temperature","celsius":25}`,
+	code, res = write(srv, customerB(), "automations.save", scheduleRule(unit, map[string]string{
+		"id":             `"` + automationID + `"`,
+		fieldWeekdays:    jsonMondays,
+		fieldStartLocal:  jsonHalfPastNine,
+		fieldEndLocal:    jsonTenOClock,
+		fieldEnabled:     jsonFalse,
+		fieldStartAction: actionCoolTo25,
 	}), 1)
 	if code != 200 {
 		t.Fatalf("disable: %d %v", code, res)
 	}
 
-	tick(clock.Add(7*24*time.Hour + 31*time.Minute))
+	tick(clock().Add(7*24*time.Hour + 31*time.Minute))
 
 	if n := len(automationCommands(t, unit)); n != 2 {
 		t.Fatalf("disabled rule fired: %d", n)
 	}
 	// delete (Figma 03g–03i): version checked, the rule is gone, its Commands stay
-	if code, _ := write(srv, &customerB, "automations.delete", `{"id":"`+id+`"}`, 1); code != 409 {
+	if code, _ := write(srv, customerB(), "automations.delete", `{"id":"`+automationID+`"}`, 1); code != 409 {
 		t.Fatalf("stale version: %d", code)
 	}
 
-	if code, _ := write(srv, &customerA, "automations.delete", `{"id":"`+id+`"}`, 2); code != 404 {
+	if code, _ := write(srv, customerA(), "automations.delete", `{"id":"`+automationID+`"}`, 2); code != 404 {
 		t.Fatalf("other customer: %d", code)
 	}
 
-	code, res = write(srv, &customerB, "automations.delete", `{"id":"`+id+`"}`, 2)
-	if code != 200 || data(res)["deleted"] != true || data(res)["id"] != id {
+	code, res = write(srv, customerB(), "automations.delete", `{"id":"`+automationID+`"}`, 2)
+	if code != 200 || data(res)["deleted"] != true || data(res)["id"] != automationID {
 		t.Fatalf("delete: %d %v", code, res)
 	}
 
 	if code, resp := post(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.list",
 		`{"filters":{"unitId":"`+unit+`"}}`,
 	); code != 200 ||
-		len(items(resp)) != 0 {
-		t.Fatalf("deleted rule listed: %v", items(resp))
+		len(items(t, resp)) != 0 {
+		t.Fatalf("deleted rule listed: %v", items(t, resp))
 	}
 
-	if code, _ := write(srv, &customerB, "automations.delete", `{"id":"`+id+`"}`, 3); code != 404 {
+	if code, _ := write(srv, customerB(), "automations.delete", `{"id":"`+automationID+`"}`, 3); code != 404 {
 		t.Fatalf("already deleted: %d", code)
 	}
 
@@ -187,28 +205,33 @@ func TestScheduleAutomationsFire(t *testing.T) {
 // runs only the last minute it passed, so the unit ends in the state real time would have left: past a whole window,
 // the end. Before, the start's Command was still pending when the end was evaluated in the same tick, so the end was
 // excluded as busy and the AC stayed on after its window. (Within one minute the order stays: TestScheduleBoundaries.)
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestScheduleCatchUpRunsTheLastMinute(t *testing.T) {
 	srv := server(t)
 	ctx := context.Background()
 	unit := boundUnit(t, srv, "online")
 
-	code, res := write(srv, &customerB, "automations.save", scheduleRule(unit, map[string]string{
-		"weekdays": "[1]", "startLocal": `"09:30"`, "endLocal": `"10:00"`, "enabled": "true",
-		"startAction": `{"kind":"set_temperature","celsius":25}`,
+	code, res := write(srv, customerB(), "automations.save", scheduleRule(unit, map[string]string{
+		fieldWeekdays:    jsonMondays,
+		fieldStartLocal:  jsonHalfPastNine,
+		fieldEndLocal:    jsonTenOClock,
+		fieldEnabled:     jsonTrue,
+		fieldStartAction: actionCoolTo25,
 	}), 0)
 	if code != 200 {
 		t.Fatalf("save: %d %v", code, res)
 	}
 
-	id := asStr(t, data(res)["id"])
+	automationID := asStr(t, data(res)["id"])
 
-	t.Cleanup(func() { write(srv, &customerB, "automations.delete", `{"id":"`+id+`"}`, 1) })
-	setWatermark(t, clock)
+	t.Cleanup(func() { write(srv, customerB(), "automations.delete", `{"id":"`+automationID+`"}`, 1) })
+	setWatermark(t, clock())
 
 	_, err := schedTick(
 		ctx,
 		srv,
-		clock.Add(61*time.Minute),
+		clock().Add(61*time.Minute),
 	)
 	if err != nil { // past the start and the end
 		t.Fatal(err)
@@ -218,7 +241,7 @@ func TestScheduleCatchUpRunsTheLastMinute(t *testing.T) {
 		t,
 		unit,
 	); len(cs) != 1 ||
-		cs[0] != `{"kind": "set_power", "power": false}` {
+		cs[0] != storedPowerOff {
 		t.Fatalf("past a whole window, the end only: %v", cs)
 	}
 
@@ -226,7 +249,7 @@ func TestScheduleCatchUpRunsTheLastMinute(t *testing.T) {
 	ownerScan(
 		t,
 		`SELECT count(*) FROM control.automation_runs WHERE rule_id = $1`,
-		[]any{id},
+		[]any{automationID},
 		&runs,
 	)
 
@@ -234,9 +257,9 @@ func TestScheduleCatchUpRunsTheLastMinute(t *testing.T) {
 		t.Fatalf("the passed-over start leaves no run: %d", runs)
 	}
 	// a week later, two windows passed at once: still the last end only
-	setWatermark(t, clock.Add(61*time.Minute))
+	setWatermark(t, clock().Add(61*time.Minute))
 
-	_, err = schedTick(ctx, srv, clock.Add(14*24*time.Hour+61*time.Minute))
+	_, err = schedTick(ctx, srv, clock().Add(14*24*time.Hour+61*time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,12 +268,14 @@ func TestScheduleCatchUpRunsTheLastMinute(t *testing.T) {
 		t,
 		unit,
 	); len(cs) != 2 ||
-		cs[1] != `{"kind": "set_power", "power": false}` {
+		cs[1] != storedPowerOff {
 		t.Fatalf("two windows passed, the last end only: %v", cs)
 	}
 }
 
 // IR214: automations.nextRuns previews an unsaved schedule (the C04 editor's Test) with the save rules.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestScheduleDraftPreview(t *testing.T) {
 	srv := server(t)
 	draft := func(extra string) string {
@@ -258,7 +283,7 @@ func TestScheduleDraftPreview(t *testing.T) {
 			`"endLocal":"22:00","endsNextDay":false,` +
 			`"startAction":{"kind":"set_temperature","celsius":25},"endAction":{"kind":"set_power","power":false}` + extra + `}}`
 	}
-	code, res := post(srv, &customerA, "automations.nextRuns", draft(""))
+	code, res := post(srv, customerA(), "automations.nextRuns", draft(""))
 
 	list, _ := res["data"].([]any)
 	if code != 200 {
@@ -277,71 +302,73 @@ func TestScheduleDraftPreview(t *testing.T) {
 	}
 	// the field each case is refused for
 	want := map[string]string{
-		"bad action":     "draft.endAction=error.invalid",
+		caseBadAction:    "draft.endAction=error.invalid",
 		"bad count":      "count=error.invalid",
-		"bad zone":       "draft.timezone=error.invalid",
-		"both targets":   "automationId=error.exactlyOneTarget",
-		"no target":      "automationId=error.exactlyOneTarget",
-		"no weekdays":    "draft.weekdays=error.required",
+		caseBadZone:      "draft.timezone=error.invalid",
+		caseBothTargets:  "automationId=error.exactlyOneTarget",
+		caseNoTarget:     "automationId=error.exactlyOneTarget",
+		caseNoWeekdays:   "draft.weekdays=error.required",
 		"nonexistent":    "draft.startLocal=errors.local_time_invalid",
 		"overnight flag": "draft.endsNextDay=errors.overnight_required",
 		"same times":     "draft.endLocal=errors.same_as_start",
 	}
 
 	for name, body := range map[string]string{
-		"both targets":   `{"count":8,"automationId":"` + uuid.NewString() + `","draft":{}}`,
-		"no target":      `{"count":8}`,
+		caseBothTargets:  `{"count":8,"automationId":"` + uuid.NewString() + `","draft":{}}`,
+		caseNoTarget:     `{"count":8}`,
 		"bad count":      strings2(draft(""), `"count":8`, `"count":3`),
 		"same times":     strings2(draft(""), `"endLocal":"22:00"`, `"endLocal":"18:00"`),
-		"no weekdays":    strings2(draft(""), `"weekdays":[1,3]`, `"weekdays":[]`),
+		caseNoWeekdays:   strings2(draft(""), `"weekdays":[1,3]`, `"weekdays":[]`),
 		"overnight flag": strings2(draft(""), `"endLocal":"22:00"`, `"endLocal":"06:00"`),
-		"bad action":     strings2(draft(""), `{"kind":"set_power","power":false}`, `{"kind":"explode"}`),
-		"bad zone":       strings2(draft(""), `"Asia/Kuala_Lumpur"`, `"Moon/Base"`),
+		caseBadAction:    strings2(draft(""), `{"kind":"set_power","power":false}`, `{"kind":"explode"}`),
+		caseBadZone:      strings2(draft(""), `"Asia/Kuala_Lumpur"`, `"Moon/Base"`),
 		"nonexistent": `{"count":8,"draft":{"timezone":"America/New_York","weekdays":[7],"startLocal":"02:30",` +
 			`"endLocal":"05:00","endsNextDay":false,"startAction":{"kind":"set_power","power":true},` +
 			`"endAction":{"kind":"set_power","power":false}}}`,
 	} {
-		code, m := post(srv, &customerA, "automations.nextRuns", body)
+		code, m := post(srv, customerA(), "automations.nextRuns", body)
 		refusal(t, name, code, m, want[name])
 	}
 }
 
-// strings2 replaces the first occurrence of old in s.
-func strings2(s, old, new string) string {
-	for i := 0; i+len(old) <= len(s); i++ {
-		if s[i:i+len(old)] == old {
-			return s[:i] + new + s[i+len(old):]
+// strings2 replaces the first occurrence of old in s with replacement.
+func strings2(text, old, replacement string) string {
+	for i := 0; i+len(old) <= len(text); i++ {
+		if text[i:i+len(old)] == old {
+			return text[:i] + replacement + text[i+len(old):]
 		}
 	}
 
-	return s
+	return text
 }
 
 // IR53 / AT-C05-N ④: withdrawing location consent disables the owner's enabled location rules (consent_revoked,
 // version + 1); granting again re-enables nothing, an explicit save with enabled=true does and clears the reason.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestConsentWithdrawalDisablesLocationRules(t *testing.T) {
 	srv := server(t)
 	consent := func() (bool, int) {
 		t.Helper()
 
-		_, m := post(srv, &customerA, "consents.get", `{"purpose":"location_automation"}`)
+		_, m := post(srv, customerA(), "consents.get", `{"purpose":"location_automation"}`)
 
-		return data(m)["granted"] == true, ver(m)
+		return data(m)["granted"] == true, ver(t, m)
 	}
 	set := func(granted bool) {
 		t.Helper()
 
-		g, v := consent()
+		g, version := consent()
 		if g == granted {
 			return
 		}
 
 		if code, res := write(
 			srv,
-			&customerA,
+			customerA(),
 			"consents.update",
-			`{"purpose":"location_automation","granted":`+map[bool]string{true: "true", false: "false"}[granted]+`}`,
-			v,
+			`{"purpose":"location_automation","granted":`+strconv.FormatBool(granted)+`}`,
+			version,
 		); code != 200 {
 			t.Fatalf("consent %v: %d %v", granted, code, res)
 		}
@@ -349,17 +376,17 @@ func TestConsentWithdrawalDisablesLocationRules(t *testing.T) {
 		drainEvents(t)
 	}
 	unit := seed.ID("unit-online-rto").String()
-	rule := func(id string, version int, enabled bool, event string) (int, map[string]any) {
+	rule := func(automationID string, version int, enabled bool, event string) (int, map[string]any) {
 		body := `{"name":"Arrive cool",` +
 			`"unitIds":["` + unit + `"],"timezone":"Asia/Kuala_Lumpur",` +
-			`"enabled":` + map[bool]string{true: "true", false: "false"}[enabled] +
+			`"enabled":` + strconv.FormatBool(enabled) +
 			`,"priority":50,"kind":"event","condition":{"type":"location",` +
 			`"event":"` + event + `"},"action":{"kind":"set_temperature","celsius":24}`
-		if id != "" {
-			body += `,"id":"` + id + `"`
+		if automationID != "" {
+			body += `,"id":"` + automationID + `"`
 		}
 
-		return write(srv, &customerA, "automations.save", body+"}", version)
+		return write(srv, customerA(), "automations.save", body+"}", version)
 	}
 
 	set(true)
@@ -373,9 +400,9 @@ func TestConsentWithdrawalDisablesLocationRules(t *testing.T) {
 
 	code, resp = write(
 		srv,
-		&customerA,
+		customerA(),
 		"automations.save",
-		scheduleRule(unit, map[string]string{"enabled": "true", "weekdays": "[6]"}),
+		scheduleRule(unit, map[string]string{fieldEnabled: jsonTrue, fieldWeekdays: "[6]"}),
 		0,
 	)
 	if code != 200 {
@@ -383,22 +410,22 @@ func TestConsentWithdrawalDisablesLocationRules(t *testing.T) {
 	}
 
 	sched := asStr(t, data(resp)["id"])
-	get := func(id string) map[string]any {
+	get := func(automationID string) map[string]any {
 		t.Helper()
 
 		_, res := post(
 			srv,
-			&customerA,
+			customerA(),
 			"automations.list",
 			`{"limit":100,"filters":{"unitId":"`+unit+`"}}`,
 		)
-		for _, it := range items(res) {
-			if it["id"] == id {
+		for _, it := range items(t, res) {
+			if it["id"] == automationID {
 				return it
 			}
 		}
 
-		t.Fatalf("%s not listed", id)
+		t.Fatalf("%s not listed", automationID)
 
 		return nil
 	}
@@ -407,7 +434,7 @@ func TestConsentWithdrawalDisablesLocationRules(t *testing.T) {
 
 	if r := get(
 		loc,
-	); r["enabled"] != false || r["disabledReason"] != "consent_revoked" ||
+	); r["enabled"] != false || r["disabledReason"] != reasonConsentRevoked ||
 		asNum(t, r["version"]) != 2 {
 		t.Fatalf("withdrawn: %v", r)
 	}
@@ -418,7 +445,7 @@ func TestConsentWithdrawalDisablesLocationRules(t *testing.T) {
 
 	set(true)
 
-	if r := get(loc); r["enabled"] != false || r["disabledReason"] != "consent_revoked" {
+	if r := get(loc); r["enabled"] != false || r["disabledReason"] != reasonConsentRevoked {
 		t.Fatalf("granting again re-enables nothing: %v", r)
 	}
 
@@ -432,15 +459,15 @@ func TestConsentWithdrawalDisablesLocationRules(t *testing.T) {
 		t.Fatalf("explicit enable: %d %v", code, res)
 	}
 	// leave the seed state: no rules, consent withdrawn
-	for id, v := range map[string]int{loc: 3, sched: 1} {
+	for automationID, version := range map[string]int{loc: 3, sched: 1} {
 		if code, _ := write(
 			srv,
-			&customerA,
+			customerA(),
 			"automations.delete",
-			`{"id":"`+id+`"}`,
-			v,
+			`{"id":"`+automationID+`"}`,
+			version,
 		); code != 200 {
-			t.Errorf("cleanup %s: %d", id, code)
+			t.Errorf("cleanup %s: %d", automationID, code)
 		}
 	}
 
@@ -449,6 +476,8 @@ func TestConsentWithdrawalDisablesLocationRules(t *testing.T) {
 
 // IR215: every onlyIf condition must hold when a rule runs. A rule whose own trigger held but that could not run keeps
 // the reason in its run log (lastRun); events that are not for the rule leave no trace.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAutomationExtraConditions(t *testing.T) {
 	srv := server(t)
 	ctx := context.Background()
@@ -465,15 +494,15 @@ func TestAutomationExtraConditions(t *testing.T) {
 			`"weekdays":[2]},{"type":"occupancy","occupied":false}]`,
 		"same type twice":    `[{"type":"occupancy","occupied":true},{"type":"occupancy","occupied":false}]`,
 		"own condition type": `[` + weather + `]`,
-		"no weekdays":        `[{"type":"weekday","weekdays":[]}]`,
-		"weekday 8":          `[{"type":"weekday","weekdays":[8]}]`,
+		caseNoWeekdays:       `[{"type":"weekday","weekdays":[]}]`,
+		caseWeekdayEight:     `[{"type":"weekday","weekdays":[8]}]`,
 		"unknown type":       `[{"type":"tariff","operator":"gt","value":1}]`,
 		"extra field":        `[{"type":"occupancy","occupied":true,"value":3}]`,
-		"bad operator":       `[{"type":"occupancy","occupied":true},{"type":"weekday","weekdays":[1],"operator":"gt"}]`,
+		caseBadOperator:      `[{"type":"occupancy","occupied":true},{"type":"weekday","weekdays":[1],"operator":"gt"}]`,
 	} {
 		if code, resp := write(
 			srv,
-			&customerB,
+			customerB(),
 			"automations.save",
 			base+`,"onlyIf":`+extra+`}`,
 			0,
@@ -485,7 +514,7 @@ func TestAutomationExtraConditions(t *testing.T) {
 
 	if code, resp := write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.save",
 		scheduleRule(unitID, map[string]string{"onlyIf": `[{"type":"weekday","weekdays":[1]}]`}),
 		0,
@@ -496,7 +525,7 @@ func TestAutomationExtraConditions(t *testing.T) {
 
 	code, res := write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.save",
 		base+`,"onlyIf":[{"type":"weekday","weekdays":[1]},{"type":"occupancy","occupied":true}]}`,
 		0,
@@ -505,13 +534,14 @@ func TestAutomationExtraConditions(t *testing.T) {
 		t.Fatalf("save: %d %v", code, res)
 	}
 
-	id := asStr(t, data(res)["id"])
+	automationID := asStr(t, data(res)["id"])
 	fact := func(metric, value, unit string) string {
 		return `{"unitId":"` + unitID + `","metric":"` + metric + `","value":` + value + `,"unit":"` + unit +
 			`","observedAt":"` +
-			clock.Format(
+			clock().Format(
 				time.RFC3339,
-			) + `","quality":"valid"}`
+			) +
+			`","quality":"valid"}`
 	}
 	fire := func(facts ...string) map[string]any {
 		// one evaluation per tick (D02): clear the tick and the unit's pending commands first
@@ -525,9 +555,9 @@ func TestAutomationExtraConditions(t *testing.T) {
 
 		code, resp := write(
 			srv,
-			&customerB,
+			customerB(),
 			"automations.fire",
-			`{"eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Format(
+			`{"eventId":"`+uuid.NewString()+`","occurredAt":"`+clock().Format(
 				time.RFC3339,
 			)+`","unitIds":["`+unitID+`"],"facts":[`+
 				strings.Join(
@@ -545,14 +575,14 @@ func TestAutomationExtraConditions(t *testing.T) {
 	last := func() map[string]any {
 		t.Helper()
 
-		_, m := post(
+		_, resp := post(
 			srv,
-			&customerB,
+			customerB(),
 			"automations.list",
 			`{"limit":10,"filters":{"unitId":"`+unitID+`"}}`,
 		)
-		for _, it := range items(m) {
-			if it["id"] == id {
+		for _, it := range items(t, resp) {
+			if it["id"] == automationID {
 				lr, _ := it["lastRun"].(map[string]any)
 
 				return lr
@@ -564,56 +594,58 @@ func TestAutomationExtraConditions(t *testing.T) {
 		return nil
 	}
 	runs := func() int {
-		var n int
+		var total int
 		ownerScan(
 			t,
 			`SELECT count(*) FROM control.automation_runs WHERE rule_id = $1`,
-			[]any{id},
-			&n,
+			[]any{automationID},
+			&total,
 		)
 
-		return n
+		return total
 	}
 	// Monday, hot and someone home: runs
 	if d := fire(
 		fact("weather_temperature", "34", "°C"),
 		fact("occupied", "true", "boolean"),
-	); d["decision"] != "requested" ||
-		d["ruleId"] != id {
+	); d["decision"] != decisionRequested ||
+		d["ruleId"] != automationID {
 		t.Fatalf("all conditions hold: %v", d)
 	}
 
-	if lr := last(); lr == nil || lr["outcome"] != "command_created" || lr["commandId"] == nil ||
-		lr["at"] != clock.Format(time.RFC3339) {
+	if lr := last(); lr == nil || lr["outcome"] != outcomeCommandCreated ||
+		lr["commandId"] == nil ||
+		lr["at"] != clock().Format(time.RFC3339) {
 		t.Fatalf("lastRun after a command: %v", lr)
 	}
 	// hot, but nobody home: the extra condition fails and is logged
 	if d := fire(
 		fact("weather_temperature", "34", "°C"),
 		fact("occupied", "false", "boolean"),
-	); d["decision"] != "suppressed" ||
-		d["reason"] != "no_match" {
+	); d["decision"] != decisionSuppressed ||
+		d["reason"] != reasonNoMatch {
 		t.Fatalf("only if someone is home: %v", d)
 	}
 
-	if lr := last(); lr["outcome"] != "skipped" || lr["reason"] != "no_match" {
+	if lr := last(); lr["outcome"] != outcomeSkipped || lr["reason"] != reasonNoMatch {
 		t.Fatalf("lastRun no_match: %v", lr)
 	}
 	// hot, occupancy unknown: missing data never matches, the skip says why
-	if d := fire(fact("weather_temperature", "34", "°C")); d["reason"] != "missing_data" {
+	if d := fire(fact("weather_temperature", "34", "°C")); d["reason"] != reasonMissingData {
 		t.Fatalf("missing occupancy: %v", d)
 	}
 
-	if lr := last(); lr["outcome"] != "skipped" || lr["reason"] != "missing_data" {
+	if lr := last(); lr["outcome"] != outcomeSkipped || lr["reason"] != reasonMissingData {
 		t.Fatalf("lastRun missing_data: %v", lr)
 	}
 	// its own data arrived incomplete: logged; an event that is not for the rule (no weather): no trace
-	if d := fire(
-		`{"unitId":"` + unitID + `","metric":"weather_temperature","value":null,"unit":"°C","observedAt":"` + clock.Format(
+	if decision := fire(
+		`{"unitId":"` + unitID + `","metric":"weather_temperature","value":null,"unit":"°C","observedAt":"` + clock().Format(
 			time.RFC3339,
-		) + `","quality":"missing"}`,
-	); d["reason"] != "missing_data" {
-		t.Fatalf("null weather: %v", d)
+		) +
+			`","quality":"missing"}`,
+	); decision["reason"] != reasonMissingData {
+		t.Fatalf("null weather: %v", decision)
 	}
 
 	n := runs()
@@ -626,9 +658,9 @@ func TestAutomationExtraConditions(t *testing.T) {
 	// not a selected weekday
 	code, res = write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.save",
-		base+`,"id":"`+id+`","onlyIf":[{"type":"weekday","weekdays":[6,7]}]}`,
+		base+`,"id":"`+automationID+`","onlyIf":[{"type":"weekday","weekdays":[6,7]}]}`,
 		1,
 	)
 	if code != 200 || len(asArr(t, data(res)["onlyIf"])) != 1 {
@@ -637,14 +669,17 @@ func TestAutomationExtraConditions(t *testing.T) {
 
 	if d := fire(
 		fact("weather_temperature", "34", "°C"),
-	); d["decision"] != "suppressed" ||
-		d["reason"] != "no_match" {
+	); d["decision"] != decisionSuppressed ||
+		d["reason"] != reasonNoMatch {
 		t.Fatalf("Monday is not a weekend: %v", d)
 	}
 	// a schedule that needs someone home skips at its start for want of occupancy data (the scheduler has none)
-	code, res = write(srv, &customerB, "automations.save", scheduleRule(unitID, map[string]string{
-		"weekdays": "[1]", "startLocal": `"09:30"`, "endLocal": `"10:00"`, "enabled": "true",
-		"onlyIf": `[{"type":"occupancy","occupied":true}]`,
+	code, res = write(srv, customerB(), "automations.save", scheduleRule(unitID, map[string]string{
+		fieldWeekdays:   jsonMondays,
+		fieldStartLocal: jsonHalfPastNine,
+		fieldEndLocal:   jsonTenOClock,
+		fieldEnabled:    jsonTrue,
+		"onlyIf":        `[{"type":"occupancy","occupied":true}]`,
 	}), 0)
 	if code != 200 {
 		t.Fatalf("schedule with onlyIf: %d %v", code, res)
@@ -652,9 +687,9 @@ func TestAutomationExtraConditions(t *testing.T) {
 
 	sid := asStr(t, data(res)["id"])
 	before := len(automationCommands(t, unitID))
-	setWatermark(t, clock)
+	setWatermark(t, clock())
 
-	_, err := schedTick(ctx, srv, clock.Add(31*time.Minute))
+	_, err := schedTick(ctx, srv, clock().Add(31*time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -668,18 +703,18 @@ func TestAutomationExtraConditions(t *testing.T) {
 		&reason,
 	)
 
-	if outcome != "skipped" || reason != "missing_data" ||
+	if outcome != outcomeSkipped || reason != reasonMissingData ||
 		len(automationCommands(t, unitID)) != before {
 		t.Fatalf("schedule skipped: %s %s", outcome, reason)
 	}
 
-	for rid, v := range map[string]int{id: 2, sid: 1} { // leave no rule behind
+	for rid, version := range map[string]int{automationID: 2, sid: 1} { // leave no rule behind
 		if code, _ := write(
 			srv,
-			&customerB,
+			customerB(),
 			"automations.delete",
 			`{"id":"`+rid+`"}`,
-			v,
+			version,
 		); code != 200 {
 			t.Errorf("cleanup: %d", code)
 		}
@@ -690,6 +725,8 @@ func TestAutomationExtraConditions(t *testing.T) {
 // minute where one schedule ends and another starts on the same unit, the start wins when it would run: the end is
 // not sent and is recorded as superseded (IR326 item 4, IR504). A start that would not run leaves the end, whose
 // Command then makes the unit busy (D04). clock is Monday 2026-09-14 09:00 Kuala Lumpur.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestScheduleBoundaries(t *testing.T) {
 	srv := server(t)
 	ctx := context.Background()
@@ -704,12 +741,12 @@ func TestScheduleBoundaries(t *testing.T) {
 	save := func(u, start, end, action string) string {
 		t.Helper()
 
-		code, res := write(srv, &customerB, "automations.save", scheduleRule(u, map[string]string{
-			"weekdays":    "[1]",
-			"startLocal":  `"` + start + `"`,
-			"endLocal":    `"` + end + `"`,
-			"enabled":     "true",
-			"startAction": action,
+		code, res := write(srv, customerB(), "automations.save", scheduleRule(u, map[string]string{
+			fieldWeekdays:    jsonMondays,
+			fieldStartLocal:  `"` + start + `"`,
+			fieldEndLocal:    `"` + end + `"`,
+			fieldEnabled:     jsonTrue,
+			fieldStartAction: action,
 		}), 0)
 		if code != 200 {
 			t.Fatalf("save %s–%s: %d %v", start, end, code, res)
@@ -724,17 +761,17 @@ func TestScheduleBoundaries(t *testing.T) {
 
 	owner(t, `UPDATE assets.units SET archived = true WHERE id = $1`, archived)
 	owner(t, `UPDATE control.automations SET timezone = 'Mars/Olympus_Mons' WHERE id = $1`, zone)
-	setWatermark(t, clock)
-	tick(clock.Add(31 * time.Minute))
+	setWatermark(t, clock())
+	tick(clock().Add(31 * time.Minute))
 	owner(t, `UPDATE assets.units SET archived = false WHERE id = $1`, archived)
 
-	if a, b := len(
+	if archivedCommands, lostCommands := len(
 		automationCommands(t, archived),
 	), len(
 		automationCommands(t, lost),
-	); a != 0 ||
-		b != 0 {
-		t.Fatalf("skipped rules sent commands: archived %d, unknown zone %d", a, b)
+	); archivedCommands != 0 ||
+		lostCommands != 0 {
+		t.Fatalf("skipped rules sent commands: archived %d, unknown zone %d", archivedCommands, lostCommands)
 	}
 
 	type run struct{ rule, trigger, outcome, reason string }
@@ -746,7 +783,7 @@ func TestScheduleBoundaries(t *testing.T) {
 		if err != nil {
 			t.Skip(err)
 		}
-		defer conn.Close(ctx)
+		defer func() { _ = conn.Close(ctx) }()
 
 		rows, err := conn.Query(
 			ctx,
@@ -776,16 +813,16 @@ func TestScheduleBoundaries(t *testing.T) {
 	first := save(unitID, "09:30", "10:00", `{"kind":"set_temperature","celsius":25}`)
 	second := save(unitID, "10:00", "10:30", `{"kind":"set_temperature","celsius":22}`)
 
-	setWatermark(t, clock.Add(59*time.Minute))
-	tick(clock.Add(61 * time.Minute))
+	setWatermark(t, clock().Add(59*time.Minute))
+	tick(clock().Add(61 * time.Minute))
 
 	end, start := "schedule:schedule_end:2026-09-14T02:00:00Z", "schedule:schedule_start:2026-09-14T02:00:00Z"
 	if got := runs(
 		unitID,
 		first,
 		second,
-	); len(got) != 2 || got[0] != (run{first, end, "skipped", "superseded"}) ||
-		got[1] != (run{second, start, "command_created", ""}) {
+	); len(got) != 2 || got[0] != (run{first, end, outcomeSkipped, "superseded"}) ||
+		got[1] != (run{second, start, outcomeCommandCreated, ""}) {
 		t.Fatalf("same-minute end and start: %v", got)
 	}
 
@@ -798,9 +835,9 @@ func TestScheduleBoundaries(t *testing.T) {
 	}
 
 	// 10:15: the next start would not run (the model lost its temperature setpoint), so the end is sent as before
-	v := boundUnit(t, srv, "online")
-	first = save(v, "09:30", "10:15", `{"kind":"set_temperature","celsius":25}`)
-	second = save(v, "10:15", "10:45", `{"kind":"set_temperature","celsius":22}`)
+	setpointUnit := boundUnit(t, srv, "online")
+	first = save(setpointUnit, "09:30", "10:15", `{"kind":"set_temperature","celsius":25}`)
+	second = save(setpointUnit, "10:15", "10:45", `{"kind":"set_temperature","celsius":22}`)
 
 	var (
 		model      string
@@ -809,7 +846,7 @@ func TestScheduleBoundaries(t *testing.T) {
 	ownerScan(
 		t,
 		`SELECT model_id::text, capability_version FROM assets.units WHERE id = $1`,
-		[]any{v},
+		[]any{setpointUnit},
 		&model,
 		&capVersion,
 	)
@@ -827,34 +864,34 @@ func TestScheduleBoundaries(t *testing.T) {
 	owner(
 		t,
 		`UPDATE assets.units SET model_id = $2, capability_version = 1 WHERE id = $1`,
-		v,
+		setpointUnit,
 		fanOnly,
 	)
-	setWatermark(t, clock.Add(74*time.Minute))
-	tick(clock.Add(76 * time.Minute))
+	setWatermark(t, clock().Add(74*time.Minute))
+	tick(clock().Add(76 * time.Minute))
 	owner(
 		t,
 		`UPDATE assets.units SET model_id = $2, capability_version = $3 WHERE id = $1`,
-		v,
+		setpointUnit,
 		model,
 		capVersion,
 	)
 
 	end, start = "schedule:schedule_end:2026-09-14T02:15:00Z", "schedule:schedule_start:2026-09-14T02:15:00Z"
 	if got := runs(
-		v,
+		setpointUnit,
 		first,
 		second,
-	); len(got) != 2 || got[0] != (run{first, end, "command_created", ""}) ||
-		got[1] != (run{second, start, "skipped", "invalid_capability"}) {
+	); len(got) != 2 || got[0] != (run{first, end, outcomeCommandCreated, ""}) ||
+		got[1] != (run{second, start, outcomeSkipped, "invalid_capability"}) {
 		t.Fatalf("an end before a start that would not run: %v", got)
 	}
 
 	if cs := automationCommands(
 		t,
-		v,
+		setpointUnit,
 	); len(cs) != 1 ||
-		cs[0] != `{"kind": "set_power", "power": false}` {
+		cs[0] != storedPowerOff {
 		t.Fatalf("commands at 10:15: %v", cs)
 	}
 }

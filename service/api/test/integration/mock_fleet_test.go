@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -14,6 +14,8 @@ import (
 // TestMockFleetSeeds: the mock fleet adds one unit per pattern on its own property, a module for each pattern that has
 // one with the pattern's connection, power signal, tamper and firmware, and runs again without adding anything. It runs
 // in a transaction that is rolled back, so the shared test database keeps only the fixture.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestMockFleetSeeds(t *testing.T) {
 	server(t) // the test database with the fixture
 
@@ -28,45 +30,45 @@ func TestMockFleetSeeds(t *testing.T) {
 	if err != nil {
 		t.Skip(err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	txn, err := conn.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer txn.Rollback(ctx) //nolint:errcheck // the test never commits
+	defer func() { _ = txn.Rollback(ctx) }() // the test never commits
 
-	n, applyFleetErr := seed.ApplyFleet(ctx, txn, fleet, clock)
-	if applyFleetErr != nil || n != len(fleet.Patterns) {
-		t.Fatalf("apply: %d units, err %v", n, applyFleetErr)
+	seeded, applyFleetErr := seed.ApplyFleet(ctx, txn, fleet, clock())
+	if applyFleetErr != nil || seeded != len(fleet.Patterns) {
+		t.Fatalf("apply: %d units, err %v", seeded, applyFleetErr)
 	}
 
-	n, applyFleetErr = seed.ApplyFleet(ctx, txn, fleet, clock)
-	if applyFleetErr != nil || n != len(fleet.Patterns) {
-		t.Fatalf("second apply: %d, err %v", n, applyFleetErr)
+	seeded, applyFleetErr = seed.ApplyFleet(ctx, txn, fleet, clock())
+	if applyFleetErr != nil || seeded != len(fleet.Patterns) {
+		t.Fatalf("second apply: %d, err %v", seeded, applyFleetErr)
 	}
 
 	count := func(sql string, args ...any) int {
-		var n int
+		var total int
 
-		err := txn.QueryRow(ctx, sql, args...).Scan(&n)
+		err := txn.QueryRow(ctx, sql, args...).Scan(&total)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		return n
+		return total
 	}
 
 	property := seed.ID(fleet.Property.ID)
-	if n := count(
+	if total := count(
 		`SELECT count(*) FROM assets.units WHERE property_id = $1`,
 		property,
-	); n != len(
+	); total != len(
 		fleet.Patterns,
 	) {
 		t.Errorf(
 			"%d units on the fleet property, want %d (a second apply adds nothing)",
-			n,
+			total,
 			len(fleet.Patterns),
 		)
 	}
@@ -101,13 +103,13 @@ func TestMockFleetSeeds(t *testing.T) {
 			t.Errorf("%s module is %s/%s/%s/%s", pattern.Key, conn, power, tamper, firmware)
 		}
 
-		if n := count(
+		if total := count(
 			`SELECT count(*) FROM devices.sensors WHERE device_id = $1`,
 			seed.ID(devicesim.DeviceName(pattern)),
-		); n != len(
+		); total != len(
 			devicesim.Sensors,
 		) {
-			t.Errorf("%s has %d sensors", pattern.Key, n)
+			t.Errorf("%s has %d sensors", pattern.Key, total)
 		}
 	}
 
@@ -153,6 +155,8 @@ func TestMockFleetSeeds(t *testing.T) {
 // TestMockFleetHistory: two days of history give each reporting module a power reading every minute (copied to
 // energy's power samples) and a temperature every 15 minutes; power follows the Kuala Lumpur day (running in the
 // afternoon, standby at night); a module that is not reporting stopped a day earlier; more than 35 days is refused.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestMockFleetHistory(t *testing.T) {
 	server(t)
 
@@ -167,15 +171,15 @@ func TestMockFleetHistory(t *testing.T) {
 	if err != nil {
 		t.Skip(err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	txn, err := conn.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer txn.Rollback(ctx) //nolint:errcheck // the test never commits
+	defer func() { _ = txn.Rollback(ctx) }() // the test never commits
 
-	_, applyFleetErr := seed.ApplyFleet(ctx, txn, fleet, clock)
+	_, applyFleetErr := seed.ApplyFleet(ctx, txn, fleet, clock())
 	if applyFleetErr != nil {
 		t.Fatal(applyFleetErr)
 	}
@@ -209,14 +213,14 @@ func TestMockFleetHistory(t *testing.T) {
 	}
 
 	count := func(sql string, args ...any) int {
-		var n int
+		var total int
 
-		err := txn.QueryRow(ctx, sql, args...).Scan(&n)
+		err := txn.QueryRow(ctx, sql, args...).Scan(&total)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		return n
+		return total
 	}
 
 	power := seed.ID("sensor-mock-cool-on-power")
@@ -269,7 +273,7 @@ func TestMockFleetHistory(t *testing.T) {
 		t.Errorf("power at 13:00 %.2f kW, at 02:00 %.3f kW", afternoon, night)
 	}
 
-	for _, metric := range []string{"humidity", "co2", "pm25"} {
+	for _, metric := range []string{metricHumidity, metricCO2, metricPM25} {
 		if n := count(
 			`SELECT count(*) FROM monitoring.measurements WHERE sensor_id = $1`,
 			seed.ID("sensor-mock-cool-on-"+metric),

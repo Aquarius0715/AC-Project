@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"strings"
@@ -8,33 +8,35 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+const fieldEndsNextDay = "endsNextDay"
+
 func scheduleRule(u string, extra map[string]string) string {
 	f := map[string]string{
-		"name":        `"Weekday cooling"`,
-		"unitIds":     `["` + u + `"]`,
-		"timezone":    `"Asia/Kuala_Lumpur"`,
-		"enabled":     "false",
-		"priority":    "50",
-		"kind":        `"schedule"`,
-		"weekdays":    "[1,2,3,4,5]",
-		"startLocal":  `"08:00"`,
-		"endLocal":    `"18:00"`,
-		"endsNextDay": "false",
-		"startAction": `{"kind":"set_power","power":true}`,
-		"endAction":   `{"kind":"set_power","power":false}`,
+		fieldName:        `"Weekday cooling"`,
+		fieldUnitIDs:     `["` + u + `"]`,
+		fieldTimezone:    jsonKualaLumpur,
+		fieldEnabled:     jsonFalse,
+		fieldPriority:    "50",
+		fieldKind:        `"schedule"`,
+		fieldWeekdays:    "[1,2,3,4,5]",
+		fieldStartLocal:  `"08:00"`,
+		fieldEndLocal:    `"18:00"`,
+		fieldEndsNextDay: jsonFalse,
+		fieldStartAction: actionPowerOn,
+		"endAction":      actionPowerOff,
 	}
 
-	for key, v := range extra {
-		if v == "" {
+	for key, value := range extra {
+		if value == "" {
 			delete(f, key)
 
 			continue
 		}
 
-		f[key] = v
+		f[key] = value
 	}
 
-	parts := []string{}
+	parts := make([]string, 0, len(f))
 	for k, v := range f {
 		parts = append(parts, `"`+k+`":`+v)
 	}
@@ -42,48 +44,49 @@ func scheduleRule(u string, extra map[string]string) string {
 	return "{" + strings.Join(parts, ",") + "}"
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAutomationSchedules(t *testing.T) {
 	srv := server(t)
 	unit := newUnit(t, srv, "Auto AC")
 	// the field each case is refused for
 	want := map[string]string{
 		"bad time":             "startLocal=error.invalid",
-		"bad zone":             "timezone=error.invalid",
-		"blank name":           "name=error.length",
+		caseBadZone:            refusedTimezoneInvalid,
+		caseBlankName:          refusedNameLength,
 		"duplicate weekday":    "weekdays=error.invalid",
-		"event fields":         "kind=error.invalid",
+		"event fields":         refusedKindInvalid,
 		"no end action":        "endAction=error.invalid",
-		"no weekdays":          "weekdays=error.required",
+		caseNoWeekdays:         "weekdays=error.required",
 		"over 24 hours":        "endsNextDay=errors.over_24_hours",
 		"overnight not marked": "endsNextDay=errors.overnight_required",
-		"priority 101":         "priority=error.range",
+		casePriorityOver100:    refusedPriorityRange,
 		"same start and end":   "endLocal=errors.same_as_start",
 		"unsupported action":   "unitIds=error.unsupportedAction",
-		"weekday 8":            "weekdays=error.invalid",
+		caseWeekdayEight:       "weekdays=error.invalid",
 	}
 
-	for name, e := range map[string]map[string]string{
-		"no weekdays":          {"weekdays": "[]"},
-		"weekday 8":            {"weekdays": "[8]"},
-		"duplicate weekday":    {"weekdays": "[1,1]"},
-		"same start and end":   {"endLocal": `"08:00"`},
-		"overnight not marked": {"startLocal": `"22:00"`, "endLocal": `"06:00"`},
-		"over 24 hours":        {"endsNextDay": "true"},
+	for name, extra := range map[string]map[string]string{
+		caseNoWeekdays:         {fieldWeekdays: "[]"},
+		caseWeekdayEight:       {fieldWeekdays: "[8]"},
+		"duplicate weekday":    {fieldWeekdays: "[1,1]"},
+		"same start and end":   {fieldEndLocal: `"08:00"`},
+		"overnight not marked": {fieldStartLocal: `"22:00"`, fieldEndLocal: `"06:00"`},
+		"over 24 hours":        {fieldEndsNextDay: jsonTrue},
 		"no end action":        {"endAction": ""},
-		"bad time":             {"startLocal": `"8:00"`},
-		"bad zone":             {"timezone": `"Moon/Base"`},
-		"priority 101":         {"priority": "101"},
-		"blank name":           {"name": `" "`},
-		"event fields":         {"condition": `{"type":"occupancy","occupied":true}`},
-		"unsupported action":   {"startAction": `{"kind":"set_temperature","celsius":40}`},
+		"bad time":             {fieldStartLocal: `"8:00"`},
+		caseBadZone:            {fieldTimezone: `"Moon/Base"`},
+		casePriorityOver100:    {fieldPriority: "101"},
+		caseBlankName:          {fieldName: jsonBlank},
+		"event fields":         {fieldCondition: `{"type":"occupancy","occupied":true}`},
+		"unsupported action":   {fieldStartAction: `{"kind":"set_temperature","celsius":40}`},
 	} {
-		code, m := write(srv, &customerB, "automations.save", scheduleRule(unit, e), 0)
+		code, m := write(srv, customerB(), "automations.save", scheduleRule(unit, extra), 0)
 		refusal(t, name, code, m, want[name])
 	}
 
 	if code, _ := write(
 		srv,
-		&customerA,
+		customerA(),
 		"automations.save",
 		scheduleRule(unit, nil),
 		0,
@@ -96,35 +99,35 @@ func TestAutomationSchedules(t *testing.T) {
 		"\"02:30\"": "startLocal=errors.local_time_invalid",
 	}
 
-	for _, hm := range []string{`"02:30"`, `"01:30"`} {
+	for _, localTime := range []string{`"02:30"`, `"01:30"`} {
 		code, res := write(
 			srv,
-			&customerB,
+			customerB(),
 			"automations.save",
 			scheduleRule(
 				unit,
 				map[string]string{
-					"timezone":   `"America/New_York"`,
-					"weekdays":   "[7]",
-					"startLocal": hm,
-					"endLocal":   `"05:00"`,
+					fieldTimezone:   `"America/New_York"`,
+					fieldWeekdays:   "[7]",
+					fieldStartLocal: localTime,
+					fieldEndLocal:   `"05:00"`,
 				},
 			),
 			0,
 		)
-		refusal(t, hm, code, res, want[hm])
+		refusal(t, localTime, code, res, want[localTime])
 	}
 
 	code, resp := write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.save",
 		scheduleRule(
 			unit,
 			map[string]string{
-				"startLocal":  `"22:00"`,
-				"endLocal":    `"06:00"`,
-				"endsNextDay": "true",
+				fieldStartLocal:  `"22:00"`,
+				fieldEndLocal:    `"06:00"`,
+				fieldEndsNextDay: jsonTrue,
 			},
 		),
 		0,
@@ -134,12 +137,12 @@ func TestAutomationSchedules(t *testing.T) {
 		t.Fatalf("save: %d %v", code, resp)
 	}
 
-	id := asStr(t, data(resp)["id"])
+	automationID := asStr(t, data(resp)["id"])
 	code, resp = post(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.nextRuns",
-		`{"automationId":"`+id+`","count":8}`,
+		`{"automationId":"`+automationID+`","count":8}`,
 	)
 
 	list := asArr(t, resp["data"])
@@ -156,9 +159,9 @@ func TestAutomationSchedules(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.nextRuns",
-		`{"automationId":"`+id+`","count":5}`,
+		`{"automationId":"`+automationID+`","count":5}`,
 	); code != 422 ||
 		fields(res) != "count=error.invalid" {
 		t.Errorf("count must be 8: %d %s", code, fields(res))
@@ -166,9 +169,9 @@ func TestAutomationSchedules(t *testing.T) {
 
 	if code, _ := post(
 		srv,
-		&customerA,
+		customerA(),
 		"automations.nextRuns",
-		`{"automationId":"`+id+`","count":8}`,
+		`{"automationId":"`+automationID+`","count":8}`,
 	); code != 404 {
 		t.Error("another customer's rule")
 	}
@@ -176,14 +179,14 @@ func TestAutomationSchedules(t *testing.T) {
 	owner(
 		t,
 		`UPDATE control.automations SET disabled_reason = 'capability_changed' WHERE id = $1`,
-		id,
+		automationID,
 	)
 
 	if code, _ := write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.save",
-		scheduleRule(unit, map[string]string{"id": `"` + id + `"`}),
+		scheduleRule(unit, map[string]string{"id": `"` + automationID + `"`}),
 		2,
 	); code != 409 {
 		t.Error("stale rule")
@@ -191,9 +194,9 @@ func TestAutomationSchedules(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.save",
-		`{"id":"`+id+`","name":"x",`+
+		`{"id":"`+automationID+`","name":"x",`+
 			`"unitIds":["`+unit+`"],"timezone":"UTC","enabled":false,"priority":1,"kind":"event",`+
 			`"condition":{"type":"occupancy","occupied":true},"action":{"kind":"set_power","power":false}}`,
 		1,
@@ -204,20 +207,20 @@ func TestAutomationSchedules(t *testing.T) {
 
 	code, resp = write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.save",
-		scheduleRule(unit, map[string]string{"id": `"` + id + `"`, "name": `"Edited"`}),
+		scheduleRule(unit, map[string]string{"id": `"` + automationID + `"`, fieldName: `"Edited"`}),
 		1,
 	)
-	if code != 200 || ver(resp) != 2 || data(resp)["disabledReason"] != "capability_changed" {
+	if code != 200 || ver(t, resp) != 2 || data(resp)["disabledReason"] != "capability_changed" {
 		t.Fatalf("edit while disabled keeps the reason: %d %v", code, resp)
 	}
 
 	code, resp = write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.save",
-		scheduleRule(unit, map[string]string{"id": `"` + id + `"`, "enabled": "true"}),
+		scheduleRule(unit, map[string]string{"id": `"` + automationID + `"`, fieldEnabled: jsonTrue}),
 		2,
 	)
 	if code != 200 || data(resp)["enabled"] != true || data(resp)["disabledReason"] != nil {
@@ -226,40 +229,41 @@ func TestAutomationSchedules(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.list",
 		`{"filters":{"unitId":"`+unit+`","kind":"schedule","enabled":true}}`,
 	); len(
-		items(res),
+		items(t, res),
 	) != 1 {
 		t.Errorf("list: %v", res)
 	}
 
 	if code, res := post(
 		srv,
-		&customerA,
+		customerA(),
 		"automations.list",
 		`{"filters":{"unitId":"`+unit+`"}}`,
 	); code != 200 ||
-		len(items(res)) != 0 {
+		len(items(t, res)) != 0 {
 		t.Error("another customer's list")
 	}
 
 	if code, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.list",
 		`{"filters":{"kind":"cron"}}`,
 	); code != 422 ||
-		fields(res) != "filters=error.invalid" {
+		fields(res) != refusedFiltersInvalid {
 		t.Errorf("bad kind filter: %d %s", code, fields(res))
 	}
 
-	if code, _ := post(srv, &hq, "automations.list", `{}`); code != 403 {
+	if code, _ := post(srv, hq(), "automations.list", `{}`); code != 403 {
 		t.Error("HQ lists customer rules")
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAutomationEvents(t *testing.T) {
 	srv := server(t)
 	u := newUnit(t, srv, "Event AC")
@@ -269,26 +273,26 @@ func TestAutomationEvents(t *testing.T) {
 			`"kind":"event","condition":` + cond + `,"action":{"kind":"set_temperature","celsius":24}}`
 	}
 	want := map[string]string{ // the field each case is refused for
-		"{\"type\":\"location\",\"event\":\"leave\"}":                                        "condition=error.invalid",
-		"{\"type\":\"occupancy\"}":                                                           "condition=error.invalid",
-		"{\"type\":\"pattern\",\"localTime\":\"25:00\"}":                                     "condition=error.invalid",
-		"{\"type\":\"tariff\",\"operator\":\"gt\",\"value\":1,\"unit\":\"MYR_per_kWh\"}":     "condition=error.invalid",
-		"{\"type\":\"weather\",\"metric\":\"temperature\",\"operator\":\"eq\",\"value\":30}": "condition=error.invalid",
+		"{\"type\":\"location\",\"event\":\"leave\"}":                                        refusedConditionInvalid,
+		"{\"type\":\"occupancy\"}":                                                           refusedConditionInvalid,
+		"{\"type\":\"pattern\",\"localTime\":\"25:00\"}":                                     refusedConditionInvalid,
+		"{\"type\":\"tariff\",\"operator\":\"gt\",\"value\":1,\"unit\":\"MYR_per_kWh\"}":     refusedConditionInvalid,
+		"{\"type\":\"weather\",\"metric\":\"temperature\",\"operator\":\"eq\",\"value\":30}": refusedConditionInvalid,
 	}
 
-	for _, c := range []string{
+	for _, condition := range []string{
 		`{"type":"occupancy"}`, `{"type":"pattern",` +
 			`"localTime":"25:00"}`, `{"type":"weather","metric":"temperature",` +
 			`"operator":"eq","value":30}`,
 		`{"type":"tariff","operator":"gt","value":1,"unit":"MYR_per_kWh"}`, `{"type":"location","event":"leave"}`,
 	} {
-		code, m := write(srv, &customerB, "automations.save", rule(c), 0)
-		refusal(t, c, code, m, want[c])
+		code, m := write(srv, customerB(), "automations.save", rule(condition), 0)
+		refusal(t, condition, code, m, want[condition])
 	}
 
 	if code, resp := write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.save",
 		rule(`{"type":"weather","metric":"temperature","operator":"gte","value":30}`),
 		0,
@@ -297,7 +301,7 @@ func TestAutomationEvents(t *testing.T) {
 		t.Fatalf("weather rule: %d %v", code, resp)
 	} else if code, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.nextRuns",
 		`{"automationId":"`+asStr(t, data(resp)["id"])+`","count":8}`,
 	); code != 422 ||
@@ -313,7 +317,7 @@ func TestAutomationEvents(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.save",
 		rule(`{"type":"location","event":"arrival"}`),
 		0,
@@ -326,7 +330,7 @@ func TestAutomationEvents(t *testing.T) {
 		t,
 		`UPDATE identity.consents SET granted = true, granted_at = $2 WHERE membership_id = $1`,
 		seed.ID("customer-b"),
-		clock,
+		clock(),
 	)
 	t.Cleanup(func() {
 		owner(
@@ -338,7 +342,7 @@ func TestAutomationEvents(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&customerB,
+		customerB(),
 		"automations.save",
 		rule(`{"type":"location","event":"arrival"}`),
 		0,
@@ -350,13 +354,15 @@ func TestAutomationEvents(t *testing.T) {
 // TestAutomationOnArchivedUnit: an automation may not name an archived unit. Archiving takes the unit out of its
 // client's scope, so the save is NOT_FOUND and stores nothing; the 409 errors.unit_archived answers only while a cached
 // scope still holds the unit (IR329). IR381 pins this answer, which had no test.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAutomationOnArchivedUnit(t *testing.T) {
 	srv := server(t)
 
 	unit := newUnit(t, srv, "Archived AC") // customer B's
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"units.archive",
 		`{"id":"`+unit+`","reason":"decommission"}`,
 		1,
@@ -372,7 +378,7 @@ func TestAutomationOnArchivedUnit(t *testing.T) {
 		&before,
 	)
 
-	code, m := write(srv, &customerB, "automations.save", scheduleRule(unit, nil), 0)
+	code, m := write(srv, customerB(), "automations.save", scheduleRule(unit, nil), 0)
 	if code != 404 || m["messageKey"] != apperr.KeyNotFound {
 		t.Fatalf("an archived unit: %d %v", code, m)
 	}

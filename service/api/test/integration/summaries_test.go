@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -9,63 +9,68 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+const kindCustomer = "customer"
+
 func seedID(s string) uuid.UUID { return seed.ID(s) }
 
-func count(m map[string]any, k string) int {
-	return int(data(m)["counts"].(map[string]any)[k].(float64))
+func count(t *testing.T, m map[string]any, k string) int {
+	t.Helper()
+
+	return int(asNum(t, asObj(t, data(m)["counts"])[k]))
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestSummariesCustomer(t *testing.T) {
 	srv := server(t)
 
-	code, resp := post(srv, &customerA, "summaries.get", `{"kind":"customer","filters":{}}`)
-	if code != 200 || data(resp)["kind"] != "customer" {
+	code, resp := post(srv, customerA(), "summaries.get", `{"kind":"customer","filters":{}}`)
+	if code != 200 || data(resp)["kind"] != kindCustomer {
 		t.Fatalf("customer: %d %v", code, resp)
 	}
 
-	_, all := post(srv, &customerA, "units.list", `{"limit":1}`)
+	_, all := post(srv, customerA(), "units.list", `{"limit":1}`)
 
-	_, on := post(srv, &customerA, "units.list", `{"filters":{"status":"online"},"limit":1}`)
-	if count(resp, "total") != int(asNum(t, data(all)["total"])) ||
-		count(resp, "online") != int(asNum(t, data(on)["total"])) {
+	_, online := post(srv, customerA(), "units.list", `{"filters":{"status":"online"},"limit":1}`)
+	if count(t, resp, "total") != int(asNum(t, data(all)["total"])) ||
+		count(t, resp, "online") != int(asNum(t, data(online)["total"])) {
 		t.Errorf(
 			"counts differ from units.list: %v / %v / %v",
 			resp,
 			data(all)["total"],
-			data(on)["total"],
+			data(online)["total"],
 		)
 	}
 
-	if count(
+	if count(t,
 		resp,
 		"total",
-	) != count(
+	) != count(t,
 		resp,
 		"online",
-	)+count(
+	)+count(t,
 		resp,
 		"offline",
-	)+count(
+	)+count(t,
 		resp,
 		"unknown",
 	) ||
-		count(
+		count(t,
 			resp,
 			"total",
-		) != count(
+		) != count(t,
 			resp,
 			"powerOn",
-		)+count(
+		)+count(t,
 			resp,
 			"powerOff",
-		)+count(
+		)+count(t,
 			resp,
 			"powerUnknown",
 		) {
 		t.Errorf("partitions: %v", resp)
 	}
 
-	if count(resp, "offerCount") != 0 || count(resp, "assignedCount") != 0 {
+	if count(t, resp, "offerCount") != 0 || count(t, resp, "assignedCount") != 0 {
 		t.Error("job counts are zero for customers")
 	}
 
@@ -79,17 +84,17 @@ func TestSummariesCustomer(t *testing.T) {
 		&alerts,
 	)
 
-	if count(resp, "alertCount") != alerts {
-		t.Errorf("alertCount %d want %d", count(resp, "alertCount"), alerts)
+	if count(t, resp, "alertCount") != alerts {
+		t.Errorf("alertCount %d want %d", count(t, resp, "alertCount"), alerts)
 	}
 
 	unit := seedID("unit-online-rto").String()
 	if _, res := post(
 		srv,
-		&customerA,
+		customerA(),
 		"summaries.get",
 		`{"kind":"customer","filters":{"unitId":"`+unit+`"}}`,
-	); count(
+	); count(t,
 		res,
 		"total",
 	) != 1 {
@@ -98,10 +103,10 @@ func TestSummariesCustomer(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&customerA,
+		customerA(),
 		"summaries.get",
 		`{"kind":"customer","filters":{"unitIds":[]}}`,
-	); count(
+	); count(t,
 		res,
 		"total",
 	) != 0 {
@@ -109,41 +114,54 @@ func TestSummariesCustomer(t *testing.T) {
 	}
 
 	want := map[string]string{ // the field each case is refused for
-		"{\"kind\":\"customer\",\"filters\":{\"overdueOnly\":true}}":    "filters=error.invalid",
-		"{\"kind\":\"customer\",\"filters\":{\"status\":\"assigned\"}}": "filters=error.invalid",
-		"{\"kind\":\"shop\",\"filters\":{}}":                            "kind=error.invalid",
+		"{\"kind\":\"customer\",\"filters\":{\"overdueOnly\":true}}":    refusedFiltersInvalid,
+		"{\"kind\":\"customer\",\"filters\":{\"status\":\"assigned\"}}": refusedFiltersInvalid,
+		"{\"kind\":\"shop\",\"filters\":{}}":                            refusedKindInvalid,
 	}
 
 	for _, b := range []string{`{"kind":"customer",` +
 		`"filters":{"status":"assigned"}}`, `{"kind":"customer",` +
 		`"filters":{"overdueOnly":true}}`, `{"kind":"shop","filters":{}}`} {
-		code, m := post(srv, &customerA, "summaries.get", b)
+		code, m := post(srv, customerA(), "summaries.get", b)
 		refusal(t, b, code, m, want[b])
 	}
 
 	if code, _ := post(
 		srv,
-		&customerA,
+		customerA(),
 		"summaries.get",
 		`{"kind":"partner","filters":{}}`,
 	); code != 403 {
 		t.Error("client asks for partner summary")
 	}
 
-	if code, _ := post(srv, &hq, "summaries.get", `{"kind":"customer","filters":{}}`); code != 403 {
+	if code, _ := post(
+		srv,
+		hq(),
+		"summaries.get",
+		`{"kind":"customer","filters":{}}`,
+	); code != 403 {
 		t.Error("HQ summaries.get")
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestSummariesTechnicianPartner(t *testing.T) {
 	srv := server(t)
 	unit := boundUnit(t, srv, "online")
-	job := assign(t, unit, "tech-external-b", clock.Add(-time.Hour), clock.Add(time.Hour), "active")
+	job := assign(
+		t,
+		unit,
+		"tech-external-b",
+		clock().Add(-time.Hour),
+		clock().Add(time.Hour),
+		"active",
+	)
 	owner(
 		t,
 		`UPDATE maintenance.assignments SET created_at = $2 WHERE job_id = $1`,
 		job,
-		clock.Add(-2*time.Hour),
+		clock().Add(-2*time.Hour),
 	)
 	owner(
 		t,
@@ -159,8 +177,8 @@ func TestSummariesTechnicianPartner(t *testing.T) {
 		$1`,
 		job,
 		seedID("org-contractor-b"),
-		clock.Add(-3*time.Hour),
-		clock.Add(24*time.Hour),
+		clock().Add(-3*time.Hour),
+		clock().Add(24*time.Hour),
 	)
 	owner(
 		t,
@@ -169,73 +187,79 @@ func TestSummariesTechnicianPartner(t *testing.T) {
 		seedID("org-contractor-b"),
 	)
 
-	code, resp := post(srv, &techB, "summaries.get", `{"kind":"technician","filters":{}}`)
-	if code != 200 || count(resp, "assignedCount") < 1 || count(resp, "scheduledCount") < 1 ||
-		count(resp, "total") < 1 ||
-		count(resp, "powerOn") != 0 ||
-		count(resp, "alertCount") != 0 {
+	code, resp := post(srv, techB(), "summaries.get", `{"kind":"technician","filters":{}}`)
+	if code != 200 || count(t, resp, "assignedCount") < 1 || count(t, resp, "scheduledCount") < 1 ||
+		count(t, resp, "total") < 1 ||
+		count(t, resp, "powerOn") != 0 ||
+		count(t, resp, "alertCount") != 0 {
 		t.Fatalf("technician: %d %v", code, resp)
 	}
 
-	_, m2 := post(
+	_, other := post(
 		srv,
-		&techB,
+		techB(),
 		"summaries.get",
 		`{"kind":"technician","filters":{"unitIds":["`+unit+`"],"status":"assigned"}}`,
 	)
-	if count(m2, "assignedCount") != 1 || count(m2, "total") != 1 || count(m2, "online") != 1 {
-		t.Errorf("technician filtered: %v", m2)
+	if count(t, other, "assignedCount") != 1 || count(t, other, "total") != 1 ||
+		count(t, other, "online") != 1 {
+		t.Errorf("technician filtered: %v", other)
 	}
 
 	_, list := post(
 		srv,
-		&techB,
+		techB(),
 		"jobs.list",
 		`{"filters":{"unitIds":["`+unit+`"],"status":"assigned"}}`,
 	)
-	if int(asNum(t, data(list)["total"])) != count(m2, "assignedCount") {
+	if int(asNum(t, data(list)["total"])) != count(t, other, "assignedCount") {
 		t.Error("summary and list disagree")
 	}
 
 	if code, res := post(
 		srv,
-		&techB,
+		techB(),
 		"summaries.get",
 		`{"kind":"technician","filters":{"status":"assigned","statuses":["assigned"]}}`,
 	); code != 422 ||
-		fields(res) != "filters.statuses=error.invalid" {
+		fields(res) != refusedFilterStatusesInvalid {
 		t.Errorf("status with statuses: %d %s", code, fields(res))
 	}
 
 	if code, res := post(
 		srv,
-		&techB,
+		techB(),
 		"summaries.get",
 		`{"kind":"technician","filters":{"statuses":[]}}`,
 	); code != 422 ||
-		fields(res) != "filters.statuses=error.invalid" {
+		fields(res) != refusedFilterStatusesInvalid {
 		t.Errorf("empty statuses: %d %s", code, fields(res))
 	}
 
 	code, resp = post(
 		srv,
-		&contrB,
+		contrB(),
 		"summaries.get",
 		`{"kind":"partner","filters":{"unitIds":["`+unit+`"]}}`,
 	)
-	if code != 200 || count(resp, "activeCount") != 1 || count(resp, "assignedCount") != 1 ||
-		count(resp, "total") != 0 {
+	if code != 200 || count(t, resp, "activeCount") != 1 || count(t, resp, "assignedCount") != 1 ||
+		count(t, resp, "total") != 0 {
 		t.Fatalf("partner: %d %v", code, resp)
 	}
 
-	owner(t, `UPDATE maintenance.jobs SET due_at = $2 WHERE id = $1`, job, clock.Add(-time.Minute))
+	owner(
+		t,
+		`UPDATE maintenance.jobs SET due_at = $2 WHERE id = $1`,
+		job,
+		clock().Add(-time.Minute),
+	)
 
 	if _, res := post(
 		srv,
-		&contrB,
+		contrB(),
 		"summaries.get",
 		`{"kind":"partner","filters":{"unitIds":["`+unit+`"],"overdueOnly":true}}`,
-	); count(
+	); count(t,
 		res,
 		"overdueCount",
 	) != 1 {
@@ -244,7 +268,7 @@ func TestSummariesTechnicianPartner(t *testing.T) {
 
 	if code, _ := post(
 		srv,
-		&contrB,
+		contrB(),
 		"summaries.get",
 		`{"kind":"technician","filters":{}}`,
 	); code != 403 {
@@ -255,6 +279,8 @@ func TestSummariesTechnicianPartner(t *testing.T) {
 // D07 / IR26: the job counts of a summary — scheduled (accepted or assigned), in progress, review (submitted), active
 // (scheduled or in progress), overdue (due before now while open) and assigned (with an active Assignment) — leave
 // completed and cancelled jobs out, and the technician's equipment counts its units once.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestSummaryJobCounts(t *testing.T) {
 	srv := server(t)
 	owner(
@@ -263,40 +289,40 @@ func TestSummaryJobCounts(t *testing.T) {
 		seedID("tech-internal-a"),
 	)
 	unit := boundUnit(t, srv, "online")
-	job := func(h int, status string, due time.Time) {
-		j := assign(
+	job := func(hours int, status string, due time.Time) {
+		job := assign(
 			t,
 			unit,
 			"tech-internal-a",
-			clock.Add(time.Duration(h)*time.Hour),
-			clock.Add(time.Duration(h+1)*time.Hour),
+			clock().Add(time.Duration(hours)*time.Hour),
+			clock().Add(time.Duration(hours+1)*time.Hour),
 			"active",
 		) // windows do not overlap
 		owner(
 			t,
 			`UPDATE maintenance.assignments SET created_at = $2 WHERE job_id = $1`,
-			j,
-			clock.Add(-2*time.Hour),
+			job,
+			clock().Add(-2*time.Hour),
 		)
 		owner(
 			t,
 			`UPDATE maintenance.jobs j SET status = $2, due_at = $3, assignment_id = a.id, scheduled_slot = a.scheduled FROM
 				maintenance.assignments a
 			WHERE a.job_id = j.id AND j.id = $1`,
-			j,
+			job,
 			status,
 			due,
 		)
 	}
-	job(0, "assigned", clock.Add(-time.Minute)) // overdue
-	job(1, "in_progress", clock.Add(24*time.Hour))
-	job(2, "submitted", clock.Add(24*time.Hour))
-	job(3, "completed", clock.Add(-time.Minute)) // done: neither counted nor overdue
-	job(4, "cancelled", clock.Add(-time.Minute))
+	job(0, "assigned", clock().Add(-time.Minute)) // overdue
+	job(1, "in_progress", clock().Add(24*time.Hour))
+	job(2, "submitted", clock().Add(24*time.Hour))
+	job(3, "completed", clock().Add(-time.Minute)) // done: neither counted nor overdue
+	job(4, "cancelled", clock().Add(-time.Minute))
 
 	code, res := post(
 		srv,
-		&techInt,
+		techInt(),
 		"summaries.get",
 		`{"kind":"technician","filters":{"unitIds":["`+unit+`"]}}`,
 	)
@@ -306,9 +332,9 @@ func TestSummaryJobCounts(t *testing.T) {
 
 	for k, want := range map[string]int{
 		"scheduledCount": 1, "inProgressCount": 1, "reviewCount": 1, "activeCount": 2,
-		"overdueCount": 1, "assignedCount": 3, "total": 1, "online": 1,
+		"overdueCount": 1, "assignedCount": 3, "total": 1, connectionOnline: 1,
 	} {
-		if got := count(res, k); got != want {
+		if got := count(t, res, k); got != want {
 			t.Errorf("%s: %d, want %d", k, got, want)
 		}
 	}

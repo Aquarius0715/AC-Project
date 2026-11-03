@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"strings"
@@ -17,6 +17,8 @@ import (
 
 // IR188, IR189, IR192: every notify, energy and maintenance reference copy holds exactly the captured columns of its
 // source rows, and follows updates and deletes made by any write path.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestReplicas(t *testing.T) {
 	_ = server(t)
 	same := func() {
@@ -30,8 +32,8 @@ func TestReplicas(t *testing.T) {
 
 			source := replica.Source
 			if source == "monitoring.measurements" { // only minute-slot power samples are captured
-				source = "(SELECT * FROM monitoring.measurements WHERE metric = 'power' AND observed_at = date_trunc('minute', " +
-					"observed_at)) m"
+				source = "(SELECT " + cols + " FROM monitoring.measurements WHERE metric = 'power' AND observed_at = " +
+					"date_trunc('minute', observed_at)) m"
 			}
 
 			var diff int
@@ -72,8 +74,8 @@ func TestReplicas(t *testing.T) {
 		seed.ID("tenant-a"),
 		uuid.New(),
 		seed.ID("cust-a"),
-		clock,
-		clock.Add(25*time.Hour),
+		clock(),
+		clock().Add(25*time.Hour),
 	)
 	owner(
 		t,
@@ -86,7 +88,7 @@ func TestReplicas(t *testing.T) {
 	powerSeries(
 		t,
 		unit.String(),
-		clock.Add(-10*time.Minute),
+		clock().Add(-10*time.Minute),
 		"measured",
 		new(float64(1)),
 		new(float64(2)),

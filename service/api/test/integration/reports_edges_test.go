@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"strings"
@@ -14,14 +14,16 @@ import (
 // that cites an attachment of another report, an empty reason kept as none, a measurement corrected in place, a
 // submission of a stale job version or of a job not in progress, the time on site without the ended pauses, and the
 // reads of a report through another job.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestWorkReportEdges(t *testing.T) {
 	srv := server(t)
 	job := assignedNow(t, srv) // version 2
-	now := clock.Format(time.RFC3339)
+	now := clock().Format(time.RFC3339)
 
 	if code, resp := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.submit",
 		`{"jobId":"`+job+`","reportVersion":1}`,
 		2,
@@ -32,7 +34,7 @@ func TestWorkReportEdges(t *testing.T) {
 
 	if code, resp := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.start",
 		`{"jobId":"`+job+`","startConfirmed":true}`,
 		2,
@@ -43,7 +45,7 @@ func TestWorkReportEdges(t *testing.T) {
 	unknown := uuid.NewString()
 	if code, _ := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.saveDraft",
 		draftBody(unknown, "", nil),
 		0,
@@ -53,7 +55,7 @@ func TestWorkReportEdges(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.submit",
 		`{"jobId":"`+unknown+`","reportVersion":1}`,
 		1,
@@ -63,7 +65,7 @@ func TestWorkReportEdges(t *testing.T) {
 
 	if code, resp := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.submit",
 		`{"jobId":"`+job+`","reportVersion":1}`,
 		2,
@@ -72,7 +74,7 @@ func TestWorkReportEdges(t *testing.T) {
 		t.Errorf("submit of a stale job version: %d %v", code, resp)
 	}
 
-	code, res := write(srv, &techInt, "jobs.saveDraft", draftBody(job, "", nil), 0)
+	code, res := write(srv, techInt(), "jobs.saveDraft", draftBody(job, "", nil), 0)
 	if code != 200 {
 		t.Fatalf("first draft: %d %v", code, res)
 	}
@@ -83,9 +85,13 @@ func TestWorkReportEdges(t *testing.T) {
 		`"evidenceIds":["` + uuid.NewString() + `"]}]`
 	if code, resp := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.saveDraft",
-		draftBody(job, "", map[string]string{"reportId": `"` + rep + `"`, "items": elsewhere}),
+		draftBody(
+			job,
+			"",
+			map[string]string{fieldReportID: `"` + rep + `"`, fieldItems: elsewhere},
+		),
 		1,
 	); code != 422 ||
 		asObj(t, resp["fieldErrors"])["items"] != apperr.KeyOtherReportAttachment {
@@ -94,8 +100,8 @@ func TestWorkReportEdges(t *testing.T) {
 	// an empty reason is no reason; a measurement saved again by its ID keeps it and counts a version
 	body := strings.Replace(
 		draftBody(job, "normal", map[string]string{
-			"reportId": `"` + rep + `"`,
-			"measurements": `[{"componentKey":"filter","metric":"temperature","value":20,"unit":"°C",` +
+			fieldReportID: `"` + rep + `"`,
+			fieldMeasurements: `[{"componentKey":"filter","metric":"temperature","value":20,"unit":"°C",` +
 				`"observedAt":"` + now + `"}]`,
 		}),
 		`"componentKey":"filter","result":"normal","reason":null`,
@@ -103,7 +109,7 @@ func TestWorkReportEdges(t *testing.T) {
 		1,
 	)
 
-	code, res = write(srv, &techInt, "jobs.saveDraft", body, 1)
+	code, res = write(srv, techInt(), "jobs.saveDraft", body, 1)
 	if code != 200 {
 		t.Fatalf("second draft: %d %v", code, res)
 	}
@@ -116,9 +122,9 @@ func TestWorkReportEdges(t *testing.T) {
 
 	first := asObj(t, asArr(t, data(res)["measurements"])[0])
 
-	code, res = write(srv, &techInt, "jobs.saveDraft", draftBody(job, "normal", map[string]string{
-		"reportId": `"` + rep + `"`,
-		"measurements": `[{"id":"` + asStr(
+	code, res = write(srv, techInt(), "jobs.saveDraft", draftBody(job, "normal", map[string]string{
+		fieldReportID: `"` + rep + `"`,
+		fieldMeasurements: `[{"id":"` + asStr(
 			t,
 			first["id"],
 		) + `","componentKey":"filter","metric":"temperature","value":21,` +
@@ -144,13 +150,13 @@ func TestWorkReportEdges(t *testing.T) {
 		jsonb_build_array(jsonb_build_object('from', $3::timestamptz, 'to', $4::timestamptz), jsonb_build_object('from',
 		$5::timestamptz))) WHERE id = $1`,
 		job,
-		clock.Add(-time.Hour),
-		clock.Add(-40*time.Minute),
-		clock.Add(-30*time.Minute),
-		clock.Add(-20*time.Minute),
+		clock().Add(-time.Hour),
+		clock().Add(-40*time.Minute),
+		clock().Add(-30*time.Minute),
+		clock().Add(-20*time.Minute),
 	)
 	// and HQ held the job for 5 minutes in between (IR449): 25 minutes
-	for _, e := range []struct {
+	for _, event := range []struct {
 		action string
 		at     time.Duration
 	}{{"job.held", -50 * time.Minute}, {"job.resumed", -45 * time.Minute}} {
@@ -159,12 +165,12 @@ func TestWorkReportEdges(t *testing.T) {
 			`INSERT INTO maintenance.job_events (id, tenant_id, job_id, action, occurred_at) SELECT gen_random_uuid(), tenant_id,
 				id, $2, $3 FROM maintenance.jobs WHERE id = $1`,
 			job,
-			e.action,
-			clock.Add(e.at),
+			event.action,
+			clock().Add(event.at),
 		)
 	}
 
-	code, res = write(srv, &techInt, "jobs.submit", `{"jobId":"`+job+`","reportVersion":3}`, 3)
+	code, res = write(srv, techInt(), "jobs.submit", `{"jobId":"`+job+`","reportVersion":3}`, 3)
 	if code != 200 {
 		t.Fatalf("submit: %d %v", code, res)
 	}
@@ -177,7 +183,7 @@ func TestWorkReportEdges(t *testing.T) {
 	// the report is read through its own job only; reviewing a job that does not exist says so
 	if code, _ := post(
 		srv,
-		&hq,
+		hq(),
 		"reports.get",
 		`{"jobId":"`+unknown+`","reportId":"`+rep+`","reportVersion":3}`,
 	); code != 404 {
@@ -187,7 +193,7 @@ func TestWorkReportEdges(t *testing.T) {
 	other := assignedNow(t, srv)
 	if code, _ := post(
 		srv,
-		&hq,
+		hq(),
 		"reports.get",
 		`{"jobId":"`+other+`","reportId":"`+rep+`","reportVersion":3}`,
 	); code != 404 {
@@ -196,7 +202,7 @@ func TestWorkReportEdges(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.review",
 		`{"jobId":"`+unknown+`","reportVersion":3,"decision":"accept","reviewMode":"normal"}`,
 		1,

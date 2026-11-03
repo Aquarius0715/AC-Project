@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"strings"
@@ -10,6 +10,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestTelemetry(t *testing.T) {
 	srv := server(t)
 	online, nonRTO, other := seed.ID("unit-online-rto").
@@ -18,166 +19,166 @@ func TestTelemetry(t *testing.T) {
 			String(),
 		seed.ID("unit-other-customer").
 			String()
-	from, to := clock.Add(-24*time.Hour).Format(time.RFC3339), clock.Format(time.RFC3339)
-	rng := `"from":"` + from + `","to":"` + to + `"`
+	from, until := clock().Add(-24*time.Hour).Format(time.RFC3339), clock().Format(time.RFC3339)
+	rng := `"from":"` + from + `","to":"` + until + `"`
 
 	// series by unit: one unit → allergen observation (available); seeded reading id = fixture event id
 	code, res := post(
 		srv,
-		&customerA,
+		customerA(),
 		"telemetry.series",
 		`{`+rng+`,"unitIds":["`+online+`"],"metric":"co2","query":{}}`,
 	)
-	if code != 200 || len(items(res)) != 1 || asNum(t, items(res)[0]["value"]) != 800 ||
-		items(res)[0]["id"] != seed.ID("m-sensor-online-co2-1").String() ||
-		items(res)[0]["id"] != items(res)[0]["eventId"] ||
-		items(res)[0]["isDemo"] != true {
+	if code != 200 || len(items(t, res)) != 1 || asNum(t, items(t, res)[0]["value"]) != 800 ||
+		items(t, res)[0]["id"] != seed.ID("m-sensor-online-co2-1").String() ||
+		items(t, res)[0]["id"] != items(t, res)[0]["eventId"] ||
+		items(t, res)[0]["isDemo"] != true {
 		t.Fatalf("series: %d %v", code, res)
 	}
 
-	if a := asObj(t, data(res)["allergenObservation"]); a["availability"] != "available" ||
+	if a := asObj(t, data(res)["allergenObservation"]); a["availability"] != stateAvailable ||
 		a["substance"] == nil {
 		t.Fatalf("allergen: %v", a)
 	}
 
 	_, res = post(
 		srv,
-		&customerA,
+		customerA(),
 		"telemetry.series",
 		`{`+rng+`,"unitIds":["`+nonRTO+`"],"metric":"co2","query":{}}`,
 	)
 	if a := asObj(t, data(res)["allergenObservation"]); a["availability"] != "unsupported" ||
 		a["substance"] != nil ||
-		len(items(res)) != 0 {
+		len(items(t, res)) != 0 {
 		t.Fatalf("unsupported allergen: %v", res)
 	}
 
 	_, res = post(
 		srv,
-		&customerA,
+		customerA(),
 		"telemetry.series",
 		`{`+rng+`,"unitIds":["`+seed.ID("unit-limited").
 			String()+
 			`"],"metric":"temperature","query":{}}`,
 	)
 	if a := asObj(t, data(res)["allergenObservation"]); a["availability"] != "not_measured" ||
-		len(items(res)) != 1 {
+		len(items(t, res)) != 1 {
 		t.Fatalf("not measured: %v", res)
 	}
 	// several units: no allergen, ordered by observedAt
 	_, res = post(
 		srv,
-		&customerA,
+		customerA(),
 		"telemetry.series",
 		`{`+rng+`,"unitIds":["`+online+`","`+nonRTO+`","`+seed.ID("unit-offline-rto").
 			String()+
 			`"],"metric":"temperature","query":{"limit":2}}`,
 	)
-	if data(res)["allergenObservation"] != nil || len(items(res)) != 2 ||
+	if data(res)["allergenObservation"] != nil || len(items(t, res)) != 2 ||
 		asNum(t, data(res)["total"]) != 3 ||
-		asNum(t, items(res)[0]["value"]) != 29 ||
+		asNum(t, items(t, res)[0]["value"]) != 29 ||
 		data(res)["nextCursor"] == nil {
 		t.Fatalf("multi-unit: %v", res)
 	}
 
 	_, res = post(
 		srv,
-		&customerA,
+		customerA(),
 		"telemetry.series",
 		`{`+rng+`,"unitIds":["`+online+`","`+nonRTO+`"],"metric":"temperature","query":{"sort":{"field":"observedAt",`+
 			`"direction":"desc"}}}`,
 	)
-	if len(items(res)) != 2 {
+	if len(items(t, res)) != 2 {
 		t.Fatal("desc sort")
 	}
 	// by space and by sensor
 	_, res = post(
 		srv,
-		&customerA,
+		customerA(),
 		"telemetry.series",
 		`{`+rng+`,"spaceId":"`+seed.ID("room-1").String()+`","metric":"humidity","query":{}}`,
 	)
-	if len(items(res)) != 1 || data(res)["allergenObservation"] == nil {
+	if len(items(t, res)) != 1 || data(res)["allergenObservation"] == nil {
 		t.Fatalf("space: %v", res)
 	}
 
 	_, res = post(
 		srv,
-		&hq,
+		hq(),
 		"telemetry.series",
 		`{`+rng+`,"unitIds":["`+online+`"],"metric":"temperature","sensorId":"`+uuid.NewString()+`","query":{}}`,
 	)
-	if len(items(res)) != 0 {
+	if len(items(t, res)) != 0 {
 		t.Fatal("sensor filter")
 	}
 	// scope and validation
 	refused := map[string]string{ // the field each VALIDATION case is refused for
-		"bad metric":          "metric=error.invalid",
+		"bad metric":          refusedMetricInvalid,
 		"bad sort":            "query.sort.field=error.invalid",
-		"both targets":        "unitIds=error.exactlyOneTarget",
-		"duplicate units":     "unitIds=error.invalid",
-		"empty unitIds":       "unitIds=error.invalid",
-		"filters not allowed": "x=error.notAllowed",
+		caseBothTargets:       "unitIds=error.exactlyOneTarget",
+		caseDuplicateUnits:    refusedUnitIDsInvalid,
+		"empty unitIds":       refusedUnitIDsInvalid,
+		"filters not allowed": refusedUnknownFieldX,
 		"missing from":        "from=error.required",
 		"missing to":          "to=error.required",
-		"no target":           "unitIds=error.exactlyOneTarget",
+		caseNoTarget:          "unitIds=error.exactlyOneTarget",
 		"range > 35 days":     "to=error.rangeTooLong",
-		"reversed range":      "to=error.range",
+		"reversed range":      refusedToRange,
 	}
 
-	for name, tc := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		a    *actor
 		body string
 		code int
 	}{
-		"other customer's unit": {&customerA, `{` + rng + `,"unitIds":["` + other + `"],"metric":"co2","query":{}}`, 404},
-		"other customer's space": {&customerA, `{` + rng + `,"spaceId":"` + seed.ID("room-b-1").String() +
+		"other customer's unit": {customerA(), `{` + rng + `,"unitIds":["` + other + `"],"metric":"co2","query":{}}`, 404},
+		"other customer's space": {customerA(), `{` + rng + `,"spaceId":"` + seed.ID("room-b-1").String() +
 			`","metric":"co2","query":{}}`, 404},
-		"technician in scope":     {&techInt, `{` + rng + `,"unitIds":["` + online + `"],"metric":"co2","query":{}}`, 200},
-		"technician out of scope": {&techInt, `{` + rng + `,"unitIds":["` + other + `"],"metric":"co2","query":{}}`, 404},
-		"external, no assignment": {&techB, `{` + rng + `,"unitIds":["` + other + `"],"metric":"co2","query":{}}`, 404},
-		"both targets": {&hq, `{` + rng + `,"unitIds":["` + online + `"],"spaceId":"` +
+		"technician in scope":     {techInt(), `{` + rng + `,"unitIds":["` + online + `"],"metric":"co2","query":{}}`, 200},
+		"technician out of scope": {techInt(), `{` + rng + `,"unitIds":["` + other + `"],"metric":"co2","query":{}}`, 404},
+		"external, no assignment": {techB(), `{` + rng + `,"unitIds":["` + other + `"],"metric":"co2","query":{}}`, 404},
+		caseBothTargets: {hq(), `{` + rng + `,"unitIds":["` + online + `"],"spaceId":"` +
 			seed.ID("room-1").String() + `","metric":"co2","query":{}}`, 422},
-		"no target":     {&hq, `{` + rng + `,"metric":"co2","query":{}}`, 422},
-		"empty unitIds": {&hq, `{` + rng + `,"unitIds":[],"metric":"co2","query":{}}`, 422},
-		"duplicate units": {&hq, `{` + rng + `,"unitIds":["` + online + `","` + online + `"],"metric":"co2",` +
+		caseNoTarget:    {hq(), `{` + rng + `,"metric":"co2","query":{}}`, 422},
+		"empty unitIds": {hq(), `{` + rng + `,"unitIds":[],"metric":"co2","query":{}}`, 422},
+		caseDuplicateUnits: {hq(), `{` + rng + `,"unitIds":["` + online + `","` + online + `"],"metric":"co2",` +
 			`"query":{}}`, 422},
-		"bad metric": {&hq, `{` + rng + `,"unitIds":["` + online + `"],"metric":"noise","query":{}}`, 422},
-		"reversed range": {&hq, `{"from":"` + to + `","to":"` + from + `","unitIds":["` + online + `"],"metric":"co2",` +
+		"bad metric": {hq(), `{` + rng + `,"unitIds":["` + online + `"],"metric":"noise","query":{}}`, 422},
+		"reversed range": {hq(), `{"from":"` + until + `","to":"` + from + `","unitIds":["` + online + `"],"metric":"co2",` +
 			`"query":{}}`, 422},
-		"range > 35 days": {&hq, `{"from":"2026-08-01T00:00:00Z",` +
-			`"to":"` + to + `","unitIds":["` + online + `"],"metric":"co2","query":{}}`, 422},
-		"filters not allowed": {&hq, `{` + rng + `,"unitIds":["` + online + `"],"metric":"co2",` +
+		"range > 35 days": {hq(), `{"from":"2026-08-01T00:00:00Z",` +
+			`"to":"` + until + `","unitIds":["` + online + `"],"metric":"co2","query":{}}`, 422},
+		"filters not allowed": {hq(), `{` + rng + `,"unitIds":["` + online + `"],"metric":"co2",` +
 			`"query":{"filters":{"x":1}}}`, 422},
-		"bad sort": {&hq, `{` + rng + `,"unitIds":["` + online + `"],"metric":"co2",` +
+		"bad sort": {hq(), `{` + rng + `,"unitIds":["` + online + `"],"metric":"co2",` +
 			`"query":{"sort":{"field":"value","direction":"asc"}}}`, 422},
-		"missing from": {&hq, `{"to":"` + to + `","unitIds":["` + online + `"],"metric":"co2","query":{}}`, 422},
-		"missing to": {&hq, `{"from":"` + from + `","unitIds":["` + online + `"],"metric":"co2",` +
+		"missing from": {hq(), `{"to":"` + until + `","unitIds":["` + online + `"],"metric":"co2","query":{}}`, 422},
+		"missing to": {hq(), `{"from":"` + from + `","unitIds":["` + online + `"],"metric":"co2",` +
 			`"query":{}}`, 422},
 	} {
-		code, m := post(srv, tc.a, "telemetry.series", tc.body)
+		code, m := post(srv, testCase.a, "telemetry.series", testCase.body)
 		if w, ok := refused[name]; ok {
 			refusal(t, name, code, m, w)
-		} else if code != tc.code {
-			t.Errorf("%s: %d want %d", name, code, tc.code)
+		} else if code != testCase.code {
+			t.Errorf("%s: %d want %d", name, code, testCase.code)
 		}
 	}
 
 	// summary: latest per unit and metric
 	code, res = post(
 		srv,
-		&customerA,
+		customerA(),
 		"telemetry.summary",
 		`{`+rng+`,"unitIds":["`+online+`","`+nonRTO+`"]}`,
 	)
 	if code != 200 || len(asArr(t, data(res)["measurements"])) != 8 || data(res)["energy"] != nil ||
-		data(res)["asOf"] != to {
+		data(res)["asOf"] != until {
 		t.Fatalf("summary: %d %v", code, res)
 	}
 
 	_, res = post(
 		srv,
-		&customerA,
+		customerA(),
 		"telemetry.summary",
 		`{`+rng+`,"unitIds":["`+online+`"],"metric":"power"}`,
 	)
@@ -185,18 +186,18 @@ func TestTelemetry(t *testing.T) {
 		t.Fatal("summary metric")
 	}
 
-	for b, want := range map[string]string{
-		`{` + rng + `,"unitIds":[]}`:                                             "unitIds=error.invalid",
-		`{` + rng + `,"unitIds":["` + online + `"],"metric":"x"}`:                "metric=error.invalid",
-		`{"from":"` + to + `","to":"` + from + `","unitIds":["` + online + `"]}`: "to=error.range",
+	for body, want := range map[string]string{
+		`{` + rng + `,"unitIds":[]}`:                                             refusedUnitIDsInvalid,
+		`{` + rng + `,"unitIds":["` + online + `"],"metric":"x"}`:                refusedMetricInvalid,
+		`{"from":"` + until + `","to":"` + from + `","unitIds":["` + online + `"]}`: refusedToRange,
 	} {
-		code, m := post(srv, &customerA, "telemetry.summary", b)
-		refusal(t, b, code, m, want)
+		code, m := post(srv, customerA(), "telemetry.summary", body)
+		refusal(t, body, code, m, want)
 	}
 
 	if code, _ := post(
 		srv,
-		&customerA,
+		customerA(),
 		"telemetry.summary",
 		`{`+rng+`,"unitIds":["`+other+`"]}`,
 	); code != 404 {
@@ -204,6 +205,7 @@ func TestTelemetry(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestVentilation(t *testing.T) {
 	srv := server(t)
 	room1, room2, roomB := seed.ID("room-1").
@@ -215,20 +217,20 @@ func TestVentilation(t *testing.T) {
 	logv := func(a *actor, body string) (int, map[string]any) { return write(srv, a, "ventilation.log", body, 0) }
 
 	code, res := logv(
-		&customerA,
+		customerA(),
 		`{"spaceId":"`+room1+`","method":"window_opened","durationMinutes":15}`,
 	)
 
 	co2, _ := data(res)["co2AtLog"].(map[string]any)
 	if code != 200 || co2 == nil || asNum(t, co2["value"]) != 800 || co2["unit"] != "ppm" ||
-		data(res)["loggedAt"] != clock.Format(time.RFC3339) {
+		data(res)["loggedAt"] != clock().Format(time.RFC3339) {
 		t.Fatalf("log: %d %v", code, res)
 	}
 
 	first := asStr(t, data(res)["id"])
 
 	code, res = logv(
-		&customerA,
+		customerA(),
 		`{"spaceId":"`+room2+`","unitId":"`+seed.ID("unit-non-rto").
 			String()+
 			`","method":"ventilation_fan","durationMinutes":240}`,
@@ -238,42 +240,42 @@ func TestVentilation(t *testing.T) {
 	}
 
 	refused := map[string]string{ // the field each VALIDATION case is refused for
-		"bad method":        "method=error.invalid",
-		"duration 0":        "durationMinutes=error.range",
-		"duration 241":      "durationMinutes=error.range",
+		caseBadMethod:       refusedMethodInvalid,
+		caseZeroDuration:    refusedDurationMinutesRange,
+		"duration 241":      refusedDurationMinutesRange,
 		"missing space":     "spaceId=error.required",
 		"unit not in space": "unitId=error.unitNotInSpace",
 	}
 
-	for name, tc := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		a    *actor
 		body string
 		code int
 	}{
-		"duration 0":    {&customerA, `{"spaceId":"` + room1 + `","method":"other","durationMinutes":0}`, 422},
-		"duration 241":  {&customerA, `{"spaceId":"` + room1 + `","method":"other","durationMinutes":241}`, 422},
-		"bad method":    {&customerA, `{"spaceId":"` + room1 + `","method":"aircon","durationMinutes":5}`, 422},
-		"missing space": {&customerA, `{"method":"other","durationMinutes":5}`, 422},
-		"unit not in space": {&customerA, `{"spaceId":"` + room1 + `","unitId":"` + seed.ID("unit-non-rto").String() +
+		caseZeroDuration: {customerA(), `{"spaceId":"` + room1 + `","method":"other","durationMinutes":0}`, 422},
+		"duration 241":   {customerA(), `{"spaceId":"` + room1 + `","method":"other","durationMinutes":241}`, 422},
+		caseBadMethod:    {customerA(), `{"spaceId":"` + room1 + `","method":"aircon","durationMinutes":5}`, 422},
+		"missing space":  {customerA(), `{"method":"other","durationMinutes":5}`, 422},
+		"unit not in space": {customerA(), `{"spaceId":"` + room1 + `","unitId":"` + seed.ID("unit-non-rto").String() +
 			`","method":"other","durationMinutes":5}`, 422},
-		"other customer's room": {&customerA, `{"spaceId":"` + roomB + `","method":"other","durationMinutes":5}`, 404},
-		"unknown room": {&customerA, `{"spaceId":"` + uuid.NewString() + `","method":"other",` +
+		"other customer's room": {customerA(), `{"spaceId":"` + roomB + `","method":"other","durationMinutes":5}`, 404},
+		"unknown room": {customerA(), `{"spaceId":"` + uuid.NewString() + `","method":"other",` +
 			`"durationMinutes":5}`, 404},
-		"hq cannot log": {&hq, `{"spaceId":"` + room1 + `","method":"other","durationMinutes":5}`, 403},
+		"hq cannot log": {hq(), `{"spaceId":"` + room1 + `","method":"other","durationMinutes":5}`, 403},
 	} {
-		code, m := logv(tc.a, tc.body)
+		code, m := logv(testCase.a, testCase.body)
 		if w, ok := refused[name]; ok {
 			refusal(t, name, code, m, w)
-		} else if code != tc.code {
-			t.Errorf("%s: %d want %d", name, code, tc.code)
+		} else if code != testCase.code {
+			t.Errorf("%s: %d want %d", name, code, testCase.code)
 		}
 	}
 
-	logv(&customerB, `{"spaceId":"`+roomB+`","method":"door_opened","durationMinutes":5}`)
+	logv(customerB(), `{"spaceId":"`+roomB+`","method":"door_opened","durationMinutes":5}`)
 
 	ids := func(m map[string]any) map[string]bool {
 		out := map[string]bool{}
-		for _, it := range items(m) {
+		for _, it := range items(t, m) {
 			out[asStr(t, it["id"])] = true
 			if it["spaceId"] == roomB && m != nil {
 				out["roomB"] = true
@@ -285,7 +287,7 @@ func TestVentilation(t *testing.T) {
 
 	_, res = post(
 		srv,
-		&customerA,
+		customerA(),
 		"ventilation.list",
 		`{"filters":{"spaceId":"`+room1+`"},"limit":100}`,
 	)
@@ -293,59 +295,59 @@ func TestVentilation(t *testing.T) {
 		t.Fatal("list by space")
 	}
 
-	_, res = post(srv, &customerA, "ventilation.list", `{"limit":100}`)
+	_, res = post(srv, customerA(), "ventilation.list", `{"limit":100}`)
 	if ids(res)["roomB"] {
 		t.Fatal("customer-a sees customer-b's log")
 	}
 
-	_, res = post(srv, &techInt, "ventilation.list", `{"limit":100}`)
+	_, res = post(srv, techInt(), "ventilation.list", `{"limit":100}`)
 
 	got := ids(res)
 	if got["roomB"] || !got[first] {
 		t.Fatalf("technician scope: %v", got)
 	}
 
-	if _, res = post(srv, &techB, "ventilation.list", `{"limit":100}`); len(items(res)) != 0 {
+	if _, res = post(srv, techB(), "ventilation.list", `{"limit":100}`); len(items(t, res)) != 0 {
 		t.Fatalf("external technician without an Assignment: %v", ids(res))
 	}
 
 	_, res = post(
 		srv,
-		&hq,
+		hq(),
 		"ventilation.list",
 		`{"filters":{"unitId":"`+seed.ID("unit-non-rto").
 			String()+
-			`","from":"`+clock.Add(-time.Minute).
+			`","from":"`+clock().Add(-time.Minute).
 			Format(time.RFC3339)+
-			`","to":"`+clock.Add(time.Minute).
+			`","to":"`+clock().Add(time.Minute).
 			Format(time.RFC3339)+
 			`"},"limit":100}`,
 	)
-	for _, it := range items(res) {
+	for _, it := range items(t, res) {
 		if it["unitId"] != seed.ID("unit-non-rto").String() {
 			t.Fatal("unit filter")
 		}
 	}
 
-	if len(items(res)) == 0 {
+	if len(items(t, res)) == 0 {
 		t.Fatal("hq list by unit")
 	}
 
 	want := map[string]string{ // the field each case is refused for
-		"{\"filters\":{\"from\":\"2026-09-14T01:00:00Z\",\"to\":\"2026-09-14T00:00:00Z\"}}": "filters.to=error.range",
-		"{\"filters\":{\"x\":1}}":                                 "x=error.notAllowed",
-		"{\"sort\":{\"field\":\"method\",\"direction\":\"asc\"}}": "sort.field=error.invalid",
+		bodyReversedPeriod: refusedFilterToRange,
+		bodyUnknownFilter:  refusedUnknownFieldX,
+		"{\"sort\":{\"field\":\"method\",\"direction\":\"asc\"}}": refusedSortFieldInvalid,
 	}
 
-	for _, b := range []string{`{"filters":{"x":1}}`, `{"filters":{"from":"` + clock.Format(time.RFC3339) + `","to":"` +
-		clock.Add(-time.Hour).Format(time.RFC3339) + `"}}`, `{"sort":{"field":"method","direction":"asc"}}`} {
-		code, m := post(srv, &hq, "ventilation.list", b)
+	for _, b := range []string{bodyUnknownFilter, `{"filters":{"from":"` + clock().Format(time.RFC3339) + `","to":"` +
+		clock().Add(-time.Hour).Format(time.RFC3339) + `"}}`, `{"sort":{"field":"method","direction":"asc"}}`} {
+		code, m := post(srv, hq(), "ventilation.list", b)
 		refusal(t, b, code, m, want[b])
 	}
 
 	if code, _ := post(
 		srv,
-		&hq,
+		hq(),
 		"ventilation.list",
 		`{"sort":{"field":"createdAt","direction":"asc"}}`,
 	); code != 200 {
@@ -358,6 +360,8 @@ func TestVentilation(t *testing.T) {
 // IR213: UnitSummary.latestMeasurements holds the latest reading of each metric at or before now (observedAt desc,
 // sequence desc), whatever its origin and quality, ordered by metric. A valid reading older than its sensor's stale
 // limit, or of an unknown sensor, reads as stale; telemetry.series keeps the stored quality.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestLatestMeasurements(t *testing.T) {
 	srv := server(t)
 	tenant := seed.ID("tenant-a")
@@ -375,13 +379,18 @@ func TestLatestMeasurements(t *testing.T) {
 	)
 
 	sensor := map[string]string{
-		"co2":         uuid.NewString(),
-		"humidity":    uuid.NewString(),
-		"temperature": uuid.NewString(),
-		"pm25":        uuid.NewString(),
+		metricCO2:         uuid.NewString(),
+		metricHumidity:    uuid.NewString(),
+		metricTemperature: uuid.NewString(),
+		metricPM25:        uuid.NewString(),
 	}
 
-	units := map[string]string{"co2": "ppm", "humidity": "%", "temperature": "°C", "pm25": "µg/m³"}
+	units := map[string]string{
+		metricCO2:         "ppm",
+		metricHumidity:    "%",
+		metricTemperature: "°C",
+		metricPM25:        "µg/m³",
+	}
 	for metric, id := range sensor {
 		owner(
 			t,
@@ -405,7 +414,7 @@ func TestLatestMeasurements(t *testing.T) {
 			unit,
 			sensorID,
 			metric,
-			clock.Add(-ago),
+			clock().Add(-ago),
 			seq,
 			value,
 			units[metric],
@@ -459,18 +468,20 @@ func TestLatestMeasurements(t *testing.T) {
 	latest := func(operation, body string) []map[string]any {
 		t.Helper()
 
-		code, resp := post(srv, &customerB, operation, body)
+		code, resp := post(srv, customerB(), operation, body)
 		if code != 200 {
 			t.Fatalf("%s: %d %v", operation, code, resp)
 		}
 
 		doc := data(resp)
-		if operation == "units.list" {
-			doc = items(resp)[0]
+		if operation == opUnitsList {
+			doc = items(t, resp)[0]
 		}
 
-		var out []map[string]any
-		for _, x := range asArr(t, doc["latestMeasurements"]) {
+		measurements := asArr(t, doc["latestMeasurements"])
+
+		out := make([]map[string]any, 0, len(measurements))
+		for _, x := range measurements {
 			out = append(out, asObj(t, x))
 		}
 
@@ -478,7 +489,7 @@ func TestLatestMeasurements(t *testing.T) {
 	}
 	got := latest("units.get", `{"id":"`+unit+`"}`)
 
-	var seen []string
+	seen := make([]string, 0, len(got))
 	for _, x := range got {
 		seen = append(seen, asStr(t, x["metric"])+"="+asStr(t, x["quality"]))
 	}
@@ -501,22 +512,22 @@ func TestLatestMeasurements(t *testing.T) {
 	// history keeps the stored quality
 	_, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"telemetry.series",
-		`{"from":"`+clock.Add(-time.Hour).
+		`{"from":"`+clock().Add(-time.Hour).
 			Format(time.RFC3339)+
-			`","to":"`+clock.Format(
+			`","to":"`+clock().Format(
 			time.RFC3339,
 		)+`","unitIds":["`+unit+`"],"metric":"temperature","query":{}}`,
 	)
-	if len(items(res)) != 1 || items(res)[0]["quality"] != "valid" {
+	if len(items(t, res)) != 1 || items(t, res)[0]["quality"] != qualityValid {
 		t.Fatalf("series quality: %v", res)
 	}
 	// co2AtLog (IR110/IR213) is the unit's latest CO₂ reading when it is valid; a newer null reading gives null, never an
 	// older valid value
 	code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"spaces.save",
 		`{"propertyId":"`+seed.ID("property-home-b").
 			String()+
@@ -535,7 +546,7 @@ func TestLatestMeasurements(t *testing.T) {
 
 		code, resp := write(
 			srv,
-			&customerB,
+			customerB(),
 			"ventilation.log",
 			`{"spaceId":"`+room+`","unitId":"`+unit+`","method":"window_opened","durationMinutes":15}`,
 			0,
@@ -547,7 +558,7 @@ func TestLatestMeasurements(t *testing.T) {
 		return data(resp)["co2AtLog"]
 	}
 	if co2, _ := vent().(map[string]any); co2 == nil || asNum(t, co2["value"]) != 1000 ||
-		co2["observedAt"] != clock.Add(-30*time.Second).Format(time.RFC3339) {
+		co2["observedAt"] != clock().Add(-30*time.Second).Format(time.RFC3339) {
 		t.Fatalf("co2AtLog: %v", co2)
 	}
 
@@ -557,7 +568,7 @@ func TestLatestMeasurements(t *testing.T) {
 		t.Fatalf("newer null reading: %v", co2)
 	}
 	// a unit without readings has an empty list, never null
-	_, res = post(srv, &customerB, "units.get", `{"id":"`+newUnit(t, srv, "Empty AC")+`"}`)
+	_, res = post(srv, customerB(), "units.get", `{"id":"`+newUnit(t, srv, "Empty AC")+`"}`)
 	if l, ok := data(res)["latestMeasurements"].([]any); !ok || len(l) != 0 {
 		t.Fatalf("no readings: %v", data(res)["latestMeasurements"])
 	}
@@ -567,11 +578,13 @@ func TestLatestMeasurements(t *testing.T) {
 // stretch present, the average of its valid readings with their count, no value and 0 where none is valid — and no page
 // of readings; the total still counts every reading. Only 5 and 60 minutes are taken, at most 1000 stretches, and the
 // unit must be readable as before.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestBucketedSeries(t *testing.T) {
 	srv := server(t)
 	unit := newUnit(t, srv, "Bucket AC") // customer B's
 
-	from := clock.Add(-time.Hour)
+	from := clock().Add(-time.Hour)
 	for i, v := range []float64{20, 21, 22, 23, 24} {
 		reading(t, unit, "temperature", v, "°C", from.Add(time.Duration(i)*time.Minute), "valid")
 	}
@@ -599,46 +612,47 @@ func TestBucketedSeries(t *testing.T) {
 	body := func(extra string) string {
 		return `{"from":"` + from.Format(
 			time.RFC3339,
-		) + `","to":"` + clock.Format(
+		) + `","to":"` + clock().Format(
 			time.RFC3339,
 		) + `","unitIds":["` + unit + `"],"metric":"temperature","query":{}` + extra + `}`
 	}
 
-	code, resp := post(srv, &customerB, "telemetry.series", body(`,"bucketMinutes":5`))
+	code, resp := post(srv, customerB(), "telemetry.series", body(`,"bucketMinutes":5`))
 	if code != 200 {
 		t.Fatalf("bucketed series: %d %v", code, resp)
 	}
 
 	doc := data(resp)
 
-	bs, _ := doc["buckets"].([]any)
-	if len(bs) != 12 || len(items(resp)) != 0 || doc["total"] != 8.0 || doc["nextCursor"] != nil {
+	buckets, _ := doc["buckets"].([]any)
+	if len(buckets) != 12 || len(items(t, resp)) != 0 || doc["total"] != 8.0 ||
+		doc["nextCursor"] != nil {
 		t.Fatalf(
 			"12 five-minute stretches, no page, every reading counted: %d buckets, %d items, total %v",
-			len(bs),
-			len(items(resp)),
+			len(buckets),
+			len(items(t, resp)),
 			doc["total"],
 		)
 	}
 
-	b := func(i int) map[string]any { return asObj(t, bs[i]) }
-	if b(0)["start"] != from.UTC().Format(time.RFC3339) || b(0)["value"] != 22.0 ||
-		b(0)["count"] != 5.0 {
-		t.Errorf("the first stretch averages its five valid readings: %v", b(0))
+	bucket := func(i int) map[string]any { return asObj(t, buckets[i]) }
+	if bucket(0)["start"] != from.UTC().Format(time.RFC3339) || bucket(0)["value"] != 22.0 ||
+		bucket(0)["count"] != 5.0 {
+		t.Errorf("the first stretch averages its five valid readings: %v", bucket(0))
 	}
 
-	if b(1)["value"] != 25.0 || b(1)["count"] != 1.0 {
-		t.Errorf("a suspect reading is left out of the average: %v", b(1))
+	if bucket(1)["value"] != 25.0 || bucket(1)["count"] != 1.0 {
+		t.Errorf("a suspect reading is left out of the average: %v", bucket(1))
 	}
 
-	if b(2)["value"] != nil || b(2)["count"] != 0.0 || b(11)["value"] != nil ||
-		b(11)["count"] != 0.0 {
-		t.Errorf("stretches without a valid reading stay, empty: %v / %v", b(2), b(11))
+	if bucket(2)["value"] != nil || bucket(2)["count"] != 0.0 || bucket(11)["value"] != nil ||
+		bucket(11)["count"] != 0.0 {
+		t.Errorf("stretches without a valid reading stay, empty: %v / %v", bucket(2), bucket(11))
 	}
 
 	if code, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"telemetry.series",
 		body(`,"bucketMinutes":60`),
 	); code != 200 || len(asArr(t, data(res)["buckets"])) != 1 ||
@@ -648,17 +662,17 @@ func TestBucketedSeries(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"telemetry.series",
 		body(``),
 	); code != 200 || data(res)["buckets"] != nil ||
-		len(items(res)) == 0 {
+		len(items(t, res)) == 0 {
 		t.Errorf("without bucketMinutes the page of readings as before: %d %v", code, res)
 	}
 
 	if code, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"telemetry.series",
 		body(`,"bucketMinutes":7`),
 	); code != 422 ||
@@ -666,14 +680,14 @@ func TestBucketedSeries(t *testing.T) {
 		t.Errorf("a stretch other than 5 or 60 minutes: %d %s", code, fields(res))
 	}
 
-	long := `{"from":"` + clock.Add(-30*24*time.Hour).
+	long := `{"from":"` + clock().Add(-30*24*time.Hour).
 		Format(time.RFC3339) +
-		`","to":"` + clock.Format(
+		`","to":"` + clock().Format(
 		time.RFC3339,
 	) + `","unitIds":["` + unit + `"],"metric":"temperature","query":{},"bucketMinutes":5}`
 	if code, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"telemetry.series",
 		long,
 	); code != 422 ||
@@ -683,7 +697,7 @@ func TestBucketedSeries(t *testing.T) {
 
 	if code, _ := post(
 		srv,
-		&customerA,
+		customerA(),
 		"telemetry.series",
 		body(`,"bucketMinutes":5`),
 	); code != 404 {

@@ -1,6 +1,7 @@
-package integration
+package integration_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http/httptest"
 	"strconv"
@@ -22,12 +23,13 @@ import (
 // versionZero sends X-Expected-Version: 0 (an absent row); 0 itself omits the header.
 const versionZero = -100
 
-func write(srv *apiserver.Server, a *actor, op, body string, version int) (int, map[string]any) {
-	req := httptest.NewRequest(ops.ClientRequest(op, body))
+func write(srv *apiserver.Server, who *actor, op, body string, version int) (int, map[string]any) {
+	method, target, reqBody := ops.ClientRequest(op, body)
+	req := httptest.NewRequestWithContext(context.Background(), method, target, reqBody)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+a.token)
+	req.Header.Set("Authorization", "Bearer "+who.token)
 	req.Header.Set("X-Tenant-Id", seed.ID("tenant-a").String())
-	req.Header.Set("X-Membership-Id", seed.ID(a.membership).String())
+	req.Header.Set("X-Membership-Id", seed.ID(who.membership).String())
 	req.Header.Set("Idempotency-Key", "test-"+uuid.NewString())
 
 	if version > 0 {
@@ -53,8 +55,14 @@ func data(m map[string]any) map[string]any {
 
 	return d
 }
-func ver(m map[string]any) int { return int(data(m)["version"].(float64)) }
 
+func ver(t *testing.T, m map[string]any) int {
+	t.Helper()
+
+	return int(asNum(t, data(m)["version"]))
+}
+
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAssetWritesLifecycle(t *testing.T) {
 	srv := server(t)
 	org := seed.ID("org-customer-b").String()
@@ -65,12 +73,12 @@ func TestAssetWritesLifecycle(t *testing.T) {
 
 	code, resp := write(
 		srv,
-		&hq,
+		hq(),
 		"properties.save",
 		`{"customerOrgId":"`+org+`","kind":"office","name":"`+propName+`","address":null,"accessInstructions":null}`,
 		0,
 	)
-	if code != 200 || ver(resp) != 1 {
+	if code != 200 || ver(t, resp) != 1 {
 		t.Fatalf("property create: %d %v", code, resp)
 	}
 
@@ -78,7 +86,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 	// names are unique among non-archived siblings, trimmed and case-insensitive (IR208); the duplicate is rolled back
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"properties.save",
 		`{"customerOrgId":"`+org+`","kind":"home","name":" `+strings.ToLower(
 			propName,
@@ -91,12 +99,12 @@ func TestAssetWritesLifecycle(t *testing.T) {
 
 	for bad, field := range map[string]string{
 		`{"customerOrgId":"` + org + `","kind":"castle","name":"x","address":null,` +
-			`"accessInstructions":null}`: "kind",
+			`"accessInstructions":null}`: fieldKind,
 		`{"customerOrgId":"` + org + `","kind":"home","name":"","address":null,` +
-			`"accessInstructions":null}`: "name",
+			`"accessInstructions":null}`: fieldName,
 		`{"customerOrgId":"` + org + `","kind":"home",` +
 			`"name":"` + strings.Repeat("x", 121) + `","address":null,` +
-			`"accessInstructions":null}`: "name",
+			`"accessInstructions":null}`: fieldName,
 		`{"customerOrgId":"` + org + `","kind":"home","name":"x",` +
 			`"address":"` + strings.Repeat("a", 501) + `","accessInstructions":null}`: "address",
 		`{"kind":"home","name":"x","address":null,` +
@@ -104,7 +112,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 	} {
 		if code, res := write(
 			srv,
-			&hq,
+			hq(),
 			"properties.save",
 			bad,
 			0,
@@ -122,7 +130,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"properties.save",
 		`{"customerOrgId":"`+uuid.NewString()+`","kind":"home","name":"x","address":null,"accessInstructions":null}`,
 		0,
@@ -137,29 +145,29 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		`Test Rd (fictional)","accessInstructions":null}`
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"properties.save",
 		upd,
 		1,
-	); code != 200 || ver(res) != 2 ||
+	); code != 200 || ver(t, res) != 2 ||
 		data(res)["name"] != renamed {
 		t.Fatalf("property update: %d %v", code, res)
 	}
 
-	if code, m := write(
+	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"properties.save",
 		upd,
 		1,
 	); code != 409 ||
-		m["code"] != "CONFLICT" {
+		res["code"] != codeConflict {
 		t.Fatalf("stale version: %d", code)
 	}
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"properties.save",
 		upd,
 		0,
@@ -168,14 +176,14 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		t.Fatalf("update without version: %d %s", code, fields(res))
 	}
 
-	if code, _ := write(srv, &customerB, "properties.save", upd, 2); code != 403 {
+	if code, _ := write(srv, customerB(), "properties.save", upd, 2); code != 403 {
 		t.Fatalf("client cannot save properties: %d", code)
 	}
 
 	// spaces: floor → room, cycle, other property
 	code, resp = write(
 		srv,
-		&hq,
+		hq(),
 		"spaces.save",
 		`{"propertyId":"`+prop+`","parentSpaceId":null,"kind":"floor","name":"1F"}`,
 		0,
@@ -188,7 +196,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 
 	code, resp = write(
 		srv,
-		&hq,
+		hq(),
 		"spaces.save",
 		`{"propertyId":"`+prop+`","parentSpaceId":"`+floor+`","kind":"room","name":"Server room"}`,
 		0,
@@ -200,7 +208,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 	room := asStr(t, data(resp)["id"])
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"spaces.save",
 		`{"id":"`+floor+`","propertyId":"`+prop+`","parentSpaceId":"`+room+`","kind":"floor","name":"1F"}`,
 		1,
@@ -211,7 +219,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"spaces.save",
 		`{"id":"`+floor+`","propertyId":"`+prop+`","parentSpaceId":"`+floor+`","kind":"floor","name":"1F"}`,
 		1,
@@ -222,7 +230,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"spaces.save",
 		`{"propertyId":"`+prop+`","parentSpaceId":"`+seed.ID("floor-1").
 			String()+
@@ -235,25 +243,25 @@ func TestAssetWritesLifecycle(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"spaces.save",
 		`{"id":"`+room+`","propertyId":"`+prop+`","parentSpaceId":"`+floor+`","kind":"room","name":"Server room A"}`,
 		1,
 	); code != 200 ||
-		ver(res) != 2 {
+		ver(t, res) != 2 {
 		t.Fatalf("space update: %d", code)
 	}
 
-	for name, b := range map[string]string{
+	for name, body := range map[string]string{
 		"floor at the root": `{"propertyId":"` + prop + `","parentSpaceId":null,"kind":"floor","name":"1f"}`,
 		"room on the floor": `{"propertyId":"` + prop + `","parentSpaceId":"` + floor + `","kind":"room","name":" server ` +
 			`room a "}`,
 	} {
 		if code, res := write(
 			srv,
-			&hq,
+			hq(),
 			"spaces.save",
-			b,
+			body,
 			0,
 		); code != 409 ||
 			res["messageKey"] != apperr.KeyDuplicateSiblingName {
@@ -263,7 +271,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 
 	code, resp = write(
 		srv,
-		&hq,
+		hq(),
 		"spaces.save",
 		`{"propertyId":"`+prop+`","parentSpaceId":"`+floor+`","kind":"room","name":"1F"}`,
 		0,
@@ -274,7 +282,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"spaces.archive",
 		`{"id":"`+asStr(t, data(resp)["id"])+`","reason":"test cleanup"}`,
 		1,
@@ -283,23 +291,23 @@ func TestAssetWritesLifecycle(t *testing.T) {
 	}
 
 	// units: create, wrong customer, unknown model, future install, relocation reason
-	unitBody := func(id, space string, extra string) string {
-		sp := "null"
+	unitBody := func(unitID, space string, extra string) string {
+		spaceJSON := jsonNull
 		if space != "" {
-			sp = `"` + space + `"`
+			spaceJSON = `"` + space + `"`
 		}
 
 		idf := ""
-		if id != "" {
-			idf = `"id":"` + id + `",`
+		if unitID != "" {
+			idf = `"id":"` + unitID + `",`
 		}
 
-		return `{` + idf + `"customerOrgId":"` + org + `","propertyId":"` + prop + `","spaceId":` + sp +
+		return `{` + idf + `"customerOrgId":"` + org + `","propertyId":"` + prop + `","spaceId":` + spaceJSON +
 			`,"displayName":"Server AC","modelId":"` + model +
 			`","type":"split","installedAt":null,"serviceScope":["indoor","outdoor"]` + extra + `}`
 	}
 
-	code, resp = write(srv, &hq, "units.save", unitBody("", room, ""), 0)
+	code, resp = write(srv, hq(), "units.save", unitBody("", room, ""), 0)
 	if code != 200 || data(resp)["displayName"] != "Server AC" ||
 		int(asNum(t, data(resp)["capabilityVersion"])) != 3 {
 		t.Fatalf("unit create: %d %v", code, resp)
@@ -309,7 +317,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"units.save",
 		strings.Replace(unitBody("", room, ""), "Server AC", "server ac", 1),
 		0,
@@ -319,13 +327,13 @@ func TestAssetWritesLifecycle(t *testing.T) {
 	}
 
 	badUnits := map[string]string{
-		"other customer": strings.Replace(
+		caseOtherCustomer: strings.Replace(
 			unitBody("", "", ""),
 			org,
 			seed.ID("org-customer-a").String(),
 			1,
 		),
-		"unknown model": strings.Replace(unitBody("", "", ""), model, uuid.NewString(), 1),
+		caseUnknownModel: strings.Replace(unitBody("", "", ""), model, uuid.NewString(), 1),
 		"future install": strings.Replace(
 			unitBody("", "", ""),
 			`"installedAt":null`,
@@ -352,19 +360,19 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		"dup scope":       "serviceScope=error.invalid",
 		"empty scope":     "serviceScope=error.required",
 		"future install":  "installedAt=error.future",
-		"other customer":  "propertyId=error.otherCustomer",
+		caseOtherCustomer: "propertyId=error.otherCustomer",
 		"space elsewhere": "spaceId=error.otherProperty",
-		"unknown model":   "modelId=error.unknownModel",
+		caseUnknownModel:  "modelId=error.unknownModel",
 	}
 
 	for name, b := range badUnits {
-		code, m := write(srv, &hq, "units.save", b, 0)
+		code, m := write(srv, hq(), "units.save", b, 0)
 		refusal(t, name, code, m, want[name])
 	}
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"units.save",
 		unitBody(unit, floor, ""),
 		1,
@@ -375,18 +383,18 @@ func TestAssetWritesLifecycle(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"units.save",
 		unitBody(unit, floor, `,"changeReason":"moved to floor"`),
 		1,
 	); code != 200 ||
-		ver(res) != 2 {
+		ver(t, res) != 2 {
 		t.Fatalf("relocate: %d %v", code, res)
 	}
 	// renaming another unit on the floor to the moved unit's name is a duplicate too (update path)
 	code, resp = write(
 		srv,
-		&hq,
+		hq(),
 		"units.save",
 		strings.Replace(unitBody("", floor, ""), "Server AC", "Server AC 2", 1),
 		0,
@@ -398,7 +406,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 	second := asStr(t, data(resp)["id"])
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"units.save",
 		unitBody(second, floor, ""),
 		1,
@@ -409,7 +417,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"units.archive",
 		`{"id":"`+second+`","reason":"test cleanup"}`,
 		1,
@@ -419,7 +427,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 	// warranty end (IR209): set, kept when omitted, cleared with null, never before the installation
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"units.save",
 		unitBody(unit, floor, `,"warrantyEndsAt":"2027-01-01T00:00:00+08:00"`),
 		2,
@@ -430,7 +438,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"units.save",
 		unitBody(unit, floor, ""),
 		3,
@@ -447,7 +455,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 	)
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"units.save",
 		early,
 		4,
@@ -464,7 +472,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"units.save",
 		strings.Replace(
 			unitBody(unit, floor, ""),
@@ -480,7 +488,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"units.save",
 		unitBody(unit, floor, `,"warrantyEndsAt":null`),
 		4,
@@ -489,21 +497,21 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		t.Fatalf("warranty cleared: %d %v", code, data(res)["warrantyEndsAt"])
 	}
 	// the history keeps the original location: only the changed field, with its old and new value (DD-A02 step 3)
-	day := `"from":"` + clock.Add(-time.Hour).
+	day := `"from":"` + clock().Add(-time.Hour).
 		Format(time.RFC3339) +
-		`","to":"` + clock.Add(time.Hour).
+		`","to":"` + clock().Add(time.Hour).
 		Format(time.RFC3339) +
 		`"`
-	_, am := post(
+	_, audit := post(
 		srv,
-		&hq,
+		hq(),
 		"audit.list",
 		`{"filters":{`+day+`,"targetKind":"unit","targetId":"`+unit+`"},"limit":10}`,
 	)
 
 	var moved map[string]any
 
-	for _, a := range items(am) {
+	for _, a := range items(t, audit) {
 		if a["nextVersion"] == float64(2) {
 			moved = a
 		}
@@ -513,12 +521,12 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		asObj(t, moved["maskedBefore"])["spaceId"] != room ||
 		asObj(t, moved["maskedAfter"])["spaceId"] != floor ||
 		len(asObj(t, moved["maskedAfter"])) != 1 {
-		t.Fatalf("relocation audit: %v", am)
+		t.Fatalf("relocation audit: %v", audit)
 	}
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"units.save",
 		unitBody(uuid.NewString(), "", ""),
 		1,
@@ -529,7 +537,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 	// archive rules
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"spaces.archive",
 		`{"id":"`+floor+`","reason":"x"}`,
 		2,
@@ -539,18 +547,18 @@ func TestAssetWritesLifecycle(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"units.archive",
 		`{"id":"`+unit+`","reason":""}`,
 		5,
 	); code != 422 ||
-		fields(res) != "reason=error.length" {
+		fields(res) != refusedReasonLength {
 		t.Errorf("archive reason required: %d %s", code, fields(res))
 	}
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"units.archive",
 		`{"id":"`+unit+`","reason":"decommissioned"}`,
 		5,
@@ -561,7 +569,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"units.archive",
 		`{"id":"`+unit+`","reason":"again"}`,
 		6,
@@ -571,7 +579,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"spaces.archive",
 		`{"id":"`+room+`","reason":"empty"}`,
 		2,
@@ -581,7 +589,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"spaces.archive",
 		`{"id":"`+floor+`","reason":"empty"}`,
 		1,
@@ -591,7 +599,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"properties.archive",
 		`{"id":"`+prop+`","reason":"closed"}`,
 		2,
@@ -601,7 +609,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"spaces.save",
 		`{"propertyId":"`+prop+`","parentSpaceId":null,"kind":"floor","name":"2F"}`,
 		0,

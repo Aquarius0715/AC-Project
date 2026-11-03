@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -11,11 +11,13 @@ import (
 
 // TestEffectivePowerSR27 covers the SR27 boundaries: freshness of observation and measurement, quality, origin,
 // null values, unknown sensors and no fallback to older valid rows.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestEffectivePowerSR27(t *testing.T) {
 	srv := server(t)
 	tenant := seed.ID("tenant-a")
 	power := func(u string) string {
-		_, m := post(srv, &hq, "units.get", `{"id":"`+u+`"}`)
+		_, m := post(srv, hq(), "units.get", `{"id":"`+u+`"}`)
 
 		return asStr(t, data(m)["effectivePowerState"])
 	}
@@ -30,7 +32,7 @@ func TestEffectivePowerSR27(t *testing.T) {
 			WHERE id = $1`,
 			unit,
 			connection,
-			clock.Add(-observedAgo),
+			clock().Add(-observedAgo),
 		)
 		owner(
 			t,
@@ -62,7 +64,7 @@ func TestEffectivePowerSR27(t *testing.T) {
 			tenant,
 			unit,
 			sensor,
-			clock.Add(-ago),
+			clock().Add(-ago),
 			seq,
 			value,
 			origin,
@@ -81,71 +83,71 @@ func TestEffectivePowerSR27(t *testing.T) {
 		{
 			"fresh valid at 120 s",
 			30 * time.Second,
-			"online",
+			connectionOnline,
 			func(u, x string) { reading(u, x, 120*time.Second, 1, "measured", "valid", 1.2) },
 			"on",
 		},
 		{
 			"measurement 121 s old",
 			30 * time.Second,
-			"online",
+			connectionOnline,
 			func(u, x string) { reading(u, x, 121*time.Second, 1, "measured", "valid", 1.2) },
-			"unknown",
+			powerUnknown,
 		},
 		{
 			"observation 121 s old",
 			121 * time.Second,
-			"online",
+			connectionOnline,
 			func(u, x string) { reading(u, x, time.Second, 1, "measured", "valid", 1.2) },
-			"unknown",
+			powerUnknown,
 		},
 		{
-			"offline",
+			connectionOffline,
 			10 * time.Second,
-			"offline",
+			connectionOffline,
 			func(u, x string) { reading(u, x, time.Second, 1, "measured", "valid", 1.2) },
-			"unknown",
+			powerUnknown,
 		},
 		{
 			"estimated origin",
 			10 * time.Second,
-			"online",
+			connectionOnline,
 			func(u, x string) { reading(u, x, time.Second, 1, "estimated", "valid", 1.2) },
-			"unknown",
+			powerUnknown,
 		},
 		{
 			"suspect quality",
 			10 * time.Second,
-			"online",
+			connectionOnline,
 			func(u, x string) { reading(u, x, time.Second, 1, "measured", "suspect", 1.2) },
-			"unknown",
+			powerUnknown,
 		},
 		{
 			"null value",
 			10 * time.Second,
-			"online",
+			connectionOnline,
 			func(u, x string) { reading(u, x, time.Second, 1, "measured", "valid", nil) },
-			"unknown",
+			powerUnknown,
 		},
-		{"no measurement", 10 * time.Second, "online", func(u, x string) {}, "unknown"},
-		{"no fallback to older valid", 10 * time.Second, "online", func(u, x string) {
+		{"no measurement", 10 * time.Second, connectionOnline, func(_, _ string) {}, powerUnknown},
+		{"no fallback to older valid", 10 * time.Second, connectionOnline, func(u, x string) {
 			reading(u, x, 20*time.Second, 1, "measured", "valid", 1.2)
 			reading(u, x, 5*time.Second, 2, "measured", "missing", nil)
-		}, "unknown"},
-		{"same time, higher sequence wins", 10 * time.Second, "online", func(u, x string) {
+		}, powerUnknown},
+		{"same time, higher sequence wins", 10 * time.Second, connectionOnline, func(u, x string) {
 			reading(u, x, 5*time.Second, 1, "measured", "missing", nil)
 			reading(u, x, 5*time.Second, 2, "measured", "valid", 0.9)
 		}, "on"},
-		{"future reading ignored", 10 * time.Second, "online", func(u, x string) {
+		{"future reading ignored", 10 * time.Second, connectionOnline, func(u, x string) {
 			reading(u, x, 5*time.Second, 1, "measured", "valid", 1.0)
 			reading(u, x, -time.Minute, 2, "measured", "missing", nil)
 		}, "on"},
 		{
 			"reading from an unknown sensor",
 			10 * time.Second,
-			"online",
-			func(u, x string) { reading(u, uuid.NewString(), time.Second, 1, "measured", "valid", 1.0) },
-			"unknown",
+			connectionOnline,
+			func(u, _ string) { reading(u, uuid.NewString(), time.Second, 1, "measured", "valid", 1.0) },
+			powerUnknown,
 		},
 	}
 	for _, tc := range cases {

@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"maps"
@@ -12,17 +12,20 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+const fieldWaves = "waves"
+
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestFirmwareCampaigns(t *testing.T) {
 	srv := server(t)
 	model := seed.ID("ventilation-demo").String()
 
-	var devs []string
+	devs := make([]string, 0, 3)
 
 	for range 3 {
 		u := newUnit(t, srv, "FW AC")
 		_, res := write(
 			srv,
-			&hq,
+			hq(),
 			"devices.register",
 			`{"serial":"FW-`+uuid.NewString()[:8]+`","sensorTypes":[],"unitId":"`+u+`"}`,
 			0,
@@ -30,20 +33,20 @@ func TestFirmwareCampaigns(t *testing.T) {
 		devs = append(devs, `"`+asStr(t, data(res)["id"])+`"`)
 	}
 
-	start := clock.Add(48 * time.Hour).Format(time.RFC3339)
+	start := clock().Add(48 * time.Hour).Format(time.RFC3339)
 	body := func(extra map[string]string) string {
 		f := map[string]string{
-			"modelId":                 `"` + model + `"`,
-			"targetVersion":           `"v2"`,
-			"deviceIds":               "[" + strings.Join(devs, ",") + "]",
-			"waves":                   `[{"label":"Pilot","percent":34},{"label":"All","percent":100}]`,
+			fieldModelID:              `"` + model + `"`,
+			fieldTargetVersion:        `"v2"`,
+			fieldDeviceIDs:            "[" + strings.Join(devs, ",") + "]",
+			fieldWaves:                `[{"label":"Pilot","percent":34},{"label":"All","percent":100}]`,
 			"window":                  `{"startLocal":"01:00","endLocal":"05:00"}`,
 			"autoPauseFailurePercent": "5",
-			"startAt":                 `"` + start + `"`,
+			fieldStartAt:              `"` + start + `"`,
 		}
 		maps.Copy(f, extra)
 
-		parts := []string{}
+		parts := make([]string, 0, len(f))
 		for k, v := range f {
 			parts = append(parts, `"`+k+`":`+v)
 		}
@@ -51,8 +54,8 @@ func TestFirmwareCampaigns(t *testing.T) {
 		return "{" + strings.Join(parts, ",") + "}"
 	}
 
-	code, resp := write(srv, &hq, "firmwareCampaigns.schedule", body(nil), 0)
-	if code != 200 || data(resp)["state"] != "scheduled" ||
+	code, resp := write(srv, hq(), "firmwareCampaigns.schedule", body(nil), 0)
+	if code != 200 || data(resp)["state"] != statusScheduled ||
 		len(asArr(t, data(resp)["results"])) != 3 ||
 		!strings.HasPrefix(asStr(t, data(resp)["checksum"]), "sha256:") ||
 		data(resp)["createdByMembershipId"] != seed.ID("hq-operator").
@@ -66,19 +69,19 @@ func TestFirmwareCampaigns(t *testing.T) {
 	}
 	// a device with an unresolved tamper, and one on a unit of another model (cap-split-std, SPL-100)
 	tu := newUnit(t, srv, "FW AC")
-	_, tm := write(
+	_, tamperedDevice := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.register",
 		`{"serial":"FW-`+uuid.NewString()[:8]+`","sensorTypes":[],"unitId":"`+tu+`"}`,
 		0,
 	)
-	tampered := asStr(t, data(tm)["id"])
+	tampered := asStr(t, data(tamperedDevice)["id"])
 	owner(t, `UPDATE devices.devices SET tamper = 'detected' WHERE id = $1`, tampered)
 
-	_, om := write(
+	_, otherUnit := write(
 		srv,
-		&hq,
+		hq(),
 		"units.save",
 		`{"customerOrgId":"`+seed.ID("org-customer-b").
 			String()+
@@ -90,47 +93,51 @@ func TestFirmwareCampaigns(t *testing.T) {
 		0,
 	)
 
-	_, od := write(
+	_, otherDevice := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.register",
 		`{"serial":"FW-`+uuid.NewString()[:8]+`","sensorTypes":[],"unitId":"`+asStr(
 			t,
-			data(om)["id"],
+			data(otherUnit)["id"],
 		)+`"}`,
 		0,
 	)
-	for name, c := range map[string]struct{ device, key string }{
+	for name, testCase := range map[string]struct{ device, key string }{
 		"tampered device": {tampered, apperr.KeyTamperUnresolved},
-		"other model":     {asStr(t, data(od)["id"]), "error.otherModel"},
+		"other model":     {asStr(t, data(otherDevice)["id"]), "error.otherModel"},
 	} {
 		if code, res := write(
 			srv,
-			&hq,
+			hq(),
 			"firmwareCampaigns.schedule",
-			body(map[string]string{"deviceIds": `["` + c.device + `"]`}),
+			body(map[string]string{fieldDeviceIDs: `["` + testCase.device + `"]`}),
 			0,
 		); code != 422 ||
-			asObj(t, res["fieldErrors"])["deviceIds"] != c.key {
+			asObj(t, res["fieldErrors"])["deviceIds"] != testCase.key {
 			t.Errorf("%s: %d %v", name, code, res)
 		}
 	}
 
 	bad := map[string]map[string]string{
-		"start < 24 h":        {"startAt": `"` + clock.Add(time.Hour).Format(time.RFC3339) + `"`},
-		"waves not ascending": {"waves": `[{"label":"A","percent":50},{"label":"B","percent":40}]`},
-		"waves end < 100":     {"waves": `[{"label":"A","percent":50}]`},
-		"auto pause 60":       {"autoPauseFailurePercent": "60"},
-		"bad window":          {"window": `{"startLocal":"25:00","endLocal":"05:00"}`},
-		"unsupported fw":      {"targetVersion": `"v9"`},
-		"already on target":   {"targetVersion": `"v1"`},
-		"unknown device":      {"deviceIds": `["` + uuid.NewString() + `"]`},
-		"duplicate device":    {"deviceIds": "[" + devs[0] + "," + devs[0] + "]"},
-		"unknown model":       {"modelId": `"` + seed.ID("ventilation-demo-b").String() + `"`},
+		"start < 24 h": {
+			fieldStartAt: `"` + clock().Add(time.Hour).Format(time.RFC3339) + `"`,
+		},
+		"waves not ascending": {
+			fieldWaves: `[{"label":"A","percent":50},{"label":"B","percent":40}]`,
+		},
+		"waves end < 100":   {fieldWaves: `[{"label":"A","percent":50}]`},
+		"auto pause 60":     {"autoPauseFailurePercent": "60"},
+		"bad window":        {"window": `{"startLocal":"25:00","endLocal":"05:00"}`},
+		"unsupported fw":    {fieldTargetVersion: `"v9"`},
+		"already on target": {fieldTargetVersion: `"v1"`},
+		"unknown device":    {fieldDeviceIDs: `["` + uuid.NewString() + `"]`},
+		"duplicate device":  {fieldDeviceIDs: "[" + devs[0] + "," + devs[0] + "]"},
+		caseUnknownModel:    {fieldModelID: `"` + seed.ID("ventilation-demo-b").String() + `"`},
 	}
 	for name, e := range bad {
-		code, res := write(srv, &hq, "firmwareCampaigns.schedule", body(e), 0)
-		if name == "unknown model" { // not a VALIDATION: the model is NOT_FOUND
+		code, res := write(srv, hq(), "firmwareCampaigns.schedule", body(e), 0)
+		if name == caseUnknownModel { // not a VALIDATION: the model is NOT_FOUND
 			if code != 404 {
 				t.Errorf("%s: %d", name, code)
 			}
@@ -150,55 +157,55 @@ func TestFirmwareCampaigns(t *testing.T) {
 	// list / get
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"firmwareCampaigns.list",
 		`{"filters":{"modelId":"`+model+`","status":"scheduled"},"limit":100}`,
 	); code != 200 ||
-		len(items(res)) == 0 {
+		len(items(t, res)) == 0 {
 		t.Fatalf("list: %d", code)
 	}
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"firmwareCampaigns.list",
 		`{"filters":{"status":"x"}}`,
 	); code != 422 ||
-		fields(res) != "filters.status=error.invalid" {
+		fields(res) != refusedFilterStatusInvalid {
 		t.Errorf("bad status: %d %s", code, fields(res))
 	}
 
 	if code, _ := post(
 		srv,
-		&hq,
+		hq(),
 		"firmwareCampaigns.get",
 		`{"id":"`+uuid.NewString()+`"}`,
 	); code != 404 {
 		t.Error("unknown campaign")
 	}
 
-	if code, _ := post(srv, &customerA, "firmwareCampaigns.list", `{}`); code != 403 {
+	if code, _ := post(srv, customerA(), "firmwareCampaigns.list", `{}`); code != 403 {
 		t.Error("client")
 	}
 	// control transitions
-	ctl := func(action, extra string, v int) (int, map[string]any) {
+	ctl := func(action, extra string, version int) (int, map[string]any) {
 		return write(
 			srv,
-			&hq,
+			hq(),
 			"firmwareCampaigns.control",
 			`{"campaignId":"`+camp+`","action":"`+action+`"`+extra+`}`,
-			v,
+			version,
 		)
 	}
 	if code, _ := ctl("resume", "", 1); code != 409 {
 		t.Error("resume a scheduled campaign")
 	}
 
-	if code, m := ctl("pause", "", 1); code != 200 || data(m)["state"] != "paused" {
+	if code, m := ctl("pause", "", 1); code != 200 || data(m)["state"] != statusPaused {
 		t.Fatalf("pause: %d", code)
 	}
 
-	if code, m := ctl("resume", "", 2); code != 200 || data(m)["state"] != "scheduled" {
+	if code, m := ctl("resume", "", 2); code != 200 || data(m)["state"] != statusScheduled {
 		t.Fatalf("resume before start returns to scheduled: %d %v", code, m)
 	}
 
@@ -229,7 +236,7 @@ func TestFirmwareCampaigns(t *testing.T) {
 		t.Fatalf("retry: %d %v", code, res)
 	}
 
-	if code, m := ctl("abort", "", 4); code != 422 || fields(m) != "reason=error.length" {
+	if code, m := ctl("abort", "", 4); code != 422 || fields(m) != refusedReasonLength {
 		t.Errorf("abort needs a reason: %d %s", code, fields(m))
 	}
 
@@ -256,7 +263,7 @@ func TestFirmwareCampaigns(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"firmwareCampaigns.control",
 		`{"campaignId":"`+uuid.NewString()+`","action":"pause"}`,
 		1,

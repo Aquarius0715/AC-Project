@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -10,6 +10,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPayouts(t *testing.T) {
 	srv := server(t)
 	tenant, org := seed.ID("tenant-a"), seed.ID("org-contractor-b")
@@ -96,7 +97,7 @@ func TestPayouts(t *testing.T) {
 	) // not yet in a closed month
 
 	gen := func(period string) (int, map[string]any) {
-		return write(srv, &hq, "payouts.generate", `{"period":"`+period+`"}`, 0)
+		return write(srv, hq(), "payouts.generate", `{"period":"`+period+`"}`, 0)
 	}
 	if code, m := gen("2026-09"); code != 422 || fields(m) != "period=errors.period_not_ended" {
 		t.Errorf("month not ended: %d %s", code, fields(m))
@@ -124,13 +125,13 @@ func TestPayouts(t *testing.T) {
 	}
 
 	jid := asStr(t, july["id"])
-	if code, _ := post(srv, &contrB, "payouts.get", `{"id":"`+jid+`"}`); code != 404 {
+	if code, _ := post(srv, contrB(), "payouts.get", `{"id":"`+jid+`"}`); code != 404 {
 		t.Error("contractor sees a draft")
 	}
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"payouts.transition",
 		`{"statementId":"`+jid+`","action":"approve"}`,
 		1,
@@ -141,7 +142,7 @@ func TestPayouts(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"payouts.transition",
 		`{"statementId":"`+jid+`","action":"approve"}`,
 		1,
@@ -152,7 +153,7 @@ func TestPayouts(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"payouts.transition",
 		`{"statementId":"`+jid+`","action":"approve"}`,
 		2,
@@ -165,7 +166,7 @@ func TestPayouts(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&contrB,
+		contrB(),
 		"payouts.query",
 		`{"statementId":"`+jid+`","lineId":"`+uuid.NewString()+`","topic":"amount","message":"why"}`,
 		2,
@@ -175,7 +176,7 @@ func TestPayouts(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&contrB,
+		contrB(),
 		"payouts.query",
 		`{"statementId":"`+jid+`","lineId":"`+line+`","topic":"price","message":"why"}`,
 		2,
@@ -186,7 +187,7 @@ func TestPayouts(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&contrB,
+		contrB(),
 		"payouts.query",
 		`{"statementId":"`+jid+`","lineId":"`+line+`","topic":"amount","message":"why"}`,
 		1,
@@ -197,18 +198,18 @@ func TestPayouts(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&contrB,
+		contrB(),
 		"payouts.query",
 		`{"statementId":"`+jid+`","lineId":"`+line+`","topic":"amount","message":"Travel was not included"}`,
 		2,
 	); code != 200 ||
-		asObj(t, asArr(t, data(res)["queries"])[0])["state"] != "open" {
+		asObj(t, asArr(t, data(res)["queries"])[0])["state"] != statusOpen {
 		t.Fatalf("query: %d %v", code, res)
 	}
 
 	if code, _ := write(
 		srv,
-		&contrA,
+		contrA(),
 		"payouts.query",
 		`{"statementId":"`+jid+`","lineId":"`+line+`","topic":"amount","message":"x"}`,
 		3,
@@ -216,14 +217,14 @@ func TestPayouts(t *testing.T) {
 		t.Error("other contractor asks")
 	}
 
-	_, resp = post(srv, &hq, "payouts.get", `{"id":"`+jid+`"}`)
+	_, resp = post(srv, hq(), "payouts.get", `{"id":"`+jid+`"}`)
 
-	q := asStr(t, asObj(t, asArr(t, data(resp)["queries"])[0])["id"])
+	queryID := asStr(t, asObj(t, asArr(t, data(resp)["queries"])[0])["id"])
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"payouts.resolveQuery",
-		`{"statementId":"`+jid+`","queryId":"`+q+`","reply":"ok","adjustmentMinor":0}`,
+		`{"statementId":"`+jid+`","queryId":"`+queryID+`","reply":"ok","adjustmentMinor":0}`,
 		3,
 	); code != 422 ||
 		fields(res) != "adjustmentMinor=error.nonZero" {
@@ -232,9 +233,9 @@ func TestPayouts(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"payouts.resolveQuery",
-		`{"statementId":"`+jid+`","queryId":"`+q+`","reply":"Added travel","adjustmentMinor":12000}`,
+		`{"statementId":"`+jid+`","queryId":"`+queryID+`","reply":"Added travel","adjustmentMinor":12000}`,
 		2,
 	); code != 409 ||
 		res["messageKey"] != apperr.KeyVersionConflict {
@@ -243,9 +244,9 @@ func TestPayouts(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"payouts.resolveQuery",
-		`{"statementId":"`+jid+`","queryId":"`+q+`","reply":"Added travel","adjustmentMinor":12000}`,
+		`{"statementId":"`+jid+`","queryId":"`+queryID+`","reply":"Added travel","adjustmentMinor":12000}`,
 		3,
 	); code != 200 ||
 		asObj(t, asArr(t, data(res)["queries"])[0])["state"] != "adjusted" {
@@ -254,18 +255,18 @@ func TestPayouts(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"payouts.resolveQuery",
-		`{"statementId":"`+jid+`","queryId":"`+q+`","reply":"again"}`,
+		`{"statementId":"`+jid+`","queryId":"`+queryID+`","reply":"again"}`,
 		4,
 	); code != 409 {
 		t.Error("resolve twice")
 	}
 
-	_, resp = post(srv, &hq, "jobs.events", `{"jobId":"`+julyJob+`","query":{"limit":100}}`)
+	_, resp = post(srv, hq(), "jobs.events", `{"jobId":"`+julyJob+`","query":{"limit":100}}`)
 	notes := 0
 
-	for _, e := range items(resp) {
+	for _, e := range items(t, resp) {
 		if e["action"] == "note.added" {
 			notes++
 		}
@@ -277,7 +278,7 @@ func TestPayouts(t *testing.T) {
 	// a second question answered with a reduction: a negative adjustment is a deduction of the next statement
 	if code, res := write(
 		srv,
-		&contrB,
+		contrB(),
 		"payouts.query",
 		`{"statementId":"`+jid+`","lineId":"`+line+`","topic":"amount","message":"Parts were charged twice"}`,
 		4,
@@ -285,21 +286,21 @@ func TestPayouts(t *testing.T) {
 		t.Fatalf("second query: %d %v", code, res)
 	}
 
-	_, resp = post(srv, &hq, "payouts.get", `{"id":"`+jid+`"}`)
+	_, resp = post(srv, hq(), "payouts.get", `{"id":"`+jid+`"}`)
 
-	var q2 string
+	var openQuery string
 
 	for _, x := range asArr(t, data(resp)["queries"]) { // both were asked at the test clock: pick the open one
-		if x := asObj(t, x); x["state"] == "open" {
-			q2 = asStr(t, x["id"])
+		if x := asObj(t, x); x["state"] == statusOpen {
+			openQuery = asStr(t, x["id"])
 		}
 	}
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"payouts.resolveQuery",
-		`{"statementId":"`+jid+`","queryId":"`+q2+`","reply":"Refund the double charge","adjustmentMinor":-3000}`,
+		`{"statementId":"`+jid+`","queryId":"`+openQuery+`","reply":"Refund the double charge","adjustmentMinor":-3000}`,
 		5,
 	); code != 200 {
 		t.Fatalf("resolve with a reduction: %d %v", code, res)
@@ -327,15 +328,15 @@ func TestPayouts(t *testing.T) {
 		t.Fatalf("august regenerated: %v", a2)
 	}
 	// paying: not before the pay date, not a draft
-	_, resp = post(srv, &hq, "payouts.get", `{"id":"`+jid+`"}`)
+	_, resp = post(srv, hq(), "payouts.get", `{"id":"`+jid+`"}`)
 	owner(t, `UPDATE billing.payout_statements SET pay_date = '2026-09-20' WHERE id = $1`, jid)
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"payouts.transition",
 		`{"statementId":"`+jid+`","action":"mark_paid"}`,
-		ver(resp),
+		ver(t, resp),
 	); code != 409 {
 		t.Error("mark paid before the pay date")
 	}
@@ -344,10 +345,10 @@ func TestPayouts(t *testing.T) {
 
 	code, resp := write(
 		srv,
-		&hq,
+		hq(),
 		"payouts.transition",
 		`{"statementId":"`+jid+`","action":"mark_paid","reason":"bank transfer"}`,
-		ver(resp),
+		ver(t, resp),
 	)
 	if code != 200 || data(resp)["paidAt"] == nil {
 		t.Fatalf("mark paid: %d %v", code, resp)
@@ -355,50 +356,50 @@ func TestPayouts(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&contrB,
+		contrB(),
 		"payouts.query",
 		`{"statementId":"`+jid+`","lineId":"`+line+`","topic":"amount","message":"late question"}`,
-		ver(resp),
+		ver(t, resp),
 	); code != 409 ||
 		res["messageKey"] != apperr.KeyInvalidState {
 		t.Errorf("question on a paid statement: %d %v", code, res)
 	}
 	// contractor sees approved/paid only
-	_, resp = post(srv, &contrB, "payouts.list", `{"limit":100}`)
-	for _, it := range items(resp) {
-		if it["status"] == "draft" || it["contractorOrgId"] != org.String() {
+	_, resp = post(srv, contrB(), "payouts.list", `{"limit":100}`)
+	for _, it := range items(t, resp) {
+		if it["status"] == statusDraft || it["contractorOrgId"] != org.String() {
 			t.Fatalf("contractor list: %v", it)
 		}
 	}
 
-	if len(items(resp)) == 0 {
+	if len(items(t, resp)) == 0 {
 		t.Error("contractor list empty")
 	}
 
 	if _, res := post(
 		srv,
-		&hq,
+		hq(),
 		"payouts.list",
 		`{"filters":{"period":"2026-08","status":"draft","contractorOrgId":"`+org.String()+`"}}`,
 	); len(
-		items(res),
+		items(t, res),
 	) != 1 {
 		t.Error("hq list filters")
 	}
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"payouts.list",
 		`{"filters":{"status":"void"}}`,
 	); code != 422 ||
-		fields(res) != "filters=error.invalid" {
+		fields(res) != refusedFiltersInvalid {
 		t.Errorf("bad status filter: %d %s", code, fields(res))
 	}
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"payouts.transition",
 		`{"statementId":"`+jid+`","action":"refund"}`,
 		6,
@@ -410,6 +411,8 @@ func TestPayouts(t *testing.T) {
 
 // TestPayoutWithoutRateCard: a contractor without a rate card in effect still gets a statement for its accepted work,
 // with each line noted "no rate card" and no amount, for HQ to settle by hand.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPayoutWithoutRateCard(t *testing.T) {
 	srv := server(t)
 	tenant, org := seed.ID(
@@ -441,22 +444,22 @@ func TestPayoutWithoutRateCard(t *testing.T) {
 		when,
 	)
 
-	code, res := write(srv, &hq, "payouts.generate", `{"period":"2026-05"}`, 0)
+	code, res := write(srv, hq(), "payouts.generate", `{"period":"2026-05"}`, 0)
 	if code != 200 {
 		t.Fatalf("generate: %d %v", code, res)
 	}
 
 	for _, x := range asArr(t, res["data"]) {
-		st := asObj(t, x)
-		if st["contractorOrgId"] != org.String() {
+		statement := asObj(t, x)
+		if statement["contractorOrgId"] != org.String() {
 			continue
 		}
 
-		lines := asArr(t, st["lines"])
+		lines := asArr(t, statement["lines"])
 		if l := asObj(t, lines[0]); len(lines) != 1 || l["note"] != "no rate card" ||
 			asNum(t, l["amountMinor"]) != 0 ||
-			asNum(t, st["netMinor"]) != 0 {
-			t.Errorf("statement without a rate card: %v", st)
+			asNum(t, statement["netMinor"]) != 0 {
+			t.Errorf("statement without a rate card: %v", statement)
 		}
 
 		return

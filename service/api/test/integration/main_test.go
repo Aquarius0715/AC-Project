@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -32,6 +32,12 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+// errNoTitleTable and errMissingTitles are the failures of the job event title check.
+var (
+	errNoTitleTable  = errors.New("jobEventTitle not found in partnerOverview.ts")
+	errMissingTitles = errors.New("no jobEventTitle in service/web/shared/lib/partnerOverview.ts")
+)
+
 // webTitles is the key set of jobEventTitle in service/web/shared/lib/partnerOverview.ts.
 func webTitles() (map[string]bool, error) {
 	src, err := os.ReadFile("../../../web/shared/lib/partnerOverview.ts")
@@ -39,17 +45,17 @@ func webTitles() (map[string]bool, error) {
 		return nil, apperr.Wrap(err, "os.ReadFile")
 	}
 
-	s := string(src)
+	source := string(src)
 
-	start := strings.Index(s, "export const jobEventTitle")
+	start := strings.Index(source, "export const jobEventTitle")
 	if start < 0 {
-		return nil, errors.New("jobEventTitle not found in partnerOverview.ts")
+		return nil, errNoTitleTable
 	}
 
-	end := strings.Index(s[start:], "};")
+	end := strings.Index(source[start:], "};")
 
 	keys := map[string]bool{}
-	for _, k := range regexp.MustCompile(`"?([a-z_]+(?:\.[a-z_]+)?)"?\s*:\s*"`).FindAllStringSubmatch(s[start:start+end],
+	for _, k := range regexp.MustCompile(`"?([a-z_]+(?:\.[a-z_]+)?)"?\s*:\s*"`).FindAllStringSubmatch(source[start:start+end],
 		-1) {
 		keys[k[1]] = true
 	}
@@ -69,7 +75,7 @@ func checkJobEventTitles() error {
 	if err != nil {
 		return nil // no database: the suite skipped its database tests too
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	rows, err := conn.Query(ctx, `SELECT DISTINCT action FROM maintenance.job_events`)
 	if err != nil {
@@ -92,10 +98,7 @@ func checkJobEventTitles() error {
 	slices.Sort(missing)
 
 	if len(missing) > 0 {
-		return fmt.Errorf(
-			"no jobEventTitle in service/web/shared/lib/partnerOverview.ts for %v",
-			missing,
-		)
+		return fmt.Errorf("%w for %v", errMissingTitles, missing)
 	}
 
 	return nil

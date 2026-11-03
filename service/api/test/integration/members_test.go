@@ -1,7 +1,6 @@
-package integration
+package integration_test
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -11,18 +10,26 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+const (
+	jsonAlertPermissions = `["alert.read","alert.resolve"]`
+	jsonRoleAdmin        = `"admin"`
+)
+
 func newUser(t *testing.T) string {
-	id := uuid.NewString()
+	t.Helper()
+
+	userID := uuid.NewString()
 	owner(
 		t,
 		`INSERT INTO identity.users (id, email, display_name) VALUES ($1, $2, 'Test user')`,
-		id,
-		id+"@ac.local",
+		userID,
+		userID+"@ac.local",
 	)
 
-	return id
+	return userID
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestMembersSave(t *testing.T) {
 	srv := server(t)
 	user := newUser(t)
@@ -33,32 +40,32 @@ func TestMembersSave(t *testing.T) {
 		seed.ID("org-customer-a").
 			String()
 	unit := seed.ID("unit-non-rto").String()
-	from := clock.Add(-time.Hour).Format(time.RFC3339)
-	until := clock.Add(30 * 24 * time.Hour).Format(time.RFC3339)
+	from := clock().Add(-time.Hour).Format(time.RFC3339)
+	until := clock().Add(30 * 24 * time.Hour).Format(time.RFC3339)
 	body := func(f map[string]string) string {
 		base := map[string]string{
-			"userId":         `"` + user + `"`,
-			"organizationId": `"` + operation + `"`,
-			"role":           `"technician"`,
-			"employment":     `"internal"`,
-			"permissions":    `["alert.read"]`,
-			"scopes":         `[{"kind":"unit","id":"` + unit + `"}]`,
-			"validFrom":      `"` + from + `"`,
-			"validUntil":     "null",
-			"reason":         `"onboarding"`,
+			fieldUserID:         `"` + user + `"`,
+			fieldOrganizationID: `"` + operation + `"`,
+			fieldRole:           jsonRoleTechnician,
+			fieldEmployment:     `"internal"`,
+			fieldPermissions:    `["alert.read"]`,
+			fieldScopes:         `[{"kind":"unit","id":"` + unit + `"}]`,
+			fieldValidFrom:      `"` + from + `"`,
+			fieldValidUntil:     jsonNull,
+			fieldReason:         `"onboarding"`,
 		}
 
-		for key, v := range f {
-			if v == "" {
+		for key, value := range f {
+			if value == "" {
 				delete(base, key)
 
 				continue
 			}
 
-			base[key] = v
+			base[key] = value
 		}
 
-		parts := []string{}
+		parts := make([]string, 0, len(base))
 		for k, v := range base {
 			parts = append(parts, `"`+k+`":`+v)
 		}
@@ -68,7 +75,7 @@ func TestMembersSave(t *testing.T) {
 	refused := map[string]string{ // the field each VALIDATION case is refused for
 		"admin unit scope":       "scopes=error.invalid",
 		"admin two tenants":      "scopes=error.invalid",
-		"blank reason":           "reason=error.length",
+		caseBlankReason:          refusedReasonLength,
 		"employment for admin":   "employment=error.notAllowed",
 		"external without end":   "validUntil=errors.external_needs_end",
 		"internal at contractor": "organizationId=errors.organization_kind",
@@ -81,68 +88,78 @@ func TestMembersSave(t *testing.T) {
 		"write without read":     "permissions=errors.write_needs_read",
 	}
 
-	for name, tc := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		f    map[string]string
 		code int
 	}{
-		"no employment":         {map[string]string{"employment": "null"}, 422},
-		"employment for admin":  {map[string]string{"role": `"admin"`}, 422},
-		"technician permission": {map[string]string{"permissions": `["job.write"]`}, 422},
+		"no employment":         {map[string]string{fieldEmployment: jsonNull}, 422},
+		"employment for admin":  {map[string]string{fieldRole: jsonRoleAdmin}, 422},
+		"technician permission": {map[string]string{fieldPermissions: `["job.write"]`}, 422},
 		"write without read": {
-			map[string]string{"role": `"admin"`, "employment": "null", "permissions": `["job.write"]`, "scopes": `[]`}, 422,
+			map[string]string{
+				fieldRole: jsonRoleAdmin, fieldEmployment: jsonNull, fieldPermissions: `["job.write"]`,
+				fieldScopes: `[]`,
+			}, 422,
 		},
 		"unknown permission": {
-			map[string]string{"role": `"admin"`, "employment": "null", "permissions": `["god.mode"]`, "scopes": `[]`}, 422,
+			map[string]string{
+				fieldRole: jsonRoleAdmin, fieldEmployment: jsonNull, fieldPermissions: `["god.mode"]`,
+				fieldScopes: `[]`,
+			}, 422,
 		},
-		"admin unit scope": {map[string]string{"role": `"admin"`, "employment": "null", "permissions": `[]`}, 422},
+		"admin unit scope": {
+			map[string]string{fieldRole: jsonRoleAdmin, fieldEmployment: jsonNull, fieldPermissions: `[]`},
+			422,
+		},
 		"admin two tenants": {
 			map[string]string{
-				"role": `"admin"`, "employment": "null", "permissions": `[]`,
-				"scopes": `[{"kind":"tenant","id":"` + seed.ID("tenant-a").String() + `"},{"kind":"tenant","id":"` +
+				fieldRole: jsonRoleAdmin, fieldEmployment: jsonNull, fieldPermissions: `[]`,
+				fieldScopes: `[{"kind":"tenant","id":"` + seed.ID("tenant-a").String() + `"},{"kind":"tenant","id":"` +
 					uuid.NewString() + `"}]`,
 			}, 422,
 		},
 		"external without end": {
-			map[string]string{"employment": `"external"`, "organizationId": `"` + contractor + `"`},
+			map[string]string{fieldEmployment: `"external"`, fieldOrganizationID: `"` + contractor + `"`},
 			422,
 		},
 		"until before from": {
-			map[string]string{"validUntil": `"` + clock.Add(-2*time.Hour).Format(time.RFC3339) + `"`},
+			map[string]string{fieldValidUntil: `"` + clock().Add(-2*time.Hour).Format(time.RFC3339) + `"`},
 			422,
 		},
-		"blank reason":           {map[string]string{"reason": `" "`}, 422},
-		"internal at contractor": {map[string]string{"organizationId": `"` + contractor + `"`}, 422},
-		"unknown scope":          {map[string]string{"scopes": `[{"kind":"unit","id":"` + uuid.NewString() + `"}]`}, 422},
-		"unknown property":       {map[string]string{"scopes": `[{"kind":"property","id":"` + uuid.NewString() + `"}]`}, 422},
-		"unknown user":           {map[string]string{"userId": `"` + uuid.NewString() + `"`}, 404},
-		"unknown organization":   {map[string]string{"organizationId": `"` + uuid.NewString() + `"`}, 404},
+		caseBlankReason:          {map[string]string{fieldReason: jsonBlank}, 422},
+		"internal at contractor": {map[string]string{fieldOrganizationID: `"` + contractor + `"`}, 422},
+		"unknown scope":          {map[string]string{fieldScopes: `[{"kind":"unit","id":"` + uuid.NewString() + `"}]`}, 422},
+		"unknown property": {map[string]string{fieldScopes: `[{"kind":"property",` +
+			`"id":"` + uuid.NewString() + `"}]`}, 422},
+		"unknown user":         {map[string]string{fieldUserID: `"` + uuid.NewString() + `"`}, 404},
+		"unknown organization": {map[string]string{fieldOrganizationID: `"` + uuid.NewString() + `"`}, 404},
 	} {
-		code, m := write(srv, &hq, "members.save", body(tc.f), 0)
+		code, m := write(srv, hq(), "members.save", body(testCase.f), 0)
 		if w, ok := refused[name]; ok {
 			refusal(t, name, code, m, w)
-		} else if code != tc.code {
-			t.Errorf("save %s: %d want %d", name, code, tc.code)
+		} else if code != testCase.code {
+			t.Errorf("save %s: %d want %d", name, code, testCase.code)
 		}
 	}
 
-	code, resp := write(srv, &hq, "members.save", body(nil), 0)
-	if code != 200 || data(resp)["role"] != "technician" ||
+	code, resp := write(srv, hq(), "members.save", body(nil), 0)
+	if code != 200 || data(resp)["role"] != roleTechnician ||
 		len(asArr(t, data(resp)["scopes"])) != 1 ||
 		asNum(t, data(resp)["scopeVersion"]) != 1 {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	id := asStr(t, data(resp)["id"])
+	membershipID := asStr(t, data(resp)["id"])
 	// update: permissions change bumps scopeVersion; role is fixed
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"members.save",
 		body(
 			map[string]string{
-				"id":          `"` + id + `"`,
-				"permissions": `["alert.read","alert.resolve"]`,
-				"validUntil":  `"` + until + `"`,
+				"id":             `"` + membershipID + `"`,
+				fieldPermissions: jsonAlertPermissions,
+				fieldValidUntil:  `"` + until + `"`,
 			},
 		),
 		1,
@@ -154,13 +171,13 @@ func TestMembersSave(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"members.save",
 		body(
 			map[string]string{
-				"id":          `"` + id + `"`,
-				"permissions": `["alert.read","alert.resolve"]`,
-				"reason":      `"period"`,
+				"id":             `"` + membershipID + `"`,
+				fieldPermissions: jsonAlertPermissions,
+				fieldReason:      `"period"`,
 			},
 		),
 		2,
@@ -171,15 +188,15 @@ func TestMembersSave(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"members.save",
 		body(
 			map[string]string{
-				"id":          `"` + id + `"`,
-				"role":        `"admin"`,
-				"employment":  "null",
-				"permissions": `[]`,
-				"scopes":      `[]`,
+				"id":             `"` + membershipID + `"`,
+				fieldRole:        jsonRoleAdmin,
+				fieldEmployment:  jsonNull,
+				fieldPermissions: `[]`,
+				fieldScopes:      `[]`,
 			},
 		),
 		3,
@@ -190,43 +207,43 @@ func TestMembersSave(t *testing.T) {
 	// a technician may also be scoped to a whole property (the identity copy of the property, IR186)
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"members.save",
 		body(
 			map[string]string{
-				"id":          `"` + id + `"`,
-				"permissions": `["alert.read","alert.resolve"]`,
-				"scopes": `[{"kind":"property","id":"` + seed.ID("property-home-a").
+				"id":             `"` + membershipID + `"`,
+				fieldPermissions: jsonAlertPermissions,
+				fieldScopes: `[{"kind":"property","id":"` + seed.ID("property-home-a").
 					String() +
 					`"}]`,
-				"reason": `"whole home"`,
+				fieldReason: `"whole home"`,
 			},
 		),
 		3,
 	); code != 200 ||
-		asObj(t, asArr(t, data(res)["scopes"])[0])["kind"] != "property" ||
+		asObj(t, asArr(t, data(res)["scopes"])[0])["kind"] != kindProperty ||
 		asNum(t, data(res)["scopeVersion"]) != 3 {
 		t.Fatalf("property scope: %d %v", code, res)
 	}
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"members.save",
-		body(map[string]string{"id": `"` + id + `"`}),
+		body(map[string]string{"id": `"` + membershipID + `"`}),
 		1,
 	); code != 409 {
 		t.Error("stale membership version")
 	}
 	// client memberships get clientRole=member and the initial consent
-	code, resp = write(srv, &hq, "members.save", body(map[string]string{
-		"organizationId": `"` + customer + `"`,
-		"role":           `"client"`,
-		"employment":     "null",
-		"permissions":    `[]`,
-		"scopes":         `[{"kind":"organization","id":"` + customer + `"}]`,
+	code, resp = write(srv, hq(), "members.save", body(map[string]string{
+		fieldOrganizationID: `"` + customer + `"`,
+		fieldRole:           `"client"`,
+		fieldEmployment:     jsonNull,
+		fieldPermissions:    `[]`,
+		fieldScopes:         `[{"kind":"organization","id":"` + customer + `"}]`,
 	}), 0)
-	if code != 200 || data(resp)["clientRole"] != "member" {
+	if code != 200 || data(resp)["clientRole"] != clientRoleMember {
 		t.Fatalf("client: %d %v", code, resp)
 	}
 
@@ -242,43 +259,43 @@ func TestMembersSave(t *testing.T) {
 		t.Error("initial consent")
 	}
 
-	if code, _ := write(srv, &customerA, "members.save", body(nil), 0); code != 403 {
+	if code, _ := write(srv, customerA(), "members.save", body(nil), 0); code != 403 {
 		t.Error("client manages members")
 	}
 
 	// self promotion and the last identity.write holder
-	_, resp = post(srv, &hq, "members.list", `{"filters":{"role":"admin"},"limit":100}`)
+	_, resp = post(srv, hq(), "members.list", `{"filters":{"role":"admin"},"limit":100}`)
 
-	var me map[string]any
+	var self map[string]any
 
-	for _, it := range items(resp) {
+	for _, it := range items(t, resp) {
 		if it["id"] == seed.ID("hq-operator").String() {
-			me = it
+			self = it
 		}
 	}
 
-	perms, _ := json.Marshal(me["permissions"])
+	perms := jsonBytes(t, self["permissions"])
 	selfBody := func(p string) string {
 		return `{"id":"` + asStr(
 			t,
-			me["id"],
-		) + `","userId":"` + asStr(t, me["userId"]) + `","organizationId":"` + operation +
+			self["id"],
+		) + `","userId":"` + asStr(t, self["userId"]) + `","organizationId":"` + operation +
 			`","role":"admin","employment":null,"permissions":` + p +
 			`,"scopes":[{"kind":"tenant","id":"` + seed.ID("tenant-a").
 			String() +
 			`"}],"validFrom":"` + asStr(
 			t,
-			me["validFrom"],
+			self["validFrom"],
 		) + `","validUntil":null,"reason":"self"}`
 	}
 
 	withOverride := strings.Replace(string(perms), `[`, `["restriction.override",`, 1)
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"members.save",
 		selfBody(withOverride),
-		int(asNum(t, me["version"])),
+		int(asNum(t, self["version"])),
 	); code != 403 {
 		t.Error("self promotion")
 	}
@@ -287,7 +304,7 @@ func TestMembersSave(t *testing.T) {
 		t,
 		`UPDATE identity.memberships SET valid_until = $2 WHERE id = $1`,
 		seed.ID("hq-restriction-manager"),
-		clock.Add(-time.Minute),
+		clock().Add(-time.Minute),
 	)
 	t.Cleanup(func() {
 		owner(
@@ -303,8 +320,8 @@ func TestMembersSave(t *testing.T) {
 			FROM identity.membership_permissions WHERE permission = 'identity.write')
 		AND created_at > $3 AND tenant_id = $4`,
 		seed.ID("hq-operator"),
-		clock.Add(-time.Minute),
-		clock.Add(-24*time.Hour),
+		clock().Add(-time.Minute),
+		clock().Add(-24*time.Hour),
 		seed.ID("tenant-a"),
 	)
 
@@ -316,31 +333,32 @@ func TestMembersSave(t *testing.T) {
 	)
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"members.save",
 		selfBody(withoutIdentity),
-		int(asNum(t, me["version"])),
+		int(asNum(t, self["version"])),
 	); code != 409 {
 		t.Errorf("last identity.write holder: %d %v", code, res)
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestMembersList(t *testing.T) {
 	srv := server(t)
 
-	_, resp := post(srv, &hq, "members.list", `{"limit":100}`)
-	for _, it := range items(resp) {
-		if it["role"] == "client" {
+	_, resp := post(srv, hq(), "members.list", `{"limit":100}`)
+	for _, it := range items(t, resp) {
+		if it["role"] == roleClient {
 			t.Fatal("clients excluded by default")
 		}
 	}
 	// IR172: every membership carries its user's display name (contractors list their technicians by name)
-	_, resp = post(srv, &contrA, "members.list", `{"limit":100}`)
-	if len(items(resp)) == 0 {
+	_, resp = post(srv, contrA(), "members.list", `{"limit":100}`)
+	if len(items(t, resp)) == 0 {
 		t.Fatal("contractor sees its technicians")
 	}
 
-	for _, it := range items(resp) {
+	for _, it := range items(t, resp) {
 		if name, _ := it["displayName"].(string); name == "" {
 			t.Fatalf("displayName missing: %v", it["id"])
 		}
@@ -348,32 +366,32 @@ func TestMembersList(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&hq,
+		hq(),
 		"members.list",
 		`{"filters":{"role":"client"},"limit":100}`,
 	); len(
-		items(res),
+		items(t, res),
 	) < 2 {
 		t.Error("role=client")
 	}
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"members.list",
 		`{"filters":{"activeOnly":false,"organizationId":"`+uuid.NewString()+`"}}`,
 	); code != 200 ||
-		len(items(res)) != 0 {
+		len(items(t, res)) != 0 {
 		t.Error("filters")
 	}
 
-	_, resp = post(srv, &contrA, "members.list", `{"limit":100}`)
-	if len(items(resp)) == 0 {
+	_, resp = post(srv, contrA(), "members.list", `{"limit":100}`)
+	if len(items(t, resp)) == 0 {
 		t.Fatal("contractor sees its technicians")
 	}
 
-	for _, it := range items(resp) {
-		if it["role"] != "technician" ||
+	for _, it := range items(t, resp) {
+		if it["role"] != roleTechnician ||
 			it["organizationId"] != seed.ID("org-contractor-a").String() ||
 			len(asArr(t, it["permissions"])) != 0 ||
 			len(asArr(t, it["scopes"])) != 0 {
@@ -382,18 +400,18 @@ func TestMembersList(t *testing.T) {
 	}
 
 	want := map[string]string{ // the field each case is refused for
-		"{\"filters\":{\"role\":\"guest\"}}":                    "filters=error.invalid",
-		"{\"filters\":{\"x\":1}}":                               "x=error.notAllowed",
-		"{\"sort\":{\"field\":\"name\",\"direction\":\"asc\"}}": "sort.field=error.invalid",
+		"{\"filters\":{\"role\":\"guest\"}}": refusedFiltersInvalid,
+		bodyUnknownFilter:                    refusedUnknownFieldX,
+		bodySortByName:                       refusedSortFieldInvalid,
 	}
 
-	for _, b := range []string{`{"filters":{"role":"guest"}}`, `{"filters":{"x":1}}`, `{"sort":{"field":"name",` +
+	for _, b := range []string{`{"filters":{"role":"guest"}}`, bodyUnknownFilter, `{"sort":{"field":"name",` +
 		`"direction":"asc"}}`} {
-		code, m := post(srv, &hq, "members.list", b)
+		code, m := post(srv, hq(), "members.list", b)
 		refusal(t, b, code, m, want[b])
 	}
 
-	if code, _ := post(srv, &customerA, "members.list", `{}`); code != 403 {
+	if code, _ := post(srv, customerA(), "members.list", `{}`); code != 403 {
 		t.Error("client lists members")
 	}
 }
@@ -401,20 +419,22 @@ func TestMembersList(t *testing.T) {
 // TestMembersListCarriesEachMembersOwn (IR496): members.list reads the permissions, scopes and qualification grants of
 // a page of members in one query per table; each member still gets only its own, and each revoked grant keeps its own
 // revocation time.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestMembersListCarriesEachMembersOwn(t *testing.T) {
 	srv := server(t)
 
-	var a, b string
+	var firstTech, secondTech string
 	ownerScan(
 		t,
 		`SELECT (array_agg(id::text ORDER BY id))[1], (array_agg(id::text ORDER BY id))[2] FROM identity.memberships
 		WHERE tenant_id = $1 AND role = 'technician'`,
 		[]any{seed.ID("tenant-a")},
-		&a,
-		&b,
+		&firstTech,
+		&secondTech,
 	)
 
-	if a == "" || b == "" {
+	if firstTech == "" || secondTech == "" {
 		t.Skip("the seed has fewer than two technicians")
 	}
 
@@ -444,8 +464,8 @@ func TestMembersListCarriesEachMembersOwn(t *testing.T) {
 		($1, $2, 'test.ir496.a', '2026-01-01Z', '2027-01-01Z', $4), ($1, $3, 'test.ir496.b', '2026-01-01Z', '2027-01-01Z',
 		$5)`,
 		seed.ID("tenant-a"),
-		a,
-		b,
+		firstTech,
+		secondTech,
 		revokedA,
 		revokedB,
 	)
@@ -458,29 +478,29 @@ func TestMembersListCarriesEachMembersOwn(t *testing.T) {
 
 	_, res := post(
 		srv,
-		&hq,
+		hq(),
 		"members.list",
 		`{"filters":{"role":"technician","activeOnly":false},"limit":100}`,
 	)
 	grants := map[string]map[string]string{} // member → test grant code → revokedAt
 
-	for _, it := range items(res) {
-		id := asStr(t, it["id"])
+	for _, it := range items(t, res) {
+		membershipID := asStr(t, it["id"])
 		for _, q := range asArr(t, it["qualifications"]) {
-			g := asObj(t, q)
-			if code := asStr(t, g["code"]); strings.HasPrefix(code, "test.ir496.") {
-				if grants[id] == nil {
-					grants[id] = map[string]string{}
+			grant := asObj(t, q)
+			if code := asStr(t, grant["code"]); strings.HasPrefix(code, "test.ir496.") {
+				if grants[membershipID] == nil {
+					grants[membershipID] = map[string]string{}
 				}
 
-				grants[id][code], _ = g["revokedAt"].(string)
+				grants[membershipID][code], _ = grant["revokedAt"].(string)
 			}
 		}
 	}
 
 	at := func(v time.Time) string { return v.Format(time.RFC3339) }
-	if len(grants[a]) != 1 || grants[a]["test.ir496.a"] != at(revokedA) || len(grants[b]) != 1 ||
-		grants[b]["test.ir496.b"] != at(revokedB) {
+	if len(grants[firstTech]) != 1 || grants[firstTech]["test.ir496.a"] != at(revokedA) || len(grants[secondTech]) != 1 ||
+		grants[secondTech]["test.ir496.b"] != at(revokedB) {
 		t.Fatalf("each member carries only its own grant with its own revocation: %v", grants)
 	}
 }

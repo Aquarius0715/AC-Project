@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"strings"
@@ -11,31 +11,31 @@ import (
 
 func autoPolicyBody(extra map[string]string) string {
 	f := map[string]string{
-		"kind":     `"automation"`,
-		"name":     `"Peak shave"`,
-		"timezone": `"Asia/Kuala_Lumpur"`,
-		"enabled":  "true",
-		"priority": "60",
-		"unitIds": `["` + seed.ID("unit-non-rto").
+		fieldKind:     `"automation"`,
+		fieldName:     `"Peak shave"`,
+		fieldTimezone: jsonKualaLumpur,
+		fieldEnabled:  jsonTrue,
+		fieldPriority: "60",
+		fieldUnitIDs: `["` + seed.ID("unit-non-rto").
 			String() +
 			`","` + seed.ID("unit-online-rto").
 			String() +
 			`"]`,
-		"condition": `{"type":"tariff","operator":"gte","value":0.5,"unit":"MYR_per_kWh"}`,
-		"action":    `{"kind":"set_temperature","celsius":26}`,
+		fieldCondition: `{"type":"tariff","operator":"gte","value":0.5,"unit":"MYR_per_kWh"}`,
+		fieldAction:    `{"kind":"set_temperature","celsius":26}`,
 	}
 
-	for k, v := range extra {
-		if v == "" {
-			delete(f, k)
+	for key, value := range extra {
+		if value == "" {
+			delete(f, key)
 
 			continue
 		}
 
-		f[k] = v
+		f[key] = value
 	}
 
-	parts := []string{}
+	parts := make([]string, 0, len(f))
 	for k, v := range f {
 		parts = append(parts, `"`+k+`":`+v)
 	}
@@ -43,6 +43,7 @@ func autoPolicyBody(extra map[string]string) string {
 	return "{" + strings.Join(parts, ",") + "}"
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAutomationPolicies(t *testing.T) {
 	srv := server(t)
 	owner(
@@ -50,113 +51,113 @@ func TestAutomationPolicies(t *testing.T) {
 		`DELETE FROM control.automation_policies`,
 	) // test-only rows (none are seeded); keeps the lists within one page
 
-	code, resp := write(srv, &hq, "policies.save", autoPolicyBody(nil), 0)
-	if code != 200 || data(resp)["kind"] != "automation" ||
+	code, resp := write(srv, hq(), "policies.save", autoPolicyBody(nil), 0)
+	if code != 200 || data(resp)["kind"] != kindAutomation ||
 		len(asArr(t, data(resp)["unitIds"])) != 2 ||
 		asNum(t, asObj(t, data(resp)["action"])["celsius"]) != 26 {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	id := asStr(t, data(resp)["id"])
+	policyID := asStr(t, data(resp)["id"])
 
 	valid := map[string]map[string]string{
 		"occupancy": {
-			"condition": `{"type":"occupancy","occupied":false}`,
-			"action":    `{"kind":"set_power","power":false}`,
+			fieldCondition: `{"type":"occupancy","occupied":false}`,
+			fieldAction:    actionPowerOff,
 		},
 		"peak": {
-			"condition": `{"type":"peak","active":true}`,
-			"action":    `{"kind":"set_mode","mode":"dry"}`,
+			fieldCondition: `{"type":"peak","active":true}`,
+			fieldAction:    `{"kind":"set_mode","mode":"dry"}`,
 		},
 		"solar": {
-			"condition": `{"type":"solar","operator":"gt","value":2.5,"unit":"kW"}`,
-			"action":    `{"kind":"set_fan","fanLevel":"high"}`,
+			fieldCondition: `{"type":"solar","operator":"gt","value":2.5,"unit":"kW"}`,
+			fieldAction:    `{"kind":"set_fan","fanLevel":"high"}`,
 		},
 		"battery": {
-			"condition": `{"type":"battery","operator":"lt","value":1,"unit":"kW"}`,
-			"action":    `{"kind":"set_temperature","celsius":16}`,
+			fieldCondition: `{"type":"battery","operator":"lt","value":1,"unit":"kW"}`,
+			fieldAction:    `{"kind":"set_temperature","celsius":16}`,
 		},
 		"ventilate": {
-			"unitIds": `["` + seed.ID("unit-online-rto").String() + `"]`,
-			"action":  `{"kind":"ventilate","level":"mid"}`,
+			fieldUnitIDs: `["` + seed.ID("unit-online-rto").String() + `"]`,
+			fieldAction:  `{"kind":"ventilate","level":"mid"}`,
 		},
 	}
 	for name, e := range valid {
-		if code, m := write(srv, &hq, "policies.save", autoPolicyBody(e), 0); code != 200 {
+		if code, m := write(srv, hq(), "policies.save", autoPolicyBody(e), 0); code != 200 {
 			t.Errorf("%s: %d %v", name, code, m)
 		}
 	}
 
 	bad := map[string]map[string]string{
-		"no units": {"unitIds": `[]`},
-		"duplicate unit": {
-			"unitIds": `["` + seed.ID("unit-non-rto").
+		caseNoUnits: {fieldUnitIDs: `[]`},
+		caseDuplicateUnit: {
+			fieldUnitIDs: `["` + seed.ID("unit-non-rto").
 				String() +
 				`","` + seed.ID("unit-non-rto").
 				String() +
 				`"]`,
 		},
 		"weather not in DD-A11": {
-			"condition": `{"type":"weather","metric":"temperature","operator":"gt","value":30}`,
+			fieldCondition: `{"type":"weather","metric":"temperature","operator":"gt","value":30}`,
 		},
 		"tariff wrong unit": {
-			"condition": `{"type":"tariff","operator":"gte","value":0.5,"unit":"kW"}`,
+			fieldCondition: `{"type":"tariff","operator":"gte","value":0.5,"unit":"kW"}`,
 		},
 		"tariff negative": {
-			"condition": `{"type":"tariff","operator":"gte","value":-1,"unit":"MYR_per_kWh"}`,
+			fieldCondition: `{"type":"tariff","operator":"gte","value":-1,"unit":"MYR_per_kWh"}`,
 		},
-		"occupancy extra field": {"condition": `{"type":"occupancy","occupied":true,"value":1}`},
-		"peak missing active":   {"condition": `{"type":"peak"}`},
+		"occupancy extra field": {fieldCondition: `{"type":"occupancy","occupied":true,"value":1}`},
+		"peak missing active":   {fieldCondition: `{"type":"peak"}`},
 		"solar bad operator": {
-			"condition": `{"type":"solar","operator":"eq","value":1,"unit":"kW"}`,
+			fieldCondition: `{"type":"solar","operator":"eq","value":1,"unit":"kW"}`,
 		},
-		"no condition":            {"condition": ""},
-		"bad action kind":         {"action": `{"kind":"explode"}`},
-		"action two fields":       {"action": `{"kind":"set_power","power":true,"celsius":20}`},
-		"bad mode":                {"action": `{"kind":"set_mode","mode":"heat"}`},
-		"temperature above max":   {"action": `{"kind":"set_temperature","celsius":31}`},
-		"temperature off step":    {"action": `{"kind":"set_temperature","celsius":24.5}`},
-		"ventilate unsupported":   {"action": `{"kind":"ventilate","level":"low"}`},
-		"alert fields":            {"customerId": `"` + seed.ID("cust-a").String() + `"`},
-		"name blank":              {"name": `" "`},
-		"priority -1":             {"priority": "-1"},
-		"no action":               {"action": ""},
-		"temperature not finite?": {"action": `{"kind":"set_temperature"}`},
+		"no condition":            {fieldCondition: ""},
+		"bad action kind":         {fieldAction: `{"kind":"explode"}`},
+		"action two fields":       {fieldAction: `{"kind":"set_power","power":true,"celsius":20}`},
+		caseBadMode:               {fieldAction: `{"kind":"set_mode","mode":"heat"}`},
+		"temperature above max":   {fieldAction: `{"kind":"set_temperature","celsius":31}`},
+		"temperature off step":    {fieldAction: `{"kind":"set_temperature","celsius":24.5}`},
+		"ventilate unsupported":   {fieldAction: actionVentilateLow},
+		"alert fields":            {fieldCustomerID: `"` + seed.ID("cust-a").String() + `"`},
+		"name blank":              {fieldName: jsonBlank},
+		"priority -1":             {fieldPriority: "-1"},
+		"no action":               {fieldAction: ""},
+		"temperature not finite?": {fieldAction: `{"kind":"set_temperature"}`},
 	}
 	// the field each case is refused for
 	want := map[string]string{
-		"action two fields":       "action=error.invalid",
+		"action two fields":       refusedActionInvalid,
 		"alert fields":            "kind=error.fieldsOfOtherKind",
-		"bad action kind":         "action=error.invalid",
-		"bad mode":                "action=error.invalid",
-		"duplicate unit":          "unitIds=error.invalid",
-		"name blank":              "name=error.length",
-		"no action":               "action=error.invalid",
-		"no condition":            "condition=error.invalid",
-		"no units":                "unitIds=error.invalid",
-		"occupancy extra field":   "condition=error.invalid",
-		"peak missing active":     "condition=error.invalid",
-		"priority -1":             "priority=error.range",
-		"solar bad operator":      "condition=error.invalid",
-		"tariff negative":         "condition=error.invalid",
-		"tariff wrong unit":       "condition=error.invalid",
-		"temperature above max":   "action=error.unsupportedAction",
-		"temperature not finite?": "action=error.invalid",
-		"temperature off step":    "action=error.unsupportedAction",
-		"ventilate unsupported":   "action=error.unsupportedAction",
-		"weather not in DD-A11":   "condition=error.invalid",
+		"bad action kind":         refusedActionInvalid,
+		caseBadMode:               refusedActionInvalid,
+		caseDuplicateUnit:         refusedUnitIDsInvalid,
+		"name blank":              refusedNameLength,
+		"no action":               refusedActionInvalid,
+		"no condition":            refusedConditionInvalid,
+		caseNoUnits:               refusedUnitIDsInvalid,
+		"occupancy extra field":   refusedConditionInvalid,
+		"peak missing active":     refusedConditionInvalid,
+		"priority -1":             refusedPriorityRange,
+		"solar bad operator":      refusedConditionInvalid,
+		"tariff negative":         refusedConditionInvalid,
+		"tariff wrong unit":       refusedConditionInvalid,
+		"temperature above max":   refusedActionUnsupported,
+		"temperature not finite?": refusedActionInvalid,
+		"temperature off step":    refusedActionUnsupported,
+		"ventilate unsupported":   refusedActionUnsupported,
+		"weather not in DD-A11":   refusedConditionInvalid,
 	}
 
 	for name, e := range bad {
-		code, m := write(srv, &hq, "policies.save", autoPolicyBody(e), 0)
+		code, m := write(srv, hq(), "policies.save", autoPolicyBody(e), 0)
 		refusal(t, name, code, m, want[name])
 	}
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"policies.save",
-		autoPolicyBody(map[string]string{"unitIds": `["` + uuid.NewString() + `"]`}),
+		autoPolicyBody(map[string]string{fieldUnitIDs: `["` + uuid.NewString() + `"]`}),
 		0,
 	); code != 404 {
 		t.Error("unknown unit → NOT_FOUND")
@@ -164,9 +165,9 @@ func TestAutomationPolicies(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"policies.save",
-		alertPolicyBody(map[string]string{"condition": `{"type":"peak","active":true}`}),
+		alertPolicyBody(map[string]string{fieldCondition: `{"type":"peak","active":true}`}),
 		0,
 	); code != 422 ||
 		fields(res) != "kind=error.fieldsOfOtherKind" {
@@ -177,17 +178,17 @@ func TestAutomationPolicies(t *testing.T) {
 	owner(
 		t,
 		`UPDATE control.automation_policies SET disabled_reason = 'capability_changed' WHERE id = $1`,
-		id,
+		policyID,
 	)
 
 	code, resp = write(
 		srv,
-		&hq,
+		hq(),
 		"policies.save",
 		autoPolicyBody(
 			map[string]string{
-				"id":      `"` + id + `"`,
-				"unitIds": `["` + seed.ID("unit-limited").String() + `"]`,
+				"id":         `"` + policyID + `"`,
+				fieldUnitIDs: `["` + seed.ID("unit-limited").String() + `"]`,
 			},
 		),
 		1,
@@ -200,9 +201,9 @@ func TestAutomationPolicies(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"policies.save",
-		autoPolicyBody(map[string]string{"id": `"` + id + `"`}),
+		autoPolicyBody(map[string]string{"id": `"` + policyID + `"`}),
 		1,
 	); code != 409 {
 		t.Error("stale version")
@@ -210,66 +211,66 @@ func TestAutomationPolicies(t *testing.T) {
 
 	def := seed.DefaultPolicyID("tenant-a").String()
 
-	_, dm := post(srv, &hq, "policies.get", `{"policyId":"`+def+`"}`)
+	_, defaultPolicy := post(srv, hq(), "policies.get", `{"policyId":"`+def+`"}`)
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"policies.save",
 		autoPolicyBody(map[string]string{"id": `"` + def + `"`}),
-		ver(dm),
+		ver(t, defaultPolicy),
 	); code != 422 ||
-		fields(res) != "kind=error.kindFixed" {
+		fields(res) != refusedKindFixed {
 		t.Errorf("default policy saved as automation: %d %s", code, fields(res))
 	}
 
 	// reads: kind filter, unit/customer filters, client and permission scope
 	ids := func(m map[string]any) map[string]bool {
 		out := map[string]bool{}
-		for _, it := range items(m) {
+		for _, it := range items(t, m) {
 			out[asStr(t, it["id"])] = true
 		}
 
 		return out
 	}
 
-	_, resp = post(srv, &hq, "policies.list", `{"filters":{"kind":"automation"},"limit":100}`)
-	if !ids(resp)[id] {
+	_, resp = post(srv, hq(), "policies.list", `{"filters":{"kind":"automation"},"limit":100}`)
+	if !ids(resp)[policyID] {
 		t.Fatal("kind=automation")
 	}
 
-	for _, it := range items(resp) {
-		if it["kind"] != "automation" {
+	for _, it := range items(t, resp) {
+		if it["kind"] != kindAutomation {
 			t.Fatal("kind filter leaks")
 		}
 	}
 
 	_, resp = post(
 		srv,
-		&hq,
+		hq(),
 		"policies.list",
 		`{"filters":{"kind":"automation","unitId":"`+seed.ID("unit-limited").
 			String()+
 			`"},"limit":100}`,
 	)
-	if !ids(resp)[id] {
+	if !ids(resp)[policyID] {
 		t.Fatal("automation unitId filter")
 	}
 
 	_, resp = post(
 		srv,
-		&hq,
+		hq(),
 		"policies.list",
 		`{"filters":{"kind":"automation","unitId":"`+seed.ID("unit-other-customer").
 			String()+
 			`"},"limit":100}`,
 	)
-	if ids(resp)[id] {
+	if ids(resp)[policyID] {
 		t.Fatal("automation unitId filter excludes")
 	}
 	// the unit and the property together: the unit counts only when it is in the property
 	_, resp = post(
 		srv,
-		&hq,
+		hq(),
 		"policies.list",
 		`{"filters":{"kind":"automation","unitId":"`+seed.ID("unit-limited").
 			String()+
@@ -277,13 +278,13 @@ func TestAutomationPolicies(t *testing.T) {
 			String()+
 			`"},"limit":100}`,
 	)
-	if !ids(resp)[id] {
+	if !ids(resp)[policyID] {
 		t.Error("unit in the property")
 	}
 
 	_, resp = post(
 		srv,
-		&hq,
+		hq(),
 		"policies.list",
 		`{"filters":{"kind":"automation","unitId":"`+seed.ID("unit-limited").
 			String()+
@@ -291,49 +292,49 @@ func TestAutomationPolicies(t *testing.T) {
 			String()+
 			`"},"limit":100}`,
 	)
-	if ids(resp)[id] {
+	if ids(resp)[policyID] {
 		t.Error("unit outside the property")
 	}
 
 	_, resp = post(
 		srv,
-		&hq,
+		hq(),
 		"policies.list",
 		`{"filters":{"kind":"automation","customerId":"`+seed.ID("cust-a").
 			String()+
 			`","enabled":true},"limit":100}`,
 	)
-	if !ids(resp)[id] {
+	if !ids(resp)[policyID] {
 		t.Fatal("automation customerId filter")
 	}
 
 	_, resp = post(
 		srv,
-		&hq,
+		hq(),
 		"policies.list",
 		`{"filters":{"kind":"automation","customerId":"`+seed.ID("cust-b").
 			String()+
 			`"},"limit":100}`,
 	)
-	if ids(resp)[id] {
+	if ids(resp)[policyID] {
 		t.Fatal("automation customerId filter excludes")
 	}
 
-	if code, _ := post(srv, &customerA, "policies.get", `{"policyId":"`+id+`"}`); code != 404 {
+	if code, _ := post(srv, customerA(), "policies.get", `{"policyId":"`+policyID+`"}`); code != 404 {
 		t.Error("clients do not see automation policies")
 	}
 
-	_, resp = post(srv, &customerA, "policies.list", `{"filters":{"kind":"automation"}}`)
-	if len(items(resp)) != 0 {
+	_, resp = post(srv, customerA(), "policies.list", `{"filters":{"kind":"automation"}}`)
+	if len(items(t, resp)) != 0 {
 		t.Error("client automation list")
 	}
 
 	// delete removes unit targets
 	if code, _ := write(
 		srv,
-		&customerA,
+		customerA(),
 		"policies.delete",
-		`{"policyId":"`+id+`"}`,
+		`{"policyId":"`+policyID+`"}`,
 		2,
 	); code != 404 {
 		t.Error("client delete automation")
@@ -341,16 +342,16 @@ func TestAutomationPolicies(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"policies.delete",
-		`{"policyId":"`+id+`"}`,
+		`{"policyId":"`+policyID+`"}`,
 		2,
 	); code != 200 ||
 		data(res)["deleted"] != true {
 		t.Fatalf("delete: %d", code)
 	}
 
-	if code, _ := post(srv, &hq, "policies.get", `{"policyId":"`+id+`"}`); code != 404 {
+	if code, _ := post(srv, hq(), "policies.get", `{"policyId":"`+policyID+`"}`); code != 404 {
 		t.Error("deleted automation policy")
 	}
 }

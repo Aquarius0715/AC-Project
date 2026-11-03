@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"strings"
@@ -10,6 +10,8 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
+
+const refusedFirmwareCandidatesInvalid = "firmwareCandidates=" + apperr.KeyInvalid
 
 func capBody(id, model, extra string) string {
 	idf := ""
@@ -27,40 +29,41 @@ func capBody(id, model, extra string) string {
 		`"firmwareCandidates":["v1"]` + extra + `}`
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestCapabilities(t *testing.T) {
 	srv := server(t)
 
-	code, resp := post(srv, &hq, "capabilities.list", `{"limit":100}`)
-	if code != 200 || len(items(resp)) < 2 {
+	code, resp := post(srv, hq(), "capabilities.list", `{"limit":100}`)
+	if code != 200 || len(items(t, resp)) < 2 {
 		t.Fatalf("list: %d %v", code, resp)
 	}
 
-	if code, _ := post(srv, &customerA, "capabilities.list", `{}`); code != 200 {
+	if code, _ := post(srv, customerA(), "capabilities.list", `{}`); code != 200 {
 		t.Error("clients read the model register (client:self)")
 	}
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"capabilities.list",
 		`{"filters":{"x":1}}`,
 	); code != 422 ||
-		fields(res) != "x=error.notAllowed" {
+		fields(res) != refusedUnknownFieldX {
 		t.Errorf("no filters: %d %s", code, fields(res))
 	}
 
 	model := "TA-" + uuid.NewString()[:6]
 
-	code, resp = write(srv, &hq, "capabilities.save", capBody("", model, ""), 0)
-	if code != 200 || ver(resp) != 1 || len(asArr(t, data(resp)["sensors"])) != 2 {
+	code, resp = write(srv, hq(), "capabilities.save", capBody("", model, ""), 0)
+	if code != 200 || ver(t, resp) != 1 || len(asArr(t, data(resp)["sensors"])) != 2 {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	id := asStr(t, data(resp)["id"])
+	modelID := asStr(t, data(resp)["id"])
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"capabilities.save",
 		capBody("", strings.ToLower(model), ""),
 		0,
@@ -75,7 +78,7 @@ func TestCapabilities(t *testing.T) {
 			`"min":30,"max":16`,
 			1,
 		),
-		"bad mode": strings.Replace(
+		caseBadMode: strings.Replace(
 			capBody("", "x2", ""),
 			`["cool","dry"]`,
 			`["heat"]`,
@@ -87,14 +90,14 @@ func TestCapabilities(t *testing.T) {
 			`["low","low"]`,
 			1,
 		),
-		"unit mismatch": strings.Replace(capBody("", "x4", ""), `"unit":"°C"`, `"unit":"%"`, 1),
+		caseUnitMismatch: strings.Replace(capBody("", "x4", ""), `"unit":"°C"`, `"unit":"%"`, 1),
 		"stale too low": strings.Replace(
 			capBody("", "x5", ""),
 			`"staleAfterSeconds":120,"boundaryId":null`,
 			`"staleAfterSeconds":1,"boundaryId":null`,
 			1,
 		),
-		"boundary": strings.Replace(
+		fieldBoundary: strings.Replace(
 			capBody("", "x6", ""),
 			`"staleAfterSeconds":120,"boundaryId":null`,
 			`"staleAfterSeconds":120,"boundaryId":"ac_input_electricity"`,
@@ -131,47 +134,47 @@ func TestCapabilities(t *testing.T) {
 	}
 	// the field each case is refused for
 	want := map[string]string{
-		"bad mode":          "modes=error.invalid",
-		"boundary":          "sensors[0].boundaryId=error.invalid",
+		caseBadMode:         "modes=error.invalid",
+		fieldBoundary:       "sensors[0].boundaryId=error.invalid",
 		"dup fan":           "fanLevels=error.invalid",
-		"dup firmware":      "firmwareCandidates=error.invalid",
-		"firmware too long": "firmwareCandidates=error.invalid",
-		"firmware blank":    "firmwareCandidates=error.invalid",
-		"firmware dup trim": "firmwareCandidates=error.invalid",
+		"dup firmware":      refusedFirmwareCandidatesInvalid,
+		"firmware too long": refusedFirmwareCandidatesInvalid,
+		"firmware blank":    refusedFirmwareCandidatesInvalid,
+		"firmware dup trim": refusedFirmwareCandidatesInvalid,
 		"empty name":        "model=error.length",
 		"modes required":    "modes=error.invalid",
 		"no control":        "control=error.controlRequired",
 		"stale too low":     "sensors[0].staleAfterSeconds=error.range",
 		"temp range":        "temperature=error.range",
-		"unit mismatch":     "sensors[0].unit=error.unitMismatch",
+		caseUnitMismatch:    "sensors[0].unit=error.unitMismatch",
 		"vent levels":       "ventilationLevels=error.invalid",
 	}
 
 	for name, b := range bad {
-		code, m := write(srv, &hq, "capabilities.save", b, 0)
+		code, m := write(srv, hq(), "capabilities.save", b, 0)
 		refusal(t, name, code, m, want[name])
 	}
 	// a unit on this model moves to the new capability version
-	_, um := write(
+	_, savedUnit := write(
 		srv,
-		&hq,
+		hq(),
 		"units.save",
 		`{"customerOrgId":"`+seed.ID("org-customer-b").
 			String()+
 			`","propertyId":"`+seed.ID("property-home-b").
 			String()+
 			`","spaceId":null,"displayName":"Cap `+
-			`AC `+uuid.NewString()[:4]+`","modelId":"`+id+`","type":"split",`+
+			`AC `+uuid.NewString()[:4]+`","modelId":"`+modelID+`","type":"split",`+
 			`"installedAt":null,"serviceScope":["indoor"]}`,
 		0,
 	)
-	unit, _ := data(um)["id"].(string)
+	unit, _ := data(savedUnit)["id"].(string)
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"capabilities.save",
-		capBody(id, model, ""),
+		capBody(modelID, model, ""),
 		1,
 	); code != 422 ||
 		asObj(t, res["fieldErrors"])["changeReason"] != apperr.KeyRequired {
@@ -180,35 +183,35 @@ func TestCapabilities(t *testing.T) {
 
 	code, resp = write(
 		srv,
-		&hq,
+		hq(),
 		"capabilities.save",
 		strings.Replace(
-			capBody(id, model, `,"changeReason":"added fan mode"`),
+			capBody(modelID, model, `,"changeReason":"added fan mode"`),
 			`["cool","dry"]`,
 			`["cool","dry","fan"]`,
 			1,
 		),
 		1,
 	)
-	if code != 200 || ver(resp) != 2 {
+	if code != 200 || ver(t, resp) != 2 {
 		t.Fatalf("update: %d %v", code, resp)
 	}
 	// the audit entry carries the changed fields only (DD-A04 version history, DD-A16 before/after)
-	day := `"from":"` + clock.Add(-time.Hour).
+	day := `"from":"` + clock().Add(-time.Hour).
 		Format(time.RFC3339) +
-		`","to":"` + clock.Add(time.Hour).
+		`","to":"` + clock().Add(time.Hour).
 		Format(time.RFC3339) +
 		`"`
-	_, am := post(
+	_, audit := post(
 		srv,
-		&hq,
+		hq(),
 		"audit.list",
-		`{"filters":{`+day+`,"targetKind":"capability","targetId":"`+id+`"},"limit":10}`,
+		`{"filters":{`+day+`,"targetKind":"capability","targetId":"`+modelID+`"},"limit":10}`,
 	)
 
 	var saved map[string]any
 
-	for _, a := range items(am) {
+	for _, a := range items(t, audit) {
 		if a["nextVersion"] == float64(2) {
 			saved = a
 		}
@@ -218,11 +221,11 @@ func TestCapabilities(t *testing.T) {
 		asObj(t, saved["maskedBefore"])["modes"] != `["cool","dry"]` ||
 		asObj(t, saved["maskedAfter"])["modes"] != `["cool","dry","fan"]` ||
 		len(asObj(t, saved["maskedAfter"])) != 1 {
-		t.Fatalf("capability audit: %v", am)
+		t.Fatalf("capability audit: %v", audit)
 	}
 
 	if unit != "" {
-		_, g := post(srv, &hq, "units.get", `{"id":"`+unit+`"}`)
+		_, g := post(srv, hq(), "units.get", `{"id":"`+unit+`"}`)
 		if int(asNum(t, data(g)["capabilityVersion"])) != 2 {
 			t.Fatalf("unit capability version: %v", data(g)["capabilityVersion"])
 		}
@@ -230,9 +233,9 @@ func TestCapabilities(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"capabilities.save",
-		capBody(id, model, `,"changeReason":"again"`),
+		capBody(modelID, model, `,"changeReason":"again"`),
 		1,
 	); code != 409 {
 		t.Error("stale version")
@@ -240,7 +243,7 @@ func TestCapabilities(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"capabilities.save",
 		capBody(uuid.NewString(), "new-"+model, `,"changeReason":"x"`),
 		1,
@@ -250,7 +253,7 @@ func TestCapabilities(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&customerA,
+		customerA(),
 		"capabilities.save",
 		capBody("", "c-"+model, ""),
 		0,
@@ -258,16 +261,16 @@ func TestCapabilities(t *testing.T) {
 		t.Error("client cannot edit models")
 	}
 	// only the current version is listed
-	_, resp = post(srv, &hq, "capabilities.list", `{"limit":100}`)
-	n := 0
+	_, resp = post(srv, hq(), "capabilities.list", `{"limit":100}`)
+	total := 0
 
-	for _, c := range items(resp) {
-		if c["id"] == id {
-			n++
+	for _, c := range items(t, resp) {
+		if c["id"] == modelID {
+			total++
 		}
 	}
 
-	if n != 1 {
-		t.Fatalf("model listed %d times", n)
+	if total != 1 {
+		t.Fatalf("model listed %d times", total)
 	}
 }

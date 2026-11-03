@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -18,23 +18,23 @@ func assignedNow(t *testing.T, srv *apiserver.Server) string {
 		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND
 			scheduled && tstzrange($2, $3)`,
 		seed.ID("tech-internal-a"),
-		clock.Add(-2*time.Hour),
-		clock.Add(30*time.Hour),
+		clock().Add(-2*time.Hour),
+		clock().Add(30*time.Hour),
 	)
 	unit := seed.ID("unit-non-rto").String()
 	_, resp := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.create",
-		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
+		jobBody(unit, map[string]string{fieldAlternativeSlots: "[]"}),
 		0,
 	)
 	job := asStr(t, data(resp)["id"])
 
-	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.assign",
 		`{"jobId":"`+job+`","technicianMembershipId":"`+seed.ID("tech-internal-a").
 			String()+
@@ -53,13 +53,14 @@ func assignedNow(t *testing.T, srv *apiserver.Server) string {
 		`UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3), created_at = $2
 			WHERE job_id = $1 AND status = 'active'`,
 		job,
-		clock.Add(-time.Hour),
-		clock.Add(time.Hour),
+		clock().Add(-time.Hour),
+		clock().Add(time.Hour),
 	)
 
 	return job
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestOnSiteOperations(t *testing.T) {
 	srv := server(t)
 	job := assignedNow(t, srv)
@@ -68,18 +69,18 @@ func TestOnSiteOperations(t *testing.T) {
 	// acknowledgement
 	if code, res := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.acknowledgeAssignment",
 		`{"jobId":"`+job+`","decision":"cant_make"}`,
 		2,
 	); code != 422 ||
-		fields(res) != "reason=error.required" {
+		fields(res) != refusedReasonRequired {
 		t.Errorf("cant_make needs a reason: %d %s", code, fields(res))
 	}
 
 	if code, res := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.acknowledgeAssignment",
 		`{"jobId":"`+job+`","decision":"accept","reason":"x"}`,
 		2,
@@ -90,7 +91,7 @@ func TestOnSiteOperations(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.acknowledgeAssignment",
 		`{"jobId":"`+job+`","decision":"maybe"}`,
 		2,
@@ -101,7 +102,7 @@ func TestOnSiteOperations(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&techA,
+		techA(),
 		"jobs.acknowledgeAssignment",
 		`{"jobId":"`+job+`","decision":"accept"}`,
 		2,
@@ -110,7 +111,7 @@ func TestOnSiteOperations(t *testing.T) {
 	}
 	// IR237: the client sees the technician's name only once the technician accepted
 	clientName := func() any {
-		_, m := post(srv, &customerA, "jobs.get", `{"jobId":"`+job+`"}`)
+		_, m := post(srv, customerA(), "jobs.get", `{"jobId":"`+job+`"}`)
 
 		return asObj(t, data(m)["assignment"])["technicianName"]
 	}
@@ -120,11 +121,11 @@ func TestOnSiteOperations(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.acknowledgeAssignment",
 		`{"jobId":"`+job+`","decision":"accept"}`,
 		2,
-	); code != 200 || data(res)["acknowledgement"] != "accepted" ||
+	); code != 200 || data(res)["acknowledgement"] != statusAccepted ||
 		data(res)["jobId"] != job {
 		t.Fatalf("ack: %d %v", code, res)
 	}
@@ -135,7 +136,7 @@ func TestOnSiteOperations(t *testing.T) {
 
 	if _, m := post(
 		srv,
-		&hq,
+		hq(),
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
 	); asObj(t, data(m)["assignment"])["technicianName"] != nil {
@@ -144,7 +145,7 @@ func TestOnSiteOperations(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.acknowledgeAssignment",
 		`{"jobId":"`+job+`","decision":"accept"}`,
 		3,
@@ -152,10 +153,10 @@ func TestOnSiteOperations(t *testing.T) {
 		t.Error("ack twice")
 	}
 
-	// pause before start, start, check-in, pause/resume
+	// a pause before the start, the start, check-in, pause/resume
 	if code, _ := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.pauseWork",
 		`{"jobId":"`+job+`","paused":true}`,
 		3,
@@ -165,7 +166,7 @@ func TestOnSiteOperations(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.start",
 		`{"jobId":"`+job+`","startConfirmed":false}`,
 		3,
@@ -176,7 +177,7 @@ func TestOnSiteOperations(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.start",
 		`{"jobId":"`+job+`","startConfirmed":true}`,
 		2,
@@ -186,18 +187,18 @@ func TestOnSiteOperations(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.start",
 		`{"jobId":"`+job+`","startConfirmed":true}`,
 		3,
-	); code != 200 || data(res)["status"] != "in_progress" ||
+	); code != 200 || data(res)["status"] != statusInProgress ||
 		data(res)["startedAt"] == nil {
 		t.Fatalf("start: %d %v", code, res)
 	}
 
 	if code, _ := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.start",
 		`{"jobId":"`+job+`","startConfirmed":true}`,
 		4,
@@ -206,28 +207,28 @@ func TestOnSiteOperations(t *testing.T) {
 	}
 
 	want := map[string]string{ // the field each case is refused for
-		"bad method":    "method=error.invalid",
-		"manual reason": "reason=error.length",
+		caseBadMethod:   refusedMethodInvalid,
+		"manual reason": refusedReasonLength,
 		"no qr":         "qrUnitId=error.required",
 		"qr mismatch":   "qrUnitId=errors.qr_unit_mismatch",
 		"too far":       "distanceMeters=errors.too_far",
 	}
 
-	for name, b := range map[string]string{
+	for name, body := range map[string]string{
 		"too far":       `{"jobId":"` + job + `","method":"location_qr","distanceMeters":201,"qrUnitId":"` + unit + `"}`,
 		"no qr":         `{"jobId":"` + job + `","method":"location_qr","distanceMeters":10,"qrUnitId":null}`,
 		"manual reason": `{"jobId":"` + job + `","method":"manual","distanceMeters":null,"qrUnitId":null,"reason":"  "}`,
-		"bad method":    `{"jobId":"` + job + `","method":"gps","distanceMeters":null,"qrUnitId":null}`,
+		caseBadMethod:   `{"jobId":"` + job + `","method":"gps","distanceMeters":null,"qrUnitId":null}`,
 		"qr mismatch": `{"jobId":"` + job + `","method":"location_qr","distanceMeters":10,` +
 			`"qrUnitId":"` + uuid.NewString() + `"}`,
 	} {
-		code, m := write(srv, &techInt, "jobs.checkIn", b, 4)
+		code, m := write(srv, techInt(), "jobs.checkIn", body, 4)
 		refusal(t, name, code, m, want[name])
 	}
 
 	code, resp := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.checkIn",
 		`{"jobId":"`+job+`","method":"location_qr","distanceMeters":200,"qrUnitId":"`+unit+`"}`,
 		4,
@@ -241,7 +242,7 @@ func TestOnSiteOperations(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.checkIn",
 		`{"jobId":"`+job+`","method":"manual","distanceMeters":null,"qrUnitId":null,"reason":"again"}`,
 		5,
@@ -251,7 +252,7 @@ func TestOnSiteOperations(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.pauseWork",
 		`{"jobId":"`+job+`","paused":false}`,
 		5,
@@ -261,7 +262,7 @@ func TestOnSiteOperations(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.pauseWork",
 		`{"jobId":"`+job+`","paused":true}`,
 		5,
@@ -272,7 +273,7 @@ func TestOnSiteOperations(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.pauseWork",
 		`{"jobId":"`+job+`","paused":true}`,
 		6,
@@ -282,7 +283,7 @@ func TestOnSiteOperations(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.pauseWork",
 		`{"jobId":"`+job+`","paused":false}`,
 		6,
@@ -293,7 +294,7 @@ func TestOnSiteOperations(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.pauseWork",
 		`{"jobId":"`+job+`"}`,
 		7,
@@ -306,40 +307,40 @@ func TestOnSiteOperations(t *testing.T) {
 	j2 := assignedNow(t, srv)
 	if code, res := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.checkIn",
 		`{"jobId":"`+j2+`","method":"manual","distanceMeters":null,"qrUnitId":null,"reason":"QR label damaged"}`,
 		2,
 	); code != 200 ||
-		data(res)["status"] != "in_progress" ||
+		data(res)["status"] != statusInProgress ||
 		asObj(t, data(res)["timeOnSite"])["checkInReason"] != "QR label damaged" {
 		t.Fatalf("manual checkIn: %d %v", code, res)
 	}
 
-	j3 := assignedNow(t, srv)
+	job3 := assignedNow(t, srv)
 	owner(
 		t,
 		`UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3) WHERE job_id = $1
 			AND status = 'active'`,
-		j3,
-		clock.Add(time.Hour),
-		clock.Add(2*time.Hour),
+		job3,
+		clock().Add(time.Hour),
+		clock().Add(2*time.Hour),
 	)
 
 	if code, res := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.start",
-		`{"jobId":"`+j3+`","startConfirmed":true}`,
+		`{"jobId":"`+job3+`","startConfirmed":true}`,
 		2,
 	); code != 403 ||
-		res["messageKey"] != "errors.assignment_not_started" {
+		res["messageKey"] != keyAssignmentNotStarted {
 		t.Errorf("before the work window: %d %v", code, res)
 	}
 
 	if code, _ := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.start",
 		`{"jobId":"`+uuid.NewString()+`","startConfirmed":true}`,
 		1,
@@ -349,17 +350,17 @@ func TestOnSiteOperations(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.start",
-		`{"jobId":"`+j3+`","startConfirmed":true}`,
+		`{"jobId":"`+job3+`","startConfirmed":true}`,
 		2,
 	); code != 403 {
 		t.Error("HQ cannot start")
 	}
 
-	alt := `"alternativeSlot":{"startAt":"` + clock.Add(48*time.Hour).
+	alt := `"alternativeSlot":{"startAt":"` + clock().Add(48*time.Hour).
 		Format(time.RFC3339) +
-		`","endAt":"` + clock.Add(50*time.Hour).
+		`","endAt":"` + clock().Add(50*time.Hour).
 		Format(time.RFC3339) +
 		`"}`
 	// acknowledgement after the viewing window ended
@@ -367,16 +368,16 @@ func TestOnSiteOperations(t *testing.T) {
 		t,
 		`UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3) WHERE job_id = $1
 			AND status = 'active'`,
-		j3,
-		clock.Add(-3*time.Hour),
-		clock.Add(-2*time.Hour),
+		job3,
+		clock().Add(-3*time.Hour),
+		clock().Add(-2*time.Hour),
 	)
 
 	if code, _ := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.acknowledgeAssignment",
-		`{"jobId":"`+j3+`","decision":"cant_make","reason":"sick",`+alt+`}`,
+		`{"jobId":"`+job3+`","decision":"cant_make","reason":"sick",`+alt+`}`,
 		2,
 	); code != 403 {
 		t.Error("ack after the window")
@@ -386,16 +387,16 @@ func TestOnSiteOperations(t *testing.T) {
 		t,
 		`UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3) WHERE job_id = $1
 			AND status = 'active'`,
-		j3,
-		clock.Add(time.Hour),
-		clock.Add(2*time.Hour),
+		job3,
+		clock().Add(time.Hour),
+		clock().Add(2*time.Hour),
 	)
 
 	if code, res := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.acknowledgeAssignment",
-		`{"jobId":"`+j3+`","decision":"cant_make","reason":"sick",`+alt+`}`,
+		`{"jobId":"`+job3+`","decision":"cant_make","reason":"sick",`+alt+`}`,
 		2,
 	); code != 200 ||
 		data(res)["alternativeSlot"] == nil ||

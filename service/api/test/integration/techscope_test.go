@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"sort"
@@ -13,9 +13,11 @@ import (
 // kind (D01, unitscope): a property scope gives that property's units, an organization scope its customer's units, and
 // no scope none at all. The seed technicians hold unit scopes only, so the property and organization branches and the
 // empty scope had no test (IR381).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestInternalTechnicianScopeKinds(t *testing.T) {
 	srv := server(t)
-	as := func(name string, scopes map[string]string) actor {
+	scopedTech := func(name string, scopes map[string]string) actor {
 		uuid := seed.ID(name)
 		owner(
 			t,
@@ -25,7 +27,7 @@ func TestInternalTechnicianScopeKinds(t *testing.T) {
 			seed.ID("tenant-a"),
 			seed.ID("user-tech-internal-a"),
 			seed.ID("org-operator-a"),
-			clock.Add(-24*time.Hour),
+			clock().Add(-24*time.Hour),
 		)
 		owner(t, `INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission)
 			SELECT tenant_id, $1, permission FROM identity.membership_permissions WHERE membership_id = $2 ON CONFLICT DO
@@ -72,19 +74,21 @@ func TestInternalTechnicianScopeKinds(t *testing.T) {
 		name[seed.ID(u).String()] = u
 	}
 
-	listed := func(a actor) string {
+	listed := func(who actor) string {
 		code, res := post(
 			srv,
-			&a,
+			&who,
 			"units.list",
 			`{"limit":100,"filters":{"unitIds":[`+strings.Join(ids, ",")+`]}}`,
 		)
 		if code != 200 {
-			t.Fatalf("units.list as %s: %d %v", a.membership, code, res)
+			t.Fatalf("units.list as %s: %d %v", who.membership, code, res)
 		}
 
-		var got []string
-		for _, it := range items(res) {
+		rows := items(t, res)
+
+		got := make([]string, 0, len(rows))
+		for _, it := range rows {
 			got = append(got, name[asStr(t, it["id"])])
 		}
 
@@ -92,14 +96,14 @@ func TestInternalTechnicianScopeKinds(t *testing.T) {
 
 		return strings.Join(got, ",")
 	}
-	property := as("test-tech-property", map[string]string{"property": "property-home-a"})
-	organization := as(
+	property := scopedTech("test-tech-property", map[string]string{kindProperty: "property-home-a"})
+	organization := scopedTech(
 		"test-tech-organization",
 		map[string]string{"organization": "org-customer-a"},
 	)
 
-	none := as("test-tech-no-scope", nil)
-	for _, c := range []struct {
+	none := scopedTech("test-tech-no-scope", nil)
+	for _, testCase := range []struct {
 		who  actor
 		want string
 	}{
@@ -107,8 +111,8 @@ func TestInternalTechnicianScopeKinds(t *testing.T) {
 		{organization, "unit-limited,unit-non-rto,unit-offline-rto,unit-online-rto"},
 		{none, ""},
 	} {
-		if got := listed(c.who); got != c.want {
-			t.Errorf("%s lists %q, want %q", c.who.membership, got, c.want)
+		if got := listed(testCase.who); got != testCase.want {
+			t.Errorf("%s lists %q, want %q", testCase.who.membership, got, testCase.want)
 		}
 	}
 	// one unit outside the scope is NOT_FOUND, one inside is read

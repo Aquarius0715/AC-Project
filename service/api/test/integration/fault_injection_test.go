@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -46,6 +46,8 @@ func injectAt(t *testing.T, match string) *apiserver.Server {
 
 // TestWithdrawRollsBackWhenTheJobCannotBeUpdated: a withdrawal whose job version update fails is not half done. The
 // operation fails as a server error, and the proposal stays pending, because the database rolls the transaction back.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestWithdrawRollsBackWhenTheJobCannotBeUpdated(t *testing.T) {
 	srv := server(t)
 	owner(
@@ -53,19 +55,19 @@ func TestWithdrawRollsBackWhenTheJobCannotBeUpdated(t *testing.T) {
 		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = ANY($1) AND status = 'active'
 			AND lower(scheduled) > $2`,
 		[]uuid.UUID{seed.ID("tech-internal-a"), seed.ID("tech-external-a")},
-		clock.Add(2*time.Hour),
+		clock().Add(2*time.Hour),
 	)
 	unit := seed.ID("unit-non-rto").String()
-	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	internalHold := `{"kind":"internal","membershipId":"` + seed.ID("tech-internal-a").
 		String() +
 		`"}`
-	_, res := write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
+	_, res := write(srv, customerA(), "jobs.create", jobBody(unit, nil), 0)
 
 	job := asStr(t, data(res)["id"])
 	if code, resp := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.proposeSlot",
 		`{"jobId":"`+job+`","slot":`+slotJSON(
 			97,
@@ -93,7 +95,7 @@ func TestWithdrawRollsBackWhenTheJobCannotBeUpdated(t *testing.T) {
 
 	code, res := write(
 		broken,
-		&hq,
+		hq(),
 		"jobs.withdrawProposal",
 		`{"jobId":"`+job+`","proposalId":"`+proposal+`"}`,
 		2,
@@ -110,7 +112,7 @@ func TestWithdrawRollsBackWhenTheJobCannotBeUpdated(t *testing.T) {
 		&status,
 	)
 
-	if status != "pending" {
+	if status != statusPending {
 		t.Errorf("a failed withdrawal left the proposal %s, want pending", status)
 	}
 }

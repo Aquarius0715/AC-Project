@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -25,6 +25,8 @@ import (
 // tenant and its HQ organization, the person and an admin membership with every HQ permission over the tenant; the
 // identity consumer opens the sign-in account (role admin, so the two-step set-up of IR468) and the administrator can
 // act at once. A second run for the tenant is refused, and so is an address someone already holds.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestBootstrapAdmin(t *testing.T) {
 	ctx := context.Background()
 
@@ -32,20 +34,20 @@ func TestBootstrapAdmin(t *testing.T) {
 	if err != nil {
 		t.Skip(err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	run := func(req bootstrap.Input) (bootstrap.Result, error) {
-		var r bootstrap.Result
+		var result bootstrap.Result
 
 		err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
 			var err error
 
-			r, err = bootstrap.Admin(ctx, tx, req)
+			result, err = bootstrap.Admin(ctx, tx, req)
 
 			return apperr.Wrap(err, "bootstrap.Admin")
 		})
 
-		return r, apperr.Wrap(err, "transaction")
+		return result, apperr.Wrap(err, "transaction")
 	}
 	tag := uuid.NewString()[:8]
 
@@ -54,12 +56,12 @@ func TestBootstrapAdmin(t *testing.T) {
 		Organization: "HQ " + tag,
 		Email:        "first-admin-" + tag + "@example.com",
 		Name:         "First Admin",
-		At:           clock,
+		At:           clock(),
 	}
 	for name, bad := range map[string]bootstrap.Input{
 		"no tenant":  {Organization: "HQ", Email: input.Email, Name: input.Name, Tenant: "", At: time.Time{}},
 		"no address": {Tenant: input.Tenant, Organization: "HQ", Email: "nobody", Name: input.Name, At: time.Time{}},
-		"no name":    {Tenant: input.Tenant, Organization: "HQ", Email: input.Email, Name: "", At: time.Time{}},
+		caseNoName:   {Tenant: input.Tenant, Organization: "HQ", Email: input.Email, Name: "", At: time.Time{}},
 	} {
 		_, err := run(bad)
 		if err == nil {
@@ -138,7 +140,7 @@ func TestBootstrapAdmin(t *testing.T) {
 	)
 
 	// the identity consumer opens the account; the administrator then works in Access & roles
-	fake := &fakeIdP{
+	fake := &fakeIDP{
 		mu:         sync.Mutex{},
 		subjects:   nil,
 		err:        nil,
@@ -150,14 +152,14 @@ func TestBootstrapAdmin(t *testing.T) {
 		lost:       nil,
 		generation: 0,
 	}
-	v := testVerifier(t)
-	v["tok-boot-"+tag] = result.UserID.String()
+	tokens := testVerifier(t)
+	tokens["tok-boot-"+tag] = result.UserID.String()
 
 	srv, err := apiserver.New(
 		ctx,
 		apiserver.Config{
 			DatabaseURL:       testDB("ac_app_login"),
-			Clock:             clockFunc,
+			Clock:             clock,
 			IdentityProvider:  fake,
 			Domains:           ops.Domains,
 			DatabaseReaderURL: "",
@@ -181,7 +183,7 @@ func TestBootstrapAdmin(t *testing.T) {
 			AccountsPerDay: 0,
 			WrapTx:         nil,
 		},
-		v,
+		tokens,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -196,7 +198,7 @@ func TestBootstrapAdmin(t *testing.T) {
 
 	fake.mu.Lock()
 	opened := slices.ContainsFunc(fake.created, func(a idp.Account) bool {
-		return a.Email == input.Email && a.Role == "admin" &&
+		return a.Email == input.Email && a.Role == roleAdmin &&
 			a.TenantID == result.TenantID.String() &&
 			a.Membership == result.MembershipID.String()
 	})
@@ -206,8 +208,12 @@ func TestBootstrapAdmin(t *testing.T) {
 		t.Fatalf("the sign-in account: %+v", fake.created)
 	}
 
-	req := httptest.NewRequest(
-		ops.ClientRequest("members.list", `{"limit":100}`),
+	method, target, reqBody := ops.ClientRequest("members.list", `{"limit":100}`)
+	req := httptest.NewRequestWithContext(
+		t.Context(),
+		method,
+		target,
+		reqBody,
 	) // the new tenant's headers, not tenant-a's
 	req.Header.Set("Authorization", "Bearer tok-boot-"+tag)
 	req.Header.Set("X-Tenant-Id", result.TenantID.String())
@@ -216,12 +222,13 @@ func TestBootstrapAdmin(t *testing.T) {
 	rec := httptest.NewRecorder()
 	srv.Echo.ServeHTTP(rec, req)
 
-	var m map[string]any
+	var res map[string]any
 
-	_ = json.Unmarshal(rec.Body.Bytes(), &m)
-	if rec.Code != 200 || len(items(m)) != 1 || items(m)[0]["id"] != result.MembershipID.String() ||
-		!slices.Contains(toStrings(items(m)[0]["permissions"]), "identity.write") {
-		t.Fatalf("the administrator lists the tenant's memberships: %d %v", rec.Code, m)
+	_ = json.Unmarshal(rec.Body.Bytes(), &res)
+	if rec.Code != 200 || len(items(t, res)) != 1 ||
+		items(t, res)[0]["id"] != result.MembershipID.String() ||
+		!slices.Contains(toStrings(items(t, res)[0]["permissions"]), "identity.write") {
+		t.Fatalf("the administrator lists the tenant's memberships: %d %v", rec.Code, res)
 	}
 }
 

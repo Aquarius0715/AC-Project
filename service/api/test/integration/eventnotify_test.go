@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -10,18 +10,19 @@ import (
 func countNotes(t *testing.T, target, recipient, template string) int {
 	t.Helper()
 
-	var n int
+	var total int
 	ownerScan(
 		t,
 		`SELECT count(*) FROM notify.notifications WHERE target->>'id' = $1 AND recipient_membership_id = $2 AND template_key
 			= $3`,
 		[]any{target, seed.ID(recipient), template},
-		&n,
+		&total,
 	)
 
-	return n
+	return total
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestBusinessEventNotifications(t *testing.T) {
 	srv := server(t)
 	// job.requested by the client: HQ job.write holders, not the acting client
@@ -33,7 +34,7 @@ func TestBusinessEventNotifications(t *testing.T) {
 
 	code, resp := write(
 		srv,
-		&customerA,
+		customerA(),
 		"jobs.create",
 		jobBody(seed.ID("unit-non-rto").String(), nil),
 		0,
@@ -52,10 +53,10 @@ func TestBusinessEventNotifications(t *testing.T) {
 		)
 	}
 	// job.assigned: technician and client get schedule_change; the acting HQ member does not
-	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.assign",
 		`{"jobId":"`+job+`","technicianMembershipId":"`+seed.ID("tech-internal-a").
 			String()+
@@ -76,13 +77,13 @@ func TestBusinessEventNotifications(t *testing.T) {
 		t.Error("job.assigned recipients")
 	}
 	// job.cancelled
-	_, g := post(srv, &hq, "jobs.get", `{"jobId":"`+job+`"}`)
+	_, detail := post(srv, hq(), "jobs.get", `{"jobId":"`+job+`"}`)
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.cancel",
 		`{"jobId":"`+job+`","cancelReason":"no longer needed"}`,
-		ver(g),
+		ver(t, detail),
 	); code != 200 {
 		t.Fatalf("cancel: %d %v", code, res)
 	}
@@ -116,7 +117,7 @@ func TestBusinessEventNotifications(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"payments.recordManual",
 		`{"invoiceId":"`+inv+`","paymentReference":"BANK-`+rid[:8]+`","confirmedAmountMinor":5000,"currency":"MYR",`+
 			`"reason":"bank"}`,
@@ -144,7 +145,7 @@ func TestBusinessEventNotifications(t *testing.T) {
 		&sev,
 	)
 
-	if sev != "warning" {
+	if sev != severityWarning {
 		t.Errorf("restriction severity %s", sev)
 	}
 }

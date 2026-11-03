@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -13,6 +13,8 @@ import (
 // observed state, observed at the report time, and moves the unit's last-seen time; a report with no settings moves
 // only the last-seen time (IR528); a report without a state, with a mode the air conditioner has no word for, or from
 // after the scenario clock is refused.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestDemoStateReport(t *testing.T) {
 	srv := serverWith(t, true)
 	unit, device := seed.ID("unit-limited"), seed.ID("device-limited")
@@ -35,20 +37,20 @@ func TestDemoStateReport(t *testing.T) {
 		)
 	})
 
-	report := func(at time.Time, st string) (int, map[string]any) {
+	report := func(at time.Time, status string) (int, map[string]any) {
 		return write(
 			srv,
-			&customerB,
+			customerB(),
 			"demo.trigger",
 			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+at.Format(
 				time.RFC3339,
 			)+
-				`","eventType":"state","deviceId":"`+device.String()+`"`+st+`}`,
+				`","eventType":"state","deviceId":"`+device.String()+`"`+status+`}`,
 			0,
 		)
 	}
 
-	when := clock.Add(-30 * time.Second)
+	when := clock().Add(-30 * time.Second)
 	if code, m := report(
 		when,
 		`,"state":{"power":false,"celsius":27,"mode":"dry","fanLevel":"high"}`,
@@ -56,7 +58,7 @@ func TestDemoStateReport(t *testing.T) {
 		t.Fatalf("state report: %d %v", code, m)
 	}
 
-	_, res := post(srv, &hq, "units.get", `{"id":"`+unit.String()+`"}`)
+	_, res := post(srv, hq(), "units.get", `{"id":"`+unit.String()+`"}`)
 
 	o := asObj(t, data(res)["observedState"])
 	if o["power"] != false || o["celsius"] != 27.0 || o["mode"] != "dry" ||
@@ -72,7 +74,7 @@ func TestDemoStateReport(t *testing.T) {
 		t.Errorf("last seen %v, want at least %v", last, when)
 	}
 	// a report with no settings (a module that reports none, IR528) is heard only: the observed state stays
-	later := clock.Add(-10 * time.Second)
+	later := clock().Add(-10 * time.Second)
 	if code, m := report(
 		later,
 		`,"state":{"power":null,"celsius":null,"mode":null,"fanLevel":null}`,
@@ -80,7 +82,7 @@ func TestDemoStateReport(t *testing.T) {
 		t.Fatalf("heard-only report: %d %v", code, m)
 	}
 
-	_, res = post(srv, &hq, "units.get", `{"id":"`+unit.String()+`"}`)
+	_, res = post(srv, hq(), "units.get", `{"id":"`+unit.String()+`"}`)
 	if o := asObj(t, data(res)["observedState"]); o["power"] != false ||
 		o["celsius"] != 27.0 ||
 		o["mode"] != "dry" ||
@@ -94,7 +96,7 @@ func TestDemoStateReport(t *testing.T) {
 		t.Errorf("last seen %v after a report at %v", last, later)
 	}
 
-	for name, c := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		at    time.Time
 		state string
 		want  string
@@ -106,10 +108,10 @@ func TestDemoStateReport(t *testing.T) {
 			`"fanLevel":"turbo"}`, "state.fanLevel=error.invalid"},
 		"hot": {when, `,"state":{"power":true,"celsius":55,"mode":"cool",` +
 			`"fanLevel":"mid"}`, "state.celsius=error.range"},
-		"future": {clock.Add(time.Hour), `,"state":{"power":true,"celsius":24,"mode":"cool",` +
+		caseFuture: {clock().Add(time.Hour), `,"state":{"power":true,"celsius":24,"mode":"cool",` +
 			`"fanLevel":"mid"}`, "occurredAt=error.range"},
 	} {
-		code, m := report(c.at, c.state)
-		refusal(t, name, code, m, c.want)
+		code, m := report(testCase.at, testCase.state)
+		refusal(t, name, code, m, testCase.want)
 	}
 }

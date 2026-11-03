@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -26,9 +26,11 @@ import (
 // server per business domain connected with its own least-privilege database role, principals from identity-api,
 // internal queries over HTTP, all behind the gateway. Pending events of every service are applied before and after
 // each request, so the suite keeps its single-process expectations while every cross-domain table access fails.
-var clusterMode = os.Getenv("AC_TEST_CLUSTER") == "1"
+func clusterMode() bool { return os.Getenv("AC_TEST_CLUSTER") == "1" }
 
 // facades caches one cluster per DemoOps setting for the whole test binary.
+//
+//nolint:gochecknoglobals // shared state: one cluster serves every test of the binary
 var facades = map[bool]*apiserver.Server{}
 
 // splitCluster is one server per business domain wired to each other like the compose services.
@@ -53,31 +55,31 @@ func buildCluster(
 
 	ctx := context.Background()
 	cluster := splitCluster{srv: map[string]*apiserver.Server{}, urls: map[string]string{}}
-	start := func(d string) {
+	start := func(domain string) {
 		cfg := base
 		cfg.Domains, cfg.InternalToken, cfg.DatabaseURL = []string{
-			d,
-		}, "test-internal", serviceURL(
-			d,
+			domain,
+		}, internalToken, serviceURL(
+			domain,
 		)
 
 		cfg.PrincipalTTL = -1 // the suite edits memberships directly and expects the next request to see them
-		if d != ops.DomainIdentity {
+		if domain != ops.DomainIdentity {
 			cfg.IdentityURL = cluster.urls[ops.DomainIdentity]
 		}
 
 		srv, err := apiserver.New(ctx, cfg, verifier)
 		if err != nil {
-			t.Fatalf("%s service: %v", d, err)
+			t.Fatalf("%s service: %v", domain, err)
 		}
 
-		hs := httptest.NewServer(srv.Echo)
+		httpSrv := httptest.NewServer(srv.Echo)
 
 		if !keep {
-			t.Cleanup(func() { hs.Close(); srv.DB.Close() })
+			t.Cleanup(func() { httpSrv.Close(); srv.DB.Close() })
 		}
 
-		cluster.srv[d], cluster.urls[d] = srv, hs.URL
+		cluster.srv[domain], cluster.urls[domain] = srv, httpSrv.URL
 	}
 	start(ops.DomainIdentity) // principals for the others
 
@@ -90,7 +92,7 @@ func buildCluster(
 	for d, s := range cluster.srv {
 		s.Registry.Remote = &ops.HTTPQueries{
 			Targets: cluster.targets(d),
-			Token:   "test-internal",
+			Token:   internalToken,
 			Client:  nil,
 		}
 	}
@@ -131,7 +133,7 @@ func newCluster(t *testing.T) splitCluster {
 	return buildCluster(
 		t,
 		apiserver.Config{
-			Clock:             clockFunc,
+			Clock:             clock,
 			DatabaseURL:       "",
 			DatabaseReaderURL: "",
 			Addr:              "",
@@ -222,32 +224,32 @@ func clusterFacade(t *testing.T, base apiserver.Config, verifier auth.Verifier) 
 		targets[d], _ = url.Parse(raw)
 	}
 
-	gw := gateway.New(targets, nil)
-	f := &apiserver.Server{
+	front := gateway.New(targets, nil)
+	facade := &apiserver.Server{
 		Registry:  all.Registry,
 		DB:        all.DB,
 		Consumers: cluster.consumers(),
 		Echo:      nil,
 	}
 	app := echo.New()
-	app.Any("/*", echo.WrapHandler(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	app.Any("/*", echo.WrapHandler(http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
 		if !strings.HasPrefix(req.URL.Path, "/v1/") {
-			all.Echo.ServeHTTP(w, req)
+			all.Echo.ServeHTTP(writer, req)
 
 			return
 		}
 
-		err := f.DrainEvents(
+		err := facade.DrainEvents(
 			req.Context(),
 		)
 		if err != nil { // direct SQL of the test and worker paths (BeforeDispatch)
-			http.Error(w, "drain before: "+err.Error(), http.StatusInternalServerError)
+			http.Error(writer, "drain before: "+err.Error(), http.StatusInternalServerError)
 
 			return
 		}
 
-		rec := &statusRecorder{ResponseWriter: w, status: 0}
-		gw.ServeHTTP(rec, req)
+		rec := &statusRecorder{ResponseWriter: writer, status: 0}
+		front.ServeHTTP(rec, req)
 
 		if req.URL.Path == "/v1/demo/advance-clock" && rec.status == http.StatusOK &&
 			base.DemoClock != nil { // the workers' tick on the new time
@@ -260,34 +262,36 @@ func clusterFacade(t *testing.T, base apiserver.Config, verifier auth.Verifier) 
 			}
 		}
 
-		err = f.DrainEvents(
+		err = facade.DrainEvents(
 			context.WithoutCancel(req.Context()),
 		)
 		if err != nil { // the write's events (AfterCommit)
 			panic("drain after: " + err.Error())
 		}
 	})))
-	f.Echo = app
-	facades[base.DemoOps] = f
-	clusters[f] = cluster
+	facade.Echo = app
+	facades[base.DemoOps] = facade
+	clusters[facade] = cluster
 
-	return f
+	return facade
 }
 
 // clusters maps a facade to its services (schedTick).
+//
+//nolint:gochecknoglobals // shared state: schedTick finds a facade's services here
 var clusters = map[*apiserver.Server]splitCluster{}
 
 // tick runs each domain's scheduler with that domain's role and registry (IR195), then applies the events.
 func (cl splitCluster) tick(ctx context.Context, now time.Time) (scheduler.Result, error) {
 	var total scheduler.Result
 
-	for _, d := range scheduler.Domains {
+	for _, domain := range scheduler.Domains {
 		result, err := scheduler.TickDomains(
 			ctx,
-			cl.srv[d].DB,
+			cl.srv[domain].DB,
 			now,
-			[]string{d},
-			cl.srv[d].Registry,
+			[]string{domain},
+			cl.srv[domain].Registry,
 		)
 		if err != nil {
 			return total, apperr.Wrap(err, "scheduler.TickDomains")

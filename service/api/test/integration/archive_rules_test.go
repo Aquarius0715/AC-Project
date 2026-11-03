@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -11,12 +11,20 @@ import (
 )
 
 // D05: units.archive conflicts with active work; customer deactivation with active units / contracts / jobs.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestArchiveRulesD05(t *testing.T) {
 	srv := server(t)
 	archive := func(unit string) (int, map[string]any) {
-		_, g := post(srv, &hq, "units.get", `{"id":"`+unit+`"}`)
+		_, detail := post(srv, hq(), "units.get", `{"id":"`+unit+`"}`)
 
-		return write(srv, &hq, "units.archive", `{"id":"`+unit+`","reason":"decommission"}`, ver(g))
+		return write(
+			srv,
+			hq(),
+			"units.archive",
+			`{"id":"`+unit+`","reason":"decommission"}`,
+			ver(t, detail),
+		)
 	}
 	// open job
 	unitID := newUnit(t, srv, "Arch job")
@@ -29,8 +37,8 @@ func TestArchiveRulesD05(t *testing.T) {
 		seed.ID("tenant-a"),
 		unitID,
 		seed.ID("org-customer-b"),
-		clock,
-		clock.Add(time.Hour),
+		clock(),
+		clock().Add(time.Hour),
 	)
 
 	if code, m := archive(unitID); code != 409 || m["messageKey"] != "error.unitActive" {
@@ -43,27 +51,27 @@ func TestArchiveRulesD05(t *testing.T) {
 		t.Fatalf("completed job is history only: %d", code)
 	}
 	// active device binding
-	u2 := newUnit(t, srv, "Arch dev")
+	unit2 := newUnit(t, srv, "Arch dev")
 	_, res := write(
 		srv,
-		&hq,
+		hq(),
 		"devices.register",
-		`{"serial":"AR-`+uuid.NewString()[:8]+`","sensorTypes":[],"unitId":"`+u2+`"}`,
+		`{"serial":"AR-`+uuid.NewString()[:8]+`","sensorTypes":[],"unitId":"`+unit2+`"}`,
 		0,
 	)
 	write(
 		srv,
-		&hq,
+		hq(),
 		"devices.bind",
-		`{"deviceId":"`+asStr(t, data(res)["id"])+`","unitId":"`+u2+`","reason":"install"}`,
+		`{"deviceId":"`+asStr(t, data(res)["id"])+`","unitId":"`+unit2+`","reason":"install"}`,
 		1,
 	)
 
-	if code, _ := archive(u2); code != 409 {
+	if code, _ := archive(unit2); code != 409 {
 		t.Errorf("bound device: %d", code)
 	}
 	// unexpired contract
-	u3 := newUnit(t, srv, "Arch contract")
+	unit3 := newUnit(t, srv, "Arch contract")
 	key := uuid.NewString()
 	owner(
 		t,
@@ -74,8 +82,8 @@ func TestArchiveRulesD05(t *testing.T) {
 		seed.ID("tenant-a"),
 		seed.ID("cust-b"),
 		seed.ID("org-customer-b"),
-		clock.Add(-24*time.Hour),
-		clock.Add(24*time.Hour),
+		clock().Add(-24*time.Hour),
+		clock().Add(24*time.Hour),
 		seed.ID("hq-operator"),
 	)
 	owner(
@@ -83,73 +91,73 @@ func TestArchiveRulesD05(t *testing.T) {
 		`INSERT INTO billing.contract_units (tenant_id, contract_id, contract_version, unit_id) VALUES ($1,$2,1,$3)`,
 		seed.ID("tenant-a"),
 		key,
-		u3,
+		unit3,
 	)
 
-	if code, _ := archive(u3); code != 409 {
+	if code, _ := archive(unit3); code != 409 {
 		t.Errorf("unexpired contract: %d", code)
 	}
 	// customer deactivation with active units
-	_, c := post(
+	_, customers := post(
 		srv,
-		&hq,
+		hq(),
 		"customers.list",
 		`{"filters":{"organizationId":"`+seed.ID("org-customer-b").String()+`"}}`,
 	)
-	cb := items(c)[0]
+	customer := items(t, customers)[0]
 
 	body := `{"id":"` + asStr(
 		t,
-		cb["id"],
+		customer["id"],
 	) + `","name":"` + asStr(
 		t,
-		cb["name"],
+		customer["name"],
 	) + `","organizationId":"` +
 		seed.ID("org-customer-b").
 			String() +
 		`","serviceProfile":"` + asStr(
 		t,
-		cb["serviceProfile"],
+		customer["serviceProfile"],
 	) + `","status":"inactive"}`
 	if code, resp := write(
 		srv,
-		&hq,
+		hq(),
 		"customers.save",
 		body,
-		int(asNum(t, cb["version"])),
+		int(asNum(t, customer["version"])),
 	); code != 409 ||
 		resp["messageKey"] != apperr.KeyCustomerActive {
 		t.Fatalf("deactivation with units: %d %v", code, resp)
 	}
 	// an organization with only an unexpired contract also blocks deactivation
 	org := uuid.NewString()
-	_, nc := write(
+	_, newCustomer := write(
 		srv,
-		&hq,
+		hq(),
 		"customers.save",
 		`{"name":"Contract only","organizationId":"`+org+`","serviceProfile":"general","status":"active"}`,
 		0,
 	)
-	k2 := uuid.NewString()
+	onlyContract := uuid.NewString()
 	owner(
 		t,
 		`INSERT INTO billing.contracts (id, version, tenant_id, customer_id, customer_org_id, plan_type, term, price_minor,
 			currency, restriction_eligible, created_by)
 		VALUES ($1,1,$2,$3,$4,'general',tstzrange($5,$6),5000,'MYR',false,$7)`,
-		k2,
+		onlyContract,
 		seed.ID("tenant-a"),
-		data(nc)["id"],
+		data(newCustomer)["id"],
 		org,
-		clock.Add(-time.Hour),
-		clock.Add(time.Hour),
+		clock().Add(-time.Hour),
+		clock().Add(time.Hour),
 		seed.ID("hq-operator"),
 	)
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"customers.save",
-		`{"id":"`+asStr(t, data(nc)["id"])+`","name":"Contract only",`+
+		`{"id":"`+asStr(t, data(newCustomer)["id"])+`","name":"Contract only",`+
 			`"organizationId":"`+org+`","serviceProfile":"general",`+
 			`"status":"inactive"}`,
 		1,

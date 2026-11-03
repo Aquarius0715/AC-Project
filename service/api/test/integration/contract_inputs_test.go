@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"encoding/json"
@@ -14,28 +14,28 @@ import (
 
 // inputFields are the JSON fields a decoder fills in a value of type t: the json names of its exported fields, with
 // the fields of embedded structs promoted.
-func inputFields(t reflect.Type, out map[string]bool) {
-	for t.Kind() == reflect.Pointer {
-		t = t.Elem()
+func inputFields(structType reflect.Type, out map[string]bool) {
+	for structType.Kind() == reflect.Pointer {
+		structType = structType.Elem()
 	}
 
-	if t.Kind() != reflect.Struct {
+	if structType.Kind() != reflect.Struct {
 		return
 	}
 
-	for structField := range t.Fields() {
+	for structField := range structType.Fields() {
 		name, _, _ := strings.Cut(structField.Tag.Get("json"), ",")
 		if name == "-" {
 			continue
 		}
 
-		ft := structField.Type
-		for ft.Kind() == reflect.Pointer {
-			ft = ft.Elem()
+		memberType := structField.Type
+		for memberType.Kind() == reflect.Pointer {
+			memberType = memberType.Elem()
 		}
 
-		if structField.Anonymous && name == "" && ft.Kind() == reflect.Struct {
-			inputFields(ft, out)
+		if structField.Anonymous && name == "" && memberType.Kind() == reflect.Struct {
+			inputFields(memberType, out)
 
 			continue
 		}
@@ -57,6 +57,8 @@ func inputFields(t reflect.Type, out map[string]bool) {
 // checker and keeps current. A field outside the contract would be accepted where D12 says an unknown field is
 // VALIDATION, and a contract field the type lacks would refuse a request that follows the contract. Two operations may
 // share an input type only when their contract inputs are the same.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestInputsMatchContract(t *testing.T) {
 	srv := serverCfg(t, func(c *apiserver.Config) { c.Domains = ops.Domains })
 

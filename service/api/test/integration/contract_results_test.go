@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"encoding/json"
@@ -13,30 +13,34 @@ import (
 
 // resultsDecidedAtRunTime are the operations whose result type cannot be held to the contract by its Go type: the
 // answer's shape is picked per request. Their tests check each shape.
-var resultsDecidedAtRunTime = map[string]string{
-	"jobs.get": "the IR42 projection of the job (detail, offer, history, summary): the role and the " +
-		"job pick it",
-	"jobs.list":                    "the IR42 projections of the listed jobs",
-	"restrictions.get":             "the SR03 projection: the whole restriction or the caller's units",
-	"restrictions.list":            "the SR03 projections of the listed restrictions",
-	"restrictions.reconcile":       "the SR03 projection of the reconciled restriction",
-	"restrictions.retry":           "the SR03 projection of the retried restriction",
-	"locations.rename":             "a property or a space, by the input's kind",
-	"payments.simulate":            "the event picks the answer: payment instructions, an attempt or a confirmation",
-	"policies.get":                 "Policy writes the fields of its kind (alert, default alert, automation)",
-	"policies.list":                "the listed policies write the fields of their kinds",
-	"policies.save":                "Policy writes the fields of its kind",
-	"voice.resolveIntent":          "ResolvedIntent writes the fields of the intent it resolved",
-	"demoSession.signIn":           "the BFF answers it; the Core API refuses it (errors.session_via_bff, IR154)",
-	"demoSession.switchMembership": "the BFF answers it; the Core API refuses it (IR154)",
-	"demoSession.extend":           "the BFF answers it; the Core API refuses it (IR154)",
+func resultsDecidedAtRunTime() map[string]string {
+	return map[string]string{
+		opJobsGet: "the IR42 projection of the job (detail, offer, history, summary): the role and the " +
+			"job pick it",
+		opJobsList:                    "the IR42 projections of the listed jobs",
+		"restrictions.get":            "the SR03 projection: the whole restriction or the caller's units",
+		"restrictions.list":           "the SR03 projections of the listed restrictions",
+		"restrictions.reconcile":      "the SR03 projection of the reconciled restriction",
+		opRestrictionsRetry:           "the SR03 projection of the retried restriction",
+		opLocationsRename:             "a property or a space, by the input's kind",
+		opPaymentsSimulate:            "the event picks the answer: payment instructions, an attempt or a confirmation",
+		opPoliciesGet:                 "Policy writes the fields of its kind (alert, default alert, automation)",
+		opPoliciesList:                "the listed policies write the fields of their kinds",
+		opPoliciesSave:                "Policy writes the fields of its kind",
+		"voice.resolveIntent":         "ResolvedIntent writes the fields of the intent it resolved",
+		opDemoSessionSignIn:           "the BFF answers it; the Core API refuses it (errors.session_via_bff, IR154)",
+		opDemoSessionSwitchMembership: "the BFF answers it; the Core API refuses it (IR154)",
+		opDemoSessionExtend:           "the BFF answers it; the Core API refuses it (IR154)",
+	}
 }
 
 // resultFieldsNeverAnswered are contract fields an operation never answers, with the reason.
-var resultFieldsNeverAnswered = map[string]map[string]string{
-	"writes.getResult": {
-		"error": "the failed variant: a rejected write leaves no record, so it reads as not_received (IR118)",
-	},
+func resultFieldsNeverAnswered() map[string]map[string]string {
+	return map[string]map[string]string{
+		opWritesGetResult: {
+			"error": "the failed variant: a rejected write leaves no record, so it reads as not_received (IR118)",
+		},
+	}
 }
 
 // TestResultsMatchContract: every operation's result type answers exactly the fields of its contract result (IR392),
@@ -44,6 +48,8 @@ var resultFieldsNeverAnswered = map[string]map[string]string{
 // contractInputs.test.ts derives from the contract with the TypeScript checker and keeps current. A field outside the
 // contract is data the contract does not promise (D12: no extra DTO fields), and a missing one breaks a client that
 // follows the contract.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestResultsMatchContract(t *testing.T) {
 	srv := serverCfg(t, func(c *apiserver.Config) { c.Domains = ops.Domains })
 
@@ -63,17 +69,17 @@ func TestResultsMatchContract(t *testing.T) {
 	}
 
 	marshaler := reflect.TypeFor[json.Marshaler]()
-	plain := func(rt reflect.Type) bool {
-		for rt.Kind() == reflect.Pointer {
-			rt = rt.Elem()
+	plain := func(resultType reflect.Type) bool {
+		for resultType.Kind() == reflect.Pointer {
+			resultType = resultType.Elem()
 		}
 
-		return rt.Kind() != reflect.Interface && !rt.Implements(marshaler) &&
-			!reflect.PointerTo(rt).Implements(marshaler)
+		return resultType.Kind() != reflect.Interface && !resultType.Implements(marshaler) &&
+			!reflect.PointerTo(resultType).Implements(marshaler)
 	}
-	compare := func(what string, rt reflect.Type, want []string, never map[string]string) {
+	compare := func(what string, resultType reflect.Type, want []string, never map[string]string) {
 		got := map[string]bool{}
-		inputFields(rt, got)
+		inputFields(resultType, got)
 
 		var extra, missing []string
 
@@ -93,11 +99,11 @@ func TestResultsMatchContract(t *testing.T) {
 		slices.Sort(missing)
 
 		if len(extra) > 0 {
-			t.Errorf("%s (%s) answers fields outside the contract: %v", what, rt, extra)
+			t.Errorf("%s (%s) answers fields outside the contract: %v", what, resultType, extra)
 		}
 
 		if len(missing) > 0 {
-			t.Errorf("%s (%s) never answers contract fields: %v", what, rt, missing)
+			t.Errorf("%s (%s) never answers contract fields: %v", what, resultType, missing)
 		}
 	}
 	checked := 0
@@ -112,20 +118,20 @@ func TestResultsMatchContract(t *testing.T) {
 			continue
 		}
 
-		if _, ok := resultsDecidedAtRunTime[name]; ok {
+		if _, ok := resultsDecidedAtRunTime()[name]; ok {
 			continue
 		}
 
-		rt := operation.Result
-		for rt.Kind() == reflect.Pointer {
-			rt = rt.Elem()
+		resultType := operation.Result
+		for resultType.Kind() == reflect.Pointer {
+			resultType = resultType.Elem()
 		}
 
-		if !plain(rt) {
+		if !plain(resultType) {
 			t.Errorf(
 				"%s answers %s, whose fields are decided at run time: give it a plain result type or list it with the reason",
 				name,
-				rt,
+				resultType,
 			)
 
 			continue
@@ -133,24 +139,24 @@ func TestResultsMatchContract(t *testing.T) {
 
 		checked++
 
-		if rt.Kind() == reflect.Slice {
+		if resultType.Kind() == reflect.Slice {
 			if want.Items == nil {
 				t.Errorf("%s answers an array, the contract does not", name)
 
 				continue
 			}
 
-			compare(name+" items", rt.Elem(), *want.Items, nil)
+			compare(name+" items", resultType.Elem(), *want.Items, nil)
 
 			continue
 		}
 
-		compare(name, rt, want.Fields, resultFieldsNeverAnswered[name])
+		compare(name, resultType, want.Fields, resultFieldsNeverAnswered()[name])
 
 		if want.Items != nil {
-			structField, ok := rt.FieldByName("Items")
+			structField, ok := resultType.FieldByName("Items")
 			if !ok || structField.Type.Kind() != reflect.Slice {
-				t.Errorf("%s (%s) has no items, the contract's result does", name, rt)
+				t.Errorf("%s (%s) has no items, the contract's result does", name, resultType)
 
 				continue
 			}

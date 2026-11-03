@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"slices"
@@ -12,6 +12,8 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+const keyEvidenceUnknown = "errors.evidence_unknown"
+
 // reading stores one measurement of the unit and returns its ID (the measurement's event ID).
 func reading(
 	t *testing.T,
@@ -23,7 +25,7 @@ func reading(
 ) string {
 	t.Helper()
 
-	id := uuid.NewString()
+	measurementID := uuid.NewString()
 	owner(
 		t,
 		`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit,
@@ -37,20 +39,22 @@ func reading(
 		value,
 		symbol,
 		quality,
-		id,
+		measurementID,
 	)
 
-	return id
+	return measurementID
 }
 
 // IR327 / IR66 / DD-A05 item 6: an alert's evidence candidates are its own evidence at detection and the unit's valid
 // remeasurements after detection — of the rule's metric when the alert has a rule — newest first; an alert without a
 // policy resolves only with at least one candidate, a policy alert also without; only resolvers read the candidates.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAlertEvidence(t *testing.T) {
 	srv := server(t)
 	unit := newUnit(t, srv, "Evidence AC")
 	org := seed.ID("org-customer-b").String()
-	free := newAlert(t, unit, org, "critical", clock.Add(-30*time.Minute)) // no policy
+	free := newAlert(t, unit, org, "critical", clock().Add(-30*time.Minute)) // no policy
 	detected := uuid.NewString()
 	owner(
 		t,
@@ -64,28 +68,28 @@ func TestAlertEvidence(t *testing.T) {
 		"temperature",
 		31,
 		"°C",
-		clock.Add(-40*time.Minute),
+		clock().Add(-40*time.Minute),
 		"valid",
 	) // before the detection
-	after := reading(t, unit, "temperature", 26, "°C", clock.Add(-5*time.Minute), "valid")
+	after := reading(t, unit, "temperature", 26, "°C", clock().Add(-5*time.Minute), "valid")
 	twin := reading(
 		t,
 		unit,
 		"humidity",
 		55,
 		"%",
-		clock.Add(-5*time.Minute),
+		clock().Add(-5*time.Minute),
 		"valid",
 	) // observed with it: the ID decides
-	suspect := reading(t, unit, "temperature", 99, "°C", clock.Add(-4*time.Minute), "suspect")
-	co2 := reading(t, unit, "co2", 650, "ppm", clock.Add(-3*time.Minute), "valid")
+	suspect := reading(t, unit, "temperature", 99, "°C", clock().Add(-4*time.Minute), "suspect")
+	co2 := reading(t, unit, "co2", 650, "ppm", clock().Add(-3*time.Minute), "valid")
 	estimate := reading(
 		t,
 		unit,
 		"temperature",
 		25,
 		"°C",
-		clock.Add(-2*time.Minute),
+		clock().Add(-2*time.Minute),
 		"valid",
 	) // estimated, not a remeasurement
 	owner(
@@ -103,21 +107,23 @@ func TestAlertEvidence(t *testing.T) {
 		return post(srv, a, "alerts.evidence", `{"alertId":"`+alert+`","query":{}}`)
 	}
 
-	code, resp := evidence(&hq, free)
+	code, resp := evidence(hq(), free)
 	if code != 200 {
 		t.Fatalf("evidence: %d %v", code, resp)
 	}
 
 	kinds := func(m map[string]any) string {
-		got := []string{}
-		for _, it := range items(m) {
+		rows := items(t, m)
+
+		got := make([]string, 0, len(rows))
+		for _, it := range rows {
 			got = append(got, asStr(t, it["kind"])+":"+asStr(t, it["id"]))
 		}
 
 		return strings.Join(got, ",")
 	}
 	byID := func(m map[string]any, id string) map[string]any {
-		for _, it := range items(m) {
+		for _, it := range items(t, m) {
 			if it["id"] == id {
 				return it
 			}
@@ -134,13 +140,14 @@ func TestAlertEvidence(t *testing.T) {
 		t.Fatalf("candidates: %s want %s", got, want)
 	}
 
-	if it := byID(
+	if item := byID(
 		resp,
 		after,
-	); it["metric"] != "temperature" || asNum(t, it["value"]) != 26 || it["unit"] != "°C" || it["origin"] != "measured" ||
-		it["quality"] != "valid" ||
-		it["eventType"] != nil {
-		t.Errorf("remeasurement fields: %v", it)
+	); item["metric"] != metricTemperature || asNum(t, item["value"]) != 26 || item["unit"] != "°C" ||
+		item["origin"] != "measured" ||
+		item["quality"] != qualityValid ||
+		item["eventType"] != nil {
+		t.Errorf("remeasurement fields: %v", item)
 	}
 
 	if it := byID(
@@ -153,17 +160,17 @@ func TestAlertEvidence(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"alerts.evidence",
 		`{"alertId":"`+free+`","query":{"limit":1}}`,
-	); code != 200 || len(items(res)) != 1 || asNum(t, data(res)["total"]) != 4 ||
+	); code != 200 || len(items(t, res)) != 1 || asNum(t, data(res)["total"]) != 4 ||
 		data(res)["nextCursor"] == nil {
 		t.Errorf("paged: %d %v", code, res)
 	}
 	// the allowed sorts: observedAt (oldest first: the detection) and id
 	if _, res := post(
 		srv,
-		&hq,
+		hq(),
 		"alerts.evidence",
 		`{"alertId":"`+free+`","query":{"sort":{"field":"observedAt","direction":"asc"}}}`,
 	); !strings.HasPrefix(kinds(res), "detection:"+detected+",") ||
@@ -176,17 +183,17 @@ func TestAlertEvidence(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&hq,
+		hq(),
 		"alerts.evidence",
 		`{"alertId":"`+free+`","query":{"sort":{"field":"id","direction":"desc"}}}`,
-	); items(res)[0]["id"] != all[3] ||
-		items(res)[3]["id"] != all[0] {
+	); items(t, res)[0]["id"] != all[3] ||
+		items(t, res)[3]["id"] != all[0] {
 		t.Errorf("id desc: %s", kinds(res))
 	}
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"alerts.evidence",
 		`{"alertId":"00000000-0000-0000-0000-000000000000","query":{}}`,
 	); code != 422 ||
@@ -196,7 +203,7 @@ func TestAlertEvidence(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"alerts.evidence",
 		`{"alertId":"`+free+`","query":{"filters":{"kind":"x"}}}`,
 	); code != 422 ||
@@ -204,16 +211,16 @@ func TestAlertEvidence(t *testing.T) {
 		t.Errorf("no filters: %d %s", code, fields(res))
 	}
 
-	if code, _ := evidence(&customerB, free); code != 403 {
+	if code, _ := evidence(customerB(), free); code != 403 {
 		t.Errorf("clients do not resolve: %d", code)
 	}
 
-	if code, _ := evidence(&hq, uuid.NewString()); code != 404 {
+	if code, _ := evidence(hq(), uuid.NewString()); code != 404 {
 		t.Error("unknown alert")
 	}
 
 	// the resolution: at least one candidate for an alert without a policy, and candidates only
-	resolve := func(alert string, v int, ids ...string) (int, map[string]any) {
+	resolve := func(alert string, version int, ids ...string) (int, map[string]any) {
 		list := "[]"
 		if len(ids) > 0 {
 			list = `["` + ids[0]
@@ -230,29 +237,29 @@ func TestAlertEvidence(t *testing.T) {
 
 		return write(
 			srv,
-			&hq,
+			hq(),
 			"alerts.resolve",
 			`{"alertId":"`+alert+`","resolutionReason":"window closed","resolutionEvidenceIds":`+list+`}`,
-			v,
+			version,
 		)
 	}
-	for name, c := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		ids []string
 		key string
 	}{
 		"none":             {nil, "errors.evidence_required"},
-		"unknown":          {[]string{uuid.NewString()}, "errors.evidence_unknown"},
-		"before detection": {[]string{before}, "errors.evidence_unknown"},
-		"suspect reading":  {[]string{suspect}, "errors.evidence_unknown"},
-		"estimate":         {[]string{estimate}, "errors.evidence_unknown"},
+		"unknown":          {[]string{uuid.NewString()}, keyEvidenceUnknown},
+		"before detection": {[]string{before}, keyEvidenceUnknown},
+		"suspect reading":  {[]string{suspect}, keyEvidenceUnknown},
+		"estimate":         {[]string{estimate}, keyEvidenceUnknown},
 		"twice":            {[]string{after, after}, apperr.KeyInvalid},
-		"one of two wrong": {[]string{after, uuid.NewString()}, "errors.evidence_unknown"},
+		"one of two wrong": {[]string{after, uuid.NewString()}, keyEvidenceUnknown},
 	} {
 		if code, m := resolve(
 			free,
 			1,
-			c.ids...); code != 422 ||
-			asObj(t, m["fieldErrors"])["resolutionEvidenceIds"] != c.key {
+			testCase.ids...); code != 422 ||
+			asObj(t, m["fieldErrors"])["resolutionEvidenceIds"] != testCase.key {
 			t.Errorf("%s: %d %v", name, code, m)
 		}
 	}
@@ -263,7 +270,7 @@ func TestAlertEvidence(t *testing.T) {
 		after,
 		detected,
 	); code != 200 ||
-		data(res)["status"] != "resolved" {
+		data(res)["status"] != statusResolved {
 		t.Fatalf("resolve with candidates: %d %v", code, res)
 	}
 
@@ -293,11 +300,11 @@ func TestAlertEvidence(t *testing.T) {
 		unit,
 		org,
 		policy,
-		clock.Add(-20*time.Minute),
+		clock().Add(-20*time.Minute),
 	)
 
-	_, resp = evidence(&hq, ruled)
-	if len(items(resp)) != 1 || items(resp)[0]["id"] != after {
+	_, resp = evidence(hq(), ruled)
+	if len(items(t, resp)) != 1 || items(t, resp)[0]["id"] != after {
 		t.Errorf("rule alert: temperature readings only: %v", resp)
 	}
 
@@ -310,7 +317,7 @@ func TestAlertEvidence(t *testing.T) {
 		t.Errorf("another metric is not the rule alert's evidence: %d %s", code, fields(res))
 	}
 
-	if code, m := resolve(ruled, 1); code != 200 || data(m)["status"] != "resolved" {
+	if code, m := resolve(ruled, 1); code != 200 || data(m)["status"] != statusResolved {
 		t.Errorf("policy alert by hand: %d %v", code, m)
 	}
 }

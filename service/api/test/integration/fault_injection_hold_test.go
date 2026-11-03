@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -9,25 +9,27 @@ import (
 // TestHoldRollsBackWhenTheStatusCannotBeWritten: a job that cannot be put on hold keeps its status and reason. The
 // operation fails as a server error, and the job stays in progress with no hold reason, because the database rolls the
 // transaction back (jobs.hold; the status write fails).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestHoldRollsBackWhenTheStatusCannotBeWritten(t *testing.T) {
 	srv := server(t)
 	_, res := write(
 		srv,
-		&customerA,
+		customerA(),
 		"jobs.create",
 		jobBody(seed.ID("unit-non-rto").String(), nil),
 		0,
 	)
 	job := asStr(t, data(res)["id"])
 	owner(t, `UPDATE maintenance.jobs SET status = 'in_progress' WHERE id = $1`, job)
-	_, res = post(srv, &hq, "jobs.get", `{"jobId":"`+job+`"}`)
-	version := ver(res)
+	_, res = post(srv, hq(), "jobs.get", `{"jobId":"`+job+`"}`)
+	version := ver(t, res)
 
 	broken := injectAt(t, "UPDATE maintenance.jobs SET status = 'on_hold'")
 
 	code, res := write(
 		broken,
-		&hq,
+		hq(),
 		"jobs.hold",
 		`{"jobId":"`+job+`","reason":"waiting for parts"}`,
 		version,
@@ -36,9 +38,9 @@ func TestHoldRollsBackWhenTheStatusCannotBeWritten(t *testing.T) {
 		t.Fatalf("hold with a failing status write: %d %v, want a server error", code, res)
 	}
 
-	_, res = post(srv, &hq, "jobs.get", `{"jobId":"`+job+`"}`)
-	if data(res)["status"] != "in_progress" || data(res)["holdReason"] != nil ||
-		ver(res) != version {
+	_, res = post(srv, hq(), "jobs.get", `{"jobId":"`+job+`"}`)
+	if data(res)["status"] != statusInProgress || data(res)["holdReason"] != nil ||
+		ver(t, res) != version {
 		t.Errorf("a failed hold changed the job: %v", res)
 	}
 }

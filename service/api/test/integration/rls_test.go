@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -15,6 +15,8 @@ import (
 // (IR376). A partition is a table of its own; read directly, it does not apply its parent's policy. So a partition
 // without one would show a service role every tenant's rows. platform.* stays outside: the relay and the scheduler
 // read it across tenants and set the tenant per item.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestTenantIsolationEverywhere(t *testing.T) {
 	ctx := context.Background()
 
@@ -22,7 +24,7 @@ func TestTenantIsolationEverywhere(t *testing.T) {
 	if err != nil {
 		t.Skip(err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	rows, err := conn.Query(
 		ctx,
@@ -98,13 +100,13 @@ func TestTenantIsolationEverywhere(t *testing.T) {
 	if err != nil {
 		t.Skip(err)
 	}
-	defer app.Close(ctx)
+	defer func() { _ = app.Close(ctx) }()
 
 	txn, err := app.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer txn.Rollback(ctx)
+	defer func() { _ = txn.Rollback(ctx) }()
 
 	_, execErr := txn.Exec(
 		ctx,
@@ -116,16 +118,16 @@ func TestTenantIsolationEverywhere(t *testing.T) {
 	}
 
 	for _, table := range []string{"monitoring.measurements", "monitoring.measurements_default"} {
-		var n int
+		var total int
 
 		err := txn.QueryRow(ctx, `SELECT count(*) FROM `+table+` WHERE event_id = $1`, event).
-			Scan(&n)
+			Scan(&total)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if n != 0 {
-			t.Errorf("%s shows tenant A's service role %d row(s) of tenant B", table, n)
+		if total != 0 {
+			t.Errorf("%s shows tenant A's service role %d row(s) of tenant B", table, total)
 		}
 	}
 }
@@ -134,6 +136,8 @@ func TestTenantIsolationEverywhere(t *testing.T) {
 // tenant data like a business table. Its readers (the write pipeline and writes.getResult) all run in a tenant
 // transaction, so it is under the same row-level security; the relay's platform.outbox and the scheduler's
 // platform.scheduled_items stay outside (IR377).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestIdempotencyKeysIsolated(t *testing.T) {
 	ctx := context.Background()
 
@@ -168,13 +172,13 @@ func TestIdempotencyKeysIsolated(t *testing.T) {
 	if err != nil {
 		t.Skip(err)
 	}
-	defer app.Close(ctx)
+	defer func() { _ = app.Close(ctx) }()
 
 	txn, err := app.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer txn.Rollback(ctx)
+	defer func() { _ = txn.Rollback(ctx) }()
 
 	_, execErr := txn.Exec(
 		ctx,
@@ -185,15 +189,15 @@ func TestIdempotencyKeysIsolated(t *testing.T) {
 		t.Fatal(execErr)
 	}
 
-	var n int
+	var total int
 
 	scanErr := txn.QueryRow(ctx, `SELECT count(*) FROM platform.idempotency_keys WHERE key = $1`, key).
-		Scan(&n)
+		Scan(&total)
 	if scanErr != nil {
 		t.Fatal(scanErr)
 	}
 
-	if n != 0 {
-		t.Errorf("tenant A's service role reads %d stored response(s) of tenant B", n)
+	if total != 0 {
+		t.Errorf("tenant A's service role reads %d stored response(s) of tenant B", total)
 	}
 }

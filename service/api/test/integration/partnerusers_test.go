@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -24,98 +24,100 @@ import (
 // TestPartnerUsers (FR-P11, IR461): a contractor lists its company's accounts, adds contractors and technicians (the
 // account is created at once and listed as invited until its first sign-in), resends the set-up e-mail and removes the
 // account; another company's accounts are NOT_FOUND, and other roles are refused.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPartnerUsers(t *testing.T) {
 	srv := server(t)
 	email := "tech-" + uuid.NewString()[:8] + "@example.com"
 	save := func(a *actor, body string, v int) (int, map[string]any) {
 		return write(srv, a, "partnerUsers.save", body, v)
 	}
-	access := `,"displayName":"New Tech","accessUntil":"` + clock.Add(30*24*time.Hour).
+	access := `,"displayName":"New Tech","accessUntil":"` + clock().Add(30*24*time.Hour).
 		Format(time.RFC3339) +
 		`"`
 	invite := `{"email":"` + email + `","partnerRole":"technician"` + access + `}`
 	want := map[string]string{ // the field each case is refused for
-		"bad email":    "email=error.invalid",
-		"bad role":     "partnerRole=error.invalid",
-		"bad status":   "status=error.invalid",
-		"blank reason": "reason=error.length",
+		caseBadEmail:    "email=error.invalid",
+		caseBadRole:     "partnerRole=error.invalid",
+		caseBadStatus:   "status=error.invalid",
+		caseBlankReason: refusedReasonLength,
 	}
 
-	for name, b := range map[string]string{
-		"bad email":    `{"email":"not-an-email","partnerRole":"technician"}`,
-		"bad role":     `{"email":"` + email + `","partnerRole":"admin"}`,
-		"bad status":   `{"email":"` + email + `","partnerRole":"technician","status":"invited"}`,
-		"blank reason": `{"email":"` + email + `","partnerRole":"technician","reason":" "}`,
+	for name, body := range map[string]string{
+		caseBadEmail:    `{"email":"not-an-email","partnerRole":"technician"}`,
+		caseBadRole:     `{"email":"` + email + `","partnerRole":"admin"}`,
+		caseBadStatus:   `{"email":"` + email + `","partnerRole":"technician","status":"invited"}`,
+		caseBlankReason: `{"email":"` + email + `","partnerRole":"technician","reason":" "}`,
 	} {
-		code, m := save(&contrA, b, 0)
+		code, m := save(contrA(), body, 0)
 		refusal(t, name, code, m, want[name])
 	}
 
 	if code, res := save(
-		&contrA,
+		contrA(),
 		`{"email":"`+email+`","partnerRole":"technician","status":"active"`+access+`}`,
 		0,
 	); code != 422 ||
-		fields(res) != "status=error.notAllowed" {
+		fields(res) != refusedStatusNotAllowed {
 		t.Errorf("status on invite: %d %s", code, fields(res))
 	}
 
-	for _, a := range []*actor{&techA, &customerA, &hq} {
-		if code, _ := post(srv, a, "partnerUsers.list", `{"limit":10}`); code != 403 {
-			t.Errorf("%s lists contractor users: %d", a.membership, code)
+	for _, who := range []*actor{techA(), customerA(), hq()} {
+		if code, _ := post(srv, who, "partnerUsers.list", `{"limit":10}`); code != 403 {
+			t.Errorf("%s lists contractor users: %d", who.membership, code)
 		}
 
-		if code, _ := save(a, invite, 0); code != 403 {
-			t.Errorf("%s invites: %d", a.membership, code)
+		if code, _ := save(who, invite, 0); code != 403 {
+			t.Errorf("%s invites: %d", who.membership, code)
 		}
 	}
 
-	code, resp := save(&contrA, invite, 0)
-	if code != 200 || data(resp)["status"] != "invited" ||
-		data(resp)["partnerRole"] != "technician" ||
+	code, resp := save(contrA(), invite, 0)
+	if code != 200 || data(resp)["status"] != statusInvited ||
+		data(resp)["partnerRole"] != roleTechnician ||
 		data(resp)["membershipId"] == nil ||
 		data(resp)["organizationId"] != seed.ID("org-contractor-a").String() ||
 		data(resp)["invitedByMembershipId"] != seed.ID("contractor-a").String() {
 		t.Fatalf("invite: %d %v", code, resp)
 	}
 
-	id := asStr(t, data(resp)["id"])
+	accountID := asStr(t, data(resp)["id"])
 
 	if code, res := save(
-		&contrA,
+		contrA(),
 		strings.Replace(invite, email, strings.ToUpper(email[:1])+email[1:], 1),
 		0,
 	); code != 422 ||
-		fields(res) != "email=errors.email_taken" {
+		fields(res) != refusedEmailTaken {
 		t.Errorf("duplicate email (case-insensitive): %d %s", code, fields(res))
 	}
 
 	if code, res := save(
-		&contrB,
+		contrB(),
 		invite,
 		0,
 	); code != 422 ||
-		fields(res) != "email=errors.email_taken" { // one person, one account (IR461)
+		fields(res) != refusedEmailTaken { // one person, one account (IR461)
 		t.Errorf("same email at company B: %d %s", code, fields(res))
 	}
 
-	_, resp = post(srv, &contrA, "partnerUsers.list", `{"limit":100}`)
+	_, resp = post(srv, contrA(), "partnerUsers.list", `{"limit":100}`)
 	byMembership := map[string]map[string]any{}
 
-	for _, it := range items(resp) {
-		if it["organizationId"] != seed.ID("org-contractor-a").String() {
-			t.Fatalf("another company's account listed: %v", it)
+	for _, item := range items(t, resp) {
+		if item["organizationId"] != seed.ID("org-contractor-a").String() {
+			t.Fatalf("another company's account listed: %v", item)
 		}
 
-		if mid, ok := it["membershipId"].(string); ok {
-			byMembership[mid] = it
+		if mid, ok := item["membershipId"].(string); ok {
+			byMembership[mid] = item
 		}
 	}
 
 	self, tech := byMembership[seed.ID("contractor-a").String()], byMembership[seed.ID("tech-external-a").String()]
-	if self == nil || self["partnerRole"] != "contractor" || self["status"] != "active" ||
+	if self == nil || self["partnerRole"] != roleContractor || self["status"] != statusActive ||
 		tech == nil ||
-		tech["partnerRole"] != "technician" ||
+		tech["partnerRole"] != roleTechnician ||
 		tech["accessUntil"] == nil {
 		t.Fatalf("seed accounts listed: %v", resp)
 	}
@@ -126,31 +128,31 @@ func TestPartnerUsers(t *testing.T) {
 
 	if _, res := post(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.list",
 		`{"filters":{"status":"invited","partnerRole":"technician","search":"`+email[:12]+`"},"limit":100}`,
 	); len(
-		items(res),
+		items(t, res),
 	) != 1 {
 		t.Errorf("filtered list: %v", res)
 	}
 
 	if code, res := post(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.list",
 		`{"filters":{"partnerRole":"owner"}}`,
 	); code != 422 ||
-		fields(res) != "filters=error.invalid" {
+		fields(res) != refusedFiltersInvalid {
 		t.Errorf("bad role filter: %d %s", code, fields(res))
 	}
 	// resend: not sooner than 5 minutes after the last invitation e-mail (IR423), then queued again (IR418), pending
 	// invites of the own company
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.resendInvite",
-		`{"id":"`+id+`"}`,
+		`{"id":"`+accountID+`"}`,
 		0,
 	); code != 429 || res["messageKey"] != "errors.invite_recently_sent" ||
 		res["retryAfterSeconds"] != float64(300) {
@@ -160,23 +162,23 @@ func TestPartnerUsers(t *testing.T) {
 	owner(
 		t,
 		`UPDATE identity.partner_users SET last_invite_sent_at = last_invite_sent_at - interval '5 minutes' WHERE id = $1`,
-		id,
+		accountID,
 	)
 
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.resendInvite",
-		`{"id":"`+id+`"}`,
+		`{"id":"`+accountID+`"}`,
 		0,
-	); code != 200 || data(res)["deliveryState"] != "queued" ||
+	); code != 200 || data(res)["deliveryState"] != statusQueued ||
 		asObj(t, data(res)["target"])["kind"] != "partner_user" {
 		t.Fatalf("resend: %d %v", code, res)
 	}
 
 	if code, _ := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.resendInvite",
 		`{"id":"`+asStr(t, tech["id"])+`"}`,
 		0,
@@ -186,37 +188,37 @@ func TestPartnerUsers(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&contrB,
+		contrB(),
 		"partnerUsers.resendInvite",
-		`{"id":"`+id+`"}`,
+		`{"id":"`+accountID+`"}`,
 		0,
 	); code != 404 {
 		t.Error("resend another company's invite")
 	}
 	// an account not signed in yet: its e-mail and role are fixed (IR461), its status is not set by hand
-	upd := func(id, email, role, status string, v int) (int, map[string]any) {
-		st := ""
+	upd := func(partnerUserID, email, role, status string, version int) (int, map[string]any) {
+		state := ""
 		if status != "" {
-			st = `,"status":"` + status + `"`
+			state = `,"status":"` + status + `"`
 		}
 
 		return save(
-			&contrA,
-			`{"id":"`+id+`","email":"`+email+`","partnerRole":"`+role+`"`+st+`,"reason":"correction"}`,
-			v,
+			contrA(),
+			`{"id":"`+partnerUserID+`","email":"`+email+`","partnerRole":"`+role+`"`+state+`,"reason":"correction"}`,
+			version,
 		)
 	}
 	if code, res := save(
-		&contrA,
-		`{"id":"`+id+`","email":"`+email+`","partnerRole":"contractor"}`,
+		contrA(),
+		`{"id":"`+accountID+`","email":"`+email+`","partnerRole":"contractor"}`,
 		1,
 	); code != 422 ||
-		fields(res) != "reason=error.required" {
+		fields(res) != refusedReasonRequired {
 		t.Errorf("update without reason: %d %s", code, fields(res))
 	}
 
 	if code, res := upd(
-		id,
+		accountID,
 		email,
 		"technician",
 		"active",
@@ -226,23 +228,23 @@ func TestPartnerUsers(t *testing.T) {
 		t.Errorf("activate a pending invite: %d %v", code, res)
 	}
 
-	if code, _ := upd(id, email, "contractor", "", 5); code != 409 {
+	if code, _ := upd(accountID, email, "contractor", "", 5); code != 409 {
 		t.Error("stale version")
 	}
 
 	if code, res := upd(
-		id,
+		accountID,
 		"fixed-"+email,
 		"technician",
 		"",
 		1,
 	); code != 422 ||
-		fields(res) != "email=error.immutable" {
+		fields(res) != refusedEmailImmutable {
 		t.Errorf("change the e-mail: %d %s", code, fields(res))
 	}
 
 	if code, res := upd(
-		id,
+		accountID,
 		email,
 		"contractor",
 		"",
@@ -253,52 +255,52 @@ func TestPartnerUsers(t *testing.T) {
 	}
 
 	if code, res := upd(
-		id,
+		accountID,
 		email,
 		"technician",
 		"",
 		1,
-	); code != 200 || data(res)["status"] != "invited" ||
-		ver(res) != 2 {
+	); code != 200 || data(res)["status"] != statusInvited ||
+		ver(t, res) != 2 {
 		t.Fatalf("save unchanged: %d %v", code, res)
 	}
 
 	if code, _ := save(
-		&contrB,
-		`{"id":"`+id+`","email":"`+email+`","partnerRole":"technician","reason":"x"}`,
+		contrB(),
+		`{"id":"`+accountID+`","email":"`+email+`","partnerRole":"technician","reason":"x"}`,
 		2,
 	); code != 404 {
 		t.Error("company B changes company A's invite")
 	}
 	// the caller's own account is not changed here
-	sv := int(asNum(t, self["version"]))
+	selfVersion := int(asNum(t, self["version"]))
 	if code, res := upd(
 		asStr(t, self["id"]),
 		asStr(t, self["email"]),
 		"contractor",
 		"disabled",
-		sv,
+		selfVersion,
 	); code != 409 ||
-		res["messageKey"] != "errors.own_account" {
+		res["messageKey"] != keyOwnAccount {
 		t.Errorf("disable the own account: %d %v", code, res)
 	}
 
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.remove",
 		`{"id":"`+asStr(t, self["id"])+`","reason":"leaving"}`,
-		sv,
+		selfVersion,
 	); code != 409 ||
-		res["messageKey"] != "errors.own_account" {
+		res["messageKey"] != keyOwnAccount {
 		t.Errorf("remove the own account: %d %v", code, res)
 	}
 
 	if code, _ := write(
 		srv,
-		&contrB,
+		contrB(),
 		"partnerUsers.remove",
-		`{"id":"`+id+`","reason":"x"}`,
+		`{"id":"`+accountID+`","reason":"x"}`,
 		2,
 	); code != 404 {
 		t.Error("company B removes company A's invite")
@@ -306,9 +308,9 @@ func TestPartnerUsers(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.remove",
-		`{"id":"`+id+`","reason":"sent to the wrong person"}`,
+		`{"id":"`+accountID+`","reason":"sent to the wrong person"}`,
 		2,
 	); code != 200 ||
 		data(res)["deleted"] != true {
@@ -317,9 +319,9 @@ func TestPartnerUsers(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.remove",
-		`{"id":"`+id+`","reason":"again"}`,
+		`{"id":"`+accountID+`","reason":"again"}`,
 		2,
 	); code != 404 {
 		t.Error("remove twice")
@@ -329,28 +331,30 @@ func TestPartnerUsers(t *testing.T) {
 // TestPartnerUserAccess: disabling a technician's account ends its membership now and keeps its access end; enabling
 // it again brings that end back; an accepted account's email and role are fixed; the company keeps an active
 // contractor.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPartnerUserAccess(t *testing.T) {
 	srv := server(t)
 	// the seed technician holds an active assignment: closing that account is refused (IR421)
 	var (
 		booked string
-		bv     int
+		bookedVersion     int
 	)
 	ownerScan(
 		t,
 		`SELECT id::text, version FROM identity.partner_users WHERE membership_id = $1`,
 		[]any{seed.ID("tech-external-a")},
 		&booked,
-		&bv,
+		&bookedVersion,
 	)
 
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.save",
 		`{"id":"`+booked+`","email":"tech-external-a@ac.local","partnerRole":"technician","status":"disabled","reason":"on `+
 			`leave"}`,
-		bv,
+		bookedVersion,
 	); code != 409 ||
 		res["messageKey"] != "errors.technician_booked" {
 		t.Errorf("disable a booked technician: %d %v", code, res)
@@ -358,10 +362,10 @@ func TestPartnerUserAccess(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.remove",
 		`{"id":"`+booked+`","reason":"left"}`,
-		bv,
+		bookedVersion,
 	); code != 409 ||
 		res["messageKey"] != "errors.technician_booked" {
 		t.Errorf("remove a booked technician: %d %v", code, res)
@@ -371,14 +375,14 @@ func TestPartnerUserAccess(t *testing.T) {
 
 	code, resp := write(
 		srv,
-		&hq,
+		hq(),
 		"members.save",
 		`{"userId":"`+user+`","organizationId":"`+seed.ID("org-contractor-a").
 			String()+
 			`","role":"technician","employment":"external",
-		"permissions":[],"scopes":[],"validFrom":"`+clock.Add(-time.Hour).
+		"permissions":[],"scopes":[],"validFrom":"`+clock().Add(-time.Hour).
 			Format(time.RFC3339)+
-			`","validUntil":"`+clock.Add(30*24*time.Hour).
+			`","validUntil":"`+clock().Add(30*24*time.Hour).
 			Format(time.RFC3339)+
 			`","reason":"contract"}`,
 		0,
@@ -416,34 +420,34 @@ func TestPartnerUserAccess(t *testing.T) {
 	})
 
 	var (
-		id, email string
-		v         int
+		partnerUserID, email string
+		userVersion         int
 	)
 	ownerScan(
 		t,
 		`SELECT id::text, email::text, version FROM identity.partner_users WHERE membership_id = $1`,
 		[]any{membership},
-		&id,
+		&partnerUserID,
 		&email,
-		&v,
+		&userVersion,
 	)
 
-	save := func(email, role, status string, v int) (int, map[string]any) {
+	save := func(email, role, status string, version int) (int, map[string]any) {
 		return write(
 			srv,
-			&contrA,
+			contrA(),
 			"partnerUsers.save",
-			`{"id":"`+id+`","email":"`+email+`","partnerRole":"`+role+`","status":"`+status+`","reason":"on leave"}`,
-			v,
+			`{"id":"`+partnerUserID+`","email":"`+email+`","partnerRole":"`+role+`","status":"`+status+`","reason":"on leave"}`,
+			version,
 		)
 	}
 	if code, res := save(
 		"other@example.com",
 		"technician",
 		"active",
-		v,
+		userVersion,
 	); code != 422 ||
-		fields(res) != "email=error.immutable" {
+		fields(res) != refusedEmailImmutable {
 		t.Errorf("change an accepted email: %d %s", code, fields(res))
 	}
 
@@ -451,14 +455,14 @@ func TestPartnerUserAccess(t *testing.T) {
 		email,
 		"contractor",
 		"active",
-		v,
+		userVersion,
 	); code != 422 ||
 		fields(res) != "partnerRole=error.immutable" {
 		t.Errorf("change an accepted role: %d %s", code, fields(res))
 	}
 	// the same address in capitals is no change: the stored spelling stays
-	code, resp = save(strings.ToUpper(email), "technician", "disabled", v)
-	if code != 200 || data(resp)["status"] != "disabled" || data(resp)["email"] != email ||
+	code, resp = save(strings.ToUpper(email), "technician", "disabled", userVersion)
+	if code != 200 || data(resp)["status"] != statusDisabled || data(resp)["email"] != email ||
 		data(resp)["accessUntil"] != until.UTC().Format(time.RFC3339) {
 		t.Fatalf("disable: %d %v", code, resp)
 	}
@@ -471,12 +475,12 @@ func TestPartnerUserAccess(t *testing.T) {
 		&now,
 	)
 
-	if !now.Equal(clock) {
-		t.Errorf("membership after disabling: %v, want %v", now, clock)
+	if !now.Equal(clock()) {
+		t.Errorf("membership after disabling: %v, want %v", now, clock())
 	}
 
-	code, resp = save(email, "technician", "active", v+1)
-	if code != 200 || data(resp)["status"] != "active" {
+	code, resp = save(email, "technician", "active", userVersion+1)
+	if code != 200 || data(resp)["status"] != statusActive {
 		t.Fatalf("enable: %d %v", code, resp)
 	}
 
@@ -491,22 +495,22 @@ func TestPartnerUserAccess(t *testing.T) {
 		t.Errorf("membership after enabling: %v, want %v", now, until)
 	}
 	// an access end that has passed while disabled is not brought back
-	if code, _ := save(email, "technician", "disabled", v+2); code != 200 {
+	if code, _ := save(email, "technician", "disabled", userVersion+2); code != 200 {
 		t.Fatal("disable again")
 	}
 
 	owner(
 		t,
 		`UPDATE identity.partner_users SET access_until = $2 WHERE id = $1`,
-		id,
-		clock.Add(-time.Minute),
+		partnerUserID,
+		clock().Add(-time.Minute),
 	)
 
 	if code, res := save(
 		email,
 		"technician",
 		"active",
-		v+3,
+		userVersion+3,
 	); code != 409 ||
 		res["messageKey"] != "errors.access_expired" {
 		t.Errorf("enable after the access end: %d %v", code, res)
@@ -538,7 +542,7 @@ func TestPartnerUserAccess(t *testing.T) {
 			nil,
 		),
 		"boss-"+other[:8]+"@example.com",
-		clock,
+		clock(),
 		seed.ID("contractor-a"),
 	)
 	owner(
@@ -557,7 +561,7 @@ func TestPartnerUserAccess(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.remove",
 		`{"id":"`+other+`","reason":"leaving"}`,
 		1,
@@ -571,8 +575,10 @@ func TestPartnerUserAccess(t *testing.T) {
 // the technicians' permissions, no unit scope and the contractor's access end are created; the identity consumer
 // opens the provider account and sends the set-up e-mail; the first sign-in makes the account active; the access end
 // moves within a year; removing the account turns its sign-in off.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPartnerAccountCreated(t *testing.T) {
-	fake := &fakeIdP{
+	fake := &fakeIDP{
 		mu:         sync.Mutex{},
 		subjects:   nil,
 		err:        nil,
@@ -598,9 +604,9 @@ func TestPartnerAccountCreated(t *testing.T) {
 	}
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.save",
-		body(clock.Add(367*24*time.Hour)),
+		body(clock().Add(367*24*time.Hour)),
 		0,
 	); code != 422 ||
 		fields(res) != "accessUntil=error.range" {
@@ -609,9 +615,9 @@ func TestPartnerAccountCreated(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.save",
-		`{"email":"`+email+`","partnerRole":"contractor","displayName":"Boss","accessUntil":"`+clock.Add(time.Hour).
+		`{"email":"`+email+`","partnerRole":"contractor","displayName":"Boss","accessUntil":"`+clock().Add(time.Hour).
 			Format(time.RFC3339)+
 			`"}`,
 		0,
@@ -620,15 +626,15 @@ func TestPartnerAccountCreated(t *testing.T) {
 		t.Errorf("access end of a contractor account: %d %s", code, fields(res))
 	}
 
-	until := clock.Add(30 * 24 * time.Hour)
+	until := clock().Add(30 * 24 * time.Hour)
 
-	code, resp := write(srv, &contrA, "partnerUsers.save", body(until), 0)
-	if code != 200 || data(resp)["status"] != "invited" || data(resp)["membershipId"] == nil ||
+	code, resp := write(srv, contrA(), "partnerUsers.save", body(until), 0)
+	if code != 200 || data(resp)["status"] != statusInvited || data(resp)["membershipId"] == nil ||
 		data(resp)["displayName"] != "Added Tech" {
 		t.Fatalf("add: %d %v", code, resp)
 	}
 
-	id, membership := asStr(t, data(resp)["id"]), asStr(t, data(resp)["membershipId"])
+	partnerUserID, membership := asStr(t, data(resp)["id"]), asStr(t, data(resp)["membershipId"])
 
 	var (
 		role, employment string
@@ -649,7 +655,7 @@ func TestPartnerAccountCreated(t *testing.T) {
 		&scopes,
 	)
 
-	if role != "technician" || employment != "external" || !end.Equal(until) || perms != 4 ||
+	if role != roleTechnician || employment != "external" || !end.Equal(until) || perms != 4 ||
 		scopes != 0 {
 		t.Errorf("membership: %s %s %v perms %d scopes %d", role, employment, end, perms, scopes)
 	}
@@ -666,7 +672,7 @@ func TestPartnerAccountCreated(t *testing.T) {
 		}
 	}
 
-	if len(created) != 1 || created[0].Role != "technician" ||
+	if len(created) != 1 || created[0].Role != roleTechnician ||
 		created[0].Membership != membership ||
 		!strings.HasSuffix(created[0].RedirectURI, "/login") ||
 		!slices.Contains(fake.setups, "sub-"+email) {
@@ -687,7 +693,7 @@ func TestPartnerAccountCreated(t *testing.T) {
 		t.Errorf("subject stored: %q", sub)
 	}
 	// the first sign-in makes the account active
-	(&auth.Authenticator{DB: srv.DB, Now: clockFunc, Verifier: nil, Source: nil}).RecordSignIn(
+	(&auth.Authenticator{DB: srv.DB, Now: clock, Verifier: nil, Source: nil}).RecordSignIn(
 		context.Background(),
 		&ops.Principal{
 			TenantID: seed.ID("tenant-a"),
@@ -703,34 +709,34 @@ func TestPartnerAccountCreated(t *testing.T) {
 			Timezone:          "",
 			SessionsRevokedAt: nil,
 		},
-		clock,
+		clock(),
 	)
 
 	var (
 		status string
-		v      int
+		version      int
 	)
 	ownerScan(
 		t,
 		`SELECT status, version FROM identity.partner_users WHERE id = $1`,
-		[]any{id},
+		[]any{partnerUserID},
 		&status,
-		&v,
+		&version,
 	)
 
-	if status != "active" {
+	if status != statusActive {
 		t.Fatalf("after the first sign-in: %s", status)
 	}
 	// the access end moves (at most a year ahead)
-	later := clock.Add(200 * 24 * time.Hour)
+	later := clock().Add(200 * 24 * time.Hour)
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.save",
-		`{"id":"`+id+`","email":"`+email+`","partnerRole":"technician","accessUntil":"`+later.Format(
+		`{"id":"`+partnerUserID+`","email":"`+email+`","partnerRole":"technician","accessUntil":"`+later.Format(
 			time.RFC3339,
 		)+`","reason":"contract extended"}`,
-		v,
+		version,
 	); code != 200 {
 		t.Fatalf("extend: %d %v", code, res)
 	}
@@ -748,10 +754,10 @@ func TestPartnerAccountCreated(t *testing.T) {
 	// removed: the membership ends and the sign-in is turned off
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.remove",
-		`{"id":"`+id+`","reason":"left the company"}`,
-		v+1,
+		`{"id":"`+partnerUserID+`","reason":"left the company"}`,
+		version+1,
 	); code != 200 {
 		t.Fatalf("remove: %d %v", code, res)
 	}
@@ -778,7 +784,7 @@ func firstSignIn(t *testing.T, srv *apiserver.Server, membership string) {
 		[]any{membership},
 		&user,
 	)
-	(&auth.Authenticator{DB: srv.DB, Now: clockFunc, Verifier: nil, Source: nil}).RecordSignIn(
+	(&auth.Authenticator{DB: srv.DB, Now: clock, Verifier: nil, Source: nil}).RecordSignIn(
 		context.Background(),
 		&ops.Principal{
 			TenantID: seed.ID("tenant-a"),
@@ -794,21 +800,23 @@ func firstSignIn(t *testing.T, srv *apiserver.Server, membership string) {
 			Timezone:          "",
 			SessionsRevokedAt: nil,
 		},
-		clock,
+		clock(),
 	)
 }
 
 // TestPartnerResendAfterAccessEnd: no set-up e-mail goes to a technician whose access ended before they signed in; once
 // the contractor moves the end, it goes again (IR461).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPartnerResendAfterAccessEnd(t *testing.T) {
 	srv := server(t)
 	email := "late-" + uuid.NewString()[:8] + "@example.com"
 
 	code, resp := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.save",
-		`{"email":"`+email+`","partnerRole":"technician","displayName":"Late Tech","accessUntil":"`+clock.Add(24*time.Hour).
+		`{"email":"`+email+`","partnerRole":"technician","displayName":"Late Tech","accessUntil":"`+clock().Add(24*time.Hour).
 			Format(time.RFC3339)+
 			`"}`,
 		0,
@@ -817,25 +825,25 @@ func TestPartnerResendAfterAccessEnd(t *testing.T) {
 		t.Fatalf("add: %d %v", code, resp)
 	}
 
-	id, membership := asStr(t, data(resp)["id"]), asStr(t, data(resp)["membershipId"])
+	partnerUserID, membership := asStr(t, data(resp)["id"]), asStr(t, data(resp)["membershipId"])
 	owner(
 		t,
 		`UPDATE identity.memberships SET valid_from = $2::timestamptz - interval '2 days', valid_until = $2::timestamptz -
 			interval '1 hour' WHERE id = $1`,
 		membership,
-		clock,
+		clock(),
 	)
 	owner(
 		t,
 		`UPDATE identity.partner_users SET last_invite_sent_at = NULL WHERE id = $1`,
-		id,
+		partnerUserID,
 	) // past the 5-minute wait (IR423)
 
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.resendInvite",
-		`{"id":"`+id+`"}`,
+		`{"id":"`+partnerUserID+`"}`,
 		0,
 	); code != 409 ||
 		res["messageKey"] != "errors.access_expired" {
@@ -844,9 +852,9 @@ func TestPartnerResendAfterAccessEnd(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.save",
-		`{"id":"`+id+`","email":"`+email+`","partnerRole":"technician","accessUntil":"`+clock.Add(48*time.Hour).
+		`{"id":"`+partnerUserID+`","email":"`+email+`","partnerRole":"technician","accessUntil":"`+clock().Add(48*time.Hour).
 			Format(time.RFC3339)+
 			`","reason":"starts later"}`,
 		1,
@@ -856,9 +864,9 @@ func TestPartnerResendAfterAccessEnd(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.resendInvite",
-		`{"id":"`+id+`"}`,
+		`{"id":"`+partnerUserID+`"}`,
 		0,
 	); code != 200 {
 		t.Errorf("resend after the move: %d %v", code, res)
@@ -867,32 +875,34 @@ func TestPartnerResendAfterAccessEnd(t *testing.T) {
 
 // TestPartnerUserInputs: the inputs of partnerUsers.remove and resendInvite name their field, an invite takes no
 // reason, a removal needs the current version, and removing an account ends its membership now.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPartnerUserInputs(t *testing.T) {
 	srv := server(t)
-	for name, c := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		op, body, want string
 	}{
-		"remove without id": {"partnerUsers.remove", `{"id":"00000000-0000-0000-0000-000000000000",` +
+		"remove without id": {opPartnerUsersRemove, `{"id":"00000000-0000-0000-0000-000000000000",` +
 			`"reason":"x"}`, "id=error.required"},
-		"remove long reason": {"partnerUsers.remove", `{"id":"` + uuid.NewString() + `","reason":"` +
-			strings.Repeat("x", 1001) + `"}`, "reason=error.length"},
+		"remove long reason": {opPartnerUsersRemove, `{"id":"` + uuid.NewString() + `","reason":"` +
+			strings.Repeat("x", 1001) + `"}`, refusedReasonLength},
 		"resend without id": {
-			"partnerUsers.resendInvite", `{"id":"00000000-0000-0000-0000-000000000000"}`,
+			opPartnerUsersResendInvite, `{"id":"00000000-0000-0000-0000-000000000000"}`,
 			"id=error.required",
 		},
-		"reason on an invite": {"partnerUsers.save", `{"email":"x-` + uuid.NewString()[:8] + `@example.com",` +
+		"reason on an invite": {opPartnerUsersSave, `{"email":"x-` + uuid.NewString()[:8] + `@example.com",` +
 			`"partnerRole":"contractor","displayName":"X","reason":"why"}`, "reason=error.notAllowed"},
 	} {
-		code, m := write(srv, &contrA, c.op, c.body, 1)
-		if c.op == "partnerUsers.resendInvite" || c.op == "partnerUsers.save" {
-			code, m = write(srv, &contrA, c.op, c.body, 0)
+		code, m := write(srv, contrA(), testCase.op, testCase.body, 1)
+		if testCase.op == opPartnerUsersResendInvite || testCase.op == opPartnerUsersSave {
+			code, m = write(srv, contrA(), testCase.op, testCase.body, 0)
 		}
 
-		refusal(t, name, code, m, c.want)
+		refusal(t, name, code, m, testCase.want)
 	}
 	// an account of the company (a membership of its own), removed: the membership ends now
 	user := newUser(t)
-	membership, id := uuid.NewString(), uuid.NewString()
+	membership, partnerUserID := uuid.NewString(), uuid.NewString()
 	owner(
 		t,
 		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, valid_from, valid_until)
@@ -901,28 +911,28 @@ func TestPartnerUserInputs(t *testing.T) {
 		seed.ID("tenant-a"),
 		user,
 		seed.ID("org-contractor-a"),
-		clock.Add(-time.Hour),
-		clock.Add(30*24*time.Hour),
+		clock().Add(-time.Hour),
+		clock().Add(30*24*time.Hour),
 	)
 	owner(
 		t,
 		`INSERT INTO identity.partner_users (id, tenant_id, organization_id, membership_id, email, partner_role, status,
 			invited_at, invited_by_membership_id)
 		VALUES ($1, $2, $3, $4, $5, 'technician', 'active', $6, $7)`,
-		id,
+		partnerUserID,
 		seed.ID("tenant-a"),
 		seed.ID("org-contractor-a"),
 		membership,
 		user+"@ac.local",
-		clock,
+		clock(),
 		seed.ID("contractor-a"),
 	)
 
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.remove",
-		`{"id":"`+id+`","reason":"left the company"}`,
+		`{"id":"`+partnerUserID+`","reason":"left the company"}`,
 		2,
 	); code != 409 ||
 		res["messageKey"] != apperr.KeyVersionConflict {
@@ -931,9 +941,9 @@ func TestPartnerUserInputs(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.remove",
-		`{"id":"`+id+`","reason":"left the company"}`,
+		`{"id":"`+partnerUserID+`","reason":"left the company"}`,
 		1,
 	); code != 200 ||
 		data(res)["deleted"] != true {
@@ -948,16 +958,18 @@ func TestPartnerUserInputs(t *testing.T) {
 		&until,
 	)
 
-	if !until.Equal(clock) {
-		t.Errorf("membership after removal: %v, want %v", until, clock)
+	if !until.Equal(clock()) {
+		t.Errorf("membership after removal: %v, want %v", until, clock())
 	}
 }
 
 // TestNotificationMailRetry (IR425): a failed e-mail notification keeps its reason and is retried a minute after the
 // failed attempt, not before; then it is sent and recorded. (Until IR479 the invitation e-mails showed this.)
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestNotificationMailRetry(t *testing.T) {
 	srv := server(t)
-	membership, id, name := uuid.NewString(), uuid.NewString(), "Retry AC "+uuid.NewString()[:8]
+	membership, notificationID, name := uuid.NewString(), uuid.NewString(), "Retry AC "+uuid.NewString()[:8]
 	owner(
 		t,
 		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from)
@@ -966,7 +978,7 @@ func TestNotificationMailRetry(t *testing.T) {
 		seed.ID("tenant-a"),
 		newUser(t),
 		seed.ID("org-customer-a"),
-		clock.Add(-time.Hour),
+		clock().Add(-time.Hour),
 	)
 	owner(
 		t,
@@ -975,23 +987,25 @@ func TestNotificationMailRetry(t *testing.T) {
 		VALUES ($1, $2, $3, 1, 'fault', 'email', 'alert', '{"kind":"unit","id":"`+seed.ID("unit-online-rto").
 			String()+
 			`"}', $4, 'warning', $5)`,
-		id,
+		notificationID,
 		seed.ID("tenant-a"),
 		membership,
 		`{"targetName":"`+name+`","status":"open"}`,
-		clock,
+		clock(),
 	)
 
-	state := func() (st, reason string) {
+	state := func() (string, string) {
+		var status, reason string
+
 		ownerScan(
 			t,
 			`SELECT state, COALESCE(failure_reason, '') FROM notify.deliveries WHERE notification_id = $1 AND channel = 'email'`,
-			[]any{id},
-			&st,
+			[]any{notificationID},
+			&status,
 			&reason,
 		)
 
-		return
+		return status, reason
 	}
 	deliver := func(sender *fakeMail, when time.Time) int {
 		t.Helper()
@@ -1008,37 +1022,40 @@ func TestNotificationMailRetry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		n := 0
+		total := 0
 
 		for _, m := range sender.sent {
 			if strings.Contains(m.subject, name) {
-				n++
+				total++
 			}
 		}
 
-		return n
+		return total
 	}
-	deliver(&fakeMail{err: errors.New("smtp down"), sent: nil}, clock)
+	deliver(&fakeMail{err: errSMTPDown, sent: nil}, clock())
 
-	if st, reason := state(); st != "failed" || reason != "smtp down" {
+	if st, reason := state(); st != statusFailed || reason != "smtp down" {
 		t.Fatalf("after a failing send: %s %s", st, reason)
 	}
 
 	sender := &fakeMail{err: nil, sent: nil}
-	if n := deliver(sender, clock.Add(59*time.Second)); n != 0 {
+	if n := deliver(sender, clock().Add(59*time.Second)); n != 0 {
 		t.Fatalf("retried before the pause: %d", n)
 	}
 
-	if n := deliver(sender, clock.Add(time.Minute)); n != 1 {
+	if n := deliver(sender, clock().Add(time.Minute)); n != 1 {
 		t.Fatalf("retried after the pause: %d", n)
 	}
 
-	if st, _ := state(); st != "sent" {
+	if st, _ := state(); st != statusSent {
 		t.Errorf("after the retry: %s", st)
 	}
 }
 
 type sentMail struct{ to, subject, body string }
+
+// errSMTPDown is the failure of a mail server that does not answer.
+var errSMTPDown = errors.New("smtp down")
 
 // fakeMail records what the worker sends, or fails every send with err.
 type fakeMail struct {
@@ -1058,10 +1075,12 @@ func (f *fakeMail) Send(_ context.Context, to, subject, body string) (string, er
 
 // TestNotificationMail (IR418): an e-mail notification goes to the recipient's address; one whose recipient's
 // membership has ended is recorded as suppressed and never sent.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestNotificationMail(t *testing.T) {
 	srv := server(t)
 	note := func(membership string) string {
-		id := uuid.NewString()
+		notificationID := uuid.NewString()
 		owner(
 			t,
 			`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type, channel,
@@ -1069,32 +1088,32 @@ func TestNotificationMail(t *testing.T) {
 			VALUES ($1, $2, $3, 1, 'fault', 'email', 'alert', '{"kind":"unit","id":"`+seed.ID("unit-online-rto").
 				String()+
 				`"}', '{"targetName":"Mail AC","status":"open"}', 'warning', $4)`,
-			id,
+			notificationID,
 			seed.ID("tenant-a"),
 			membership,
-			clock,
+			clock(),
 		)
 
-		return id
+		return notificationID
 	}
 	member := func(until time.Time) string {
-		id := uuid.NewString()
+		membershipID := uuid.NewString()
 		owner(
 			t,
 			`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from,
 				valid_until)
 			VALUES ($1, $2, $3, $4, 'client', 'member', $5, $6)`,
-			id,
+			membershipID,
 			seed.ID("tenant-a"),
 			newUser(t),
 			seed.ID("org-customer-a"),
-			clock.Add(-time.Hour),
+			clock().Add(-time.Hour),
 			until,
 		)
 
-		return id
+		return membershipID
 	}
-	active, ended := note(member(clock.Add(time.Hour))), note(member(clock.Add(-time.Minute)))
+	active, ended := note(member(clock().Add(time.Hour))), note(member(clock().Add(-time.Minute)))
 
 	sender := &fakeMail{err: nil, sent: nil}
 
@@ -1103,25 +1122,27 @@ func TestNotificationMail(t *testing.T) {
 		srv.DB,
 		sender,
 		notify.Apps{Customer: "http://c", Partner: "", Technician: "", Admin: ""},
-		clock,
+		clock(),
 		500,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	state := func(id string) (st, reason string) {
+	state := func(notificationID string) (string, string) {
+		var status, reason string
+
 		ownerScan(
 			t,
 			`SELECT state, COALESCE(failure_reason, '') FROM notify.deliveries WHERE notification_id = $1 AND channel = 'email'`,
-			[]any{id},
-			&st,
+			[]any{notificationID},
+			&status,
 			&reason,
 		)
 
-		return
+		return status, reason
 	}
-	if st, _ := state(active); st != "sent" {
+	if st, _ := state(active); st != statusSent {
 		t.Errorf("active recipient: %s", st)
 	}
 
@@ -1145,10 +1166,10 @@ func TestNotificationMail(t *testing.T) {
 		t,
 		`UPDATE notify.notifications SET occurred_at = $2 WHERE id = $1`,
 		active,
-		clock.Add(-notify.Retention-time.Hour),
+		clock().Add(-notify.Retention-time.Hour),
 	)
 
-	_, err = notify.SweepAll(context.Background(), srv.DB, clock)
+	_, err = notify.SweepAll(context.Background(), srv.DB, clock())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1175,14 +1196,16 @@ func TestNotificationMail(t *testing.T) {
 
 // TestDisabledAccountStaysClosed (IR420): HQ extending the membership of an account its contractor disabled does not
 // reopen it; the new end is kept and comes back when the contractor enables the account.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestDisabledAccountStaysClosed(t *testing.T) {
 	srv := server(t)
 	user := newUser(t)
-	from, until, later := clock.Add(-time.Hour).
+	from, until, later := clock().Add(-time.Hour).
 		Format(time.RFC3339),
-		clock.Add(
+		clock().Add(
 			30*24*time.Hour,
-		), clock.Add(
+		), clock().Add(
 			60*24*time.Hour,
 		)
 	body := func(id string, end time.Time) string {
@@ -1199,7 +1222,7 @@ func TestDisabledAccountStaysClosed(t *testing.T) {
 		) + `","reason":"contract"}`
 	}
 
-	code, m := write(srv, &hq, "members.save", body("", until), 0)
+	code, m := write(srv, hq(), "members.save", body("", until), 0)
 	if code != 200 {
 		t.Fatalf("members.save: %d %v", code, m)
 	}
@@ -1209,39 +1232,39 @@ func TestDisabledAccountStaysClosed(t *testing.T) {
 
 	var (
 		account string
-		v       int
+		version       int
 	)
 	ownerScan(
 		t,
 		`SELECT id::text, version FROM identity.partner_users WHERE membership_id = $1`,
 		[]any{membership},
 		&account,
-		&v,
+		&version,
 	)
-	status := func(st string, v int) {
+	status := func(state string, userVersion int) {
 		t.Helper()
 
 		if code, res := write(
 			srv,
-			&contrA,
+			contrA(),
 			"partnerUsers.save",
-			`{"id":"`+account+`","email":"`+user+`@ac.local","partnerRole":"technician","status":"`+st+`","reason":"leave"}`,
-			v,
+			`{"id":"`+account+`","email":"`+user+`@ac.local","partnerRole":"technician","status":"`+state+`","reason":"leave"}`,
+			userVersion,
 		); code != 200 {
-			t.Fatalf("%s: %d %v", st, code, res)
+			t.Fatalf("%s: %d %v", state, code, res)
 		}
 	}
-	status("disabled", v)
+	status("disabled", version)
 
-	var mv int
-	ownerScan(t, `SELECT version FROM identity.memberships WHERE id = $1`, []any{membership}, &mv)
+	var membershipVersion int
+	ownerScan(t, `SELECT version FROM identity.memberships WHERE id = $1`, []any{membership}, &membershipVersion)
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"members.save",
 		body(membership, later),
-		mv,
+		membershipVersion,
 	); code != 200 { // HQ extends the contract
 		t.Fatalf("extend: %d %v", code, res)
 	}
@@ -1254,16 +1277,16 @@ func TestDisabledAccountStaysClosed(t *testing.T) {
 		&end,
 	)
 
-	if !end.Equal(clock) {
+	if !end.Equal(clock()) {
 		t.Errorf(
 			"membership of a disabled account after HQ's change: %v, want still closed at %v",
 			end,
-			clock,
+			clock(),
 		)
 	}
 
-	ownerScan(t, `SELECT version FROM identity.partner_users WHERE id = $1`, []any{account}, &v)
-	status("active", v)
+	ownerScan(t, `SELECT version FROM identity.partner_users WHERE id = $1`, []any{account}, &version)
+	status("active", version)
 	ownerScan(
 		t,
 		`SELECT valid_until FROM identity.memberships WHERE id = $1`,
@@ -1279,14 +1302,16 @@ func TestDisabledAccountStaysClosed(t *testing.T) {
 // TestContractorAddedTechnicianAssigned (IR461): a technician the contractor added has no unit scope, and the
 // contractor still assigns them on its own accepted offer once HQ verified their qualification; another contractor
 // cannot.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestContractorAddedTechnicianAssigned(t *testing.T) {
 	srv := server(t)
-	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	email := "assign-" + uuid.NewString()[:8] + "@example.com"
 
 	code, resp := write(
 		srv,
-		&contrA,
+		contrA(),
 		"partnerUsers.save",
 		`{"email":"`+email+`","partnerRole":"technician","displayName":"Assignable","accessUntil":"`+stamp(
 			24*60,
@@ -1307,14 +1332,14 @@ func TestContractorAddedTechnicianAssigned(t *testing.T) {
 			seed.ID("tenant-a"),
 			tech,
 			code,
-			clock.Add(-time.Hour),
-			clock.Add(365*24*time.Hour),
+			clock().Add(-time.Hour),
+			clock().Add(365*24*time.Hour),
 		)
 	}
 
 	_, resp = write(
 		srv,
-		&customerA,
+		customerA(),
 		"jobs.create",
 		jobBody(seed.ID("unit-non-rto").String(), nil),
 		0,
@@ -1323,7 +1348,7 @@ func TestContractorAddedTechnicianAssigned(t *testing.T) {
 	job := asStr(t, data(resp)["id"])
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
@@ -1353,7 +1378,7 @@ func TestContractorAddedTechnicianAssigned(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"jobs.accept",
 		`{"jobId":"`+job+`","offerId":"`+offer+`","termsVersion":"t"}`,
 		2,
@@ -1363,7 +1388,7 @@ func TestContractorAddedTechnicianAssigned(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"jobs.assign",
 		`{"jobId":"`+job+`","technicianMembershipId":"`+tech+`","startAt":"`+stamp(
 			49,

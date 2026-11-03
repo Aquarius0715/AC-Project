@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -13,6 +13,8 @@ import (
 // TestProposalRefusalsByState: a slot proposal can be withdrawn or answered only while it is pending and only within
 // its job. An unknown proposal, a proposal of another job and a decided proposal are each refused with the state
 // that applies, and the decided one changes nothing.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestProposalRefusalsByState(t *testing.T) {
 	srv := server(t)
 	owner(
@@ -20,19 +22,19 @@ func TestProposalRefusalsByState(t *testing.T) {
 		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = ANY($1) AND status = 'active'
 			AND lower(scheduled) > $2`,
 		[]uuid.UUID{seed.ID("tech-internal-a"), seed.ID("tech-external-a")},
-		clock.Add(2*time.Hour),
+		clock().Add(2*time.Hour),
 	)
 	unit := seed.ID("unit-non-rto").String()
-	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	internalHold := `{"kind":"internal","membershipId":"` + seed.ID("tech-internal-a").
 		String() +
 		`"}`
-	_, m := write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
+	_, m := write(srv, customerA(), "jobs.create", jobBody(unit, nil), 0)
 
 	job := asStr(t, data(m)["id"])
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.proposeSlot",
 		`{"jobId":"`+job+`","slot":`+slotJSON(
 			97,
@@ -57,7 +59,7 @@ func TestProposalRefusalsByState(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.withdrawProposal",
 		`{"jobId":"`+job+`","proposalId":"`+unknown+`"}`,
 		2,
@@ -68,7 +70,7 @@ func TestProposalRefusalsByState(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&customerA,
+		customerA(),
 		"jobs.respondProposal",
 		`{"jobId":"`+job+`","proposalId":"`+unknown+`","decision":"accept"}`,
 		2,
@@ -79,7 +81,7 @@ func TestProposalRefusalsByState(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.withdrawProposal",
 		`{"jobId":"`+job+`","proposalId":"`+proposal+`"}`,
 		2,
@@ -89,7 +91,7 @@ func TestProposalRefusalsByState(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&customerA,
+		customerA(),
 		"jobs.respondProposal",
 		`{"jobId":"`+job+`","proposalId":"`+proposal+`","decision":"accept"}`,
 		3,
@@ -106,7 +108,7 @@ func TestProposalRefusalsByState(t *testing.T) {
 		&status,
 	)
 
-	if status != "withdrawn" {
+	if status != statusWithdrawn {
 		t.Errorf("a refused answer changed the proposal: %s", status)
 	}
 }

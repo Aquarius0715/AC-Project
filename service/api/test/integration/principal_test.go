@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"encoding/json"
@@ -14,17 +14,20 @@ import (
 
 // IR181 step 1: identity-api resolves principals for the other services; a billing-only service authenticates
 // without reading identity tables, and answers UNAVAILABLE when identity-api is down.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPrincipalFromIdentityService(t *testing.T) {
 	identity := serverCfg(t, func(c *apiserver.Config) {
 		c.Domains = []string{ops.DomainIdentity}
-		c.InternalToken = "test-internal"
+		c.InternalToken = internalToken
 	})
 
 	idSrv := httptest.NewServer(identity.Echo)
 	defer idSrv.Close()
 
 	get := func(token, subject, membership string) (int, map[string]any) {
-		req, _ := http.NewRequest(
+		req, _ := http.NewRequestWithContext(
+			t.Context(),
 			http.MethodGet,
 			idSrv.URL+auth.PrincipalPath+"?subject="+subject+"&tenant="+seed.ID("tenant-a").
 				String()+
@@ -37,7 +40,7 @@ func TestPrincipalFromIdentityService(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer res.Body.Close()
+		defer func() { _ = res.Body.Close() }()
 
 		var m map[string]any
 
@@ -51,8 +54,8 @@ func TestPrincipalFromIdentityService(t *testing.T) {
 		"test-internal",
 		user,
 		seed.ID("customer-a").String(),
-	); code != 200 || res["role"] != "client" ||
-		res["clientRole"] != "owner" {
+	); code != 200 || res["role"] != roleClient ||
+		res["clientRole"] != clientRoleOwner {
 		t.Fatalf("principal: %d %v", code, res)
 	}
 
@@ -69,14 +72,14 @@ func TestPrincipalFromIdentityService(t *testing.T) {
 	billing := serverCfg(t, func(c *apiserver.Config) {
 		c.Domains = []string{ops.DomainBilling}
 		c.IdentityURL = idSrv.URL
-		c.InternalToken = "test-internal"
+		c.InternalToken = internalToken
 		c.ServiceURLs = cluster.others(ops.DomainBilling)
 	})
-	if code, m := post(billing, &customerA, "invoices.list", `{"limit":1}`); code != 200 {
+	if code, m := post(billing, customerA(), "invoices.list", `{"limit":1}`); code != 200 {
 		t.Fatalf("billing-api with remote principal: %d %v", code, m)
 	}
 
-	if code, _ := post(billing, &customerB, "invoices.list", `{"limit":1}`); code != 200 {
+	if code, _ := post(billing, customerB(), "invoices.list", `{"limit":1}`); code != 200 {
 		t.Fatalf("second member: %d", code)
 	}
 
@@ -85,16 +88,16 @@ func TestPrincipalFromIdentityService(t *testing.T) {
 	down := serverCfg(t, func(c *apiserver.Config) {
 		c.Domains = []string{ops.DomainBilling}
 		c.IdentityURL = idSrv.URL
-		c.InternalToken = "test-internal"
+		c.InternalToken = internalToken
 		c.ServiceURLs = cluster.others(ops.DomainBilling)
 	})
 	if code, res := post(
 		down,
-		&customerA,
+		customerA(),
 		"invoices.list",
 		`{"limit":1}`,
 	); code != 503 ||
-		res["code"] != "UNAVAILABLE" {
+		res["code"] != codeUnavailable {
 		t.Fatalf("identity down: %d %v", code, res)
 	}
 }

@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"strings"
@@ -11,6 +11,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestNotificationsInbox(t *testing.T) {
 	srv := server(t)
 	// earlier runs leave many notifications: mark customer-b's existing ones read so unreadOnly shows this run's
@@ -18,14 +19,14 @@ func TestNotificationsInbox(t *testing.T) {
 		t,
 		`UPDATE notify.notifications SET read_at = $2 WHERE recipient_membership_id = $1 AND read_at IS NULL`,
 		seed.ID("customer-b"),
-		clock,
+		clock(),
 	)
 	unit := boundUnit(t, srv, "online")
 	key, inv := overdueContract(t, srv, unit)
 
 	code, res := write(
 		srv,
-		&restrMgr,
+		restrMgr(),
 		"restrictions.schedule",
 		scheduleBody(key, inv, []string{unit}, nil),
 		0,
@@ -46,59 +47,59 @@ func TestNotificationsInbox(t *testing.T) {
 		seed.ID("tenant-a"),
 		seed.ID("customer-b"),
 		`{"kind":"unit","id":"`+seed.ID("unit-online-rto").String()+`"}`,
-		clock,
+		clock(),
 	)
 
 	_, res = post(
 		srv,
-		&customerB,
+		customerB(),
 		"notifications.list",
 		`{"filters":{"type":"restriction","unreadOnly":true},"limit":100}`,
 	)
 
-	var n map[string]any
+	var notice map[string]any
 
-	for _, it := range items(res) {
+	for _, it := range items(t, res) {
 		if asObj(t, it["target"])["id"] == rid {
-			n = it
+			notice = it
 		}
 	}
 
-	if n == nil || n["deliveryState"] != "simulated" ||
-		asObj(t, n["params"])["targetName"] == "" ||
-		n["severity"] != "warning" {
+	if notice == nil || notice["deliveryState"] != "simulated" ||
+		asObj(t, notice["params"])["targetName"] == "" ||
+		notice["severity"] != severityWarning {
 		t.Fatalf("restriction notice: %v", res)
 	}
 
 	_, res = post(
 		srv,
-		&customerB,
+		customerB(),
 		"notifications.list",
 		`{"filters":{"severity":"critical"},"limit":100}`,
 	)
-	for _, it := range items(res) {
+	for _, it := range items(t, res) {
 		if it["id"] == hidden {
 			t.Fatal("unreadable target listed")
 		}
 	}
 
 	want := map[string]string{ // the field each case is refused for
-		"{\"filters\":{\"kind\":\"x\"}}":        "kind=error.notAllowed",
-		"{\"filters\":{\"severity\":\"high\"}}": "filters=error.invalid",
-		"{\"filters\":{\"type\":\"spam\"}}":     "filters=error.invalid",
+		bodyUnknownKind:                         "kind=error.notAllowed",
+		"{\"filters\":{\"severity\":\"high\"}}": refusedFiltersInvalid,
+		"{\"filters\":{\"type\":\"spam\"}}":     refusedFiltersInvalid,
 	}
 
 	for _, b := range []string{
-		`{"filters":{"severity":"high"}}`, `{"filters":{"kind":"x"}}`,
+		`{"filters":{"severity":"high"}}`, bodyUnknownKind,
 		`{"filters":{"type":"spam"}}`,
 	} {
-		code, m := post(srv, &customerB, "notifications.list", b)
+		code, m := post(srv, customerB(), "notifications.list", b)
 		refusal(t, b, code, m, want[b])
 	}
 
 	if code, resp := post(
 		srv,
-		&customerB,
+		customerB(),
 		"notifications.list",
 		`{"filters":{"from":"2026-09-14T00:00:00Z","to":"2026-09-01T00:00:00Z"}}`,
 	); code != 422 ||
@@ -108,21 +109,21 @@ func TestNotificationsInbox(t *testing.T) {
 
 	if _, resp := post(
 		srv,
-		&customerB,
+		customerB(),
 		"notifications.list",
 		`{"sort":{"field":"severity","direction":"desc"},"limit":5}`,
 	); len(
-		items(resp),
+		items(t, resp),
 	) == 0 {
 		t.Error("severity sort")
 	}
 
-	id := asStr(t, n["id"])
+	notificationID := asStr(t, notice["id"])
 	if code, _ := write(
 		srv,
-		&customerB,
+		customerB(),
 		"notifications.markRead",
-		`{"id":"`+id+`"}`,
+		`{"id":"`+notificationID+`"}`,
 		2,
 	); code != 409 {
 		t.Error("stale notification version")
@@ -130,9 +131,9 @@ func TestNotificationsInbox(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&customerA,
+		customerA(),
 		"notifications.markRead",
-		`{"id":"`+id+`"}`,
+		`{"id":"`+notificationID+`"}`,
 		1,
 	); code != 404 {
 		t.Error("mark another member's notification")
@@ -140,7 +141,7 @@ func TestNotificationsInbox(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&customerB,
+		customerB(),
 		"notifications.markRead",
 		`{"id":"`+hidden+`"}`,
 		1,
@@ -148,29 +149,29 @@ func TestNotificationsInbox(t *testing.T) {
 		t.Error("mark an unreadable target")
 	}
 
-	code, res = write(srv, &customerB, "notifications.markRead", `{"id":"`+id+`"}`, 1)
-	if code != 200 || data(res)["readAt"] == nil || ver(res) != 2 {
+	code, res = write(srv, customerB(), "notifications.markRead", `{"id":"`+notificationID+`"}`, 1)
+	if code != 200 || data(res)["readAt"] == nil || ver(t, res) != 2 {
 		t.Fatalf("markRead: %d %v", code, res)
 	}
 
 	if code, resp := write(
 		srv,
-		&customerB,
+		customerB(),
 		"notifications.markRead",
-		`{"id":"`+id+`"}`,
+		`{"id":"`+notificationID+`"}`,
 		2,
 	); code != 200 ||
-		ver(resp) != 2 {
+		ver(t, resp) != 2 {
 		t.Error("markRead again keeps the record")
 	}
 	// HQ sees the restriction notice target; technicians see nothing for it
 	if code, resp := post(
 		srv,
-		&techB,
+		techB(),
 		"notifications.list",
 		`{"filters":{"type":"restriction"}}`,
 	); code != 200 ||
-		len(items(resp)) != 0 {
+		len(items(t, resp)) != 0 {
 		t.Error("technician restriction notices")
 	}
 }
@@ -179,23 +180,25 @@ func TestNotificationsInbox(t *testing.T) {
 // writes a minute (IR375). The caller's unread notifications with a readable target are marked; every other ID
 // (already read, another member's, an unreadable target, unknown) is skipped alike and stays as it is. The list holds
 // 1–100 distinct IDs and takes no expected version.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestMarkAllRead(t *testing.T) {
 	srv := server(t)
 	note := func(member, unit string) string {
-		id := uuid.NewString()
+		notificationID := uuid.NewString()
 		owner(
 			t,
 			`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type,
 				template_key, target, params, severity, occurred_at)
 			VALUES ($1,$2,$3,1,'fault','alert',$4,'{}','warning',$5)`,
-			id,
+			notificationID,
 			seed.ID("tenant-a"),
 			seed.ID(member),
 			`{"kind":"unit","id":"`+seed.ID(unit).String()+`"}`,
-			clock,
+			clock(),
 		)
 
-		return id
+		return notificationID
 	}
 	mine, mine2, read := note(
 		"customer-b",
@@ -207,7 +210,12 @@ func TestMarkAllRead(t *testing.T) {
 		"customer-b",
 		"unit-other-customer",
 	)
-	owner(t, `UPDATE notify.notifications SET read_at = $2, version = 2 WHERE id = $1`, read, clock)
+	owner(
+		t,
+		`UPDATE notify.notifications SET read_at = $2, version = 2 WHERE id = $1`,
+		read,
+		clock(),
+	)
 
 	hidden := note(
 		"customer-b",
@@ -222,23 +230,23 @@ func TestMarkAllRead(t *testing.T) {
 		many[i] = uuid.NewString()
 	}
 
-	for name, c := range map[string]struct{ body, want string }{
+	for name, testCase := range map[string]struct{ body, want string }{
 		"no list":     {`{}`, "ids=error.required"},
 		"empty list":  {`{"ids":[]}`, "ids=error.required"},
 		"101 IDs":     {list(many...), "ids=error.count"},
 		"a duplicate": {list(mine, mine), "ids=error.invalid"},
 		"the nil ID":  {list(uuid.Nil.String()), "ids=error.invalid"},
 	} {
-		code, m := write(srv, &customerB, "notifications.markAllRead", c.body, 0)
-		refusal(t, name, code, m, c.want)
+		code, m := write(srv, customerB(), "notifications.markAllRead", testCase.body, 0)
+		refusal(t, name, code, m, testCase.want)
 	}
 
-	code, res := write(srv, &customerB, "notifications.markAllRead", list(mine), 1)
+	code, res := write(srv, customerB(), "notifications.markAllRead", list(mine), 1)
 	refusal(t, "an expected version", code, res, "expectedVersion=error.notAllowed")
 
 	code, res = write(
 		srv,
-		&customerB,
+		customerB(),
 		"notifications.markAllRead",
 		list(mine, read, theirs, hidden, unknown, mine2),
 		0,
@@ -248,8 +256,10 @@ func TestMarkAllRead(t *testing.T) {
 	}
 
 	got := func(k string) string {
-		var out []string
-		for _, v := range asArr(t, data(res)[k]) {
+		listed := asArr(t, data(res)[k])
+
+		out := make([]string, 0, len(listed))
+		for _, v := range listed {
 			out = append(out, asStr(t, v))
 		}
 
@@ -260,20 +270,20 @@ func TestMarkAllRead(t *testing.T) {
 		t.Fatalf("marked %s, skipped %s", got("markedIds"), got("skippedIds"))
 	}
 
-	state := func(id string) (bool, int) {
+	state := func(notificationID string) (bool, int) {
 		var (
 			readAt *time.Time
-			v      int
+			version      int
 		)
 		ownerScan(
 			t,
 			`SELECT read_at, version FROM notify.notifications WHERE id = $1`,
-			[]any{id},
+			[]any{notificationID},
 			&readAt,
-			&v,
+			&version,
 		)
 
-		return readAt != nil, v
+		return readAt != nil, version
 	}
 	for id, want := range map[string]struct {
 		read    bool
@@ -284,7 +294,7 @@ func TestMarkAllRead(t *testing.T) {
 		}
 	}
 	// a second click finds nothing unread: everything is skipped and nothing changes
-	code, res = write(srv, &customerB, "notifications.markAllRead", list(mine, mine2), 0)
+	code, res = write(srv, customerB(), "notifications.markAllRead", list(mine, mine2), 0)
 	if code != 200 || got("markedIds") != "" || got("skippedIds") != mine+","+mine2 {
 		t.Fatalf("again: %d %v", code, res)
 	}
@@ -294,6 +304,7 @@ func TestMarkAllRead(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestNotificationRecipientsPreview(t *testing.T) {
 	srv := server(t)
 	_, inv := newInvoice(t, srv)
@@ -303,39 +314,39 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 			`"id":"` + inv + `"},"templateKey":"payment_reminder",` +
 			`"channel":"` + channel + `","query":{}}`
 	}
-	if code, _ := post(srv, &hq, "notifications.recipients", body("inApp")); code != 409 {
+	if code, _ := post(srv, hq(), "notifications.recipients", body("inApp")); code != 409 {
 		t.Error("reminder recipients before due")
 	}
 
-	owner(t, `UPDATE billing.invoices SET due_at = $2 WHERE id = $1`, inv, clock.Add(-time.Hour))
+	owner(t, `UPDATE billing.invoices SET due_at = $2 WHERE id = $1`, inv, clock().Add(-time.Hour))
 
-	code, resp := post(srv, &hq, "notifications.recipients", body("inApp"))
-	if code != 200 || len(items(resp)) == 0 {
+	code, resp := post(srv, hq(), "notifications.recipients", body("inApp"))
+	if code != 200 || len(items(t, resp)) == 0 {
 		t.Fatalf("recipients: %d %v", code, resp)
 	}
 
-	for _, r := range items(resp) {
-		if r["role"] != "client" {
+	for _, r := range items(t, resp) {
+		if r["role"] != roleClient {
 			t.Errorf("payment_reminder recipient %v", r)
 		}
 	}
 
-	recipient := asStr(t, items(resp)[0]["id"])
+	recipient := asStr(t, items(t, resp)[0]["id"])
 
-	if code, _ := post(srv, &customerB, "notifications.recipients", body("inApp")); code != 403 {
+	if code, _ := post(srv, customerB(), "notifications.recipients", body("inApp")); code != 403 {
 		t.Error("client lists reminder recipients")
 	}
 
 	if code, _ := post(
 		srv,
-		&customerA,
+		customerA(),
 		"notifications.recipients",
 		`{"target":{"kind":"invoice","id":"`+inv+`"},"templateKey":"payment","channel":"inApp","query":{}}`,
 	); code != 404 {
 		t.Error("other customer's invoice")
 	}
 
-	for b, want := range map[string]string{
+	for payload, want := range map[string]string{
 		`{"target":{"kind":"planet",` +
 			`"id":"` + inv + `"},"templateKey":"payment","channel":"inApp",` +
 			`"query":{}}`: "target=error.invalid",
@@ -347,21 +358,21 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 			`"query":{}}`: "role=error.invalid",
 		`{"target":{"kind":"invoice",` +
 			`"id":"` + inv + `"},"templateKey":"payment","channel":"inApp",` +
-			`"query":{"filters":{"x":1}}}`: "x=error.notAllowed",
+			`"query":{"filters":{"x":1}}}`: refusedUnknownFieldX,
 	} {
-		code, m := post(srv, &hq, "notifications.recipients", b)
-		refusal(t, b, code, m, want)
+		code, m := post(srv, hq(), "notifications.recipients", payload)
+		refusal(t, payload, code, m, want)
 	}
 
 	if _, res := post(
 		srv,
-		&hq,
+		hq(),
 		"notifications.recipients",
 		`{"target":{"kind":"invoice",`+
 			`"id":"`+inv+`"},"templateKey":"payment","channel":"email","role":"admin",`+
 			`"query":{"limit":1}}`,
 	); len(
-		items(res),
+		items(t, res),
 	) != 1 {
 		t.Errorf("admin recipients for payment: %v", res)
 	}
@@ -369,7 +380,7 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 	preview := func(recipient string) (int, map[string]any) {
 		return post(
 			srv,
-			&hq,
+			hq(),
 			"notifications.preview",
 			`{"target":{"kind":"invoice",`+
 				`"id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email",`+
@@ -378,7 +389,7 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 	}
 
 	code, resp = preview(recipient)
-	if code != 200 || data(resp)["deliveryState"] != "preview" ||
+	if code != 200 || data(resp)["deliveryState"] != deliveryPreview ||
 		asObj(t, data(resp)["params"])["message"] != "Please pay" ||
 		data(resp)["type"] != "payment_reminder" {
 		t.Fatalf("preview: %d %v", code, resp)
@@ -405,7 +416,7 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 	// a payment reminder is about an invoice only
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"notifications.preview",
 		`{"target":{"kind":"job","id":"`+seed.ID("job-contractor-a").
 			String()+
@@ -419,20 +430,20 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"notifications.preview",
 		`{"target":{"kind":"invoice",`+
 			`"id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email",`+
 			`"recipientMembershipId":"`+recipient+`","message":" "}`,
 	); code != 422 ||
-		fields(res) != "message=error.length" {
+		fields(res) != refusedMessageLength {
 		t.Errorf("blank message: %d %s", code, fields(res))
 	}
 	// the message may be as long as a job note (2000, DD-P07); the reason stays at 1000 (IR228)
 	long := strings.Repeat("m", 2000)
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"notifications.preview",
 		`{"target":{"kind":"invoice",`+
 			`"id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email",`+
@@ -443,11 +454,11 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 
 	for body, field := range map[string]string{
 		`"message":"` + long + `m"`:                    "message",
-		`"reason":"` + strings.Repeat("r", 1001) + `"`: "reason",
+		`"reason":"` + strings.Repeat("r", 1001) + `"`: fieldReason,
 	} {
 		if code, res := post(
 			srv,
-			&hq,
+			hq(),
 			"notifications.preview",
 			`{"target":{"kind":"invoice",`+
 				`"id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email",`+
@@ -461,11 +472,11 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 	unit := seed.ID("unit-online-rto").String()
 	if code, res := post(
 		srv,
-		&customerA,
+		customerA(),
 		"notifications.recipients",
 		`{"target":{"kind":"unit","id":"`+unit+`"},"templateKey":"alert","channel":"inApp","query":{}}`,
 	); code != 200 ||
-		len(items(res)) == 0 {
+		len(items(t, res)) == 0 {
 		t.Errorf("unit recipients: %d %v", code, res)
 	}
 	// an alert message is a fault notification about an open alert, of warning severity unless the policy's is given
@@ -473,7 +484,7 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 	alertPreview := func(extra string) (int, map[string]any) {
 		return post(
 			srv,
-			&hq,
+			hq(),
 			"notifications.preview",
 			`{"target":{"kind":"unit",`+
 				`"id":"`+unit+`"},"templateKey":"alert","channel":"inApp",`+
@@ -484,15 +495,15 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 	}
 	if code, m := alertPreview(
 		`,"message":"Please check the unit"`,
-	); code != 200 || data(m)["type"] != "fault" || data(m)["severity"] != "warning" ||
-		asObj(t, data(m)["params"])["status"] != "open" {
+	); code != 200 || data(m)["type"] != "fault" || data(m)["severity"] != severityWarning ||
+		asObj(t, data(m)["params"])["status"] != statusOpen {
 		t.Errorf("alert preview: %d %v", code, m)
 	}
 
 	if code, m := alertPreview(
 		`,"severity":"critical"`,
 	); code != 200 || data(m)["severity"] != "critical" ||
-		data(m)["deliveryState"] != "preview" {
+		data(m)["deliveryState"] != deliveryPreview {
 		t.Errorf("critical alert preview: %d %v", code, m)
 	}
 
@@ -505,7 +516,7 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"notifications.preview",
 		`{"target":{"kind":"invoice",`+
 			`"id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email",`+
@@ -517,7 +528,7 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 
 	if code, _ := post(
 		srv,
-		&customerB,
+		customerB(),
 		"notifications.recipients",
 		`{"target":{"kind":"unit","id":"`+unit+`"},"templateKey":"alert","channel":"inApp","query":{}}`,
 	); code != 404 {
@@ -534,7 +545,7 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 		seed.ID("tenant-a"),
 		newUser(t),
 		seed.ID("org-operator-a"),
-		clock.Add(-time.Hour),
+		clock().Add(-time.Hour),
 	)
 	owner(
 		t,
@@ -550,12 +561,14 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 		)
 	})
 
-	listed := func(template string) (hqOperator, asset bool) {
+	listed := func(template string) (bool, bool) {
 		t.Helper()
+
+		var hqOperator, asset bool
 
 		code, res := post(
 			srv,
-			&hq,
+			hq(),
 			"notifications.recipients",
 			`{"target":{"kind":"unit",`+
 				`"id":"`+unit+`"},"templateKey":"`+template+`","channel":"inApp","role":"admin",`+
@@ -565,12 +578,12 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 			t.Fatalf("%s recipients: %d %v", template, code, res)
 		}
 
-		for _, r := range items(res) {
+		for _, r := range items(t, res) {
 			hqOperator = hqOperator || r["id"] == seed.ID("hq-operator").String()
 			asset = asset || r["id"] == assetOnly
 		}
 
-		return
+		return hqOperator, asset
 	}
 	if op, asset := listed("alert"); !op || asset {
 		t.Errorf("alert recipients: hq-operator %v, asset.read only %v", op, asset)
@@ -582,7 +595,7 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&hq,
+		hq(),
 		"notifications.preview",
 		`{"target":{"kind":"unit",`+
 			`"id":"`+unit+`"},"templateKey":"alert","channel":"inApp",`+
@@ -593,11 +606,12 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPreferencesAndConsents(t *testing.T) {
 	srv := server(t)
 	if code, res := post(
 		srv,
-		&techB,
+		techB(),
 		"preferences.get",
 		`{}`,
 	); code != 200 || data(res)["currency"] != "MYR" ||
@@ -606,21 +620,21 @@ func TestPreferencesAndConsents(t *testing.T) {
 	}
 
 	want := map[string]string{ // the field each case is refused for
-		"{\"locale\":\"en\",\"timezone\":\"Local\"}":             "timezone=error.invalid",
-		"{\"locale\":\"en\",\"timezone\":\"Mars/Base\"}":         "timezone=error.invalid",
+		"{\"locale\":\"en\",\"timezone\":\"Local\"}":             refusedTimezoneInvalid,
+		"{\"locale\":\"en\",\"timezone\":\"Mars/Base\"}":         refusedTimezoneInvalid,
 		"{\"locale\":\"fr\",\"timezone\":\"Asia/Kuala_Lumpur\"}": "locale=error.invalid",
 	}
 
 	for _, b := range []string{`{"locale":"fr",` +
 		`"timezone":"Asia/Kuala_Lumpur"}`, `{"locale":"en",` +
 		`"timezone":"Mars/Base"}`, `{"locale":"en","timezone":"Local"}`} {
-		code, m := write(srv, &customerB, "preferences.update", b, 0)
+		code, m := write(srv, customerB(), "preferences.update", b, 0)
 		refusal(t, b, code, m, want[b])
 	}
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"preferences.update",
 		`{"locale":"en","timezone":"UTC","monthlyReportEmail":true}`,
 		0,
@@ -631,7 +645,7 @@ func TestPreferencesAndConsents(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&customerB,
+		customerB(),
 		"preferences.update",
 		`{"locale":"ms","timezone":"Asia/Singapore","monthlyReportEmail":true}`,
 		0,
@@ -642,7 +656,7 @@ func TestPreferencesAndConsents(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&customerB,
+		customerB(),
 		"preferences.update",
 		`{"locale":"en","timezone":"Asia/Kuala_Lumpur"}`,
 		0,
@@ -651,7 +665,7 @@ func TestPreferencesAndConsents(t *testing.T) {
 		t.Fatalf("keep monthly flag: %d %v", code, res)
 	}
 
-	if _, m := post(srv, &customerB, "preferences.get", `{}`); data(m)["locale"] != "en" {
+	if _, m := post(srv, customerB(), "preferences.get", `{}`); data(m)["locale"] != "en" {
 		t.Error("saved preferences")
 	}
 
@@ -664,17 +678,17 @@ func TestPreferencesAndConsents(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"consents.get",
 		`{"purpose":"location_automation"}`,
 	); code != 200 || data(res)["granted"] != false ||
-		ver(res) != 1 {
+		ver(t, res) != 1 {
 		t.Fatalf("consent get: %d %v", code, res)
 	}
 
 	if code, res := post(
 		srv,
-		&customerB,
+		customerB(),
 		"consents.get",
 		`{"purpose":"marketing"}`,
 	); code != 422 ||
@@ -682,13 +696,18 @@ func TestPreferencesAndConsents(t *testing.T) {
 		t.Errorf("bad purpose: %d %s", code, fields(res))
 	}
 
-	if code, _ := post(srv, &hq, "consents.get", `{"purpose":"location_automation"}`); code != 403 {
+	if code, _ := post(
+		srv,
+		hq(),
+		"consents.get",
+		`{"purpose":"location_automation"}`,
+	); code != 403 {
 		t.Error("HQ consent")
 	}
 
 	if code, _ := write(
 		srv,
-		&customerB,
+		customerB(),
 		"consents.update",
 		`{"purpose":"location_automation","granted":true}`,
 		3,
@@ -698,29 +717,29 @@ func TestPreferencesAndConsents(t *testing.T) {
 
 	code, resp := write(
 		srv,
-		&customerB,
+		customerB(),
 		"consents.update",
 		`{"purpose":"location_automation","granted":true}`,
 		1,
 	)
-	if code != 200 || data(resp)["grantedAt"] == nil || ver(resp) != 2 {
+	if code != 200 || data(resp)["grantedAt"] == nil || ver(t, resp) != 2 {
 		t.Fatalf("grant: %d %v", code, resp)
 	}
 
 	if code, res := write(
 		srv,
-		&customerB,
+		customerB(),
 		"consents.update",
 		`{"purpose":"location_automation","granted":true}`,
 		2,
 	); code != 200 ||
-		ver(res) != 2 {
+		ver(t, res) != 2 {
 		t.Error("same value unchanged")
 	}
 
 	code, resp = write(
 		srv,
-		&customerB,
+		customerB(),
 		"consents.update",
 		`{"purpose":"location_automation","granted":false}`,
 		2,
@@ -732,6 +751,8 @@ func TestPreferencesAndConsents(t *testing.T) {
 
 // TestTechnicianJobNotificationScope: a technician's notification about a job is listed and can be marked read only
 // while the assignment lets the technician open the job — active and its scheduled window not over (IR49, IR58, IR253).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestTechnicianJobNotificationScope(t *testing.T) {
 	srv := server(t)
 	tenant, tech, job := seed.ID(
@@ -751,7 +772,7 @@ func TestTechnicianJobNotificationScope(t *testing.T) {
 		tenant,
 		tech,
 		`{"kind":"job","id":"`+job.String()+`"}`,
-		clock,
+		clock(),
 	)
 	owner(
 		t,
@@ -761,8 +782,8 @@ func TestTechnicianJobNotificationScope(t *testing.T) {
 		tenant,
 		job,
 		tech,
-		clock.Add(-time.Hour),
-		clock.Add(time.Hour),
+		clock().Add(-time.Hour),
+		clock().Add(time.Hour),
 	)
 	t.Cleanup(func() {
 		owner(t, `DELETE FROM notify.notifications WHERE id = $1`, nid)
@@ -773,11 +794,11 @@ func TestTechnicianJobNotificationScope(t *testing.T) {
 	listed := func() bool {
 		_, res := post(
 			srv,
-			&techInt,
+			techInt(),
 			"notifications.list",
 			`{"filters":{"type":"schedule_change"},"limit":100}`,
 		)
-		for _, it := range items(res) {
+		for _, it := range items(t, res) {
 			if it["id"] == nid {
 				return true
 			}
@@ -834,8 +855,8 @@ func TestTechnicianJobNotificationScope(t *testing.T) {
 		t,
 		`UPDATE notify.ref_assignments SET status = 'active', scheduled = tstzrange($2,$3) WHERE id = $1`,
 		aid,
-		clock.Add(-3*time.Hour),
-		clock.Add(-time.Hour),
+		clock().Add(-3*time.Hour),
+		clock().Add(-time.Hour),
 	)
 
 	if listed() {
@@ -844,7 +865,7 @@ func TestTechnicianJobNotificationScope(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&techInt,
+		techInt(),
 		"notifications.markRead",
 		`{"id":"`+nid+`"}`,
 		1,
@@ -856,13 +877,13 @@ func TestTechnicianJobNotificationScope(t *testing.T) {
 		t,
 		`UPDATE notify.ref_assignments SET scheduled = tstzrange($2,$3) WHERE id = $1`,
 		aid,
-		clock.Add(-time.Hour),
-		clock.Add(time.Hour),
+		clock().Add(-time.Hour),
+		clock().Add(time.Hour),
 	)
 
 	if code, _ := write(
 		srv,
-		&techInt,
+		techInt(),
 		"notifications.markRead",
 		`{"id":"`+nid+`"}`,
 		1,
@@ -873,35 +894,37 @@ func TestTechnicianJobNotificationScope(t *testing.T) {
 
 // IR58: a contractor reads the notifications of jobs offered to its company, and nothing else — not another job, not
 // a unit.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestContractorInbox(t *testing.T) {
 	srv := server(t)
-	note := func(kind, id string) string {
-		n := uuid.NewString()
+	note := func(kind, targetID string) string {
+		notificationID := uuid.NewString()
 		owner(
 			t,
 			`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type,
 				template_key, target, params, severity, occurred_at)
 			VALUES ($1, $2, $3, 1, 'job_update', 'job_update', $4, '{}', 'normal', $5)`,
-			n,
+			notificationID,
 			seed.ID("tenant-a"),
 			seed.ID("contractor-a"),
-			`{"kind":"`+kind+`","id":"`+id+`"}`,
-			clock,
+			`{"kind":"`+kind+`","id":"`+targetID+`"}`,
+			clock(),
 		)
 
-		return n
+		return notificationID
 	}
 	offered := note("job", seed.ID("job-contractor-a").String())
 	other := note("job", uuid.NewString())
 	unit := note("unit", seed.ID("unit-online-rto").String())
 
-	code, resp := post(srv, &contrA, "notifications.list", `{"limit":100}`)
+	code, resp := post(srv, contrA(), "notifications.list", `{"limit":100}`)
 	if code != 200 {
 		t.Fatalf("contractor inbox: %d %v", code, resp)
 	}
 
 	seen := map[string]bool{}
-	for _, it := range items(resp) {
+	for _, it := range items(t, resp) {
 		seen[asStr(t, it["id"])] = true
 	}
 
@@ -914,7 +937,7 @@ func TestContractorInbox(t *testing.T) {
 		)
 	}
 
-	for _, it := range items(resp) { // the accepted job opens for the company: its notice may link it (IR602)
+	for _, it := range items(t, resp) { // the accepted job opens for the company: its notice may link it (IR602)
 		if it["id"] == offered && it["targetOpen"] != true {
 			t.Errorf("the accepted job's notice: targetOpen %v", it["targetOpen"])
 		}
@@ -922,12 +945,12 @@ func TestContractorInbox(t *testing.T) {
 
 	if code, res := post(
 		srv,
-		&contrB,
+		contrB(),
 		"notifications.list",
 		`{"limit":100}`,
 	); code != 200 ||
-		len(items(res)) > 0 {
-		for _, it := range items(res) {
+		len(items(t, res)) > 0 {
+		for _, it := range items(t, res) {
 			if it["id"] == offered {
 				t.Error("another contractor reads the notification")
 			}
@@ -938,15 +961,23 @@ func TestContractorInbox(t *testing.T) {
 // IR602: HQ withdraws an offer by cancelling the job before the company accepted it. The company keeps the notice — the
 // offer was its own — but the job page no longer opens for it (jobs.get NOT_FOUND), so the notice says targetOpen
 // false and the apps show it without a link.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestWithdrawnOfferNoticeHasNoLink(t *testing.T) {
 	srv := server(t)
-	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
-	_, m := write(srv, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	_, resp := write(
+		srv,
+		customerA(),
+		"jobs.create",
+		jobBody(seed.ID("unit-non-rto").String(), nil),
+		0,
+	)
 
-	job := asStr(t, data(m)["id"])
+	job := asStr(t, data(resp)["id"])
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
@@ -970,13 +1001,13 @@ func TestWithdrawnOfferNoticeHasNoLink(t *testing.T) {
 		t.Helper()
 		drainEvents(t)
 
-		code, res := post(srv, &contrA, "notifications.list", `{"limit":100}`)
+		code, res := post(srv, contrA(), "notifications.list", `{"limit":100}`)
 		if code != 200 {
 			t.Fatalf("contractor inbox: %d %v", code, res)
 		}
 
 		var last map[string]any
-		for _, it := range items(res) { // newest first: the first notice of the job is its latest
+		for _, it := range items(t, res) { // newest first: the first notice of the job is its latest
 			if tg, _ := it["target"].(map[string]any); tg["kind"] == "job" && tg["id"] == job &&
 				last == nil {
 				last = it
@@ -991,7 +1022,7 @@ func TestWithdrawnOfferNoticeHasNoLink(t *testing.T) {
 
 	if code, res := write(
 		srv,
-		&hq,
+		hq(),
 		"jobs.cancel",
 		`{"jobId":"`+job+`","cancelReason":"the customer withdrew"}`,
 		2,
@@ -999,16 +1030,16 @@ func TestWithdrawnOfferNoticeHasNoLink(t *testing.T) {
 		t.Fatalf("cancel: %d %v", code, res)
 	}
 
-	n := notice()
-	if n == nil {
+	kept := notice()
+	if kept == nil {
 		t.Fatal("the company lost the notice of its withdrawn offer")
 	}
 
-	if n["targetOpen"] != false {
-		t.Errorf("the withdrawn offer's notice still links a page that does not open: %v", n)
+	if kept["targetOpen"] != false {
+		t.Errorf("the withdrawn offer's notice still links a page that does not open: %v", kept)
 	}
 
-	if code, _ := post(srv, &contrA, "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
+	if code, _ := post(srv, contrA(), "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
 		t.Errorf("the withdrawn offer's job opens for the company: %d", code)
 	}
 }

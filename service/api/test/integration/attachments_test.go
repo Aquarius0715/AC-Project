@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"encoding/base64"
@@ -8,6 +8,8 @@ import (
 	"github.com/google/uuid"
 )
 
+const refusedSignatureOrAbsence = "signature=errors.signature_or_absence"
+
 func blobJSON(name, mime string, data []byte, size int) string {
 	return `{"name":"` + name + `","mime":"` + mime + `","size":` + itoa(
 		size,
@@ -16,51 +18,52 @@ func blobJSON(name, mime string, data []byte, size int) string {
 	) + `"}`
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAttachmentsAndSignOff(t *testing.T) {
 	srv := server(t)
 	job := assignedNow(t, srv)
-	write(srv, &techInt, "jobs.start", `{"jobId":"`+job+`","startConfirmed":true}`, 2)
-	_, res := write(srv, &techInt, "jobs.saveDraft", draftBody(job, "normal", nil), 0)
+	write(srv, techInt(), "jobs.start", `{"jobId":"`+job+`","startConfirmed":true}`, 2)
+	_, res := write(srv, techInt(), "jobs.saveDraft", draftBody(job, "normal", nil), 0)
 	rep := asStr(t, data(res)["id"])
 	img, jpg := tinyPNG(t), tinyJPEG(t)
 	flood := pngHeader(50000, 50000) // 2.5 gigapixels declared in a few dozen bytes (IR389)
-	add := func(file string, v int) (int, map[string]any) {
+	add := func(file string, version int) (int, map[string]any) {
 		return write(
 			srv,
-			&techInt,
+			techInt(),
 			"attachments.add",
 			`{"jobId":"`+job+`","reportId":"`+rep+`","file":`+file+`}`,
-			v,
+			version,
 		)
 	}
 	want := map[string]string{ // the field each case is refused for
-		"empty":         "file=error.invalidFile",
-		"gif":           "file=error.invalidFile",
-		"no name":       "file=error.invalidFile",
-		"not a png":     "file=error.invalidFile",
-		"png as jpeg":   "file=error.invalidFile",
-		"size mismatch": "file=error.invalidFile",
-		"pixel flood":   "file=error.invalidFile",
+		"empty":          refusedFileInvalid,
+		"gif":            refusedFileInvalid,
+		caseNoName:       refusedFileInvalid,
+		"not a png":      refusedFileInvalid,
+		casePNGAsJPEG:    refusedFileInvalid,
+		caseSizeMismatch: refusedFileInvalid,
+		casePixelFlood:   refusedFileInvalid,
 		// IR368: the name is a label without control characters, paths or bidirectional overrides
-		"line break in the name": "file=error.invalidFile",
-		"path in the name":       "file=error.invalidFile",
-		"override in the name":   "file=error.invalidFile",
+		"line break in the name": refusedFileInvalid,
+		"path in the name":       refusedFileInvalid,
+		"override in the name":   refusedFileInvalid,
 	}
 
-	for name, f := range map[string]string{
-		"gif":           blobJSON("a.gif", "image/gif", img, len(img)),
-		"size mismatch": blobJSON("a.png", "image/png", img, 3),
-		"pixel flood":   blobJSON("flood.png", "image/png", flood, len(flood)),
-		"empty":         blobJSON("a.png", "image/png", nil, 0),
-		"no name":       blobJSON(" ", "image/png", img, len(img)),
+	for name, file := range map[string]string{
+		"gif":            blobJSON("a.gif", "image/gif", img, len(img)),
+		caseSizeMismatch: blobJSON("a.png", "image/png", img, 3),
+		casePixelFlood:   blobJSON("flood.png", "image/png", flood, len(flood)),
+		"empty":          blobJSON("a.png", "image/png", nil, 0),
+		caseNoName:       blobJSON(" ", "image/png", img, len(img)),
 		// stored and served only as what it is (IR308)
 		"not a png":              blobJSON("a.png", "image/png", []byte("<svg onload=alert(1)>"), 21),
-		"png as jpeg":            blobJSON("a.jpg", "image/jpeg", img, len(img)),
+		casePNGAsJPEG:            blobJSON("a.jpg", "image/jpeg", img, len(img)),
 		"line break in the name": blobJSON(`a\r\nSet-Cookie: x.png`, "image/png", img, len(img)),
 		"path in the name":       blobJSON("../../a.png", "image/png", img, len(img)),
 		"override in the name":   blobJSON("photo\u202egnp.exe", "image/png", img, len(img)),
 	} {
-		code, m := add(f, 1)
+		code, m := add(file, 1)
 		refusal(t, name, code, m, want[name])
 	}
 
@@ -70,7 +73,7 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&techInt,
+		techInt(),
 		"attachments.add",
 		`{"jobId":"`+job+`","reportId":"`+uuid.NewString()+`","file":`+blobJSON(
 			"a.png",
@@ -94,14 +97,17 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		draftBody(
 			job,
 			"normal",
-			map[string]string{"reportId": `"` + rep + `"`, "attachmentIds": `["` + att + `"]`},
+			map[string]string{
+				fieldReportID:      `"` + rep + `"`,
+				fieldAttachmentIDs: `["` + att + `"]`,
+			},
 		),
 		`"componentKey":"filter","result":"normal","reason":null,"evidenceIds":[]`,
 		`"componentKey":"filter","result":"normal","reason":null,"evidenceIds":["`+att+`"]`,
 		1,
 	)
 
-	code, res = write(srv, &techInt, "jobs.saveDraft", body, 2)
+	code, res = write(srv, techInt(), "jobs.saveDraft", body, 2)
 	if code != 200 || len(asArr(t, data(res)["attachmentRefs"])) != 1 {
 		t.Fatalf("draft with attachment: %d %v", code, res)
 	}
@@ -114,24 +120,24 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		}
 	}
 	// sign-off
-	sign := func(extra string, v, rv int) (int, map[string]any) {
+	sign := func(extra string, version, reportVersion int) (int, map[string]any) {
 		return write(
 			srv,
-			&techInt,
+			techInt(),
 			"reports.signOff",
 			`{"jobId":"`+job+`","reportId":"`+rep+`","reportVersion":`+itoa(
-				rv,
+				reportVersion,
 			)+`,"signerName":" Aisha "`+extra+`}`,
-			v,
+			version,
 		)
 	}
 	sig := blobJSON("sig.png", "image/png", img, len(img))
 	want = map[string]string{ // the field each case is refused for
-		"absent without photo": "signature=errors.signature_or_absence",
+		"absent without photo": refusedSignatureOrAbsence,
 		"blank absent reason":  "absentReason=error.length",
-		"both":                 "signature=errors.signature_or_absence",
+		"both":                 refusedSignatureOrAbsence,
 		"jpeg signature":       "signature=error.invalidFile",
-		"neither":              "signature=errors.signature_or_absence",
+		"neither":              refusedSignatureOrAbsence,
 	}
 
 	for name, extra := range map[string]string{
@@ -172,30 +178,30 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		t.Fatalf("absent sign-off: %d %v", code, resp)
 	}
 	// getContent
-	get := func(a *actor, v int) (int, map[string]any) {
+	get := func(a *actor, version int) (int, map[string]any) {
 		return post(
 			srv,
 			a,
 			"attachments.getContent",
 			`{"jobId":"`+job+`","reportId":"`+rep+`","reportVersion":`+itoa(
-				v,
+				version,
 			)+`,"attachmentId":"`+att+`"}`,
 		)
 	}
 
-	code, res = get(&techInt, 3)
+	code, res = get(techInt(), 3)
 	if code != 200 || data(res)["bytes"] != base64.StdEncoding.EncodeToString(img) ||
-		data(res)["mime"] != "image/png" {
+		data(res)["mime"] != mimePNG {
 		t.Fatalf("getContent: %d %v", code, res)
 	}
 
-	if code, _ := get(&customerA, 3); code != 404 {
+	if code, _ := get(customerA(), 3); code != 404 {
 		t.Error("client before acceptance")
 	}
 
 	if code, _ := post(
 		srv,
-		&hq,
+		hq(),
 		"attachments.getContent",
 		`{"jobId":"`+job+`","reportId":"`+rep+`","reportVersion":3,"attachmentId":"`+uuid.NewString()+`"}`,
 	); code != 404 {
@@ -204,7 +210,7 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 	// saving the draft clears the sign-off
 	if code, resp := write(
 		srv,
-		&techInt,
+		techInt(),
 		"jobs.saveDraft",
 		body,
 		3,

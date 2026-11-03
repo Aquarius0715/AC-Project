@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -11,17 +11,19 @@ import (
 // TestMRVReadRefusals: an MRV report that does not exist is NOT_FOUND; a version below 1 and a nil id are refused as
 // VALIDATION on id before any row is read (energy mrv.get, mrv.versions; the input rules of GetInput and
 // VersionsInput).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestMRVReadRefusals(t *testing.T) {
 	srv := server(t)
 	missing := uuid.NewString()
 
-	code, res := post(srv, &hq, "mrv.get", `{"id":"`+missing+`"}`)
+	code, res := post(srv, hq(), "mrv.get", `{"id":"`+missing+`"}`)
 	if code != 404 || res["messageKey"] != apperr.KeyNotFound {
 		t.Fatalf("mrv.get of a missing report: %d %v, want 404 NOT_FOUND", code, res)
 	}
 
-	code, res = post(srv, &hq, "mrv.get", `{"id":"`+missing+`","reportVersion":0}`)
+	code, res = post(srv, hq(), "mrv.get", `{"id":"`+missing+`","reportVersion":0}`)
 	refusal(t, "mrv.get reportVersion 0", code, res, "id=error.invalid")
-	code, res = post(srv, &hq, "mrv.versions", `{"id":"00000000-0000-0000-0000-000000000000"}`)
+	code, res = post(srv, hq(), "mrv.versions", `{"id":"00000000-0000-0000-0000-000000000000"}`)
 	refusal(t, "mrv.versions nil id", code, res, "id=error.required")
 }

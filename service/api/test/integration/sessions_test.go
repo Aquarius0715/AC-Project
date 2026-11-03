@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"context"
@@ -23,6 +23,8 @@ import (
 // when, is UNAUTHENTICATED errors.session_revoked, in identity and in the other services; a sign-in after it works. The
 // access stays. A client membership needs asset.write, any other identity.write; a reason is required; another tenant's
 // membership is NOT_FOUND and keeps its sessions.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestRevokeSessions(t *testing.T) {
 	srv := server(t)
 	tenantA, tenantB := seed.ID("tenant-a"), seed.ID("tenant-b")
@@ -37,7 +39,7 @@ func TestRevokeSessions(t *testing.T) {
 	assets := seed.ID(
 		"test-revoke-assets",
 	) // an HQ membership with asset.write but not identity.write
-	from := clock.Add(-24 * time.Hour)
+	from := clock().Add(-24 * time.Hour)
 
 	owner(
 		t,
@@ -86,10 +88,13 @@ func TestRevokeSessions(t *testing.T) {
 		from,
 	)
 
-	for m, copyOf := range map[string]string{"test-revoke-tech": "tech-internal-a", "test-revoke-client": "customer-a"} {
+	for membership, copyOf := range map[string]string{
+		"test-revoke-tech":   membershipTechInternalA,
+		"test-revoke-client": membershipCustomerA,
+	} {
 		owner(t, `INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission)
 			SELECT tenant_id, $1, permission FROM identity.membership_permissions WHERE membership_id = $2 ON CONFLICT DO
-			NOTHING`, seed.ID(m), seed.ID(copyOf))
+			NOTHING`, seed.ID(membership), seed.ID(copyOf))
 	}
 
 	owner(
@@ -130,11 +135,11 @@ func TestRevokeSessions(t *testing.T) {
 	}
 
 	// the input and who may
-	code, resp := write(srv, &hq, "members.revokeSessions", body(tech, "   "), 0)
+	code, resp := write(srv, hq(), "members.revokeSessions", body(tech, "   "), 0)
 	refusal(t, "an empty reason", code, resp, "reason=error.length")
 	code, resp = write(
 		srv,
-		&hq,
+		hq(),
 		"members.revokeSessions",
 		body("00000000-0000-0000-0000-000000000000", "Phone lost"),
 		0,
@@ -143,7 +148,7 @@ func TestRevokeSessions(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&overrider,
+		overrider(),
 		"members.revokeSessions",
 		body(tech, "Phone lost"),
 		0,
@@ -164,7 +169,7 @@ func TestRevokeSessions(t *testing.T) {
 
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"members.revokeSessions",
 		body(foreign, "Phone lost"),
 		0,
@@ -185,8 +190,10 @@ func TestRevokeSessions(t *testing.T) {
 		t.Fatalf("revoke: %d %v", code, resp)
 	}
 
-	var ids []string
-	for _, v := range asArr(t, data(resp)["membershipIds"]) {
+	revokedIDs := asArr(t, data(resp)["membershipIds"])
+
+	ids := make([]string, 0, len(revokedIDs))
+	for _, v := range revokedIDs {
 		ids = append(ids, asStr(t, v))
 	}
 
@@ -198,23 +205,23 @@ func TestRevokeSessions(t *testing.T) {
 		t.Errorf("revoked memberships %s", got)
 	}
 
-	for _, c := range []struct {
+	for _, testCase := range []struct {
 		who actor
 		op  string
 	}{
-		{old, "session.get"},
-		{oldClient, "session.get"},
-		{actor{"tok-rv", "test-revoke-tech"}, "session.get"},
-		{oldClient, "units.list"},
+		{old, opSessionGet},
+		{oldClient, opSessionGet},
+		{actor{"tok-rv", "test-revoke-tech"}, opSessionGet},
+		{oldClient, opUnitsList},
 	} {
 		if code, res := post(
 			srv,
-			&c.who,
-			c.op,
+			&testCase.who,
+			testCase.op,
 			`{}`,
 		); code != 401 ||
 			res["messageKey"] != "errors.session_revoked" {
-			t.Errorf("%s as %s signed in before: %d %v", c.op, c.who.token, code, res)
+			t.Errorf("%s as %s signed in before: %d %v", testCase.op, testCase.who.token, code, res)
 		}
 	}
 	// a sign-in in the revocation's own second: auth_time has whole seconds, so it cannot be told from one just before
@@ -264,8 +271,14 @@ func TestRevokeSessions(t *testing.T) {
 	}
 }
 
-// fakeIdP records the subjects whose identity-provider sessions were ended.
-type fakeIdP struct {
+// errProviderDown and errIdentityProviderDown are the failures of an identity provider that does not answer.
+var (
+	errProviderDown         = errors.New("provider unavailable")
+	errIdentityProviderDown = errors.New("identity provider unavailable")
+)
+
+// fakeIDP records the subjects whose identity-provider sessions were ended.
+type fakeIDP struct {
 	mu       sync.Mutex
 	subjects []string
 	err      error
@@ -282,12 +295,12 @@ type fakeIdP struct {
 	generation int
 }
 
-func (f *fakeIdP) CreateAccount(_ context.Context, account idp.Account) (string, error) {
+func (f *fakeIDP) CreateAccount(_ context.Context, account idp.Account) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
 	if f.failing {
-		return "", errors.New("provider unavailable")
+		return "", errProviderDown
 	}
 
 	f.created = append(f.created, account)
@@ -298,12 +311,12 @@ func (f *fakeIdP) CreateAccount(_ context.Context, account idp.Account) (string,
 	return "sub-" + account.Email, nil
 }
 
-func (f *fakeIdP) UpdateAccount(_ context.Context, subject string, account idp.Account) error {
+func (f *fakeIDP) UpdateAccount(_ context.Context, subject string, account idp.Account) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
 	if f.failing {
-		return errors.New("provider unavailable")
+		return errProviderDown
 	}
 
 	if f.lost[subject] {
@@ -315,7 +328,7 @@ func (f *fakeIdP) UpdateAccount(_ context.Context, subject string, account idp.A
 	return nil
 }
 
-func (f *fakeIdP) SendSetup(_ context.Context, subject string, _ idp.Account) error {
+func (f *fakeIDP) SendSetup(_ context.Context, subject string, _ idp.Account) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -324,7 +337,7 @@ func (f *fakeIdP) SendSetup(_ context.Context, subject string, _ idp.Account) er
 	return nil
 }
 
-func (f *fakeIdP) SetEnabled(_ context.Context, subject string, enabled bool) error {
+func (f *fakeIDP) SetEnabled(_ context.Context, subject string, enabled bool) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -333,7 +346,7 @@ func (f *fakeIdP) SetEnabled(_ context.Context, subject string, enabled bool) er
 	return nil
 }
 
-func (f *fakeIdP) EndSessions(_ context.Context, subject string) error {
+func (f *fakeIDP) EndSessions(_ context.Context, subject string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -342,7 +355,7 @@ func (f *fakeIdP) EndSessions(_ context.Context, subject string) error {
 	return f.err
 }
 
-func (f *fakeIdP) take() []string {
+func (f *fakeIDP) take() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -356,8 +369,10 @@ func (f *fakeIdP) take() []string {
 // sessions at the identity provider (IR386): the user's ID in the realm locally, the Cognito sub once the user has one.
 // The event is applied once. A provider that fails is logged and the event is still done, so it does not hold up
 // the identity consumer's other events; the Core API refuses the old sign-ins either way (IR384).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
-	idp := &fakeIdP{
+	idp := &fakeIDP{
 		mu:         sync.Mutex{},
 		subjects:   nil,
 		err:        nil,
@@ -389,7 +404,7 @@ func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
 		seed.ID("tenant-a"),
 		user,
 		seed.ID("org-operator-a"),
-		clock.Add(-24*time.Hour),
+		clock().Add(-24*time.Hour),
 	)
 	t.Cleanup(func() { owner(t, `DELETE FROM identity.memberships WHERE id = $1`, member) })
 
@@ -398,7 +413,7 @@ func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
 
 		if code, res := write(
 			srv,
-			&hq,
+			hq(),
 			"members.revokeSessions",
 			fmt.Sprintf(`{"membershipId":"%s","reason":"Laptop stolen"}`, member),
 			0,
@@ -430,7 +445,7 @@ func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
 		func() { owner(t, `UPDATE identity.users SET cognito_sub = NULL WHERE id = $1`, user) },
 	)
 
-	idp.err = errors.New("identity provider unavailable")
+	idp.err = errIdentityProviderDown
 
 	revoke()
 

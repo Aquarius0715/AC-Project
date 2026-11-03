@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -12,11 +12,13 @@ import (
 // (NOT_FOUND, a record outside the caller's scope) leaves an audit entry with the result denied — the actor, the
 // operation and the target it asked for, the refusal as the reason — at most one per actor and operation a minute.
 // A refusal of the input (VALIDATION) and a refused read leave none.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestDeniedWritesAudited(t *testing.T) {
 	srv := server(t)
-	day := `"from":"` + clock.Add(-24*time.Hour).
+	day := `"from":"` + clock().Add(-24*time.Hour).
 		Format(time.RFC3339) +
-		`","to":"` + clock.Add(time.Hour).
+		`","to":"` + clock().Add(time.Hour).
 		Format(time.RFC3339) +
 		`"`
 	denied := func(action, actor string) []map[string]any {
@@ -25,13 +27,13 @@ func TestDeniedWritesAudited(t *testing.T) {
 
 		_, res := post(
 			srv,
-			&hq,
+			hq(),
 			"audit.list",
 			`{"filters":{`+day+`,"result":"denied","actorId":"`+actor+`"},"limit":100}`,
 		)
 		out := []map[string]any{}
 
-		for _, a := range items(res) {
+		for _, a := range items(t, res) {
 			if a["action"] == action {
 				out = append(out, a)
 			}
@@ -52,7 +54,7 @@ func TestDeniedWritesAudited(t *testing.T) {
 	for range 2 {
 		if code, res := write(
 			srv,
-			&contrA,
+			contrA(),
 			"units.archive",
 			`{"id":"`+unit+`","reason":"probe"}`,
 			1,
@@ -74,25 +76,31 @@ func TestDeniedWritesAudited(t *testing.T) {
 		t.Fatalf("denied entries of the two attempts: %d, want 1 a minute", n)
 	}
 
-	e := got[0]
-	if e["actorRoleAtTime"] != "contractor" || e["result"] != "denied" ||
-		e["reason"] != apperr.KeyForbidden ||
-		asObj(t, e["targetRef"])["kind"] != "unit" ||
-		asObj(t, e["targetRef"])["id"] != unit ||
-		e["correlationId"] == "" {
+	entry := got[0]
+	if entry["actorRoleAtTime"] != roleContractor || entry["result"] != "denied" ||
+		entry["reason"] != apperr.KeyForbidden ||
+		asObj(t, entry["targetRef"])["kind"] != "unit" ||
+		asObj(t, entry["targetRef"])["id"] != unit ||
+		entry["correlationId"] == "" {
 		t.Errorf(
 			"the denied entry names the actor, the operation, the target and the refusal: %v",
-			e,
+			entry,
 		)
 	}
 
 	// scope: a contractor reviewing a job HQ keeps in-house (NOT_FOUND) — the job it asked for is the target
-	_, m := write(srv, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	_, resp := write(
+		srv,
+		customerA(),
+		"jobs.create",
+		jobBody(seed.ID("unit-non-rto").String(), nil),
+		0,
+	)
 
-	job := asStr(t, data(m)["id"])
+	job := asStr(t, data(resp)["id"])
 	if code, res := write(
 		srv,
-		&contrA,
+		contrA(),
 		"jobs.review",
 		`{"jobId":"`+job+`","reportVersion":1,"decision":"accept","reviewMode":"normal"}`,
 		1,
@@ -112,7 +120,7 @@ func TestDeniedWritesAudited(t *testing.T) {
 		t.Errorf("the scope refusal records the job asked for: %v", target)
 	}
 	// a refused read is not audited
-	if code, _ := post(srv, &contrA, "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
+	if code, _ := post(srv, contrA(), "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
 		t.Errorf("a contractor reads an in-house job: %d", code)
 	}
 
@@ -122,7 +130,7 @@ func TestDeniedWritesAudited(t *testing.T) {
 	// the input's own refusal is not a denial
 	if code, _ := write(
 		srv,
-		&hq,
+		hq(),
 		"units.archive",
 		`{"id":"`+unit+`","reason":""}`,
 		1,
