@@ -171,7 +171,7 @@ func (in *ProposeInput) Validate() map[string]string {
 		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
-	trimmedReason(&in.Message, 1000, "message", fieldErrs)
+	trimmedReason(&in.Message, maxReasonLength, "message", fieldErrs)
 
 	if in.ReplyBy.IsZero() {
 		fieldErrs["replyBy"] = apperr.KeyRequired
@@ -495,7 +495,7 @@ func (in *RespondInput) Validate() map[string]string {
 
 	if in.Comment != nil {
 		*in.Comment = strings.TrimSpace(*in.Comment)
-		if utf8.RuneCountInString(*in.Comment) > 1000 {
+		if utf8.RuneCountInString(*in.Comment) > maxReasonLength {
 			fieldErrs["comment"] = apperr.KeyLength
 		}
 	}
@@ -845,7 +845,7 @@ func (in *RescheduleInput) Validate() map[string]string {
 
 	if in.Comment != nil {
 		*in.Comment = strings.TrimSpace(*in.Comment)
-		if utf8.RuneCountInString(*in.Comment) > 1000 {
+		if utf8.RuneCountInString(*in.Comment) > maxReasonLength {
 			fieldErrs["comment"] = apperr.KeyLength
 		}
 	}
@@ -1012,7 +1012,7 @@ func (in *PartnerProposeInput) Validate() map[string]string {
 		fieldErrs["technicianMembershipId"] = apperr.KeyRequired
 	}
 
-	trimmedReason(&in.Reason, 1000, fieldReason, fieldErrs)
+	trimmedReason(&in.Reason, maxReasonLength, fieldReason, fieldErrs)
 
 	return fieldErrs
 }

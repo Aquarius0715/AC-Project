@@ -481,7 +481,7 @@ func (in *DraftInput) Validate() map[string]string {
 
 		if itemInput.Reason != nil {
 			*itemInput.Reason = strings.TrimSpace(*itemInput.Reason)
-			if utf8.RuneCountInString(*itemInput.Reason) > 1000 {
+			if utf8.RuneCountInString(*itemInput.Reason) > maxReasonLength {
 				fieldErrs[fieldItems] = apperr.KeyLength
 			}
 		}
@@ -500,7 +500,8 @@ func (in *DraftInput) Validate() map[string]string {
 
 	for _, p := range in.Parts {
 		n := utf8.RuneCountInString(strings.TrimSpace(p.Name))
-		if n < 1 || n > 120 || p.Quantity < 0 || p.Quantity > 999 || !partSources[p.Source] ||
+		if n < 1 || n > maxNameLength || p.Quantity < 0 || p.Quantity > 999 ||
+			!partSources[p.Source] ||
 			(p.OldPartDisposal != nil && !disposals[*p.OldPartDisposal]) ||
 			(p.ReplacesComponentKey != nil && groupOf(*p.ReplacesComponentKey) == "") {
 			fieldErrs["parts"] = apperr.KeyInvalid
@@ -509,7 +510,7 @@ func (in *DraftInput) Validate() map[string]string {
 
 	for _, r := range in.Refrigerant {
 		n := utf8.RuneCountInString(r.CylinderID)
-		if !refrigerants[r.Refrigerant] || n < 1 || n > 64 || r.RecoveredKg < 0 ||
+		if !refrigerants[r.Refrigerant] || n < 1 || n > maxCodeLength || r.RecoveredKg < 0 ||
 			r.ChargedKg < 0 ||
 			!leakChecks[r.LeakCheck] {
 			fieldErrs["refrigerant"] = apperr.KeyInvalid
@@ -528,7 +529,7 @@ func (in *DraftInput) Validate() map[string]string {
 			}
 		case nextActionFollowUp:
 			if nextAction.Date == nil || nextAction.Note == nil ||
-				utf8.RuneCountInString(*nextAction.Note) > 1000 {
+				utf8.RuneCountInString(*nextAction.Note) > maxReasonLength {
 				fieldErrs[fieldNextAction] = apperr.KeyInvalid
 			}
 		default:
@@ -1353,7 +1354,7 @@ func (in *ReviewInput) Validate() map[string]string {
 	}
 
 	if in.Reason != nil {
-		trimmedReason(in.Reason, 1000, fieldReason, fieldErrs)
+		trimmedReason(in.Reason, maxReasonLength, fieldReason, fieldErrs)
 	}
 
 	if (in.Decision == decisionReturn || in.ReviewMode == reviewHQEscalation) && in.Reason == nil {

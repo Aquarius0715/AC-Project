@@ -249,7 +249,7 @@ func (in *SignOffInput) Validate() map[string]string {
 		fieldErrs["reportId"] = apperr.KeyRequired
 	}
 
-	trimmedReason(&in.SignerName, 120, "signerName", fieldErrs)
+	trimmedReason(&in.SignerName, maxNameLength, "signerName", fieldErrs)
 
 	switch {
 	case in.Signature != nil && in.AbsentReason == nil && in.SitePhoto == nil:
@@ -257,7 +257,7 @@ func (in *SignOffInput) Validate() map[string]string {
 			fieldErrs["signature"] = apperr.KeyInvalidFile
 		}
 	case in.Signature == nil && in.AbsentReason != nil && in.SitePhoto != nil:
-		trimmedReason(in.AbsentReason, 1000, "absentReason", fieldErrs)
+		trimmedReason(in.AbsentReason, maxReasonLength, "absentReason", fieldErrs)
 
 		if !ValidBlob(*in.SitePhoto, 5<<20) {
 			fieldErrs["sitePhoto"] = apperr.KeyInvalidFile

@@ -221,7 +221,7 @@ func (in *OfferInput) Validate() map[string]string {
 		fieldErrs["accessValidFrom"] = "error.accessMustCoverVisit"
 	}
 
-	if n := utf8.RuneCountInString(in.TermsVersion); n < 1 || n > 64 {
+	if n := utf8.RuneCountInString(in.TermsVersion); n < 1 || n > maxCodeLength {
 		fieldErrs["termsVersion"] = apperr.KeyLength
 	}
 
@@ -366,7 +366,7 @@ func (in *AcceptInput) Validate() map[string]string {
 	fieldErrs := decisionRefs(in.JobID, in.OfferID)
 	if in.TermsVersion == "" {
 		fieldErrs["termsVersion"] = apperr.KeyRequired
-	} else if utf8.RuneCountInString(in.TermsVersion) > 64 {
+	} else if utf8.RuneCountInString(in.TermsVersion) > maxCodeLength {
 		fieldErrs["termsVersion"] = apperr.KeyLength
 	}
 
@@ -383,7 +383,7 @@ type DeclineInput struct {
 // Validate implements ops.Validator.
 func (in *DeclineInput) Validate() map[string]string {
 	fe := decisionRefs(in.JobID, in.OfferID)
-	trimmedReason(&in.Reason, 1000, fieldReason, fe)
+	trimmedReason(&in.Reason, maxReasonLength, fieldReason, fe)
 
 	return fe
 }
@@ -644,7 +644,7 @@ func (in *AssignInput) Validate() map[string]string {
 
 	if in.Reason != nil {
 		*in.Reason = strings.TrimSpace(*in.Reason)
-		if utf8.RuneCountInString(*in.Reason) > 1000 {
+		if utf8.RuneCountInString(*in.Reason) > maxReasonLength {
 			fieldErrs[fieldReason] = apperr.KeyLength
 		}
 	}

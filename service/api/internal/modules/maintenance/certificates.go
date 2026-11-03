@@ -211,8 +211,8 @@ func (in *SubmitCertInput) Validate() map[string]string {
 		fieldErrs["code"] = apperr.KeyInvalid
 	}
 
-	trimmedReason(&in.Name, 120, fieldName, fieldErrs)
-	trimmedReason(&in.Number, 64, "number", fieldErrs)
+	trimmedReason(&in.Name, maxNameLength, fieldName, fieldErrs)
+	trimmedReason(&in.Number, maxCodeLength, "number", fieldErrs)
 
 	if in.IssuedAt.IsZero() || !in.IssuedAt.Before(in.ExpiresAt) {
 		fieldErrs["expiresAt"] = apperr.KeyRange
@@ -370,7 +370,7 @@ func (in *VerifyInput) Validate() map[string]string {
 		if in.Reason == nil {
 			fieldErrs[fieldReason] = apperr.KeyRequired
 		} else {
-			trimmedReason(in.Reason, 1000, fieldReason, fieldErrs)
+			trimmedReason(in.Reason, maxReasonLength, fieldReason, fieldErrs)
 		}
 	default:
 		fieldErrs["decision"] = apperr.KeyInvalid
@@ -519,7 +519,7 @@ func (in *TrainingInput) Validate() map[string]string {
 		fieldErrs["certificateId"] = apperr.KeyRequired
 	}
 
-	trimmedReason(&in.Note, 1000, "note", fieldErrs)
+	trimmedReason(&in.Note, maxReasonLength, "note", fieldErrs)
 
 	return fieldErrs
 }

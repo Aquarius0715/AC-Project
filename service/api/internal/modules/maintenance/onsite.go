@@ -102,9 +102,12 @@ func (m OnSite) save(
 	timeOnSite TimeOnSite,
 	action, event, reason string,
 ) (Job, error) {
-	raw, _ := json.Marshal(timeOnSite)
+	raw, err := json.Marshal(timeOnSite)
+	if err != nil {
+		return Job{}, apperr.Wrap(err, "json.Marshal")
+	}
 
-	_, err := call.Tx.Exec(
+	_, err = call.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.jobs SET status = $2, time_on_site = $3, started_at = COALESCE(started_at, $4), version = version
 			+ 1,
@@ -231,28 +234,38 @@ func (in *CheckInInput) Validate() map[string]string {
 
 	switch in.Method {
 	case "location_qr":
-		if in.DistanceMeters == nil || *in.DistanceMeters < 0 || *in.DistanceMeters > 200 {
-			fieldErrs["distanceMeters"] = "errors.too_far"
-		}
-
-		if in.QRUnitID == nil {
-			fieldErrs["qrUnitId"] = apperr.KeyRequired
-		}
+		in.checkLocation(fieldErrs)
 	case "manual":
-		if in.Reason == nil {
-			fieldErrs[fieldReason] = apperr.KeyRequired
-		} else {
-			trimmedReason(in.Reason, 1000, fieldReason, fieldErrs)
-		}
-
-		if in.DistanceMeters != nil && *in.DistanceMeters < 0 {
-			fieldErrs["distanceMeters"] = apperr.KeyRange
-		}
+		in.checkManual(fieldErrs)
 	default:
 		fieldErrs["method"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
+}
+
+// checkLocation applies IR111 to a location_qr check-in: within 200 m, with the unit whose QR code was scanned.
+func (in *CheckInInput) checkLocation(fieldErrs map[string]string) {
+	if in.DistanceMeters == nil || *in.DistanceMeters < 0 || *in.DistanceMeters > 200 {
+		fieldErrs["distanceMeters"] = "errors.too_far"
+	}
+
+	if in.QRUnitID == nil {
+		fieldErrs["qrUnitId"] = apperr.KeyRequired
+	}
+}
+
+// checkManual applies IR111 to a manual check-in: a reason, and no negative distance.
+func (in *CheckInInput) checkManual(fieldErrs map[string]string) {
+	if in.Reason == nil {
+		fieldErrs[fieldReason] = apperr.KeyRequired
+	} else {
+		trimmedReason(in.Reason, maxReasonLength, fieldReason, fieldErrs)
+	}
+
+	if in.DistanceMeters != nil && *in.DistanceMeters < 0 {
+		fieldErrs["distanceMeters"] = apperr.KeyRange
+	}
 }
 
 // checkIn serves jobs.checkIn.
@@ -453,7 +466,7 @@ func (in *AckInput) Validate() map[string]string {
 		if in.Reason == nil {
 			fieldErrs[fieldReason] = apperr.KeyRequired
 		} else {
-			trimmedReason(in.Reason, 1000, fieldReason, fieldErrs)
+			trimmedReason(in.Reason, maxReasonLength, fieldReason, fieldErrs)
 		}
 
 		if in.AlternativeSlot != nil &&
@@ -500,79 +513,14 @@ func (m OnSite) acknowledge(
 	call *ops.Call,
 	input *AckInput,
 ) (Assignment, error) {
-	var (
-		aid uuid.UUID
-		ack string
-		end time.Time
-	)
-
-	err := call.Tx.QueryRow(ctx, `SELECT id, acknowledgement, upper(scheduled) FROM maintenance.assignments WHERE job_id = $1
-		AND technician_membership_id = $2
-		AND status = 'active' AND created_at <= $3 FOR UPDATE`, input.JobID, call.Principal.MembershipID, call.Now).
-		Scan(&aid, &ack, &end)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return Assignment{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
-	}
-
+	aid, err := pendingAssignment(ctx, call, input.JobID)
 	if err != nil {
-		return Assignment{}, apperr.Wrap(err, "select maintenance.assignments")
+		return Assignment{}, err
 	}
 
-	if !call.Now.Before(end) {
-		return Assignment{}, apperr.E(apperr.Forbidden, "errors.assignment_ended")
-	}
-
-	var version int
-
-	scanErr := call.Tx.QueryRow(ctx, `SELECT version FROM maintenance.jobs WHERE id = $1 FOR UPDATE`, input.JobID).
-		Scan(&version)
-	if scanErr != nil {
-		return Assignment{}, apperr.Wrap(scanErr, "select maintenance.jobs")
-	}
-
-	if version != *call.ExpectedVersion {
-		return Assignment{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
-	}
-
-	if ack != ackPending {
-		return Assignment{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
-	}
-
-	value := ackAccepted
-
-	var altStart, altEnd *time.Time
-
-	if input.Decision == ackCantMake {
-		value = ackCantMake
-
-		if input.AlternativeSlot != nil {
-			altStart, altEnd = &input.AlternativeSlot.StartAt, &input.AlternativeSlot.EndAt
-		}
-	}
-
-	_, execErr := call.Tx.Exec(
-		ctx,
-		`UPDATE maintenance.assignments SET acknowledgement = $2, acknowledged_at = $3, cant_make_reason = $4,
-		alternative_slot = CASE WHEN $5::timestamptz IS NULL THEN NULL ELSE tstzrange($5, $6) END, version = version + 1,
-		updated_at = platform.app_now() WHERE id = $1`,
-		aid,
-		value,
-		call.Now,
-		input.Reason,
-		altStart,
-		altEnd,
-	)
-	if execErr != nil {
-		return Assignment{}, apperr.Wrap(execErr, "update maintenance.assignments")
-	}
-
-	_, execErr = call.Tx.Exec(
-		ctx,
-		`UPDATE maintenance.jobs SET version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
-		input.JobID,
-	)
-	if execErr != nil {
-		return Assignment{}, apperr.Wrap(execErr, "update maintenance.jobs")
+	value, err := recordAcknowledgement(ctx, call, aid, input)
+	if err != nil {
+		return Assignment{}, err
 	}
 
 	eventErr := m.Jobs.event(ctx, call, input.JobID, "assignment."+value, nil)
@@ -604,16 +552,105 @@ func (m OnSite) acknowledge(
 		),
 	)
 
-	active, err := m.Jobs.activeAssignment(
+	active, found, err := m.Jobs.activeAssignment(
 		ctx,
 		call,
 		input.JobID,
 	) // the result is the Assignment (service-contracts)
-	if err != nil || active == nil {
+	if err != nil || !found {
 		return Assignment{}, err
 	}
 
-	return *active, nil
+	return active, nil
+}
+
+// pendingAssignment locks the caller's active assignment on the job, which must not have ended and must wait for the
+// acknowledgement, and the job at the expected version; it answers the assignment's ID.
+func pendingAssignment(ctx context.Context, call *ops.Call, jobID uuid.UUID) (uuid.UUID, error) {
+	var (
+		aid uuid.UUID
+		ack string
+		end time.Time
+	)
+
+	err := call.Tx.QueryRow(ctx, `SELECT id, acknowledgement, upper(scheduled) FROM maintenance.assignments WHERE job_id = $1
+		AND technician_membership_id = $2
+		AND status = 'active' AND created_at <= $3 FOR UPDATE`, jobID, call.Principal.MembershipID, call.Now).
+		Scan(&aid, &ack, &end)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return aid, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	}
+
+	if err != nil {
+		return aid, apperr.Wrap(err, "select maintenance.assignments")
+	}
+
+	if !call.Now.Before(end) {
+		return aid, apperr.E(apperr.Forbidden, "errors.assignment_ended")
+	}
+
+	var version int
+
+	scanErr := call.Tx.QueryRow(ctx, `SELECT version FROM maintenance.jobs WHERE id = $1 FOR UPDATE`, jobID).
+		Scan(&version)
+	if scanErr != nil {
+		return aid, apperr.Wrap(scanErr, "select maintenance.jobs")
+	}
+
+	if version != *call.ExpectedVersion {
+		return aid, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
+	}
+
+	if ack != ackPending {
+		return aid, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
+	}
+
+	return aid, nil
+}
+
+// recordAcknowledgement stores the technician's answer on the assignment, with the reason and the alternative slot of
+// a cant_make, and bumps the job's version; it answers the acknowledgement.
+func recordAcknowledgement(
+	ctx context.Context,
+	call *ops.Call,
+	aid uuid.UUID,
+	input *AckInput,
+) (string, error) {
+	value := ackAccepted
+
+	var altStart, altEnd *time.Time
+
+	if input.Decision == ackCantMake {
+		value = ackCantMake
+
+		if input.AlternativeSlot != nil {
+			altStart, altEnd = &input.AlternativeSlot.StartAt, &input.AlternativeSlot.EndAt
+		}
+	}
+
+	_, execErr := call.Tx.Exec(
+		ctx,
+		`UPDATE maintenance.assignments SET acknowledgement = $2, acknowledged_at = $3, cant_make_reason = $4,
+		alternative_slot = CASE WHEN $5::timestamptz IS NULL THEN NULL ELSE tstzrange($5, $6) END, version = version + 1,
+		updated_at = platform.app_now() WHERE id = $1`,
+		aid,
+		value,
+		call.Now,
+		input.Reason,
+		altStart,
+		altEnd,
+	)
+	if execErr != nil {
+		return value, apperr.Wrap(execErr, "update maintenance.assignments")
+	}
+
+	_, execErr = call.Tx.Exec(
+		ctx,
+		`UPDATE maintenance.jobs SET version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
+		input.JobID,
+	)
+
+	return value, apperr.Wrap(execErr, "update maintenance.jobs")
 }
 
 // RegisterOnSite binds the technician on-site operations.

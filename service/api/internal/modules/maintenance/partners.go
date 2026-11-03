@@ -484,7 +484,7 @@ func (in *ProfileInput) Validate() map[string]string {
 		fieldErrs[fieldOrganizationID] = apperr.KeyRequired
 	}
 
-	trimmedReason(&in.RegistrationNo, 64, "registrationNo", fieldErrs)
+	trimmedReason(&in.RegistrationNo, maxCodeLength, "registrationNo", fieldErrs)
 
 	seen := map[string]bool{}
 
@@ -686,7 +686,7 @@ func (in *OfferStatusInput) Validate() map[string]string {
 		fieldErrs[fieldStatus] = apperr.KeyInvalid
 	}
 
-	trimmedReason(&in.Reason, 1000, fieldReason, fieldErrs)
+	trimmedReason(&in.Reason, maxReasonLength, fieldReason, fieldErrs)
 
 	return fieldErrs
 }

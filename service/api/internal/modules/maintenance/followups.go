@@ -158,7 +158,7 @@ func (in *RateInput) Validate() map[string]string {
 
 	if in.Comment != nil {
 		*in.Comment = strings.TrimSpace(*in.Comment)
-		if utf8.RuneCountInString(*in.Comment) > 1000 {
+		if utf8.RuneCountInString(*in.Comment) > maxReasonLength {
 			fieldErrs["comment"] = apperr.KeyLength
 		}
 
@@ -559,7 +559,7 @@ func (in *ClassifyInput) Validate() map[string]string {
 		fieldErrs["classification"] = apperr.KeyInvalid
 	}
 
-	trimmedReason(&in.Reason, 1000, fieldReason, fieldErrs)
+	trimmedReason(&in.Reason, maxReasonLength, fieldReason, fieldErrs)
 
 	return fieldErrs
 }
@@ -764,7 +764,7 @@ func (in *ExtendInput) Validate() map[string]string {
 		fieldErrs["accessValidUntil"] = apperr.KeyRequired
 	}
 
-	trimmedReason(&in.Reason, 1000, fieldReason, fieldErrs)
+	trimmedReason(&in.Reason, maxReasonLength, fieldReason, fieldErrs)
 
 	return fieldErrs
 }
@@ -889,7 +889,7 @@ func (in *ClaimInput) Validate() map[string]string {
 		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
-	trimmedReason(&in.PartLabel, 120, "partLabel", fieldErrs)
+	trimmedReason(&in.PartLabel, maxNameLength, "partLabel", fieldErrs)
 
 	if in.AmountMinor < 1 {
 		fieldErrs["amountMinor"] = apperr.KeyRange
@@ -899,7 +899,7 @@ func (in *ClaimInput) Validate() map[string]string {
 		fieldErrs["currency"] = apperr.KeyInvalid
 	}
 
-	trimmedReason(&in.Reason, 1000, fieldReason, fieldErrs)
+	trimmedReason(&in.Reason, maxReasonLength, fieldReason, fieldErrs)
 
 	return fieldErrs
 }
