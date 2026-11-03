@@ -92,11 +92,12 @@ func addCap(ctx context.Context, c *ops.Call, org uuid.UUID) error {
 		return nil
 	}
 
-	if _, err := c.Tx.Exec(
+	_, err := c.Tx.Exec(
 		ctx,
 		`SELECT 1 FROM identity.organizations WHERE id = $1 FOR UPDATE`,
 		org,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 
@@ -104,10 +105,11 @@ func addCap(ctx context.Context, c *ops.Call, org uuid.UUID) error {
 		n      int
 		oldest *time.Time
 	)
-	if err := c.Tx.QueryRow(ctx, `SELECT count(*), min(created_at) FROM (SELECT created_at FROM identity.memberships
+	err = c.Tx.QueryRow(ctx, `SELECT count(*), min(created_at) FROM (SELECT created_at FROM identity.memberships
 		WHERE organization_id = $1 AND created_at > $2 AND created_at <= $3 ORDER BY created_at DESC LIMIT $4) x`,
 		org, c.Now.Add(-24*time.Hour), c.Now, AccountsPerOrgPerDay).
-		Scan(&n, &oldest); err != nil {
+		Scan(&n, &oldest)
+	if err != nil {
 		return err
 	}
 
@@ -173,7 +175,8 @@ func createAccount(
 	c *ops.Call,
 	a newAccount,
 ) (user, membership uuid.UUID, err error) {
-	if err = addCap(ctx, c, a.OrgID); err != nil {
+	err = addCap(ctx, c, a.OrgID)
+	if err != nil {
 		return user, membership, err
 	}
 
@@ -188,8 +191,9 @@ func createAccount(
 
 	if c.Principal.Role != "admin" { // a person whose access HQ ended comes back only through HQ (IR508), not as a new account
 		var revoked bool
-		if err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.memberships WHERE user_id = $1 AND revoked_at IS NOT NULL)`, user).
-			Scan(&revoked); err != nil {
+		err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.memberships WHERE user_id = $1 AND revoked_at IS NOT NULL)`, user).
+			Scan(&revoked)
+		if err != nil {
 			return user, membership, err
 		}
 
@@ -200,42 +204,46 @@ func createAccount(
 		}
 	}
 
-	if err = c.Tx.QueryRow(ctx, `INSERT INTO identity.memberships (tenant_id, user_id, organization_id, role, employment, client_role, valid_from, valid_until, created_at, updated_at)
+	err = c.Tx.QueryRow(ctx, `INSERT INTO identity.memberships (tenant_id, user_id, organization_id, role, employment, client_role, valid_from, valid_until, created_at, updated_at)
 		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7, $6, $6) RETURNING id`,
 		user, a.OrgID, a.Role, a.Employment, a.ClientRole, c.Now, a.ValidUntil).
-		Scan(&membership); err != nil {
+		Scan(&membership)
+	if err != nil {
 		return user, membership, err
 	}
 
 	for _, p := range a.Permissions {
-		if _, err = c.Tx.Exec(
+		_, err = c.Tx.Exec(
 			ctx,
 			`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES (current_setting('app.tenant_id')::uuid, $1, $2)`,
 			membership,
 			p,
-		); err != nil {
+		)
+		if err != nil {
 			return user, membership, err
 		}
 	}
 
 	for _, sc := range a.Scopes {
-		if _, err = c.Tx.Exec(
+		_, err = c.Tx.Exec(
 			ctx,
 			`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3) ON CONFLICT DO NOTHING`,
 			membership,
 			sc.Kind,
 			sc.ID,
-		); err != nil {
+		)
+		if err != nil {
 			return user, membership, err
 		}
 	}
 
 	if a.Role == "client" { // IR84 initial Consent
-		if _, err = c.Tx.Exec(
+		_, err = c.Tx.Exec(
 			ctx,
 			`INSERT INTO identity.consents (tenant_id, membership_id, purpose, granted) VALUES (current_setting('app.tenant_id')::uuid, $1, 'location_automation', false)`,
 			membership,
-		); err != nil {
+		)
+		if err != nil {
 			return user, membership, err
 		}
 	}
@@ -294,8 +302,9 @@ func AccountHandlers(p Provider, apps AccountApps) map[string]events.Handler {
 				MembershipID uuid.UUID `json:"membershipId"`
 				Role         string    `json:"role"`
 			}
-			if err := e.Decode(&in); err != nil {
-				return err
+			decodeErr := e.Decode(&in)
+			if decodeErr != nil {
+				return decodeErr
 			}
 
 			var (
@@ -351,7 +360,8 @@ func AccountHandlers(p Provider, apps AccountApps) map[string]events.Handler {
 			}
 
 			if subject == "" {
-				if subject, err = p.CreateAccount(cctx, acct); err != nil {
+				subject, err = p.CreateAccount(cctx, acct)
+				if err != nil {
 					slog.WarnContext(
 						ctx,
 						"identity: the provider account was not created",
@@ -365,24 +375,26 @@ func AccountHandlers(p Provider, apps AccountApps) map[string]events.Handler {
 				}
 			}
 
-			if _, err := tx.Exec(
+			_, execErr := tx.Exec(
 				ctx,
 				`UPDATE identity.users SET cognito_sub = $2, sign_in_membership_id = $3 WHERE id = $1`,
 				in.UserID,
 				subject,
 				in.MembershipID,
-			); err != nil {
-				return err
+			)
+			if execErr != nil {
+				return execErr
 			}
 
-			if err := p.SendSetup(cctx, subject, acct); err != nil {
+			sendSetupErr := p.SendSetup(cctx, subject, acct)
+			if sendSetupErr != nil {
 				slog.WarnContext(
 					ctx,
 					"identity: the set-up e-mail was not sent",
 					"user",
 					in.UserID,
 					"err",
-					err,
+					sendSetupErr,
 				)
 			}
 
@@ -393,8 +405,9 @@ func AccountHandlers(p Provider, apps AccountApps) map[string]events.Handler {
 				MembershipID uuid.UUID `json:"membershipId"`
 				Enabled      bool      `json:"enabled"`
 			}
-			if err := e.Decode(&in); err != nil {
-				return err
+			decodeErr := e.Decode(&in)
+			if decodeErr != nil {
+				return decodeErr
 			}
 			// the subject is the provider's, or the person's ID for the realm's demo accounts (auth accepts either); a
 			// membership the account does not sign in with leaves it alone (IR462)
@@ -414,14 +427,15 @@ func AccountHandlers(p Provider, apps AccountApps) map[string]events.Handler {
 			cctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 			defer cancel()
 
-			if err := p.SetEnabled(cctx, sub, in.Enabled); err != nil {
+			setEnabledErr := p.SetEnabled(cctx, sub, in.Enabled)
+			if setEnabledErr != nil {
 				slog.WarnContext(
 					ctx,
 					"identity: the provider account was not turned on or off",
 					"membership",
 					in.MembershipID,
 					"err",
-					err,
+					setEnabledErr,
 				)
 			}
 

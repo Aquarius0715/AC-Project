@@ -128,8 +128,9 @@ func main() {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", " ")
 
-	if err := enc.Encode(out); err != nil {
-		log.Fatal(err)
+	encodeErr := enc.Encode(out)
+	if encodeErr != nil {
+		log.Fatal(encodeErr)
 	}
 }
 

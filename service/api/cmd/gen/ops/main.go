@@ -305,7 +305,8 @@ func main() {
 
 	src, ts, ct, n := generate(*docs)
 	for path, data := range map[string][]byte{*out: src, *web: ts, *types: ct} {
-		if err := os.WriteFile(path, data, 0o644); err != nil {
+		err := os.WriteFile(path, data, 0o644)
+		if err != nil {
 			log.Fatal(err)
 		}
 	}

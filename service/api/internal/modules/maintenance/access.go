@@ -132,13 +132,14 @@ func checkTechnicianJob(ctx context.Context, c *ops.Call, jobID uuid.UUID, unit 
 
 	for rows.Next() {
 		var a assignment
-		if err := rows.Scan(
+		err := rows.Scan(
 			&a.unit,
 			&a.status,
 			&a.validFrom,
 			&a.validTil,
 			&a.jobStatus,
-		); err != nil {
+		)
+		if err != nil {
 			rows.Close()
 
 			return err
@@ -149,8 +150,9 @@ func checkTechnicianJob(ctx context.Context, c *ops.Call, jobID uuid.UUID, unit 
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return rowsErr
 	}
 
 	now := c.Now

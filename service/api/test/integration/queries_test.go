@@ -129,7 +129,8 @@ func TestNotificationsAcrossServices(t *testing.T) {
 		t.Fatal("billing-api must not store notifications itself")
 	}
 
-	if err := identitySrv.DrainEvents(t.Context()); err != nil {
+	err := identitySrv.DrainEvents(t.Context())
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -177,7 +178,8 @@ func TestDirectoryAcrossServices(t *testing.T) {
 		t.Fatalf("verify on maintenance-api: %d %v", code, m)
 	}
 
-	if err := identitySrv.DrainEvents(t.Context()); err != nil {
+	err := identitySrv.DrainEvents(t.Context())
+	if err != nil {
 		t.Fatal(err)
 	}
 

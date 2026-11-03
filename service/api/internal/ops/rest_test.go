@@ -96,8 +96,9 @@ func bind(
 	}
 
 	var obj map[string]any
-	if err := json.Unmarshal(raw, &obj); err != nil {
-		t.Fatal(err)
+	unmarshalErr := json.Unmarshal(raw, &obj)
+	if unmarshalErr != nil {
+		t.Fatal(unmarshalErr)
 	}
 
 	return obj, nil
@@ -313,8 +314,9 @@ func TestRESTQueryInput(t *testing.T) {
 		NewContext(httptest.NewRequest(http.MethodGet, "/v1/jobs/invoice-a/things", nil), httptest.NewRecorder())
 	c.SetPathValues(echo.PathValues{{Name: "jobId", Value: "invoice-a"}})
 
-	if _, err := b.Input(c, nil); apperr.From(err).Code != apperr.NotFound {
-		t.Errorf("malformed ID: %v", err)
+	_, inputErr := b.Input(c, nil)
+	if apperr.From(inputErr).Code != apperr.NotFound {
+		t.Errorf("malformed ID: %v", inputErr)
 	}
 }
 
@@ -351,12 +353,13 @@ func TestRESTBodyInput(t *testing.T) {
 		echo.PathValues{{Name: "jobId", Value: job}, {Name: "target.kind", Value: "unit"}},
 	)
 
-	if raw, err := b.Input(
+	raw, inputErr := b.Input(
 		c,
 		[]byte(`{"ratio": 12345678901234567890}`),
-	); err != nil ||
+	)
+	if inputErr != nil ||
 		!strings.Contains(string(raw), "12345678901234567890") { // numbers keep their text
-		t.Fatalf("number changed: %s %v", raw, err)
+		t.Fatalf("number changed: %s %v", raw, inputErr)
 	}
 
 	for body, wantFE := range map[string]map[string]string{
@@ -395,15 +398,17 @@ func TestRESTBindingRules(t *testing.T) {
 		"objects in a query":     {restOp(Read, func() any { return new(restOpaque) }), Route{Method: "GET", Path: "/v1/x"}},
 		"a parameter twice":      {restOp(Read, func() any { return new(restTwice) }), Route{Method: "GET", Path: "/v1/x"}},
 	} {
-		if _, err := NewBinding(c.op, c.rt); err == nil {
+		_, err := NewBinding(c.op, c.rt)
+		if err == nil {
 			t.Errorf("%s: accepted", name)
 		}
 	}
 
-	if _, err := NewBinding(
+	_, err := NewBinding(
 		restOp(Write, func() any { return new(restOpaque) }),
 		Route{Method: "POST", Path: "/v1/x"},
-	); err != nil {
+	)
+	if err != nil {
 		t.Errorf("objects in a body: %v", err)
 	}
 
@@ -479,7 +484,8 @@ func TestRESTRoutes(t *testing.T) {
 		},
 	)
 	Register(r, "units.get", func(ctx context.Context, c *Call, in *getIn) (map[string]any, error) {
-		if err := c.Require(authz.Facts{"self": in.ID == "mine"}); err != nil {
+		err := c.Require(authz.Facts{"self": in.ID == "mine"})
+		if err != nil {
 			return nil, err
 		}
 
@@ -503,7 +509,8 @@ func TestRESTRoutes(t *testing.T) {
 	e := echo.New()
 
 	e.HTTPErrorHandler = HTTPErrorHandler
-	if err := r.MountREST(e.Group("/v1")); err != nil {
+	err := r.MountREST(e.Group("/v1"))
+	if err != nil {
 		t.Fatal(err)
 	}
 

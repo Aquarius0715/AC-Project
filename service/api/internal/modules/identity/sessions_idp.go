@@ -35,8 +35,9 @@ func SessionHandlers(ender SessionEnder) map[string]events.Handler {
 			var p struct {
 				UserID uuid.UUID `json:"userId"`
 			}
-			if err := e.Decode(&p); err != nil {
-				return err
+			decodeErr := e.Decode(&p)
+			if decodeErr != nil {
+				return decodeErr
 			}
 
 			var subject string // the provider's subject: Cognito's sub, or locally the user ID itself
@@ -54,14 +55,15 @@ func SessionHandlers(ender SessionEnder) map[string]events.Handler {
 			cctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
 
-			if err := ender.EndSessions(cctx, subject); err != nil {
+			endSessionsErr := ender.EndSessions(cctx, subject)
+			if endSessionsErr != nil {
 				slog.WarnContext(
 					ctx,
 					"identity: the identity provider's sessions were not ended",
 					"user",
 					p.UserID,
 					"err",
-					err,
+					endSessionsErr,
 				)
 			}
 

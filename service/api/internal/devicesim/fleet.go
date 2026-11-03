@@ -83,7 +83,8 @@ func MockFleet() (Fleet, error) { return parseFleet(fleetJSON) }
 
 func parseFleet(raw []byte) (Fleet, error) {
 	var f Fleet
-	if err := json.Unmarshal(raw, &f); err != nil {
+	err := json.Unmarshal(raw, &f)
+	if err != nil {
 		return f, fmt.Errorf("fleet: %w", err)
 	}
 

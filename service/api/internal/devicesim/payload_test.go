@@ -35,8 +35,9 @@ func TestTelemetryBatchShape(t *testing.T) {
 	}
 
 	var b map[string]any
-	if err := json.Unmarshal(raw, &b); err != nil {
-		t.Fatal(err)
+	unmarshalErr := json.Unmarshal(raw, &b)
+	if unmarshalErr != nil {
+		t.Fatal(unmarshalErr)
 	}
 
 	if b["deviceId"] != device {
@@ -85,8 +86,9 @@ func TestSequenceNeverRepeats(t *testing.T) {
 				Sequence float64 `json:"sequence"`
 			} `json:"measurements"`
 		}
-		if err := json.Unmarshal(raw, &b); err != nil {
-			t.Fatal(err)
+		unmarshalErr := json.Unmarshal(raw, &b)
+		if unmarshalErr != nil {
+			t.Fatal(unmarshalErr)
 		}
 
 		for _, x := range b.Measurements {
@@ -113,8 +115,9 @@ func TestHeartbeatCarriesFirmware(t *testing.T) {
 	}
 
 	var h map[string]any
-	if err := json.Unmarshal(raw, &h); err != nil {
-		t.Fatal(err)
+	unmarshalErr := json.Unmarshal(raw, &h)
+	if unmarshalErr != nil {
+		t.Fatal(unmarshalErr)
 	}
 
 	if h["deviceId"] != device || h["firmware"] != "v2.1" || h["at"] != "2026-10-13T02:00:00Z" {
@@ -134,8 +137,9 @@ func TestAcknowledgeAppliesAndExpires(t *testing.T) {
 		}
 
 		var a map[string]any
-		if err := json.Unmarshal(raw, &a); err != nil {
-			t.Fatal(err)
+		unmarshalErr := json.Unmarshal(raw, &a)
+		if unmarshalErr != nil {
+			t.Fatal(unmarshalErr)
 		}
 
 		return a
@@ -163,7 +167,8 @@ func TestAcknowledgeAppliesAndExpires(t *testing.T) {
 		t.Fatalf("unsupported: %v", a)
 	}
 
-	if _, _, err := m.Acknowledge([]byte(`not json`), now); err == nil {
+	_, _, err := m.Acknowledge([]byte(`not json`), now)
+	if err == nil {
 		t.Error("a malformed command is accepted")
 	}
 }
@@ -184,7 +189,8 @@ func TestCommandAndAckTopics(t *testing.T) {
 // command of an unknown kind is answered unsupported with the setpoint unchanged.
 func TestAcknowledgeRefusesMalformedAndKeepsUnknownKinds(t *testing.T) {
 	m := NewModule(tenant, device, "v1", 1)
-	if _, _, err := m.Acknowledge([]byte(`{"commandId":`), time.Now()); err == nil {
+	_, _, err := m.Acknowledge([]byte(`{"commandId":`), time.Now())
+	if err == nil {
 		t.Error("a malformed command is accepted")
 	}
 
@@ -197,8 +203,9 @@ func TestAcknowledgeRefusesMalformedAndKeepsUnknownKinds(t *testing.T) {
 	}
 
 	var a map[string]any
-	if err := json.Unmarshal(raw, &a); err != nil {
-		t.Fatal(err)
+	unmarshalErr := json.Unmarshal(raw, &a)
+	if unmarshalErr != nil {
+		t.Fatal(unmarshalErr)
 	}
 
 	if a["result"] != "unsupported" || a["observed"].(map[string]any)["setpointCelsius"] != 24.0 {

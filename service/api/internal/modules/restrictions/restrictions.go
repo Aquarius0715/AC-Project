@@ -217,7 +217,7 @@ func decorate(ctx context.Context, c *ops.Call, x *Restriction) error {
 			u   Unit
 			obs []byte
 		)
-		if err := rows.Scan(
+		err := rows.Scan(
 			&u.UnitID,
 			&u.ApplyState,
 			&u.ReleaseState,
@@ -227,7 +227,8 @@ func decorate(ctx context.Context, c *ops.Call, x *Restriction) error {
 			&u.ObservedAt,
 			&u.EvidenceID,
 			&u.PendingReason,
-		); err != nil {
+		)
+		if err != nil {
 			rows.Close()
 
 			return err
@@ -244,8 +245,9 @@ func decorate(ctx context.Context, c *ops.Call, x *Restriction) error {
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return rowsErr
 	}
 
 	hist, err := audit.History(ctx, c, "restriction", x.ID.String()) // identity's audit log (IR196)
@@ -483,9 +485,10 @@ func (m Restrictions) query(
 	where := strings.Join(conds, " AND ")
 
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM restrictions.restrictions r WHERE "+where, args...).
-		Scan(&total); err != nil {
-		return nil, nil, 0, 0, err
+	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM restrictions.restrictions r WHERE "+where, args...).
+		Scan(&total)
+	if scanErr != nil {
+		return nil, nil, 0, 0, scanErr
 	}
 
 	rows, err := c.Tx.Query(
@@ -518,12 +521,14 @@ func (m Restrictions) query(
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return nil, nil, 0, 0, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return nil, nil, 0, 0, rowsErr
 	}
 
 	for i := range out {
-		if err := decorate(ctx, c, &out[i]); err != nil {
+		err := decorate(ctx, c, &out[i])
+		if err != nil {
 			return nil, nil, 0, 0, err
 		}
 	}
@@ -578,7 +583,8 @@ func (m Restrictions) list(
 	in *paging.Query,
 ) (paging.Page[any], error) {
 	var f listFilter
-	if err := decodeFilter(in.Filters, &f); err != nil {
+	err := decodeFilter(in.Filters, &f)
+	if err != nil {
 		return paging.Page[any]{}, err
 	}
 
@@ -664,8 +670,9 @@ func (m Restrictions) forInvoice(
 	}
 
 	var f listFilter
-	if err := decodeFilter(in.Query.Filters, &f); err != nil {
-		return paging.Page[Restriction]{}, err
+	decodeFilterErr := decodeFilter(in.Query.Filters, &f)
+	if decodeFilterErr != nil {
+		return paging.Page[Restriction]{}, decodeFilterErr
 	}
 	// query catalog: input.invoiceId (the REST path) => causeInvoiceIds contains; contractId => contractId; status => state.
 	// invoiceId is no filter of this read: the REST binding refuses it as error.notAllowed

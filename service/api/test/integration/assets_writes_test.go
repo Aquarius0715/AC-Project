@@ -586,15 +586,17 @@ func TestAssetWritesLifecycle(t *testing.T) {
 	var audits, events int
 
 	p := &ops.Principal{TenantID: seed.ID("tenant-a"), MembershipID: seed.ID("hq-operator")}
-	if err := s.DB.Run(t.Context(), true, p, func(tx pgx.Tx) error {
-		if err := tx.QueryRow(t.Context(), `SELECT count(*) FROM audit.audit_log WHERE target_id = $1 AND result = 'success'`, prop).
-			Scan(&audits); err != nil {
+	err := s.DB.Run(t.Context(), true, p, func(tx pgx.Tx) error {
+		err := tx.QueryRow(t.Context(), `SELECT count(*) FROM audit.audit_log WHERE target_id = $1 AND result = 'success'`, prop).
+			Scan(&audits)
+		if err != nil {
 			return err
 		}
 
 		return tx.QueryRow(t.Context(), `SELECT count(*) FROM platform.outbox WHERE aggregate_id = $1 AND event_type NOT LIKE 'RowChanged:%'`, prop).
 			Scan(&events)
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatal(err)
 	}
 

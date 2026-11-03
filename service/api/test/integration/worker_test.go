@@ -39,7 +39,8 @@ func TestWorkerTickExpiresOffers(t *testing.T) {
 		1,
 	)
 	// before the deadline nothing changes
-	if _, err := schedTick(context.Background(), s, clock); err != nil {
+	_, err := schedTick(context.Background(), s, clock)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -91,13 +92,14 @@ func TestWorkerTickExpiresOffers(t *testing.T) {
 		t.Error("re-offer after expiry")
 	}
 
-	if r, err := schedTick(
+	schedTickR, schedTickErr := schedTick(
 		context.Background(),
 		s,
 		clock.Add(time.Hour),
-	); err != nil ||
-		r.ExpiredOffers != 0 {
-		t.Fatalf("idempotent tick: %+v %v", r, err)
+	)
+	if schedTickErr != nil ||
+		schedTickR.ExpiredOffers != 0 {
+		t.Fatalf("idempotent tick: %+v %v", schedTickR, schedTickErr)
 	}
 }
 
@@ -206,12 +208,13 @@ func TestSchedulerInstancesShareTheWork(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := holder.Exec(
+	_, execErr := holder.Exec(
 		ctx,
 		`SELECT pg_advisory_xact_lock(hashtext('scheduler:maintenance'), hashtext($1))`,
 		tenant,
-	); err != nil {
-		t.Fatal(err)
+	)
+	if execErr != nil {
+		t.Fatal(execErr)
 	}
 
 	r, err := scheduler.TryTickDomains(ctx, ms.DB, clock.Add(time.Hour), maint, ms.Registry)
@@ -236,8 +239,9 @@ func TestSchedulerInstancesShareTheWork(t *testing.T) {
 	case <-time.After(300 * time.Millisecond):
 	}
 
-	if err := holder.Commit(ctx); err != nil {
-		t.Fatal(err)
+	commitErr := holder.Commit(ctx)
+	if commitErr != nil {
+		t.Fatal(commitErr)
 	}
 
 	if r := <-done; r.ExpiredOffers < 1 || status(job) != "requested" || expiries(job) != 1 {
@@ -272,11 +276,12 @@ func TestSchedulerInstancesShareTheWork(t *testing.T) {
 		t.Fatalf("two instances: %+v %v %d", total, status(job2), expiries(job2))
 	}
 
-	if _, err := schedTick(
+	_, schedTickErr := schedTick(
 		ctx,
 		s,
 		clock.Add(time.Hour),
-	); err != nil { // apply the ticks' events as the consumers would
-		t.Fatal(err)
+	)
+	if schedTickErr != nil { // apply the ticks' events as the consumers would
+		t.Fatal(schedTickErr)
 	}
 }

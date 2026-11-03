@@ -77,8 +77,9 @@ func Main(service string, domains ...string) {
 		HidePort:        true,
 		GracefulTimeout: 25 * time.Second,
 	}
-	if err := sc.Start(ctx, s.Echo); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		slog.Error("serve", "err", err)
+	startErr := sc.Start(ctx, s.Echo)
+	if startErr != nil && !errors.Is(startErr, http.ErrServerClosed) {
+		slog.Error("serve", "err", startErr)
 	}
 
 	s.DB.Close()
@@ -121,7 +122,8 @@ func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 
 		limit := 60
 		if v := os.Getenv("WRITE_LIMIT_PER_MINUTE"); v != "" {
-			if limit, err = strconv.Atoi(v); err != nil || limit < 1 {
+			limit, err = strconv.Atoi(v)
+			if err != nil || limit < 1 {
 				return cfg, fmt.Errorf("WRITE_LIMIT_PER_MINUTE: %q", v)
 			}
 		}
@@ -164,9 +166,10 @@ func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 		}
 
 		for i, k := range []string{"IDP_TOKEN_URL", "IDP_ADMIN_URL"} {
-			if u, err := url.Parse(
+			u, err := url.Parse(
 				v[i],
-			); err != nil || (u.Scheme != "http" && u.Scheme != "https") ||
+			)
+			if err != nil || (u.Scheme != "http" && u.Scheme != "https") ||
 				u.Host == "" {
 				return cfg, fmt.Errorf("%s: not an http(s) URL", k)
 			}

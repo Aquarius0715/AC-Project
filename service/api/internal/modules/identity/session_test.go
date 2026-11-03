@@ -33,7 +33,8 @@ func TestSessionGet(t *testing.T) {
 	e := echo.New()
 
 	e.HTTPErrorHandler = ops.HTTPErrorHandler
-	if err := r.MountREST(e.Group("/v1")); err != nil {
+	err := r.MountREST(e.Group("/v1"))
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -59,7 +60,8 @@ func TestSessionGet(t *testing.T) {
 	e.ServeHTTP(w, req)
 
 	var res struct{ Data Session }
-	if err := json.Unmarshal(w.Body.Bytes(), &res); err != nil || w.Code != 200 {
+	err = json.Unmarshal(w.Body.Bytes(), &res)
+	if err != nil || w.Code != 200 {
 		t.Fatalf("%d %s", w.Code, w.Body.String())
 	}
 

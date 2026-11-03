@@ -77,12 +77,13 @@ func seedFixture(t *testing.T) *seed.Fixture {
 		t.Fatal(err)
 	}
 
-	if err := pgx.BeginFunc(
+	beginFuncErr := pgx.BeginFunc(
 		ctx,
 		conn,
 		func(tx pgx.Tx) error { return seed.Apply(ctx, tx, f) },
-	); err != nil {
-		t.Fatal(err)
+	)
+	if beginFuncErr != nil {
+		t.Fatal(beginFuncErr)
 	}
 
 	return f
@@ -167,7 +168,8 @@ func drainEvents(t *testing.T) {
 		return
 	}
 
-	if err := lastServer.DrainEvents(context.Background()); err != nil {
+	err := lastServer.DrainEvents(context.Background())
+	if err != nil {
 		t.Fatal(err)
 	}
 }

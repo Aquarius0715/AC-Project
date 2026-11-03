@@ -114,15 +114,17 @@ func TestDemoOperations(t *testing.T) {
 
 		for r.Next() {
 			var x row
-			if err := r.Scan(&x.quality, &x.seq, &x.value, &x.reason, &x.rawUn); err != nil {
+			err := r.Scan(&x.quality, &x.seq, &x.value, &x.reason, &x.rawUn)
+			if err != nil {
 				t.Fatal(err)
 			}
 
 			rows = append(rows, x)
 		}
 
-		if err := r.Err(); err != nil {
-			t.Fatal(err)
+		rowsErr := r.Err()
+		if rowsErr != nil {
+			t.Fatal(rowsErr)
 		}
 	}()
 

@@ -81,7 +81,8 @@ func (s *Server) DrainEvents(ctx context.Context) error {
 			applied += n
 		}
 
-		if err := errors.Join(errs...); err != nil || applied == 0 {
+		err := errors.Join(errs...)
+		if err != nil || applied == 0 {
 			return err
 		}
 	}
@@ -96,8 +97,9 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 		return nil, err
 	}
 
-	if err := ops.CheckDomains(); err != nil {
-		return nil, err
+	checkDomainsErr := ops.CheckDomains()
+	if checkDomainsErr != nil {
+		return nil, checkDomainsErr
 	}
 
 	reg := ops.NewRegistry()
@@ -378,7 +380,8 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 		cfg.Domains,
 	) == 0 { // one process serves every domain: apply events inline after each write
 		reg.AfterCommit = func(ctx context.Context) {
-			if err := srv.DrainEvents(context.WithoutCancel(ctx)); err != nil && cfg.Logger != nil {
+			err := srv.DrainEvents(context.WithoutCancel(ctx))
+			if err != nil && cfg.Logger != nil {
 				cfg.Logger.Error("inline events", "error", err)
 			}
 		}

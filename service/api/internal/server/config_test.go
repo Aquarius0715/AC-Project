@@ -46,10 +46,11 @@ func TestConfigFromEnv(t *testing.T) {
 
 	t.Setenv("WRITE_LIMIT_PER_MINUTE", "5")
 
-	if cfg, err = ConfigFromEnv(
+	cfg, err = ConfigFromEnv(
 		nil,
 		nil,
-	); err != nil ||
+	)
+	if err != nil ||
 		cfg.WriteLimit.(*ratelimit.Window).Limit != 5 {
 		t.Fatalf("limit 5: %v", err)
 	}
@@ -57,7 +58,8 @@ func TestConfigFromEnv(t *testing.T) {
 	for _, bad := range []string{"0", "-1", "sixty"} {
 		t.Setenv("WRITE_LIMIT_PER_MINUTE", bad)
 
-		if _, err := ConfigFromEnv(nil, nil); err == nil {
+		_, err := ConfigFromEnv(nil, nil)
+		if err == nil {
 			t.Errorf("WRITE_LIMIT_PER_MINUTE=%q accepted", bad)
 		}
 	}
@@ -65,7 +67,8 @@ func TestConfigFromEnv(t *testing.T) {
 	t.Setenv("WRITE_LIMIT_PER_MINUTE", "")
 	t.Setenv("RATE_LIMIT_URL", "http://valkey:6379")
 
-	if _, err := ConfigFromEnv(nil, nil); err == nil {
+	_, configFromEnvErr := ConfigFromEnv(nil, nil)
+	if configFromEnvErr == nil {
 		t.Error("a RATE_LIMIT_URL that is not redis:// accepted")
 	}
 
@@ -73,7 +76,8 @@ func TestConfigFromEnv(t *testing.T) {
 	t.Setenv("DEMO_OPS", "1")
 	t.Setenv("DEMO_CLOCK_START", "yesterday")
 
-	if _, err := ConfigFromEnv(nil, nil); err == nil {
+	_, configFromEnvErr = ConfigFromEnv(nil, nil)
+	if configFromEnvErr == nil {
 		t.Error("a bad DEMO_CLOCK_START accepted")
 	}
 
@@ -98,7 +102,8 @@ func TestConfigFromEnv(t *testing.T) {
 		old := os.Getenv(missing)
 		t.Setenv(missing, "")
 
-		if _, err := ConfigFromEnv(nil, nil); err == nil {
+		_, err := ConfigFromEnv(nil, nil)
+		if err == nil {
 			t.Errorf("IDP_* without %s accepted", missing)
 		}
 
@@ -108,7 +113,8 @@ func TestConfigFromEnv(t *testing.T) {
 	for _, bad := range []string{"keycloak:8080/admin/realms/ac", "ftp://idp.test/admin", "http:///admin"} {
 		t.Setenv("IDP_ADMIN_URL", bad)
 
-		if _, err := ConfigFromEnv(nil, nil); err == nil {
+		_, err := ConfigFromEnv(nil, nil)
+		if err == nil {
 			t.Errorf("IDP_ADMIN_URL=%q accepted", bad)
 		}
 	}
@@ -123,10 +129,11 @@ func TestInternalTokenOutsideTheDemo(t *testing.T) {
 	for _, bad := range []string{"short", "local-internal-token-change-me"} {
 		t.Setenv("INTERNAL_API_TOKEN", bad)
 
-		if _, err := ConfigFromEnv(
+		_, err := ConfigFromEnv(
 			nil,
 			nil,
-		); err == nil ||
+		)
+		if err == nil ||
 			!strings.Contains(err.Error(), "INTERNAL_API_TOKEN") {
 			t.Errorf("%q outside the demo: %v", bad, err)
 		}
@@ -134,14 +141,16 @@ func TestInternalTokenOutsideTheDemo(t *testing.T) {
 
 	t.Setenv("INTERNAL_API_TOKEN", strings.Repeat("k", 32))
 
-	if _, err := ConfigFromEnv(nil, nil); err != nil {
+	_, err := ConfigFromEnv(nil, nil)
+	if err != nil {
 		t.Errorf("a real token: %v", err)
 	}
 
 	t.Setenv("DEMO_OPS", "1")
 	t.Setenv("INTERNAL_API_TOKEN", "local-internal-token-change-me")
 
-	if _, err := ConfigFromEnv(nil, nil); err != nil {
+	_, err = ConfigFromEnv(nil, nil)
+	if err != nil {
 		t.Errorf("the local value in the demo: %v", err)
 	}
 }

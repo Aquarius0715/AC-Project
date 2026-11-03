@@ -166,7 +166,8 @@ func technician(ctx context.Context, c *ops.Call, in *MembershipInput) (Technici
 			k  string
 			id uuid.UUID
 		)
-		if err := rows.Scan(&k, &id); err != nil {
+		err := rows.Scan(&k, &id)
+		if err != nil {
 			return t, err
 		}
 
@@ -194,7 +195,8 @@ func GrantHandlers() map[string]events.Handler {
 	return map[string]events.Handler{
 		events.QualificationGranted: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var g events.Grant
-			if err := e.Decode(&g); err != nil {
+			err := e.Decode(&g)
+			if err != nil {
 				return err
 			}
 

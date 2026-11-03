@@ -143,9 +143,10 @@ func organizationsList(
 	where := strings.Join(conds, " AND ")
 
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM identity.organizations WHERE "+where, args...).
-		Scan(&total); err != nil {
-		return paging.Page[Organization]{}, err
+	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM identity.organizations WHERE "+where, args...).
+		Scan(&total)
+	if scanErr != nil {
+		return paging.Page[Organization]{}, scanErr
 	}
 
 	rows, err := c.Tx.Query(
@@ -216,9 +217,10 @@ func (in *OrganizationSave) Validate() map[string]string {
 // transaction, so NOT_FOUND and version conflicts come first and a duplicate rolls the write back.
 func uniqueName(ctx context.Context, c *ops.Call, id uuid.UUID) error {
 	var taken bool
-	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.organizations o, identity.organizations t WHERE t.id = $1
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.organizations o, identity.organizations t WHERE t.id = $1
 		AND o.kind = t.kind AND o.id <> t.id AND lower(btrim(o.name)) = lower(btrim(t.name)))`, id).
-		Scan(&taken); err != nil {
+		Scan(&taken)
+	if err != nil {
 		return err
 	}
 
@@ -274,8 +276,9 @@ func organizationsSave(
 			return Organization{}, err
 		}
 
-		if err := uniqueName(ctx, c, id); err != nil {
-			return Organization{}, err
+		uniqueNameErr := uniqueName(ctx, c, id)
+		if uniqueNameErr != nil {
+			return Organization{}, uniqueNameErr
 		}
 
 		c.Audit(
@@ -307,8 +310,9 @@ func organizationsSave(
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		var kind string
-		if e := c.Tx.QueryRow(ctx, `SELECT kind FROM identity.organizations WHERE id = $1`, *in.ID).
-			Scan(&kind); e != nil {
+		e := c.Tx.QueryRow(ctx, `SELECT kind FROM identity.organizations WHERE id = $1`, *in.ID).
+			Scan(&kind)
+		if e != nil {
 			return Organization{}, apperr.E(apperr.NotFound, "error.notFound")
 		}
 
@@ -323,8 +327,9 @@ func organizationsSave(
 		return Organization{}, err
 	}
 
-	if err := uniqueName(ctx, c, o.ID); err != nil {
-		return Organization{}, err
+	uniqueNameErr := uniqueName(ctx, c, o.ID)
+	if uniqueNameErr != nil {
+		return Organization{}, uniqueNameErr
 	}
 
 	c.Audit(
@@ -435,8 +440,9 @@ func (Directory) SetGrant(
 	from, until time.Time,
 ) error {
 	var tenant uuid.UUID
-	if err := c.Tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')::uuid`).
-		Scan(&tenant); err != nil {
+	err := c.Tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')::uuid`).
+		Scan(&tenant)
+	if err != nil {
 		return err
 	}
 

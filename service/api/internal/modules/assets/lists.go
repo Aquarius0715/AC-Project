@@ -57,9 +57,10 @@ func list[T any](
 	where := strings.Join(conds, " AND ")
 
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM "+table+" WHERE "+where, args...).
-		Scan(&total); err != nil {
-		return paging.Page[T]{}, err
+	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM "+table+" WHERE "+where, args...).
+		Scan(&total)
+	if scanErr != nil {
+		return paging.Page[T]{}, scanErr
 	}
 
 	rows, err := c.Tx.Query(
@@ -90,8 +91,9 @@ func list[T any](
 		items = append(items, v)
 	}
 
-	if err := rows.Err(); err != nil {
-		return paging.Page[T]{}, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return paging.Page[T]{}, rowsErr
 	}
 
 	return paging.Page[T]{
@@ -186,7 +188,8 @@ func (m *Module) customersList(
 		Status         *string    `json:"status,omitempty"`
 		OrganizationID *uuid.UUID `json:"organizationId,omitempty"`
 	}
-	if err := decodeFilters(in.Filters, &f); err != nil {
+	err := decodeFilters(in.Filters, &f)
+	if err != nil {
 		return paging.Page[Customer]{}, err
 	}
 
@@ -325,8 +328,9 @@ func (m *Module) customersSave(
 
 	if in.Status == "inactive" { // D05: deactivation conflicts with active units, contracts or jobs
 		var units bool
-		if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.units WHERE customer_org_id = $1 AND NOT archived)`, in.OrganizationID).
-			Scan(&units); err != nil {
+		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.units WHERE customer_org_id = $1 AND NOT archived)`, in.OrganizationID).
+			Scan(&units)
+		if err != nil {
 			return Customer{}, err
 		}
 
@@ -413,7 +417,8 @@ func (m *Module) propertiesList(
 		CustomerID *uuid.UUID `json:"customerId,omitempty"`
 		Kind       *string    `json:"kind,omitempty"`
 	}
-	if err := decodeFilters(in.Filters, &f); err != nil {
+	err := decodeFilters(in.Filters, &f)
+	if err != nil {
 		return paging.Page[Property]{}, err
 	}
 
@@ -482,7 +487,8 @@ func (m *Module) spacesList(
 		PropertyID *uuid.UUID `json:"propertyId,omitempty"`
 		Kind       *string    `json:"kind,omitempty"`
 	}
-	if err := decodeFilters(in.Filters, &f); err != nil {
+	err := decodeFilters(in.Filters, &f)
+	if err != nil {
 		return paging.Page[Space]{}, err
 	}
 
@@ -601,9 +607,10 @@ func (m *Module) locationsRename(ctx context.Context, c *ops.Call, in *RenameInp
 	}
 
 	var visible bool
-	if err := c.Tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM "+table+" WHERE id = $1 AND NOT archived AND "+visScope+")", visArgs...).
-		Scan(&visible); err != nil {
-		return nil, err
+	scanErr := c.Tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM "+table+" WHERE id = $1 AND NOT archived AND "+visScope+")", visArgs...).
+		Scan(&visible)
+	if scanErr != nil {
+		return nil, scanErr
 	}
 
 	if !visible {
@@ -611,9 +618,10 @@ func (m *Module) locationsRename(ctx context.Context, c *ops.Call, in *RenameInp
 	}
 
 	var dup bool
-	if err := c.Tx.QueryRow(ctx, "SELECT EXISTS ("+siblings+")", in.Target.ID, name).
-		Scan(&dup); err != nil {
-		return nil, err
+	scanErr = c.Tx.QueryRow(ctx, "SELECT EXISTS ("+siblings+")", in.Target.ID, name).
+		Scan(&dup)
+	if scanErr != nil {
+		return nil, scanErr
 	}
 
 	if dup {

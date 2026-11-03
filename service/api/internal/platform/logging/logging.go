@@ -54,7 +54,8 @@ func ReplaceAttr(_ []string, a slog.Attr) slog.Attr {
 			return slog.String(a.Key, Mask(s))
 		}
 	case slog.KindAny:
-		if err, ok := a.Value.Any().(error); ok {
+		err, ok := a.Value.Any().(error)
+		if ok {
 			return slog.String(a.Key, Mask(err.Error()))
 		}
 	}

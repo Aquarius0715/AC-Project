@@ -63,11 +63,12 @@ func main() {
 		HidePort:        true,
 		GracefulTimeout: 25 * time.Second,
 	}
-	if err := sc.Start(
+	startErr := sc.Start(
 		ctx,
 		gateway.New(targets, logger),
-	); err != nil &&
-		!errors.Is(err, http.ErrServerClosed) {
-		logger.Error("serve", "err", err)
+	)
+	if startErr != nil &&
+		!errors.Is(startErr, http.ErrServerClosed) {
+		logger.Error("serve", "err", startErr)
 	}
 }

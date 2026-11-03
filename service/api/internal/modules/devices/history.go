@@ -92,13 +92,14 @@ func (m *Module) historyAccess(
 			return "", nil, apperr.E(apperr.NotFound, "error.notFound")
 		}
 
-		if err := m.UnitAccess.TechnicianUnit(
+		err := m.UnitAccess.TechnicianUnit(
 			ctx,
 			c,
 			*unit,
 			true,
 			c.Principal.Employment == "internal",
-		); err != nil {
+		)
+		if err != nil {
 			return "", nil, err
 		}
 
@@ -170,9 +171,10 @@ func historyPageOf[T any](
 	}
 
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) "+from+" WHERE "+where, args...).
-		Scan(&total); err != nil {
-		return paging.Page[T]{}, err
+	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) "+from+" WHERE "+where, args...).
+		Scan(&total)
+	if scanErr != nil {
+		return paging.Page[T]{}, scanErr
 	}
 
 	rows, err := c.Tx.Query(
@@ -426,7 +428,8 @@ func (m *Module) withNotes(ctx context.Context, c *ops.Call, evs []DeviceEvent) 
 			event uuid.UUID
 			n     ResponseNote
 		)
-		if err := rows.Scan(&event, &n.ActorID, &n.Message, &n.At); err != nil {
+		err := rows.Scan(&event, &n.ActorID, &n.Message, &n.At)
+		if err != nil {
 			rows.Close()
 
 			return err
@@ -605,19 +608,21 @@ func (m *Module) addResponseNote(
 		return DeviceEvent{}, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`INSERT INTO devices.device_event_notes (tenant_id, event_id, actor_id, message) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3)`,
 		in.EventID,
 		c.Principal.UserID,
 		in.ResponseNote,
-	); err != nil {
-		return DeviceEvent{}, err
+	)
+	if execErr != nil {
+		return DeviceEvent{}, execErr
 	}
 
-	if err := c.Tx.QueryRow(ctx, `UPDATE devices.device_events SET version = version + 1 WHERE id = $1 RETURNING version`, in.EventID).
-		Scan(&v); err != nil {
-		return DeviceEvent{}, err
+	scanErr := c.Tx.QueryRow(ctx, `UPDATE devices.device_events SET version = version + 1 WHERE id = $1 RETURNING version`, in.EventID).
+		Scan(&v)
+	if scanErr != nil {
+		return DeviceEvent{}, scanErr
 	}
 
 	c.Audit(

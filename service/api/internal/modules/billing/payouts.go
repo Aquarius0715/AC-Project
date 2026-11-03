@@ -132,7 +132,7 @@ func (m Payouts) fill(ctx context.Context, c *ops.Call, x *Statement) error {
 
 	for rows.Next() {
 		var l PayoutLine
-		if err := rows.Scan(
+		err := rows.Scan(
 			&l.ID,
 			&l.JobID,
 			&l.WorkType,
@@ -140,7 +140,8 @@ func (m Payouts) fill(ctx context.Context, c *ops.Call, x *Statement) error {
 			&l.AmountMinor,
 			&l.Kind,
 			&l.Note,
-		); err != nil {
+		)
+		if err != nil {
 			rows.Close()
 
 			return err
@@ -165,7 +166,7 @@ func (m Payouts) fill(ctx context.Context, c *ops.Call, x *Statement) error {
 
 	for rows.Next() {
 		var q Question
-		if err := rows.Scan(
+		err := rows.Scan(
 			&q.ID,
 			&q.LineID,
 			&q.Topic,
@@ -173,7 +174,8 @@ func (m Payouts) fill(ctx context.Context, c *ops.Call, x *Statement) error {
 			&q.State,
 			&q.Reply,
 			&q.AdjustmentMinor,
-		); err != nil {
+		)
+		if err != nil {
 			return err
 		}
 
@@ -226,7 +228,8 @@ func periodBounds(p string) (time.Time, time.Time, error) {
 
 // Validate implements ops.Validator.
 func (in *GenerateInput) Validate() map[string]string {
-	if _, _, err := periodBounds(in.Period); err != nil {
+	_, _, err := periodBounds(in.Period)
+	if err != nil {
 		return map[string]string{"period": "error.invalid"}
 	}
 
@@ -334,9 +337,10 @@ func (m Payouts) generate(
 	}
 	// adjustments of answered questions not yet applied (from earlier periods); those carried by a draft of this
 	// period are released first because the draft is regenerated
-	if _, err := c.Tx.Exec(ctx, `UPDATE billing.payout_queries SET applied_statement_id = NULL
-		WHERE applied_statement_id IN (SELECT id FROM billing.payout_statements WHERE period = $1 AND status = 'draft')`, in.Period); err != nil {
-		return nil, err
+	_, execErr := c.Tx.Exec(ctx, `UPDATE billing.payout_queries SET applied_statement_id = NULL
+		WHERE applied_statement_id IN (SELECT id FROM billing.payout_statements WHERE period = $1 AND status = 'draft')`, in.Period)
+	if execErr != nil {
+		return nil, execErr
 	}
 	// adjustments of answered questions not yet applied (from earlier periods)
 	rows, err := c.Tx.Query(
@@ -362,7 +366,8 @@ func (m Payouts) generate(
 			a   adj
 			job *uuid.UUID
 		)
-		if err := rows.Scan(&a.query, &a.org, &a.amount, &job); err != nil {
+		err := rows.Scan(&a.query, &a.org, &a.amount, &job)
+		if err != nil {
 			rows.Close()
 
 			return nil, err
@@ -377,8 +382,9 @@ func (m Payouts) generate(
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return nil, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return nil, rowsErr
 	}
 
 	for _, a := range adjs {
@@ -412,13 +418,14 @@ func (m Payouts) generate(
 			return nil, err
 		}
 
-		if _, err := c.Tx.Exec(
+		_, execErr := c.Tx.Exec(
 			ctx,
 			`DELETE FROM billing.payout_statements WHERE contractor_org_id = $1 AND period = $2 AND status = 'draft'`,
 			org,
 			in.Period,
-		); err != nil {
-			return nil, err
+		)
+		if execErr != nil {
+			return nil, execErr
 		}
 
 		a := per[org]
@@ -437,14 +444,15 @@ func (m Payouts) generate(
 		}
 
 		var sid uuid.UUID
-		if err := c.Tx.QueryRow(ctx, `INSERT INTO billing.payout_statements (tenant_id, contractor_org_id, period, status, currency, gross_minor, deductions_minor, net_minor, pay_date, created_at, updated_at)
+		scanErr := c.Tx.QueryRow(ctx, `INSERT INTO billing.payout_statements (tenant_id, contractor_org_id, period, status, currency, gross_minor, deductions_minor, net_minor, pay_date, created_at, updated_at)
 			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, 'draft', $3, $4, $5, $6, $7, $8, $8) RETURNING id`, org, in.Period, a.currency, gross, ded, gross-ded, payDate, c.Now).
-			Scan(&sid); err != nil {
-			return nil, err
+			Scan(&sid)
+		if scanErr != nil {
+			return nil, scanErr
 		}
 
 		for _, l := range a.lines {
-			if _, err := c.Tx.Exec(
+			_, err := c.Tx.Exec(
 				ctx,
 				`INSERT INTO billing.payout_lines (id, statement_id, tenant_id, job_id, work_type, accepted_at, amount_minor, kind, note)
 				VALUES ($1, $2, current_setting('app.tenant_id')::uuid, $3, $4, $5, $6, $7, $8)`,
@@ -456,19 +464,21 @@ func (m Payouts) generate(
 				l.AmountMinor,
 				l.Kind,
 				l.Note,
-			); err != nil {
+			)
+			if err != nil {
 				return nil, err
 			}
 		}
 
 		for _, x := range adjs {
 			if x.org == org {
-				if _, err := c.Tx.Exec(
+				_, err := c.Tx.Exec(
 					ctx,
 					`UPDATE billing.payout_queries SET applied_statement_id = $2 WHERE id = $1`,
 					x.query,
 					sid,
-				); err != nil {
+				)
+				if err != nil {
 					return nil, err
 				}
 			}
@@ -727,7 +737,7 @@ func (m Payouts) query(ctx context.Context, c *ops.Call, in *QueryInput) (Statem
 		return x, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`INSERT INTO billing.payout_queries (statement_id, line_id, tenant_id, asked_by, topic, message, state, created_at)
 		VALUES ($1, $2, current_setting('app.tenant_id')::uuid, $3, $4, $5, 'open', $6)`,
@@ -737,26 +747,29 @@ func (m Payouts) query(ctx context.Context, c *ops.Call, in *QueryInput) (Statem
 		in.Topic,
 		in.Message,
 		c.Now,
-	); err != nil {
-		return x, err
+	)
+	if execErr != nil {
+		return x, execErr
 	}
 
-	if err := m.Source.AddJobNote(
+	addJobNoteErr := m.Source.AddJobNote(
 		ctx,
 		c,
 		*job,
 		fmt.Sprintf("Payout question (%s): %s", in.Topic, in.Message),
-	); err != nil {
-		return x, err
+	)
+	if addJobNoteErr != nil {
+		return x, addJobNoteErr
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr = c.Tx.Exec(
 		ctx,
 		`UPDATE billing.payout_statements SET version = version + 1, updated_at = $2 WHERE id = $1`,
 		x.ID,
 		c.Now,
-	); err != nil {
-		return x, err
+	)
+	if execErr != nil {
+		return x, execErr
 	}
 
 	return m.finish(ctx, c, x.ID, "payouts.query", "")
@@ -848,7 +861,7 @@ func (m Payouts) resolve(ctx context.Context, c *ops.Call, in *ResolveInput) (St
 		next = "adjusted"
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE billing.payout_queries SET state = $2, resolution = $3, adjustment_minor = $4, resolved_by = $5, resolved_at = $6 WHERE id = $1`,
 		in.QueryID,
@@ -857,25 +870,28 @@ func (m Payouts) resolve(ctx context.Context, c *ops.Call, in *ResolveInput) (St
 		in.AdjustmentMinor,
 		c.Principal.MembershipID,
 		c.Now,
-	); err != nil {
-		return x, err
+	)
+	if execErr != nil {
+		return x, execErr
 	}
 
 	for _, l := range x.Lines {
 		if line != nil && l.ID == *line {
-			if err := m.Source.AddJobNote(ctx, c, l.JobID, "Payout reply: "+in.Reply); err != nil {
+			err := m.Source.AddJobNote(ctx, c, l.JobID, "Payout reply: "+in.Reply)
+			if err != nil {
 				return x, err
 			}
 		}
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr = c.Tx.Exec(
 		ctx,
 		`UPDATE billing.payout_statements SET version = version + 1, updated_at = $2 WHERE id = $1`,
 		x.ID,
 		c.Now,
-	); err != nil {
-		return x, err
+	)
+	if execErr != nil {
+		return x, execErr
 	}
 
 	return m.finish(ctx, c, x.ID, "payouts.resolveQuery", in.Reply)
@@ -1021,9 +1037,10 @@ func (m Payouts) list(
 	where := strings.Join(conds, " AND ")
 
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM billing.payout_statements WHERE "+where, args...).
-		Scan(&total); err != nil {
-		return paging.Page[Statement]{}, err
+	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM billing.payout_statements WHERE "+where, args...).
+		Scan(&total)
+	if scanErr != nil {
+		return paging.Page[Statement]{}, scanErr
 	}
 
 	rows, err := c.Tx.Query(
@@ -1056,12 +1073,14 @@ func (m Payouts) list(
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return paging.Page[Statement]{}, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return paging.Page[Statement]{}, rowsErr
 	}
 
 	for i := range items {
-		if err := m.fill(ctx, c, &items[i]); err != nil {
+		err := m.fill(ctx, c, &items[i])
+		if err != nil {
 			return paging.Page[Statement]{}, err
 		}
 	}
@@ -1108,13 +1127,14 @@ func (m Payouts) GenerateMonthly(ctx context.Context, c *ops.Call) (int, error) 
 		return 0, err
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE billing.payout_runs SET statements = $2 WHERE tenant_id = current_setting('app.tenant_id')::uuid AND period = $1`,
 		period,
 		len(drafts),
-	); err != nil {
-		return 0, err
+	)
+	if execErr != nil {
+		return 0, execErr
 	}
 
 	return 1, nil

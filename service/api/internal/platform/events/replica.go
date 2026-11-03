@@ -39,8 +39,9 @@ func Handlers(replicas ...Replica) map[string]Handler {
 
 func (r Replica) handle(ctx context.Context, tx pgx.Tx, e Event) error {
 	var p RowChange
-	if err := e.Decode(&p); err != nil {
-		return err
+	decodeErr := e.Decode(&p)
+	if decodeErr != nil {
+		return decodeErr
 	}
 
 	keyMatch := make([]string, len(r.Keys))

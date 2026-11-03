@@ -106,16 +106,18 @@ func (m *Module) unitsDelete(
 		}
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`DELETE FROM assets.unit_alert_policies WHERE unit_id = $1`,
 		in.ID,
-	); err != nil {
-		return DeletedResource{}, err
+	)
+	if execErr != nil {
+		return DeletedResource{}, execErr
 	}
 
-	if _, err := c.Tx.Exec(ctx, `DELETE FROM assets.units WHERE id = $1`, in.ID); err != nil {
-		return DeletedResource{}, err
+	_, execErr = c.Tx.Exec(ctx, `DELETE FROM assets.units WHERE id = $1`, in.ID)
+	if execErr != nil {
+		return DeletedResource{}, execErr
 	}
 
 	c.Emit(ops.Event{AggregateType: "unit", AggregateID: in.ID, Type: "UnitDeleted"})
@@ -254,26 +256,28 @@ func (m *Module) unitsSetAlertPoliciesUnit(
 		return Unit{}, err
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`DELETE FROM assets.unit_alert_policies WHERE unit_id = $1 AND NOT (policy_id = ANY($2))`,
 		in.UnitID,
 		in.AlertPolicyIDs,
-	); err != nil {
-		return Unit{}, err
+	)
+	if execErr != nil {
+		return Unit{}, execErr
 	}
 
 	ids := append([]uuid.UUID(nil), in.AlertPolicyIDs...)
 	sort.Slice(ids, func(i, j int) bool { return ids[i].String() < ids[j].String() })
 
 	for _, id := range ids {
-		if _, err := c.Tx.Exec(
+		_, err := c.Tx.Exec(
 			ctx,
 			`INSERT INTO assets.unit_alert_policies (tenant_id, unit_id, policy_id) VALUES (current_setting('app.tenant_id')::uuid, $1, $2)
 			ON CONFLICT DO NOTHING`,
 			in.UnitID,
 			id,
-		); err != nil {
+		)
+		if err != nil {
 			return Unit{}, err
 		}
 	}

@@ -116,8 +116,9 @@ func (m Delivery) load(ctx context.Context, c *ops.Call, id uuid.UUID) (jobRow, 
 		r.scheduled = &Slot{*ss, *se}
 	}
 
-	if err := unmarshalSlots(pref, &r.preferred); err != nil {
-		return r, err
+	unmarshalSlotsErr := unmarshalSlots(pref, &r.preferred)
+	if unmarshalSlotsErr != nil {
+		return r, unmarshalSlotsErr
 	}
 
 	return r, nil
@@ -140,9 +141,10 @@ func (m Delivery) agreed(
 	}
 
 	var n int
-	if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM maintenance.slot_proposals WHERE job_id = $1 AND status = 'accepted' AND slot = tstzrange($2, $3)`,
+	err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM maintenance.slot_proposals WHERE job_id = $1 AND status = 'accepted' AND slot = tstzrange($2, $3)`,
 		id, s.StartAt, s.EndAt).
-		Scan(&n); err != nil {
+		Scan(&n)
+	if err != nil {
 		return false, err
 	}
 
@@ -253,9 +255,10 @@ func (m Delivery) offerJob(ctx context.Context, c *ops.Call, in *OfferInput) (Jo
 	}
 
 	var suspended bool
-	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id = $1 AND status = 'suspended')`, in.ContractorOrgID).
-		Scan(&suspended); err != nil {
-		return Job{}, err
+	scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id = $1 AND status = 'suspended')`, in.ContractorOrgID).
+		Scan(&suspended)
+	if scanErr != nil {
+		return Job{}, scanErr
 	}
 
 	r, err := m.lock(ctx, c, in.JobID)
@@ -280,7 +283,7 @@ func (m Delivery) offerJob(ctx context.Context, c *ops.Call, in *OfferInput) (Jo
 		return Job{}, apperr.Fields(map[string]string{"visitSlot": "errors.slot_not_agreed"})
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at, offer_expires_at,
 		access_valid_from, access_valid_until) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, tstzrange($4, $5), $6, $7, $8, $9)`,
@@ -293,21 +296,24 @@ func (m Delivery) offerJob(ctx context.Context, c *ops.Call, in *OfferInput) (Jo
 		in.OfferExpiresAt,
 		in.AccessValidFrom,
 		in.AccessValidUntil,
-	); err != nil {
-		return Job{}, err
+	)
+	if execErr != nil {
+		return Job{}, execErr
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr = c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.jobs SET status = 'offered', contractor_org_id = $2, version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
 		in.JobID,
 		in.ContractorOrgID,
-	); err != nil {
-		return Job{}, err
+	)
+	if execErr != nil {
+		return Job{}, execErr
 	}
 
-	if err := m.Jobs.event(ctx, c, in.JobID, "job.offered", nil); err != nil {
-		return Job{}, err
+	eventErr := m.Jobs.event(ctx, c, in.JobID, "job.offered", nil)
+	if eventErr != nil {
+		return Job{}, eventErr
 	}
 
 	return m.Jobs.finish(ctx, c, in.JobID, "jobs.offer", "JobOffered", "")
@@ -416,8 +422,9 @@ func (m Delivery) decide(
 
 	if decision == "accept" {
 		var open bool
-		if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.partner_slot_proposals WHERE offer_id = $1 AND status IN ('pending','sent_to_client'))`, offer).
-			Scan(&open); err != nil {
+		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.partner_slot_proposals WHERE offer_id = $1 AND status IN ('pending','sent_to_client'))`, offer).
+			Scan(&open)
+		if err != nil {
 			return Receipt{}, err
 		}
 
@@ -430,7 +437,7 @@ func (m Delivery) decide(
 		return Receipt{}, apperr.E(apperr.Conflict, "errors.terms_changed")
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.offers SET decision = $2, decided_by = $3, decided_at = $4, decline_reason = NULLIF($5, ''),
 		version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
@@ -439,8 +446,9 @@ func (m Delivery) decide(
 		c.Principal.UserID,
 		c.Now,
 		reason,
-	); err != nil {
-		return Receipt{}, err
+	)
+	if execErr != nil {
+		return Receipt{}, execErr
 	}
 
 	next, contractor := "accepted", "contractor_org_id"
@@ -448,36 +456,40 @@ func (m Delivery) decide(
 		next, contractor = "requested", "NULL"
 		// the contractor's open time change ends with the declined offer (IR444), and so does a client proposal that holds
 		// this contractor: accepting it would offer the job again to the company that just declined it (IR445)
-		if _, err := c.Tx.Exec(
+		_, err := c.Tx.Exec(
 			ctx,
 			`UPDATE maintenance.partner_slot_proposals SET status = 'withdrawn' WHERE offer_id = $1 AND status IN ('pending','sent_to_client')`,
 			offer,
-		); err != nil {
+		)
+		if err != nil {
 			return Receipt{}, err
 		}
 
-		if _, err := c.Tx.Exec(
+		_, err = c.Tx.Exec(
 			ctx,
 			`UPDATE maintenance.slot_proposals SET status = 'withdrawn', decided_at = $3 WHERE job_id = $1 AND status = 'pending'
 			AND hold->>'contractorOrgId' = $2`,
 			job,
 			c.Principal.OrgID.String(),
 			c.Now,
-		); err != nil {
+		)
+		if err != nil {
 			return Receipt{}, err
 		}
 	}
 
 	var v int
-	if err := c.Tx.QueryRow(ctx, `UPDATE maintenance.jobs SET status = $2, contractor_org_id = `+contractor+`, version = version + 1, updated_at = platform.app_now()
+	scanErr := c.Tx.QueryRow(ctx, `UPDATE maintenance.jobs SET status = $2, contractor_org_id = `+contractor+`, version = version + 1, updated_at = platform.app_now()
 		WHERE id = $1 RETURNING version`, job, next).
-		Scan(&v); err != nil {
-		return Receipt{}, err
+		Scan(&v)
+	if scanErr != nil {
+		return Receipt{}, scanErr
 	}
 
 	done := map[string]string{"accept": "accepted", "decline": "declined"}[decision] // the past tense the history reads (offer.declined)
-	if err := m.Jobs.event(ctx, c, job, "offer."+done, nil); err != nil {
-		return Receipt{}, err
+	eventErr := m.Jobs.event(ctx, c, job, "offer."+done, nil)
+	if eventErr != nil {
+		return Receipt{}, eventErr
 	}
 
 	c.Emit(
@@ -662,19 +674,21 @@ func (m Delivery) assignJob(ctx context.Context, c *ops.Call, in *AssignInput) (
 		return Job{}, apperr.E(apperr.Forbidden, "errors.internal_job_only")
 	}
 
-	if err := r.current(c); err != nil {
-		return Job{}, err
+	currentErr := r.current(c)
+	if currentErr != nil {
+		return Job{}, currentErr
 	}
 
-	if err := m.checkTechnician(
+	checkTechnicianErr := m.checkTechnician(
 		ctx,
 		c,
 		r.unit,
 		in.TechnicianMembershipID,
 		contractor,
 		nil,
-	); err != nil {
-		return Job{}, err
+	)
+	if checkTechnicianErr != nil {
+		return Job{}, checkTechnicianErr
 	}
 	// state and slot rules (IR113 / IR49 / IR123 item 4)
 	switch {
@@ -687,7 +701,8 @@ func (m Delivery) assignJob(ctx context.Context, c *ops.Call, in *AssignInput) (
 
 		ok := contractor && sameSlot(visit, slot)
 		if !contractor {
-			if ok, err = m.agreed(ctx, c, in.JobID, r, slot); err != nil {
+			ok, err = m.agreed(ctx, c, in.JobID, r, slot)
+			if err != nil {
 				return Job{}, err
 			}
 		}
@@ -712,19 +727,21 @@ func (m Delivery) assignJob(ctx context.Context, c *ops.Call, in *AssignInput) (
 		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
 	}
 
-	if err := m.checkQualified(ctx, c, r.unit, in.TechnicianMembershipID, slot); err != nil {
-		return Job{}, err
+	checkQualifiedErr := m.checkQualified(ctx, c, r.unit, in.TechnicianMembershipID, slot)
+	if checkQualifiedErr != nil {
+		return Job{}, checkQualifiedErr
 	}
 
-	if err := m.createAssignment(
+	createAssignmentErr := m.createAssignment(
 		ctx,
 		c,
 		in.JobID,
 		in.TechnicianMembershipID,
 		slot,
 		deref(in.Reason),
-	); err != nil {
-		return Job{}, err
+	)
+	if createAssignmentErr != nil {
+		return Job{}, createAssignmentErr
 	}
 
 	j, err := m.Jobs.scoped(ctx, c, in.JobID)
@@ -865,21 +882,23 @@ func (m Delivery) createAssignment(
 	slot Slot,
 	reason string,
 ) error {
-	if _, err := c.Tx.Exec(
+	_, err := c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.assignments SET status = 'revoked', reason = COALESCE(NULLIF($2, ''), 'reassigned'), version = version + 1, updated_at = platform.app_now()
 		WHERE job_id = $1 AND status = 'active'`,
 		job,
 		reason,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 
 	var aid uuid.UUID
-	if err := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.assignments (tenant_id, job_id, technician_membership_id, valid_from, valid_until, scheduled, status, reason, created_at, updated_at)
+	err = c.Tx.QueryRow(ctx, `INSERT INTO maintenance.assignments (tenant_id, job_id, technician_membership_id, valid_from, valid_until, scheduled, status, reason, created_at, updated_at)
 		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, tstzrange($3, $4), 'active', NULLIF($5, ''), $6, $6) RETURNING id`,
 		job, tech, slot.StartAt, slot.EndAt, reason, c.Now).
-		Scan(&aid); err != nil {
+		Scan(&aid)
+	if err != nil {
 		if apperr.From(err).Code == apperr.Conflict {
 			return apperr.E(apperr.Conflict, "errors.assignment_overlap")
 		}
@@ -887,16 +906,17 @@ func (m Delivery) createAssignment(
 		return err
 	}
 	// a window of this technician that had ended was frozen into their history; it is frozen again when the new one ends (IR459)
-	if _, err := c.Tx.Exec(
+	_, err = c.Tx.Exec(
 		ctx,
 		`DELETE FROM maintenance.job_history_snapshots WHERE job_id = $1 AND owner_kind = 'membership' AND owner_id = $2`,
 		job,
 		tech,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 
-	if _, err := c.Tx.Exec(
+	_, err = c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.jobs SET status = CASE WHEN status IN ('requested','accepted') THEN 'assigned' ELSE status END,
 		assignment_id = $2, scheduled_slot = tstzrange($3, $4), version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
@@ -904,11 +924,13 @@ func (m Delivery) createAssignment(
 		aid,
 		slot.StartAt,
 		slot.EndAt,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 
-	if err := m.Jobs.event(ctx, c, job, "job.assigned", nil); err != nil {
+	err = m.Jobs.event(ctx, c, job, "job.assigned", nil)
+	if err != nil {
 		return err
 	}
 

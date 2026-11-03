@@ -38,32 +38,36 @@ func TestAskRoutesQueries(t *testing.T) {
 	)
 
 	c := &Call{Queries: r}
-	if out, err := Ask[echoOut](
+	out, err := Ask[echoOut](
 		ctx,
 		r,
 		c,
 		"test.twice",
 		echoIn{N: 4},
-	); err != nil ||
+	)
+	if err != nil ||
 		out.Twice != 8 {
 		t.Fatalf("served domain: %v %v", out, err)
 	}
 
-	if _, err := Ask[echoOut](
+	_, err = Ask[echoOut](
 		ctx,
 		r,
 		c,
 		"test.twice",
 		"not an object",
-	); apperr.From(err).FieldErrors["_"] != "error.malformedInput" {
+	)
+	if apperr.From(err).FieldErrors["_"] != "error.malformedInput" {
 		t.Errorf("undecodable input: %v", err)
 	}
 
-	if _, err := Ask[echoOut](ctx, nil, c, "test.twice", echoIn{}); err == nil {
+	_, err = Ask[echoOut](ctx, nil, c, "test.twice", echoIn{})
+	if err == nil {
 		t.Error("a query outside a request")
 	}
 
-	if _, err := Ask[echoOut](ctx, r, c, "test.nope", echoIn{}); err == nil {
+	_, err = Ask[echoOut](ctx, r, c, "test.nope", echoIn{})
+	if err == nil {
 		t.Error("an unknown query")
 	}
 
@@ -71,26 +75,28 @@ func TestAskRoutesQueries(t *testing.T) {
 		DomainMaintenance,
 	) // equipment is now another service's domain, and there is no transport
 
-	if _, err := Ask[echoOut](
+	_, err = Ask[echoOut](
 		ctx,
 		r,
 		c,
 		"test.twice",
 		echoIn{N: 1},
-	); apperr.From(
+	)
+	if apperr.From(
 		err,
 	).Code != apperr.Unavailable {
 		t.Errorf("another domain without a transport: %v", err)
 	}
 
 	local := func(_ context.Context, _ *Call, in *echoIn) (echoOut, error) { return echoOut{Twice: in.N * 2}, nil }
-	if out, err := Delegate(
+	out, err = Delegate(
 		ctx,
 		&Call{},
 		"test.twice",
 		echoIn{N: 3},
 		local,
-	); err != nil ||
+	)
+	if err != nil ||
 		out.Twice != 6 {
 		t.Errorf("a call without a registry runs locally: %v %v", out, err)
 	}
@@ -148,88 +154,95 @@ func TestHTTPQueries(t *testing.T) {
 	}
 
 	worker := &Call{Principal: p, Now: now} // a scheduler job: no user, the tenant only (IR195)
-	if _, err := h.Query(
+	_, queryErr := h.Query(
 		ctx,
 		worker,
 		DomainEquipment,
 		"assets.unitState",
 		nil,
-	); err != nil || got.URL.Path != "/internal/v1/system/queries/assets.unitState" ||
+	)
+	if queryErr != nil || got.URL.Path != "/internal/v1/system/queries/assets.unitState" ||
 		got.Header.Get("Authorization") != "" ||
 		got.Header.Get("X-Membership-Id") != "" {
-		t.Errorf("system query: %v %s %v", err, got.URL.Path, got.Header)
+		t.Errorf("system query: %v %s %v", queryErr, got.URL.Path, got.Header)
 	}
 
 	status, body = http.StatusNotFound, `{"code":"NOT_FOUND","messageKey":"error.notFound","fieldErrors":{}}`
 
-	if _, err := h.Query(
+	_, queryErr = h.Query(
 		ctx,
 		user,
 		DomainEquipment,
 		"q",
 		nil,
-	); apperr.From(
-		err,
+	)
+	if apperr.From(
+		queryErr,
 	).Code != apperr.NotFound {
-		t.Errorf("a DomainError from the owner: %v", err)
+		t.Errorf("a DomainError from the owner: %v", queryErr)
 	}
 
 	status, body = http.StatusBadGateway, `<html>proxy error</html>`
 
-	if _, err := h.Query(
+	_, queryErr = h.Query(
 		ctx,
 		user,
 		DomainEquipment,
 		"q",
 		nil,
-	); apperr.From(
-		err,
+	)
+	if apperr.From(
+		queryErr,
 	).Code != apperr.Unavailable {
-		t.Errorf("an answer that is no DomainError: %v", err)
+		t.Errorf("an answer that is no DomainError: %v", queryErr)
 	}
 
 	status, body = http.StatusOK, `not json`
 
-	if _, err := h.Query(ctx, user, DomainEquipment, "q", nil); err == nil {
+	_, queryErr = h.Query(ctx, user, DomainEquipment, "q", nil)
+	if queryErr == nil {
 		t.Error("an undecodable envelope")
 	}
 
 	for name, c := range map[string]*Call{"no principal": {Bearer: "x"}} {
-		if _, err := h.Query(
+		_, err := h.Query(
 			ctx,
 			c,
 			DomainEquipment,
 			"q",
 			nil,
-		); apperr.From(
+		)
+		if apperr.From(
 			err,
 		).Code != apperr.Unavailable {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
 
-	if _, err := h.Query(
+	_, queryErr = h.Query(
 		ctx,
 		user,
 		DomainBilling,
 		"q",
 		nil,
-	); apperr.From(
-		err,
+	)
+	if apperr.From(
+		queryErr,
 	).Code != apperr.Unavailable {
-		t.Errorf("a domain without a target: %v", err)
+		t.Errorf("a domain without a target: %v", queryErr)
 	}
 
 	srv.Close()
 
-	if _, err := h.Query(
+	_, queryErr = h.Query(
 		ctx,
 		user,
 		DomainEquipment,
 		"q",
 		nil,
-	); apperr.From(err).Code != apperr.Unavailable ||
-		errors.Is(err, context.Canceled) {
-		t.Errorf("the owner is down: %v", err)
+	)
+	if apperr.From(queryErr).Code != apperr.Unavailable ||
+		errors.Is(queryErr, context.Canceled) {
+		t.Errorf("the owner is down: %v", queryErr)
 	}
 }

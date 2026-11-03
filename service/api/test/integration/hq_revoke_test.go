@@ -27,7 +27,8 @@ func TestHQRevokeTurnsSignInOff(t *testing.T) {
 	drain := func() {
 		t.Helper()
 
-		if err := s.DrainEvents(context.Background()); err != nil {
+		err := s.DrainEvents(context.Background())
+		if err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -347,7 +348,8 @@ func TestHQSaveOfAnEndedAccessIsNoRevoke(t *testing.T) {
 
 	id, membership := data(m)["id"].(string), data(m)["membershipId"].(string)
 
-	if err := s.DrainEvents(context.Background()); err != nil {
+	err := s.DrainEvents(context.Background())
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -394,7 +396,8 @@ func TestHQSaveOfAnEndedAccessIsNoRevoke(t *testing.T) {
 		t.Fatalf("HQ's save of an ended access: %d %v", code, m)
 	}
 
-	if err := s.DrainEvents(context.Background()); err != nil {
+	err = s.DrainEvents(context.Background())
+	if err != nil {
 		t.Fatal(err)
 	}
 

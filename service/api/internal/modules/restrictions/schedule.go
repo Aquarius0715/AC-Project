@@ -265,20 +265,22 @@ func (m Restrictions) schedule(
 	// one active restriction per unit (DDC-08 §3): schedules touching the same unit wait for each other here, in unit
 	// order, so two contracts sharing a unit cannot both pass the check below (the contract row lock only orders
 	// schedules of one contract)
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`SELECT pg_advisory_xact_lock(hashtext('restrictions.unit:' || u::text)) FROM unnest($1::uuid[]) AS u ORDER BY u`,
 		in.UnitIDs,
-	); err != nil {
-		return Restriction{}, err
+	)
+	if execErr != nil {
+		return Restriction{}, execErr
 	}
 
 	var busy bool
-	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_units ru JOIN restrictions.restrictions r ON r.id = ru.restriction_id
+	scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_units ru JOIN restrictions.restrictions r ON r.id = ru.restriction_id
 			WHERE ru.unit_id = ANY($1) AND (r.state NOT IN ('released','cancelled')
 			  OR jsonb_path_exists(r.recovery_cases, '$[*] ? (@.state != "resolved" && @.unitId == $u)', jsonb_build_object('u', ru.unit_id::text))))`, in.UnitIDs).
-		Scan(&busy); err != nil {
-		return Restriction{}, err
+		Scan(&busy)
+	if scanErr != nil {
+		return Restriction{}, scanErr
 	}
 
 	if busy {
@@ -299,7 +301,7 @@ func (m Restrictions) schedule(
 	id := uuid.New()
 
 	policy, _ := json.Marshal(in.policy)
-	if _, err := c.Tx.Exec(
+	_, execErr = c.Tx.Exec(
 		ctx,
 		`INSERT INTO restrictions.restrictions (id, tenant_id, contract_id, contract_version, customer_id, rules_version, notice_at, execute_after, reason,
 		policy, state, created_at, updated_at) VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9, 'scheduled', $6, $6)`,
@@ -312,29 +314,32 @@ func (m Restrictions) schedule(
 		in.ExecuteAfter,
 		in.Reason,
 		policy,
-	); err != nil {
-		return Restriction{}, err
+	)
+	if execErr != nil {
+		return Restriction{}, execErr
 	}
 
 	for _, inv := range in.CauseInvoiceIDs {
-		if _, err := c.Tx.Exec(
+		_, err := c.Tx.Exec(
 			ctx,
 			`INSERT INTO restrictions.restriction_invoices (tenant_id, restriction_id, invoice_id) VALUES (current_setting('app.tenant_id')::uuid, $1, $2)`,
 			id,
 			inv,
-		); err != nil {
+		)
+		if err != nil {
 			return Restriction{}, err
 		}
 	}
 
 	for _, u := range in.UnitIDs {
-		if _, err := c.Tx.Exec(
+		_, err := c.Tx.Exec(
 			ctx,
 			`INSERT INTO restrictions.restriction_units (tenant_id, restriction_id, unit_id, apply_state, release_state)
 			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, 'not_sent', 'none')`,
 			id,
 			u,
-		); err != nil {
+		)
+		if err != nil {
 			return Restriction{}, err
 		}
 	}
@@ -361,13 +366,14 @@ func (m Restrictions) schedule(
 		notices = append(notices, n)
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr = c.Tx.Exec(
 		ctx,
 		`UPDATE restrictions.restrictions SET notice_notification_ids = $2 WHERE id = $1`,
 		id,
 		notices,
-	); err != nil {
-		return Restriction{}, err
+	)
+	if execErr != nil {
+		return Restriction{}, execErr
 	}
 
 	c.Emit(
@@ -502,9 +508,10 @@ func (m Restrictions) execute(
 	}
 
 	var contractVersion int
-	if err := c.Tx.QueryRow(ctx, `SELECT COALESCE((SELECT version FROM billing.contracts WHERE id = $1 AND is_current), 0)`, x.ContractID).
-		Scan(&contractVersion); err != nil {
-		return x, err
+	scanErr := c.Tx.QueryRow(ctx, `SELECT COALESCE((SELECT version FROM billing.contracts WHERE id = $1 AND is_current), 0)`, x.ContractID).
+		Scan(&contractVersion)
+	if scanErr != nil {
+		return x, scanErr
 	}
 
 	evidence := 0 // the notices identity stored for the restriction at notice time (IR191)
@@ -539,12 +546,13 @@ func (m Restrictions) execute(
 
 	next := x.Version + 1
 	if paid { // all causes paid right before execution: cancel without apply requests (DD-A09)
-		if _, err := c.Tx.Exec(
+		_, err := c.Tx.Exec(
 			ctx,
 			`UPDATE restrictions.restrictions SET state = 'cancelled', version = version + 1, updated_at = $2 WHERE id = $1`,
 			x.ID,
 			c.Now,
-		); err != nil {
+		)
+		if err != nil {
 			return x, err
 		}
 
@@ -589,7 +597,7 @@ func (m Restrictions) execute(
 			state = "sent_unknown"
 		}
 
-		if _, err := c.Tx.Exec(
+		_, execErr := c.Tx.Exec(
 			ctx,
 			`UPDATE restrictions.restriction_units SET apply_state = $3, apply_command_ids = apply_command_ids || $4::uuid, pending_reason = $5
 			WHERE restriction_id = $1 AND unit_id = $2`,
@@ -598,18 +606,20 @@ func (m Restrictions) execute(
 			state,
 			cmd,
 			reason,
-		); err != nil {
-			return x, err
+		)
+		if execErr != nil {
+			return x, execErr
 		}
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE restrictions.restrictions SET state = 'requested', version = version + 1, updated_at = $2 WHERE id = $1`,
 		x.ID,
 		c.Now,
-	); err != nil {
-		return x, err
+	)
+	if execErr != nil {
+		return x, execErr
 	}
 
 	c.Emit(
@@ -799,12 +809,13 @@ func (m Restrictions) cancel(
 
 	next := x.Version + 1
 	if x.State == "scheduled" {
-		if _, err := c.Tx.Exec(
+		_, err := c.Tx.Exec(
 			ctx,
 			`UPDATE restrictions.restrictions SET state = 'cancelled', version = version + 1, updated_at = $2 WHERE id = $1`,
 			x.ID,
 			c.Now,
-		); err != nil {
+		)
+		if err != nil {
 			return x, err
 		}
 
@@ -816,8 +827,11 @@ func (m Restrictions) cancel(
 				Payload:       map[string]any{"source": "cancel"},
 			},
 		)
-	} else if err := m.RequestRelease(ctx, c, x.ID, "cancel"); err != nil {
-		return x, err
+	} else {
+		err := m.RequestRelease(ctx, c, x.ID, "cancel")
+		if err != nil {
+			return x, err
+		}
 	}
 
 	c.Audit(

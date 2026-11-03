@@ -628,7 +628,8 @@ func TestWorkerConfirmsUnratedJobs(t *testing.T) {
 		clock.Add(-7*24*time.Hour),
 	)
 
-	if _, err := schedTick(context.Background(), s, clock); err != nil {
+	_, err := schedTick(context.Background(), s, clock)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -714,7 +715,8 @@ func TestExtendAccessRefreezesHistory(t *testing.T) {
 		return at
 	}
 
-	if _, err := schedTick(ctx, s, clock); err != nil {
+	_, err := schedTick(ctx, s, clock)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -739,7 +741,8 @@ func TestExtendAccessRefreezesHistory(t *testing.T) {
 		t.Errorf("the old snapshot stays while the access is open again: %v", at)
 	}
 
-	if _, err := schedTick(ctx, s, clock.Add(3*time.Hour)); err != nil {
+	_, err = schedTick(ctx, s, clock.Add(3*time.Hour))
+	if err != nil {
 		t.Fatal(err)
 	}
 

@@ -124,7 +124,7 @@ func policiesOf(ctx context.Context, c *ops.Call, unit, org uuid.UUID) ([]notifP
 			p           notifPolicy
 			cond, rules []byte
 		)
-		if err := rows.Scan(
+		err := rows.Scan(
 			&p.id,
 			&p.isDefault,
 			&p.enabled,
@@ -135,7 +135,8 @@ func policiesOf(ctx context.Context, c *ops.Call, unit, org uuid.UUID) ([]notifP
 			&p.channels,
 			&p.cooldown,
 			&p.timezone,
-		); err != nil {
+		)
+		if err != nil {
 			rows.Close()
 
 			return nil, err
@@ -166,8 +167,9 @@ func policiesOf(ctx context.Context, c *ops.Call, unit, org uuid.UUID) ([]notifP
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return nil, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return nil, rowsErr
 	}
 
 	for i := range out { // default rules switched off for this customer (owner-only settings, IR115)
@@ -344,7 +346,8 @@ func recoverAlert(
 
 	for rows.Next() {
 		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
+		err := rows.Scan(&id)
+		if err != nil {
 			rows.Close()
 
 			return err
@@ -355,8 +358,9 @@ func recoverAlert(
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return rowsErr
 	}
 
 	for _, id := range ids {
@@ -401,8 +405,9 @@ func (n Notifier) Evaluate(
 	}
 
 	var org uuid.UUID
-	if err := c.Tx.QueryRow(ctx, `SELECT customer_org_id FROM assets.units WHERE id = $1`, unit).
-		Scan(&org); err != nil {
+	err := c.Tx.QueryRow(ctx, `SELECT customer_org_id FROM assets.units WHERE id = $1`, unit).
+		Scan(&org)
+	if err != nil {
 		return nil, err
 	}
 
@@ -418,7 +423,7 @@ func (n Notifier) Evaluate(
 			for i, cnd := range p.conds {
 				if f, ok := byMetric[cnd.Metric]; ok {
 					if v, ok := freshValue(f, at); ok && recovered(cnd, v) {
-						if err := recoverAlert(
+						err := recoverAlert(
 							ctx,
 							c,
 							unit,
@@ -428,7 +433,8 @@ func (n Notifier) Evaluate(
 							v,
 							at,
 							eventID,
-						); err != nil {
+						)
+						if err != nil {
 							return nil, err
 						}
 					}
@@ -492,8 +498,9 @@ func (n Notifier) Evaluate(
 		if reason == "" &&
 			p.cooldown > 0 { // cooldown since the last created notification of this policy and unit
 			var last *time.Time
-			if err := c.Tx.QueryRow(ctx, `SELECT max(occurred_at) FROM monitoring.alert_notifications WHERE policy_id = $1 AND unit_id = $2`, p.id, unit).
-				Scan(&last); err != nil {
+			err := c.Tx.QueryRow(ctx, `SELECT max(occurred_at) FROM monitoring.alert_notifications WHERE policy_id = $1 AND unit_id = $2`, p.id, unit).
+				Scan(&last)
+			if err != nil {
 				return nil, err
 			}
 
@@ -511,9 +518,10 @@ func (n Notifier) Evaluate(
 			}
 
 			var told bool
-			if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM monitoring.alerts a JOIN monitoring.alert_notifications n ON n.alert_id = a.id AND n.policy_id = a.policy_id
+			err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM monitoring.alerts a JOIN monitoring.alert_notifications n ON n.alert_id = a.id AND n.policy_id = a.policy_id
 				WHERE a.unit_id = $1 AND a.policy_id = $2 AND a.rule_key IS NOT DISTINCT FROM $3 AND a.type = 'sensor' AND a.status <> 'resolved')`, unit, p.id, key).
-				Scan(&told); err != nil {
+				Scan(&told)
+			if err != nil {
 				return nil, err
 			}
 
@@ -527,7 +535,8 @@ func (n Notifier) Evaluate(
 			channels []string
 		)
 		if reason == "" {
-			if recips, channels, err = recipientsOf(ctx, c, p, org); err != nil {
+			recips, channels, err = recipientsOf(ctx, c, p, org)
+			if err != nil {
 				return nil, err
 			}
 		}
@@ -576,7 +585,7 @@ func (n Notifier) Evaluate(
 							return nil, err
 						}
 
-						if _, err := c.Tx.Exec(
+						_, execErr := c.Tx.Exec(
 							ctx,
 							`INSERT INTO monitoring.alert_notifications (tenant_id, notification_id, alert_id, policy_id, unit_id, occurred_at)
 							VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5)`,
@@ -585,8 +594,9 @@ func (n Notifier) Evaluate(
 							p.id,
 							unit,
 							c.Now,
-						); err != nil {
-							return nil, err
+						)
+						if execErr != nil {
+							return nil, execErr
 						}
 
 						o.NotificationIDs = append(o.NotificationIDs, id)
@@ -672,9 +682,10 @@ func deliveryFailure(
 	at time.Time,
 ) (uuid.UUID, error) {
 	var raw []byte
-	if err := c.Tx.QueryRow(ctx, `SELECT delivery_failures FROM monitoring.alerts WHERE id = $1 FOR UPDATE`, alert).
-		Scan(&raw); err != nil {
-		return uuid.Nil, err
+	scanErr := c.Tx.QueryRow(ctx, `SELECT delivery_failures FROM monitoring.alerts WHERE id = $1 FOR UPDATE`, alert).
+		Scan(&raw)
+	if scanErr != nil {
+		return uuid.Nil, scanErr
 	}
 
 	var fs []map[string]any

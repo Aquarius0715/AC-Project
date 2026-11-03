@@ -46,9 +46,10 @@ func versionedUpdate(
 	}
 
 	var exists bool
-	if err := c.Tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM "+table+" WHERE id = $1)", id).
-		Scan(&exists); err != nil {
-		return err
+	scanErr := c.Tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM "+table+" WHERE id = $1)", id).
+		Scan(&exists)
+	if scanErr != nil {
+		return scanErr
 	}
 
 	if exists {
@@ -182,7 +183,8 @@ func siblingName(ctx context.Context, c *ops.Call, kind string, id uuid.UUID) er
 	}
 
 	var taken bool
-	if err := c.Tx.QueryRow(ctx, "SELECT EXISTS ("+q+")", id).Scan(&taken); err != nil {
+	err := c.Tx.QueryRow(ctx, "SELECT EXISTS ("+q+")", id).Scan(&taken)
+	if err != nil {
 		return err
 	}
 
@@ -221,7 +223,8 @@ func (m *Module) propertiesSave(
 	in *PropertySave,
 ) (Property, error) {
 	if in.ID == nil {
-		if err := m.customerActive(ctx, c, in.CustomerOrgID); err != nil {
+		err := m.customerActive(ctx, c, in.CustomerOrgID)
+		if err != nil {
 			return Property{}, err
 		}
 
@@ -244,8 +247,9 @@ func (m *Module) propertiesSave(
 			return Property{}, dupSibling(err)
 		}
 
-		if err := siblingName(ctx, c, "property", id); err != nil {
-			return Property{}, err
+		siblingNameErr := siblingName(ctx, c, "property", id)
+		if siblingNameErr != nil {
+			return Property{}, siblingNameErr
 		}
 
 		c.Emit(ops.Event{AggregateType: "property", AggregateID: id, Type: "LocationChanged"})
@@ -280,8 +284,9 @@ func (m *Module) propertiesSave(
 		return Property{}, versionedUpdate(ctx, c, "assets.properties", *in.ID, err)
 	}
 
-	if err := siblingName(ctx, c, "property", p.ID); err != nil {
-		return Property{}, err
+	siblingNameErr := siblingName(ctx, c, "property", p.ID)
+	if siblingNameErr != nil {
+		return Property{}, siblingNameErr
 	}
 
 	c.Emit(ops.Event{AggregateType: "property", AggregateID: p.ID, Type: "LocationChanged"})
@@ -412,10 +417,11 @@ func (m *Module) checkParent(
 	}
 
 	var cycle bool
-	if err := c.Tx.QueryRow(ctx, `WITH RECURSIVE d AS (SELECT id FROM assets.spaces WHERE parent_space_id = $1
+	scanErr := c.Tx.QueryRow(ctx, `WITH RECURSIVE d AS (SELECT id FROM assets.spaces WHERE parent_space_id = $1
 		UNION ALL SELECT s.id FROM assets.spaces s JOIN d ON s.parent_space_id = d.id) SELECT EXISTS (SELECT 1 FROM d WHERE id = $2)`, *self, *parent).
-		Scan(&cycle); err != nil {
-		return err
+		Scan(&cycle)
+	if scanErr != nil {
+		return scanErr
 	}
 
 	if cycle {
@@ -448,11 +454,13 @@ func (m *Module) checkParent(
 // @Security		BearerAuth
 // @Router			/v1/spaces [post]
 func (m *Module) spacesSave(ctx context.Context, c *ops.Call, in *SpaceSave) (Space, error) {
-	if err := m.activeProperty(ctx, c, in.PropertyID); err != nil {
+	err := m.activeProperty(ctx, c, in.PropertyID)
+	if err != nil {
 		return Space{}, err
 	}
 
-	if err := m.checkParent(ctx, c, in.ID, in.PropertyID, in.ParentSpaceID); err != nil {
+	err = m.checkParent(ctx, c, in.ID, in.PropertyID, in.ParentSpaceID)
+	if err != nil {
 		return Space{}, err
 	}
 
@@ -475,8 +483,9 @@ func (m *Module) spacesSave(ctx context.Context, c *ops.Call, in *SpaceSave) (Sp
 			return Space{}, dupSibling(err)
 		}
 
-		if err := siblingName(ctx, c, "space", id); err != nil {
-			return Space{}, err
+		siblingNameErr := siblingName(ctx, c, "space", id)
+		if siblingNameErr != nil {
+			return Space{}, siblingNameErr
 		}
 
 		c.Emit(ops.Event{AggregateType: "space", AggregateID: id, Type: "LocationChanged"})
@@ -509,8 +518,9 @@ func (m *Module) spacesSave(ctx context.Context, c *ops.Call, in *SpaceSave) (Sp
 		return Space{}, versionedUpdate(ctx, c, "assets.spaces", *in.ID, err)
 	}
 
-	if err := siblingName(ctx, c, "space", s.ID); err != nil {
-		return Space{}, err
+	siblingNameErr := siblingName(ctx, c, "space", s.ID)
+	if siblingNameErr != nil {
+		return Space{}, siblingNameErr
 	}
 
 	c.Emit(ops.Event{AggregateType: "space", AggregateID: s.ID, Type: "LocationChanged"})
@@ -578,7 +588,8 @@ func (in *UnitSave) Validate() map[string]string {
 		in.warrantySet = true
 		if string(in.WarrantyEndsAt) != "null" {
 			var t time.Time
-			if err := json.Unmarshal(in.WarrantyEndsAt, &t); err != nil {
+			err := json.Unmarshal(in.WarrantyEndsAt, &t)
+			if err != nil {
 				fe["warrantyEndsAt"] = "error.invalid"
 			} else if in.InstalledAt != nil && t.Before(*in.InstalledAt) {
 				fe["warrantyEndsAt"] = "error.range" // a warranty cannot end before the installation
@@ -680,12 +691,13 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (
 	}
 
 	if in.ID == nil {
-		if err := m.customerActive(ctx, c, in.CustomerOrgID); err != nil {
+		err := m.customerActive(ctx, c, in.CustomerOrgID)
+		if err != nil {
 			return Unit{}, err
 		}
 
 		id := uuid.Must(uuid.NewV7())
-		if _, err := c.Tx.Exec(
+		_, err = c.Tx.Exec(
 			ctx,
 			`INSERT INTO assets.units (id, tenant_id, customer_org_id, property_id, space_id, display_name, model_id, type, installed_at, service_scope, capability_version, warranty_ends_at)
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
@@ -700,11 +712,13 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (
 			in.ServiceScope,
 			capVer,
 			in.warranty,
-		); err != nil {
+		)
+		if err != nil {
 			return Unit{}, err
 		}
 
-		if err := siblingName(ctx, c, "unit", id); err != nil {
+		err = siblingName(ctx, c, "unit", id)
+		if err != nil {
 			return Unit{}, err
 		}
 
@@ -776,8 +790,9 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (
 		return Unit{}, versionedUpdate(ctx, c, "assets.units", *in.ID, err)
 	}
 
-	if err := siblingName(ctx, c, "unit", *in.ID); err != nil {
-		return Unit{}, err
+	siblingNameErr := siblingName(ctx, c, "unit", *in.ID)
+	if siblingNameErr != nil {
+		return Unit{}, siblingNameErr
 	}
 
 	c.Emit(ops.Event{AggregateType: "unit", AggregateID: *in.ID, Type: "UnitChanged"})
@@ -950,17 +965,19 @@ func (m *Module) archive(
 	return func(ctx context.Context, c *ops.Call, in *ArchiveInput) (ArchivedResource, error) {
 		// the row is locked before the check for active children: a unit or space added at the same moment reads its
 		// parent with a share lock, so one of the two waits and then sees the other (IR478)
-		if _, err := c.Tx.Exec(
+		_, execErr := c.Tx.Exec(
 			ctx,
 			"SELECT 1 FROM "+table+" WHERE id = $1 FOR UPDATE",
 			in.ID,
-		); err != nil {
-			return ArchivedResource{}, err
+		)
+		if execErr != nil {
+			return ArchivedResource{}, execErr
 		}
 
 		if busySQL != "" {
 			var busy bool
-			if err := c.Tx.QueryRow(ctx, busySQL, in.ID).Scan(&busy); err != nil {
+			err := c.Tx.QueryRow(ctx, busySQL, in.ID).Scan(&busy)
+			if err != nil {
 				return ArchivedResource{}, err
 			}
 
@@ -1023,7 +1040,8 @@ func (m *Module) MoveToCapabilityVersion(
 
 	for rows.Next() {
 		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
+		err := rows.Scan(&id)
+		if err != nil {
 			return n, err
 		}
 
@@ -1114,7 +1132,8 @@ func (m *Module) UnitsOfProperty(
 
 	for rows.Next() {
 		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
+		err := rows.Scan(&id)
+		if err != nil {
 			return nil, err
 		}
 
@@ -1161,7 +1180,8 @@ func (m *Module) AttachedUnits(
 
 	for rows.Next() {
 		var p, u uuid.UUID
-		if err := rows.Scan(&p, &u); err != nil {
+		err := rows.Scan(&p, &u)
+		if err != nil {
 			return nil, err
 		}
 
@@ -1191,7 +1211,8 @@ func (m *Module) PoliciesOfUnits(
 
 	for rows.Next() {
 		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
+		err := rows.Scan(&id)
+		if err != nil {
 			return nil, err
 		}
 
@@ -1216,7 +1237,8 @@ func (m *Module) DetachPolicy(ctx context.Context, c *ops.Call, policy uuid.UUID
 
 	for rows.Next() {
 		var u uuid.UUID
-		if err := rows.Scan(&u); err != nil {
+		err := rows.Scan(&u)
+		if err != nil {
 			rows.Close()
 
 			return err
@@ -1227,20 +1249,22 @@ func (m *Module) DetachPolicy(ctx context.Context, c *ops.Call, policy uuid.UUID
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return rowsErr
 	}
 
 	if len(units) == 0 {
 		return nil
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE assets.units SET version = version + 1, updated_at = platform.app_now() WHERE id = ANY($1)`,
 		units,
-	); err != nil {
-		return err
+	)
+	if execErr != nil {
+		return execErr
 	}
 
 	for _, u := range units {
@@ -1270,7 +1294,8 @@ func (m *Module) OrgsOfUnits(
 
 	for rows.Next() {
 		var u, o uuid.UUID
-		if err := rows.Scan(&u, &o); err != nil {
+		err := rows.Scan(&u, &o)
+		if err != nil {
 			return nil, err
 		}
 
@@ -1358,7 +1383,8 @@ func (m *Module) unitIDs(
 
 	for rows.Next() {
 		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
+		err := rows.Scan(&id)
+		if err != nil {
 			return nil, err
 		}
 
@@ -1411,7 +1437,8 @@ func (m *Module) SpacesOfUnits(
 
 	for rows.Next() {
 		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
+		err := rows.Scan(&id)
+		if err != nil {
 			return nil, err
 		}
 
@@ -1445,7 +1472,8 @@ func (m *Module) SpacesOfOrg(ctx context.Context, c *ops.Call, org uuid.UUID) ([
 
 	for rows.Next() {
 		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
+		err := rows.Scan(&id)
+		if err != nil {
 			return nil, err
 		}
 
@@ -1547,7 +1575,8 @@ func (m *Module) CustomerProfiles(
 			org      uuid.UUID
 			id, prof string
 		)
-		if err := rows.Scan(&org, &id, &prof); err != nil {
+		err := rows.Scan(&org, &id, &prof)
+		if err != nil {
 			return nil, err
 		}
 
@@ -1602,7 +1631,8 @@ func (m *Module) BriefUnits(
 
 	for rows.Next() {
 		var b ops.UnitBrief
-		if err := rows.Scan(&b.ID, &b.OrgID, &b.Connection); err != nil {
+		err := rows.Scan(&b.ID, &b.OrgID, &b.Connection)
+		if err != nil {
 			return nil, err
 		}
 

@@ -162,10 +162,11 @@ func TestCommandTriggerMapsTheAcknowledgement(t *testing.T) {
 		t.Error("an expired acknowledgement is forwarded")
 	}
 
-	if _, _, err := CommandTrigger(
+	_, _, commandTriggerErr := CommandTrigger(
 		devicesim.Ack{CommandID: "not-a-uuid", Result: "applied"},
 		received,
-	); err == nil {
+	)
+	if commandTriggerErr == nil {
 		t.Error("a command ID that is not a UUID is accepted")
 	}
 }
@@ -203,7 +204,8 @@ func TestFleetLinksResolve(t *testing.T) {
 		t.Errorf("fleet IDs %v %v", out[0].Measurement.UnitID, out[0].Measurement.SensorID)
 	}
 
-	if _, err := r.Triggers(batch("device-mock-no-module", 1), received); err == nil {
+	_, triggersErr := r.Triggers(batch("device-mock-no-module", 1), received)
+	if triggersErr == nil {
 		t.Error("a unit without a module has a link")
 	}
 }

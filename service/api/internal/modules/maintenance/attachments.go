@@ -41,8 +41,9 @@ func (m Files) lockDraft(ctx context.Context, c *ops.Call, job, report uuid.UUID
 		return nil, err
 	}
 
-	if err := m.Reports.Access.TechnicianJob(ctx, c, job, unit); err != nil {
-		return nil, err
+	technicianJobErr := m.Reports.Access.TechnicianJob(ctx, c, job, unit)
+	if technicianJobErr != nil {
+		return nil, technicianJobErr
 	}
 
 	draft, err := m.Reports.draftOf(ctx, c, job, true)
@@ -67,8 +68,9 @@ func (m Files) store(
 	id := uuid.New()
 
 	key := "jobs/" + job.String() + "/reports/" + report.String() + "/" + id.String()
-	if err := m.Blobs.Put(ctx, key, f.Mime, f.Bytes); err != nil {
-		return id, err
+	putErr := m.Blobs.Put(ctx, key, f.Mime, f.Bytes)
+	if putErr != nil {
+		return id, putErr
 	}
 
 	_, err := c.Tx.Exec(
@@ -148,9 +150,10 @@ func (m Files) add(ctx context.Context, c *ops.Call, in *AddInput) (AttachmentRe
 	}
 
 	var n int
-	if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM maintenance.attachments WHERE report_id = $1`, in.ReportID).
-		Scan(&n); err != nil {
-		return AttachmentRef{}, err
+	scanErr := c.Tx.QueryRow(ctx, `SELECT count(*) FROM maintenance.attachments WHERE report_id = $1`, in.ReportID).
+		Scan(&n)
+	if scanErr != nil {
+		return AttachmentRef{}, scanErr
 	}
 
 	if n >= MaxReportAttachments {
@@ -162,23 +165,25 @@ func (m Files) add(ctx context.Context, c *ops.Call, in *AddInput) (AttachmentRe
 		return AttachmentRef{}, err
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.work_reports SET version = version + 1, sign_off = NULL, updated_at = $3 WHERE id = $1 AND version = $2`,
 		in.ReportID,
 		draft.Version,
 		c.Now,
-	); err != nil {
-		return AttachmentRef{}, err
+	)
+	if execErr != nil {
+		return AttachmentRef{}, execErr
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr = c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.jobs SET draft_report_version = $2 WHERE id = $1`,
 		in.JobID,
 		draft.Version+1,
-	); err != nil {
-		return AttachmentRef{}, err
+	)
+	if execErr != nil {
+		return AttachmentRef{}, execErr
 	}
 
 	next := draft.Version + 1
@@ -327,15 +332,16 @@ func (m Files) signOff(ctx context.Context, c *ops.Call, in *SignOffInput) (Repo
 	}
 
 	raw, _ := json.Marshal(so)
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.work_reports SET sign_off = $3, updated_at = $4 WHERE id = $1 AND version = $2`,
 		in.ReportID,
 		draft.Version,
 		raw,
 		c.Now,
-	); err != nil {
-		return Report{}, err
+	)
+	if execErr != nil {
+		return Report{}, execErr
 	}
 
 	x, err := m.Reports.load(ctx, c, in.ReportID, draft.Version)
@@ -417,12 +423,13 @@ type BlobOut struct {
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/reports/{reportId}/attachments/{attachmentId}/content [get]
 func (m Files) content(ctx context.Context, c *ops.Call, in *ContentInput) (BlobOut, error) {
-	if _, err := m.Reports.get(
+	_, getErr := m.Reports.get(
 		ctx,
 		c,
 		&GetReportInput{JobID: in.JobID, ReportID: in.ReportID, ReportVersion: in.ReportVersion},
-	); err != nil {
-		return BlobOut{}, err
+	)
+	if getErr != nil {
+		return BlobOut{}, getErr
 	}
 
 	var (
@@ -441,7 +448,8 @@ func (m Files) content(ctx context.Context, c *ops.Call, in *ContentInput) (Blob
 		return out, err
 	}
 
-	if out.Bytes, err = m.Blobs.Get(ctx, key); errors.Is(err, blob.ErrNotFound) {
+	out.Bytes, err = m.Blobs.Get(ctx, key)
+	if errors.Is(err, blob.ErrNotFound) {
 		return out, apperr.E(
 			apperr.NotFound,
 			"error.notFound",

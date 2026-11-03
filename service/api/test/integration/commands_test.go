@@ -132,12 +132,13 @@ func TestCommands(t *testing.T) {
 
 	keepObserved(t, id)
 
-	if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
+	beginFuncErr := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
 		ok, err = control.Acknowledge(ctx, tx, uuid.MustParse(id), clock.Add(5*time.Second))
 
 		return err
-	}); err != nil || !ok {
-		t.Fatalf("ack: %v %v", ok, err)
+	})
+	if beginFuncErr != nil || !ok {
+		t.Fatalf("ack: %v %v", ok, beginFuncErr)
 	}
 
 	if _, m := post(
@@ -157,20 +158,22 @@ func TestCommands(t *testing.T) {
 	id2 := data(m)["id"].(string)
 	// IR453: a tick just after expiresAt leaves the command for an acknowledgement still on its way; the grace after
 	// it expires the command
-	if _, err := schedTick(ctx, s, clock.Add(32*time.Second)); err != nil {
-		t.Fatal(err)
+	_, schedTickErr := schedTick(ctx, s, clock.Add(32*time.Second))
+	if schedTickErr != nil {
+		t.Fatal(schedTickErr)
 	}
 
 	if _, m := post(s, &hq, "commands.get", `{"id":"`+id2+`"}`); data(m)["status"] == "expired" {
 		t.Fatalf("expired within the grace: %v", m)
 	}
 
-	if _, err := schedTick(
+	_, schedTickErr = schedTick(
 		ctx,
 		s,
 		clock.Add(30*time.Second+control.ExpireGrace+time.Second),
-	); err != nil {
-		t.Fatal(err)
+	)
+	if schedTickErr != nil {
+		t.Fatal(schedTickErr)
 	}
 
 	if _, m := post(
@@ -185,12 +188,13 @@ func TestCommands(t *testing.T) {
 
 	keepObserved(t, id2)
 
-	if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
+	beginFuncErr = pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
 		ok, err = control.Acknowledge(ctx, tx, uuid.MustParse(id2), clock.Add(40*time.Second))
 
 		return err
-	}); err != nil || ok {
-		t.Fatalf("late ack must not succeed: %v %v", ok, err)
+	})
+	if beginFuncErr != nil || ok {
+		t.Fatalf("late ack must not succeed: %v %v", ok, beginFuncErr)
 	}
 	// restriction table and offline delivery
 	rid := uuid.NewString()

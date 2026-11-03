@@ -58,14 +58,15 @@ func main() {
 
 	started := time.Now()
 
-	if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
+	beginFuncErr := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
 		var err error
 
 		rows, err = seed.ApplyFleetHistory(ctx, tx, fleet, until, *days)
 
 		return err
-	}); err != nil {
-		log.Fatal(err)
+	})
+	if beginFuncErr != nil {
+		log.Fatal(beginFuncErr)
 	}
 
 	log.Printf(
@@ -86,7 +87,8 @@ func envOr(key, def string) string {
 }
 
 func envInt(key string, def int) int {
-	if v, err := strconv.Atoi(os.Getenv(key)); err == nil {
+	v, err := strconv.Atoi(os.Getenv(key))
+	if err == nil {
 		return v
 	}
 

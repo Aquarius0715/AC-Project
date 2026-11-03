@@ -97,22 +97,25 @@ func TestKeycloakAccounts(t *testing.T) {
 		Enabled    bool                `json:"enabled"`
 		Attributes map[string][]string `json:"attributes"`
 	}
-	if err := json.Unmarshal(
+	unmarshalErr := json.Unmarshal(
 		[]byte(calls[0].body),
 		&user,
-	); err != nil || user.Username != a.Email || !user.Enabled ||
+	)
+	if unmarshalErr != nil || user.Username != a.Email || !user.Enabled ||
 		user.Attributes["membership_id"][0] != "m1" || user.Attributes["role"][0] != "technician" ||
 		user.Attributes["tenant_id"][0] != "t1" {
 		t.Errorf("created user: %s", calls[0].body)
 	}
 
 	exists, calls = true, nil
-	if id, err := k.CreateAccount(
+	createAccountId, createAccountErr := k.CreateAccount(
 		ctx,
 		a,
-	); err != nil || id != "old-id" || len(calls) != 4 || calls[3].method != http.MethodPut ||
+	)
+	if createAccountErr != nil || createAccountId != "old-id" || len(calls) != 4 ||
+		calls[3].method != http.MethodPut ||
 		calls[3].path != "/users/old-id" {
-		t.Fatalf("existing e-mail: %q %v %v", id, err, calls)
+		t.Fatalf("existing e-mail: %q %v %v", createAccountId, createAccountErr, calls)
 	}
 
 	var updated struct {
@@ -121,27 +124,31 @@ func TestKeycloakAccounts(t *testing.T) {
 		Attributes map[string][]string `json:"attributes"`
 	}
 	// the whole user goes back: the e-mail stays (IR463), the other attributes too
-	if err := json.Unmarshal(
+	unmarshalErr = json.Unmarshal(
 		[]byte(calls[3].body),
 		&updated,
-	); err != nil || !updated.Enabled || updated.Email != a.Email || updated.Attributes["membership_id"][0] != "m1" ||
+	)
+	if unmarshalErr != nil || !updated.Enabled || updated.Email != a.Email ||
+		updated.Attributes["membership_id"][0] != "m1" ||
 		updated.Attributes["locale"][0] != "ms" {
 		t.Errorf("updated user: %s", calls[3].body)
 	}
 
-	if err := k.UpdateAccount(ctx, "gone-id", a); !errors.Is(err, ErrNoAccount) {
-		t.Errorf("an account the realm lost: %v", err)
+	updateAccountErr := k.UpdateAccount(ctx, "gone-id", a)
+	if !errors.Is(updateAccountErr, ErrNoAccount) {
+		t.Errorf("an account the realm lost: %v", updateAccountErr)
 	}
 
 	calls = nil
-	if err := k.SendSetup(
+	sendSetupErr := k.SendSetup(
 		ctx,
 		"new-id",
 		a,
-	); err != nil || calls[0].path != "/users/new-id/execute-actions-email" ||
+	)
+	if sendSetupErr != nil || calls[0].path != "/users/new-id/execute-actions-email" ||
 		!strings.Contains(calls[0].query, "redirect_uri=http%3A%2F%2Flocalhost%3A3002%2Flogin") ||
 		calls[0].body != `["UPDATE_PASSWORD","VERIFY_EMAIL"]` {
-		t.Errorf("set-up e-mail: %v %v", err, calls)
+		t.Errorf("set-up e-mail: %v %v", sendSetupErr, calls)
 	}
 	// HQ (IR468): a new account must set up its one-time-code device, in the e-mail's steps and as a required action;
 	// one with a device keeps it
@@ -149,41 +156,45 @@ func TestKeycloakAccounts(t *testing.T) {
 	hq.Role = "admin"
 
 	exists, calls = false, nil
-	if _, err := k.CreateAccount(
+	_, createAccountErr = k.CreateAccount(
 		ctx,
 		hq,
-	); err != nil ||
+	)
+	if createAccountErr != nil ||
 		!strings.Contains(calls[0].body, `"requiredActions":["CONFIGURE_TOTP"]`) {
-		t.Errorf("a new HQ account: %v %v", err, calls)
+		t.Errorf("a new HQ account: %v %v", createAccountErr, calls)
 	}
 
 	calls = nil
-	if err := k.SendSetup(
+	sendSetupErr = k.SendSetup(
 		ctx,
 		"hq-new",
 		hq,
-	); err != nil ||
+	)
+	if sendSetupErr != nil ||
 		calls[1].body != `["UPDATE_PASSWORD","VERIFY_EMAIL","CONFIGURE_TOTP"]` {
-		t.Errorf("the set-up e-mail of an HQ account without a device: %v %v", err, calls)
+		t.Errorf("the set-up e-mail of an HQ account without a device: %v %v", sendSetupErr, calls)
 	}
 
 	calls = nil
-	if err := k.SendSetup(
+	sendSetupErr = k.SendSetup(
 		ctx,
 		"hq-otp",
 		hq,
-	); err != nil ||
+	)
+	if sendSetupErr != nil ||
 		calls[1].body != `["UPDATE_PASSWORD","VERIFY_EMAIL"]` {
-		t.Errorf("the set-up e-mail of an HQ account with a device: %v %v", err, calls)
+		t.Errorf("the set-up e-mail of an HQ account with a device: %v %v", sendSetupErr, calls)
 	}
 
 	calls = nil
-	if err := k.SetEnabled(
+	setEnabledErr := k.SetEnabled(
 		ctx,
 		"new-id",
 		false,
-	); err != nil ||
+	)
+	if setEnabledErr != nil ||
 		calls[0].body != `{"enabled":false}` {
-		t.Errorf("disable: %v %v", err, calls)
+		t.Errorf("disable: %v %v", setEnabledErr, calls)
 	}
 }

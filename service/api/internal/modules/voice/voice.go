@@ -112,7 +112,8 @@ func (v Voice) candidates(ctx context.Context, c *ops.Call, room string) ([]Cand
 
 	for rows.Next() {
 		var x Candidate
-		if err := rows.Scan(&x.UnitID, &x.PathLabel); err != nil {
+		err := rows.Scan(&x.UnitID, &x.PathLabel)
+		if err != nil {
 			rows.Close()
 
 			return nil, err
@@ -123,8 +124,9 @@ func (v Voice) candidates(ctx context.Context, c *ops.Call, room string) ([]Cand
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil || len(all) == 0 {
-		return []Candidate{}, err
+	rowsErr := rows.Err()
+	if rowsErr != nil || len(all) == 0 {
+		return []Candidate{}, rowsErr
 	}
 
 	ids := make([]uuid.UUID, len(all))

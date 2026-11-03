@@ -155,7 +155,8 @@ func claimableJobs(
 			u, j uuid.UUID
 			at   time.Time
 		)
-		if err := rows.Scan(&u, &j, &at); err != nil {
+		err := rows.Scan(&u, &j, &at)
+		if err != nil {
 			return nil, err
 		}
 

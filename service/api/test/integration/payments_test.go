@@ -574,7 +574,8 @@ func TestInvoiceOnePaymentAtATime(t *testing.T) {
 		inv,
 		clock,
 	)
-	if pe := (*pgconn.PgError)(nil); !errors.As(err, &pe) || pe.Code != "23505" {
+	pe := (*pgconn.PgError)(nil)
+	if !errors.As(err, &pe) || pe.Code != "23505" {
 		t.Fatalf("a second open payment in the database: %v", err)
 	}
 

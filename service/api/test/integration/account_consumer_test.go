@@ -24,7 +24,8 @@ func TestAccountConsumerApart(t *testing.T) {
 	)
 
 	ctx := context.Background()
-	if err := s.DrainEvents(ctx); err != nil {
+	err := s.DrainEvents(ctx)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -90,7 +91,8 @@ func TestAccountConsumerApart(t *testing.T) {
 	})
 	emit("AccountEnabled", `{"membershipId":"`+membership.String()+`","enabled":false}`)
 
-	if err := s.DrainEvents(ctx); err == nil {
+	err = s.DrainEvents(ctx)
+	if err == nil {
 		t.Fatal("the audit entry that cannot be written was applied")
 	}
 

@@ -45,13 +45,14 @@ func (PayoutSource) AcceptedJobs(
 
 	for rows.Next() {
 		var a AcceptedJob
-		if err := rows.Scan(
+		err := rows.Scan(
 			&a.JobID,
 			&a.ContractorOrgID,
 			&a.Type,
 			&a.AcceptedAt,
 			&a.Returned,
-		); err != nil {
+		)
+		if err != nil {
 			return nil, err
 		}
 
@@ -85,8 +86,9 @@ func (PayoutSource) RateAt(
 	}
 
 	var lines []RateLine
-	if err := json.Unmarshal(raw, &lines); err != nil {
-		return nil, "", false, err
+	unmarshalErr := json.Unmarshal(raw, &lines)
+	if unmarshalErr != nil {
+		return nil, "", false, unmarshalErr
 	}
 
 	out := map[string]int64{}
@@ -103,7 +105,8 @@ func NoteHandlers() map[string]events.Handler {
 	return map[string]events.Handler{
 		events.JobNoteRequested: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var n events.JobNote
-			if err := e.Decode(&n); err != nil {
+			err := e.Decode(&n)
+			if err != nil {
 				return err
 			}
 
@@ -126,9 +129,10 @@ func (s PayoutSource) AddJobNote(
 	message string,
 ) error {
 	var note uuid.UUID
-	if err := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.job_notes (tenant_id, job_id, author_id, visibility, message, created_at)
+	err := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.job_notes (tenant_id, job_id, author_id, visibility, message, created_at)
 		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, 'internal', $3, $4) RETURNING id`, job, c.Principal.UserID, message, c.Now).
-		Scan(&note); err != nil {
+		Scan(&note)
+	if err != nil {
 		return err
 	}
 

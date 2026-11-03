@@ -211,8 +211,9 @@ func scanJob(r pgx.Row) (Job, error) {
 		j.ScheduledSlot = &Slot{*schedStart, *schedEnd}
 	}
 
-	if err := unmarshalSlots(preferred, &j.PreferredSlots); err != nil {
-		return j, err
+	unmarshalSlotsErr := unmarshalSlots(preferred, &j.PreferredSlots)
+	if unmarshalSlotsErr != nil {
+		return j, unmarshalSlotsErr
 	}
 
 	if j.TimeOnSite == nil {
@@ -449,8 +450,9 @@ func (m Jobs) createJob(ctx context.Context, c *ops.Call, in *CreateInput) (Job,
 		return Job{}, err
 	}
 
-	if err := m.event(ctx, c, id, "job.created", nil); err != nil {
-		return Job{}, err
+	eventErr := m.event(ctx, c, id, "job.created", nil)
+	if eventErr != nil {
+		return Job{}, eventErr
 	}
 
 	j, err := m.detail(ctx, c, id)
@@ -551,11 +553,13 @@ func (m Jobs) load(
 	}
 
 	j.Projection = "detail"
-	if j.SlotProposal, err = m.pendingOrLastProposal(ctx, c, id); err != nil {
+	j.SlotProposal, err = m.pendingOrLastProposal(ctx, c, id)
+	if err != nil {
 		return j, err
 	}
 
-	if j.Assignment, err = m.shownAssignment(ctx, c, id); err != nil {
+	j.Assignment, err = m.shownAssignment(ctx, c, id)
+	if err != nil {
 		return j, err
 	}
 
@@ -577,11 +581,13 @@ func (m Jobs) load(
 		cursorSQL += clientEventFilter // the cursor counts what the client's jobs.events lists, so it reveals no hidden event (IR42, IR442)
 	}
 
-	if err := c.Tx.QueryRow(ctx, cursorSQL, id).Scan(&j.EventCursor); err != nil {
-		return j, err
+	scanErr := c.Tx.QueryRow(ctx, cursorSQL, id).Scan(&j.EventCursor)
+	if scanErr != nil {
+		return j, scanErr
 	}
 
-	if j.ProblemPhotos, err = problemPhotos(ctx, c, id); err != nil {
+	j.ProblemPhotos, err = problemPhotos(ctx, c, id)
+	if err != nil {
 		return j, err
 	}
 
@@ -600,7 +606,8 @@ func (m Jobs) load(
 			v     int
 			state string
 		)
-		if err := rows.Scan(&rid, &v, &state); err != nil {
+		err := rows.Scan(&rid, &v, &state)
+		if err != nil {
 			rows.Close()
 
 			return j, err
@@ -620,8 +627,9 @@ func (m Jobs) load(
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return j, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return j, rowsErr
 	}
 
 	return j, m.project(ctx, c, &j)
@@ -687,10 +695,12 @@ func (m Jobs) project(ctx context.Context, c *ops.Call, j *Job) error {
 			j.Assignment.Reason = nil
 			if j.Assignment.Acknowledgement == "accepted" {
 				var user uuid.UUID
-				if err := c.Tx.QueryRow(ctx, `SELECT user_id FROM maintenance.ref_memberships WHERE id = $1`, j.Assignment.TechnicianMembershipID).
-					Scan(&user); err == nil {
+				err := c.Tx.QueryRow(ctx, `SELECT user_id FROM maintenance.ref_memberships WHERE id = $1`, j.Assignment.TechnicianMembershipID).
+					Scan(&user)
+				if err == nil {
 					ms := []identity.Member{{UserID: user}}
-					if err := identity.LoadMembers(ctx, c, ms); err != nil {
+					err := identity.LoadMembers(ctx, c, ms)
+					if err != nil {
 						return err
 					}
 
@@ -849,7 +859,7 @@ func problemPhotos(ctx context.Context, c *ops.Call, job uuid.UUID) ([]JobAttach
 
 	for rows.Next() {
 		a := JobAttachment{Version: 1}
-		if err := rows.Scan(
+		err := rows.Scan(
 			&a.ID,
 			&a.TenantID,
 			&a.CreatedAt,
@@ -859,7 +869,8 @@ func problemPhotos(ctx context.Context, c *ops.Call, job uuid.UUID) ([]JobAttach
 			&a.Mime,
 			&a.Size,
 			&a.Status,
-		); err != nil {
+		)
+		if err != nil {
 			return nil, err
 		}
 
@@ -913,8 +924,9 @@ func (m Jobs) getAttachment(
 	c *ops.Call,
 	in *JobAttachmentInput,
 ) (BlobOut, error) {
-	if _, err := m.get(ctx, c, &JobIDInput{JobID: in.JobID}); err != nil {
-		return BlobOut{}, err
+	_, getErr := m.get(ctx, c, &JobIDInput{JobID: in.JobID})
+	if getErr != nil {
+		return BlobOut{}, getErr
 	}
 
 	var (
@@ -933,7 +945,8 @@ func (m Jobs) getAttachment(
 		return out, err
 	}
 
-	if out.Bytes, err = m.Blobs.Get(ctx, key); errors.Is(err, blob.ErrNotFound) {
+	out.Bytes, err = m.Blobs.Get(ctx, key)
+	if errors.Is(err, blob.ErrNotFound) {
 		return out, apperr.E(apperr.NotFound, "error.notFound")
 	} else if err != nil {
 		return out, err
@@ -1088,7 +1101,8 @@ func (m Jobs) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.P
 		}
 	}
 
-	if err := f.check(); err != nil {
+	err := f.check()
+	if err != nil {
 		return paging.Page[any]{}, err
 	}
 
@@ -1321,7 +1335,7 @@ func (m Jobs) collect(ctx context.Context, c *ops.Call, fp *listFilters) ([]list
 			pref    []byte
 			pending bool
 		)
-		if err := rows.Scan(
+		err := rows.Scan(
 			&r.s.ID,
 			&r.s.Version,
 			&r.s.UnitID,
@@ -1344,7 +1358,8 @@ func (m Jobs) collect(ctx context.Context, c *ops.Call, fp *listFilters) ([]list
 			&r.s.CreatedAt,
 			&r.s.FollowUpOfJobID,
 			&r.s.FollowUpClass,
-		); err != nil {
+		)
+		if err != nil {
 			rows.Close()
 
 			return nil, err
@@ -1367,8 +1382,9 @@ func (m Jobs) collect(ctx context.Context, c *ops.Call, fp *listFilters) ([]list
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return nil, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return nil, rowsErr
 	}
 
 	sev, err := m.Severity.UnitSeverities(ctx, c, units)
@@ -1555,14 +1571,15 @@ func eventSummaries(
 			action *string
 			at     *time.Time
 		)
-		if err := rows.Scan(
+		err := rows.Scan(
 			&job,
 			&s.Count,
 			&s.CustomerVisible,
 			&s.Notes,
 			&action,
 			&at,
-		); err != nil {
+		)
+		if err != nil {
 			return nil, err
 		}
 
@@ -1616,8 +1633,11 @@ func (m Jobs) events(
 		}
 
 		ownOnly = kind != "detail" // offer / history: only the decision events of the caller's side (IR124 item 5)
-	} else if _, err := m.detail(ctx, c, in.JobID); err != nil {
-		return paging.Page[Event]{}, err
+	} else {
+		_, err := m.detail(ctx, c, in.JobID)
+		if err != nil {
+			return paging.Page[Event]{}, err
+		}
 	}
 
 	var f struct {
@@ -1692,9 +1712,10 @@ func (m Jobs) events(
 	}
 
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM maintenance.job_events e LEFT JOIN maintenance.job_notes n ON n.id = e.note_id WHERE "+where, args...).
-		Scan(&total); err != nil {
-		return paging.Page[Event]{}, err
+	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM maintenance.job_events e LEFT JOIN maintenance.job_notes n ON n.id = e.note_id WHERE "+where, args...).
+		Scan(&total)
+	if scanErr != nil {
+		return paging.Page[Event]{}, scanErr
 	}
 
 	items, err := m.eventRows(ctx, c, where, args, order, w.Limit, w.Offset)
@@ -1753,7 +1774,7 @@ func (m Jobs) eventRows(
 			vis, msg       *string
 			noteAt         *time.Time
 		)
-		if err := rows.Scan(
+		err := rows.Scan(
 			&e.ID,
 			&e.TenantID,
 			&e.JobID,
@@ -1767,7 +1788,8 @@ func (m Jobs) eventRows(
 			&vis,
 			&msg,
 			&noteAt,
-		); err != nil {
+		)
+		if err != nil {
 			return nil, err
 		}
 
@@ -1965,66 +1987,73 @@ func (m Jobs) cancelJob(ctx context.Context, c *ops.Call, in *CancelInput) (Job,
 		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.offers SET decision = 'decline', decided_by = $2, decided_at = $3, decline_reason = 'job_cancelled',
 		version = version + 1, updated_at = platform.app_now() WHERE job_id = $1 AND decision IS NULL`,
 		in.JobID,
 		c.Principal.MembershipID,
 		c.Now,
-	); err != nil {
-		return Job{}, err
+	)
+	if execErr != nil {
+		return Job{}, execErr
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr = c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.assignments SET status = 'revoked', reason = 'job_cancelled', version = version + 1, updated_at = $2
 		WHERE job_id = $1 AND status = 'active'`,
 		in.JobID,
 		c.Now,
-	); err != nil {
-		return Job{}, err
+	)
+	if execErr != nil {
+		return Job{}, execErr
 	}
 	// the contractor's access to the unit ends with the job, as on a reschedule: a cancelled job leaves only its history
 	// (BR-P08, IR588)
-	if _, err := c.Tx.Exec(
+	_, execErr = c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.offers SET access_valid_until = GREATEST(access_valid_from, $2), version = version + 1, updated_at = platform.app_now()
 		WHERE job_id = $1 AND decision = 'accept' AND access_valid_until > $2`,
 		in.JobID,
 		c.Now,
-	); err != nil {
-		return Job{}, err
+	)
+	if execErr != nil {
+		return Job{}, execErr
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr = c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.slot_proposals SET status = 'withdrawn', decided_at = $2 WHERE job_id = $1 AND status = 'pending'`,
 		in.JobID,
 		c.Now,
-	); err != nil {
-		return Job{}, err
+	)
+	if execErr != nil {
+		return Job{}, execErr
 	}
 	// the contractor's open time change ends with the job (IR444)
-	if _, err := c.Tx.Exec(
+	_, execErr = c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.partner_slot_proposals SET status = 'withdrawn' WHERE status IN ('pending','sent_to_client')
 		AND offer_id IN (SELECT id FROM maintenance.offers WHERE job_id = $1)`,
 		in.JobID,
-	); err != nil {
-		return Job{}, err
+	)
+	if execErr != nil {
+		return Job{}, execErr
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr = c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.jobs SET status = 'cancelled', hold_reason = NULL, version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
 		in.JobID,
-	); err != nil {
-		return Job{}, err
+	)
+	if execErr != nil {
+		return Job{}, execErr
 	}
 
-	if err := m.event(ctx, c, in.JobID, "job.cancelled", nil); err != nil {
-		return Job{}, err
+	eventErr := m.event(ctx, c, in.JobID, "job.cancelled", nil)
+	if eventErr != nil {
+		return Job{}, eventErr
 	}
 
 	return m.finish(ctx, c, in.JobID, "jobs.cancel", "JobCancelled", in.CancelReason)
@@ -2087,17 +2116,19 @@ func (m Jobs) holdJob(ctx context.Context, c *ops.Call, in *ReasonInput) (Job, e
 		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.jobs SET status = 'on_hold', hold_reason = $2, version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
 		in.JobID,
 		in.Reason,
-	); err != nil {
-		return Job{}, err
+	)
+	if execErr != nil {
+		return Job{}, execErr
 	}
 
-	if err := m.event(ctx, c, in.JobID, "job.held", nil); err != nil {
-		return Job{}, err
+	eventErr := m.event(ctx, c, in.JobID, "job.held", nil)
+	if eventErr != nil {
+		return Job{}, eventErr
 	}
 
 	return m.finish(ctx, c, in.JobID, "jobs.hold", "JobHeld", in.Reason)
@@ -2146,24 +2177,27 @@ func (m Jobs) resumeHoldJob(ctx context.Context, c *ops.Call, in *ReasonInput) (
 		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.jobs SET status = 'in_progress', hold_reason = NULL, version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
 		in.JobID,
-	); err != nil {
-		return Job{}, err
+	)
+	if execErr != nil {
+		return Job{}, execErr
 	}
 
-	if err := NewDraftFromLatest(
+	newDraftFromLatestErr := NewDraftFromLatest(
 		ctx,
 		c,
 		in.JobID,
-	); err != nil { // a submitted report stays; work continues on a new draft (D06)
-		return Job{}, err
+	)
+	if newDraftFromLatestErr != nil { // a submitted report stays; work continues on a new draft (D06)
+		return Job{}, newDraftFromLatestErr
 	}
 
-	if err := m.event(ctx, c, in.JobID, "job.resumed", nil); err != nil {
-		return Job{}, err
+	eventErr := m.event(ctx, c, in.JobID, "job.resumed", nil)
+	if eventErr != nil {
+		return Job{}, eventErr
 	}
 
 	return m.finish(ctx, c, in.JobID, "jobs.resumeHold", "JobResumed", in.Reason)
@@ -2233,26 +2267,30 @@ func (m Jobs) addNote(ctx context.Context, c *ops.Call, in *NoteInput) (Note, er
 	}
 
 	var note uuid.UUID
-	if err := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.job_notes (tenant_id, job_id, author_id, visibility, message, created_at)
+	scanErr := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.job_notes (tenant_id, job_id, author_id, visibility, message, created_at)
 		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5) RETURNING id`, in.JobID, c.Principal.UserID, in.Visibility, in.Message, c.Now).
-		Scan(&note); err != nil {
-		return Note{}, err
+		Scan(&note)
+	if scanErr != nil {
+		return Note{}, scanErr
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.jobs SET version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
 		in.JobID,
-	); err != nil {
-		return Note{}, err
+	)
+	if execErr != nil {
+		return Note{}, execErr
 	}
 
-	if err := m.event(ctx, c, in.JobID, "note.added", &note); err != nil {
-		return Note{}, err
+	eventErr := m.event(ctx, c, in.JobID, "note.added", &note)
+	if eventErr != nil {
+		return Note{}, eventErr
 	}
 
-	if _, err := m.finish(ctx, c, in.JobID, "jobs.addNote", "JobNoteAdded", ""); err != nil {
-		return Note{}, err
+	_, finishErr := m.finish(ctx, c, in.JobID, "jobs.addNote", "JobNoteAdded", "")
+	if finishErr != nil {
+		return Note{}, finishErr
 	}
 
 	x := Note{
@@ -2301,7 +2339,8 @@ func (m Jobs) jobsOpen(
 
 	for _, id := range in.JobIDs {
 		if c.Principal.Role == "contractor" || c.Principal.Role == "technician" {
-			if _, _, err := m.projection(ctx, c, id); err != nil {
+			_, _, err := m.projection(ctx, c, id)
+			if err != nil {
 				if code := apperr.From(
 					err,
 				).Code; code == apperr.NotFound ||

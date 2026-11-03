@@ -127,7 +127,8 @@ func (m *Module) unitsCoverage(
 		ExpiringWithinDays *int       `json:"expiringWithinDays,omitempty"`
 		Search             *string    `json:"search,omitempty"`
 	}
-	if err := decodeFilters(in.Filters, &f); err != nil {
+	err := decodeFilters(in.Filters, &f)
+	if err != nil {
 		return paging.Page[UnitCoverage]{}, err
 	}
 
@@ -189,13 +190,14 @@ func (m *Module) unitsCoverage(
 
 	for rows.Next() {
 		var x UnitCoverage
-		if err := rows.Scan(
+		err := rows.Scan(
 			&x.UnitID,
 			&x.CustomerID,
 			&x.ModelID,
 			&x.WarrantyEndsAt,
 			&x.name,
-		); err != nil {
+		)
+		if err != nil {
 			rows.Close()
 
 			return paging.Page[UnitCoverage]{}, err
@@ -206,8 +208,9 @@ func (m *Module) unitsCoverage(
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return paging.Page[UnitCoverage]{}, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return paging.Page[UnitCoverage]{}, rowsErr
 	}
 
 	ids := make([]uuid.UUID, len(all))

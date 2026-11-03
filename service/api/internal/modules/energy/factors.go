@@ -155,9 +155,10 @@ func listFactors(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 	where := strings.Join(conds, " AND ")
 
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM energy.emission_factors f WHERE "+where, args...).
-		Scan(&total); err != nil {
-		return paging.Page[Factor]{}, err
+	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM energy.emission_factors f WHERE "+where, args...).
+		Scan(&total)
+	if scanErr != nil {
+		return paging.Page[Factor]{}, scanErr
 	}
 
 	rows, err := c.Tx.Query(
@@ -187,8 +188,9 @@ func listFactors(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 		items = append(items, x)
 	}
 
-	if err := rows.Err(); err != nil {
-		return paging.Page[Factor]{}, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return paging.Page[Factor]{}, rowsErr
 	}
 
 	return paging.Page[Factor]{
@@ -279,8 +281,9 @@ func saveFactor(ctx context.Context, c *ops.Call, in *FactorInput) (Factor, erro
 	}
 
 	var taken bool
-	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM energy.emission_factors WHERE is_current AND region = $1 AND year = $2 AND id <> $3)`, in.Region, in.Year, id).
-		Scan(&taken); err != nil {
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM energy.emission_factors WHERE is_current AND region = $1 AND year = $2 AND id <> $3)`, in.Region, in.Year, id).
+		Scan(&taken)
+	if err != nil {
 		return Factor{}, err
 	}
 
@@ -289,16 +292,17 @@ func saveFactor(ctx context.Context, c *ops.Call, in *FactorInput) (Factor, erro
 	}
 
 	if version > 1 {
-		if _, err := c.Tx.Exec(
+		_, err := c.Tx.Exec(
 			ctx,
 			`UPDATE energy.emission_factors SET is_current = false WHERE id = $1 AND is_current`,
 			id,
-		); err != nil {
+		)
+		if err != nil {
 			return Factor{}, err
 		}
 	}
 
-	if _, err := c.Tx.Exec(
+	_, err = c.Tx.Exec(
 		ctx,
 		`INSERT INTO energy.emission_factors (id, version, tenant_id, region, year, kg_co2e_per_kwh, source, created_by, created_at)
 		VALUES ($1, $2, current_setting('app.tenant_id')::uuid, $3, $4, $5, $6, $7, $8)`,
@@ -310,7 +314,8 @@ func saveFactor(ctx context.Context, c *ops.Call, in *FactorInput) (Factor, erro
 		in.Source,
 		c.Principal.MembershipID,
 		c.Now,
-	); err != nil {
+	)
+	if err != nil {
 		return Factor{}, err
 	}
 

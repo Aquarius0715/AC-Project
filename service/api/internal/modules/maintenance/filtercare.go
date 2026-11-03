@@ -116,9 +116,10 @@ func (m FilterCare) status(
 
 	var at time.Time
 
-	if err := c.Tx.QueryRow(ctx, `SELECT max(cleaned_at) FROM maintenance.filter_cleanings WHERE unit_id = $1`, u.ID).
-		Scan(&st.LastCleanedAt); err != nil {
-		return st, err
+	scanErr := c.Tx.QueryRow(ctx, `SELECT max(cleaned_at) FROM maintenance.filter_cleanings WHERE unit_id = $1`, u.ID).
+		Scan(&st.LastCleanedAt)
+	if scanErr != nil {
+		return st, scanErr
 	}
 
 	if st.LastCleanedAt != nil {
@@ -141,12 +142,13 @@ func (m FilterCare) status(
 	}
 
 	if u.Connection == "online" {
-		if st.RunHoursSinceCleaning, err = m.Run.RunHours(
+		st.RunHoursSinceCleaning, err = m.Run.RunHours(
 			ctx,
 			c,
 			u.ID,
 			st.LastCleanedAt,
-		); err != nil {
+		)
+		if err != nil {
 			return st, err
 		}
 	}
@@ -255,7 +257,8 @@ func (m FilterCare) list(
 				return paging.Page[FilterStatus]{}, err
 			}
 
-			if set, err = m.settings(ctx, c, cust); err != nil {
+			set, err = m.settings(ctx, c, cust)
+			if err != nil {
 				return paging.Page[FilterStatus]{}, err
 			}
 
@@ -345,14 +348,15 @@ func (m FilterCare) markCleaned(
 		return FilterStatus{}, apperr.Fields(map[string]string{"unitId": "error.unitArchived"})
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`INSERT INTO maintenance.filter_cleanings (tenant_id, unit_id, cleaned_at, marked_by_membership_id) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3)`,
 		in.UnitID,
 		c.Now,
 		c.Principal.MembershipID,
-	); err != nil {
-		return FilterStatus{}, err
+	)
+	if execErr != nil {
+		return FilterStatus{}, execErr
 	}
 
 	units, err := m.Units.BriefUnits(ctx, c, nil, nil, nil, &in.UnitID)
@@ -375,13 +379,14 @@ func (m FilterCare) markCleaned(
 		return st, err
 	}
 
-	if _, err := clearReminders(
+	_, clearRemindersErr := clearReminders(
 		ctx,
 		c,
 		in.UnitID,
 		st.LastCleanedAt,
-	); err != nil { // the cleaning ends the reminder's cycle (IR239)
-		return st, err
+	)
+	if clearRemindersErr != nil { // the cleaning ends the reminder's cycle (IR239)
+		return st, clearRemindersErr
 	}
 
 	c.Emit(ops.Event{AggregateType: "unit", AggregateID: in.UnitID, Type: "FilterCleaned"})
@@ -474,7 +479,7 @@ func (m FilterCare) saveSettings(
 		return FilterSettings{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`INSERT INTO maintenance.filter_care_settings (tenant_id, customer_id, threshold_hours, fallback_days, recipients, channels, updated_at)
 		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6)
@@ -486,8 +491,9 @@ func (m FilterCare) saveSettings(
 		in.Recipients,
 		in.Channels,
 		c.Now,
-	); err != nil {
-		return FilterSettings{}, err
+	)
+	if execErr != nil {
+		return FilterSettings{}, execErr
 	}
 
 	s, err := m.settings(ctx, c, cust)
@@ -579,14 +585,15 @@ func (m FilterCare) Remind(ctx context.Context, c *ops.Call) (int, error) {
 		return 0, nil
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`INSERT INTO maintenance.filter_reminder_watermarks (tenant_id, evaluated_at) VALUES ($1, $2)
 		ON CONFLICT (tenant_id) DO UPDATE SET evaluated_at = EXCLUDED.evaluated_at`,
 		c.Principal.TenantID,
 		c.Now,
-	); err != nil {
-		return 0, err
+	)
+	if execErr != nil {
+		return 0, execErr
 	}
 
 	units, err := m.Units.BriefUnits(ctx, c, nil, nil, nil, nil)
@@ -609,7 +616,8 @@ func (m FilterCare) Remind(ctx context.Context, c *ops.Call) (int, error) {
 				continue
 			}
 
-			if set, err = m.settings(ctx, c, cust); err != nil {
+			set, err = m.settings(ctx, c, cust)
+			if err != nil {
 				return n, err
 			}
 
@@ -721,7 +729,7 @@ func remind(
 
 	for _, r := range recipients {
 		for _, ch := range set.Channels {
-			if _, err := (notify.Store{}).Create(ctx, c, notify.New{
+			_, err := (notify.Store{}).Create(ctx, c, notify.New{
 				RecipientMembershipID: r,
 				Channel:               ch,
 				Type:                  "cleaning_due",
@@ -731,7 +739,8 @@ func remind(
 				Severity:              "normal",
 				SourceAlertID:         &id,
 				Params:                map[string]any{"status": "open", "message": evidence},
-			}); err != nil {
+			})
+			if err != nil {
 				return 0, err
 			}
 
@@ -739,13 +748,14 @@ func remind(
 		}
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.filter_reminders SET notifications = $2 WHERE id = $1`,
 		id,
 		sent,
-	); err != nil {
-		return 0, err
+	)
+	if execErr != nil {
+		return 0, execErr
 	}
 
 	c.Emit(ops.Event{

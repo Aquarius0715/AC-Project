@@ -247,9 +247,10 @@ func listBaselines(
 	where := strings.Join(conds, " AND ")
 
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM energy.baselines b WHERE "+where, args...).
-		Scan(&total); err != nil {
-		return paging.Page[Baseline]{}, err
+	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM energy.baselines b WHERE "+where, args...).
+		Scan(&total)
+	if scanErr != nil {
+		return paging.Page[Baseline]{}, scanErr
 	}
 
 	rows, err := c.Tx.Query(
@@ -279,8 +280,9 @@ func listBaselines(
 		items = append(items, x)
 	}
 
-	if err := rows.Err(); err != nil {
-		return paging.Page[Baseline]{}, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return paging.Page[Baseline]{}, rowsErr
 	}
 
 	return paging.Page[Baseline]{
@@ -407,8 +409,9 @@ const modeledQuality = `{"kind":"modeled","coverage":null,"expectedSlots":null,"
 //	@Router			/v1/baselines [post]
 func saveBaseline(ctx context.Context, c *ops.Call, in *BaselineInput) (Baseline, error) {
 	var known int
-	if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND NOT archived`, in.UnitIDs).
-		Scan(&known); err != nil {
+	err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND NOT archived`, in.UnitIDs).
+		Scan(&known)
+	if err != nil {
 		return Baseline{}, err
 	}
 
@@ -446,9 +449,10 @@ func saveBaseline(ctx context.Context, c *ops.Call, in *BaselineInput) (Baseline
 		}
 
 		q.SourceSnapshot.Generation, q.SourceSnapshot.SnapshotAt = 1, c.Now
-		if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM platform.outbox`).
-			Scan(&q.SourceSnapshot.EventCursor); err != nil {
-			return Baseline{}, err
+		scanErr := c.Tx.QueryRow(ctx, `SELECT count(*) FROM platform.outbox`).
+			Scan(&q.SourceSnapshot.EventCursor)
+		if scanErr != nil {
+			return Baseline{}, scanErr
 		}
 
 		quality, _ = json.Marshal(q)
@@ -456,16 +460,17 @@ func saveBaseline(ctx context.Context, c *ops.Call, in *BaselineInput) (Baseline
 	}
 
 	if version > 1 {
-		if _, err := c.Tx.Exec(
+		_, err := c.Tx.Exec(
 			ctx,
 			`UPDATE energy.baselines SET is_current = false WHERE id = $1 AND is_current`,
 			id,
-		); err != nil {
+		)
+		if err != nil {
 			return Baseline{}, err
 		}
 	}
 
-	if _, err := c.Tx.Exec(
+	_, err = c.Tx.Exec(
 		ctx,
 		`INSERT INTO energy.baselines (id, version, tenant_id, unit_ids, period, method, baseline_kwh, quality, boundary_id, boundary, assumptions, source, created_by, created_at)
 		VALUES ($1, $2, current_setting('app.tenant_id')::uuid, $3, tstzrange($4, $5), $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
@@ -483,7 +488,8 @@ func saveBaseline(ctx context.Context, c *ops.Call, in *BaselineInput) (Baseline
 		in.Source,
 		c.Principal.MembershipID,
 		c.Now,
-	); err != nil {
+	)
+	if err != nil {
 		return Baseline{}, err
 	}
 

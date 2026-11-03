@@ -87,7 +87,8 @@ func TestFleetRefusesBadDefinitions(t *testing.T) {
 		"unknown room":      `{"floors":[{"key":"1f","rooms":[{"key":"r1"}]}],"patterns":[{"key":"a","room":"r2"}]}`,
 		"repeated room":     `{"floors":[{"key":"1f","rooms":[{"key":"r1"},{"key":"r1"}]}],"patterns":[]}`,
 	} {
-		if _, err := parseFleet([]byte(raw)); err == nil {
+		_, err := parseFleet([]byte(raw))
+		if err == nil {
 			t.Errorf("%s: accepted", name)
 		}
 	}

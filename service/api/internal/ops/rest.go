@@ -434,7 +434,8 @@ func (b *Binding) Input(c *echo.Context, body []byte) ([]byte, error) {
 			dec := json.NewDecoder(bytes.NewReader(body))
 			dec.UseNumber()
 
-			if err := dec.Decode(&obj); err != nil || obj == nil || dec.More() {
+			err := dec.Decode(&obj)
+			if err != nil || obj == nil || dec.More() {
 				return nil, apperr.Fields(map[string]string{"_": "error.malformedInput"})
 			}
 		}
@@ -463,9 +464,10 @@ func (b *Binding) Input(c *echo.Context, body []byte) ([]byte, error) {
 	for _, name := range b.Path {
 		raw, err := url.PathUnescape(c.Param(name))
 		if p := b.Params[name]; p.UUID && err == nil && raw != "" {
-			if _, perr := uuid.Parse(
+			_, perr := uuid.Parse(
 				raw,
-			); perr != nil { // no resource has this ID: the path names nothing
+			)
+			if perr != nil { // no resource has this ID: the path names nothing
 				return nil, apperr.E(apperr.NotFound, "error.notFound")
 			}
 		}
@@ -508,15 +510,16 @@ func (r *Registry) MountREST(g *echo.Group) error {
 				return fmt.Errorf("ops: %s: route %s outside /v1", op.Spec.Name, rt.Path)
 			}
 
-			if _, err := g.AddRoute(
+			_, addRouteErr := g.AddRoute(
 				echo.Route{
 					Method:  rt.Method,
 					Path:    "/" + EchoPath(path),
 					Name:    op.Spec.Name,
 					Handler: r.restHandler(op, b),
 				},
-			); err != nil {
-				return fmt.Errorf("ops: %s: %w", op.Spec.Name, err)
+			)
+			if addRouteErr != nil {
+				return fmt.Errorf("ops: %s: %w", op.Spec.Name, addRouteErr)
 			}
 		}
 	}
@@ -532,7 +535,8 @@ func (r *Registry) restHandler(op *Operation, b *Binding) echo.HandlerFunc {
 
 		if b.Body {
 			var err error
-			if body, err = readBody(c, op.Spec.Name); err != nil {
+			body, err = readBody(c, op.Spec.Name)
+			if err != nil {
 				return fail(c, err, corr)
 			}
 		}

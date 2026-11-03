@@ -208,14 +208,15 @@ func (a *Authenticator) RecordSignIn(ctx context.Context, p *ops.Principal, sign
 	}
 
 	err := a.DB.Run(ctx, false, p, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(
+		_, err := tx.Exec(
 			ctx,
 			`UPDATE identity.users SET last_sign_in_at = $3, sign_in_auth_time = $2
 			WHERE id = $1 AND (sign_in_auth_time IS NULL OR sign_in_auth_time < $2)`,
 			p.UserID,
 			signedIn,
 			a.now(),
-		); err != nil {
+		)
+		if err != nil {
 			return err
 		}
 		// an account HQ, a contractor or a customer owner added is listed as invited until its first sign-in (IR461)
@@ -223,7 +224,8 @@ func (a *Authenticator) RecordSignIn(ctx context.Context, p *ops.Principal, sign
 			`UPDATE identity.partner_users SET status = 'active', version = version + 1, updated_at = $2 WHERE membership_id = $1 AND status = 'invited'`,
 			`UPDATE identity.client_users SET status = 'active', version = version + 1, updated_at = $2 WHERE membership_id = $1 AND status = 'invited'`,
 		} {
-			if _, err := tx.Exec(ctx, q, p.MembershipID, a.now()); err != nil {
+			_, err := tx.Exec(ctx, q, p.MembershipID, a.now())
+			if err != nil {
 				return err
 			}
 		}
@@ -256,10 +258,11 @@ func (a *Authenticator) Load(
 			validFrom                        time.Time
 			status                           string
 		)
-		if err := tx.QueryRow(ctx, `SELECT m.user_id, m.organization_id, m.role, m.client_role, m.employment, m.scope_version, m.valid_from, m.valid_until, m.sessions_revoked_at, u.status, pf.timezone
+		err := tx.QueryRow(ctx, `SELECT m.user_id, m.organization_id, m.role, m.client_role, m.employment, m.scope_version, m.valid_from, m.valid_until, m.sessions_revoked_at, u.status, pf.timezone
 			FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id LEFT JOIN identity.preferences pf ON pf.user_id = u.id
 			WHERE m.id = $1 AND (u.cognito_sub = $2 OR u.id::text = $2)`, membership, subject).
-			Scan(&p.UserID, &p.OrgID, &p.Role, &clientRole, &employment, &p.ScopeVersion, &validFrom, &validUntil, &p.SessionsRevokedAt, &status, &timezone); err != nil {
+			Scan(&p.UserID, &p.OrgID, &p.Role, &clientRole, &employment, &p.ScopeVersion, &validFrom, &validUntil, &p.SessionsRevokedAt, &status, &timezone)
+		if err != nil {
 			return err
 		}
 
@@ -296,15 +299,17 @@ func (a *Authenticator) Load(
 
 		for rows.Next() {
 			var perm string
-			if err := rows.Scan(&perm); err != nil {
+			err := rows.Scan(&perm)
+			if err != nil {
 				return err
 			}
 
 			p.Permissions[perm] = true
 		}
 
-		if err := rows.Err(); err != nil {
-			return err
+		rowsErr := rows.Err()
+		if rowsErr != nil {
+			return rowsErr
 		}
 
 		scopes, err := tx.Query(
@@ -323,7 +328,8 @@ func (a *Authenticator) Load(
 				kind string
 				ref  uuid.UUID
 			)
-			if err := scopes.Scan(&kind, &ref); err != nil {
+			err := scopes.Scan(&kind, &ref)
+			if err != nil {
 				return err
 			}
 

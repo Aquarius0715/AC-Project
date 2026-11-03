@@ -130,7 +130,8 @@ func setup(t *testing.T) (*Registry, *echo.Echo, *fakeRec, *fakeIdem, *bool) {
 		ID string `json:"id"`
 	},
 	) (out, error) {
-		if err := c.Require(authz.Facts{"self": in.ID == "mine"}); err != nil {
+		err := c.Require(authz.Facts{"self": in.ID == "mine"})
+		if err != nil {
 			return out{}, err
 		}
 
@@ -150,7 +151,8 @@ func setup(t *testing.T) (*Registry, *echo.Echo, *fakeRec, *fakeIdem, *bool) {
 	e := echo.New()
 
 	e.HTTPErrorHandler = HTTPErrorHandler
-	if err := r.MountREST(e.Group("/v1")); err != nil {
+	err := r.MountREST(e.Group("/v1"))
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -180,7 +182,8 @@ func errCode(t *testing.T, w *httptest.ResponseRecorder) string {
 	t.Helper()
 
 	var de apperr.DomainError
-	if err := json.Unmarshal(w.Body.Bytes(), &de); err != nil {
+	err := json.Unmarshal(w.Body.Bytes(), &de)
+	if err != nil {
 		t.Fatalf("not a DomainError: %s", w.Body.String())
 	}
 

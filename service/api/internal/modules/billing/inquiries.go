@@ -121,14 +121,15 @@ func (m Billing) notifyMembers(
 			continue
 		}
 
-		if _, err := m.Notify.Create(ctx, c, notify.New{
+		_, err := m.Notify.Create(ctx, c, notify.New{
 			RecipientMembershipID: id,
 			Type:                  "inquiry",
 			TemplateKey:           "inquiry",
 			TargetKind:            "inquiry",
 			TargetID:              inquiry,
 			Params:                map[string]any{"status": status},
-		}); err != nil {
+		})
+		if err != nil {
 			return err
 		}
 	}
@@ -175,8 +176,9 @@ func (m Billing) createInquiry(
 
 	if in.InvoiceID != nil {
 		var owned bool
-		if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM billing.invoices WHERE id = $1 AND customer_id = $2)`, *in.InvoiceID, customer).
-			Scan(&owned); err != nil {
+		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM billing.invoices WHERE id = $1 AND customer_id = $2)`, *in.InvoiceID, customer).
+			Scan(&owned)
+		if err != nil {
 			return Inquiry{}, err
 		}
 
@@ -187,9 +189,10 @@ func (m Billing) createInquiry(
 
 	if in.RestrictionID != nil {
 		var owned, cites bool
-		if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restrictions WHERE id = $1 AND customer_id = $2),
+		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restrictions WHERE id = $1 AND customer_id = $2),
 			$3::uuid IS NULL OR EXISTS (SELECT 1 FROM restrictions.restriction_invoices WHERE restriction_id = $1 AND invoice_id = $3)`, *in.RestrictionID, customer, in.InvoiceID).
-			Scan(&owned, &cites); err != nil {
+			Scan(&owned, &cites)
+		if err != nil {
 			return Inquiry{}, err
 		}
 
@@ -205,7 +208,7 @@ func (m Billing) createInquiry(
 	}
 
 	id := uuid.New()
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`INSERT INTO billing.inquiries (id, tenant_id, customer_id, invoice_id, restriction_id, subject_type, message, state, created_by, created_at, updated_at)
 		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, 'received', $7, $8, $8)`,
@@ -217,18 +220,20 @@ func (m Billing) createInquiry(
 		in.Message,
 		c.Principal.MembershipID,
 		c.Now,
-	); err != nil {
-		return Inquiry{}, err
+	)
+	if execErr != nil {
+		return Inquiry{}, execErr
 	}
 
-	if err := m.notifyMembers(
+	notifyMembersErr := m.notifyMembers(
 		ctx,
 		c,
 		identity.MembersInput{Role: "admin", Permission: "billing.write"},
 		id,
 		"received",
-	); err != nil {
-		return Inquiry{}, err
+	)
+	if notifyMembersErr != nil {
+		return Inquiry{}, notifyMembersErr
 	}
 
 	c.Emit(
@@ -366,9 +371,10 @@ func (m Billing) listInquiries(
 	from := "billing.inquiries q JOIN billing.ref_customers cu ON cu.id = q.customer_id"
 
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM "+from+" WHERE "+where, args...).
-		Scan(&total); err != nil {
-		return paging.Page[Inquiry]{}, err
+	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM "+from+" WHERE "+where, args...).
+		Scan(&total)
+	if scanErr != nil {
+		return paging.Page[Inquiry]{}, scanErr
 	}
 
 	rows, err := c.Tx.Query(
@@ -399,8 +405,9 @@ func (m Billing) listInquiries(
 		items = append(items, x)
 	}
 
-	if err := rows.Err(); err != nil {
-		return paging.Page[Inquiry]{}, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return paging.Page[Inquiry]{}, rowsErr
 	}
 
 	return paging.Page[Inquiry]{
@@ -467,25 +474,27 @@ func (m Billing) answerInquiry(ctx context.Context, c *ops.Call, in *AnswerInput
 		return x, apperr.E(apperr.Conflict, "errors.inquiry_answered")
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE billing.inquiries SET state = 'answered', reply = $2, answered_by = $3, answered_at = $4, version = version + 1, updated_at = $4 WHERE id = $1`,
 		x.ID,
 		in.Reply,
 		c.Principal.MembershipID,
 		c.Now,
-	); err != nil {
-		return x, err
+	)
+	if execErr != nil {
+		return x, execErr
 	}
 
-	if err := m.notifyMembers(
+	notifyMembersErr := m.notifyMembers(
 		ctx,
 		c,
 		identity.MembersInput{Role: "client", OrganizationID: &x.customerOrg},
 		x.ID,
 		"answered",
-	); err != nil {
-		return x, err
+	)
+	if notifyMembersErr != nil {
+		return x, notifyMembersErr
 	}
 
 	next := x.Version + 1

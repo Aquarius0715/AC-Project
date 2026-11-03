@@ -13,7 +13,8 @@ import (
 // (unknown route, wrong method, body limit) map to the nearest DomainError, and anything else is a logged 503
 // UNAVAILABLE without internal details.
 func HTTPErrorHandler(c *echo.Context, err error) {
-	if r, uerr := echo.UnwrapResponse(c.Response()); uerr == nil && r.Committed {
+	r, uerr := echo.UnwrapResponse(c.Response())
+	if uerr == nil && r.Committed {
 		return
 	}
 

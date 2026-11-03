@@ -44,14 +44,16 @@ func TestIDDeterministic(t *testing.T) {
 }
 
 func TestLoadErrors(t *testing.T) {
-	if _, err := Load("nope.json"); err == nil {
+	_, err := Load("nope.json")
+	if err == nil {
 		t.Fatal("missing file")
 	}
 
 	p := t.TempDir() + "/bad.json"
 
 	_ = os.WriteFile(p, []byte("{"), 0o600)
-	if _, err := Load(p); err == nil {
+	_, err = Load(p)
+	if err == nil {
 		t.Fatal("bad json")
 	}
 }
@@ -96,7 +98,8 @@ func TestApplyFixture(t *testing.T) {
 	defer tx.Rollback(ctx)
 
 	for i := range 2 {
-		if err := Apply(ctx, tx, f); err != nil {
+		err := Apply(ctx, tx, f)
+		if err != nil {
 			t.Fatalf("apply %d: %v", i, err)
 		}
 	}
@@ -142,8 +145,9 @@ func TestApplyFixture(t *testing.T) {
 	}
 	for table, want := range counts {
 		var got int
-		if err := tx.QueryRow(ctx, "SELECT count(DISTINCT id) FROM "+table+" WHERE id = ANY($1::uuid[])", want).
-			Scan(&got); err != nil {
+		err := tx.QueryRow(ctx, "SELECT count(DISTINCT id) FROM "+table+" WHERE id = ANY($1::uuid[])", want).
+			Scan(&got)
+		if err != nil {
 			t.Fatal(err)
 		}
 
@@ -161,25 +165,28 @@ func TestApplyFixture(t *testing.T) {
 	}
 
 	var name string
-	if err := tx.QueryRow(ctx, `SELECT display_name FROM assets.units WHERE id=$1`, ID("unit-online-rto")).
-		Scan(&name); err != nil ||
+	scanErr := tx.QueryRow(ctx, `SELECT display_name FROM assets.units WHERE id=$1`, ID("unit-online-rto")).
+		Scan(&name)
+	if scanErr != nil ||
 		name != "Bedroom AC" {
-		t.Fatalf("unit-online-rto: %v %q", err, name)
+		t.Fatalf("unit-online-rto: %v %q", scanErr, name)
 	}
 	// IR91 item 2: rows without createdAt carry fixture.seedCreatedAt, not the wall clock (IR318); explicit ones keep theirs
 	for _, table := range []string{"identity.organizations", "identity.users", "identity.memberships", "devices.capabilities", "assets.customers", "assets.properties", "assets.spaces", "assets.units", "devices.devices", "monitoring.alert_policies", "billing.invoices"} {
 		var later int
-		if err := tx.QueryRow(ctx, "SELECT count(*) FROM "+table+" WHERE created_at <> $1", f.SeedCreatedAt).
-			Scan(&later); err != nil ||
+		err := tx.QueryRow(ctx, "SELECT count(*) FROM "+table+" WHERE created_at <> $1", f.SeedCreatedAt).
+			Scan(&later)
+		if err != nil ||
 			later != 0 {
 			t.Errorf("%s: %d rows not created at seedCreatedAt (%v)", table, later, err)
 		}
 	}
 
 	var now time.Time
-	if err := tx.QueryRow(ctx, `SELECT platform.app_now()`).
-		Scan(&now); err != nil ||
+	scanErr = tx.QueryRow(ctx, `SELECT platform.app_now()`).
+		Scan(&now)
+	if scanErr != nil ||
 		now.Equal(f.SeedCreatedAt) {
-		t.Errorf("app.now stays the seed time after Apply: %v %v", now, err)
+		t.Errorf("app.now stays the seed time after Apply: %v %v", now, scanErr)
 	}
 }

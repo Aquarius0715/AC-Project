@@ -74,12 +74,13 @@ func (m *TxManager) Run(
 	for range 3 {
 		err = pgx.BeginTxFunc(ctx, pool, opts, func(tx pgx.Tx) error {
 			if p != nil {
-				if _, err := tx.Exec(
+				_, err := tx.Exec(
 					ctx,
 					"SELECT set_config('app.tenant_id', $1, true), set_config('app.membership_id', $2, true)",
 					p.TenantID.String(),
 					p.MembershipID.String(),
-				); err != nil {
+				)
+				if err != nil {
 					return err
 				}
 			}
@@ -149,10 +150,11 @@ func (s Idempotency) Begin(
 			resp          []byte
 			expired       bool
 		)
-		if err := tx.QueryRow(ctx, `SELECT operation, request_hash, status, response, expires_at < platform.app_now() FROM platform.idempotency_keys
+		scanErr := tx.QueryRow(ctx, `SELECT operation, request_hash, status, response, expires_at < platform.app_now() FROM platform.idempotency_keys
 			WHERE tenant_id=$1 AND membership_id=$2 AND key=$3 FOR UPDATE`, p.TenantID, p.MembershipID, key).
-			Scan(&gotOp, &gotHash, &status, &resp, &expired); err != nil {
-			return err
+			Scan(&gotOp, &gotHash, &status, &resp, &expired)
+		if scanErr != nil {
+			return scanErr
 		}
 
 		if expired {
@@ -290,7 +292,7 @@ func (Recorder) Record(ctx context.Context, tx pgx.Tx, c *ops.Call, op string) e
 			membership = &m
 		}
 
-		if err := events.Publish(
+		err := events.Publish(
 			ctx,
 			tx,
 			p.TenantID,
@@ -314,7 +316,8 @@ func (Recorder) Record(ctx context.Context, tx pgx.Tx, c *ops.Call, op string) e
 				MaskedBefore:    ops.Masked(a.Before),
 				MaskedAfter:     ops.Masked(a.After),
 			},
-		); err != nil {
+		)
+		if err != nil {
 			return err
 		}
 	}
@@ -329,7 +332,7 @@ func (Recorder) Record(ctx context.Context, tx pgx.Tx, c *ops.Call, op string) e
 			payload = []byte("{}")
 		}
 
-		if _, err := tx.Exec(
+		_, execErr := tx.Exec(
 			ctx,
 			`INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id, occurred_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7)`,
@@ -340,8 +343,9 @@ func (Recorder) Record(ctx context.Context, tx pgx.Tx, c *ops.Call, op string) e
 			payload,
 			c.CorrelationID,
 			c.Now,
-		); err != nil {
-			return err
+		)
+		if execErr != nil {
+			return execErr
 		}
 	}
 

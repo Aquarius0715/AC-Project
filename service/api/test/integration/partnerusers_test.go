@@ -632,7 +632,8 @@ func TestPartnerAccountCreated(t *testing.T) {
 		t.Errorf("membership: %s %s %v perms %d scopes %d", role, employment, end, perms, scopes)
 	}
 
-	if err := s.DrainEvents(context.Background()); err != nil {
+	err := s.DrainEvents(context.Background())
+	if err != nil {
 		t.Fatal(err)
 	}
 	// other tests' accounts may be drained here too: look at this one only
@@ -723,7 +724,8 @@ func TestPartnerAccountCreated(t *testing.T) {
 		t.Fatalf("remove: %d %v", code, m)
 	}
 
-	if err := s.DrainEvents(context.Background()); err != nil {
+	err = s.DrainEvents(context.Background())
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -944,14 +946,15 @@ func TestNotificationMailRetry(t *testing.T) {
 	deliver := func(sender *fakeMail, at time.Time) int {
 		t.Helper()
 
-		if _, err := notify.DeliverAll(
+		_, err := notify.DeliverAll(
 			context.Background(),
 			s.DB,
 			sender,
 			notify.Apps{Customer: "http://c"},
 			at,
 			500,
-		); err != nil {
+		)
+		if err != nil {
 			t.Fatal(err)
 		}
 
@@ -1042,14 +1045,15 @@ func TestNotificationMail(t *testing.T) {
 	active, ended := note(member(clock.Add(time.Hour))), note(member(clock.Add(-time.Minute)))
 
 	sender := &fakeMail{}
-	if _, err := notify.DeliverAll(
+	_, err := notify.DeliverAll(
 		context.Background(),
 		s.DB,
 		sender,
 		notify.Apps{Customer: "http://c"},
 		clock,
 		500,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -1091,7 +1095,8 @@ func TestNotificationMail(t *testing.T) {
 		clock.Add(-notify.Retention-time.Hour),
 	)
 
-	if _, err := notify.SweepAll(context.Background(), s.DB, clock); err != nil {
+	_, err = notify.SweepAll(context.Background(), s.DB, clock)
+	if err != nil {
 		t.Fatal(err)
 	}
 

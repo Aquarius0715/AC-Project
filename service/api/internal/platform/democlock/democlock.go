@@ -41,15 +41,17 @@ func Open(
 		off = start.Sub(base())
 	}
 
-	if _, err := pool.Exec(
+	_, err := pool.Exec(
 		ctx,
 		`INSERT INTO platform.demo_clock (id, offset_ms) VALUES (true, $1) ON CONFLICT (id) DO NOTHING`,
 		off.Milliseconds(),
-	); err != nil {
+	)
+	if err != nil {
 		return nil, err
 	}
 
-	if err := c.load(ctx); err != nil {
+	err = c.load(ctx)
+	if err != nil {
 		return nil, err
 	}
 
@@ -104,8 +106,9 @@ func (c *Clock) Now() time.Time {
 // Advance moves the scenario clock forward by d for every process.
 func (c *Clock) Advance(ctx context.Context, d time.Duration) error {
 	var ms int64
-	if err := c.pool.QueryRow(ctx, `UPDATE platform.demo_clock SET offset_ms = offset_ms + $1, updated_at = now() WHERE id RETURNING offset_ms`, d.Milliseconds()).
-		Scan(&ms); err != nil {
+	err := c.pool.QueryRow(ctx, `UPDATE platform.demo_clock SET offset_ms = offset_ms + $1, updated_at = now() WHERE id RETURNING offset_ms`, d.Milliseconds()).
+		Scan(&ms)
+	if err != nil {
 		return err
 	}
 

@@ -120,7 +120,8 @@ func (d *demoOps) advance(ctx context.Context, c *ops.Call, in *AdvanceInput) (G
 		return Generation{}, apperr.Fields(map[string]string{"to": "errors.clock_backwards"})
 	}
 
-	if err := d.clock.Advance(ctx, in.To.Sub(c.Now)); err != nil {
+	err := d.clock.Advance(ctx, in.To.Sub(c.Now))
+	if err != nil {
 		return Generation{}, apperr.From(err)
 	}
 	// process deadlines reached by the jump: in-process when one process serves every domain; split services leave
@@ -129,7 +130,8 @@ func (d *demoOps) advance(ctx context.Context, c *ops.Call, in *AdvanceInput) (G
 		return Generation{Generation: 1}, nil
 	}
 
-	if _, err := scheduler.Tick(ctx, d.m, in.To, d.reg); err != nil {
+	_, err = scheduler.Tick(ctx, d.m, in.To, d.reg)
+	if err != nil {
 		return Generation{}, err
 	}
 
@@ -380,17 +382,19 @@ func (d *demoOps) inTenant(
 
 		err := d.m.Run(ctx, false, &ops.Principal{TenantID: t}, func(tx pgx.Tx) error {
 			var ok bool
-			if err := tx.QueryRow(ctx, probe, id).Scan(&ok); err != nil || !ok {
+			err := tx.QueryRow(ctx, probe, id).Scan(&ok)
+			if err != nil || !ok {
 				return err
 			}
 
 			found = true
 
-			if _, err := tx.Exec(
+			_, err = tx.Exec(
 				ctx,
 				`SELECT set_config('app.now', $1, true)`,
 				now.UTC().Format(time.RFC3339Nano),
-			); err != nil { // column defaults on the demo clock
+			)
+			if err != nil { // column defaults on the demo clock
 				return err
 			}
 
@@ -480,7 +484,7 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 					return err
 				}
 
-				if err := control.AuditResult(
+				auditResultErr := control.AuditResult(
 					ctx,
 					tx,
 					*in.CommandID,
@@ -488,8 +492,9 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 					"failed",
 					"DEVICE_REJECTED",
 					in.OccurredAt,
-				); err != nil {
-					return err
+				)
+				if auditResultErr != nil {
+					return auditResultErr
 				}
 
 				return control.EndRestrictionCommands(
@@ -571,7 +576,8 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 						UserID:    seed.ID("system-demo"),
 					},
 				}
-				if _, err := d.notify(ctx, ic, ev); err != nil {
+				_, err := d.notify(ctx, ic, ev)
+				if err != nil {
 					return err
 				}
 
@@ -600,13 +606,14 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 				if st.Power == nil && st.Celsius == nil && st.Mode == nil && st.FanLevel == nil {
 					// a report with no settings (a module that reports none, IR528) is heard only: the settings that acknowledged
 					// commands set stay
-					if _, err := tx.Exec(
+					_, err := tx.Exec(
 						ctx,
 						`UPDATE assets.units u SET last_seen_at = GREATEST(COALESCE(u.last_seen_at, $2), $2)
 					FROM devices.devices d WHERE d.id = $1 AND u.id = d.unit_id`,
 						*in.DeviceID,
 						in.OccurredAt,
-					); err != nil {
+					)
+					if err != nil {
 						return err
 					}
 				} else {
@@ -619,14 +626,15 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 							"observedAt": in.OccurredAt.UTC(),
 						},
 					)
-					if _, err := tx.Exec(
+					_, err := tx.Exec(
 						ctx,
 						`UPDATE assets.units u SET observed_state = $2, last_seen_at = GREATEST(COALESCE(u.last_seen_at, $3), $3)
 					FROM devices.devices d WHERE d.id = $1 AND u.id = d.unit_id`,
 						*in.DeviceID,
 						state,
 						in.OccurredAt,
-					); err != nil {
+					)
+					if err != nil {
 						return err
 					}
 				}
@@ -655,13 +663,14 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 					obsRaw, _ = json.Marshal(in.Observed)
 				}
 
-				if _, err := tx.Exec(
+				_, err := tx.Exec(
 					ctx,
 					`UPDATE assets.units SET observed_restriction = $2, last_seen_at = $3 WHERE id = $1`,
 					*in.UnitID,
 					obsRaw,
 					c.Now,
-				); err != nil {
+				)
+				if err != nil {
 					return err
 				}
 
@@ -698,9 +707,10 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 				boundary     *string
 				bound        *uuid.UUID
 			)
-			if err := tx.QueryRow(ctx, `SELECT s.metric, s.unit, s.boundary_id, d.unit_id FROM devices.sensors s JOIN devices.devices d ON d.id = s.device_id WHERE s.id = $1`, r.SensorID).
-				Scan(&metric, &unit, &boundary, &bound); err != nil {
-				return err
+			scanErr := tx.QueryRow(ctx, `SELECT s.metric, s.unit, s.boundary_id, d.unit_id FROM devices.sensors s JOIN devices.devices d ON d.id = s.device_id WHERE s.id = $1`, r.SensorID).
+				Scan(&metric, &unit, &boundary, &bound)
+			if scanErr != nil {
+				return scanErr
 			}
 
 			if metric != r.Metric || bound == nil || *bound != r.UnitID {
@@ -734,15 +744,20 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 			seq := int64(0)
 			if r.Sequence != nil {
 				seq = *r.Sequence
-			} else if err := tx.QueryRow(ctx, `SELECT COALESCE(max(sequence), 0) + 1 FROM monitoring.measurements WHERE sensor_id = $1`, r.SensorID).Scan(&seq); err != nil {
-				return err
+			} else {
+				err := tx.QueryRow(ctx, `SELECT COALESCE(max(sequence), 0) + 1 FROM monitoring.measurements WHERE sensor_id = $1`, r.SensorID).
+					Scan(&seq)
+				if err != nil {
+					return err
+				}
 			}
 
 			var dup bool
-			if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM monitoring.measurements WHERE event_id = $1)`, r.EventID).
-				Scan(&dup); err != nil ||
+			scanErr = tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM monitoring.measurements WHERE event_id = $1)`, r.EventID).
+				Scan(&dup)
+			if scanErr != nil ||
 				dup {
-				return err
+				return scanErr
 			}
 
 			_, err := tx.Exec(

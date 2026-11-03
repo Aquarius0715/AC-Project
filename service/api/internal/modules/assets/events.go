@@ -15,8 +15,9 @@ func EventHandlers() map[string]events.Handler {
 	return map[string]events.Handler{
 		events.UnitRestrictionApplied: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.UnitRestriction
-			if err := e.Decode(&p); err != nil {
-				return err
+			decodeErr := e.Decode(&p)
+			if decodeErr != nil {
+				return decodeErr
 			}
 
 			_, err := tx.Exec(
@@ -30,8 +31,9 @@ func EventHandlers() map[string]events.Handler {
 		},
 		events.UnitRestrictionCleared: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.UnitRestriction
-			if err := e.Decode(&p); err != nil {
-				return err
+			decodeErr := e.Decode(&p)
+			if decodeErr != nil {
+				return decodeErr
 			}
 
 			_, err := tx.Exec(
@@ -45,8 +47,9 @@ func EventHandlers() map[string]events.Handler {
 		},
 		events.RecoveryCasesChanged: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.Units
-			if err := e.Decode(&p); err != nil {
-				return err
+			decodeErr := e.Decode(&p)
+			if decodeErr != nil {
+				return decodeErr
 			}
 
 			_, err := tx.Exec(
@@ -59,8 +62,9 @@ func EventHandlers() map[string]events.Handler {
 		},
 		events.OfferAccessChanged: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.OfferAccess
-			if err := e.Decode(&p); err != nil {
-				return err
+			decodeErr := e.Decode(&p)
+			if decodeErr != nil {
+				return decodeErr
 			}
 
 			if !p.Accepted || p.UnitID == nil {
@@ -93,8 +97,9 @@ func EventHandlers() map[string]events.Handler {
 		},
 		events.AssignmentAccessChanged: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.AssignmentAccess
-			if err := e.Decode(&p); err != nil {
-				return err
+			decodeErr := e.Decode(&p)
+			if decodeErr != nil {
+				return decodeErr
 			}
 
 			if p.Deleted || p.UnitID == nil {

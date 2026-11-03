@@ -39,12 +39,13 @@ func main() {
 	}
 	defer conn.Close(ctx)
 
-	if err := pgx.BeginFunc(
+	beginFuncErr := pgx.BeginFunc(
 		ctx,
 		conn,
 		func(tx pgx.Tx) error { return seed.Apply(ctx, tx, f) },
-	); err != nil {
-		log.Fatal(err)
+	)
+	if beginFuncErr != nil {
+		log.Fatal(beginFuncErr)
 	}
 
 	log.Printf("seeded %d actors, %d units", len(f.Actors), len(f.DemoSeed.Units))

@@ -93,7 +93,8 @@ func (m Plans) occurrences(ctx context.Context, c *ops.Call, ps []Plan) error {
 			plan uuid.UUID
 			o    Occurrence
 		)
-		if err := rows.Scan(&plan, &o.OccurrenceAt, &o.JobID); err != nil {
+		err := rows.Scan(&plan, &o.OccurrenceAt, &o.JobID)
+		if err != nil {
 			rows.Close()
 
 			return err
@@ -288,9 +289,10 @@ func (m Plans) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.
 	where := "(" + strings.Join(conds, ") AND (") + ")"
 
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM maintenance.plans p WHERE "+where, args...).
-		Scan(&total); err != nil {
-		return paging.Page[Plan]{}, err
+	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM maintenance.plans p WHERE "+where, args...).
+		Scan(&total)
+	if scanErr != nil {
+		return paging.Page[Plan]{}, scanErr
 	}
 
 	rows, err := c.Tx.Query(
@@ -323,12 +325,14 @@ func (m Plans) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return paging.Page[Plan]{}, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return paging.Page[Plan]{}, rowsErr
 	}
 
-	if err := m.occurrences(ctx, c, items); err != nil {
-		return paging.Page[Plan]{}, err
+	occurrencesErr := m.occurrences(ctx, c, items)
+	if occurrencesErr != nil {
+		return paging.Page[Plan]{}, occurrencesErr
 	}
 
 	return paging.Page[Plan]{
@@ -415,9 +419,10 @@ func (m Plans) save(ctx context.Context, c *ops.Call, in *PlanSaveInput) (Plan, 
 	event := "PlanCreated"
 
 	if in.ID == nil {
-		if err := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.plans (tenant_id, unit_id, interval_months, anchor_day, next_due_at, created_at, updated_at)
+		err := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.plans (tenant_id, unit_id, interval_months, anchor_day, next_due_at, created_at, updated_at)
 			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $5) RETURNING id`, in.UnitID, in.Recurrence.IntervalMonths, next.Day(), next, c.Now).
-			Scan(&id); err != nil {
+			Scan(&id)
+		if err != nil {
 			return Plan{}, err
 		}
 	} else {
@@ -439,7 +444,7 @@ func (m Plans) save(ctx context.Context, c *ops.Call, in *PlanSaveInput) (Plan, 
 			anchor = next.Day()
 		}
 
-		if _, err := c.Tx.Exec(
+		_, execErr := c.Tx.Exec(
 			ctx,
 			`UPDATE maintenance.plans SET interval_months = $2, anchor_day = $3, next_due_at = $4, version = version + 1, updated_at = $5 WHERE id = $1`,
 			p.ID,
@@ -447,8 +452,9 @@ func (m Plans) save(ctx context.Context, c *ops.Call, in *PlanSaveInput) (Plan, 
 			anchor,
 			next,
 			c.Now,
-		); err != nil {
-			return p, err
+		)
+		if execErr != nil {
+			return p, execErr
 		}
 
 		id, event = p.ID, "PlanChanged"
@@ -571,26 +577,29 @@ func (m Plans) generateNextJob(ctx context.Context, c *ops.Call, in *GenerateInp
 	start := in.OccurrenceDate.UTC()
 
 	var id uuid.UUID
-	if err := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.jobs (tenant_id, unit_id, customer_org_id, plan_id, occurrence_at, type, status, origin, symptom, requested_slot,
+	scanErr := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.jobs (tenant_id, unit_id, customer_org_id, plan_id, occurrence_at, type, status, origin, symptom, requested_slot,
 		preferred_slots, due_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, 'periodic', 'requested', 'periodic_plan', 'Scheduled periodic maintenance',
 		tstzrange($4, $5), '[]', $5) RETURNING id`, p.UnitID, org, p.ID, start, start.Add(time.Hour)).
-		Scan(&id); err != nil {
-		return Job{}, err
+		Scan(&id)
+	if scanErr != nil {
+		return Job{}, scanErr
 	}
 
 	next := NextOccurrence(start, p.Recurrence.IntervalMonths, p.AnchorDay)
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.plans SET next_due_at = $2, version = version + 1, updated_at = $3 WHERE id = $1`,
 		p.ID,
 		next,
 		c.Now,
-	); err != nil {
-		return Job{}, err
+	)
+	if execErr != nil {
+		return Job{}, execErr
 	}
 
-	if err := m.Jobs.event(ctx, c, id, "job.created", nil); err != nil {
-		return Job{}, err
+	eventErr := m.Jobs.event(ctx, c, id, "job.created", nil)
+	if eventErr != nil {
+		return Job{}, eventErr
 	}
 
 	j, err := m.Jobs.detail(ctx, c, id)

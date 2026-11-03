@@ -106,7 +106,8 @@ func tick(
 
 	for rows.Next() {
 		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
+		err := rows.Scan(&id)
+		if err != nil {
 			rows.Close()
 
 			return Result{}, err
@@ -117,8 +118,9 @@ func tick(
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return Result{}, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return Result{}, rowsErr
 	}
 
 	var r Result
@@ -127,11 +129,12 @@ func tick(
 
 	for _, t := range tenants {
 		err := m.Run(ctx, false, &ops.Principal{TenantID: t}, func(tx pgx.Tx) error {
-			if _, err := tx.Exec(
+			_, err := tx.Exec(
 				ctx,
 				`SELECT set_config('app.now', $1, true)`,
 				now.UTC().Format(time.RFC3339Nano),
-			); err != nil {
+			)
+			if err != nil {
 				return err
 			}
 			// the domains this transaction ticks: those whose lock it holds, taken in the order of Domains (IR356)
@@ -143,7 +146,8 @@ func tick(
 				}
 
 				if wait {
-					if _, err := tx.Exec(ctx, lockSQL, d, t); err != nil {
+					_, err := tx.Exec(ctx, lockSQL, d, t)
+					if err != nil {
 						return err
 					}
 
@@ -153,7 +157,8 @@ func tick(
 				}
 
 				var ok bool
-				if err := tx.QueryRow(ctx, tryLockSQL, d, t).Scan(&ok); err != nil {
+				err := tx.QueryRow(ctx, tryLockSQL, d, t).Scan(&ok)
+				if err != nil {
 					return err
 				}
 
@@ -177,11 +182,12 @@ func tick(
 					Principal: &ops.Principal{TenantID: t},
 					Queries:   reg,
 				} // restriction policies come from billing
-				if n, err = control.AdvanceRuns(
+				n, err = control.AdvanceRuns(
 					ctx,
 					c,
 					control.Commands{Devices: devices.Models{}, Restrictions: restrictions.Busy{}},
-				); err != nil {
+				)
+				if err != nil {
 					return err
 				}
 
@@ -215,7 +221,8 @@ func tick(
 						r.Jobs += n
 
 						if reg.Rec != nil {
-							if err := reg.Rec.Record(ctx, tx, c, "scheduler"); err != nil {
+							err := reg.Rec.Record(ctx, tx, c, "scheduler")
+							if err != nil {
 								return err
 							}
 						}
@@ -230,12 +237,14 @@ func tick(
 				}
 
 				r.ExpiredOffers += n
-				if n, err = maintenance.ExpireProposals(ctx, tx, now); err != nil {
+				n, err = maintenance.ExpireProposals(ctx, tx, now)
+				if err != nil {
 					return err
 				}
 
 				r.ExpiredProposals += n
-				if n, err = maintenance.ConfirmUnrated(ctx, tx, now); err != nil {
+				n, err = maintenance.ConfirmUnrated(ctx, tx, now)
+				if err != nil {
 					return err
 				}
 
@@ -277,7 +286,8 @@ func RunDomains(
 	} // a failure that repeats every second is logged once a minute (IR429)
 
 	for {
-		if r, err := TryTickDomains(ctx, m, clock(), domains, reg); err != nil {
+		r, err := TryTickDomains(ctx, m, clock(), domains, reg)
+		if err != nil {
 			rep.Failed(fmt.Sprintf("worker tick failed: %v", err))
 		} else {
 			rep.OK("worker tick")

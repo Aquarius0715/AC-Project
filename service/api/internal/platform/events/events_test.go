@@ -28,11 +28,12 @@ func (r testRunner) Run(
 ) error {
 	return pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
 		if p != nil {
-			if _, err := tx.Exec(
+			_, err := tx.Exec(
 				ctx,
 				"SELECT set_config('app.tenant_id', $1, true)",
 				p.TenantID.String(),
-			); err != nil {
+			)
+			if err != nil {
 				return err
 			}
 		}
@@ -86,9 +87,10 @@ func TestConsumerOrderDedupAndRetry(t *testing.T) {
 
 	var tenant uuid.UUID
 
-	if err := m.Run(ctx, true, nil, func(tx pgx.Tx) error {
+	err := m.Run(ctx, true, nil, func(tx pgx.Tx) error {
 		return tx.QueryRow(ctx, `SELECT id FROM platform.tenants ORDER BY id LIMIT 1`).Scan(&tenant)
-	}); err != nil {
+	})
+	if err != nil {
 		t.Skip("no tenant seeded:", err)
 	}
 
@@ -108,13 +110,15 @@ func TestConsumerOrderDedupAndRetry(t *testing.T) {
 		Now:   func() time.Time { return clock },
 		Handlers: map[string]Handler{typ: func(ctx context.Context, tx pgx.Tx, e Event) error {
 			var p struct{ N int }
-			if err := e.Decode(&p); err != nil {
+			err := e.Decode(&p)
+			if err != nil {
 				return err
 			}
 
 			var got string
-			if err := tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')`).
-				Scan(&got); err != nil ||
+			err = tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')`).
+				Scan(&got)
+			if err != nil ||
 				got != tenant.String() {
 				return errors.New("tenant context missing")
 			}
@@ -136,18 +140,21 @@ func TestConsumerOrderDedupAndRetry(t *testing.T) {
 
 	fail = false
 	// the retry waits a minute after the failure (IR427)
-	if n, err := c.Drain(ctx); err != nil || n != 0 || len(seen) != 1 {
-		t.Fatalf("before the pause: n=%d seen=%v err=%v", n, seen, err)
+	drainN, drainErr := c.Drain(ctx)
+	if drainErr != nil || drainN != 0 || len(seen) != 1 {
+		t.Fatalf("before the pause: n=%d seen=%v err=%v", drainN, seen, drainErr)
 	}
 
 	clock = clock.Add(time.Minute)
 
-	if n, err := c.Drain(ctx); err != nil || n != 1 || len(seen) != 2 || seen[1] != 2 {
-		t.Fatalf("retry: n=%d seen=%v err=%v", n, seen, err)
+	drainN, drainErr = c.Drain(ctx)
+	if drainErr != nil || drainN != 1 || len(seen) != 2 || seen[1] != 2 {
+		t.Fatalf("retry: n=%d seen=%v err=%v", drainN, seen, drainErr)
 	}
 
-	if n, err := c.Drain(ctx); err != nil || n != 0 {
-		t.Fatalf("nothing pending: n=%d err=%v", n, err)
+	drainN, drainErr = c.Drain(ctx)
+	if drainErr != nil || drainN != 0 {
+		t.Fatalf("nothing pending: n=%d err=%v", drainN, drainErr)
 	}
 	// a second consumer gets its own copy of every event
 	other := &Consumer{
@@ -157,16 +164,18 @@ func TestConsumerOrderDedupAndRetry(t *testing.T) {
 			typ: func(context.Context, pgx.Tx, Event) error { return nil },
 		},
 	}
-	if n, err := other.Drain(ctx); err != nil || n != 2 {
-		t.Fatalf("independent consumer: n=%d err=%v", n, err)
+	drainN, drainErr = other.Drain(ctx)
+	if drainErr != nil || drainN != 2 {
+		t.Fatalf("independent consumer: n=%d err=%v", drainN, drainErr)
 	}
 	// replaying an event that is already recorded does nothing
-	if done, err := c.apply(
+	done, applyErr := c.apply(
 		ctx,
 		Event{ID: first, TenantID: tenant, Type: typ, Payload: []byte(`{"n":9}`)},
-	); err != nil || done ||
+	)
+	if applyErr != nil || done ||
 		len(seen) != 2 {
-		t.Fatalf("replay: done=%v seen=%v err=%v", done, seen, err)
+		t.Fatalf("replay: done=%v seen=%v err=%v", done, seen, applyErr)
 	}
 
 	_ = second
@@ -180,9 +189,10 @@ func TestConsumerDeadLetters(t *testing.T) {
 
 	var tenant uuid.UUID
 
-	if err := m.Run(ctx, true, nil, func(tx pgx.Tx) error {
+	err := m.Run(ctx, true, nil, func(tx pgx.Tx) error {
 		return tx.QueryRow(ctx, `SELECT id FROM platform.tenants ORDER BY id LIMIT 1`).Scan(&tenant)
-	}); err != nil {
+	})
+	if err != nil {
 		t.Skip("no tenant seeded:", err)
 	}
 
@@ -217,20 +227,23 @@ func TestConsumerDeadLetters(t *testing.T) {
 	for i, pause := range []time.Duration{0, time.Minute, 2 * time.Minute, 4 * time.Minute} {
 		clock = clock.Add(pause)
 
-		if _, err := c.Drain(ctx); err == nil || len(applied) != 0 {
+		_, err := c.Drain(ctx)
+		if err == nil || len(applied) != 0 {
 			t.Fatalf("attempt %d: err=%v applied=%v", i+1, err, applied)
 		}
 	}
 
 	clock = clock.Add(8*time.Minute - time.Second)
 
-	if n, err := c.Drain(ctx); n != 0 || err != nil {
+	n, err := c.Drain(ctx)
+	if n != 0 || err != nil {
 		t.Fatalf("before the last pause: n=%d err=%v", n, err)
 	}
 
 	clock = clock.Add(time.Second)
 
-	if n, err := c.Drain(ctx); n != 1 || err != nil || len(applied) != 1 || applied[0] != 2 {
+	n, err = c.Drain(ctx)
+	if n != 1 || err != nil || len(applied) != 1 || applied[0] != 2 {
 		t.Fatalf("fifth attempt: n=%d err=%v applied=%v", n, err, applied)
 	}
 
@@ -238,10 +251,11 @@ func TestConsumerDeadLetters(t *testing.T) {
 		attempts int
 		dead     bool
 	)
-	if err := m.Run(ctx, true, nil, func(tx pgx.Tx) error {
+	err = m.Run(ctx, true, nil, func(tx pgx.Tx) error {
 		return tx.QueryRow(ctx, `SELECT attempts, dead_at IS NOT NULL FROM platform.event_failures WHERE consumer = $1 AND event_id = $2`, c.Name, poison).
 			Scan(&attempts, &dead)
-	}); err != nil || attempts != MaxAttempts || !dead {
+	})
+	if err != nil || attempts != MaxAttempts || !dead {
 		t.Fatalf("failure record: attempts=%d dead=%v err=%v", attempts, dead, err)
 	}
 
@@ -249,7 +263,8 @@ func TestConsumerDeadLetters(t *testing.T) {
 		t.Errorf("logged: %q", logged)
 	}
 
-	if n, err := c.Drain(ctx); n != 0 || err != nil {
+	n, err = c.Drain(ctx)
+	if n != 0 || err != nil {
 		t.Errorf("after the dead letter: n=%d err=%v", n, err)
 	}
 }
@@ -263,9 +278,10 @@ func TestHousekeep(t *testing.T) {
 
 	var tenant uuid.UUID
 
-	if err := m.Run(ctx, true, nil, func(tx pgx.Tx) error {
+	err := m.Run(ctx, true, nil, func(tx pgx.Tx) error {
 		return tx.QueryRow(ctx, `SELECT id FROM platform.tenants ORDER BY id LIMIT 1`).Scan(&tenant)
-	}); err != nil {
+	})
+	if err != nil {
 		t.Skip("no tenant seeded:", err)
 	}
 
@@ -278,7 +294,7 @@ func TestHousekeep(t *testing.T) {
 	exec := func(p *ops.Principal, sql string, args ...any) {
 		t.Helper()
 
-		if err := m.Run(
+		err := m.Run(
 			ctx,
 			false,
 			p,
@@ -287,7 +303,8 @@ func TestHousekeep(t *testing.T) {
 
 				return err
 			},
-		); err != nil {
+		)
+		if err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -346,12 +363,13 @@ func TestHousekeep(t *testing.T) {
 	count := func(p *ops.Principal, sql string, args ...any) (n int) {
 		t.Helper()
 
-		if err := m.Run(
+		err := m.Run(
 			ctx,
 			true,
 			p,
 			func(tx pgx.Tx) error { return tx.QueryRow(ctx, sql, args...).Scan(&n) },
-		); err != nil {
+		)
+		if err != nil {
 			t.Fatal(err)
 		}
 

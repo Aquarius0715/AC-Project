@@ -220,23 +220,25 @@ func (r *Registry) recordDenied(ctx context.Context, c *Call, op string, in any,
 	}
 
 	if r.DenyLimit != nil {
-		if wait, lerr := r.DenyLimit.Allow(
+		wait, lerr := r.DenyLimit.Allow(
 			ctx,
 			c.Principal.TenantID.String()+":"+c.Principal.UserID.String()+":"+op,
-		); lerr == nil &&
+		)
+		if lerr == nil &&
 			wait > 0 {
 			return
 		}
 	}
 
 	kind, id := deniedTarget(op, in)
-	if rerr := r.DB.Run(ctx, false, c.Principal, func(tx pgx.Tx) error {
+	rerr := r.DB.Run(ctx, false, c.Principal, func(tx pgx.Tx) error {
 		if tx != nil {
-			if _, err := tx.Exec(
+			_, err := tx.Exec(
 				ctx,
 				`SELECT set_config('app.now', $1, true)`,
 				c.Now.UTC().Format(time.RFC3339Nano),
-			); err != nil {
+			)
+			if err != nil {
 				return err
 			}
 		}
@@ -248,7 +250,8 @@ func (r *Registry) recordDenied(ctx context.Context, c *Call, op string, in any,
 			op,
 			Denial{TargetKind: kind, TargetID: id, Reason: de.MessageKey},
 		)
-	}); rerr != nil {
+	})
+	if rerr != nil {
 		slog.WarnContext(ctx, "ops: denied write not recorded", "op", op, "err", rerr)
 	}
 }
@@ -526,7 +529,8 @@ func (r *Registry) run(c *echo.Context, op *Operation, body []byte, corr string)
 	dec := json.NewDecoder(bytes.NewReader(body))
 	dec.DisallowUnknownFields()
 
-	if err := dec.Decode(in); err != nil {
+	err := dec.Decode(in)
+	if err != nil {
 		return fail(c, apperr.Fields(map[string]string{"_": "error.malformedInput"}), corr)
 	}
 
@@ -634,11 +638,12 @@ func (r *Registry) run(c *echo.Context, op *Operation, body []byte, corr string)
 		call.Tx = r.txFor(tx)
 		// business time of this transaction for SQL defaults and platform.app_now() (IR157)
 		if tx != nil {
-			if _, err := tx.Exec(
+			_, err := tx.Exec(
 				ctx,
 				`SELECT set_config('app.now', $1, true)`,
 				call.Now.UTC().Format(time.RFC3339Nano),
-			); err != nil {
+			)
+			if err != nil {
 				return err
 			}
 		}
@@ -651,7 +656,8 @@ func (r *Registry) run(c *echo.Context, op *Operation, body []byte, corr string)
 		}
 
 		if write && r.Rec != nil {
-			if err := r.Rec.Record(ctx, tx, call, name); err != nil {
+			err := r.Rec.Record(ctx, tx, call, name)
+			if err != nil {
 				return err
 			}
 		}
@@ -691,7 +697,8 @@ func (r *Registry) run(c *echo.Context, op *Operation, body []byte, corr string)
 	}
 
 	if write && r.Idem != nil {
-		if err := r.Idem.Complete(ctx, p, name, key, resp); err != nil {
+		err := r.Idem.Complete(ctx, p, name, key, resp)
+		if err != nil {
 			return fail(c, err, corr)
 		}
 	}

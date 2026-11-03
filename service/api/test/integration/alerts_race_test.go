@@ -47,12 +47,13 @@ func TestConcurrentAlertOpening(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if _, err := tx.Exec(
+		_, execErr := tx.Exec(
 			ctx,
 			`SELECT set_config('app.tenant_id', $1, true)`,
 			tenant.String(),
-		); err != nil {
-			t.Fatal(err)
+		)
+		if execErr != nil {
+			t.Fatal(execErr)
 		}
 
 		return tx
@@ -86,8 +87,9 @@ func TestConcurrentAlertOpening(t *testing.T) {
 
 	time.Sleep(300 * time.Millisecond)
 
-	if err := tx1.Commit(ctx); err != nil {
-		t.Fatal(err)
+	commitErr := tx1.Commit(ctx)
+	if commitErr != nil {
+		t.Fatal(commitErr)
 	}
 
 	r := <-done

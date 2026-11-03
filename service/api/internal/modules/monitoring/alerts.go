@@ -299,9 +299,10 @@ func (m Alerts) list(
 	where := strings.Join(conds, " AND ")
 
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM monitoring.alerts a WHERE "+where, args...).
-		Scan(&total); err != nil {
-		return paging.Page[Alert]{}, err
+	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM monitoring.alerts a WHERE "+where, args...).
+		Scan(&total)
+	if scanErr != nil {
+		return paging.Page[Alert]{}, scanErr
 	}
 
 	rows, err := c.Tx.Query(
@@ -424,13 +425,14 @@ func (m Alerts) lockAlert(
 	}
 
 	if c.Principal.Role == "technician" {
-		if err := m.Access.TechnicianUnit(
+		err := m.Access.TechnicianUnit(
 			ctx,
 			c,
 			unit,
 			true,
 			c.Principal.Employment == "internal",
-		); err != nil {
+		)
+		if err != nil {
 			return "", unit, err
 		}
 	}
@@ -598,8 +600,9 @@ func (m Alerts) resolve(ctx context.Context, c *ops.Call, in *ResolveInput) (Ale
 		return Alert{}, err
 	}
 
-	if err := m.checkEvidence(ctx, c, cur, in.ResolutionEvidenceIDs); err != nil {
-		return Alert{}, err
+	checkEvidenceErr := m.checkEvidence(ctx, c, cur, in.ResolutionEvidenceIDs)
+	if checkEvidenceErr != nil {
+		return Alert{}, checkEvidenceErr
 	}
 
 	a, err := scanAlert(
@@ -664,7 +667,8 @@ func (Alerts) ActiveAlertCounts(
 			u uuid.UUID
 			n int
 		)
-		if err := rows.Scan(&u, &n); err != nil {
+		err := rows.Scan(&u, &n)
+		if err != nil {
 			return nil, err
 		}
 
@@ -707,7 +711,8 @@ func (Alerts) UnitSeverities(
 			u uuid.UUID
 			s string
 		)
-		if err := rows.Scan(&u, &s); err != nil {
+		err := rows.Scan(&u, &s)
+		if err != nil {
 			return nil, err
 		}
 

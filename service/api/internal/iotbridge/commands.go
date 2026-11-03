@@ -29,7 +29,8 @@ func CommandMessage(w Waiting, offset time.Duration) (devicesim.Command, error) 
 		Kind    string   `json:"kind"`
 		Celsius *float64 `json:"celsius"`
 	}
-	if err := json.Unmarshal(w.Action, &a); err != nil {
+	err := json.Unmarshal(w.Action, &a)
+	if err != nil {
 		return devicesim.Command{}, fmt.Errorf("command %s action: %w", w.ID, err)
 	}
 

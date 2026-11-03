@@ -56,7 +56,8 @@ func RegisterQuery[I any, O any](
 		domain: domain,
 		handle: func(ctx context.Context, c *Call, raw json.RawMessage) (any, error) {
 			in := new(I)
-			if err := json.Unmarshal(raw, in); err != nil {
+			err := json.Unmarshal(raw, in)
+			if err != nil {
 				return nil, apperr.Fields(map[string]string{"_": "error.malformedInput"})
 			}
 			// an input that validates itself is checked here too, as the operations' inputs are (IR431)
@@ -113,7 +114,8 @@ func Ask[O any](ctx context.Context, r *Registry, c *Call, name string, in any) 
 
 	var res any
 	if r.domains == nil || r.domains[q.domain] {
-		if res, err = q.handle(ctx, c, raw); err != nil {
+		res, err = q.handle(ctx, c, raw)
+		if err != nil {
 			return out, err
 		}
 
@@ -228,8 +230,9 @@ func (h *HTTPQueries) Query(
 	var env struct {
 		Data json.RawMessage `json:"data" swaggertype:"object"`
 	}
-	if err := json.Unmarshal(body, &env); err != nil {
-		return nil, err
+	unmarshalErr := json.Unmarshal(body, &env)
+	if unmarshalErr != nil {
+		return nil, unmarshalErr
 	}
 
 	return env.Data, nil
@@ -288,10 +291,11 @@ func (r *Registry) serveQuery(c *echo.Context, token string, p *Principal, beare
 	}
 
 	now := r.Clock()
-	if t, err := time.Parse(
+	t, parseErr := time.Parse(
 		time.RFC3339Nano,
 		c.Request().Header.Get(BusinessNowHeader),
-	); err == nil {
+	)
+	if parseErr == nil {
 		now = t
 	}
 
@@ -310,11 +314,12 @@ func (r *Registry) serveQuery(c *echo.Context, token string, p *Principal, beare
 
 	err = r.DB.Run(ctx, true, p, func(tx pgx.Tx) error {
 		call.Tx = r.txFor(tx)
-		if _, err := tx.Exec(
+		_, err := tx.Exec(
 			ctx,
 			`SELECT set_config('app.now', $1, true)`,
 			now.UTC().Format(time.RFC3339Nano),
-		); err != nil {
+		)
+		if err != nil {
 			return err
 		}
 

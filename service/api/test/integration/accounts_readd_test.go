@@ -29,7 +29,8 @@ func TestPersonAddedAgain(t *testing.T) {
 	drain := func() {
 		t.Helper()
 
-		if err := s.DrainEvents(context.Background()); err != nil {
+		err := s.DrainEvents(context.Background())
+		if err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -308,7 +309,8 @@ func TestAccountSwitchedByMembership(t *testing.T) {
 			t.Fatalf("%s: %d %v", status, code, m)
 		}
 
-		if err := s.DrainEvents(context.Background()); err != nil {
+		err := s.DrainEvents(context.Background())
+		if err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -358,7 +360,8 @@ func TestClientAddedAgain(t *testing.T) {
 
 	first := data(m)["membershipId"].(string)
 
-	if err := s.DrainEvents(context.Background()); err != nil {
+	err := s.DrainEvents(context.Background())
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -426,7 +429,8 @@ func TestAccountProviderTrouble(t *testing.T) {
 	drain := func() {
 		t.Helper()
 
-		if err := s.DrainEvents(context.Background()); err != nil {
+		err := s.DrainEvents(context.Background())
+		if err != nil {
 			t.Fatal(err)
 		}
 	}

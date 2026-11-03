@@ -63,10 +63,11 @@ func connectionFault(
 		return out, err
 	}
 
-	if err := c.Tx.QueryRow(ctx, `SELECT COALESCE(max(sequence), 0) FROM devices.device_events WHERE device_id = $1 AND binding_id IS NOT DISTINCT FROM $2
+	scanErr := c.Tx.QueryRow(ctx, `SELECT COALESCE(max(sequence), 0) FROM devices.device_events WHERE device_id = $1 AND binding_id IS NOT DISTINCT FROM $2
 		AND axis = 'connection'`, in.DeviceID, out.BindingID).
-		Scan(&out.Sequence); err != nil {
-		return out, err
+		Scan(&out.Sequence)
+	if scanErr != nil {
+		return out, scanErr
 	}
 	// the newest fault of the axis, as RecordSignal's restored looks it up
 	var (

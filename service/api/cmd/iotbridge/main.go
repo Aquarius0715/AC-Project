@@ -72,8 +72,9 @@ func main() {
 
 	clock := &demoClock{api: *api, c: httpc}
 
-	if err := clock.refresh(); err != nil {
-		log.Fatalf("demo clock: %v", err)
+	refreshErr := clock.refresh()
+	if refreshErr != nil {
+		log.Fatalf("demo clock: %v", refreshErr)
 	}
 	go clock.keepRefreshing(ctx)
 
@@ -137,7 +138,8 @@ func subscribeDemo(
 	// t/<tenantId>/d/<deviceId>/telemetry, every tenant and device
 	sub("t/+/d/+/telemetry", func(_ mqtt.Client, msg mqtt.Message) {
 		var b devicesim.Batch
-		if err := json.Unmarshal(msg.Payload(), &b); err != nil {
+		err := json.Unmarshal(msg.Payload(), &b)
+		if err != nil {
 			log.Printf("telemetry on %s: %v", msg.Topic(), err)
 
 			return
@@ -152,7 +154,8 @@ func subscribeDemo(
 		}
 
 		for _, tr := range triggers {
-			if err := send(httpc, endpoint, tr); err != nil {
+			err := send(httpc, endpoint, tr)
+			if err != nil {
 				log.Printf("trigger %s: %v", tr.EventID, err)
 			}
 		}
@@ -161,7 +164,8 @@ func subscribeDemo(
 	// not is heard all the same (IR613)
 	sub("t/+/d/+/heartbeat", func(_ mqtt.Client, msg mqtt.Message) {
 		var hb devicesim.Heartbeat
-		if err := json.Unmarshal(msg.Payload(), &hb); err != nil {
+		err := json.Unmarshal(msg.Payload(), &hb)
+		if err != nil {
 			log.Printf("heartbeat on %s: %v", msg.Topic(), err)
 
 			return
@@ -174,14 +178,16 @@ func subscribeDemo(
 			return
 		}
 
-		if err := send(httpc, endpoint, tr); err != nil {
-			log.Printf("state %s: %v", hb.DeviceID, err)
+		sendErr := send(httpc, endpoint, tr)
+		if sendErr != nil {
+			log.Printf("state %s: %v", hb.DeviceID, sendErr)
 		}
 	})
 	// t/<tenantId>/d/<deviceId>/cmd/ack: a module's answer to a command the API sent
 	sub("t/+/d/+/cmd/ack", func(_ mqtt.Client, msg mqtt.Message) {
 		var a devicesim.Ack
-		if err := json.Unmarshal(msg.Payload(), &a); err != nil {
+		err := json.Unmarshal(msg.Payload(), &a)
+		if err != nil {
 			log.Printf("ack on %s: %v", msg.Topic(), err)
 
 			return
@@ -204,8 +210,9 @@ func subscribeDemo(
 			return
 		}
 
-		if err := send(httpc, endpoint, tr); err != nil {
-			log.Printf("trigger %s: %v", tr.EventID, err)
+		sendErr := send(httpc, endpoint, tr)
+		if sendErr != nil {
+			log.Printf("trigger %s: %v", tr.EventID, sendErr)
 		}
 	})
 }
@@ -223,7 +230,8 @@ func listenLive(
 	api liveAPI,
 ) mqtt.Client {
 	host := raw
-	if u, err := url.Parse(raw); err == nil && u.Host != "" {
+	u, err := url.Parse(raw)
+	if err == nil && u.Host != "" {
 		host = u.Host // never the credentials a URL may carry
 	}
 
@@ -266,7 +274,8 @@ func listenLive(
 		}
 
 		for _, tr := range triggers {
-			if err := send(httpc, endpoint, tr); err != nil && !recorded(err) {
+			err := send(httpc, endpoint, tr)
+			if err != nil && !recorded(err) {
 				gate.Release(node, slot)
 				rep.Failed(fmt.Sprintf("live %s: %v", node, err))
 
@@ -401,7 +410,8 @@ func (d *demoClock) keepRefreshing(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			if err := d.refresh(); err != nil {
+			err := d.refresh()
+			if err != nil {
 				log.Printf("demo clock: %v", err)
 			}
 		}
@@ -491,8 +501,9 @@ func fetchWaiting(c *http.Client, api, token, tenant string) ([]iotbridge.Waitin
 	var out struct {
 		Data []iotbridge.Waiting `json:"data"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return nil, err
+	decodeErr := json.NewDecoder(resp.Body).Decode(&out)
+	if decodeErr != nil {
+		return nil, decodeErr
 	}
 
 	return out.Data, nil
@@ -561,7 +572,8 @@ func reportGap(
 			if err != nil {
 				rep.Failed(fmt.Sprintf("live connection: %v", err))
 			} else if tr, ok := iotbridge.LiveConnectionTrigger(f, gap, at); ok {
-				if err := send(httpc, endpoint, tr); err != nil && !recorded(err) {
+				err := send(httpc, endpoint, tr)
+				if err != nil && !recorded(err) {
 					rep.Failed(fmt.Sprintf("live connection %s: %v", tr.Kind, err))
 				} else {
 					log.Printf(
@@ -573,13 +585,14 @@ func reportGap(
 				}
 			}
 
-			if err := send(
+			sendErr := send(
 				httpc,
 				endpoint,
 				iotbridge.LiveGapTrigger(gap, at.Truncate(time.Minute)),
-			); err != nil &&
-				!recorded(err) {
-				rep.Failed(fmt.Sprintf("live heartbeat gap: %v", err))
+			)
+			if sendErr != nil &&
+				!recorded(sendErr) {
+				rep.Failed(fmt.Sprintf("live heartbeat gap: %v", sendErr))
 
 				continue
 			}
@@ -623,8 +636,9 @@ func fetchConnectionFault(
 	var body struct {
 		Data iotbridge.ConnectionFault `json:"data"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		return out, err
+	decodeErr := json.NewDecoder(resp.Body).Decode(&body)
+	if decodeErr != nil {
+		return out, decodeErr
 	}
 
 	return body.Data, nil
@@ -695,14 +709,16 @@ func (l *liveControl) send(
 		return errors.New("the nodes' broker did not take the command in 5 s")
 	}
 
-	if err := tok.Error(); err != nil {
-		return err
+	errorErr := tok.Error()
+	if errorErr != nil {
+		return errorErr
 	}
 
 	log.Printf("live command %s: %s → %s", w.ID, payload, iotbridge.LiveCommandTopic(l.node))
 
 	for _, tr := range iotbridge.LiveSentTriggers(w, at, at.Add(-clockMargin), state) {
-		if err := send(httpc, endpoint, tr); err != nil {
+		err := send(httpc, endpoint, tr)
+		if err != nil {
 			return err
 		}
 	}

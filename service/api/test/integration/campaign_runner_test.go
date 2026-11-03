@@ -83,7 +83,8 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 		t.Helper()
 
 		at += d
-		if _, err := schedTick(ctx, s, base.Add(at)); err != nil {
+		_, err := schedTick(ctx, s, base.Add(at))
+		if err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -456,7 +457,8 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 		func() { owner(t, `UPDATE control.commands SET status = 'cancelled' WHERE id = $1`, cmd) },
 	)
 
-	if _, err := schedTick(ctx, s, base.Add(time.Minute)); err != nil {
+	_, err := schedTick(ctx, s, base.Add(time.Minute))
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -555,7 +557,8 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 		return st
 	}
 
-	if _, err := schedTick(ctx, s, base.Add(2*time.Minute)); err != nil {
+	_, err = schedTick(ctx, s, base.Add(2*time.Minute))
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -570,7 +573,8 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 		base.Add(2*time.Minute),
 	)
 
-	if _, err := schedTick(ctx, s, base.Add(3*time.Minute)); err != nil {
+	_, err = schedTick(ctx, s, base.Add(3*time.Minute))
+	if err != nil {
 		t.Fatal(err)
 	}
 

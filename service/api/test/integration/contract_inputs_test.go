@@ -66,8 +66,9 @@ func TestInputsMatchContract(t *testing.T) {
 	}
 
 	var contract map[string][]string
-	if err := json.Unmarshal(raw, &contract); err != nil {
-		t.Fatal(err)
+	unmarshalErr := json.Unmarshal(raw, &contract)
+	if unmarshalErr != nil {
+		t.Fatal(unmarshalErr)
 	}
 
 	registered := map[string]bool{}

@@ -60,12 +60,13 @@ func TestMailTexts(t *testing.T) {
 func TestSMTPRefusesHeaderBreaks(t *testing.T) {
 	s := SMTP{Addr: "127.0.0.1:1", From: "x@example.com"}
 	for _, c := range [][2]string{{"a@example.com\r\nBcc: b@example.com", "Hi"}, {"a@example.com", "Hi\nBcc: b@example.com"}} {
-		if _, err := s.Send(
+		_, err := s.Send(
 			context.Background(),
 			c[0],
 			c[1],
 			"body",
-		); err == nil ||
+		)
+		if err == nil ||
 			!strings.Contains(err.Error(), "line break") {
 			t.Errorf("%q: %v", c, err)
 		}
@@ -147,13 +148,14 @@ func TestSMTPSends(t *testing.T) {
 	}()
 
 	s := SMTP{Addr: ln.Addr().String(), From: "AC Project <no-reply@ac-project.local>"}
-	if _, err := s.Send(
+	_, sendErr := s.Send(
 		context.Background(),
 		"tan@example.com",
 		"Hello 陈",
 		"Body line\r\nsecond",
-	); err != nil {
-		t.Fatal(err)
+	)
+	if sendErr != nil {
+		t.Fatal(sendErr)
 	}
 
 	m := <-got

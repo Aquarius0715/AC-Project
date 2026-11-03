@@ -17,8 +17,9 @@ func EventHandlers() map[string]events.Handler {
 	return map[string]events.Handler{
 		events.FilterCleaningDue: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.FilterReminder
-			if err := e.Decode(&p); err != nil {
-				return err
+			decodeErr := e.Decode(&p)
+			if decodeErr != nil {
+				return decodeErr
 			}
 
 			failures := "[]"
@@ -57,8 +58,9 @@ func EventHandlers() map[string]events.Handler {
 		},
 		events.FilterCleaningCleared: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.FilterReminder
-			if err := e.Decode(&p); err != nil {
-				return err
+			decodeErr := e.Decode(&p)
+			if decodeErr != nil {
+				return decodeErr
 			}
 
 			_, err := tx.Exec(
@@ -73,8 +75,9 @@ func EventHandlers() map[string]events.Handler {
 		},
 		events.ReconciliationRequired: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.Units
-			if err := e.Decode(&p); err != nil {
-				return err
+			decodeErr := e.Decode(&p)
+			if decodeErr != nil {
+				return decodeErr
 			}
 
 			_, err := tx.Exec(
@@ -92,8 +95,9 @@ func EventHandlers() map[string]events.Handler {
 		},
 		events.ReconciliationResolved: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.Units
-			if err := e.Decode(&p); err != nil {
-				return err
+			decodeErr := e.Decode(&p)
+			if decodeErr != nil {
+				return decodeErr
 			}
 
 			_, err := tx.Exec(

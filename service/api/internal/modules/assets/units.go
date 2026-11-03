@@ -188,8 +188,9 @@ func (m *Module) query(
 	limit, offset int,
 ) ([]Unit, int, error) {
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM assets.units u WHERE "+where, args...).
-		Scan(&total); err != nil {
+	err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM assets.units u WHERE "+where, args...).
+		Scan(&total)
+	if err != nil {
 		return nil, 0, err
 	}
 
@@ -211,7 +212,7 @@ func (m *Module) query(
 			u     Unit
 			state []byte
 		)
-		if err := rows.Scan(
+		err := rows.Scan(
 			&u.ID,
 			&u.TenantID,
 			&u.Version,
@@ -233,11 +234,13 @@ func (m *Module) query(
 			&u.ObservedRestriction,
 			&u.LastSeenAt,
 			&u.AlertPolicyIDs,
-		); err != nil {
+		)
+		if err != nil {
 			return nil, 0, err
 		}
 
-		if err := json.Unmarshal(state, &u.ObservedState); err != nil {
+		err = json.Unmarshal(state, &u.ObservedState)
+		if err != nil {
 			return nil, 0, err
 		}
 
@@ -249,8 +252,9 @@ func (m *Module) query(
 		out = append(out, u)
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, 0, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return nil, 0, rowsErr
 	}
 
 	return out, total, m.enrich(ctx, c, out)
@@ -366,7 +370,8 @@ func (m *Module) unitsList(
 		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
 		dec.DisallowUnknownFields()
 
-		if err := dec.Decode(&f); err != nil {
+		err := dec.Decode(&f)
+		if err != nil {
 			return paging.Page[Unit]{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
 		}
 	}
@@ -567,17 +572,19 @@ func (m *Module) unitsGet(ctx context.Context, c *ops.Call, in *UnitGetInput) (U
 		return UnitDetail{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
-	if err := unitscope.Gate(
+	gateErr := unitscope.Gate(
 		ctx,
 		c,
 		[]uuid.UUID{in.ID},
-	); err != nil { // IR49(b): equipment read waits for the work window
-		return UnitDetail{}, err
+	)
+	if gateErr != nil { // IR49(b): equipment read waits for the work window
+		return UnitDetail{}, gateErr
 	}
 
 	d := UnitDetail{Unit: units[0]}
 	if m.Details != nil {
-		if d.DetailExtras, err = m.Details.Detail(ctx, c, units[0]); err != nil {
+		d.DetailExtras, err = m.Details.Detail(ctx, c, units[0])
+		if err != nil {
 			return UnitDetail{}, err
 		}
 	}

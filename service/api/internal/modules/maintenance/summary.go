@@ -34,7 +34,8 @@ func (m Jobs) CountJobs(ctx context.Context, c *ops.Call, raw json.RawMessage) (
 		}
 	}
 
-	if err := f.check(); err != nil {
+	err := f.check()
+	if err != nil {
 		return JobCounts{}, err
 	}
 

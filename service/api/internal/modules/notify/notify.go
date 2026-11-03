@@ -46,8 +46,9 @@ func (Store) Create(ctx context.Context, c *ops.Call, n New) (uuid.UUID, error) 
 	id := uuid.Must(uuid.NewV7())
 
 	var tenant uuid.UUID
-	if err := c.Tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')::uuid`).
-		Scan(&tenant); err != nil {
+	err := c.Tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')::uuid`).
+		Scan(&tenant)
+	if err != nil {
 		return id, err
 	}
 
@@ -81,8 +82,9 @@ func EventHandlers() map[string]events.Handler {
 	return map[string]events.Handler{
 		events.NotificationRequested: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.Notification
-			if err := e.Decode(&p); err != nil {
-				return err
+			decodeErr := e.Decode(&p)
+			if decodeErr != nil {
+				return decodeErr
 			}
 
 			target, _ := json.Marshal(p.Target)

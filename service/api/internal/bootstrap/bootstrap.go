@@ -76,14 +76,16 @@ func (in *Input) Validate() error {
 // them (IR472), so a save that adds one at the same time waits for this one.
 func Admin(ctx context.Context, tx pgx.Tx, in Input) (Result, error) {
 	var r Result
-	if err := in.Validate(); err != nil {
+	err := in.Validate()
+	if err != nil {
 		return r, err
 	}
 	// the business time: a demo environment's clock runs at an offset from the wall clock (IR168)
 	r.At = in.At
 	if r.At.IsZero() {
-		if err := tx.QueryRow(ctx, `SELECT now() + COALESCE((SELECT offset_ms FROM platform.demo_clock WHERE id), 0) * interval '1 millisecond'`).
-			Scan(&r.At); err != nil {
+		err := tx.QueryRow(ctx, `SELECT now() + COALESCE((SELECT offset_ms FROM platform.demo_clock WHERE id), 0) * interval '1 millisecond'`).
+			Scan(&r.At)
+		if err != nil {
 			return r, err
 		}
 	}
@@ -95,14 +97,16 @@ func Admin(ctx context.Context, tx pgx.Tx, in Input) (Result, error) {
 		return r, err
 	}
 
-	if ids, err = pgx.CollectRows(rows, pgx.RowTo[uuid.UUID]); err != nil {
+	ids, err = pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	if err != nil {
 		return r, err
 	}
 
 	switch len(ids) {
 	case 0:
-		if err := tx.QueryRow(ctx, `INSERT INTO platform.tenants (name, created_at) VALUES ($1, $2) RETURNING id`, in.Tenant, r.At).
-			Scan(&r.TenantID); err != nil {
+		err := tx.QueryRow(ctx, `INSERT INTO platform.tenants (name, created_at) VALUES ($1, $2) RETURNING id`, in.Tenant, r.At).
+			Scan(&r.TenantID)
+		if err != nil {
 			return r, err
 		}
 
@@ -113,19 +117,21 @@ func Admin(ctx context.Context, tx pgx.Tx, in Input) (Result, error) {
 		return r, fmt.Errorf("tenant: %d tenants are named %q", len(ids), in.Tenant)
 	}
 
-	if _, err := tx.Exec(
+	_, execErr := tx.Exec(
 		ctx,
 		`SELECT pg_advisory_xact_lock(hashtext('identity.identity_admins:' || $1::text))`,
 		r.TenantID,
-	); err != nil {
-		return r, err
+	)
+	if execErr != nil {
+		return r, execErr
 	}
 
 	var exists bool
-	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.memberships m JOIN identity.membership_permissions p ON p.membership_id = m.id AND p.permission = 'identity.write'
+	scanErr := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.memberships m JOIN identity.membership_permissions p ON p.membership_id = m.id AND p.permission = 'identity.write'
 		WHERE m.tenant_id = $1 AND m.valid_from <= $2 AND (m.valid_until IS NULL OR m.valid_until > $2))`, r.TenantID, r.At).
-		Scan(&exists); err != nil {
-		return r, err
+		Scan(&exists)
+	if scanErr != nil {
+		return r, scanErr
 	}
 
 	if exists {
@@ -156,40 +162,44 @@ func Admin(ctx context.Context, tx pgx.Tx, in Input) (Result, error) {
 		return r, err
 	}
 
-	if err := tx.QueryRow(ctx, `INSERT INTO identity.memberships (tenant_id, user_id, organization_id, role, valid_from, created_at, updated_at)
+	scanErr = tx.QueryRow(ctx, `INSERT INTO identity.memberships (tenant_id, user_id, organization_id, role, valid_from, created_at, updated_at)
 		VALUES ($1, $2, $3, 'admin', $4, $4, $4) RETURNING id`, r.TenantID, r.UserID, r.OrganizationID, r.At).
-		Scan(&r.MembershipID); err != nil {
-		return r, err
+		Scan(&r.MembershipID)
+	if scanErr != nil {
+		return r, scanErr
 	}
 	// every HQ permission (the contractor's partner.* are not HQ's), over the whole tenant
-	if _, err := tx.Exec(
+	_, execErr = tx.Exec(
 		ctx,
 		`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission)
 		SELECT $1, $2, code FROM identity.permissions WHERE code NOT LIKE 'partner.%'`,
 		r.TenantID,
 		r.MembershipID,
-	); err != nil {
-		return r, err
+	)
+	if execErr != nil {
+		return r, execErr
 	}
 
-	if _, err := tx.Exec(
+	_, execErr = tx.Exec(
 		ctx,
 		`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES ($1, $2, 'tenant', $1)`,
 		r.TenantID,
 		r.MembershipID,
-	); err != nil {
-		return r, err
+	)
+	if execErr != nil {
+		return r, execErr
 	}
 
-	if _, err := tx.Exec(
+	_, execErr = tx.Exec(
 		ctx,
 		`INSERT INTO audit.audit_log (tenant_id, actor_id, actor_role_at_time, action, target_kind, target_id, next_version, occurred_at, correlation_id, result, reason)
 		VALUES ($1, 'system-bootstrap', 'system', 'bootstrap.admin', 'membership', $2::text, 1, $3, 'bootstrap-admin', 'success', 'first HQ administrator')`,
 		r.TenantID,
 		r.MembershipID,
 		r.At,
-	); err != nil {
-		return r, err
+	)
+	if execErr != nil {
+		return r, execErr
 	}
 
 	_, err = tx.Exec(

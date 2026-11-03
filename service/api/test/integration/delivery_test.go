@@ -847,7 +847,8 @@ func TestReleaseEndedAccess(t *testing.T) {
 		clock.Add(24*time.Hour),
 	)
 
-	if _, err := schedTick(ctx, s, clock.Add(time.Minute)); err != nil {
+	_, err := schedTick(ctx, s, clock.Add(time.Minute))
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -877,7 +878,8 @@ func TestReleaseEndedAccess(t *testing.T) {
 		t.Errorf("HQ notices: %d, want %d", n, before+1)
 	}
 	// nothing more to release on the next tick
-	if _, err := schedTick(ctx, s, clock.Add(2*time.Minute)); err != nil {
+	_, err = schedTick(ctx, s, clock.Add(2*time.Minute))
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -1010,7 +1012,8 @@ func TestReleaseEndedAccessContractor(t *testing.T) {
 		clock.Add(50*time.Hour),
 	)
 
-	if _, err := schedTick(ctx, s, clock.Add(time.Minute)); err != nil {
+	_, err := schedTick(ctx, s, clock.Add(time.Minute))
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -1373,7 +1376,8 @@ func TestExtensionRefreezesTechnicianHistory(t *testing.T) {
 		return at
 	}
 
-	if _, err := schedTick(ctx, s, clock); err != nil {
+	_, err := schedTick(ctx, s, clock)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -1398,7 +1402,8 @@ func TestExtensionRefreezesTechnicianHistory(t *testing.T) {
 		t.Fatalf("extension: %d %v", code, m)
 	}
 
-	if _, err := schedTick(ctx, s, clock.Add(time.Minute)); err != nil {
+	_, err = schedTick(ctx, s, clock.Add(time.Minute))
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -1406,7 +1411,8 @@ func TestExtensionRefreezesTechnicianHistory(t *testing.T) {
 		t.Errorf("frozen while the extension is open: %v", at)
 	}
 
-	if _, err := schedTick(ctx, s, clock.Add(3*time.Hour)); err != nil {
+	_, err = schedTick(ctx, s, clock.Add(3*time.Hour))
+	if err != nil {
 		t.Fatal(err)
 	}
 

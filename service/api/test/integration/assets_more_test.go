@@ -22,8 +22,9 @@ func owner(t *testing.T, sql string, args ...any) {
 	}
 	defer conn.Close(ctx)
 
-	if _, err := conn.Exec(ctx, sql, args...); err != nil {
-		t.Fatal(err)
+	_, execErr := conn.Exec(ctx, sql, args...)
+	if execErr != nil {
+		t.Fatal(execErr)
 	}
 }
 
@@ -60,8 +61,9 @@ func ownerScan(t *testing.T, sql string, args []any, dest ...any) {
 	}
 	defer conn.Close(ctx)
 
-	if err := conn.QueryRow(ctx, sql, args...).Scan(dest...); err != nil {
-		t.Fatal(err)
+	scanErr := conn.QueryRow(ctx, sql, args...).Scan(dest...)
+	if scanErr != nil {
+		t.Fatal(scanErr)
 	}
 }
 
@@ -422,9 +424,10 @@ func defaultPolicyID(t *testing.T) string {
 	defer conn.Close(ctx)
 
 	var id string
-	if err := conn.QueryRow(ctx, `SELECT id::text FROM monitoring.alert_policies WHERE tenant_id = $1 AND kind = 'default_alert'`, seed.ID("tenant-a")).
-		Scan(&id); err != nil {
-		t.Fatal(err)
+	scanErr := conn.QueryRow(ctx, `SELECT id::text FROM monitoring.alert_policies WHERE tenant_id = $1 AND kind = 'default_alert'`, seed.ID("tenant-a")).
+		Scan(&id)
+	if scanErr != nil {
+		t.Fatal(scanErr)
 	}
 
 	return id

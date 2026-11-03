@@ -55,7 +55,8 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 	tick := func(at time.Time) {
 		t.Helper()
 
-		if _, err := schedTick(ctx, s, at); err != nil {
+		_, err := schedTick(ctx, s, at)
+		if err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -74,7 +74,8 @@ func Integrate(
 			unit, origin, quality string
 			boundary              *string
 		)
-		if err := rows.Scan(&v, &unit, &origin, &quality, &boundary); err != nil {
+		err := rows.Scan(&v, &unit, &origin, &quality, &boundary)
+		if err != nil {
 			return out, err
 		}
 
@@ -91,8 +92,9 @@ func Integrate(
 		}
 	}
 
-	if err := rows.Err(); err != nil {
-		return out, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return out, rowsErr
 	}
 
 	if out.ValidSlots > 0 {

@@ -96,7 +96,8 @@ func TestCertificateReminders(t *testing.T) {
 
 		drainEvents(t)
 
-		if _, err := schedTick(ctx, s, clock.Add(time.Duration(tick)*time.Minute)); err != nil {
+		_, err := schedTick(ctx, s, clock.Add(time.Duration(tick)*time.Minute))
+		if err != nil {
 			t.Fatal(err)
 		}
 	}

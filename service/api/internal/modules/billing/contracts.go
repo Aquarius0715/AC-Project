@@ -251,9 +251,10 @@ func (m Billing) listContracts(
 	where := strings.Join(conds, " AND ")
 
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM billing.contracts k WHERE "+where, args...).
-		Scan(&total); err != nil {
-		return paging.Page[Contract]{}, err
+	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM billing.contracts k WHERE "+where, args...).
+		Scan(&total)
+	if scanErr != nil {
+		return paging.Page[Contract]{}, scanErr
 	}
 
 	rows, err := c.Tx.Query(
@@ -286,12 +287,14 @@ func (m Billing) listContracts(
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return paging.Page[Contract]{}, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return paging.Page[Contract]{}, rowsErr
 	}
 
 	for i := range items {
-		if err := m.decorate(ctx, c, &items[i]); err != nil {
+		err := m.decorate(ctx, c, &items[i])
+		if err != nil {
 			return paging.Page[Contract]{}, err
 		}
 	}
@@ -448,18 +451,19 @@ func (m Billing) saveContract(
 			return cur, apperr.E(apperr.Conflict, "errors.contract_restricted")
 		}
 
-		if _, err := c.Tx.Exec(
+		_, execErr := c.Tx.Exec(
 			ctx,
 			`UPDATE billing.contracts SET is_current = false WHERE id = $1 AND is_current`,
 			cur.ID,
-		); err != nil {
-			return cur, err
+		)
+		if execErr != nil {
+			return cur, execErr
 		}
 
 		id, version, prev = cur.ID, cur.Version+1, c.ExpectedVersion
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`INSERT INTO billing.contracts (id, version, tenant_id, customer_id, customer_org_id, plan_type, term, price_minor, currency, restriction_eligible,
 		rules_version, created_by, created_at) VALUES ($1, $2, current_setting('app.tenant_id')::uuid, $3, $4, $5, tstzrange($6, $7), $8, $9, $10, $11, $12, $13)`,
@@ -476,18 +480,20 @@ func (m Billing) saveContract(
 		in.RulesVersion,
 		c.Principal.MembershipID,
 		c.Now,
-	); err != nil {
-		return Contract{}, err
+	)
+	if execErr != nil {
+		return Contract{}, execErr
 	}
 
 	for _, u := range in.UnitIDs {
-		if _, err := c.Tx.Exec(
+		_, err := c.Tx.Exec(
 			ctx,
 			`INSERT INTO billing.contract_units (tenant_id, contract_id, contract_version, unit_id) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3)`,
 			id,
 			version,
 			u,
-		); err != nil {
+		)
+		if err != nil {
 			return Contract{}, err
 		}
 	}
@@ -691,14 +697,16 @@ func (m Billing) createInvoice(
 	}
 	// the tenant sequence: serialize concurrent creates of one tenant so two invoices never draw the same number
 	var seq int
-	if err := c.Tx.QueryRow(ctx, `SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtext('billing.invoice_number:' || current_setting('app.tenant_id')))) l`).
-		Scan(&seq); err != nil {
-		return Invoice{}, err
+	scanErr := c.Tx.QueryRow(ctx, `SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtext('billing.invoice_number:' || current_setting('app.tenant_id')))) l`).
+		Scan(&seq)
+	if scanErr != nil {
+		return Invoice{}, scanErr
 	}
 
-	if err := c.Tx.QueryRow(ctx, `SELECT count(*) + 1 FROM billing.invoices`).
-		Scan(&seq); err != nil {
-		return Invoice{}, err
+	scanErr = c.Tx.QueryRow(ctx, `SELECT count(*) + 1 FROM billing.invoices`).
+		Scan(&seq)
+	if scanErr != nil {
+		return Invoice{}, scanErr
 	}
 
 	number := InvoiceNumber(in.Period.From, seq)
@@ -827,7 +835,7 @@ func (m Billing) getInvoice(ctx context.Context, c *ops.Call, in *IDInput) (Invo
 
 	for rows.Next() {
 		var p Payment
-		if err := rows.Scan(
+		err := rows.Scan(
 			&p.ID,
 			&p.TenantID,
 			&p.Version,
@@ -841,7 +849,8 @@ func (m Billing) getInvoice(ctx context.Context, c *ops.Call, in *IDInput) (Invo
 			&p.PaymentReference,
 			&p.ConfirmedAt,
 			&p.ConfirmationReason,
-		); err != nil {
+		)
+		if err != nil {
 			rows.Close()
 
 			return x, err
@@ -853,8 +862,9 @@ func (m Billing) getInvoice(ctx context.Context, c *ops.Call, in *IDInput) (Invo
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return x, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return x, rowsErr
 	}
 
 	x.RestrictionIDs, err = m.Restrictions.ForInvoice(ctx, c, x.ID)
@@ -1007,9 +1017,10 @@ func (m Billing) listInvoices(
 	where := strings.Join(conds, " AND ")
 
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM billing.invoices i WHERE "+where, args...).
-		Scan(&total); err != nil {
-		return paging.Page[Invoice]{}, err
+	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM billing.invoices i WHERE "+where, args...).
+		Scan(&total)
+	if scanErr != nil {
+		return paging.Page[Invoice]{}, scanErr
 	}
 
 	rows, err := c.Tx.Query(
@@ -1150,9 +1161,10 @@ func (m Billing) remind(ctx context.Context, c *ops.Call, in *RemindInput) (Rece
 	}
 
 	var v int
-	if err := c.Tx.QueryRow(ctx, `UPDATE billing.invoices SET last_reminded_at = $2, version = version + 1, updated_at = $2 WHERE id = $1 RETURNING version`, x.ID, c.Now).
-		Scan(&v); err != nil {
-		return Receipt{}, err
+	scanErr := c.Tx.QueryRow(ctx, `UPDATE billing.invoices SET last_reminded_at = $2, version = version + 1, updated_at = $2 WHERE id = $1 RETURNING version`, x.ID, c.Now).
+		Scan(&v)
+	if scanErr != nil {
+		return Receipt{}, scanErr
 	}
 
 	c.Emit(

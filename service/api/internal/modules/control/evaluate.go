@@ -426,7 +426,7 @@ func (m Automations) candidates(
 
 	for rows.Next() {
 		x := candidate{hq: true, kind: "automation_policy"}
-		if err := rows.Scan(
+		err := rows.Scan(
 			&x.id,
 			&x.priority,
 			&x.enabled,
@@ -434,7 +434,8 @@ func (m Automations) candidates(
 			&x.action,
 			&x.cond,
 			&x.tz,
-		); err != nil {
+		)
+		if err != nil {
 			rows.Close()
 
 			return nil, err
@@ -465,7 +466,7 @@ func (m Automations) candidates(
 			kind string
 			raw  []byte
 		)
-		if err := rows.Scan(
+		err := rows.Scan(
 			&x.id,
 			&x.priority,
 			&x.enabled,
@@ -473,7 +474,8 @@ func (m Automations) candidates(
 			&kind,
 			&raw,
 			&x.tz,
-		); err != nil {
+		)
+		if err != nil {
 			return nil, err
 		}
 
@@ -635,16 +637,22 @@ func (m Automations) decide(
 
 				if !Allowed(a, policy) {
 					reason = "restricted"
-				} else if _, err := m.Cmd.ready(ctx, c, unit); err != nil {
-					var de *apperr.DomainError
-					if errors.As(err, &de) && de.MessageKey == "errors.reconciliation_required" {
-						reason = "reconciliation_required"
-					} else if errors.As(err, &de) && de.Code == apperr.Conflict {
-						reason = "busy"
-					} else if errors.As(err, &de) && de.Code == apperr.Offline {
-						reason = "offline"
-					} else {
-						return Decision{}, nil, nil, err
+				} else {
+					_, err := m.Cmd.ready(ctx, c, unit)
+					if err != nil {
+						var de *apperr.DomainError
+						if errors.As(err, &de) &&
+							de.MessageKey == "errors.reconciliation_required" {
+							reason = "reconciliation_required"
+						} else if errors.As(err, &de) &&
+							de.Code == apperr.Conflict {
+							reason = "busy"
+						} else if errors.As(err, &de) &&
+							de.Code == apperr.Offline {
+							reason = "offline"
+						} else {
+							return Decision{}, nil, nil, err
+						}
 					}
 				}
 			}
@@ -691,7 +699,8 @@ func (m Automations) prepare(
 	c *ops.Call,
 	in *EvaluationInput,
 ) (map[string]Fact, error) {
-	if err := m.targets(ctx, c, in); err != nil {
+	err := m.targets(ctx, c, in)
+	if err != nil {
 		return nil, err
 	}
 
@@ -754,7 +763,7 @@ func (m Automations) evaluate(
 					continue
 				}
 
-				if _, err := c.Tx.Exec(
+				_, err := c.Tx.Exec(
 					ctx,
 					`INSERT INTO control.automation_runs (tenant_id, rule_kind, rule_id, unit_id, trigger_ref, outcome, skip_reason, occurred_at)
 					VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, 'skipped', $5, $6) ON CONFLICT DO NOTHING`,
@@ -764,7 +773,8 @@ func (m Automations) evaluate(
 					ref,
 					sk.reason,
 					in.OccurredAt,
-				); err != nil {
+				)
+				if err != nil {
 					return Result{}, err
 				}
 			}
@@ -788,7 +798,7 @@ func (m Automations) evaluate(
 				}
 
 				d.Decision, d.CommandID, d.fresh = "requested", &id, true
-				if _, err := c.Tx.Exec(
+				_, execErr := c.Tx.Exec(
 					ctx,
 					`INSERT INTO control.automation_runs (tenant_id, rule_kind, rule_id, unit_id, trigger_ref, outcome, command_id, occurred_at)
 					VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, 'command_created', $5, $6)
@@ -800,8 +810,9 @@ func (m Automations) evaluate(
 					ref,
 					id,
 					in.OccurredAt,
-				); err != nil {
-					return Result{}, err
+				)
+				if execErr != nil {
+					return Result{}, execErr
 				}
 			}
 		}
@@ -912,7 +923,8 @@ func (m Automations) simulate(
 	c *ops.Call,
 	in *EvaluationInput,
 ) (Result, error) {
-	if err := checkTick(c, in); err != nil {
+	err := checkTick(c, in)
+	if err != nil {
 		return Result{}, err
 	}
 
@@ -947,8 +959,9 @@ func (m Automations) simulate(
 func (m Automations) fire(ctx context.Context, c *ops.Call, in *EvaluationInput) (Result, error) {
 	// the target units first: a stored result is returned only after authorization (IR21), and a caller outside the
 	// units' scope gets NOT_FOUND, not the result of another caller's identical input or a tick CONFLICT (IR366)
-	if err := m.targets(ctx, c, in); err != nil {
-		return Result{}, err
+	targetsErr := m.targets(ctx, c, in)
+	if targetsErr != nil {
+		return Result{}, targetsErr
 	}
 
 	norm, _ := json.Marshal(struct {
@@ -982,8 +995,9 @@ func (m Automations) fire(ctx context.Context, c *ops.Call, in *EvaluationInput)
 		return Result{}, err
 	}
 
-	if err := checkTick(c, in); err != nil {
-		return Result{}, err
+	checkTickErr := checkTick(c, in)
+	if checkTickErr != nil {
+		return Result{}, checkTickErr
 	}
 	// one tick has one result (D02): the same input with another eventId reuses it; other input is CONFLICT
 	var storedPhase string
@@ -1014,7 +1028,7 @@ func (m Automations) fire(ctx context.Context, c *ops.Call, in *EvaluationInput)
 	}
 
 	raw, _ := json.Marshal(r)
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`INSERT INTO control.evaluation_events (tenant_id, event_id, phase, occurred_at, input_hash, result) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5)`,
 		in.EventID,
@@ -1022,8 +1036,9 @@ func (m Automations) fire(ctx context.Context, c *ops.Call, in *EvaluationInput)
 		in.OccurredAt,
 		hash,
 		raw,
-	); err != nil {
-		return r, err
+	)
+	if execErr != nil {
+		return r, execErr
 	}
 
 	c.Audit(
@@ -1047,7 +1062,8 @@ func (m Automations) Notify(
 	c *ops.Call,
 	in *EvaluationInput,
 ) ([]json.RawMessage, error) {
-	if _, err := m.prepare(ctx, c, in); err != nil {
+	_, err := m.prepare(ctx, c, in)
+	if err != nil {
 		return nil, err
 	}
 

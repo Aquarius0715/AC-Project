@@ -87,11 +87,12 @@ func (c *Consumer) failed(ctx context.Context, e Event, cause error) (bool, erro
 	dead := false
 	err := c.DB.Run(ctx, false, nil, func(tx pgx.Tx) error {
 		var attempts int
-		if err := tx.QueryRow(ctx, `INSERT INTO platform.event_failures (consumer, event_id, attempts, last_error, last_attempt_at) VALUES ($1, $2, 1, $3, $4)
+		scanErr := tx.QueryRow(ctx, `INSERT INTO platform.event_failures (consumer, event_id, attempts, last_error, last_attempt_at) VALUES ($1, $2, 1, $3, $4)
 			ON CONFLICT (consumer, event_id) DO UPDATE SET attempts = platform.event_failures.attempts + 1, last_error = EXCLUDED.last_error, last_attempt_at = EXCLUDED.last_attempt_at
 			RETURNING attempts`, c.Name, e.ID, cause.Error(), c.now()).
-			Scan(&attempts); err != nil {
-			return err
+			Scan(&attempts)
+		if scanErr != nil {
+			return scanErr
 		}
 
 		if attempts < MaxAttempts {
@@ -100,14 +101,15 @@ func (c *Consumer) failed(ctx context.Context, e Event, cause error) (bool, erro
 
 		dead = true
 
-		if _, err := tx.Exec(
+		_, execErr := tx.Exec(
 			ctx,
 			`UPDATE platform.event_failures SET dead_at = $3 WHERE consumer = $1 AND event_id = $2`,
 			c.Name,
 			e.ID,
 			c.now(),
-		); err != nil {
-			return err
+		)
+		if execErr != nil {
+			return execErr
 		}
 
 		_, err := tx.Exec(
@@ -219,7 +221,7 @@ func (c *Consumer) pending(ctx context.Context, types []string, limit int) ([]Ev
 
 		for rows.Next() {
 			var e Event
-			if err := rows.Scan(
+			err := rows.Scan(
 				&e.ID,
 				&e.Seq,
 				&e.TenantID,
@@ -231,7 +233,8 @@ func (c *Consumer) pending(ctx context.Context, types []string, limit int) ([]Ev
 				&e.OccurredAt,
 				&e.failures,
 				&e.lastFailure,
-			); err != nil {
+			)
+			if err != nil {
 				return err
 			}
 
@@ -263,16 +266,18 @@ func (c *Consumer) apply(ctx context.Context, e Event) (bool, error) {
 			return nil // already applied
 		}
 		// the business time of the event (IR157): handlers' SQL defaults use the producer's clock
-		if _, err := tx.Exec(
+		_, execErr := tx.Exec(
 			ctx,
 			`SELECT set_config('app.now', $1, true)`,
 			e.OccurredAt.UTC().Format(time.RFC3339Nano),
-		); err != nil {
-			return err
+		)
+		if execErr != nil {
+			return execErr
 		}
 
-		if err := c.Handlers[e.Type](ctx, tx, e); err != nil {
-			return err
+		handlersErr := c.Handlers[e.Type](ctx, tx, e)
+		if handlersErr != nil {
+			return handlersErr
 		}
 
 		done = true
@@ -290,7 +295,8 @@ func (c *Consumer) Run(ctx context.Context, every time.Duration) {
 
 	rep := &logging.Repeats{Logf: c.Logf}
 	for {
-		if n, err := c.Drain(ctx); err != nil && c.Logf != nil {
+		n, err := c.Drain(ctx)
+		if err != nil && c.Logf != nil {
 			rep.Failed(fmt.Sprintf("consumer %s: %v (applied %d)", c.Name, err, n))
 		} else if err == nil && c.Logf != nil {
 			rep.OK("consumer " + c.Name)

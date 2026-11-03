@@ -3,7 +3,8 @@ package ops
 import "testing"
 
 func TestEveryOperationHasOneDomain(t *testing.T) {
-	if err := CheckDomains(); err != nil {
+	err := CheckDomains()
+	if err != nil {
 		t.Fatal(err)
 	}
 

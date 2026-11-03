@@ -247,7 +247,8 @@ func (m *Module) AckTopic() string     { return Topic(m.TenantID, m.DeviceID, "c
 // applies the command but sends the answer two seconds after the command expired.
 func (m *Module) Acknowledge(raw []byte, at time.Time) ([]byte, time.Time, error) {
 	var c Command
-	if err := json.Unmarshal(raw, &c); err != nil {
+	err := json.Unmarshal(raw, &c)
+	if err != nil {
 		return nil, at, fmt.Errorf("command: %w", err)
 	}
 
@@ -273,7 +274,7 @@ func (m *Module) Acknowledge(raw []byte, at time.Time) ([]byte, time.Time, error
 		sendAt = c.ExpiresAt.Add(2 * time.Second)
 	}
 
-	raw, err := json.Marshal(
+	raw, err = json.Marshal(
 		Ack{
 			DeviceID:   m.DeviceID,
 			CommandID:  c.CommandID,
@@ -302,7 +303,8 @@ func (m *Module) Keep() ([]byte, error) { return json.Marshal(Kept{SetpointCelsi
 // Restore applies a kept state read back from the broker; a setpoint outside 16–30 °C is ignored.
 func (m *Module) Restore(raw []byte) error {
 	var k Kept
-	if err := json.Unmarshal(raw, &k); err != nil {
+	err := json.Unmarshal(raw, &k)
+	if err != nil {
 		return fmt.Errorf("kept state: %w", err)
 	}
 

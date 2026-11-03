@@ -47,8 +47,9 @@ func (d Dir) Put(_ context.Context, key, _ string, data []byte) error {
 		return err
 	}
 
-	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
-		return err
+	mkdirAllErr := os.MkdirAll(filepath.Dir(p), 0o700)
+	if mkdirAllErr != nil {
+		return mkdirAllErr
 	}
 
 	return os.WriteFile(p, data, 0o600)

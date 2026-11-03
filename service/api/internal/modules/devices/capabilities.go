@@ -61,7 +61,7 @@ func scanCap(r pgx.Row) (Capability, error) {
 		c             Capability
 		temp, sensors []byte
 	)
-	if err := r.Scan(
+	err := r.Scan(
 		&c.ID,
 		&c.TenantID,
 		&c.Version,
@@ -79,20 +79,23 @@ func scanCap(r pgx.Row) (Capability, error) {
 		&c.VentilationLevels,
 		&sensors,
 		&c.FirmwareCandidates,
-	); err != nil {
+	)
+	if err != nil {
 		return c, err
 	}
 
 	if len(temp) > 0 {
 		c.Temperature = &TempRange{}
-		if err := json.Unmarshal(temp, c.Temperature); err != nil {
+		err := json.Unmarshal(temp, c.Temperature)
+		if err != nil {
 			return c, err
 		}
 	}
 
 	c.Sensors = []SensorSpec{}
 	if len(sensors) > 0 {
-		if err := json.Unmarshal(sensors, &c.Sensors); err != nil {
+		err := json.Unmarshal(sensors, &c.Sensors)
+		if err != nil {
 			return c, err
 		}
 	}
@@ -149,9 +152,10 @@ func capabilitiesList(
 	}
 
 	var total int
-	if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM devices.capabilities WHERE is_current`).
-		Scan(&total); err != nil {
-		return paging.Page[Capability]{}, err
+	scanErr := c.Tx.QueryRow(ctx, `SELECT count(*) FROM devices.capabilities WHERE is_current`).
+		Scan(&total)
+	if scanErr != nil {
+		return paging.Page[Capability]{}, scanErr
 	}
 
 	rows, err := c.Tx.Query(
@@ -382,9 +386,10 @@ func (m Capabilities) save(
 	sensors, _ := json.Marshal(append([]SensorSpec{}, in.Sensors...))
 
 	var dup bool
-	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.capabilities WHERE is_current AND lower(manufacturer) = lower($1) AND lower(model) = lower($2)
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.capabilities WHERE is_current AND lower(manufacturer) = lower($1) AND lower(model) = lower($2)
 		AND ($3::uuid IS NULL OR id <> $3))`, in.Manufacturer, in.Model, in.ID).
-		Scan(&dup); err != nil {
+		Scan(&dup)
+	if err != nil {
 		return Capability{}, err
 	}
 
@@ -420,13 +425,14 @@ func (m Capabilities) save(
 			return Capability{}, apperr.E(apperr.Conflict, "error.versionConflict")
 		}
 
-		if _, err := c.Tx.Exec(
+		_, execErr := c.Tx.Exec(
 			ctx,
 			`UPDATE devices.capabilities SET is_current = false WHERE id = $1 AND version = $2`,
 			*in.ID,
 			cur,
-		); err != nil {
-			return Capability{}, err
+		)
+		if execErr != nil {
+			return Capability{}, execErr
 		}
 
 		id, version = *in.ID, cur+1
@@ -462,7 +468,8 @@ func (m Capabilities) save(
 	}
 
 	if version > 1 && m.Units != nil {
-		if _, err := m.Units.MoveToCapabilityVersion(ctx, c, id, version); err != nil {
+		_, err := m.Units.MoveToCapabilityVersion(ctx, c, id, version)
+		if err != nil {
 			return Capability{}, err
 		}
 	}

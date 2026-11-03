@@ -65,9 +65,10 @@ func (s devState) current(c *ops.Call) error {
 // exclusive applies D05 on a unit: no queued/running DeviceOperation for its device and no in-flight control work.
 func (m *Module) exclusive(ctx context.Context, c *ops.Call, unit uuid.UUID) error {
 	var busy bool
-	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE unit_id = $1 AND status IN ('queued','running') AND expires_at > $2)`,
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE unit_id = $1 AND status IN ('queued','running') AND expires_at > $2)`,
 		unit, c.Now).
-		Scan(&busy); err != nil {
+		Scan(&busy)
+	if err != nil {
 		return err
 	}
 
@@ -163,7 +164,8 @@ func (m *Module) bind(ctx context.Context, c *ops.Call, in *BindInput) (Device, 
 
 // bindDetail is bind answering the device with its detail (IR392: the write itself answers Device).
 func (m *Module) bindDetail(ctx context.Context, c *ops.Call, in *BindInput) (DeviceDetail, error) {
-	if err := m.technicianGate(ctx, c, in.JobID, in.UnitID); err != nil {
+	err := m.technicianGate(ctx, c, in.JobID, in.UnitID)
+	if err != nil {
 		return DeviceDetail{}, err
 	}
 
@@ -174,13 +176,15 @@ func (m *Module) bindDetail(ctx context.Context, c *ops.Call, in *BindInput) (De
 	// a technician moves a bound device only from a unit of an assignment of theirs as well: the unit it leaves is in
 	// scope too, and DD-T11 rejects an unauthorized rebinding (IR366)
 	if s.unit != nil && *s.unit != in.UnitID && c.Principal.Role == "technician" {
-		if err := m.UnitAccess.TechnicianUnit(ctx, c, *s.unit, false, false); err != nil {
+		err := m.UnitAccess.TechnicianUnit(ctx, c, *s.unit, false, false)
+		if err != nil {
 			return DeviceDetail{}, err
 		}
 	}
 
-	if err := s.current(c); err != nil {
-		return DeviceDetail{}, err
+	currentErr := s.current(c)
+	if currentErr != nil {
+		return DeviceDetail{}, currentErr
 	}
 
 	if s.unit != nil && *s.unit == in.UnitID {
@@ -206,15 +210,17 @@ func (m *Module) bindDetail(ctx context.Context, c *ops.Call, in *BindInput) (De
 	}
 
 	for _, unit := range units {
-		if err := m.exclusive(ctx, c, unit); err != nil {
+		err := m.exclusive(ctx, c, unit)
+		if err != nil {
 			return DeviceDetail{}, err
 		}
 	}
 
 	var taken bool
-	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_bindings WHERE unit_id = $1 AND unbound_at IS NULL)`, in.UnitID).
-		Scan(&taken); err != nil {
-		return DeviceDetail{}, err
+	scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_bindings WHERE unit_id = $1 AND unbound_at IS NULL)`, in.UnitID).
+		Scan(&taken)
+	if scanErr != nil {
+		return DeviceDetail{}, scanErr
 	}
 
 	if taken {
@@ -222,28 +228,30 @@ func (m *Module) bindDetail(ctx context.Context, c *ops.Call, in *BindInput) (De
 	}
 
 	if s.unit != nil {
-		if _, err := c.Tx.Exec(
+		_, err := c.Tx.Exec(
 			ctx,
 			`UPDATE devices.device_bindings SET unbound_at = $2, reason = $3 WHERE device_id = $1 AND unbound_at IS NULL`,
 			in.DeviceID,
 			c.Now,
 			in.Reason,
-		); err != nil {
+		)
+		if err != nil {
 			return DeviceDetail{}, err
 		}
 		// new binding → new sensor IDs; the old sensors are detached (device_id kept for history) by re-keying
-		if _, err := c.Tx.Exec(
+		_, err = c.Tx.Exec(
 			ctx,
 			`UPDATE devices.sensors SET id = gen_random_uuid(), calibrated_at = NULL WHERE device_id = $1 AND NOT EXISTS
 			(SELECT 1 FROM devices.calibration_records r WHERE r.sensor_id = devices.sensors.id)`,
 			in.DeviceID,
-		); err != nil {
+		)
+		if err != nil {
 			return DeviceDetail{}, err
 		}
 	}
 
 	binding := uuid.Must(uuid.NewV7())
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`INSERT INTO devices.device_bindings (id, tenant_id, device_id, unit_id, customer_org_id, bound_at, reason, actor_membership_id)
 		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7)`,
@@ -254,15 +262,17 @@ func (m *Module) bindDetail(ctx context.Context, c *ops.Call, in *BindInput) (De
 		c.Now,
 		in.Reason,
 		c.Principal.MembershipID,
-	); err != nil {
-		return DeviceDetail{}, err
+	)
+	if execErr != nil {
+		return DeviceDetail{}, execErr
 	}
 
 	var v int
-	if err := c.Tx.QueryRow(ctx, `UPDATE devices.devices SET unit_id = $2, binding_id = $3, target_unit_id = $2, version = version + 1, updated_at = platform.app_now()
+	scanErr = c.Tx.QueryRow(ctx, `UPDATE devices.devices SET unit_id = $2, binding_id = $3, target_unit_id = $2, version = version + 1, updated_at = platform.app_now()
 		WHERE id = $1 RETURNING version`, in.DeviceID, in.UnitID, binding).
-		Scan(&v); err != nil {
-		return DeviceDetail{}, err
+		Scan(&v)
+	if scanErr != nil {
+		return DeviceDetail{}, scanErr
 	}
 
 	c.Emit(
@@ -354,12 +364,14 @@ func (m *Module) startOperation(
 		return DeviceOperation{}, apperr.E(apperr.Conflict, "error.deviceNotBound")
 	}
 
-	if err := m.technicianGate(ctx, c, jobID, *s.unit); err != nil {
-		return DeviceOperation{}, err
+	technicianGateErr := m.technicianGate(ctx, c, jobID, *s.unit)
+	if technicianGateErr != nil {
+		return DeviceOperation{}, technicianGateErr
 	}
 
-	if err := s.current(c); err != nil {
-		return DeviceOperation{}, err
+	currentErr := s.current(c)
+	if currentErr != nil {
+		return DeviceOperation{}, currentErr
 	}
 
 	if kind == "firmware" {
@@ -369,9 +381,10 @@ func (m *Module) startOperation(
 		}
 
 		var candidates []string
-		if err := c.Tx.QueryRow(ctx, `SELECT firmware_candidates FROM devices.capabilities WHERE id = $1 AND version = $2`, u.ModelID, u.CapabilityVersion).
-			Scan(&candidates); err != nil {
-			return DeviceOperation{}, err
+		scanErr := c.Tx.QueryRow(ctx, `SELECT firmware_candidates FROM devices.capabilities WHERE id = $1 AND version = $2`, u.ModelID, u.CapabilityVersion).
+			Scan(&candidates)
+		if scanErr != nil {
+			return DeviceOperation{}, scanErr
 		}
 
 		if !slices.Contains(candidates, *target) || *target == s.firmware {
@@ -388,12 +401,13 @@ func (m *Module) startOperation(
 		}
 	}
 
-	if err := m.exclusive(ctx, c, *s.unit); err != nil {
-		return DeviceOperation{}, err
+	exclusiveErr := m.exclusive(ctx, c, *s.unit)
+	if exclusiveErr != nil {
+		return DeviceOperation{}, exclusiveErr
 	}
 
 	id := uuid.Must(uuid.NewV7())
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`INSERT INTO devices.device_operations (id, tenant_id, device_id, unit_id, job_id, kind, status, target_version, expires_at, actor_membership_id)
 		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, 'queued', $6, $7, $8)`,
@@ -405,8 +419,9 @@ func (m *Module) startOperation(
 		target,
 		c.Now.Add(operationTTL),
 		c.Principal.MembershipID,
-	); err != nil {
-		return DeviceOperation{}, err
+	)
+	if execErr != nil {
+		return DeviceOperation{}, execErr
 	}
 
 	v, err := bumpDevice(ctx, c, device)
@@ -647,12 +662,14 @@ func (m *Module) calibrate(
 		return CalibrationRecord{}, apperr.E(apperr.Conflict, "error.deviceNotBound")
 	}
 
-	if err := m.technicianGate(ctx, c, in.JobID, *s.unit); err != nil {
-		return CalibrationRecord{}, err
+	technicianGateErr := m.technicianGate(ctx, c, in.JobID, *s.unit)
+	if technicianGateErr != nil {
+		return CalibrationRecord{}, technicianGateErr
 	}
 
-	if err := s.current(c); err != nil {
-		return CalibrationRecord{}, err
+	currentErr := s.current(c)
+	if currentErr != nil {
+		return CalibrationRecord{}, currentErr
 	}
 
 	var metric, unit string
@@ -675,12 +692,13 @@ func (m *Module) calibrate(
 		)
 	}
 
-	if err := m.exclusive(ctx, c, *s.unit); err != nil {
-		return CalibrationRecord{}, err
+	exclusiveErr := m.exclusive(ctx, c, *s.unit)
+	if exclusiveErr != nil {
+		return CalibrationRecord{}, exclusiveErr
 	}
 
 	id := uuid.Must(uuid.NewV7())
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`INSERT INTO devices.calibration_records (id, tenant_id, device_id, sensor_id, metric, unit, reference_value, measured_value, calibrated_at, actor_id, job_id)
 		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
@@ -694,17 +712,19 @@ func (m *Module) calibrate(
 		in.CalibratedAt,
 		c.Principal.UserID,
 		in.JobID,
-	); err != nil {
-		return CalibrationRecord{}, err
+	)
+	if execErr != nil {
+		return CalibrationRecord{}, execErr
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr = c.Tx.Exec(
 		ctx,
 		`UPDATE devices.sensors SET calibrated_at = $2 WHERE id = $1`,
 		in.SensorID,
 		in.CalibratedAt,
-	); err != nil {
-		return CalibrationRecord{}, err
+	)
+	if execErr != nil {
+		return CalibrationRecord{}, execErr
 	}
 
 	v, err := bumpDevice(ctx, c, in.DeviceID)

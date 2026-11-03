@@ -128,7 +128,8 @@ func (Busy) ContractState(
 			id             uuid.UUID
 			isActive, open bool
 		)
-		if err := rows.Scan(&id, &isActive, &open); err != nil {
+		err := rows.Scan(&id, &isActive, &open)
+		if err != nil {
 			return nil, false, err
 		}
 
@@ -158,7 +159,8 @@ func (Busy) ForInvoice(ctx context.Context, c *ops.Call, invoice uuid.UUID) ([]u
 
 	for rows.Next() {
 		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
+		err := rows.Scan(&id)
+		if err != nil {
 			return nil, err
 		}
 
@@ -177,12 +179,13 @@ func (m Restrictions) OnInvoicePaid(
 ) ([]uuid.UUID, error) {
 	// the restrictions citing the invoice are locked first, in ID order, so the payments of their other cause invoices
 	// wait for each other: two at once each saw the other invoice still unpaid and both left the restriction (IR476)
-	if _, err := c.Tx.Exec(
+	_, err := c.Tx.Exec(
 		ctx,
 		`SELECT 1 FROM restrictions.restrictions r WHERE r.state IN ('scheduled','requested','applied')
 		AND EXISTS (SELECT 1 FROM restrictions.restriction_invoices ri WHERE ri.restriction_id = r.id AND ri.invoice_id = $1) ORDER BY r.id FOR UPDATE OF r`,
 		invoice,
-	); err != nil {
+	)
+	if err != nil {
 		return nil, err
 	}
 
@@ -204,15 +207,17 @@ func (m Restrictions) OnInvoicePaid(
 
 	for rows.Next() {
 		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
+		err := rows.Scan(&id)
+		if err != nil {
 			return nil, err
 		}
 
 		out = append(out, id)
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return nil, rowsErr
 	}
 
 	for _, id := range out {
@@ -225,11 +230,12 @@ func (m Restrictions) OnInvoicePaid(
 			},
 		)
 
-		if err := m.evaluateRelease(
+		err := m.evaluateRelease(
 			ctx,
 			c,
 			id,
-		); err != nil { // D03 release evaluation in the same transition (IR35 ①)
+		)
+		if err != nil { // D03 release evaluation in the same transition (IR35 ①)
 			return nil, err
 		}
 

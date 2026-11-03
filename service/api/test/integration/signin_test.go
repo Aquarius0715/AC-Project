@@ -28,13 +28,15 @@ func TestLastSignIn(t *testing.T) {
 
 	user := seed.ID("user-customer-a")
 	exec := func(sql string, args ...any) {
-		if _, err := owner.Exec(ctx, sql, args...); err != nil {
+		_, err := owner.Exec(ctx, sql, args...)
+		if err != nil {
 			t.Fatal(err)
 		}
 	}
 	read := func() (last, auth *time.Time) {
-		if err := owner.QueryRow(ctx, `SELECT last_sign_in_at, sign_in_auth_time FROM identity.users WHERE id = $1`, user).
-			Scan(&last, &auth); err != nil {
+		err := owner.QueryRow(ctx, `SELECT last_sign_in_at, sign_in_auth_time FROM identity.users WHERE id = $1`, user).
+			Scan(&last, &auth)
+		if err != nil {
 			t.Fatal(err)
 		}
 
@@ -78,7 +80,8 @@ func TestLastSignIn(t *testing.T) {
 		}
 	}
 
-	if at, err := time.Parse(time.RFC3339Nano, shown); err != nil || !at.Equal(*last) {
+	at, parseErr := time.Parse(time.RFC3339Nano, shown)
+	if parseErr != nil || !at.Equal(*last) {
 		t.Fatalf("Users list: %q, want %v", shown, last)
 	}
 

@@ -23,7 +23,8 @@ type notifyingRecorder struct {
 
 func (r notifyingRecorder) Record(ctx context.Context, tx pgx.Tx, c *ops.Call, op string) error {
 	if c.Principal != nil {
-		if err := r.dispatch(ctx, c, op); err != nil {
+		err := r.dispatch(ctx, c, op)
+		if err != nil {
 			return err
 		}
 	}
@@ -127,7 +128,7 @@ func (r notifyingRecorder) send(
 			continue
 		}
 
-		if _, err := r.store.Create(ctx, c, notify.New{
+		_, err := r.store.Create(ctx, c, notify.New{
 			RecipientMembershipID: id,
 			Type:                  template,
 			TemplateKey:           template,
@@ -135,7 +136,8 @@ func (r notifyingRecorder) send(
 			TargetID:              target,
 			Severity:              severity,
 			Params:                map[string]any{"status": status},
-		}); err != nil {
+		})
+		if err != nil {
 			return err
 		}
 	}
@@ -179,13 +181,15 @@ func (r notifyingRecorder) dispatch(ctx context.Context, c *ops.Call, op string)
 		switch a.TargetKind {
 		case "job":
 			if op == "jobs.reportProblem" { // the audit names the reported job; the request is the follow-up it created (IR438)
-				if err := c.Tx.QueryRow(ctx, `SELECT id FROM maintenance.jobs WHERE follow_up_of_job_id = $1 ORDER BY created_at DESC, id DESC LIMIT 1`, id).
-					Scan(&id); err != nil {
+				err := c.Tx.QueryRow(ctx, `SELECT id FROM maintenance.jobs WHERE follow_up_of_job_id = $1 ORDER BY created_at DESC, id DESC LIMIT 1`, id).
+					Scan(&id)
+				if err != nil {
 					return err
 				}
 			}
 
-			if err := r.job(ctx, c, op, id); err != nil {
+			err := r.job(ctx, c, op, id)
+			if err != nil {
 				return err
 			}
 		case "restriction":
@@ -193,7 +197,8 @@ func (r notifyingRecorder) dispatch(ctx context.Context, c *ops.Call, op string)
 				continue
 			}
 
-			if err := r.restriction(ctx, c, id); err != nil {
+			err := r.restriction(ctx, c, id)
+			if err != nil {
 				return err
 			}
 		}
@@ -206,9 +211,10 @@ func (r notifyingRecorder) dispatch(ctx context.Context, c *ops.Call, op string)
 		}
 
 		var org, invoice uuid.UUID
-		if err := c.Tx.QueryRow(ctx, `SELECT k.customer_org_id, i.id FROM billing.payments p JOIN billing.invoices i ON i.id = p.invoice_id
+		err := c.Tx.QueryRow(ctx, `SELECT k.customer_org_id, i.id FROM billing.payments p JOIN billing.invoices i ON i.id = p.invoice_id
 			JOIN billing.contracts k ON k.id = i.contract_id AND k.version = i.contract_version WHERE p.id = $1`, e.AggregateID).
-			Scan(&org, &invoice); err != nil {
+			Scan(&org, &invoice)
+		if err != nil {
 			return err
 		}
 
@@ -227,7 +233,7 @@ func (r notifyingRecorder) dispatch(ctx context.Context, c *ops.Call, op string)
 		set.add(cl...)
 		set.add(hq...)
 
-		if err := r.send(
+		sendErr := r.send(
 			ctx,
 			c,
 			set,
@@ -236,8 +242,9 @@ func (r notifyingRecorder) dispatch(ctx context.Context, c *ops.Call, op string)
 			invoice,
 			"normal",
 			"confirmed",
-		); err != nil {
-			return err
+		)
+		if sendErr != nil {
+			return sendErr
 		}
 	}
 
@@ -264,8 +271,9 @@ func (r notifyingRecorder) job(ctx context.Context, c *ops.Call, op string, job 
 
 	if event == "offered" { // the contractor of the latest open offer
 		var offered uuid.UUID
-		if err := c.Tx.QueryRow(ctx, `SELECT contractor_org_id FROM maintenance.offers WHERE job_id = $1 ORDER BY offered_at DESC, id DESC LIMIT 1`, job).
-			Scan(&offered); err == nil {
+		err := c.Tx.QueryRow(ctx, `SELECT contractor_org_id FROM maintenance.offers WHERE job_id = $1 ORDER BY offered_at DESC, id DESC LIMIT 1`, job).
+			Scan(&offered)
+		if err == nil {
 			contractor = &offered
 		}
 	}
@@ -324,7 +332,8 @@ func (r notifyingRecorder) job(ctx context.Context, c *ops.Call, op string, job 
 	}
 
 	for _, s := range steps {
-		if err := s(); err != nil {
+		err := s()
+		if err != nil {
 			return err
 		}
 	}
@@ -337,9 +346,10 @@ func (r notifyingRecorder) restriction(ctx context.Context, c *ops.Call, id uuid
 		state string
 		org   uuid.UUID
 	)
-	if err := c.Tx.QueryRow(ctx, `SELECT r.state, k.customer_org_id FROM restrictions.restrictions r
+	err := c.Tx.QueryRow(ctx, `SELECT r.state, k.customer_org_id FROM restrictions.restrictions r
 		JOIN billing.contracts k ON k.id = r.contract_id AND k.version = r.contract_version WHERE r.id = $1`, id).
-		Scan(&state, &org); err != nil {
+		Scan(&state, &org)
+	if err != nil {
 		return err
 	}
 

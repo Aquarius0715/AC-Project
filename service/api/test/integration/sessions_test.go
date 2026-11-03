@@ -379,7 +379,8 @@ func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
 			t.Fatalf("revoke: %d %v", code, m)
 		}
 
-		if err := s.DrainEvents(context.Background()); err != nil {
+		err := s.DrainEvents(context.Background())
+		if err != nil {
 			t.Fatalf("drain: %v", err)
 		}
 	}
@@ -390,7 +391,8 @@ func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
 		t.Errorf("ended at the identity provider: %v, want %s", got, user)
 	}
 
-	if err := s.DrainEvents(context.Background()); err != nil || len(idp.take()) != 0 {
+	err := s.DrainEvents(context.Background())
+	if err != nil || len(idp.take()) != 0 {
 		t.Errorf("the event was applied again: %v", err)
 	}
 
@@ -410,7 +412,8 @@ func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
 	}
 
 	idp.err = nil
-	if err := s.DrainEvents(context.Background()); err != nil || len(idp.take()) != 0 {
+	err = s.DrainEvents(context.Background())
+	if err != nil || len(idp.take()) != 0 {
 		t.Errorf("a failed provider call is retried and holds up the consumer: %v", err)
 	}
 
@@ -424,7 +427,8 @@ func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
 		uuid.New(),
 	)
 
-	if err := s.DrainEvents(context.Background()); err != nil || len(idp.take()) != 0 {
+	err = s.DrainEvents(context.Background())
+	if err != nil || len(idp.take()) != 0 {
 		t.Errorf("a user who is gone: %v", err)
 	}
 }

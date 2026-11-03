@@ -92,10 +92,15 @@ func resolveQr(
 	}
 
 	var unit uuid.UUID
-	if id, err := uuid.Parse(code); err == nil {
+	id, err := uuid.Parse(code)
+	if err == nil {
 		unit = id
-	} else if err := c.Tx.QueryRow(ctx, `SELECT unit_id FROM devices.devices WHERE upper(btrim(serial)) = upper($1) AND unit_id IS NOT NULL`, in.Code).Scan(&unit); err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return QrResolution{}, err
+	} else {
+		scanErr := c.Tx.QueryRow(ctx, `SELECT unit_id FROM devices.devices WHERE upper(btrim(serial)) = upper($1) AND unit_id IS NOT NULL`, in.Code).
+			Scan(&unit)
+		if scanErr != nil && !errors.Is(scanErr, pgx.ErrNoRows) {
+			return QrResolution{}, scanErr
+		}
 	}
 
 	nf := apperr.E(apperr.NotFound, "error.notFound")

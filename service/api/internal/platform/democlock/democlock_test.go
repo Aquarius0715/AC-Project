@@ -29,7 +29,8 @@ func scratch(t *testing.T) *pgxpool.Pool {
 
 	const name = "ac_democlock_test"
 	for _, q := range []string{"DROP DATABASE IF EXISTS " + name + " WITH (FORCE)", "CREATE DATABASE " + name} {
-		if _, err := ac.Exec(ctx, q); err != nil {
+		_, err := ac.Exec(ctx, q)
+		if err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -42,11 +43,12 @@ func scratch(t *testing.T) *pgxpool.Pool {
 		t.Fatal(err)
 	}
 
-	if _, err := p.Exec(
+	_, execErr := p.Exec(
 		ctx,
 		`CREATE SCHEMA platform; CREATE TABLE platform.demo_clock (id boolean PRIMARY KEY DEFAULT true CHECK (id), offset_ms bigint NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())`,
-	); err != nil {
-		t.Fatal(err)
+	)
+	if execErr != nil {
+		t.Fatal(execErr)
 	}
 
 	t.Cleanup(func() {
@@ -74,8 +76,9 @@ func TestSharedAcrossProcessesAndRestarts(t *testing.T) {
 		t.Fatalf("first open: %v, want %v", got, start)
 	}
 	// the API jumps forward; a worker that opens later with the same start keeps the stored offset
-	if err := api.Advance(ctx, 2*time.Hour); err != nil {
-		t.Fatal(err)
+	advanceErr := api.Advance(ctx, 2*time.Hour)
+	if advanceErr != nil {
+		t.Fatal(advanceErr)
 	}
 
 	worker, err := Open(ctx, p, base, start)
@@ -89,8 +92,9 @@ func TestSharedAcrossProcessesAndRestarts(t *testing.T) {
 	// wall time passes: both clocks run in real time and the worker picks up a later jump after refreshEvery
 	wall = wall.Add(10 * time.Second)
 
-	if err := api.Advance(ctx, time.Hour); err != nil {
-		t.Fatal(err)
+	advanceErr = api.Advance(ctx, time.Hour)
+	if advanceErr != nil {
+		t.Fatal(advanceErr)
 	}
 
 	want := start.Add(3*time.Hour + 10*time.Second)
@@ -122,8 +126,9 @@ func TestNowKeepsOffsetWhenDatabaseFails(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := p.Exec(ctx, `UPDATE platform.demo_clock SET offset_ms = 60000`); err != nil {
-		t.Fatal(err)
+	_, execErr := p.Exec(ctx, `UPDATE platform.demo_clock SET offset_ms = 60000`)
+	if execErr != nil {
+		t.Fatal(execErr)
 	}
 
 	p.Close()
@@ -145,8 +150,9 @@ func TestMissingRowKeepsOffset(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := p.Exec(ctx, `DELETE FROM platform.demo_clock`); err != nil {
-		t.Fatal(err)
+	_, execErr := p.Exec(ctx, `DELETE FROM platform.demo_clock`)
+	if execErr != nil {
+		t.Fatal(execErr)
 	}
 
 	wall = wall.Add(5 * time.Second)
@@ -156,14 +162,16 @@ func TestMissingRowKeepsOffset(t *testing.T) {
 }
 
 func TestStartFromEnv(t *testing.T) {
-	if s, err := StartFromEnv(
+	s, err := StartFromEnv(
 		func(string) string { return "" },
-	); err != nil ||
+	)
+	if err != nil ||
 		s.Format(time.RFC3339) != DefaultStart {
 		t.Fatalf("default = %v, %v", s, err)
 	}
 
-	if _, err := StartFromEnv(func(string) string { return "soon" }); err == nil {
+	_, err = StartFromEnv(func(string) string { return "soon" })
+	if err == nil {
 		t.Fatal("want parse error")
 	}
 }

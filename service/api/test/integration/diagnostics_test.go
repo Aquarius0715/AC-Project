@@ -25,18 +25,19 @@ func ackCommand(t *testing.T, id string, at time.Time) bool {
 
 	keepObserved(t, id)
 	// the gateway sends a requested command and reports it sent (command_sent) before the device answers
-	if _, err := conn.Exec(
+	_, execErr := conn.Exec(
 		ctx,
 		`UPDATE control.commands SET status = 'sent', delivery = 'sent', sent_at = $2 WHERE id = $1 AND status = 'requested'`,
 		uuid.MustParse(id),
 		at.Add(-time.Second),
-	); err != nil {
-		t.Fatal(err)
+	)
+	if execErr != nil {
+		t.Fatal(execErr)
 	}
 
 	var ok bool
 
-	if err := pgx.BeginFunc(
+	beginFuncErr := pgx.BeginFunc(
 		ctx,
 		conn,
 		func(tx pgx.Tx) error {
@@ -44,8 +45,9 @@ func ackCommand(t *testing.T, id string, at time.Time) bool {
 
 			return err
 		},
-	); err != nil {
-		t.Fatal(err)
+	)
+	if beginFuncErr != nil {
+		t.Fatal(beginFuncErr)
 	}
 
 	drainEvents(
@@ -172,7 +174,8 @@ func TestDiagnosticRuns(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	if _, err := schedTick(ctx, s, clock.Add(6*time.Minute)); err != nil {
+	_, err := schedTick(ctx, s, clock.Add(6*time.Minute))
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -201,11 +204,12 @@ func TestDiagnosticRuns(t *testing.T) {
 
 	r2 := data(m)["id"].(string)
 
-	if _, err := schedTick(
+	_, err = schedTick(
 		ctx,
 		s,
 		clock.Add(36*time.Second),
-	); err != nil { // 30 s window + the 5 s grace (IR453)
+	)
+	if err != nil { // 30 s window + the 5 s grace (IR453)
 		t.Fatal(err)
 	}
 
@@ -251,7 +255,8 @@ func TestDiagnosticRuns(t *testing.T) {
 		t.Errorf("start action prohibited or busy: %d", code)
 	}
 
-	if _, err := schedTick(ctx, s, clock.Add(2*time.Minute)); err != nil {
+	_, err = schedTick(ctx, s, clock.Add(2*time.Minute))
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -275,7 +280,8 @@ func TestDiagnosticRuns(t *testing.T) {
 	ackCommand(t, data(m)["startCommandId"].(string), clock.Add(time.Second))
 	owner(t, `UPDATE devices.devices SET connection = 'offline' WHERE unit_id = $1`, unit)
 
-	if _, err := schedTick(ctx, s, clock.Add(3*time.Minute)); err != nil {
+	_, err = schedTick(ctx, s, clock.Add(3*time.Minute))
+	if err != nil {
 		t.Fatal(err)
 	}
 

@@ -135,16 +135,18 @@ func (m Restrictions) except(
 	}
 
 	args = append([]any{x.ID, args[0], c.Now}, args[1:]...)
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE restrictions.restrictions SET `+set+`, version = version + 1 WHERE id = $1`,
-		args...); err != nil {
-		return x, err
+		args...)
+	if execErr != nil {
+		return x, execErr
 	}
 
 	next := x.Version + 1
 	if x.State == "requested" || x.State == "applied" {
-		if err := m.RequestRelease(ctx, c, x.ID, "exception"); err != nil {
+		err := m.RequestRelease(ctx, c, x.ID, "exception")
+		if err != nil {
 			return x, err
 		}
 
@@ -247,8 +249,9 @@ func (m Restrictions) release(
 		return x, apperr.E(apperr.Forbidden, "errors.restriction_release_unpaid")
 	}
 
-	if err := m.RequestRelease(ctx, c, x.ID, "manual"); err != nil {
-		return x, err
+	requestReleaseErr := m.RequestRelease(ctx, c, x.ID, "manual")
+	if requestReleaseErr != nil {
+		return x, requestReleaseErr
 	}
 
 	next := x.Version + 1
@@ -333,8 +336,9 @@ func (m Restrictions) override(
 		return ReleaseView{}, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 
-	if err := m.RequestRelease(ctx, c, x.ID, "override"); err != nil {
-		return ReleaseView{}, err
+	requestReleaseErr := m.RequestRelease(ctx, c, x.ID, "override")
+	if requestReleaseErr != nil {
+		return ReleaseView{}, requestReleaseErr
 	}
 
 	next := x.Version + 1
@@ -494,8 +498,9 @@ func (m Restrictions) reconcile(ctx context.Context, c *ops.Call, in *ReconcileI
 		}
 
 		var open bool
-		if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_commands WHERE restriction_id = $1 AND unit_id = $2 AND status = 'requested')`, x.ID, u.UnitID).
-			Scan(&open); err != nil {
+		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_commands WHERE restriction_id = $1 AND unit_id = $2 AND status = 'requested')`, x.ID, u.UnitID).
+			Scan(&open)
+		if err != nil {
 			return nil, err
 		}
 
@@ -546,7 +551,8 @@ func (m Restrictions) reconcile(ctx context.Context, c *ops.Call, in *ReconcileI
 				err = set(`apply_state = 'not_applied', observed_restriction = NULL`)
 			}
 		case *o.RestrictionID == x.ID && o.RulesVersion == x.RulesVersion:
-			if err = set(`apply_state = 'applied', observed_restriction = $4`, raw); err != nil {
+			err = set(`apply_state = 'applied', observed_restriction = $4`, raw)
+			if err != nil {
 				return nil, err
 			}
 
@@ -560,11 +566,12 @@ func (m Restrictions) reconcile(ctx context.Context, c *ops.Call, in *ReconcileI
 					return nil, apperr.E(apperr.Conflict, "errors.unit_busy")
 				}
 
-				if err := set(
+				setErr := set(
 					`release_state = 'requested', release_command_ids = release_command_ids || $4::uuid`,
 					cmd,
-				); err != nil { // was assigned and dropped (staticcheck SA4006)
-					return nil, err
+				)
+				if setErr != nil { // was assigned and dropped (staticcheck SA4006)
+					return nil, setErr
 				}
 			}
 		default:
@@ -576,19 +583,21 @@ func (m Restrictions) reconcile(ctx context.Context, c *ops.Call, in *ReconcileI
 		}
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE restrictions.restrictions r SET version = version + 1, updated_at = $2,
 		state = CASE WHEN r.state = 'requested' AND NOT EXISTS (SELECT 1 FROM restrictions.restriction_units ru WHERE ru.restriction_id = r.id AND ru.apply_state <> 'applied')
 			THEN 'applied' ELSE r.state END WHERE r.id = $1`,
 		x.ID,
 		c.Now,
-	); err != nil {
-		return nil, err
+	)
+	if execErr != nil {
+		return nil, execErr
 	}
 
-	if err := finishRelease(ctx, c.Tx, x.ID, c.Now); err != nil {
-		return nil, err
+	finishReleaseErr := finishRelease(ctx, c.Tx, x.ID, c.Now)
+	if finishReleaseErr != nil {
+		return nil, finishReleaseErr
 	}
 
 	next := x.Version + 1
@@ -730,8 +739,9 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, in *RetryInput) (a
 
 	for _, u := range targets {
 		var open bool
-		if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_commands WHERE restriction_id = $1 AND unit_id = $2 AND status = 'requested')`, x.ID, u.UnitID).
-			Scan(&open); err != nil {
+		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_commands WHERE restriction_id = $1 AND unit_id = $2 AND status = 'requested')`, x.ID, u.UnitID).
+			Scan(&open)
+		if err != nil {
 			return nil, err
 		}
 
@@ -755,7 +765,7 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, in *RetryInput) (a
 				state = "sent_unknown"
 			}
 
-			if _, err := c.Tx.Exec(
+			_, execErr := c.Tx.Exec(
 				ctx,
 				`UPDATE restrictions.restriction_units SET apply_state = $3, apply_command_ids = apply_command_ids || $4::uuid, pending_reason = $5
 				WHERE restriction_id = $1 AND unit_id = $2`,
@@ -764,8 +774,9 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, in *RetryInput) (a
 				state,
 				cmd,
 				reason,
-			); err != nil {
-				return nil, err
+			)
+			if execErr != nil {
+				return nil, execErr
 			}
 
 			changed = true
@@ -793,15 +804,16 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, in *RetryInput) (a
 			return nil, apperr.E(apperr.Offline, "errors.device_offline")
 		}
 
-		if _, err := c.Tx.Exec(
+		_, execErr := c.Tx.Exec(
 			ctx,
 			`UPDATE restrictions.restriction_units SET release_state = 'requested', release_command_ids = release_command_ids || $3::uuid, pending_reason = NULL
 			WHERE restriction_id = $1 AND unit_id = $2`,
 			x.ID,
 			u.UnitID,
 			cmd,
-		); err != nil {
-			return nil, err
+		)
+		if execErr != nil {
+			return nil, execErr
 		}
 
 		changed = true
@@ -811,13 +823,14 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, in *RetryInput) (a
 		return project(c, x), nil
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE restrictions.restrictions SET version = version + 1, updated_at = $2 WHERE id = $1`,
 		x.ID,
 		c.Now,
-	); err != nil {
-		return nil, err
+	)
+	if execErr != nil {
+		return nil, execErr
 	}
 
 	next := x.Version + 1

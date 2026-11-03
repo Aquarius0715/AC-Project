@@ -101,7 +101,8 @@ func From(err error) *DomainError {
 		return nil
 	}
 
-	if de, ok := errors.AsType[*DomainError](err); ok {
+	de, ok := errors.AsType[*DomainError](err)
+	if ok {
 		return de
 	}
 
@@ -113,7 +114,8 @@ func From(err error) *DomainError {
 		return caused(E(NotFound, "error.notFound"), err)
 	}
 
-	if pg, ok := errors.AsType[*pgconn.PgError](err); ok {
+	pg, ok := errors.AsType[*pgconn.PgError](err)
+	if ok {
 		switch pg.Code {
 		case "23514", "22P02", "22001", "22003", "22007", "22008":
 			return caused(E(Validation, "error.validation"), err)

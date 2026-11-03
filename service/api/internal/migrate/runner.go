@@ -90,8 +90,9 @@ func Load(fsys fs.FS) ([]Migration, error) {
 
 // Version returns the applied version (0 when nothing has run) and the dirty flag.
 func Version(ctx context.Context, conn *pgx.Conn) (int64, bool, error) {
-	if err := ensureTable(ctx, conn); err != nil {
-		return 0, false, err
+	ensureTableErr := ensureTable(ctx, conn)
+	if ensureTableErr != nil {
+		return 0, false, ensureTableErr
 	}
 
 	var (
@@ -110,7 +111,8 @@ func Version(ctx context.Context, conn *pgx.Conn) (int64, bool, error) {
 
 // Up applies every migration newer than the recorded version and returns the versions it applied.
 func Up(ctx context.Context, conn *pgx.Conn, ms []Migration) ([]int64, error) {
-	if _, err := conn.Exec(ctx, `SELECT pg_advisory_lock($1)`, lockKey); err != nil {
+	_, err := conn.Exec(ctx, `SELECT pg_advisory_lock($1)`, lockKey)
+	if err != nil {
 		return nil, err
 	}
 	defer conn.Exec(
@@ -130,8 +132,9 @@ func Up(ctx context.Context, conn *pgx.Conn, ms []Migration) ([]int64, error) {
 
 	if cur == 0 {
 		var exists bool
-		if err := conn.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'platform')`).
-			Scan(&exists); err != nil {
+		err := conn.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'platform')`).
+			Scan(&exists)
+		if err != nil {
 			return nil, err
 		}
 
@@ -147,7 +150,8 @@ func Up(ctx context.Context, conn *pgx.Conn, ms []Migration) ([]int64, error) {
 			continue
 		}
 
-		if err := apply(ctx, conn, m); err != nil {
+		err := apply(ctx, conn, m)
+		if err != nil {
 			return applied, fmt.Errorf("migrate: %06d_%s: %w", m.Version, m.Name, err)
 		}
 
@@ -159,7 +163,8 @@ func Up(ctx context.Context, conn *pgx.Conn, ms []Migration) ([]int64, error) {
 
 // Force records version as applied and clean without running SQL (golang-migrate "force").
 func Force(ctx context.Context, conn *pgx.Conn, version int64) error {
-	if err := ensureTable(ctx, conn); err != nil {
+	err := ensureTable(ctx, conn)
+	if err != nil {
 		return err
 	}
 
@@ -172,15 +177,17 @@ func Force(ctx context.Context, conn *pgx.Conn, version int64) error {
 
 func apply(ctx context.Context, conn *pgx.Conn, m Migration) error {
 	if m.NoTx() {
-		if err := pgx.BeginFunc(
+		err := pgx.BeginFunc(
 			ctx,
 			conn,
 			func(tx pgx.Tx) error { return setVersion(ctx, tx, m.Version, true) },
-		); err != nil {
+		)
+		if err != nil {
 			return err
 		}
 
-		if _, err := conn.Exec(ctx, m.SQL); err != nil {
+		_, err = conn.Exec(ctx, m.SQL)
+		if err != nil {
 			return err
 		}
 
@@ -192,7 +199,8 @@ func apply(ctx context.Context, conn *pgx.Conn, m Migration) error {
 	}
 
 	return pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, m.SQL); err != nil {
+		_, err := tx.Exec(ctx, m.SQL)
+		if err != nil {
 			return err
 		}
 
@@ -201,8 +209,9 @@ func apply(ctx context.Context, conn *pgx.Conn, m Migration) error {
 }
 
 func setVersion(ctx context.Context, tx pgx.Tx, v int64, dirty bool) error {
-	if _, err := tx.Exec(ctx, `DELETE FROM public.schema_migrations`); err != nil {
-		return err
+	_, execErr := tx.Exec(ctx, `DELETE FROM public.schema_migrations`)
+	if execErr != nil {
+		return execErr
 	}
 
 	_, err := tx.Exec(
@@ -229,16 +238,18 @@ func EnsureLogin(ctx context.Context, conn *pgx.Conn, login, password, group str
 	ident := pgx.Identifier{login}.Sanitize()
 
 	var exists bool
-	if err := conn.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = $1)`, login).
-		Scan(&exists); err != nil {
-		return err
+	scanErr := conn.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = $1)`, login).
+		Scan(&exists)
+	if scanErr != nil {
+		return scanErr
 	}
 
 	if !exists {
-		if _, err := conn.Exec(
+		_, err := conn.Exec(
 			ctx,
 			fmt.Sprintf(`CREATE ROLE %s LOGIN IN ROLE %s`, ident, pgx.Identifier{group}.Sanitize()),
-		); err != nil {
+		)
+		if err != nil {
 			return err
 		}
 	}

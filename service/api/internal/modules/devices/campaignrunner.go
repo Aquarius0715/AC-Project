@@ -229,7 +229,7 @@ func (m *Module) campaignNotices(ctx context.Context, c *ops.Call) (int, error) 
 			}
 
 			for _, r := range recipients {
-				if _, err := (notify.Store{}).Create(ctx, c, notify.New{
+				_, err := (notify.Store{}).Create(ctx, c, notify.New{
 					RecipientMembershipID: r,
 					Type:                  "device_operation",
 					TemplateKey:           "device_operation",
@@ -241,7 +241,8 @@ func (m *Module) campaignNotices(ctx context.Context, c *ops.Call) (int, error) 
 						"status":  "scheduled",
 						"message": message,
 					},
-				}); err != nil {
+				})
+				if err != nil {
 					return 0, err
 				}
 
@@ -249,13 +250,14 @@ func (m *Module) campaignNotices(ctx context.Context, c *ops.Call) (int, error) 
 			}
 		}
 
-		if _, err := c.Tx.Exec(
+		_, execErr := c.Tx.Exec(
 			ctx,
 			`UPDATE devices.firmware_campaigns SET notice_sent_at = $2 WHERE id = $1`,
 			d.id,
 			c.Now,
-		); err != nil {
-			return 0, err
+		)
+		if execErr != nil {
+			return 0, execErr
 		}
 
 		c.Audit(
@@ -293,7 +295,8 @@ func waveCounts(ctx context.Context, c *ops.Call, id uuid.UUID, waves int) ([]wa
 			w, k   int
 			result string
 		)
-		if err := rows.Scan(&w, &result, &k); err != nil {
+		err := rows.Scan(&w, &result, &k)
+		if err != nil {
 			return nil, err
 		}
 
@@ -317,14 +320,16 @@ func (m *Module) advanceCampaign(ctx context.Context, c *ops.Call, id uuid.UUID)
 		from, to, target string
 		autoPause        int
 	)
-	if err := c.Tx.QueryRow(ctx, `SELECT waves, model_id, to_char(window_start_local, 'HH24:MI'), to_char(window_end_local, 'HH24:MI'), target_version, auto_pause_failure_percent
+	err := c.Tx.QueryRow(ctx, `SELECT waves, model_id, to_char(window_start_local, 'HH24:MI'), to_char(window_end_local, 'HH24:MI'), target_version, auto_pause_failure_percent
 		FROM devices.firmware_campaigns WHERE id = $1`, id).
-		Scan(&raw, &model, &from, &to, &target, &autoPause); err != nil {
+		Scan(&raw, &model, &from, &to, &target, &autoPause)
+	if err != nil {
 		return 0, err
 	}
 
 	var waves []Wave
-	if err := json.Unmarshal(raw, &waves); err != nil {
+	err = json.Unmarshal(raw, &waves)
+	if err != nil {
 		return 0, err
 	}
 
@@ -359,7 +364,7 @@ func (m *Module) advanceCampaign(ctx context.Context, c *ops.Call, id uuid.UUID)
 
 	for _, f := range done {
 		result, key := outcome(f.status, f.code)
-		if _, err := c.Tx.Exec(
+		_, err := c.Tx.Exec(
 			ctx,
 			`UPDATE devices.firmware_campaign_devices SET result = $3, detail = NULLIF($4, ''), result_at = $5 WHERE campaign_id = $1 AND device_id = $2`,
 			id,
@@ -367,7 +372,8 @@ func (m *Module) advanceCampaign(ctx context.Context, c *ops.Call, id uuid.UUID)
 			result,
 			key,
 			f.at,
-		); err != nil {
+		)
+		if err != nil {
 			return 0, err
 		}
 
@@ -394,9 +400,10 @@ func (m *Module) advanceCampaign(ctx context.Context, c *ops.Call, id uuid.UUID)
 			)
 
 			var v int
-			if err := c.Tx.QueryRow(ctx, `UPDATE devices.firmware_campaigns SET state = 'paused', reason = $2, version = version + 1, updated_at = $3 WHERE id = $1 RETURNING version`,
+			err := c.Tx.QueryRow(ctx, `UPDATE devices.firmware_campaigns SET state = 'paused', reason = $2, version = version + 1, updated_at = $3 WHERE id = $1 RETURNING version`,
 				id, reason, c.Now).
-				Scan(&v); err != nil {
+				Scan(&v)
+			if err != nil {
 				return n, err
 			}
 
@@ -414,7 +421,8 @@ func (m *Module) advanceCampaign(ctx context.Context, c *ops.Call, id uuid.UUID)
 				return n, err
 			}
 
-			if counts, err = waveCounts(ctx, c, id, len(waves)); err != nil {
+			counts, err = waveCounts(ctx, c, id, len(waves))
+			if err != nil {
 				return n, err
 			}
 		}
@@ -431,10 +439,11 @@ func (m *Module) advanceCampaign(ctx context.Context, c *ops.Call, id uuid.UUID)
 	}
 
 	var v int
-	if err := c.Tx.QueryRow(ctx, `UPDATE devices.firmware_campaigns SET state = 'completed', version = version + 1, updated_at = $2 WHERE id = $1 RETURNING version`,
+	scanErr := c.Tx.QueryRow(ctx, `UPDATE devices.firmware_campaigns SET state = 'completed', version = version + 1, updated_at = $2 WHERE id = $1 RETURNING version`,
 		id, c.Now).
-		Scan(&v); err != nil {
-		return n, err
+		Scan(&v)
+	if scanErr != nil {
+		return n, scanErr
 	}
 
 	campaignChanged(c, id, "complete", "completed", v, "")
@@ -503,7 +512,8 @@ func (m *Module) dispatchWave(
 		case p.unit == nil:
 			key = "errors.device_unbound"
 		case p.fw == target:
-			if err := set(p.id, "succeeded", "", nil); err != nil {
+			err := set(p.id, "succeeded", "", nil)
+			if err != nil {
 				return 0, err
 			}
 
@@ -521,27 +531,32 @@ func (m *Module) dispatchWave(
 			}
 
 			var open bool // an operation of the device not finished yet, expired or not (one firmware operation per device)
-			if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE device_id = $1 AND status IN ('queued','running'))`, p.id).
-				Scan(&open); err != nil {
-				return 0, err
+			scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE device_id = $1 AND status IN ('queued','running'))`, p.id).
+				Scan(&open)
+			if scanErr != nil {
+				return 0, scanErr
 			}
 
 			if !ok || u.ModelID != model {
 				key = "errors.other_model"
 			} else if open {
 				key = "errors.device_busy"
-			} else if err := m.exclusive(ctx, c, *p.unit); err != nil {
-				var de *apperr.DomainError
-				if !errors.As(err, &de) || de.Code != apperr.Conflict {
-					return 0, err
-				}
+			} else {
+				err := m.exclusive(ctx, c, *p.unit)
+				if err != nil {
+					var de *apperr.DomainError
+					if !errors.As(err, &de) || de.Code != apperr.Conflict {
+						return 0, err
+					}
 
-				key = "errors.device_busy"
+					key = "errors.device_busy"
+				}
 			}
 		}
 
 		if key != "" {
-			if err := set(p.id, "skipped", key, nil); err != nil {
+			err := set(p.id, "skipped", key, nil)
+			if err != nil {
 				return 0, err
 			}
 
@@ -549,7 +564,7 @@ func (m *Module) dispatchWave(
 		}
 
 		op := uuid.Must(uuid.NewV7())
-		if _, err := c.Tx.Exec(
+		_, err := c.Tx.Exec(
 			ctx,
 			`INSERT INTO devices.device_operations (id, tenant_id, device_id, unit_id, kind, status, target_version, campaign_id, expires_at)
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, 'firmware', 'queued', $4, $5, $6)`,
@@ -559,11 +574,13 @@ func (m *Module) dispatchWave(
 			target,
 			id,
 			c.Now.Add(operationTTL),
-		); err != nil {
+		)
+		if err != nil {
 			return 0, err
 		}
 
-		if err := set(p.id, "installing", "", &op); err != nil {
+		err = set(p.id, "installing", "", &op)
+		if err != nil {
 			return 0, err
 		}
 

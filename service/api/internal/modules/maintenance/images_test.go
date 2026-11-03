@@ -15,7 +15,8 @@ func tinyPNG(t *testing.T) []byte {
 	t.Helper()
 
 	var b bytes.Buffer
-	if err := png.Encode(&b, image.NewGray(image.Rect(0, 0, 1, 1))); err != nil {
+	err := png.Encode(&b, image.NewGray(image.Rect(0, 0, 1, 1)))
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -26,7 +27,8 @@ func tinyJPEG(t *testing.T) []byte {
 	t.Helper()
 
 	var b bytes.Buffer
-	if err := jpeg.Encode(&b, image.NewGray(image.Rect(0, 0, 1, 1)), nil); err != nil {
+	err := jpeg.Encode(&b, image.NewGray(image.Rect(0, 0, 1, 1)), nil)
+	if err != nil {
 		t.Fatal(err)
 	}
 

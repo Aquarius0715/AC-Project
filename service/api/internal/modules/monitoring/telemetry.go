@@ -255,15 +255,19 @@ func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (Ai
 	units := in.UnitIDs
 	if in.SpaceID != nil {
 		var err error
-		if units, err = m.Units.UnitsInSpace(ctx, c, *in.SpaceID); err != nil {
+		units, err = m.Units.UnitsInSpace(ctx, c, *in.SpaceID)
+		if err != nil {
 			return AirSeries{}, err
 		}
 
 		if len(units) == 0 {
 			return AirSeries{}, apperr.E(apperr.NotFound, "error.notFound")
 		}
-	} else if err := m.readableUnits(ctx, c, units); err != nil {
-		return AirSeries{}, err
+	} else {
+		err := m.readableUnits(ctx, c, units)
+		if err != nil {
+			return AirSeries{}, err
+		}
 	}
 
 	if in.Query.Sort != nil && in.Query.Sort.Field != "observedAt" {
@@ -294,9 +298,10 @@ func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (Ai
 	}
 
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM monitoring.measurements m WHERE "+where, args...).
-		Scan(&total); err != nil {
-		return AirSeries{}, err
+	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM monitoring.measurements m WHERE "+where, args...).
+		Scan(&total)
+	if scanErr != nil {
+		return AirSeries{}, scanErr
 	}
 
 	if in.BucketMinutes != nil { // the whole period in averages, every bucket present (IR605)
@@ -362,8 +367,9 @@ func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (Ai
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return AirSeries{}, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return AirSeries{}, rowsErr
 	}
 
 	out := AirSeries{
@@ -409,7 +415,8 @@ func bucketed(
 
 	for rows.Next() {
 		var b SeriesBucket
-		if err := rows.Scan(&b.Start, &b.Value, &b.Count); err != nil {
+		err := rows.Scan(&b.Start, &b.Value, &b.Count)
+		if err != nil {
 			rows.Close()
 
 			return nil, err
@@ -420,8 +427,9 @@ func bucketed(
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return nil, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return nil, rowsErr
 	}
 
 	out := []SeriesBucket{}
@@ -523,7 +531,8 @@ func (m Telemetry) summary(
 	c *ops.Call,
 	in *SummaryInput,
 ) (TelemetrySummary, error) {
-	if err := m.readableUnits(ctx, c, in.UnitIDs); err != nil {
+	err := m.readableUnits(ctx, c, in.UnitIDs)
+	if err != nil {
 		return TelemetrySummary{}, err
 	}
 
@@ -804,7 +813,8 @@ func (m Telemetry) list(
 		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
 		dec.DisallowUnknownFields()
 
-		if err := dec.Decode(&f); err != nil {
+		err := dec.Decode(&f)
+		if err != nil {
 			return paging.Page[VentilationLog]{}, apperr.Fields(
 				map[string]string{"filters": "error.invalid"},
 			)
@@ -889,9 +899,10 @@ func (m Telemetry) list(
 	}
 
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM monitoring.ventilation_logs v WHERE "+where, args...).
-		Scan(&total); err != nil {
-		return paging.Page[VentilationLog]{}, err
+	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM monitoring.ventilation_logs v WHERE "+where, args...).
+		Scan(&total)
+	if scanErr != nil {
+		return paging.Page[VentilationLog]{}, scanErr
 	}
 
 	rows, err := c.Tx.Query(
@@ -983,7 +994,8 @@ func (m Telemetry) PowerMeasured(
 			origin, quality string
 			value           *float64
 		)
-		if err := rows.Scan(&r.unit, &r.sensor, &origin, &quality, &value, &r.at); err != nil {
+		err := rows.Scan(&r.unit, &r.sensor, &origin, &quality, &value, &r.at)
+		if err != nil {
 			rows.Close()
 
 			return nil, err
@@ -995,8 +1007,9 @@ func (m Telemetry) PowerMeasured(
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return nil, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return nil, rowsErr
 	}
 
 	limits, err := m.Sensors.StaleAfter(ctx, c, sensors)
@@ -1073,8 +1086,9 @@ func (m Telemetry) LatestMeasurements(
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return nil, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return nil, rowsErr
 	}
 
 	limits, err := m.Sensors.StaleAfter(ctx, c, sensors)
@@ -1137,7 +1151,8 @@ func (m Telemetry) RunHours(
 			v               *float64
 			origin, quality string
 		)
-		if err := rows.Scan(&x.sensor, &x.at, &v, &origin, &quality); err != nil {
+		err := rows.Scan(&x.sensor, &x.at, &v, &origin, &quality)
+		if err != nil {
 			rows.Close()
 
 			return nil, err
@@ -1149,8 +1164,9 @@ func (m Telemetry) RunHours(
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil || len(rs) == 0 {
-		return nil, err
+	rowsErr := rows.Err()
+	if rowsErr != nil || len(rs) == 0 {
+		return nil, rowsErr
 	}
 
 	limits, err := m.Sensors.StaleAfter(ctx, c, sensors)

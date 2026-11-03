@@ -150,14 +150,15 @@ func runMail(ctx context.Context) {
 	defer t.Stop()
 
 	for {
-		if n, err := notify.DeliverAll(
+		n, err := notify.DeliverAll(
 			ctx,
 			srv.DB,
 			sender,
 			apps,
 			srv.Registry.Clock(),
 			50,
-		); err != nil {
+		)
+		if err != nil {
 			log.Printf("notification worker: %v", err)
 		} else if n > 0 {
 			log.Printf("notification worker: %d e-mail(s) sent", n)
@@ -202,7 +203,8 @@ func runHousekeeping(ctx context.Context) {
 
 	for {
 		now := srv.Registry.Clock()
-		if s, err := events.Housekeep(ctx, srv.DB, now, srv.Consumers); err != nil {
+		s, err := events.Housekeep(ctx, srv.DB, now, srv.Consumers)
+		if err != nil {
 			log.Printf("housekeeping: %v", err)
 		} else {
 			log.Printf(
@@ -214,11 +216,12 @@ func runHousekeeping(ctx context.Context) {
 			)
 		}
 
-		if n, err := notify.SweepAll(
+		n, err := notify.SweepAll(
 			ctx,
 			srv.DB,
 			now,
-		); err != nil { // notifications and sent e-mails older than 2 years
+		)
+		if err != nil { // notifications and sent e-mails older than 2 years
 			log.Printf("housekeeping: notifications: %v", err)
 		} else if n > 0 {
 			log.Printf(

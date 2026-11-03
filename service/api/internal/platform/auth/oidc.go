@@ -101,7 +101,8 @@ func accessToken(c jwt.MapClaims) bool {
 // audienceOK accepts `aud` or Keycloak/Cognito `azp` / `client_id` matching an allowed client.
 func audienceOK(c jwt.MapClaims, allowed []string) bool {
 	var got []string
-	if aud, err := c.GetAudience(); err == nil {
+	aud, err := c.GetAudience()
+	if err == nil {
 		got = append(got, aud...)
 	}
 

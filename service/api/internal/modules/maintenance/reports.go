@@ -236,7 +236,8 @@ func scanReport(r pgx.Row) (Report, error) {
 		dst any
 	}{{items, &x.Items}, {meas, &x.Measurements}, {parts, &x.Parts}, {refr, &x.Refrigerant}} {
 		if len(p.raw) > 0 {
-			if err := json.Unmarshal(p.raw, p.dst); err != nil {
+			err := json.Unmarshal(p.raw, p.dst)
+			if err != nil {
 				return x, err
 			}
 		}
@@ -244,7 +245,8 @@ func scanReport(r pgx.Row) (Report, error) {
 
 	if len(next) > 0 && string(next) != "null" {
 		x.NextAction = &NextAction{}
-		if err := json.Unmarshal(next, x.NextAction); err != nil {
+		err := json.Unmarshal(next, x.NextAction)
+		if err != nil {
 			return x, err
 		}
 	}
@@ -272,7 +274,7 @@ func (m Reports) decorate(ctx context.Context, c *ops.Call, x *Report) error {
 
 	for rows.Next() {
 		var a AttachmentRef
-		if err := rows.Scan(
+		err := rows.Scan(
 			&a.ID,
 			&a.TenantID,
 			&a.CreatedAt,
@@ -282,7 +284,8 @@ func (m Reports) decorate(ctx context.Context, c *ops.Call, x *Report) error {
 			&a.Mime,
 			&a.Size,
 			&a.Status,
-		); err != nil {
+		)
+		if err != nil {
 			rows.Close()
 
 			return err
@@ -294,8 +297,9 @@ func (m Reports) decorate(ctx context.Context, c *ops.Call, x *Report) error {
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return rowsErr
 	}
 
 	rows, err = c.Tx.Query(
@@ -311,13 +315,14 @@ func (m Reports) decorate(ctx context.Context, c *ops.Call, x *Report) error {
 
 	for rows.Next() {
 		var r Review
-		if err := rows.Scan(
+		err := rows.Scan(
 			&r.ReviewerUserID,
 			&r.ReportVersion,
 			&r.Decision,
 			&r.Reason,
 			&r.OccurredAt,
-		); err != nil {
+		)
+		if err != nil {
 			rows.Close()
 
 			return err
@@ -328,14 +333,16 @@ func (m Reports) decorate(ctx context.Context, c *ops.Call, x *Report) error {
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return err
+	rowsErr = rows.Err()
+	if rowsErr != nil {
+		return rowsErr
 	}
 
 	var latest int
-	if err := c.Tx.QueryRow(ctx, `SELECT max(version) FROM maintenance.work_reports WHERE id = $1`, x.ID).
-		Scan(&latest); err != nil {
-		return err
+	scanErr := c.Tx.QueryRow(ctx, `SELECT max(version) FROM maintenance.work_reports WHERE id = $1`, x.ID).
+		Scan(&latest)
+	if scanErr != nil {
+		return scanErr
 	}
 
 	reason := any(nil)
@@ -561,8 +568,9 @@ func (m Reports) saveDraft(ctx context.Context, c *ops.Call, in *DraftInput) (Re
 		return Report{}, err
 	}
 
-	if err := m.Access.TechnicianJob(ctx, c, in.JobID, unit); err != nil {
-		return Report{}, err
+	technicianJobErr := m.Access.TechnicianJob(ctx, c, in.JobID, unit)
+	if technicianJobErr != nil {
+		return Report{}, technicianJobErr
 	}
 
 	if status != "in_progress" {
@@ -579,8 +587,9 @@ func (m Reports) saveDraft(ctx context.Context, c *ops.Call, in *DraftInput) (Re
 	switch {
 	case in.ReportID == nil:
 		var n int
-		if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM maintenance.work_reports WHERE job_id = $1`, in.JobID).
-			Scan(&n); err != nil {
+		err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM maintenance.work_reports WHERE job_id = $1`, in.JobID).
+			Scan(&n)
+		if err != nil {
 			return Report{}, err
 		}
 
@@ -610,7 +619,8 @@ func (m Reports) saveDraft(ctx context.Context, c *ops.Call, in *DraftInput) (Re
 
 	for rows.Next() {
 		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
+		err := rows.Scan(&id)
+		if err != nil {
 			rows.Close()
 
 			return Report{}, err
@@ -621,8 +631,9 @@ func (m Reports) saveDraft(ctx context.Context, c *ops.Call, in *DraftInput) (Re
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return Report{}, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return Report{}, rowsErr
 	}
 
 	for _, id := range in.AttachmentIDs {
@@ -780,22 +791,24 @@ func (m Reports) saveDraft(ctx context.Context, c *ops.Call, in *DraftInput) (Re
 		return Report{}, err
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.attachments SET report_id = $2 WHERE id = ANY($1)`,
 		in.AttachmentIDs,
 		prev.ID,
-	); err != nil {
-		return Report{}, err
+	)
+	if execErr != nil {
+		return Report{}, execErr
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr = c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.jobs SET draft_report_version = $2 WHERE id = $1`,
 		in.JobID,
 		prev.Version+1,
-	); err != nil {
-		return Report{}, err
+	)
+	if execErr != nil {
+		return Report{}, execErr
 	}
 
 	x, err := m.load(ctx, c, prev.ID, prev.Version+1)
@@ -894,7 +907,8 @@ func (m Reports) lockJob(
 	}
 
 	if c.Principal.Role == "technician" {
-		if err := m.Access.TechnicianJob(ctx, c, id, unit); err != nil {
+		err := m.Access.TechnicianJob(ctx, c, id, unit)
+		if err != nil {
 			return "", unit, err
 		}
 	}
@@ -954,8 +968,9 @@ func (m Reports) submitJob(ctx context.Context, c *ops.Call, in *SubmitInput) (J
 		return Job{}, apperr.E(apperr.Conflict, "errors.report_version_changed")
 	}
 
-	if err := m.decorate(ctx, c, draft); err != nil {
-		return Job{}, err
+	decorateErr := m.decorate(ctx, c, draft)
+	if decorateErr != nil {
+		return Job{}, decorateErr
 	}
 
 	_, _, scope, err := m.Units.UnitService(ctx, c, unit)
@@ -967,20 +982,22 @@ func (m Reports) submitJob(ctx context.Context, c *ops.Call, in *SubmitInput) (J
 		return Job{}, apperr.Fields(fe)
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.work_reports SET state = 'submitted', submitted_at = $3, updated_at = $3 WHERE id = $1 AND version = $2`,
 		draft.ID,
 		draft.Version,
 		c.Now,
-	); err != nil {
-		return Job{}, err
+	)
+	if execErr != nil {
+		return Job{}, execErr
 	}
 
 	var raw []byte
-	if err := c.Tx.QueryRow(ctx, `SELECT time_on_site FROM maintenance.jobs WHERE id = $1`, in.JobID).
-		Scan(&raw); err != nil {
-		return Job{}, err
+	scanErr := c.Tx.QueryRow(ctx, `SELECT time_on_site FROM maintenance.jobs WHERE id = $1`, in.JobID).
+		Scan(&raw)
+	if scanErr != nil {
+		return Job{}, scanErr
 	}
 
 	t := TimeOnSite{Pauses: []Pause{}}
@@ -1006,25 +1023,27 @@ func (m Reports) submitJob(ctx context.Context, c *ops.Call, in *SubmitInput) (J
 	}
 
 	tos, _ := json.Marshal(t)
-	if _, err := c.Tx.Exec(
+	_, execErr = c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.jobs SET status = 'submitted', time_on_site = $2, draft_report_version = NULL, version = version + 1, updated_at = platform.app_now()
 		WHERE id = $1`,
 		in.JobID,
 		tos,
-	); err != nil {
-		return Job{}, err
+	)
+	if execErr != nil {
+		return Job{}, execErr
 	}
 
-	if err := m.reportEvent(
+	reportEventErr := m.reportEvent(
 		ctx,
 		c,
 		in.JobID,
 		"job.submitted",
 		draft.ID,
 		draft.Version,
-	); err != nil {
-		return Job{}, err
+	)
+	if reportEventErr != nil {
+		return Job{}, reportEventErr
 	}
 
 	return m.Jobs.finishScoped(ctx, c, in.JobID, "jobs.submit", "ReportSubmitted", "")
@@ -1067,7 +1086,8 @@ func offWork(
 			action string
 			at     time.Time
 		)
-		if err := rows.Scan(&action, &at); err != nil {
+		err := rows.Scan(&action, &at)
+		if err != nil {
 			return nil, err
 		}
 
@@ -1274,8 +1294,9 @@ func (m Reports) review(ctx context.Context, c *ops.Call, in *ReviewInput) (Main
 // reviewJob is review answering the job with its detail extras.
 func (m Reports) reviewJob(ctx context.Context, c *ops.Call, in *ReviewInput) (Job, error) {
 	var contractor *uuid.UUID
-	if err := c.Tx.QueryRow(ctx, `SELECT contractor_org_id FROM maintenance.jobs WHERE id = $1`, in.JobID).
-		Scan(&contractor); err != nil {
+	err := c.Tx.QueryRow(ctx, `SELECT contractor_org_id FROM maintenance.jobs WHERE id = $1`, in.JobID).
+		Scan(&contractor)
+	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Job{}, apperr.E(apperr.NotFound, "error.notFound")
 		}
@@ -1320,9 +1341,10 @@ func (m Reports) reviewJob(ctx context.Context, c *ops.Call, in *ReviewInput) (J
 	}
 
 	var latest int
-	if err := c.Tx.QueryRow(ctx, `SELECT max(version) FROM maintenance.work_reports WHERE id = $1`, id).
-		Scan(&latest); err != nil {
-		return Job{}, err
+	scanErr := c.Tx.QueryRow(ctx, `SELECT max(version) FROM maintenance.work_reports WHERE id = $1`, id).
+		Scan(&latest)
+	if scanErr != nil {
+		return Job{}, scanErr
 	}
 
 	if latest != in.ReportVersion || state != "submitted" {
@@ -1338,7 +1360,7 @@ func (m Reports) reviewJob(ctx context.Context, c *ops.Call, in *ReviewInput) (J
 		reportState, jobStatus = "returned", "rework_requested"
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.work_reports SET state = $3, accepted_at = CASE WHEN $3 = 'accepted' THEN $4::timestamptz END, updated_at = $4
 		WHERE id = $1 AND version = $2`,
@@ -1346,11 +1368,12 @@ func (m Reports) reviewJob(ctx context.Context, c *ops.Call, in *ReviewInput) (J
 		latest,
 		reportState,
 		c.Now,
-	); err != nil {
-		return Job{}, err
+	)
+	if execErr != nil {
+		return Job{}, execErr
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr = c.Tx.Exec(
 		ctx,
 		`INSERT INTO maintenance.report_reviews (tenant_id, report_id, report_version, reviewer_user_id, decision, reason, occurred_at)
 		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6)`,
@@ -1360,29 +1383,33 @@ func (m Reports) reviewJob(ctx context.Context, c *ops.Call, in *ReviewInput) (J
 		in.Decision,
 		in.Reason,
 		c.Now,
-	); err != nil {
-		return Job{}, err
+	)
+	if execErr != nil {
+		return Job{}, execErr
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr = c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.jobs SET status = $2, completed_at = CASE WHEN $2 = 'completed' THEN $3::timestamptz ELSE completed_at END,
 		version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
 		in.JobID,
 		jobStatus,
 		c.Now,
-	); err != nil {
-		return Job{}, err
+	)
+	if execErr != nil {
+		return Job{}, execErr
 	}
 
 	if jobStatus == "completed" { // DEC-73 / IR234: completion releases the assignment; a return keeps it for the rework
-		if err := ReleaseOnCompletion(ctx, c.Tx, in.JobID, c.Now); err != nil {
+		err := ReleaseOnCompletion(ctx, c.Tx, in.JobID, c.Now)
+		if err != nil {
 			return Job{}, err
 		}
 	}
 
-	if err := m.reportEvent(ctx, c, in.JobID, "job.reviewed", id, latest); err != nil {
-		return Job{}, err
+	reportEventErr := m.reportEvent(ctx, c, in.JobID, "job.reviewed", id, latest)
+	if reportEventErr != nil {
+		return Job{}, reportEventErr
 	}
 
 	return m.Jobs.finishScoped(ctx, c, in.JobID, "jobs.review", "ReportReviewed", deref(in.Reason))
@@ -1458,20 +1485,23 @@ func (m Reports) resumeReworkJob(ctx context.Context, c *ops.Call, in *JobIDInpu
 		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
 	}
 
-	if err := NewDraftFromLatest(ctx, c, in.JobID); err != nil {
-		return Job{}, err
+	newDraftFromLatestErr := NewDraftFromLatest(ctx, c, in.JobID)
+	if newDraftFromLatestErr != nil {
+		return Job{}, newDraftFromLatestErr
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.jobs SET status = 'in_progress', version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
 		in.JobID,
-	); err != nil {
-		return Job{}, err
+	)
+	if execErr != nil {
+		return Job{}, execErr
 	}
 
-	if err := m.Jobs.event(ctx, c, in.JobID, "job.rework_started", nil); err != nil {
-		return Job{}, err
+	eventErr := m.Jobs.event(ctx, c, in.JobID, "job.rework_started", nil)
+	if eventErr != nil {
+		return Job{}, eventErr
 	}
 
 	return m.Jobs.finishScoped(ctx, c, in.JobID, "jobs.resumeRework", "ReworkStarted", "")
@@ -1564,7 +1594,8 @@ func (m Reports) get(ctx context.Context, c *ops.Call, in *GetReportInput) (Repo
 			return Report{}, nf
 		}
 	case "technician":
-		if err := m.Access.TechnicianJob(ctx, c, in.JobID, unit); err != nil {
+		err := m.Access.TechnicianJob(ctx, c, in.JobID, unit)
+		if err != nil {
 			return Report{}, err
 		}
 	}

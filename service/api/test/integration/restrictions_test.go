@@ -164,7 +164,7 @@ func expireAt(t *testing.T, now time.Time) {
 	}
 	defer conn.Close(ctx)
 
-	if err := pgx.BeginFunc(
+	beginFuncErr := pgx.BeginFunc(
 		ctx,
 		conn,
 		func(tx pgx.Tx) error {
@@ -172,8 +172,9 @@ func expireAt(t *testing.T, now time.Time) {
 
 			return err
 		},
-	); err != nil {
-		t.Fatal(err)
+	)
+	if beginFuncErr != nil {
+		t.Fatal(beginFuncErr)
 	}
 
 	drainEvents(
@@ -1652,8 +1653,9 @@ func TestRestrictionAppliedWhenTwoUnitsAnswerAtOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := restrictions.CommandAcknowledged(ctx, tx1, applies[0], at); err != nil {
-		t.Fatal(err)
+	commandAcknowledgedErr := restrictions.CommandAcknowledged(ctx, tx1, applies[0], at)
+	if commandAcknowledgedErr != nil {
+		t.Fatal(commandAcknowledgedErr)
 	}
 
 	second := make(chan error, 1)
@@ -1661,7 +1663,8 @@ func TestRestrictionAppliedWhenTwoUnitsAnswerAtOnce(t *testing.T) {
 	go func() { // starts while the first answer is still open, and waits for it
 		tx2, err := c2.Begin(ctx)
 		if err == nil {
-			if err = restrictions.CommandAcknowledged(ctx, tx2, applies[1], at); err == nil {
+			err = restrictions.CommandAcknowledged(ctx, tx2, applies[1], at)
+			if err == nil {
 				err = tx2.Commit(ctx)
 			}
 		}
@@ -1671,12 +1674,14 @@ func TestRestrictionAppliedWhenTwoUnitsAnswerAtOnce(t *testing.T) {
 
 	time.Sleep(300 * time.Millisecond)
 
-	if err := tx1.Commit(ctx); err != nil {
-		t.Fatal(err)
+	commitErr := tx1.Commit(ctx)
+	if commitErr != nil {
+		t.Fatal(commitErr)
 	}
 
-	if err := <-second; err != nil {
-		t.Fatal(err)
+	opErr := <-second
+	if opErr != nil {
+		t.Fatal(opErr)
 	}
 
 	var state string

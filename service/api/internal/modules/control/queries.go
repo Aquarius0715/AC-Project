@@ -66,7 +66,8 @@ func requested(ctx context.Context, c *ops.Call, in *RequestedInput) ([]Requeste
 			x      Requested
 			action []byte
 		)
-		if err := rows.Scan(&x.ID, &x.DeviceID, &x.UnitID, &action, &x.ExpiresAt); err != nil {
+		err := rows.Scan(&x.ID, &x.DeviceID, &x.UnitID, &action, &x.ExpiresAt)
+		if err != nil {
 			return nil, err
 		}
 

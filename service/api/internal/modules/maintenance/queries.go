@@ -65,7 +65,8 @@ func statusCounts(ctx context.Context, c *ops.Call, in *StatusCountsInput) (map[
 			s string
 			k int
 		)
-		if err := rows.Scan(&s, &k); err != nil {
+		err := rows.Scan(&s, &k)
+		if err != nil {
 			return nil, err
 		}
 

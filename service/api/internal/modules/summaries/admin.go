@@ -208,8 +208,9 @@ func (m Summaries) admin(ctx context.Context, c *ops.Call, in *AdminInput) (Admi
 	}
 
 	if len(active) > 0 {
-		if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM assets.customers cu WHERE cu.organization_id = ANY("+cadd(active)+") AND "+strings.Join(cconds, " AND "), cargs...).
-			Scan(&out.CustomerCount); err != nil {
+		err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM assets.customers cu WHERE cu.organization_id = ANY("+cadd(active)+") AND "+strings.Join(cconds, " AND "), cargs...).
+			Scan(&out.CustomerCount)
+		if err != nil {
 			return out, err
 		}
 	}

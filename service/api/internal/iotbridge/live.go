@@ -64,7 +64,8 @@ func LiveTriggers(node string, payload []byte, at time.Time) ([]Trigger, error) 
 	}
 
 	var msg map[string]any
-	if err := json.Unmarshal(payload, &msg); err != nil {
+	err := json.Unmarshal(payload, &msg)
+	if err != nil {
 		return nil, fmt.Errorf("node %s: %w", node, err)
 	}
 
@@ -364,8 +365,9 @@ func LiveCommand(
 		Kind  string `json:"kind"`
 		Power *bool  `json:"power"`
 	}
-	if err := json.Unmarshal(action, &a); err != nil {
-		return "", nil, false, fmt.Errorf("live command action: %w", err)
+	unmarshalErr := json.Unmarshal(action, &a)
+	if unmarshalErr != nil {
+		return "", nil, false, fmt.Errorf("live command action: %w", unmarshalErr)
 	}
 
 	if a.Kind != "set_power" || a.Power == nil {

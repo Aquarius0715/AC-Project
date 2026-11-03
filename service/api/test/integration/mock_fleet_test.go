@@ -36,17 +36,20 @@ func TestMockFleetSeeds(t *testing.T) {
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck // the test never commits
 
-	if n, err := seed.ApplyFleet(ctx, tx, fleet, clock); err != nil || n != len(fleet.Patterns) {
-		t.Fatalf("apply: %d units, err %v", n, err)
+	n, applyFleetErr := seed.ApplyFleet(ctx, tx, fleet, clock)
+	if applyFleetErr != nil || n != len(fleet.Patterns) {
+		t.Fatalf("apply: %d units, err %v", n, applyFleetErr)
 	}
 
-	if n, err := seed.ApplyFleet(ctx, tx, fleet, clock); err != nil || n != len(fleet.Patterns) {
-		t.Fatalf("second apply: %d, err %v", n, err)
+	n, applyFleetErr = seed.ApplyFleet(ctx, tx, fleet, clock)
+	if applyFleetErr != nil || n != len(fleet.Patterns) {
+		t.Fatalf("second apply: %d, err %v", n, applyFleetErr)
 	}
 
 	count := func(sql string, args ...any) int {
 		var n int
-		if err := tx.QueryRow(ctx, sql, args...).Scan(&n); err != nil {
+		err := tx.QueryRow(ctx, sql, args...).Scan(&n)
+		if err != nil {
 			t.Fatal(err)
 		}
 
@@ -84,8 +87,9 @@ func TestMockFleetSeeds(t *testing.T) {
 		modules++
 
 		var conn, power, tamper, firmware string
-		if err := tx.QueryRow(ctx, `SELECT connection, power_signal, tamper, firmware_version FROM devices.devices WHERE id = $1`, seed.ID(devicesim.DeviceName(p))).
-			Scan(&conn, &power, &tamper, &firmware); err != nil {
+		err := tx.QueryRow(ctx, `SELECT connection, power_signal, tamper, firmware_version FROM devices.devices WHERE id = $1`, seed.ID(devicesim.DeviceName(p))).
+			Scan(&conn, &power, &tamper, &firmware)
+		if err != nil {
 			t.Fatalf("%s module: %v", p.Key, err)
 		}
 
@@ -168,34 +172,39 @@ func TestMockFleetHistory(t *testing.T) {
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck // the test never commits
 
-	if _, err := seed.ApplyFleet(ctx, tx, fleet, clock); err != nil {
-		t.Fatal(err)
+	_, applyFleetErr := seed.ApplyFleet(ctx, tx, fleet, clock)
+	if applyFleetErr != nil {
+		t.Fatal(applyFleetErr)
 	}
 
 	until := time.Date(2026, 9, 14, 6, 0, 0, 0, time.UTC) // 14:00 in Kuala Lumpur, a Monday
-	if _, err := seed.ApplyFleetHistory(ctx, tx, fleet, until, 36); err == nil {
+	_, applyFleetHistoryErr := seed.ApplyFleetHistory(ctx, tx, fleet, until, 36)
+	if applyFleetHistoryErr == nil {
 		t.Error("36 days of history are accepted")
 	}
 	// a live reading the simulator already sent half an hour before until: history leaves that minute alone
 	live := until.Add(-30 * time.Minute)
-	if _, err := tx.Exec(
+	_, execErr := tx.Exec(
 		ctx,
 		`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit, origin, quality, received_at, event_id)
 		SELECT u.tenant_id, u.id, $2, 'power', $3, 1, 1.5, 'kW', 'measured', 'valid', $3, gen_random_uuid() FROM assets.units u WHERE u.id = $1`,
 		seed.ID("unit-mock-cool-on"),
 		seed.ID("sensor-mock-cool-on-power"),
 		live,
-	); err != nil {
-		t.Fatal(err)
+	)
+	if execErr != nil {
+		t.Fatal(execErr)
 	}
 
-	if _, err := seed.ApplyFleetHistory(ctx, tx, fleet, until, 2); err != nil {
-		t.Fatal(err)
+	_, applyFleetHistoryErr = seed.ApplyFleetHistory(ctx, tx, fleet, until, 2)
+	if applyFleetHistoryErr != nil {
+		t.Fatal(applyFleetHistoryErr)
 	}
 
 	count := func(sql string, args ...any) int {
 		var n int
-		if err := tx.QueryRow(ctx, sql, args...).Scan(&n); err != nil {
+		err := tx.QueryRow(ctx, sql, args...).Scan(&n)
+		if err != nil {
 			t.Fatal(err)
 		}
 
@@ -233,14 +242,16 @@ func TestMockFleetHistory(t *testing.T) {
 	}
 
 	var afternoon, night float64
-	if err := tx.QueryRow(ctx, `SELECT value FROM monitoring.measurements WHERE sensor_id = $1 AND observed_at = $2`, power, until.Add(-time.Hour)).
-		Scan(&afternoon); err != nil {
-		t.Fatal(err)
+	scanErr := tx.QueryRow(ctx, `SELECT value FROM monitoring.measurements WHERE sensor_id = $1 AND observed_at = $2`, power, until.Add(-time.Hour)).
+		Scan(&afternoon)
+	if scanErr != nil {
+		t.Fatal(scanErr)
 	}
 
-	if err := tx.QueryRow(ctx, `SELECT value FROM monitoring.measurements WHERE sensor_id = $1 AND observed_at = $2`, power, until.Add(-12*time.Hour)).
-		Scan(&night); err != nil {
-		t.Fatal(err)
+	scanErr = tx.QueryRow(ctx, `SELECT value FROM monitoring.measurements WHERE sensor_id = $1 AND observed_at = $2`, power, until.Add(-12*time.Hour)).
+		Scan(&night)
+	if scanErr != nil {
+		t.Fatal(scanErr)
 	}
 
 	if afternoon < 0.8 || night > 0.05 {
@@ -257,14 +268,16 @@ func TestMockFleetHistory(t *testing.T) {
 	}
 
 	var co2Day, co2Night float64
-	if err := tx.QueryRow(ctx, `SELECT value FROM monitoring.measurements WHERE sensor_id = $1 AND observed_at = $2`, seed.ID("sensor-mock-cool-on-co2"), until.Add(-time.Hour)).
-		Scan(&co2Day); err != nil {
-		t.Fatal(err)
+	scanErr = tx.QueryRow(ctx, `SELECT value FROM monitoring.measurements WHERE sensor_id = $1 AND observed_at = $2`, seed.ID("sensor-mock-cool-on-co2"), until.Add(-time.Hour)).
+		Scan(&co2Day)
+	if scanErr != nil {
+		t.Fatal(scanErr)
 	}
 
-	if err := tx.QueryRow(ctx, `SELECT value FROM monitoring.measurements WHERE sensor_id = $1 AND observed_at = $2`, seed.ID("sensor-mock-cool-on-co2"), until.Add(-12*time.Hour)).
-		Scan(&co2Night); err != nil {
-		t.Fatal(err)
+	scanErr = tx.QueryRow(ctx, `SELECT value FROM monitoring.measurements WHERE sensor_id = $1 AND observed_at = $2`, seed.ID("sensor-mock-cool-on-co2"), until.Add(-12*time.Hour)).
+		Scan(&co2Night)
+	if scanErr != nil {
+		t.Fatal(scanErr)
 	}
 
 	if co2Day < 800 || co2Night > 500 {
@@ -272,14 +285,16 @@ func TestMockFleetHistory(t *testing.T) {
 	}
 
 	var seen time.Time
-	if err := tx.QueryRow(ctx, `SELECT last_seen_at FROM devices.devices WHERE id = $1`, seed.ID("device-mock-cool-on")).
-		Scan(&seen); err != nil ||
+	scanErr = tx.QueryRow(ctx, `SELECT last_seen_at FROM devices.devices WHERE id = $1`, seed.ID("device-mock-cool-on")).
+		Scan(&seen)
+	if scanErr != nil ||
 		!seen.Equal(until) {
-		t.Errorf("the module was last seen at %v (%v), want %v", seen, err, until)
+		t.Errorf("the module was last seen at %v (%v), want %v", seen, scanErr, until)
 	}
 	// a later run (7 minutes on) keeps the quarter hours: no reading lands between them and none is doubled
-	if _, err := seed.ApplyFleetHistory(ctx, tx, fleet, until.Add(7*time.Minute), 2); err != nil {
-		t.Fatal(err)
+	_, applyFleetHistoryErr = seed.ApplyFleetHistory(ctx, tx, fleet, until.Add(7*time.Minute), 2)
+	if applyFleetHistoryErr != nil {
+		t.Fatal(applyFleetHistoryErr)
 	}
 
 	temperature := seed.ID("sensor-mock-cool-on-temperature")
@@ -298,9 +313,10 @@ func TestMockFleetHistory(t *testing.T) {
 	}
 
 	var latest time.Time
-	if err := tx.QueryRow(ctx, `SELECT max(observed_at) FROM monitoring.measurements WHERE sensor_id = $1`, seed.ID("sensor-mock-offline-power")).
-		Scan(&latest); err != nil {
-		t.Fatal(err)
+	scanErr = tx.QueryRow(ctx, `SELECT max(observed_at) FROM monitoring.measurements WHERE sensor_id = $1`, seed.ID("sensor-mock-offline-power")).
+		Scan(&latest)
+	if scanErr != nil {
+		t.Fatal(scanErr)
 	}
 
 	if !latest.Equal(until.Add(7*time.Minute - 24*time.Hour)) {

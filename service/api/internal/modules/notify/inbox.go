@@ -250,9 +250,10 @@ func openTargets(ctx context.Context, c *ops.Call, items []Notification) error {
 
 	ids := []uuid.UUID{}
 	for _, x := range items {
-		if id, err := uuid.Parse(
+		id, err := uuid.Parse(
 			x.Target["id"],
-		); err == nil && x.Target["kind"] == "job" &&
+		)
+		if err == nil && x.Target["kind"] == "job" &&
 			!slices.Contains(ids, id) {
 			ids = append(ids, id)
 		}
@@ -268,7 +269,8 @@ func openTargets(ctx context.Context, c *ops.Call, items []Notification) error {
 	}
 
 	for i, x := range items {
-		if id, err := uuid.Parse(x.Target["id"]); err == nil && x.Target["kind"] == "job" {
+		id, err := uuid.Parse(x.Target["id"])
+		if err == nil && x.Target["kind"] == "job" {
 			items[i].TargetOpen = slices.Contains(open, id)
 		}
 	}
@@ -417,9 +419,10 @@ func (Inbox) list(
 	where := strings.Join(conds, " AND ")
 
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM "+inboxFrom()+" WHERE "+where, args...).
-		Scan(&total); err != nil {
-		return paging.Page[Notification]{}, err
+	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM "+inboxFrom()+" WHERE "+where, args...).
+		Scan(&total)
+	if scanErr != nil {
+		return paging.Page[Notification]{}, scanErr
 	}
 
 	rows, err := c.Tx.Query(
@@ -450,12 +453,14 @@ func (Inbox) list(
 		items = append(items, x)
 	}
 
-	if err := rows.Err(); err != nil {
-		return paging.Page[Notification]{}, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return paging.Page[Notification]{}, rowsErr
 	}
 
-	if err := openTargets(ctx, c, items); err != nil {
-		return paging.Page[Notification]{}, err
+	openTargetsErr := openTargets(ctx, c, items)
+	if openTargetsErr != nil {
+		return paging.Page[Notification]{}, openTargetsErr
 	}
 
 	return paging.Page[Notification]{
@@ -529,8 +534,9 @@ func (Inbox) markRead(ctx context.Context, c *ops.Call, in *MarkReadInput) (Noti
 	}
 
 	one := []Notification{x}
-	if err := openTargets(ctx, c, one); err != nil {
-		return x, err
+	openTargetsErr := openTargets(ctx, c, one)
+	if openTargetsErr != nil {
+		return x, openTargetsErr
 	}
 
 	x = one[0]
@@ -538,13 +544,14 @@ func (Inbox) markRead(ctx context.Context, c *ops.Call, in *MarkReadInput) (Noti
 		return x, nil
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE notify.notifications SET read_at = $2, version = version + 1 WHERE id = $1`,
 		x.ID,
 		c.Now,
-	); err != nil {
-		return x, err
+	)
+	if execErr != nil {
+		return x, execErr
 	}
 
 	x.ReadAt, x.Version, x.UpdatedAt = &c.Now, x.Version+1, c.Now
@@ -722,8 +729,9 @@ func resolve(ctx context.Context, c *ops.Call, in *TargetInput) (target, error) 
 		}
 
 		var ok bool
-		if err := c.Tx.QueryRow(ctx, `SELECT status = 'unpaid' AND due_at < $2 FROM notify.ref_invoices WHERE id = $1`, in.Target.ID, c.Now).
-			Scan(&ok); err != nil {
+		err := c.Tx.QueryRow(ctx, `SELECT status = 'unpaid' AND due_at < $2 FROM notify.ref_invoices WHERE id = $1`, in.Target.ID, c.Now).
+			Scan(&ok)
+		if err != nil {
 			return t, err
 		}
 
@@ -804,7 +812,8 @@ func recipients(
 
 	for rows.Next() {
 		var r Recipient
-		if err := rows.Scan(&r.ID, &r.Role, &r.DisplayLabel, &r.AllowedChannels); err != nil {
+		err := rows.Scan(&r.ID, &r.Role, &r.DisplayLabel, &r.AllowedChannels)
+		if err != nil {
 			return nil, err
 		}
 
@@ -989,9 +998,10 @@ func (Inbox) preview(ctx context.Context, c *ops.Call, in *PreviewInput) (Notifi
 	}
 
 	var scope int
-	if err := c.Tx.QueryRow(ctx, `SELECT scope_version FROM identity.memberships WHERE id = $1`, in.RecipientMembershipID).
-		Scan(&scope); err != nil {
-		return Notification{}, err
+	scanErr := c.Tx.QueryRow(ctx, `SELECT scope_version FROM identity.memberships WHERE id = $1`, in.RecipientMembershipID).
+		Scan(&scope)
+	if scanErr != nil {
+		return Notification{}, scanErr
 	}
 
 	typ, status := in.TemplateKey, in.TemplateKey

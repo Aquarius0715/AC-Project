@@ -52,7 +52,8 @@ func loadCases(
 		state   string
 		version int
 	)
-	if err := tx.QueryRow(ctx, q, id).Scan(&raw, &state, &version); err != nil {
+	err := tx.QueryRow(ctx, q, id).Scan(&raw, &state, &version)
+	if err != nil {
 		return nil, "", 0, err
 	}
 
@@ -142,15 +143,16 @@ func Observe(
 		successor *uuid.UUID
 		s         uuid.UUID
 	)
-	if err := tx.QueryRow(ctx, `SELECT r.id FROM restrictions.restrictions r JOIN restrictions.restriction_units ru ON ru.restriction_id = r.id
+	scanErr := tx.QueryRow(ctx, `SELECT r.id FROM restrictions.restrictions r JOIN restrictions.restriction_units ru ON ru.restriction_id = r.id
 		WHERE ru.unit_id = $1 AND r.id <> $2 AND r.state NOT IN ('released','cancelled') ORDER BY r.created_at DESC LIMIT 1`, unit, observed.RestrictionID).
-		Scan(&s); err == nil {
+		Scan(&s)
+	if scanErr == nil {
 		successor = &s
 	} else if !errors.Is(
-		err,
+		scanErr,
 		pgx.ErrNoRows,
 	) {
-		return false, err
+		return false, scanErr
 	}
 
 	found := false
@@ -178,8 +180,9 @@ func Observe(
 		})
 	}
 
-	if err := saveCases(ctx, tx, observed.RestrictionID, cases, now); err != nil {
-		return false, err
+	saveCasesErr := saveCases(ctx, tx, observed.RestrictionID, cases, now)
+	if saveCasesErr != nil {
+		return false, saveCasesErr
 	}
 	// the reconciliation_required alert is owned by equipment (IR184)
 	err = publish(
@@ -284,11 +287,13 @@ func (m Restrictions) reconcileTerminal(
 	}
 
 	if changed {
-		if err := saveCases(ctx, c.Tx, x.ID, cases, c.Now); err != nil {
+		err := saveCases(ctx, c.Tx, x.ID, cases, c.Now)
+		if err != nil {
 			return nil, err
 		}
 
-		if err := resolveRecoveryAlerts(ctx, c.Tx, units, c.Now); err != nil {
+		err = resolveRecoveryAlerts(ctx, c.Tx, units, c.Now)
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -324,9 +329,10 @@ func resolveRecoveryAlerts(ctx context.Context, tx pgx.Tx, units []uuid.UUID, _ 
 	}
 
 	var tenant uuid.UUID
-	if err := tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')::uuid`).
-		Scan(&tenant); err != nil {
-		return err
+	scanErr := tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')::uuid`).
+		Scan(&tenant)
+	if scanErr != nil {
+		return scanErr
 	}
 
 	return events.Publish(
@@ -366,7 +372,7 @@ func recoveryAcknowledged(
 		return true, nil // terminal restriction: never change its per-unit state
 	}
 
-	if err := publish(
+	publishErr := publish(
 		ctx,
 		tx,
 		restriction,
@@ -374,12 +380,14 @@ func recoveryAcknowledged(
 		unit,
 		events.UnitRestrictionCleared,
 		events.UnitRestriction{UnitID: unit, RestrictionID: restriction},
-	); err != nil {
-		return true, err
+	)
+	if publishErr != nil {
+		return true, publishErr
 	}
 
-	if err := saveCases(ctx, tx, restriction, cases, at); err != nil {
-		return true, err
+	saveCasesErr := saveCases(ctx, tx, restriction, cases, at)
+	if saveCasesErr != nil {
+		return true, saveCasesErr
 	}
 
 	return true, resolveRecoveryAlerts(ctx, tx, []uuid.UUID{unit}, at)
@@ -424,7 +432,8 @@ func recoveryEnded(ctx context.Context, tx pgx.Tx, commands []uuid.UUID, now tim
 		}
 
 		if hit {
-			if err := saveCases(ctx, tx, r, cases, now); err != nil {
+			err := saveCases(ctx, tx, r, cases, now)
+			if err != nil {
 				return err
 			}
 		}
@@ -445,8 +454,9 @@ func publish(
 	payload any,
 ) error {
 	var tenant uuid.UUID
-	if err := tx.QueryRow(ctx, `SELECT tenant_id FROM restrictions.restrictions WHERE id = $1`, restriction).
-		Scan(&tenant); err != nil {
+	err := tx.QueryRow(ctx, `SELECT tenant_id FROM restrictions.restrictions WHERE id = $1`, restriction).
+		Scan(&tenant)
+	if err != nil {
 		return err
 	}
 

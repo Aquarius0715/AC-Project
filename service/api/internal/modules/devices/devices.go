@@ -124,8 +124,9 @@ func (m *Module) load(
 	limit, offset int,
 ) ([]Device, int, error) {
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM devices.devices d WHERE "+where, args...).
-		Scan(&total); err != nil {
+	err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM devices.devices d WHERE "+where, args...).
+		Scan(&total)
+	if err != nil {
 		return nil, 0, err
 	}
 
@@ -148,7 +149,7 @@ func (m *Module) load(
 
 	for rows.Next() {
 		var d Device
-		if err := rows.Scan(
+		err := rows.Scan(
 			&d.ID,
 			&d.TenantID,
 			&d.Version,
@@ -164,7 +165,8 @@ func (m *Module) load(
 			&d.FirmwareVersion,
 			&d.PowerSignal,
 			&d.Tamper,
-		); err != nil {
+		)
+		if err != nil {
 			rows.Close()
 
 			return nil, 0, err
@@ -176,8 +178,9 @@ func (m *Module) load(
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return nil, 0, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return nil, 0, rowsErr
 	}
 
 	if len(out) == 0 {
@@ -201,7 +204,7 @@ func (m *Module) load(
 
 	for srows.Next() {
 		var s Sensor
-		if err := srows.Scan(
+		err := srows.Scan(
 			&s.BoundaryID,
 			&s.ID,
 			&s.DeviceID,
@@ -209,7 +212,8 @@ func (m *Module) load(
 			&s.Unit,
 			&s.StaleAfterSeconds,
 			&s.CalibratedAt,
-		); err != nil {
+		)
+		if err != nil {
 			srows.Close()
 
 			return nil, 0, err
@@ -222,8 +226,9 @@ func (m *Module) load(
 
 	srows.Close()
 
-	if err := srows.Err(); err != nil {
-		return nil, 0, err
+	rowsErr = srows.Err()
+	if rowsErr != nil {
+		return nil, 0, rowsErr
 	}
 
 	return out, total, nil
@@ -411,7 +416,8 @@ func (m *Module) detail(
 
 	for rows.Next() {
 		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
+		err := rows.Scan(&id)
+		if err != nil {
 			rows.Close()
 
 			return DeviceDetail{}, err
@@ -422,8 +428,9 @@ func (m *Module) detail(
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return DeviceDetail{}, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return DeviceDetail{}, rowsErr
 	}
 
 	var op []byte
@@ -531,7 +538,8 @@ func (m *Module) registerDetail(
 	c *ops.Call,
 	in *RegisterInput,
 ) (DeviceDetail, error) {
-	if err := m.technicianGate(ctx, c, in.JobID, in.UnitID); err != nil {
+	err := m.technicianGate(ctx, c, in.JobID, in.UnitID)
+	if err != nil {
 		return DeviceDetail{}, err
 	}
 
@@ -545,9 +553,10 @@ func (m *Module) registerDetail(
 	}
 
 	var sensorsRaw []byte
-	if err := c.Tx.QueryRow(ctx, `SELECT sensors FROM devices.capabilities WHERE id = $1 AND version = $2`, u.ModelID, u.CapabilityVersion).
-		Scan(&sensorsRaw); err != nil {
-		return DeviceDetail{}, err
+	scanErr := c.Tx.QueryRow(ctx, `SELECT sensors FROM devices.capabilities WHERE id = $1 AND version = $2`, u.ModelID, u.CapabilityVersion).
+		Scan(&sensorsRaw)
+	if scanErr != nil {
+		return DeviceDetail{}, scanErr
 	}
 
 	var specs []SensorSpec
@@ -568,9 +577,10 @@ func (m *Module) registerDetail(
 	}
 
 	var dup bool
-	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.devices WHERE upper(serial) = $1)`, in.Serial).
-		Scan(&dup); err != nil {
-		return DeviceDetail{}, err
+	scanErr = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.devices WHERE upper(serial) = $1)`, in.Serial).
+		Scan(&dup)
+	if scanErr != nil {
+		return DeviceDetail{}, scanErr
 	}
 
 	if dup {
@@ -581,7 +591,7 @@ func (m *Module) registerDetail(
 	}
 	// D05: register reserves targetUnitId; unitId stays null until devices.bind
 	id := uuid.Must(uuid.NewV7())
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version)
 		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, 'v1')`,
@@ -589,13 +599,14 @@ func (m *Module) registerDetail(
 		in.Serial,
 		in.UnitID,
 		c.Principal.MembershipID,
-	); err != nil {
-		return DeviceDetail{}, err
+	)
+	if execErr != nil {
+		return DeviceDetail{}, execErr
 	}
 
 	for _, mt := range in.SensorTypes {
 		s := byMetric[mt]
-		if _, err := c.Tx.Exec(
+		_, err := c.Tx.Exec(
 			ctx,
 			`INSERT INTO devices.sensors (tenant_id, device_id, metric, unit, boundary_id, stale_after_seconds)
 			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5)`,
@@ -604,7 +615,8 @@ func (m *Module) registerDetail(
 			s.Unit,
 			s.BoundaryID,
 			s.StaleAfterSeconds,
-		); err != nil {
+		)
+		if err != nil {
 			return DeviceDetail{}, err
 		}
 	}

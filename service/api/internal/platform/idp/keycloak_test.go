@@ -64,11 +64,13 @@ func TestKeycloakEndSessions(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	if err := k.EndSessions(ctx, "09f7f651-9f19-5407-b222-8730fe8fd5c3"); err != nil {
+	err := k.EndSessions(ctx, "09f7f651-9f19-5407-b222-8730fe8fd5c3")
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := k.EndSessions(ctx, "../../clients/x"); err != nil {
+	err = k.EndSessions(ctx, "../../clients/x")
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -85,29 +87,34 @@ func TestKeycloakEndSessions(t *testing.T) {
 
 	status = http.StatusNotFound // a user the realm does not know
 
-	if err := k.EndSessions(ctx, "unknown"); err != nil {
+	err = k.EndSessions(ctx, "unknown")
+	if err != nil {
 		t.Errorf("unknown user: %v", err)
 	}
 
 	status = http.StatusUnauthorized // the token was ended early: the next call fetches a new one
 
-	if err := k.EndSessions(ctx, "u-1"); err == nil {
+	err = k.EndSessions(ctx, "u-1")
+	if err == nil {
 		t.Error("a refused token passes")
 	}
 
 	status = http.StatusNoContent
 
-	if err := k.EndSessions(ctx, "u-1"); err != nil || tokens.Load() != 2 {
+	err = k.EndSessions(ctx, "u-1")
+	if err != nil || tokens.Load() != 2 {
 		t.Errorf("after a refused token: %v, %d token requests", err, tokens.Load())
 	}
 
 	now = now.Add(5 * time.Minute) // expired: fetched again
 
-	if err := k.EndSessions(ctx, "u-1"); err != nil || tokens.Load() != 3 {
+	err = k.EndSessions(ctx, "u-1")
+	if err != nil || tokens.Load() != 3 {
 		t.Errorf("after expiry: %v, %d token requests", err, tokens.Load())
 	}
 
-	if err := k.EndSessions(ctx, ""); err == nil {
+	err = k.EndSessions(ctx, "")
+	if err == nil {
 		t.Error("no subject passes")
 	}
 
@@ -117,7 +124,8 @@ func TestKeycloakEndSessions(t *testing.T) {
 		ClientID:     "svc",
 		ClientSecret: "wrong",
 	}
-	if err := bad.EndSessions(ctx, "u-1"); err == nil {
+	err = bad.EndSessions(ctx, "u-1")
+	if err == nil {
 		t.Error("a wrong client secret passes")
 	}
 	// the service's own HTTP client and the wall clock
@@ -128,7 +136,8 @@ func TestKeycloakEndSessions(t *testing.T) {
 		ClientSecret: "test-secret",
 		Client:       srv.Client(),
 	}
-	if err := own.EndSessions(ctx, "u-1"); err != nil {
+	err = own.EndSessions(ctx, "u-1")
+	if err != nil {
 		t.Errorf("with its own client: %v", err)
 	}
 }
@@ -152,7 +161,8 @@ func TestKeycloakTokenAnswers(t *testing.T) {
 			ClientID:     "svc",
 			ClientSecret: "test-secret",
 		}
-		if err := k.EndSessions(context.Background(), "u-1"); err == nil {
+		err := k.EndSessions(context.Background(), "u-1")
+		if err == nil {
 			t.Errorf("token answer %s passes", body)
 		}
 

@@ -128,11 +128,12 @@ func (m Partners) kpis(ctx context.Context, c *ops.Call, org uuid.UUID) (KPIs, e
 
 	var acc, dec int
 	// offers closed by HQ's cancellation or the client's reschedule were no decision of the contractor (IR452)
-	if err := c.Tx.QueryRow(ctx, `SELECT count(*) FILTER (WHERE decision = 'accept'), count(*) FILTER (WHERE decision IS NOT NULL OR expired_at IS NOT NULL)
+	err := c.Tx.QueryRow(ctx, `SELECT count(*) FILTER (WHERE decision = 'accept'), count(*) FILTER (WHERE decision IS NOT NULL OR expired_at IS NOT NULL)
 		FROM maintenance.offers WHERE contractor_org_id = $1 AND offered_at >= $2 AND offered_at < $3
 		AND NOT COALESCE(decision = 'decline' AND decline_reason IN ('job_cancelled','rescheduled'), false)`,
 		org, k.Period.From, k.Period.To).
-		Scan(&acc, &dec); err != nil {
+		Scan(&acc, &dec)
+	if err != nil {
 		return k, err
 	}
 
@@ -245,7 +246,7 @@ func jobMetrics(ctx context.Context, c *ops.Call, extra string, args []any) ([]j
 
 	for rows.Next() {
 		var j jobMetric
-		if err := rows.Scan(
+		err := rows.Scan(
 			&j.id,
 			&j.customerOrg,
 			&j.unit,
@@ -262,7 +263,8 @@ func jobMetrics(ctx context.Context, c *ops.Call, extra string, args []any) ([]j
 			&j.stars,
 			&j.cancelledAt,
 			&j.planned,
-		); err != nil {
+		)
+		if err != nil {
 			return nil, err
 		}
 
@@ -386,9 +388,10 @@ func (m Partners) list(
 	where := strings.Join(conds, " AND ")
 
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM maintenance.contractors p WHERE "+where+" AND $1::timestamptz IS NOT NULL", args...).
-		Scan(&total); err != nil {
-		return paging.Page[Profile]{}, err
+	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM maintenance.contractors p WHERE "+where+" AND $1::timestamptz IS NOT NULL", args...).
+		Scan(&total)
+	if scanErr != nil {
+		return paging.Page[Profile]{}, scanErr
 	}
 
 	rows, err := c.Tx.Query(
@@ -421,12 +424,14 @@ func (m Partners) list(
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return paging.Page[Profile]{}, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return paging.Page[Profile]{}, rowsErr
 	}
 
 	for i := range items {
-		if items[i].KPIs, err = m.kpis(ctx, c, items[i].OrganizationID); err != nil {
+		items[i].KPIs, err = m.kpis(ctx, c, items[i].OrganizationID)
+		if err != nil {
 			return paging.Page[Profile]{}, err
 		}
 	}
@@ -476,9 +481,10 @@ func (in *ProfileInput) Validate() map[string]string {
 	}
 
 	in.ContactEmail = strings.TrimSpace(in.ContactEmail)
-	if a, err := mail.ParseAddress(
+	a, err := mail.ParseAddress(
 		in.ContactEmail,
-	); err != nil || a.Address != in.ContactEmail ||
+	)
+	if err != nil || a.Address != in.ContactEmail ||
 		len(in.ContactEmail) > 254 {
 		fe["contactEmail"] = "error.invalid"
 	}
@@ -539,8 +545,9 @@ func (m Partners) save(ctx context.Context, c *ops.Call, in *ProfileInput) (Prof
 
 	if in.ID == nil {
 		var exists bool
-		if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id = $1)`, in.OrganizationID).
-			Scan(&exists); err != nil {
+		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id = $1)`, in.OrganizationID).
+			Scan(&exists)
+		if err != nil {
 			return Profile{}, err
 		}
 
@@ -548,10 +555,11 @@ func (m Partners) save(ctx context.Context, c *ops.Call, in *ProfileInput) (Prof
 			return Profile{}, apperr.E(apperr.Conflict, "errors.profile_exists")
 		}
 
-		if err := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.contractors (tenant_id, organization_id, name, status, registration_no, service_areas, contact_email,
+		err = c.Tx.QueryRow(ctx, `INSERT INTO maintenance.contractors (tenant_id, organization_id, name, status, registration_no, service_areas, contact_email,
 			insurance_valid_until, delegation, created_at, updated_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, 'active', $3, $4, $5, $6, tstzrange($7, $8), $7, $7)
 			RETURNING id`, in.OrganizationID, name, in.RegistrationNo, in.ServiceAreas, in.ContactEmail, in.InsuranceValidUntil, c.Now, delegationEnd(c.Now)).
-			Scan(&id); err != nil {
+			Scan(&id)
+		if err != nil {
 			return Profile{}, err
 		}
 	} else {
@@ -568,7 +576,7 @@ func (m Partners) save(ctx context.Context, c *ops.Call, in *ProfileInput) (Prof
 			return p, apperr.E(apperr.Conflict, "error.versionConflict")
 		}
 
-		if _, err := c.Tx.Exec(
+		_, execErr := c.Tx.Exec(
 			ctx,
 			`UPDATE maintenance.contractors SET name = $2, registration_no = $3, service_areas = $4, contact_email = $5, insurance_valid_until = $6,
 			delegation = tstzrange(lower(delegation), $7), version = version + 1, updated_at = $8 WHERE id = $1`,
@@ -580,8 +588,9 @@ func (m Partners) save(ctx context.Context, c *ops.Call, in *ProfileInput) (Prof
 			in.InsuranceValidUntil,
 			delegationEnd(p.CreatedAt),
 			c.Now,
-		); err != nil {
-			return p, err
+		)
+		if execErr != nil {
+			return p, execErr
 		}
 
 		id = p.ID
@@ -683,15 +692,16 @@ func (m Partners) setOfferStatus(
 		reason = &in.Reason
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.contractors SET status = $2, suspended_reason = $3, version = version + 1, updated_at = $4 WHERE id = $1`,
 		p.ID,
 		in.Status,
 		reason,
 		c.Now,
-	); err != nil {
-		return p, err
+	)
+	if execErr != nil {
+		return p, execErr
 	}
 
 	p, err = m.loadProfile(ctx, c, "p.id = $2", []any{p.ID}, false)
@@ -855,8 +865,9 @@ func (m Partners) saveRateCard(
 	}
 
 	var exists bool
-	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id = $1)`, in.ContractorOrgID).
-		Scan(&exists); err != nil {
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id = $1)`, in.ContractorOrgID).
+		Scan(&exists)
+	if err != nil {
 		return RateCard{}, err
 	}
 
@@ -972,9 +983,10 @@ func (m Partners) listRateCards(
 	}
 
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM maintenance.rate_cards WHERE "+where, args...).
-		Scan(&total); err != nil {
-		return paging.Page[RateCard]{}, err
+	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM maintenance.rate_cards WHERE "+where, args...).
+		Scan(&total)
+	if scanErr != nil {
+		return paging.Page[RateCard]{}, scanErr
 	}
 
 	rows, err := c.Tx.Query(
@@ -1353,14 +1365,15 @@ func (m Partners) scorecard(
 
 	for rows.Next() {
 		var t SlaTargets
-		if err := rows.Scan(
+		err := rows.Scan(
 			&t.PlanType,
 			&t.ResponseHours,
 			&t.ArrivalInWindowPercent,
 			&t.FirstTimeFixPercent,
 			&t.EffectiveFrom,
 			&t.Version,
-		); err != nil {
+		)
+		if err != nil {
 			rows.Close()
 
 			return Scorecard{}, err
@@ -1371,8 +1384,9 @@ func (m Partners) scorecard(
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return Scorecard{}, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return Scorecard{}, rowsErr
 	}
 
 	orgs := []uuid.UUID{}

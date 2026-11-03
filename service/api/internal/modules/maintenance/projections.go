@@ -160,7 +160,7 @@ func (m Jobs) offers(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]OfferS
 			unit     uuid.UUID
 			decision *string
 		)
-		if err := rows.Scan(
+		err := rows.Scan(
 			&o.JobID,
 			&o.JobVersion,
 			&o.Type,
@@ -178,7 +178,8 @@ func (m Jobs) offers(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]OfferS
 			&o.OfferedAt,
 			&o.AccessValidFrom,
 			&o.AccessValidUntil,
-		); err != nil {
+		)
+		if err != nil {
 			rows.Close()
 
 			return nil, err
@@ -194,8 +195,9 @@ func (m Jobs) offers(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]OfferS
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return nil, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return nil, rowsErr
 	}
 
 	for i := range out {
@@ -268,7 +270,7 @@ func (m Jobs) histories(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]His
 			acc string
 			ids []uuid.UUID
 		)
-		if err := rows.Scan(
+		err := rows.Scan(
 			&h.JobID,
 			&h.AsOf,
 			&h.Type,
@@ -278,7 +280,8 @@ func (m Jobs) histories(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]His
 			&has,
 			&acc,
 			&ids,
-		); err != nil {
+		)
+		if err != nil {
 			rows.Close()
 
 			return nil, err
@@ -291,8 +294,9 @@ func (m Jobs) histories(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]His
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return nil, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return nil, rowsErr
 	}
 	// the decision events of every snapshot in one query (IR506), then each snapshot's own in time order
 	var all []uuid.UUID
@@ -529,14 +533,15 @@ func freezeTechnicians(ctx context.Context, tx pgx.Tx, now time.Time, job *uuid.
 // no longer grants unit access (change capture publishes active=false); the technician's viewing window ends with it
 // and the history snapshot is stored at once, so the finished job stays in the technician's list (IR124).
 func ReleaseOnCompletion(ctx context.Context, tx pgx.Tx, job uuid.UUID, now time.Time) error {
-	if _, err := tx.Exec(
+	_, execErr := tx.Exec(
 		ctx,
 		`UPDATE maintenance.assignments SET status = 'completed', reason = 'job_completed', version = version + 1, updated_at = $2
 		WHERE job_id = $1 AND status = 'active'`,
 		job,
 		now,
-	); err != nil {
-		return err
+	)
+	if execErr != nil {
+		return execErr
 	}
 
 	_, err := freezeTechnicians(ctx, tx, now, &job)
@@ -564,7 +569,8 @@ func ExpireOffers(ctx context.Context, tx pgx.Tx, now time.Time, actor uuid.UUID
 
 	for rows.Next() {
 		var h hit
-		if err := rows.Scan(&h.job, &h.tenant); err != nil {
+		err := rows.Scan(&h.job, &h.tenant)
+		if err != nil {
 			rows.Close()
 
 			return 0, err
@@ -575,30 +581,33 @@ func ExpireOffers(ctx context.Context, tx pgx.Tx, now time.Time, actor uuid.UUID
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return 0, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return 0, rowsErr
 	}
 	// a contractor's time change still waiting for HQ ends with its expired offer (IR444); one sent to the client stays, as
 	// the client's acceptance offers the job to the contractor again (IR128)
-	if _, err := tx.Exec(
+	_, execErr := tx.Exec(
 		ctx,
 		`UPDATE maintenance.partner_slot_proposals SET status = 'withdrawn' WHERE status = 'pending' AND offer_id IN
 		(SELECT id FROM maintenance.offers WHERE decision IS NULL AND expired_at IS NULL AND offer_expires_at <= $1)`,
 		now,
-	); err != nil {
-		return 0, err
+	)
+	if execErr != nil {
+		return 0, execErr
 	}
 
-	if _, err := tx.Exec(
+	_, execErr = tx.Exec(
 		ctx,
 		`UPDATE maintenance.offers SET expired_at = $1 WHERE decision IS NULL AND expired_at IS NULL AND offer_expires_at <= $1`,
 		now,
-	); err != nil {
-		return 0, err
+	)
+	if execErr != nil {
+		return 0, execErr
 	}
 
 	for _, h := range hits {
-		if _, err := tx.Exec(
+		_, err := tx.Exec(
 			ctx,
 			`INSERT INTO maintenance.job_events (id, tenant_id, job_id, actor_user_id, action, occurred_at) VALUES ($1,$2,$3,$4,'offer_expired',$5)`,
 			uuid.Must(uuid.NewV7()),
@@ -606,7 +615,8 @@ func ExpireOffers(ctx context.Context, tx pgx.Tx, now time.Time, actor uuid.UUID
 			h.job,
 			actor,
 			now,
-		); err != nil {
+		)
+		if err != nil {
 			return 0, err
 		}
 	}

@@ -403,7 +403,8 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 				r  row
 				id uuid.UUID
 			)
-			if err := rs.Scan(&id, &r.status, &r.reason, &r.evidence, &r.previous); err != nil {
+			err := rs.Scan(&id, &r.status, &r.reason, &r.evidence, &r.previous)
+			if err != nil {
 				t.Fatal(err)
 			}
 
@@ -411,8 +412,9 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 			out = append(out, r)
 		}
 
-		if err := rs.Err(); err != nil {
-			t.Fatal(err)
+		rowsErr := rs.Err()
+		if rowsErr != nil {
+			t.Fatal(rowsErr)
 		}
 
 		return out

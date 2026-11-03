@@ -91,7 +91,8 @@ func (m Files) list(
 	c *ops.Call,
 	in *ListAttachmentsInput,
 ) (paging.Page[EvidenceAttachment], error) {
-	if err := paging.NoFilters(in.Query, "query.filters"); err != nil {
+	err := paging.NoFilters(in.Query, "query.filters")
+	if err != nil {
 		return paging.Page[EvidenceAttachment]{}, err
 	}
 
@@ -114,7 +115,7 @@ func (m Files) list(
 
 	for rows.Next() {
 		var a EvidenceAttachment
-		if err := rows.Scan(
+		err := rows.Scan(
 			&a.ID,
 			&a.TenantID,
 			&a.CreatedAt,
@@ -127,7 +128,8 @@ func (m Files) list(
 			&a.Status,
 			&a.UnitID,
 			&a.AcceptedAt,
-		); err != nil {
+		)
+		if err != nil {
 			rows.Close()
 
 			return paging.Page[EvidenceAttachment]{}, err
@@ -139,8 +141,9 @@ func (m Files) list(
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return paging.Page[EvidenceAttachment]{}, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return paging.Page[EvidenceAttachment]{}, rowsErr
 	}
 
 	sort := in.Query.Sort
@@ -148,14 +151,15 @@ func (m Files) list(
 		sort = &paging.SortSpec{Field: "createdAt", Direction: "desc"}
 	}
 
-	if err := paging.SortSlice(all, sort, map[string]func(x, y EvidenceAttachment) int{
+	sortSliceErr := paging.SortSlice(all, sort, map[string]func(x, y EvidenceAttachment) int{
 		"id":        func(x, y EvidenceAttachment) int { return strings.Compare(x.ID.String(), y.ID.String()) },
 		"createdAt": func(x, y EvidenceAttachment) int { return x.CreatedAt.Compare(y.CreatedAt) },
 		"name": func(x, y EvidenceAttachment) int {
 			return strings.Compare(strings.ToLower(x.Name), strings.ToLower(y.Name))
 		},
-	}); err != nil {
-		return paging.Page[EvidenceAttachment]{}, err
+	})
+	if sortSliceErr != nil {
+		return paging.Page[EvidenceAttachment]{}, sortSliceErr
 	}
 
 	w, err := paging.Resolve(in.Query, struct {

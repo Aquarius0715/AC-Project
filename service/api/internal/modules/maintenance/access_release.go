@@ -42,7 +42,8 @@ func (m Jobs) ReleaseEndedAccess(ctx context.Context, c *ops.Call) (int, error) 
 	}
 
 	for _, e := range list {
-		if err := releaseAssignment(ctx, c, e, accessEnded); err != nil {
+		err := releaseAssignment(ctx, c, e, accessEnded)
+		if err != nil {
 			return 0, err
 		}
 	}
@@ -101,8 +102,9 @@ func releaseQualificationEnded(
 			continue
 		}
 
-		if err := releaseAssignment(ctx, c, e.released, qualificationEnded); err != nil {
-			return err
+		releaseAssignmentErr := releaseAssignment(ctx, c, e.released, qualificationEnded)
+		if releaseAssignmentErr != nil {
+			return releaseAssignmentErr
 		}
 	}
 
@@ -137,13 +139,14 @@ var (
 // releaseAssignment revokes the assignment and returns its job to be assigned again with its agreed visit (IR439):
 // accepted for a contractor's job, requested for HQ's own delivery. The job's assigners get a job_update notice.
 func releaseAssignment(ctx context.Context, c *ops.Call, e released, why releaseCause) error {
-	if _, err := c.Tx.Exec(
+	_, err := c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.assignments SET status = 'revoked', reason = $3, version = version + 1, updated_at = $2 WHERE id = $1`,
 		e.assignment,
 		c.Now,
 		why.reason,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 
@@ -152,17 +155,19 @@ func releaseAssignment(ctx context.Context, c *ops.Call, e released, why release
 		status = "accepted" // the contractor assigns again on its accepted offer
 	}
 
-	if _, err := c.Tx.Exec(
+	_, err = c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.jobs SET status = $2, assignment_id = NULL, scheduled_slot = NULL, version = version + 1, updated_at = $3 WHERE id = $1`,
 		e.job,
 		status,
 		c.Now,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 
-	if err := (Jobs{}).event(ctx, c, e.job, why.event, nil); err != nil {
+	err = (Jobs{}).event(ctx, c, e.job, why.event, nil)
+	if err != nil {
 		return err
 	}
 
@@ -181,7 +186,7 @@ func releaseAssignment(ctx context.Context, c *ops.Call, e released, why release
 	}
 
 	for _, r := range recipients {
-		if _, err := (notify.Store{}).Create(ctx, c, notify.New{
+		_, err := (notify.Store{}).Create(ctx, c, notify.New{
 			RecipientMembershipID: r,
 			Type:                  "job_update",
 			TemplateKey:           "job_update",
@@ -189,7 +194,8 @@ func releaseAssignment(ctx context.Context, c *ops.Call, e released, why release
 			TargetID:              e.job,
 			Severity:              "warning",
 			Params:                map[string]any{"status": status, "reason": why.notice},
-		}); err != nil {
+		})
+		if err != nil {
 			return err
 		}
 	}

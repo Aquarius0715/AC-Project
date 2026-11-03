@@ -84,7 +84,8 @@ func (m Automations) FireSchedules(ctx context.Context, c *ops.Call) (int, error
 			tz    string
 			units []uuid.UUID
 		)
-		if err := rows.Scan(&raw, &tz, &units); err != nil {
+		err := rows.Scan(&raw, &tz, &units)
+		if err != nil {
 			rows.Close()
 
 			return 0, err
@@ -121,8 +122,9 @@ func (m Automations) FireSchedules(ctx context.Context, c *ops.Call) (int, error
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return 0, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return 0, rowsErr
 	}
 
 	order := make([]*tick, 0, len(ticks))
@@ -162,7 +164,8 @@ func (m Automations) FireSchedules(ctx context.Context, c *ops.Call) (int, error
 				continue // passed over: a later minute sets the unit's state
 			}
 
-			if _, found, err := m.Units.Target(ctx, c, u); err != nil {
+			_, found, err := m.Units.Target(ctx, c, u)
+			if err != nil {
 				return created, err
 			} else if found { // an archived or removed unit is skipped, not an error of the tick
 				in.UnitIDs = append(in.UnitIDs, u)

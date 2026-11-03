@@ -68,10 +68,11 @@ func TestHTTPErrorHandler(t *testing.T) {
 		}
 
 		var de apperr.DomainError
-		if err := json.Unmarshal(
+		err := json.Unmarshal(
 			w.Body.Bytes(),
 			&de,
-		); err != nil || string(de.Code) != tc.code ||
+		)
+		if err != nil || string(de.Code) != tc.code ||
 			de.CorrelationID != "corr-1" {
 			t.Errorf("%s %s: body %s", tc.method, tc.path, w.Body)
 		}

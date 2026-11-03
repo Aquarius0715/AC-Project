@@ -100,11 +100,12 @@ func (m *Module) RemindWarranties(ctx context.Context, c *ops.Call) (int, error)
 		}
 
 		if recipients == nil {
-			if recipients, err = identity.Members(
+			recipients, err = identity.Members(
 				ctx,
 				c,
 				identity.MembersInput{Role: "admin", Permission: "asset.read"},
-			); err != nil {
+			)
+			if err != nil {
 				return n, err
 			}
 		}
@@ -115,7 +116,7 @@ func (m *Module) RemindWarranties(ctx context.Context, c *ops.Call) (int, error)
 		}
 
 		for _, r := range recipients {
-			if _, err := (notify.Store{}).Create(ctx, c, notify.New{
+			_, err := (notify.Store{}).Create(ctx, c, notify.New{
 				RecipientMembershipID: r,
 				Type:                  "warranty_expiring",
 				TemplateKey:           "warranty_expiring",
@@ -123,20 +124,22 @@ func (m *Module) RemindWarranties(ctx context.Context, c *ops.Call) (int, error)
 				TargetID:              d.id,
 				Severity:              severity,
 				Params:                map[string]any{"at": d.ends, "status": "expiring"},
-			}); err != nil {
+			})
+			if err != nil {
 				return n, err
 			}
 		}
 
-		if _, err := c.Tx.Exec(
+		_, execErr := c.Tx.Exec(
 			ctx,
 			`UPDATE assets.warranty_reminders SET notifications = $4 WHERE unit_id = $1 AND warranty_ends_at = $2 AND days_before = $3`,
 			d.id,
 			d.ends,
 			days,
 			len(recipients),
-		); err != nil {
-			return n, err
+		)
+		if execErr != nil {
+			return n, execErr
 		}
 
 		c.Audit(

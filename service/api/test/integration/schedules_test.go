@@ -56,7 +56,8 @@ func TestScheduleAutomationsFire(t *testing.T) {
 	tick := func(at time.Time) {
 		t.Helper()
 
-		if _, err := schedTick(ctx, s, at); err != nil {
+		_, err := schedTick(ctx, s, at)
+		if err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -203,11 +204,12 @@ func TestScheduleCatchUpRunsTheLastMinute(t *testing.T) {
 	t.Cleanup(func() { write(s, &customerB, "automations.delete", `{"id":"`+id+`"}`, 1) })
 	setWatermark(t, clock)
 
-	if _, err := schedTick(
+	_, err := schedTick(
 		ctx,
 		s,
 		clock.Add(61*time.Minute),
-	); err != nil { // past the start and the end
+	)
+	if err != nil { // past the start and the end
 		t.Fatal(err)
 	}
 
@@ -233,7 +235,8 @@ func TestScheduleCatchUpRunsTheLastMinute(t *testing.T) {
 	// a week later, two windows passed at once: still the last end only
 	setWatermark(t, clock.Add(61*time.Minute))
 
-	if _, err := schedTick(ctx, s, clock.Add(14*24*time.Hour+61*time.Minute)); err != nil {
+	_, err = schedTick(ctx, s, clock.Add(14*24*time.Hour+61*time.Minute))
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -632,7 +635,8 @@ func TestAutomationExtraConditions(t *testing.T) {
 	before := len(automationCommands(t, u))
 	setWatermark(t, clock)
 
-	if _, err := schedTick(ctx, s, clock.Add(31*time.Minute)); err != nil {
+	_, err := schedTick(ctx, s, clock.Add(31*time.Minute))
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -672,7 +676,8 @@ func TestScheduleBoundaries(t *testing.T) {
 	tick := func(at time.Time) {
 		t.Helper()
 
-		if _, err := schedTick(ctx, s, at); err != nil {
+		_, err := schedTick(ctx, s, at)
+		if err != nil {
 			t.Fatal(err)
 		}
 	}

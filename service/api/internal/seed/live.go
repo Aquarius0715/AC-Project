@@ -77,14 +77,15 @@ func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 	s := LiveSite
 	tenant := ID(s.Tenant)
 	ex := func(what, sql string, args ...any) error {
-		if _, err := tx.Exec(ctx, sql, args...); err != nil {
+		_, err := tx.Exec(ctx, sql, args...)
+		if err != nil {
 			return fmt.Errorf("live site %s: %w", what, err)
 		}
 
 		return nil
 	}
 	// the customer as HQ adds one: its organization, then the customer (organizations.save, customers.save)
-	if err := ex(
+	err := ex(
 		"customer organization",
 		`INSERT INTO identity.organizations (id, tenant_id, name, kind, status, created_at, updated_at)
 		VALUES ($1,$2,$3,'customer','active',$4,$4) ON CONFLICT DO NOTHING`,
@@ -92,11 +93,12 @@ func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 		tenant,
 		s.CustomerName,
 		at,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 
-	if err := ex(
+	err = ex(
 		"customer",
 		`INSERT INTO assets.customers (id, tenant_id, organization_id, name, status, service_profile, created_at, updated_at)
 		VALUES ($1,$2,$3,$4,'active','environment',$5,$5) ON CONFLICT DO NOTHING`,
@@ -105,11 +107,13 @@ func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 		ID(s.CustomerOrgID),
 		s.CustomerName,
 		at,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 
-	if err := liveOwner(ctx, tx, tenant, at); err != nil {
+	err = liveOwner(ctx, tx, tenant, at)
+	if err != nil {
 		return err
 	}
 
@@ -136,7 +140,7 @@ func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 		return err
 	}
 	// remote power only: no mode, fan or temperature setting (deterministic contracts: empty lists, null temperature)
-	if err := ex(
+	exErr := ex(
 		"model",
 		`INSERT INTO devices.capabilities (id, version, tenant_id, manufacturer, model, control, mode_control, fan_control, temperature,
 		modes, fan_levels, ventilation, ventilation_levels, sensors, firmware_candidates, is_current)
@@ -146,40 +150,44 @@ func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 		s.Manufacturer,
 		s.Model,
 		capSensors,
-	); err != nil {
-		return err
+	)
+	if exErr != nil {
+		return exErr
 	}
 
-	if err := ex(
+	exErr = ex(
 		"property",
 		`INSERT INTO assets.properties (id, tenant_id, customer_org_id, kind, name, address, access_instructions, archived)
 		VALUES ($1,$2,$3,'office','Live sensors',NULL,NULL,false) ON CONFLICT DO NOTHING`,
 		ID(s.Property),
 		tenant,
 		ID(s.CustomerOrgID),
-	); err != nil {
-		return err
+	)
+	if exErr != nil {
+		return exErr
 	}
 
-	if err := ex(
+	exErr = ex(
 		"floor",
 		`INSERT INTO assets.spaces (id, tenant_id, property_id, parent_space_id, kind, name) VALUES ($1,$2,$3,NULL,'floor','1F') ON CONFLICT DO NOTHING`,
 		ID(s.Floor),
 		tenant,
 		ID(s.Property),
-	); err != nil {
-		return err
+	)
+	if exErr != nil {
+		return exErr
 	}
 
-	if err := ex(
+	exErr = ex(
 		"room",
 		`INSERT INTO assets.spaces (id, tenant_id, property_id, parent_space_id, kind, name) VALUES ($1,$2,$3,$4,'room','Sensor room') ON CONFLICT DO NOTHING`,
 		ID(s.Room),
 		tenant,
 		ID(s.Property),
 		ID(s.Floor),
-	); err != nil {
-		return err
+	)
+	if exErr != nil {
+		return exErr
 	}
 	// the air conditioner's settings are unknown until a command sets them (the nodes report none)
 	state, _ := json.Marshal(
@@ -193,7 +201,7 @@ func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 	)
 
 	unit := ID(s.Unit)
-	if err := ex(
+	exErr = ex(
 		"unit",
 		`INSERT INTO assets.units (id, tenant_id, customer_org_id, property_id, space_id, display_name, model_id, installed_at,
 		service_scope, archived, capability_version, observed_state, observed_restriction, version, warranty_ends_at)
@@ -206,8 +214,9 @@ func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 		s.UnitName,
 		ID(s.Capability),
 		state,
-	); err != nil {
-		return err
+	)
+	if exErr != nil {
+		return exErr
 	}
 
 	device, binding := ID(s.Device), ID(s.Binding)
@@ -234,7 +243,7 @@ func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 			boundary = &x.Boundary
 		}
 
-		if err := ex(
+		err := ex(
 			"sensor "+x.Metric,
 			`INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, boundary_id, stale_after_seconds, calibrated_at)
 			VALUES ($1,$2,$3,$4,$5,$6,120,NULL) ON CONFLICT DO NOTHING`,
@@ -244,12 +253,13 @@ func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 			x.Metric,
 			x.Unit,
 			boundary,
-		); err != nil {
+		)
+		if err != nil {
 			return err
 		}
 	}
 
-	if err := ex(
+	exErr = ex(
 		"binding",
 		`INSERT INTO devices.device_bindings (id, tenant_id, device_id, unit_id, customer_org_id, bound_at, reason, actor_membership_id)
 		VALUES ($1,$2,$3,$4,$5,$6,'live sensors',$7) ON CONFLICT DO NOTHING`,
@@ -260,8 +270,9 @@ func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 		ID(s.CustomerOrgID),
 		at,
 		ID("system-demo"),
-	); err != nil {
-		return err
+	)
+	if exErr != nil {
+		return exErr
 	}
 
 	if added.RowsAffected() == 0 { // a module from an earlier start keeps its connection and last seen
@@ -285,7 +296,7 @@ func liveOwner(ctx context.Context, tx pgx.Tx, tenant uuid.UUID, at time.Time) e
 	o, org, customer := LiveSite.Owner, ID(LiveSite.CustomerOrgID), ID(LiveSite.Customer)
 
 	user, membership := ID(o.User), ID(o.Membership)
-	if _, err := tx.Exec(
+	_, err := tx.Exec(
 		ctx,
 		`INSERT INTO identity.users (id, email, display_name, status, created_at, updated_at) VALUES ($1,$2,$3,'active',$4,$4)
 		ON CONFLICT DO NOTHING`,
@@ -293,13 +304,15 @@ func liveOwner(ctx context.Context, tx pgx.Tx, tenant uuid.UUID, at time.Time) e
 		o.Email,
 		o.Name,
 		at,
-	); err != nil {
+	)
+	if err != nil {
 		return fmt.Errorf("live owner: %w", err)
 	}
 
 	var holder uuid.UUID
-	if err := tx.QueryRow(ctx, `SELECT id FROM identity.users WHERE email = $1`, o.Email).
-		Scan(&holder); err != nil {
+	err = tx.QueryRow(ctx, `SELECT id FROM identity.users WHERE email = $1`, o.Email).
+		Scan(&holder)
+	if err != nil {
 		return fmt.Errorf("live owner: %w", err)
 	}
 
@@ -322,39 +335,42 @@ func liveOwner(ctx context.Context, tx pgx.Tx, tenant uuid.UUID, at time.Time) e
 	}
 
 	for _, p := range identity.DefaultPermissions("client") {
-		if _, err := tx.Exec(
+		_, err := tx.Exec(
 			ctx,
 			`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
 			tenant,
 			membership,
 			p,
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("live owner permission %s: %w", p, err)
 		}
 	}
 
-	if _, err := tx.Exec(
+	_, execErr := tx.Exec(
 		ctx,
 		`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES ($1,$2,'organization',$3) ON CONFLICT DO NOTHING`,
 		tenant,
 		membership,
 		org,
-	); err != nil {
-		return fmt.Errorf("live owner scope: %w", err)
+	)
+	if execErr != nil {
+		return fmt.Errorf("live owner scope: %w", execErr)
 	}
 
-	if _, err := tx.Exec(
+	_, execErr = tx.Exec(
 		ctx,
 		`INSERT INTO identity.consents (tenant_id, membership_id, purpose, granted, created_at, updated_at) VALUES ($1,$2,'location_automation',false,$3,$3)
 		ON CONFLICT DO NOTHING`,
 		tenant,
 		membership,
 		at,
-	); err != nil {
-		return fmt.Errorf("live owner consent: %w", err)
+	)
+	if execErr != nil {
+		return fmt.Errorf("live owner consent: %w", execErr)
 	}
 
-	if _, err := tx.Exec(
+	_, execErr = tx.Exec(
 		ctx,
 		`INSERT INTO identity.client_users (id, tenant_id, customer_id, membership_id, email, display_name, client_role, status, invited_at,
 		invited_by_membership_id, last_invite_sent_at, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,'owner','invited',$7,$4,$7,$7,$7) ON CONFLICT DO NOTHING`,
@@ -365,8 +381,9 @@ func liveOwner(ctx context.Context, tx pgx.Tx, tenant uuid.UUID, at time.Time) e
 		o.Email,
 		o.Name,
 		at,
-	); err != nil {
-		return fmt.Errorf("live owner user list: %w", err)
+	)
+	if execErr != nil {
+		return fmt.Errorf("live owner user list: %w", execErr)
 	}
 
 	if added.RowsAffected() == 0 {

@@ -263,7 +263,8 @@ func (m Commands) create(ctx context.Context, c *ops.Call, in *CreateInput) (Com
 			return Command{}, apperr.Fields(map[string]string{"jobId": "error.required"})
 		}
 
-		if err := m.Access.TechnicianJob(ctx, c, *in.JobID, in.UnitID); err != nil {
+		err := m.Access.TechnicianJob(ctx, c, *in.JobID, in.UnitID)
+		if err != nil {
 			return Command{}, err
 		}
 
@@ -517,7 +518,8 @@ func (m Commands) list(
 	c *ops.Call,
 	in *ListInput,
 ) (paging.Page[Command], error) {
-	if err := paging.NoFilters(in.Query, "query.filters"); err != nil {
+	err := paging.NoFilters(in.Query, "query.filters")
+	if err != nil {
 		return paging.Page[Command]{}, err
 	}
 
@@ -558,9 +560,10 @@ func (m Commands) list(
 		}
 
 		var ok bool
-		if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.unit_assignment_access WHERE job_id = $1 AND unit_id = $2 AND technician_membership_id = $3)`,
+		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.unit_assignment_access WHERE job_id = $1 AND unit_id = $2 AND technician_membership_id = $3)`,
 			*in.JobID, in.UnitID, c.Principal.MembershipID).
-			Scan(&ok); err != nil {
+			Scan(&ok)
+		if err != nil {
 			return paging.Page[Command]{}, err
 		}
 
@@ -582,9 +585,10 @@ func (m Commands) list(
 	}
 
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM control.commands WHERE "+where, args...).
-		Scan(&total); err != nil {
-		return paging.Page[Command]{}, err
+	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM control.commands WHERE "+where, args...).
+		Scan(&total)
+	if scanErr != nil {
+		return paging.Page[Command]{}, scanErr
 	}
 
 	rows, err := c.Tx.Query(
@@ -642,8 +646,9 @@ func AuditResult(
 		corr   *string
 		source string
 	)
-	if err := tx.QueryRow(ctx, `SELECT tenant_id, correlation_id, source FROM control.commands WHERE id = $1`, command).
-		Scan(&tenant, &corr, &source); err != nil {
+	err := tx.QueryRow(ctx, `SELECT tenant_id, correlation_id, source FROM control.commands WHERE id = $1`, command).
+		Scan(&tenant, &corr, &source)
+	if err != nil {
 		return err
 	}
 
@@ -690,7 +695,7 @@ func ExpireCommands(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) 
 	}
 
 	for _, id := range ids {
-		if err := AuditResult(
+		err := AuditResult(
 			ctx,
 			tx,
 			id,
@@ -698,7 +703,8 @@ func ExpireCommands(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) 
 			"failed",
 			"TIMEOUT",
 			now,
-		); err != nil {
+		)
+		if err != nil {
 			return 0, err
 		}
 	}
@@ -734,17 +740,18 @@ func Acknowledge(
 	}
 
 	if tag.RowsAffected() == 1 {
-		if err := publishRestrictionCommands(
+		err := publishRestrictionCommands(
 			ctx,
 			tx,
 			events.CommandAcknowledged,
 			[]uuid.UUID{command},
 			receivedAt,
-		); err != nil { // billing reacts (IR185)
+		)
+		if err != nil { // billing reacts (IR185)
 			return true, err
 		}
 
-		if err := AuditResult(
+		err = AuditResult(
 			ctx,
 			tx,
 			command,
@@ -752,11 +759,13 @@ func Acknowledge(
 			"success",
 			"",
 			receivedAt,
-		); err != nil {
+		)
+		if err != nil {
 			return true, err
 		}
 
-		if err := applyObserved(ctx, tx, command, receivedAt); err != nil {
+		err = applyObserved(ctx, tx, command, receivedAt)
+		if err != nil {
 			return true, err
 		}
 

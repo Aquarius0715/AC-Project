@@ -191,9 +191,10 @@ func clusterFacade(t *testing.T, base apiserver.Config, v auth.Verifier) *apiser
 			return
 		}
 
-		if err := f.DrainEvents(
+		err := f.DrainEvents(
 			r.Context(),
-		); err != nil { // direct SQL of the test and worker paths (BeforeDispatch)
+		)
+		if err != nil { // direct SQL of the test and worker paths (BeforeDispatch)
 			http.Error(w, "drain before: "+err.Error(), http.StatusInternalServerError)
 
 			return
@@ -204,17 +205,19 @@ func clusterFacade(t *testing.T, base apiserver.Config, v auth.Verifier) *apiser
 
 		if r.URL.Path == "/v1/demo/advance-clock" && rec.status == http.StatusOK &&
 			base.DemoClock != nil { // the workers' tick on the new time
-			if _, err := cl.tick(
+			_, err := cl.tick(
 				context.WithoutCancel(r.Context()),
 				base.DemoClock.Now(),
-			); err != nil {
+			)
+			if err != nil {
 				panic("tick after the jump: " + err.Error())
 			}
 		}
 
-		if err := f.DrainEvents(
+		err = f.DrainEvents(
 			context.WithoutCancel(r.Context()),
-		); err != nil { // the write's events (AfterCommit)
+		)
+		if err != nil { // the write's events (AfterCommit)
 			panic("drain after: " + err.Error())
 		}
 	})))

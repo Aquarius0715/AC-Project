@@ -53,20 +53,22 @@ func Housekeep(
 		}
 
 		s.Outbox = tag.RowsAffected()
-		if tag, err = tx.Exec(
+		tag, err = tx.Exec(
 			ctx,
 			`DELETE FROM platform.processed_events p WHERE p.processed_at < $1
 			AND NOT EXISTS (SELECT 1 FROM platform.outbox o WHERE o.id = p.event_id)`,
 			now.Add(-ProcessedRetention),
-		); err != nil {
+		)
+		if err != nil {
 			return err
 		}
 
 		s.Processed = tag.RowsAffected()
-		if tag, err = tx.Exec(
+		tag, err = tx.Exec(
 			ctx,
 			`DELETE FROM platform.event_failures f WHERE NOT EXISTS (SELECT 1 FROM platform.outbox o WHERE o.id = f.event_id)`,
-		); err != nil {
+		)
+		if err != nil {
 			return err
 		}
 
@@ -80,7 +82,7 @@ func Housekeep(
 
 	var tenants []uuid.UUID
 
-	if err := m.Run(ctx, true, nil, func(tx pgx.Tx) error {
+	runErr := m.Run(ctx, true, nil, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `SELECT id FROM platform.tenants ORDER BY id`)
 		if err != nil {
 			return err
@@ -89,12 +91,13 @@ func Housekeep(
 		tenants, err = pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 
 		return err
-	}); err != nil {
-		return s, err
+	})
+	if runErr != nil {
+		return s, runErr
 	}
 
 	for _, t := range tenants {
-		if err := m.Run(ctx, false, &ops.Principal{TenantID: t}, func(tx pgx.Tx) error {
+		err := m.Run(ctx, false, &ops.Principal{TenantID: t}, func(tx pgx.Tx) error {
 			tag, err := tx.Exec(
 				ctx,
 				`DELETE FROM platform.idempotency_keys WHERE expires_at < $1`,
@@ -103,7 +106,8 @@ func Housekeep(
 			s.IdempotencyKeys += tag.RowsAffected()
 
 			return err
-		}); err != nil {
+		})
+		if err != nil {
 			return s, err
 		}
 	}

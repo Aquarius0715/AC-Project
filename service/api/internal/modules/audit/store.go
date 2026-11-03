@@ -44,7 +44,7 @@ func history(ctx context.Context, c *ops.Call, in *HistoryInput) ([]View, error)
 
 	for rows.Next() {
 		var x View
-		if err := rows.Scan(
+		err := rows.Scan(
 			&x.ID,
 			&x.TenantID,
 			&x.ActorID,
@@ -59,7 +59,8 @@ func history(ctx context.Context, c *ops.Call, in *HistoryInput) ([]View, error)
 			&x.MaskedBefore,
 			&x.MaskedAfter,
 			&x.Reason,
-		); err != nil {
+		)
+		if err != nil {
 			return nil, err
 		}
 
@@ -81,8 +82,9 @@ func EventHandlers() map[string]events.Handler {
 	return map[string]events.Handler{
 		events.AuditRecorded: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var a events.Audit
-			if err := e.Decode(&a); err != nil {
-				return err
+			decodeErr := e.Decode(&a)
+			if decodeErr != nil {
+				return decodeErr
 			}
 
 			before, after := a.MaskedBefore, a.MaskedAfter

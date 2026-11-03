@@ -138,7 +138,8 @@ func Gate(ctx context.Context, c *ops.Call, units []uuid.UUID) error {
 	) + ")"
 
 	var waiting int
-	if err := c.Tx.QueryRow(ctx, q, args...).Scan(&waiting); err != nil {
+	err := c.Tx.QueryRow(ctx, q, args...).Scan(&waiting)
+	if err != nil {
 		return err
 	}
 

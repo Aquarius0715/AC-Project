@@ -16,8 +16,9 @@ func EventHandlers() map[string]events.Handler {
 	return map[string]events.Handler{
 		events.ConsentRevoked: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.ConsentRevocation
-			if err := e.Decode(&p); err != nil || p.Purpose != "location_automation" {
-				return err
+			decodeErr := e.Decode(&p)
+			if decodeErr != nil || p.Purpose != "location_automation" {
+				return decodeErr
 			}
 			// IR53: every enabled location rule of the membership stops with consent_revoked (version + 1); renewed
 			// consent never re-enables them (an explicit save with enabled=true does, IR27)
@@ -33,8 +34,9 @@ func EventHandlers() map[string]events.Handler {
 		},
 		events.RestrictionCommandRequested: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.RestrictionCommand
-			if err := e.Decode(&p); err != nil {
-				return err
+			decodeErr := e.Decode(&p)
+			if decodeErr != nil {
+				return decodeErr
 			}
 
 			_, err := tx.Exec(
@@ -61,8 +63,9 @@ func EventHandlers() map[string]events.Handler {
 		},
 		events.RestrictionCommandsCancelled: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.CommandsCancelled
-			if err := e.Decode(&p); err != nil {
-				return err
+			decodeErr := e.Decode(&p)
+			if decodeErr != nil {
+				return decodeErr
 			}
 
 			if len(p.CommandIDs) > 0 {
@@ -120,7 +123,8 @@ func publishRestrictionCommands(
 			t, id  uuid.UUID
 			status string
 		)
-		if err := rows.Scan(&t, &id, &status); err != nil {
+		err := rows.Scan(&t, &id, &status)
+		if err != nil {
 			rows.Close()
 
 			return err
@@ -136,8 +140,9 @@ func publishRestrictionCommands(
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return rowsErr
 	}
 
 	for _, t := range order {
@@ -146,7 +151,7 @@ func publishRestrictionCommands(
 			st[id] = statuses[id]
 		}
 
-		if err := events.Publish(
+		err := events.Publish(
 			ctx,
 			tx,
 			t,
@@ -154,7 +159,8 @@ func publishRestrictionCommands(
 			byTenant[t][0],
 			eventType,
 			events.Commands{CommandIDs: byTenant[t], At: at, Statuses: st},
-		); err != nil {
+		)
+		if err != nil {
 			return err
 		}
 	}

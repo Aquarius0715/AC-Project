@@ -289,8 +289,9 @@ func (in *SummaryInput) Validate() map[string]string {
 func summary(ctx context.Context, c *ops.Call, in *SummaryInput) (Summary, error) {
 	if c.Principal.Role == "client" {
 		var mine int
-		if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND customer_org_id = $2`, in.UnitIDs, c.Principal.OrgID).
-			Scan(&mine); err != nil {
+		err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND customer_org_id = $2`, in.UnitIDs, c.Principal.OrgID).
+			Scan(&mine)
+		if err != nil {
 			return Summary{}, err
 		}
 
@@ -300,8 +301,9 @@ func summary(ctx context.Context, c *ops.Call, in *SummaryInput) (Summary, error
 	}
 
 	var known int
-	if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND NOT archived`, in.UnitIDs).
-		Scan(&known); err != nil {
+	err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND NOT archived`, in.UnitIDs).
+		Scan(&known)
+	if err != nil {
 		return Summary{}, err
 	}
 
@@ -403,7 +405,8 @@ func ForecastFor(
 
 	for rows.Next() {
 		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
+		err := rows.Scan(&id)
+		if err != nil {
 			rows.Close()
 
 			return f, err
@@ -414,8 +417,9 @@ func ForecastFor(
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return f, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return f, rowsErr
 	}
 
 	var chosen *Baseline

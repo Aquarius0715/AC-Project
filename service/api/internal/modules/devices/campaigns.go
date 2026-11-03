@@ -134,14 +134,15 @@ func campaignDetail(ctx context.Context, c *ops.Call, id uuid.UUID) (Campaign, e
 
 	for rows.Next() {
 		var r CampaignResult
-		if err := rows.Scan(
+		err := rows.Scan(
 			&r.DeviceID,
 			&r.WaveIndex,
 			&r.Status,
 			&r.ReasonKey,
 			&r.OperationID,
 			&r.At,
-		); err != nil {
+		)
+		if err != nil {
 			return x, err
 		}
 
@@ -241,9 +242,10 @@ func campaignsList(
 	where := strings.Join(conds, " AND ")
 
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM devices.firmware_campaigns WHERE "+where, args...).
-		Scan(&total); err != nil {
-		return paging.Page[Campaign]{}, err
+	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM devices.firmware_campaigns WHERE "+where, args...).
+		Scan(&total)
+	if scanErr != nil {
+		return paging.Page[Campaign]{}, scanErr
 	}
 
 	rows, err := c.Tx.Query(
@@ -264,7 +266,8 @@ func campaignsList(
 
 	for rows.Next() {
 		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
+		err := rows.Scan(&id)
+		if err != nil {
 			rows.Close()
 
 			return paging.Page[Campaign]{}, err
@@ -275,8 +278,9 @@ func campaignsList(
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return paging.Page[Campaign]{}, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return paging.Page[Campaign]{}, rowsErr
 	}
 
 	items := []Campaign{}
@@ -467,7 +471,8 @@ func (m *Module) campaignsSchedule(
 			id uuid.UUID
 			x  dv
 		)
-		if err := rows.Scan(&id, &x.fw, &x.tamper, &x.unit); err != nil {
+		err := rows.Scan(&id, &x.fw, &x.tamper, &x.unit)
+		if err != nil {
 			rows.Close()
 
 			return Campaign{}, err
@@ -478,8 +483,9 @@ func (m *Module) campaignsSchedule(
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return Campaign{}, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return Campaign{}, rowsErr
 	}
 
 	from := []string{}
@@ -522,7 +528,7 @@ func (m *Module) campaignsSchedule(
 	id := uuid.Must(uuid.NewV7())
 
 	waves, _ := json.Marshal(in.Waves)
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`INSERT INTO devices.firmware_campaigns (id, tenant_id, model_id, from_versions, target_version, checksum, waves, window_start_local,
 		window_end_local, auto_pause_failure_percent, start_at, state, created_by_membership_id) VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7::time, $8::time, $9, $10, 'scheduled', $11)`,
@@ -537,18 +543,20 @@ func (m *Module) campaignsSchedule(
 		in.AutoPauseFailurePercent,
 		in.StartAt,
 		c.Principal.MembershipID,
-	); err != nil {
-		return Campaign{}, err
+	)
+	if execErr != nil {
+		return Campaign{}, execErr
 	}
 
 	for i, d := range in.DeviceIDs {
-		if _, err := c.Tx.Exec(
+		_, err := c.Tx.Exec(
 			ctx,
 			`INSERT INTO devices.firmware_campaign_devices (campaign_id, device_id, tenant_id, wave) VALUES ($1, $2, current_setting('app.tenant_id')::uuid, $3)`,
 			id,
 			d,
 			waveOf(i, len(in.DeviceIDs), in.Waves),
-		); err != nil {
+		)
+		if err != nil {
 			return Campaign{}, err
 		}
 	}
@@ -705,10 +713,11 @@ func campaignsControl(ctx context.Context, c *ops.Call, in *ControlInput) (Campa
 		}
 	}
 
-	if err := c.Tx.QueryRow(ctx, `UPDATE devices.firmware_campaigns SET state = $2, reason = NULLIF(COALESCE($3, reason), ''), version = version + 1, updated_at = platform.app_now()
+	scanErr := c.Tx.QueryRow(ctx, `UPDATE devices.firmware_campaigns SET state = $2, reason = NULLIF(COALESCE($3, reason), ''), version = version + 1, updated_at = platform.app_now()
 		WHERE id = $1 RETURNING version`, in.CampaignID, next, reason).
-		Scan(&v); err != nil {
-		return Campaign{}, err
+		Scan(&v)
+	if scanErr != nil {
+		return Campaign{}, scanErr
 	}
 
 	r := ""

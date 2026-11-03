@@ -32,14 +32,16 @@ func TestLiveSiteSeeds(t *testing.T) {
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck // the test never commits
 
-	if err := seed.ApplyLive(ctx, tx, clock); err != nil {
-		t.Fatalf("apply: %v", err)
+	applyLiveErr := seed.ApplyLive(ctx, tx, clock)
+	if applyLiveErr != nil {
+		t.Fatalf("apply: %v", applyLiveErr)
 	}
 
 	s := seed.LiveSite
 	count := func(sql string, args ...any) int {
 		var n int
-		if err := tx.QueryRow(ctx, sql, args...).Scan(&n); err != nil {
+		err := tx.QueryRow(ctx, sql, args...).Scan(&n)
+		if err != nil {
 			t.Fatal(err)
 		}
 
@@ -108,11 +110,12 @@ func TestLiveSiteSeeds(t *testing.T) {
 		control, modeControl, fanControl, noTemperature bool
 		manufacturer, model                             string
 	)
-	if err := tx.QueryRow(ctx, `SELECT control, mode_control, fan_control, temperature IS NULL, manufacturer, model FROM devices.capabilities WHERE id = $1 AND is_current`,
+	scanErr := tx.QueryRow(ctx, `SELECT control, mode_control, fan_control, temperature IS NULL, manufacturer, model FROM devices.capabilities WHERE id = $1 AND is_current`,
 		seed.ID(s.Capability),
 	).
-		Scan(&control, &modeControl, &fanControl, &noTemperature, &manufacturer, &model); err != nil {
-		t.Fatalf("model: %v", err)
+		Scan(&control, &modeControl, &fanControl, &noTemperature, &manufacturer, &model)
+	if scanErr != nil {
+		t.Fatalf("model: %v", scanErr)
 	}
 
 	if !control || modeControl || fanControl || !noTemperature || manufacturer != s.Manufacturer ||
@@ -157,9 +160,10 @@ func TestLiveSiteSeeds(t *testing.T) {
 	read := func() {
 		t.Helper()
 
-		if err := tx.QueryRow(ctx, `SELECT d.connection, d.last_seen_at, u.connection, u.last_seen_at FROM devices.devices d JOIN assets.units u ON u.id = d.unit_id
+		err := tx.QueryRow(ctx, `SELECT d.connection, d.last_seen_at, u.connection, u.last_seen_at FROM devices.devices d JOIN assets.units u ON u.id = d.unit_id
 			WHERE d.id = $1`, seed.ID(s.Device)).
-			Scan(&devConn, &devSeen, &unitConn, &unitSeen); err != nil {
+			Scan(&devConn, &devSeen, &unitConn, &unitSeen)
+		if err != nil {
 			t.Fatalf("module: %v", err)
 		}
 	}
@@ -214,24 +218,27 @@ func TestLiveSiteSeeds(t *testing.T) {
 	}
 
 	// the module went offline since: the next start keeps that and adds nothing
-	if _, err := tx.Exec(
+	_, execErr := tx.Exec(
 		ctx,
 		`UPDATE devices.devices SET connection = 'offline' WHERE id = $1`,
 		seed.ID(s.Device),
-	); err != nil {
-		t.Fatal(err)
+	)
+	if execErr != nil {
+		t.Fatal(execErr)
 	}
 
-	if _, err := tx.Exec(
+	_, execErr = tx.Exec(
 		ctx,
 		`UPDATE assets.units SET connection = 'offline' WHERE id = $1`,
 		seed.ID(s.Unit),
-	); err != nil {
-		t.Fatal(err)
+	)
+	if execErr != nil {
+		t.Fatal(execErr)
 	}
 
-	if err := seed.ApplyLive(ctx, tx, clock.Add(time.Hour)); err != nil {
-		t.Fatalf("second apply: %v", err)
+	applyLiveErr = seed.ApplyLive(ctx, tx, clock.Add(time.Hour))
+	if applyLiveErr != nil {
+		t.Fatalf("second apply: %v", applyLiveErr)
 	}
 
 	read()
@@ -299,15 +306,17 @@ func TestLiveSiteRefusesATakenAddress(t *testing.T) {
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck // the test never commits
 
-	if _, err := tx.Exec(
+	_, execErr := tx.Exec(
 		ctx,
 		`INSERT INTO identity.users (email, display_name) VALUES ($1, 'Someone else')`,
 		seed.LiveSite.Owner.Email,
-	); err != nil {
-		t.Fatal(err)
+	)
+	if execErr != nil {
+		t.Fatal(execErr)
 	}
 
-	if err := seed.ApplyLive(ctx, tx, clock); err == nil {
+	applyLiveErr := seed.ApplyLive(ctx, tx, clock)
+	if applyLiveErr == nil {
 		t.Fatal("the seed took an address another person holds")
 	}
 }

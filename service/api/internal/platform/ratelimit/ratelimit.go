@@ -71,7 +71,8 @@ func (v Valkey) Incr(ctx context.Context, key string, ttl time.Duration) (int64,
 	n := pipe.Incr(ctx, key)
 	pipe.Expire(ctx, key, ttl)
 
-	if _, err := pipe.Exec(ctx); err != nil {
+	_, err := pipe.Exec(ctx)
+	if err != nil {
 		return 0, err
 	}
 

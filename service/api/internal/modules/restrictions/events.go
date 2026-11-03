@@ -15,21 +15,24 @@ func EventHandlers() map[string]events.Handler {
 	return map[string]events.Handler{
 		events.CommandAcknowledged: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.Commands
-			if err := e.Decode(&p); err != nil {
+			err := e.Decode(&p)
+			if err != nil {
 				return err
 			}
 
-			if _, err := tx.Exec(
+			_, err = tx.Exec(
 				ctx,
 				`UPDATE restrictions.restriction_commands SET status = 'acknowledged', updated_at = $2 WHERE command_id = ANY($1) AND status = 'requested'`,
 				p.CommandIDs,
 				p.At,
-			); err != nil {
+			)
+			if err != nil {
 				return err
 			}
 
 			for _, id := range p.CommandIDs {
-				if err := CommandAcknowledged(ctx, tx, id, p.At); err != nil {
+				err := CommandAcknowledged(ctx, tx, id, p.At)
+				if err != nil {
 					return err
 				}
 			}
@@ -38,14 +41,16 @@ func EventHandlers() map[string]events.Handler {
 		},
 		events.UnitRestrictionObserved: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.Observation
-			if err := e.Decode(&p); err != nil {
-				return err
+			decodeErr := e.Decode(&p)
+			if decodeErr != nil {
+				return decodeErr
 			}
 
 			var observed *Observation
 			if len(p.Observed) > 0 && string(p.Observed) != "null" {
 				observed = &Observation{}
-				if err := json.Unmarshal(p.Observed, observed); err != nil {
+				err := json.Unmarshal(p.Observed, observed)
+				if err != nil {
 					return err
 				}
 			}
@@ -56,7 +61,8 @@ func EventHandlers() map[string]events.Handler {
 		},
 		events.CommandsEnded: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.Commands
-			if err := e.Decode(&p); err != nil {
+			err := e.Decode(&p)
+			if err != nil {
 				return err
 			}
 
@@ -66,13 +72,14 @@ func EventHandlers() map[string]events.Handler {
 					status = "expired"
 				}
 
-				if _, err := tx.Exec(
+				_, err := tx.Exec(
 					ctx,
 					`UPDATE restrictions.restriction_commands SET status = $2, updated_at = $3 WHERE command_id = $1 AND status = 'requested'`,
 					id,
 					status,
 					p.At,
-				); err != nil {
+				)
+				if err != nil {
 					return err
 				}
 			}

@@ -33,15 +33,17 @@ func ApplyFleetHistory(
 	}
 
 	var tenant string
-	if err := tx.QueryRow(ctx, `SELECT tenant_id::text FROM assets.customers WHERE organization_id = $1`, ID(f.CustomerOrgID)).
-		Scan(&tenant); err != nil {
+	err := tx.QueryRow(ctx, `SELECT tenant_id::text FROM assets.customers WHERE organization_id = $1`, ID(f.CustomerOrgID)).
+		Scan(&tenant)
+	if err != nil {
 		return 0, fmt.Errorf("history customer %s: %w", f.CustomerOrgID, err)
 	}
 
-	if _, err := tx.Exec(
+	_, err = tx.Exec(
 		ctx,
 		`SET LOCAL session_replication_role = replica`,
-	); err != nil { // no capture events for history
+	)
+	if err != nil { // no capture events for history
 		return 0, err
 	}
 
@@ -184,22 +186,24 @@ func ApplyFleetHistory(
 			total += tag.RowsAffected()
 		}
 		// the module was last heard from at its last reading
-		if _, err := tx.Exec(
+		_, execErr := tx.Exec(
 			ctx,
 			`UPDATE devices.devices SET last_seen_at = $2 WHERE id = $1 AND (last_seen_at IS NULL OR last_seen_at < $2)`,
 			ID(devicesim.DeviceName(p)),
 			last,
-		); err != nil {
-			return total, err
+		)
+		if execErr != nil {
+			return total, execErr
 		}
 
-		if _, err := tx.Exec(
+		_, execErr = tx.Exec(
 			ctx,
 			`UPDATE assets.units SET last_seen_at = $2 WHERE id = $1 AND (last_seen_at IS NULL OR last_seen_at < $2)`,
 			unit,
 			last,
-		); err != nil {
-			return total, err
+		)
+		if execErr != nil {
+			return total, execErr
 		}
 	}
 

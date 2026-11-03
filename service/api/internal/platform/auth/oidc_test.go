@@ -33,10 +33,11 @@ func TestOIDCVerifier(t *testing.T) {
 			"exp": time.Now().Add(time.Hour).Unix(),
 		}
 	}
-	if id, err := v.Verify(
+	id, err := v.Verify(
 		context.Background(),
 		sign(key, base()),
-	); err != nil || id.Subject != "user-1" || !id.SignedIn.IsZero() || id.Client != "ac-web" ||
+	)
+	if err != nil || id.Subject != "user-1" || !id.SignedIn.IsZero() || id.Client != "ac-web" ||
 		id.AdminApp {
 		t.Fatalf("valid token: %+v %v", id, err)
 	}
@@ -49,10 +50,11 @@ func TestOIDCVerifier(t *testing.T) {
 
 		maps.Copy(claims, c)
 
-		if id, err := v.Verify(
+		id, err := v.Verify(
 			context.Background(),
 			sign(key, claims),
-		); err != nil || id.Client != "ac-admin-web" ||
+		)
+		if err != nil || id.Client != "ac-admin-web" ||
 			!id.AdminApp {
 			t.Errorf("HQ's app by %s: %+v %v", name, id, err)
 		}
@@ -71,19 +73,21 @@ func TestOIDCVerifier(t *testing.T) {
 	c := base()
 
 	c["auth_time"] = signedIn.Unix()
-	if id, err := v.Verify(
+	id, err = v.Verify(
 		context.Background(),
 		sign(key, c),
-	); err != nil ||
+	)
+	if err != nil ||
 		!id.SignedIn.Equal(signedIn) {
 		t.Fatalf("auth_time: %+v %v", id, err)
 	}
 
 	c["auth_time"] = "yesterday"
-	if id, err := v.Verify(
+	id, err = v.Verify(
 		context.Background(),
 		sign(key, c),
-	); err != nil ||
+	)
+	if err != nil ||
 		!id.SignedIn.IsZero() {
 		t.Fatalf("a non-numeric auth_time gives no sign-in time: %+v %v", id, err)
 	}
@@ -92,7 +96,8 @@ func TestOIDCVerifier(t *testing.T) {
 	delete(c, "azp")
 
 	c["aud"] = "ac-admin-web"
-	if _, err := v.Verify(context.Background(), sign(key, c)); err != nil {
+	_, err = v.Verify(context.Background(), sign(key, c))
+	if err != nil {
 		t.Fatalf("aud claim: %v", err)
 	}
 
@@ -100,7 +105,8 @@ func TestOIDCVerifier(t *testing.T) {
 	delete(c, "typ")
 
 	c["token_use"] = "access"
-	if _, err := v.Verify(context.Background(), sign(key, c)); err != nil {
+	_, err = v.Verify(context.Background(), sign(key, c))
+	if err != nil {
 		t.Fatalf("Cognito access token: %v", err)
 	}
 
@@ -139,17 +145,20 @@ func TestOIDCVerifier(t *testing.T) {
 
 	bad["no token type"] = c
 	for name, cl := range bad {
-		if _, err := v.Verify(context.Background(), sign(key, cl)); err == nil {
+		_, err := v.Verify(context.Background(), sign(key, cl))
+		if err == nil {
 			t.Errorf("%s must fail", name)
 		}
 	}
 
-	if _, err := v.Verify(context.Background(), sign(other, base())); err == nil {
+	_, err = v.Verify(context.Background(), sign(other, base()))
+	if err == nil {
 		t.Error("wrong key must fail")
 	}
 
 	hs, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, base()).SignedString([]byte("secret"))
-	if _, err := v.Verify(context.Background(), hs); err == nil {
+	_, err = v.Verify(context.Background(), hs)
+	if err == nil {
 		t.Error("HS256 must be rejected")
 	}
 }
@@ -157,7 +166,8 @@ func TestOIDCVerifier(t *testing.T) {
 func TestNewVerifierFromEnv(t *testing.T) {
 	t.Setenv("OIDC_ISSUER", "")
 
-	if _, err := NewVerifierFromEnv(context.Background()); err == nil {
+	_, err := NewVerifierFromEnv(context.Background())
+	if err == nil {
 		t.Fatal("issuer required")
 	}
 

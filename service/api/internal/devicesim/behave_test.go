@@ -12,7 +12,8 @@ func readings(t *testing.T, raw []byte) []map[string]any {
 	var b struct {
 		Measurements []map[string]any `json:"measurements"`
 	}
-	if err := json.Unmarshal(raw, &b); err != nil {
+	err := json.Unmarshal(raw, &b)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -89,8 +90,9 @@ func TestCommandBehaviours(t *testing.T) {
 		}
 
 		var a map[string]any
-		if err := json.Unmarshal(raw, &a); err != nil {
-			t.Fatal(err)
+		unmarshalErr := json.Unmarshal(raw, &a)
+		if unmarshalErr != nil {
+			t.Fatal(unmarshalErr)
 		}
 
 		return a, at
@@ -138,11 +140,13 @@ func TestOnlyNarrowsTheReadings(t *testing.T) {
 // TestAModuleWithoutSensorsOnlyBeats: a module narrowed to no sensor sends no readings, and still its heartbeat (IR613).
 func TestAModuleWithoutSensorsOnlyBeats(t *testing.T) {
 	m := NewModule(tenant, device, "v1", 1).Only()
-	if raw, err := m.Telemetry(time.Now()); err != nil || raw != nil {
+	raw, err := m.Telemetry(time.Now())
+	if err != nil || raw != nil {
 		t.Errorf("readings %s %v", raw, err)
 	}
 
-	if raw, err := m.Beat(time.Now()); err != nil || raw == nil {
+	raw, err = m.Beat(time.Now())
+	if err != nil || raw == nil {
 		t.Errorf("heartbeat %s %v", raw, err)
 	}
 }
@@ -159,8 +163,9 @@ func TestHeartbeatReportsTheState(t *testing.T) {
 		}
 
 		var h map[string]any
-		if err := json.Unmarshal(raw, &h); err != nil {
-			t.Fatal(err)
+		unmarshalErr := json.Unmarshal(raw, &h)
+		if unmarshalErr != nil {
+			t.Fatal(unmarshalErr)
 		}
 
 		return h
@@ -172,12 +177,13 @@ func TestHeartbeatReportsTheState(t *testing.T) {
 		t.Errorf("state %v", st)
 	}
 
-	if _, _, err := m.Acknowledge(
+	_, _, err := m.Acknowledge(
 		[]byte(
 			`{"commandId":"c1","kind":"set_temperature","setpointCelsius":27,"expiresAt":"2099-01-01T00:00:00Z"}`,
 		),
 		time.Now(),
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -196,12 +202,13 @@ func TestKeptSetpoint(t *testing.T) {
 	celsius, power := 24.0, true
 
 	m := NewModule("t", "d", "v1", 1).Reports(&power, &celsius, nil, nil)
-	if _, _, err := m.Acknowledge(
+	_, _, err := m.Acknowledge(
 		[]byte(
 			`{"commandId":"c1","kind":"set_temperature","setpointCelsius":27,"expiresAt":"2099-01-01T00:00:00Z"}`,
 		),
 		time.Now(),
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -213,11 +220,12 @@ func TestKeptSetpoint(t *testing.T) {
 	c2 := 24.0
 
 	again := NewModule("t", "d", "v1", 1).Reports(&power, &c2, nil, nil)
-	if err := again.Restore(
+	restoreErr := again.Restore(
 		kept,
-	); err != nil || again.setpoint != 27 ||
+	)
+	if restoreErr != nil || again.setpoint != 27 ||
 		*again.state.Celsius != 27 {
-		t.Fatalf("restore: %v %v", err, again.setpoint)
+		t.Fatalf("restore: %v %v", restoreErr, again.setpoint)
 	}
 
 	if again.KeptTopic() != "t/t/d/d/sim/kept" {
@@ -225,7 +233,8 @@ func TestKeptSetpoint(t *testing.T) {
 	}
 
 	for _, bad := range []string{`{"setpointCelsius":45}`, `not json`} {
-		if err := again.Restore([]byte(bad)); err == nil || again.setpoint != 27 {
+		err := again.Restore([]byte(bad))
+		if err == nil || again.setpoint != 27 {
 			t.Errorf("restore %s: %v %v", bad, err, again.setpoint)
 		}
 	}

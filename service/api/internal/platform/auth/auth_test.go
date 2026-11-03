@@ -34,12 +34,13 @@ func setup(t *testing.T) *Authenticator {
 		t.Fatal(err)
 	}
 
-	if err := pgx.BeginFunc(
+	beginFuncErr := pgx.BeginFunc(
 		ctx,
 		conn,
 		func(tx pgx.Tx) error { return seed.Apply(ctx, tx, f) },
-	); err != nil {
-		t.Fatal(err)
+	)
+	if beginFuncErr != nil {
+		t.Fatal(beginFuncErr)
 	}
 
 	conn.Close(ctx)
@@ -219,14 +220,16 @@ func TestHQThroughItsApp(t *testing.T) {
 }
 
 func TestStaticVerifier(t *testing.T) {
-	if _, err := (StaticVerifier{}).Verify(context.Background(), "x"); err == nil {
+	_, err := (StaticVerifier{}).Verify(context.Background(), "x")
+	if err == nil {
 		t.Fatal("unknown token")
 	}
 
-	if id, err := (StaticVerifier{"x": "sub"}).Verify(
+	id, err := (StaticVerifier{"x": "sub"}).Verify(
 		context.Background(),
 		"x",
-	); err != nil || id.Subject != "sub" ||
+	)
+	if err != nil || id.Subject != "sub" ||
 		!id.SignedIn.IsZero() {
 		t.Fatalf("static tokens carry no sign-in time: %+v %v", id, err)
 	}
@@ -264,18 +267,20 @@ func TestRecordSignIn(t *testing.T) {
 
 	user := seed.ID("user-customer-a")
 	set := func(last *time.Time) {
-		if _, err := owner.Exec(
+		_, err := owner.Exec(
 			ctx,
 			`UPDATE identity.users SET last_sign_in_at = $2, sign_in_auth_time = CASE WHEN $2::timestamptz IS NULL THEN NULL ELSE sign_in_auth_time END WHERE id = $1`,
 			user,
 			last,
-		); err != nil {
+		)
+		if err != nil {
 			t.Fatal(err)
 		}
 	}
 	read := func() (last, auth *time.Time) {
-		if err := owner.QueryRow(ctx, `SELECT last_sign_in_at, sign_in_auth_time FROM identity.users WHERE id = $1`, user).
-			Scan(&last, &auth); err != nil {
+		err := owner.QueryRow(ctx, `SELECT last_sign_in_at, sign_in_auth_time FROM identity.users WHERE id = $1`, user).
+			Scan(&last, &auth)
+		if err != nil {
 			t.Fatal(err)
 		}
 

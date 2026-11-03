@@ -49,7 +49,8 @@ func overdue(ctx context.Context, c *ops.Call, in *OverdueInput) ([]Overdue, err
 
 	for rows.Next() {
 		var o Overdue
-		if err := rows.Scan(&o.Currency, &o.Count, &o.AmountMinor); err != nil {
+		err := rows.Scan(&o.Currency, &o.Count, &o.AmountMinor)
+		if err != nil {
 			return nil, err
 		}
 

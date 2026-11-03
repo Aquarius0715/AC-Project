@@ -161,7 +161,8 @@ func TestUpstreamDownIsUnavailable(t *testing.T) {
 func TestTargetsFromEnv(t *testing.T) {
 	env := map[string]string{}
 
-	if _, err := TargetsFromEnv(func(k string) string { return env[k] }); err == nil {
+	_, err := TargetsFromEnv(func(k string) string { return env[k] })
+	if err == nil {
 		t.Fatal("missing URLs must fail")
 	}
 
@@ -177,7 +178,8 @@ func TestTargetsFromEnv(t *testing.T) {
 
 	env["ENERGY_API_URL"] = "not a url"
 
-	if _, err := TargetsFromEnv(func(k string) string { return env[k] }); err == nil {
+	_, targetsFromEnvErr := TargetsFromEnv(func(k string) string { return env[k] })
+	if targetsFromEnvErr == nil {
 		t.Fatal("relative URL must fail")
 	}
 }

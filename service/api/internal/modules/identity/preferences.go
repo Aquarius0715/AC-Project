@@ -119,7 +119,7 @@ func updatePreferences(
 		monthly = *in.MonthlyReportEmail
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`INSERT INTO identity.preferences (user_id, locale, timezone, monthly_report_email, updated_at) VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (user_id) DO UPDATE SET locale = $2, timezone = $3, monthly_report_email = $4, version = identity.preferences.version + 1, updated_at = $5`,
@@ -128,8 +128,9 @@ func updatePreferences(
 		in.Timezone,
 		monthly,
 		c.Now,
-	); err != nil {
-		return cur, err
+	)
+	if execErr != nil {
+		return cur, execErr
 	}
 
 	c.Audit(
@@ -278,7 +279,7 @@ func updateConsent(ctx context.Context, c *ops.Call, in *ConsentUpdateInput) (Co
 		x.RevokedAt = &c.Now
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE identity.consents SET granted = $2, granted_at = $3, revoked_at = $4, version = version + 1, updated_at = $5 WHERE id = $1::uuid`,
 		x.ID,
@@ -286,8 +287,9 @@ func updateConsent(ctx context.Context, c *ops.Call, in *ConsentUpdateInput) (Co
 		x.GrantedAt,
 		x.RevokedAt,
 		c.Now,
-	); err != nil {
-		return x, err
+	)
+	if execErr != nil {
+		return x, execErr
 	}
 
 	prev := x.Version

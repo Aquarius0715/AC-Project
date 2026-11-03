@@ -70,7 +70,8 @@ func TestFilterReminders(t *testing.T) {
 		t.Helper()
 		owner(t, `DELETE FROM maintenance.filter_reminder_watermarks WHERE tenant_id = $1`, tenant)
 
-		if _, err := schedTick(ctx, s, at); err != nil {
+		_, err := schedTick(ctx, s, at)
+		if err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -205,7 +206,8 @@ func TestFilterReminders(t *testing.T) {
 		t.Errorf("audit: %d", audits)
 	}
 	// the same cycle is reminded once; within 15 minutes nothing is evaluated
-	if _, err := schedTick(ctx, s, clock.Add(5*time.Minute)); err != nil {
+	_, err := schedTick(ctx, s, clock.Add(5*time.Minute))
+	if err != nil {
 		t.Fatal(err)
 	}
 

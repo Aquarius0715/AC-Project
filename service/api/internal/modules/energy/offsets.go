@@ -186,9 +186,10 @@ func previewQuote(ctx context.Context, c *ops.Call, in *QuoteInput) (Quote, erro
 	}
 
 	var inOrg int
-	if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND customer_org_id = $2 AND NOT archived`, in.UnitIDs, org).
-		Scan(&inOrg); err != nil {
-		return Quote{}, err
+	scanErr := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND customer_org_id = $2 AND NOT archived`, in.UnitIDs, org).
+		Scan(&inOrg)
+	if scanErr != nil {
+		return Quote{}, scanErr
 	}
 
 	if inOrg != len(in.UnitIDs) {
@@ -200,11 +201,12 @@ func previewQuote(ctx context.Context, c *ops.Call, in *QuoteInput) (Quote, erro
 	}
 
 	var id uuid.UUID
-	if err := c.Tx.QueryRow(ctx, `INSERT INTO energy.offset_quotes (tenant_id, customer_id, purpose, amount_kg, period, unit_ids, expires_at, created_at)
+	scanErr = c.Tx.QueryRow(ctx, `INSERT INTO energy.offset_quotes (tenant_id, customer_id, purpose, amount_kg, period, unit_ids, expires_at, created_at)
 		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, tstzrange($4, $5), $6, $7, $8) RETURNING id`,
 		customer, in.Purpose, in.AmountKg, in.Period.From, in.Period.To, in.UnitIDs, c.Now.Add(QuoteTTL), c.Now).
-		Scan(&id); err != nil {
-		return Quote{}, err
+		Scan(&id)
+	if scanErr != nil {
+		return Quote{}, scanErr
 	}
 
 	return scanQuote(
@@ -308,7 +310,8 @@ func decorateRecord(ctx context.Context, c *ops.Call, x *Record) error {
 
 	for rows.Next() {
 		var a Attempt
-		if err := rows.Scan(&a.ID, &a.Stage, &a.Status, &a.StartedAt, &a.CompletedAt); err != nil {
+		err := rows.Scan(&a.ID, &a.Stage, &a.Status, &a.StartedAt, &a.CompletedAt)
+		if err != nil {
 			rows.Close()
 
 			return err
@@ -319,8 +322,9 @@ func decorateRecord(ctx context.Context, c *ops.Call, x *Record) error {
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return rowsErr
 	}
 
 	if x.State != "demo_retired" && len(x.Attempts) > 0 {
@@ -405,10 +409,11 @@ func listRecords(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 		From       *time.Time `json:"from,omitempty"`   // [from, to) on createdAt
 		To         *time.Time `json:"to,omitempty"`
 	}
-	if err := decodeStrict(
+	err := decodeStrict(
 		in.Filters,
 		&f,
-	); err != nil ||
+	)
+	if err != nil ||
 		(f.Status != nil && !strings.Contains(" demo_requested demo_purchased demo_retired failed ", " "+*f.Status+" ")) {
 		return paging.Page[Record]{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
 	}
@@ -467,9 +472,10 @@ func listRecords(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 	where := strings.Join(conds, " AND ")
 
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM "+recordFrom+" WHERE "+where, args...).
-		Scan(&total); err != nil {
-		return paging.Page[Record]{}, err
+	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM "+recordFrom+" WHERE "+where, args...).
+		Scan(&total)
+	if scanErr != nil {
+		return paging.Page[Record]{}, scanErr
 	}
 
 	rows, err := c.Tx.Query(
@@ -503,12 +509,14 @@ func listRecords(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return paging.Page[Record]{}, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return paging.Page[Record]{}, rowsErr
 	}
 
 	for i := range items {
-		if err := decorateRecord(ctx, c, &items[i]); err != nil {
+		err := decorateRecord(ctx, c, &items[i])
+		if err != nil {
 			return paging.Page[Record]{}, err
 		}
 	}
@@ -633,7 +641,8 @@ func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, erro
 		}
 
 		if client {
-			if _, _, err := customerOf(ctx, c, &q.CustomerID); err != nil {
+			_, _, err := customerOf(ctx, c, &q.CustomerID)
+			if err != nil {
 				return Record{}, err
 			}
 		}
@@ -643,9 +652,10 @@ func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, erro
 		}
 
 		var used bool
-		if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM energy.offset_records WHERE quote_id = $1)`, q.ID).
-			Scan(&used); err != nil {
-			return Record{}, err
+		scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM energy.offset_records WHERE quote_id = $1)`, q.ID).
+			Scan(&used)
+		if scanErr != nil {
+			return Record{}, scanErr
 		}
 
 		if used || !c.Now.Before(q.ExpiresAt) {
@@ -653,14 +663,16 @@ func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, erro
 		}
 
 		var id uuid.UUID
-		if err := c.Tx.QueryRow(ctx, `INSERT INTO energy.offset_records (tenant_id, quote_id, customer_id, amount_kg, state, created_at, updated_at)
+		scanErr = c.Tx.QueryRow(ctx, `INSERT INTO energy.offset_records (tenant_id, quote_id, customer_id, amount_kg, state, created_at, updated_at)
 			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'demo_requested', $4, $4) RETURNING id`, q.ID, q.CustomerID, q.AmountKg, c.Now).
-			Scan(&id); err != nil {
-			return Record{}, err
+			Scan(&id)
+		if scanErr != nil {
+			return Record{}, scanErr
 		}
 
-		if err := newAttempt(ctx, c, id, "purchase"); err != nil {
-			return Record{}, err
+		newAttemptErr := newAttempt(ctx, c, id, "purchase")
+		if newAttemptErr != nil {
+			return Record{}, newAttemptErr
 		}
 
 		v := 1
@@ -742,8 +754,9 @@ func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, erro
 
 	switch {
 	case in.Event == "purchase_confirm" && x.State == "demo_requested" && cur.Stage == "purchase" && cur.Status == "pending":
-		if err := finish("succeeded"); err != nil {
-			return x, err
+		finishErr := finish("succeeded")
+		if finishErr != nil {
+			return x, finishErr
 		}
 
 		var ref *string
@@ -751,20 +764,23 @@ func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, erro
 			ref = demoRef("DEMO-PUR")
 		}
 
-		if err := setState("demo_purchased", ref, nil, nil); err != nil {
-			return x, err
+		setStateErr := setState("demo_purchased", ref, nil, nil)
+		if setStateErr != nil {
+			return x, setStateErr
 		}
 
 		err = newAttempt(ctx, c, x.ID, "retirement")
 	case in.Event == "retire" && x.State == "demo_purchased" && cur.Stage == "retirement" && cur.Status == "pending":
-		if err := finish("succeeded"); err != nil {
-			return x, err
+		finishErr := finish("succeeded")
+		if finishErr != nil {
+			return x, finishErr
 		}
 
 		err = setState("demo_retired", nil, demoRef("DEMO-RET"), demoRef("DEMO-CERT"))
 	case in.Event == "fail" && (x.State == "demo_requested" || x.State == "demo_purchased") && cur.Status == "pending":
-		if err := finish("failed"); err != nil {
-			return x, err
+		finishErr := finish("failed")
+		if finishErr != nil {
+			return x, finishErr
 		}
 
 		err = setState("failed", nil, nil, nil)
@@ -774,8 +790,9 @@ func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, erro
 			next = "demo_purchased"
 		}
 
-		if err := setState(next, nil, nil, nil); err != nil {
-			return x, err
+		setStateErr := setState(next, nil, nil, nil)
+		if setStateErr != nil {
+			return x, setStateErr
 		}
 
 		err = newAttempt(ctx, c, x.ID, cur.Stage)

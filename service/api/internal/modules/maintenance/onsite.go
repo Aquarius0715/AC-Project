@@ -60,8 +60,9 @@ func (m OnSite) lockOwn(
 		return "", TimeOnSite{}, err
 	}
 
-	if err := m.Access.TechnicianJob(ctx, c, id, unit); err != nil {
-		return "", TimeOnSite{}, err
+	technicianJobErr := m.Access.TechnicianJob(ctx, c, id, unit)
+	if technicianJobErr != nil {
+		return "", TimeOnSite{}, technicianJobErr
 	}
 
 	if v != *c.ExpectedVersion {
@@ -70,7 +71,8 @@ func (m OnSite) lockOwn(
 
 	t := TimeOnSite{Pauses: []Pause{}}
 	if len(raw) > 0 && string(raw) != "null" {
-		if err := json.Unmarshal(raw, &t); err != nil {
+		err := json.Unmarshal(raw, &t)
+		if err != nil {
 			return "", t, err
 		}
 	}
@@ -91,7 +93,7 @@ func (m OnSite) save(
 	action, event, reason string,
 ) (Job, error) {
 	raw, _ := json.Marshal(t)
-	if _, err := c.Tx.Exec(
+	_, err := c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.jobs SET status = $2, time_on_site = $3, started_at = COALESCE(started_at, $4), version = version + 1,
 		updated_at = platform.app_now() WHERE id = $1`,
@@ -99,11 +101,13 @@ func (m OnSite) save(
 		status,
 		raw,
 		t.StartedAt,
-	); err != nil {
+	)
+	if err != nil {
 		return Job{}, err
 	}
 
-	if err := m.Jobs.event(ctx, c, id, action, nil); err != nil {
+	err = m.Jobs.event(ctx, c, id, action, nil)
+	if err != nil {
 		return Job{}, err
 	}
 
@@ -282,8 +286,9 @@ func (m OnSite) checkInJob(ctx context.Context, c *ops.Call, in *CheckInInput) (
 
 	if in.Method == "location_qr" {
 		var unit uuid.UUID
-		if err := c.Tx.QueryRow(ctx, `SELECT unit_id FROM maintenance.jobs WHERE id = $1`, in.JobID).
-			Scan(&unit); err != nil {
+		err := c.Tx.QueryRow(ctx, `SELECT unit_id FROM maintenance.jobs WHERE id = $1`, in.JobID).
+			Scan(&unit)
+		if err != nil {
 			return Job{}, err
 		}
 
@@ -484,9 +489,10 @@ func (m OnSite) acknowledge(ctx context.Context, c *ops.Call, in *AckInput) (Ass
 	}
 
 	var v int
-	if err := c.Tx.QueryRow(ctx, `SELECT version FROM maintenance.jobs WHERE id = $1 FOR UPDATE`, in.JobID).
-		Scan(&v); err != nil {
-		return Assignment{}, err
+	scanErr := c.Tx.QueryRow(ctx, `SELECT version FROM maintenance.jobs WHERE id = $1 FOR UPDATE`, in.JobID).
+		Scan(&v)
+	if scanErr != nil {
+		return Assignment{}, scanErr
 	}
 
 	if v != *c.ExpectedVersion {
@@ -509,7 +515,7 @@ func (m OnSite) acknowledge(ctx context.Context, c *ops.Call, in *AckInput) (Ass
 		}
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.assignments SET acknowledgement = $2, acknowledged_at = $3, cant_make_reason = $4,
 		alternative_slot = CASE WHEN $5::timestamptz IS NULL THEN NULL ELSE tstzrange($5, $6) END, version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
@@ -519,20 +525,23 @@ func (m OnSite) acknowledge(ctx context.Context, c *ops.Call, in *AckInput) (Ass
 		in.Reason,
 		altStart,
 		altEnd,
-	); err != nil {
-		return Assignment{}, err
+	)
+	if execErr != nil {
+		return Assignment{}, execErr
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr = c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.jobs SET version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
 		in.JobID,
-	); err != nil {
-		return Assignment{}, err
+	)
+	if execErr != nil {
+		return Assignment{}, execErr
 	}
 
-	if err := m.Jobs.event(ctx, c, in.JobID, "assignment."+value, nil); err != nil {
-		return Assignment{}, err
+	eventErr := m.Jobs.event(ctx, c, in.JobID, "assignment."+value, nil)
+	if eventErr != nil {
+		return Assignment{}, eventErr
 	}
 
 	j, err := m.Jobs.scoped(ctx, c, in.JobID)

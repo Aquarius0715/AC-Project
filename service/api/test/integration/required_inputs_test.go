@@ -154,7 +154,8 @@ func TestRequiredInputs(t *testing.T) {
 		{"telemetry.series", `{"query":{"filters":{"x":"1"}}}`, map[string]string{"x": "error.notAllowed"}}, // the REST binding refuses an unknown query parameter first
 	} {
 		body := map[string]any{}
-		if err := json.Unmarshal([]byte(c.body), &body); err != nil {
+		err := json.Unmarshal([]byte(c.body), &body)
+		if err != nil {
 			t.Fatalf("%s: body %v", c.op, err)
 		}
 

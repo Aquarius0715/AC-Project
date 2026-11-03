@@ -131,9 +131,10 @@ func exportReport(ctx context.Context, c *ops.Call, in *ExportInput) (ReportFile
 	}
 
 	var own int
-	if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_properties WHERE id = ANY($1) AND customer_org_id = $2 AND NOT archived`, in.PropertyIDs, c.Principal.OrgID).
-		Scan(&own); err != nil {
-		return ReportFile{}, err
+	scanErr := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_properties WHERE id = ANY($1) AND customer_org_id = $2 AND NOT archived`, in.PropertyIDs, c.Principal.OrgID).
+		Scan(&own)
+	if scanErr != nil {
+		return ReportFile{}, scanErr
 	}
 
 	if own != len(in.PropertyIDs) {
@@ -203,9 +204,10 @@ func exportReport(ctx context.Context, c *ops.Call, in *ExportInput) (ReportFile
 			)
 		case "co2_offsets":
 			var retired float64
-			if err := c.Tx.QueryRow(ctx, `SELECT COALESCE(sum(r.amount_kg), 0)::float8 FROM energy.offset_records r JOIN energy.ref_customers cu ON cu.id = r.customer_id
+			err := c.Tx.QueryRow(ctx, `SELECT COALESCE(sum(r.amount_kg), 0)::float8 FROM energy.offset_records r JOIN energy.ref_customers cu ON cu.id = r.customer_id
 				WHERE cu.organization_id = $1 AND r.state = 'demo_retired' AND r.updated_at >= $2 AND r.updated_at < $3`, c.Principal.OrgID, start, end).
-				Scan(&retired); err != nil {
+				Scan(&retired)
+			if err != nil {
 				return ReportFile{}, err
 			}
 
@@ -217,9 +219,10 @@ func exportReport(ctx context.Context, c *ops.Call, in *ExportInput) (ReportFile
 			)
 		case "alerts_maintenance":
 			var alerts, jobs int
-			if err := c.Tx.QueryRow(ctx, `SELECT (SELECT count(*) FROM energy.ref_alerts WHERE unit_id = ANY($1) AND detected_at >= $2 AND detected_at < $3),
+			err := c.Tx.QueryRow(ctx, `SELECT (SELECT count(*) FROM energy.ref_alerts WHERE unit_id = ANY($1) AND detected_at >= $2 AND detected_at < $3),
 				(SELECT count(*) FROM energy.ref_jobs WHERE unit_id = ANY($1) AND status = 'completed' AND updated_at >= $2 AND updated_at < $3)`, units, start, end).
-				Scan(&alerts, &jobs); err != nil {
+				Scan(&alerts, &jobs)
+			if err != nil {
 				return ReportFile{}, err
 			}
 

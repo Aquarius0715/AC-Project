@@ -23,7 +23,7 @@ func freeze(t *testing.T, now time.Time) {
 	}
 	defer conn.Close(ctx)
 
-	if err := pgx.BeginFunc(
+	beginFuncErr := pgx.BeginFunc(
 		ctx,
 		conn,
 		func(tx pgx.Tx) error {
@@ -31,8 +31,9 @@ func freeze(t *testing.T, now time.Time) {
 
 			return err
 		},
-	); err != nil {
-		t.Fatal(err)
+	)
+	if beginFuncErr != nil {
+		t.Fatal(beginFuncErr)
 	}
 }
 

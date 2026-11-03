@@ -248,7 +248,8 @@ func envOr(key, def string) string {
 func subscribe(client mqtt.Client, modules []*devicesim.Module) {
 	for _, m := range modules {
 		tok := client.Subscribe(m.KeptTopic(), 1, func(_ mqtt.Client, msg mqtt.Message) {
-			if err := m.Restore(msg.Payload()); err != nil {
+			err := m.Restore(msg.Payload())
+			if err != nil {
 				log.Printf("kept %s: %v", m.DeviceID, err)
 			}
 		})
@@ -266,7 +267,8 @@ func subscribe(client mqtt.Client, modules []*devicesim.Module) {
 				return
 			}
 
-			if kept, err := m.Keep(); err == nil { // retained, so the next start reads it back
+			kept, keepErr := m.Keep()
+			if keepErr == nil { // retained, so the next start reads it back
 				if tok := client.Publish(
 					m.KeptTopic(),
 					1,

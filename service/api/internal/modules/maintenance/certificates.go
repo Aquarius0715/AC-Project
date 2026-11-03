@@ -130,9 +130,10 @@ func (m Certificates) lock(
 		return x, "", err
 	}
 
-	if err := c.Tx.QueryRow(ctx, `SELECT status FROM maintenance.certificates WHERE id = $1`, id).
-		Scan(&stored); err != nil {
-		return x, "", err
+	scanErr := c.Tx.QueryRow(ctx, `SELECT status FROM maintenance.certificates WHERE id = $1`, id).
+		Scan(&stored)
+	if scanErr != nil {
+		return x, "", scanErr
 	}
 
 	if x.Version != *c.ExpectedVersion {
@@ -248,8 +249,9 @@ func (m Certificates) submit(
 
 	if in.RenewalOf != nil {
 		var ok bool
-		if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.certificates WHERE id = $1 AND membership_id = $2 AND code = $3)`, *in.RenewalOf, in.MembershipID, in.Code).
-			Scan(&ok); err != nil {
+		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.certificates WHERE id = $1 AND membership_id = $2 AND code = $3)`, *in.RenewalOf, in.MembershipID, in.Code).
+			Scan(&ok)
+		if err != nil {
 			return Certificate{}, err
 		}
 
@@ -261,12 +263,13 @@ func (m Certificates) submit(
 	id := uuid.New()
 
 	key := "certificates/" + in.MembershipID.String() + "/" + id.String()
-	if err := m.Blobs.Put(ctx, key, in.File.Mime, in.File.Bytes); err != nil {
-		return Certificate{}, err
+	putErr := m.Blobs.Put(ctx, key, in.File.Mime, in.File.Bytes)
+	if putErr != nil {
+		return Certificate{}, putErr
 	}
 
 	name := strings.TrimSpace(in.File.Name)
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`INSERT INTO maintenance.certificates (id, tenant_id, membership_id, organization_id, code, name, number, issued_at, expires_at, object_key,
 		file_name, status, renewal_of, created_at, updated_at) VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending_verification', $11, $12, $12)`,
@@ -282,8 +285,9 @@ func (m Certificates) submit(
 		name,
 		in.RenewalOf,
 		c.Now,
-	); err != nil {
-		return Certificate{}, err
+	)
+	if execErr != nil {
+		return Certificate{}, execErr
 	}
 
 	x, err := m.reload(ctx, c, id)
@@ -381,29 +385,31 @@ func (m Certificates) verify(
 	}
 
 	if in.Decision == "approve" {
-		if _, err := c.Tx.Exec(
+		_, err := c.Tx.Exec(
 			ctx,
 			`UPDATE maintenance.certificates SET status = 'valid', verified_by_membership_id = $2, verified_at = $3, version = version + 1, updated_at = $3 WHERE id = $1`,
 			x.ID,
 			c.Principal.MembershipID,
 			c.Now,
-		); err != nil {
+		)
+		if err != nil {
 			return x, err
 		}
 
 		if x.Code != "other" {
-			if err := m.Grants.SetGrant(
+			err := m.Grants.SetGrant(
 				ctx,
 				c,
 				x.MembershipID,
 				x.Code,
 				x.IssuedAt,
 				x.ExpiresAt,
-			); err != nil {
+			)
+			if err != nil {
 				return x, err
 			}
 
-			if err := releaseQualificationEnded(
+			err = releaseQualificationEnded(
 				ctx,
 				c,
 				m.Delivery.Units,
@@ -411,13 +417,24 @@ func (m Certificates) verify(
 				x.Code,
 				x.IssuedAt,
 				x.ExpiresAt,
-			); err != nil { // IR440
+			)
+			if err != nil { // IR440
 				return x, err
 			}
 		}
-	} else if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.certificates SET status = 'rejected', rejection_reason = $2, verified_by_membership_id = $3, verified_at = $4,
-		version = version + 1, updated_at = $4 WHERE id = $1`, x.ID, *in.Reason, c.Principal.MembershipID, c.Now); err != nil {
-		return x, err
+	} else {
+		_, err := c.Tx.Exec(
+			ctx,
+			`UPDATE maintenance.certificates SET status = 'rejected', rejection_reason = $2, verified_by_membership_id = $3, verified_at = $4,
+		version = version + 1, updated_at = $4 WHERE id = $1`,
+			x.ID,
+			*in.Reason,
+			c.Principal.MembershipID,
+			c.Now,
+		)
+		if err != nil {
+			return x, err
+		}
 	}
 
 	x, err = m.reload(ctx, c, x.ID)
@@ -501,14 +518,15 @@ func (m Certificates) requestTraining(
 		return x, err
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.certificates SET training_requested_at = $2, training_request_note = $3, version = version + 1, updated_at = $2 WHERE id = $1`,
 		x.ID,
 		c.Now,
 		in.Note,
-	); err != nil {
-		return x, err
+	)
+	if execErr != nil {
+		return x, execErr
 	}
 
 	x, err = m.reload(ctx, c, x.ID)
@@ -652,7 +670,8 @@ func (m Certificates) content(
 		out.Name = *name
 	}
 
-	if out.Bytes, err = m.Blobs.Get(ctx, *key); errors.Is(err, blob.ErrNotFound) {
+	out.Bytes, err = m.Blobs.Get(ctx, *key)
+	if errors.Is(err, blob.ErrNotFound) {
 		return out, apperr.E(apperr.NotFound, "error.notFound")
 	} else if err != nil {
 		return out, err
@@ -780,16 +799,18 @@ func (m Certificates) list(
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return paging.Page[Certificate]{}, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return paging.Page[Certificate]{}, rowsErr
 	}
 
-	if err := paging.SortSlice(all, in.Sort, map[string]func(a, b Certificate) int{
+	sortSliceErr := paging.SortSlice(all, in.Sort, map[string]func(a, b Certificate) int{
 		"id":        func(a, b Certificate) int { return strings.Compare(a.ID.String(), b.ID.String()) },
 		"expiresAt": func(a, b Certificate) int { return a.ExpiresAt.Compare(b.ExpiresAt) },
 		"status":    func(a, b Certificate) int { return strings.Compare(a.Status, b.Status) },
-	}); err != nil {
-		return paging.Page[Certificate]{}, err
+	})
+	if sortSliceErr != nil {
+		return paging.Page[Certificate]{}, sortSliceErr
 	}
 
 	return pageOf(all, *in, f, c.Principal.ScopeVersion)
@@ -870,7 +891,8 @@ func (m Certificates) parts(
 
 	for rows.Next() {
 		var p PartItem
-		if err := rows.Scan(&p.Code, &p.Name); err != nil {
+		err := rows.Scan(&p.Code, &p.Name)
+		if err != nil {
 			rows.Close()
 
 			return paging.Page[PartItem]{}, err
@@ -881,15 +903,17 @@ func (m Certificates) parts(
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return paging.Page[PartItem]{}, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return paging.Page[PartItem]{}, rowsErr
 	}
 
-	if err := paging.SortSlice(all, in.Sort, map[string]func(a, b PartItem) int{
+	sortSliceErr := paging.SortSlice(all, in.Sort, map[string]func(a, b PartItem) int{
 		"id":   func(a, b PartItem) int { return strings.Compare(a.Code, b.Code) },
 		"name": func(a, b PartItem) int { return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)) },
-	}); err != nil {
-		return paging.Page[PartItem]{}, err
+	})
+	if sortSliceErr != nil {
+		return paging.Page[PartItem]{}, sortSliceErr
 	}
 
 	return pageOf(all, *in, f, c.Principal.ScopeVersion)
@@ -988,7 +1012,7 @@ func (m Certificates) Remind(ctx context.Context, c *ops.Call) (int, error) {
 		}
 
 		for _, r := range recipients {
-			if _, err := (notify.Store{}).Create(ctx, c, notify.New{
+			_, err := (notify.Store{}).Create(ctx, c, notify.New{
 				RecipientMembershipID: r,
 				Type:                  "certificate_expiry",
 				TemplateKey:           "certificate_expiry",
@@ -996,19 +1020,21 @@ func (m Certificates) Remind(ctx context.Context, c *ops.Call) (int, error) {
 				TargetID:              d.id,
 				Severity:              severity,
 				Params:                map[string]any{"at": d.expires, "status": "expiring"},
-			}); err != nil {
+			})
+			if err != nil {
 				return n, err
 			}
 		}
 
-		if _, err := c.Tx.Exec(
+		_, execErr := c.Tx.Exec(
 			ctx,
 			`UPDATE maintenance.certificate_reminders SET notifications = $3 WHERE certificate_id = $1 AND days_before = $2`,
 			d.id,
 			days,
 			len(recipients),
-		); err != nil {
-			return n, err
+		)
+		if execErr != nil {
+			return n, execErr
 		}
 
 		c.Audit(

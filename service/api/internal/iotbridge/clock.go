@@ -34,8 +34,9 @@ func ScenarioNow(c *http.Client, api string) (time.Time, error) {
 			SnapshotAt time.Time `json:"snapshotAt"`
 		} `json:"meta"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return time.Time{}, err
+	decodeErr := json.NewDecoder(resp.Body).Decode(&out)
+	if decodeErr != nil {
+		return time.Time{}, decodeErr
 	}
 
 	if out.Meta.SnapshotAt.IsZero() {

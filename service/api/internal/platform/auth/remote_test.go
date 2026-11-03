@@ -76,20 +76,22 @@ func TestRemoteSource(t *testing.T) {
 		t.Fatalf("no sign-in time is sent without one: %q", signedIn)
 	}
 
-	if _, err := r.Principal(ctx, "sub-1", tenant, member, none); err != nil || calls != 1 {
-		t.Fatalf("cached call: calls=%d err=%v", calls, err)
+	_, principalErr := r.Principal(ctx, "sub-1", tenant, member, none)
+	if principalErr != nil || calls != 1 {
+		t.Fatalf("cached call: calls=%d err=%v", calls, principalErr)
 	}
 
 	now = now.Add(31 * time.Second)
 
 	at := time.Date(2026, 9, 14, 0, 55, 0, 0, time.UTC)
-	if _, err := r.Principal(
+	_, principalErr = r.Principal(
 		ctx,
 		"sub-1",
 		tenant,
 		member,
 		at,
-	); err != nil || calls != 2 ||
+	)
+	if principalErr != nil || calls != 2 ||
 		signedIn != "2026-09-14T00:55:00Z" {
 		t.Fatalf(
 			"expired cache: calls=%d signedIn=%q",
@@ -98,37 +100,41 @@ func TestRemoteSource(t *testing.T) {
 		) // the fetch passes the token's sign-in time on (IR268)
 	}
 
-	if _, err := r.Principal(
+	_, principalErr = r.Principal(
 		ctx,
 		"sub-1",
 		tenant,
 		uuid.New(),
 		none,
-	); !errors.Is(
-		err,
+	)
+	if !errors.Is(
+		principalErr,
 		ErrNoMembership,
 	) {
-		t.Fatalf("unknown membership: %v", err)
+		t.Fatalf("unknown membership: %v", principalErr)
 	}
 
 	status = http.StatusServiceUnavailable
 	now = now.Add(time.Minute)
 
-	if _, err := r.Principal(ctx, "sub-1", tenant, member, none); !errors.Is(err, ErrUnavailable) {
-		t.Fatalf("outage: %v", err)
+	_, principalErr = r.Principal(ctx, "sub-1", tenant, member, none)
+	if !errors.Is(principalErr, ErrUnavailable) {
+		t.Fatalf("outage: %v", principalErr)
 	}
 
 	status = http.StatusOK
 
-	if _, err := r.Principal(ctx, "sub-1", tenant, member, none); err != nil {
-		t.Fatalf("outage must not be cached: %v", err)
+	_, principalErr = r.Principal(ctx, "sub-1", tenant, member, none)
+	if principalErr != nil {
+		t.Fatalf("outage must not be cached: %v", principalErr)
 	}
 
 	srv.Close()
 
 	now = now.Add(time.Minute)
 
-	if _, err := r.Principal(ctx, "sub-1", tenant, member, none); !errors.Is(err, ErrUnavailable) {
-		t.Fatalf("down: %v", err)
+	_, principalErr = r.Principal(ctx, "sub-1", tenant, member, none)
+	if !errors.Is(principalErr, ErrUnavailable) {
+		t.Fatalf("down: %v", principalErr)
 	}
 }

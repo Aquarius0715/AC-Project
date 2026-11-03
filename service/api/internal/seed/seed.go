@@ -219,8 +219,9 @@ func Load(path string) (*Fixture, error) {
 	}
 
 	var f Fixture
-	if err := json.Unmarshal(b, &f); err != nil {
-		return nil, fmt.Errorf("fixture: %w", err)
+	unmarshalErr := json.Unmarshal(b, &f)
+	if unmarshalErr != nil {
+		return nil, fmt.Errorf("fixture: %w", unmarshalErr)
 	}
 
 	return &f, nil
@@ -247,10 +248,11 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 	// platform.app_now(), so the transaction's app.now is that time while the fixture is applied; otherwise the
 	// seed would carry the wall clock, a date after the demo clock (IR318: "customer since Oct 2026").
 	if !f.SeedCreatedAt.IsZero() {
-		if err := ex(
+		err := ex(
 			`SELECT set_config('app.now', $1, true)`,
 			f.SeedCreatedAt.UTC().Format(time.RFC3339Nano),
-		); err != nil {
+		)
+		if err != nil {
 			return err
 		}
 
@@ -259,11 +261,12 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 
 	orgTenant := tenantOfOrg(f)
 	for _, t := range f.DemoSeed.Tenants {
-		if err := ex(
+		err := ex(
 			`INSERT INTO platform.tenants (id, name) VALUES ($1,$2) ON CONFLICT DO NOTHING`,
 			ID(t),
 			t,
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("tenant %s: %w", t, err)
 		}
 	}
@@ -274,21 +277,22 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 			kind = "operator"
 		}
 
-		if err := ex(
+		err := ex(
 			`INSERT INTO identity.organizations (id, tenant_id, name, kind, status) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`,
 			ID(o.ID),
 			ID(o.TenantID),
 			o.Name,
 			kind,
 			o.Status,
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("organization %s: %w", o.ID, err)
 		}
 	}
 
 	for _, a := range f.Actors {
 		// the realm's account of the actor names this membership in its claims (IR462)
-		if err := ex(
+		err := ex(
 			`INSERT INTO identity.users (id, email, display_name, sign_in_membership_id) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
 			ID(
 				a.UserID,
@@ -296,11 +300,12 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 			a.MembershipID+"@ac.local",
 			a.DisplayName,
 			ID(a.MembershipID),
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("user %s: %w", a.UserID, err)
 		}
 
-		if err := ex(
+		err = ex(
 			`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, client_role, scope_version, valid_from, valid_until)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT DO NOTHING`,
 			ID(
@@ -315,23 +320,25 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 			max(a.ScopeVersion, 1),
 			a.ValidFrom,
 			a.ValidUntil,
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("membership %s: %w", a.MembershipID, err)
 		}
 
 		for _, p := range a.Permissions {
-			if err := ex(
+			err := ex(
 				`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
 				ID(a.TenantID),
 				ID(a.MembershipID),
 				p,
-			); err != nil {
+			)
+			if err != nil {
 				return fmt.Errorf("permission %s/%s: %w", a.MembershipID, p, err)
 			}
 		}
 
 		for _, q := range a.Qualifications { // one grant per membership and code (UUIDv5 of both)
-			if err := ex(
+			err := ex(
 				`INSERT INTO identity.qualification_grants (id, tenant_id, membership_id, code, valid_from, valid_until, revoked_at)
 				VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING`,
 				ID("grant-"+a.MembershipID+"-"+q.Code),
@@ -341,19 +348,21 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 				q.ValidFrom,
 				q.ValidUntil,
 				q.RevokedAt,
-			); err != nil {
+			)
+			if err != nil {
 				return fmt.Errorf("grant %s/%s: %w", a.MembershipID, q.Code, err)
 			}
 		}
 
 		for _, s := range a.Scopes {
-			if err := ex(
+			err := ex(
 				`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
 				ID(a.TenantID),
 				ID(a.MembershipID),
 				s.Kind,
 				ID(s.ID),
-			); err != nil {
+			)
+			if err != nil {
 				return fmt.Errorf("scope %s: %w", a.MembershipID, err)
 			}
 		}
@@ -377,7 +386,7 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 
 			return a
 		}
-		if err := ex(
+		err := ex(
 			`INSERT INTO devices.capabilities (id, version, tenant_id, manufacturer, model, control, mode_control, fan_control, temperature,
 			modes, fan_levels, ventilation, ventilation_levels, sensors, firmware_candidates, is_current)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,true) ON CONFLICT DO NOTHING`,
@@ -400,13 +409,14 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 			nz(m.VentilationLevels),
 			sensors,
 			nz(m.FirmwareCandidates),
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("capability %s: %w", m.ID, err)
 		}
 	}
 
 	for _, c := range f.DemoSeed.Customers {
-		if err := ex(
+		err := ex(
 			`INSERT INTO assets.customers (id, tenant_id, organization_id, name, status, service_profile) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`,
 			ID(
 				c.ID,
@@ -416,7 +426,8 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 			c.Name,
 			c.Status,
 			c.ServiceProfile,
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("customer %s: %w", c.ID, err)
 		}
 	}
@@ -427,7 +438,7 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 		t := orgTenant[p.CustomerOrgID]
 
 		propTenant[p.ID] = t
-		if err := ex(
+		err := ex(
 			`INSERT INTO assets.properties (id, tenant_id, customer_org_id, kind, name, address, access_instructions, archived)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING`,
 			ID(
@@ -440,7 +451,8 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 			p.Address,
 			p.AccessInstructions,
 			p.Archived,
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("property %s: %w", p.ID, err)
 		}
 	}
@@ -464,7 +476,7 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 				parent = &u
 			}
 
-			if err := ex(
+			err := ex(
 				`INSERT INTO assets.spaces (id, tenant_id, property_id, parent_space_id, kind, name) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`,
 				ID(
 					s.ID,
@@ -474,7 +486,8 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 				parent,
 				s.Kind,
 				s.Name,
-			); err != nil {
+			)
+			if err != nil {
 				return fmt.Errorf("space %s: %w", s.ID, err)
 			}
 
@@ -513,7 +526,7 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 			scope = []string{"indoor", "outdoor", "electrical"}
 		}
 
-		if err := ex(
+		err := ex(
 			`INSERT INTO assets.units (id, tenant_id, customer_org_id, property_id, space_id, display_name, model_id, installed_at,
 			service_scope, archived, capability_version, observed_state, observed_restriction, version, warranty_ends_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) ON CONFLICT DO NOTHING`,
@@ -534,7 +547,8 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 			restr,
 			max(u.Version, 1),
 			u.WarrantyEndsAt,
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("unit %s: %w", u.ID, err)
 		}
 	}
@@ -559,7 +573,7 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 			binding = &b
 		}
 
-		if err := ex(
+		err := ex(
 			`INSERT INTO devices.devices (id, tenant_id, serial, binding_id, unit_id, target_unit_id, created_by_membership_id, connection, last_seen_at,
 			firmware_version, power_signal, tamper) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT DO NOTHING`,
 			ID(
@@ -576,12 +590,13 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 			d.FirmwareVersion,
 			d.PowerSignal,
 			d.Tamper,
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("device %s: %w", d.ID, err)
 		}
 
 		for _, x := range d.Sensors {
-			if err := ex(
+			err := ex(
 				`INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, boundary_id, stale_after_seconds, calibrated_at)
 				VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING`,
 				ID(x.ID),
@@ -592,7 +607,8 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 				x.BoundaryID,
 				x.StaleAfterSeconds,
 				x.CalibratedAt,
-			); err != nil {
+			)
+			if err != nil {
 				return fmt.Errorf("sensor %s: %w", x.ID, err)
 			}
 		}
@@ -601,7 +617,7 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 			continue
 		}
 
-		if err := ex(
+		err = ex(
 			`INSERT INTO devices.device_bindings (id, tenant_id, device_id, unit_id, customer_org_id, bound_at, reason, actor_membership_id)
 			SELECT $1,$2,$3,$4,u.customer_org_id,$5,'demo seed',$6 FROM assets.units u WHERE u.id = $4 ON CONFLICT DO NOTHING`,
 			*binding,
@@ -610,22 +626,24 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 			*unit,
 			f.SeedCreatedAt,
 			ID(d.CreatedByMembershipID),
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("binding %s: %w", d.ID, err)
 		}
 
-		if err := ex(
+		err = ex(
 			`UPDATE assets.units SET connection = $2, last_seen_at = $3 WHERE id = $1`,
 			*unit,
 			d.Connection,
 			d.LastSeenAt,
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("unit connection %s: %w", d.ID, err)
 		}
 	}
 
 	for _, m := range f.DemoSeed.Measurements { // IR121: Measurement.id = eventId
-		if err := ex(
+		err := ex(
 			`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit, origin, quality, boundary_id, received_at, event_id)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT DO NOTHING`,
 			ID(
@@ -643,13 +661,14 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 			m.BoundaryID,
 			m.ReceivedAt,
 			ID(m.ID),
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("measurement %s: %w", m.ID, err)
 		}
 	}
 
 	for _, a := range f.DemoSeed.AllergenObservations {
-		if err := ex(
+		err := ex(
 			`INSERT INTO monitoring.allergen_observations (id, tenant_id, unit_id, availability, substance, value, unit, source_label, observed_at, evidence_text, created_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT DO NOTHING`,
 			ID(
@@ -665,14 +684,15 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 			a.ObservedAt,
 			a.EvidenceText,
 			a.CreatedAt,
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("allergen %s: %w", a.ID, err)
 		}
 	}
 
 	hq := ID("hq-operator")
 	for _, x := range f.DemoSeed.Factors {
-		if err := ex(
+		err := ex(
 			`INSERT INTO energy.emission_factors (id, version, tenant_id, region, year, kg_co2e_per_kwh, source, created_by, created_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT DO NOTHING`,
 			ID(x.ID),
@@ -684,7 +704,8 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 			x.Source,
 			hq,
 			x.CreatedAt,
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("factor %s: %w", x.ID, err)
 		}
 	}
@@ -695,7 +716,7 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 			units[i] = ID(u)
 		}
 
-		if err := ex(
+		err := ex(
 			`INSERT INTO energy.baselines (id, version, tenant_id, unit_ids, period, method, baseline_kwh, quality, boundary_id, boundary, assumptions, source, created_by, created_at)
 			VALUES ($1,$2,$3,$4,tstzrange($5,$6),$7,$8,$9,$10,$11,$12,$13,$14,$15) ON CONFLICT DO NOTHING`,
 			ID(x.ID),
@@ -713,13 +734,14 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 			x.Source,
 			hq,
 			x.CreatedAt,
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("baseline %s: %w", x.ID, err)
 		}
 	}
 
 	for _, x := range f.DemoSeed.Consents { // IR84 initial location consents
-		if err := ex(
+		err := ex(
 			`INSERT INTO identity.consents (id, tenant_id, membership_id, purpose, granted, granted_at, revoked_at, created_at, updated_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8) ON CONFLICT DO NOTHING`,
 			ID(x.ID),
@@ -730,33 +752,37 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 			x.GrantedAt,
 			x.RevokedAt,
 			x.CreatedAt,
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("consent %s: %w", x.ID, err)
 		}
 	}
 	// client_users rows for the seed client memberships (owners, active; IR144)
-	if err := ex(
+	err := ex(
 		`INSERT INTO identity.client_users (id, tenant_id, customer_id, membership_id, email, display_name, client_role, status, invited_at, invited_by_membership_id, created_at, updated_at)
 		SELECT m.id, m.tenant_id, cu.id, m.id, u.email, u.display_name, COALESCE(m.client_role, 'owner'), 'active', $1, m.id, $1, $1
 		FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id JOIN assets.customers cu ON cu.organization_id = m.organization_id
 		WHERE m.role = 'client' AND m.id = ANY($2) ON CONFLICT DO NOTHING`,
 		f.SeedCreatedAt,
 		clientMemberships(f),
-	); err != nil {
+	)
+	if err != nil {
 		return fmt.Errorf("client users: %w", err)
 	}
 	// partner_users rows for the seed contractor company accounts (contractors and their technicians, active; FR-P11)
-	if err := ex(
+	err = ex(
 		`INSERT INTO identity.partner_users (id, tenant_id, organization_id, membership_id, email, display_name, partner_role, status, invited_at, invited_by_membership_id, created_at, updated_at)
 		SELECT m.id, m.tenant_id, m.organization_id, m.id, u.email, u.display_name, m.role, 'active', $1, m.id, $1, $1
 		FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id JOIN identity.organizations o ON o.id = m.organization_id
 		WHERE o.kind = 'contractor' AND m.role IN ('contractor','technician') ON CONFLICT DO NOTHING`,
 		f.SeedCreatedAt,
-	); err != nil {
+	)
+	if err != nil {
 		return fmt.Errorf("partner users: %w", err)
 	}
 
-	if err := applyBusiness(ex, f); err != nil {
+	err = applyBusiness(ex, f)
+	if err != nil {
 		return err
 	}
 
@@ -792,7 +818,7 @@ func applyPolicies(ex func(string, ...any) error, f *Fixture) error {
 		done[a.TenantID] = true
 
 		id := DefaultPolicyID(a.TenantID)
-		if err := ex(
+		err := ex(
 			`INSERT INTO monitoring.alert_policies (id, tenant_id, kind, customer_id, name, owner_membership_id, created_by_user_id, timezone, enabled, priority, rules)
 			VALUES ($1,$2,'default_alert',NULL,'Default policy',$3,$4,'Asia/Kuala_Lumpur',true,0,$5) ON CONFLICT DO NOTHING`,
 			id,
@@ -800,19 +826,21 @@ func applyPolicies(ex func(string, ...any) error, f *Fixture) error {
 			ID(a.MembershipID),
 			ID(a.UserID),
 			rules,
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("default policy %s: %w", a.TenantID, err)
 		}
 
 		if a.TenantID == "tenant-a" {
-			if err := ex(
+			err := ex(
 				`INSERT INTO monitoring.default_rule_settings (tenant_id, policy_id, rule_key, customer_id, enabled, changed_by_membership_id, reason)
 				VALUES ($1,$2,'ac_offline',$3,false,$4,'Demo: customer switched the offline rule off') ON CONFLICT DO NOTHING`,
 				ID(a.TenantID),
 				id,
 				ID("cust-a"),
 				ID(a.MembershipID),
-			); err != nil {
+			)
+			if err != nil {
 				return fmt.Errorf("default rule setting: %w", err)
 			}
 		}
@@ -927,7 +955,7 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 		t := tenantOf[str(k, "customerId")]
 
 		contractTenant[str(k, "id")] = t
-		if err := ex(
+		err := ex(
 			`INSERT INTO billing.contracts (id, version, tenant_id, customer_id, customer_org_id, plan_type, term, price_minor, currency, restriction_eligible, rules_version, created_by, created_at)
 			VALUES ($1,$2,$3,$4,$5,$6,tstzrange($7::timestamptz,$8::timestamptz),$9,$10,$11,$12,$13,$7::timestamptz) ON CONFLICT DO NOTHING`,
 			ID(
@@ -947,18 +975,20 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 			k["restrictionEligible"],
 			opt(k, "rulesVersion"),
 			hq,
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("contract %s: %w", str(k, "id"), err)
 		}
 
 		for _, u := range ids(k["unitIds"]) {
-			if err := ex(
+			err := ex(
 				`INSERT INTO billing.contract_units (tenant_id, contract_id, contract_version, unit_id) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
 				ID(t),
 				ID(str(k, "id")),
 				int(num(k, "version")),
 				u,
-			); err != nil {
+			)
+			if err != nil {
 				return fmt.Errorf("contract units %s: %w", str(k, "id"), err)
 			}
 		}
@@ -982,7 +1012,7 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 			return fmt.Errorf("invoice %s period: %w", str(inv, "id"), err)
 		}
 
-		if err := ex(
+		exErr := ex(
 			`INSERT INTO billing.invoices (id, tenant_id, number, contract_id, contract_version, customer_id, amount_minor, currency, period, due_at, status, paid_at, version)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,tstzrange($9::timestamptz,$10::timestamptz),$11,$12,$13,$14) ON CONFLICT DO NOTHING`,
 			ID(
@@ -1003,8 +1033,9 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 			str(inv, "status"),
 			opt(inv, "paidAt"),
 			int(num(inv, "version")),
-		); err != nil {
-			return fmt.Errorf("invoice %s: %w", str(inv, "id"), err)
+		)
+		if exErr != nil {
+			return fmt.Errorf("invoice %s: %w", str(inv, "id"), exErr)
 		}
 	}
 
@@ -1019,7 +1050,7 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 			}
 		}
 
-		if err := ex(
+		err := ex(
 			`INSERT INTO restrictions.restrictions (id, tenant_id, contract_id, contract_version, customer_id, rules_version, notice_at, execute_after, reason, policy, state,
 			notice_notification_ids, version, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$7,$7) ON CONFLICT DO NOTHING`,
 			ID(
@@ -1040,17 +1071,19 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 			str(r, "state"),
 			ids(r["noticeNotificationIds"]),
 			int(num(r, "version")),
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("restriction %s: %w", str(r, "id"), err)
 		}
 
 		for _, inv := range ids(r["causeInvoiceIds"]) {
-			if err := ex(
+			err := ex(
 				`INSERT INTO restrictions.restriction_invoices (tenant_id, restriction_id, invoice_id) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
 				ID(t),
 				ID(str(r, "id")),
 				inv,
-			); err != nil {
+			)
+			if err != nil {
 				return err
 			}
 		}
@@ -1070,7 +1103,7 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 				observed = raw(obs)
 			}
 
-			if err := ex(
+			err := ex(
 				`INSERT INTO restrictions.restriction_units (tenant_id, restriction_id, unit_id, apply_state, release_state, apply_command_ids, release_command_ids, observed_restriction,
 				observed_at, pending_reason) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT DO NOTHING`,
 				ID(t),
@@ -1086,16 +1119,18 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 				observed,
 				opt(u, "observedAt"),
 				opt(u, "pendingReason"),
-			); err != nil {
+			)
+			if err != nil {
 				return fmt.Errorf("restriction unit: %w", err)
 			}
 
 			if observed != nil {
-				if err := ex(
+				err := ex(
 					`UPDATE assets.units SET observed_restriction = $2 WHERE id = $1`,
 					ID(str(u, "unitId")),
 					observed,
-				); err != nil {
+				)
+				if err != nil {
 					return err
 				}
 			}
@@ -1104,7 +1139,7 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 
 	for _, c := range f.DemoSeed.Commands {
 		a, _ := c["action"].(map[string]any)
-		if err := ex(
+		err := ex(
 			`INSERT INTO control.commands (id, tenant_id, unit_id, actor_membership_id, source, action, restriction_id, status, delivery, requested_at, sent_at, acknowledged_at,
 			expires_at, correlation_id, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'seed',$10,$10) ON CONFLICT DO NOTHING`,
 			ID(
@@ -1125,7 +1160,8 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 			opt(c, "sentAt"),
 			opt(c, "acknowledgedAt"),
 			str(c, "expiresAt"),
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("command %s: %w", str(c, "id"), err)
 		}
 
@@ -1136,7 +1172,7 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 			}
 
 			kind, _ := a["kind"].(string)
-			if err := ex(
+			err := ex(
 				`INSERT INTO restrictions.restriction_commands (tenant_id, command_id, restriction_id, unit_id, kind, delivered, status, requested_at, updated_at)
 				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8) ON CONFLICT DO NOTHING`,
 				ID(unitTenant[str(c, "unitId")]),
@@ -1147,7 +1183,8 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 				str(c, "delivery") == "sent",
 				status,
 				str(c, "requestedAt"),
-			); err != nil {
+			)
+			if err != nil {
 				return fmt.Errorf("restriction command %s: %w", str(c, "id"), err)
 			}
 		}
@@ -1155,7 +1192,7 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 
 	for _, a := range f.DemoSeed.Alerts {
 		u := str(a, "unitId")
-		if err := ex(
+		err := ex(
 			`INSERT INTO monitoring.alerts (id, tenant_id, unit_id, customer_org_id, policy_id, type, severity, status, cause_code, evidence_kind, evidence_text, observed_at, detected_at,
 			previous_alert_id, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$13,$13) ON CONFLICT DO NOTHING`,
 			ID(
@@ -1177,7 +1214,8 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 			str(a, "observedAt"),
 			str(a, "detectedAt"),
 			optID(a, "previousAlertId"),
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("alert %s: %w", str(a, "id"), err)
 		}
 	}
@@ -1191,7 +1229,7 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 		tg, _ := n["target"].(map[string]any)
 
 		target := raw(map[string]any{"kind": tg["kind"], "id": ID(tg["id"].(string)).String()})
-		if err := ex(
+		err := ex(
 			`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type, channel, template_key, target, params, source_alert_id, severity,
 			occurred_at, read_at, created_at) VALUES ($1,$2,$3,1,$4,$5,$6,$7,'{}',$8,$9,$10,$11,$10) ON CONFLICT DO NOTHING`,
 			ID(
@@ -1210,7 +1248,8 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 			str(n, "severity"),
 			str(n, "occurredAt"),
 			opt(n, "readAt"),
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("notification %s: %w", str(n, "id"), err)
 		}
 	}
@@ -1225,7 +1264,7 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 			sched = fmt.Sprintf("[%s,%s)", ss, se)
 		}
 
-		if err := ex(
+		err := ex(
 			`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, type, status, origin, symptom, contact_window, requested_slot, preferred_slots, preference_round,
 			scheduled_slot, due_at, contractor_org_id, assignment_id, version, created_at, updated_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,tstzrange($10::timestamptz,$11::timestamptz),$12,$13,$14::tstzrange,$15,$16,$17,$18,$19,$19) ON CONFLICT DO NOTHING`,
@@ -1252,17 +1291,19 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 			optID(j, "assignmentId"),
 			int(num(j, "version")),
 			f.SeedCreatedAt,
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("job %s: %w", str(j, "id"), err)
 		}
 
 		for _, a := range ids(j["alertIds"]) {
-			if err := ex(
+			err := ex(
 				`INSERT INTO maintenance.job_alerts (tenant_id, job_id, alert_id) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
 				ID(unitTenant[u]),
 				ID(str(j, "id")),
 				a,
-			); err != nil {
+			)
+			if err != nil {
 				return err
 			}
 		}
@@ -1275,7 +1316,7 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 
 	for _, o := range f.DemoSeed.Offers {
 		vs, ve := rng(o, "visitSlot", "startAt", "endAt")
-		if err := ex(
+		err := ex(
 			`INSERT INTO maintenance.offers (id, tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at, offer_expires_at, access_valid_from, access_valid_until,
 			decision, decided_by, decided_at, decline_reason, created_at, updated_at)
 			VALUES ($1,$2,$3,$4,$5,tstzrange($6::timestamptz,$7::timestamptz),$8,$9,$10,$11,$12,$13,$14,$15,$8,$8) ON CONFLICT DO NOTHING`,
@@ -1299,13 +1340,14 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 			optID(o, "decidedBy"),
 			opt(o, "decidedAt"),
 			opt(o, "declineReason"),
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("offer %s: %w", str(o, "id"), err)
 		}
 	}
 
 	for _, a := range f.DemoSeed.Assignments {
-		if err := ex(
+		err := ex(
 			`INSERT INTO maintenance.assignments (id, tenant_id, job_id, technician_membership_id, valid_from, valid_until, scheduled, status, reason, acknowledgement, acknowledged_at,
 			cant_make_reason, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,tstzrange($7::timestamptz,$8::timestamptz),$9,$10,$11,$12,$13,$14,$14) ON CONFLICT DO NOTHING`,
 			ID(
@@ -1327,14 +1369,15 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 			opt(a, "acknowledgedAt"),
 			opt(a, "cantMakeReason"),
 			str(a, "createdAt"),
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("assignment %s: %w", str(a, "id"), err)
 		}
 	}
 
 	for _, r := range f.DemoSeed.RateCards { // contractor rate cards (FR-A22 / FR-P10): the payout prices of a contractor
 		lines, _ := json.Marshal(r["lines"])
-		if err := ex(
+		err := ex(
 			`INSERT INTO maintenance.rate_cards (id, tenant_id, contractor_org_id, effective_from, currency, lines, version, created_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING`,
 			ID(
@@ -1347,13 +1390,14 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 			lines,
 			r["version"],
 			str(r, "createdAt"),
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("rate card %s: %w", str(r, "id"), err)
 		}
 	}
 
 	for _, c := range f.DemoSeed.FilterCleanings {
-		if err := ex(
+		err := ex(
 			`INSERT INTO maintenance.filter_cleanings (id, tenant_id, unit_id, cleaned_at, marked_by_membership_id) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`,
 			ID(
 				str(c, "id"),
@@ -1362,7 +1406,8 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 			ID(str(c, "unitId")),
 			str(c, "cleanedAt"),
 			ID(str(c, "markedByMembershipId")),
-		); err != nil {
+		)
+		if err != nil {
 			return fmt.Errorf("filter cleaning %s: %w", str(c, "id"), err)
 		}
 	}
@@ -1386,14 +1431,16 @@ func seedJobEvents(ex func(string, ...any) error, f *Fixture, jobTenant map[stri
 		)
 	}
 	for _, j := range f.DemoSeed.Jobs {
-		if err := ev(str(j, "id"), "job.created", nil, f.SeedCreatedAt); err != nil {
+		err := ev(str(j, "id"), "job.created", nil, f.SeedCreatedAt)
+		if err != nil {
 			return err
 		}
 	}
 
 	for _, o := range f.DemoSeed.Offers {
 		job := str(o, "jobId")
-		if err := ev(job, "job.offered", nil, str(o, "offeredAt")); err != nil {
+		err := ev(job, "job.offered", nil, str(o, "offeredAt"))
+		if err != nil {
 			return err
 		}
 
@@ -1403,14 +1450,16 @@ func seedJobEvents(ex func(string, ...any) error, f *Fixture, jobTenant map[stri
 				action = "offer.declined"
 			}
 
-			if err := ev(job, action, optID(o, "decidedBy"), *opt(o, "decidedAt")); err != nil {
+			err := ev(job, action, optID(o, "decidedBy"), *opt(o, "decidedAt"))
+			if err != nil {
 				return err
 			}
 		}
 	}
 
 	for _, a := range f.DemoSeed.Assignments {
-		if err := ev(str(a, "jobId"), "job.assigned", nil, str(a, "createdAt")); err != nil {
+		err := ev(str(a, "jobId"), "job.assigned", nil, str(a, "createdAt"))
+		if err != nil {
 			return err
 		}
 	}

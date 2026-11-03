@@ -110,7 +110,8 @@ func enableTwoFactor(ctx context.Context, c *ops.Call, in *CodeInput) (TwoFactor
 	codes, hashes := make([]string, 8), make([]string, 8)
 	for i := range codes {
 		b := make([]byte, 5)
-		if _, err := rand.Read(b); err != nil {
+		_, err := rand.Read(b)
+		if err != nil {
 			return TwoFactorEnabled{}, err
 		}
 
@@ -120,14 +121,15 @@ func enableTwoFactor(ctx context.Context, c *ops.Call, in *CodeInput) (TwoFactor
 		hashes[i] = hex.EncodeToString(h[:])
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`INSERT INTO identity.two_factor (user_id, enabled_at, recovery_code_hashes, updated_at) VALUES ($1, $2, $3, $2)`,
 		c.Principal.UserID,
 		c.Now,
 		hashes,
-	); err != nil {
-		return TwoFactorEnabled{}, err
+	)
+	if execErr != nil {
+		return TwoFactorEnabled{}, execErr
 	}
 
 	c.Audit(

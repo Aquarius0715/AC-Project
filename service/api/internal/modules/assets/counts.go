@@ -67,8 +67,9 @@ func (m *Module) CountUnits(
 		return UnitCounts{}, err
 	}
 
-	if err := m.enrich(ctx, c, units); err != nil {
-		return UnitCounts{}, err
+	enrichErr := m.enrich(ctx, c, units)
+	if enrichErr != nil {
+		return UnitCounts{}, enrichErr
 	}
 
 	var n UnitCounts

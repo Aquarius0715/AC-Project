@@ -171,9 +171,10 @@ func partnerUsersList(
 	where := strings.Join(conds, " AND ")
 
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM identity.partner_users x WHERE "+where, args...).
-		Scan(&total); err != nil {
-		return paging.Page[PartnerUser]{}, err
+	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM identity.partner_users x WHERE "+where, args...).
+		Scan(&total)
+	if scanErr != nil {
+		return paging.Page[PartnerUser]{}, scanErr
 	}
 
 	rows, err := c.Tx.Query(
@@ -204,14 +205,16 @@ func partnerUsersList(
 		items = append(items, x)
 	}
 
-	if err := rows.Err(); err != nil {
-		return paging.Page[PartnerUser]{}, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return paging.Page[PartnerUser]{}, rowsErr
 	}
 
 	rows.Close()
 
-	if err := markBooked(ctx, c, items); err != nil {
-		return paging.Page[PartnerUser]{}, err
+	markBookedErr := markBooked(ctx, c, items)
+	if markBookedErr != nil {
+		return paging.Page[PartnerUser]{}, markBookedErr
 	}
 
 	return paging.Page[PartnerUser]{
@@ -294,9 +297,10 @@ func (in *PartnerUserInput) Validate() map[string]string {
 	fe := map[string]string{}
 
 	in.Email = strings.TrimSpace(in.Email)
-	if a, err := mail.ParseAddress(
+	a, err := mail.ParseAddress(
 		in.Email,
-	); err != nil || a.Address != in.Email ||
+	)
+	if err != nil || a.Address != in.Email ||
 		len(in.Email) > 254 {
 		fe["email"] = "error.invalid"
 	}
@@ -346,12 +350,13 @@ func accessUntilOK(now, until time.Time) bool {
 // The company's changes to its contractors wait for each other here, so two at once — each disabling or removing the
 // other contractor — cannot both see the other still active (IR471).
 func otherActiveContractor(ctx context.Context, c *ops.Call, org, except uuid.UUID) (bool, error) {
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`SELECT pg_advisory_xact_lock(hashtext('identity.active_contractors:' || $1::text))`,
 		org,
-	); err != nil {
-		return false, err
+	)
+	if execErr != nil {
+		return false, execErr
 	}
 
 	var ok bool
@@ -370,8 +375,9 @@ const InviteResendGap = 5 * time.Minute
 // invitation e-mail (RATE_LIMITED with the seconds to wait).
 func inviteResendWait(ctx context.Context, c *ops.Call, table string, id uuid.UUID) error {
 	var last *time.Time
-	if err := c.Tx.QueryRow(ctx, `SELECT last_invite_sent_at FROM identity.`+table+` WHERE id = $1 FOR UPDATE`, id).
-		Scan(&last); err != nil {
+	err := c.Tx.QueryRow(ctx, `SELECT last_invite_sent_at FROM identity.`+table+` WHERE id = $1 FOR UPDATE`, id).
+		Scan(&last)
+	if err != nil {
 		return err
 	}
 
@@ -456,8 +462,9 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 	}
 
 	var dup bool
-	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.partner_users WHERE organization_id = $1 AND email = $2::citext AND id <> $3)`, c.Principal.OrgID, in.Email, self).
-		Scan(&dup); err != nil {
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.partner_users WHERE organization_id = $1 AND email = $2::citext AND id <> $3)`, c.Principal.OrgID, in.Email, self).
+		Scan(&dup)
+	if err != nil {
 		return PartnerUser{}, err
 	}
 
@@ -498,7 +505,7 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 		}
 
 		id := uuid.New()
-		if _, err := c.Tx.Exec(
+		_, execErr := c.Tx.Exec(
 			ctx,
 			`INSERT INTO identity.partner_users (id, tenant_id, organization_id, membership_id, email, display_name, partner_role, status, invited_at, invited_by_membership_id, last_invite_sent_at, created_at, updated_at)
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, 'invited', $7, $8, $7, $7, $7)`,
@@ -510,8 +517,9 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 			in.PartnerRole,
 			c.Now,
 			c.Principal.MembershipID,
-		); err != nil {
-			return PartnerUser{}, err
+		)
+		if execErr != nil {
+			return PartnerUser{}, execErr
 		}
 
 		v := 1
@@ -565,7 +573,8 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 	}
 
 	if x.Status != "invited" && status != x.Status || x.PartnerRole != in.PartnerRole {
-		if err := notSelfOrLast(ctx, c, x); err != nil {
+		err := notSelfOrLast(ctx, c, x)
+		if err != nil {
 			return x, err
 		}
 	}
@@ -574,13 +583,14 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 	if x.MembershipID != nil && status != x.Status {
 		if status == "disabled" { // keep the access end, and close the membership now
 			kept = x.AccessUntil
-			if _, err := c.Tx.Exec(
+			_, err := c.Tx.Exec(
 				ctx,
 				`UPDATE identity.memberships SET valid_until = GREATEST($2::timestamptz, valid_from + interval '1 second'), scope_version = scope_version + 1,
 				version = version + 1, updated_at = $2 WHERE id = $1`,
 				*x.MembershipID,
 				c.Now,
-			); err != nil {
+			)
+			if err != nil {
 				return x, err
 			}
 		} else { // re-enabled: the kept access end comes back, if it has not passed
@@ -588,13 +598,14 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 				return x, apperr.E(apperr.Conflict, "errors.access_expired")
 			}
 
-			if _, err := c.Tx.Exec(
+			_, err := c.Tx.Exec(
 				ctx,
 				`UPDATE identity.memberships SET valid_until = $2, scope_version = scope_version + 1, version = version + 1, updated_at = $3 WHERE id = $1`,
 				*x.MembershipID,
 				kept,
 				c.Now,
-			); err != nil {
+			)
+			if err != nil {
 				return x, err
 			}
 
@@ -630,13 +641,21 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 
 		if status == "disabled" {
 			kept = in.AccessUntil // comes back when re-enabled
-		} else if _, err := c.Tx.Exec(ctx, `UPDATE identity.memberships SET valid_until = $2, scope_version = scope_version + 1, version = version + 1, updated_at = $3 WHERE id = $1`,
-			*x.MembershipID, *in.AccessUntil, c.Now); err != nil {
-			return x, err
+		} else {
+			_, err := c.Tx.Exec(
+				ctx,
+				`UPDATE identity.memberships SET valid_until = $2, scope_version = scope_version + 1, version = version + 1, updated_at = $3 WHERE id = $1`,
+				*x.MembershipID,
+				*in.AccessUntil,
+				c.Now,
+			)
+			if err != nil {
+				return x, err
+			}
 		}
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE identity.partner_users SET email = $2, partner_role = $3, status = $4, access_until = $5, version = version + 1, updated_at = $6 WHERE id = $1`,
 		x.ID,
@@ -645,8 +664,9 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 		status,
 		kept,
 		c.Now,
-	); err != nil {
-		return x, err
+	)
+	if execErr != nil {
+		return x, execErr
 	}
 
 	if x.MembershipID != nil && status != x.Status &&
@@ -726,26 +746,29 @@ func partnerUsersRemove(ctx context.Context, c *ops.Call, in *PartnerRemoveInput
 		return Deleted{}, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 
-	if err := notSelfOrLast(ctx, c, x); err != nil {
-		return Deleted{}, err
+	notSelfOrLastErr := notSelfOrLast(ctx, c, x)
+	if notSelfOrLastErr != nil {
+		return Deleted{}, notSelfOrLastErr
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`DELETE FROM identity.partner_users WHERE id = $1`,
 		x.ID,
-	); err != nil {
-		return Deleted{}, err
+	)
+	if execErr != nil {
+		return Deleted{}, execErr
 	}
 
 	if x.MembershipID != nil {
-		if _, err := c.Tx.Exec(
+		_, err := c.Tx.Exec(
 			ctx,
 			`UPDATE identity.memberships SET valid_until = GREATEST($2::timestamptz, valid_from + interval '1 second'), scope_version = scope_version + 1,
 			version = version + 1, updated_at = $2 WHERE id = $1 AND (valid_until IS NULL OR valid_until > $2)`,
 			*x.MembershipID,
 			c.Now,
-		); err != nil {
+		)
+		if err != nil {
 			return Deleted{}, err
 		}
 
@@ -823,25 +846,28 @@ func partnerUsersResend(
 		return InvitePreview{}, apperr.E(apperr.Conflict, "errors.access_expired")
 	}
 
-	if err := inviteResendWait(ctx, c, "partner_users", x.ID); err != nil {
-		return InvitePreview{}, err
+	inviteResendWaitErr := inviteResendWait(ctx, c, "partner_users", x.ID)
+	if inviteResendWaitErr != nil {
+		return InvitePreview{}, inviteResendWaitErr
 	}
 
 	var user uuid.UUID // the set-up e-mail again (IR461)
-	if err := c.Tx.QueryRow(ctx, `SELECT user_id FROM identity.memberships WHERE id = $1`, *x.MembershipID).
-		Scan(&user); err != nil {
-		return InvitePreview{}, err
+	scanErr := c.Tx.QueryRow(ctx, `SELECT user_id FROM identity.memberships WHERE id = $1`, *x.MembershipID).
+		Scan(&user)
+	if scanErr != nil {
+		return InvitePreview{}, scanErr
 	}
 
 	requestAccount(c, user, *x.MembershipID, x.PartnerRole)
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE identity.partner_users SET last_invite_sent_at = $2 WHERE id = $1`,
 		x.ID,
 		c.Now,
-	); err != nil {
-		return InvitePreview{}, err
+	)
+	if execErr != nil {
+		return InvitePreview{}, execErr
 	}
 
 	c.Audit(

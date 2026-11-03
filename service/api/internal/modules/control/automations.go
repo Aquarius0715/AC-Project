@@ -102,7 +102,7 @@ func scanAutomation(r pgx.Row) (Automation, error) {
 		x         Automation
 		def, last []byte
 	)
-	if err := r.Scan(
+	err := r.Scan(
 		&x.ID,
 		&x.TenantID,
 		&x.Version,
@@ -120,7 +120,8 @@ func scanAutomation(r pgx.Row) (Automation, error) {
 		&x.customerOrg,
 		&x.UnitIDs,
 		&last,
-	); err != nil {
+	)
+	if err != nil {
 		return x, err
 	}
 
@@ -136,7 +137,8 @@ func scanAutomation(r pgx.Row) (Automation, error) {
 
 	if len(last) > 0 {
 		var lr LastRun
-		if err := json.Unmarshal(last, &lr); err == nil {
+		err := json.Unmarshal(last, &lr)
+		if err == nil {
 			lr.At = lr.At.UTC()
 			x.LastRun = &lr
 		}
@@ -260,9 +262,10 @@ func (m Automations) list(
 	where := strings.Join(conds, " AND ")
 
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM control.automations a WHERE "+where, args...).
-		Scan(&total); err != nil {
-		return paging.Page[Automation]{}, err
+	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM control.automations a WHERE "+where, args...).
+		Scan(&total)
+	if scanErr != nil {
+		return paging.Page[Automation]{}, scanErr
 	}
 
 	rows, err := c.Tx.Query(
@@ -292,8 +295,9 @@ func (m Automations) list(
 		items = append(items, x)
 	}
 
-	if err := rows.Err(); err != nil {
-		return paging.Page[Automation]{}, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return paging.Page[Automation]{}, rowsErr
 	}
 
 	return paging.Page[Automation]{
@@ -715,9 +719,10 @@ func (m Automations) save(
 		}
 
 		var archived bool
-		if err := c.Tx.QueryRow(ctx, `SELECT archived FROM assets.units WHERE id = $1`, u).
-			Scan(&archived); err != nil {
-			return Automation{}, err
+		scanErr := c.Tx.QueryRow(ctx, `SELECT archived FROM assets.units WHERE id = $1`, u).
+			Scan(&archived)
+		if scanErr != nil {
+			return Automation{}, scanErr
 		}
 
 		if archived {
@@ -785,10 +790,11 @@ func (m Automations) save(
 	version := 1
 
 	if in.ID == nil {
-		if err := c.Tx.QueryRow(ctx, `INSERT INTO control.automations (tenant_id, customer_org_id, kind, name, owner_membership_id, created_by_user_id, timezone, enabled, priority,
+		err := c.Tx.QueryRow(ctx, `INSERT INTO control.automations (tenant_id, customer_org_id, kind, name, owner_membership_id, created_by_user_id, timezone, enabled, priority,
 			definition, created_at, updated_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10) RETURNING id`,
 			c.Principal.OrgID, in.Kind, in.Name, c.Principal.MembershipID, c.Principal.UserID, in.Timezone, in.Enabled, in.Priority, raw, c.Now).
-			Scan(&id); err != nil {
+			Scan(&id)
+		if err != nil {
 			return Automation{}, err
 		}
 	} else {
@@ -805,7 +811,7 @@ func (m Automations) save(
 			return cur, apperr.Fields(map[string]string{"kind": "error.immutable"})
 		}
 		// IR27: explicit enabling rechecks (done above) and clears the stop reason; editing while disabled keeps it
-		if _, err := c.Tx.Exec(
+		_, execErr := c.Tx.Exec(
 			ctx,
 			`UPDATE control.automations SET name = $2, timezone = $3, enabled = $4, priority = $5, definition = $6,
 			disabled_reason = CASE WHEN $4 THEN NULL ELSE disabled_reason END, version = version + 1, updated_at = $7 WHERE id = $1`,
@@ -816,28 +822,31 @@ func (m Automations) save(
 			in.Priority,
 			raw,
 			c.Now,
-		); err != nil {
-			return cur, err
+		)
+		if execErr != nil {
+			return cur, execErr
 		}
 
-		if _, err := c.Tx.Exec(
+		_, execErr = c.Tx.Exec(
 			ctx,
 			`DELETE FROM control.automation_units WHERE automation_id = $1`,
 			cur.ID,
-		); err != nil {
-			return cur, err
+		)
+		if execErr != nil {
+			return cur, execErr
 		}
 
 		id, prev, version = cur.ID, c.ExpectedVersion, cur.Version+1
 	}
 
 	for _, u := range in.UnitIDs {
-		if _, err := c.Tx.Exec(
+		_, err := c.Tx.Exec(
 			ctx,
 			`INSERT INTO control.automation_units (tenant_id, automation_id, unit_id) VALUES (current_setting('app.tenant_id')::uuid, $1, $2)`,
 			id,
 			u,
-		); err != nil {
+		)
+		if err != nil {
 			return Automation{}, err
 		}
 	}
@@ -1058,12 +1067,13 @@ func (m Automations) delete(
 		return Deleted{}, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`DELETE FROM control.automations WHERE id = $1`,
 		cur.ID,
-	); err != nil { // units follow (cascade)
-		return Deleted{}, err
+	)
+	if execErr != nil { // units follow (cascade)
+		return Deleted{}, execErr
 	}
 
 	c.Emit(

@@ -19,7 +19,8 @@ import (
 func TestMain(m *testing.M) {
 	code := m.Run()
 	if code == 0 {
-		if err := checkJobEventTitles(); err != nil {
+		err := checkJobEventTitles()
+		if err != nil {
 			fmt.Fprintln(os.Stderr, "job event titles:", err)
 
 			code = 1

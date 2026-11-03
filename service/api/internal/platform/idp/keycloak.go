@@ -88,7 +88,8 @@ func (k *Keycloak) accessToken(ctx context.Context) (string, error) {
 		AccessToken string `json:"access_token"`
 		ExpiresIn   int    `json:"expires_in"`
 	}
-	if err := json.NewDecoder(res.Body).Decode(&t); err != nil || t.AccessToken == "" {
+	decodeErr := json.NewDecoder(res.Body).Decode(&t)
+	if decodeErr != nil || t.AccessToken == "" {
 		return "", errors.New("idp: no access token")
 	}
 
@@ -271,8 +272,9 @@ func (k *Keycloak) UpdateAccount(ctx context.Context, subject string, a Account)
 	}
 
 	var user map[string]any
-	if err := json.NewDecoder(res.Body).Decode(&user); err != nil {
-		return err
+	decodeErr := json.NewDecoder(res.Body).Decode(&user)
+	if decodeErr != nil {
+		return decodeErr
 	}
 
 	attrs, _ := user["attributes"].(map[string]any)
@@ -316,7 +318,8 @@ func (k *Keycloak) findByEmail(ctx context.Context, email string) (string, error
 	var users []struct {
 		ID string `json:"id"`
 	}
-	if err := json.NewDecoder(res.Body).Decode(&users); err != nil || len(users) != 1 {
+	decodeErr := json.NewDecoder(res.Body).Decode(&users)
+	if decodeErr != nil || len(users) != 1 {
 		return "", errors.New("idp: the e-mail's user was not found")
 	}
 
@@ -379,8 +382,9 @@ func (k *Keycloak) hasOTP(ctx context.Context, subject string) (bool, error) {
 	var creds []struct {
 		Type string `json:"type"`
 	}
-	if err := json.NewDecoder(res.Body).Decode(&creds); err != nil {
-		return false, err
+	decodeErr := json.NewDecoder(res.Body).Decode(&creds)
+	if decodeErr != nil {
+		return false, decodeErr
 	}
 
 	for _, c := range creds {

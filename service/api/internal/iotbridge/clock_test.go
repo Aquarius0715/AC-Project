@@ -38,14 +38,16 @@ func TestScenarioNowReadsThePreviewSnapshot(t *testing.T) {
 				func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(body)) },
 			),
 		)
-		if _, err := ScenarioNow(c, bad.URL); err == nil {
+		_, err := ScenarioNow(c, bad.URL)
+		if err == nil {
 			t.Errorf("%s: accepted", name)
 		}
 
 		bad.Close()
 	}
 
-	if _, err := ScenarioNow(c, "http://127.0.0.1:1"); err == nil {
+	_, scenarioNowErr := ScenarioNow(c, "http://127.0.0.1:1")
+	if scenarioNowErr == nil {
 		t.Error("a dead API is not an error")
 	}
 }

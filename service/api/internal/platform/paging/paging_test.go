@@ -82,7 +82,8 @@ func TestResolveAndNext(t *testing.T) {
 		{Query{Limit: new(2), Cursor: new("")}, cond, 1, ""},
 	}
 	for i, c := range cases {
-		if _, err := Resolve(c.q, c.cond, c.sv, 1); code(err) != c.want {
+		_, err := Resolve(c.q, c.cond, c.sv, 1)
+		if code(err) != c.want {
 			t.Errorf("case %d: got %v want %s", i, err, c.want)
 		}
 	}
@@ -106,11 +107,12 @@ func TestOrderBy(t *testing.T) {
 		t.Fatal(s)
 	}
 
-	if _, err := OrderBy(
+	_, err := OrderBy(
 		&SortSpec{Field: "evil; drop", Direction: "asc"},
 		allowed,
 		"",
-	); code(
+	)
+	if code(
 		err,
 	) != apperr.Validation {
 		t.Fatal("unknown sort field")
@@ -122,11 +124,12 @@ func TestOrderBy(t *testing.T) {
 func TestOrderByDirection(t *testing.T) {
 	allowed := map[string]string{"id": "r.id", "createdAt": "r.created_at"}
 	for dir, want := range map[string]string{"asc": "r.created_at ASC, r.id ASC", "desc": "r.created_at DESC, r.id ASC"} {
-		if got, err := OrderBy(
+		got, err := OrderBy(
 			&SortSpec{Field: "createdAt", Direction: dir},
 			allowed,
 			"",
-		); err != nil ||
+		)
+		if err != nil ||
 			got != want {
 			t.Errorf("%s: %q %v", dir, got, err)
 		}
@@ -142,7 +145,8 @@ func TestOrderByDirection(t *testing.T) {
 		}
 	}
 
-	if got, err := Direction(&SortSpec{Direction: "desc"}); err != nil || got != "DESC" {
+	got, err := Direction(&SortSpec{Direction: "desc"})
+	if err != nil || got != "DESC" {
 		t.Errorf("Direction desc: %q %v", got, err)
 	}
 }

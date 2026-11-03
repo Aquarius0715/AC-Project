@@ -28,7 +28,8 @@ func TestLoadSortsAndValidates(t *testing.T) {
 		"zero":      {"000000_zero.up.sql": {}},
 		"duplicate": {"000001_a.up.sql": {}, "1_b.up.sql": {}},
 	} {
-		if _, err := Load(fsys); err == nil {
+		_, err := Load(fsys)
+		if err == nil {
 			t.Errorf("%s: want error", name)
 		}
 	}
@@ -72,12 +73,14 @@ func testDB(t *testing.T) *pgx.Conn {
 	t.Cleanup(func() { ac.Close(ctx) })
 
 	const name = "ac_migrate_test"
-	if _, err := ac.Exec(ctx, "DROP DATABASE IF EXISTS "+name+" WITH (FORCE)"); err != nil {
-		t.Fatal(err)
+	_, execErr := ac.Exec(ctx, "DROP DATABASE IF EXISTS "+name+" WITH (FORCE)")
+	if execErr != nil {
+		t.Fatal(execErr)
 	}
 
-	if _, err := ac.Exec(ctx, "CREATE DATABASE "+name); err != nil {
-		t.Fatal(err)
+	_, execErr = ac.Exec(ctx, "CREATE DATABASE "+name)
+	if execErr != nil {
+		t.Fatal(execErr)
 	}
 
 	cfg, _ := pgx.ParseConfig(admin)
@@ -119,32 +122,39 @@ func TestUpAppliesOnceAndRecordsVersion(t *testing.T) {
 		t.Fatalf("version = %d dirty=%t", v, dirty)
 	}
 
-	if again, err := Up(ctx, c, extra); err != nil || len(again) != 0 {
-		t.Fatalf("second Up = %v, %v", again, err)
+	again, upErr := Up(ctx, c, extra)
+	if upErr != nil || len(again) != 0 {
+		t.Fatalf("second Up = %v, %v", again, upErr)
 	}
 
-	if _, err := c.Exec(ctx, "DELETE FROM public.schema_migrations"); err != nil {
-		t.Fatal(err)
+	_, execErr := c.Exec(ctx, "DELETE FROM public.schema_migrations")
+	if execErr != nil {
+		t.Fatal(execErr)
 	}
 
-	if _, err := Up(ctx, c, extra); !errors.Is(err, ErrUnversioned) {
-		t.Fatalf("want ErrUnversioned, got %v", err)
+	_, upErr = Up(ctx, c, extra)
+	if !errors.Is(upErr, ErrUnversioned) {
+		t.Fatalf("want ErrUnversioned, got %v", upErr)
 	}
 
-	if err := Force(ctx, c, 900); err != nil {
-		t.Fatal(err)
+	forceErr := Force(ctx, c, 900)
+	if forceErr != nil {
+		t.Fatal(forceErr)
 	}
 
-	if ok, err := Seeded(ctx, c); err != nil || ok {
-		t.Fatalf("Seeded = %t, %v", ok, err)
+	ok, seededErr := Seeded(ctx, c)
+	if seededErr != nil || ok {
+		t.Fatalf("Seeded = %t, %v", ok, seededErr)
 	}
 
-	if err := EnsureLogin(ctx, c, "ac_app_login", "it's-local", "ac_app"); err != nil {
-		t.Fatal(err)
+	ensureLoginErr := EnsureLogin(ctx, c, "ac_app_login", "it's-local", "ac_app")
+	if ensureLoginErr != nil {
+		t.Fatal(ensureLoginErr)
 	}
 
-	if err := EnsureLogin(ctx, c, "ac_app_login", "local", "ac_app"); err != nil {
-		t.Fatal("EnsureLogin must be idempotent:", err)
+	ensureLoginErr = EnsureLogin(ctx, c, "ac_app_login", "local", "ac_app")
+	if ensureLoginErr != nil {
+		t.Fatal("EnsureLogin must be idempotent:", ensureLoginErr)
 	}
 }
 
@@ -166,10 +176,11 @@ func TestFailedMigrationRollsBack(t *testing.T) {
 	}
 
 	var b *string
-	if err := c.QueryRow(ctx, "SELECT to_regclass('public.b')::text").
-		Scan(&b); err != nil ||
+	scanErr := c.QueryRow(ctx, "SELECT to_regclass('public.b')::text").
+		Scan(&b)
+	if scanErr != nil ||
 		b != nil {
-		t.Fatalf("table b must not exist: %v %v", b, err)
+		t.Fatalf("table b must not exist: %v %v", b, scanErr)
 	}
 }
 
@@ -188,22 +199,26 @@ func TestNoTxFailureLeavesDirty(t *testing.T) {
 		t.Fatal("marker not detected")
 	}
 
-	if _, err := Up(ctx, c, ms); err == nil {
+	_, err := Up(ctx, c, ms)
+	if err == nil {
 		t.Fatal("want error")
 	}
 
-	if _, err := Up(ctx, c, ms); !errors.Is(err, ErrDirty) {
+	_, err = Up(ctx, c, ms)
+	if !errors.Is(err, ErrDirty) {
 		t.Fatalf("want ErrDirty, got %v", err)
 	}
 
-	if err := Force(ctx, c, 2); err != nil {
+	err = Force(ctx, c, 2)
+	if err != nil {
 		t.Fatal(err)
 	}
 
 	ok := []Migration{
 		{Version: 3, Name: "idx", SQL: noTxMarker + "\nCREATE TABLE public.t (id int)"},
 	}
-	if got, err := Up(ctx, c, ok); err != nil || len(got) != 1 {
+	got, err := Up(ctx, c, ok)
+	if err != nil || len(got) != 1 {
 		t.Fatalf("Up after force = %v, %v", got, err)
 	}
 

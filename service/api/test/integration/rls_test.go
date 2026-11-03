@@ -43,7 +43,8 @@ func TestTenantIsolationEverywhere(t *testing.T) {
 			name                          string
 			partition, rls, force, policy bool
 		)
-		if err := rows.Scan(&name, &partition, &rls, &force, &policy); err != nil {
+		err := rows.Scan(&name, &partition, &rls, &force, &policy)
+		if err != nil {
 			t.Fatal(err)
 		}
 
@@ -100,18 +101,20 @@ func TestTenantIsolationEverywhere(t *testing.T) {
 	}
 	defer tx.Rollback(ctx)
 
-	if _, err := tx.Exec(
+	_, execErr := tx.Exec(
 		ctx,
 		`SELECT set_config('app.tenant_id', $1, true)`,
 		seed.ID("tenant-a").String(),
-	); err != nil {
-		t.Fatal(err)
+	)
+	if execErr != nil {
+		t.Fatal(execErr)
 	}
 
 	for _, table := range []string{"monitoring.measurements", "monitoring.measurements_default"} {
 		var n int
-		if err := tx.QueryRow(ctx, `SELECT count(*) FROM `+table+` WHERE event_id = $1`, event).
-			Scan(&n); err != nil {
+		err := tx.QueryRow(ctx, `SELECT count(*) FROM `+table+` WHERE event_id = $1`, event).
+			Scan(&n)
+		if err != nil {
 			t.Fatal(err)
 		}
 
@@ -165,18 +168,20 @@ func TestIdempotencyKeysIsolated(t *testing.T) {
 	}
 	defer tx.Rollback(ctx)
 
-	if _, err := tx.Exec(
+	_, execErr := tx.Exec(
 		ctx,
 		`SELECT set_config('app.tenant_id', $1, true)`,
 		seed.ID("tenant-a").String(),
-	); err != nil {
-		t.Fatal(err)
+	)
+	if execErr != nil {
+		t.Fatal(execErr)
 	}
 
 	var n int
-	if err := tx.QueryRow(ctx, `SELECT count(*) FROM platform.idempotency_keys WHERE key = $1`, key).
-		Scan(&n); err != nil {
-		t.Fatal(err)
+	scanErr := tx.QueryRow(ctx, `SELECT count(*) FROM platform.idempotency_keys WHERE key = $1`, key).
+		Scan(&n)
+	if scanErr != nil {
+		t.Fatal(scanErr)
 	}
 
 	if n != 0 {

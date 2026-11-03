@@ -187,11 +187,13 @@ func TestLiveTriggersSkipWhatIsNotMeasured(t *testing.T) {
 
 // TestLiveTriggersRefuse: a node the site does not know and a message that is no JSON are errors.
 func TestLiveTriggersRefuse(t *testing.T) {
-	if _, err := LiveTriggers("node_3", []byte(node1Message), liveAt); err == nil {
+	_, err := LiveTriggers("node_3", []byte(node1Message), liveAt)
+	if err == nil {
 		t.Error("an unknown node was converted")
 	}
 
-	if _, err := LiveTriggers("node_1", []byte(`temp=27.2`), liveAt); err == nil {
+	_, err = LiveTriggers("node_1", []byte(`temp=27.2`), liveAt)
+	if err == nil {
 		t.Error("a message that is no JSON was converted")
 	}
 }
@@ -293,23 +295,32 @@ func TestLiveCommand(t *testing.T) {
 		t.Errorf("power on: %q %+v %t %v", payload, state, ok, err)
 	}
 
-	if payload, state, ok, err := LiveCommand(
+	liveCommandPayload, liveCommandState, liveCommandOk, liveCommandErr := LiveCommand(
 		json.RawMessage(`{"kind":"set_power","power":false}`),
-	); err != nil || !ok || payload != "OFF" ||
-		state != nil {
-		t.Errorf("power off: %q %+v %t %v", payload, state, ok, err)
+	)
+	if liveCommandErr != nil || !liveCommandOk || liveCommandPayload != "OFF" ||
+		liveCommandState != nil {
+		t.Errorf(
+			"power off: %q %+v %t %v",
+			liveCommandPayload,
+			liveCommandState,
+			liveCommandOk,
+			liveCommandErr,
+		)
 	}
 
 	for _, a := range []string{`{"kind":"set_temperature","celsius":24}`, `{"kind":"set_mode","mode":"cool"}`, `{"kind":"set_fan","fanLevel":"mid"}`, `{"kind":"set_power"}`} {
-		if payload, _, ok, err := LiveCommand(
+		payload, _, ok, err := LiveCommand(
 			json.RawMessage(a),
-		); err != nil || ok ||
+		)
+		if err != nil || ok ||
 			payload != "" {
 			t.Errorf("%s: %q %t %v", a, payload, ok, err)
 		}
 	}
 
-	if _, _, _, err := LiveCommand(json.RawMessage(`power on`)); err == nil {
+	_, _, _, liveCommandErr = LiveCommand(json.RawMessage(`power on`))
+	if liveCommandErr == nil {
 		t.Error("an action that is no JSON was taken")
 	}
 }

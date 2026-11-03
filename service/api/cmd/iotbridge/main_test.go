@@ -40,7 +40,8 @@ func TestFetchWaitingReadsTheRequestedCommands(t *testing.T) {
 		t.Fatalf("waiting: %v %v", got, err)
 	}
 
-	if _, err := fetchWaiting(c, srv.URL, "wrong", "t1"); err == nil {
+	_, fetchWaitingErr := fetchWaiting(c, srv.URL, "wrong", "t1")
+	if fetchWaitingErr == nil {
 		t.Error("a refused token is not an error")
 	}
 
@@ -51,11 +52,13 @@ func TestFetchWaitingReadsTheRequestedCommands(t *testing.T) {
 	)
 	defer bad.Close()
 
-	if _, err := fetchWaiting(c, bad.URL, "tok", "t1"); err == nil {
+	_, fetchWaitingErr = fetchWaiting(c, bad.URL, "tok", "t1")
+	if fetchWaitingErr == nil {
 		t.Error("a bad answer is not an error")
 	}
 
-	if _, err := fetchWaiting(c, "http://127.0.0.1:1", "tok", "t1"); err == nil {
+	_, fetchWaitingErr = fetchWaiting(c, "http://127.0.0.1:1", "tok", "t1")
+	if fetchWaitingErr == nil {
 		t.Error("a dead API is not an error")
 	}
 }
@@ -78,7 +81,8 @@ func TestDemoClockFollowsTheScenarioClock(t *testing.T) {
 	defer srv.Close()
 
 	d := &demoClock{api: srv.URL, c: &http.Client{Timeout: 5 * time.Second}}
-	if err := d.refresh(); err != nil {
+	err := d.refresh()
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -97,7 +101,8 @@ func TestDemoClockFollowsTheScenarioClock(t *testing.T) {
 	keep := d.offset()
 
 	d.api = empty.URL
-	if err := d.refresh(); err == nil {
+	err = d.refresh()
+	if err == nil {
 		t.Error("an answer without a snapshot time is accepted")
 	}
 
@@ -121,7 +126,8 @@ func TestSendReportsRefusals(t *testing.T) {
 	c := &http.Client{Timeout: 5 * time.Second}
 
 	tr := iotbridge.Trigger{EventID: uuid.New(), EventType: "telemetry"}
-	if err := send(c, srv.URL, tr); err != nil {
+	err := send(c, srv.URL, tr)
+	if err != nil {
 		t.Fatalf("accepted trigger: %v", err)
 	}
 
@@ -129,11 +135,13 @@ func TestSendReportsRefusals(t *testing.T) {
 		t.Errorf("idempotency key %q, want the event ID", key)
 	}
 
-	if err := send(c, srv.URL, iotbridge.Trigger{EventID: uuid.Nil}); err == nil {
+	err = send(c, srv.URL, iotbridge.Trigger{EventID: uuid.Nil})
+	if err == nil {
 		t.Error("a refused trigger is not an error")
 	}
 
-	if err := send(c, "http://127.0.0.1:1", tr); err == nil {
+	err = send(c, "http://127.0.0.1:1", tr)
+	if err == nil {
 		t.Error("a dead API is not an error")
 	}
 }
@@ -146,14 +154,15 @@ func TestSendCommandStopsBeforePublishingABadCommand(t *testing.T) {
 		Action:    json.RawMessage(`{"celsius":26}`),
 		ExpiresAt: time.Now().Add(time.Minute),
 	}
-	if err := sendCommand(
+	err := sendCommand(
 		nil,
 		&http.Client{},
 		"http://127.0.0.1:1",
 		uuid.New().String(),
 		w,
 		0,
-	); err == nil {
+	)
+	if err == nil {
 		t.Error("a command without an action kind is sent")
 	}
 }

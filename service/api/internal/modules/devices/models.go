@@ -99,9 +99,10 @@ func (Models) BindImported(
 		bound  bool
 		tamper string
 	)
-	if err := c.Tx.QueryRow(ctx, `SELECT d.unit_id IS NOT NULL OR EXISTS (SELECT 1 FROM devices.device_bindings b WHERE b.device_id = d.id AND b.unbound_at IS NULL), d.tamper
+	err := c.Tx.QueryRow(ctx, `SELECT d.unit_id IS NOT NULL OR EXISTS (SELECT 1 FROM devices.device_bindings b WHERE b.device_id = d.id AND b.unbound_at IS NULL), d.tamper
 		FROM devices.devices d WHERE d.id = $1 FOR UPDATE`, device).
-		Scan(&bound, &tamper); err != nil {
+		Scan(&bound, &tamper)
+	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return false, nil
 		}
@@ -114,7 +115,7 @@ func (Models) BindImported(
 	}
 
 	binding := uuid.Must(uuid.NewV7())
-	if _, err := c.Tx.Exec(
+	_, err = c.Tx.Exec(
 		ctx,
 		`INSERT INTO devices.device_bindings (id, tenant_id, device_id, unit_id, customer_org_id, bound_at, reason, actor_membership_id)
 		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7)`,
@@ -125,14 +126,16 @@ func (Models) BindImported(
 		c.Now,
 		reason,
 		c.Principal.MembershipID,
-	); err != nil {
+	)
+	if err != nil {
 		return false, err
 	}
 
 	var v int
-	if err := c.Tx.QueryRow(ctx, `UPDATE devices.devices SET unit_id = $2, binding_id = $3, target_unit_id = $2, version = version + 1, updated_at = platform.app_now()
+	err = c.Tx.QueryRow(ctx, `UPDATE devices.devices SET unit_id = $2, binding_id = $3, target_unit_id = $2, version = version + 1, updated_at = platform.app_now()
 		WHERE id = $1 RETURNING version`, device, unit, binding).
-		Scan(&v); err != nil {
+		Scan(&v)
+	if err != nil {
 		return false, err
 	}
 
@@ -181,7 +184,8 @@ func (Models) UnbindUnits(
 
 	for rows.Next() {
 		var p pair
-		if err := rows.Scan(&p.device, &p.unit); err != nil {
+		err := rows.Scan(&p.device, &p.unit)
+		if err != nil {
 			rows.Close()
 
 			return err
@@ -192,15 +196,17 @@ func (Models) UnbindUnits(
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return rowsErr
 	}
 
 	for _, p := range ended {
 		var v int
-		if err := c.Tx.QueryRow(ctx, `UPDATE devices.devices SET unit_id = NULL, binding_id = NULL, version = version + 1, updated_at = platform.app_now()
+		err := c.Tx.QueryRow(ctx, `UPDATE devices.devices SET unit_id = NULL, binding_id = NULL, version = version + 1, updated_at = platform.app_now()
 			WHERE id = $1 RETURNING version`, p.device).
-			Scan(&v); err != nil {
+			Scan(&v)
+		if err != nil {
 			return err
 		}
 
@@ -288,7 +294,8 @@ func (Models) StaleAfter(
 			id  uuid.UUID
 			sec int
 		)
-		if err := rows.Scan(&id, &sec); err != nil {
+		err := rows.Scan(&id, &sec)
+		if err != nil {
 			return nil, err
 		}
 

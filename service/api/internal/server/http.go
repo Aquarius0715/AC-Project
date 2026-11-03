@@ -75,7 +75,8 @@ func newEcho(
 
 	e.GET("/healthz", func(c *echo.Context) error { return c.NoContent(http.StatusOK) })
 	e.GET("/readyz", func(c *echo.Context) error {
-		if err := m.Writer.Ping(c.Request().Context()); err != nil {
+		err := m.Writer.Ping(c.Request().Context())
+		if err != nil {
 			return apperr.E(apperr.Unavailable, "error.unavailable")
 		}
 
@@ -99,9 +100,10 @@ func newEcho(
 	}
 
 	v1 := e.Group("/v1", a.Middleware())
-	if err := reg.MountREST(
+	err := reg.MountREST(
 		v1,
-	); err != nil { // the catalog's REST routes of the served operations (IR222)
+	)
+	if err != nil { // the catalog's REST routes of the served operations (IR222)
 		return nil, err
 	}
 
@@ -136,7 +138,8 @@ func principalHandler(a *auth.Authenticator, token string) echo.HandlerFunc {
 
 		p, err := a.Principal(c.Request().Context(), q.Get("subject"), tenant, membership, signedIn)
 		if err != nil {
-			if de := apperr.From(err); de.Code == apperr.NotFound {
+			de := apperr.From(err)
+			if de.Code == apperr.NotFound {
 				return apperr.E(apperr.NotFound, "error.membershipInvalid")
 			}
 

@@ -110,7 +110,8 @@ func (m FollowUps) done(
 	id uuid.UUID,
 	action, op, event, reason string,
 ) (Job, error) {
-	if err := m.Jobs.event(ctx, c, id, action, nil); err != nil {
+	err := m.Jobs.event(ctx, c, id, action, nil)
+	if err != nil {
 		return Job{}, err
 	}
 
@@ -216,7 +217,8 @@ func (m FollowUps) rateJob(ctx context.Context, c *ops.Call, in *RateInput) (Job
 	first := len(s.rating) == 0 || string(s.rating) == "null"
 	if !first {
 		var prev Rating
-		if err := json.Unmarshal(s.rating, &prev); err != nil {
+		err := json.Unmarshal(s.rating, &prev)
+		if err != nil {
 			return Job{}, err
 		}
 
@@ -228,15 +230,16 @@ func (m FollowUps) rateJob(ctx context.Context, c *ops.Call, in *RateInput) (Job
 	}
 
 	raw, _ := json.Marshal(r)
-	if err := m.bump(
+	bumpErr := m.bump(
 		ctx,
 		c,
 		in.JobID,
 		"rating = $2, customer_confirmed_at = COALESCE(customer_confirmed_at, $3)",
 		raw,
 		c.Now,
-	); err != nil {
-		return Job{}, err
+	)
+	if bumpErr != nil {
+		return Job{}, bumpErr
 	}
 
 	return m.done(ctx, c, in.JobID, "job.rated", "jobs.rate", "JobRated", "")
@@ -436,22 +439,24 @@ func (m FollowUps) reportProblemJob(
 	pref, _ := json.Marshal(preferred)
 
 	var id uuid.UUID
-	if err := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.jobs (tenant_id, unit_id, customer_org_id, type, status, origin, symptom, requested_slot, preferred_slots,
+	scanErr := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.jobs (tenant_id, unit_id, customer_org_id, type, status, origin, symptom, requested_slot, preferred_slots,
 		preference_round, due_at, follow_up_of_job_id, follow_up_class) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, 'reactive', 'requested', 'client_request',
 		$3, tstzrange($4, $5), $6, 1, $5, $7, 'pending') RETURNING id`, s.unit, s.org, in.Details, requested.StartAt, requested.EndAt, pref, in.JobID).
-		Scan(&id); err != nil {
-		return Job{}, err
+		Scan(&id)
+	if scanErr != nil {
+		return Job{}, scanErr
 	}
 
 	for _, p := range in.Photos {
 		aid := uuid.New()
 
 		key := "jobs/" + id.String() + "/" + aid.String()
-		if err := m.Blobs.Put(ctx, key, p.Mime, p.Bytes); err != nil {
+		err := m.Blobs.Put(ctx, key, p.Mime, p.Bytes)
+		if err != nil {
 			return Job{}, err
 		}
 
-		if _, err := c.Tx.Exec(
+		_, err = c.Tx.Exec(
 			ctx,
 			`INSERT INTO maintenance.attachments (id, tenant_id, job_id, object_key, name, mime, size_bytes, status, uploaded_by)
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, 'ready', $7)`,
@@ -462,21 +467,25 @@ func (m FollowUps) reportProblemJob(
 			p.Mime,
 			p.Size,
 			c.Principal.UserID,
-		); err != nil {
+		)
+		if err != nil {
 			return Job{}, err
 		}
 	}
 
-	if err := m.Jobs.event(ctx, c, id, "job.created", nil); err != nil {
-		return Job{}, err
+	eventErr := m.Jobs.event(ctx, c, id, "job.created", nil)
+	if eventErr != nil {
+		return Job{}, eventErr
 	}
 
-	if err := m.bump(ctx, c, in.JobID, ""); err != nil {
-		return Job{}, err
+	bumpErr := m.bump(ctx, c, in.JobID, "")
+	if bumpErr != nil {
+		return Job{}, bumpErr
 	}
 
-	if err := m.Jobs.event(ctx, c, in.JobID, "job.problem_reported", nil); err != nil {
-		return Job{}, err
+	eventErr = m.Jobs.event(ctx, c, in.JobID, "job.problem_reported", nil)
+	if eventErr != nil {
+		return Job{}, eventErr
 	}
 
 	j, err := m.Jobs.detail(ctx, c, id)
@@ -573,15 +582,16 @@ func (m FollowUps) classifyJob(ctx context.Context, c *ops.Call, in *ClassifyInp
 		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
 	}
 
-	if err := m.bump(
+	bumpErr := m.bump(
 		ctx,
 		c,
 		in.JobID,
 		"follow_up_class = $2, follow_up_reason = $3",
 		in.Classification,
 		in.Reason,
-	); err != nil {
-		return Job{}, err
+	)
+	if bumpErr != nil {
+		return Job{}, bumpErr
 	}
 
 	return m.done(
@@ -684,8 +694,9 @@ func (m FollowUps) saveCostJob(ctx context.Context, c *ops.Call, in *CostInput) 
 	}
 
 	raw, _ := json.Marshal(in.CostLines)
-	if err := m.bump(ctx, c, in.JobID, "costs = $2", raw); err != nil {
-		return Job{}, err
+	bumpErr := m.bump(ctx, c, in.JobID, "costs = $2", raw)
+	if bumpErr != nil {
+		return Job{}, bumpErr
 	}
 
 	return m.done(ctx, c, in.JobID, "job.costs_saved", "jobs.saveCost", "JobCostsSaved", "")
@@ -750,8 +761,9 @@ func (m FollowUps) extendAccess(
 
 // extendAccessJob is extendAccess answering the job with its detail extras.
 func (m FollowUps) extendAccessJob(ctx context.Context, c *ops.Call, in *ExtendInput) (Job, error) {
-	if _, err := m.lock(ctx, c, in.JobID); err != nil {
-		return Job{}, err
+	_, lockErr := m.lock(ctx, c, in.JobID)
+	if lockErr != nil {
+		return Job{}, lockErr
 	}
 
 	var (
@@ -773,26 +785,29 @@ func (m FollowUps) extendAccessJob(ctx context.Context, c *ops.Call, in *ExtendI
 		return Job{}, apperr.Fields(map[string]string{"accessValidUntil": "error.mustExtend"})
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.offers SET access_valid_until = $2, version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
 		offer,
 		in.AccessValidUntil,
-	); err != nil {
-		return Job{}, err
+	)
+	if execErr != nil {
+		return Job{}, execErr
 	}
 	// a window that had already ended was frozen into the contractor's history; it is frozen again at the new end (IR458)
-	if _, err := c.Tx.Exec(
+	_, execErr = c.Tx.Exec(
 		ctx,
 		`DELETE FROM maintenance.job_history_snapshots WHERE job_id = $1 AND owner_kind = 'organization' AND owner_id = $2`,
 		in.JobID,
 		contractor,
-	); err != nil {
-		return Job{}, err
+	)
+	if execErr != nil {
+		return Job{}, execErr
 	}
 
-	if err := m.bump(ctx, c, in.JobID, ""); err != nil {
-		return Job{}, err
+	bumpErr := m.bump(ctx, c, in.JobID, "")
+	if bumpErr != nil {
+		return Job{}, bumpErr
 	}
 
 	return m.done(
@@ -908,7 +923,8 @@ func (m FollowUps) recordWarrantyClaimJob(
 
 	claims := []WarrantyClaim{}
 	if len(s.claims) > 0 {
-		if err := json.Unmarshal(s.claims, &claims); err != nil {
+		err := json.Unmarshal(s.claims, &claims)
+		if err != nil {
 			return Job{}, err
 		}
 	}
@@ -928,8 +944,9 @@ func (m FollowUps) recordWarrantyClaimJob(
 	)
 
 	raw, _ := json.Marshal(claims)
-	if err := m.bump(ctx, c, in.JobID, "warranty_claims = $2", raw); err != nil {
-		return Job{}, err
+	bumpErr := m.bump(ctx, c, in.JobID, "warranty_claims = $2", raw)
+	if bumpErr != nil {
+		return Job{}, bumpErr
 	}
 
 	return m.done(

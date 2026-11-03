@@ -93,7 +93,8 @@ func activeContracts(
 
 	for rows.Next() {
 		var u, k uuid.UUID
-		if err := rows.Scan(&u, &k); err != nil {
+		err := rows.Scan(&u, &k)
+		if err != nil {
 			return nil, err
 		}
 

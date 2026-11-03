@@ -92,7 +92,7 @@ func (m Alerts) candidates(ctx context.Context, c *ops.Call, a Alert) ([]Evidenc
 			x                             EvidenceCandidate
 			metric, unit, origin, quality string
 		)
-		if err := rows.Scan(
+		err := rows.Scan(
 			&x.ID,
 			&x.ObservedAt,
 			&metric,
@@ -100,7 +100,8 @@ func (m Alerts) candidates(ctx context.Context, c *ops.Call, a Alert) ([]Evidenc
 			&unit,
 			&origin,
 			&quality,
-		); err != nil {
+		)
+		if err != nil {
 			rows.Close()
 
 			return nil, err
@@ -112,8 +113,9 @@ func (m Alerts) candidates(ctx context.Context, c *ops.Call, a Alert) ([]Evidenc
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return nil, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return nil, rowsErr
 	}
 
 	if m.Devices != nil {
@@ -154,8 +156,9 @@ func (m Alerts) isCandidate(ctx context.Context, c *ops.Call, a Alert, id uuid.U
 	}
 
 	var ok bool
-	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 `+remeasurementSQL+` AND m.event_id = $4)`, a.UnitID, a.DetectedAt, ruleMetric(a), id).
-		Scan(&ok); err != nil ||
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 `+remeasurementSQL+` AND m.event_id = $4)`, a.UnitID, a.DetectedAt, ruleMetric(a), id).
+		Scan(&ok)
+	if err != nil ||
 		ok {
 		return ok, err
 	}
@@ -258,7 +261,8 @@ func (m Alerts) evidence(
 	c *ops.Call,
 	in *EvidenceInput,
 ) (paging.Page[EvidenceCandidate], error) {
-	if err := paging.NoFilters(in.Query, "query.filters"); err != nil {
+	err := paging.NoFilters(in.Query, "query.filters")
+	if err != nil {
 		return paging.Page[EvidenceCandidate]{}, err
 	}
 
@@ -282,8 +286,9 @@ func (m Alerts) evidence(
 		return paging.Page[EvidenceCandidate]{}, err
 	}
 
-	if err := unitscope.Gate(ctx, c, []uuid.UUID{a.UnitID}); err != nil {
-		return paging.Page[EvidenceCandidate]{}, err
+	gateErr := unitscope.Gate(ctx, c, []uuid.UUID{a.UnitID})
+	if gateErr != nil {
+		return paging.Page[EvidenceCandidate]{}, gateErr
 	}
 
 	all, err := m.candidates(ctx, c, a)
@@ -291,11 +296,16 @@ func (m Alerts) evidence(
 		return paging.Page[EvidenceCandidate]{}, err
 	}
 
-	if err := paging.SortSlice(all, in.Query.Sort, map[string]func(x, y EvidenceCandidate) int{
-		"id":         func(x, y EvidenceCandidate) int { return strings.Compare(x.ID.String(), y.ID.String()) },
-		"observedAt": func(x, y EvidenceCandidate) int { return x.ObservedAt.Compare(y.ObservedAt) },
-	}); err != nil {
-		return paging.Page[EvidenceCandidate]{}, err
+	sortSliceErr := paging.SortSlice(
+		all,
+		in.Query.Sort,
+		map[string]func(x, y EvidenceCandidate) int{
+			"id":         func(x, y EvidenceCandidate) int { return strings.Compare(x.ID.String(), y.ID.String()) },
+			"observedAt": func(x, y EvidenceCandidate) int { return x.ObservedAt.Compare(y.ObservedAt) },
+		},
+	)
+	if sortSliceErr != nil {
+		return paging.Page[EvidenceCandidate]{}, sortSliceErr
 	}
 
 	w, err := paging.Resolve(in.Query, in.AlertID, c.Principal.ScopeVersion, 1)

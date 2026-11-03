@@ -31,7 +31,8 @@ import (
 )
 
 func main() {
-	if err := run(context.Background(), os.Args[1:]); err != nil {
+	err := run(context.Background(), os.Args[1:])
+	if err != nil {
 		log.Fatal(err)
 	}
 }
@@ -127,19 +128,21 @@ func bootstrapAdmin(ctx context.Context, conn *pgx.Conn, args []string) error {
 	)
 	fs.StringVar(&in.Name, "name", "", "the administrator's display name")
 
-	if err := fs.Parse(args); err != nil {
+	err := fs.Parse(args)
+	if err != nil {
 		return err
 	}
 
 	var r bootstrap.Result
 
-	if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
+	err = pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
 		var err error
 
 		r, err = bootstrap.Admin(ctx, tx, in)
 
 		return err
-	}); err != nil {
+	})
+	if err != nil {
 		return fmt.Errorf("bootstrap-admin: %w", err)
 	}
 
@@ -160,20 +163,22 @@ func bootstrapAdmin(ctx context.Context, conn *pgx.Conn, args []string) error {
 // local applies the development-only steps controlled by environment variables.
 func local(ctx context.Context, conn *pgx.Conn) error {
 	if pw := os.Getenv("APP_LOGIN_PASSWORD"); pw != "" {
-		if err := migrate.EnsureLogin(ctx, conn, "ac_app_login", pw, "ac_app"); err != nil {
+		err := migrate.EnsureLogin(ctx, conn, "ac_app_login", pw, "ac_app")
+		if err != nil {
 			return err
 		}
 
 		log.Printf("migrate: login role ac_app_login ready")
 
 		for _, d := range []string{"identity", "equipment", "maintenance", "billing", "energy"} { // one login per domain service (IR194)
-			if err := migrate.EnsureLogin(
+			err := migrate.EnsureLogin(
 				ctx,
 				conn,
 				"ac_"+d+"_login",
 				pw,
 				"ac_svc_"+d,
-			); err != nil {
+			)
+			if err != nil {
 				return err
 			}
 		}
@@ -199,11 +204,12 @@ func local(ctx context.Context, conn *pgx.Conn) error {
 	if done {
 		log.Printf("migrate: fixture already loaded")
 	} else {
-		if err := pgx.BeginFunc(
+		err := pgx.BeginFunc(
 			ctx,
 			conn,
 			func(tx pgx.Tx) error { return seed.Apply(ctx, tx, f) },
-		); err != nil {
+		)
+		if err != nil {
 			return err
 		}
 
@@ -218,25 +224,27 @@ func local(ctx context.Context, conn *pgx.Conn) error {
 
 		var n int
 
-		if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
+		beginFuncErr := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
 			var err error
 
 			n, err = seed.ApplyFleet(ctx, tx, fleet, f.SeedCreatedAt)
 
 			return err
-		}); err != nil {
-			return err
+		})
+		if beginFuncErr != nil {
+			return beginFuncErr
 		}
 
 		log.Printf("migrate: mock fleet of %d units ready", n)
 	}
 	// SEED_LIVE_SENSORS=1 (development only): the live site that real sensor nodes report to (DEC-86, IR524)
 	if os.Getenv("SEED_LIVE_SENSORS") == "1" {
-		if err := pgx.BeginFunc(
+		err := pgx.BeginFunc(
 			ctx,
 			conn,
 			func(tx pgx.Tx) error { return seed.ApplyLive(ctx, tx, f.SeedCreatedAt) },
-		); err != nil {
+		)
+		if err != nil {
 			return err
 		}
 

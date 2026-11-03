@@ -192,7 +192,7 @@ func Deliver(
 
 	for rows.Next() {
 		var p pending
-		if err := rows.Scan(
+		err := rows.Scan(
 			&p.id,
 			&p.to,
 			&p.key,
@@ -200,7 +200,8 @@ func Deliver(
 			&p.params,
 			&p.attempts,
 			&p.ended,
-		); err != nil {
+		)
+		if err != nil {
 			rows.Close()
 
 			return 0, err
@@ -211,8 +212,9 @@ func Deliver(
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return 0, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return 0, rowsErr
 	}
 
 	for _, p := range ns {
@@ -232,14 +234,15 @@ func Deliver(
 		case p.ended: // a disabled or removed account gets no more e-mails (recorded, never retried)
 			state, reason = "suppressed", new("membership ended")
 		default:
-			if msgID, err = s.Send(ctx, p.to, subject, body); err != nil {
+			msgID, err = s.Send(ctx, p.to, subject, body)
+			if err != nil {
 				state, reason = "failed", new(err.Error())
 			} else {
 				sent++
 			}
 		}
 
-		if _, err := tx.Exec(
+		_, execErr := tx.Exec(
 			ctx,
 			`INSERT INTO notify.deliveries (tenant_id, notification_id, channel, state, provider_message_id, failure_reason, attempts, updated_at)
 			VALUES (current_setting('app.tenant_id')::uuid, $1, 'email', $2, NULLIF($3, ''), $4, $5, $6)
@@ -251,8 +254,9 @@ func Deliver(
 			reason,
 			p.attempts+1,
 			now,
-		); err != nil {
-			return sent, err
+		)
+		if execErr != nil {
+			return sent, execErr
 		}
 	}
 
@@ -277,7 +281,8 @@ func DeliverAll(
 
 	for rows.Next() {
 		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
+		err := rows.Scan(&id)
+		if err != nil {
 			rows.Close()
 
 			return 0, err
@@ -288,8 +293,9 @@ func DeliverAll(
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return 0, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return 0, rowsErr
 	}
 
 	total := 0
@@ -343,19 +349,21 @@ func SweepAll(ctx context.Context, m *db.TxManager, now time.Time) (int64, error
 		return 0, err
 	}
 
-	if tenants, err = pgx.CollectRows(rows, pgx.RowTo[uuid.UUID]); err != nil {
+	tenants, err = pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	if err != nil {
 		return 0, err
 	}
 
 	var total int64
 
 	for _, t := range tenants {
-		if err := m.Run(ctx, false, &ops.Principal{TenantID: t}, func(tx pgx.Tx) error {
+		err := m.Run(ctx, false, &ops.Principal{TenantID: t}, func(tx pgx.Tx) error {
 			n, err := Sweep(ctx, tx, now)
 			total += n
 
 			return err
-		}); err != nil {
+		})
+		if err != nil {
 			return total, err
 		}
 	}

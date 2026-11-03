@@ -138,9 +138,10 @@ func preview(ctx context.Context, c *ops.Call, in *Conditions) (Preview, error) 
 	}
 
 	var inOrg int
-	if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND customer_org_id = $2 AND NOT archived`, in.UnitIDs, in.OrganizationID).
-		Scan(&inOrg); err != nil {
-		return Preview{}, err
+	scanErr := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND customer_org_id = $2 AND NOT archived`, in.UnitIDs, in.OrganizationID).
+		Scan(&inOrg)
+	if scanErr != nil {
+		return Preview{}, scanErr
 	}
 
 	if inOrg != len(in.UnitIDs) {
@@ -215,7 +216,7 @@ func scanReport(row pgx.Row) (Report, error) {
 		x         Report
 		cond, res []byte
 	)
-	if err := row.Scan(
+	err := row.Scan(
 		&x.ID,
 		&x.TenantID,
 		&x.Version,
@@ -225,7 +226,8 @@ func scanReport(row pgx.Row) (Report, error) {
 		&res,
 		&x.Status,
 		&x.EvidenceIDs,
-	); err != nil {
+	)
+	if err != nil {
 		return x, err
 	}
 
@@ -254,7 +256,8 @@ func reviews(ctx context.Context, c *ops.Call, x *Report) error {
 
 	for rows.Next() {
 		var r Review
-		if err := rows.Scan(&r.UserID, &r.ReportVersion, &r.Comment, &r.At); err != nil {
+		err := rows.Scan(&r.UserID, &r.ReportVersion, &r.Comment, &r.At)
+		if err != nil {
 			return err
 		}
 
@@ -287,7 +290,8 @@ func LoadReport(ctx context.Context, c *ops.Call, id uuid.UUID, version *int) (R
 		v = *version
 	} else {
 		var err error
-		if v, err = latestVersion(ctx, c, id); err != nil {
+		v, err = latestVersion(ctx, c, id)
+		if err != nil {
 			return Report{}, err
 		}
 	}
@@ -367,9 +371,10 @@ func pageReports(
 	}
 
 	var total int
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM energy.mrv_reports r WHERE "+where, args...).
-		Scan(&total); err != nil {
-		return paging.Page[Report]{}, err
+	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM energy.mrv_reports r WHERE "+where, args...).
+		Scan(&total)
+	if scanErr != nil {
+		return paging.Page[Report]{}, scanErr
 	}
 
 	rows, err := c.Tx.Query(
@@ -402,12 +407,14 @@ func pageReports(
 
 	rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return paging.Page[Report]{}, err
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return paging.Page[Report]{}, rowsErr
 	}
 
 	for i := range items {
-		if err := reviews(ctx, c, &items[i]); err != nil {
+		err := reviews(ctx, c, &items[i])
+		if err != nil {
 			return paging.Page[Report]{}, err
 		}
 	}
@@ -573,8 +580,9 @@ func versions(ctx context.Context, c *ops.Call, in *VersionsInput) (paging.Page[
 		return paging.Page[Report]{}, err
 	}
 
-	if _, err := latestVersion(ctx, c, in.ID); err != nil {
-		return paging.Page[Report]{}, err
+	_, latestVersionErr := latestVersion(ctx, c, in.ID)
+	if latestVersionErr != nil {
+		return paging.Page[Report]{}, latestVersionErr
 	}
 
 	return pageReports(ctx, c, in.Query, in.ID, "r.id = $1", []any{in.ID}, order)
@@ -681,8 +689,9 @@ func saveDraft(ctx context.Context, c *ops.Call, in *SaveInput) (Report, error) 
 	}
 
 	var found int
-	if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_attachments WHERE id = ANY($1)`, in.EvidenceIDs).
-		Scan(&found); err != nil {
+	err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_attachments WHERE id = ANY($1)`, in.EvidenceIDs).
+		Scan(&found)
+	if err != nil {
 		return Report{}, err
 	}
 
@@ -695,8 +704,9 @@ func saveDraft(ctx context.Context, c *ops.Call, in *SaveInput) (Report, error) 
 		return Report{}, err
 	}
 
-	if err := insertReport(ctx, c, id, version, p, "draft", in.EvidenceIDs); err != nil {
-		return Report{}, err
+	insertReportErr := insertReport(ctx, c, id, version, p, "draft", in.EvidenceIDs)
+	if insertReportErr != nil {
+		return Report{}, insertReportErr
 	}
 
 	c.Audit(
@@ -789,7 +799,7 @@ func recordReview(ctx context.Context, c *ops.Call, in *ReviewInput) (Report, er
 		return x, apperr.E(apperr.Conflict, "errors.mrv_already_reviewed")
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`INSERT INTO energy.mrv_reviews (tenant_id, report_id, report_version, user_id, comment, reviewed_at)
 		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5)`,
@@ -798,15 +808,17 @@ func recordReview(ctx context.Context, c *ops.Call, in *ReviewInput) (Report, er
 		c.Principal.UserID,
 		in.ReviewComment,
 		c.Now,
-	); err != nil {
-		return x, err
+	)
+	if execErr != nil {
+		return x, execErr
 	}
 
 	next := latest + 1
 
 	p := Preview{Conditions: x.Conditions, Summary: x.Summary, Incomplete: x.Incomplete}
-	if err := insertReport(ctx, c, x.ID, next, p, "demo_reviewed", x.EvidenceIDs); err != nil {
-		return x, err
+	insertReportErr := insertReport(ctx, c, x.ID, next, p, "demo_reviewed", x.EvidenceIDs)
+	if insertReportErr != nil {
+		return x, insertReportErr
 	}
 
 	c.Audit(

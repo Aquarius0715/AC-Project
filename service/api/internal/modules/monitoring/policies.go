@@ -93,7 +93,8 @@ func (Policies) Owners(
 			id uuid.UUID
 			o  PolicyOwner
 		)
-		if err := rows.Scan(&id, &o.CustomerID, &o.Kind); err != nil {
+		err := rows.Scan(&id, &o.CustomerID, &o.Kind)
+		if err != nil {
 			return nil, err
 		}
 
@@ -394,13 +395,15 @@ func scanAlertPolicy(r pgx.Row) (Policy, error) {
 
 	p.UnitIDs, p.RuleSettings = []uuid.UUID{}, []RuleSetting{}
 	if len(cond) > 0 {
-		if err := json.Unmarshal(cond, &p.Condition); err != nil {
+		err := json.Unmarshal(cond, &p.Condition)
+		if err != nil {
 			return p, err
 		}
 	}
 
 	if len(rules) > 0 {
-		if err := json.Unmarshal(rules, &p.Rules); err != nil {
+		err := json.Unmarshal(rules, &p.Rules)
+		if err != nil {
 			return p, err
 		}
 	}
@@ -518,7 +521,7 @@ func (m Policies) decorate(
 
 		for rows.Next() {
 			var s RuleSetting
-			if err := rows.Scan(
+			err := rows.Scan(
 				&s.ID,
 				&s.TenantID,
 				&s.Version,
@@ -530,7 +533,8 @@ func (m Policies) decorate(
 				&s.Enabled,
 				&s.ChangedByMembershipID,
 				&s.Reason,
-			); err != nil {
+			)
+			if err != nil {
 				rows.Close()
 
 				return err
@@ -541,8 +545,9 @@ func (m Policies) decorate(
 
 		rows.Close()
 
-		if err := rows.Err(); err != nil {
-			return err
+		rowsErr := rows.Err()
+		if rowsErr != nil {
+			return rowsErr
 		}
 	}
 
@@ -746,8 +751,9 @@ func (m Policies) list(
 
 		rows.Close()
 
-		if err := rows.Err(); err != nil {
-			return paging.Page[Policy]{}, err
+		rowsErr := rows.Err()
+		if rowsErr != nil {
+			return paging.Page[Policy]{}, rowsErr
 		}
 	}
 
@@ -815,8 +821,9 @@ func (m Policies) list(
 		settingsFor = &own
 	}
 
-	if err := m.decorate(ctx, c, page, settingsFor); err != nil {
-		return paging.Page[Policy]{}, err
+	decorateErr := m.decorate(ctx, c, page, settingsFor)
+	if decorateErr != nil {
+		return paging.Page[Policy]{}, decorateErr
 	}
 
 	return paging.Page[Policy]{
@@ -989,8 +996,9 @@ func (m Policies) get(ctx context.Context, c *ops.Call, in *PolicyIDInput) (Poli
 	}
 
 	ps := []Policy{p}
-	if err := m.decorate(ctx, c, ps, settingsFor); err != nil {
-		return p, err
+	decorateErr := m.decorate(ctx, c, ps, settingsFor)
+	if decorateErr != nil {
+		return p, decorateErr
 	}
 
 	return ps[0], nil
@@ -1072,8 +1080,11 @@ func (in *SaveInput) Validate() map[string]string {
 
 	if in.Timezone == nil {
 		fe["timezone"] = "error.required"
-	} else if _, err := time.LoadLocation(*in.Timezone); err != nil || *in.Timezone == "" || *in.Timezone == "Local" {
-		fe["timezone"] = "error.invalid"
+	} else {
+		_, err := time.LoadLocation(*in.Timezone)
+		if err != nil || *in.Timezone == "" || *in.Timezone == "Local" {
+			fe["timezone"] = "error.invalid"
+		}
 	}
 
 	if in.Enabled == nil {
@@ -1236,13 +1247,14 @@ func (m Policies) saveDefault(ctx context.Context, c *ops.Call, in *SaveInput) (
 	}
 
 	rules, _ := json.Marshal(in.Rules)
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE monitoring.alert_policies SET rules = $2, version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
 		p.ID,
 		rules,
-	); err != nil {
-		return p, err
+	)
+	if execErr != nil {
+		return p, execErr
 	}
 
 	return m.finishSave(ctx, c, p.ID, "PolicyChanged", c.ExpectedVersion)
@@ -1328,7 +1340,7 @@ func (m Policies) saveAlert(ctx context.Context, c *ops.Call, in *SaveInput) (Po
 		return p, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 
-	if _, err := c.Tx.Exec(
+	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE monitoring.alert_policies SET name = $2, timezone = $3, enabled = $4, priority = $5, condition = $6,
 		recipient_membership_ids = $7, channels = $8, escalate_after_minutes = $9, cooldown_minutes = $10, version = version + 1, updated_at = platform.app_now()
@@ -1343,8 +1355,9 @@ func (m Policies) saveAlert(ctx context.Context, c *ops.Call, in *SaveInput) (Po
 		in.Channels,
 		*in.EscalateAfterMinutes,
 		*in.CooldownMinutes,
-	); err != nil {
-		return p, err
+	)
+	if execErr != nil {
+		return p, execErr
 	}
 
 	return m.finishSave(ctx, c, p.ID, "PolicyChanged", c.ExpectedVersion)
@@ -1449,7 +1462,7 @@ func (m Policies) saveAutomation(ctx context.Context, c *ops.Call, in *SaveInput
 			return p, apperr.E(apperr.Conflict, "error.versionConflict")
 		}
 
-		if _, err := c.Tx.Exec(
+		_, execErr := c.Tx.Exec(
 			ctx,
 			`UPDATE control.automation_policies SET name = $2, timezone = $3, enabled = $4, priority = $5, condition = $6, action = $7,
 			disabled_reason = NULL, version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
@@ -1460,28 +1473,31 @@ func (m Policies) saveAutomation(ctx context.Context, c *ops.Call, in *SaveInput
 			*in.Priority,
 			[]byte(in.Condition),
 			[]byte(in.Action),
-		); err != nil {
-			return p, err
+		)
+		if execErr != nil {
+			return p, execErr
 		}
 
-		if _, err := c.Tx.Exec(
+		_, execErr = c.Tx.Exec(
 			ctx,
 			`DELETE FROM control.automation_policy_units WHERE policy_id = $1`,
 			p.ID,
-		); err != nil {
-			return p, err
+		)
+		if execErr != nil {
+			return p, execErr
 		}
 
 		id, prev = p.ID, c.ExpectedVersion
 	}
 
 	for _, u := range in.UnitIDs {
-		if _, err := c.Tx.Exec(
+		_, err := c.Tx.Exec(
 			ctx,
 			`INSERT INTO control.automation_policy_units (tenant_id, policy_id, unit_id) VALUES (current_setting('app.tenant_id')::uuid, $1, $2)`,
 			id,
 			u,
-		); err != nil {
+		)
+		if err != nil {
 			return Policy{}, err
 		}
 	}
@@ -1577,23 +1593,26 @@ func (m Policies) delete(ctx context.Context, c *ops.Call, in *PolicyIDInput) (D
 
 	switch p.Kind {
 	case "alert":
-		if err := m.Units.DetachPolicy(ctx, c, p.ID); err != nil {
+		err := m.Units.DetachPolicy(ctx, c, p.ID)
+		if err != nil {
 			return Deleted{}, err
 		}
 
-		if _, err := c.Tx.Exec(
+		_, err = c.Tx.Exec(
 			ctx,
 			`DELETE FROM monitoring.alert_policies WHERE id = $1`,
 			p.ID,
-		); err != nil {
+		)
+		if err != nil {
 			return Deleted{}, err
 		}
 	case "automation":
-		if _, err := c.Tx.Exec(
+		_, err := c.Tx.Exec(
 			ctx,
 			`DELETE FROM control.automation_policies WHERE id = $1`,
 			p.ID,
-		); err != nil {
+		)
+		if err != nil {
 			return Deleted{}, err
 		}
 	}
@@ -1724,8 +1743,9 @@ func (m Policies) setDefaultRule(
 		return RuleSetting{}, apperr.Fields(map[string]string{"policyId": "error.notDefaultPolicy"})
 	}
 
-	if _, _, found, err := m.Units.CustomerState(ctx, c, in.CustomerID); err != nil {
-		return RuleSetting{}, err
+	_, _, found, customerStateErr := m.Units.CustomerState(ctx, c, in.CustomerID)
+	if customerStateErr != nil {
+		return RuleSetting{}, customerStateErr
 	} else if !found {
 		return RuleSetting{}, apperr.E(apperr.NotFound, "error.notFound")
 	}

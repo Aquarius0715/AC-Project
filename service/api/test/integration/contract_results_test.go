@@ -55,8 +55,9 @@ func TestResultsMatchContract(t *testing.T) {
 		Fields []string  `json:"fields"`
 		Items  *[]string `json:"items"`
 	}
-	if err := json.Unmarshal(raw, &contract); err != nil {
-		t.Fatal(err)
+	unmarshalErr := json.Unmarshal(raw, &contract)
+	if unmarshalErr != nil {
+		t.Fatal(unmarshalErr)
 	}
 
 	marshaler := reflect.TypeFor[json.Marshaler]()

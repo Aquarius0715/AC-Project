@@ -23,7 +23,8 @@ func (unitDetails) Detail(
 	u assets.Unit,
 ) (assets.DetailExtras, error) {
 	var d assets.DetailExtras
-	if cp, ok, err := devices.LoadCapability(ctx, c, u.ModelID, u.CapabilityVersion); err != nil {
+	cp, ok, err := devices.LoadCapability(ctx, c, u.ModelID, u.CapabilityVersion)
+	if err != nil {
 		return d, err
 	} else if ok {
 		d.Capabilities = cp
@@ -71,12 +72,13 @@ func (unitDetails) Detail(
 	}
 	// location: property > ancestor spaces > space, with the property address and access instructions
 	d.Location.PathLabels = []string{}
-	if err := c.Tx.QueryRow(ctx, `WITH RECURSIVE up(id, name, parent, depth) AS (
+	scanErr := c.Tx.QueryRow(ctx, `WITH RECURSIVE up(id, name, parent, depth) AS (
 			SELECT s.id, s.name, s.parent_space_id, 0 FROM assets.spaces s WHERE s.id = $2
 			UNION ALL SELECT a.id, a.name, a.parent_space_id, up.depth + 1 FROM up JOIN assets.spaces a ON a.id = up.parent)
 		SELECT array_prepend(p.name, COALESCE((SELECT array_agg(name ORDER BY depth DESC) FROM up), '{}')), p.address, p.access_instructions
-		FROM assets.properties p WHERE p.id = $1`, u.PropertyID, u.SpaceID).Scan(&d.Location.PathLabels, &d.Location.Address, &d.Location.AccessInstructions); err != nil {
-		return d, err
+		FROM assets.properties p WHERE p.id = $1`, u.PropertyID, u.SpaceID).Scan(&d.Location.PathLabels, &d.Location.Address, &d.Location.AccessInstructions)
+	if scanErr != nil {
+		return d, scanErr
 	}
 
 	return d, nil

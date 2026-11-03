@@ -63,7 +63,8 @@ func TestServesTheAPIDescription(t *testing.T) {
 			Responses   map[string]json.RawMessage  `json:"responses"`
 		} `json:"paths"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &doc); err != nil || doc.Swagger != "2.0" {
+	err := json.Unmarshal(w.Body.Bytes(), &doc)
+	if err != nil || doc.Swagger != "2.0" {
 		t.Fatalf("swagger document: %v %q", err, doc.Swagger)
 	}
 	// every REST route of the catalog (IR222) is documented with its path parameters, write headers and responses

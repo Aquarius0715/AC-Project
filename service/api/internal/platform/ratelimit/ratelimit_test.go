@@ -29,13 +29,15 @@ func TestWindow(t *testing.T) {
 
 	ctx := context.Background()
 	for i := 1; i <= 3; i++ {
-		if wait, err := w.Allow(ctx, "t1:m1"); err != nil || wait != 0 {
+		wait, err := w.Allow(ctx, "t1:m1")
+		if err != nil || wait != 0 {
 			t.Fatalf("write %d: wait %d %v", i, wait, err)
 		}
 	}
 	// the fourth in the minute waits until the window ends (45 s after 09:00:15)
-	if wait, err := w.Allow(ctx, "t1:m1"); err != nil || wait != 45 {
-		t.Fatalf("over the limit: wait %d %v", wait, err)
+	wait, allowErr := w.Allow(ctx, "t1:m1")
+	if allowErr != nil || wait != 45 {
+		t.Fatalf("over the limit: wait %d %v", wait, allowErr)
 	}
 	// another caller has its own count
 	if wait, _ := w.Allow(ctx, "t1:m2"); wait != 0 {
@@ -77,7 +79,8 @@ func TestWindow(t *testing.T) {
 	// an unreachable store is an error: the caller decides (the Core API fails open)
 	mr.Close()
 
-	if _, err := w.Allow(ctx, "t1:m1"); err == nil {
+	_, allowErr = w.Allow(ctx, "t1:m1")
+	if allowErr == nil {
 		t.Error("closed store: no error")
 	}
 }

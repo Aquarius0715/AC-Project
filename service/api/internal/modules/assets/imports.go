@@ -315,7 +315,8 @@ func (m *Module) unitsImportPreview(
 
 		for _, d := range []*string{row.InstalledOn, row.WarrantyEnd} {
 			if row.Result != "error" && d != nil {
-				if _, err := time.ParseInLocation("2006-01-02", *d, kualaLumpur); err != nil {
+				_, err := time.ParseInLocation("2006-01-02", *d, kualaLumpur)
+				if err != nil {
 					fail("error.importInvalidDate")
 				}
 			}
@@ -394,9 +395,10 @@ func (m *Module) unitsImportPreview(
 			key := parent.String() + "/" + strings.ToLower(row.UnitName)
 
 			var exists bool
-			if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.units WHERE property_id = $1 AND space_id IS NOT DISTINCT FROM $2
+			err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.units WHERE property_id = $1 AND space_id IS NOT DISTINCT FROM $2
 				AND NOT archived AND lower(display_name) = lower($3))`, row.PropertyID, parentSpace, row.UnitName).
-				Scan(&exists); err != nil {
+				Scan(&exists)
+			if err != nil {
 				return ImportPreview{}, err
 			}
 
@@ -434,7 +436,7 @@ func (m *Module) unitsImportPreview(
 
 	rows, _ := json.Marshal(stored)
 	// the preview is not business data: stored outside the operation's read-only transaction
-	if err := m.Store.Run(ctx, false, c.Principal, func(tx pgx.Tx) error {
+	runErr := m.Store.Run(ctx, false, c.Principal, func(tx pgx.Tx) error {
 		_, err := tx.Exec(
 			ctx,
 			`INSERT INTO assets.unit_import_previews (id, tenant_id, customer_id, membership_id, file_name, rows, expires_at)
@@ -448,8 +450,9 @@ func (m *Module) unitsImportPreview(
 		)
 
 		return err
-	}); err != nil {
-		return ImportPreview{}, err
+	})
+	if runErr != nil {
+		return ImportPreview{}, runErr
 	}
 
 	return p, nil
@@ -562,14 +565,16 @@ func (m *Module) unitsImportCommit(
 	}
 
 	var org uuid.UUID
-	if err := c.Tx.QueryRow(ctx, `SELECT organization_id FROM assets.customers WHERE id = $1 AND status = 'active'`, customer).
-		Scan(&org); err != nil {
+	scanErr := c.Tx.QueryRow(ctx, `SELECT organization_id FROM assets.customers WHERE id = $1 AND status = 'active'`, customer).
+		Scan(&org)
+	if scanErr != nil {
 		return UnitImport{}, conflict("error.customerInactive")
 	}
 
 	var rows []storedRow
-	if err := json.Unmarshal(raw, &rows); err != nil {
-		return UnitImport{}, err
+	unmarshalErr := json.Unmarshal(raw, &rows)
+	if unmarshalErr != nil {
+		return UnitImport{}, unmarshalErr
 	}
 
 	created := map[uuid.UUID]uuid.UUID{} // placeholder → created property or space id
@@ -587,9 +592,10 @@ func (m *Module) unitsImportCommit(
 		}
 
 		var taken bool // someone added the property since the preview: validate again
-		if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.properties WHERE customer_org_id = $1 AND NOT archived AND lower(name) = lower($2))`,
+		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.properties WHERE customer_org_id = $1 AND NOT archived AND lower(name) = lower($2))`,
 			org, row.PropertyName).
-			Scan(&taken); err != nil {
+			Scan(&taken)
+		if err != nil {
 			return uuid.Nil, err
 		}
 
@@ -598,13 +604,14 @@ func (m *Module) unitsImportCommit(
 		}
 
 		id := uuid.Must(uuid.NewV7())
-		if _, err := c.Tx.Exec(
+		_, err = c.Tx.Exec(
 			ctx,
 			`INSERT INTO assets.properties (id, tenant_id, customer_org_id, kind, name) VALUES ($1, current_setting('app.tenant_id')::uuid, $2, 'office', $3)`,
 			id,
 			org,
 			row.PropertyName,
-		); err != nil {
+		)
+		if err != nil {
 			return uuid.Nil, err
 		}
 
@@ -624,8 +631,9 @@ func (m *Module) unitsImportCommit(
 		}
 
 		var ok bool
-		if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.spaces WHERE id = $1 AND NOT archived)`, *placeholder).
-			Scan(&ok); err != nil {
+		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.spaces WHERE id = $1 AND NOT archived)`, *placeholder).
+			Scan(&ok)
+		if err != nil {
 			return nil, err
 		}
 
@@ -634,7 +642,7 @@ func (m *Module) unitsImportCommit(
 		}
 
 		id := uuid.Must(uuid.NewV7())
-		if _, err := c.Tx.Exec(
+		_, err = c.Tx.Exec(
 			ctx,
 			`INSERT INTO assets.spaces (id, tenant_id, property_id, parent_space_id, kind, name)
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5)`,
@@ -643,7 +651,8 @@ func (m *Module) unitsImportCommit(
 			parent,
 			kind,
 			name,
-		); err != nil {
+		)
+		if err != nil {
 			return nil, dupSibling(err)
 		}
 
@@ -703,7 +712,7 @@ func (m *Module) unitsImportCommit(
 		}
 
 		id := uuid.Must(uuid.NewV7())
-		if _, err := c.Tx.Exec(
+		_, execErr := c.Tx.Exec(
 			ctx,
 			`INSERT INTO assets.units (id, tenant_id, customer_org_id, property_id, space_id, display_name, model_id, installed_at,
 			warranty_ends_at, capability_version) VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9)`,
@@ -716,8 +725,9 @@ func (m *Module) unitsImportCommit(
 			installed,
 			warranty,
 			row.CapVersion,
-		); err != nil {
-			return UnitImport{}, err
+		)
+		if execErr != nil {
+			return UnitImport{}, execErr
 		}
 
 		units = append(units, id)
@@ -868,24 +878,26 @@ func (m *Module) unitsImportUndo(
 		}
 	}
 	// the devices the serial column bound go back to unbound; history alone (no telemetry yet) does not block the undo
-	if err := m.Import.UnbindUnits(
+	unbindUnitsErr := m.Import.UnbindUnits(
 		ctx,
 		c,
 		x.CreatedUnitIDs,
 		"CSV import undone: "+in.Reason,
-	); err != nil {
-		return UnitImport{}, err
+	)
+	if unbindUnitsErr != nil {
+		return UnitImport{}, unbindUnitsErr
 	}
 
 	for _, q := range []struct {
 		table string
 		ids   []uuid.UUID
 	}{{"assets.units", x.CreatedUnitIDs}, {"assets.spaces", x.CreatedSpaceIDs}, {"assets.properties", x.CreatedPropertyIDs}} {
-		if _, err := c.Tx.Exec(
+		_, err := c.Tx.Exec(
 			ctx,
 			"UPDATE "+q.table+" SET archived = true, version = version + 1, updated_at = platform.app_now() WHERE id = ANY($1) AND NOT archived",
 			q.ids,
-		); err != nil {
+		)
+		if err != nil {
 			return UnitImport{}, err
 		}
 	}

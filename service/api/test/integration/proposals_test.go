@@ -357,7 +357,8 @@ func TestSlotProposals(t *testing.T) {
 	j4 := data(m)["id"].(string)
 	propose(j4, slotJSON(100, 2), internalHold, ts(2), 1)
 
-	if _, err := schedTick(context.Background(), s, clock.Add(2*time.Hour)); err != nil {
+	_, err := schedTick(context.Background(), s, clock.Add(2*time.Hour))
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -1320,7 +1321,8 @@ func TestPartnerProposalEndsWithClientProposal(t *testing.T) {
 	// the client lets it expire: the contractor may propose again
 	job, offer, partner = sent(129)
 
-	if _, err := schedTick(ctx, s, clock.Add(6*time.Hour)); err != nil {
+	_, err := schedTick(ctx, s, clock.Add(6*time.Hour))
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -1488,7 +1490,8 @@ func TestPartnerProposalEndsWithOffer(t *testing.T) {
 
 	job, _, partner = proposed(134)
 
-	if _, err := schedTick(ctx, s, clock.Add(12*time.Hour)); err != nil {
+	_, err := schedTick(ctx, s, clock.Add(12*time.Hour))
+	if err != nil {
 		t.Fatal(err)
 	}
 

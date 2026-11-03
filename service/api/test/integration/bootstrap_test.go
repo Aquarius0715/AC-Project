@@ -56,7 +56,8 @@ func TestBootstrapAdmin(t *testing.T) {
 		"no tenant": {Organization: "HQ", Email: in.Email, Name: in.Name}, "no address": {Tenant: in.Tenant, Organization: "HQ", Email: "nobody", Name: in.Name},
 		"no name": {Tenant: in.Tenant, Organization: "HQ", Email: in.Email},
 	} {
-		if _, err := run(bad); err == nil {
+		_, err := run(bad)
+		if err == nil {
 			t.Errorf("%s: accepted", name)
 		}
 	}
@@ -109,15 +110,17 @@ func TestBootstrapAdmin(t *testing.T) {
 		)
 	}
 
-	if _, err := run(in); !errors.Is(err, bootstrap.ErrAdminExists) {
-		t.Errorf("second run for the tenant: %v", err)
+	_, runErr := run(in)
+	if !errors.Is(runErr, bootstrap.ErrAdminExists) {
+		t.Errorf("second run for the tenant: %v", runErr)
 	}
 
 	other := in
 
 	other.Tenant = "Bootstrap other " + tag
-	if _, err := run(other); !errors.Is(err, bootstrap.ErrEmailTaken) {
-		t.Errorf("an address someone holds: %v", err)
+	_, runErr = run(other)
+	if !errors.Is(runErr, bootstrap.ErrEmailTaken) {
+		t.Errorf("an address someone holds: %v", runErr)
 	}
 
 	owner(
@@ -147,8 +150,9 @@ func TestBootstrapAdmin(t *testing.T) {
 
 	t.Cleanup(s.DB.Close)
 
-	if err := s.DrainEvents(ctx); err != nil {
-		t.Fatal(err)
+	drainEventsErr := s.DrainEvents(ctx)
+	if drainEventsErr != nil {
+		t.Fatal(drainEventsErr)
 	}
 
 	fake.mu.Lock()
