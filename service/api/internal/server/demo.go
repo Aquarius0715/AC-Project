@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"math"
+	"slices"
 	"sync"
 	"time"
 
@@ -24,33 +25,35 @@ import (
 )
 
 // ScenarioClock is the demo scenario clock: democlock.Clock (shared through platform.demo_clock, IR168) when the
-// scenario has a start, else the process-local demoClock (tests with a fixed base clock).
+// scenario has a start, else the process-local LocalClock (tests with a fixed base clock).
 type ScenarioClock interface {
 	Now() time.Time
 	Advance(ctx context.Context, d time.Duration) error
 }
 
-// NewScenarioClock is a process-local scenario clock over base; services of one binary can share it
-// (Config.DemoClock).
-func NewScenarioClock(base func() time.Time) ScenarioClock {
-	return &demoClock{base: base, mu: sync.Mutex{}, offset: 0}
-}
-
-// demoClock is the base clock plus a forward offset set by demo.advanceClock (IR36), local to this process.
-type demoClock struct {
+// LocalClock is the base clock plus a forward offset set by demo.advanceClock (IR36), local to this process.
+type LocalClock struct {
 	mu     sync.Mutex
 	base   func() time.Time
 	offset time.Duration
 }
 
-func (d *demoClock) Now() time.Time {
+// NewScenarioClock is a process-local scenario clock over base; services of one binary can share it
+// (Config.DemoClock).
+func NewScenarioClock(base func() time.Time) *LocalClock {
+	return &LocalClock{base: base, mu: sync.Mutex{}, offset: 0}
+}
+
+// Now is the base clock plus the offset.
+func (d *LocalClock) Now() time.Time {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
 	return d.base().Add(d.offset)
 }
 
-func (d *demoClock) Advance(_ context.Context, by time.Duration) error {
+// Advance moves the clock forward by by.
+func (d *LocalClock) Advance(_ context.Context, by time.Duration) error {
 	d.mu.Lock()
 	d.offset += by
 	d.mu.Unlock()
@@ -273,79 +276,136 @@ func (in *TriggerInput) Validate() map[string]string {
 	}
 
 	switch in.EventType {
-	case "command_sent", "command_ack", "command_fail":
-		if in.CommandID == nil || in.Measurement != nil {
-			fieldErrs["commandId"] = apperr.KeyRequired
-		}
-	case "telemetry":
-		if in.Measurement == nil || in.CommandID != nil {
-			fieldErrs["measurement"] = apperr.KeyRequired
-		}
-	case "restriction_observation":
-		if in.RestrictionID == nil || in.UnitID == nil || in.CommandID != nil ||
-			in.Measurement != nil {
-			fieldErrs["unitId"] = apperr.KeyRequired
-		}
+	case eventCommandSent,
+		eventCommandAck,
+		eventCommandFail,
+		"telemetry",
+		eventRestrictionObservation:
+		in.validateSubject(fieldErrs)
 	case "device":
-		if in.DeviceID == nil {
-			fieldErrs["deviceId"] = apperr.KeyRequired
-		}
-
-		if in.Sequence == nil || *in.Sequence < 0 {
-			fieldErrs["sequence"] = apperr.KeyRequired
-		}
-
-		switch recovery := in.Recovery; {
-		case in.Kind == kindRestored &&
-			(recovery == nil || recovery.SourceEventID == uuid.Nil || devices.RecoveredValue[recovery.Axis] == "" ||
-				devices.RecoveredValue[recovery.Axis] != recovery.Value):
-			fieldErrs["recovery"] = apperr.KeyInvalid // DeviceRecovery: connection → online, power → on, tamper → clear
-		case in.Kind != kindRestored && devices.FaultAxis[in.Kind] == "":
-			fieldErrs["kind"] = apperr.KeyInvalid
-		case in.Kind != kindRestored && recovery != nil:
-			fieldErrs["recovery"] = apperr.KeyInvalid // faults carry no recovery (SR20)
-		}
+		in.validateDevice(fieldErrs)
 	case keyState:
-		if in.DeviceID == nil {
-			fieldErrs["deviceId"] = apperr.KeyRequired
-		}
-
-		switch reportedState := in.State; {
-		case reportedState == nil:
-			fieldErrs[keyState] = apperr.KeyRequired
-		case reportedState.Mode != nil && *reportedState.Mode != "cool" && *reportedState.Mode != "dry" &&
-			*reportedState.Mode != "fan":
-			fieldErrs["state.mode"] = apperr.KeyInvalid
-		case reportedState.FanLevel != nil && *reportedState.FanLevel != "low" && *reportedState.FanLevel != "mid" &&
-			*reportedState.FanLevel != "high":
-			fieldErrs["state.fanLevel"] = apperr.KeyInvalid
-		case reportedState.Celsius != nil && (*reportedState.Celsius < 10 || *reportedState.Celsius > 40):
-			fieldErrs["state.celsius"] = apperr.KeyRange
-		}
+		in.validateState(fieldErrs)
 	case "automation":
-		switch evaluationInput := in.Event; {
-		case evaluationInput == nil || in.CommandID != nil || in.Measurement != nil:
-			fieldErrs["event"] = apperr.KeyRequired
-		case evaluationInput.Phase != "condition": // a gateway reports conditions; schedules come from the clock (IR54)
-			fieldErrs["event.phase"] = apperr.KeyInvalid
-		default:
-			for k, v := range evaluationInput.Validate() {
-				fieldErrs["event."+k] = v
-			}
-		}
+		in.validateAutomation(fieldErrs)
 	case "operation":
-		if in.OperationID == nil {
-			fieldErrs["operationId"] = apperr.KeyRequired
-		}
-
-		if in.Result != "succeeded" && in.Result != "failed" {
-			fieldErrs["result"] = apperr.KeyInvalid
-		}
+		in.validateOperation(fieldErrs)
 	default:
 		fieldErrs["eventType"] = "errors.trigger_unsupported"
 	}
 
 	return fieldErrs
+}
+
+// validateOperation checks a device operation's result (IR67): the operation, and succeeded or failed.
+func (in *TriggerInput) validateOperation(fieldErrs map[string]string) {
+	if in.OperationID == nil {
+		fieldErrs["operationId"] = apperr.KeyRequired
+	}
+
+	if in.Result != "succeeded" && in.Result != "failed" {
+		fieldErrs["result"] = apperr.KeyInvalid
+	}
+}
+
+// validateSubject checks that a command event, telemetry or a restriction observation names its subject and carries
+// no other event's.
+func (in *TriggerInput) validateSubject(fieldErrs map[string]string) {
+	command, measurement := in.CommandID != nil, in.Measurement != nil
+
+	switch in.EventType {
+	case "telemetry":
+		requireOnly(fieldErrs, "measurement", measurement, command)
+	case eventRestrictionObservation:
+		requireOnly(
+			fieldErrs,
+			"unitId",
+			in.RestrictionID != nil && in.UnitID != nil,
+			command || measurement,
+		)
+	default: // command_sent, command_ack, command_fail
+		requireOnly(fieldErrs, "commandId", command, measurement)
+	}
+}
+
+// requireOnly marks field required unless the event has it and nothing it must not carry (extra).
+func requireOnly(fieldErrs map[string]string, field string, has, extra bool) {
+	if !has || extra {
+		fieldErrs[field] = apperr.KeyRequired
+	}
+}
+
+// validateDevice checks a device fault or recovery (SR20): a fault names its axis by its kind and carries no recovery;
+// a recovery (DeviceRecovery: connection → online, power → on, tamper → clear) names its source event and the value
+// its axis recovers to.
+func (in *TriggerInput) validateDevice(fieldErrs map[string]string) {
+	if in.DeviceID == nil {
+		fieldErrs["deviceId"] = apperr.KeyRequired
+	}
+
+	if in.Sequence == nil || *in.Sequence < 0 {
+		fieldErrs["sequence"] = apperr.KeyRequired
+	}
+
+	switch {
+	case in.Kind == kindRestored:
+		if !validRecovery(in.Recovery) {
+			fieldErrs["recovery"] = apperr.KeyInvalid
+		}
+	case devices.FaultAxis[in.Kind] == "":
+		fieldErrs["kind"] = apperr.KeyInvalid
+	case in.Recovery != nil:
+		fieldErrs["recovery"] = apperr.KeyInvalid
+	}
+}
+
+// validRecovery is whether a recovery names its source event and the value its axis recovers to.
+func validRecovery(recovery *devices.Recovery) bool {
+	return recovery != nil && recovery.SourceEventID != uuid.Nil &&
+		devices.RecoveredValue[recovery.Axis] != "" &&
+		devices.RecoveredValue[recovery.Axis] == recovery.Value
+}
+
+// reportedCelsiusMin and reportedCelsiusMax bound the temperature setting a device may report.
+const (
+	reportedCelsiusMin = 10
+	reportedCelsiusMax = 40
+)
+
+// validateState checks a device's state report: its device, and settings of the air conditioner's modes, fan levels
+// and temperature range.
+func (in *TriggerInput) validateState(fieldErrs map[string]string) {
+	if in.DeviceID == nil {
+		fieldErrs["deviceId"] = apperr.KeyRequired
+	}
+
+	reported := in.State
+
+	switch {
+	case reported == nil:
+		fieldErrs[keyState] = apperr.KeyRequired
+	case reported.Mode != nil && !slices.Contains([]string{"cool", "dry", "fan"}, *reported.Mode):
+		fieldErrs["state.mode"] = apperr.KeyInvalid
+	case reported.FanLevel != nil && !slices.Contains([]string{"low", "mid", "high"}, *reported.FanLevel):
+		fieldErrs["state.fanLevel"] = apperr.KeyInvalid
+	case reported.Celsius != nil && (*reported.Celsius < reportedCelsiusMin || *reported.Celsius > reportedCelsiusMax):
+		fieldErrs["state.celsius"] = apperr.KeyRange
+	}
+}
+
+// validateAutomation checks a gateway's facts: a condition evaluation and nothing else. Schedules come from the clock
+// (IR54), never from a gateway.
+func (in *TriggerInput) validateAutomation(fieldErrs map[string]string) {
+	switch evaluationInput := in.Event; {
+	case evaluationInput == nil || in.CommandID != nil || in.Measurement != nil:
+		fieldErrs["event"] = apperr.KeyRequired
+	case evaluationInput.Phase != "condition":
+		fieldErrs["event.phase"] = apperr.KeyInvalid
+	default:
+		for k, v := range evaluationInput.Validate() {
+			fieldErrs["event."+k] = v
+		}
+	}
 }
 
 // Event is DemoEvent.
@@ -356,22 +416,60 @@ type Event struct {
 	Type       string    `json:"type"`
 }
 
-// metricUnits is the D07 metric / unit / range table.
-var metricUnits = map[string]struct {
+// metricRange is the D07 unit and value range of a metric.
+type metricRange struct {
 	unit     string
 	min, max float64
-}{
-	"temperature": {
-		"°C",
-		-50,
-		100,
-	},
-	"humidity":             {"%", 0, 100},
-	"co2":                  {"ppm", 0, 10000},
-	"pm25":                 {"µg/m³", 0, 1000},
-	"power":                {"kW", 0, 100},
-	"vibration":            {"mm/s", 0, 100},
-	"refrigerant_pressure": {"kPa", 0, 5000},
+}
+
+// metricUnits is the D07 metric / unit / range table: unit, minimum, maximum.
+func metricUnits() map[string]metricRange {
+	return map[string]metricRange{
+		"temperature":          {"°C", -50, 100},
+		"humidity":             {"%", 0, 100},
+		"co2":                  {"ppm", 0, 10000},
+		"pm25":                 {"µg/m³", 0, 1000},
+		"power":                {"kW", 0, 100},
+		"vibration":            {"mm/s", 0, 100},
+		"refrigerant_pressure": {"kPa", 0, 5000},
+	}
+}
+
+// tenantPrincipal is the principal a demo trigger runs as in tenant: anonymous, with only the tenant that row-level
+// security needs.
+func tenantPrincipal(tenant uuid.UUID) *ops.Principal {
+	return &ops.Principal{
+		TenantID:          tenant,
+		Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
+		MembershipID:      uuid.UUID{},
+		UserID:            uuid.UUID{},
+		OrgID:             uuid.UUID{},
+		ScopeVersion:      0,
+		Scopes:            nil,
+		Employment:        "",
+		Timezone:          "",
+		SessionsRevokedAt: nil,
+	}
+}
+
+// systemPrincipal is the demo system's principal in tenant, the one a scheduler job runs as.
+func systemPrincipal(tenant uuid.UUID) *ops.Principal {
+	return &ops.Principal{
+		Principal: authz.Principal{
+			Role:        "system",
+			Permissions: nil,
+			ClientRole:  "",
+		},
+		TenantID:          tenant,
+		UserID:            seed.ID("system-demo"),
+		MembershipID:      uuid.UUID{},
+		OrgID:             uuid.UUID{},
+		ScopeVersion:      0,
+		Scopes:            nil,
+		Employment:        "",
+		Timezone:          "",
+		SessionsRevokedAt: nil,
+	}
 }
 
 // inTenant runs fn in the tenant that owns the row found by probe (demo triggers are anonymous, RLS needs a tenant).
@@ -395,43 +493,27 @@ func (d *demoOps) inTenant(
 	for _, tenant := range tenants {
 		found := false
 
-		err := d.m.Run(
-			ctx,
-			false,
-			&ops.Principal{
-				TenantID:          tenant,
-				Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
-				MembershipID:      uuid.UUID{},
-				UserID:            uuid.UUID{},
-				OrgID:             uuid.UUID{},
-				ScopeVersion:      0,
-				Scopes:            nil,
-				Employment:        "",
-				Timezone:          "",
-				SessionsRevokedAt: nil,
-			},
-			func(txn pgx.Tx) error {
-				var ok bool
+		err := d.m.Run(ctx, false, tenantPrincipal(tenant), func(txn pgx.Tx) error {
+			var ok bool
 
-				err := txn.QueryRow(ctx, probe, probeID).Scan(&ok)
-				if err != nil || !ok {
-					return apperr.Wrap(err, "queryrow (inTenant)")
-				}
+			err := txn.QueryRow(ctx, probe, probeID).Scan(&ok)
+			if err != nil || !ok {
+				return apperr.Wrap(err, "queryrow (inTenant)")
+			}
 
-				found = true
+			found = true
 
-				_, err = txn.Exec(
-					ctx,
-					`SELECT set_config('app.now', $1, true)`,
-					now.UTC().Format(time.RFC3339Nano),
-				)
-				if err != nil { // column defaults on the demo clock
-					return apperr.Wrap(err, "select set_config")
-				}
+			_, err = txn.Exec(
+				ctx,
+				`SELECT set_config('app.now', $1, true)`,
+				now.UTC().Format(time.RFC3339Nano),
+			)
+			if err != nil { // column defaults on the demo clock
+				return apperr.Wrap(err, "select set_config")
+			}
 
-				return callback(txn, tenant)
-			},
-		)
+			return callback(txn, tenant)
+		})
 		if err != nil || found {
 			return apperr.Wrap(err, "db.TxManager.Run")
 		}
@@ -481,388 +563,507 @@ func (d *demoOps) trigger(ctx context.Context, call *ops.Call, input *TriggerInp
 		OccurredAt: input.OccurredAt,
 		Type:       input.EventType,
 	}
-	switch input.EventType {
-	case "command_sent":
-		return out, d.inTenant(
-			ctx,
-			call.Now,
-			`SELECT EXISTS (SELECT 1 FROM control.commands WHERE id = $1)`,
-			*input.CommandID,
-			func(tx pgx.Tx, _ uuid.UUID) error {
-				_, err := tx.Exec(
-					ctx,
-					`UPDATE control.commands SET status = 'sent', delivery = 'sent', sent_at = $2, version = version + 1, updated_at =
-						$2 WHERE id = $1 AND status = 'requested'`,
-					*input.CommandID,
-					input.OccurredAt,
-				)
 
-				return apperr.Wrap(err, "update control.commands")
-			},
-		)
-	case "command_ack":
-		return out, d.inTenant(
-			ctx,
-			call.Now,
-			`SELECT EXISTS (SELECT 1 FROM control.commands WHERE id = $1)`,
-			*input.CommandID,
-			func(tx pgx.Tx, _ uuid.UUID) error {
-				_, err := control.Acknowledge(ctx, tx, *input.CommandID, input.OccurredAt)
-
-				return apperr.Wrap(err, "control.Acknowledge")
-			},
-		)
-	case "command_fail":
-		return out, d.inTenant(
-			ctx,
-			call.Now,
-			`SELECT EXISTS (SELECT 1 FROM control.commands WHERE id = $1)`,
-			*input.CommandID,
-			func(txn pgx.Tx, _ uuid.UUID) error {
-				tag, err := txn.Exec(
-					ctx,
-					`UPDATE control.commands SET status = 'failed', failure_code = 'DEVICE_REJECTED', version = version + 1, updated_at
-						= $2
-				WHERE id = $1 AND status IN ('requested','sent')`,
-					*input.CommandID,
-					input.OccurredAt,
-				)
-				if err != nil || tag.RowsAffected() == 0 {
-					return apperr.Wrap(err, "update control.commands")
-				}
-
-				auditResultErr := control.AuditResult(
-					ctx,
-					txn,
-					*input.CommandID,
-					"system-iot",
-					"failed",
-					"DEVICE_REJECTED",
-					input.OccurredAt,
-				)
-				if auditResultErr != nil {
-					return apperr.Wrap(auditResultErr, "control.AuditResult")
-				}
-
-				return control.EndRestrictionCommands(
-					ctx,
-					txn,
-					[]uuid.UUID{*input.CommandID},
-					input.OccurredAt,
-				)
-			},
-		)
-	}
+	var err error
 
 	switch input.EventType {
+	case eventCommandSent, eventCommandAck, eventCommandFail:
+		err = d.command(ctx, call, input)
 	case "device": // SR20 faults and recoveries, SR23 tamper Alert
-		signal := devices.Signal{
-			EventID:    input.EventID,
-			DeviceID:   *input.DeviceID,
-			BindingID:  input.BindingID,
-			Sequence:   int64(*input.Sequence),
-			Kind:       input.Kind,
-			Recovery:   input.Recovery,
-			OccurredAt: input.OccurredAt,
-		}
-
-		return out, d.inTenant(
-			ctx,
-			call.Now,
-			`SELECT EXISTS (SELECT 1 FROM devices.devices WHERE id = $1)`,
-			*input.DeviceID,
-			func(tx pgx.Tx, _ uuid.UUID) error {
-				_, err := devices.RecordSignal(
-					ctx,
-					tx,
-					signal,
-					call.Now,
-					monitoring.Alerts{Units: nil, Access: nil, Devices: nil},
-				)
-
-				return apperr.Wrap(err, "devices.RecordSignal")
-			},
-		)
+		err = d.deviceSignal(ctx, call, input)
 	case "operation": // IR67: the result of a running check / firmware operation
-		return out, d.inTenant(
-			ctx,
-			call.Now,
-			`SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE id = $1)`,
-			*input.OperationID,
-			func(tx pgx.Tx, _ uuid.UUID) error {
-				return devices.FinishOperation(
-					ctx,
-					tx,
-					*input.OperationID,
-					input.Result == "succeeded",
-					input.OccurredAt,
-					call.Now,
-				)
-			},
-		)
+		err = d.operationResult(ctx, call, input)
+	case "automation": // a gateway's facts: the alert policies of the units, never an automation (IR529)
+		err = d.gatewayFacts(ctx, call, input)
+	case keyState: // the device's state report: the unit's observed settings and when the device was last heard
+		err = d.stateReport(ctx, call, input)
+	case eventRestrictionObservation: // SR26: a device reports which restriction it enforces
+		err = d.restrictionObserved(ctx, call, input)
+	default: // telemetry: D07 / IR12 normalization, IR77 sequence latest+1, IR11 boundary from the sensor
+		err = d.telemetry(ctx, call, input)
 	}
 
-	if input.EventType == "automation" { // a gateway's facts: the alert policies of the units, never an automation (IR529)
-		evaluationInput := input.Event
-		if evaluationInput.OccurredAt.After(call.Now) {
-			return out, apperr.Fields(map[string]string{"event.occurredAt": apperr.KeyRange})
-		}
+	return out, err
+}
 
-		if d.notify == nil {
-			return out, apperr.E(apperr.Unavailable, "errors.demo_only")
-		}
-
-		return out, d.inTenant(
-			ctx,
-			call.Now,
-			`SELECT EXISTS (SELECT 1 FROM assets.units WHERE id = $1)`,
-			evaluationInput.UnitIDs[0],
-			func(tx pgx.Tx, tenant uuid.UUID) error {
-				systemCall := &ops.Call{
-					Tx:            tx,
-					Now:           call.Now,
-					CorrelationID: uuid.NewString(),
-					Queries:       d.reg,
-					Principal: &ops.Principal{
-						Principal: authz.Principal{
-							Role:        "system",
-							Permissions: nil,
-							ClientRole:  "",
-						},
-						TenantID: tenant,
-						UserID: seed.ID(
-							"system-demo",
-						),
-						MembershipID:      uuid.UUID{},
-						OrgID:             uuid.UUID{},
-						ScopeVersion:      0,
-						Scopes:            nil,
-						Employment:        "",
-						Timezone:          "",
-						SessionsRevokedAt: nil,
-					}, Bearer: "", ExpectedVersion: nil, Candidates: nil, Events: nil, Audits: nil,
-				}
-
-				_, err := d.notify(ctx, systemCall, evaluationInput)
-				if err != nil {
-					return err
-				}
-
-				if d.reg != nil &&
-					d.reg.Rec != nil { // the alerts' and notifications' events and audits, as a scheduler job's
-					return d.reg.Rec.Record(ctx, tx, systemCall, "demo.trigger")
-				}
-
-				return nil
-			},
-		)
+// command records what a device did with a command: sent it, acknowledged it or failed it.
+func (d *demoOps) command(ctx context.Context, call *ops.Call, input *TriggerInput) error {
+	switch input.EventType {
+	case eventCommandSent:
+		return d.commandSent(ctx, call, input)
+	case eventCommandAck:
+		return d.commandAcknowledged(ctx, call, input)
 	}
 
-	if input.EventType == keyState {
-		// the device's state report: the unit's observed settings and when the device was last heard
-		if input.OccurredAt.After(call.Now) {
-			return out, apperr.Fields(map[string]string{"occurredAt": apperr.KeyRange})
-		}
+	return d.commandFailed(ctx, call, input)
+}
 
-		return out, d.inTenant(
-			ctx,
-			call.Now,
-			`SELECT EXISTS (SELECT 1 FROM devices.devices WHERE id = $1 AND unit_id IS NOT NULL)`,
-			*input.DeviceID,
-			func(txn pgx.Tx, _ uuid.UUID) error {
-				reportedState := input.State
-				if reportedState.Power == nil && reportedState.Celsius == nil &&
-					reportedState.Mode == nil &&
-					reportedState.FanLevel == nil {
-					// a report with no settings (a module that reports none, IR528) is heard only: the settings that acknowledged
-					// commands set stay
-					_, err := txn.Exec(
-						ctx,
-						`UPDATE assets.units u SET last_seen_at = GREATEST(COALESCE(u.last_seen_at, $2), $2)
-					FROM devices.devices d WHERE d.id = $1 AND u.id = d.unit_id`,
-						*input.DeviceID,
-						input.OccurredAt,
-					)
-					if err != nil {
-						return apperr.Wrap(err, "update assets.units")
-					}
-				} else {
-					state, _ := json.Marshal(
-						map[string]any{
-							"power":      reportedState.Power,
-							"celsius":    reportedState.Celsius,
-							"mode":       reportedState.Mode,
-							"fanLevel":   reportedState.FanLevel,
-							"observedAt": input.OccurredAt.UTC(),
-						},
-					)
+// commandProbe finds the tenant of a command.
+const commandProbe = `SELECT EXISTS (SELECT 1 FROM control.commands WHERE id = $1)`
 
-					_, err := txn.Exec(
-						ctx,
-						`UPDATE assets.units u SET observed_state = $2, last_seen_at = GREATEST(COALESCE(u.last_seen_at, $3), $3)
-					FROM devices.devices d WHERE d.id = $1 AND u.id = d.unit_id`,
-						*input.DeviceID,
-						state,
-						input.OccurredAt,
-					)
-					if err != nil {
-						return apperr.Wrap(err, "update assets.units")
-					}
-				}
-
-				_, err := txn.Exec(
-					ctx,
-					`UPDATE devices.devices SET last_seen_at = GREATEST(COALESCE(last_seen_at, $2), $2) WHERE id = $1`,
-					*input.DeviceID,
-					input.OccurredAt,
-				)
-
-				return apperr.Wrap(err, "update devices.devices")
-			},
-		)
-	}
-
-	if input.EventType == "restriction_observation" { // SR26: a device reports which restriction it enforces
-		return out, d.inTenant(
-			ctx,
-			call.Now,
-			`SELECT EXISTS (SELECT 1 FROM assets.units WHERE id = $1)`,
-			*input.UnitID,
-			func(txn pgx.Tx, _ uuid.UUID) error {
-				var obsRaw any // the device observation itself (equipment data); restrictions reacts to it
-				if input.Observed != nil {
-					obsRaw, _ = json.Marshal(input.Observed)
-				}
-
-				_, err := txn.Exec(
-					ctx,
-					`UPDATE assets.units SET observed_restriction = $2, last_seen_at = $3 WHERE id = $1`,
-					*input.UnitID,
-					obsRaw,
-					call.Now,
-				)
-				if err != nil {
-					return apperr.Wrap(err, "update assets.units")
-				}
-
-				raw, _ := json.Marshal(input.Observed) // "null" when the device enforces none
-
-				return events.Publish(
-					ctx,
-					txn,
-					call.Principal.TenantID,
-					"unit",
-					*input.UnitID,
-					events.UnitRestrictionObserved,
-					events.Observation{
-						UnitID:   *input.UnitID,
-						Observed: raw,
-						EventID:  input.EventID,
-						At:       call.Now,
-					},
-				) // billing updates recovery cases (IR185)
-			},
-		)
-	}
-
-	// telemetry: D07 / IR12 normalization, IR77 sequence latest+1, IR11 boundary from the sensor
-	rawMeasurement := input.Measurement
-
-	return out, d.inTenant(
+// commandSent marks a requested command sent.
+func (d *demoOps) commandSent(ctx context.Context, call *ops.Call, input *TriggerInput) error {
+	return d.inTenant(
 		ctx,
 		call.Now,
-		`SELECT EXISTS (SELECT 1 FROM devices.sensors s JOIN devices.devices d ON d.id = s.device_id WHERE s.id = $1)`,
-		rawMeasurement.SensorID,
-		func(txn pgx.Tx, tenant uuid.UUID) error {
-			var (
-				metric, unit string
-				boundary     *string
-				bound        *uuid.UUID
-			)
-
-			scanErr := txn.QueryRow(ctx, `SELECT s.metric, s.unit, s.boundary_id, d.unit_id FROM devices.sensors s JOIN
-				devices.devices d ON d.id = s.device_id WHERE s.id = $1`, rawMeasurement.SensorID).
-				Scan(&metric, &unit, &boundary, &bound)
-			if scanErr != nil {
-				return apperr.Wrap(scanErr, "select devices.sensors")
-			}
-
-			if metric != rawMeasurement.Metric || bound == nil || *bound != rawMeasurement.UnitID {
-				return apperr.Fields(map[string]string{"measurement": "errors.sensor_mismatch"})
-			}
-			// IR12 causes in priority order unit_mismatch → non_finite → out_of_range → invalid_time; a cause keeps a null
-			// input suspect (D07), the value itself is never stored for the first three; otherwise null is missing
-			quality, value, reason := rawMeasurement.Quality, rawMeasurement.Value, (*string)(nil)
-			spec, known := metricUnits[rawMeasurement.Metric]
-			suspect := func(why string, drop bool) {
-				quality, reason = "suspect", &why
-
-				if drop {
-					value = nil
-				}
-			}
-
-			switch {
-			case !known || rawMeasurement.Unit != spec.unit:
-				suspect("unit_mismatch", true)
-			case value != nil && (math.IsNaN(*value) || math.IsInf(*value, 0)):
-				suspect("non_finite", true)
-			case value != nil && (*value < spec.min || *value > spec.max):
-				suspect("out_of_range", true)
-			case rawMeasurement.ObservedAt.After(rawMeasurement.ReceivedAt) || rawMeasurement.ReceivedAt.After(call.Now):
-				suspect("invalid_time", false)
-			case value == nil:
-				quality = "missing"
-			}
-
-			seq := int64(0)
-			if rawMeasurement.Sequence != nil {
-				seq = *rawMeasurement.Sequence
-			} else {
-				err := txn.QueryRow(ctx, `SELECT COALESCE(max(sequence), 0) + 1 FROM monitoring.measurements WHERE sensor_id =
-					$1`, rawMeasurement.SensorID).
-					Scan(&seq)
-				if err != nil {
-					return apperr.Wrap(err, "select monitoring.measurements")
-				}
-			}
-
-			var dup bool
-
-			scanErr = txn.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM monitoring.measurements WHERE event_id =
-				$1)`, rawMeasurement.EventID).
-				Scan(&dup)
-			if scanErr != nil ||
-				dup {
-				return apperr.Wrap(scanErr, "select monitoring.measurements")
-			}
-
+		commandProbe,
+		*input.CommandID,
+		func(txn pgx.Tx, _ uuid.UUID) error {
 			_, err := txn.Exec(
 				ctx,
-				`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit,
-					raw_unit, origin, quality, quality_reason,
-			boundary_id, received_at, event_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
-				tenant,
-				rawMeasurement.UnitID,
-				rawMeasurement.SensorID,
-				rawMeasurement.Metric,
-				rawMeasurement.ObservedAt,
-				seq,
-				value,
-				unit,
-				rawUnit(rawMeasurement.Unit, unit),
-				rawMeasurement.Origin,
-				quality,
-				reason,
-				boundary,
-				rawMeasurement.ReceivedAt,
-				rawMeasurement.EventID,
+				`UPDATE control.commands SET status = 'sent', delivery = 'sent', sent_at = $2, version = version + 1, updated_at =
+				$2 WHERE id = $1 AND status = 'requested'`,
+				*input.CommandID,
+				input.OccurredAt,
 			)
 
-			return apperr.Wrap(err, "insert monitoring.measurements")
+			return apperr.Wrap(err, "update control.commands")
 		},
 	)
 }
+
+// commandAcknowledged records the device's acknowledgement of a command.
+func (d *demoOps) commandAcknowledged(
+	ctx context.Context,
+	call *ops.Call,
+	input *TriggerInput,
+) error {
+	return d.inTenant(
+		ctx,
+		call.Now,
+		commandProbe,
+		*input.CommandID,
+		func(txn pgx.Tx, _ uuid.UUID) error {
+			_, err := control.Acknowledge(ctx, txn, *input.CommandID, input.OccurredAt)
+
+			return apperr.Wrap(err, "control.Acknowledge")
+		},
+	)
+}
+
+// commandFailed fails a requested or sent command as the device rejected it, audits the result and ends the
+// restriction commands it belonged to.
+func (d *demoOps) commandFailed(ctx context.Context, call *ops.Call, input *TriggerInput) error {
+	return d.inTenant(
+		ctx,
+		call.Now,
+		commandProbe,
+		*input.CommandID,
+		func(txn pgx.Tx, _ uuid.UUID) error {
+			tag, err := txn.Exec(
+				ctx,
+				`UPDATE control.commands SET status = 'failed', failure_code = 'DEVICE_REJECTED', version = version + 1, updated_at
+				= $2
+		WHERE id = $1 AND status IN ('requested','sent')`,
+				*input.CommandID,
+				input.OccurredAt,
+			)
+			if err != nil || tag.RowsAffected() == 0 {
+				return apperr.Wrap(err, "update control.commands")
+			}
+
+			auditResultErr := control.AuditResult(
+				ctx,
+				txn,
+				*input.CommandID,
+				"system-iot",
+				"failed",
+				"DEVICE_REJECTED",
+				input.OccurredAt,
+			)
+			if auditResultErr != nil {
+				return apperr.Wrap(auditResultErr, "control.AuditResult")
+			}
+
+			return control.EndRestrictionCommands(
+				ctx,
+				txn,
+				[]uuid.UUID{*input.CommandID},
+				input.OccurredAt,
+			)
+		},
+	)
+}
+
+// deviceSignal records a device fault or recovery (SR20); a tamper raises an Alert (SR23).
+func (d *demoOps) deviceSignal(ctx context.Context, call *ops.Call, input *TriggerInput) error {
+	signal := devices.Signal{
+		EventID:    input.EventID,
+		DeviceID:   *input.DeviceID,
+		BindingID:  input.BindingID,
+		Sequence:   int64(*input.Sequence),
+		Kind:       input.Kind,
+		Recovery:   input.Recovery,
+		OccurredAt: input.OccurredAt,
+	}
+
+	return d.inTenant(
+		ctx,
+		call.Now,
+		`SELECT EXISTS (SELECT 1 FROM devices.devices WHERE id = $1)`,
+		*input.DeviceID,
+		func(txn pgx.Tx, _ uuid.UUID) error {
+			_, err := devices.RecordSignal(
+				ctx,
+				txn,
+				signal,
+				call.Now,
+				monitoring.Alerts{Units: nil, Access: nil, Devices: nil},
+			)
+
+			return apperr.Wrap(err, "devices.RecordSignal")
+		},
+	)
+}
+
+// operationResult finishes a running device operation (IR67) with the device's result.
+func (d *demoOps) operationResult(ctx context.Context, call *ops.Call, input *TriggerInput) error {
+	return d.inTenant(
+		ctx,
+		call.Now,
+		`SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE id = $1)`,
+		*input.OperationID,
+		func(txn pgx.Tx, _ uuid.UUID) error {
+			return devices.FinishOperation(
+				ctx,
+				txn,
+				*input.OperationID,
+				input.Result == "succeeded",
+				input.OccurredAt,
+				call.Now,
+			)
+		},
+	)
+}
+
+// gatewayFacts evaluates a gateway's facts against the alert policies of its units, never an automation (IR529), and
+// records the alerts' and notifications' events and audits as a scheduler job does.
+func (d *demoOps) gatewayFacts(ctx context.Context, call *ops.Call, input *TriggerInput) error {
+	evaluationInput := input.Event
+	if evaluationInput.OccurredAt.After(call.Now) {
+		return apperr.Fields(map[string]string{"event.occurredAt": apperr.KeyRange})
+	}
+
+	if d.notify == nil {
+		return apperr.E(apperr.Unavailable, "errors.demo_only")
+	}
+
+	return d.inTenant(
+		ctx,
+		call.Now,
+		`SELECT EXISTS (SELECT 1 FROM assets.units WHERE id = $1)`,
+		evaluationInput.UnitIDs[0],
+		func(txn pgx.Tx, tenant uuid.UUID) error {
+			systemCall := &ops.Call{
+				Tx:              txn,
+				Now:             call.Now,
+				CorrelationID:   uuid.NewString(),
+				Queries:         d.reg,
+				Principal:       systemPrincipal(tenant),
+				Bearer:          "",
+				ExpectedVersion: nil,
+				Candidates:      nil,
+				Events:          nil,
+				Audits:          nil,
+			}
+
+			_, err := d.notify(ctx, systemCall, evaluationInput)
+			if err != nil {
+				return err
+			}
+
+			if d.reg != nil && d.reg.Rec != nil {
+				return d.reg.Rec.Record(ctx, txn, systemCall, "demo.trigger")
+			}
+
+			return nil
+		},
+	)
+}
+
+// stateReport records a device's state report: the unit's observed settings and when the device was last heard.
+func (d *demoOps) stateReport(ctx context.Context, call *ops.Call, input *TriggerInput) error {
+	if input.OccurredAt.After(call.Now) {
+		return apperr.Fields(map[string]string{"occurredAt": apperr.KeyRange})
+	}
+
+	return d.inTenant(
+		ctx,
+		call.Now,
+		`SELECT EXISTS (SELECT 1 FROM devices.devices WHERE id = $1 AND unit_id IS NOT NULL)`,
+		*input.DeviceID,
+		func(txn pgx.Tx, _ uuid.UUID) error {
+			err := observeState(ctx, txn, *input.DeviceID, input.State, input.OccurredAt)
+			if err != nil {
+				return err
+			}
+
+			_, err = txn.Exec(
+				ctx,
+				`UPDATE devices.devices SET last_seen_at = GREATEST(COALESCE(last_seen_at, $2), $2) WHERE id = $1`,
+				*input.DeviceID,
+				input.OccurredAt,
+			)
+
+			return apperr.Wrap(err, "update devices.devices")
+		},
+	)
+}
+
+// observeState updates the observed settings and the last seen time of the device's unit. A report with no settings
+// (a module that reports none, IR528) is heard only: the settings that acknowledged commands set stay.
+func observeState(
+	ctx context.Context,
+	txn pgx.Tx,
+	device uuid.UUID,
+	reported *ReportedState,
+	observedAt time.Time,
+) error {
+	if reported.Power == nil && reported.Celsius == nil && reported.Mode == nil &&
+		reported.FanLevel == nil {
+		_, err := txn.Exec(
+			ctx,
+			`UPDATE assets.units u SET last_seen_at = GREATEST(COALESCE(u.last_seen_at, $2), $2)
+			FROM devices.devices d WHERE d.id = $1 AND u.id = d.unit_id`,
+			device,
+			observedAt,
+		)
+
+		return apperr.Wrap(err, "update assets.units")
+	}
+
+	state, err := json.Marshal(
+		map[string]any{
+			"power":      reported.Power,
+			"celsius":    reported.Celsius,
+			"mode":       reported.Mode,
+			"fanLevel":   reported.FanLevel,
+			"observedAt": observedAt.UTC(),
+		},
+	)
+	if err != nil {
+		return apperr.Wrap(err, "json.Marshal")
+	}
+
+	_, err = txn.Exec(
+		ctx,
+		`UPDATE assets.units u SET observed_state = $2, last_seen_at = GREATEST(COALESCE(u.last_seen_at, $3), $3)
+		FROM devices.devices d WHERE d.id = $1 AND u.id = d.unit_id`,
+		device,
+		state,
+		observedAt,
+	)
+
+	return apperr.Wrap(err, "update assets.units")
+}
+
+// restrictionObserved records which restriction a device reports it enforces (SR26) on its unit, and publishes the
+// observation, from which billing updates the recovery cases (IR185).
+func (d *demoOps) restrictionObserved(
+	ctx context.Context,
+	call *ops.Call,
+	input *TriggerInput,
+) error {
+	observed, err := json.Marshal(input.Observed) // "null" when the device enforces none
+	if err != nil {
+		return apperr.Wrap(err, "json.Marshal")
+	}
+
+	var column any // the device observation itself (equipment data), SQL NULL when it enforces none
+	if input.Observed != nil {
+		column = observed
+	}
+
+	return d.inTenant(
+		ctx,
+		call.Now,
+		`SELECT EXISTS (SELECT 1 FROM assets.units WHERE id = $1)`,
+		*input.UnitID,
+		func(txn pgx.Tx, _ uuid.UUID) error {
+			_, err := txn.Exec(
+				ctx,
+				`UPDATE assets.units SET observed_restriction = $2, last_seen_at = $3 WHERE id = $1`,
+				*input.UnitID,
+				column,
+				call.Now,
+			)
+			if err != nil {
+				return apperr.Wrap(err, "update assets.units")
+			}
+
+			return events.Publish(
+				ctx,
+				txn,
+				call.Principal.TenantID,
+				"unit",
+				*input.UnitID,
+				events.UnitRestrictionObserved,
+				events.Observation{
+					UnitID:   *input.UnitID,
+					Observed: observed,
+					EventID:  input.EventID,
+					At:       call.Now,
+				},
+			)
+		},
+	)
+}
+
+// telemetry stores one measurement of a sensor: D07 / IR12 normalization, IR77 sequence latest+1, IR11 boundary from
+// the sensor.
+func (d *demoOps) telemetry(ctx context.Context, call *ops.Call, input *TriggerInput) error {
+	measurement := input.Measurement
+
+	return d.inTenant(
+		ctx,
+		call.Now,
+		`SELECT EXISTS (SELECT 1 FROM devices.sensors s JOIN devices.devices d ON d.id = s.device_id WHERE s.id = $1)`,
+		measurement.SensorID,
+		func(txn pgx.Tx, tenant uuid.UUID) error {
+			return storeMeasurement(ctx, txn, tenant, measurement, call.Now)
+		},
+	)
+}
+
+// storeMeasurement checks a measurement against its sensor, classifies it (IR12) and stores it once: a repeated event
+// ID is not stored again.
+func storeMeasurement(
+	ctx context.Context,
+	txn pgx.Tx,
+	tenant uuid.UUID,
+	measurement *RawMeasurement,
+	now time.Time,
+) error {
+	var (
+		metric, unit string
+		boundary     *string
+		bound        *uuid.UUID
+	)
+
+	scanErr := txn.QueryRow(ctx, `SELECT s.metric, s.unit, s.boundary_id, d.unit_id FROM devices.sensors s JOIN
+		devices.devices d ON d.id = s.device_id WHERE s.id = $1`, measurement.SensorID).
+		Scan(&metric, &unit, &boundary, &bound)
+	if scanErr != nil {
+		return apperr.Wrap(scanErr, "select devices.sensors")
+	}
+
+	if metric != measurement.Metric || bound == nil || *bound != measurement.UnitID {
+		return apperr.Fields(map[string]string{"measurement": "errors.sensor_mismatch"})
+	}
+
+	quality, value, reason := classify(measurement, now)
+
+	seq, err := sequenceOf(ctx, txn, measurement)
+	if err != nil {
+		return err
+	}
+
+	stored, err := alreadyStored(ctx, txn, measurement.EventID)
+	if err != nil || stored {
+		return err
+	}
+
+	_, err = txn.Exec(
+		ctx,
+		`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit,
+			raw_unit, origin, quality, quality_reason,
+	boundary_id, received_at, event_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+		tenant,
+		measurement.UnitID,
+		measurement.SensorID,
+		measurement.Metric,
+		measurement.ObservedAt,
+		seq,
+		value,
+		unit,
+		rawUnit(measurement.Unit, unit),
+		measurement.Origin,
+		quality,
+		reason,
+		boundary,
+		measurement.ReceivedAt,
+		measurement.EventID,
+	)
+
+	return apperr.Wrap(err, "insert monitoring.measurements")
+}
+
+// alreadyStored is whether the measurement of eventID is stored already.
+func alreadyStored(ctx context.Context, txn pgx.Tx, eventID uuid.UUID) (bool, error) {
+	var stored bool
+
+	err := txn.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM monitoring.measurements WHERE event_id =
+		$1)`, eventID).
+		Scan(&stored)
+	if err != nil {
+		return false, apperr.Wrap(err, "select monitoring.measurements")
+	}
+
+	return stored, nil
+}
+
+// classify is the IR12 quality of a measurement, the value to store and the reason. A cause makes it suspect and the
+// first three causes drop the value (D07); otherwise a null value is missing.
+func classify(measurement *RawMeasurement, now time.Time) (string, *float64, *string) {
+	cause, drop := suspectCause(measurement, now)
+
+	switch {
+	case cause != "" && drop:
+		return qualitySuspect, nil, &cause
+	case cause != "":
+		return qualitySuspect, measurement.Value, &cause
+	case measurement.Value == nil:
+		return "missing", nil, nil
+	}
+
+	return measurement.Quality, measurement.Value, nil
+}
+
+// suspectCause is the first IR12 cause that makes a measurement suspect, in priority order unit_mismatch →
+// non_finite → out_of_range → invalid_time, and whether it drops the value; "" when none applies.
+func suspectCause(measurement *RawMeasurement, now time.Time) (string, bool) {
+	spec, known := metricUnits()[measurement.Metric]
+	if !known || measurement.Unit != spec.unit {
+		return "unit_mismatch", true
+	}
+
+	if value := measurement.Value; value != nil {
+		if math.IsNaN(*value) || math.IsInf(*value, 0) {
+			return "non_finite", true
+		}
+
+		if *value < spec.min || *value > spec.max {
+			return "out_of_range", true
+		}
+	}
+
+	if measurement.ObservedAt.After(measurement.ReceivedAt) || measurement.ReceivedAt.After(now) {
+		return "invalid_time", false
+	}
+
+	return "", false
+}
+
+// sequenceOf is the measurement's sequence, or the sensor's latest + 1 when the measurement has none (IR77).
+func sequenceOf(ctx context.Context, txn pgx.Tx, measurement *RawMeasurement) (int64, error) {
+	if measurement.Sequence != nil {
+		return *measurement.Sequence, nil
+	}
+
+	var seq int64
+
+	err := txn.QueryRow(ctx, `SELECT COALESCE(max(sequence), 0) + 1 FROM monitoring.measurements WHERE sensor_id =
+		$1`, measurement.SensorID).
+		Scan(&seq)
+	if err != nil {
+		return 0, apperr.Wrap(err, "select monitoring.measurements")
+	}
+
+	return seq, nil
+}
+
+// rawUnitMax is how many characters of a received unit IR12 keeps as evidence.
+const rawUnitMax = 32
 
 // rawUnit keeps a received unit that differs from the sensor's (IR12: at most 32 characters as evidence).
 func rawUnit(got, want string) *string {
@@ -870,8 +1071,8 @@ func rawUnit(got, want string) *string {
 		return nil
 	}
 
-	if r := []rune(got); len(r) > 32 {
-		got = string(r[:32])
+	if r := []rune(got); len(r) > rawUnitMax {
+		got = string(r[:rawUnitMax])
 	}
 
 	return &got

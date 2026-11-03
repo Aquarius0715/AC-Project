@@ -7,9 +7,12 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
+	"fmt"
 	"hash/fnv"
 	"log"
+	"maps"
 	"os"
 	"os/signal"
 	"strings"
@@ -20,33 +23,64 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/devicesim"
 	"github.com/pradita/ac-project/service/api/internal/iotbridge"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+// keepAlive is the MQTT keep-alive interval, disconnectWait how long (in milliseconds) a disconnect waits for the work
+// in flight, and clientTagLength how many characters of the tenant ID the client ID keeps.
+const (
+	keepAlive       = 60 * time.Second
+	disconnectWait  = 500
+	clientTagLength = 8
+)
+
+// errNoDevices refuses a run without a device to simulate.
+var errNoDevices = errors.New("--devices must name at least one device")
+
+// config is what the flags set.
+type config struct {
+	broker, tenant, names, firmware string
+	interval, beat                  time.Duration
+	withFleet                       bool
+}
+
 func main() {
-	broker := flag.String("broker", envOr("MQTT_URL", "tcp://localhost:1883"), "MQTT broker URL")
-	tenant := flag.String(
+	var cfg config
+
+	flag.StringVar(
+		&cfg.broker,
+		"broker",
+		envOr("MQTT_URL", "tcp://localhost:1883"),
+		"MQTT broker URL",
+	)
+	flag.StringVar(
+		&cfg.tenant,
 		"tenant",
 		seed.ID("tenant-a").String(),
 		"tenant ID the devices belong to (the demo tenant by default)",
 	)
-	names := flag.String(
+	flag.StringVar(
+		&cfg.names,
 		"devices",
 		strings.Join(demoDevices(), ","),
 		"comma-separated fixture device IDs (demoSeed.devices); their API IDs are derived with seed.ID",
 	)
-	firmware := flag.String("firmware", "v1", "firmware version the modules report")
-	interval := flag.Duration(
+	flag.StringVar(&cfg.firmware, "firmware", "v1", "firmware version the modules report")
+	flag.DurationVar(
+		&cfg.interval,
 		"telemetry-interval",
 		time.Minute,
 		"time between telemetry batches (design: every minute)",
 	)
-	beat := flag.Duration(
+	flag.DurationVar(
+		&cfg.beat,
 		"heartbeat-interval",
 		time.Minute,
 		"time between heartbeats (design: every 60 seconds)",
 	)
-	withFleet := flag.Bool(
+	flag.BoolVar(
+		&cfg.withFleet,
 		"fleet",
 		true,
 		"also run the mock fleet (internal/devicesim/fleet.json): one module per state pattern",
@@ -54,74 +88,125 @@ func main() {
 
 	flag.Parse()
 
-	if *names == "" {
-		log.Fatal("--devices must name at least one device")
+	err := run(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+// run plays the modules until a signal ends it; main exits on its error once its deferred clean-up has run.
+func run(cfg config) error {
+	if cfg.names == "" {
+		return errNoDevices
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	modules, beats := fixtureModules(cfg.tenant, cfg.names, cfg.firmware)
+
+	if cfg.withFleet {
+		fleet, fleetBeats, err := fleetModules(cfg.tenant)
+		if err != nil {
+			return err
+		}
+
+		modules = append(modules, fleet...)
+
+		maps.Copy(beats, fleetBeats)
+	}
+
+	client := mqtt.NewClient(clientOptions(cfg.broker, cfg.tenant, modules))
+	if tok := client.Connect(); tok.Wait() && tok.Error() != nil {
+		return fmt.Errorf("connect %s: %w", cfg.broker, tok.Error())
+	}
+	defer client.Disconnect(disconnectWait)
+
+	log.Printf("devicesim: %d modules on %s", len(modules), cfg.broker)
+
+	play(ctx, client, modules, beats, cfg)
+
+	return nil
+}
+
+// fixtureModules are the modules of the named fixture devices (comma-separated) and which of them send heartbeats (a
+// module that is not online sends none).
+func fixtureModules(
+	tenant, names, firmware string,
+) ([]*devicesim.Module, map[*devicesim.Module]bool) {
 	var modules []*devicesim.Module
 
-	beats := map[*devicesim.Module]bool{} // modules that send heartbeats (a module that is not online sends none)
+	beats := map[*devicesim.Module]bool{}
 
-	for name := range strings.SplitSeq(*names, ",") {
+	for name := range strings.SplitSeq(names, ",") {
 		name = strings.TrimSpace(name)
 		if name == "" {
 			continue
 		}
 
-		m, beating := fixtureModule(*tenant, name, *firmware)
-		modules = append(modules, m)
-		beats[m] = beating
+		module, beating := fixtureModule(tenant, name, firmware)
+		modules = append(modules, module)
+		beats[module] = beating
 	}
 
-	if *withFleet {
-		fleet, err := devicesim.MockFleet()
-		if err != nil {
-			log.Fatal(err)
-		}
+	return modules, beats
+}
 
-		for _, pattern := range fleet.Patterns {
-			if pattern.NoDevice {
-				continue
-			}
-
-			id := seed.ID(devicesim.DeviceName(pattern)).String()
-			powerOff := pattern.PowerSignal == "off" ||
-				(pattern.State.Power != nil && !*pattern.State.Power)
-			fleetModule := devicesim.NewModule(*tenant, id, fleet.FirmwareOf(pattern), seedOf(id)).
-				Behave(pattern.Telemetry, pattern.Commands, powerOff).
-				Reports(pattern.State.Power, pattern.State.Celsius, pattern.State.Mode, pattern.State.FanLevel)
-
-				// the fleet's units show their state live
-			modules = append(modules, fleetModule)
-			beats[fleetModule] = pattern.Connection == "online"
-		}
+// fleetModules are the mock fleet's modules, one per state pattern that has a device, so the fleet's units show their
+// state live, and which of them send heartbeats.
+func fleetModules(tenant string) ([]*devicesim.Module, map[*devicesim.Module]bool, error) {
+	fleet, err := devicesim.MockFleet()
+	if err != nil {
+		return nil, nil, apperr.Wrap(err, "devicesim.MockFleet")
 	}
-	// the subscriptions are made on every connect: a clean session loses them when the broker restarts
-	opts := mqtt.NewClientOptions().
-		AddBroker(*broker).
-		SetClientID("devicesim-" + clientTag(*tenant)).
+
+	modules := make([]*devicesim.Module, 0, len(fleet.Patterns))
+	beats := map[*devicesim.Module]bool{}
+
+	for _, pattern := range fleet.Patterns {
+		if pattern.NoDevice {
+			continue
+		}
+
+		id := seed.ID(devicesim.DeviceName(pattern)).String()
+		powerOff := pattern.PowerSignal == "off" ||
+			(pattern.State.Power != nil && !*pattern.State.Power)
+		module := devicesim.NewModule(tenant, id, fleet.FirmwareOf(pattern), seedOf(id)).
+			Behave(pattern.Telemetry, pattern.Commands, powerOff).
+			Reports(pattern.State.Power, pattern.State.Celsius, pattern.State.Mode, pattern.State.FanLevel)
+		modules = append(modules, module)
+		beats[module] = pattern.Connection == "online"
+	}
+
+	return modules, beats, nil
+}
+
+// clientOptions are the broker connection's options. The subscriptions are made on every connect: a clean session
+// loses them when the broker restarts.
+func clientOptions(broker, tenant string, modules []*devicesim.Module) *mqtt.ClientOptions {
+	return mqtt.NewClientOptions().
+		AddBroker(broker).
+		SetClientID("devicesim-" + clientTag(tenant)).
 		SetUsername(os.Getenv("MQTT_USER")).
 		SetPassword(os.Getenv("MQTT_PASSWORD")).
 		SetAutoReconnect(true).
 		SetConnectRetry(true).
-		SetKeepAlive(60 * time.Second).
+		SetKeepAlive(keepAlive).
 		SetOnConnectHandler(func(c mqtt.Client) { subscribe(c, modules) }).
 		SetConnectionLostHandler(
-			func(_ mqtt.Client, err error) { log.Printf("broker %s: connection lost: %v", *broker, err) })
+			func(_ mqtt.Client, err error) { log.Printf("broker %s: connection lost: %v", broker, err) })
+}
 
-	client := mqtt.NewClient(opts)
-	if tok := client.Connect(); tok.Wait() && tok.Error() != nil {
-		log.Fatalf("connect %s: %v", *broker, tok.Error())
-	}
-	defer client.Disconnect(500)
-
-	log.Printf("devicesim: %d modules on %s", len(modules), *broker)
-
-	telemetry := time.NewTicker(*interval)
-	heartbeat := time.NewTicker(*beat)
+// play sends the telemetry batches and the heartbeats on their tickers until the context ends.
+func play(
+	ctx context.Context,
+	client mqtt.Client,
+	modules []*devicesim.Module,
+	beats map[*devicesim.Module]bool,
+	cfg config,
+) {
+	telemetry := time.NewTicker(cfg.interval)
+	heartbeat := time.NewTicker(cfg.beat)
 
 	defer telemetry.Stop()
 	defer heartbeat.Stop()
@@ -133,36 +218,49 @@ func main() {
 
 			return
 		case now := <-telemetry.C:
-			for _, module := range modules {
-				raw, err := module.Telemetry(now)
-				if err != nil {
-					log.Printf("telemetry %s: %v", module.DeviceID, err)
-
-					continue
-				}
-
-				if raw == nil { // a silent pattern reports nothing
-					continue
-				}
-
-				publish(client, module.TelemetryTopic(), raw)
-			}
+			sendTelemetry(client, modules, now)
 		case now := <-heartbeat.C:
-			for _, module := range modules {
-				if !beats[module] {
-					continue
-				}
-
-				raw, err := module.Beat(now)
-				if err != nil {
-					log.Printf("heartbeat %s: %v", module.DeviceID, err)
-
-					continue
-				}
-
-				publish(client, module.HeartbeatTopic(), raw)
-			}
+			sendHeartbeats(client, modules, beats, now)
 		}
+	}
+}
+
+// sendTelemetry publishes one telemetry batch per module; a silent pattern reports nothing.
+func sendTelemetry(client mqtt.Client, modules []*devicesim.Module, now time.Time) {
+	for _, module := range modules {
+		raw, err := module.Telemetry(now)
+		if err != nil {
+			log.Printf("telemetry %s: %v", module.DeviceID, err)
+
+			continue
+		}
+
+		if raw != nil {
+			publish(client, module.TelemetryTopic(), raw)
+		}
+	}
+}
+
+// sendHeartbeats publishes one heartbeat per module that beats.
+func sendHeartbeats(
+	client mqtt.Client,
+	modules []*devicesim.Module,
+	beats map[*devicesim.Module]bool,
+	now time.Time,
+) {
+	for _, module := range modules {
+		if !beats[module] {
+			continue
+		}
+
+		raw, err := module.Beat(now)
+		if err != nil {
+			log.Printf("heartbeat %s: %v", module.DeviceID, err)
+
+			continue
+		}
+
+		publish(client, module.HeartbeatTopic(), raw)
 	}
 }
 
@@ -178,8 +276,8 @@ func publish(c mqtt.Client, topic string, payload []byte) {
 
 // clientTag keeps the MQTT client ID short and unique per tenant.
 func clientTag(tenant string) string {
-	if len(tenant) > 8 {
-		return tenant[:8]
+	if len(tenant) > clientTagLength {
+		return tenant[:clientTagLength]
 	}
 
 	return tenant
@@ -263,42 +361,41 @@ func subscribe(client mqtt.Client, modules []*devicesim.Module) {
 
 	for _, module := range modules {
 		tok := client.Subscribe(module.CommandTopic(), 1, func(_ mqtt.Client, msg mqtt.Message) {
-			raw, sendAt, err := module.Acknowledge(msg.Payload(), time.Now())
-			if err != nil {
-				log.Printf("command %s: %v", module.DeviceID, err)
-
-				return
-			}
-
-			kept, keepErr := module.Keep()
-			if keepErr == nil { // retained, so the next start reads it back
-				if tok := client.Publish(
-					module.KeptTopic(),
-					1,
-					true,
-					kept,
-				); tok.Wait() &&
-					tok.Error() != nil {
-					log.Printf("publish %s: %v", module.KeptTopic(), tok.Error())
-				}
-			}
-
-			if raw == nil { // the pattern never answers
-				return
-			}
-
-			if wait := time.Until(
-				sendAt,
-			); wait > 0 { // the pattern answers after the command expired
-				time.AfterFunc(wait, func() { publish(client, module.AckTopic(), raw) })
-
-				return
-			}
-
-			publish(client, module.AckTopic(), raw)
+			answer(client, module, msg.Payload())
 		})
 		if tok.Wait() && tok.Error() != nil {
 			log.Printf("subscribe %s: %v", module.CommandTopic(), tok.Error())
 		}
 	}
+}
+
+// answer acknowledges one command as the module's pattern does. It first keeps the new state (retained, so the next
+// start reads it back), then answers at once, after the command expired, or never.
+func answer(client mqtt.Client, module *devicesim.Module, payload []byte) {
+	raw, sendAt, err := module.Acknowledge(payload, time.Now())
+	if err != nil {
+		log.Printf("command %s: %v", module.DeviceID, err)
+
+		return
+	}
+
+	kept, keepErr := module.Keep()
+	if keepErr == nil {
+		tok := client.Publish(module.KeptTopic(), 1, true, kept)
+		if tok.Wait() && tok.Error() != nil {
+			log.Printf("publish %s: %v", module.KeptTopic(), tok.Error())
+		}
+	}
+
+	if raw == nil { // the pattern never answers
+		return
+	}
+
+	if wait := time.Until(sendAt); wait > 0 { // the pattern answers after the command expired
+		time.AfterFunc(wait, func() { publish(client, module.AckTopic(), raw) })
+
+		return
+	}
+
+	publish(client, module.AckTopic(), raw)
 }

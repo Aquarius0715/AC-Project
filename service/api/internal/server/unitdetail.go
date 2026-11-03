@@ -31,34 +31,10 @@ func (unitDetails) Detail(
 	} else if ok {
 		detailExtras.Capabilities = cp
 	}
-	// effectiveControlPolicy: the newest restriction that currently restricts the unit (IR46)
-	// (restrictions belong to billing: asked through its queries, IR194)
-	unitRestriction, err := restrictions.Busy{}.UnitRestriction(ctx, call, unit.ID)
-	switch {
-	case err != nil:
-		return detailExtras, apperr.Wrap(err, "restrictions.Busy.UnitRestriction")
-	case !unitRestriction.Found:
-		detailExtras.EffectiveControlPolicy = map[string]any{keyState: "unrestricted"}
-	default:
-		detailExtras.EffectiveControlPolicy = map[string]any{
-			keyState:    "restricted",
-			"phase":     unitRestriction.Phase,
-			"policy":    unitRestriction.Policy,
-			"reasonKey": "control.restriction_active",
-		}
-	}
-	// controlAvailability: blocked while any terminal-restriction recovery case of the unit is unresolved (SR26)
-	blocked, err := restrictions.Busy{}.UnitRecovering(ctx, call, unit.ID)
-	if err != nil {
-		return detailExtras, apperr.Wrap(err, "restrictions.Busy.UnitRecovering")
-	}
 
-	detailExtras.ControlAvailability = map[string]any{keyState: "available"}
-	if blocked {
-		detailExtras.ControlAvailability = map[string]any{
-			keyState:    "blocked",
-			"reasonKey": "control.reconciliation_required",
-		}
+	err = restrictionParts(ctx, call, unit.ID, &detailExtras)
+	if err != nil {
+		return detailExtras, err
 	}
 
 	detailExtras.Components = maintenance.Components(unit.ServiceScope)
@@ -88,4 +64,44 @@ func (unitDetails) Detail(
 	}
 
 	return detailExtras, nil
+}
+
+// restrictionParts sets the unit's effectiveControlPolicy and controlAvailability; restrictions belong to billing and
+// are asked through its queries (IR194).
+func restrictionParts(
+	ctx context.Context,
+	call *ops.Call,
+	unit uuid.UUID,
+	extras *assets.DetailExtras,
+) error {
+	// effectiveControlPolicy: the newest restriction that currently restricts the unit (IR46)
+	unitRestriction, err := restrictions.Busy{}.UnitRestriction(ctx, call, unit)
+	switch {
+	case err != nil:
+		return apperr.Wrap(err, "restrictions.Busy.UnitRestriction")
+	case !unitRestriction.Found:
+		extras.EffectiveControlPolicy = map[string]any{keyState: "unrestricted"}
+	default:
+		extras.EffectiveControlPolicy = map[string]any{
+			keyState:    "restricted",
+			"phase":     unitRestriction.Phase,
+			"policy":    unitRestriction.Policy,
+			"reasonKey": "control.restriction_active",
+		}
+	}
+	// controlAvailability: blocked while any terminal-restriction recovery case of the unit is unresolved (SR26)
+	blocked, err := restrictions.Busy{}.UnitRecovering(ctx, call, unit)
+	if err != nil {
+		return apperr.Wrap(err, "restrictions.Busy.UnitRecovering")
+	}
+
+	extras.ControlAvailability = map[string]any{keyState: "available"}
+	if blocked {
+		extras.ControlAvailability = map[string]any{
+			keyState:    "blocked",
+			"reasonKey": "control.reconciliation_required",
+		}
+	}
+
+	return nil
 }

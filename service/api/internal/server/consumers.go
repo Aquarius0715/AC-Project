@@ -18,48 +18,58 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
 )
 
+// consumerSet collects the event subscribers of the served domains (all domains when none is given).
+type consumerSet struct {
+	txm     *db.TxManager
+	domains []string
+	out     []*events.Consumer
+}
+
+// add adds the consumer name with domain's handlers when the process serves the domain and there are handlers.
+func (set *consumerSet) add(
+	domain, name string,
+	handlers map[string]events.Handler,
+) *events.Consumer {
+	if len(handlers) == 0 || (len(set.domains) > 0 && !slices.Contains(set.domains, domain)) {
+		return nil
+	}
+
+	consumer := &events.Consumer{
+		Name:      name,
+		DB:        set.txm,
+		Handlers:  handlers,
+		Batch:     0,
+		Logf:      nil,
+		Now:       nil,
+		SplitFrom: "",
+	}
+	set.out = append(set.out, consumer)
+
+	return consumer
+}
+
 // consumers returns the event subscribers of the served domains (all domains when none is given). Each consumer
-// name is stable: it is the de-duplication key in platform.processed_events (IR183).
-// ender ends a user's sessions at the identity provider when HQ signs them out everywhere (nil: none, IR386).
+// name is stable: it is the de-duplication key in platform.processed_events (IR183). provider ends a user's sessions
+// at the identity provider when HQ signs them out everywhere (nil: none, IR386).
 func consumers(
 	txm *db.TxManager,
 	domains []string,
 	provider identity.Provider,
 	apps identity.AccountApps,
 ) []*events.Consumer {
-	serves := func(d string) bool { return len(domains) == 0 || slices.Contains(domains, d) }
+	set := &consumerSet{txm: txm, domains: domains, out: nil}
 
-	var out []*events.Consumer
-
-	add := func(domain, name string, handlers map[string]events.Handler) *events.Consumer {
-		if serves(domain) && len(handlers) > 0 {
-			consumer := &events.Consumer{
-				Name:      name,
-				DB:        txm,
-				Handlers:  handlers,
-				Batch:     0,
-				Logf:      nil,
-				Now:       nil,
-				SplitFrom: "",
-			}
-			out = append(out, consumer)
-
-			return consumer
-		}
-
-		return nil
-	}
-	add(
+	set.add(
 		ops.DomainEquipment,
 		"equipment",
 		merge(assets.EventHandlers(), monitoring.EventHandlers(), control.EventHandlers()),
 	) // IR184, IR185
-	add(
+	set.add(
 		ops.DomainBilling,
 		"billing",
 		merge(restrictions.EventHandlers(), events.Handlers(billing.Replicas...)),
 	) // IR185
-	add(
+	set.add(
 		ops.DomainIdentity,
 		"identity",
 		merge(
@@ -72,7 +82,7 @@ func consumers(
 	// the sign-in accounts and sessions in their own consumer (IR511): a notification, audit or copy event that keeps
 	// failing holds back only "identity", not turning an account off or ending sessions (IR386, IR461); the events
 	// "identity" applied before the split count as applied, so no set-up e-mail or account change is repeated
-	if c := add(
+	if c := set.add(
 		ops.DomainIdentity,
 		"identity-accounts",
 		merge(identity.SessionHandlers(provider), identity.AccountHandlers(provider, apps)),
@@ -80,18 +90,18 @@ func consumers(
 		c.SplitFrom = "identity"
 	}
 
-	add(
+	set.add(
 		ops.DomainMaintenance,
 		"maintenance",
 		merge(events.Handlers(maintenance.Replicas...), maintenance.NoteHandlers()),
 	) // IR192
-	add(
+	set.add(
 		ops.DomainEnergy,
 		"energy",
 		events.Handlers(energy.Replicas...),
 	) // IR189
 
-	return out
+	return set.out
 }
 
 func merge(ms ...map[string]events.Handler) map[string]events.Handler {

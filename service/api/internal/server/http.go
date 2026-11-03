@@ -44,7 +44,36 @@ func newEcho(
 		RequestIDHandler: nil,
 		TargetHeader:     "",
 	}))
-	app.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
+	app.Use(requestLogger(app))
+	app.Use(middleware.ContextTimeout(requestTimeout))
+
+	app.GET("/healthz", func(c *echo.Context) error { return c.NoContent(http.StatusOK) })
+	app.GET("/readyz", func(ectx *echo.Context) error {
+		err := txm.Writer.Ping(ectx.Request().Context())
+		if err != nil {
+			return apperr.E(apperr.Unavailable, apperr.KeyUnavailable)
+		}
+
+		return ectx.NoContent(http.StatusOK)
+	})
+
+	mountInternal(app, reg, authenticator, internalToken, servesIdentity)
+
+	v1 := app.Group("/v1", authenticator.Middleware())
+
+	err := reg.MountREST(
+		v1,
+	)
+	if err != nil { // the catalog's REST routes of the served operations (IR222)
+		return nil, apperr.Wrap(err, "ops.Registry.MountREST")
+	}
+
+	return app, nil
+}
+
+// requestLogger logs one line per request on the app's logger: server errors (5xx) at error level, the rest at info.
+func requestLogger(app *echo.Echo) echo.MiddlewareFunc {
+	return middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogStatus:    true,
 		LogMethod:    true,
 		LogURI:       true,
@@ -87,45 +116,30 @@ func newEcho(
 		LogHeaders:       nil,
 		LogQueryParams:   nil,
 		LogFormValues:    nil,
-	}))
-	app.Use(middleware.ContextTimeout(requestTimeout))
-
-	app.GET("/healthz", func(c *echo.Context) error { return c.NoContent(http.StatusOK) })
-	app.GET("/readyz", func(ectx *echo.Context) error {
-		err := txm.Writer.Ping(ectx.Request().Context())
-		if err != nil {
-			return apperr.E(apperr.Unavailable, apperr.KeyUnavailable)
-		}
-
-		return ectx.NoContent(http.StatusOK)
 	})
+}
 
-	if internalToken != "" && servesIdentity {
-		app.GET(
-			auth.PrincipalPath,
-			principalHandler(authenticator, internalToken),
-		) // IR181 step 1; not routed by the gateway
+// mountInternal mounts the endpoints the gateway does not route, when the services share an internal token:
+// identity-api's principal endpoint (IR181 step 1) and the internal queries between the services (IR190, IR195),
+// including the worker's calls without a user.
+func mountInternal(
+	app *echo.Echo,
+	reg *ops.Registry,
+	authenticator *auth.Authenticator,
+	internalToken string,
+	servesIdentity bool,
+) {
+	if internalToken == "" {
+		return
 	}
 
-	if internalToken != "" { // internal queries between the services (IR190, IR195); not routed by the gateway
-		app.Group("/internal/v1", authenticator.Middleware()).
-			POST("/queries/:query", reg.ServeQuery(internalToken))
-		app.POST(
-			ops.SystemQueryPath,
-			reg.ServeSystemQuery(internalToken),
-		) // worker calls without a user
+	if servesIdentity {
+		app.GET(auth.PrincipalPath, principalHandler(authenticator, internalToken))
 	}
 
-	v1 := app.Group("/v1", authenticator.Middleware())
-
-	err := reg.MountREST(
-		v1,
-	)
-	if err != nil { // the catalog's REST routes of the served operations (IR222)
-		return nil, apperr.Wrap(err, "ops.Registry.MountREST")
-	}
-
-	return app, nil
+	app.Group("/internal/v1", authenticator.Middleware()).
+		POST("/queries/:query", reg.ServeQuery(internalToken))
+	app.POST(ops.SystemQueryPath, reg.ServeSystemQuery(internalToken))
 }
 
 // principalHandler is identity-api's internal principal endpoint: it resolves a token subject's membership from the

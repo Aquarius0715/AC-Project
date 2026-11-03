@@ -1,4 +1,4 @@
-package server
+package server_test
 
 import (
 	"os"
@@ -8,38 +8,63 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/platform/idp"
 	"github.com/pradita/ac-project/service/api/internal/platform/ratelimit"
+	"github.com/pradita/ac-project/service/api/internal/server"
 )
 
-// ConfigFromEnv reads a domain service's environment (container design §4). The write limit (IR375) is off without
-// RATE_LIMIT_URL, 60 by default with it, and a bad limit or URL stops the start instead of running unlimited. The
-// identity provider's admin API (IR386) takes all four IDP_* values or none, and its URLs are http(s).
-func TestConfigFromEnv(t *testing.T) {
-	idpEnv := []string{
+// envRateLimit and envWriteLimit are the settings the tests change most, and unusedRedis a Redis URL that nothing
+// listens on.
+const (
+	envRateLimit  = "RATE_LIMIT_URL"
+	envWriteLimit = "WRITE_LIMIT_PER_MINUTE"
+	unusedRedis   = "redis://127.0.0.1:1/0"
+)
+
+// idpEnv are the settings of the identity provider's admin API, which go together (IR386).
+func idpEnv() []string {
+	return []string{
 		"IDP_TOKEN_URL",
 		"IDP_ADMIN_URL",
 		"IDP_ADMIN_CLIENT_ID",
 		"IDP_ADMIN_CLIENT_SECRET",
 	}
+}
+
+// clearEnv starts a test from an environment without the settings ConfigFromEnv reads.
+func clearEnv(t *testing.T) {
+	t.Helper()
+
 	for _, k := range append(
 		[]string{
-			"RATE_LIMIT_URL", "WRITE_LIMIT_PER_MINUTE", "DEMO_OPS", "DEMO_CLOCK_START", "ADDR", "ENERGY_API_URL",
+			envRateLimit, envWriteLimit, "DEMO_OPS", "DEMO_CLOCK_START", "ADDR", "ENERGY_API_URL",
 			"INTERNAL_API_TOKEN",
-		}, idpEnv...) {
+		}, idpEnv()...) {
 		t.Setenv(k, "")
 	}
+}
 
-	cfg, err := ConfigFromEnv(nil, []string{"identity"})
+// ConfigFromEnv reads a domain service's environment (container design §4). Without settings the service listens on
+// :8080 with no write limit, no other services and no identity provider.
+//
+//nolint:paralleltest // clearEnv sets the environment (t.Setenv), so the test cannot run in parallel
+func TestConfigFromEnvDefaults(t *testing.T) {
+	clearEnv(t)
+
+	cfg, err := server.ConfigFromEnv(nil, []string{"identity"})
 	if err != nil || cfg.WriteLimit != nil || cfg.Addr != ":8080" || len(cfg.Domains) != 1 ||
 		len(cfg.ServiceURLs) != 0 ||
 		cfg.IdentityProvider != nil {
 		t.Fatalf("defaults: %+v %v", cfg, err)
 	}
+}
 
-	t.Setenv("RATE_LIMIT_URL", "redis://127.0.0.1:1/0")
+// The write limit (IR375) is on with RATE_LIMIT_URL, 60 a minute unless WRITE_LIMIT_PER_MINUTE sets another.
+func TestConfigFromEnvWriteLimit(t *testing.T) {
+	clearEnv(t)
+	t.Setenv(envRateLimit, unusedRedis)
 	t.Setenv("ENERGY_API_URL", "http://energy-api:8080")
 	t.Setenv("ADDR", ":9090")
 
-	cfg, err = ConfigFromEnv(nil, nil)
+	cfg, err := server.ConfigFromEnv(nil, nil)
 
 	window, matched := cfg.WriteLimit.(*ratelimit.Window)
 	if err != nil || !matched || window.Limit != 60 || window.Window != time.Minute ||
@@ -48,65 +73,63 @@ func TestConfigFromEnv(t *testing.T) {
 		t.Fatalf("limit on: %+v %v", cfg, err)
 	}
 
-	t.Setenv("WRITE_LIMIT_PER_MINUTE", "5")
+	t.Setenv(envWriteLimit, "5")
 
-	cfg, err = ConfigFromEnv(
-		nil,
-		nil,
-	)
-	if err != nil ||
-		cfg.WriteLimit.(*ratelimit.Window).Limit != 5 {
+	cfg, err = server.ConfigFromEnv(nil, nil)
+
+	window, matched = cfg.WriteLimit.(*ratelimit.Window)
+	if err != nil || !matched || window.Limit != 5 {
 		t.Fatalf("limit 5: %v", err)
 	}
+}
 
-	for _, bad := range []string{"0", "-1", "sixty"} {
-		t.Setenv("WRITE_LIMIT_PER_MINUTE", bad)
+// A bad write limit, a RATE_LIMIT_URL that is not redis:// or a bad DEMO_CLOCK_START stops the start instead of
+// running unlimited or on the wrong clock.
+//
+//nolint:paralleltest // the cases set the environment (t.Setenv), so the test cannot run in parallel
+func TestConfigFromEnvRefusesBadSettings(t *testing.T) {
+	for _, bad := range []map[string]string{
+		{envRateLimit: unusedRedis, envWriteLimit: "0"},
+		{envRateLimit: unusedRedis, envWriteLimit: "-1"},
+		{envRateLimit: unusedRedis, envWriteLimit: "sixty"},
+		{envRateLimit: "http://valkey:6379"},
+		{"DEMO_OPS": "1", "DEMO_CLOCK_START": "yesterday"},
+	} {
+		clearEnv(t)
 
-		_, err := ConfigFromEnv(nil, nil)
+		for k, v := range bad {
+			t.Setenv(k, v)
+		}
+
+		_, err := server.ConfigFromEnv(nil, nil)
 		if err == nil {
-			t.Errorf("WRITE_LIMIT_PER_MINUTE=%q accepted", bad)
+			t.Errorf("%v accepted", bad)
 		}
 	}
+}
 
-	t.Setenv("WRITE_LIMIT_PER_MINUTE", "")
-	t.Setenv("RATE_LIMIT_URL", "http://valkey:6379")
-
-	_, configFromEnvErr := ConfigFromEnv(nil, nil)
-	if configFromEnvErr == nil {
-		t.Error("a RATE_LIMIT_URL that is not redis:// accepted")
-	}
-
-	t.Setenv("RATE_LIMIT_URL", "")
-	t.Setenv("DEMO_OPS", "1")
-	t.Setenv("DEMO_CLOCK_START", "yesterday")
-
-	_, configFromEnvErr = ConfigFromEnv(nil, nil)
-	if configFromEnvErr == nil {
-		t.Error("a bad DEMO_CLOCK_START accepted")
-	}
-
-	t.Setenv("DEMO_OPS", "")
-	t.Setenv("DEMO_CLOCK_START", "")
-
+// The identity provider's admin API (IR386) takes all four IDP_* values or none, and its URLs are http(s).
+func TestConfigFromEnvIdentityProvider(t *testing.T) {
+	clearEnv(t)
 	t.Setenv("IDP_TOKEN_URL", "http://idp.test/realms/ac/protocol/openid-connect/token")
 	t.Setenv("IDP_ADMIN_URL", "http://idp.test/admin/realms/ac/")
 	t.Setenv("IDP_ADMIN_CLIENT_ID", "svc")
 	t.Setenv("IDP_ADMIN_CLIENT_SECRET", "test-secret")
 
-	cfg, err = ConfigFromEnv(nil, []string{"identity"})
+	cfg, err := server.ConfigFromEnv(nil, []string{"identity"})
 
-	k, matched := cfg.IdentityProvider.(*idp.Keycloak)
-	if err != nil || !matched || k.AdminURL != "http://idp.test/admin/realms/ac" ||
-		k.ClientID != "svc" ||
-		k.ClientSecret != "test-secret" {
+	keycloak, matched := cfg.IdentityProvider.(*idp.Keycloak)
+	if err != nil || !matched || keycloak.AdminURL != "http://idp.test/admin/realms/ac" ||
+		keycloak.ClientID != "svc" ||
+		keycloak.ClientSecret != "test-secret" {
 		t.Fatalf("identity provider: %+v %v", cfg.IdentityProvider, err)
 	}
 
-	for _, missing := range idpEnv { // one value without the others is a mistake, not "off"
+	for _, missing := range idpEnv() { // one value without the others is a mistake, not "off"
 		old := os.Getenv(missing)
 		t.Setenv(missing, "")
 
-		_, err := ConfigFromEnv(nil, nil)
+		_, err := server.ConfigFromEnv(nil, nil)
 		if err == nil {
 			t.Errorf("IDP_* without %s accepted", missing)
 		}
@@ -117,7 +140,7 @@ func TestConfigFromEnv(t *testing.T) {
 	for _, bad := range []string{"keycloak:8080/admin/realms/ac", "ftp://idp.test/admin", "http:///admin"} {
 		t.Setenv("IDP_ADMIN_URL", bad)
 
-		_, err := ConfigFromEnv(nil, nil)
+		_, err := server.ConfigFromEnv(nil, nil)
 		if err == nil {
 			t.Errorf("IDP_ADMIN_URL=%q accepted", bad)
 		}
@@ -127,13 +150,13 @@ func TestConfigFromEnv(t *testing.T) {
 // TestInternalTokenOutsideTheDemo (IR430): outside the demo a short service token or the public local value of
 // compose.yaml stops the start; in the demo the local value is fine.
 func TestInternalTokenOutsideTheDemo(t *testing.T) {
-	t.Setenv("RATE_LIMIT_URL", "")
+	t.Setenv(envRateLimit, "")
 	t.Setenv("DEMO_OPS", "")
 
 	for _, bad := range []string{"short", "local-internal-token-change-me"} {
 		t.Setenv("INTERNAL_API_TOKEN", bad)
 
-		_, err := ConfigFromEnv(
+		_, err := server.ConfigFromEnv(
 			nil,
 			nil,
 		)
@@ -145,7 +168,7 @@ func TestInternalTokenOutsideTheDemo(t *testing.T) {
 
 	t.Setenv("INTERNAL_API_TOKEN", strings.Repeat("k", 32))
 
-	_, err := ConfigFromEnv(nil, nil)
+	_, err := server.ConfigFromEnv(nil, nil)
 	if err != nil {
 		t.Errorf("a real token: %v", err)
 	}
@@ -153,7 +176,7 @@ func TestInternalTokenOutsideTheDemo(t *testing.T) {
 	t.Setenv("DEMO_OPS", "1")
 	t.Setenv("INTERNAL_API_TOKEN", "local-internal-token-change-me")
 
-	_, err = ConfigFromEnv(nil, nil)
+	_, err = server.ConfigFromEnv(nil, nil)
 	if err != nil {
 		t.Errorf("the local value in the demo: %v", err)
 	}

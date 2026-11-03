@@ -15,6 +15,7 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/gateway"
+	"github.com/pradita/ac-project/service/api/internal/platform/health"
 	"github.com/pradita/ac-project/service/api/internal/platform/logging"
 )
 
@@ -61,7 +62,7 @@ func main() {
 	}
 
 	if len(os.Args) > 1 && os.Args[1] == "healthcheck" { // container healthcheck subcommand
-		os.Exit(healthcheck("http://127.0.0.1" + addr + "/healthz"))
+		os.Exit(health.Check(addr))
 	}
 
 	logger := logging.New(os.Stdout, "gateway")
@@ -97,32 +98,4 @@ func main() {
 		!errors.Is(startErr, http.ErrServerClosed) {
 		logger.Error("serve", "err", startErr)
 	}
-}
-
-// healthcheckTimeout bounds the container healthcheck's request (compose.yaml gives the healthcheck 3 s).
-const healthcheckTimeout = 3 * time.Second
-
-// healthcheck is the container healthcheck subcommand: it asks target (the process's own /healthz) and returns the
-// exit code, 0 when the answer is 200 OK.
-func healthcheck(target string) int {
-	ctx, cancel := context.WithTimeout(context.Background(), healthcheckTimeout)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
-	if err != nil {
-		return 1
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return 1
-	}
-
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return 1
-	}
-
-	return 0
 }

@@ -569,28 +569,28 @@ func (v maintenanceView) rateAt(ctx context.Context, c *ops.Call, in *rateIn) (r
 
 // registerCrossDomain binds the owner-side handlers of the adapters above.
 func registerCrossDomain(
-	r *ops.Registry,
+	reg *ops.Registry,
 	equipment equipmentView,
 	maintenanceReads maintenanceView,
 ) {
 	equipmentDomain := ops.DomainEquipment
-	ops.RegisterQuery(r, equipmentDomain, qUnitState, equipment.unitState)
-	ops.RegisterQuery(r, equipmentDomain, qUnitsOfProperty, equipment.unitsOfProperty)
-	ops.RegisterQuery(r, equipmentDomain, qOrgOfCustomer, equipment.orgOfCustomer)
-	ops.RegisterQuery(r, equipmentDomain, qUnitsOfOrg, equipment.unitsOfOrg)
-	ops.RegisterQuery(r, equipmentDomain, qUnitService, equipment.unitService)
-	ops.RegisterQuery(r, equipmentDomain, qCustomerProfiles, equipment.customerProfiles)
-	ops.RegisterQuery(r, equipmentDomain, qSiteAddress, equipment.siteAddress)
-	ops.RegisterQuery(r, equipmentDomain, qWarrantyEnd, equipment.warrantyEnd)
-	ops.RegisterQuery(r, equipmentDomain, qBriefUnits, equipment.briefUnits)
-	ops.RegisterQuery(r, equipmentDomain, qCustomerOfOrg, equipment.customerOfOrg)
-	ops.RegisterQuery(r, equipmentDomain, qCustomerState, equipment.customerState)
-	ops.RegisterQuery(r, equipmentDomain, qRestrictionTarget, equipment.restrictionTarget)
-	ops.RegisterQuery(r, equipmentDomain, qUnitObservation, equipment.observation)
-	ops.RegisterQuery(r, equipmentDomain, qUnitSeverities, equipment.unitSeverities)
-	ops.RegisterQuery(r, equipmentDomain, qRunHours, equipment.runHours)
-	ops.RegisterQuery(r, equipmentDomain, qBoundDevice, equipment.boundDevice)
-	ops.RegisterQuery(r, equipmentDomain, qOperationBusy, equipment.operationBusy)
-	ops.RegisterQuery(r, ops.DomainMaintenance, qAcceptedJobs, maintenanceReads.acceptedJobs)
-	ops.RegisterQuery(r, ops.DomainMaintenance, qRateAt, maintenanceReads.rateAt)
+	ops.RegisterQuery(reg, equipmentDomain, qUnitState, equipment.unitState)
+	ops.RegisterQuery(reg, equipmentDomain, qUnitsOfProperty, equipment.unitsOfProperty)
+	ops.RegisterQuery(reg, equipmentDomain, qOrgOfCustomer, equipment.orgOfCustomer)
+	ops.RegisterQuery(reg, equipmentDomain, qUnitsOfOrg, equipment.unitsOfOrg)
+	ops.RegisterQuery(reg, equipmentDomain, qUnitService, equipment.unitService)
+	ops.RegisterQuery(reg, equipmentDomain, qCustomerProfiles, equipment.customerProfiles)
+	ops.RegisterQuery(reg, equipmentDomain, qSiteAddress, equipment.siteAddress)
+	ops.RegisterQuery(reg, equipmentDomain, qWarrantyEnd, equipment.warrantyEnd)
+	ops.RegisterQuery(reg, equipmentDomain, qBriefUnits, equipment.briefUnits)
+	ops.RegisterQuery(reg, equipmentDomain, qCustomerOfOrg, equipment.customerOfOrg)
+	ops.RegisterQuery(reg, equipmentDomain, qCustomerState, equipment.customerState)
+	ops.RegisterQuery(reg, equipmentDomain, qRestrictionTarget, equipment.restrictionTarget)
+	ops.RegisterQuery(reg, equipmentDomain, qUnitObservation, equipment.observation)
+	ops.RegisterQuery(reg, equipmentDomain, qUnitSeverities, equipment.unitSeverities)
+	ops.RegisterQuery(reg, equipmentDomain, qRunHours, equipment.runHours)
+	ops.RegisterQuery(reg, equipmentDomain, qBoundDevice, equipment.boundDevice)
+	ops.RegisterQuery(reg, equipmentDomain, qOperationBusy, equipment.operationBusy)
+	ops.RegisterQuery(reg, ops.DomainMaintenance, qAcceptedJobs, maintenanceReads.acceptedJobs)
+	ops.RegisterQuery(reg, ops.DomainMaintenance, qRateAt, maintenanceReads.rateAt)
 }

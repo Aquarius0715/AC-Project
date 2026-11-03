@@ -1,4 +1,4 @@
-// Package app is the composition root: configuration → pools → modules → Echo (backend Go design §2).
+// Package server is the composition root: configuration → pools → modules → Echo (backend Go design §2).
 package server
 
 import (
@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"net/url"
 	"slices"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -90,67 +89,135 @@ func New(ctx context.Context, cfg Config, verifier auth.Verifier) (*Server, erro
 		return nil, apperr.Wrap(checkDomainsErr, "ops.CheckDomains")
 	}
 
-	reg := ops.NewRegistry()
-	reg.ServeDomains(cfg.Domains...)
-	reg.DB, reg.Rec, reg.Idem = txm, notifyingRecorder{
-		inner: db.Recorder{},
-		store: notify.Store{},
-	}, db.Idempotency{
-		M: txm,
-	}
-	reg.Limit = cfg.WriteLimit
+	reg := newRegistry(cfg, txm)
 
-	reg.DenyLimit = cfg.DenyLimit
-	if reg.DenyLimit == nil {
-		// without the shared store each process keeps its own minute counts (tests, a single instance)
-		reg.DenyLimit = &ratelimit.Window{
-			Store:  &ratelimit.Memory{},
-			Limit:  1,
-			Window: time.Minute,
-			Prefix: "ac:rl:denied:", Now: nil,
-		}
+	demo, err := newDemoOps(ctx, cfg, txm, reg)
+	if err != nil {
+		txm.Close()
+
+		return nil, err
 	}
 
-	if cfg.AccountsPerDay > 0 {
-		identity.AccountsPerOrgPerDay = cfg.AccountsPerDay
+	registerModules(reg, txm, demo)
+
+	servesIdentity := len(cfg.Domains) == 0 || slices.Contains(cfg.Domains, ops.DomainIdentity)
+
+	//nolint:contextcheck // the handlers run on each request's own context, not on the one the server starts with
+	app, err := newEcho(
+		reg,
+		txm,
+		newAuthenticator(cfg, verifier, txm, reg.Clock, servesIdentity),
+		cfg.Logger,
+		cfg.InternalToken,
+		servesIdentity,
+	)
+	if err != nil {
+		txm.Close()
+
+		return nil, err
 	}
 
-	if cfg.Clock != nil {
-		reg.Clock = cfg.Clock
+	srv := &Server{
+		Echo:      app,
+		Registry:  reg,
+		DB:        txm,
+		Consumers: consumers(txm, cfg.Domains, cfg.IdentityProvider, cfg.AccountApps),
 	}
 
-	var scenarioClock ScenarioClock = &demoClock{base: reg.Clock, mu: sync.Mutex{}, offset: 0}
-
-	if cfg.DemoOps {
-		if cfg.DemoClock != nil {
-			scenarioClock = cfg.DemoClock
-		} else if !cfg.DemoStart.IsZero() {
-			// starts at fixture.clock, runs in real time, shared with the workers (IR36, IR168)
-			shared, err := democlock.Open(ctx, txm.Writer, reg.Clock, cfg.DemoStart)
-			if err != nil {
-				txm.Close()
-
-				return nil, apperr.Wrap(err, "democlock.Open")
-			}
-
-			scenarioClock = shared
-		}
-
-		reg.Clock = scenarioClock.Now
+	err = useRemoteQueries(reg, cfg)
+	if err != nil {
+		return nil, err
 	}
 
+	reg.WrapTx = cfg.WrapTx
+	if len(
+		cfg.Domains,
+	) == 0 { // one process serves every domain: apply events inline after each write
+		reg.AfterCommit = srv.inlineEvents(cfg.Logger)
+		reg.BeforeDispatch = reg.AfterCommit
+	}
+
+	return srv, nil
+}
+
+// newDemoOps is demo.* with its scenario clock: the configured one, the clock shared in the database when the scenario
+// has a start, or one local to the process. In the demo the registry runs on that clock.
+func newDemoOps(
+	ctx context.Context,
+	cfg Config,
+	txm *db.TxManager,
+	reg *ops.Registry,
+) (*demoOps, error) {
 	demo := &demoOps{
 		inline:  len(cfg.Domains) == 0,
 		enabled: cfg.DemoOps,
 		m:       txm,
-		clock:   scenarioClock,
+		clock:   NewScenarioClock(reg.Clock),
 		reg:     reg,
 		notify:  nil,
 	}
+	if !cfg.DemoOps {
+		return demo, nil
+	}
+
+	if cfg.DemoClock != nil {
+		demo.clock = cfg.DemoClock
+	} else if !cfg.DemoStart.IsZero() {
+		// starts at fixture.clock, runs in real time, shared with the workers (IR36, IR168)
+		shared, err := democlock.Open(ctx, txm.Writer, reg.Clock, cfg.DemoStart)
+		if err != nil {
+			return nil, apperr.Wrap(err, "democlock.Open")
+		}
+
+		demo.clock = shared
+	}
+
+	reg.Clock = demo.clock.Now
+
+	return demo, nil
+}
+
+// wiring is what the later registration steps share: the registry, the demo operations, and the equipment and
+// maintenance parts the first two steps made.
+type wiring struct {
+	reg       *ops.Registry
+	demo      *demoOps
+	assets    *assets.Module
+	equipment equipmentView // other domains' view of the units (IR193)
+	blobs     blob.Store
+	jobs      maintenance.Jobs
+	delivery  maintenance.Delivery
+}
+
+// registerModules registers every module's operations, queries and scheduler jobs. The steps keep their order: the
+// scheduler runs each domain's jobs in the order they were added.
+func registerModules(reg *ops.Registry, txm *db.TxManager, demo *demoOps) {
 	registerDemo(reg, demo)
 	identity.Register(reg)
 	identity.RegisterMembers(reg)
 
+	assetsModule, equipment := registerEquipment(reg, txm)
+	blobs, jobs, delivery := registerMaintenance(reg, equipment)
+
+	wired := &wiring{
+		reg:       reg,
+		demo:      demo,
+		assets:    assetsModule,
+		equipment: equipment,
+		blobs:     blobs,
+		jobs:      jobs,
+		delivery:  delivery,
+	}
+	wired.registerControl()
+	wired.registerReads()
+	wired.registerBilling()
+	wired.registerCare()
+	wired.registerDevices()
+}
+
+// registerEquipment registers the units and their devices and alerts, and returns the assets module with the view
+// the other domains have of the units (IR193).
+func registerEquipment(reg *ops.Registry, txm *db.TxManager) (*assets.Module, equipmentView) {
 	assetsModule := &assets.Module{
 		Mon: monitorReads{
 			alerts:    monitoring.Alerts{Units: nil, Access: nil, Devices: nil},
@@ -200,6 +267,15 @@ func New(ctx context.Context, cfg Config, verifier auth.Verifier) (*Server, erro
 		},
 	)
 
+	return assetsModule, equipment
+}
+
+// registerMaintenance registers the jobs, their visits, reports, follow-ups, plans, partners, files, delivery and
+// proposals, and returns the parts the later steps use.
+func registerMaintenance(
+	reg *ops.Registry,
+	equipment equipmentView,
+) (blob.Dir, maintenance.Jobs, maintenance.Delivery) {
 	blobs := blob.NewDirFromEnv()
 	jobs := maintenance.Jobs{
 		Units:    equipment,
@@ -209,7 +285,10 @@ func New(ctx context.Context, cfg Config, verifier auth.Verifier) (*Server, erro
 		Blobs:    blobs,
 	}
 	maintenance.RegisterJobs(reg, jobs)
-	maintenance.RegisterOnSite(reg, maintenance.OnSite{Jobs: jobs, Access: maintenance.Access{}})
+	maintenance.RegisterOnSite(
+		reg,
+		maintenance.OnSite{Jobs: jobs, Access: maintenance.Access{}},
+	)
 	reports := maintenance.Reports{Jobs: jobs, Units: equipment, Access: maintenance.Access{}}
 	maintenance.RegisterFollowUps(
 		reg,
@@ -223,122 +302,149 @@ func New(ctx context.Context, cfg Config, verifier auth.Verifier) (*Server, erro
 	)
 	maintenance.RegisterFiles(reg, maintenance.Files{Reports: reports, Blobs: blobs})
 
-	delivery := maintenance.Delivery{Jobs: jobs, Directory: identity.Directory{}, Units: equipment}
+	delivery := maintenance.Delivery{
+		Jobs:      jobs,
+		Directory: identity.Directory{},
+		Units:     equipment,
+	}
 	maintenance.RegisterDelivery(reg, delivery)
 	maintenance.RegisterProposals(reg, maintenance.Proposals{Delivery: delivery})
 
+	return blobs, jobs, delivery
+}
+
+// registerControl registers the commands, the automations (with the IR54 schedule job) and the diagnostics.
+func (w *wiring) registerControl() {
 	cmds := control.Commands{
-		Units:        controlTargets{assetsModule},
+		Units:        controlTargets{w.assets},
 		Devices:      devices.Models{},
 		Restrictions: restrictions.Busy{},
 		Access:       maintenance.Access{},
 	}
-	control.Register(reg, cmds)
+	control.Register(w.reg, cmds)
 	control.RegisterQueries(
-		reg,
+		w.reg,
 	) // internal: the commands the IoT gateway sends (IR195 system query)
 
 	automations := control.Automations{
-		Units:    controlTargets{assetsModule},
+		Units:    controlTargets{w.assets},
 		Cmd:      cmds,
 		Notifier: monitoring.Notifier{Notify: notify.Store{}},
 	}
-	control.RegisterAutomations(reg, automations)
-	demo.notify = automations.Notify // demo.trigger automation: a gateway's facts against the alert policies (IR529)
-	reg.AddJob(
+	control.RegisterAutomations(w.reg, automations)
+	w.demo.notify = automations.Notify // demo.trigger automation: a gateway's facts against the alert policies (IR529)
+	w.reg.AddJob(
 		ops.DomainEquipment,
 		automations.FireSchedules,
-	) // IR54: schedule occurrences fire from the equipment scheduler
+	) // IR54: schedule occurrences fire from the w.equipment scheduler
 	control.RegisterDiagnostics(
-		reg,
+		w.reg,
 		control.Diagnostics{Commands: cmds, Jobs: maintenance.Access{}},
 	)
-	identity.RegisterPreferences(reg)
-	identity.RegisterClientUsers(reg)
-	identity.RegisterPartnerUsers(reg)
-	identity.RegisterTwoFactor(reg)
-	writes.Register(reg)
+}
+
+// registerReads registers the account settings, writes, QR access, energy, voice, the internal queries of the read
+// models (IR190), the summaries and the notifications.
+func (w *wiring) registerReads() {
+	identity.RegisterPreferences(w.reg)
+	identity.RegisterClientUsers(w.reg)
+	identity.RegisterPartnerUsers(w.reg)
+	identity.RegisterTwoFactor(w.reg)
+	writes.Register(w.reg)
 	assets.RegisterQr(
-		reg,
+		w.reg,
 		maintenance.QrAccess{},
 	) // an Assets operation; maintenance answers the assignment (IR194)
-	energy.Register(reg)
-	voice.Register(reg, voice.Voice{Units: assetsModule})
-	energy.RegisterMRV(reg)
-	energy.RegisterOffsets(reg)
-	sums := summaries.Summaries{Units: assetsModule, Registry: reg}
-	maintenance.RegisterQueries(reg, jobs) // internal queries of the read models (IR190)
-	billing.RegisterQueries(reg)
-	energy.RegisterQueries(reg)
-	identity.RegisterQueries(reg)
-	restrictions.RegisterQueries(reg)
-	audit.RegisterQueries(reg)
-	summaries.Register(reg, sums)
-	summaries.RegisterAdmin(reg, sums)
-	notify.Register(reg)
+	energy.Register(w.reg)
+	voice.Register(w.reg, voice.Voice{Units: w.assets})
+	energy.RegisterMRV(w.reg)
+	energy.RegisterOffsets(w.reg)
+	sums := summaries.Summaries{Units: w.assets, Registry: w.reg}
+	maintenance.RegisterQueries(w.reg, w.jobs) // internal queries of the read models (IR190)
+	billing.RegisterQueries(w.reg)
+	energy.RegisterQueries(w.reg)
+	identity.RegisterQueries(w.reg)
+	restrictions.RegisterQueries(w.reg)
+	audit.RegisterQueries(w.reg)
+	summaries.Register(w.reg, sums)
+	summaries.RegisterAdmin(w.reg, sums)
+	notify.Register(w.reg)
+}
 
+// registerBilling registers the restrictions, billing, payments, inquiries, audit and payouts (with the IR341 job),
+// then the cross-domain reads and the workforce.
+func (w *wiring) registerBilling() {
 	restrictionsModule := restrictions.Restrictions{
-		Units:   equipment,
-		Devices: equipment,
+		Units:   w.equipment,
+		Devices: w.equipment,
 		Notify:  notify.Store{},
 	}
-	restrictions.Register(reg, restrictionsModule)
+	restrictions.Register(w.reg, restrictionsModule)
 	bill := billing.Billing{
-		Customers:    equipment,
+		Customers:    w.equipment,
 		Restrictions: restrictions.Busy{},
 		Recipients:   identity.Directory{},
 		Releases:     restrictionsModule, Notify: notify.Store{},
 	}
-	billing.Register(reg, bill)
-	billing.RegisterPayments(reg, bill)
-	billing.RegisterInquiries(reg, bill)
-	audit.Register(reg)
+	billing.Register(w.reg, bill)
+	billing.RegisterPayments(w.reg, bill)
+	billing.RegisterInquiries(w.reg, bill)
+	audit.Register(w.reg)
 
-	maintenanceReads := maintenanceView{src: maintenance.PayoutSource{Jobs: jobs}}
+	maintenanceReads := maintenanceView{src: maintenance.PayoutSource{Jobs: w.jobs}}
 	payouts := billing.Payouts{Source: maintenanceReads}
-	billing.RegisterPayouts(reg, payouts)
-	reg.AddJob(
+	billing.RegisterPayouts(w.reg, payouts)
+	w.reg.AddJob(
 		ops.DomainBilling,
 		payouts.GenerateMonthly,
 	) // IR341: the payout drafts of the month that ended, on the 1st (BR-A23)
-	registerCrossDomain(reg, equipment, maintenanceReads)
-	maintenance.RegisterWorkforce(reg, maintenance.Workforce{Delivery: delivery})
+	registerCrossDomain(w.reg, w.equipment, maintenanceReads)
+	maintenance.RegisterWorkforce(w.reg, maintenance.Workforce{Delivery: w.delivery})
+}
 
-	filters := maintenance.FilterCare{Units: equipment, Run: equipment}
-	maintenance.RegisterFilterCare(reg, filters)
-	reg.AddJob(
+// registerCare registers the filter care and certificates with their reminder jobs, and the job that releases a
+// technician whose access ends (IR439).
+func (w *wiring) registerCare() {
+	filters := maintenance.FilterCare{Units: w.equipment, Run: w.equipment}
+	maintenance.RegisterFilterCare(w.reg, filters)
+	w.reg.AddJob(
 		ops.DomainMaintenance,
 		filters.Remind,
 	) // IR239: filter cleaning reminders from the maintenance scheduler
 
 	certs := maintenance.Certificates{
-		Delivery: delivery,
+		Delivery: w.delivery,
 		Grants:   identity.Directory{},
-		Blobs:    blobs,
+		Blobs:    w.blobs,
 	}
-	maintenance.RegisterCertificates(reg, certs)
-	reg.AddJob(
+	maintenance.RegisterCertificates(w.reg, certs)
+	w.reg.AddJob(
 		ops.DomainMaintenance,
 		certs.Remind,
 	) // IR336: certificate expiry reminders (BR-P09)
-	reg.AddJob(
+	w.reg.AddJob(
 		ops.DomainMaintenance,
-		jobs.ReleaseEndedAccess,
+		w.jobs.ReleaseEndedAccess,
 	) // IR439: a technician whose access ends before the visit is released (OPEN-BE-09)
+}
+
+// registerDevices registers the telemetry, alert policies, devices and campaigns, with the device operation and
+// campaign jobs after the other equipment jobs.
+func (w *wiring) registerDevices() {
 	monitoring.RegisterTelemetry(
-		reg,
-		monitoring.Telemetry{Units: assetsModule, Sensors: devices.Models{}},
+		w.reg,
+		monitoring.Telemetry{Units: w.assets, Sensors: devices.Models{}},
 	)
 	monitoring.RegisterPolicies(
-		reg,
+		w.reg,
 		monitoring.Policies{
-			Units:      assetsModule,
+			Units:      w.assets,
 			Recipients: identity.Directory{},
-			Caps:       unitCaps{assetsModule},
+			Caps:       unitCaps{w.assets},
 		},
 	)
 	module := &devices.Module{
-		Units: assetsModule,
+		Units: w.assets,
 		Exclusion: []devices.Exclusion{
 			control.Busy{},
 			restrictions.Busy{},
@@ -346,87 +452,114 @@ func New(ctx context.Context, cfg Config, verifier auth.Verifier) (*Server, erro
 		Access:     nil,
 		UnitAccess: nil,
 	}
-	devices.RegisterDevices(reg, module)
-	devices.RegisterCampaigns(reg, module)
-	reg.AddJob(
+	devices.RegisterDevices(w.reg, module)
+	devices.RegisterCampaigns(w.reg, module)
+	w.reg.AddJob(
 		ops.DomainEquipment,
 		devices.Lifecycle{Guard: control.Busy{}}.Advance,
-	) // IR67: operations start and time out on the equipment scheduler
-	reg.AddJob(
+	) // IR67: operations start and time out on the w.equipment scheduler
+	w.reg.AddJob(
 		ops.DomainEquipment,
 		module.AdvanceCampaigns,
 	) // IR339: campaign notices, starts, waves and completion (BR-A20), after the timeouts
+}
 
-	authn := &auth.Authenticator{Verifier: verifier, DB: txm, Now: reg.Clock, Source: nil}
+// newAuthenticator verifies the bearer tokens; a service that does not serve identity takes the principals from
+// identity-api (IR181 step 1).
+func newAuthenticator(
+	cfg Config,
+	verifier auth.Verifier,
+	txm *db.TxManager,
+	now func() time.Time,
+	servesIdentity bool,
+) *auth.Authenticator {
+	authn := &auth.Authenticator{Verifier: verifier, DB: txm, Now: now, Source: nil}
+	if cfg.IdentityURL == "" || servesIdentity {
+		return authn
+	}
 
-	servesIdentity := len(cfg.Domains) == 0 || slices.Contains(cfg.Domains, ops.DomainIdentity)
-	if cfg.IdentityURL != "" && !servesIdentity { // IR181 step 1: principals come from identity-api
-		ttl := cfg.PrincipalTTL
-		if ttl == 0 {
-			ttl = 30 * time.Second
+	ttl := cfg.PrincipalTTL
+	if ttl == 0 {
+		ttl = defaultPrincipalTTL
+	}
+
+	authn.Source = &auth.RemoteSource{
+		BaseURL: cfg.IdentityURL,
+		Token:   cfg.InternalToken,
+		TTL:     ttl, Client: nil, Now: nil,
+	}
+
+	return authn
+}
+
+// useRemoteQueries points the read models at the owning services when this process serves only some domains (IR190).
+func useRemoteQueries(reg *ops.Registry, cfg Config) error {
+	if len(cfg.Domains) == 0 || len(cfg.ServiceURLs) == 0 {
+		return nil
+	}
+
+	httpQueries := &ops.HTTPQueries{
+		Targets: map[string]*url.URL{},
+		Token:   cfg.InternalToken,
+		Client:  nil,
+	}
+	for domain, raw := range cfg.ServiceURLs {
+		u, err := url.Parse(raw)
+		if err != nil || u.Scheme == "" || u.Host == "" {
+			return fmt.Errorf("server: service URL of %s %w", domain, errRelativeURL)
 		}
 
-		authn.Source = &auth.RemoteSource{
-			BaseURL: cfg.IdentityURL,
-			Token:   cfg.InternalToken,
-			TTL:     ttl, Client: nil, Now: nil,
+		httpQueries.Targets[domain] = u
+	}
+
+	reg.Remote = httpQueries
+
+	return nil
+}
+
+// defaultPrincipalTTL is how long a principal from identity-api is kept when the configuration sets no PrincipalTTL.
+const defaultPrincipalTTL = 30 * time.Second
+
+// newRegistry is the registry of the served domains with the configured recorder, idempotency store, limits and
+// clock.
+func newRegistry(cfg Config, txm *db.TxManager) *ops.Registry {
+	reg := ops.NewRegistry()
+	reg.ServeDomains(cfg.Domains...)
+	reg.DB, reg.Rec, reg.Idem = txm, notifyingRecorder{
+		inner: db.Recorder{},
+		store: notify.Store{},
+	}, db.Idempotency{
+		M: txm,
+	}
+	reg.Limit = cfg.WriteLimit
+
+	reg.DenyLimit = cfg.DenyLimit
+	if reg.DenyLimit == nil {
+		// without the shared store each process keeps its own minute counts (tests, a single instance)
+		reg.DenyLimit = &ratelimit.Window{
+			Store:  &ratelimit.Memory{},
+			Limit:  1,
+			Window: time.Minute,
+			Prefix: "ac:rl:denied:", Now: nil,
 		}
 	}
 
-	app, err := newEcho(reg, txm, authn, cfg.Logger, cfg.InternalToken, servesIdentity)
-	if err != nil {
-		txm.Close()
-
-		return nil, err
+	if cfg.AccountsPerDay > 0 {
+		identity.AccountsPerOrgPerDay = cfg.AccountsPerDay
 	}
 
-	srv := &Server{
-		Echo:      app,
-		Registry:  reg,
-		DB:        txm,
-		Consumers: consumers(txm, cfg.Domains, cfg.IdentityProvider, cfg.AccountApps),
-	}
-	if len(cfg.Domains) > 0 &&
-		len(cfg.ServiceURLs) > 0 { // read models ask the owning services (IR190)
-		httpQueries := &ops.HTTPQueries{
-			Targets: map[string]*url.URL{},
-			Token:   cfg.InternalToken,
-			Client:  nil,
-		}
-		for domain, raw := range cfg.ServiceURLs {
-			u, err := url.Parse(raw)
-			if err != nil || u.Scheme == "" || u.Host == "" {
-				return nil, fmt.Errorf("server: service URL of %s %w", domain, errRelativeURL)
-			}
-
-			httpQueries.Targets[domain] = u
-		}
-
-		reg.Remote = httpQueries
+	if cfg.Clock != nil {
+		reg.Clock = cfg.Clock
 	}
 
-	reg.WrapTx = cfg.WrapTx
-	if len(
-		cfg.Domains,
-	) == 0 { // one process serves every domain: apply events inline after each write
-		reg.AfterCommit = func(ctx context.Context) {
-			err := srv.DrainEvents(context.WithoutCancel(ctx))
-			if err != nil && cfg.Logger != nil {
-				cfg.Logger.Error("inline events", "error", err)
-			}
-		}
-		reg.BeforeDispatch = reg.AfterCommit
-	}
-
-	return srv, nil
+	return reg
 }
 
 // DrainEvents applies every pending event of this server's consumers (inline mode and tests).
 func (s *Server) DrainEvents(ctx context.Context) error {
 	for range 10 { // events can trigger further events: repeat until nothing is pending
 		applied := 0
-
-		var errs []error
+		errs := make([]error, 0, len(s.Consumers))
 
 		for _, c := range s.Consumers {
 			// each on its own, as each runs its own loop: one failing does not hold the others (IR511)
@@ -442,6 +575,16 @@ func (s *Server) DrainEvents(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// inlineEvents applies the pending events after a write when one process serves every domain; a failure is logged.
+func (s *Server) inlineEvents(logger *slog.Logger) func(context.Context) {
+	return func(ctx context.Context) {
+		err := s.DrainEvents(context.WithoutCancel(ctx))
+		if err != nil && logger != nil {
+			logger.Error("inline events", "error", err)
+		}
+	}
 }
 
 // monitorReads combines the Monitoring read interfaces Assets uses.

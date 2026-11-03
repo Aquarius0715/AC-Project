@@ -10,6 +10,8 @@ import (
 
 // TestClientTagIsShortAndStable: the MQTT client ID uses at most the first eight characters of the tenant.
 func TestClientTagIsShortAndStable(t *testing.T) {
+	t.Parallel()
+
 	if got := clientTag("820cc6b6-9ea8-5d18-8b10-5c8c1d126814"); got != "820cc6b6" {
 		t.Errorf("long tenant: %q", got)
 	}
@@ -21,6 +23,8 @@ func TestClientTagIsShortAndStable(t *testing.T) {
 
 // TestSeedIsPerDevice: each device has its own seed, the same device always the same seed.
 func TestSeedIsPerDevice(t *testing.T) {
+	t.Parallel()
+
 	first, second := seedOf(
 		"71f1fdc1-0d2b-516c-8bfa-bd8dfecd338b",
 	), seedOf(
@@ -33,6 +37,8 @@ func TestSeedIsPerDevice(t *testing.T) {
 
 // TestDemoDevicesAreTheFixtureLinks: the simulator runs the five fixture devices, by fixture name (IR613).
 func TestDemoDevicesAreTheFixtureLinks(t *testing.T) {
+	t.Parallel()
+
 	names := demoDevices()
 	if len(names) != 5 || !strings.HasPrefix(names[0], "device-") {
 		t.Fatalf("demo devices %v", names)
@@ -53,6 +59,8 @@ func TestEnvOr(t *testing.T) {
 
 // TestSensorsOfAFixtureDevice: a fixture device reports the sensors its link names, an unknown device none.
 func TestSensorsOfAFixtureDevice(t *testing.T) {
+	t.Parallel()
+
 	got := map[string]bool{}
 	for _, s := range sensorsOf("device-tamper") {
 		got[s] = true
@@ -71,22 +79,28 @@ func TestSensorsOfAFixtureDevice(t *testing.T) {
 // fixture (Meeting room AC's) sends no readings, no heartbeats and no command answers; a device without sensors only
 // beats (IR613).
 func TestFixtureModulesPlayTheirConnection(t *testing.T) {
+	t.Parallel()
+
 	when := time.Date(2026, 9, 15, 1, 30, 0, 0, time.UTC)
 
-	online, beats := fixtureModule("t", "device-online-rto", "v1")
+	for _, testCase := range []struct {
+		device         string
+		reports, beats bool
+	}{
+		{device: "device-online-rto", reports: true, beats: true},
+		{device: "device-offline-rto", reports: false, beats: false},
+		// device-no-sensor (Bedroom AC B) has no sensors: its module only beats
+		{device: "device-no-sensor", reports: false, beats: true},
+	} {
+		module, beats := fixtureModule("t", testCase.device, "v1")
 
-	raw, err := online.Telemetry(when)
-	if err != nil || raw == nil || !beats {
-		t.Errorf("online: %s %v beats=%v", raw, err, beats)
+		raw, err := module.Telemetry(when)
+		if err != nil || (raw != nil) != testCase.reports || beats != testCase.beats {
+			t.Errorf("%s: %s %v beats=%v", testCase.device, raw, err, beats)
+		}
 	}
 
-	offline, beats := fixtureModule("t", "device-offline-rto", "v1")
-
-	raw, err = offline.Telemetry(when)
-	if err != nil || raw != nil || beats {
-		t.Errorf("offline: %s %v beats=%v", raw, err, beats)
-	}
-
+	offline, _ := fixtureModule("t", "device-offline-rto", "v1")
 	cmd := []byte(
 		`{"commandId":"c1","kind":"set_temperature","setpoint":25,"expiresAt":"2026-09-15T01:31:00Z"}`,
 	)
@@ -98,12 +112,5 @@ func TestFixtureModulesPlayTheirConnection(t *testing.T) {
 
 	if _, beats := fixtureModule("t", "device-unknown", "v1"); !beats {
 		t.Error("a device without a link is not taken as online")
-	}
-	// device-no-sensor (Bedroom AC B) has no sensors: its module only beats
-	bare, beats := fixtureModule("t", "device-no-sensor", "v1")
-
-	raw, err = bare.Telemetry(when)
-	if err != nil || raw != nil || !beats {
-		t.Errorf("no sensors: %s %v beats=%v", raw, err, beats)
 	}
 }

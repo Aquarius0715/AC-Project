@@ -17,6 +17,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/server"
 )
 
@@ -55,10 +56,19 @@ func typeName(parameter ops.Param) string {
 }
 
 func main() {
+	err := run()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+// run prints the routes of every operation as JSON on stdout. The database URL is only parsed: the pool connects
+// lazily and nothing here queries it.
+func run() error {
 	srv, err := server.New(
 		context.Background(),
 		server.Config{
-			DatabaseURL:       "postgres://doc:doc@127.0.0.1:1/doc",
+			DatabaseURL:       "postgres://doc@127.0.0.1:1/doc",
 			DatabaseReaderURL: "",
 			Addr:              "",
 			Clock:             nil,
@@ -86,7 +96,7 @@ func main() {
 		nil,
 	)
 	if err != nil {
-		log.Fatal(err)
+		return apperr.Wrap(err, "server.New")
 	}
 	defer srv.DB.Close()
 
@@ -94,58 +104,9 @@ func main() {
 
 	for _, operation := range srv.Registry.Operations() {
 		for _, catalogRoute := range operation.Spec.Routes {
-			binding, err := ops.NewBinding(operation, catalogRoute)
+			described, err := describe(operation, catalogRoute)
 			if err != nil {
-				log.Fatal(err)
-			}
-
-			described := route{
-				Method:     catalogRoute.Method,
-				Path:       catalogRoute.Path,
-				Body:       binding.Body,
-				FixedField: catalogRoute.FixedField,
-				FixedValue: catalogRoute.FixedValue,
-				Params:     []param{},
-			}
-			for _, name := range binding.Path {
-				parameter := binding.Params[name]
-				described.Params = append(
-					described.Params,
-					param{
-						Name:     name,
-						In:       "path",
-						Type:     typeName(parameter),
-						Role:     "path",
-						Field:    strings.Join(parameter.At, "."),
-						Required: true, List: false,
-					},
-				)
-			}
-
-			if !binding.Body {
-				var query []ops.Param
-
-				for name, p := range binding.Params {
-					if name != catalogRoute.FixedField && !contains(binding.Path, name) {
-						query = append(query, p)
-					}
-				}
-
-				sort.Slice(query, func(i, j int) bool { return query[i].Order < query[j].Order })
-
-				for _, parameter := range query {
-					described.Params = append(
-						described.Params,
-						param{
-							Name:  parameter.Name,
-							In:    "query",
-							Type:  typeName(parameter),
-							List:  parameter.List,
-							Role:  parameter.Role,
-							Field: strings.Join(parameter.At, "."), Required: false,
-						},
-					)
-				}
+				return err
 			}
 
 			out[operation.Spec.Name] = append(out[operation.Spec.Name], described)
@@ -155,10 +116,69 @@ func main() {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", " ")
 
-	encodeErr := enc.Encode(out)
-	if encodeErr != nil {
-		log.Fatal(encodeErr)
+	return apperr.Wrap(enc.Encode(out), "json.Encoder.Encode")
+}
+
+// describe is one route of an operation with the parameters its binding reads: the path parameters in order, then
+// for a route without a body the query parameters in catalog order.
+func describe(operation *ops.Operation, catalogRoute ops.Route) (route, error) {
+	binding, err := ops.NewBinding(operation, catalogRoute)
+	if err != nil {
+		return route{}, apperr.Wrap(err, "ops.NewBinding")
 	}
+
+	described := route{
+		Method:     catalogRoute.Method,
+		Path:       catalogRoute.Path,
+		Body:       binding.Body,
+		FixedField: catalogRoute.FixedField,
+		FixedValue: catalogRoute.FixedValue,
+		Params:     []param{},
+	}
+	for _, name := range binding.Path {
+		parameter := binding.Params[name]
+		described.Params = append(
+			described.Params,
+			param{
+				Name:     name,
+				In:       "path",
+				Type:     typeName(parameter),
+				Role:     "path",
+				Field:    strings.Join(parameter.At, "."),
+				Required: true, List: false,
+			},
+		)
+	}
+
+	if binding.Body {
+		return described, nil
+	}
+
+	var query []ops.Param
+
+	for name, p := range binding.Params {
+		if name != catalogRoute.FixedField && !contains(binding.Path, name) {
+			query = append(query, p)
+		}
+	}
+
+	sort.Slice(query, func(i, j int) bool { return query[i].Order < query[j].Order })
+
+	for _, parameter := range query {
+		described.Params = append(
+			described.Params,
+			param{
+				Name:  parameter.Name,
+				In:    "query",
+				Type:  typeName(parameter),
+				List:  parameter.List,
+				Role:  parameter.Role,
+				Field: strings.Join(parameter.At, "."), Required: false,
+			},
+		)
+	}
+
+	return described, nil
 }
 
 func contains(list []string, s string) bool {

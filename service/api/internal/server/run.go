@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -18,8 +19,10 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/auth"
 	"github.com/pradita/ac-project/service/api/internal/platform/democlock"
+	"github.com/pradita/ac-project/service/api/internal/platform/health"
 	"github.com/pradita/ac-project/service/api/internal/platform/idp"
 	"github.com/pradita/ac-project/service/api/internal/platform/logging"
 	"github.com/pradita/ac-project/service/api/internal/platform/ratelimit"
@@ -40,19 +43,29 @@ var (
 	errNotHTTPURL = errors.New("not an http(s) URL")
 )
 
+// consumerPoll is how often the service's event subscribers look for new events, and gracefulTimeout how long the
+// requests in flight may finish after SIGTERM (ECS stopTimeout is 30 s).
+const (
+	consumerPoll    = 250 * time.Millisecond
+	gracefulTimeout = 25 * time.Second
+)
+
 // Main runs one domain service (IR180): it serves only the operations of domains, with /healthz and /readyz and the
 // container healthcheck subcommand (container design §3).
 func Main(service string, domains ...string) {
-	if len(os.Args) > 1 &&
-		os.Args[1] == "healthcheck" { // container healthcheck subcommand (container design §3)
-		r, err := http.Get("http://127.0.0.1:8080/healthz")
-		if err != nil || r.StatusCode != http.StatusOK {
-			os.Exit(1)
-		}
-
-		os.Exit(0)
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		os.Exit(health.Check(envOr("ADDR", ":8080")))
 	}
 
+	err := run(service, domains)
+	if err != nil {
+		slog.Error("startup", "err", err)
+		os.Exit(1)
+	}
+}
+
+// run serves until SIGINT or SIGTERM; Main exits on its error once its deferred clean-up has run.
+func run(service string, domains []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -64,33 +77,31 @@ func Main(service string, domains ...string) {
 
 	cfg, err := ConfigFromEnv(logger, domains)
 	if err != nil {
-		slog.Error("config", "err", err)
-		os.Exit(1)
+		return fmt.Errorf("config: %w", err)
 	}
 
 	verifier, err := auth.NewVerifierFromEnv(ctx)
 	if err != nil {
-		slog.Error("auth", "err", err)
-		os.Exit(1)
+		return apperr.Wrap(err, "auth.NewVerifierFromEnv")
 	}
 
 	srv, err := New(ctx, cfg, verifier)
 	if err != nil {
-		slog.Error("startup", "err", err)
-		os.Exit(1)
+		return err
 	}
+	defer srv.DB.Close()
 	// graceful shutdown as in the Echo cookbook: StartConfig.Start returns once ctx is cancelled (SIGINT/SIGTERM)
 	// and in-flight requests have finished or GracefulTimeout has passed (ECS stopTimeout is 30 s)
 	for _, c := range srv.Consumers { // event subscribers of this service (IR183)
 		c.Logf = func(f string, a ...any) { logger.Warn(fmt.Sprintf(f, a...)) }
-		go c.Run(ctx, 250*time.Millisecond)
+		go c.Run(ctx, consumerPoll)
 	}
 
 	startConfig := echo.StartConfig{
 		Address:          cfg.Addr,
 		HideBanner:       true,
 		HidePort:         true,
-		GracefulTimeout:  25 * time.Second,
+		GracefulTimeout:  gracefulTimeout,
 		CertFilesystem:   nil,
 		TLSConfig:        nil,
 		Listener:         nil,
@@ -105,7 +116,129 @@ func Main(service string, domains ...string) {
 		slog.Error("serve", "err", startErr)
 	}
 
-	srv.DB.Close()
+	return nil
+}
+
+// writeLimitDefault is the writes per membership and minute when WRITE_LIMIT_PER_MINUTE does not set another
+// (network architecture §6).
+const writeLimitDefault = 60
+
+// withWriteLimit sets the write limit per membership (IR375) and the record of denied writes (IR603) on the shared
+// counter store at url.
+func withWriteLimit(cfg *Config, url string) error {
+	store, err := ratelimit.NewValkey(url)
+	if err != nil {
+		return fmt.Errorf("RATE_LIMIT_URL: %w", err)
+	}
+
+	limit := writeLimitDefault
+	if v := os.Getenv("WRITE_LIMIT_PER_MINUTE"); v != "" {
+		limit, err = strconv.Atoi(v)
+		if err != nil || limit < 1 {
+			return fmt.Errorf("WRITE_LIMIT_PER_MINUTE: %q: %w", v, errNotPositive)
+		}
+	}
+
+	cfg.WriteLimit = &ratelimit.Window{
+		Store:  store,
+		Limit:  limit,
+		Window: time.Minute,
+		Prefix: "ac:rl:write:", Now: nil,
+	}
+	// denied writes recorded in the audit log: one per actor and operation a minute, across instances (IR603)
+	cfg.DenyLimit = &ratelimit.Window{
+		Store:  store,
+		Limit:  1,
+		Window: time.Minute,
+		Prefix: "ac:rl:denied:", Now: nil,
+	}
+
+	return nil
+}
+
+// idpEnv are the IDP_* settings of the identity provider's admin API: token URL, admin URL, client ID and secret.
+func idpEnv() []string {
+	return []string{
+		os.Getenv("IDP_TOKEN_URL"),
+		os.Getenv("IDP_ADMIN_URL"),
+		os.Getenv("IDP_ADMIN_CLIENT_ID"),
+		os.Getenv("IDP_ADMIN_CLIENT_SECRET"),
+	}
+}
+
+// identityProvider is the identity provider's admin API from the IDP_* settings: the token endpoint and admin API of
+// the realm with a service-account client. All four go together, and the URLs are http(s).
+func identityProvider(values []string) (*idp.Keycloak, error) {
+	if slices.Contains(values, "") {
+		return nil, errPartialIDP
+	}
+
+	for i, key := range []string{"IDP_TOKEN_URL", "IDP_ADMIN_URL"} {
+		u, err := url.Parse(values[i])
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return nil, fmt.Errorf("%s: %w", key, errNotHTTPURL)
+		}
+	}
+
+	return &idp.Keycloak{
+		TokenURL:     values[0],
+		AdminURL:     strings.TrimRight(values[1], "/"),
+		ClientID:     values[2],
+		ClientSecret: values[3], Client: nil, Now: nil,
+	}, nil
+}
+
+// minInternalToken is the shortest service token accepted outside the demo.
+const minInternalToken = 32
+
+// checkInternalToken refuses, outside the demo, a service token that is not a real secret: a short one, or the public
+// local value of compose.yaml (IR430), which anyone could send to the internal endpoints.
+func checkInternalToken(token string, demo bool) error {
+	if !demo && token != "" &&
+		(len(token) < minInternalToken || strings.Contains(token, "change-me")) {
+		return errWeakInternalToken
+	}
+
+	return nil
+}
+
+// serviceURLsFromEnv are the other services' URLs, <DOMAIN>_API_URL, where set (IR190).
+func serviceURLsFromEnv() map[string]string {
+	urls := map[string]string{}
+
+	for _, d := range ops.Domains {
+		if v := os.Getenv(strings.ToUpper(d) + "_API_URL"); v != "" {
+			urls[d] = v
+		}
+	}
+
+	return urls
+}
+
+// accountsPerDayFromEnv is ACCOUNTS_PER_ORG_PER_DAY, the accounts a contractor or customer owner adds per organization
+// in 24 hours (IR464); 0 when it is unset, which keeps the default of 30.
+func accountsPerDayFromEnv() (int, error) {
+	raw := os.Getenv("ACCOUNTS_PER_ORG_PER_DAY")
+	if raw == "" {
+		return 0, nil
+	}
+
+	accounts, err := strconv.Atoi(raw)
+	if err != nil || accounts < 1 {
+		return 0, fmt.Errorf("ACCOUNTS_PER_ORG_PER_DAY: %q: %w", raw, errNotPositive)
+	}
+
+	return accounts, nil
+}
+
+// accountAppsFromEnv are the apps a new account's set-up e-mail returns to (IR461).
+func accountAppsFromEnv() identity.AccountApps {
+	return identity.AccountApps{
+		Customer:   envOr("APP_URL_CUSTOMER", "http://localhost:3000"),
+		Partner:    envOr("APP_URL_PARTNER", "http://localhost:3001"),
+		Technician: envOr("APP_URL_TECHNICIAN", "http://localhost:3002"),
+		Admin:      envOr("APP_URL_ADMIN", "http://localhost:3003"),
+	}
 }
 
 // ConfigFromEnv reads the configuration of a domain service (or its worker, IR195) from the environment.
@@ -119,7 +252,7 @@ func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 		Domains:           domains,
 		IdentityURL:       os.Getenv("IDENTITY_INTERNAL_URL"),
 		InternalToken:     os.Getenv("INTERNAL_API_TOKEN"),
-		ServiceURLs:       map[string]string{},
+		ServiceURLs:       serviceURLsFromEnv(),
 		Clock:             nil,
 		DemoStart:         time.Time{},
 		PrincipalTTL:      0,
@@ -127,108 +260,38 @@ func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 		WriteLimit:        nil,
 		DenyLimit:         nil,
 		IdentityProvider:  nil,
-		AccountApps: identity.AccountApps{
-			Customer:   "",
-			Partner:    "",
-			Technician: "",
-			Admin:      "",
-		},
-		AccountsPerDay: 0,
-		WrapTx:         nil,
-	}
-	// outside the demo the service token must be a real secret: not short, and not the public local value of
-	// compose.yaml (IR430), which anyone could send to the internal endpoints
-	if t := cfg.InternalToken; !cfg.DemoOps && t != "" &&
-		(len(t) < 32 || strings.Contains(t, "change-me")) {
-		return cfg, errWeakInternalToken
+		AccountApps:       accountAppsFromEnv(),
+		AccountsPerDay:    0,
+		WrapTx:            nil,
 	}
 
-	for _, d := range ops.Domains { // <DOMAIN>_API_URL of the other services (IR190), optional
-		if v := os.Getenv(strings.ToUpper(d) + "_API_URL"); v != "" {
-			cfg.ServiceURLs[d] = v
-		}
+	err := checkInternalToken(cfg.InternalToken, cfg.DemoOps)
+	if err != nil {
+		return cfg, err
 	}
 	// the write limit per membership (IR375): RATE_LIMIT_URL is the shared counter store, WRITE_LIMIT_PER_MINUTE the
 	// limit (60 by default, network architecture §6); without a store there is no limit
 	if url := os.Getenv("RATE_LIMIT_URL"); url != "" {
-		store, err := ratelimit.NewValkey(url)
+		err := withWriteLimit(&cfg, url)
 		if err != nil {
-			return cfg, fmt.Errorf("RATE_LIMIT_URL: %w", err)
-		}
-
-		limit := 60
-		if v := os.Getenv("WRITE_LIMIT_PER_MINUTE"); v != "" {
-			limit, err = strconv.Atoi(v)
-			if err != nil || limit < 1 {
-				return cfg, fmt.Errorf("WRITE_LIMIT_PER_MINUTE: %q: %w", v, errNotPositive)
-			}
-		}
-
-		cfg.WriteLimit = &ratelimit.Window{
-			Store:  store,
-			Limit:  limit,
-			Window: time.Minute,
-			Prefix: "ac:rl:write:", Now: nil,
-		}
-		// denied writes recorded in the audit log: one per actor and operation a minute, across instances (IR603)
-		cfg.DenyLimit = &ratelimit.Window{
-			Store:  store,
-			Limit:  1,
-			Window: time.Minute,
-			Prefix: "ac:rl:denied:", Now: nil,
-		}
-	}
-	// the accounts a contractor or customer owner adds per organization in 24 hours (IR464; 30 by default)
-	if v := os.Getenv("ACCOUNTS_PER_ORG_PER_DAY"); v != "" {
-		n, err := strconv.Atoi(v)
-		if err != nil || n < 1 {
-			return cfg, fmt.Errorf("ACCOUNTS_PER_ORG_PER_DAY: %q: %w", v, errNotPositive)
-		}
-
-		cfg.AccountsPerDay = n
-	}
-	// the identity provider's admin API ends a user's sessions when HQ signs them out everywhere (IR386): the token
-	// endpoint and admin API of the realm with a service-account client; all four or none
-	if idpValues := []string{
-		os.Getenv("IDP_TOKEN_URL"),
-		os.Getenv("IDP_ADMIN_URL"),
-		os.Getenv("IDP_ADMIN_CLIENT_ID"),
-		os.Getenv("IDP_ADMIN_CLIENT_SECRET"),
-	}; idpValues[0]+idpValues[1]+idpValues[2]+idpValues[3] != "" {
-		if idpValues[0] == "" || idpValues[1] == "" || idpValues[2] == "" || idpValues[3] == "" {
-			return cfg, errPartialIDP
-		}
-
-		for i, key := range []string{"IDP_TOKEN_URL", "IDP_ADMIN_URL"} {
-			u, err := url.Parse(
-				idpValues[i],
-			)
-			if err != nil || (u.Scheme != "http" && u.Scheme != "https") ||
-				u.Host == "" {
-				return cfg, fmt.Errorf("%s: %w", key, errNotHTTPURL)
-			}
-		}
-
-		cfg.IdentityProvider = &idp.Keycloak{
-			TokenURL:     idpValues[0],
-			AdminURL:     strings.TrimRight(idpValues[1], "/"),
-			ClientID:     idpValues[2],
-			ClientSecret: idpValues[3], Client: nil, Now: nil,
+			return cfg, err
 		}
 	}
 
-	cfg.AccountApps = identity.AccountApps{
-		Customer: envOr(
-			"APP_URL_CUSTOMER",
-			"http://localhost:3000",
-		),
-		Partner: envOr("APP_URL_PARTNER", "http://localhost:3001"),
-		Technician: envOr(
-			"APP_URL_TECHNICIAN",
-			"http://localhost:3002",
-		),
-		Admin: envOr("APP_URL_ADMIN", "http://localhost:3003"),
+	cfg.AccountsPerDay, err = accountsPerDayFromEnv()
+	if err != nil {
+		return cfg, err
 	}
+	// the identity provider's admin API ends a user's sessions when HQ signs them out everywhere (IR386)
+	if values := idpEnv(); strings.Join(values, "") != "" {
+		provider, err := identityProvider(values)
+		if err != nil {
+			return cfg, err
+		}
+
+		cfg.IdentityProvider = provider
+	}
+
 	if cfg.DemoOps { // fixture.clock unless DEMO_CLOCK_START overrides it (IR36); shared with the workers (IR168)
 		start, err := democlock.StartFromEnv(os.Getenv)
 		if err != nil {
