@@ -88,8 +88,7 @@ export function webConfig(tsconfigRootDir) {
         // 1: a suppression names its rule and says why, and a dependency array is never suppressed
         "@eslint-community/eslint-comments/require-description": "error",
         "@eslint-community/eslint-comments/no-restricted-disable": ["error", "react-hooks/exhaustive-deps"],
-        // 1: no assertion that narrows a type, and no double assertion through unknown or any
-        "@typescript-eslint/no-unsafe-type-assertion": "error",
+        // 1: no double assertion through unknown or any (no-unsafe-type-assertion, which needs types, is set below)
         "no-restricted-syntax": [
           "error",
           {
@@ -129,6 +128,12 @@ export function webConfig(tsconfigRootDir) {
           },
         ],
       },
+    },
+    {
+      // 1: no assertion that narrows a type. The rule reads types, so it applies to the TypeScript files only: the config
+      // files (*.mjs) are linted without type information
+      files: ["**/*.{ts,tsx,mts,cts}"],
+      rules: { "@typescript-eslint/no-unsafe-type-assertion": "error" },
     },
     {
       // 4-2: a test reads as one scenario from its set-up to its assertions; cutting it up only to meet a size or
