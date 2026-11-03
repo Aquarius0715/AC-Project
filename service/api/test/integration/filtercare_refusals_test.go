@@ -6,6 +6,8 @@ import (
 
 // TestFilterCareMarkNeedsAUnit: marking a filter cleaned without a unit is refused as VALIDATION on unitId, before the
 // unit or the customer is looked up (filterCare.markCleaned; MarkInput.Validate).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestFilterCareMarkNeedsAUnit(t *testing.T) {
 	s := server(t)
 	code, res := write(
@@ -20,6 +22,8 @@ func TestFilterCareMarkNeedsAUnit(t *testing.T) {
 
 // TestFilterCareSettingsAreForCustomersOnly: HQ reads and saves no customer's filter care settings; the client scope
 // gate refuses it FORBIDDEN before the customer lookup.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestFilterCareSettingsAreForCustomersOnly(t *testing.T) {
 	srv := server(t)
 	if code, _ := post(srv, hq(), "filterCare.getSettings", `{}`); code != 403 {

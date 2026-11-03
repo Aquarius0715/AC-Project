@@ -27,6 +27,8 @@ func (downStore) Incr(context.Context, string, time.Duration) (int64, error) {
 // TestWriteLimit: one membership's writes per minute are bounded, across every operation (network architecture §6,
 // IR375). The write over the limit is RATE_LIMITED with the seconds to wait; other members, reads and a store that does
 // not answer are not held up.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestWriteLimit(t *testing.T) {
 	now := time.Date(2026, 10, 11, 9, 0, 20, 0, time.UTC)
 	limited := func(store ratelimit.Store) *apiserver.Server {

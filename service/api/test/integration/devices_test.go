@@ -82,6 +82,7 @@ func assign(t *testing.T, unit, membership string, from, until time.Time, status
 	return job
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestDevicesRegisterListGet(t *testing.T) {
 	srv := server(t)
 	unit := newUnit(t, srv, "Dev AC")
@@ -221,6 +222,8 @@ func TestDevicesRegisterListGet(t *testing.T) {
 }
 
 // IR94 technician write table via devices.register.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestTechnicianWriteTable(t *testing.T) {
 	srv := server(t)
 	// assignments of one technician must not overlap (assignments_no_overlap): clear earlier runs' test assignments
@@ -345,6 +348,7 @@ func TestTechnicianWriteTable(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestDeviceBindAndOperations(t *testing.T) {
 	srv := server(t)
 	u1, u2 := newUnit(t, srv, "Op AC"), newUnit(t, srv, "Op AC2")

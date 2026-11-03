@@ -64,6 +64,7 @@ func newInvoice(t *testing.T, srv *apiserver.Server) (string, string) {
 	return key, asStr(t, data(res)["id"])
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPaymentSimulation(t *testing.T) {
 	srv := server(t)
 	_, inv := newInvoice(t, srv)
@@ -269,6 +270,7 @@ func TestPaymentSimulation(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestHQPaymentsAndRelease(t *testing.T) {
 	srv := server(t)
 	key, inv := newInvoice(t, srv)
@@ -497,6 +499,8 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 
 // TestManualAfterFailedPayment (IR447): after the customer's card payment failed, HQ records the bank transfer it
 // received; an attempt still in flight keeps refusing it.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestManualAfterFailedPayment(t *testing.T) {
 	srv := server(t)
 	_, inv := newInvoice(t, srv)
@@ -550,6 +554,8 @@ func TestManualAfterFailedPayment(t *testing.T) {
 // attempt while one is initiated is refused, and the database refuses a second open payment too. Before, the second
 // initiate passed (the invoice stays unpaid until processing), so two attempts could both be confirmed. After the first
 // attempt fails, a new one starts.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestInvoiceOnePaymentAtATime(t *testing.T) {
 	srv := server(t)
 	_, inv := newInvoice(t, srv)

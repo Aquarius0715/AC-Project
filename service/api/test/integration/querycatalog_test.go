@@ -20,6 +20,8 @@ const jsonStatusActive = `"active"`
 // key is accepted on its own (no VALIDATION on filters) and an unknown key is VALIDATION (SR06); each allowed sort
 // field sorts both ways and an unknown one is VALIDATION. It keeps the allowlists of the design and the handlers the
 // same.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestQueryCatalogFilters(t *testing.T) {
 	srv := server(t)
 

@@ -11,6 +11,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestDeviceHistory(t *testing.T) {
 	srv := server(t)
 	unit := newUnit(t, srv, "Hist AC")
@@ -188,6 +189,8 @@ func TestDeviceHistory(t *testing.T) {
 
 // A unit holds one device at a time (error.unitHasDevice), and only a bound device is calibrated
 // (error.deviceNotBound).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestDeviceBindingRefusals(t *testing.T) {
 	srv := server(t)
 	unit := newUnit(t, srv, "Bind AC")

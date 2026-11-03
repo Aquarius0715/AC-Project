@@ -11,6 +11,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestNotificationsInbox(t *testing.T) {
 	srv := server(t)
 	// earlier runs leave many notifications: mark customer-b's existing ones read so unreadOnly shows this run's
@@ -179,6 +180,8 @@ func TestNotificationsInbox(t *testing.T) {
 // writes a minute (IR375). The caller's unread notifications with a readable target are marked; every other ID
 // (already read, another member's, an unreadable target, unknown) is skipped alike and stays as it is. The list holds
 // 1–100 distinct IDs and takes no expected version.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestMarkAllRead(t *testing.T) {
 	srv := server(t)
 	note := func(member, unit string) string {
@@ -301,6 +304,7 @@ func TestMarkAllRead(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestNotificationRecipientsPreview(t *testing.T) {
 	srv := server(t)
 	_, inv := newInvoice(t, srv)
@@ -602,6 +606,7 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPreferencesAndConsents(t *testing.T) {
 	srv := server(t)
 	if code, res := post(
@@ -746,6 +751,8 @@ func TestPreferencesAndConsents(t *testing.T) {
 
 // TestTechnicianJobNotificationScope: a technician's notification about a job is listed and can be marked read only
 // while the assignment lets the technician open the job — active and its scheduled window not over (IR49, IR58, IR253).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestTechnicianJobNotificationScope(t *testing.T) {
 	srv := server(t)
 	tenant, tech, job := seed.ID(
@@ -887,6 +894,8 @@ func TestTechnicianJobNotificationScope(t *testing.T) {
 
 // IR58: a contractor reads the notifications of jobs offered to its company, and nothing else — not another job, not
 // a unit.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestContractorInbox(t *testing.T) {
 	srv := server(t)
 	note := func(kind, id string) string {
@@ -952,6 +961,8 @@ func TestContractorInbox(t *testing.T) {
 // IR602: HQ withdraws an offer by cancelling the job before the company accepted it. The company keeps the notice — the
 // offer was its own — but the job page no longer opens for it (jobs.get NOT_FOUND), so the notice says targetOpen
 // false and the apps show it without a link.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestWithdrawnOfferNoticeHasNoLink(t *testing.T) {
 	srv := server(t)
 	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }

@@ -18,6 +18,7 @@ func blobJSON(name, mime string, data []byte, size int) string {
 	) + `"}`
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAttachmentsAndSignOff(t *testing.T) {
 	srv := server(t)
 	job := assignedNow(t, srv)

@@ -11,6 +11,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAutomationNotifications(t *testing.T) {
 	srv := server(t)
 	owner(t, `DELETE FROM control.evaluation_events`)
@@ -296,6 +297,8 @@ func TestAutomationNotifications(t *testing.T) {
 // simulation change nothing, an alert without a policy stays open, and the next breach opens a new alert linked to the
 // resolved one. Both policies have no cooldown, so each notifies once per open alert: a breach that goes on adds no
 // notice, and the recurrence notifies again (IR600).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 	srv := server(t)
 	owner(t, `DELETE FROM control.evaluation_events`)
@@ -520,6 +523,8 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 // policy and notify, and a recovered reading resolves it, as the UI's fire does; but no automation is decided, so HQ's
 // automation policy whose tariff condition holds sends nothing. heartbeat_gap, a contract Metric the default rule
 // ac_offline watches (IR120), is taken. A schedule phase, an empty event and a report from the future are refused.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestDemoAutomationNotifiesOnly(t *testing.T) {
 	srv := serverWith(t, true)
 	unitID := newUnit(t, srv, "Gateway AC")

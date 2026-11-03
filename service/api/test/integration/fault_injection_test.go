@@ -46,6 +46,8 @@ func injectAt(t *testing.T, match string) *apiserver.Server {
 
 // TestWithdrawRollsBackWhenTheJobCannotBeUpdated: a withdrawal whose job version update fails is not half done. The
 // operation fails as a server error, and the proposal stays pending, because the database rolls the transaction back.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestWithdrawRollsBackWhenTheJobCannotBeUpdated(t *testing.T) {
 	srv := server(t)
 	owner(

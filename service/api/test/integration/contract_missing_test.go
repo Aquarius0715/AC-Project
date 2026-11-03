@@ -13,6 +13,8 @@ import (
 
 // TestContractUpdateOfAMissingContractIsNotFound: revising a contract that does not exist is NOT_FOUND, read under the
 // row lock before any rule of the revision is checked (billing contracts.save with an id; loadContract).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestContractUpdateOfAMissingContractIsNotFound(t *testing.T) {
 	srv := server(t)
 	u := newUnit(t, srv, "Missing contract AC")

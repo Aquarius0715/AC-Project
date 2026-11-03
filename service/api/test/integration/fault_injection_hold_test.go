@@ -9,6 +9,8 @@ import (
 // TestHoldRollsBackWhenTheStatusCannotBeWritten: a job that cannot be put on hold keeps its status and reason. The
 // operation fails as a server error, and the job stays in progress with no hold reason, because the database rolls the
 // transaction back (jobs.hold; the status write fails).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestHoldRollsBackWhenTheStatusCannotBeWritten(t *testing.T) {
 	srv := server(t)
 	_, res := write(

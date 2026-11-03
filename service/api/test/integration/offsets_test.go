@@ -16,6 +16,7 @@ const (
 	statusDemoRequested = "demo_requested"
 )
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestOffsets(t *testing.T) {
 	srv := server(t)
 	unit := newUnit(t, srv, "Offset AC")

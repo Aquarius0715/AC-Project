@@ -17,6 +17,7 @@ const (
 	refusedSlotNotAgreed = "startAt=errors.slot_not_agreed"
 )
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestOfferAcceptAssign(t *testing.T) {
 	srv := server(t)
 	// earlier runs leave active assignments for these technicians in the same slots
@@ -492,6 +493,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAgreedSlotsAndInputs(t *testing.T) {
 	srv := server(t)
 	owner(
@@ -735,6 +737,8 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 
 // TestAssignWithinAccess (IR433): a technician is assigned only to a slot that ends before their access does; a slot
 // past the access end is FORBIDDEN errors.technician_access_ends, and the same slot is fine once the access lasts.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAssignWithinAccess(t *testing.T) {
 	srv := server(t)
 	tech := seed.ID("tech-internal-a")
@@ -806,6 +810,8 @@ func TestAssignWithinAccess(t *testing.T) {
 // TestReleaseEndedAccess (OPEN-BE-09, IR439): HQ shortens a booked technician's access to end before the visit; the
 // maintenance scheduler releases the assignment of the job that has not started, the job goes back to be assigned
 // (requested for HQ's own delivery), and HQ's assigners get a job_update notice.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestReleaseEndedAccess(t *testing.T) {
 	srv := server(t)
 	ctx := context.Background()
@@ -915,6 +921,8 @@ func TestReleaseEndedAccess(t *testing.T) {
 
 // TestReleaseEndedAccessContractor (IR439): the contractor's job whose technician's access now ends before the visit
 // goes back to accepted with its offer, and the contractor's assigners get the job_update notice.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestReleaseEndedAccessContractor(t *testing.T) {
 	srv := server(t)
 	ctx := context.Background()
@@ -1079,6 +1087,8 @@ func TestReleaseEndedAccessContractor(t *testing.T) {
 // TestReleaseQualificationEnded (IR440): HQ approves a technician's certificate whose window no longer covers an
 // assigned visit on a unit that requires the code; the not-started assignment is released like an ended access
 // (IR439). A certificate that still covers the visit releases nothing.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestReleaseQualificationEnded(t *testing.T) {
 	srv := server(t)
 	tech := seed.ID("tech-external-a")
@@ -1271,6 +1281,8 @@ func TestReleaseQualificationEnded(t *testing.T) {
 }
 
 // TestPastSlotsRefused (IR456): a preferred time that is over can neither be assigned nor offered.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPastSlotsRefused(t *testing.T) {
 	srv := server(t)
 	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
@@ -1370,6 +1382,8 @@ func TestPastSlotsRefused(t *testing.T) {
 // TestExtensionRefreezesTechnicianHistory (IR459): a technician whose window ended was frozen into their history; an
 // extension for the same technician removes that snapshot, nothing is frozen while the new window is open, and its end
 // freezes the history again.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestExtensionRefreezesTechnicianHistory(t *testing.T) {
 	srv := server(t)
 	ctx := context.Background()

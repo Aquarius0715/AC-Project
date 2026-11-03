@@ -13,6 +13,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestWritesGetResult(t *testing.T) {
 	srv := server(t)
 	key := "wr-" + uuid.NewString()
@@ -111,6 +112,7 @@ func TestWritesGetResult(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestResolveQr(t *testing.T) {
 	srv := server(t)
 	unit := boundUnit(t, srv, "online")

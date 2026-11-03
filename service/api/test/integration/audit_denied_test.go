@@ -12,6 +12,8 @@ import (
 // (NOT_FOUND, a record outside the caller's scope) leaves an audit entry with the result denied — the actor, the
 // operation and the target it asked for, the refusal as the reason — at most one per actor and operation a minute.
 // A refusal of the input (VALIDATION) and a refused read leave none.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestDeniedWritesAudited(t *testing.T) {
 	srv := server(t)
 	day := `"from":"` + clock().Add(-24*time.Hour).

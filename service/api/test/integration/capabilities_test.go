@@ -29,6 +29,7 @@ func capBody(id, model, extra string) string {
 		`"firmwareCandidates":["v1"]` + extra + `}`
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestCapabilities(t *testing.T) {
 	srv := server(t)
 

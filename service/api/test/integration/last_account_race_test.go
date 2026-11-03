@@ -100,6 +100,8 @@ func raceRefused(
 // TestLastOwnerAtOnce (IR471): a customer with two active owners; HQ demotes one and removes the other at the same
 // moment. Each change alone keeps an owner, so without waiting for each other both passed and left none. The customer's
 // other active owners (the seed's, and any another test added) are switched off for the test.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestLastOwnerAtOnce(t *testing.T) {
 	srv := server(t)
 	cust := seed.ID("cust-b")
@@ -178,6 +180,8 @@ func TestLastOwnerAtOnce(t *testing.T) {
 // removed at the same moment. Each change alone keeps a contractor, so without waiting for each other both passed and
 // left none. The company's other active contractor accounts (the caller's own, and any another test added) are
 // switched off for the test.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestLastContractorAtOnce(t *testing.T) {
 	srv := server(t)
 	org := seed.ID("org-contractor-a")
@@ -334,6 +338,8 @@ func withoutIdentityWrite(t *testing.T, b map[string]any) {
 // TestLastIdentityAdminAtOnce (IR472): the tenant's last two identity.write holders take the permission from each other
 // at the same moment. Each caller stays a holder in its own change, so without waiting for each other both passed and
 // left no one who can manage access. The tenant's other holders lose the permission for the test.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestLastIdentityAdminAtOnce(t *testing.T) {
 	srv := server(t)
 	identityAdmins(t)
@@ -374,6 +380,8 @@ func TestLastIdentityAdminAtOnce(t *testing.T) {
 
 // TestLastIdentityAdminStartLater (IR472): the last identity.write holder cannot move its own start later — it would
 // stop being valid now, like ending it; another holder can.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestLastIdentityAdminStartLater(t *testing.T) {
 	srv := server(t)
 	identityAdmins(t)

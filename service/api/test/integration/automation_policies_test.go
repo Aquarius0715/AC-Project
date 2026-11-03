@@ -43,6 +43,7 @@ func autoPolicyBody(extra map[string]string) string {
 	return "{" + strings.Join(parts, ",") + "}"
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAutomationPolicies(t *testing.T) {
 	srv := server(t)
 	owner(

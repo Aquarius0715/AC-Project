@@ -11,6 +11,7 @@ import (
 
 const statusDueSoon = "due_soon"
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestFilterCare(t *testing.T) {
 	srv := server(t)
 	tenant := seed.ID("tenant-a")

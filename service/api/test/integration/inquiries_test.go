@@ -12,6 +12,7 @@ import (
 
 const fieldFiltersTo = "filters.to"
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestInquiries(t *testing.T) {
 	srv := server(t)
 	u := boundUnit(t, srv, "online")
@@ -200,6 +201,7 @@ func TestInquiries(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAuditList(t *testing.T) {
 	srv := server(t)
 	_, inv := newInvoice(t, srv)

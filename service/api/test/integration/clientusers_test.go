@@ -11,6 +11,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestClientUsers(t *testing.T) {
 	srv := server(t)
 	cust := seed.ID("cust-b").String()
@@ -249,6 +250,7 @@ func TestClientUsers(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestTwoFactor(t *testing.T) {
 	srv := server(t)
 	owner(
@@ -317,6 +319,8 @@ func TestTwoFactor(t *testing.T) {
 // TestClientUserMembershipSync: a client user who has signed in keeps the membership in step (FR-A17): disabling ends
 // its access now, activating opens it again, and removing the user ends it; the customer of a user is fixed, and a
 // removal needs the current version.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestClientUserMembershipSync(t *testing.T) {
 	srv := server(t)
 	cust := seed.ID("cust-b").String()
@@ -450,6 +454,8 @@ func TestClientUserMembershipSync(t *testing.T) {
 // TestClientUsersByOwner (IR417): an owner manages the customer's users like HQ: invites members and owners, changes a
 // pending invite, a user's role and access with a reason, and removes users; never the own account, never an accepted
 // user's e-mail, never another customer's user, and the customer keeps an active owner. A member is refused.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestClientUsersByOwner(t *testing.T) {
 	srv := server(t)
 	cust := seed.ID("cust-b").String()
@@ -608,6 +614,8 @@ func TestClientUsersByOwner(t *testing.T) {
 // TestClientAccountCreated (IR417, IR461): an owner adds an owner: the person and an owner client membership of the
 // customer are created at once, with the client permissions and the customer's scope, and the user is listed as
 // invited.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestClientAccountCreated(t *testing.T) {
 	srv := server(t)
 	cust := seed.ID("cust-b").String()
@@ -677,6 +685,8 @@ func TestClientAccountCreated(t *testing.T) {
 
 // TestDisabledClientStaysClosed (IR420): HQ changing the membership of a client user that is disabled keeps the
 // membership closed.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestDisabledClientStaysClosed(t *testing.T) {
 	srv := server(t)
 	user := newUser(t)

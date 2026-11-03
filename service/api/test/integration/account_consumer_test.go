@@ -17,6 +17,8 @@ import (
 // TestAccountConsumerApart (IR511): the sign-in accounts and sessions have their own consumer, "identity-accounts". An
 // event the "identity" consumer cannot apply holds back only that consumer: an account is still turned off at once.
 // An account event "identity" applied before the split counts as applied and is not applied again.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAccountConsumerApart(t *testing.T) {
 	fake := &fakeIDP{
 		mu:         sync.Mutex{},

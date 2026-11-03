@@ -21,6 +21,8 @@ const keyRevokedByHQ = "errors.revoked_by_hq"
 // and only HQ gives it back. The contractor cannot extend the access end, enable the account again or add the person
 // as a new account; disabling and removing stay its own. HQ's later end clears the revoke: the sign-in comes back
 // unless the company disabled the account, which it may then enable again.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestHQRevokeTurnsSignInOff(t *testing.T) {
 	fake := &fakeIDP{
 		mu:         sync.Mutex{},
@@ -247,6 +249,8 @@ func TestHQRevokeTurnsSignInOff(t *testing.T) {
 
 // TestHQRevokeOfAClientUser (IR508): a customer owner cannot change a user whose access HQ ended — a save would open
 // the membership again — but may disable or remove them.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestHQRevokeOfAClientUser(t *testing.T) {
 	srv := server(t)
 	user := newUser(t)
@@ -342,6 +346,8 @@ func TestHQRevokeOfAClientUser(t *testing.T) {
 // TestHQSaveOfAnEndedAccessIsNoRevoke (IR514): HQ's form sends whole minutes. Saving other changes to a technician
 // whose access ended by itself (the contractor's end is the day's last second) is no revoke: the sign-in is not
 // touched and the contractor can still give a new access end.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestHQSaveOfAnEndedAccessIsNoRevoke(t *testing.T) {
 	fake := &fakeIDP{
 		mu:         sync.Mutex{},

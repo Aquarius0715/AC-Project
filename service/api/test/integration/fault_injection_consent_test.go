@@ -8,6 +8,8 @@ import (
 // operation fails as a server error, and the consent reads back as it was before, version included, because the
 // database rolls the transaction back (consents.update; the consent write fails). The consent is first revoked, since
 // a grant of a consent already in force writes nothing and would not reach the failing statement.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestConsentChangeRollsBackWhenItCannotBeWritten(t *testing.T) {
 	srv := server(t)
 	get := func() map[string]any {

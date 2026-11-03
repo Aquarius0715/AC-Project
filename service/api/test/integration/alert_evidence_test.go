@@ -48,6 +48,8 @@ func reading(
 // IR327 / IR66 / DD-A05 item 6: an alert's evidence candidates are its own evidence at detection and the unit's valid
 // remeasurements after detection — of the rule's metric when the alert has a rule — newest first; an alert without a
 // policy resolves only with at least one candidate, a policy alert also without; only resolvers read the candidates.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAlertEvidence(t *testing.T) {
 	srv := server(t)
 	unit := newUnit(t, srv, "Evidence AC")

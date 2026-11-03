@@ -60,6 +60,7 @@ func ackCommand(t *testing.T, id string, when time.Time) bool {
 	return ok
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestDiagnosticRuns(t *testing.T) {
 	srv := server(t)
 	unit := seed.ID("unit-non-rto").String()

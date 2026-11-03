@@ -54,6 +54,7 @@ func alertPolicyBody(extra map[string]string) string {
 	return "{" + strings.Join(parts, ",") + "}"
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPolicies(t *testing.T) {
 	srv := server(t)
 	def := seed.DefaultPolicyID("tenant-a").String()
@@ -733,6 +734,8 @@ func TestPolicies(t *testing.T) {
 
 // TestPolicySaveRefusals covers two refusals of policies.save: a customer that is no longer active cannot get an alert
 // policy, and the kind of a saved policy is fixed (an automation policy cannot be saved as an alert policy).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPolicySaveRefusals(t *testing.T) {
 	srv := server(t)
 	owner(t, `UPDATE assets.customers SET status = 'inactive' WHERE id = $1`, seed.ID("cust-a"))

@@ -22,6 +22,7 @@ func countNotes(t *testing.T, target, recipient, template string) int {
 	return n
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestBusinessEventNotifications(t *testing.T) {
 	srv := server(t)
 	// job.requested by the client: HQ job.write holders, not the acting client

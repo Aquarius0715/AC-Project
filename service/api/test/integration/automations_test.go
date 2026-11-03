@@ -44,6 +44,7 @@ func scheduleRule(u string, extra map[string]string) string {
 	return "{" + strings.Join(parts, ",") + "}"
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAutomationSchedules(t *testing.T) {
 	srv := server(t)
 	unit := newUnit(t, srv, "Auto AC")
@@ -262,6 +263,7 @@ func TestAutomationSchedules(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAutomationEvents(t *testing.T) {
 	srv := server(t)
 	u := newUnit(t, srv, "Event AC")
@@ -352,6 +354,8 @@ func TestAutomationEvents(t *testing.T) {
 // TestAutomationOnArchivedUnit: an automation may not name an archived unit. Archiving takes the unit out of its
 // client's scope, so the save is NOT_FOUND and stores nothing; the 409 errors.unit_archived answers only while a cached
 // scope still holds the unit (IR329). IR381 pins this answer, which had no test.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAutomationOnArchivedUnit(t *testing.T) {
 	srv := server(t)
 

@@ -13,6 +13,8 @@ import (
 // observed state, observed at the report time, and moves the unit's last-seen time; a report with no settings moves
 // only the last-seen time (IR528); a report without a state, with a mode the air conditioner has no word for, or from
 // after the scenario clock is refused.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestDemoStateReport(t *testing.T) {
 	srv := serverWith(t, true)
 	unit, device := seed.ID("unit-limited"), seed.ID("device-limited")

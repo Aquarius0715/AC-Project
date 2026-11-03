@@ -65,6 +65,8 @@ func poweredUnit(t *testing.T, name string, onAgo, offAgo time.Duration) string 
 // (normal, “Cleaning due … Not a fault.”) and one cleaning_due notification per recipient and channel of the customer's
 // settings; Mark cleaned resolves it at once, a technician cleaning at the next evaluation; no recipient leaves a
 // no_recipient DeliveryFailure on the Alert.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestFilterReminders(t *testing.T) {
 	srv := server(t)
 	ctx := context.Background()

@@ -32,6 +32,8 @@ const (
 // record and never a change. Lists are asked with filters naming the foreign records and must not return them; a
 // filter never widens the caller's scope. The catalog check keeps the table complete: each operation with a role
 // other than admin is either called here or named with the reason it takes no foreign target.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestForeignTargets(t *testing.T) {
 	srv := server(t)
 	id := func(k string) string { return seed.ID(k).String() }
@@ -1108,6 +1110,8 @@ func TestForeignTargets(t *testing.T) {
 // TestTechnicianRebind: a technician binds a device to the unit of their job only when the unit the device leaves is
 // in their scope too, through an assignment whose work window contains now (DD-T11 rejects an unauthorized rebinding,
 // IR366). An unbound device needs no second unit.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestTechnicianRebind(t *testing.T) {
 	srv := server(t)
 	device := func(unit string) string {
@@ -1260,6 +1264,8 @@ func TestTechnicianRebind(t *testing.T) {
 // TestFireAuthorizesFirst: automations.fire checks the target units before it returns a stored result or a tick
 // CONFLICT (IR21, IR366). Customer B repeating customer A's evaluation gets NOT_FOUND, never A's result: the same
 // event, the same input under another event, or other facts in the same tick.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestFireAuthorizesFirst(t *testing.T) {
 	srv := server(t)
 	owner(t, `DELETE FROM control.evaluation_events`) // the test clock stands still: a fresh tick

@@ -10,6 +10,8 @@ import (
 
 // TestSearchIsLiteral: filters.search finds the term as written, anywhere and in any case, in every list that has it
 // (IR388). A %, _ or \ in the term is not a wildcard: "%" alone finds only values with a "%" in them, not every row.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestSearchIsLiteral(t *testing.T) {
 	srv := server(t)
 	// a part and a contractor whose names hold a % and an _ (the seed's do not)

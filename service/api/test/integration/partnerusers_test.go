@@ -24,6 +24,8 @@ import (
 // TestPartnerUsers (FR-P11, IR461): a contractor lists its company's accounts, adds contractors and technicians (the
 // account is created at once and listed as invited until its first sign-in), resends the set-up e-mail and removes the
 // account; another company's accounts are NOT_FOUND, and other roles are refused.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPartnerUsers(t *testing.T) {
 	srv := server(t)
 	email := "tech-" + uuid.NewString()[:8] + "@example.com"
@@ -329,6 +331,8 @@ func TestPartnerUsers(t *testing.T) {
 // TestPartnerUserAccess: disabling a technician's account ends its membership now and keeps its access end; enabling
 // it again brings that end back; an accepted account's email and role are fixed; the company keeps an active
 // contractor.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPartnerUserAccess(t *testing.T) {
 	srv := server(t)
 	// the seed technician holds an active assignment: closing that account is refused (IR421)
@@ -571,6 +575,8 @@ func TestPartnerUserAccess(t *testing.T) {
 // the technicians' permissions, no unit scope and the contractor's access end are created; the identity consumer
 // opens the provider account and sends the set-up e-mail; the first sign-in makes the account active; the access end
 // moves within a year; removing the account turns its sign-in off.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPartnerAccountCreated(t *testing.T) {
 	fake := &fakeIDP{
 		mu:         sync.Mutex{},
@@ -800,6 +806,8 @@ func firstSignIn(t *testing.T, srv *apiserver.Server, membership string) {
 
 // TestPartnerResendAfterAccessEnd: no set-up e-mail goes to a technician whose access ended before they signed in; once
 // the contractor moves the end, it goes again (IR461).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPartnerResendAfterAccessEnd(t *testing.T) {
 	srv := server(t)
 	email := "late-" + uuid.NewString()[:8] + "@example.com"
@@ -867,6 +875,8 @@ func TestPartnerResendAfterAccessEnd(t *testing.T) {
 
 // TestPartnerUserInputs: the inputs of partnerUsers.remove and resendInvite name their field, an invite takes no
 // reason, a removal needs the current version, and removing an account ends its membership now.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPartnerUserInputs(t *testing.T) {
 	srv := server(t)
 	for name, c := range map[string]struct {
@@ -955,6 +965,8 @@ func TestPartnerUserInputs(t *testing.T) {
 
 // TestNotificationMailRetry (IR425): a failed e-mail notification keeps its reason and is retried a minute after the
 // failed attempt, not before; then it is sent and recorded. (Until IR479 the invitation e-mails showed this.)
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestNotificationMailRetry(t *testing.T) {
 	srv := server(t)
 	membership, id, name := uuid.NewString(), uuid.NewString(), "Retry AC "+uuid.NewString()[:8]
@@ -1063,6 +1075,8 @@ func (f *fakeMail) Send(_ context.Context, to, subject, body string) (string, er
 
 // TestNotificationMail (IR418): an e-mail notification goes to the recipient's address; one whose recipient's
 // membership has ended is recorded as suppressed and never sent.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestNotificationMail(t *testing.T) {
 	srv := server(t)
 	note := func(membership string) string {
@@ -1182,6 +1196,8 @@ func TestNotificationMail(t *testing.T) {
 
 // TestDisabledAccountStaysClosed (IR420): HQ extending the membership of an account its contractor disabled does not
 // reopen it; the new end is kept and comes back when the contractor enables the account.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestDisabledAccountStaysClosed(t *testing.T) {
 	srv := server(t)
 	user := newUser(t)
@@ -1286,6 +1302,8 @@ func TestDisabledAccountStaysClosed(t *testing.T) {
 // TestContractorAddedTechnicianAssigned (IR461): a technician the contractor added has no unit scope, and the
 // contractor still assigns them on its own accepted offer once HQ verified their qualification; another contractor
 // cannot.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestContractorAddedTechnicianAssigned(t *testing.T) {
 	srv := server(t)
 	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }

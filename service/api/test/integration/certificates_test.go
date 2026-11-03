@@ -12,6 +12,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestCertificatesAndParts(t *testing.T) {
 	srv := server(t)
 	tech := seed.ID("tech-external-a").String()
@@ -317,6 +318,8 @@ func TestCertificatesAndParts(t *testing.T) {
 
 // TestCertificateCreatesMissingGrant: approving a certificate for a code the technician holds no grant for creates
 // the grant (QualificationGranted, IR133, IR192), not only extends an existing one. The seed grant is restored after.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestCertificateCreatesMissingGrant(t *testing.T) {
 	srv := server(t)
 	tech := seed.ID("tech-external-a")

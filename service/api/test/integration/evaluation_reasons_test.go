@@ -13,6 +13,8 @@ import (
 // the unit's capability no longer supports (invalid_capability), an owner who lost control of the unit
 // (owner_forbidden) and a location rule whose owner's consent is gone (consent_revoked). Each rule is removed before
 // the next so the decision names its reason.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAutomationDecideReasons(t *testing.T) {
 	srv := server(t)
 	unit := boundUnit(t, srv, "online")

@@ -32,6 +32,7 @@ func newAlert(t *testing.T, unit, org, severity string, when time.Time) string {
 	return id
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAlerts(t *testing.T) {
 	srv := server(t)
 	unit := newUnit(t, srv, "Alert AC")
@@ -230,6 +231,8 @@ func TestAlerts(t *testing.T) {
 // IR284: every reader of an alert sees the condition that raised it — its policy's own, or the default rule of its rule
 // key — and none for an alert without a policy; a technician on the unit acknowledges with alert.read, and only
 // alert.resolve resolves.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
 	srv := server(t)
 	unit := newUnit(t, srv, "Rule AC")

@@ -59,6 +59,8 @@ func setWatermark(t *testing.T, at time.Time) {
 // IR54 / IR214 / AT-C04-N: the equipment scheduler fires a schedule rule at its start and end minutes — once per
 // occurrence, re-authorizing the owner, audited — and a disabled or deleted rule creates nothing. clock is Monday
 // 2026-09-14 09:00 Kuala Lumpur.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestScheduleAutomationsFire(t *testing.T) {
 	srv := server(t)
 	ctx := context.Background()
@@ -203,6 +205,8 @@ func TestScheduleAutomationsFire(t *testing.T) {
 // runs only the last minute it passed, so the unit ends in the state real time would have left: past a whole window,
 // the end. Before, the start's Command was still pending when the end was evaluated in the same tick, so the end was
 // excluded as busy and the AC stayed on after its window. (Within one minute the order stays: TestScheduleBoundaries.)
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestScheduleCatchUpRunsTheLastMinute(t *testing.T) {
 	srv := server(t)
 	ctx := context.Background()
@@ -270,6 +274,8 @@ func TestScheduleCatchUpRunsTheLastMinute(t *testing.T) {
 }
 
 // IR214: automations.nextRuns previews an unsaved schedule (the C04 editor's Test) with the save rules.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestScheduleDraftPreview(t *testing.T) {
 	srv := server(t)
 	draft := func(extra string) string {
@@ -338,6 +344,8 @@ func strings2(s, old, replacement string) string {
 
 // IR53 / AT-C05-N ④: withdrawing location consent disables the owner's enabled location rules (consent_revoked,
 // version + 1); granting again re-enables nothing, an explicit save with enabled=true does and clears the reason.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestConsentWithdrawalDisablesLocationRules(t *testing.T) {
 	srv := server(t)
 	consent := func() (bool, int) {
@@ -468,6 +476,8 @@ func TestConsentWithdrawalDisablesLocationRules(t *testing.T) {
 
 // IR215: every onlyIf condition must hold when a rule runs. A rule whose own trigger held but that could not run keeps
 // the reason in its run log (lastRun); events that are not for the rule leave no trace.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAutomationExtraConditions(t *testing.T) {
 	srv := server(t)
 	ctx := context.Background()
@@ -715,6 +725,8 @@ func TestAutomationExtraConditions(t *testing.T) {
 // minute where one schedule ends and another starts on the same unit, the start wins when it would run: the end is
 // not sent and is recorded as superseded (IR326 item 4, IR504). A start that would not run leaves the end, whose
 // Command then makes the unit busy (D04). clock is Monday 2026-09-14 09:00 Kuala Lumpur.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestScheduleBoundaries(t *testing.T) {
 	srv := server(t)
 	ctx := context.Background()

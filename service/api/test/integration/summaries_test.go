@@ -19,6 +19,7 @@ func count(t *testing.T, m map[string]any, k string) int {
 	return int(asNum(t, asObj(t, data(m)["counts"])[k]))
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestSummariesCustomer(t *testing.T) {
 	srv := server(t)
 
@@ -144,6 +145,7 @@ func TestSummariesCustomer(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestSummariesTechnicianPartner(t *testing.T) {
 	srv := server(t)
 	unit := boundUnit(t, srv, "online")
@@ -277,6 +279,8 @@ func TestSummariesTechnicianPartner(t *testing.T) {
 // D07 / IR26: the job counts of a summary — scheduled (accepted or assigned), in progress, review (submitted), active
 // (scheduled or in progress), overdue (due before now while open) and assigned (with an active Assignment) — leave
 // completed and cancelled jobs out, and the technician's equipment counts its units once.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestSummaryJobCounts(t *testing.T) {
 	srv := server(t)
 	owner(

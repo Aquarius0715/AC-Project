@@ -17,6 +17,8 @@ import (
 // (devices.connectionFault, IR532): no open fault at first; after a communication_lost the fault's DeviceEvent ID and
 // sequence, which a restored names to bring the device back online; after it no open fault and the newer sequence.
 // A request without the token, without a device or for an unknown one is refused.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestConnectionFaultForTheGateway(t *testing.T) {
 	srv := serverWith(t, true)
 	cluster := newCluster(t)

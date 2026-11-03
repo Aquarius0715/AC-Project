@@ -25,6 +25,8 @@ import (
 // tenant and its HQ organization, the person and an admin membership with every HQ permission over the tenant; the
 // identity consumer opens the sign-in account (role admin, so the two-step set-up of IR468) and the administrator can
 // act at once. A second run for the tenant is refused, and so is an address someone already holds.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestBootstrapAdmin(t *testing.T) {
 	ctx := context.Background()
 

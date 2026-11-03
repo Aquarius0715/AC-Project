@@ -73,6 +73,7 @@ func listJob(t *testing.T, s *apiserver.Server, a *actor, job string) map[string
 	return nil
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestContractorAndTechnicianProjections(t *testing.T) {
 	srv := server(t)
 	owner(

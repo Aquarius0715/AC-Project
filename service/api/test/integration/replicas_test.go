@@ -17,6 +17,8 @@ import (
 
 // IR188, IR189, IR192: every notify, energy and maintenance reference copy holds exactly the captured columns of its
 // source rows, and follows updates and deletes made by any write path.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestReplicas(t *testing.T) {
 	_ = server(t)
 	same := func() {

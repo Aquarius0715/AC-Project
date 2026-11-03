@@ -10,6 +10,8 @@ import (
 // TestCapabilityVersionRollsBackWhenThePreviousVersionCannotBeRetired: a new version of a device capability is not kept
 // when the previous version cannot be retired as current. The operation fails as a server error, and the capability
 // still has only its first version (capabilities.save; the is_current update fails).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestCapabilityVersionRollsBackWhenThePreviousVersionCannotBeRetired(t *testing.T) {
 	s := server(t)
 	model := "FI-" + uuid.NewString()[:8]

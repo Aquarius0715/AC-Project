@@ -12,6 +12,8 @@ import (
 
 // TestCommandCreateValidation covers the commands.create input rules, the technician reason and job checks, and the
 // unit's pendingCommands list while a command is open.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestCommandCreateValidation(t *testing.T) {
 	srv := server(t)
 	unit := seed.ID("unit-online-rto").String()
@@ -116,6 +118,8 @@ func TestCommandCreateValidation(t *testing.T) {
 
 // TestRestrictionInputValidation covers the input rules of the restriction actions, which run before any state or
 // permission check.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestRestrictionInputValidation(t *testing.T) {
 	srv := server(t)
 

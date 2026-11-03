@@ -12,6 +12,7 @@ import (
 
 const refusedRecurrenceInvalid = "recurrence=" + apperr.KeyInvalid
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPlans(t *testing.T) {
 	srv := server(t)
 	unit := newUnit(t, srv, "Plan AC")

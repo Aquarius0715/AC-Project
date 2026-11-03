@@ -14,6 +14,7 @@ import (
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestDemoOperations(t *testing.T) {
 	plain := server(t)
 	trig := func(s *apiserver.Server, body string) (int, map[string]any) {

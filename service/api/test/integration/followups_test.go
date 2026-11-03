@@ -32,6 +32,7 @@ func completedJob(t *testing.T, s *apiserver.Server) string {
 	return job
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestRateAndReportProblem(t *testing.T) {
 	srv := server(t)
 	job := completedJob(t, srv)
@@ -334,6 +335,7 @@ func TestRateAndReportProblem(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 	srv := server(t)
 	job := completedJob(t, srv)
@@ -635,6 +637,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestWorkerConfirmsUnratedJobs(t *testing.T) {
 	srv := server(t)
 	job := completedJob(t, srv)
@@ -663,6 +666,8 @@ func TestWorkerConfirmsUnratedJobs(t *testing.T) {
 
 // TestExtendAccessRefreezesHistory (IR458): an access window that already ended was frozen into the contractor's
 // history; extending it removes that snapshot, and the next end freezes it again with the new end.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestExtendAccessRefreezesHistory(t *testing.T) {
 	srv := server(t)
 	ctx := context.Background()

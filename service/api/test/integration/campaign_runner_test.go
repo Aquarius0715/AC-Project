@@ -20,6 +20,8 @@ func eachDevice(results ...string) string { return strings.Join(results, " ") }
 // reached 95 % success, and skips devices that are offline, tampered or busy. A new failure above the auto-pause
 // share pauses the campaign; after Retry and Resume it goes on. An unanswered install fails with TIMEOUT. Outside the
 // window nothing starts. The campaign completes when every wave passed and nothing is pending or installing.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestFirmwareCampaignRunner(t *testing.T) {
 	srv := serverWith(t, true)
 	ctx := context.Background()
@@ -408,6 +410,8 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 // IR339: the dispatch skips a device that left its unit, one now on a unit of another model, and one whose unit has a
 // command in flight (D05, control.Busy). A wave passes at exactly 95 % success, but the campaign completes only once
 // its last installing device finished.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 	srv := serverWith(t, true)
 	ctx := context.Background()

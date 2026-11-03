@@ -12,6 +12,8 @@ import (
 
 // IR190: in the split services the read models of equipment-api ask maintenance, billing, energy and identity over
 // the internal query endpoint; the answers equal the single-process composition.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestReadModelsAcrossServices(t *testing.T) {
 	all := server(t)
 	cl := newCluster(t)
@@ -95,6 +97,8 @@ func TestReadModelsAcrossServices(t *testing.T) {
 
 // IR191: billing-api alone notifies through identity — recipients come from identity.members over HTTP and the
 // notification is stored by identity-api's consumer from NotificationRequested.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestNotificationsAcrossServices(t *testing.T) {
 	s := server(t)
 	u := boundUnit(t, s, "online")
@@ -143,6 +147,8 @@ func TestNotificationsAcrossServices(t *testing.T) {
 
 // IR192: maintenance-api alone checks technicians through identity.technician over HTTP, and a verified certificate
 // reaches identity's qualification grants through QualificationGranted.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestDirectoryAcrossServices(t *testing.T) {
 	_ = server(t)
 	cl := newCluster(t)
@@ -200,6 +206,8 @@ func TestDirectoryAcrossServices(t *testing.T) {
 }
 
 // IR195: workers ask other domains without a user through the system route: internal token and tenant only.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestSystemQueries(t *testing.T) {
 	cl := newCluster(t)
 	unit := seed.ID("unit-online-rto").String()

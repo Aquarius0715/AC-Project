@@ -10,6 +10,8 @@ import (
 
 // IR180: a business-domain service answers only its own operations; others are NOT_FOUND as if unknown, so a request
 // routed to the wrong service never runs. Data of other domains comes from their services (IR193).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestDomainServiceServesOnlyItsOperations(t *testing.T) {
 	cluster := newCluster(t)
 

@@ -10,6 +10,8 @@ import (
 // TestManualPaymentRollsBackWhenTheInvoiceCannotBePaid: a manual payment whose invoice cannot be marked paid is not
 // recorded. The operation fails as a server error, the invoice stays as it was, and the same payment reference is then
 // still free: the same request succeeds once the database accepts the write (payments.recordManual; markPaid fails).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestManualPaymentRollsBackWhenTheInvoiceCannotBePaid(t *testing.T) {
 	srv := server(t)
 	_, inv := newInvoice(t, srv)

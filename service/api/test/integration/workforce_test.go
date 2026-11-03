@@ -10,6 +10,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestEligibleCapacityUnavailability(t *testing.T) {
 	srv := server(t)
 	tech := seed.ID("tech-internal-a")
@@ -214,6 +215,8 @@ func TestEligibleCapacityUnavailability(t *testing.T) {
 // first day first, a contractor's own company only; members.clearUnavailability clears a row's days from a day on —
 // from its first day the row goes, from a later day the earlier days stay (version + 1) — never a day before today,
 // with the row's version, and only within the caller's company (IR612). The clock's day is Monday 2026-09-14.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestUnavailabilityListAndClear(t *testing.T) {
 	srv := server(t)
 	tech, orgA := seed.ID("tech-external-a"), seed.ID("org-contractor-a")

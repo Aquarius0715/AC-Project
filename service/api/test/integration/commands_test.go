@@ -16,6 +16,7 @@ import (
 
 const actionLimitTo26 = `{"kind":"temperature_limit","minimumCoolingSetpoint":26}`
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestCommands(t *testing.T) {
 	srv := server(t)
 	unit := seed.ID("unit-online-rto").String()
@@ -327,6 +328,8 @@ func TestCommands(t *testing.T) {
 
 // IR216: commands.list is the unit's Command history, newest first: a client sees its unit's commands with the
 // reason of others' withheld; a technician sees one job it holds (jobId required); HQ sees every command and reason.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestCommandHistory(t *testing.T) {
 	srv := server(t)
 	unit := seed.ID("unit-non-rto").String()
@@ -496,6 +499,8 @@ func TestCommandHistory(t *testing.T) {
 
 // TestCommandExpiryAudited (IR604): a command whose window passes without an answer is failed by the scheduler, and
 // its request's audit trail ends with that result under the same correlation ID: pending, then failed (TIMEOUT).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestCommandExpiryAudited(t *testing.T) {
 	srv := server(t)
 	unit := boundUnit(t, srv, "online")

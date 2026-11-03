@@ -12,6 +12,8 @@ import (
 // IR49(b) / IR152: external technicians see a unit only through their own active Assignment, inside its viewing
 // window and the accepted Offer's access window; equipment reads wait for the work window. Contractors see the
 // units of jobs with their own accepted Offer inside its access window.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 	srv := server(t)
 	unit := seed.ID("unit-other-customer").String()
@@ -217,6 +219,8 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 
 // IR186: equipment's copy of maintenance access follows every change of the Offer and the Assignment rows (row
 // triggers → outbox → assets consumer), including changes made outside the operations.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestUnitAccessProjection(t *testing.T) {
 	_ = server(t)
 	unit := seed.ID("unit-other-customer")

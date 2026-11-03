@@ -11,6 +11,8 @@ import (
 // BR-A19 / IR340: the equipment scheduler reminds HQ (asset.read) 90 and 30 days before a unit's warranty ends while
 // no active contract covers it: the latest reminder reached, once per warranty end, and a changed warranty end gets
 // its own. Archived units, covered units, ended warranties and ends beyond 90 days get none; clients get none.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestWarrantyReminders(t *testing.T) {
 	srv := server(t)
 	ctx := context.Background()

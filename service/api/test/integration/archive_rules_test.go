@@ -11,6 +11,8 @@ import (
 )
 
 // D05: units.archive conflicts with active work; customer deactivation with active units / contracts / jobs.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestArchiveRulesD05(t *testing.T) {
 	srv := server(t)
 	archive := func(unit string) (int, map[string]any) {

@@ -10,6 +10,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestTelemetry(t *testing.T) {
 	srv := server(t)
 	online, nonRTO, other := seed.ID("unit-online-rto").
@@ -204,6 +205,7 @@ func TestTelemetry(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestVentilation(t *testing.T) {
 	srv := server(t)
 	room1, room2, roomB := seed.ID("room-1").
@@ -358,6 +360,8 @@ func TestVentilation(t *testing.T) {
 // IR213: UnitSummary.latestMeasurements holds the latest reading of each metric at or before now (observedAt desc,
 // sequence desc), whatever its origin and quality, ordered by metric. A valid reading older than its sensor's stale
 // limit, or of an unknown sensor, reads as stale; telemetry.series keeps the stored quality.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestLatestMeasurements(t *testing.T) {
 	srv := server(t)
 	tenant := seed.ID("tenant-a")
@@ -574,6 +578,8 @@ func TestLatestMeasurements(t *testing.T) {
 // stretch present, the average of its valid readings with their count, no value and 0 where none is valid — and no page
 // of readings; the total still counts every reading. Only 5 and 60 minutes are taken, at most 1000 stretches, and the
 // unit must be readable as before.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestBucketedSeries(t *testing.T) {
 	srv := server(t)
 	unit := newUnit(t, srv, "Bucket AC") // customer B's

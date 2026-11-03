@@ -13,6 +13,8 @@ import (
 // jobId (devices.events → TechnicianUnit): an external technician without a delegation is NOT_FOUND; an internal
 // technician with the unit in scope but no assignment, an assignment that has not started, or one whose window
 // ended is FORBIDDEN with the reason; inside the window the history is readable.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestTechnicianUnitAccessReasons(t *testing.T) {
 	srv := server(t)
 	unit := newUnit(t, srv, "Access AC")

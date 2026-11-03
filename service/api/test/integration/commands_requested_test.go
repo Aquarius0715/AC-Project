@@ -15,6 +15,8 @@ import (
 
 // TestRequestedCommandsForTheGateway: the IoT gateway reads the commands waiting to be sent with the internal service
 // token and the tenant; a command leaves the list once it is reported sent, and a request without the token is refused.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestRequestedCommandsForTheGateway(t *testing.T) {
 	cluster := newCluster(t)
 	tenant := seed.ID("tenant-a").String()

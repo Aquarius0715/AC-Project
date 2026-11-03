@@ -124,6 +124,7 @@ func newPolicy(t *testing.T, customer, kind string) string {
 	return id
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 	srv := server(t)
 	pA, pA2, pB := newPolicy(
@@ -306,6 +307,7 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestOrganizations(t *testing.T) {
 	srv := server(t)
 

@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 )
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestRestrictionRecoveryCases(t *testing.T) {
 	srv := serverWith(t, true)
 	unit := boundUnit(t, srv, "online")

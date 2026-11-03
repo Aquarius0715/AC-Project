@@ -13,6 +13,8 @@ import (
 // stale observation, another restriction observed, a device operation blocking the remove command), the return of
 // a removing case to pending when its remove command fails, and the automation skip reasons an applied restriction
 // (restricted) and an unresolved recovery case (reconciliation_required) give.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestRestrictionRecoveryRefusals(t *testing.T) {
 	srv := serverWith(t, true)
 	unit := boundUnit(t, srv, "online")

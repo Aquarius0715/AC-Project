@@ -9,6 +9,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestUnitsCoverage(t *testing.T) {
 	srv := server(t)
 	// warranty dates relative to the test clock: Bedroom AC expiring (30 d), Living room AC under warranty (200 d)

@@ -48,6 +48,8 @@ func resultFieldsNeverAnswered() map[string]map[string]string {
 // contractInputs.test.ts derives from the contract with the TypeScript checker and keeps current. A field outside the
 // contract is data the contract does not promise (D12: no extra DTO fields), and a missing one breaks a client that
 // follows the contract.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestResultsMatchContract(t *testing.T) {
 	srv := serverCfg(t, func(c *apiserver.Config) { c.Domains = ops.Domains })
 

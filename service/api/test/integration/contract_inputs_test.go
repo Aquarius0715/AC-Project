@@ -57,6 +57,8 @@ func inputFields(t reflect.Type, out map[string]bool) {
 // checker and keeps current. A field outside the contract would be accepted where D12 says an unknown field is
 // VALIDATION, and a contract field the type lacks would refuse a request that follows the contract. Two operations may
 // share an input type only when their contract inputs are the same.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestInputsMatchContract(t *testing.T) {
 	srv := serverCfg(t, func(c *apiserver.Config) { c.Domains = ops.Domains })
 

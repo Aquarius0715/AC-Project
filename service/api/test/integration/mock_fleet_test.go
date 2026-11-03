@@ -14,6 +14,8 @@ import (
 // TestMockFleetSeeds: the mock fleet adds one unit per pattern on its own property, a module for each pattern that has
 // one with the pattern's connection, power signal, tamper and firmware, and runs again without adding anything. It runs
 // in a transaction that is rolled back, so the shared test database keeps only the fixture.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestMockFleetSeeds(t *testing.T) {
 	server(t) // the test database with the fixture
 
@@ -153,6 +155,8 @@ func TestMockFleetSeeds(t *testing.T) {
 // TestMockFleetHistory: two days of history give each reporting module a power reading every minute (copied to
 // energy's power samples) and a temperature every 15 minutes; power follows the Kuala Lumpur day (running in the
 // afternoon, standby at night); a module that is not reporting stopped a day earlier; more than 35 days is refused.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestMockFleetHistory(t *testing.T) {
 	server(t)
 

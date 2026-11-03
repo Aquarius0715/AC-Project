@@ -197,6 +197,7 @@ func expireAt(t *testing.T, now time.Time) {
 	) // the worker tick is not an operation: apply CommandsEnded as billing's consumer would (IR185)
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestRestrictionLifecycle(t *testing.T) {
 	srv := server(t)
 	online, offline := boundUnit(t, srv, "online"), boundUnit(t, srv, "offline")
@@ -531,6 +532,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestRestrictionCancelAndPayment(t *testing.T) {
 	srv := server(t)
 	unit := boundUnit(t, srv, "online")
@@ -676,6 +678,7 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 	owner(t, `UPDATE restrictions.restrictions SET state = 'released' WHERE id = $1`, id)
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestRestrictionScheduleRecipients(t *testing.T) {
 	srv := server(t)
 	unit := boundUnit(t, srv, "online")
@@ -753,6 +756,7 @@ func cmdOf(t *testing.T, m map[string]any, unit, field string) string {
 	return asStr(t, ids[len(ids)-1])
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 	srv := server(t)
 	online, offline := boundUnit(t, srv, "online"), boundUnit(t, srv, "offline")
@@ -1026,6 +1030,7 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestRestrictionOverrideReconcile(t *testing.T) {
 	srv := server(t)
 	unit := boundUnit(t, srv, "online")
@@ -1173,6 +1178,7 @@ func TestRestrictionOverrideReconcile(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestRestrictionReconcileNotApplied(t *testing.T) {
 	srv := server(t)
 	unit := boundUnit(t, srv, "online")
@@ -1287,6 +1293,8 @@ func TestRestrictionReconcileNotApplied(t *testing.T) {
 // TestRestrictionScheduleRefusals covers the contract and unit refusals of restrictions.schedule: a contract that is
 // not restriction eligible, a contract without an overdue invoice, and an archived unit. The same request schedules
 // once each cause is gone.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestRestrictionScheduleRefusals(t *testing.T) {
 	s := server(t)
 	unit := boundUnit(t, s, "online")
@@ -1380,6 +1388,8 @@ func TestRestrictionScheduleRefusals(t *testing.T) {
 // TestRestrictionReconcilePaths covers the other outcomes of restrictions.reconcile (SR26): a scheduled restriction has
 // nothing to reconcile, a unit the device says carries no restriction becomes not applied (and is not reconciled
 // twice), and a releasing unit that still carries the restriction gets its remove command at once.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestRestrictionReconcilePaths(t *testing.T) {
 	srv := server(t)
 	reconcile := func(id, u string, v int) (int, map[string]any) {
@@ -1494,6 +1504,8 @@ func TestRestrictionReconcilePaths(t *testing.T) {
 
 // TestRestrictionExplicitRelease: restrictions.release requests the release itself once every cause invoice is paid
 // (IR35), on the current version only, and the audit log records it.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestRestrictionExplicitRelease(t *testing.T) {
 	srv := server(t)
 	u := boundUnit(t, srv, "online")
@@ -1546,6 +1558,8 @@ func TestRestrictionExplicitRelease(t *testing.T) {
 // TestRestrictionOnePerUnitAtOnce (DDC-08 §3): two RTO contracts may cover the same unit, but the unit holds one active
 // restriction; scheduled from both contracts at the same moment, one succeeds and the other is CONFLICT
 // errors.restriction_exists — the check and the insert of one wait for the other's.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestRestrictionOnePerUnitAtOnce(t *testing.T) {
 	srv := server(t)
 	for round := range 3 {
@@ -1592,6 +1606,8 @@ func TestRestrictionOnePerUnitAtOnce(t *testing.T) {
 // IR476: a restriction whose two cause invoices are paid at the same moment ends. Each payment checked for another
 // unpaid cause invoice while the other payment was still open, so both saw one, both left the restriction, and the
 // customer stayed restricted after paying everything. Five rounds of two manual payments sent at once.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestRestrictionEndsWhenItsInvoicesArePaidAtOnce(t *testing.T) {
 	srv := server(t)
 	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
@@ -1682,6 +1698,8 @@ func TestRestrictionEndsWhenItsInvoicesArePaidAtOnce(t *testing.T) {
 // waited and then judged "every unit applied" on what it had read before the first committed: its own unit applied,
 // the other not yet, and the restriction stayed requested with both units applied. (A remove answer already locked the
 // restriction first, in its recovery check.)
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestRestrictionAppliedWhenTwoUnitsAnswerAtOnce(t *testing.T) {
 	srv := server(t)
 	ctx := context.Background()

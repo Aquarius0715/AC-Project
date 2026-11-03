@@ -20,6 +20,8 @@ const (
 // pipeline decodes, validates, then authorizes): a missing ID, an unknown choice, a reversed period or an over-long
 // text is VALIDATION naming the field, whoever asks. Path parameters are sent as the nil UUID, so the route matches
 // and the rule for a missing ID fires.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestRequiredInputs(t *testing.T) {
 	srv := server(t)
 	long := func(n int) string { return `"` + strings.Repeat("x", n) + `"` }

@@ -7,6 +7,8 @@ import (
 // TestAutomationPolicyEditRollsBackWhenItCannotBeWritten: an automation policy whose edit cannot be written keeps its
 // name and version. The operation fails as a server error, and the policy reads back as it was, because the database
 // rolls the transaction back (policies.save on an existing policy; the policy write fails).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAutomationPolicyEditRollsBackWhenItCannotBeWritten(t *testing.T) {
 	srv := server(t)
 

@@ -23,6 +23,8 @@ import (
 // when, is UNAUTHENTICATED errors.session_revoked, in identity and in the other services; a sign-in after it works. The
 // access stays. A client membership needs asset.write, any other identity.write; a reason is required; another tenant's
 // membership is NOT_FOUND and keeps its sessions.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestRevokeSessions(t *testing.T) {
 	srv := server(t)
 	tenantA, tenantB := seed.ID("tenant-a"), seed.ID("tenant-b")
@@ -367,6 +369,8 @@ func (f *fakeIDP) take() []string {
 // sessions at the identity provider (IR386): the user's ID in the realm locally, the Cognito sub once the user has one.
 // The event is applied once. A provider that fails is logged and the event is still done, so it does not hold up
 // the identity consumer's other events; the Core API refuses the old sign-ins either way (IR384).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
 	idp := &fakeIDP{
 		mu:         sync.Mutex{},

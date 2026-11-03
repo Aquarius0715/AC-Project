@@ -11,6 +11,8 @@ import (
 
 // TestSaveOfAMissingUnitIsNotFound: updating a unit that does not exist is NOT_FOUND, and it is refused before any
 // other rule (assets units.save with an id; writes.go unitsSaveUnit, the load of the current row).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestSaveOfAMissingUnitIsNotFound(t *testing.T) {
 	srv := server(t)
 	body := `{"id":"` + uuid.NewString() + `","customerOrgId":"` + seed.ID("org-customer-b").

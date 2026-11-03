@@ -59,6 +59,7 @@ func jobBody(unit string, extra map[string]string) string {
 	return "{" + strings.Join(parts, ",") + "}"
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestJobsCreate(t *testing.T) {
 	srv := server(t)
 	unit := seed.ID("unit-non-rto").String()
@@ -260,6 +261,7 @@ func TestJobsCreate(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestJobsReadAndTransitions(t *testing.T) {
 	srv := server(t)
 	unit := newUnit(t, srv, "Job AC")

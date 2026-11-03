@@ -14,6 +14,8 @@ import (
 
 // TestConcurrentAlertOpening (IR460): two tamper events of one unit opening its alert at the same time end with one
 // open alert and both see it; the second one used to fail on alerts_one_open_per_rule.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestConcurrentAlertOpening(t *testing.T) {
 	ctx := context.Background()
 	connect := func() *pgx.Conn {

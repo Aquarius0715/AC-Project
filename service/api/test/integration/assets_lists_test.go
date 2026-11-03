@@ -9,6 +9,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAssetLists(t *testing.T) {
 	srv := server(t)
 	// customers: HQ only; inactive hidden by default
@@ -123,6 +124,7 @@ func TestAssetLists(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestCustomersSaveAndRename(t *testing.T) {
 	srv := server(t)
 	org := uuid.NewString()

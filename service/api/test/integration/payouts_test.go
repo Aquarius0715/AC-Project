@@ -10,6 +10,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPayouts(t *testing.T) {
 	srv := server(t)
 	tenant, org := seed.ID("tenant-a"), seed.ID("org-contractor-b")
@@ -410,6 +411,8 @@ func TestPayouts(t *testing.T) {
 
 // TestPayoutWithoutRateCard: a contractor without a rate card in effect still gets a statement for its accepted work,
 // with each line noted "no rate card" and no amount, for HQ to settle by hand.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPayoutWithoutRateCard(t *testing.T) {
 	srv := server(t)
 	tenant, org := seed.ID(

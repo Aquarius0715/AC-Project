@@ -15,6 +15,8 @@ import (
 // (IR376). A partition is a table of its own; read directly, it does not apply its parent's policy. So a partition
 // without one would show a service role every tenant's rows. platform.* stays outside: the relay and the scheduler
 // read it across tenants and set the tenant per item.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestTenantIsolationEverywhere(t *testing.T) {
 	ctx := context.Background()
 
@@ -134,6 +136,8 @@ func TestTenantIsolationEverywhere(t *testing.T) {
 // tenant data like a business table. Its readers (the write pipeline and writes.getResult) all run in a tenant
 // transaction, so it is under the same row-level security; the relay's platform.outbox and the scheduler's
 // platform.scheduled_items stay outside (IR377).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestIdempotencyKeysIsolated(t *testing.T) {
 	ctx := context.Background()
 

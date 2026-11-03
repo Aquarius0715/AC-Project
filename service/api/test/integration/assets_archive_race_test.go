@@ -12,6 +12,8 @@ import (
 // IR478: archiving a space while a unit is added to it, at the same moment, never leaves an active unit in an archived
 // space. The archive checked for active units and then archived; the unit save checked that the space was not archived
 // and then inserted; neither locked the space, so both could pass. Eight rounds of the two sent at once.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestSpaceArchiveRacesAUnitAdd(t *testing.T) {
 	srv := server(t)
 

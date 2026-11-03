@@ -11,6 +11,8 @@ import (
 // TestOtherTechnicianCannotReadAJob: a job assigned to another technician is not visible to a technician without a
 // delegation: the read is NOT_FOUND, so neither the job nor its assignment reason (why the other technician could not
 // do it) leaks (maintenance jobs.get; the object is out of scope, D01).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestOtherTechnicianCannotReadAJob(t *testing.T) {
 	srv := server(t)
 	unit := seed.ID("unit-non-rto").String()

@@ -26,6 +26,7 @@ func jsonStr2(t *testing.T, v any) string {
 const mapping = `{"property":"Property","floor":"Floor","room":"Room","unit_name":"Unit","model_code":"Model",` +
 	`"serial":"Serial","installed_on":"Installed","warranty_end":"Warranty"}`
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestUnitsImport(t *testing.T) {
 	srv := server(t)
 	cust := seed.ID("cust-b").String()
@@ -449,6 +450,8 @@ func TestUnitsImport(t *testing.T) {
 // TestUnitsImportRefusals covers the import's other refusals (DD-A18): an inactive customer at preview and at commit,
 // a header that is not CSV, a unit name over 120 characters, a device with an unresolved tamper, and a preview that
 // went stale because its new property was created meanwhile.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestUnitsImportRefusals(t *testing.T) {
 	srv := server(t)
 	cust := seed.ID("cust-b")
@@ -569,6 +572,8 @@ func TestUnitsImportRefusals(t *testing.T) {
 
 // DD-A18: a commit validates again what may have changed since the preview — two rows of one new property create it
 // once, and a serial that was bound in between turns the preview stale (error.previewExpired), so nothing is imported.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestUnitsImportRevalidation(t *testing.T) {
 	srv := server(t)
 	cust, org := seed.ID("cust-b").String(), seed.ID("org-customer-b").String()

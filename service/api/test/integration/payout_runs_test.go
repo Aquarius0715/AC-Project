@@ -13,6 +13,8 @@ import (
 // BR-A23 / BR-P10 / IR341: the billing scheduler generates the drafts of the month that ended (August for the
 // September clock), once per month. A later tick regenerates nothing, and a run after HQ approved the statement
 // leaves it as it is.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestMonthlyPayoutDrafts(t *testing.T) {
 	srv := server(t)
 	ctx := context.Background()

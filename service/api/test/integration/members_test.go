@@ -29,6 +29,7 @@ func newUser(t *testing.T) string {
 	return id
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestMembersSave(t *testing.T) {
 	srv := server(t)
 	user := newUser(t)
@@ -341,6 +342,7 @@ func TestMembersSave(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestMembersList(t *testing.T) {
 	srv := server(t)
 
@@ -417,6 +419,8 @@ func TestMembersList(t *testing.T) {
 // TestMembersListCarriesEachMembersOwn (IR496): members.list reads the permissions, scopes and qualification grants of
 // a page of members in one query per table; each member still gets only its own, and each revoked grant keeps its own
 // revocation time.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestMembersListCarriesEachMembersOwn(t *testing.T) {
 	srv := server(t)
 

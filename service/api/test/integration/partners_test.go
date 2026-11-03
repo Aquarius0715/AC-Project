@@ -12,6 +12,7 @@ import (
 
 const refusedLinesInvalid = "lines=" + apperr.KeyInvalid
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestContractorRegister(t *testing.T) {
 	srv := server(t)
 	org := seed.ID("org-contractor-b").String()
@@ -297,6 +298,7 @@ func TestContractorRegister(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestSLAScorecard(t *testing.T) {
 	srv := server(t)
 	owner(t, `DELETE FROM maintenance.sla_targets`) // test-only rows
@@ -635,6 +637,8 @@ func TestSLAScorecard(t *testing.T) {
 // completed jobs of contractor B on two units: one on time and accepted at once, one late and returned once with a
 // rework visit. A later job on the same unit within 30 days also counts as not fixed the first time, so the units
 // differ.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestContractorQualityMetrics(t *testing.T) {
 	srv := server(t)
 	units := []string{newUnit(t, srv, "Quality AC"), newUnit(t, srv, "Quality AC")}
@@ -785,6 +789,8 @@ func TestContractorQualityMetrics(t *testing.T) {
 
 // TestFirstTimeFixIgnoresPlanVisits (IR450): a plan's next visit on the unit is no follow-up, so it does not make the
 // completed job a first-time-fix miss; a client's new request within 30 days does.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestFirstTimeFixIgnoresPlanVisits(t *testing.T) {
 	srv := server(t)
 	unit := newUnit(t, srv, "FTF AC")
@@ -876,6 +882,8 @@ func TestFirstTimeFixIgnoresPlanVisits(t *testing.T) {
 
 // TestOfferAcceptanceIgnoresCancelledJobs (IR452): an offer HQ's cancellation closes is no decline of the contractor,
 // so the contractor's offer acceptance stays as it was.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestOfferAcceptanceIgnoresCancelledJobs(t *testing.T) {
 	srv := server(t)
 	org := seed.ID("org-contractor-a")
@@ -984,6 +992,8 @@ func TestOfferAcceptanceIgnoresCancelledJobs(t *testing.T) {
 // instead of staying readable until the window's planned end; once the worker freezes it, the job reads as its history.
 // The scope's own copy of the window (assets.unit_offer_access) is checked, since other jobs of the shared database
 // may grant contractor-a the same unit.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestCancelEndsContractorAccess(t *testing.T) {
 	srv := server(t)
 	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }

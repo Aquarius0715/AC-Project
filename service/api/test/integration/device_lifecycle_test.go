@@ -21,6 +21,8 @@ const (
 // TestDeviceOperationLifecycle covers IR67 on the equipment scheduler and demo.trigger(operation): queued → running
 // one second after creation (check connecting), results only for running operations, TIMEOUT at expiresAt, the
 // start recheck of REV19-018 and the firmware OFFLINE start failure.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestDeviceOperationLifecycle(t *testing.T) {
 	srv := serverWith(t, true)
 	ctx := context.Background()
@@ -351,6 +353,8 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 
 // TestDeviceEvents covers demo.trigger(device) (SR20, SR23, REV18-040, AT-T12-N/E/B): independent connection, power
 // and tamper axes, the tamper Alert, recoveries of the current fault only, out-of-order sequences and eventId repeats.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestDeviceEvents(t *testing.T) {
 	srv := serverWith(t, true)
 	unit := boundUnit(t, srv, "online")

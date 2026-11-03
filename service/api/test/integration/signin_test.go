@@ -15,6 +15,8 @@ import (
 // customer's Users list shows it. Further requests of that sign-in and the token of an older session leave it alone;
 // a later sign-in moves it — directly on identity (session.get) and through another service, whose principal comes
 // from identity-api in cluster mode (units.list).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestLastSignIn(t *testing.T) {
 	srv := server(t)
 	ctx := context.Background()

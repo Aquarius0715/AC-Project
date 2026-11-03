@@ -18,6 +18,8 @@ import (
 //   - client users (list, invite, resend);
 //   - the default rules' switches;
 //   - the filter-care settings.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestClientMembersAreNotOwners(t *testing.T) {
 	srv := server(t)
 	member := seed.ID("test-member-a")
@@ -91,6 +93,8 @@ func TestClientMembersAreNotOwners(t *testing.T) {
 
 // TestMembersSaveNewUser (IR461): HQ creates a person with the membership (newUser instead of userId); the e-mail of an
 // existing person is a field error, and newUser goes with neither userId nor id.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestMembersSaveNewUser(t *testing.T) {
 	srv := server(t)
 	email := "hq-new-" + uuid.NewString()[:8] + "@example.com"

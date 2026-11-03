@@ -15,6 +15,8 @@ import (
 // room, one air conditioner whose online module (both nodes) has the live sensors and an active binding; the unit
 // mirrors the module. A second run adds nothing, asks for no second account and leaves a connection that changed
 // since alone. It runs in a transaction that is rolled back, so the shared test database keeps only the fixture.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestLiveSiteSeeds(t *testing.T) {
 	server(t) // the test database with the fixture
 
@@ -299,6 +301,8 @@ func TestLiveSiteSeeds(t *testing.T) {
 
 // TestLiveSiteRefusesATakenAddress: the owner's address held by another person stops the seed instead of giving the
 // live customer someone else's account.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestLiveSiteRefusesATakenAddress(t *testing.T) {
 	server(t)
 

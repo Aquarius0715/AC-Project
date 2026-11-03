@@ -41,6 +41,7 @@ func powerSeries(t *testing.T, unit string, start time.Time, origin string, kw .
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestFactors(t *testing.T) {
 	srv := server(t)
 	if _, resp := post(
@@ -121,6 +122,7 @@ func TestFactors(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestBaselines(t *testing.T) {
 	srv := server(t)
 	unit := newUnit(t, srv, "Energy AC")
@@ -319,6 +321,7 @@ func isolatedUnit(t *testing.T, srv *apiserver.Server) (string, string) {
 	return asStr(t, data(res)["id"]), prop
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestEnergySummary(t *testing.T) {
 	srv := server(t)
 	unit := newUnit(t, srv, "Summary AC")
@@ -471,6 +474,7 @@ func TestEnergySummary(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAdminSummary(t *testing.T) {
 	srv := server(t)
 	unit, prop := isolatedUnit(t, srv)
@@ -580,6 +584,8 @@ func TestAdminSummary(t *testing.T) {
 
 // TestForecastWithoutReadings: a unit set without any valid reading has no actual to forecast from (IR78), so the
 // forecast says so instead of predicting zero.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestForecastWithoutReadings(t *testing.T) {
 	s := server(t)
 	_, prop := isolatedUnit(t, s)
@@ -611,6 +617,8 @@ func TestForecastWithoutReadings(t *testing.T) {
 
 // IR110 / IR153: the monthly report states the month's figures — 5 kWh at the demo tariff is "5.0" and "2.50 MYR" —
 // and "n/a" for a month without readings; only the file's metadata is returned, so its size tells the two apart.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestEnergyReportFigures(t *testing.T) {
 	srv := server(t)
 	_, resp := write(

@@ -14,6 +14,8 @@ import (
 // that cites an attachment of another report, an empty reason kept as none, a measurement corrected in place, a
 // submission of a stale job version or of a job not in progress, the time on site without the ended pauses, and the
 // reads of a report through another job.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestWorkReportEdges(t *testing.T) {
 	srv := server(t)
 	job := assignedNow(t, srv) // version 2

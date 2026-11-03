@@ -248,6 +248,7 @@ func items(t *testing.T, m map[string]any) []map[string]any {
 	return out
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestHealth(t *testing.T) {
 	s := server(t)
 
@@ -261,6 +262,7 @@ func TestHealth(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestSessionGet(t *testing.T) {
 	srv := server(t)
 	code, res := post(srv, hq(), "session.get", `{}`)
@@ -324,6 +326,7 @@ func TestSessionGet(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestUnitsListScopes(t *testing.T) {
 	srv := server(t)
 	_, res := post(srv, hq(), "units.list", `{"limit":100}`)
@@ -472,6 +475,7 @@ func TestUnitsListScopes(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestUnitsGet(t *testing.T) {
 	srv := server(t)
 

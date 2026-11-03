@@ -14,6 +14,8 @@ import (
 
 // IR181 step 1: identity-api resolves principals for the other services; a billing-only service authenticates
 // without reading identity tables, and answers UNAVAILABLE when identity-api is down.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPrincipalFromIdentityService(t *testing.T) {
 	identity := serverCfg(t, func(c *apiserver.Config) {
 		c.Domains = []string{ops.DomainIdentity}

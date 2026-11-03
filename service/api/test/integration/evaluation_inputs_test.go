@@ -12,6 +12,8 @@ const fieldFacts = "facts"
 
 // TestEvaluationInputValidation covers the D02 / IR16 input rules of automations.simulate: ids, the tick, the unit
 // list and every fact shape.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestEvaluationInputValidation(t *testing.T) {
 	srv := server(t)
 	unitID := boundUnit(t, srv, "online")
@@ -138,6 +140,8 @@ func TestEvaluationInputValidation(t *testing.T) {
 // TestEvaluationFireReplay covers the D02 / IR21 idempotency of automations.fire: a repeated eventId returns the
 // stored result, a reused eventId with other input is CONFLICT, another eventId with the same input in the same tick
 // reuses the result, other input in the same tick is CONFLICT, and a past tick is VALIDATION.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestEvaluationFireReplay(t *testing.T) {
 	srv := server(t)
 	owner(t, `DELETE FROM control.evaluation_events`)

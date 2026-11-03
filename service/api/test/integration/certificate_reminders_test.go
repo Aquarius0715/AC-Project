@@ -15,6 +15,8 @@ import (
 // wait for HQ, were rejected, have expired, were replaced by a valid renewal or a later certificate of the same
 // qualification, or whose technician left get none; a pending renewal does not stop them. The contractor reads the
 // notifications of its own technicians' certificates only.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestCertificateReminders(t *testing.T) {
 	srv := server(t)
 	ctx := context.Background()

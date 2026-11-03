@@ -10,6 +10,8 @@ import (
 // operation fails as a server error, and the job stays on hold with its version unchanged, because the database
 // rolls the transaction back (jobs.cancel; the status write fails). A job in progress cannot be cancelled, so the
 // job starts on hold.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestCancelRollsBackWhenTheStatusCannotBeWritten(t *testing.T) {
 	srv := server(t)
 	_, res := write(

@@ -13,6 +13,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestWorkerTickExpiresOffers(t *testing.T) {
 	srv := server(t)
 	unit := seed.ID("unit-non-rto").String()
@@ -108,6 +109,7 @@ func TestWorkerTickExpiresOffers(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestWorkerRunStopsOnCancel(t *testing.T) {
 	srv := server(t)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -142,6 +144,8 @@ func TestWorkerRunStopsOnCancel(t *testing.T) {
 // IR356: several instances of a domain's scheduler. The background tick skips a domain and tenant whose lock another
 // instance holds, and its next tick catches up; the waiting tick (demo clock jumps, tests) waits for the lock; two
 // background ticks at once apply a transition once.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestSchedulerInstancesShareTheWork(t *testing.T) {
 	srv := server(t)
 	ctx := context.Background()

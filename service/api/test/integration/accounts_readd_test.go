@@ -21,6 +21,8 @@ import (
 // the new name holds and no sign-in shows yet. While the person still holds an open membership the address stays
 // errors.email_taken, for the company and for another one. HQ giving the removed person a membership points the
 // account at it too.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPersonAddedAgain(t *testing.T) {
 	fake := &fakeIDP{
 		mu:         sync.Mutex{},
@@ -212,6 +214,8 @@ func TestPersonAddedAgain(t *testing.T) {
 
 // TestPersonOfAnotherTenant (IR462): an address whose person signs in with another tenant's membership is
 // errors.email_taken, though their membership here has ended.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPersonOfAnotherTenant(t *testing.T) {
 	srv := server(t)
 	email := "foreign-" + uuid.NewString()[:8] + "@example.com"
@@ -265,6 +269,8 @@ func TestPersonOfAnotherTenant(t *testing.T) {
 
 // TestAccountSwitchedByMembership (IR462): disabling a demo-style account — no provider subject stored — turns it off
 // by the person's ID; when the account signs in with another membership, enabling this one leaves it alone.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAccountSwitchedByMembership(t *testing.T) {
 	fake := &fakeIDP{
 		mu:         sync.Mutex{},
@@ -365,6 +371,8 @@ func TestAccountSwitchedByMembership(t *testing.T) {
 // TestClientAddedAgain (IR462): a customer owner removes a member and adds the same address again as an owner: the same
 // person, a new client membership with the new role. (Only a person whose account the provider opened for this tenant
 // is taken back, hence the provider and the drained events.)
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestClientAddedAgain(t *testing.T) {
 	srv := serverCfg(
 		t,
@@ -463,6 +471,8 @@ func TestClientAddedAgain(t *testing.T) {
 // TestAccountProviderTrouble (IR461–IR463): a provider that does not answer leaves the person without an account and
 // nothing recorded; once it answers, the set-up e-mail sent again opens the account. An account the provider lost is
 // opened anew when the person is added again.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAccountProviderTrouble(t *testing.T) {
 	fake := &fakeIDP{
 		failing:    true,
@@ -591,6 +601,8 @@ func TestAccountProviderTrouble(t *testing.T) {
 // TestAccountsPerOrgPerDay (IR464): a contractor or a customer owner adds at most identity.AccountsPerOrgPerDay
 // accounts to their organization in 24 hours — the next is RATE_LIMITED errors.too_many_accounts with the seconds until
 // the oldest of them is a day old; HQ is not limited.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAccountsPerOrgPerDay(t *testing.T) {
 	srv := server(t)
 	filler := uuid.New()

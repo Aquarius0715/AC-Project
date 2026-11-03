@@ -13,6 +13,8 @@ import (
 // TestProposalRefusalsByState: a slot proposal can be withdrawn or answered only while it is pending and only within
 // its job. An unknown proposal, a proposal of another job and a decided proposal are each refused with the state
 // that applies, and the decided one changes nothing.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestProposalRefusalsByState(t *testing.T) {
 	srv := server(t)
 	owner(

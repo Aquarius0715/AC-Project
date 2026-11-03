@@ -11,6 +11,8 @@ import (
 // TestMRVReadRefusals: an MRV report that does not exist is NOT_FOUND; a version below 1 and a nil id are refused as
 // VALIDATION on id before any row is read (energy mrv.get, mrv.versions; the input rules of GetInput and
 // VersionsInput).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestMRVReadRefusals(t *testing.T) {
 	srv := server(t)
 	missing := uuid.NewString()

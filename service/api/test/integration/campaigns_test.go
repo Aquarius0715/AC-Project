@@ -14,6 +14,7 @@ import (
 
 const fieldWaves = "waves"
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestFirmwareCampaigns(t *testing.T) {
 	srv := server(t)
 	model := seed.ID("ventilation-demo").String()

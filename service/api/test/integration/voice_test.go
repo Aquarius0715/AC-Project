@@ -15,6 +15,7 @@ const (
 	monthAugust       = "2026-08"
 )
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestVoiceAndExport(t *testing.T) {
 	srv := server(t)
 	say := func(a *actor, text, locale, extra string) (int, map[string]any) {

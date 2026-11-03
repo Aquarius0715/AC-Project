@@ -12,6 +12,7 @@ import (
 
 const refusedFactsInvalid = "facts=" + apperr.KeyInvalid
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAutomationEvaluation(t *testing.T) {
 	srv := server(t)
 	owner(t, `DELETE FROM control.evaluation_events`)

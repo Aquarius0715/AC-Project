@@ -6,6 +6,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestUnitDetail(t *testing.T) {
 	srv := server(t)
 	code, res := post(

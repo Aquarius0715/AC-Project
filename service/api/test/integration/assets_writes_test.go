@@ -62,6 +62,7 @@ func ver(t *testing.T, m map[string]any) int {
 	return int(asNum(t, data(m)["version"]))
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAssetWritesLifecycle(t *testing.T) {
 	srv := server(t)
 	org := seed.ID("org-customer-b").String()

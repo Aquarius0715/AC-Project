@@ -16,6 +16,7 @@ const (
 	refusedReplyByRange = "replyBy=" + apperr.KeyRange
 )
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestSlotProposals(t *testing.T) {
 	srv := server(t)
 	owner(
@@ -393,6 +394,7 @@ func TestSlotProposals(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPartnerProposalsAndReschedule(t *testing.T) {
 	srv := server(t)
 	owner(
@@ -831,6 +833,8 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 // TestRescheduleAfterContractorAssignment: HQ may propose another time for an assigned job only after the technician
 // answered that they can't make it. When the customer accepts it, the contractor's accepted offer moves to the new
 // visit, the assignment is revoked as rescheduled, and the job goes back to accepted, so the contractor assigns again.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestRescheduleAfterContractorAssignment(t *testing.T) {
 	srv := server(t)
 	owner(
@@ -1014,6 +1018,8 @@ func TestRescheduleAfterContractorAssignment(t *testing.T) {
 // TestPartnerProposalRefusals covers the refusals around a contractor's time proposal: a time that breaks the slot
 // rules, an offer that has expired, sending it to the customer while HQ's own proposal is pending, and a reply-by
 // outside the allowed range.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPartnerProposalRefusals(t *testing.T) {
 	srv := server(t)
 	owner(
@@ -1158,6 +1164,8 @@ func TestPartnerProposalRefusals(t *testing.T) {
 // TestRescheduleOfferedPeriodicVisit: a periodic visit that is offered but not yet assigned has no scheduled slot, so
 // the 48-hour rule of jobs.requestReschedule reads the open offer's visit (IR113): within 48 hours it is too late,
 // later the customer's three times go back to HQ.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestRescheduleOfferedPeriodicVisit(t *testing.T) {
 	srv := server(t)
 	unit := seed.ID("unit-non-rto")
@@ -1233,6 +1241,8 @@ func TestRescheduleOfferedPeriodicVisit(t *testing.T) {
 // TestPartnerProposalEndsWithClientProposal (IR443): when the client's proposal made from a contractor's time change
 // ends without an answer, the time change ends too — kept when HQ withdraws the proposal, declined when the client lets
 // it expire — so the contractor can accept the offer or propose again.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPartnerProposalEndsWithClientProposal(t *testing.T) {
 	srv := server(t)
 	ctx := context.Background()
@@ -1389,6 +1399,8 @@ func TestPartnerProposalEndsWithClientProposal(t *testing.T) {
 
 // TestPartnerProposalEndsWithOffer (IR444): a contractor's time change still waiting for HQ ends (withdrawn) when its
 // offer is declined or expires, so HQ's job no longer shows it once the job is offered again.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPartnerProposalEndsWithOffer(t *testing.T) {
 	srv := server(t)
 	ctx := context.Background()
@@ -1548,6 +1560,8 @@ func TestPartnerProposalEndsWithOffer(t *testing.T) {
 
 // TestDeclineWithdrawsClientProposal (IR445): a contractor that declines its offer while HQ has sent its time change to
 // the client ends that client proposal too, so the client's acceptance cannot offer the job again to that company.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestDeclineWithdrawsClientProposal(t *testing.T) {
 	srv := server(t)
 	owner(
@@ -1683,6 +1697,8 @@ func TestDeclineWithdrawsClientProposal(t *testing.T) {
 
 // TestAcceptRechecksHold (IR446): the client's acceptance checks the proposal's hold again. HQ suspends the held
 // contractor after proposing; the acceptance is CONFLICT errors.proposal_unavailable and no offer is created.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAcceptRechecksHold(t *testing.T) {
 	srv := server(t)
 	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
@@ -1767,6 +1783,8 @@ func TestAcceptRechecksHold(t *testing.T) {
 
 // TestAcceptedProposalExtendsAccess (IR454): a contractor's time change after the offer's access window ends moves the
 // visit, and the access window follows it to the new slot end + 24 h.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestAcceptedProposalExtendsAccess(t *testing.T) {
 	srv := server(t)
 	owner(
@@ -1902,6 +1920,8 @@ func TestAcceptedProposalExtendsAccess(t *testing.T) {
 
 // TestProposalReplyByBeforeSlot (IR455): the reply-by cannot fall after the proposed time starts, and a proposal whose
 // time has begun cannot be accepted.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestProposalReplyByBeforeSlot(t *testing.T) {
 	srv := server(t)
 	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }

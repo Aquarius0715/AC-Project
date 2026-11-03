@@ -12,6 +12,8 @@ import (
 
 // IR349: attachments.list offers the evidence an MRV report may cite (DD-A14 item 6, IR203): the ready attachments of
 // accepted work reports on the units, uploaded in [from, to), newest first; HQ with mrv.write or job.read only.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestMRVEvidenceAttachments(t *testing.T) {
 	srv := server(t)
 	tenant := seed.ID("tenant-a")

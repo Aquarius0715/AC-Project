@@ -13,6 +13,8 @@ import (
 // kind (D01, unitscope): a property scope gives that property's units, an organization scope its customer's units, and
 // no scope none at all. The seed technicians hold unit scopes only, so the property and organization branches and the
 // empty scope had no test (IR381).
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestInternalTechnicianScopeKinds(t *testing.T) {
 	srv := server(t)
 	as := func(name string, scopes map[string]string) actor {

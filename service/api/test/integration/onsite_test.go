@@ -60,6 +60,7 @@ func assignedNow(t *testing.T, srv *apiserver.Server) string {
 	return job
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestOnSiteOperations(t *testing.T) {
 	srv := server(t)
 	job := assignedNow(t, srv)

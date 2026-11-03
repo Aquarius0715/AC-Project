@@ -11,6 +11,8 @@ import (
 
 // TestEffectivePowerSR27 covers the SR27 boundaries: freshness of observation and measurement, quality, origin,
 // null values, unknown sensors and no fallback to older valid rows.
+//
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestEffectivePowerSR27(t *testing.T) {
 	srv := server(t)
 	tenant := seed.ID("tenant-a")

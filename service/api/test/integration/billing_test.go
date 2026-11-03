@@ -13,6 +13,7 @@ import (
 
 const fieldPriceMinor = "priceMinor"
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestContractsAndInvoices(t *testing.T) {
 	srv := server(t)
 	unit := newUnit(t, srv, "Billing AC")

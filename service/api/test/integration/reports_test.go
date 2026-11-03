@@ -70,6 +70,7 @@ func draftBody(job, result string, extra map[string]string) string {
 	return "{" + strings.Join(parts, ",") + "}"
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestWorkReports(t *testing.T) {
 	srv := server(t)
 	job := assignedNow(t, srv)
@@ -648,6 +649,7 @@ func itoa(n int) string {
 	return strconv.Itoa(n)
 }
 
+//nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestContractorReview(t *testing.T) {
 	srv := server(t)
 	owner(
