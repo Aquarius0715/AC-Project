@@ -7,7 +7,7 @@
 // and the week — stays on Kuala Lumpur working days and clock times, and the screen says so.
 import { EN, showSpan, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
-import { hhmm, shortQualification, unavailabilityLabel, until, type ApiCapacity, type ApiMember, type ApiPartnerJob, type Slot } from "@ac/web/lib/partnerOverview";
+import { hhmm, onTeam, shortQualification, unavailabilityLabel, until, type ApiCapacity, type ApiMember, type ApiPartnerJob, type Slot } from "@ac/web/lib/partnerOverview";
 import { qualificationLabel, qualified, statusWord, type ApiDetail, type ApiOffer } from "@ac/web/lib/partnerJobDetail";
 
 const en = translator("en");
@@ -127,6 +127,14 @@ export function freeText(c: ApiCapacity | undefined, t: T = en): string {
 
 export type Candidate = { id: string; name: string; sub: string; badge: { text: string; tone: Tone }; eligible: boolean };
 /** The company's technicians for the slot: eligible ones (members.eligible) first, the others with the reason. */
+/** The technicians the schedule offers and shows: those who can still work (IR575), and the job's current technician
+ * even when their access has ended, so the form can name whom it replaces. A former technician, whose access ended or
+ * HQ revoked, can take no job and stays out of the choice and the week (IR624). */
+export function scheduleTeam(members: ApiMember[], now: number, currentId: string | null): ApiMember[] {
+  const team = new Set(onTeam(members, now).map((m) => m.id));
+  return members.filter((m) => m.role === "technician" && (team.has(m.id) || m.id === currentId));
+}
+
 export function candidates(members: ApiMember[], eligible: Set<string>, required: string[], slot: Slot, day: ApiCapacity[], currentId: string | null, t: T = en): Candidate[] {
   const cap = new Map(day.map((c) => [c.membershipId, c]));
   const overlaps = (a: Slot, b: Slot) => Date.parse(a.startAt) < Date.parse(b.endAt) && Date.parse(b.startAt) < Date.parse(a.endAt);

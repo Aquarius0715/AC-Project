@@ -55,7 +55,6 @@ export function ScheduleView({ live }: { live: ScheduleLive }) {
                 </ListRow>
               ))}
             </div>
-            {live.total > live.rows.length && <p className="mt-2 text-[11px] text-muted-foreground">{t("Showing {shown} of {total}.", { shown: live.rows.length, total: live.total })}</p>}
           </Card>
           <Card title={t("Delegation windows")} sub={t("Work must fit inside each window. Access ends automatically at the end time.")}>
             {live.rows.map((r) => (
@@ -130,7 +129,7 @@ function AssignCard({ sel, choice, zone, otherZone }: { sel: Selected; choice: C
     if (!tech || reasonMissing || !endOk || same) return;
     const name = chosen?.name ?? t("technician");
     run(() => assignTechnician(sel.id, sel.version, tech, slot, reason), t(m.kind === "assign" ? "Technician assigned — waiting for acceptance" : "Assignment changed"),
-      (v) => setResult({ tone: "ok", text: m.kind === "assign" ? t("Assigned {name} for {slot}. The technician must accept (受領); HQ and the technician are notified.", { name, slot: v.slot }) : t("Changed to {name} for {slot}. The technician must accept (受領); HQ and the technician are notified.", { name, slot: v.slot }) }),
+      (v) => setResult({ tone: "ok", text: m.kind === "assign" ? t("Assigned {name} for {slot}. The technician must accept the assignment; HQ and the technician are notified.", { name, slot: v.slot }) : t("Changed to {name} for {slot}. The technician must accept the assignment; HQ and the technician are notified.", { name, slot: v.slot }) }),
       (f: ActionFailure) => setResult({ tone: f.code === "CONFLICT" ? "warn" : "crit", text: assignRefusal(f, name, t) }));
   };
   return (
@@ -171,7 +170,7 @@ function AssignCard({ sel, choice, zone, otherZone }: { sel: Selected; choice: C
           </Field>
         )}
         {m.kind === "extend" && chosen && chosen.id !== sel.currentId && <Banner tone="warn">{t("On save, {current} loses action access immediately. The job keeps its state; {name} continues in a new draft version and the original report authorship is kept.", { current: currentName ?? t("the current technician"), name: chosen.name })}</Banner>}
-        {sel.ack && m.kind === "reassign" && sel.ack.status !== "cant_make" && <Banner tone={sel.ack.status === "accepted" ? "ok" : "primary"}>{t(sel.ack.status === "accepted" ? "The current technician accepted the assignment" : "Waiting for the current technician to accept (受領).")}</Banner>}
+        {sel.ack && m.kind === "reassign" && sel.ack.status !== "cant_make" && <Banner tone={sel.ack.status === "accepted" ? "ok" : "primary"}>{t(sel.ack.status === "accepted" ? "The current technician accepted the assignment" : "Waiting for the current technician to accept the assignment.")}</Banner>}
         {sel.text.alternative && <p className="text-[11px] text-muted-foreground">{t("The technician could do {slot} instead — a different time needs the client’s approval via HQ.", { slot: sel.text.alternative })}</p>}
         {sel.candidates.length > 0 && !sel.candidates.some((c) => c.eligible) && <Banner tone="warn">{t("No technician of your company can take this time (busy, unavailable or not qualified). Free a technician in Team & capacity, or ask HQ to agree another time with the client.")}</Banner>}
         {chosen && (chosen.eligible

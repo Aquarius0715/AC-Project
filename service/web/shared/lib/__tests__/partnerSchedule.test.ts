@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assignRefusal, candidates, formMode, freeText, scheduleRow, sortOf, weekGrid } from "@ac/web/lib/partnerSchedule";
+import { assignRefusal, candidates, formMode, freeText, scheduleRow, scheduleTeam, sortOf, weekGrid } from "@ac/web/lib/partnerSchedule";
 import type { ApiDetail, ApiOffer } from "@ac/web/lib/partnerJobDetail";
 import type { ApiCapacity, ApiMember, ApiPartnerJob } from "@ac/web/lib/partnerOverview";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
@@ -136,5 +136,17 @@ describe("partner schedule", () => {
     expect([week[0].sub, week[0].cells]).toEqual(["Dalaman, Luaran, Elektrik · 0 j tersedia", [{ kind: "leave", text: "Cuti", sub: "cuti sakit" }]]);
     expect(assignRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { reason: "error.required" } }, "tech-external-a", ms)).toBe("Sebab: diperlukan (1–1000 aksara)");
     expect(assignRefusal({ code: "CONFLICT", messageKey: "errors.assignment_overlap", fieldErrors: {} }, "tech-external-a", ms)).toBe("Bertindih dengan jadual yang disahkan untuk tech-external-a — pilih juruteknik lain.");
+  });
+});
+
+// IR624: a former technician — access ended, or revoked by HQ — can take no job and stays out of the schedule's choice
+// and week; the job's current technician stays, so the form can name whom it replaces
+describe("the schedule's team", () => {
+  it("keeps the technicians who can still work, and the current one", () => {
+    const ended = { id: "m-e", userId: "u-e", displayName: "former", role: "technician", validUntil: "2026-09-20T00:00:00Z", qualifications: [] } as unknown as ApiMember;
+    const revoked = { id: "m-r", userId: "u-r", displayName: "revoked", role: "technician", revokedAt: "2026-09-19T00:00:00Z", qualifications: [] } as unknown as ApiMember;
+    const all = [...members, ended, revoked];
+    expect(scheduleTeam(all, NOW, null).map((m) => m.id)).toEqual(["m-a", "m-b", "m-c"]);
+    expect(scheduleTeam(all, NOW, "m-e").map((m) => m.id)).toEqual(["m-a", "m-b", "m-c", "m-e"]);
   });
 });

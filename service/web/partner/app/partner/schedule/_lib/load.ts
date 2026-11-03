@@ -11,7 +11,7 @@ import { i18nOf, showDay, showSpan, showTime, zonedParts } from "@ac/web/lib/i18
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { requiredFor, type ApiPartnerJobDetail } from "@ac/web/lib/partnerJobDetail";
 import { klDay, weekOf, type ApiCapacity, type ApiMember, type ApiPartnerJob, type Slot } from "@ac/web/lib/partnerOverview";
-import { candidates, formMode, SCHEDULE_STATUSES, scheduleRow, sortOf, SORTS, type ScheduleRow } from "@ac/web/lib/partnerSchedule";
+import { candidates, formMode, SCHEDULE_STATUSES, scheduleRow, scheduleTeam, sortOf, SORTS, type ScheduleRow } from "@ac/web/lib/partnerSchedule";
 
 type Page<T> = { items: T[]; total: number };
 const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => {
@@ -37,7 +37,8 @@ export async function loadSchedule(sp: { jobId?: string; sort?: string }) {
   const names = new Map(members.map((m) => [m.id, m.displayName]));
   const unitNames = new Map(units.map((u) => [u.id, u.displayName]));
   const rows = jobs.map((j) => scheduleRow(j, nowMs, unitNames, names, i)).filter((r): r is ScheduleRow => !!r);
-  const base = { now: now.toISOString(), sort, sorts: SORTS.map((s) => ({ id: s.id, text: t(s.text) })), rows, total: jobs.length, members, zone: display.timeZone, otherZone: display.timeZone !== KL };
+  // a job whose delegation has ended reads as history and is not listed: nothing to assign there (IR624)
+  const base = { now: now.toISOString(), sort, sorts: SORTS.map((s) => ({ id: s.id, text: t(s.text) })), rows, members, zone: display.timeZone, otherZone: display.timeZone !== KL };
   const picked = rows.find((r) => r.id === sp.jobId) ?? rows[0];
   if (!picked) return { ...base, selected: null, week: null };
   const job = await coreOp<ApiPartnerJobDetail>("jobs.get", { jobId: picked.id }).catch((e) => {
@@ -52,22 +53,23 @@ export async function loadSchedule(sp: { jobId?: string; sort?: string }) {
   const required = job.projection === "offer" ? job.requiredQualifications : requiredFor(unit?.serviceScope ?? []);
   const week = weekOf(slot?.startAt ?? now.toISOString());
   const dates = [0, 1, 2, 3, 4, 5, 6].map((n) => plusDays(week.from, n));
-  const technicians = members.filter((m) => m.role === "technician");
+  const currentId = job.projection === "detail" ? job.assignment?.technicianMembershipId ?? null : null;
+  const technicians = scheduleTeam(members, nowMs, currentId); // the choice and the week leave former technicians out (IR624)
   const [capacity, eligible, booked] = await Promise.all([
     Promise.all(dates.map((date) => optional(coreOp<Page<ApiCapacity>>("members.capacity", { date, query: { limit: 100 } }).then((r) => r.items), []))),
     slot && mode.kind !== "blocked" ? optional(coreOp<Page<ApiMember>>("members.eligible", { jobId: picked.id, startAt: slot.startAt, endAt: slot.endAt, query: { limit: 100 } }).then((r) => r.items.map((m) => m.id)), []) : Promise.resolve([] as string[]),
     Promise.all(technicians.map((t) => optional(coreOp<Page<ApiPartnerJob>>("jobs.list", { filters: { membershipId: t.id }, limit: 100 }), { items: [], total: 0 }).then((r) => [t.id, r.items.flatMap((j) => (j.projection === "summary" && j.scheduledSlot && j.status !== "completed" && j.status !== "cancelled" ? [{ short: j.id.slice(0, 8), slot: j.scheduledSlot }] : [])) /* completion released them (IR234) */] as const))),
   ]);
-  const currentId = job.projection === "detail" ? job.assignment?.technicianMembershipId ?? null : null;
   const day = slot ? capacity[dates.indexOf(klDate(slot.startAt))] ?? [] : [];
   const alternative = job.projection === "detail" ? job.assignment?.alternativeSlot ?? null : null;
   const local = (iso: string) => { const p = zonedParts(iso, display.timeZone); return `${p.date}T${p.time}`; }; // datetime-local in the display zone
   return {
     ...base,
+    members: technicians, // the week's rows (IR624)
     selected: {
       id: picked.id, short: picked.short, label, version: job.projection === "detail" ? job.version : job.jobVersion, mode, currentId,
       ack: job.projection === "detail" && job.assignment ? { status: job.assignment.acknowledgement, reason: job.assignment.cantMakeReason, alternative } : null,
-      window: picked.window, required, candidates: slot ? candidates(members, new Set(eligible), required, slot, day, currentId, t) : [],
+      window: picked.window, required, candidates: slot ? candidates(technicians, new Set(eligible), required, slot, day, currentId, t) : [],
       text: {
         window: picked.window ? showSpan(picked.window.from, picked.window.until, display) : null,
         slot: slot ? showSpan(slot.startAt, slot.endAt, display) : null, start: slot ? showTime(slot.startAt, display) : null,

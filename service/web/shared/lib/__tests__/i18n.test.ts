@@ -72,6 +72,11 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
     expect(texts.filter((text) => coded.test(text))).toEqual([]);
   });
 
+  // IR624: the apps speak English and Malay; a Japanese term of the specification ("受領") once reached the partner's schedule
+  it("shows no Japanese term in a text the apps translate", () => {
+    expect(Object.keys(ms).filter((text) => /[\u3040-\u30ff\u4e00-\u9fff]/.test(text))).toEqual([]);
+  });
+
   it("names every sidebar item and the role words of the four apps in Malay", () => {
     for (const cfg of Object.values(ROLES)) {
       for (const item of cfg.nav.filter((i) => i.label !== "MRV")) expect(ms[item.label], item.label).toBeTruthy();

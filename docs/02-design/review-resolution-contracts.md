@@ -8743,3 +8743,19 @@ Found in the UX loop (UX-41, the customer's alert policies). customer-a created 
      - The save focused the new policy.
      - Attaching it read in words; the focus went back to Attach policy.
      - Delete named Bedroom AC and focused "Keep policy"; after the delete the focus was on the list.
+
+## IR624 The schedule offers only technicians who can still work, and speaks no Japanese — 2026-11-03
+
+Found in the UX loop (UX-42, the contractor's Schedule & assignments). contractor-a assigned tech-external-a to a job it had accepted for Living room AC: a temporary job and offer, with the visit tomorrow, removed afterwards.
+
+1. **Former technicians in the choice.** "Technician (own company, active, qualified)" listed 44 people. 41 were former technicians whose access had ended or was revoked by HQ (here, accounts left by the e2e suites), each disabled with "no qualifications · no hours". The team's week repeated all 44 rows. At 1280 the page was 5,500 px tall, Confirm assignment sat far below, and the loader read the jobs of all 44 people. IR575 had kept former technicians off the overview, but not this screen. The choice, the week and the per-technician job reads now take `scheduleTeam`: the technicians `onTeam` keeps, plus the job's current technician, so the form can still name whom it replaces.
+2. **"Showing 1 of 2".** The accepted jobs said "Showing 1 of 2" with no way to see the other one. Since IR494 every open job is loaded, so the gap was only a job whose delegation had ended. Such a job is a history snapshot with nothing to assign, so the line is gone.
+3. **Japanese in the English and Malay texts.** The assignment notes said "The technician must accept (受領)" and "Waiting for the current technician to accept (受領).", the specification's Japanese term. They now say "accept the assignment". The Malay texts use "penugasan", as the other assignment texts do. A guard rejects Japanese characters in any text the apps translate.
+4. **Design.** DD-P03 says the same. Figma is unchanged: the screen shows fewer rows and no other change.
+5. **Tests.**
+   - `partnerSchedule.test.ts`: `scheduleTeam` drops ended and revoked technicians and keeps the current one.
+   - `i18n.test.ts`: no Japanese characters in translated texts.
+   - On the development stack:
+     - Three candidates and three week rows remained, and the 1920 page fit one screen.
+     - Confirm assignment gave "Assigned · tech-external-a · awaiting acceptance", and the focus stayed on the button (IR622).
+     - axe passed, with no sideways scroll at 1920 or 1280.
