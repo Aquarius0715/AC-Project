@@ -13,6 +13,21 @@ service/.cover/
 service/api/coverage.out
 service/api/.cover/
 service/api/.test-all/
+# the binaries `go build ./cmd/<name>/` (one package) leaves in service/api; three were committed by mistake in 8d3080a0
+service/api/billing-api
+service/api/devicesim
+service/api/energy-api
+service/api/equipment-api
+service/api/gateway
+service/api/identity-api
+service/api/iotbridge
+service/api/maintenance-api
+service/api/migrate
+service/api/mockhistory
+service/api/ops
+service/api/restdoc
+service/api/seed
+service/api/worker
 
 # Playwright end-to-end runs (service/web/e2e, IR252): signed-in browser state and run output
 service/web/e2e/.auth/
