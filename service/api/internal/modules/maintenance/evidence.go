@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
 
@@ -95,7 +96,7 @@ func (m Files) list(
 ) (paging.Page[EvidenceAttachment], error) {
 	err := paging.NoFilters(in.Query, "query.filters")
 	if err != nil {
-		return paging.Page[EvidenceAttachment]{}, err
+		return paging.Page[EvidenceAttachment]{}, apperr.Wrap(err, "paging.NoFilters")
 	}
 
 	rows, err := c.Tx.Query(
@@ -111,7 +112,7 @@ func (m Files) list(
 		in.To,
 	)
 	if err != nil {
-		return paging.Page[EvidenceAttachment]{}, err
+		return paging.Page[EvidenceAttachment]{}, apperr.Wrap(err, "select maintenance.attachments")
 	}
 
 	all := []EvidenceAttachment{}
@@ -136,7 +137,10 @@ func (m Files) list(
 		if err != nil {
 			rows.Close()
 
-			return paging.Page[EvidenceAttachment]{}, err
+			return paging.Page[EvidenceAttachment]{}, apperr.Wrap(
+				err,
+				"select maintenance.attachments",
+			)
 		}
 
 		a.Version, a.BlobID = 1, a.ID
@@ -147,7 +151,10 @@ func (m Files) list(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return paging.Page[EvidenceAttachment]{}, rowsErr
+		return paging.Page[EvidenceAttachment]{}, apperr.Wrap(
+			rowsErr,
+			"select maintenance.attachments",
+		)
 	}
 
 	sort := in.Query.Sort
@@ -163,7 +170,7 @@ func (m Files) list(
 		},
 	})
 	if sortSliceErr != nil {
-		return paging.Page[EvidenceAttachment]{}, sortSliceErr
+		return paging.Page[EvidenceAttachment]{}, apperr.Wrap(sortSliceErr, "paging.SortSlice")
 	}
 
 	w, err := paging.Resolve(in.Query, struct {
@@ -171,7 +178,7 @@ func (m Files) list(
 		F, T time.Time
 	}{in.UnitIDs, in.From, in.To}, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[EvidenceAttachment]{}, err
+		return paging.Page[EvidenceAttachment]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	items := []EvidenceAttachment{}

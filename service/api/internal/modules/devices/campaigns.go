@@ -100,7 +100,7 @@ func scanCampaign(r pgx.Row) (Campaign, error) {
 		err = json.Unmarshal(waves, &x.Waves)
 	}
 
-	return x, err
+	return x, apperr.Wrap(err, "json.Unmarshal")
 }
 
 func campaignDetail(ctx context.Context, c *ops.Call, id uuid.UUID) (Campaign, error) {
@@ -131,7 +131,7 @@ func campaignDetail(ctx context.Context, c *ops.Call, id uuid.UUID) (Campaign, e
 		id,
 	)
 	if err != nil {
-		return x, err
+		return x, apperr.Wrap(err, "select devices.firmware_campaign_devices")
 	}
 	defer rows.Close()
 
@@ -147,7 +147,7 @@ func campaignDetail(ctx context.Context, c *ops.Call, id uuid.UUID) (Campaign, e
 			&r.At,
 		)
 		if err != nil {
-			return x, err
+			return x, apperr.Wrap(err, "select devices.firmware_campaign_devices")
 		}
 
 		x.Results = append(x.Results, r)
@@ -155,7 +155,7 @@ func campaignDetail(ctx context.Context, c *ops.Call, id uuid.UUID) (Campaign, e
 		x.Progress[r.Status]++
 	}
 
-	return x, rows.Err()
+	return x, apperr.Wrap(rows.Err(), "select devices.firmware_campaign_devices")
 }
 
 // campaignsList serves firmwareCampaigns.list.
@@ -218,12 +218,12 @@ func campaignsList(
 		"created_at DESC, id ASC",
 	)
 	if err != nil {
-		return paging.Page[Campaign]{}, err
+		return paging.Page[Campaign]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[Campaign]{}, err
+		return paging.Page[Campaign]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	conds, args := []string{"TRUE"}, []any{}
@@ -253,7 +253,7 @@ func campaignsList(
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM devices.firmware_campaigns WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
-		return paging.Page[Campaign]{}, scanErr
+		return paging.Page[Campaign]{}, apperr.Wrap(scanErr, "select devices.firmware_campaigns")
 	}
 
 	rows, err := c.Tx.Query(
@@ -267,7 +267,7 @@ func campaignsList(
 		),
 		args...)
 	if err != nil {
-		return paging.Page[Campaign]{}, err
+		return paging.Page[Campaign]{}, apperr.Wrap(err, "select devices.firmware_campaigns")
 	}
 
 	var ids []uuid.UUID
@@ -279,7 +279,7 @@ func campaignsList(
 		if err != nil {
 			rows.Close()
 
-			return paging.Page[Campaign]{}, err
+			return paging.Page[Campaign]{}, apperr.Wrap(err, "select devices.firmware_campaigns")
 		}
 
 		ids = append(ids, id)
@@ -289,7 +289,7 @@ func campaignsList(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return paging.Page[Campaign]{}, rowsErr
+		return paging.Page[Campaign]{}, apperr.Wrap(rowsErr, "select devices.firmware_campaigns")
 	}
 
 	items := []Campaign{}
@@ -457,7 +457,7 @@ func (m *Module) campaignsSchedule(
 	}
 
 	if err != nil {
-		return Campaign{}, err
+		return Campaign{}, apperr.Wrap(err, "select devices.capabilities")
 	}
 
 	if !slices.Contains(candidates, in.TargetVersion) {
@@ -473,7 +473,7 @@ func (m *Module) campaignsSchedule(
 		in.DeviceIDs,
 	)
 	if err != nil {
-		return Campaign{}, err
+		return Campaign{}, apperr.Wrap(err, "select devices.devices")
 	}
 
 	type dv struct {
@@ -493,7 +493,7 @@ func (m *Module) campaignsSchedule(
 		if err != nil {
 			rows.Close()
 
-			return Campaign{}, err
+			return Campaign{}, apperr.Wrap(err, "select devices.devices")
 		}
 
 		found[id] = x
@@ -503,7 +503,7 @@ func (m *Module) campaignsSchedule(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return Campaign{}, rowsErr
+		return Campaign{}, apperr.Wrap(rowsErr, "select devices.devices")
 	}
 
 	from := []string{}
@@ -528,7 +528,7 @@ func (m *Module) campaignsSchedule(
 
 		u, ok, err := m.Units.UnitInfo(ctx, c, x.unit)
 		if err != nil {
-			return Campaign{}, err
+			return Campaign{}, apperr.Wrap(err, "devices.Units.UnitInfo")
 		}
 
 		if !ok || u.ModelID != in.ModelID {
@@ -566,7 +566,7 @@ func (m *Module) campaignsSchedule(
 		c.Principal.MembershipID,
 	)
 	if execErr != nil {
-		return Campaign{}, execErr
+		return Campaign{}, apperr.Wrap(execErr, "insert devices.firmware_campaigns")
 	}
 
 	for i, d := range in.DeviceIDs {
@@ -579,7 +579,7 @@ func (m *Module) campaignsSchedule(
 			waveOf(i, len(in.DeviceIDs), in.Waves),
 		)
 		if err != nil {
-			return Campaign{}, err
+			return Campaign{}, apperr.Wrap(err, "insert devices.firmware_campaign_devices")
 		}
 	}
 
@@ -690,7 +690,7 @@ func campaignsControl(ctx context.Context, c *ops.Call, in *ControlInput) (Campa
 	}
 
 	if err != nil {
-		return Campaign{}, err
+		return Campaign{}, apperr.Wrap(err, "select devices.firmware_campaigns")
 	}
 
 	if v != *c.ExpectedVersion {
@@ -716,7 +716,7 @@ func campaignsControl(ctx context.Context, c *ops.Call, in *ControlInput) (Campa
 			*in.DeviceID,
 		)
 		if err != nil {
-			return Campaign{}, err
+			return Campaign{}, apperr.Wrap(err, "update devices.firmware_campaign_devices")
 		}
 
 		if tag.RowsAffected() == 0 {
@@ -750,7 +750,7 @@ func campaignsControl(ctx context.Context, c *ops.Call, in *ControlInput) (Campa
 		WHERE id = $1 RETURNING version`, in.CampaignID, next, reason).
 		Scan(&v)
 	if scanErr != nil {
-		return Campaign{}, scanErr
+		return Campaign{}, apperr.Wrap(scanErr, "update devices.firmware_campaigns")
 	}
 
 	r := ""

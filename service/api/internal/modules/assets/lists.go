@@ -46,12 +46,12 @@ func list[T any](
 ) (paging.Page[T], error) {
 	order, err := paging.OrderBy(in.Sort, listSort, "id ASC")
 	if err != nil {
-		return paging.Page[T]{}, err
+		return paging.Page[T]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[T]{}, err
+		return paging.Page[T]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	where := strings.Join(conds, " AND ")
@@ -61,7 +61,7 @@ func list[T any](
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM "+table+" WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
-		return paging.Page[T]{}, scanErr
+		return paging.Page[T]{}, apperr.Wrap(scanErr, "select count")
 	}
 
 	rows, err := c.Tx.Query(
@@ -77,7 +77,7 @@ func list[T any](
 		),
 		args...)
 	if err != nil {
-		return paging.Page[T]{}, err
+		return paging.Page[T]{}, apperr.Wrap(err, "select (list)")
 	}
 	defer rows.Close()
 
@@ -94,7 +94,7 @@ func list[T any](
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return paging.Page[T]{}, rowsErr
+		return paging.Page[T]{}, apperr.Wrap(rowsErr, "select (list)")
 	}
 
 	return paging.Page[T]{
@@ -148,7 +148,7 @@ func scanCustomer(r pgx.Row) (Customer, error) {
 		&x.ServiceProfile,
 	)
 
-	return x, err
+	return x, apperr.Wrap(err, "scan (scanCustomer)")
 }
 
 var profiles = map[string]bool{"rto": true, "general": true, "energy": true, "environment": true}
@@ -353,7 +353,7 @@ func (m *Module) customersSave(
 			archived)`, in.OrganizationID).
 			Scan(&units)
 		if err != nil {
-			return Customer{}, err
+			return Customer{}, apperr.Wrap(err, "select assets.units")
 		}
 
 		if units {
@@ -363,7 +363,7 @@ func (m *Module) customersSave(
 		for _, a := range m.OrgActive {
 			busy, err := a.OrgActive(ctx, c, in.OrganizationID)
 			if err != nil {
-				return Customer{}, err
+				return Customer{}, apperr.Wrap(err, "assets.OrgActivity.OrgActive")
 			}
 
 			if busy {
@@ -658,7 +658,7 @@ func (m *Module) locationsRename(ctx context.Context, c *ops.Call, in *RenameInp
 		")", visArgs...).
 		Scan(&visible)
 	if scanErr != nil {
-		return nil, scanErr
+		return nil, apperr.Wrap(scanErr, "select exists")
 	}
 
 	if !visible {
@@ -670,7 +670,7 @@ func (m *Module) locationsRename(ctx context.Context, c *ops.Call, in *RenameInp
 	scanErr = c.Tx.QueryRow(ctx, "SELECT EXISTS ("+siblings+")", in.Target.ID, name).
 		Scan(&dup)
 	if scanErr != nil {
-		return nil, scanErr
+		return nil, apperr.Wrap(scanErr, "select exists")
 	}
 
 	if dup {
@@ -687,7 +687,7 @@ func (m *Module) locationsRename(ctx context.Context, c *ops.Call, in *RenameInp
 	}
 
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "update (locationsRename)")
 	}
 
 	typ := "LocationChanged"

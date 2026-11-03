@@ -137,7 +137,7 @@ func TestIdempotencyLifecycle(t *testing.T) {
 			key,
 		)
 
-		return err
+		return apperr.Wrap(err, "update platform.idempotency_keys")
 	})
 	if runErr != nil {
 		t.Fatal(runErr)
@@ -240,7 +240,7 @@ func TestRecorderAndRLS(t *testing.T) {
 			agg.String(),
 		)
 
-		return err
+		return apperr.Wrap(err, "insert audit.audit_log")
 	})
 	if runErr != nil {
 		t.Fatal(runErr)
@@ -270,7 +270,7 @@ func TestRecorderAndRLS(t *testing.T) {
 	err := m.Run(ctx, true, p, func(tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, `INSERT INTO platform.tenants (name) VALUES ('x')`)
 
-		return err
+		return apperr.Wrap(err, "insert platform.tenants")
 	})
 	if apperr.From(err).Code != apperr.Unavailable {
 		t.Fatalf("read-only write: %v", err)
@@ -303,7 +303,7 @@ func TestRecorderAndRLS(t *testing.T) {
 			agg.String(),
 		)
 
-		return err
+		return apperr.Wrap(err, "update audit.audit_log")
 	})
 	if err == nil {
 		t.Fatal("audit update must fail")

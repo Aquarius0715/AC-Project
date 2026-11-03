@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // QueryRequestedCommands lists the commands waiting to be sent to a device (requested, not yet delivered, not expired).
@@ -55,7 +56,7 @@ func requested(ctx context.Context, c *ops.Call, in *RequestedInput) ([]Requeste
 		in.Limit,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select control.commands")
 	}
 	defer rows.Close()
 
@@ -69,12 +70,12 @@ func requested(ctx context.Context, c *ops.Call, in *RequestedInput) ([]Requeste
 
 		err := rows.Scan(&x.ID, &x.DeviceID, &x.UnitID, &action, &x.ExpiresAt)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select control.commands")
 		}
 
 		x.Action = action
 		out = append(out, x)
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select control.commands")
 }

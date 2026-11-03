@@ -366,3 +366,29 @@ func TestFieldsAndError(t *testing.T) {
 		t.Fatal(e.Error())
 	}
 }
+
+func TestWrap(t *testing.T) {
+	if Wrap(nil, "select assets.units") != nil {
+		t.Fatal("a nil error stays nil")
+	}
+
+	err := Wrap(pgx.ErrNoRows, "select assets.units")
+	if err.Error() != "select assets.units: no rows in result set" {
+		t.Fatalf("the context comes first: %q", err.Error())
+	}
+
+	if !errors.Is(err, pgx.ErrNoRows) || From(err).Code != NotFound {
+		t.Fatal("the wrapped error is still found inside")
+	}
+
+	de := E(Conflict, "error.versionConflict")
+
+	got := From(Wrap(Wrap(de, "jobs.save"), "transaction"))
+	if got != de {
+		t.Fatalf("From returns the DomainError itself through any number of wraps: %v", got)
+	}
+
+	if From(Wrap(context.DeadlineExceeded, "tx.Exec")).Code != Timeout {
+		t.Fatal("a wrapped deadline is still a timeout")
+	}
+}

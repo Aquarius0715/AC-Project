@@ -403,7 +403,7 @@ func ownerValid(
 
 	ids, err := identity.Members(ctx, c, f)
 
-	return len(ids) == 1, err
+	return len(ids) == 1, apperr.Wrap(err, "identity.Members")
 }
 
 func (m Automations) candidates(
@@ -422,7 +422,7 @@ func (m Automations) candidates(
 		unit,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select control.automation_policies")
 	}
 
 	for rows.Next() {
@@ -451,7 +451,7 @@ func (m Automations) candidates(
 		if err != nil {
 			rows.Close()
 
-			return nil, err
+			return nil, apperr.Wrap(err, "select control.automation_policies")
 		}
 
 		if in.Phase == "condition" {
@@ -469,7 +469,7 @@ func (m Automations) candidates(
 		unit,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select control.automations")
 	}
 	defer rows.Close()
 
@@ -502,7 +502,7 @@ func (m Automations) candidates(
 			&x.tz,
 		)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select control.automations")
 		}
 
 		var d definition
@@ -538,7 +538,7 @@ func (m Automations) candidates(
 		out = append(out, x)
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select control.automations")
 }
 
 // decide arbitrates one unit (D02): candidates in HQ-policy then customer order, priority desc, ID asc; the first
@@ -570,7 +570,7 @@ func (m Automations) decide(
 
 	t, found, err := m.Units.Target(ctx, c, unit)
 	if err != nil {
-		return Decision{}, nil, nil, err
+		return Decision{}, nil, nil, apperr.Wrap(err, "control.Units.Target")
 	}
 
 	if in.Phase == "schedule_end" &&
@@ -649,7 +649,7 @@ func (m Automations) decide(
 		if reason == "" && cond.Type == "location" {
 			granted, err := identity.ConsentGranted(ctx, c, x.owner, "location_automation")
 			if err != nil {
-				return Decision{}, nil, nil, err
+				return Decision{}, nil, nil, apperr.Wrap(err, "identity.ConsentGranted")
 			}
 
 			if !granted {
@@ -665,7 +665,7 @@ func (m Automations) decide(
 			default:
 				policy, err := m.Cmd.Restrictions.UnitPolicy(ctx, c, unit)
 				if err != nil {
-					return Decision{}, nil, nil, err
+					return Decision{}, nil, nil, apperr.Wrap(err, "control.Restrictions.UnitPolicy")
 				}
 
 				if !Allowed(a, policy) {
@@ -772,7 +772,7 @@ func (m Automations) targets(ctx context.Context, c *ops.Call, in *EvaluationInp
 	for _, u := range in.UnitIDs {
 		t, found, err := m.Units.Target(ctx, c, u)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "control.Units.Target")
 		}
 
 		if !found || (c.Principal.Role == "client" && t.OrgID != c.Principal.OrgID) {
@@ -830,7 +830,7 @@ func (m Automations) evaluate(
 					in.OccurredAt,
 				)
 				if err != nil {
-					return Result{}, err
+					return Result{}, apperr.Wrap(err, "insert control.automation_runs")
 				}
 			}
 		}
@@ -846,7 +846,7 @@ func (m Automations) evaluate(
 			case err == nil: // this trigger already ran for the rule and unit
 				d.Decision, d.CommandID = "requested", &earlier
 			case !errors.Is(err, pgx.ErrNoRows):
-				return Result{}, err
+				return Result{}, apperr.Wrap(err, "select control.automation_runs")
 			default:
 				id, err := m.automationCommand(ctx, c, u, win, in)
 				if err != nil {
@@ -871,7 +871,7 @@ func (m Automations) evaluate(
 					in.OccurredAt,
 				)
 				if execErr != nil {
-					return Result{}, execErr
+					return Result{}, apperr.Wrap(execErr, "insert control.automation_runs")
 				}
 			}
 		}
@@ -882,7 +882,7 @@ func (m Automations) evaluate(
 
 			ns, err := m.Notifier.Evaluate(ctx, c, u, factsJSON, in.OccurredAt, in.EventID, fire)
 			if err != nil {
-				return Result{}, err
+				return Result{}, apperr.Wrap(err, "control.Notifier.Evaluate")
 			}
 
 			matched := false
@@ -946,7 +946,7 @@ func (m Automations) automationCommand(
 		)
 	}
 
-	return id, err
+	return id, apperr.Wrap(err, "insert control.commands")
 }
 
 func checkTick(c *ops.Call, in *EvaluationInput) error {
@@ -1058,7 +1058,7 @@ func (m Automations) fire(ctx context.Context, c *ops.Call, in *EvaluationInput)
 	}
 
 	if !errors.Is(err, pgx.ErrNoRows) {
-		return Result{}, err
+		return Result{}, apperr.Wrap(err, "select control.evaluation_events")
 	}
 
 	checkTickErr := checkTick(c, in)
@@ -1086,7 +1086,7 @@ func (m Automations) fire(ctx context.Context, c *ops.Call, in *EvaluationInput)
 	}
 
 	if !errors.Is(err, pgx.ErrNoRows) {
-		return Result{}, err
+		return Result{}, apperr.Wrap(err, "select control.evaluation_events")
 	}
 
 	r, err := m.evaluate(ctx, c, in, true, true)
@@ -1107,7 +1107,7 @@ func (m Automations) fire(ctx context.Context, c *ops.Call, in *EvaluationInput)
 		raw,
 	)
 	if execErr != nil {
-		return r, execErr
+		return r, apperr.Wrap(execErr, "insert control.evaluation_events")
 	}
 
 	c.Audit(
@@ -1155,7 +1155,7 @@ func (m Automations) Notify(
 	for _, u := range units {
 		ns, err := m.Notifier.Evaluate(ctx, c, u, facts, in.OccurredAt, in.EventID, true)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "control.Notifier.Evaluate")
 		}
 
 		out = append(out, ns...)

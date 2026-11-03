@@ -82,7 +82,7 @@ func scanMember(r pgx.Row) (Member, error) {
 		&x.DisplayName,
 	)
 
-	return x, err
+	return x, apperr.Wrap(err, "scan (scanMember)")
 }
 
 // QueryLoadMembers completes members for other domains (IR194: maintenance's technician lists).
@@ -102,7 +102,7 @@ func LoadMembers(ctx context.Context, c *ops.Call, ms []Member) error {
 
 	out, err := ops.Delegate(ctx, c, QueryLoadMembers, LoadMembersInput{Members: ms}, loadMembers)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "delegate identity.loadMembers")
 	}
 
 	copy(ms, out)
@@ -118,7 +118,7 @@ func loadMembers(ctx context.Context, c *ops.Call, in *LoadMembersInput) ([]Memb
 				'')`, ms[i].UserID).
 				Scan(&ms[i].DisplayName)
 			if err != nil {
-				return nil, err
+				return nil, apperr.Wrap(err, "select identity.users")
 			}
 		}
 	}
@@ -150,7 +150,7 @@ func fillMembers(ctx context.Context, c *ops.Call, ms []Member) error {
 	each := func(sql string, scans []any, add func(x *Member)) error {
 		rows, err := c.Tx.Query(ctx, sql, ids)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "query (fillMembers)")
 		}
 
 		_, err = pgx.ForEachRow(rows, append([]any{&id}, scans...), func() error {
@@ -161,7 +161,7 @@ func fillMembers(ctx context.Context, c *ops.Call, ms []Member) error {
 			return nil
 		})
 
-		return err
+		return apperr.Wrap(err, "query (fillMembers)")
 	}
 
 	if c.Principal.Role != "contractor" {
@@ -274,12 +274,12 @@ func membersList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 		"m.id ASC",
 	)
 	if err != nil {
-		return paging.Page[Member]{}, err
+		return paging.Page[Member]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[Member]{}, err
+		return paging.Page[Member]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	var args []any
@@ -332,7 +332,7 @@ func membersList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM identity.memberships m WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
-		return paging.Page[Member]{}, scanErr
+		return paging.Page[Member]{}, apperr.Wrap(scanErr, "select identity.memberships")
 	}
 
 	rows, err := c.Tx.Query(
@@ -347,7 +347,7 @@ func membersList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 		),
 		args...)
 	if err != nil {
-		return paging.Page[Member]{}, err
+		return paging.Page[Member]{}, apperr.Wrap(err, "select identity.memberships")
 	}
 
 	items := []Member{}
@@ -367,7 +367,7 @@ func membersList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return paging.Page[Member]{}, rowsErr
+		return paging.Page[Member]{}, apperr.Wrap(rowsErr, "select identity.memberships")
 	}
 
 	loadMembersErr := LoadMembers(ctx, c, items)
@@ -580,7 +580,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 	scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.users WHERE id = $1)`, in.UserID).
 		Scan(&exists)
 	if scanErr != nil {
-		return Member{}, scanErr
+		return Member{}, apperr.Wrap(scanErr, "select identity.users")
 	}
 
 	var kind string
@@ -592,7 +592,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 	}
 
 	if err != nil {
-		return Member{}, err
+		return Member{}, apperr.Wrap(err, "select identity.organizations")
 	}
 
 	want := map[string]string{"admin": "operator", "client": "customer", "contractor": "contractor"}[in.Role]
@@ -628,7 +628,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		}
 
 		if err != nil {
-			return Member{}, err
+			return Member{}, apperr.Wrap(err, "select notify.ref_units")
 		}
 
 		if !ok {
@@ -648,7 +648,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 					permission = $2)`, *in.ID, p).
 					Scan(&had)
 				if err != nil {
-					return Member{}, err
+					return Member{}, apperr.Wrap(err, "select identity.membership_permissions")
 				}
 			}
 
@@ -681,7 +681,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 			in.UserID, in.OrganizationID, in.Role, in.Employment, clientRole, in.ValidFrom, in.ValidUntil, c.Now).
 			Scan(&id)
 		if err != nil {
-			return Member{}, err
+			return Member{}, apperr.Wrap(err, "insert identity.memberships")
 		}
 		// an existing person whose memberships here have all ended signs in with this one from now on (IR462); one
 		// whose sign-in belongs to another tenant keeps it
@@ -694,7 +694,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 				FROM identity.users u WHERE u.id = $1`, in.UserID, id, c.Now).
 				Scan(&account)
 			if err != nil {
-				return Member{}, err
+				return Member{}, apperr.Wrap(err, "select identity.users")
 			}
 		}
 
@@ -711,7 +711,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 				id,
 			)
 			if err != nil {
-				return Member{}, err
+				return Member{}, apperr.Wrap(err, "insert identity.consents")
 			}
 			// IR144: the customer's user list includes the new member, listed as not signed in yet when the person was
 			// created with it (IR461); an address already on the list keeps its row
@@ -731,7 +731,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 				listed,
 			)
 			if err != nil {
-				return Member{}, err
+				return Member{}, apperr.Wrap(err, "insert identity.client_users")
 			}
 		}
 		// FR-P11: the contractor company's user list includes the new account, listed as not signed in yet when the
@@ -753,7 +753,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 				listed,
 			)
 			if err != nil {
-				return Member{}, err
+				return Member{}, apperr.Wrap(err, "insert identity.partner_users")
 			}
 		}
 	} else {
@@ -790,7 +790,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 				c.Principal.TenantID,
 			)
 			if err != nil {
-				return Member{}, err
+				return Member{}, apperr.Wrap(err, "select pg_advisory_xact_lock")
 			}
 
 			var (
@@ -802,7 +802,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 				permission = 'identity.write')`, x.ID).
 				Scan(&holds)
 			if err != nil {
-				return Member{}, err
+				return Member{}, apperr.Wrap(err, "select identity.membership_permissions")
 			}
 
 			err = c.Tx.QueryRow(ctx, `SELECT count(*) FROM identity.memberships m JOIN identity.membership_permissions p ON
@@ -810,7 +810,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 				WHERE m.id <> $1 AND m.valid_from <= $2 AND (m.valid_until IS NULL OR m.valid_until > $2)`, x.ID, c.Now).
 				Scan(&others)
 			if err != nil {
-				return Member{}, err
+				return Member{}, apperr.Wrap(err, "select identity.memberships")
 			}
 
 			if holds && others == 0 {
@@ -828,7 +828,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 			OR EXISTS (SELECT 1 FROM identity.client_users WHERE membership_id = $1 AND status = 'disabled')`, x.ID).
 			Scan(&disabled)
 		if scanErr != nil {
-			return Member{}, scanErr
+			return Member{}, apperr.Wrap(scanErr, "select identity.partner_users")
 		}
 
 		if disabled && x.ValidUntil != nil && (until == nil || until.After(*x.ValidUntil)) {
@@ -841,7 +841,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 				c.Now,
 			)
 			if err != nil {
-				return Member{}, err
+				return Member{}, apperr.Wrap(err, "update identity.partner_users")
 			}
 
 			until = x.ValidUntil
@@ -875,7 +875,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 			revoked,
 		)
 		if execErr != nil {
-			return Member{}, execErr
+			return Member{}, apperr.Wrap(execErr, "update identity.memberships")
 		}
 
 		id, prev = x.ID, c.ExpectedVersion
@@ -918,7 +918,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		id,
 	)
 	if execErr != nil {
-		return Member{}, execErr
+		return Member{}, apperr.Wrap(execErr, "delete identity.membership_permissions")
 	}
 
 	for _, p := range in.Permissions {
@@ -930,7 +930,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 			p,
 		)
 		if err != nil {
-			return Member{}, err
+			return Member{}, apperr.Wrap(err, "insert identity.membership_permissions")
 		}
 	}
 
@@ -940,7 +940,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		id,
 	)
 	if execErr != nil {
-		return Member{}, execErr
+		return Member{}, apperr.Wrap(execErr, "delete identity.membership_scopes")
 	}
 
 	for _, sc := range in.Scopes {
@@ -954,7 +954,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 			sc.ID,
 		)
 		if err != nil {
-			return Member{}, err
+			return Member{}, apperr.Wrap(err, "insert identity.membership_scopes")
 		}
 	}
 
@@ -976,7 +976,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 				id,
 			)
 			if err != nil {
-				return Member{}, err
+				return Member{}, apperr.Wrap(err, "update identity.memberships")
 			}
 		}
 	}
@@ -1107,12 +1107,12 @@ func membersRevokeSessions(
 	}
 
 	if err != nil {
-		return SessionsRevoked{}, err
+		return SessionsRevoked{}, apperr.Wrap(err, "select identity.memberships")
 	}
 
 	requireErr := c.Require(authz.Facts{"client-membership": role == "client"})
 	if requireErr != nil {
-		return SessionsRevoked{}, requireErr
+		return SessionsRevoked{}, apperr.Wrap(requireErr, "ops.Call.Require")
 	}
 
 	at := wallClock()
@@ -1124,12 +1124,12 @@ func membersRevokeSessions(
 		at,
 	)
 	if err != nil {
-		return SessionsRevoked{}, err
+		return SessionsRevoked{}, apperr.Wrap(err, "update identity.memberships")
 	}
 
 	ids, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 	if err != nil {
-		return SessionsRevoked{}, err
+		return SessionsRevoked{}, apperr.Wrap(err, "update identity.memberships")
 	}
 
 	slices.SortFunc(

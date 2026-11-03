@@ -116,7 +116,7 @@ func scanStatement(r pgx.Row) (Statement, error) {
 		&x.PaidAt,
 	)
 
-	return x, err
+	return x, apperr.Wrap(err, "scan (scanStatement)")
 }
 
 func (m Payouts) fill(ctx context.Context, c *ops.Call, x *Statement) error {
@@ -127,7 +127,7 @@ func (m Payouts) fill(ctx context.Context, c *ops.Call, x *Statement) error {
 		x.ID,
 	)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select billing.payout_lines")
 	}
 
 	x.Lines = []PayoutLine{}
@@ -147,7 +147,7 @@ func (m Payouts) fill(ctx context.Context, c *ops.Call, x *Statement) error {
 		if err != nil {
 			rows.Close()
 
-			return err
+			return apperr.Wrap(err, "select billing.payout_lines")
 		}
 
 		x.Lines = append(x.Lines, l)
@@ -162,7 +162,7 @@ func (m Payouts) fill(ctx context.Context, c *ops.Call, x *Statement) error {
 		x.ID,
 	)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select billing.payout_queries")
 	}
 	defer rows.Close()
 
@@ -181,13 +181,13 @@ func (m Payouts) fill(ctx context.Context, c *ops.Call, x *Statement) error {
 			&q.AdjustmentMinor,
 		)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "select billing.payout_queries")
 		}
 
 		x.Queries = append(x.Queries, q)
 	}
 
-	return rows.Err()
+	return apperr.Wrap(rows.Err(), "select billing.payout_queries")
 }
 
 // load reads a statement; contractors see only their own approved/paid statements.
@@ -225,7 +225,7 @@ type GenerateInput struct {
 func periodBounds(p string) (time.Time, time.Time, error) {
 	start, err := time.ParseInLocation("2006-01", p, kualaLumpur)
 	if err != nil {
-		return start, start, err
+		return start, start, apperr.Wrap(err, "time.ParseInLocation")
 	}
 
 	return start, start.AddDate(0, 1, 0), nil
@@ -278,7 +278,7 @@ func (m Payouts) generate(
 
 	jobs, err := m.Source.AcceptedJobs(ctx, c, from, to)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "billing.PayoutSource.AcceptedJobs")
 	}
 
 	type acc struct {
@@ -303,7 +303,7 @@ func (m Payouts) generate(
 
 		rates, currency, found, err := m.Source.RateAt(ctx, c, j.ContractorOrgID, j.AcceptedAt)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "billing.PayoutSource.RateAt")
 		}
 
 		work := "repair_base"
@@ -349,7 +349,7 @@ func (m Payouts) generate(
 		WHERE applied_statement_id IN (SELECT id FROM billing.payout_statements WHERE period = $1 AND status =
 		'draft')`, in.Period)
 	if execErr != nil {
-		return nil, execErr
+		return nil, apperr.Wrap(execErr, "update billing.payout_queries")
 	}
 	// adjustments of answered questions not yet applied (from earlier periods)
 	rows, err := c.Tx.Query(
@@ -361,7 +361,7 @@ func (m Payouts) generate(
 		in.Period,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select billing.payout_queries")
 	}
 
 	type adj struct {
@@ -381,7 +381,7 @@ func (m Payouts) generate(
 		if err != nil {
 			rows.Close()
 
-			return nil, err
+			return nil, apperr.Wrap(err, "select billing.payout_queries")
 		}
 
 		if job != nil {
@@ -395,7 +395,7 @@ func (m Payouts) generate(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return nil, rowsErr
+		return nil, apperr.Wrap(rowsErr, "select billing.payout_queries")
 	}
 
 	for _, a := range adjs {
@@ -427,7 +427,7 @@ func (m Payouts) generate(
 		}
 
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			return nil, err
+			return nil, apperr.Wrap(err, "select billing.payout_statements")
 		}
 
 		_, execErr := c.Tx.Exec(
@@ -437,7 +437,7 @@ func (m Payouts) generate(
 			in.Period,
 		)
 		if execErr != nil {
-			return nil, execErr
+			return nil, apperr.Wrap(execErr, "delete billing.payout_statements")
 		}
 
 		a := per[org]
@@ -463,7 +463,7 @@ func (m Payouts) generate(
 			id`, org, in.Period, a.currency, gross, ded, gross-ded, payDate, c.Now).
 			Scan(&sid)
 		if scanErr != nil {
-			return nil, scanErr
+			return nil, apperr.Wrap(scanErr, "insert billing.payout_statements")
 		}
 
 		for _, l := range a.lines {
@@ -482,7 +482,7 @@ func (m Payouts) generate(
 				l.Note,
 			)
 			if err != nil {
-				return nil, err
+				return nil, apperr.Wrap(err, "insert billing.payout_lines")
 			}
 		}
 
@@ -495,7 +495,7 @@ func (m Payouts) generate(
 					sid,
 				)
 				if err != nil {
-					return nil, err
+					return nil, apperr.Wrap(err, "update billing.payout_queries")
 				}
 			}
 		}
@@ -634,7 +634,7 @@ func (m Payouts) transition(
 	}
 
 	if err != nil {
-		return x, err
+		return x, apperr.Wrap(err, "update billing.payout_statements")
 	}
 
 	return m.finish(ctx, c, x.ID, "payouts.transition", reasonOf(in.Reason))
@@ -778,7 +778,7 @@ func (m Payouts) query(ctx context.Context, c *ops.Call, in *QueryInput) (Statem
 		c.Now,
 	)
 	if execErr != nil {
-		return x, execErr
+		return x, apperr.Wrap(execErr, "insert billing.payout_queries")
 	}
 
 	addJobNoteErr := m.Source.AddJobNote(
@@ -788,7 +788,7 @@ func (m Payouts) query(ctx context.Context, c *ops.Call, in *QueryInput) (Statem
 		fmt.Sprintf("Payout question (%s): %s", in.Topic, in.Message),
 	)
 	if addJobNoteErr != nil {
-		return x, addJobNoteErr
+		return x, apperr.Wrap(addJobNoteErr, "billing.PayoutSource.AddJobNote")
 	}
 
 	_, execErr = c.Tx.Exec(
@@ -798,7 +798,7 @@ func (m Payouts) query(ctx context.Context, c *ops.Call, in *QueryInput) (Statem
 		c.Now,
 	)
 	if execErr != nil {
-		return x, execErr
+		return x, apperr.Wrap(execErr, "update billing.payout_statements")
 	}
 
 	return m.finish(ctx, c, x.ID, "payouts.query", "")
@@ -882,7 +882,7 @@ func (m Payouts) resolve(ctx context.Context, c *ops.Call, in *ResolveInput) (St
 	}
 
 	if err != nil {
-		return x, err
+		return x, apperr.Wrap(err, "select billing.payout_queries")
 	}
 
 	if state != "open" {
@@ -906,14 +906,14 @@ func (m Payouts) resolve(ctx context.Context, c *ops.Call, in *ResolveInput) (St
 		c.Now,
 	)
 	if execErr != nil {
-		return x, execErr
+		return x, apperr.Wrap(execErr, "update billing.payout_queries")
 	}
 
 	for _, l := range x.Lines {
 		if line != nil && l.ID == *line {
 			err := m.Source.AddJobNote(ctx, c, l.JobID, "Payout reply: "+in.Reply)
 			if err != nil {
-				return x, err
+				return x, apperr.Wrap(err, "billing.PayoutSource.AddJobNote")
 			}
 		}
 	}
@@ -925,7 +925,7 @@ func (m Payouts) resolve(ctx context.Context, c *ops.Call, in *ResolveInput) (St
 		c.Now,
 	)
 	if execErr != nil {
-		return x, execErr
+		return x, apperr.Wrap(execErr, "update billing.payout_statements")
 	}
 
 	return m.finish(ctx, c, x.ID, "payouts.resolveQuery", in.Reply)
@@ -1037,12 +1037,12 @@ func (m Payouts) list(
 		"period DESC, contractor_org_id, id",
 	)
 	if err != nil {
-		return paging.Page[Statement]{}, err
+		return paging.Page[Statement]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[Statement]{}, err
+		return paging.Page[Statement]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	var args []any
@@ -1080,7 +1080,7 @@ func (m Payouts) list(
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM billing.payout_statements WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
-		return paging.Page[Statement]{}, scanErr
+		return paging.Page[Statement]{}, apperr.Wrap(scanErr, "select billing.payout_statements")
 	}
 
 	rows, err := c.Tx.Query(
@@ -1095,7 +1095,7 @@ func (m Payouts) list(
 		),
 		args...)
 	if err != nil {
-		return paging.Page[Statement]{}, err
+		return paging.Page[Statement]{}, apperr.Wrap(err, "select billing.payout_statements")
 	}
 
 	items := []Statement{}
@@ -1115,7 +1115,7 @@ func (m Payouts) list(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return paging.Page[Statement]{}, rowsErr
+		return paging.Page[Statement]{}, apperr.Wrap(rowsErr, "select billing.payout_statements")
 	}
 
 	for i := range items {
@@ -1160,7 +1160,7 @@ func (m Payouts) GenerateMonthly(ctx context.Context, c *ops.Call) (int, error) 
 		c.Now,
 	)
 	if err != nil || tag.RowsAffected() == 0 { // generated already
-		return 0, err
+		return 0, apperr.Wrap(err, "insert billing.payout_runs")
 	}
 
 	drafts, err := m.generate(ctx, c, &GenerateInput{Period: period})
@@ -1176,7 +1176,7 @@ func (m Payouts) GenerateMonthly(ctx context.Context, c *ops.Call) (int, error) 
 		len(drafts),
 	)
 	if execErr != nil {
-		return 0, execErr
+		return 0, apperr.Wrap(execErr, "update billing.payout_runs")
 	}
 
 	return 1, nil

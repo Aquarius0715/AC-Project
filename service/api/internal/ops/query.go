@@ -110,7 +110,7 @@ func Ask[O any](ctx context.Context, r *Registry, c *Call, name string, in any) 
 
 	raw, err := json.Marshal(in)
 	if err != nil {
-		return out, err
+		return out, apperr.Wrap(err, "json.Marshal")
 	}
 
 	var res any
@@ -126,10 +126,10 @@ func Ask[O any](ctx context.Context, r *Registry, c *Call, name string, in any) 
 
 		b, err := json.Marshal(res)
 		if err != nil {
-			return out, err
+			return out, apperr.Wrap(err, "json.Marshal")
 		}
 
-		return out, json.Unmarshal(b, &out)
+		return out, apperr.Wrap(json.Unmarshal(b, &out), "json.Unmarshal")
 	}
 
 	if r.Remote == nil {
@@ -138,10 +138,10 @@ func Ask[O any](ctx context.Context, r *Registry, c *Call, name string, in any) 
 
 	body, err := r.Remote.Query(ctx, c, q.domain, name, raw)
 	if err != nil {
-		return out, err
+		return out, apperr.Wrap(err, "ops.QueryTransport.Query")
 	}
 
-	return out, json.Unmarshal(body, &out)
+	return out, apperr.Wrap(json.Unmarshal(body, &out), "json.Unmarshal")
 }
 
 // QueryTransport sends a query to the service of another domain.
@@ -185,7 +185,7 @@ func (h *HTTPQueries) Query(
 		bytes.NewReader(in),
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "http.NewRequestWithContext")
 	}
 
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -245,7 +245,7 @@ func (h *HTTPQueries) Query(
 
 	unmarshalErr := json.Unmarshal(body, &env)
 	if unmarshalErr != nil {
-		return nil, unmarshalErr
+		return nil, apperr.Wrap(unmarshalErr, "json.Unmarshal")
 	}
 
 	return env.Data, nil
@@ -350,7 +350,7 @@ func (r *Registry) serveQuery(c *echo.Context, token string, p *Principal, beare
 			now.UTC().Format(time.RFC3339Nano),
 		)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "select set_config")
 		}
 
 		var herr error
@@ -360,8 +360,8 @@ func (r *Registry) serveQuery(c *echo.Context, token string, p *Principal, beare
 		return herr
 	})
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "ops.Runner.Run")
 	}
 
-	return c.JSON(http.StatusOK, map[string]any{"data": out})
+	return apperr.Wrap(c.JSON(http.StatusOK, map[string]any{"data": out}), "echo.Context.JSON")
 }

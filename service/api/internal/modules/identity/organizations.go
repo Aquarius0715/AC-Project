@@ -46,7 +46,7 @@ func scanOrg(r pgx.Row) (Organization, error) {
 		&o.Status,
 	)
 
-	return o, err
+	return o, apperr.Wrap(err, "scan (scanOrg)")
 }
 
 var orgKinds = map[string]bool{"customer": true, "contractor": true, "operator": true}
@@ -135,12 +135,12 @@ func organizationsList(
 		"id ASC",
 	)
 	if err != nil {
-		return paging.Page[Organization]{}, err
+		return paging.Page[Organization]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[Organization]{}, err
+		return paging.Page[Organization]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	where := strings.Join(conds, " AND ")
@@ -150,7 +150,7 @@ func organizationsList(
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM identity.organizations WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
-		return paging.Page[Organization]{}, scanErr
+		return paging.Page[Organization]{}, apperr.Wrap(scanErr, "select identity.organizations")
 	}
 
 	rows, err := c.Tx.Query(
@@ -165,7 +165,7 @@ func organizationsList(
 		),
 		args...)
 	if err != nil {
-		return paging.Page[Organization]{}, err
+		return paging.Page[Organization]{}, apperr.Wrap(err, "select identity.organizations")
 	}
 	defer rows.Close()
 
@@ -185,7 +185,7 @@ func organizationsList(
 		NextCursor:      w.Next(total),
 		Total:           total,
 		SnapshotVersion: w.Snapshot,
-	}, rows.Err()
+	}, apperr.Wrap(rows.Err(), "select identity.organizations")
 }
 
 // OrganizationSave is organizations.save input (Save<Organization>).
@@ -227,7 +227,7 @@ func uniqueName(ctx context.Context, c *ops.Call, id uuid.UUID) error {
 		AND o.kind = t.kind AND o.id <> t.id AND lower(btrim(o.name)) = lower(btrim(t.name)))`, id).
 		Scan(&taken)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select identity.organizations")
 	}
 
 	if taken {
@@ -384,13 +384,15 @@ func (Directory) NonReaders(
 	ids []uuid.UUID,
 	customerOrg uuid.UUID,
 ) ([]uuid.UUID, error) {
-	return ops.Delegate(
+	out, err := ops.Delegate(
 		ctx,
 		c,
 		QueryNonReaders,
 		NonReadersInput{IDs: ids, CustomerOrgID: customerOrg},
 		nonReaders,
 	)
+
+	return out, apperr.Wrap(err, "delegate identity.nonReaders")
 }
 
 // OrgState returns the kind and status of an organization.
@@ -401,7 +403,7 @@ func (Directory) OrgState(
 ) (kind, status string, found bool, err error) {
 	st, err := ops.Delegate(ctx, c, QueryOrgState, OrgInput{OrgID: org}, orgState)
 
-	return st.Kind, st.Status, st.Found, err
+	return st.Kind, st.Status, st.Found, apperr.Wrap(err, "delegate identity.orgState")
 }
 
 // Technician describes a role=technician membership for assignment checks.
@@ -427,7 +429,7 @@ func (Directory) Technician(
 		technician,
 	)
 
-	return t.Technician, t.Found, err
+	return t.Technician, t.Found, apperr.Wrap(err, "delegate identity.technician")
 }
 
 // Qualified reports whether the membership holds unrevoked grants for every code covering [start, end) (IR123 item 3).
@@ -442,18 +444,22 @@ func (Directory) Qualified(
 		return true, nil
 	}
 
-	return ops.Delegate(
+	out, err := ops.Delegate(
 		ctx,
 		c,
 		QueryQualified,
 		QualifiedInput{MembershipID: membership, Codes: codes, Start: start, End: end},
 		qualified,
 	)
+
+	return out, apperr.Wrap(err, "delegate identity.qualified")
 }
 
 // OrgName returns an organization's name.
 func (Directory) OrgName(ctx context.Context, c *ops.Call, org uuid.UUID) (string, error) {
-	return ops.Delegate(ctx, c, QueryOrgName, OrgInput{OrgID: org}, orgName)
+	out, err := ops.Delegate(ctx, c, QueryOrgName, OrgInput{OrgID: org}, orgName)
+
+	return out, apperr.Wrap(err, "delegate identity.orgName")
 }
 
 // SetGrant makes the membership's grant for code cover [from, until) without revocation (certificates.verify, IR133).
@@ -470,11 +476,26 @@ func (Directory) SetGrant(
 	err := c.Tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')::uuid`).
 		Scan(&tenant)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select current_setting")
 	}
 
-	return events.Publish(ctx, c.Tx, tenant, "membership", membership, events.QualificationGranted,
-		events.Grant{MembershipID: membership, Code: code, ValidFrom: from, ValidUntil: until})
+	return apperr.Wrap(
+		events.Publish(
+			ctx,
+			c.Tx,
+			tenant,
+			"membership",
+			membership,
+			events.QualificationGranted,
+			events.Grant{
+				MembershipID: membership,
+				Code:         code,
+				ValidFrom:    from,
+				ValidUntil:   until,
+			},
+		),
+		"events.Publish",
+	)
 }
 
 // ActiveClientOf reports whether a membership is an active client membership of the organization (identity.members,

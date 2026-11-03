@@ -93,7 +93,7 @@ func (m *TxManager) Run(
 					p.MembershipID.String(),
 				)
 				if err != nil {
-					return err
+					return apperr.Wrap(err, "select set_config")
 				}
 			}
 
@@ -101,7 +101,8 @@ func (m *TxManager) Run(
 		})
 
 		var pg *pgconn.PgError
-		if !(errors.As(err, &pg) && (pg.Code == "40001" || pg.Code == "40P01")) {
+		if !errors.As(err, &pg) ||
+			(pg.Code != "40001" && pg.Code != "40P01") { // only a serialization failure retries
 			break
 		}
 	}
@@ -149,7 +150,7 @@ func (s Idempotency) Begin(
 			h,
 		)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "insert platform.idempotency_keys")
 		}
 
 		if tag.RowsAffected() == 1 {
@@ -168,7 +169,7 @@ func (s Idempotency) Begin(
 			WHERE tenant_id=$1 AND membership_id=$2 AND key=$3 FOR UPDATE`, p.TenantID, p.MembershipID, key).
 			Scan(&gotOp, &gotHash, &status, &resp, &expired)
 		if scanErr != nil {
-			return scanErr
+			return apperr.Wrap(scanErr, "select platform.idempotency_keys")
 		}
 
 		if expired {
@@ -184,7 +185,7 @@ func (s Idempotency) Begin(
 				h,
 			)
 
-			return err
+			return apperr.Wrap(err, "update platform.idempotency_keys")
 		}
 
 		if gotOp != op || hex.EncodeToString(gotHash) != hash {
@@ -225,7 +226,7 @@ func (s Idempotency) Complete(
 			resp,
 		)
 
-		return err
+		return apperr.Wrap(err, "update platform.idempotency_keys")
 	})
 }
 
@@ -244,7 +245,7 @@ func (s Idempotency) Abort(ctx context.Context, p *ops.Principal, op, key string
 			key,
 		)
 
-		return err
+		return apperr.Wrap(err, "delete platform.idempotency_keys")
 	})
 }
 
@@ -270,23 +271,26 @@ func (Recorder) RecordDenied(
 		membership = &m
 	}
 
-	return events.Publish(ctx, tx, p.TenantID, "audit", id, events.AuditRecorded, events.Audit{
-		ID:              id,
-		ActorID:         p.UserID.String(),
-		ActorRole:       p.Role,
-		MembershipID:    membership,
-		Action:          op,
-		TargetKind:      d.TargetKind,
-		TargetID:        d.TargetID,
-		OccurredAt:      c.Now,
-		CorrelationID:   c.CorrelationID,
-		Result:          "denied",
-		Reason:          d.Reason,
-		PreviousVersion: nil,
-		NextVersion:     nil,
-		MaskedBefore:    nil,
-		MaskedAfter:     nil,
-	})
+	return apperr.Wrap(
+		events.Publish(ctx, tx, p.TenantID, "audit", id, events.AuditRecorded, events.Audit{
+			ID:              id,
+			ActorID:         p.UserID.String(),
+			ActorRole:       p.Role,
+			MembershipID:    membership,
+			Action:          op,
+			TargetKind:      d.TargetKind,
+			TargetID:        d.TargetID,
+			OccurredAt:      c.Now,
+			CorrelationID:   c.CorrelationID,
+			Result:          "denied",
+			Reason:          d.Reason,
+			PreviousVersion: nil,
+			NextVersion:     nil,
+			MaskedBefore:    nil,
+			MaskedAfter:     nil,
+		}),
+		"events.Publish",
+	)
 }
 
 // Record implements ops.Recorder.
@@ -338,14 +342,14 @@ func (Recorder) Record(ctx context.Context, tx pgx.Tx, c *ops.Call, op string) e
 			},
 		)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "events.Publish")
 		}
 	}
 
 	for _, e := range c.Events {
 		payload, err := json.Marshal(e.Payload)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "json.Marshal")
 		}
 
 		if e.Payload == nil {
@@ -366,7 +370,7 @@ func (Recorder) Record(ctx context.Context, tx pgx.Tx, c *ops.Call, op string) e
 			c.Now,
 		)
 		if execErr != nil {
-			return execErr
+			return apperr.Wrap(execErr, "insert platform.outbox")
 		}
 	}
 
@@ -378,7 +382,7 @@ func (Recorder) Record(ctx context.Context, tx pgx.Tx, c *ops.Call, op string) e
 func newPool(ctx context.Context, url string) (*pgxpool.Pool, error) {
 	cfg, err := pgxpool.ParseConfig(url)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "pgxpool.ParseConfig")
 	}
 
 	cfg.AfterConnect = func(_ context.Context, conn *pgx.Conn) error {
@@ -393,5 +397,7 @@ func newPool(ctx context.Context, url string) (*pgxpool.Pool, error) {
 		return nil
 	}
 
-	return pgxpool.NewWithConfig(ctx, cfg)
+	out, err := pgxpool.NewWithConfig(ctx, cfg)
+
+	return out, apperr.Wrap(err, "pgxpool.NewWithConfig")
 }

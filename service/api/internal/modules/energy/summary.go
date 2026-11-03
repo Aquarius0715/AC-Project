@@ -311,7 +311,7 @@ func summary(ctx context.Context, c *ops.Call, in *SummaryInput) (Summary, error
 			$2`, in.UnitIDs, c.Principal.OrgID).
 			Scan(&mine)
 		if err != nil {
-			return Summary{}, err
+			return Summary{}, apperr.Wrap(err, "select energy.ref_units")
 		}
 
 		if mine != len(in.UnitIDs) {
@@ -324,7 +324,7 @@ func summary(ctx context.Context, c *ops.Call, in *SummaryInput) (Summary, error
 	err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND NOT archived`, in.UnitIDs).
 		Scan(&known)
 	if err != nil {
-		return Summary{}, err
+		return Summary{}, apperr.Wrap(err, "select energy.ref_units")
 	}
 
 	if known != len(in.UnitIDs) {
@@ -428,7 +428,7 @@ func ForecastFor(
 		Boundary,
 	)
 	if err != nil {
-		return f, err
+		return f, apperr.Wrap(err, "select energy.baselines")
 	}
 
 	ids := []uuid.UUID{}
@@ -440,7 +440,7 @@ func ForecastFor(
 		if err != nil {
 			rows.Close()
 
-			return f, err
+			return f, apperr.Wrap(err, "select energy.baselines")
 		}
 
 		ids = append(ids, id)
@@ -450,7 +450,7 @@ func ForecastFor(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return f, rowsErr
+		return f, apperr.Wrap(rowsErr, "select energy.baselines")
 	}
 
 	var chosen *Baseline

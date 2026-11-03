@@ -16,6 +16,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/bootstrap"
 	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/idp"
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
@@ -41,10 +42,10 @@ func TestBootstrapAdmin(t *testing.T) {
 
 			r, err = bootstrap.Admin(ctx, tx, in)
 
-			return err
+			return apperr.Wrap(err, "bootstrap.Admin")
 		})
 
-		return r, err
+		return r, apperr.Wrap(err, "transaction")
 	}
 	tag := uuid.NewString()[:8]
 

@@ -12,6 +12,8 @@ import (
 	"github.com/MicahParks/keyfunc/v3"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/time/rate"
+
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // OIDCVerifier verifies RS256 access tokens from Cognito (production) or Keycloak (local): issuer, audience
@@ -37,7 +39,7 @@ func (v *OIDCVerifier) Verify(_ context.Context, token string) (Identity, error)
 		jwt.WithValidMethods([]string{"RS256"}),
 	)
 	if err != nil {
-		return Identity{}, err
+		return Identity{}, apperr.Wrap(err, "jwt.Parse")
 	}
 
 	claims := t.Claims.(jwt.MapClaims)

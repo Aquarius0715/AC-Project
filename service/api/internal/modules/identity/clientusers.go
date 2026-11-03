@@ -72,7 +72,7 @@ func scanClientUser(r pgx.Row) (ClientUser, error) {
 		&x.customerOrg,
 	)
 
-	return x, err
+	return x, apperr.Wrap(err, "scan (scanClientUser)")
 }
 
 // ownerOnly enforces the client:self-customer:owner alternative: clients must be owners (FORBIDDEN).
@@ -157,12 +157,12 @@ func clientUsersList(
 		"lower(COALESCE(x.display_name, x.email::text)) ASC, x.id ASC",
 	)
 	if err != nil {
-		return paging.Page[ClientUser]{}, err
+		return paging.Page[ClientUser]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[ClientUser]{}, err
+		return paging.Page[ClientUser]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	var args []any
@@ -202,7 +202,7 @@ func clientUsersList(
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM "+clientUserFrom+" WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
-		return paging.Page[ClientUser]{}, scanErr
+		return paging.Page[ClientUser]{}, apperr.Wrap(scanErr, "select identity.client_users")
 	}
 
 	rows, err := c.Tx.Query(
@@ -218,7 +218,7 @@ func clientUsersList(
 		),
 		args...)
 	if err != nil {
-		return paging.Page[ClientUser]{}, err
+		return paging.Page[ClientUser]{}, apperr.Wrap(err, "select (clientUsersList)")
 	}
 	defer rows.Close()
 
@@ -235,7 +235,7 @@ func clientUsersList(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return paging.Page[ClientUser]{}, rowsErr
+		return paging.Page[ClientUser]{}, apperr.Wrap(rowsErr, "select (clientUsersList)")
 	}
 
 	return paging.Page[ClientUser]{
@@ -329,7 +329,7 @@ func otherActiveOwner(ctx context.Context, c *ops.Call, customer, except uuid.UU
 		customer,
 	)
 	if execErr != nil {
-		return false, execErr
+		return false, apperr.Wrap(execErr, "select pg_advisory_xact_lock")
 	}
 
 	var ok bool
@@ -338,7 +338,7 @@ func otherActiveOwner(ctx context.Context, c *ops.Call, customer, except uuid.UU
 		client_role = 'owner' AND status = 'active')`, customer, except).
 		Scan(&ok)
 
-	return ok, err
+	return ok, apperr.Wrap(err, "select identity.client_users")
 }
 
 // clientUsersSave serves clientUsers.save.
@@ -387,7 +387,7 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 	}
 
 	if err != nil {
-		return ClientUser{}, err
+		return ClientUser{}, apperr.Wrap(err, "select notify.ref_customers")
 	}
 
 	var (
@@ -402,7 +402,7 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 		$2::citext AND id <> $3)`, in.CustomerID, in.Email, self).
 		Scan(&dup)
 	if scanErr != nil {
-		return ClientUser{}, scanErr
+		return ClientUser{}, apperr.Wrap(scanErr, "select identity.client_users")
 	}
 
 	if dup {
@@ -452,7 +452,7 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 			c.Principal.MembershipID,
 		)
 		if execErr != nil {
-			return ClientUser{}, execErr
+			return ClientUser{}, apperr.Wrap(execErr, "insert identity.client_users")
 		}
 
 		v := 1
@@ -539,7 +539,7 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 		c.Now,
 	)
 	if execErr != nil {
-		return x, execErr
+		return x, apperr.Wrap(execErr, "update identity.client_users")
 	}
 
 	if x.MembershipID != nil { // keep the membership in step: role and access window
@@ -556,7 +556,7 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 			c.Now,
 		)
 		if err != nil {
-			return x, err
+			return x, apperr.Wrap(err, "update identity.memberships")
 		}
 
 		if status != x.Status &&
@@ -672,7 +672,7 @@ func clientUsersRemove(ctx context.Context, c *ops.Call, in *RemoveInput) (Delet
 		x.ID,
 	)
 	if execErr != nil {
-		return Deleted{}, execErr
+		return Deleted{}, apperr.Wrap(execErr, "delete identity.client_users")
 	}
 
 	if x.MembershipID != nil {
@@ -685,7 +685,7 @@ func clientUsersRemove(ctx context.Context, c *ops.Call, in *RemoveInput) (Delet
 			c.Now,
 		)
 		if err != nil {
-			return Deleted{}, err
+			return Deleted{}, apperr.Wrap(err, "update identity.memberships")
 		}
 
 		setAccountEnabled(c, *x.MembershipID, false) // the sign-in ends too (IR461)
@@ -794,7 +794,7 @@ func clientUsersResend(ctx context.Context, c *ops.Call, in *ResendInput) (Invit
 	scanErr := c.Tx.QueryRow(ctx, `SELECT user_id FROM identity.memberships WHERE id = $1`, *x.MembershipID).
 		Scan(&user)
 	if scanErr != nil {
-		return InvitePreview{}, scanErr
+		return InvitePreview{}, apperr.Wrap(scanErr, "select identity.memberships")
 	}
 
 	requestAccount(c, user, *x.MembershipID, "client")
@@ -806,7 +806,7 @@ func clientUsersResend(ctx context.Context, c *ops.Call, in *ResendInput) (Invit
 		c.Now,
 	)
 	if execErr != nil {
-		return InvitePreview{}, execErr
+		return InvitePreview{}, apperr.Wrap(execErr, "update identity.client_users")
 	}
 
 	c.Audit(

@@ -167,7 +167,7 @@ func (m Summaries) get(ctx context.Context, c *ops.Call, in *Input) (Summary, er
 
 		n, err := m.Units.CountUnits(ctx, c, true, f.UnitIDs, f.CustomerID, f.PropertyID, f.UnitID)
 		if err != nil {
-			return Summary{}, err
+			return Summary{}, apperr.Wrap(err, "summaries.Units.CountUnits")
 		}
 
 		out.Counts = Counts{
@@ -227,7 +227,7 @@ func (m Summaries) get(ctx context.Context, c *ops.Call, in *Input) (Summary, er
 
 		n, err := m.Units.CountUnits(ctx, c, false, &ids, nil, nil, nil)
 		if err != nil {
-			return Summary{}, err
+			return Summary{}, apperr.Wrap(err, "summaries.Units.CountUnits")
 		}
 
 		out.Counts.Total, out.Counts.Online, out.Counts.Offline, out.Counts.Unknown = n.Total, n.Online, n.Offline, n.Unknown

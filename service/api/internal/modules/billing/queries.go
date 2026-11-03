@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // QueryOverdue is the internal query of unpaid invoices past due for the read models (IR190, IR115).
@@ -42,7 +43,7 @@ func overdue(ctx context.Context, c *ops.Call, in *OverdueInput) ([]Overdue, err
 		c.Now,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select billing.invoices")
 	}
 	defer rows.Close()
 
@@ -53,11 +54,11 @@ func overdue(ctx context.Context, c *ops.Call, in *OverdueInput) ([]Overdue, err
 
 		err := rows.Scan(&o.Currency, &o.Count, &o.AmountMinor)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select billing.invoices")
 		}
 
 		out = append(out, o)
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select billing.invoices")
 }

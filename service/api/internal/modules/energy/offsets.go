@@ -125,7 +125,7 @@ func scanQuote(r pgx.Row) (Quote, error) {
 		LedgerStatus:       "not_connected",
 	}
 
-	return x, err
+	return x, apperr.Wrap(err, "scan (scanQuote)")
 }
 
 // customerOf resolves the target customer: clients use their own (a different customerId is NOT_FOUND); HQ must name
@@ -155,7 +155,7 @@ func customerOf(ctx context.Context, c *ops.Call, given *uuid.UUID) (uuid.UUID, 
 		return id, org, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
-	return id, org, err
+	return id, org, apperr.Wrap(err, "select energy.ref_customers")
 }
 
 // previewQuote saves a quote snapshot that expires in 15 minutes (provider unselected, no price).
@@ -195,7 +195,7 @@ func previewQuote(ctx context.Context, c *ops.Call, in *QuoteInput) (Quote, erro
 		NOT archived`, in.UnitIDs, org).
 		Scan(&inOrg)
 	if scanErr != nil {
-		return Quote{}, scanErr
+		return Quote{}, apperr.Wrap(scanErr, "select energy.ref_units")
 	}
 
 	if inOrg != len(in.UnitIDs) {
@@ -214,7 +214,7 @@ func previewQuote(ctx context.Context, c *ops.Call, in *QuoteInput) (Quote, erro
 		customer, in.Purpose, in.AmountKg, in.Period.From, in.Period.To, in.UnitIDs, c.Now.Add(QuoteTTL), c.Now).
 		Scan(&id)
 	if scanErr != nil {
-		return Quote{}, scanErr
+		return Quote{}, apperr.Wrap(scanErr, "insert energy.offset_quotes")
 	}
 
 	return scanQuote(
@@ -302,7 +302,7 @@ func scanRecord(row pgx.Row) (Record, error) {
 	)
 	x.IsDemo = true
 
-	return x, err
+	return x, apperr.Wrap(err, "scan (scanRecord)")
 }
 
 func decorateRecord(ctx context.Context, c *ops.Call, x *Record) error {
@@ -313,7 +313,7 @@ func decorateRecord(ctx context.Context, c *ops.Call, x *Record) error {
 		x.ID,
 	)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select energy.offset_attempts")
 	}
 
 	x.Attempts = []Attempt{}
@@ -325,7 +325,7 @@ func decorateRecord(ctx context.Context, c *ops.Call, x *Record) error {
 		if err != nil {
 			rows.Close()
 
-			return err
+			return apperr.Wrap(err, "select energy.offset_attempts")
 		}
 
 		x.Attempts = append(x.Attempts, a)
@@ -335,7 +335,7 @@ func decorateRecord(ctx context.Context, c *ops.Call, x *Record) error {
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return rowsErr
+		return apperr.Wrap(rowsErr, "select energy.offset_attempts")
 	}
 
 	if x.State != "demo_retired" && len(x.Attempts) > 0 {
@@ -350,7 +350,7 @@ func decorateRecord(ctx context.Context, c *ops.Call, x *Record) error {
 		x.ID.String(),
 	) // identity's audit log (IR196)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "audit.History")
 	}
 
 	x.EventHistory = []Event{}
@@ -443,12 +443,12 @@ func listRecords(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 		"r.created_at DESC, r.id DESC",
 	)
 	if err != nil {
-		return paging.Page[Record]{}, err
+		return paging.Page[Record]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[Record]{}, err
+		return paging.Page[Record]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	var args []any
@@ -492,7 +492,7 @@ func listRecords(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM "+recordFrom+" WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
-		return paging.Page[Record]{}, scanErr
+		return paging.Page[Record]{}, apperr.Wrap(scanErr, "select energy.offset_records")
 	}
 
 	rows, err := c.Tx.Query(
@@ -508,7 +508,7 @@ func listRecords(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 		),
 		args...)
 	if err != nil {
-		return paging.Page[Record]{}, err
+		return paging.Page[Record]{}, apperr.Wrap(err, "select (listRecords)")
 	}
 
 	items := []Record{}
@@ -528,7 +528,7 @@ func listRecords(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return paging.Page[Record]{}, rowsErr
+		return paging.Page[Record]{}, apperr.Wrap(rowsErr, "select (listRecords)")
 	}
 
 	for i := range items {
@@ -600,7 +600,7 @@ func newAttempt(ctx context.Context, c *ops.Call, record uuid.UUID, stage string
 		uuid.Must(uuid.NewV7()),
 	)
 
-	return err
+	return apperr.Wrap(err, "insert energy.offset_attempts")
 }
 
 func demoRef(prefix string) *string {
@@ -674,7 +674,7 @@ func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, erro
 		scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM energy.offset_records WHERE quote_id = $1)`, q.ID).
 			Scan(&used)
 		if scanErr != nil {
-			return Record{}, scanErr
+			return Record{}, apperr.Wrap(scanErr, "select energy.offset_records")
 		}
 
 		if used || !c.Now.Before(q.ExpiresAt) {
@@ -689,7 +689,7 @@ func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, erro
 			id`, q.ID, q.CustomerID, q.AmountKg, c.Now).
 			Scan(&id)
 		if scanErr != nil {
-			return Record{}, scanErr
+			return Record{}, apperr.Wrap(scanErr, "insert energy.offset_records")
 		}
 
 		newAttemptErr := newAttempt(ctx, c, id, "purchase")
@@ -738,7 +738,7 @@ func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, erro
 		}
 
 		if !errors.Is(err, pgx.ErrNoRows) {
-			return x, err
+			return x, apperr.Wrap(err, "select energy.offset_attempts")
 		}
 	}
 
@@ -763,7 +763,7 @@ func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, erro
 			in.Event,
 		)
 
-		return err
+		return apperr.Wrap(err, "update energy.offset_attempts")
 	}
 	setState := func(state string, purchase, retirement, cert *string) error {
 		_, err := c.Tx.Exec(
@@ -779,7 +779,7 @@ func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, erro
 			c.Now,
 		)
 
-		return err
+		return apperr.Wrap(err, "update energy.offset_records")
 	}
 
 	switch {

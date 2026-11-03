@@ -90,7 +90,7 @@ func (x Intent) MarshalJSON() ([]byte, error) {
 
 	b, err := json.Marshal(plain(x))
 	if err != nil || !x.measurementNull {
-		return b, err
+		return b, apperr.Wrap(err, "json.Marshal")
 	}
 
 	return append(b[:len(b)-1], []byte(`,"measurement":null}`)...), nil
@@ -108,7 +108,7 @@ func (v Voice) candidates(ctx context.Context, c *ops.Call, room string) ([]Cand
 		JOIN assets.properties pr ON pr.id = s.property_id
 		JOIN assets.units u ON u.space_id = s.id AND NOT u.archived WHERE p.parent IS NULL ORDER BY 2, 1`, room)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select path")
 	}
 
 	var all []Candidate
@@ -120,7 +120,7 @@ func (v Voice) candidates(ctx context.Context, c *ops.Call, room string) ([]Cand
 		if err != nil {
 			rows.Close()
 
-			return nil, err
+			return nil, apperr.Wrap(err, "select path")
 		}
 
 		all = append(all, x)
@@ -130,7 +130,7 @@ func (v Voice) candidates(ctx context.Context, c *ops.Call, room string) ([]Cand
 
 	rowsErr := rows.Err()
 	if rowsErr != nil || len(all) == 0 {
-		return []Candidate{}, rowsErr
+		return []Candidate{}, apperr.Wrap(rowsErr, "select path")
 	}
 
 	ids := make([]uuid.UUID, len(all))
@@ -140,7 +140,7 @@ func (v Voice) candidates(ctx context.Context, c *ops.Call, room string) ([]Cand
 
 	visible, err := v.Units.VisibleUnits(ctx, c, ids)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "voice.Units.VisibleUnits")
 	}
 
 	keep := map[uuid.UUID]bool{}
@@ -275,7 +275,7 @@ func (v Voice) resolve(ctx context.Context, c *ops.Call, in *Input) (Intent, err
 	if celsius == nil {
 		meas, err := monitoring.LatestMeasurement(ctx, c, unit, "temperature")
 		if err != nil {
-			return Intent{}, err
+			return Intent{}, apperr.Wrap(err, "monitoring.LatestMeasurement")
 		}
 
 		return Intent{
@@ -303,7 +303,7 @@ func (v Voice) resolve(ctx context.Context, c *ops.Call, in *Input) (Intent, err
 	}
 
 	if err != nil {
-		return Intent{}, err
+		return Intent{}, apperr.Wrap(err, "select assets.units")
 	}
 
 	return Intent{

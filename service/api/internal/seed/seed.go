@@ -16,6 +16,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/modules/billing"
 	"github.com/pradita/ac-project/service/api/internal/modules/monitoring"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // Namespace is the UUIDv5 namespace for fixture IDs.
@@ -215,7 +216,7 @@ type Fixture struct {
 func Load(path string) (*Fixture, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "os.ReadFile")
 	}
 
 	var f Fixture
@@ -243,7 +244,7 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 	ex := func(sql string, args ...any) error {
 		_, err := tx.Exec(ctx, sql, args...)
 
-		return err
+		return apperr.Wrap(err, "exec (Apply)")
 	}
 	// IR91 item 2: a row without createdAt / updatedAt gets fixture.seedCreatedAt. The columns default to
 	// platform.app_now(), so the transaction's app.now is that time while the fixture is applied; otherwise the
@@ -831,7 +832,7 @@ func clientMemberships(f *Fixture) []uuid.UUID {
 func applyPolicies(ex func(string, ...any) error, f *Fixture) error {
 	rules, err := json.Marshal(monitoring.DefaultRules)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "json.Marshal")
 	}
 
 	done := map[string]bool{}

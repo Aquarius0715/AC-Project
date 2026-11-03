@@ -148,7 +148,7 @@ func (m Jobs) offers(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]OfferS
 
 	rows, err := c.Tx.Query(ctx, q, args...)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "query (offers)")
 	}
 
 	var (
@@ -185,7 +185,7 @@ func (m Jobs) offers(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]OfferS
 		if err != nil {
 			rows.Close()
 
-			return nil, err
+			return nil, apperr.Wrap(err, "query (offers)")
 		}
 
 		o.Projection, o.Status = "offer", "offered"
@@ -200,13 +200,13 @@ func (m Jobs) offers(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]OfferS
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return nil, rowsErr
+		return nil, apperr.Wrap(rowsErr, "query (offers)")
 	}
 
 	for i := range out {
 		addr, scope, err := m.Sites.SiteAddress(ctx, c, units[i])
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "maintenance.SiteAddresses.SiteAddress")
 		}
 
 		out[i].SiteAddress, out[i].RequiredQualifications = addr, requiredCodes(scope)
@@ -222,7 +222,7 @@ func (m Jobs) offers(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]OfferS
 		case err == nil:
 			out[i].PartnerSlotProposal = pp
 		case !errors.Is(err, pgx.ErrNoRows):
-			return nil, err
+			return nil, apperr.Wrap(err, "select maintenance.partner_slot_proposals")
 		}
 	}
 
@@ -259,7 +259,7 @@ func (m Jobs) histories(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]His
 
 	rows, err := c.Tx.Query(ctx, q, args...)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "query (histories)")
 	}
 
 	var (
@@ -289,7 +289,7 @@ func (m Jobs) histories(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]His
 		if err != nil {
 			rows.Close()
 
-			return nil, err
+			return nil, apperr.Wrap(err, "query (histories)")
 		}
 
 		h.Projection = "history"
@@ -301,7 +301,7 @@ func (m Jobs) histories(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]His
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return nil, rowsErr
+		return nil, apperr.Wrap(rowsErr, "query (histories)")
 	}
 	// the decision events of every snapshot in one query (IR506), then each snapshot's own in time order
 	var all []uuid.UUID
@@ -497,7 +497,7 @@ func FreezeEnded(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) {
 		now,
 	)
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "insert maintenance.job_history_snapshots")
 	}
 
 	n += int(tag.RowsAffected())
@@ -542,7 +542,7 @@ func freezeTechnicians(ctx context.Context, tx pgx.Tx, now time.Time, job *uuid.
 		upper(a.scheduled) END DESC, a.updated_at DESC
 		ON CONFLICT (job_id, owner_kind, owner_id) DO NOTHING`, args...)
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "exec (freezeTechnicians)")
 	}
 
 	return int(tag.RowsAffected()), nil
@@ -562,7 +562,7 @@ func ReleaseOnCompletion(ctx context.Context, tx pgx.Tx, job uuid.UUID, now time
 		now,
 	)
 	if execErr != nil {
-		return execErr
+		return apperr.Wrap(execErr, "update maintenance.assignments")
 	}
 
 	_, err := freezeTechnicians(ctx, tx, now, &job)
@@ -584,7 +584,7 @@ func ExpireOffers(ctx context.Context, tx pgx.Tx, now time.Time, actor uuid.UUID
 		now,
 	)
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "update maintenance.jobs")
 	}
 
 	type hit struct{ job, tenant uuid.UUID }
@@ -598,7 +598,7 @@ func ExpireOffers(ctx context.Context, tx pgx.Tx, now time.Time, actor uuid.UUID
 		if err != nil {
 			rows.Close()
 
-			return 0, err
+			return 0, apperr.Wrap(err, "update maintenance.jobs")
 		}
 
 		hits = append(hits, h)
@@ -608,7 +608,7 @@ func ExpireOffers(ctx context.Context, tx pgx.Tx, now time.Time, actor uuid.UUID
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return 0, rowsErr
+		return 0, apperr.Wrap(rowsErr, "update maintenance.jobs")
 	}
 	// a contractor's time change still waiting for HQ ends with its expired offer (IR444); one sent to the client stays,
 	// as the client's acceptance offers the job to the contractor again (IR128)
@@ -619,7 +619,7 @@ func ExpireOffers(ctx context.Context, tx pgx.Tx, now time.Time, actor uuid.UUID
 		now,
 	)
 	if execErr != nil {
-		return 0, execErr
+		return 0, apperr.Wrap(execErr, "update maintenance.partner_slot_proposals")
 	}
 
 	_, execErr = tx.Exec(
@@ -629,7 +629,7 @@ func ExpireOffers(ctx context.Context, tx pgx.Tx, now time.Time, actor uuid.UUID
 		now,
 	)
 	if execErr != nil {
-		return 0, execErr
+		return 0, apperr.Wrap(execErr, "update maintenance.offers")
 	}
 
 	for _, h := range hits {
@@ -644,7 +644,7 @@ func ExpireOffers(ctx context.Context, tx pgx.Tx, now time.Time, actor uuid.UUID
 			now,
 		)
 		if err != nil {
-			return 0, err
+			return 0, apperr.Wrap(err, "insert maintenance.job_events")
 		}
 	}
 

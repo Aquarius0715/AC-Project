@@ -77,7 +77,7 @@ func scanPlan(r pgx.Row) (Plan, error) {
 		&p.NextDueAt,
 	)
 
-	return p, err
+	return p, apperr.Wrap(err, "scan (scanPlan)")
 }
 
 // occurrences reads the jobs generated for the plans in one query, not one per plan (IR497).
@@ -98,7 +98,7 @@ func (m Plans) occurrences(ctx context.Context, c *ops.Call, ps []Plan) error {
 		ids,
 	)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select maintenance.jobs")
 	}
 
 	for rows.Next() {
@@ -111,7 +111,7 @@ func (m Plans) occurrences(ctx context.Context, c *ops.Call, ps []Plan) error {
 		if err != nil {
 			rows.Close()
 
-			return err
+			return apperr.Wrap(err, "select maintenance.jobs")
 		}
 
 		if i, ok := at[plan]; ok {
@@ -121,7 +121,7 @@ func (m Plans) occurrences(ctx context.Context, c *ops.Call, ps []Plan) error {
 
 	rows.Close()
 
-	return rows.Err()
+	return apperr.Wrap(rows.Err(), "select maintenance.jobs")
 }
 
 func (m Plans) load(ctx context.Context, c *ops.Call, id uuid.UUID, lock bool) (Plan, error) {
@@ -257,12 +257,12 @@ func (m Plans) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.
 		"p.id ASC",
 	)
 	if err != nil {
-		return paging.Page[Plan]{}, err
+		return paging.Page[Plan]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[Plan]{}, err
+		return paging.Page[Plan]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	var args []any
@@ -281,7 +281,7 @@ func (m Plans) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.
 	if f.CustomerID != nil {
 		org, ok, err := m.Jobs.Units.OrgOfCustomer(ctx, c, *f.CustomerID)
 		if err != nil {
-			return paging.Page[Plan]{}, err
+			return paging.Page[Plan]{}, apperr.Wrap(err, "maintenance.JobUnits.OrgOfCustomer")
 		}
 
 		if !ok {
@@ -290,7 +290,7 @@ func (m Plans) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.
 
 		units, err := m.Jobs.Units.UnitsOfOrg(ctx, c, org)
 		if err != nil {
-			return paging.Page[Plan]{}, err
+			return paging.Page[Plan]{}, apperr.Wrap(err, "maintenance.JobUnits.UnitsOfOrg")
 		}
 
 		conds = append(conds, "p.unit_id = ANY("+add(units)+")")
@@ -299,7 +299,7 @@ func (m Plans) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.
 	if f.PropertyID != nil {
 		units, err := m.Jobs.Units.UnitsOfProperty(ctx, c, *f.PropertyID)
 		if err != nil {
-			return paging.Page[Plan]{}, err
+			return paging.Page[Plan]{}, apperr.Wrap(err, "maintenance.JobUnits.UnitsOfProperty")
 		}
 
 		conds = append(conds, "p.unit_id = ANY("+add(units)+")")
@@ -312,7 +312,7 @@ func (m Plans) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM maintenance.plans p WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
-		return paging.Page[Plan]{}, scanErr
+		return paging.Page[Plan]{}, apperr.Wrap(scanErr, "select maintenance.plans")
 	}
 
 	rows, err := c.Tx.Query(
@@ -327,7 +327,7 @@ func (m Plans) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.
 		),
 		args...)
 	if err != nil {
-		return paging.Page[Plan]{}, err
+		return paging.Page[Plan]{}, apperr.Wrap(err, "select maintenance.plans")
 	}
 
 	items := []Plan{}
@@ -347,7 +347,7 @@ func (m Plans) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return paging.Page[Plan]{}, rowsErr
+		return paging.Page[Plan]{}, apperr.Wrap(rowsErr, "select maintenance.plans")
 	}
 
 	occurrencesErr := m.occurrences(ctx, c, items)
@@ -423,7 +423,7 @@ func (m Plans) save(ctx context.Context, c *ops.Call, in *PlanSaveInput) (Plan, 
 
 	_, archived, found, err := m.Jobs.Units.UnitState(ctx, c, in.UnitID)
 	if err != nil {
-		return Plan{}, err
+		return Plan{}, apperr.Wrap(err, "maintenance.JobUnits.UnitState")
 	}
 
 	if !found {
@@ -447,7 +447,7 @@ func (m Plans) save(ctx context.Context, c *ops.Call, in *PlanSaveInput) (Plan, 
 			id`, in.UnitID, in.Recurrence.IntervalMonths, next.Day(), next, c.Now).
 			Scan(&id)
 		if err != nil {
-			return Plan{}, err
+			return Plan{}, apperr.Wrap(err, "insert maintenance.plans")
 		}
 	} else {
 		p, err := m.load(ctx, c, *in.ID, true)
@@ -479,7 +479,7 @@ func (m Plans) save(ctx context.Context, c *ops.Call, in *PlanSaveInput) (Plan, 
 			c.Now,
 		)
 		if execErr != nil {
-			return p, execErr
+			return p, apperr.Wrap(execErr, "update maintenance.plans")
 		}
 
 		id, event = p.ID, "PlanChanged"
@@ -594,7 +594,7 @@ func (m Plans) generateNextJob(ctx context.Context, c *ops.Call, in *GenerateInp
 
 	org, archived, found, err := m.Jobs.Units.UnitState(ctx, c, p.UnitID)
 	if err != nil {
-		return Job{}, err
+		return Job{}, apperr.Wrap(err, "maintenance.JobUnits.UnitState")
 	}
 
 	if !found || archived {
@@ -612,7 +612,7 @@ func (m Plans) generateNextJob(ctx context.Context, c *ops.Call, in *GenerateInp
 		tstzrange($4, $5), '[]', $5) RETURNING id`, p.UnitID, org, p.ID, start, start.Add(time.Hour)).
 		Scan(&id)
 	if scanErr != nil {
-		return Job{}, scanErr
+		return Job{}, apperr.Wrap(scanErr, "insert maintenance.jobs")
 	}
 
 	next := NextOccurrence(start, p.Recurrence.IntervalMonths, p.AnchorDay)
@@ -625,7 +625,7 @@ func (m Plans) generateNextJob(ctx context.Context, c *ops.Call, in *GenerateInp
 		c.Now,
 	)
 	if execErr != nil {
-		return Job{}, execErr
+		return Job{}, apperr.Wrap(execErr, "update maintenance.plans")
 	}
 
 	eventErr := m.Jobs.event(ctx, c, id, "job.created", nil)

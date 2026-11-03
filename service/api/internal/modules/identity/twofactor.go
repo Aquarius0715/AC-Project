@@ -61,7 +61,7 @@ func twoFactorStatus(ctx context.Context, c *ops.Call) (TwoFactorStatus, error) 
 	}
 
 	if err != nil {
-		return TwoFactorStatus{}, err
+		return TwoFactorStatus{}, apperr.Wrap(err, "select identity.two_factor")
 	}
 
 	return TwoFactorStatus{
@@ -127,7 +127,7 @@ func enableTwoFactor(ctx context.Context, c *ops.Call, in *CodeInput) (TwoFactor
 
 		_, err := rand.Read(b)
 		if err != nil {
-			return TwoFactorEnabled{}, err
+			return TwoFactorEnabled{}, apperr.Wrap(err, "rand.Read")
 		}
 
 		s := hex.EncodeToString(b)
@@ -144,7 +144,7 @@ func enableTwoFactor(ctx context.Context, c *ops.Call, in *CodeInput) (TwoFactor
 		hashes,
 	)
 	if execErr != nil {
-		return TwoFactorEnabled{}, execErr
+		return TwoFactorEnabled{}, apperr.Wrap(execErr, "insert identity.two_factor")
 	}
 
 	c.Audit(
@@ -205,7 +205,7 @@ func disableTwoFactor(ctx context.Context, c *ops.Call, in *CodeInput) (TwoFacto
 		c.Principal.UserID,
 	)
 	if err != nil {
-		return TwoFactorStatus{}, err
+		return TwoFactorStatus{}, apperr.Wrap(err, "delete identity.two_factor")
 	}
 
 	if tag.RowsAffected() == 0 {

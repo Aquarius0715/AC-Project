@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // Busy reports in-flight control work on a unit (D05 mutual exclusion): Commands requested/sent and DiagnosticRuns
@@ -23,7 +24,7 @@ func (Busy) UnitBusy(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, er
 		'end_requested'))`, unit).
 		Scan(&b)
 
-	return b, err
+	return b, apperr.Wrap(err, "select control.commands")
 }
 
 // OperationConflict implements devices.OperationGuard (REV19-018): the start tick of a device operation fails on a
@@ -37,7 +38,7 @@ func (Busy) OperationConflict(ctx context.Context, c *ops.Call, unit uuid.UUID) 
 		'end_requested'))`, unit).
 		Scan(&b)
 
-	return b, err
+	return b, apperr.Wrap(err, "select control.commands")
 }
 
 // UnitActive implements assets.UnitActivity (same rule as UnitBusy).

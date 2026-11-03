@@ -24,6 +24,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/maintenance"
 	"github.com/pradita/ac-project/service/api/internal/modules/restrictions"
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/db"
 	"github.com/pradita/ac-project/service/api/internal/platform/logging"
@@ -101,7 +102,7 @@ func tick(
 
 	rows, err := m.Writer.Query(ctx, `SELECT id FROM platform.tenants ORDER BY id`)
 	if err != nil {
-		return Result{}, err
+		return Result{}, apperr.Wrap(err, "select platform.tenants")
 	}
 
 	for rows.Next() {
@@ -111,7 +112,7 @@ func tick(
 		if err != nil {
 			rows.Close()
 
-			return Result{}, err
+			return Result{}, apperr.Wrap(err, "select platform.tenants")
 		}
 
 		tenants = append(tenants, id)
@@ -121,7 +122,7 @@ func tick(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return Result{}, rowsErr
+		return Result{}, apperr.Wrap(rowsErr, "select platform.tenants")
 	}
 
 	var r Result
@@ -151,7 +152,7 @@ func tick(
 					now.UTC().Format(time.RFC3339Nano),
 				)
 				if err != nil {
-					return err
+					return apperr.Wrap(err, "select set_config")
 				}
 				// the domains this transaction ticks: those whose lock it holds, taken in the order of Domains (IR356)
 				held := map[string]bool{}
@@ -164,7 +165,7 @@ func tick(
 					if wait {
 						_, err := tx.Exec(ctx, lockSQL, d, t)
 						if err != nil {
-							return err
+							return apperr.Wrap(err, "select pg_advisory_xact_lock")
 						}
 
 						held[d] = true
@@ -176,7 +177,7 @@ func tick(
 
 					err := tx.QueryRow(ctx, tryLockSQL, d, t).Scan(&ok)
 					if err != nil {
-						return err
+						return apperr.Wrap(err, "select pg_try_advisory_xact_lock")
 					}
 
 					held[d] = ok
@@ -188,7 +189,7 @@ func tick(
 				if held[ops.DomainEquipment] {
 					n, err := control.ExpireCommands(ctx, tx, now)
 					if err != nil {
-						return err
+						return apperr.Wrap(err, "control.ExpireCommands")
 					}
 
 					r.ExpiredCommands += n
@@ -232,7 +233,7 @@ func tick(
 						},
 					)
 					if err != nil {
-						return err
+						return apperr.Wrap(err, "control.AdvanceRuns")
 					}
 
 					r.Runs += n
@@ -280,7 +281,7 @@ func tick(
 							if reg.Rec != nil {
 								err := reg.Rec.Record(ctx, tx, c, "scheduler")
 								if err != nil {
-									return err
+									return apperr.Wrap(err, "ops.Recorder.Record")
 								}
 							}
 						}
@@ -290,21 +291,21 @@ func tick(
 				if held[ops.DomainMaintenance] {
 					n, err := maintenance.ExpireOffers(ctx, tx, now, actor)
 					if err != nil {
-						return err
+						return apperr.Wrap(err, "maintenance.ExpireOffers")
 					}
 
 					r.ExpiredOffers += n
 
 					n, err = maintenance.ExpireProposals(ctx, tx, now)
 					if err != nil {
-						return err
+						return apperr.Wrap(err, "maintenance.ExpireProposals")
 					}
 
 					r.ExpiredProposals += n
 
 					n, err = maintenance.ConfirmUnrated(ctx, tx, now)
 					if err != nil {
-						return err
+						return apperr.Wrap(err, "maintenance.ConfirmUnrated")
 					}
 
 					r.Confirmed += n
@@ -313,7 +314,7 @@ func tick(
 					r.FrozenHistories += n
 
 					if err != nil {
-						return err
+						return apperr.Wrap(err, "maintenance.FreezeEnded")
 					}
 				}
 
@@ -321,7 +322,7 @@ func tick(
 			},
 		)
 		if err != nil {
-			return r, err
+			return r, apperr.Wrap(err, "db.TxManager.Run")
 		}
 	}
 

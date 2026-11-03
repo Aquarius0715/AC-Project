@@ -15,6 +15,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/auth"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
@@ -99,12 +100,12 @@ func (v testTokens) Verify(ctx context.Context, token string) (auth.Identity, er
 
 	id, err := auth.StaticVerifier(v).Verify(ctx, tok)
 	if err != nil || !signed {
-		return id, err
+		return id, apperr.Wrap(err, "auth.StaticVerifier.Verify")
 	}
 
 	sec, err := strconv.ParseInt(at, 10, 64)
 	if err != nil {
-		return auth.Identity{}, err
+		return auth.Identity{}, apperr.Wrap(err, "strconv.ParseInt")
 	}
 
 	id.SignedIn = time.Unix(sec, 0).UTC()

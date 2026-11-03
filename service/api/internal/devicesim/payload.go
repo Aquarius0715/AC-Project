@@ -10,6 +10,8 @@ import (
 	"math"
 	"math/rand/v2"
 	"time"
+
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // Sensor is one measurement a module reports: the metric, its unit, the value range it simulates and its measurement
@@ -209,14 +211,18 @@ func (m *Module) Telemetry(at time.Time) ([]byte, error) {
 		b.Measurements = append(b.Measurements, x)
 	}
 
-	return json.Marshal(b)
+	out, err := json.Marshal(b)
+
+	return out, apperr.Wrap(err, "json.Marshal")
 }
 
 // Beat returns the heartbeat at the given time.
 func (m *Module) Beat(at time.Time) ([]byte, error) {
-	return json.Marshal(
+	out, err := json.Marshal(
 		Heartbeat{DeviceID: m.DeviceID, At: at.UTC(), Firmware: m.Firmware, State: m.state},
 	)
+
+	return out, apperr.Wrap(err, "json.Marshal")
 }
 
 // Command is a control command the backend sends down on /cmd. ExpiresAt is when the command stops being valid; the
@@ -293,7 +299,7 @@ func (m *Module) Acknowledge(raw []byte, at time.Time) ([]byte, time.Time, error
 		},
 	)
 
-	return raw, sendAt, err
+	return raw, sendAt, apperr.Wrap(err, "json.Marshal")
 }
 
 // Kept is what a module keeps across a simulator restart: the setpoint its last applied command set. The simulator
@@ -307,7 +313,11 @@ type Kept struct {
 func (m *Module) KeptTopic() string { return Topic(m.TenantID, m.DeviceID, "sim/kept") }
 
 // Keep returns the module's kept state.
-func (m *Module) Keep() ([]byte, error) { return json.Marshal(Kept{SetpointCelsius: m.setpoint}) }
+func (m *Module) Keep() ([]byte, error) {
+	out, err := json.Marshal(Kept{SetpointCelsius: m.setpoint})
+
+	return out, apperr.Wrap(err, "json.Marshal")
+}
 
 // Restore applies a kept state read back from the broker; a setpoint outside 16–30 °C is ignored.
 func (m *Module) Restore(raw []byte) error {

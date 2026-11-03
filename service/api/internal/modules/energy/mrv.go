@@ -134,7 +134,7 @@ func preview(ctx context.Context, c *ops.Call, in *Conditions) (Preview, error) 
 	}
 
 	if err != nil {
-		return Preview{}, err
+		return Preview{}, apperr.Wrap(err, "select energy.ref_organizations")
 	}
 
 	var inOrg int
@@ -143,7 +143,7 @@ func preview(ctx context.Context, c *ops.Call, in *Conditions) (Preview, error) 
 		NOT archived`, in.UnitIDs, in.OrganizationID).
 		Scan(&inOrg)
 	if scanErr != nil {
-		return Preview{}, scanErr
+		return Preview{}, apperr.Wrap(scanErr, "select energy.ref_units")
 	}
 
 	if inOrg != len(in.UnitIDs) {
@@ -232,7 +232,7 @@ func scanReport(row pgx.Row) (Report, error) {
 		&x.EvidenceIDs,
 	)
 	if err != nil {
-		return x, err
+		return x, apperr.Wrap(err, "scan (scanReport)")
 	}
 
 	var st stored
@@ -253,7 +253,7 @@ func reviews(ctx context.Context, c *ops.Call, x *Report) error {
 		x.Version,
 	)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select energy.mrv_reviews")
 	}
 	defer rows.Close()
 
@@ -264,13 +264,13 @@ func reviews(ctx context.Context, c *ops.Call, x *Report) error {
 
 		err := rows.Scan(&r.UserID, &r.ReportVersion, &r.Comment, &r.At)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "select energy.mrv_reviews")
 		}
 
 		x.ReviewHistory = append(x.ReviewHistory, r)
 	}
 
-	return rows.Err()
+	return apperr.Wrap(rows.Err(), "select energy.mrv_reviews")
 }
 
 func latestVersion(ctx context.Context, c *ops.Call, id uuid.UUID) (int, error) {
@@ -279,7 +279,7 @@ func latestVersion(ctx context.Context, c *ops.Call, id uuid.UUID) (int, error) 
 	err := c.Tx.QueryRow(ctx, `SELECT max(version) FROM energy.mrv_reports WHERE id = $1`, id).
 		Scan(&v)
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "select energy.mrv_reports")
 	}
 
 	if v == nil {
@@ -376,7 +376,7 @@ func pageReports(
 ) (paging.Page[Report], error) {
 	w, err := paging.Resolve(q, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[Report]{}, err
+		return paging.Page[Report]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	var total int
@@ -384,7 +384,7 @@ func pageReports(
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM energy.mrv_reports r WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
-		return paging.Page[Report]{}, scanErr
+		return paging.Page[Report]{}, apperr.Wrap(scanErr, "select energy.mrv_reports")
 	}
 
 	rows, err := c.Tx.Query(
@@ -399,7 +399,7 @@ func pageReports(
 		),
 		args...)
 	if err != nil {
-		return paging.Page[Report]{}, err
+		return paging.Page[Report]{}, apperr.Wrap(err, "select energy.mrv_reports")
 	}
 
 	items := []Report{}
@@ -419,7 +419,7 @@ func pageReports(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return paging.Page[Report]{}, rowsErr
+		return paging.Page[Report]{}, apperr.Wrap(rowsErr, "select energy.mrv_reports")
 	}
 
 	for i := range items {
@@ -501,7 +501,7 @@ func listReports(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 		"r.created_at DESC, r.id DESC",
 	)
 	if err != nil {
-		return paging.Page[Report]{}, err
+		return paging.Page[Report]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
 	var args []any
@@ -592,7 +592,7 @@ func versions(ctx context.Context, c *ops.Call, in *VersionsInput) (paging.Page[
 		"r.version ASC",
 	)
 	if err != nil {
-		return paging.Page[Report]{}, err
+		return paging.Page[Report]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
 	_, latestVersionErr := latestVersion(ctx, c, in.ID)
@@ -660,7 +660,7 @@ func insertReport(
 		c.Now,
 	)
 
-	return err
+	return apperr.Wrap(err, "insert energy.mrv_reports")
 }
 
 // saveDraft stores the current conditions and the result computed now as a new draft version (SR09). Evidence IDs
@@ -709,7 +709,7 @@ func saveDraft(ctx context.Context, c *ops.Call, in *SaveInput) (Report, error) 
 	err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_attachments WHERE id = ANY($1)`, in.EvidenceIDs).
 		Scan(&found)
 	if err != nil {
-		return Report{}, err
+		return Report{}, apperr.Wrap(err, "select energy.ref_attachments")
 	}
 
 	if found != len(in.EvidenceIDs) {
@@ -828,7 +828,7 @@ func recordReview(ctx context.Context, c *ops.Call, in *ReviewInput) (Report, er
 		c.Now,
 	)
 	if execErr != nil {
-		return x, execErr
+		return x, apperr.Wrap(execErr, "insert energy.mrv_reviews")
 	}
 
 	next := latest + 1

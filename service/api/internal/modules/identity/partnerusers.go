@@ -75,7 +75,7 @@ func scanPartnerUser(r pgx.Row) (PartnerUser, error) {
 		&x.accessKept,
 	)
 
-	return x, err
+	return x, apperr.Wrap(err, "scan (scanPartnerUser)")
 }
 
 // partnerUsersList lists the caller's contractor company accounts and invites.
@@ -144,12 +144,12 @@ func partnerUsersList(
 		"lower(COALESCE(x.display_name, x.email::text)) ASC, x.id ASC",
 	)
 	if err != nil {
-		return paging.Page[PartnerUser]{}, err
+		return paging.Page[PartnerUser]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[PartnerUser]{}, err
+		return paging.Page[PartnerUser]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	args := []any{c.Principal.OrgID}
@@ -180,7 +180,7 @@ func partnerUsersList(
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM identity.partner_users x WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
-		return paging.Page[PartnerUser]{}, scanErr
+		return paging.Page[PartnerUser]{}, apperr.Wrap(scanErr, "select identity.partner_users")
 	}
 
 	rows, err := c.Tx.Query(
@@ -196,7 +196,7 @@ func partnerUsersList(
 		),
 		args...)
 	if err != nil {
-		return paging.Page[PartnerUser]{}, err
+		return paging.Page[PartnerUser]{}, apperr.Wrap(err, "select (partnerUsersList)")
 	}
 	defer rows.Close()
 
@@ -213,7 +213,7 @@ func partnerUsersList(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return paging.Page[PartnerUser]{}, rowsErr
+		return paging.Page[PartnerUser]{}, apperr.Wrap(rowsErr, "select (partnerUsersList)")
 	}
 
 	rows.Close()
@@ -364,7 +364,7 @@ func otherActiveContractor(ctx context.Context, c *ops.Call, org, except uuid.UU
 		org,
 	)
 	if execErr != nil {
-		return false, execErr
+		return false, apperr.Wrap(execErr, "select pg_advisory_xact_lock")
 	}
 
 	var ok bool
@@ -373,7 +373,7 @@ func otherActiveContractor(ctx context.Context, c *ops.Call, org, except uuid.UU
 		AND partner_role = 'contractor' AND status = 'active')`, org, except).
 		Scan(&ok)
 
-	return ok, err
+	return ok, apperr.Wrap(err, "select identity.partner_users")
 }
 
 // InviteResendGap is the least time between two invitation e-mails to one invite (IR423): the write limit per member
@@ -388,7 +388,7 @@ func inviteResendWait(ctx context.Context, c *ops.Call, table string, id uuid.UU
 	err := c.Tx.QueryRow(ctx, `SELECT last_invite_sent_at FROM identity.`+table+` WHERE id = $1 FOR UPDATE`, id).
 		Scan(&last)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select identity")
 	}
 
 	if last == nil {
@@ -484,7 +484,7 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 		$2::citext AND id <> $3)`, c.Principal.OrgID, in.Email, self).
 		Scan(&dup)
 	if err != nil {
-		return PartnerUser{}, err
+		return PartnerUser{}, apperr.Wrap(err, "select identity.partner_users")
 	}
 
 	if dup {
@@ -544,7 +544,7 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 			c.Principal.MembershipID,
 		)
 		if execErr != nil {
-			return PartnerUser{}, execErr
+			return PartnerUser{}, apperr.Wrap(execErr, "insert identity.partner_users")
 		}
 
 		v := 1
@@ -623,7 +623,7 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 				c.Now,
 			)
 			if err != nil {
-				return x, err
+				return x, apperr.Wrap(err, "update identity.memberships")
 			}
 		} else { // re-enabled: the kept access end comes back, if it has not passed
 			if kept != nil && !kept.After(c.Now) {
@@ -639,7 +639,7 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 				c.Now,
 			)
 			if err != nil {
-				return x, err
+				return x, apperr.Wrap(err, "update identity.memberships")
 			}
 
 			kept = nil
@@ -684,7 +684,7 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 				c.Now,
 			)
 			if err != nil {
-				return x, err
+				return x, apperr.Wrap(err, "update identity.memberships")
 			}
 		}
 	}
@@ -701,7 +701,7 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 		c.Now,
 	)
 	if execErr != nil {
-		return x, execErr
+		return x, apperr.Wrap(execErr, "update identity.partner_users")
 	}
 
 	if x.MembershipID != nil && status != x.Status &&
@@ -794,7 +794,7 @@ func partnerUsersRemove(ctx context.Context, c *ops.Call, in *PartnerRemoveInput
 		x.ID,
 	)
 	if execErr != nil {
-		return Deleted{}, execErr
+		return Deleted{}, apperr.Wrap(execErr, "delete identity.partner_users")
 	}
 
 	if x.MembershipID != nil {
@@ -807,7 +807,7 @@ func partnerUsersRemove(ctx context.Context, c *ops.Call, in *PartnerRemoveInput
 			c.Now,
 		)
 		if err != nil {
-			return Deleted{}, err
+			return Deleted{}, apperr.Wrap(err, "update identity.memberships")
 		}
 
 		setAccountEnabled(c, *x.MembershipID, false) // the sign-in ends too (IR461)
@@ -897,7 +897,7 @@ func partnerUsersResend(
 	scanErr := c.Tx.QueryRow(ctx, `SELECT user_id FROM identity.memberships WHERE id = $1`, *x.MembershipID).
 		Scan(&user)
 	if scanErr != nil {
-		return InvitePreview{}, scanErr
+		return InvitePreview{}, apperr.Wrap(scanErr, "select identity.memberships")
 	}
 
 	requestAccount(c, user, *x.MembershipID, x.PartnerRole)
@@ -909,7 +909,7 @@ func partnerUsersResend(
 		c.Now,
 	)
 	if execErr != nil {
-		return InvitePreview{}, execErr
+		return InvitePreview{}, apperr.Wrap(execErr, "update identity.partner_users")
 	}
 
 	c.Audit(

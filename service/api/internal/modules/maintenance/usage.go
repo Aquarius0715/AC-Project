@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // Usage reports whether a unit has maintenance jobs, which blocks physical deletion (DD-A02). Equipment calls it;
@@ -56,7 +57,9 @@ type OrgInput struct {
 
 // UnitInUse implements assets.UnitUsage.
 func (Usage) UnitInUse(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, error) {
-	return ops.Delegate(ctx, c, QueryUnitInUse, UnitInput{UnitID: unit}, unitInUse)
+	out, err := ops.Delegate(ctx, c, QueryUnitInUse, UnitInput{UnitID: unit}, unitInUse)
+
+	return out, apperr.Wrap(err, "delegate maintenance.unitInUse")
 }
 
 // ClaimableJobs returns, per unit, the completed jobs whose accepted work report lists parts and that have no filed
@@ -67,17 +70,23 @@ func (Usage) ClaimableJobs(
 	c *ops.Call,
 	units []uuid.UUID,
 ) (map[uuid.UUID]map[uuid.UUID]time.Time, error) {
-	return ops.Delegate(ctx, c, QueryClaimableJobs, UnitsInput{UnitIDs: units}, claimableJobs)
+	out, err := ops.Delegate(ctx, c, QueryClaimableJobs, UnitsInput{UnitIDs: units}, claimableJobs)
+
+	return out, apperr.Wrap(err, "delegate maintenance.claimableJobs")
 }
 
 // UnitActive reports an open job on the unit (blocks units.archive, D05).
 func (Usage) UnitActive(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, error) {
-	return ops.Delegate(ctx, c, QueryUnitActive, UnitInput{UnitID: unit}, unitActive)
+	out, err := ops.Delegate(ctx, c, QueryUnitActive, UnitInput{UnitID: unit}, unitActive)
+
+	return out, apperr.Wrap(err, "delegate maintenance.unitActive")
 }
 
 // OrgActive reports open jobs for a customer organization (blocks customer deactivation, D05).
 func (Usage) OrgActive(ctx context.Context, c *ops.Call, org uuid.UUID) (bool, error) {
-	return ops.Delegate(ctx, c, QueryOrgActive, OrgInput{OrgID: org}, orgActive)
+	out, err := ops.Delegate(ctx, c, QueryOrgActive, OrgInput{OrgID: org}, orgActive)
+
+	return out, apperr.Wrap(err, "delegate maintenance.orgActive")
 }
 
 func registerUsage(r *ops.Registry) {
@@ -107,10 +116,12 @@ func bookedTechnicians(
 		c.Now,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select maintenance.assignments")
 	}
 
-	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	out2, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+
+	return out2, apperr.Wrap(err, "select maintenance.assignments")
 }
 
 func technicianBooked(ctx context.Context, c *ops.Call, in *MembershipInput) (bool, error) {
@@ -121,7 +132,7 @@ func technicianBooked(ctx context.Context, c *ops.Call, in *MembershipInput) (bo
 		in.MembershipID, c.Now).
 		Scan(&b)
 
-	return b, err
+	return b, apperr.Wrap(err, "select maintenance.assignments")
 }
 
 func unitInUse(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
@@ -130,7 +141,7 @@ func unitInUse(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
 	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.jobs WHERE unit_id = $1)`, in.UnitID).
 		Scan(&b)
 
-	return b, err
+	return b, apperr.Wrap(err, "select maintenance.jobs")
 }
 
 func claimableJobs(
@@ -149,7 +160,7 @@ func claimableJobs(
 		in.UnitIDs,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select maintenance.jobs")
 	}
 	defer rows.Close()
 
@@ -161,7 +172,7 @@ func claimableJobs(
 
 		err := rows.Scan(&u, &j, &at)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select maintenance.jobs")
 		}
 
 		if out[u] == nil {
@@ -171,7 +182,7 @@ func claimableJobs(
 		out[u][j] = at
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select maintenance.jobs")
 }
 
 func unitActive(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
@@ -181,7 +192,7 @@ func unitActive(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
 		('completed','cancelled'))`, in.UnitID).
 		Scan(&b)
 
-	return b, err
+	return b, apperr.Wrap(err, "select maintenance.jobs")
 }
 
 func orgActive(ctx context.Context, c *ops.Call, in *OrgInput) (bool, error) {
@@ -191,5 +202,5 @@ func orgActive(ctx context.Context, c *ops.Call, in *OrgInput) (bool, error) {
 		('completed','cancelled'))`, in.OrgID).
 		Scan(&b)
 
-	return b, err
+	return b, apperr.Wrap(err, "select maintenance.jobs")
 }

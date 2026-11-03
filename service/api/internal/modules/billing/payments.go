@@ -42,7 +42,7 @@ func scanPayment(r pgx.Row) (Payment, error) {
 		&p.EventIDs,
 	)
 
-	return p, err
+	return p, apperr.Wrap(err, "scan (scanPayment)")
 }
 
 // forCaller hides HQ's confirmation reason from non-HQ callers (DD-A08 shows it to HQ; IR199).
@@ -100,7 +100,7 @@ func referenceFree(ctx context.Context, c *ops.Call, ref string, except uuid.UUI
 		$2)`, ref, except).
 		Scan(&used)
 
-	return !used, err
+	return !used, apperr.Wrap(err, "select billing.payments")
 }
 
 // markPaid sets the invoice paid and triggers the IR35 release route.
@@ -112,7 +112,7 @@ func (m Billing) markPaid(ctx context.Context, c *ops.Call, invoice uuid.UUID) e
 		c.Now,
 	)
 	if execErr != nil {
-		return execErr
+		return apperr.Wrap(execErr, "update billing.invoices")
 	}
 
 	c.Emit(
@@ -130,7 +130,7 @@ func (m Billing) markPaid(ctx context.Context, c *ops.Call, invoice uuid.UUID) e
 
 	_, err := m.Releases.OnInvoicePaid(ctx, c, invoice)
 
-	return err
+	return apperr.Wrap(err, "billing.Releases.OnInvoicePaid")
 }
 
 func (m Billing) paymentResult(
@@ -266,7 +266,7 @@ func (m Billing) simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (
 				('initiated','processing','confirmed'))`, inv.ID).
 				Scan(&open)
 			if err != nil {
-				return nil, err
+				return nil, apperr.Wrap(err, "select billing.payments")
 			}
 
 			if open {
@@ -313,7 +313,7 @@ func (m Billing) simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (
 			id`, inv.ID, inv.AmountMinor, inv.Currency, *in.Method, c.Now).
 			Scan(&id)
 		if scanErr != nil {
-			return nil, scanErr
+			return nil, apperr.Wrap(scanErr, "insert billing.payments")
 		}
 
 		_, execErr := c.Tx.Exec(
@@ -323,7 +323,7 @@ func (m Billing) simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (
 			c.Now,
 		)
 		if execErr != nil {
-			return nil, execErr
+			return nil, apperr.Wrap(execErr, "update billing.invoices")
 		}
 
 		return m.paymentResult(ctx, c, id, "payments.simulate", "initiate")
@@ -386,7 +386,7 @@ func (m Billing) simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (
 		*in.EventID,
 	)
 	if execErr != nil {
-		return nil, execErr
+		return nil, apperr.Wrap(execErr, "update billing.payments")
 	}
 
 	if next == "confirmed" {
@@ -403,7 +403,7 @@ func (m Billing) simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (
 			c.Now,
 		)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "update billing.invoices")
 		}
 	}
 
@@ -551,7 +551,7 @@ func (m Billing) confirm(ctx context.Context, c *ops.Call, in *ConfirmInput) (Pa
 		c.Principal.MembershipID,
 	)
 	if execErr != nil {
-		return p, execErr
+		return p, apperr.Wrap(execErr, "update billing.payments")
 	}
 
 	markPaidErr := m.markPaid(ctx, c, inv.ID)
@@ -622,7 +622,7 @@ func (m Billing) recordManual(ctx context.Context, c *ops.Call, in *ManualInput)
 		('initiated','processing','confirmed'))`, inv.ID).
 		Scan(&any)
 	if scanErr != nil {
-		return Payment{}, scanErr
+		return Payment{}, apperr.Wrap(scanErr, "select billing.payments")
 	}
 
 	if any || inv.Status == "paid" {
@@ -652,7 +652,7 @@ func (m Billing) recordManual(ctx context.Context, c *ops.Call, in *ManualInput)
 		inv.ID, inv.AmountMinor, inv.Currency, in.PaymentReference, c.Principal.MembershipID, c.Now, in.Reason).
 		Scan(&id)
 	if scanErr != nil {
-		return Payment{}, scanErr
+		return Payment{}, apperr.Wrap(scanErr, "insert billing.payments")
 	}
 
 	markPaidErr := m.markPaid(ctx, c, inv.ID)

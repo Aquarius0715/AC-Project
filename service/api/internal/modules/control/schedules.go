@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // scheduleRef is the automation_runs trigger of a schedule occurrence: the same for the scheduler and a UI fire of
@@ -50,11 +51,11 @@ func (m Automations) FireSchedules(ctx context.Context, c *ops.Call) (int, error
 			now,
 		)
 
-		return 0, err
+		return 0, apperr.Wrap(err, "insert control.schedule_watermarks")
 	}
 
 	if err != nil || !now.After(since) {
-		return 0, err
+		return 0, apperr.Wrap(err, "insert control.schedule_watermarks")
 	}
 
 	if now.Sub(since) > maxScheduleWindow {
@@ -76,7 +77,7 @@ func (m Automations) FireSchedules(ctx context.Context, c *ops.Call) (int, error
 		BY a.id`,
 	)
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "select control.automations")
 	}
 
 	days := int(now.Sub(since).Hours()/24) + 3
@@ -92,7 +93,7 @@ func (m Automations) FireSchedules(ctx context.Context, c *ops.Call) (int, error
 		if err != nil {
 			rows.Close()
 
-			return 0, err
+			return 0, apperr.Wrap(err, "select control.automations")
 		}
 
 		loc, err := time.LoadLocation(tz)
@@ -128,7 +129,7 @@ func (m Automations) FireSchedules(ctx context.Context, c *ops.Call) (int, error
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return 0, rowsErr
+		return 0, apperr.Wrap(rowsErr, "select control.automations")
 	}
 
 	order := make([]*tick, 0, len(ticks))
@@ -170,7 +171,7 @@ func (m Automations) FireSchedules(ctx context.Context, c *ops.Call) (int, error
 
 			_, found, err := m.Units.Target(ctx, c, u)
 			if err != nil {
-				return created, err
+				return created, apperr.Wrap(err, "control.Units.Target")
 			} else if found { // an archived or removed unit is skipped, not an error of the tick
 				in.UnitIDs = append(in.UnitIDs, u)
 			}
@@ -213,5 +214,5 @@ func (m Automations) FireSchedules(ctx context.Context, c *ops.Call) (int, error
 		now,
 	)
 
-	return created, err
+	return created, apperr.Wrap(err, "update control.schedule_watermarks")
 }

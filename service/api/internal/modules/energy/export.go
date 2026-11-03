@@ -137,7 +137,7 @@ func exportReport(ctx context.Context, c *ops.Call, in *ExportInput) (ReportFile
 		AND NOT archived`, in.PropertyIDs, c.Principal.OrgID).
 		Scan(&own)
 	if scanErr != nil {
-		return ReportFile{}, scanErr
+		return ReportFile{}, apperr.Wrap(scanErr, "select energy.ref_properties")
 	}
 
 	if own != len(in.PropertyIDs) {
@@ -150,12 +150,12 @@ func exportReport(ctx context.Context, c *ops.Call, in *ExportInput) (ReportFile
 		in.PropertyIDs,
 	)
 	if err != nil {
-		return ReportFile{}, err
+		return ReportFile{}, apperr.Wrap(err, "select energy.ref_units")
 	}
 
 	units, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 	if err != nil {
-		return ReportFile{}, err
+		return ReportFile{}, apperr.Wrap(err, "select energy.ref_units")
 	}
 
 	var b strings.Builder
@@ -214,7 +214,7 @@ func exportReport(ctx context.Context, c *ops.Call, in *ExportInput) (ReportFile
 				$3`, c.Principal.OrgID, start, end).
 				Scan(&retired)
 			if err != nil {
-				return ReportFile{}, err
+				return ReportFile{}, apperr.Wrap(err, "select energy.offset_records")
 			}
 
 			fmt.Fprintf(
@@ -232,7 +232,7 @@ func exportReport(ctx context.Context, c *ops.Call, in *ExportInput) (ReportFile
 				updated_at < $3)`, units, start, end).
 				Scan(&alerts, &jobs)
 			if err != nil {
-				return ReportFile{}, err
+				return ReportFile{}, apperr.Wrap(err, "select energy.ref_alerts")
 			}
 
 			fmt.Fprintf(

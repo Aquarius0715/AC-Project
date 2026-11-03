@@ -11,6 +11,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/modules/control"
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // Models answers model-register questions for other modules (assets.Models).
@@ -31,7 +32,7 @@ func (Models) CurrentVersion(
 			return 0, false, nil
 		}
 
-		return 0, false, err
+		return 0, false, apperr.Wrap(err, "select devices.capabilities")
 	}
 
 	return v, true, nil
@@ -51,7 +52,7 @@ func (Models) ByCode(ctx context.Context, c *ops.Call, code string) (uuid.UUID, 
 		return uuid.Nil, 0, false, nil
 	}
 
-	return id, v, err == nil, err
+	return id, v, err == nil, apperr.Wrap(err, "select devices.capabilities")
 }
 
 // SerialState is the device behind a serial for a CSV import row (DD-A18, case-insensitive): "unknown", "bound" (to
@@ -76,7 +77,7 @@ func (Models) SerialState(
 	}
 
 	if err != nil {
-		return uuid.Nil, "", err
+		return uuid.Nil, "", apperr.Wrap(err, "select devices.devices")
 	}
 
 	switch {
@@ -111,7 +112,7 @@ func (Models) BindImported(
 			return false, nil
 		}
 
-		return false, err
+		return false, apperr.Wrap(err, "select devices.devices")
 	}
 
 	if bound || tamper == "detected" {
@@ -134,7 +135,7 @@ func (Models) BindImported(
 		c.Principal.MembershipID,
 	)
 	if err != nil {
-		return false, err
+		return false, apperr.Wrap(err, "insert devices.device_bindings")
 	}
 
 	var v int
@@ -144,7 +145,7 @@ func (Models) BindImported(
 		WHERE id = $1 RETURNING version`, device, unit, binding).
 		Scan(&v)
 	if err != nil {
-		return false, err
+		return false, apperr.Wrap(err, "update devices.devices")
 	}
 
 	c.Emit(
@@ -184,7 +185,7 @@ func (Models) UnbindUnits(
 		reason,
 	)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "update devices.device_bindings")
 	}
 
 	type pair struct{ device, unit uuid.UUID }
@@ -198,7 +199,7 @@ func (Models) UnbindUnits(
 		if err != nil {
 			rows.Close()
 
-			return err
+			return apperr.Wrap(err, "update devices.device_bindings")
 		}
 
 		ended = append(ended, p)
@@ -208,7 +209,7 @@ func (Models) UnbindUnits(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return rowsErr
+		return apperr.Wrap(rowsErr, "update devices.device_bindings")
 	}
 
 	for _, p := range ended {
@@ -219,7 +220,7 @@ func (Models) UnbindUnits(
 			WHERE id = $1 RETURNING version`, p.device).
 			Scan(&v)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "update devices.devices")
 		}
 
 		c.Emit(
@@ -312,7 +313,7 @@ func (Models) StaleAfter(
 		sensors,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select devices.sensors")
 	}
 	defer rows.Close()
 
@@ -326,13 +327,13 @@ func (Models) StaleAfter(
 
 		err := rows.Scan(&id, &sec)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select devices.sensors")
 		}
 
 		out[id] = time.Duration(sec) * time.Second
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select devices.sensors")
 }
 
 // BoundDevice returns the connection and power signal of the device currently bound to a unit.
@@ -354,7 +355,7 @@ func (Models) BoundDevice(
 		return id, "", "", false, nil
 	}
 
-	return id, conn, power, err == nil, err
+	return id, conn, power, err == nil, apperr.Wrap(err, "select devices.device_bindings")
 }
 
 // OperationBusy reports a queued/running device operation on the unit (D04 mutual exclusion).
@@ -365,7 +366,7 @@ func (Models) OperationBusy(ctx context.Context, c *ops.Call, unit uuid.UUID) (b
 		('queued','running') AND expires_at > $2)`, unit, c.Now).
 		Scan(&b)
 
-	return b, err
+	return b, apperr.Wrap(err, "select devices.device_operations")
 }
 
 // AlertRecovery is a recovery event of a device linked to an alert.
@@ -392,14 +393,16 @@ func (Models) AlertRecoveries(
 		since,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select devices.device_events")
 	}
 
-	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (AlertRecovery, error) {
+	recoveries, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (AlertRecovery, error) {
 		var x AlertRecovery
 
 		err := r.Scan(&x.ID, &x.EventType, &x.OccurredAt)
 
-		return x, err
+		return x, apperr.Wrap(err, "scan (AlertRecoveries)")
 	})
+
+	return recoveries, apperr.Wrap(err, "select devices.device_events")
 }

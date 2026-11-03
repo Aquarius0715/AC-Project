@@ -27,6 +27,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/devicesim"
 	"github.com/pradita/ac-project/service/api/internal/migrate"
 	"github.com/pradita/ac-project/service/api/internal/migrations"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -50,7 +51,7 @@ func run(ctx context.Context, args []string) error {
 
 	conn, err := pgx.Connect(ctx, url)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "pgx.Connect")
 	}
 	defer conn.Close(context.WithoutCancel(ctx))
 
@@ -58,17 +59,17 @@ func run(ctx context.Context, args []string) error {
 	case "up":
 		ms, err := migrate.Load(migrations.FS)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "migrate.Load")
 		}
 
 		applied, err := migrate.Up(ctx, conn, ms)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "migrate.Up")
 		}
 
 		v, _, err := migrate.Version(ctx, conn)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "migrate.Version")
 		}
 
 		log.Printf("migrate: applied %d migration(s); version %d", len(applied), v)
@@ -77,7 +78,7 @@ func run(ctx context.Context, args []string) error {
 	case "version":
 		v, dirty, err := migrate.Version(ctx, conn)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "migrate.Version")
 		}
 
 		fmt.Printf("%d dirty=%t\n", v, dirty)
@@ -90,10 +91,10 @@ func run(ctx context.Context, args []string) error {
 
 		v, err := strconv.ParseInt(args[1], 10, 64)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "strconv.ParseInt")
 		}
 
-		return migrate.Force(ctx, conn, v)
+		return apperr.Wrap(migrate.Force(ctx, conn, v), "migrate.Force")
 	case "bootstrap-admin":
 		return bootstrapAdmin(ctx, conn, args[1:])
 	}
@@ -130,7 +131,7 @@ func bootstrapAdmin(ctx context.Context, conn *pgx.Conn, args []string) error {
 
 	err := fs.Parse(args)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "flag.FlagSet.Parse")
 	}
 
 	var r bootstrap.Result
@@ -140,7 +141,7 @@ func bootstrapAdmin(ctx context.Context, conn *pgx.Conn, args []string) error {
 
 		r, err = bootstrap.Admin(ctx, tx, in)
 
-		return err
+		return apperr.Wrap(err, "bootstrap.Admin")
 	})
 	if err != nil {
 		return fmt.Errorf("bootstrap-admin: %w", err)
@@ -166,7 +167,7 @@ func local(ctx context.Context, conn *pgx.Conn) error {
 	if pw := os.Getenv("APP_LOGIN_PASSWORD"); pw != "" {
 		err := migrate.EnsureLogin(ctx, conn, "ac_app_login", pw, "ac_app")
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "migrate.EnsureLogin")
 		}
 
 		log.Printf("migrate: login role ac_app_login ready")
@@ -181,7 +182,7 @@ func local(ctx context.Context, conn *pgx.Conn) error {
 				"ac_svc_"+d,
 			)
 			if err != nil {
-				return err
+				return apperr.Wrap(err, "migrate.EnsureLogin")
 			}
 		}
 
@@ -195,12 +196,12 @@ func local(ctx context.Context, conn *pgx.Conn) error {
 
 	done, err := migrate.Seeded(ctx, conn)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "migrate.Seeded")
 	}
 
 	f, err := seed.Load(path)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "seed.Load")
 	}
 
 	if done {
@@ -212,7 +213,7 @@ func local(ctx context.Context, conn *pgx.Conn) error {
 			func(tx pgx.Tx) error { return seed.Apply(ctx, tx, f) },
 		)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "transaction")
 		}
 
 		log.Printf("migrate: seeded %d actors, %d units", len(f.Actors), len(f.DemoSeed.Units))
@@ -221,7 +222,7 @@ func local(ctx context.Context, conn *pgx.Conn) error {
 	if os.Getenv("SEED_MOCK_FLEET") == "1" {
 		fleet, err := devicesim.MockFleet()
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "devicesim.MockFleet")
 		}
 
 		var n int
@@ -231,10 +232,10 @@ func local(ctx context.Context, conn *pgx.Conn) error {
 
 			n, err = seed.ApplyFleet(ctx, tx, fleet, f.SeedCreatedAt)
 
-			return err
+			return apperr.Wrap(err, "seed.ApplyFleet")
 		})
 		if beginFuncErr != nil {
-			return beginFuncErr
+			return apperr.Wrap(beginFuncErr, "transaction")
 		}
 
 		log.Printf("migrate: mock fleet of %d units ready", n)
@@ -247,7 +248,7 @@ func local(ctx context.Context, conn *pgx.Conn) error {
 			func(tx pgx.Tx) error { return seed.ApplyLive(ctx, tx, f.SeedCreatedAt) },
 		)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "transaction")
 		}
 
 		log.Printf(

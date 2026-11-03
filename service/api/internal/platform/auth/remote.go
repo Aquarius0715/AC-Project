@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 )
 
@@ -173,7 +174,7 @@ func (r *RemoteSource) fetch(
 		nil,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "http.NewRequestWithContext")
 	}
 
 	req.Header.Set("Authorization", "Bearer "+r.Token)

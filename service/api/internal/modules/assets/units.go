@@ -195,7 +195,7 @@ func (m *Module) query(
 	err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM assets.units u WHERE "+where, args...).
 		Scan(&total)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, apperr.Wrap(err, "select assets.units")
 	}
 
 	q := "SELECT " + unitCols + " FROM assets.units u WHERE " + where + " ORDER BY " + order
@@ -205,7 +205,7 @@ func (m *Module) query(
 
 	rows, err := c.Tx.Query(ctx, q, args...)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, apperr.Wrap(err, "query (query)")
 	}
 	defer rows.Close()
 
@@ -241,12 +241,12 @@ func (m *Module) query(
 			&u.AlertPolicyIDs,
 		)
 		if err != nil {
-			return nil, 0, err
+			return nil, 0, apperr.Wrap(err, "query (query)")
 		}
 
 		err = json.Unmarshal(state, &u.ObservedState)
 		if err != nil {
-			return nil, 0, err
+			return nil, 0, apperr.Wrap(err, "json.Unmarshal")
 		}
 
 		if len(u.ObservedRestriction) == 0 {
@@ -259,7 +259,7 @@ func (m *Module) query(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return nil, 0, rowsErr
+		return nil, 0, apperr.Wrap(rowsErr, "query (query)")
 	}
 
 	return out, total, m.enrich(ctx, c, out)
@@ -296,12 +296,12 @@ func (m *Module) enrich(ctx context.Context, c *ops.Call, units []Unit) error {
 
 	power, err := m.Mon.PowerMeasured(ctx, c, ids)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "assets.Monitoring.PowerMeasured")
 	}
 
 	counts, err := m.Mon.ActiveAlertCounts(ctx, c, ids)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "assets.Monitoring.ActiveAlertCounts")
 	}
 
 	readable, err := unitscope.EquipmentReadable(
@@ -310,12 +310,12 @@ func (m *Module) enrich(ctx context.Context, c *ops.Call, units []Unit) error {
 		ids,
 	) // telemetry is an equipment read (IR49(b)): nothing before the work window
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "unitscope.EquipmentReadable")
 	}
 
 	latest, err := m.Mon.LatestMeasurements(ctx, c, readable)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "assets.Monitoring.LatestMeasurements")
 	}
 
 	for i := range units {
@@ -428,12 +428,12 @@ func (m *Module) unitsList(
 		"u.id ASC",
 	)
 	if err != nil {
-		return paging.Page[Unit]{}, err
+		return paging.Page[Unit]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[Unit]{}, err
+		return paging.Page[Unit]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	var args []any
@@ -609,7 +609,7 @@ func (m *Module) unitsGet(ctx context.Context, c *ops.Call, in *UnitGetInput) (U
 		[]uuid.UUID{in.ID},
 	)
 	if gateErr != nil { // IR49(b): equipment read waits for the work window
-		return UnitDetail{}, gateErr
+		return UnitDetail{}, apperr.Wrap(gateErr, "unitscope.Gate")
 	}
 
 	d := UnitDetail{
@@ -631,7 +631,7 @@ func (m *Module) unitsGet(ctx context.Context, c *ops.Call, in *UnitGetInput) (U
 	if m.Details != nil {
 		d.DetailExtras, err = m.Details.Detail(ctx, c, units[0])
 		if err != nil {
-			return UnitDetail{}, err
+			return UnitDetail{}, apperr.Wrap(err, "assets.Details.Detail")
 		}
 	}
 

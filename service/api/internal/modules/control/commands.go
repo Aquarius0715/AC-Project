@@ -117,7 +117,7 @@ func scanCommand(r pgx.Row) (Command, error) {
 		&x.Source,
 	)
 
-	return x, err
+	return x, apperr.Wrap(err, "scan (scanCommand)")
 }
 
 // Allowed applies the IR46 restriction table to an action (policy is RestrictionPolicy JSON or nil).
@@ -246,7 +246,7 @@ func inScope(p *ops.Principal, unit, property, org uuid.UUID) bool {
 func (m Commands) create(ctx context.Context, c *ops.Call, in *CreateInput) (Command, error) {
 	t, found, err := m.Units.Target(ctx, c, in.UnitID)
 	if err != nil {
-		return Command{}, err
+		return Command{}, apperr.Wrap(err, "control.Units.Target")
 	}
 
 	nf := apperr.E(apperr.NotFound, "error.notFound")
@@ -275,7 +275,7 @@ func (m Commands) create(ctx context.Context, c *ops.Call, in *CreateInput) (Com
 
 		err := m.Access.TechnicianJob(ctx, c, *in.JobID, in.UnitID)
 		if err != nil {
-			return Command{}, err
+			return Command{}, apperr.Wrap(err, "control.TechAccess.TechnicianJob")
 		}
 
 		if in.Reason == nil {
@@ -305,7 +305,7 @@ func (m Commands) create(ctx context.Context, c *ops.Call, in *CreateInput) (Com
 
 	policy, err := m.Restrictions.UnitPolicy(ctx, c, in.UnitID)
 	if err != nil {
-		return Command{}, err
+		return Command{}, apperr.Wrap(err, "control.Restrictions.UnitPolicy")
 	}
 
 	if !Allowed(in.action, policy) {
@@ -379,7 +379,7 @@ func (m Commands) ready(ctx context.Context, c *ops.Call, unit uuid.UUID) (uuid.
 		unit,
 	) // SR26: an unresolved terminal-restriction recovery case blocks ordinary control
 	if err != nil {
-		return uuid.Nil, err
+		return uuid.Nil, apperr.Wrap(err, "control.Restrictions.UnitRecovering")
 	}
 
 	if blocked {
@@ -393,7 +393,7 @@ func (m Commands) ready(ctx context.Context, c *ops.Call, unit uuid.UUID) (uuid.
 
 	opBusy, err := m.Devices.OperationBusy(ctx, c, unit)
 	if err != nil {
-		return uuid.Nil, err
+		return uuid.Nil, apperr.Wrap(err, "control.Devices.OperationBusy")
 	}
 
 	if busy || opBusy {
@@ -402,7 +402,7 @@ func (m Commands) ready(ctx context.Context, c *ops.Call, unit uuid.UUID) (uuid.
 
 	dev, conn, power, bound, err := m.Devices.BoundDevice(ctx, c, unit)
 	if err != nil {
-		return uuid.Nil, err
+		return uuid.Nil, apperr.Wrap(err, "control.Devices.BoundDevice")
 	}
 
 	return dev, Deliverable(bound, conn, power)
@@ -469,7 +469,7 @@ func (m Commands) get(ctx context.Context, c *ops.Call, in *GetInput) (Command, 
 	if c.Principal.Role == "client" || c.Principal.Role == "technician" {
 		t, found, err := m.Units.Target(ctx, c, x.UnitID)
 		if err != nil {
-			return x, err
+			return x, apperr.Wrap(err, "control.Units.Target")
 		}
 
 		ok := found &&
@@ -538,7 +538,7 @@ func (m Commands) list(
 ) (paging.Page[Command], error) {
 	err := paging.NoFilters(in.Query, "query.filters")
 	if err != nil {
-		return paging.Page[Command]{}, err
+		return paging.Page[Command]{}, apperr.Wrap(err, "paging.NoFilters")
 	}
 
 	order, err := paging.OrderBy(
@@ -547,7 +547,7 @@ func (m Commands) list(
 		"requested_at DESC, id",
 	)
 	if err != nil {
-		return paging.Page[Command]{}, err
+		return paging.Page[Command]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 	// the cursor binds the unit and job, not the paging fields themselves (the next page carries the cursor)
 	w, err := paging.Resolve(in.Query, struct {
@@ -555,12 +555,12 @@ func (m Commands) list(
 		JobID  *uuid.UUID `json:"jobId"`
 	}{in.UnitID, in.JobID}, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[Command]{}, err
+		return paging.Page[Command]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	t, found, err := m.Units.Target(ctx, c, in.UnitID)
 	if err != nil {
-		return paging.Page[Command]{}, err
+		return paging.Page[Command]{}, apperr.Wrap(err, "control.Units.Target")
 	}
 
 	nf := apperr.E(apperr.NotFound, "error.notFound")
@@ -584,7 +584,7 @@ func (m Commands) list(
 			*in.JobID, in.UnitID, c.Principal.MembershipID).
 			Scan(&ok)
 		if err != nil {
-			return paging.Page[Command]{}, err
+			return paging.Page[Command]{}, apperr.Wrap(err, "select assets.unit_assignment_access")
 		}
 
 		if !ok {
@@ -609,7 +609,7 @@ func (m Commands) list(
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM control.commands WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
-		return paging.Page[Command]{}, scanErr
+		return paging.Page[Command]{}, apperr.Wrap(scanErr, "select control.commands")
 	}
 
 	rows, err := c.Tx.Query(
@@ -624,7 +624,7 @@ func (m Commands) list(
 		),
 		args...)
 	if err != nil {
-		return paging.Page[Command]{}, err
+		return paging.Page[Command]{}, apperr.Wrap(err, "select control.commands")
 	}
 	defer rows.Close()
 
@@ -648,7 +648,7 @@ func (m Commands) list(
 		NextCursor:      w.Next(total),
 		Total:           total,
 		SnapshotVersion: w.Snapshot,
-	}, rows.Err()
+	}, apperr.Wrap(rows.Err(), "select control.commands")
 }
 
 // AuditResult appends the final result of a command that a person asked for (commands.create: source ui or voice) under
@@ -671,7 +671,7 @@ func AuditResult(
 	err := tx.QueryRow(ctx, `SELECT tenant_id, correlation_id, source FROM control.commands WHERE id = $1`, command).
 		Scan(&tenant, &corr, &source)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select control.commands")
 	}
 
 	if (source != "ui" && source != "voice") || corr == nil || *corr == "" {
@@ -680,23 +680,26 @@ func AuditResult(
 
 	id := uuid.Must(uuid.NewV7())
 
-	return events.Publish(ctx, tx, tenant, "audit", id, events.AuditRecorded, events.Audit{
-		ID:              id,
-		ActorID:         actor,
-		ActorRole:       "system",
-		Action:          "commands.create",
-		TargetKind:      "command",
-		TargetID:        command.String(),
-		OccurredAt:      at,
-		CorrelationID:   *corr,
-		Result:          result,
-		Reason:          reason,
-		MembershipID:    nil,
-		PreviousVersion: nil,
-		NextVersion:     nil,
-		MaskedBefore:    nil,
-		MaskedAfter:     nil,
-	})
+	return apperr.Wrap(
+		events.Publish(ctx, tx, tenant, "audit", id, events.AuditRecorded, events.Audit{
+			ID:              id,
+			ActorID:         actor,
+			ActorRole:       "system",
+			Action:          "commands.create",
+			TargetKind:      "command",
+			TargetID:        command.String(),
+			OccurredAt:      at,
+			CorrelationID:   *corr,
+			Result:          result,
+			Reason:          reason,
+			MembershipID:    nil,
+			PreviousVersion: nil,
+			NextVersion:     nil,
+			MaskedBefore:    nil,
+			MaskedAfter:     nil,
+		}),
+		"events.Publish",
+	)
 }
 
 // ExpireGrace is how long after expiresAt a command waits before it is expired (IR453): an acknowledgement the bridge
@@ -713,12 +716,12 @@ func ExpireCommands(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) 
 		now.Add(-ExpireGrace),
 	)
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "update control.commands")
 	}
 
 	ids, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "update control.commands")
 	}
 
 	for _, id := range ids {
@@ -763,7 +766,7 @@ func Acknowledge(
 		receivedAt,
 	)
 	if err != nil {
-		return false, err
+		return false, apperr.Wrap(err, "update control.commands")
 	}
 
 	if tag.RowsAffected() == 1 {
@@ -806,7 +809,7 @@ func Acknowledge(
 		receivedAt,
 	)
 
-	return false, err
+	return false, apperr.Wrap(err, "update control.commands")
 }
 
 // applyObserved copies an acknowledged unit setting into ACUnit.observedState (power / celsius / mode / fanLevel
@@ -828,7 +831,7 @@ func applyObserved(ctx context.Context, tx pgx.Tx, command uuid.UUID, at time.Ti
 		at.UTC().Format(time.RFC3339Nano),
 	)
 
-	return err
+	return apperr.Wrap(err, "update assets.units")
 }
 
 // Register binds commands.create / commands.get.
@@ -847,7 +850,7 @@ func PendingCommands(ctx context.Context, c *ops.Call, unit uuid.UUID) ([]Comman
 		unit,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select control.commands")
 	}
 	defer rows.Close()
 
@@ -862,5 +865,5 @@ func PendingCommands(ctx context.Context, c *ops.Call, unit uuid.UUID) ([]Comman
 		out = append(out, x)
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select control.commands")
 }

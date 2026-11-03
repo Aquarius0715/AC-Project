@@ -89,7 +89,7 @@ func get(ctx context.Context, c *ops.Call, in *Input) (Result, error) {
 	}
 
 	if err != nil {
-		return Result{}, err
+		return Result{}, apperr.Wrap(err, "select platform.idempotency_keys")
 	}
 
 	if status != "completed" {

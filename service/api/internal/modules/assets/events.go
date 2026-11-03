@@ -5,6 +5,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
 )
 
@@ -18,7 +19,7 @@ func EventHandlers() map[string]events.Handler {
 
 			decodeErr := e.Decode(&p)
 			if decodeErr != nil {
-				return decodeErr
+				return apperr.Wrap(decodeErr, "events.Event.Decode")
 			}
 
 			_, err := tx.Exec(
@@ -28,14 +29,14 @@ func EventHandlers() map[string]events.Handler {
 				[]byte(p.Observed),
 			)
 
-			return err
+			return apperr.Wrap(err, "update assets.units")
 		},
 		events.UnitRestrictionCleared: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.UnitRestriction
 
 			decodeErr := e.Decode(&p)
 			if decodeErr != nil {
-				return decodeErr
+				return apperr.Wrap(decodeErr, "events.Event.Decode")
 			}
 
 			_, err := tx.Exec(
@@ -46,14 +47,14 @@ func EventHandlers() map[string]events.Handler {
 				p.RestrictionID,
 			)
 
-			return err
+			return apperr.Wrap(err, "update assets.units")
 		},
 		events.RecoveryCasesChanged: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.Units
 
 			decodeErr := e.Decode(&p)
 			if decodeErr != nil {
-				return decodeErr
+				return apperr.Wrap(decodeErr, "events.Event.Decode")
 			}
 
 			_, err := tx.Exec(
@@ -62,14 +63,14 @@ func EventHandlers() map[string]events.Handler {
 				p.UnitIDs,
 			)
 
-			return err
+			return apperr.Wrap(err, "update assets.units")
 		},
 		events.OfferAccessChanged: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.OfferAccess
 
 			decodeErr := e.Decode(&p)
 			if decodeErr != nil {
-				return decodeErr
+				return apperr.Wrap(decodeErr, "events.Event.Decode")
 			}
 
 			if !p.Accepted || p.UnitID == nil {
@@ -80,7 +81,7 @@ func EventHandlers() map[string]events.Handler {
 					p.OfferID,
 				)
 
-				return err
+				return apperr.Wrap(err, "delete assets.unit_offer_access")
 			}
 
 			_, err := tx.Exec(
@@ -100,14 +101,14 @@ func EventHandlers() map[string]events.Handler {
 				p.AccessValidUntil,
 			)
 
-			return err
+			return apperr.Wrap(err, "insert assets.unit_offer_access")
 		},
 		events.AssignmentAccessChanged: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.AssignmentAccess
 
 			decodeErr := e.Decode(&p)
 			if decodeErr != nil {
-				return decodeErr
+				return apperr.Wrap(decodeErr, "events.Event.Decode")
 			}
 
 			if p.Deleted || p.UnitID == nil {
@@ -118,7 +119,7 @@ func EventHandlers() map[string]events.Handler {
 					p.AssignmentID,
 				)
 
-				return err
+				return apperr.Wrap(err, "delete assets.unit_assignment_access")
 			}
 
 			_, err := tx.Exec(
@@ -140,7 +141,7 @@ func EventHandlers() map[string]events.Handler {
 				p.Active,
 			)
 
-			return err
+			return apperr.Wrap(err, "insert assets.unit_assignment_access")
 		},
 	}
 }

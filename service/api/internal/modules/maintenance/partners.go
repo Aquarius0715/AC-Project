@@ -111,7 +111,7 @@ func scanProfile(r pgx.Row) (Profile, error) {
 		&p.RateCardID,
 	)
 
-	return p, err
+	return p, apperr.Wrap(err, "scan (scanProfile)")
 }
 
 func pct(n, d int) *float64 {
@@ -145,7 +145,7 @@ func (m Partners) kpis(ctx context.Context, c *ops.Call, org uuid.UUID) (KPIs, e
 		org, k.Period.From, k.Period.To).
 		Scan(&acc, &dec)
 	if err != nil {
-		return k, err
+		return k, apperr.Wrap(err, "select maintenance.offers")
 	}
 
 	k.OfferAcceptance = pct(acc, dec)
@@ -254,7 +254,7 @@ func jobMetrics(ctx context.Context, c *ops.Call, extra string, args []any) ([]j
 		FROM maintenance.jobs j WHERE j.created_at >= $1 AND j.created_at < $2 AND `+extra+` ORDER BY j.created_at, j.id`,
 		args...)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select maintenance.offers")
 	}
 	defer rows.Close()
 
@@ -282,13 +282,13 @@ func jobMetrics(ctx context.Context, c *ops.Call, extra string, args []any) ([]j
 			&j.planned,
 		)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select maintenance.offers")
 		}
 
 		out = append(out, j)
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select maintenance.offers")
 }
 
 // ---- contractors.list / save / setOfferStatus ----
@@ -374,12 +374,12 @@ func (m Partners) list(
 		"p.name ASC, p.id ASC",
 	)
 	if err != nil {
-		return paging.Page[Profile]{}, err
+		return paging.Page[Profile]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[Profile]{}, err
+		return paging.Page[Profile]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	args := []any{c.Now}
@@ -413,7 +413,7 @@ func (m Partners) list(
 		"IS NOT NULL", args...).
 		Scan(&total)
 	if scanErr != nil {
-		return paging.Page[Profile]{}, scanErr
+		return paging.Page[Profile]{}, apperr.Wrap(scanErr, "select maintenance.contractors")
 	}
 
 	rows, err := c.Tx.Query(
@@ -428,7 +428,7 @@ func (m Partners) list(
 		),
 		args...)
 	if err != nil {
-		return paging.Page[Profile]{}, err
+		return paging.Page[Profile]{}, apperr.Wrap(err, "select maintenance.contractors")
 	}
 
 	items := []Profile{}
@@ -448,7 +448,7 @@ func (m Partners) list(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return paging.Page[Profile]{}, rowsErr
+		return paging.Page[Profile]{}, apperr.Wrap(rowsErr, "select maintenance.contractors")
 	}
 
 	for i := range items {
@@ -543,7 +543,7 @@ func (in *ProfileInput) Validate() map[string]string {
 func (m Partners) save(ctx context.Context, c *ops.Call, in *ProfileInput) (Profile, error) {
 	kind, _, found, err := m.Orgs.OrgState(ctx, c, in.OrganizationID)
 	if err != nil {
-		return Profile{}, err
+		return Profile{}, apperr.Wrap(err, "maintenance.OrgNames.OrgState")
 	}
 
 	if !found {
@@ -556,7 +556,7 @@ func (m Partners) save(ctx context.Context, c *ops.Call, in *ProfileInput) (Prof
 
 	name, err := m.Orgs.OrgName(ctx, c, in.OrganizationID)
 	if err != nil {
-		return Profile{}, err
+		return Profile{}, apperr.Wrap(err, "maintenance.OrgNames.OrgName")
 	}
 
 	delegationEnd := func(from time.Time) time.Time {
@@ -576,7 +576,7 @@ func (m Partners) save(ctx context.Context, c *ops.Call, in *ProfileInput) (Prof
 			$1)`, in.OrganizationID).
 			Scan(&exists)
 		if err != nil {
-			return Profile{}, err
+			return Profile{}, apperr.Wrap(err, "select maintenance.contractors")
 		}
 
 		if exists {
@@ -592,7 +592,7 @@ func (m Partners) save(ctx context.Context, c *ops.Call, in *ProfileInput) (Prof
 			delegationEnd(c.Now)).
 			Scan(&id)
 		if err != nil {
-			return Profile{}, err
+			return Profile{}, apperr.Wrap(err, "insert maintenance.contractors")
 		}
 	} else {
 		p, err := m.loadProfile(ctx, c, "p.id = $2", []any{*in.ID}, true)
@@ -623,7 +623,7 @@ func (m Partners) save(ctx context.Context, c *ops.Call, in *ProfileInput) (Prof
 			c.Now,
 		)
 		if execErr != nil {
-			return p, execErr
+			return p, apperr.Wrap(execErr, "update maintenance.contractors")
 		}
 
 		id = p.ID
@@ -738,7 +738,7 @@ func (m Partners) setOfferStatus(
 		c.Now,
 	)
 	if execErr != nil {
-		return p, execErr
+		return p, apperr.Wrap(execErr, "update maintenance.contractors")
 	}
 
 	p, err = m.loadProfile(ctx, c, "p.id = $2", []any{p.ID}, false)
@@ -865,7 +865,7 @@ func scanRateCard(r pgx.Row) (RateCard, error) {
 		err = json.Unmarshal(lines, &x.Lines)
 	}
 
-	return x, err
+	return x, apperr.Wrap(err, "json.Unmarshal")
 }
 
 const rateCols = `id, tenant_id, version, created_at, contractor_org_id, effective_from, currency, lines`
@@ -910,7 +910,7 @@ func (m Partners) saveRateCard(
 		$1)`, in.ContractorOrgID).
 		Scan(&exists)
 	if err != nil {
-		return RateCard{}, err
+		return RateCard{}, apperr.Wrap(err, "select maintenance.contractors")
 	}
 
 	if !exists {
@@ -1020,12 +1020,12 @@ func (m Partners) listRateCards(
 		"effective_from DESC, id",
 	)
 	if err != nil {
-		return paging.Page[RateCard]{}, err
+		return paging.Page[RateCard]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[RateCard]{}, err
+		return paging.Page[RateCard]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	where, args := "TRUE", []any{}
@@ -1038,7 +1038,7 @@ func (m Partners) listRateCards(
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM maintenance.rate_cards WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
-		return paging.Page[RateCard]{}, scanErr
+		return paging.Page[RateCard]{}, apperr.Wrap(scanErr, "select maintenance.rate_cards")
 	}
 
 	rows, err := c.Tx.Query(
@@ -1053,7 +1053,7 @@ func (m Partners) listRateCards(
 		),
 		args...)
 	if err != nil {
-		return paging.Page[RateCard]{}, err
+		return paging.Page[RateCard]{}, apperr.Wrap(err, "select maintenance.rate_cards")
 	}
 	defer rows.Close()
 
@@ -1073,7 +1073,7 @@ func (m Partners) listRateCards(
 		NextCursor:      w.Next(total),
 		Total:           total,
 		SnapshotVersion: w.Snapshot,
-	}, rows.Err()
+	}, apperr.Wrap(rows.Err(), "select maintenance.rate_cards")
 }
 
 // ---- SLA ----
@@ -1194,7 +1194,7 @@ func (m Partners) saveTargets(
 			return t, apperr.E(apperr.Conflict, "errors.targets_exist")
 		}
 
-		return t, err
+		return t, apperr.Wrap(err, "insert maintenance.sla_targets")
 	}
 
 	t.CreatedAt, t.UpdatedAt = c.Now, c.Now
@@ -1439,7 +1439,7 @@ func (m Partners) scorecard(
 			version FROM maintenance.sla_targets`,
 	)
 	if err != nil {
-		return Scorecard{}, err
+		return Scorecard{}, apperr.Wrap(err, "select maintenance.sla_targets")
 	}
 
 	for rows.Next() {
@@ -1456,7 +1456,7 @@ func (m Partners) scorecard(
 		if err != nil {
 			rows.Close()
 
-			return Scorecard{}, err
+			return Scorecard{}, apperr.Wrap(err, "select maintenance.sla_targets")
 		}
 
 		targets = append(targets, t)
@@ -1466,7 +1466,7 @@ func (m Partners) scorecard(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return Scorecard{}, rowsErr
+		return Scorecard{}, apperr.Wrap(rowsErr, "select maintenance.sla_targets")
 	}
 
 	orgs := []uuid.UUID{}
@@ -1476,7 +1476,7 @@ func (m Partners) scorecard(
 
 	profiles, err := m.Customers.CustomerProfiles(ctx, c, orgs)
 	if err != nil {
-		return Scorecard{}, err
+		return Scorecard{}, apperr.Wrap(err, "maintenance.CustomerProfiles.CustomerProfiles")
 	}
 
 	out := Scorecard{

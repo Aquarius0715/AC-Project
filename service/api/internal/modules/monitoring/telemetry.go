@@ -45,7 +45,7 @@ func (Telemetry) UnitInUse(ctx context.Context, c *ops.Call, unit uuid.UUID) (bo
 	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM monitoring.measurements WHERE unit_id = $1)`, unit).
 		Scan(&b)
 
-	return b, err
+	return b, apperr.Wrap(err, "select monitoring.measurements")
 }
 
 // Measurement is Measurement of service-contracts.ts (IR121 item 1).
@@ -118,7 +118,7 @@ func scanMeasurement(r pgx.Row) (Measurement, error) {
 	)
 	x.EventID, x.CreatedAt, x.UpdatedAt = x.ID, x.ReceivedAt, x.ReceivedAt
 
-	return x, err
+	return x, apperr.Wrap(err, "scan (scanMeasurement)")
 }
 
 var metrics = map[string]bool{
@@ -140,14 +140,17 @@ const maxSeriesRange = 35 * 24 * time.Hour
 func (m Telemetry) readableUnits(ctx context.Context, c *ops.Call, units []uuid.UUID) error {
 	vis, err := m.Units.VisibleUnits(ctx, c, units)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "monitoring.TelemetryUnits.VisibleUnits")
 	}
 
 	if len(vis) != len(units) {
 		return apperr.E(apperr.NotFound, "error.notFound")
 	}
 
-	return unitscope.Gate(ctx, c, units) // IR49(b): external technicians wait for the work window
+	return apperr.Wrap(
+		unitscope.Gate(ctx, c, units),
+		"unitscope.Gate",
+	) // IR49(b): external technicians wait for the work window
 }
 
 // ---- telemetry.series ----
@@ -285,7 +288,7 @@ func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (Ai
 
 		units, err = m.Units.UnitsInSpace(ctx, c, *in.SpaceID)
 		if err != nil {
-			return AirSeries{}, err
+			return AirSeries{}, apperr.Wrap(err, "monitoring.TelemetryUnits.UnitsInSpace")
 		}
 
 		if len(units) == 0 {
@@ -314,7 +317,7 @@ func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (Ai
 		Sensor   *uuid.UUID
 	}{in.From, in.To, units, in.Metric, in.SensorID}, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return AirSeries{}, err
+		return AirSeries{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	args := []any{units, in.Metric, in.From, in.To}
@@ -330,7 +333,7 @@ func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (Ai
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM monitoring.measurements m WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
-		return AirSeries{}, scanErr
+		return AirSeries{}, apperr.Wrap(scanErr, "select monitoring.measurements")
 	}
 
 	if in.BucketMinutes != nil { // the whole period in averages, every bucket present (IR605)
@@ -379,7 +382,7 @@ func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (Ai
 		),
 		args...)
 	if err != nil {
-		return AirSeries{}, err
+		return AirSeries{}, apperr.Wrap(err, "select monitoring.measurements")
 	}
 
 	items := []Measurement{}
@@ -399,7 +402,7 @@ func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (Ai
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return AirSeries{}, rowsErr
+		return AirSeries{}, apperr.Wrap(rowsErr, "select monitoring.measurements")
 	}
 
 	out := AirSeries{
@@ -439,7 +442,7 @@ func bucketed(
 
 	rows, err := c.Tx.Query(ctx, q, append(append([]any{}, args...), size.Seconds())...)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select monitoring.measurements")
 	}
 
 	got := map[int64]SeriesBucket{}
@@ -451,7 +454,7 @@ func bucketed(
 		if err != nil {
 			rows.Close()
 
-			return nil, err
+			return nil, apperr.Wrap(err, "select monitoring.measurements")
 		}
 
 		got[b.Start.UnixMilli()] = b
@@ -461,7 +464,7 @@ func bucketed(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return nil, rowsErr
+		return nil, apperr.Wrap(rowsErr, "select monitoring.measurements")
 	}
 
 	out := []SeriesBucket{}
@@ -515,7 +518,7 @@ func allergen(ctx context.Context, c *ops.Call, unit uuid.UUID) (AllergenObserva
 		}
 	}
 
-	return a, err
+	return a, apperr.Wrap(err, "select monitoring.allergen_observations")
 }
 
 // ---- telemetry.summary ----
@@ -603,7 +606,7 @@ func (m Telemetry) summary(
 		ORDER BY m.unit_id, m.metric, m.observed_at DESC, m.sequence DESC) m ORDER BY m.unit_id, m.metric`,
 		args...)
 	if err != nil {
-		return TelemetrySummary{}, err
+		return TelemetrySummary{}, apperr.Wrap(err, "select monitoring.measurements")
 	}
 	defer rows.Close()
 
@@ -618,7 +621,7 @@ func (m Telemetry) summary(
 		out.Measurements = append(out.Measurements, x)
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select monitoring.measurements")
 }
 
 // ---- ventilation ----
@@ -668,7 +671,7 @@ func scanVent(r pgx.Row) (VentilationLog, error) {
 		&v.LoggedAt,
 	)
 
-	return v, err
+	return v, apperr.Wrap(err, "scan (scanVent)")
 }
 
 var ventMethods = map[string]bool{
@@ -733,7 +736,7 @@ func (in *VentLogInput) Validate() map[string]string {
 func (m Telemetry) log(ctx context.Context, c *ops.Call, in *VentLogInput) (VentilationLog, error) {
 	org, spaceUnits, found, err := m.Units.SpaceInfo(ctx, c, in.SpaceID)
 	if err != nil {
-		return VentilationLog{}, err
+		return VentilationLog{}, apperr.Wrap(err, "monitoring.TelemetryUnits.SpaceInfo")
 	}
 
 	if !found || org != c.Principal.OrgID {
@@ -900,12 +903,12 @@ func (m Telemetry) list(
 		"v.created_at DESC, v.id ASC",
 	)
 	if err != nil {
-		return paging.Page[VentilationLog]{}, err
+		return paging.Page[VentilationLog]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[VentilationLog]{}, err
+		return paging.Page[VentilationLog]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	var args []any
@@ -923,19 +926,28 @@ func (m Telemetry) list(
 	case "client":
 		spaces, err := m.Units.SpacesOfOrg(ctx, c, c.Principal.OrgID)
 		if err != nil {
-			return paging.Page[VentilationLog]{}, err
+			return paging.Page[VentilationLog]{}, apperr.Wrap(
+				err,
+				"monitoring.TelemetryUnits.SpacesOfOrg",
+			)
 		}
 
 		conds = append(conds, "v.space_id = ANY("+add(spaces)+")")
 	default:
 		units, err := m.Units.ScopedUnits(ctx, c)
 		if err != nil {
-			return paging.Page[VentilationLog]{}, err
+			return paging.Page[VentilationLog]{}, apperr.Wrap(
+				err,
+				"monitoring.TelemetryUnits.ScopedUnits",
+			)
 		}
 
 		spaces, err := m.Units.SpacesOfUnits(ctx, c, units)
 		if err != nil {
-			return paging.Page[VentilationLog]{}, err
+			return paging.Page[VentilationLog]{}, apperr.Wrap(
+				err,
+				"monitoring.TelemetryUnits.SpacesOfUnits",
+			)
 		}
 
 		conds = append(
@@ -970,7 +982,10 @@ func (m Telemetry) list(
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM monitoring.ventilation_logs v WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
-		return paging.Page[VentilationLog]{}, scanErr
+		return paging.Page[VentilationLog]{}, apperr.Wrap(
+			scanErr,
+			"select monitoring.ventilation_logs",
+		)
 	}
 
 	rows, err := c.Tx.Query(
@@ -985,7 +1000,7 @@ func (m Telemetry) list(
 		),
 		args...)
 	if err != nil {
-		return paging.Page[VentilationLog]{}, err
+		return paging.Page[VentilationLog]{}, apperr.Wrap(err, "select monitoring.ventilation_logs")
 	}
 	defer rows.Close()
 
@@ -1005,7 +1020,7 @@ func (m Telemetry) list(
 		NextCursor:      w.Next(total),
 		Total:           total,
 		SnapshotVersion: w.Snapshot,
-	}, rows.Err()
+	}, apperr.Wrap(rows.Err(), "select monitoring.ventilation_logs")
 }
 
 // RegisterTelemetry binds telemetry.* and ventilation.*.
@@ -1042,7 +1057,7 @@ func (m Telemetry) PowerMeasured(
 		c.Now,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select monitoring.measurements")
 	}
 
 	type reading struct {
@@ -1067,7 +1082,7 @@ func (m Telemetry) PowerMeasured(
 		if err != nil {
 			rows.Close()
 
-			return nil, err
+			return nil, apperr.Wrap(err, "select monitoring.measurements")
 		}
 
 		r.ok = origin == "measured" && quality == "valid" && value != nil
@@ -1078,12 +1093,12 @@ func (m Telemetry) PowerMeasured(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return nil, rowsErr
+		return nil, apperr.Wrap(rowsErr, "select monitoring.measurements")
 	}
 
 	limits, err := m.Sensors.StaleAfter(ctx, c, sensors)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "monitoring.SensorLimits.StaleAfter")
 	}
 
 	out := map[uuid.UUID]bool{}
@@ -1136,7 +1151,7 @@ func (m Telemetry) LatestMeasurements(
 		metricOrder,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select unnest")
 	}
 
 	var (
@@ -1159,12 +1174,12 @@ func (m Telemetry) LatestMeasurements(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return nil, rowsErr
+		return nil, apperr.Wrap(rowsErr, "select unnest")
 	}
 
 	limits, err := m.Sensors.StaleAfter(ctx, c, sensors)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "monitoring.SensorLimits.StaleAfter")
 	}
 
 	for _, x := range all {
@@ -1204,7 +1219,7 @@ func (m Telemetry) RunHours(
 		`SELECT sensor_id, observed_at, value, origin, quality FROM (`+q+`) r ORDER BY observed_at, sequence`,
 		args...)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select sensor_id")
 	}
 
 	type r struct {
@@ -1229,7 +1244,7 @@ func (m Telemetry) RunHours(
 		if err != nil {
 			rows.Close()
 
-			return nil, err
+			return nil, apperr.Wrap(err, "select sensor_id")
 		}
 
 		x.on = origin == "measured" && quality == "valid" && v != nil && *v > 0
@@ -1240,12 +1255,12 @@ func (m Telemetry) RunHours(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil || len(rs) == 0 {
-		return nil, rowsErr
+		return nil, apperr.Wrap(rowsErr, "select sensor_id")
 	}
 
 	limits, err := m.Sensors.StaleAfter(ctx, c, sensors)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "monitoring.SensorLimits.StaleAfter")
 	}
 
 	var total time.Duration

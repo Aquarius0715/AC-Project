@@ -6,6 +6,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
 )
 
@@ -24,7 +25,15 @@ type HistoryInput struct {
 
 // History asks identity for the audit entries of a target (any domain; local for the worker).
 func History(ctx context.Context, c *ops.Call, kind, id string) ([]View, error) {
-	return ops.Delegate(ctx, c, QueryHistory, HistoryInput{TargetKind: kind, TargetID: id}, history)
+	out, err := ops.Delegate(
+		ctx,
+		c,
+		QueryHistory,
+		HistoryInput{TargetKind: kind, TargetID: id},
+		history,
+	)
+
+	return out, apperr.Wrap(err, "delegate audit.history")
 }
 
 func history(ctx context.Context, c *ops.Call, in *HistoryInput) ([]View, error) {
@@ -39,7 +48,7 @@ func history(ctx context.Context, c *ops.Call, in *HistoryInput) ([]View, error)
 		in.TargetID,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select audit.audit_log")
 	}
 	defer rows.Close()
 
@@ -65,7 +74,7 @@ func history(ctx context.Context, c *ops.Call, in *HistoryInput) ([]View, error)
 			&x.Reason,
 		)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select audit.audit_log")
 		}
 
 		x.Version, x.CreatedAt, x.UpdatedAt = 1, x.OccurredAt, x.OccurredAt
@@ -73,7 +82,7 @@ func history(ctx context.Context, c *ops.Call, in *HistoryInput) ([]View, error)
 		out = append(out, x)
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select audit.audit_log")
 }
 
 // RegisterQueries binds the audit queries other domains ask.
@@ -89,7 +98,7 @@ func EventHandlers() map[string]events.Handler {
 
 			decodeErr := e.Decode(&a)
 			if decodeErr != nil {
-				return decodeErr
+				return apperr.Wrap(decodeErr, "events.Event.Decode")
 			}
 
 			before, after := a.MaskedBefore, a.MaskedAfter
@@ -126,7 +135,7 @@ func EventHandlers() map[string]events.Handler {
 				after,
 			)
 
-			return err
+			return apperr.Wrap(err, "insert audit.audit_log")
 		},
 	}
 }

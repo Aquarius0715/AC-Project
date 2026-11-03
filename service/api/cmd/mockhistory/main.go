@@ -16,6 +16,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/devicesim"
 	"github.com/pradita/ac-project/service/api/internal/iotbridge"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -66,7 +67,7 @@ func main() {
 
 		rows, err = seed.ApplyFleetHistory(ctx, tx, fleet, until, *days)
 
-		return err
+		return apperr.Wrap(err, "seed.ApplyFleetHistory")
 	})
 	if beginFuncErr != nil {
 		log.Fatal(beginFuncErr)

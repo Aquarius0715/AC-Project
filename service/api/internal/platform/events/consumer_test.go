@@ -83,7 +83,7 @@ func TestConsumerRunLogsFailures(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	if len(logged) == 0 || !strings.Contains(logged[0], "consumer broken: no database") {
-		t.Fatalf("failures are logged with the consumer name: %q", logged)
+	if len(logged) == 0 || !strings.HasPrefix(logged[0], "consumer broken: ") || !strings.Contains(logged[0], "no database") {
+		t.Fatalf("failures are logged with the consumer name and the cause: %q", logged)
 	}
 }

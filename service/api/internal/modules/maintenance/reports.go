@@ -228,7 +228,7 @@ func scanReport(r pgx.Row) (Report, error) {
 		&x.AcceptedAt,
 	)
 	if err != nil {
-		return x, err
+		return x, apperr.Wrap(err, "scan (scanReport)")
 	}
 
 	x.Items, x.Measurements, x.Parts, x.Refrigerant = []Item{}, []ReportMeasurement{}, []Part{}, []Refrigerant{}
@@ -239,7 +239,7 @@ func scanReport(r pgx.Row) (Report, error) {
 		if len(p.raw) > 0 {
 			err := json.Unmarshal(p.raw, p.dst)
 			if err != nil {
-				return x, err
+				return x, apperr.Wrap(err, "json.Unmarshal")
 			}
 		}
 	}
@@ -249,7 +249,7 @@ func scanReport(r pgx.Row) (Report, error) {
 
 		err := json.Unmarshal(next, x.NextAction)
 		if err != nil {
-			return x, err
+			return x, apperr.Wrap(err, "json.Unmarshal")
 		}
 	}
 
@@ -269,7 +269,7 @@ func (m Reports) decorate(ctx context.Context, c *ops.Call, x *Report) error {
 		x.ID,
 	)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select maintenance.attachments")
 	}
 
 	x.AttachmentRefs = []AttachmentRef{}
@@ -291,7 +291,7 @@ func (m Reports) decorate(ctx context.Context, c *ops.Call, x *Report) error {
 		if err != nil {
 			rows.Close()
 
-			return err
+			return apperr.Wrap(err, "select maintenance.attachments")
 		}
 
 		a.Version, a.ReportID, a.BlobID = 1, x.ID, a.ID
@@ -302,7 +302,7 @@ func (m Reports) decorate(ctx context.Context, c *ops.Call, x *Report) error {
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return rowsErr
+		return apperr.Wrap(rowsErr, "select maintenance.attachments")
 	}
 
 	rows, err = c.Tx.Query(
@@ -312,7 +312,7 @@ func (m Reports) decorate(ctx context.Context, c *ops.Call, x *Report) error {
 		x.ID,
 	)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select maintenance.report_reviews")
 	}
 
 	x.ReviewHistory = []Review{}
@@ -330,7 +330,7 @@ func (m Reports) decorate(ctx context.Context, c *ops.Call, x *Report) error {
 		if err != nil {
 			rows.Close()
 
-			return err
+			return apperr.Wrap(err, "select maintenance.report_reviews")
 		}
 
 		x.ReviewHistory = append(x.ReviewHistory, r)
@@ -340,7 +340,7 @@ func (m Reports) decorate(ctx context.Context, c *ops.Call, x *Report) error {
 
 	rowsErr = rows.Err()
 	if rowsErr != nil {
-		return rowsErr
+		return apperr.Wrap(rowsErr, "select maintenance.report_reviews")
 	}
 
 	var latest int
@@ -348,7 +348,7 @@ func (m Reports) decorate(ctx context.Context, c *ops.Call, x *Report) error {
 	scanErr := c.Tx.QueryRow(ctx, `SELECT max(version) FROM maintenance.work_reports WHERE id = $1`, x.ID).
 		Scan(&latest)
 	if scanErr != nil {
-		return scanErr
+		return apperr.Wrap(scanErr, "select maintenance.work_reports")
 	}
 
 	reason := any(nil)
@@ -576,7 +576,7 @@ func (m Reports) saveDraft(ctx context.Context, c *ops.Call, in *DraftInput) (Re
 	}
 
 	if err != nil {
-		return Report{}, err
+		return Report{}, apperr.Wrap(err, "select maintenance.jobs")
 	}
 
 	technicianJobErr := m.Access.TechnicianJob(ctx, c, in.JobID, unit)
@@ -602,7 +602,7 @@ func (m Reports) saveDraft(ctx context.Context, c *ops.Call, in *DraftInput) (Re
 		err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM maintenance.work_reports WHERE job_id = $1`, in.JobID).
 			Scan(&n)
 		if err != nil {
-			return Report{}, err
+			return Report{}, apperr.Wrap(err, "select maintenance.work_reports")
 		}
 
 		if n > 0 {
@@ -647,7 +647,7 @@ func (m Reports) saveDraft(ctx context.Context, c *ops.Call, in *DraftInput) (Re
 		prev.ID,
 	)
 	if err != nil {
-		return Report{}, err
+		return Report{}, apperr.Wrap(err, "select maintenance.attachments")
 	}
 
 	for rows.Next() {
@@ -657,7 +657,7 @@ func (m Reports) saveDraft(ctx context.Context, c *ops.Call, in *DraftInput) (Re
 		if err != nil {
 			rows.Close()
 
-			return Report{}, err
+			return Report{}, apperr.Wrap(err, "select maintenance.attachments")
 		}
 
 		allowed[id] = true
@@ -667,7 +667,7 @@ func (m Reports) saveDraft(ctx context.Context, c *ops.Call, in *DraftInput) (Re
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return Report{}, rowsErr
+		return Report{}, apperr.Wrap(rowsErr, "select maintenance.attachments")
 	}
 
 	for _, id := range in.AttachmentIDs {
@@ -829,7 +829,7 @@ func (m Reports) saveDraft(ctx context.Context, c *ops.Call, in *DraftInput) (Re
 	}
 
 	if err != nil {
-		return Report{}, err
+		return Report{}, apperr.Wrap(err, "update maintenance.work_reports")
 	}
 
 	_, execErr := c.Tx.Exec(
@@ -839,7 +839,7 @@ func (m Reports) saveDraft(ctx context.Context, c *ops.Call, in *DraftInput) (Re
 		prev.ID,
 	)
 	if execErr != nil {
-		return Report{}, execErr
+		return Report{}, apperr.Wrap(execErr, "update maintenance.attachments")
 	}
 
 	_, execErr = c.Tx.Exec(
@@ -849,7 +849,7 @@ func (m Reports) saveDraft(ctx context.Context, c *ops.Call, in *DraftInput) (Re
 		prev.Version+1,
 	)
 	if execErr != nil {
-		return Report{}, execErr
+		return Report{}, apperr.Wrap(execErr, "update maintenance.jobs")
 	}
 
 	x, err := m.load(ctx, c, prev.ID, prev.Version+1)
@@ -944,7 +944,7 @@ func (m Reports) lockJob(
 	}
 
 	if err != nil {
-		return "", unit, err
+		return "", unit, apperr.Wrap(err, "select maintenance.jobs")
 	}
 
 	if c.Principal.Role == "technician" {
@@ -1020,7 +1020,7 @@ func (m Reports) submitJob(ctx context.Context, c *ops.Call, in *SubmitInput) (J
 
 	_, _, scope, err := m.Units.UnitService(ctx, c, unit)
 	if err != nil {
-		return Job{}, err
+		return Job{}, apperr.Wrap(err, "maintenance.ServiceUnits.UnitService")
 	}
 
 	if fe := submitErrors(draft, Components(scope), c.Now); len(fe) > 0 {
@@ -1036,7 +1036,7 @@ func (m Reports) submitJob(ctx context.Context, c *ops.Call, in *SubmitInput) (J
 		c.Now,
 	)
 	if execErr != nil {
-		return Job{}, execErr
+		return Job{}, apperr.Wrap(execErr, "update maintenance.work_reports")
 	}
 
 	var raw []byte
@@ -1044,7 +1044,7 @@ func (m Reports) submitJob(ctx context.Context, c *ops.Call, in *SubmitInput) (J
 	scanErr := c.Tx.QueryRow(ctx, `SELECT time_on_site FROM maintenance.jobs WHERE id = $1`, in.JobID).
 		Scan(&raw)
 	if scanErr != nil {
-		return Job{}, scanErr
+		return Job{}, apperr.Wrap(scanErr, "select maintenance.jobs")
 	}
 
 	t := TimeOnSite{
@@ -1089,7 +1089,7 @@ func (m Reports) submitJob(ctx context.Context, c *ops.Call, in *SubmitInput) (J
 		tos,
 	)
 	if execErr != nil {
-		return Job{}, execErr
+		return Job{}, apperr.Wrap(execErr, "update maintenance.jobs")
 	}
 
 	reportEventErr := m.reportEvent(
@@ -1133,7 +1133,7 @@ func offWork(
 		from,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select maintenance.job_events")
 	}
 	defer rows.Close()
 
@@ -1147,7 +1147,7 @@ func offWork(
 
 		err := rows.Scan(&action, &at)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select maintenance.job_events")
 		}
 
 		switch {
@@ -1159,7 +1159,7 @@ func offWork(
 		}
 	}
 
-	return off, rows.Err()
+	return off, apperr.Wrap(rows.Err(), "select maintenance.job_events")
 }
 
 // workedFor is the time in [from, to) outside the off intervals, overlaps counted once.
@@ -1280,7 +1280,7 @@ func (m Reports) reportEvent(
 		c.Now,
 	)
 
-	return err
+	return apperr.Wrap(err, "insert maintenance.job_events")
 }
 
 // ---- jobs.review ----
@@ -1367,7 +1367,7 @@ func (m Reports) reviewJob(ctx context.Context, c *ops.Call, in *ReviewInput) (J
 			return Job{}, apperr.E(apperr.NotFound, "error.notFound")
 		}
 
-		return Job{}, err
+		return Job{}, apperr.Wrap(err, "select maintenance.jobs")
 	}
 
 	switch c.Principal.Role {
@@ -1404,7 +1404,7 @@ func (m Reports) reviewJob(ctx context.Context, c *ops.Call, in *ReviewInput) (J
 	}
 
 	if err != nil {
-		return Job{}, err
+		return Job{}, apperr.Wrap(err, "select maintenance.work_reports")
 	}
 
 	var latest int
@@ -1412,7 +1412,7 @@ func (m Reports) reviewJob(ctx context.Context, c *ops.Call, in *ReviewInput) (J
 	scanErr := c.Tx.QueryRow(ctx, `SELECT max(version) FROM maintenance.work_reports WHERE id = $1`, id).
 		Scan(&latest)
 	if scanErr != nil {
-		return Job{}, scanErr
+		return Job{}, apperr.Wrap(scanErr, "select maintenance.work_reports")
 	}
 
 	if latest != in.ReportVersion || state != "submitted" {
@@ -1439,7 +1439,7 @@ func (m Reports) reviewJob(ctx context.Context, c *ops.Call, in *ReviewInput) (J
 		c.Now,
 	)
 	if execErr != nil {
-		return Job{}, execErr
+		return Job{}, apperr.Wrap(execErr, "update maintenance.work_reports")
 	}
 
 	_, execErr = c.Tx.Exec(
@@ -1455,7 +1455,7 @@ func (m Reports) reviewJob(ctx context.Context, c *ops.Call, in *ReviewInput) (J
 		c.Now,
 	)
 	if execErr != nil {
-		return Job{}, execErr
+		return Job{}, apperr.Wrap(execErr, "insert maintenance.report_reviews")
 	}
 
 	_, execErr = c.Tx.Exec(
@@ -1468,7 +1468,7 @@ func (m Reports) reviewJob(ctx context.Context, c *ops.Call, in *ReviewInput) (J
 		c.Now,
 	)
 	if execErr != nil {
-		return Job{}, execErr
+		return Job{}, apperr.Wrap(execErr, "update maintenance.jobs")
 	}
 
 	if jobStatus == "completed" { // DEC-73 / IR234: completion releases the assignment; a return keeps it for the rework
@@ -1504,7 +1504,7 @@ func NewDraftFromLatest(ctx context.Context, c *ops.Call, job uuid.UUID) error {
 		c.Now,
 	)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "insert maintenance.work_reports")
 	}
 
 	_, err = c.Tx.Exec(
@@ -1514,7 +1514,7 @@ func NewDraftFromLatest(ctx context.Context, c *ops.Call, job uuid.UUID) error {
 		job,
 	)
 
-	return err
+	return apperr.Wrap(err, "update maintenance.jobs")
 }
 
 // resumeRework serves jobs.resumeRework.
@@ -1575,7 +1575,7 @@ func (m Reports) resumeReworkJob(ctx context.Context, c *ops.Call, in *JobIDInpu
 		in.JobID,
 	)
 	if execErr != nil {
-		return Job{}, execErr
+		return Job{}, apperr.Wrap(execErr, "update maintenance.jobs")
 	}
 
 	eventErr := m.Jobs.event(ctx, c, in.JobID, "job.rework_started", nil)
@@ -1654,7 +1654,7 @@ func (m Reports) get(ctx context.Context, c *ops.Call, in *GetReportInput) (Repo
 	}
 
 	if err != nil {
-		return Report{}, err
+		return Report{}, apperr.Wrap(err, "select maintenance.jobs")
 	}
 
 	x, err := m.load(ctx, c, in.ReportID, in.ReportVersion)

@@ -88,7 +88,7 @@ func (m *Module) unitsDelete(
 	}
 
 	if err != nil {
-		return DeletedResource{}, err
+		return DeletedResource{}, apperr.Wrap(err, "select assets.units")
 	}
 
 	if v != *c.ExpectedVersion {
@@ -98,7 +98,7 @@ func (m *Module) unitsDelete(
 	for _, u := range m.Usage {
 		busy, err := u.UnitInUse(ctx, c, in.ID)
 		if err != nil {
-			return DeletedResource{}, err
+			return DeletedResource{}, apperr.Wrap(err, "assets.UnitUsage.UnitInUse")
 		}
 
 		if busy {
@@ -112,12 +112,12 @@ func (m *Module) unitsDelete(
 		in.ID,
 	)
 	if execErr != nil {
-		return DeletedResource{}, execErr
+		return DeletedResource{}, apperr.Wrap(execErr, "delete assets.unit_alert_policies")
 	}
 
 	_, execErr = c.Tx.Exec(ctx, `DELETE FROM assets.units WHERE id = $1`, in.ID)
 	if execErr != nil {
-		return DeletedResource{}, execErr
+		return DeletedResource{}, apperr.Wrap(execErr, "delete assets.units")
 	}
 
 	c.Emit(ops.Event{AggregateType: "unit", AggregateID: in.ID, Type: "UnitDeleted", Payload: nil})
@@ -223,7 +223,7 @@ func (m *Module) unitsSetAlertPoliciesUnit(
 	}
 
 	if err != nil {
-		return Unit{}, err
+		return Unit{}, apperr.Wrap(err, "select assets.units")
 	}
 
 	if c.Principal.Role == "client" && org != c.Principal.OrgID {
@@ -232,7 +232,7 @@ func (m *Module) unitsSetAlertPoliciesUnit(
 
 	owners, err := m.Policies.Owners(ctx, c, in.AlertPolicyIDs)
 	if err != nil {
-		return Unit{}, err
+		return Unit{}, apperr.Wrap(err, "assets.PolicyReader.Owners")
 	}
 
 	for _, id := range in.AlertPolicyIDs {
@@ -258,7 +258,7 @@ func (m *Module) unitsSetAlertPoliciesUnit(
 	}
 
 	if err != nil {
-		return Unit{}, err
+		return Unit{}, apperr.Wrap(err, "update assets.units")
 	}
 
 	_, execErr := c.Tx.Exec(
@@ -268,7 +268,7 @@ func (m *Module) unitsSetAlertPoliciesUnit(
 		in.AlertPolicyIDs,
 	)
 	if execErr != nil {
-		return Unit{}, execErr
+		return Unit{}, apperr.Wrap(execErr, "delete assets.unit_alert_policies")
 	}
 
 	ids := append([]uuid.UUID(nil), in.AlertPolicyIDs...)
@@ -284,7 +284,7 @@ func (m *Module) unitsSetAlertPoliciesUnit(
 			id,
 		)
 		if err != nil {
-			return Unit{}, err
+			return Unit{}, apperr.Wrap(err, "insert assets.unit_alert_policies")
 		}
 	}
 

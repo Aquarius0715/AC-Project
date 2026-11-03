@@ -130,11 +130,13 @@ func overdueInvoices(ctx context.Context, c *ops.Call, contract uuid.UUID) ([]uu
 		c.Now,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select billing.invoices")
 	}
 	defer rows.Close()
 
-	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	out, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+
+	return out, apperr.Wrap(err, "select billing.invoices")
 }
 
 func sameSet(a, b []uuid.UUID) bool {
@@ -195,7 +197,7 @@ func (m Restrictions) schedule(
 	}
 
 	if err != nil {
-		return Restriction{}, err
+		return Restriction{}, apperr.Wrap(err, "select billing.contracts")
 	}
 
 	if version != in.ExpectedContractVersion {
@@ -243,7 +245,7 @@ func (m Restrictions) schedule(
 
 		t, found, err := m.Units.RestrictionTarget(ctx, c, u)
 		if err != nil {
-			return Restriction{}, err
+			return Restriction{}, apperr.Wrap(err, "restrictions.Units.RestrictionTarget")
 		}
 
 		if !found || t.Archived {
@@ -275,7 +277,7 @@ func (m Restrictions) schedule(
 		in.UnitIDs,
 	)
 	if execErr != nil {
-		return Restriction{}, execErr
+		return Restriction{}, apperr.Wrap(execErr, "select unnest")
 	}
 
 	var busy bool
@@ -287,7 +289,7 @@ func (m Restrictions) schedule(
 			  ru.unit_id::text))))`, in.UnitIDs).
 		Scan(&busy)
 	if scanErr != nil {
-		return Restriction{}, scanErr
+		return Restriction{}, apperr.Wrap(scanErr, "select restrictions.restriction_units")
 	}
 
 	if busy {
@@ -326,7 +328,7 @@ func (m Restrictions) schedule(
 		policy,
 	)
 	if execErr != nil {
-		return Restriction{}, execErr
+		return Restriction{}, apperr.Wrap(execErr, "insert restrictions.restrictions")
 	}
 
 	for _, inv := range in.CauseInvoiceIDs {
@@ -338,7 +340,7 @@ func (m Restrictions) schedule(
 			inv,
 		)
 		if err != nil {
-			return Restriction{}, err
+			return Restriction{}, apperr.Wrap(err, "insert restrictions.restriction_invoices")
 		}
 	}
 
@@ -351,7 +353,7 @@ func (m Restrictions) schedule(
 			u,
 		)
 		if err != nil {
-			return Restriction{}, err
+			return Restriction{}, apperr.Wrap(err, "insert restrictions.restriction_units")
 		}
 	}
 
@@ -371,7 +373,7 @@ func (m Restrictions) schedule(
 			}, Channel: "", SourceAlertID: nil,
 		})
 		if err != nil {
-			return Restriction{}, err
+			return Restriction{}, apperr.Wrap(err, "notify.Store.Create")
 		}
 
 		notices = append(notices, n)
@@ -384,7 +386,7 @@ func (m Restrictions) schedule(
 		notices,
 	)
 	if execErr != nil {
-		return Restriction{}, execErr
+		return Restriction{}, apperr.Wrap(execErr, "update restrictions.restrictions")
 	}
 
 	c.Emit(
@@ -469,7 +471,7 @@ func causesPaid(ctx context.Context, c *ops.Call, id uuid.UUID) (bool, error) {
 		WHERE ri.restriction_id = $1 AND i.status <> 'paid')`, id).
 		Scan(&unpaid)
 
-	return !unpaid, err
+	return !unpaid, apperr.Wrap(err, "select restrictions.restriction_invoices")
 }
 
 // execute serves restrictions.execute.
@@ -534,7 +536,7 @@ func (m Restrictions) execute(
 		0)`, x.ContractID).
 		Scan(&contractVersion)
 	if scanErr != nil {
-		return x, scanErr
+		return x, apperr.Wrap(scanErr, "select billing.contracts")
 	}
 
 	evidence := 0 // the notices identity stored for the restriction at notice time (IR191)
@@ -576,7 +578,7 @@ func (m Restrictions) execute(
 			c.Now,
 		)
 		if err != nil {
-			return x, err
+			return x, apperr.Wrap(err, "update restrictions.restrictions")
 		}
 
 		c.Emit(
@@ -632,7 +634,7 @@ func (m Restrictions) execute(
 			reason,
 		)
 		if execErr != nil {
-			return x, execErr
+			return x, apperr.Wrap(execErr, "update restrictions.restriction_units")
 		}
 	}
 
@@ -643,7 +645,7 @@ func (m Restrictions) execute(
 		c.Now,
 	)
 	if execErr != nil {
-		return x, execErr
+		return x, apperr.Wrap(execErr, "update restrictions.restrictions")
 	}
 
 	c.Emit(
@@ -678,12 +680,12 @@ func (m Restrictions) send(
 ) (uuid.UUID, bool, *string, error) {
 	dev, conn, power, bound, err := m.Devices.BoundDevice(ctx, c, unit)
 	if err != nil {
-		return uuid.Nil, false, nil, err
+		return uuid.Nil, false, nil, apperr.Wrap(err, "restrictions.Devices.BoundDevice")
 	}
 
 	opBusy, err := m.Devices.OperationBusy(ctx, c, unit)
 	if err != nil {
-		return uuid.Nil, false, nil, err
+		return uuid.Nil, false, nil, apperr.Wrap(err, "restrictions.Devices.OperationBusy")
 	}
 
 	var reason *string
@@ -766,7 +768,7 @@ func (m Restrictions) send(
 		)
 	}
 
-	return id, reason == nil, reason, err
+	return id, reason == nil, reason, apperr.Wrap(err, "insert restrictions.restriction_commands")
 }
 
 // CancelInput is restrictions.cancel input.
@@ -845,7 +847,7 @@ func (m Restrictions) cancel(
 			c.Now,
 		)
 		if err != nil {
-			return x, err
+			return x, apperr.Wrap(err, "update restrictions.restrictions")
 		}
 
 		c.Emit(

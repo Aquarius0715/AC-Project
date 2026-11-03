@@ -50,7 +50,7 @@ func versionedUpdate(
 	scanErr := c.Tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM "+table+" WHERE id = $1)", id).
 		Scan(&exists)
 	if scanErr != nil {
-		return scanErr
+		return apperr.Wrap(scanErr, "select exists")
 	}
 
 	if exists {
@@ -97,7 +97,7 @@ func scanProperty(row pgx.Row) (Property, error) {
 		&p.Archived,
 	)
 
-	return p, err
+	return p, apperr.Wrap(err, "scan (scanProperty)")
 }
 
 // PropertySave is properties.save input.
@@ -148,7 +148,7 @@ func (m *Module) customerActive(ctx context.Context, c *ops.Call, org uuid.UUID)
 	}
 
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select assets.customers")
 	}
 
 	if status != "active" {
@@ -193,7 +193,7 @@ func siblingName(ctx context.Context, c *ops.Call, kind string, id uuid.UUID) er
 
 	err := c.Tx.QueryRow(ctx, "SELECT EXISTS ("+q+")", id).Scan(&taken)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select exists")
 	}
 
 	if taken {
@@ -366,7 +366,7 @@ func scanSpace(row pgx.Row) (Space, error) {
 		&s.Archived,
 	)
 
-	return s, err
+	return s, apperr.Wrap(err, "scan (scanSpace)")
 }
 
 // SpaceSave is spaces.save input.
@@ -413,7 +413,7 @@ func (m *Module) activeProperty(ctx context.Context, c *ops.Call, id uuid.UUID) 
 		return notFound()
 	}
 
-	return err
+	return apperr.Wrap(err, "select assets.properties")
 }
 
 // checkParent requires the parent to be an active space of the same property and, for an existing space, not one
@@ -439,7 +439,7 @@ func (m *Module) checkParent(
 	}
 
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select assets.spaces")
 	}
 
 	if self == nil {
@@ -453,7 +453,7 @@ func (m *Module) checkParent(
 		= $2)`, *self, *parent).
 		Scan(&cycle)
 	if scanErr != nil {
-		return scanErr
+		return apperr.Wrap(scanErr, "select d")
 	}
 
 	if cycle {
@@ -716,7 +716,7 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (
 	}
 
 	if err != nil {
-		return Unit{}, err
+		return Unit{}, apperr.Wrap(err, "select assets.properties")
 	}
 
 	if propOrg != in.CustomerOrgID {
@@ -732,13 +732,13 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (
 		}
 
 		if err != nil {
-			return Unit{}, err
+			return Unit{}, apperr.Wrap(err, "select assets.spaces")
 		}
 	}
 
 	capVer, ok, err := m.Models.CurrentVersion(ctx, c, in.ModelID)
 	if err != nil {
-		return Unit{}, err
+		return Unit{}, apperr.Wrap(err, "assets.Models.CurrentVersion")
 	}
 
 	if !ok {
@@ -771,7 +771,7 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (
 			in.warranty,
 		)
 		if err != nil {
-			return Unit{}, err
+			return Unit{}, apperr.Wrap(err, "insert assets.units")
 		}
 
 		err = siblingName(ctx, c, "unit", id)
@@ -818,7 +818,7 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (
 	}
 
 	if err != nil {
-		return Unit{}, err
+		return Unit{}, apperr.Wrap(err, "select assets.units")
 	}
 
 	moved := curProp != in.PropertyID || (curSpace == nil) != (in.SpaceID == nil) ||
@@ -1038,7 +1038,7 @@ func (m *Module) archive(
 			in.ID,
 		)
 		if execErr != nil {
-			return ArchivedResource{}, execErr
+			return ArchivedResource{}, apperr.Wrap(execErr, "select (archive)")
 		}
 
 		if busySQL != "" {
@@ -1046,7 +1046,7 @@ func (m *Module) archive(
 
 			err := c.Tx.QueryRow(ctx, busySQL, in.ID).Scan(&busy)
 			if err != nil {
-				return ArchivedResource{}, err
+				return ArchivedResource{}, apperr.Wrap(err, "queryrow (archive)")
 			}
 
 			if busy {
@@ -1101,7 +1101,7 @@ func (m *Module) MoveToCapabilityVersion(
 		version,
 	)
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "update assets.units")
 	}
 	defer rows.Close()
 
@@ -1112,7 +1112,7 @@ func (m *Module) MoveToCapabilityVersion(
 
 		err := rows.Scan(&id)
 		if err != nil {
-			return n, err
+			return n, apperr.Wrap(err, "update assets.units")
 		}
 
 		c.Emit(ops.Event{AggregateType: "unit", AggregateID: id, Type: "UnitChanged", Payload: nil})
@@ -1120,7 +1120,7 @@ func (m *Module) MoveToCapabilityVersion(
 		n++
 	}
 
-	return n, rows.Err()
+	return n, apperr.Wrap(rows.Err(), "update assets.units")
 }
 
 // UnitInfo answers unit lookups for Devices (scope is applied by the calling operation's own rules).
@@ -1138,7 +1138,7 @@ func (m *Module) UnitInfo(
 		return u, false, nil
 	}
 
-	return u, err == nil, err
+	return u, err == nil, apperr.Wrap(err, "select assets.units")
 }
 
 // unitsArchive applies D05: an active job, device binding or operation, restriction, command / run or unexpired
@@ -1176,7 +1176,7 @@ func (m *Module) unitsArchive(
 	for _, a := range m.Active {
 		busy, err := a.UnitActive(ctx, c, in.ID)
 		if err != nil {
-			return ArchivedResource{}, err
+			return ArchivedResource{}, apperr.Wrap(err, "assets.UnitActivity.UnitActive")
 		}
 
 		if busy {
@@ -1195,7 +1195,7 @@ func (m *Module) UnitsOfProperty(
 ) ([]uuid.UUID, error) {
 	rows, err := c.Tx.Query(ctx, `SELECT id FROM assets.units WHERE property_id = $1`, property)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select assets.units")
 	}
 	defer rows.Close()
 
@@ -1206,13 +1206,13 @@ func (m *Module) UnitsOfProperty(
 
 		err := rows.Scan(&id)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select assets.units")
 		}
 
 		out = append(out, id)
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select assets.units")
 }
 
 // OrgOfCustomer maps a customer ID to its organization.
@@ -1229,7 +1229,7 @@ func (m *Module) OrgOfCustomer(
 		return org, false, nil
 	}
 
-	return org, err == nil, err
+	return org, err == nil, apperr.Wrap(err, "select assets.customers")
 }
 
 // AttachedUnits returns the units carrying each alert policy (IR108: units are the attachment source).
@@ -1244,7 +1244,7 @@ func (m *Module) AttachedUnits(
 		policies,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select assets.unit_alert_policies")
 	}
 	defer rows.Close()
 
@@ -1255,13 +1255,13 @@ func (m *Module) AttachedUnits(
 
 		err := rows.Scan(&p, &u)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select assets.unit_alert_policies")
 		}
 
 		out[p] = append(out[p], u)
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select assets.unit_alert_policies")
 }
 
 // PoliciesOfUnits returns the alert policies attached to any of the units.
@@ -1276,7 +1276,7 @@ func (m *Module) PoliciesOfUnits(
 		units,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select assets.unit_alert_policies")
 	}
 	defer rows.Close()
 
@@ -1287,13 +1287,13 @@ func (m *Module) PoliciesOfUnits(
 
 		err := rows.Scan(&id)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select assets.unit_alert_policies")
 		}
 
 		out = append(out, id)
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select assets.unit_alert_policies")
 }
 
 // DetachPolicy removes an alert policy from every unit and bumps the version of each changed unit (policies.delete,
@@ -1305,7 +1305,7 @@ func (m *Module) DetachPolicy(ctx context.Context, c *ops.Call, policy uuid.UUID
 		policy,
 	)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "delete assets.unit_alert_policies")
 	}
 
 	var units []uuid.UUID
@@ -1317,7 +1317,7 @@ func (m *Module) DetachPolicy(ctx context.Context, c *ops.Call, policy uuid.UUID
 		if err != nil {
 			rows.Close()
 
-			return err
+			return apperr.Wrap(err, "delete assets.unit_alert_policies")
 		}
 
 		units = append(units, u)
@@ -1327,7 +1327,7 @@ func (m *Module) DetachPolicy(ctx context.Context, c *ops.Call, policy uuid.UUID
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return rowsErr
+		return apperr.Wrap(rowsErr, "delete assets.unit_alert_policies")
 	}
 
 	if len(units) == 0 {
@@ -1340,7 +1340,7 @@ func (m *Module) DetachPolicy(ctx context.Context, c *ops.Call, policy uuid.UUID
 		units,
 	)
 	if execErr != nil {
-		return execErr
+		return apperr.Wrap(execErr, "update assets.units")
 	}
 
 	for _, u := range units {
@@ -1362,7 +1362,7 @@ func (m *Module) OrgsOfUnits(
 		units,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select assets.units")
 	}
 	defer rows.Close()
 
@@ -1373,13 +1373,13 @@ func (m *Module) OrgsOfUnits(
 
 		err := rows.Scan(&u, &o)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select assets.units")
 		}
 
 		out[u] = o
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select assets.units")
 }
 
 // CustomerOfOrg maps an organization to its customer.
@@ -1396,7 +1396,7 @@ func (m *Module) CustomerOfOrg(
 		return id, false, nil
 	}
 
-	return id, err == nil, err
+	return id, err == nil, apperr.Wrap(err, "select assets.customers")
 }
 
 // CustomerState returns the organization of a customer and whether it is active.
@@ -1416,7 +1416,7 @@ func (m *Module) CustomerState(
 		return org, false, false, nil
 	}
 
-	return org, status == "active", err == nil, err
+	return org, status == "active", err == nil, apperr.Wrap(err, "select assets.customers")
 }
 
 // VisibleUnits returns the given units that the caller may read (D01 scope; archived units included for history).
@@ -1452,7 +1452,7 @@ func (m *Module) unitIDs(
 		"SELECT u.id FROM assets.units u WHERE "+where+" ORDER BY u.id",
 		args...)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select assets.units")
 	}
 	defer rows.Close()
 
@@ -1463,13 +1463,13 @@ func (m *Module) unitIDs(
 
 		err := rows.Scan(&id)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select assets.units")
 		}
 
 		out = append(out, id)
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select assets.units")
 }
 
 // SpaceInfo returns the customer organization of a space and the units placed directly in it.
@@ -1488,7 +1488,7 @@ func (m *Module) SpaceInfo(
 	}
 
 	if err != nil {
-		return org, nil, false, err
+		return org, nil, false, apperr.Wrap(err, "select assets.spaces")
 	}
 
 	units, err := m.unitIDs(ctx, c, "u.space_id = $1", []any{space})
@@ -1508,7 +1508,7 @@ func (m *Module) SpacesOfUnits(
 		units,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select assets.units")
 	}
 	defer rows.Close()
 
@@ -1519,13 +1519,13 @@ func (m *Module) SpacesOfUnits(
 
 		err := rows.Scan(&id)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select assets.units")
 		}
 
 		out = append(out, id)
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select assets.units")
 }
 
 // ScopedUnits returns every unit whose equipment data the caller may read (Equipment mode: external technicians
@@ -1544,7 +1544,7 @@ func (m *Module) SpacesOfOrg(ctx context.Context, c *ops.Call, org uuid.UUID) ([
 		org,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select assets.spaces")
 	}
 	defer rows.Close()
 
@@ -1555,13 +1555,13 @@ func (m *Module) SpacesOfOrg(ctx context.Context, c *ops.Call, org uuid.UUID) ([
 
 		err := rows.Scan(&id)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select assets.spaces")
 		}
 
 		out = append(out, id)
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select assets.spaces")
 }
 
 // UnitState returns the customer organization of a unit and whether it is archived (Maintenance job intake).
@@ -1581,7 +1581,7 @@ func (m *Module) UnitState(
 		return org, false, false, nil
 	}
 
-	return org, archived, err == nil, err
+	return org, archived, err == nil, apperr.Wrap(err, "select assets.units")
 }
 
 // UnitService returns the organization, property and service scope of a unit (Maintenance qualification checks).
@@ -1598,7 +1598,7 @@ func (m *Module) UnitService(
 	err := c.Tx.QueryRow(ctx, `SELECT customer_org_id, property_id, service_scope FROM assets.units WHERE id = $1`, unit).
 		Scan(&org, &prop, &scope)
 
-	return org, prop, scope, err
+	return org, prop, scope, apperr.Wrap(err, "select assets.units")
 }
 
 // SiteAddress returns the IR25 installation address of a unit (null for blank) and the unit's service scope.
@@ -1616,7 +1616,7 @@ func (m *Module) SiteAddress(
 		assets.properties p ON p.id = u.property_id WHERE u.id = $1`, unit).
 		Scan(&addr, &scope)
 
-	return addr, scope, err
+	return addr, scope, apperr.Wrap(err, "select assets.units")
 }
 
 // WarrantyEnd returns a unit's warrantyEndsAt (Maintenance warranty claims).
@@ -1626,7 +1626,7 @@ func (m *Module) WarrantyEnd(ctx context.Context, c *ops.Call, unit uuid.UUID) (
 	err := c.Tx.QueryRow(ctx, `SELECT warranty_ends_at FROM assets.units WHERE id = $1`, unit).
 		Scan(&t)
 
-	return t, err
+	return t, apperr.Wrap(err, "select assets.units")
 }
 
 // UnitsOfOrg returns the units of a customer organization.
@@ -1646,7 +1646,7 @@ func (m *Module) CustomerProfiles(
 		orgs,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select assets.customers")
 	}
 	defer rows.Close()
 
@@ -1660,13 +1660,13 @@ func (m *Module) CustomerProfiles(
 
 		err := rows.Scan(&org, &id, &prof)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select assets.customers")
 		}
 
 		out[org] = [2]string{id, prof}
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select assets.customers")
 }
 
 // BriefUnits lists the caller-readable, not archived units matching the optional customer / property / space / unit
@@ -1707,7 +1707,7 @@ func (m *Module) BriefUnits(
 		"SELECT u.id, u.customer_org_id, u.connection FROM assets.units u WHERE "+where+" ORDER BY u.id",
 		args...)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select assets.units")
 	}
 	defer rows.Close()
 
@@ -1718,13 +1718,13 @@ func (m *Module) BriefUnits(
 
 		err := rows.Scan(&b.ID, &b.OrgID, &b.Connection)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select assets.units")
 		}
 
 		out = append(out, b)
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select assets.units")
 }
 
 // UnitVersion returns a unit's current version (Control expectedUnitVersion).
@@ -1733,5 +1733,5 @@ func (m *Module) UnitVersion(ctx context.Context, c *ops.Call, unit uuid.UUID) (
 
 	err := c.Tx.QueryRow(ctx, `SELECT version FROM assets.units WHERE id = $1`, unit).Scan(&v)
 
-	return v, err
+	return v, apperr.Wrap(err, "select assets.units")
 }

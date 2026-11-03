@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 )
 
@@ -51,7 +52,7 @@ func Housekeep(
 				  o.id))`,
 			now.Add(-OutboxRetention), names, types)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "delete platform.outbox")
 		}
 
 		s.Outbox = tag.RowsAffected()
@@ -63,7 +64,7 @@ func Housekeep(
 			now.Add(-ProcessedRetention),
 		)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "delete platform.processed_events")
 		}
 
 		s.Processed = tag.RowsAffected()
@@ -73,7 +74,7 @@ func Housekeep(
 			`DELETE FROM platform.event_failures f WHERE NOT EXISTS (SELECT 1 FROM platform.outbox o WHERE o.id = f.event_id)`,
 		)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "delete platform.event_failures")
 		}
 
 		s.Failures = tag.RowsAffected()
@@ -81,7 +82,7 @@ func Housekeep(
 		return nil
 	})
 	if err != nil {
-		return s, err
+		return s, apperr.Wrap(err, "ops.Runner.Run")
 	}
 
 	var tenants []uuid.UUID
@@ -89,15 +90,15 @@ func Housekeep(
 	runErr := m.Run(ctx, true, nil, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `SELECT id FROM platform.tenants ORDER BY id`)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "select platform.tenants")
 		}
 
 		tenants, err = pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 
-		return err
+		return apperr.Wrap(err, "select platform.tenants")
 	})
 	if runErr != nil {
-		return s, runErr
+		return s, apperr.Wrap(runErr, "ops.Runner.Run")
 	}
 
 	for _, t := range tenants {
@@ -124,11 +125,11 @@ func Housekeep(
 				)
 				s.IdempotencyKeys += tag.RowsAffected()
 
-				return err
+				return apperr.Wrap(err, "delete platform.idempotency_keys")
 			},
 		)
 		if err != nil {
-			return s, err
+			return s, apperr.Wrap(err, "ops.Runner.Run")
 		}
 	}
 

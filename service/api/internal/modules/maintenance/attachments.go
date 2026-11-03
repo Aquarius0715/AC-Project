@@ -38,7 +38,7 @@ func (m Files) lockDraft(ctx context.Context, c *ops.Call, job, report uuid.UUID
 	}
 
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select maintenance.jobs")
 	}
 
 	technicianJobErr := m.Reports.Access.TechnicianJob(ctx, c, job, unit)
@@ -71,7 +71,7 @@ func (m Files) store(
 
 	putErr := m.Blobs.Put(ctx, key, f.Mime, f.Bytes)
 	if putErr != nil {
-		return id, putErr
+		return id, apperr.Wrap(putErr, "blob.Store.Put")
 	}
 
 	_, err := c.Tx.Exec(
@@ -90,7 +90,7 @@ func (m Files) store(
 		c.Now,
 	)
 
-	return id, err
+	return id, apperr.Wrap(err, "insert maintenance.attachments")
 }
 
 // ---- attachments.add ----
@@ -159,7 +159,7 @@ func (m Files) add(ctx context.Context, c *ops.Call, in *AddInput) (AttachmentRe
 	scanErr := c.Tx.QueryRow(ctx, `SELECT count(*) FROM maintenance.attachments WHERE report_id = $1`, in.ReportID).
 		Scan(&n)
 	if scanErr != nil {
-		return AttachmentRef{}, scanErr
+		return AttachmentRef{}, apperr.Wrap(scanErr, "select maintenance.attachments")
 	}
 
 	if n >= MaxReportAttachments {
@@ -180,7 +180,7 @@ func (m Files) add(ctx context.Context, c *ops.Call, in *AddInput) (AttachmentRe
 		c.Now,
 	)
 	if execErr != nil {
-		return AttachmentRef{}, execErr
+		return AttachmentRef{}, apperr.Wrap(execErr, "update maintenance.work_reports")
 	}
 
 	_, execErr = c.Tx.Exec(
@@ -190,7 +190,7 @@ func (m Files) add(ctx context.Context, c *ops.Call, in *AddInput) (AttachmentRe
 		draft.Version+1,
 	)
 	if execErr != nil {
-		return AttachmentRef{}, execErr
+		return AttachmentRef{}, apperr.Wrap(execErr, "update maintenance.jobs")
 	}
 
 	next := draft.Version + 1
@@ -352,7 +352,7 @@ func (m Files) signOff(ctx context.Context, c *ops.Call, in *SignOffInput) (Repo
 		c.Now,
 	)
 	if execErr != nil {
-		return Report{}, execErr
+		return Report{}, apperr.Wrap(execErr, "update maintenance.work_reports")
 	}
 
 	x, err := m.Reports.load(ctx, c, in.ReportID, draft.Version)
@@ -460,7 +460,7 @@ func (m Files) content(ctx context.Context, c *ops.Call, in *ContentInput) (Blob
 	}
 
 	if err != nil {
-		return out, err
+		return out, apperr.Wrap(err, "select maintenance.attachments")
 	}
 
 	out.Bytes, err = m.Blobs.Get(ctx, key)
@@ -470,7 +470,7 @@ func (m Files) content(ctx context.Context, c *ops.Call, in *ContentInput) (Blob
 			"error.notFound",
 		) // the row is kept but its content was lost: not retryable (IR229)
 	} else if err != nil {
-		return out, err
+		return out, apperr.Wrap(err, "blob.Store.Get")
 	}
 
 	return out, nil

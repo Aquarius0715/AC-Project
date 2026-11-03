@@ -4,6 +4,7 @@ package apperr
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -107,6 +108,17 @@ func (e *DomainError) RetryAfter(s int) *DomainError {
 	e.RetryAfterSeconds = &s
 
 	return e
+}
+
+// Wrap says where err happened (the statement or the call that failed) for the log of a 5xx: every error from
+// another package carries that context (wrapcheck). Nil stays nil, and From still finds the DomainError, the
+// PostgreSQL error or the deadline inside.
+func Wrap(err error, where string) error {
+	if err == nil {
+		return nil
+	}
+
+	return fmt.Errorf("%s: %w", where, err)
 }
 
 // From converts any error into a DomainError (PostgreSQL errors, deadlines, unknown errors).

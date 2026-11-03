@@ -11,6 +11,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // ReleaseEndedAccess is the maintenance scheduler job of OPEN-BE-09 (IR439). A technician whose access ends before an
@@ -29,7 +30,7 @@ func (m Jobs) ReleaseEndedAccess(ctx context.Context, c *ops.Call) (int, error) 
 		ORDER BY a.job_id FOR UPDATE OF a, j SKIP LOCKED`,
 	)
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "select maintenance.assignments")
 	}
 
 	list, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (released, error) {
@@ -38,7 +39,7 @@ func (m Jobs) ReleaseEndedAccess(ctx context.Context, c *ops.Call) (int, error) 
 		return e, r.Scan(&e.assignment, &e.job, &e.contractor)
 	})
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "select maintenance.assignments")
 	}
 
 	for _, e := range list {
@@ -74,7 +75,7 @@ func releaseQualificationEnded(
 		until,
 	)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select maintenance.assignments")
 	}
 
 	type candidate struct {
@@ -89,13 +90,13 @@ func releaseQualificationEnded(
 		return e, r.Scan(&e.assignment, &e.job, &e.contractor, &e.unit)
 	})
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select maintenance.assignments")
 	}
 
 	for _, e := range list {
 		_, _, scope, err := units.UnitService(ctx, c, e.unit)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "maintenance.ServiceUnits.UnitService")
 		}
 
 		if !slices.Contains(requiredCodes(scope), code) {
@@ -148,7 +149,7 @@ func releaseAssignment(ctx context.Context, c *ops.Call, e released, why release
 		why.reason,
 	)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "update maintenance.assignments")
 	}
 
 	status := "requested" // HQ's own delivery assigns from requested
@@ -165,7 +166,7 @@ func releaseAssignment(ctx context.Context, c *ops.Call, e released, why release
 		c.Now,
 	)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "update maintenance.jobs")
 	}
 
 	err = (Jobs{Units: nil, Severity: nil, HQOrg: nil, Sites: nil, Blobs: nil}).event(
@@ -196,7 +197,7 @@ func releaseAssignment(ctx context.Context, c *ops.Call, e released, why release
 
 	recipients, err := identity.Members(ctx, c, in)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "identity.Members")
 	}
 
 	for _, r := range recipients {
@@ -215,7 +216,7 @@ func releaseAssignment(ctx context.Context, c *ops.Call, e released, why release
 			SourceAlertID: nil,
 		})
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "notify.Store.Create")
 		}
 	}
 

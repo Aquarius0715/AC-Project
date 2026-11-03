@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/db"
 )
@@ -61,7 +62,10 @@ func (s SMTP) Send(_ context.Context, to, subject, body string) (string, error) 
 		return "", fmt.Errorf("mail: sender %q: %w", s.From, err)
 	}
 
-	return id, smtp.SendMail(s.Addr, nil, from.Address, []string{to}, []byte(msg))
+	return id, apperr.Wrap(
+		smtp.SendMail(s.Addr, nil, from.Address, []string{to}, []byte(msg)),
+		"smtp.SendMail",
+	)
 }
 
 // Apps are the sign-in addresses of the web apps that e-mails link to.
@@ -190,7 +194,7 @@ func Deliver(
 		now,
 	) // a second worker takes other rows: no e-mail is sent twice
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "select notify.notifications")
 	}
 
 	var ns []pending
@@ -210,7 +214,7 @@ func Deliver(
 		if err != nil {
 			rows.Close()
 
-			return 0, err
+			return 0, apperr.Wrap(err, "select notify.notifications")
 		}
 
 		ns = append(ns, p)
@@ -220,7 +224,7 @@ func Deliver(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return 0, rowsErr
+		return 0, apperr.Wrap(rowsErr, "select notify.notifications")
 	}
 
 	for _, p := range ns {
@@ -264,7 +268,7 @@ func Deliver(
 			now,
 		)
 		if execErr != nil {
-			return sent, execErr
+			return sent, apperr.Wrap(execErr, "insert notify.deliveries")
 		}
 	}
 
@@ -284,7 +288,7 @@ func DeliverAll(
 
 	rows, err := m.Writer.Query(ctx, `SELECT id FROM platform.tenants ORDER BY id`)
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "select platform.tenants")
 	}
 
 	for rows.Next() {
@@ -294,7 +298,7 @@ func DeliverAll(
 		if err != nil {
 			rows.Close()
 
-			return 0, err
+			return 0, apperr.Wrap(err, "select platform.tenants")
 		}
 
 		tenants = append(tenants, id)
@@ -304,7 +308,7 @@ func DeliverAll(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return 0, rowsErr
+		return 0, apperr.Wrap(rowsErr, "select platform.tenants")
 	}
 
 	total := 0
@@ -333,7 +337,7 @@ func DeliverAll(
 			},
 		)
 		if err != nil {
-			return total, err
+			return total, apperr.Wrap(err, "db.TxManager.Run")
 		}
 	}
 
@@ -356,7 +360,7 @@ func Sweep(ctx context.Context, tx pgx.Tx, now time.Time) (int64, error) {
 	} {
 		tag, err := tx.Exec(ctx, q, cut)
 		if err != nil {
-			return n, err
+			return n, apperr.Wrap(err, "exec (Sweep)")
 		}
 
 		n += tag.RowsAffected()
@@ -371,12 +375,12 @@ func SweepAll(ctx context.Context, m *db.TxManager, now time.Time) (int64, error
 
 	rows, err := m.Writer.Query(ctx, `SELECT id FROM platform.tenants ORDER BY id`)
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "select platform.tenants")
 	}
 
 	tenants, err = pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "select platform.tenants")
 	}
 
 	var total int64
@@ -405,7 +409,7 @@ func SweepAll(ctx context.Context, m *db.TxManager, now time.Time) (int64, error
 			},
 		)
 		if err != nil {
-			return total, err
+			return total, apperr.Wrap(err, "db.TxManager.Run")
 		}
 	}
 

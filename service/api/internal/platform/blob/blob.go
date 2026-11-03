@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // ErrNotFound is returned by Get when no blob exists under the key (a stored row whose content was lost).
@@ -49,10 +51,10 @@ func (d Dir) Put(_ context.Context, key, _ string, data []byte) error {
 
 	mkdirAllErr := os.MkdirAll(filepath.Dir(p), 0o700)
 	if mkdirAllErr != nil {
-		return mkdirAllErr
+		return apperr.Wrap(mkdirAllErr, "os.MkdirAll")
 	}
 
-	return os.WriteFile(p, data, 0o600)
+	return apperr.Wrap(os.WriteFile(p, data, 0o600), "os.WriteFile")
 }
 
 // Get implements Store.
@@ -67,5 +69,5 @@ func (d Dir) Get(_ context.Context, key string) ([]byte, error) {
 		return nil, fmt.Errorf("%w: %s", ErrNotFound, key)
 	}
 
-	return b, err
+	return b, apperr.Wrap(err, "os.ReadFile")
 }

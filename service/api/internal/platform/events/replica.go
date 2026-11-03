@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // RowChanged is the event type prefix of the generic change capture (IR188): platform.capture_row() publishes
@@ -61,7 +63,7 @@ func (r Replica) handle(ctx context.Context, tx pgx.Tx, e Event) error {
 			[]byte(p.Row),
 		)
 
-		return err
+		return apperr.Wrap(err, "delete (handle)")
 	}
 
 	all := append(append([]string{}, r.Keys...), r.Cols...)
@@ -89,5 +91,5 @@ func (r Replica) handle(ctx context.Context, tx pgx.Tx, e Event) error {
 		[]byte(p.Row),
 	)
 
-	return err
+	return apperr.Wrap(err, "insert (handle)")
 }

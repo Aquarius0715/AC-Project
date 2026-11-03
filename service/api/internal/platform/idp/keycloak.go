@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // Keycloak ends sessions through the admin REST API of one realm.
@@ -69,14 +71,14 @@ func (k *Keycloak) accessToken(ctx context.Context) (string, error) {
 		strings.NewReader(form.Encode()),
 	)
 	if err != nil {
-		return "", err
+		return "", apperr.Wrap(err, "http.NewRequestWithContext")
 	}
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	res, err := k.client().Do(req)
 	if err != nil {
-		return "", err
+		return "", apperr.Wrap(err, "http.Client.Do")
 	}
 	defer res.Body.Close()
 
@@ -118,14 +120,14 @@ func (k *Keycloak) EndSessions(ctx context.Context, subject string) error {
 		nil,
 	)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "http.NewRequestWithContext")
 	}
 
 	req.Header.Set("Authorization", "Bearer "+tok)
 
 	res, err := k.client().Do(req)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "http.Client.Do")
 	}
 	defer res.Body.Close()
 
@@ -166,7 +168,7 @@ func (k *Keycloak) do(ctx context.Context, method, path string, body any) (*http
 	if body != nil {
 		raw, err := json.Marshal(body)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "json.Marshal")
 		}
 
 		rd = strings.NewReader(string(raw))
@@ -176,7 +178,7 @@ func (k *Keycloak) do(ctx context.Context, method, path string, body any) (*http
 
 	req, err := http.NewRequestWithContext(ctx, method, k.AdminURL+path, rd)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "http.NewRequestWithContext")
 	}
 
 	req.Header.Set("Authorization", "Bearer "+tok)
@@ -192,7 +194,7 @@ func (k *Keycloak) do(ctx context.Context, method, path string, body any) (*http
 		k.mu.Unlock()
 	}
 
-	return res, err
+	return res, apperr.Wrap(err, "http.Client.Do")
 }
 
 // ErrNoAccount is UpdateAccount's answer for a subject the provider does not know (an account deleted there).
@@ -276,7 +278,7 @@ func (k *Keycloak) UpdateAccount(ctx context.Context, subject string, a Account)
 
 	decodeErr := json.NewDecoder(res.Body).Decode(&user)
 	if decodeErr != nil {
-		return decodeErr
+		return apperr.Wrap(decodeErr, "json.Decoder.Decode")
 	}
 
 	attrs, _ := user["attributes"].(map[string]any)
@@ -388,7 +390,7 @@ func (k *Keycloak) hasOTP(ctx context.Context, subject string) (bool, error) {
 
 	decodeErr := json.NewDecoder(res.Body).Decode(&creds)
 	if decodeErr != nil {
-		return false, decodeErr
+		return false, apperr.Wrap(decodeErr, "json.Decoder.Decode")
 	}
 
 	for _, c := range creds {

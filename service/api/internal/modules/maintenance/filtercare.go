@@ -101,7 +101,7 @@ func (m FilterCare) settings(
 
 	s.CreatedAt = s.UpdatedAt
 
-	return s, err
+	return s, apperr.Wrap(err, "select maintenance.filter_care_settings")
 }
 
 // status computes FilterCareStatus for one unit (IR134 items 1–3).
@@ -130,7 +130,7 @@ func (m FilterCare) status(
 	scanErr := c.Tx.QueryRow(ctx, `SELECT max(cleaned_at) FROM maintenance.filter_cleanings WHERE unit_id = $1`, u.ID).
 		Scan(&st.LastCleanedAt)
 	if scanErr != nil {
-		return st, scanErr
+		return st, apperr.Wrap(scanErr, "select maintenance.filter_cleanings")
 	}
 
 	if st.LastCleanedAt != nil {
@@ -151,7 +151,7 @@ func (m FilterCare) status(
 		by := "technician"
 		st.LastCleanedAt, st.LastCleanedBy, st.LastCleaningJobID = &at, &by, &job
 	case err != nil && !errors.Is(err, pgx.ErrNoRows):
-		return st, err
+		return st, apperr.Wrap(err, "select maintenance.jobs")
 	}
 
 	if u.Connection == "online" {
@@ -162,7 +162,7 @@ func (m FilterCare) status(
 			st.LastCleanedAt,
 		)
 		if err != nil {
-			return st, err
+			return st, apperr.Wrap(err, "maintenance.RunTime.RunHours")
 		}
 	}
 
@@ -259,7 +259,7 @@ func (m FilterCare) list(
 
 	units, err := m.Units.BriefUnits(ctx, c, f.CustomerID, f.PropertyID, f.SpaceID, f.UnitID)
 	if err != nil {
-		return paging.Page[FilterStatus]{}, err
+		return paging.Page[FilterStatus]{}, apperr.Wrap(err, "maintenance.FilterUnits.BriefUnits")
 	}
 
 	cache := map[uuid.UUID]FilterSettings{}
@@ -270,7 +270,10 @@ func (m FilterCare) list(
 		if !ok {
 			cust, _, err := m.Units.CustomerOfOrg(ctx, c, u.OrgID)
 			if err != nil {
-				return paging.Page[FilterStatus]{}, err
+				return paging.Page[FilterStatus]{}, apperr.Wrap(
+					err,
+					"maintenance.FilterUnits.CustomerOfOrg",
+				)
 			}
 
 			set, err = m.settings(ctx, c, cust)
@@ -355,7 +358,7 @@ func (m FilterCare) markCleaned(
 ) (FilterStatus, error) {
 	org, archived, found, err := m.Units.UnitState(ctx, c, in.UnitID)
 	if err != nil {
-		return FilterStatus{}, err
+		return FilterStatus{}, apperr.Wrap(err, "maintenance.FilterUnits.UnitState")
 	}
 
 	if !found || org != c.Principal.OrgID {
@@ -375,17 +378,17 @@ func (m FilterCare) markCleaned(
 		c.Principal.MembershipID,
 	)
 	if execErr != nil {
-		return FilterStatus{}, execErr
+		return FilterStatus{}, apperr.Wrap(execErr, "insert maintenance.filter_cleanings")
 	}
 
 	units, err := m.Units.BriefUnits(ctx, c, nil, nil, nil, &in.UnitID)
 	if err != nil || len(units) == 0 {
-		return FilterStatus{}, err
+		return FilterStatus{}, apperr.Wrap(err, "maintenance.FilterUnits.BriefUnits")
 	}
 
 	cust, _, err := m.Units.CustomerOfOrg(ctx, c, org)
 	if err != nil {
-		return FilterStatus{}, err
+		return FilterStatus{}, apperr.Wrap(err, "maintenance.FilterUnits.CustomerOfOrg")
 	}
 
 	set, err := m.settings(ctx, c, cust)
@@ -507,7 +510,7 @@ func (m FilterCare) saveSettings(
 
 	cust, ok, err := m.Units.CustomerOfOrg(ctx, c, c.Principal.OrgID)
 	if err != nil {
-		return FilterSettings{}, err
+		return FilterSettings{}, apperr.Wrap(err, "maintenance.FilterUnits.CustomerOfOrg")
 	}
 
 	if !ok {
@@ -531,7 +534,7 @@ func (m FilterCare) saveSettings(
 		c.Now,
 	)
 	if execErr != nil {
-		return FilterSettings{}, execErr
+		return FilterSettings{}, apperr.Wrap(execErr, "insert maintenance.filter_care_settings")
 	}
 
 	s, err := m.settings(ctx, c, cust)
@@ -598,7 +601,7 @@ func (m FilterCare) getSettings(
 ) (FilterSettings, error) {
 	cust, ok, err := m.Units.CustomerOfOrg(ctx, c, c.Principal.OrgID)
 	if err != nil {
-		return FilterSettings{}, err
+		return FilterSettings{}, apperr.Wrap(err, "maintenance.FilterUnits.CustomerOfOrg")
 	}
 
 	if !ok {
@@ -627,7 +630,7 @@ func (m FilterCare) Remind(ctx context.Context, c *ops.Call) (int, error) {
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 	case err != nil:
-		return 0, err
+		return 0, apperr.Wrap(err, "select maintenance.filter_reminder_watermarks")
 	case c.Now.Sub(at) < FilterRemindEvery:
 		return 0, nil
 	}
@@ -640,12 +643,12 @@ func (m FilterCare) Remind(ctx context.Context, c *ops.Call) (int, error) {
 		c.Now,
 	)
 	if execErr != nil {
-		return 0, execErr
+		return 0, apperr.Wrap(execErr, "insert maintenance.filter_reminder_watermarks")
 	}
 
 	units, err := m.Units.BriefUnits(ctx, c, nil, nil, nil, nil)
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "maintenance.FilterUnits.BriefUnits")
 	}
 
 	cache := map[uuid.UUID]FilterSettings{}
@@ -656,7 +659,7 @@ func (m FilterCare) Remind(ctx context.Context, c *ops.Call) (int, error) {
 		if !ok {
 			cust, found, err := m.Units.CustomerOfOrg(ctx, c, u.OrgID)
 			if err != nil {
-				return n, err
+				return n, apperr.Wrap(err, "maintenance.FilterUnits.CustomerOfOrg")
 			}
 
 			if !found {
@@ -710,7 +713,7 @@ func clearReminders(
 		c.Now,
 	)
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "update maintenance.filter_reminders")
 	}
 
 	type ended struct{ id, org uuid.UUID }
@@ -759,7 +762,7 @@ func remind(
 		c.Now,
 	)
 	if err != nil || tag.RowsAffected() == 0 { // this cycle was reminded already
-		return 0, err
+		return 0, apperr.Wrap(err, "insert maintenance.filter_reminders")
 	}
 
 	f := identity.MembersInput{
@@ -775,7 +778,7 @@ func remind(
 
 	recipients, err := identity.Members(ctx, c, f)
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "identity.Members")
 	}
 
 	evidence := reminderEvidence(st, c.Now)
@@ -795,7 +798,7 @@ func remind(
 				Params:                map[string]any{"status": "open", "message": evidence},
 			})
 			if err != nil {
-				return 0, err
+				return 0, apperr.Wrap(err, "notify.Store.Create")
 			}
 
 			sent++
@@ -809,7 +812,7 @@ func remind(
 		sent,
 	)
 	if execErr != nil {
-		return 0, execErr
+		return 0, apperr.Wrap(execErr, "update maintenance.filter_reminders")
 	}
 
 	c.Emit(ops.Event{

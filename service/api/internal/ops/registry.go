@@ -240,7 +240,7 @@ func (r *Registry) recordDenied(ctx context.Context, c *Call, op string, in any,
 				c.Now.UTC().Format(time.RFC3339Nano),
 			)
 			if err != nil {
-				return err
+				return apperr.Wrap(err, "select set_config")
 			}
 		}
 
@@ -628,7 +628,7 @@ func (r *Registry) run(c *echo.Context, op *Operation, body []byte, corr string)
 			}
 
 			if stored != nil {
-				return c.JSONBlob(http.StatusOK, stored)
+				return apperr.Wrap(c.JSONBlob(http.StatusOK, stored), "echo.Context.JSONBlob")
 			}
 		}
 	}
@@ -668,7 +668,7 @@ func (r *Registry) run(c *echo.Context, op *Operation, body []byte, corr string)
 				call.Now.UTC().Format(time.RFC3339Nano),
 			)
 			if err != nil {
-				return err
+				return apperr.Wrap(err, "select set_config")
 			}
 		}
 
@@ -682,7 +682,7 @@ func (r *Registry) run(c *echo.Context, op *Operation, body []byte, corr string)
 		if write && r.Rec != nil {
 			err := r.Rec.Record(ctx, tx, call, name)
 			if err != nil {
-				return err
+				return apperr.Wrap(err, "ops.Recorder.Record")
 			}
 		}
 
@@ -731,7 +731,7 @@ func (r *Registry) run(c *echo.Context, op *Operation, body []byte, corr string)
 		r.AfterCommit(ctx)
 	}
 
-	return c.JSONBlob(http.StatusOK, resp)
+	return apperr.Wrap(c.JSONBlob(http.StatusOK, resp), "echo.Context.JSONBlob")
 }
 
 // txFor is the transaction a call runs in: tx itself unless WrapTx is set.

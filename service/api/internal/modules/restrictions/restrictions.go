@@ -198,7 +198,7 @@ func scan(row pgx.Row) (Restriction, error) {
 		x.ReleaseIntent = intent
 	}
 
-	return x, err
+	return x, apperr.Wrap(err, "scan (scan)")
 }
 
 // decorate loads per-unit state and the audit events.
@@ -211,7 +211,7 @@ func decorate(ctx context.Context, c *ops.Call, x *Restriction) error {
 		x.ID,
 	)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select restrictions.restriction_units")
 	}
 
 	x.PerUnit, x.UnitIDs = []Unit{}, []uuid.UUID{}
@@ -236,7 +236,7 @@ func decorate(ctx context.Context, c *ops.Call, x *Restriction) error {
 		if err != nil {
 			rows.Close()
 
-			return err
+			return apperr.Wrap(err, "select restrictions.restriction_units")
 		}
 
 		u.ObservedRestriction = json.RawMessage("null")
@@ -252,12 +252,12 @@ func decorate(ctx context.Context, c *ops.Call, x *Restriction) error {
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return rowsErr
+		return apperr.Wrap(rowsErr, "select restrictions.restriction_units")
 	}
 
 	hist, err := audit.History(ctx, c, "restriction", x.ID.String()) // identity's audit log (IR196)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "audit.History")
 	}
 
 	x.Events = []Event{}
@@ -454,14 +454,14 @@ func (m Restrictions) query(
 		"r.created_at DESC, r.id DESC",
 	)
 	if err != nil {
-		return nil, nil, 0, 0, err
+		return nil, nil, 0, 0, apperr.Wrap(err, "paging.OrderBy")
 	}
 	// the cursor binds the filter (SR14)
 	w, err := paging.Resolve(in, struct {
 		F listFilter `json:"f"`
 	}{f}, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return nil, nil, 0, 0, err
+		return nil, nil, 0, 0, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	var args []any
@@ -497,7 +497,7 @@ func (m Restrictions) query(
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM restrictions.restrictions r WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
-		return nil, nil, 0, 0, scanErr
+		return nil, nil, 0, 0, apperr.Wrap(scanErr, "select restrictions.restrictions")
 	}
 
 	rows, err := c.Tx.Query(
@@ -512,7 +512,7 @@ func (m Restrictions) query(
 		),
 		args...)
 	if err != nil {
-		return nil, nil, 0, 0, err
+		return nil, nil, 0, 0, apperr.Wrap(err, "select restrictions.restrictions")
 	}
 
 	out := []Restriction{}
@@ -532,7 +532,7 @@ func (m Restrictions) query(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return nil, nil, 0, 0, rowsErr
+		return nil, nil, 0, 0, apperr.Wrap(rowsErr, "select restrictions.restrictions")
 	}
 
 	for i := range out {
@@ -684,7 +684,7 @@ func (m Restrictions) forInvoice(
 	}
 
 	if err != nil {
-		return paging.Page[Restriction]{}, err
+		return paging.Page[Restriction]{}, apperr.Wrap(err, "select billing.invoices")
 	}
 
 	var f listFilter

@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
@@ -29,7 +30,9 @@ func (f failing) Exec(ctx context.Context, sql string, args ...any) (pgconn.Comm
 		return pgconn.CommandTag{}, errInjected
 	}
 
-	return f.Tx.Exec(ctx, sql, args...)
+	out, err := f.Tx.Exec(ctx, sql, args...)
+
+	return out, apperr.Wrap(err, "exec (Exec)")
 }
 
 // injectAt returns a server whose operations fail at the first statement containing match.

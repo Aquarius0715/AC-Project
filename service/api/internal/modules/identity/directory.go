@@ -75,14 +75,14 @@ func nonReaders(ctx context.Context, c *ops.Call, in *NonReadersInput) ([]uuid.U
 		  p.permission = 'alert.read'))
 		    OR (m.role = 'client' AND m.organization_id = $2))`, in.IDs, in.CustomerOrgID, c.Now)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select identity.memberships")
 	}
 
 	ok := map[uuid.UUID]bool{}
 
 	readers, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select identity.memberships")
 	}
 
 	for _, id := range readers {
@@ -111,7 +111,7 @@ func orgState(ctx context.Context, c *ops.Call, in *OrgInput) (OrgStateResult, e
 
 	r.Found = err == nil
 
-	return r, err
+	return r, apperr.Wrap(err, "select identity.organizations")
 }
 
 func orgName(ctx context.Context, c *ops.Call, in *OrgInput) (string, error) {
@@ -123,7 +123,7 @@ func orgName(ctx context.Context, c *ops.Call, in *OrgInput) (string, error) {
 		return "", apperr.E(apperr.NotFound, "error.notFound")
 	}
 
-	return name, err
+	return name, apperr.Wrap(err, "select identity.organizations")
 }
 
 func technician(ctx context.Context, c *ops.Call, in *MembershipInput) (TechnicianResult, error) {
@@ -151,7 +151,7 @@ func technician(ctx context.Context, c *ops.Call, in *MembershipInput) (Technici
 	}
 
 	if err != nil {
-		return t, err
+		return t, apperr.Wrap(err, "select identity.memberships")
 	}
 
 	if emp != nil {
@@ -168,7 +168,7 @@ func technician(ctx context.Context, c *ops.Call, in *MembershipInput) (Technici
 		in.MembershipID,
 	)
 	if err != nil {
-		return t, err
+		return t, apperr.Wrap(err, "select identity.membership_scopes")
 	}
 	defer rows.Close()
 
@@ -180,7 +180,7 @@ func technician(ctx context.Context, c *ops.Call, in *MembershipInput) (Technici
 
 		err := rows.Scan(&k, &id)
 		if err != nil {
-			return t, err
+			return t, apperr.Wrap(err, "select identity.membership_scopes")
 		}
 
 		t.Scopes[k] = append(t.Scopes[k], id)
@@ -188,7 +188,7 @@ func technician(ctx context.Context, c *ops.Call, in *MembershipInput) (Technici
 
 	t.Found = true
 
-	return t, rows.Err()
+	return t, apperr.Wrap(rows.Err(), "select identity.membership_scopes")
 }
 
 func qualified(ctx context.Context, c *ops.Call, in *QualifiedInput) (bool, error) {
@@ -199,7 +199,7 @@ func qualified(ctx context.Context, c *ops.Call, in *QualifiedInput) (bool, erro
 		AND valid_from <= $3 AND valid_until >= $4 AND revoked_at IS NULL`, in.MembershipID, in.Codes, in.Start, in.End).
 		Scan(&n)
 
-	return n == len(in.Codes), err
+	return n == len(in.Codes), apperr.Wrap(err, "select identity.qualification_grants")
 }
 
 // GrantHandlers apply QualificationGranted (consumer identity, IR192): the grant for the code covers
@@ -211,7 +211,7 @@ func GrantHandlers() map[string]events.Handler {
 
 			err := e.Decode(&g)
 			if err != nil {
-				return err
+				return apperr.Wrap(err, "events.Event.Decode")
 			}
 
 			tag, err := tx.Exec(
@@ -224,7 +224,7 @@ func GrantHandlers() map[string]events.Handler {
 				g.ValidUntil,
 			)
 			if err != nil || tag.RowsAffected() > 0 {
-				return err
+				return apperr.Wrap(err, "update identity.qualification_grants")
 			}
 
 			_, err = tx.Exec(
@@ -238,7 +238,7 @@ func GrantHandlers() map[string]events.Handler {
 				g.ValidUntil,
 			)
 
-			return err
+			return apperr.Wrap(err, "insert identity.qualification_grants")
 		},
 	}
 }

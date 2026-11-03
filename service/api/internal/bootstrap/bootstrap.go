@@ -18,6 +18,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // Input names the tenant, its HQ organization and the first administrator.
@@ -89,7 +91,7 @@ func Admin(ctx context.Context, tx pgx.Tx, in Input) (Result, error) {
 			'1 millisecond'`).
 			Scan(&r.At)
 		if err != nil {
-			return r, err
+			return r, apperr.Wrap(err, "select platform.demo_clock")
 		}
 	}
 
@@ -97,12 +99,12 @@ func Admin(ctx context.Context, tx pgx.Tx, in Input) (Result, error) {
 
 	rows, err := tx.Query(ctx, `SELECT id FROM platform.tenants WHERE name = $1`, in.Tenant)
 	if err != nil {
-		return r, err
+		return r, apperr.Wrap(err, "select platform.tenants")
 	}
 
 	ids, err = pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 	if err != nil {
-		return r, err
+		return r, apperr.Wrap(err, "select platform.tenants")
 	}
 
 	switch len(ids) {
@@ -111,7 +113,7 @@ func Admin(ctx context.Context, tx pgx.Tx, in Input) (Result, error) {
 			id`, in.Tenant, r.At).
 			Scan(&r.TenantID)
 		if err != nil {
-			return r, err
+			return r, apperr.Wrap(err, "insert platform.tenants")
 		}
 
 		r.NewTenant = true
@@ -127,7 +129,7 @@ func Admin(ctx context.Context, tx pgx.Tx, in Input) (Result, error) {
 		r.TenantID,
 	)
 	if execErr != nil {
-		return r, execErr
+		return r, apperr.Wrap(execErr, "select pg_advisory_xact_lock")
 	}
 
 	var exists bool
@@ -137,7 +139,7 @@ func Admin(ctx context.Context, tx pgx.Tx, in Input) (Result, error) {
 		WHERE m.tenant_id = $1 AND m.valid_from <= $2 AND (m.valid_until IS NULL OR m.valid_until > $2))`, r.TenantID, r.At).
 		Scan(&exists)
 	if scanErr != nil {
-		return r, scanErr
+		return r, apperr.Wrap(scanErr, "select identity.memberships")
 	}
 
 	if exists {
@@ -156,7 +158,7 @@ func Admin(ctx context.Context, tx pgx.Tx, in Input) (Result, error) {
 	}
 
 	if err != nil {
-		return r, err
+		return r, apperr.Wrap(err, "insert identity.organizations")
 	}
 
 	err = tx.QueryRow(ctx, `INSERT INTO identity.users (email, display_name, status, created_at, updated_at) VALUES ($1,
@@ -168,7 +170,7 @@ func Admin(ctx context.Context, tx pgx.Tx, in Input) (Result, error) {
 	}
 
 	if err != nil {
-		return r, err
+		return r, apperr.Wrap(err, "insert identity.users")
 	}
 
 	scanErr = tx.QueryRow(ctx, `INSERT INTO identity.memberships (tenant_id, user_id, organization_id, role, valid_from,
@@ -176,7 +178,7 @@ func Admin(ctx context.Context, tx pgx.Tx, in Input) (Result, error) {
 		VALUES ($1, $2, $3, 'admin', $4, $4, $4) RETURNING id`, r.TenantID, r.UserID, r.OrganizationID, r.At).
 		Scan(&r.MembershipID)
 	if scanErr != nil {
-		return r, scanErr
+		return r, apperr.Wrap(scanErr, "insert identity.memberships")
 	}
 	// every HQ permission (the contractor's partner.* are not HQ's), over the whole tenant
 	_, execErr = tx.Exec(
@@ -187,7 +189,7 @@ func Admin(ctx context.Context, tx pgx.Tx, in Input) (Result, error) {
 		r.MembershipID,
 	)
 	if execErr != nil {
-		return r, execErr
+		return r, apperr.Wrap(execErr, "insert identity.membership_permissions")
 	}
 
 	_, execErr = tx.Exec(
@@ -197,7 +199,7 @@ func Admin(ctx context.Context, tx pgx.Tx, in Input) (Result, error) {
 		r.MembershipID,
 	)
 	if execErr != nil {
-		return r, execErr
+		return r, apperr.Wrap(execErr, "insert identity.membership_scopes")
 	}
 
 	_, execErr = tx.Exec(
@@ -211,7 +213,7 @@ func Admin(ctx context.Context, tx pgx.Tx, in Input) (Result, error) {
 		r.At,
 	)
 	if execErr != nil {
-		return r, execErr
+		return r, apperr.Wrap(execErr, "insert audit.audit_log")
 	}
 
 	_, err = tx.Exec(
@@ -226,5 +228,5 @@ func Admin(ctx context.Context, tx pgx.Tx, in Input) (Result, error) {
 		r.At,
 	)
 
-	return r, err
+	return r, apperr.Wrap(err, "insert platform.outbox")
 }

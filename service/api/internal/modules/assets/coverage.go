@@ -157,7 +157,7 @@ func (m *Module) unitsCoverage(
 
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[UnitCoverage]{}, err
+		return paging.Page[UnitCoverage]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	var args []any
@@ -187,7 +187,7 @@ func (m *Module) unitsCoverage(
 		JOIN assets.customers cu ON cu.organization_id = u.customer_org_id WHERE `+strings.Join(conds, " AND "),
 		args...)
 	if err != nil {
-		return paging.Page[UnitCoverage]{}, err
+		return paging.Page[UnitCoverage]{}, apperr.Wrap(err, "select assets.units")
 	}
 
 	var all []UnitCoverage
@@ -205,7 +205,7 @@ func (m *Module) unitsCoverage(
 		if err != nil {
 			rows.Close()
 
-			return paging.Page[UnitCoverage]{}, err
+			return paging.Page[UnitCoverage]{}, apperr.Wrap(err, "select assets.units")
 		}
 
 		all = append(all, x)
@@ -215,7 +215,7 @@ func (m *Module) unitsCoverage(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return paging.Page[UnitCoverage]{}, rowsErr
+		return paging.Page[UnitCoverage]{}, apperr.Wrap(rowsErr, "select assets.units")
 	}
 
 	ids := make([]uuid.UUID, len(all))
@@ -225,12 +225,15 @@ func (m *Module) unitsCoverage(
 
 	contracts, err := m.Contracts.ActiveContracts(ctx, c, ids)
 	if err != nil {
-		return paging.Page[UnitCoverage]{}, err
+		return paging.Page[UnitCoverage]{}, apperr.Wrap(
+			err,
+			"assets.ContractReader.ActiveContracts",
+		)
 	}
 
 	claims, err := m.Claims.ClaimableJobs(ctx, c, ids)
 	if err != nil {
-		return paging.Page[UnitCoverage]{}, err
+		return paging.Page[UnitCoverage]{}, apperr.Wrap(err, "assets.ClaimReader.ClaimableJobs")
 	}
 
 	var keep []UnitCoverage

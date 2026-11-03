@@ -70,7 +70,7 @@ func (Access) TechnicianJob(
 		technicianJob,
 	)
 
-	return err
+	return apperr.Wrap(err, "delegate maintenance.technicianJob")
 }
 
 // TechnicianUnit checks a technician write without jobId (see technicianUnit).
@@ -89,7 +89,7 @@ func (Access) TechnicianUnit(
 		technicianUnit,
 	)
 
-	return err
+	return apperr.Wrap(err, "delegate maintenance.technicianUnit")
 }
 
 // JobVersion returns a job's version and unit (Control diagnostic runs).
@@ -100,7 +100,7 @@ func (Access) JobVersion(
 ) (int, uuid.UUID, bool, error) {
 	r, err := ops.Delegate(ctx, c, QueryJobVersion, JobInput{JobID: job}, jobVersion)
 
-	return r.Version, r.UnitID, r.Found, err
+	return r.Version, r.UnitID, r.Found, apperr.Wrap(err, "delegate maintenance.jobVersion")
 }
 
 func forbidden(key string) error { return apperr.E(apperr.Forbidden, key) }
@@ -125,7 +125,7 @@ func checkTechnicianJob(ctx context.Context, c *ops.Call, jobID uuid.UUID, unit 
 		FROM maintenance.assignments a JOIN maintenance.jobs j ON j.id = a.job_id
 		WHERE a.job_id = $1 AND a.technician_membership_id = $2 ORDER BY a.created_at DESC`, jobID, c.Principal.MembershipID)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select maintenance.assignments")
 	}
 
 	var as []assignment
@@ -143,7 +143,7 @@ func checkTechnicianJob(ctx context.Context, c *ops.Call, jobID uuid.UUID, unit 
 		if err != nil {
 			rows.Close()
 
-			return err
+			return apperr.Wrap(err, "select maintenance.assignments")
 		}
 
 		as = append(as, a)
@@ -153,7 +153,7 @@ func checkTechnicianJob(ctx context.Context, c *ops.Call, jobID uuid.UUID, unit 
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return rowsErr
+		return apperr.Wrap(rowsErr, "select maintenance.assignments")
 	}
 
 	now := c.Now
@@ -211,7 +211,7 @@ func checkTechnicianUnit(
 		WHERE j.unit_id = $1 AND a.technician_membership_id =
 		$2`, unit, c.Principal.MembershipID, c.Now).Scan(&any, &inWindow, &notStarted)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return err
+		return apperr.Wrap(err, "select maintenance.assignments")
 	}
 
 	switch {
@@ -247,5 +247,5 @@ func jobVersion(ctx context.Context, c *ops.Call, in *JobInput) (JobVersionResul
 
 	r.Found = err == nil
 
-	return r, err
+	return r, apperr.Wrap(err, "select maintenance.jobs")
 }

@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // Store keeps the counters.
@@ -40,7 +42,7 @@ func (w *Window) Allow(ctx context.Context, key string) (int, error) {
 
 	n, err := w.Store.Incr(ctx, fmt.Sprintf("%s%s:%d", w.Prefix, key, start.Unix()), 2*w.Window)
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "ratelimit.Store.Incr")
 	}
 
 	if n <= int64(w.Limit) {
@@ -57,7 +59,7 @@ type Valkey struct{ Client *redis.Client }
 func NewValkey(url string) (Valkey, error) {
 	opt, err := redis.ParseURL(url)
 	if err != nil {
-		return Valkey{}, err
+		return Valkey{}, apperr.Wrap(err, "redis.ParseURL")
 	}
 
 	opt.DialTimeout, opt.ReadTimeout, opt.WriteTimeout = time.Second, 500*time.Millisecond, 500*time.Millisecond
@@ -73,7 +75,7 @@ func (v Valkey) Incr(ctx context.Context, key string, ttl time.Duration) (int64,
 
 	_, err := pipe.Exec(ctx)
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "redis.Pipeliner.Exec")
 	}
 
 	return n.Val(), nil

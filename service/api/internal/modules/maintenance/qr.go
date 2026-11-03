@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // QrAccess answers units.resolveQr's assignment question for equipment (IR145, IR194).
@@ -29,7 +30,7 @@ func (QrAccess) QrAssignment(
 ) (bool, *uuid.UUID, error) {
 	r, err := ops.Delegate(ctx, c, QueryQrAssignment, UnitInput{UnitID: unit}, qrAssignment)
 
-	return r.Assigned, r.JobID, err
+	return r.Assigned, r.JobID, apperr.Wrap(err, "delegate maintenance.qrAssignment")
 }
 
 func qrAssignment(ctx context.Context, c *ops.Call, in *UnitInput) (QrAssignmentResult, error) {
@@ -45,5 +46,5 @@ func qrAssignment(ctx context.Context, c *ops.Call, in *UnitInput) (QrAssignment
 			  1)`, in.UnitID, c.Principal.MembershipID, c.Now).
 		Scan(&r.Assigned, &r.JobID)
 
-	return r, err
+	return r, apperr.Wrap(err, "select maintenance.assignments")
 }

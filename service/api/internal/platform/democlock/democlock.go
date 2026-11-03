@@ -11,6 +11,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // refreshEvery bounds how stale another process's advance can be in this process.
@@ -47,7 +49,7 @@ func Open(
 		off.Milliseconds(),
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "insert platform.demo_clock")
 	}
 
 	err = c.load(ctx)
@@ -74,7 +76,7 @@ func (c *Clock) load(ctx context.Context) error {
 	}
 
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select platform.demo_clock")
 	}
 
 	c.mu.Lock()
@@ -111,7 +113,7 @@ func (c *Clock) Advance(ctx context.Context, d time.Duration) error {
 		RETURNING offset_ms`, d.Milliseconds()).
 		Scan(&ms)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "update platform.demo_clock")
 	}
 
 	c.mu.Lock()
@@ -132,5 +134,7 @@ func StartFromEnv(getenv func(string) string) (time.Time, error) {
 		v = DefaultStart
 	}
 
-	return time.Parse(time.RFC3339, v)
+	out, err := time.Parse(time.RFC3339, v)
+
+	return out, apperr.Wrap(err, "time.Parse")
 }

@@ -99,7 +99,7 @@ func scanAlert(r pgx.Row) (Alert, error) {
 		&a.Rule,
 	)
 
-	return a, err
+	return a, apperr.Wrap(err, "scan (scanAlert)")
 }
 
 // UnitLocator resolves property membership of units for the propertyId filter (Assets).
@@ -222,7 +222,7 @@ func (m Alerts) list(
 		if in.Sort.Field == "severity" {
 			dir, err := paging.Direction(in.Sort)
 			if err != nil {
-				return paging.Page[Alert]{}, err
+				return paging.Page[Alert]{}, apperr.Wrap(err, "paging.Direction")
 			}
 
 			order = severityRank + " " + dir + ", a.id ASC"
@@ -237,7 +237,7 @@ func (m Alerts) list(
 				"",
 			)
 			if err != nil {
-				return paging.Page[Alert]{}, err
+				return paging.Page[Alert]{}, apperr.Wrap(err, "paging.OrderBy")
 			}
 
 			order = o
@@ -246,7 +246,7 @@ func (m Alerts) list(
 
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[Alert]{}, err
+		return paging.Page[Alert]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	var args []any
@@ -285,7 +285,7 @@ func (m Alerts) list(
 	if f.CustomerID != nil {
 		org, ok, err := m.Units.OrgOfCustomer(ctx, c, *f.CustomerID)
 		if err != nil {
-			return paging.Page[Alert]{}, err
+			return paging.Page[Alert]{}, apperr.Wrap(err, "monitoring.UnitLocator.OrgOfCustomer")
 		}
 
 		if !ok {
@@ -298,7 +298,7 @@ func (m Alerts) list(
 	if f.PropertyID != nil {
 		units, err := m.Units.UnitsOfProperty(ctx, c, *f.PropertyID)
 		if err != nil {
-			return paging.Page[Alert]{}, err
+			return paging.Page[Alert]{}, apperr.Wrap(err, "monitoring.UnitLocator.UnitsOfProperty")
 		}
 
 		conds = append(conds, "a.unit_id = ANY("+add(units)+")")
@@ -311,7 +311,7 @@ func (m Alerts) list(
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM monitoring.alerts a WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
-		return paging.Page[Alert]{}, scanErr
+		return paging.Page[Alert]{}, apperr.Wrap(scanErr, "select monitoring.alerts")
 	}
 
 	rows, err := c.Tx.Query(
@@ -326,7 +326,7 @@ func (m Alerts) list(
 		),
 		args...)
 	if err != nil {
-		return paging.Page[Alert]{}, err
+		return paging.Page[Alert]{}, apperr.Wrap(err, "select monitoring.alerts")
 	}
 	defer rows.Close()
 
@@ -346,7 +346,7 @@ func (m Alerts) list(
 		NextCursor:      w.Next(total),
 		Total:           total,
 		SnapshotVersion: w.Snapshot,
-	}, rows.Err()
+	}, apperr.Wrap(rows.Err(), "select monitoring.alerts")
 }
 
 // GetInput is alerts.get input.
@@ -408,7 +408,7 @@ func (m Alerts) get(ctx context.Context, c *ops.Call, in *GetInput) (Alert, erro
 		return a, err
 	}
 
-	return a, unitscope.Gate(ctx, c, []uuid.UUID{a.UnitID})
+	return a, apperr.Wrap(unitscope.Gate(ctx, c, []uuid.UUID{a.UnitID}), "unitscope.Gate")
 }
 
 // lockAlert loads an alert in the caller's scope for update, applies the version and the technician rule (IR94 for
@@ -434,7 +434,7 @@ func (m Alerts) lockAlert(
 	}
 
 	if err != nil {
-		return "", unit, err
+		return "", unit, apperr.Wrap(err, "select monitoring.alerts")
 	}
 
 	if c.Principal.Role == "technician" {
@@ -446,7 +446,7 @@ func (m Alerts) lockAlert(
 			c.Principal.Employment == "internal",
 		)
 		if err != nil {
-			return "", unit, err
+			return "", unit, apperr.Wrap(err, "monitoring.TechAccess.TechnicianUnit")
 		}
 	}
 
@@ -680,7 +680,7 @@ func (Alerts) ActiveAlertCounts(
 		units,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select monitoring.alerts")
 	}
 	defer rows.Close()
 
@@ -692,13 +692,13 @@ func (Alerts) ActiveAlertCounts(
 
 		err := rows.Scan(&u, &n)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select monitoring.alerts")
 		}
 
 		out[u] = n
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select monitoring.alerts")
 }
 
 // RegisterAlerts binds the alert operations.
@@ -723,7 +723,7 @@ func (Alerts) UnitSeverities(
 		units,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select monitoring.alerts")
 	}
 	defer rows.Close()
 
@@ -737,11 +737,11 @@ func (Alerts) UnitSeverities(
 
 		err := rows.Scan(&u, &s)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select monitoring.alerts")
 		}
 
 		out[u] = s
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select monitoring.alerts")
 }

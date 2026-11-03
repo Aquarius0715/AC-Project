@@ -122,7 +122,7 @@ func newEcho(
 		v1,
 	)
 	if err != nil { // the catalog's REST routes of the served operations (IR222)
-		return nil, err
+		return nil, apperr.Wrap(err, "ops.Registry.MountREST")
 	}
 
 	return e, nil
@@ -161,7 +161,7 @@ func principalHandler(a *auth.Authenticator, token string) echo.HandlerFunc {
 				return apperr.E(apperr.NotFound, "error.membershipInvalid")
 			}
 
-			return err
+			return apperr.Wrap(err, "auth.Authenticator.Principal")
 		}
 
 		return c.JSON(http.StatusOK, auth.ToDTO(p))

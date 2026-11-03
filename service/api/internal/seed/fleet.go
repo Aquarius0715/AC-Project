@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/devicesim"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // ApplyFleet adds the mock fleet (internal/devicesim/fleet.json) to a seeded database: a property of the fleet's
@@ -28,7 +29,7 @@ func ApplyFleet(ctx context.Context, tx pgx.Tx, f devicesim.Fleet, at time.Time)
 	ex := func(sql string, args ...any) error {
 		_, err := tx.Exec(ctx, sql, args...)
 
-		return err
+		return apperr.Wrap(err, "exec (ApplyFleet)")
 	}
 
 	err = ex(

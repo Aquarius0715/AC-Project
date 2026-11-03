@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/modules/control"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -43,7 +44,7 @@ func ackCommand(t *testing.T, id string, at time.Time) bool {
 		func(tx pgx.Tx) error {
 			ok, err = control.Acknowledge(ctx, tx, uuid.MustParse(id), at)
 
-			return err
+			return apperr.Wrap(err, "control.Acknowledge")
 		},
 	)
 	if beginFuncErr != nil {

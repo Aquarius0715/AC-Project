@@ -113,7 +113,7 @@ func (m Delivery) load(ctx context.Context, c *ops.Call, id uuid.UUID) (jobRow, 
 	}
 
 	if err != nil {
-		return r, err
+		return r, apperr.Wrap(err, "select maintenance.jobs")
 	}
 
 	if ss != nil && se != nil {
@@ -151,7 +151,7 @@ func (m Delivery) agreed(
 		id, s.StartAt, s.EndAt).
 		Scan(&n)
 	if err != nil {
-		return false, err
+		return false, apperr.Wrap(err, "select maintenance.slot_proposals")
 	}
 
 	if n > 0 {
@@ -259,7 +259,7 @@ func (m Delivery) offerJob(ctx context.Context, c *ops.Call, in *OfferInput) (Jo
 
 	kind, status, found, err := m.Directory.OrgState(ctx, c, in.ContractorOrgID)
 	if err != nil {
-		return Job{}, err
+		return Job{}, apperr.Wrap(err, "maintenance.Directory.OrgState")
 	}
 
 	if !found || kind != "contractor" || status != "active" {
@@ -272,7 +272,7 @@ func (m Delivery) offerJob(ctx context.Context, c *ops.Call, in *OfferInput) (Jo
 		status = 'suspended')`, in.ContractorOrgID).
 		Scan(&suspended)
 	if scanErr != nil {
-		return Job{}, scanErr
+		return Job{}, apperr.Wrap(scanErr, "select maintenance.contractors")
 	}
 
 	r, err := m.lock(ctx, c, in.JobID)
@@ -314,7 +314,7 @@ func (m Delivery) offerJob(ctx context.Context, c *ops.Call, in *OfferInput) (Jo
 		in.AccessValidUntil,
 	)
 	if execErr != nil {
-		return Job{}, execErr
+		return Job{}, apperr.Wrap(execErr, "insert maintenance.offers")
 	}
 
 	_, execErr = c.Tx.Exec(
@@ -325,7 +325,7 @@ func (m Delivery) offerJob(ctx context.Context, c *ops.Call, in *OfferInput) (Jo
 		in.ContractorOrgID,
 	)
 	if execErr != nil {
-		return Job{}, execErr
+		return Job{}, apperr.Wrap(execErr, "update maintenance.jobs")
 	}
 
 	eventErr := m.Jobs.event(ctx, c, in.JobID, "job.offered", nil)
@@ -415,7 +415,7 @@ func (m Delivery) decide(
 	}
 
 	if err != nil {
-		return Receipt{}, err
+		return Receipt{}, apperr.Wrap(err, "select maintenance.offers")
 	}
 
 	if decided != nil {
@@ -445,7 +445,7 @@ func (m Delivery) decide(
 			status IN ('pending','sent_to_client'))`, offer).
 			Scan(&open)
 		if err != nil {
-			return Receipt{}, err
+			return Receipt{}, apperr.Wrap(err, "select maintenance.partner_slot_proposals")
 		}
 
 		if open {
@@ -468,7 +468,7 @@ func (m Delivery) decide(
 		reason,
 	)
 	if execErr != nil {
-		return Receipt{}, execErr
+		return Receipt{}, apperr.Wrap(execErr, "update maintenance.offers")
 	}
 
 	next, contractor := "accepted", "contractor_org_id"
@@ -483,7 +483,7 @@ func (m Delivery) decide(
 			offer,
 		)
 		if err != nil {
-			return Receipt{}, err
+			return Receipt{}, apperr.Wrap(err, "update maintenance.partner_slot_proposals")
 		}
 
 		_, err = c.Tx.Exec(
@@ -495,7 +495,7 @@ func (m Delivery) decide(
 			c.Now,
 		)
 		if err != nil {
-			return Receipt{}, err
+			return Receipt{}, apperr.Wrap(err, "update maintenance.slot_proposals")
 		}
 	}
 
@@ -507,7 +507,7 @@ func (m Delivery) decide(
 		WHERE id = $1 RETURNING version`, job, next).
 		Scan(&v)
 	if scanErr != nil {
-		return Receipt{}, scanErr
+		return Receipt{}, apperr.Wrap(scanErr, "update maintenance.jobs")
 	}
 
 	// the past tense the history reads (offer.declined)
@@ -708,7 +708,7 @@ func (m Delivery) assignJob(ctx context.Context, c *ops.Call, in *AssignInput) (
 		}
 
 		if err != nil {
-			return Job{}, err
+			return Job{}, apperr.Wrap(err, "select maintenance.offers")
 		}
 
 		if c.Now.Before(from) || !c.Now.Before(until) {
@@ -843,7 +843,7 @@ func (m Delivery) checkTechnician(
 ) error {
 	tech, found, err := m.Directory.Technician(ctx, c, membership)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "maintenance.Directory.Technician")
 	}
 
 	if !found || !tech.Active {
@@ -867,7 +867,7 @@ func (m Delivery) checkTechnician(
 
 	uorg, prop, _, err := m.Units.UnitService(ctx, c, unit)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "maintenance.ServiceUnits.UnitService")
 	}
 
 	if !InScope(
@@ -903,7 +903,7 @@ func (m Delivery) checkQualified(
 ) error {
 	tech, found, err := m.Directory.Technician(ctx, c, membership)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "maintenance.Directory.Technician")
 	}
 
 	if found && tech.ValidUntil != nil && tech.ValidUntil.Before(slot.EndAt) {
@@ -912,7 +912,7 @@ func (m Delivery) checkQualified(
 
 	_, _, scope, err := m.Units.UnitService(ctx, c, unit)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "maintenance.ServiceUnits.UnitService")
 	}
 
 	ok, err := m.Directory.Qualified(
@@ -924,7 +924,7 @@ func (m Delivery) checkQualified(
 		slot.EndAt,
 	)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "maintenance.Directory.Qualified")
 	}
 
 	if !ok {
@@ -952,7 +952,7 @@ func (m Delivery) createAssignment(
 		reason,
 	)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "update maintenance.assignments")
 	}
 
 	var aid uuid.UUID
@@ -968,7 +968,7 @@ func (m Delivery) createAssignment(
 			return apperr.E(apperr.Conflict, "errors.assignment_overlap")
 		}
 
-		return err
+		return apperr.Wrap(err, "insert maintenance.assignments")
 	}
 	// a window of this technician that had ended was frozen into their history; it is frozen again when the new one ends
 	// (IR459)
@@ -979,7 +979,7 @@ func (m Delivery) createAssignment(
 		tech,
 	)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "delete maintenance.job_history_snapshots")
 	}
 
 	_, err = c.Tx.Exec(
@@ -993,7 +993,7 @@ func (m Delivery) createAssignment(
 		slot.EndAt,
 	)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "update maintenance.jobs")
 	}
 
 	err = m.Jobs.event(ctx, c, job, "job.assigned", nil)

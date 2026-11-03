@@ -52,7 +52,7 @@ func setConnection(
 		WHERE id = $1 RETURNING unit_id, last_seen_at`, device, conn, seen, now).
 		Scan(&unit, &last)
 	if scanErr != nil {
-		return scanErr
+		return apperr.Wrap(scanErr, "update devices.devices")
 	}
 
 	if unit == nil {
@@ -67,7 +67,7 @@ func setConnection(
 		last,
 	)
 
-	return err
+	return apperr.Wrap(err, "update assets.units")
 }
 
 // Lifecycle moves check and firmware operations on the demo clock (IR67, D05).
@@ -90,7 +90,7 @@ func (l Lifecycle) Advance(ctx context.Context, c *ops.Call) (int, error) {
 		c.Now,
 	)
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "update devices.device_operations")
 	}
 
 	type op struct {
@@ -105,7 +105,7 @@ func (l Lifecycle) Advance(ctx context.Context, c *ops.Call) (int, error) {
 		return o, r.Scan(&o.id, &o.device, &o.kind)
 	})
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "update devices.device_operations")
 	}
 
 	for _, o := range expired {
@@ -137,7 +137,7 @@ func (l Lifecycle) Advance(ctx context.Context, c *ops.Call) (int, error) {
 		c.Now.Add(-operationStart),
 	)
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "select devices.device_operations")
 	}
 
 	due, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (op, error) {
@@ -146,7 +146,7 @@ func (l Lifecycle) Advance(ctx context.Context, c *ops.Call) (int, error) {
 		return o, r.Scan(&o.id, &o.device, &o.unit, &o.kind)
 	})
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "select devices.device_operations")
 	}
 
 	for _, o := range due {
@@ -165,7 +165,7 @@ func (l Lifecycle) Advance(ctx context.Context, c *ops.Call) (int, error) {
 				c.Now,
 			)
 			if err != nil {
-				return 0, err
+				return 0, apperr.Wrap(err, "update devices.device_operations")
 			}
 
 			c.Emit(
@@ -192,7 +192,7 @@ func (l Lifecycle) Advance(ctx context.Context, c *ops.Call) (int, error) {
 			c.Now,
 		)
 		if execErr != nil {
-			return 0, execErr
+			return 0, apperr.Wrap(execErr, "update devices.device_operations")
 		}
 
 		if o.kind == "check" {
@@ -231,13 +231,13 @@ func (l Lifecycle) startFailure(
 			*unit, id, c.Now).
 			Scan(&other)
 		if err != nil {
-			return "", err
+			return "", apperr.Wrap(err, "select devices.device_operations")
 		}
 
 		if !other && l.Guard != nil {
 			busy, err := l.Guard.OperationConflict(ctx, c, *unit)
 			if err != nil {
-				return "", err
+				return "", apperr.Wrap(err, "devices.OperationGuard.OperationConflict")
 			}
 
 			other = busy
@@ -254,7 +254,7 @@ func (l Lifecycle) startFailure(
 		err := c.Tx.QueryRow(ctx, `SELECT connection FROM devices.devices WHERE id = $1`, device).
 			Scan(&conn)
 		if err != nil {
-			return "", err
+			return "", apperr.Wrap(err, "select devices.devices")
 		}
 
 		if conn != "online" {
@@ -291,7 +291,7 @@ func FinishOperation(
 	}
 
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select devices.device_operations")
 	}
 
 	if status != "running" || !expires.After(now) {
@@ -316,7 +316,7 @@ func FinishOperation(
 		now,
 	)
 	if execErr != nil {
-		return execErr
+		return apperr.Wrap(execErr, "update devices.device_operations")
 	}
 
 	switch {
@@ -334,7 +334,7 @@ func FinishOperation(
 		)
 	}
 
-	return err
+	return apperr.Wrap(err, "update devices.devices")
 }
 
 // Recovery is DeviceRecovery of service-contracts.ts.
@@ -427,7 +427,7 @@ func RecordSignal(
 	}
 
 	if !errors.Is(err, pgx.ErrNoRows) {
-		return false, err
+		return false, apperr.Wrap(err, "select devices.device_events")
 	}
 
 	var (
@@ -442,7 +442,7 @@ func RecordSignal(
 	}
 
 	if err != nil {
-		return false, err
+		return false, apperr.Wrap(err, "select devices.devices")
 	}
 
 	if !sameID(binding, s.BindingID) {
@@ -456,7 +456,7 @@ func RecordSignal(
 		s.DeviceID, s.BindingID, axis).
 		Scan(&latest)
 	if scanErr != nil {
-		return false, scanErr
+		return false, apperr.Wrap(scanErr, "select devices.device_events")
 	}
 
 	if latest != nil && s.Sequence <= *latest {
@@ -482,7 +482,7 @@ func RecordSignal(
 		}
 
 		if err != nil {
-			return false, err
+			return false, apperr.Wrap(err, "select devices.device_events")
 		}
 
 		_, execErr := tx.Exec(
@@ -492,7 +492,7 @@ func RecordSignal(
 			s.OccurredAt,
 		)
 		if execErr != nil {
-			return false, execErr
+			return false, apperr.Wrap(execErr, "update devices.device_events")
 		}
 	}
 
@@ -502,7 +502,7 @@ func RecordSignal(
 		err := tx.QueryRow(ctx, `SELECT customer_org_id FROM devices.device_bindings WHERE id = $1`, *binding).
 			Scan(&org)
 		if err != nil {
-			return false, err
+			return false, apperr.Wrap(err, "select devices.device_bindings")
 		}
 
 		a, err := alerts.TamperAlert(
@@ -514,7 +514,7 @@ func RecordSignal(
 			s.OccurredAt,
 		)
 		if err != nil {
-			return false, err
+			return false, apperr.Wrap(err, "devices.AlertOpener.TamperAlert")
 		}
 
 		alertIDs = []uuid.UUID{a}
@@ -543,7 +543,7 @@ func RecordSignal(
 		now,
 	)
 	if execErr != nil {
-		return false, execErr
+		return false, apperr.Wrap(execErr, "insert devices.device_events")
 	}
 
 	restored := s.Kind == "restored"
@@ -570,5 +570,5 @@ func RecordSignal(
 		)
 	}
 
-	return err == nil, err
+	return err == nil, apperr.Wrap(err, "update devices.devices")
 }

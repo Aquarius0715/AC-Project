@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
 )
@@ -39,7 +40,7 @@ func (PayoutSource) AcceptedJobs(
 		WHERE j.contractor_org_id IS NOT NULL AND w.accepted_at >= $1 AND w.accepted_at < $2 ORDER BY j.contractor_org_id,
 		w.accepted_at, j.id`, from, to)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select maintenance.jobs")
 	}
 	defer rows.Close()
 
@@ -56,13 +57,13 @@ func (PayoutSource) AcceptedJobs(
 			&a.Returned,
 		)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select maintenance.jobs")
 		}
 
 		out = append(out, a)
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select maintenance.jobs")
 }
 
 // RateAt returns the rate card lines (workType → amount) and currency effective for a contractor at a time.
@@ -86,14 +87,14 @@ func (PayoutSource) RateAt(
 	}
 
 	if err != nil {
-		return nil, "", false, err
+		return nil, "", false, apperr.Wrap(err, "select maintenance.rate_cards")
 	}
 
 	var lines []RateLine
 
 	unmarshalErr := json.Unmarshal(raw, &lines)
 	if unmarshalErr != nil {
-		return nil, "", false, unmarshalErr
+		return nil, "", false, apperr.Wrap(unmarshalErr, "json.Unmarshal")
 	}
 
 	out := map[string]int64{}
@@ -113,7 +114,7 @@ func NoteHandlers() map[string]events.Handler {
 
 			err := e.Decode(&n)
 			if err != nil {
-				return err
+				return apperr.Wrap(err, "events.Event.Decode")
 			}
 
 			c := &ops.Call{
@@ -167,7 +168,7 @@ func (s PayoutSource) AddJobNote(
 		id`, job, c.Principal.UserID, message, c.Now).
 		Scan(&note)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "insert maintenance.job_notes")
 	}
 
 	return s.Jobs.event(ctx, c, job, "note.added", &note)

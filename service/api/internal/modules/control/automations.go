@@ -128,7 +128,7 @@ func scanAutomation(r pgx.Row) (Automation, error) {
 		&last,
 	)
 	if err != nil {
-		return x, err
+		return x, apperr.Wrap(err, "scan (scanAutomation)")
 	}
 
 	var d definition
@@ -237,12 +237,12 @@ func (m Automations) list(
 		"a.created_at DESC, a.id DESC",
 	)
 	if err != nil {
-		return paging.Page[Automation]{}, err
+		return paging.Page[Automation]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[Automation]{}, err
+		return paging.Page[Automation]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	args := []any{c.Principal.OrgID}
@@ -277,7 +277,7 @@ func (m Automations) list(
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM control.automations a WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
-		return paging.Page[Automation]{}, scanErr
+		return paging.Page[Automation]{}, apperr.Wrap(scanErr, "select control.automations")
 	}
 
 	rows, err := c.Tx.Query(
@@ -292,7 +292,7 @@ func (m Automations) list(
 		),
 		args...)
 	if err != nil {
-		return paging.Page[Automation]{}, err
+		return paging.Page[Automation]{}, apperr.Wrap(err, "select control.automations")
 	}
 	defer rows.Close()
 
@@ -309,7 +309,7 @@ func (m Automations) list(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return paging.Page[Automation]{}, rowsErr
+		return paging.Page[Automation]{}, apperr.Wrap(rowsErr, "select control.automations")
 	}
 
 	return paging.Page[Automation]{
@@ -729,7 +729,7 @@ func (m Automations) save(
 	for _, u := range in.UnitIDs { // own, not archived units whose capabilities support every action
 		t, found, err := m.Units.Target(ctx, c, u)
 		if err != nil {
-			return Automation{}, err
+			return Automation{}, apperr.Wrap(err, "control.Units.Target")
 		}
 
 		if !found || t.OrgID != c.Principal.OrgID {
@@ -741,7 +741,7 @@ func (m Automations) save(
 		scanErr := c.Tx.QueryRow(ctx, `SELECT archived FROM assets.units WHERE id = $1`, u).
 			Scan(&archived)
 		if scanErr != nil {
-			return Automation{}, scanErr
+			return Automation{}, apperr.Wrap(scanErr, "select assets.units")
 		}
 
 		if archived {
@@ -766,7 +766,7 @@ func (m Automations) save(
 			"location_automation",
 		) // identity's record (IR194)
 		if err != nil {
-			return Automation{}, err
+			return Automation{}, apperr.Wrap(err, "identity.ConsentGranted")
 		}
 
 		if !granted {
@@ -817,7 +817,7 @@ func (m Automations) save(
 			in.Priority, raw, c.Now).
 			Scan(&id)
 		if err != nil {
-			return Automation{}, err
+			return Automation{}, apperr.Wrap(err, "insert control.automations")
 		}
 	} else {
 		cur, err := m.load(ctx, c, *in.ID, true)
@@ -847,7 +847,7 @@ func (m Automations) save(
 			c.Now,
 		)
 		if execErr != nil {
-			return cur, execErr
+			return cur, apperr.Wrap(execErr, "update control.automations")
 		}
 
 		_, execErr = c.Tx.Exec(
@@ -856,7 +856,7 @@ func (m Automations) save(
 			cur.ID,
 		)
 		if execErr != nil {
-			return cur, execErr
+			return cur, apperr.Wrap(execErr, "delete control.automation_units")
 		}
 
 		id, prev, version = cur.ID, c.ExpectedVersion, cur.Version+1
@@ -871,7 +871,7 @@ func (m Automations) save(
 			u,
 		)
 		if err != nil {
-			return Automation{}, err
+			return Automation{}, apperr.Wrap(err, "insert control.automation_units")
 		}
 	}
 
@@ -1099,7 +1099,7 @@ func (m Automations) delete(
 		cur.ID,
 	)
 	if execErr != nil { // units follow (cascade)
-		return Deleted{}, execErr
+		return Deleted{}, apperr.Wrap(execErr, "delete control.automations")
 	}
 
 	c.Emit(

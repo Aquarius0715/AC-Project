@@ -130,7 +130,7 @@ func (m *Module) load(
 	err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM devices.devices d WHERE "+where, args...).
 		Scan(&total)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, apperr.Wrap(err, "select devices.devices")
 	}
 
 	rows, err := c.Tx.Query(
@@ -145,7 +145,7 @@ func (m *Module) load(
 		),
 		args...)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, apperr.Wrap(err, "select devices.devices")
 	}
 
 	var out []Device
@@ -173,7 +173,7 @@ func (m *Module) load(
 		if err != nil {
 			rows.Close()
 
-			return nil, 0, err
+			return nil, 0, apperr.Wrap(err, "select devices.devices")
 		}
 
 		d.Sensors = []Sensor{}
@@ -184,7 +184,7 @@ func (m *Module) load(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return nil, 0, rowsErr
+		return nil, 0, apperr.Wrap(rowsErr, "select devices.devices")
 	}
 
 	if len(out) == 0 {
@@ -203,7 +203,7 @@ func (m *Module) load(
 		ids,
 	)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, apperr.Wrap(err, "select devices.sensors")
 	}
 
 	for srows.Next() {
@@ -221,7 +221,7 @@ func (m *Module) load(
 		if err != nil {
 			srows.Close()
 
-			return nil, 0, err
+			return nil, 0, apperr.Wrap(err, "select devices.sensors")
 		}
 
 		if i, ok := at[s.DeviceID]; ok {
@@ -233,7 +233,7 @@ func (m *Module) load(
 
 	rowsErr = srows.Err()
 	if rowsErr != nil {
-		return nil, 0, rowsErr
+		return nil, 0, apperr.Wrap(rowsErr, "select devices.sensors")
 	}
 
 	return out, total, nil
@@ -295,12 +295,12 @@ func (m *Module) list(
 		"d.id ASC",
 	)
 	if err != nil {
-		return paging.Page[Device]{}, err
+		return paging.Page[Device]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[Device]{}, err
+		return paging.Page[Device]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	var args []any
@@ -395,7 +395,7 @@ func (m *Module) get(ctx context.Context, c *ops.Call, in *IDInput) (DeviceDetai
 		return d, err
 	}
 
-	return d, unitscope.Gate(ctx, c, []uuid.UUID{*d.UnitID})
+	return d, apperr.Wrap(unitscope.Gate(ctx, c, []uuid.UUID{*d.UnitID}), "unitscope.Gate")
 }
 
 // detail loads one device with calibration references and its active operation.
@@ -423,7 +423,7 @@ func (m *Module) detail(
 		d.ID,
 	)
 	if err != nil {
-		return DeviceDetail{}, err
+		return DeviceDetail{}, apperr.Wrap(err, "select devices.calibration_records")
 	}
 
 	for rows.Next() {
@@ -433,7 +433,7 @@ func (m *Module) detail(
 		if err != nil {
 			rows.Close()
 
-			return DeviceDetail{}, err
+			return DeviceDetail{}, apperr.Wrap(err, "select devices.calibration_records")
 		}
 
 		d.CalibrationRefs = append(d.CalibrationRefs, id)
@@ -443,7 +443,7 @@ func (m *Module) detail(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return DeviceDetail{}, rowsErr
+		return DeviceDetail{}, apperr.Wrap(rowsErr, "select devices.calibration_records")
 	}
 
 	var op []byte
@@ -457,7 +457,7 @@ func (m *Module) detail(
 		1) o`, d.ID).
 		Scan(&op)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return DeviceDetail{}, err
+		return DeviceDetail{}, apperr.Wrap(err, "select devices.device_operations")
 	}
 
 	d.ActiveOperation = json.RawMessage("null")
@@ -517,7 +517,10 @@ func (m *Module) technicianGate(
 		return apperr.Fields(map[string]string{"jobId": "error.required"})
 	}
 
-	return m.Access.TechnicianJob(ctx, c, *jobID, unit)
+	return apperr.Wrap(
+		m.Access.TechnicianJob(ctx, c, *jobID, unit),
+		"devices.TechAccess.TechnicianJob",
+	)
 }
 
 // register serves devices.register.
@@ -564,7 +567,7 @@ func (m *Module) registerDetail(
 
 	u, ok, err := m.Units.UnitInfo(ctx, c, in.UnitID)
 	if err != nil {
-		return DeviceDetail{}, err
+		return DeviceDetail{}, apperr.Wrap(err, "devices.Units.UnitInfo")
 	}
 
 	if !ok {
@@ -577,7 +580,7 @@ func (m *Module) registerDetail(
 		$2`, u.ModelID, u.CapabilityVersion).
 		Scan(&sensorsRaw)
 	if scanErr != nil {
-		return DeviceDetail{}, scanErr
+		return DeviceDetail{}, apperr.Wrap(scanErr, "select devices.capabilities")
 	}
 
 	var specs []SensorSpec
@@ -602,7 +605,7 @@ func (m *Module) registerDetail(
 	scanErr = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.devices WHERE upper(serial) = $1)`, in.Serial).
 		Scan(&dup)
 	if scanErr != nil {
-		return DeviceDetail{}, scanErr
+		return DeviceDetail{}, apperr.Wrap(scanErr, "select devices.devices")
 	}
 
 	if dup {
@@ -624,7 +627,7 @@ func (m *Module) registerDetail(
 		c.Principal.MembershipID,
 	)
 	if execErr != nil {
-		return DeviceDetail{}, execErr
+		return DeviceDetail{}, apperr.Wrap(execErr, "insert devices.devices")
 	}
 
 	for _, mt := range in.SensorTypes {
@@ -641,7 +644,7 @@ func (m *Module) registerDetail(
 			s.StaleAfterSeconds,
 		)
 		if err != nil {
-			return DeviceDetail{}, err
+			return DeviceDetail{}, apperr.Wrap(err, "insert devices.sensors")
 		}
 	}
 

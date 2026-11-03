@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
 )
 
@@ -20,7 +21,7 @@ func EventHandlers() map[string]events.Handler {
 
 			decodeErr := e.Decode(&p)
 			if decodeErr != nil {
-				return decodeErr
+				return apperr.Wrap(decodeErr, "events.Event.Decode")
 			}
 
 			failures := "[]"
@@ -57,14 +58,14 @@ func EventHandlers() map[string]events.Handler {
 				p.At,
 			)
 
-			return err
+			return apperr.Wrap(err, "insert monitoring.alerts")
 		},
 		events.FilterCleaningCleared: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.FilterReminder
 
 			decodeErr := e.Decode(&p)
 			if decodeErr != nil {
-				return decodeErr
+				return apperr.Wrap(decodeErr, "events.Event.Decode")
 			}
 
 			_, err := tx.Exec(
@@ -76,14 +77,14 @@ func EventHandlers() map[string]events.Handler {
 				p.At,
 			)
 
-			return err
+			return apperr.Wrap(err, "update monitoring.alerts")
 		},
 		events.ReconciliationRequired: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.Units
 
 			decodeErr := e.Decode(&p)
 			if decodeErr != nil {
-				return decodeErr
+				return apperr.Wrap(decodeErr, "events.Event.Decode")
 			}
 
 			_, err := tx.Exec(
@@ -101,14 +102,14 @@ func EventHandlers() map[string]events.Handler {
 				p.UnitIDs,
 			) // a concurrent delivery may have opened it (alerts_one_open_per_rule)
 
-			return err
+			return apperr.Wrap(err, "insert monitoring.alerts")
 		},
 		events.ReconciliationResolved: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.Units
 
 			decodeErr := e.Decode(&p)
 			if decodeErr != nil {
-				return decodeErr
+				return apperr.Wrap(decodeErr, "events.Event.Decode")
 			}
 
 			_, err := tx.Exec(
@@ -120,7 +121,7 @@ func EventHandlers() map[string]events.Handler {
 				p.UnitIDs,
 			)
 
-			return err
+			return apperr.Wrap(err, "update monitoring.alerts")
 		},
 	}
 }

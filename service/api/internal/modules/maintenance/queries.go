@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // Internal queries maintenance answers for the read models (IR190).
@@ -57,7 +58,7 @@ func statusCounts(ctx context.Context, c *ops.Call, in *StatusCountsInput) (map[
 		in.To,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select maintenance.jobs")
 	}
 	defer rows.Close()
 
@@ -69,11 +70,11 @@ func statusCounts(ctx context.Context, c *ops.Call, in *StatusCountsInput) (map[
 
 		err := rows.Scan(&s, &k)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select maintenance.jobs")
 		}
 
 		out[s] = k
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select maintenance.jobs")
 }

@@ -32,6 +32,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/devicesim"
 	"github.com/pradita/ac-project/service/api/internal/iotbridge"
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/logging"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
@@ -334,12 +335,12 @@ func listenLive(
 func send(c *http.Client, endpoint string, tr iotbridge.Trigger) error {
 	body, err := json.Marshal(tr)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "json.Marshal")
 	}
 
 	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "http.NewRequest")
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -347,7 +348,7 @@ func send(c *http.Client, endpoint string, tr iotbridge.Trigger) error {
 
 	resp, err := c.Do(req)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "http.Client.Do")
 	}
 	defer resp.Body.Close()
 
@@ -401,7 +402,7 @@ func (d *demoClock) refresh() error {
 
 	scenario, err := iotbridge.ScenarioNow(d.c, d.api)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "iotbridge.ScenarioNow")
 	}
 
 	mid := before.Add(time.Since(before) / 2)
@@ -493,7 +494,7 @@ func fetchWaiting(c *http.Client, api, token, tenant string) ([]iotbridge.Waitin
 		strings.NewReader(`{"limit":50}`),
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "http.NewRequest")
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -502,7 +503,7 @@ func fetchWaiting(c *http.Client, api, token, tenant string) ([]iotbridge.Waitin
 
 	resp, err := c.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "http.Client.Do")
 	}
 	defer resp.Body.Close()
 
@@ -516,7 +517,7 @@ func fetchWaiting(c *http.Client, api, token, tenant string) ([]iotbridge.Waitin
 
 	decodeErr := json.NewDecoder(resp.Body).Decode(&out)
 	if decodeErr != nil {
-		return nil, decodeErr
+		return nil, apperr.Wrap(decodeErr, "json.Decoder.Decode")
 	}
 
 	return out.Data, nil
@@ -533,19 +534,19 @@ func sendCommand(
 ) error {
 	cmd, err := iotbridge.CommandMessage(w, off) // the expiry on the module's clock
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "iotbridge.CommandMessage")
 	}
 
 	raw, err := json.Marshal(cmd)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "json.Marshal")
 	}
 
 	tok := mc.Publish(iotbridge.CommandTopic(uuid.MustParse(tenant), w.DeviceID), 1, false, raw)
 	tok.Wait()
 
 	if tok.Error() != nil {
-		return tok.Error()
+		return apperr.Wrap(tok.Error(), "mqtt.Token.Error")
 	}
 
 	return send(httpc, endpoint, iotbridge.SentTrigger(w, time.Now().Add(off)))
@@ -629,7 +630,7 @@ func fetchConnectionFault(
 		strings.NewReader(`{"deviceId":"`+device.String()+`"}`),
 	)
 	if err != nil {
-		return out, err
+		return out, apperr.Wrap(err, "http.NewRequest")
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -638,7 +639,7 @@ func fetchConnectionFault(
 
 	resp, err := c.Do(req)
 	if err != nil {
-		return out, err
+		return out, apperr.Wrap(err, "http.Client.Do")
 	}
 	defer resp.Body.Close()
 
@@ -652,7 +653,7 @@ func fetchConnectionFault(
 
 	decodeErr := json.NewDecoder(resp.Body).Decode(&body)
 	if decodeErr != nil {
-		return out, decodeErr
+		return out, apperr.Wrap(decodeErr, "json.Decoder.Decode")
 	}
 
 	return body.Data, nil
@@ -706,7 +707,7 @@ func (l *liveControl) send(
 ) error {
 	payload, state, ok, err := iotbridge.LiveCommand(w.Action)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "iotbridge.LiveCommand")
 	}
 
 	at := time.Now().Add(off)
@@ -725,7 +726,7 @@ func (l *liveControl) send(
 
 	errorErr := tok.Error()
 	if errorErr != nil {
-		return errorErr
+		return apperr.Wrap(errorErr, "mqtt.Token.Error")
 	}
 
 	log.Printf("live command %s: %s → %s", w.ID, payload, iotbridge.LiveCommandTopic(l.node))

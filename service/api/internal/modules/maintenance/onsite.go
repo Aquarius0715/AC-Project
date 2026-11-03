@@ -58,7 +58,7 @@ func (m OnSite) lockOwn(
 	}
 
 	if err != nil {
-		return "", TimeOnSite{}, err
+		return "", TimeOnSite{}, apperr.Wrap(err, "select maintenance.jobs")
 	}
 
 	technicianJobErr := m.Access.TechnicianJob(ctx, c, id, unit)
@@ -83,7 +83,7 @@ func (m OnSite) lockOwn(
 	if len(raw) > 0 && string(raw) != "null" {
 		err := json.Unmarshal(raw, &t)
 		if err != nil {
-			return "", t, err
+			return "", t, apperr.Wrap(err, "json.Unmarshal")
 		}
 	}
 
@@ -115,7 +115,7 @@ func (m OnSite) save(
 		t.StartedAt,
 	)
 	if err != nil {
-		return Job{}, err
+		return Job{}, apperr.Wrap(err, "update maintenance.jobs")
 	}
 
 	err = m.Jobs.event(ctx, c, id, action, nil)
@@ -309,7 +309,7 @@ func (m OnSite) checkInJob(ctx context.Context, c *ops.Call, in *CheckInInput) (
 		err := c.Tx.QueryRow(ctx, `SELECT unit_id FROM maintenance.jobs WHERE id = $1`, in.JobID).
 			Scan(&unit)
 		if err != nil {
-			return Job{}, err
+			return Job{}, apperr.Wrap(err, "select maintenance.jobs")
 		}
 
 		if *in.QRUnitID != unit {
@@ -508,7 +508,7 @@ func (m OnSite) acknowledge(ctx context.Context, c *ops.Call, in *AckInput) (Ass
 	}
 
 	if err != nil {
-		return Assignment{}, err
+		return Assignment{}, apperr.Wrap(err, "select maintenance.assignments")
 	}
 
 	if !c.Now.Before(end) {
@@ -520,7 +520,7 @@ func (m OnSite) acknowledge(ctx context.Context, c *ops.Call, in *AckInput) (Ass
 	scanErr := c.Tx.QueryRow(ctx, `SELECT version FROM maintenance.jobs WHERE id = $1 FOR UPDATE`, in.JobID).
 		Scan(&v)
 	if scanErr != nil {
-		return Assignment{}, scanErr
+		return Assignment{}, apperr.Wrap(scanErr, "select maintenance.jobs")
 	}
 
 	if v != *c.ExpectedVersion {
@@ -556,7 +556,7 @@ func (m OnSite) acknowledge(ctx context.Context, c *ops.Call, in *AckInput) (Ass
 		altEnd,
 	)
 	if execErr != nil {
-		return Assignment{}, execErr
+		return Assignment{}, apperr.Wrap(execErr, "update maintenance.assignments")
 	}
 
 	_, execErr = c.Tx.Exec(
@@ -565,7 +565,7 @@ func (m OnSite) acknowledge(ctx context.Context, c *ops.Call, in *AckInput) (Ass
 		in.JobID,
 	)
 	if execErr != nil {
-		return Assignment{}, execErr
+		return Assignment{}, apperr.Wrap(execErr, "update maintenance.jobs")
 	}
 
 	eventErr := m.Jobs.event(ctx, c, in.JobID, "assignment."+value, nil)

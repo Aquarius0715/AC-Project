@@ -84,7 +84,7 @@ func (m *Module) historyAccess(
 	}
 
 	if err != nil {
-		return "", nil, err
+		return "", nil, apperr.Wrap(err, "select devices.devices")
 	}
 
 	switch c.Principal.Role {
@@ -101,7 +101,7 @@ func (m *Module) historyAccess(
 			c.Principal.Employment == "internal",
 		)
 		if err != nil {
-			return "", nil, err
+			return "", nil, apperr.Wrap(err, "devices.TechUnitAccess.TechnicianUnit")
 		}
 
 		return "b.unit_id = $2", []any{*unit}, nil // only history of the current binding's unit
@@ -168,7 +168,7 @@ func historyPageOf[T any](
 ) (paging.Page[T], error) {
 	w, err := paging.Resolve(q, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[T]{}, err
+		return paging.Page[T]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	var total int
@@ -176,7 +176,7 @@ func historyPageOf[T any](
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) "+from+" WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
-		return paging.Page[T]{}, scanErr
+		return paging.Page[T]{}, apperr.Wrap(scanErr, "select count")
 	}
 
 	rows, err := c.Tx.Query(
@@ -192,7 +192,7 @@ func historyPageOf[T any](
 		),
 		args...)
 	if err != nil {
-		return paging.Page[T]{}, err
+		return paging.Page[T]{}, apperr.Wrap(err, "select (historyPageOf)")
 	}
 	defer rows.Close()
 
@@ -212,11 +212,11 @@ func historyPageOf[T any](
 		NextCursor:      w.Next(total),
 		Total:           total,
 		SnapshotVersion: w.Snapshot,
-	}, rows.Err()
+	}, apperr.Wrap(rows.Err(), "select (historyPageOf)")
 }
 
 func orderFor(q paging.Query, prefix string) (string, error) {
-	return paging.OrderBy(
+	out, err := paging.OrderBy(
 		q.Sort,
 		map[string]string{
 			"id":        prefix + "id",
@@ -225,6 +225,8 @@ func orderFor(q paging.Query, prefix string) (string, error) {
 		},
 		prefix+"created_at DESC, "+prefix+"id ASC",
 	)
+
+	return out, apperr.Wrap(err, "paging.OrderBy")
 }
 
 // operations serves devices.operations.
@@ -408,7 +410,7 @@ func (m *Module) scanEvent(ctx context.Context, c *ops.Call) func(pgx.Row) (Devi
 			e.RecoveryJSON = jsonRaw(e.Recovery)
 		}
 
-		return e, err
+		return e, apperr.Wrap(err, "scan (scanEvent)")
 	}
 }
 
@@ -434,7 +436,7 @@ func (m *Module) withNotes(ctx context.Context, c *ops.Call, evs []DeviceEvent) 
 		ids,
 	)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select devices.device_event_notes")
 	}
 
 	for rows.Next() {
@@ -447,7 +449,7 @@ func (m *Module) withNotes(ctx context.Context, c *ops.Call, evs []DeviceEvent) 
 		if err != nil {
 			rows.Close()
 
-			return err
+			return apperr.Wrap(err, "select devices.device_event_notes")
 		}
 
 		if i, ok := at[event]; ok {
@@ -457,7 +459,7 @@ func (m *Module) withNotes(ctx context.Context, c *ops.Call, evs []DeviceEvent) 
 
 	rows.Close()
 
-	return rows.Err()
+	return apperr.Wrap(rows.Err(), "select devices.device_event_notes")
 }
 
 // events serves devices.events.
@@ -506,7 +508,7 @@ func (m *Module) events(
 		"e.occurred_at DESC, e.sequence DESC, e.id ASC",
 	)
 	if err != nil {
-		return paging.Page[DeviceEvent]{}, err
+		return paging.Page[DeviceEvent]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
 	f, err := decodeHistory(in.Query, true)
@@ -622,7 +624,7 @@ func (m *Module) addResponseNote(
 	}
 
 	if err != nil {
-		return DeviceEvent{}, err
+		return DeviceEvent{}, apperr.Wrap(err, "select devices.device_events")
 	}
 
 	if v != *c.ExpectedVersion {
@@ -638,14 +640,14 @@ func (m *Module) addResponseNote(
 		in.ResponseNote,
 	)
 	if execErr != nil {
-		return DeviceEvent{}, execErr
+		return DeviceEvent{}, apperr.Wrap(execErr, "insert devices.device_event_notes")
 	}
 
 	scanErr := c.Tx.QueryRow(ctx, `UPDATE devices.device_events SET version = version + 1 WHERE id = $1 RETURNING
 		version`, in.EventID).
 		Scan(&v)
 	if scanErr != nil {
-		return DeviceEvent{}, scanErr
+		return DeviceEvent{}, apperr.Wrap(scanErr, "update devices.device_events")
 	}
 
 	c.Audit(

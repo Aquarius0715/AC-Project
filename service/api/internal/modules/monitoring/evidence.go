@@ -98,7 +98,7 @@ func (m Alerts) candidates(ctx context.Context, c *ops.Call, a Alert) ([]Evidenc
 		ruleMetric(a),
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select monitoring.measurements")
 	}
 
 	for rows.Next() {
@@ -119,7 +119,7 @@ func (m Alerts) candidates(ctx context.Context, c *ops.Call, a Alert) ([]Evidenc
 		if err != nil {
 			rows.Close()
 
-			return nil, err
+			return nil, apperr.Wrap(err, "select monitoring.measurements")
 		}
 
 		x.Kind, x.Metric, x.Unit, x.Origin, x.Quality = "remeasurement", &metric, &unit, &origin, &quality
@@ -130,13 +130,13 @@ func (m Alerts) candidates(ctx context.Context, c *ops.Call, a Alert) ([]Evidenc
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return nil, rowsErr
+		return nil, apperr.Wrap(rowsErr, "select monitoring.measurements")
 	}
 
 	if m.Devices != nil {
 		recs, err := m.Devices.AlertRecoveries(ctx, c, a.ID, a.DetectedAt)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "monitoring.DeviceRecoveries.AlertRecoveries")
 		}
 
 		for _, r := range recs {
@@ -178,7 +178,7 @@ func (m Alerts) isCandidate(ctx context.Context, c *ops.Call, a Alert, id uuid.U
 		Scan(&ok)
 	if err != nil ||
 		ok {
-		return ok, err
+		return ok, apperr.Wrap(err, "select monitoring.measurements")
 	}
 
 	if m.Devices == nil {
@@ -187,7 +187,7 @@ func (m Alerts) isCandidate(ctx context.Context, c *ops.Call, a Alert, id uuid.U
 
 	recs, err := m.Devices.AlertRecoveries(ctx, c, a.ID, a.DetectedAt)
 	if err != nil {
-		return false, err
+		return false, apperr.Wrap(err, "monitoring.DeviceRecoveries.AlertRecoveries")
 	}
 
 	return slices.ContainsFunc(recs, func(r DeviceRecovery) bool { return r.ID == id }), nil
@@ -283,7 +283,7 @@ func (m Alerts) evidence(
 ) (paging.Page[EvidenceCandidate], error) {
 	err := paging.NoFilters(in.Query, "query.filters")
 	if err != nil {
-		return paging.Page[EvidenceCandidate]{}, err
+		return paging.Page[EvidenceCandidate]{}, apperr.Wrap(err, "paging.NoFilters")
 	}
 
 	args := []any{in.AlertID}
@@ -308,7 +308,7 @@ func (m Alerts) evidence(
 
 	gateErr := unitscope.Gate(ctx, c, []uuid.UUID{a.UnitID})
 	if gateErr != nil {
-		return paging.Page[EvidenceCandidate]{}, gateErr
+		return paging.Page[EvidenceCandidate]{}, apperr.Wrap(gateErr, "unitscope.Gate")
 	}
 
 	all, err := m.candidates(ctx, c, a)
@@ -325,12 +325,12 @@ func (m Alerts) evidence(
 		},
 	)
 	if sortSliceErr != nil {
-		return paging.Page[EvidenceCandidate]{}, sortSliceErr
+		return paging.Page[EvidenceCandidate]{}, apperr.Wrap(sortSliceErr, "paging.SortSlice")
 	}
 
 	w, err := paging.Resolve(in.Query, in.AlertID, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[EvidenceCandidate]{}, err
+		return paging.Page[EvidenceCandidate]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	items := []EvidenceCandidate{}

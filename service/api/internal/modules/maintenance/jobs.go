@@ -208,7 +208,7 @@ func scanJob(r pgx.Row) (Job, error) {
 		&j.AlertIDs,
 	)
 	if err != nil {
-		return j, err
+		return j, apperr.Wrap(err, "scan (scanJob)")
 	}
 
 	if schedStart != nil && schedEnd != nil {
@@ -414,7 +414,7 @@ func (m Jobs) createJob(ctx context.Context, c *ops.Call, in *CreateInput) (Job,
 
 	org, archived, found, err := m.Units.UnitState(ctx, c, in.UnitID)
 	if err != nil {
-		return Job{}, err
+		return Job{}, apperr.Wrap(err, "maintenance.JobUnits.UnitState")
 	}
 
 	if !found || (c.Principal.Role == "client" && org != c.Principal.OrgID) {
@@ -462,7 +462,7 @@ func (m Jobs) createJob(ctx context.Context, c *ops.Call, in *CreateInput) (Job,
 		id`, in.UnitID, org, in.Type, in.Symptom, cw, in.RequestedStart, in.RequestedEnd, pref, due).
 		Scan(&id)
 	if err != nil {
-		return Job{}, err
+		return Job{}, apperr.Wrap(err, "insert maintenance.jobs")
 	}
 
 	eventErr := m.event(ctx, c, id, "job.created", nil)
@@ -520,7 +520,7 @@ func (m Jobs) event(
 		uuid.Must(uuid.NewV7()),
 	)
 
-	return err
+	return apperr.Wrap(err, "insert maintenance.job_events")
 }
 
 // ---- jobs.get ----
@@ -597,7 +597,7 @@ func (m Jobs) load(
 	case err == nil && c.Principal.Role != "client" && c.Principal.Role != "technician":
 		j.PartnerSlotProposal, _ = json.Marshal(pp)
 	case err != nil && !errors.Is(err, pgx.ErrNoRows):
-		return j, err
+		return j, apperr.Wrap(err, "select maintenance.partner_slot_proposals")
 	}
 
 	cursorSQL := `SELECT count(*) FROM maintenance.job_events e LEFT JOIN maintenance.job_notes n ON n.id = e.note_id WHERE
@@ -609,7 +609,7 @@ func (m Jobs) load(
 
 	scanErr := c.Tx.QueryRow(ctx, cursorSQL, id).Scan(&j.EventCursor)
 	if scanErr != nil {
-		return j, scanErr
+		return j, apperr.Wrap(scanErr, "queryrow (load)")
 	}
 
 	j.ProblemPhotos, err = problemPhotos(ctx, c, id)
@@ -623,7 +623,7 @@ func (m Jobs) load(
 		id,
 	)
 	if err != nil {
-		return j, err
+		return j, apperr.Wrap(err, "select maintenance.work_reports")
 	}
 
 	for rows.Next() {
@@ -637,7 +637,7 @@ func (m Jobs) load(
 		if err != nil {
 			rows.Close()
 
-			return j, err
+			return j, apperr.Wrap(err, "select maintenance.work_reports")
 		}
 
 		ref := map[string]any{"reportId": rid, "reportVersion": v}
@@ -656,7 +656,7 @@ func (m Jobs) load(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return j, rowsErr
+		return j, apperr.Wrap(rowsErr, "select maintenance.work_reports")
 	}
 
 	return j, m.project(ctx, c, &j)
@@ -714,7 +714,7 @@ func (m Jobs) project(ctx context.Context, c *ops.Call, j *Job) error {
 
 			j.Offer = o
 		case !errors.Is(err, pgx.ErrNoRows):
-			return err
+			return apperr.Wrap(err, "queryrow (project)")
 		}
 	}
 
@@ -754,7 +754,7 @@ func (m Jobs) project(ctx context.Context, c *ops.Call, j *Job) error {
 
 					err := identity.LoadMembers(ctx, c, ms)
 					if err != nil {
-						return err
+						return apperr.Wrap(err, "identity.LoadMembers")
 					}
 
 					if ms[0].DisplayName != "" {
@@ -764,7 +764,7 @@ func (m Jobs) project(ctx context.Context, c *ops.Call, j *Job) error {
 					err,
 					pgx.ErrNoRows,
 				) {
-					return err
+					return apperr.Wrap(err, "select maintenance.ref_memberships")
 				}
 			}
 		}
@@ -809,7 +809,7 @@ func (m Jobs) pendingOrLastProposal(
 		return nil, nil
 	}
 
-	return &p, err
+	return &p, apperr.Wrap(err, "select maintenance.slot_proposals")
 }
 
 func (m Jobs) activeAssignment(
@@ -863,7 +863,7 @@ func (m Jobs) assignmentWhere(
 		a.AlternativeSlot = &Slot{*altStart, *altEnd}
 	}
 
-	return &a, err
+	return &a, apperr.Wrap(err, "select maintenance.assignments")
 }
 
 // JobAttachment is JobAttachment of service-contracts.ts: a problem photo of a follow-up job (IR437).
@@ -889,7 +889,7 @@ func problemPhotos(ctx context.Context, c *ops.Call, job uuid.UUID) ([]JobAttach
 		job,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select maintenance.attachments")
 	}
 	defer rows.Close()
 
@@ -921,13 +921,13 @@ func problemPhotos(ctx context.Context, c *ops.Call, job uuid.UUID) ([]JobAttach
 			&a.Status,
 		)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select maintenance.attachments")
 		}
 
 		out = append(out, a)
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select maintenance.attachments")
 }
 
 // JobAttachmentInput is jobs.getAttachment input.
@@ -995,14 +995,14 @@ func (m Jobs) getAttachment(
 	}
 
 	if err != nil {
-		return out, err
+		return out, apperr.Wrap(err, "select maintenance.attachments")
 	}
 
 	out.Bytes, err = m.Blobs.Get(ctx, key)
 	if errors.Is(err, blob.ErrNotFound) {
 		return out, apperr.E(apperr.NotFound, "error.notFound")
 	} else if err != nil {
-		return out, err
+		return out, apperr.Wrap(err, "blob.Store.Get")
 	}
 
 	return out, nil
@@ -1188,7 +1188,7 @@ func (m Jobs) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.P
 
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[any]{}, err
+		return paging.Page[any]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	merged, err := m.collect(ctx, c, &f)
@@ -1325,7 +1325,7 @@ func (m Jobs) collect(ctx context.Context, c *ops.Call, fp *listFilters) ([]list
 	if f.CustomerID != nil {
 		org, ok, err := m.Units.OrgOfCustomer(ctx, c, *f.CustomerID)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "maintenance.JobUnits.OrgOfCustomer")
 		}
 
 		if !ok {
@@ -1338,7 +1338,7 @@ func (m Jobs) collect(ctx context.Context, c *ops.Call, fp *listFilters) ([]list
 	if f.PropertyID != nil {
 		units, err := m.Units.UnitsOfProperty(ctx, c, *f.PropertyID)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "maintenance.JobUnits.UnitsOfProperty")
 		}
 
 		conds = append(conds, "j.unit_id = ANY("+add(units)+")")
@@ -1386,7 +1386,7 @@ func (m Jobs) collect(ctx context.Context, c *ops.Call, fp *listFilters) ([]list
 		),
 		args...)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select maintenance.jobs")
 	}
 
 	type row struct {
@@ -1434,7 +1434,7 @@ func (m Jobs) collect(ctx context.Context, c *ops.Call, fp *listFilters) ([]list
 		if err != nil {
 			rows.Close()
 
-			return nil, err
+			return nil, apperr.Wrap(err, "select maintenance.jobs")
 		}
 
 		if ss != nil && se != nil {
@@ -1456,12 +1456,12 @@ func (m Jobs) collect(ctx context.Context, c *ops.Call, fp *listFilters) ([]list
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return nil, rowsErr
+		return nil, apperr.Wrap(rowsErr, "select maintenance.jobs")
 	}
 
 	sev, err := m.Severity.UnitSeverities(ctx, c, units)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "maintenance.UnitSeverity.UnitSeverities")
 	}
 
 	var merged []listItem
@@ -1612,7 +1612,7 @@ func eventSummaries(
 		jobs,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select e.job_id")
 	}
 	defer rows.Close()
 
@@ -1633,7 +1633,7 @@ func eventSummaries(
 			&at,
 		)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select e.job_id")
 		}
 
 		if action != nil && at != nil {
@@ -1643,7 +1643,7 @@ func eventSummaries(
 		out[job] = s
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select e.job_id")
 }
 
 // events serves jobs.events.
@@ -1726,7 +1726,7 @@ func (m Jobs) events(
 		"e.occurred_at ASC, e.id ASC",
 	)
 	if err != nil {
-		return paging.Page[Event]{}, err
+		return paging.Page[Event]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
 	w, err := paging.Resolve(in.Query, struct {
@@ -1734,7 +1734,7 @@ func (m Jobs) events(
 		F   any
 	}{in.JobID, f}, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[Event]{}, err
+		return paging.Page[Event]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	args := []any{in.JobID}
@@ -1777,7 +1777,7 @@ func (m Jobs) events(
 		"n.id = e.note_id WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
-		return paging.Page[Event]{}, scanErr
+		return paging.Page[Event]{}, apperr.Wrap(scanErr, "select maintenance.job_events")
 	}
 
 	items, err := m.eventRows(ctx, c, where, args, order, w.Limit, w.Offset)
@@ -1822,7 +1822,7 @@ func (m Jobs) eventRows(
 		),
 		args...)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select maintenance.job_events")
 	}
 	defer rows.Close()
 
@@ -1854,7 +1854,7 @@ func (m Jobs) eventRows(
 			&noteAt,
 		)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select maintenance.job_events")
 		}
 
 		e.Version, e.CreatedAt, e.UpdatedAt = 1, e.OccurredAt, e.OccurredAt
@@ -1879,7 +1879,7 @@ func (m Jobs) eventRows(
 		items = append(items, e)
 	}
 
-	return items, rows.Err()
+	return items, apperr.Wrap(rows.Err(), "select maintenance.job_events")
 }
 
 // ---- state changes ----
@@ -1901,7 +1901,7 @@ func (m Jobs) lockJob(ctx context.Context, c *ops.Call, id uuid.UUID) (string, e
 	}
 
 	if err != nil {
-		return "", err
+		return "", apperr.Wrap(err, "select maintenance.jobs")
 	}
 
 	if v != *c.ExpectedVersion {
@@ -2065,7 +2065,7 @@ func (m Jobs) cancelJob(ctx context.Context, c *ops.Call, in *CancelInput) (Job,
 		c.Now,
 	)
 	if execErr != nil {
-		return Job{}, execErr
+		return Job{}, apperr.Wrap(execErr, "update maintenance.offers")
 	}
 
 	_, execErr = c.Tx.Exec(
@@ -2077,7 +2077,7 @@ func (m Jobs) cancelJob(ctx context.Context, c *ops.Call, in *CancelInput) (Job,
 		c.Now,
 	)
 	if execErr != nil {
-		return Job{}, execErr
+		return Job{}, apperr.Wrap(execErr, "update maintenance.assignments")
 	}
 	// the contractor's access to the unit ends with the job, as on a reschedule: a cancelled job leaves only its history
 	// (BR-P08, IR588)
@@ -2090,7 +2090,7 @@ func (m Jobs) cancelJob(ctx context.Context, c *ops.Call, in *CancelInput) (Job,
 		c.Now,
 	)
 	if execErr != nil {
-		return Job{}, execErr
+		return Job{}, apperr.Wrap(execErr, "update maintenance.offers")
 	}
 
 	_, execErr = c.Tx.Exec(
@@ -2101,7 +2101,7 @@ func (m Jobs) cancelJob(ctx context.Context, c *ops.Call, in *CancelInput) (Job,
 		c.Now,
 	)
 	if execErr != nil {
-		return Job{}, execErr
+		return Job{}, apperr.Wrap(execErr, "update maintenance.slot_proposals")
 	}
 	// the contractor's open time change ends with the job (IR444)
 	_, execErr = c.Tx.Exec(
@@ -2111,7 +2111,7 @@ func (m Jobs) cancelJob(ctx context.Context, c *ops.Call, in *CancelInput) (Job,
 		in.JobID,
 	)
 	if execErr != nil {
-		return Job{}, execErr
+		return Job{}, apperr.Wrap(execErr, "update maintenance.partner_slot_proposals")
 	}
 
 	_, execErr = c.Tx.Exec(
@@ -2121,7 +2121,7 @@ func (m Jobs) cancelJob(ctx context.Context, c *ops.Call, in *CancelInput) (Job,
 		in.JobID,
 	)
 	if execErr != nil {
-		return Job{}, execErr
+		return Job{}, apperr.Wrap(execErr, "update maintenance.jobs")
 	}
 
 	eventErr := m.event(ctx, c, in.JobID, "job.cancelled", nil)
@@ -2199,7 +2199,7 @@ func (m Jobs) holdJob(ctx context.Context, c *ops.Call, in *ReasonInput) (Job, e
 		in.Reason,
 	)
 	if execErr != nil {
-		return Job{}, execErr
+		return Job{}, apperr.Wrap(execErr, "update maintenance.jobs")
 	}
 
 	eventErr := m.event(ctx, c, in.JobID, "job.held", nil)
@@ -2262,7 +2262,7 @@ func (m Jobs) resumeHoldJob(ctx context.Context, c *ops.Call, in *ReasonInput) (
 		in.JobID,
 	)
 	if execErr != nil {
-		return Job{}, execErr
+		return Job{}, apperr.Wrap(execErr, "update maintenance.jobs")
 	}
 
 	newDraftFromLatestErr := NewDraftFromLatest(
@@ -2353,7 +2353,7 @@ func (m Jobs) addNote(ctx context.Context, c *ops.Call, in *NoteInput) (Note, er
 		id`, in.JobID, c.Principal.UserID, in.Visibility, in.Message, c.Now).
 		Scan(&note)
 	if scanErr != nil {
-		return Note{}, scanErr
+		return Note{}, apperr.Wrap(scanErr, "insert maintenance.job_notes")
 	}
 
 	_, execErr := c.Tx.Exec(
@@ -2362,7 +2362,7 @@ func (m Jobs) addNote(ctx context.Context, c *ops.Call, in *NoteInput) (Note, er
 		in.JobID,
 	)
 	if execErr != nil {
-		return Note{}, execErr
+		return Note{}, apperr.Wrap(execErr, "update maintenance.jobs")
 	}
 
 	eventErr := m.event(ctx, c, in.JobID, "note.added", &note)
@@ -2388,7 +2388,7 @@ func (m Jobs) addNote(ctx context.Context, c *ops.Call, in *NoteInput) (Note, er
 	err = c.Tx.QueryRow(ctx, `SELECT tenant_id, message FROM maintenance.job_notes WHERE id = $1`, note).
 		Scan(&x.TenantID, &x.Message)
 
-	return x, err
+	return x, apperr.Wrap(err, "select maintenance.job_notes")
 }
 
 // RegisterJobs binds the job operations implemented so far.
@@ -2447,5 +2447,5 @@ func unmarshalSlots(raw []byte, out *[]Slot) error {
 		return nil
 	}
 
-	return json.Unmarshal(raw, out)
+	return apperr.Wrap(json.Unmarshal(raw, out), "json.Unmarshal")
 }

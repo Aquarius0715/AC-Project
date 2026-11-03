@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
 )
 
@@ -50,10 +51,10 @@ func (Store) Create(ctx context.Context, c *ops.Call, n New) (uuid.UUID, error) 
 	err := c.Tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')::uuid`).
 		Scan(&tenant)
 	if err != nil {
-		return id, err
+		return id, apperr.Wrap(err, "select current_setting")
 	}
 
-	return id, events.Publish(
+	return id, apperr.Wrap(events.Publish(
 		ctx,
 		c.Tx,
 		tenant,
@@ -75,7 +76,7 @@ func (Store) Create(ctx context.Context, c *ops.Call, n New) (uuid.UUID, error) 
 			SourceAlertID: n.SourceAlertID,
 			OccurredAt:    c.Now,
 		},
-	)
+	), "events.Publish")
 }
 
 // EventHandlers store requested notifications (consumer identity, IR191).
@@ -86,7 +87,7 @@ func EventHandlers() map[string]events.Handler {
 
 			decodeErr := e.Decode(&p)
 			if decodeErr != nil {
-				return decodeErr
+				return apperr.Wrap(decodeErr, "events.Event.Decode")
 			}
 
 			target, _ := json.Marshal(p.Target)
@@ -112,7 +113,7 @@ func EventHandlers() map[string]events.Handler {
 				p.OccurredAt,
 			)
 
-			return err
+			return apperr.Wrap(err, "insert notify.notifications")
 		},
 	}
 }

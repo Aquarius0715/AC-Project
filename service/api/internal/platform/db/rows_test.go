@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // TestRowLoopsCheckErr: pgx reports a query's server error (a timeout, a deadlock, a failed cast) only through
@@ -27,7 +29,7 @@ func TestRowLoopsCheckErr(t *testing.T) {
 
 			f, err := parser.ParseFile(fset, path, nil, 0)
 			if err != nil {
-				return err
+				return apperr.Wrap(err, "parser.ParseFile")
 			}
 
 			ast.Inspect(f, func(n ast.Node) bool {

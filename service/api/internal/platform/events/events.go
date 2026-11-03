@@ -19,6 +19,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/logging"
 )
@@ -40,7 +41,9 @@ type Event struct {
 }
 
 // Decode unmarshals the payload into v.
-func (e Event) Decode(v any) error { return json.Unmarshal(e.Payload, v) }
+func (e Event) Decode(v any) error {
+	return apperr.Wrap(json.Unmarshal(e.Payload, v), "json.Unmarshal")
+}
 
 // Handler applies one event inside tx (tenant context set). Returning an error rolls the event back; it is retried
 // on the next poll.
@@ -96,7 +99,7 @@ func (c *Consumer) failed(ctx context.Context, e Event, cause error) (bool, erro
 			RETURNING attempts`, c.Name, e.ID, cause.Error(), c.now()).
 			Scan(&attempts)
 		if scanErr != nil {
-			return scanErr
+			return apperr.Wrap(scanErr, "insert platform.event_failures")
 		}
 
 		if attempts < MaxAttempts {
@@ -113,7 +116,7 @@ func (c *Consumer) failed(ctx context.Context, e Event, cause error) (bool, erro
 			c.now(),
 		)
 		if execErr != nil {
-			return execErr
+			return apperr.Wrap(execErr, "update platform.event_failures")
 		}
 
 		_, err := tx.Exec(
@@ -123,10 +126,10 @@ func (c *Consumer) failed(ctx context.Context, e Event, cause error) (bool, erro
 			e.ID,
 		)
 
-		return err
+		return apperr.Wrap(err, "insert platform.processed_events")
 	})
 
-	return dead, err
+	return dead, apperr.Wrap(err, "ops.Runner.Run")
 }
 
 // Drain applies every pending event once, in order, and returns how many were applied. It stops at the first
@@ -220,7 +223,7 @@ func (c *Consumer) pending(ctx context.Context, types []string, limit int) ([]Ev
 			c.SplitFrom,
 		)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "select platform.outbox")
 		}
 		defer rows.Close()
 
@@ -241,7 +244,7 @@ func (c *Consumer) pending(ctx context.Context, types []string, limit int) ([]Ev
 				&e.lastFailure,
 			)
 			if err != nil {
-				return err
+				return apperr.Wrap(err, "select platform.outbox")
 			}
 
 			out = append(out, e)
@@ -250,7 +253,7 @@ func (c *Consumer) pending(ctx context.Context, types []string, limit int) ([]Ev
 		return rows.Err()
 	})
 
-	return out, err
+	return out, apperr.Wrap(err, "ops.Runner.Run")
 }
 
 // apply runs the handler and records the event as processed in one transaction; false when another poll got there
@@ -280,7 +283,7 @@ func (c *Consumer) apply(ctx context.Context, e Event) (bool, error) {
 				e.ID,
 			)
 			if err != nil {
-				return err
+				return apperr.Wrap(err, "insert platform.processed_events")
 			}
 
 			if tag.RowsAffected() == 0 {
@@ -293,7 +296,7 @@ func (c *Consumer) apply(ctx context.Context, e Event) (bool, error) {
 				e.OccurredAt.UTC().Format(time.RFC3339Nano),
 			)
 			if execErr != nil {
-				return execErr
+				return apperr.Wrap(execErr, "select set_config")
 			}
 
 			handlersErr := c.Handlers[e.Type](ctx, tx, e)
@@ -307,7 +310,7 @@ func (c *Consumer) apply(ctx context.Context, e Event) (bool, error) {
 		},
 	)
 
-	return done, err
+	return done, apperr.Wrap(err, "ops.Runner.Run")
 }
 
 // Run polls until ctx ends. A failure that repeats is logged once a minute, and the recovery once (IR429).

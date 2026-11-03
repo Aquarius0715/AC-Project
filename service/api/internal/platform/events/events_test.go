@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 )
 
@@ -27,7 +28,7 @@ func (r testRunner) Run(
 	p *ops.Principal,
 	fn func(pgx.Tx) error,
 ) error {
-	return pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+	return apperr.Wrap(pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
 		if p != nil {
 			_, err := tx.Exec(
 				ctx,
@@ -35,12 +36,12 @@ func (r testRunner) Run(
 				p.TenantID.String(),
 			)
 			if err != nil {
-				return err
+				return apperr.Wrap(err, "select set_config")
 			}
 		}
 
 		return fn(tx)
-	})
+	}), "transaction")
 }
 
 func testDB(t *testing.T) testRunner {
@@ -320,7 +321,7 @@ func TestHousekeep(t *testing.T) {
 			func(tx pgx.Tx) error {
 				_, err := tx.Exec(ctx, sql, args...)
 
-				return err
+				return apperr.Wrap(err, "exec (TestHousekeep)")
 			},
 		)
 		if err != nil {

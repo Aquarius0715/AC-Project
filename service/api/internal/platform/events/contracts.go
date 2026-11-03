@@ -27,9 +27,9 @@ const (
 
 	// any domain → identity (IR191).
 	NotificationRequested = "NotificationRequested" // store one notification (ID assigned by the producer)
-	// maintenance → identity: a verified certificate covers a grant (IR192)
+	// maintenance → identity: a verified certificate covers a grant (IR192).
 	QualificationGranted = "QualificationGranted"
-	// billing → maintenance: an internal job note (payout questions, IR193)
+	// billing → maintenance: an internal job note (payout questions, IR193).
 	JobNoteRequested = "JobNoteRequested"
 	AuditRecorded    = "AuditRecorded" // any domain → identity: one audit log entry (IR196)
 

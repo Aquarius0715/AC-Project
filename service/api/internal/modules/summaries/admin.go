@@ -15,6 +15,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/modules/maintenance"
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // AdminInput is admin.summary input (Range & {customerId?, propertyId?}).
@@ -75,7 +76,9 @@ var jobStatuses = []string{
 }
 
 func collectIDs(rows pgx.Rows) ([]uuid.UUID, error) {
-	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	out, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+
+	return out, apperr.Wrap(err, "pgx.CollectRows")
 }
 
 // admin is admin.summary (DD-A01, IR40, IR51, IR78, IR115, IR148).
@@ -170,7 +173,7 @@ func (m Summaries) admin(ctx context.Context, c *ops.Call, in *AdminInput) (Admi
 		"SELECT u.id FROM assets.units u WHERE "+strings.Join(conds, " AND ")+" ORDER BY u.id",
 		args...)
 	if err != nil {
-		return out, err
+		return out, apperr.Wrap(err, "select assets.units")
 	}
 
 	units, err := collectIDs(rows)
@@ -180,7 +183,7 @@ func (m Summaries) admin(ctx context.Context, c *ops.Call, in *AdminInput) (Admi
 
 	n, err := m.Units.CountUnits(ctx, c, true, nil, in.CustomerID, in.PropertyID, nil)
 	if err != nil {
-		return out, err
+		return out, apperr.Wrap(err, "summaries.Units.CountUnits")
 	}
 
 	out.Total, out.Online, out.Offline, out.Unknown = n.Total, n.Online, n.Offline, n.Unknown
@@ -221,7 +224,7 @@ func (m Summaries) admin(ctx context.Context, c *ops.Call, in *AdminInput) (Admi
 		),
 		cargs...)
 	if err != nil {
-		return out, err
+		return out, apperr.Wrap(err, "select assets.customers")
 	}
 
 	orgs, err := collectIDs(rows)
@@ -245,7 +248,7 @@ func (m Summaries) admin(ctx context.Context, c *ops.Call, in *AdminInput) (Admi
 			") AND "+strings.Join(cconds, " AND "), cargs...).
 			Scan(&out.CustomerCount)
 		if err != nil {
-			return out, err
+			return out, apperr.Wrap(err, "select assets.customers")
 		}
 	}
 	// jobs whose requested slot starts in the period, by status (maintenance)

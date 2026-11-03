@@ -15,6 +15,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/gateway"
 	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/auth"
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
 	"github.com/pradita/ac-project/service/api/internal/scheduler"
@@ -273,7 +274,7 @@ func (cl splitCluster) tick(ctx context.Context, now time.Time) (scheduler.Resul
 	for _, d := range scheduler.Domains {
 		r, err := scheduler.TickDomains(ctx, cl.srv[d].DB, now, []string{d}, cl.srv[d].Registry)
 		if err != nil {
-			return total, err
+			return total, apperr.Wrap(err, "scheduler.TickDomains")
 		}
 
 		total.ExpiredOffers += r.ExpiredOffers
@@ -287,7 +288,7 @@ func (cl splitCluster) tick(ctx context.Context, now time.Time) (scheduler.Resul
 
 	f := &apiserver.Server{Consumers: cl.consumers(), Echo: nil, Registry: nil, DB: nil}
 
-	return total, f.DrainEvents(ctx)
+	return total, apperr.Wrap(f.DrainEvents(ctx), "server.Server.DrainEvents")
 }
 
 // schedTick is the worker tick of the suite: the domain schedulers of the cluster in cluster mode, otherwise the
@@ -302,5 +303,5 @@ func schedTick(ctx context.Context, s *apiserver.Server, now time.Time) (schedul
 		err = s.DrainEvents(ctx) // the jobs' events (inline mode)
 	}
 
-	return r, err
+	return r, apperr.Wrap(err, "server.Server.DrainEvents")
 }

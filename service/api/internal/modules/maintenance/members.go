@@ -50,7 +50,7 @@ func (m Workforce) technicians(
 
 	rows, err := c.Tx.Query(ctx, q+" ORDER BY m.id", args...)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "query (technicians)")
 	}
 
 	var out []identity.Member
@@ -76,7 +76,7 @@ func (m Workforce) technicians(
 		if err != nil {
 			rows.Close()
 
-			return nil, err
+			return nil, apperr.Wrap(err, "query (technicians)")
 		}
 
 		out = append(out, x)
@@ -84,7 +84,7 @@ func (m Workforce) technicians(
 
 	rows.Close()
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "query (technicians)")
 }
 
 // techFilter is the members.eligible / members.capacity filter set of the query catalog: organizationId,
@@ -122,7 +122,7 @@ func (f techFilter) keep(
 	if f.Qualification != nil {
 		err := identity.LoadMembers(ctx, c, techs)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "identity.LoadMembers")
 		}
 	}
 
@@ -158,7 +158,7 @@ func holds(m identity.Member, code string, now time.Time) bool {
 func pageOf[T any](all []T, q paging.Query, hashOf any, scopeVersion int) (paging.Page[T], error) {
 	w, err := paging.Resolve(q, hashOf, scopeVersion, 1)
 	if err != nil {
-		return paging.Page[T]{}, err
+		return paging.Page[T]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	items := []T{}
@@ -199,7 +199,7 @@ func unavailable(
 		return "", false, nil
 	}
 
-	return typ, err == nil, err
+	return typ, err == nil, apperr.Wrap(err, "select maintenance.unavailability")
 }
 
 // ---- members.eligible ----
@@ -277,7 +277,7 @@ func (m Workforce) eligible(
 	}
 
 	if err != nil {
-		return paging.Page[identity.Member]{}, err
+		return paging.Page[identity.Member]{}, apperr.Wrap(err, "select maintenance.jobs")
 	}
 
 	f, err := decodeTechFilter(in.Query)
@@ -319,7 +319,10 @@ func (m Workforce) eligible(
 			AND scheduled && tstzrange($3, $4))`, t.ID, in.JobID, in.StartAt, in.EndAt).
 			Scan(&busy)
 		if err != nil {
-			return paging.Page[identity.Member]{}, err
+			return paging.Page[identity.Member]{}, apperr.Wrap(
+				err,
+				"select maintenance.assignments",
+			)
 		}
 
 		if !busy {
@@ -329,7 +332,7 @@ func (m Workforce) eligible(
 
 	loadMembersErr := identity.LoadMembers(ctx, c, out)
 	if loadMembersErr != nil {
-		return paging.Page[identity.Member]{}, loadMembersErr
+		return paging.Page[identity.Member]{}, apperr.Wrap(loadMembersErr, "identity.LoadMembers")
 	}
 
 	sortSliceErr := paging.SortSlice(out, in.Query.Sort, map[string]func(a, b identity.Member) int{
@@ -338,7 +341,7 @@ func (m Workforce) eligible(
 		"updatedAt": func(a, b identity.Member) int { return a.UpdatedAt.Compare(b.UpdatedAt) },
 	})
 	if sortSliceErr != nil {
-		return paging.Page[identity.Member]{}, sortSliceErr
+		return paging.Page[identity.Member]{}, apperr.Wrap(sortSliceErr, "paging.SortSlice")
 	}
 
 	return pageOf(out, in.Query, in, c.Principal.ScopeVersion)
@@ -470,7 +473,7 @@ func (m Workforce) capacity(
 			work.EndAt,
 		)
 		if err != nil {
-			return paging.Page[Capacity]{}, err
+			return paging.Page[Capacity]{}, apperr.Wrap(err, "select maintenance.assignments")
 		}
 
 		for rows.Next() {
@@ -480,7 +483,7 @@ func (m Workforce) capacity(
 			if err != nil {
 				rows.Close()
 
-				return paging.Page[Capacity]{}, err
+				return paging.Page[Capacity]{}, apperr.Wrap(err, "select maintenance.assignments")
 			}
 
 			if s.StartAt.Before(work.StartAt) {
@@ -498,7 +501,7 @@ func (m Workforce) capacity(
 
 		rowsErr := rows.Err()
 		if rowsErr != nil {
-			return paging.Page[Capacity]{}, rowsErr
+			return paging.Page[Capacity]{}, apperr.Wrap(rowsErr, "select maintenance.assignments")
 		}
 
 		if len(cp.AvailableSlots) > 0 {
@@ -522,7 +525,7 @@ func (m Workforce) capacity(
 		"id": func(a, b Capacity) int { return strings.Compare(a.MembershipID.String(), b.MembershipID.String()) },
 	})
 	if sortSliceErr != nil {
-		return paging.Page[Capacity]{}, sortSliceErr
+		return paging.Page[Capacity]{}, apperr.Wrap(sortSliceErr, "paging.SortSlice")
 	}
 
 	return pageOf(out, in.Query, in.Date, c.Principal.ScopeVersion)
@@ -658,7 +661,7 @@ func (m Workforce) setUnavailability(
 	if in.MembershipID != nil {
 		t, found, err := m.Delivery.Directory.Technician(ctx, c, *in.MembershipID)
 		if err != nil {
-			return Unavailability{}, err
+			return Unavailability{}, apperr.Wrap(err, "maintenance.Directory.Technician")
 		}
 
 		if !found || (c.Principal.Role == "contractor" && t.OrgID != c.Principal.OrgID) {
@@ -687,7 +690,7 @@ func (m Workforce) setUnavailability(
 
 	rows, err := c.Tx.Query(ctx, q+" ORDER BY a.id", args...)
 	if err != nil {
-		return Unavailability{}, err
+		return Unavailability{}, apperr.Wrap(err, "query (setUnavailability)")
 	}
 
 	conflicts := []uuid.UUID{}
@@ -699,7 +702,7 @@ func (m Workforce) setUnavailability(
 		if err != nil {
 			rows.Close()
 
-			return Unavailability{}, err
+			return Unavailability{}, apperr.Wrap(err, "query (setUnavailability)")
 		}
 
 		conflicts = append(conflicts, id)
@@ -709,7 +712,7 @@ func (m Workforce) setUnavailability(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return Unavailability{}, rowsErr
+		return Unavailability{}, apperr.Wrap(rowsErr, "query (setUnavailability)")
 	}
 
 	u := Unavailability{
@@ -733,7 +736,7 @@ func (m Workforce) setUnavailability(
 		org, in.MembershipID, in.From, in.To, in.Type, in.Note, conflicts, c.Now).
 		Scan(&u.ID)
 	if scanErr != nil {
-		return u, scanErr
+		return u, apperr.Wrap(scanErr, "insert maintenance.unavailability")
 	}
 
 	c.Emit(
@@ -787,7 +790,7 @@ func scanUnavailability(row pgx.Row) (Unavailability, error) {
 	)
 	u.From, u.To = first.Format("2006-01-02"), last.Format("2006-01-02")
 
-	return u, err
+	return u, apperr.Wrap(err, "scan (scanUnavailability)")
 }
 
 // ---- members.unavailability ----
@@ -875,7 +878,7 @@ func (m Workforce) unavailabilityList(
 		)+" ORDER BY lower(days), id",
 		args...)
 	if err != nil {
-		return paging.Page[Unavailability]{}, err
+		return paging.Page[Unavailability]{}, apperr.Wrap(err, "select maintenance.unavailability")
 	}
 
 	all := []Unavailability{}
@@ -895,7 +898,10 @@ func (m Workforce) unavailabilityList(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return paging.Page[Unavailability]{}, rowsErr
+		return paging.Page[Unavailability]{}, apperr.Wrap(
+			rowsErr,
+			"select maintenance.unavailability",
+		)
 	}
 
 	sortSliceErr := paging.SortSlice(all, in.Sort, map[string]func(a, b Unavailability) int{
@@ -903,7 +909,7 @@ func (m Workforce) unavailabilityList(
 		"from": func(a, b Unavailability) int { return strings.Compare(a.From, b.From) },
 	})
 	if sortSliceErr != nil {
-		return paging.Page[Unavailability]{}, sortSliceErr
+		return paging.Page[Unavailability]{}, apperr.Wrap(sortSliceErr, "paging.SortSlice")
 	}
 
 	return pageOf(all, *in, f, c.Principal.ScopeVersion)
@@ -1007,7 +1013,7 @@ func (m Workforce) clearUnavailability(
 			u.ID,
 		)
 		if err != nil {
-			return UnavailabilityCleared{}, err
+			return UnavailabilityCleared{}, apperr.Wrap(err, "delete maintenance.unavailability")
 		}
 
 		c.Emit(
@@ -1049,7 +1055,7 @@ func (m Workforce) clearUnavailability(
 		c.Now,
 	)
 	if execErr != nil {
-		return UnavailabilityCleared{}, execErr
+		return UnavailabilityCleared{}, apperr.Wrap(execErr, "update maintenance.unavailability")
 	}
 
 	c.Emit(

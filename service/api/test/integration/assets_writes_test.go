@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
@@ -615,7 +616,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 			'success'`, prop).
 			Scan(&audits)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "select audit.audit_log")
 		}
 
 		return tx.QueryRow(t.Context(), `SELECT count(*) FROM platform.outbox WHERE aggregate_id = $1 AND event_type NOT LIKE

@@ -13,6 +13,7 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/db"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
@@ -190,7 +191,7 @@ func (v clientVerifier) Verify(ctx context.Context, token string) (Identity, err
 	id, err := v.Verifier.Verify(ctx, token)
 	id.Client, id.AdminApp = v.client, v.admin
 
-	return id, err
+	return id, apperr.Wrap(err, "auth.Verifier.Verify")
 }
 
 // TestHQThroughItsApp (DEC-85, IR510): an HQ membership works only with a token of HQ's app, whose sign-in asks for

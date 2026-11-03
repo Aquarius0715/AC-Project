@@ -7,6 +7,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // TamperAlert implements devices.AlertOpener: the tamper Alert of a unit for a device's tamper event (SR23: created in
@@ -27,7 +29,7 @@ func (Alerts) TamperAlert(
 		unit).
 		Scan(&id)
 	if err == nil || !errors.Is(err, pgx.ErrNoRows) {
-		return id, err
+		return id, apperr.Wrap(err, "select monitoring.alerts")
 	}
 
 	err = tx.QueryRow(ctx, `INSERT INTO monitoring.alerts (tenant_id, unit_id, customer_org_id, type, severity, status,
@@ -49,5 +51,5 @@ func (Alerts) TamperAlert(
 			Scan(&id)
 	}
 
-	return id, err
+	return id, apperr.Wrap(err, "select monitoring.alerts")
 }

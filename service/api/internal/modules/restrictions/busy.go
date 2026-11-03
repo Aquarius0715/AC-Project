@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // Busy reports an active restriction (requested / applied / release_requested) on a unit, which blocks rebinding
@@ -50,7 +51,9 @@ func (Busy) UnitRestriction(
 	c *ops.Call,
 	unit uuid.UUID,
 ) (UnitRestriction, error) {
-	return ops.Delegate(ctx, c, QueryUnitRestriction, UnitInput{UnitID: unit}, unitRestriction)
+	out, err := ops.Delegate(ctx, c, QueryUnitRestriction, UnitInput{UnitID: unit}, unitRestriction)
+
+	return out, apperr.Wrap(err, "delegate restrictions.unitRestriction")
 }
 
 func unitRestriction(ctx context.Context, c *ops.Call, in *UnitInput) (UnitRestriction, error) {
@@ -67,13 +70,15 @@ func unitRestriction(ctx context.Context, c *ops.Call, in *UnitInput) (UnitRestr
 
 	r.Found = err == nil
 
-	return r, err
+	return r, apperr.Wrap(err, "select restrictions.restriction_units")
 }
 
 // UnitRecovering reports an unresolved terminal-restriction recovery case of the unit, which blocks ordinary control
 // (SR26).
 func (Busy) UnitRecovering(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, error) {
-	return ops.Delegate(ctx, c, QueryUnitRecovering, UnitInput{UnitID: unit}, unitRecovering)
+	out, err := ops.Delegate(ctx, c, QueryUnitRecovering, UnitInput{UnitID: unit}, unitRecovering)
+
+	return out, apperr.Wrap(err, "delegate restrictions.unitRecovering")
 }
 
 func unitRecovering(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
@@ -84,12 +89,14 @@ func unitRecovering(ctx context.Context, c *ops.Call, in *UnitInput) (bool, erro
 		WHERE k->>'unitId' = $1::text AND k->>'state' <> 'resolved')`, in.UnitID).
 		Scan(&blocked)
 
-	return blocked, err
+	return blocked, apperr.Wrap(err, "select restrictions.restrictions")
 }
 
 // UnitBusy implements devices.Exclusion (asks billing, IR193).
 func (Busy) UnitBusy(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, error) {
-	return ops.Delegate(ctx, c, QueryUnitBusy, UnitInput{UnitID: unit}, unitBusy)
+	out, err := ops.Delegate(ctx, c, QueryUnitBusy, UnitInput{UnitID: unit}, unitBusy)
+
+	return out, apperr.Wrap(err, "delegate restrictions.unitBusy")
 }
 
 func unitBusy(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
@@ -100,7 +107,7 @@ func unitBusy(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
 		WHERE ru.unit_id = $1 AND r.state IN ('requested','applied','release_requested'))`, in.UnitID).
 		Scan(&b)
 
-	return b, err
+	return b, apperr.Wrap(err, "select restrictions.restriction_units")
 }
 
 // UnitActive implements assets.UnitActivity (same rule as UnitBusy).
@@ -122,7 +129,7 @@ func (Busy) ContractState(
 		contract,
 	)
 	if err != nil {
-		return nil, false, err
+		return nil, false, apperr.Wrap(err, "select restrictions.restrictions")
 	}
 	defer rows.Close()
 
@@ -136,7 +143,7 @@ func (Busy) ContractState(
 
 		err := rows.Scan(&id, &isActive, &open)
 		if err != nil {
-			return nil, false, err
+			return nil, false, apperr.Wrap(err, "select restrictions.restrictions")
 		}
 
 		if isActive {
@@ -146,7 +153,7 @@ func (Busy) ContractState(
 		unresolved = unresolved || open
 	}
 
-	return active, unresolved, rows.Err()
+	return active, unresolved, apperr.Wrap(rows.Err(), "select restrictions.restrictions")
 }
 
 // ForInvoice returns the restrictions citing an invoice.
@@ -157,7 +164,7 @@ func (Busy) ForInvoice(ctx context.Context, c *ops.Call, invoice uuid.UUID) ([]u
 		invoice,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select restrictions.restriction_invoices")
 	}
 	defer rows.Close()
 
@@ -168,13 +175,13 @@ func (Busy) ForInvoice(ctx context.Context, c *ops.Call, invoice uuid.UUID) ([]u
 
 		err := rows.Scan(&id)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select restrictions.restriction_invoices")
 		}
 
 		out = append(out, id)
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select restrictions.restriction_invoices")
 }
 
 // OnInvoicePaid applies IR35 route ①: restrictions citing the invoice whose cause invoices are all paid move scheduled
@@ -194,7 +201,7 @@ func (m Restrictions) OnInvoicePaid(
 		invoice,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select restrictions.restrictions")
 	}
 
 	rows, err := c.Tx.Query(ctx, `UPDATE restrictions.restrictions r SET
@@ -209,7 +216,7 @@ func (m Restrictions) OnInvoicePaid(
 			WHERE ri.restriction_id = r.id AND i.status <> 'paid')
 		RETURNING r.id`, invoice, c.Now, c.Principal.MembershipID)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "update restrictions.restrictions")
 	}
 	defer rows.Close()
 
@@ -220,7 +227,7 @@ func (m Restrictions) OnInvoicePaid(
 
 		err := rows.Scan(&id)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "update restrictions.restrictions")
 		}
 
 		out = append(out, id)
@@ -228,7 +235,7 @@ func (m Restrictions) OnInvoicePaid(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return nil, rowsErr
+		return nil, apperr.Wrap(rowsErr, "update restrictions.restrictions")
 	}
 
 	for _, id := range out {
@@ -271,7 +278,9 @@ func (m Restrictions) OnInvoicePaid(
 // UnitPolicy returns the policy of the restriction that currently restricts a unit (requested / applied /
 // release_requested), as raw RestrictionPolicy JSON; nil when the unit is unrestricted (IR46). Asks billing (IR193).
 func (Busy) UnitPolicy(ctx context.Context, c *ops.Call, unit uuid.UUID) ([]byte, error) {
-	return ops.Delegate(ctx, c, QueryUnitPolicy, UnitInput{UnitID: unit}, unitPolicy)
+	out, err := ops.Delegate(ctx, c, QueryUnitPolicy, UnitInput{UnitID: unit}, unitPolicy)
+
+	return out, apperr.Wrap(err, "delegate restrictions.unitPolicy")
 }
 
 func unitPolicy(ctx context.Context, c *ops.Call, in *UnitInput) ([]byte, error) {
@@ -286,5 +295,5 @@ func unitPolicy(ctx context.Context, c *ops.Call, in *UnitInput) ([]byte, error)
 		return nil, nil
 	}
 
-	return p, err
+	return p, apperr.Wrap(err, "select restrictions.restriction_units")
 }

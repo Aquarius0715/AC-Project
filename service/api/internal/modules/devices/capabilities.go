@@ -83,7 +83,7 @@ func scanCap(r pgx.Row) (Capability, error) {
 		&c.FirmwareCandidates,
 	)
 	if err != nil {
-		return c, err
+		return c, apperr.Wrap(err, "scan (scanCap)")
 	}
 
 	if len(temp) > 0 {
@@ -91,7 +91,7 @@ func scanCap(r pgx.Row) (Capability, error) {
 
 		err := json.Unmarshal(temp, c.Temperature)
 		if err != nil {
-			return c, err
+			return c, apperr.Wrap(err, "json.Unmarshal")
 		}
 	}
 
@@ -99,7 +99,7 @@ func scanCap(r pgx.Row) (Capability, error) {
 	if len(sensors) > 0 {
 		err := json.Unmarshal(sensors, &c.Sensors)
 		if err != nil {
-			return c, err
+			return c, apperr.Wrap(err, "json.Unmarshal")
 		}
 	}
 
@@ -149,12 +149,12 @@ func capabilitiesList(
 		"id ASC",
 	)
 	if err != nil {
-		return paging.Page[Capability]{}, err
+		return paging.Page[Capability]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
 	w, err := paging.Resolve(*in, nil, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[Capability]{}, err
+		return paging.Page[Capability]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	var total int
@@ -162,7 +162,7 @@ func capabilitiesList(
 	scanErr := c.Tx.QueryRow(ctx, `SELECT count(*) FROM devices.capabilities WHERE is_current`).
 		Scan(&total)
 	if scanErr != nil {
-		return paging.Page[Capability]{}, scanErr
+		return paging.Page[Capability]{}, apperr.Wrap(scanErr, "select devices.capabilities")
 	}
 
 	rows, err := c.Tx.Query(
@@ -176,7 +176,7 @@ func capabilitiesList(
 		),
 	)
 	if err != nil {
-		return paging.Page[Capability]{}, err
+		return paging.Page[Capability]{}, apperr.Wrap(err, "select devices.capabilities")
 	}
 	defer rows.Close()
 
@@ -196,7 +196,7 @@ func capabilitiesList(
 		NextCursor:      w.Next(total),
 		Total:           total,
 		SnapshotVersion: w.Snapshot,
-	}, rows.Err()
+	}, apperr.Wrap(rows.Err(), "select devices.capabilities")
 }
 
 // CapabilitySave is capabilities.save input.
@@ -403,7 +403,7 @@ func (m Capabilities) save(
 		AND ($3::uuid IS NULL OR id <> $3))`, in.Manufacturer, in.Model, in.ID).
 		Scan(&dup)
 	if err != nil {
-		return Capability{}, err
+		return Capability{}, apperr.Wrap(err, "select devices.capabilities")
 	}
 
 	if dup {
@@ -445,7 +445,7 @@ func (m Capabilities) save(
 			cur,
 		)
 		if execErr != nil {
-			return Capability{}, execErr
+			return Capability{}, apperr.Wrap(execErr, "update devices.capabilities")
 		}
 
 		id, version = *in.ID, cur+1
@@ -485,7 +485,10 @@ func (m Capabilities) save(
 	if version > 1 && m.Units != nil {
 		_, err := m.Units.MoveToCapabilityVersion(ctx, c, id, version)
 		if err != nil {
-			return Capability{}, err
+			return Capability{}, apperr.Wrap(
+				err,
+				"devices.UnitCapabilities.MoveToCapabilityVersion",
+			)
 		}
 	}
 

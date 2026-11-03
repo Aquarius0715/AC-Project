@@ -66,7 +66,7 @@ func Integrate(
 		to,
 	)
 	if err != nil {
-		return out, err
+		return out, apperr.Wrap(err, "select energy.ref_power_samples")
 	}
 	defer rows.Close()
 
@@ -82,7 +82,7 @@ func Integrate(
 
 		err := rows.Scan(&v, &unit, &origin, &quality, &boundary)
 		if err != nil {
-			return out, err
+			return out, apperr.Wrap(err, "select energy.ref_power_samples")
 		}
 
 		switch {
@@ -100,7 +100,7 @@ func Integrate(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return out, rowsErr
+		return out, apperr.Wrap(rowsErr, "select energy.ref_power_samples")
 	}
 
 	if out.ValidSlots > 0 {

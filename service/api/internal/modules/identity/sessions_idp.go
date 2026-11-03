@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
 )
 
@@ -38,7 +39,7 @@ func SessionHandlers(ender SessionEnder) map[string]events.Handler {
 
 			decodeErr := e.Decode(&p)
 			if decodeErr != nil {
-				return decodeErr
+				return apperr.Wrap(decodeErr, "events.Event.Decode")
 			}
 
 			var subject string // the provider's subject: Cognito's sub, or locally the user ID itself
@@ -50,7 +51,7 @@ func SessionHandlers(ender SessionEnder) map[string]events.Handler {
 			}
 
 			if err != nil {
-				return err
+				return apperr.Wrap(err, "select identity.users")
 			}
 
 			cctx, cancel := context.WithTimeout(ctx, 5*time.Second)

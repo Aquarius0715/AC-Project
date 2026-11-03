@@ -189,7 +189,7 @@ func (m *Module) unitsImportPreview(
 	}
 
 	if err != nil {
-		return ImportPreview{}, err
+		return ImportPreview{}, apperr.Wrap(err, "select assets.customers")
 	}
 
 	if status != "active" {
@@ -321,14 +321,14 @@ func (m *Module) unitsImportPreview(
 					[]byte("property/"+strings.ToLower(row.PropertyName)),
 				) // stable placeholder
 			} else if err != nil {
-				return ImportPreview{}, err
+				return ImportPreview{}, apperr.Wrap(err, "select assets.properties")
 			}
 		}
 
 		if row.Result != "error" {
 			id, v, ok, err := m.Import.ByCode(ctx, c, row.ModelCode)
 			if err != nil {
-				return ImportPreview{}, err
+				return ImportPreview{}, apperr.Wrap(err, "assets.ImportModels.ByCode")
 			}
 
 			if !ok {
@@ -363,7 +363,7 @@ func (m *Module) unitsImportPreview(
 			row.Serial != nil { // the device must exist, be free and untampered; one row per serial
 			id, state, err := m.Import.SerialState(ctx, c, *row.Serial)
 			if err != nil {
-				return ImportPreview{}, err
+				return ImportPreview{}, apperr.Wrap(err, "assets.ImportModels.SerialState")
 			}
 
 			switch key := strings.ToUpper(*row.Serial); {
@@ -410,7 +410,7 @@ func (m *Module) unitsImportPreview(
 					[]byte(lvl.kind+"/"+parent.String()+"/"+strings.ToLower(*lvl.name)),
 				) // stable placeholder
 			} else if err != nil {
-				return ImportPreview{}, err
+				return ImportPreview{}, apperr.Wrap(err, "select assets.spaces")
 			}
 
 			*lvl.dst = &id
@@ -427,7 +427,7 @@ func (m *Module) unitsImportPreview(
 				AND NOT archived AND lower(display_name) = lower($3))`, row.PropertyID, parentSpace, row.UnitName).
 				Scan(&exists)
 			if err != nil {
-				return ImportPreview{}, err
+				return ImportPreview{}, apperr.Wrap(err, "select assets.units")
 			}
 
 			if exists || unitNames[key] {
@@ -477,10 +477,10 @@ func (m *Module) unitsImportPreview(
 			p.ExpiresAt,
 		)
 
-		return err
+		return apperr.Wrap(err, "insert assets.unit_import_previews")
 	})
 	if runErr != nil {
-		return ImportPreview{}, runErr
+		return ImportPreview{}, apperr.Wrap(runErr, "ops.Runner.Run")
 	}
 
 	return p, nil
@@ -525,7 +525,7 @@ func scanImport(r pgx.Row) (UnitImport, error) {
 		&x.State,
 	)
 
-	return x, err
+	return x, apperr.Wrap(err, "scan (scanImport)")
 }
 
 // ImportCommitInput is units.importCommit input.
@@ -595,7 +595,7 @@ func (m *Module) unitsImportCommit(
 	}
 
 	if err != nil {
-		return UnitImport{}, err
+		return UnitImport{}, apperr.Wrap(err, "delete assets.unit_import_previews")
 	}
 
 	var org uuid.UUID
@@ -611,7 +611,7 @@ func (m *Module) unitsImportCommit(
 
 	unmarshalErr := json.Unmarshal(raw, &rows)
 	if unmarshalErr != nil {
-		return UnitImport{}, unmarshalErr
+		return UnitImport{}, apperr.Wrap(unmarshalErr, "json.Unmarshal")
 	}
 
 	created := map[uuid.UUID]uuid.UUID{} // placeholder → created property or space id
@@ -635,7 +635,7 @@ func (m *Module) unitsImportCommit(
 			org, row.PropertyName).
 			Scan(&taken)
 		if err != nil {
-			return uuid.Nil, err
+			return uuid.Nil, apperr.Wrap(err, "select assets.properties")
 		}
 
 		if taken {
@@ -653,7 +653,7 @@ func (m *Module) unitsImportCommit(
 			row.PropertyName,
 		)
 		if err != nil {
-			return uuid.Nil, err
+			return uuid.Nil, apperr.Wrap(err, "insert assets.properties")
 		}
 
 		created[row.PropertyID] = id
@@ -685,7 +685,7 @@ func (m *Module) unitsImportCommit(
 		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.spaces WHERE id = $1 AND NOT archived)`, *placeholder).
 			Scan(&ok)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select assets.spaces")
 		}
 
 		if ok {
@@ -789,7 +789,7 @@ func (m *Module) unitsImportCommit(
 			row.CapVersion,
 		)
 		if execErr != nil {
-			return UnitImport{}, execErr
+			return UnitImport{}, apperr.Wrap(execErr, "insert assets.units")
 		}
 
 		units = append(units, id)
@@ -798,7 +798,7 @@ func (m *Module) unitsImportCommit(
 		if row.DeviceID != nil { // the serial column binds the device (bound or tampered since the preview: validate again)
 			ok, err := m.Import.BindImported(ctx, c, *row.DeviceID, id, org, "CSV import "+fileName)
 			if err != nil {
-				return UnitImport{}, err
+				return UnitImport{}, apperr.Wrap(err, "assets.ImportModels.BindImported")
 			}
 
 			if !ok {
@@ -940,7 +940,7 @@ func (m *Module) unitsImportUndo(
 		for _, a := range m.Activity {
 			busy, err := a.UnitInUse(ctx, c, u)
 			if err != nil {
-				return UnitImport{}, err
+				return UnitImport{}, apperr.Wrap(err, "assets.UnitUsage.UnitInUse")
 			}
 
 			if busy {
@@ -956,7 +956,7 @@ func (m *Module) unitsImportUndo(
 		"CSV import undone: "+in.Reason,
 	)
 	if unbindUnitsErr != nil {
-		return UnitImport{}, unbindUnitsErr
+		return UnitImport{}, apperr.Wrap(unbindUnitsErr, "assets.ImportModels.UnbindUnits")
 	}
 
 	for _, q := range []struct {
@@ -974,7 +974,7 @@ func (m *Module) unitsImportUndo(
 			q.ids,
 		)
 		if err != nil {
-			return UnitImport{}, err
+			return UnitImport{}, apperr.Wrap(err, "update (unitsImportUndo)")
 		}
 	}
 

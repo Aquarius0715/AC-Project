@@ -30,6 +30,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/voice"
 	"github.com/pradita/ac-project/service/api/internal/modules/writes"
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/auth"
 	"github.com/pradita/ac-project/service/api/internal/platform/blob"
 	"github.com/pradita/ac-project/service/api/internal/platform/db"
@@ -101,12 +102,12 @@ func (s *Server) DrainEvents(ctx context.Context) error {
 func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	m, err := db.Open(ctx, cfg.DatabaseURL, cfg.DatabaseReaderURL)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "db.Open")
 	}
 
 	checkDomainsErr := ops.CheckDomains()
 	if checkDomainsErr != nil {
-		return nil, checkDomainsErr
+		return nil, apperr.Wrap(checkDomainsErr, "ops.CheckDomains")
 	}
 
 	reg := ops.NewRegistry()
@@ -149,7 +150,7 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 			if err != nil {
 				m.Close()
 
-				return nil, err
+				return nil, apperr.Wrap(err, "democlock.Open")
 			}
 
 			dc = shared
@@ -442,7 +443,7 @@ func (deviceRecoveries) AlertRecoveries(
 		}
 	}
 
-	return out, err
+	return out, apperr.Wrap(err, "devices.Models.AlertRecoveries")
 }
 
 type monitorReads struct {
@@ -455,7 +456,9 @@ func (m monitorReads) PowerMeasured(
 	c *ops.Call,
 	units []uuid.UUID,
 ) (map[uuid.UUID]bool, error) {
-	return m.telemetry.PowerMeasured(ctx, c, units)
+	out, err := m.telemetry.PowerMeasured(ctx, c, units)
+
+	return out, apperr.Wrap(err, "monitoring.Telemetry.PowerMeasured")
 }
 
 func (m monitorReads) ActiveAlertCounts(
@@ -463,7 +466,9 @@ func (m monitorReads) ActiveAlertCounts(
 	c *ops.Call,
 	units []uuid.UUID,
 ) (map[uuid.UUID]int, error) {
-	return m.alerts.ActiveAlertCounts(ctx, c, units)
+	out, err := m.alerts.ActiveAlertCounts(ctx, c, units)
+
+	return out, apperr.Wrap(err, "monitoring.Alerts.ActiveAlertCounts")
 }
 
 func (m monitorReads) LatestMeasurements(
@@ -480,7 +485,7 @@ func (m monitorReads) LatestMeasurements(
 		}
 	}
 
-	return out, err
+	return out, apperr.Wrap(err, "monitoring.Telemetry.LatestMeasurements")
 }
 
 // unitCaps joins the unit's model version (Assets) with its Capability (Devices) for UnitAction checks.
@@ -493,10 +498,12 @@ func (u unitCaps) UnitCaps(
 ) (control.Caps, bool, error) {
 	info, ok, err := u.am.UnitInfo(ctx, c, unit)
 	if err != nil || !ok {
-		return control.Caps{}, false, err
+		return control.Caps{}, false, apperr.Wrap(err, "assets.Module.UnitInfo")
 	}
 
-	return devices.Models{}.Caps(ctx, c, info.ModelID, info.CapabilityVersion)
+	out, out2, err := devices.Models{}.Caps(ctx, c, info.ModelID, info.CapabilityVersion)
+
+	return out, out2, apperr.Wrap(err, "devices.Models.Caps")
 }
 
 // restrictionTargets joins Assets (organization, archived) with the unit's capability for Restrictions.
@@ -514,7 +521,7 @@ func (t restrictionTargets) RestrictionTarget(
 
 	org, archived, _, err := t.am.UnitState(ctx, c, unit)
 	if err != nil {
-		return restrictions.UnitCaps{}, false, err
+		return restrictions.UnitCaps{}, false, apperr.Wrap(err, "assets.Module.UnitState")
 	}
 
 	return restrictions.UnitCaps{
@@ -538,12 +545,12 @@ func (t controlTargets) Target(
 ) (control.Target, bool, error) {
 	info, ok, err := t.am.UnitInfo(ctx, c, unit)
 	if err != nil || !ok {
-		return control.Target{}, false, err
+		return control.Target{}, false, apperr.Wrap(err, "assets.Module.UnitInfo")
 	}
 
 	v, err := t.am.UnitVersion(ctx, c, unit)
 	if err != nil {
-		return control.Target{}, false, err
+		return control.Target{}, false, apperr.Wrap(err, "assets.Module.UnitVersion")
 	}
 
 	caps, _, err := devices.Models{}.Caps(ctx, c, info.ModelID, info.CapabilityVersion)
@@ -553,5 +560,5 @@ func (t controlTargets) Target(
 		PropertyID: info.PropertyID,
 		Version:    v,
 		Caps:       caps,
-	}, true, err
+	}, true, apperr.Wrap(err, "devices.Models.Caps")
 }

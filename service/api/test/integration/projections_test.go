@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/modules/maintenance"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
@@ -29,7 +30,7 @@ func freeze(t *testing.T, now time.Time) {
 		func(tx pgx.Tx) error {
 			_, err := maintenance.FreezeEnded(ctx, tx, now)
 
-			return err
+			return apperr.Wrap(err, "maintenance.FreezeEnded")
 		},
 	)
 	if beginFuncErr != nil {

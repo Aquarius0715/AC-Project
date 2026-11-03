@@ -14,6 +14,8 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // lockKey serialises concurrent runners (one-off ECS tasks may overlap during a deploy).
@@ -47,7 +49,7 @@ var ErrUnversioned = errors.New(
 func Load(fsys fs.FS) ([]Migration, error) {
 	entries, err := fs.ReadDir(fsys, ".")
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "fs.ReadDir")
 	}
 
 	var out []Migration
@@ -77,7 +79,7 @@ func Load(fsys fs.FS) ([]Migration, error) {
 
 		b, err := fs.ReadFile(fsys, e.Name())
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "fs.ReadFile")
 		}
 
 		out = append(out, Migration{Version: v, Name: m[2], SQL: string(b)})
@@ -106,14 +108,14 @@ func Version(ctx context.Context, conn *pgx.Conn) (int64, bool, error) {
 		return 0, false, nil
 	}
 
-	return v, dirty, err
+	return v, dirty, apperr.Wrap(err, "select public.schema_migrations")
 }
 
 // Up applies every migration newer than the recorded version and returns the versions it applied.
 func Up(ctx context.Context, conn *pgx.Conn, ms []Migration) ([]int64, error) {
 	_, err := conn.Exec(ctx, `SELECT pg_advisory_lock($1)`, lockKey)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select pg_advisory_lock")
 	}
 	defer conn.Exec(
 		context.WithoutCancel(ctx),
@@ -136,7 +138,7 @@ func Up(ctx context.Context, conn *pgx.Conn, ms []Migration) ([]int64, error) {
 		err := conn.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'platform')`).
 			Scan(&exists)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select pg_namespace")
 		}
 
 		if exists {
@@ -169,11 +171,11 @@ func Force(ctx context.Context, conn *pgx.Conn, version int64) error {
 		return err
 	}
 
-	return pgx.BeginFunc(
+	return apperr.Wrap(pgx.BeginFunc(
 		ctx,
 		conn,
 		func(tx pgx.Tx) error { return setVersion(ctx, tx, version, false) },
-	)
+	), "transaction")
 }
 
 func apply(ctx context.Context, conn *pgx.Conn, m Migration) error {
@@ -184,35 +186,35 @@ func apply(ctx context.Context, conn *pgx.Conn, m Migration) error {
 			func(tx pgx.Tx) error { return setVersion(ctx, tx, m.Version, true) },
 		)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "transaction")
 		}
 
 		_, err = conn.Exec(ctx, m.SQL)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "exec (apply)")
 		}
 
-		return pgx.BeginFunc(
+		return apperr.Wrap(pgx.BeginFunc(
 			ctx,
 			conn,
 			func(tx pgx.Tx) error { return setVersion(ctx, tx, m.Version, false) },
-		)
+		), "transaction")
 	}
 
-	return pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
+	return apperr.Wrap(pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, m.SQL)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "exec (apply)")
 		}
 
 		return setVersion(ctx, tx, m.Version, false)
-	})
+	}), "transaction")
 }
 
 func setVersion(ctx context.Context, tx pgx.Tx, v int64, dirty bool) error {
 	_, execErr := tx.Exec(ctx, `DELETE FROM public.schema_migrations`)
 	if execErr != nil {
-		return execErr
+		return apperr.Wrap(execErr, "delete public.schema_migrations")
 	}
 
 	_, err := tx.Exec(
@@ -222,7 +224,7 @@ func setVersion(ctx context.Context, tx pgx.Tx, v int64, dirty bool) error {
 		dirty,
 	)
 
-	return err
+	return apperr.Wrap(err, "insert public.schema_migrations")
 }
 
 func ensureTable(ctx context.Context, conn *pgx.Conn) error {
@@ -231,7 +233,7 @@ func ensureTable(ctx context.Context, conn *pgx.Conn) error {
 		`CREATE TABLE IF NOT EXISTS public.schema_migrations (version bigint NOT NULL PRIMARY KEY, dirty boolean NOT NULL)`,
 	)
 
-	return err
+	return apperr.Wrap(err, "exec (ensureTable)")
 }
 
 // EnsureLogin creates a LOGIN role that inherits from group (local and CI only; production uses IAM auth).
@@ -243,7 +245,7 @@ func EnsureLogin(ctx context.Context, conn *pgx.Conn, login, password, group str
 	scanErr := conn.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = $1)`, login).
 		Scan(&exists)
 	if scanErr != nil {
-		return scanErr
+		return apperr.Wrap(scanErr, "select pg_roles")
 	}
 
 	if !exists {
@@ -252,7 +254,7 @@ func EnsureLogin(ctx context.Context, conn *pgx.Conn, login, password, group str
 			fmt.Sprintf(`CREATE ROLE %s LOGIN IN ROLE %s`, ident, pgx.Identifier{group}.Sanitize()),
 		)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "exec (EnsureLogin)")
 		}
 	}
 	// ALTER ROLE ... PASSWORD takes no bind parameters; quote the literal.
@@ -261,7 +263,7 @@ func EnsureLogin(ctx context.Context, conn *pgx.Conn, login, password, group str
 		fmt.Sprintf(`ALTER ROLE %s PASSWORD %s`, ident, quoteLiteral(password)),
 	)
 
-	return err
+	return apperr.Wrap(err, "exec (EnsureLogin)")
 }
 
 func quoteLiteral(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
@@ -272,5 +274,5 @@ func Seeded(ctx context.Context, conn *pgx.Conn) (bool, error) {
 
 	err := conn.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.users)`).Scan(&ok)
 
-	return ok, err
+	return ok, apperr.Wrap(err, "select identity.users")
 }

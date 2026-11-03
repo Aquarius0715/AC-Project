@@ -76,7 +76,7 @@ func (m FollowUps) lock(ctx context.Context, c *ops.Call, id uuid.UUID) (jobStat
 	}
 
 	if err != nil {
-		return s, err
+		return s, apperr.Wrap(err, "select maintenance.jobs")
 	}
 
 	if v != *c.ExpectedVersion {
@@ -102,7 +102,7 @@ func (m FollowUps) bump(
 		`UPDATE maintenance.jobs SET `+set+`version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
 		append([]any{id}, args...)...)
 
-	return err
+	return apperr.Wrap(err, "update maintenance.jobs")
 }
 
 func (m FollowUps) done(
@@ -224,7 +224,7 @@ func (m FollowUps) rateJob(ctx context.Context, c *ops.Call, in *RateInput) (Job
 
 		err := json.Unmarshal(s.rating, &prev)
 		if err != nil {
-			return Job{}, err
+			return Job{}, apperr.Wrap(err, "json.Unmarshal")
 		}
 
 		if !c.Now.Before(prev.EditableUntil) {
@@ -457,7 +457,7 @@ func (m FollowUps) reportProblemJob(
 		id`, s.unit, s.org, in.Details, requested.StartAt, requested.EndAt, pref, in.JobID).
 		Scan(&id)
 	if scanErr != nil {
-		return Job{}, scanErr
+		return Job{}, apperr.Wrap(scanErr, "insert maintenance.jobs")
 	}
 
 	for _, p := range in.Photos {
@@ -467,7 +467,7 @@ func (m FollowUps) reportProblemJob(
 
 		err := m.Blobs.Put(ctx, key, p.Mime, p.Bytes)
 		if err != nil {
-			return Job{}, err
+			return Job{}, apperr.Wrap(err, "blob.Store.Put")
 		}
 
 		_, err = c.Tx.Exec(
@@ -483,7 +483,7 @@ func (m FollowUps) reportProblemJob(
 			c.Principal.UserID,
 		)
 		if err != nil {
-			return Job{}, err
+			return Job{}, apperr.Wrap(err, "insert maintenance.attachments")
 		}
 	}
 
@@ -801,7 +801,7 @@ func (m FollowUps) extendAccessJob(ctx context.Context, c *ops.Call, in *ExtendI
 	}
 
 	if err != nil {
-		return Job{}, err
+		return Job{}, apperr.Wrap(err, "select maintenance.offers")
 	}
 
 	if !in.AccessValidUntil.After(until) || !in.AccessValidUntil.After(c.Now) {
@@ -816,7 +816,7 @@ func (m FollowUps) extendAccessJob(ctx context.Context, c *ops.Call, in *ExtendI
 		in.AccessValidUntil,
 	)
 	if execErr != nil {
-		return Job{}, execErr
+		return Job{}, apperr.Wrap(execErr, "update maintenance.offers")
 	}
 	// a window that had already ended was frozen into the contractor's history; it is frozen again at the new end (IR458)
 	_, execErr = c.Tx.Exec(
@@ -826,7 +826,7 @@ func (m FollowUps) extendAccessJob(ctx context.Context, c *ops.Call, in *ExtendI
 		contractor,
 	)
 	if execErr != nil {
-		return Job{}, execErr
+		return Job{}, apperr.Wrap(execErr, "delete maintenance.job_history_snapshots")
 	}
 
 	bumpErr := m.bump(ctx, c, in.JobID, "")
@@ -942,7 +942,7 @@ func (m FollowUps) recordWarrantyClaimJob(
 
 	end, err := m.Warranty.WarrantyEnd(ctx, c, s.unit)
 	if err != nil {
-		return Job{}, err
+		return Job{}, apperr.Wrap(err, "maintenance.WarrantyUnits.WarrantyEnd")
 	}
 
 	if end == nil || end.Before(*s.completedAt) {
@@ -953,7 +953,7 @@ func (m FollowUps) recordWarrantyClaimJob(
 	if len(s.claims) > 0 {
 		err := json.Unmarshal(s.claims, &claims)
 		if err != nil {
-			return Job{}, err
+			return Job{}, apperr.Wrap(err, "json.Unmarshal")
 		}
 	}
 

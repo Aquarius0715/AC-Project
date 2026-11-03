@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
 )
 
@@ -19,7 +20,7 @@ func EventHandlers() map[string]events.Handler {
 
 			decodeErr := e.Decode(&p)
 			if decodeErr != nil || p.Purpose != "location_automation" {
-				return decodeErr
+				return apperr.Wrap(decodeErr, "events.Event.Decode")
 			}
 			// IR53: every enabled location rule of the membership stops with consent_revoked (version + 1); renewed
 			// consent never re-enables them (an explicit save with enabled=true does, IR27)
@@ -32,14 +33,14 @@ func EventHandlers() map[string]events.Handler {
 				p.At,
 			)
 
-			return err
+			return apperr.Wrap(err, "update control.automations")
 		},
 		events.RestrictionCommandRequested: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.RestrictionCommand
 
 			decodeErr := e.Decode(&p)
 			if decodeErr != nil {
-				return decodeErr
+				return apperr.Wrap(decodeErr, "events.Event.Decode")
 			}
 
 			_, err := tx.Exec(
@@ -64,14 +65,14 @@ func EventHandlers() map[string]events.Handler {
 				p.CorrelationID,
 			)
 
-			return err
+			return apperr.Wrap(err, "insert control.commands")
 		},
 		events.RestrictionCommandsCancelled: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.CommandsCancelled
 
 			decodeErr := e.Decode(&p)
 			if decodeErr != nil {
-				return decodeErr
+				return apperr.Wrap(decodeErr, "events.Event.Decode")
 			}
 
 			if len(p.CommandIDs) > 0 {
@@ -82,7 +83,7 @@ func EventHandlers() map[string]events.Handler {
 					p.CommandIDs,
 				)
 
-				return err
+				return apperr.Wrap(err, "update control.commands")
 			}
 
 			_, err := tx.Exec(
@@ -93,7 +94,7 @@ func EventHandlers() map[string]events.Handler {
 				p.UnitID,
 			)
 
-			return err
+			return apperr.Wrap(err, "update control.commands")
 		},
 	}
 }
@@ -117,7 +118,7 @@ func publishRestrictionCommands(
 		ids,
 	)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select control.commands")
 	}
 
 	byTenant := map[uuid.UUID][]uuid.UUID{}
@@ -135,7 +136,7 @@ func publishRestrictionCommands(
 		if err != nil {
 			rows.Close()
 
-			return err
+			return apperr.Wrap(err, "select control.commands")
 		}
 
 		if _, ok := byTenant[t]; !ok {
@@ -150,7 +151,7 @@ func publishRestrictionCommands(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return rowsErr
+		return apperr.Wrap(rowsErr, "select control.commands")
 	}
 
 	for _, t := range order {
@@ -169,7 +170,7 @@ func publishRestrictionCommands(
 			events.Commands{CommandIDs: byTenant[t], At: at, Statuses: st},
 		)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "events.Publish")
 		}
 	}
 

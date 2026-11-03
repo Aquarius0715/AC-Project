@@ -241,7 +241,7 @@ func scanNotification(r pgx.Row) (Notification, error) {
 	x.DeliveryState = deliveryState(x.Channel)
 	x.TargetOpen = true
 
-	return x, err
+	return x, apperr.Wrap(err, "scan (scanNotification)")
 }
 
 // QueryJobsOpen asks maintenance which jobs open for the caller — jobs.get answers them, live or as the caller's
@@ -396,12 +396,12 @@ func (Inbox) list(
 		"severity":   "CASE n.severity WHEN 'critical' THEN 3 WHEN 'warning' THEN 2 ELSE 1 END",
 	}, "n.occurred_at DESC, n.id DESC")
 	if err != nil {
-		return paging.Page[Notification]{}, err
+		return paging.Page[Notification]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[Notification]{}, err
+		return paging.Page[Notification]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	args := []any{c.Principal.MembershipID}
@@ -442,7 +442,7 @@ func (Inbox) list(
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM "+inboxFrom()+" WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
-		return paging.Page[Notification]{}, scanErr
+		return paging.Page[Notification]{}, apperr.Wrap(scanErr, "select count")
 	}
 
 	rows, err := c.Tx.Query(
@@ -458,7 +458,7 @@ func (Inbox) list(
 		),
 		args...)
 	if err != nil {
-		return paging.Page[Notification]{}, err
+		return paging.Page[Notification]{}, apperr.Wrap(err, "select (list)")
 	}
 	defer rows.Close()
 
@@ -475,7 +475,7 @@ func (Inbox) list(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return paging.Page[Notification]{}, rowsErr
+		return paging.Page[Notification]{}, apperr.Wrap(rowsErr, "select (list)")
 	}
 
 	openTargetsErr := openTargets(ctx, c, items)
@@ -574,7 +574,7 @@ func (Inbox) markRead(ctx context.Context, c *ops.Call, in *MarkReadInput) (Noti
 		c.Now,
 	)
 	if execErr != nil {
-		return x, execErr
+		return x, apperr.Wrap(execErr, "update notify.notifications")
 	}
 
 	x.ReadAt, x.Version, x.UpdatedAt = &c.Now, x.Version+1, c.Now
@@ -658,12 +658,12 @@ func (Inbox) markAllRead(ctx context.Context, c *ops.Call, in *MarkAllReadInput)
 
 	rows, err := c.Tx.Query(ctx, q, args...)
 	if err != nil {
-		return Marked{}, err
+		return Marked{}, apperr.Wrap(err, "update notify.notifications")
 	}
 
 	ids, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 	if err != nil {
-		return Marked{}, err
+		return Marked{}, apperr.Wrap(err, "update notify.notifications")
 	}
 
 	out := Marked{MarkedIDs: []uuid.UUID{}, SkippedIDs: []uuid.UUID{}}
@@ -742,7 +742,7 @@ func resolve(ctx context.Context, c *ops.Call, in *TargetInput) (target, error) 
 	}
 
 	if err != nil {
-		return t, err
+		return t, apperr.Wrap(err, "select t.org")
 	}
 
 	if in.TemplateKey == "payment_reminder" {
@@ -760,7 +760,7 @@ func resolve(ctx context.Context, c *ops.Call, in *TargetInput) (target, error) 
 			$1`, in.Target.ID, c.Now).
 			Scan(&ok)
 		if err != nil {
-			return t, err
+			return t, apperr.Wrap(err, "select notify.ref_invoices")
 		}
 
 		if !ok {
@@ -836,7 +836,7 @@ func recipients(
 
 	rows, err := c.Tx.Query(ctx, q+" ORDER BY r.role, r.label, r.id", args...)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "query (recipients)")
 	}
 	defer rows.Close()
 
@@ -847,13 +847,13 @@ func recipients(
 
 		err := rows.Scan(&r.ID, &r.Role, &r.DisplayLabel, &r.AllowedChannels)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "query (recipients)")
 		}
 
 		out = append(out, r)
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "query (recipients)")
 }
 
 // RecipientsInput is notifications.recipients input.
@@ -919,7 +919,7 @@ func (Inbox) recipients(
 
 	w, err := paging.Resolve(in.Query, struct{}{}, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[Recipient]{}, err
+		return paging.Page[Recipient]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	t, err := resolve(ctx, c, &in.TargetInput)
@@ -1041,7 +1041,7 @@ func (Inbox) preview(ctx context.Context, c *ops.Call, in *PreviewInput) (Notifi
 		$1`, in.RecipientMembershipID).
 		Scan(&scope)
 	if scanErr != nil {
-		return Notification{}, scanErr
+		return Notification{}, apperr.Wrap(scanErr, "select identity.memberships")
 	}
 
 	typ, status := in.TemplateKey, in.TemplateKey

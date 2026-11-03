@@ -48,7 +48,7 @@ func lockDevice(ctx context.Context, c *ops.Call, id uuid.UUID) (devState, error
 	}
 
 	if err != nil {
-		return s, err
+		return s, apperr.Wrap(err, "select devices.devices")
 	}
 
 	return s, nil
@@ -72,7 +72,7 @@ func (m *Module) exclusive(ctx context.Context, c *ops.Call, unit uuid.UUID) err
 		unit, c.Now).
 		Scan(&busy)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select devices.device_operations")
 	}
 
 	for _, x := range m.Exclusion {
@@ -82,7 +82,7 @@ func (m *Module) exclusive(ctx context.Context, c *ops.Call, unit uuid.UUID) err
 
 		b, err := x.UnitBusy(ctx, c, unit)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "devices.Exclusion.UnitBusy")
 		}
 
 		busy = b
@@ -102,7 +102,7 @@ func bumpDevice(ctx context.Context, c *ops.Call, id uuid.UUID) (int, error) {
 		$1 RETURNING version`, id).
 		Scan(&v)
 
-	return v, err
+	return v, apperr.Wrap(err, "update devices.devices")
 }
 
 // ---- bind ----
@@ -183,7 +183,7 @@ func (m *Module) bindDetail(ctx context.Context, c *ops.Call, in *BindInput) (De
 	if s.unit != nil && *s.unit != in.UnitID && c.Principal.Role == "technician" {
 		err := m.UnitAccess.TechnicianUnit(ctx, c, *s.unit, false, false)
 		if err != nil {
-			return DeviceDetail{}, err
+			return DeviceDetail{}, apperr.Wrap(err, "devices.TechUnitAccess.TechnicianUnit")
 		}
 	}
 
@@ -202,7 +202,7 @@ func (m *Module) bindDetail(ctx context.Context, c *ops.Call, in *BindInput) (De
 
 	u, ok, err := m.Units.UnitInfo(ctx, c, in.UnitID)
 	if err != nil {
-		return DeviceDetail{}, err
+		return DeviceDetail{}, apperr.Wrap(err, "devices.Units.UnitInfo")
 	}
 
 	if !ok {
@@ -227,7 +227,7 @@ func (m *Module) bindDetail(ctx context.Context, c *ops.Call, in *BindInput) (De
 		IS NULL)`, in.UnitID).
 		Scan(&taken)
 	if scanErr != nil {
-		return DeviceDetail{}, scanErr
+		return DeviceDetail{}, apperr.Wrap(scanErr, "select devices.device_bindings")
 	}
 
 	if taken {
@@ -243,7 +243,7 @@ func (m *Module) bindDetail(ctx context.Context, c *ops.Call, in *BindInput) (De
 			in.Reason,
 		)
 		if err != nil {
-			return DeviceDetail{}, err
+			return DeviceDetail{}, apperr.Wrap(err, "update devices.device_bindings")
 		}
 		// new binding → new sensor IDs; the old sensors are detached (device_id kept for history) by re-keying
 		_, err = c.Tx.Exec(
@@ -253,7 +253,7 @@ func (m *Module) bindDetail(ctx context.Context, c *ops.Call, in *BindInput) (De
 			in.DeviceID,
 		)
 		if err != nil {
-			return DeviceDetail{}, err
+			return DeviceDetail{}, apperr.Wrap(err, "update devices.sensors")
 		}
 	}
 
@@ -273,7 +273,7 @@ func (m *Module) bindDetail(ctx context.Context, c *ops.Call, in *BindInput) (De
 		c.Principal.MembershipID,
 	)
 	if execErr != nil {
-		return DeviceDetail{}, execErr
+		return DeviceDetail{}, apperr.Wrap(execErr, "insert devices.device_bindings")
 	}
 
 	var v int
@@ -283,7 +283,7 @@ func (m *Module) bindDetail(ctx context.Context, c *ops.Call, in *BindInput) (De
 		WHERE id = $1 RETURNING version`, in.DeviceID, in.UnitID, binding).
 		Scan(&v)
 	if scanErr != nil {
-		return DeviceDetail{}, scanErr
+		return DeviceDetail{}, apperr.Wrap(scanErr, "update devices.devices")
 	}
 
 	c.Emit(
@@ -356,7 +356,7 @@ func scanOp(r pgx.Row) (DeviceOperation, error) {
 		&o.ExpiresAt,
 	)
 
-	return o, err
+	return o, apperr.Wrap(err, "scan (scanOp)")
 }
 
 func (m *Module) startOperation(
@@ -389,7 +389,7 @@ func (m *Module) startOperation(
 	if kind == "firmware" {
 		u, _, err := m.Units.UnitInfo(ctx, c, *s.unit)
 		if err != nil {
-			return DeviceOperation{}, err
+			return DeviceOperation{}, apperr.Wrap(err, "devices.Units.UnitInfo")
 		}
 
 		var candidates []string
@@ -398,7 +398,7 @@ func (m *Module) startOperation(
 			$2`, u.ModelID, u.CapabilityVersion).
 			Scan(&candidates)
 		if scanErr != nil {
-			return DeviceOperation{}, scanErr
+			return DeviceOperation{}, apperr.Wrap(scanErr, "select devices.capabilities")
 		}
 
 		if !slices.Contains(candidates, *target) || *target == s.firmware {
@@ -437,7 +437,7 @@ func (m *Module) startOperation(
 		c.Principal.MembershipID,
 	)
 	if execErr != nil {
-		return DeviceOperation{}, execErr
+		return DeviceOperation{}, apperr.Wrap(execErr, "insert devices.device_operations")
 	}
 
 	v, err := bumpDevice(ctx, c, device)
@@ -717,7 +717,7 @@ func (m *Module) calibrate(
 	}
 
 	if err != nil {
-		return CalibrationRecord{}, err
+		return CalibrationRecord{}, apperr.Wrap(err, "select devices.sensors")
 	}
 
 	if metric != in.Metric || unit != in.Unit {
@@ -750,7 +750,7 @@ func (m *Module) calibrate(
 		in.JobID,
 	)
 	if execErr != nil {
-		return CalibrationRecord{}, execErr
+		return CalibrationRecord{}, apperr.Wrap(execErr, "insert devices.calibration_records")
 	}
 
 	_, execErr = c.Tx.Exec(
@@ -760,7 +760,7 @@ func (m *Module) calibrate(
 		in.CalibratedAt,
 	)
 	if execErr != nil {
-		return CalibrationRecord{}, execErr
+		return CalibrationRecord{}, apperr.Wrap(execErr, "update devices.sensors")
 	}
 
 	v, err := bumpDevice(ctx, c, in.DeviceID)
@@ -815,7 +815,7 @@ func scanCal(row pgx.Row) (CalibrationRecord, error) {
 	)
 	x.Version, x.IsDemo = 1, true
 
-	return x, err
+	return x, apperr.Wrap(err, "scan (scanCal)")
 }
 
 // calibration rows carry the binding at their time (SR24).

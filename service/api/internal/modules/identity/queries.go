@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // QueryActiveOrganizations returns which of the given organizations are active (IR190; IR40 customer counts).
@@ -31,7 +32,7 @@ func RegisterQueries(r *ops.Registry) {
 				in.IDs,
 			)
 			if err != nil {
-				return nil, err
+				return nil, apperr.Wrap(err, "select identity.organizations")
 			}
 
 			return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
@@ -69,7 +70,9 @@ type ConsentInput struct {
 
 // Members asks identity for the active memberships matching f (any domain; local for the worker).
 func Members(ctx context.Context, c *ops.Call, f MembersInput) ([]uuid.UUID, error) {
-	return ops.Delegate(ctx, c, QueryMembers, f, members)
+	out, err := ops.Delegate(ctx, c, QueryMembers, f, members)
+
+	return out, apperr.Wrap(err, "delegate identity.members")
 }
 
 // ConsentGranted asks identity whether the membership granted the purpose (false when never recorded).
@@ -79,13 +82,15 @@ func ConsentGranted(
 	membership uuid.UUID,
 	purpose string,
 ) (bool, error) {
-	return ops.Delegate(
+	out, err := ops.Delegate(
 		ctx,
 		c,
 		QueryConsent,
 		ConsentInput{MembershipID: membership, Purpose: purpose},
 		consent,
 	)
+
+	return out, apperr.Wrap(err, "delegate identity.consent")
 }
 
 func consent(ctx context.Context, c *ops.Call, in *ConsentInput) (bool, error) {
@@ -95,7 +100,7 @@ func consent(ctx context.Context, c *ops.Call, in *ConsentInput) (bool, error) {
 		= $2), false)`, in.MembershipID, in.Purpose).
 		Scan(&granted)
 
-	return granted, err
+	return granted, apperr.Wrap(err, "select identity.consents")
 }
 
 // QueryNotificationsStored counts stored notifications among ids for the target at occurredAt (IR191: the
@@ -134,7 +139,7 @@ func members(ctx context.Context, c *ops.Call, in *MembersInput) ([]uuid.UUID, e
 		in.ClientRole,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select identity.memberships")
 	}
 
 	out, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
@@ -142,7 +147,7 @@ func members(ctx context.Context, c *ops.Call, in *MembersInput) ([]uuid.UUID, e
 		out = []uuid.UUID{}
 	}
 
-	return out, err
+	return out, apperr.Wrap(err, "select identity.memberships")
 }
 
 func notificationsStored(
@@ -157,5 +162,5 @@ func notificationsStored(
 		in.IDs, in.TargetID, in.OccurredAt).
 		Scan(&n)
 
-	return n, err
+	return n, apperr.Wrap(err, "select notify.notifications")
 }

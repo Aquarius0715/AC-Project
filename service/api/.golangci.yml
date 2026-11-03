@@ -29,6 +29,14 @@ linters:
             - github.com/labstack/echo/v5
             - github.com/redis/go-redis/v9
             - golang.org/x/time
+    wrapcheck:
+      # the DomainError constructors start an error, as errors.New does; From converts one and keeps its cause.
+      # Every other error from another package is wrapped with apperr.Wrap (".Wrap(" is a default ignore-sig)
+      extra-ignore-sigs:
+        - apperr.E(
+        - apperr.Fields(
+        - apperr.From(
+        - .RetryAfter(
     godot:
       exclude:
         - "^ *@" # swag annotations (@Router, @Param …) are read by swag: a period would change the route

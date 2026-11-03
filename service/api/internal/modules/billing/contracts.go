@@ -108,7 +108,7 @@ func scanContract(r pgx.Row) (Contract, error) {
 	)
 	x.UpdatedAt = x.CreatedAt
 
-	return x, err
+	return x, apperr.Wrap(err, "scan (scanContract)")
 }
 
 func (m Billing) decorate(ctx context.Context, c *ops.Call, x *Contract) error {
@@ -120,7 +120,7 @@ func (m Billing) decorate(ctx context.Context, c *ops.Call, x *Contract) error {
 		x.ID,
 	)
 
-	return err
+	return apperr.Wrap(err, "billing.Restrictions.ContractState")
 }
 
 // clientScope restricts clients to their own customer organization.
@@ -219,12 +219,12 @@ func (m Billing) listContracts(
 		"k.id ASC",
 	)
 	if err != nil {
-		return paging.Page[Contract]{}, err
+		return paging.Page[Contract]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[Contract]{}, err
+		return paging.Page[Contract]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	var args []any
@@ -261,7 +261,7 @@ func (m Billing) listContracts(
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM billing.contracts k WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
-		return paging.Page[Contract]{}, scanErr
+		return paging.Page[Contract]{}, apperr.Wrap(scanErr, "select billing.contracts")
 	}
 
 	rows, err := c.Tx.Query(
@@ -276,7 +276,7 @@ func (m Billing) listContracts(
 		),
 		args...)
 	if err != nil {
-		return paging.Page[Contract]{}, err
+		return paging.Page[Contract]{}, apperr.Wrap(err, "select billing.contracts")
 	}
 
 	items := []Contract{}
@@ -296,7 +296,7 @@ func (m Billing) listContracts(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return paging.Page[Contract]{}, rowsErr
+		return paging.Page[Contract]{}, apperr.Wrap(rowsErr, "select billing.contracts")
 	}
 
 	for i := range items {
@@ -412,7 +412,7 @@ func (m Billing) saveContract(
 ) (Contract, error) {
 	org, active, found, err := m.Customers.CustomerState(ctx, c, in.CustomerID)
 	if err != nil {
-		return Contract{}, err
+		return Contract{}, apperr.Wrap(err, "billing.Customers.CustomerState")
 	}
 
 	if !found {
@@ -426,7 +426,7 @@ func (m Billing) saveContract(
 	for _, u := range in.UnitIDs {
 		uorg, archived, ok, err := m.Customers.UnitState(ctx, c, u)
 		if err != nil {
-			return Contract{}, err
+			return Contract{}, apperr.Wrap(err, "billing.Customers.UnitState")
 		}
 
 		if !ok || archived || uorg != org {
@@ -468,7 +468,7 @@ func (m Billing) saveContract(
 			cur.ID,
 		)
 		if execErr != nil {
-			return cur, execErr
+			return cur, apperr.Wrap(execErr, "update billing.contracts")
 		}
 
 		id, version, prev = cur.ID, cur.Version+1, c.ExpectedVersion
@@ -495,7 +495,7 @@ func (m Billing) saveContract(
 		c.Now,
 	)
 	if execErr != nil {
-		return Contract{}, execErr
+		return Contract{}, apperr.Wrap(execErr, "insert billing.contracts")
 	}
 
 	for _, u := range in.UnitIDs {
@@ -508,7 +508,7 @@ func (m Billing) saveContract(
 			u,
 		)
 		if err != nil {
-			return Contract{}, err
+			return Contract{}, apperr.Wrap(err, "insert billing.contract_units")
 		}
 	}
 
@@ -629,7 +629,7 @@ func scanInvoice(r pgx.Row) (Invoice, error) {
 		&x.customerOrg,
 	)
 
-	return x, err
+	return x, apperr.Wrap(err, "scan (scanInvoice)")
 }
 
 // InvoiceInput is invoices.create input.
@@ -722,13 +722,13 @@ func (m Billing) createInvoice(
 		current_setting('app.tenant_id')))) l`).
 		Scan(&seq)
 	if scanErr != nil {
-		return Invoice{}, scanErr
+		return Invoice{}, apperr.Wrap(scanErr, "select (createInvoice)")
 	}
 
 	scanErr = c.Tx.QueryRow(ctx, `SELECT count(*) + 1 FROM billing.invoices`).
 		Scan(&seq)
 	if scanErr != nil {
-		return Invoice{}, scanErr
+		return Invoice{}, apperr.Wrap(scanErr, "select billing.invoices")
 	}
 
 	number := InvoiceNumber(in.Period.From, seq)
@@ -746,7 +746,7 @@ func (m Billing) createInvoice(
 			return Invoice{}, apperr.E(apperr.Conflict, "errors.invoice_period_exists")
 		}
 
-		return Invoice{}, err
+		return Invoice{}, apperr.Wrap(err, "insert billing.invoices")
 	}
 
 	x, err := m.loadInvoice(ctx, c, id, false)
@@ -860,7 +860,7 @@ func (m Billing) getInvoice(ctx context.Context, c *ops.Call, in *IDInput) (Invo
 		x.ID,
 	)
 	if err != nil {
-		return x, err
+		return x, apperr.Wrap(err, "select billing.payments")
 	}
 
 	x.PaymentRefs = []Payment{}
@@ -886,7 +886,7 @@ func (m Billing) getInvoice(ctx context.Context, c *ops.Call, in *IDInput) (Invo
 		if err != nil {
 			rows.Close()
 
-			return x, err
+			return x, apperr.Wrap(err, "select billing.payments")
 		}
 
 		p.EventIDs = []uuid.UUID{}
@@ -897,12 +897,12 @@ func (m Billing) getInvoice(ctx context.Context, c *ops.Call, in *IDInput) (Invo
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return x, rowsErr
+		return x, apperr.Wrap(rowsErr, "select billing.payments")
 	}
 
 	x.RestrictionIDs, err = m.Restrictions.ForInvoice(ctx, c, x.ID)
 
-	return x, err
+	return x, apperr.Wrap(err, "billing.Restrictions.ForInvoice")
 }
 
 var invoiceStatuses = []string{"unpaid", "processing", "paid"}
@@ -991,12 +991,12 @@ func (m Billing) listInvoices(
 		"i.due_at DESC, i.id ASC",
 	)
 	if err != nil {
-		return paging.Page[Invoice]{}, err
+		return paging.Page[Invoice]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[Invoice]{}, err
+		return paging.Page[Invoice]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	var args []any
@@ -1011,7 +1011,7 @@ func (m Billing) listInvoices(
 	if c.Principal.Role == "client" {
 		cust, _, err := m.Customers.CustomerOfOrg(ctx, c, c.Principal.OrgID)
 		if err != nil {
-			return paging.Page[Invoice]{}, err
+			return paging.Page[Invoice]{}, apperr.Wrap(err, "billing.Customers.CustomerOfOrg")
 		}
 
 		conds = append(conds, "i.customer_id = "+add(cust))
@@ -1058,7 +1058,7 @@ func (m Billing) listInvoices(
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM billing.invoices i WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
-		return paging.Page[Invoice]{}, scanErr
+		return paging.Page[Invoice]{}, apperr.Wrap(scanErr, "select billing.invoices")
 	}
 
 	rows, err := c.Tx.Query(
@@ -1073,7 +1073,7 @@ func (m Billing) listInvoices(
 		),
 		args...)
 	if err != nil {
-		return paging.Page[Invoice]{}, err
+		return paging.Page[Invoice]{}, apperr.Wrap(err, "select billing.invoices")
 	}
 	defer rows.Close()
 
@@ -1093,7 +1093,7 @@ func (m Billing) listInvoices(
 		NextCursor:      w.Next(total),
 		Total:           total,
 		SnapshotVersion: w.Snapshot,
-	}, rows.Err()
+	}, apperr.Wrap(rows.Err(), "select billing.invoices")
 }
 
 // RemindInput is invoices.remind input.
@@ -1172,7 +1172,7 @@ func (m Billing) remind(ctx context.Context, c *ops.Call, in *RemindInput) (Rece
 
 	ok, err := m.Recipients.ActiveClientOf(ctx, c, in.RecipientMembershipID, x.customerOrg)
 	if err != nil {
-		return Receipt{}, err
+		return Receipt{}, apperr.Wrap(err, "billing.Recipients.ActiveClientOf")
 	}
 
 	if !ok {
@@ -1197,7 +1197,7 @@ func (m Billing) remind(ctx context.Context, c *ops.Call, in *RemindInput) (Rece
 		Severity: "warning", SourceAlertID: nil,
 	})
 	if err != nil {
-		return Receipt{}, err
+		return Receipt{}, apperr.Wrap(err, "notify.Store.Create")
 	}
 
 	var v int
@@ -1206,7 +1206,7 @@ func (m Billing) remind(ctx context.Context, c *ops.Call, in *RemindInput) (Rece
 		$2 WHERE id = $1 RETURNING version`, x.ID, c.Now).
 		Scan(&v)
 	if scanErr != nil {
-		return Receipt{}, scanErr
+		return Receipt{}, apperr.Wrap(scanErr, "update billing.invoices")
 	}
 
 	c.Emit(

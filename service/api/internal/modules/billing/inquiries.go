@@ -59,7 +59,7 @@ func scanInquiry(r pgx.Row) (Inquiry, error) {
 		&x.customerOrg,
 	)
 
-	return x, err
+	return x, apperr.Wrap(err, "scan (scanInquiry)")
 }
 
 func textLen(s *string, key string, max int, fe map[string]string) {
@@ -136,7 +136,7 @@ func (m Billing) notifyMembers(
 			SourceAlertID: nil,
 		})
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "notify.Store.Create")
 		}
 	}
 
@@ -174,7 +174,7 @@ func (m Billing) createInquiry(
 ) (Inquiry, error) {
 	customer, ok, err := m.Customers.CustomerOfOrg(ctx, c, c.Principal.OrgID)
 	if err != nil {
-		return Inquiry{}, err
+		return Inquiry{}, apperr.Wrap(err, "billing.Customers.CustomerOfOrg")
 	}
 
 	nf := apperr.E(apperr.NotFound, "error.notFound")
@@ -189,7 +189,7 @@ func (m Billing) createInquiry(
 			$2)`, *in.InvoiceID, customer).
 			Scan(&owned)
 		if err != nil {
-			return Inquiry{}, err
+			return Inquiry{}, apperr.Wrap(err, "select billing.invoices")
 		}
 
 		if !owned {
@@ -205,7 +205,7 @@ func (m Billing) createInquiry(
 			= $3)`, *in.RestrictionID, customer, in.InvoiceID).
 			Scan(&owned, &cites)
 		if err != nil {
-			return Inquiry{}, err
+			return Inquiry{}, apperr.Wrap(err, "select restrictions.restrictions")
 		}
 
 		if !owned {
@@ -236,7 +236,7 @@ func (m Billing) createInquiry(
 		c.Now,
 	)
 	if execErr != nil {
-		return Inquiry{}, execErr
+		return Inquiry{}, apperr.Wrap(execErr, "insert billing.inquiries")
 	}
 
 	notifyMembersErr := m.notifyMembers(
@@ -361,12 +361,12 @@ func (m Billing) listInquiries(
 		"q.created_at DESC, q.id DESC",
 	)
 	if err != nil {
-		return paging.Page[Inquiry]{}, err
+		return paging.Page[Inquiry]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[Inquiry]{}, err
+		return paging.Page[Inquiry]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	var args []any
@@ -402,7 +402,7 @@ func (m Billing) listInquiries(
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM "+from+" WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
-		return paging.Page[Inquiry]{}, scanErr
+		return paging.Page[Inquiry]{}, apperr.Wrap(scanErr, "select count")
 	}
 
 	rows, err := c.Tx.Query(
@@ -418,7 +418,7 @@ func (m Billing) listInquiries(
 		),
 		args...)
 	if err != nil {
-		return paging.Page[Inquiry]{}, err
+		return paging.Page[Inquiry]{}, apperr.Wrap(err, "select (listInquiries)")
 	}
 	defer rows.Close()
 
@@ -435,7 +435,7 @@ func (m Billing) listInquiries(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return paging.Page[Inquiry]{}, rowsErr
+		return paging.Page[Inquiry]{}, apperr.Wrap(rowsErr, "select (listInquiries)")
 	}
 
 	return paging.Page[Inquiry]{
@@ -514,7 +514,7 @@ func (m Billing) answerInquiry(ctx context.Context, c *ops.Call, in *AnswerInput
 		c.Now,
 	)
 	if execErr != nil {
-		return x, execErr
+		return x, apperr.Wrap(execErr, "update billing.inquiries")
 	}
 
 	notifyMembersErr := m.notifyMembers(

@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/modules/control"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -138,7 +139,7 @@ func TestCommands(t *testing.T) {
 	beginFuncErr := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
 		ok, err = control.Acknowledge(ctx, tx, uuid.MustParse(id), clock.Add(5*time.Second))
 
-		return err
+		return apperr.Wrap(err, "control.Acknowledge")
 	})
 	if beginFuncErr != nil || !ok {
 		t.Fatalf("ack: %v %v", ok, beginFuncErr)
@@ -194,7 +195,7 @@ func TestCommands(t *testing.T) {
 	beginFuncErr = pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
 		ok, err = control.Acknowledge(ctx, tx, uuid.MustParse(id2), clock.Add(40*time.Second))
 
-		return err
+		return apperr.Wrap(err, "control.Acknowledge")
 	})
 	if beginFuncErr != nil || ok {
 		t.Fatalf("late ack must not succeed: %v %v", ok, beginFuncErr)

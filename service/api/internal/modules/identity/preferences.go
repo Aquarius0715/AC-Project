@@ -46,7 +46,7 @@ func loadPreferences(ctx context.Context, c *ops.Call) (Preferences, error) {
 	err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.two_factor WHERE user_id = $1)`, c.Principal.UserID).
 		Scan(&p.TwoFactorEnabled)
 
-	return p, err
+	return p, apperr.Wrap(err, "select identity.two_factor")
 }
 
 // PreferencesInput is preferences.update input.
@@ -140,7 +140,7 @@ func updatePreferences(
 		c.Now,
 	)
 	if execErr != nil {
-		return cur, execErr
+		return cur, apperr.Wrap(execErr, "insert identity.preferences")
 	}
 
 	c.Audit(
@@ -207,7 +207,7 @@ func loadConsent(ctx context.Context, c *ops.Call, purpose string, lock bool) (C
 		return x, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
-	return x, err
+	return x, apperr.Wrap(err, "update (loadConsent)")
 }
 
 // getConsent serves consents.get.
@@ -311,7 +311,7 @@ func updateConsent(ctx context.Context, c *ops.Call, in *ConsentUpdateInput) (Co
 		c.Now,
 	)
 	if execErr != nil {
-		return x, execErr
+		return x, apperr.Wrap(execErr, "update identity.consents")
 	}
 
 	prev := x.Version

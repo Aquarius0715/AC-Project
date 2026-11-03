@@ -118,10 +118,12 @@ func EquipmentReadable(ctx context.Context, c *ops.Call, units []uuid.UUID) ([]u
 		"SELECT t.id FROM unnest($1::uuid[]) AS t(id) WHERE "+SQL(c, &args, "t.id", Equipment),
 		args...)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select unnest")
 	}
 
-	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	out, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+
+	return out, apperr.Wrap(err, "select unnest")
 }
 
 // Gate applies IR49(b) to equipment reads of units the caller can already see in List mode: an external technician
@@ -144,7 +146,7 @@ func Gate(ctx context.Context, c *ops.Call, units []uuid.UUID) error {
 
 	err := c.Tx.QueryRow(ctx, q, args...).Scan(&waiting)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select unnest")
 	}
 
 	if waiting > 0 {

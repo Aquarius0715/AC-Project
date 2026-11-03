@@ -55,7 +55,7 @@ func loadCases(
 
 	err := tx.QueryRow(ctx, q, id).Scan(&raw, &state, &version)
 	if err != nil {
-		return nil, "", 0, err
+		return nil, "", 0, apperr.Wrap(err, "update (loadCases)")
 	}
 
 	var cases []RecoveryCase
@@ -82,7 +82,7 @@ func saveCases(
 		now,
 	)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "update restrictions.restrictions")
 	}
 	// SR29: a recovery-case change also increments the target units' versions — owned by equipment (IR184)
 	units, err := restrictionUnits(ctx, tx, id)
@@ -108,10 +108,12 @@ func restrictionUnits(ctx context.Context, tx pgx.Tx, id uuid.UUID) ([]uuid.UUID
 		id,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select restrictions.restriction_units")
 	}
 
-	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	out, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+
+	return out, apperr.Wrap(err, "select restrictions.restriction_units")
 }
 
 // Observe applies a device observation of a unit (demo.trigger restriction_observation, SR26). The unit's
@@ -156,7 +158,7 @@ func Observe(
 		scanErr,
 		pgx.ErrNoRows,
 	) {
-		return false, scanErr
+		return false, apperr.Wrap(scanErr, "select restrictions.restrictions")
 	}
 
 	found := false
@@ -239,7 +241,7 @@ func (m Restrictions) reconcileTerminal(
 
 		_, conn, power, bound, err := m.Devices.BoundDevice(ctx, c, u)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "restrictions.Devices.BoundDevice")
 		}
 
 		if !bound || conn != "online" || power == "off" {
@@ -248,7 +250,7 @@ func (m Restrictions) reconcileTerminal(
 
 		raw, at, err := m.Units.Observation(ctx, c, u) // equipment's observation (IR194)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "restrictions.Units.Observation")
 		}
 
 		if at == nil || c.Now.Sub(*at) > IntentTTL {
@@ -329,12 +331,12 @@ func resolveRecoveryAlerts(ctx context.Context, tx pgx.Tx, units []uuid.UUID, _ 
 		WHERE NOT EXISTS (SELECT 1 FROM restrictions.restrictions r, jsonb_array_elements(r.recovery_cases) k
 			WHERE k->>'unitId' = u::text AND k->>'state' <> 'resolved') ORDER BY u`, units)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select unnest")
 	}
 
 	done, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 	if err != nil || len(done) == 0 {
-		return err
+		return apperr.Wrap(err, "select unnest")
 	}
 
 	var tenant uuid.UUID
@@ -342,10 +344,10 @@ func resolveRecoveryAlerts(ctx context.Context, tx pgx.Tx, units []uuid.UUID, _ 
 	scanErr := tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')::uuid`).
 		Scan(&tenant)
 	if scanErr != nil {
-		return scanErr
+		return apperr.Wrap(scanErr, "select current_setting")
 	}
 
-	return events.Publish(
+	return apperr.Wrap(events.Publish(
 		ctx,
 		tx,
 		tenant,
@@ -353,7 +355,7 @@ func resolveRecoveryAlerts(ctx context.Context, tx pgx.Tx, units []uuid.UUID, _ 
 		done[0],
 		events.ReconciliationResolved,
 		events.Units{UnitIDs: done, RestrictionID: uuid.UUID{}},
-	)
+	), "events.Publish")
 }
 
 // recoveryAcknowledged resolves the removing case of a terminal restriction when its remove Command is acknowledged.
@@ -411,12 +413,12 @@ func recoveryEnded(ctx context.Context, tx pgx.Tx, commands []uuid.UUID, now tim
 		commands,
 	)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select restrictions.restriction_commands")
 	}
 
 	ids, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select restrictions.restriction_commands")
 	}
 
 	for _, r := range ids {
@@ -468,8 +470,11 @@ func publish(
 	err := tx.QueryRow(ctx, `SELECT tenant_id FROM restrictions.restrictions WHERE id = $1`, restriction).
 		Scan(&tenant)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select restrictions.restrictions")
 	}
 
-	return events.Publish(ctx, tx, tenant, aggregateType, aggregateID, eventType, payload)
+	return apperr.Wrap(
+		events.Publish(ctx, tx, tenant, aggregateType, aggregateID, eventType, payload),
+		"events.Publish",
+	)
 }

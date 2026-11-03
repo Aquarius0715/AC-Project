@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
 )
 
@@ -20,7 +21,7 @@ func EventHandlers() map[string]events.Handler {
 
 			err := e.Decode(&p)
 			if err != nil {
-				return err
+				return apperr.Wrap(err, "events.Event.Decode")
 			}
 
 			_, err = tx.Exec(
@@ -31,7 +32,7 @@ func EventHandlers() map[string]events.Handler {
 				p.At,
 			)
 			if err != nil {
-				return err
+				return apperr.Wrap(err, "update restrictions.restriction_commands")
 			}
 
 			for _, id := range p.CommandIDs {
@@ -48,7 +49,7 @@ func EventHandlers() map[string]events.Handler {
 
 			decodeErr := e.Decode(&p)
 			if decodeErr != nil {
-				return decodeErr
+				return apperr.Wrap(decodeErr, "events.Event.Decode")
 			}
 
 			var observed *Observation
@@ -62,7 +63,7 @@ func EventHandlers() map[string]events.Handler {
 
 				err := json.Unmarshal(p.Observed, observed)
 				if err != nil {
-					return err
+					return apperr.Wrap(err, "json.Unmarshal")
 				}
 			}
 
@@ -75,7 +76,7 @@ func EventHandlers() map[string]events.Handler {
 
 			err := e.Decode(&p)
 			if err != nil {
-				return err
+				return apperr.Wrap(err, "events.Event.Decode")
 			}
 
 			for _, id := range p.CommandIDs { // billing's record takes equipment's final status (IR194)
@@ -93,7 +94,7 @@ func EventHandlers() map[string]events.Handler {
 					p.At,
 				)
 				if err != nil {
-					return err
+					return apperr.Wrap(err, "update restrictions.restriction_commands")
 				}
 			}
 

@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/modules/identity"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // LiveSensor is one sensor of the live site's module, by its fixture-style name.
@@ -137,7 +138,7 @@ func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 
 	capSensors, err := json.Marshal(sensors)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "json.Marshal")
 	}
 	// remote power only: no mode, fan or temperature setting (deterministic contracts: empty lists, null temperature)
 	exErr := ex(

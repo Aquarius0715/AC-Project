@@ -6,6 +6,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // Publish writes one event of tenant into platform.outbox inside tx. Use it
@@ -22,7 +24,7 @@ func Publish(
 ) error {
 	raw, err := json.Marshal(payload)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "json.Marshal")
 	}
 
 	_, err = tx.Exec(
@@ -36,5 +38,5 @@ func Publish(
 		raw,
 	)
 
-	return err
+	return apperr.Wrap(err, "insert platform.outbox")
 }

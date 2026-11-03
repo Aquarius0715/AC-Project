@@ -84,7 +84,7 @@ func (Policies) Owners(
 		ids,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select monitoring.alert_policies")
 	}
 	defer rows.Close()
 
@@ -96,13 +96,13 @@ func (Policies) Owners(
 
 		err := rows.Scan(&id, &o.CustomerID, &o.Kind)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select monitoring.alert_policies")
 		}
 
 		out[id] = o
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select monitoring.alert_policies")
 }
 
 // ---- condition model ----
@@ -359,7 +359,9 @@ func (p Policy) MarshalJSON() ([]byte, error) {
 		m["condition"], m["action"] = p.AutoCondition, p.Action
 	}
 
-	return json.Marshal(m)
+	out, err := json.Marshal(m)
+
+	return out, apperr.Wrap(err, "json.Marshal")
 }
 
 const alertPolicyCols = `p.id, p.tenant_id, p.version, p.created_at, p.updated_at, p.kind, p.customer_id, p.name, ` +
@@ -395,21 +397,21 @@ func scanAlertPolicy(r pgx.Row) (Policy, error) {
 		&p.CooldownMinutes,
 	)
 	if err != nil {
-		return p, err
+		return p, apperr.Wrap(err, "scan (scanAlertPolicy)")
 	}
 
 	p.UnitIDs, p.RuleSettings = []uuid.UUID{}, []RuleSetting{}
 	if len(cond) > 0 {
 		err := json.Unmarshal(cond, &p.Condition)
 		if err != nil {
-			return p, err
+			return p, apperr.Wrap(err, "json.Unmarshal")
 		}
 	}
 
 	if len(rules) > 0 {
 		err := json.Unmarshal(rules, &p.Rules)
 		if err != nil {
-			return p, err
+			return p, apperr.Wrap(err, "json.Unmarshal")
 		}
 	}
 
@@ -475,7 +477,7 @@ func scanAutoPolicy(r pgx.Row) (Policy, error) {
 		&p.UnitIDs,
 	)
 
-	return p, err
+	return p, apperr.Wrap(err, "scan (scanAutoPolicy)")
 }
 
 // ---- scope ----
@@ -505,7 +507,7 @@ func (m Policies) clientCustomer(ctx context.Context, c *ops.Call) (uuid.UUID, e
 
 	id, ok, err := m.Units.CustomerOfOrg(ctx, c, c.Principal.OrgID)
 	if err != nil || !ok {
-		return uuid.Nil, err
+		return uuid.Nil, apperr.Wrap(err, "monitoring.PolicyUnits.CustomerOfOrg")
 	}
 
 	return id, nil
@@ -529,7 +531,7 @@ func (m Policies) decorate(
 	if len(alertIDs) > 0 {
 		att, err := m.Units.AttachedUnits(ctx, c, alertIDs)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "monitoring.PolicyUnits.AttachedUnits")
 		}
 
 		for i := range ps {
@@ -557,7 +559,7 @@ func (m Policies) decorate(
 
 		rows, err := c.Tx.Query(ctx, q+" ORDER BY customer_id, rule_key", args...)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "query (decorate)")
 		}
 
 		for rows.Next() {
@@ -579,7 +581,7 @@ func (m Policies) decorate(
 			if err != nil {
 				rows.Close()
 
-				return err
+				return apperr.Wrap(err, "query (decorate)")
 			}
 
 			ps[i].RuleSettings = append(ps[i].RuleSettings, s)
@@ -589,7 +591,7 @@ func (m Policies) decorate(
 
 		rowsErr := rows.Err()
 		if rowsErr != nil {
-			return rowsErr
+			return apperr.Wrap(rowsErr, "query (decorate)")
 		}
 	}
 
@@ -699,7 +701,7 @@ func (m Policies) list(
 
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[Policy]{}, err
+		return paging.Page[Policy]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	kinds := grantedKinds(c)
@@ -720,7 +722,7 @@ func (m Policies) list(
 	if f.PropertyID != nil {
 		pu, err := m.Units.UnitsOfProperty(ctx, c, *f.PropertyID)
 		if err != nil {
-			return paging.Page[Policy]{}, err
+			return paging.Page[Policy]{}, apperr.Wrap(err, "monitoring.PolicyUnits.UnitsOfProperty")
 		}
 
 		if units == nil {
@@ -768,7 +770,10 @@ func (m Policies) list(
 		if units != nil {
 			ids, err := m.Units.PoliciesOfUnits(ctx, c, units)
 			if err != nil {
-				return paging.Page[Policy]{}, err
+				return paging.Page[Policy]{}, apperr.Wrap(
+					err,
+					"monitoring.PolicyUnits.PoliciesOfUnits",
+				)
 			}
 
 			conds = append(conds, "p.id = ANY("+add(ids)+")")
@@ -782,7 +787,7 @@ func (m Policies) list(
 			),
 			args...)
 		if err != nil {
-			return paging.Page[Policy]{}, err
+			return paging.Page[Policy]{}, apperr.Wrap(err, "select monitoring.alert_policies")
 		}
 
 		for rows.Next() {
@@ -800,7 +805,7 @@ func (m Policies) list(
 
 		rowsErr := rows.Err()
 		if rowsErr != nil {
-			return paging.Page[Policy]{}, rowsErr
+			return paging.Page[Policy]{}, apperr.Wrap(rowsErr, "select monitoring.alert_policies")
 		}
 	}
 
@@ -815,7 +820,10 @@ func (m Policies) list(
 		if f.CustomerID != nil {
 			org, _, found, err := m.Units.CustomerState(ctx, c, *f.CustomerID)
 			if err != nil {
-				return paging.Page[Policy]{}, err
+				return paging.Page[Policy]{}, apperr.Wrap(
+					err,
+					"monitoring.PolicyUnits.CustomerState",
+				)
 			}
 
 			if found {
@@ -831,7 +839,10 @@ func (m Policies) list(
 			if f.CustomerID != nil {
 				orgs, err := m.Units.OrgsOfUnits(ctx, c, p.UnitIDs)
 				if err != nil {
-					return paging.Page[Policy]{}, err
+					return paging.Page[Policy]{}, apperr.Wrap(
+						err,
+						"monitoring.PolicyUnits.OrgsOfUnits",
+					)
 				}
 
 				match := false
@@ -910,7 +921,7 @@ func (m Policies) automationPolicies(
 
 	rows, err := c.Tx.Query(ctx, q, args...)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select control.automation_policies")
 	}
 	defer rows.Close()
 
@@ -925,7 +936,7 @@ func (m Policies) automationPolicies(
 		out = append(out, p)
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select control.automation_policies")
 }
 
 // ---- policies.get ----
@@ -1311,7 +1322,7 @@ func (m Policies) saveDefault(ctx context.Context, c *ops.Call, in *SaveInput) (
 		rules,
 	)
 	if execErr != nil {
-		return p, execErr
+		return p, apperr.Wrap(execErr, "update monitoring.alert_policies")
 	}
 
 	return m.finishSave(ctx, c, p.ID, "PolicyChanged", c.ExpectedVersion)
@@ -1340,7 +1351,7 @@ func (m Policies) saveAlert(ctx context.Context, c *ops.Call, in *SaveInput) (Po
 
 	org, active, found, err := m.Units.CustomerState(ctx, c, *in.CustomerID)
 	if err != nil {
-		return Policy{}, err
+		return Policy{}, apperr.Wrap(err, "monitoring.PolicyUnits.CustomerState")
 	}
 
 	if !found {
@@ -1353,7 +1364,7 @@ func (m Policies) saveAlert(ctx context.Context, c *ops.Call, in *SaveInput) (Po
 
 	bad, err := m.Recipients.NonReaders(ctx, c, in.RecipientMembershipIDs, org)
 	if err != nil {
-		return Policy{}, err
+		return Policy{}, apperr.Wrap(err, "monitoring.Recipients.NonReaders")
 	}
 
 	if len(bad) > 0 {
@@ -1377,7 +1388,7 @@ func (m Policies) saveAlert(ctx context.Context, c *ops.Call, in *SaveInput) (Po
 			in.RecipientMembershipIDs, in.Channels, *in.EscalateAfterMinutes, *in.CooldownMinutes).
 			Scan(&id)
 		if err != nil {
-			return Policy{}, err
+			return Policy{}, apperr.Wrap(err, "insert monitoring.alert_policies")
 		}
 
 		return m.finishSave(ctx, c, id, "PolicyCreated", nil)
@@ -1418,7 +1429,7 @@ func (m Policies) saveAlert(ctx context.Context, c *ops.Call, in *SaveInput) (Po
 		*in.CooldownMinutes,
 	)
 	if execErr != nil {
-		return p, execErr
+		return p, apperr.Wrap(execErr, "update monitoring.alert_policies")
 	}
 
 	return m.finishSave(ctx, c, p.ID, "PolicyChanged", c.ExpectedVersion)
@@ -1485,7 +1496,7 @@ func (m Policies) saveAutomation(ctx context.Context, c *ops.Call, in *SaveInput
 	for _, u := range in.UnitIDs {
 		caps, found, err := m.Caps.UnitCaps(ctx, c, u)
 		if err != nil {
-			return Policy{}, err
+			return Policy{}, apperr.Wrap(err, "monitoring.UnitCaps.UnitCaps")
 		}
 
 		if !found {
@@ -1509,7 +1520,7 @@ func (m Policies) saveAutomation(ctx context.Context, c *ops.Call, in *SaveInput
 			[]byte(in.Condition), []byte(in.Action)).
 			Scan(&id)
 		if err != nil {
-			return Policy{}, err
+			return Policy{}, apperr.Wrap(err, "insert control.automation_policies")
 		}
 	} else {
 		p, err := m.load(ctx, c, *in.ID, true)
@@ -1539,7 +1550,7 @@ func (m Policies) saveAutomation(ctx context.Context, c *ops.Call, in *SaveInput
 			[]byte(in.Action),
 		)
 		if execErr != nil {
-			return p, execErr
+			return p, apperr.Wrap(execErr, "update control.automation_policies")
 		}
 
 		_, execErr = c.Tx.Exec(
@@ -1548,7 +1559,7 @@ func (m Policies) saveAutomation(ctx context.Context, c *ops.Call, in *SaveInput
 			p.ID,
 		)
 		if execErr != nil {
-			return p, execErr
+			return p, apperr.Wrap(execErr, "delete control.automation_policy_units")
 		}
 
 		id, prev = p.ID, c.ExpectedVersion
@@ -1563,7 +1574,7 @@ func (m Policies) saveAutomation(ctx context.Context, c *ops.Call, in *SaveInput
 			u,
 		)
 		if err != nil {
-			return Policy{}, err
+			return Policy{}, apperr.Wrap(err, "insert control.automation_policy_units")
 		}
 	}
 
@@ -1665,7 +1676,7 @@ func (m Policies) delete(ctx context.Context, c *ops.Call, in *PolicyIDInput) (D
 	case "alert":
 		err := m.Units.DetachPolicy(ctx, c, p.ID)
 		if err != nil {
-			return Deleted{}, err
+			return Deleted{}, apperr.Wrap(err, "monitoring.PolicyUnits.DetachPolicy")
 		}
 
 		_, err = c.Tx.Exec(
@@ -1674,7 +1685,7 @@ func (m Policies) delete(ctx context.Context, c *ops.Call, in *PolicyIDInput) (D
 			p.ID,
 		)
 		if err != nil {
-			return Deleted{}, err
+			return Deleted{}, apperr.Wrap(err, "delete monitoring.alert_policies")
 		}
 	case "automation":
 		_, err := c.Tx.Exec(
@@ -1683,7 +1694,7 @@ func (m Policies) delete(ctx context.Context, c *ops.Call, in *PolicyIDInput) (D
 			p.ID,
 		)
 		if err != nil {
-			return Deleted{}, err
+			return Deleted{}, apperr.Wrap(err, "delete control.automation_policies")
 		}
 	}
 
@@ -1814,7 +1825,7 @@ func (m Policies) setDefaultRule(
 	}
 
 	if err != nil {
-		return RuleSetting{}, err
+		return RuleSetting{}, apperr.Wrap(err, "select monitoring.alert_policies")
 	}
 
 	if kind != "default_alert" {
@@ -1823,7 +1834,7 @@ func (m Policies) setDefaultRule(
 
 	_, _, found, customerStateErr := m.Units.CustomerState(ctx, c, in.CustomerID)
 	if customerStateErr != nil {
-		return RuleSetting{}, customerStateErr
+		return RuleSetting{}, apperr.Wrap(customerStateErr, "monitoring.PolicyUnits.CustomerState")
 	} else if !found {
 		return RuleSetting{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
@@ -1835,7 +1846,7 @@ func (m Policies) setDefaultRule(
 		in.PolicyID, in.RuleKey, in.CustomerID).
 		Scan(&cur)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return RuleSetting{}, err
+		return RuleSetting{}, apperr.Wrap(err, "select monitoring.default_rule_settings")
 	}
 
 	if cur != *c.ExpectedVersion {
@@ -1856,7 +1867,7 @@ func (m Policies) setDefaultRule(
 		Scan(&s.ID, &s.TenantID, &s.Version, &s.CreatedAt, &s.UpdatedAt, &s.PolicyID, &s.RuleKey, &s.CustomerID, &s.Enabled,
 			&s.ChangedByMembershipID, &s.Reason)
 	if err != nil {
-		return s, err
+		return s, apperr.Wrap(err, "insert monitoring.default_rule_settings")
 	}
 
 	c.Emit(

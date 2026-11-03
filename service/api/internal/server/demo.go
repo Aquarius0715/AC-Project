@@ -137,7 +137,7 @@ func (d *demoOps) advance(ctx context.Context, c *ops.Call, in *AdvanceInput) (G
 
 	_, err = scheduler.Tick(ctx, d.m, in.To, d.reg)
 	if err != nil {
-		return Generation{}, err
+		return Generation{}, apperr.Wrap(err, "scheduler.Tick")
 	}
 
 	return Generation{Generation: 1}, nil
@@ -378,12 +378,12 @@ func (d *demoOps) inTenant(
 ) error {
 	rows, err := d.m.Writer.Query(ctx, `SELECT id FROM platform.tenants ORDER BY id`)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select platform.tenants")
 	}
 
 	tenants, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select platform.tenants")
 	}
 
 	for _, t := range tenants {
@@ -409,7 +409,7 @@ func (d *demoOps) inTenant(
 
 				err := tx.QueryRow(ctx, probe, id).Scan(&ok)
 				if err != nil || !ok {
-					return err
+					return apperr.Wrap(err, "queryrow (inTenant)")
 				}
 
 				found = true
@@ -420,14 +420,14 @@ func (d *demoOps) inTenant(
 					now.UTC().Format(time.RFC3339Nano),
 				)
 				if err != nil { // column defaults on the demo clock
-					return err
+					return apperr.Wrap(err, "select set_config")
 				}
 
 				return fn(tx, t)
 			},
 		)
 		if err != nil || found {
-			return err
+			return apperr.Wrap(err, "db.TxManager.Run")
 		}
 	}
 
@@ -486,7 +486,7 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 					in.OccurredAt,
 				)
 
-				return err
+				return apperr.Wrap(err, "update control.commands")
 			},
 		)
 	case "command_ack":
@@ -498,7 +498,7 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 			func(tx pgx.Tx, _ uuid.UUID) error {
 				_, err := control.Acknowledge(ctx, tx, *in.CommandID, in.OccurredAt)
 
-				return err
+				return apperr.Wrap(err, "control.Acknowledge")
 			},
 		)
 	case "command_fail":
@@ -517,7 +517,7 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 					in.OccurredAt,
 				)
 				if err != nil || tag.RowsAffected() == 0 {
-					return err
+					return apperr.Wrap(err, "update control.commands")
 				}
 
 				auditResultErr := control.AuditResult(
@@ -530,7 +530,7 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 					in.OccurredAt,
 				)
 				if auditResultErr != nil {
-					return auditResultErr
+					return apperr.Wrap(auditResultErr, "control.AuditResult")
 				}
 
 				return control.EndRestrictionCommands(
@@ -569,7 +569,7 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 					monitoring.Alerts{Units: nil, Access: nil, Devices: nil},
 				)
 
-				return err
+				return apperr.Wrap(err, "devices.RecordSignal")
 			},
 		)
 	case "operation": // IR67: the result of a running check / firmware operation
@@ -671,7 +671,7 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 						in.OccurredAt,
 					)
 					if err != nil {
-						return err
+						return apperr.Wrap(err, "update assets.units")
 					}
 				} else {
 					state, _ := json.Marshal(
@@ -693,7 +693,7 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 						in.OccurredAt,
 					)
 					if err != nil {
-						return err
+						return apperr.Wrap(err, "update assets.units")
 					}
 				}
 
@@ -704,7 +704,7 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 					in.OccurredAt,
 				)
 
-				return err
+				return apperr.Wrap(err, "update devices.devices")
 			},
 		)
 	}
@@ -729,7 +729,7 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 					c.Now,
 				)
 				if err != nil {
-					return err
+					return apperr.Wrap(err, "update assets.units")
 				}
 
 				raw, _ := json.Marshal(in.Observed) // "null" when the device enforces none
@@ -770,7 +770,7 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 				devices.devices d ON d.id = s.device_id WHERE s.id = $1`, r.SensorID).
 				Scan(&metric, &unit, &boundary, &bound)
 			if scanErr != nil {
-				return scanErr
+				return apperr.Wrap(scanErr, "select devices.sensors")
 			}
 
 			if metric != r.Metric || bound == nil || *bound != r.UnitID {
@@ -809,7 +809,7 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 					$1`, r.SensorID).
 					Scan(&seq)
 				if err != nil {
-					return err
+					return apperr.Wrap(err, "select monitoring.measurements")
 				}
 			}
 
@@ -819,7 +819,7 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 				Scan(&dup)
 			if scanErr != nil ||
 				dup {
-				return scanErr
+				return apperr.Wrap(scanErr, "select monitoring.measurements")
 			}
 
 			_, err := tx.Exec(
@@ -844,7 +844,7 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 				r.EventID,
 			)
 
-			return err
+			return apperr.Wrap(err, "insert monitoring.measurements")
 		},
 	)
 }

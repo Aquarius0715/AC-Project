@@ -16,6 +16,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // Notifier evaluates alert-policy notifications for automations.simulate / fire (SR21, SR25, SR28, SR12, IR155).
@@ -116,7 +117,7 @@ func policiesOf(ctx context.Context, c *ops.Call, unit, org uuid.UUID) ([]notifP
 		unit,
 	)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select monitoring.alert_policies")
 	}
 
 	var out []notifPolicy
@@ -142,7 +143,7 @@ func policiesOf(ctx context.Context, c *ops.Call, unit, org uuid.UUID) ([]notifP
 		if err != nil {
 			rows.Close()
 
-			return nil, err
+			return nil, apperr.Wrap(err, "select monitoring.alert_policies")
 		}
 
 		if p.isDefault {
@@ -172,7 +173,7 @@ func policiesOf(ctx context.Context, c *ops.Call, unit, org uuid.UUID) ([]notifP
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return nil, rowsErr
+		return nil, apperr.Wrap(rowsErr, "select monitoring.alert_policies")
 	}
 
 	for i := range out { // default rules switched off for this customer (owner-only settings, IR115)
@@ -188,7 +189,7 @@ func policiesOf(ctx context.Context, c *ops.Call, unit, org uuid.UUID) ([]notifP
 			org,
 		)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select monitoring.default_rule_settings")
 		}
 
 		switchedOff, err := pgx.CollectRows(
@@ -196,7 +197,7 @@ func policiesOf(ctx context.Context, c *ops.Call, unit, org uuid.UUID) ([]notifP
 			pgx.RowTo[string],
 		) // a failed read must not turn a switched-off rule back on
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select monitoring.default_rule_settings")
 		}
 
 		off := map[string]bool{}
@@ -362,7 +363,7 @@ func recoverAlert(
 		eventID,
 	)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "update monitoring.alerts")
 	}
 
 	var ids []uuid.UUID
@@ -374,7 +375,7 @@ func recoverAlert(
 		if err != nil {
 			rows.Close()
 
-			return err
+			return apperr.Wrap(err, "update monitoring.alerts")
 		}
 
 		ids = append(ids, id)
@@ -384,7 +385,7 @@ func recoverAlert(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return rowsErr
+		return apperr.Wrap(rowsErr, "update monitoring.alerts")
 	}
 
 	for _, id := range ids {
@@ -433,7 +434,7 @@ func (n Notifier) Evaluate(
 	err := c.Tx.QueryRow(ctx, `SELECT customer_org_id FROM assets.units WHERE id = $1`, unit).
 		Scan(&org)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select assets.units")
 	}
 
 	pols, err := policiesOf(ctx, c, unit, org)
@@ -541,7 +542,7 @@ func (n Notifier) Evaluate(
 				unit_id = $2`, p.id, unit).
 				Scan(&last)
 			if err != nil {
-				return nil, err
+				return nil, apperr.Wrap(err, "select monitoring.alert_notifications")
 			}
 
 			if last != nil && at.Sub(*last) < time.Duration(p.cooldown)*time.Minute {
@@ -567,7 +568,7 @@ func (n Notifier) Evaluate(
 				<> 'resolved')`, unit, p.id, key).
 				Scan(&told)
 			if err != nil {
-				return nil, err
+				return nil, apperr.Wrap(err, "select monitoring.alerts")
 			}
 
 			if told {
@@ -627,7 +628,7 @@ func (n Notifier) Evaluate(
 							Params:                map[string]any{"status": "open"},
 						})
 						if err != nil {
-							return nil, err
+							return nil, apperr.Wrap(err, "notify.Store.Create")
 						}
 
 						_, execErr := c.Tx.Exec(
@@ -642,7 +643,10 @@ func (n Notifier) Evaluate(
 							c.Now,
 						)
 						if execErr != nil {
-							return nil, execErr
+							return nil, apperr.Wrap(
+								execErr,
+								"insert monitoring.alert_notifications",
+							)
 						}
 
 						o.NotificationIDs = append(o.NotificationIDs, id)
@@ -701,7 +705,7 @@ func sourceAlert(
 	}
 
 	if !errors.Is(err, pgx.ErrNoRows) {
-		return id, err
+		return id, apperr.Wrap(err, "select monitoring.alerts")
 	}
 
 	err = c.Tx.QueryRow(ctx, `INSERT INTO monitoring.alerts (tenant_id, unit_id, customer_org_id, policy_id, rule_key,
@@ -723,7 +727,7 @@ func sourceAlert(
 			Scan(&id)
 	}
 
-	return id, err
+	return id, apperr.Wrap(err, "select monitoring.alerts")
 }
 
 // deliveryFailure appends one no_recipient DeliveryFailure per alert/event/policy (SR12; repeats add none).
@@ -738,7 +742,7 @@ func deliveryFailure(
 	scanErr := c.Tx.QueryRow(ctx, `SELECT delivery_failures FROM monitoring.alerts WHERE id = $1 FOR UPDATE`, alert).
 		Scan(&raw)
 	if scanErr != nil {
-		return uuid.Nil, scanErr
+		return uuid.Nil, apperr.Wrap(scanErr, "select monitoring.alerts")
 	}
 
 	var fs []map[string]any
@@ -773,5 +777,5 @@ func deliveryFailure(
 		at,
 	)
 
-	return id, err
+	return id, apperr.Wrap(err, "update monitoring.alerts")
 }

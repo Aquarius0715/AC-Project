@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
 )
 
@@ -38,7 +39,7 @@ func (m Restrictions) RequestRelease(
 		c.Now,
 	)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "update restrictions.restrictions")
 	}
 
 	c.Emit(
@@ -60,7 +61,7 @@ func (m Restrictions) evaluateRelease(ctx context.Context, c *ops.Call, id uuid.
 	err := c.Tx.QueryRow(ctx, `SELECT rules_version FROM restrictions.restrictions WHERE id = $1`, id).
 		Scan(&rules)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select restrictions.restrictions")
 	}
 
 	rows, err := c.Tx.Query(
@@ -70,7 +71,7 @@ func (m Restrictions) evaluateRelease(ctx context.Context, c *ops.Call, id uuid.
 		id,
 	)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select restrictions.restriction_units")
 	}
 
 	type pending struct {
@@ -87,7 +88,7 @@ func (m Restrictions) evaluateRelease(ctx context.Context, c *ops.Call, id uuid.
 		if err != nil {
 			rows.Close()
 
-			return err
+			return apperr.Wrap(err, "select restrictions.restriction_units")
 		}
 
 		units = append(units, p)
@@ -97,7 +98,7 @@ func (m Restrictions) evaluateRelease(ctx context.Context, c *ops.Call, id uuid.
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return rowsErr
+		return apperr.Wrap(rowsErr, "select restrictions.restriction_units")
 	}
 
 	remove, _ := json.Marshal(
@@ -111,7 +112,7 @@ func (m Restrictions) evaluateRelease(ctx context.Context, c *ops.Call, id uuid.
 				`UPDATE restrictions.restriction_units SET `+sql+` WHERE restriction_id = $1 AND unit_id = $2`,
 				append([]any{id, u.unit}, args...)...)
 
-			return err
+			return apperr.Wrap(err, "update restrictions.restriction_units")
 		}
 
 		switch u.apply {
@@ -128,7 +129,7 @@ func (m Restrictions) evaluateRelease(ctx context.Context, c *ops.Call, id uuid.
 				events.CommandsCancelled{RestrictionID: id, UnitID: &unit, CommandIDs: nil},
 			)
 			if publishErr != nil {
-				return publishErr
+				return apperr.Wrap(publishErr, "events.Publish")
 			}
 
 			_, execErr := c.Tx.Exec(
@@ -140,7 +141,7 @@ func (m Restrictions) evaluateRelease(ctx context.Context, c *ops.Call, id uuid.
 				c.Now,
 			)
 			if execErr != nil { // same rule as equipment
-				return execErr
+				return apperr.Wrap(execErr, "update restrictions.restriction_commands")
 			}
 
 			err = set(
@@ -182,7 +183,7 @@ func (m Restrictions) evaluateRelease(ctx context.Context, c *ops.Call, id uuid.
 					},
 				)
 				if publishErr != nil {
-					return publishErr
+					return apperr.Wrap(publishErr, "events.Publish")
 				}
 
 				_, execErr := c.Tx.Exec(
@@ -193,7 +194,7 @@ func (m Restrictions) evaluateRelease(ctx context.Context, c *ops.Call, id uuid.
 					c.Now,
 				)
 				if execErr != nil {
-					return execErr
+					return apperr.Wrap(execErr, "update restrictions.restriction_commands")
 				}
 
 				err = set(`pending_reason = $3`, reason)
@@ -220,7 +221,7 @@ func finishRelease(ctx context.Context, tx pgx.Tx, id uuid.UUID, now time.Time) 
 		now,
 	)
 
-	return err
+	return apperr.Wrap(err, "update restrictions.restrictions")
 }
 
 // CommandAcknowledged applies a timely acknowledgement of a restriction Command (control.Acknowledge): apply →
@@ -240,7 +241,7 @@ func CommandAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, at t
 	}
 
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select restrictions.restriction_commands")
 	}
 	// the restriction is locked before its unit changes: two answers for units of one restriction (or an answer beside
 	// HQ's reconcile) wait for each other, and the second judges "every unit applied" on the first one's result (IR477)
@@ -250,7 +251,7 @@ func CommandAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, at t
 		restriction,
 	)
 	if execErr != nil {
-		return execErr
+		return apperr.Wrap(execErr, "select restrictions.restrictions")
 	}
 
 	if kind == "remove_restriction" { // SR26: removes of terminal restrictions only resolve recovery cases
@@ -280,7 +281,7 @@ func CommandAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, at t
 			at,
 		)
 		if execErr != nil {
-			return execErr
+			return apperr.Wrap(execErr, "update restrictions.restriction_units")
 		}
 
 		var observed []byte
@@ -289,7 +290,7 @@ func CommandAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, at t
 			AND unit_id = $2`, restriction, unit).
 			Scan(&observed)
 		if scanErr != nil {
-			return scanErr
+			return apperr.Wrap(scanErr, "select restrictions.restriction_units")
 		}
 		// the unit's observedRestriction is owned by equipment (IR184)
 		publishErr := publish(
@@ -316,7 +317,7 @@ func CommandAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, at t
 			at,
 		)
 
-		return err
+		return apperr.Wrap(err, "update restrictions.restrictions")
 	}
 
 	_, execErr = tx.Exec(
@@ -329,7 +330,7 @@ func CommandAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, at t
 		at,
 	)
 	if execErr != nil {
-		return execErr
+		return apperr.Wrap(execErr, "update restrictions.restriction_units")
 	}
 
 	publishErr := publish(
@@ -356,7 +357,7 @@ func CommandAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, at t
 		at,
 	)
 
-	return err
+	return apperr.Wrap(err, "update restrictions.restrictions")
 }
 
 // CommandsEnded applies D03 to restriction Commands that expired or failed: a remove that did not succeed sets
@@ -380,7 +381,7 @@ func CommandsEnded(ctx context.Context, tx pgx.Tx, commands []uuid.UUID, now tim
 		now,
 	)
 	if execErr != nil {
-		return execErr
+		return apperr.Wrap(execErr, "update restrictions.restrictions")
 	}
 
 	_, execErr = tx.Exec(
@@ -391,7 +392,7 @@ func CommandsEnded(ctx context.Context, tx pgx.Tx, commands []uuid.UUID, now tim
 		commands,
 	)
 	if execErr != nil {
-		return execErr
+		return apperr.Wrap(execErr, "update restrictions.restriction_units")
 	}
 
 	_, err := tx.Exec(ctx, `UPDATE restrictions.restriction_units ru SET apply_state = 'not_applied'
@@ -399,5 +400,5 @@ func CommandsEnded(ctx context.Context, tx pgx.Tx, commands []uuid.UUID, now tim
 		'failed'
 		  AND ru.restriction_id = k.restriction_id AND ru.unit_id = k.unit_id AND ru.apply_state = 'sent_unknown'`, commands)
 
-	return err
+	return apperr.Wrap(err, "update restrictions.restriction_units")
 }

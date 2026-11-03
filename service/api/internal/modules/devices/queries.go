@@ -60,7 +60,7 @@ func connectionFault(
 	}
 
 	if err != nil {
-		return out, err
+		return out, apperr.Wrap(err, "select devices.devices")
 	}
 
 	scanErr := c.Tx.QueryRow(ctx, `SELECT COALESCE(max(sequence), 0) FROM devices.device_events WHERE device_id = $1 AND
@@ -68,7 +68,7 @@ func connectionFault(
 		AND axis = 'connection'`, in.DeviceID, out.BindingID).
 		Scan(&out.Sequence)
 	if scanErr != nil {
-		return out, scanErr
+		return out, apperr.Wrap(scanErr, "select devices.device_events")
 	}
 	// the newest fault of the axis, as RecordSignal's restored looks it up
 	var (
@@ -84,7 +84,7 @@ func connectionFault(
 	case errors.Is(err, pgx.ErrNoRows):
 		return out, nil
 	case err != nil:
-		return out, err
+		return out, apperr.Wrap(err, "select devices.device_events")
 	case restored == nil:
 		out.FaultID = &id
 	}

@@ -72,7 +72,7 @@ func scanBaseline(r pgx.Row) (Baseline, error) {
 		func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) },
 	)
 
-	return x, err
+	return x, apperr.Wrap(err, "scan (scanBaseline)")
 }
 
 // clientUnits restricts clients to baselines whose units all belong to their organization (IR90).
@@ -193,12 +193,12 @@ func listBaselines(
 		"b.created_at DESC, b.id DESC",
 	)
 	if err != nil {
-		return paging.Page[Baseline]{}, err
+		return paging.Page[Baseline]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[Baseline]{}, err
+		return paging.Page[Baseline]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	args := []any{}
@@ -259,7 +259,7 @@ func listBaselines(
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM energy.baselines b WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
-		return paging.Page[Baseline]{}, scanErr
+		return paging.Page[Baseline]{}, apperr.Wrap(scanErr, "select energy.baselines")
 	}
 
 	rows, err := c.Tx.Query(
@@ -274,7 +274,7 @@ func listBaselines(
 		),
 		args...)
 	if err != nil {
-		return paging.Page[Baseline]{}, err
+		return paging.Page[Baseline]{}, apperr.Wrap(err, "select energy.baselines")
 	}
 	defer rows.Close()
 
@@ -291,7 +291,7 @@ func listBaselines(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return paging.Page[Baseline]{}, rowsErr
+		return paging.Page[Baseline]{}, apperr.Wrap(rowsErr, "select energy.baselines")
 	}
 
 	return paging.Page[Baseline]{
@@ -423,7 +423,7 @@ func saveBaseline(ctx context.Context, c *ops.Call, in *BaselineInput) (Baseline
 	err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND NOT archived`, in.UnitIDs).
 		Scan(&known)
 	if err != nil {
-		return Baseline{}, err
+		return Baseline{}, apperr.Wrap(err, "select energy.ref_units")
 	}
 
 	if known != len(in.UnitIDs) {
@@ -473,7 +473,7 @@ func saveBaseline(ctx context.Context, c *ops.Call, in *BaselineInput) (Baseline
 		scanErr := c.Tx.QueryRow(ctx, `SELECT count(*) FROM platform.outbox`).
 			Scan(&q.SourceSnapshot.EventCursor)
 		if scanErr != nil {
-			return Baseline{}, scanErr
+			return Baseline{}, apperr.Wrap(scanErr, "select platform.outbox")
 		}
 
 		quality, _ = json.Marshal(q)
@@ -487,7 +487,7 @@ func saveBaseline(ctx context.Context, c *ops.Call, in *BaselineInput) (Baseline
 			id,
 		)
 		if err != nil {
-			return Baseline{}, err
+			return Baseline{}, apperr.Wrap(err, "update energy.baselines")
 		}
 	}
 
@@ -513,7 +513,7 @@ func saveBaseline(ctx context.Context, c *ops.Call, in *BaselineInput) (Baseline
 		c.Now,
 	)
 	if err != nil {
-		return Baseline{}, err
+		return Baseline{}, apperr.Wrap(err, "insert energy.baselines")
 	}
 
 	c.Audit(
@@ -539,7 +539,12 @@ func Register(r *ops.Registry) {
 	ops.Register(r, "energy.exportReport", exportReport)
 }
 
-func jsonUnmarshal(b []byte, v any) error { return json.Unmarshal(b, v) }
+func jsonUnmarshal(
+	b []byte,
+	v any,
+) error {
+	return apperr.Wrap(json.Unmarshal(b, v), "json.Unmarshal")
+}
 
 func decodeStrict(raw []byte, v any) error {
 	if len(raw) == 0 {
@@ -549,5 +554,5 @@ func decodeStrict(raw []byte, v any) error {
 	dec := json.NewDecoder(strings.NewReader(string(raw)))
 	dec.DisallowUnknownFields()
 
-	return dec.Decode(v)
+	return apperr.Wrap(dec.Decode(v), "json.Decoder.Decode")
 }

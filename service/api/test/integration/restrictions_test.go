@@ -14,6 +14,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/modules/control"
 	"github.com/pradita/ac-project/service/api/internal/modules/restrictions"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
@@ -172,7 +173,7 @@ func expireAt(t *testing.T, now time.Time) {
 		func(tx pgx.Tx) error {
 			_, err := control.ExpireCommands(ctx, tx, now)
 
-			return err
+			return apperr.Wrap(err, "control.ExpireCommands")
 		},
 	)
 	if beginFuncErr != nil {

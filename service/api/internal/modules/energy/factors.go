@@ -52,7 +52,7 @@ func scanFactor(r pgx.Row) (Factor, error) {
 	)
 	x.IsDemo = true
 
-	return x, err
+	return x, apperr.Wrap(err, "scan (scanFactor)")
 }
 
 // LoadFactor returns a factor version (current when version is nil).
@@ -132,12 +132,12 @@ func listFactors(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 		"f.year DESC, f.region ASC, f.id ASC",
 	)
 	if err != nil {
-		return paging.Page[Factor]{}, err
+		return paging.Page[Factor]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[Factor]{}, err
+		return paging.Page[Factor]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	args := []any{}
@@ -163,7 +163,7 @@ func listFactors(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM energy.emission_factors f WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
-		return paging.Page[Factor]{}, scanErr
+		return paging.Page[Factor]{}, apperr.Wrap(scanErr, "select energy.emission_factors")
 	}
 
 	rows, err := c.Tx.Query(
@@ -178,7 +178,7 @@ func listFactors(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 		),
 		args...)
 	if err != nil {
-		return paging.Page[Factor]{}, err
+		return paging.Page[Factor]{}, apperr.Wrap(err, "select energy.emission_factors")
 	}
 	defer rows.Close()
 
@@ -195,7 +195,7 @@ func listFactors(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return paging.Page[Factor]{}, rowsErr
+		return paging.Page[Factor]{}, apperr.Wrap(rowsErr, "select energy.emission_factors")
 	}
 
 	return paging.Page[Factor]{
@@ -291,7 +291,7 @@ func saveFactor(ctx context.Context, c *ops.Call, in *FactorInput) (Factor, erro
 		year = $2 AND id <> $3)`, in.Region, in.Year, id).
 		Scan(&taken)
 	if err != nil {
-		return Factor{}, err
+		return Factor{}, apperr.Wrap(err, "select energy.emission_factors")
 	}
 
 	if taken {
@@ -305,7 +305,7 @@ func saveFactor(ctx context.Context, c *ops.Call, in *FactorInput) (Factor, erro
 			id,
 		)
 		if err != nil {
-			return Factor{}, err
+			return Factor{}, apperr.Wrap(err, "update energy.emission_factors")
 		}
 	}
 
@@ -324,7 +324,7 @@ func saveFactor(ctx context.Context, c *ops.Call, in *FactorInput) (Factor, erro
 		c.Now,
 	)
 	if err != nil {
-		return Factor{}, err
+		return Factor{}, apperr.Wrap(err, "insert energy.emission_factors")
 	}
 
 	c.Audit(

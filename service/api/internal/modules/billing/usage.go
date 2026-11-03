@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // Usage reports whether a unit is covered by a contract, which blocks physical deletion (DD-A02). Equipment calls
@@ -38,7 +39,9 @@ type OrgInput struct {
 
 // UnitInUse implements assets.UnitUsage.
 func (Usage) UnitInUse(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, error) {
-	return ops.Delegate(ctx, c, QueryUnitInUse, UnitInput{UnitID: unit}, unitInUse)
+	out, err := ops.Delegate(ctx, c, QueryUnitInUse, UnitInput{UnitID: unit}, unitInUse)
+
+	return out, apperr.Wrap(err, "delegate billing.unitInUse")
 }
 
 // ActiveContracts returns, per unit, the IDs of current contracts whose term contains now (coverage, DD-A19).
@@ -47,17 +50,29 @@ func (Usage) ActiveContracts(
 	c *ops.Call,
 	units []uuid.UUID,
 ) (map[uuid.UUID][]uuid.UUID, error) {
-	return ops.Delegate(ctx, c, QueryActiveContracts, UnitsInput{UnitIDs: units}, activeContracts)
+	out, err := ops.Delegate(
+		ctx,
+		c,
+		QueryActiveContracts,
+		UnitsInput{UnitIDs: units},
+		activeContracts,
+	)
+
+	return out, apperr.Wrap(err, "delegate billing.activeContracts")
 }
 
 // UnitActive reports a current contract on the unit whose term has not ended (blocks units.archive, D05).
 func (Usage) UnitActive(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, error) {
-	return ops.Delegate(ctx, c, QueryUnitActive, UnitInput{UnitID: unit}, unitActive)
+	out, err := ops.Delegate(ctx, c, QueryUnitActive, UnitInput{UnitID: unit}, unitActive)
+
+	return out, apperr.Wrap(err, "delegate billing.unitActive")
 }
 
 // OrgActive reports an unexpired current contract of the customer organization.
 func (Usage) OrgActive(ctx context.Context, c *ops.Call, org uuid.UUID) (bool, error) {
-	return ops.Delegate(ctx, c, QueryOrgActive, OrgInput{OrgID: org}, orgActive)
+	out, err := ops.Delegate(ctx, c, QueryOrgActive, OrgInput{OrgID: org}, orgActive)
+
+	return out, apperr.Wrap(err, "delegate billing.orgActive")
 }
 
 func registerUsage(r *ops.Registry) {
@@ -73,7 +88,7 @@ func unitInUse(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
 	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM billing.contract_units WHERE unit_id = $1)`, in.UnitID).
 		Scan(&b)
 
-	return b, err
+	return b, apperr.Wrap(err, "select billing.contract_units")
 }
 
 func activeContracts(
@@ -87,7 +102,7 @@ func activeContracts(
 		JOIN billing.contracts k ON k.id = cu.contract_id AND k.version = cu.contract_version
 		WHERE k.is_current AND k.term @> $2::timestamptz AND cu.unit_id = ANY($1) ORDER BY k.id`, in.UnitIDs, c.Now)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select billing.contract_units")
 	}
 	defer rows.Close()
 
@@ -96,13 +111,13 @@ func activeContracts(
 
 		err := rows.Scan(&u, &k)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select billing.contract_units")
 		}
 
 		out[u] = append(out[u], k)
 	}
 
-	return out, rows.Err()
+	return out, apperr.Wrap(rows.Err(), "select billing.contract_units")
 }
 
 func unitActive(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
@@ -113,7 +128,7 @@ func unitActive(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
 		WHERE cu.unit_id = $1 AND k.is_current AND upper(k.term) > $2)`, in.UnitID, c.Now).
 		Scan(&b)
 
-	return b, err
+	return b, apperr.Wrap(err, "select billing.contract_units")
 }
 
 func orgActive(ctx context.Context, c *ops.Call, in *OrgInput) (bool, error) {
@@ -123,5 +138,5 @@ func orgActive(ctx context.Context, c *ops.Call, in *OrgInput) (bool, error) {
 		upper(term) > $2)`, in.OrgID, c.Now).
 		Scan(&b)
 
-	return b, err
+	return b, apperr.Wrap(err, "select billing.contracts")
 }

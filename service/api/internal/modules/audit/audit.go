@@ -138,12 +138,12 @@ func list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[View]
 		"a.occurred_at DESC, a.id DESC",
 	) // entries are immutable: created = updated = occurred
 	if err != nil {
-		return paging.Page[View]{}, err
+		return paging.Page[View]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
-		return paging.Page[View]{}, err
+		return paging.Page[View]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	args := []any{*f.From, *f.To}
@@ -171,7 +171,7 @@ func list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[View]
 	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM audit.audit_log a WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
-		return paging.Page[View]{}, scanErr
+		return paging.Page[View]{}, apperr.Wrap(scanErr, "select audit.audit_log")
 	}
 
 	rows, err := c.Tx.Query(
@@ -188,7 +188,7 @@ func list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[View]
 		),
 		args...)
 	if err != nil {
-		return paging.Page[View]{}, err
+		return paging.Page[View]{}, apperr.Wrap(err, "select audit.audit_log")
 	}
 	defer rows.Close()
 
@@ -219,7 +219,7 @@ func list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[View]
 			&x.Reason,
 		)
 		if err != nil {
-			return paging.Page[View]{}, err
+			return paging.Page[View]{}, apperr.Wrap(err, "select audit.audit_log")
 		}
 
 		x.Version, x.CreatedAt, x.UpdatedAt = 1, x.OccurredAt, x.OccurredAt
@@ -229,7 +229,7 @@ func list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[View]
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return paging.Page[View]{}, rowsErr
+		return paging.Page[View]{}, apperr.Wrap(rowsErr, "select audit.audit_log")
 	}
 
 	return paging.Page[View]{

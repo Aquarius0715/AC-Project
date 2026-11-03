@@ -522,7 +522,9 @@ func (b *Binding) Input(c *echo.Context, body []byte) ([]byte, error) {
 		return nil, apperr.Fields(fe)
 	}
 
-	return json.Marshal(obj)
+	out, err := json.Marshal(obj)
+
+	return out, apperr.Wrap(err, "json.Marshal")
 }
 
 // MountREST registers the REST routes of the operations this process serves on the /v1 group (IR222).

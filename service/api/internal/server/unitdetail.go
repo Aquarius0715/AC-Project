@@ -11,6 +11,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/maintenance"
 	"github.com/pradita/ac-project/service/api/internal/modules/restrictions"
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // unitDetails assembles the UnitDetail parts owned by Devices, Control, Restrictions and Maintenance (IR165); the
@@ -26,7 +27,7 @@ func (unitDetails) Detail(
 
 	cp, ok, err := devices.LoadCapability(ctx, c, u.ModelID, u.CapabilityVersion)
 	if err != nil {
-		return d, err
+		return d, apperr.Wrap(err, "devices.LoadCapability")
 	} else if ok {
 		d.Capabilities = cp
 	}
@@ -35,7 +36,7 @@ func (unitDetails) Detail(
 	r, err := restrictions.Busy{}.UnitRestriction(ctx, c, u.ID)
 	switch {
 	case err != nil:
-		return d, err
+		return d, apperr.Wrap(err, "restrictions.Busy.UnitRestriction")
 	case !r.Found:
 		d.EffectiveControlPolicy = map[string]any{"state": "unrestricted"}
 	default:
@@ -49,7 +50,7 @@ func (unitDetails) Detail(
 	// controlAvailability: blocked while any terminal-restriction recovery case of the unit is unresolved (SR26)
 	blocked, err := restrictions.Busy{}.UnitRecovering(ctx, c, u.ID)
 	if err != nil {
-		return d, err
+		return d, apperr.Wrap(err, "restrictions.Busy.UnitRecovering")
 	}
 
 	d.ControlAvailability = map[string]any{"state": "available"}
@@ -64,7 +65,7 @@ func (unitDetails) Detail(
 
 	cmds, err := control.PendingCommands(ctx, c, u.ID)
 	if err != nil {
-		return d, err
+		return d, apperr.Wrap(err, "control.PendingCommands")
 	}
 
 	d.PendingCommands, d.PendingCommandIDs = cmds, []uuid.UUID{}
@@ -82,7 +83,7 @@ func (unitDetails) Detail(
 		FROM assets.properties p WHERE p.id =
 		$1`, u.PropertyID, u.SpaceID).Scan(&d.Location.PathLabels, &d.Location.Address, &d.Location.AccessInstructions)
 	if scanErr != nil {
-		return d, scanErr
+		return d, apperr.Wrap(scanErr, "select assets.properties")
 	}
 
 	return d, nil

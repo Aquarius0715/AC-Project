@@ -11,6 +11,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // ---- warranty reminders (scheduler job) ----
@@ -43,7 +44,7 @@ func (m *Module) RemindWarranties(ctx context.Context, c *ops.Call) (int, error)
 		c.Now.Add(time.Duration(warrantyReminderDays[len(warrantyReminderDays)-1])*24*time.Hour),
 	)
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "select assets.units")
 	}
 
 	type due struct {
@@ -57,7 +58,7 @@ func (m *Module) RemindWarranties(ctx context.Context, c *ops.Call) (int, error)
 		return d, r.Scan(&d.id, &d.ends)
 	})
 	if err != nil || len(list) == 0 {
-		return 0, err
+		return 0, apperr.Wrap(err, "select assets.units")
 	}
 
 	ids := make([]uuid.UUID, len(list))
@@ -67,7 +68,7 @@ func (m *Module) RemindWarranties(ctx context.Context, c *ops.Call) (int, error)
 
 	contracts, err := m.Contracts.ActiveContracts(ctx, c, ids)
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "assets.ContractReader.ActiveContracts")
 	}
 
 	var recipients []uuid.UUID
@@ -93,7 +94,7 @@ func (m *Module) RemindWarranties(ctx context.Context, c *ops.Call) (int, error)
 			c.Now,
 		)
 		if err != nil {
-			return n, err
+			return n, apperr.Wrap(err, "insert assets.warranty_reminders")
 		}
 
 		if tag.RowsAffected() == 0 { // this reminder (or a later one) went already
@@ -113,7 +114,7 @@ func (m *Module) RemindWarranties(ctx context.Context, c *ops.Call) (int, error)
 				},
 			)
 			if err != nil {
-				return n, err
+				return n, apperr.Wrap(err, "identity.Members")
 			}
 		}
 
@@ -138,7 +139,7 @@ func (m *Module) RemindWarranties(ctx context.Context, c *ops.Call) (int, error)
 				SourceAlertID: nil,
 			})
 			if err != nil {
-				return n, err
+				return n, apperr.Wrap(err, "notify.Store.Create")
 			}
 		}
 
@@ -152,7 +153,7 @@ func (m *Module) RemindWarranties(ctx context.Context, c *ops.Call) (int, error)
 			len(recipients),
 		)
 		if execErr != nil {
-			return n, execErr
+			return n, apperr.Wrap(execErr, "update assets.warranty_reminders")
 		}
 
 		c.Audit(

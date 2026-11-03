@@ -104,7 +104,7 @@ func scanCert(r pgx.Row, now time.Time) (Certificate, error) {
 	)
 	x.Status = readStatus(x.Status, x.ExpiresAt, now)
 
-	return x, err
+	return x, apperr.Wrap(err, "scan (scanCert)")
 }
 
 func (m Certificates) lock(
@@ -134,7 +134,7 @@ func (m Certificates) lock(
 	scanErr := c.Tx.QueryRow(ctx, `SELECT status FROM maintenance.certificates WHERE id = $1`, id).
 		Scan(&stored)
 	if scanErr != nil {
-		return x, "", scanErr
+		return x, "", apperr.Wrap(scanErr, "select maintenance.certificates")
 	}
 
 	if x.Version != *c.ExpectedVersion {
@@ -244,7 +244,7 @@ func (m Certificates) submit(
 ) (Certificate, error) {
 	t, found, err := m.Delivery.Directory.Technician(ctx, c, in.MembershipID)
 	if err != nil {
-		return Certificate{}, err
+		return Certificate{}, apperr.Wrap(err, "maintenance.Directory.Technician")
 	}
 
 	if !found || !t.Active || t.OrgID != c.Principal.OrgID {
@@ -258,7 +258,7 @@ func (m Certificates) submit(
 			AND code = $3)`, *in.RenewalOf, in.MembershipID, in.Code).
 			Scan(&ok)
 		if err != nil {
-			return Certificate{}, err
+			return Certificate{}, apperr.Wrap(err, "select maintenance.certificates")
 		}
 
 		if !ok {
@@ -272,7 +272,7 @@ func (m Certificates) submit(
 
 	putErr := m.Blobs.Put(ctx, key, in.File.Mime, in.File.Bytes)
 	if putErr != nil {
-		return Certificate{}, putErr
+		return Certificate{}, apperr.Wrap(putErr, "blob.Store.Put")
 	}
 
 	name := strings.TrimSpace(in.File.Name)
@@ -297,7 +297,7 @@ func (m Certificates) submit(
 		c.Now,
 	)
 	if execErr != nil {
-		return Certificate{}, execErr
+		return Certificate{}, apperr.Wrap(execErr, "insert maintenance.certificates")
 	}
 
 	x, err := m.reload(ctx, c, id)
@@ -414,7 +414,7 @@ func (m Certificates) verify(
 			c.Now,
 		)
 		if err != nil {
-			return x, err
+			return x, apperr.Wrap(err, "update maintenance.certificates")
 		}
 
 		if x.Code != "other" {
@@ -427,7 +427,7 @@ func (m Certificates) verify(
 				x.ExpiresAt,
 			)
 			if err != nil {
-				return x, err
+				return x, apperr.Wrap(err, "maintenance.Grants.SetGrant")
 			}
 
 			err = releaseQualificationEnded(
@@ -455,7 +455,7 @@ func (m Certificates) verify(
 			c.Now,
 		)
 		if err != nil {
-			return x, err
+			return x, apperr.Wrap(err, "update maintenance.certificates")
 		}
 	}
 
@@ -552,7 +552,7 @@ func (m Certificates) requestTraining(
 		in.Note,
 	)
 	if execErr != nil {
-		return x, execErr
+		return x, apperr.Wrap(execErr, "update maintenance.certificates")
 	}
 
 	x, err = m.reload(ctx, c, x.ID)
@@ -662,7 +662,7 @@ func (m Certificates) content(
 	}
 
 	if err != nil {
-		return DocumentOut{}, err
+		return DocumentOut{}, apperr.Wrap(err, "select maintenance.certificates")
 	}
 
 	if key == nil || *key == "" {
@@ -681,7 +681,7 @@ func (m Certificates) content(
 	if errors.Is(err, blob.ErrNotFound) {
 		return out, apperr.E(apperr.NotFound, "error.notFound")
 	} else if err != nil {
-		return out, err
+		return out, apperr.Wrap(err, "blob.Store.Get")
 	}
 
 	out.Mime, out.Size = documentMime(out.Bytes), len(out.Bytes)
@@ -789,7 +789,7 @@ func (m Certificates) list(
 		)+" ORDER BY expires_at, id",
 		args...)
 	if err != nil {
-		return paging.Page[Certificate]{}, err
+		return paging.Page[Certificate]{}, apperr.Wrap(err, "select maintenance.certificates")
 	}
 
 	all := []Certificate{}
@@ -811,7 +811,7 @@ func (m Certificates) list(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return paging.Page[Certificate]{}, rowsErr
+		return paging.Page[Certificate]{}, apperr.Wrap(rowsErr, "select maintenance.certificates")
 	}
 
 	sortSliceErr := paging.SortSlice(all, in.Sort, map[string]func(a, b Certificate) int{
@@ -820,7 +820,7 @@ func (m Certificates) list(
 		"status":    func(a, b Certificate) int { return strings.Compare(a.Status, b.Status) },
 	})
 	if sortSliceErr != nil {
-		return paging.Page[Certificate]{}, sortSliceErr
+		return paging.Page[Certificate]{}, apperr.Wrap(sortSliceErr, "paging.SortSlice")
 	}
 
 	return pageOf(all, *in, f, c.Principal.ScopeVersion)
@@ -897,7 +897,7 @@ func (m Certificates) parts(
 		q+" ORDER BY lower(name), code",
 		args...) // name asc, id asc (query catalog)
 	if err != nil {
-		return paging.Page[PartItem]{}, err
+		return paging.Page[PartItem]{}, apperr.Wrap(err, "select maintenance.parts_catalog")
 	}
 
 	all := []PartItem{}
@@ -909,7 +909,7 @@ func (m Certificates) parts(
 		if err != nil {
 			rows.Close()
 
-			return paging.Page[PartItem]{}, err
+			return paging.Page[PartItem]{}, apperr.Wrap(err, "select maintenance.parts_catalog")
 		}
 
 		all = append(all, p)
@@ -919,7 +919,7 @@ func (m Certificates) parts(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return paging.Page[PartItem]{}, rowsErr
+		return paging.Page[PartItem]{}, apperr.Wrap(rowsErr, "select maintenance.parts_catalog")
 	}
 
 	sortSliceErr := paging.SortSlice(all, in.Sort, map[string]func(a, b PartItem) int{
@@ -927,7 +927,7 @@ func (m Certificates) parts(
 		"name": func(a, b PartItem) int { return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)) },
 	})
 	if sortSliceErr != nil {
-		return paging.Page[PartItem]{}, sortSliceErr
+		return paging.Page[PartItem]{}, apperr.Wrap(sortSliceErr, "paging.SortSlice")
 	}
 
 	return pageOf(all, *in, f, c.Principal.ScopeVersion)
@@ -970,7 +970,7 @@ func (m Certificates) Remind(ctx context.Context, c *ops.Call) (int, error) {
 		c.Now.Add(time.Duration(reminderDays[len(reminderDays)-1])*24*time.Hour),
 	)
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "select maintenance.certificates")
 	}
 
 	type due struct {
@@ -984,7 +984,7 @@ func (m Certificates) Remind(ctx context.Context, c *ops.Call) (int, error) {
 		return d, r.Scan(&d.id, &d.org, &d.expires)
 	})
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "select maintenance.certificates")
 	}
 
 	n := 0
@@ -1003,7 +1003,7 @@ func (m Certificates) Remind(ctx context.Context, c *ops.Call) (int, error) {
 			c.Now,
 		)
 		if err != nil {
-			return n, err
+			return n, apperr.Wrap(err, "insert maintenance.certificate_reminders")
 		}
 
 		if tag.RowsAffected() == 0 { // this reminder (or a later one) went already
@@ -1020,7 +1020,7 @@ func (m Certificates) Remind(ctx context.Context, c *ops.Call) (int, error) {
 			},
 		)
 		if err != nil {
-			return n, err
+			return n, apperr.Wrap(err, "identity.Members")
 		}
 
 		severity := "normal"
@@ -1044,7 +1044,7 @@ func (m Certificates) Remind(ctx context.Context, c *ops.Call) (int, error) {
 				SourceAlertID: nil,
 			})
 			if err != nil {
-				return n, err
+				return n, apperr.Wrap(err, "notify.Store.Create")
 			}
 		}
 
@@ -1056,7 +1056,7 @@ func (m Certificates) Remind(ctx context.Context, c *ops.Call) (int, error) {
 			len(recipients),
 		)
 		if execErr != nil {
-			return n, execErr
+			return n, apperr.Wrap(execErr, "update maintenance.certificate_reminders")
 		}
 
 		c.Audit(

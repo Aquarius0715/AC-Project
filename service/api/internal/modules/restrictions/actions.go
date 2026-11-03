@@ -147,7 +147,7 @@ func (m Restrictions) except(
 		`UPDATE restrictions.restrictions SET `+set+`, version = version + 1 WHERE id = $1`,
 		args...)
 	if execErr != nil {
-		return x, execErr
+		return x, apperr.Wrap(execErr, "update restrictions.restrictions")
 	}
 
 	next := x.Version + 1
@@ -516,7 +516,7 @@ func (m Restrictions) reconcile(ctx context.Context, c *ops.Call, in *ReconcileI
 			AND unit_id = $2 AND status = 'requested')`, x.ID, u.UnitID).
 			Scan(&open)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select restrictions.restriction_commands")
 		}
 
 		if open {
@@ -525,7 +525,7 @@ func (m Restrictions) reconcile(ctx context.Context, c *ops.Call, in *ReconcileI
 
 		_, conn, power, bound, err := m.Devices.BoundDevice(ctx, c, u.UnitID)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "restrictions.Devices.BoundDevice")
 		}
 
 		if !bound || conn != "online" || power == "off" {
@@ -534,7 +534,7 @@ func (m Restrictions) reconcile(ctx context.Context, c *ops.Call, in *ReconcileI
 
 		raw, at, err := m.Units.Observation(ctx, c, u.UnitID) // equipment's observation (IR194)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "restrictions.Units.Observation")
 		}
 
 		if at == nil || c.Now.Sub(*at) > IntentTTL {
@@ -555,7 +555,7 @@ func (m Restrictions) reconcile(ctx context.Context, c *ops.Call, in *ReconcileI
 					`= $1 AND unit_id = $2`,
 				append([]any{x.ID, u.UnitID, c.Now}, args...)...)
 
-			return err
+			return apperr.Wrap(err, "update restrictions.restriction_units")
 		}
 
 		switch {
@@ -610,7 +610,7 @@ func (m Restrictions) reconcile(ctx context.Context, c *ops.Call, in *ReconcileI
 		c.Now,
 	)
 	if execErr != nil {
-		return nil, execErr
+		return nil, apperr.Wrap(execErr, "update restrictions.restrictions")
 	}
 
 	finishReleaseErr := finishRelease(ctx, c.Tx, x.ID, c.Now)
@@ -763,7 +763,7 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, in *RetryInput) (a
 			AND unit_id = $2 AND status = 'requested')`, x.ID, u.UnitID).
 			Scan(&open)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(err, "select restrictions.restriction_commands")
 		}
 
 		if in.Phase == "apply" {
@@ -798,7 +798,7 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, in *RetryInput) (a
 				reason,
 			)
 			if execErr != nil {
-				return nil, execErr
+				return nil, apperr.Wrap(execErr, "update restrictions.restriction_units")
 			}
 
 			changed = true
@@ -836,7 +836,7 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, in *RetryInput) (a
 			cmd,
 		)
 		if execErr != nil {
-			return nil, execErr
+			return nil, apperr.Wrap(execErr, "update restrictions.restriction_units")
 		}
 
 		changed = true
@@ -853,7 +853,7 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, in *RetryInput) (a
 		c.Now,
 	)
 	if execErr != nil {
-		return nil, execErr
+		return nil, apperr.Wrap(execErr, "update restrictions.restrictions")
 	}
 
 	next := x.Version + 1

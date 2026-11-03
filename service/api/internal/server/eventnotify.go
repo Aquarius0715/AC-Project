@@ -11,6 +11,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // notifyingRecorder creates the IR95 business-event notifications from the committed transitions of a write before
@@ -29,7 +30,7 @@ func (r notifyingRecorder) Record(ctx context.Context, tx pgx.Tx, c *ops.Call, o
 		}
 	}
 
-	return r.inner.Record(ctx, tx, c, op)
+	return apperr.Wrap(r.inner.Record(ctx, tx, c, op), "ops.Recorder.Record")
 }
 
 // RecordDenied passes a refused write's audit entry to the inner recorder (ops.DeniedRecorder, IR603); a refusal
@@ -42,7 +43,7 @@ func (r notifyingRecorder) RecordDenied(
 	d ops.Denial,
 ) error {
 	if dr, ok := r.inner.(ops.DeniedRecorder); ok {
-		return dr.RecordDenied(ctx, tx, c, op, d)
+		return apperr.Wrap(dr.RecordDenied(ctx, tx, c, op, d), "ops.DeniedRecorder.RecordDenied")
 	}
 
 	return nil
@@ -131,12 +132,12 @@ func (r notifyingRecorder) technician(
 		WHERE a.job_id = $2 AND (a.status = 'active' OR (a.status IN ('revoked', 'completed') AND a.updated_at =
 		$1))`, c.Now, job)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "select maintenance.assignments")
 	}
 
 	ids, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 	if err != nil || len(ids) == 0 {
-		return nil, err
+		return nil, apperr.Wrap(err, "select maintenance.assignments")
 	}
 
 	return members(
@@ -179,7 +180,7 @@ func (r notifyingRecorder) send(
 			SourceAlertID: nil,
 		})
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "notify.Store.Create")
 		}
 	}
 
@@ -226,7 +227,7 @@ func (r notifyingRecorder) dispatch(ctx context.Context, c *ops.Call, op string)
 					id DESC LIMIT 1`, id).
 					Scan(&id)
 				if err != nil {
-					return err
+					return apperr.Wrap(err, "select maintenance.jobs")
 				}
 			}
 
@@ -259,7 +260,7 @@ func (r notifyingRecorder) dispatch(ctx context.Context, c *ops.Call, op string)
 			JOIN billing.contracts k ON k.id = i.contract_id AND k.version = i.contract_version WHERE p.id = $1`, e.AggregateID).
 			Scan(&org, &invoice)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "select billing.payments")
 		}
 
 		set := &recipientSet{ids: nil}
@@ -398,7 +399,7 @@ func (r notifyingRecorder) restriction(ctx context.Context, c *ops.Call, id uuid
 		JOIN billing.contracts k ON k.id = r.contract_id AND k.version = r.contract_version WHERE r.id = $1`, id).
 		Scan(&state, &org)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select restrictions.restrictions")
 	}
 
 	set := &recipientSet{ids: nil}

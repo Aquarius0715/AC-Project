@@ -173,7 +173,9 @@ func (a *Authenticator) principal(
 	signedIn time.Time,
 ) (*ops.Principal, error) {
 	if a.Source != nil {
-		return a.Source.Principal(ctx, subject, tenant, membership, signedIn)
+		out, err := a.Source.Principal(ctx, subject, tenant, membership, signedIn)
+
+		return out, apperr.Wrap(err, "auth.PrincipalSource.Principal")
 	}
 
 	return a.Principal(ctx, subject, tenant, membership, signedIn)
@@ -218,7 +220,7 @@ func (a *Authenticator) RecordSignIn(ctx context.Context, p *ops.Principal, sign
 			a.now(),
 		)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "update identity.users")
 		}
 		// an account HQ, a contractor or a customer owner added is listed as invited until its first sign-in (IR461)
 		for _, q := range []string{
@@ -229,7 +231,7 @@ func (a *Authenticator) RecordSignIn(ctx context.Context, p *ops.Principal, sign
 		} {
 			_, err := tx.Exec(ctx, q, p.MembershipID, a.now())
 			if err != nil {
-				return err
+				return apperr.Wrap(err, "exec (RecordSignIn)")
 			}
 		}
 
@@ -281,7 +283,7 @@ func (a *Authenticator) Load(
 			Scan(&p.UserID, &p.OrgID, &p.Role, &clientRole, &employment, &p.ScopeVersion, &validFrom, &validUntil,
 				&p.SessionsRevokedAt, &status, &timezone)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "select identity.memberships")
 		}
 
 		if status != "active" || now.Before(validFrom) ||
@@ -310,7 +312,7 @@ func (a *Authenticator) Load(
 			membership,
 		)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "select identity.membership_permissions")
 		}
 
 		p.Permissions = map[string]bool{}
@@ -320,7 +322,7 @@ func (a *Authenticator) Load(
 
 			err := rows.Scan(&perm)
 			if err != nil {
-				return err
+				return apperr.Wrap(err, "select identity.membership_permissions")
 			}
 
 			p.Permissions[perm] = true
@@ -328,7 +330,7 @@ func (a *Authenticator) Load(
 
 		rowsErr := rows.Err()
 		if rowsErr != nil {
-			return rowsErr
+			return apperr.Wrap(rowsErr, "select identity.membership_permissions")
 		}
 
 		scopes, err := tx.Query(
@@ -337,7 +339,7 @@ func (a *Authenticator) Load(
 			membership,
 		)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "select identity.membership_scopes")
 		}
 
 		p.Scopes = map[string][]uuid.UUID{}
@@ -350,7 +352,7 @@ func (a *Authenticator) Load(
 
 			err := scopes.Scan(&kind, &ref)
 			if err != nil {
-				return err
+				return apperr.Wrap(err, "select identity.membership_scopes")
 			}
 
 			p.Scopes[kind] = append(p.Scopes[kind], ref)
@@ -359,7 +361,7 @@ func (a *Authenticator) Load(
 		return scopes.Err()
 	})
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "ops.Runner.Run")
 	}
 
 	return p, nil

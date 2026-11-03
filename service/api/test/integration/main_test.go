@@ -11,6 +11,8 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // TestMain runs the suite, then checks that every job event action the suite wrote has a title in the web's job history
@@ -34,7 +36,7 @@ func TestMain(m *testing.M) {
 func webTitles() (map[string]bool, error) {
 	src, err := os.ReadFile("../../../web/shared/lib/partnerOverview.ts")
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(err, "os.ReadFile")
 	}
 
 	s := string(src)
@@ -71,12 +73,12 @@ func checkJobEventTitles() error {
 
 	rows, err := conn.Query(ctx, `SELECT DISTINCT action FROM maintenance.job_events`)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select maintenance.job_events")
 	}
 
 	actions, err := pgx.CollectRows(rows, pgx.RowTo[string])
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select maintenance.job_events")
 	}
 
 	var missing []string

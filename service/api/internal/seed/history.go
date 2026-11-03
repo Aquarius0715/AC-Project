@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/devicesim"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // ApplyFleetHistory gives the mock fleet days of past readings ending at until, so the charts have a long series:
@@ -46,7 +47,7 @@ func ApplyFleetHistory(
 		`SET LOCAL session_replication_role = replica`,
 	)
 	if err != nil { // no capture events for history
-		return 0, err
+		return 0, apperr.Wrap(err, "exec (ApplyFleetHistory)")
 	}
 
 	end := until.UTC().Truncate(time.Minute)
@@ -223,7 +224,7 @@ func ApplyFleetHistory(
 			last,
 		)
 		if execErr != nil {
-			return total, execErr
+			return total, apperr.Wrap(execErr, "update devices.devices")
 		}
 
 		_, execErr = tx.Exec(
@@ -233,7 +234,7 @@ func ApplyFleetHistory(
 			last,
 		)
 		if execErr != nil {
-			return total, execErr
+			return total, apperr.Wrap(execErr, "update assets.units")
 		}
 	}
 

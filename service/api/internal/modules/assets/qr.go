@@ -103,7 +103,7 @@ func resolveQr(
 			IS NOT NULL`, in.Code).
 			Scan(&unit)
 		if scanErr != nil && !errors.Is(scanErr, pgx.ErrNoRows) {
-			return QrResolution{}, scanErr
+			return QrResolution{}, apperr.Wrap(scanErr, "select devices.devices")
 		}
 	}
 
@@ -114,7 +114,7 @@ func resolveQr(
 
 	assigned, job, err := a.QrAssignment(ctx, c, unit)
 	if err != nil {
-		return QrResolution{}, err
+		return QrResolution{}, apperr.Wrap(err, "assets.QrAssignments.QrAssignment")
 	}
 
 	if !assigned {

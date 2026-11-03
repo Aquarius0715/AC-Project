@@ -47,7 +47,7 @@ func (m Proposals) pending(ctx context.Context, c *ops.Call, job uuid.UUID) (boo
 		'pending')`, job).
 		Scan(&b)
 
-	return b, err
+	return b, apperr.Wrap(err, "select maintenance.slot_proposals")
 }
 
 func (m Proposals) finish(
@@ -62,7 +62,7 @@ func (m Proposals) finish(
 		job,
 	)
 	if err != nil {
-		return Job{}, err
+		return Job{}, apperr.Wrap(err, "update maintenance.jobs")
 	}
 
 	err = m.jobs().event(ctx, c, job, action, nil)
@@ -102,7 +102,7 @@ func (m Proposals) checkHold(
 
 		kind, status, found, err := d.Directory.OrgState(ctx, c, *h.ContractorOrgID)
 		if err != nil {
-			return err
+			return apperr.Wrap(err, "maintenance.Directory.OrgState")
 		}
 
 		if !found || kind != "contractor" || status != "active" {
@@ -115,7 +115,7 @@ func (m Proposals) checkHold(
 			status = 'suspended')`, *h.ContractorOrgID).
 			Scan(&suspended)
 		if scanErr != nil {
-			return scanErr
+			return apperr.Wrap(scanErr, "select maintenance.contractors")
 		}
 
 		if suspended {
@@ -225,7 +225,7 @@ func (m Proposals) proposeSlotJob(ctx context.Context, c *ops.Call, in *ProposeI
 			WHERE o.job_id = $1 AND p.status <> 'withdrawn'`, in.JobID).
 			Scan(&n)
 		if err != nil {
-			return Job{}, err
+			return Job{}, apperr.Wrap(err, "select maintenance.partner_slot_proposals")
 		}
 
 		allowed = n > 0
@@ -237,7 +237,7 @@ func (m Proposals) proposeSlotJob(ctx context.Context, c *ops.Call, in *ProposeI
 			Scan(&ack)
 		if err != nil &&
 			!errors.Is(err, pgx.ErrNoRows) {
-			return Job{}, err
+			return Job{}, apperr.Wrap(err, "select maintenance.assignments")
 		}
 
 		allowed = ack == "cant_make"
@@ -317,7 +317,7 @@ func (m Proposals) insertProposal(
 		c.Now,
 	)
 
-	return err
+	return apperr.Wrap(err, "insert maintenance.slot_proposals")
 }
 
 // ---- jobs.withdrawProposal / jobs.withdrawPartnerSlot ----
@@ -399,7 +399,7 @@ func (m Proposals) withdrawProposalJob(
 	}
 
 	if err != nil {
-		return Job{}, err
+		return Job{}, apperr.Wrap(err, "select maintenance.slot_proposals")
 	}
 
 	if status != "pending" {
@@ -413,7 +413,7 @@ func (m Proposals) withdrawProposalJob(
 		c.Now,
 	)
 	if execErr != nil {
-		return Job{}, execErr
+		return Job{}, apperr.Wrap(execErr, "update maintenance.slot_proposals")
 	}
 	// the contractor's time change HQ had sent on: HQ keeps the agreed time, and the contractor may accept or propose
 	// again (IR443)
@@ -424,7 +424,7 @@ func (m Proposals) withdrawProposalJob(
 		in.JobID,
 	)
 	if execErr != nil {
-		return Job{}, execErr
+		return Job{}, apperr.Wrap(execErr, "update maintenance.partner_slot_proposals")
 	}
 
 	return m.finish(
@@ -539,7 +539,7 @@ func (m Proposals) respondJob(ctx context.Context, c *ops.Call, in *RespondInput
 	scanErr := c.Tx.QueryRow(ctx, `SELECT customer_org_id FROM maintenance.jobs WHERE id = $1`, in.JobID).
 		Scan(&org)
 	if scanErr != nil {
-		return Job{}, scanErr
+		return Job{}, apperr.Wrap(scanErr, "select maintenance.jobs")
 	}
 
 	if org != c.Principal.OrgID {
@@ -566,7 +566,7 @@ func (m Proposals) respondJob(ctx context.Context, c *ops.Call, in *RespondInput
 	}
 
 	if err != nil {
-		return Job{}, err
+		return Job{}, apperr.Wrap(err, "select maintenance.slot_proposals")
 	}
 
 	if status != "pending" {
@@ -577,7 +577,7 @@ func (m Proposals) respondJob(ctx context.Context, c *ops.Call, in *RespondInput
 
 	unmarshalErr := json.Unmarshal(holdRaw, &hold)
 	if unmarshalErr != nil {
-		return Job{}, unmarshalErr
+		return Job{}, apperr.Wrap(unmarshalErr, "json.Unmarshal")
 	}
 
 	if in.Decision == "decline" {
@@ -595,7 +595,7 @@ func (m Proposals) respondJob(ctx context.Context, c *ops.Call, in *RespondInput
 			in.Comment,
 		)
 		if err != nil {
-			return Job{}, err
+			return Job{}, apperr.Wrap(err, "update maintenance.slot_proposals")
 		}
 
 		if len(in.PreferredSlots) == 3 {
@@ -608,7 +608,7 @@ func (m Proposals) respondJob(ctx context.Context, c *ops.Call, in *RespondInput
 				raw,
 			)
 			if err != nil {
-				return Job{}, err
+				return Job{}, apperr.Wrap(err, "update maintenance.jobs")
 			}
 		}
 
@@ -619,7 +619,7 @@ func (m Proposals) respondJob(ctx context.Context, c *ops.Call, in *RespondInput
 			in.JobID,
 		)
 		if err != nil {
-			return Job{}, err
+			return Job{}, apperr.Wrap(err, "update maintenance.partner_slot_proposals")
 		}
 
 		return m.finish(
@@ -654,7 +654,7 @@ func (m Proposals) respondJob(ctx context.Context, c *ops.Call, in *RespondInput
 		c.Now,
 	)
 	if execErr != nil {
-		return Job{}, execErr
+		return Job{}, apperr.Wrap(execErr, "update maintenance.slot_proposals")
 	}
 
 	applyAcceptedErr := m.applyAccepted(ctx, c, in.JobID, r, hold, slot)
@@ -710,7 +710,7 @@ func (m Proposals) applyAccepted(
 			Scan(&terms)
 		if scanErr != nil &&
 			!errors.Is(scanErr, pgx.ErrNoRows) {
-			return scanErr
+			return apperr.Wrap(scanErr, "select maintenance.offers")
 		}
 
 		_, execErr := c.Tx.Exec(
@@ -729,7 +729,7 @@ func (m Proposals) applyAccepted(
 			slot.EndAt.Add(24*time.Hour),
 		)
 		if execErr != nil {
-			return execErr
+			return apperr.Wrap(execErr, "insert maintenance.offers")
 		}
 
 		_, err := c.Tx.Exec(
@@ -739,9 +739,9 @@ func (m Proposals) applyAccepted(
 			*h.ContractorOrgID,
 		)
 
-		return err
+		return apperr.Wrap(err, "update maintenance.jobs")
 	case err != nil:
-		return err
+		return apperr.Wrap(err, "select maintenance.offers")
 	}
 	// the access window follows the moved visit (IR454): it still has to cover it, as jobs.offer requires, and reaches
 	// slot end + 24 h like an offer the acceptance creates; it is never shortened
@@ -756,7 +756,7 @@ func (m Proposals) applyAccepted(
 		slot.EndAt.Add(24*time.Hour),
 	)
 	if execErr != nil {
-		return execErr
+		return apperr.Wrap(execErr, "update maintenance.offers")
 	}
 	// a contractor history frozen at an earlier end is frozen again at the widened one (IR458)
 	_, execErr = c.Tx.Exec(
@@ -766,7 +766,7 @@ func (m Proposals) applyAccepted(
 		*h.ContractorOrgID,
 	)
 	if execErr != nil {
-		return execErr
+		return apperr.Wrap(execErr, "delete maintenance.job_history_snapshots")
 	}
 
 	_, execErr = c.Tx.Exec(
@@ -776,7 +776,7 @@ func (m Proposals) applyAccepted(
 		offer,
 	)
 	if execErr != nil {
-		return execErr
+		return apperr.Wrap(execErr, "update maintenance.partner_slot_proposals")
 	}
 
 	if decision != nil { // accepted Offer: the contractor assigns again for the new visit slot
@@ -788,7 +788,7 @@ func (m Proposals) applyAccepted(
 			job,
 		)
 		if execErr != nil {
-			return execErr
+			return apperr.Wrap(execErr, "update maintenance.assignments")
 		}
 
 		_, err := c.Tx.Exec(
@@ -797,7 +797,7 @@ func (m Proposals) applyAccepted(
 			job,
 		)
 
-		return err
+		return apperr.Wrap(err, "update maintenance.jobs")
 	}
 
 	return nil
@@ -888,7 +888,7 @@ func (m Proposals) requestRescheduleJob(
 	scanErr := c.Tx.QueryRow(ctx, `SELECT customer_org_id, origin FROM maintenance.jobs WHERE id = $1`, in.JobID).
 		Scan(&org, &origin)
 	if scanErr != nil {
-		return Job{}, scanErr
+		return Job{}, apperr.Wrap(scanErr, "select maintenance.jobs")
 	}
 
 	if org != c.Principal.OrgID {
@@ -940,7 +940,7 @@ func (m Proposals) requestRescheduleJob(
 	} {
 		_, err := c.Tx.Exec(ctx, q, in.JobID, c.Principal.UserID, c.Now)
 		if err != nil {
-			return Job{}, err
+			return Job{}, apperr.Wrap(err, "exec (requestRescheduleJob)")
 		}
 	}
 
@@ -955,7 +955,7 @@ func (m Proposals) requestRescheduleJob(
 		raw,
 	)
 	if execErr != nil {
-		return Job{}, execErr
+		return Job{}, apperr.Wrap(execErr, "update maintenance.jobs")
 	}
 
 	return m.finish(
@@ -1049,7 +1049,7 @@ func (m Proposals) proposePartnerJob(
 	}
 
 	if err != nil {
-		return Job{}, err
+		return Job{}, apperr.Wrap(err, "select maintenance.offers")
 	}
 
 	r, err := m.Delivery.lock(ctx, c, in.JobID)
@@ -1067,7 +1067,7 @@ func (m Proposals) proposePartnerJob(
 		status IN ('pending','sent_to_client'))`, in.OfferID).
 		Scan(&open)
 	if scanErr != nil {
-		return Job{}, scanErr
+		return Job{}, apperr.Wrap(scanErr, "select maintenance.partner_slot_proposals")
 	}
 
 	if open {
@@ -1114,7 +1114,7 @@ func (m Proposals) proposePartnerJob(
 		c.Now,
 	)
 	if execErr != nil {
-		return Job{}, execErr
+		return Job{}, apperr.Wrap(execErr, "insert maintenance.partner_slot_proposals")
 	}
 
 	return m.finish(
@@ -1157,7 +1157,7 @@ func (m Proposals) partnerProposal(
 		return "", offer, slot, tech, org, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
-	return status, offer, slot, tech, org, err
+	return status, offer, slot, tech, org, apperr.Wrap(err, "queryrow (partnerProposal)")
 }
 
 // withdrawPartner serves jobs.withdrawPartnerSlot.
@@ -1222,7 +1222,7 @@ func (m Proposals) withdrawPartnerJob(
 		in.ProposalID,
 	)
 	if execErr != nil {
-		return Job{}, execErr
+		return Job{}, apperr.Wrap(execErr, "update maintenance.partner_slot_proposals")
 	}
 
 	return m.finish(
@@ -1376,7 +1376,7 @@ func (m Proposals) resolvePartnerJob(
 		next,
 	)
 	if execErr != nil {
-		return Job{}, execErr
+		return Job{}, apperr.Wrap(execErr, "update maintenance.partner_slot_proposals")
 	}
 
 	return m.finish(
@@ -1399,12 +1399,12 @@ func ExpireProposals(ctx context.Context, tx pgx.Tx, now time.Time) (int, error)
 		now,
 	)
 	if err != nil {
-		return 0, err
+		return 0, apperr.Wrap(err, "update maintenance.slot_proposals")
 	}
 
 	jobs, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 	if err != nil || len(jobs) == 0 {
-		return 0, err
+		return 0, apperr.Wrap(err, "update maintenance.slot_proposals")
 	}
 	// a contractor's time change the client left unanswered ends as declined, as when the client declines (IR443)
 	_, execErr := tx.Exec(
@@ -1414,7 +1414,7 @@ func ExpireProposals(ctx context.Context, tx pgx.Tx, now time.Time) (int, error)
 		jobs,
 	)
 	if execErr != nil {
-		return 0, execErr
+		return 0, apperr.Wrap(execErr, "update maintenance.partner_slot_proposals")
 	}
 
 	return len(jobs), nil

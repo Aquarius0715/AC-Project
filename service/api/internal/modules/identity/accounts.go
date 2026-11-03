@@ -98,7 +98,7 @@ func addCap(ctx context.Context, c *ops.Call, org uuid.UUID) error {
 		org,
 	)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select identity.organizations")
 	}
 
 	var (
@@ -111,7 +111,7 @@ func addCap(ctx context.Context, c *ops.Call, org uuid.UUID) error {
 		org, c.Now.Add(-24*time.Hour), c.Now, AccountsPerOrgPerDay).
 		Scan(&n, &oldest)
 	if err != nil {
-		return err
+		return apperr.Wrap(err, "select identity.memberships")
 	}
 
 	if n < AccountsPerOrgPerDay || oldest == nil {
@@ -142,7 +142,7 @@ func personFor(ctx context.Context, c *ops.Call, email, name string) (uuid.UUID,
 		ON CONFLICT (email) DO NOTHING RETURNING id`, email, name, c.Now).
 		Scan(&user)
 	if !errors.Is(err, pgx.ErrNoRows) {
-		return user, err
+		return user, apperr.Wrap(err, "insert identity.users")
 	}
 
 	err = c.Tx.QueryRow(ctx, `SELECT u.id FROM identity.users u
@@ -156,7 +156,7 @@ func personFor(ctx context.Context, c *ops.Call, email, name string) (uuid.UUID,
 	}
 
 	if err != nil {
-		return uuid.Nil, err
+		return uuid.Nil, apperr.Wrap(err, "select identity.users")
 	}
 
 	_, err = c.Tx.Exec(
@@ -168,7 +168,7 @@ func personFor(ctx context.Context, c *ops.Call, email, name string) (uuid.UUID,
 		c.Now,
 	)
 
-	return user, err
+	return user, apperr.Wrap(err, "update identity.users")
 }
 
 // createAccount creates the person (or takes back one removed before, personFor), the membership with its permissions
@@ -201,7 +201,7 @@ func createAccount(
 			NULL)`, user).
 			Scan(&revoked)
 		if err != nil {
-			return user, membership, err
+			return user, membership, apperr.Wrap(err, "select identity.memberships")
 		}
 
 		if revoked {
@@ -217,7 +217,7 @@ func createAccount(
 		user, a.OrgID, a.Role, a.Employment, a.ClientRole, c.Now, a.ValidUntil).
 		Scan(&membership)
 	if err != nil {
-		return user, membership, err
+		return user, membership, apperr.Wrap(err, "insert identity.memberships")
 	}
 
 	for _, p := range a.Permissions {
@@ -229,7 +229,7 @@ func createAccount(
 			p,
 		)
 		if err != nil {
-			return user, membership, err
+			return user, membership, apperr.Wrap(err, "insert identity.membership_permissions")
 		}
 	}
 
@@ -243,7 +243,7 @@ func createAccount(
 			sc.ID,
 		)
 		if err != nil {
-			return user, membership, err
+			return user, membership, apperr.Wrap(err, "insert identity.membership_scopes")
 		}
 	}
 
@@ -255,7 +255,7 @@ func createAccount(
 			membership,
 		)
 		if err != nil {
-			return user, membership, err
+			return user, membership, apperr.Wrap(err, "insert identity.consents")
 		}
 	}
 
@@ -316,7 +316,7 @@ func AccountHandlers(p Provider, apps AccountApps) map[string]events.Handler {
 
 			decodeErr := e.Decode(&in)
 			if decodeErr != nil {
-				return decodeErr
+				return apperr.Wrap(decodeErr, "events.Event.Decode")
 			}
 
 			var (
@@ -331,7 +331,7 @@ func AccountHandlers(p Provider, apps AccountApps) map[string]events.Handler {
 			}
 
 			if err != nil {
-				return err
+				return apperr.Wrap(err, "select identity.users")
 			}
 
 			url, client := apps.of(in.Role)
@@ -395,7 +395,7 @@ func AccountHandlers(p Provider, apps AccountApps) map[string]events.Handler {
 				in.MembershipID,
 			)
 			if execErr != nil {
-				return execErr
+				return apperr.Wrap(execErr, "update identity.users")
 			}
 
 			sendSetupErr := p.SendSetup(cctx, subject, acct)
@@ -420,7 +420,7 @@ func AccountHandlers(p Provider, apps AccountApps) map[string]events.Handler {
 
 			decodeErr := e.Decode(&in)
 			if decodeErr != nil {
-				return decodeErr
+				return apperr.Wrap(decodeErr, "events.Event.Decode")
 			}
 			// the subject is the provider's, or the person's ID for the realm's demo accounts (auth accepts either); a
 			// membership the account does not sign in with leaves it alone (IR462)
@@ -435,7 +435,7 @@ func AccountHandlers(p Provider, apps AccountApps) map[string]events.Handler {
 			}
 
 			if err != nil {
-				return err
+				return apperr.Wrap(err, "select identity.memberships")
 			}
 
 			cctx, cancel := context.WithTimeout(ctx, 10*time.Second)
