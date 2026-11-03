@@ -485,19 +485,9 @@ func RecordSignal(
 	now time.Time,
 	alerts AlertOpener,
 ) (bool, error) {
-	axis := FaultAxis[signal.Kind]
-
-	var recovery []byte
-
-	if signal.Kind == signalRestored {
-		axis = signal.Recovery.Axis
-
-		recoveryJSON, err := json.Marshal(signal.Recovery)
-		if err != nil {
-			return false, apperr.Wrap(err, "json.Marshal")
-		}
-
-		recovery = recoveryJSON
+	axis, recovery, err := signalAxis(signal)
+	if err != nil {
+		return false, err
 	}
 
 	stored, err := storedSignal(ctx, txn, signal)
@@ -505,65 +495,19 @@ func RecordSignal(
 		return false, err
 	}
 
-	var (
-		binding, unit *uuid.UUID
-		serial        string
-	)
-
-	err = txn.QueryRow(ctx, `SELECT binding_id, unit_id, serial FROM devices.devices WHERE id = $1 FOR
-		UPDATE`, signal.DeviceID).
-		Scan(&binding, &unit, &serial)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return false, apperr.E(apperr.NotFound, apperr.KeyNotFound)
-	}
-
+	device, err := lockSignalDevice(ctx, txn, signal)
 	if err != nil {
-		return false, apperr.Wrap(err, "select devices.devices")
+		return false, err
 	}
 
-	if !sameID(binding, signal.BindingID) {
-		return false, apperr.Fields(map[string]string{"bindingId": "errors.binding_mismatch"})
+	outOfOrder, err := outOfOrderSignal(ctx, txn, signal, axis)
+	if outOfOrder || err != nil {
+		return false, err // an old heartbeat does not restore the device (SR20)
 	}
 
-	var latest *int64
-
-	scanErr := txn.QueryRow(ctx, `SELECT max(sequence) FROM devices.device_events WHERE device_id = $1 AND binding_id IS
-		NOT
-		DISTINCT FROM $2 AND axis = $3`,
-		signal.DeviceID, signal.BindingID, axis).
-		Scan(&latest)
-	if scanErr != nil {
-		return false, apperr.Wrap(scanErr, "select devices.device_events")
-	}
-
-	if latest != nil && signal.Sequence <= *latest {
-		return false, nil // an old heartbeat does not restore the device (SR20)
-	}
-
-	evidence, alertIDs := evidenceOf(axis), []uuid.UUID{}
-
-	if signal.Kind == signalRestored {
-		err := restoreFault(ctx, txn, signal, axis, &evidence, &alertIDs)
-		if err != nil {
-			return false, err
-		}
-	}
-
-	if signal.Kind == signalTamper && unit != nil && binding != nil {
-		alertID, err := openTamperAlert(
-			ctx,
-			txn,
-			alerts,
-			*binding,
-			*unit,
-			serial,
-			signal.OccurredAt,
-		)
-		if err != nil {
-			return false, err
-		}
-
-		alertIDs = []uuid.UUID{alertID}
+	evidence, alertIDs, err := signalEvidence(ctx, txn, alerts, signal, axis, device)
+	if err != nil {
+		return false, err
 	}
 
 	_, execErr := txn.Exec(
@@ -576,7 +520,7 @@ func RecordSignal(
 			uuid.NewV7(),
 		),
 		signal.DeviceID,
-		unit,
+		device.unit,
 		signal.BindingID,
 		signal.EventID,
 		signal.Kind,
@@ -597,20 +541,49 @@ func RecordSignal(
 	return err == nil, err
 }
 
+// signalAxis is the state axis a signal changes and, for restored, its recovery as JSON.
+func signalAxis(signal Signal) (string, []byte, error) {
+	if signal.Kind != signalRestored {
+		return FaultAxis[signal.Kind], nil, nil
+	}
+
+	recovery, err := json.Marshal(signal.Recovery)
+	if err != nil {
+		return "", nil, apperr.Wrap(err, "json.Marshal")
+	}
+
+	return signal.Recovery.Axis, recovery, nil
+}
+
+// storedEvent is the stored DeviceEvent of an eventId that a signal repeats.
+type storedEvent struct {
+	device   uuid.UUID
+	kind     string
+	binding  *uuid.UUID
+	seq      int64
+	recovery *Recovery
+}
+
+// sameAs reports whether a repeated signal carries the stored event's content.
+func (e storedEvent) sameAs(signal Signal) bool {
+	return e.device == signal.DeviceID && e.kind == signal.Kind &&
+		sameID(e.binding, signal.BindingID) &&
+		e.seq == signal.Sequence &&
+		(e.recovery == nil) == (signal.Recovery == nil) &&
+		(e.recovery == nil || *e.recovery == *signal.Recovery)
+}
+
 // storedSignal reports whether a DeviceEvent with the signal's eventId is stored already: the same content is a
 // repeat that changes nothing, other content is CONFLICT.
 func storedSignal(ctx context.Context, txn pgx.Tx, signal Signal) (bool, error) {
-	var seen struct {
-		device  uuid.UUID
-		kind    string
-		binding *uuid.UUID
-		seq     int64
-		rec     []byte
-	}
+	var (
+		stored   storedEvent
+		recovery []byte
+	)
 
 	err := txn.QueryRow(ctx, `SELECT device_id, event_type, binding_id, sequence, recovery FROM devices.device_events WHERE
 		event_id = $1`, signal.EventID).
-		Scan(&seen.device, &seen.kind, &seen.binding, &seen.seq, &seen.rec)
+		Scan(&stored.device, &stored.kind, &stored.binding, &stored.seq, &recovery)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
 	}
@@ -619,20 +592,98 @@ func storedSignal(ctx context.Context, txn pgx.Tx, signal Signal) (bool, error) 
 		return false, apperr.Wrap(err, "select devices.device_events")
 	}
 
-	var prev *Recovery
-	if len(seen.rec) > 0 {
-		_ = json.Unmarshal(seen.rec, &prev)
+	if len(recovery) > 0 {
+		_ = json.Unmarshal(recovery, &stored.recovery)
 	}
 
-	if seen.device != signal.DeviceID || seen.kind != signal.Kind ||
-		!sameID(seen.binding, signal.BindingID) ||
-		seen.seq != signal.Sequence ||
-		(prev == nil) != (signal.Recovery == nil) ||
-		(prev != nil && *prev != *signal.Recovery) {
+	if !stored.sameAs(signal) {
 		return true, apperr.E(apperr.Conflict, "errors.event_id_reused")
 	}
 
 	return true, nil
+}
+
+// signalDevice is the device row a signal locks: its current binding and unit, and the serial its tamper Alert names.
+type signalDevice struct {
+	binding, unit *uuid.UUID
+	serial        string
+}
+
+// lockSignalDevice locks the signal's device (NOT_FOUND); the signal must name its current binding (VALIDATION).
+func lockSignalDevice(ctx context.Context, txn pgx.Tx, signal Signal) (signalDevice, error) {
+	var device signalDevice
+
+	err := txn.QueryRow(ctx, `SELECT binding_id, unit_id, serial FROM devices.devices WHERE id = $1 FOR
+		UPDATE`, signal.DeviceID).
+		Scan(&device.binding, &device.unit, &device.serial)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return device, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	}
+
+	if err != nil {
+		return device, apperr.Wrap(err, "select devices.devices")
+	}
+
+	if !sameID(device.binding, signal.BindingID) {
+		return device, apperr.Fields(map[string]string{"bindingId": "errors.binding_mismatch"})
+	}
+
+	return device, nil
+}
+
+// outOfOrderSignal reports a sequence not newer than the latest event of the device, binding and axis.
+func outOfOrderSignal(ctx context.Context, txn pgx.Tx, signal Signal, axis string) (bool, error) {
+	var latest *int64
+
+	err := txn.QueryRow(ctx, `SELECT max(sequence) FROM devices.device_events WHERE device_id = $1 AND binding_id IS
+		NOT
+		DISTINCT FROM $2 AND axis = $3`,
+		signal.DeviceID, signal.BindingID, axis).
+		Scan(&latest)
+	if err != nil {
+		return false, apperr.Wrap(err, "select devices.device_events")
+	}
+
+	return latest != nil && signal.Sequence <= *latest, nil
+}
+
+// signalEvidence is the evidence source and the alertIds of the signal's event: the axis's source, the fault's when
+// restored, and the unit's new tamper Alert for a tamper on a bound device.
+func signalEvidence(
+	ctx context.Context,
+	txn pgx.Tx,
+	alerts AlertOpener,
+	signal Signal,
+	axis string,
+	device signalDevice,
+) (string, []uuid.UUID, error) {
+	evidence, alertIDs := evidenceOf(axis), []uuid.UUID{}
+
+	if signal.Kind == signalRestored {
+		err := restoreFault(ctx, txn, signal, axis, &evidence, &alertIDs)
+		if err != nil {
+			return "", nil, err
+		}
+	}
+
+	if signal.Kind == signalTamper && device.unit != nil && device.binding != nil {
+		alertID, err := openTamperAlert(
+			ctx,
+			txn,
+			alerts,
+			*device.binding,
+			*device.unit,
+			device.serial,
+			signal.OccurredAt,
+		)
+		if err != nil {
+			return "", nil, err
+		}
+
+		alertIDs = []uuid.UUID{alertID}
+	}
+
+	return evidence, alertIDs, nil
 }
 
 // restoreFault gives the current unresolved fault of the axis its restoredAt (CONFLICT unless the restored signal

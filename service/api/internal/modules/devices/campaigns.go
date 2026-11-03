@@ -66,6 +66,31 @@ type Campaign struct {
 	CreatedByMembershipID   *uuid.UUID       `json:"createdByMembershipId"` // who scheduled it (IR344)
 }
 
+// FirmwareCampaign states, the control actions that move them and the results of a campaign's devices.
+const (
+	entityCampaign = "firmware_campaign"
+
+	stateScheduled = "scheduled"
+	stateRunning   = "running"
+	statePaused    = "paused"
+	stateAborted   = "aborted"
+	stateCompleted = "completed"
+
+	actionPause       = "pause"
+	actionResume      = "resume"
+	actionAbort       = "abort"
+	actionRetryDevice = "retry_device"
+
+	resultPending    = "pending"
+	resultInstalling = "installing"
+	resultSucceeded  = "succeeded"
+	resultFailed     = "failed"
+	resultSkipped    = "skipped"
+)
+
+// minScheduleLead is how far ahead a campaign must start (DD-A20: startAt at least 24 h ahead).
+const minScheduleLead = 24 * time.Hour
+
 const campCols = `id, tenant_id, version, created_at, updated_at, model_id, from_versions, target_version, checksum, ` +
 	`waves,
 	to_char(window_start_local, 'HH24:MI'), to_char(window_end_local, 'HH24:MI'), auto_pause_failure_percent, start_at, ` +
@@ -120,11 +145,11 @@ func campaignDetail(ctx context.Context, call *ops.Call, campaignID uuid.UUID) (
 	}
 
 	campaign.Progress = map[string]int{
-		"succeeded":  0,
-		"installing": 0,
-		"pending":    0,
-		"failed":     0,
-		"skipped":    0,
+		resultSucceeded:  0,
+		resultInstalling: 0,
+		resultPending:    0,
+		resultFailed:     0,
+		resultSkipped:    0,
 	}
 	campaign.Results, campaign.DeviceIDs = []CampaignResult{}, []uuid.UUID{}
 
@@ -195,29 +220,20 @@ func campaignsList(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[Campaign], error) {
-	var filter struct {
-		ModelID *uuid.UUID `json:"modelId,omitempty"`
-		Status  *string    `json:"status,omitempty"`
-	}
+	var filter campaignFilter
 
-	if len(query.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
-		dec.DisallowUnknownFields()
-
-		if dec.Decode(&filter) != nil {
-			return paging.Page[Campaign]{}, apperr.Fields(
-				map[string]string{"filters": apperr.KeyInvalid},
-			)
-		}
+	err := decodeFilters(query, &filter)
+	if err != nil {
+		return paging.Page[Campaign]{}, err
 	}
 
 	order, err := paging.OrderBy(
 		query.Sort,
 		map[string]string{
-			"id":        "id",
-			"createdAt": "created_at",
-			"updatedAt": "updated_at",
-			"status":    "state",
+			"id":           "id",
+			fieldCreatedAt: colCreatedAt,
+			fieldUpdatedAt: "updated_at",
+			fieldStatus:    "state",
 		},
 		"created_at DESC, id ASC",
 	)
@@ -230,6 +246,44 @@ func campaignsList(
 		return paging.Page[Campaign]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
+	where, args, err := campaignConditions(filter)
+	if err != nil {
+		return paging.Page[Campaign]{}, err
+	}
+
+	ids, total, err := campaignPage(ctx, call, where, order, window, args)
+	if err != nil {
+		return paging.Page[Campaign]{}, err
+	}
+
+	items := []Campaign{}
+
+	for _, id := range ids {
+		campaign, err := campaignDetail(ctx, call, id)
+		if err != nil {
+			return paging.Page[Campaign]{}, err
+		}
+
+		items = append(items, campaign)
+	}
+
+	return paging.Page[Campaign]{
+		Items:           items,
+		NextCursor:      window.Next(total),
+		Total:           total,
+		SnapshotVersion: window.Snapshot,
+	}, nil
+}
+
+// campaignFilter is the firmwareCampaigns.list filters of the query catalog.
+type campaignFilter struct {
+	ModelID *uuid.UUID `json:"modelId,omitempty"`
+	Status  *string    `json:"status,omitempty"`
+}
+
+// campaignConditions is the firmwareCampaigns.list WHERE clause and its arguments (a status that is no campaign state
+// is VALIDATION).
+func campaignConditions(filter campaignFilter) (string, []any, error) {
 	conds, args := []string{"TRUE"}, []any{}
 	if filter.ModelID != nil {
 		args = append(args, *filter.ModelID)
@@ -238,10 +292,10 @@ func campaignsList(
 
 	if filter.Status != nil {
 		if !slices.Contains(
-			[]string{"scheduled", "running", "paused", "aborted", "completed"},
+			[]string{stateScheduled, stateRunning, statePaused, stateAborted, stateCompleted},
 			*filter.Status,
 		) {
-			return paging.Page[Campaign]{}, apperr.Fields(
+			return "", nil, apperr.Fields(
 				map[string]string{"filters.status": apperr.KeyInvalid},
 			)
 		}
@@ -250,14 +304,23 @@ func campaignsList(
 		conds = append(conds, fmt.Sprintf("state = $%d", len(args)))
 	}
 
-	where := strings.Join(conds, " AND ")
+	return strings.Join(conds, " AND "), args, nil
+}
 
+// campaignPage counts the campaigns that match and reads the IDs of the page.
+func campaignPage(
+	ctx context.Context,
+	call *ops.Call,
+	where, order string,
+	window paging.Window,
+	args []any,
+) ([]uuid.UUID, int, error) {
 	var total int
 
 	scanErr := call.Tx.QueryRow(ctx, "SELECT count(*) FROM devices.firmware_campaigns WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
-		return paging.Page[Campaign]{}, apperr.Wrap(scanErr, "select devices.firmware_campaigns")
+		return nil, 0, apperr.Wrap(scanErr, "select devices.firmware_campaigns")
 	}
 
 	rows, err := call.Tx.Query(
@@ -271,7 +334,7 @@ func campaignsList(
 		),
 		args...)
 	if err != nil {
-		return paging.Page[Campaign]{}, apperr.Wrap(err, "select devices.firmware_campaigns")
+		return nil, 0, apperr.Wrap(err, "select devices.firmware_campaigns")
 	}
 
 	var ids []uuid.UUID
@@ -283,7 +346,7 @@ func campaignsList(
 		if err != nil {
 			rows.Close()
 
-			return paging.Page[Campaign]{}, apperr.Wrap(err, "select devices.firmware_campaigns")
+			return nil, 0, apperr.Wrap(err, "select devices.firmware_campaigns")
 		}
 
 		ids = append(ids, campaignID)
@@ -291,28 +354,7 @@ func campaignsList(
 
 	rows.Close()
 
-	rowsErr := rows.Err()
-	if rowsErr != nil {
-		return paging.Page[Campaign]{}, apperr.Wrap(rowsErr, "select devices.firmware_campaigns")
-	}
-
-	items := []Campaign{}
-
-	for _, id := range ids {
-		x, err := campaignDetail(ctx, call, id)
-		if err != nil {
-			return paging.Page[Campaign]{}, err
-		}
-
-		items = append(items, x)
-	}
-
-	return paging.Page[Campaign]{
-		Items:           items,
-		NextCursor:      window.Next(total),
-		Total:           total,
-		SnapshotVersion: window.Snapshot,
-	}, nil
+	return ids, total, apperr.Wrap(rows.Err(), "select devices.firmware_campaigns")
 }
 
 // campaignsGet serves firmwareCampaigns.get.
@@ -366,32 +408,8 @@ func (in *ScheduleInput) Validate() map[string]string {
 		fieldErrs["targetVersion"] = apperr.KeyRequired
 	}
 
-	if len(in.DeviceIDs) == 0 {
-		fieldErrs["deviceIds"] = apperr.KeyRequired
-	}
-
-	seen := map[uuid.UUID]bool{}
-	for _, d := range in.DeviceIDs {
-		if seen[d] {
-			fieldErrs["deviceIds"] = apperr.KeyDuplicate
-		}
-
-		seen[d] = true
-	}
-
-	prev := 0
-	for i, wave := range in.Waves {
-		if wave.Percent <= prev || wave.Percent > 100 || utf8.RuneCountInString(wave.Label) < 1 ||
-			utf8.RuneCountInString(wave.Label) > 40 {
-			fieldErrs[fmt.Sprintf("waves[%d]", i)] = "error.ascending"
-		}
-
-		prev = wave.Percent
-	}
-
-	if len(in.Waves) == 0 || prev != 100 {
-		fieldErrs["waves"] = "error.mustEndAt100"
-	}
+	validateDeviceIDs(fieldErrs, in.DeviceIDs)
+	validateWaves(fieldErrs, in.Waves)
 
 	if !hhmm.MatchString(in.Window.StartLocal) || !hhmm.MatchString(in.Window.EndLocal) ||
 		in.Window.StartLocal == in.Window.EndLocal {
@@ -403,6 +421,39 @@ func (in *ScheduleInput) Validate() map[string]string {
 	}
 
 	return fieldErrs
+}
+
+// validateDeviceIDs requires at least one device and no device twice.
+func validateDeviceIDs(fieldErrs map[string]string, deviceIDs []uuid.UUID) {
+	if len(deviceIDs) == 0 {
+		fieldErrs[fieldDeviceIDs] = apperr.KeyRequired
+	}
+
+	seen := map[uuid.UUID]bool{}
+	for _, deviceID := range deviceIDs {
+		if seen[deviceID] {
+			fieldErrs[fieldDeviceIDs] = apperr.KeyDuplicate
+		}
+
+		seen[deviceID] = true
+	}
+}
+
+// validateWaves requires waves of 1–40 character labels whose cumulative percents ascend and end at 100.
+func validateWaves(fieldErrs map[string]string, waves []Wave) {
+	prev := 0
+	for i, wave := range waves {
+		if wave.Percent <= prev || wave.Percent > 100 || utf8.RuneCountInString(wave.Label) < 1 ||
+			utf8.RuneCountInString(wave.Label) > 40 {
+			fieldErrs[fmt.Sprintf("waves[%d]", i)] = "error.ascending"
+		}
+
+		prev = wave.Percent
+	}
+
+	if len(waves) == 0 || prev != 100 {
+		fieldErrs["waves"] = "error.mustEndAt100"
+	}
 }
 
 // waveOf assigns the i-th of n devices to the first wave whose cumulative percent covers it.
@@ -447,96 +498,120 @@ func (m *Module) campaignsSchedule(
 	call *ops.Call,
 	input *ScheduleInput,
 ) (Campaign, error) {
-	if input.StartAt.Before(call.Now.Add(24 * time.Hour)) {
+	if input.StartAt.Before(call.Now.Add(minScheduleLead)) {
 		return Campaign{}, apperr.Fields(map[string]string{"startAt": "error.atLeast24h"})
 	}
 
+	err := targetSupported(ctx, call, input)
+	if err != nil {
+		return Campaign{}, err
+	}
+
+	from, err := m.fromVersions(ctx, call, input)
+	if err != nil {
+		return Campaign{}, err
+	}
+
+	campaignID, err := insertCampaign(ctx, call, input, from)
+	if err != nil {
+		return Campaign{}, err
+	}
+
+	one := 1
+
+	call.Emit(
+		ops.Event{
+			AggregateType: entityCampaign,
+			AggregateID:   campaignID,
+			Type:          "FirmwareCampaignScheduled", Payload: nil,
+		},
+	)
+	call.Audit(
+		ops.AuditEntry{
+			Action:          "firmwareCampaigns.schedule",
+			TargetKind:      entityCampaign,
+			TargetID:        campaignID.String(),
+			NextVersion:     &one,
+			PreviousVersion: nil,
+			Reason:          "",
+			Result:          "",
+			Before:          nil,
+			After:           nil,
+		},
+	)
+
+	return campaignDetail(ctx, call, campaignID)
+}
+
+// targetSupported requires a current model whose firmware candidates include the target version (IR111).
+func targetSupported(ctx context.Context, call *ops.Call, input *ScheduleInput) error {
 	var candidates []string
 
 	err := call.Tx.QueryRow(ctx, `SELECT firmware_candidates FROM devices.capabilities WHERE id = $1 AND
 		is_current`, input.ModelID).
 		Scan(&candidates)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return Campaign{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+		return apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
-		return Campaign{}, apperr.Wrap(err, "select devices.capabilities")
+		return apperr.Wrap(err, "select devices.capabilities")
 	}
 
 	if !slices.Contains(candidates, input.TargetVersion) {
-		return Campaign{}, apperr.Fields(
+		return apperr.Fields(
 			map[string]string{"targetVersion": "error.unsupportedFirmware"},
 		)
 	}
-	// devices of the model (via their current unit's model), excluding open tamper
-	rows, err := call.Tx.Query(
-		ctx,
-		`SELECT d.id, d.firmware_version, d.tamper, COALESCE(d.unit_id, d.target_unit_id) FROM devices.devices d WHERE d.id =
-			ANY($1)`,
-		input.DeviceIDs,
-	)
+
+	return nil
+}
+
+// scheduledDevice is a device a campaign is scheduled for: its firmware version, tamper state and unit.
+type scheduledDevice struct {
+	fw, tamper string
+	unit       uuid.UUID
+}
+
+// fromVersions checks the campaign's devices, the devices of the model (via their current unit's model) without an
+// open tamper and not on the target version yet, and returns their firmware versions, sorted.
+func (m *Module) fromVersions(
+	ctx context.Context,
+	call *ops.Call,
+	input *ScheduleInput,
+) ([]string, error) {
+	devicesByID, err := scheduledDevices(ctx, call, input.DeviceIDs)
 	if err != nil {
-		return Campaign{}, apperr.Wrap(err, "select devices.devices")
-	}
-
-	type dv struct {
-		fw, tamper string
-		unit       uuid.UUID
-	}
-
-	found := map[uuid.UUID]dv{}
-
-	for rows.Next() {
-		var (
-			deviceID uuid.UUID
-			device   dv
-		)
-
-		err := rows.Scan(&deviceID, &device.fw, &device.tamper, &device.unit)
-		if err != nil {
-			rows.Close()
-
-			return Campaign{}, apperr.Wrap(err, "select devices.devices")
-		}
-
-		found[deviceID] = device
-	}
-
-	rows.Close()
-
-	rowsErr := rows.Err()
-	if rowsErr != nil {
-		return Campaign{}, apperr.Wrap(rowsErr, "select devices.devices")
+		return nil, err
 	}
 
 	from := []string{}
 
-	for _, id := range input.DeviceIDs {
-		device, ok := found[id]
-		if !ok {
-			return Campaign{}, apperr.Fields(map[string]string{"deviceIds": "error.unknownDevice"})
+	for _, deviceID := range input.DeviceIDs {
+		device, known := devicesByID[deviceID]
+		if !known {
+			return nil, apperr.Fields(map[string]string{fieldDeviceIDs: "error.unknownDevice"})
 		}
 
-		if device.tamper == "detected" {
-			return Campaign{}, apperr.Fields(
-				map[string]string{"deviceIds": apperr.KeyTamperUnresolved},
+		if device.tamper == tamperDetected {
+			return nil, apperr.Fields(
+				map[string]string{fieldDeviceIDs: apperr.KeyTamperUnresolved},
 			)
 		}
 
 		if device.fw == input.TargetVersion {
-			return Campaign{}, apperr.Fields(
-				map[string]string{"deviceIds": "error.alreadyOnTarget"},
+			return nil, apperr.Fields(
+				map[string]string{fieldDeviceIDs: "error.alreadyOnTarget"},
 			)
 		}
 
-		u, ok, err := m.Units.UnitInfo(ctx, call, device.unit)
+		unitInfo, unitFound, err := m.Units.UnitInfo(ctx, call, device.unit)
 		if err != nil {
-			return Campaign{}, apperr.Wrap(err, "devices.Units.UnitInfo")
+			return nil, apperr.Wrap(err, "devices.Units.UnitInfo")
 		}
 
-		if !ok || u.ModelID != input.ModelID {
-			return Campaign{}, apperr.Fields(map[string]string{"deviceIds": "error.otherModel"})
+		if !unitFound || unitInfo.ModelID != input.ModelID {
+			return nil, apperr.Fields(map[string]string{fieldDeviceIDs: "error.otherModel"})
 		}
 
 		if !slices.Contains(from, device.fw) {
@@ -546,10 +621,62 @@ func (m *Module) campaignsSchedule(
 
 	slices.Sort(from)
 
+	return from, nil
+}
+
+// scheduledDevices reads the campaign's devices by ID.
+func scheduledDevices(
+	ctx context.Context,
+	call *ops.Call,
+	deviceIDs []uuid.UUID,
+) (map[uuid.UUID]scheduledDevice, error) {
+	rows, err := call.Tx.Query(
+		ctx,
+		`SELECT d.id, d.firmware_version, d.tamper, COALESCE(d.unit_id, d.target_unit_id) FROM devices.devices d WHERE d.id =
+			ANY($1)`,
+		deviceIDs,
+	)
+	if err != nil {
+		return nil, apperr.Wrap(err, "select devices.devices")
+	}
+
+	devicesByID := map[uuid.UUID]scheduledDevice{}
+
+	for rows.Next() {
+		var (
+			deviceID uuid.UUID
+			device   scheduledDevice
+		)
+
+		err := rows.Scan(&deviceID, &device.fw, &device.tamper, &device.unit)
+		if err != nil {
+			rows.Close()
+
+			return nil, apperr.Wrap(err, "select devices.devices")
+		}
+
+		devicesByID[deviceID] = device
+	}
+
+	rows.Close()
+
+	return devicesByID, apperr.Wrap(rows.Err(), "select devices.devices")
+}
+
+// insertCampaign stores the scheduled campaign and each of its devices in its wave, and returns the campaign ID.
+func insertCampaign(
+	ctx context.Context,
+	call *ops.Call,
+	input *ScheduleInput,
+	from []string,
+) (uuid.UUID, error) {
 	sum := sha256.Sum256([]byte(input.ModelID.String() + ":" + input.TargetVersion))
 	campaignID := uuid.Must(uuid.NewV7())
 
-	waves, _ := json.Marshal(input.Waves)
+	waves, err := json.Marshal(input.Waves)
+	if err != nil {
+		return uuid.Nil, apperr.Wrap(err, "json.Marshal")
+	}
 
 	_, execErr := call.Tx.Exec(
 		ctx,
@@ -570,7 +697,7 @@ func (m *Module) campaignsSchedule(
 		call.Principal.MembershipID,
 	)
 	if execErr != nil {
-		return Campaign{}, apperr.Wrap(execErr, "insert devices.firmware_campaigns")
+		return uuid.Nil, apperr.Wrap(execErr, "insert devices.firmware_campaigns")
 	}
 
 	for idx, deviceID := range input.DeviceIDs {
@@ -583,34 +710,11 @@ func (m *Module) campaignsSchedule(
 			waveOf(idx, len(input.DeviceIDs), input.Waves),
 		)
 		if err != nil {
-			return Campaign{}, apperr.Wrap(err, "insert devices.firmware_campaign_devices")
+			return uuid.Nil, apperr.Wrap(err, "insert devices.firmware_campaign_devices")
 		}
 	}
 
-	one := 1
-
-	call.Emit(
-		ops.Event{
-			AggregateType: "firmware_campaign",
-			AggregateID:   campaignID,
-			Type:          "FirmwareCampaignScheduled", Payload: nil,
-		},
-	)
-	call.Audit(
-		ops.AuditEntry{
-			Action:          "firmwareCampaigns.schedule",
-			TargetKind:      "firmware_campaign",
-			TargetID:        campaignID.String(),
-			NextVersion:     &one,
-			PreviousVersion: nil,
-			Reason:          "",
-			Result:          "",
-			Before:          nil,
-			After:           nil,
-		},
-	)
-
-	return campaignDetail(ctx, call, campaignID)
+	return campaignID, nil
 }
 
 // ControlInput is firmwareCampaigns.control input.
@@ -629,27 +733,34 @@ func (in *ControlInput) Validate() map[string]string {
 	}
 
 	switch in.Action {
-	case "pause", "resume":
-	case "abort":
+	case actionPause, actionResume:
+	case actionAbort:
 		if in.Reason == nil || utf8.RuneCountInString(strings.TrimSpace(*in.Reason)) < 1 ||
 			utf8.RuneCountInString(strings.TrimSpace(*in.Reason)) > 1000 {
 			fieldErrs["reason"] = apperr.KeyLength
 		}
-	case "retry_device":
+	case actionRetryDevice:
 		if in.DeviceID == nil {
 			fieldErrs["deviceId"] = apperr.KeyRequired
 		}
 	default:
-		fieldErrs["action"] = apperr.KeyInvalid
+		fieldErrs[fieldAction] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
 }
 
-var transitions = map[string]map[string]string{
-	"pause":  {"running": "paused", "scheduled": "paused"},
-	"resume": {"paused": "running"},
-	"abort":  {"scheduled": "aborted", "running": "aborted", "paused": "aborted"},
+// transitions is the state each control action leads to from each state it is allowed in.
+func transitions() map[string]map[string]string {
+	return map[string]map[string]string{
+		actionPause:  {stateRunning: statePaused, stateScheduled: statePaused},
+		actionResume: {statePaused: stateRunning},
+		actionAbort: {
+			stateScheduled: stateAborted,
+			stateRunning:   stateAborted,
+			statePaused:    stateAborted,
+		},
+	}
 }
 
 // campaignsControl serves firmwareCampaigns.control.
@@ -679,14 +790,14 @@ var transitions = map[string]map[string]string{
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/firmware-campaigns/{campaignId}/pause [post]
-func campaignsControl(ctx context.Context, c *ops.Call, input *ControlInput) (Campaign, error) {
+func campaignsControl(ctx context.Context, call *ops.Call, input *ControlInput) (Campaign, error) {
 	var (
 		state   string
 		version int
 		start   time.Time
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT state, version, start_at FROM devices.firmware_campaigns WHERE id = $1 FOR
+	err := call.Tx.QueryRow(ctx, `SELECT state, version, start_at FROM devices.firmware_campaigns WHERE id = $1 FOR
 		UPDATE`, input.CampaignID).
 		Scan(&state, &version, &start)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -697,59 +808,17 @@ func campaignsControl(ctx context.Context, c *ops.Call, input *ControlInput) (Ca
 		return Campaign{}, apperr.Wrap(err, "select devices.firmware_campaigns")
 	}
 
-	if version != *c.ExpectedVersion {
+	if version != *call.ExpectedVersion {
 		return Campaign{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
-	next := state
-
-	var reason *string
-
-	switch input.Action {
-	case "retry_device":
-		if state != "running" && state != "paused" {
-			return Campaign{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
-		}
-
-		tag, err := c.Tx.Exec(
-			ctx,
-			`UPDATE devices.firmware_campaign_devices SET result = 'pending', detail = NULL, operation_id = NULL, result_at =
-				NULL
-			WHERE campaign_id = $1 AND device_id = $2 AND result IN ('failed','skipped')`,
-			input.CampaignID,
-			*input.DeviceID,
-		)
-		if err != nil {
-			return Campaign{}, apperr.Wrap(err, "update devices.firmware_campaign_devices")
-		}
-
-		if tag.RowsAffected() == 0 {
-			return Campaign{}, apperr.E(apperr.Conflict, "error.retryOnlyFailedOrSkipped")
-		}
-	default:
-		target, ok := transitions[input.Action][state]
-		if !ok {
-			return Campaign{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
-		}
-
-		if input.Action == "resume" && c.Now.Before(start) {
-			target = "scheduled" // resuming before the start time returns to scheduled
-		}
-
-		if input.Action == "resume" {
-			clear := ""
-			reason = &clear // the runner's pause reason ends with the pause (IR339)
-		}
-
-		next = target
-
-		if input.Action == "abort" {
-			r := strings.TrimSpace(*input.Reason)
-			reason = &r
-		}
+	next, reason, err := campaignTransition(ctx, call, input, state, start)
+	if err != nil {
+		return Campaign{}, err
 	}
 
-	scanErr := c.Tx.QueryRow(ctx, `UPDATE devices.firmware_campaigns SET state = $2, reason = NULLIF(COALESCE($3, reason),
+	scanErr := call.Tx.QueryRow(ctx, `UPDATE devices.firmware_campaigns SET state = $2, reason = NULLIF(COALESCE($3,
+		reason),
 		''), version = version + 1, updated_at = platform.app_now()
 		WHERE id = $1 RETURNING version`, input.CampaignID, next, reason).
 		Scan(&version)
@@ -762,26 +831,89 @@ func campaignsControl(ctx context.Context, c *ops.Call, input *ControlInput) (Ca
 		auditReason = *reason
 	}
 
-	c.Emit(
+	call.Emit(
 		ops.Event{
-			AggregateType: "firmware_campaign",
+			AggregateType: entityCampaign,
 			AggregateID:   input.CampaignID,
 			Type:          "FirmwareCampaignChanged",
-			Payload:       map[string]string{"action": input.Action, "state": next},
+			Payload:       map[string]string{fieldAction: input.Action, fieldState: next},
 		},
 	)
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "firmwareCampaigns.control",
-			TargetKind:      "firmware_campaign",
+			TargetKind:      entityCampaign,
 			TargetID:        input.CampaignID.String(),
-			PreviousVersion: c.ExpectedVersion,
+			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &version,
 			Reason:          auditReason, Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return campaignDetail(ctx, c, input.CampaignID)
+	return campaignDetail(ctx, call, input.CampaignID)
+}
+
+// campaignTransition applies a control action to a campaign in state. retry_device returns one failed or skipped
+// device of a running or paused campaign to pending and keeps the state; the other actions move the state
+// (transitions). It returns the next state and the reason to store (nil keeps the stored one).
+func campaignTransition(
+	ctx context.Context,
+	call *ops.Call,
+	input *ControlInput,
+	state string,
+	start time.Time,
+) (string, *string, error) {
+	if input.Action == actionRetryDevice {
+		return state, nil, retryDevice(ctx, call, input, state)
+	}
+
+	next, allowed := transitions()[input.Action][state]
+	if !allowed {
+		return "", nil, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
+	}
+
+	var reason *string
+
+	if input.Action == actionResume && call.Now.Before(start) {
+		next = stateScheduled // resuming before the start time returns to scheduled
+	}
+
+	if input.Action == actionResume {
+		cleared := ""
+		reason = &cleared // the runner's pause reason ends with the pause (IR339)
+	}
+
+	if input.Action == actionAbort {
+		trimmed := strings.TrimSpace(*input.Reason)
+		reason = &trimmed
+	}
+
+	return next, reason, nil
+}
+
+// retryDevice returns a failed or skipped device of a running or paused campaign to pending.
+func retryDevice(ctx context.Context, call *ops.Call, input *ControlInput, state string) error {
+	if state != stateRunning && state != statePaused {
+		return apperr.E(apperr.Conflict, apperr.KeyInvalidState)
+	}
+
+	tag, err := call.Tx.Exec(
+		ctx,
+		`UPDATE devices.firmware_campaign_devices SET result = 'pending', detail = NULL, operation_id = NULL, result_at =
+			NULL
+		WHERE campaign_id = $1 AND device_id = $2 AND result IN ('failed','skipped')`,
+		input.CampaignID,
+		*input.DeviceID,
+	)
+	if err != nil {
+		return apperr.Wrap(err, "update devices.firmware_campaign_devices")
+	}
+
+	if tag.RowsAffected() == 0 {
+		return apperr.E(apperr.Conflict, "error.retryOnlyFailedOrSkipped")
+	}
+
+	return nil
 }
 
 // RegisterCampaigns binds the firmware campaign operations.

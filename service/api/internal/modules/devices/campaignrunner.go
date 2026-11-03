@@ -20,56 +20,69 @@ import (
 const (
 	waveSuccessPercent = 95             // the next wave starts once the one before it reaches 95 % success
 	noticeLead         = 24 * time.Hour // the customers of the affected units hear of the update 24 h before the start
+	mytOffsetSeconds   = 8 * 60 * 60    // Malaysia Time is UTC+8 all year
+)
+
+// The reason keys of a device's campaign result (FirmwareCampaignResult.reasonKey).
+const (
+	keyDeviceBusy       = "errors.device_busy"
+	keyDeviceOffline    = "errors.device_offline"
+	keyDeviceUnbound    = "errors.device_unbound"
+	keyInstallFailed    = "errors.install_failed"
+	keyInstallTimeout   = "errors.install_timeout"
+	keyOtherModel       = "errors.other_model"
+	keyTamperUnresolved = "errors.tamper_unresolved"
 )
 
 // localZone is the devices' local time of the install window: Kuala Lumpur (no site has another zone).
 func localZone() *time.Location {
 	l, err := time.LoadLocation("Asia/Kuala_Lumpur")
 	if err != nil {
-		return time.FixedZone("MYT", 8*3600)
+		return time.FixedZone("MYT", mytOffsetSeconds)
 	}
 
 	return l
 }
 
-// inWindow reports whether the local clock time of now lies in [from, to) (HH:MM); a window that ends earlier than
+// inWindow reports whether the local clock time of now lies in [start, end) (HH:MM); a window that ends earlier than
 // it starts runs over midnight.
-func inWindow(now time.Time, from, to string) bool {
+func inWindow(now time.Time, start, end string) bool {
 	hm := now.In(localZone()).Format("15:04")
-	if from < to {
-		return hm >= from && hm < to
+	if start < end {
+		return hm >= start && hm < end
 	}
 
-	return hm >= from || hm < to
+	return hm >= start || hm < end
 }
 
-// outcome maps a finished firmware operation onto the device's campaign result. An operation that the unit's other
-// work (CONFLICT) or a lost connection (OFFLINE) stopped at its start skips the device; no answer within the
-// operation's lifetime (TIMEOUT) or a failure the device reports fails it, and it keeps its old version (FR-T11).
-func outcome(status, code string) (result, key string) {
+// outcome maps a finished firmware operation onto the device's campaign result and its reason key. An operation that
+// the unit's other work (CONFLICT) or a lost connection (OFFLINE) stopped at its start skips the device; no answer
+// within the operation's lifetime (TIMEOUT) or a failure the device reports fails it, and it keeps its old version
+// (FR-T11).
+func outcome(status, code string) (string, string) {
 	switch {
-	case status == "succeeded":
-		return "succeeded", ""
+	case status == statusSucceeded:
+		return resultSucceeded, ""
 	case code == string(apperr.Conflict):
-		return "skipped", "errors.device_busy"
+		return resultSkipped, keyDeviceBusy
 	case code == string(apperr.Offline):
-		return "skipped", "errors.device_offline"
+		return resultSkipped, keyDeviceOffline
 	case code == string(apperr.Timeout):
-		return "failed", "errors.install_timeout"
+		return resultFailed, keyInstallTimeout
 	}
 
-	return "failed", "errors.install_failed"
+	return resultFailed, keyInstallFailed
 }
 
 // waveCount is the number of a wave's devices in each result.
 type waveCount map[string]int
 
 func (w waveCount) total() int {
-	return w["pending"] + w["installing"] + w["succeeded"] + w["failed"] + w["skipped"]
+	return w[resultPending] + w[resultInstalling] + w[resultSucceeded] + w[resultFailed] + w[resultSkipped]
 }
 
 // passed reports whether the wave lets the next one start: 95 % of its devices succeeded (an empty wave passes).
-func (w waveCount) passed() bool { return w["succeeded"]*100 >= waveSuccessPercent*w.total() }
+func (w waveCount) passed() bool { return w[resultSucceeded]*100 >= waveSuccessPercent*w.total() }
 
 // AdvanceCampaigns is the equipment scheduler job of firmware campaigns (BR-A20, IR339). Each tick it
 //   - sends the customers' notice of a scheduled campaign 24 h before its start, once;
@@ -107,7 +120,7 @@ func (m *Module) AdvanceCampaigns(ctx context.Context, call *ops.Call) (int, err
 	}
 
 	for _, s := range list {
-		campaignChanged(call, s.id, "start", "running", s.v, "")
+		campaignChanged(call, s.id, "start", stateRunning, s.v, "")
 	}
 
 	count += len(list)
@@ -137,29 +150,36 @@ func (m *Module) AdvanceCampaigns(ctx context.Context, call *ops.Call) (int, err
 
 // campaignChanged records a transition the runner made (FirmwareCampaignChanged, audited as the system).
 func campaignChanged(
-	c *ops.Call,
+	call *ops.Call,
 	campaignID uuid.UUID,
 	action, state string,
-	v int,
+	version int,
 	reason string,
 ) {
-	c.Emit(
+	call.Emit(
 		ops.Event{
-			AggregateType: "firmware_campaign",
+			AggregateType: entityCampaign,
 			AggregateID:   campaignID,
 			Type:          "FirmwareCampaignChanged",
-			Payload:       map[string]string{"action": action, "state": state},
+			Payload:       map[string]string{fieldAction: action, fieldState: state},
 		},
 	)
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:      "firmwareCampaigns." + action,
-			TargetKind:  "firmware_campaign",
+			TargetKind:  entityCampaign,
 			TargetID:    campaignID.String(),
-			NextVersion: &v,
+			NextVersion: &version,
 			Reason:      reason, PreviousVersion: nil, Result: "", Before: nil, After: nil,
 		},
 	)
+}
+
+// dueNotice is a scheduled campaign whose customer notice is due, with its start and install window.
+type dueNotice struct {
+	id                     uuid.UUID
+	start                  time.Time
+	windowStart, windowEnd string
 }
 
 // campaignNotices tells the customers of the affected units 24 h before a campaign starts (BR-A20, DD-A20 step 3):
@@ -177,121 +197,143 @@ func (m *Module) campaignNotices(ctx context.Context, call *ops.Call) (int, erro
 		return 0, apperr.Wrap(err, "select devices.firmware_campaigns")
 	}
 
-	type due struct {
-		id       uuid.UUID
-		start    time.Time
-		from, to string
-	}
+	list, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (dueNotice, error) {
+		var notice dueNotice
 
-	list, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (due, error) {
-		var d due
-
-		return d, r.Scan(&d.id, &d.start, &d.from, &d.to)
+		return notice, row.Scan(&notice.id, &notice.start, &notice.windowStart, &notice.windowEnd)
 	})
 	if err != nil {
 		return 0, apperr.Wrap(err, "select devices.firmware_campaigns")
 	}
 
 	for _, campaign := range list {
-		rows, err := call.Tx.Query(
-			ctx,
-			`SELECT DISTINCT COALESCE(dv.unit_id, dv.target_unit_id) FROM devices.firmware_campaign_devices fd
-			JOIN devices.devices dv ON dv.id = fd.device_id WHERE fd.campaign_id = $1`,
-			campaign.id,
-		)
+		err := m.sendNotice(ctx, call, campaign)
 		if err != nil {
-			return 0, apperr.Wrap(err, "select devices.firmware_campaign_devices")
+			return 0, err
 		}
-
-		units, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
-		if err != nil {
-			return 0, apperr.Wrap(err, "select devices.firmware_campaign_devices")
-		}
-
-		message := fmt.Sprintf(
-			"Firmware update from %s, %s–%s local time. The AC may restart for about 2 minutes.",
-			campaign.start.In(localZone()).Format("2 Jan 2006"),
-			campaign.from,
-			campaign.to,
-		)
-		sent := 0
-
-		for _, unitID := range units {
-			info, ok, err := m.Units.UnitInfo(ctx, call, unitID)
-			if err != nil {
-				return 0, apperr.Wrap(err, "devices.Units.UnitInfo")
-			}
-
-			if !ok || info.OrgID == uuid.Nil {
-				continue
-			}
-
-			recipients, err := identity.Members(
-				ctx,
-				call,
-				identity.MembersInput{
-					Role:           "client",
-					OrganizationID: &info.OrgID,
-					IDs:            nil,
-					Permission:     "",
-					ClientRole:     "",
-				},
-			)
-			if err != nil {
-				return 0, apperr.Wrap(err, "identity.Members")
-			}
-
-			for _, r := range recipients {
-				_, err := (notify.Store{}).Create(ctx, call, notify.New{
-					RecipientMembershipID: r,
-					Type:                  "device_operation",
-					TemplateKey:           "device_operation",
-					TargetKind:            "unit",
-					TargetID:              unitID,
-					Severity:              "normal",
-					Params: map[string]any{
-						"at":      campaign.start,
-						"status":  "scheduled",
-						"message": message,
-					}, Channel: "", SourceAlertID: nil,
-				})
-				if err != nil {
-					return 0, apperr.Wrap(err, "notify.Store.Create")
-				}
-
-				sent++
-			}
-		}
-
-		_, execErr := call.Tx.Exec(
-			ctx,
-			`UPDATE devices.firmware_campaigns SET notice_sent_at = $2 WHERE id = $1`,
-			campaign.id,
-			call.Now,
-		)
-		if execErr != nil {
-			return 0, apperr.Wrap(execErr, "update devices.firmware_campaigns")
-		}
-
-		call.Audit(
-			ops.AuditEntry{
-				Action:     "firmwareCampaigns.notice",
-				TargetKind: "firmware_campaign",
-				TargetID:   campaign.id.String(),
-				Reason: fmt.Sprintf(
-					"%d customer notices",
-					sent,
-				),
-				PreviousVersion: nil,
-				NextVersion:     nil,
-				Result:          "",
-				Before:          nil,
-				After:           nil,
-			},
-		)
 	}
 
 	return len(list), nil
+}
+
+// sendNotice notifies the customers of the units a campaign affects, marks its notice sent and audits how many
+// notifications it sent.
+func (m *Module) sendNotice(ctx context.Context, call *ops.Call, campaign dueNotice) error {
+	rows, err := call.Tx.Query(
+		ctx,
+		`SELECT DISTINCT COALESCE(dv.unit_id, dv.target_unit_id) FROM devices.firmware_campaign_devices fd
+		JOIN devices.devices dv ON dv.id = fd.device_id WHERE fd.campaign_id = $1`,
+		campaign.id,
+	)
+	if err != nil {
+		return apperr.Wrap(err, "select devices.firmware_campaign_devices")
+	}
+
+	units, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	if err != nil {
+		return apperr.Wrap(err, "select devices.firmware_campaign_devices")
+	}
+
+	message := fmt.Sprintf(
+		"Firmware update from %s, %s–%s local time. The AC may restart for about 2 minutes.",
+		campaign.start.In(localZone()).Format("2 Jan 2006"),
+		campaign.windowStart,
+		campaign.windowEnd,
+	)
+	sent := 0
+
+	for _, unitID := range units {
+		count, err := m.notifyUnitCustomer(ctx, call, unitID, campaign.start, message)
+		if err != nil {
+			return err
+		}
+
+		sent += count
+	}
+
+	_, execErr := call.Tx.Exec(
+		ctx,
+		`UPDATE devices.firmware_campaigns SET notice_sent_at = $2 WHERE id = $1`,
+		campaign.id,
+		call.Now,
+	)
+	if execErr != nil {
+		return apperr.Wrap(execErr, "update devices.firmware_campaigns")
+	}
+
+	call.Audit(
+		ops.AuditEntry{
+			Action:     "firmwareCampaigns.notice",
+			TargetKind: entityCampaign,
+			TargetID:   campaign.id.String(),
+			Reason: fmt.Sprintf(
+				"%d customer notices",
+				sent,
+			),
+			PreviousVersion: nil,
+			NextVersion:     nil,
+			Result:          "",
+			Before:          nil,
+			After:           nil,
+		},
+	)
+
+	return nil
+}
+
+// notifyUnitCustomer sends the campaign notice to each client member of the unit's customer (none for a unit
+// without one) and returns how many notifications it sent.
+func (m *Module) notifyUnitCustomer(
+	ctx context.Context,
+	call *ops.Call,
+	unitID uuid.UUID,
+	start time.Time,
+	message string,
+) (int, error) {
+	info, found, err := m.Units.UnitInfo(ctx, call, unitID)
+	if err != nil {
+		return 0, apperr.Wrap(err, "devices.Units.UnitInfo")
+	}
+
+	if !found || info.OrgID == uuid.Nil {
+		return 0, nil
+	}
+
+	recipients, err := identity.Members(
+		ctx,
+		call,
+		identity.MembersInput{
+			Role:           roleClient,
+			OrganizationID: &info.OrgID,
+			IDs:            nil,
+			Permission:     "",
+			ClientRole:     "",
+		},
+	)
+	if err != nil {
+		return 0, apperr.Wrap(err, "identity.Members")
+	}
+
+	for _, recipient := range recipients {
+		_, err := (notify.Store{}).Create(ctx, call, notify.New{
+			RecipientMembershipID: recipient,
+			Type:                  "device_operation",
+			TemplateKey:           "device_operation",
+			TargetKind:            "unit",
+			TargetID:              unitID,
+			Severity:              "normal",
+			Params: map[string]any{
+				"at":        start,
+				fieldStatus: stateScheduled,
+				"message":   message,
+			}, Channel: "", SourceAlertID: nil,
+		})
+		if err != nil {
+			return 0, apperr.Wrap(err, "notify.Store.Create")
+		}
+	}
+
+	return len(recipients), nil
 }
 
 // waveCounts counts the campaign's devices per wave and result.
@@ -318,21 +360,64 @@ func waveCounts(
 
 	for rows.Next() {
 		var (
-			wave, k int
-			result  string
+			wave, count int
+			result      string
 		)
 
-		err := rows.Scan(&wave, &result, &k)
+		err := rows.Scan(&wave, &result, &count)
 		if err != nil {
 			return nil, apperr.Wrap(err, "select devices.firmware_campaign_devices")
 		}
 
 		if wave >= 0 && wave < waves {
-			out[wave][result] += k
+			out[wave][result] += count
 		}
 	}
 
 	return out, apperr.Wrap(rows.Err(), "select devices.firmware_campaign_devices")
+}
+
+// runningCampaign is what the runner needs of a running campaign.
+type runningCampaign struct {
+	waves                  []Wave
+	model                  uuid.UUID
+	windowStart, windowEnd string
+	target                 string
+	autoPausePercent       int
+}
+
+// loadRunningCampaign reads the waves, model, install window, target version and auto-pause threshold of a campaign.
+func loadRunningCampaign(
+	ctx context.Context,
+	call *ops.Call,
+	campaignID uuid.UUID,
+) (runningCampaign, error) {
+	var (
+		campaign runningCampaign
+		raw      []byte
+	)
+
+	err := call.Tx.QueryRow(ctx, `SELECT waves, model_id, to_char(window_start_local, 'HH24:MI'), to_char(window_end_local,
+		'HH24:MI'), target_version, auto_pause_failure_percent
+		FROM devices.firmware_campaigns WHERE id = $1`, campaignID).
+		Scan(
+			&raw,
+			&campaign.model,
+			&campaign.windowStart,
+			&campaign.windowEnd,
+			&campaign.target,
+			&campaign.autoPausePercent,
+		)
+	if err != nil {
+		return campaign, apperr.Wrap(err, "select devices.firmware_campaigns")
+	}
+
+	err = json.Unmarshal(raw, &campaign.waves)
+	if err != nil {
+		return campaign, apperr.Wrap(err, "json.Unmarshal")
+	}
+
+	return campaign, nil
 }
 
 // advanceCampaign moves one running campaign:
@@ -340,54 +425,94 @@ func waveCounts(
 //   - a wave that a new failure takes above autoPauseFailurePercent pauses the campaign;
 //   - inside the install window, the pending devices of each wave whose earlier waves passed start installing;
 //   - once every wave passed and no device is pending or installing, the campaign is completed.
-func (m *Module) advanceCampaign(ctx context.Context, call *ops.Call, id uuid.UUID) (int, error) {
-	var (
-		raw              []byte
-		model            uuid.UUID
-		from, to, target string
-		autoPause        int
+func (m *Module) advanceCampaign(
+	ctx context.Context,
+	call *ops.Call,
+	campaignID uuid.UUID,
+) (int, error) {
+	campaign, err := loadRunningCampaign(ctx, call, campaignID)
+	if err != nil {
+		return 0, err
+	}
+
+	failedNow, count, err := recordInstallResults(ctx, call, campaignID)
+	if err != nil {
+		return 0, err
+	}
+
+	counts, err := waveCounts(ctx, call, campaignID, len(campaign.waves))
+	if err != nil {
+		return count, err
+	}
+
+	paused, err := autoPauseCampaign(
+		ctx,
+		call,
+		campaignID,
+		counts,
+		failedNow,
+		campaign.autoPausePercent,
 	)
-
-	err := call.Tx.QueryRow(ctx, `SELECT waves, model_id, to_char(window_start_local, 'HH24:MI'), to_char(window_end_local,
-		'HH24:MI'), target_version, auto_pause_failure_percent
-		FROM devices.firmware_campaigns WHERE id = $1`, id).
-		Scan(&raw, &model, &from, &to, &target, &autoPause)
 	if err != nil {
-		return 0, apperr.Wrap(err, "select devices.firmware_campaigns")
+		return count, err
 	}
 
-	var waves []Wave
-
-	err = json.Unmarshal(raw, &waves)
-	if err != nil {
-		return 0, apperr.Wrap(err, "json.Unmarshal")
+	if paused {
+		return count + 1, nil
 	}
 
+	dispatched, done, err := m.installWaves(ctx, call, campaignID, campaign, counts)
+	if count += dispatched; err != nil || !done {
+		return count, err
+	}
+
+	err = completeCampaign(ctx, call, campaignID)
+	if err != nil {
+		return count, err
+	}
+
+	return count + 1, nil
+}
+
+// finishedInstall is a campaign device whose firmware operation finished.
+type finishedInstall struct {
+	device       uuid.UUID
+	wave         int
+	status, code string
+	at           time.Time
+}
+
+// recordInstallResults gives the installing devices whose operation finished their result (outcome). It returns the
+// waves that got a new failure and how many devices it moved.
+func recordInstallResults(
+	ctx context.Context,
+	call *ops.Call,
+	campaignID uuid.UUID,
+) (map[int]bool, int, error) {
 	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT d.device_id, d.wave, o.status, COALESCE(o.failure_code, ''), COALESCE(o.finished_at, o.updated_at)
 		FROM devices.firmware_campaign_devices d JOIN devices.device_operations o ON o.id = d.operation_id
 		WHERE d.campaign_id = $1 AND d.result = 'installing' AND o.status IN ('succeeded', 'failed')`,
-		id,
+		campaignID,
 	)
 	if err != nil {
-		return 0, apperr.Wrap(err, "select devices.firmware_campaign_devices")
+		return nil, 0, apperr.Wrap(err, "select devices.firmware_campaign_devices")
 	}
 
-	type finished struct {
-		device       uuid.UUID
-		wave         int
-		status, code string
-		at           time.Time
-	}
+	done, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (finishedInstall, error) {
+		var install finishedInstall
 
-	done, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (finished, error) {
-		var f finished
-
-		return f, r.Scan(&f.device, &f.wave, &f.status, &f.code, &f.at)
+		return install, row.Scan(
+			&install.device,
+			&install.wave,
+			&install.status,
+			&install.code,
+			&install.at,
+		)
 	})
 	if err != nil {
-		return 0, apperr.Wrap(err, "select devices.firmware_campaign_devices")
+		return nil, 0, apperr.Wrap(err, "select devices.firmware_campaign_devices")
 	}
 
 	failedNow := map[int]bool{}
@@ -399,93 +524,133 @@ func (m *Module) advanceCampaign(ctx context.Context, call *ops.Call, id uuid.UU
 			ctx,
 			`UPDATE devices.firmware_campaign_devices SET result = $3, detail = NULLIF($4, ''), result_at = $5 WHERE campaign_id
 				= $1 AND device_id = $2`,
-			id,
+			campaignID,
 			install.device,
 			result,
 			key,
 			install.at,
 		)
 		if err != nil {
-			return 0, apperr.Wrap(err, "update devices.firmware_campaign_devices")
+			return nil, 0, apperr.Wrap(err, "update devices.firmware_campaign_devices")
 		}
 
-		if result == "failed" {
+		if result == resultFailed {
 			failedNow[install.wave] = true
 		}
 	}
 
-	count := len(done)
+	return failedNow, len(done), nil
+}
 
-	counts, err := waveCounts(ctx, call, id, len(waves))
-	if err != nil {
-		return count, err
-	}
-
-	for wave := range waves {
-		if failedNow[wave] && counts[wave]["failed"]*100 > autoPause*counts[wave].total() {
+// autoPauseCampaign pauses the campaign when a wave that got a new failure has more than autoPausePercent of its
+// devices failed, and reports whether it did.
+func autoPauseCampaign(
+	ctx context.Context,
+	call *ops.Call,
+	campaignID uuid.UUID,
+	counts []waveCount,
+	failedNow map[int]bool,
+	autoPausePercent int,
+) (bool, error) {
+	for wave := range counts {
+		if failedNow[wave] &&
+			counts[wave][resultFailed]*100 > autoPausePercent*counts[wave].total() {
 			reason := fmt.Sprintf(
 				"Auto-paused: %d of %d devices failed in wave %d (more than %d %%).",
-				counts[wave]["failed"],
+				counts[wave][resultFailed],
 				counts[wave].total(),
 				wave+1,
-				autoPause,
+				autoPausePercent,
 			)
 
-			var v int
+			var version int
 
 			err := call.Tx.QueryRow(ctx, `UPDATE devices.firmware_campaigns SET state = 'paused', reason = $2, version = version
 				+
 				1, updated_at = $3 WHERE id = $1 RETURNING version`,
-				id, reason, call.Now).
-				Scan(&v)
+				campaignID, reason, call.Now).
+				Scan(&version)
 			if err != nil {
-				return count, apperr.Wrap(err, "update devices.firmware_campaigns")
+				return false, apperr.Wrap(err, "update devices.firmware_campaigns")
 			}
 
-			campaignChanged(call, id, "autoPause", "paused", v, reason)
+			campaignChanged(call, campaignID, "autoPause", statePaused, version, reason)
 
-			return count + 1, nil
+			return true, nil
 		}
 	}
 
-	open := inWindow(call.Now, from, to)
-	for wave := range waves {
-		if open && counts[wave]["pending"] > 0 {
-			k, err := m.dispatchWave(ctx, call, id, wave, model, target)
-			if count += k; err != nil {
-				return count, err
+	return false, nil
+}
+
+// installWaves starts, inside the install window, the pending devices of each wave whose earlier waves passed. It
+// returns how many devices it moved and whether every wave passed with no device pending or installing.
+func (m *Module) installWaves(
+	ctx context.Context,
+	call *ops.Call,
+	campaignID uuid.UUID,
+	campaign runningCampaign,
+	counts []waveCount,
+) (int, bool, error) {
+	count := 0
+
+	open := inWindow(call.Now, campaign.windowStart, campaign.windowEnd)
+	for wave := range campaign.waves {
+		if open && counts[wave][resultPending] > 0 {
+			dispatched, err := m.dispatchWave(
+				ctx,
+				call,
+				campaignID,
+				wave,
+				campaign.model,
+				campaign.target,
+			)
+			if count += dispatched; err != nil {
+				return count, false, err
 			}
 
-			counts, err = waveCounts(ctx, call, id, len(waves))
+			counts, err = waveCounts(ctx, call, campaignID, len(campaign.waves))
 			if err != nil {
-				return count, err
+				return count, false, err
 			}
 		}
 
 		if !counts[wave].passed() {
-			return count, nil // the later waves wait for this one
+			return count, false, nil // the later waves wait for this one
 		}
 	}
 
-	for _, w := range counts {
-		if w["pending"] > 0 || w["installing"] > 0 {
-			return count, nil
+	for _, tally := range counts {
+		if tally[resultPending] > 0 || tally[resultInstalling] > 0 {
+			return count, false, nil
 		}
 	}
 
+	return count, true, nil
+}
+
+// completeCampaign completes a campaign whose waves all passed.
+func completeCampaign(ctx context.Context, call *ops.Call, campaignID uuid.UUID) error {
 	var version int
 
 	scanErr := call.Tx.QueryRow(ctx, `UPDATE devices.firmware_campaigns SET state = 'completed', version = version + 1,
 		updated_at = $2 WHERE id = $1 RETURNING version`,
-		id, call.Now).
+		campaignID, call.Now).
 		Scan(&version)
 	if scanErr != nil {
-		return count, apperr.Wrap(scanErr, "update devices.firmware_campaigns")
+		return apperr.Wrap(scanErr, "update devices.firmware_campaigns")
 	}
 
-	campaignChanged(call, id, "complete", "completed", version, "")
+	campaignChanged(call, campaignID, "complete", stateCompleted, version, "")
 
-	return count + 1, nil
+	return nil
+}
+
+// pendingDevice is a pending device of a wave with what decides its dispatch.
+type pendingDevice struct {
+	id               uuid.UUID
+	unit             *uuid.UUID
+	conn, tamper, fw string
 }
 
 // dispatchWave starts the firmware update of the wave's pending devices. A device that left its unit or the
@@ -514,146 +679,187 @@ func (m *Module) dispatchWave(
 		return 0, apperr.Wrap(err, "select devices.firmware_campaign_devices")
 	}
 
-	type pending struct {
-		id               uuid.UUID
-		unit             *uuid.UUID
-		conn, tamper, fw string
-	}
+	list, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (pendingDevice, error) {
+		var device pendingDevice
 
-	list, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (pending, error) {
-		var p pending
-
-		return p, r.Scan(&p.id, &p.unit, &p.conn, &p.tamper, &p.fw)
+		return device, row.Scan(&device.id, &device.unit, &device.conn, &device.tamper, &device.fw)
 	})
 	if err != nil {
 		return 0, apperr.Wrap(err, "select devices.firmware_campaign_devices")
 	}
 
-	set := func(device uuid.UUID, result, key string, operationID *uuid.UUID) error {
-		_, err := call.Tx.Exec(
-			ctx,
-			`UPDATE devices.firmware_campaign_devices SET result = $3, detail = NULLIF($4, ''), operation_id = $5, result_at = $6
-			WHERE campaign_id = $1 AND device_id = $2`,
-			campaignID,
-			device,
-			result,
-			key,
-			operationID,
-			call.Now,
-		)
-
-		return apperr.Wrap(err, "update devices.firmware_campaign_devices")
-	}
 	for _, device := range list {
-		key := ""
-
-		switch {
-		case device.unit == nil:
-			key = "errors.device_unbound"
-		case device.fw == target:
-			err := set(device.id, "succeeded", "", nil)
-			if err != nil {
-				return 0, err
-			}
-
-			continue
-		case device.tamper == "detected":
-			key = "errors.tamper_unresolved"
-		case device.conn != "online":
-			key = "errors.device_offline"
-		}
-
-		if key == "" {
-			u, found, err := m.Units.UnitInfo(ctx, call, *device.unit)
-			if err != nil {
-				return 0, apperr.Wrap(err, "devices.Units.UnitInfo")
-			}
-
-			var open bool // an operation of the device not finished yet, expired or not (one firmware operation per device)
-
-			scanErr := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE device_id = $1 AND
-				status
-				IN ('queued','running'))`, device.id).
-				Scan(&open)
-			if scanErr != nil {
-				return 0, apperr.Wrap(scanErr, "select devices.device_operations")
-			}
-
-			if !found || u.ModelID != model {
-				key = "errors.other_model"
-			} else if open {
-				key = "errors.device_busy"
-			} else {
-				err := m.exclusive(ctx, call, *device.unit)
-				if err != nil {
-					var de *apperr.DomainError
-					if !errors.As(err, &de) || de.Code != apperr.Conflict {
-						return 0, err
-					}
-
-					key = "errors.device_busy"
-				}
-			}
-		}
-
-		if key != "" {
-			err := set(device.id, "skipped", key, nil)
-			if err != nil {
-				return 0, err
-			}
-
-			continue
-		}
-
-		operationID := uuid.Must(uuid.NewV7())
-
-		_, err := call.Tx.Exec(
-			ctx,
-			`INSERT INTO devices.device_operations (id, tenant_id, device_id, unit_id, kind, status, target_version, campaign_id,
-				expires_at)
-			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, 'firmware', 'queued', $4, $5, $6)`,
-			operationID,
-			device.id,
-			*device.unit,
-			target,
-			campaignID,
-			call.Now.Add(operationTTL),
-		)
-		if err != nil {
-			return 0, apperr.Wrap(err, "insert devices.device_operations")
-		}
-
-		err = set(device.id, "installing", "", &operationID)
+		err := m.dispatchDevice(ctx, call, campaignID, device, model, target)
 		if err != nil {
 			return 0, err
 		}
-
-		call.Emit(
-			ops.Event{
-				AggregateType: "device",
-				AggregateID:   device.id,
-				Type:          "DeviceOperationRequested",
-				Payload: map[string]any{
-					"operationId": operationID,
-					"kind":        "firmware",
-					"campaignId":  campaignID,
-				},
-			},
-		)
-		call.Audit(
-			ops.AuditEntry{
-				Action:          "firmwareCampaigns.install",
-				TargetKind:      "device",
-				TargetID:        device.id.String(),
-				Reason:          "campaign " + campaignID.String(),
-				PreviousVersion: nil,
-				NextVersion:     nil,
-				Result:          "",
-				Before:          nil,
-				After:           nil,
-			},
-		)
 	}
 
 	return len(list), nil
+}
+
+// dispatchDevice settles one pending device of a wave: on the target version already it succeeded, with a skip reason
+// it is skipped, otherwise it gets a queued firmware operation of the campaign.
+func (m *Module) dispatchDevice(
+	ctx context.Context,
+	call *ops.Call,
+	campaignID uuid.UUID,
+	device pendingDevice,
+	model uuid.UUID,
+	target string,
+) error {
+	if device.unit != nil && device.fw == target {
+		return setCampaignDevice(ctx, call, campaignID, device.id, resultSucceeded, "", nil)
+	}
+
+	key, err := m.skipReason(ctx, call, device, model)
+	if err != nil {
+		return err
+	}
+
+	if key != "" {
+		return setCampaignDevice(ctx, call, campaignID, device.id, resultSkipped, key, nil)
+	}
+
+	operationID := uuid.Must(uuid.NewV7())
+
+	_, err = call.Tx.Exec(
+		ctx,
+		`INSERT INTO devices.device_operations (id, tenant_id, device_id, unit_id, kind, status, target_version, campaign_id,
+			expires_at)
+		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, 'firmware', 'queued', $4, $5, $6)`,
+		operationID,
+		device.id,
+		*device.unit,
+		target,
+		campaignID,
+		call.Now.Add(operationTTL),
+	)
+	if err != nil {
+		return apperr.Wrap(err, "insert devices.device_operations")
+	}
+
+	err = setCampaignDevice(ctx, call, campaignID, device.id, resultInstalling, "", &operationID)
+	if err != nil {
+		return err
+	}
+
+	installRequested(call, campaignID, device.id, operationID)
+
+	return nil
+}
+
+// installRequested emits DeviceOperationRequested of a campaign's firmware operation and audits the install.
+func installRequested(call *ops.Call, campaignID, device, operationID uuid.UUID) {
+	call.Emit(
+		ops.Event{
+			AggregateType: entityDevice,
+			AggregateID:   device,
+			Type:          "DeviceOperationRequested",
+			Payload: map[string]any{
+				fieldOperationID: operationID,
+				"kind":           kindFirmware,
+				"campaignId":     campaignID,
+			},
+		},
+	)
+	call.Audit(
+		ops.AuditEntry{
+			Action:          "firmwareCampaigns.install",
+			TargetKind:      entityDevice,
+			TargetID:        device.String(),
+			Reason:          "campaign " + campaignID.String(),
+			PreviousVersion: nil,
+			NextVersion:     nil,
+			Result:          "",
+			Before:          nil,
+			After:           nil,
+		},
+	)
+}
+
+// skipReason is the reason key that skips a pending device not yet on the target version ("" when it may install):
+// it left its unit, has an open tamper event or is not online, else the reason its unit gives (unitSkipReason).
+func (m *Module) skipReason(
+	ctx context.Context,
+	call *ops.Call,
+	device pendingDevice,
+	model uuid.UUID,
+) (string, error) {
+	switch {
+	case device.unit == nil:
+		return keyDeviceUnbound, nil
+	case device.tamper == tamperDetected:
+		return keyTamperUnresolved, nil
+	case device.conn != connOnline:
+		return keyDeviceOffline, nil
+	}
+
+	return m.unitSkipReason(ctx, call, device, model)
+}
+
+// unitSkipReason is the skip reason of a bound, online device without tamper: its unit has another model, it still has
+// an unfinished operation, or its unit is busy (D05).
+func (m *Module) unitSkipReason(
+	ctx context.Context,
+	call *ops.Call,
+	device pendingDevice,
+	model uuid.UUID,
+) (string, error) {
+	unitInfo, found, err := m.Units.UnitInfo(ctx, call, *device.unit)
+	if err != nil {
+		return "", apperr.Wrap(err, "devices.Units.UnitInfo")
+	}
+
+	var open bool // an operation of the device not finished yet, expired or not (one firmware operation per device)
+
+	scanErr := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE device_id = $1 AND
+		status
+		IN ('queued','running'))`, device.id).
+		Scan(&open)
+	if scanErr != nil {
+		return "", apperr.Wrap(scanErr, "select devices.device_operations")
+	}
+
+	switch {
+	case !found || unitInfo.ModelID != model:
+		return keyOtherModel, nil
+	case open:
+		return keyDeviceBusy, nil
+	}
+
+	err = m.exclusive(ctx, call, *device.unit)
+	if err == nil {
+		return "", nil
+	}
+
+	var de *apperr.DomainError
+	if !errors.As(err, &de) || de.Code != apperr.Conflict {
+		return "", err
+	}
+
+	return keyDeviceBusy, nil
+}
+
+// setCampaignDevice records the result of a campaign's device, with its reason key and operation.
+func setCampaignDevice(
+	ctx context.Context,
+	call *ops.Call,
+	campaignID, device uuid.UUID,
+	result, key string,
+	operationID *uuid.UUID,
+) error {
+	_, err := call.Tx.Exec(
+		ctx,
+		`UPDATE devices.firmware_campaign_devices SET result = $3, detail = NULLIF($4, ''), operation_id = $5, result_at = $6
+		WHERE campaign_id = $1 AND device_id = $2`,
+		campaignID,
+		device,
+		result,
+		key,
+		operationID,
+		call.Now,
+	)
+
+	return apperr.Wrap(err, "update devices.firmware_campaign_devices")
 }

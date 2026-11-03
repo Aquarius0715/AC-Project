@@ -204,13 +204,9 @@ func (m *Module) bindDetail(
 		return DeviceDetail{}, err
 	}
 
-	unitInfo, ok, err := m.Units.UnitInfo(ctx, call, input.UnitID)
+	unitInfo, err := m.existingUnit(ctx, call, input.UnitID)
 	if err != nil {
-		return DeviceDetail{}, apperr.Wrap(err, "devices.Units.UnitInfo")
-	}
-
-	if !ok {
-		return DeviceDetail{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+		return DeviceDetail{}, err
 	}
 
 	err = m.unitsFree(ctx, call, input.UnitID, state.unit)
@@ -463,6 +459,69 @@ func scanOp(r pgx.Row) (DeviceOperation, error) {
 	return deviceOperation, apperr.Wrap(err, "scan (scanOp)")
 }
 
+// lockBoundDevice locks a bound device for a write on it: NOT_FOUND, CONFLICT while it is unbound, the IR94
+// technician gate on its unit, then the expected version.
+func (m *Module) lockBoundDevice(
+	ctx context.Context,
+	call *ops.Call,
+	device uuid.UUID,
+	jobID *uuid.UUID,
+) (devState, error) {
+	state, err := lockDevice(ctx, call, device)
+	if err != nil {
+		return state, err
+	}
+
+	if state.unit == nil {
+		return state, apperr.E(apperr.Conflict, apperr.KeyDeviceNotBound)
+	}
+
+	technicianGateErr := m.technicianGate(ctx, call, jobID, *state.unit)
+	if technicianGateErr != nil {
+		return state, technicianGateErr
+	}
+
+	return state, state.current(call)
+}
+
+// firmwareAllowed checks a firmware update of a locked device: the target is a candidate of its unit's model version
+// other than the installed one, and the device is online (IR94: no DeviceOperation when not online).
+func (m *Module) firmwareAllowed(
+	ctx context.Context,
+	call *ops.Call,
+	state devState,
+	target string,
+) error {
+	unitInfo, _, err := m.Units.UnitInfo(ctx, call, *state.unit)
+	if err != nil {
+		return apperr.Wrap(err, "devices.Units.UnitInfo")
+	}
+
+	var candidates []string
+
+	scanErr := call.Tx.QueryRow(ctx, `SELECT firmware_candidates FROM devices.capabilities WHERE id = $1 AND version =
+		$2`, unitInfo.ModelID, unitInfo.CapabilityVersion).
+		Scan(&candidates)
+	if scanErr != nil {
+		return apperr.Wrap(scanErr, "select devices.capabilities")
+	}
+
+	if !slices.Contains(candidates, target) || target == state.firmware {
+		return apperr.Fields(
+			map[string]string{"firmwareVersion": "error.unsupportedFirmware"},
+		)
+	}
+
+	if state.connection != connOnline {
+		return apperr.E(
+			apperr.Offline,
+			"error.offline",
+		) // IR94: no DeviceOperation when not online
+	}
+
+	return nil
+}
+
 func (m *Module) startOperation(
 	ctx context.Context,
 	call *ops.Call,
@@ -471,51 +530,15 @@ func (m *Module) startOperation(
 	kind string,
 	target *string,
 ) (DeviceOperation, error) {
-	state, err := lockDevice(ctx, call, device)
+	state, err := m.lockBoundDevice(ctx, call, device, jobID)
 	if err != nil {
 		return DeviceOperation{}, err
 	}
 
-	if state.unit == nil {
-		return DeviceOperation{}, apperr.E(apperr.Conflict, apperr.KeyDeviceNotBound)
-	}
-
-	technicianGateErr := m.technicianGate(ctx, call, jobID, *state.unit)
-	if technicianGateErr != nil {
-		return DeviceOperation{}, technicianGateErr
-	}
-
-	currentErr := state.current(call)
-	if currentErr != nil {
-		return DeviceOperation{}, currentErr
-	}
-
 	if kind == kindFirmware {
-		unitInfo, _, err := m.Units.UnitInfo(ctx, call, *state.unit)
+		err := m.firmwareAllowed(ctx, call, state, *target)
 		if err != nil {
-			return DeviceOperation{}, apperr.Wrap(err, "devices.Units.UnitInfo")
-		}
-
-		var candidates []string
-
-		scanErr := call.Tx.QueryRow(ctx, `SELECT firmware_candidates FROM devices.capabilities WHERE id = $1 AND version =
-			$2`, unitInfo.ModelID, unitInfo.CapabilityVersion).
-			Scan(&candidates)
-		if scanErr != nil {
-			return DeviceOperation{}, apperr.Wrap(scanErr, "select devices.capabilities")
-		}
-
-		if !slices.Contains(candidates, *target) || *target == state.firmware {
-			return DeviceOperation{}, apperr.Fields(
-				map[string]string{"firmwareVersion": "error.unsupportedFirmware"},
-			)
-		}
-
-		if state.connection != connOnline {
-			return DeviceOperation{}, apperr.E(
-				apperr.Offline,
-				"error.offline",
-			) // IR94: no DeviceOperation when not online
+			return DeviceOperation{}, err
 		}
 	}
 
@@ -549,6 +572,21 @@ func (m *Module) startOperation(
 		return DeviceOperation{}, err
 	}
 
+	operationRequested(call, device, operationID, kind, version)
+
+	return scanOp(
+		call.Tx.QueryRow(
+			ctx,
+			`SELECT `+opCols+` FROM devices.device_operations o LEFT JOIN devices.device_bindings b ON b.device_id = o.device_id
+				AND b.unbound_at IS NULL WHERE o.id = $1`,
+			operationID,
+		),
+	)
+}
+
+// operationRequested emits DeviceOperationRequested and audits the devices.check or devices.updateFirmware that
+// requested the operation.
+func operationRequested(call *ops.Call, device, operationID uuid.UUID, kind string, version int) {
 	call.Emit(
 		ops.Event{
 			AggregateType: entityDevice,
@@ -568,15 +606,6 @@ func (m *Module) startOperation(
 		Before:          nil,
 		After:           nil,
 	})
-
-	return scanOp(
-		call.Tx.QueryRow(
-			ctx,
-			`SELECT `+opCols+` FROM devices.device_operations o LEFT JOIN devices.device_bindings b ON b.device_id = o.device_id
-				AND b.unbound_at IS NULL WHERE o.id = $1`,
-			operationID,
-		),
-	)
 }
 
 // CheckInput is devices.check input.
@@ -737,7 +766,7 @@ func (in *CalibrateInput) Validate() map[string]string {
 		fieldErrs["sensorId"] = apperr.KeyRequired
 	}
 
-	if metricUnit[in.Metric] == "" || metricUnit[in.Metric] != in.Unit {
+	if unit := metricUnits()[in.Metric]; unit == "" || unit != in.Unit {
 		fieldErrs["unit"] = "error.unitMismatch"
 	}
 
@@ -792,44 +821,14 @@ func (m *Module) calibrate(
 		)
 	}
 
-	state, err := lockDevice(ctx, call, input.DeviceID)
+	state, err := m.lockBoundDevice(ctx, call, input.DeviceID, input.JobID)
 	if err != nil {
 		return CalibrationRecord{}, err
 	}
 
-	if state.unit == nil {
-		return CalibrationRecord{}, apperr.E(apperr.Conflict, apperr.KeyDeviceNotBound)
-	}
-
-	technicianGateErr := m.technicianGate(ctx, call, input.JobID, *state.unit)
-	if technicianGateErr != nil {
-		return CalibrationRecord{}, technicianGateErr
-	}
-
-	currentErr := state.current(call)
-	if currentErr != nil {
-		return CalibrationRecord{}, currentErr
-	}
-
-	var metric, unit string
-
-	err = call.Tx.QueryRow(ctx, `SELECT metric, unit FROM devices.sensors WHERE id = $1 AND device_id =
-		$2`, input.SensorID, input.DeviceID).
-		Scan(&metric, &unit)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return CalibrationRecord{}, apperr.Fields(
-			map[string]string{"sensorId": "error.notOnDevice"},
-		)
-	}
-
+	err = matchSensor(ctx, call, input)
 	if err != nil {
-		return CalibrationRecord{}, apperr.Wrap(err, "select devices.sensors")
-	}
-
-	if metric != input.Metric || unit != input.Unit {
-		return CalibrationRecord{}, apperr.Fields(
-			map[string]string{"metric": "error.sensorMismatch"},
-		)
+		return CalibrationRecord{}, err
 	}
 
 	exclusiveErr := m.exclusive(ctx, call, *state.unit)
@@ -839,34 +838,9 @@ func (m *Module) calibrate(
 
 	recordID := uuid.Must(uuid.NewV7())
 
-	_, execErr := call.Tx.Exec(
-		ctx,
-		`INSERT INTO devices.calibration_records (id, tenant_id, device_id, sensor_id, metric, unit, reference_value,
-			measured_value, calibrated_at, actor_id, job_id)
-		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-		recordID,
-		input.DeviceID,
-		input.SensorID,
-		input.Metric,
-		input.Unit,
-		input.ReferenceValue,
-		input.MeasuredValue,
-		input.CalibratedAt,
-		call.Principal.UserID,
-		input.JobID,
-	)
-	if execErr != nil {
-		return CalibrationRecord{}, apperr.Wrap(execErr, "insert devices.calibration_records")
-	}
-
-	_, execErr = call.Tx.Exec(
-		ctx,
-		`UPDATE devices.sensors SET calibrated_at = $2 WHERE id = $1`,
-		input.SensorID,
-		input.CalibratedAt,
-	)
-	if execErr != nil {
-		return CalibrationRecord{}, apperr.Wrap(execErr, "update devices.sensors")
+	err = insertCalibration(ctx, call, input, recordID)
+	if err != nil {
+		return CalibrationRecord{}, err
 	}
 
 	version, err := bumpDevice(ctx, call, input.DeviceID)
@@ -895,8 +869,71 @@ func (m *Module) calibrate(
 	return m.calibration(ctx, call, recordID)
 }
 
-const calCols = `r.id, r.tenant_id, r.created_at, r.created_at, b.id, b.unit_id, b.customer_org_id, r.device_id, ` +
-	`r.sensor_id, r.metric, r.unit,
+// matchSensor checks that the sensor is on the device and measures the input's metric in its unit.
+func matchSensor(ctx context.Context, call *ops.Call, input *CalibrateInput) error {
+	var metric, unit string
+
+	err := call.Tx.QueryRow(ctx, `SELECT metric, unit FROM devices.sensors WHERE id = $1 AND device_id =
+		$2`, input.SensorID, input.DeviceID).
+		Scan(&metric, &unit)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return apperr.Fields(
+			map[string]string{"sensorId": "error.notOnDevice"},
+		)
+	}
+
+	if err != nil {
+		return apperr.Wrap(err, "select devices.sensors")
+	}
+
+	if metric != input.Metric || unit != input.Unit {
+		return apperr.Fields(
+			map[string]string{"metric": "error.sensorMismatch"},
+		)
+	}
+
+	return nil
+}
+
+// insertCalibration stores the calibration record and the sensor's calibratedAt.
+func insertCalibration(
+	ctx context.Context,
+	call *ops.Call,
+	input *CalibrateInput,
+	recordID uuid.UUID,
+) error {
+	_, err := call.Tx.Exec(
+		ctx,
+		`INSERT INTO devices.calibration_records (id, tenant_id, device_id, sensor_id, metric, unit, reference_value,
+			measured_value, calibrated_at, actor_id, job_id)
+		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		recordID,
+		input.DeviceID,
+		input.SensorID,
+		input.Metric,
+		input.Unit,
+		input.ReferenceValue,
+		input.MeasuredValue,
+		input.CalibratedAt,
+		call.Principal.UserID,
+		input.JobID,
+	)
+	if err != nil {
+		return apperr.Wrap(err, "insert devices.calibration_records")
+	}
+
+	_, err = call.Tx.Exec(
+		ctx,
+		`UPDATE devices.sensors SET calibrated_at = $2 WHERE id = $1`,
+		input.SensorID,
+		input.CalibratedAt,
+	)
+
+	return apperr.Wrap(err, "update devices.sensors")
+}
+
+const calCols = `r.id, r.tenant_id, r.created_at, r.created_at AS updated_at, b.id, b.unit_id, b.customer_org_id, ` +
+	`r.device_id, r.sensor_id, r.metric, r.unit,
 	r.reference_value, r.measured_value, r.calibrated_at, r.actor_id`
 
 func scanCal(row pgx.Row) (CalibrationRecord, error) {
