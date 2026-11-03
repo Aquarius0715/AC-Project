@@ -13,6 +13,31 @@ linters:
     - gomodguard # deprecated: gomodguard_v2
     - wsl # deprecated: wsl_v5
   settings:
+    # Size and complexity limits judge whether code is hard to read, not whether a function can be cut smaller: a
+    # function is never split into trivial pieces only to pass them (CLAUDE.md, lint rules 4-2). The cyclomatic count
+    # adds every case of a flat switch that maps one value to another, so it takes gocyclo's limit (30); gocognit (30)
+    # and nestif judge how hard the code is to follow, and the package average keeps the overall level low.
+    cyclop:
+      max-complexity: 30
+      package-average: 10.0
+    # statements measure what a function does; a struct literal that names every field (exhaustruct) adds lines only
+    funlen:
+      lines: 100
+      statements: 50
+    # Go keeps conventional names short (Go Code Review Comments, "Variable Names"): err, ctx, ok, id, loop indexes and
+    # values, tx and db, and the standard parameters of tests and HTTP handlers; hq is the domain's word for
+    # headquarters. Other short names must say what they hold when they are used far from their declaration.
+    varnamelen:
+      ignore-names: [err, ctx, ok, id, i, j, k, n, v, tx, db, hq]
+      ignore-type-assert-ok: true
+      ignore-map-index-ok: true
+      ignore-chan-recv-ok: true
+      ignore-decls:
+        - t *testing.T
+        - b *testing.B
+        - w http.ResponseWriter
+        - r *http.Request
+        - tx pgx.Tx
     depguard:
       rules:
         main:
@@ -51,6 +76,15 @@ linters:
       - linters:
           - lll
         source: '^\s*//\s*@Param\s'
+      # a test reads as one scenario from its set-up to its assertions; cutting it up only to meet a size or complexity
+      # limit hides its steps (CLAUDE.md, lint rules 4-2)
+      - linters:
+          - cyclop
+          - funlen
+          - gocognit
+          - gocyclo
+          - maintidx
+        path: (_test\.go|^test/)
 formatters:
   enable:
     - gci

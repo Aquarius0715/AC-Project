@@ -214,22 +214,15 @@ func jobEvent(operation, status string) (string, string) {
 		return "assigned", "schedule_change"
 	case "jobs.submit":
 		return "submitted", noticeJobUpdate
-	case "jobs.review":
-		return reviewEvent(status)
+	case "jobs.review": // a returned report, or a completed job
+		switch status {
+		case "rework_requested":
+			return "returned", "report_return"
+		case statusCompleted:
+			return statusCompleted, "completion"
+		}
 	case "jobs.cancel", "jobs.hold", "jobs.resumeHold":
 		return status, noticeJobUpdate
-	}
-
-	return "", ""
-}
-
-// reviewEvent is the event of a review by the status after it: a returned report or a completed job.
-func reviewEvent(status string) (string, string) {
-	switch status {
-	case "rework_requested":
-		return "returned", "report_return"
-	case statusCompleted:
-		return statusCompleted, "completion"
 	}
 
 	return "", ""

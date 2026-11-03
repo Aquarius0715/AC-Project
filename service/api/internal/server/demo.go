@@ -275,13 +275,21 @@ func (in *TriggerInput) Validate() map[string]string {
 		fieldErrs["occurredAt"] = apperr.KeyRequired
 	}
 
+	command, measurement := in.CommandID != nil, in.Measurement != nil
+
 	switch in.EventType {
-	case eventCommandSent,
-		eventCommandAck,
-		eventCommandFail,
-		"telemetry",
-		eventRestrictionObservation:
-		in.validateSubject(fieldErrs)
+	case eventCommandSent, eventCommandAck, eventCommandFail:
+		if !command || measurement {
+			fieldErrs["commandId"] = apperr.KeyRequired
+		}
+	case "telemetry":
+		if !measurement || command {
+			fieldErrs["measurement"] = apperr.KeyRequired
+		}
+	case eventRestrictionObservation:
+		if in.RestrictionID == nil || in.UnitID == nil || command || measurement {
+			fieldErrs["unitId"] = apperr.KeyRequired
+		}
 	case "device":
 		in.validateDevice(fieldErrs)
 	case keyState:
@@ -289,50 +297,18 @@ func (in *TriggerInput) Validate() map[string]string {
 	case "automation":
 		in.validateAutomation(fieldErrs)
 	case "operation":
-		in.validateOperation(fieldErrs)
+		if in.OperationID == nil {
+			fieldErrs["operationId"] = apperr.KeyRequired
+		}
+
+		if in.Result != "succeeded" && in.Result != "failed" {
+			fieldErrs["result"] = apperr.KeyInvalid
+		}
 	default:
 		fieldErrs["eventType"] = "errors.trigger_unsupported"
 	}
 
 	return fieldErrs
-}
-
-// validateOperation checks a device operation's result (IR67): the operation, and succeeded or failed.
-func (in *TriggerInput) validateOperation(fieldErrs map[string]string) {
-	if in.OperationID == nil {
-		fieldErrs["operationId"] = apperr.KeyRequired
-	}
-
-	if in.Result != "succeeded" && in.Result != "failed" {
-		fieldErrs["result"] = apperr.KeyInvalid
-	}
-}
-
-// validateSubject checks that a command event, telemetry or a restriction observation names its subject and carries
-// no other event's.
-func (in *TriggerInput) validateSubject(fieldErrs map[string]string) {
-	command, measurement := in.CommandID != nil, in.Measurement != nil
-
-	switch in.EventType {
-	case "telemetry":
-		requireOnly(fieldErrs, "measurement", measurement, command)
-	case eventRestrictionObservation:
-		requireOnly(
-			fieldErrs,
-			"unitId",
-			in.RestrictionID != nil && in.UnitID != nil,
-			command || measurement,
-		)
-	default: // command_sent, command_ack, command_fail
-		requireOnly(fieldErrs, "commandId", command, measurement)
-	}
-}
-
-// requireOnly marks field required unless the event has it and nothing it must not carry (extra).
-func requireOnly(fieldErrs map[string]string, field string, has, extra bool) {
-	if !has || extra {
-		fieldErrs[field] = apperr.KeyRequired
-	}
 }
 
 // validateDevice checks a device fault or recovery (SR20): a fault names its axis by its kind and carries no recovery;
@@ -349,7 +325,10 @@ func (in *TriggerInput) validateDevice(fieldErrs map[string]string) {
 
 	switch {
 	case in.Kind == kindRestored:
-		if !validRecovery(in.Recovery) {
+		recovery := in.Recovery
+		if recovery == nil || recovery.SourceEventID == uuid.Nil ||
+			devices.RecoveredValue[recovery.Axis] == "" ||
+			devices.RecoveredValue[recovery.Axis] != recovery.Value {
 			fieldErrs["recovery"] = apperr.KeyInvalid
 		}
 	case devices.FaultAxis[in.Kind] == "":
@@ -357,13 +336,6 @@ func (in *TriggerInput) validateDevice(fieldErrs map[string]string) {
 	case in.Recovery != nil:
 		fieldErrs["recovery"] = apperr.KeyInvalid
 	}
-}
-
-// validRecovery is whether a recovery names its source event and the value its axis recovers to.
-func validRecovery(recovery *devices.Recovery) bool {
-	return recovery != nil && recovery.SourceEventID != uuid.Nil &&
-		devices.RecoveredValue[recovery.Axis] != "" &&
-		devices.RecoveredValue[recovery.Axis] == recovery.Value
 }
 
 // reportedCelsiusMin and reportedCelsiusMax bound the temperature setting a device may report.
@@ -567,8 +539,12 @@ func (d *demoOps) trigger(ctx context.Context, call *ops.Call, input *TriggerInp
 	var err error
 
 	switch input.EventType {
-	case eventCommandSent, eventCommandAck, eventCommandFail:
-		err = d.command(ctx, call, input)
+	case eventCommandSent:
+		err = d.commandSent(ctx, call, input)
+	case eventCommandAck:
+		err = d.commandAcknowledged(ctx, call, input)
+	case eventCommandFail:
+		err = d.commandFailed(ctx, call, input)
 	case "device": // SR20 faults and recoveries, SR23 tamper Alert
 		err = d.deviceSignal(ctx, call, input)
 	case "operation": // IR67: the result of a running check / firmware operation
@@ -584,18 +560,6 @@ func (d *demoOps) trigger(ctx context.Context, call *ops.Call, input *TriggerInp
 	}
 
 	return out, err
-}
-
-// command records what a device did with a command: sent it, acknowledged it or failed it.
-func (d *demoOps) command(ctx context.Context, call *ops.Call, input *TriggerInput) error {
-	switch input.EventType {
-	case eventCommandSent:
-		return d.commandSent(ctx, call, input)
-	case eventCommandAck:
-		return d.commandAcknowledged(ctx, call, input)
-	}
-
-	return d.commandFailed(ctx, call, input)
 }
 
 // commandProbe finds the tenant of a command.
