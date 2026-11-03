@@ -84,8 +84,13 @@ func runScheduler(ctx context.Context, domain string) error {
 	var domains []string // nil: every domain on an all-domain role (single-process development)
 
 	if domain != "" {
-		if !slices.Contains(scheduler.Domains, domain) {
-			return fmt.Errorf("%w %q (want one of %v)", errUnknownDomain, domain, scheduler.Domains)
+		if !slices.Contains(scheduler.Domains(), domain) {
+			return fmt.Errorf(
+				"%w %q (want one of %v)",
+				errUnknownDomain,
+				domain,
+				scheduler.Domains(),
+			)
 		}
 
 		domains = []string{domain}

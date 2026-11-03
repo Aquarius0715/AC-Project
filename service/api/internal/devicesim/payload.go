@@ -48,40 +48,42 @@ const (
 
 // Sensors are the ones a simulated AC module can report (the metrics and units of the capability register's sensors).
 // Temperature and power come first; a module reports the subset its device has (Only).
-var Sensors = []Sensor{
-	{
-		ID:       metricTemperature,
-		Metric:   metricTemperature,
-		Unit:     "°C",
-		Base:     temperatureBaseCelsius,
-		Swing:    temperatureSwingCelsius,
-		Boundary: "",
-	},
-	{
-		ID:       metricPower,
-		Metric:   metricPower,
-		Unit:     "kW",
-		Base:     powerBaseKW,
-		Swing:    powerSwingKW,
-		Boundary: "ac_input_electricity",
-	},
-	{
-		ID:       "humidity",
-		Metric:   "humidity",
-		Unit:     "%",
-		Base:     humidityBasePercent,
-		Swing:    humiditySwingPercent,
-		Boundary: "",
-	},
-	{ID: "co2", Metric: "co2", Unit: "ppm", Base: co2BasePPM, Swing: co2SwingPPM, Boundary: ""},
-	{
-		ID:       "pm25",
-		Metric:   "pm25",
-		Unit:     "µg/m³",
-		Base:     pm25BaseMicrograms,
-		Swing:    pm25SwingMicrograms,
-		Boundary: "",
-	},
+func Sensors() []Sensor {
+	return []Sensor{
+		{
+			ID:       metricTemperature,
+			Metric:   metricTemperature,
+			Unit:     "°C",
+			Base:     temperatureBaseCelsius,
+			Swing:    temperatureSwingCelsius,
+			Boundary: "",
+		},
+		{
+			ID:       metricPower,
+			Metric:   metricPower,
+			Unit:     "kW",
+			Base:     powerBaseKW,
+			Swing:    powerSwingKW,
+			Boundary: "ac_input_electricity",
+		},
+		{
+			ID:       "humidity",
+			Metric:   "humidity",
+			Unit:     "%",
+			Base:     humidityBasePercent,
+			Swing:    humiditySwingPercent,
+			Boundary: "",
+		},
+		{ID: "co2", Metric: "co2", Unit: "ppm", Base: co2BasePPM, Swing: co2SwingPPM, Boundary: ""},
+		{
+			ID:       "pm25",
+			Metric:   "pm25",
+			Unit:     "µg/m³",
+			Base:     pm25BaseMicrograms,
+			Swing:    pm25SwingMicrograms,
+			Boundary: "",
+		},
+	}
 }
 
 // Measurement is one reading in a telemetry batch.
@@ -167,7 +169,7 @@ func (m *Module) Only(names ...string) *Module {
 
 	out := []Sensor{}
 
-	for _, s := range Sensors {
+	for _, s := range Sensors() {
 		if keep[s.ID] {
 			out = append(out, s)
 		}
@@ -226,7 +228,7 @@ func (m *Module) Telemetry(at time.Time) ([]byte, error) {
 
 	sensors := m.sensors
 	if sensors == nil {
-		sensors = Sensors
+		sensors = Sensors()
 	}
 
 	if len(sensors) == 0 { // a module without sensors sends only its heartbeat

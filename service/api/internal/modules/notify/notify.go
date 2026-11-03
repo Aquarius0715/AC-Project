@@ -121,83 +121,91 @@ func EventHandlers() map[string]events.Handler {
 // Replicas are notify's reference copies of other domains' rows (IR188), kept by the identity-api consumer from
 // RowChanged events: targets (units, jobs, invoices, restrictions, devices, inquiries, certificates) and job parties
 // (offers, assignments, the job histories frozen for them) for the IR142 read scope and recipients.
-var Replicas = []events.Replica{
-	{
-		Source: "assets.units",
-		Table:  "notify.ref_units",
-		Keys:   []string{"id"},
-		Cols:   []string{colTenantID, colCustomerOrgID, "property_id", "display_name"},
-	},
-	{
-		Source: "assets.customers",
-		Table:  "notify.ref_customers",
-		Keys:   []string{"id"},
-		Cols:   []string{colTenantID, "organization_id"},
-	},
-	{
-		Source: "maintenance.jobs",
-		Table:  "notify.ref_jobs",
-		Keys:   []string{"id"},
-		Cols:   []string{colTenantID, colUnitID, colCustomerOrgID},
-	},
-	{
-		Source: "maintenance.offers",
-		Table:  "notify.ref_offers",
-		Keys:   []string{"id"},
-		Cols:   []string{colTenantID, colJobID, "contractor_org_id"},
-	},
-	{
-		Source: "maintenance.assignments",
-		Table:  "notify.ref_assignments",
-		Keys:   []string{"id"},
-		Cols:   []string{colTenantID, colJobID, "technician_membership_id", keyStatus, "scheduled"},
-	},
-	{
-		Source: "billing.invoices",
-		Table:  "notify.ref_invoices",
-		Keys:   []string{"id"},
-		Cols:   []string{colTenantID, "number", colCustomerID, keyStatus, "due_at"},
-	},
-	{
-		Source: "billing.inquiries",
-		Table:  "notify.ref_inquiries",
-		Keys:   []string{"id"},
-		Cols:   []string{colTenantID, colCustomerID, "subject_type"},
-	},
-	{
-		Source: "restrictions.restrictions",
-		Table:  "notify.ref_restrictions",
-		Keys:   []string{"id"},
-		Cols:   []string{colTenantID, colCustomerID},
-	},
-	{
-		Source: "restrictions.restriction_units",
-		Table:  "notify.ref_restriction_units",
-		Keys:   []string{"restriction_id", colUnitID},
-		Cols:   []string{colTenantID},
-	},
-	{
-		Source: "devices.devices",
-		Table:  "notify.ref_devices",
-		Keys:   []string{"id"},
-		Cols:   []string{colTenantID, "serial", colUnitID},
-	},
-	{
-		Source: "assets.properties",
-		Table:  "notify.ref_properties",
-		Keys:   []string{"id"},
-		Cols:   []string{colTenantID, colCustomerOrgID},
-	}, // identity scopes (IR194)
-	{
-		Source: "maintenance.certificates",
-		Table:  "notify.ref_certificates",
-		Keys:   []string{"id"},
-		Cols:   []string{colTenantID, "organization_id", "membership_id", "name"},
-	}, // IR336
-	{
-		Source: "maintenance.job_history_snapshots",
-		Table:  "notify.ref_job_histories",
-		Keys:   []string{"id"},
-		Cols:   []string{colTenantID, colJobID, "owner_kind", "owner_id"},
-	}, // IR601
+func Replicas() []events.Replica {
+	return []events.Replica{
+		{
+			Source: "assets.units",
+			Table:  "notify.ref_units",
+			Keys:   []string{"id"},
+			Cols:   []string{colTenantID, colCustomerOrgID, "property_id", "display_name"},
+		},
+		{
+			Source: "assets.customers",
+			Table:  "notify.ref_customers",
+			Keys:   []string{"id"},
+			Cols:   []string{colTenantID, "organization_id"},
+		},
+		{
+			Source: "maintenance.jobs",
+			Table:  "notify.ref_jobs",
+			Keys:   []string{"id"},
+			Cols:   []string{colTenantID, colUnitID, colCustomerOrgID},
+		},
+		{
+			Source: "maintenance.offers",
+			Table:  "notify.ref_offers",
+			Keys:   []string{"id"},
+			Cols:   []string{colTenantID, colJobID, "contractor_org_id"},
+		},
+		{
+			Source: "maintenance.assignments",
+			Table:  "notify.ref_assignments",
+			Keys:   []string{"id"},
+			Cols: []string{
+				colTenantID,
+				colJobID,
+				"technician_membership_id",
+				keyStatus,
+				"scheduled",
+			},
+		},
+		{
+			Source: "billing.invoices",
+			Table:  "notify.ref_invoices",
+			Keys:   []string{"id"},
+			Cols:   []string{colTenantID, "number", colCustomerID, keyStatus, "due_at"},
+		},
+		{
+			Source: "billing.inquiries",
+			Table:  "notify.ref_inquiries",
+			Keys:   []string{"id"},
+			Cols:   []string{colTenantID, colCustomerID, "subject_type"},
+		},
+		{
+			Source: "restrictions.restrictions",
+			Table:  "notify.ref_restrictions",
+			Keys:   []string{"id"},
+			Cols:   []string{colTenantID, colCustomerID},
+		},
+		{
+			Source: "restrictions.restriction_units",
+			Table:  "notify.ref_restriction_units",
+			Keys:   []string{"restriction_id", colUnitID},
+			Cols:   []string{colTenantID},
+		},
+		{
+			Source: "devices.devices",
+			Table:  "notify.ref_devices",
+			Keys:   []string{"id"},
+			Cols:   []string{colTenantID, "serial", colUnitID},
+		},
+		{
+			Source: "assets.properties",
+			Table:  "notify.ref_properties",
+			Keys:   []string{"id"},
+			Cols:   []string{colTenantID, colCustomerOrgID},
+		}, // identity scopes (IR194)
+		{
+			Source: "maintenance.certificates",
+			Table:  "notify.ref_certificates",
+			Keys:   []string{"id"},
+			Cols:   []string{colTenantID, "organization_id", "membership_id", "name"},
+		}, // IR336
+		{
+			Source: "maintenance.job_history_snapshots",
+			Table:  "notify.ref_job_histories",
+			Keys:   []string{"id"},
+			Cols:   []string{colTenantID, colJobID, "owner_kind", "owner_id"},
+		}, // IR601
+	}
 }

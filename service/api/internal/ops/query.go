@@ -18,7 +18,6 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
-	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 )
 
 // Internal queries (IR190) are reads one domain exposes to the read models of another (API composition). They are
@@ -335,22 +334,7 @@ func (r *Registry) ServeSystemQuery(token string) echo.HandlerFunc {
 		return r.serveQuery(
 			ectx,
 			token,
-			&Principal{
-				Principal: authz.Principal{
-					Role:        "system",
-					Permissions: nil,
-					ClientRole:  "",
-				},
-				TenantID:          tenant,
-				MembershipID:      uuid.UUID{},
-				UserID:            uuid.UUID{},
-				OrgID:             uuid.UUID{},
-				ScopeVersion:      0,
-				Scopes:            nil,
-				Employment:        "",
-				Timezone:          "",
-				SessionsRevokedAt: nil,
-			},
+			SystemPrincipal(tenant, uuid.Nil),
 			"",
 		)
 	}

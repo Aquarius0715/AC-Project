@@ -59,17 +59,17 @@ func TestResolveAndNext(t *testing.T) {
 		t.Fatal("next")
 	}
 
-	w2, err := paging.Resolve(
+	secondPage, err := paging.Resolve(
 		paging.Query{Limit: new(2), Cursor: next, Sort: nil, Filters: nil},
 		cond,
 		1,
 		1,
 	)
-	if err != nil || w2.Offset != 2 {
-		t.Fatalf("second page: %+v %v", w2, err)
+	if err != nil || secondPage.Offset != 2 {
+		t.Fatalf("second page: %+v %v", secondPage, err)
 	}
 
-	if w3 := w2.Next(5); w3 == nil {
+	if w3 := secondPage.Next(5); w3 == nil {
 		t.Fatal("third page")
 	} else if w4, _ := paging.Resolve(paging.Query{Limit: new(2), Cursor: w3, Sort: nil, Filters: nil}, cond, 1,
 		1); w4.Next(5) != nil ||

@@ -302,7 +302,7 @@ func FleetLinks(f devicesim.Fleet) []Link {
 		}
 
 		sensors := map[string]string{}
-		for _, s := range devicesim.Sensors {
+		for _, s := range devicesim.Sensors() {
 			sensors[s.ID] = devicesim.SensorName(pattern, s)
 		}
 

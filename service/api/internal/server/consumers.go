@@ -67,13 +67,13 @@ func consumers(
 	set.add(
 		ops.DomainBilling,
 		"billing",
-		merge(restrictions.EventHandlers(), events.Handlers(billing.Replicas...)),
+		merge(restrictions.EventHandlers(), events.Handlers(billing.Replicas()...)),
 	) // IR185
 	set.add(
 		ops.DomainIdentity,
 		"identity",
 		merge(
-			events.Handlers(notify.Replicas...),
+			events.Handlers(notify.Replicas()...),
 			notify.EventHandlers(),
 			identity.GrantHandlers(),
 			audit.EventHandlers(),
@@ -93,12 +93,12 @@ func consumers(
 	set.add(
 		ops.DomainMaintenance,
 		"maintenance",
-		merge(events.Handlers(maintenance.Replicas...), maintenance.NoteHandlers()),
+		merge(events.Handlers(maintenance.Replicas()...), maintenance.NoteHandlers()),
 	) // IR192
 	set.add(
 		ops.DomainEnergy,
 		"energy",
-		events.Handlers(energy.Replicas...),
+		events.Handlers(energy.Replicas()...),
 	) // IR189
 
 	return set.out

@@ -270,7 +270,7 @@ func TestLiveEventIDIsOnePerMinute(t *testing.T) {
 // a node the bridge listens to.
 func TestLiveNodesMatchTheSite(t *testing.T) {
 	platform := map[string]string{}
-	for _, s := range devicesim.Sensors {
+	for _, s := range devicesim.Sensors() {
 		platform[s.Metric] = s.Unit
 	}
 

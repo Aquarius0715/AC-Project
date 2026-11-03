@@ -26,8 +26,8 @@ func TestReplicas(t *testing.T) {
 		drainEvents(t)
 
 		for _, replica := range append(
-			append(append(append([]events.Replica{}, notify.Replicas...), energy.Replicas...), maintenance.Replicas...),
-			billing.Replicas...) {
+			append(append(append([]events.Replica{}, notify.Replicas()...), energy.Replicas()...), maintenance.Replicas()...),
+			billing.Replicas()...) {
 			cols := strings.Join(append(append([]string{}, replica.Keys...), replica.Cols...), ", ")
 
 			source := replica.Source

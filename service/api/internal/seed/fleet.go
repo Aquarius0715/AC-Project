@@ -155,7 +155,7 @@ func ApplyFleet(ctx context.Context, tx pgx.Tx, fleet devicesim.Fleet, at time.T
 			return n, fmt.Errorf("fleet device %s: %w", pattern.Key, err)
 		}
 
-		for _, sensor := range devicesim.Sensors {
+		for _, sensor := range devicesim.Sensors() {
 			var boundary *string
 			if sensor.Boundary != "" {
 				boundary = &sensor.Boundary

@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -25,12 +26,14 @@ var (
 	errNoGrantingAlternative  = errors.New("no granting alternative")
 )
 
-// The roles of a Membership (Membership.role of service-contracts.ts).
+// The roles of a Membership (Membership.role of service-contracts.ts), and RoleSystem, the role of the system's own
+// work: scheduler jobs, event consumers and internal queries without a user.
 const (
 	RoleClient     = "client"
 	RoleContractor = "contractor"
 	RoleTechnician = "technician"
 	RoleAdmin      = "admin"
+	RoleSystem     = "system"
 )
 
 // isRole reports whether name is a Membership.role or one of the two pseudo roles used in the catalog.
@@ -43,22 +46,19 @@ func isRole(name string) bool {
 	}
 }
 
-// Permissions is the Permission union of service-contracts.ts (38 values).
-var Permissions = permissionSet()
+// permissionNames is the Permission union of service-contracts.ts (38 values).
+const permissionNames = "dashboard.read asset.read asset.write identity.read identity.write " +
+	"device.read device.write device.maintain control.execute control.diagnose alert.read alert.resolve " +
+	"alert.policy.read alert.policy.write job.read job.write contract.read contract.write billing.read " +
+	"billing.write billing.payment restriction.read restriction.write restriction.override automation.policy.read " +
+	"automation.policy.write energy.read energy.write mrv.read mrv.write mrv.review mrv.factors offset.read " +
+	"offset.write audit.read partner.accept partner.assign partner.review"
 
-func permissionSet() map[string]bool {
-	set := map[string]bool{}
-	for permission := range strings.SplitSeq("dashboard.read asset.read asset.write identity.read identity.write "+
-		"device.read device.write device.maintain control.execute control.diagnose alert.read alert.resolve "+
-		"alert.policy.read alert.policy.write job.read job.write contract.read contract.write billing.read "+
-		"billing.write billing.payment restriction.read restriction.write restriction.override automation.policy.read "+
-		"automation.policy.write energy.read energy.write mrv.read mrv.write mrv.review mrv.factors offset.read "+
-		"offset.write audit.read partner.accept partner.assign partner.review", " ") {
-		set[permission] = true
-	}
+// Permissions are the Permission union of service-contracts.ts (38 values), in the contract's order.
+func Permissions() []string { return strings.Fields(permissionNames) }
 
-	return set
-}
+// IsPermission reports whether name is one of the contract's permissions.
+func IsPermission(name string) bool { return slices.Contains(Permissions(), name) }
 
 var predicateRe = regexp.MustCompile(`^[a-z][a-z0-9_-]*(=[a-z0-9_-]+)?$`)
 
@@ -122,7 +122,7 @@ func parseAlternative(parts []string, column string) (Alternative, error) {
 	alternative := Alternative{Role: parts[0], Permission: "", Predicates: nil}
 
 	rest := parts[1:]
-	if len(rest) > 0 && Permissions[rest[0]] {
+	if len(rest) > 0 && IsPermission(rest[0]) {
 		alternative.Permission, rest = rest[0], rest[1:]
 	}
 

@@ -43,6 +43,33 @@ type Principal struct {
 	SessionsRevokedAt *time.Time
 }
 
+// TenantPrincipal is the principal of work that acts for no one in tenant, such as a scheduler transaction or a demo
+// trigger: it carries only the tenant that row-level security needs.
+func TenantPrincipal(tenant uuid.UUID) *Principal {
+	return &Principal{
+		Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
+		TenantID:          tenant,
+		MembershipID:      uuid.UUID{},
+		UserID:            uuid.UUID{},
+		OrgID:             uuid.UUID{},
+		ScopeVersion:      0,
+		Scopes:            nil,
+		Employment:        "",
+		Timezone:          "",
+		SessionsRevokedAt: nil,
+	}
+}
+
+// SystemPrincipal is the system acting in tenant as user, the actor its audit entries name: a scheduler job, or the
+// demo's gateway facts.
+func SystemPrincipal(tenant, user uuid.UUID) *Principal {
+	principal := TenantPrincipal(tenant)
+	principal.Role = authz.RoleSystem
+	principal.UserID = user
+
+	return principal
+}
+
 // Event is an outbox row recorded by a handler (backend architecture §8).
 type Event struct {
 	AggregateType string

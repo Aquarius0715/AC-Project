@@ -288,7 +288,7 @@ var clusters = map[*apiserver.Server]splitCluster{}
 func (cl splitCluster) tick(ctx context.Context, now time.Time) (scheduler.Result, error) {
 	var total scheduler.Result
 
-	for _, domain := range scheduler.Domains {
+	for _, domain := range scheduler.Domains() {
 		result, err := scheduler.TickDomains(
 			ctx,
 			cl.srv[domain].DB,

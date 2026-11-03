@@ -3,6 +3,8 @@ package scheduler
 import "testing"
 
 func TestResultChanges(t *testing.T) {
+	t.Parallel()
+
 	empty := Result{
 		ExpiredOffers:    0,
 		ExpiredCommands:  0,

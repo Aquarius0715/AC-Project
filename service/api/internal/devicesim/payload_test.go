@@ -53,12 +53,12 @@ func TestTelemetryBatchShape(t *testing.T) {
 	}
 
 	ms, found := batch["measurements"].([]any)
-	if !found || len(ms) != len(devicesim.Sensors) {
-		t.Fatalf("%d measurements, want %d", len(ms), len(devicesim.Sensors))
+	if !found || len(ms) != len(devicesim.Sensors()) {
+		t.Fatalf("%d measurements, want %d", len(ms), len(devicesim.Sensors()))
 	}
 
 	for idx, x := range ms {
-		checkReading(t, idx, x, devicesim.Sensors[idx])
+		checkReading(t, idx, x, devicesim.Sensors()[idx])
 	}
 }
 
@@ -125,8 +125,8 @@ func TestSequenceNeverRepeats(t *testing.T) {
 		}
 	}
 
-	if len(seen) != 3*len(devicesim.Sensors) {
-		t.Errorf("%d distinct sequences, want %d", len(seen), 3*len(devicesim.Sensors))
+	if len(seen) != 3*len(devicesim.Sensors()) {
+		t.Errorf("%d distinct sequences, want %d", len(seen), 3*len(devicesim.Sensors()))
 	}
 }
 

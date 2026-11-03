@@ -17,7 +17,6 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/restrictions"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
-	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/db"
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
 	"github.com/pradita/ac-project/service/api/internal/scheduler"
@@ -327,11 +326,11 @@ func (in *TriggerInput) validateDevice(fieldErrs map[string]string) {
 	case in.Kind == kindRestored:
 		recovery := in.Recovery
 		if recovery == nil || recovery.SourceEventID == uuid.Nil ||
-			devices.RecoveredValue[recovery.Axis] == "" ||
-			devices.RecoveredValue[recovery.Axis] != recovery.Value {
+			devices.RecoveredValue(recovery.Axis) == "" ||
+			devices.RecoveredValue(recovery.Axis) != recovery.Value {
 			fieldErrs["recovery"] = apperr.KeyInvalid
 		}
-	case devices.FaultAxis[in.Kind] == "":
+	case devices.FaultAxis(in.Kind) == "":
 		fieldErrs["kind"] = apperr.KeyInvalid
 	case in.Recovery != nil:
 		fieldErrs["recovery"] = apperr.KeyInvalid
@@ -407,43 +406,6 @@ func metricUnits() map[string]metricRange {
 	}
 }
 
-// tenantPrincipal is the principal a demo trigger runs as in tenant: anonymous, with only the tenant that row-level
-// security needs.
-func tenantPrincipal(tenant uuid.UUID) *ops.Principal {
-	return &ops.Principal{
-		TenantID:          tenant,
-		Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
-		MembershipID:      uuid.UUID{},
-		UserID:            uuid.UUID{},
-		OrgID:             uuid.UUID{},
-		ScopeVersion:      0,
-		Scopes:            nil,
-		Employment:        "",
-		Timezone:          "",
-		SessionsRevokedAt: nil,
-	}
-}
-
-// systemPrincipal is the demo system's principal in tenant, the one a scheduler job runs as.
-func systemPrincipal(tenant uuid.UUID) *ops.Principal {
-	return &ops.Principal{
-		Principal: authz.Principal{
-			Role:        "system",
-			Permissions: nil,
-			ClientRole:  "",
-		},
-		TenantID:          tenant,
-		UserID:            seed.ID("system-demo"),
-		MembershipID:      uuid.UUID{},
-		OrgID:             uuid.UUID{},
-		ScopeVersion:      0,
-		Scopes:            nil,
-		Employment:        "",
-		Timezone:          "",
-		SessionsRevokedAt: nil,
-	}
-}
-
 // inTenant runs fn in the tenant that owns the row found by probe (demo triggers are anonymous, RLS needs a tenant).
 func (d *demoOps) inTenant(
 	ctx context.Context,
@@ -465,7 +427,7 @@ func (d *demoOps) inTenant(
 	for _, tenant := range tenants {
 		found := false
 
-		err := d.m.Run(ctx, false, tenantPrincipal(tenant), func(txn pgx.Tx) error {
+		err := d.m.Run(ctx, false, ops.TenantPrincipal(tenant), func(txn pgx.Tx) error {
 			var ok bool
 
 			err := txn.QueryRow(ctx, probe, probeID).Scan(&ok)
@@ -723,7 +685,7 @@ func (d *demoOps) gatewayFacts(ctx context.Context, call *ops.Call, input *Trigg
 				Now:             call.Now,
 				CorrelationID:   uuid.NewString(),
 				Queries:         d.reg,
-				Principal:       systemPrincipal(tenant),
+				Principal:       ops.SystemPrincipal(tenant, seed.ID("system-demo")),
 				Bearer:          "",
 				ExpectedVersion: nil,
 				Candidates:      nil,

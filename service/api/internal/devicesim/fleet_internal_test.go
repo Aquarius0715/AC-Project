@@ -77,13 +77,13 @@ func TestFleetNames(t *testing.T) {
 	pattern.Key = "cool-on"
 	if UnitName(pattern) != "unit-mock-cool-on" || DeviceName(pattern) != "device-mock-cool-on" ||
 		BindingName(pattern) != "binding-mock-cool-on" ||
-		SensorName(pattern, Sensors[0]) != "sensor-mock-cool-on-temperature" {
+		SensorName(pattern, Sensors()[0]) != "sensor-mock-cool-on-temperature" {
 		t.Errorf(
 			"names %s %s %s %s",
 			UnitName(pattern),
 			DeviceName(pattern),
 			BindingName(pattern),
-			SensorName(pattern, Sensors[0]),
+			SensorName(pattern, Sensors()[0]),
 		)
 	}
 }

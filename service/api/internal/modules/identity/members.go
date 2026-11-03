@@ -491,7 +491,7 @@ func (in *MemberInput) Validate() map[string]string {
 	seen := map[string]bool{}
 
 	for _, permission := range in.Permissions {
-		allowed := authz.Permissions[permission]
+		allowed := authz.IsPermission(permission)
 		if list, ok := RolePermissions[in.Role]; ok {
 			allowed = slices.Contains(list, permission)
 		}
@@ -507,7 +507,7 @@ func (in *MemberInput) Validate() map[string]string {
 		if r, ok := strings.CutSuffix(
 			p,
 			".write",
-		); ok && authz.Permissions[r+".read"] &&
+		); ok && authz.IsPermission(r+".read") &&
 			!seen[r+".read"] {
 			fieldErrs["permissions"] = "errors.write_needs_read"
 		}

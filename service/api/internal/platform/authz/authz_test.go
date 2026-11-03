@@ -23,12 +23,12 @@ func TestPermissionsMatchContracts(t *testing.T) {
 	m := regexp.MustCompile(`export type Permission = ([^;]+);`).FindSubmatch(b)
 
 	vals := regexp.MustCompile(`'([^']+)'`).FindAllSubmatch(m[1], -1)
-	if len(vals) != 38 || len(authz.Permissions) != 38 {
-		t.Fatalf("want 38 permissions, contracts %d, authz %d", len(vals), len(authz.Permissions))
+	if len(vals) != 38 || len(authz.Permissions()) != 38 {
+		t.Fatalf("want 38 permissions, contracts %d, authz %d", len(vals), len(authz.Permissions()))
 	}
 
 	for _, v := range vals {
-		if !authz.Permissions[string(v[1])] {
+		if !authz.IsPermission(string(v[1])) {
 			t.Errorf("missing %s", v[1])
 		}
 	}

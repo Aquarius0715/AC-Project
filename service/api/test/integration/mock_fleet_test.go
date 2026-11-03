@@ -106,9 +106,7 @@ func TestMockFleetSeeds(t *testing.T) {
 		if total := count(
 			`SELECT count(*) FROM devices.sensors WHERE device_id = $1`,
 			seed.ID(devicesim.DeviceName(pattern)),
-		); total != len(
-			devicesim.Sensors,
-		) {
+		); total != len(devicesim.Sensors()) {
 			t.Errorf("%s has %d sensors", pattern.Key, total)
 		}
 	}

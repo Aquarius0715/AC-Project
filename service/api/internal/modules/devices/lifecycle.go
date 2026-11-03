@@ -437,20 +437,34 @@ const (
 	signalRestored          = "restored"
 )
 
-// FaultAxis is the state axis of each fault kind and RecoveredValue the value restored gives back on an axis (SR20);
-// each axis has one evidence source (REV18-040).
-var (
-	FaultAxis = map[string]string{
-		signalCommunicationLost: axisConnection,
-		signalPowerLost:         axisPower,
-		signalTamper:            axisTamper,
+// FaultAxis is the state axis a fault kind affects (SR20), "" for a kind that is not a fault; each axis has one
+// evidence source (REV18-040).
+func FaultAxis(kind string) string {
+	switch kind {
+	case signalCommunicationLost:
+		return axisConnection
+	case signalPowerLost:
+		return axisPower
+	case signalTamper:
+		return axisTamper
 	}
-	RecoveredValue = map[string]string{
-		axisConnection: connOnline,
-		axisPower:      "on",
-		axisTamper:     "clear",
+
+	return ""
+}
+
+// RecoveredValue is the value restored gives back on an axis (SR20), "" for an unknown axis.
+func RecoveredValue(axis string) string {
+	switch axis {
+	case axisConnection:
+		return connOnline
+	case axisPower:
+		return "on"
+	case axisTamper:
+		return "clear"
 	}
-)
+
+	return ""
+}
 
 // evidenceOf is the evidence source of an axis ("" for an unknown one).
 func evidenceOf(axis string) string {
@@ -544,7 +558,7 @@ func RecordSignal(
 // signalAxis is the state axis a signal changes and, for restored, its recovery as JSON.
 func signalAxis(signal Signal) (string, []byte, error) {
 	if signal.Kind != signalRestored {
-		return FaultAxis[signal.Kind], nil, nil
+		return FaultAxis(signal.Kind), nil, nil
 	}
 
 	recovery, err := json.Marshal(signal.Recovery)
@@ -775,7 +789,7 @@ func applySignal(ctx context.Context, txn pgx.Tx, signal Signal, axis string, no
 			axisTamper: tamperDetected,
 		}[axis]
 		if restored {
-			value = RecoveredValue[axis]
+			value = RecoveredValue(axis)
 		}
 
 		_, err = txn.Exec(
