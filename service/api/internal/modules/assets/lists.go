@@ -17,7 +17,10 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
 
-var listSort = map[string]string{"id": "id", "createdAt": "created_at", "updatedAt": "updated_at"}
+// listSort is the column each sort field of the customer, property and space lists orders by.
+func listSort() map[string]string {
+	return map[string]string{"id": "id", "createdAt": "created_at", "updatedAt": "updated_at"}
+}
 
 func decodeFilters(raw json.RawMessage, dst any) error {
 	if len(raw) == 0 {
@@ -45,7 +48,7 @@ func list[T any](
 	args []any,
 	scan func(pgx.Row) (T, error),
 ) (paging.Page[T], error) {
-	order, err := paging.OrderBy(query.Sort, listSort, "id ASC")
+	order, err := paging.OrderBy(query.Sort, listSort(), "id ASC")
 	if err != nil {
 		return paging.Page[T]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
@@ -152,7 +155,15 @@ func scanCustomer(r pgx.Row) (Customer, error) {
 	return customer, apperr.Wrap(err, "scan (scanCustomer)")
 }
 
-var profiles = map[string]bool{"rto": true, "general": true, "energy": true, "environment": true}
+// validProfile reports whether profile is a customer's service profile.
+func validProfile(profile string) bool {
+	switch profile {
+	case "rto", "general", "energy", "environment":
+		return true
+	}
+
+	return false
+}
 
 // customersList serves customers.list.
 //
@@ -210,7 +221,7 @@ func (m *Module) customersList(
 	conds := []string{everyRow}
 
 	if filters.Kind != nil {
-		if !profiles[*filters.Kind] {
+		if !validProfile(*filters.Kind) {
 			return paging.Page[Customer]{}, apperr.Fields(
 				map[string]string{keyFiltersKind: apperr.KeyInvalid},
 			)
@@ -265,7 +276,7 @@ func (in *CustomerSave) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 
 	in.Name = strings.TrimSpace(in.Name)
-	if !strLen(in.Name, 1, 120) {
+	if !strLen(in.Name, 1, maxName) {
 		fieldErrs[keyName] = apperr.KeyLength
 	}
 
@@ -273,7 +284,7 @@ func (in *CustomerSave) Validate() map[string]string {
 		fieldErrs["organizationId"] = apperr.KeyRequired
 	}
 
-	if !profiles[in.ServiceProfile] {
+	if !validProfile(in.ServiceProfile) {
 		fieldErrs["serviceProfile"] = apperr.KeyInvalid
 	}
 
@@ -314,72 +325,13 @@ func (m *Module) customersSave(
 	input *CustomerSave,
 ) (Customer, error) {
 	if input.ID == nil {
-		customerID := uuid.Must(uuid.NewV7())
-
-		customer, err := scanCustomer(
-			call.Tx.QueryRow(
-				ctx,
-				`INSERT INTO assets.customers (id, tenant_id, organization_id, name, status, service_profile)
-			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5) RETURNING `+customerCols,
-				customerID,
-				input.OrganizationID,
-				input.Name,
-				input.Status,
-				input.ServiceProfile,
-			),
-		)
-		if err != nil {
-			return Customer{}, err // 23505: organization already has a customer → CONFLICT
-		}
-
-		call.Audit(
-			ops.AuditEntry{
-				Action:          "customers.save",
-				TargetKind:      kindCustomer,
-				TargetID:        customerID.String(),
-				NextVersion:     &customer.Version,
-				PreviousVersion: nil,
-				Reason:          "",
-				Result:          "",
-				Before:          nil,
-				After:           nil,
-			},
-		)
-		call.Emit(
-			ops.Event{
-				AggregateType: kindCustomer,
-				AggregateID:   customerID,
-				Type:          "CustomerChanged",
-				Payload:       nil,
-			},
-		)
-
-		return customer, nil
+		return m.addCustomer(ctx, call, input)
 	}
 
-	if input.Status == statusInactive { // D05: deactivation conflicts with active units, contracts or jobs
-		var units bool
-
-		err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.units WHERE customer_org_id = $1 AND NOT
-			archived)`, input.OrganizationID).
-			Scan(&units)
+	if input.Status == statusInactive {
+		err := m.canDeactivate(ctx, call, input.OrganizationID)
 		if err != nil {
-			return Customer{}, apperr.Wrap(err, "select assets.units")
-		}
-
-		if units {
-			return Customer{}, conflict(apperr.KeyCustomerActive)
-		}
-
-		for _, a := range m.OrgActive {
-			busy, err := a.OrgActive(ctx, call, input.OrganizationID)
-			if err != nil {
-				return Customer{}, apperr.Wrap(err, "assets.OrgActivity.OrgActive")
-			}
-
-			if busy {
-				return Customer{}, conflict(apperr.KeyCustomerActive)
-			}
+			return Customer{}, err
 		}
 	}
 
@@ -420,6 +372,84 @@ func (m *Module) customersSave(
 	)
 
 	return updated, nil
+}
+
+// addCustomer creates the customer of an organization; one the organization has already is a conflict (23505).
+func (m *Module) addCustomer(
+	ctx context.Context,
+	call *ops.Call,
+	input *CustomerSave,
+) (Customer, error) {
+	customerID := uuid.Must(uuid.NewV7())
+
+	customer, err := scanCustomer(
+		call.Tx.QueryRow(
+			ctx,
+			`INSERT INTO assets.customers (id, tenant_id, organization_id, name, status, service_profile)
+		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5) RETURNING `+customerCols,
+			customerID,
+			input.OrganizationID,
+			input.Name,
+			input.Status,
+			input.ServiceProfile,
+		),
+	)
+	if err != nil {
+		return Customer{}, err // 23505: organization already has a customer → CONFLICT
+	}
+
+	call.Audit(
+		ops.AuditEntry{
+			Action:          "customers.save",
+			TargetKind:      kindCustomer,
+			TargetID:        customerID.String(),
+			NextVersion:     &customer.Version,
+			PreviousVersion: nil,
+			Reason:          "",
+			Result:          "",
+			Before:          nil,
+			After:           nil,
+		},
+	)
+	call.Emit(
+		ops.Event{
+			AggregateType: kindCustomer,
+			AggregateID:   customerID,
+			Type:          "CustomerChanged",
+			Payload:       nil,
+		},
+	)
+
+	return customer, nil
+}
+
+// canDeactivate refuses to deactivate a customer that has units, or active contracts or jobs (D05).
+func (m *Module) canDeactivate(ctx context.Context, call *ops.Call, org uuid.UUID) error {
+	var units bool
+
+	err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.units WHERE customer_org_id = $1 AND NOT
+		archived)`, org).
+		Scan(&units)
+	if err != nil {
+		return apperr.Wrap(err, "select assets.units")
+	}
+
+	if units {
+		return conflict(apperr.KeyCustomerActive)
+	}
+
+	for _, activity := range m.OrgActive {
+		busy, err := activity.OrgActive(ctx, call, org)
+		if err != nil {
+			return apperr.Wrap(err, "assets.OrgActivity.OrgActive")
+		}
+
+		if busy {
+			return conflict(apperr.KeyCustomerActive)
+		}
+	}
+
+	return nil
 }
 
 // ---- properties / spaces lists ----
@@ -574,7 +604,7 @@ func (m *Module) spacesList(
 	}
 
 	if filters.Kind != nil {
-		if !spaceKinds[*filters.Kind] {
+		if !validSpaceKind(*filters.Kind) {
 			return paging.Page[Space]{}, apperr.Fields(
 				map[string]string{keyFiltersKind: apperr.KeyInvalid},
 			)
@@ -608,7 +638,7 @@ func (in *RenameInput) Validate() map[string]string {
 		fieldErrs["target.id"] = apperr.KeyRequired
 	}
 
-	if !strLen(strings.TrimSpace(in.Name), 1, 120) {
+	if !strLen(strings.TrimSpace(in.Name), 1, maxName) {
 		fieldErrs[keyName] = apperr.KeyLength
 	}
 
@@ -650,24 +680,7 @@ func (m *Module) locationsRename(
 ) (any, error) {
 	name := strings.TrimSpace(input.Name)
 
-	var table, col, org, siblings string
-
-	switch input.Target.Kind {
-	case kindProperty:
-		table, col, org = "assets.properties", keyName, "customer_org_id"
-		siblings = `SELECT 1 FROM assets.properties o, assets.properties t WHERE t.id = $1 AND o.customer_org_id =
-			t.customer_org_id AND o.id <> t.id AND NOT o.archived AND lower(o.name) = lower($2)`
-	case kindSpace:
-		table, col, org = "assets.spaces", keyName, "(SELECT customer_org_id FROM assets.properties p WHERE p.id = "+
-			"property_id)"
-		siblings = `SELECT 1 FROM assets.spaces o, assets.spaces t WHERE t.id = $1 AND o.property_id = t.property_id AND
-			o.parent_space_id IS NOT DISTINCT FROM t.parent_space_id AND o.id <> t.id AND NOT o.archived AND lower(o.name) =
-			lower($2)`
-	default:
-		table, col, org = "assets.units", "display_name", "customer_org_id"
-		siblings = `SELECT 1 FROM assets.units o, assets.units t WHERE t.id = $1 AND o.property_id = t.property_id AND
-			o.space_id IS NOT DISTINCT FROM t.space_id AND o.id <> t.id AND NOT o.archived AND lower(o.display_name) = lower($2)`
-	}
+	target := renameTargetOf(input.Target.Kind)
 
 	visArgs, updArgs := []any{input.Target.ID}, []any{input.Target.ID, *call.ExpectedVersion, name}
 	visScope, updScope := everyRow, everyRow
@@ -680,13 +693,14 @@ func (m *Module) locationsRename(
 			updArgs,
 			call.Principal.OrgID,
 		)
-		visScope, updScope = org+" = $2", org+" = $4"
+		visScope, updScope = target.org+" = $2", target.org+" = $4"
 	}
 
 	var visible bool
 
-	scanErr := call.Tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM "+table+" WHERE id = $1 AND NOT archived AND "+visScope+
-		")", visArgs...).
+	visibleSQL := "SELECT EXISTS (SELECT 1 FROM " + target.table + " WHERE id = $1 AND NOT archived AND " + visScope + ")"
+
+	scanErr := call.Tx.QueryRow(ctx, visibleSQL, visArgs...).
 		Scan(&visible)
 	if scanErr != nil {
 		return nil, apperr.Wrap(scanErr, "select exists")
@@ -698,7 +712,7 @@ func (m *Module) locationsRename(
 
 	var dup bool
 
-	scanErr = call.Tx.QueryRow(ctx, "SELECT EXISTS ("+siblings+")", input.Target.ID, name).
+	scanErr = call.Tx.QueryRow(ctx, "SELECT EXISTS ("+target.siblings+")", input.Target.ID, name).
 		Scan(&dup)
 	if scanErr != nil {
 		return nil, apperr.Wrap(scanErr, "select exists")
@@ -710,7 +724,7 @@ func (m *Module) locationsRename(
 
 	var version int
 
-	err := call.Tx.QueryRow(ctx, "UPDATE "+table+" SET "+col+" = $3, version = version + 1, updated_at = "+
+	err := call.Tx.QueryRow(ctx, "UPDATE "+target.table+" SET "+target.col+" = $3, version = version + 1, updated_at = "+
 		"platform.app_now() WHERE id = $1 AND version = $2 AND NOT archived AND "+updScope+" RETURNING version", updArgs...).
 		Scan(&version)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -744,13 +758,62 @@ func (m *Module) locationsRename(
 		},
 	)
 
-	switch input.Target.Kind {
+	return m.renamed(ctx, call, input.Target.Kind, input.Target.ID)
+}
+
+// renameTarget is where a rename writes: the table, its name column, the SQL of a record's customer organization (for
+// a client's own records), and the query of a sibling that has the name ($2) already.
+type renameTarget struct {
+	table, col, org, siblings string
+}
+
+// renameTargetOf is the rename target of a property, space or unit.
+func renameTargetOf(kind string) renameTarget {
+	switch kind {
+	case kindProperty:
+		return renameTarget{
+			"assets.properties",
+			keyName,
+			"customer_org_id",
+			`SELECT 1 FROM assets.properties o, assets.properties t
+			WHERE t.id = $1 AND o.customer_org_id = t.customer_org_id AND o.id <> t.id AND NOT o.archived AND lower(o.name) =
+			lower($2)`,
+		}
+	case kindSpace:
+		return renameTarget{
+			"assets.spaces",
+			keyName,
+			"(SELECT customer_org_id FROM assets.properties p WHERE p.id = property_id)",
+			`SELECT 1 FROM assets.spaces o, assets.spaces t WHERE t.id = $1 AND o.property_id = t.property_id AND
+			o.parent_space_id IS NOT DISTINCT FROM t.parent_space_id AND o.id <> t.id AND NOT o.archived AND lower(o.name) =
+			lower($2)`,
+		}
+	default:
+		return renameTarget{
+			"assets.units",
+			"display_name",
+			"customer_org_id",
+			`SELECT 1 FROM assets.units o, assets.units t WHERE
+			t.id = $1 AND o.property_id = t.property_id AND o.space_id IS NOT DISTINCT FROM t.space_id AND o.id <> t.id AND NOT
+			o.archived AND lower(o.display_name) = lower($2)`,
+		}
+	}
+}
+
+// renamed is the renamed property, space or unit as its list shows it.
+func (m *Module) renamed(
+	ctx context.Context,
+	call *ops.Call,
+	kind string,
+	id uuid.UUID,
+) (any, error) {
+	switch kind {
 	case kindProperty:
 		return scanProperty(
 			call.Tx.QueryRow(
 				ctx,
 				"SELECT "+propertyCols+" FROM assets.properties WHERE id = $1",
-				input.Target.ID,
+				id,
 			),
 		)
 	case kindSpace:
@@ -758,10 +821,10 @@ func (m *Module) locationsRename(
 			call.Tx.QueryRow(
 				ctx,
 				"SELECT "+spaceCols+" FROM assets.spaces WHERE id = $1",
-				input.Target.ID,
+				id,
 			),
 		)
 	}
 
-	return m.load(ctx, call, input.Target.ID)
+	return m.load(ctx, call, id)
 }

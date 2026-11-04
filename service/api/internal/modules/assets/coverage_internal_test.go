@@ -8,6 +8,8 @@ import (
 )
 
 func TestCoverageStatus(t *testing.T) {
+	t.Parallel()
+
 	now := time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC)
 	daysFromNow := func(days int) *time.Time {
 		x := now.Add(time.Duration(days) * 24 * time.Hour)
@@ -37,17 +39,19 @@ func TestCoverageStatus(t *testing.T) {
 }
 
 func TestClaimable(t *testing.T) {
+	t.Parallel()
+
 	now := time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC)
-	a, b, c := uuid.New(), uuid.New(), uuid.New()
+	recent, older, later := uuid.New(), uuid.New(), uuid.New()
 	jobs := map[uuid.UUID]time.Time{
-		a: now.Add(-time.Hour),
-		b: now.Add(-48 * time.Hour),
-		c: now.Add(time.Hour),
+		recent: now.Add(-time.Hour),
+		older:  now.Add(-48 * time.Hour),
+		later:  now.Add(time.Hour),
 	}
 	ends := now
 
 	got := claimable(jobs, &ends)
-	if len(got) != 2 || got[0] != b || got[1] != a {
+	if len(got) != 2 || got[0] != older || got[1] != recent {
 		t.Fatalf("completed while the warranty ran, earliest first: %v", got)
 	}
 
@@ -56,7 +60,7 @@ func TestClaimable(t *testing.T) {
 	}
 
 	exact := now.Add(-time.Hour)
-	if got := claimable(map[uuid.UUID]time.Time{a: exact}, &exact); len(got) != 1 {
+	if got := claimable(map[uuid.UUID]time.Time{recent: exact}, &exact); len(got) != 1 {
 		t.Fatalf("completion on the last warranty instant counts: %v", got)
 	}
 }
@@ -64,6 +68,8 @@ func TestClaimable(t *testing.T) {
 // TestWarrantyStage: the latest BR-A19 reminder a warranty end has reached — 90 or 30 days before it, each from that
 // very instant — and none earlier than 90 days (IR340).
 func TestWarrantyStage(t *testing.T) {
+	t.Parallel()
+
 	now := time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC)
 
 	day := 24 * time.Hour

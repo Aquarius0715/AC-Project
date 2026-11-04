@@ -238,21 +238,9 @@ func (m *Module) unitsSetAlertPoliciesUnit(
 		return Unit{}, notFound()
 	}
 
-	owners, err := m.Policies.Owners(ctx, call, input.AlertPolicyIDs)
+	err = m.customerPolicies(ctx, call, customerID, input.AlertPolicyIDs)
 	if err != nil {
-		return Unit{}, apperr.Wrap(err, "assets.PolicyReader.Owners")
-	}
-
-	for _, id := range input.AlertPolicyIDs {
-		owner, found := owners[id]
-		switch { // IR108 / IR120 item 8
-		case found && owner.Kind != "alert":
-			return Unit{}, apperr.Fields(
-				map[string]string{"alertPolicyIds": "error.defaultPolicyImplicit"},
-			)
-		case !found || owner.CustomerID == nil || customerID == nil || *owner.CustomerID != *customerID:
-			return Unit{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
-		}
+		return Unit{}, err
 	}
 
 	var version int
@@ -270,31 +258,9 @@ func (m *Module) unitsSetAlertPoliciesUnit(
 		return Unit{}, apperr.Wrap(err, "update assets.units")
 	}
 
-	_, execErr := call.Tx.Exec(
-		ctx,
-		`DELETE FROM assets.unit_alert_policies WHERE unit_id = $1 AND NOT (policy_id = ANY($2))`,
-		input.UnitID,
-		input.AlertPolicyIDs,
-	)
-	if execErr != nil {
-		return Unit{}, apperr.Wrap(execErr, "delete assets.unit_alert_policies")
-	}
-
-	ids := append([]uuid.UUID(nil), input.AlertPolicyIDs...)
-	sort.Slice(ids, func(i, j int) bool { return ids[i].String() < ids[j].String() })
-
-	for _, policyID := range ids {
-		_, err := call.Tx.Exec(
-			ctx,
-			`INSERT INTO assets.unit_alert_policies (tenant_id, unit_id, policy_id) VALUES
-				(current_setting('app.tenant_id')::uuid, $1, $2)
-			ON CONFLICT DO NOTHING`,
-			input.UnitID,
-			policyID,
-		)
-		if err != nil {
-			return Unit{}, apperr.Wrap(err, "insert assets.unit_alert_policies")
-		}
+	err = replacePolicies(ctx, call, input.UnitID, input.AlertPolicyIDs)
+	if err != nil {
+		return Unit{}, err
 	}
 
 	call.Emit(
@@ -316,4 +282,69 @@ func (m *Module) unitsSetAlertPoliciesUnit(
 	)
 
 	return m.load(ctx, call, input.UnitID)
+}
+
+// customerPolicies requires the policies to be alert policies of the unit's customer (IR108, IR120 item 8): the
+// default policy is implicit, and another customer's policy is not found.
+func (m *Module) customerPolicies(
+	ctx context.Context,
+	call *ops.Call,
+	customerID *uuid.UUID,
+	ids []uuid.UUID,
+) error {
+	owners, err := m.Policies.Owners(ctx, call, ids)
+	if err != nil {
+		return apperr.Wrap(err, "assets.PolicyReader.Owners")
+	}
+
+	for _, id := range ids {
+		owner, found := owners[id]
+		switch { // IR108 / IR120 item 8
+		case found && owner.Kind != "alert":
+			return apperr.Fields(
+				map[string]string{"alertPolicyIds": "error.defaultPolicyImplicit"},
+			)
+		case !found || owner.CustomerID == nil || customerID == nil || *owner.CustomerID != *customerID:
+			return apperr.E(apperr.NotFound, apperr.KeyNotFound)
+		}
+	}
+
+	return nil
+}
+
+// replacePolicies makes the policies the unit's attached ones, adding the new ones in ID order.
+func replacePolicies(
+	ctx context.Context,
+	call *ops.Call,
+	unit uuid.UUID,
+	policies []uuid.UUID,
+) error {
+	_, execErr := call.Tx.Exec(
+		ctx,
+		`DELETE FROM assets.unit_alert_policies WHERE unit_id = $1 AND NOT (policy_id = ANY($2))`,
+		unit,
+		policies,
+	)
+	if execErr != nil {
+		return apperr.Wrap(execErr, "delete assets.unit_alert_policies")
+	}
+
+	ids := append([]uuid.UUID(nil), policies...)
+	sort.Slice(ids, func(i, j int) bool { return ids[i].String() < ids[j].String() })
+
+	for _, policyID := range ids {
+		_, err := call.Tx.Exec(
+			ctx,
+			`INSERT INTO assets.unit_alert_policies (tenant_id, unit_id, policy_id) VALUES
+				(current_setting('app.tenant_id')::uuid, $1, $2)
+			ON CONFLICT DO NOTHING`,
+			unit,
+			policyID,
+		)
+		if err != nil {
+			return apperr.Wrap(err, "insert assets.unit_alert_policies")
+		}
+	}
+
+	return nil
 }

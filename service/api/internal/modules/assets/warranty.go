@@ -16,12 +16,19 @@ import (
 
 // ---- warranty reminders (scheduler job) ----
 
+// The BR-A19 reminders in days before a warranty ends: the last one, and the first, which is also how far ahead the
+// job looks.
+const (
+	lastReminderDays  = 30
+	firstReminderDays = 90
+)
+
 // warrantyReminderDays are the BR-A19 reminders in days before a warranty ends, the latest first.
-var warrantyReminderDays = []int{30, 90}
+func warrantyReminderDays() []int { return []int{lastReminderDays, firstReminderDays} }
 
 // warrantyStage is the latest reminder a warranty end has reached at now (0 when it ends later than 90 days).
 func warrantyStage(ends, now time.Time) int {
-	for _, d := range warrantyReminderDays {
+	for _, d := range warrantyReminderDays() {
 		if !now.Before(ends.Add(-time.Duration(d) * 24 * time.Hour)) {
 			return d
 		}
@@ -41,7 +48,7 @@ func (m *Module) RemindWarranties(ctx context.Context, call *ops.Call) (int, err
 		`SELECT id, warranty_ends_at FROM assets.units WHERE NOT archived AND warranty_ends_at > $1 AND warranty_ends_at <= $2
 		ORDER BY warranty_ends_at, id`,
 		call.Now,
-		call.Now.Add(time.Duration(warrantyReminderDays[len(warrantyReminderDays)-1])*24*time.Hour),
+		call.Now.Add(firstReminderDays*24*time.Hour),
 	)
 	if err != nil {
 		return 0, apperr.Wrap(err, "select assets.units")
@@ -71,8 +78,7 @@ func (m *Module) RemindWarranties(ctx context.Context, call *ops.Call) (int, err
 		return 0, apperr.Wrap(err, "assets.ContractReader.ActiveContracts")
 	}
 
-	var recipients []uuid.UUID
-
+	reminder := warrantyReminder{recipients: nil}
 	reminded := 0
 
 	for _, dueUnit := range list {
@@ -80,101 +86,129 @@ func (m *Module) RemindWarranties(ctx context.Context, call *ops.Call) (int, err
 			continue
 		}
 
-		days := warrantyStage(dueUnit.ends, call.Now)
-
-		tag, err := call.Tx.Exec(
+		sent, err := reminder.remind(
 			ctx,
-			`INSERT INTO assets.warranty_reminders (unit_id, warranty_ends_at, days_before, tenant_id, sent_at)
-			SELECT $1, $2, $3, current_setting('app.tenant_id')::uuid, $4
-			WHERE NOT EXISTS (SELECT 1 FROM assets.warranty_reminders WHERE unit_id = $1 AND warranty_ends_at = $2 AND
-			days_before <= $3) ON CONFLICT DO NOTHING`,
+			call,
 			dueUnit.id,
 			dueUnit.ends,
-			days,
-			call.Now,
+			warrantyStage(dueUnit.ends, call.Now),
 		)
 		if err != nil {
-			return reminded, apperr.Wrap(err, "insert assets.warranty_reminders")
+			return reminded, err
 		}
 
-		if tag.RowsAffected() == 0 { // this reminder (or a later one) went already
-			continue
+		if sent {
+			reminded++
 		}
-
-		if recipients == nil {
-			recipients, err = identity.Members(
-				ctx,
-				call,
-				identity.MembersInput{
-					Role:           "admin",
-					Permission:     "asset.read",
-					IDs:            nil,
-					OrganizationID: nil,
-					ClientRole:     "",
-				},
-			)
-			if err != nil {
-				return reminded, apperr.Wrap(err, "identity.Members")
-			}
-		}
-
-		severity := "normal"
-		if days == warrantyReminderDays[0] {
-			severity = severityWarning
-		}
-
-		for _, r := range recipients {
-			_, err := (notify.Store{}).Create(ctx, call, notify.New{
-				RecipientMembershipID: r,
-				Type:                  "warranty_expiring",
-				TemplateKey:           "warranty_expiring",
-				TargetKind:            kindUnit,
-				TargetID:              dueUnit.id,
-				Severity:              severity,
-				Params: map[string]any{
-					"at":     dueUnit.ends,
-					"status": coverageExpiring,
-				},
-				Channel:       "",
-				SourceAlertID: nil,
-			})
-			if err != nil {
-				return reminded, apperr.Wrap(err, "notify.Store.Create")
-			}
-		}
-
-		_, execErr := call.Tx.Exec(
-			ctx,
-			`UPDATE assets.warranty_reminders SET notifications = $4 WHERE unit_id = $1 AND warranty_ends_at = $2 AND days_before
-				= $3`,
-			dueUnit.id,
-			dueUnit.ends,
-			days,
-			len(recipients),
-		)
-		if execErr != nil {
-			return reminded, apperr.Wrap(execErr, "update assets.warranty_reminders")
-		}
-
-		call.Audit(
-			ops.AuditEntry{
-				Action:     "units.remindWarranty",
-				TargetKind: kindUnit,
-				TargetID:   dueUnit.id.String(),
-				Reason: fmt.Sprintf(
-					"%d days before the warranty ends",
-					days,
-				),
-				PreviousVersion: nil,
-				NextVersion:     nil,
-				Result:          "",
-				Before:          nil,
-				After:           nil,
-			},
-		)
-
-		reminded++
 	}
 
 	return reminded, nil
+}
+
+// warrantyReminder sends the reminders of one run; the HQ members who read the units are looked up at the first one.
+type warrantyReminder struct {
+	recipients []uuid.UUID
+}
+
+// remind sends the unit's reminder of the stage, unless it (or a later one) went for this warranty end already, and
+// reports whether it went.
+func (reminder *warrantyReminder) remind(
+	ctx context.Context,
+	call *ops.Call,
+	unit uuid.UUID,
+	ends time.Time,
+	days int,
+) (bool, error) {
+	tag, err := call.Tx.Exec(
+		ctx,
+		`INSERT INTO assets.warranty_reminders (unit_id, warranty_ends_at, days_before, tenant_id, sent_at)
+		SELECT $1, $2, $3, current_setting('app.tenant_id')::uuid, $4
+		WHERE NOT EXISTS (SELECT 1 FROM assets.warranty_reminders WHERE unit_id = $1 AND warranty_ends_at = $2 AND
+		days_before <= $3) ON CONFLICT DO NOTHING`,
+		unit,
+		ends,
+		days,
+		call.Now,
+	)
+	if err != nil {
+		return false, apperr.Wrap(err, "insert assets.warranty_reminders")
+	}
+
+	if tag.RowsAffected() == 0 { // this reminder (or a later one) went already
+		return false, nil
+	}
+
+	if reminder.recipients == nil {
+		reminder.recipients, err = identity.Members(
+			ctx,
+			call,
+			identity.MembersInput{
+				Role:           "admin",
+				Permission:     "asset.read",
+				IDs:            nil,
+				OrganizationID: nil,
+				ClientRole:     "",
+			},
+		)
+		if err != nil {
+			return false, apperr.Wrap(err, "identity.Members")
+		}
+	}
+
+	severity := "normal"
+	if days == lastReminderDays {
+		severity = severityWarning
+	}
+
+	for _, recipient := range reminder.recipients {
+		_, err := (notify.Store{}).Create(ctx, call, notify.New{
+			RecipientMembershipID: recipient,
+			Type:                  "warranty_expiring",
+			TemplateKey:           "warranty_expiring",
+			TargetKind:            kindUnit,
+			TargetID:              unit,
+			Severity:              severity,
+			Params: map[string]any{
+				"at":     ends,
+				"status": coverageExpiring,
+			},
+			Channel:       "",
+			SourceAlertID: nil,
+		})
+		if err != nil {
+			return false, apperr.Wrap(err, "notify.Store.Create")
+		}
+	}
+
+	_, execErr := call.Tx.Exec(
+		ctx,
+		`UPDATE assets.warranty_reminders SET notifications = $4 WHERE unit_id = $1 AND warranty_ends_at = $2 AND days_before
+			= $3`,
+		unit,
+		ends,
+		days,
+		len(reminder.recipients),
+	)
+	if execErr != nil {
+		return false, apperr.Wrap(execErr, "update assets.warranty_reminders")
+	}
+
+	call.Audit(
+		ops.AuditEntry{
+			Action:     "units.remindWarranty",
+			TargetKind: kindUnit,
+			TargetID:   unit.String(),
+			Reason: fmt.Sprintf(
+				"%d days before the warranty ends",
+				days,
+			),
+			PreviousVersion: nil,
+			NextVersion:     nil,
+			Result:          "",
+			Before:          nil,
+			After:           nil,
+		},
+	)
+
+	return true, nil
 }

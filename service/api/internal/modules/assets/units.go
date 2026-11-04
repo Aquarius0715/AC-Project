@@ -158,12 +158,14 @@ type UnitFilters struct {
 	UnassignedOnly     *bool        `json:"unassignedOnly,omitempty"`
 }
 
-var connections = map[string]bool{
-	connectionOnline: true,
-	"offline":        true,
-	stateUnknown:     true,
-	"connecting":     true,
-	stateError:       true,
+// validConnection reports whether state is a unit's connection.
+func validConnection(state string) bool {
+	switch state {
+	case connectionOnline, "offline", stateUnknown, "connecting", stateError:
+		return true
+	}
+
+	return false
 }
 
 // scopeSQL restricts unit rows (alias u) to the caller's List-mode scope (unitscope, IR169).
@@ -398,33 +400,9 @@ func (m *Module) unitsList(
 		}
 	}
 
-	if unitFilters.UnassignedOnly != nil && *unitFilters.UnassignedOnly &&
-		unitFilters.SpaceID != nil {
-		return paging.Page[Unit]{}, apperr.Fields(
-			map[string]string{"filters.unassignedOnly": "error.conflictsWithSpaceId"},
-		)
-	}
-
-	if unitFilters.Status != nil && !connections[*unitFilters.Status] {
-		return paging.Page[Unit]{}, apperr.Fields(
-			map[string]string{"filters.status": apperr.KeyInvalid},
-		)
-	}
-
-	for _, s := range unitFilters.Connections {
-		if !connections[s] {
-			return paging.Page[Unit]{}, apperr.Fields(
-				map[string]string{"filters.connections": apperr.KeyInvalid},
-			)
-		}
-	}
-
-	if unitFilters.PowerState != nil && *unitFilters.PowerState != "on" &&
-		*unitFilters.PowerState != powerOff &&
-		*unitFilters.PowerState != stateUnknown {
-		return paging.Page[Unit]{}, apperr.Fields(
-			map[string]string{"filters.powerState": apperr.KeyInvalid},
-		)
+	err := unitFilters.check()
+	if err != nil {
+		return paging.Page[Unit]{}, err
 	}
 
 	order, err := paging.OrderBy(
@@ -443,88 +421,9 @@ func (m *Module) unitsList(
 
 	var args []any
 
-	add := func(v any) string {
-		args = append(args, v)
-
-		return fmt.Sprintf("$%d", len(args))
-	}
-
-	conds := []string{unarchivedUnits, scopeSQL(call, &args)}
-	if unitFilters.CustomerID != nil {
-		conds = append(
-			conds,
-			"u.customer_org_id = (SELECT organization_id FROM assets.customers WHERE id = "+add(
-				*unitFilters.CustomerID,
-			)+")",
-		)
-	}
-
-	if unitFilters.OrganizationID != nil {
-		conds = append(conds, "u.customer_org_id = "+add(*unitFilters.OrganizationID))
-	}
-
-	if unitFilters.PropertyID != nil {
-		conds = append(conds, "u.property_id = "+add(*unitFilters.PropertyID))
-	}
-
-	if unitFilters.SpaceID != nil {
-		if unitFilters.IncludeDescendants != nil && *unitFilters.IncludeDescendants {
-			conds = append(
-				conds,
-				`u.space_id IN (WITH RECURSIVE t AS (SELECT id FROM assets.spaces WHERE id = `+add(
-					*unitFilters.SpaceID,
-				)+
-					` UNION ALL SELECT s.id FROM assets.spaces s JOIN t ON s.parent_space_id = t.id) SELECT id FROM t)`,
-			)
-		} else {
-			conds = append(conds, "u.space_id = "+add(*unitFilters.SpaceID))
-		}
-	}
-
-	if unitFilters.UnassignedOnly != nil && *unitFilters.UnassignedOnly {
-		conds = append(conds, "u.space_id IS NULL")
-	}
-
-	if unitFilters.Status != nil {
-		conds = append(conds, "u.connection = "+add(*unitFilters.Status))
-	}
-
-	if len(unitFilters.Connections) > 0 {
-		conds = append(conds, "u.connection = ANY("+add(unitFilters.Connections)+")")
-	}
-
-	if unitFilters.UnitIDs != nil {
-		conds = append(conds, "u.id = ANY("+add(*unitFilters.UnitIDs)+")")
-	}
-
-	where := strings.Join(conds, " AND ")
-	if unitFilters.PowerState != nil { // derived filter: evaluate on the full scoped set, then page in memory
-		all, _, err := m.query(ctx, call, where, args, order, 0, 0)
-		if err != nil {
-			return paging.Page[Unit]{}, err
-		}
-
-		var keep []Unit
-
-		for _, u := range all {
-			if u.EffectivePowerState == *unitFilters.PowerState {
-				keep = append(keep, u)
-			}
-		}
-
-		end := min(window.Offset+window.Limit, len(keep))
-
-		items := []Unit{}
-		if window.Offset < len(keep) {
-			items = keep[window.Offset:end]
-		}
-
-		return paging.Page[Unit]{
-			Items:           items,
-			NextCursor:      window.Next(len(keep)),
-			Total:           len(keep),
-			SnapshotVersion: window.Snapshot,
-		}, nil
+	where := unitFilters.where(call, &args)
+	if unitFilters.PowerState != nil {
+		return m.unitsByPower(ctx, call, where, args, order, window, *unitFilters.PowerState)
 	}
 
 	items, total, err := m.query(ctx, call, where, args, order, window.Limit, window.Offset)
@@ -540,6 +439,139 @@ func (m *Module) unitsList(
 		Items:           items,
 		NextCursor:      window.Next(total),
 		Total:           total,
+		SnapshotVersion: window.Snapshot,
+	}, nil
+}
+
+// check refuses filters that contradict each other (unassignedOnly with a space) or name a state that is not one.
+func (filters UnitFilters) check() error {
+	if filters.UnassignedOnly != nil && *filters.UnassignedOnly &&
+		filters.SpaceID != nil {
+		return apperr.Fields(
+			map[string]string{"filters.unassignedOnly": "error.conflictsWithSpaceId"},
+		)
+	}
+
+	if filters.Status != nil && !validConnection(*filters.Status) {
+		return apperr.Fields(
+			map[string]string{"filters.status": apperr.KeyInvalid},
+		)
+	}
+
+	for _, s := range filters.Connections {
+		if !validConnection(s) {
+			return apperr.Fields(
+				map[string]string{"filters.connections": apperr.KeyInvalid},
+			)
+		}
+	}
+
+	if filters.PowerState != nil && *filters.PowerState != "on" &&
+		*filters.PowerState != powerOff &&
+		*filters.PowerState != stateUnknown {
+		return apperr.Fields(
+			map[string]string{"filters.powerState": apperr.KeyInvalid},
+		)
+	}
+
+	return nil
+}
+
+// where is the SQL condition of the filters over the units the caller may list (alias u); the arguments it uses are
+// added to args.
+func (filters UnitFilters) where(call *ops.Call, args *[]any) string {
+	add := func(v any) string {
+		*args = append(*args, v)
+
+		return fmt.Sprintf("$%d", len(*args))
+	}
+
+	conds := []string{unarchivedUnits, scopeSQL(call, args)}
+	if filters.CustomerID != nil {
+		conds = append(
+			conds,
+			"u.customer_org_id = (SELECT organization_id FROM assets.customers WHERE id = "+add(
+				*filters.CustomerID,
+			)+")",
+		)
+	}
+
+	if filters.OrganizationID != nil {
+		conds = append(conds, "u.customer_org_id = "+add(*filters.OrganizationID))
+	}
+
+	if filters.PropertyID != nil {
+		conds = append(conds, "u.property_id = "+add(*filters.PropertyID))
+	}
+
+	if filters.SpaceID != nil {
+		if filters.IncludeDescendants != nil && *filters.IncludeDescendants {
+			conds = append(
+				conds,
+				`u.space_id IN (WITH RECURSIVE t AS (SELECT id FROM assets.spaces WHERE id = `+add(
+					*filters.SpaceID,
+				)+
+					` UNION ALL SELECT s.id FROM assets.spaces s JOIN t ON s.parent_space_id = t.id) SELECT id FROM t)`,
+			)
+		} else {
+			conds = append(conds, "u.space_id = "+add(*filters.SpaceID))
+		}
+	}
+
+	if filters.UnassignedOnly != nil && *filters.UnassignedOnly {
+		conds = append(conds, "u.space_id IS NULL")
+	}
+
+	if filters.Status != nil {
+		conds = append(conds, "u.connection = "+add(*filters.Status))
+	}
+
+	if len(filters.Connections) > 0 {
+		conds = append(conds, "u.connection = ANY("+add(filters.Connections)+")")
+	}
+
+	if filters.UnitIDs != nil {
+		conds = append(conds, "u.id = ANY("+add(*filters.UnitIDs)+")")
+	}
+
+	return strings.Join(conds, " AND ")
+}
+
+// unitsByPower is the page of the units whose derived power state is state: the filter is evaluated on the full
+// scoped set, then paged in memory.
+func (m *Module) unitsByPower(
+	ctx context.Context,
+	call *ops.Call,
+	where string,
+	args []any,
+	order string,
+	window paging.Window,
+	state string,
+) (paging.Page[Unit], error) {
+	all, _, err := m.query(ctx, call, where, args, order, 0, 0)
+	if err != nil {
+		return paging.Page[Unit]{}, err
+	}
+
+	var keep []Unit
+
+	for _, unit := range all {
+		if unit.EffectivePowerState == state {
+			keep = append(keep, unit)
+		}
+	}
+
+	end := min(window.Offset+window.Limit, len(keep))
+
+	items := []Unit{}
+	if window.Offset < len(keep) {
+		items = keep[window.Offset:end]
+	}
+
+	return paging.Page[Unit]{
+		Items:           items,
+		NextCursor:      window.Next(len(keep)),
+		Total:           len(keep),
 		SnapshotVersion: window.Snapshot,
 	}, nil
 }
@@ -598,9 +630,7 @@ func (m *Module) unitsGet(
 	call *ops.Call,
 	input *UnitGetInput,
 ) (UnitDetail, error) {
-	var args []any
-
-	args = append(args, input.ID)
+	args := []any{input.ID}
 	where := "u.id = $1 AND " + scopeSQL(call, &args)
 
 	units, _, err := m.query(ctx, call, where, args, "u.id", 1, 0)

@@ -8,6 +8,8 @@ import (
 )
 
 func TestEffectivePower(t *testing.T) {
+	t.Parallel()
+
 	now := time.Date(2026, 9, 14, 1, 0, 0, 0, time.UTC)
 	powerOn, off := true, false
 	fromNow := func(d time.Duration) *time.Time {

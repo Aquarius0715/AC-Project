@@ -73,10 +73,10 @@ func (m *Module) CountUnits(
 	}
 
 	var unitCounts UnitCounts
-	for _, u := range units {
+	for _, unit := range units {
 		unitCounts.Total++
 
-		switch u.Connection {
+		switch unit.Connection {
 		case connectionOnline:
 			unitCounts.Online++
 		case "offline":
@@ -85,7 +85,7 @@ func (m *Module) CountUnits(
 			unitCounts.Unknown++
 		}
 
-		switch u.EffectivePowerState {
+		switch unit.EffectivePowerState {
 		case "on":
 			unitCounts.PowerOn++
 		case powerOff:
@@ -94,7 +94,7 @@ func (m *Module) CountUnits(
 			unitCounts.PowerUnknown++
 		}
 
-		unitCounts.AlertCount += u.ActiveAlertCount
+		unitCounts.AlertCount += unit.ActiveAlertCount
 	}
 
 	return unitCounts, nil

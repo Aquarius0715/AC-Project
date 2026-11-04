@@ -30,15 +30,19 @@ type ImportModels interface {
 	UnbindUnits(ctx context.Context, c *ops.Call, units []uuid.UUID, reason string) error
 }
 
-// kualaLumpur reads the CSV dates (YYYY-MM-DD) as calendar dates of the tenant time zone, like the unit form.
-var kualaLumpur = func() *time.Location {
-	l, err := time.LoadLocation("Asia/Kuala_Lumpur")
+// kualaLumpur is the tenant time zone the CSV dates (YYYY-MM-DD) are calendar dates of, like the unit form's; Malaysia
+// Time when the time zone database is missing.
+func kualaLumpur() *time.Location {
+	zone, err := time.LoadLocation("Asia/Kuala_Lumpur")
 	if err != nil {
-		return time.FixedZone("MYT", 8*3600)
+		return time.FixedZone("MYT", malaysiaOffset)
 	}
 
-	return l
-}()
+	return zone
+}
+
+// malaysiaOffset is Malaysia Time's offset east of UTC in seconds (UTC+8, no daylight saving).
+const malaysiaOffset = 8 * 60 * 60
 
 const (
 	maxImportRows  = 1000
@@ -46,9 +50,21 @@ const (
 	importUndoTime = 24 * time.Hour
 )
 
-var importColumns = map[string]bool{
-	kindProperty: true, levelFloor: true, levelRoom: true, "unit_name": true, "model_code": true,
-	"serial": true, "installed_on": true, "warranty_end": true,
+// importColumn reports whether key is one of the columns an import maps (DD-A18).
+func importColumn(key string) bool {
+	switch key {
+	case kindProperty,
+		levelFloor,
+		levelRoom,
+		"unit_name",
+		"model_code",
+		"serial",
+		"installed_on",
+		"warranty_end":
+		return true
+	}
+
+	return false
 }
 
 // ImportRow is ImportRow of service-contracts.ts; the unexported fields are kept in the preview store.
@@ -66,6 +82,8 @@ type ImportRow struct {
 	MessageKey   *string `json:"messageKey"`
 }
 
+// storedRow is a checked row with what the commit needs: the IDs of its property, locations, model and device, or the
+// stable placeholders of a property and locations the import creates.
 type storedRow struct {
 	ImportRow
 
@@ -105,7 +123,7 @@ func (in *ImportPreviewInput) Validate() map[string]string {
 		fieldErrs["customerId"] = apperr.KeyRequired
 	}
 
-	if !strLen(in.FileName, 1, 200) {
+	if !strLen(in.FileName, 1, maxFileName) {
 		fieldErrs["fileName"] = apperr.KeyLength
 	}
 
@@ -114,7 +132,7 @@ func (in *ImportPreviewInput) Validate() map[string]string {
 	}
 
 	for k := range in.Mapping {
-		if !importColumns[k] {
+		if !importColumn(k) {
 			fieldErrs["mapping."+k] = "error.unknownColumn"
 		}
 	}
@@ -140,12 +158,6 @@ func cell(rec []string, idx map[string]int, key string) *string {
 	}
 
 	return &v
-}
-
-type locKey struct {
-	parent uuid.UUID
-	kind   string
-	name   string
 }
 
 // unitsImportPreview serves units.importPreview.
@@ -206,271 +218,26 @@ func (m *Module) unitsImportPreview(
 		)
 	}
 
-	idx := map[string]int{}
-
-	for key, col := range input.Mapping {
-		found := false
-
-		for i, h := range header {
-			if strings.EqualFold(strings.TrimSpace(h), strings.TrimSpace(col)) {
-				idx[key], found = i, true
-			}
-		}
-
-		if !found && strings.TrimSpace(col) != "" {
-			return ImportPreview{}, apperr.Fields(
-				map[string]string{"mapping." + key: "error.columnNotFound"},
-			)
-		}
+	idx, err := columnIndex(header, input.Mapping)
+	if err != nil {
+		return ImportPreview{}, err
 	}
 
-	var stored []storedRow
-
-	planned := map[locKey]bool{} // spaces this file would create
-	unitNames := map[string]bool{}
-	serials := map[string]bool{}
-
-	for rowNumber := 1; ; rowNumber++ {
-		rec, err := reader.Read()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-
-		if err != nil {
-			return ImportPreview{}, apperr.Fields(
-				map[string]string{keyCSVText: apperr.KeyMalformedCsv},
-			)
-		}
-
-		if rowNumber > maxImportRows {
-			return ImportPreview{}, apperr.Fields(
-				map[string]string{keyCSVText: "error.tooManyRows"},
-			)
-		}
-
-		row := storedRow{
-			ImportRow: ImportRow{
-				RowNumber:    rowNumber,
-				Result:       rowReady,
-				PropertyName: "",
-				FloorName:    nil,
-				RoomName:     nil,
-				UnitName:     "",
-				ModelCode:    "",
-				Serial:       nil,
-				InstalledOn:  nil,
-				WarrantyEnd:  nil,
-				MessageKey:   nil,
-			},
-			NewProperty: false,
-			DeviceID:    nil,
-			PropertyID:  uuid.UUID{},
-			FloorID:     nil,
-			RoomID:      nil,
-			ModelID:     uuid.UUID{},
-			CapVersion:  0,
-		}
-		get := func(k string) *string { return cell(rec, idx, k) }
-		fail := func(key string) { row.Result, row.MessageKey = rowError, new(key) }
-		warn := func(key string) {
-			if row.Result == rowReady {
-				row.Result, row.MessageKey = rowWarning, new(key)
-			}
-		}
-
-		if p := get(kindProperty); p != nil {
-			row.PropertyName = *p
-		}
-
-		if u := get("unit_name"); u != nil {
-			row.UnitName = *u
-		}
-
-		if mc := get("model_code"); mc != nil {
-			row.ModelCode = *mc
-		}
-
-		row.FloorName, row.RoomName, row.Serial, row.InstalledOn, row.WarrantyEnd = get(
-			levelFloor,
-		), get(
-			levelRoom,
-		), get(
-			"serial",
-		), get(
-			"installed_on",
-		), get(
-			"warranty_end",
-		)
-		switch {
-		case row.PropertyName == "" || row.UnitName == "" || row.ModelCode == "":
-			fail("error.importMissingField")
-		case !strLen(row.UnitName, 1, 120):
-			fail(apperr.KeyLength)
-		}
-
-		if row.Result != rowError {
-			err := call.Tx.QueryRow(ctx, `SELECT id FROM assets.properties WHERE customer_org_id = $1 AND NOT archived AND
-				lower(name) = lower($2) ORDER BY id LIMIT 1`,
-				org, row.PropertyName).
-				Scan(&row.PropertyID)
-			if errors.Is(
-				err,
-				pgx.ErrNoRows,
-			) { // created at import (Figma 02 import step 1): kind office, no address yet
-				warn("warning.importCreatesProperty")
-
-				row.NewProperty = true
-				row.PropertyID = uuid.NewSHA1(
-					org,
-					[]byte("property/"+strings.ToLower(row.PropertyName)),
-				) // stable placeholder
-			} else if err != nil {
-				return ImportPreview{}, apperr.Wrap(err, "select assets.properties")
-			}
-		}
-
-		if row.Result != rowError {
-			modelID, capVersion, ok, err := m.Import.ByCode(ctx, call, row.ModelCode)
-			if err != nil {
-				return ImportPreview{}, apperr.Wrap(err, "assets.ImportModels.ByCode")
-			}
-
-			if !ok {
-				fail("error.unknownModel")
-			}
-
-			row.ModelID, row.CapVersion = modelID, capVersion
-		}
-
-		for _, d := range []*string{row.InstalledOn, row.WarrantyEnd} {
-			if row.Result != rowError && d != nil {
-				_, err := time.ParseInLocation("2006-01-02", *d, kualaLumpur)
-				if err != nil {
-					fail("error.importInvalidDate")
-				}
-			}
-		}
-
-		if row.Result != rowError && row.InstalledOn != nil {
-			if t, _ := time.ParseInLocation(
-				"2006-01-02",
-				*row.InstalledOn,
-				kualaLumpur,
-			); t.After(
-				call.Now,
-			) {
-				fail(apperr.KeyFuture)
-			}
-		}
-
-		if row.Result != rowError &&
-			row.Serial != nil { // the device must exist, be free and untampered; one row per serial
-			deviceID, state, err := m.Import.SerialState(ctx, call, *row.Serial)
-			if err != nil {
-				return ImportPreview{}, apperr.Wrap(err, "assets.ImportModels.SerialState")
-			}
-
-			switch key := strings.ToUpper(*row.Serial); {
-			case serials[key]:
-				fail(apperr.KeyDuplicateSerial)
-			case state == stateUnknown:
-				fail("error.unknownSerial")
-			case state == "bound":
-				fail("error.serialBound")
-			case state == "tamper":
-				fail(apperr.KeyTamperUnresolved)
-			default:
-				row.DeviceID = &deviceID
-				serials[key] = true
-			}
-		}
-		// locations: floor under the property, room under the floor (or the property root)
-		parent := row.PropertyID
-
-		var parentSpace *uuid.UUID
-
-		for _, lvl := range []struct {
-			name *string
-			kind string
-			dst  **uuid.UUID
-		}{{row.FloorName, levelFloor, &row.FloorID}, {row.RoomName, levelRoom, &row.RoomID}} {
-			if row.Result == rowError || lvl.name == nil {
-				continue
-			}
-
-			var spaceID uuid.UUID
-			// an existing location of any kind with this name under the parent is reused: names are unique per parent
-			err := call.Tx.QueryRow(ctx, `SELECT id FROM assets.spaces WHERE property_id = $1 AND parent_space_id IS NOT DISTINCT
-				FROM $2
-				AND NOT archived AND lower(name) = lower($3) ORDER BY id LIMIT 1`, row.PropertyID, parentSpace, *lvl.name).
-				Scan(&spaceID)
-			if errors.Is(err, pgx.ErrNoRows) {
-				warn("warning.importCreatesSpace")
-
-				k := locKey{parent, lvl.kind, strings.ToLower(*lvl.name)}
-				planned[k] = true
-				spaceID = uuid.NewSHA1(
-					row.PropertyID,
-					[]byte(lvl.kind+"/"+parent.String()+"/"+strings.ToLower(*lvl.name)),
-				) // stable placeholder
-			} else if err != nil {
-				return ImportPreview{}, apperr.Wrap(err, "select assets.spaces")
-			}
-
-			*lvl.dst = &spaceID
-			parent, parentSpace = spaceID, &spaceID
-		}
-
-		if row.Result != rowError {
-			key := parent.String() + "/" + strings.ToLower(row.UnitName)
-
-			var exists bool
-
-			err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.units WHERE property_id = $1 AND space_id IS NOT
-				DISTINCT FROM $2
-				AND NOT archived AND lower(display_name) = lower($3))`, row.PropertyID, parentSpace, row.UnitName).
-				Scan(&exists)
-			if err != nil {
-				return ImportPreview{}, apperr.Wrap(err, "select assets.units")
-			}
-
-			if exists || unitNames[key] {
-				fail(apperr.KeyDuplicateSiblingName)
-			}
-
-			unitNames[key] = true
-		}
-
-		stored = append(stored, row)
+	check := importCheck{
+		models:    m.Import,
+		call:      call,
+		org:       org,
+		zone:      kualaLumpur(),
+		unitNames: map[string]bool{},
+		serials:   map[string]bool{},
 	}
 
-	if len(stored) == 0 {
-		return ImportPreview{}, apperr.Fields(map[string]string{keyCSVText: "error.noRows"})
+	stored, err := check.rows(ctx, reader, idx)
+	if err != nil {
+		return ImportPreview{}, err
 	}
 
-	importPreview := ImportPreview{
-		PreviewID:  uuid.Must(uuid.NewV7()),
-		CustomerID: input.CustomerID,
-		FileName:   input.FileName,
-		ExpiresAt: call.Now.Add(
-			previewTTL,
-		),
-		Rows:         nil,
-		ReadyCount:   0,
-		WarningCount: 0,
-		ErrorCount:   0,
-	}
-	for _, s := range stored {
-		importPreview.Rows = append(importPreview.Rows, s.ImportRow)
-		switch s.Result {
-		case rowReady:
-			importPreview.ReadyCount++
-		case rowWarning:
-			importPreview.WarningCount++
-		default:
-			importPreview.ErrorCount++
-		}
-	}
+	importPreview := previewOf(input, stored, call.Now)
 
 	rows, marshalErr := json.Marshal(stored)
 	if marshalErr != nil {
@@ -497,6 +264,332 @@ func (m *Module) unitsImportPreview(
 	}
 
 	return importPreview, nil
+}
+
+// columnIndex is the position of each mapped column in the header; a mapped column the header does not have is a
+// field error.
+func columnIndex(header []string, mapping map[string]string) (map[string]int, error) {
+	idx := map[string]int{}
+
+	for key, col := range mapping {
+		found := false
+
+		for i, h := range header {
+			if strings.EqualFold(strings.TrimSpace(h), strings.TrimSpace(col)) {
+				idx[key], found = i, true
+			}
+		}
+
+		if !found && strings.TrimSpace(col) != "" {
+			return nil, apperr.Fields(
+				map[string]string{"mapping." + key: "error.columnNotFound"},
+			)
+		}
+	}
+
+	return idx, nil
+}
+
+// previewOf is the preview of the checked rows, open for previewTTL from now, with the count of each result.
+func previewOf(input *ImportPreviewInput, stored []storedRow, now time.Time) ImportPreview {
+	importPreview := ImportPreview{
+		PreviewID:    uuid.Must(uuid.NewV7()),
+		CustomerID:   input.CustomerID,
+		FileName:     input.FileName,
+		ExpiresAt:    now.Add(previewTTL),
+		Rows:         nil,
+		ReadyCount:   0,
+		WarningCount: 0,
+		ErrorCount:   0,
+	}
+	for _, row := range stored {
+		importPreview.Rows = append(importPreview.Rows, row.ImportRow)
+		switch row.Result {
+		case rowReady:
+			importPreview.ReadyCount++
+		case rowWarning:
+			importPreview.WarningCount++
+		default:
+			importPreview.ErrorCount++
+		}
+	}
+
+	return importPreview
+}
+
+// rowOf is a row's cells by the mapped columns, ready until a check says otherwise.
+func rowOf(rowNumber int, rec []string, idx map[string]int) storedRow {
+	get := func(k string) *string { return cell(rec, idx, k) }
+	text := func(k string) string {
+		if v := get(k); v != nil {
+			return *v
+		}
+
+		return ""
+	}
+
+	return storedRow{
+		ImportRow: ImportRow{
+			RowNumber:    rowNumber,
+			Result:       rowReady,
+			PropertyName: text(kindProperty),
+			FloorName:    get(levelFloor),
+			RoomName:     get(levelRoom),
+			UnitName:     text("unit_name"),
+			ModelCode:    text("model_code"),
+			Serial:       get("serial"),
+			InstalledOn:  get("installed_on"),
+			WarrantyEnd:  get("warranty_end"),
+			MessageKey:   nil,
+		},
+		NewProperty: false,
+		DeviceID:    nil,
+		PropertyID:  uuid.UUID{},
+		FloorID:     nil,
+		RoomID:      nil,
+		ModelID:     uuid.UUID{},
+		CapVersion:  0,
+	}
+}
+
+// fail makes the row an error with the message key.
+func (row *storedRow) fail(key string) { row.Result, row.MessageKey = rowError, new(key) }
+
+// warn makes a ready row a warning with the message key; an error or an earlier warning stays.
+func (row *storedRow) warn(key string) {
+	if row.Result == rowReady {
+		row.Result, row.MessageKey = rowWarning, new(key)
+	}
+}
+
+// importCheck checks the rows of one import file: against the customer's places, the model register and the devices,
+// and against the rows before them (a serial or a unit name twice).
+type importCheck struct {
+	models    ImportModels
+	call      *ops.Call
+	org       uuid.UUID
+	zone      *time.Location
+	unitNames map[string]bool // the units of the rows so far, by location and lower-case name
+	serials   map[string]bool // the serials of the rows so far, in upper case
+}
+
+// rows reads and checks the file's rows: at least one, at most maxImportRows.
+func (check *importCheck) rows(
+	ctx context.Context,
+	reader *csv.Reader,
+	idx map[string]int,
+) ([]storedRow, error) {
+	var stored []storedRow
+
+	for rowNumber := 1; ; rowNumber++ {
+		rec, err := reader.Read()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+
+		if err != nil {
+			return nil, apperr.Fields(
+				map[string]string{keyCSVText: apperr.KeyMalformedCsv},
+			)
+		}
+
+		if rowNumber > maxImportRows {
+			return nil, apperr.Fields(
+				map[string]string{keyCSVText: "error.tooManyRows"},
+			)
+		}
+
+		row, err := check.row(ctx, rowOf(rowNumber, rec, idx))
+		if err != nil {
+			return nil, err
+		}
+
+		stored = append(stored, row)
+	}
+
+	if len(stored) == 0 {
+		return nil, apperr.Fields(map[string]string{keyCSVText: "error.noRows"})
+	}
+
+	return stored, nil
+}
+
+// row checks one row: its required fields and the unit name's length, then the property, model, dates, device and
+// places, until a check makes the row an error.
+func (check *importCheck) row(ctx context.Context, row storedRow) (storedRow, error) {
+	switch {
+	case row.PropertyName == "" || row.UnitName == "" || row.ModelCode == "":
+		row.fail("error.importMissingField")
+	case !strLen(row.UnitName, 1, maxName):
+		row.fail(apperr.KeyLength)
+	}
+
+	for _, step := range []func(context.Context, *storedRow) error{
+		check.property, check.model, check.dates, check.serial, check.places,
+	} {
+		if row.Result == rowError {
+			break
+		}
+
+		err := step(ctx, &row)
+		if err != nil {
+			return row, err
+		}
+	}
+
+	return row, nil
+}
+
+// property finds the row's property by name. One the customer does not have is created at import (Figma 02 import
+// step 1: kind office, no address yet), under a stable placeholder ID.
+func (check *importCheck) property(ctx context.Context, row *storedRow) error {
+	err := check.call.Tx.QueryRow(ctx, `SELECT id FROM assets.properties WHERE customer_org_id = $1 AND NOT archived AND
+		lower(name) = lower($2) ORDER BY id LIMIT 1`,
+		check.org, row.PropertyName).
+		Scan(&row.PropertyID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		row.warn("warning.importCreatesProperty")
+
+		row.NewProperty = true
+		row.PropertyID = uuid.NewSHA1(
+			check.org,
+			[]byte("property/"+strings.ToLower(row.PropertyName)),
+		)
+
+		return nil
+	}
+
+	return apperr.Wrap(err, "select assets.properties")
+}
+
+// model finds the row's model in the register.
+func (check *importCheck) model(ctx context.Context, row *storedRow) error {
+	modelID, capVersion, ok, err := check.models.ByCode(ctx, check.call, row.ModelCode)
+	if err != nil {
+		return apperr.Wrap(err, "assets.ImportModels.ByCode")
+	}
+
+	if !ok {
+		row.fail("error.unknownModel")
+	}
+
+	row.ModelID, row.CapVersion = modelID, capVersion
+
+	return nil
+}
+
+// dates checks the row's dates: calendar dates of the tenant time zone, the installation not in the future.
+func (check *importCheck) dates(_ context.Context, row *storedRow) error {
+	for _, d := range []*string{row.InstalledOn, row.WarrantyEnd} {
+		if row.Result != rowError && d != nil {
+			_, err := time.ParseInLocation(time.DateOnly, *d, check.zone)
+			if err != nil {
+				row.fail("error.importInvalidDate")
+			}
+		}
+	}
+
+	if row.Result != rowError && row.InstalledOn != nil {
+		if t, _ := time.ParseInLocation(
+			time.DateOnly,
+			*row.InstalledOn,
+			check.zone,
+		); t.After(
+			check.call.Now,
+		) {
+			row.fail(apperr.KeyFuture)
+		}
+	}
+
+	return nil
+}
+
+// serial checks the device the row's serial names: it must exist, be free and untampered, and have one row in the
+// file.
+func (check *importCheck) serial(ctx context.Context, row *storedRow) error {
+	if row.Serial == nil {
+		return nil
+	}
+
+	deviceID, state, err := check.models.SerialState(ctx, check.call, *row.Serial)
+	if err != nil {
+		return apperr.Wrap(err, "assets.ImportModels.SerialState")
+	}
+
+	switch key := strings.ToUpper(*row.Serial); {
+	case check.serials[key]:
+		row.fail(apperr.KeyDuplicateSerial)
+	case state == stateUnknown:
+		row.fail("error.unknownSerial")
+	case state == "bound":
+		row.fail("error.serialBound")
+	case state == "tamper":
+		row.fail(apperr.KeyTamperUnresolved)
+	default:
+		row.DeviceID = &deviceID
+		check.serials[key] = true
+	}
+
+	return nil
+}
+
+// places finds the row's floor under the property and its room under the floor (or the property root): an existing
+// location of any kind with the name under the parent is reused (names are unique per parent), and a new one gets a
+// stable placeholder ID. The unit's name must then be new among its siblings and the rows before it.
+func (check *importCheck) places(ctx context.Context, row *storedRow) error {
+	parent := row.PropertyID
+
+	var parentSpace *uuid.UUID
+
+	for _, lvl := range []struct {
+		name *string
+		kind string
+		dst  **uuid.UUID
+	}{{row.FloorName, levelFloor, &row.FloorID}, {row.RoomName, levelRoom, &row.RoomID}} {
+		if lvl.name == nil {
+			continue
+		}
+
+		var spaceID uuid.UUID
+
+		err := check.call.Tx.QueryRow(ctx, `SELECT id FROM assets.spaces WHERE property_id = $1 AND parent_space_id IS NOT
+			DISTINCT FROM $2
+			AND NOT archived AND lower(name) = lower($3) ORDER BY id LIMIT 1`, row.PropertyID, parentSpace, *lvl.name).
+			Scan(&spaceID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			row.warn("warning.importCreatesSpace")
+
+			spaceID = uuid.NewSHA1(
+				row.PropertyID,
+				[]byte(lvl.kind+"/"+parent.String()+"/"+strings.ToLower(*lvl.name)),
+			)
+		} else if err != nil {
+			return apperr.Wrap(err, "select assets.spaces")
+		}
+
+		*lvl.dst = &spaceID
+		parent, parentSpace = spaceID, &spaceID
+	}
+
+	key := parent.String() + "/" + strings.ToLower(row.UnitName)
+
+	var exists bool
+
+	err := check.call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.units WHERE property_id = $1 AND space_id
+		IS NOT DISTINCT FROM $2
+		AND NOT archived AND lower(display_name) = lower($3))`, row.PropertyID, parentSpace, row.UnitName).
+		Scan(&exists)
+	if err != nil {
+		return apperr.Wrap(err, "select assets.units")
+	}
+
+	if exists || check.unitNames[key] {
+		row.fail(apperr.KeyDuplicateSiblingName)
+	}
+
+	check.unitNames[key] = true
+
+	return nil
 }
 
 // UnitImport is UnitImport of service-contracts.ts.
@@ -592,261 +685,36 @@ func (m *Module) unitsImportCommit(
 	call *ops.Call,
 	input *ImportCommitInput,
 ) (UnitImport, error) {
-	var (
-		raw      []byte
-		fileName string
-		expires  time.Time
-		customer uuid.UUID
-	)
-
-	err := call.Tx.QueryRow(ctx, `DELETE FROM assets.unit_import_previews WHERE id = $1 RETURNING rows, file_name,
-		expires_at,
-		customer_id`, input.PreviewID).
-		Scan(&raw, &fileName, &expires, &customer)
-	if errors.Is(err, pgx.ErrNoRows) ||
-		(err == nil && (!call.Now.Before(expires) || customer != input.CustomerID)) {
-		return UnitImport{}, conflict(apperr.KeyPreviewExpired) // validate again
-	}
-
+	preview, err := takePreview(ctx, call, input)
 	if err != nil {
-		return UnitImport{}, apperr.Wrap(err, "delete assets.unit_import_previews")
+		return UnitImport{}, err
 	}
 
-	var org uuid.UUID
-
-	scanErr := call.Tx.QueryRow(ctx, `SELECT organization_id FROM assets.customers WHERE id = $1 AND status =
-		'active'`, customer).
-		Scan(&org)
-	if scanErr != nil {
-		return UnitImport{}, conflict(apperr.KeyCustomerInactive)
+	commit := importCommit{
+		models:     m.Import,
+		call:       call,
+		org:        preview.org,
+		fileName:   preview.fileName,
+		zone:       kualaLumpur(),
+		created:    map[uuid.UUID]uuid.UUID{},
+		properties: []uuid.UUID{},
+		spaces:     []uuid.UUID{},
+		units:      []uuid.UUID{},
 	}
-
-	var rows []storedRow
-
-	unmarshalErr := json.Unmarshal(raw, &rows)
-	if unmarshalErr != nil {
-		return UnitImport{}, apperr.Wrap(unmarshalErr, "json.Unmarshal")
-	}
-
-	created := map[uuid.UUID]uuid.UUID{} // placeholder → created property or space id
-
-	var properties, spaces, units []uuid.UUID
-
 	skipped := []int32{}
-	property := func(row storedRow) (uuid.UUID, error) {
-		if !row.NewProperty {
-			return row.PropertyID, nil
-		}
 
-		if real, ok := created[row.PropertyID]; ok {
-			return real, nil
-		}
-
-		var taken bool // someone added the property since the preview: validate again
-
-		err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.properties WHERE customer_org_id = $1 AND NOT
-			archived
-			AND lower(name) = lower($2))`,
-			org, row.PropertyName).
-			Scan(&taken)
-		if err != nil {
-			return uuid.Nil, apperr.Wrap(err, "select assets.properties")
-		}
-
-		if taken {
-			return uuid.Nil, conflict(apperr.KeyPreviewExpired)
-		}
-
-		propertyID := uuid.Must(uuid.NewV7())
-
-		_, err = call.Tx.Exec(
-			ctx,
-			`INSERT INTO assets.properties (id, tenant_id, customer_org_id, kind, name) VALUES ($1,
-				current_setting('app.tenant_id')::uuid, $2, 'office', $3)`,
-			propertyID,
-			org,
-			row.PropertyName,
-		)
-		if err != nil {
-			return uuid.Nil, apperr.Wrap(err, "insert assets.properties")
-		}
-
-		created[row.PropertyID] = propertyID
-		properties = append(properties, propertyID)
-		call.Emit(
-			ops.Event{
-				AggregateType: kindProperty,
-				AggregateID:   propertyID,
-				Type:          eventLocationChanged,
-				Payload:       nil,
-			},
-		)
-
-		return propertyID, nil
-	}
-	resolve := func(propertyID uuid.UUID, placeholder *uuid.UUID, parent *uuid.UUID, kind, name string) (*uuid.UUID,
-		error,
-	) {
-		if placeholder == nil {
-			return nil, nil
-		}
-
-		if real, ok := created[*placeholder]; ok {
-			return &real, nil
-		}
-
-		var present bool
-
-		err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.spaces WHERE id = $1 AND NOT
-			archived)`, *placeholder).
-			Scan(&present)
-		if err != nil {
-			return nil, apperr.Wrap(err, "select assets.spaces")
-		}
-
-		if present {
-			return placeholder, nil
-		}
-
-		spaceID := uuid.Must(uuid.NewV7())
-
-		_, err = call.Tx.Exec(
-			ctx,
-			`INSERT INTO assets.spaces (id, tenant_id, property_id, parent_space_id, kind, name)
-			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5)`,
-			spaceID,
-			propertyID,
-			parent,
-			kind,
-			name,
-		)
-		if err != nil {
-			return nil, dupSibling(err)
-		}
-
-		created[*placeholder] = spaceID
-		spaces = append(spaces, spaceID)
-		call.Emit(
-			ops.Event{
-				AggregateType: kindSpace,
-				AggregateID:   spaceID,
-				Type:          eventLocationChanged,
-				Payload:       nil,
-			},
-		)
-
-		return &spaceID, nil
-	}
-
-	for _, row := range rows {
+	for _, row := range preview.rows {
 		if row.Result == rowError {
+			//nolint:gosec // G115: a row number is at most maxImportRows (1000); the preview stops a longer file
 			skipped = append(skipped, int32(row.RowNumber))
 
 			continue
 		}
 
-		var floorName, roomName string
-		if row.FloorName != nil {
-			floorName = *row.FloorName
-		}
-
-		if row.RoomName != nil {
-			roomName = *row.RoomName
-		}
-
-		propertyID, err := property(row)
+		err := commit.unit(ctx, row)
 		if err != nil {
 			return UnitImport{}, err
 		}
-
-		floor, err := resolve(propertyID, row.FloorID, nil, levelFloor, floorName)
-		if err != nil {
-			return UnitImport{}, err
-		}
-
-		room, err := resolve(propertyID, row.RoomID, floor, levelRoom, roomName)
-		if err != nil {
-			return UnitImport{}, err
-		}
-
-		space := floor
-		if room != nil {
-			space = room
-		}
-
-		var installed, warranty *time.Time
-
-		if row.InstalledOn != nil {
-			t, _ := time.ParseInLocation("2006-01-02", *row.InstalledOn, kualaLumpur)
-			installed = &t
-		}
-
-		if row.WarrantyEnd != nil {
-			t, _ := time.ParseInLocation("2006-01-02", *row.WarrantyEnd, kualaLumpur)
-			warranty = &t
-		}
-
-		unitID := uuid.Must(uuid.NewV7())
-
-		_, execErr := call.Tx.Exec(
-			ctx,
-			`INSERT INTO assets.units (id, tenant_id, customer_org_id, property_id, space_id, display_name, model_id,
-				installed_at,
-			warranty_ends_at, capability_version) VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8,
-			$9)`,
-			unitID,
-			org,
-			propertyID,
-			space,
-			row.UnitName,
-			row.ModelID,
-			installed,
-			warranty,
-			row.CapVersion,
-		)
-		if execErr != nil {
-			return UnitImport{}, apperr.Wrap(execErr, "insert assets.units")
-		}
-
-		units = append(units, unitID)
-		call.Emit(
-			ops.Event{
-				AggregateType: kindUnit,
-				AggregateID:   unitID,
-				Type:          eventUnitChanged,
-				Payload:       nil,
-			},
-		)
-
-		if row.DeviceID != nil { // the serial column binds the device (bound or tampered since the preview: validate again)
-			bound, err := m.Import.BindImported(
-				ctx,
-				call,
-				*row.DeviceID,
-				unitID,
-				org,
-				"CSV import "+fileName,
-			)
-			if err != nil {
-				return UnitImport{}, apperr.Wrap(err, "assets.ImportModels.BindImported")
-			}
-
-			if !bound {
-				return UnitImport{}, conflict(apperr.KeyPreviewExpired)
-			}
-		}
-	}
-
-	if properties == nil {
-		properties = []uuid.UUID{}
-	}
-
-	if spaces == nil {
-		spaces = []uuid.UUID{}
-	}
-
-	if units == nil {
-		units = []uuid.UUID{}
 	}
 
 	importID := uuid.Must(uuid.NewV7())
@@ -859,12 +727,12 @@ func (m *Module) unitsImportCommit(
 		current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9, 'imported')
 		RETURNING `+importCols,
 			importID,
-			customer,
+			preview.customer,
 			input.PreviewID,
-			"inline:"+fileName,
-			properties,
-			spaces,
-			units,
+			"inline:"+preview.fileName,
+			commit.properties,
+			commit.spaces,
+			commit.units,
 			skipped,
 			call.Now.Add(importUndoTime),
 		),
@@ -890,6 +758,287 @@ func (m *Module) unitsImportCommit(
 	return unitImport, nil
 }
 
+// takenPreview is a stored preview a commit takes: its checked rows, file name, customer and customer organization.
+type takenPreview struct {
+	rows          []storedRow
+	fileName      string
+	customer, org uuid.UUID
+}
+
+// takePreview deletes the stored preview and returns it while it is open, for the customer named, and the customer is
+// active; otherwise the preview has to be made again.
+func takePreview(
+	ctx context.Context,
+	call *ops.Call,
+	input *ImportCommitInput,
+) (takenPreview, error) {
+	var (
+		raw     []byte
+		expires time.Time
+		taken   takenPreview
+	)
+
+	err := call.Tx.QueryRow(ctx, `DELETE FROM assets.unit_import_previews WHERE id = $1 RETURNING rows, file_name,
+		expires_at,
+		customer_id`, input.PreviewID).
+		Scan(&raw, &taken.fileName, &expires, &taken.customer)
+	if errors.Is(err, pgx.ErrNoRows) ||
+		(err == nil && (!call.Now.Before(expires) || taken.customer != input.CustomerID)) {
+		return taken, conflict(apperr.KeyPreviewExpired) // validate again
+	}
+
+	if err != nil {
+		return taken, apperr.Wrap(err, "delete assets.unit_import_previews")
+	}
+
+	scanErr := call.Tx.QueryRow(ctx, `SELECT organization_id FROM assets.customers WHERE id = $1 AND status =
+		'active'`, taken.customer).
+		Scan(&taken.org)
+	if scanErr != nil {
+		return taken, conflict(apperr.KeyCustomerInactive)
+	}
+
+	unmarshalErr := json.Unmarshal(raw, &taken.rows)
+
+	return taken, apperr.Wrap(unmarshalErr, "json.Unmarshal")
+}
+
+// importCommit creates the rows of a checked import: the properties and locations its placeholders stand for, once
+// each, and the units with their devices.
+type importCommit struct {
+	models   ImportModels
+	call     *ops.Call
+	org      uuid.UUID
+	fileName string
+	zone     *time.Location
+	created  map[uuid.UUID]uuid.UUID // placeholder → created property or space id
+
+	properties, spaces, units []uuid.UUID // what the import created
+}
+
+// unit creates the row's unit in its property and location, and binds the device its serial names (bound or tampered
+// since the preview: validate again).
+func (commit *importCommit) unit(ctx context.Context, row storedRow) error {
+	propertyID, err := commit.property(ctx, row)
+	if err != nil {
+		return err
+	}
+
+	space, err := commit.locations(ctx, row, propertyID)
+	if err != nil {
+		return err
+	}
+
+	var installed, warranty *time.Time
+
+	if row.InstalledOn != nil {
+		t, _ := time.ParseInLocation(time.DateOnly, *row.InstalledOn, commit.zone)
+		installed = &t
+	}
+
+	if row.WarrantyEnd != nil {
+		t, _ := time.ParseInLocation(time.DateOnly, *row.WarrantyEnd, commit.zone)
+		warranty = &t
+	}
+
+	unitID := uuid.Must(uuid.NewV7())
+
+	_, execErr := commit.call.Tx.Exec(
+		ctx,
+		`INSERT INTO assets.units (id, tenant_id, customer_org_id, property_id, space_id, display_name, model_id,
+			installed_at,
+		warranty_ends_at, capability_version) VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8,
+		$9)`,
+		unitID,
+		commit.org,
+		propertyID,
+		space,
+		row.UnitName,
+		row.ModelID,
+		installed,
+		warranty,
+		row.CapVersion,
+	)
+	if execErr != nil {
+		return apperr.Wrap(execErr, "insert assets.units")
+	}
+
+	commit.units = append(commit.units, unitID)
+	commit.call.Emit(
+		ops.Event{
+			AggregateType: kindUnit,
+			AggregateID:   unitID,
+			Type:          eventUnitChanged,
+			Payload:       nil,
+		},
+	)
+
+	if row.DeviceID == nil {
+		return nil
+	}
+
+	bound, err := commit.models.BindImported(
+		ctx,
+		commit.call,
+		*row.DeviceID,
+		unitID,
+		commit.org,
+		"CSV import "+commit.fileName,
+	)
+	if err != nil {
+		return apperr.Wrap(err, "assets.ImportModels.BindImported")
+	}
+
+	if !bound {
+		return conflict(apperr.KeyPreviewExpired)
+	}
+
+	return nil
+}
+
+// property is the row's property: the existing one, or the one its placeholder stands for, created once (someone added
+// the property since the preview: validate again).
+func (commit *importCommit) property(ctx context.Context, row storedRow) (uuid.UUID, error) {
+	if !row.NewProperty {
+		return row.PropertyID, nil
+	}
+
+	if id, ok := commit.created[row.PropertyID]; ok {
+		return id, nil
+	}
+
+	var taken bool // someone added the property since the preview: validate again
+
+	err := commit.call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.properties WHERE customer_org_id = $1 AND NOT
+		archived
+		AND lower(name) = lower($2))`,
+		commit.org, row.PropertyName).
+		Scan(&taken)
+	if err != nil {
+		return uuid.Nil, apperr.Wrap(err, "select assets.properties")
+	}
+
+	if taken {
+		return uuid.Nil, conflict(apperr.KeyPreviewExpired)
+	}
+
+	propertyID := uuid.Must(uuid.NewV7())
+
+	_, err = commit.call.Tx.Exec(
+		ctx,
+		`INSERT INTO assets.properties (id, tenant_id, customer_org_id, kind, name) VALUES ($1,
+			current_setting('app.tenant_id')::uuid, $2, 'office', $3)`,
+		propertyID,
+		commit.org,
+		row.PropertyName,
+	)
+	if err != nil {
+		return uuid.Nil, apperr.Wrap(err, "insert assets.properties")
+	}
+
+	commit.created[row.PropertyID] = propertyID
+	commit.properties = append(commit.properties, propertyID)
+	commit.call.Emit(
+		ops.Event{
+			AggregateType: kindProperty,
+			AggregateID:   propertyID,
+			Type:          eventLocationChanged,
+			Payload:       nil,
+		},
+	)
+
+	return propertyID, nil
+}
+
+// locations creates the row's floor and room where they are new and returns the unit's location: the room, else the
+// floor, else none (the property root).
+func (commit *importCommit) locations(
+	ctx context.Context,
+	row storedRow,
+	property uuid.UUID,
+) (*uuid.UUID, error) {
+	var parent *uuid.UUID
+
+	for _, level := range []struct {
+		placeholder *uuid.UUID
+		name        *string
+		kind        string
+	}{{row.FloorID, row.FloorName, levelFloor}, {row.RoomID, row.RoomName, levelRoom}} {
+		if level.placeholder == nil {
+			continue
+		}
+
+		var name string
+		if level.name != nil {
+			name = *level.name
+		}
+
+		id, err := commit.space(ctx, property, *level.placeholder, parent, level.kind, name)
+		if err != nil {
+			return nil, err
+		}
+
+		parent = &id
+	}
+
+	return parent, nil
+}
+
+// space is the location a placeholder stands for: one the import created already, an existing one, or a new one under
+// parent.
+func (commit *importCommit) space(
+	ctx context.Context,
+	property, placeholder uuid.UUID,
+	parent *uuid.UUID,
+	kind, name string,
+) (uuid.UUID, error) {
+	if id, ok := commit.created[placeholder]; ok {
+		return id, nil
+	}
+
+	var present bool
+
+	err := commit.call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.spaces WHERE id = $1 AND NOT
+		archived)`, placeholder).
+		Scan(&present)
+	if err != nil {
+		return uuid.Nil, apperr.Wrap(err, "select assets.spaces")
+	}
+
+	if present {
+		return placeholder, nil
+	}
+
+	spaceID := uuid.Must(uuid.NewV7())
+
+	_, err = commit.call.Tx.Exec(
+		ctx,
+		`INSERT INTO assets.spaces (id, tenant_id, property_id, parent_space_id, kind, name)
+		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5)`,
+		spaceID,
+		property,
+		parent,
+		kind,
+		name,
+	)
+	if err != nil {
+		return uuid.Nil, dupSibling(err)
+	}
+
+	commit.created[placeholder] = spaceID
+	commit.spaces = append(commit.spaces, spaceID)
+	commit.call.Emit(
+		ops.Event{
+			AggregateType: kindSpace,
+			AggregateID:   spaceID,
+			Type:          eventLocationChanged,
+			Payload:       nil,
+		},
+	)
+
+	return spaceID, nil
+}
+
 // ImportUndoInput is units.importUndo input.
 type ImportUndoInput struct {
 	ImportID uuid.UUID `json:"importId"`
@@ -903,7 +1052,7 @@ func (in *ImportUndoInput) Validate() map[string]string {
 		fieldErrs["importId"] = apperr.KeyRequired
 	}
 
-	if !strLen(in.Reason, 1, 1000) {
+	if !strLen(in.Reason, 1, maxText) {
 		fieldErrs["reason"] = apperr.KeyLength
 	}
 
@@ -966,17 +1115,9 @@ func (m *Module) unitsImportUndo(
 		return UnitImport{}, conflict("error.undoWindowClosed")
 	}
 
-	for _, u := range unitImport.CreatedUnitIDs {
-		for _, a := range m.Activity {
-			busy, err := a.UnitInUse(ctx, call, u)
-			if err != nil {
-				return UnitImport{}, apperr.Wrap(err, "assets.UnitUsage.UnitInUse")
-			}
-
-			if busy {
-				return UnitImport{}, conflict("error.importUnitInUse")
-			}
-		}
+	err = m.unitsInUse(ctx, call, unitImport.CreatedUnitIDs)
+	if err != nil {
+		return UnitImport{}, err
 	}
 	// the devices the serial column bound go back to unbound; history alone (no telemetry yet) does not block the undo
 	unbindUnitsErr := m.Import.UnbindUnits(
@@ -1043,4 +1184,22 @@ func (m *Module) unitsImportUndo(
 	)
 
 	return unitImport, nil
+}
+
+// unitsInUse refuses an undo while a unit the import created has telemetry or jobs.
+func (m *Module) unitsInUse(ctx context.Context, call *ops.Call, units []uuid.UUID) error {
+	for _, unit := range units {
+		for _, usage := range m.Activity {
+			busy, err := usage.UnitInUse(ctx, call, unit)
+			if err != nil {
+				return apperr.Wrap(err, "assets.UnitUsage.UnitInUse")
+			}
+
+			if busy {
+				return conflict("error.importUnitInUse")
+			}
+		}
+	}
+
+	return nil
 }

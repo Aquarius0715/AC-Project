@@ -14,8 +14,9 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
 
-// Coverage sources owned by other modules.
+// The coverage sources other modules own.
 type (
+	// ContractReader is billing's view of the units' active contracts.
 	ContractReader interface {
 		ActiveContracts(
 			ctx context.Context,
@@ -23,6 +24,7 @@ type (
 			units []uuid.UUID,
 		) (map[uuid.UUID][]uuid.UUID, error)
 	}
+	// ClaimReader is maintenance's view of the units' jobs a warranty claim can name.
 	ClaimReader interface {
 		ClaimableJobs(
 			ctx context.Context,
@@ -82,11 +84,14 @@ func claimable(jobs map[uuid.UUID]time.Time, ends *time.Time) []uuid.UUID {
 	return out
 }
 
-var coverageStatuses = map[string]bool{
-	"under_warranty": true,
-	"contract":       true,
-	coverageExpiring: true,
-	coverageNone:     true,
+// validCoverage reports whether status is a coverage status (IR111).
+func validCoverage(status string) bool {
+	switch status {
+	case "under_warranty", "contract", coverageExpiring, coverageNone:
+		return true
+	}
+
+	return false
 }
 
 // unitsCoverage serves units.coverage.
@@ -124,36 +129,16 @@ func (m *Module) unitsCoverage(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[UnitCoverage], error) {
-	var filters struct {
-		CustomerID         *uuid.UUID `json:"customerId,omitempty"`
-		Coverage           *string    `json:"coverage,omitempty"`
-		ExpiringWithinDays *int       `json:"expiringWithinDays,omitempty"`
-		Search             *string    `json:"search,omitempty"`
-	}
+	var filters coverageFilters
 
 	err := decodeFilters(query.Filters, &filters)
 	if err != nil {
 		return paging.Page[UnitCoverage]{}, err
 	}
 
-	if filters.Coverage != nil && !coverageStatuses[*filters.Coverage] {
-		return paging.Page[UnitCoverage]{}, apperr.Fields(
-			map[string]string{"filters.coverage": apperr.KeyInvalid},
-		)
-	}
-
-	if filters.ExpiringWithinDays != nil &&
-		(*filters.ExpiringWithinDays < 1 || *filters.ExpiringWithinDays > 3650) {
-		return paging.Page[UnitCoverage]{}, apperr.Fields(
-			map[string]string{"filters.expiringWithinDays": apperr.KeyRange},
-		)
-	}
-
-	if query.Sort != nil && query.Sort.Field != "id" && query.Sort.Field != keyName &&
-		query.Sort.Field != keyDueAt {
-		return paging.Page[UnitCoverage]{}, apperr.Fields(
-			map[string]string{"sort.field": apperr.KeyInvalid},
-		)
+	err = filters.check(query.Sort)
+	if err != nil {
+		return paging.Page[UnitCoverage]{}, err
 	}
 
 	window, err := paging.Resolve(*query, filters, call.Principal.ScopeVersion, 1)
@@ -161,6 +146,87 @@ func (m *Module) unitsCoverage(
 		return paging.Page[UnitCoverage]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
+	all, err := coverageRows(ctx, call, filters)
+	if err != nil {
+		return paging.Page[UnitCoverage]{}, err
+	}
+
+	keep, err := m.withCoverage(ctx, call, all, filters)
+	if err != nil {
+		return paging.Page[UnitCoverage]{}, err
+	}
+
+	sortCoverage(keep, query.Sort)
+
+	end := min(window.Offset+window.Limit, len(keep))
+
+	items := []UnitCoverage{}
+	if window.Offset < len(keep) {
+		items = keep[window.Offset:end]
+	}
+
+	return paging.Page[UnitCoverage]{
+		Items:           items,
+		NextCursor:      window.Next(len(keep)),
+		Total:           len(keep),
+		SnapshotVersion: window.Snapshot,
+	}, nil
+}
+
+// coverageFilters are the filters of units.coverage.
+type coverageFilters struct {
+	CustomerID         *uuid.UUID `json:"customerId,omitempty"`
+	Coverage           *string    `json:"coverage,omitempty"`
+	ExpiringWithinDays *int       `json:"expiringWithinDays,omitempty"`
+	Search             *string    `json:"search,omitempty"`
+}
+
+// check refuses a coverage status that is not one, an expiry window outside 1–3650 days, and a sort by another field
+// than id, name or dueAt.
+func (filters coverageFilters) check(sortBy *paging.SortSpec) error {
+	if filters.Coverage != nil && !validCoverage(*filters.Coverage) {
+		return apperr.Fields(
+			map[string]string{"filters.coverage": apperr.KeyInvalid},
+		)
+	}
+
+	if filters.ExpiringWithinDays != nil &&
+		(*filters.ExpiringWithinDays < 1 || *filters.ExpiringWithinDays > 3650) {
+		return apperr.Fields(
+			map[string]string{"filters.expiringWithinDays": apperr.KeyRange},
+		)
+	}
+
+	if sortBy != nil && sortBy.Field != "id" && sortBy.Field != keyName &&
+		sortBy.Field != keyDueAt {
+		return apperr.Fields(
+			map[string]string{"sort.field": apperr.KeyInvalid},
+		)
+	}
+
+	return nil
+}
+
+// keeps reports whether a unit's coverage passes the status filter and, with an expiry window, whether its warranty
+// ends within the window from now.
+func (filters coverageFilters) keeps(coverage UnitCoverage, now time.Time) bool {
+	if filters.Coverage != nil && coverage.Status != *filters.Coverage {
+		return false
+	}
+
+	return filters.ExpiringWithinDays == nil ||
+		coverage.WarrantyEndsAt != nil && !coverage.WarrantyEndsAt.Before(now) &&
+			!coverage.WarrantyEndsAt.After(
+				now.Add(time.Duration(*filters.ExpiringWithinDays)*24*time.Hour),
+			)
+}
+
+// coverageRows are the units the filters name, with their customer, model and warranty end.
+func coverageRows(
+	ctx context.Context,
+	call *ops.Call,
+	filters coverageFilters,
+) ([]UnitCoverage, error) {
 	var args []any
 
 	add := func(v any) string {
@@ -188,7 +254,7 @@ func (m *Module) unitsCoverage(
 		JOIN assets.customers cu ON cu.organization_id = u.customer_org_id WHERE `+strings.Join(conds, " AND "),
 		args...)
 	if err != nil {
-		return paging.Page[UnitCoverage]{}, apperr.Wrap(err, "select assets.units")
+		return nil, apperr.Wrap(err, "select assets.units")
 	}
 
 	var all []UnitCoverage
@@ -206,7 +272,7 @@ func (m *Module) unitsCoverage(
 		if err != nil {
 			rows.Close()
 
-			return paging.Page[UnitCoverage]{}, apperr.Wrap(err, "select assets.units")
+			return nil, apperr.Wrap(err, "select assets.units")
 		}
 
 		all = append(all, unitCoverage)
@@ -216,9 +282,20 @@ func (m *Module) unitsCoverage(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return paging.Page[UnitCoverage]{}, apperr.Wrap(rowsErr, "select assets.units")
+		return nil, apperr.Wrap(rowsErr, "select assets.units")
 	}
 
+	return all, nil
+}
+
+// withCoverage gives each unit its active contracts, its jobs a warranty claim can name and its coverage status
+// (IR111), and keeps the ones the filters pass.
+func (m *Module) withCoverage(
+	ctx context.Context,
+	call *ops.Call,
+	all []UnitCoverage,
+	filters coverageFilters,
+) ([]UnitCoverage, error) {
 	ids := make([]uuid.UUID, len(all))
 	for i := range all {
 		ids[i] = all[i].UnitID
@@ -226,7 +303,7 @@ func (m *Module) unitsCoverage(
 
 	contracts, err := m.Contracts.ActiveContracts(ctx, call, ids)
 	if err != nil {
-		return paging.Page[UnitCoverage]{}, apperr.Wrap(
+		return nil, apperr.Wrap(
 			err,
 			"assets.ContractReader.ActiveContracts",
 		)
@@ -234,7 +311,7 @@ func (m *Module) unitsCoverage(
 
 	claims, err := m.Claims.ClaimableJobs(ctx, call, ids)
 	if err != nil {
-		return paging.Page[UnitCoverage]{}, apperr.Wrap(err, "assets.ClaimReader.ClaimableJobs")
+		return nil, apperr.Wrap(err, "assets.ClaimReader.ClaimableJobs")
 	}
 
 	var keep []UnitCoverage
@@ -251,28 +328,28 @@ func (m *Module) unitsCoverage(
 			unitCoverage.WarrantyEndsAt,
 			len(unitCoverage.ContractIDs),
 		)
-		if filters.Coverage != nil && unitCoverage.Status != *filters.Coverage {
-			continue
-		}
-
-		if filters.ExpiringWithinDays != nil &&
-			(unitCoverage.WarrantyEndsAt == nil || unitCoverage.WarrantyEndsAt.Before(call.Now) ||
-				unitCoverage.WarrantyEndsAt.After(call.Now.Add(time.Duration(*filters.ExpiringWithinDays)*24*time.Hour))) {
+		if !filters.keeps(unitCoverage, call.Now) {
 			continue
 		}
 
 		keep = append(keep, unitCoverage)
 	}
 
-	desc := query.Sort != nil && query.Sort.Direction == "desc"
+	return keep, nil
+}
+
+// sortCoverage orders the units by the sort field: dueAt (the warranty end, none last in both directions) unless id
+// or name is named; ties go by unit ID.
+func sortCoverage(units []UnitCoverage, sortBy *paging.SortSpec) {
+	desc := sortBy != nil && sortBy.Direction == "desc"
 
 	field := keyDueAt
-	if query.Sort != nil {
-		field = query.Sort.Field
+	if sortBy != nil {
+		field = sortBy.Field
 	}
 
-	sort.SliceStable(keep, func(i, j int) bool {
-		unitCoverage, otherCoverage := keep[i], keep[j]
+	sort.SliceStable(units, func(i, j int) bool {
+		unitCoverage, otherCoverage := units[i], units[j]
 		less, equal := false, false
 
 		switch field {
@@ -302,17 +379,4 @@ func (m *Module) unitsCoverage(
 
 		return less != desc
 	})
-	end := min(window.Offset+window.Limit, len(keep))
-
-	items := []UnitCoverage{}
-	if window.Offset < len(keep) {
-		items = keep[window.Offset:end]
-	}
-
-	return paging.Page[UnitCoverage]{
-		Items:           items,
-		NextCursor:      window.Next(len(keep)),
-		Total:           len(keep),
-		SnapshotVersion: window.Snapshot,
-	}, nil
 }
