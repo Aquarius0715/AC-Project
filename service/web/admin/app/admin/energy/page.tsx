@@ -13,6 +13,7 @@ import { i18nOf } from "@ac/web/lib/i18n";
 import { withAccess } from "@ac/web/lib/withAccess";
 import { EnergyDemo } from "./_components/energy-demo";
 import { EnergyView, type EnergyLive } from "./_components/energy-view";
+import { queryReader } from "@ac/web/lib/searchParams";
 
 const minute = (d: Date) => new Date(Math.floor(d.getTime() / 60_000) * 60_000);
 
@@ -26,7 +27,7 @@ async function AdminEnergyPageContent({ searchParams }: Readonly<PageProps<"/adm
   await connection();
   if (!apiMode()) return <EnergyDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
+  const one = queryReader(sp);
   const tab = one("tab") === "baselines" ? "baselines" : "analysis";
   const [now, perms, display, customers, properties, units, all] = await Promise.all([
     coreNow(), corePermissions(), coreDisplay(),

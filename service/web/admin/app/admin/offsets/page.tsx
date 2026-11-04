@@ -12,6 +12,7 @@ import { recordRows, type ApiOffsetRecord } from "@ac/web/lib/offsets";
 import { withAccess } from "@ac/web/lib/withAccess";
 import { OffsetsDemo } from "./_components/offsets-demo";
 import { OffsetsView } from "./_components/offsets-view";
+import { queryReader } from "@ac/web/lib/searchParams";
 
 const STATES = ["demo_requested", "demo_purchased", "demo_retired", "failed"] as const;
 const CREATED = { "7d": 7, "30d": 30, "90d": 90, all: null } as const;
@@ -27,7 +28,7 @@ async function AdminOffsetsPageContent({ searchParams }: Readonly<PageProps<"/ad
   await connection();
   if (!apiMode()) return <OffsetsDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
+  const one = queryReader(sp);
   const tab = one("tab") === "market" ? "market" : "records";
   const customerId = one("customerId");
   const status = STATES.find((x) => x === one("status"));

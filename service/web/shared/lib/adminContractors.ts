@@ -5,7 +5,7 @@
 // the register's dates — delegation, insurance, rate card starts, memberships and certificates — are Kuala Lumpur days,
 // as on the contractor's own certifications (IR277).
 import { businessDay, KL } from "@ac/web/lib/clientBilling";
-import { EN, showDayMonth, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, showDayMonth, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { amount } from "@ac/web/lib/money";
 import { qualificationLabel } from "@ac/web/lib/partnerJobDetail";
@@ -154,7 +154,7 @@ export function contractorRefusal(f: { code: string; messageKey: string; fieldEr
     "error.invalidState": "nothing to change in the current state", "error.versionConflict": "the record changed meanwhile — the latest version is shown",
     "error.count": "wrong number of entries", "error.invalid": "not a valid value", "error.length": "too long", "error.required": "required", "error.past": "must be in the future",
   };
-  const word = (k: string) => (keys[k] ? t(keys[k]) : k);
+  const word = (k: string) => (textOf(keys, k, t) ?? k);
   const fields = Object.entries(f.fieldErrors ?? {}).map(([k, v]) => `${k}: ${word(v)}`);
   if (fields.length > 0) return fields.join(" · ");
   if (keys[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved: {reason}.", { reason: word(f.messageKey) }) : `${word(f.messageKey)}.`;

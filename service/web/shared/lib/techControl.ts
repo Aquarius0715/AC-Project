@@ -3,7 +3,7 @@
 // (DiagnosticRun states, IR139), the capability, restriction and authorization texts and a refused write in words.
 // Pure code shared by the Server Component and the client view; Vitest covers it. Texts in the display language (`i`
 // / `t`, IR286); instants in the user's display time zone (IR44). Command codes (“set_mode = cool”) stay codes.
-import { EN, showClock, showSpan, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, showClock, showSpan, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import type { UnitAction } from "@ac/web/lib/contracts.gen";
 import { FAN_LABEL, MODE_LABEL, type ApiUnitDetail, type CommandAction } from "@ac/web/lib/units";
@@ -97,7 +97,7 @@ export function runBanner(r: ApiRun | null, i: I18n = EN): { tone: "primary" | "
 export const runActive = (r: ApiRun | null) => !!r && (r.state === "awaiting_start" || r.state === "running" || r.state === "end_requested");
 
 const QUALITY: Record<string, string> = { stale: "stale", suspect: "suspect", missing: "missing" };
-const word = (v: string, labels: Record<string, string>, t: T) => (labels[v] ? t(labels[v]) : v.charAt(0).toUpperCase() + v.slice(1));
+const word = (v: string, labels: Record<string, string>, t: T) => (textOf(labels, v, t) ?? (v.charAt(0).toUpperCase() + v.slice(1)));
 /** The current state tiles (Figma: Power, Mode, Setpoint, Fan, Room). */
 export function stateTiles(d: { observedState: { power: boolean | null; celsius: number | null; mode: string | null; fanLevel: string | null; observedAt: string | null };
   latestMeasurements: { metric: string; value: number | null; quality: string }[] }, t: T = en): { label: string; value: string; warn?: boolean }[] {
@@ -114,7 +114,7 @@ export function stateTiles(d: { observedState: { power: boolean | null; celsius:
 export const observedText = (iso: string | null, i: I18n = EN) => (iso ? i.t("observed {time}", { time: clock(iso, i) }) : i.t("no observation yet"));
 const CONNECTION: Record<string, string> = { online: "Online", offline: "Offline", unknown: "Unknown", connecting: "Connecting", error: "Error" };
 /** The unit's connection after the capability text (“Connection: Online.”). */
-export const connectionText = (c: string, t: T = en) => t("Connection: {state}.", { state: CONNECTION[c] ? t(CONNECTION[c]) : c });
+export const connectionText = (c: string, t: T = en) => t("Connection: {state}.", { state: textOf(CONNECTION, c, t) ?? c });
 /** The work window as one span in the display time zone. */
 export const windowText = (from: string, to: string, i: I18n = EN) => showSpan(from, to, i.display);
 
@@ -135,7 +135,7 @@ export function restrictionText(d: Pick<ApiUnitDetail, "effectiveControlPolicy">
 const BLOCKED: Record<string, string> = { "control.reconciliation_required": "the unit must be reconciled after a restriction" };
 /** Why control is blocked now, in words (controlAvailability). */
 export const blockedText = (d: Pick<ApiUnitDetail, "controlAvailability">, t: T = en) =>
-  d.controlAvailability.state === "blocked" ? (BLOCKED[d.controlAvailability.reasonKey] ? t(BLOCKED[d.controlAvailability.reasonKey]) : d.controlAvailability.reasonKey.replace(/^(errors?|control)\./, "").replaceAll('_', " ")) : null;
+  d.controlAvailability.state === "blocked" ? (textOf(BLOCKED, d.controlAvailability.reasonKey, t) ?? d.controlAvailability.reasonKey.replace(/^(errors?|control)\./, "").replaceAll('_', " ")) : null;
 
 const REFUSED: Record<string, string> = {
   "errors.restriction_active": "The active restriction does not allow this action (for example a setpoint below its minimum).",
@@ -154,8 +154,8 @@ const CODES: Record<string, string> = {
 VALIDATION that only marks fields. */
 export function refusal(f: { code: string; messageKey: string; retryAfterSeconds?: number | null }, t: T = en): string | null {
   if (REFUSED[f.messageKey]) return t(REFUSED[f.messageKey]);
-  return CODES[f.code] ? t(CODES[f.code]) : (f.code === "VALIDATION" ? null : actionMessage({ ...f, fieldErrors: {} }, t)); // the write limit's wait (IR380)
+  return textOf(CODES, f.code, t) ?? (f.code === "VALIDATION" ? null : actionMessage({ ...f, fieldErrors: {} }, t)); // the write limit's wait (IR380)
 }
 const FIELD: Record<string, string> = { "error.length": "1–1000 characters", "error.required": "Required", "error.range": "1–15 minutes", "error.unsupportedAction": "Not supported by this AC", "error.invalid": "Not valid" };
 /** A field error of the Core API in words. */
-export const fieldText = (key: string, t: T = en) => (FIELD[key] ? t(FIELD[key]) : key.replace(/^errors?\./, "").replaceAll('_', " "));
+export const fieldText = (key: string, t: T = en) => (textOf(FIELD, key, t) ?? key.replace(/^errors?\./, "").replaceAll('_', " "));

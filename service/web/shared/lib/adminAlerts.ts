@@ -2,7 +2,7 @@
 // members.list projected for the admin alerts screen. Pure code shared by the Server Component and the client view;
 // Vitest covers it. Texts in the display language (`i` / `t`, IR292); times IR44 in the user's display time zone, with
 // "today / yesterday" for the days next to now. Cause codes and evidence texts stay as the Core API records them.
-import { EN, relativeTime, showDate, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, relativeTime, showDate, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { evidenceText, resolutionText } from "@ac/web/lib/evidence";
 import { alertTitle } from "@ac/web/lib/alerts";
 import type { OpInput } from "@ac/web/lib/opTypes";
@@ -82,7 +82,7 @@ const stLabel: Record<AlertState, string> = { open: "Open", acknowledged: "Ackno
 const evidenceKind: Record<string, string> = { inferred: "inferred", inspection: "inspection record", demo_observation: "demo observation" };
 const roleWord: Record<string, string> = { client: "client", admin: "HQ", contractor: "contractor", technician: "technician" };
 /** A member's role in the display language (client / HQ). */
-export const recipientRole = (role: string, t: T = en) => (roleWord[role] ? t(roleWord[role]) : role);
+export const recipientRole = (role: string, t: T = en) => (textOf(roleWord, role, t) ?? role);
 
 /** Recovery must lie on the safe side of the threshold for the operator (≥ / >: below, ≤ / <: above). */
 export function recoveryError(op: Operator, threshold: number, recovery: number, t: T = en): string | undefined {
@@ -116,7 +116,7 @@ export function adminAlertRows(alerts: ApiAdminAlert[], units: ApiUnitName[], cu
         meta: `${customer} · ${u?.displayName ?? a.unitId} · ${pol}`, state: a.status, st: t(stLabel[a.status]),
         unitId: a.unitId, customerId: (u && custIdByOrg.get(u.customerOrgId)) ?? null, policyless: !a.policyId, inferred: a.evidenceKind === "inferred",
         unit: `${u?.displayName ?? t("Unit")} · ${a.unitId}`, context: customer,
-        evidence: `${evidenceKind[a.evidenceKind] ? t(evidenceKind[a.evidenceKind]) : a.evidenceKind} — “${evidenceText(a.evidenceText, t)}”`,
+        evidence: `${textOf(evidenceKind, a.evidenceKind, t) ?? a.evidenceKind} — “${evidenceText(a.evidenceText, t)}”`,
         cause: a.causeCode === "unknown" ? t("not determined") : t("{cause} (suspected)", { cause: a.causeCode }),
         observed: showTime(a.observedAt, display), detected: showTime(a.detectedAt, display),
         evidenceRecords: a.evidenceIds.length > 0 ? t(a.evidenceIds.length === 1 ? "1 attached" : "{n} attached", { n: a.evidenceIds.length }) : t("none attached"), timeline,
@@ -139,7 +139,7 @@ export function policyRows(policies: ApiPolicy[], customers: ApiCustomerName[], 
       const rules = p.rules?.length ?? 0;
       const sub = p.kind === "default_alert"
         ? t(rules === 1 ? "1 rule · ventilation (CO₂, PM2.5) + fault causes" : "{n} rules · ventilation (CO₂, PM2.5) + fault causes", { n: rules })
-        : `${metricLabel[metric] ? t(metricLabel[metric]) : metric} ${opSymbol[op]} ${String(p.threshold ?? "—")} ${metricUnit[metric] ?? ""} ${t("for {n} s", { n: p.durationSeconds ?? 0 })}`;
+        : `${textOf(metricLabel, metric, t) ?? metric} ${opSymbol[op]} ${String(p.threshold ?? "—")} ${metricUnit[metric] ?? ""} ${t("for {n} s", { n: p.durationSeconds ?? 0 })}`;
       const recipients = (p.recipientMembershipIds ?? []).map((id) => {
         const m = member.get(id);
         return { id, label: m?.displayName || id, role: m ? recipientRole(m.role, t) : "" };

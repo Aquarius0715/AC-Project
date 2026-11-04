@@ -4,7 +4,7 @@
 // alert, D08; a reason with alert.resolve otherwise, IR66), its history and what it relates to. Pure code shared by
 // the server loader and the view; Vitest covers it. Texts in the display language; instants in the user's display time
 // zone (IR44).
-import { EN, relativeTime, showDate, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, relativeTime, showDate, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { evidenceText, resolutionText } from "@ac/web/lib/evidence";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { alertTitle } from "@ac/web/lib/alerts";
@@ -27,7 +27,7 @@ const OP: Record<string, string> = { gt: ">", gte: "≥", lt: "<", lte: "≤" };
 /** A duration in its largest whole unit from two of them up: “60 s”, “10 min”, “3 h”. */
 export const durationText = (s: number, t: T) => (s >= 7200 && s % 3600 === 0 ? t("{n} h", { n: s / 3600 }) : (s >= 120 && s % 60 === 0 ? t("{n} min", { n: s / 60 }) : t("{n} s", { n: s })));
 const value = (metric: string, v: number) => `${airNumber(metric, v)} ${metricUnit[metric] ?? ""}`.trim();
-const label = (metric: string, t: T) => (metricLabel[metric] ? t(metricLabel[metric]) : metric.replaceAll('_', " "));
+const label = (metric: string, t: T) => (textOf(metricLabel, metric, t) ?? metric.replaceAll('_', " "));
 /** The words of a rule (Figma: “Policy: temperature ≥ 30 °C, recovery < 28 °C, duration 60 s”); recovery is below the
 recovery threshold for a high limit and above it for a low one (D08). */
 export function ruleWords(r: ApiAlertRule, t: T) {

@@ -3,7 +3,7 @@
 // it. Texts in the display language (`i` / `t`, IR295); instants in the user's display time zone, and a campaign's
 // start is typed there (NFR-08), while its install window stays the device's local time. Metric and status codes
 // stay codes where the API shows them.
-import { EN, showTime, translator, zonedInstant, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, showTime, translator, zonedInstant, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { UnitSymbol } from "@ac/web/lib/contracts.gen";
 import { byText } from "@ac/web/lib/order";
@@ -200,8 +200,7 @@ const RESULT_REASON: Record<string, string> = {
   "errors.install_timeout": "Failed — no answer within 60 s; the old version is kept",
 };
 export function resultReason(key: string | null, t: T = en): string {
-  if (!key) return "";
-  return RESULT_REASON[key] ? t(RESULT_REASON[key]) : key.replace(/^errors?\./, "").replaceAll('_', " ");
+  return key ? textOf(RESULT_REASON, key, t) ?? key.replace(/^errors?\./, "").replaceAll('_', " ") : "";
 }
 
 /** Each wave's state for its chip: Done once 95 % of its devices succeeded (BR-A20), the first wave that has not is

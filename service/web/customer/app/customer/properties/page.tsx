@@ -16,12 +16,13 @@ import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { roomUnits } from "@ac/web/lib/clientProperties";
 import { PropertiesDemo } from "./_components/properties-demo";
 import { PropertiesView, type PropertiesLive } from "./_components/properties-view";
+import { queryReader } from "@ac/web/lib/searchParams";
 
 export default async function CustomerPropertiesPage({ searchParams }: Readonly<PageProps<"/customer/properties">>) {
   await connection();
   if (!apiMode()) return <PropertiesDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
+  const one = queryReader(sp);
   const [me, properties, spaces, units, display] = await Promise.all([
     corePrincipal(), coreAll<ApiPropertyRow>("properties.list"), coreAll<ApiSpaceRow>("spaces.list"), coreAll<ApiUnitRow>("units.list"), coreDisplay(),
   ]);

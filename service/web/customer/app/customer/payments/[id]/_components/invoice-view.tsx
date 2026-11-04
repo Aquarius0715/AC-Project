@@ -11,6 +11,7 @@ import { stateTone } from "@ac/web/lib/restrictions";
 import { methodLabel, previewText, type InquiryLine, type NoticeUnit, type PaymentLine, type PreviewParams, type RestrictionNotice } from "@ac/web/lib/clientBilling";
 import { demoOutcome, paymentInstructions, previewMessage, sendInquiry, startPayment } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
+import { textOf } from "@ac/web/lib/i18n";
 
 export interface InvoiceLive {
   tab: "payment" | "restriction" | "inquiry";
@@ -64,7 +65,7 @@ function PaymentTab({ live }: Readonly<{ live: InvoiceLive }>) {
   const open = live.open;
   const isFailed = !open && i.payable && live.last?.status === "failed";
   const isConfirmed = i.status === "Paid" && live.last?.status === "confirmed";
-  const methodText = (m: string | null, none: string) => (m ? (methodLabel[m] ? t(methodLabel[m]) : m) : t(none));
+  const methodText = (m: string | null, none: string) => (m ? (textOf(methodLabel, m, t) ?? m) : t(none));
   const pay = () => {
     if (method === "instructions") run(() => paymentInstructions(i.id, i.version), t("Payment instructions shown — the invoice stays unpaid"), setInstructions); else run(() => startPayment(i.id, i.version, method), t("Demo payment started — processing"));
   };
@@ -121,7 +122,7 @@ function PaymentTab({ live }: Readonly<{ live: InvoiceLive }>) {
           <Card title={t("Payment reminders")} sub={t("Notifications only — not payment methods")}>
             {live.reminders.length === 0 ? <p className="text-xs text-muted-foreground">{t("No reminder has been sent for this invoice.")}</p> : live.reminders.map((r) => {
               return (
-                <div key={r.id} className="border-t border-line py-2 text-[13px] first:border-0">{t("{channel} · sent {date} (demo record)", { channel: channelName[r.channel] ? t(channelName[r.channel]) : r.channel, date: r.at })}</div>
+                <div key={r.id} className="border-t border-line py-2 text-[13px] first:border-0">{t("{channel} · sent {date} (demo record)", { channel: textOf(channelName, r.channel, t) ?? r.channel, date: r.at })}</div>
               );
             })}
             <div className="mt-2 flex gap-2"><Btn size="sm" variant="ghost" disabled={pending} onClick={() => { show("email"); }}>{t("Preview email")}</Btn><Btn size="sm" variant="ghost" disabled={pending || !live.whatsapp} onClick={() => { show("whatsapp"); }}>{t("Preview WhatsApp")}</Btn></div>

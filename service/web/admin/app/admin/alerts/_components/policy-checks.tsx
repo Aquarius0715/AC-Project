@@ -9,6 +9,7 @@ import { inboxRow, type ApiNotification } from "@ac/web/lib/notifications";
 import { metricLabel, metricUnit, recipientRole, testOutcome, type ApiRecipient, type NotificationDecision, type Operator, type PolicyRecipient, type Severity } from "@ac/web/lib/adminAlerts";
 import { testPolicy } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
+import { textOf } from "@ac/web/lib/i18n";
 
 interface Unit { id: string; name: string }
 const TONE = { ok: "text-ok", warn: "text-warn", crit: "text-crit", muted: "text-muted-foreground" } as const;
@@ -114,7 +115,7 @@ export function DemoTest({ saved, dirty, unit, demo }: Readonly<{ saved: Tested;
           <>
             {dirty && <p className="mb-1 text-xs text-warn">{t("Unsaved changes are not tested: the saved version is.")}</p>}
             <div className="flex flex-wrap items-center gap-2 text-[13px]">
-              <span>{t("Reading of {metric}", { metric: metricLabel[saved.metric] ? t(metricLabel[saved.metric]) : saved.metric })}</span>
+              <span>{t("Reading of {metric}", { metric: textOf(metricLabel, saved.metric, t) ?? saved.metric })}</span>
               <Input aria-label={t("Reading")} type="number" className="w-28" value={value} onChange={(e) => { setValue(e.target.value); }} />
               <span>{unitSymbol}</span><span>{t("on {name}", { name: unit.name })}</span>
               <Btn size="sm" disabled={pending} onClick={run}>{t("Evaluate (demo)")}</Btn>

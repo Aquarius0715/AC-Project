@@ -16,6 +16,7 @@ import {
 } from "@ac/web/lib/restrictions";
 import { RestrictionsDemo } from "./_components/restrictions-demo";
 import { RestrictionsView, type RestrictionsLive } from "./_components/restrictions-view";
+import { queryReader } from "@ac/web/lib/searchParams";
 
 const active = new Set<RestrictionState>(["scheduled", "requested", "applied", "release_requested"]);
 
@@ -25,7 +26,7 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
   await connection();
   if (!apiMode()) return <RestrictionsDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
+  const one = queryReader(sp);
   const [now, perms, display] = await Promise.all([coreNow(), corePermissions(), coreDisplay()]);
   const i = i18nOf(display), { t } = i;
   const isFull = perms.has("restriction.read") || perms.has("restriction.write");

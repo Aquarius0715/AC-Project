@@ -10,6 +10,7 @@ import type { ApiCustomer, ApiProperty } from "@ac/web/lib/billing";
 import { contractRows, unitOptions, type ApiContractFull, type ApiUnitBrief, type PlanType } from "@ac/web/lib/contracts";
 import { withAccess } from "@ac/web/lib/withAccess";
 import { ContractsView } from "./_components/contracts-view";
+import { queryReader } from "@ac/web/lib/searchParams";
 
 const plans: PlanType[] = ["rto", "general", "energy", "environment"];
 
@@ -22,7 +23,7 @@ async function AdminContractsPageContent({ searchParams }: Readonly<PageProps<"/
   await connection();
   if (!apiMode()) return <ContractsView />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
+  const one = queryReader(sp);
   const kind = plans.find((p) => p === one("kind"));
   const scope = { customerId: one("customerId"), unitId: one("unitId"), kind };
   const where = { ...(scope.customerId && { customerId: scope.customerId }), ...(scope.unitId && { unitId: scope.unitId }) };

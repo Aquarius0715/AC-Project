@@ -2,7 +2,7 @@
 // the Core API turned into one toast line. Pure code shared by every client view that calls Server Actions. The line
 // is in the display language (`t`, IR269); a field name and a domain message key are humanized English, because the
 // API sends keys, not texts.
-import { translator, type T } from "@ac/web/lib/i18n";
+import { translator, type T, textOf } from "@ac/web/lib/i18n";
 
 export interface ActionFailure { code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null }
 
@@ -92,5 +92,5 @@ export function actionMessage(r: ActionFailure, t: T = translator("en")): string
   }
   if (keyText[r.messageKey]) return t(keyText[r.messageKey]);
   if (r.messageKey.startsWith("errors.")) return humanize(r.messageKey);
-  return codeText[r.code] ? t(codeText[r.code]) : `${r.code}: ${humanize(r.messageKey)}`;
+  return textOf(codeText, r.code, t) ?? `${r.code}: ${humanize(r.messageKey)}`;
 }

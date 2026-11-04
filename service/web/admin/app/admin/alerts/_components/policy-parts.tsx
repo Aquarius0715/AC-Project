@@ -6,6 +6,7 @@ import { windowText } from "@ac/web/lib/customerPolicies";
 import { HQ_METRICS, metricLabel, metricUnit, opSymbol, type ApiPolicy, type Operator } from "@ac/web/lib/adminAlerts";
 import { Icon } from "@ac/web/components/Icon";
 import { byNumber } from "@ac/web/lib/order";
+import { textOf } from "@ac/web/lib/i18n";
 
 type Window = NonNullable<ApiPolicy["activeWindow"]>;
 /** A condition as both editors hold it: an alert policy's and a default rule's (IR120 item 3). */
@@ -25,7 +26,7 @@ export function ConditionFields({ c, onChange, errors, tried, fixedMetric }: Rea
     <>
       <div className="grid-fluid" style={{ ["--min" as string]: "130px" }}>
         {fixedMetric
-          ? <Field label={t("Metric")} hint={unit && t("unit fixed: {unit}", { unit })}><Input readOnly value={metricLabel[c.metric] ? t(metricLabel[c.metric]) : c.metric} /></Field>
+          ? <Field label={t("Metric")} hint={unit && t("unit fixed: {unit}", { unit })}><Input readOnly value={textOf(metricLabel, c.metric, t) ?? c.metric} /></Field>
           : <Field label={t("Metric")}><Select value={c.metric} onChange={(e) => { onChange({ metric: e.target.value }); }}>{HQ_METRICS.map((k) => <option key={k} value={k}>{t(metricLabel[k])}</option>)}</Select></Field>}
         <Field label={t("Comparison")}><Select value={c.operator} onChange={(e) => { onChange({ operator: e.target.value as Operator }); }}>{OPERATORS.map((o) => <option key={o} value={o}>{opSymbol[o]}</option>)}</Select></Field>
         <Field label={t("Alert when {op}", { op: opSymbol[c.operator] })} error={tried ? errors.threshold : undefined}><Input type="number" value={c.threshold} onChange={(e) => { onChange({ threshold: +e.target.value }); }} /></Field>

@@ -3,7 +3,7 @@
 // and the communication form — save a note and render a notification preview for a recipient of the job (nothing is
 // sent, deliveryState stays preview). Pure code shared by the server loader and the client view; Vitest covers it.
 // Texts in the display language (`t` / `i`, IR278); every instant is formatted for the user's display time zone.
-import { EN, relativeTime, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, relativeTime, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { jobEventTitle, type ApiEventSummary, type ApiJobEvent, type ApiMember, type ApiPartnerJob } from "@ac/web/lib/partnerOverview";
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 
@@ -40,9 +40,9 @@ const ACTIVE = new Set(["accepted", "assigned", "in_progress", "on_hold", "rewor
 const STATUS_LABEL: Record<string, string> = {
   accepted: "Accepted", assigned: "Assigned", in_progress: "In progress", on_hold: "On hold", rework_requested: "Rework requested", submitted: "Submitted", completed: "Completed", cancelled: "Cancelled",
 };
-const statusLabel = (s: string, t: T) => (STATUS_LABEL[s] ? t(STATUS_LABEL[s]) : s.replaceAll('_', " "));
+const statusLabel = (s: string, t: T) => (textOf(STATUS_LABEL, s, t) ?? s.replaceAll('_', " "));
 const STATUS_TONE: Record<string, Tone> = { accepted: "primary", assigned: "primary", in_progress: "primary", on_hold: "warn", rework_requested: "warn", submitted: "primary", completed: "ok", cancelled: "muted" };
-const eventTitle = (action: string, t: T) => (jobEventTitle[action] ? t(jobEventTitle[action]) : action.replaceAll(/[._]/g, " "));
+const eventTitle = (action: string, t: T) => (textOf(jobEventTitle, action, t) ?? action.replaceAll(/[._]/g, " "));
 const ACKS: Record<string, string> = { accepted: "accepted the slot", cant_make: "can’t make it", pending: "awaiting acceptance" };
 
 export interface HistoryRow {
@@ -142,7 +142,7 @@ export function communicationRefusal(f: { code: string; messageKey: string; fiel
   }
   if (f.code === "NOT_FOUND") return t("The job is no longer readable by your company.");
   if (f.code === "VALIDATION") {
-    return Object.entries(f.fieldErrors).map(([k, v]) => `${FIELDS[k] ? t(FIELDS[k]) : k}: ${FIELD_TEXT[v] ? t(FIELD_TEXT[v]) : v}`).join(" · ") || t("Check the input.");
+    return Object.entries(f.fieldErrors).map(([k, v]) => `${textOf(FIELDS, k, t) ?? k}: ${textOf(FIELD_TEXT, v, t) ?? v}`).join(" · ") || t("Check the input.");
   }
   return t("{code} — {key} (your text is kept; retry)", { code: f.code, key: f.messageKey });
 }

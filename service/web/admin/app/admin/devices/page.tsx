@@ -18,6 +18,7 @@ import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { withAccess } from "@ac/web/lib/withAccess";
 import { DevicesDemo } from "./_components/devices-demo";
 import { DevicesView, type DevicesLive } from "./_components/devices-view";
+import { queryReader } from "@ac/web/lib/searchParams";
 
 const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((error) => { // members the session may not read (no identity.read)
   if (error instanceof CoreError && error.error.code === "FORBIDDEN") return fallback;
@@ -38,7 +39,7 @@ async function AdminDevicesPageContent({ searchParams }: Readonly<PageProps<"/ad
   await connection();
   if (!apiMode()) return <DevicesDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
+  const one = queryReader(sp);
   const tab = one("tab") === "devices" ? "devices" : (one("tab") === "firmware" ? "firmware" : "models");
   const [now, perms, display, caps, units, devices] = await Promise.all([
     coreNow(), corePermissions(), coreDisplay(),

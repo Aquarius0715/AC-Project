@@ -4,7 +4,7 @@
 // in the user's display time zone, while dates that are Kuala Lumpur days (installation, warranty end, contract end)
 // stay so (IR44).
 import type { Currency } from "@ac/web/lib/contracts.gen";
-import { EN, intlTag, showDate, showTime, translator, type I18n, type Locale, type T } from "@ac/web/lib/i18n";
+import { EN, intlTag, showDate, showTime, translator, type I18n, type Locale, type T, textOf } from "@ac/web/lib/i18n";
 import { businessDay } from "@ac/web/lib/clientBilling";
 import { amount, klStamp, one } from "@ac/web/lib/energy";
 import { metricLabel, metricUnit, opSymbol, type Operator, type Severity } from "@ac/web/lib/adminAlerts";
@@ -318,7 +318,7 @@ export function conditionText(p: { metric?: string; operator?: Operator; thresho
   const m = p.metric ?? "";
   const w = p.activeWindow ? `, ${days(p.activeWindow.weekdays, i)}${p.activeWindow.startLocal}–${p.activeWindow.endLocal}` : "";
   const cond = m === "heartbeat_gap" ? `${t("No heartbeat for {n} min", { n: p.threshold ?? 0 })}${w}` // the gap itself is the duration (minutes)
-    : `${metricLabel[m] ? t(metricLabel[m]) : m} ${opSymbol[p.operator ?? "gte"]} ${String(p.threshold ?? 0)} ${metricUnit[m] ?? ""} ${t("for {duration}", { duration: duration(p.durationSeconds ?? 0, t) })}${w}`;
+    : `${textOf(metricLabel, m, t) ?? m} ${opSymbol[p.operator ?? "gte"]} ${String(p.threshold ?? 0)} ${metricUnit[m] ?? ""} ${t("for {duration}", { duration: duration(p.durationSeconds ?? 0, t) })}${w}`;
   return p.severity ? `${cond} → ${t(sevLabel[p.severity])}` : cond;
 }
 export interface PolicyLine { id: string; version: number; kind: "alert" | "default_alert"; name: string; type: string; condition: string; madeBy: string; units: number; enabled: boolean }
@@ -333,7 +333,7 @@ export function policyLines(ps: ApiCustomerPolicy[], customerUnits: string[], ow
     .map((p) => {
       return p.kind === "default_alert"
         ? { id: p.id, version: p.version, kind: p.kind, name: p.name === "Default policy" ? t("Default policy") : p.name, type: t("Default"), condition: t((p.rules?.length ?? 0) === 1 ? "1 rule · {on} on for this customer" : "{n} rules · {on} on for this customer", { n: p.rules?.length ?? 0, on: defaultRules(p, i).filter((r) => r.enabled).length }), madeBy: t("HQ (template)"), units: mine.size, enabled: p.enabled }
-        : { id: p.id, version: p.version, kind: p.kind, name: p.name, type: metricLabel[p.metric ?? ""] ? t(metricLabel[p.metric ?? ""]) : p.metric ?? "", condition: conditionText(p, i), madeBy: owner(p.ownerMembershipId), units: p.unitIds.filter((u) => mine.has(u)).length, enabled: p.enabled };
+        : { id: p.id, version: p.version, kind: p.kind, name: p.name, type: textOf(metricLabel, p.metric ?? "", t) ?? (p.metric ?? ""), condition: conditionText(p, i), madeBy: owner(p.ownerMembershipId), units: p.unitIds.filter((u) => mine.has(u)).length, enabled: p.enabled };
     });
 }
 /** The default policy's rules with this customer's on/off settings (no setting = on). */

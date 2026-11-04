@@ -12,6 +12,7 @@ import { mrvView, reportRows, reviewItems, type ApiFactor, type ApiMRVReport } f
 import { withAccess } from "@ac/web/lib/withAccess";
 import { MRVDemo } from "./_components/mrv-demo";
 import { MRVView, type MRVLive } from "./_components/mrv-view";
+import { queryReader } from "@ac/web/lib/searchParams";
 
 interface Unit { id: string; displayName: string; customerOrgId: string; archived: boolean }
 
@@ -24,7 +25,7 @@ async function AdminMRVPageContent({ searchParams }: Readonly<PageProps<"/admin/
   await connection();
   if (!apiMode()) return <MRVDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
+  const one = queryReader(sp);
   const tab = one("tab") === "factors" ? "factors" : "reports";
   const [perms, display, orgs, units, baselines, factors] = await Promise.all([
     corePermissions(), coreDisplay(),

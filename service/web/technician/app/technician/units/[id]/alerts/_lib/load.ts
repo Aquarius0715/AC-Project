@@ -6,7 +6,7 @@
 // formatted here (IR284).
 import "server-only";
 import { coreDisplay, coreNow, coreOp, corePermissions, CoreError } from "@ac/web/lib/dal";
-import { i18nOf, showTime } from "@ac/web/lib/i18n";
+import { i18nOf, showTime, textOf } from "@ac/web/lib/i18n";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { alertChoices, alertView, selectAlert, type ApiTechAlert } from "@ac/web/lib/techAlerts";
 import { evidenceRows, type ApiEvidenceCandidate } from "@ac/web/lib/alertEvidence";
@@ -47,7 +47,7 @@ export async function loadAlerts(unitId: string, sp: { jobId?: string; alertId?:
         unitHref,
       };
     }
-    return { kind: "unavailable" as const, title: t("Alerts aren’t available"), back: t("Unit"), text: UNAVAILABLE[alerts.messageKey] ? t(UNAVAILABLE[alerts.messageKey]) : alerts.code, unitHref };
+    return { kind: "unavailable" as const, title: t("Alerts aren’t available"), back: t("Unit"), text: textOf(UNAVAILABLE, alerts.messageKey, t) ?? alerts.code, unitHref };
   }
   const [unit, job, permissions] = await Promise.all([
     optional(coreOp<ApiUnitDetail>("units.get", { id: unitId }), null),

@@ -11,12 +11,13 @@ import type { ApiOffsetRecord } from "@ac/web/lib/offsets";
 import { periodKinds, periodRange, pickUnits, selectionQuery } from "@ac/web/lib/clientEnergy";
 import { OffsetsDemo } from "./_components/offsets-demo";
 import { OffsetsView } from "./_components/offsets-view";
+import { queryReader } from "@ac/web/lib/searchParams";
 
 export default async function CustomerOffsetsPage({ searchParams }: Readonly<PageProps<"/customer/energy/offsets">>) {
   await connection();
   if (!apiMode()) return <OffsetsDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
+  const one = queryReader(sp);
   const [now, units, records, display] = await Promise.all([
     coreNow(), coreAll<{ id: string; displayName: string }>("units.list"), coreAll<ApiOffsetRecord>("offsets.list", { sort: { field: "createdAt", direction: "desc" } }), coreDisplay(),
   ]);

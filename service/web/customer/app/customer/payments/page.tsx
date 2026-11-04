@@ -13,6 +13,7 @@ import {
 } from "@ac/web/lib/clientBilling";
 import { PaymentsDemo } from "./_components/payments-demo";
 import { PaymentsView } from "./_components/payments-view";
+import { queryReader } from "@ac/web/lib/searchParams";
 
 
 export default async function CustomerPaymentsPage({ searchParams }: Readonly<PageProps<"/customer/payments">>) {
@@ -20,7 +21,7 @@ export default async function CustomerPaymentsPage({ searchParams }: Readonly<Pa
   await connection();
   if (!apiMode()) return <PaymentsDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
+  const one = queryReader(sp);
   const [now, contracts, units, properties, spaces, display] = await Promise.all([
     coreNow(), coreAll<ClientContract>("contracts.list"), coreAll<Unit>("units.list"), coreAll<{ id: string; name: string }>("properties.list"),
     coreAll<{ id: string; name: string; parentSpaceId: string | null }>("spaces.list"), coreDisplay(),

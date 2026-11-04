@@ -4,7 +4,7 @@
 // with the jobs an ending certificate blocks, the KPIs, the assignment impact and the renewal / training forms.
 // Pure code shared by the server loader and the client view; Vitest covers it. Texts in the display language (`t` /
 // `i`, IR277); certificate dates are Kuala Lumpur days, a job's time an instant in the display time zone.
-import { EN, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { businessDay } from "@ac/web/lib/clientBilling";
 import { klDay, type Slot } from "@ac/web/lib/partnerOverview";
 import { qualificationLabel } from "@ac/web/lib/partnerJobDetail";
@@ -209,7 +209,7 @@ export function certificateRefusal(f: { code: string; messageKey: string; fieldE
   if (f.code === "NOT_FOUND") return { fields: {}, text: t("That technician or certificate is no longer in your company — reload the page.") };
   if (f.code === "CONFLICT") return { fields: {}, text: t("The certificate changed in the meantime — the page shows the latest state.") };
   if (f.code !== "VALIDATION") return { fields: {}, text: null };
-  const fields = Object.fromEntries(Object.entries(f.fieldErrors).map(([k, v]) => [FIELDS[k] ?? k, TEXT[v] ? t(TEXT[v]) : v]));
+  const fields = Object.fromEntries(Object.entries(f.fieldErrors).map(([k, v]) => [FIELDS[k] ?? k, textOf(TEXT, v, t) ?? v]));
   return { fields, text: Object.keys(fields).length > 0 ? null : t("Check the input.") };
 }
 /** “412 KB”, “2.4 MB”: a file's size as the form shows it. */

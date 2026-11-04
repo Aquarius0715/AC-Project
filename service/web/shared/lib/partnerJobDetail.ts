@@ -5,7 +5,7 @@
 // Pure code shared by the server loader and the client view; Vitest covers it. Texts in the display language (`t` / `i`,
 // IR272); the loader formats every time on the server — instants in the user's display time zone, the capacity days
 // as Kuala Lumpur dates.
-import { EN, intlTag, showSpan, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, intlTag, showSpan, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { jobEventTitle, klDay, until, type ApiCapacity, type ApiJobEvent, type ApiMember, type Slot } from "@ac/web/lib/partnerOverview";
 import type { ReportHistorySummary } from "@ac/web/lib/contracts.gen";
@@ -31,19 +31,19 @@ export interface ApiHistory { projection: "history"; jobId: string; type: string
 export type ApiPartnerJobDetail = ApiOffer | ApiDetail | ApiHistory;
 
 const QUALIFICATIONS: Record<string, string> = { demo_indoor: "Indoor unit work", demo_outdoor: "Outdoor unit work", demo_electrical: "Electrical work" };
-export const qualificationLabel = (code: string, t: T = en) => (QUALIFICATIONS[code] ? t(QUALIFICATIONS[code]) : code.replace(/^demo_/, "").replaceAll('_', " "));
+export const qualificationLabel = (code: string, t: T = en) => (textOf(QUALIFICATIONS, code, t) ?? code.replace(/^demo_/, "").replaceAll('_', " "));
 const SCOPE_QUALIFICATION: Record<string, string> = { indoor: "demo_indoor", outdoor: "demo_outdoor", electrical: "demo_electrical" }; // fixture qualificationRequirements
 /** The qualifications a delegated job requires: one per entry of the unit's maintenance scope (IR123 item 3). */
 export const requiredFor = (serviceScope: string[]) => serviceScope.map((s) => SCOPE_QUALIFICATION[s]).filter(Boolean);
 const TYPES: Record<string, string> = { periodic: "Periodic inspection", reactive: "Repair", preventive: "Preventive maintenance" };
-export const typeLabel = (type: string, t: T = en) => (TYPES[type] ? t(TYPES[type]) : type);
+export const typeLabel = (type: string, t: T = en) => (textOf(TYPES, type, t) ?? type);
 export const originLabel = (o: string, t: T = en) => t(o === "periodic_plan" ? "from the periodic plan" : "agreed with the client");
 const STATUS_WORDS: Record<string, string> = {
   requested: "requested", offered: "offered", accepted: "accepted", assigned: "assigned", in_progress: "in progress", on_hold: "on hold", submitted: "submitted",
   rework_requested: "rework requested", completed: "completed", cancelled: "cancelled",
 };
 /** A job status inside a sentence (“the job is on hold”), in the display language. */
-export const statusWord = (status: string, t: T = en) => (STATUS_WORDS[status] ? t(STATUS_WORDS[status]) : status.replaceAll('_', " "));
+export const statusWord = (status: string, t: T = en) => (textOf(STATUS_WORDS, status, t) ?? status.replaceAll('_', " "));
 /** “1st”, “2nd”, “3rd”, “4th” … in English, “ke-1” in Malay. */
 export const ordinal = (n: number, locale: "en" | "ms" = "en") => (locale === "ms" ? `ke-${String(n)}` : `${String(n)}${n % 10 === 1 && n % 100 !== 11 ? "st" : n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th"}`);
 
@@ -190,7 +190,7 @@ export function decisionRefusal(f: { code: string; messageKey: string; fieldErro
     }
   }
   if (f.code === "NOT_FOUND") return t("This offer is no longer available to your company.");
-  const text = (v: string) => (FIELD_TEXT[v] ? t(FIELD_TEXT[v]) : v);
+  const text = (v: string) => (textOf(FIELD_TEXT, v, t) ?? v);
   if (f.code === "VALIDATION") return Object.entries(f.fieldErrors).map(([k, v]) => k === "_" ? text(v) : `${k}: ${text(v)}`).join(" · ") || t("Check the input.");
   return actionMessage({ ...f, fieldErrors: {} }, t); // the write limit's wait and other codes (IR380)
 }

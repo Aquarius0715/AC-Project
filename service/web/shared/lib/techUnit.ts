@@ -4,7 +4,7 @@
 // connection is down (DD-T03) — and one metric over 1 h or 24 h (rolling) or 7 days (Kuala Lumpur calendar days) with
 // the other metrics and the events of that period. Pure code shared by the server loader and the view; Vitest covers
 // it. Texts in the display language (`i`, IR283); instants in the user's display time zone (IR44).
-import { EN, relativeTime, showClock, showDate, showDayMonth, showSpan, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, relativeTime, showClock, showDate, showDayMonth, showSpan, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { evidenceText, resolutionText } from "@ac/web/lib/evidence";
 import { alertTitle, type ApiAlert } from "@ac/web/lib/alerts";
 import { metricLabel } from "@ac/web/lib/adminAlerts";
@@ -40,7 +40,7 @@ export function metricOf(d: ApiTechUnit, v?: string): Metric {
   if (asked) return asked;
   return measured.includes("temperature") || measured.length === 0 ? "temperature" : measured[0];
 }
-const label = (metric: string, t: T) => (metricLabel[metric] ? t(metricLabel[metric]) : metric.replaceAll('_', " "));
+const label = (metric: string, t: T) => (textOf(metricLabel, metric, t) ?? metric.replaceAll('_', " "));
 
 const SCOPE: Record<string, string> = { indoor: "Indoor", outdoor: "Outdoor", electrical: "Electrical" };
 const TYPE: Record<string, string> = { split: "Split" };
@@ -54,10 +54,10 @@ export function registerRows(d: ApiTechUnit, i: I18n = EN): Register {
   const rows: [string, string][] = [
     [t("Location"), d.location.pathLabels.join(" › ") || none],
     [t("Manufacturer / model"), d.capabilities.manufacturer && d.capabilities.model ? `${d.capabilities.manufacturer} / ${d.capabilities.model}` : none],
-    [t("Configuration"), d.type ? (TYPE[d.type] ? t(TYPE[d.type]) : d.type) : none],
+    [t("Configuration"), d.type ? (textOf(TYPE, d.type, t) ?? d.type) : none],
     [t("Installed"), d.installedAt ? showDate(d.installedAt, display) : none],
     [t("Capability version"), String(d.capabilityVersion)],
-    [t("Maintenance scope"), d.serviceScope.map((s) => (SCOPE[s] ? t(SCOPE[s]) : s)).join(" · ") || none],
+    [t("Maintenance scope"), d.serviceScope.map((s) => (textOf(SCOPE, s, t) ?? s)).join(" · ") || none],
   ];
   if (d.location.accessInstructions) rows.push([t("Access"), d.location.accessInstructions]);
   const groups = componentGroups.map(({ group, keys }) => ({ group, n: keys.filter((k) => d.components.includes(k)).length })).filter((g) => g.n);

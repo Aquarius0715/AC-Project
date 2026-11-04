@@ -191,3 +191,17 @@ export function relativeTime(iso: string, nowMs: number, i: I18n = EN): string {
   if (day === dayKey(nowMs + 86_400_000, tz)) return i.t("tomorrow {time}", { time });
   return showTime(iso, i.display);
 }
+
+const textTables = new WeakMap<object, ReadonlyMap<string, string>>();
+
+/** textOf is the translated text of `key` in a table of English texts, or undefined when the table has none. */
+export function textOf(table: Readonly<Partial<Record<string, string>>>, key: string | null | undefined, t: T): string | undefined {
+  if (key === null || key === undefined) return undefined;
+  let texts = textTables.get(table);
+  if (!texts) {
+    texts = new Map(Object.entries(table).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+    textTables.set(table, texts);
+  }
+  const text = texts.get(key);
+  return text ? t(text) : undefined;
+}

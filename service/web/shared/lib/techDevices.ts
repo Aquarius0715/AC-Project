@@ -3,7 +3,7 @@
 // card and the device event rows with their alerts and response notes. Pure code shared by the Server Components and
 // the client view; Vitest covers it. Texts in the display language (`i` / `t`, IR287); instants in the user's display
 // time zone (IR44). Event types, evidence sources and versions stay codes, as in Figma.
-import { EN, relativeTime, showClock, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, relativeTime, showClock, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import type { ApiCalibration, ApiDevice, ApiDeviceDetail, ApiDeviceOperation, Connection } from "@ac/web/lib/devices";
 import { metricLabel } from "@ac/web/lib/adminAlerts";
 
@@ -148,7 +148,7 @@ export const calibrationText = (c: ApiCalibration, i: I18n = EN) => {
   });
 };
 /** A sensor's metric in words ("temperature" → "Temperature", in the display language); an unknown one as stored (IR499). */
-export const metricText = (metric: string, t: T) => (metricLabel[metric] ? t(metricLabel[metric]) : metric);
+export const metricText = (metric: string, t: T) => (textOf(metricLabel, metric, t) ?? metric);
 /** The sensors of the device for the T11 table: metric, unit, stale limit and the last calibration. */
 export const sensorRows = (d: ApiDevice, i: I18n = EN) =>
   d.sensors.map((s) => ({ id: s.id, metric: metricText(s.metric, i.t), unit: s.unit, stale: i.t("{n} s", { n: s.staleAfterSeconds }), calibrated: s.calibratedAt ? showTime(s.calibratedAt, i.display) : i.t("Never") }));
@@ -198,9 +198,9 @@ const REFUSED: Record<string, string> = {
 };
 /** A refused device write in words (null for a VALIDATION that only marks fields). */
 export function deviceRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string> }, t: T = en): string | null {
-  if (f.messageKey === "errors.duplicate_serial" || (f.code === "CONFLICT" && f.fieldErrors.serial)) return t("This serial is already registered.");
-  return REFUSED[f.code] ? t(REFUSED[f.code]) : null;
+  const duplicate = f.messageKey === "errors.duplicate_serial" || (f.code === "CONFLICT" && f.fieldErrors.serial);
+  return duplicate ? t("This serial is already registered.") : textOf(REFUSED, f.code, t) ?? null;
 }
 const FIELD: Record<string, string> = { "error.required": "Required", "error.length": "1–1000 characters", "error.invalid": "Not valid", "error.duplicate": "Already registered" };
 /** A field error of the Core API in words. */
-export const deviceFieldText = (key: string, t: T = en) => (FIELD[key] ? t(FIELD[key]) : key.replace(/^errors?\./, "").replaceAll('_', " "));
+export const deviceFieldText = (key: string, t: T = en) => (textOf(FIELD, key, t) ?? key.replace(/^errors?\./, "").replaceAll('_', " "));

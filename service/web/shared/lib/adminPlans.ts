@@ -3,7 +3,7 @@
 // stored in UTC), the next-occurrence box with Generate job, the generated occurrences and the refusals. Pure code shared
 // by the server loader and the client view; Vitest covers it. Texts in the display language (`i` / `t`, IR291); a
 // plan's dates are its instants in the user's display time zone, the zone its next date is typed in (D16, NFR-08).
-import { EN, showDate, translator, type Display, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, showDate, translator, type Display, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 
 const en = translator("en");
@@ -86,7 +86,7 @@ export function planRefusal(f: { code: string; messageKey: string; fieldErrors: 
     "error.unitArchived": "the unit is archived", "error.unitFixed": "a plan’s unit cannot change",
     "error.past": "must be in the future", "error.invalid": "not a valid value (monthly, every 1–12 months)", "error.required": "required",
   };
-  const word = (k: string) => (keys[k] ? t(keys[k]) : k);
+  const word = (k: string) => (textOf(keys, k, t) ?? k);
   const fields = Object.entries(f.fieldErrors ?? {}).map(([k, v]) => `${k}: ${word(v)}`);
   if (fields.length > 0) return fields.join(" · ");
   if (keys[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved: {reason}.", { reason: word(f.messageKey) }) : `${word(f.messageKey)}.`;

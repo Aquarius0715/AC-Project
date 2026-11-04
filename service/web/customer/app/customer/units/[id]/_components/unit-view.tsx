@@ -8,7 +8,7 @@ import { units, unitRowFromApi, type UnitRow } from "@ac/web/lib/client";
 import { OpError } from "@ac/web/lib/ops";
 import { controlLayout, FAN_LABEL, historyRow, latest, MODE_LABEL, type ApiCommand, type ApiUnitDetail, type UnitAction } from "@ac/web/lib/units";
 import { waitForCommand } from "@ac/web/lib/unitCommands";
-import { showRecent, showTime } from "@ac/web/lib/i18n";
+import { showRecent, showTime, textOf } from "@ac/web/lib/i18n";
 import { useDisplay, useT } from "@ac/web/components/I18n";
 import { createCommand, setUnitAlertPolicies } from "../actions";
 import { RenameModal } from "../../../_components/rename-modal";
@@ -98,7 +98,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
   const pow = d ? latest(d, "power", t, display, nowMs) : { text: "742 W", at: "09:12:30" };
   const isDisabled = isOffline || isBlocked || (d !== null && !d.capabilities.control);
   const track = (c: ApiCommand) => { setSent((xs) => [c, ...xs.filter((x) => x.id !== c.id)]); };
-  const reason = (key: string, code: string) => (REASONS[key] ? t(REASONS[key]) : code);
+  const reason = (key: string, code: string) => (textOf(REASONS, key, t) ?? code);
   const fail = (e: unknown) => { toast(e instanceof OpError ? t("Not sent: {reason}", { reason: reason(e.error.messageKey, e.error.code) }) : t("Not sent"), "warn"); };
   const modeWord = (m: string | null) => (m && m in MODE_LABEL ? t(MODE_LABEL[m as keyof typeof MODE_LABEL]) : m ?? "—");
   const fanWord = (f: string | null) => (f && f in FAN_LABEL ? t(FAN_LABEL[f as keyof typeof FAN_LABEL]) : f ?? "—");
@@ -198,7 +198,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
             ) : <p className="text-[13px] text-muted-foreground">{t("This AC’s module only measures: its readings are shown below, and settings are changed on the AC itself.")}</p>}
           </Card>
           <div className="split-even">
-            <Card title={t("Live telemetry")}><SummaryList items={d ? [[t("Power draw"), pow ? `${pow.text} · ${pow.at}` : "—"], [t("Connection"), CONNECTION[d.connection] ? t(CONNECTION[d.connection]) : d.connection], [t("Last seen"), showTime(d.lastSeenAt, display)], [t("Room temp"), room ? `${room.text} · ${room.at}` : "—"], [t("Humidity"), hum ? `${hum.text} · ${hum.at}` : "—"]] : [[t("Power draw"), "742 W · 09:12:30"], ["Wi-Fi", "RSSI −52 dBm (strong)"], [t("Last heartbeat"), "2 s ago"], [t("Room temp"), "28.0 °C · 09:12:30"], [t("Humidity"), "60 % · 09:12:30"]]} /></Card>
+            <Card title={t("Live telemetry")}><SummaryList items={d ? [[t("Power draw"), pow ? `${pow.text} · ${pow.at}` : "—"], [t("Connection"), textOf(CONNECTION, d.connection, t) ?? d.connection], [t("Last seen"), showTime(d.lastSeenAt, display)], [t("Room temp"), room ? `${room.text} · ${room.at}` : "—"], [t("Humidity"), hum ? `${hum.text} · ${hum.at}` : "—"]] : [[t("Power draw"), "742 W · 09:12:30"], ["Wi-Fi", "RSSI −52 dBm (strong)"], [t("Last heartbeat"), "2 s ago"], [t("Room temp"), "28.0 °C · 09:12:30"], [t("Humidity"), "60 % · 09:12:30"]]} /></Card>
             <Card title={t("Device information")}><SummaryList items={d ? [[t("Model"), `${d.capabilities.manufacturer} ${d.capabilities.model}`], [t("Remote control"), t(d.capabilities.control ? "supported" : "not supported")], [t("Capabilities"), tempRange ? t("Modes {modes} · fan {fans} · {min}–{max}°C step {step}", { modes: d.capabilities.modes.map(modeWord).join("/") || "—", fans: d.capabilities.fanLevels.map(fanWord).join("/") || "—", min: tempRange.min, max: tempRange.max, step: tempRange.step }) : t("Modes {modes} · fan {fans} · no temperature setting", { modes: d.capabilities.modes.map(modeWord).join("/") || "—", fans: d.capabilities.fanLevels.map(fanWord).join("/") || "—" })]] : [[t("Model"), "Split 1.5HP (demo)"], [t("Firmware"), "v2.4.1"], [t("Protocol"), "MQTT/TLS"], [t("Uptime"), "14d 8h"], [t("Capabilities"), "Modes cool/dry/fan · fan low/mid/high · 16–30°C step 1"]]} /></Card>
           </div>
           <Card title={t("Alert policies on this AC")} sub={t("Limits that raise alerts for this AC. Policies are made in Alerts › Alert policies.")}>

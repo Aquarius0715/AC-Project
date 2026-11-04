@@ -7,7 +7,7 @@ import { amount } from "@ac/web/lib/energy";
 import {  businessDay, invoiceStatus, KL, type ApiContract, type ApiInquiry, type ApiInvoice, type ApiPayment, type InvoiceStatus } from "@ac/web/lib/billing";
 import { policyText, stateLabel, type ApiCommand, type ApiRestriction, type RestrictionState } from "@ac/web/lib/restrictions";
 import { money } from "@ac/web/lib/money";
-import { EN, intlTag, showDate, showTime, translator, type I18n, type Locale, type T } from "@ac/web/lib/i18n";
+import { EN, intlTag, showDate, showTime, translator, type I18n, type Locale, type T, textOf } from "@ac/web/lib/i18n";
 
 const en = translator("en");
 // The business-day helpers live with the billing types (HQ billing words its dates the same way, IR299).
@@ -50,9 +50,9 @@ export function contractCards(cs: ClientContract[], unit: (id: string) => UnitPl
   const rank = { Active: 0, Upcoming: 1, Expired: 2 };
   return [...cs].toSorted((a, b) => rank[status(a)] - rank[status(b)] || b.startAt.localeCompare(a.startAt)).map((k) => {
     return {
-      id: k.id, version: k.version, name: planName[k.planType] ? t(planName[k.planType]) : k.planType,
+      id: k.id, version: k.version, name: textOf(planName, k.planType, t) ?? k.planType,
       sub: `${k.id.slice(0, 8)} · ${businessDayShort(k.startAt, locale)} → ${businessDay(k.endAt, locale)}`,
-      period: `${businessDay(k.startAt, locale)} → ${businessDay(k.endAt, locale)}`, plan: planLong[k.planType] ? t(planLong[k.planType]) : k.planType, planType: k.planType, status: status(k),
+      period: `${businessDay(k.startAt, locale)} → ${businessDay(k.endAt, locale)}`, plan: textOf(planLong, k.planType, t) ?? k.planType, planType: k.planType, status: status(k),
       units: k.unitIds.map((id) => ({ id, ...(unit(id) ?? { name: id.slice(0, 8), place: "" }) })), restrictionIds: k.activeRestrictionIds ?? [],
     };
   });
@@ -86,7 +86,7 @@ export function paymentLines(ps: ClientPayment[], i: I18n = EN): PaymentLine[] {
   const { t, display } = i;
   return [...ps].toSorted((a, b) => b.createdAt.localeCompare(a.createdAt)).map((p) => {
     return {
-      id: p.id, version: p.version, label: `${p.id.slice(0, 8)} · ${p.method ? (methodLabel[p.method] ? t(methodLabel[p.method]) : p.method) : t("Bank transfer (recorded by HQ)")}`,
+      id: p.id, version: p.version, label: `${p.id.slice(0, 8)} · ${p.method ? (textOf(methodLabel, p.method, t) ?? p.method) : t("Bank transfer (recorded by HQ)")}`,
       at: showTime(p.confirmedAt ?? p.updatedAt, display), status: p.status, reference: p.paymentReference,
     };
   });
@@ -129,7 +129,7 @@ export function noticeUnits(r: ApiRestriction, unit: (id: string) => UnitPlace |
     return {
       unitId: u.unitId,
       name: n ? `${n.name}${n.place ? ` · ${n.place}` : ""}` : u.unitId.slice(0, 8),
-      apply: applyText[u.applyState] ? t(applyText[u.applyState]) : u.applyState,
+      apply: textOf(applyText, u.applyState, t) ?? u.applyState,
       release: release === undefined ? u.releaseState : release && t(release),
       releaseTone: u.releaseState === "released" ? "ok" : (u.releaseState === "failed" ? "crit" : "primary"),
       tone: u.releaseState === "released" ? "ok" : u.applyState === "sent_unknown" ? "unknown" : u.applyState === "applied" ? "warn" : "primary",
@@ -147,7 +147,7 @@ export function noticeTimeline(r: ApiRestriction, i: I18n = EN): { time: string;
   const { t, display } = i;
   const items: { time: string; title: string; tone?: "warn" | "ok" }[] = (r.events ?? []).map((e) => {
     return {
-      time: showTime(e.occurredAt, display), title: eventTitle[e.action] ? t(eventTitle[e.action]) : e.action,
+      time: showTime(e.occurredAt, display), title: textOf(eventTitle, e.action, t) ?? e.action,
       ...(e.action === "restriction.applied" ? { tone: "warn" as const } : (e.action === "restriction.released" ? { tone: "ok" as const } : {})),
     };
   });

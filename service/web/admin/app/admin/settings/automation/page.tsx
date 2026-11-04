@@ -11,6 +11,7 @@ import { policyGroups, type ApiAutoPolicy } from "@ac/web/lib/automation";
 import { withAccess } from "@ac/web/lib/withAccess";
 import { AutomationDemo } from "./_components/automation-demo";
 import { AutomationView } from "./_components/automation-view";
+import { queryReader } from "@ac/web/lib/searchParams";
 
 interface Unit { id: string; displayName: string; customerOrgId: string; propertyId: string; modelId: string; archived: boolean }
 
@@ -23,7 +24,7 @@ async function AdminAutomationPageContent({ searchParams }: Readonly<PageProps<"
   await connection();
   if (!apiMode()) return <AutomationDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
+  const one = queryReader(sp);
   const scope = { customerId: one("customerId"), propertyId: one("propertyId"), unitId: one("unitId") };
   const filters = { kind: "automation", ...(scope.customerId && { customerId: scope.customerId }), ...(scope.propertyId && { propertyId: scope.propertyId }), ...(scope.unitId && { unitId: scope.unitId }) };
   const [now, perms, display, policies, units, customers, properties, caps] = await Promise.all([

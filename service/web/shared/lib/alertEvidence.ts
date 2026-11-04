@@ -4,7 +4,7 @@
 // to the alert. An alert without a policy resolves only with at least one; a policy alert may be resolved by hand
 // without. Pure code shared by the HQ Resolve dialog and the technician's resolution; Vitest covers it. Texts in the
 // display language; instants in the user's display time zone (IR44).
-import { EN, relativeTime, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, relativeTime, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { metricLabel } from "@ac/web/lib/adminAlerts";
 import { airNumber } from "@ac/web/lib/air";
 
@@ -31,8 +31,9 @@ export function evidenceRows(items: ApiEvidenceCandidate[], nowMs: number, i: I1
       const value = c.value === null ? "—" : `${airNumber(metric, c.value)} ${c.unit ?? ""}`.trim();
       return { id: c.id, kind: c.kind, title: t("Remeasurement · {metric} {value} · {time}", { metric: metricName(metric, t), value, time }), sub: t("{origin} · valid", { origin: t(ORIGIN[c.origin ?? ""] ?? c.origin ?? "") }) };
     }
-    if (c.kind === "device_event") return { id: c.id, kind: c.kind, title: t("Device event · {time}", { time }), sub: EVENT[c.eventType ?? ""] ? t(EVENT[c.eventType ?? ""]) : c.eventType ?? "" };
-    return { id: c.id, kind: c.kind, title: t("Evidence attached to this alert"), sub: `${c.id.slice(0, 8)} · ${t("observed {time}", { time })}` };
+    return c.kind === "device_event"
+      ? { id: c.id, kind: c.kind, title: t("Device event · {time}", { time }), sub: textOf(EVENT, c.eventType, t) ?? c.eventType ?? "" }
+      : { id: c.id, kind: c.kind, title: t("Evidence attached to this alert"), sub: `${c.id.slice(0, 8)} · ${t("observed {time}", { time })}` };
   });
 }
 
@@ -59,8 +60,7 @@ const REFUSED: Record<string, string> = {
 /** The resolution's refusal of its evidence (fieldErrors.resolutionEvidenceIds) in words, or null for another refusal. */
 export function evidenceRefusal(fieldErrors: Record<string, string> | undefined, t: T): string | null {
   const key = fieldErrors?.resolutionEvidenceIds;
-  if (!key) return null;
-  return REFUSED[key] ? t(REFUSED[key]) : t("Pick each evidence record once, at most {n}", { n: MAX_EVIDENCE });
+  return key ? textOf(REFUSED, key, t) ?? t("Pick each evidence record once, at most {n}", { n: MAX_EVIDENCE }) : null;
 }
 
 /** The picked IDs after ticking one on or off, in the order they were picked. */

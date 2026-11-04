@@ -5,11 +5,12 @@ import { apiMode } from "@ac/web/lib/dal";
 import { JobsDemo } from "./_components/jobs-demo";
 import { JobsView } from "./_components/jobs-view";
 import { loadJobs } from "./_lib/load";
+import { queryReader } from "@ac/web/lib/searchParams";
 
 export default async function PartnerJobsPage({ searchParams }: Readonly<PageProps<"/partner/jobs">>) {
   await connection();
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
+  const one = queryReader(sp);
   if (!apiMode()) return <JobsDemo status={one("status")} />;
   // the overview's KPI links use status=…; the list's URL key is tab
   const tab = one("tab") ?? ({ offered: "offered", active: "active", submitted: "review", completed: "completed" } as Record<string, string>)[one("status") ?? ""];

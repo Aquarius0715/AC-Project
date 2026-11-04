@@ -3,7 +3,7 @@
 // proposal to answer, the plan visit, the technician once accepted, the accepted report, the rating), the notes and
 // history from the job events, and the form checks. Pure code shared by the server loader and the client view; Vitest
 // covers it. Texts in the display language and times in the user's display time zone (`i`, IR262).
-import { EN, showDate, showSpan, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, showDate, showSpan, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import type { Slot } from "@ac/web/lib/partnerOverview";
 import type { IconName } from "@ac/web/components/Icon";
@@ -38,7 +38,7 @@ const CLIENT_TITLE: Record<string, string> = {
   "job.rated": "You rated the job", "job.problem_reported": "You reported a problem", "proposal.sent": "New time proposed", "partner_proposal.sent_to_client": "New time proposed", "job.follow_up_classified": "HQ reviewed your problem report", "proposal.accepted": "You accepted the proposed time",
   "proposal.declined": "You declined the proposed time", "job.reschedule_requested": "You asked for another time",
 };
-export const clientEventTitle = (action: string, shared: Record<string, string>, t: T = en) => (CLIENT_TITLE[action] ? t(CLIENT_TITLE[action]) : (shared[action] ? t(shared[action]) : action.replaceAll(/[._]/g, " ")));
+export const clientEventTitle = (action: string, shared: Record<string, string>, t: T = en) => (textOf(CLIENT_TITLE, action, t) ?? (shared[action] ? t(shared[action]) : action.replaceAll(/[._]/g, " ")));
 export const sameSlot = (a: Slot | null, b: Slot | null) => !!a && !!b && Date.parse(a.startAt) === Date.parse(b.startAt) && Date.parse(a.endAt) === Date.parse(b.endAt);
 
 export type StatusTab = "all" | "reply" | "requested" | "scheduled" | "progress" | "completed" | "cancelled";
@@ -193,7 +193,7 @@ export function clientJobRefusal(f: { code: string; messageKey: string; fieldErr
     "errors.contact_details_forbidden": "no e-mail addresses or phone numbers in the contact window", "error.length": "wrong length", "error.count": "wrong number of entries",
     "error.invalidFile": "photos must be JPEG or PNG up to 5 MiB", "error.unitArchived": "the unit is archived", "error.required": "required", "error.invalid": "not a valid value",
   };
-  const fields = Object.entries(f.fieldErrors ?? {}).map(([k, v]) => `${k}: ${keys[v] ? t(keys[v]) : v}`);
+  const fields = Object.entries(f.fieldErrors ?? {}).map(([k, v]) => `${k}: ${textOf(keys, v, t) ?? v}`);
   if (fields.length > 0) return fields.join(" · ");
   if (keys[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved: {reason}.", { reason: t(keys[f.messageKey]) }) : `${t(keys[f.messageKey])}.`;
   if (f.code === "NOT_FOUND") return t("The request no longer exists.");

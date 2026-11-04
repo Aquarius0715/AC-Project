@@ -4,7 +4,7 @@
 // the server loader and the client view; Vitest covers it. Texts in the display language (`i` / `t`, IR291): a breach
 // is phrased from its kind and its response minutes, and the targets' start times are instants in the display time
 // zone, as typed (NFR-08).
-import { EN, showDate, showTime, translator, zonedParts, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, showDate, showTime, translator, zonedParts, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { planLabel } from "@ac/web/lib/contracts";
 import { csvQuoted } from "@ac/web/lib/csv";
@@ -38,7 +38,7 @@ function targetText(values: number[], t: T): string {
   return u.length === 0 ? t("no target") : (u.length === 1 ? t("target {n} %", { n: u[0] }) : t("targets {from}–{to} % by plan", { from: u[0], to: u[u.length - 1] }));
 }
 /** The plan type's name in the user's language. */
-const planName = (plan: string, t: T) => (planLabel[plan as PlanType] ? t(planLabel[plan as PlanType]) : plan);
+const planName = (plan: string, t: T) => (textOf(planLabel, plan, t) ?? plan);
 
 /** The KPI tiles (Figma 06-10) with the targets of the plan types of the customers in the scorecard; no data is “—”. */
 export function slaTiles(sc: ApiScorecard, t: T = en): { label: string; value: string; icon?: IconName; sub: string; tone?: "warn" | "crit" }[] {
@@ -85,13 +85,13 @@ export function breachText(b: ApiBreach, t: T = en): string {
     return b.tookMinutes == null ? t("no response within {limit}", { limit: duration(b.limitMinutes, t) }) : t("response {took} vs {limit}", { took: duration(b.tookMinutes, t), limit: duration(b.limitMinutes, t) });
   }
   const fixed: Record<string, string> = { arrival: "arrival outside the scheduled window", first_time_fix: "not fixed the first time", overdue: "open past its due time" };
-  return fixed[b.kind] ? t(fixed[b.kind]) : b.detail;
+  return textOf(fixed, b.kind, t) ?? b.detail;
 }
 const KIND: Record<string, string> = { response: "Response", arrival: "Arrival", first_time_fix: "First-time fix", overdue: "Overdue" };
 const breachTone = (kind: string): Tone => (kind === "overdue" ? "crit" : "warn");
 /** The recent breaches (newest first, at most 50) with the customer and Open job →. */
 export const breachRows = (sc: ApiScorecard, names: Map<string, string>, t: T = en) =>
-  sc.breaches.map((b, i) => ({ key: `${b.jobId}:${b.kind}:${String(i)}`, jobId: b.jobId, short: b.jobId.slice(0, 8), text: `${names.get(b.customerId) ?? t("customer")} · ${breachText(b, t)}`, kind: KIND[b.kind] ? t(KIND[b.kind]) : b.kind, tone: breachTone(b.kind) }));
+  sc.breaches.map((b, i) => ({ key: `${b.jobId}:${b.kind}:${String(i)}`, jobId: b.jobId, short: b.jobId.slice(0, 8), text: `${names.get(b.customerId) ?? t("customer")} · ${breachText(b, t)}`, kind: textOf(KIND, b.kind, t) ?? b.kind, tone: breachTone(b.kind) }));
 
 /** The targets per plan type for the edit dialog: the one in effect (or the default) and a scheduled one, if any. */
 export function targetsByPlan(targets: ApiTargetView[], i: I18n = EN) {
@@ -135,7 +135,7 @@ export function slaCsv(rows: SlaRow[], period: { from: string; to: string }, i: 
 /** Readable refusals of sla.saveTargets. */
 export function slaRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null }, t: T = en): string {
   const keys: Record<string, string> = { "errors.targets_exist": "targets for this plan already start at that time", "error.past": "must be now or later", "error.range": "out of range", "error.invalid": "not a valid value", "error.required": "required" };
-  const word = (k: string) => (keys[k] ? t(keys[k]) : k);
+  const word = (k: string) => (textOf(keys, k, t) ?? k);
   const fields = Object.entries(f.fieldErrors ?? {}).map(([k, v]) => `${k}: ${word(v)}`);
   if (fields.length > 0) return fields.join(" · ");
   if (keys[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved: {reason}.", { reason: word(f.messageKey) }) : `${word(f.messageKey)}.`;

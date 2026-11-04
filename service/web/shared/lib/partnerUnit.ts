@@ -3,7 +3,7 @@
 // evidence, the latest readings and the last 24 hours of two diagnosis metrics — read only, no control — and, after
 // the delegation, the job's history snapshot. Pure code shared by the server loader and the view; Vitest covers it.
 // Texts in the display language (`t` / `i`, IR280); every time in the user's display time zone (IR44).
-import { EN, showClock, showDate, showSpan, showTime, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, showClock, showDate, showSpan, showTime, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { evidenceText } from "@ac/web/lib/evidence";
 import { alertTitle, type ApiAlert } from "@ac/web/lib/alerts";
 import { metricLabel } from "@ac/web/lib/adminAlerts";
@@ -24,7 +24,7 @@ const QUALITY: Record<string, { text: string; tone?: "warn" | "crit" }> = { vali
 const EVIDENCE: Record<string, string> = { inferred: "Suspected", inspection: "Inspection record", demo_observation: "Observed (demo)" };
 /** The diagnosis metrics a chart shows first, in order (Figma: vibration and refrigerant pressure). */
 export const CHART_METRICS: Metric[] = ["vibration", "refrigerant_pressure", "temperature", "humidity", "power"];
-const label = (metric: string, t: T) => (metricLabel[metric] ? t(metricLabel[metric]) : metric.replaceAll('_', " "));
+const label = (metric: string, t: T) => (textOf(metricLabel, metric, t) ?? metric.replaceAll('_', " "));
 
 /** The unit register (Figma: location, model, maintenance scope; the connection — a badge — and the last seen time). */
 export function registerRows(d: ApiUnitDetail, i: I18n = EN): { connection: ApiUnitDetail["connection"]; rows: [string, string][]; lastSeen: string } {
@@ -33,7 +33,7 @@ export function registerRows(d: ApiUnitDetail, i: I18n = EN): { connection: ApiU
     connection: d.connection, lastSeen: showTime(d.lastSeenAt, display),
     rows: [
       [t("Location"), d.location.pathLabels.join(" › ") || "—"], [t("Model"), `${d.capabilities.manufacturer} ${d.capabilities.model}`],
-      [t("Maintenance scope"), d.serviceScope.map((s) => (SCOPE[s] ? t(SCOPE[s]) : s)).join(" · ") || "—"],
+      [t("Maintenance scope"), d.serviceScope.map((s) => (textOf(SCOPE, s, t) ?? s)).join(" · ") || "—"],
     ],
   };
 }

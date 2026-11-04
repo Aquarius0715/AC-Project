@@ -1,7 +1,7 @@
 // Energy analysis (FR-A13, FR-C06, DATA_SOURCE=API): energy.summary and baselines projected for the screens, with the
 // IR68 savings wording and the IR44 number rules. Pure code shared by Server Components and client views; texts in the
 // display language (`t` / `i`, IR265). Numbers keep the en-MY format, which ms-MY shares.
-import { EN, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import type { OpInput } from "@ac/web/lib/opTypes";
 
 const en = translator("en");
@@ -77,13 +77,13 @@ const warningText: Record<string, string> = {
   factor_missing: "Emission factor missing — emissions cannot be calculated",
   boundary_mismatch: "Boundary differs from the baseline",
 };
-export const warning = (code: string, t: T = en) => (warningText[code] ? t(warningText[code]) : code);
+export const warning = (code: string, t: T = en) => (textOf(warningText, code, t) ?? code);
 // The same warnings in a few words, for a badge; a code without a label still reads as words (IR577)
 const warningShortText: Record<string, string> = {
   partial_coverage: "Partial coverage", baseline_not_comparable: "Baseline not comparable", modeled_baseline: "Modeled baseline", prorated_modeled_baseline: "Prorated baseline",
   prorated_forecast: "Prorated forecast", factor_missing: "Emission factor missing", boundary_mismatch: "Boundary differs", baseline_unavailable: "Baseline not set", no_units: "No target equipment",
 };
-export const warningShort = (code: string, t: T = en) => (warningShortText[code] ? t(warningShortText[code]) : code.replaceAll('_', " "));
+export const warningShort = (code: string, t: T = en) => (textOf(warningShortText, code, t) ?? code.replaceAll('_', " "));
 
 export interface SummaryView {
   actual: string; baseline: string; difference: string; percent: string; cost: string; savedCost: string; emissions: string; savedEmissions: string;

@@ -7,7 +7,7 @@ import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { focusField } from "@ac/web/lib/focusField";
 import { metricUnit, type Metric } from "@ac/web/lib/devices";
-import { zonedInstant, type T } from "@ac/web/lib/i18n";
+import { zonedInstant, type T, textOf } from "@ac/web/lib/i18n";
 import { typeLabel } from "@ac/web/lib/partnerJobDetail";
 import { actionMessage, fieldErrorTexts, type ActionFailure } from "@ac/web/lib/actionMessage";
 import {
@@ -43,7 +43,7 @@ const FORBIDDEN: Record<string, string> = {
 const refusal = (f: ActionFailure, t: T): string => {
   return f.messageKey === "errors.report_version_changed" || f.messageKey === "error.versionConflict" ? t("The report or job changed elsewhere; reload the page to continue from the latest version.")
     : f.code === "CONFLICT" ? t("The job is not in a state that allows this (on hold, submitted or cancelled); the page shows the latest state.")
-    : f.code === "FORBIDDEN" ? t("Not allowed: {reason}.", { reason: FORBIDDEN[f.messageKey] ? t(FORBIDDEN[f.messageKey]) : f.messageKey.replace(/^errors?\./, "").replaceAll('_', " ") })
+    : f.code === "FORBIDDEN" ? t("Not allowed: {reason}.", { reason: textOf(FORBIDDEN, f.messageKey, t) ?? f.messageKey.replace(/^errors?\./, "").replaceAll('_', " ") })
     : f.code === "UNAVAILABLE" ? t("Not sent; your draft is kept on this page. Try again.") : actionMessage(f, t);
 }; // field errors, the write limit's wait and other codes (IR380)
 const LEAK: Record<string, string> = { pass: "passed", fail: "failed", not_done: "not done" };
@@ -155,7 +155,7 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
   const head = (
     <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
       <Link href="/technician" className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Overview")}</Link>
-      <h2 id="job-title" tabIndex={-1} className="rounded font-bold text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring/50">{job.id.slice(0, 8)} · {live.unitName ?? t("Unit")} — {statusText[job.status] ? t(statusText[job.status]) : job.status}</h2>
+      <h2 id="job-title" tabIndex={-1} className="rounded font-bold text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring/50">{job.id.slice(0, 8)} · {live.unitName ?? t("Unit")} — {textOf(statusText, job.status, t) ?? job.status}</h2>
       {dirty && <Badge tone="warn">{t("Unsaved changes")}</Badge>}
     </div>
   );
@@ -222,7 +222,7 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
       {job.status === "completed" && <Banner tone="ok">{t("Accepted — the job is completed and the report is visible to the customer.")}</Banner>}
       {job.status === "rework_requested" && <Banner tone="warn" action={<Btn size="sm" variant="primary" disabled={pending || win.phase === "ended"} onClick={() => { run(() => resumeRework(job.id, job.version), t("Rework resumed — continue in the new draft"), () => { remountFocus = { jobId: job.id, id: "job-title" }; }, failed); }}>{t("Resume rework")}</Btn>}>{live.report?.reviewHistory.at(-1)?.reason ? t("Returned for rework — “{reason}”. Resume to continue as a new draft version; the returned version stays as it was.", { reason: live.report.reviewHistory.at(-1)!.reason! }) : t("Returned for rework. Resume to continue as a new draft version; the returned version stays as it was.")}</Banner>}
       {isInWork && win.phase === "ended" && <Banner tone="crit">{t("The work window ended — unsaved input was discarded and the job can no longer be edited. Ask your coordinator.")}</Banner>}
-      {live.reportRefused && <Banner tone="warn">{t("The report is not readable now ({reason}).", { reason: FORBIDDEN[live.reportRefused] ? t(FORBIDDEN[live.reportRefused]) : live.reportRefused.replace(/^errors?\./, "").replaceAll('_', " ") })}</Banner>}
+      {live.reportRefused && <Banner tone="warn">{t("The report is not readable now ({reason}).", { reason: textOf(FORBIDDEN, live.reportRefused, t) ?? live.reportRefused.replace(/^errors?\./, "").replaceAll('_', " ") })}</Banner>}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-4 xl:col-span-2">
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

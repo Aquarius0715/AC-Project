@@ -11,7 +11,7 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePermissions, CoreError } from "@ac/web/lib/dal";
 import { klStamp } from "@ac/web/lib/energy";
-import { i18nOf, relativeTime, showDate, type I18n } from "@ac/web/lib/i18n";
+import { i18nOf, relativeTime, showDate, type I18n, textOf } from "@ac/web/lib/i18n";
 import { businessDay } from "@ac/web/lib/clientBilling";
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import { metricLabel } from "@ac/web/lib/adminAlerts";
@@ -24,6 +24,7 @@ import {
 } from "@ac/web/lib/assets";
 import { UnitsDemo } from "./_components/units-demo";
 import { UnitsView, type CustomerLive, type UnitLive, type UnitsLive } from "./_components/units-view";
+import { queryReader } from "@ac/web/lib/searchParams";
 
 interface Audit { occurredAt: string; actorId: string; reason: string | null }
 interface JobForClaim { projection: "detail"; id: string; version: number; type: string; unitId: string; completedAt: string | null; costs: { kind: "estimate" | "actual"; amountMinor: number; currency: Currency }[]; reportRefs: { reportId: string; reportVersion: number }[] }
@@ -38,7 +39,7 @@ export default async function AdminUnitsPage({ searchParams }: Readonly<PageProp
   await connection();
   if (!apiMode()) return <UnitsDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
+  const one = queryReader(sp);
   const [now, perms, display] = await Promise.all([coreNow(), corePermissions(), coreDisplay()]);
   const i = i18nOf(display);
   const { t } = i;
@@ -173,7 +174,7 @@ async function unitLive(d: ApiUnitDetail, x: Ctx): Promise<UnitLive> {
     ...d.alertPolicyIds.map((id) => {
       const p = byId.get(id);
       const metric = p?.metric ?? "";
-      return { id, kind: "alert" as const, name: p?.name ?? id.slice(0, 8), type: metricLabel[metric] ? t(metricLabel[metric]) : metric, condition: p ? conditionText(p, x.i) : t("policy outside this view"), madeBy: p ? t("Made by {name}", { name: x.memberName.get(p.ownerMembershipId) ?? x.customerName }) : "", on: p && !p.enabled ? t("Off") : "" };
+      return { id, kind: "alert" as const, name: p?.name ?? id.slice(0, 8), type: textOf(metricLabel, metric, t) ?? metric, condition: p ? conditionText(p, x.i) : t("policy outside this view"), madeBy: p ? t("Made by {name}", { name: x.memberName.get(p.ownerMembershipId) ?? x.customerName }) : "", on: p && !p.enabled ? t("Off") : "" };
     }),
   ];
   return {

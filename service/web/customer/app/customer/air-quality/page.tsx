@@ -18,6 +18,7 @@ import {
 import { AirQualityDemo } from "./_components/air-quality-demo";
 import { AirQualityView, type AirLive } from "./_components/air-quality-view";
 import type { OpInput } from "@ac/web/lib/opTypes";
+import { queryReader } from "@ac/web/lib/searchParams";
 
 /** telemetry.series of one unit over the window, whole: the chart's slots — 5-minute averages for an hour or a day, hourly
 for 7 days — of the valid readings, with how many readings the window holds (IR605, IR607). */
@@ -31,7 +32,7 @@ export default async function CustomerAirQualityPage({ searchParams }: Readonly<
   await connection();
   if (!apiMode()) return <AirQualityDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
+  const one = queryReader(sp);
   const [me, now, properties, spaces, units, display] = await Promise.all([
     corePrincipal(), coreNow(), coreAll<ApiPropertyRow>("properties.list"), coreAll<ApiSpaceRow>("spaces.list"), coreAll<ApiUnitRow>("units.list"), coreDisplay(),
   ]);

@@ -16,6 +16,7 @@ import { i18nOf } from "@ac/web/lib/i18n";
 import type { ApiAlertLite } from "@ac/web/lib/techDevices";
 import { withAccess } from "@ac/web/lib/withAccess";
 import { AuditView, type AuditLive } from "./_components/audit-view";
+import { queryReader } from "@ac/web/lib/searchParams";
 
 interface Device { id: string; serial: string; unitId: string | null }
 // a part the session may not read (FORBIDDEN, NOT_FOUND) is left out; UNAVAILABLE and TIMEOUT still fail the page
@@ -36,7 +37,7 @@ async function AdminAuditPageContent({ searchParams }: Readonly<PageProps<"/admi
   await connection();
   if (!apiMode()) return <AuditView />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
+  const one = queryReader(sp);
   const [now, display] = await Promise.all([coreNow(), coreDisplay()]);
   const i = i18nOf(display), zone = display.timeZone;
   const filters = auditFilters(sp, now, zone);

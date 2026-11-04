@@ -2,7 +2,7 @@
 // the evidence check of DD-P05 step 2, the version / alert rows and the IR31 review availability. Pure code shared by
 // the Server Component and the client view. Texts in the display language (`t` / `i`) and times in the user's display
 // time zone, formatted by the loader on the server (IR274).
-import { EN, showSpan, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, showSpan, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { evidenceText } from "@ac/web/lib/evidence";
 
 const en = translator("en");
@@ -71,7 +71,7 @@ export function inspectionRows(items: ApiInspectionItem[], t: T = en, attachment
   const names = new Map(attachments.map((a) => [a.id, a.name]));
   return [...items].toSorted((a, b) => order[a.componentGroup] - order[b.componentGroup]).map((it) => {
     return {
-      id: it.id, label: `${t(groupLabel[it.componentGroup])} — ${componentLabel[it.componentKey] ? t(componentLabel[it.componentKey]) : it.componentKey.replaceAll('_', " ")}`, result: it.result, reason: it.reason,
+      id: it.id, label: `${t(groupLabel[it.componentGroup])} — ${textOf(componentLabel, it.componentKey, t) ?? it.componentKey.replaceAll('_', " ")}`, result: it.result, reason: it.reason,
       photos: it.evidenceIds.map((id) => names.get(id) ?? id.slice(0, 8)),
     };
   });
@@ -85,8 +85,8 @@ const componentShort: Record<string, string> = { filter: "filter", refrigerant_p
 export function readingRows(ms: ApiReportMeasurement[], t: T = en): [string, string][] {
   const part = (key: string) => (componentShort[key] ?? componentLabel[key] ? t(componentShort[key] ?? componentLabel[key]) : key);
   return ms.map((m) => {
-    return [`${metricLabel[m.metric] ? t(metricLabel[m.metric]) : m.metric}${m.componentKey ? ` (${part(m.componentKey)})` : ""}`,
-      m.value === null ? t("no value") : `${String(m.value)} ${m.unit} · ${qualityNote[m.quality] ? t(qualityNote[m.quality]) : m.quality}${m.qualityReason ? ` (${m.qualityReason.replaceAll('_', " ")})` : ""}`];
+    return [`${textOf(metricLabel, m.metric, t) ?? m.metric}${m.componentKey ? ` (${part(m.componentKey)})` : ""}`,
+      m.value === null ? t("no value") : `${String(m.value)} ${m.unit} · ${textOf(qualityNote, m.quality, t) ?? m.quality}${m.qualityReason ? ` (${m.qualityReason.replaceAll('_', " ")})` : ""}`];
   });
 }
 /** “14 Sept, 9:05 – 11:40 am MYT (2 h 35 m)” from the job's time on site, in the display time zone (IR274). */
@@ -103,9 +103,9 @@ const partSource: Record<string, string> = { van_stock: "from van stock", hq_war
 const leakCheckText: Record<string, string> = { pass: "passed", fail: "failed", not_done: "not done" };
 /** Parts & refrigerant lines (Figma 03): “Filter × 1 · from van stock · replaces filter”. */
 export function partLines(parts: ApiPart[], refrigerant: ApiRefrigerant[], t: T = en): [string, string][] {
-  const code = (x: string, map: Record<string, string>) => (map[x] ? t(map[x]) : x.replaceAll('_', " "));
+  const code = (x: string, map: Record<string, string>) => (textOf(map, x, t) ?? x.replaceAll('_', " "));
   return [
-    ...parts.map((p): [string, string] => [`${p.name} × ${String(p.quantity)}`, [code(p.source, partSource), ...(p.replacesComponentKey ? [t("replaces {part}", { part: componentLabel[p.replacesComponentKey] ? t(componentLabel[p.replacesComponentKey]) : p.replacesComponentKey.replaceAll('_', " ") })] : [])].join(" · ")]),
+    ...parts.map((p): [string, string] => [`${p.name} × ${String(p.quantity)}`, [code(p.source, partSource), ...(p.replacesComponentKey ? [t("replaces {part}", { part: textOf(componentLabel, p.replacesComponentKey, t) ?? p.replacesComponentKey.replaceAll('_', " ") })] : [])].join(" · ")]),
     ...refrigerant.map((x): [string, string] => [t("{refrigerant} · cylinder {id}", { refrigerant: x.refrigerant, id: x.cylinderId }), t("recovered {recovered} kg · charged {charged} kg · leak check {check}", { recovered: x.recoveredKg, charged: x.chargedKg, check: code(x.leakCheck, leakCheckText) })]),
   ];
 }

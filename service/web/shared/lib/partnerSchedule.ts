@@ -5,7 +5,7 @@
 // Pure code shared by the server loader and the client view; Vitest covers it. Texts in the display language (`t` / `i`,
 // IR275): the loader formats the job's instants in the user's display time zone; the team's capacity — the free hours
 // and the week — stays on Kuala Lumpur working days and clock times, and the screen says so.
-import { EN, showSpan, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, showSpan, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { hhmm, onTeam, shortQualification, unavailabilityLabel, until, type ApiCapacity, type ApiMember, type ApiPartnerJob, type Slot } from "@ac/web/lib/partnerOverview";
 import { qualificationLabel, qualified, statusWord, type ApiDetail, type ApiOffer } from "@ac/web/lib/partnerJobDetail";
@@ -226,7 +226,7 @@ export function assignRefusal(f: { code: string; messageKey: string; fieldErrors
   }
   if (f.code === "NOT_FOUND") return t("The job is no longer delegated to your company.");
   if (f.code === "VALIDATION") {
-    return Object.entries(f.fieldErrors).map(([k, v]) => `${FIELDS[k] ? t(FIELDS[k]) : k}: ${FIELD_ERRORS[v] ? t(FIELD_ERRORS[v]) : v}`).join(" · ") || t("Check the input.");
+    return Object.entries(f.fieldErrors).map(([k, v]) => `${textOf(FIELDS, k, t) ?? k}: ${textOf(FIELD_ERRORS, v, t) ?? v}`).join(" · ") || t("Check the input.");
   }
   return actionMessage({ ...f, fieldErrors: {} }, t); // the write limit's wait and other codes (IR380)
 }

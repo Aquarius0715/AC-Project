@@ -5,7 +5,7 @@
 // Texts in the display language (`t` / `i`, IR281). Today and its 08:00–18:00 timeline are Kuala Lumpur, where the
 // work happens; a job's window and an alert's time are instants in the user's display time zone (IR44).
 import { klTime } from "@ac/web/lib/devices";
-import { EN, relativeTime, showSpan, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, relativeTime, showSpan, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { alertTitle, type ApiAlert } from "@ac/web/lib/alerts";
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { Slot } from "@ac/web/lib/partnerOverview";
@@ -128,7 +128,7 @@ export function alertRows(alerts: ApiAlert[], units: Map<string, string>, jobOfU
     const job = jobOfUnit.get(a.unitId);
     return {
       id: a.id, title: alertTitle(a, t), severity: a.severity, href: `/technician/units/${a.unitId}/alerts?${job ? `jobId=${job}&` : ""}alertId=${a.id}`,
-      sub: `${units.get(a.unitId) ?? t("unit")} · ${ALERT_STATE[a.status] ? t(ALERT_STATE[a.status]) : a.status} · ${showTime(a.detectedAt, display)}`,
+      sub: `${units.get(a.unitId) ?? t("unit")} · ${textOf(ALERT_STATE, a.status, t) ?? a.status} · ${showTime(a.detectedAt, display)}`,
     };
   });
 }

@@ -9,7 +9,7 @@
 import "server-only";
 import { evidenceText } from "@ac/web/lib/evidence";
 import { coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
-import { i18nOf, showTime } from "@ac/web/lib/i18n";
+import { i18nOf, showTime, textOf } from "@ac/web/lib/i18n";
 import { alertTitle } from "@ac/web/lib/alerts";
 import { jobEventTitle, type ApiJobEvent } from "@ac/web/lib/partnerOverview";
 import type { ApiWorkReport } from "@ac/web/lib/partnerReview";
@@ -134,7 +134,7 @@ export async function loadJobs(sp: SP) {
       preferred: preferredRows(job, eligible, nowMs, i),
       history: [...events].toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)).slice(0, 12).map((e) => {
         return {
-          id: e.id, at: showTime(e.occurredAt, i.display), text: `${jobEventTitle[e.action] ? t(jobEventTitle[e.action]) : e.action.replaceAll(/[._]/g, " ")}${e.actorUserId ? ` · ${byUser.get(e.actorUserId) ?? t("client")}` : ""}`,
+          id: e.id, at: showTime(e.occurredAt, i.display), text: `${textOf(jobEventTitle, e.action, t) ?? e.action.replaceAll(/[._]/g, " ")}${e.actorUserId ? ` · ${byUser.get(e.actorUserId) ?? t("client")}` : ""}`,
         };
       }),
       partnerTech: pp ? names.people.get(pp.technicianMembershipId) ?? t("technician") : null,

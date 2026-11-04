@@ -4,7 +4,7 @@
 // Texts in the display language (`t` / `i`, IR270). The periods and today's timeline are Kuala Lumpur days and hours;
 // deadlines, starts and the activity are instants in the user's display time zone (IR44).
 import { klTime } from "@ac/web/lib/devices";
-import { EN, intlTag, relativeTime, showTime, translator, type I18n, type Locale, type T } from "@ac/web/lib/i18n";
+import { EN, intlTag, relativeTime, showTime, translator, type I18n, type Locale, type T, textOf } from "@ac/web/lib/i18n";
 
 const en = translator("en");
 
@@ -74,7 +74,7 @@ export function periodChoice(p: { from: string; to: string; label: string }, now
   const week = weekOf(nowIso);
   const range = (q: { from: string; to: string }) => `${klDay(q.from, locale)} – ${klDay(q.to, locale)}`;
   return {
-    period: { value: `${p.from}|${p.to}`, custom: p.label === "Period", text: periodWord[p.label] ? t(periodWord[p.label]) : range(p), label: range(p) },
+    period: { value: `${p.from}|${p.to}`, custom: p.label === "Period", text: textOf(periodWord, p.label, t) ?? range(p), label: range(p) },
     periods: [{ label: "Last week", ...shift(week, -7) }, { label: "This week", ...week }, { label: "Next week", ...shift(week, 7) }]
       .map((o) => ({ value: `${o.from}|${o.to}`, label: `${t(o.label)} (${range(o)})` })),
   };
@@ -123,7 +123,7 @@ export function bucket(j: PartnerJob, now: number): Bucket {
 }
 
 const typeText: Record<string, string> = { periodic: "Periodic inspection", reactive: "Repair", preventive: "Preventive maintenance" };
-const label = (j: PartnerJob, t: T = en) => [j.short, j.unit ?? j.address ?? (typeText[j.type] ? t(typeText[j.type]) : j.type)].filter(Boolean).join(" · ");
+const label = (j: PartnerJob, t: T = en) => [j.short, j.unit ?? j.address ?? (textOf(typeText, j.type, t) ?? j.type)].filter(Boolean).join(" · ");
 export const hhmm = (iso: string) => klTime(iso).slice(11);
 /** "15 h", "3 d 8 h" or "45 min" until an instant (negative → "ended"), in the display language. */
 export function until(iso: string, now: number, t: T = en): string {
@@ -209,10 +209,10 @@ export function timelinePct(iso: string, date: string): number {
 
 const SHORT_QUALIFICATIONS: Record<string, string> = { demo_indoor: "Indoor", demo_outdoor: "Outdoor", demo_electrical: "Electrical" };
 /** A qualification in a compact list (“Indoor, Electrical”); an unknown code reads as its words. */
-export const shortQualification = (code: string, t: T = en) => (SHORT_QUALIFICATIONS[code] ? t(SHORT_QUALIFICATIONS[code]) : code.replace(/^demo_/, "").replaceAll('_', " "));
+export const shortQualification = (code: string, t: T = en) => (textOf(SHORT_QUALIFICATIONS, code, t) ?? code.replace(/^demo_/, "").replaceAll('_', " "));
 const UNAVAILABILITY: Record<string, string> = { annual_leave: "annual leave", sick: "sick leave", training: "training", public_holiday: "public holiday", other: "other" };
 /** Why a technician is unavailable on a day (the members.setUnavailability types), in running text. */
-export const unavailabilityLabel = (type: string, t: T = en) => (UNAVAILABILITY[type] ? t(UNAVAILABILITY[type]) : type.replaceAll('_', " "));
+export const unavailabilityLabel = (type: string, t: T = en) => (textOf(UNAVAILABILITY, type, t) ?? type.replaceAll('_', " "));
 
 /** The technicians who can still work: access neither revoked by HQ nor past its end (IR575). The overview's timeline
 and capacity list them; a former technician stays in Team & capacity and in job history. */
@@ -280,7 +280,7 @@ export function activity(events: ApiJobEvent[], jobs: Map<string, PartnerJob>, m
   return [...events].toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || b.id.localeCompare(a.id)).slice(0, max).map((e) => {
     const j = jobs.get(e.jobId);
     const who = e.actorUserId ? byUser.get(e.actorUserId) : null;
-    const title = jobEventTitle[e.action] ? t(jobEventTitle[e.action]) : e.action.replaceAll(/[._]/g, " ");
+    const title = textOf(jobEventTitle, e.action, t) ?? e.action.replaceAll(/[._]/g, " ");
     return { id: e.id, time: relativeTime(e.occurredAt, now, i), text: `${title} — ${j ? label(j, t) : e.jobId.slice(0, 8)}${who ? ` (${who})` : ""}`, href: `/partner/history?jobId=${e.jobId}` };
   });
 }

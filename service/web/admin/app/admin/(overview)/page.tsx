@@ -11,6 +11,7 @@ import { asOfText, type AdminSummary } from "@ac/web/lib/adminSummary";
 import { NeedsAccess } from "@ac/web/components/NeedsAccess";
 import { AdminOverviewDemo } from "./_components/overview-demo";
 import { AdminOverviewView } from "./_components/overview-view";
+import { queryReader } from "@ac/web/lib/searchParams";
 
 const quiet = <T,>(p: Promise<T>) => p.catch((error) => { if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return null; throw error; });
 
@@ -18,7 +19,7 @@ export default async function AdminOverviewPage({ searchParams }: Readonly<PageP
   await connection();
   if (!apiMode()) return <AdminOverviewDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
+  const one = queryReader(sp);
   const kind = (periodKinds.find((k) => k === one("period")) ?? "today");
   const [now, display] = await Promise.all([coreNow(), coreDisplay()]);
   const i = i18nOf(display);

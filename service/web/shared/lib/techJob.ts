@@ -4,7 +4,7 @@
 // language (`t`, IR282); instants through a formatter (`Fmt`) that reads the loader's server-formatted strings, so the
 // first render matches the server's, and formats in the browser only what appears after the page loaded.
 import { metricUnit, type Metric } from "@ac/web/lib/devices";
-import { EN, showClock, showDate, showSpan, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, showClock, showDate, showSpan, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { businessDay } from "@ac/web/lib/clientBilling";
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { OpInput } from "@ac/web/lib/opTypes";
@@ -146,7 +146,7 @@ export function submitIssues(d: Draft, attachments: { id: string; name: string; 
   if (n < 10 || n > 4000) out.push({ key: null, group: null, text: t("Work performed must be 10–4000 characters") });
   if (d.nextAction.kind === "follow_up" && (!d.nextAction.date || Date.parse(d.nextAction.date) <= now || !d.nextAction.note.trim())) out.push({ key: null, group: null, text: t("A follow-up needs a future date and a note") });
   for (const [k, p] of d.parts.entries()) { if (p.quantity < 1 || p.quantity > 999) out.push({ key: null, group: null, text: t("Part {n} ({name}) needs a quantity of 1–999", { n: k + 1, name: p.name || t("unnamed") }) }); }
-  for (const a of attachments.filter((x) => d.attachmentIds.includes(x.id) && x.status !== "ready")) out.push({ key: null, group: null, text: t("Photo {name} is {state} — remove or retry it", { name: a.name, state: PHOTO_STATE[a.status] ? t(PHOTO_STATE[a.status]) : a.status }) });
+  for (const a of attachments.filter((x) => d.attachmentIds.includes(x.id) && x.status !== "ready")) out.push({ key: null, group: null, text: t("Photo {name} is {state} — remove or retry it", { name: a.name, state: textOf(PHOTO_STATE, a.status, t) ?? a.status }) });
   return out;
 }
 

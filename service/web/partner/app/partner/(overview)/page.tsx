@@ -6,11 +6,12 @@ import { apiMode } from "@ac/web/lib/dal";
 import { OverviewDemo } from "./_components/overview-demo";
 import { OverviewView } from "./_components/overview-view";
 import { loadOverview } from "./_lib/load";
+import { queryReader } from "@ac/web/lib/searchParams";
 
 export default async function PartnerOverviewPage({ searchParams }: Readonly<PageProps<"/partner">>) {
   await connection();
   if (!apiMode()) return <OverviewDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
+  const one = queryReader(sp);
   return <OverviewView live={await loadOverview({ from: one("from"), to: one("to") })} />;
 }

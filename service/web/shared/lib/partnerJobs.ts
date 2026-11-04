@@ -3,7 +3,7 @@
 // slot or deadline and the status badge; rows open the offer, the job detail, the schedule or the quality review.
 // Pure code shared by the server loader and the client view; Vitest covers it. Rows in the display language with the
 // slots and deadlines in the user's display time zone (IR271).
-import { EN, showSpan, showTime, type I18n } from "@ac/web/lib/i18n";
+import { EN, showSpan, showTime, type I18n, textOf } from "@ac/web/lib/i18n";
 import { bucket, partnerJob, until, type ApiPartnerJob, type Slot } from "@ac/web/lib/partnerOverview";
 import type { OpInput } from "@ac/web/lib/opTypes";
 
@@ -48,7 +48,7 @@ const historyStatus: Record<string, string> = { completed: "Completed", cancelle
 export function jobRow(raw: ApiPartnerJob, now: number, units: Map<string, string>, names: Map<string, string>, i: I18n = EN): JobRow {
   const { t, display } = i;
   const j = partnerJob(raw, units);
-  const typeLabel = (type: string) => (typeText[type] ? t(typeText[type]) : type);
+  const typeLabel = (type: string) => (textOf(typeText, type, t) ?? type);
   const span = (x: Slot) => showSpan(x.startAt, x.endAt, display);
   const at = (iso: string) => showTime(iso, display);
   const place = j.unit ?? j.address ?? typeLabel(j.type);
@@ -86,7 +86,7 @@ export function jobRow(raw: ApiPartnerJob, now: number, units: Map<string, strin
     };
   }
   if (raw.projection === "history") {
-    const status = historyStatus[raw.status] ? t(historyStatus[raw.status]) : raw.status.replaceAll('_', " ");
+    const status = textOf(historyStatus, raw.status, t) ?? raw.status.replaceAll('_', " ");
     return {
       id: j.id,
       origin: null,

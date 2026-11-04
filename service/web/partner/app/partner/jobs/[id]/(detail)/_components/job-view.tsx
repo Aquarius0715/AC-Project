@@ -7,7 +7,7 @@ import { OriginBadge } from "@ac/web/components/JobBits";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { alertTitle } from "@ac/web/lib/alerts";
-import { zonedInstant } from "@ac/web/lib/i18n";
+import { zonedInstant, textOf } from "@ac/web/lib/i18n";
 import { decisionRefusal, originLabel, qualificationLabel, typeLabel, type ApiDetail, type ApiOffer, type FitRow } from "@ac/web/lib/partnerJobDetail";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { acceptOffer, declineOffer, proposeSlot, withdrawProposal } from "../actions";
@@ -29,7 +29,7 @@ export function JobDetailView({ live }: Readonly<{ live: JobDetailLive }>) {
   if (live.kind === "offer") return <OfferView live={live} />;
   if (live.kind === "detail") return <DetailView live={live} />;
   const h = live.job;
-  const status = statusWord[h.status] ? t(statusWord[h.status]) : h.status.replaceAll('_', " ");
+  const status = textOf(statusWord, h.status, t) ?? h.status.replaceAll('_', " ");
   return (
     <Page narrow>
       <Crumb text={t("{id} · history", { id: h.jobId.slice(0, 8) })} />
@@ -171,8 +171,8 @@ function DetailView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "d
   const isSettled = j.status === "submitted" || j.status === "completed" || j.status === "cancelled"; // the work is done: no technician to find any more
   const reading = u?.latestMeasurements?.find((m) => m.value !== null);
   const isNeedsTech = j.status === "accepted" || (j.assignment?.acknowledgement === "cant_make") || (!!j.assignment && Date.parse(j.assignment.scheduledEnd) <= now && (j.status === "assigned" || j.status === "in_progress"));
-  const status = statusWord[j.status] ? t(statusWord[j.status]) : j.status.replaceAll('_', " ");
-  const connection = u ? (connectionWord[u.connection] ? t(connectionWord[u.connection]) : u.connection) : "";
+  const status = textOf(statusWord, j.status, t) ?? j.status.replaceAll('_', " ");
+  const connection = u ? (textOf(connectionWord, u.connection, t) ?? u.connection) : "";
   return (
     <Page>
       <Crumb text={`${short} · ${u?.displayName ?? typeLabel(j.type, t)}`} />
@@ -210,7 +210,7 @@ function DetailView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "d
                   <SummaryList items={[
                     [t("Open alerts"), live.alerts.length > 0 ? <span key="a" className="text-crit">{live.alerts.length} · {alertTitle(live.alerts[0], t)}</span> : t("none")],
                     [t("Last reading"), reading ? `${reading.metric.replaceAll('_', " ")} ${String(reading.value ?? "—")} ${reading.unit}` : "—"],
-                    [t("Maintenance scope"), u.serviceScope.map((s) => (scopeLabel[s] ? t(scopeLabel[s]) : s)).join(" · ")],
+                    [t("Maintenance scope"), u.serviceScope.map((s) => (textOf(scopeLabel, s, t) ?? s)).join(" · ")],
                   ]} />
                 </div>
                 {live.alerts.map((a) => <div key={a.id} className="mt-2"><Banner tone={a.severity === "critical" ? "crit" : "warn"}>{t("{alert} — raised {time} · linked to this job. Completing the job does not resolve the alert.", { alert: alertTitle(a, t), time: x.raised[a.id] ?? "" })}</Banner></div>)}

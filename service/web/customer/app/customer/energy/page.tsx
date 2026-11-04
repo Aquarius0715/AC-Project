@@ -13,6 +13,7 @@ import { klLocal, summaryView, type ApiBaseline, type ApiEnergySummary } from "@
 import { baselineLabel, baselinesFor, compareRow, dayRanges, periodKinds, periodRange, pickUnits, selectionQuery } from "@ac/web/lib/clientEnergy";
 import { EnergyDemo } from "./_components/energy-demo";
 import { EnergyView, type EnergyLive } from "./_components/energy-view";
+import { queryReader } from "@ac/web/lib/searchParams";
 
 
 export default async function CustomerEnergyPage({ searchParams }: Readonly<PageProps<"/customer/energy">>) {
@@ -21,7 +22,7 @@ export default async function CustomerEnergyPage({ searchParams }: Readonly<Page
   await connection();
   if (!apiMode()) return <EnergyDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
+  const one = queryReader(sp);
   const [now, units, baselines, properties, prefs, display] = await Promise.all([
     coreNow(), coreAll<Unit>("units.list"), coreAll<ApiBaseline>("baselines.list"), coreAll<{ id: string; name: string }>("properties.list"),
     coreOp<Preferences>("preferences.get", {}).catch(() => null), coreDisplay(),

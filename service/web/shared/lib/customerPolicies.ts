@@ -5,7 +5,7 @@
 // kept on edit, IR120). Pure code shared by the Server Component and the client view; texts in the display language
 // (`t` / `i`, IR261).
 import { metricUnit, opSymbol, recoveryError, type Channel, type Operator, type Severity } from "@ac/web/lib/adminAlerts";
-import { EN, showDate, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, showDate, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { Metric as ContractMetric } from "@ac/web/lib/contracts.gen";
 import { byNumber } from "@ac/web/lib/order";
@@ -45,7 +45,7 @@ export function conditionText(c: { metric: string; operator: Operator; threshold
   if (c.metric === "heartbeat_gap") return t("No heartbeat for {n} min", { n: c.threshold });
   const unit = metricUnit[c.metric] ?? "";
   const value = unit === "%" || unit === "cycles/h" ? `${String(c.threshold)}${unit === "%" ? " %" : " cycles / h"}` : `${String(c.threshold)}${unit ? ` ${unit}` : ""}`;
-  return t("{metric} {op} {value} for {duration}", { metric: label[c.metric] ? t(label[c.metric]) : c.metric, op: opSymbol[c.operator], duration: durationText(c.durationSeconds), value });
+  return t("{metric} {op} {value} for {duration}", { metric: textOf(label, c.metric, t) ?? c.metric, op: opSymbol[c.operator], duration: durationText(c.durationSeconds), value });
 }
 /** “on weekdays”, “on weekends”, “on Mon, Wed”, or "" for every day. */
 const daysText = (weekdays: number[], t: T) => {
@@ -68,7 +68,7 @@ export function defaultRuleRows(p: ApiDefaultPolicy, customerId: string | null, 
   const mine = new Map(p.ruleSettings.filter((s) => s.customerId === customerId).map((s) => [s.ruleKey, s]));
   const rows = p.rules.map((r) => {
     const s = mine.get(r.ruleKey);
-    return { ruleKey: r.ruleKey, name: r.name, condition: conditionText(r, t), category: r.category, type: categoryText[r.category] ? t(categoryText[r.category]) : r.category, severity: r.severity, enabled: s?.enabled ?? true, version: s?.version ?? 0 };
+    return { ruleKey: r.ruleKey, name: r.name, condition: conditionText(r, t), category: r.category, type: textOf(categoryText, r.category, t) ?? r.category, severity: r.severity, enabled: s?.enabled ?? true, version: s?.version ?? 0 };
   });
   const notes = rows.filter((r) => !r.enabled).map((r) => {
     const s = mine.get(r.ruleKey)!;
@@ -143,7 +143,7 @@ export function summaryText(f: PolicyForm, t: T = en): string {
   const s = seconds(f);
   const d = f.windowOn && f.weekdays.length > 0 ? daysText(f.weekdays, t) : "";
   const win = f.windowOn && f.weekdays.length > 0 ? ` ${d ? `${d} ` : ""}${f.start}–${f.end}` : "";
-  const what = f.metric === "co2" || f.metric === "pm25" ? label[f.metric] : (label[f.metric] ? t(label[f.metric]) : f.metric).toLowerCase();
+  const what = f.metric === "co2" || f.metric === "pm25" ? label[f.metric] : (textOf(label, f.metric, t) ?? f.metric).toLowerCase();
   const isUp = f.operator === "gt" || f.operator === "gte";
   return t(isUp ? "{verb} when {what} stays {op} {value} {unit} for {duration}{window}. Clears below {recovery} {unit}." : "{verb} when {what} stays {op} {value} {unit} for {duration}{window}. Clears above {recovery} {unit}.",
     { verb, what, unit, op: opSymbol[f.operator], value: f.threshold || "…", duration: s === null ? "…" : durationText(s), window: win, recovery: f.recovery || "…" }).replaceAll(/ +/g, " ");

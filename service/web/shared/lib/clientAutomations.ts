@@ -1,7 +1,7 @@
 // Customer automations & schedules (FR-C04, FR-C05, DATA_SOURCE=API): the rule cards of the list (Figma Client 03a,
 // 03d, 03f, 03i), the editor draft with its automations.save input and checks (03b, 03e), the schedule preview and the
 // event test (03c), and the location consent card. Pure code shared by the Server Component and the client view.
-import { EN, intlTag, showDate, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, intlTag, showDate, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import type { UnitAction } from "@ac/web/lib/contracts.gen";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { IconName } from "@ac/web/components/Icon";
@@ -63,9 +63,9 @@ export function actionLabel(a: UnitAction, t: T = en): string {
     }
     case "set_temperature": { return t("Set temperature {celsius}°C", { celsius: a.celsius });
     }
-    case "set_mode": { return t("Mode {mode}", { mode: modeWord[a.mode] ? t(modeWord[a.mode]) : cap(a.mode) });
+    case "set_mode": { return t("Mode {mode}", { mode: textOf(modeWord, a.mode, t) ?? cap(a.mode) });
     }
-    case "set_fan": { return t("Fan {level}", { level: fanWord[a.fanLevel] ? t(fanWord[a.fanLevel]) : cap(a.fanLevel) });
+    case "set_fan": { return t("Fan {level}", { level: textOf(fanWord, a.fanLevel, t) ?? cap(a.fanLevel) });
     }
     case "ventilate": { return t("Ventilate {level}", { level: fanWord[a.level] ? t(fanWord[a.level]).toLowerCase() : a.level });
     }
@@ -155,7 +155,7 @@ export function ruleCard(a: ApiAutomation, unit: { name: string; path: string; p
   const note = a.disabledReason === "consent_revoked" ? t("Will not run: location consent withdrawn {date}. Existing commands are not cancelled.", { date: showDate(a.updatedAt, i.display) })
     : a.disabledReason === "capability_changed" ? t("Will not run: the AC's capabilities changed — edit the actions, then switch it on again.")
     : a.disabledReason === "unit_archived" ? t("Will not run: the AC was archived.") : null;
-  const skipped = !note && a.lastRun?.outcome === "skipped" ? t("Last evaluation skipped {when} — {reason}", { when: runText(a.lastRun.at, a.timezone, i), reason: decisionText[a.lastRun.reason ?? ""] ? t(decisionText[a.lastRun.reason ?? ""]) : a.lastRun.reason ?? t("no reason recorded") }) : null;
+  const skipped = !note && a.lastRun?.outcome === "skipped" ? t("Last evaluation skipped {when} — {reason}", { when: runText(a.lastRun.at, a.timezone, i), reason: textOf(decisionText, a.lastRun.reason ?? "", t) ?? (a.lastRun.reason ?? t("no reason recorded")) }) : null;
   const isNeedsConsent = trigger === "location" && !consentGranted;
   return {
     id: a.id,
@@ -317,7 +317,7 @@ const keyText: Record<string, string> = {
 /** API field errors of automations.save / nextRuns draft mapped to the editor fields. */
 export function apiErrors(fe: Record<string, string>, t: T = en): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const [k, v] of Object.entries(fe)) out[fieldName[k] ?? k] = keyText[v] ? t(keyText[v]) : v.replace(/^errors?\./, "").replaceAll('_', " ");
+  for (const [k, v] of Object.entries(fe)) out[fieldName[k] ?? k] = textOf(keyText, v, t) ?? v.replace(/^errors?\./, "").replaceAll('_', " ");
   return out;
 }
 
@@ -367,11 +367,11 @@ export function summaryText(d: Draft, unit: string, place: string, t: T = en): s
       }
       case "set_temperature": { return t("set {unit} to {value}", { unit, value: `${String(a.celsius)}°C` });
       }
-      case "set_mode": { return t("set {unit} to {value}", { unit, value: t("mode {mode}", { mode: (modeWord[a.mode] ? t(modeWord[a.mode]) : a.mode).toLowerCase() }) });
+      case "set_mode": { return t("set {unit} to {value}", { unit, value: t("mode {mode}", { mode: (textOf(modeWord, a.mode, t) ?? a.mode).toLowerCase() }) });
       }
-      case "set_fan": { return t("set {unit} to {value}", { unit, value: t("fan {level}", { level: (fanWord[a.fanLevel] ? t(fanWord[a.fanLevel]) : a.fanLevel).toLowerCase() }) });
+      case "set_fan": { return t("set {unit} to {value}", { unit, value: t("fan {level}", { level: (textOf(fanWord, a.fanLevel, t) ?? a.fanLevel).toLowerCase() }) });
       }
-      case "ventilate": { return t("set {unit} to {value}", { unit, value: t("ventilation {level}", { level: (fanWord[a.level] ? t(fanWord[a.level]) : a.level).toLowerCase() }) });
+      case "ventilate": { return t("set {unit} to {value}", { unit, value: t("ventilation {level}", { level: (textOf(fanWord, a.level, t) ?? a.level).toLowerCase() }) });
       }
     }
   };
@@ -434,7 +434,7 @@ export function eventTest(dec: ApiDecision | undefined, ruleId: string | null, n
   if (!dec) return { at, title: t("No result"), detail: t("The simulation returned no decision for this AC"), tone: "muted" };
   if (dec.decision === "selected" && dec.ruleId === ruleId) return { at, title: t("{when} — matches", { when }), detail: t("Would send 1 command: {unit} · {action}", { unit, action: actionLabel(action, t) }), tone: "ok" };
   if (dec.decision === "selected") return { at, title: t("{when} — another rule wins", { when }), detail: t("“{rule}” has priority for {unit} — this one would not send", { rule: names.get(dec.ruleId ?? "") ?? t("Another automation"), unit }), tone: "muted" };
-  return { at, title: t("{when} — not sent", { when }), detail: t("Nothing would be sent: {reason}", { reason: decisionText[dec.reason ?? ""] ? t(decisionText[dec.reason ?? ""]) : dec.reason ?? t("no reason") }), tone: "muted" };
+  return { at, title: t("{when} — not sent", { when }), detail: t("Nothing would be sent: {reason}", { reason: textOf(decisionText, dec.reason ?? "", t) ?? (dec.reason ?? t("no reason")) }), tone: "muted" };
 }
 /** The synthetic fact a test sends for an event rule (Phase 1A demo events; the action adds the AC and the tick). */
 export function testFact(d: Draft): Omit<OpInput<"automations.simulate">["facts"][number], "unitId" | "observedAt">[] {

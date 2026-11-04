@@ -18,6 +18,7 @@ import {
 } from "@ac/web/lib/clientBilling";
 import { InvoiceDemo } from "./_components/invoice-demo";
 import { InvoiceView, type InvoiceLive } from "./_components/invoice-view";
+import { queryReader } from "@ac/web/lib/searchParams";
 
 
 export default async function CustomerInvoicePage({ params, searchParams }: Readonly<PageProps<"/customer/payments/[id]">>) {
@@ -25,7 +26,7 @@ export default async function CustomerInvoicePage({ params, searchParams }: Read
   interface Unit { id: string; displayName: string; propertyId: string; spaceId: string | null }
   const { id } = await params;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
+  const one = queryReader(sp);
   await connection();
   if (!apiMode()) return <InvoiceDemo id={id} tab={one("tab")} />;
   let inv: ApiInvoiceDetail & { createdAt: string; paymentRefs: ClientPayment[] };

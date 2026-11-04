@@ -13,6 +13,7 @@ import { AccessDemo } from "./_components/access-demo";
 import { AccessView } from "./_components/access-view";
 import type { Role } from "@ac/web/lib/contracts.gen";
 import { withAccess } from "@ac/web/lib/withAccess";
+import { queryReader } from "@ac/web/lib/searchParams";
 
 
 // a role without the page's read permission sees which one it needs, not a failure (IR582)
@@ -24,7 +25,7 @@ async function AdminAccessPageContent({ searchParams }: Readonly<PageProps<"/adm
   await connection();
   if (!apiMode()) return <AccessDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
+  const one = queryReader(sp);
   const role = one("role") === "admin" || one("role") === "contractor" || one("role") === "technician" ? one("role") : undefined;
   const status = one("status") === "active" || one("status") === "inactive" ? one("status") : undefined;
   const organizationId = one("organizationId");
