@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ms } from "@ac/web/lib/i18n-ms";
-import { agreedSlots, classifyBy, contractorNames, controls, costLineOf, costTotals, delivery, extendDefault, fromZonedInput, LISTED, money, newJobErrors, periodChip, reportCard, returnReason, reviewModeOf, facts, filtersOf, hqRefusal, HQ_REFUSAL_KEYS, hqRow, longSlot, offerDefaults, preferredRows, slotText, sortOf, stageOf, stepper, tomorrowIn, zonedInput, type ApiHqJob, type ApiHqRow, type Names } from "@ac/web/lib/adminJobs";
+import { agreedSlots, classifyBy, contractorNames, controls, costLineOf, costTotals, delivery, extendDefault, fromZonedInput, LISTED, money, jobRequestErrors as jobRequestErrors, periodChip, reportCard, returnReason, reviewModeOf, facts, filtersOf, hqRefusal, HQ_REFUSAL_KEYS, hqRow, longSlot, offerDefaults, preferredRows, slotText, sortOf, stageOf, stepper, tomorrowIn, zonedInput, type ApiHqJob, type ApiHqRow, type Names } from "@ac/web/lib/adminJobs";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
@@ -107,19 +107,19 @@ describe("HQ maintenance jobs", () => {
   // seven digits once spaces and - ( ) + tabs are removed
   it("checks the contact window of a new job as the API does", () => {
     const base = { unitId: "u1", symptom: "Water dripping from the indoor unit", slots: [slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z")] };
-    expect(newJobErrors({ ...base, contactWindow: "9:00–18:00" }, NOW)).toEqual({});
-    expect(newJobErrors({ ...base, contactWindow: "Ring the demo bell" }, NOW)).toEqual({});
-    expect(newJobErrors({ ...base, contactWindow: "call a@b.c" }, NOW)).toHaveProperty("contactWindow");
-    expect(newJobErrors({ ...base, contactWindow: "012-345 6789" }, NOW)).toHaveProperty("contactWindow");
-    expect(newJobErrors({ ...base, contactWindow: "1234567" }, NOW)).toHaveProperty("contactWindow");
-    expect(newJobErrors({ ...base, contactWindow: "x".repeat(201) }, NOW)).toHaveProperty("contactWindow");
-    expect(newJobErrors({ ...base, contactWindow: "x".repeat(200) }, NOW)).toEqual({});
+    expect(jobRequestErrors({ ...base, contactWindow: "9:00–18:00" }, NOW)).toEqual({});
+    expect(jobRequestErrors({ ...base, contactWindow: "Ring the demo bell" }, NOW)).toEqual({});
+    expect(jobRequestErrors({ ...base, contactWindow: "call a@b.c" }, NOW)).toHaveProperty("contactWindow");
+    expect(jobRequestErrors({ ...base, contactWindow: "012-345 6789" }, NOW)).toHaveProperty("contactWindow");
+    expect(jobRequestErrors({ ...base, contactWindow: "1234567" }, NOW)).toHaveProperty("contactWindow");
+    expect(jobRequestErrors({ ...base, contactWindow: "x".repeat(201) }, NOW)).toHaveProperty("contactWindow");
+    expect(jobRequestErrors({ ...base, contactWindow: "x".repeat(200) }, NOW)).toEqual({});
   });
 
   it("checks a new job and the review mode", () => {
-    const ok = newJobErrors({ unitId: "u1", symptom: "Water dripping from the indoor unit", slots: [slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"), slot("2026-09-23T02:00:00Z", "2026-09-23T04:00:00Z")] }, NOW);
+    const ok = jobRequestErrors({ unitId: "u1", symptom: "Water dripping from the indoor unit", slots: [slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"), slot("2026-09-23T02:00:00Z", "2026-09-23T04:00:00Z")] }, NOW);
     expect(ok).toEqual({});
-    const bad = newJobErrors({ unitId: "", symptom: "short", slots: [slot("2026-09-21T06:00:00Z", "2026-09-21T08:00:00Z"), slot("2026-09-22T02:00:00Z", "2026-09-22T08:00:00Z"), slot("2026-09-23T02:00:00Z", "2026-09-23T04:00:00Z"), slot("2026-09-23T02:00:00Z", "2026-09-23T04:00:00Z")] }, NOW);
+    const bad = jobRequestErrors({ unitId: "", symptom: "short", slots: [slot("2026-09-21T06:00:00Z", "2026-09-21T08:00:00Z"), slot("2026-09-22T02:00:00Z", "2026-09-22T08:00:00Z"), slot("2026-09-23T02:00:00Z", "2026-09-23T04:00:00Z"), slot("2026-09-23T02:00:00Z", "2026-09-23T04:00:00Z")] }, NOW);
     expect(bad).toEqual({ unitId: "Choose the unit.", symptom: "Describe the symptom in 10–2000 characters.", slot0: "Times start on a later day than today (Kuala Lumpur).", slot1: "Each time is 1–4 hours long.", slot3: "The times must differ." });
     expect([reviewModeOf({ contractorOrgId: null }), reviewModeOf({ contractorOrgId: "org-c" })]).toEqual(["normal", "hq_escalation"]);
     expect(extendDefault("2026-09-23T04:00:00Z")).toBe("2026-09-24T04:00:00.000Z");
@@ -196,7 +196,7 @@ describe("HQ Jobs tab in Malay with the display time zone (IR290)", () => {
     expect([f[0].label, f[0].sub, f[2].value]).toEqual(["Tetingkap yang diminta", "masa pilihan pertama pelanggan", "belum ditempah"]);
     expect(f[0].value).toMatch(/GMT\+9$/); // 11:00 – 1:00 in Tokyo, the client's 10:00–12:00 in Kuala Lumpur
     expect(controls("in_progress", MS.t).cancelWhy).toBe("Tangguhkan kerja dahulu.");
-    expect(newJobErrors({ unitId: "", symptom: "x", slots: [slot("2026-09-21T06:00:00Z", "2026-09-21T08:00:00Z")] }, NOW, MS.t)).toEqual({ unitId: "Pilih unit.", symptom: "Terangkan simptom dalam 10–2000 aksara.", slot0: "Masa bermula pada hari selepas hari ini (Kuala Lumpur)." });
+    expect(jobRequestErrors({ unitId: "", symptom: "x", slots: [slot("2026-09-21T06:00:00Z", "2026-09-21T08:00:00Z")] }, NOW, MS.t)).toEqual({ unitId: "Pilih unit.", symptom: "Terangkan simptom dalam 10–2000 aksara.", slot0: "Masa bermula pada hari selepas hari ini (Kuala Lumpur)." });
     expect(hqRefusal({ code: "NOT_FOUND", messageKey: "error.notFound", fieldErrors: {} }, MS.t)).toBe("Kerja ini tidak lagi wujud dalam skop anda.");
     expect(returnReason(["Airflow — attention"], "Re-check", MS.t)).toBe("Kerja semula: Airflow — attention. Re-check");
   });

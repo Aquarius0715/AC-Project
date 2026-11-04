@@ -16,7 +16,7 @@ const member = (over: Partial<ApiMember>): ApiMember => {
 const draft = (over: Partial<MemberDraft>): MemberDraft => {
   return {
     userId: "u1", organizationId: "org-p", role: "technician", employment: "external", permissions: ["alert.read"], scopes: [{ kind: "unit", id: "unit-1" }], validFrom: "2026-09-01T08:00", validUntil: "2027-01-01T00:00", reason: "Rotation",
-    newUser: false, newEmail: "", newName: "", ...over,
+    creatingUser: false, inviteEmail: "", inviteName: "", ...over,
   };
 };
 
@@ -60,14 +60,14 @@ describe("HQ access & roles (FR-A03, BR-A03, IR107)", () => {
   });
 
   it("creates a new person with the membership: e-mail and name instead of a user, and no user ID yet (IR461)", () => {
-    expect(memberErrors(draft({ userId: "", newUser: true, newEmail: "nope", newName: " " }), { selfUserId: "me" })).toEqual({
+    expect(memberErrors(draft({ userId: "", creatingUser: true, inviteEmail: "nope", inviteName: " " }), { selfUserId: "me" })).toEqual({
       "newUser.email": "A valid email address (up to 254 characters)", "newUser.displayName": "A name of 1–120 characters",
     });
-    expect(memberErrors(draft({ userId: "", newUser: true, newEmail: "new@example.com", newName: "New Colleague" }), { selfUserId: "me" })).toEqual({});
-    expect(memberInput(draft({ userId: "", newUser: true, newEmail: " new@example.com ", newName: " New Colleague " }))).toMatchObject({
-      userId: "00000000-0000-0000-0000-000000000000", newUser: { email: "new@example.com", displayName: "New Colleague" },
+    expect(memberErrors(draft({ userId: "", creatingUser: true, inviteEmail: "new@example.com", inviteName: "New Colleague" }), { selfUserId: "me" })).toEqual({});
+    expect(memberInput(draft({ userId: "", creatingUser: true, inviteEmail: " new@example.com ", inviteName: " New Colleague " }))).toMatchObject({
+      userId: "00000000-0000-0000-0000-000000000000", "newUser": { email: "new@example.com", displayName: "New Colleague" },
     });
-    expect("newUser" in memberInput(draft({ newUser: true }), "m1")).toBe(false); // an existing membership keeps its user
+    expect("newUser" in memberInput(draft({ creatingUser: true }), "m1")).toBe(false); // an existing membership keeps its user
   });
 });
 
@@ -85,7 +85,7 @@ describe("HQ access & roles in Malay with the display time zone (IR302)", () => 
 describe("the form's field order", () => {
   it("holds every field a check can name, each with its element id", () => {
     const all = { ...memberErrors(draft({ userId: "", organizationId: "", scopes: [], validFrom: "", validUntil: "", reason: " ", permissions: ["alert.read", "billing.read"] }), { selfUserId: "me" }),
-      ...memberErrors(draft({ userId: "", newUser: true, newEmail: "nope", newName: " " }), { selfUserId: "me" }) };
+      ...memberErrors(draft({ userId: "", creatingUser: true, inviteEmail: "nope", inviteName: " " }), { selfUserId: "me" }) };
     expect(Object.keys(all).filter((k) => !(MEMBER_FIELDS as readonly string[]).includes(k))).toEqual([]);
     expect([memberFieldId("newUser.email"), memberFieldId("validFrom")]).toEqual(["member-newUser-email", "member-validFrom"]);
   });

@@ -189,7 +189,7 @@ export function extraChoices(d: Draft): ExtraDraft["type"][] {
   const own = d.trigger === "presence" ? "occupancy" : (d.trigger === "weather" ? "weather" : null);
   return (["weekday", "occupancy", "weather"] as const).filter((t) => !(t === "weekday" && d.trigger === "schedule") && t !== own && d.extras.every((x) => x.type !== t));
 }
-export const newExtra = (t: ExtraDraft["type"]): ExtraDraft => (t === "weekday" ? { type: t, weekdays: [1, 2, 3, 4, 5] } : (t === "occupancy" ? { type: t, occupied: true } : { type: t, operator: "gte", value: "30" }));
+export const blankExtra = (t: ExtraDraft["type"]): ExtraDraft => (t === "weekday" ? { type: t, weekdays: [1, 2, 3, 4, 5] } : (t === "occupancy" ? { type: t, occupied: true } : { type: t, operator: "gte", value: "30" }));
 /** Extras that no longer fit the trigger (switching the trigger) are dropped. */
 export function fitExtras(d: Draft): ExtraDraft[] {
   const own = d.trigger === "presence" ? "occupancy" : (d.trigger === "weather" ? "weather" : null);
@@ -210,7 +210,7 @@ export function actionOf(key: string): UnitAction {
   if (k === "vent") return { kind: "ventilate", level: v as "low" | "mid" | "high" };
   return { kind: "set_fan", fanLevel: v as "low" | "mid" | "high" };
 }
-export function newDraft(unitId: string, timezone: string): Draft {
+export function blankDraft(unitId: string, timezone: string): Draft {
   return {
     id: null,
     version: null,
@@ -237,7 +237,7 @@ export function newDraft(unitId: string, timezone: string): Draft {
   };
 }
 export function draftOf(a: ApiAutomation): Draft {
-  const d = newDraft(a.unitIds[0] ?? "", a.timezone);
+  const d = blankDraft(a.unitIds[0] ?? "", a.timezone);
   const base = { ...d, id: a.id, version: a.version, name: a.name, enabled: a.enabled, priority: a.priority, trigger: triggerOf(a), others: a.unitIds.slice(1), // rules saved elsewhere may target more ACs: kept
     extras: (a.onlyIf ?? []).map(extraDraftOf) };
   if (a.kind === "schedule") {

@@ -35,10 +35,10 @@ export function MaintenanceView({ live }: Readonly<{ live: MaintenanceLive }>) {
   const [going, startGo] = useTransition();
   const [target, setTarget] = useState<"requests" | "filters">(live.page);
   const page = going ? target : live.page;
-  const [prefill, setPrefill] = useState<CleaningPrefill | null>(live.newFor ? { unitId: live.newFor, symptom: "", type: "reactive" } : null);
+  const [prefill, setPrefill] = useState<CleaningPrefill | null>(live.requestUnitId ? { unitId: live.requestUnitId, symptom: "", type: "reactive" } : null);
   const [tab, setTab] = useState<StatusTab>("all");
   const [origin, setOrigin] = useState<"all" | "request" | "plan">("all");
-  const [modal, setModal] = useState<ModalKind>(live.newFor ? "new" : null);
+  const [modal, setModal] = useState<ModalKind>(live.requestUnitId ? "new" : null);
   const [result, setResult] = useState<{ tone: "ok" | "warn" | "crit"; text: string } | null>(null);
   const d = live.detail;
   const count = (t: StatusTab) => live.rows.filter((r) => t === "all" || r.tab === t).length;

@@ -201,7 +201,7 @@ export function settingText(s: RuleSettingRow | undefined, i: I18n = EN): string
 /** A new, unsaved alert policy of a customer as DD-A05 starts one (IR345): the display time zone (Preferences), off and
 priority 50; the condition of the Figma example (temperature ≥ 30 °C for 60 s, recovery 28), in-app only, nobody
 notified yet. The owner is fixed once it is saved. */
-export function newPolicyDraft(customer: { id: string; name: string }, timezone: string, from?: DefaultRule): AdminPolicy {
+export function blankPolicyDraft(customer: { id: string; name: string }, timezone: string, from?: DefaultRule): AdminPolicy {
   const draft: AdminPolicy = {
     id: "",
     version: 0,

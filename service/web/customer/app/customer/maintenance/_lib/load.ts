@@ -38,8 +38,8 @@ export async function loadMaintenance(sp: Record<string, string | string[] | und
   const unitOf = (id: string) => place.get(id) ?? { name: t("Unit"), place: "" };
   const active = units.filter((u) => !u.archived);
   // new=<unitId>: open New request for that unit (an alert's “Request repair”, Figma Client 06g)
-  const newFor = active.some((u) => u.id === one(sp.new)) ? one(sp.new)! : null;
-  const common = { now: now.toISOString(), owner: me.clientRole === "owner", units: active.map((u) => ({ id: u.id, ...unitOf(u.id) })), display, page, newFor };
+  const requestUnitId = active.some((u) => u.id === one(sp.new)) ? one(sp.new)! : null;
+  const common = { now: now.toISOString(), owner: me.clientRole === "owner", units: active.map((u) => ({ id: u.id, ...unitOf(u.id) })), display, page, requestUnitId };
   if (page === "filters") {
     const [items, settings] = await Promise.all([coreAll<ApiFilterStatus>("filterCare.list"), coreOp<ApiFilterSettings>("filterCare.getSettings", {})]);
     const lines = filterLines(items, units.map((u) => ({ id: u.id, ...unitOf(u.id), spaceId: u.spaceId, connection: u.connection })), nowMs, i);

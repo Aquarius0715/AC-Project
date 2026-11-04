@@ -77,7 +77,7 @@ export default async function AdminAlertsPage({ searchParams }: Readonly<PagePro
         alerts: adminAlertRows(alerts.items, units.items, customers.items, scoped, now.getTime(), i),
         policies: policyRows(scoped, customers.items, members.items, i.t, units.items),
         pol: {
-          policyId: one(sp.policyId) ?? null, newFor: one(sp.new) ?? null, from: one(sp.from) ?? null, canWrite: perms.has("alert.policy.write"), timezone: display.timeZone,
+          policyId: one(sp.policyId) ?? null, creatingFor: one(sp.new) ?? null, from: one(sp.from) ?? null, canWrite: perms.has("alert.policy.write"), timezone: display.timeZone,
           customers: customers.items.filter((c) => c.status !== "inactive").map((c) => ({ id: c.id, name: c.name })),
           units: units.items.filter((u) => !u.archived).map((u) => ({ id: u.id, name: u.displayName, customerId: custByOrg.get(u.customerOrgId) ?? null })),
         },

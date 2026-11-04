@@ -292,7 +292,7 @@ export const reviewModeOf = (j: Pick<ApiHqJob, "contractorOrgId">) => (j.contrac
 
 /** The New job form (DD-A06 item 8): symptom 10–2000, the 1st preferred time plus up to two more (IR113 item 2: future,
 on a later calendar day than today, 1–4 hours, distinct). */
-export function newJobErrors(f: { unitId: string; symptom: string; slots: Slot[]; contactWindow?: string }, now: number, t: T = en): Record<string, string> {
+export function jobRequestErrors(f: { unitId: string; symptom: string; slots: Slot[]; contactWindow?: string }, now: number, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
   if (!f.unitId) e.unitId = t("Choose the unit.");
   const s = [...f.symptom.trim()].length;

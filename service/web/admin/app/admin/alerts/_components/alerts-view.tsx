@@ -101,9 +101,9 @@ export function AdminAlertsView({ live }: Readonly<{ live?: Live }>) {
   const pick = (id: string) => { if (live) patch({ alertId: id }); else setDemoAlertId(id); };
   const pickStatus = (s: AlertState) => { if (live) patch({ status: s === "open" ? null : s, alertId: null }); else { setDemoStatus(s); setDemoAlertId(null); } };
   // policies: the selected one and a new one's owner customer, in the URL in API mode (DD-A05 items 5 and 8, IR345)
-  const [demoSel, setDemoSel] = useState<PolicySel>({ policyId: null, newFor: null, from: null });
-  const polSel: PolicySel = live ? { policyId: live.pol.policyId, newFor: live.pol.newFor, from: live.pol.from } : demoSel;
-  const selectPolicy = (policyId: string | null, newFor: string | null = null) => { if (live) patch({ policyId, new: newFor, from: null }); else setDemoSel({ policyId, newFor, from: null }); };
+  const [demoSel, setDemoSel] = useState<PolicySel>({ policyId: null, creatingFor: null, from: null });
+  const polSel: PolicySel = live ? { policyId: live.pol.policyId, creatingFor: live.pol.creatingFor, from: live.pol.from } : demoSel;
+  const selectPolicy = (policyId: string | null, creatingFor: string | null = null) => { if (live) patch({ policyId, new: creatingFor, from: null }); else setDemoSel({ policyId, creatingFor, from: null }); };
   // “+ New policy” asks for the owner; a default rule's copy remembers the rule it starts from (`from`, DD-A05 item 9)
   const [asking, setAsking] = useState<{ from: string | null } | null>(null);
   const [showOff, setShowOff] = useState(true);
@@ -111,7 +111,7 @@ export function AdminAlertsView({ live }: Readonly<{ live?: Live }>) {
     setAsking(null);
     if (live) { router.replace(scoped({ tab: "policies", new: customerId, ...(from && { from }) }), { scroll: false }); return; }
     setUrlTab("policies");
-    setDemoSel({ policyId: null, newFor: customerId, from });
+    setDemoSel({ policyId: null, creatingFor: customerId, from });
   };
   // scoped to one active customer, “+ New policy for <customer>” opens its draft at once (Figma 268:2)
   const scopeOwner = live?.q.customerId ? live.pol.customers.find((c) => c.id === live.q.customerId) ?? null : null;

@@ -4,7 +4,7 @@
 // out of the role areas in API mode. The Phase 1A demo (DATA_SOURCE=mock) is unaffected.
 import { NextResponse, type NextRequest } from "next/server";
 import { clearedCookieOptions, cookieOptions, dropSession, loadSession, needsRefresh, oidcConfig, refresh, renewSessionCookie, roleHome, SESSION_COOKIE, type Session } from "@ac/web/lib/session";
-import { contentSecurityPolicy, HSTS, newNonce, originOf } from "@ac/web/lib/securityHeaders";
+import { contentSecurityPolicy, HSTS, makeNonce as makeNonce, originOf } from "@ac/web/lib/securityHeaders";
 
 const sharedAreas = ["/notifications", "/settings"]; // shared pages that need a session but no particular role
 
@@ -13,7 +13,7 @@ page response also carries the Content-Security-Policy with this request's nonce
 headers to put on its scripts and styles (Next.js CSP guide, network architecture §6, IR354). */
 export async function authProxy(req: NextRequest, appRole: Session["role"]) {
   const isHttps = req.nextUrl.protocol === "https:" || req.headers.get("x-forwarded-proto") === "https";
-  const nonce = newNonce();
+  const nonce = makeNonce();
   const idp = originOf(oidcConfig().issuer);
   const csp = contentSecurityPolicy(nonce, { dev: process.env.NODE_ENV === "development", https: isHttps, formActions: idp ? [idp] : [] });
   const headers = new Headers(req.headers);

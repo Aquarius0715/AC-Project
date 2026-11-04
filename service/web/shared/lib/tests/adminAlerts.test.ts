@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  adminAlertRows, alertPolicyInput, conditionErrors, copyable, defaultRulesInput, HQ_METRICS, newPolicyDraft, policyChanges, policyErrors, policyRows, recoveryError, ruleChanges, settingText,
+  adminAlertRows, alertPolicyInput, conditionErrors, copyable, defaultRulesInput, HQ_METRICS, blankPolicyDraft as blankPolicyDraft, policyChanges, policyErrors, policyRows, recoveryError, ruleChanges, settingText,
   testOutcome, type ApiAdminAlert, type ApiPolicy, type NotificationDecision,
 } from "@ac/web/lib/adminAlerts";
 import { i18nOf } from "@ac/web/lib/i18n";
@@ -76,7 +76,7 @@ describe("HQ alerts and alert policies", () => {
   });
 
   it("starts a new policy as DD-A05 says and creates it without an id (IR345)", () => {
-    const d = newPolicyDraft({ id: "c-a", name: "Demo Customer A" }, "Asia/Tokyo");
+    const d = blankPolicyDraft({ id: "c-a", name: "Demo Customer A" }, "Asia/Tokyo");
     expect([d.id, d.version, d.kind, d.customerId, d.group, d.timezone, d.on, d.priority, d.channels, d.recipients, d.unitIds]).toEqual(["", 0, "alert", "c-a", "DEMO CUSTOMER A", "Asia/Tokyo", false, 50, ["inApp"], [], []]);
     expect(policyErrors(d)).toEqual({ name: "1–120 characters", recipients: "Add at least one recipient" });
     const input = alertPolicyInput({ ...d, name: "Too hot", recipients: [{ id: "m-1", label: "customer-a", role: "client" }] });
@@ -136,9 +136,9 @@ describe("the default policy's rules and the customers' switches (DD-A05 item 9,
 
   it("copies only a rule whose metric a policy may watch, with its name and condition", () => {
     expect(p.rules.map(copyable)).toEqual([true, false]); // heartbeat_gap is not one of the HQ metrics
-    const d = newPolicyDraft({ id: "c-a", name: "Demo Customer A" }, "Asia/Tokyo", p.rules[0]);
+    const d = blankPolicyDraft({ id: "c-a", name: "Demo Customer A" }, "Asia/Tokyo", p.rules[0]);
     expect([d.id, d.name, d.metric, d.operator, d.threshold, d.recovery, d.duration, d.severity, d.on, d.timezone, d.customerId]).toEqual(["", "Refrigerant low pressure", "refrigerant_pressure", "lte", 350, 380, 120, "critical", false, "Asia/Tokyo", "c-a"]);
-    expect(newPolicyDraft({ id: "c-a", name: "A" }, "UTC", p.rules[1]).metric).toBe("temperature"); // not copyable: the plain draft
+    expect(blankPolicyDraft({ id: "c-a", name: "A" }, "UTC", p.rules[1]).metric).toBe("temperature"); // not copyable: the plain draft
   });
 
   it("checks a rule's condition, names the changed rules and saves all six with their fixed fields", () => {

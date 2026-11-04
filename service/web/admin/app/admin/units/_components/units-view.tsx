@@ -161,7 +161,7 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
   const canWrite = live.canWrite;
   const sel = c.selection;
   const selId = sel ? sel.kind === "property" ? sel.property.id : sel.kind === "space" ? sel.space.id : `unassigned:${sel.property.id}` : "";
-  const newUnitAt = () => { setM({ kind: "unit", propertyId: sel?.property.id ?? c.tree[0]?.id ?? "", spaceId: sel?.kind === "space" ? sel.space.id : "" }); };
+  const addUnitHere = () => { setM({ kind: "unit", propertyId: sel?.property.id ?? c.tree[0]?.id ?? "", spaceId: sel?.kind === "space" ? sel.space.id : "" }); };
   const unitsTotal = c.tree.reduce((n, p) => n + p.units, 0);
   return (
     <Page>
@@ -171,7 +171,7 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
         {r.marks.map((x) => <Badge key={x.label} tone={x.tone} icon={x.icon}>{x.label}</Badge>)}
         <div className="ml-auto flex gap-2">
           {canWrite && <Btn size="sm" onClick={() => { setM({ kind: "customer" }); }}>{t("Edit customer")}</Btn>}
-          {canWrite && r.status === "active" && c.tree.length > 0 && <Btn size="sm" variant="primary" onClick={newUnitAt}><Icon name="add" /> {t("New unit")}</Btn>}
+          {canWrite && r.status === "active" && c.tree.length > 0 && <Btn size="sm" variant="primary" onClick={addUnitHere}><Icon name="add" /> {t("New unit")}</Btn>}
         </div>
       </div>
       <Card>
@@ -220,7 +220,7 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
             {c.unitMissing && <Banner tone="warn" action={<Btn size="sm" onClick={() => { nav(clearUnit); }}>{t("Close")}</Btn>}>{t("This unit no longer exists or belongs to another customer.")}</Banner>}
             {c.unit ? <UnitEdit key={c.unit.u.id} live={live} c={c} x={c.unit} nav={nav} run={run} pending={pending} /> : sel && <>
               <LocationCard c={c} sel={sel} canWrite={canWrite} active={r.status === "active"} setM={setM} />
-              <UnitsCard key={selId} c={c} sel={sel} nav={nav} canWrite={canWrite && r.status === "active"} onNew={newUnitAt} />
+              <UnitsCard key={selId} c={c} sel={sel} nav={nav} canWrite={canWrite && r.status === "active"} onNew={addUnitHere} />
             </>}
           </div>
         </div>

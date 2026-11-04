@@ -84,14 +84,14 @@ export async function loadJobs(sp: SP) {
   ]);
   const rows = list.items.map((j) => hqRow(j, nowMs, names, unitOrg, i));
   // ?new=<unitId>[&alertId=] opens New job for that unit, its symptom taken from the alert (DD-A05 item 11, IR318)
-  const newUnit = one(sp.new), fromAlert = one(sp.alertId);
-  const alert = newUnit && fromAlert ? await optional(coreOp<{ id: string; type: string; causeCode: string; evidenceText: string }>("alerts.get", { id: fromAlert }), null) : null;
-  const newJob = newUnit ? { unitId: newUnit, symptom: alert ? t("Alert {id}: {title} — {evidence}", { id: alert.id.slice(0, 8), title: alertTitle(alert, t), evidence: evidenceText(alert.evidenceText, t) }).slice(0, 2000) : "" } : null;
+  const requestedUnit = one(sp.new), fromAlert = one(sp.alertId);
+  const alert = requestedUnit && fromAlert ? await optional(coreOp<{ id: string; type: string; causeCode: string; evidenceText: string }>("alerts.get", { id: fromAlert }), null) : null;
+  const jobRequest = requestedUnit ? { unitId: requestedUnit, symptom: alert ? t("Alert {id}: {title} — {evidence}", { id: alert.id.slice(0, 8), title: alertTitle(alert, t), evidence: evidenceText(alert.evidenceText, t) }).slice(0, 2000) : "" } : null;
   // the job the new-job dialog just created: ?jobId=<id>&created=book|requested (its detail opens step 2, or says it was saved as requested)
   const createdKind = one(sp.created);
   const created = createdKind === "book" || createdKind === "requested" ? { id: one(sp.jobId) ?? "", book: createdKind === "book" } : null;
   const base = {
-    ...head, q, newJob, created, period, periodChip: period ? periodChip(period, i) : null, sort, sorts: SORTS.map((x) => ({ id: x.id, text: t(x.text) })), total: list.total,
+    ...head, q, requestDraft: jobRequest, created, period, periodChip: period ? periodChip(period, i) : null, sort, sorts: SORTS.map((x) => ({ id: x.id, text: t(x.text) })), total: list.total,
     stages: STAGES.map((x, k) => ({ id: x.id, label: t(x.label), count: counts[k] })),
     deliveries: [{ id: "internal", name: t("Internal") }, ...contractors.map((c) => ({ id: c.id, name: c.name }))],
     assignees: members.filter((m) => m.role === "technician").map((m) => ({ id: m.id, name: m.displayName })),

@@ -7,7 +7,7 @@ import { actionMessage } from "@ac/web/lib/actionMessage";
 import { useOp } from "@ac/web/lib/useOp";
 import { ZONES } from "@ac/web/lib/preferences";
 import {
-  newPolicyDraft, policyChanges, policyErrors, recipientRole,
+  blankPolicyDraft, policyChanges, policyErrors, recipientRole,
   type AdminPolicy, type ApiRecipient, type Channel, type DefaultRule, type PolicyRecipient,
 } from "@ac/web/lib/adminAlerts";
 import { deletePolicy, savePolicy } from "../actions";
@@ -21,7 +21,7 @@ import { Icon } from "@ac/web/components/Icon";
 one starts in, the active customers that may own one, and each customer's units (notifications.recipients lists a
 policy's recipients for one of them). */
 export interface PoliciesLive {
-  policyId: string | null; newFor: string | null; from: string | null; canWrite: boolean; timezone: string;
+  policyId: string | null; creatingFor: string | null; from: string | null; canWrite: boolean; timezone: string;
   customers: { id: string; name: string }[]; units: { id: string; name: string; customerId: string | null }[];
 }
 
@@ -84,14 +84,14 @@ const demoCandidates: ApiRecipient[] = [
 ];
 
 /** The selected policy, or the owner customer of a new one and the default rule it copies: URL state in API mode, local state in the demo. */
-export interface PolicySel { policyId: string | null; newFor: string | null; from: string | null }
+export interface PolicySel { policyId: string | null; creatingFor: string | null; from: string | null }
 
 /** The Policies tab (DD-A05 items 7–9, Figma Admin 38:5 / 356:3714, IR345): the policies by customer and the editor of
 the selected one. A new policy (`sel.newFor`, started by “+ New policy”) starts as DD-A05 says (display time zone,
 off, priority 50) and is created by Save policy. Recipients are added from notifications.recipients; Delete policy
 detaches it from every unit. The demo keeps its fixture policies and saves nothing. */
 export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, onCopy }: Readonly<{
-  pols: AdminPolicy[]; live?: PoliciesLive; sel: PolicySel; select: (policyId: string | null, newFor?: string | null) => void; showOff?: boolean;
+  pols: AdminPolicy[]; live?: PoliciesLive; sel: PolicySel; select: (policyId: string | null, creatingFor?: string | null) => void; showOff?: boolean;
   /** the scoped customer a default rule is copied for, else the copy asks for the owner (onCopy) */
   copyFor: { id: string; name: string } | null; onCopy: (ruleKey: string) => void;
 }>) {
@@ -103,11 +103,11 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
 
   // the policy the editor starts from: a new one for `new`, else the selected one (a policyId the list does not hold
   // says so instead of opening another policy), else the first customer policy
-  const owner = sel.newFor ? customers.find((c) => c.id === sel.newFor) ?? null : null;
-  const isMissing = !sel.newFor && !!sel.policyId && pols.every((x) => x.id !== sel.policyId);
+  const owner = sel.creatingFor ? customers.find((c) => c.id === sel.creatingFor) ?? null : null;
+  const isMissing = !sel.creatingFor && !!sel.policyId && pols.every((x) => x.id !== sel.policyId);
   const fromRule = sel.from ? pols.find((x) => x.kind === "default_alert")?.rules.find((r) => r.ruleKey === sel.from) : undefined;
-  const p = owner ? newPolicyDraft(owner, live?.timezone ?? "Asia/Kuala_Lumpur", fromRule)
-    : (sel.newFor || isMissing ? null : pols.find((x) => x.id === sel.policyId) ?? pols.find((x) => x.kind === "alert") ?? pols[0] ?? null);
+  const p = owner ? blankPolicyDraft(owner, live?.timezone ?? "Asia/Kuala_Lumpur", fromRule)
+    : (sel.creatingFor || isMissing ? null : pols.find((x) => x.id === sel.policyId) ?? pols.find((x) => x.kind === "alert") ?? pols[0] ?? null);
   const key = owner ? `new:${owner.id}:${fromRule?.ruleKey ?? ""}` : (p ? `${p.id}@${String(p.version)}` : "");
   const [draft, setDraft] = useState<AdminPolicy | null>(p);
   const [draftOf, setDraftOf] = useState(key);
@@ -251,8 +251,8 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
           </Card>
         )) : (
           <Card title={t("Alert policy")}>
-            <EmptyState title={t(isMissing ? "This policy is not in the list" : (sel.newFor ? "No such active customer" : "No alert policies"))}>
-              {t(isMissing ? "It may have been deleted. Pick a policy in the list." : (sel.newFor ? "A new policy needs an active owner customer — start it again with + New policy." : "Customers have no alert policies yet."))}
+            <EmptyState title={t(isMissing ? "This policy is not in the list" : (sel.creatingFor ? "No such active customer" : "No alert policies"))}>
+              {t(isMissing ? "It may have been deleted. Pick a policy in the list." : (sel.creatingFor ? "A new policy needs an active owner customer — start it again with + New policy." : "Customers have no alert policies yet."))}
             </EmptyState>
           </Card>
         )}

@@ -9,7 +9,7 @@ import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { showTime, zonedInstant } from "@ac/web/lib/i18n";
-import { contractorNames, costLineOf, extendDefault, fromZonedInput, hqRefusal, longSlot, money, newJobErrors, offerDefaults, returnReason, slotText, tomorrowIn, zonedInput, type CostLine, type PreferredRow } from "@ac/web/lib/adminJobs";
+import { contractorNames, costLineOf, extendDefault, fromZonedInput, hqRefusal, longSlot, money, jobRequestErrors, offerDefaults, returnReason, slotText, tomorrowIn, zonedInput, type CostLine, type PreferredRow } from "@ac/web/lib/adminJobs";
 import { typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { JobStatus } from "@ac/web/lib/jobs";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
@@ -31,14 +31,14 @@ come formatted from the loader, the dialogs format and read times in the display
 export function JobsView({ live }: Readonly<{ live: JobsLive }>) {
   const t = useT();
   const patch = useUrlPatch();
-  const [creating, setCreating] = useState(!!live.newJob); // opened by ?new=<unitId> (an alert's Request maintenance)
+  const [creating, setCreating] = useState(!!live.requestDraft); // opened by ?new=<unitId> (an alert's Request maintenance)
   // The job New job just created: its detail opens step 2 (book) or says it was saved as requested.
   const [fresh, setFresh] = useState<Fresh | null>(() => (live.created?.id ? live.created : null));
   const clearFresh = useCallback(() => { setFresh(null); patch({ created: null }); }, [patch]);
   return (
     <Page className="max-w-[1440px]">
       <JobsTabs tab="jobs" counts={live.counts} q={live.q} action={<Btn variant="primary" size="sm" onClick={() => { setCreating(true); }}><Icon name="add" /> {t("New job")}</Btn>} />
-      {creating && <NewJobModal live={live} initial={live.newJob ?? undefined} onClose={() => { setCreating(false); if (live.newJob) patch({ new: null, alertId: null }); }} onCreated={(f) => { setCreating(false); setFresh(f); }} />}
+      {creating && <NewJobModal live={live} initial={live.requestDraft ?? undefined} onClose={() => { setCreating(false); if (live.requestDraft) patch({ new: null, alertId: null }); }} onCreated={(f) => { setCreating(false); setFresh(f); }} />}
       <JobsTab live={live} patch={patch} fresh={fresh} onFresh={clearFresh} />
     </Page>
   );
@@ -512,7 +512,7 @@ export function NewJobModal({ live, initial, onClose, onCreated }: Readonly<{ li
   const [refusal, setRefusal] = useState<string | null>(null);
   // typed in the display time zone and sent as instants (NFR-08); "from tomorrow" stays the Kuala Lumpur day (IR113)
   const slots = times.map((x) => ({ startAt: zonedInstant(x.date, x.from, zone), endAt: zonedInstant(x.date, x.to, zone) }));
-  const errors = newJobErrors({ unitId, symptom, slots, contactWindow: contact }, now, t);
+  const errors = jobRequestErrors({ unitId, symptom, slots, contactWindow: contact }, now, t);
   const dueAt = due ? fromZonedInput(due, zone) : null;
   const dueError = dueAt && Date.parse(dueAt) < Date.parse(slots[0].endAt) ? t("The due time cannot be before the end of the 1st time.") : undefined;
   const set = (n: number, k: "date" | "from" | "to", v: string) => { setTimes(times.map((x, m) => (m === n ? { ...x, [k]: v } : x))); };

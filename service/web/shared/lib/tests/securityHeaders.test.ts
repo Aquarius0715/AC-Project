@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-import { contentSecurityPolicy, HSTS, newNonce, originOf, sameOriginRequest } from "@ac/web/lib/securityHeaders";
+import { contentSecurityPolicy, HSTS, makeNonce as makeNonce, originOf, sameOriginRequest } from "@ac/web/lib/securityHeaders";
 import { authProxy } from "@ac/web/proxy";
 import { STYLE_HASHES } from "@ac/web/lib/styleHashes.gen";
 
@@ -29,7 +29,7 @@ describe("the page Content-Security-Policy", () => {
     expect(contentSecurityPolicy("n", { dev: false, https: true, formActions: [] }).endsWith("; upgrade-insecure-requests")).toBe(true);
   });
   it("makes a fresh nonce each time and reads origins", () => {
-    const [a, b] = [newNonce(), newNonce()];
+    const [a, b] = [makeNonce(), makeNonce()];
     expect(a).not.toBe(b);
     expect(a).toMatch(/^[A-Za-z0-9+/]+=*$/);
     expect([originOf("https://id.example.com/realms/ac"), originOf("not a url")]).toEqual(["https://id.example.com", null]);

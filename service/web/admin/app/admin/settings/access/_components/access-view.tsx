@@ -105,10 +105,10 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
             <section>
               <h3 className="mb-2 text-[13px] font-bold">{t("Identity & role")}</h3>
               <div className="grid-fluid" style={{ ["--min" as string]: "220px" }}>
-                {isNew && live.canWrite && <div className="col-span-full"><Choice value={d.newUser ? "new" : "existing"} onChange={(v: string) => { set({ newUser: v === "new" }); }} options={[{ id: "existing", label: t("Existing user") }, { id: "new", label: t("New person") }]} /></div>}
-                {isNew && d.newUser ? <>
-                  <Field label={t("Name")} error={fieldError("newUser.displayName")}><Input id={memberFieldId("newUser.displayName")} value={d.newName} maxLength={120} onChange={(e) => { set({ newName: e.target.value }); }} /></Field>
-                  <Field label={t("Email")} error={fieldError("newUser.email")} hint={t("Their account is created now; the set-up e-mail goes to this address")}><Input id={memberFieldId("newUser.email")} type="email" value={d.newEmail} onChange={(e) => { set({ newEmail: e.target.value }); }} /></Field>
+                {isNew && live.canWrite && <div className="col-span-full"><Choice value={d.creatingUser ? "new" : "existing"} onChange={(v: string) => { set({ creatingUser: v === "new" }); }} options={[{ id: "existing", label: t("Existing user") }, { id: "new", label: t("New person") }]} /></div>}
+                {isNew && d.creatingUser ? <>
+                  <Field label={t("Name")} error={fieldError("newUser.displayName")}><Input id={memberFieldId("newUser.displayName")} value={d.inviteName} maxLength={120} onChange={(e) => { set({ inviteName: e.target.value }); }} /></Field>
+                  <Field label={t("Email")} error={fieldError("newUser.email")} hint={t("Their account is created now; the set-up e-mail goes to this address")}><Input id={memberFieldId("newUser.email")} type="email" value={d.inviteEmail} onChange={(e) => { set({ inviteEmail: e.target.value }); }} /></Field>
                 </> : <Field label={t("User")} error={fieldError("userId")} hint={isNew ? undefined : t("Fixed after creation")}><Select id={memberFieldId("userId")} value={d.userId} disabled={!isNew || !live.canWrite} onChange={(e) => { set({ userId: e.target.value }); }}><option value="">{t("Select…")}</option>{live.users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</Select></Field>}
                 <Field label={t("Organization")} error={fieldError("organizationId")} hint={isNew ? undefined : t("Fixed after creation")}><Select id={memberFieldId("organizationId")} value={d.organizationId} disabled={!isNew || !live.canWrite} onChange={(e) => { chooseOrg(e.target.value); }}><option value="">{t("Select…")}</option>{orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</Select></Field>
               </div>

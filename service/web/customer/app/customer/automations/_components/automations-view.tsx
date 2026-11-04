@@ -6,7 +6,7 @@ import { useAction } from "@ac/web/lib/useAction";
 import { useOp } from "@ac/web/lib/useOp";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import {
-  actionGroupOf, actionLabel, actionOf, actionOptions, apiErrors, compares, compareText, dayLong, dayShort, draftErrors, draftOf, eventTest, extraChoices, extraLabel, firstAction, fitExtras, newDraft, newExtra, runClock, runText,
+  actionGroupOf, actionLabel, actionOf, actionOptions, apiErrors, compares, compareText, dayLong, dayShort, draftErrors, draftOf, eventTest, extraChoices, extraLabel, firstAction, fitExtras, blankDraft, blankExtra, runClock, runText,
   saveInput, scheduleDraft, scheduleTest, summaryNote, summaryText, testFact, triggerInfo, triggers,
   type ApiAutomation, type ApiOccurrence, type Caps, type Draft, type ExtraDraft, type RuleCard, type TestRow,
 } from "@ac/web/lib/clientAutomations";
@@ -139,7 +139,7 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
   const i18n = useI18n();
   const { t } = i18n;
   const rule = live.editing === "new" ? null : live.rules.find((r) => r.id === live.editing) ?? null;
-  const [draft, setDraft] = useState<Draft>(() => (rule ? draftOf(rule) : newDraft(live.acs[0]?.id ?? "", live.timezone)));
+  const [draft, setDraft] = useState<Draft>(() => (rule ? draftOf(rule) : blankDraft(live.acs[0]?.id ?? "", live.timezone)));
   const [apiError, setApiError] = useState<Record<string, string>>({});
   const [shown, setShown] = useState(false); // client checks shown after the first Save / Test
   const [test, setTest] = useState<TestRow[] | null>(null);
@@ -378,7 +378,7 @@ function OnlyIf({ draft, errors, set }: Readonly<{ draft: Draft; errors: Record<
       ))}
       {errors.onlyIf && <p className="flex items-center gap-1 text-xs font-medium text-crit"><Icon name="error" />{errors.onlyIf}</p>}
       <div className="flex flex-wrap items-center gap-2">
-        {adding && choices.length > 0 ? choices.map((c) => <Btn key={c} size="sm" onClick={() => { set({ extras: [...extras, newExtra(c)] }); setAdding(false); }}>{t(extraLabel[c])}</Btn>)
+        {adding && choices.length > 0 ? choices.map((c) => <Btn key={c} size="sm" onClick={() => { set({ extras: [...extras, blankExtra(c)] }); setAdding(false); }}>{t(extraLabel[c])}</Btn>)
           : <Btn size="sm" disabled={choices.length === 0} onClick={() => { setAdding(true); }}><Icon name="add" /> {t("Add condition")}</Btn>}
         <span className="text-xs text-muted-foreground">{t(choices.length === 0 && extras.length > 0 ? "No more condition types for this trigger" : "e.g. only if someone is home · only if outdoor ≥ 30°C")}</span>
       </div>
