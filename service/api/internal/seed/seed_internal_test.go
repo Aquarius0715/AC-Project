@@ -5,33 +5,9 @@ import (
 	"os"
 	"testing"
 	"time"
-
-	"github.com/jackc/pgx/v5"
 )
 
 const fixturePath = "../../../../docs/04-agentic-sdlc/fixture-contract.json"
-
-func ownerConn(t *testing.T) *pgx.Conn {
-	t.Helper()
-
-	url := os.Getenv("AC_TEST_OWNER_DATABASE_URL")
-	if url == "" {
-		//nolint:gosec // local test database password, not a secret
-		url = "postgres://postgres:local@localhost:5432/ac_test?sslmode=disable"
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	conn, err := pgx.Connect(ctx, url)
-	if err != nil {
-		t.Skip("database not available:", err)
-	}
-
-	t.Cleanup(func() { _ = conn.Close(context.Background()) })
-
-	return conn
-}
 
 // TestIDDeterministic: a fixture ID maps to one UUIDv5, and two IDs to two.
 func TestIDDeterministic(t *testing.T) {
@@ -108,7 +84,9 @@ func TestApplyFixture(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	conn := ownerConn(t)
+	// its own database: the integration suite commits users, units and modules to ac_test meanwhile (CI run
+	// 41846091547)
+	conn := scratchDB(t, "ac_seed_fixture_test")
 	ctx := context.Background()
 
 	txn, err := conn.Begin(ctx)

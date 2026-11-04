@@ -13,12 +13,9 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/migrations"
 )
 
-// scratchName is the database TestApplyAccounts builds: the test databases hold the whole fixture, so the
-// accounts-only seed is checked on an empty one.
-const scratchName = "ac_seed_accounts_test"
-
-// scratchDB is an empty database with the schema, removed after the test.
-func scratchDB(t *testing.T) *pgx.Conn {
+// scratchDB is an empty database with the schema, named name and removed after the test. The seed tests run on their
+// own: the test databases hold the whole fixture, and the integration suite adds rows to ac_test while they run.
+func scratchDB(t *testing.T, name string) *pgx.Conn {
 	t.Helper()
 
 	ctx := context.Background()
@@ -35,8 +32,8 @@ func scratchDB(t *testing.T) *pgx.Conn {
 	}
 
 	for _, statement := range []string{
-		"DROP DATABASE IF EXISTS " + scratchName + " WITH (FORCE)",
-		"CREATE DATABASE " + scratchName,
+		"DROP DATABASE IF EXISTS " + name + " WITH (FORCE)",
+		"CREATE DATABASE " + name,
 	} {
 		_, err := conn.Exec(ctx, statement)
 		if err != nil {
@@ -49,7 +46,7 @@ func scratchDB(t *testing.T) *pgx.Conn {
 		t.Fatal(err)
 	}
 
-	cfg.Database = scratchName
+	cfg.Database = name
 
 	db, err := pgx.ConnectConfig(ctx, cfg)
 	if err != nil {
@@ -58,7 +55,7 @@ func scratchDB(t *testing.T) *pgx.Conn {
 
 	t.Cleanup(func() {
 		_ = db.Close(ctx)
-		_, _ = conn.Exec(ctx, "DROP DATABASE IF EXISTS "+scratchName+" WITH (FORCE)")
+		_, _ = conn.Exec(ctx, "DROP DATABASE IF EXISTS "+name+" WITH (FORCE)")
 		_ = conn.Close(ctx)
 	})
 
@@ -117,7 +114,7 @@ func TestLiveSiteAt(t *testing.T) {
 //nolint:paralleltest // it rebuilds the scratch database ac_seed_accounts_test
 func TestApplyAccounts(t *testing.T) {
 	ctx := context.Background()
-	db := scratchDB(t)
+	db := scratchDB(t, "ac_seed_accounts_test")
 
 	fixture, err := Load(fixturePath)
 	if err != nil {
