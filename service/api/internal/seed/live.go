@@ -3,6 +3,7 @@ package seed
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -60,17 +61,20 @@ func (site Site) UnitNames() []string {
 // liveStaleAfterSeconds is when a live reading goes stale: two missed minutes (the bridge sends one reading a minute).
 const liveStaleAfterSeconds = 120
 
+// errNoLiveClient stops the live seed at a client membership the fixture does not have with a customer.
+var errNoLiveClient = errors.New("not a client of a fixture customer")
+
 // liveExec runs one statement of the live seed; what names the record in its error.
 type liveExec func(what, sql string, args ...any) error
 
 // LiveSite is where the readings of real sensor nodes land (DEC-86, IR524): a property of the fixture's Demo Customer
 // B, so that its client customer-b sees the real devices while customer-a keeps the demo data (DEC-92, IR628), with one
-// Daikin air conditioner (DEC-89, IR528). The two nodes in front of it make one module: node_1 measures the
-// room, node_2 the air conditioner's supply, and node_1's infrared LED switches it on and off. The model offers the
-// power only, the one setting the nodes' firmware takes (ON, OFF and a cooling preset). node_2 measures the room too
-// since November 2026; its temperature and humidity go to a sensor unit of its own in the same room (DEC-91, IR627).
-// The IoT bridge subscribes to the nodes' broker (REAL_MQTT_URL), sends their readings to these sensors and the power
-// commands to node_1. Development only.
+// Daikin air conditioner (DEC-89, IR528); LiveSiteAt puts it at another customer. The two nodes in front of it make
+// one module: node_1 measures the room, node_2 the air conditioner's supply, and node_1's infrared LED switches it on
+// and off. The model offers the power only, the one setting the nodes' firmware takes (ON, OFF and a cooling preset).
+// node_2 measures the room too since November 2026; its temperature and humidity go to a sensor unit of its own in the
+// same room (DEC-91, IR627). The IoT bridge subscribes to the nodes' broker (REAL_MQTT_URL), sends their readings to
+// these sensors and the power commands to node_1. Development and the shared test environment only.
 func LiveSite() Site {
 	return Site{
 		Tenant:        demoTenant,
@@ -132,14 +136,42 @@ func LiveSite() Site {
 	}
 }
 
-// ApplyLive adds the live site to a database with the fixture: a property of the fixture customer with one room, and in
-// it the air conditioner (remote power only) and the nodes' sensor units, each with its model and its module, online
-// as of now. The customer's client keeps the access without an end date, so the real devices stay in view after the
+// LiveSiteAt is the live site at the customer of another client membership of the fixture (SEED_LIVE_CLIENT): the
+// shared test environment puts the real devices at customer-a, which has none of the demo there (DEC-96). An empty
+// client keeps LiveSite. The site's own records keep their names, so a database has the site at one customer: the
+// client is chosen when the data is built.
+func LiveSiteAt(fixture *Fixture, client string) (Site, error) {
+	site := LiveSite()
+	if client == "" {
+		return site, nil
+	}
+
+	for _, actor := range fixture.Actors {
+		if actor.MembershipID != client || actor.Role != "client" {
+			continue
+		}
+
+		for _, customer := range fixture.DemoSeed.Customers {
+			if customer.OrganizationID == actor.OrganizationID &&
+				customer.TenantID == actor.TenantID {
+				site.Tenant, site.CustomerOrgID, site.Customer = customer.TenantID, customer.OrganizationID, customer.ID
+				site.CustomerName, site.Client = customer.Name, client
+
+				return site, nil
+			}
+		}
+	}
+
+	return Site{}, fmt.Errorf("live site: %q is %w", client, errNoLiveClient)
+}
+
+// ApplyLive adds the site to a database with the fixture: a property of the fixture customer with one room, and in it
+// the air conditioner (remote power only) and the nodes' sensor units, each with its model and its module, online as
+// of now. The customer's client keeps the access without an end date, so the real devices stay in view after the
 // fixture's access ends (DEC-92); an end date set since is cleared at the next start. Records that exist are kept (ON
 // CONFLICT DO NOTHING), so it can run on every start, and a unit added to the site comes in at the next start.
-// Development only: tests and production never load it.
-func ApplyLive(ctx context.Context, txn pgx.Tx, now time.Time) error {
-	site := LiveSite()
+// Development and the shared test environment only: tests and production never load it.
+func ApplyLive(ctx context.Context, txn pgx.Tx, site Site, now time.Time) error {
 	tenant := ID(site.Tenant)
 	exec := func(what, sql string, args ...any) error {
 		_, err := txn.Exec(ctx, sql, args...)

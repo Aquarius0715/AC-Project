@@ -254,6 +254,7 @@ func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 		InternalToken:     os.Getenv("INTERNAL_API_TOKEN"),
 		ServiceURLs:       serviceURLsFromEnv(),
 		Clock:             nil,
+		DemoShared:        false,
 		DemoStart:         time.Time{},
 		PrincipalTTL:      0,
 		DemoClock:         nil,
@@ -292,13 +293,15 @@ func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 		cfg.IdentityProvider = provider
 	}
 
-	if cfg.DemoOps { // fixture.clock unless DEMO_CLOCK_START overrides it (IR36); shared with the workers (IR168)
+	// fixture.clock unless DEMO_CLOCK_START overrides it (IR36), or the real clock (now, DEC-96); shared with the
+	// workers (IR168)
+	if cfg.DemoOps {
 		start, err := democlock.StartFromEnv(os.Getenv)
 		if err != nil {
 			return cfg, fmt.Errorf("DEMO_CLOCK_START: %w", err)
 		}
 
-		cfg.DemoStart = start
+		cfg.DemoShared, cfg.DemoStart = true, start
 	}
 
 	return cfg, nil

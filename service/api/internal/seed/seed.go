@@ -263,6 +263,22 @@ func tenantOfOrg(f *Fixture) map[string]string {
 // Apply inserts the fixture inside tx. It must run as the schema owner (seeding bypasses row-level security)
 // and is idempotent: rows that already exist are left unchanged.
 func Apply(ctx context.Context, txn pgx.Tx, fixture *Fixture) error {
+	return apply(ctx, txn, fixture, false)
+}
+
+// ApplyAccounts inserts the fixture's accounts only, as Apply does (DEC-96: the shared test environment, where only
+// the real devices are added): the tenants and organizations, the people with their memberships, permissions,
+// qualifications and organization or tenant scopes, the customers with their user lists, the consents and the default
+// alert policies. No access ends, but an external technician's, which must end (FR-A03), far ahead; the
+// qualifications hold as long, because the fixture's dates are the demo scenario's. The fixture's places, models,
+// devices, readings and business records stay out, and with them the unit scopes and the demo rule setting that name
+// them.
+func ApplyAccounts(ctx context.Context, txn pgx.Tx, fixture *Fixture) error {
+	return apply(ctx, txn, fixture, true)
+}
+
+// apply is Apply, or ApplyAccounts when accountsOnly.
+func apply(ctx context.Context, txn pgx.Tx, fixture *Fixture, accountsOnly bool) error {
 	exec := func(sql string, args ...any) error {
 		_, err := txn.Exec(ctx, sql, args...)
 
@@ -283,15 +299,52 @@ func Apply(ctx context.Context, txn pgx.Tx, fixture *Fixture) error {
 		defer func() { _, _ = txn.Exec(ctx, `SELECT set_config('app.now', '', true)`) }()
 	}
 
-	run := newSeeding(exec, fixture)
+	run := newSeeding(exec, fixture, accountsOnly)
 	// the records a row names come before it; the business records (IR161) follow the demo's places and devices, and
 	// the default alert policies come last
-	for _, step := range []func() error{
-		run.tenants, run.organizations, run.actors, run.capabilities, run.customers, run.properties, run.spaces,
-		run.units, run.devices, run.measurements, run.allergens, run.factors, run.baselines, run.consents,
-		run.companyUsers, run.contracts, run.invoices, run.restrictions, run.commands, run.alerts, run.notifications,
-		run.jobs, run.offers, run.assignments, run.rateCards, run.filterCleanings, run.jobEvents, run.policies,
-	} {
+	steps := []func() error{
+		run.tenants,
+		run.organizations,
+		run.actors,
+		run.capabilities,
+		run.customers,
+		run.properties,
+		run.spaces,
+		run.units,
+		run.devices,
+		run.measurements,
+		run.allergens,
+		run.factors,
+		run.baselines,
+		run.consents,
+		run.companyUsers,
+		run.contracts,
+		run.invoices,
+		run.restrictions,
+		run.commands,
+		run.alerts,
+		run.notifications,
+		run.jobs,
+		run.offers,
+		run.assignments,
+		run.rateCards,
+		run.filterCleanings,
+		run.jobEvents,
+		run.policies,
+	}
+	if accountsOnly {
+		steps = []func() error{
+			run.tenants,
+			run.organizations,
+			run.actors,
+			run.customers,
+			run.consents,
+			run.companyUsers,
+			run.policies,
+		}
+	}
+
+	for _, step := range steps {
 		err := step()
 		if err != nil {
 			return err
@@ -309,20 +362,22 @@ type execSQL func(sql string, args ...any) error
 // contract, job and membership, the customer organization of each unit and the customer of each contract. The business
 // records take their tenants from the customers and units they name (IR161).
 type seeding struct {
-	exec    execSQL
-	fixture *Fixture
-	hq      uuid.UUID
+	exec         execSQL
+	fixture      *Fixture
+	hq           uuid.UUID
+	accountsOnly bool // ApplyAccounts: the accounts without an end of access, and nothing that names the demo's places
 
 	orgTenant, propertyTenant, unitTenant, unitOrg, memberTenant map[string]string
 	customerTenant, contractTenant, contractCustomer, jobTenant  map[string]string
 }
 
-// newSeeding prepares a run of Apply on the fixture.
-func newSeeding(exec execSQL, fixture *Fixture) *seeding {
+// newSeeding prepares a run of Apply, or of ApplyAccounts when accountsOnly, on the fixture.
+func newSeeding(exec execSQL, fixture *Fixture, accountsOnly bool) *seeding {
 	run := &seeding{
 		exec:             exec,
 		fixture:          fixture,
 		hq:               ID("hq-operator"),
+		accountsOnly:     accountsOnly,
 		orgTenant:        tenantOfOrg(fixture),
 		propertyTenant:   map[string]string{},
 		unitTenant:       map[string]string{},
@@ -437,7 +492,7 @@ func (s *seeding) actors() error {
 			actor.ClientRole,
 			max(actor.ScopeVersion, 1),
 			actor.ValidFrom,
-			actor.ValidUntil,
+			s.accessUntil(actor.Role, actor.Employment, actor.ValidUntil),
 		)
 		if err != nil {
 			return fmt.Errorf("membership %s: %w", actor.MembershipID, err)
@@ -465,7 +520,7 @@ func (s *seeding) actors() error {
 				ID(actor.MembershipID),
 				qualification.Code,
 				qualification.ValidFrom,
-				qualification.ValidUntil,
+				s.grantUntil(qualification.ValidUntil),
 				qualification.RevokedAt,
 			)
 			if err != nil {
@@ -474,6 +529,10 @@ func (s *seeding) actors() error {
 		}
 
 		for _, scope := range actor.Scopes {
+			if s.accountsOnly && (scope.Kind == "property" || scope.Kind == "unit") {
+				continue // ApplyAccounts loads none of the fixture's places
+			}
+
 			err := s.exec(
 				`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES ($1,$2,$3,$4) ON CONFLICT DO
 					NOTHING`,
@@ -489,6 +548,36 @@ func (s *seeding) actors() error {
 	}
 
 	return nil
+}
+
+// accountsUntil is the end ApplyAccounts gives where the schema needs one (an external technician's access, every
+// qualification): after the shared test environment will have ended, and near enough that a time.Duration from now
+// still reaches it.
+func accountsUntil() time.Time { return time.Date(2099, time.December, 31, 0, 0, 0, 0, time.UTC) }
+
+// accessUntil is the end of an actor's access: the fixture's, or in ApplyAccounts none, but for an external
+// technician, whose access must end (FR-A03).
+func (s *seeding) accessUntil(role string, employment *string, until *time.Time) *time.Time {
+	if !s.accountsOnly {
+		return until
+	}
+
+	if role == "technician" && employment != nil && *employment == "external" {
+		end := accountsUntil()
+
+		return &end
+	}
+
+	return nil
+}
+
+// grantUntil is the end of a qualification: the fixture's, or accountsUntil in ApplyAccounts.
+func (s *seeding) grantUntil(until time.Time) time.Time {
+	if s.accountsOnly {
+		return accountsUntil()
+	}
+
+	return until
 }
 
 // capabilities inserts the models' capabilities, each the current version.
@@ -979,8 +1068,8 @@ func clientMemberships(f *Fixture) []uuid.UUID {
 	return out
 }
 
-// policies seeds the IR120 default policy of each tenant (owned by its first HQ actor) and the customer-actor demo
-// setting that switches the AC offline rule off.
+// policies seeds the IR120 default policy of each tenant (owned by its first HQ actor) and, but in ApplyAccounts, the
+// customer-actor demo setting that switches the AC offline rule off.
 func (s *seeding) policies() error {
 	rules, err := json.Marshal(monitoring.DefaultRules())
 	if err != nil {
@@ -1011,7 +1100,8 @@ func (s *seeding) policies() error {
 			return fmt.Errorf("default policy %s: %w", actor.TenantID, err)
 		}
 
-		if actor.TenantID == demoTenant {
+		if actor.TenantID == demoTenant &&
+			!s.accountsOnly { // the demo setting names a customer of the demo
 			err := s.exec(
 				`INSERT INTO monitoring.default_rule_settings (tenant_id, policy_id, rule_key, customer_id, enabled,
 					changed_by_membership_id, reason)

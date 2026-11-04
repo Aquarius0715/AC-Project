@@ -25,6 +25,7 @@ x-worker: &worker             # cmd/worker (independent service, IR166/IR174)
   environment:
     DATABASE_URL: postgres://ac_app_login:local@postgres:5432/ac?sslmode=disable
     DEMO_OPS: "1"                                       # scenario clock shared with the API (platform.demo_clock, IR168)
+    DEMO_CLOCK_START: ${DEMO_CLOCK_START:-}             # empty: from fixture.clock; now: the real clock (deploy/test, DEC-96)
     # the apps that links in e-mails open (the defaults are this machine; deploy/test names the shared test URLs)
     APP_URL_CUSTOMER: ${CUSTOMER_WEB_URL:-http://localhost:3000}
     APP_URL_PARTNER: ${PARTNER_WEB_URL:-http://localhost:3001}
@@ -45,6 +46,7 @@ x-backend: &backend          # Core API business-domain services (service/api/cm
   environment: &backend-env
     APP_ENV: local
     DEMO_OPS: "1"                                       # demo.advanceClock / demo.trigger (IR154); never set in production
+    DEMO_CLOCK_START: ${DEMO_CLOCK_START:-}             # empty: from fixture.clock; now: the real clock (deploy/test, DEC-96)
     DATABASE_URL: postgres://ac_app_login:local@postgres:5432/ac?sslmode=disable
     DATABASE_READER_URL: postgres://ac_app_login:local@postgres:5432/ac?sslmode=disable
     AWS_REGION: ap-southeast-5
@@ -217,6 +219,7 @@ services:
       SEED_FIXTURE: /fixture/fixture-contract.json     # local only: skipped when identity.users has rows
       SEED_MOCK_FLEET: "1"                             # local only: one air conditioner and IoT module per state pattern (internal/devicesim/fleet.json)
       SEED_LIVE_SENSORS: ${REAL_MQTT_URL:+1}           # local only: the live site of real sensor nodes when .env.local names their broker (DEC-86)
+      DEMO_CLOCK_START: ${DEMO_CLOCK_START:-}           # now: the live site as of now, on the real clock (deploy/test, DEC-96)
     volumes: [./docs/04-agentic-sdlc/fixture-contract.json:/fixture/fixture-contract.json:ro]
     read_only: true
     cap_drop: [ALL]             # IR373
@@ -340,6 +343,7 @@ services:
     environment:
       DATABASE_URL: postgres://ac_app_login:local@postgres:5432/ac?sslmode=disable
       DEMO_OPS: "1"
+      DEMO_CLOCK_START: ${DEMO_CLOCK_START:-}
       MAIL_SMTP_ADDR: mailpit:1025
       MAIL_FROM: AC Project <no-reply@ac-project.local>
       APP_URL_CUSTOMER: ${CUSTOMER_WEB_URL:-http://localhost:3000}

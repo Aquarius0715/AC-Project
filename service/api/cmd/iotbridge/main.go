@@ -304,12 +304,11 @@ func startLive(
 		liveOptions(raw, host, topic, liveReadings(ctx, clock, httpc, endpoint, api)),
 	)
 	client.Connect() // not waited for: the client keeps trying while the broker is out of reach
-	log.Printf(
-		"iot-bridge: live sensors from %s (%s) → %s of %s",
+	log.Printf(      // the units' customer is the database's (migrate's SEED_LIVE_CLIENT)
+		"iot-bridge: live sensors from %s (%s) → %s",
 		strconv.Quote(host),
 		strconv.Quote(topic),
 		strings.Join(seed.LiveSite().UnitNames(), ", "),
-		seed.LiveSite().CustomerName,
 	)
 
 	control := newLiveControl(

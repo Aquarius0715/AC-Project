@@ -175,15 +175,41 @@ func TestMissingRowKeepsOffset(t *testing.T) {
 	}
 }
 
+// TestRealTimeStart (DEC-96): a scenario that starts on the real clock (the zero start of DEMO_CLOCK_START=now) is
+// stored at offset 0, so every process reads the base clock until demo.advanceClock moves it.
+//
+//nolint:paralleltest // every test rebuilds the same scratch database ac_democlock_test
+func TestRealTimeStart(t *testing.T) {
+	pool := scratch(t)
+	wall := time.Date(2026, 11, 4, 12, 0, 0, 0, time.UTC)
+
+	clock := open(t, pool, func() time.Time { return wall }, time.Time{})
+	if got := clock.Now(); !got.Equal(wall) {
+		t.Fatalf("Now = %v, want the base clock %v", got, wall)
+	}
+
+	var offsetMS int64
+
+	err := pool.QueryRow(t.Context(), `SELECT offset_ms FROM platform.demo_clock`).Scan(&offsetMS)
+	if err != nil || offsetMS != 0 {
+		t.Fatalf("stored offset %d ms, %v; want 0", offsetMS, err)
+	}
+}
+
 func TestStartFromEnv(t *testing.T) {
 	t.Parallel()
 
-	s, err := democlock.StartFromEnv(
+	start, err := democlock.StartFromEnv(
 		func(string) string { return "" },
 	)
 	if err != nil ||
-		s.Format(time.RFC3339) != democlock.DefaultStart {
-		t.Fatalf("default = %v, %v", s, err)
+		start.Format(time.RFC3339) != democlock.DefaultStart {
+		t.Fatalf("default = %v, %v", start, err)
+	}
+
+	start, err = democlock.StartFromEnv(func(string) string { return democlock.RealTime })
+	if err != nil || !start.IsZero() {
+		t.Fatalf("now = %v, %v; want the zero start", start, err)
 	}
 
 	_, err = democlock.StartFromEnv(func(string) string { return "soon" })

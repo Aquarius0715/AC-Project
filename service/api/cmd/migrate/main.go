@@ -9,7 +9,10 @@
 // Local and CI only: APP_LOGIN_PASSWORD creates or updates the ac_app_login role and the domain service logins
 // ac_<domain>_login (IR194), and SEED_FIXTURE loads the demo fixture once (skipped when identity.users already has
 // rows). With the fixture, SEED_MOCK_FLEET=1 adds the mock fleet and SEED_LIVE_SENSORS=1 the live sensor site
-// (DEC-86); both keep what exists, so they run on every start.
+// (DEC-86); both keep what exists, so they run on every start. The shared test environment (DEC-96) loads the
+// fixture's accounts only (SEED_ACCOUNTS_ONLY=1) and puts the live site at the customer of another client of the
+// fixture (SEED_LIVE_CLIENT, customer-b when empty), as of now when the scenario runs on the real clock
+// (DEMO_CLOCK_START=now).
 package main
 
 import (
@@ -21,6 +24,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -29,6 +33,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/migrate"
 	"github.com/pradita/ac-project/service/api/internal/migrations"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/democlock"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -207,7 +212,7 @@ func local(ctx context.Context, conn *pgx.Conn) error {
 		return nil
 	}
 
-	fixture, err := seedFixture(ctx, conn, path)
+	fixture, err := seedFixture(ctx, conn, path, os.Getenv("SEED_ACCOUNTS_ONLY") == "1")
 	if err != nil {
 		return err
 	}
@@ -218,23 +223,42 @@ func local(ctx context.Context, conn *pgx.Conn) error {
 			return err
 		}
 	}
-	// SEED_LIVE_SENSORS=1 (development only): the live site that real sensor nodes report to (DEC-86, IR524)
+	// SEED_LIVE_SENSORS=1 (development and the shared test environment): the live site that real sensor nodes report to
+	// (DEC-86, IR524)
 	if os.Getenv("SEED_LIVE_SENSORS") == "1" {
-		err := pgx.BeginFunc(
-			ctx,
-			conn,
-			func(tx pgx.Tx) error { return seed.ApplyLive(ctx, tx, fixture.SeedCreatedAt) },
-		)
-		if err != nil {
-			return apperr.Wrap(err, "transaction")
-		}
-
-		log.Printf(
-			"migrate: live sensor site of %s ready (%s)",
-			seed.LiveSite().CustomerName,
-			strings.Join(seed.LiveSite().UnitNames(), ", "),
-		)
+		return seedLive(ctx, conn, fixture)
 	}
+
+	return nil
+}
+
+// seedLive adds the live sensor site at the customer of the client SEED_LIVE_CLIENT names (customer-b when empty), as
+// of the fixture's seed time, or of now when the scenario runs on the real clock (DEMO_CLOCK_START=now, DEC-96).
+func seedLive(ctx context.Context, conn *pgx.Conn, fixture *seed.Fixture) error {
+	site, err := seed.LiveSiteAt(fixture, os.Getenv("SEED_LIVE_CLIENT"))
+	if err != nil {
+		return apperr.Wrap(err, "seed.LiveSiteAt")
+	}
+
+	since := fixture.SeedCreatedAt
+	if os.Getenv("DEMO_CLOCK_START") == democlock.RealTime {
+		since = time.Now().UTC()
+	}
+
+	err = pgx.BeginFunc(
+		ctx,
+		conn,
+		func(tx pgx.Tx) error { return seed.ApplyLive(ctx, tx, site, since) },
+	)
+	if err != nil {
+		return apperr.Wrap(err, "transaction")
+	}
+
+	log.Printf( // quoted: SEED_LIVE_CLIENT chose the site's customer
+		"migrate: live sensor site of %s ready (%s)",
+		strconv.Quote(site.CustomerName),
+		strconv.Quote(strings.Join(site.UnitNames(), ", ")),
+	)
 
 	return nil
 }
@@ -266,8 +290,14 @@ func ensureLogins(ctx context.Context, conn *pgx.Conn, password string) error {
 	return nil
 }
 
-// seedFixture loads the demo fixture at path once: a database whose identity.users has rows keeps what it has.
-func seedFixture(ctx context.Context, conn *pgx.Conn, path string) (*seed.Fixture, error) {
+// seedFixture loads the demo fixture at path once, or its accounts only: a database whose identity.users has rows keeps
+// what it has.
+func seedFixture(
+	ctx context.Context,
+	conn *pgx.Conn,
+	path string,
+	accountsOnly bool,
+) (*seed.Fixture, error) {
 	done, err := migrate.Seeded(ctx, conn)
 	if err != nil {
 		return nil, apperr.Wrap(err, "migrate.Seeded")
@@ -284,20 +314,21 @@ func seedFixture(ctx context.Context, conn *pgx.Conn, path string) (*seed.Fixtur
 		return fixture, nil
 	}
 
-	err = pgx.BeginFunc(
-		ctx,
-		conn,
-		func(tx pgx.Tx) error { return seed.Apply(ctx, tx, fixture) },
+	apply, seeded := seed.Apply, fmt.Sprintf(
+		"%d actors, %d units",
+		len(fixture.Actors),
+		len(fixture.DemoSeed.Units),
 	)
+	if accountsOnly {
+		apply, seeded = seed.ApplyAccounts, fmt.Sprintf("the %d accounts only", len(fixture.Actors))
+	}
+
+	err = pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error { return apply(ctx, tx, fixture) })
 	if err != nil {
 		return nil, apperr.Wrap(err, "transaction")
 	}
 
-	log.Printf(
-		"migrate: seeded %d actors, %d units",
-		len(fixture.Actors),
-		len(fixture.DemoSeed.Units),
-	)
+	log.Printf("migrate: seeded %s", seeded)
 
 	return fixture, nil
 }
