@@ -55,18 +55,28 @@ export interface OverviewRow {
   id: string; name: string; place: string; observed: string; temp: string | null; hum: string | null; power: string | null;
   state: "running" | "stopped" | "unknown"; conn: "online" | "offline" | "connecting" | "unknown" | "error";
 }
+const POWER_STATE = new Map<string, OverviewRow["state"]>([["on", "running"], ["off", "stopped"]]);
+/** Down for less energy than before, up for more, a dash for the same. */
+function trendIcon(delta: number): IconName {
+  if (delta < 0) return "arrowDown";
+  return delta > 0 ? "arrowUp" : "remove";
+}
 /** One row per unit: the latest valid room temperature, humidity and power (W); missing readings stay empty. */
 export function overviewRows(units: OverviewUnit[], place: (u: OverviewUnit) => string, i: I18n = EN): OverviewRow[] {
   return units.map((u) => {
     const t = latestOf(u, "temperature"), h = latestOf(u, "humidity"), p = latestOf(u, "power");
     const last = [t, h, p].filter((m): m is ApiMeasurement => !!m).map((m) => m.observedAt).toSorted(byText).at(-1);
-    const watts = current(p) === null ? null : Math.round(p!.unit === "kW" ? p!.value! * 1000 : p!.value!);
+    const power = current(p);
+    const perUnit = p?.unit === "kW" ? 1000 : 1;
+    const watts = power === null ? null : Math.round(power * perUnit);
+    const reading = last ? showClock(last, i.display) : i.t("no reading yet");
+    const seen = u.lastSeenAt ? showTime(u.lastSeenAt, i.display) : i.t("never");
     return {
       id: u.id, name: u.displayName, place: place(u),
-      observed: u.connection === "online" ? (last ? showClock(last, i.display) : i.t("no reading yet")) : i.t("last seen {when}", { when: u.lastSeenAt ? showTime(u.lastSeenAt, i.display) : i.t("never") }),
+      observed: u.connection === "online" ? reading : i.t("last seen {when}", { when: seen }),
       temp: current(t) === null ? null : airNumber("temperature", current(t)!), hum: current(h) === null ? null : airNumber("humidity", current(h)!),
       power: watts === null ? null : String(watts),
-      state: u.effectivePowerState === "on" ? "running" : (u.effectivePowerState === "off" ? "stopped" : "unknown"), conn: u.connection,
+      state: POWER_STATE.get(u.effectivePowerState) ?? "unknown", conn: u.connection,
     };
   });
 }
@@ -81,7 +91,7 @@ export function energyCard(kind: OverviewPeriod, selected: ApiEnergySummary | nu
   const delta = total !== null && was !== null && was > 0 ? Math.round(((total - was) / was) * 100) : null;
   return {
     sub: `${i.t(periodLabel[kind])} · ${scope}`, total: total === null ? null : one(total),
-    delta: delta === null ? null : { text: i.t("{pct}% vs {previous} ({kWh} kWh)", { pct: Math.abs(delta), previous: i.t(previousName[kind]), kWh: one(was!) }), icon: delta < 0 ? "arrowDown" : (delta > 0 ? "arrowUp" : "remove"), tone: delta <= 0 ? "ok" : "warn" },
+    delta: delta === null ? null : { text: i.t("{pct}% vs {previous} ({kWh} kWh)", { pct: Math.abs(delta), previous: i.t(previousName[kind]), kWh: one(was!) }), icon: trendIcon(delta), tone: delta <= 0 ? "ok" : "warn" },
     labels: week.map((d) => d.label), series: [before.map((v) => v ?? 0), week.map((d) => d.kWh ?? 0)], gaps: week.some((d) => d.kWh === null) || before.includes(null),
   };
 }
@@ -93,9 +103,10 @@ export function emissionsCard(selected: ApiEnergySummary | null, baselineLabel: 
   const e = selected?.totals.emissionsKg ?? null;
   const saved = selected?.totals.savedEmissionsKg ?? null;
   const f = selected?.factorSnapshot ?? null;
+  const label = baselineLabel ? ` (${baselineLabel})` : "";
   return {
     total: e === null ? null : one(e), factor: f ? i.t("{region} {year} · {factor} kgCO₂e/kWh (demo factor)", { region: f.region, year: f.year, factor: f.kgCO2ePerKWh }) : null,
-    baseline: e === null || saved === null ? null : `${one(e + saved)} kgCO₂e${baselineLabel ? ` (${baselineLabel})` : ""}`, saved: saved === null ? null : `${one(saved)} kgCO₂e`,
+    baseline: e === null || saved === null ? null : `${one(e + saved)} kgCO₂e${label}`, saved: saved === null ? null : `${one(saved)} kgCO₂e`,
   };
 }
 

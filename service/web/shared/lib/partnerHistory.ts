@@ -37,6 +37,17 @@ export function eventSummary(events: (ApiJobEvent & { note?: ApiEvent["note"] })
   return { count: events.length, customerVisible: events.filter((item) => customerVisible(item)).length, notes: events.filter((e) => e.note).length, latest: latest ? { action: latest.action, occurredAt: latest.occurredAt } : null };
 }
 const ACTIVE = new Set(["accepted", "assigned", "in_progress", "on_hold", "rework_requested"]);
+const DONE_TAB = new Map<string, "review" | "completed">([["submitted", "review"], ["completed", "completed"]]);
+/** The delegation's end: ended at a past time, or until a later one. */
+function delegationText(until: string, now: number, { t, display }: I18n): string {
+  const time = showTime(until, display);
+  return t(Date.parse(until) <= now ? "ended {time}" : "until {time}", { time });
+}
+/** An event's tone: a review or completion is ok, a setback warns, anything else is plain. */
+function eventTone(action: string): "ok" | "warn" | undefined {
+  if (/reviewed|accepted|completed/.test(action)) return "ok";
+  return /rework|cant_make|held|cancel|problem/.test(action) ? "warn" : undefined;
+}
 const STATUS_LABEL: Record<string, string> = {
   accepted: "Accepted", assigned: "Assigned", in_progress: "In progress", on_hold: "On hold", rework_requested: "Rework requested", submitted: "Submitted", completed: "Completed", cancelled: "Cancelled",
 };
@@ -70,8 +81,8 @@ export function historyRow(j: ApiPartnerJob, now: number, units: Map<string, str
   const ack = ACKS[j.assignmentAcknowledgement ?? ""];
   const isOverdue = (j.status === "assigned" || j.status === "in_progress") && !!j.scheduledSlot && Date.parse(j.scheduledSlot.endAt) <= now;
   const until = j.accessValidUntil ?? null;
-  const delegation = until ? t(Date.parse(until) <= now ? "ended {time}" : "until {time}", { time: showTime(until, display) }) : "—";
-  const tab = ACTIVE.has(j.status) ? "active" : j.status === "submitted" ? "review" : j.status === "completed" ? "completed" : null;
+  const delegation = until ? delegationText(until, now, i) : "—";
+  const tab = ACTIVE.has(j.status) ? "active" : (DONE_TAB.get(j.status) ?? null);
   return {
     id: j.id,
     short: j.id.slice(0, 8),
@@ -107,7 +118,7 @@ export function eventItem(e: ApiEvent, byUser: Map<string, string>, i: I18n = EN
   const { t, display } = i;
   const actor = e.actorUserId ? byUser.get(e.actorUserId) ?? null : t("system");
   const detail = [e.note ? `“${e.note.message}” · ${t(e.note.visibility)}` : "", actor ? t("by {name}", { name: actor }) : ""].filter(Boolean).join(" · ");
-  const tone = /reviewed|accepted|completed/.test(e.action) ? "ok" : (/rework|cant_make|held|cancel|problem/.test(e.action) ? "warn" : undefined);
+  const tone = eventTone(e.action);
   return { id: e.id, title: eventTitle(e.action, t), at: showTime(e.occurredAt, display), badge: customerVisible(e) ? "customer" : "internal", detail, tone };
 }
 /** Who acted, by user: the company's members by name and the signed-in user as “you”. */

@@ -19,6 +19,8 @@ export type ApiUnitJob =
   | { projection: "history"; jobId: string; type: string; status: string; completedAt: string | null }
   | { projection: "offer"; jobId: string; type: string; status: string };
 
+// the mode word after On; any other mode is fan only
+const MODE_WORD: Record<string, string> = { cool: "cooling", dry: "drying" };
 const SCOPE: Record<string, string> = { indoor: "Indoor unit", outdoor: "Outdoor unit", electrical: "Electrical / control" };
 const QUALITY: Record<string, { text: string; tone?: "warn" | "crit" }> = { valid: { text: "good" }, stale: { text: "stale", tone: "warn" }, suspect: { text: "suspect", tone: "crit" }, missing: { text: "missing", tone: "warn" } };
 const EVIDENCE: Record<string, string> = { inferred: "Suspected", inspection: "Inspection record", demo_observation: "Observed (demo)" };
@@ -96,7 +98,8 @@ export function readingRows(d: ApiUnitDetail, i: I18n = EN): { rows: { label: st
     return { label: label(m.metric, t), value: m.value === null ? `— · ${t(q.text)}` : `${airNumber(m.metric, m.value)} ${m.unit} · ${t(q.text)}`, tone: q.tone };
   });
   const s = d.observedState;
-  if (s.power !== null) rows.push({ label: t("Power state"), value: s.power ? `${t("On")}${s.mode ? ` · ${t(s.mode === "cool" ? "cooling" : (s.mode === "dry" ? "drying" : "fan only"))}` : ""}` : t("Off"), tone: undefined });
+  const mode = s.mode ? ` · ${textOf(MODE_WORD, s.mode, t) ?? t("fan only")}` : "";
+  if (s.power !== null) rows.push({ label: t("Power state"), value: s.power ? `${t("On")}${mode}` : t("Off"), tone: undefined });
   return { rows, observed: s.observedAt ? showTime(s.observedAt, display) : "—" };
 }
 
@@ -122,10 +125,18 @@ export function snapshotRows(h: ApiHistory, i: I18n = EN): [string, string][] {
   const { t, display } = i;
   const decision = [...h.ownDecisionEvents].filter((e) => e.action === "offer.accepted" || e.action === "offer.declined").toSorted((a, b) => b.occurredAt.localeCompare(a.occurredAt))[0];
   const report = h.redactedReportSummary ?? null;
+  const decisionText = () => {
+    if (!decision) return "—";
+    return `${t(decision.action === "offer.accepted" ? "Accepted" : "Declined")} · ${showTime(decision.occurredAt, display)}`;
+  };
+  const reportText = () => {
+    if (!report?.hasReport) return t("No report");
+    return t(report.acceptance === "accepted" ? "Submitted · accepted" : "Submitted · not accepted");
+  };
   return [
-    [t("Your decision"), decision ? `${t(decision.action === "offer.accepted" ? "Accepted" : "Declined")} · ${showTime(decision.occurredAt, display)}` : "—"],
+    [t("Your decision"), decisionText()],
     [t("Work"), `${statusWord(h.status, t)}${h.completedAt ? ` · ${showDate(h.completedAt, display)}` : ""}`],
-    [t("Report"), report?.hasReport ? t(report.acceptance === "accepted" ? "Submitted · accepted" : "Submitted · not accepted") : t("No report")],
+    [t("Report"), reportText()],
     [t("Live unit values"), t("Not available after the period")],
   ];
 }

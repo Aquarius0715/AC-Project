@@ -1,7 +1,7 @@
 // Admin dashboard KPIs (FR-A01, IR115): admin.summary projected into the KPI tiles. Pure code shared by the
 // Server Component that reads it and the client view. Texts in the display language (`t` / `i`, IR289); the as-of time
 // in the user's display time zone (IR44), the period in Kuala Lumpur days (named so).
-import { EN, showClock, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { byCount, EN, showClock, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { statusWord } from "@ac/web/lib/partnerJobDetail";
 import { coveragePct, warningShort } from "@ac/web/lib/energy";
 import { money as formatMoney } from "@ac/web/lib/money";
@@ -32,7 +32,7 @@ export function kpisFrom(a: AdminSummary, t: T = en): Kpis {
     kwh: e?.totals.kWh == null ? "—" : `${e.totals.kWh.toFixed(1)} kWh`,
     kwhSub: t("measured · coverage {coverage} · cost {cost}", { coverage: e?.coverage == null ? "—" : `${coveragePct(e.coverage, 0)}%`, cost: e?.totals.amountMinor == null ? "—" : formatMoney(e.totals.amountMinor, "MYR") }),
     billing: a.billingVisibility === "forbidden" ? t("Not permitted") : (a.amountsByCurrency ?? []).map((item) => money(item)).join(" · ") || "0.00 MYR",
-    billingSub: a.billingVisibility === "forbidden" ? t("billing.read required") : t(overdue === 1 ? "1 overdue invoice · unpaid, per currency" : "{n} overdue invoices · unpaid, per currency", { n: overdue }),
+    billingSub: a.billingVisibility === "forbidden" ? t("billing.read required") : byCount(overdue, { one: t("1 overdue invoice · unpaid, per currency"), many: t("{n} overdue invoices · unpaid, per currency", { n: overdue }) }),
     jobs: Object.values(a.jobCounts).reduce((x, y) => x + y, 0), online: a.online, offline: a.offline, connUnknown: a.unknown,
   };
 }
@@ -69,21 +69,36 @@ export type ForecastView =
       actual: { value: string; sub: string }; coverage: string; warnings: string[] }
   | { state: "none"; text: string; warnings: string[] };
 const direction = (v: number, unit: string, t: T) => {
-  return (v > 0 ? { text: t("Expected reduction {value}", { value: unit === "%" ? `${v.toFixed(1)}%` : kwh(v) }), tone: "ok" as const }
-    : (v < 0 ? { text: t("Expected increase {value}", { value: unit === "%" ? `${Math.abs(v).toFixed(1)}%` : kwh(Math.abs(v)) }), tone: "crit" as const } : { text: t("No change 0.0"), tone: "muted" as const }));
+  const size = unit === "%" ? `${Math.abs(v).toFixed(1)}%` : kwh(Math.abs(v));
+  if (v > 0) return { text: t("Expected reduction {value}", { value: size }), tone: "ok" as const };
+  if (v < 0) return { text: t("Expected increase {value}", { value: size }), tone: "crit" as const };
+  return { text: t("No change 0.0"), tone: "muted" as const };
 };
+// the warnings that say why there is no forecast at all, in the order the title names them
+const NONE_REASONS = ["no_units", "baseline_unavailable"] as const;
+function noneTitle(why: string | null, t: T): string {
+  if (why === "no_units") return t("No target equipment");
+  if (why === "baseline_unavailable") return t("Baseline not set");
+  return t("Cannot calculate");
+}
+/** The baseline under the forecast: its ID and version, method and total, or the word alone without one. */
+function baselineSub(f: ApiForecast, t: T): string {
+  const b = f.baselineSnapshot;
+  if (!b) return t("baseline");
+  const total = b.baselineKWh === null ? "" : ` · ${thousands(b.baselineKWh)} kWh`;
+  return `${f.baselineRef?.id.slice(0, 8) ?? b.id.slice(0, 8)} v${String(f.baselineRef?.version ?? b.version)} · ${b.method}${total}`;
+}
 /** The energy-saving forecast card (IR78): a forecast from a prorated demo_fixed baseline, never a measured saving. */
 export function forecastView(f: ApiForecast | null | undefined, t: T = en): ForecastView {
   if (!f || f.forecastSavedKWh === null || f.predictedBaselineKWh === null || f.predictedActualKWh === null) {
     const w = f?.qualityWarnings ?? [];
-    const why = w.includes("no_units") ? "no_units" : (w.includes("baseline_unavailable") ? "baseline_unavailable" : null);
+    const why = NONE_REASONS.find((x) => w.includes(x)) ?? null;
     // the badges name the other warnings in words; the one the title already says is not repeated (IR577)
-    return { state: "none", text: t(why === "no_units" ? "No target equipment" : (why === "baseline_unavailable" ? "Baseline not set" : "Cannot calculate")), warnings: w.filter((x) => x !== why).map((x) => warningShort(x, t)) };
+    return { state: "none", text: noneTitle(why, t), warnings: w.filter((x) => x !== why).map((x) => warningShort(x, t)) };
   }
-  const b = f.baselineSnapshot;
   return {
     state: "ok", saved: direction(f.forecastSavedKWh, "kWh", t), rate: f.forecastSavingPercentage === null ? { text: "—", tone: "muted" } : direction(f.forecastSavingPercentage, "%", t),
-    baseline: { value: kwh(f.predictedBaselineKWh), sub: b ? `${f.baselineRef?.id.slice(0, 8) ?? b.id.slice(0, 8)} v${String(f.baselineRef?.version ?? b.version)} · ${b.method}${b.baselineKWh === null ? "" : ` · ${thousands(b.baselineKWh)} kWh`}` : t("baseline") },
+    baseline: { value: kwh(f.predictedBaselineKWh), sub: baselineSub(f, t) },
     actual: { value: kwh(f.predictedActualKWh), sub: t("{actual} on valid slots ÷ {valid} × {expected} unit-min", { actual: f.actualKWhOnValidSlots === null ? "—" : kwh(f.actualKWhOnValidSlots), valid: thousands(f.validUnitMinutes), expected: thousands(f.expectedUnitMinutes) }) },
     coverage: t("{valid} / {expected} unit-min", { valid: thousands(f.validUnitMinutes), expected: thousands(f.expectedUnitMinutes) }), warnings: f.qualityWarnings.map((x) => warningShort(x, t)),
   };

@@ -21,6 +21,8 @@ export const sortOf = (v?: string): ScheduleSort => (SORTS.some((s) => s.id === 
 type Tone = "crit" | "warn" | "ok" | "primary" | "muted";
 const ended = (s: Slot | null, now: number) => !!s && Date.parse(s.endAt) <= now;
 const ACKS: Record<string, string> = { accepted: "accepted", cant_make: "can’t make it" };
+// the job's state in a reassignment title; any other state is rework
+const WORK_STATE: Record<string, string> = { in_progress: "in progress", on_hold: "on hold" };
 
 export interface ScheduleRow {
   id: string; short: string; title: string; line: string; tone?: Tone;
@@ -47,14 +49,16 @@ export function scheduleRow(j: ApiPartnerJob, now: number, units: Map<string, st
   const elapsedPct = span > 0 ? Math.min(100, Math.max(0, Math.round(((now - Date.parse(from!)) / span) * 100))) : 0;
   const isOver = !!to && Date.parse(to) <= now;
   const isSoon = !!to && Date.parse(to) - now < 24 * 3_600_000;
+  const leftText = (end: string) => (isOver ? t("Ended") : t("{left} left", { left: until(end, now, t) }));
+  const soonTone = isSoon ? "warn" : "primary";
   return {
     short: id.slice(0, 8),
     title: j.projection === "offer" ? j.siteAddress ?? t("Accepted job") : units.get(j.unitId) ?? t("Unit"),
     window: from && to ? { from, until: to } : null,
     windowText: from && to ? showSpan(from, to, display) : "—",
-    left: to ? (isOver ? t("Ended") : t("{left} left", { left: until(to, now, t) })) : "—",
+    left: to ? leftText(to) : "—",
     ended: isOver,
-    leftTone: isOver ? "crit" : (isSoon ? "warn" : "primary"),
+    leftTone: isOver ? "crit" : soonTone,
     id,
     line,
     tone,
@@ -108,7 +112,7 @@ export function formMode(j: ApiDetail | ApiOffer, label: string, now: number, na
     case "rework_requested": {
       return {
         kind: "extend",
-        title: ended(slot, now) ? reschedule : t("Reassign — {job} ({state})", { job: label, state: t(j.status === "in_progress" ? "in progress" : (j.status === "on_hold" ? "on hold" : "rework")) }),
+        title: ended(slot, now) ? reschedule : t("Reassign — {job} ({state})", { job: label, state: textOf(WORK_STATE, j.status, t) ?? t("rework") }),
         endEditable: true,
         reasonRequired: true,
         button: t("Confirm reassignment"),
@@ -165,9 +169,14 @@ export function candidates(members: ApiMember[], eligible: Set<string>, required
     const sub = `${quals} · ${freeText(c, t)}`;
     if (eligible.has(m.id)) return { id: m.id, name: m.displayName, badge: m.id === currentId ? { text: t("Current"), tone: "primary" } : { text: t("Qualified"), tone: "ok" }, eligible: true, sub };
     const missing = required.filter((r) => !qualified(m, [r], slot.startAt)).map((code) => qualificationLabel(code, t));
-    const badge = missing.length > 0 ? { text: t("Missing: {list}", { list: missing.join(", ") }), tone: "warn" as Tone }
-      : (c?.unavailability ? { text: t("Unavailable ({reason})", { reason: unavailabilityLabel(c.unavailability, t) }), tone: "warn" as Tone }
-      : ({ text: c?.assignedSlots.some((s) => overlaps(s, slot)) ? t(m.id === currentId ? "Current · booked here" : "Busy at this time") : t("Not eligible"), tone: "muted" as Tone }));
+    // why the member cannot take the job: a missing qualification, unavailability, another booking, or not eligible
+    const blocked = (): { text: string; tone: Tone } => {
+      if (missing.length > 0) return { text: t("Missing: {list}", { list: missing.join(", ") }), tone: "warn" };
+      if (c?.unavailability) return { text: t("Unavailable ({reason})", { reason: unavailabilityLabel(c.unavailability, t) }), tone: "warn" };
+      if (c?.assignedSlots.some((s) => overlaps(s, slot))) return { text: t(m.id === currentId ? "Current · booked here" : "Busy at this time"), tone: "muted" };
+      return { text: t("Not eligible"), tone: "muted" };
+    };
+    const badge = blocked();
     return { id: m.id, name: m.displayName, eligible: false, sub, badge };
   });
   return rows.toSorted((a, b) => Number(b.eligible) - Number(a.eligible) || a.name.localeCompare(b.name));
