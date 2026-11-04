@@ -211,6 +211,11 @@ Actions are pinned by commit SHA, and `.github/dependabot.yml` proposes their up
   - **Real nodes:** `REAL_MQTT_URL` names the broker on the same server, and `REAL_MQTT_COMMANDS=1` lets the app switch the real air conditioner.
 - **Data.** It stays from one deployment to the next. When the migrations changed since the deployed tag, the data is built again from the seed, because version 1 is edited in place before the first release. `deploy.sh reset` does the same by hand.
 - **Failures and reboots.** A failed deployment brings back the tag before it, and a tag is tried three times at most. After a reboot, the first check starts the stack and restarts the API services once Keycloak answers (IR419).
+- **Progress on GitHub (IR630).** With `GITHUB_DEPLOY_TOKEN` in the environment file, each tag is a deployment of the environment `test`, shown under the repository's Deployments.
+  - The token is a fine-grained token of this repository with only the Deployments permission (read and write).
+  - Its status follows the steps: queued while CI runs, in progress at each step (checking out, the realm, each image as n/13, starting, waiting for the apps, the mock fleet's history), then success, or failure with the step that failed and the tag brought back.
+  - `deploy/test/github.py` reads the token from the file, so the token never appears on a command line. Nothing it sends names the server.
+  - A tag that changes the deploy scripts is deployed by its own scripts: the check checks the tag out and runs its `deploy.sh`.
 - **On the server:**
   - `journalctl -u ac-test-deploy -f` shows the progress.
   - `bash ~/ac-test/repo/deploy/test/deploy.sh status` shows the deployed tag and the containers.

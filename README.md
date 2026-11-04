@@ -43,7 +43,8 @@ the stack to the lab server, the real nodes' broker's machine. Its timer checks 
 there and starts them; the apps open at `http://<server>:3200` (customer), `:3201` (partner), `:3202` (technician) and
 `:3203` (HQ), Keycloak at `:8281` and Mailpit at `:8225`. The one-time set-up on the server is `git clone
 https://github.com/Aquarius0715/AC-Project.git ~/ac-test/repo && bash ~/ac-test/repo/deploy/test/setup.sh` (container
-design §6).
+design §6). With a GitHub token in the server's environment file, each deployment's progress shows under the
+repository's Deployments (environment `test`).
 
 Profiles: `infra` (PostgreSQL, Valkey, LocalStack, Mosquitto, Keycloak, Mailpit, mocks), `backend` (+ API services and
 workers), `full` (+ the four apps), `iot` (bridge, simulator, mock history), `obs`, `stripe`.

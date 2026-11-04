@@ -8895,3 +8895,27 @@ The user wants continuous deployment: pushing a tag like `test1.0.0r0` deploys t
    - `deploy.sh reset` rebuilt the data and Keycloak's volume from the seed (scenario clock back to 14 Sept), and the four apps signed in again (12 passed).
    - The CI check read `success` for a commit of main and `pending` for an unknown one.
    - The trial was then removed (containers, volumes, the 13 images). The development stack ran on, untouched.
+
+## IR630 A test deployment shows its progress on GitHub (DEC-93) — 2026-11-04
+
+The first test deployment, `test1.0.0r0`, could be followed only in the server's journal. The user asked to see it on GitHub, and accepted a token on the server for that (recommended).
+
+1. **Deployments of the environment `test` (`deploy/test/github.py`).** Each tag becomes one GitHub deployment, and each step adds a status:
+   - queued while its CI runs;
+   - in progress at each step: checking out, the realm and broker logins, each image as n/13, starting the stack, waiting for the apps and Keycloak, the mock fleet's history;
+   - success, or failure naming the step that failed and the tag brought back;
+   - error when the tag is not on main or its CI failed.
+
+   A reset reports on the deployed tag's deployment.
+2. **The token.** `GITHUB_DEPLOY_TOKEN` in `~/ac-test/env` is a fine-grained token of this repository with only the Deployments permission (read and write). If it leaks, it can only write deployment statuses.
+   - Running `setup.sh` again asks for it when the file lacks it.
+   - Python reads it from the file, so it never appears on a command line that other users of the server could see.
+   - Without it nothing is sent.
+   - Nothing sent names the server, because the repository is public.
+3. **Reports never stop a deployment.** A report that fails is logged, and the deployment goes on.
+4. **A tag deploys with its own scripts.** When a tag changes `deploy/test`, the check checks the tag out and runs that tag's `deploy.sh`. A script change thus takes effect in the deployment that brings it.
+5. **Checked with stubs.** The real script ran in a sandbox, with Docker and GitHub's API replaced by stubs that record each call:
+   - with CI pending, one queued status was sent, and not repeated a minute later;
+   - with CI passed on a tag that changes the scripts, the script re-ran from the tag, sent the step statuses in order, then success, and recorded the tag as deployed;
+   - a failing build sent a failure naming "building the images (1/2)" and the way back, then started the tag before;
+   - the token went in the Authorization header only.

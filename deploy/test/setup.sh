@@ -7,7 +7,8 @@
 #
 # It asks for the address others open and the real broker's login, writes ~/ac-test/env (this user only) with its own
 # random secrets, and installs the timer that runs deploy.sh every minute. Nothing is deployed until a tag
-# test<major>.<minor>.<patch>r<n> is pushed. Running it again keeps the environment file and reinstalls the timer.
+# test<major>.<minor>.<patch>r<n> is pushed. Running it again keeps the environment file, asks for what it lacks (the
+# GitHub token of the deployment status, IR630) and reinstalls the timer.
 set -euo pipefail
 
 REPO_URL=https://github.com/Aquarius0715/AC-Project.git
@@ -79,6 +80,21 @@ EOF
   echo "wrote $SETTINGS"
 else
   echo "keeping $SETTINGS"
+fi
+
+if ! grep -q '^GITHUB_DEPLOY_TOKEN=' "$SETTINGS"; then
+  echo "Optional: a fine-grained GitHub token of this repository with the Deployments permission (read and write) shows"
+  echo "each deployment's progress on GitHub (the repository's Deployments, environment test). Enter skips it."
+  read -rsp "GitHub token (GITHUB_DEPLOY_TOKEN): " github_token
+  echo
+  if [ -n "$github_token" ]; then
+    case "$github_token" in
+    *"'"*) fail "a token with a single quote cannot be written here; write $SETTINGS by hand" ;;
+    esac
+    umask 077
+    printf "# the progress on GitHub's Deployments (deploy/test/github.py)\nGITHUB_DEPLOY_TOKEN='%s'\n" "$github_token" >>"$SETTINGS"
+    echo "added GITHUB_DEPLOY_TOKEN to $SETTINGS"
+  fi
 fi
 
 sudo tee "/etc/systemd/system/$UNIT.service" >/dev/null <<EOF
