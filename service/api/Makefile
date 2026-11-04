@@ -9,6 +9,12 @@ gen:
 seed:
 	$(GO) run ./cmd/seed
 
+# lint runs every golangci-lint linter and formatter check of .golangci.yml (staticcheck among them) on the module, as
+# CI's go-lint job and scripts/check.sh do; it must report 0 issues (CLAUDE.md, lint rules 5). Like vuln, it runs on
+# the module's own toolchain.
+lint:
+	GOTOOLCHAIN=$(TOOLCHAIN) go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0 run ./...
+
 # unit tests next to the code (no database)
 test-unit:
 	$(GO) vet ./...
@@ -91,4 +97,4 @@ TOOLCHAIN := $(shell sed -n 's/^toolchain //p' go.mod)
 vuln:
 	GOTOOLCHAIN=$(TOOLCHAIN) go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
-.PHONY: swagger gen seed test test-run test-unit test-integration test-cluster test-cluster-run test-all cover migrations resetdb testdb testdb-cluster testdb-exists test-fresh vuln
+.PHONY: swagger gen seed lint test test-run test-unit test-integration test-cluster test-cluster-run test-all cover migrations resetdb testdb testdb-cluster testdb-exists test-fresh vuln

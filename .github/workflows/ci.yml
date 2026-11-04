@@ -1,5 +1,5 @@
 # Lint and tests of the whole repository on every push and pull request. Each check is its own job, so they run in
-# parallel: Go lint (format, vet, staticcheck, generated files and the API description), the Go suite (unit + integration on one
+# parallel: Go lint (format, vet, golangci-lint, generated files and the API description), the Go suite (unit + integration on one
 # server), the integration suite against the split services, web lint (no warnings allowed), web typecheck, web unit tests, and the design
 # document validators. The end-to-end suite needs the whole compose stack and runs in e2e.yml.
 name: CI
@@ -22,7 +22,7 @@ env:
 
 jobs:
   go-lint:
-    name: Go lint (gofmt, vet, staticcheck, generated files, Swagger)
+    name: Go lint (gofmt, vet, golangci-lint, generated files, Swagger)
     runs-on: ubuntu-24.04
     defaults: { run: { working-directory: service/api } }
     steps:
@@ -35,9 +35,8 @@ jobs:
           if [ -n "$out" ]; then echo "not gofmt-formatted:"; echo "$out"; exit 1; fi
       - name: go vet
         run: go vet ./...
-      - name: staticcheck
-        env: { GOTOOLCHAIN: go1.26.10 }
-        run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...
+      - name: golangci-lint (every linter and formatter, .golangci.yml; staticcheck among them)
+        run: make lint
       - name: generated files are current (catalog, routes, contracts, Swagger)
         run: |
           go run ./cmd/gen/ops

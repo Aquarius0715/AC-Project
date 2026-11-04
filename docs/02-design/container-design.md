@@ -190,7 +190,7 @@ Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`,
 
 As built (GitHub Actions, IR550), every push to `main` and every pull request runs two workflows:
 - `.github/workflows/ci.yml`, seven parallel jobs:
-  - `go-lint`: gofmt, vet and staticcheck, and the generated catalog, routes, contracts and Swagger must be current;
+  - `go-lint`: gofmt, vet and golangci-lint (`make lint`: every linter of `.golangci.yml` at 0 issues), and the generated catalog, routes, contracts and Swagger must be current;
   - `go-test` and `go-test-cluster`: the Go suites on a fresh PostgreSQL test database, the second against the split services;
   - `web-lint`, `web-typecheck` and `web-test`: ESLint, TypeScript and Vitest of the four apps and the shared package;
   - `docs`: the document validators.
