@@ -24,7 +24,7 @@ export function JobsDemo({ jobId, tab: initial }: Readonly<{ jobId?: string; tab
   const [delivery, setDelivery] = useState<"all" | "internal" | "contractor">("all");
   const [stage, setStage] = useState<JobStatus | null>(null);
   const [modal, setModal] = useState<null | { kind: "book"; slot: Slot } | { kind: "propose" } | { kind: "new" } | { kind: "reason"; what: "rework" | "hold" | "reassign" } | { kind: "classify" }>(null);
-  const list = [...jobs].filter((j) => j.status !== "cancelled").sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status))
+  const list = [...jobs].filter((j) => j.status !== "cancelled").toSorted((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status))
     .filter((j) => (origin === "all" || j.origin === origin) && (delivery === "all" || j.delivery === delivery) && (!stage || j.status === stage));
   const sel = jobs.find((j) => j.id === selId) ?? list[0];
   return (

@@ -8,6 +8,7 @@ import type { OpInput } from "@ac/web/lib/opTypes";
 import type { AuditView } from "@ac/web/lib/contracts.gen";
 import { stateWord, states, type RestrictionState } from "@ac/web/lib/restrictions";
 import { eventCause, eventRows, type ApiAlertLite, type ApiDeviceEventFull } from "@ac/web/lib/techDevices";
+import { byText } from "@ac/web/lib/order";
 
 const en = translator("en");
 export type AuditResult = "Success" | "Denied" | "Failed" | "Pending";
@@ -86,7 +87,7 @@ export function correlationQuery(a: Pick<ApiAudit, "correlationId" | "occurredAt
 /** One entry of the log: who acted (the user's name, else the actor ID — a system actor has no name, IR305), the list
 time relative to now, the full time, the role in the display language and the versions it moved the target between. */
 export function auditRow(a: ApiAudit, i: I18n = EN, nowMs?: number): AuditRow {
-  const fields = [...new Set([...Object.keys(a.maskedBefore ?? {}), ...Object.keys(a.maskedAfter ?? {})])].sort();
+  const fields = [...new Set([...Object.keys(a.maskedBefore ?? {}), ...Object.keys(a.maskedAfter ?? {})])].toSorted(byText);
   const { t } = i;
   return {
     id: a.id,
@@ -128,12 +129,12 @@ export const auditItem = (a: ApiAudit, i: I18n = EN) => {
 /** The entries of one correlation ID in the order they were appended (Figma Admin 338:2): a pending entry stays as it
 was; the final result is a later entry of its own. Empty when the entry stands alone. */
 export const correlationTrace = (group: ApiAudit[], i: I18n = EN) =>
-  group.length < 2 ? [] : [...group].sort((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt) || a.id.localeCompare(b.id)).map((a) => ({ id: a.id, ...auditItem(a, i) }));
+  group.length < 2 ? [] : [...group].toSorted((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt) || a.id.localeCompare(b.id)).map((a) => ({ id: a.id, ...auditItem(a, i) }));
 
 /** The target kinds the Target filter always offers, the records HQ looks up most; the kinds of the shown entries and
 the URL's kind join them (targetKind is a string like AuditView.targetRef.kind and the log records more kinds). */
 const KINDS = ["alert", "automation", "command", "contract", "device", "device_event", "invoice", "job", "membership", "payment", "policy", "restriction", "unit", "user"];
-export const targetKinds = (rows: Pick<AuditRow, "targetKind">[], current: string) => [...new Set([...KINDS, ...rows.map((r) => r.targetKind), ...(current ? [current] : [])])].sort();
+export const targetKinds = (rows: Pick<AuditRow, "targetKind">[], current: string) => [...new Set([...KINDS, ...rows.map((r) => r.targetKind), ...(current ? [current] : [])])].toSorted(byText);
 
 /** The Actor filter's people by name: the users of the memberships the session may read (members.list), the actors of
 the shown entries and the URL's actor (a system actor by its ID). A name that several people share carries the start
@@ -145,7 +146,7 @@ export function actorOptions(members: { userId: string; displayName: string }[],
   if (current && !m.has(current)) m.set(current, current);
   const shared = new Map<string, number>();
   for (const name of m.values()) shared.set(name, (shared.get(name) ?? 0) + 1);
-  return [...m].map(([id, name]) => ({ id, name: (shared.get(name) ?? 0) > 1 ? `${name} · ${id.slice(0, 8)}` : name })).sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+  return [...m].map(([id, name]) => ({ id, name: (shared.get(name) ?? 0) > 1 ? `${name} · ${id.slice(0, 8)}` : name })).toSorted((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
 }
 
 /** A record related to an entry: its own target, or the target of an entry with the same correlation ID. */
@@ -191,7 +192,7 @@ export interface AuditDeviceEvent {
 export function auditDeviceEvents(es: ApiAuditDeviceEvent[], alerts: Map<string, ApiAlertLite>, names: Map<string, string>, units: Map<string, string>, nowMs: number, i: I18n = EN): AuditDeviceEvent[] {
   const { t, display } = i;
   const rows = new Map(eventRows(es, alerts, nowMs, i).map((r) => [r.id, r]));
-  const seqs = es.map((e) => e.sequence).sort((a, b) => a - b);
+  const seqs = es.map((e) => e.sequence).toSorted((a, b) => a - b);
   return es.map((e) => {
     const r = rows.get(e.id)!;
     const prev = [...seqs].reverse().find((s) => s < e.sequence);

@@ -56,7 +56,7 @@ const TYPE: Record<string, string> = { reactive: "Repair", preventive: "Preventi
 export function clientRows(rows: ApiClientRow[], unit: (id: string) => { name: string; place: string }, i: I18n = EN): ClientRow[] {
   const { t } = i;
   const slot = (s: Slot) => slotShort(s, i);
-  return [...rows].sort((a, b) => ORDER.indexOf(a.displayStatus) - ORDER.indexOf(b.displayStatus) || Date.parse(a.dueAt) - Date.parse(b.dueAt)).map((j) => {
+  return [...rows].toSorted((a, b) => ORDER.indexOf(a.displayStatus) - ORDER.indexOf(b.displayStatus) || Date.parse(a.dueAt) - Date.parse(b.dueAt)).map((j) => {
     const u = unit(j.unitId);
     const isPlan = j.origin === "periodic_plan";
     let line = "", isWarn = false, icon: IconName = "time";
@@ -180,7 +180,7 @@ export function contactError(v: string, tr: T = en): string | null {
 /** The client's notes and the job history from jobs.events (internal notes never reach the client, IR42). */
 export interface ApiClientEvent { id: string; action: string; occurredAt: string; actorUserId: string | null; note: { visibility: string; message: string } | null }
 export function notesOf(events: ApiClientEvent[], me: string, i: I18n = EN): { id: string; who: string; at: string; text: string }[] {
-  return events.filter((e) => e.note && e.note.visibility === "customer").sort((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt))
+  return events.filter((e) => e.note && e.note.visibility === "customer").toSorted((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt))
     .map((e) => ({ id: e.id, who: i.t(e.actorUserId === me ? "You" : "Coordinator"), at: showTime(e.occurredAt, i.display), text: e.note!.message }));
 }
 

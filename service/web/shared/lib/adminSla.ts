@@ -34,7 +34,7 @@ const pct = (v: number | null) => (v === null ? "—" : `${String(Math.round(v))
 const plans = (targets: ApiTargetView[], used: PlanType[]) => targets.filter((x) => x.state !== "scheduled" && used.includes(x.planType));
 /** “target 95 %” for one plan type, “targets 85–95 % by plan” when the customers' plans differ. */
 function targetText(values: number[], t: T): string {
-  const u = [...new Set(values)].sort((a, b) => a - b);
+  const u = [...new Set(values)].toSorted((a, b) => a - b);
   return u.length === 0 ? t("no target") : (u.length === 1 ? t("target {n} %", { n: u[0] }) : t("targets {from}–{to} % by plan", { from: u[0], to: u[u.length - 1] }));
 }
 /** The plan type's name in the user's language. */
@@ -44,7 +44,7 @@ const planName = (plan: string, t: T) => (planLabel[plan as PlanType] ? t(planLa
 export function slaTiles(sc: ApiScorecard, t: T = en): { label: string; value: string; icon?: IconName; sub: string; tone?: "warn" | "crit" }[] {
   const used = [...new Set(sc.customers.map((c) => c.planType))];
   const ts = plans(sc.targets, used.length > 0 ? used : ["general"]);
-  const hours = [...new Set(ts.map((x) => x.responseHours))].sort((a, b) => a - b);
+  const hours = [...new Set(ts.map((x) => x.responseHours))].toSorted((a, b) => a - b);
   const m = sc.totals;
   const below = (v: number | null, target: number) => (v !== null && v < target ? (target - v > 10 ? "crit" : "warn") : undefined);
   const arrival = Math.min(...ts.map((x) => x.arrivalInWindowPercent));

@@ -13,7 +13,7 @@ export interface ApiDeviceEvent { id: string; eventType: string; sequence: numbe
 
 /** The latest connection fault that has not been restored: the source a recovery must name (SR20). */
 export function openFault(events: ApiDeviceEvent[]): ApiDeviceEvent | null {
-  return events.filter((e) => e.eventType === "communication_lost" && !e.restoredAt).sort((a, b) => b.sequence - a.sequence)[0] ?? null;
+  return events.filter((e) => e.eventType === "communication_lost" && !e.restoredAt).toSorted((a, b) => b.sequence - a.sequence)[0] ?? null;
 }
 
 /** The next device sequence: above every event of the device, so the signal is never taken for an old one. */

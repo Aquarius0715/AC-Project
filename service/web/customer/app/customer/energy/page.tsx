@@ -27,7 +27,7 @@ export default async function CustomerEnergyPage({ searchParams }: Readonly<Page
     coreOp<Preferences>("preferences.get", {}).catch(() => null), coreDisplay(),
   ]);
   const i = i18nOf(display);
-  const own = units.map((u) => ({ id: u.id, name: u.displayName })).sort((a, b) => a.name.localeCompare(b.name));
+  const own = units.map((u) => ({ id: u.id, name: u.displayName })).toSorted((a, b) => a.name.localeCompare(b.name));
   const unitIds = pickUnits(units, one("unitIds"));
   const kind = periodKinds.find((k) => k === one("period")) ?? "7d";
   const period = periodRange(kind, now, { from: one("from"), to: one("to") }, i);

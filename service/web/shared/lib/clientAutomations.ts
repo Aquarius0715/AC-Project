@@ -47,7 +47,7 @@ export const dayShort = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 export const dayLong = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 /** "Mon, Wed" (lists) or "Mon & Wed" / "Mon, Tue & Sun" (sentences); every day, weekdays and weekends by name. */
 export function weekdaysText(ds: number[], sentence = false, t: T = en): string {
-  const s = [...ds].sort((a, b) => a - b);
+  const s = [...ds].toSorted((a, b) => a - b);
   if (s.length === 7) return t("Every day");
   if (s.join(',') === "1,2,3,4,5") return t("Weekdays");
   if (s.join(',') === "6,7") return t("Weekends");
@@ -89,7 +89,7 @@ export function whenText(a: ApiAutomation, place: string, t: T = en): string {
 /** “someone is home”, “outdoor ≥ 30°C”, “weekdays” — the “Only if” clause of a sentence. */
 export function extraText(x: ExtraCondition, t: T = en): string {
   if (x.type === "weekday") {
-    const s = [...x.weekdays].sort((a, b) => a - b).join(',');
+    const s = [...x.weekdays].toSorted((a, b) => a - b).join(',');
     const days = weekdaysText(x.weekdays, false, t);
     return s === "1,2,3,4,5" || s === "6,7" || x.weekdays.length === 7 ? days.toLowerCase() : days;
   }
@@ -266,13 +266,13 @@ export function saveInput(d: Draft): OpInput<"automations.save"> {
   const base = { ...(d.id && { id: d.id }), name: d.name.trim(), unitIds: [d.unitId, ...d.others.filter((u) => u !== d.unitId)], timezone: d.timezone, enabled: d.enabled, priority: d.priority,
     onlyIf: fitExtras(d).map(extraOf) };
   return d.trigger === "schedule"
-    ? { ...base, kind: "schedule", weekdays: [...d.weekdays].sort((a, b) => a - b), startLocal: d.startLocal, endLocal: d.endLocal, endsNextDay: d.endsNextDay, startAction: actionOf(d.startAction), endAction: actionOf(d.endAction) }
+    ? { ...base, kind: "schedule", weekdays: [...d.weekdays].toSorted((a, b) => a - b), startLocal: d.startLocal, endLocal: d.endLocal, endsNextDay: d.endsNextDay, startAction: actionOf(d.startAction), endAction: actionOf(d.endAction) }
     : { ...base, kind: "event", condition: conditionOf(d), action: actionOf(d.action) };
 }
 /** The schedule part of a draft for the automations.nextRuns draft preview. */
 export const scheduleDraft = (d: Draft) => {
   return {
-    timezone: d.timezone, weekdays: [...d.weekdays].sort((a, b) => a - b), startLocal: d.startLocal, endLocal: d.endLocal, endsNextDay: d.endsNextDay,
+    timezone: d.timezone, weekdays: [...d.weekdays].toSorted((a, b) => a - b), startLocal: d.startLocal, endLocal: d.endLocal, endsNextDay: d.endsNextDay,
     startAction: actionOf(d.startAction), endAction: actionOf(d.endAction),
   };
 };

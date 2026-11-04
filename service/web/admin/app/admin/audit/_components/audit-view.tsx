@@ -9,6 +9,7 @@ import { callOp, OpError } from "@ac/web/lib/ops";
 import { historyRow, type ApiCommand } from "@ac/web/lib/units";
 import { periodError, resultTone, resultWord, type AuditDeviceEvent, type AuditFilters, type AuditRow, type Related, type RelatedRef } from "@ac/web/lib/audit";
 import { Icon } from "@ac/web/components/Icon";
+import { byText } from "@ac/web/lib/order";
 
 const seed: AuditRow[] = [
   { id: "1", op: "restriction.override", target: "restriction · restriction-a41", targetKind: "restriction", targetId: "restriction-a41", versions: "version 3 → 4", actor: "hq-operator", actorId: "hq-operator", role: "admin", at: "09-22 09:14", occurred: "2026-09-22 09:14 (Asia/Kuala_Lumpur)", corr: "corr-7f21a9", res: "Success", reason: "Customer requested a short exception while the invoice is under review.",
@@ -96,7 +97,7 @@ export function AuditView({ live }: Readonly<{ live?: AuditLive }>) {
   };
   const open = (id: string) => { if (live) patch({ entryId: id }); else setSelId(id); };
   const actors = live ? live.actors : [...new Map(seed.map((r) => [r.actorId, r.actor]))].map(([id, name]) => ({ id, name }));
-  const kinds = live ? live.kinds : [...new Set(seed.map((r) => r.targetKind))].toSorted();
+  const kinds = live ? live.kinds : [...new Set(seed.map((r) => r.targetKind))].toSorted(byText);
   const related = live ? live.related : (sel?.id === "1" ? seedRelated : { restriction: null, command: null, job: null, unit: null });
   const trace = live ? live.trace : [];
   const corr = live ? live.filters.correlationId : f.correlationId; // the searched correlation ID (typing waits 300 ms)

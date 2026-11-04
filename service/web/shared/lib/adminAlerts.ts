@@ -7,6 +7,7 @@ import { evidenceText, resolutionText } from "@ac/web/lib/evidence";
 import { alertTitle } from "@ac/web/lib/alerts";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { Metric as ContractMetric } from "@ac/web/lib/contracts.gen";
+import { byNumber, byText } from "@ac/web/lib/order";
 
 const en = translator("en");
 
@@ -100,7 +101,7 @@ export function adminAlertRows(alerts: ApiAdminAlert[], units: ApiUnitName[], cu
   const custIdByOrg = new Map(customers.map((c) => [c.organizationId, c.id]));
   const policy = new Map(policies.map((p) => [p.id, p.name]));
   return [...alerts]
-    .sort((a, b) => stRank[a.status] - stRank[b.status] || sevRank[a.severity] - sevRank[b.severity] || b.detectedAt.localeCompare(a.detectedAt))
+    .toSorted((a, b) => stRank[a.status] - stRank[b.status] || sevRank[a.severity] - sevRank[b.severity] || b.detectedAt.localeCompare(a.detectedAt))
     .map((a) => {
       const u = unit.get(a.unitId);
       const customer = (u && custByOrg.get(u.customerOrgId)) ?? t("unknown customer");
@@ -130,7 +131,7 @@ export function policyRows(policies: ApiPolicy[], customers: ApiCustomerName[], 
   const unitName = new Map(units.map((u) => [u.id, u.displayName]));
   return policies
     .filter((p): p is ApiPolicy & { kind: "alert" | "default_alert" } => p.kind === "alert" || p.kind === "default_alert")
-    .sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : (a.kind === "default_alert" ? -1 : 1)))
+    .toSorted((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : (a.kind === "default_alert" ? -1 : 1)))
     .map((p) => {
       const customerName = p.customerId ? cust.get(p.customerId) ?? t("customer") : "";
       const op = p.operator ?? "gte";
@@ -265,7 +266,7 @@ export function conditionErrors(p: Pick<DefaultRule, "duration" | "operator" | "
   return e;
 }
 
-const ruleShape = (r: DefaultRule) => [r.operator, r.threshold, r.recovery, r.duration, r.severity, r.activeWindow && [[...r.activeWindow.weekdays].sort(), r.activeWindow.startLocal, r.activeWindow.endLocal]];
+const ruleShape = (r: DefaultRule) => [r.operator, r.threshold, r.recovery, r.duration, r.severity, r.activeWindow && [[...r.activeWindow.weekdays].toSorted(byNumber), r.activeWindow.startLocal, r.activeWindow.endLocal]];
 /** The default rules a draft changes against the saved policy, by name. */
 export const ruleChanges = (draft: AdminPolicy, saved: AdminPolicy): string[] =>
   draft.rules.filter((r) => { const o = saved.rules.find((x) => x.ruleKey === r.ruleKey); return !o || JSON.stringify(ruleShape(r)) !== JSON.stringify(ruleShape(o)); }).map((r) => r.name);
@@ -286,8 +287,8 @@ export function defaultRulesInput(p: AdminPolicy): OpInput<"policies.save"> {
 
 const CHANGES: [string, (p: AdminPolicy) => unknown][] = [
   ["Name", (p) => p.name], ["Enabled", (p) => p.on], ["Priority", (p) => p.priority], ["Timezone", (p) => p.timezone],
-  ["Condition", (p) => [p.metric, p.operator, p.threshold, p.recovery, p.duration]], ["Active hours", (p) => p.activeWindow && [[...p.activeWindow.weekdays].sort(), p.activeWindow.startLocal, p.activeWindow.endLocal]], ["Severity", (p) => p.severity],
-  ["Recipients", (p) => p.recipients.map((r) => r.id)], ["Channels", (p) => [...p.channels].sort()], ["Cooldown", (p) => p.cooldown], ["Escalation", (p) => p.escalate],
+  ["Condition", (p) => [p.metric, p.operator, p.threshold, p.recovery, p.duration]], ["Active hours", (p) => p.activeWindow && [[...p.activeWindow.weekdays].toSorted(byNumber), p.activeWindow.startLocal, p.activeWindow.endLocal]], ["Severity", (p) => p.severity],
+  ["Recipients", (p) => p.recipients.map((r) => r.id)], ["Channels", (p) => [...p.channels].toSorted(byText)], ["Cooldown", (p) => p.cooldown], ["Escalation", (p) => p.escalate],
 ];
 /** What the draft changes against the saved policy, as the editor's footer names it. */
 export function policyChanges(draft: AdminPolicy, saved: AdminPolicy, t: T = en): string[] {

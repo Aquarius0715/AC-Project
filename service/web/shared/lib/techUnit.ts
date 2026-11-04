@@ -194,7 +194,7 @@ export function windowEvents(alerts: ApiAlert[], events: ApiDeviceEventFull[], p
     const [title, sub, kind, tone]: [string, string, string, Tone] = back ? [back[0], back[1], back[2], "ok"] : DEVICE[e.eventType];
     out.push({ id: e.id, at: e.occurredAt, title: t(title), sub: t(sub), badge: { text: t(kind), tone } });
   }
-  return out.sort((x, y) => y.at.localeCompare(x.at) || x.id.localeCompare(y.id)).map((x) => ({ ...x, time: relativeTime(x.at, nowMs, i) }));
+  return out.toSorted((x, y) => y.at.localeCompare(x.at) || x.id.localeCompare(y.id)).map((x) => ({ ...x, time: relativeTime(x.at, nowMs, i) }));
 }
 
 export interface HistoryRow { id: string; title: string; sub: string; badge: { text: string; tone: Tone } }
@@ -204,7 +204,7 @@ ones with the day they were completed, newest first. */
 export function jobRows(jobs: ApiTechJobRow[], i: I18n = EN): HistoryRow[] {
   const { t, display } = i;
   const current = jobs.filter((j): j is Extract<ApiTechJobRow, { projection: "summary" }> => j.projection === "summary")
-    .sort((a, b) => (b.scheduledSlot?.startAt ?? b.dueAt).localeCompare(a.scheduledSlot?.startAt ?? a.dueAt))
+    .toSorted((a, b) => (b.scheduledSlot?.startAt ?? b.dueAt).localeCompare(a.scheduledSlot?.startAt ?? a.dueAt))
     .map((j): HistoryRow => {
       return {
         id: j.id, title: `${j.id.slice(0, 8)} · ${typeLabel(j.type, t)}`, sub: j.scheduledSlot ? showSpan(j.scheduledSlot.startAt, j.scheduledSlot.endAt, display) : t("not scheduled yet"),
@@ -212,7 +212,7 @@ export function jobRows(jobs: ApiTechJobRow[], i: I18n = EN): HistoryRow[] {
       };
     });
   const ended = jobs.filter((j): j is Extract<ApiTechJobRow, { projection: "history" }> => j.projection === "history")
-    .sort((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? ""))
+    .toSorted((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? ""))
     .map((j): HistoryRow => {
       return {
         id: j.jobId, title: `${j.jobId.slice(0, 8)} · ${typeLabel(j.type, t)}`, sub: j.completedAt ? t("completed {date}", { date: showDate(j.completedAt, display) }) : t("your assignment ended"),
@@ -226,7 +226,7 @@ const ACTIVE: Record<string, number> = { in_progress: 0, assigned: 1, rework_req
 /** The job diagnostic control works for (DD-T10, IR94): the URL's job when it is one of the technician's active jobs on
 the unit, else the one in progress, then assigned or returned for rework; null without one. */
 export function controlJob(jobs: ApiTechJobRow[], jobId?: string): string | null {
-  const active = jobs.filter((j): j is Extract<ApiTechJobRow, { projection: "summary" }> => j.projection === "summary" && j.status in ACTIVE).sort((a, b) => ACTIVE[a.status] - ACTIVE[b.status]);
+  const active = jobs.filter((j): j is Extract<ApiTechJobRow, { projection: "summary" }> => j.projection === "summary" && j.status in ACTIVE).toSorted((a, b) => ACTIVE[a.status] - ACTIVE[b.status]);
   return (active.find((j) => j.id === jobId) ?? active[0])?.id ?? null;
 }
 
@@ -235,7 +235,7 @@ const RANK: Record<string, number> = { critical: 0, warning: 1, normal: 2 };
 /** The unit's unresolved alerts, worst and newest first, each with its evidence and who acknowledged it — finishing the job never resolves one. */
 export function openAlerts(alerts: ApiAlert[], nowMs: number, i: I18n = EN): OpenAlert[] {
   const { t } = i;
-  return alerts.filter((a) => a.status !== "resolved").sort((a, b) => RANK[a.severity] - RANK[b.severity] || b.detectedAt.localeCompare(a.detectedAt)).map((a) => {
+  return alerts.filter((a) => a.status !== "resolved").toSorted((a, b) => RANK[a.severity] - RANK[b.severity] || b.detectedAt.localeCompare(a.detectedAt)).map((a) => {
     return {
       id: a.id, title: alertTitle(a, t), severity: a.severity, sub: `${evidenceText(a.evidenceText, t)} · ${relativeTime(a.detectedAt, nowMs, i)}`,
       ack: `${a.acknowledgedAt ? t("Acknowledged {time}.", { time: relativeTime(a.acknowledgedAt, nowMs, i) }) : t("Acknowledged by nobody yet.")} ${t("Completing the job does not resolve it.")}`,

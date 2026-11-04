@@ -83,7 +83,7 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
     <Page>
       <div className="flex flex-wrap items-center gap-3">
         <SearchSelect className="w-64" label={t("Filter by organization")} value={live.scope.organizationId ?? ""} onChange={(v) => { nav({ organizationId: v || null, membershipId: null }); }}
-          options={[{ id: "", label: t("Organization: All") }, ...live.orgs.filter((o) => o.kind !== "customer").sort((a, b) => a.name.localeCompare(b.name)).map((o) => ({ id: o.id, label: o.name }))]} />
+          options={[{ id: "", label: t("Organization: All") }, ...live.orgs.filter((o) => o.kind !== "customer").toSorted((a, b) => a.name.localeCompare(b.name)).map((o) => ({ id: o.id, label: o.name }))]} />
         <Choice value={live.scope.role ?? "all"} onChange={(v) => { nav({ role: v === "all" ? null : v, membershipId: null }); }} options={[{ id: "all", label: t("All roles") }, ...roles]} />
         <Choice value={live.scope.status ?? "all"} onChange={(v) => { nav({ status: v === "all" ? null : v, membershipId: null }); }} options={[{ id: "all", label: t("All") }, { id: "active", label: t("Active") }, { id: "inactive", label: t("Inactive") }]} />
       </div>

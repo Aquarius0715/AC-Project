@@ -33,7 +33,7 @@ export function MaintenanceDemo({ jobId, initialTab }: Readonly<{ jobId?: string
   const [origin, setOrigin] = useState<"all" | "request" | "plan">("all");
   const [selId, setSelId] = useState<string | null>(sp.jobId ?? null);
   const [modal, setModal] = useState<null | "new" | "decline" | "other" | "rate" | "problem" | "cancel" | "note">(null);
-  const jobs = [...all].sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status));
+  const jobs = [...all].toSorted((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status));
   const shown = jobs.filter((j) => (tab === "all" || tabOf(j.status) === tab) && (origin === "all" || j.origin === origin));
   const count = (t: StatusTab) => jobs.filter((j) => t === "all" || tabOf(j.status) === t).length;
   const sel = all.find((j) => j.id === selId) ?? null;

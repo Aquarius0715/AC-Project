@@ -33,7 +33,7 @@ export const customerVisible = (e: ApiJobEvent & { note?: ApiEvent["note"] }) =>
 /** The counts of a list of events as jobs.list gives them for a summary (IR506); a history's own decision events are
 counted this way. */
 export function eventSummary(events: (ApiJobEvent & { note?: ApiEvent["note"] })[]): ApiEventSummary {
-  const latest = [...events].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || b.id.localeCompare(a.id))[0];
+  const latest = [...events].toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || b.id.localeCompare(a.id))[0];
   return { count: events.length, customerVisible: events.filter(customerVisible).length, notes: events.filter((e) => e.note).length, latest: latest ? { action: latest.action, occurredAt: latest.occurredAt } : null };
 }
 const ACTIVE = new Set(["accepted", "assigned", "in_progress", "on_hold", "rework_requested"]);
@@ -96,7 +96,7 @@ export function historyRow(j: ApiPartnerJob, now: number, units: Map<string, str
 export function visibleRows(rows: HistoryRow[], tab: HistoryTab, sort: HistorySort): HistoryRow[] {
   const order = [...HISTORY_STATUSES] as string[];
   const shown = rows.filter((r) => tab === "all" || r.tab === tab);
-  return shown.sort((a, b) => (sort === "status" ? order.indexOf(a.status) - order.indexOf(b.status) : 0) || b.lastAt - a.lastAt || a.id.localeCompare(b.id));
+  return shown.toSorted((a, b) => (sort === "status" ? order.indexOf(a.status) - order.indexOf(b.status) : 0) || b.lastAt - a.lastAt || a.id.localeCompare(b.id));
 }
 export const tabCounts = (rows: HistoryRow[]) => Object.fromEntries(TABS.map((t) => [t.id, t.id === "all" ? rows.length : rows.filter((r) => r.tab === t.id).length])) as Record<HistoryTab, number>;
 

@@ -124,7 +124,7 @@ const ALERT_STATE: Record<string, string> = { open: "open", acknowledged: "ackno
 export function alertRows(alerts: ApiAlert[], units: Map<string, string>, jobOfUnit: Map<string, string>, i: I18n = EN): AlertRow[] {
   const { t, display } = i;
   const rank = { critical: 0, warning: 1, normal: 2 } as const;
-  return alerts.filter((a) => a.status !== "resolved").sort((a, b) => rank[a.severity] - rank[b.severity] || Date.parse(b.detectedAt) - Date.parse(a.detectedAt)).map((a) => {
+  return alerts.filter((a) => a.status !== "resolved").toSorted((a, b) => rank[a.severity] - rank[b.severity] || Date.parse(b.detectedAt) - Date.parse(a.detectedAt)).map((a) => {
     const job = jobOfUnit.get(a.unitId);
     return {
       id: a.id, title: alertTitle(a, t), severity: a.severity, href: `/technician/units/${a.unitId}/alerts?${job ? `jobId=${job}&` : ""}alertId=${a.id}`,

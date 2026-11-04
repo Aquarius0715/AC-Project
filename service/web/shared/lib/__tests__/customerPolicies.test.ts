@@ -4,6 +4,7 @@ import {
   type ApiAlertPolicy, type ApiDefaultPolicy,
 } from "@ac/web/lib/customerPolicies";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
+import { byText } from "@ac/web/lib/order";
 
 const rule = (ruleKey: string, name: string, over: Partial<ApiDefaultPolicy["rules"][number]> = {}): ApiDefaultPolicy["rules"][number] =>
   ({ ruleKey, name, category: "air_quality", metric: "co2", operator: "gte", threshold: 1000, recoveryThreshold: 900, durationSeconds: 600, activeWindow: null, severity: "warning", ...over });
@@ -77,7 +78,7 @@ describe("customer alert policies", () => {
 describe("the editor's field order", () => {
   it("holds every field policyErrors can name, top to bottom, each with its element id", () => {
     const all = policyErrors({ ...policyForm(), name: " ", threshold: "x", recovery: "", duration: "0", windowOn: true, weekdays: [] });
-    expect(Object.keys(all).sort()).toEqual([...POLICY_FIELDS].sort());
+    expect(Object.keys(all).toSorted(byText)).toEqual([...POLICY_FIELDS].toSorted(byText));
     expect(POLICY_FIELDS.find((k) => all[k])).toBe("name");
     expect(policyFieldId("recovery")).toBe("policy-recovery");
   });

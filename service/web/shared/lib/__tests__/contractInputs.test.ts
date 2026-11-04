@@ -3,6 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
+import { byCodeUnit } from "@ac/web/lib/order";
 
 // The input and result fields of every operation in the Core API contract (OperationContracts[op] of contracts.gen.ts,
 // a copy of docs/02-design/service-contracts.ts): named types, intersections and unions resolved by the TypeScript
@@ -30,12 +31,12 @@ function contract(): { inputs: Record<string, string[]>; results: Record<string,
     if (t.isUnion() || t.isIntersection()) for (const x of t.types) fields(x, out);
     else if (t.flags & ts.TypeFlags.Object) for (const p of c.getPropertiesOfType(t)) out.add(p.getName());
   };
-  const sorted = (t: ts.Type) => { const set = new Set<string>(); fields(t, set); return [...set].sort(); };
+  const sorted = (t: ts.Type) => { const set = new Set<string>(); fields(t, set); return [...set].toSorted(byCodeUnit); };
   const variants = (t: ts.Type): ts.Type[] => (t.isUnion() ? t.types.flatMap(variants) : [t]);
   const element = (t: ts.Type) => (c.isArrayType(t) ? c.getIndexInfoOfType(t, ts.IndexKind.Number)?.type ?? null : null);
   const inputs: Record<string, string[]> = {};
   const results: Record<string, ResultFields> = {};
-  for (const op of c.getPropertiesOfType(ops!).sort((a, b) => a.getName().localeCompare(b.getName()))) {
+  for (const op of c.getPropertiesOfType(ops!).toSorted((a, b) => a.getName().localeCompare(b.getName()))) {
     const contract = c.getTypeOfSymbol(op);
     inputs[op.getName()] = sorted(c.getTypeOfSymbol(contract.getProperty("input")!));
     const result = c.getTypeOfSymbol(contract.getProperty("result")!);
@@ -45,7 +46,7 @@ function contract(): { inputs: Record<string, string[]>; results: Record<string,
       continue;
     }
     const items = variants(result).map((v) => v.getProperty("items")).filter((p): p is ts.Symbol => !!p).map((p) => element(c.getTypeOfSymbol(p))).filter((e): e is ts.Type => !!e);
-    results[op.getName()] = { fields: sorted(result), items: items.length > 0 ? [...new Set(items.flatMap(sorted))].sort() : null };
+    results[op.getName()] = { fields: sorted(result), items: items.length > 0 ? [...new Set(items.flatMap(sorted))].toSorted(byCodeUnit) : null };
   }
   return { inputs, results };
 }

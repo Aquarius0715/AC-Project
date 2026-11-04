@@ -46,7 +46,7 @@ export async function loadTeam(sp: TeamParams) {
   const techs = listedMembers.filter((m) => m.role === "technician");
   // one label per technician on the whole screen, sorted by it: a name two technicians share gets each one's e-mail
   const names = technicianNames(techs, new Map(users.flatMap((u) => (u.membershipId ? [[u.membershipId, u.email] as const] : []))));
-  const members = techs.map((m) => ({ ...m, displayName: names.get(m.id) ?? m.displayName })).sort((a, b) => a.displayName.localeCompare(b.displayName) || a.id.localeCompare(b.id));
+  const members = techs.map((m) => ({ ...m, displayName: names.get(m.id) ?? m.displayName })).toSorted((a, b) => a.displayName.localeCompare(b.displayName) || a.id.localeCompare(b.id));
   const current = members.filter((m) => activeNow(m, nowMs)); // capacity and assignments exist only for these
   const shown = listed(members, q, nowMs);
   const [capacity, booked, certs, units, unavailable] = await Promise.all([

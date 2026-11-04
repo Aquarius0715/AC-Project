@@ -97,7 +97,7 @@ export function fits(members: ApiMember[], required: string[], visit: Slot, days
       badge: isOk ? (isFree ? { text: t("Fits"), tone: "ok" } : { text: t("Busy at the visit"), tone: "warn" }) : { text: t("Not qualified"), tone: "muted" },
     };
   });
-  return rows.sort((a, b) => rank[a.id] - rank[b.id] || a.name.localeCompare(b.name));
+  return rows.toSorted((a, b) => rank[a.id] - rank[b.id] || a.name.localeCompare(b.name));
 }
 
 export interface Step { label: string; at: string | null; atText: string | null; sub: string; state: "done" | "current" | "todo" }
@@ -106,7 +106,7 @@ const ORDER = ["requested", "offered", "accepted", "assigned", "in_progress", "s
 `atText` is the step's time in the user's display time zone (IR44). */
 export function timeline(status: string, events: ApiJobEvent[], hasTechnician: boolean, origin?: string, i: I18n = EN): Step[] {
   const { t, display } = i;
-  const at = (actions: string[]) => [...events].filter((e) => actions.includes(e.action)).sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))[0]?.occurredAt ?? null;
+  const at = (actions: string[]) => [...events].filter((e) => actions.includes(e.action)).toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))[0]?.occurredAt ?? null;
   const reached = status === "on_hold" || status === "rework_requested" ? ORDER.indexOf(hasTechnician ? "in_progress" : "accepted") : ORDER.indexOf(status === "cancelled" ? "requested" : status);
   const steps: [string, string[], string][] = [
     ["Requested", ["job.created"], origin === "periodic_plan" ? "periodic plan" : (origin === "client_request" ? "client request" : "by the client or the plan")], ["Offered", ["job.offered"], "HQ offered your company"], ["Accepted", ["offer.accepted"], "you"],
@@ -196,6 +196,6 @@ export function decisionRefusal(f: { code: string; messageKey: string; fieldErro
 
 /** The job event rows of a history snapshot or the detail's history card, the times in the display time zone. */
 export const eventRows = (events: ApiJobEvent[], i: I18n = EN) => {
-  return [...events].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))
+  return [...events].toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))
     .map((e) => ({ id: e.id, at: showTime(e.occurredAt, i.display), text: jobEventTitle[e.action] ? i.t(jobEventTitle[e.action]) : e.action.replaceAll(/[._]/g, " ") }));
 };

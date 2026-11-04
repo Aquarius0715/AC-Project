@@ -48,7 +48,7 @@ export function contractCards(cs: ClientContract[], unit: (id: string) => UnitPl
   const ms = now.getTime();
   const status = (k: ApiContract): ContractCard["status"] => (ms < Date.parse(k.startAt) ? "Upcoming" : (ms >= Date.parse(k.endAt) ? "Expired" : "Active"));
   const rank = { Active: 0, Upcoming: 1, Expired: 2 };
-  return [...cs].sort((a, b) => rank[status(a)] - rank[status(b)] || b.startAt.localeCompare(a.startAt)).map((k) => {
+  return [...cs].toSorted((a, b) => rank[status(a)] - rank[status(b)] || b.startAt.localeCompare(a.startAt)).map((k) => {
     return {
       id: k.id, version: k.version, name: planName[k.planType] ? t(planName[k.planType]) : k.planType,
       sub: `${k.id.slice(0, 8)} · ${businessDayShort(k.startAt, locale)} → ${businessDay(k.endAt, locale)}`,
@@ -63,7 +63,7 @@ export interface ClientInvoiceRow { id: string; version: number; number: string;
 Kuala Lumpur business day; the payment date is the user's day. */
 export function clientInvoiceRows(is: ApiInvoice[], now: Date, i: I18n = EN): ClientInvoiceRow[] {
   const { t, display } = i;
-  return [...is].sort((a, b) => b.dueAt.localeCompare(a.dueAt)).map((inv) => {
+  return [...is].toSorted((a, b) => b.dueAt.localeCompare(a.dueAt)).map((inv) => {
     const st = invoiceStatus(inv, now);
     return {
       id: inv.id, version: inv.version, number: inv.number, amount: amount(inv.amountMinor, inv.currency),
@@ -84,7 +84,7 @@ export const methodLabel: Record<string, string> = { demo_credit_card: "Credit c
 export interface PaymentLine { id: string; version: number; label: string; at: string; status: ClientPayment["status"]; reference: string | null }
 export function paymentLines(ps: ClientPayment[], i: I18n = EN): PaymentLine[] {
   const { t, display } = i;
-  return [...ps].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((p) => {
+  return [...ps].toSorted((a, b) => b.createdAt.localeCompare(a.createdAt)).map((p) => {
     return {
       id: p.id, version: p.version, label: `${p.id.slice(0, 8)} · ${p.method ? (methodLabel[p.method] ? t(methodLabel[p.method]) : p.method) : t("Bank transfer (recorded by HQ)")}`,
       at: showTime(p.confirmedAt ?? p.updatedAt, display), status: p.status, reference: p.paymentReference,
@@ -93,7 +93,7 @@ export function paymentLines(ps: ClientPayment[], i: I18n = EN): PaymentLine[] {
 }
 /** The payment state the invoice page shows: the open payment (initiated or processing), else the last one. */
 export function paymentPhase(ps: ClientPayment[]): { open: ClientPayment | null; last: ClientPayment | null } {
-  const sorted = [...ps].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const sorted = [...ps].toSorted((a, b) => b.createdAt.localeCompare(a.createdAt));
   return { open: sorted.find((p) => p.status === "initiated" || p.status === "processing") ?? null, last: sorted[0] ?? null };
 }
 /** The demo PSP reference of a payment (unique per payment, as payments.simulate requires for confirm). */
@@ -161,7 +161,7 @@ export interface PreviewParams { targetName: string; at: string; status: string;
 
 export interface InquiryLine { id: string; subject: string; at: string; message: string; state: ApiInquiry["state"]; reply: string | null }
 export const inquiryLines = (is: ApiInquiry[], i: I18n = EN): InquiryLine[] => {
-  return [...is].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((q) => {
+  return [...is].toSorted((a, b) => b.createdAt.localeCompare(a.createdAt)).map((q) => {
     return {
       id: q.id, subject: i.t(q.subjectType === "payment" ? "Payment" : "Cooling restriction"), at: showTime(q.createdAt, i.display), message: q.message, state: q.state, reply: q.reply,
     };

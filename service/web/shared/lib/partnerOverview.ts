@@ -141,9 +141,9 @@ from the list, and in progress / scheduled as the summary's active jobs without 
 export function kpis(counts: ApiCounts, jobs: PartnerJob[], now: number, names: Map<string, string>, period?: { from: string; to: string }, i: I18n = EN): KpiTile[] {
   const { t } = i;
   const list = (tab: string) => `/partner/jobs?tab=${tab}${period ? `&from=${period.from}&to=${period.to}` : ""}`; // the list with the same period
-  const offers = jobs.filter((j) => j.status === "offered" && j.offerExpiresAt).sort((a, b) => Date.parse(a.offerExpiresAt!) - Date.parse(b.offerExpiresAt!));
+  const offers = jobs.filter((j) => j.status === "offered" && j.offerExpiresAt).toSorted((a, b) => Date.parse(a.offerExpiresAt!) - Date.parse(b.offerExpiresAt!));
   const unassigned = jobs.filter((j) => bucket(j, now) === "unassigned");
-  const running = jobs.filter((j) => (j.status === "assigned" || j.status === "in_progress") && j.slot).sort((a, b) => Date.parse(a.slot!.startAt) - Date.parse(b.slot!.startAt));
+  const running = jobs.filter((j) => (j.status === "assigned" || j.status === "in_progress") && j.slot).toSorted((a, b) => Date.parse(a.slot!.startAt) - Date.parse(b.slot!.startAt));
   const next = running.find((j) => j.status === "in_progress") ?? running.find((j) => Date.parse(j.slot!.endAt) > now);
   const review = jobs.filter((j) => j.status === "submitted");
   const active = Math.max(0, counts.activeCount - unassigned.length);
@@ -181,7 +181,7 @@ export interface ActionRow { kind: "offer" | "overdue" | "review" | "unassigned"
 export function actions(jobs: PartnerJob[], now: number, names: Map<string, string>, i: I18n = EN): ActionRow[] {
   const { t, display } = i;
   const rows: ActionRow[] = [];
-  for (const j of jobs.filter((x) => x.status === "offered").sort((a, b) => Date.parse(a.offerExpiresAt ?? a.dueAt ?? "") - Date.parse(b.offerExpiresAt ?? b.dueAt ?? ""))) {
+  for (const j of jobs.filter((x) => x.status === "offered").toSorted((a, b) => Date.parse(a.offerExpiresAt ?? a.dueAt ?? "") - Date.parse(b.offerExpiresAt ?? b.dueAt ?? ""))) {
     const detail = j.offerExpiresAt ? t("Answer by {time} ({left} left)", { time: showTime(j.offerExpiresAt, display), left: until(j.offerExpiresAt, now, t) }) : t("Answer the offer");
     rows.push({ kind: "offer", badge: t("Offer"), title: label(j, t), href: `/partner/jobs/${j.id}`, button: t("Respond"), detail });
   }
@@ -233,7 +233,7 @@ export function timeline(today: ApiCapacity[], members: ApiMember[], date: strin
     }).filter((b) => b.width > 0);
     const quals = (m.qualifications ?? []).filter((q) => !q.revokedAt).map((q) => shortQualification(q.code, t));
     return { id: m.id, name: m.displayName, sub: quals.slice(0, 2).join(", ") || t("Technician"), off: c?.unavailability ? unavailabilityLabel(c.unavailability, t) : null, blocks };
-  }).sort((a, b) => Number(a.blocks.length === 0 && !a.off) - Number(b.blocks.length === 0 && !b.off) || (a.blocks[0]?.left ?? 100) - (b.blocks[0]?.left ?? 100) || a.name.localeCompare(b.name));
+  }).toSorted((a, b) => Number(a.blocks.length === 0 && !a.off) - Number(b.blocks.length === 0 && !b.off) || (a.blocks[0]?.left ?? 100) - (b.blocks[0]?.left ?? 100) || a.name.localeCompare(b.name));
 }
 
 export interface CapacityRow { id: string; name: string; text: string; pct: number | null }
@@ -251,7 +251,7 @@ export function capacity(days: ApiCapacity[][], members: ApiMember[], t: T = en)
   }
   const h = (min: number) => t("{n} h", { n: Math.round((min / 60) * 10) / 10 });
   const of = (m: ApiMember) => sum.get(m.id) ?? { assigned: 0, available: null };
-  return members.filter((m) => m.role === "technician").sort((a, b) => of(b).assigned - of(a).assigned || a.displayName.localeCompare(b.displayName)).map((m) => {
+  return members.filter((m) => m.role === "technician").toSorted((a, b) => of(b).assigned - of(a).assigned || a.displayName.localeCompare(b.displayName)).map((m) => {
     const s = of(m);
     const pct = s.available ? Math.min(100, Math.round((s.assigned / s.available) * 100)) : null;
     return { id: m.id, name: m.displayName, text: `${h(s.assigned)} / ${s.available === null ? "—" : h(s.available)} · ${pct === null ? "—" : `${String(pct)}%`}`, pct };
@@ -277,7 +277,7 @@ export interface ActivityRow { id: string; time: string; text: string; href: str
 export function activity(events: ApiJobEvent[], jobs: Map<string, PartnerJob>, members: ApiMember[], now: number, max = 6, i: I18n = EN): ActivityRow[] {
   const { t } = i;
   const byUser = new Map(members.map((m) => [m.userId, m.displayName]));
-  return [...events].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || b.id.localeCompare(a.id)).slice(0, max).map((e) => {
+  return [...events].toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || b.id.localeCompare(a.id)).slice(0, max).map((e) => {
     const j = jobs.get(e.jobId);
     const who = e.actorUserId ? byUser.get(e.actorUserId) : null;
     const title = jobEventTitle[e.action] ? t(jobEventTitle[e.action]) : e.action.replaceAll(/[._]/g, " ");

@@ -24,7 +24,7 @@ export interface PlanRow { id: string; short: string; unitId: string; unit: stri
 /** One plan of the list (Figma “Living room AC · customer-a / Every 3 months · day 8 · Next 2026-12-08”), next due first. */
 export function planRows(plans: ApiPlan[], units: Map<string, string>, customerOfUnit: Map<string, string>, i: I18n = EN): PlanRow[] {
   const { t, display } = i;
-  return [...plans].sort((a, b) => Date.parse(a.nextDueAt) - Date.parse(b.nextDueAt) || a.id.localeCompare(b.id)).map((p) => {
+  return [...plans].toSorted((a, b) => Date.parse(a.nextDueAt) - Date.parse(b.nextDueAt) || a.id.localeCompare(b.id)).map((p) => {
     return {
       id: p.id, short: p.id.slice(0, 8), unitId: p.unitId, unit: units.get(p.unitId) ?? t("Unit"), customer: customerOfUnit.get(p.unitId) ?? t("customer"),
       line: `${everyText(p.recurrence.intervalMonths, t)} · ${t("day {n}", { n: p.anchorDay })}`, next: t("Next {date}", { date: planDate(p.nextDueAt, display) }),

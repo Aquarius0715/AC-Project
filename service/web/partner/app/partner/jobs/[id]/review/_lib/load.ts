@@ -43,7 +43,7 @@ export async function loadReview(jobId: string): Promise<ReviewLive> {
   }))).filter((p): p is { id: string; name: string; url: string } => !!p);
   const author = names.get(r.authorId) ?? t("technician {id}", { id: r.authorId.slice(0, 8) });
   const check = evidenceCheck(r, names, t);
-  const last = [...r.reviewHistory].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))[0] ?? null;
+  const last = [...r.reviewHistory].toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))[0] ?? null;
   // a follow-up is a calendar date the technician picked: written as it is, in the user's language
   const followDay = (d: string) => new Date(`${d.slice(0, 10)}T00:00:00Z`).toLocaleDateString(intlTag(display.locale), { timeZone: "UTC", dateStyle: "medium" }).replaceAll(/[\u00A0\u2009\u202F]/g, " ");
   const next = r.nextAction?.kind === "follow_up" ? t("follow-up {date} — {note}", { date: followDay(r.nextAction.date), note: r.nextAction.note }) : t("no follow-up needed");

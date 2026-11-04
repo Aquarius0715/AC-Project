@@ -8,6 +8,7 @@ import { metricUnit, opSymbol, recoveryError, type Channel, type Operator, type 
 import { EN, showDate, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { Metric as ContractMetric } from "@ac/web/lib/contracts.gen";
+import { byNumber } from "@ac/web/lib/order";
 
 const en = translator("en");
 
@@ -48,7 +49,7 @@ export function conditionText(c: { metric: string; operator: Operator; threshold
 }
 /** “on weekdays”, “on weekends”, “on Mon, Wed”, or "" for every day. */
 const daysText = (weekdays: number[], t: T) => {
-  const days = [...weekdays].sort();
+  const days = [...weekdays].toSorted(byNumber);
   return days.length === 7 ? "" : days.join(',') === "1,2,3,4,5" ? t("on weekdays") : days.join(',') === "6,7" ? t("on weekends") : t("on {days}", { days: days.map((d) => t(dayNames[d - 1])).join(", ") });
 };
 /** “only 08:00–19:00 on weekdays”, “only 22:00–06:00”, “only 09:00–12:00 on Sat, Sun”. */
@@ -83,7 +84,7 @@ export interface PolicyCard {
 const groupOf = (metric: string) => (metric === "co2" || metric === "pm25" ? "Air quality" : metric === "temperature" ? "Temperature" : metric === "humidity" ? "Humidity" : metric === "power" ? "Power" : metric);
 /** One card per own policy (Figma 06e): When / Then sentences and the attached ACs (attaching happens on each AC). */
 export function policyCards(ps: ApiAlertPolicy[], unitName: (id: string) => string | undefined, t: T = en): PolicyCard[] {
-  return [...ps].sort((a, b) => a.name.localeCompare(b.name)).map((p) => {
+  return [...ps].toSorted((a, b) => a.name.localeCompare(b.name)).map((p) => {
     const names = p.unitIds.map((id) => unitName(id) ?? "AC");
     return {
       id: p.id, version: p.version, name: p.name, badge: t(groupOf(p.metric)), enabled: p.enabled,
@@ -155,7 +156,7 @@ export function policyInput(f: PolicyForm, existing: ApiAlertPolicy | null, ctx:
     timezone: existing?.timezone ?? ctx.timezone, enabled: existing?.enabled ?? true, priority: existing?.priority ?? 50,
     recipientMembershipIds: existing?.recipientMembershipIds ?? [ctx.membershipId], escalateAfterMinutes: existing?.escalateAfterMinutes ?? 60, cooldownMinutes: existing?.cooldownMinutes ?? 5,
     channels: (f.email ? ["inApp", "email"] : ["inApp"]) as Channel[], metric: f.metric as ContractMetric, operator: f.operator, threshold: Number(f.threshold), recoveryThreshold: Number(f.recovery),
-    durationSeconds: seconds(f) ?? 0, activeWindow: f.windowOn ? { weekdays: [...f.weekdays].sort(), startLocal: f.start, endLocal: f.end } : null, severity: f.severity,
+    durationSeconds: seconds(f) ?? 0, activeWindow: f.windowOn ? { weekdays: [...f.weekdays].toSorted(byNumber), startLocal: f.start, endLocal: f.end } : null, severity: f.severity,
   };
 }
 /** The on / off switch of a policy card: the saved policy with only `enabled` changed. */

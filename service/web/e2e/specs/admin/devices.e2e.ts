@@ -13,7 +13,7 @@ test("the device list filters by state and the detail shows the device as Figma 
   await expect(list.getByRole("button").first()).toBeVisible();
   const seed = async () => (await serials()).filter((x) => x.startsWith("AC-DEMO-"));
   const all = await serials();
-  expect(all).toEqual([...all].sort()); // sorted by serial
+  expect(all).toEqual([...all].toSorted((a, b) => a.localeCompare(b))); // sorted by serial
   await main.getByRole("button", { name: /^Offline\s*\d+$/ }).click();
   expect(await seed()).toEqual(["AC-DEMO-0003"]);
   await main.getByRole("button", { name: /^No sensors\s*\d+$/ }).click();

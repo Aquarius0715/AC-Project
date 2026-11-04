@@ -38,7 +38,7 @@ access end can move again (IR461), and it can be removed. */
 export function partnerUserRows(us: ApiPartnerUser[], self: string | null, i: I18n = EN, now?: Date): PartnerUserRow[] {
   const { t } = i;
   const contractors = us.filter((u) => u.partnerRole === "contractor" && u.status === "active").length;
-  return [...us].sort((a, b) => (a.displayName ?? a.email).localeCompare(b.displayName ?? b.email)).map((u) => {
+  return [...us].toSorted((a, b) => (a.displayName ?? a.email).localeCompare(b.displayName ?? b.email)).map((u) => {
     const isYou = !!self && u.membershipId === self;
     const isLastContractor = u.partnerRole === "contractor" && u.status === "active" && contractors === 1;
     const isInvited = u.status === "invited";

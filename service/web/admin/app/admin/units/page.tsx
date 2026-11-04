@@ -119,7 +119,7 @@ export default async function AdminUnitsPage({ searchParams }: Readonly<PageProp
     selection: sel,
     places: placeOptions(tree, spaces, t),
     users: clientUserRows(clientUsers, (m) => memberName.get(m) ?? t("{name} owner", { name: cust.name }), undefined, i),
-    models: caps.map((k) => ({ id: k.id, label: `${k.manufacturer} ${k.model}` })).sort((a, b) => a.label.localeCompare(b.label)),
+    models: caps.map((k) => ({ id: k.id, label: `${k.manufacturer} ${k.model}` })).toSorted((a, b) => a.label.localeCompare(b.label)),
     perProperty: tree.map((p) => `${p.name} ${String(p.units)}`).join(" · ") || t("no properties yet"),
     alertsSub: openAlerts ? ([["{n} critical", sev("critical")], ["{n} warning", sev("warning")], ["{n} info", sev("normal")]] as const).filter(([, n]) => n > 0).map(([l, n]) => t(l, { n })).join(" · ") || t("none open") : null,
     filter: { powerState, connections: conns, search: one("search") ?? "" },

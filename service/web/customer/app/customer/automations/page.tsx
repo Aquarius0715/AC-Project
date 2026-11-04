@@ -32,7 +32,7 @@ export default async function CustomerAutomationsPage({ searchParams }: Readonly
   const acs = units.filter((u) => !u.archived).map((u) => {
     const property = propertyName.get(u.propertyId) ?? "";
     return { id: u.id, name: u.displayName, path: [property, spacePath(u.spaceId, spaces)].filter(Boolean).join(" › "), property };
-  }).sort((a, b) => a.path.localeCompare(b.path) || a.name.localeCompare(b.name));
+  }).toSorted((a, b) => a.path.localeCompare(b.path) || a.name.localeCompare(b.name));
   const ac = new Map(acs.map((u) => [u.id, u]));
   const nextRuns = new Map(await Promise.all(rules.filter((r) => r.kind === "schedule" && r.enabled).map(async (r) =>
     [r.id, (await coreOp<ApiOccurrence[]>("automations.nextRuns", { automationId: r.id, count: 8 })).find((o) => o.phase === "schedule_start")?.at ?? null] as const)));

@@ -52,7 +52,7 @@ export function inboxAlerts(alerts: ApiAlert[], notes: AlertNote[], unit: (id: s
   const { t, display } = i;
   const stamp = (iso: string) => showTime(iso, display);
   const attn = (a: ApiAlert) => a.status !== "resolved" && a.severity !== "normal";
-  const order = [...alerts].sort((x, y) => Number(attn(y)) - Number(attn(x)) || rank[x.severity] - rank[y.severity] || y.detectedAt.localeCompare(x.detectedAt));
+  const order = [...alerts].toSorted((x, y) => Number(attn(y)) - Number(attn(x)) || rank[x.severity] - rank[y.severity] || y.detectedAt.localeCompare(x.detectedAt));
   return order.map((a): InboxAlert => {
     const u = unit(a.unitId);
     const mine = notes.filter((n) => n.sourceAlertId === a.id);

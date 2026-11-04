@@ -11,6 +11,7 @@ import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { typeLabel } from "@ac/web/lib/partnerJobDetail";
 import { kpis, lineRows, money, periodLabel, questionRows, statementRows, topicLabel, type ApiPayoutStatement, type JobLabel, type ReviewingJob } from "@ac/web/lib/partnerPayouts";
 import type { PayoutsLive } from "../_components/payouts-view";
+import { byText } from "@ac/web/lib/order";
 
 const quiet = <T,>(p: Promise<T>) => {
   return p.catch((error) => {
@@ -39,7 +40,7 @@ export async function loadPayouts(opts: { statementId?: string; period?: string;
   const selected = shown.find((s) => s.id === opts.statementId) ?? shown[0] ?? null;
   const units = new Map<string, Promise<string | null>>();
   const live: PayoutsLive = {
-    periods: [...new Set(all.map((s) => s.period))].sort().reverse().map((p) => ({ value: p, text: periodLabel(p, display.locale) })), period: opts.period ?? "", status: status ?? "",
+    periods: [...new Set(all.map((s) => s.period))].toSorted(byText).reverse().map((p) => ({ value: p, text: periodLabel(p, display.locale) })), period: opts.period ?? "", status: status ?? "",
     statements: statementRows(shown, i), selected: null, company: who.organizationName || t("your company"),
     topics: (Object.keys(topicLabel) as (keyof typeof topicLabel)[]).map((x) => ({ id: x, text: t(topicLabel[x]) })),
   };

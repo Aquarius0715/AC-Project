@@ -80,7 +80,7 @@ async function AdminAuditPageContent({ searchParams }: Readonly<PageProps<"/admi
   const wanted = one("deviceId");
   const d = wanted ? devices.find((x) => x.id === wanted) : undefined;
   live.device = {
-    options: [...devices].sort((a, b) => a.serial.localeCompare(b.serial)).map((x) => ({ id: x.id, label: label(x) })),
+    options: [...devices].toSorted((a, b) => a.serial.localeCompare(b.serial)).map((x) => ({ id: x.id, label: label(x) })),
     deviceId: d?.id ?? null, missing: !!wanted && !d, label: d ? label(d) : null, total: 0, events: [], selected: null,
   };
   if (d && isSearched) {

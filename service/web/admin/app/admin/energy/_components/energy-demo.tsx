@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Btn, Card, Check, Field, Input, ListRow, Page, Select, SummaryList, Tabs, useToast } from "@ac/web/components/ui";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
 import { Icon } from "@ac/web/components/Icon";
+import { byText } from "@ac/web/lib/order";
 
 const baselines = [
   { id: "baseline-energy-100", name: "baseline-energy-100", sub: "unit-online-rto · 100.0 kWh · demo_fixed", kwh: 100, units: ["unit-online-rto"] },
@@ -21,7 +22,7 @@ export function EnergyDemo() {
   const [sel, setSel] = useState(baselines[0]);
   const [kwh, setKwh] = useState("100");
   const b = baselines.find((x) => x.id === bid)!;
-  const isMismatch = b.units.slice().sort().join(',') !== units.slice().sort().join(',');
+  const isMismatch = b.units.slice().toSorted(byText).join(',') !== units.slice().toSorted(byText).join(',');
   const diff = b.kwh - actual;
   const isInc = diff < 0;
   return (

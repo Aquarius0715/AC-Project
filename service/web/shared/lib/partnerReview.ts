@@ -69,7 +69,7 @@ export interface InspectionRow { id: string; label: string; result: ApiInspectio
 export function inspectionRows(items: ApiInspectionItem[], t: T = en, attachments: Pick<ApiAttachment, "id" | "name">[] = []): InspectionRow[] {
   const order = { indoor: 0, outdoor: 1, electrical: 2 };
   const names = new Map(attachments.map((a) => [a.id, a.name]));
-  return [...items].sort((a, b) => order[a.componentGroup] - order[b.componentGroup]).map((it) => {
+  return [...items].toSorted((a, b) => order[a.componentGroup] - order[b.componentGroup]).map((it) => {
     return {
       id: it.id, label: `${t(groupLabel[it.componentGroup])} — ${componentLabel[it.componentKey] ? t(componentLabel[it.componentKey]) : it.componentKey.replaceAll('_', " ")}`, result: it.result, reason: it.reason,
       photos: it.evidenceIds.map((id) => names.get(id) ?? id.slice(0, 8)),
@@ -157,7 +157,7 @@ export function versionRows(job: ApiReviewJob, r: ApiWorkReport, author: string,
   const { t, display } = i;
   const refs = job.reportRefs ?? [];
   const rows: VersionRow[] = refs.map((ref) => {
-    const rv = r.reviewHistory.filter((h) => h.reportVersion === ref.reportVersion).sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))[0];
+    const rv = r.reviewHistory.filter((h) => h.reportVersion === ref.reportVersion).toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))[0];
     const isCurrent = ref.reportVersion === r.version;
     const by = rv ? names.get(rv.reviewerUserId) ?? t("reviewer") : "";
     if (rv?.decision === "accept") return { title: t("v{version} · accepted {time}", { version: ref.reportVersion, time: showTime(rv.occurredAt, display) }), sub: t("by {name} · visible to the customer", { name: by }), badge: { label: t("Accepted"), tone: "ok" } };

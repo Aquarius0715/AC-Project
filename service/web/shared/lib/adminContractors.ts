@@ -10,6 +10,7 @@ import { actionMessage } from "@ac/web/lib/actionMessage";
 import { amount } from "@ac/web/lib/money";
 import { qualificationLabel } from "@ac/web/lib/partnerJobDetail";
 import type { IconName } from "@ac/web/components/Icon";
+import { byText } from "@ac/web/lib/order";
 
 const en = translator("en");
 
@@ -35,7 +36,7 @@ const dayMonth = (iso: string, i: I18n) => showDayMonth(iso, { locale: i.display
 /** One contractor organization of the list (Figma “contractor-a · KL, Selangor · 2 technicians · Active”). */
 export interface ContractorRow { id: string; name: string; sub: string; badge: { label: string; tone: Tone } }
 export function contractorRows(orgs: { id: string; name: string }[], profiles: ApiProfile[], technicians: ApiTechnician[], t: T = en): ContractorRow[] {
-  return [...orgs].sort((a, b) => a.name.localeCompare(b.name)).map((o) => {
+  return [...orgs].toSorted((a, b) => a.name.localeCompare(b.name)).map((o) => {
     const p = profiles.find((x) => x.organizationId === o.id);
     const n = technicians.filter((x) => x.organizationId === o.id).length;
     const techs = t(n === 1 ? "1 technician" : "{n} technicians", { n });
@@ -85,7 +86,7 @@ export function rateCardView(cards: ApiRateCard[], rateCardId: string | null, no
   const lines = (c: ApiRateCard) => WORK_TYPES.flatMap((w) => c.lines.filter((l) => l.workType === w.id).map((l) => ({ workType: w.id, label: t(w.label), amount: rateAmount(l), note: l.note })));
   return {
     current: current ? { title: t("Rate card v{v} (from {date})", { v: current.version, date: day(current.effectiveFrom) }), since: t("v{v} (from {date})", { v: current.version, date: day(current.effectiveFrom) }), currency: current.currency, lines: lines(current) } : null,
-    scheduled: cards.filter((c) => Date.parse(c.effectiveFrom) > now).sort((a, b) => Date.parse(a.effectiveFrom) - Date.parse(b.effectiveFrom)).map((c) => ({ id: c.id, title: t("v{v} from {date} · scheduled", { v: c.version, date: day(c.effectiveFrom) }), currency: c.currency, lines: lines(c) })),
+    scheduled: cards.filter((c) => Date.parse(c.effectiveFrom) > now).toSorted((a, b) => Date.parse(a.effectiveFrom) - Date.parse(b.effectiveFrom)).map((c) => ({ id: c.id, title: t("v{v} from {date} · scheduled", { v: c.version, date: day(c.effectiveFrom) }), currency: c.currency, lines: lines(c) })),
     nextVersion: Math.max(0, ...cards.map((c) => c.version)) + 1,
   };
 }
@@ -101,11 +102,11 @@ export function technicianRows(technicians: ApiTechnician[], certs: ApiCertifica
     const mine = certs.filter((c) => c.membershipId === x.id);
     const pending = mine.filter((c) => c.status === "pending_verification").length;
     const expiring = mine.filter((c) => c.status === "expiring");
-    const soonest = [...quals].filter((q) => Date.parse(q.validUntil) > now).sort((a, b) => Date.parse(a.validUntil) - Date.parse(b.validUntil))[0];
+    const soonest = [...quals].filter((q) => Date.parse(q.validUntil) > now).toSorted((a, b) => Date.parse(a.validUntil) - Date.parse(b.validUntil))[0];
     let badge: TechRow["badge"];
     if (ended) badge = { label: t("Expired"), tone: "muted" };
     else if (pending) badge = { label: t("{n} awaiting verification", { n: pending }), tone: "primary" };
-    else if (expiring.length > 0) badge = { label: t("{n} expiring · {date}", { n: expiring.length, date: dayMonth(expiring.map((c) => c.expiresAt).sort()[0], i) }), tone: "warn" };
+    else if (expiring.length > 0) badge = { label: t("{n} expiring · {date}", { n: expiring.length, date: dayMonth(expiring.map((c) => c.expiresAt).toSorted(byText)[0], i) }), tone: "warn" };
     else if (quals.length === 0 || !soonest) badge = { label: t(quals.length > 0 ? "Expired" : "None"), tone: quals.length > 0 ? "crit" : "muted" };
     else if (Date.parse(soonest.validUntil) - now <= 30 * 86_400_000) badge = { label: t("expiring · {date}", { date: dayMonth(soonest.validUntil, i) }), tone: "warn" };
     else badge = { label: t("Valid"), tone: "ok" };
@@ -114,7 +115,7 @@ export function technicianRows(technicians: ApiTechnician[], certs: ApiCertifica
 }
 
 /** The certificates waiting for HQ (Verify uploads), oldest first. */
-export const pendingCertificates = (certs: ApiCertificate[]) => certs.filter((c) => c.status === "pending_verification").sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+export const pendingCertificates = (certs: ApiCertificate[]) => certs.filter((c) => c.status === "pending_verification").toSorted((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
 
 /** The profile form (IR131 item 1): registration 1–64, 1–20 distinct service areas of 1–80, a contact e-mail. */
 export function profileErrors(f: { registrationNo: string; serviceAreas: string; contactEmail: string }, t: T = en): Record<string, string> {

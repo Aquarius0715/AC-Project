@@ -23,7 +23,7 @@ export interface TechJob { id: string; unitId: string; status: string }
 const rank: Record<string, number> = { in_progress: 0, assigned: 1, rework_requested: 2 };
 /** The job a device write on the unit runs under (IR94): in progress first, else assigned or rework; null without one. */
 export function jobFor(unitId: string | null, jobs: TechJob[]): string | null {
-  return unitId ? jobs.filter((j) => j.unitId === unitId && j.status in rank).sort((a, b) => rank[a.status] - rank[b.status])[0]?.id ?? null : null;
+  return unitId ? jobs.filter((j) => j.unitId === unitId && j.status in rank).toSorted((a, b) => rank[a.status] - rank[b.status])[0]?.id ?? null : null;
 }
 
 const ago = (iso: string | null, now: number, t: T) => {
@@ -38,7 +38,7 @@ const ago = (iso: string | null, now: number, t: T) => {
 /** `unit` names the bound unit; a device not bound yet says so with its planned unit (D05, IR467). */
 export interface TechDeviceRow { id: string; serial: string; unitId: string | null; targetUnitId: string | null; unit: string; conn: Connection; connText: string | null; fw: string; tamper: boolean; sensors: number }
 export function techDeviceRows(ds: ApiDevice[], unitName: Map<string, string>, now: number, t: T = en): TechDeviceRow[] {
-  return [...ds].sort((a, b) => a.serial.localeCompare(b.serial)).map((d) => {
+  return [...ds].toSorted((a, b) => a.serial.localeCompare(b.serial)).map((d) => {
     return {
       id: d.id, serial: d.serial, unitId: d.unitId, targetUnitId: d.targetUnitId ?? null, conn: d.connection,
       unit: d.unitId ? unitName.get(d.unitId) ?? t("unit") : (d.targetUnitId ? t("Not bound yet — planned for {unit}", { unit: unitName.get(d.targetUnitId) ?? t("unit") }) : t("Unbound")),
@@ -68,7 +68,7 @@ const faultAxis: Partial<Record<ApiDeviceEventFull["eventType"], keyof OpenFault
 export function openFaults(es: ApiDeviceEventFull[]): OpenFaults {
   const out: OpenFaults = {};
   const seen = new Set<string>();
-  for (const e of [...es].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))) {
+  for (const e of [...es].toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))) {
     const k = faultAxis[e.eventType];
     if (!k || seen.has(k)) continue;
     seen.add(k);
@@ -98,7 +98,7 @@ export function deviceTiles(d: ApiDeviceDetail, newer: string | null, now: numbe
 const byVersion = (a: string, b: string) => a.localeCompare(b, "en", { numeric: true });
 /** The firmware candidates above the installed version, oldest first (capability firmwareCandidates; v2 < v10). A
 technician only updates forward; HQ campaigns handle anything else. */
-export const newerVersions = (current: string, candidates: string[]) => [...new Set(candidates)].filter((v) => byVersion(v, current) > 0).sort(byVersion);
+export const newerVersions = (current: string, candidates: string[]) => [...new Set(candidates)].filter((v) => byVersion(v, current) > 0).toSorted(byVersion);
 /** The newest of them, null when the device runs the latest. */
 export const newerFirmware = (current: string, candidates: string[]) => newerVersions(current, candidates).pop() ?? null;
 

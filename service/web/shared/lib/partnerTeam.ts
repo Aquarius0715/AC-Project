@@ -130,7 +130,7 @@ export function grantRows(members: ApiTeamMember[], nowMs: number, i: I18n = EN)
   for (const code of QUALIFICATION_CODES) {
     if (!held.has(code)) rows.push({ key: `none:${code}`, technician: "—", name: qualificationLabel(code, t), sub: t("not held"), until: "—", badge: { text: "—", tone: "muted" } });
   }
-  return rows.sort((a, b) => a.name.localeCompare(b.name) || a.technician.localeCompare(b.technician));
+  return rows.toSorted((a, b) => a.name.localeCompare(b.name) || a.technician.localeCompare(b.technician));
 }
 const qualifiedCodes = (m: ApiTeamMember, nowMs: number) => QUALIFICATION_CODES.filter((code) => qualified(m, [code], new Date(nowMs).toISOString()));
 
@@ -215,7 +215,7 @@ type, the Kuala Lumpur days and the note, first day first. `first` is the earlie
 that started before today keeps its past days. */
 export function unavailabilityRows(rows: ApiUnavailability[], names: Map<string, string>, today: string, i: I18n = EN): UnavailabilityRow[] {
   const { t, display: { locale } } = i;
-  return [...rows].sort((a, b) => a.from.localeCompare(b.from) || a.id.localeCompare(b.id)).map((u) => {
+  return [...rows].toSorted((a, b) => a.from.localeCompare(b.from) || a.id.localeCompare(b.id)).map((u) => {
     return {
       id: u.id, version: u.version, who: u.membershipId ? names.get(u.membershipId) ?? t("Technician") : t("All technicians"),
       type: t(UNAVAILABILITY_TYPES.find((x) => x.id === u.type)?.text ?? "Other"), note: u.note, days: dayRange(u.from, u.to, locale),

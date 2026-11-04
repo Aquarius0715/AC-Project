@@ -21,7 +21,7 @@ export interface RoomUnit {
 const metric = (d: ApiUnitDetail, m: string) => { const x = d.latestMeasurements.find((r) => r.metric === m); return x && x.quality === "valid" ? x.value : null; };
 export function roomUnits(ds: ApiUnitDetail[], i: I18n = EN): RoomUnit[] {
   const { t } = i;
-  return [...ds].sort((a, b) => a.displayName.localeCompare(b.displayName)).map((d) => {
+  return [...ds].toSorted((a, b) => a.displayName.localeCompare(b.displayName)).map((d) => {
     const o = d.observedState;
     const set = [o.celsius === null ? null : t("Set {celsius}°C", { celsius: o.celsius }), o.mode ? t(modeLabel[o.mode]) : null, o.fanLevel ? t("Fan {level}", { level: t(fanLabel[o.fanLevel]) }) : null].filter(Boolean).join(" · ");
     const temp = metric(d, "temperature");

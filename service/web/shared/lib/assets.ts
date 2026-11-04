@@ -10,6 +10,7 @@ import { amount, klStamp, one } from "@ac/web/lib/energy";
 import { metricLabel, metricUnit, opSymbol, type Operator, type Severity } from "@ac/web/lib/adminAlerts";
 import { csvCell } from "@ac/web/lib/csv";
 import type { IconName } from "@ac/web/components/Icon";
+import { byText } from "@ac/web/lib/order";
 
 export type Profile = "rto" | "general" | "energy" | "environment";
 export type Connection = "online" | "offline" | "unknown" | "connecting" | "error";
@@ -52,7 +53,7 @@ export function standing(customerId: string, contracts: ApiContractLite[], overd
   const ids = new Set(mine.map((k) => k.id));
   const current = mine.filter((k) => Date.parse(k.startAt) <= t && t < Date.parse(k.endAt));
   const due = overdue.filter((i) => ids.has(i.contractId));
-  const r = (restrictions ?? []).filter((x) => x.contractId && ids.has(x.contractId) && x.state in restrictionRank).sort((a, b) => restrictionRank[a.state] - restrictionRank[b.state])[0];
+  const r = (restrictions ?? []).filter((x) => x.contractId && ids.has(x.contractId) && x.state in restrictionRank).toSorted((a, b) => restrictionRank[a.state] - restrictionRank[b.state])[0];
   return {
     plans: [...new Set(current.map((k) => k.planType))], contracts: current.length, contractUnits: new Set(current.flatMap((k) => k.unitIds)).size, overdue: due.length,
     overdueAmount: due.length > 0 ? amount(due.reduce((n, i) => n + i.amountMinor, 0), due[0].currency) : null,
@@ -85,9 +86,9 @@ export const operation = (us: ApiUnitRow[]) => {
 };
 export function customerRows(cs: ApiCustomerRow[], orgs: ApiOrgRow[], ps: ApiPropertyRow[], us: ApiUnitRow[], standingOf: (c: ApiCustomerRow) => Standing | null, i: I18n = EN): CustomerRow[] {
   const org = new Map(orgs.map((o) => [o.id, o]));
-  return [...cs].sort(byName).map((c) => {
+  return [...cs].toSorted(byName).map((c) => {
     const units = us.filter((u) => u.customerOrgId === c.organizationId);
-    const props = ps.filter((p) => p.customerOrgId === c.organizationId).sort(byName);
+    const props = ps.filter((p) => p.customerOrgId === c.organizationId).toSorted(byName);
     const s = standingOf(c);
     return {
       id: c.id, version: c.version, name: c.name, billingName: org.get(c.organizationId)?.name ?? "", status: c.status, orgId: c.organizationId, orgVersion: org.get(c.organizationId)?.version ?? null,
@@ -149,13 +150,13 @@ export const flatten = (xs: TreeSpace[]): TreeSpace[] => xs.flatMap((x) => [x, .
 export function locationTree(ps: ApiPropertyRow[], ss: ApiSpaceRow[], us: ApiUnitRow[], orgId: string): TreeProperty[] {
   const live = ss.filter((s) => !s.archived);
   const build = (propertyId: string, parent: string | null): TreeSpace[] => {
-    return live.filter((s) => s.propertyId === propertyId && s.parentSpaceId === parent).sort(byName).map((s) => {
+    return live.filter((s) => s.propertyId === propertyId && s.parentSpaceId === parent).toSorted(byName).map((s) => {
       const children = build(propertyId, s.id);
       const direct = us.filter((u) => u.spaceId === s.id).length;
       return { id: s.id, version: s.version, kind: s.kind, name: s.name, parentSpaceId: parent, units: direct + children.reduce((n, c) => n + c.units, 0), propertyId, direct, children };
     });
   };
-  return ps.filter((p) => p.customerOrgId === orgId && !p.archived).sort(byName).map((p) => {
+  return ps.filter((p) => p.customerOrgId === orgId && !p.archived).toSorted(byName).map((p) => {
     const spaces = build(p.id, null);
     const all = flatten(spaces);
     return {
@@ -234,7 +235,7 @@ const power = { on: "running", off: "stopped", unknown: "unknown" } as const;
 /** The model as the table shows it ("ventilation-demo v3": capability model and the unit's capability version). */
 export const modelLabel = (u: Pick<ApiUnitRow, "modelId" | "capabilityVersion">, models: Map<string, string>) => `${models.get(u.modelId) ?? u.modelId.slice(0, 8)} v${String(u.capabilityVersion)}`;
 export function unitRows(us: ApiUnitRow[], ss: ApiSpaceRow[], models: Map<string, string>, t: T = en): UnitRow[] {
-  return [...us].sort((a, b) => a.displayName.localeCompare(b.displayName)).map((u) => {
+  return [...us].toSorted((a, b) => a.displayName.localeCompare(b.displayName)).map((u) => {
     return {
       id: u.id, version: u.version, name: u.displayName, model: modelLabel(u, models), location: spacePath(u.spaceId, ss) || t("Unassigned"),
       power: power[u.effectivePowerState], conn: u.connection, alerts: u.activeAlertCount, policies: u.alertPolicyIds.length > 0 ? t("Default + {n}", { n: u.alertPolicyIds.length }) : t("Default"),
@@ -289,7 +290,7 @@ export function changedFields(u: ApiUnitRow, d: UnitDraft, t: T = en): string[] 
   if (saved.modelId !== d.modelId) out.push(t("Model"));
   if (saved.installedAt !== d.installedAt) out.push(t("Installed at"));
   if (saved.warrantyEnd !== d.warrantyEnd) out.push(t("Warranty end"));
-  if ([...saved.serviceScope].sort().join(',') !== [...d.serviceScope].sort().join(',')) out.push(t("Service scope"));
+  if ([...saved.serviceScope].toSorted(byText).join(',') !== [...d.serviceScope].toSorted(byText).join(',')) out.push(t("Service scope"));
   return out;
 }
 
@@ -308,8 +309,8 @@ const duration = (s: number, t: T) => (s % 3600 === 0 && s >= 3600 ? t("{n} h", 
 /** The short weekday name of ISO day 1–7 (Monday first) in the user's language: 1 Jan 2024 was a Monday. */
 const dayName = (x: number, locale: Locale) => new Date(Date.UTC(2024, 0, x)).toLocaleDateString(intlTag(locale), { weekday: "short", timeZone: "UTC" });
 const days = (w: number[], i: I18n) => {
-  const d = [...w].sort((a, b) => a - b).join(',');
-  return w.length === 7 ? "" : d === "1,2,3,4,5" ? `${i.t("weekdays")} ` : d === "6,7" ? `${i.t("weekends")} ` : `${[...w].sort((a, b) => a - b).map((x) => dayName(x, i.display.locale)).join(", ")} `;
+  const d = [...w].toSorted((a, b) => a - b).join(',');
+  return w.length === 7 ? "" : d === "1,2,3,4,5" ? `${i.t("weekdays")} ` : d === "6,7" ? `${i.t("weekends")} ` : `${[...w].toSorted((a, b) => a - b).map((x) => dayName(x, i.display.locale)).join(", ")} `;
 };
 /** "Temperature ≥ 30 °C for 60 s, weekdays 08:00–19:00 → Warning", in the display language; the window's hours are the policy's local hours. */
 export function conditionText(p: { metric?: string; operator?: Operator; threshold?: number; durationSeconds?: number; activeWindow?: ApiCustomerPolicy["activeWindow"]; severity?: Severity }, i: I18n = EN): string {
@@ -328,7 +329,7 @@ export function policyLines(ps: ApiCustomerPolicy[], customerUnits: string[], ow
   const { t } = i;
   const mine = new Set(customerUnits);
   return ps.filter((p): p is ApiCustomerPolicy & { kind: "alert" | "default_alert" } => p.kind === "alert" || p.kind === "default_alert")
-    .sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : (a.kind === "default_alert" ? -1 : 1)))
+    .toSorted((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : (a.kind === "default_alert" ? -1 : 1)))
     .map((p) => {
       return p.kind === "default_alert"
         ? { id: p.id, version: p.version, kind: p.kind, name: p.name === "Default policy" ? t("Default policy") : p.name, type: t("Default"), condition: t((p.rules?.length ?? 0) === 1 ? "1 rule · {on} on for this customer" : "{n} rules · {on} on for this customer", { n: p.rules?.length ?? 0, on: defaultRules(p, i).filter((r) => r.enabled).length }), madeBy: t("HQ (template)"), units: mine.size, enabled: p.enabled }
@@ -368,7 +369,7 @@ the user's time zone. */
 export function clientUserRows(us: ApiClientUser[], who: (membershipId: string) => string, self?: string, i?: I18n): ClientUserRow[] {
   const owners = us.filter((u) => u.clientRole === "owner" && u.status === "active").length;
   const t = (i ?? EN).t;
-  return [...us].sort((a, b) => (a.displayName ?? a.email).localeCompare(b.displayName ?? b.email)).map((u) => {
+  return [...us].toSorted((a, b) => (a.displayName ?? a.email).localeCompare(b.displayName ?? b.email)).map((u) => {
     return {
       id: u.id, version: u.version, email: u.email, name: u.displayName, role: u.clientRole, status: u.status,
       sub: u.displayName ? u.email : t("invited {date} by {who}", { date: i ? showDate(u.invitedAt, i.display) : klDate(u.invitedAt), who: who(u.invitedByMembershipId) }),
@@ -421,7 +422,7 @@ export function coverageRows(cs: ApiCoverage[], x: { unit: (id: string) => { nam
       days,
       statusText,
     };
-  }).sort((a, b) => (a.endsAt === b.endsAt ? a.unit.localeCompare(b.unit) : a.endsAt === null ? 1 : b.endsAt === null ? -1 : a.endsAt.localeCompare(b.endsAt)));
+  }).toSorted((a, b) => (a.endsAt === b.endsAt ? a.unit.localeCompare(b.unit) : a.endsAt === null ? 1 : b.endsAt === null ? -1 : a.endsAt.localeCompare(b.endsAt)));
 }
 /** KPI tiles (Figma 02 warranty): under warranty (any unit whose warranty still runs), ending within 90 / 30 days, no coverage, contracts. */
 export function coverageKpis(rows: CoverageRow[], t: T = en) {

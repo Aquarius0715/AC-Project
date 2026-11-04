@@ -72,7 +72,7 @@ export function compareRow(unitId: string, name: string, s: ApiEnergySummary, tr
 Offsets (IR265). */
 export function pickUnits(units: { id: string; displayName: string }[], param: string | undefined): string[] {
   const picked = [...new Set((param ?? "").split(","))].filter((id) => units.some((u) => u.id === id)).slice(0, 4);
-  return picked.length > 0 ? picked : [...units].sort((a, b) => a.displayName.localeCompare(b.displayName)).slice(0, 1).map((u) => u.id);
+  return picked.length > 0 ? picked : [...units].toSorted((a, b) => a.displayName.localeCompare(b.displayName)).slice(0, 1).map((u) => u.id);
 }
 /** The energy screen's selection as URL parameters (also passed to the offsets page, FR-C13 “Based on Energy & cost”). */
 export function selectionQuery(p: { unitIds: string[]; period: PeriodKind; from?: string; to?: string; baselineId?: string | null }): string {

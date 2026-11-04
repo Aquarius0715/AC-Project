@@ -67,7 +67,7 @@ export function jobContext(j: Extract<ApiUnitJob, { projection: "summary" }>, na
 export function pastWork(jobs: ApiUnitJob[], i: I18n = EN) {
   const { t, display } = i;
   return jobs.filter((j): j is Extract<ApiUnitJob, { projection: "history" }> => j.projection === "history")
-    .sort((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? ""))
+    .toSorted((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? ""))
     .map((j) => {
       return {
         id: j.jobId, title: `${j.jobId.slice(0, 8)} · ${typeLabel(j.type, t)}`, sub: j.completedAt ? showDate(j.completedAt, display) : t("not completed"),
@@ -79,7 +79,7 @@ export function pastWork(jobs: ApiUnitJob[], i: I18n = EN) {
 /** The alert evidence: the title, the kind of evidence with its text and when it was detected. */
 export function evidenceRows(alerts: ApiAlert[], i: I18n = EN) {
   const { t, display } = i;
-  return [...alerts].sort((a, b) => b.detectedAt.localeCompare(a.detectedAt)).map((a) => {
+  return [...alerts].toSorted((a, b) => b.detectedAt.localeCompare(a.detectedAt)).map((a) => {
     return {
       id: a.id, title: alertTitle(a, t), severity: a.severity, resolved: a.status === "resolved",
       sub: `${t(EVIDENCE[a.evidenceKind] ?? "Evidence")} — ${evidenceText(a.evidenceText, t)} · ${showTime(a.detectedAt, display)}`,
@@ -119,7 +119,7 @@ export function chart(metric: string, unit: string, items: { value: number | nul
 and that live values are gone. */
 export function snapshotRows(h: ApiHistory, i: I18n = EN): [string, string][] {
   const { t, display } = i;
-  const decision = [...h.ownDecisionEvents].filter((e) => e.action === "offer.accepted" || e.action === "offer.declined").sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))[0];
+  const decision = [...h.ownDecisionEvents].filter((e) => e.action === "offer.accepted" || e.action === "offer.declined").toSorted((a, b) => b.occurredAt.localeCompare(a.occurredAt))[0];
   const report = (h.redactedReportSummary ?? null) as { hasReport?: boolean; acceptance?: string } | null;
   return [
     [t("Your decision"), decision ? `${t(decision.action === "offer.accepted" ? "Accepted" : "Declined")} · ${showTime(decision.occurredAt, display)}` : "—"],

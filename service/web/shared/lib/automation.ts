@@ -59,7 +59,7 @@ const ACROSS = "\0across"; // the group key of policies spanning customers (sort
 /** The list grouped by the customer of the target units; policies spanning customers go under “Across customers”. */
 export function policyGroups(ps: ApiAutoPolicy[], customerOfUnit: Map<string, string>, t: T = en): PolicyGroup[] {
   const groups = new Map<string, PolicyGroup>();
-  for (const p of [...ps].sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id))) {
+  for (const p of [...ps].toSorted((a, b) => b.priority - a.priority || a.id.localeCompare(b.id))) {
     const customers = new Set(p.unitIds.map((u) => customerOfUnit.get(u) ?? t("unknown customer")));
     const key = customers.size === 1 ? [...customers][0] : ACROSS;
     const g = groups.get(key) ?? { label: key === ACROSS ? t("Across customers") : key, rows: [] };
@@ -69,7 +69,7 @@ export function policyGroups(ps: ApiAutoPolicy[], customerOfUnit: Map<string, st
     });
     groups.set(key, g);
   }
-  return [...groups].sort(([a], [b]) => (a === ACROSS ? -1 : (b === ACROSS ? 1 : a.localeCompare(b)))).map(([, g]) => g);
+  return [...groups].toSorted(([a], [b]) => (a === ACROSS ? -1 : (b === ACROSS ? 1 : a.localeCompare(b)))).map(([, g]) => g);
 }
 
 /** Why a policy was turned off automatically, worded; another code stays as it is. */

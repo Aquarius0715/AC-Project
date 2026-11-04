@@ -129,7 +129,7 @@ export function freeSlots(c: ApiCapacity | undefined): string[] {
   for (const a of c.availableSlots) {
     let start = Date.parse(a.startAt);
     const end = Date.parse(a.endAt);
-    for (const b of [...c.assignedSlots].sort((x, y) => Date.parse(x.startAt) - Date.parse(y.startAt))) {
+    for (const b of [...c.assignedSlots].toSorted((x, y) => Date.parse(x.startAt) - Date.parse(y.startAt))) {
       const bs = Date.parse(b.startAt), be = Date.parse(b.endAt);
       if (be <= start || bs >= end) continue;
       if (bs > start) parts.push(`${hhmm(new Date(start).toISOString())}–${hhmm(new Date(bs).toISOString())}`);
@@ -170,7 +170,7 @@ export function candidates(members: ApiMember[], eligible: Set<string>, required
       : ({ text: c?.assignedSlots.some((s) => overlaps(s, slot)) ? t(m.id === currentId ? "Current · booked here" : "Busy at this time") : t("Not eligible"), tone: "muted" as Tone }));
     return { id: m.id, name: m.displayName, eligible: false, sub, badge };
   });
-  return rows.sort((a, b) => Number(b.eligible) - Number(a.eligible) || a.name.localeCompare(b.name));
+  return rows.toSorted((a, b) => Number(b.eligible) - Number(a.eligible) || a.name.localeCompare(b.name));
 }
 
 export interface WeekCell { kind: "booked" | "free" | "leave" | "none" | "proposal"; text: string; sub?: string }

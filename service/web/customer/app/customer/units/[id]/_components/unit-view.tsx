@@ -80,7 +80,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
   ]);
   // this screen's sends (live status) over the stored history (commands.list, IR216), newest first
   const hist: Cmd[] = d ? [...sent, ...[...history, ...d.pendingCommands].filter((p, i, all) => sent.every((x) => x.id !== p.id) && all.findIndex((x) => x.id === p.id) === i)]
-    .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt)).map((c) => historyRow(c, t, display)) : mockHist;
+    .toSorted((a, b) => b.requestedAt.localeCompare(a.requestedAt)).map((c) => historyRow(c, t, display)) : mockHist;
   // the model's capabilities decide what can be set (deterministic contracts: control=false forbids ordinary actions,
   // temperature=null temperature changes; AT-X06); the demo screen shows a full model
   const layout = controlLayout(d?.capabilities ?? null);

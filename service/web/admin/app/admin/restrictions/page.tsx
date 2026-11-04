@@ -54,7 +54,7 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
   const invoicesOf = isFull ? await coreAll<ApiInvoice>("invoices.list") : [];
   const contractOf = new Map(contracts.items.map((k) => [k.id, k]));
   const causeIds = new Set(new Set(all.items.flatMap((x) => x.causeInvoiceIds ?? [])));
-  const causes = invoicesOf.filter((x) => causeIds.has(x.id)).sort((a, b) => a.number.localeCompare(b.number))
+  const causes = invoicesOf.filter((x) => causeIds.has(x.id)).toSorted((a, b) => a.number.localeCompare(b.number))
     .map((x) => ({ id: x.id, label: `${x.number} · ${customerName.get(contractOf.get(x.contractId)?.customerId ?? "") ?? t("customer")}` }));
   const live: RestrictionsLive = {
     now: now.toISOString(),

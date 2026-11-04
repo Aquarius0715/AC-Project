@@ -49,7 +49,7 @@ export async function loadMaintenance(sp: Record<string, string | string[] | und
   const rows = clientRows(list.filter((j) => j.projection === "summary"), unitOf, i);
   // the newest completed requests: the first one still waiting for Confirm & rate gets the banner (IR110, DD-C17)
   const done = await Promise.all(list.filter((j) => j.projection === "summary" && j.status === "completed")
-    .sort((a, b) => Date.parse(b.scheduledSlot?.startAt ?? b.dueAt) - Date.parse(a.scheduledSlot?.startAt ?? a.dueAt)).slice(0, 3)
+    .toSorted((a, b) => Date.parse(b.scheduledSlot?.startAt ?? b.dueAt) - Date.parse(a.scheduledSlot?.startAt ?? a.dueAt)).slice(0, 3)
     .map((j) => quiet(coreOp<ApiClientJob>("jobs.get", { jobId: j.id }), null)));
   const toRate = done.find((j) => j && j.projection === "detail" && feedback(j, nowMs).kind === "rate") ?? null;
   const base = {
@@ -75,7 +75,7 @@ export async function loadMaintenance(sp: Record<string, string | string[] | und
     detail: {
       job, unit: u, facts: detailFacts(job, u, i), preferred: preferredLines(job, i), proposal: proposalCard(job, nowMs, i), declined: declinedNotice(job, t), plan: planVisit(job, nowMs, t),
       feedback: feedback(job, nowMs, i), notes: notesOf(events, me.userId, i),
-      history: [...events].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)).slice(0, 8).map((e) => ({ id: e.id, time: showTime(e.occurredAt, display), title: e.note ? t(e.actorUserId === me.userId ? "You added a note" : "Note from the coordinator") : clientEventTitle(e.action, jobEventTitle, t) })),
+      history: [...events].toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)).slice(0, 8).map((e) => ({ id: e.id, time: showTime(e.occurredAt, display), title: e.note ? t(e.actorUserId === me.userId ? "You added a note" : "Note from the coordinator") : clientEventTitle(e.action, jobEventTitle, t) })),
       report: report ? {
         version: report.version, accepted: report.acceptedAt ? showTime(report.acceptedAt, display) : null, items: inspectionRows(report.items, t).map((r) => ({ id: r.id, label: r.label, result: r.result ? t(resultText[r.result].label) : "—", tone: r.result ? resultText[r.result].tone : "muted", reason: r.reason })),
         readings: readingRows(report.measurements, t), parts: report.parts.map((p) => `${p.name} × ${String(p.quantity)}`), workText: report.workText, photos,

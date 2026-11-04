@@ -5,6 +5,7 @@ import { intlTag, isLocale, showRecent, showSpan, showTime, translate, translato
 import { ms } from "@ac/web/lib/i18n-ms";
 import { ROLES } from "@ac/web/lib/nav";
 import { consentNote } from "@ac/web/lib/preferences";
+import { byText } from "@ac/web/lib/order";
 
 describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
   it("keeps English as the key and falls back to it when Malay has no entry", () => {
@@ -25,7 +26,7 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
   });
 
   it("keeps every placeholder of an English key in its Malay text", () => {
-    const names = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
+    const names = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).toSorted(byText);
     for (const [en, text] of Object.entries(ms)) expect(names(text), en).toEqual(names(en));
   });
 

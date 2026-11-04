@@ -6,6 +6,7 @@
 import { EN, showTime, translator, zonedInstant, type I18n, type T } from "@ac/web/lib/i18n";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { UnitSymbol } from "@ac/web/lib/contracts.gen";
+import { byText } from "@ac/web/lib/order";
 
 const en = translator("en");
 export type Mode = "cool" | "dry" | "fan";
@@ -123,8 +124,8 @@ export function capabilityInput(d: CapabilityDraft, id?: string): OpInput<"capab
 
 const CAPABILITY_PARTS: [string, (d: CapabilityDraft) => unknown][] = [
   ["identity", (d) => [d.manufacturer.trim(), d.model.trim()]], ["controls", (d) => [d.control, d.modeControl, d.fanControl, d.temperatureOn]],
-  ["temperature", (d) => (d.temperatureOn ? [num(d.min), num(d.max), num(d.step)] : null)], ["modes", (d) => [...d.modes].sort()], ["fan levels", (d) => [...d.fanLevels].sort()],
-  ["ventilation levels", (d) => [d.ventilation, [...d.ventilationLevels].sort()]], ["sensors", (d) => d.sensors.map((x) => [x.metric, num(x.staleAfterSeconds)])],
+  ["temperature", (d) => (d.temperatureOn ? [num(d.min), num(d.max), num(d.step)] : null)], ["modes", (d) => [...d.modes].toSorted(byText)], ["fan levels", (d) => [...d.fanLevels].toSorted(byText)],
+  ["ventilation levels", (d) => [d.ventilation, [...d.ventilationLevels].toSorted(byText)]], ["sensors", (d) => d.sensors.map((x) => [x.metric, num(x.staleAfterSeconds)])],
   ["firmware candidates", (d) => d.firmware],
 ];
 /** What a model's draft changes against its saved capability (Figma Admin 106:3 “1 change · ventilation levels”); the

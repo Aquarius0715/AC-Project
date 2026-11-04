@@ -63,7 +63,7 @@ export async function loadHistory(sp: { jobId?: string; tab?: string; sort?: str
     optional(coreOp<Page<ApiEvent>>("jobs.events", { jobId: hit.id, query: { limit: 100, sort: { field: "occurredAt", direction: "desc" } } }).then((r) => r.items), [] as ApiEvent[]),
   ]);
   const users = byUser(members, principal.userId, t);
-  const items = [...events].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || b.id.localeCompare(a.id)).map((e) => eventItem(e, users, i));
+  const items = [...events].toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || b.id.localeCompare(a.id)).map((e) => eventItem(e, users, i));
   const mode = noteMode(hit, t);
   const recipients = mode.kind === "closed" ? [] : await optional(coreOp<Page<ApiRecipient>>("notifications.recipients", { target: { kind: "job", id: hit.id }, templateKey: "schedule_change", channel: "inApp", query: { limit: 100 } }).then((r) => r.items.filter((x) => x.role !== "contractor")), []);
   return { ...base, detail: { missing: false as const, row: hit, items, mode, recipients } };

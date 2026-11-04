@@ -42,7 +42,7 @@ async function shared(sp: SP) {
     optional(coreAll<Member>("members.list"), []),
   ]);
   const hq = orgs.find((o) => o.kind === "operator") ?? null;
-  const contractors = orgs.filter((o) => o.kind === "contractor").sort((a, b) => a.name.localeCompare(b.name)); // by name in every list and select (IR572)
+  const contractors = orgs.filter((o) => o.kind === "contractor").toSorted((a, b) => a.name.localeCompare(b.name)); // by name in every list and select (IR572)
   const names: Names = {
     units: new Map(units.map((u) => [u.id, u.displayName])), customers: new Map(orgs.filter((o) => o.kind === "customer").map((o) => [o.id, o.name])),
     people: new Map(members.map((m) => [m.id, m.displayName])), orgs: new Map(orgs.map((o) => [o.id, o.name])),
@@ -64,7 +64,7 @@ async function shared(sp: SP) {
         properties: properties.filter((p) => !custOrg || p.customerOrgId === custOrg).map((p) => ({ id: p.id, name: p.name })),
         units: units.filter((u) => (!custOrg || u.customerOrgId === custOrg) && (!sq.propertyId || u.propertyId === sq.propertyId)).map((u) => ({ id: u.id, name: u.displayName })),
       },
-      units: units.map((u) => ({ id: u.id, name: u.displayName, customer: names.customers.get(u.customerOrgId) ?? i.t("customer") })).sort((a, b) => a.customer.localeCompare(b.customer) || a.name.localeCompare(b.name)),
+      units: units.map((u) => ({ id: u.id, name: u.displayName, customer: names.customers.get(u.customerOrgId) ?? i.t("customer") })).toSorted((a, b) => a.customer.localeCompare(b.customer) || a.name.localeCompare(b.name)),
     },
   };
 }
@@ -131,7 +131,7 @@ export async function loadJobs(sp: SP) {
       job, title: names.units.get(job.unitId) ?? unit?.displayName ?? t("Unit"), customer: names.customers.get(unitOrg.get(job.unitId) ?? "") ?? t("customer"), location: unit?.location.pathLabels.join(" › ") ?? "",
       steps: stepper(job.status, !job.contractorOrgId, t), facts: facts(job, names, i), delivery: delivery(job, names, nowMs, i), controls: controls(job.status, t),
       preferred: preferredRows(job, eligible, nowMs, i),
-      history: [...events].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)).slice(0, 12).map((e) => {
+      history: [...events].toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)).slice(0, 12).map((e) => {
         return {
           id: e.id, at: showTime(e.occurredAt, i.display), text: `${jobEventTitle[e.action] ? t(jobEventTitle[e.action]) : e.action.replaceAll(/[._]/g, " ")}${e.actorUserId ? ` · ${byUser.get(e.actorUserId) ?? t("client")}` : ""}`,
         };
@@ -182,7 +182,7 @@ export async function loadPlans(sp: SP) {
     ...base,
     detail: {
       plan, unit: names.units.get(plan.unitId) ?? unit?.displayName ?? t("Unit"), customer: customerOfUnit.get(plan.unitId) ?? t("customer"), location: unit?.location.pathLabels.join(" › ") ?? "",
-      occurrences: [...plan.generatedOccurrences].sort((a, b) => Date.parse(b.occurrenceAt) - Date.parse(a.occurrenceAt)).map((o) => ({ ...o, date: planDate(o.occurrenceAt, i.display), status: status.get(o.jobId) ?? null })),
+      occurrences: [...plan.generatedOccurrences].toSorted((a, b) => Date.parse(b.occurrenceAt) - Date.parse(a.occurrenceAt)).map((o) => ({ ...o, date: planDate(o.occurrenceAt, i.display), status: status.get(o.jobId) ?? null })),
       texts: { next: planDate(plan.nextDueAt, i.display), then: planDate(nextOccurrence(plan.nextDueAt, plan.recurrence.intervalMonths, plan.anchorDay), i.display) },
     },
   };
@@ -212,7 +212,7 @@ export async function loadContractors(sp: SP) {
     optional(coreAll<ApiCertificate>("certificates.list", { filters: { organizationId: pick } }), [] as ApiCertificate[]),
   ]);
   // without a profile there is no rateCardId: the card in effect is the latest that has started
-  const inEffect = profile?.rateCardId ?? [...cards].filter((c) => Date.parse(c.effectiveFrom) <= nowMs).sort((a, b) => Date.parse(b.effectiveFrom) - Date.parse(a.effectiveFrom))[0]?.id ?? null;
+  const inEffect = profile?.rateCardId ?? [...cards].filter((c) => Date.parse(c.effectiveFrom) <= nowMs).toSorted((a, b) => Date.parse(b.effectiveFrom) - Date.parse(a.effectiveFrom))[0]?.id ?? null;
   const mine = technicians.filter((t) => t.organizationId === pick);
   return {
     ...base,

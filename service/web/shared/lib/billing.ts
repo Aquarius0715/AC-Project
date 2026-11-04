@@ -130,7 +130,7 @@ export function invoiceDetail(d: ApiInvoiceDetail, t: T = en): InvoiceDetail {
 export function inquiryRows(inquiries: ApiInquiry[], customers: ApiCustomer[], i: I18n = EN): InquiryRow[] {
   const { t } = i;
   const customer = new Map(customers.map((c) => [c.id, c.name]));
-  return [...inquiries].sort((a, b) => (a.state === b.state ? b.createdAt.localeCompare(a.createdAt) : (a.state === "received" ? -1 : 1))).map((q) => {
+  return [...inquiries].toSorted((a, b) => (a.state === b.state ? b.createdAt.localeCompare(a.createdAt) : (a.state === "received" ? -1 : 1))).map((q) => {
     return {
       id: q.id, version: q.version, cust: customer.get(q.customerId) ?? t("customer"), kind: t(q.subjectType === "payment" ? "Payment" : "Cooling restriction"), at: showTime(q.createdAt, i.display),
       text: `“${q.message}”`, state: q.state, reply: q.reply, invoiceId: q.invoiceId, restrictionId: q.restrictionId,
@@ -168,7 +168,7 @@ const statusLabel = { draft: "Draft", approved: "Approved", paid: "Paid" } as co
 export function statementRows(statements: ApiStatement[], orgs: ApiOrganization[], i: I18n = EN): StatementRow[] {
   const org = new Map(orgs.map((o) => [o.id, o.name]));
   const day = (iso: string) => businessDay(iso, i.display.locale);
-  return [...statements].sort((a, b) => b.period.localeCompare(a.period) || a.contractorOrgId.localeCompare(b.contractorOrgId)).map((s) => {
+  return [...statements].toSorted((a, b) => b.period.localeCompare(a.period) || a.contractorOrgId.localeCompare(b.contractorOrgId)).map((s) => {
     return {
       id: s.id, version: s.version, contractor: org.get(s.contractorOrgId) ?? i.t("contractor"), period: periodName(s.period, i.display.locale), status: statusLabel[s.status],
       jobs: new Set(s.lines.map((l) => l.jobId)).size, net: money(s.netMinor, s.currency),

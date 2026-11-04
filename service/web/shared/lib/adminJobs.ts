@@ -200,7 +200,7 @@ export function preferredRows(j: ApiHqJob, eligible: { id: string; displayName: 
 /** The active contractors any agreed time can be offered to, by name: the first three and how many more, so the
 booking table keeps its times and HQ technicians readable however many companies HQ works with (IR572). */
 export function contractorNames(names: string[], t: T = en): string {
-  const sorted = [...names].sort((a, b) => a.localeCompare(b));
+  const sorted = [...names].toSorted((a, b) => a.localeCompare(b));
   return sorted.length > 3 ? t("{names} and {n} more", { names: sorted.slice(0, 3).join(", "), n: sorted.length - 3 }) : sorted.join(", ") || "—";
 }
 
@@ -275,7 +275,7 @@ export function costTotals(lines: CostLine[]): { estimate: string; actual: strin
   const total = (kind: CostLine["kind"]) => {
     const by = new Map<string, number>();
     for (const l of lines) if (l.kind === kind) by.set(l.currency, (by.get(l.currency) ?? 0) + l.amountMinor);
-    return by.size > 0 ? [...by].sort(([a], [b]) => a.localeCompare(b)).map(([c, v]) => money(v, c)).join(" + ") : "—";
+    return by.size > 0 ? [...by].toSorted(([a], [b]) => a.localeCompare(b)).map(([c, v]) => money(v, c)).join(" + ") : "—";
   };
   return { estimate: total("estimate"), actual: total("actual") };
 }
@@ -360,7 +360,7 @@ export function reportCard(j: ApiHqJob, r: ApiWorkReport, byUser: Map<string, st
       ...r.refrigerant.map((x): [string, string] => [t("{refrigerant} · cylinder {id}", { refrigerant: x.refrigerant, id: x.cylinderId }), t("recovered {recovered} kg · charged {charged} kg · leak check {check}", { recovered: x.recoveredKg, charged: x.chargedKg, check: x.leakCheck.replaceAll('_', " ") })])],
     next: r.nextAction?.kind === "follow_up" ? t("Follow-up {date} — {note}", { date: r.nextAction.date.slice(0, 10), note: r.nextAction.note }) : t("No follow-up needed"),
     signOff: r.signOff ? (r.signOff.absentReason ? t("Customer absent — {reason}", { reason: r.signOff.absentReason }) : t("Signed by {name} {time}", { name: r.signOff.signerName, time: showTime(r.signOff.signedAt, display) })) : t("Not signed"),
-    reviews: [...r.reviewHistory].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)).map((h) => {
+    reviews: [...r.reviewHistory].toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)).map((h) => {
       return {
         text: `${t(h.decision === "accept" ? "v{version} accepted {time} by {name}" : "v{version} returned {time} by {name}", { version: h.reportVersion, time: showTime(h.occurredAt, display), name: byUser.get(h.reviewerUserId) ?? t("reviewer") })}${h.reason ? ` — “${h.reason}”` : ""}`,
         tone: h.decision === "accept" ? "ok" : "warn",

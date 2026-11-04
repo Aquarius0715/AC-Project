@@ -38,7 +38,7 @@ export async function loadAlerts(sp: Record<string, string | string[] | undefine
     now: now.toISOString(),
     unreadOnly: isUnreadOnly,
     unitId: units.some((u) => u.id === unitId) ? unitId! : null,
-    units: units.map((u) => ({ id: u.id, name: u.displayName, place: place.get(u.id)?.place ?? "" })).sort((a, b) => a.name.localeCompare(b.name)),
+    units: units.map((u) => ({ id: u.id, name: u.displayName, place: place.get(u.id)?.place ?? "" })).toSorted((a, b) => a.name.localeCompare(b.name)),
     alertCount: summary.counts.alertCount,
     total: all.length,
     unread: all.filter((a) => a.unread.length).length,

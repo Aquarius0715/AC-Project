@@ -86,7 +86,7 @@ async function AdminBillingPageContent({ searchParams }: Readonly<PageProps<"/ad
     ]);
     live.payouts = {
       period, contractorOrgId, status, lastClosed: lastClosedMonth(now),
-      contractors: orgs.filter((o) => o.kind === "contractor").map((o) => ({ id: o.id, name: o.name })).sort((a, b) => a.name.localeCompare(b.name)),
+      contractors: orgs.filter((o) => o.kind === "contractor").map((o) => ({ id: o.id, name: o.name })).toSorted((a, b) => a.name.localeCompare(b.name)),
     };
     live.statements = statementRows(statements, orgs, i);
     const wanted = one("statementId");

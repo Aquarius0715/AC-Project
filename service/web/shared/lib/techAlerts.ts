@@ -106,13 +106,13 @@ export function alertView(a: ApiTechAlert, ctx: { alerts: ApiTechAlert[]; unit: 
 const RANK: Record<string, number> = { critical: 0, warning: 1, normal: 2 };
 /** The alert the page opens: the URL's, else the worst unresolved one, else the newest. */
 export function selectAlert(alerts: ApiTechAlert[], alertId?: string): ApiTechAlert | null {
-  const open = alerts.filter((a) => a.status !== "resolved").sort((a, b) => RANK[a.severity] - RANK[b.severity] || b.detectedAt.localeCompare(a.detectedAt));
-  return alerts.find((a) => a.id === alertId) ?? open[0] ?? [...alerts].sort((a, b) => b.detectedAt.localeCompare(a.detectedAt))[0] ?? null;
+  const open = alerts.filter((a) => a.status !== "resolved").toSorted((a, b) => RANK[a.severity] - RANK[b.severity] || b.detectedAt.localeCompare(a.detectedAt));
+  return alerts.find((a) => a.id === alertId) ?? open[0] ?? [...alerts].toSorted((a, b) => b.detectedAt.localeCompare(a.detectedAt))[0] ?? null;
 }
 /** The unit's alerts to choose from: title, state and when each was detected, unresolved first. */
 export function alertChoices(alerts: ApiTechAlert[], nowMs: number, i: I18n = EN) {
   const { t } = i;
-  return [...alerts].sort((a, b) => Number(a.status === "resolved") - Number(b.status === "resolved") || b.detectedAt.localeCompare(a.detectedAt)).map((a) => {
+  return [...alerts].toSorted((a, b) => Number(a.status === "resolved") - Number(b.status === "resolved") || b.detectedAt.localeCompare(a.detectedAt)).map((a) => {
     return {
       id: a.id, title: a.rule?.name ?? alertTitle(a, t), sub: `${t((STATE[a.status] ?? STATE.open)[0])} · ${relativeTime(a.detectedAt, nowMs, i)}`, severity: a.severity,
     };

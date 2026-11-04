@@ -46,7 +46,7 @@ export function certRows(members: ApiTeamMember[], certs: ApiCert[], jobs: CertJ
   const { t, display: { locale } } = i;
   const rows: CertRow[] = [];
   const blocks = (m: string, code: string, endsAt: number) => jobs.filter((j) => j.technicianId === m && j.required.includes(code) && Date.parse(j.slot.endAt) > endsAt)
-    .sort((a, b) => Date.parse(a.slot.startAt) - Date.parse(b.slot.startAt)).map((j) => {
+    .toSorted((a, b) => Date.parse(a.slot.startAt) - Date.parse(b.slot.startAt)).map((j) => {
       const day = klDay(new Date(Date.parse(j.slot.startAt) + 8 * 3_600_000).toISOString().slice(0, 10), locale); // the visit's Kuala Lumpur day
       return { jobId: j.jobId, text: `${j.short} (${day})`, day };
     });
@@ -79,9 +79,9 @@ export function certRows(members: ApiTeamMember[], certs: ApiCert[], jobs: CertJ
     }
     const viaGrant = new Map<string, "pending" | "rejected">(); // no certificate on file yet: the HQ grant still decides (BR-P09)
     for (const [k, list] of groups) {
-      const onFile = list.filter((c) => c.status === "valid" || c.status === "expiring" || c.status === "expired").sort((a, b) => Date.parse(b.expiresAt) - Date.parse(a.expiresAt))[0];
-      const pending = list.filter((c) => c.status === "pending_verification").sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
-      const rejected = list.filter((c) => c.status === "rejected").sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
+      const onFile = list.filter((c) => c.status === "valid" || c.status === "expiring" || c.status === "expired").toSorted((a, b) => Date.parse(b.expiresAt) - Date.parse(a.expiresAt))[0];
+      const pending = list.filter((c) => c.status === "pending_verification").toSorted((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
+      const rejected = list.filter((c) => c.status === "rejected").toSorted((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
       if (!onFile && (m.qualifications ?? []).some((q) => q.code === k && !q.revokedAt && q.validUntil)) { viaGrant.set(k, pending ? "pending" : "rejected"); continue; }
       const shown = onFile ?? pending ?? rejected!;
       const s = onFile ? state(Date.parse(onFile.expiresAt)) : { status: (pending ? "pending" : "rejected") as CertStatus, days: null };
@@ -100,7 +100,7 @@ export function certRows(members: ApiTeamMember[], certs: ApiCert[], jobs: CertJ
     for (const code of QUALIFICATION_CODES) {
       if (groups.has(code) && !viaGrant.has(code)) continue;
       const upload = viaGrant.get(code);
-      const grant = (m.qualifications ?? []).filter((q) => q.code === code && !q.revokedAt && q.validUntil).sort((a, b) => Date.parse(b.validUntil!) - Date.parse(a.validUntil!))[0];
+      const grant = (m.qualifications ?? []).filter((q) => q.code === code && !q.revokedAt && q.validUntil).toSorted((a, b) => Date.parse(b.validUntil!) - Date.parse(a.validUntil!))[0];
       if (grant) {
         const s = state(Date.parse(grant.validUntil!));
         rows.push({
@@ -147,13 +147,13 @@ export function certRows(members: ApiTeamMember[], certs: ApiCert[], jobs: CertJ
     }
   }
   const rank: Record<CertStatus, number> = { expired: 0, expiring: 1, not_held: 2, rejected: 3, pending: 4, valid: 5 };
-  return rows.sort((a, b) => a.technician.localeCompare(b.technician) || rank[a.status] - rank[b.status] || a.name.localeCompare(b.name));
+  return rows.toSorted((a, b) => a.technician.localeCompare(b.technician) || rank[a.status] - rank[b.status] || a.name.localeCompare(b.name));
 }
 
 /** The four KPIs (Figma 04-6): in date, expiring within the window (the soonest named), expired, pending HQ
 verification (renewals included). */
 export function certKpis(rows: CertRow[], certs: ApiCert[], within: number, t: T = en) {
-  const expiring = rows.filter((r) => r.status === "expiring").sort((a, b) => (a.days ?? 0) - (b.days ?? 0));
+  const expiring = rows.filter((r) => r.status === "expiring").toSorted((a, b) => (a.days ?? 0) - (b.days ?? 0));
   const expired = rows.filter((r) => r.status === "expired");
   const ids = new Set(rows.map((r) => r.technicianId));
   return [
@@ -167,7 +167,7 @@ export function certKpis(rows: CertRow[], certs: ApiCert[], within: number, t: T
 /** The assignment impact (Figma 04-6): the first job an expiring, expired or missing qualification blocks. */
 export function impact(rows: CertRow[], jobs: CertJob[], t: T = en) {
   const row = rows.filter((r) => r.blocks.length && (r.status === "expiring" || r.status === "expired" || r.status === "not_held"))
-    .map((r) => ({ r, job: jobs.find((j) => j.jobId === r.blocks[0].jobId)! })).sort((a, b) => Date.parse(a.job.slot.startAt) - Date.parse(b.job.slot.startAt))[0];
+    .map((r) => ({ r, job: jobs.find((j) => j.jobId === r.blocks[0].jobId)! })).toSorted((a, b) => Date.parse(a.job.slot.startAt) - Date.parse(b.job.slot.startAt))[0];
   if (!row) return null;
   const { r, job } = row;
   const day = r.blocks[0].day;

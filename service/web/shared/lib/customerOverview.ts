@@ -10,6 +10,7 @@ import { airNumber, type ApiMeasurement } from "@ac/web/lib/air";
 import type { ApiPropertyRow, ApiUnitRow } from "@ac/web/lib/assets";
 import type { ApiEnergySummary } from "@ac/web/lib/energy";
 import type { IconName } from "@ac/web/components/Icon";
+import { byText } from "@ac/web/lib/order";
 
 export type OverviewPeriod = "today" | "7d" | "30d";
 export const OVERVIEW_PERIODS: { id: OverviewPeriod; label: string }[] = [{ id: "today", label: "Today" }, { id: "7d", label: "7d" }, { id: "30d", label: "30d" }];
@@ -26,7 +27,7 @@ export function overviewScope(units: OverviewUnit[], properties: ApiPropertyRow[
   const props = properties.filter((p) => !p.archived);
   const live = units.filter((u) => !u.archived && props.some((p) => p.id === u.propertyId));
   const propertyId = props.some((p) => p.id === q.propertyId) ? q.propertyId! : null;
-  const inProperty = live.filter((u) => !propertyId || u.propertyId === propertyId).sort((a, b) => a.displayName.localeCompare(b.displayName));
+  const inProperty = live.filter((u) => !propertyId || u.propertyId === propertyId).toSorted((a, b) => a.displayName.localeCompare(b.displayName));
   const unitId = inProperty.some((u) => u.id === q.unitId) ? q.unitId! : null;
   return {
     propertyId, unitId, inProperty, scope: unitId ? inProperty.filter((u) => u.id === unitId) : inProperty,
@@ -58,7 +59,7 @@ export interface OverviewRow {
 export function overviewRows(units: OverviewUnit[], place: (u: OverviewUnit) => string, i: I18n = EN): OverviewRow[] {
   return units.map((u) => {
     const t = latestOf(u, "temperature"), h = latestOf(u, "humidity"), p = latestOf(u, "power");
-    const last = [t, h, p].filter((m): m is ApiMeasurement => !!m).map((m) => m.observedAt).sort().at(-1);
+    const last = [t, h, p].filter((m): m is ApiMeasurement => !!m).map((m) => m.observedAt).toSorted(byText).at(-1);
     const watts = current(p) === null ? null : Math.round(p!.unit === "kW" ? p!.value! * 1000 : p!.value!);
     return {
       id: u.id, name: u.displayName, place: place(u),
@@ -108,7 +109,7 @@ unresolved information (normal severity) is counted separately and never in the 
 export function attentionCard(alerts: ApiAlert[], units: OverviewUnit[], nowMs: number, max = 3, i: I18n = EN): AttentionCard {
   const names = new Map(units.map((u) => [u.id, u.displayName]));
   const open = alerts.filter((a) => names.has(a.unitId) && a.status !== "resolved");
-  const warn = open.filter((a) => a.severity !== "normal").sort((a, b) => rank[a.severity] - rank[b.severity] || b.detectedAt.localeCompare(a.detectedAt));
+  const warn = open.filter((a) => a.severity !== "normal").toSorted((a, b) => rank[a.severity] - rank[b.severity] || b.detectedAt.localeCompare(a.detectedAt));
   const info = open.filter((a) => a.severity === "normal");
   const titles = [...new Set(info.map((a) => alertTitle(a, i.t).toLowerCase()))];
   return {

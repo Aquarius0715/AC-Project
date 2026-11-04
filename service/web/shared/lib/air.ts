@@ -61,7 +61,7 @@ export interface AirRoom { key: string; spaceId: string | null; label: string; p
 export function airRooms(ps: ApiPropertyRow[], ss: ApiSpaceRow[], us: ApiUnitRow[], t: T = en): AirRoom[] {
   const props = new Map(ps.filter((p) => !p.archived).map((p) => [p.id, p.name]));
   const live = us.filter((u) => !u.archived && props.has(u.propertyId));
-  const units = (keep: (u: ApiUnitRow) => boolean) => live.filter(keep).map((u) => ({ id: u.id, name: u.displayName })).sort((a, b) => a.name.localeCompare(b.name));
+  const units = (keep: (u: ApiUnitRow) => boolean) => live.filter(keep).map((u) => ({ id: u.id, name: u.displayName })).toSorted((a, b) => a.name.localeCompare(b.name));
   const out: (AirRoom & { sort: string })[] = [];
   for (const s of ss.filter((x) => !x.archived && props.has(x.propertyId))) {
     const here = units((u) => u.spaceId === s.id);
@@ -72,7 +72,7 @@ export function airRooms(ps: ApiPropertyRow[], ss: ApiSpaceRow[], us: ApiUnitRow
     const loose = units((u) => u.propertyId === id && u.spaceId === null);
     if (loose.length > 0) out.push({ key: `unassigned:${id}`, spaceId: null, label: t("Not in a room · {property}", { property }), path: property, units: loose, sort: `${property}\0￿` });
   }
-  return out.sort((a, b) => a.sort.localeCompare(b.sort)).map((r) => ({ key: r.key, spaceId: r.spaceId, label: r.label, path: r.path, units: r.units }));
+  return out.toSorted((a, b) => a.sort.localeCompare(b.sort)).map((r) => ({ key: r.key, spaceId: r.spaceId, label: r.label, path: r.path, units: r.units }));
 }
 /** The room and unit shown: the URL unit when it is listed, else the URL room's (or the first room's) first unit. */
 export function airSelection(rooms: AirRoom[], unitId?: string, spaceId?: string): { room: AirRoom; unitId: string } | null {
