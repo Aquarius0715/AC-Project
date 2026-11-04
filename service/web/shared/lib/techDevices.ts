@@ -37,12 +37,17 @@ const ago = (iso: string | null, now: number, t: T) => {
 /** One device of the list (Figma Technician 03, Admin 246:2): serial, connection, unit, firmware and its sensor count. */
 /** `unit` names the bound unit; a device not bound yet says so with its planned unit (D05, IR467). */
 export interface TechDeviceRow { id: string; serial: string; unitId: string | null; targetUnitId: string | null; unit: string; conn: Connection; connText: string | null; fw: string; tamper: boolean; sensors: number }
+/** The unit a device serves: the bound unit, the planned one when it is not bound yet, or none. */
+function deviceUnit(d: ApiDevice, unitName: Map<string, string>, t: T): string {
+  if (d.unitId) return unitName.get(d.unitId) ?? t("unit");
+  return d.targetUnitId ? t("Not bound yet — planned for {unit}", { unit: unitName.get(d.targetUnitId) ?? t("unit") }) : t("Unbound");
+}
 export function techDeviceRows(ds: ApiDevice[], unitName: Map<string, string>, now: number, t: T = en): TechDeviceRow[] {
   return [...ds].toSorted((a, b) => a.serial.localeCompare(b.serial)).map((d) => {
     return {
       id: d.id, serial: d.serial, unitId: d.unitId, targetUnitId: d.targetUnitId ?? null, conn: d.connection,
-      unit: d.unitId ? unitName.get(d.unitId) ?? t("unit") : (d.targetUnitId ? t("Not bound yet — planned for {unit}", { unit: unitName.get(d.targetUnitId) ?? t("unit") }) : t("Unbound")),
-      connText: d.connection === "online" ? null : (d.lastSeenAt ? ago(d.lastSeenAt, now, t) : null), fw: d.firmwareVersion, tamper: d.tamper === "detected", sensors: d.sensors.length,
+      unit: deviceUnit(d, unitName, t),
+      connText: d.connection !== "online" && d.lastSeenAt ? ago(d.lastSeenAt, now, t) : null, fw: d.firmwareVersion, tamper: d.tamper === "detected", sensors: d.sensors.length,
     };
   });
 }
@@ -50,9 +55,14 @@ export type Filter = "all" | "online" | "offline" | "tamper" | "nosensors";
 export const FILTERS: { id: Filter; label: string }[] = [{ id: "all", label: "All" }, { id: "online", label: "Online" }, { id: "offline", label: "Offline" }, { id: "tamper", label: "Tamper" }];
 /** HQ also lists the devices without sensors (Figma Admin 246:2). */
 export const HQ_FILTERS: { id: Filter; label: string }[] = [...FILTERS, { id: "nosensors", label: "No sensors" }];
-export const filterOf = (f: Filter) => {
-  return (r: TechDeviceRow) =>
-    f === "all" || (f === "tamper" ? r.tamper : f === "nosensors" ? r.sensors === 0 : f === "online" ? r.conn === "online" : r.conn !== "online");
+export const filterOf = (f: Filter) => (r: TechDeviceRow): boolean => {
+  switch (f) {
+    case "all": { return true; }
+    case "tamper": { return r.tamper; }
+    case "nosensors": { return r.sensors === 0; }
+    case "online": { return r.conn === "online"; }
+    case "offline": { return r.conn !== "online"; }
+  }
 };
 
 /** The device a state filter opens (IR616): when the open device is one the filter hides, the filter's first device —
@@ -81,17 +91,23 @@ const connDot: Record<Connection, string> = { online: "ok", connecting: "primary
 const CONNECTION: Record<Connection, string> = { online: "Online", connecting: "Connecting", unknown: "Unknown", offline: "Offline", error: "Error" };
 /** The four tiles (Connection, Power signal, Tamper, Firmware) with their evidence lines; with the T12 events a fault
 line shows when it was detected (Figma 03 “lost 08:12”). */
+// the power signal tile: what it reads and its dot
+const UNKNOWN_POWER = { text: "Unknown", dot: "muted" } as const;
+const POWER = new Map<string, { text: string; dot: "crit" | "primary" | "muted" }>([["on", { text: "ON", dot: "primary" }], ["off", { text: "Lost", dot: "crit" }]]);
 export function deviceTiles(d: ApiDeviceDetail, newer: string | null, now: number, faults: OpenFaults = {}, i: I18n = EN) {
   const { t, display } = i;
   const clock = (iso: string) => showClock(iso, display);
   const conn = d.connection;
+  const lost = conn !== "online" && faults.connection ? t("lost {time}", { time: clock(faults.connection) }) : t("last seen {time}", { time: ago(d.lastSeenAt, now, t) });
+  const power = POWER.get(d.powerSignal) ?? UNKNOWN_POWER;
+  const opened = faults.tamper ? t("cover opened {time}", { time: clock(faults.tamper) }) : t("cover opened — see device events");
   return [
     { label: t("Connection"), value: t(CONNECTION[conn] ?? conn), dot: connDot[conn] ?? "muted",
-      sub: conn === "connecting" ? t("check running — waiting for the device") : (conn !== "online" && faults.connection ? t("lost {time}", { time: clock(faults.connection) }) : t("last seen {time}", { time: ago(d.lastSeenAt, now, t) })) },
-    { label: t("Power signal"), value: d.powerSignal === "on" ? t("ON") : (t(d.powerSignal === "off" ? "Lost" : "Unknown")), dot: d.powerSignal === "off" ? "crit" : (d.powerSignal === "on" ? "primary" : "muted"),
+      sub: conn === "connecting" ? t("check running — waiting for the device") : lost },
+    { label: t("Power signal"), value: t(power.text), dot: power.dot,
       sub: d.powerSignal === "off" && faults.power ? `power_signal ${clock(faults.power)}` : t("from the device's dedicated power signal") },
     { label: t("Tamper"), value: t(d.tamper === "detected" ? "Detected" : "tamper::Clear"), dot: d.tamper === "detected" ? "warn" : "ok",
-      sub: d.tamper === "detected" ? (faults.tamper ? t("cover opened {time}", { time: clock(faults.tamper) }) : t("cover opened — see device events")) : t("no removal detected"), warn: d.tamper === "detected" },
+      sub: d.tamper === "detected" ? opened : t("no removal detected"), warn: d.tamper === "detected" },
     { label: t("Firmware"), value: d.firmwareVersion, dot: null, sub: newer ? t("{version} available", { version: newer }) : t("latest") },
   ];
 }
@@ -122,7 +138,7 @@ const FAILURE: Record<string, string> = {
   UNAVAILABLE: "the device reported a failure",
 };
 /** Why a device operation failed (IR67, REV19-018). */
-export const failureText = (code: string | null | undefined, t: T = en) => (code && FAILURE[code] ? t(FAILURE[code]) : code ?? t("no result"));
+export const failureText = (code: string | null | undefined, t: T = en) => textOf(FAILURE, code, t) ?? code ?? t("no result");
 
 const KIND: Record<ApiDeviceOperation["kind"], string> = { check: "Connection check", calibrate: "Calibration", firmware: "Firmware update" };
 const STATUS: Record<ApiDeviceOperation["status"], string> = { queued: "Queued", running: "Running", succeeded: "Succeeded", failed: "Failed" };
@@ -130,13 +146,18 @@ const STATUS: Record<ApiDeviceOperation["status"], string> = { queued: "Queued",
 export const operationLabel = (o: Pick<ApiDeviceOperation, "kind" | "status">, t: T = en) => `${t(KIND[o.kind] ?? o.kind)} · ${t(STATUS[o.status] ?? o.status)}`;
 /** One operation of the T11 history (Figma 03: started, “v1 → v2”, “heartbeat confirmed”). */
 export interface OperationRow { id: string; kind: string; status: ApiDeviceOperation["status"]; statusText: string; time: string; detail: string }
+/** What an operation did: its failure, the firmware it installs or installed, or the connection check's heartbeat. */
+function operationDetail(o: ApiDeviceOperation, isOpen: boolean, current: string, t: T): string {
+  if (o.status === "failed") return failureText(o.failureCode, t);
+  if (o.kind === "firmware") return isOpen ? `${current} → ${o.targetVersion ?? "—"}` : t("{version} installed", { version: o.targetVersion ?? "—" });
+  if (o.status === "succeeded") return t("heartbeat confirmed");
+  return t(o.status === "running" ? "waiting for the heartbeat" : "starts within a second");
+}
 export function operationRows(ops: (ApiDeviceOperation & { startedAt?: string | null })[], current: string, i: I18n = EN): OperationRow[] {
   const { t, display } = i;
   return ops.map((o) => {
     const isOpen = o.status === "queued" || o.status === "running";
-    const detail = o.status === "failed" ? failureText(o.failureCode, t)
-      : o.kind === "firmware" ? (isOpen ? `${current} → ${o.targetVersion ?? "—"}` : t("{version} installed", { version: o.targetVersion ?? "—" }))
-      : o.status === "succeeded" ? t("heartbeat confirmed") : t(o.status === "running" ? "waiting for the heartbeat" : "starts within a second");
+    const detail = operationDetail(o, isOpen, current, t);
     return { id: o.id, kind: t(KIND[o.kind] ?? o.kind), status: o.status, statusText: t(STATUS[o.status] ?? o.status), time: showTime(o.startedAt ?? o.createdAt, display), detail };
   });
 }
@@ -164,6 +185,19 @@ const restoredDetail: Record<NonNullable<ApiDeviceEventFull["recovery"]>["axis"]
 export const eventCause = (e: Pick<ApiDeviceEventFull, "eventType" | "recovery">, t: T = en) => t(e.recovery ? restoredDetail[e.recovery.axis] : eventDetail[e.eventType]);
 /** One device event row (Figma 03 “Device events”): detection, evidence, its alerts and the recovery or response. */
 export interface EventRow { id: string; version: number; time: string; type: ApiDeviceEventFull["eventType"]; tone: "warn" | "crit" | "ok" | "muted"; detail: string; recovery: string; notes: string[]; alerts: ApiAlertLite[] }
+const EVENT_TONE: Partial<Record<ApiDeviceEventFull["eventType"], EventRow["tone"]>> = { tamper: "warn", restored: "ok", operation_failed: "muted" };
+const alertCount = (n: number, t: T) => {
+  if (n === 0) return "";
+  return ` · ${n === 1 ? t("1 alert") : t("{n} alerts", { n })}`;
+};
+/** Where an event stands: restored, a recovery of an earlier fault, or open with its alerts' state. */
+function eventRecovery(e: ApiDeviceEventFull, source: ApiDeviceEventFull | undefined, as: ApiAlertLite[], open: number, when: (iso: string) => string, t: T): string {
+  if (e.restoredAt) return t("restored {time}", { time: when(e.restoredAt) });
+  if (e.eventType === "restored") return source ? t("recovers {event} {time}", { event: source.eventType, time: when(source.occurredAt) }) : t("recovers an earlier fault");
+  if (as.length === 0) return t("open");
+  if (open) return t("open · unacknowledged");
+  return t(as.every((a) => a.status === "resolved") ? "open · resolved" : "open · acknowledged");
+}
 export function eventRows(es: ApiDeviceEventFull[], alerts: Map<string, ApiAlertLite>, now: number, i: I18n = EN): EventRow[] {
   const { t } = i;
   const when = (iso: string) => relativeTime(iso, now, i);
@@ -172,16 +206,14 @@ export function eventRows(es: ApiDeviceEventFull[], alerts: Map<string, ApiAlert
     const as = e.alertIds.map((id) => alerts.get(id)).filter((a): a is ApiAlertLite => !!a);
     const open = as.filter((a) => a.status === "open").length;
     const source = e.recovery ? byId.get(e.recovery.sourceEventId) : undefined;
-    const recovery = e.restoredAt ? t("restored {time}", { time: when(e.restoredAt) })
-      : e.eventType === "restored" ? (source ? t("recovers {event} {time}", { event: source.eventType, time: when(source.occurredAt) }) : t("recovers an earlier fault"))
-      : as.length > 0 ? t(open ? "open · unacknowledged" : (as.every((a) => a.status === "resolved") ? "open · resolved" : "open · acknowledged")) : t("open");
+    const recovery = eventRecovery(e, source, as, open, when, t);
     return {
       id: e.id,
       version: e.version,
       time: when(e.occurredAt),
       type: e.eventType,
-      tone: e.eventType === "tamper" ? "warn" : e.eventType === "restored" ? "ok" : e.eventType === "operation_failed" ? "muted" : "crit",
-      detail: `${eventCause(e, t)} · ${e.evidenceSource}${e.alertIds.length > 0 ? ` · ${t(e.alertIds.length === 1 ? "1 alert" : "{n} alerts", { n: e.alertIds.length })}` : ""}`,
+      tone: EVENT_TONE[e.eventType] ?? "crit",
+      detail: `${eventCause(e, t)} · ${e.evidenceSource}${alertCount(e.alertIds.length, t)}`,
       notes: e.responseNotes.map((n) => `${when(n.at)} — ${n.message}`),
       alerts: as,
       recovery,

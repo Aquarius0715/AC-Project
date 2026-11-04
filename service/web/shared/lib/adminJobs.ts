@@ -7,7 +7,7 @@
 // covers it. Texts in the display language (`i` / `t`, IR290); instants in the user's display time zone (IR44), and the
 // times HQ types are read in it too (NFR-08). Business days (a follow-up's classify-by day, "from tomorrow") stay
 // Kuala Lumpur days.
-import { EN, showSpan, showTime, translator, zonedInstant, zonedParts, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, showSpan, showTime, translator, zonedInstant, zonedParts, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { actionMessage, fieldName } from "@ac/web/lib/actionMessage";
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { Slot } from "@ac/web/lib/partnerOverview";
@@ -95,7 +95,17 @@ export function filtersOf(q: Query, hqOrgId: string | null, withStage = true): R
 }
 
 export interface HqRow { id: string; short: string; title: string; customer: string; type: string; origin: string; status: string; badge: { status: string; overdue: boolean }; line: string; lineTone?: Tone }
-const ack = (a: string | null, t: T) => t(a === "accepted" ? "accepted" : (a === "cant_make" ? "can’t make it" : "awaiting acceptance"));
+const ACK: Record<string, string> = { accepted: "accepted", cant_make: "can’t make it" };
+const ack = (a: string | null, t: T) => textOf(ACK, a, t) ?? t("awaiting acceptance");
+/** What HQ does next with a requested job: book a preferred time, the plan occurrence, or wait for the due time. */
+function requestedLine(j: ApiHqRow, i: I18n): string {
+  const { t } = i;
+  const n = j.preferredSlots.length;
+  if (n === 1) return t("1 preferred time · book one or propose", { n });
+  if (n > 1) return t("{n} preferred times · book one or propose", { n });
+  if (j.origin === "periodic_plan") return t("plan occurrence {slot} · book it", { slot: slotText(j.requestedSlot, i) });
+  return t("due {time} · unassigned", { time: showTime(j.dueAt, i.display) });
+}
 /** One job of the list: unit, customer, type, origin, status (Time proposed derived, IR89 overdue) and what is next. */
 export function hqRow(j: ApiHqRow, now: number, n: Names, unitOrg: Map<string, string>, i: I18n = EN): HqRow {
   const { t } = i;
@@ -104,8 +114,7 @@ export function hqRow(j: ApiHqRow, now: number, n: Names, unitOrg: Map<string, s
   const ended = isOverdue ? ` · ${t("window ended")}` : "";
   let line = "", lineTone: Tone | undefined;
   switch (j.displayStatus === "time_proposed" ? "time_proposed" : j.status) {
-    case "requested": { line = j.preferredSlots.length > 0 ? t(j.preferredSlots.length === 1 ? "1 preferred time · book one or propose" : "{n} preferred times · book one or propose", { n: j.preferredSlots.length })
-      : (j.origin === "periodic_plan" ? t("plan occurrence {slot} · book it", { slot: slotText(j.requestedSlot, i) }) : t("due {time} · unassigned", { time: showTime(j.dueAt, i.display) })); break;
+    case "requested": { line = requestedLine(j, i); break;
     }
     case "time_proposed": { line = t("Time proposed · waiting for the client"); break;
     }
@@ -141,22 +150,46 @@ export interface Step { label: string; state: "done" | "current" | "todo" }
 export function stepper(status: string, internal: boolean, t: T = en): Step[] {
   const all = internal ? ["requested", "assigned", "in_progress", "submitted", "completed"] : ["requested", "offered", "accepted", "assigned", "in_progress", "submitted", "completed"];
   const labels: Record<string, string> = { requested: "Requested", offered: "Offered", accepted: "Accepted", assigned: "Assigned", in_progress: "In progress", submitted: "Submitted", completed: "Completed" };
-  const at = status === "rework_requested" || status === "on_hold" ? all.indexOf("in_progress") : (status === "cancelled" ? -1 : all.indexOf(status));
-  return all.map((s, k) => ({ label: t(labels[s]), state: status === "completed" || k < at ? "done" : (k === at ? "current" : "todo") }));
+  // a returned or held job is back at in progress; a cancelled one reaches no step
+  const reached = status === "rework_requested" || status === "on_hold" ? "in_progress" : status;
+  const at = status === "cancelled" ? -1 : all.indexOf(reached);
+  const stateOf = (k: number): Step["state"] => {
+    if (status === "completed" || k < at) return "done";
+    return k === at ? "current" : "todo";
+  };
+  return all.map((s, k) => ({ label: t(labels[s]), state: stateOf(k) }));
 }
 
 /** The four facts of the detail: requested window, due, scheduled slot, symptom with the contact window. */
 export function facts(j: ApiHqJob, n: Names, i: I18n = EN): { label: string; value: string; sub: string }[] {
   const { t } = i;
+  const dueWhy = j.type === "reactive" ? "reactive SLA" : "plan occurrence";
+  const offeredTo = j.offer ? n.orgs.get(j.offer.contractorOrgId) ?? t("contractor") : "—";
   return [
     { label: t("Requested window"), value: slotText(j.requestedSlot, i), sub: t(j.origin === "periodic_plan" ? "the plan occurrence" : "the client’s 1st preferred time") },
-    { label: t("Due"), value: showTime(j.dueAt, i.display), sub: t(j.dueAt === j.requestedSlot.endAt ? "= requested end" : (j.type === "reactive" ? "reactive SLA" : "plan occurrence")) },
-    { label: t("Scheduled"), value: j.scheduledSlot ? slotText(j.scheduledSlot, i) : t("not booked"), sub: j.assignment ? n.people.get(j.assignment.technicianMembershipId) ?? t("technician") : (j.offer ? n.orgs.get(j.offer.contractorOrgId) ?? t("contractor") : "—") },
+    { label: t("Due"), value: showTime(j.dueAt, i.display), sub: t(j.dueAt === j.requestedSlot.endAt ? "= requested end" : dueWhy) },
+    { label: t("Scheduled"), value: j.scheduledSlot ? slotText(j.scheduledSlot, i) : t("not booked"), sub: j.assignment ? n.people.get(j.assignment.technicianMembershipId) ?? t("technician") : offeredTo },
     { label: t("Symptom"), value: j.symptom || "—", sub: j.contactWindow ? t("contact {window}", { window: j.contactWindow }) : t("no contact window") },
   ];
 }
 
 export interface Delivery { kind: "internal" | "contractor"; title: string; lines: [string, string][]; ack: { tone: Tone; text: string } | null; cantMake: boolean }
+/** The technician's answer to an assignment: completed, accepted, can't make it (with reason and another time), or waiting. */
+function acknowledgement(a: NonNullable<ApiHqJob["assignment"]>, tech: string, i: I18n): { tone: Tone; text: string } {
+  const { t } = i;
+  if (a.status === "completed") return { tone: "ok", text: t("{name} completed the job — the assignment ended with it, so {name}’s time is free again.", { name: tech }) };
+  if (a.acknowledgement === "accepted") return { tone: "ok", text: t("{name} accepted the assignment", { name: tech }) };
+  if (a.acknowledgement !== "cant_make") return { tone: "primary", text: t("Waiting for {name} to accept.", { name: tech }) };
+  const why = a.cantMakeReason ? t("{name} can’t make this time: “{reason}”", { name: tech, reason: a.cantMakeReason }) : t("{name} can’t make this time", { name: tech });
+  const other = a.alternativeSlot ? ` · ${t("could do {slot}", { slot: slotText(a.alternativeSlot, i) })}` : "";
+  return { tone: "warn", text: `${why}${other}. ${t("Any new time needs the client’s approval.")}` };
+}
+/** Where an offer stands: accepted (when), expired, or open until it expires. */
+function offerState(o: NonNullable<ApiHqJob["offer"]>, now: number, i: I18n): string {
+  const { t, display } = i;
+  if (o.decision === "accept") return o.decidedAt ? t("accepted {time}", { time: showTime(o.decidedAt, display) }) : t("accepted");
+  return Date.parse(o.offerExpiresAt) <= now ? t("expired") : t("offer open · expires {time}", { time: showTime(o.offerExpiresAt, display) });
+}
 /** Who does the work: the internal assignment, or the contractor's offer with its access window and the technician. */
 export function delivery(j: ApiHqJob, n: Names, now: number, i: I18n = EN): Delivery | null {
   const { t, display } = i;
@@ -164,13 +197,10 @@ export function delivery(j: ApiHqJob, n: Names, now: number, i: I18n = EN): Deli
   const tech = a ? n.people.get(a.technicianMembershipId) ?? t("technician") : "";
   const window = a ? slotText({ startAt: a.scheduledStart, endAt: a.scheduledEnd }, i) : "";
   const done = a?.status === "completed" ? ` · ${t("ended at completion")}` : "";
-  const ackLine = a?.status === "completed" ? { tone: "ok" as Tone, text: t("{name} completed the job — the assignment ended with it, so {name}’s time is free again.", { name: tech }) }
-    : a ? (a.acknowledgement === "accepted" ? { tone: "ok" as Tone, text: t("{name} accepted the assignment", { name: tech }) }
-      : a.acknowledgement === "cant_make" ? { tone: "warn" as Tone, text: `${a.cantMakeReason ? t("{name} can’t make this time: “{reason}”", { name: tech, reason: a.cantMakeReason }) : t("{name} can’t make this time", { name: tech })}${a.alternativeSlot ? ` · ${t("could do {slot}", { slot: slotText(a.alternativeSlot, i) })}` : ""}. ${t("Any new time needs the client’s approval.")}` }
-      : { tone: "primary" as Tone, text: t("Waiting for {name} to accept.", { name: tech }) }) : null;
+  const ackLine = a ? acknowledgement(a, tech, i) : null;
   if (o && j.contractorOrgId) {
     const org = n.orgs.get(o.contractorOrgId) ?? t("contractor");
-    const state = o.decision === "accept" ? (o.decidedAt ? t("accepted {time}", { time: showTime(o.decidedAt, display) }) : t("accepted")) : (Date.parse(o.offerExpiresAt) <= now ? t("expired") : t("offer open · expires {time}", { time: showTime(o.offerExpiresAt, display) }));
+    const state = offerState(o, now, i);
     return {
       kind: "contractor", title: t("Delivery · contractor {name}", { name: org }),
       lines: [[t("Visit"), `${slotText(o.visitSlot, i)} · ${state}`], [t("Access"), `${showSpan(o.accessValidFrom, o.accessValidUntil, display)}${o.decision === "accept" && Date.parse(o.accessValidUntil) <= now ? ` · ${t("ended")}` : ""}`],
@@ -183,7 +213,10 @@ export function delivery(j: ApiHqJob, n: Names, now: number, i: I18n = EN): Deli
 
 /** The times HQ may book (IR113): the client's preferred times, or — for a plan's job without them — the plan
 occurrence (the requested window the plan generated, D16). */
-export const agreedSlots = (j: Pick<ApiHqJob, "preferredSlots" | "planId" | "occurrenceAt" | "requestedSlot">): Slot[] => (j.preferredSlots.length > 0 ? j.preferredSlots : (j.planId && j.occurrenceAt ? [j.requestedSlot] : []));
+export function agreedSlots(j: Pick<ApiHqJob, "preferredSlots" | "planId" | "occurrenceAt" | "requestedSlot">): Slot[] {
+  if (j.preferredSlots.length > 0) return j.preferredSlots;
+  return j.planId && j.occurrenceAt ? [j.requestedSlot] : [];
+}
 
 export interface PreferredRow { rank: number; slot: Slot; text: string; hq: string; fits: boolean; people: { id: string; displayName: string }[]; plan: boolean }
 /** The agreed times with the HQ technicians free and qualified for each (members.eligible). */
@@ -193,7 +226,8 @@ export function preferredRows(j: ApiHqJob, eligible: { id: string; displayName: 
   return agreedSlots(j).map((s, k) => {
     const people = eligible[k] ?? [];
     const isPast = Date.parse(s.startAt) <= now;
-    return { rank: k + 1, slot: s, text: longSlot(s, i), hq: isPast ? t("in the past") : (people.length > 0 ? people.map((p) => p.displayName).join(", ") : t("no qualified HQ technician free")), fits: !isPast && people.length > 0, people: isPast ? [] : people, plan: isPlan };
+    const free = people.length > 0 ? people.map((p) => p.displayName).join(", ") : t("no qualified HQ technician free");
+    return { rank: k + 1, slot: s, text: longSlot(s, i), hq: isPast ? t("in the past") : free, fits: !isPast && people.length > 0, people: isPast ? [] : people, plan: isPlan };
   });
 }
 
@@ -213,7 +247,9 @@ export function offerDefaults(slot: Slot, now: number): { offerExpiresAt: string
 /** Which of hold / resume / cancel HQ may use (IR56; hold only from in progress or submitted). */
 export function controls(status: string, t: T = en): { hold: boolean; resume: boolean; cancel: boolean; cancelWhy: string | null } {
   const isCancel = ["requested", "offered", "accepted", "assigned", "on_hold", "rework_requested"].includes(status);
-  const cancelWhy = isCancel ? null : t(status === "in_progress" || status === "submitted" ? "Put the job on hold first." : "Completed and cancelled jobs cannot be cancelled.");
+  const isRunning = status === "in_progress" || status === "submitted";
+  const why = isRunning ? "Put the job on hold first." : "Completed and cancelled jobs cannot be cancelled.";
+  const cancelWhy = isCancel ? null : t(why);
   return { hold: status === "in_progress" || status === "submitted", resume: status === "on_hold", cancel: isCancel, cancelWhy };
 }
 
@@ -329,6 +365,29 @@ export interface ReportCard {
   /** The rest of the report for “Open report →”: parts and refrigerant, the next action and the customer's sign-off. */
   parts: [string, string][]; next: string; signOff: string;
 }
+/** Why HQ may or may not review the report, in the job's state (English; the caller translates it). */
+function reviewNote(status: string, av: ApiWorkReport["reviewAvailability"], mode: ReportCard["mode"]): string {
+  if (status === "completed") return "Accepted — the job is completed. Completion does not resolve linked alerts.";
+  if (status === "rework_requested") return "Returned for rework — the technician works on the next version.";
+  if (status !== "submitted") return "The report is not under review in the job’s current state.";
+  if (av.allowed) {
+    return mode === "hq_escalation" ? "The contractor reviews its own reports first. HQ may accept or return this one only by escalation, with a reason."
+      : "You did not contribute to this report, so you can review it (self-approval is rejected).";
+  }
+  if (av.reason === "self_authored") return "You submitted this report version, so you cannot accept or return it (self-approval is rejected).";
+  return av.reason === "not_current" ? "A newer report version exists — reload to review it." : "Reviewing needs the job.write permission.";
+}
+/** The card's colour: a decision HQ may take (warn when it is an escalation), or the outcome. */
+function cardTone(isDecide: boolean, mode: ReportCard["mode"], status: string): ReportCard["tone"] {
+  if (isDecide) return mode === "hq_escalation" ? "warn" : "primary";
+  return status === "completed" ? "ok" : "muted";
+}
+/** The customer's sign-off: absent with the reason, signed by whom and when, or none. */
+function signOffText(s: ApiWorkReport["signOff"], i: I18n): string {
+  const { t, display } = i;
+  if (!s) return t("Not signed");
+  return s.absentReason ? t("Customer absent — {reason}", { reason: s.absentReason }) : t("Signed by {name} {time}", { name: s.signerName, time: showTime(s.signedAt, display) });
+}
 export function reportCard(j: ApiHqJob, r: ApiWorkReport, byUser: Map<string, string>, i: I18n = EN): ReportCard {
   const { t, display } = i;
   const author = byUser.get(r.authorId) ?? t("technician");
@@ -336,31 +395,27 @@ export function reportCard(j: ApiHqJob, r: ApiWorkReport, byUser: Map<string, st
   const mode = reviewModeOf(j);
   const av = r.reviewAvailability;
   const isDecide = j.status === "submitted" && av.allowed;
-  const note = t(j.status === "completed" ? "Accepted — the job is completed. Completion does not resolve linked alerts."
-    : j.status === "rework_requested" ? "Returned for rework — the technician works on the next version."
-    : j.status === "submitted" ? av.allowed ? mode === "hq_escalation" ? "The contractor reviews its own reports first. HQ may accept or return this one only by escalation, with a reason."
-    : "You did not contribute to this report, so you can review it (self-approval is rejected)."
-    : (av.reason === "self_authored" ? "You submitted this report version, so you cannot accept or return it (self-approval is rejected)." : av.reason === "not_current" ? "A newer report version exists — reload to review it." : "Reviewing needs the job.write permission.")
-    : "The report is not under review in the job’s current state.");
+  const note = t(reviewNote(j.status, av, mode));
   const rows = inspectionRows(r.items, t, r.attachmentRefs).map((it) => {
     const x = it.result ? resultText[it.result] : { label: "No result", tone: "crit" as const };
     return { id: it.id, label: it.label, result: t(x.label), tone: x.tone, reason: it.reason, photos: it.photos };
   });
   const readings = readingRows(r.measurements, t);
-  const submitted = r.submittedAt ? t(j.reportRefs.length > 1 ? "Resubmitted {time}" : "Submitted {time}", { time: showTime(r.submittedAt, display) }) : t("Not submitted");
+  const submittedText = j.reportRefs.length > 1 ? "Resubmitted {time}" : "Submitted {time}";
+  const submitted = r.submittedAt ? t(submittedText, { time: showTime(r.submittedAt, display) }) : t("Not submitted");
   return {
     id: r.id, version: r.version, title: t("Work report · version {version}", { version: r.version }), author, rows, readings, workText: r.workText, mode, decide: isDecide, note,
     sub: t("{submitted} by {author} · {checks} · {photos}", {
       submitted, author, checks: t(r.items.length === 1 ? "1 check" : "{n} checks", { n: r.items.length }), photos: t(photos === 1 ? "1 photo" : "{n} photos", { n: photos }),
     }),
-    tone: isDecide ? (mode === "hq_escalation" ? "warn" : "primary") : (j.status === "completed" ? "ok" : "muted"),
+    tone: cardTone(isDecide, mode, j.status),
     // Figma 06-1 “Items that need rework”: the items needing attention (ticked), the readings, and the photos (shared with
     // the contractor's dialog, IR609)
     rework: reworkItems(inspectionRows(r.items, t, r.attachmentRefs), readings, photos, t),
     parts: [...r.parts.map((p): [string, string] => [`${p.name} × ${String(p.quantity)}`, `${p.source.replaceAll('_', " ")}${p.replacesComponentKey ? ` · ${t("replaces {part}", { part: p.replacesComponentKey.replaceAll('_', " ") })}` : ""}`]),
       ...r.refrigerant.map((x): [string, string] => [t("{refrigerant} · cylinder {id}", { refrigerant: x.refrigerant, id: x.cylinderId }), t("recovered {recovered} kg · charged {charged} kg · leak check {check}", { recovered: x.recoveredKg, charged: x.chargedKg, check: x.leakCheck.replaceAll('_', " ") })])],
     next: r.nextAction?.kind === "follow_up" ? t("Follow-up {date} — {note}", { date: r.nextAction.date.slice(0, 10), note: r.nextAction.note }) : t("No follow-up needed"),
-    signOff: r.signOff ? (r.signOff.absentReason ? t("Customer absent — {reason}", { reason: r.signOff.absentReason }) : t("Signed by {name} {time}", { name: r.signOff.signerName, time: showTime(r.signOff.signedAt, display) })) : t("Not signed"),
+    signOff: signOffText(r.signOff, i),
     reviews: [...r.reviewHistory].toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)).map((h) => {
       return {
         text: `${t(h.decision === "accept" ? "v{version} accepted {time} by {name}" : "v{version} returned {time} by {name}", { version: h.reportVersion, time: showTime(h.occurredAt, display), name: byUser.get(h.reviewerUserId) ?? t("reviewer") })}${h.reason ? ` — “${h.reason}”` : ""}`,

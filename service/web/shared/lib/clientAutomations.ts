@@ -75,17 +75,22 @@ export function actionLabel(a: UnitAction, t: T = en): string {
 const cmp: Record<Compare, string> = { gt: ">", gte: "≥", lt: "<", lte: "≤" };
 export const compares: Compare[] = ["gte", "gt", "lte", "lt"];
 export const compareText = (c: Compare) => cmp[c];
+/** The trigger of a condition rule in words: arrival or departure at the place, occupancy, the usual time or the weather. */
+function conditionText(c: ClientCondition, place: string, t: T): string {
+  switch (c.type) {
+    case "location": { return t(c.event === "arrival" ? "Arrival at {place}" : "Everyone leaves {place} (departure event)", { place }); }
+    case "occupancy": { return t(c.occupied ? "Someone is in the room (demo occupancy)" : "No one detected (demo occupancy)"); }
+    case "pattern": { return t("Your usual time {time} (demo routine)", { time: c.localTime }); }
+    default: { return t("Outdoor temperature {op} {value}°C (demo weather)", { op: cmp[c.operator], value: c.value }); }
+  }
+}
 /** The “When …” sentence of a rule; a location event happens where the target AC is (its property). */
 export function whenText(a: ApiAutomation, place: string, t: T = en): string {
   if (a.kind === "schedule") {
     return (a.endsNextDay ? t("{days} {start} → {end} next day (overnight)", { days: weekdaysText(a.weekdays, false, t), start: a.startLocal, end: a.endLocal })
       : t("{days} at {start} ({zone})", { days: weekdaysText(a.weekdays, false, t), start: a.startLocal, zone: a.timezone })) + onlyIfText(a.onlyIf, t);
   }
-  const c = a.condition;
-  const when = c.type === "location" ? (t(c.event === "arrival" ? "Arrival at {place}" : "Everyone leaves {place} (departure event)", { place }))
-    : c.type === "occupancy" ? t(c.occupied ? "Someone is in the room (demo occupancy)" : "No one detected (demo occupancy)")
-    : c.type === "pattern" ? t("Your usual time {time} (demo routine)", { time: c.localTime }) : t("Outdoor temperature {op} {value}°C (demo weather)", { op: cmp[c.operator], value: c.value });
-  return when + onlyIfText(a.onlyIf, t);
+  return conditionText(a.condition, place, t) + onlyIfText(a.onlyIf, t);
 }
 /** “someone is home”, “outdoor ≥ 30°C”, “weekdays” — the “Only if” clause of a sentence. */
 export function extraText(x: ExtraCondition, t: T = en): string {
@@ -144,18 +149,32 @@ export interface RuleCard {
   id: string; version: number; name: string; trigger: Trigger; when: string; then: string; steps: RuleStep[]; place: string; enabled: boolean;
   status: { text: string; tone: "ok" | "warn" | "muted" }; note: string | null; skipped: string | null; toggle: { allowed: boolean; hint: string | null };
 }
+/** A rule's switch: on, disabled by the system (with the reason) or switched off. */
+function ruleStatus(a: ApiAutomation, t: T): RuleCard["status"] {
+  if (a.enabled) return { text: t("On"), tone: "ok" };
+  return a.disabledReason ? { text: t("Disabled · {reason}", { reason: t(reasonText[a.disabledReason]) }), tone: "warn" } : { text: t("Off"), tone: "muted" };
+}
+/** Why a disabled rule will not run, for the reasons the system disables it. */
+function disabledNote(a: ApiAutomation, i: I18n): string | null {
+  const { t } = i;
+  switch (a.disabledReason) {
+    case "consent_revoked": { return t("Will not run: location consent withdrawn {date}. Existing commands are not cancelled.", { date: showDate(a.updatedAt, i.display) }); }
+    case "capability_changed": { return t("Will not run: the AC's capabilities changed — edit the actions, then switch it on again."); }
+    case "unit_archived": { return t("Will not run: the AC was archived."); }
+    default: { return null; }
+  }
+}
 /** One rule card in the display language (IR260); a rule's own times stay in its time zone. */
 export function ruleCard(a: ApiAutomation, unit: { name: string; path: string; property: string } | null, nextStart: string | null, consentGranted: boolean, i: I18n = EN): RuleCard {
   const { t } = i;
   const trigger = triggerOf(a);
   const place = unit?.property ?? t("the AC's property");
   const extra = a.unitIds.length - 1;
-  const more = extra > 0 ? t(extra === 1 ? " (+{n} more AC)" : " (+{n} more ACs)", { n: extra }) : "";
+  const moreText = extra === 1 ? " (+{n} more AC)" : " (+{n} more ACs)";
+  const more = extra > 0 ? t(moreText, { n: extra }) : "";
   const where = unit ? `${unit.name}${more} · ${unit.path}` : t("AC no longer available");
-  const status = a.enabled ? { text: t("On"), tone: "ok" as const } : (a.disabledReason ? { text: t("Disabled · {reason}", { reason: t(reasonText[a.disabledReason]) }), tone: "warn" as const } : { text: t("Off"), tone: "muted" as const });
-  const note = a.disabledReason === "consent_revoked" ? t("Will not run: location consent withdrawn {date}. Existing commands are not cancelled.", { date: showDate(a.updatedAt, i.display) })
-    : a.disabledReason === "capability_changed" ? t("Will not run: the AC's capabilities changed — edit the actions, then switch it on again.")
-    : a.disabledReason === "unit_archived" ? t("Will not run: the AC was archived.") : null;
+  const status = ruleStatus(a, t);
+  const note = disabledNote(a, i);
   const skipped = !note && a.lastRun?.outcome === "skipped" ? t("Last evaluation skipped {when} — {reason}", { when: runText(a.lastRun.at, a.timezone, i), reason: textOf(decisionText, a.lastRun.reason ?? "", t) ?? (a.lastRun.reason ?? t("no reason recorded")) }) : null;
   const isNeedsConsent = trigger === "location" && !consentGranted;
   return {
@@ -167,7 +186,7 @@ export function ruleCard(a: ApiAutomation, unit: { name: string; path: string; p
     steps: ruleSteps(a, t),
     enabled: a.enabled,
     place: `${where}${a.enabled && nextStart ? t(" · next run {when}", { when: runText(nextStart, a.timezone, i) }) : ""}`,
-    toggle: { allowed: (!isNeedsConsent || a.enabled) && !!unit, hint: isNeedsConsent && !a.enabled ? t("Grant location consent first") : (unit ? null : t("The AC is no longer available")) },
+    toggle: { allowed: (!isNeedsConsent || a.enabled) && !!unit, hint: toggleHint(isNeedsConsent && !a.enabled, !!unit, t) },
     trigger,
     status,
     note,
@@ -175,6 +194,11 @@ export function ruleCard(a: ApiAutomation, unit: { name: string; path: string; p
   };
 }
 
+/** Why the switch is unavailable: location consent first, or the AC is gone. */
+function toggleHint(needsConsent: boolean, hasUnit: boolean, t: T): string | null {
+  if (needsConsent) return t("Grant location consent first");
+  return hasUnit ? null : t("The AC is no longer available");
+}
 /** The editor draft (DD-C04 / DD-C05 fields); actions are option keys of actionOptions. */
 export interface Draft {
   id: string | null; version: number | null; name: string; trigger: Trigger; unitId: string; others: string[]; timezone: string; enabled: boolean; priority: number;
@@ -184,24 +208,40 @@ export interface Draft {
 /** One “Only if” row of the editor (weather value kept as typed). */
 export type ExtraDraft = { type: "weekday"; weekdays: number[] } | { type: "occupancy"; occupied: boolean } | { type: "weather"; operator: Compare; value: string };
 export const extraLabel: Record<ExtraDraft["type"], string> = { weekday: "Weekdays", occupancy: "Occupancy", weather: "Outdoor temperature" };
+/** The “Only if” type a trigger already is, which the rule cannot add again. */
+function ownExtra(trigger: Trigger): ExtraDraft["type"] | null {
+  if (trigger === "presence") return "occupancy";
+  return trigger === "weather" ? "weather" : null;
+}
 /** The “Only if” types a draft may still add (IR215): no weekday on a schedule, not the trigger's own type, each once, at most 3. */
 export function extraChoices(d: Draft): ExtraDraft["type"][] {
   if (d.extras.length >= 3) return [];
-  const own = d.trigger === "presence" ? "occupancy" : (d.trigger === "weather" ? "weather" : null);
+  const own = ownExtra(d.trigger);
   return (["weekday", "occupancy", "weather"] as const).filter((t) => !(t === "weekday" && d.trigger === "schedule") && t !== own && d.extras.every((x) => x.type !== t));
 }
-export const blankExtra = (t: ExtraDraft["type"]): ExtraDraft => (t === "weekday" ? { type: t, weekdays: [1, 2, 3, 4, 5] } : (t === "occupancy" ? { type: t, occupied: true } : { type: t, operator: "gte", value: "30" }));
+export function blankExtra(t: ExtraDraft["type"]): ExtraDraft {
+  switch (t) {
+    case "weekday": { return { type: t, weekdays: [1, 2, 3, 4, 5] }; }
+    case "occupancy": { return { type: t, occupied: true }; }
+    case "weather": { return { type: t, operator: "gte", value: "30" }; }
+  }
+}
 /** Extras that no longer fit the trigger (switching the trigger) are dropped. */
 export function fitExtras(d: Draft): ExtraDraft[] {
-  const own = d.trigger === "presence" ? "occupancy" : (d.trigger === "weather" ? "weather" : null);
+  const own = ownExtra(d.trigger);
   return d.extras.filter((x) => !(x.type === "weekday" && d.trigger === "schedule") && x.type !== own);
 }
 const extraOf = (x: ExtraDraft): ExtraCondition => (x.type === "weather" ? { type: "weather", metric: "temperature", operator: x.operator, value: Number(x.value) } : x);
 const extraDraftOf = (x: ExtraCondition): ExtraDraft => (x.type === "weather" ? { type: "weather", operator: x.operator, value: String(x.value) } : x);
 /** The option key of an action; every UnitAction of the contract has one, so a saved rule edits back unchanged (IR314). */
 export const actionKey = (a: UnitAction): string => {
-  return a.kind === "set_power" ? `power:${a.power ? "on" : "off"}` : a.kind === "set_temperature" ? `temp:${String(a.celsius)}` : a.kind === "set_mode" ? `mode:${a.mode}`
-    : a.kind === "set_fan" ? `fan:${a.fanLevel}` : `vent:${a.level}`;
+  switch (a.kind) {
+    case "set_power": { return `power:${a.power ? "on" : "off"}`; }
+    case "set_temperature": { return `temp:${String(a.celsius)}`; }
+    case "set_mode": { return `mode:${a.mode}`; }
+    case "set_fan": { return `fan:${a.fanLevel}`; }
+    default: { return `vent:${a.level}`; }
+  }
 };
 export function actionOf(key: string): UnitAction {
   const [k, v] = key.split(":", 2);
@@ -381,9 +421,15 @@ export function summaryText(d: Draft, unit: string, place: string, t: T = en): s
     return t(d.endsNextDay ? "When {days} at {start} → {startAction}. At {end} (next day) → {endAction}.{onlyIf}" : "When {days} at {start} → {startAction}. At {end} → {endAction}.{onlyIf}",
       { days, start: d.startLocal, startAction: set(d.startAction), end: d.endLocal, endAction: set(d.endAction), onlyIf: onlyIfSummary(d, t) });
   }
-  const when = d.trigger === "location" ? t(d.event === "arrival" ? "you arrive at {place}" : "everyone leaves {place}", { place })
-    : d.trigger === "presence" ? t(d.occupied ? "someone is in the room" : "no one is detected") : d.trigger === "routine" ? t("it is your usual time {time}", { time: d.localTime }) : t("the outdoor temperature is {op} {value}°C", { op: cmp[d.operator], value: d.value });
+  const when = draftWhen(d, place, t);
   return t("When {when} → {action}.{onlyIf}", { when, action: set(d.action), onlyIf: onlyIfSummary(d, t) });
+}
+/** The draft's trigger in the editor's summary sentence. */
+function draftWhen(d: Draft, place: string, t: T): string {
+  if (d.trigger === "location") return t(d.event === "arrival" ? "you arrive at {place}" : "everyone leaves {place}", { place });
+  if (d.trigger === "presence") return t(d.occupied ? "someone is in the room" : "no one is detected");
+  if (d.trigger === "routine") return t("it is your usual time {time}", { time: d.localTime });
+  return t("the outdoor temperature is {op} {value}°C", { op: cmp[d.operator], value: d.value });
 }
 function onlyIfSummary(d: Draft, t: T): string {
   const xs = fitExtras(d).filter((x) => x.type !== "weather" || x.value.trim() !== "").map((x) => extraText(extraOf(x), t));
