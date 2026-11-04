@@ -52,44 +52,48 @@ export function MaintenanceView({ live }: Readonly<{ live: MaintenanceLive }>) {
     setResult(null);
     startGo(() => { router.replace(v === "filters" ? "/customer/maintenance?tab=filter-care" : "/customer/maintenance", { scroll: false }); });
   };
+  // the shown tab's body: filter care once loaded, or the requests with the selected one beside them
+  const filtersBody = () => (live.filters && !going ? (
+      <FilterCareTab f={live.filters} owner={live.owner} onRequest={(p) => { setPrefill(p); setModal("new"); }}
+        onDone={(text) => { setResult({ tone: "ok", text }); }} onFail={(f) => { setResult({ tone: f.code === "FORBIDDEN" ? "warn" : "crit", text: filterRefusal(f, t) }); }} />
+  ) : <Card title={t("Filters by AC")}><p className="text-[13px] text-muted-foreground">{t("Loading filter care…")}</p></Card>);
+  const requestsBody = () => {
+    if (going) return <Card title={t("My requests")}><p className="text-[13px] text-muted-foreground">{t("Loading your requests…")}</p></Card>;
+    return (
+      <>
+        {replies > 0 && <Banner tone="warn" icon="swap" action={<Btn size="sm" variant="primary" onClick={() => { setTab("reply"); const r = live.rows.find((x) => x.tab === "reply"); if (r) open(r.id); }}>{t("Review")}</Btn>}>{t("A new visit time needs your reply ({n}). Nothing is booked until you accept.", { n: replies })}</Banner>}
+        {live.rateBanner && <Banner tone="ok" icon="check" action={<Btn size="sm" variant="primary" onClick={() => { open(live.rateBanner!.jobId); }}>{t("Confirm & rate")}</Btn>}><b>{live.rateBanner.text}</b> {t("Is everything working? Your confirmation closes the job.")}</Banner>}
+        <PageHead title={t("My requests")} sub={t(live.rows.length === 1 ? "{n} request · sorted by status (business order)" : "{n} requests · sorted by status (business order)", { n: live.rows.length })} action={<Btn variant="primary" onClick={() => { setModal("new"); }}><Icon name="add" /> {t("New maintenance request")}</Btn>} />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Tabs value={tab} onChange={setTab} tabs={STATUS_TABS.filter(([s]) => s !== "reply" || replies > 0).map(([id, label]) => ({ id, label: t(label), count: count(id) }))} />
+          <Select aria-label={t("Origin")} value={origin} onChange={(e) => { setOrigin(e.target.value as typeof origin); }} className="w-auto"><option value="all">{t("Origin: All")}</option><option value="request">{t("Origin: Client request")}</option><option value="plan">{t("Origin: Periodic plan")}</option></Select>
+        </div>
+        <div className={cx("grid gap-4", d ? "grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" : "grid-cols-1")}>
+          <div className="flex min-w-0 flex-col gap-2">
+            {shown.map((r) => (
+              <ListRow key={r.id} selected={d?.job.id === r.id} href={`/customer/maintenance?jobId=${r.id}`}>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold text-muted-foreground">{r.short}</span><b>{r.unit}</b><OriginBadge origin={r.origin} /></div>
+                  <div className="text-xs text-muted-foreground">{r.place ? `${r.place} · ` : ""}{r.type}</div>
+                  <div className={cx("flex items-center gap-1.5 text-xs", r.warn && "font-semibold text-warn")}><Icon name={r.icon} className="shrink-0" />{r.line}</div>
+                </div>
+                <JobStatusBadge s={r.status as JobStatus} client /><span className="text-muted-foreground"><Icon name="chevronRight" /></span>
+              </ListRow>
+            ))}
+            {shown.length === 0 && <p className="rounded-xl border border-line bg-surface p-4 text-center text-xs text-muted-foreground">{t(live.rows.length > 0 ? "No requests in this filter." : "No requests yet — “+ New maintenance request” asks HQ for a visit.")}</p>}
+            <p className="text-[11px] text-muted-foreground">{t("“Scheduled” = a time is confirmed: one of your 3 preferred times, or a new time you accepted. Periodic plan visits are scheduled from your maintenance plan.")}</p>
+          </div>
+          {d ? <JobDetail key={`${d.job.id}:${String(d.job.version)}`} d={d} open={setModal} onDone={close} onFail={fail} /> : null}
+          {!d && "missing" in live ? <Card title={t("Request")}><p className="text-[13px] text-muted-foreground">{t("That request no longer exists in your account.")}</p></Card> : null}
+        </div>
+      </>
+    );
+  };
   return (
     <Page>
       <Tabs value={page} onChange={go} tabs={[{ id: "requests", label: t("My requests") }, { id: "filters", label: t("Filter care") }]} />
       {result && <Banner tone={result.tone}>{result.text}</Banner>}
-      {page === "filters" ? (
-        live.filters && !going ? (
-          <FilterCareTab f={live.filters} owner={live.owner} onRequest={(p) => { setPrefill(p); setModal("new"); }}
-            onDone={(text) => { setResult({ tone: "ok", text }); }} onFail={(f) => { setResult({ tone: f.code === "FORBIDDEN" ? "warn" : "crit", text: filterRefusal(f, t) }); }} />
-        ) : <Card title={t("Filters by AC")}><p className="text-[13px] text-muted-foreground">{t("Loading filter care…")}</p></Card>
-      ) : (going ? <Card title={t("My requests")}><p className="text-[13px] text-muted-foreground">{t("Loading your requests…")}</p></Card> : (
-        <>
-          {replies > 0 && <Banner tone="warn" icon="swap" action={<Btn size="sm" variant="primary" onClick={() => { setTab("reply"); const r = live.rows.find((x) => x.tab === "reply"); if (r) open(r.id); }}>{t("Review")}</Btn>}>{t("A new visit time needs your reply ({n}). Nothing is booked until you accept.", { n: replies })}</Banner>}
-          {live.rateBanner && <Banner tone="ok" icon="check" action={<Btn size="sm" variant="primary" onClick={() => { open(live.rateBanner!.jobId); }}>{t("Confirm & rate")}</Btn>}><b>{live.rateBanner.text}</b> {t("Is everything working? Your confirmation closes the job.")}</Banner>}
-          <PageHead title={t("My requests")} sub={t(live.rows.length === 1 ? "{n} request · sorted by status (business order)" : "{n} requests · sorted by status (business order)", { n: live.rows.length })} action={<Btn variant="primary" onClick={() => { setModal("new"); }}><Icon name="add" /> {t("New maintenance request")}</Btn>} />
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <Tabs value={tab} onChange={setTab} tabs={STATUS_TABS.filter(([s]) => s !== "reply" || replies > 0).map(([id, label]) => ({ id, label: t(label), count: count(id) }))} />
-            <Select aria-label={t("Origin")} value={origin} onChange={(e) => { setOrigin(e.target.value as typeof origin); }} className="w-auto"><option value="all">{t("Origin: All")}</option><option value="request">{t("Origin: Client request")}</option><option value="plan">{t("Origin: Periodic plan")}</option></Select>
-          </div>
-          <div className={cx("grid gap-4", d ? "grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" : "grid-cols-1")}>
-            <div className="flex min-w-0 flex-col gap-2">
-              {shown.map((r) => (
-                <ListRow key={r.id} selected={d?.job.id === r.id} href={`/customer/maintenance?jobId=${r.id}`}>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold text-muted-foreground">{r.short}</span><b>{r.unit}</b><OriginBadge origin={r.origin} /></div>
-                    <div className="text-xs text-muted-foreground">{r.place ? `${r.place} · ` : ""}{r.type}</div>
-                    <div className={cx("flex items-center gap-1.5 text-xs", r.warn && "font-semibold text-warn")}><Icon name={r.icon} className="shrink-0" />{r.line}</div>
-                  </div>
-                  <JobStatusBadge s={r.status as JobStatus} client /><span className="text-muted-foreground"><Icon name="chevronRight" /></span>
-                </ListRow>
-              ))}
-              {shown.length === 0 && <p className="rounded-xl border border-line bg-surface p-4 text-center text-xs text-muted-foreground">{t(live.rows.length > 0 ? "No requests in this filter." : "No requests yet — “+ New maintenance request” asks HQ for a visit.")}</p>}
-              <p className="text-[11px] text-muted-foreground">{t("“Scheduled” = a time is confirmed: one of your 3 preferred times, or a new time you accepted. Periodic plan visits are scheduled from your maintenance plan.")}</p>
-            </div>
-            {d ? <JobDetail key={`${d.job.id}:${String(d.job.version)}`} d={d} open={setModal} onDone={close} onFail={fail} />
-              : ("missing" in live ? <Card title={t("Request")}><p className="text-[13px] text-muted-foreground">{t("That request no longer exists in your account.")}</p></Card> : null)}
-          </div>
-        </>
-      ))}
+      {page === "filters" ? filtersBody() : requestsBody()}
       {modal === "new" && <NewRequest live={live} prefill={prefill} onClose={(text, tone) => { setPrefill(null); close(text, tone); }} onFail={(f) => { setPrefill(null); fail(f); }} />}
       {d && modal === "decline" && <DeclineModal d={d} now={Date.parse(live.now)} onClose={close} onFail={fail} />}
       {d && modal === "other" && <OtherTimeModal d={d} now={Date.parse(live.now)} onClose={close} onFail={fail} />}
@@ -216,10 +220,18 @@ function NewRequest({ live, prefill, onClose, onFail }: ModalProps & { live: Mai
   const slotError = preferredError(slots, now, 3, t);
   const cError = contactError(contact, t);
   const ids = { unit: useId(), sym: useId(), times: useId(), contact: useId() };
+  // the first field to fix, top to bottom, or null when the form is valid
+  const firstBad = () => {
+    if (!unitId) return ids.unit;
+    if (symError) return ids.sym;
+    if (slotError) return ids.times;
+    if (cError) return ids.contact;
+    return null;
+  };
   const submit = () => {
     setTried(true);
     // a failed submit takes focus to the first field to fix, top to bottom (IR573)
-    const bad = unitId ? symError ? ids.sym : slotError ? ids.times : cError ? ids.contact : null : ids.unit;
+    const bad = firstBad();
     if (bad) {
       requestAnimationFrame(() => document.getElementById(bad)?.focus());
       return;
@@ -318,7 +330,13 @@ function ProblemModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now
   const [visit, setVisit] = useState<Row | null>(null);
   const [tried, setTried] = useState(false);
   const total = files.reduce((a, f) => a + f.size, 0);
-  const fileError = files.length > 5 ? t("Up to 5 photos.") : files.some((f) => !["image/jpeg", "image/png"].includes(f.type) || f.size > 5 * 1024 * 1024) ? t("Photos must be JPEG or PNG up to 5 MiB each.") : total > 5.5 * 1024 * 1024 ? t("The photos together may be 5.5 MB at most.") : null;
+  const photoError = (): string | null => {
+    if (files.length > 5) return t("Up to 5 photos.");
+    if (files.some((f) => !["image/jpeg", "image/png"].includes(f.type) || f.size > 5 * 1024 * 1024)) return t("Photos must be JPEG or PNG up to 5 MiB each.");
+    if (total > 5.5 * 1024 * 1024) return t("The photos together may be 5.5 MB at most.");
+    return null;
+  };
+  const fileError = photoError();
   const detailError = details.trim().length < 10 || details.length > 2000 ? t("Describe the problem (10–2000 characters)") : null;
   const visitError = visit ? preferredError([toSlot(visit, timeZone)], now, 1, t) : null;
   const send = () => {

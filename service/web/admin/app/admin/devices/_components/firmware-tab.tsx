@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Check, EmptyState, Field, Input, ListRow, Modal, Select, SummaryList, Textarea, UtilizationBar } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, EmptyState, Field, Input, ListRow, Modal, Select, SummaryList, Textarea, UtilizationBar, type Tone } from "@ac/web/components/ui";
 import { useI18n } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -11,7 +11,10 @@ import { controlCampaign, scheduleCampaign } from "../actions";
 import type { DevicesLive } from "./devices-view";
 import { Icon } from "@ac/web/components/Icon";
 
-const tone = (s: CampaignRow["state"]) => (s === "completed" ? "ok" : s === "running" ? "primary" : s === "paused" ? "warn" : s === "aborted" ? "crit" : "muted");
+// a campaign's tone by its state, and a device result's by its status; anything else is muted
+const CAMPAIGN_TONE = new Map<CampaignRow["state"], Tone>([["completed", "ok"], ["running", "primary"], ["paused", "warn"], ["aborted", "crit"]]);
+const RESULT_TONE = new Map<string, Tone>([["succeeded", "ok"], ["failed", "crit"], ["skipped", "warn"]]);
+const tone = (s: CampaignRow["state"]): Tone => CAMPAIGN_TONE.get(s) ?? "muted";
 const stateWord: Record<CampaignRow["state"], string> = { scheduled: "scheduled", running: "running", paused: "paused", aborted: "aborted", completed: "completed" };
 const resultWord: Record<string, string> = { pending: "pending", installing: "installing", succeeded: "succeeded", failed: "failed", skipped: "skipped" };
 const waveWord: Record<WaveState, [string, "ok" | "primary" | "warn" | "crit" | "muted"]> = { done: ["Done", "ok"], running: ["Running", "primary"], paused: ["Paused", "warn"], aborted: ["Aborted", "crit"], waiting: ["Waiting", "muted"] };
@@ -63,7 +66,7 @@ export function FirmwareTab({ live }: Readonly<{ live: DevicesLive }>) {
           })}</div>
           <div className="mt-3"><SummaryList items={[[t("Succeeded / installing / pending"), `${String(sel.c.progress.succeeded)} / ${String(sel.c.progress.installing)} / ${String(sel.c.progress.pending)}`], [t("Failed"), t("{n} · failed devices keep their old version", { n: sel.c.progress.failed })], [t("Skipped"), t("{n} · busy, offline or tampered", { n: sel.c.progress.skipped })], ...(sel.c.reason ? [[t("Reason"), sel.c.reason] as [string, string]] : [])]} /></div>
           <h3 className="mb-1 mt-4 text-[13px] font-bold">{t("Devices")}</h3>
-          <div className="flex flex-col gap-1">{sel.c.results.map((r) => <div key={r.deviceId} className="flex items-center justify-between gap-2 border-t border-line py-1.5 text-[13px]"><span className="min-w-0">{serial.get(r.deviceId) ?? r.deviceId.slice(0, 8)} <span className="text-xs text-muted-foreground">{t("wave {n}", { n: r.waveIndex + 1 })}{r.reasonKey ? ` · ${resultReason(r.reasonKey, t)}` : ""}</span></span><span className="flex shrink-0 items-center gap-2">{r.at && <span className="text-xs text-muted-foreground">{showTime(r.at, i.display)}</span>}<Badge tone={r.status === "succeeded" ? "ok" : r.status === "failed" ? "crit" : r.status === "skipped" ? "warn" : "muted"}>{t(resultWord[r.status] ?? r.status)}</Badge>{live.canWrite && (r.status === "failed" || r.status === "skipped") && ["running", "paused"].includes(sel.state) && <Btn size="sm" disabled={pending} onClick={() => control("retry_device", r.deviceId)}>{t("Retry")}</Btn>}</span></div>)}</div>
+          <div className="flex flex-col gap-1">{sel.c.results.map((r) => <div key={r.deviceId} className="flex items-center justify-between gap-2 border-t border-line py-1.5 text-[13px]"><span className="min-w-0">{serial.get(r.deviceId) ?? r.deviceId.slice(0, 8)} <span className="text-xs text-muted-foreground">{t("wave {n}", { n: r.waveIndex + 1 })}{r.reasonKey ? ` · ${resultReason(r.reasonKey, t)}` : ""}</span></span><span className="flex shrink-0 items-center gap-2">{r.at && <span className="text-xs text-muted-foreground">{showTime(r.at, i.display)}</span>}<Badge tone={RESULT_TONE.get(r.status) ?? "muted"}>{t(resultWord[r.status] ?? r.status)}</Badge>{live.canWrite && (r.status === "failed" || r.status === "skipped") && ["running", "paused"].includes(sel.state) && <Btn size="sm" disabled={pending} onClick={() => control("retry_device", r.deviceId)}>{t("Retry")}</Btn>}</span></div>)}</div>
         </Card>
       ) : <Card title={t("Campaign")}><EmptyState title={t("Nothing selected")}>{t("Choose or schedule a campaign.")}</EmptyState></Card>}
       <Modal open={modal === "new"} onClose={close} title={t("New firmware campaign")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={schedule}>{t("campaign::Schedule")}</Btn></>}>

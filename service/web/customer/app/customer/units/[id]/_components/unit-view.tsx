@@ -8,7 +8,7 @@ import { units, unitRowFromApi, type UnitRow } from "@ac/web/lib/client";
 import { OpError } from "@ac/web/lib/ops";
 import { controlLayout, FAN_LABEL, historyRow, latest, MODE_LABEL, type ApiCommand, type ApiUnitDetail, type UnitAction } from "@ac/web/lib/units";
 import { waitForCommand } from "@ac/web/lib/unitCommands";
-import { showRecent, showTime, textOf } from "@ac/web/lib/i18n";
+import { byCount, showRecent, showTime, textOf } from "@ac/web/lib/i18n";
 import { useDisplay, useT } from "@ac/web/components/I18n";
 import { createCommand, setUnitAlertPolicies } from "../actions";
 import { RenameModal } from "../../../_components/rename-modal";
@@ -90,7 +90,8 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
   const { modes, fans } = layout;
   const isShowMode = modes.length > 0;
   const isShowFan = fans.length > 0;
-  const min = policy?.kind === "temperature_limit" ? Math.max(cap.min, policy.minimumCoolingSetpoint) : (isRestricted ? 24 : cap.min);
+  const capMin = isRestricted ? 24 : cap.min;
+  const min = policy?.kind === "temperature_limit" ? Math.max(cap.min, policy.minimumCoolingSetpoint) : capMin;
   const max = cap.max;
   const confirmed = d ? d.observedState.celsius ?? "—" : 26;
   const room = d ? latest(d, "temperature", t, display, nowMs) : { text: "28.0 °C", at: "09:12:30" };
@@ -102,7 +103,12 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
   const fail = (e: unknown) => { toast(e instanceof OpError ? t("Not sent: {reason}", { reason: reason(e.error.messageKey, e.error.code) }) : t("Not sent"), "warn"); };
   const modeWord = (m: string | null) => (m && m in MODE_LABEL ? t(MODE_LABEL[m as keyof typeof MODE_LABEL]) : m ?? "—");
   const fanWord = (f: string | null) => (f && f in FAN_LABEL ? t(FAN_LABEL[f as keyof typeof FAN_LABEL]) : f ?? "—");
-  const changeText = (a: UnitAction) => (a.kind === "set_temperature" ? t("Set temperature {from}°C → {to}°C", { from: confirmed, to: setpoint }) : a.kind === "set_mode" ? t("Mode → {mode}", { mode: modeWord(mode) }) : a.kind === "set_fan" ? t("Fan → {fan}", { fan: fanWord(fan) }) : "");
+  const changeText = (a: UnitAction) => {
+    if (a.kind === "set_temperature") return t("Set temperature {from}°C → {to}°C", { from: confirmed, to: setpoint });
+    if (a.kind === "set_mode") return t("Mode → {mode}", { mode: modeWord(mode) });
+    if (a.kind === "set_fan") return t("Fan → {fan}", { fan: fanWord(fan) });
+    return "";
+  };
   const changes = (): UnitAction[] => {
     if (!d) return [];
     const a: UnitAction[] = [];
@@ -113,6 +119,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
     if (isShowFan && edited.fan && fan !== d.observedState.fanLevel) a.push({ kind: "set_fan", fanLevel: fan });
     return a;
   };
+  const changeCount = d ? changes().length : 1; // the demo shows its one temperature change
   const sendApi = async (actions: UnitAction[]) => {
     setWaiting(true);
     try {
@@ -134,7 +141,11 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
       router.refresh(); // re-read the unit on the server (observed setting, pending commands)
     }
   };
-  const togglePower = (v: boolean) => (d ? void sendApi([{ kind: "set_power", power: v }]) : (setOn(v), toast(t(v ? "Power ON sent" : "Power OFF sent"))));
+  const togglePower = (v: boolean) => {
+    if (d) { void sendApi([{ kind: "set_power", power: v }]); return; }
+    setOn(v);
+    toast(t(v ? "Power ON sent" : "Power OFF sent"));
+  };
   const savePolicies = (ids: string[], message: string, tone?: "warn") => {
     if (!d) return setAttached(ids), toast(message, tone);
     setUnitAlertPolicies(id, ids).then((res) => { if (res.ok) toast(message, tone); else toast(t("Not saved: {reason}", { reason: reason(res.messageKey, res.code) }), "warn"); }, fail);
@@ -149,7 +160,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
     <Page>
       <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href="/customer/properties" className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Back to {place}", { place: d ? d.location.pathLabels.at(-1) ?? t("Units") : "Bedroom" })}</Link><span>{unit.loc} › <b className="text-ink">{unit.name}</b></span></div>
       <div className="split-rev">
-        <Card title={t("DEVICES IN THIS ROOM")} sub={d ? t(roomUnits.data.length === 1 ? "{room} · {n} AC" : "{room} · {n} ACs", { room: d.location.pathLabels.at(-1) ?? t("Room"), n: roomUnits.data.length }) : "Bedroom · 2 ACs · Home A › 1F"} className="self-start">
+        <Card title={t("DEVICES IN THIS ROOM")} sub={d ? byCount(roomUnits.data.length, { one: t("{room} · {n} AC", { room: d.location.pathLabels.at(-1) ?? t("Room"), n: 1 }), many: t("{room} · {n} ACs", { room: d.location.pathLabels.at(-1) ?? t("Room"), n: roomUnits.data.length }) }) : "Bedroom · 2 ACs · Home A › 1F"} className="self-start">
           <div className="flex flex-col gap-2">
             {(isApi ? roomUnits.data : siblings).map((s) => (
               <Link key={s.id} href={`/customer/units/${s.id}`} className={cx("rounded-xl border p-3", s.id === id ? "border-primary bg-primary-soft/60" : "border-line hover:bg-surface2/60")}>
@@ -185,7 +196,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
               {isShowMode && <div><div className="mb-1 font-semibold">{t("Mode")}</div><Choice value={mode} disabled={isDisabled} onChange={(m) => { setMode(m); setEdited((e) => ({ ...e, mode: true })); }} options={modes.map((m) => ({ id: m, label: t(MODE_LABEL[m]) }))} /></div>}
               {isShowFan && <div><div className="mb-1 font-semibold">{t("Fan speed")}</div><Choice value={fan} disabled={isDisabled} onChange={(f) => { setFan(f); setEdited((e) => ({ ...e, fan: true })); }} options={fans.map((f) => ({ id: f, label: t(FAN_LABEL[f]) }))} /></div>}
               {layout.review && ( // a model with the power only sends it at once: nothing to review (Figma 02o)
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 p-3 text-xs"><span><b>{t((d ? changes().length : 1) === 1 ? "{n} change:" : "{n} changes:", { n: d ? changes().length : 1 })}</b> {d ? changes().map((item) => changeText(item)).join(" · ") || t("No change yet") : t("Set temperature {from}°C → {to}°C", { from: 26, to: setpoint })}<br /><span className="text-muted-foreground">{t("Target: {name} only · you will confirm before sending", { name: unit.name })}</span></span><Btn variant="primary" disabled={isDisabled || waiting || (d !== null && changes().length === 0)} onClick={() => { setConfirm(true); }}>{t(waiting ? "Waiting for device…" : "Review & send")}</Btn></div>
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 p-3 text-xs"><span><b>{t(changeCount === 1 ? "{n} change:" : "{n} changes:", { n: changeCount })}</b> {d ? changes().map((item) => changeText(item)).join(" · ") || t("No change yet") : t("Set temperature {from}°C → {to}°C", { from: 26, to: setpoint })}<br /><span className="text-muted-foreground">{t("Target: {name} only · you will confirm before sending", { name: unit.name })}</span></span><Btn variant="primary" disabled={isDisabled || waiting || (d !== null && changes().length === 0)} onClick={() => { setConfirm(true); }}>{t(waiting ? "Waiting for device…" : "Review & send")}</Btn></div>
               )}
               {waiting && <Banner>{t("Waiting for device response… The result is shown only after the device acknowledges (fails after 30 s).")}</Banner>}
               {isOffline && ( // Figma 02h: nothing is sent to an offline AC; a repair request is the way forward (IR243, IR315)
