@@ -7,6 +7,7 @@ import { EN, showDate, showSpan, showTime, translator, type I18n, type T, textOf
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import type { Slot } from "@ac/web/lib/partnerOverview";
 import type { IconName } from "@ac/web/components/Icon";
+import { codePoints } from "@ac/web/lib/text";
 
 export interface ApiClientRow {
   projection: "summary"; id: string; version: number; unitId: string; type: string; status: string; displayStatus: string; origin: string; dueAt: string;
@@ -167,7 +168,7 @@ export function preferredError(slots: Slot[], now: number, count = 3, t: T = en)
 /** The contact window rule (IR64, IR90): up to 200 characters without an e-mail address or a phone number. */
 // the symptom length the API checks (jobs.create): the trimmed text, counted in code points (characters), as the API counts it
 export function symptomLength(v: string): number {
-  return [...v.trim()].length;
+  return codePoints(v.trim());
 }
 
 export function contactError(v: string, tr: T = en): string | null {

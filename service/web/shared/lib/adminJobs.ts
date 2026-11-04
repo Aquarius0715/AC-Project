@@ -270,6 +270,7 @@ export interface CostLine { kind: "estimate" | "actual"; description: string; vi
 /** “80.00 MYR” from minor units. */
 export { money } from "@ac/web/lib/money";
 import { money } from "@ac/web/lib/money";
+import { codePoints } from "@ac/web/lib/text";
 /** Estimate and actual totals per currency, never converted (“80.00 MYR + 6.20 USD”). */
 export function costTotals(lines: CostLine[]): { estimate: string; actual: string } {
   const total = (kind: CostLine["kind"]) => {
@@ -295,12 +296,12 @@ on a later calendar day than today, 1–4 hours, distinct). */
 export function jobRequestErrors(f: { unitId: string; symptom: string; slots: Slot[]; contactWindow?: string }, now: number, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
   if (!f.unitId) e.unitId = t("Choose the unit.");
-  const s = [...f.symptom.trim()].length;
+  const s = codePoints(f.symptom.trim());
   if (s < 10 || s > 2000) e.symptom = t("Describe the symptom in 10–2000 characters.");
   // the API's rule (ContactWindowOK, IR64): up to 200 characters, no e-mail address and no run of 7 digits once spaces and
   // - ( ) + tabs are removed
   const contact = (f.contactWindow ?? "").trim();
-  if ([...contact].length > 200) e.contactWindow = t("Up to 200 characters.");
+  if (codePoints(contact) > 200) e.contactWindow = t("Up to 200 characters.");
   else if (contact.includes("@") || /\d{7,}/.test(contact.replaceAll(/[ \-()+\t]/g, ""))) e.contactWindow = t("No e-mail addresses or phone numbers in the contact window.");
   const today = new Date(now + 8 * 3_600_000).toISOString().slice(0, 10);
   const keys = new Set<string>();

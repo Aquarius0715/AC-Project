@@ -6,7 +6,7 @@ import { RouteError } from "@ac/web/components/RouteStates";
 const assign = vi.fn();
 beforeEach(() => {
   assign.mockClear();
-  vi.stubGlobal("location", { ...location, pathname: "/customer/units/u-1", search: "?tab=readings", assign });
+  vi.stubGlobal("location", { href: location.href, origin: location.origin, protocol: location.protocol, host: location.host, hostname: location.hostname, port: location.port, hash: location.hash, pathname: "/customer/units/u-1", search: "?tab=readings", assign });
 });
 afterEach(() => {
   cleanup();

@@ -5,6 +5,7 @@ import { EN, intlTag, showDate, showTime, translator, type I18n, type T, textOf 
 import type { UnitAction } from "@ac/web/lib/contracts.gen";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { IconName } from "@ac/web/components/Icon";
+import { codePoints } from "@ac/web/lib/text";
 
 const en = translator("en");
 
@@ -281,7 +282,7 @@ const minutes = (s: string) => Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5)
 /** The checks automations.save makes, shown before saving (the API checks again). */
 export function draftErrors(d: Draft, tr: T = en): Record<string, string> {
   const e: Record<string, string> = {};
-  const n = [...d.name.trim()].length;
+  const n = codePoints(d.name.trim());
   if (n < 1 || n > 120) e.name = tr("1–120 characters");
   if (!d.unitId) e.unitId = tr("Choose the AC");
   if (d.trigger === "schedule") {

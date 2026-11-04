@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Badge, Banner, Btn, Card, DataTable, Field, Input, LinkButton, Modal, Page, PageHead, Select, useToast } from "@ac/web/components/ui";
 import { CURRENT_CLIENT, ClientUser, clientUserActions, emailError, useClientUsers } from "@ac/web/lib/clientUsers";
 import { Icon } from "@ac/web/components/Icon";
+import { codePoints } from "@ac/web/lib/text";
 
 /** FR-C19 / IR417 / IR461 — the customer owner lists users, adds members and owners (the account exists at once), resends
 the set-up e-mail, changes roles, disables / enables and removes users (Figma Client 11a–11e); the demo applies
@@ -17,7 +18,7 @@ export function UsersDemo() {
   const [tried, setTried] = useState(false);
   const [role, setRole] = useState<"member" | "owner">("member");
   const errorText = tried ? emailError(email, users) : undefined;
-  const nameError = tried && ([...name.trim()].length === 0 || [...name.trim()].length > 120) ? "A name of 1–120 characters" : undefined;
+  const nameError = tried && (codePoints(name.trim()) === 0 || codePoints(name.trim()) > 120) ? "A name of 1–120 characters" : undefined;
 
   if (CURRENT_CLIENT.role !== "owner") {
     return (
@@ -33,7 +34,7 @@ export function UsersDemo() {
   const close = () => { setOpen(false); setTried(false); setEmail(""); setName(""); setRole("member"); };
   const send = () => {
     setTried(true);
-    const n = [...name.trim()].length;
+    const n = codePoints(name.trim());
     if (n < 1 || n > 120) return;
     const e = clientUserActions.invite(email, role, CURRENT_CLIENT.name, name);
     if (e) return;

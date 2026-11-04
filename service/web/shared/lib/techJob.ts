@@ -9,6 +9,7 @@ import { businessDay } from "@ac/web/lib/clientBilling";
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { ComponentKey } from "@ac/web/lib/contracts.gen";
+import { codePoints } from "@ac/web/lib/text";
 
 const en = translator("en");
 
@@ -142,7 +143,7 @@ export function submitIssues(d: Draft, attachments: { id: string; name: string; 
   for (const m of d.readings) {
     if (m.value.trim() !== "" && !Number.isFinite(Number(m.value))) out.push({ key: m.componentKey, group: groupOf(m.componentKey), text: t("{name} reading is not a number", { name: label(m.componentKey) }) });
   }
-  const n = [...d.workText.trim()].length;
+  const n = codePoints(d.workText.trim());
   if (n < 10 || n > 4000) out.push({ key: null, group: null, text: t("Work performed must be 10–4000 characters") });
   if (d.nextAction.kind === "follow_up" && (!d.nextAction.date || Date.parse(d.nextAction.date) <= now || !d.nextAction.note.trim())) out.push({ key: null, group: null, text: t("A follow-up needs a future date and a note") });
   for (const [k, p] of d.parts.entries()) { if (p.quantity < 1 || p.quantity > 999) out.push({ key: null, group: null, text: t("Part {n} ({name}) needs a quantity of 1–999", { n: k + 1, name: p.name || t("unnamed") }) }); }

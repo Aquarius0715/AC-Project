@@ -3,6 +3,7 @@
 // its Phase 1A demo (partnerUsersDemo.ts). Texts in the display language, times in the display time zone (IR267).
 import { EN, showDate, showTime, type I18n } from "@ac/web/lib/i18n";
 import { klDate, klStart } from "@ac/web/lib/partnerTeam";
+import { codePoints } from "@ac/web/lib/text";
 
 export type PartnerRole = "contractor" | "technician";
 export type PartnerStatus = "invited" | "active" | "disabled";
@@ -68,7 +69,7 @@ export function partnerInviteError(email: string, us: { id: string; email: strin
 
 /** A reason of 1–1000 characters (trimmed), as partnerUsers.save and partnerUsers.remove require. */
 export function reasonError(reason: string, t = EN.t): string | undefined {
-  const n = [...reason.trim()].length;
+  const n = codePoints(reason.trim());
   return n < 1 || n > 1000 ? t("A reason of 1–1000 characters") : undefined;
 }
 
@@ -77,7 +78,7 @@ export const statusFilter = (v: string | undefined): PartnerStatus | null => (PA
 
 /** A display name of 1–120 characters (trimmed), as a new user needs (IR461). */
 export function nameError(name: string, t = EN.t): string | undefined {
-  const n = [...name.trim()].length;
+  const n = codePoints(name.trim());
   return n < 1 || n > 120 ? t("A name of 1–120 characters") : undefined;
 }
 

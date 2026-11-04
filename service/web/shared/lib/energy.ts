@@ -3,6 +3,7 @@
 // display language (`t` / `i`, IR265). Numbers keep the en-MY format, which ms-MY shares.
 import { EN, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import type { OpInput } from "@ac/web/lib/opTypes";
+import { codePoints } from "@ac/web/lib/text";
 
 const en = translator("en");
 
@@ -145,9 +146,9 @@ export function baselineErrors(d: BaselineDraft, t: T = en): Record<string, stri
   else if (Date.parse(klInstant(d.to)) - Date.parse(klInstant(d.from)) > 366 * 24 * 3600 * 1000) e.period = t("At most 366 days");
   if (d.method === "demo_fixed" && !(d.baselineKWh.trim() !== "" && Number.isFinite(+d.baselineKWh) && +d.baselineKWh >= 0)) e.baselineKWh = t("A value ≥ 0 kWh");
   if (d.method === "demo_period_comparison" && d.boundaryId === "whole_building_electricity") e.boundaryId = t("Period comparison measures AC input electricity only");
-  if ([...d.boundary.trim()].length === 0 || d.boundary.length > 500) e.boundary = t("1–500 characters");
-  if ([...d.assumptions.trim()].length === 0 || d.assumptions.length > 2000) e.assumptions = t("1–2000 characters");
-  if ([...d.source.trim()].length === 0 || d.source.length > 500) e.source = t("1–500 characters");
+  if (codePoints(d.boundary.trim()) === 0 || d.boundary.length > 500) e.boundary = t("1–500 characters");
+  if (codePoints(d.assumptions.trim()) === 0 || d.assumptions.length > 2000) e.assumptions = t("1–2000 characters");
+  if (codePoints(d.source.trim()) === 0 || d.source.length > 500) e.source = t("1–500 characters");
   return e;
 }
 export function baselineInput(d: BaselineDraft, id?: string): OpInput<"baselines.save"> {

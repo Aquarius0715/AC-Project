@@ -11,6 +11,7 @@ import { metricLabel, metricUnit, opSymbol, type Operator, type Severity } from 
 import { csvCell } from "@ac/web/lib/csv";
 import type { IconName } from "@ac/web/components/Icon";
 import { byText } from "@ac/web/lib/order";
+import { codePoints } from "@ac/web/lib/text";
 
 export type Profile = "rto" | "general" | "energy" | "environment";
 export type Connection = "online" | "offline" | "unknown" | "connecting" | "error";
@@ -136,7 +137,7 @@ export function customerErrors(d: CustomerDraft, t: T = en): Record<string, stri
   if (!between(d.name, 1, 120)) e.name = t("1–120 characters");
   return e;
 }
-const between = (s: string, min: number, max: number) => [...s.trim()].length >= min && [...s.trim()].length <= max;
+const between = (s: string, min: number, max: number) => codePoints(s.trim()) >= min && codePoints(s.trim()) <= max;
 
 // ---- locations ----
 
@@ -216,8 +217,8 @@ export const propertyDraft = (p?: TreeProperty): PropertyDraft => ({ kind: p?.ki
 export function propertyErrors(d: PropertyDraft, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
   if (!between(d.name, 1, 120)) e.name = t("1–120 characters");
-  if ([...d.address.trim()].length > 500) e.address = t("At most 500 characters");
-  if ([...d.accessInstructions.trim()].length > 1000) e.accessInstructions = t("At most 1000 characters");
+  if (codePoints(d.address.trim()) > 500) e.address = t("At most 500 characters");
+  if (codePoints(d.accessInstructions.trim()) > 1000) e.accessInstructions = t("At most 1000 characters");
   return e;
 }
 export const propertyInput = (d: PropertyDraft, orgId: string, id?: string) => {

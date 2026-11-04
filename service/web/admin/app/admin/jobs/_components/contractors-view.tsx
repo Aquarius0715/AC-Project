@@ -15,6 +15,7 @@ import { JobsTabs } from "./jobs-header";
 import { NewJobModal } from "./jobs-view";
 import { Icon } from "@ac/web/components/Icon";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
+import { codePoints } from "@ac/web/lib/text";
 
 type Detail = NonNullable<ContractorsLive["detail"]>;
 /** The organization choice of a company still to create (IR465). */
@@ -110,7 +111,7 @@ function ProfileModal({ live, d, organizationId, onClose, onFail }: ModalProps &
   const [tried, setTried] = useState(false);
   const errors = profileErrors(f, t);
   const choices = existing ? [{ id: existing.organizationId, name: existing.name }] : [...live.withoutProfile, ...(created ? [created] : [])];
-  const companyLength = [...company.trim()].length;
+  const companyLength = codePoints(company.trim());
   const companyError = org === NEW_COMPANY && (companyLength < 1 || companyLength > 120) ? t("A company name of 1–120 characters") : undefined;
   const save = () => {
     setTried(true);

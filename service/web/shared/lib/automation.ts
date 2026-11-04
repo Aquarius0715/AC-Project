@@ -4,6 +4,7 @@
 import { translator, type T } from "@ac/web/lib/i18n";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { Fact } from "@ac/web/lib/contracts.gen";
+import { codePoints } from "@ac/web/lib/text";
 
 const en = translator("en");
 
@@ -95,7 +96,7 @@ export function autoDraft(p?: ApiAutoPolicy, timezone = "Asia/Kuala_Lumpur"): Au
 }
 export function autoErrors(d: AutoDraft, temperatureRange: { min: number; max: number } | null, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
-  if ([...d.name.trim()].length === 0 || [...d.name.trim()].length > 120) e.name = t("1–120 characters");
+  if (codePoints(d.name.trim()) === 0 || codePoints(d.name.trim()) > 120) e.name = t("1–120 characters");
   const pr = Number(d.priority);
   if (!(Number.isInteger(pr) && pr >= 0 && pr <= 100)) e.priority = t("An integer 0–100");
   if (!d.timezone.trim()) e.timezone = t("Required");

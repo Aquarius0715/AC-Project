@@ -9,6 +9,7 @@ import { businessDay } from "@ac/web/lib/clientBilling";
 import { hhmm, unavailabilityLabel, type ApiCapacity, type ApiMember, type Slot } from "@ac/web/lib/partnerOverview";
 import { qualificationLabel, qualified } from "@ac/web/lib/partnerJobDetail";
 import { freeSlots } from "@ac/web/lib/partnerSchedule";
+import { codePoints } from "@ac/web/lib/text";
 
 const en = translator("en");
 const DAY = 86_400_000, KL_OFFSET = 8 * 3_600_000;
@@ -160,7 +161,7 @@ export function unavailabilityErrors(f: UnavailabilityForm, t: T = en): Partial<
     if (days < 0) e.to = t("The last day must be on or after the first day");
     else if (days > 30) e.to = t("At most 31 days at a time");
   }
-  if ([...f.note.trim()].length > 500) e.note = t("At most 500 characters");
+  if (codePoints(f.note.trim()) > 500) e.note = t("At most 500 characters");
   return e;
 }
 

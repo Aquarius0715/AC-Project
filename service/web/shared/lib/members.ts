@@ -5,6 +5,7 @@
 import { EN, showTime, translator, zonedInstant, zonedParts, type I18n, type T } from "@ac/web/lib/i18n";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { Permission } from "@ac/web/lib/contracts.gen";
+import { codePoints } from "@ac/web/lib/text";
 
 const en = translator("en");
 
@@ -126,7 +127,7 @@ export function memberErrors(d: MemberDraft, ctx: { selfUserId: string; current?
   if (d.creatingUser) { // IR461: the person is created with the membership
     const email = d.inviteEmail.trim();
     if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e["newUser.email"] = t("A valid email address (up to 254 characters)");
-    const n = [...d.inviteName.trim()].length;
+    const n = codePoints(d.inviteName.trim());
     if (n < 1 || n > 120) e["newUser.displayName"] = t("A name of 1–120 characters");
   } else if (!d.userId) e.userId = t("Choose a user");
   if (!d.organizationId) e.organizationId = t("Choose the organization");
@@ -139,7 +140,7 @@ export function memberErrors(d: MemberDraft, ctx: { selfUserId: string; current?
   if (!d.validFrom) e.validFrom = t("Required");
   if (d.validUntil && d.validFrom && d.validUntil <= d.validFrom) e.validUntil = t("Must be after valid from");
   if (d.role === "technician" && d.employment === "external" && !d.validUntil) e.validUntil = t("External technicians need an end date");
-  if ([...d.reason.trim()].length === 0 || d.reason.length > 1000) e.reason = t("A change reason is required (1–1000 characters)");
+  if (codePoints(d.reason.trim()) === 0 || d.reason.length > 1000) e.reason = t("A change reason is required (1–1000 characters)");
   return e;
 }
 

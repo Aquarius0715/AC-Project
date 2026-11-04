@@ -11,7 +11,7 @@ const assign = vi.fn();
 beforeEach(() => {
   assign.mockClear();
   // the page the action runs on; jsdom cannot navigate, so the sign-in redirect is caught here
-  vi.stubGlobal("location", { ...location, pathname: "/admin/units", search: "?customerId=c-1&tab=users", assign });
+  vi.stubGlobal("location", { href: location.href, origin: location.origin, protocol: location.protocol, host: location.host, hostname: location.hostname, port: location.port, hash: location.hash, pathname: "/admin/units", search: "?customerId=c-1&tab=users", assign });
 });
 afterEach(() => {
   cleanup();

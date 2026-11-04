@@ -3,6 +3,7 @@
 // Report periods are Kuala Lumpur business time and say so; review times are in the display time zone (IR297).
 import { klInstant, klLocal, klStamp, one, saving, summaryView, type ApiBaseline, type ApiEnergySummary, type BoundaryId, type SummaryView } from "@ac/web/lib/energy";
 import { EN, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { codePoints } from "@ac/web/lib/text";
 
 const en = translator("en");
 
@@ -86,7 +87,7 @@ export function mrvDraftErrors(d: MRVDraft, t: T = en): Record<string, string> {
   else if (d.from >= d.to) e.period = t("The end must be after the start");
   if (!d.baseline) e.baseline = t("Choose a baseline version");
   if (!d.factor) e.factor = t("Choose an emission factor version");
-  if ([...d.boundary.trim()].length === 0 || d.boundary.length > 500) e.boundary = t("1–500 characters");
+  if (codePoints(d.boundary.trim()) === 0 || d.boundary.length > 500) e.boundary = t("1–500 characters");
   return e;
 }
 
@@ -112,12 +113,12 @@ export function mrvDraftOf(c?: MRVConditions, baseline?: ApiBaseline): MRVDraft 
 export interface FactorDraft { region: string; year: string; kgCO2ePerKWh: string; source: string }
 export function factorErrors(d: FactorDraft, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
-  if ([...d.region.trim()].length === 0 || [...d.region.trim()].length > 120) e.region = t("1–120 characters");
+  if (codePoints(d.region.trim()) === 0 || codePoints(d.region.trim()) > 120) e.region = t("1–120 characters");
   const y = Number(d.year);
   if (!(Number.isInteger(y) && y >= 2000 && y <= 2100)) e.year = t("A year 2000–2100");
   const k = Number(d.kgCO2ePerKWh);
   if (!(d.kgCO2ePerKWh.trim() !== "" && k > 0 && k <= 10)) e.kgCO2ePerKWh = t("Above 0 and at most 10 kgCO₂e/kWh");
-  if ([...d.source.trim()].length === 0 || [...d.source.trim()].length > 500) e.source = t("1–500 characters, stating the demo source");
+  if (codePoints(d.source.trim()) === 0 || codePoints(d.source.trim()) > 500) e.source = t("1–500 characters, stating the demo source");
   return e;
 }
 export const factorInput = (d: FactorDraft, id?: string) => {
