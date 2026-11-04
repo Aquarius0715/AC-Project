@@ -107,7 +107,9 @@ describe("the server-side session store", () => {
   it("refuses a cookie that carries the session itself, an altered cookie and a short ID", async () => {
     const cookie = await createSessionCookie(session());
     const [iv, body] = cookie.split(".", 2);
-    expect([await loadSession(seal(session())), await loadSession(`${iv}.${body.slice(0, -2)}xx`), await loadSession(seal({ sid: "short" })), await loadSession(undefined)])
+    // an altered cookie: its last two characters replaced by others (a cookie that already ends in "xx" gets "yy")
+    const altered = `${iv}.${body.slice(0, -2)}${body.endsWith("xx") ? "yy" : "xx"}`;
+    expect([await loadSession(seal(session())), await loadSession(altered), await loadSession(seal({ sid: "short" })), await loadSession(undefined)])
       .toEqual([null, null, null, null]);
   });
 

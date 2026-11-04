@@ -11,6 +11,7 @@ import {
   type ApiAutomation, type ApiOccurrence, type Caps, type Draft, type ExtraDraft, type RuleCard, type TestRow,
 } from "@ac/web/lib/clientAutomations";
 import { useI18n, useT } from "@ac/web/components/I18n";
+import type { T } from "@ac/web/lib/i18n";
 import { deleteAutomation, saveAutomation, testEvent, updateConsent } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@ac/web/components/ui/dropdown-menu";
@@ -35,17 +36,33 @@ export function AutomationsView({ live }: Readonly<{ live: AutomationsLive }>) {
   return <List live={live} notice={notice} setNotice={setNotice} create={() => { setNotice(null); patch({ automationId: "new" }); }} edit={(id) => { setNotice(null); patch({ automationId: id }); }} />;
 }
 
+// a card's or a status's badge icon per tone (dot for the others)
+const TONE_ICON = new Map<string, "live" | "unsupported">([["ok", "live"], ["warn", "unsupported"]]);
+const CONSENT_TONE = new Map<string, "ok" | "warn">([["ok", "ok"], ["warn", "warn"]]);
+/** The consent card's frame: warned, compact (in the editor) or on the page. */
+function consentBox(tone: string, compact = false): string {
+  if (tone === "warn") return "border-warn bg-warn-soft/60";
+  return compact ? "border-line bg-primary-soft/40" : "border-line bg-surface";
+}
+/** A rule's on/off line: on, disabled by the system (warn) or switched off. */
+function ruleState(enabled: boolean, tone: string): { cls: string; text: string } {
+  if (enabled) return { cls: "text-ok", text: "On" };
+  return tone === "warn" ? { cls: "text-warn", text: "Disabled" } : { cls: "text-muted-foreground", text: "Off" };
+}
 function ConsentCard({ live, compact }: Readonly<{ live: AutomationsLive; compact?: boolean }>) {
   const t = useT();
   const [pending, run] = useAction();
   const c = live.consent;
   const flip = () => c.version !== null && run(() => updateConsent(!c.granted, c.version!), t(c.granted ? "Location consent withdrawn — location automations are off" : "Location consent granted"));
-  const badge = <Badge tone={c.tone === "ok" ? "ok" : (c.tone === "warn" ? "warn" : "muted")} icon={c.granted ? "check" : (c.tone === "warn" ? "unsupported" : "dot")}>{c.title}</Badge>;
+  const badgeIcon = c.tone === "warn" ? "unsupported" : "dot";
+  const badge = <Badge tone={CONSENT_TONE.get(c.tone) ?? "muted"} icon={c.granted ? "check" : badgeIcon}>{c.title}</Badge>;
+  const withdrawText = compact ? "Withdraw" : "Withdraw consent";
+  const grantText = compact ? "Grant" : "Grant consent";
   // the page's one primary action is Create automation; granting is primary only where it is the remedy — location
   // automations turned off by a withdrawal, or the editor of a location automation (IR619)
-  const action = c.version !== null && <Btn size="sm" variant={c.granted || (c.tone !== "warn" && !compact) ? "secondary" : "primary"} disabled={pending} onClick={flip}>{t(c.granted ? (compact ? "Withdraw" : "Withdraw consent") : (compact ? "Grant" : "Grant consent"))}</Btn>;
+  const action = c.version !== null && <Btn size="sm" variant={c.granted || (c.tone !== "warn" && !compact) ? "secondary" : "primary"} disabled={pending} onClick={flip}>{t(c.granted ? withdrawText : grantText)}</Btn>;
   return (
-    <div className={cx("rounded-2xl border p-4", c.tone === "warn" ? "border-warn bg-warn-soft/60" : (compact ? "border-line bg-primary-soft/40" : "border-line bg-surface"))}>
+    <div className={cx("rounded-2xl border p-4", consentBox(c.tone, compact))}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2 text-[13px]"><b className="inline-flex items-center gap-1.5">{!compact && <Icon name="location" />}{t(compact ? "Location consent" : "Location consent — for arrival/departure automations only")}</b>{badge}</div>
         {action}
@@ -80,7 +97,7 @@ function List({ live, notice, setNotice, create, edit }: Readonly<{ live: Automa
               {/* the switch and the buttons beside the text on a wide card, in a row under it on a narrow one */}
               <div className="@container"><div className="flex flex-col gap-3 @md:flex-row @md:items-start @md:justify-between">
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2"><b className="text-[15px]">{c.name}</b><Badge tone="primary" icon={triggerInfo[c.trigger].icon}>{t(triggerInfo[c.trigger].label)}</Badge><Badge tone={c.status.tone} icon={c.status.tone === "ok" ? "live" : (c.status.tone === "warn" ? "unsupported" : "dot")}>{c.status.text}</Badge></div>
+                  <div className="flex flex-wrap items-center gap-2"><b className="text-[15px]">{c.name}</b><Badge tone="primary" icon={triggerInfo[c.trigger].icon}>{t(triggerInfo[c.trigger].label)}</Badge><Badge tone={c.status.tone} icon={TONE_ICON.get(c.status.tone) ?? "dot"}>{c.status.text}</Badge></div>
                   <p className="mt-2 text-sm"><span className="mr-1.5 font-semibold text-muted-foreground">{t("When")}</span>{c.when}</p>
                   {/* the actions, one row each: a schedule's start and end at their own times */}
                   <dl className="mt-2 grid grid-cols-[auto_auto_minmax(0,1fr)] items-baseline gap-x-3 gap-y-1.5 rounded-lg bg-surface2 px-3 py-2 text-sm">
@@ -98,7 +115,7 @@ function List({ live, notice, setNotice, create, edit }: Readonly<{ live: Automa
                 </div>
                 <div className="relative flex items-center justify-between gap-2 border-t border-line pt-3 @md:flex-col @md:items-end @md:justify-start @md:border-0 @md:pt-0">
                   <span className="flex items-center gap-2 text-xs font-semibold">
-                    <span className={c.enabled ? "text-ok" : (c.status.tone === "warn" ? "text-warn" : "text-muted-foreground")}>{t(c.enabled ? "On" : (c.status.tone === "warn" ? "Disabled" : "Off"))}</span>
+                    <span className={ruleState(c.enabled, c.status.tone).cls}>{t(ruleState(c.enabled, c.status.tone).text)}</span>
                     <span title={c.toggle.hint ?? undefined}><Toggle on={c.enabled} disabled={pending || !c.toggle.allowed} onChange={() => { toggle(c); }} label={t(c.enabled ? "Switch {name} off" : "Switch {name} on", { name: c.name })} /></span>
                   </span>
                   <span className="flex gap-2">
@@ -125,6 +142,12 @@ function List({ live, notice, setNotice, create, edit }: Readonly<{ live: Automa
   );
 }
 
+/** Why the event test is not offered: a routine (try it with Demo controls) or unsaved changes; none for a schedule. */
+function eventHint(isSchedule: boolean, isRoutine: boolean, isDirty: boolean, t: T): string | null {
+  if (isSchedule) return null;
+  if (isRoutine) return t("A routine runs at its usual time — try it with Demo controls");
+  return isDirty ? t("Save first — the test runs your saved automations for this AC") : null;
+}
 /** Debounces a value (the schedule preview reads after typing pauses). */
 function useDebounced<T>(value: T, ms: number): T {
   const [v, setV] = useState(value);
@@ -166,8 +189,9 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
     if (!isValid) return;
     run(() => saveAutomation(saveInput(draft), draft.version), t("Automation saved"), (a) => {
       const next = a.kind === "schedule" && a.enabled ? preview.data.find((o) => o.phase === "schedule_start") : undefined;
+      const savedText = a.enabled ? "“{name}” saved · on. Saving sends no command now." : "“{name}” saved · off — switch it on to run it. Saving sends no command now.";
       onDone({ title: t("Automation saved"), text: next ? t("“{name}” saved · next run {when} ({zone}). Saving sends no command now.", { name: a.name, when: runText(next.at, a.timezone, i18n), zone: a.timezone })
-        : t(a.enabled ? "“{name}” saved · on. Saving sends no command now." : "“{name}” saved · off — switch it on to run it. Saving sends no command now.", { name: a.name }) });
+        : t(savedText, { name: a.name }) });
     }, (f) => { setApiError(apiErrors(f.fieldErrors, t)); });
   };
   const runTest = () => {
@@ -179,7 +203,16 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
     if (!rule) return;
     run(() => testEvent(draft.unitId, testFact(draft)), t("Simulated — no command was sent"), (r) => { setTest([eventTest(r.decision ?? undefined, rule.id, new Map(live.rules.map((x) => [x.id, x.name])), ac?.name ?? t("the AC"), actionOf(draft.action), r.at, i18n)]); });
   };
-  const eventTestHint = isSched ? null : draft.trigger === "routine" ? t("A routine runs at its usual time — try it with Demo controls") : isDirty ? t("Save first — the test runs your saved automations for this AC") : null;
+  const eventTestHint = eventHint(isSched, draft.trigger === "routine", isDirty, t);
+  // the schedule's next runs: the preview's first two, its problem, or why there is none yet
+  const nextRuns = () => {
+    if (!isScheduleOk) return <>{t("Fix the schedule to preview")}</>;
+    if (preview.loading) return <>{t("Checking…")}</>;
+    const problem = Object.values(previewError).at(0);
+    if (problem !== undefined) return <span className="text-crit">{problem}</span>;
+    if (runsShown.length === 0) return <>{t("None in the next weeks")}</>;
+    return <>{runsShown.map((r) => <span key={r.start.at} className="block">{runText(r.start.at, draft.timezone, i18n)}{r.end ? ` · ${runClock(r.end.at, draft.timezone, i18n)}` : ""}</span>)}</>;
+  };
   // the action in two parts, each under its own label: the Setting (power, temperature, mode, fan, ventilation) and its
   // Value — side by side when the box is wide enough, stacked on a narrow screen
   const actionSelect = (label: string, key: "startAction" | "endAction" | "action", hint?: string) => {
@@ -307,8 +340,7 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
             {isSched && (
               <div className="mt-3 grid grid-cols-[90px_1fr] gap-2 border-t border-line pt-2 text-xs">
                 <span className="text-muted-foreground">{t("Next runs")}</span>
-                <span>{isScheduleOk ? preview.loading ? t("Checking…") : Object.keys(previewError).length > 0 ? <span className="text-crit">{Object.values(previewError)[0]}</span>
-                  : runsShown.length === 0 ? t("None in the next weeks") : runsShown.map((r) => <span key={r.start.at} className="block">{runText(r.start.at, draft.timezone, i18n)}{r.end ? ` · ${runClock(r.end.at, draft.timezone, i18n)}` : ""}</span>) : t("Fix the schedule to preview")}</span>
+                <span>{nextRuns()}</span>
               </div>
             )}
             <div className="mt-2 flex items-center justify-between gap-2 border-t border-line pt-2 text-xs">

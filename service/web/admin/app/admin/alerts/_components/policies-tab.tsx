@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, EmptyState, Field, Input, ListRow, Modal, SearchSelect, Select, SeverityBadge, TextLink, Toggle, useToast, cx } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
+import { byCount, type T } from "@ac/web/lib/i18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { useOp } from "@ac/web/lib/useOp";
 import { ZONES } from "@ac/web/lib/preferences";
@@ -86,6 +87,19 @@ const demoCandidates: ApiRecipient[] = [
 /** The selected policy, or the owner customer of a new one and the default rule it copies: URL state in API mode, local state in the demo. */
 export interface PolicySel { policyId: string | null; creatingFor: string | null; from: string | null }
 
+/** The editor's status line: problems to fix, a new policy, the unsaved changes, or none. */
+function editorStatus(problems: number, isNew: boolean, changes: string[], t: T): string {
+  if (problems) return byCount(problems, { one: t("1 problem to fix · nothing saved"), many: t("{n} problems to fix · nothing saved", { n: problems }) });
+  if (isNew) return t("New policy · not saved yet");
+  if (changes.length === 0) return t("No unsaved changes");
+  return `${byCount(changes.length, { one: t("1 unsaved change"), many: t("{n} unsaved changes", { n: changes.length }) })} · ${changes.join(", ")}`;
+}
+/** Why no policy is shown: the URL's policy is gone, the owner customer is not active, or there is none. */
+function emptyPolicy(isMissing: boolean, isCreating: boolean, t: T): { title: string; text: string } {
+  if (isMissing) return { title: t("This policy is not in the list"), text: t("It may have been deleted. Pick a policy in the list.") };
+  return isCreating ? { title: t("No such active customer"), text: t("A new policy needs an active owner customer — start it again with + New policy.") }
+    : { title: t("No alert policies"), text: t("Customers have no alert policies yet.") };
+}
 /** The Policies tab (DD-A05 items 7–9, Figma Admin 38:5 / 356:3714, IR345): the policies by customer and the editor of
 the selected one. A new policy (`sel.newFor`, started by “+ New policy”) starts as DD-A05 says (display time zone,
 off, priority 50) and is created by Save policy. Recipients are added from notifications.recipients; Delete policy
@@ -106,9 +120,10 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
   const owner = sel.creatingFor ? customers.find((c) => c.id === sel.creatingFor) ?? null : null;
   const isMissing = !sel.creatingFor && !!sel.policyId && pols.every((x) => x.id !== sel.policyId);
   const fromRule = sel.from ? pols.find((x) => x.kind === "default_alert")?.rules.find((r) => r.ruleKey === sel.from) : undefined;
-  const p = owner ? blankPolicyDraft(owner, live?.timezone ?? "Asia/Kuala_Lumpur", fromRule)
-    : (sel.creatingFor || isMissing ? null : pols.find((x) => x.id === sel.policyId) ?? pols.find((x) => x.kind === "alert") ?? pols[0] ?? null);
-  const key = owner ? `new:${owner.id}:${fromRule?.ruleKey ?? ""}` : (p ? `${p.id}@${String(p.version)}` : "");
+  const shown = sel.creatingFor || isMissing ? null : pols.find((x) => x.id === sel.policyId) ?? pols.find((x) => x.kind === "alert") ?? pols[0] ?? null;
+  const p = owner ? blankPolicyDraft(owner, live?.timezone ?? "Asia/Kuala_Lumpur", fromRule) : shown;
+  const savedKey = p ? `${p.id}@${String(p.version)}` : "";
+  const key = owner ? `new:${owner.id}:${fromRule?.ruleKey ?? ""}` : savedKey;
   const [draft, setDraft] = useState<AdminPolicy | null>(p);
   const [draftOf, setDraftOf] = useState(key);
   const [tried, setTried] = useState(false);
@@ -125,9 +140,8 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
   const problems = Object.keys(errors).length;
   const isNew = !!draft && !draft.id;
   const changes = draft && p && !isNew ? policyChanges(draft, p, t) : [];
-  const status = tried && problems ? t(problems === 1 ? "1 problem to fix · nothing saved" : "{n} problems to fix · nothing saved", { n: problems })
-    : isNew ? t("New policy · not saved yet")
-    : changes.length > 0 ? `${t(changes.length === 1 ? "1 unsaved change" : "{n} unsaved changes", { n: changes.length })} · ${changes.join(", ")}` : t("No unsaved changes");
+  const status = editorStatus(tried ? problems : 0, isNew, changes, t);
+  const emptyText = emptyPolicy(isMissing, !!sel.creatingFor, t);
   // the unit notifications.recipients and .preview are asked about: one the policy is attached to, else one of its
   // customer's; the demo test runs on a unit the saved policy is attached to
   const units = live?.units ?? demoUnits;
@@ -188,9 +202,10 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
             </div>
           ))}
         </Card>
-        {draft ? (draft.kind === "default_alert" && p ? (
+        {draft?.kind === "default_alert" && p && (
           <DefaultPolicyEditor p={p} customers={customers} units={units} canWrite={canWrite} copyFor={copyFor} onCopy={onCopy} demo={!live} />
-        ) : (
+        )}
+        {draft && !(draft.kind === "default_alert" && p) && (
           <Card
             title={<span className="inline-flex flex-wrap items-center gap-2">{draft.name.trim() || t("New alert policy")}<Badge tone={isNew ? "warn" : "muted"}>{isNew ? t("Not saved") : t("Policy v{n}", { n: draft.version })}</Badge></span>}
             sub={[isNew ? t("new") : draft.id, draft.customerName, draft.madeBy && t("made by {name}", { name: draft.madeBy })].filter(Boolean).join(" · ")}
@@ -249,11 +264,10 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
               </div>
             )}
           </Card>
-        )) : (
+        )}
+        {!draft && (
           <Card title={t("Alert policy")}>
-            <EmptyState title={t(isMissing ? "This policy is not in the list" : (sel.creatingFor ? "No such active customer" : "No alert policies"))}>
-              {t(isMissing ? "It may have been deleted. Pick a policy in the list." : (sel.creatingFor ? "A new policy needs an active owner customer — start it again with + New policy." : "Customers have no alert policies yet."))}
-            </EmptyState>
+            <EmptyState title={emptyText.title}>{emptyText.text}</EmptyState>
           </Card>
         )}
       </div>
@@ -294,11 +308,11 @@ function RecipientPicker({ unitId, customer, chosen, demo, onClose, onAdd }: Rea
   const options = cands.data.filter((r) => !chosen.includes(r.id));
   const add = () => { onAdd(options.filter((r) => pick.includes(r.id)).map((r) => ({ id: r.id, label: r.displayLabel, role: recipientRole(r.role, t) }))); };
   return (
-    <Modal open onClose={onClose} title={t("Add recipients")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pick.length === 0} onClick={add}>{pick.length > 0 ? t(pick.length === 1 ? "Add 1 recipient" : "Add {n} recipients", { n: pick.length }) : t("Add recipients")}</Btn></>}>
-      {unitId ? cands.loading ? <p className="text-[13px] text-muted-foreground">{t("Loading the recipients…")}</p>
-        : cands.error ? <p className="text-[13px] text-crit">{t("The recipients could not be loaded — close the dialog and try again.")}</p>
-        : options.length === 0 ? <EmptyState title={t("Everyone is already a recipient")}>{t("Only {customer}’s users and HQ staff who read alerts can be recipients.", { customer })}</EmptyState>
-        : (
+    <Modal open onClose={onClose} title={t("Add recipients")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pick.length === 0} onClick={add}>{byCount(pick.length, { none: t("Add recipients"), one: t("Add 1 recipient"), many: t("Add {n} recipients", { n: pick.length }) })}</Btn></>}>
+      {unitId && cands.loading && <p className="text-[13px] text-muted-foreground">{t("Loading the recipients…")}</p>}
+      {unitId && !cands.loading && cands.error && <p className="text-[13px] text-crit">{t("The recipients could not be loaded — close the dialog and try again.")}</p>}
+      {unitId && !cands.loading && !cands.error && options.length === 0 && <EmptyState title={t("Everyone is already a recipient")}>{t("Only {customer}’s users and HQ staff who read alerts can be recipients.", { customer })}</EmptyState>}
+      {unitId && !cands.loading && !cands.error && options.length > 0 && (
           <div role="group" aria-label={t("Recipients")} className="flex flex-col gap-2">
             {options.map((r) => (
               <div key={r.id} className="rounded-xl border border-line px-3 py-2">
@@ -307,8 +321,8 @@ function RecipientPicker({ unitId, customer, chosen, demo, onClose, onAdd }: Rea
               </div>
             ))}
           </div>
-        )
-        : <EmptyState title={t("{customer} has no units yet", { customer })}>{t("Recipients are the people allowed to see the customer’s units. Add a unit first.")}</EmptyState>}
+        )}
+      {!unitId && <EmptyState title={t("{customer} has no units yet", { customer })}>{t("Recipients are the people allowed to see the customer’s units. Add a unit first.")}</EmptyState>}
       <p className="text-[11px] text-muted-foreground">{t("Only {customer}’s users and HQ staff who read alerts can be recipients.", { customer })}</p>
     </Modal>
   );
