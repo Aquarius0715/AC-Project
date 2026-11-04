@@ -1,6 +1,8 @@
 # End-to-end tests of the four web apps against the whole compose stack (IR252): the stack is built and started with
-# a fresh demo seed, then Playwright runs every spec. Separate from ci.yml because it takes the longest; it runs in
-# parallel with it on every push to main, on pull requests and by hand.
+# a fresh demo seed, then Playwright runs every spec. It takes the longest, 20 to 25 minutes on the only runner, so it
+# runs by hand (Actions > E2E > Run workflow, on any branch) and every night on main at 02:00 in the lab (WIB, 19:00
+# UTC), not on each push and pull request (DEC-95, IR632). A failed night is mailed by GitHub; the specs also run
+# locally with npm run e2e against the development stack.
 #
 # It runs on the lab server's self-hosted runner (label ac-test, DEC-94), beside the server's own services and the shared
 # test environment: the stack is the compose project ac-e2e, its apps on 127.0.0.1:3300–3303 (Grafana has 3000), and its
@@ -9,12 +11,9 @@
 # the dependencies' code never runs on the server itself, and the stack is removed at the end. One run at a time.
 name: E2E
 
-on:   # not for documentation-only changes: ci.yml validates those
-  push:
-    branches: [main]
-    paths-ignore: ["docs/**", "**/*.md"]
-  pull_request:
-    paths-ignore: ["docs/**", "**/*.md"]
+on:
+  schedule:
+    - cron: "0 19 * * *" # 02:00 WIB, when the lab server is idle
   workflow_dispatch:
 
 permissions:

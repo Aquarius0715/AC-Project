@@ -188,13 +188,13 @@ Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`,
 
 ## 6. CI pipeline
 
-As built (GitHub Actions, IR550), every push to `main` and every pull request runs two workflows, and a test tag a third (`deploy-test.yml`, below). All three run on the lab server, the repository's self-hosted runner (label `ac-test`, DEC-94, DEC-95, IR632), so the private repository's Actions minutes stay unused:
+As built (GitHub Actions, IR550), every push to `main` and every pull request runs `ci.yml`. `e2e.yml` runs every night on `main` and by hand, and a test tag runs `deploy-test.yml` (below). All three run on the lab server, the repository's self-hosted runner (label `ac-test`, DEC-94, DEC-95, IR632), so the private repository's Actions minutes stay unused:
 - `.github/workflows/ci.yml`, seven parallel jobs:
   - `go-lint`: gofmt, vet and golangci-lint (`make lint`: every linter of `.golangci.yml` at 0 issues), and the generated catalog, routes, contracts and Swagger must be current;
   - `go-test` and `go-test-cluster`: the Go suites on a fresh PostgreSQL test database, the second against the split services;
   - `web-lint`, `web-typecheck` and `web-test`: ESLint, TypeScript and Vitest of the four apps and the shared package;
   - `docs`: the document validators.
-- `.github/workflows/e2e.yml`: the compose stack (`--profile full`, built from the commit one image at a time, with random broker keys and client secrets), 30 days of mock fleet history and the Playwright suite. Changes to documentation only skip it.
+- `.github/workflows/e2e.yml`: the compose stack (`--profile full`, built from the commit one image at a time, with random broker keys and client secrets), 30 days of mock fleet history and the Playwright suite. It takes 20 to 25 minutes on the only runner, so it runs every night on `main` at 02:00 in the lab (WIB, 19:00 UTC) and by hand on any branch, not on each push. GitHub mails a failed night.
   - The stack is the compose project `ac-e2e`, beside the server's own services and the test environment. Its apps listen on `127.0.0.1:3300–3303`, because Grafana has 3000. Its stores and brokers are not published (`deploy/test/compose.test.yaml`), because the server's PostgreSQL has 5432 and the real broker 1883. Keycloak (8081) and Mailpit (8025), which the specs open, keep their ports.
   - Playwright runs in its own image as the runner's user, and the stack is removed at the end. One run at a time.
 

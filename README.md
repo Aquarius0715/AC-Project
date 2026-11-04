@@ -41,7 +41,7 @@ of access (DEC-86, DEC-89, DEC-92; what the nodes must send: backend architectur
 Shared test environment (DEC-93, DEC-94): pushing a tag such as `test1.0.0r2` on a commit of `main` runs the workflow
 "Test deployment" on the lab server, the real nodes' broker's machine, which is the repository's self-hosted runner. Once
 the commit's CI passed it builds the images there and starts them, with the build and deploy logs on the Actions tab. CI
-and E2E run on that runner too (DEC-95).
+runs on that runner too on every push, and E2E every night and by hand (DEC-95).
 The apps open at `http://<server>:3200` (customer), `:3201` (partner), `:3202` (technician) and `:3203` (HQ), Keycloak at
 `:8281` and Mailpit at `:8225`. The server's one-time set-up is `bash deploy/test/setup.sh` from a checkout, then the
 runner's registration (container design §6).

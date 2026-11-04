@@ -8959,6 +8959,7 @@ A private repository has 2,000 free Actions minutes a month on GitHub's runners,
    - **The realm.** `deploy/test/realm.py` writes the realm with these URLs and random client secrets.
    - **Playwright.** It runs in `mcr.microsoft.com/playwright:v1.64.1-noble` as the runner's user, on the host network, with its npm cache kept in `~/.cache/ac-e2e-npm`.
    - **Teardown.** The stack is removed at the end. One run at a time.
+   - **When.** It takes 20 to 25 minutes on the only runner, so it runs every night on `main` at 02:00 in the lab (WIB, 19:00 UTC) and by hand on any branch, no longer on each push and pull request. The user asked whether to drop E2E, and chose this, the recommendation, over running it by hand only or deleting it. GitHub mails a failed night, and the specs still run locally (`npm run e2e`).
 3. **The deployment no longer waits for CI on the runner.** A deployment job that waited for CI would hold the only runner that CI needs. `ci_gate.py` with 0 minutes reads once, and exits 3 while CI still runs.
    - When the tag is pushed, it deploys at once if CI passed on the commit already; otherwise the run ends with a notice.
    - When CI completes on a push to main, `deploy-test.yml` also runs (`workflow_run`). It deploys the newest test tag on that commit unless that tag is deployed already.
