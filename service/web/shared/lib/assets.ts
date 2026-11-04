@@ -48,6 +48,12 @@ restriction.read (`restrictions` null) the contracts' activeRestrictionIds still
 unknown ("active", IR319). */
 export interface Standing { plans: Profile[]; contracts: number; contractUnits: number; overdue: number; overdueAmount: string | null; restriction: { id: string; state: string; contractId: string } | null }
 const restrictionRank: Record<string, number> = { applied: 0, requested: 1, release_requested: 2, scheduled: 3 };
+/** Without restriction.read a contract's activeRestrictionIds still tell that one is active (state unknown, IR319). */
+function unknownRestriction(mine: ApiContractLite[], restrictions: ApiRestrictionLite[] | null): Standing["restriction"] {
+  if (restrictions !== null) return null;
+  const k = mine.find((x) => x.activeRestrictionIds.length > 0);
+  return k ? { id: k.activeRestrictionIds[0], state: "active", contractId: k.id } : null;
+}
 export function standing(customerId: string, contracts: ApiContractLite[], overdue: ApiInvoiceLite[], restrictions: ApiRestrictionLite[] | null, now: Date): Standing {
   const t = now.getTime();
   const mine = contracts.filter((k) => k.customerId === customerId);
@@ -58,8 +64,7 @@ export function standing(customerId: string, contracts: ApiContractLite[], overd
   return {
     plans: [...new Set(current.map((k) => k.planType))], contracts: current.length, contractUnits: new Set(current.flatMap((k) => k.unitIds)).size, overdue: due.length,
     overdueAmount: due.length > 0 ? amount(due.reduce((n, i) => n + i.amountMinor, 0), due[0].currency) : null,
-    restriction: r ? { id: r.id, state: r.state, contractId: r.contractId! }
-      : (restrictions === null ? mine.filter((k) => k.activeRestrictionIds.length).map((k) => ({ id: k.activeRestrictionIds[0], state: "active", contractId: k.id }))[0] ?? null : null),
+    restriction: r ? { id: r.id, state: r.state, contractId: r.contractId! } : unknownRestriction(mine, restrictions),
   };
 }
 export interface Mark { label: string; tone: "crit" | "warn" | "ok" | "muted"; icon?: IconName }
@@ -102,8 +107,8 @@ export function customerRows(cs: ApiCustomerRow[], orgs: ApiOrgRow[], ps: ApiPro
 }
 export type ContractFilter = "all" | "overdue" | "restricted" | "good" | "none";
 export function contractMatch(f: ContractFilter, r: CustomerRow): boolean {
-  const s = r.standing;
   if (f === "all") return true;
+  const s = r.standing;
   if (!s || r.status === "inactive") return false;
   if (f === "overdue") return s.overdue > 0;
   if (f === "restricted") return !!s.restriction;
@@ -306,12 +311,20 @@ export interface ApiCustomerPolicy {
   ruleSettings?: { ruleKey: string; customerId: string; enabled: boolean; version: number; reason: string | null; updatedAt: string }[];
 }
 const sevLabel: Record<Severity, string> = { critical: "Critical", warning: "Warning", normal: "Info" };
-const duration = (s: number, t: T) => (s % 3600 === 0 && s >= 3600 ? t("{n} h", { n: s / 3600 }) : (s % 60 === 0 && s >= 120 ? t("{n} min", { n: s / 60 }) : t("{n} s", { n: s })));
+function duration(s: number, t: T): string {
+  if (s % 3600 === 0 && s >= 3600) return t("{n} h", { n: s / 3600 });
+  if (s % 60 === 0 && s >= 120) return t("{n} min", { n: s / 60 });
+  return t("{n} s", { n: s });
+}
 /** The short weekday name of ISO day 1–7 (Monday first) in the user's language: 1 Jan 2024 was a Monday. */
 const dayName = (x: number, locale: Locale) => new Date(Date.UTC(2024, 0, x)).toLocaleDateString(intlTag(locale), { weekday: "short", timeZone: "UTC" });
 const days = (w: number[], i: I18n) => {
-  const d = [...w].toSorted((a, b) => a - b).join(',');
-  return w.length === 7 ? "" : d === "1,2,3,4,5" ? `${i.t("weekdays")} ` : d === "6,7" ? `${i.t("weekends")} ` : `${[...w].toSorted((a, b) => a - b).map((x) => dayName(x, i.display.locale)).join(", ")} `;
+  if (w.length === 7) return "";
+  const sorted = [...w].toSorted((a, b) => a - b);
+  const d = sorted.join(",");
+  if (d === "1,2,3,4,5") return `${i.t("weekdays")} `;
+  if (d === "6,7") return `${i.t("weekends")} `;
+  return `${sorted.map((x) => dayName(x, i.display.locale)).join(", ")} `;
 };
 /** "Temperature ≥ 30 °C for 60 s, weekdays 08:00–19:00 → Warning", in the display language; the window's hours are the policy's local hours. */
 export function conditionText(p: { metric?: string; operator?: Operator; threshold?: number; durationSeconds?: number; activeWindow?: ApiCustomerPolicy["activeWindow"]; severity?: Severity }, i: I18n = EN): string {
@@ -330,7 +343,8 @@ export function policyLines(ps: ApiCustomerPolicy[], customerUnits: string[], ow
   const { t } = i;
   const mine = new Set(customerUnits);
   return ps.filter((p): p is ApiCustomerPolicy & { kind: "alert" | "default_alert" } => p.kind === "alert" || p.kind === "default_alert")
-    .toSorted((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : (a.kind === "default_alert" ? -1 : 1)))
+    // the default policy first, then by name
+    .toSorted((a, b) => Number(b.kind === "default_alert") - Number(a.kind === "default_alert") || a.name.localeCompare(b.name))
     .map((p) => {
       return p.kind === "default_alert"
         ? { id: p.id, version: p.version, kind: p.kind, name: p.name === "Default policy" ? t("Default policy") : p.name, type: t("Default"), condition: t((p.rules?.length ?? 0) === 1 ? "1 rule · {on} on for this customer" : "{n} rules · {on} on for this customer", { n: p.rules?.length ?? 0, on: defaultRules(p, i).filter((r) => r.enabled).length }), madeBy: t("HQ (template)"), units: mine.size, enabled: p.enabled }
@@ -342,8 +356,10 @@ export function defaultRules(p: ApiCustomerPolicy, i: I18n = EN): RuleLine[] {
   const { t } = i;
   return (p.rules ?? []).map((r) => {
     const s = p.ruleSettings?.find((x) => x.ruleKey === r.ruleKey);
-    const since = s ? t(s.enabled ? "On since {date}" : "Off since {date}", { date: showDate(s.updatedAt, i.display) }) : null;
-    return { ruleKey: r.ruleKey, name: r.name, condition: conditionText(r, i), enabled: s?.enabled ?? true, version: s?.version ?? 0, note: since ? `${since}${s?.reason ? ` · ${s.reason}` : ""}` : null };
+    const sinceText = s?.enabled ? "On since {date}" : "Off since {date}";
+    const since = s ? t(sinceText, { date: showDate(s.updatedAt, i.display) }) : null;
+    const reason = s?.reason ? ` · ${s.reason}` : "";
+    return { ruleKey: r.ruleKey, name: r.name, condition: conditionText(r, i), enabled: s?.enabled ?? true, version: s?.version ?? 0, note: since ? `${since}${reason}` : null };
   });
 }
 
@@ -364,6 +380,11 @@ export interface ClientUserRow {
   revoked: boolean; // HQ ended the access: the owner cannot change, enable or re-add the user (IR508)
 }
 const channelLabel: Record<Channel, string> = { inApp: "In-app", email: "Email", whatsapp: "WhatsApp" };
+/** When a user last signed in: in the user's display settings when known, else Kuala Lumpur time. */
+function signInText(at: string | null, i?: I18n): string {
+  if (!at) return "—";
+  return i ? showTime(at, i.display) : klStamp(at);
+}
 /** Rows by name; the last active owner is marked because it cannot be demoted, disabled or removed (CONFLICT). The
 customer's Users page (IR267) and HQ's register (IR293) pass their display: the invite day and the last sign-in in
 the user's time zone. */
@@ -374,7 +395,7 @@ export function clientUserRows(us: ApiClientUser[], who: (membershipId: string) 
     return {
       id: u.id, version: u.version, email: u.email, name: u.displayName, role: u.clientRole, status: u.status,
       sub: u.displayName ? u.email : t("invited {date} by {who}", { date: i ? showDate(u.invitedAt, i.display) : klDate(u.invitedAt), who: who(u.invitedByMembershipId) }),
-      lastSignIn: u.lastSignInAt ? (i ? showTime(u.lastSignInAt, i.display) : klStamp(u.lastSignInAt)) : "—",
+      lastSignIn: signInText(u.lastSignInAt, i),
       channels: u.status === "active" && u.allowedChannels.length > 0 ? u.allowedChannels.map((c) => t(channelLabel[c])).join(" · ") : "—",
       lastOwner: u.clientRole === "owner" && u.status === "active" && owners === 1, you: !!self && u.membershipId === self, membershipId: u.membershipId, revoked: !!u.revokedAt,
     };
@@ -398,6 +419,21 @@ export interface CoverageRow {
   contractIds: string[]; contracts: string; status: CoverageStatus; statusText: string;
 }
 const dayMs = 86_400_000;
+/** A unit's cover in words: contract, warranty, ending soon, or none. */
+function coverageText(c: ApiCoverage, days: number | null, t: T): string {
+  switch (c.status) {
+    case "contract": { return t("Covered by contract"); }
+    case "under_warranty": { return t("Under warranty"); }
+    case "expiring": { return t("Ends in {n} d · no contract", { n: days ?? 0 }); }
+    default: { return t(c.warrantyEndsAt ? "Warranty ended · no contract" : "No warranty · no contract"); }
+  }
+}
+/** The soonest warranty end first, units without one last; then by unit name. */
+function byWarrantyEnd(a: { endsAt: string | null; unit: string }, b: { endsAt: string | null; unit: string }): number {
+  if (a.endsAt === b.endsAt) return a.unit.localeCompare(b.unit);
+  if (a.endsAt === null) return 1;
+  return b.endsAt === null ? -1 : a.endsAt.localeCompare(b.endsAt);
+}
 /** One row per unit with its warranty end (a Kuala Lumpur day, in the user's language; `endsDate` YYYY-MM-DD for the
 CSV) and the covering contracts. */
 export function coverageRows(cs: ApiCoverage[], x: { unit: (id: string) => { name: string; place: string } | undefined; customer: (id: string) => string; model: (id: string) => string; contract: (id: string) => string }, now: Date, i: I18n = EN): CoverageRow[] {
@@ -405,8 +441,7 @@ export function coverageRows(cs: ApiCoverage[], x: { unit: (id: string) => { nam
   return cs.map((c) => {
     const u = x.unit(c.unitId);
     const days = c.warrantyEndsAt ? Math.ceil((Date.parse(c.warrantyEndsAt) - now.getTime()) / dayMs) : null;
-    const statusText = c.status === "contract" ? t("Covered by contract") : c.status === "under_warranty" ? t("Under warranty")
-      : c.status === "expiring" ? t("Ends in {n} d · no contract", { n: days ?? 0 }) : t(c.warrantyEndsAt ? "Warranty ended · no contract" : "No warranty · no contract");
+    const statusText = coverageText(c, days, t);
     return {
       unitId: c.unitId,
       unit: u?.name ?? c.unitId.slice(0, 8),
@@ -423,7 +458,7 @@ export function coverageRows(cs: ApiCoverage[], x: { unit: (id: string) => { nam
       days,
       statusText,
     };
-  }).toSorted((a, b) => (a.endsAt === b.endsAt ? a.unit.localeCompare(b.unit) : a.endsAt === null ? 1 : b.endsAt === null ? -1 : a.endsAt.localeCompare(b.endsAt)));
+  }).toSorted(byWarrantyEnd);
 }
 /** KPI tiles (Figma 02 warranty): under warranty (any unit whose warranty still runs), ending within 90 / 30 days, no coverage, contracts. */
 export function coverageKpis(rows: CoverageRow[], t: T = en) {

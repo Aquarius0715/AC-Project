@@ -40,13 +40,13 @@ export function durationText(s: number): string {
   if (s >= 60 && s % 60 === 0) return `${String(s / 60)} min`;
   return `${String(s)} s`;
 }
-/** “Room temperature ≥ 30 °C for 60 s”, “No heartbeat for 15 min”. */
 /** The unit after a threshold: " %", " cycles / h", " °C" …, or nothing. */
 function unitSuffix(unit: string): string {
   if (unit === "%") return " %";
   if (unit === "cycles/h") return " cycles / h";
   return unit ? ` ${unit}` : "";
 }
+/** “Room temperature ≥ 30 °C for 60 s”, “No heartbeat for 15 min”. */
 export function conditionText(c: { metric: string; operator: Operator; threshold: number; durationSeconds: number }, t: T = en): string {
   if (c.metric === "heartbeat_gap") return t("No heartbeat for {n} min", { n: c.threshold });
   const unit = metricUnit[c.metric] ?? "";

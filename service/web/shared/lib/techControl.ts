@@ -45,23 +45,43 @@ export function actionCode(a: CommandAction): string {
   }
 }
 /** A test run's start or end action: “Power ON” in words, the other settings as their code. */
-export const actionWord = (a: UnitAction, t: T = en) => (a.kind === "set_power" ? t(a.power ? "Power ON" : "Power OFF") : actionCode(a));
+export function actionWord(a: UnitAction, t: T = en): string {
+  if (a.kind !== "set_power") return actionCode(a);
+  return t(a.power ? "Power ON" : "Power OFF");
+}
 
 /** One history row: what was sent, its device outcome and the badge. Test-run commands name their run. */
 export interface HistoryRow { id: string; at: string; title: string; sub: string; badge: { text: string; tone: "ok" | "warn" | "crit" | "muted" | "primary" }; run: boolean }
+function runTitle(run: ApiRun, isStart: boolean, t: T): string {
+  return isStart ? t("test run start ({action}, {n} min)", { action: actionWord(run.startAction, t), n: run.durationMinutes }) : t("test run end ({action})", { action: actionWord(run.endAction, t) });
+}
+/** What became of a command: acknowledged when, rejected (with the device's code), no response, cancelled or waiting. */
+function commandOutcome(c: ApiCommandRow, i: I18n): string {
+  const { t } = i;
+  switch (c.status) {
+    case "acknowledged": { return t("acknowledged {time}", { time: clock(c.acknowledgedAt, i) }); }
+    case "failed": { return c.failureCode ? t("rejected by the device ({code})", { code: c.failureCode }) : t("rejected by the device"); }
+    case "expired": { return t("no device response (expired)"); }
+    case "cancelled": { return t("cancelled"); }
+    default: { return t("waiting for the device"); }
+  }
+}
+const COMMAND_BADGE = new Map<string, { text: string; tone: "ok" | "crit" | "muted" }>([
+  ["acknowledged", { text: "Acked", tone: "ok" }], ["failed", { text: "Rejected", tone: "crit" }], ["expired", { text: "No response", tone: "crit" }], ["cancelled", { text: "Cancelled", tone: "muted" }],
+]);
+function commandBadge(status: string, t: T): HistoryRow["badge"] {
+  const b = COMMAND_BADGE.get(status);
+  return b ? { text: t(b.text), tone: b.tone } : { text: t("Waiting"), tone: "warn" };
+}
 export function historyRows(cs: ApiCommandRow[], runs: ApiRun[], i: I18n = EN): HistoryRow[] {
   const { t } = i;
   return cs.map((c) => {
     const run = runs.find((r) => r.startCommandId === c.id || r.endCommandId === c.id);
     const isStart = !!run && run.startCommandId === c.id;
-    const title = run ? (isStart ? t("test run start ({action}, {n} min)", { action: actionWord(run.startAction, t), n: run.durationMinutes }) : t("test run end ({action})", { action: actionWord(run.endAction, t) })) : actionCode(c.action);
-    const outcome = c.status === "acknowledged" ? t("acknowledged {time}", { time: clock(c.acknowledgedAt, i) })
-      : c.status === "failed" ? (c.failureCode ? t("rejected by the device ({code})", { code: c.failureCode }) : t("rejected by the device"))
-      : c.status === "expired" ? t("no device response (expired)") : t(c.status === "cancelled" ? "cancelled" : "waiting for the device");
+    const title = run ? runTitle(run, isStart, t) : actionCode(c.action);
+    const outcome = commandOutcome(c, i);
     const ends = isStart && run?.state === "running" && run.endAt ? ` · ${t("ends {time}", { time: clock(run.endAt, i) })}` : "";
-    const badge = isStart && run?.state === "running" ? { text: t("Running"), tone: "primary" as const }
-      : c.status === "acknowledged" ? { text: t("Acked"), tone: "ok" as const } : c.status === "failed" ? { text: t("Rejected"), tone: "crit" as const }
-      : c.status === "expired" ? { text: t("No response"), tone: "crit" as const } : c.status === "cancelled" ? { text: t("Cancelled"), tone: "muted" as const } : { text: t("Waiting"), tone: "warn" as const };
+    const badge = isStart && run?.state === "running" ? { text: t("Running"), tone: "primary" as const } : commandBadge(c.status, t);
     return { id: c.id, at: clock(c.requestedAt, i), sub: `${c.id.slice(0, 8)} · ${outcome}${ends}`, run: !!run, title, badge };
   });
 }
@@ -103,12 +123,14 @@ export function stateTiles(d: { observedState: { power: boolean | null; celsius:
   latestMeasurements: { metric: string; value: number | null; quality: string }[] }, t: T = en): { label: string; value: string; warn?: boolean }[] {
   const o = d.observedState;
   const room = d.latestMeasurements.find((m) => m.metric === "temperature");
+  const powerText = o.power ? "On" : "Off";
+  const roomQuality = !room || room.quality === "valid" ? "" : ` (${t(QUALITY[room.quality] ?? room.quality)})`;
   return [
-    { label: t("Power"), value: o.power === null ? t("Unknown") : t(o.power ? "On" : "Off") },
+    { label: t("Power"), value: t(o.power === null ? "Unknown" : powerText) },
     { label: t("Mode"), value: o.mode ? word(o.mode, MODE_LABEL, t) : "—" },
     { label: t("Setpoint"), value: o.celsius === null ? "—" : `${String(o.celsius)} °C` },
     { label: t("Fan"), value: o.fanLevel ? word(o.fanLevel, FAN_LABEL, t) : "—" },
-    { label: t("Room"), value: room && room.value !== null ? `${airNumber("temperature", room.value)} °C${room.quality === "valid" ? "" : ` (${t(QUALITY[room.quality] ?? room.quality)})`}` : "—", warn: !!room && room.value !== null && room.value >= 30 },
+    { label: t("Room"), value: room && room.value !== null ? `${airNumber("temperature", room.value)} °C${roomQuality}` : "—", warn: !!room && room.value !== null && room.value >= 30 },
   ];
 }
 export const observedText = (iso: string | null, i: I18n = EN) => (iso ? i.t("observed {time}", { time: clock(iso, i) }) : i.t("no observation yet"));
@@ -130,7 +152,8 @@ export function capabilityText(d: Pick<ApiUnitDetail, "capabilities" | "capabili
 /** The active restriction in words: none, a minimum setpoint or power off only. */
 export function restrictionText(d: Pick<ApiUnitDetail, "effectiveControlPolicy">, t: T = en): string | null {
   const p = d.effectiveControlPolicy.state === "restricted" ? d.effectiveControlPolicy.policy : null;
-  return p ? (p.kind === "temperature_limit" ? t("min {celsius} °C", { celsius: p.minimumCoolingSetpoint }) : t("power off only")) : null;
+  if (!p) return null;
+  return p.kind === "temperature_limit" ? t("min {celsius} °C", { celsius: p.minimumCoolingSetpoint }) : t("power off only");
 }
 const BLOCKED: Record<string, string> = { "control.reconciliation_required": "the unit must be reconciled after a restriction" };
 /** Why control is blocked now, in words (controlAvailability). */
