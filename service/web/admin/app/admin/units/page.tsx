@@ -25,6 +25,7 @@ import {
 import { UnitsDemo } from "./_components/units-demo";
 import { UnitsView, type CustomerLive, type UnitLive, type UnitsLive } from "./_components/units-view";
 import { queryReader } from "@ac/web/lib/searchParams";
+import { orNull } from "@ac/web/lib/promises";
 
 interface Audit { occurredAt: string; actorId: string; reason: string | null }
 interface JobForClaim { projection: "detail"; id: string; version: number; type: string; unitId: string; completedAt: string | null; costs: { kind: "estimate" | "actual"; amountMinor: number; currency: Currency }[]; reportRefs: { reportId: string; reportVersion: number }[] }
@@ -208,10 +209,10 @@ async function warrantyLive(coverage: ApiCoverage[], x: { has: (...p: string[]) 
   if (x.has("job.read")) {
     const ids = [...new Set(coverage.flatMap((c) => c.claimableJobIds))];
     const candidates = await Promise.all(ids.map(async (jobId) => {
-      const j = await coreOp<JobForClaim>("jobs.get", { jobId }).catch(() => null);
+      const j = await orNull(coreOp<JobForClaim>("jobs.get", { jobId }));
       if (!j) return null;
       const ref = j.reportRefs.at(-1);
-      const r = ref ? await coreOp<Report>("reports.get", { jobId, reportId: ref.reportId, reportVersion: ref.reportVersion }).catch(() => null) : null;
+      const r = ref ? await orNull(coreOp<Report>("reports.get", { jobId, reportId: ref.reportId, reportVersion: ref.reportVersion })) : null;
       return claimCandidate(j, r?.parts ?? [], unit.get(j.unitId)?.displayName ?? j.unitId.slice(0, 8), x.i);
     }));
     claims = candidates.filter((c): c is ClaimCandidate => !!c);

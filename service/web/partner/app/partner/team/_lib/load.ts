@@ -46,9 +46,8 @@ export async function loadTeam(sp: TeamParams) {
   const shown = listed(members, q, nowMs);
   const [capacity, booked, certs, units, unavailable] = await Promise.all([
     Promise.all(dates.map((date) => optional(coreItems<ApiCapacity>("members.capacity", { date, query: { limit: 100 } }), []))),
-    Promise.all(current.map((m) => optional(coreOp<Page<ApiPartnerJob>>("jobs.list", { filters: { membershipId: m.id }, limit: 100 }), { items: [], total: 0 })
-      .then((r) => r.items.flatMap((j): (TeamJob & { unitId: string })[] => (j.projection === "summary" && j.scheduledSlot && j.status !== "completed" && j.status !== "cancelled" // completion releases the assignment (IR234)
-        ? [{ jobId: j.id, short: j.id.slice(0, 8), technicianId: m.id, slot: j.scheduledSlot, text: showSpan(j.scheduledSlot.startAt, j.scheduledSlot.endAt, display), unitId: j.unitId }] : []))))),
+    Promise.all(current.map(async (m) => { const r = await optional(coreOp<Page<ApiPartnerJob>>("jobs.list", { filters: { membershipId: m.id }, limit: 100 }), { items: [], total: 0 }); return r.items.flatMap((j): (TeamJob & { unitId: string })[] => (j.projection === "summary" && j.scheduledSlot && j.status !== "completed" && j.status !== "cancelled" // completion releases the assignment (IR234)
+        ? [{ jobId: j.id, short: j.id.slice(0, 8), technicianId: m.id, slot: j.scheduledSlot, text: showSpan(j.scheduledSlot.startAt, j.scheduledSlot.endAt, display), unitId: j.unitId }] : [])); })),
     optional(coreAll<ApiCert>("certificates.list"), [] as ApiCert[]),
     optional(coreAll<{ id: string; displayName: string; serviceScope?: string[] }>("units.list"), []),
     optional(coreAll<ApiUnavailability>("members.unavailability"), [] as ApiUnavailability[]),

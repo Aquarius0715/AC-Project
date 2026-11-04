@@ -22,7 +22,7 @@ async function run<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
 
 /** devices.register on an assigned unit (serial trimmed and upper-cased by the API before the uniqueness check). */
 export async function registerDevice(serial: string, sensorTypes: Metric[], unitId: string, jobId: string) {
-  return run(() => coreOp<{ id: string }>("devices.register", { serial, sensorTypes, unitId, jobId }, { write: true }).then((d) => d.id));
+  return run(async () => { const d = await coreOp<{ id: string }>("devices.register", { serial, sensorTypes, unitId, jobId }, { write: true }); return d.id; });
 }
 /** devices.bind to another assigned unit; a reason is required and the device gets new sensor IDs (SR24). */
 export async function bindDevice(deviceId: string, version: number, unitId: string, jobId: string, reason: string) {

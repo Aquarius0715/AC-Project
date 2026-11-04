@@ -21,7 +21,7 @@ async function run<T>(fn: () => Promise<T>, rerender = true): Promise<ActionResu
 }
 
 export async function saveAutoPolicy(input: OpInput<"policies.save">, version?: number) {
-  return run(() => coreOp<{ id: string; version: number }>("policies.save", input, { write: true, expectedVersion: input.id ? version : undefined }).then((p) => ({ id: p.id, version: p.version })));
+  return run(async () => { const p = await coreOp<{ id: string; version: number }>("policies.save", input, { write: true, expectedVersion: input.id ? version : undefined }); return ({ id: p.id, version: p.version }); });
 }
 type Evaluation = OpInput<"automations.simulate">;
 /** The current minute of the Core API clock: an evaluation is for the current tick (IR21), so the time the page loaded

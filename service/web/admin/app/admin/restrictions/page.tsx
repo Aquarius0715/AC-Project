@@ -17,6 +17,7 @@ import {
 import { RestrictionsDemo } from "./_components/restrictions-demo";
 import { RestrictionsView, type RestrictionsLive } from "./_components/restrictions-view";
 import { queryReader } from "@ac/web/lib/searchParams";
+import { orNull } from "@ac/web/lib/promises";
 
 const active = new Set<RestrictionState>(["scheduled", "requested", "applied", "release_requested"]);
 
@@ -74,7 +75,7 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
     const r = await coreOp<ApiRestriction>("restrictions.get", { id });
     const commandIds = r.perUnit.flatMap((u) => [u.applyCommandIds.at(-1), u.releaseCommandIds.at(-1)]).filter((x): x is string => !!x);
     const [commands, invoices] = await Promise.all([
-      Promise.all(commandIds.map((c) => coreOp<ApiCommand>("commands.get", { id: c }).catch(() => null))),
+      Promise.all(commandIds.map((c) => orNull(coreOp<ApiCommand>("commands.get", { id: c })))),
       isFull && r.contractId ? coreOp<Page<ApiInvoice>>("invoices.list", { limit: 100, filters: { contractId: r.contractId } }) : Promise.resolve({ items: [] as ApiInvoice[] }),
     ]);
     const invoice = new Map(invoices.items.map((i) => [i.id, i]));

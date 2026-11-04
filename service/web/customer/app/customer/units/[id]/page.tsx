@@ -12,6 +12,7 @@ import { unitRowFromApi, type ApiUnit } from "@ac/web/lib/client";
 import type { ApiCommand, ApiUnitDetail } from "@ac/web/lib/units";
 import type { ApiRestriction } from "@ac/web/lib/restrictions";
 import { UnitView, type PolicyOption } from "./_components/unit-view";
+import { orNull } from "@ac/web/lib/promises";
 
 interface ApiPolicy { id: string; name: string; kind: string; metric?: string; operator?: string; threshold?: number; durationSeconds?: number; severity?: string }
 
@@ -47,7 +48,7 @@ export default async function CustomerUnitPage({ params }: Readonly<PageProps<"/
     coreOp<{ items: ApiPolicy[] }>("policies.list", { limit: 100 }),
     coreOp<{ items: ApiCommand[] }>("commands.list", { unitId: id, query: { limit: 20 } }),
     coreDisplay(),
-    detail.effectiveControlPolicy.state === "restricted" ? restrictionHref(id).catch(() => null) : Promise.resolve(null), // a link only, never a failure
+    detail.effectiveControlPolicy.state === "restricted" ? orNull(restrictionHref(id)) : Promise.resolve(null), // a link only, never a failure
     coreNow(), // the scenario's now: a time of another day keeps its date (IR613)
     corePrincipal(),
   ]);

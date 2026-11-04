@@ -19,6 +19,7 @@ import {
 import { InvoiceDemo } from "./_components/invoice-demo";
 import { InvoiceView, type InvoiceLive } from "./_components/invoice-view";
 import { queryReader } from "@ac/web/lib/searchParams";
+import { orNull } from "@ac/web/lib/promises";
 
 
 export default async function CustomerInvoicePage({ params, searchParams }: Readonly<PageProps<"/customer/payments/[id]">>) {
@@ -60,7 +61,7 @@ export default async function CustomerInvoicePage({ params, searchParams }: Read
   if (r) {
     const ids = r.perUnit.flatMap((u) => [u.applyCommandIds.at(-1), u.releaseCommandIds.at(-1)]).filter((x): x is string => !!x);
     const [commands, about] = await Promise.all([
-      tab === "restriction" ? Promise.all(ids.map((c) => coreOp<ApiCommand>("commands.get", { id: c }).catch(() => null))) : Promise.resolve([]),
+      tab === "restriction" ? Promise.all(ids.map((c) => orNull(coreOp<ApiCommand>("commands.get", { id: c })))) : Promise.resolve([]),
       coreAll<ApiInquiry>("inquiries.list", { filters: { restrictionId: r.id } }),
     ]);
     const byId = new Map(commands.filter((c): c is ApiCommand => !!c).map((c) => [c.id, c]));

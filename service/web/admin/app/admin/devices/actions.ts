@@ -23,7 +23,7 @@ async function run<T>(fn: () => Promise<T>, rerender = true): Promise<ActionResu
 
 /** capabilities.save: a new model (no id) or the next capability version (id + the version it was read at). */
 export async function saveCapability(input: OpInput<"capabilities.save">, version?: number) {
-  return run(() => coreOp<{ id: string; version: number }>("capabilities.save", input, { write: true, expectedVersion: input.id ? version : undefined }).then((k) => ({ id: k.id, version: k.version })));
+  return run(async () => { const k = await coreOp<{ id: string; version: number }>("capabilities.save", input, { write: true, expectedVersion: input.id ? version : undefined }); return ({ id: k.id, version: k.version }); });
 }
 
 export interface HistoryEntry { at: string; actor: string; from: number | null; to: number | null; reason: string | null; changes: string[] }
@@ -46,7 +46,7 @@ export async function capabilityHistory(capabilityId: string) {
 }
 
 export async function registerDevice(serial: string, sensorTypes: Metric[], unitId: string) {
-  return run(() => coreOp<{ id: string }>("devices.register", { serial, sensorTypes, unitId }, { write: true }).then((d) => d.id));
+  return run(async () => { const d = await coreOp<{ id: string }>("devices.register", { serial, sensorTypes, unitId }, { write: true }); return d.id; });
 }
 
 export async function bindDevice(deviceId: string, version: number, unitId: string, reason: string) {
@@ -72,12 +72,10 @@ export async function updateFirmware(deviceId: string, version: number, firmware
 
 /** firmwareCampaigns.schedule; `startAt` is the instant the form read in the user's display time zone (NFR-08). */
 export async function scheduleCampaign(d: CampaignDraft, startAt: string) {
-  return run(() => {
-    return coreOp<{ id: string }>("firmwareCampaigns.schedule", {
+  return run(async () => { const c = await coreOp<{ id: string }>("firmwareCampaigns.schedule", {
       modelId: d.modelId, targetVersion: d.targetVersion, deviceIds: d.deviceIds, waves: parseWaves(d.waves) ?? [], window: { startLocal: d.startLocal, endLocal: d.endLocal },
       autoPauseFailurePercent: Number(d.autoPause), startAt,
-    }, { write: true }).then((c) => c.id);
-  });
+    }, { write: true }); return c.id; });
 }
 
 export async function controlCampaign(campaignId: string, version: number, action: "pause" | "resume" | "abort" | "retry_device", deviceId?: string, reason?: string) {

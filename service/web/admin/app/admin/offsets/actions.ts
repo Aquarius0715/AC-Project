@@ -26,7 +26,7 @@ export async function quoteOffset(input: { customerId: string; purpose: string; 
 
 /** offsets.simulate request: the quote becomes a demo_requested record. */
 export async function requestOffset(quoteId: string, quoteVersion: number) {
-  return run(() => coreOp<{ id: string }>("offsets.simulate", { event: "request", demoConfirmed: true, quoteId, quoteVersion }, { write: true }).then((r) => r.id));
+  return run(async () => { const r = await coreOp<{ id: string }>("offsets.simulate", { event: "request", demoConfirmed: true, quoteId, quoteVersion }, { write: true }); return r.id; });
 }
 
 /** offsets.simulate purchase_confirm / retire / fail of the current attempt (a fresh event ID per click). */

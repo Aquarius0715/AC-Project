@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { APP_ROLE, cookieOptions, createSessionCookie, OIDC_COOKIE, oidcConfig, oidcCookieOptions, roleHome, SESSION_COOKIE, sessionFromTokens, unseal, type Session } from "@ac/web/lib/session";
+import { orNull } from "@ac/web/lib/promises";
 
 interface Pending { state: string; verifier: string; returnTo: string | null; reauth?: boolean }
 
@@ -11,7 +12,7 @@ async function revokedSignIn(s: Session): Promise<boolean> {
       cache: "no-store", signal: AbortSignal.timeout(3000),
       headers: { Authorization: `Bearer ${s.accessToken}`, "X-Tenant-Id": s.tenantId, "X-Membership-Id": s.membershipId },
     });
-    return r.status === 401 && ((await r.json().catch(() => null)) as { messageKey?: string } | null)?.messageKey === "errors.session_revoked";
+    return r.status === 401 && ((await orNull(r.json())) as { messageKey?: string } | null)?.messageKey === "errors.session_revoked";
   } catch {
     return false;
   }

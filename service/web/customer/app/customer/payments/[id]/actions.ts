@@ -30,11 +30,11 @@ export async function startPayment(invoiceId: string, version: number, method: "
 }
 /** A demo PSP event for an open payment: processing, confirm (marks the invoice paid) or fail (stays unpaid). */
 export async function demoOutcome(paymentId: string, version: number, event: "processing" | "confirm" | "fail") {
-  return run(() => coreOp<ClientPayment>("payments.simulate", { event, paymentId, eventId: crypto.randomUUID(), paymentReference: demoReference(paymentId) }, write(version)).then((p) => p.status));
+  return run(async () => { const p = await coreOp<ClientPayment>("payments.simulate", { event, paymentId, eventId: crypto.randomUUID(), paymentReference: demoReference(paymentId) }, write(version)); return p.status; });
 }
 /** Payment instructions only: no Payment is created and the invoice stays unpaid. */
 export async function paymentInstructions(invoiceId: string, version: number) {
-  return run(() => coreOp<{ params: PreviewParams }>("payments.simulate", { event: "instructions", demoConfirmed: true, invoiceId }, write(version)).then((n) => n.params));
+  return run(async () => { const n = await coreOp<{ params: PreviewParams }>("payments.simulate", { event: "instructions", demoConfirmed: true, invoiceId }, write(version)); return n.params; });
 }
 /** notifications.preview of the payment message for one channel (nothing is stored or sent). */
 export async function previewMessage(invoiceId: string, channel: "email" | "whatsapp") {
@@ -46,5 +46,5 @@ export async function previewMessage(invoiceId: string, channel: "email" | "what
   });
 }
 export async function sendInquiry(input: { subjectType: "payment"; invoiceId: string; message: string } | { subjectType: "restriction"; restrictionId: string; message: string }) {
-  return run(() => coreOp<{ id: string }>("inquiries.create", { ...input, message: input.message.trim() }, write()).then((i) => i.id));
+  return run(async () => { const i = await coreOp<{ id: string }>("inquiries.create", { ...input, message: input.message.trim() }, write()); return i.id; });
 }

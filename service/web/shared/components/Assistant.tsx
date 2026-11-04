@@ -16,6 +16,7 @@ import { sendVoiceChange } from "@ac/web/screens/shell/assistant/actions";
 import { Icon } from "./Icon";
 import { Sheet, SheetContent } from "@ac/web/components/ui/sheet";
 import { Button } from "@ac/web/components/ui/button";
+import { orNull } from "@ac/web/lib/promises";
 
 /** The header assistant (FR-X02, Figma Client 09a–09g). In API mode (`live`) it reads voice.resolveIntent with the
 fixed en/ms grammar (D09), confirms a change before anything is sent and follows the command until the device
@@ -82,7 +83,7 @@ function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
   const add = (...m: ChatMessage[]) => { setMsgs((s) => [...s, ...m]); };
   const drop = (kind: ChatMessage["kind"]) => { setMsgs((s) => s.filter((m) => m.kind !== kind)); };
   const failure = (e: unknown) => (e instanceof OpError ? actionMessage({ code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors ?? {}, retryAfterSeconds: e.error.retryAfterSeconds }, t) : t("The assistant is unavailable — try again."));
-  const unit = (id: string) => callOp<ApiUnitDetail>("units.get", { id }).catch(() => null);
+  const unit = (id: string) => orNull(callOp<ApiUnitDetail>("units.get", { id }));
   // D09: a language change discards an unconfirmed intent but keeps what was typed
   const setLang = (l: Locale) => {
     setLangState(l);
@@ -142,7 +143,7 @@ function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
       const p = progressOf(c, card.unit, m.intent.celsius, m.intent.before.celsius, measured, t, display);
       setMsgs((s) => (s.some((x) => x.kind === "progress" && x.id === id) ? s.map((x) => (x.kind === "progress" && x.id === id ? { ...x, p } : x)) : [...s, { kind: "progress", unitId: m.intent.unitId, id, p, question }]));
     };
-    const final = await waitForCommand(r.value, show).catch(() => null);
+    const final = await orNull(waitForCommand(r.value, show));
     setState(final?.status === "acknowledged" ? "success" : (final && ["failed", "expired", "cancelled"].includes(final.status) ? "failure" : "sending"));
   };
   const voice = () => {

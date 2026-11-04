@@ -9,6 +9,7 @@ import type { DomainError } from "@ac/web/lib/ops";
 import { coreRequest } from "@ac/web/lib/rest";
 import { DEFAULT_DISPLAY, isLocale, type Display } from "@ac/web/lib/i18n";
 import type { ListArgs, OpArgs } from "@ac/web/lib/opTypes";
+import { orNull } from "@ac/web/lib/promises";
 
 /** The session of the cookie (sealed, or stored under the sealed ID it holds, IR382), or null. proxy.ts refreshes tokens
 before pages render (Server Components cannot write cookies), so an expired token here means the refresh failed.
@@ -159,7 +160,7 @@ async function coreCall<T>(operation: string, input: unknown, options: CoreOptio
   if (options.write) headers["Idempotency-Key"] = options.idempotencyKey ?? crypto.randomUUID();
   if (options.expectedVersion !== undefined) headers["X-Expected-Version"] = String(options.expectedVersion);
   const res = await fetch(`${process.env.CORE_API_URL ?? "http://localhost:8080"}${req.path}`, { method: req.method, body: req.body, cache: "no-store", headers });
-  const body = await res.json().catch(() => null);
+  const body = await orNull(res.json());
   // the Core API no longer takes this sign-in (HQ signed the user out everywhere, IR384, or the membership ended): the
   // stored session goes too, so the next page asks to sign in; the caller still gets the refusal (IR385)
   if (res.status === 401) {

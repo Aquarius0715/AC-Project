@@ -14,6 +14,7 @@ import { baselineLabel, baselinesFor, compareRow, dayRanges, periodKinds, period
 import { EnergyDemo } from "./_components/energy-demo";
 import { EnergyView, type EnergyLive } from "./_components/energy-view";
 import { queryReader } from "@ac/web/lib/searchParams";
+import { orNull } from "@ac/web/lib/promises";
 
 
 export default async function CustomerEnergyPage({ searchParams }: Readonly<PageProps<"/customer/energy">>) {
@@ -25,7 +26,7 @@ export default async function CustomerEnergyPage({ searchParams }: Readonly<Page
   const one = queryReader(sp);
   const [now, units, baselines, properties, prefs, display] = await Promise.all([
     coreNow(), coreAll<Unit>("units.list"), coreAll<ApiBaseline>("baselines.list"), coreAll<{ id: string; name: string }>("properties.list"),
-    coreOp<Preferences>("preferences.get", {}).catch(() => null), coreDisplay(),
+    orNull(coreOp<Preferences>("preferences.get", {})), coreDisplay(),
   ]);
   const i = i18nOf(display);
   const own = units.map((u) => ({ id: u.id, name: u.displayName })).toSorted((a, b) => a.name.localeCompare(b.name));

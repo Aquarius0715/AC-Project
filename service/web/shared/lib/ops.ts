@@ -2,6 +2,7 @@
 // code / messageKey / fieldErrors of service-contracts.ts.
 import type { OpArgs } from "@ac/web/lib/opTypes";
 import { randomId } from "@ac/web/lib/randomId";
+import { orNull } from "@ac/web/lib/promises";
 
 export interface DomainError { code: string; messageKey: string; fieldErrors: Record<string, string>; correlationId: string; retryAfterSeconds: number | null }
 
@@ -19,7 +20,7 @@ export async function callOp<T>(...[operation, input, options = {}]: OpArgs<Writ
   if (options.write) headers["Idempotency-Key"] = options.idempotencyKey ?? randomId(); // also over HTTP (DEC-93)
   if (options.expectedVersion !== undefined) headers["X-Expected-Version"] = String(options.expectedVersion);
   const res = await fetch(`/bff/ops/${operation}`, { method: "POST", body: JSON.stringify(input ?? {}), headers });
-  const body = await res.json().catch(() => null);
+  const body = await orNull(res.json());
   if (!res.ok) {
     throw new OpError(res.status, body ?? { code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {}, correlationId: "", retryAfterSeconds: null });
   }

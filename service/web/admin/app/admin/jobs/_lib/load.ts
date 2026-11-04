@@ -73,7 +73,7 @@ export async function loadJobs(sp: SP) {
   const sort = sortOf(one(sp.sort));
   const spec = SORTS.find((s) => s.id === sort)!;
   const [counts, list, profiles] = await Promise.all([
-    Promise.all(STAGES.map((s) => coreOp<Page<unknown>>("jobs.list", { filters: { ...scope, ...period, ...s.filter }, limit: 1 }).then((r) => r.total))),
+    Promise.all(STAGES.map(async (s) => { const r = await coreOp<Page<unknown>>("jobs.list", { filters: { ...scope, ...period, ...s.filter }, limit: 1 }); return r.total; })),
     coreOp<Page<ApiHqRow>>("jobs.list", { filters: filtersOf(q, hq?.id ?? null), sort: { field: spec.field, direction: spec.direction }, limit: 100 }),
     optional(coreAll<{ organizationId: string; status: string }>("contractors.list"), []), // offers suspended per profile (DD-A21)
   ]);

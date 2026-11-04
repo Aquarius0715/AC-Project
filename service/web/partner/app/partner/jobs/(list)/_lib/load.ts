@@ -29,7 +29,7 @@ export async function loadJobs(sp: { tab?: string; sort?: string; from?: string;
     return query();
   });
   const [counts, units, members] = await Promise.all([
-    Promise.all(TABS.map((t) => coreOp<Page<unknown>>("jobs.list", { filters: tabFilters(t.id, p.fromAt, p.toAt), limit: 1 }).then((r) => r.total))),
+    Promise.all(TABS.map(async (t) => { const r = await coreOp<Page<unknown>>("jobs.list", { filters: tabFilters(t.id, p.fromAt, p.toAt), limit: 1 }); return r.total; })),
     optional(coreAll<{ id: string; displayName: string }>("units.list"), []),
     optional(coreAll<ApiMember>("members.list"), []),
   ]);

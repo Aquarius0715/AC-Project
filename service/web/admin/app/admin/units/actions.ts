@@ -56,11 +56,11 @@ export async function updateCustomer(id: string, version: number, org: { id: str
 
 export interface PropertyInput { id?: string; customerOrgId: string; kind: "home" | "office"; name: string; address: string | null; accessInstructions: string | null }
 export async function saveProperty(input: PropertyInput, version?: number) {
-  return run(() => coreOp<{ id: string }>("properties.save", input, write(version)).then((p) => p.id));
+  return run(async () => { const p = await coreOp<{ id: string }>("properties.save", input, write(version)); return p.id; });
 }
 export interface SpaceInput { id?: string; propertyId: string; parentSpaceId: string | null; kind: "area" | "floor" | "room" | "space"; name: string }
 export async function saveSpace(input: SpaceInput, version?: number) {
-  return run(() => coreOp<{ id: string }>("spaces.save", input, write(version)).then((s) => s.id));
+  return run(async () => { const s = await coreOp<{ id: string }>("spaces.save", input, write(version)); return s.id; });
 }
 /** properties.archive / spaces.archive (CONFLICT while it still holds units or child spaces). */
 export async function archiveLocation(kind: "property" | "space", id: string, version: number, reason: string) {
@@ -72,7 +72,7 @@ export interface UnitInput {
   serviceScope: Scope[]; warrantyEndsAt?: string | null; changeReason?: string;
 }
 export async function saveUnit(input: UnitInput, version?: number) {
-  return run(() => coreOp<{ id: string }>("units.save", input, write(version)).then((u) => u.id));
+  return run(async () => { const u = await coreOp<{ id: string }>("units.save", input, write(version)); return u.id; });
 }
 /** units.archive takes the unit out of use and keeps its ID and history (D05: CONFLICT while it is still in use). */
 export async function archiveUnit(id: string, version: number, reason: string) {
@@ -93,7 +93,7 @@ export async function setDefaultRule(policyId: string, ruleKey: string, customer
 // ---- client users (FR-A17): adding (the account at once, IR461), role / sign-in changes with a reason, removal, set-up
 // e-mail again and reset previews ----
 export async function inviteClientUser(customerId: string, email: string, clientRole: "owner" | "member", displayName: string) {
-  return run(() => coreOp<{ id: string }>("clientUsers.save", { customerId, clientRole, email: email.trim(), displayName: displayName.trim() }, write()).then((u) => u.id));
+  return run(async () => { const u = await coreOp<{ id: string }>("clientUsers.save", { customerId, clientRole, email: email.trim(), displayName: displayName.trim() }, write()); return u.id; });
 }
 export async function updateClientUser(id: string, version: number, input: { customerId: string; email: string; clientRole: "owner" | "member"; status?: "active" | "disabled"; reason: string }) {
   return run(async () => { await coreOp("clientUsers.save", { id, ...input, reason: input.reason.trim() }, write(version)); return null; });

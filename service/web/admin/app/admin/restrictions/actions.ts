@@ -23,7 +23,7 @@ const write = (version: number) => ({ write: true, expectedVersion: version });
 export interface ScheduleInput { contractId: string; expectedContractVersion: number; causeInvoiceIds: string[]; unitIds: string[]; policy: Policy; executeAfter: string; reason: string; rulesVersion: string }
 /** restrictions.schedule (noticeAt is the acceptance time; the notice goes to the customer's clients, IR05). */
 export async function scheduleRestriction(input: ScheduleInput) {
-  return run(() => coreOp<{ id: string }>("restrictions.schedule", input, { write: true }).then((r) => r.id));
+  return run(async () => { const r = await coreOp<{ id: string }>("restrictions.schedule", input, { write: true }); return r.id; });
 }
 export async function executeRestriction(id: string, version: number, confirmedRulesVersion: string) {
   return run(async () => { await coreOp("restrictions.execute", { restrictionId: id, confirmedRulesVersion }, write(version)); return null; });

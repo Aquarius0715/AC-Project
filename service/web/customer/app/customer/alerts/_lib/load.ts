@@ -11,6 +11,7 @@ import { i18nOf } from "@ac/web/lib/i18n";
 import { unitPlaces } from "@ac/web/lib/clientBilling";
 import { inboxAlerts, type AlertNote, type ApiAlert } from "@ac/web/lib/alerts";
 import { defaultRuleRows, policyCards, policyForm, type ApiAlertPolicy, type ApiDefaultPolicy } from "@ac/web/lib/customerPolicies";
+import { orNull } from "@ac/web/lib/promises";
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
@@ -26,7 +27,7 @@ export async function loadAlerts(sp: Record<string, string | string[] | undefine
     coreOp<{ counts: { alertCount: number } }>("summaries.get", { kind: "customer", filters: {} }),
     coreAll<Unit>("units.list"), coreAll<{ id: string; name: string }>("properties.list"), coreAll<{ id: string; name: string; parentSpaceId: string | null }>("spaces.list"),
     coreAll<ApiAlertPolicy>("policies.list", { filters: { kind: "alert" } }), coreAll<ApiDefaultPolicy>("policies.list", { filters: { kind: "default_alert" } }),
-    coreOp<{ timezone: string }>("preferences.get", {}).catch(() => null), coreDisplay(),
+    orNull(coreOp<{ timezone: string }>("preferences.get", {})), coreDisplay(),
   ]);
   const i = i18nOf(display);
   const place = unitPlaces(units, properties, spaces);

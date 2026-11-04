@@ -12,6 +12,7 @@ import type { ApiUnitDetail } from "@ac/web/lib/units";
 import {
   blockedText, capabilityText, connectionText, historyRows, observedText, restrictionText, runActive, runBanner, stateTiles, windowText, type ApiCommandRow, type ApiRun,
 } from "@ac/web/lib/techControl";
+import { orNull } from "@ac/web/lib/promises";
 
 const gone = (e: unknown) => e instanceof CoreError && (e.error.code === "NOT_FOUND" || e.error.code === "FORBIDDEN" || !!e.error.fieldErrors.id || !!e.error.fieldErrors.jobId);
 
@@ -28,7 +29,7 @@ export async function loadControl(unitId: string, jobId: string | null) {
   const unitHref = `/technician/units/${unitId}${jobId ? `?jobId=${jobId}` : ""}`;
   if (d === null) return null; // not in the technician's assignments: not found (IR169)
   if (d === "not_started") { // IR76: the start time from the URL's job
-    const job = jobId ? await coreOp<JobRead>("jobs.get", { jobId }).catch(() => null) : null;
+    const job = jobId ? await orNull(coreOp<JobRead>("jobs.get", { jobId })) : null;
     const start = job?.projection === "detail" ? job.assignment?.scheduledStart ?? null : null;
     return {
       kind: "not_started" as const,

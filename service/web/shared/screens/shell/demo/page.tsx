@@ -8,17 +8,18 @@ import { apiMode, coreAll, coreNow, coreItems } from "@ac/web/lib/dal";
 import { clockText, deviceOptions, openFault, type ApiDevice, type ApiDeviceEvent } from "@ac/web/lib/demoPanel";
 import { DemoMock } from "./_components/demo-mock";
 import { DemoView } from "./_components/demo-view";
+import { orNull } from "@ac/web/lib/promises";
 
 export default async function DemoPage() {
   await connection();
   if (!apiMode()) return <DemoMock />;
   const [now, devices, units] = await Promise.all([
     coreNow(),
-    coreAll<ApiDevice>("devices.list").catch(() => null), // a role without device reads gets no device tile
+    orNull(coreAll<ApiDevice>("devices.list")), // a role without device reads gets no device tile
     coreAll<{ id: string; displayName: string }>("units.list").catch(() => []),
   ]);
   const listed = (devices ?? []).slice(0, 20);
-  const histories = await Promise.all(listed.map((d) => coreItems<ApiDeviceEvent>("devices.events", { id: d.id, query: { limit: 100 } }).catch(() => null)));
+  const histories = await Promise.all(listed.map((d) => orNull(coreItems<ApiDeviceEvent>("devices.events", { id: d.id, query: { limit: 100 } }))));
   const faults = new Map<string, string>();
   for (const [i, h] of histories.entries()) { const f = h && openFault(h); if (f) faults.set(listed[i].id, f.id); }
   const usable = listed.filter((_, i) => histories[i] !== null);

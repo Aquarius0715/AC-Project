@@ -13,6 +13,7 @@ import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { consentCard, ruleCard, triggerOf, type ApiAutomation, type ApiConsent, type ApiOccurrence, type Caps } from "@ac/web/lib/clientAutomations";
 import { AutomationsDemo } from "./_components/automations-demo";
 import { AutomationsView, type AutomationsLive } from "./_components/automations-view";
+import { orNull } from "@ac/web/lib/promises";
 
 export default async function CustomerAutomationsPage({ searchParams }: Readonly<PageProps<"/customer/automations">>) {
   await connection();
@@ -43,7 +44,7 @@ export default async function CustomerAutomationsPage({ searchParams }: Readonly
   // the editor's ACs with their capabilities (action options), read only while editing
   const caps: Record<string, Caps | null> = {};
   if (editing) {
-    const details = await Promise.all(acs.map((u) => coreOp<ApiUnitDetail>("units.get", { id: u.id }).catch(() => null)));
+    const details = await Promise.all(acs.map((u) => orNull(coreOp<ApiUnitDetail>("units.get", { id: u.id }))));
     for (const [i, d] of details.entries()) { caps[acs[i].id] = d?.capabilities ?? null; }
   }
   const live: AutomationsLive = {

@@ -10,9 +10,10 @@ import { connection } from "next/server";
 import { apiMode, coreDisplay, coreIdentity, coreOp } from "@ac/web/lib/dal";
 import type { Role, ShellLive } from "@ac/web/lib/nav";
 import type { OpCall } from "@ac/web/lib/opTypes";
+import { orNull } from "@ac/web/lib/promises";
 
-const total = (...call: OpCall) => coreOp<{ total: number }>(...call).then((p) => p.total);
-const quiet = (p: Promise<number>) => p.catch(() => null);
+const total = async (...call: OpCall) => { const p = await coreOp<{ total: number }>(...call); return p.total; };
+const quiet = (p: Promise<number>) => orNull(p);
 
 export async function loadShell(role: Role): Promise<ShellLive | undefined> {
   await connection();

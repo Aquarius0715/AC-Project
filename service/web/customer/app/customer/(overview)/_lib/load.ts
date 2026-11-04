@@ -20,6 +20,7 @@ import type { ApiBaseline, ApiEnergySummary } from "@ac/web/lib/energy";
 import {
   attentionCard, bucketPoints, emissionsCard, energyCard, nextRunText, overviewRows, overviewScope, periodLabel, periodNote, periodOf, previousRange, type OverviewUnit,
 } from "@ac/web/lib/customerOverview";
+import { orNull } from "@ac/web/lib/promises";
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
@@ -29,7 +30,7 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
   const [now, units, properties, spaces, alerts, automations, baselines, consent, display] = await Promise.all([
     coreNow(), coreAll<OverviewUnit>("units.list"), coreAll<ApiPropertyRow>("properties.list"), coreAll<ApiSpaceRow>("spaces.list"),
     coreAll<ApiAlert>("alerts.list"), coreAll<ApiAutomation>("automations.list"), coreAll<ApiBaseline>("baselines.list"),
-    coreOp<ApiConsent>("consents.get", { purpose: "location_automation" }).catch(() => null), coreDisplay(),
+    orNull(coreOp<ApiConsent>("consents.get", { purpose: "location_automation" })), coreDisplay(),
   ]);
   const i = i18nOf(display);
   const { t } = i;
@@ -74,7 +75,7 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
   const shown = inScope.slice(0, 3);
   const [summary, sums, co2, nexts, dueLines] = await Promise.all([
     coreOp<Summary>("summaries.get", { kind: "customer", filters }), energy, hasCo2 ? series() : Promise.resolve(null),
-    Promise.all(shown.map((a) => (a.kind === "schedule" && a.enabled ? coreOp<ApiOccurrence[]>("automations.nextRuns", { automationId: a.id, count: 8 }).then((o) => o.find((x) => x.phase === "schedule_start")?.at ?? null).catch(() => null) : Promise.resolve(null)))), due
+    Promise.all(shown.map((a) => (a.kind === "schedule" && a.enabled ? orNull(coreOp<ApiOccurrence[]>("automations.nextRuns", { automationId: a.id, count: 8 }).then((o) => o.find((x) => x.phase === "schedule_start")?.at ?? null)) : Promise.resolve(null)))), due
   ]);
   const unitName = new Map(units.map((u) => [u.id, u.displayName]));
   const n = sel.scope.length;

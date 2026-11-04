@@ -22,12 +22,10 @@ export interface NewInvoice { contractId: string; contractVersion: number; from:
 
 /** invoices.create for a contract version (dates are Kuala Lumpur days). */
 export async function createInvoice(n: NewInvoice) {
-  return run(() => {
-    return coreOp("invoices.create", {
+  return run(async () => { await coreOp("invoices.create", {
       contractId: n.contractId, contractVersion: n.contractVersion, amountMinor: n.amountMinor, currency: n.currency,
       period: { from: `${n.from}T00:00:00+08:00`, to: `${n.to}T00:00:00+08:00` }, dueAt: `${n.dueAt}T00:00:00+08:00`,
-    }, { write: true }).then(() => null);
-  });
+    }, { write: true }); return null; });
 }
 
 export async function recordManualPayment(invoiceId: string, version: number, paymentReference: string, amountMinor: number, currency: OpInput<"payments.recordManual">["currency"], reason: string) {
@@ -40,11 +38,9 @@ export async function confirmCardPayment(paymentId: string, version: number, pay
 
 /** notifications.preview of a payment reminder (a read: nothing is sent, the route is not re-rendered). */
 export async function previewReminder(invoiceId: string, recipientMembershipId: string, channel: OpInput<"invoices.remind">["channel"], reason: string) {
-  return run(() => {
-    return coreOp<{ params: { targetName: string } }>("notifications.preview", {
+  return run(async () => { const p = await coreOp<{ params: { targetName: string } }>("notifications.preview", {
       target: { kind: "invoice", id: invoiceId }, templateKey: "payment_reminder", channel, recipientMembershipId, reason,
-    }).then((p) => p.params.targetName);
-  }, false);
+    }); return p.params.targetName; }, false);
 }
 
 export async function sendReminder(invoiceId: string, version: number, recipientMembershipId: string, channel: OpInput<"invoices.remind">["channel"], reason: string) {
@@ -56,7 +52,7 @@ export async function answerInquiry(inquiryId: string, version: number, reply: s
 }
 
 export async function generatePayouts(period: string) {
-  return run(() => coreOp<unknown[]>("payouts.generate", { period }, { write: true }).then((s) => s.length));
+  return run(async () => { const s = await coreOp<unknown[]>("payouts.generate", { period }, { write: true }); return s.length; });
 }
 
 export async function transitionStatement(statementId: string, version: number, action: "approve" | "mark_paid") {
