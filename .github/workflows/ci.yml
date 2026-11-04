@@ -8,11 +8,12 @@
 # from one run to the next. A container works as root, so each job hands its workspace back to the runner's user at the end, or
 # the next checkout could not clean it.
 #
-# The three runners take the jobs in three lanes, longest first, so that the run lasts about as long as its longest job (the
-# runner picks queued jobs in no fixed order, and a long job started last made a run up to 11 minutes). Mean durations of
-# November 2026: docs 380 s | go-test-cluster 215 s -> web-lint 67 s -> go-lint 30 s | go-test 185 s -> web-typecheck 70 s ->
-# web-test 50 s. A job in a lane waits for the one before it with needs, and runs even when that one failed (!cancelled()),
-# so every check still reports.
+# The three runners take the jobs in three lanes, longest first, so that the run lasts about as long as its longest lane
+# (the runner picks queued jobs in no fixed order, and a long job started last made a run up to 11 minutes):
+# go-test-cluster -> web-test -> go-lint | docs -> web-lint | go-test -> web-typecheck. The Go suites run the integration
+# tests in three shards (service/api/scripts/test-shards.sh) and the document regressions run in parallel, so each lane
+# takes about three minutes. A job in a lane waits for the one before it with needs, and runs even when that one failed
+# (!cancelled()), so every check still reports.
 name: CI
 
 on:
@@ -38,7 +39,7 @@ defaults:
 jobs:
   go-lint:
     name: Go lint (gofmt, vet, golangci-lint, generated files, Swagger)
-    needs: web-lint
+    needs: web-test
     if: ${{ !cancelled() }}
     runs-on: [self-hosted, ac-test]
     container: { image: "golang:1.26-trixie", volumes: ["ac-ci-go:/go/pkg/mod", "ac-ci-cache:/root/.cache"] }
@@ -88,19 +89,26 @@ jobs:
           apt-get update -qq && apt-get install -y -qq postgresql-client socat >/dev/null
           setsid nohup socat TCP-LISTEN:5432,fork,reuseaddr TCP:postgres:5432 >/dev/null 2>&1 &
           until pg_isready -q -h localhost -p 5432; do sleep 1; done
-      - name: test database
+      - name: test databases (ac_test for the packages, one per integration shard)
         working-directory: service/api
         run: |
           make testdb
+          SHARDS=3 RESET=only sh scripts/test-shards.sh
       - name: go test
         working-directory: service/api
-        # a failing test's lines also become annotations, readable on the run without the logs (like the E2E's reporter)
+        # the packages and the integration suite's three shards at once, each on its own database; a failing test's
+        # lines also become annotations, readable on the run without the logs (like the E2E's reporter)
         run: |
-          set -o pipefail
-          go test -count=1 -timeout 30m ./... 2>&1 | tee go-test.log || {
+          rp=0 ri=0
+          go test -count=1 -timeout 30m $(go list ./... | grep -v /test/) > packages.log 2>&1 & p=$!
+          SHARDS=3 RESET=0 sh scripts/test-shards.sh > integration.log 2>&1 || ri=$?
+          wait $p || rp=$?
+          cat packages.log integration.log > go-test.log
+          cat go-test.log
+          if [ "$rp" != 0 ] || [ "$ri" != 0 ]; then
             grep -E -- '--- FAIL|_test\.go:[0-9]+:|panic:' go-test.log | head -40 | sed 's/%/%25/g; s/^/::error title=go test::/'
             exit 1
-          }
+          fi
       - name: the workspace back to the runner's user
         if: always()
         run: chown -R "$(stat -c '%u:%g' .)" .
@@ -124,16 +132,16 @@ jobs:
           apt-get update -qq && apt-get install -y -qq postgresql-client socat >/dev/null
           setsid nohup socat TCP-LISTEN:5432,fork,reuseaddr TCP:postgres:5432 >/dev/null 2>&1 &
           until pg_isready -q -h localhost -p 5432; do sleep 1; done
-      - name: test database
+      - name: test databases (one per shard)
         working-directory: service/api
-        run: |
-          make testdb-cluster
+        run: SHARDS=3 CLUSTER=1 RESET=only sh scripts/test-shards.sh
       - name: go test (cluster)
         working-directory: service/api
-        # a failing test's lines also become annotations, readable on the run without the logs (like the E2E's reporter)
+        # the suite's three shards at once; a failing test's lines also become annotations, readable on the run without
+        # the logs (like the E2E's reporter)
         run: |
           set -o pipefail
-          AC_TEST_DB=ac_test_cluster AC_TEST_CLUSTER=1 go test -count=1 -timeout 30m ./test/... 2>&1 | tee go-test.log || {
+          SHARDS=3 CLUSTER=1 RESET=0 sh scripts/test-shards.sh 2>&1 | tee go-test.log || {
             grep -E -- '--- FAIL|_test\.go:[0-9]+:|panic:' go-test.log | head -40 | sed 's/%/%25/g; s/^/::error title=go test (cluster)::/'
             exit 1
           }
@@ -143,7 +151,7 @@ jobs:
 
   web-lint:
     name: Web lint (ESLint)
-    needs: go-test-cluster
+    needs: docs
     if: ${{ !cancelled() }}
     runs-on: [self-hosted, ac-test]
     container: { image: "node:26-bookworm", volumes: ["ac-ci-npm:/root/.npm"] }
@@ -175,7 +183,7 @@ jobs:
 
   web-test:
     name: Web unit tests (Vitest)
-    needs: web-typecheck
+    needs: go-test-cluster
     if: ${{ !cancelled() }}
     runs-on: [self-hosted, ac-test]
     container: { image: "node:26-bookworm", volumes: ["ac-ci-npm:/root/.npm"] }

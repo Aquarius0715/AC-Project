@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "489beb1dd72a1cc6f27da629f3d90a62b9c3e9e848d3157572cd86ba07fcf77d",
+  "spec_baseline_id": "bd5e9c510f97fb743e937ae8777acccf8c100031d9542f6c6acf98241a4fb4d5",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -110,7 +110,7 @@
     },
     {
       "path": "02-design/backend-go-design.md",
-      "sha256": "74ebc6e8a9c768b55ecb9044f0ff851498ab6fdc5eca1a585fd99a7ac479c1d9"
+      "sha256": "0397ae05d3d6133d3f619f579ae6924707a809cabb1739142caf15ef483719d8"
     },
     {
       "path": "02-design/client.md",
@@ -158,7 +158,7 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "b534c56022eec694146717c9164ac5d51694516a69eeaf8c9bf5baef448f1d26"
+      "sha256": "de48288bd1fedf267a1e3808f7d45fb2e957c253e409ccbe5fdf7679b37cd982"
     },
     {
       "path": "02-design/service-contracts.ts",
@@ -290,7 +290,7 @@
     },
     {
       "path": "tools/check_review_regressions.py",
-      "sha256": "7d07a576857cc1d713bf6a43ea1b2a293cbcdf12482e5ff478d9887356f1eedb"
+      "sha256": "46a5ea10a0cc17fd9e7cffe618fa0e9870f6a31be3fe25fcb290b0080a5dd1e8"
     },
     {
       "path": "tools/gen_operation_persistence_map.py",

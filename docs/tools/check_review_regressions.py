@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Mutation checks for the document validator; never edits the source documents."""
+from concurrent.futures import ThreadPoolExecutor
 import json
+import os
 from pathlib import Path
+import queue
 import shutil
 import subprocess
 import sys
@@ -194,29 +197,44 @@ def validate(root):
                             capture_output=True, text=True)
     return result.returncode, json.loads(result.stdout)
 
-results = []
+# The cases run in parallel, each worker on a copy of its own (a case changes files of its copy and restores them):
+# AC_DOC_WORKERS workers, or one per CPU up to 8.
+WORKERS = max(1, int(os.environ.get('AC_DOC_WORKERS', '0')) or min(8, os.cpu_count() or 1))
+
+def run_case(copies, case):
+    name, mutations, expected = case
+    copied = copies.get()
+    originals = {}
+    try:
+        for relative, old, new in mutations:
+            path = copied/relative
+            originals.setdefault(path, path.read_bytes())
+            content = path.read_text()
+            if old not in content:
+                raise AssertionError('Mutation target missing: '+name)
+            path.write_text(content.replace(old, new))
+        code, report = validate(copied)
+        passed = code != 0 and any(expected in error for error in report['errors'])
+        return {'case':name, 'detected':passed, 'expected_diagnostic':expected}
+    finally:
+        for path, data in originals.items():
+            path.write_bytes(data)
+        copies.put(copied)
+
 with tempfile.TemporaryDirectory(prefix='ac-document-regression-') as directory:
-    copied = Path(directory)/'docs'
-    shutil.copytree(ROOT, copied, ignore=shutil.ignore_patterns('05-document-review', '__pycache__'))
-    code, report = validate(copied)
+    first = Path(directory)/'docs-0'
+    shutil.copytree(ROOT, first, ignore=shutil.ignore_patterns('05-document-review', '__pycache__'))
+    code, report = validate(first)
     if code or report['errors']:
         raise SystemExit('Unmodified copied specification must pass first: '+str(report['errors']))
-    for name, mutations, expected in CASES:
-        originals = {}
-        try:
-            for relative, old, new in mutations:
-                path = copied/relative
-                originals.setdefault(path, path.read_bytes())
-                content = path.read_text()
-                if old not in content:
-                    raise AssertionError('Mutation target missing: '+name)
-                path.write_text(content.replace(old, new))
-            code, report = validate(copied)
-            passed = code != 0 and any(expected in error for error in report['errors'])
-            results.append({'case':name, 'detected':passed, 'expected_diagnostic':expected})
-        finally:
-            for path, data in originals.items():
-                path.write_bytes(data)
+    copies = queue.Queue()
+    copies.put(first)
+    for i in range(1, WORKERS):
+        copy = Path(directory)/f'docs-{i}'
+        shutil.copytree(first, copy)
+        copies.put(copy)
+    with ThreadPoolExecutor(WORKERS) as pool:
+        results = list(pool.map(lambda case: run_case(copies, case), CASES))  # in the order of CASES
 print(json.dumps({'scope':'document-validator-mutations-only', 'application_tests':'not_run',
                   'results':results, 'passed':all(r['detected'] for r in results)}, indent=2))
 sys.exit(0 if all(r['detected'] for r in results) else 1)

@@ -69,9 +69,19 @@ func TestSearchIsLiteral(t *testing.T) {
 			t.Fatalf("%s lists nothing to search", operation)
 		}
 
-		value, _ := all[0][field].(string)
-		if len(value) < 3 {
-			t.Fatalf("%s: no %s to search in %v", operation, field, all[0])
+		// the first row with a value long enough to take a middle from: other tests leave rows such as a contractor "B"
+		var value string
+
+		for _, item := range all {
+			if v, ok := item[field].(string); ok && len(v) >= 3 {
+				value = v
+
+				break
+			}
+		}
+
+		if value == "" {
+			t.Fatalf("%s: no %s to search in %v", operation, field, all)
 		}
 
 		if got := search(operation, strings.ToUpper(value[1:len(value)-1])); len(got) == 0 {
