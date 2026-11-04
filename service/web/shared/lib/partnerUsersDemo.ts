@@ -35,8 +35,16 @@ export const usePartnerUsersDemo = () => useSyncExternalStore(subscribe, load, (
 const lastContractor = (us: ApiPartnerUser[], u: ApiPartnerUser) =>
   u.partnerRole === "contractor" && u.status === "active" && us.every((x) => !(x.id !== u.id && x.partnerRole === "contractor" && x.status === "active"));
 /** A refusal as the API words it (messageKey), or undefined when done. */
-const guard = (us: ApiPartnerUser[], u: ApiPartnerUser | undefined) =>
-  u ? u.membershipId === DEMO_SELF ? "errors.own_account" : lastContractor(us, u) ? "errors.last_contractor" : undefined : "error.notFound";
+const guard = (us: ApiPartnerUser[], u: ApiPartnerUser | undefined) => {
+  if (!u) return "error.notFound";
+  if (u.membershipId === DEMO_SELF) return "errors.own_account";
+  return lastContractor(us, u) ? "errors.last_contractor" : undefined;
+};
+/** The refusal of a change to a user's own account, or of one that does not exist. */
+const selfGuard = (u: ApiPartnerUser | undefined) => {
+  if (!u) return "error.notFound";
+  return u.membershipId === DEMO_SELF ? "errors.own_account" : undefined;
+};
 
 export const partnerUserDemo = {
   reset() { save(PARTNER_USERS_SEED); },
@@ -61,7 +69,7 @@ export const partnerUserDemo = {
   setStatus(id: string, status: "active" | "disabled") {
     const us = load();
     const u = us.find((x) => x.id === id);
-    const no = status === "disabled" ? guard(us, u) : u ? u.membershipId === DEMO_SELF ? "errors.own_account" : undefined : "error.notFound";
+    const no = status === "disabled" ? guard(us, u) : selfGuard(u);
     if (no) return no;
     save(us.map((x) => (x.id === id ? { ...x, status, version: x.version + 1 } : x)));
     return;

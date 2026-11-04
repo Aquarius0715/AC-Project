@@ -60,7 +60,9 @@ export function reworkItems(items: Pick<InspectionRow, "label" | "result" | "rea
 /** The return reason sent to jobs.review: the ticked items, then the reviewer's words (1–1000 together). */
 export function returnReason(items: string[], text: string, t: T = en): string {
   const words = text.trim();
-  return items.length > 0 ? `${t("Rework: {items}.", { items: items.join("; ") })}${words ? ` ${words}` : ""}` : words;
+  if (items.length === 0) return words;
+  const rework = t("Rework: {items}.", { items: items.join("; ") });
+  return words ? `${rework} ${words}` : rework;
 }
 /** One inspection row (Figma 03 “Indoor unit — filter condition · Normal”, reason under not-applicable items) with the
 names of the report photos linked to its finding (InspectionItem.evidenceIds, IR352); a photo the report no longer
@@ -85,8 +87,9 @@ const componentShort: Record<string, string> = { filter: "filter", refrigerant_p
 export function readingRows(ms: ApiReportMeasurement[], t: T = en): [string, string][] {
   const part = (key: string) => (componentShort[key] ?? componentLabel[key] ? t(componentShort[key] ?? componentLabel[key]) : key);
   return ms.map((m) => {
+    const reason = m.qualityReason ? ` (${m.qualityReason.replaceAll('_', " ")})` : "";
     return [`${textOf(metricLabel, m.metric, t) ?? m.metric}${m.componentKey ? ` (${part(m.componentKey)})` : ""}`,
-      m.value === null ? t("no value") : `${String(m.value)} ${m.unit} · ${textOf(qualityNote, m.quality, t) ?? m.quality}${m.qualityReason ? ` (${m.qualityReason.replaceAll('_', " ")})` : ""}`];
+      m.value === null ? t("no value") : `${String(m.value)} ${m.unit} · ${textOf(qualityNote, m.quality, t) ?? m.quality}${reason}`];
   });
 }
 /** “14 Sept, 9:05 – 11:40 am MYT (2 h 35 m)” from the job's time on site, in the display time zone (IR274). */
@@ -135,6 +138,12 @@ export function evidenceCheck(r: ApiWorkReport, names: Map<string, string>, t: T
   };
 }
 
+/** Why a report version that is not submitted cannot be reviewed, by the job's status. */
+function notSubmittedText(status: string, t: T): string {
+  if (status === "completed") return t("This report was accepted; the job is completed.");
+  if (status === "rework_requested") return t("This version was returned for rework; wait for the technician's next version.");
+  return t("The report has not been submitted yet.");
+}
 /** Why the signed-in reviewer may not decide (IR31 self-authorship, stale version, not submitted, permission). */
 export function availabilityText(av: ReviewAvailability, status: string, t: T = en): string | null {
   if (av.allowed) return null;
@@ -143,7 +152,7 @@ export function availabilityText(av: ReviewAvailability, status: string, t: T = 
     }
     case "not_current": { return t("This is not the current report version — a newer version exists; the page shows the latest refs.");
     }
-    case "not_submitted": { return t(status === "completed" ? "This report was accepted; the job is completed." : (status === "rework_requested" ? "This version was returned for rework; wait for the technician's next version." : "The report has not been submitted yet."));
+    case "not_submitted": { return notSubmittedText(status, t);
     }
     default: { return t("Reviewing needs the partner.review permission on this delegated job.");
     }
@@ -170,17 +179,23 @@ export function versionRows(job: ApiReviewJob, r: ApiWorkReport, author: string,
   if (job.draftReportRef) rows.push({ title: t("v{version} · draft", { version: job.draftReportRef.reportVersion }), sub: t("{name} is working on the rework", { name: author }), badge: { label: t("Draft"), tone: "muted" } });
   return rows;
 }
+/** An alert's badge: resolved, or acknowledged or open in its severity's tone. */
+function alertBadge(a: ApiAlertLite, t: T): NonNullable<VersionRow["badge"]> {
+  if (a.status === "resolved") return { label: t("Resolved"), tone: "ok" };
+  return { label: t(a.status === "acknowledged" ? "Acknowledged" : "Open"), tone: a.severity === "critical" ? "crit" : "warn" };
+}
 export function alertRows(alerts: ApiAlertLite[], i: I18n = EN): VersionRow[] {
   const { t, display } = i;
   return alerts.map((a) => {
     return {
       title: t("{text} (alert)", { text: a.evidenceText ? evidenceText(a.evidenceText, t) : a.type }), sub: `${showTime(a.detectedAt, display)} · ${t(a.status === "resolved" ? "resolved" : "stays open after completion")}`,
-      badge: { label: t(a.status === "resolved" ? "Resolved" : (a.status === "acknowledged" ? "Acknowledged" : "Open")), tone: a.status === "resolved" ? "ok" : (a.severity === "critical" ? "crit" : "warn") },
+      badge: alertBadge(a, t),
     };
   });
 }
 export function dueRow(job: ApiReviewJob, i: I18n = EN): VersionRow {
   const { t, display } = i;
   const a = job.assignment;
-  return { title: t("Job due"), sub: a ? t("work window {span}", { span: showSpan(a.scheduledStart, a.scheduledEnd, display) }) : (job.dueAt ? t("due {time}", { time: showTime(job.dueAt, display) }) : t("no window")), badge: null };
+  const due = job.dueAt ? t("due {time}", { time: showTime(job.dueAt, display) }) : t("no window");
+  return { title: t("Job due"), sub: a ? t("work window {span}", { span: showSpan(a.scheduledStart, a.scheduledEnd, display) }) : due, badge: null };
 }

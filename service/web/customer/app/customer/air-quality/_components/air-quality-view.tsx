@@ -11,6 +11,7 @@ import {
 } from "@ac/web/lib/air";
 import { logVentilation } from "../actions";
 import { Icon, type IconName } from "@ac/web/components/Icon";
+import { byCount } from "@ac/web/lib/i18n";
 
 type Tone = MetricCard["feed"]["tone"];
 export interface AirLive {
@@ -48,8 +49,11 @@ export function AirQualityView({ live }: Readonly<{ live: AirLive | null }>) {
     const r = live.rooms.find((x) => x.key === key);
     if (r) patch({ spaceId: r.spaceId, unitId: r.units[0].id });
   };
-  const noValid = c.readings === 0 ? t("No valid {metric} readings in this window — missing data is never drawn as a line.", { metric: label })
-    : t(c.readings === 1 ? "No valid {metric} readings in this window (1 reading without a valid value) — missing data is never drawn as a line." : "No valid {metric} readings in this window ({n} readings without a valid value) — missing data is never drawn as a line.", { metric: label, n: c.readings });
+  const noValid = byCount(c.readings, {
+    none: t("No valid {metric} readings in this window — missing data is never drawn as a line.", { metric: label }),
+    one: t("No valid {metric} readings in this window (1 reading without a valid value) — missing data is never drawn as a line.", { metric: label, n: 1 }),
+    many: t("No valid {metric} readings in this window ({n} readings without a valid value) — missing data is never drawn as a line.", { metric: label, n: c.readings }),
+  });
   return (
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-line bg-surface px-4 py-3 text-xs">
@@ -86,7 +90,7 @@ export function AirQualityView({ live }: Readonly<{ live: AirLive | null }>) {
         <Tabs value={live.period} onChange={(p) => { patch({ period: p }); }} tabs={airPeriods.map((p) => ({ id: p, label: t(p) }))} />
         <Tabs value={view} onChange={setView} tabs={[{ id: "chart", label: t("Chart") }, { id: "table", label: t("Table") }]} />
       </div>}>
-        {c.hasSensor ? c.valid ? view === "chart" ? (
+        {view === "chart" && c.hasSensor && c.valid ? (
             <>
               <LineChart points={c.points} min={c.min} max={c.max} threshold={c.guide ?? undefined} ticks={c.ticks} shadeGaps height={300} labels={c.labels} />
               <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
@@ -95,7 +99,8 @@ export function AirQualityView({ live }: Readonly<{ live: AirLive | null }>) {
                 {c.gaps && <span className="inline-flex items-center gap-1"><span aria-hidden className="inline-block h-2.5 w-2.5 rounded-sm border border-dashed border-muted-foreground" />{t("No data (gap, not joined)")}</span>}
               </div>
             </>
-          ) : (
+          ) : null}
+        {view !== "chart" && c.hasSensor && c.valid ? (
             // the table scrolls on its own: it takes the focus so a keyboard can scroll it, named as the chart is (axe
             // scrollable-region-focusable, IR607)
             <div className="max-h-[420px] overflow-y-auto" tabIndex={0} role="region" aria-label={c.title}>
@@ -105,18 +110,18 @@ export function AirQualityView({ live }: Readonly<{ live: AirLive | null }>) {
                 { key: "n", label: t("Readings"), render: (r) => <span className="text-xs text-muted-foreground">{r.note}</span> },
               ]} />
             </div>
-          )
-          : <p className="text-[13px] text-muted-foreground">{noValid}</p>
-          : <p className="text-[13px] text-muted-foreground">{t("{unit} has no {metric} sensor — nothing to chart.", { unit: live.unitName, metric: label })}</p>}
+          ) : null}
+        {c.hasSensor && !c.valid ? <p className="text-[13px] text-muted-foreground">{noValid}</p> : null}
+        {c.hasSensor ? null : <p className="text-[13px] text-muted-foreground">{t("{unit} has no {metric} sensor — nothing to chart.", { unit: live.unitName, metric: label })}</p>}
       </Card>
-      <Card title={t("Ventilation history")} sub={live.history ? `${live.path} · ${t(live.history.total === 1 ? "{n} log" : "{n} logs", { n: live.history.total })} · ${t("manual records, nothing sent to the AC or to HQ")}` : live.path}>
-        {live.history ? (live.history.rows.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No ventilation logged in this room yet.")}</p>
-          : live.history.rows.map((l) => (
+      <Card title={t("Ventilation history")} sub={live.history ? `${live.path} · ${byCount(live.history.total, { one: t("{n} log", { n: 1 }), many: t("{n} logs", { n: live.history.total }) })} · ${t("manual records, nothing sent to the AC or to HQ")}` : live.path}>
+        {live.history?.rows.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No ventilation logged in this room yet.")}</p> : null}
+        {live.history?.rows.map((l) => (
             <div key={l.id} className="flex flex-wrap justify-between gap-2 border-b border-line py-2 text-[13px] last:border-0">
               <span>{l.text} <span className="text-xs text-muted-foreground">· {l.co2}</span></span><span className="text-xs text-muted-foreground">{l.when} · {l.by}</span>
             </div>
-          )))
-          : <p className="text-[13px] text-muted-foreground">{t("Ventilation logs belong to a room — {unit} is not in one.", { unit: live.unitName })}</p>}
+          ))}
+        {live.history ? null : <p className="text-[13px] text-muted-foreground">{t("Ventilation logs belong to a room — {unit} is not in one.", { unit: live.unitName })}</p>}
         {live.history && live.history.total > live.history.rows.length && <p className="mt-1 text-xs text-muted-foreground">{t("Showing the latest {n}.", { n: live.history.rows.length })}</p>}
       </Card>
       {open && live.spaceId && <LogModal spaceId={live.spaceId} unitId={live.unitId} path={live.path} co2Now={live.co2Now} onClose={() => { setOpen(false); }} />}
