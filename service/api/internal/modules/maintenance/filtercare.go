@@ -80,13 +80,41 @@ const (
 	filterOverdue = "overdue"
 )
 
+// reminderChannels are the channels a cleaning reminder goes on.
+func reminderChannels() []string { return []string{"inApp", "email"} }
+
+// The defaults of the filter care settings: a cleaning is due 30 days after the last one when the run time is unknown,
+// and due soon at 80 % of the threshold or the days.
+const (
+	defaultFallbackDays = 30
+	dueSoonShare        = 0.8
+	hoursPerDay         = 24
+)
+
 // recipientsOwners sends the cleaning reminders to the customer's owners only (FilterCareSettings.recipients); the
 // other choice is all_users.
 const recipientsOwners = "owners"
 
-// filterRank orders the filter statuses for the status sort, unknown first.
-func filterRank() map[string]int {
-	return map[string]int{filterUnknown: 0, filterOK: 1, filterDueSoon: 2, filterOverdue: 3}
+// The ranks of the filter statuses in the status sort, unknown first.
+const (
+	rankFilterUnknown = iota
+	rankFilterOK
+	rankFilterDueSoon
+	rankFilterOverdue
+)
+
+// filterRank is the rank of a filter status in the status sort; a status that is not one ranks with unknown.
+func filterRank(status string) int {
+	switch status {
+	case filterOK:
+		return rankFilterOK
+	case filterDueSoon:
+		return rankFilterDueSoon
+	case filterOverdue:
+		return rankFilterOverdue
+	}
+
+	return rankFilterUnknown
 }
 
 // MarkInput is filterCare.markCleaned input.
@@ -128,9 +156,9 @@ func (in *SettingsInput) Validate() map[string]string {
 
 	seen := map[string]bool{}
 
-	valid := len(in.Channels) >= 1 && len(in.Channels) <= 2
+	valid := len(in.Channels) >= 1 && len(in.Channels) <= len(reminderChannels())
 	for _, ch := range in.Channels {
-		valid = valid && (ch == "inApp" || ch == "email") && !seen[ch]
+		valid = valid && slices.Contains(reminderChannels(), ch) && !seen[ch]
 		seen[ch] = true
 	}
 
@@ -239,7 +267,7 @@ func (m FilterCare) settings(
 		TenantID:     call.Principal.TenantID,
 		Version:      0,
 		CustomerID:   customer,
-		FallbackDays: 30,
+		FallbackDays: defaultFallbackDays,
 		Recipients:   recipientsOwners,
 		Channels: []string{
 			"inApp",
@@ -334,7 +362,7 @@ func (m FilterCare) status(
 	case filterStatus.LastCleanedAt != nil:
 		ratio = call.Now.Sub(*filterStatus.LastCleanedAt).
 			Hours() /
-			24 / float64(
+			hoursPerDay / float64(
 			filterStatus.FallbackDays,
 		)
 	}
@@ -342,7 +370,7 @@ func (m FilterCare) status(
 	switch {
 	case ratio >= 1:
 		filterStatus.Status = filterOverdue
-	case ratio >= 0.8:
+	case ratio >= dueSoonShare:
 		filterStatus.Status = filterDueSoon
 	case ratio >= 0:
 		filterStatus.Status = filterOK
@@ -400,7 +428,7 @@ func (m FilterCare) list(
 		dec.DisallowUnknownFields()
 
 		if dec.Decode(&filters) != nil ||
-			(filters.Status != nil && filterRank()[*filters.Status] == 0 && *filters.Status != filterUnknown) {
+			(filters.Status != nil && filterRank(*filters.Status) == rankFilterUnknown && *filters.Status != filterUnknown) {
 			return paging.Page[FilterStatus]{}, apperr.Fields(
 				map[string]string{fieldFilters: apperr.KeyInvalid},
 			)
@@ -431,6 +459,23 @@ func (m FilterCare) list(
 		return paging.Page[FilterStatus]{}, apperr.Wrap(err, "maintenance.FilterUnits.BriefUnits")
 	}
 
+	out, err := m.statuses(ctx, call, units, filters.Status)
+	if err != nil {
+		return paging.Page[FilterStatus]{}, err
+	}
+
+	sortFilterStatuses(out, query.Sort, desc)
+
+	return pageOf(out, *query, filters, call.Principal.ScopeVersion)
+}
+
+// statuses are the units' filter statuses, with the status filter; the settings are read once per customer.
+func (m FilterCare) statuses(
+	ctx context.Context,
+	call *ops.Call,
+	units []ops.UnitBrief,
+	status *string,
+) ([]FilterStatus, error) {
 	cache := map[uuid.UUID]FilterSettings{}
 	out := []FilterStatus{}
 
@@ -439,7 +484,7 @@ func (m FilterCare) list(
 		if !ok {
 			cust, _, err := m.Units.CustomerOfOrg(ctx, call, unitBrief.OrgID)
 			if err != nil {
-				return paging.Page[FilterStatus]{}, apperr.Wrap(
+				return nil, apperr.Wrap(
 					err,
 					"maintenance.FilterUnits.CustomerOfOrg",
 				)
@@ -447,7 +492,7 @@ func (m FilterCare) list(
 
 			set, err = m.settings(ctx, call, cust)
 			if err != nil {
-				return paging.Page[FilterStatus]{}, err
+				return nil, err
 			}
 
 			cache[unitBrief.OrgID] = set
@@ -455,30 +500,34 @@ func (m FilterCare) list(
 
 		filterStatus, err := m.status(ctx, call, unitBrief, set)
 		if err != nil {
-			return paging.Page[FilterStatus]{}, err
+			return nil, err
 		}
 
-		if filters.Status == nil || filterStatus.Status == *filters.Status {
+		if status == nil || filterStatus.Status == *status {
 			out = append(out, filterStatus)
 		}
 	}
 
+	return out, nil
+}
+
+// sortFilterStatuses orders the statuses by rank (unknown, ok, due soon, overdue; desc unless asked otherwise) and then
+// by unit, or by unit only for the id sort.
+func sortFilterStatuses(out []FilterStatus, sortBy *paging.SortSpec, desc bool) {
 	sort.SliceStable(out, func(left, right int) bool {
-		if query.Sort == nil || query.Sort.Field == fieldStatus {
-			if a, b := filterRank()[out[left].Status], filterRank()[out[right].Status]; a != b {
+		if sortBy == nil || sortBy.Field == fieldStatus {
+			if a, b := filterRank(out[left].Status), filterRank(out[right].Status); a != b {
 				return (a > b) == desc
 			}
 		}
 
 		less := out[left].UnitID.String() < out[right].UnitID.String()
-		if query.Sort != nil && query.Sort.Field == "id" && desc {
+		if sortBy != nil && sortBy.Field == "id" && desc {
 			return !less
 		}
 
 		return less
 	})
-
-	return pageOf(out, *query, filters, call.Principal.ScopeVersion)
 }
 
 // markCleaned serves filterCare.markCleaned.
@@ -843,7 +892,7 @@ func reminderEvidence(filterStatus FilterStatus, now time.Time) string {
 	case filterStatus.LastCleanedAt != nil:
 		return fmt.Sprintf(
 			"Cleaning due (%d days since the last cleaning, run time unknown). Not a fault.",
-			int(now.Sub(*filterStatus.LastCleanedAt).Hours()/24),
+			int(now.Sub(*filterStatus.LastCleanedAt).Hours()/hoursPerDay),
 		)
 	}
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -371,6 +370,12 @@ func (in *CapacityInput) Validate() map[string]string {
 	return nil
 }
 
+// A technician's working day in Kuala Lumpur time: from 09:00 to 17:00.
+const (
+	workdayStart = 9 * time.Hour
+	workdayEnd   = 17 * time.Hour
+)
+
 // Capacity is Capacity of service-contracts.ts.
 type Capacity struct {
 	MembershipID     uuid.UUID `json:"membershipId"`
@@ -420,7 +425,7 @@ func (m Workforce) capacity(
 	input *CapacityInput,
 ) (paging.Page[Capacity], error) {
 	day, _ := time.ParseInLocation("2006-01-02", input.Date, kualaLumpur)
-	work := Slot{day.Add(9 * time.Hour).UTC(), day.Add(17 * time.Hour).UTC()}
+	work := Slot{day.Add(workdayStart).UTC(), day.Add(workdayEnd).UTC()}
 	weekend := day.Weekday() == time.Saturday || day.Weekday() == time.Sunday
 
 	filter, err := decodeTechFilter(input.Query)
@@ -440,90 +445,9 @@ func (m Workforce) capacity(
 	out := []Capacity{}
 
 	for _, member := range techs {
-		capacity := Capacity{
-			MembershipID:     member.ID,
-			Date:             input.Date,
-			AvailableSlots:   []Slot{},
-			AssignedSlots:    []Slot{},
-			AvailableMinutes: nil,
-			AssignedMinutes:  0,
-			Utilization:      nil,
-			Unavailability:   nil,
-		}
-
-		typ, off, err := unavailable(
-			ctx,
-			call,
-			member.ID,
-			member.OrganizationID,
-			input.Date,
-			input.Date,
-		)
+		capacity, err := memberCapacity(ctx, call, member, input.Date, work, weekend)
 		if err != nil {
 			return paging.Page[Capacity]{}, err
-		}
-
-		if off {
-			capacity.Unavailability = &typ
-		}
-
-		avail := 0
-
-		if !weekend && !off {
-			capacity.AvailableSlots = []Slot{work}
-			avail = int(work.EndAt.Sub(work.StartAt) / time.Minute)
-		}
-
-		capacity.AvailableMinutes = &avail
-
-		rows, err := call.Tx.Query(
-			ctx,
-			`SELECT lower(scheduled), upper(scheduled) FROM maintenance.assignments WHERE technician_membership_id = $1 AND
-				status = 'active'
-			AND scheduled && tstzrange($2, $3) ORDER BY lower(scheduled)`,
-			member.ID,
-			work.StartAt,
-			work.EndAt,
-		)
-		if err != nil {
-			return paging.Page[Capacity]{}, apperr.Wrap(err, "select maintenance.assignments")
-		}
-
-		for rows.Next() {
-			var slot Slot
-
-			err := rows.Scan(&slot.StartAt, &slot.EndAt)
-			if err != nil {
-				rows.Close()
-
-				return paging.Page[Capacity]{}, apperr.Wrap(err, "select maintenance.assignments")
-			}
-
-			if slot.StartAt.Before(work.StartAt) {
-				slot.StartAt = work.StartAt
-			}
-
-			if slot.EndAt.After(work.EndAt) {
-				slot.EndAt = work.EndAt
-			}
-
-			capacity.AssignedSlots = append(capacity.AssignedSlots, slot)
-		}
-
-		rows.Close()
-
-		rowsErr := rows.Err()
-		if rowsErr != nil {
-			return paging.Page[Capacity]{}, apperr.Wrap(rowsErr, "select maintenance.assignments")
-		}
-
-		if len(capacity.AvailableSlots) > 0 {
-			capacity.AssignedMinutes = unionMinutes(capacity.AssignedSlots)
-		}
-
-		if avail > 0 {
-			u := math.Round(float64(capacity.AssignedMinutes)*1000/float64(avail)) / 10
-			capacity.Utilization = &u
 		}
 
 		out = append(out, capacity)
@@ -542,6 +466,123 @@ func (m Workforce) capacity(
 	}
 
 	return pageOf(out, input.Query, input.Date, call.Principal.ScopeVersion)
+}
+
+// memberCapacity is a technician's capacity on the day: the working hours unless it is a weekend or the technician is
+// unavailable, the visits assigned within them, and the share of the hours they take.
+func memberCapacity(
+	ctx context.Context,
+	call *ops.Call,
+	member identity.Member,
+	date string,
+	work Slot,
+	weekend bool,
+) (Capacity, error) {
+	capacity := Capacity{
+		MembershipID:     member.ID,
+		Date:             date,
+		AvailableSlots:   []Slot{},
+		AssignedSlots:    []Slot{},
+		AvailableMinutes: nil,
+		AssignedMinutes:  0,
+		Utilization:      nil,
+		Unavailability:   nil,
+	}
+
+	typ, off, err := unavailable(
+		ctx,
+		call,
+		member.ID,
+		member.OrganizationID,
+		date,
+		date,
+	)
+	if err != nil {
+		return capacity, err
+	}
+
+	if off {
+		capacity.Unavailability = &typ
+	}
+
+	avail := 0
+
+	if !weekend && !off {
+		capacity.AvailableSlots = []Slot{work}
+		avail = int(work.EndAt.Sub(work.StartAt) / time.Minute)
+	}
+
+	capacity.AvailableMinutes = &avail
+
+	assigned, err := assignedSlots(ctx, call, member.ID, work)
+	if err != nil {
+		return capacity, err
+	}
+
+	capacity.AssignedSlots = append(capacity.AssignedSlots, assigned...)
+
+	if len(capacity.AvailableSlots) > 0 {
+		capacity.AssignedMinutes = unionMinutes(capacity.AssignedSlots)
+	}
+
+	if avail > 0 {
+		capacity.Utilization = pct(capacity.AssignedMinutes, avail)
+	}
+
+	return capacity, nil
+}
+
+// assignedSlots are the technician's active assignments that overlap the working hours, cut to them, in time order.
+func assignedSlots(
+	ctx context.Context,
+	call *ops.Call,
+	member uuid.UUID,
+	work Slot,
+) ([]Slot, error) {
+	var slots []Slot
+
+	rows, err := call.Tx.Query(
+		ctx,
+		`SELECT lower(scheduled), upper(scheduled) FROM maintenance.assignments WHERE technician_membership_id = $1 AND
+			status = 'active'
+		AND scheduled && tstzrange($2, $3) ORDER BY lower(scheduled)`,
+		member,
+		work.StartAt,
+		work.EndAt,
+	)
+	if err != nil {
+		return nil, apperr.Wrap(err, "select maintenance.assignments")
+	}
+
+	for rows.Next() {
+		var slot Slot
+
+		err := rows.Scan(&slot.StartAt, &slot.EndAt)
+		if err != nil {
+			rows.Close()
+
+			return nil, apperr.Wrap(err, "select maintenance.assignments")
+		}
+
+		if slot.StartAt.Before(work.StartAt) {
+			slot.StartAt = work.StartAt
+		}
+
+		if slot.EndAt.After(work.EndAt) {
+			slot.EndAt = work.EndAt
+		}
+
+		slots = append(slots, slot)
+	}
+
+	rows.Close()
+
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return nil, apperr.Wrap(rowsErr, "select maintenance.assignments")
+	}
+
+	return slots, nil
 }
 
 // unionMinutes returns the minutes covered by the union of the slots.
@@ -588,12 +629,14 @@ type UnavailabilityInput struct {
 	Note         *string    `json:"note,omitempty"`
 }
 
-var unavailabilityTypes = map[string]bool{
-	"annual_leave":   true,
-	"training":       true,
-	"public_holiday": true,
-	"sick":           true,
-	codeOther:        true,
+// validUnavailabilityType reports whether value is a kind of unavailability.
+func validUnavailabilityType(value string) bool {
+	switch value {
+	case "annual_leave", "training", "public_holiday", "sick", codeOther:
+		return true
+	}
+
+	return false
 }
 
 // Validate implements ops.Validator.
@@ -606,13 +649,13 @@ func (in *UnavailabilityInput) Validate() map[string]string {
 		fieldErrs["to"] = apperr.KeyRange
 	}
 
-	if !unavailabilityTypes[in.Type] {
+	if !validUnavailabilityType(in.Type) {
 		fieldErrs["type"] = apperr.KeyInvalid
 	}
 
 	if in.Note != nil {
 		*in.Note = strings.TrimSpace(*in.Note)
-		if utf8.RuneCountInString(*in.Note) > 500 {
+		if utf8.RuneCountInString(*in.Note) > maxUnavailabilityNote {
 			fieldErrs["note"] = apperr.KeyLength
 		}
 
@@ -670,63 +713,14 @@ func (m Workforce) setUnavailability(
 	call *ops.Call,
 	input *UnavailabilityInput,
 ) (Unavailability, error) {
-	org := call.Principal.OrgID
-	if input.MembershipID != nil {
-		technician, found, err := m.Delivery.Directory.Technician(ctx, call, *input.MembershipID)
-		if err != nil {
-			return Unavailability{}, apperr.Wrap(err, "maintenance.Directory.Technician")
-		}
-
-		if !found ||
-			(call.Principal.Role == roleContractor && technician.OrgID != call.Principal.OrgID) {
-			return Unavailability{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
-		}
-
-		org = technician.OrgID
-	}
-
-	f, _ := time.ParseInLocation("2006-01-02", input.From, kualaLumpur)
-	t, _ := time.ParseInLocation("2006-01-02", input.To, kualaLumpur)
-	stmt := `SELECT a.id FROM maintenance.assignments a JOIN maintenance.ref_memberships mb ON mb.id =
-		a.technician_membership_id
-		WHERE a.status = 'active' AND a.scheduled && tstzrange($1, $2) AND `
-	args := []any{f.UTC(), t.AddDate(0, 0, 1).UTC()}
-
-	if input.MembershipID != nil {
-		stmt += "a.technician_membership_id = $3"
-
-		args = append(args, *input.MembershipID)
-	} else {
-		stmt += "mb.organization_id = $3"
-
-		args = append(args, org)
-	}
-
-	rows, err := call.Tx.Query(ctx, stmt+" ORDER BY a.id", args...)
+	org, err := m.unavailabilityOrg(ctx, call, input.MembershipID)
 	if err != nil {
-		return Unavailability{}, apperr.Wrap(err, "query (setUnavailability)")
+		return Unavailability{}, err
 	}
 
-	conflicts := []uuid.UUID{}
-
-	for rows.Next() {
-		var assignmentID uuid.UUID
-
-		err := rows.Scan(&assignmentID)
-		if err != nil {
-			rows.Close()
-
-			return Unavailability{}, apperr.Wrap(err, "query (setUnavailability)")
-		}
-
-		conflicts = append(conflicts, assignmentID)
-	}
-
-	rows.Close()
-
-	rowsErr := rows.Err()
-	if rowsErr != nil {
-		return Unavailability{}, apperr.Wrap(rowsErr, "query (setUnavailability)")
+	conflicts, err := conflictingAssignments(ctx, call, input, org)
+	if err != nil {
+		return Unavailability{}, err
 	}
 
 	unavailability := Unavailability{
@@ -774,6 +768,85 @@ func (m Workforce) setUnavailability(
 	)
 
 	return unavailability, nil
+}
+
+// unavailabilityOrg is the company an unavailability belongs to: the caller's, or the named technician's, who must be
+// a contractor's own.
+func (m Workforce) unavailabilityOrg(
+	ctx context.Context,
+	call *ops.Call,
+	membership *uuid.UUID,
+) (uuid.UUID, error) {
+	org := call.Principal.OrgID
+	if membership != nil {
+		technician, found, err := m.Delivery.Directory.Technician(ctx, call, *membership)
+		if err != nil {
+			return org, apperr.Wrap(err, "maintenance.Directory.Technician")
+		}
+
+		if !found ||
+			(call.Principal.Role == roleContractor && technician.OrgID != call.Principal.OrgID) {
+			return org, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+		}
+
+		org = technician.OrgID
+	}
+
+	return org, nil
+}
+
+// conflictingAssignments are the active assignments in the days, of the technician or of the whole company.
+func conflictingAssignments(
+	ctx context.Context,
+	call *ops.Call,
+	input *UnavailabilityInput,
+	org uuid.UUID,
+) ([]uuid.UUID, error) {
+	f, _ := time.ParseInLocation("2006-01-02", input.From, kualaLumpur)
+	t, _ := time.ParseInLocation("2006-01-02", input.To, kualaLumpur)
+	stmt := `SELECT a.id FROM maintenance.assignments a JOIN maintenance.ref_memberships mb ON mb.id =
+		a.technician_membership_id
+		WHERE a.status = 'active' AND a.scheduled && tstzrange($1, $2) AND `
+	args := []any{f.UTC(), t.AddDate(0, 0, 1).UTC()}
+
+	if input.MembershipID != nil {
+		stmt += "a.technician_membership_id = $3"
+
+		args = append(args, *input.MembershipID)
+	} else {
+		stmt += "mb.organization_id = $3"
+
+		args = append(args, org)
+	}
+
+	rows, err := call.Tx.Query(ctx, stmt+" ORDER BY a.id", args...)
+	if err != nil {
+		return nil, apperr.Wrap(err, "query (setUnavailability)")
+	}
+
+	conflicts := []uuid.UUID{}
+
+	for rows.Next() {
+		var assignmentID uuid.UUID
+
+		err := rows.Scan(&assignmentID)
+		if err != nil {
+			rows.Close()
+
+			return nil, apperr.Wrap(err, "query (setUnavailability)")
+		}
+
+		conflicts = append(conflicts, assignmentID)
+	}
+
+	rows.Close()
+
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return nil, apperr.Wrap(rowsErr, "query (setUnavailability)")
+	}
+
+	return conflicts, nil
 }
 
 // unavailabilityCols are the columns scanUnavailability reads: the days as the first and the last day.

@@ -23,14 +23,8 @@ type listItem struct {
 	item any
 }
 
-var rankOf = func() map[string]int {
-	m := map[string]int{}
-	for i, s := range jobStatuses() {
-		m[s] = i
-	}
-
-	return m
-}()
+// jobStatusRank is the position of a job status in the status order, 0 for a status that is not one.
+func jobStatusRank(status string) int { return max(slices.Index(jobStatuses(), status), 0) }
 
 // sortItems applies the IR23/IR34 order: desc reverses the rank only, null last both ways, ties id asc.
 func sortItems(items []listItem, field string, desc bool) {
@@ -235,7 +229,7 @@ func (m Jobs) offers(ctx context.Context, call *ops.Call, job *uuid.UUID) ([]Off
 func requiredCodes(scope []string) []string {
 	codes := []string{}
 	for _, s := range scope {
-		if q, ok := QualificationRequirements[s]; ok && !slices.Contains(codes, q) {
+		if q, ok := qualificationFor(s); ok && !slices.Contains(codes, q) {
 			codes = append(codes, q)
 		}
 	}
@@ -416,7 +410,7 @@ func (m Jobs) extraProjections(
 			out = append(
 				out,
 				listItem{
-					rank: rankOf[offerSummary.Status],
+					rank: jobStatusRank(offerSummary.Status),
 					sev:  -1,
 					due:  &due,
 					id:   offerSummary.JobID.String(),
@@ -444,7 +438,7 @@ func (m Jobs) extraProjections(
 		out = append(
 			out,
 			listItem{
-				rank: rankOf[history.Status],
+				rank: jobStatusRank(history.Status),
 				sev:  -1,
 				id:   history.JobID.String(),
 				item: history,

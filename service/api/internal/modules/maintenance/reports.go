@@ -17,30 +17,35 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
-// ComponentGroups lists the inspection components per Unit.serviceScope group in DD-T04–T06 order (IR100 / IR126).
-var ComponentGroups = []struct {
+// ComponentGroup is one Unit.serviceScope group and its inspection components in order.
+type ComponentGroup struct {
 	Group string
 	Keys  []string
-}{
-	{
-		"indoor",
-		[]string{
-			"filter",
-			"evaporator_coil",
-			"blower_motor",
-			"blower_fan",
-			"drain_pipe",
-			"drain_pan",
-			"outlet",
-			"louver",
+}
+
+// ComponentGroups lists the inspection components per Unit.serviceScope group in DD-T04–T06 order (IR100 / IR126).
+func ComponentGroups() []ComponentGroup {
+	return []ComponentGroup{
+		{
+			"indoor",
+			[]string{
+				"filter",
+				"evaporator_coil",
+				"blower_motor",
+				"blower_fan",
+				"drain_pipe",
+				"drain_pan",
+				"outlet",
+				"louver",
+			},
 		},
-	},
-	{"outdoor", []string{"condenser_coil", "compressor", "fan", "blade", "refrigerant_pipe"}},
-	{"electrical", []string{"thermostat", "sensor", "capacitor", "contactor", "wiring"}},
+		{"outdoor", []string{"condenser_coil", "compressor", "fan", "blade", "refrigerant_pipe"}},
+		{"electrical", []string{"thermostat", "sensor", "capacitor", "contactor", "wiring"}},
+	}
 }
 
 func groupOf(key string) string {
-	for _, g := range ComponentGroups {
+	for _, g := range ComponentGroups() {
 		if slices.Contains(g.Keys, key) {
 			return g.Group
 		}
@@ -53,7 +58,7 @@ func groupOf(key string) string {
 func Components(scope []string) []string {
 	var out []string
 
-	for _, g := range ComponentGroups {
+	for _, g := range ComponentGroups() {
 		if slices.Contains(scope, g.Group) {
 			out = append(out, g.Keys...)
 		}
@@ -62,18 +67,30 @@ func Components(scope []string) []string {
 	return out
 }
 
-// MetricUnits is the expected UnitSymbol per Metric (IR126 item 2).
-var MetricUnits = map[string]string{
-	"temperature":          "°C",
-	"humidity":             "%",
-	"co2":                  "ppm",
-	"pm25":                 "µg/m³",
-	"power":                "kW",
-	"vibration":            "mm/s",
-	"refrigerant_pressure": "kPa",
-	"compressor_cycles":    "cycles/h",
-	"airflow_drop":         "%",
-	"heartbeat_gap":        "min",
+// metricUnit is the expected UnitSymbol of a Metric (IR126 item 2), "" for a metric that is not one.
+func metricUnit(metric string) string {
+	switch metric {
+	case "temperature":
+		return "°C"
+	case "humidity", "airflow_drop":
+		return "%"
+	case "co2":
+		return "ppm"
+	case "pm25":
+		return "µg/m³"
+	case "power":
+		return "kW"
+	case "vibration":
+		return "mm/s"
+	case "refrigerant_pressure":
+		return "kPa"
+	case "compressor_cycles":
+		return "cycles/h"
+	case "heartbeat_gap":
+		return "min"
+	}
+
+	return ""
 }
 
 // Item is InspectionItem.
@@ -284,6 +301,21 @@ func scanReport(row pgx.Row) (Report, error) {
 
 // decorate adds attachments, review history and the caller's review availability.
 func (m Reports) decorate(ctx context.Context, call *ops.Call, report *Report) error {
+	err := attachmentRefs(ctx, call, report)
+	if err != nil {
+		return err
+	}
+
+	err = reviewHistory(ctx, call, report)
+	if err != nil {
+		return err
+	}
+
+	return reviewAvailability(ctx, call, report)
+}
+
+// attachmentRefs lists the report's attachments, the oldest first.
+func attachmentRefs(ctx context.Context, call *ops.Call, report *Report) error {
 	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT id, tenant_id, created_at, updated_at, job_id, name, mime, size_bytes, status FROM maintenance.attachments
@@ -327,7 +359,12 @@ func (m Reports) decorate(ctx context.Context, call *ops.Call, report *Report) e
 		return apperr.Wrap(rowsErr, "select maintenance.attachments")
 	}
 
-	rows, err = call.Tx.Query(
+	return nil
+}
+
+// reviewHistory lists the reviews of the report's versions in the order they happened.
+func reviewHistory(ctx context.Context, call *ops.Call, report *Report) error {
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT reviewer_user_id, report_version, decision, reason, occurred_at FROM maintenance.report_reviews WHERE
 			report_id = $1 ORDER BY occurred_at, report_version`,
@@ -360,11 +397,17 @@ func (m Reports) decorate(ctx context.Context, call *ops.Call, report *Report) e
 
 	rows.Close()
 
-	rowsErr = rows.Err()
+	rowsErr := rows.Err()
 	if rowsErr != nil {
 		return apperr.Wrap(rowsErr, "select maintenance.report_reviews")
 	}
 
+	return nil
+}
+
+// reviewAvailability says whether the caller may review the report, and why not: the permission, a report the caller
+// wrote, a version that is not the latest, or a report that is not submitted.
+func reviewAvailability(ctx context.Context, call *ops.Call, report *Report) error {
 	var latest int
 
 	scanErr := call.Tx.QueryRow(ctx, `SELECT max(version) FROM maintenance.work_reports WHERE id = $1`, report.ID).
@@ -426,29 +469,65 @@ type DraftInput struct {
 	AttachmentIDs []uuid.UUID        `json:"attachmentIds"`
 }
 
-var (
-	itemResults = map[string]bool{
-		resultNormal:     true,
-		"attention":      true,
-		"not_inspected":  true,
-		"not_applicable": true,
+// validItemResult reports whether value is an inspection item's result.
+func validItemResult(value string) bool {
+	switch value {
+	case resultNormal, "attention", "not_inspected", "not_applicable":
+		return true
 	}
-	partSources  = map[string]bool{"van_stock": true, "hq_warehouse": true, "bought_locally": true}
-	disposals    = map[string]bool{"disposed_on_site": true, "returned": true}
-	refrigerants = map[string]bool{"R32": true, "R410A": true}
-	leakChecks   = map[string]bool{"pass": true, "fail": true, "not_done": true}
-	unitSymbols  = map[string]bool{
-		"°C":       true,
-		"%":        true,
-		"ppm":      true,
-		"µg/m³":    true,
-		"kW":       true,
-		"mm/s":     true,
-		"kPa":      true,
-		"cycles/h": true,
-		"min":      true,
+
+	return false
+}
+
+// validPartSource reports whether value is where a part came from.
+func validPartSource(value string) bool {
+	switch value {
+	case "van_stock", "hq_warehouse", "bought_locally":
+		return true
 	}
-)
+
+	return false
+}
+
+// validDisposal reports whether value is what happened to an old part.
+func validDisposal(value string) bool {
+	switch value {
+	case "disposed_on_site", "returned":
+		return true
+	}
+
+	return false
+}
+
+// validRefrigerant reports whether value is a refrigerant the reports record.
+func validRefrigerant(value string) bool {
+	switch value {
+	case "R32", "R410A":
+		return true
+	}
+
+	return false
+}
+
+// validLeakCheck reports whether value is a leak check's result.
+func validLeakCheck(value string) bool {
+	switch value {
+	case "pass", "fail", "not_done":
+		return true
+	}
+
+	return false
+}
+
+// validUnitSymbol reports whether value is the symbol of a measurement unit.
+func validUnitSymbol(value string) bool {
+	switch value {
+	case "°C", "%", "ppm", "µg/m³", "kW", "mm/s", "kPa", "cycles/h", "min":
+		return true
+	}
+
+	return false
+}
 
 // Validate implements ops.Validator (IR126 item 2, drafting rules).
 func (in *DraftInput) Validate() map[string]string {
@@ -464,6 +543,21 @@ func (in *DraftInput) Validate() map[string]string {
 		return fieldErrs
 	}
 
+	seen := in.validateItems(fieldErrs)
+	in.validateRecords(seen, fieldErrs)
+
+	if utf8.RuneCountInString(in.WorkText) > maxWorkTextLength {
+		fieldErrs["workText"] = apperr.KeyLength
+	}
+
+	validateNextAction(in.NextAction, fieldErrs)
+
+	return fieldErrs
+}
+
+// validateItems checks the inspection items: known components in their own group, each once, with a result that is
+// one and a reason within its length; it returns the components the draft covers.
+func (in *DraftInput) validateItems(fieldErrs map[string]string) map[string]bool {
 	seen := map[string]bool{}
 
 	for i := range in.Items {
@@ -475,7 +569,7 @@ func (in *DraftInput) Validate() map[string]string {
 		}
 
 		seen[itemInput.ComponentKey] = true
-		if itemInput.Result != nil && !itemResults[*itemInput.Result] {
+		if itemInput.Result != nil && !validItemResult(*itemInput.Result) {
 			fieldErrs[fieldItems] = apperr.KeyInvalid
 		}
 
@@ -491,8 +585,14 @@ func (in *DraftInput) Validate() map[string]string {
 		}
 	}
 
+	return seen
+}
+
+// validateRecords checks the measurements (of a component the draft covers, with the metric's unit), the parts and the
+// refrigerant records.
+func (in *DraftInput) validateRecords(seen map[string]bool, fieldErrs map[string]string) {
 	for _, x := range in.Measurements {
-		if !seen[x.ComponentKey] || MetricUnits[x.Metric] == "" || !unitSymbols[x.Unit] ||
+		if !seen[x.ComponentKey] || metricUnit(x.Metric) == "" || !validUnitSymbol(x.Unit) ||
 			x.ObservedAt.IsZero() {
 			fieldErrs["measurements"] = apperr.KeyInvalid
 		}
@@ -501,8 +601,8 @@ func (in *DraftInput) Validate() map[string]string {
 	for _, p := range in.Parts {
 		n := utf8.RuneCountInString(strings.TrimSpace(p.Name))
 		if n < 1 || n > maxNameLength || p.Quantity < 0 || p.Quantity > 999 ||
-			!partSources[p.Source] ||
-			(p.OldPartDisposal != nil && !disposals[*p.OldPartDisposal]) ||
+			!validPartSource(p.Source) ||
+			(p.OldPartDisposal != nil && !validDisposal(*p.OldPartDisposal)) ||
 			(p.ReplacesComponentKey != nil && groupOf(*p.ReplacesComponentKey) == "") {
 			fieldErrs["parts"] = apperr.KeyInvalid
 		}
@@ -510,54 +610,53 @@ func (in *DraftInput) Validate() map[string]string {
 
 	for _, r := range in.Refrigerant {
 		n := utf8.RuneCountInString(r.CylinderID)
-		if !refrigerants[r.Refrigerant] || n < 1 || n > maxCodeLength || r.RecoveredKg < 0 ||
+		if !validRefrigerant(r.Refrigerant) || n < 1 || n > maxCodeLength || r.RecoveredKg < 0 ||
 			r.ChargedKg < 0 ||
-			!leakChecks[r.LeakCheck] {
+			!validLeakCheck(r.LeakCheck) {
 			fieldErrs["refrigerant"] = apperr.KeyInvalid
 		}
 	}
-
-	if utf8.RuneCountInString(in.WorkText) > 4000 {
-		fieldErrs["workText"] = apperr.KeyLength
-	}
-
-	if nextAction := in.NextAction; nextAction != nil {
-		switch nextAction.Kind {
-		case nextActionNone:
-			if nextAction.Date != nil || nextAction.Note != nil {
-				fieldErrs[fieldNextAction] = apperr.KeyInvalid
-			}
-		case nextActionFollowUp:
-			if nextAction.Date == nil || nextAction.Note == nil ||
-				utf8.RuneCountInString(*nextAction.Note) > maxReasonLength {
-				fieldErrs[fieldNextAction] = apperr.KeyInvalid
-			}
-		default:
-			fieldErrs[fieldNextAction] = apperr.KeyInvalid
-		}
-	}
-
-	return fieldErrs
 }
 
-// draftOf returns the job's current draft (nil when none).
-func (m Reports) draftOf(
+// validateNextAction checks the next action: none, or a follow-up with its date and a note within its length.
+func validateNextAction(nextAction *NextAction, fieldErrs map[string]string) {
+	if nextAction == nil {
+		return
+	}
+
+	switch nextAction.Kind {
+	case nextActionNone:
+		if nextAction.Date != nil || nextAction.Note != nil {
+			fieldErrs[fieldNextAction] = apperr.KeyInvalid
+		}
+	case nextActionFollowUp:
+		if nextAction.Date == nil || nextAction.Note == nil ||
+			utf8.RuneCountInString(*nextAction.Note) > maxReasonLength {
+			fieldErrs[fieldNextAction] = apperr.KeyInvalid
+		}
+	default:
+		fieldErrs[fieldNextAction] = apperr.KeyInvalid
+	}
+}
+
+// currentDraft reads the job's current draft and whether it has one.
+func (m Reports) currentDraft(
 	ctx context.Context,
 	call *ops.Call,
 	job uuid.UUID,
 	lock bool,
-) (*Report, error) {
+) (Report, bool, error) {
 	q := "SELECT " + reportCols + " FROM maintenance.work_reports WHERE job_id = $1 AND state = 'draft'"
 	if lock {
 		q += forUpdate
 	}
 
-	x, err := scanReport(call.Tx.QueryRow(ctx, q, job))
+	draft, err := scanReport(call.Tx.QueryRow(ctx, q, job))
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
+		return draft, false, nil
 	}
 
-	return &x, err
+	return draft, err == nil, err
 }
 
 // saveDraft serves jobs.saveDraft.
@@ -589,33 +688,111 @@ func (m Reports) draftOf(
 //	@Security		BearerAuth
 //	@Router			/v1/jobs/{jobId}/report-draft [put]
 func (m Reports) saveDraft(ctx context.Context, call *ops.Call, input *DraftInput) (Report, error) {
+	unit, err := m.draftJob(ctx, call, input.JobID)
+	if err != nil {
+		return Report{}, err
+	}
+
+	prev, err := m.previousDraft(ctx, call, input)
+	if err != nil {
+		return Report{}, err
+	}
+
+	allowed, err := reportAttachments(ctx, call, prev.ID)
+	if err != nil {
+		return Report{}, err
+	}
+
+	for _, id := range input.AttachmentIDs {
+		if !allowed[id] {
+			return Report{}, apperr.Fields(
+				map[string]string{"attachmentIds": apperr.KeyOtherReportAttachment},
+			)
+		}
+	}
+
+	items, err := mergeItems(call, input, prev, allowed)
+	if err != nil {
+		return Report{}, err
+	}
+
+	meas, err := mergeMeasurements(call, input, prev, unit, items)
+	if err != nil {
+		return Report{}, err
+	}
+
+	err = writeDraft(ctx, call, input, prev, items, meas)
+	if err != nil {
+		return Report{}, err
+	}
+
+	report, err := m.load(ctx, call, prev.ID, prev.Version+1)
+	if err != nil {
+		return report, err
+	}
+
+	call.Emit(
+		outboxEvent(
+			"report",
+			report.ID,
+			"ReportDraftSaved",
+			map[string]any{fieldJobID: input.JobID, "version": report.Version},
+		),
+	)
+	call.Audit(
+		auditEntry(
+			"jobs.saveDraft",
+			"report",
+			report.ID,
+			call.ExpectedVersion,
+			&report.Version,
+			"",
+		),
+	)
+
+	return report, nil
+}
+
+// draftJob checks the job a draft is saved for: it exists, the caller is its technician now, and it is in progress.
+// It returns the job's unit.
+func (m Reports) draftJob(ctx context.Context, call *ops.Call, job uuid.UUID) (uuid.UUID, error) {
 	var (
 		status string
 		unit   uuid.UUID
 	)
 
-	err := call.Tx.QueryRow(ctx, `SELECT status, unit_id FROM maintenance.jobs WHERE id = $1 FOR UPDATE`, input.JobID).
+	err := call.Tx.QueryRow(ctx, `SELECT status, unit_id FROM maintenance.jobs WHERE id = $1 FOR UPDATE`, job).
 		Scan(&status, &unit)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return Report{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+		return unit, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
-		return Report{}, apperr.Wrap(err, "select maintenance.jobs")
+		return unit, apperr.Wrap(err, "select maintenance.jobs")
 	}
 
-	technicianJobErr := m.Access.TechnicianJob(ctx, call, input.JobID, unit)
+	technicianJobErr := m.Access.TechnicianJob(ctx, call, job, unit)
 	if technicianJobErr != nil {
-		return Report{}, technicianJobErr
+		return unit, technicianJobErr
 	}
 
 	if status != statusInProgress {
-		return Report{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
+		return unit, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
-	draft, err := m.draftOf(ctx, call, input.JobID, true)
+	return unit, nil
+}
+
+// previousDraft is the report the draft replaces: a new one when the input names none (the job has no report yet), or
+// the job's current draft at the version shown.
+func (m Reports) previousDraft(
+	ctx context.Context,
+	call *ops.Call,
+	input *DraftInput,
+) (Report, error) {
+	draft, found, err := m.currentDraft(ctx, call, input.JobID, true)
 	if err != nil {
-		return Report{}, err
+		return draft, err
 	}
 
 	var prev Report
@@ -656,23 +833,32 @@ func (m Reports) saveDraft(ctx context.Context, call *ops.Call, input *DraftInpu
 			ReviewHistory:      nil,
 			State:              "",
 		}
-	case draft == nil || draft.ID != *input.ReportID:
+	case !found || draft.ID != *input.ReportID:
 		return Report{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	case draft.Version != *call.ExpectedVersion:
 		return Report{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	default:
-		prev = *draft
+		prev = draft
 	}
-	// attachments of the same report
+
+	return prev, nil
+}
+
+// reportAttachments are the attachments of the report, the only ones its draft may name.
+func reportAttachments(
+	ctx context.Context,
+	call *ops.Call,
+	report uuid.UUID,
+) (map[uuid.UUID]bool, error) {
 	allowed := map[uuid.UUID]bool{}
 
 	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT id FROM maintenance.attachments WHERE report_id = $1`,
-		prev.ID,
+		report,
 	)
 	if err != nil {
-		return Report{}, apperr.Wrap(err, "select maintenance.attachments")
+		return nil, apperr.Wrap(err, "select maintenance.attachments")
 	}
 
 	for rows.Next() {
@@ -682,7 +868,7 @@ func (m Reports) saveDraft(ctx context.Context, call *ops.Call, input *DraftInpu
 		if err != nil {
 			rows.Close()
 
-			return Report{}, apperr.Wrap(err, "select maintenance.attachments")
+			return nil, apperr.Wrap(err, "select maintenance.attachments")
 		}
 
 		allowed[attachmentID] = true
@@ -692,17 +878,21 @@ func (m Reports) saveDraft(ctx context.Context, call *ops.Call, input *DraftInpu
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return Report{}, apperr.Wrap(rowsErr, "select maintenance.attachments")
+		return nil, apperr.Wrap(rowsErr, "select maintenance.attachments")
 	}
 
-	for _, id := range input.AttachmentIDs {
-		if !allowed[id] {
-			return Report{}, apperr.Fields(
-				map[string]string{"attachmentIds": apperr.KeyOtherReportAttachment},
-			)
-		}
-	}
-	// items keep their id and author unless changed (SR07)
+	return allowed, nil
+}
+
+// mergeItems are the draft's inspection items, merged with the previous report's: an item keeps its ID, and its
+// author and time while its result, reason and evidence are unchanged (SR07); evidence must be the report's own
+// attachments.
+func mergeItems(
+	call *ops.Call,
+	input *DraftInput,
+	prev Report,
+	allowed map[uuid.UUID]bool,
+) ([]Item, error) {
 	old := map[string]Item{}
 	for _, it := range prev.Items {
 		old[it.ComponentKey] = it
@@ -713,7 +903,7 @@ func (m Reports) saveDraft(ctx context.Context, call *ops.Call, input *DraftInpu
 	for _, req := range input.Items {
 		for _, e := range req.EvidenceIDs {
 			if !allowed[e] {
-				return Report{}, apperr.Fields(
+				return nil, apperr.Fields(
 					map[string]string{fieldItems: apperr.KeyOtherReportAttachment},
 				)
 			}
@@ -744,6 +934,20 @@ func (m Reports) saveDraft(ctx context.Context, call *ops.Call, input *DraftInpu
 		items = append(items, item)
 	}
 
+	return items, nil
+}
+
+// mergeMeasurements are the draft's measurements on the unit, each on its item's sensor, merged with the previous
+// report's: a measurement the draft had
+// keeps its ID and creation and moves its version on; a value that is no number is missing, and a unit other than the
+// metric's makes it suspect.
+func mergeMeasurements(
+	call *ops.Call,
+	input *DraftInput,
+	prev Report,
+	unit uuid.UUID,
+	items []Item,
+) ([]ReportMeasurement, error) {
 	itemID := map[string]uuid.UUID{}
 	for _, it := range items {
 		itemID[it.ComponentKey] = it.ID
@@ -783,7 +987,7 @@ func (m Reports) saveDraft(ctx context.Context, call *ops.Call, input *DraftInpu
 		if measurement.ID != nil {
 			o, ok := oldM[*measurement.ID]
 			if !ok {
-				return Report{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+				return nil, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 			}
 
 			reportMeasurement.ID, reportMeasurement.CreatedAt, reportMeasurement.Version = o.ID, o.CreatedAt, o.Version+1
@@ -794,7 +998,7 @@ func (m Reports) saveDraft(ctx context.Context, call *ops.Call, input *DraftInpu
 		switch {
 		case measurement.Value == nil || math.IsNaN(*measurement.Value) || math.IsInf(*measurement.Value, 0):
 			reportMeasurement.Quality, reportMeasurement.Value = "missing", nil
-		case MetricUnits[measurement.Metric] != measurement.Unit:
+		case metricUnit(measurement.Metric) != measurement.Unit:
 			reason := "unit_mismatch"
 			reportMeasurement.Quality = "suspect"
 			reportMeasurement.QualityReason = &reason
@@ -804,6 +1008,19 @@ func (m Reports) saveDraft(ctx context.Context, call *ops.Call, input *DraftInpu
 		meas = append(meas, reportMeasurement)
 	}
 
+	return meas, nil
+}
+
+// writeDraft stores the draft: a new report or the next version of the previous one, with its attachments, and the
+// job's draft version.
+func writeDraft(
+	ctx context.Context,
+	call *ops.Call,
+	input *DraftInput,
+	prev Report,
+	items []Item,
+	meas []ReportMeasurement,
+) error {
 	for i := range input.Parts {
 		input.Parts[i].Name = strings.TrimSpace(input.Parts[i].Name)
 	}
@@ -814,7 +1031,7 @@ func (m Reports) saveDraft(ctx context.Context, call *ops.Call, input *DraftInpu
 	for i, v := range []any{items, meas, input.Parts, input.Refrigerant} {
 		encoded, marshalErr := json.Marshal(v)
 		if marshalErr != nil {
-			return Report{}, apperr.Wrap(marshalErr, "json.Marshal")
+			return apperr.Wrap(marshalErr, "json.Marshal")
 		}
 
 		cols[i] = encoded
@@ -825,11 +1042,13 @@ func (m Reports) saveDraft(ctx context.Context, call *ops.Call, input *DraftInpu
 	if input.NextAction != nil {
 		encoded, marshalErr := json.Marshal(input.NextAction)
 		if marshalErr != nil {
-			return Report{}, apperr.Wrap(marshalErr, "json.Marshal")
+			return apperr.Wrap(marshalErr, "json.Marshal")
 		}
 
 		next = encoded
 	}
+
+	var err error
 
 	if input.ReportID == nil {
 		_, err = call.Tx.Exec(
@@ -868,7 +1087,7 @@ func (m Reports) saveDraft(ctx context.Context, call *ops.Call, input *DraftInpu
 	}
 
 	if err != nil {
-		return Report{}, apperr.Wrap(err, "update maintenance.work_reports")
+		return apperr.Wrap(err, "update maintenance.work_reports")
 	}
 
 	_, execErr := call.Tx.Exec(
@@ -878,7 +1097,7 @@ func (m Reports) saveDraft(ctx context.Context, call *ops.Call, input *DraftInpu
 		prev.ID,
 	)
 	if execErr != nil {
-		return Report{}, apperr.Wrap(execErr, "update maintenance.attachments")
+		return apperr.Wrap(execErr, "update maintenance.attachments")
 	}
 
 	_, execErr = call.Tx.Exec(
@@ -888,34 +1107,10 @@ func (m Reports) saveDraft(ctx context.Context, call *ops.Call, input *DraftInpu
 		prev.Version+1,
 	)
 	if execErr != nil {
-		return Report{}, apperr.Wrap(execErr, "update maintenance.jobs")
+		return apperr.Wrap(execErr, "update maintenance.jobs")
 	}
 
-	report, err := m.load(ctx, call, prev.ID, prev.Version+1)
-	if err != nil {
-		return report, err
-	}
-
-	call.Emit(
-		outboxEvent(
-			"report",
-			report.ID,
-			"ReportDraftSaved",
-			map[string]any{fieldJobID: input.JobID, "version": report.Version},
-		),
-	)
-	call.Audit(
-		auditEntry(
-			"jobs.saveDraft",
-			"report",
-			report.ID,
-			call.ExpectedVersion,
-			&report.Version,
-			"",
-		),
-	)
-
-	return report, nil
+	return nil
 }
 
 func eqStr(
@@ -1049,12 +1244,13 @@ func (m Reports) submitJob(ctx context.Context, call *ops.Call, input *SubmitInp
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
-	draft, err := m.draftOf(ctx, call, input.JobID, true)
+	current, found, err := m.currentDraft(ctx, call, input.JobID, true)
 	if err != nil {
 		return Job{}, err
 	}
 
-	if draft == nil || draft.Version != input.ReportVersion {
+	draft := &current
+	if !found || draft.Version != input.ReportVersion {
 		return Job{}, apperr.E(apperr.Conflict, "errors.report_version_changed")
 	}
 
@@ -1084,48 +1280,9 @@ func (m Reports) submitJob(ctx context.Context, call *ops.Call, input *SubmitInp
 		return Job{}, apperr.Wrap(execErr, "update maintenance.work_reports")
 	}
 
-	var raw []byte
-
-	scanErr := call.Tx.QueryRow(ctx, `SELECT time_on_site FROM maintenance.jobs WHERE id = $1`, input.JobID).
-		Scan(&raw)
-	if scanErr != nil {
-		return Job{}, apperr.Wrap(scanErr, "select maintenance.jobs")
-	}
-
-	timeOnSite := TimeOnSite{
-		Pauses:        []Pause{},
-		ArrivedAt:     nil,
-		CheckInMethod: nil,
-		CheckInReason: nil,
-		Distance:      nil,
-		StartedAt:     nil,
-		FinishedAt:    nil,
-		OnSiteMinutes: nil,
-	}
-	if len(raw) > 0 && string(raw) != jsonNull {
-		_ = json.Unmarshal(raw, &timeOnSite)
-	}
-
-	now := call.Now
-	timeOnSite.FinishedAt = &now
-	// a pause still open ends with the submission, so its time is not counted as on site (IR448)
-	if n := len(timeOnSite.Pauses); n > 0 && timeOnSite.Pauses[n-1].To == nil {
-		timeOnSite.Pauses[n-1].To = &now
-	}
-
-	if from := firstNonNil(timeOnSite.ArrivedAt, timeOnSite.StartedAt); from != nil {
-		off, err := offWork(ctx, call, input.JobID, *from, timeOnSite.Pauses)
-		if err != nil {
-			return Job{}, err
-		}
-
-		mins := int(workedFor(*from, now, off) / time.Minute)
-		timeOnSite.OnSiteMinutes = &mins
-	}
-
-	tos, marshalErr := json.Marshal(timeOnSite)
-	if marshalErr != nil {
-		return Job{}, apperr.Wrap(marshalErr, "json.Marshal")
+	tos, err := closedTimeOnSite(ctx, call, input.JobID)
+	if err != nil {
+		return Job{}, err
 	}
 
 	_, execErr = call.Tx.Exec(
@@ -1153,6 +1310,56 @@ func (m Reports) submitJob(ctx context.Context, call *ops.Call, input *SubmitInp
 	}
 
 	return m.Jobs.finishScoped(ctx, call, input.JobID, "jobs.submit", "ReportSubmitted", "")
+}
+
+// closedTimeOnSite is the job's time on site closed at the submission: it finishes now, a pause still open ends with
+// it (IR448), and the minutes on site leave out the pauses and the time the job was out of progress (IR449).
+func closedTimeOnSite(ctx context.Context, call *ops.Call, job uuid.UUID) ([]byte, error) {
+	var raw []byte
+
+	scanErr := call.Tx.QueryRow(ctx, `SELECT time_on_site FROM maintenance.jobs WHERE id = $1`, job).
+		Scan(&raw)
+	if scanErr != nil {
+		return nil, apperr.Wrap(scanErr, "select maintenance.jobs")
+	}
+
+	timeOnSite := TimeOnSite{
+		Pauses:        []Pause{},
+		ArrivedAt:     nil,
+		CheckInMethod: nil,
+		CheckInReason: nil,
+		Distance:      nil,
+		StartedAt:     nil,
+		FinishedAt:    nil,
+		OnSiteMinutes: nil,
+	}
+	if len(raw) > 0 && string(raw) != jsonNull {
+		err := json.Unmarshal(raw, &timeOnSite)
+		if err != nil {
+			return nil, apperr.Wrap(err, "decode maintenance.jobs time_on_site")
+		}
+	}
+
+	now := call.Now
+	timeOnSite.FinishedAt = &now
+	// a pause still open ends with the submission, so its time is not counted as on site (IR448)
+	if n := len(timeOnSite.Pauses); n > 0 && timeOnSite.Pauses[n-1].To == nil {
+		timeOnSite.Pauses[n-1].To = &now
+	}
+
+	if from := firstNonNil(timeOnSite.ArrivedAt, timeOnSite.StartedAt); from != nil {
+		off, err := offWork(ctx, call, job, *from, timeOnSite.Pauses)
+		if err != nil {
+			return nil, err
+		}
+
+		mins := int(workedFor(*from, now, off) / time.Minute)
+		timeOnSite.OnSiteMinutes = &mins
+	}
+
+	tos, marshalErr := json.Marshal(timeOnSite)
+
+	return tos, apperr.Wrap(marshalErr, "json.Marshal")
 }
 
 // offWork lists the intervals since from when the technician was not working on the job (IR449): the pauses and the
@@ -1254,7 +1461,7 @@ func firstNonNil(ts ...*time.Time) *time.Time {
 func submitErrors(report *Report, components []string, now time.Time) map[string]string {
 	fieldErrs := map[string]string{}
 
-	keys := []string{}
+	keys := make([]string, 0, len(report.Items))
 	for _, it := range report.Items {
 		keys = append(keys, it.ComponentKey)
 		if it.Result == nil {
@@ -1415,31 +1622,9 @@ func (m Reports) review(ctx context.Context, c *ops.Call, in *ReviewInput) (Main
 
 // reviewJob is review answering the job with its detail extras.
 func (m Reports) reviewJob(ctx context.Context, call *ops.Call, input *ReviewInput) (Job, error) {
-	var contractor *uuid.UUID
-
-	err := call.Tx.QueryRow(ctx, `SELECT contractor_org_id FROM maintenance.jobs WHERE id = $1`, input.JobID).
-		Scan(&contractor)
+	err := checkReviewer(ctx, call, input)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return Job{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
-		}
-
-		return Job{}, apperr.Wrap(err, "select maintenance.jobs")
-	}
-
-	switch call.Principal.Role {
-	case roleContractor:
-		if contractor == nil || *contractor != call.Principal.OrgID {
-			return Job{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
-		}
-
-		if input.ReviewMode != reviewNormal {
-			return Job{}, apperr.Fields(map[string]string{"reviewMode": apperr.KeyInvalid})
-		}
-	default: // admin
-		if (contractor == nil) != (input.ReviewMode == reviewNormal) {
-			return Job{}, apperr.E(apperr.Forbidden, "errors.review_mode")
-		}
+		return Job{}, err
 	}
 
 	status, _, err := m.lockJob(ctx, call, input.JobID)
@@ -1447,38 +1632,9 @@ func (m Reports) reviewJob(ctx context.Context, call *ops.Call, input *ReviewInp
 		return Job{}, err
 	}
 
-	var (
-		reportID uuid.UUID
-		author   uuid.UUID
-		state    string
-	)
-
-	err = call.Tx.QueryRow(ctx, `SELECT id, author_id, state FROM maintenance.work_reports WHERE job_id = $1 ORDER BY
-		version
-		DESC LIMIT 1 FOR UPDATE`, input.JobID).
-		Scan(&reportID, &author, &state)
-	if errors.Is(err, pgx.ErrNoRows) || status != statusSubmitted {
-		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
-	}
-
+	reportID, latest, err := reportUnderReview(ctx, call, input, status)
 	if err != nil {
-		return Job{}, apperr.Wrap(err, "select maintenance.work_reports")
-	}
-
-	var latest int
-
-	scanErr := call.Tx.QueryRow(ctx, `SELECT max(version) FROM maintenance.work_reports WHERE id = $1`, reportID).
-		Scan(&latest)
-	if scanErr != nil {
-		return Job{}, apperr.Wrap(scanErr, "select maintenance.work_reports")
-	}
-
-	if latest != input.ReportVersion || state != reportSubmitted {
-		return Job{}, apperr.E(apperr.Conflict, "errors.report_version_changed")
-	}
-
-	if author == call.Principal.UserID {
-		return Job{}, apperr.E(apperr.Forbidden, "errors.self_review")
+		return Job{}, err
 	}
 
 	reportState, jobStatus := reportAccepted, statusCompleted
@@ -1550,6 +1706,84 @@ func (m Reports) reviewJob(ctx context.Context, call *ops.Call, input *ReviewInp
 		"ReportReviewed",
 		deref(input.Reason),
 	)
+}
+
+// checkReviewer checks who reviews the job: its contractor, in the normal review only, or HQ, in the normal review of
+// a job without a contractor and the HQ review of one with a contractor.
+func checkReviewer(ctx context.Context, call *ops.Call, input *ReviewInput) error {
+	var contractor *uuid.UUID
+
+	err := call.Tx.QueryRow(ctx, `SELECT contractor_org_id FROM maintenance.jobs WHERE id = $1`, input.JobID).
+		Scan(&contractor)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperr.E(apperr.NotFound, apperr.KeyNotFound)
+		}
+
+		return apperr.Wrap(err, "select maintenance.jobs")
+	}
+
+	switch call.Principal.Role {
+	case roleContractor:
+		if contractor == nil || *contractor != call.Principal.OrgID {
+			return apperr.E(apperr.NotFound, apperr.KeyNotFound)
+		}
+
+		if input.ReviewMode != reviewNormal {
+			return apperr.Fields(map[string]string{"reviewMode": apperr.KeyInvalid})
+		}
+	default: // admin
+		if (contractor == nil) != (input.ReviewMode == reviewNormal) {
+			return apperr.E(apperr.Forbidden, "errors.review_mode")
+		}
+	}
+
+	return nil
+}
+
+// reportUnderReview is the job's submitted report at the version shown, which someone other than its author reviews;
+// it returns the report and its latest version.
+func reportUnderReview(
+	ctx context.Context,
+	call *ops.Call,
+	input *ReviewInput,
+	status string,
+) (uuid.UUID, int, error) {
+	var (
+		reportID uuid.UUID
+		author   uuid.UUID
+		state    string
+	)
+
+	err := call.Tx.QueryRow(ctx, `SELECT id, author_id, state FROM maintenance.work_reports WHERE job_id = $1 ORDER BY
+		version
+		DESC LIMIT 1 FOR UPDATE`, input.JobID).
+		Scan(&reportID, &author, &state)
+	if errors.Is(err, pgx.ErrNoRows) || status != statusSubmitted {
+		return reportID, 0, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
+	}
+
+	if err != nil {
+		return reportID, 0, apperr.Wrap(err, "select maintenance.work_reports")
+	}
+
+	var latest int
+
+	scanErr := call.Tx.QueryRow(ctx, `SELECT max(version) FROM maintenance.work_reports WHERE id = $1`, reportID).
+		Scan(&latest)
+	if scanErr != nil {
+		return reportID, 0, apperr.Wrap(scanErr, "select maintenance.work_reports")
+	}
+
+	if latest != input.ReportVersion || state != reportSubmitted {
+		return reportID, 0, apperr.E(apperr.Conflict, "errors.report_version_changed")
+	}
+
+	if author == call.Principal.UserID {
+		return reportID, 0, apperr.E(apperr.Forbidden, "errors.self_review")
+	}
+
+	return reportID, latest, nil
 }
 
 // ---- jobs.resumeRework ----

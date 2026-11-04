@@ -212,14 +212,14 @@ func checkTechnicianUnit(
 	inScope bool,
 	internal bool,
 ) error {
-	var any, inWindow, notStarted bool
+	var assigned, inWindow, notStarted bool
 
 	err := call.Tx.QueryRow(ctx, `SELECT count(*) > 0,
 		COALESCE(bool_or(a.status = 'active' AND a.valid_from <= $3 AND $3 < a.valid_until), false),
 		COALESCE(bool_or(a.status = 'active' AND $3 < a.valid_from), false)
 		FROM maintenance.assignments a JOIN maintenance.jobs j ON j.id = a.job_id
 		WHERE j.unit_id = $1 AND a.technician_membership_id =
-		$2`, unit, call.Principal.MembershipID, call.Now).Scan(&any, &inWindow, &notStarted)
+		$2`, unit, call.Principal.MembershipID, call.Now).Scan(&assigned, &inWindow, &notStarted)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return apperr.Wrap(err, "select maintenance.assignments")
 	}
@@ -229,7 +229,7 @@ func checkTechnicianUnit(
 		return nil
 	case notStarted:
 		return forbidden("errors.assignment_not_started")
-	case any:
+	case assigned:
 		return forbidden("errors.assignment_ended")
 	case internal && inScope:
 		return forbidden("errors.assignment_required")

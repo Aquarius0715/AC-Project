@@ -43,7 +43,7 @@ func (m Jobs) ReleaseEndedAccess(ctx context.Context, call *ops.Call) (int, erro
 	}
 
 	for _, e := range list {
-		err := releaseAssignment(ctx, call, e, accessEnded)
+		err := releaseAssignment(ctx, call, e, accessEnded())
 		if err != nil {
 			return 0, err
 		}
@@ -103,7 +103,7 @@ func releaseQualificationEnded(
 			continue
 		}
 
-		releaseAssignmentErr := releaseAssignment(ctx, call, target.released, qualificationEnded)
+		releaseAssignmentErr := releaseAssignment(ctx, call, target.released, qualificationEnded())
 		if releaseAssignmentErr != nil {
 			return releaseAssignmentErr
 		}
@@ -122,20 +122,25 @@ type released struct {
 // parameter and the audit reason.
 type releaseCause struct{ reason, event, notice, audit string }
 
-var (
-	accessEnded = releaseCause{
+// accessEnded is the release of an assignment whose technician's access ended before the visit (IR439).
+func accessEnded() releaseCause {
+	return releaseCause{
 		"access_ended",
 		"job.assignment_released",
 		"technician_access_ended",
 		"technician access ended before the visit",
 	}
-	qualificationEnded = releaseCause{
+}
+
+// qualificationEnded is the release of an assignment whose technician's qualification no longer covers the visit.
+func qualificationEnded() releaseCause {
+	return releaseCause{
 		"qualification_ended",
 		"job.qualification_released",
 		"technician_qualification_ended",
 		"technician qualification does not cover the visit",
 	}
-)
+}
 
 // releaseAssignment revokes the assignment and returns its job to be assigned again with its agreed visit (IR439):
 // accepted for a contractor's job, requested for HQ's own delivery. The job's assigners get a job_update notice.

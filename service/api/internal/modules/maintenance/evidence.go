@@ -31,12 +31,15 @@ type ListAttachmentsInput struct {
 	Query   paging.Query `json:"query"`
 }
 
+// maxEvidenceUnits is how many units one evidence export names at most.
+const maxEvidenceUnits = 500
+
 // Validate implements ops.Validator: 1–500 distinct units and a period [from, to) of at most 366 days.
 func (in *ListAttachmentsInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	seen := map[uuid.UUID]bool{}
 
-	valid := len(in.UnitIDs) >= 1 && len(in.UnitIDs) <= 500
+	valid := len(in.UnitIDs) >= 1 && len(in.UnitIDs) <= maxEvidenceUnits
 	for _, u := range in.UnitIDs {
 		valid = valid && u != uuid.Nil && !seen[u]
 		seen[u] = true
@@ -99,62 +102,9 @@ func (m Files) list(
 		return paging.Page[EvidenceAttachment]{}, apperr.Wrap(err, "paging.NoFilters")
 	}
 
-	rows, err := call.Tx.Query(
-		ctx,
-		`SELECT a.id, a.tenant_id, a.created_at, a.updated_at, a.job_id, a.report_id, a.name, a.mime, a.size_bytes, a.status,
-			j.unit_id, r.accepted_at
-		FROM maintenance.attachments a
-		JOIN maintenance.work_reports r ON r.id = a.report_id AND r.state = 'accepted'
-		JOIN maintenance.jobs j ON j.id = a.job_id
-		WHERE a.status = 'ready' AND j.unit_id = ANY($1) AND a.created_at >= $2 AND a.created_at < $3`,
-		input.UnitIDs,
-		input.From,
-		input.To,
-	)
+	all, err := evidenceAttachments(ctx, call, input)
 	if err != nil {
-		return paging.Page[EvidenceAttachment]{}, apperr.Wrap(err, "select maintenance.attachments")
-	}
-
-	all := []EvidenceAttachment{}
-
-	for rows.Next() {
-		var evidenceAttachment EvidenceAttachment
-
-		err := rows.Scan(
-			&evidenceAttachment.ID,
-			&evidenceAttachment.TenantID,
-			&evidenceAttachment.CreatedAt,
-			&evidenceAttachment.UpdatedAt,
-			&evidenceAttachment.JobID,
-			&evidenceAttachment.ReportID,
-			&evidenceAttachment.Name,
-			&evidenceAttachment.Mime,
-			&evidenceAttachment.Size,
-			&evidenceAttachment.Status,
-			&evidenceAttachment.UnitID,
-			&evidenceAttachment.AcceptedAt,
-		)
-		if err != nil {
-			rows.Close()
-
-			return paging.Page[EvidenceAttachment]{}, apperr.Wrap(
-				err,
-				"select maintenance.attachments",
-			)
-		}
-
-		evidenceAttachment.Version, evidenceAttachment.BlobID = 1, evidenceAttachment.ID
-		all = append(all, evidenceAttachment)
-	}
-
-	rows.Close()
-
-	rowsErr := rows.Err()
-	if rowsErr != nil {
-		return paging.Page[EvidenceAttachment]{}, apperr.Wrap(
-			rowsErr,
-			"select maintenance.attachments",
-		)
+		return paging.Page[EvidenceAttachment]{}, err
 	}
 
 	sort := input.Query.Sort
@@ -192,4 +142,71 @@ func (m Files) list(
 		Total:           len(all),
 		SnapshotVersion: window.Snapshot,
 	}, nil
+}
+
+// evidenceAttachments are the ready attachments of the accepted reports on the units, created in the period.
+func evidenceAttachments(
+	ctx context.Context,
+	call *ops.Call,
+	input *ListAttachmentsInput,
+) ([]EvidenceAttachment, error) {
+	rows, err := call.Tx.Query(
+		ctx,
+		`SELECT a.id, a.tenant_id, a.created_at, a.updated_at, a.job_id, a.report_id, a.name, a.mime, a.size_bytes, a.status,
+			j.unit_id, r.accepted_at
+		FROM maintenance.attachments a
+		JOIN maintenance.work_reports r ON r.id = a.report_id AND r.state = 'accepted'
+		JOIN maintenance.jobs j ON j.id = a.job_id
+		WHERE a.status = 'ready' AND j.unit_id = ANY($1) AND a.created_at >= $2 AND a.created_at < $3`,
+		input.UnitIDs,
+		input.From,
+		input.To,
+	)
+	if err != nil {
+		return nil, apperr.Wrap(err, "select maintenance.attachments")
+	}
+
+	all := []EvidenceAttachment{}
+
+	for rows.Next() {
+		var evidenceAttachment EvidenceAttachment
+
+		err := rows.Scan(
+			&evidenceAttachment.ID,
+			&evidenceAttachment.TenantID,
+			&evidenceAttachment.CreatedAt,
+			&evidenceAttachment.UpdatedAt,
+			&evidenceAttachment.JobID,
+			&evidenceAttachment.ReportID,
+			&evidenceAttachment.Name,
+			&evidenceAttachment.Mime,
+			&evidenceAttachment.Size,
+			&evidenceAttachment.Status,
+			&evidenceAttachment.UnitID,
+			&evidenceAttachment.AcceptedAt,
+		)
+		if err != nil {
+			rows.Close()
+
+			return nil, apperr.Wrap(
+				err,
+				"select maintenance.attachments",
+			)
+		}
+
+		evidenceAttachment.Version, evidenceAttachment.BlobID = 1, evidenceAttachment.ID
+		all = append(all, evidenceAttachment)
+	}
+
+	rows.Close()
+
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return nil, apperr.Wrap(
+			rowsErr,
+			"select maintenance.attachments",
+		)
+	}
+
+	return all, nil
 }

@@ -53,17 +53,17 @@ func (m Jobs) CountJobs(
 	seen := map[uuid.UUID]bool{}
 
 	for _, it := range items {
-		switch x := it.item.(type) {
+		switch job := it.item.(type) {
 		case OfferSummary:
-			if x.Status == statusOffered {
+			if job.Status == statusOffered {
 				jobCounts.Offer++
 			}
 		case Summary:
-			if x.Status == statusCompleted || x.Status == statusCancelled {
+			if job.Status == statusCompleted || job.Status == statusCancelled {
 				continue
 			}
 
-			switch x.Status { // D07 / SR KPI definitions
+			switch job.Status { // D07 / SR KPI definitions
 			case statusAccepted, statusAssigned:
 				jobCounts.Active++
 				jobCounts.Scheduled++
@@ -74,17 +74,17 @@ func (m Jobs) CountJobs(
 				jobCounts.Review++
 			}
 
-			if x.DueAt.Before(call.Now) {
+			if job.DueAt.Before(call.Now) {
 				jobCounts.Overdue++
 			}
 
-			if x.AssignmentID != nil {
+			if job.AssignmentID != nil {
 				jobCounts.Assigned++
 			}
 
-			if !seen[x.UnitID] {
-				seen[x.UnitID] = true
-				jobCounts.Units = append(jobCounts.Units, x.UnitID)
+			if !seen[job.UnitID] {
+				seen[job.UnitID] = true
+				jobCounts.Units = append(jobCounts.Units, job.UnitID)
 			}
 		}
 	}

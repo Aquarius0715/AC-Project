@@ -111,14 +111,26 @@ func scanProfile(r pgx.Row) (Profile, error) {
 	return profile, apperr.Wrap(err, "scan (scanProfile)")
 }
 
+// The precision of the shares and ratings answered: a share in tenths of a percent, a rating to a tenth.
+const (
+	tenthsOfPercent = 1000
+	tenths          = 10
+)
+
+// pct is n of d as a percentage to a tenth, nil when d is 0.
 func pct(n, d int) *float64 {
 	if d == 0 {
 		return nil
 	}
 
-	v := math.Round(float64(n)*1000/float64(d)) / 10
+	v := math.Round(float64(n)*tenthsOfPercent/float64(d)) / tenths
 
 	return &v
+}
+
+// averageRating is the average of the stars over the ratings, to a tenth.
+func averageRating(stars, ratings int) float64 {
+	return math.Round(float64(stars)*tenths/float64(ratings)) / tenths
 }
 
 // kpis computes ContractorKpis for the 90 days ending now (IR131 item 6).
@@ -202,7 +214,7 @@ func (m Partners) kpis(ctx context.Context, call *ops.Call, org uuid.UUID) (KPIs
 		completed,
 	)
 	if kpIs.RatingCount > 0 {
-		v := math.Round(float64(stars)*10/float64(kpIs.RatingCount)) / 10
+		v := averageRating(stars, kpIs.RatingCount)
 		kpIs.AverageRating = &v
 	}
 
@@ -317,6 +329,61 @@ func (m Partners) loadProfile(
 	return profile, err
 }
 
+// contractorFilter is the filters of contractors.list.
+type contractorFilter struct {
+	Status *string `json:"status,omitempty"`
+	Search *string `json:"search,omitempty"` // name, registration number or a service area contains
+}
+
+// contractorFilterOf decodes and checks the filters of contractors.list.
+func contractorFilterOf(raw json.RawMessage) (contractorFilter, error) {
+	var filter contractorFilter
+
+	if len(raw) == 0 {
+		return filter, nil
+	}
+
+	dec := json.NewDecoder(strings.NewReader(string(raw)))
+	dec.DisallowUnknownFields()
+
+	if dec.Decode(&filter) != nil ||
+		(filter.Status != nil && *filter.Status != contractorActive && *filter.Status != contractorSuspended) {
+		return contractorFilter{}, apperr.Fields(
+			map[string]string{fieldFilters: apperr.KeyInvalid},
+		)
+	}
+
+	return filter, nil
+}
+
+// where is the filter's WHERE clause, with its arguments.
+func (filter contractorFilter) where(call *ops.Call) (string, []any) {
+	args := []any{call.Now}
+	conds := []string{sqlTrue}
+
+	if filter.Status != nil {
+		args = append(args, *filter.Status)
+		conds = append(conds, fmt.Sprintf("p.status = $%d", len(args)))
+	}
+
+	if filter.Search != nil && strings.TrimSpace(*filter.Search) != "" {
+		args = append(args, paging.Contains(*filter.Search))
+		searchArg := len(args)
+		conds = append(
+			conds,
+			fmt.Sprintf(
+				"(p.name ILIKE $%d OR p.registration_no ILIKE $%d OR EXISTS (SELECT 1 FROM unnest(p.service_areas) a WHERE a "+
+					"ILIKE $%d))",
+				searchArg,
+				searchArg,
+				searchArg,
+			),
+		)
+	}
+
+	return strings.Join(conds, " AND "), args
+}
+
 // list serves contractors.list.
 //
 //	@Summary		contractors.list (read)
@@ -349,21 +416,9 @@ func (m Partners) list(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[Profile], error) {
-	var filters struct {
-		Status *string `json:"status,omitempty"`
-		Search *string `json:"search,omitempty"` // name, registration number or a service area contains
-	}
-
-	if len(query.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
-		dec.DisallowUnknownFields()
-
-		if dec.Decode(&filters) != nil ||
-			(filters.Status != nil && *filters.Status != contractorActive && *filters.Status != contractorSuspended) {
-			return paging.Page[Profile]{}, apperr.Fields(
-				map[string]string{fieldFilters: apperr.KeyInvalid},
-			)
-		}
+	filters, err := contractorFilterOf(query.Filters)
+	if err != nil {
+		return paging.Page[Profile]{}, err
 	}
 
 	order, err := paging.OrderBy(
@@ -380,30 +435,7 @@ func (m Partners) list(
 		return paging.Page[Profile]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
-	args := []any{call.Now}
-	conds := []string{sqlTrue}
-
-	if filters.Status != nil {
-		args = append(args, *filters.Status)
-		conds = append(conds, fmt.Sprintf("p.status = $%d", len(args)))
-	}
-
-	if filters.Search != nil && strings.TrimSpace(*filters.Search) != "" {
-		args = append(args, paging.Contains(*filters.Search))
-		searchArg := len(args)
-		conds = append(
-			conds,
-			fmt.Sprintf(
-				"(p.name ILIKE $%d OR p.registration_no ILIKE $%d OR EXISTS (SELECT 1 FROM unnest(p.service_areas) a WHERE a "+
-					"ILIKE $%d))",
-				searchArg,
-				searchArg,
-				searchArg,
-			),
-		)
-	}
-
-	where := strings.Join(conds, " AND ")
+	where, args := filters.where(call)
 
 	var total int
 
@@ -539,97 +571,21 @@ func (in *ProfileInput) Validate() map[string]string {
 //	@Security		BearerAuth
 //	@Router			/v1/contractors [post]
 func (m Partners) save(ctx context.Context, call *ops.Call, input *ProfileInput) (Profile, error) {
-	org, err := m.Orgs.OrgState(ctx, call, input.OrganizationID)
+	name, err := m.contractorName(ctx, call, input.OrganizationID)
 	if err != nil {
-		return Profile{}, apperr.Wrap(err, "maintenance.OrgNames.OrgState")
-	}
-
-	if !org.Found {
-		return Profile{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
-	}
-
-	if org.Kind != orgKindContractor {
-		return Profile{}, apperr.Fields(
-			map[string]string{fieldOrganizationID: "error.notContractor"},
-		)
-	}
-
-	name, err := m.Orgs.OrgName(ctx, call, input.OrganizationID)
-	if err != nil {
-		return Profile{}, apperr.Wrap(err, "maintenance.OrgNames.OrgName")
-	}
-
-	delegationEnd := func(from time.Time) time.Time {
-		if input.InsuranceValidUntil != nil && input.InsuranceValidUntil.After(from) {
-			return *input.InsuranceValidUntil
-		}
-
-		return from.Add(365 * 24 * time.Hour)
+		return Profile{}, err
 	}
 
 	var profileID uuid.UUID
 
 	if input.ID == nil {
-		var exists bool
-
-		err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id =
-			$1)`, input.OrganizationID).
-			Scan(&exists)
-		if err != nil {
-			return Profile{}, apperr.Wrap(err, "select maintenance.contractors")
-		}
-
-		if exists {
-			return Profile{}, apperr.E(apperr.Conflict, "errors.profile_exists")
-		}
-
-		err = call.Tx.QueryRow(ctx, `INSERT INTO maintenance.contractors (tenant_id, organization_id, name, status,
-			registration_no, service_areas, contact_email,
-			insurance_valid_until, delegation, created_at, updated_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2,
-			'active', $3, $4, $5, $6, tstzrange($7, $8), $7, $7)
-			RETURNING
-			id`, input.OrganizationID, name, input.RegistrationNo, input.ServiceAreas, input.ContactEmail,
-			input.InsuranceValidUntil, call.Now,
-			delegationEnd(call.Now)).
-			Scan(&profileID)
-		if err != nil {
-			return Profile{}, apperr.Wrap(err, "insert maintenance.contractors")
-		}
+		profileID, err = addProfile(ctx, call, input, name)
 	} else {
-		profile, err := m.loadProfile(ctx, call, "p.id = $2", []any{*input.ID}, true)
-		if err != nil {
-			return profile, err
-		}
+		profileID, err = m.updateProfile(ctx, call, input, name)
+	}
 
-		if profile.OrganizationID != input.OrganizationID {
-			return profile, apperr.Fields(
-				map[string]string{fieldOrganizationID: "error.organizationFixed"},
-			)
-		}
-
-		if profile.Version != *call.ExpectedVersion {
-			return profile, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
-		}
-
-		_, execErr := call.Tx.Exec(
-			ctx,
-			`UPDATE maintenance.contractors SET name = $2, registration_no = $3, service_areas = $4, contact_email = $5,
-				insurance_valid_until = $6,
-			delegation = tstzrange(lower(delegation), $7), version = version + 1, updated_at = $8 WHERE id = $1`,
-			profile.ID,
-			name,
-			input.RegistrationNo,
-			input.ServiceAreas,
-			input.ContactEmail,
-			input.InsuranceValidUntil,
-			delegationEnd(profile.CreatedAt),
-			call.Now,
-		)
-		if execErr != nil {
-			return profile, apperr.Wrap(execErr, "update maintenance.contractors")
-		}
-
-		profileID = profile.ID
+	if err != nil {
+		return Profile{}, err
 	}
 
 	saved, err := m.loadProfile(ctx, call, "p.id = $2", []any{profileID}, false)
@@ -657,6 +613,119 @@ func (m Partners) save(ctx context.Context, call *ops.Call, input *ProfileInput)
 	)
 
 	return saved, nil
+}
+
+// contractorName is the name of the contractor company a profile is saved for; another kind of organization is refused.
+func (m Partners) contractorName(
+	ctx context.Context,
+	call *ops.Call,
+	org uuid.UUID,
+) (string, error) {
+	state, err := m.Orgs.OrgState(ctx, call, org)
+	if err != nil {
+		return "", apperr.Wrap(err, "maintenance.OrgNames.OrgState")
+	}
+
+	if !state.Found {
+		return "", apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	}
+
+	if state.Kind != orgKindContractor {
+		return "", apperr.Fields(
+			map[string]string{fieldOrganizationID: "error.notContractor"},
+		)
+	}
+
+	name, err := m.Orgs.OrgName(ctx, call, org)
+
+	return name, apperr.Wrap(err, "maintenance.OrgNames.OrgName")
+}
+
+// delegationEnd is when a contractor's delegation starting at from ends: with its insurance, or a year on without one.
+func delegationEnd(insuranceValidUntil *time.Time, from time.Time) time.Time {
+	if insuranceValidUntil != nil && insuranceValidUntil.After(from) {
+		return *insuranceValidUntil
+	}
+
+	return from.Add(365 * 24 * time.Hour)
+}
+
+// addProfile creates the company's contractor profile, active from now; a company has one.
+func addProfile(
+	ctx context.Context,
+	call *ops.Call,
+	input *ProfileInput,
+	name string,
+) (uuid.UUID, error) {
+	var exists bool
+
+	err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id =
+		$1)`, input.OrganizationID).
+		Scan(&exists)
+	if err != nil {
+		return uuid.Nil, apperr.Wrap(err, "select maintenance.contractors")
+	}
+
+	if exists {
+		return uuid.Nil, apperr.E(apperr.Conflict, "errors.profile_exists")
+	}
+
+	var profileID uuid.UUID
+
+	err = call.Tx.QueryRow(ctx, `INSERT INTO maintenance.contractors (tenant_id, organization_id, name, status,
+		registration_no, service_areas, contact_email,
+		insurance_valid_until, delegation, created_at, updated_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2,
+		'active', $3, $4, $5, $6, tstzrange($7, $8), $7, $7)
+		RETURNING
+		id`, input.OrganizationID, name, input.RegistrationNo, input.ServiceAreas, input.ContactEmail,
+		input.InsuranceValidUntil, call.Now,
+		delegationEnd(input.InsuranceValidUntil, call.Now)).
+		Scan(&profileID)
+
+	return profileID, apperr.Wrap(err, "insert maintenance.contractors")
+}
+
+// updateProfile saves the company's profile at the version shown; its organization stays as it is.
+func (m Partners) updateProfile(
+	ctx context.Context,
+	call *ops.Call,
+	input *ProfileInput,
+	name string,
+) (uuid.UUID, error) {
+	profile, err := m.loadProfile(ctx, call, "p.id = $2", []any{*input.ID}, true)
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	if profile.OrganizationID != input.OrganizationID {
+		return uuid.Nil, apperr.Fields(
+			map[string]string{fieldOrganizationID: "error.organizationFixed"},
+		)
+	}
+
+	if profile.Version != *call.ExpectedVersion {
+		return uuid.Nil, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
+	}
+
+	_, execErr := call.Tx.Exec(
+		ctx,
+		`UPDATE maintenance.contractors SET name = $2, registration_no = $3, service_areas = $4, contact_email = $5,
+			insurance_valid_until = $6,
+		delegation = tstzrange(lower(delegation), $7), version = version + 1, updated_at = $8 WHERE id = $1`,
+		profile.ID,
+		name,
+		input.RegistrationNo,
+		input.ServiceAreas,
+		input.ContactEmail,
+		input.InsuranceValidUntil,
+		delegationEnd(input.InsuranceValidUntil, profile.CreatedAt),
+		call.Now,
+	)
+	if execErr != nil {
+		return uuid.Nil, apperr.Wrap(execErr, "update maintenance.contractors")
+	}
+
+	return profile.ID, nil
 }
 
 // The offer statuses of a contractor profile: an active contractor is offered jobs, a suspended one is not.
@@ -806,7 +875,10 @@ type RateCard struct {
 	Lines           []RateLine `json:"lines"`
 }
 
-var workTypes = []string{"periodic_inspection", "repair_base", "emergency", "rework_deduction"}
+// workTypes are the kinds of work a rate card prices.
+func workTypes() []string {
+	return []string{"periodic_inspection", "repair_base", "emergency", "rework_deduction"}
+}
 
 // RateCardInput is rateCards.save input.
 type RateCardInput struct {
@@ -839,7 +911,7 @@ func (in *RateCardInput) Validate() map[string]string {
 
 	for i := range in.Lines {
 		rateLine := &in.Lines[i]
-		if !slices.Contains(workTypes, rateLine.WorkType) || seen[rateLine.WorkType] ||
+		if !slices.Contains(workTypes(), rateLine.WorkType) || seen[rateLine.WorkType] ||
 			rateLine.AmountMinor < 0 {
 			fieldErrs["lines"] = apperr.KeyInvalid
 		}
@@ -847,7 +919,7 @@ func (in *RateCardInput) Validate() map[string]string {
 		seen[rateLine.WorkType] = true
 		if rateLine.Note != nil {
 			*rateLine.Note = strings.TrimSpace(*rateLine.Note)
-			if utf8.RuneCountInString(*rateLine.Note) > 200 {
+			if utf8.RuneCountInString(*rateLine.Note) > maxRateNoteLength {
 				fieldErrs["lines"] = apperr.KeyLength
 			}
 
@@ -1125,7 +1197,7 @@ func defaultSLA() SlaTargets {
 }
 
 // SlaTargets is SlaTargets of service-contracts.ts.
-type SlaTargets struct {
+type SlaTargets struct { //nolint:revive // the name service-contracts.ts and the API description use
 	ID                     uuid.UUID `json:"id"`
 	TenantID               uuid.UUID `json:"tenantId"`
 	Version                int       `json:"version"`
@@ -1404,15 +1476,18 @@ func (t *tally) metrics() Metrics {
 		OpenOverdue:          t.overdue, AverageRating: nil,
 	}
 	if t.rated > 0 {
-		v := math.Round(float64(t.stars)*10/float64(t.rated)) / 10
+		v := averageRating(t.stars, t.rated)
 		metrics.AverageRating = &v
 	}
 
 	return metrics
 }
 
+// minutesPerHour splits a duration's minutes from its hours.
+const minutesPerHour = 60
+
 func durationText(d time.Duration) string {
-	h, mnt := int(d.Hours()), int(d.Minutes())%60
+	h, mnt := int(d.Hours()), int(d.Minutes())%minutesPerHour
 	if mnt == 0 {
 		return fmt.Sprintf("%d h", h)
 	}
@@ -1460,6 +1535,31 @@ func (m Partners) scorecard(
 		return Scorecard{}, err
 	}
 
+	targets, err := slaTargets(ctx, call)
+	if err != nil {
+		return Scorecard{}, err
+	}
+
+	orgs := []uuid.UUID{}
+	for _, j := range jobs {
+		orgs = append(orgs, j.customerOrg)
+	}
+
+	profiles, err := m.Customers.CustomerProfiles(ctx, call, orgs)
+	if err != nil {
+		return Scorecard{}, apperr.Wrap(err, "maintenance.CustomerProfiles.CustomerProfiles")
+	}
+
+	tallied := newScoring(call.Now, targets)
+	for _, metric := range jobs {
+		tallied.add(metric, profiles[metric.customerOrg])
+	}
+
+	return tallied.scorecard(input), nil
+}
+
+// slaTargets are every version of every plan's SLA targets.
+func slaTargets(ctx context.Context, call *ops.Call) ([]SlaTargets, error) {
 	var targets []SlaTargets
 
 	rows, err := call.Tx.Query(
@@ -1468,7 +1568,7 @@ func (m Partners) scorecard(
 			version FROM maintenance.sla_targets`,
 	)
 	if err != nil {
-		return Scorecard{}, apperr.Wrap(err, "select maintenance.sla_targets")
+		return nil, apperr.Wrap(err, "select maintenance.sla_targets")
 	}
 
 	for rows.Next() {
@@ -1485,7 +1585,7 @@ func (m Partners) scorecard(
 		if err != nil {
 			rows.Close()
 
-			return Scorecard{}, apperr.Wrap(err, "select maintenance.sla_targets")
+			return nil, apperr.Wrap(err, "select maintenance.sla_targets")
 		}
 
 		targets = append(targets, slaTargets)
@@ -1495,227 +1595,243 @@ func (m Partners) scorecard(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return Scorecard{}, apperr.Wrap(rowsErr, "select maintenance.sla_targets")
+		return nil, apperr.Wrap(rowsErr, "select maintenance.sla_targets")
 	}
 
-	orgs := []uuid.UUID{}
-	for _, j := range jobs {
-		orgs = append(orgs, j.customerOrg)
+	return targets, nil
+}
+
+// scoring tallies the SLA measures of a scorecard's jobs, in total and per customer in the order the customers first
+// appear, and lists the breaches.
+type scoring struct {
+	now      time.Time
+	targets  []SlaTargets
+	total    *tally
+	per      map[uuid.UUID]*tally
+	planOf   map[uuid.UUID]string
+	order    []uuid.UUID
+	breaches []Breach
+}
+
+// newScoring starts the tallies of a scorecard at now against the plans' targets.
+func newScoring(now time.Time, targets []SlaTargets) *scoring {
+	return &scoring{
+		now:      now,
+		targets:  targets,
+		total:    new(tally),
+		per:      map[uuid.UUID]*tally{},
+		planOf:   map[uuid.UUID]string{},
+		order:    nil,
+		breaches: []Breach{},
+	}
+}
+
+// add counts one job for its customer and in total against the target in effect when the job was created, and lists
+// its breaches: of the response, the arrival, the first-time fix and the due time, in that order.
+func (sc *scoring) add(metric jobMetric, profile [2]string) {
+	cust, _ := uuid.Parse(profile[0])
+	if sc.per[cust] == nil {
+		sc.per[cust] = new(tally)
+		sc.planOf[cust] = profile[1]
+		sc.order = append(sc.order, cust)
 	}
 
-	profiles, err := m.Customers.CustomerProfiles(ctx, call, orgs)
-	if err != nil {
-		return Scorecard{}, apperr.Wrap(err, "maintenance.CustomerProfiles.CustomerProfiles")
+	tallies := []*tally{sc.total, sc.per[cust]}
+	for _, t := range tallies {
+		t.jobs++
 	}
 
+	target := targetFor(sc.targets, profile[1], metric.createdAt)
+	responseBreach := sc.response(metric, target, tallies)
+	arrivalBreach := arrival(metric, tallies)
+	fixBreach := firstTimeFix(metric, tallies)
+	rating(metric, tallies)
+	overdueBreach := sc.overdue(metric, tallies)
+
+	for _, breach := range []*Breach{responseBreach, arrivalBreach, fixBreach, overdueBreach} {
+		if breach != nil {
+			breach.JobID, breach.CustomerID, breach.at = metric.id, cust, metric.createdAt
+			sc.breaches = append(sc.breaches, *breach)
+		}
+	}
+}
+
+// response counts the job's response against the plan's response hours. A plan's visit is generated ahead of its date,
+// so the response target applies to requests only (IR451); a job cancelled before its response was due is neither
+// within the target nor a miss (IR291).
+func (sc *scoring) response(metric jobMetric, target SlaTargets, tallies []*tally) *Breach {
+	limit := time.Duration(target.ResponseHours) * time.Hour
+	limitMin := int(limit.Minutes())
+
+	switch {
+	case metric.planned:
+		return nil
+	case metric.responseAt != nil:
+		onTime := metric.responseAt.Sub(metric.createdAt) <= limit
+
+		for _, t := range tallies {
+			t.respN++
+			if onTime {
+				t.respOK++
+			}
+		}
+
+		if onTime {
+			return nil
+		}
+
+		took := int(metric.responseAt.Sub(metric.createdAt).Minutes())
+
+		return &Breach{
+			Kind: "response",
+			Detail: "response " + durationText(
+				metric.responseAt.Sub(metric.createdAt),
+			) + " vs " + durationText(
+				limit,
+			),
+			TookMinutes:  &took,
+			LimitMinutes: &limitMin,
+			JobID:        uuid.UUID{},
+			CustomerID:   uuid.UUID{},
+			at:           time.Time{},
+		}
+	case metric.cancelledAt != nil && metric.cancelledAt.Sub(metric.createdAt) <= limit:
+		return nil
+	case sc.now.Sub(metric.createdAt) > limit:
+		for _, t := range tallies {
+			t.respN++
+		}
+
+		return &Breach{
+			Kind:         "response",
+			Detail:       "no response within " + durationText(limit),
+			LimitMinutes: &limitMin,
+			JobID:        uuid.UUID{},
+			CustomerID:   uuid.UUID{},
+			TookMinutes:  nil,
+			at:           time.Time{},
+		}
+	}
+
+	return nil
+}
+
+// arrival counts whether the technician arrived within the scheduled window.
+func arrival(metric jobMetric, tallies []*tally) *Breach {
+	if metric.arrivedAt == nil {
+		return nil
+	}
+
+	for _, t := range tallies {
+		t.arrN++
+		if metric.inWindow {
+			t.arrOK++
+		}
+	}
+
+	if metric.inWindow {
+		return nil
+	}
+
+	return &Breach{
+		Kind:         "arrival",
+		Detail:       "arrival outside the scheduled window",
+		JobID:        uuid.UUID{},
+		CustomerID:   uuid.UUID{},
+		TookMinutes:  nil,
+		LimitMinutes: nil,
+		at:           time.Time{},
+	}
+}
+
+// firstTimeFix counts whether a completed job was fixed the first time: its report never sent back, and no follow-up
+// within 30 days.
+func firstTimeFix(metric jobMetric, tallies []*tally) *Breach {
+	if metric.status != statusCompleted {
+		return nil
+	}
+
+	fixedFirstTime := !metric.everReturned && !metric.followUpWithin30
+
+	for _, t := range tallies {
+		t.ftfN++
+		if fixedFirstTime {
+			t.ftfOK++
+		}
+	}
+
+	if fixedFirstTime {
+		return nil
+	}
+
+	return &Breach{
+		Kind:         "first_time_fix",
+		Detail:       "not fixed the first time",
+		JobID:        uuid.UUID{},
+		CustomerID:   uuid.UUID{},
+		TookMinutes:  nil,
+		LimitMinutes: nil,
+		at:           time.Time{},
+	}
+}
+
+// rating counts the customer's stars for the job, when it was rated.
+func rating(metric jobMetric, tallies []*tally) {
+	if metric.stars <= 0 {
+		return
+	}
+
+	for _, t := range tallies {
+		t.rated++
+		t.stars += metric.stars
+	}
+}
+
+// overdue counts a job still open past its due time.
+func (sc *scoring) overdue(metric jobMetric, tallies []*tally) *Breach {
+	if metric.status == statusCompleted || metric.status == statusCancelled ||
+		!sc.now.After(metric.dueAt) {
+		return nil
+	}
+
+	for _, t := range tallies {
+		t.overdue++
+	}
+
+	return &Breach{
+		Kind:         "overdue",
+		Detail:       "open past its due time",
+		JobID:        uuid.UUID{},
+		CustomerID:   uuid.UUID{},
+		TookMinutes:  nil,
+		LimitMinutes: nil,
+		at:           time.Time{},
+	}
+}
+
+// scorecard is the tallies as the scorecard answers them: the totals, each customer's measures and standing against
+// its plan's targets now (DD-A22), and the newest breaches first, at most maxBreaches.
+func (sc *scoring) scorecard(input *ScorecardInput) Scorecard {
 	out := Scorecard{
 		Period:          input.Period,
 		ContractorOrgID: input.ContractorOrgID,
 		Customers:       []CustomerMetrics{},
-		Breaches:        []Breach{},
-		Targets: targetViews(
-			targets,
-			call.Now,
-		),
-		Totals: Metrics{
-			ResponseWithinTarget: nil,
-			ArrivalInWindow:      nil,
-			FirstTimeFix:         nil,
-			AverageRating:        nil,
-			RatingCount:          0,
-			OpenOverdue:          0,
-		},
-	}
-	total := &tally{
-		respN:   0,
-		respOK:  0,
-		arrN:    0,
-		arrOK:   0,
-		ftfN:    0,
-		ftfOK:   0,
-		stars:   0,
-		rated:   0,
-		overdue: 0,
-		jobs:    0,
-	}
-	per := map[uuid.UUID]*tally{}
-	planOf := map[uuid.UUID]string{}
-
-	var order []uuid.UUID
-
-	for _, metric := range jobs {
-		prof := profiles[metric.customerOrg]
-
-		cust, _ := uuid.Parse(prof[0])
-		if per[cust] == nil {
-			per[cust] = &tally{
-				respN:   0,
-				respOK:  0,
-				arrN:    0,
-				arrOK:   0,
-				ftfN:    0,
-				ftfOK:   0,
-				stars:   0,
-				rated:   0,
-				overdue: 0,
-				jobs:    0,
-			}
-			planOf[cust] = prof[1]
-			order = append(order, cust)
-		}
-
-		tgt := targetFor(targets, prof[1], metric.createdAt)
-		limit := time.Duration(tgt.ResponseHours) * time.Hour
-		limitMin := int(limit.Minutes())
-
-		for _, t := range []*tally{total, per[cust]} {
-			t.jobs++
-		}
-
-		breach := func(b Breach) {
-			b.JobID, b.CustomerID, b.at = metric.id, cust, metric.createdAt
-			out.Breaches = append(out.Breaches, b)
-		}
-
-		switch {
-		case metric.planned:
-			// a plan's visit is generated ahead of its date: the response target applies to requests (IR451)
-		case metric.responseAt != nil:
-			onTime := metric.responseAt.Sub(metric.createdAt) <= limit
-
-			for _, t := range []*tally{total, per[cust]} {
-				t.respN++
-				if onTime {
-					t.respOK++
-				}
-			}
-
-			if !onTime {
-				took := int(metric.responseAt.Sub(metric.createdAt).Minutes())
-				breach(
-					Breach{
-						Kind: "response",
-						Detail: "response " + durationText(
-							metric.responseAt.Sub(metric.createdAt),
-						) + " vs " + durationText(
-							limit,
-						),
-						TookMinutes:  &took,
-						LimitMinutes: &limitMin,
-						JobID:        uuid.UUID{},
-						CustomerID:   uuid.UUID{},
-						at:           time.Time{},
-					},
-				)
-			}
-		case metric.cancelledAt != nil && metric.cancelledAt.Sub(metric.createdAt) <= limit:
-			// cancelled before its response was due: neither within the target nor a miss (IR291)
-		case call.Now.Sub(metric.createdAt) > limit:
-			for _, t := range []*tally{total, per[cust]} {
-				t.respN++
-			}
-
-			breach(
-				Breach{
-					Kind:         "response",
-					Detail:       "no response within " + durationText(limit),
-					LimitMinutes: &limitMin,
-					JobID:        uuid.UUID{},
-					CustomerID:   uuid.UUID{},
-					TookMinutes:  nil,
-					at:           time.Time{},
-				},
-			)
-		}
-
-		if metric.arrivedAt != nil {
-			for _, t := range []*tally{total, per[cust]} {
-				t.arrN++
-				if metric.inWindow {
-					t.arrOK++
-				}
-			}
-
-			if !metric.inWindow {
-				breach(
-					Breach{
-						Kind:         "arrival",
-						Detail:       "arrival outside the scheduled window",
-						JobID:        uuid.UUID{},
-						CustomerID:   uuid.UUID{},
-						TookMinutes:  nil,
-						LimitMinutes: nil,
-						at:           time.Time{},
-					},
-				)
-			}
-		}
-
-		if metric.status == statusCompleted {
-			fixedFirstTime := !metric.everReturned && !metric.followUpWithin30
-
-			for _, t := range []*tally{total, per[cust]} {
-				t.ftfN++
-				if fixedFirstTime {
-					t.ftfOK++
-				}
-			}
-
-			if !fixedFirstTime {
-				breach(
-					Breach{
-						Kind:         "first_time_fix",
-						Detail:       "not fixed the first time",
-						JobID:        uuid.UUID{},
-						CustomerID:   uuid.UUID{},
-						TookMinutes:  nil,
-						LimitMinutes: nil,
-						at:           time.Time{},
-					},
-				)
-			}
-		}
-
-		if metric.stars > 0 {
-			for _, t := range []*tally{total, per[cust]} {
-				t.rated++
-				t.stars += metric.stars
-			}
-		}
-
-		if metric.status != statusCompleted && metric.status != statusCancelled &&
-			call.Now.After(metric.dueAt) {
-			for _, t := range []*tally{total, per[cust]} {
-				t.overdue++
-			}
-
-			breach(
-				Breach{
-					Kind:         "overdue",
-					Detail:       "open past its due time",
-					JobID:        uuid.UUID{},
-					CustomerID:   uuid.UUID{},
-					TookMinutes:  nil,
-					LimitMinutes: nil,
-					at:           time.Time{},
-				},
-			)
-		}
+		Breaches:        sc.breaches,
+		Targets:         targetViews(sc.targets, sc.now),
+		Totals:          sc.total.metrics(),
 	}
 
-	out.Totals = total.metrics()
-
-	for _, cust := range order {
-		counts := per[cust]
+	for _, cust := range sc.order {
+		counts := sc.per[cust]
 		metrics := counts.metrics()
 		out.Customers = append(
 			out.Customers,
 			CustomerMetrics{
 				Metrics:    metrics,
 				CustomerID: cust,
-				PlanType:   planOf[cust],
+				PlanType:   sc.planOf[cust],
 				JobCount:   counts.jobs,
-				Status:     customerStatus(metrics, targetFor(targets, planOf[cust], call.Now)),
+				Status:     customerStatus(metrics, targetFor(sc.targets, sc.planOf[cust], sc.now)),
 			},
 		)
 	}
@@ -1725,12 +1841,22 @@ func (m Partners) scorecard(
 		func(i, k int) bool { return out.Breaches[i].at.After(out.Breaches[k].at) },
 	)
 
-	if len(out.Breaches) > 50 {
-		out.Breaches = out.Breaches[:50]
+	if len(out.Breaches) > maxBreaches {
+		out.Breaches = out.Breaches[:maxBreaches]
 	}
 
-	return out, nil
+	return out
 }
+
+// maxBreaches is how many SLA breaches a scorecard lists, the newest first.
+const maxBreaches = 50
+
+// The response share every plan holds a customer to (100 %), and how far below its target a share is still at risk
+// rather than breached (10 points).
+const (
+	fullShare  = 100
+	riskMargin = 10
+)
 
 // The SLA standings of a customer (CustomerMetrics.status, DD-A22).
 const (
@@ -1750,13 +1876,13 @@ func customerStatus(metrics Metrics, tgt SlaTargets) string {
 			return
 		}
 
-		if target-*v > 10 {
+		if target-*v > riskMargin {
 			status = slaBreached
 		} else if status != slaBreached {
 			status = slaAtRisk
 		}
 	}
-	check(metrics.ResponseWithinTarget, 100)
+	check(metrics.ResponseWithinTarget, fullShare)
 	check(metrics.ArrivalInWindow, tgt.ArrivalInWindowPercent)
 	check(metrics.FirstTimeFix, tgt.FirstTimeFixPercent)
 

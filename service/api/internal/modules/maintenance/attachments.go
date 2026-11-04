@@ -50,16 +50,16 @@ func (m Files) lockDraft(
 		return nil, technicianJobErr
 	}
 
-	draft, err := m.Reports.draftOf(ctx, call, job, true)
+	draft, found, err := m.Reports.currentDraft(ctx, call, job, true)
 	if err != nil {
 		return nil, err
 	}
 
-	if status != statusInProgress || draft == nil || draft.ID != report {
+	if status != statusInProgress || !found || draft.ID != report {
 		return nil, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
-	return draft, nil
+	return &draft, nil
 }
 
 // store saves one file as a ready Attachment of the report and returns its ID.
@@ -113,7 +113,7 @@ func (in *AddInput) Validate() map[string]string {
 		fieldErrs["reportId"] = apperr.KeyRequired
 	}
 
-	if !ValidBlob(in.File, 5<<20) {
+	if !ValidBlob(in.File, photoMaxBytes) {
 		fieldErrs["file"] = apperr.KeyInvalidFile
 	}
 
@@ -253,13 +253,13 @@ func (in *SignOffInput) Validate() map[string]string {
 
 	switch {
 	case in.Signature != nil && in.AbsentReason == nil && in.SitePhoto == nil:
-		if in.Signature.Mime != mimePNG || !ValidBlob(*in.Signature, 5<<20) {
+		if in.Signature.Mime != mimePNG || !ValidBlob(*in.Signature, photoMaxBytes) {
 			fieldErrs["signature"] = apperr.KeyInvalidFile
 		}
 	case in.Signature == nil && in.AbsentReason != nil && in.SitePhoto != nil:
 		trimmedReason(in.AbsentReason, maxReasonLength, "absentReason", fieldErrs)
 
-		if !ValidBlob(*in.SitePhoto, 5<<20) {
+		if !ValidBlob(*in.SitePhoto, photoMaxBytes) {
 			fieldErrs["sitePhoto"] = apperr.KeyInvalidFile
 		}
 	default:

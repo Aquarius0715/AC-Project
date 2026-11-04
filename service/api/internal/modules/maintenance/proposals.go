@@ -490,7 +490,7 @@ func (in *RespondInput) Validate() map[string]string {
 			fieldErrs["declineReason"] = apperr.KeyInvalid
 		}
 
-		if n := len(in.PreferredSlots); n != 0 && n != 3 {
+		if n := len(in.PreferredSlots); n != 0 && n != preferredSlotCount {
 			fieldErrs["preferredSlots"] = apperr.KeyCount
 		}
 	default:
@@ -573,91 +573,15 @@ func (m Proposals) respondJob(
 		return Job{}, currentErr
 	}
 
-	var (
-		status, source string
-		slot           Slot
-		holdRaw        []byte
-	)
-
-	err = call.Tx.QueryRow(ctx, `SELECT status, source, lower(slot), upper(slot), hold FROM maintenance.slot_proposals
-		WHERE
-		id = $1 AND job_id = $2 FOR UPDATE`,
-		input.ProposalID, input.JobID).
-		Scan(&status, &source, &slot.StartAt, &slot.EndAt, &holdRaw)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return Job{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
-	}
-
+	slot, hold, err := pendingProposal(ctx, call, input)
 	if err != nil {
-		return Job{}, apperr.Wrap(err, "select maintenance.slot_proposals")
-	}
-
-	if status != proposalPending {
-		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
-	}
-
-	var hold Hold
-
-	unmarshalErr := json.Unmarshal(holdRaw, &hold)
-	if unmarshalErr != nil {
-		return Job{}, apperr.Wrap(unmarshalErr, "json.Unmarshal")
+		return Job{}, err
 	}
 
 	if input.Decision == decisionDecline {
-		if len(input.PreferredSlots) == 3 && !PreferredSlotsOK(call.Now, input.PreferredSlots) {
-			return Job{}, apperr.Fields(map[string]string{"preferredSlots": apperr.KeySlotRules})
-		}
-
-		_, err := call.Tx.Exec(
-			ctx,
-			`UPDATE maintenance.slot_proposals SET status = 'declined', decided_at = $2, decline_reason = $3, decline_comment =
-				$4 WHERE id = $1`,
-			input.ProposalID,
-			call.Now,
-			*input.DeclineReason,
-			input.Comment,
-		)
-		if err != nil {
-			return Job{}, apperr.Wrap(err, "update maintenance.slot_proposals")
-		}
-
-		if len(input.PreferredSlots) == 3 {
-			raw, marshalErr := json.Marshal(input.PreferredSlots)
-			if marshalErr != nil {
-				return Job{}, apperr.Wrap(marshalErr, "json.Marshal")
-			}
-
-			_, err := call.Tx.Exec(
-				ctx,
-				`UPDATE maintenance.jobs SET preferred_slots = $2, preference_round = preference_round + 1 WHERE id = $1`,
-				input.JobID,
-				raw,
-			)
-			if err != nil {
-				return Job{}, apperr.Wrap(err, "update maintenance.jobs")
-			}
-		}
-
-		_, err = call.Tx.Exec(
-			ctx,
-			`UPDATE maintenance.partner_slot_proposals SET status = 'declined' WHERE status = 'sent_to_client'
-			AND offer_id IN (SELECT id FROM maintenance.offers WHERE job_id = $1)`,
-			input.JobID,
-		)
-		if err != nil {
-			return Job{}, apperr.Wrap(err, "update maintenance.partner_slot_proposals")
-		}
-
-		return m.finish(
-			ctx,
-			call,
-			input.JobID,
-			"proposal.declined",
-			"jobs.respondProposal",
-			"ProposalDeclined",
-			deref(input.DeclineReason),
-		)
+		return m.declineProposal(ctx, call, input)
 	}
+
 	// a proposal whose time has begun cannot be accepted any more (IR455)
 	if !slot.StartAt.After(call.Now) {
 		return Job{}, apperr.E(apperr.Conflict, "errors.proposal_expired")
@@ -683,7 +607,7 @@ func (m Proposals) respondJob(
 		return Job{}, apperr.Wrap(execErr, "update maintenance.slot_proposals")
 	}
 
-	applyAcceptedErr := m.applyAccepted(ctx, call, input.JobID, job, hold, slot)
+	applyAcceptedErr := m.applyAccepted(ctx, call, input.JobID, hold, slot)
 	if applyAcceptedErr != nil {
 		return Job{}, applyAcceptedErr
 	}
@@ -699,12 +623,112 @@ func (m Proposals) respondJob(
 	)
 }
 
+// pendingProposal is the job's pending slot proposal: its slot and the hold it keeps.
+func pendingProposal(ctx context.Context, call *ops.Call, input *RespondInput) (Slot, Hold, error) {
+	var (
+		status, source string
+		slot           Slot
+		holdRaw        []byte
+		hold           Hold
+	)
+
+	err := call.Tx.QueryRow(ctx, `SELECT status, source, lower(slot), upper(slot), hold FROM maintenance.slot_proposals
+		WHERE
+		id = $1 AND job_id = $2 FOR UPDATE`,
+		input.ProposalID, input.JobID).
+		Scan(&status, &source, &slot.StartAt, &slot.EndAt, &holdRaw)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return slot, hold, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	}
+
+	if err != nil {
+		return slot, hold, apperr.Wrap(err, "select maintenance.slot_proposals")
+	}
+
+	if status != proposalPending {
+		return slot, hold, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
+	}
+
+	unmarshalErr := json.Unmarshal(holdRaw, &hold)
+
+	return slot, hold, apperr.Wrap(unmarshalErr, "json.Unmarshal")
+}
+
+// declineProposal declines the proposal: three new preferred times, if the customer gives them, start the next round
+// of preferences (IR113), and the contractor's time sent to the customer goes with it.
+func (m Proposals) declineProposal(
+	ctx context.Context,
+	call *ops.Call,
+	input *RespondInput,
+) (Job, error) {
+	if len(input.PreferredSlots) == preferredSlotCount &&
+		!PreferredSlotsOK(call.Now, input.PreferredSlots) {
+		return Job{}, apperr.Fields(map[string]string{"preferredSlots": apperr.KeySlotRules})
+	}
+
+	_, err := call.Tx.Exec(
+		ctx,
+		`UPDATE maintenance.slot_proposals SET status = 'declined', decided_at = $2, decline_reason = $3, decline_comment =
+			$4 WHERE id = $1`,
+		input.ProposalID,
+		call.Now,
+		*input.DeclineReason,
+		input.Comment,
+	)
+	if err != nil {
+		return Job{}, apperr.Wrap(err, "update maintenance.slot_proposals")
+	}
+
+	if len(input.PreferredSlots) == preferredSlotCount {
+		raw, marshalErr := json.Marshal(input.PreferredSlots)
+		if marshalErr != nil {
+			return Job{}, apperr.Wrap(marshalErr, "json.Marshal")
+		}
+
+		_, err := call.Tx.Exec(
+			ctx,
+			`UPDATE maintenance.jobs SET preferred_slots = $2, preference_round = preference_round + 1 WHERE id = $1`,
+			input.JobID,
+			raw,
+		)
+		if err != nil {
+			return Job{}, apperr.Wrap(err, "update maintenance.jobs")
+		}
+	}
+
+	_, err = call.Tx.Exec(
+		ctx,
+		`UPDATE maintenance.partner_slot_proposals SET status = 'declined' WHERE status = 'sent_to_client'
+		AND offer_id IN (SELECT id FROM maintenance.offers WHERE job_id = $1)`,
+		input.JobID,
+	)
+	if err != nil {
+		return Job{}, apperr.Wrap(err, "update maintenance.partner_slot_proposals")
+	}
+
+	return m.finish(
+		ctx,
+		call,
+		input.JobID,
+		"proposal.declined",
+		"jobs.respondProposal",
+		"ProposalDeclined",
+		deref(input.DeclineReason),
+	)
+}
+
+// An offer made from an accepted slot proposal stays open a day, or until the visit when that is sooner, and its
+// access window reaches a day past the visit's end, as the window of an offer the acceptance creates.
+const (
+	proposalOfferOpen = 24 * time.Hour
+	accessAfterVisit  = 24 * time.Hour
+)
+
 // applyAccepted performs the IR128 item 2 effects of an accepted proposal.
 func (m Proposals) applyAccepted(
 	ctx context.Context,
 	call *ops.Call,
 	job uuid.UUID,
-	r jobRow,
 	hold Hold,
 	slot Slot,
 ) error {
@@ -726,51 +750,76 @@ func (m Proposals) applyAccepted(
 		Scan(&offer, &decision)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
-		expires := call.Now.Add(24 * time.Hour)
-		if slot.StartAt.Before(expires) {
-			expires = slot.StartAt
-		}
-
-		terms := DefaultTermsVersion // the company's first offer
-
-		scanErr := call.Tx.QueryRow(ctx, `SELECT terms_version FROM maintenance.offers WHERE contractor_org_id = $1 ORDER BY
-			offered_at DESC LIMIT 1`, *hold.ContractorOrgID).
-			Scan(&terms)
-		if scanErr != nil &&
-			!errors.Is(scanErr, pgx.ErrNoRows) {
-			return apperr.Wrap(scanErr, "select maintenance.offers")
-		}
-
-		_, execErr := call.Tx.Exec(
-			ctx,
-			`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at,
-				offer_expires_at,
-			access_valid_from, access_valid_until) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, tstzrange($4, $5),
-			$6, $7, $6, $8)`,
-			job,
-			*hold.ContractorOrgID,
-			terms,
-			slot.StartAt,
-			slot.EndAt,
-			call.Now,
-			expires,
-			slot.EndAt.Add(24*time.Hour),
-		)
-		if execErr != nil {
-			return apperr.Wrap(execErr, "insert maintenance.offers")
-		}
-
-		_, err := call.Tx.Exec(
-			ctx,
-			`UPDATE maintenance.jobs SET status = 'offered', contractor_org_id = $2 WHERE id = $1`,
-			job,
-			*hold.ContractorOrgID,
-		)
-
-		return apperr.Wrap(err, "update maintenance.jobs")
+		return offerFromProposal(ctx, call, job, *hold.ContractorOrgID, slot)
 	case err != nil:
 		return apperr.Wrap(err, "select maintenance.offers")
 	}
+
+	return moveOffer(ctx, call, job, *hold.ContractorOrgID, offer, decision, slot)
+}
+
+// offerFromProposal offers the job to the proposal's contractor for its slot under the company's latest terms (the
+// demo terms for its first offer): open a day, or until the visit when that is sooner.
+func offerFromProposal(
+	ctx context.Context,
+	call *ops.Call,
+	job, contractor uuid.UUID,
+	slot Slot,
+) error {
+	expires := call.Now.Add(proposalOfferOpen)
+	if slot.StartAt.Before(expires) {
+		expires = slot.StartAt
+	}
+
+	terms := DefaultTermsVersion // the company's first offer
+
+	scanErr := call.Tx.QueryRow(ctx, `SELECT terms_version FROM maintenance.offers WHERE contractor_org_id = $1 ORDER BY
+		offered_at DESC LIMIT 1`, contractor).
+		Scan(&terms)
+	if scanErr != nil &&
+		!errors.Is(scanErr, pgx.ErrNoRows) {
+		return apperr.Wrap(scanErr, "select maintenance.offers")
+	}
+
+	_, execErr := call.Tx.Exec(
+		ctx,
+		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at,
+			offer_expires_at,
+		access_valid_from, access_valid_until) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, tstzrange($4, $5),
+		$6, $7, $6, $8)`,
+		job,
+		contractor,
+		terms,
+		slot.StartAt,
+		slot.EndAt,
+		call.Now,
+		expires,
+		slot.EndAt.Add(accessAfterVisit),
+	)
+	if execErr != nil {
+		return apperr.Wrap(execErr, "insert maintenance.offers")
+	}
+
+	_, err := call.Tx.Exec(
+		ctx,
+		`UPDATE maintenance.jobs SET status = 'offered', contractor_org_id = $2 WHERE id = $1`,
+		job,
+		contractor,
+	)
+
+	return apperr.Wrap(err, "update maintenance.jobs")
+}
+
+// moveOffer moves the contractor's open offer to the proposal's slot: its access window follows the visit (IR454), a
+// frozen contractor history is frozen again (IR458), its partner proposals are approved, and an accepted offer goes
+// back to be assigned again.
+func moveOffer(
+	ctx context.Context,
+	call *ops.Call,
+	job, contractor, offer uuid.UUID,
+	decision *string,
+	slot Slot,
+) error {
 	// the access window follows the moved visit (IR454): it still has to cover it, as jobs.offer requires, and reaches
 	// slot end + 24 h like an offer the acceptance creates; it is never shortened
 	_, execErr := call.Tx.Exec(
@@ -781,7 +830,7 @@ func (m Proposals) applyAccepted(
 		offer,
 		slot.StartAt,
 		slot.EndAt,
-		slot.EndAt.Add(24*time.Hour),
+		slot.EndAt.Add(accessAfterVisit),
 	)
 	if execErr != nil {
 		return apperr.Wrap(execErr, "update maintenance.offers")
@@ -791,7 +840,7 @@ func (m Proposals) applyAccepted(
 		ctx,
 		`DELETE FROM maintenance.job_history_snapshots WHERE job_id = $1 AND owner_kind = 'organization' AND owner_id = $2`,
 		job,
-		*hold.ContractorOrgID,
+		contractor,
 	)
 	if execErr != nil {
 		return apperr.Wrap(execErr, "delete maintenance.job_history_snapshots")
@@ -847,7 +896,7 @@ func (in *RescheduleInput) Validate() map[string]string {
 		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
-	if len(in.PreferredSlots) != 3 {
+	if len(in.PreferredSlots) != preferredSlotCount {
 		fieldErrs["preferredSlots"] = apperr.KeyCount
 	}
 
@@ -1166,14 +1215,10 @@ func (m Proposals) partnerProposal(
 	call *ops.Call,
 	input *ProposalRef,
 	ownOnly bool,
-) (string, uuid.UUID, Slot, uuid.UUID, uuid.UUID, error) {
-	var (
-		status           string
-		offer, tech, org uuid.UUID
-		slot             Slot
-	)
+) (partnerSlotProposal, error) {
+	var proposal partnerSlotProposal
 
-	stmt := `SELECT p.status, p.offer_id, lower(p.slot), upper(p.slot), p.technician_membership_id, o.contractor_org_id
+	stmt := `SELECT p.status, lower(p.slot), upper(p.slot), p.technician_membership_id, o.contractor_org_id
 		FROM
 		maintenance.partner_slot_proposals p
 		JOIN maintenance.offers o ON o.id = p.offer_id WHERE p.id = $1 AND o.job_id = $2`
@@ -1186,12 +1231,19 @@ func (m Proposals) partnerProposal(
 	}
 
 	err := call.Tx.QueryRow(ctx, stmt+" FOR UPDATE OF p", args...).
-		Scan(&status, &offer, &slot.StartAt, &slot.EndAt, &tech, &org)
+		Scan(&proposal.status, &proposal.slot.StartAt, &proposal.slot.EndAt, &proposal.tech, &proposal.org)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", offer, slot, tech, org, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+		return proposal, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
-	return status, offer, slot, tech, org, apperr.Wrap(err, "queryrow (partnerProposal)")
+	return proposal, apperr.Wrap(err, "queryrow (partnerProposal)")
+}
+
+// partnerSlotProposal is a contractor's slot proposal: its status, slot, technician and company.
+type partnerSlotProposal struct {
+	status    string
+	slot      Slot
+	tech, org uuid.UUID
 }
 
 // withdrawPartner serves jobs.withdrawPartnerSlot.
@@ -1236,7 +1288,7 @@ func (m Proposals) withdrawPartnerJob(
 	call *ops.Call,
 	input *ProposalRef,
 ) (Job, error) {
-	status, _, _, _, _, err := m.partnerProposal(ctx, call, input, true)
+	proposal, err := m.partnerProposal(ctx, call, input, true)
 	if err != nil {
 		return Job{}, err
 	}
@@ -1246,7 +1298,7 @@ func (m Proposals) withdrawPartnerJob(
 		return Job{}, lockErr
 	}
 
-	if status != proposalPending {
+	if proposal.status != proposalPending {
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
@@ -1344,7 +1396,7 @@ func (m Proposals) resolvePartnerJob(
 	call *ops.Call,
 	input *ResolveInput,
 ) (Job, error) {
-	status, _, slot, tech, org, err := m.partnerProposal(
+	proposal, err := m.partnerProposal(
 		ctx,
 		call,
 		&ProposalRef{JobID: input.JobID, ProposalID: input.ProposalID},
@@ -1359,43 +1411,14 @@ func (m Proposals) resolvePartnerJob(
 		return Job{}, lockErr
 	}
 
-	if status != proposalPending {
+	if proposal.status != proposalPending {
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	next := "kept"
 
 	if input.Decision == "send_to_client" {
-		p, err := m.pending(ctx, call, input.JobID)
-		if err != nil || p {
-			if err != nil {
-				return Job{}, err
-			}
-
-			return Job{}, apperr.E(apperr.Conflict, "errors.proposal_pending")
-		}
-
-		if !replyByOK(call.Now, *input.ReplyBy, slot.StartAt) {
-			return Job{}, apperr.Fields(map[string]string{"replyBy": apperr.KeyRange})
-		}
-
-		hold := Hold{
-			Kind:                   holdContractor,
-			ContractorOrgID:        &org,
-			TechnicianMembershipID: &tech,
-			MembershipID:           nil,
-		}
-
-		err = m.insertProposal(
-			ctx,
-			call,
-			input.JobID,
-			"contractor",
-			slot,
-			hold,
-			"Partner time proposal",
-			*input.ReplyBy,
-		)
+		err := m.sendToClient(ctx, call, input, proposal)
 		if err != nil {
 			return Job{}, err
 		}
@@ -1422,6 +1445,48 @@ func (m Proposals) resolvePartnerJob(
 		"PartnerSlotResolved",
 		"",
 	)
+}
+
+// sendToClient puts the contractor's time to the customer as an HQ slot proposal held for the contractor and its
+// technician; one pending proposal at a time, answered by a reply-by time the visit allows.
+func (m Proposals) sendToClient(
+	ctx context.Context,
+	call *ops.Call,
+	input *ResolveInput,
+	proposal partnerSlotProposal,
+) error {
+	pending, err := m.pending(ctx, call, input.JobID)
+	if err != nil {
+		return err
+	}
+
+	if pending {
+		return apperr.E(apperr.Conflict, "errors.proposal_pending")
+	}
+
+	if !replyByOK(call.Now, *input.ReplyBy, proposal.slot.StartAt) {
+		return apperr.Fields(map[string]string{"replyBy": apperr.KeyRange})
+	}
+
+	hold := Hold{
+		Kind:                   holdContractor,
+		ContractorOrgID:        &proposal.org,
+		TechnicianMembershipID: &proposal.tech,
+		MembershipID:           nil,
+	}
+
+	err = m.insertProposal(
+		ctx,
+		call,
+		input.JobID,
+		"contractor",
+		proposal.slot,
+		hold,
+		"Partner time proposal",
+		*input.ReplyBy,
+	)
+
+	return err
 }
 
 // ExpireProposals applies IR128 item 4 in the worker tick.

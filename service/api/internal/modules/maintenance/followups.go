@@ -387,7 +387,7 @@ func (in *ProblemInput) Validate() map[string]string {
 	}
 
 	for _, p := range in.Photos {
-		if !ValidBlob(p, 5<<20) {
+		if !ValidBlob(p, photoMaxBytes) {
 			fieldErrs["photos"] = apperr.KeyInvalidFile
 		}
 	}
@@ -430,6 +430,12 @@ func (m FollowUps) reportProblem(
 	return written(m.reportProblemJob(ctx, c, in))
 }
 
+// A follow-up visit asked for without a preferred time is the next Kuala Lumpur day from 09:00, for three hours.
+const (
+	followUpHour = 9
+	followUpSlot = 3 * time.Hour
+)
+
 // reportProblemJob is reportProblem answering the job with its detail extras.
 func (m FollowUps) reportProblemJob(
 	ctx context.Context,
@@ -446,20 +452,9 @@ func (m FollowUps) reportProblemJob(
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
-	var requested Slot
-
-	preferred := []Slot{}
-
-	if input.PreferredSlot != nil {
-		if !PreferredSlotsOK(call.Now, []Slot{*input.PreferredSlot}) {
-			return Job{}, apperr.Fields(map[string]string{"preferredSlot": apperr.KeySlotRules})
-		}
-
-		requested, preferred = *input.PreferredSlot, []Slot{*input.PreferredSlot}
-	} else {
-		y, mo, d := call.Now.In(kualaLumpur).Date()
-		start := time.Date(y, mo, d+1, 9, 0, 0, 0, kualaLumpur)
-		requested = Slot{start.UTC(), start.Add(3 * time.Hour).UTC()}
+	requested, preferred, err := followUpSlots(call.Now, input.PreferredSlot)
+	if err != nil {
+		return Job{}, err
 	}
 
 	pref, marshalErr := json.Marshal(preferred)
@@ -481,31 +476,9 @@ func (m FollowUps) reportProblemJob(
 		return Job{}, apperr.Wrap(scanErr, "insert maintenance.jobs")
 	}
 
-	for _, blobInput := range input.Photos {
-		aid := uuid.New()
-
-		key := "jobs/" + followUpID.String() + "/" + aid.String()
-
-		err := m.Blobs.Put(ctx, key, blobInput.Mime, blobInput.Bytes)
-		if err != nil {
-			return Job{}, apperr.Wrap(err, "blob.Store.Put")
-		}
-
-		_, err = call.Tx.Exec(
-			ctx,
-			`INSERT INTO maintenance.attachments (id, tenant_id, job_id, object_key, name, mime, size_bytes, status, uploaded_by)
-			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, 'ready', $7)`,
-			aid,
-			followUpID,
-			key,
-			strings.TrimSpace(blobInput.Name),
-			blobInput.Mime,
-			blobInput.Size,
-			call.Principal.UserID,
-		)
-		if err != nil {
-			return Job{}, apperr.Wrap(err, "insert maintenance.attachments")
-		}
+	err = m.attachPhotos(ctx, call, followUpID, input.Photos)
+	if err != nil {
+		return Job{}, err
 	}
 
 	eventErr := m.Jobs.event(ctx, call, followUpID, "job.created", nil)
@@ -544,6 +517,67 @@ func (m FollowUps) reportProblemJob(
 	)
 
 	return job, nil
+}
+
+// followUpSlots are the requested visit of a follow-up and its preferred times: the customer's preferred time when it
+// follows the slot rules (IR113), else the next Kuala Lumpur day from 09:00 for three hours with no preference.
+func followUpSlots(now time.Time, preferredSlot *Slot) (Slot, []Slot, error) {
+	var requested Slot
+
+	preferred := []Slot{}
+
+	if preferredSlot != nil {
+		if !PreferredSlotsOK(now, []Slot{*preferredSlot}) {
+			return requested, preferred, apperr.Fields(
+				map[string]string{"preferredSlot": apperr.KeySlotRules},
+			)
+		}
+
+		requested, preferred = *preferredSlot, []Slot{*preferredSlot}
+	} else {
+		y, mo, d := now.In(kualaLumpur).Date()
+		start := time.Date(y, mo, d+1, followUpHour, 0, 0, 0, kualaLumpur)
+		requested = Slot{start.UTC(), start.Add(followUpSlot).UTC()}
+	}
+
+	return requested, preferred, nil
+}
+
+// attachPhotos stores the problem's photos as ready attachments of the follow-up job.
+func (m FollowUps) attachPhotos(
+	ctx context.Context,
+	call *ops.Call,
+	job uuid.UUID,
+	photos []BlobInput,
+) error {
+	for _, blobInput := range photos {
+		aid := uuid.New()
+
+		key := "jobs/" + job.String() + "/" + aid.String()
+
+		err := m.Blobs.Put(ctx, key, blobInput.Mime, blobInput.Bytes)
+		if err != nil {
+			return apperr.Wrap(err, "blob.Store.Put")
+		}
+
+		_, err = call.Tx.Exec(
+			ctx,
+			`INSERT INTO maintenance.attachments (id, tenant_id, job_id, object_key, name, mime, size_bytes, status, uploaded_by)
+			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, 'ready', $7)`,
+			aid,
+			job,
+			key,
+			strings.TrimSpace(blobInput.Name),
+			blobInput.Mime,
+			blobInput.Size,
+			call.Principal.UserID,
+		)
+		if err != nil {
+			return apperr.Wrap(err, "insert maintenance.attachments")
+		}
+	}
+
+	return nil
 }
 
 // ---- jobs.classifyFollowUp ----
@@ -986,7 +1020,7 @@ func (m FollowUps) recordWarrantyClaimJob(
 		return Job{}, apperr.Fields(map[string]string{fieldJobID: "errors.outside_warranty"})
 	}
 
-	claims := []WarrantyClaim{}
+	claims := make([]WarrantyClaim, 0, 1)
 	if len(state.claims) > 0 {
 		err := json.Unmarshal(state.claims, &claims)
 		if err != nil {

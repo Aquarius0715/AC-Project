@@ -24,7 +24,7 @@ const (
 func draftBody(job, result string, extra map[string]string) string {
 	var items []string
 
-	for _, group := range maintenance.ComponentGroups {
+	for _, group := range maintenance.ComponentGroups() {
 		for _, key := range group.Keys {
 			resultJSON := jsonNull
 			if result != "" {

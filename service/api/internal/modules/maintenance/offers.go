@@ -49,11 +49,18 @@ const (
 	orgStatusActive   = "active"
 )
 
-// QualificationRequirements maps Unit.serviceScope entries to QualificationCodes (fixture qualificationRequirements).
-var QualificationRequirements = map[string]string{
-	"indoor":     "demo_indoor",
-	"outdoor":    "demo_outdoor",
-	"electrical": "demo_electrical",
+// qualificationFor is the QualificationCode a Unit.serviceScope entry requires (fixture qualificationRequirements).
+func qualificationFor(scope string) (string, bool) {
+	switch scope {
+	case "indoor":
+		return "demo_indoor", true
+	case "outdoor":
+		return "demo_outdoor", true
+	case "electrical":
+		return "demo_electrical", true
+	}
+
+	return "", false
 }
 
 // Delivery is the offer / decision / assignment operation set (IR123).
@@ -413,62 +420,16 @@ func (m Delivery) decide(
 	job, offer uuid.UUID,
 	decision, readTerms, reason string,
 ) (Receipt, error) {
-	var (
-		terms   string
-		expires time.Time
-		decided *string
-	)
-
-	err := call.Tx.QueryRow(ctx, `SELECT terms_version, offer_expires_at, decision FROM maintenance.offers WHERE id = $1
-		AND
-		job_id = $2 AND contractor_org_id = $3 FOR UPDATE`,
-		offer, job, call.Principal.OrgID).
-		Scan(&terms, &expires, &decided)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return Receipt{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
-	}
-
-	if err != nil {
-		return Receipt{}, apperr.Wrap(err, "select maintenance.offers")
-	}
-
-	if decided != nil {
-		return Receipt{}, apperr.E(
-			apperr.NotFound,
-			apperr.KeyNotFound,
-		) // declined / decided offers are only reachable through the IR01 receipt
-	}
-
-	locked, err := m.lock(ctx, call, job)
+	terms, err := m.decidableOffer(ctx, call, job, offer)
 	if err != nil {
 		return Receipt{}, err
 	}
 
-	if !call.Now.Before(expires) {
-		return Receipt{}, apperr.E(apperr.Conflict, "errors.offer_expired")
-	}
-
-	if locked.status != statusOffered {
-		return Receipt{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
-	}
-
 	if decision == decisionAccept {
-		var open bool
-
-		err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.partner_slot_proposals WHERE offer_id = $1 AND
-			status IN ('pending','sent_to_client'))`, offer).
-			Scan(&open)
+		err := acceptable(ctx, call, offer, readTerms, terms)
 		if err != nil {
-			return Receipt{}, apperr.Wrap(err, "select maintenance.partner_slot_proposals")
+			return Receipt{}, err
 		}
-
-		if open {
-			return Receipt{}, apperr.E(apperr.Conflict, "errors.partner_proposal_pending")
-		}
-	}
-
-	if decision == decisionAccept && readTerms != terms {
-		return Receipt{}, apperr.E(apperr.Conflict, "errors.terms_changed")
 	}
 
 	_, execErr := call.Tx.Exec(
@@ -488,28 +449,10 @@ func (m Delivery) decide(
 	next, contractor := statusAccepted, "contractor_org_id"
 	if decision == decisionDecline {
 		next, contractor = statusRequested, "NULL"
-		// the contractor's open time change ends with the declined offer (IR444), and so does a client proposal that holds
-		// this contractor: accepting it would offer the job again to the company that just declined it (IR445)
-		_, err := call.Tx.Exec(
-			ctx,
-			`UPDATE maintenance.partner_slot_proposals SET status = 'withdrawn' WHERE offer_id = $1 AND status IN ('pending',
-				'sent_to_client')`,
-			offer,
-		)
-		if err != nil {
-			return Receipt{}, apperr.Wrap(err, "update maintenance.partner_slot_proposals")
-		}
 
-		_, err = call.Tx.Exec(
-			ctx,
-			`UPDATE maintenance.slot_proposals SET status = 'withdrawn', decided_at = $3 WHERE job_id = $1 AND status = 'pending'
-			AND hold->>'contractorOrgId' = $2`,
-			job,
-			call.Principal.OrgID.String(),
-			call.Now,
-		)
+		err := withdrawWithOffer(ctx, call, job, offer)
 		if err != nil {
-			return Receipt{}, apperr.Wrap(err, "update maintenance.slot_proposals")
+			return Receipt{}, err
 		}
 	}
 
@@ -543,6 +486,112 @@ func (m Delivery) decide(
 	call.Audit(auditEntry("jobs."+decision, "job", job, call.ExpectedVersion, &version, reason))
 
 	return Receipt{JobID: job, JobVersion: version, OfferID: offer, Decision: decision}, nil
+}
+
+// decidableOffer is the company's offer of the job while it can still be decided: undecided (a decided one is reached
+// only through its IR01 receipt), unexpired, and on a job that is still offered. It locks the job and returns the
+// offer's terms version.
+func (m Delivery) decidableOffer(
+	ctx context.Context,
+	call *ops.Call,
+	job, offer uuid.UUID,
+) (string, error) {
+	var (
+		terms   string
+		expires time.Time
+		decided *string
+	)
+
+	err := call.Tx.QueryRow(ctx, `SELECT terms_version, offer_expires_at, decision FROM maintenance.offers WHERE id = $1
+		AND
+		job_id = $2 AND contractor_org_id = $3 FOR UPDATE`,
+		offer, job, call.Principal.OrgID).
+		Scan(&terms, &expires, &decided)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return terms, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	}
+
+	if err != nil {
+		return terms, apperr.Wrap(err, "select maintenance.offers")
+	}
+
+	if decided != nil {
+		return terms, apperr.E(
+			apperr.NotFound,
+			apperr.KeyNotFound,
+		) // declined / decided offers are only reachable through the IR01 receipt
+	}
+
+	locked, err := m.lock(ctx, call, job)
+	if err != nil {
+		return terms, err
+	}
+
+	if !call.Now.Before(expires) {
+		return terms, apperr.E(apperr.Conflict, "errors.offer_expired")
+	}
+
+	if locked.status != statusOffered {
+		return terms, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
+	}
+
+	return terms, nil
+}
+
+// acceptable checks an acceptance: no time change of the company's is open on the offer, and the terms read are the
+// offer's.
+func acceptable(
+	ctx context.Context,
+	call *ops.Call,
+	offer uuid.UUID,
+	readTerms, terms string,
+) error {
+	var open bool
+
+	err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.partner_slot_proposals WHERE offer_id = $1 AND
+		status IN ('pending','sent_to_client'))`, offer).
+		Scan(&open)
+	if err != nil {
+		return apperr.Wrap(err, "select maintenance.partner_slot_proposals")
+	}
+
+	if open {
+		return apperr.E(apperr.Conflict, "errors.partner_proposal_pending")
+	}
+
+	if readTerms != terms {
+		return apperr.E(apperr.Conflict, "errors.terms_changed")
+	}
+
+	return nil
+}
+
+// withdrawWithOffer ends what a declined offer leaves open: the contractor's time change (IR444), and a client proposal
+// that holds the contractor, which would offer the job again to the company that just declined it (IR445).
+func withdrawWithOffer(ctx context.Context, call *ops.Call, job, offer uuid.UUID) error {
+	_, err := call.Tx.Exec(
+		ctx,
+		`UPDATE maintenance.partner_slot_proposals SET status = 'withdrawn' WHERE offer_id = $1 AND status IN ('pending',
+			'sent_to_client')`,
+		offer,
+	)
+	if err != nil {
+		return apperr.Wrap(err, "update maintenance.partner_slot_proposals")
+	}
+
+	_, err = call.Tx.Exec(
+		ctx,
+		`UPDATE maintenance.slot_proposals SET status = 'withdrawn', decided_at = $3 WHERE job_id = $1 AND status = 'pending'
+		AND hold->>'contractorOrgId' = $2`,
+		job,
+		call.Principal.OrgID.String(),
+		call.Now,
+	)
+	if err != nil {
+		return apperr.Wrap(err, "update maintenance.slot_proposals")
+	}
+
+	return nil
 }
 
 // accept serves jobs.accept.
@@ -696,31 +745,10 @@ func (m Delivery) assignJob(ctx context.Context, call *ops.Call, input *AssignIn
 
 	slot := Slot{input.StartAt, input.EndAt}
 	contractor := call.Principal.Role == roleContractor
-	// scope: HQ internal jobs; contractor its accepted Offer within the access window
-	var visit Slot
 
-	if contractor {
-		var from, until time.Time
-
-		err := call.Tx.QueryRow(ctx, `SELECT lower(visit_slot), upper(visit_slot), access_valid_from, access_valid_until FROM
-			maintenance.offers
-			WHERE job_id = $1 AND contractor_org_id = $2 AND decision = 'accept' ORDER BY decided_at DESC LIMIT
-			1`, input.JobID, call.Principal.OrgID).
-			Scan(&visit.StartAt, &visit.EndAt, &from, &until)
-		if errors.Is(err, pgx.ErrNoRows) || locked.contractor == nil ||
-			*locked.contractor != call.Principal.OrgID {
-			return Job{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
-		}
-
-		if err != nil {
-			return Job{}, apperr.Wrap(err, "select maintenance.offers")
-		}
-
-		if call.Now.Before(from) || !call.Now.Before(until) {
-			return Job{}, apperr.E(apperr.Forbidden, "errors.access_window")
-		}
-	} else if locked.contractor != nil {
-		return Job{}, apperr.E(apperr.Forbidden, "errors.internal_job_only")
+	visit, err := assignmentScope(ctx, call, input.JobID, locked, contractor)
+	if err != nil {
+		return Job{}, err
 	}
 
 	currentErr := locked.current(call)
@@ -739,42 +767,10 @@ func (m Delivery) assignJob(ctx context.Context, call *ops.Call, input *AssignIn
 	if checkTechnicianErr != nil {
 		return Job{}, checkTechnicianErr
 	}
-	// state and slot rules (IR113 / IR49 / IR123 item 4)
-	switch {
-	case (locked.status == statusRequested && !contractor) || (locked.status == statusAccepted && contractor):
-		if !slot.EndAt.After(
-			call.Now,
-		) { // a time already over cannot be worked (IR456): HQ proposes another
-			return Job{}, apperr.Fields(map[string]string{"endAt": apperr.KeyPast})
-		}
 
-		agreed := contractor && sameSlot(visit, slot)
-		if !contractor {
-			agreed, err = m.agreed(ctx, call, input.JobID, locked, slot)
-			if err != nil {
-				return Job{}, err
-			}
-		}
-
-		if !agreed {
-			return Job{}, apperr.Fields(map[string]string{"startAt": keySlotNotAgreed})
-		}
-	case locked.status == statusAssigned:
-		if locked.scheduled == nil || !sameSlot(*locked.scheduled, slot) {
-			return Job{}, apperr.Fields(map[string]string{"startAt": keySlotNotAgreed})
-		}
-	case locked.status == statusInProgress || locked.status == statusReworkRequested || locked.status == statusOnHold:
-		// D06 extension / reassignment
-		if locked.scheduled == nil || !slot.StartAt.Equal(locked.scheduled.StartAt) ||
-			slot.EndAt.Before(locked.scheduled.EndAt) {
-			return Job{}, apperr.Fields(map[string]string{"endAt": "errors.extension_only"})
-		}
-
-		if input.Reason == nil || *input.Reason == "" {
-			return Job{}, apperr.Fields(map[string]string{fieldReason: apperr.KeyRequired})
-		}
-	default:
-		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
+	err = m.slotRules(ctx, call, input, locked, slot, visit, contractor)
+	if err != nil {
+		return Job{}, err
 	}
 
 	checkQualifiedErr := m.checkQualified(
@@ -825,6 +821,97 @@ func (m Delivery) assignJob(ctx context.Context, call *ops.Call, input *AssignIn
 	)
 
 	return job, nil
+}
+
+// assignmentScope checks who may assign the job: HQ its internal jobs; a contractor the job of its accepted offer,
+// within the offer's access window. It returns the visit of the contractor's offer.
+func assignmentScope(
+	ctx context.Context,
+	call *ops.Call,
+	job uuid.UUID,
+	locked jobRow,
+	contractor bool,
+) (Slot, error) {
+	var visit Slot
+
+	if contractor {
+		var from, until time.Time
+
+		err := call.Tx.QueryRow(ctx, `SELECT lower(visit_slot), upper(visit_slot), access_valid_from, access_valid_until FROM
+			maintenance.offers
+			WHERE job_id = $1 AND contractor_org_id = $2 AND decision = 'accept' ORDER BY decided_at DESC LIMIT
+			1`, job, call.Principal.OrgID).
+			Scan(&visit.StartAt, &visit.EndAt, &from, &until)
+		if errors.Is(err, pgx.ErrNoRows) || locked.contractor == nil ||
+			*locked.contractor != call.Principal.OrgID {
+			return visit, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+		}
+
+		if err != nil {
+			return visit, apperr.Wrap(err, "select maintenance.offers")
+		}
+
+		if call.Now.Before(from) || !call.Now.Before(until) {
+			return visit, apperr.E(apperr.Forbidden, "errors.access_window")
+		}
+	} else if locked.contractor != nil {
+		return visit, apperr.E(apperr.Forbidden, "errors.internal_job_only")
+	}
+
+	return visit, nil
+}
+
+// slotRules applies the state and slot rules of an assignment (IR113 / IR49 / IR123 item 4): a first assignment takes
+// the agreed time, which is not over (IR456); a reassignment keeps the scheduled time; a job under way may only be
+// extended, with a reason (D06).
+func (m Delivery) slotRules(
+	ctx context.Context,
+	call *ops.Call,
+	input *AssignInput,
+	locked jobRow,
+	slot, visit Slot,
+	contractor bool,
+) error {
+	switch {
+	case (locked.status == statusRequested && !contractor) || (locked.status == statusAccepted && contractor):
+		if !slot.EndAt.After(
+			call.Now,
+		) { // a time already over cannot be worked (IR456): HQ proposes another
+			return apperr.Fields(map[string]string{"endAt": apperr.KeyPast})
+		}
+
+		agreed := contractor && sameSlot(visit, slot)
+		if !contractor {
+			var err error
+
+			agreed, err = m.agreed(ctx, call, input.JobID, locked, slot)
+			if err != nil {
+				return err
+			}
+		}
+
+		if !agreed {
+			return apperr.Fields(map[string]string{"startAt": keySlotNotAgreed})
+		}
+	case locked.status == statusAssigned:
+		if locked.scheduled == nil || !sameSlot(*locked.scheduled, slot) {
+			return apperr.Fields(map[string]string{"startAt": keySlotNotAgreed})
+		}
+	case locked.status == statusInProgress || locked.status == statusReworkRequested || locked.status == statusOnHold:
+		// D06 extension / reassignment
+		if locked.scheduled == nil || !slot.StartAt.Equal(locked.scheduled.StartAt) ||
+			slot.EndAt.Before(locked.scheduled.EndAt) {
+			return apperr.Fields(map[string]string{"endAt": "errors.extension_only"})
+		}
+
+		if input.Reason == nil || *input.Reason == "" {
+			return apperr.Fields(map[string]string{fieldReason: apperr.KeyRequired})
+		}
+	default:
+		return apperr.E(apperr.Conflict, apperr.KeyInvalidState)
+	}
+
+	return nil
 }
 
 func deref(s *string) string {

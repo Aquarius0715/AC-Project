@@ -245,11 +245,7 @@ func (m Plans) list(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[Plan], error) {
-	var filters struct {
-		UnitID     *uuid.UUID `json:"unitId,omitempty"`
-		CustomerID *uuid.UUID `json:"customerId,omitempty"`
-		PropertyID *uuid.UUID `json:"propertyId,omitempty"`
-	}
+	var filters planFilters
 
 	if len(query.Filters) > 0 {
 		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
@@ -282,45 +278,10 @@ func (m Plans) list(
 
 	var args []any
 
-	add := func(v any) string {
-		args = append(args, v)
-
-		return fmt.Sprintf("$%d", len(args))
+	where, err := m.where(ctx, call, filters, &args)
+	if err != nil {
+		return paging.Page[Plan]{}, err
 	}
-
-	conds := []string{sqlTrue}
-	if filters.UnitID != nil {
-		conds = append(conds, "p.unit_id = "+add(*filters.UnitID))
-	}
-
-	if filters.CustomerID != nil {
-		org, ok, err := m.Jobs.Units.OrgOfCustomer(ctx, call, *filters.CustomerID)
-		if err != nil {
-			return paging.Page[Plan]{}, apperr.Wrap(err, "maintenance.JobUnits.OrgOfCustomer")
-		}
-
-		if !ok {
-			org = uuid.Nil
-		}
-
-		units, err := m.Jobs.Units.UnitsOfOrg(ctx, call, org)
-		if err != nil {
-			return paging.Page[Plan]{}, apperr.Wrap(err, "maintenance.JobUnits.UnitsOfOrg")
-		}
-
-		conds = append(conds, "p.unit_id = ANY("+add(units)+")")
-	}
-
-	if filters.PropertyID != nil {
-		units, err := m.Jobs.Units.UnitsOfProperty(ctx, call, *filters.PropertyID)
-		if err != nil {
-			return paging.Page[Plan]{}, apperr.Wrap(err, "maintenance.JobUnits.UnitsOfProperty")
-		}
-
-		conds = append(conds, "p.unit_id = ANY("+add(units)+")")
-	}
-
-	where := "(" + strings.Join(conds, ") AND (") + ")"
 
 	var total int
 
@@ -376,6 +337,62 @@ func (m Plans) list(
 		Total:           total,
 		SnapshotVersion: window.Snapshot,
 	}, nil
+}
+
+// planFilters are the filters of plans.list.
+type planFilters struct {
+	UnitID     *uuid.UUID `json:"unitId,omitempty"`
+	CustomerID *uuid.UUID `json:"customerId,omitempty"`
+	PropertyID *uuid.UUID `json:"propertyId,omitempty"`
+}
+
+// where is the SQL condition of the filters over the plans (alias p): of a unit, or of the units of a customer or a
+// property. The arguments it uses are added to args.
+func (m Plans) where(
+	ctx context.Context,
+	call *ops.Call,
+	filters planFilters,
+	args *[]any,
+) (string, error) {
+	add := func(v any) string {
+		*args = append(*args, v)
+
+		return fmt.Sprintf("$%d", len(*args))
+	}
+
+	conds := []string{sqlTrue}
+	if filters.UnitID != nil {
+		conds = append(conds, "p.unit_id = "+add(*filters.UnitID))
+	}
+
+	if filters.CustomerID != nil {
+		org, ok, err := m.Jobs.Units.OrgOfCustomer(ctx, call, *filters.CustomerID)
+		if err != nil {
+			return "", apperr.Wrap(err, "maintenance.JobUnits.OrgOfCustomer")
+		}
+
+		if !ok {
+			org = uuid.Nil
+		}
+
+		units, err := m.Jobs.Units.UnitsOfOrg(ctx, call, org)
+		if err != nil {
+			return "", apperr.Wrap(err, "maintenance.JobUnits.UnitsOfOrg")
+		}
+
+		conds = append(conds, "p.unit_id = ANY("+add(units)+")")
+	}
+
+	if filters.PropertyID != nil {
+		units, err := m.Jobs.Units.UnitsOfProperty(ctx, call, *filters.PropertyID)
+		if err != nil {
+			return "", apperr.Wrap(err, "maintenance.JobUnits.UnitsOfProperty")
+		}
+
+		conds = append(conds, "p.unit_id = ANY("+add(units)+")")
+	}
+
+	return "(" + strings.Join(conds, ") AND (") + ")", nil
 }
 
 // ---- plans.save ----
@@ -465,39 +482,12 @@ func (m Plans) save(ctx context.Context, call *ops.Call, input *PlanSaveInput) (
 			return Plan{}, apperr.Wrap(err, "insert maintenance.plans")
 		}
 	} else {
-		plan, err := m.load(ctx, call, *input.ID, true)
+		planID, err = m.updatePlan(ctx, call, input, next)
 		if err != nil {
-			return plan, err
+			return Plan{}, err
 		}
 
-		if plan.UnitID != input.UnitID {
-			return plan, apperr.Fields(map[string]string{fieldUnitID: "error.unitFixed"})
-		}
-
-		if plan.Version != *call.ExpectedVersion {
-			return plan, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
-		}
-
-		anchor := plan.AnchorDay
-		if !plan.NextDueAt.Equal(next) {
-			anchor = next.Day()
-		}
-
-		_, execErr := call.Tx.Exec(
-			ctx,
-			`UPDATE maintenance.plans SET interval_months = $2, anchor_day = $3, next_due_at = $4, version = version + 1,
-				updated_at = $5 WHERE id = $1`,
-			plan.ID,
-			input.Recurrence.IntervalMonths,
-			anchor,
-			next,
-			call.Now,
-		)
-		if execErr != nil {
-			return plan, apperr.Wrap(execErr, "update maintenance.plans")
-		}
-
-		planID, event = plan.ID, "PlanChanged"
+		event = "PlanChanged"
 	}
 
 	saved, err := m.load(ctx, call, planID, false)
@@ -509,6 +499,49 @@ func (m Plans) save(ctx context.Context, call *ops.Call, input *PlanSaveInput) (
 	call.Audit(auditEntry("plans.save", "plan", planID, call.ExpectedVersion, &saved.Version, ""))
 
 	return saved, nil
+}
+
+// updatePlan saves the plan at the version shown: its unit stays as it is, and a moved next due date moves the day of
+// the month the plan keeps.
+func (m Plans) updatePlan(
+	ctx context.Context,
+	call *ops.Call,
+	input *PlanSaveInput,
+	next time.Time,
+) (uuid.UUID, error) {
+	plan, err := m.load(ctx, call, *input.ID, true)
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	if plan.UnitID != input.UnitID {
+		return uuid.Nil, apperr.Fields(map[string]string{fieldUnitID: "error.unitFixed"})
+	}
+
+	if plan.Version != *call.ExpectedVersion {
+		return uuid.Nil, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
+	}
+
+	anchor := plan.AnchorDay
+	if !plan.NextDueAt.Equal(next) {
+		anchor = next.Day()
+	}
+
+	_, execErr := call.Tx.Exec(
+		ctx,
+		`UPDATE maintenance.plans SET interval_months = $2, anchor_day = $3, next_due_at = $4, version = version + 1,
+			updated_at = $5 WHERE id = $1`,
+		plan.ID,
+		input.Recurrence.IntervalMonths,
+		anchor,
+		next,
+		call.Now,
+	)
+	if execErr != nil {
+		return uuid.Nil, apperr.Wrap(execErr, "update maintenance.plans")
+	}
+
+	return plan.ID, nil
 }
 
 // ---- plans.generateNext ----

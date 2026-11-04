@@ -409,6 +409,12 @@ func (in *CreateInput) Validate() map[string]string {
 	return fieldErrs
 }
 
+// maxBatchJobs is how many jobs one batch read names at most.
+const maxBatchJobs = 100
+
+// photoMaxBytes is the largest photo, signature or site photo an upload takes: 5 MiB.
+const photoMaxBytes = 5 << 20
+
 // kualaLumpurOffset is the UTC offset of Malaysia Time in seconds, the zone when the zone database is missing.
 const kualaLumpurOffset = 8 * 60 * 60
 
@@ -2345,11 +2351,17 @@ func (m Jobs) lockJob(ctx context.Context, call *ops.Call, id uuid.UUID) (string
 
 // The longest free texts, in characters after trimming.
 const (
-	maxReasonLength = 1000 // a reason, a note, a comment or a message
-	maxNameLength   = 120  // the name of a signer, a certificate or a part
-	maxCodeLength   = 64   // a certificate number, a registration number or a terms version
-	maxNoteLength   = 2000 // a job note
+	maxReasonLength       = 1000 // a reason, a note, a comment or a message
+	maxNameLength         = 120  // the name of a signer, a certificate or a part
+	maxCodeLength         = 64   // a certificate number, a registration number or a terms version
+	maxNoteLength         = 2000 // a job note
+	maxWorkTextLength     = 4000 // a work report's text
+	maxUnavailabilityNote = 500  // an unavailability's note
+	maxRateNoteLength     = 200  // a rate card line's note
 )
+
+// preferredSlotCount is how many preferred times a request or a slot proposal's decline names (IR113).
+const preferredSlotCount = 3
 
 func trimmedReason(s *string, maxLength int, key string, fe map[string]string) {
 	*s = strings.TrimSpace(*s)
@@ -2848,7 +2860,7 @@ func (m Jobs) jobsOpen(
 	call *ops.Call,
 	input *notify.JobsOpenInput,
 ) ([]uuid.UUID, error) {
-	if len(input.JobIDs) > 100 {
+	if len(input.JobIDs) > maxBatchJobs {
 		return nil, apperr.Fields(map[string]string{"jobIds": apperr.KeyRange})
 	}
 
