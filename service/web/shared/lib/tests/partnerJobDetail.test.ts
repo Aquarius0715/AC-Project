@@ -21,7 +21,7 @@ describe("partner job detail", () => {
     expect(qualificationLabel("demo_outdoor")).toBe("Outdoor unit work");
     expect(qualified(members[0], ["demo_indoor", "demo_electrical"], "2026-09-22T01:00:00Z")).toBe(true);
     expect(qualified(members[1], ["demo_indoor", "demo_electrical"], "2026-09-22T01:00:00Z")).toBe(false);
-    expect(qualified({ ...members[0], qualifications: quals(["demo_indoor"], { revokedAt: "2026-09-10T00:00:00Z" }) } as unknown as ApiMember, ["demo_indoor"], "2026-09-22T01:00:00Z")).toBe(false);
+    expect(qualified({ ...members[0], qualifications: quals(["demo_indoor"], { revokedAt: "2026-09-10T00:00:00Z" }) }, ["demo_indoor"], "2026-09-22T01:00:00Z")).toBe(false);
     expect(qualified(members[0], ["demo_indoor"], "2027-04-01T00:00:00Z")).toBe(false); // expired by the visit
     expect(freeHours(cap("m-a", "d", [], [], 480, 120))).toBe(6);
     expect(freeHours(cap("m-a", "d", [], [], null))).toBeNull();
@@ -81,7 +81,7 @@ describe("partner job detail", () => {
     const assigned = { ...base, status: "assigned", assignment: { technicianMembershipId: "m-a", scheduledStart: "2026-09-22T02:00:00Z", scheduledEnd: "2026-09-22T04:00:00Z", status: "active", acknowledgement: "cant_make", cantMakeReason: "sick" } };
     expect(detailBanner(assigned, "tech-external-a", NOW)).toEqual({ tone: "warn", text: "Assigned — tech-external-a · 22 Sept, 10:00 am – 12:00 pm MYT · the technician can’t make it (“sick”) — reassign in Schedule." });
     expect(detailBanner(assigned, "tech-external-a", NOW, MS_TOKYO)?.text).toBe("Ditugaskan — tech-external-a · 22 Sep, 11:00 PG – 1:00 PTG GMT+9 · juruteknik tidak dapat hadir (“sick”) — tugaskan semula dalam Jadual.");
-    expect(detailBanner({ ...assigned, assignment: { ...assigned.assignment!, scheduledEnd: "2026-09-20T09:00:00Z" } }, "tech-external-a", NOW)?.tone).toBe("crit");
+    expect(detailBanner({ ...assigned, assignment: { ...assigned.assignment, scheduledEnd: "2026-09-20T09:00:00Z" } }, "tech-external-a", NOW)?.tone).toBe("crit");
     expect(delegationLeft("2026-09-28T16:00:00Z", NOW)).toBe("Delegation ends 29 Sept 2026, 12:00 am MYT — 7 d 14 h left.");
     expect(delegationLeft("2026-09-28T16:00:00Z", NOW, true)).toBe("Delegation ends 29 Sept 2026, 12:00 am MYT — 7 d 14 h to schedule the work.");
     expect(delegationLeft("2026-09-28T16:00:00Z", NOW, true, MS_TOKYO)).toBe("Delegasi tamat 29 Sep 2026, 1:00 PG GMT+9 — 7 hari 14 j lagi untuk menjadualkan kerja.");

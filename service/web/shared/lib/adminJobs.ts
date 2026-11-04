@@ -288,7 +288,7 @@ export function costLineOf(f: { kind: string; description: string; visibility: s
 }
 
 /** HQ reviews internal jobs normally and contractor jobs only by escalation (reason required, IR31). */
-export const reviewModeOf = (j: Pick<ApiHqJob, "contractorOrgId">) => (j.contractorOrgId ? "hq_escalation" : "normal") as "normal" | "hq_escalation";
+export const reviewModeOf = (j: Pick<ApiHqJob, "contractorOrgId">) => (j.contractorOrgId ? "hq_escalation" : "normal");
 
 /** The New job form (DD-A06 item 8): symptom 10–2000, the 1st preferred time plus up to two more (IR113 item 2: future,
 on a later calendar day than today, 1–4 hours, distinct). */

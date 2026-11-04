@@ -26,7 +26,7 @@ async function AdminEnergyPageContent({ searchParams }: Readonly<PageProps<"/adm
   await connection();
   if (!apiMode()) return <EnergyDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
   const tab = one("tab") === "baselines" ? "baselines" : "analysis";
   const [now, perms, display, customers, properties, units, all] = await Promise.all([
     coreNow(), corePermissions(), coreDisplay(),

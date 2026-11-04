@@ -8,6 +8,7 @@
 import { EN, intlTag, showSpan, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { jobEventTitle, klDay, until, type ApiCapacity, type ApiJobEvent, type ApiMember, type Slot } from "@ac/web/lib/partnerOverview";
+import type { ReportHistorySummary } from "@ac/web/lib/contracts.gen";
 
 const en = translator("en");
 
@@ -26,7 +27,7 @@ export interface ApiDetail {
   assignment: { technicianMembershipId: string; scheduledStart: string; scheduledEnd: string; status: string; acknowledgement: string; cantMakeReason: string | null; alternativeSlot?: Slot | null } | null;
   offer: { id: string; termsVersion: string; visitSlot: Slot; offeredAt: string; accessValidFrom: string; accessValidUntil: string; decision: string | null; decidedAt: string | null } | null;
 }
-export interface ApiHistory { projection: "history"; jobId: string; type: string; status: string; asOf: string; completedAt: string | null; ownDecisionEvents: ApiJobEvent[]; redactedReportSummary?: unknown }
+export interface ApiHistory { projection: "history"; jobId: string; type: string; status: string; asOf: string; completedAt: string | null; ownDecisionEvents: ApiJobEvent[]; redactedReportSummary?: ReportHistorySummary }
 export type ApiPartnerJobDetail = ApiOffer | ApiDetail | ApiHistory;
 
 const QUALIFICATIONS: Record<string, string> = { demo_indoor: "Indoor unit work", demo_outdoor: "Outdoor unit work", demo_electrical: "Electrical work" };
@@ -131,7 +132,7 @@ export function detailBanner(j: ApiDetail, techName: string | null, now: number,
     case "in_progress": {
       const a = j.assignment;
       const ended = a && Date.parse(a.scheduledEnd) <= now;
-      if (ended) return { tone: "crit", text: t("The work window ended {time} without a submitted report — extend or reassign in Schedule.", { time: showTime(a!.scheduledEnd, display) }) };
+      if (ended) return { tone: "crit", text: t("The work window ended {time} without a submitted report — extend or reassign in Schedule.", { time: showTime(a.scheduledEnd, display) }) };
       const ack = a?.acknowledgement === "accepted" ? t("accepted by the technician")
         : a?.acknowledgement === "cant_make" ? (a.cantMakeReason ? t("the technician can’t make it (“{reason}”) — reassign in Schedule", { reason: a.cantMakeReason }) : t("the technician can’t make it — reassign in Schedule"))
         : t("awaiting the technician’s acceptance");

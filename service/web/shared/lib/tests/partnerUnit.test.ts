@@ -27,7 +27,7 @@ describe("partner unit view", () => {
     expect(contextJob([other, job], "job-p02-aaaa")).toBe(job);
     expect(contextJob([other, job], "nope")).toBe(other);
     expect(contextJob([{ projection: "history", jobId: "h", type: "periodic", status: "completed", completedAt: null }])).toBeNull();
-    expect(jobContext(job as Extract<ApiUnitJob, { projection: "summary" }>, new Map(), NOW)).toEqual({
+    expect(jobContext(job, new Map(), NOW)).toEqual({
       id: "job-p02-aaaa", techMissing: true, pct: 37,
       rows: [["Job", "job-p02- · Repair"], ["Technician", "Not assigned yet"], ["Access window", "14 Sept, 1:00 am – 15 Sept, 12:00 am MYT"]],
       note: "Access ends in 14 h. After that, live values are cleared and only a history snapshot remains.",
@@ -61,7 +61,7 @@ describe("partner unit view", () => {
 
   it("words the unit view in Malay with the display time zone (IR280)", () => {
     expect(registerRows(unit, MS).rows[2]).toEqual(["Skop penyelenggaraan", "Unit dalaman · Unit luaran"]);
-    expect(jobContext(job as Extract<ApiUnitJob, { projection: "summary" }>, new Map(), NOW, MS).rows[1]).toEqual(["Juruteknik", "Belum ditugaskan"]);
+    expect(jobContext(job, new Map(), NOW, MS).rows[1]).toEqual(["Juruteknik", "Belum ditugaskan"]);
     expect(readingRows(unit, MS).rows.map((r) => r.value)).toEqual(["14.2 °C · baik", "310 kPa · baik", "2.1 mm/s · diragui", "Hidup · menyejuk"]);
     expect(chart("vibration", "mm/s", [], NOW, MS)).toMatchObject({ title: "Getaran (mm/s)", now: "tiada bacaan" });
   });

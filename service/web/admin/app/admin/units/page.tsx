@@ -38,7 +38,7 @@ export default async function AdminUnitsPage({ searchParams }: Readonly<PageProp
   await connection();
   if (!apiMode()) return <UnitsDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
   const [now, perms, display] = await Promise.all([coreNow(), corePermissions(), coreDisplay()]);
   const i = i18nOf(display);
   const { t } = i;

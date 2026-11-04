@@ -155,7 +155,7 @@ export function policyInput(f: PolicyForm, existing: ApiAlertPolicy | null, ctx:
     ...(existing && { id: existing.id }), kind: "alert" as const, name: f.name.trim(), customerId: ctx.customerId,
     timezone: existing?.timezone ?? ctx.timezone, enabled: existing?.enabled ?? true, priority: existing?.priority ?? 50,
     recipientMembershipIds: existing?.recipientMembershipIds ?? [ctx.membershipId], escalateAfterMinutes: existing?.escalateAfterMinutes ?? 60, cooldownMinutes: existing?.cooldownMinutes ?? 5,
-    channels: (f.email ? ["inApp", "email"] : ["inApp"]) as Channel[], metric: f.metric as ContractMetric, operator: f.operator, threshold: Number(f.threshold), recoveryThreshold: Number(f.recovery),
+    channels: (f.email ? ["inApp", "email"] : ["inApp"]), metric: f.metric as ContractMetric, operator: f.operator, threshold: Number(f.threshold), recoveryThreshold: Number(f.recovery),
     durationSeconds: seconds(f) ?? 0, activeWindow: f.windowOn ? { weekdays: [...f.weekdays].toSorted(byNumber), startLocal: f.start, endLocal: f.end } : null, severity: f.severity,
   };
 }

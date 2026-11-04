@@ -22,7 +22,7 @@ async function AdminContractsPageContent({ searchParams }: Readonly<PageProps<"/
   await connection();
   if (!apiMode()) return <ContractsView />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
   const kind = plans.find((p) => p === one("kind"));
   const scope = { customerId: one("customerId"), unitId: one("unitId"), kind };
   const where = { ...(scope.customerId && { customerId: scope.customerId }), ...(scope.unitId && { unitId: scope.unitId }) };

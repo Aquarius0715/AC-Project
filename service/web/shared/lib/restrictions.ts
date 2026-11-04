@@ -30,7 +30,7 @@ export const stateLabel: Record<RestrictionState, string> = { scheduled: "Schedu
 /** A state as the screens word it. */
 export const stateWord = (s: RestrictionState, t: T = en) =>
   ({ scheduled: t("Scheduled"), requested: t("Requested"), applied: t("Applied"), release_requested: t("Release requested"), released: t("Released"), cancelled: t("Cancelled") })[s] ?? s;
-export const stateTone = (s: RestrictionState) => (s === "applied" ? "warn" : s === "released" ? "ok" : s === "cancelled" ? "muted" : s === "release_requested" ? "unknown" : "primary") as "warn" | "ok" | "muted" | "unknown" | "primary";
+export const stateTone = (s: RestrictionState) => (s === "applied" ? "warn" : s === "released" ? "ok" : s === "cancelled" ? "muted" : s === "release_requested" ? "unknown" : "primary");
 export const policyText = (p: Policy, t: T = en) => (p.kind === "power_off" ? t("Power off") : t("Temperature limit — cooling setpoint ≥ {value} °C", { value: p.minimumCoolingSetpoint }));
 /** Where a release intent came from, worded. */
 export const sourceWord = (s: NonNullable<ReleaseIntent>["source"], t: T = en) =>

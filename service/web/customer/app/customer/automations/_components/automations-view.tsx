@@ -185,7 +185,7 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
   const actionSelect = (label: string, key: "startAction" | "endAction" | "action", hint?: string) => {
     const value = draft[key];
     const group = options.find((g) => g.id === actionGroupOf(value));
-    const pick = (v: string) => { set({ [key]: v } as Partial<Draft>); };
+    const pick = (v: string) => { set({ [key]: v }); };
     const part = (title: string, control: ReactNode, name?: string) => (
       <div role={name ? "group" : undefined} aria-label={name} className="flex min-w-0 flex-col gap-1">
         <span aria-hidden className="font-semibold">{title}</span>

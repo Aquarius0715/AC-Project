@@ -91,7 +91,7 @@ function OfferView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "of
     <Page narrow>
       <Crumb text={`${short} · ${j.siteAddress ?? typeLabel(j.type, t)} · ${t(j.status === "offered" ? "offer" : "accepted")}`} />
       {refused && <Banner tone="crit">{refused}</Banner>}
-      {isOpen && <Banner tone="warn">{t(p!.status === "sent_to_client" ? "HQ asked the client about your proposed time ({slot} · {name}) — the offer stays reserved for you; Accept is disabled until it is answered." : "Your proposed time is with HQ ({slot} · {name}) — the offer stays reserved for you; Accept is disabled until it is answered.", { slot: x.proposal ?? "", name: live.names[p!.technicianMembershipId] ?? t("technician") })}</Banner>}
+      {isOpen && <Banner tone="warn">{t(p.status === "sent_to_client" ? "HQ asked the client about your proposed time ({slot} · {name}) — the offer stays reserved for you; Accept is disabled until it is answered." : "Your proposed time is with HQ ({slot} · {name}) — the offer stays reserved for you; Accept is disabled until it is answered.", { slot: x.proposal ?? "", name: live.names[p.technicianMembershipId] ?? t("technician") })}</Banner>}
       {p?.status === "approved" && <Banner tone="ok">{t("The client approved your proposed time — the visit is now {slot}. Accept the offer to continue.", { slot: x.visit })}</Banner>}
       {(p?.status === "declined" || p?.status === "kept") && <Banner tone="warn">{t("Your time change was not taken — the agreed time stays {slot}. Accept or decline.", { slot: x.visit })}</Banner>}
       {j.status === "accepted" && <Banner tone="ok" action={<LinkBtn size="sm" variant="primary" href={`/partner/schedule?jobId=${j.jobId}`}>{t("Assign technician")} <Icon name="arrowRight" /></LinkBtn>}>{t("Accepted — the delegation period starts {time}; unit details open then. Assign your technician for exactly {slot}.", { time: x.accessFrom, slot: x.visit })}</Banner>}
@@ -112,7 +112,7 @@ function OfferView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "of
               <Input value={reason} maxLength={1000} onChange={(e) => { setReason(e.target.value); }} placeholder={t("No qualified technician available in this window.")} />
             </Field>
             <Btn variant="danger" disabled={pending} onClick={() => { setTried(true); if (reason.trim()) setModal("decline"); }}>{t("Decline")}</Btn>
-            {isOpen ? <Btn disabled={pending} onClick={() => { run(() => withdrawProposal(j.jobId, p!.id, j.jobVersion), t("Proposal withdrawn"), () => { setRefused(null); }, failed); }}>{t("Withdraw my proposal")}</Btn>
+            {isOpen ? <Btn disabled={pending} onClick={() => { run(() => withdrawProposal(j.jobId, p.id, j.jobVersion), t("Proposal withdrawn"), () => { setRefused(null); }, failed); }}>{t("Withdraw my proposal")}</Btn>
               : <Btn disabled={pending || live.technicians.length === 0} onClick={() => { setModal("propose"); }}>{t("Propose another time…")}</Btn>}
             <Btn variant="primary" disabled={pending || isOpen || Date.parse(j.offerExpiresAt) <= now} onClick={() => { run(() => acceptOffer(j.jobId, j.offerId, j.termsVersion, j.jobVersion), t("Offer accepted — assign a technician next"), () => { setRefused(null); }, failed); }}>{t("Accept job")}</Btn>
           </div>

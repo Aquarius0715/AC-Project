@@ -47,7 +47,7 @@ test("a customer request reaches the partner's technician", async ({ browser }) 
       const dialog = admin.getByRole("dialog");
       await dialog.getByRole("button", { name: "Offer to contractor" }).click();
       const org = dialog.getByLabel("Contractor organization");
-      await org.selectOption((await org.locator("option", { hasText: /Contractor A/ }).first().getAttribute("value"))!);
+      await org.selectOption((await org.locator("option", { hasText: /Contractor A/ }).first().getAttribute("value")));
       await dialog.getByRole("button", { name: "Send offer" }).click();
       await expect(admin.getByText(/They accept, decline or propose/)).toBeVisible();
     });

@@ -64,7 +64,7 @@ describe("HQ device registry in Malay with the display time zone (IR295)", () =>
     expect(modelRows([cap], units, [], MS)[0]).toMatchObject({ used: "1 unit · 0 peranti", updated: "10 Sep 2026, 11:00 PG GMT+9" });
     expect(deviceRows([device({ unitId: null })], units, MS.t)[0].unit).toBe("Tidak terikat");
     expect(campaignErrors(draft({ modelId: "" }), NOW, "Asia/Tokyo", MS.t)).toEqual({ modelId: "Pilih model" });
-    expect(campaignRows([{ ...({} as ApiCampaign), id: "k", version: 1, modelId: "x", fromVersions: [], targetVersion: "v2", deviceIds: [], startAt: "2026-09-16T02:00:00Z", state: "paused" } as ApiCampaign], [], MS)[0])
+    expect(campaignRows([{ ...({} as ApiCampaign), id: "k", version: 1, modelId: "x", fromVersions: [], targetVersion: "v2", deviceIds: [], startAt: "2026-09-16T02:00:00Z", state: "paused" }], [], MS)[0])
       .toMatchObject({ model: "model", versions: "mana-mana → v2", start: "16 Sep 2026, 11:00 PG GMT+9" });
     expect(resultReason("errors.device_busy", MS.t)).toBe("Dilangkau — unit sedang sibuk (operasi, arahan, ujian diagnostik atau sekatan)");
   });

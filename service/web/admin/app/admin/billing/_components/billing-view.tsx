@@ -191,7 +191,7 @@ export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
   const isOtherZone = i.display.timeZone !== KL;
   return (
     <Page>
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: "invoices", label: t("Invoices"), count: list.length }, { id: "inquiries", label: t("Inquiries"), count: inquiries.length }, { id: "payouts" as Tab, label: t("Contractor payouts"), count: live ? live.statements?.length : 1 }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ id: "invoices", label: t("Invoices"), count: list.length }, { id: "inquiries", label: t("Inquiries"), count: inquiries.length }, { id: "payouts", label: t("Contractor payouts"), count: live ? live.statements?.length : 1 }]} />
       {tab === "payouts" ? (live ? <PayoutsTab live={live} nav={nav} act={act} pending={pending} /> : <ContractorPayouts />) : tab === "invoices" ? (
         <>
           {live && (

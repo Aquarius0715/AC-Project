@@ -13,6 +13,6 @@ export default async function TechnicianDevicesPage({ searchParams }: Readonly<P
   await connection();
   if (!apiMode()) return <DevicesView />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
   return <TechDevicesView live={await loadDevices({ selected: one("deviceId"), unitId: one("unitId"), jobId: one("jobId"), events: false })} />;
 }

@@ -31,7 +31,7 @@ function useRevision(): number {
 export function bffSession(): Promise<BffSession> {
   cached ??= fetch("/bff/session", { cache: "no-store" })
     .then((r) => r.json() as Promise<BffSession>)
-    .catch(() => ({ dataSource: "mock", signedIn: false, role: null, membershipId: null, clientRole: null, serverNow: null }) as BffSession);
+    .catch(() => ({ dataSource: "mock", signedIn: false, role: null, membershipId: null, clientRole: null, serverNow: null }));
   return cached;
 }
 

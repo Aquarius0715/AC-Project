@@ -27,7 +27,7 @@ export function JobsDemo({ status }: Readonly<{ status?: string }>) {
       label: isOffered ? (isPend ? "Time proposed" : "Offered") : (j.status === "accepted" ? "Unassigned" : "Assigned"), tone: isPend ? "warn" : "primary",
     };
   });
-  const rows: Row[] = [...liveRows, ...pjobs.map((p) => ({ ...p, origin: (p.id === "job-p09" ? "plan" : "request") as Row["origin"] }))];
+  const rows: Row[] = [...liveRows, ...pjobs.map((p): Row => ({ ...p, origin: p.id === "job-p09" ? "plan" : "request" }))];
   const match = (j: Row, t: T) => t === "all" || j.status === t || (t === "Active" && j.status === "Overdue");
   const jobs = rows.filter((j) => match(j, tab) && (origin === "all" || j.origin === origin));
   const count = (t: T) => rows.filter((j) => match(j, t)).length;

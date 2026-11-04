@@ -17,7 +17,7 @@ export function useTechJobs(today = false): TechRow[] {
       note: j.techAck?.status === "pending" ? "new assignment — accept it" : (j.techAck?.status === "cant_make" ? "you said you can’t make it" : `assigned by ${j.contractor ?? "HQ"}`),
       status: j.techAck?.status === "pending" ? "Not accepted" : (j.techAck?.status === "cant_make" ? "Can’t make it" : "Assigned"),
       progress: j.techAck?.status === "accepted" ? "accepted · opens on the day (read-only until then)" : "visit time agreed with the client",
-      tone: (j.techAck?.status === "pending" ? "warn" : "primary") as TechRow["tone"],
+      tone: (j.techAck?.status === "pending" ? "warn" : "primary"),
     };
   });
   return [...rows, ...tjobs.filter((t) => !today || t.today)];

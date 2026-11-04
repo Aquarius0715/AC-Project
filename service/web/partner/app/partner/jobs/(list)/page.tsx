@@ -9,7 +9,7 @@ import { loadJobs } from "./_lib/load";
 export default async function PartnerJobsPage({ searchParams }: Readonly<PageProps<"/partner/jobs">>) {
   await connection();
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
   if (!apiMode()) return <JobsDemo status={one("status")} />;
   // the overview's KPI links use status=…; the list's URL key is tab
   const tab = one("tab") ?? ({ offered: "offered", active: "active", submitted: "review", completed: "completed" } as Record<string, string>)[one("status") ?? ""];

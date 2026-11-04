@@ -11,6 +11,6 @@ export default async function PartnerOverviewPage({ searchParams }: Readonly<Pag
   await connection();
   if (!apiMode()) return <OverviewDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
   return <OverviewView live={await loadOverview({ from: one("from"), to: one("to") })} />;
 }

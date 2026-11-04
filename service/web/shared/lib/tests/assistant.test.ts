@@ -44,7 +44,7 @@ describe("the customer assistant (FR-X02, D09, Figma Client 09a–09g)", () => {
     expect(changeCard(change(31), unit(), en)).toMatchObject({ supported: false });
     expect(changeCard(change(24, null), null, en)).toMatchObject({ target: "u-0001-a", current: "not known", range: "not supported", supported: false });
     // a model without remote control takes no temperature, whatever range it lists (deterministic contracts, IR537)
-    const monitoring = unit({ capabilities: { ...unit().capabilities, control: false } as ApiUnitDetail["capabilities"] });
+    const monitoring = unit({ capabilities: { ...unit().capabilities, control: false } });
     expect(changeCard(change(24), monitoring, en)).toMatchObject({ range: "not supported", supported: false });
   });
 

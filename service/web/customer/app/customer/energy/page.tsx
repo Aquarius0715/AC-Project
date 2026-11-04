@@ -21,7 +21,7 @@ export default async function CustomerEnergyPage({ searchParams }: Readonly<Page
   await connection();
   if (!apiMode()) return <EnergyDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
   const [now, units, baselines, properties, prefs, display] = await Promise.all([
     coreNow(), coreAll<Unit>("units.list"), coreAll<ApiBaseline>("baselines.list"), coreAll<{ id: string; name: string }>("properties.list"),
     coreOp<Preferences>("preferences.get", {}).catch(() => null), coreDisplay(),

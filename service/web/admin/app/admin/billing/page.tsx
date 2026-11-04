@@ -34,7 +34,7 @@ async function AdminBillingPageContent({ searchParams }: Readonly<PageProps<"/ad
   await connection();
   if (!apiMode()) return <BillingView />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
   const tab = one("tab") === "payouts" ? "payouts" : (one("tab") === "inquiries" || (!one("tab") && one("inquiryId") && !one("invoiceId")) ? "inquiries" : "invoices");
   const months = billingMonths(one("from"), one("to"));
   const scope = { customerId: one("customerId"), propertyId: one("propertyId"), contractId: one("contractId"), overdueOnly: one("overdueOnly") === "true", from: months.from, to: months.to };

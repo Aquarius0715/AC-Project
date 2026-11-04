@@ -72,7 +72,7 @@ export function AlertsView({ rows = seed }: Readonly<{ rows?: Alert[] }>) {
 /** The alert policies of the Phase 1A demo (FR-C15): the default policy's rules and the customer's own policies. */
 export function PoliciesPanel() {
   const toast = useToast();
-  const [rules, setRules] = useState(defaultRules.map((r) => r[3] as boolean));
+  const [rules, setRules] = useState(defaultRules.map((r) => r[3]));
   const [policies, setPolicies] = useState(seedPolicies);
   const [edit, setEdit] = useState<string | null>(null);
   const [f, setF] = useState({ name: "", metric: "co2", op: "≥", val: "1200", dur: "15", rec: "1000", sev: "warning" });

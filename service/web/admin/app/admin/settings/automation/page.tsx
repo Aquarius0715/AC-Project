@@ -23,7 +23,7 @@ async function AdminAutomationPageContent({ searchParams }: Readonly<PageProps<"
   await connection();
   if (!apiMode()) return <AutomationDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
   const scope = { customerId: one("customerId"), propertyId: one("propertyId"), unitId: one("unitId") };
   const filters = { kind: "automation", ...(scope.customerId && { customerId: scope.customerId }), ...(scope.propertyId && { propertyId: scope.propertyId }), ...(scope.unitId && { unitId: scope.unitId }) };
   const [now, perms, display, policies, units, customers, properties, caps] = await Promise.all([

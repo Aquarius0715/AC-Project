@@ -53,7 +53,7 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
   // the last 24 hours in hourly averages of the valid CO2 readings, whole (bucketMinutes, IR605, IR607)
   const series = async () => {
     const to = Math.floor(nowMs / 60_000) * 60_000;
-    const page: ApiAirSeries = await coreOp("telemetry.series", { from: new Date(to - 86_400_000).toISOString(), to: new Date(to).toISOString(), unitIds: [air!.id], metric: "co2", bucketMinutes: 60, query: {} });
+    const page: ApiAirSeries = await coreOp("telemetry.series", { from: new Date(to - 86_400_000).toISOString(), to: new Date(to).toISOString(), unitIds: [air.id], metric: "co2", bucketMinutes: 60, query: {} });
     return bucketPoints(page.buckets ?? []);
   };
   // what is due or restricted (DEC-90, IR610): the overdue invoices and the restriction they caused, read as the payments
@@ -101,7 +101,7 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
       items: shown.map((a, k) => {
         const u = units.find((x) => x.id === a.unitIds[0]);
         const card = ruleCard(a, u ? { name: u.displayName, path: place.get(u.id)?.place ?? "", property: properties.find((p) => p.id === u.propertyId)?.name ?? "" } : null, nexts[k], !!consent?.granted, i);
-        const line = nexts[k] ? t("Next run: {when} · {unit}", { when: nextRunText(nexts[k]!, nowMs, i), unit: u?.displayName ?? "AC" })
+        const line = nexts[k] ? t("Next run: {when} · {unit}", { when: nextRunText(nexts[k], nowMs, i), unit: u?.displayName ?? "AC" })
           : (triggerOf(a) === "location" ? t("{when} · location consent: {state}", { when: card.when, state: t(consent?.granted ? "granted" : "not granted") }) : card.when);
         return { id: a.id, name: a.name, status: card.status, line };
       }),

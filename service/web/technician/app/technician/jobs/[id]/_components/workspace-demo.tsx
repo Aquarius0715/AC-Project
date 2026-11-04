@@ -110,7 +110,7 @@ function Workspace({ id }: Readonly<{ id: string }>) {
       {errs.length > 0 && <Banner tone="crit"><b>Can’t submit:</b><ul className="list-disc pl-5 text-xs">{errs.slice(0, 5).map((e) => <li key={e}>{e}</li>)}</ul></Banner>}
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title="Inspection checklist" action={<Tabs value={tab} onChange={setTab} tabs={(Object.keys(groups) as (keyof typeof groups)[]).map((g) => ({ id: g as "indoor", label: labels[g as "indoor"] }))} />}>
+          <Card title="Inspection checklist" action={<Tabs value={tab} onChange={setTab} tabs={(Object.keys(groups)).map((g) => ({ id: g as "indoor", label: labels[g as "indoor"] }))} />}>
             <ul className="divide-y divide-line">
               {groups[tab].map((k) => (
                 <li key={k} className="py-2.5">

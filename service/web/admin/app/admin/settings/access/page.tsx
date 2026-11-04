@@ -24,7 +24,7 @@ async function AdminAccessPageContent({ searchParams }: Readonly<PageProps<"/adm
   await connection();
   if (!apiMode()) return <AccessDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
   const role = one("role") === "admin" || one("role") === "contractor" || one("role") === "technician" ? one("role") : undefined;
   const status = one("status") === "active" || one("status") === "inactive" ? one("status") : undefined;
   const organizationId = one("organizationId");

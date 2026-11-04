@@ -25,7 +25,7 @@ export default async function CustomerInvoicePage({ params, searchParams }: Read
   interface Unit { id: string; displayName: string; propertyId: string; spaceId: string | null }
   const { id } = await params;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
   await connection();
   if (!apiMode()) return <InvoiceDemo id={id} tab={one("tab")} />;
   let inv: ApiInvoiceDetail & { createdAt: string; paymentRefs: ClientPayment[] };

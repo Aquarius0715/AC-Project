@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Banner, Btn, Card, Check, ConnBadge, Modal, Page, PowerBadge, Stat, SummaryList, Toggle, cx, useToast, Choice } from "@ac/web/components/ui";
-import { units, unitRowFromApi, type ApiUnit, type UnitRow } from "@ac/web/lib/client";
+import { units, unitRowFromApi, type UnitRow } from "@ac/web/lib/client";
 import { OpError } from "@ac/web/lib/ops";
 import { controlLayout, FAN_LABEL, historyRow, latest, MODE_LABEL, type ApiCommand, type ApiUnitDetail, type UnitAction } from "@ac/web/lib/units";
 import { waitForCommand } from "@ac/web/lib/unitCommands";
@@ -35,7 +35,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
   const roomUnits = { data: roomRows ?? units };
   const apiPolicies = { data: policies ?? null };
   const mockUnit = units.find((u) => u.id === id) ?? units[0];
-  const unit = d ? { ...unitRowFromApi(d as unknown as ApiUnit), loc: d.location.pathLabels.join(" › "), obs: showRecent(d.lastSeenAt, nowMs, display) } : mockUnit;
+  const unit = d ? { ...unitRowFromApi(d), loc: d.location.pathLabels.join(" › "), obs: showRecent(d.lastSeenAt, nowMs, display) } : mockUnit;
   const isOffline = unit.conn === "offline";
   const policy = d?.effectiveControlPolicy.state === "restricted" ? d.effectiveControlPolicy.policy : null;
   const isRestricted = d ? policy?.kind === "temperature_limit" : id === "unit-limited";

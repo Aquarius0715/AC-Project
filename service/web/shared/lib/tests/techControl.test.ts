@@ -94,10 +94,10 @@ describe("capability, restriction and refusals (IR286)", () => {
   } as unknown as ApiUnitDetail;
   it("words what the unit allows and why control waits", () => {
     expect(capabilityText(unit)).toBe("Capability v3 allows: set_mode (cool/dry/fan), set_temperature 16–30 °C, set_fan (low/mid/high), test run 1–15 min.");
-    expect([restrictionText(unit), restrictionText({ effectiveControlPolicy: { state: "restricted", phase: "active", policy: { kind: "power_off" } } } as unknown as ApiUnitDetail), restrictionText({ effectiveControlPolicy: { state: "unrestricted" } } as ApiUnitDetail)])
+    expect([restrictionText(unit), restrictionText({ effectiveControlPolicy: { state: "restricted", phase: "active", policy: { kind: "power_off" } } } as unknown as ApiUnitDetail), restrictionText({ effectiveControlPolicy: { state: "unrestricted" } })])
       .toEqual(["min 24 °C", "power off only", null]);
     expect(blockedText(unit)).toBe("the unit must be reconciled after a restriction");
-    expect(blockedText({ controlAvailability: { state: "available" } } as ApiUnitDetail)).toBeNull();
+    expect(blockedText({ controlAvailability: { state: "available" } })).toBeNull();
     expect(connectionText("offline")).toBe("Connection: Offline.");
   });
   it("words a refused write and its fields", () => {

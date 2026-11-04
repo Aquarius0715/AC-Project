@@ -439,7 +439,7 @@ export function eventTest(dec: ApiDecision | undefined, ruleId: string | null, n
 /** The synthetic fact a test sends for an event rule (Phase 1A demo events; the action adds the AC and the tick). */
 export function testFact(d: Draft): Omit<OpInput<"automations.simulate">["facts"][number], "unitId" | "observedAt">[] {
   switch (d.trigger) {
-    case "location": { return [{ metric: "location", value: d.event as "arrival" | "departure", unit: "event", quality: "valid" }];
+    case "location": { return [{ metric: "location", value: d.event, unit: "event", quality: "valid" }];
     }
     case "presence": { return [{ metric: "occupied", value: d.occupied, unit: "boolean", quality: "valid" }];
     }

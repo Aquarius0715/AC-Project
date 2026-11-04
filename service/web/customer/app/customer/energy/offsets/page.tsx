@@ -16,7 +16,7 @@ export default async function CustomerOffsetsPage({ searchParams }: Readonly<Pag
   await connection();
   if (!apiMode()) return <OffsetsDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
   const [now, units, records, display] = await Promise.all([
     coreNow(), coreAll<{ id: string; displayName: string }>("units.list"), coreAll<ApiOffsetRecord>("offsets.list", { sort: { field: "createdAt", direction: "desc" } }), coreDisplay(),
   ]);

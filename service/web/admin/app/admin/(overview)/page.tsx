@@ -6,7 +6,7 @@
 import { connection } from "next/server";
 import { apiMode, coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
-import { periodKinds, periodRange, type PeriodKind } from "@ac/web/lib/clientEnergy";
+import { periodKinds, periodRange } from "@ac/web/lib/clientEnergy";
 import { asOfText, type AdminSummary } from "@ac/web/lib/adminSummary";
 import { NeedsAccess } from "@ac/web/components/NeedsAccess";
 import { AdminOverviewDemo } from "./_components/overview-demo";
@@ -18,8 +18,8 @@ export default async function AdminOverviewPage({ searchParams }: Readonly<PageP
   await connection();
   if (!apiMode()) return <AdminOverviewDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
-  const kind = (periodKinds.find((k) => k === one("period")) ?? "today") as PeriodKind;
+  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
+  const kind = (periodKinds.find((k) => k === one("period")) ?? "today");
   const [now, display] = await Promise.all([coreNow(), coreDisplay()]);
   const i = i18nOf(display);
   const period = periodRange(kind, now, { from: one("from"), to: one("to") }, i);

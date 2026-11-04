@@ -27,7 +27,7 @@ async function AdminOffsetsPageContent({ searchParams }: Readonly<PageProps<"/ad
   await connection();
   if (!apiMode()) return <OffsetsDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
   const tab = one("tab") === "market" ? "market" : "records";
   const customerId = one("customerId");
   const status = STATES.find((x) => x === one("status"));

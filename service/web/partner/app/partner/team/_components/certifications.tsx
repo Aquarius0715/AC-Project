@@ -118,18 +118,18 @@ function CertificateModal({ live, kind, row, onClose }: Readonly<{ live: Live; k
     if (!file) return;
     const data = new FormData();
     for (const [k, v] of Object.entries({ membershipId: form.membershipId, code: form.code, name: form.name, number: form.number, issued: form.issued, expires: form.expires })) data.set(k, v);
-    if (renew) data.set("renewalOf", row!.cert!.id);
+    if (renew) data.set("renewalOf", row.cert!.id);
     data.set("file", file);
     run(() => submitCertificate(data), t("Submitted for HQ verification — it counts for eligibility once HQ approves it."), onClose,
       (f) => { const r = certificateRefusal(f, t); setServer(r.fields); setRefused(r.text); });
   };
   return (
-    <Modal open onClose={onClose} title={renew ? t("Upload renewal — {name}", { name: row!.name }) : t("Add certificate")} footer={<>
+    <Modal open onClose={onClose} title={renew ? t("Upload renewal — {name}", { name: row.name }) : t("Add certificate")} footer={<>
       <Btn onClick={onClose}>{t("Cancel")}</Btn>
       <Btn variant="primary" disabled={pending} onClick={save}>{t("Submit for verification")}</Btn>
     </>}>
       {renew ? (
-        <SummaryList items={[[t("Technician"), row!.technician], [t("Current"), t("{number} · expires {date}", { number: row!.cert!.number, date: row!.expires })]]} />
+        <SummaryList items={[[t("Technician"), row.technician], [t("Current"), t("{number} · expires {date}", { number: row.cert!.number, date: row.expires })]]} />
       ) : (
         <>
           <Field label={t("Technician")} error={err("membershipId")}>

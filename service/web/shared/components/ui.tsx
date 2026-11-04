@@ -495,7 +495,9 @@ export function ToastProvider({ children }: Readonly<{ children: React.ReactNode
 /* ───────────── Data display ───────────── */
 export interface Col<T> { key: string; label: string; render: (r: T) => React.ReactNode; className?: string; hideBelow?: "sm" | "md" }
 // TanStack Table builds the rows and cells (shadcn/ui's data table, DEC-75); a column carries its classes as meta
-const tableFx = tableFeatures({ columnMeta: {} as { className?: string; hideBelow?: "sm" | "md" } });
+// the columns' meta type, given to TanStack through its type-only columnMeta slot
+const columnMeta: { className?: string; hideBelow?: "sm" | "md" } = {};
+const tableFx = tableFeatures({ columnMeta });
 const hideCls = (m?: { hideBelow?: "sm" | "md" }) => (m?.hideBelow === "sm" ? "max-sm:hidden" : (m?.hideBelow === "md" ? "max-md:hidden" : undefined));
 /** A cell's content under one component type for good. A column's `render` is a new function on every render of the
 page, and FlexRender mounts a function as a component, so each render remounted every cell: a row's button that

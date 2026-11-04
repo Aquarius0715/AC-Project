@@ -232,7 +232,7 @@ function ProblemModal({ open, j, onClose, onDone }: Readonly<{ open: boolean; j:
   const [tried, setTried] = useState(false);
   const [err, setErr] = useState<string | undefined>();
   return (
-    <Modal open={open} onClose={onClose} title={`Report a problem — ${j.id}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (d.trim().length < 10 || d.length > 2000) return; const r = jobActions.reportProblem(j.id, PROBLEM[reason], d.trim(), visit); if ("error" in r) { setErr(r.error); return; } setD(""); setTried(false); onDone(r.id!); }}>Send report</Btn></>}>
+    <Modal open={open} onClose={onClose} title={`Report a problem — ${j.id}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (d.trim().length < 10 || d.length > 2000) return; const r = jobActions.reportProblem(j.id, PROBLEM[reason], d.trim(), visit); if ("error" in r) { setErr(r.error); return; } setD(""); setTried(false); onDone(r.id); }}>Send report</Btn></>}>
       <Field label="What happened?"><Choice value={reason} onChange={setReason} options={[{ id: "same", label: "Same problem again" }, { id: "new", label: "New damage" }, { id: "incomplete", label: "Work not completed" }, { id: "other", label: "Other" }]} /></Field>
       <Field label="Details (10–2000 characters)" error={tried && (d.trim().length < 10 || d.length > 2000) ? "Describe the problem (10–2000 characters)" : undefined}><Textarea value={d} onChange={(e) => { setD(e.target.value); }} /></Field>
       <Field label="Preferred visit (optional)"><Input type="date" value={visit} onChange={(e) => { setVisit(e.target.value); }} /></Field>

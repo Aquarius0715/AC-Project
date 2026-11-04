@@ -69,9 +69,10 @@ export function pastWork(jobs: ApiUnitJob[], i: I18n = EN) {
   return jobs.filter((j): j is Extract<ApiUnitJob, { projection: "history" }> => j.projection === "history")
     .toSorted((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? ""))
     .map((j) => {
+      const tone: "ok" | "muted" = j.status === "completed" ? "ok" : "muted";
       return {
         id: j.jobId, title: `${j.jobId.slice(0, 8)} · ${typeLabel(j.type, t)}`, sub: j.completedAt ? showDate(j.completedAt, display) : t("not completed"),
-        badge: { text: statusWord(j.status, t), tone: (j.status === "completed" ? "ok" : "muted") as "ok" | "muted" },
+        badge: { text: statusWord(j.status, t), tone },
       };
     });
 }
@@ -120,7 +121,7 @@ and that live values are gone. */
 export function snapshotRows(h: ApiHistory, i: I18n = EN): [string, string][] {
   const { t, display } = i;
   const decision = [...h.ownDecisionEvents].filter((e) => e.action === "offer.accepted" || e.action === "offer.declined").toSorted((a, b) => b.occurredAt.localeCompare(a.occurredAt))[0];
-  const report = (h.redactedReportSummary ?? null) as { hasReport?: boolean; acceptance?: string } | null;
+  const report = h.redactedReportSummary ?? null;
   return [
     [t("Your decision"), decision ? `${t(decision.action === "offer.accepted" ? "Accepted" : "Declined")} · ${showTime(decision.occurredAt, display)}` : "—"],
     [t("Work"), `${statusWord(h.status, t)}${h.completedAt ? ` · ${showDate(h.completedAt, display)}` : ""}`],

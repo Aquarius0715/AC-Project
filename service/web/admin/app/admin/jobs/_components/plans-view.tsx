@@ -74,7 +74,7 @@ function PlanDetail({ d, now, notice, setNotice }: Readonly<{ d: Detail; now: nu
   const conflict = notice?.kind === "conflict" ? generateConflict(p, notice.attempted, i) : null;
   const save = () => {
     if (Object.keys(errors).length > 0) return;
-    const nextDueAt = isNextChanged ? nextIso! : p.nextDueAt;
+    const nextDueAt = isNextChanged ? nextIso : p.nextDueAt;
     run(() => savePlan({ id: p.id, version: p.version, unitId: p.unitId, intervalMonths: every, nextDueAt }), t("Plan saved"),
       () => { setNotice({ planId: p.id, kind: "saved", text: t("Plan saved — {every}, next due {date} (anchor day {n}).", { every: everyText(every, t).toLowerCase(), date: planDate(nextDueAt, i.display), n: anchor }) }); }, (f) => { setNotice({ planId: p.id, kind: "error", text: planRefusal(f, t) }); });
   };

@@ -25,7 +25,7 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
   await connection();
   if (!apiMode()) return <RestrictionsDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
   const [now, perms, display] = await Promise.all([coreNow(), corePermissions(), coreDisplay()]);
   const i = i18nOf(display), { t } = i;
   const isFull = perms.has("restriction.read") || perms.has("restriction.write");

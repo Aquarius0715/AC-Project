@@ -200,7 +200,7 @@ export function dueNotice(overdue: Pick<ApiInvoice, "id" | "number" | "amountMin
       : (r.policy.kind === "power_off"
         ? t(n === 1 ? "{n} unit is switched off until it is paid" : "{n} units are switched off until it is paid", { n })
         : t(n === 1 ? "Cooling is limited to {value} °C or warmer on {n} unit until it is paid" : "Cooling is limited to {value} °C or warmer on {n} units until it is paid", { n, value: r.policy.minimumCoolingSetpoint }));
-    lines.push({ text, href: `/customer/payments/${restriction!.invoiceId}?tab=restriction&restrictionId=${r.id}`, link: t("View restriction details") });
+    lines.push({ text, href: `/customer/payments/${restriction.invoiceId}?tab=restriction&restrictionId=${r.id}`, link: t("View restriction details") });
   }
   return lines;
 }

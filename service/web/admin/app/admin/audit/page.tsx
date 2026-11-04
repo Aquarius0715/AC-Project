@@ -36,7 +36,7 @@ async function AdminAuditPageContent({ searchParams }: Readonly<PageProps<"/admi
   await connection();
   if (!apiMode()) return <AuditView />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
   const [now, display] = await Promise.all([coreNow(), coreDisplay()]);
   const i = i18nOf(display), zone = display.timeZone;
   const filters = auditFilters(sp, now, zone);

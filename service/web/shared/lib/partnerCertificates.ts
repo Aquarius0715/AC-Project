@@ -83,7 +83,7 @@ export function certRows(members: ApiTeamMember[], certs: ApiCert[], jobs: CertJ
       const pending = list.filter((c) => c.status === "pending_verification").toSorted((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
       const rejected = list.filter((c) => c.status === "rejected").toSorted((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
       if (!onFile && (m.qualifications ?? []).some((q) => q.code === k && !q.revokedAt && q.validUntil)) { viaGrant.set(k, pending ? "pending" : "rejected"); continue; }
-      const shown = onFile ?? pending ?? rejected!;
+      const shown = onFile ?? pending ?? rejected;
       const s = onFile ? state(Date.parse(onFile.expiresAt)) : { status: (pending ? "pending" : "rejected") as CertStatus, days: null };
       const ends = Date.parse(shown.expiresAt);
       const training = onFile?.trainingRequestedAt ? t("Training requested {date}", { date: businessDay(onFile.trainingRequestedAt, locale) }) : null;

@@ -88,9 +88,10 @@ export function breachText(b: ApiBreach, t: T = en): string {
   return fixed[b.kind] ? t(fixed[b.kind]) : b.detail;
 }
 const KIND: Record<string, string> = { response: "Response", arrival: "Arrival", first_time_fix: "First-time fix", overdue: "Overdue" };
+const breachTone = (kind: string): Tone => (kind === "overdue" ? "crit" : "warn");
 /** The recent breaches (newest first, at most 50) with the customer and Open job →. */
 export const breachRows = (sc: ApiScorecard, names: Map<string, string>, t: T = en) =>
-  sc.breaches.map((b, i) => ({ key: `${b.jobId}:${b.kind}:${String(i)}`, jobId: b.jobId, short: b.jobId.slice(0, 8), text: `${names.get(b.customerId) ?? t("customer")} · ${breachText(b, t)}`, kind: KIND[b.kind] ? t(KIND[b.kind]) : b.kind, tone: (b.kind === "overdue" ? "crit" : "warn") as Tone }));
+  sc.breaches.map((b, i) => ({ key: `${b.jobId}:${b.kind}:${String(i)}`, jobId: b.jobId, short: b.jobId.slice(0, 8), text: `${names.get(b.customerId) ?? t("customer")} · ${breachText(b, t)}`, kind: KIND[b.kind] ? t(KIND[b.kind]) : b.kind, tone: breachTone(b.kind) }));
 
 /** The targets per plan type for the edit dialog: the one in effect (or the default) and a scheduled one, if any. */
 export function targetsByPlan(targets: ApiTargetView[], i: I18n = EN) {

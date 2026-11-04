@@ -24,7 +24,7 @@ async function AdminMRVPageContent({ searchParams }: Readonly<PageProps<"/admin/
   await connection();
   if (!apiMode()) return <MRVDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
   const tab = one("tab") === "factors" ? "factors" : "reports";
   const [perms, display, orgs, units, baselines, factors] = await Promise.all([
     corePermissions(), coreDisplay(),

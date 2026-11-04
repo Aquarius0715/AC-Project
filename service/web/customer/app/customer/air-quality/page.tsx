@@ -31,7 +31,7 @@ export default async function CustomerAirQualityPage({ searchParams }: Readonly<
   await connection();
   if (!apiMode()) return <AirQualityDemo />;
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k]) : undefined);
   const [me, now, properties, spaces, units, display] = await Promise.all([
     corePrincipal(), coreNow(), coreAll<ApiPropertyRow>("properties.list"), coreAll<ApiSpaceRow>("spaces.list"), coreAll<ApiUnitRow>("units.list"), coreDisplay(),
   ]);

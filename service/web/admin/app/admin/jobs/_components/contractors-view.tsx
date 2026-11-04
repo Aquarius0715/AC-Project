@@ -7,7 +7,7 @@ import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { businessDay, KL } from "@ac/web/lib/clientBilling";
 import { klDate, klStart } from "@ac/web/lib/partnerTeam";
-import { areasOf, contractorRefusal, nextMonthStart, profileErrors, rateCardErrors, WORK_TYPES, type WorkType } from "@ac/web/lib/adminContractors";
+import { areasOf, contractorRefusal, nextMonthStart, profileErrors, rateCardErrors, WORK_TYPES } from "@ac/web/lib/adminContractors";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { createContractorOrganization, saveContractor, saveRateCard, setOfferStatus, verifyCertificate } from "../actions";
 import type { ContractorsLive } from "../_lib/load";
@@ -177,7 +177,7 @@ function RatesModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now: 
   const [lines, setLines] = useState(() => {
     return WORK_TYPES.map((w) => {
       const l = base?.lines.find((x) => x.workType === w.id);
-      return { workType: w.id as WorkType, on: !!l || !base, amount: l ? l.amount.replace("− ", "") : "", note: l?.note ?? "" };
+      return { workType: w.id, on: !!l || !base, amount: l ? l.amount.replace("− ", "") : "", note: l?.note ?? "" };
     });
   });
   const [tried, setTried] = useState(false);
