@@ -157,98 +157,147 @@ func rule(
 }
 
 // DefaultRules are the six IR120 default rules in their fixed order.
-var DefaultRules = []DefaultAlertRule{
-	rule(
-		"ventilation_co2",
-		"Ventilation",
-		"air_quality",
-		metricCO2,
-		opGTE,
-		1000,
-		900,
-		600,
-		"warning",
-	),
-	rule("dust_pm25", "Dust / filter", "air_quality", metricPM25, opGTE, 35, 30, 1800, "warning"),
-	rule(
-		"refrigerant_low_pressure",
-		"Refrigerant low pressure",
-		"fault",
-		metricRefrigerantPressure,
-		"lte",
-		350,
-		380,
-		120,
-		"critical",
-	),
-	rule(
-		"compressor_short_cycling",
-		"Compressor short-cycling",
-		"fault",
-		"compressor_cycles",
-		opGTE,
-		4,
-		3,
-		10800,
-		"warning",
-	),
-	rule(
-		"clogged_filter",
-		"Clogged filter",
-		"maintenance",
-		"airflow_drop",
-		opGTE,
-		30,
-		20,
-		3600,
-		"normal",
-	),
-	rule(
-		"ac_offline",
-		"AC offline",
-		"connection",
-		"heartbeat_gap",
-		opGTE,
-		15,
-		1,
-		1,
-		"warning",
-	), // heartbeat_gap is in minutes (UnitSymbol min): 15 minutes without a heartbeat
+//
+//nolint:mnd // IR120's thresholds, recovery thresholds and durations (s), as rule's parameters name them
+func DefaultRules() []DefaultAlertRule {
+	return []DefaultAlertRule{
+		rule(
+			"ventilation_co2",
+			"Ventilation",
+			"air_quality",
+			metricCO2,
+			opGTE,
+			1000,
+			900,
+			600,
+			"warning",
+		),
+		rule(
+			"dust_pm25",
+			"Dust / filter",
+			"air_quality",
+			metricPM25,
+			opGTE,
+			35,
+			30,
+			1800,
+			"warning",
+		),
+		rule(
+			"refrigerant_low_pressure",
+			"Refrigerant low pressure",
+			"fault",
+			metricRefrigerantPressure,
+			"lte",
+			350,
+			380,
+			120,
+			"critical",
+		),
+		rule(
+			"compressor_short_cycling",
+			"Compressor short-cycling",
+			"fault",
+			"compressor_cycles",
+			opGTE,
+			4,
+			3,
+			10800,
+			"warning",
+		),
+		rule(
+			"clogged_filter",
+			"Clogged filter",
+			"maintenance",
+			"airflow_drop",
+			opGTE,
+			30,
+			20,
+			3600,
+			"normal",
+		),
+		rule(
+			"ac_offline",
+			"AC offline",
+			"connection",
+			"heartbeat_gap",
+			opGTE,
+			15,
+			1,
+			1,
+			"warning",
+		), // heartbeat_gap is in minutes (UnitSymbol min): 15 minutes without a heartbeat
+	}
 }
 
-var (
-	hqMetrics = map[string]bool{
-		metricTemperature:         true,
-		metricHumidity:            true,
-		metricCO2:                 true,
-		metricPM25:                true,
-		metricRefrigerantPressure: true,
-		metricVibration:           true,
-		metricPower:               true,
+var hhmm = regexp.MustCompile(`^([01]\d|2[0-3]):[0-5]\d$`)
+
+// hqMetric reports whether HQ's alert policies may watch the metric.
+func hqMetric(metric string) bool {
+	switch metric {
+	case metricTemperature,
+		metricHumidity,
+		metricCO2,
+		metricPM25,
+		metricRefrigerantPressure,
+		metricVibration,
+		metricPower:
+		return true
 	}
-	clientMetrics = map[string]bool{
-		metricTemperature: true,
-		metricHumidity:    true,
-		metricCO2:         true,
-		metricPM25:        true,
-		metricPower:       true,
+
+	return false
+}
+
+// clientMetric reports whether a customer's own alert policies may watch the metric.
+func clientMetric(metric string) bool {
+	switch metric {
+	case metricTemperature, metricHumidity, metricCO2, metricPM25, metricPower:
+		return true
 	}
-	operators  = map[string]bool{"gt": true, opGTE: true, "lt": true, "lte": true}
-	channelSet = map[string]bool{"inApp": true, "email": true, "whatsapp": true}
-	hhmm       = regexp.MustCompile(`^([01]\d|2[0-3]):[0-5]\d$`)
+
+	return false
+}
+
+// validOperator reports whether op compares a value with a threshold.
+func validOperator(op string) bool {
+	switch op {
+	case "gt", opGTE, "lt", "lte":
+		return true
+	}
+
+	return false
+}
+
+// The channels an alert policy notifies on; channelCount is how many there are.
+const (
+	channelInApp = "inApp"
+	channelCount = 3
 )
+
+// validChannel reports whether channel is one an alert policy notifies on.
+func validChannel(channel string) bool {
+	switch channel {
+	case channelInApp, "email", "whatsapp":
+		return true
+	}
+
+	return false
+}
+
+// daysPerWeek is how many weekdays an active window can name.
+const daysPerWeek = 7
 
 // validate checks an AlertCondition (IR120 item 3); prefix names the field path.
 func (a *AlertCondition) validate(
-	metrics map[string]bool,
+	allowed func(metric string) bool,
 	prefix string,
 	fieldErrs map[string]string,
 ) {
-	if !metrics[a.Metric] {
+	if !allowed(a.Metric) {
 		fieldErrs[prefix+"metric"] = apperr.KeyInvalid
 	}
 
-	if !operators[a.Operator] {
+	if !validOperator(a.Operator) {
 		fieldErrs[prefix+"operator"] = apperr.KeyInvalid
 	}
 
@@ -266,16 +315,16 @@ func (a *AlertCondition) validate(
 		fieldErrs[prefix+"durationSeconds"] = apperr.KeyRange
 	}
 
-	if !severities[a.Severity] {
+	if !validSeverity(a.Severity) {
 		fieldErrs[prefix+"severity"] = apperr.KeyInvalid
 	}
 
 	if activeWindow := a.ActiveWindow; activeWindow != nil {
 		seen := map[int]bool{}
 
-		valid := len(activeWindow.Weekdays) >= 1 && len(activeWindow.Weekdays) <= 7
+		valid := len(activeWindow.Weekdays) >= 1 && len(activeWindow.Weekdays) <= daysPerWeek
 		for _, d := range activeWindow.Weekdays {
-			if d < 1 || d > 7 || seen[d] {
+			if d < 1 || d > daysPerWeek || seen[d] {
 				valid = false
 			}
 
@@ -617,7 +666,24 @@ func (m Policies) decorate(
 
 // ---- policies.list ----
 
-var kindRank = map[string]int{kindDefaultAlert: 0, kindAlert: 1, kindAutomation: 2}
+// The ranks of the kinds of policies in a list: the default policy, the alert policies, then the automations.
+const (
+	rankDefaultAlert = iota
+	rankAlert
+	rankAutomation
+)
+
+// kindRank is the rank of a kind of policy in a list; an unknown kind ranks with the default policy.
+func kindRank(kind string) int {
+	switch kind {
+	case kindAlert:
+		return rankAlert
+	case kindAutomation:
+		return rankAutomation
+	}
+
+	return rankDefaultAlert
+}
 
 // list serves policies.list.
 //
@@ -657,13 +723,7 @@ func (m Policies) list(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[Policy], error) {
-	var filters struct {
-		Kind       *string    `json:"kind,omitempty"`
-		CustomerID *uuid.UUID `json:"customerId,omitempty"`
-		PropertyID *uuid.UUID `json:"propertyId,omitempty"`
-		UnitID     *uuid.UUID `json:"unitId,omitempty"`
-		Enabled    *bool      `json:"enabled,omitempty"`
-	}
+	var filters policyFilters
 
 	if len(query.Filters) > 0 {
 		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
@@ -676,44 +736,16 @@ func (m Policies) list(
 		}
 	}
 
-	if filters.Kind != nil && kindRank[*filters.Kind] == 0 && *filters.Kind != kindDefaultAlert {
+	if filters.Kind != nil && kindRank(*filters.Kind) == rankDefaultAlert &&
+		*filters.Kind != kindDefaultAlert {
 		return paging.Page[Policy]{}, apperr.Fields(
 			map[string]string{"filters.kind": apperr.KeyInvalid},
 		)
 	}
 
-	var less func(a, b Policy) int
-
-	if query.Sort != nil {
-		dir := 1
-		if query.Sort.Direction == "desc" {
-			dir = -1
-		}
-
-		switch query.Sort.Field {
-		case "id":
-			less = func(a, b Policy) int { return dir * strings.Compare(a.ID.String(), b.ID.String()) }
-		case keyCreatedAt:
-			less = func(a, b Policy) int { return dir * a.CreatedAt.Compare(b.CreatedAt) }
-		case "name":
-			less = func(a, b Policy) int { return dir * strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)) }
-		case "priority":
-			less = func(a, b Policy) int { return dir * (a.Priority - b.Priority) }
-		case keyUpdatedAt:
-			less = func(a, b Policy) int { return dir * a.UpdatedAt.Compare(b.UpdatedAt) }
-		default:
-			return paging.Page[Policy]{}, apperr.Fields(
-				map[string]string{"sort.field": apperr.KeyInvalid},
-			)
-		}
-	} else {
-		less = func(a, b Policy) int {
-			if d := kindRank[a.Kind] - kindRank[b.Kind]; d != 0 {
-				return d
-			}
-
-			return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
-		}
+	less, err := policyOrder(query.Sort)
+	if err != nil {
+		return paging.Page[Policy]{}, err
 	}
 
 	window, err := paging.Resolve(*query, filters, call.Principal.ScopeVersion, 1)
@@ -730,150 +762,30 @@ func (m Policies) list(
 	if err != nil {
 		return paging.Page[Policy]{}, err
 	}
-	// unit filters: the units in question (nil = no unit filter)
-	var units []uuid.UUID
-	if filters.UnitID != nil {
-		units = []uuid.UUID{*filters.UnitID}
-	}
 
-	if filters.PropertyID != nil {
-		propertyUnits, err := m.Units.UnitsOfProperty(ctx, call, *filters.PropertyID)
-		if err != nil {
-			return paging.Page[Policy]{}, apperr.Wrap(err, "monitoring.PolicyUnits.UnitsOfProperty")
-		}
-
-		if units == nil {
-			units = propertyUnits
-		} else {
-			units = intersect(units, propertyUnits)
-		}
+	units, err := m.unitsInQuestion(ctx, call, filters)
+	if err != nil {
+		return paging.Page[Policy]{}, err
 	}
 
 	var all []Policy
 
 	if kinds[kindAlert] || kinds[kindDefaultAlert] {
-		var args []any
-
-		add := func(v any) string {
-			args = append(args, v)
-
-			return fmt.Sprintf("$%d", len(args))
-		}
-
-		var alertKinds []string
-
-		for _, k := range []string{kindAlert, kindDefaultAlert} {
-			if kinds[k] && (k != kindDefaultAlert || units == nil) {
-				alertKinds = append(alertKinds, k)
-			}
-		}
-
-		conds := []string{"p.kind = ANY(" + add(alertKinds) + ")"}
-		if own != uuid.Nil || call.Principal.Role == authz.RoleClient {
-			conds = append(conds, "(p.kind = 'default_alert' OR p.customer_id = "+add(own)+")")
-		}
-
-		if filters.CustomerID != nil {
-			conds = append(
-				conds,
-				"(p.kind = 'default_alert' OR p.customer_id = "+add(*filters.CustomerID)+")",
-			)
-		}
-
-		if filters.Enabled != nil {
-			conds = append(conds, "p.enabled = "+add(*filters.Enabled))
-		}
-
-		if units != nil {
-			ids, err := m.Units.PoliciesOfUnits(ctx, call, units)
-			if err != nil {
-				return paging.Page[Policy]{}, apperr.Wrap(
-					err,
-					"monitoring.PolicyUnits.PoliciesOfUnits",
-				)
-			}
-
-			conds = append(conds, "p.id = ANY("+add(ids)+")")
-		}
-
-		rows, err := call.Tx.Query(
-			ctx,
-			"SELECT "+alertPolicyCols+" FROM monitoring.alert_policies p WHERE "+strings.Join(
-				conds,
-				" AND ",
-			),
-			args...)
-		if err != nil {
-			return paging.Page[Policy]{}, apperr.Wrap(err, "select monitoring.alert_policies")
-		}
-
-		for rows.Next() {
-			policy, err := scanAlertPolicy(rows)
-			if err != nil {
-				rows.Close()
-
-				return paging.Page[Policy]{}, err
-			}
-
-			all = append(all, policy)
-		}
-
-		rows.Close()
-
-		rowsErr := rows.Err()
-		if rowsErr != nil {
-			return paging.Page[Policy]{}, apperr.Wrap(rowsErr, "select monitoring.alert_policies")
-		}
-	}
-
-	if kinds[kindAutomation] {
-		autos, err := m.automationPolicies(ctx, call, filters.Enabled)
+		alerts, err := m.alertPolicies(ctx, call, filters, kinds, own, units)
 		if err != nil {
 			return paging.Page[Policy]{}, err
 		}
 
-		var custOrg uuid.UUID
+		all = append(all, alerts...)
+	}
 
-		if filters.CustomerID != nil {
-			org, _, found, err := m.Units.CustomerState(ctx, call, *filters.CustomerID)
-			if err != nil {
-				return paging.Page[Policy]{}, apperr.Wrap(
-					err,
-					"monitoring.PolicyUnits.CustomerState",
-				)
-			}
-
-			if found {
-				custOrg = org
-			}
+	if kinds[kindAutomation] {
+		autos, err := m.automationsFor(ctx, call, filters, units)
+		if err != nil {
+			return paging.Page[Policy]{}, err
 		}
 
-		for _, policy := range autos {
-			if units != nil && len(intersect(policy.UnitIDs, units)) == 0 {
-				continue
-			}
-
-			if filters.CustomerID != nil {
-				orgs, err := m.Units.OrgsOfUnits(ctx, call, policy.UnitIDs)
-				if err != nil {
-					return paging.Page[Policy]{}, apperr.Wrap(
-						err,
-						"monitoring.PolicyUnits.OrgsOfUnits",
-					)
-				}
-
-				match := false
-				for _, o := range orgs {
-					match = match || o == custOrg
-				}
-
-				if !match {
-					continue
-				}
-			}
-
-			all = append(all, policy)
-		}
+		all = append(all, autos...)
 	}
 
 	sort.SliceStable(all, func(i, j int) bool {
@@ -907,6 +819,231 @@ func (m Policies) list(
 		Total:           total,
 		SnapshotVersion: window.Snapshot,
 	}, nil
+}
+
+// policyFilters are the filters of policies.list.
+type policyFilters struct {
+	Kind       *string    `json:"kind,omitempty"`
+	CustomerID *uuid.UUID `json:"customerId,omitempty"`
+	PropertyID *uuid.UUID `json:"propertyId,omitempty"`
+	UnitID     *uuid.UUID `json:"unitId,omitempty"`
+	Enabled    *bool      `json:"enabled,omitempty"`
+}
+
+// policyOrder compares two policies by the sort field; without a sort the default policy comes first, then the alert
+// policies and the automations, each by name.
+func policyOrder(sortBy *paging.SortSpec) (func(a, b Policy) int, error) {
+	var less func(a, b Policy) int
+
+	if sortBy != nil {
+		dir := 1
+		if sortBy.Direction == "desc" {
+			dir = -1
+		}
+
+		switch sortBy.Field {
+		case "id":
+			less = func(a, b Policy) int { return dir * strings.Compare(a.ID.String(), b.ID.String()) }
+		case keyCreatedAt:
+			less = func(a, b Policy) int { return dir * a.CreatedAt.Compare(b.CreatedAt) }
+		case "name":
+			less = func(a, b Policy) int { return dir * strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)) }
+		case "priority":
+			less = func(a, b Policy) int { return dir * (a.Priority - b.Priority) }
+		case keyUpdatedAt:
+			less = func(a, b Policy) int { return dir * a.UpdatedAt.Compare(b.UpdatedAt) }
+		default:
+			return nil, apperr.Fields(
+				map[string]string{"sort.field": apperr.KeyInvalid},
+			)
+		}
+	} else {
+		less = func(a, b Policy) int {
+			if d := kindRank(a.Kind) - kindRank(b.Kind); d != 0 {
+				return d
+			}
+
+			return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
+		}
+	}
+
+	return less, nil
+}
+
+// unitsInQuestion are the units the unit and property filters name, nil for no unit filter.
+func (m Policies) unitsInQuestion(
+	ctx context.Context,
+	call *ops.Call,
+	filters policyFilters,
+) ([]uuid.UUID, error) {
+	var units []uuid.UUID
+	if filters.UnitID != nil {
+		units = []uuid.UUID{*filters.UnitID}
+	}
+
+	if filters.PropertyID != nil {
+		propertyUnits, err := m.Units.UnitsOfProperty(ctx, call, *filters.PropertyID)
+		if err != nil {
+			return nil, apperr.Wrap(err, "monitoring.PolicyUnits.UnitsOfProperty")
+		}
+
+		if units == nil {
+			units = propertyUnits
+		} else {
+			units = intersect(units, propertyUnits)
+		}
+	}
+
+	return units, nil
+}
+
+// alertPolicies are the alert policies, and the default policy unless units are filtered, that the filters and the
+// caller's own customer let through.
+func (m Policies) alertPolicies(
+	ctx context.Context,
+	call *ops.Call,
+	filters policyFilters,
+	kinds map[string]bool,
+	own uuid.UUID,
+	units []uuid.UUID,
+) ([]Policy, error) {
+	var out []Policy
+
+	var args []any
+
+	add := func(v any) string {
+		args = append(args, v)
+
+		return fmt.Sprintf("$%d", len(args))
+	}
+
+	var alertKinds []string
+
+	for _, k := range []string{kindAlert, kindDefaultAlert} {
+		if kinds[k] && (k != kindDefaultAlert || units == nil) {
+			alertKinds = append(alertKinds, k)
+		}
+	}
+
+	conds := []string{"p.kind = ANY(" + add(alertKinds) + ")"}
+	if own != uuid.Nil || call.Principal.Role == authz.RoleClient {
+		conds = append(conds, "(p.kind = 'default_alert' OR p.customer_id = "+add(own)+")")
+	}
+
+	if filters.CustomerID != nil {
+		conds = append(
+			conds,
+			"(p.kind = 'default_alert' OR p.customer_id = "+add(*filters.CustomerID)+")",
+		)
+	}
+
+	if filters.Enabled != nil {
+		conds = append(conds, "p.enabled = "+add(*filters.Enabled))
+	}
+
+	if units != nil {
+		ids, err := m.Units.PoliciesOfUnits(ctx, call, units)
+		if err != nil {
+			return nil, apperr.Wrap(
+				err,
+				"monitoring.PolicyUnits.PoliciesOfUnits",
+			)
+		}
+
+		conds = append(conds, "p.id = ANY("+add(ids)+")")
+	}
+
+	rows, err := call.Tx.Query(
+		ctx,
+		"SELECT "+alertPolicyCols+" FROM monitoring.alert_policies p WHERE "+strings.Join(
+			conds,
+			" AND ",
+		),
+		args...)
+	if err != nil {
+		return nil, apperr.Wrap(err, "select monitoring.alert_policies")
+	}
+
+	for rows.Next() {
+		policy, err := scanAlertPolicy(rows)
+		if err != nil {
+			rows.Close()
+
+			return nil, err
+		}
+
+		out = append(out, policy)
+	}
+
+	rows.Close()
+
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return nil, apperr.Wrap(rowsErr, "select monitoring.alert_policies")
+	}
+
+	return out, nil
+}
+
+// automationsFor are the automations that act on the units in question and, with a customer filter, on one of the
+// customer's units.
+func (m Policies) automationsFor(
+	ctx context.Context,
+	call *ops.Call,
+	filters policyFilters,
+	units []uuid.UUID,
+) ([]Policy, error) {
+	var out []Policy
+
+	autos, err := m.automationPolicies(ctx, call, filters.Enabled)
+	if err != nil {
+		return nil, err
+	}
+
+	var custOrg uuid.UUID
+
+	if filters.CustomerID != nil {
+		org, _, found, err := m.Units.CustomerState(ctx, call, *filters.CustomerID)
+		if err != nil {
+			return nil, apperr.Wrap(
+				err,
+				"monitoring.PolicyUnits.CustomerState",
+			)
+		}
+
+		if found {
+			custOrg = org
+		}
+	}
+
+	for _, policy := range autos {
+		if units != nil && len(intersect(policy.UnitIDs, units)) == 0 {
+			continue
+		}
+
+		if filters.CustomerID != nil {
+			orgs, err := m.Units.OrgsOfUnits(ctx, call, policy.UnitIDs)
+			if err != nil {
+				return nil, apperr.Wrap(
+					err,
+					"monitoring.PolicyUnits.OrgsOfUnits",
+				)
+			}
+
+			match := false
+			for _, o := range orgs {
+				match = match || o == custOrg
+			}
+
+			if !match {
+				continue
+			}
+		}
+
+		out = append(out, policy)
+	}
+
+	return out, nil
 }
 
 func intersect(ids, others []uuid.UUID) []uuid.UUID {
@@ -1120,26 +1257,7 @@ func (in *SaveInput) Validate() map[string]string {
 
 	switch in.Kind {
 	case kindDefaultAlert:
-		if in.ID == nil {
-			fieldErrs["id"] = apperr.KeyRequired
-		}
-
-		if len(in.Rules) != len(DefaultRules) {
-			fieldErrs["rules"] = apperr.KeyFixedRules
-		}
-
-		for idx, defaultAlertRule := range in.Rules {
-			if idx < len(DefaultRules) &&
-				(defaultAlertRule.RuleKey != DefaultRules[idx].RuleKey || defaultAlertRule.Name != DefaultRules[idx].Name ||
-					defaultAlertRule.Category != DefaultRules[idx].Category) {
-				fieldErrs["rules"] = apperr.KeyFixedRules
-			}
-
-			if idx < len(DefaultRules) {
-				metrics := map[string]bool{DefaultRules[idx].Metric: true}
-				defaultAlertRule.validate(metrics, fmt.Sprintf("rules.%d.", idx), fieldErrs)
-			}
-		}
+		in.validateRules(fieldErrs)
 
 		return fieldErrs
 	case kindAlert, kindAutomation:
@@ -1149,11 +1267,61 @@ func (in *SaveInput) Validate() map[string]string {
 		return fieldErrs
 	}
 
+	in.validateCommon(fieldErrs)
+
+	if in.Kind == kindAutomation {
+		in.validateAutomation(fieldErrs)
+	} else {
+		in.validateAlert(fieldErrs)
+	}
+
+	return fieldErrs
+}
+
+// The limits of a policy's fields.
+const (
+	maxPolicyName      = 120  // characters
+	maxPriority        = 100  // the highest priority
+	maxAutomationUnits = 500  // the units one automation acts on
+	maxRecipients      = 20   // the members one alert policy notifies
+	minutesPerDay      = 1440 // the longest escalation and cooldown
+	maxSettingReason   = 500  // characters of a default rule setting's reason
+)
+
+// validateRules checks the default policy's rules: the fixed six in their order (IR120), each watching its own metric.
+func (in *SaveInput) validateRules(fieldErrs map[string]string) {
+	if in.ID == nil {
+		fieldErrs["id"] = apperr.KeyRequired
+	}
+
+	fixed := DefaultRules()
+	if len(in.Rules) != len(fixed) {
+		fieldErrs["rules"] = apperr.KeyFixedRules
+	}
+
+	for idx, defaultAlertRule := range in.Rules {
+		if idx >= len(fixed) {
+			continue
+		}
+
+		if defaultAlertRule.RuleKey != fixed[idx].RuleKey ||
+			defaultAlertRule.Name != fixed[idx].Name ||
+			defaultAlertRule.Category != fixed[idx].Category {
+			fieldErrs["rules"] = apperr.KeyFixedRules
+		}
+
+		sameMetric := func(metric string) bool { return metric == fixed[idx].Metric }
+		defaultAlertRule.validate(sameMetric, fmt.Sprintf("rules.%d.", idx), fieldErrs)
+	}
+}
+
+// validateCommon checks the fields of an alert policy and an automation alike: name, time zone, enabled and priority.
+func (in *SaveInput) validateCommon(fieldErrs map[string]string) {
 	if in.Name == nil {
 		fieldErrs["name"] = apperr.KeyRequired
 	} else {
 		*in.Name = strings.TrimSpace(*in.Name)
-		if n := utf8.RuneCountInString(*in.Name); n < 1 || n > 120 {
+		if n := utf8.RuneCountInString(*in.Name); n < 1 || n > maxPolicyName {
 			fieldErrs["name"] = apperr.KeyLength
 		}
 	}
@@ -1171,83 +1339,84 @@ func (in *SaveInput) Validate() map[string]string {
 		fieldErrs["enabled"] = apperr.KeyRequired
 	}
 
-	if in.Priority == nil || *in.Priority < 0 || *in.Priority > 100 {
+	if in.Priority == nil || *in.Priority < 0 || *in.Priority > maxPriority {
 		fieldErrs["priority"] = apperr.KeyRange
 	}
+}
 
-	if in.Kind == kindAutomation {
-		if n := len(in.UnitIDs); n < 1 || n > 500 || hasDup(in.UnitIDs) {
-			fieldErrs["unitIds"] = apperr.KeyInvalid
-		}
-
-		if !validAutoCondition(in.Condition) {
-			fieldErrs["condition"] = apperr.KeyInvalid
-		}
-
-		if _, ok := control.ParseAction(in.Action); !ok {
-			fieldErrs["action"] = apperr.KeyInvalid
-		}
-
-		if in.CustomerID != nil || in.Metric != nil || in.RecipientMembershipIDs != nil ||
-			in.Channels != nil ||
-			in.Rules != nil {
-			fieldErrs[keyKind] = "error.fieldsOfOtherKind"
-		}
+// validateAutomation checks an automation's units, condition and action, and that no alert field is sent.
+func (in *SaveInput) validateAutomation(fieldErrs map[string]string) {
+	if n := len(in.UnitIDs); n < 1 || n > maxAutomationUnits || hasDup(in.UnitIDs) {
+		fieldErrs["unitIds"] = apperr.KeyInvalid
 	}
 
-	if in.Kind == kindAlert {
-		if in.Condition != nil || in.Action != nil {
-			fieldErrs[keyKind] = "error.fieldsOfOtherKind"
-		}
-
-		if in.CustomerID == nil {
-			fieldErrs[keyCustomerID] = apperr.KeyRequired
-		}
-
-		if in.UnitIDs != nil {
-			fieldErrs["unitIds"] = "error.unitsAttachOnUnit"
-		}
-
-		if in.Metric == nil || in.Operator == nil || in.Threshold == nil ||
-			in.RecoveryThreshold == nil ||
-			in.DurationSeconds == nil ||
-			in.Severity == nil {
-			fieldErrs["condition"] = apperr.KeyRequired
-		} else {
-			cond := in.condition()
-			cond.validate(hqMetrics, "", fieldErrs)
-		}
-
-		if n := len(
-			in.RecipientMembershipIDs,
-		); n < 1 || n > 20 ||
-			hasDup(in.RecipientMembershipIDs) {
-			fieldErrs["recipientMembershipIds"] = apperr.KeyInvalid
-		}
-
-		seen := map[string]bool{}
-
-		valid := len(in.Channels) >= 1 && len(in.Channels) <= 3
-		for _, ch := range in.Channels {
-			valid = valid && channelSet[ch] && !seen[ch]
-			seen[ch] = true
-		}
-
-		if !valid || !seen["inApp"] {
-			fieldErrs["channels"] = apperr.KeyInvalid
-		}
-
-		if in.EscalateAfterMinutes == nil || *in.EscalateAfterMinutes < 1 ||
-			*in.EscalateAfterMinutes > 1440 {
-			fieldErrs["escalateAfterMinutes"] = apperr.KeyRange
-		}
-
-		if in.CooldownMinutes == nil || *in.CooldownMinutes < 1 || *in.CooldownMinutes > 1440 {
-			fieldErrs["cooldownMinutes"] = apperr.KeyRange
-		}
+	if !validAutoCondition(in.Condition) {
+		fieldErrs["condition"] = apperr.KeyInvalid
 	}
 
-	return fieldErrs
+	if _, ok := control.ParseAction(in.Action); !ok {
+		fieldErrs["action"] = apperr.KeyInvalid
+	}
+
+	if in.CustomerID != nil || in.Metric != nil || in.RecipientMembershipIDs != nil ||
+		in.Channels != nil ||
+		in.Rules != nil {
+		fieldErrs[keyKind] = "error.fieldsOfOtherKind"
+	}
+}
+
+// validateAlert checks an alert policy's customer, condition, recipients, channels (in-app always among them),
+// escalation and cooldown, and that no automation field is sent.
+func (in *SaveInput) validateAlert(fieldErrs map[string]string) {
+	if in.Condition != nil || in.Action != nil {
+		fieldErrs[keyKind] = "error.fieldsOfOtherKind"
+	}
+
+	if in.CustomerID == nil {
+		fieldErrs[keyCustomerID] = apperr.KeyRequired
+	}
+
+	if in.UnitIDs != nil {
+		fieldErrs["unitIds"] = "error.unitsAttachOnUnit"
+	}
+
+	if in.Metric == nil || in.Operator == nil || in.Threshold == nil ||
+		in.RecoveryThreshold == nil ||
+		in.DurationSeconds == nil ||
+		in.Severity == nil {
+		fieldErrs["condition"] = apperr.KeyRequired
+	} else {
+		cond := in.condition()
+		cond.validate(hqMetric, "", fieldErrs)
+	}
+
+	if n := len(
+		in.RecipientMembershipIDs,
+	); n < 1 || n > maxRecipients ||
+		hasDup(in.RecipientMembershipIDs) {
+		fieldErrs["recipientMembershipIds"] = apperr.KeyInvalid
+	}
+
+	seen := map[string]bool{}
+
+	valid := len(in.Channels) >= 1 && len(in.Channels) <= channelCount
+	for _, ch := range in.Channels {
+		valid = valid && validChannel(ch) && !seen[ch]
+		seen[ch] = true
+	}
+
+	if !valid || !seen[channelInApp] {
+		fieldErrs["channels"] = apperr.KeyInvalid
+	}
+
+	if in.EscalateAfterMinutes == nil || *in.EscalateAfterMinutes < 1 ||
+		*in.EscalateAfterMinutes > minutesPerDay {
+		fieldErrs["escalateAfterMinutes"] = apperr.KeyRange
+	}
+
+	if in.CooldownMinutes == nil || *in.CooldownMinutes < 1 || *in.CooldownMinutes > minutesPerDay {
+		fieldErrs["cooldownMinutes"] = apperr.KeyRange
+	}
 }
 
 func (in *SaveInput) condition() AlertCondition {
@@ -1356,46 +1525,9 @@ func (m Policies) saveDefault(
 func (m Policies) saveAlert(ctx context.Context, call *ops.Call, input *SaveInput) (Policy, error) {
 	cond := input.condition()
 
-	if call.Principal.Role == authz.RoleClient {
-		fe := map[string]string{}
-		cond.validate(clientMetrics, "", fe)
-
-		if len(fe) > 0 {
-			return Policy{}, apperr.Fields(fe)
-		}
-
-		own, err := m.clientCustomer(ctx, call)
-		if err != nil {
-			return Policy{}, err
-		}
-
-		if *input.CustomerID != own {
-			return Policy{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
-		}
-	}
-
-	org, active, found, err := m.Units.CustomerState(ctx, call, *input.CustomerID)
+	err := m.checkAlertAudience(ctx, call, input, cond)
 	if err != nil {
-		return Policy{}, apperr.Wrap(err, "monitoring.PolicyUnits.CustomerState")
-	}
-
-	if !found {
-		return Policy{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
-	}
-
-	if !active {
-		return Policy{}, apperr.Fields(map[string]string{keyCustomerID: apperr.KeyInactiveCustomer})
-	}
-
-	bad, err := m.Recipients.NonReaders(ctx, call, input.RecipientMembershipIDs, org)
-	if err != nil {
-		return Policy{}, apperr.Wrap(err, "monitoring.Recipients.NonReaders")
-	}
-
-	if len(bad) > 0 {
-		return Policy{}, apperr.Fields(
-			map[string]string{"recipientMembershipIds": "error.recipientCannotRead"},
-		)
+		return Policy{}, err
 	}
 
 	condJSON, marshalErr := json.Marshal(cond)
@@ -1423,6 +1555,69 @@ func (m Policies) saveAlert(ctx context.Context, call *ops.Call, input *SaveInpu
 		return m.finishSave(ctx, call, policyID, "PolicyCreated", nil)
 	}
 
+	return m.updateAlert(ctx, call, input, condJSON)
+}
+
+// checkAlertAudience checks who an alert policy is for: a customer saves policies of its own with the metrics a
+// customer may watch; the customer must exist and be active, and every recipient must be able to read it.
+func (m Policies) checkAlertAudience(
+	ctx context.Context,
+	call *ops.Call,
+	input *SaveInput,
+	cond AlertCondition,
+) error {
+	if call.Principal.Role == authz.RoleClient {
+		fe := map[string]string{}
+		cond.validate(clientMetric, "", fe)
+
+		if len(fe) > 0 {
+			return apperr.Fields(fe)
+		}
+
+		own, err := m.clientCustomer(ctx, call)
+		if err != nil {
+			return err
+		}
+
+		if *input.CustomerID != own {
+			return apperr.E(apperr.NotFound, apperr.KeyNotFound)
+		}
+	}
+
+	org, active, found, err := m.Units.CustomerState(ctx, call, *input.CustomerID)
+	if err != nil {
+		return apperr.Wrap(err, "monitoring.PolicyUnits.CustomerState")
+	}
+
+	if !found {
+		return apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	}
+
+	if !active {
+		return apperr.Fields(map[string]string{keyCustomerID: apperr.KeyInactiveCustomer})
+	}
+
+	bad, err := m.Recipients.NonReaders(ctx, call, input.RecipientMembershipIDs, org)
+	if err != nil {
+		return apperr.Wrap(err, "monitoring.Recipients.NonReaders")
+	}
+
+	if len(bad) > 0 {
+		return apperr.Fields(
+			map[string]string{"recipientMembershipIds": "error.recipientCannotRead"},
+		)
+	}
+
+	return nil
+}
+
+// updateAlert saves an alert policy at the version shown; its kind and customer stay as they are.
+func (m Policies) updateAlert(
+	ctx context.Context,
+	call *ops.Call,
+	input *SaveInput,
+	condJSON []byte,
+) (Policy, error) {
 	policy, err := m.load(ctx, call, *input.ID, true)
 	if err != nil {
 		return policy, err
@@ -1469,12 +1664,14 @@ type UnitCaps interface {
 	UnitCaps(ctx context.Context, c *ops.Call, unit uuid.UUID) (control.Caps, bool, error)
 }
 
-var autoConditionTypes = map[string]bool{
-	"occupancy": true,
-	"tariff":    true,
-	"peak":      true,
-	"solar":     true,
-	"battery":   true,
+// autoConditionType reports whether kind is the type of an automation condition (DD-A11).
+func autoConditionType(kind string) bool {
+	switch kind {
+	case "occupancy", "tariff", "peak", "solar", "battery":
+		return true
+	}
+
+	return false
 }
 
 // validAutoCondition checks an automation Condition of DD-A11 (occupancy, tariff, peak, solar, battery).
@@ -1491,12 +1688,12 @@ func validAutoCondition(raw json.RawMessage) bool {
 	dec := json.NewDecoder(strings.NewReader(string(raw)))
 	dec.DisallowUnknownFields()
 
-	if len(raw) == 0 || dec.Decode(&condition) != nil || !autoConditionTypes[condition.Type] {
+	if len(raw) == 0 || dec.Decode(&condition) != nil || !autoConditionType(condition.Type) {
 		return false
 	}
 
 	compare := func(unit string) bool {
-		return condition.Operator != nil && operators[*condition.Operator] &&
+		return condition.Operator != nil && validOperator(*condition.Operator) &&
 			condition.Value != nil &&
 			!math.IsNaN(*condition.Value) &&
 			!math.IsInf(*condition.Value, 0) &&
@@ -1559,46 +1756,12 @@ func (m Policies) saveAutomation(
 			return Policy{}, apperr.Wrap(err, "insert control.automation_policies")
 		}
 	} else {
-		policy, err := m.load(ctx, call, *input.ID, true)
+		updated, err := m.updateAutomation(ctx, call, input)
 		if err != nil {
-			return policy, err
+			return Policy{}, err
 		}
 
-		if policy.Kind != kindAutomation {
-			return policy, apperr.Fields(map[string]string{keyKind: apperr.KeyKindFixed})
-		}
-
-		if policy.Version != *call.ExpectedVersion {
-			return policy, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
-		}
-
-		_, execErr := call.Tx.Exec(
-			ctx,
-			`UPDATE control.automation_policies SET name = $2, timezone = $3, enabled = $4, priority = $5, condition = $6, action
-				= $7,
-			disabled_reason = NULL, version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
-			policy.ID,
-			*input.Name,
-			*input.Timezone,
-			*input.Enabled,
-			*input.Priority,
-			[]byte(input.Condition),
-			[]byte(input.Action),
-		)
-		if execErr != nil {
-			return policy, apperr.Wrap(execErr, "update control.automation_policies")
-		}
-
-		_, execErr = call.Tx.Exec(
-			ctx,
-			`DELETE FROM control.automation_policy_units WHERE policy_id = $1`,
-			policy.ID,
-		)
-		if execErr != nil {
-			return policy, apperr.Wrap(execErr, "delete control.automation_policy_units")
-		}
-
-		policyID, prev = policy.ID, call.ExpectedVersion
+		policyID, prev = updated, call.ExpectedVersion
 	}
 
 	for _, unitID := range input.UnitIDs {
@@ -1620,6 +1783,55 @@ func (m Policies) saveAutomation(
 	}
 
 	return m.finishSave(ctx, call, policyID, event, prev)
+}
+
+// updateAutomation saves an automation at the version shown and clears its units, which the save adds again; its
+// kind stays as it is. A disabled automation saved again runs again.
+func (m Policies) updateAutomation(
+	ctx context.Context,
+	call *ops.Call,
+	input *SaveInput,
+) (uuid.UUID, error) {
+	policy, err := m.load(ctx, call, *input.ID, true)
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	if policy.Kind != kindAutomation {
+		return uuid.Nil, apperr.Fields(map[string]string{keyKind: apperr.KeyKindFixed})
+	}
+
+	if policy.Version != *call.ExpectedVersion {
+		return uuid.Nil, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
+	}
+
+	_, execErr := call.Tx.Exec(
+		ctx,
+		`UPDATE control.automation_policies SET name = $2, timezone = $3, enabled = $4, priority = $5, condition = $6, action
+			= $7,
+		disabled_reason = NULL, version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
+		policy.ID,
+		*input.Name,
+		*input.Timezone,
+		*input.Enabled,
+		*input.Priority,
+		[]byte(input.Condition),
+		[]byte(input.Action),
+	)
+	if execErr != nil {
+		return uuid.Nil, apperr.Wrap(execErr, "update control.automation_policies")
+	}
+
+	_, execErr = call.Tx.Exec(
+		ctx,
+		`DELETE FROM control.automation_policy_units WHERE policy_id = $1`,
+		policy.ID,
+	)
+	if execErr != nil {
+		return uuid.Nil, apperr.Wrap(execErr, "delete control.automation_policy_units")
+	}
+
+	return policy.ID, nil
 }
 
 func (m Policies) finishSave(
@@ -1786,7 +1998,7 @@ func (in *SetDefaultRuleInput) Validate() map[string]string {
 	}
 
 	known := false
-	for _, r := range DefaultRules {
+	for _, r := range DefaultRules() {
 		known = known || r.RuleKey == in.RuleKey
 	}
 
@@ -1796,7 +2008,7 @@ func (in *SetDefaultRuleInput) Validate() map[string]string {
 
 	if in.Reason != nil {
 		*in.Reason = strings.TrimSpace(*in.Reason)
-		if utf8.RuneCountInString(*in.Reason) > 500 {
+		if utf8.RuneCountInString(*in.Reason) > maxSettingReason {
 			fieldErrs["reason"] = apperr.KeyLength
 		}
 	}

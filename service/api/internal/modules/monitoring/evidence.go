@@ -91,6 +91,49 @@ func (m Alerts) candidates(
 		)
 	}
 
+	remeasured, err := remeasurements(ctx, call, alert)
+	if err != nil {
+		return nil, err
+	}
+
+	out = append(out, remeasured...)
+
+	if m.Devices != nil {
+		recs, err := m.Devices.AlertRecoveries(ctx, call, alert.ID, alert.DetectedAt)
+		if err != nil {
+			return nil, apperr.Wrap(err, "monitoring.DeviceRecoveries.AlertRecoveries")
+		}
+
+		for _, deviceRecovery := range recs {
+			typ := deviceRecovery.EventType
+			out = append(
+				out,
+				EvidenceCandidate{
+					ID:         deviceRecovery.ID,
+					Kind:       "device_event",
+					ObservedAt: deviceRecovery.OccurredAt,
+					EventType:  &typ, Metric: nil, Value: nil, Unit: nil, Origin: nil, Quality: nil,
+				},
+			)
+		}
+	}
+
+	slices.SortStableFunc(out, func(x, y EvidenceCandidate) int {
+		if c := y.ObservedAt.Compare(x.ObservedAt); c != 0 {
+			return c
+		}
+
+		return strings.Compare(x.ID.String(), y.ID.String())
+	})
+
+	return out, nil
+}
+
+// remeasurements are the unit's valid measured or inspection readings after the alert's detection, of the rule's
+// metric when it has one, the newest first and at most maxRemeasurements.
+func remeasurements(ctx context.Context, call *ops.Call, alert Alert) ([]EvidenceCandidate, error) {
+	var out []EvidenceCandidate
+
 	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT m.event_id, m.observed_at, m.metric, m.value, m.unit, m.origin, m.quality `+remeasurementSQL+`
@@ -140,34 +183,6 @@ func (m Alerts) candidates(
 	if rowsErr != nil {
 		return nil, apperr.Wrap(rowsErr, "select monitoring.measurements")
 	}
-
-	if m.Devices != nil {
-		recs, err := m.Devices.AlertRecoveries(ctx, call, alert.ID, alert.DetectedAt)
-		if err != nil {
-			return nil, apperr.Wrap(err, "monitoring.DeviceRecoveries.AlertRecoveries")
-		}
-
-		for _, deviceRecovery := range recs {
-			typ := deviceRecovery.EventType
-			out = append(
-				out,
-				EvidenceCandidate{
-					ID:         deviceRecovery.ID,
-					Kind:       "device_event",
-					ObservedAt: deviceRecovery.OccurredAt,
-					EventType:  &typ, Metric: nil, Value: nil, Unit: nil, Origin: nil, Quality: nil,
-				},
-			)
-		}
-	}
-
-	slices.SortStableFunc(out, func(x, y EvidenceCandidate) int {
-		if c := y.ObservedAt.Compare(x.ObservedAt); c != 0 {
-			return c
-		}
-
-		return strings.Compare(x.ID.String(), y.ID.String())
-	})
 
 	return out, nil
 }

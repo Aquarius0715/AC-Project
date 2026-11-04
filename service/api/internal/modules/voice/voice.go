@@ -297,9 +297,14 @@ func unsupportedIntent() Intent {
 
 // temperatureIntent reports the unit's latest temperature reading (measurement null without readings).
 func temperatureIntent(ctx context.Context, call *ops.Call, unit uuid.UUID) (Intent, error) {
-	meas, err := monitoring.LatestMeasurement(ctx, call, unit, "temperature")
+	latest, found, err := monitoring.LatestMeasurement(ctx, call, unit, "temperature")
 	if err != nil {
 		return Intent{}, apperr.Wrap(err, "monitoring.LatestMeasurement")
+	}
+
+	var meas *monitoring.Measurement
+	if found {
+		meas = &latest
 	}
 
 	return Intent{

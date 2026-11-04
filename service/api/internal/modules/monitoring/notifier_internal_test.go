@@ -6,6 +6,8 @@ import (
 )
 
 func TestInWindow(t *testing.T) {
+	t.Parallel()
+
 	kl := time.FixedZone("MYT", 8*3600)
 	localTime := func(day, h, m int) time.Time { return time.Date(2026, 9, day, h, m, 0, 0, kl) } // 2026-09-14 is a Monday
 	day := &ActiveWindow{Weekdays: []int{1, 2, 3, 4, 5}, StartLocal: "08:00", EndLocal: "19:00"}
@@ -44,6 +46,8 @@ func TestInWindow(t *testing.T) {
 // TestCompareAndRecover covers the four threshold operators at the boundary and the recovery side of each (D08): a high
 // limit (gt / gte) recovers below its recovery threshold, a low limit (lt / lte) above it.
 func TestCompareAndRecover(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		op         string
 		at, beyond bool // the value equal to the threshold, and one past it on the limit's side

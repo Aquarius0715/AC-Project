@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 	"time"
 
@@ -124,18 +125,8 @@ func scanMeasurement(row pgx.Row) (Measurement, error) {
 	return measurement, apperr.Wrap(err, "scan (scanMeasurement)")
 }
 
-var metrics = map[string]bool{
-	metricTemperature:         true,
-	metricHumidity:            true,
-	metricCO2:                 true,
-	metricPM25:                true,
-	metricPower:               true,
-	metricVibration:           true,
-	metricRefrigerantPressure: true,
-	"compressor_cycles":       true,
-	"airflow_drop":            true,
-	"heartbeat_gap":           true,
-}
+// knownMetric reports whether metric is one the platform measures.
+func knownMetric(metric string) bool { return slices.Contains(metricOrder(), metric) }
 
 const maxSeriesRange = 35 * 24 * time.Hour
 
@@ -158,7 +149,7 @@ type SeriesInput struct {
 // maxBuckets bounds one bucketed series (a 35-day period in 60-minute buckets is 840).
 const maxBuckets = 1000
 
-func validRange(from, until time.Time, max time.Duration, fieldErrs map[string]string) {
+func validRange(from, until time.Time, longest time.Duration, fieldErrs map[string]string) {
 	switch {
 	case from.IsZero():
 		fieldErrs["from"] = apperr.KeyRequired
@@ -166,7 +157,7 @@ func validRange(from, until time.Time, max time.Duration, fieldErrs map[string]s
 		fieldErrs["to"] = apperr.KeyRequired
 	case !from.Before(until):
 		fieldErrs["to"] = apperr.KeyRange
-	case max > 0 && until.Sub(from) > max:
+	case longest > 0 && until.Sub(from) > longest:
 		fieldErrs["to"] = "error.rangeTooLong"
 	}
 }
@@ -182,7 +173,7 @@ func (in *SeriesInput) Validate() map[string]string {
 		fieldErrs["unitIds"] = apperr.KeyInvalid
 	}
 
-	if !metrics[in.Metric] {
+	if !knownMetric(in.Metric) {
 		fieldErrs["metric"] = apperr.KeyInvalid
 	}
 
@@ -232,9 +223,9 @@ type AirSeries struct {
 	Buckets             []SeriesBucket       `json:"buckets"` // with bucketMinutes only; null otherwise (IR605)
 }
 
-// bucketed averages the valid readings of the series in stretches of size from from to to (IR605, DEC-90): a stretch
-// without a valid reading stays in the list with no value and a count of 0, so a gap is never joined; stale, suspect
-// and missing readings are left out, as the charts leave them out.
+// bucketed averages the valid readings of the series between from and to in stretches of size (IR605, DEC-90): a
+// stretch without a valid reading stays in the list with no value and a count of 0, so a gap is never joined; stale,
+// suspect and missing readings are left out, as the charts leave them out.
 func bucketed(
 	ctx context.Context,
 	call *ops.Call,
@@ -350,7 +341,7 @@ func (in *SummaryInput) Validate() map[string]string {
 		fieldErrs["unitIds"] = apperr.KeyInvalid
 	}
 
-	if in.Metric != nil && !metrics[*in.Metric] {
+	if in.Metric != nil && !knownMetric(*in.Metric) {
 		fieldErrs["metric"] = apperr.KeyInvalid
 	}
 
@@ -414,11 +405,14 @@ func scanVent(r pgx.Row) (VentilationLog, error) {
 	return ventilationLog, apperr.Wrap(err, "scan (scanVent)")
 }
 
-var ventMethods = map[string]bool{
-	"window_opened":   true,
-	"door_opened":     true,
-	"ventilation_fan": true,
-	"other":           true,
+// validVentMethod reports whether method is a way a room is ventilated.
+func validVentMethod(method string) bool {
+	switch method {
+	case "window_opened", "door_opened", "ventilation_fan", "other":
+		return true
+	}
+
+	return false
 }
 
 // VentLogInput is ventilation.log input.
@@ -436,7 +430,7 @@ func (in *VentLogInput) Validate() map[string]string {
 		fieldErrs["spaceId"] = apperr.KeyRequired
 	}
 
-	if !ventMethods[in.Method] {
+	if !validVentMethod(in.Method) {
 		fieldErrs["method"] = apperr.KeyInvalid
 	}
 
@@ -536,17 +530,19 @@ func (m Telemetry) PowerMeasured(
 }
 
 // metricOrder lists every Metric for the latest-reading lookup (one index probe per unit and metric).
-var metricOrder = []string{
-	"airflow_drop",
-	metricCO2,
-	"compressor_cycles",
-	"heartbeat_gap",
-	metricHumidity,
-	metricPM25,
-	metricPower,
-	metricRefrigerantPressure,
-	metricTemperature,
-	metricVibration,
+func metricOrder() []string {
+	return []string{
+		"airflow_drop",
+		metricCO2,
+		"compressor_cycles",
+		"heartbeat_gap",
+		metricHumidity,
+		metricPM25,
+		metricPower,
+		metricRefrigerantPressure,
+		metricTemperature,
+		metricVibration,
+	}
 }
 
 // LatestMeasurements implements assets.Monitoring (UnitSummary.latestMeasurements, IR213): per unit, the latest
@@ -563,6 +559,7 @@ func (m Telemetry) LatestMeasurements(
 		return out, nil
 	}
 
+	//nolint:unqueryvet // x.* is the row of the lateral subquery, which names measurementCols
 	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT x.* FROM unnest($1::uuid[]) AS u(id) CROSS JOIN unnest($3::text[]) AS k(metric)
@@ -572,7 +569,7 @@ func (m Telemetry) LatestMeasurements(
 		ORDER BY m.observed_at DESC, m.sequence DESC, m.event_id ASC LIMIT 1) x ORDER BY x.unit_id, x.metric`,
 		units,
 		call.Now,
-		metricOrder,
+		metricOrder(),
 	)
 	if err != nil {
 		return nil, apperr.Wrap(err, "select unnest")
@@ -617,6 +614,9 @@ func (m Telemetry) LatestMeasurements(
 
 	return out, nil
 }
+
+// hourTenths is the step the ventilation hours are rounded to: a tenth of an hour.
+const hourTenths = 10
 
 // RunHours implements IR134 item 1: hours with a valid measured power reading > 0 since `since` (nil = all), each
 // reading counting until the next one capped at its sensor's stale limit; the reading in force at `since` counts from
@@ -713,7 +713,7 @@ func (m Telemetry) RunHours(
 		}
 	}
 
-	h := math.Round(total.Hours()*10) / 10
+	h := math.Round(total.Hours()*hourTenths) / hourTenths
 
 	return &h, nil
 }
@@ -775,23 +775,9 @@ func (m Telemetry) series(
 	call *ops.Call,
 	input *SeriesInput,
 ) (AirSeries, error) {
-	units := input.UnitIDs
-	if input.SpaceID != nil {
-		var err error
-
-		units, err = m.Units.UnitsInSpace(ctx, call, *input.SpaceID)
-		if err != nil {
-			return AirSeries{}, apperr.Wrap(err, "monitoring.TelemetryUnits.UnitsInSpace")
-		}
-
-		if len(units) == 0 {
-			return AirSeries{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
-		}
-	} else {
-		err := m.readableUnits(ctx, call, units)
-		if err != nil {
-			return AirSeries{}, err
-		}
+	units, err := m.seriesUnits(ctx, call, input)
+	if err != nil {
+		return AirSeries{}, err
 	}
 
 	if input.Query.Sort != nil && input.Query.Sort.Field != "observedAt" {
@@ -850,18 +836,33 @@ func (m Telemetry) series(
 			Buckets:         buckets, NextCursor: nil, AllergenObservation: nil,
 		}
 
-		if len(units) == 1 {
-			a, err := allergen(ctx, call, units[0])
-			if err != nil {
-				return out, err
-			}
-
-			out.AllergenObservation = &a
-		}
-
-		return out, nil
+		return withAllergen(ctx, call, out, units)
 	}
 
+	items, err := seriesPage(ctx, call, where, args, dir, window)
+	if err != nil {
+		return AirSeries{}, err
+	}
+
+	out := AirSeries{
+		Items:           items,
+		NextCursor:      window.Next(total),
+		Total:           total,
+		SnapshotVersion: window.Snapshot, AllergenObservation: nil, Buckets: nil,
+	}
+
+	return withAllergen(ctx, call, out, units)
+}
+
+// seriesPage is the window's page of the series' readings in time order (dir), then by sensor and event.
+func seriesPage(
+	ctx context.Context,
+	call *ops.Call,
+	where string,
+	args []any,
+	dir string,
+	window paging.Window,
+) ([]Measurement, error) {
 	rows, err := call.Tx.Query(
 		ctx,
 		fmt.Sprintf(
@@ -875,7 +876,7 @@ func (m Telemetry) series(
 		),
 		args...)
 	if err != nil {
-		return AirSeries{}, apperr.Wrap(err, "select monitoring.measurements")
+		return nil, apperr.Wrap(err, "select monitoring.measurements")
 	}
 
 	items := []Measurement{}
@@ -885,7 +886,7 @@ func (m Telemetry) series(
 		if err != nil {
 			rows.Close()
 
-			return AirSeries{}, err
+			return nil, err
 		}
 
 		items = append(items, measurement)
@@ -895,24 +896,58 @@ func (m Telemetry) series(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return AirSeries{}, apperr.Wrap(rowsErr, "select monitoring.measurements")
+		return nil, apperr.Wrap(rowsErr, "select monitoring.measurements")
 	}
 
-	out := AirSeries{
-		Items:           items,
-		NextCursor:      window.Next(total),
-		Total:           total,
-		SnapshotVersion: window.Snapshot, AllergenObservation: nil, Buckets: nil,
-	}
+	return items, nil
+}
 
-	if len(units) == 1 {
-		a, err := allergen(ctx, call, units[0])
+// seriesUnits are the units a series reads: the units in the space, or the units named, which the caller must be able
+// to read.
+func (m Telemetry) seriesUnits(
+	ctx context.Context,
+	call *ops.Call,
+	input *SeriesInput,
+) ([]uuid.UUID, error) {
+	units := input.UnitIDs
+	if input.SpaceID != nil {
+		var err error
+
+		units, err = m.Units.UnitsInSpace(ctx, call, *input.SpaceID)
 		if err != nil {
-			return out, err
+			return nil, apperr.Wrap(err, "monitoring.TelemetryUnits.UnitsInSpace")
 		}
 
-		out.AllergenObservation = &a
+		if len(units) == 0 {
+			return nil, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+		}
+	} else {
+		err := m.readableUnits(ctx, call, units)
+		if err != nil {
+			return nil, err
+		}
 	}
+
+	return units, nil
+}
+
+// withAllergen adds the unit's latest allergen observation to the series of one unit.
+func withAllergen(
+	ctx context.Context,
+	call *ops.Call,
+	out AirSeries,
+	units []uuid.UUID,
+) (AirSeries, error) {
+	if len(units) != 1 {
+		return out, nil
+	}
+
+	observation, err := allergen(ctx, call, units[0])
+	if err != nil {
+		return out, err
+	}
+
+	out.AllergenObservation = &observation
 
 	return out, nil
 }
@@ -1156,12 +1191,7 @@ func (m Telemetry) list(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[VentilationLog], error) {
-	var filters struct {
-		SpaceID *uuid.UUID `json:"spaceId,omitempty"`
-		UnitID  *uuid.UUID `json:"unitId,omitempty"`
-		From    *time.Time `json:"from,omitempty"`
-		To      *time.Time `json:"to,omitempty"`
-	}
+	var filters ventFilters
 
 	if len(query.Filters) > 0 {
 		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
@@ -1197,68 +1227,9 @@ func (m Telemetry) list(
 
 	var args []any
 
-	add := func(v any) string {
-		args = append(args, v)
-
-		return fmt.Sprintf("$%d", len(args))
-	}
-
-	var conds []string
-
-	switch call.Principal.Role {
-	case "admin":
-	case authz.RoleClient:
-		spaces, err := m.Units.SpacesOfOrg(ctx, call, call.Principal.OrgID)
-		if err != nil {
-			return paging.Page[VentilationLog]{}, apperr.Wrap(
-				err,
-				"monitoring.TelemetryUnits.SpacesOfOrg",
-			)
-		}
-
-		conds = append(conds, "v.space_id = ANY("+add(spaces)+")")
-	default:
-		units, err := m.Units.ScopedUnits(ctx, call)
-		if err != nil {
-			return paging.Page[VentilationLog]{}, apperr.Wrap(
-				err,
-				"monitoring.TelemetryUnits.ScopedUnits",
-			)
-		}
-
-		spaces, err := m.Units.SpacesOfUnits(ctx, call, units)
-		if err != nil {
-			return paging.Page[VentilationLog]{}, apperr.Wrap(
-				err,
-				"monitoring.TelemetryUnits.SpacesOfUnits",
-			)
-		}
-
-		conds = append(
-			conds,
-			"(v.unit_id = ANY("+add(units)+") OR v.space_id = ANY("+add(spaces)+"))",
-		)
-	}
-
-	if filters.SpaceID != nil {
-		conds = append(conds, "v.space_id = "+add(*filters.SpaceID))
-	}
-
-	if filters.UnitID != nil {
-		conds = append(conds, "v.unit_id = "+add(*filters.UnitID))
-	}
-
-	if filters.From != nil {
-		conds = append(conds, "v.logged_at >= "+add(*filters.From))
-	}
-
-	if filters.To != nil {
-		conds = append(conds, "v.logged_at < "+add(*filters.To))
-	}
-
-	where := "TRUE"
-	if len(conds) > 0 {
-		where = strings.Join(conds, " AND ")
+	where, err := m.ventWhere(ctx, call, filters, &args)
+	if err != nil {
+		return paging.Page[VentilationLog]{}, err
 	}
 
 	var total int
@@ -1307,14 +1278,97 @@ func (m Telemetry) list(
 	}, apperr.Wrap(rows.Err(), "select monitoring.ventilation_logs")
 }
 
+// ventFilters are the filters of ventilation.list.
+type ventFilters struct {
+	SpaceID *uuid.UUID `json:"spaceId,omitempty"`
+	UnitID  *uuid.UUID `json:"unitId,omitempty"`
+	From    *time.Time `json:"from,omitempty"`
+	To      *time.Time `json:"to,omitempty"`
+}
+
+// ventWhere is the SQL condition of the filters over the ventilation logs the caller may read (alias v): HQ reads every
+// log, a client the logs of its spaces, others the logs of their units and those units' spaces. The arguments it uses
+// are added to args.
+func (m Telemetry) ventWhere(
+	ctx context.Context,
+	call *ops.Call,
+	filters ventFilters,
+	args *[]any,
+) (string, error) {
+	add := func(v any) string {
+		*args = append(*args, v)
+
+		return fmt.Sprintf("$%d", len(*args))
+	}
+
+	var conds []string
+
+	switch call.Principal.Role {
+	case "admin":
+	case authz.RoleClient:
+		spaces, err := m.Units.SpacesOfOrg(ctx, call, call.Principal.OrgID)
+		if err != nil {
+			return "", apperr.Wrap(
+				err,
+				"monitoring.TelemetryUnits.SpacesOfOrg",
+			)
+		}
+
+		conds = append(conds, "v.space_id = ANY("+add(spaces)+")")
+	default:
+		units, err := m.Units.ScopedUnits(ctx, call)
+		if err != nil {
+			return "", apperr.Wrap(
+				err,
+				"monitoring.TelemetryUnits.ScopedUnits",
+			)
+		}
+
+		spaces, err := m.Units.SpacesOfUnits(ctx, call, units)
+		if err != nil {
+			return "", apperr.Wrap(
+				err,
+				"monitoring.TelemetryUnits.SpacesOfUnits",
+			)
+		}
+
+		conds = append(
+			conds,
+			"(v.unit_id = ANY("+add(units)+") OR v.space_id = ANY("+add(spaces)+"))",
+		)
+	}
+
+	if filters.SpaceID != nil {
+		conds = append(conds, "v.space_id = "+add(*filters.SpaceID))
+	}
+
+	if filters.UnitID != nil {
+		conds = append(conds, "v.unit_id = "+add(*filters.UnitID))
+	}
+
+	if filters.From != nil {
+		conds = append(conds, "v.logged_at >= "+add(*filters.From))
+	}
+
+	if filters.To != nil {
+		conds = append(conds, "v.logged_at < "+add(*filters.To))
+	}
+
+	if len(conds) == 0 {
+		return "TRUE", nil
+	}
+
+	return strings.Join(conds, " AND "), nil
+}
+
 // LatestMeasurement returns the most recent measurement of a unit for a metric (highest observedAt, then sequence),
-// or nil (voice temperature reads, IR65).
+// and whether the unit has one (voice temperature reads, IR65).
 func LatestMeasurement(
 	ctx context.Context,
 	c *ops.Call,
 	unit uuid.UUID,
 	metric string,
-) (*Measurement, error) {
+) (Measurement, bool, error) {
 	measurement, err := scanMeasurement(
 		c.Tx.QueryRow(
 			ctx,
@@ -1325,8 +1379,8 @@ func LatestMeasurement(
 		),
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
+		return measurement, false, nil
 	}
 
-	return &measurement, err
+	return measurement, err == nil, err
 }

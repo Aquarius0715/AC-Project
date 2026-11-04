@@ -133,10 +133,25 @@ func alertScope(c *ops.Call, args *[]any, mode unitscope.Mode) string {
 	return unitscope.SQL(c, args, "a.unit_id", mode)
 }
 
-var (
-	severities    = map[string]bool{"critical": true, "warning": true, "normal": true}
-	alertStatuses = map[string]bool{statusOpen: true, "acknowledged": true, "resolved": true}
-)
+// validSeverity reports whether severity is an alert's severity.
+func validSeverity(severity string) bool {
+	switch severity {
+	case "critical", "warning", "normal":
+		return true
+	}
+
+	return false
+}
+
+// validAlertStatus reports whether status is an alert's status.
+func validAlertStatus(status string) bool {
+	switch status {
+	case statusOpen, "acknowledged", "resolved":
+		return true
+	}
+
+	return false
+}
 
 const severityRank = `CASE a.severity WHEN 'normal' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END`
 
@@ -318,16 +333,7 @@ func (m Alerts) list(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[Alert], error) {
-	var filters struct {
-		UnitID     *uuid.UUID   `json:"unitId,omitempty"`
-		UnitIDs    *[]uuid.UUID `json:"unitIds,omitempty"`
-		Severity   *string      `json:"severity,omitempty"`
-		Status     *string      `json:"status,omitempty"`
-		From       *time.Time   `json:"from,omitempty"`
-		To         *time.Time   `json:"to,omitempty"`
-		CustomerID *uuid.UUID   `json:"customerId,omitempty"`
-		PropertyID *uuid.UUID   `json:"propertyId,omitempty"`
-	}
+	var filters alertFilters
 
 	if len(query.Filters) > 0 {
 		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
@@ -340,45 +346,14 @@ func (m Alerts) list(
 		}
 	}
 
-	switch {
-	case filters.Severity != nil && !severities[*filters.Severity]:
-		return paging.Page[Alert]{}, apperr.Fields(
-			map[string]string{"filters.severity": apperr.KeyInvalid},
-		)
-	case filters.Status != nil && !alertStatuses[*filters.Status]:
-		return paging.Page[Alert]{}, apperr.Fields(
-			map[string]string{"filters.status": apperr.KeyInvalid},
-		)
-	case filters.From != nil && filters.To != nil && !filters.From.Before(*filters.To):
-		return paging.Page[Alert]{}, apperr.Fields(map[string]string{"filters.to": apperr.KeyRange})
+	err := filters.check()
+	if err != nil {
+		return paging.Page[Alert]{}, err
 	}
-	// default sort severity desc (critical → warning → normal), id asc; severity asc = normal, warning, critical
-	order := severityRank + " DESC, a.id ASC"
 
-	if query.Sort != nil {
-		if query.Sort.Field == "severity" {
-			dir, err := paging.Direction(query.Sort)
-			if err != nil {
-				return paging.Page[Alert]{}, apperr.Wrap(err, "paging.Direction")
-			}
-
-			order = severityRank + " " + dir + ", a.id ASC"
-		} else {
-			fieldOrder, err := paging.OrderBy(
-				query.Sort,
-				map[string]string{
-					"id":         "a.id",
-					keyCreatedAt: "a.created_at",
-					keyUpdatedAt: "a.updated_at",
-				},
-				"",
-			)
-			if err != nil {
-				return paging.Page[Alert]{}, apperr.Wrap(err, "paging.OrderBy")
-			}
-
-			order = fieldOrder
-		}
+	order, err := alertOrder(query.Sort)
+	if err != nil {
+		return paging.Page[Alert]{}, err
 	}
 
 	window, err := paging.Resolve(*query, filters, call.Principal.ScopeVersion, 1)
@@ -388,60 +363,10 @@ func (m Alerts) list(
 
 	var args []any
 
-	add := func(v any) string {
-		args = append(args, v)
-
-		return fmt.Sprintf("$%d", len(args))
+	where, err := m.where(ctx, call, filters, &args)
+	if err != nil {
+		return paging.Page[Alert]{}, err
 	}
-
-	conds := []string{alertScope(call, &args, unitscope.Equipment)}
-	if filters.UnitID != nil {
-		conds = append(conds, "a.unit_id = "+add(*filters.UnitID))
-	}
-
-	if filters.UnitIDs != nil {
-		conds = append(conds, "a.unit_id = ANY("+add(*filters.UnitIDs)+")")
-	}
-
-	if filters.Severity != nil {
-		conds = append(conds, "a.severity = "+add(*filters.Severity))
-	}
-
-	if filters.Status != nil {
-		conds = append(conds, "a.status = "+add(*filters.Status))
-	}
-
-	if filters.From != nil {
-		conds = append(conds, "a.observed_at >= "+add(*filters.From))
-	}
-
-	if filters.To != nil {
-		conds = append(conds, "a.observed_at < "+add(*filters.To))
-	}
-
-	if filters.CustomerID != nil {
-		org, ok, err := m.Units.OrgOfCustomer(ctx, call, *filters.CustomerID)
-		if err != nil {
-			return paging.Page[Alert]{}, apperr.Wrap(err, "monitoring.UnitLocator.OrgOfCustomer")
-		}
-
-		if !ok {
-			org = uuid.Nil
-		}
-
-		conds = append(conds, "a.customer_org_id = "+add(org))
-	}
-
-	if filters.PropertyID != nil {
-		units, err := m.Units.UnitsOfProperty(ctx, call, *filters.PropertyID)
-		if err != nil {
-			return paging.Page[Alert]{}, apperr.Wrap(err, "monitoring.UnitLocator.UnitsOfProperty")
-		}
-
-		conds = append(conds, "a.unit_id = ANY("+add(units)+")")
-	}
-
-	where := strings.Join(conds, " AND ")
 
 	var total int
 
@@ -484,6 +409,129 @@ func (m Alerts) list(
 		Total:           total,
 		SnapshotVersion: window.Snapshot,
 	}, apperr.Wrap(rows.Err(), "select monitoring.alerts")
+}
+
+// alertFilters are the filters of alerts.list.
+type alertFilters struct {
+	UnitID     *uuid.UUID   `json:"unitId,omitempty"`
+	UnitIDs    *[]uuid.UUID `json:"unitIds,omitempty"`
+	Severity   *string      `json:"severity,omitempty"`
+	Status     *string      `json:"status,omitempty"`
+	From       *time.Time   `json:"from,omitempty"`
+	To         *time.Time   `json:"to,omitempty"`
+	CustomerID *uuid.UUID   `json:"customerId,omitempty"`
+	PropertyID *uuid.UUID   `json:"propertyId,omitempty"`
+}
+
+// check refuses a severity or status that is not one, and a time range that ends before it starts.
+func (filters alertFilters) check() error {
+	switch {
+	case filters.Severity != nil && !validSeverity(*filters.Severity):
+		return apperr.Fields(
+			map[string]string{"filters.severity": apperr.KeyInvalid},
+		)
+	case filters.Status != nil && !validAlertStatus(*filters.Status):
+		return apperr.Fields(
+			map[string]string{"filters.status": apperr.KeyInvalid},
+		)
+	case filters.From != nil && filters.To != nil && !filters.From.Before(*filters.To):
+		return apperr.Fields(map[string]string{"filters.to": apperr.KeyRange})
+	}
+
+	return nil
+}
+
+// alertOrder is the ORDER BY of the alert list: by default severity desc (critical → warning → normal), then id asc;
+// severity asc is normal, warning, critical.
+func alertOrder(sortBy *paging.SortSpec) (string, error) {
+	if sortBy == nil {
+		return severityRank + " DESC, a.id ASC", nil
+	}
+
+	if sortBy.Field == "severity" {
+		dir, err := paging.Direction(sortBy)
+		if err != nil {
+			return "", apperr.Wrap(err, "paging.Direction")
+		}
+
+		return severityRank + " " + dir + ", a.id ASC", nil
+	}
+
+	order, err := paging.OrderBy(
+		sortBy,
+		map[string]string{
+			"id":         "a.id",
+			keyCreatedAt: "a.created_at",
+			keyUpdatedAt: "a.updated_at",
+		},
+		"",
+	)
+
+	return order, apperr.Wrap(err, "paging.OrderBy")
+}
+
+// where is the SQL condition of the filters over the alerts the caller may read (alias a); the arguments it uses are
+// added to args.
+func (m Alerts) where(
+	ctx context.Context,
+	call *ops.Call,
+	filters alertFilters,
+	args *[]any,
+) (string, error) {
+	add := func(v any) string {
+		*args = append(*args, v)
+
+		return fmt.Sprintf("$%d", len(*args))
+	}
+
+	conds := []string{alertScope(call, args, unitscope.Equipment)}
+	if filters.UnitID != nil {
+		conds = append(conds, "a.unit_id = "+add(*filters.UnitID))
+	}
+
+	if filters.UnitIDs != nil {
+		conds = append(conds, "a.unit_id = ANY("+add(*filters.UnitIDs)+")")
+	}
+
+	if filters.Severity != nil {
+		conds = append(conds, "a.severity = "+add(*filters.Severity))
+	}
+
+	if filters.Status != nil {
+		conds = append(conds, "a.status = "+add(*filters.Status))
+	}
+
+	if filters.From != nil {
+		conds = append(conds, "a.observed_at >= "+add(*filters.From))
+	}
+
+	if filters.To != nil {
+		conds = append(conds, "a.observed_at < "+add(*filters.To))
+	}
+
+	if filters.CustomerID != nil {
+		org, ok, err := m.Units.OrgOfCustomer(ctx, call, *filters.CustomerID)
+		if err != nil {
+			return "", apperr.Wrap(err, "monitoring.UnitLocator.OrgOfCustomer")
+		}
+
+		if !ok {
+			org = uuid.Nil
+		}
+
+		conds = append(conds, "a.customer_org_id = "+add(org))
+	}
+
+	if filters.PropertyID != nil {
+		units, err := m.Units.UnitsOfProperty(ctx, call, *filters.PropertyID)
+		if err != nil {
+			return "", apperr.Wrap(err, "monitoring.UnitLocator.UnitsOfProperty")
+		}
+
+		conds = append(conds, "a.unit_id = ANY("+add(units)+")")
+	}
+
+	return strings.Join(conds, " AND "), nil
 }
 
 // get serves alerts.get.

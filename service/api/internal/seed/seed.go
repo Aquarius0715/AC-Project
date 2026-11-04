@@ -982,7 +982,7 @@ func clientMemberships(f *Fixture) []uuid.UUID {
 // policies seeds the IR120 default policy of each tenant (owned by its first HQ actor) and the customer-actor demo
 // setting that switches the AC offline rule off.
 func (s *seeding) policies() error {
-	rules, err := json.Marshal(monitoring.DefaultRules)
+	rules, err := json.Marshal(monitoring.DefaultRules())
 	if err != nil {
 		return apperr.Wrap(err, "json.Marshal")
 	}
