@@ -32,7 +32,8 @@ const results: AuditResult[] = ["Success", "Denied", "Failed", "Pending"];
 /** A result as the screen words it. */
 export const resultWord = (r: AuditResult | string, t: T = en) => ({ Success: t("Success"), Denied: t("Denied"), Failed: t("Failed"), Pending: t("Pending") })[r] ?? r;
 /** The badge tone of a result. */
-export const resultTone = (r: AuditResult) => (r === "Success" ? "ok" : r === "Denied" ? "warn" : r === "Failed" ? "crit" : "primary");
+const RESULT_TONE = new Map<AuditResult, "ok" | "warn" | "crit">([["Success", "ok"], ["Denied", "warn"], ["Failed", "crit"]]);
+export const resultTone = (r: AuditResult) => RESULT_TONE.get(r) ?? "primary";
 /** The role an entry recorded, worded (it is never rewritten). */
 export const roleAtTimeWord = (r: string, t: T = en) =>
   ({ admin: t("Admin"), contractor: t("Contractor"), technician: t("Technician"), client: t("Client"), system: t("System") })[r] ?? r;
@@ -84,6 +85,11 @@ export function correlationQuery(a: Pick<ApiAudit, "correlationId" | "occurredAt
   return { limit: 100, sort: { field: "occurredAt", direction: "asc" }, filters: { from: new Date(at - 86_400_000).toISOString(), to: new Date(at + 86_400_000).toISOString(), correlationId: a.correlationId } };
 }
 
+/** The versions a write moved between: “version 3”, “version 2 → 3”, or none. */
+function versionsText(previous: number | null, next: number | null, t: T): string | null {
+  if (next === null) return null;
+  return previous === null ? t("version {v}", { v: next }) : t("version {from} → {to}", { from: previous, to: next });
+}
 /** One entry of the log: who acted (the user's name, else the actor ID — a system actor has no name, IR305), the list
 time relative to now, the full time, the role in the display language and the versions it moved the target between. */
 export function auditRow(a: ApiAudit, i: I18n = EN, nowMs?: number): AuditRow {
@@ -93,7 +99,7 @@ export function auditRow(a: ApiAudit, i: I18n = EN, nowMs?: number): AuditRow {
     id: a.id,
     op: a.action,
     target: `${a.targetRef.kind} · ${a.targetRef.id}`, targetKind: a.targetRef.kind, targetId: a.targetRef.id,
-    versions: a.nextVersion === null ? null : (a.previousVersion === null ? t("version {v}", { v: a.nextVersion }) : t("version {from} → {to}", { from: a.previousVersion, to: a.nextVersion })),
+    versions: versionsText(a.previousVersion, a.nextVersion, t),
     actor: a.actorName ?? a.actorId,
     actorId: a.actorId,
     role: roleAtTimeWord(a.actorRoleAtTime, t),
@@ -189,6 +195,16 @@ export interface AuditDeviceEvent {
   id: string; title: string; type: ApiDeviceEventFull["eventType"]; tone: "warn" | "crit" | "ok" | "muted"; meta: string; state: string;
   badge: { text: string; tone: "crit" | "ok" } | null; facts: [string, string][]; alerts: { id: string; text: string; href: string }[]; notes: { text: string; by: string }[];
 }
+/** An event's sequence number against the one before it: no gap, or how many are missing. */
+function sequenceText(n: number, prev: number | undefined, t: T): string {
+  if (prev === undefined) return String(n);
+  return prev === n - 1 ? t("{n} (previous {p} — no gap)", { n, p: prev }) : t("{n} (previous {p} — {missing} missing)", { n, p: prev, missing: n - prev - 1 });
+}
+/** A fault's badge (whether it was restored); a restore event has none. */
+function faultBadge(e: ApiAuditDeviceEvent, t: T): { text: string; tone: "ok" | "crit" } | null {
+  if (e.eventType === "restored") return null;
+  return e.restoredAt ? { text: t("Restored"), tone: "ok" } : { text: t("Not restored"), tone: "crit" };
+}
 export function auditDeviceEvents(es: ApiAuditDeviceEvent[], alerts: Map<string, ApiAlertLite>, names: Map<string, string>, units: Map<string, string>, nowMs: number, i: I18n = EN): AuditDeviceEvent[] {
   const { t, display } = i;
   const rows = new Map(eventRows(es, alerts, nowMs, i).map((r) => [r.id, r]));
@@ -196,13 +212,12 @@ export function auditDeviceEvents(es: ApiAuditDeviceEvent[], alerts: Map<string,
   return es.map((e) => {
     const r = rows.get(e.id)!;
     const prev = [...seqs].reverse().find((s) => s < e.sequence);
-    const sequence = prev === undefined ? String(e.sequence)
-      : (prev === e.sequence - 1 ? t("{n} (previous {p} — no gap)", { n: e.sequence, p: prev }) : t("{n} (previous {p} — {missing} missing)", { n: e.sequence, p: prev, missing: e.sequence - prev - 1 }));
+    const sequence = sequenceText(e.sequence, prev, t);
     const isFault = e.eventType !== "restored";
     return {
       id: e.id, title: t(EVENT_TITLE[e.eventType]), type: e.eventType, tone: r.tone,
       meta: t("{source} · seq {n} · {time}", { source: e.evidenceSource, n: e.sequence, time: r.time }), state: r.recovery,
-      badge: isFault ? (e.restoredAt ? { text: t("Restored"), tone: "ok" } : { text: t("Not restored"), tone: "crit" }) : null,
+      badge: faultBadge(e, t),
       facts: [
         [t("Event type"), e.eventType], [t("Evidence"), `${e.evidenceSource} — ${eventCause(e, t)}`], [t("Sequence"), sequence],
         [t("Unit at the time"), units.get(e.unitIdAtOccurrence) ?? e.unitIdAtOccurrence.slice(0, 8)], [t("Occurred"), showTime(e.occurredAt, display)],
@@ -210,7 +225,7 @@ export function auditDeviceEvents(es: ApiAuditDeviceEvent[], alerts: Map<string,
       ],
       alerts: e.alertIds.map((id) => {
         const a = alerts.get(id);
-        return { id, text: a ? `${a.type} · ${t(a.status === "open" ? "open" : (a.status === "acknowledged" ? "acknowledged" : "resolved"))}` : t("alert {id}", { id: id.slice(0, 8) }), href: `/admin/alerts?alertId=${id}${a && a.status !== "open" ? `&status=${a.status}` : ""}` };
+        return { id, text: a ? `${a.type} · ${t(a.status)}` : t("alert {id}", { id: id.slice(0, 8) }), href: `/admin/alerts?alertId=${id}${a && a.status !== "open" ? `&status=${a.status}` : ""}` };
       }),
       notes: e.responseNotes.map((n) => ({ text: n.message, by: `${names.get(n.actorId) ?? n.actorId.slice(0, 8)} · ${showTime(n.at, display)}` })),
     };

@@ -25,7 +25,11 @@ type Tone = "ok" | "warn" | "crit" | "primary" | "muted";
 
 const OP: Record<string, string> = { gt: ">", gte: "≥", lt: "<", lte: "≤" };
 /** A duration in its largest whole unit from two of them up: “60 s”, “10 min”, “3 h”. */
-export const durationText = (s: number, t: T) => (s >= 7200 && s % 3600 === 0 ? t("{n} h", { n: s / 3600 }) : (s >= 120 && s % 60 === 0 ? t("{n} min", { n: s / 60 }) : t("{n} s", { n: s })));
+export function durationText(s: number, t: T): string {
+  if (s >= 7200 && s % 3600 === 0) return t("{n} h", { n: s / 3600 });
+  if (s >= 120 && s % 60 === 0) return t("{n} min", { n: s / 60 });
+  return t("{n} s", { n: s });
+}
 const value = (metric: string, v: number) => `${airNumber(metric, v)} ${metricUnit[metric] ?? ""}`.trim();
 const label = (metric: string, t: T) => (textOf(metricLabel, metric, t) ?? metric.replaceAll('_', " "));
 /** The words of a rule (Figma: “Policy: temperature ≥ 30 °C, recovery < 28 °C, duration 60 s”); recovery is below the
@@ -53,6 +57,24 @@ export interface AlertView {
   history: { id: string; time: string; title: string; sub: string; badge: { text: string; tone: Tone } }[];
   related: [string, string][];
 }
+/** A unit with its place (“Bedroom AC · Home › Floor 1”). */
+function unitPath(u: ApiUnitDetail): string {
+  return u.location.pathLabels.length > 0 ? `${u.displayName} · ${u.location.pathLabels.join(" › ")}` : u.displayName;
+}
+/** How the technician can resolve an open alert: by reason, by a remeasurement when it has a policy, or not at all. */
+function resolveWay(canResolve: boolean, hasRule: boolean): string {
+  if (canResolve) return hasRule ? "with a reason, or by a remeasurement" : "with a reason";
+  return hasRule ? "with a remeasurement only" : "no — ask a user with alert.resolve";
+}
+/** When the alert reached its state: resolved or acknowledged (else when it was raised). */
+function stateTime(a: ApiTechAlert): string {
+  return (a.status === "resolved" ? a.resolvedAt : a.acknowledgedAt) ?? a.detectedAt;
+}
+/** What resolves an open alert: a remeasurement within its recovery, or only a reason when it has no policy. */
+function resolutionInfo(words: { recovery: string } | null, t: T): string {
+  return words ? t("Automatic resolution needs a remeasurement {recovery} — or a reason below with alert.resolve.", { recovery: words.recovery })
+    : t("No remeasurement resolves this alert — it has no policy. Resolve it with a reason below with alert.resolve.");
+}
 /** The selected alert as the screen shows it. `latest` is the unit's latest reading of the rule's metric (units.get);
 `job` the URL's job (jobs.get); `canResolve` whether the user holds alert.resolve. */
 export function alertView(a: ApiTechAlert, ctx: { alerts: ApiTechAlert[]; unit: ApiUnitDetail | null; job: { id: string; type: string } | null; canResolve: boolean }, nowMs: number, i: I18n = EN): AlertView {
@@ -74,20 +96,20 @@ export function alertView(a: ApiTechAlert, ctx: { alerts: ApiTechAlert[]; unit: 
   if (a.acknowledgedAt) history.push({ id: "acknowledged", time: when(a.acknowledgedAt), title: t("Acknowledged"), sub: "", badge: { text: t("Acknowledged"), tone: "primary" } });
   history.push({ id: "raised", time: when(a.detectedAt), title: t("Raised"), sub: [evidenceText(a.evidenceText, t), words && t("{condition} for {duration}", { condition: words.raise, duration: durationText(rule!.durationSeconds, t) })].filter(Boolean).join(" · "), badge: { text: t(KIND[a.evidenceKind] ?? "Evidence"), tone: "primary" } });
   const prev = a.previousAlertId ? ctx.alerts.find((x) => x.id === a.previousAlertId) : undefined;
-  const unit = ctx.unit ? `${ctx.unit.displayName}${ctx.unit.location.pathLabels.length > 0 ? ` · ${ctx.unit.location.pathLabels.join(" › ")}` : ""}` : a.unitId.slice(0, 8);
-  const resolver = a.status === "resolved" ? t("done {time}", { time: when(a.resolvedAt ?? a.detectedAt) }) : (ctx.canResolve ? t(rule ? "with a reason, or by a remeasurement" : "with a reason") : t(rule ? "with a remeasurement only" : "no — ask a user with alert.resolve"));
+  const unit = ctx.unit ? unitPath(ctx.unit) : a.unitId.slice(0, 8);
+  const resolver = a.status === "resolved" ? t("done {time}", { time: when(a.resolvedAt ?? a.detectedAt) }) : t(resolveWay(ctx.canResolve, !!rule));
+  const previous = prev ? `${showDate(prev.detectedAt, display)} · ${statusWord(prev.status, t)}` : (a.previousAlertId?.slice(0, 8) ?? t("none"));
   return {
     id: a.id, version: a.version, status: a.status, severity: a.severity, policyless: !a.policyId,
     banner: {
       title: `${a.id.slice(0, 8)} · ${title}`,
-      state: a.status === "open" ? null : `${t(state)} · ${when((a.status === "resolved" ? a.resolvedAt : a.acknowledgedAt) ?? a.detectedAt)}`,
+      state: a.status === "open" ? null : `${t(state)} · ${when(stateTime(a))}`,
       sub: words ? words.policy : t("{kind} · no policy — it resolves only with a reason", { kind: t(KIND[a.evidenceKind] ?? "Evidence") }),
       tone,
     },
     cards,
     resolution: {
-      info: a.status === "resolved" ? null : (words ? t("Automatic resolution needs a remeasurement {recovery} — or a reason below with alert.resolve.", { recovery: words.recovery })
-        : t("No remeasurement resolves this alert — it has no policy. Resolve it with a reason below with alert.resolve.")),
+      info: a.status === "resolved" ? null : resolutionInfo(words, t),
       done: a.status === "resolved" ? [t("Resolved {time} — {reason}.", { time: when(a.resolvedAt ?? a.detectedAt), reason: a.resolutionReason ? resolutionText(a.resolutionReason, t) : t("no reason recorded") }), a.acknowledgedAt ? t("Acknowledged {time}.", { time: when(a.acknowledgedAt) }) : ""].filter(Boolean).join(" ") : null,
       note: a.status === "resolved" ? t("Completing the job alone never resolves an alert. If the condition returns, a new alert is created that links back to alert {id}.", { id: a.id.slice(0, 8) })
         : t("If it recurs after it is resolved, a new alert is created that links back to this one."),
@@ -97,7 +119,7 @@ export function alertView(a: ApiTechAlert, ctx: { alerts: ApiTechAlert[]; unit: 
     history,
     related: [
       [t("Job"), ctx.job ? `${ctx.job.id.slice(0, 8)} · ${typeLabel(ctx.job.type, t)}` : "—"], [t("Unit"), unit], [t("Policy"), rule ? rule.name : t("No policy")],
-      [t("Recovery rule"), words ? words.recovery : "—"], [t("Previous alert"), prev ? `${showDate(prev.detectedAt, display)} · ${statusWord(prev.status, t)}` : (a.previousAlertId ? a.previousAlertId.slice(0, 8) : t("none"))],
+      [t("Recovery rule"), words ? words.recovery : "—"], [t("Previous alert"), previous],
       [t("You can resolve"), resolver],
     ],
   };

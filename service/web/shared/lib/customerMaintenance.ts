@@ -45,14 +45,21 @@ export const sameSlot = (a: Slot | null, b: Slot | null) => !!a && !!b && Date.p
 export type StatusTab = "all" | "reply" | "requested" | "scheduled" | "progress" | "completed" | "cancelled";
 export const STATUS_TABS: [StatusTab, string][] = [["all", "All"], ["reply", "Needs your reply"], ["requested", "Requested"], ["scheduled", "Scheduled"], ["progress", "In progress"], ["completed", "Completed"], ["cancelled", "Cancelled"]];
 /** The tab of a request: Needs your reply = a pending proposal; Scheduled = a time is agreed (offered … assigned). */
-export const tabOf = (displayStatus: string): StatusTab => {
-  return displayStatus === "time_proposed" ? "reply" : displayStatus === "requested" ? "requested" : ["offered", "accepted", "assigned"].includes(displayStatus) ? "scheduled"
-    : displayStatus === "completed" ? "completed" : displayStatus === "cancelled" ? "cancelled" : "progress";
-};
+const TAB_OF = new Map<string, StatusTab>([
+  ["time_proposed", "reply"], ["requested", "requested"], ["offered", "scheduled"], ["accepted", "scheduled"], ["assigned", "scheduled"], ["completed", "completed"], ["cancelled", "cancelled"],
+]);
+export const tabOf = (displayStatus: string): StatusTab => TAB_OF.get(displayStatus) ?? "progress";
 const ORDER = ["time_proposed", "requested", "in_progress", "rework_requested", "submitted", "offered", "accepted", "assigned", "on_hold", "completed", "cancelled"];
 
 export interface ClientRow { id: string; short: string; unit: string; place: string; origin: "plan" | "request"; type: string; status: string; tab: StatusTab; line: string; icon: IconName; warn: boolean }
 const TYPE: Record<string, string> = { reactive: "Repair", preventive: "Preventive maintenance", periodic: "Periodic inspection" };
+/** What a requested job waits for: the preferred times (not confirmed yet), HQ booking the plan visit, or HQ. */
+function requestedLine(j: ApiClientRow, isPlan: boolean, slot: (s: Slot) => string, t: T): string {
+  const first = j.preferredSlots.at(0);
+  if (!first) return isPlan ? t("Plan visit {slot} · HQ is booking it", { slot: slot(j.requestedSlot) }) : t("Waiting for HQ");
+  const more = j.preferredSlots.length - 1;
+  return more > 0 ? t("Preferred {slot} · +{n} more (not confirmed yet)", { slot: slot(first), n: more }) : t("Preferred {slot} (not confirmed yet)", { slot: slot(first) });
+}
 /** One request of the list (Figma 07a): unit and place, origin, type and what is next — business status order. */
 export function clientRows(rows: ApiClientRow[], unit: (id: string) => { name: string; place: string }, i: I18n = EN): ClientRow[] {
   const { t } = i;
@@ -64,8 +71,7 @@ export function clientRows(rows: ApiClientRow[], unit: (id: string) => { name: s
     switch (j.displayStatus) {
       case "time_proposed": { [line, isWarn, icon] = [t("A new visit time needs your reply — nothing is booked until you accept"), true, "swap"]; break;
       }
-      case "requested": { line = j.preferredSlots.length > 1 ? t("Preferred {slot} · +{n} more (not confirmed yet)", { slot: slot(j.preferredSlots[0]), n: j.preferredSlots.length - 1 })
-        : j.preferredSlots.length > 0 ? t("Preferred {slot} (not confirmed yet)", { slot: slot(j.preferredSlots[0]) }) : isPlan ? t("Plan visit {slot} · HQ is booking it", { slot: slot(j.requestedSlot) }) : t("Waiting for HQ"); break;
+      case "requested": { line = requestedLine(j, isPlan, slot, t); break;
       }
       case "completed": { icon = "success"; line = j.scheduledSlot ? t("Completed · visit {slot} · report available", { slot: slot(j.scheduledSlot) }) : t("Completed · report available"); break;
       }
@@ -96,7 +102,8 @@ export function detailFacts(j: ApiClientJob, unit: { name: string; place: string
   else if (j.scheduledSlot && ["offered", "accepted", "assigned"].includes(j.status)) out.push([t("Technician"), t("being confirmed — the name shows once the technician accepts")]);
   return out;
 }
-export const followUpText = (c: ApiClientJob["followUpClass"], t: T = en) => t(c === "rework" ? "Rework (free)" : (c === "new_request" ? "New request" : "Under HQ review"));
+const FOLLOW_UP = new Map([["rework", "Rework (free)"], ["new_request", "New request"]]);
+export const followUpText = (c: ApiClientJob["followUpClass"], t: T = en) => t(FOLLOW_UP.get(c ?? "") ?? "Under HQ review");
 
 const RANK = ["1st", "2nd", "3rd"];
 /** The preferred times with the booked one marked (request origin, open jobs). */
