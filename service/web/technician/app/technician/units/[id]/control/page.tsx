@@ -12,7 +12,7 @@ import { ControlView } from "./_components/control-view";
 import { loadControl } from "./_lib/load";
 import { Icon } from "@ac/web/components/Icon";
 
-export default async function TechnicianControlPage({ params, searchParams }: PageProps<"/technician/units/[id]/control">) {
+export default async function TechnicianControlPage({ params, searchParams }: Readonly<PageProps<"/technician/units/[id]/control">>) {
   const { id } = await params;
   await connection();
   if (!apiMode()) return <ControlDemo id={id} />;

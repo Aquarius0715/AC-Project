@@ -10,7 +10,7 @@ import { PayoutsView } from "./_components/payouts-view";
 
 const str = (v: string | string[] | undefined) => (typeof v === "string" && v ? v : undefined);
 
-export default async function PartnerPayoutsPage({ searchParams }: PageProps<"/partner/payouts">) {
+export default async function PartnerPayoutsPage({ searchParams }: Readonly<PageProps<"/partner/payouts">>) {
   await connection();
   if (!apiMode()) return <PayoutsDemo />;
   const sp = await searchParams;

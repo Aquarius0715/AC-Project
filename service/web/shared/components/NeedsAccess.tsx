@@ -5,7 +5,7 @@ import { useT } from "@ac/web/components/I18n";
 
 /** A page the signed-in role may not read: which permission it needs and whom to ask, as Customers & units says it —
 not "could not be loaded" with Try again, which reads as a failure (IR581). `what` is the sidebar's name. */
-export function NeedsAccess({ what, permission }: { what: string; permission: string }) {
+export function NeedsAccess({ what, permission }: Readonly<{ what: string; permission: string }>) {
   const t = useT();
   return (
     <Page>

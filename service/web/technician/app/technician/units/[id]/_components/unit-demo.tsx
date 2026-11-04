@@ -10,7 +10,7 @@ const counts = { Indoor: 8, Outdoor: 5, Electrical: 5 };
 
 /** The Phase 1A demo of the technician unit page (fixture values; “preview: communication lost” toggles the offline
 state). */
-export function TechUnitDemo({ id }: { id: string }) {
+export function TechUnitDemo({ id }: Readonly<{ id: string }>) {
   const [tab, setTab] = useState<"register" | "monitoring">("register");
   const [win, setWin] = useState<"1h" | "24h" | "7d">("24h");
   const [lost, setLost] = useState(false);

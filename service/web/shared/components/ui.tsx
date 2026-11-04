@@ -47,7 +47,7 @@ const toneCls: Record<Tone, string> = {
 };
 
 /** A status badge: the shadcn/ui Badge in the tone's colours. */
-export function Badge({ tone = "muted", icon, children, className }: { tone?: Tone; icon?: IconName; children: React.ReactNode; className?: string }) {
+export function Badge({ tone = "muted", icon, children, className }: Readonly<{ tone?: Tone; icon?: IconName; children: React.ReactNode; className?: string }>) {
   return (
     <UIBadge variant="secondary" className={cn(toneCls[tone], className)}>
       {icon && <Icon name={icon} />}
@@ -87,22 +87,22 @@ const btnCls = (v: BtnVariant, size: "sm" | "md") => cn(buttonVariants({ variant
 export function Btn({ variant = "secondary", size = "md", className, ...p }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: BtnVariant; size?: "sm" | "md" }) {
   return <Button type="button" {...p} variant={variantOf[variant]} size={sizeOf(size)} className={cn(variantCls(variant), className)} />;
 }
-export function LinkBtn({ href, variant = "secondary", size = "md", className, children }: { href: string; variant?: BtnVariant; size?: "sm" | "md"; className?: string; children: React.ReactNode }) {
+export function LinkBtn({ href, variant = "secondary", size = "md", className, children }: Readonly<{ href: string; variant?: BtnVariant; size?: "sm" | "md"; className?: string; children: React.ReactNode }>) {
   return <Link href={href} className={cx(btnCls(variant, size), className)}>{children}</Link>;
 }
-export function TextLink({ href, children, className }: { href: string; children: React.ReactNode; className?: string }) {
+export function TextLink({ href, children, className }: Readonly<{ href: string; children: React.ReactNode; className?: string }>) {
   return <Link href={href} className={cx("text-xs font-semibold text-primary hover:underline", className)}>{children}</Link>;
 }
 
 /* ───────────── Layout primitives ───────────── */
 /** The main column: 1280 px wide, or the 640 px single-column of offers and snapshots (Figma) with `narrow`. */
-export function Page({ children, className, narrow }: { children: React.ReactNode; className?: string; narrow?: boolean }) {
+export function Page({ children, className, narrow }: Readonly<{ children: React.ReactNode; className?: string; narrow?: boolean }>) {
   return <div className={cx("page mx-auto flex w-full flex-col gap-4", narrow ? "max-w-[640px]" : "max-w-[1280px]", className)}>{children}</div>;
 }
 
 /** A card: the shadcn/ui Card. The title stays a level-2 heading; `pad={false}` lets a table reach the edges; the
 overflow stays visible for the menus that still open inside a card. */
-export function Card({ title, sub, action, children, className, pad = true, tone }: { title?: React.ReactNode; sub?: React.ReactNode; action?: React.ReactNode; children?: React.ReactNode; className?: string; pad?: boolean; tone?: "crit" | "warn" | "ok" }) {
+export function Card({ title, sub, action, children, className, pad = true, tone }: Readonly<{ title?: React.ReactNode; sub?: React.ReactNode; action?: React.ReactNode; children?: React.ReactNode; className?: string; pad?: boolean; tone?: "crit" | "warn" | "ok" }>) {
   return (
     <UICard className={cn("min-w-0 overflow-visible", !pad && "pb-0", tone === "crit" && "ring-crit", tone === "warn" && "ring-[#fdba74]", tone === "ok" && "ring-[#86efac]", className)}>
       {(title || action) && (
@@ -121,7 +121,7 @@ export function Card({ title, sub, action, children, className, pad = true, tone
   );
 }
 
-export function PageHead({ title, sub, action }: { title: React.ReactNode; sub?: React.ReactNode; action?: React.ReactNode }) {
+export function PageHead({ title, sub, action }: Readonly<{ title: React.ReactNode; sub?: React.ReactNode; action?: React.ReactNode }>) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
@@ -136,7 +136,7 @@ export function PageHead({ title, sub, action }: { title: React.ReactNode; sub?:
 /** A part that scrolls sideways when the screen is narrower than its content (a wide table, a board). While it overflows
 it can take the focus, so a keyboard can scroll it (WCAG 2.1.1, axe scrollable-region-focusable); with a label it is a
 named region. On a wide screen nothing overflows and it adds no tab stop. */
-export function ScrollX({ label, className, children }: { label?: string; className?: string; children: React.ReactNode }) {
+export function ScrollX({ label, className, children }: Readonly<{ label?: string; className?: string; children: React.ReactNode }>) {
   const ref = useRef<HTMLDivElement>(null);
   const [overflows, setOverflows] = useState(false);
   useEffect(() => {
@@ -153,7 +153,7 @@ export function ScrollX({ label, className, children }: { label?: string; classN
   // of widening the page (IR501)
   return <div ref={ref} className={cx("scroll-x relative", className)} tabIndex={overflows ? 0 : undefined} role={label ? "region" : undefined} aria-label={label}>{children}</div>;
 }
-export function Kpi({ label, value, icon, unit, badge, sub, href, link, tone }: { label: string; value: React.ReactNode; icon?: IconName; unit?: string; badge?: React.ReactNode; sub?: React.ReactNode; href?: string; link?: string; tone?: "crit" | "warn" | "ok" }) {
+export function Kpi({ label, value, icon, unit, badge, sub, href, link, tone }: Readonly<{ label: string; value: React.ReactNode; icon?: IconName; unit?: string; badge?: React.ReactNode; sub?: React.ReactNode; href?: string; link?: string; tone?: "crit" | "warn" | "ok" }>) {
   return (
     <UICard className="min-w-0 gap-1 px-4">
       <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
@@ -172,7 +172,7 @@ export function Kpi({ label, value, icon, unit, badge, sub, href, link, tone }: 
   );
 }
 
-export function Stat({ label, value, sub }: { label: string; value: React.ReactNode; sub?: React.ReactNode }) {
+export function Stat({ label, value, sub }: Readonly<{ label: string; value: React.ReactNode; sub?: React.ReactNode }>) {
   return (
     <div className="min-w-0 rounded-xl bg-surface2 p-3">
       <div className="text-[11px] text-muted-foreground">{label}</div>
@@ -183,7 +183,7 @@ export function Stat({ label, value, sub }: { label: string; value: React.ReactN
 }
 
 /** A message line: the shadcn/ui Alert in the tone's colours, an alert only when critical (otherwise a status). */
-export function Banner({ tone = "primary", icon, children, action }: { tone?: Tone; icon?: IconName; children: React.ReactNode; action?: React.ReactNode }) {
+export function Banner({ tone = "primary", icon, children, action }: Readonly<{ tone?: Tone; icon?: IconName; children: React.ReactNode; action?: React.ReactNode }>) {
   const bd = tone === "warn" ? "border-[#fdba74] bg-warn-soft/60" : tone === "crit" ? "border-crit bg-crit-soft/60" : tone === "ok" ? "border-[#86efac] bg-ok-soft/60" : "border-border bg-primary-soft/50";
   return (
     <Alert role={tone === "crit" ? "alert" : "status"} className={cn("flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl px-3.5 py-2.5 text-[13px] *:[svg]:translate-y-0", bd)}>
@@ -196,7 +196,7 @@ export function Banner({ tone = "primary", icon, children, action }: { tone?: To
 }
 
 /** No rows, a failed read, no connection: the shadcn/ui Empty. The title stays a level-3 heading. */
-export function EmptyState({ title, children, action }: { title: string; children?: React.ReactNode; action?: React.ReactNode }) {
+export function EmptyState({ title, children, action }: Readonly<{ title: string; children?: React.ReactNode; action?: React.ReactNode }>) {
   return (
     <Empty className="border bg-card">
       <EmptyHeader>
@@ -208,7 +208,7 @@ export function EmptyState({ title, children, action }: { title: string; childre
     </Empty>
   );
 }
-export function ErrorState({ title, children, onRetry }: { title: string; children?: React.ReactNode; onRetry?: () => void }) {
+export function ErrorState({ title, children, onRetry }: Readonly<{ title: string; children?: React.ReactNode; onRetry?: () => void }>) {
   return (
     <Empty className="border border-solid border-crit bg-card">
       <EmptyHeader>
@@ -221,7 +221,7 @@ export function ErrorState({ title, children, onRetry }: { title: string; childr
   );
 }
 
-export function SummaryList({ items, cols = 1 }: { items: [string, React.ReactNode][]; cols?: 1 | 2 }) {
+export function SummaryList({ items, cols = 1 }: Readonly<{ items: [string, React.ReactNode][]; cols?: 1 | 2 }>) {
   return (
     <dl className={cx("grid gap-x-6 text-[13px]", cols === 2 ? "grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))]" : "grid-cols-1")}>
       {items.map(([k, v]) => (
@@ -234,7 +234,7 @@ export function SummaryList({ items, cols = 1 }: { items: [string, React.ReactNo
   );
 }
 
-export function Steps({ steps, current }: { steps: string[]; current: number }) {
+export function Steps({ steps, current }: Readonly<{ steps: string[]; current: number }>) {
   return (
     <ol className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold">
       {steps.map((s, i) => (
@@ -247,7 +247,7 @@ export function Steps({ steps, current }: { steps: string[]; current: number }) 
   );
 }
 
-export function Timeline({ items }: { items: { time: string; title: React.ReactNode; detail?: React.ReactNode; tone?: Tone }[] }) {
+export function Timeline({ items }: Readonly<{ items: { time: string; title: React.ReactNode; detail?: React.ReactNode; tone?: Tone }[] }>) {
   return (
     <ol className="flex flex-col gap-3">
       {items.map((it, i) => (
@@ -266,7 +266,7 @@ export function Timeline({ items }: { items: { time: string; title: React.ReactN
 
 /* ───────────── Tabs / segmented ───────────── */
 /** A tab bar: the shadcn/ui Tabs (tablist and tabs; the screens draw the panels). `count` is a badge after the label. */
-export function Tabs<T extends string>({ tabs, value, onChange, className }: { tabs: { id: T; label: string; count?: number | string }[]; value: T; onChange: (v: T) => void; className?: string }) {
+export function Tabs<T extends string>({ tabs, value, onChange, className }: Readonly<{ tabs: { id: T; label: string; count?: number | string }[]; value: T; onChange: (v: T) => void; className?: string }>) {
   return (
     <UITabs value={value} onValueChange={(v) => { onChange(v as T); }} className={cn("max-w-full", className)}>
       <TabsList className="max-w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto">
@@ -282,7 +282,7 @@ export function Tabs<T extends string>({ tabs, value, onChange, className }: { t
 }
 
 /* ───────────── Forms ───────────── */
-export function Field({ label, hint, error, children, className, labelHidden }: { label: string; hint?: React.ReactNode; error?: React.ReactNode; children: React.ReactNode; className?: string; labelHidden?: boolean }) {
+export function Field({ label, hint, error, children, className, labelHidden }: Readonly<{ label: string; hint?: React.ReactNode; error?: React.ReactNode; children: React.ReactNode; className?: string; labelHidden?: boolean }>) {
   // Only a single form control sits inside a <label>. Anything else — choice buttons, a set of checkboxes or buttons, a
   // read-only box — is a labelled group: inside a <label> a button takes the label as its name (IR230, IR238).
   // `labelHidden` keeps the label for assistive technology only, for a group that shows labels of its own.
@@ -310,7 +310,7 @@ export const Select = ({ className, children, ...p }: Omit<React.SelectHTMLAttri
 };
 /** A row's actions behind the "more" icon: the shadcn/ui DropdownMenu. The actions are written as <option value>
 children (shown only when they apply); `onChoose` gets the chosen value. */
-export function ActionMenu({ label, disabled, onChoose, children }: { label: string; disabled?: boolean; onChoose: (value: string) => void; children: React.ReactNode }) {
+export function ActionMenu({ label, disabled, onChoose, children }: Readonly<{ label: string; disabled?: boolean; onChoose: (value: string) => void; children: React.ReactNode }>) {
   const items = Children.toArray(children).filter((c): c is React.ReactElement<{ value: string; children: React.ReactNode }> => isValidElement(c) && c.type === "option");
   return (
     <DropdownMenu>
@@ -336,7 +336,7 @@ export const Plain = ({ className, touch, ...p }: React.ComponentProps<typeof Bu
 };
 /** A one-time code as separate boxes (Figma 10g): one transparent input over the boxes, so typing, pasting and the
 browser's one-time-code autofill all work; the box for the next digit is outlined while the input has focus. */
-export function CodeInput({ value, onChange, label, length = 6, autoFocus }: { value: string; onChange: (v: string) => void; label: string; length?: number; autoFocus?: boolean }) {
+export function CodeInput({ value, onChange, label, length = 6, autoFocus }: Readonly<{ value: string; onChange: (v: string) => void; label: string; length?: number; autoFocus?: boolean }>) {
   const [focused, setFocused] = useState(false);
   const next = Math.min(value.length, length - 1);
   return (
@@ -353,15 +353,15 @@ export function CodeInput({ value, onChange, label, length = 6, autoFocus }: { v
   );
 }
 /** A QR code drawn from its module path (lib/twoFactor qrPath), dark on white whatever the theme so it scans. */
-export function QrCode({ qr, label, className }: { qr: { size: number; path: string }; label: string; className?: string }) {
+export function QrCode({ qr, label, className }: Readonly<{ qr: { size: number; path: string }; label: string; className?: string }>) {
   return (
-    <svg role="img" aria-label={label} viewBox={`0 0 ${qr.size} ${qr.size}`} shapeRendering="crispEdges" className={cx("block bg-white", className)}>
+    <svg role="img" aria-label={label} viewBox={`0 0 ${String(qr.size)} ${String(qr.size)}`} shapeRendering="crispEdges" className={cx("block bg-white", className)}>
       <path d={qr.path} fill="#0b1220" />
     </svg>
   );
 }
 /** A checkbox with its label: the shadcn/ui Checkbox, 20 px so the lists' targets keep 24 px apart (WCAG 2.5.8, IR360). */
-export function Check({ label, checked, onChange, disabled }: { label: React.ReactNode; checked?: boolean; onChange?: (v: boolean) => void; disabled?: boolean }) {
+export function Check({ label, checked, onChange, disabled }: Readonly<{ label: React.ReactNode; checked?: boolean; onChange?: (v: boolean) => void; disabled?: boolean }>) {
   return (
     <label className="inline-flex items-center gap-2 text-[13px]">
       <Checkbox checked={checked} disabled={disabled} onCheckedChange={(v) => onChange?.(v)} className="size-5" />
@@ -370,18 +370,18 @@ export function Check({ label, checked, onChange, disabled }: { label: React.Rea
   );
 }
 /** An on/off switch: the shadcn/ui Switch, named by `label`. */
-export function Toggle({ on, onChange, label, disabled }: { on: boolean; onChange: (v: boolean) => void; label?: string; disabled?: boolean }) {
+export function Toggle({ on, onChange, label, disabled }: Readonly<{ on: boolean; onChange: (v: boolean) => void; label?: string; disabled?: boolean }>) {
   return <Switch checked={on} onCheckedChange={(v) => { onChange(v); }} aria-label={label} disabled={disabled} />;
 }
 /** One choice of a few, shown as pressed buttons: the shadcn/ui ToggleGroup. The chosen one stays chosen when pressed again. */
-export function Choice<T extends string>({ options, value, onChange, disabled }: { options: { id: T; label: string }[]; value: T; onChange: (v: T) => void; disabled?: boolean }) {
+export function Choice<T extends string>({ options, value, onChange, disabled }: Readonly<{ options: { id: T; label: string }[]; value: T; onChange: (v: T) => void; disabled?: boolean }>) {
   return (
     <ToggleGroup value={[value]} disabled={disabled} onValueChange={(v) => { const next = v[v.length - 1] as T | undefined; if (next !== undefined && next !== value) onChange(next); }} variant="outline" className="flex-wrap">
       {options.map((o) => <ToggleGroupItem key={o.id} value={o.id} className="px-3 text-[13px] font-semibold data-pressed:border-primary data-pressed:bg-primary-soft data-pressed:text-primary">{o.label}</ToggleGroupItem>)}
     </ToggleGroup>
   );
 }
-export function Search({ placeholder, value, onChange }: { placeholder: string; value: string; onChange: (v: string) => void }) {
+export function Search({ placeholder, value, onChange }: Readonly<{ placeholder: string; value: string; onChange: (v: string) => void }>) {
   return (
     <span className="relative flex w-full min-w-0 items-center">
       <Icon name="search" className="pointer-events-none absolute left-3 text-muted-foreground" />
@@ -393,9 +393,9 @@ export function Search({ placeholder, value, onChange }: { placeholder: string; 
 /** A select for long lists (DD-A03 search-selects): the shadcn/ui Combobox. Typing narrows the options, the first
 `limit` matches are listed, the arrow keys and Enter choose one and Escape closes; closed, it shows the chosen
 option. `label` names the input and its list. */
-export function SearchSelect({ value, onChange, options, label, placeholder, limit = 20, className }: {
+export function SearchSelect({ value, onChange, options, label, placeholder, limit = 20, className }: Readonly<{
   value: string; onChange: (id: string) => void; options: { id: string; label: string }[]; label: string; placeholder?: string; limit?: number; className?: string;
-}) {
+}>) {
   const t = useT();
   const [query, setQuery] = useState("");
   const current = options.find((o) => o.id === value) ?? null;
@@ -428,7 +428,7 @@ inside, Escape or a press outside closes it, and focus returns to what had it be
 `finalFocus` returns, where the dialog's own action takes the trigger away (a removed row, IR612). That element
 itself takes the focus, also a list region outside the Tab order: Base UI would pass it on to the region's first
 control, another row's button (IR620). */
-export function Modal({ open, title, onClose, children, footer, wide, finalFocus }: { open: boolean; title: string; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode; wide?: boolean; finalFocus?: () => HTMLElement | true | null }) {
+export function Modal({ open, title, onClose, children, footer, wide, finalFocus }: Readonly<{ open: boolean; title: string; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode; wide?: boolean; finalFocus?: () => HTMLElement | true | null }>) {
   const t = useT();
   const popup = useRef<HTMLDivElement>(null);
   const firstStop = () => {
@@ -464,7 +464,7 @@ const ToastCtx = createContext<(msg: string, tone?: Tone) => void>(() => {});
 export const useToast = () => useContext(ToastCtx);
 /** The toasts: shadcn/ui's Sonner. Sonner announces through one polite region, so an error carries its text in an alert
 (announced at once) and every other result in a status (UX-06, IR362). */
-export function ToastProvider({ children }: { children: React.ReactNode }) {
+export function ToastProvider({ children }: Readonly<{ children: React.ReactNode }>) {
   const push = useCallback((msg: string, tone: Tone = "ok") => {
     const body = <span role={tone === "crit" ? "alert" : "status"}>{msg}</span>;
     switch (tone) {
@@ -505,11 +505,11 @@ function Cell<T>({ render, row }: { render: (r: T) => React.ReactNode; row: T })
 }
 /** Responsive table: scrolls horizontally if needed; optional columns hide on narrow containers. A row that opens a
 record (`onRowClick`) is focusable and opens with Enter or Space as well as a click (keyboard access, IR294). */
-export function DataTable<T extends RowData>({ cols, rows, rowKey, onRowClick, selectedKey }: { cols: Col<T>[]; rows: T[]; rowKey: (r: T) => string; onRowClick?: (r: T) => void; selectedKey?: string }) {
+export function DataTable<T extends RowData>({ cols, rows, rowKey, onRowClick, selectedKey }: Readonly<{ cols: Col<T>[]; rows: T[]; rowKey: (r: T) => string; onRowClick?: (r: T) => void; selectedKey?: string }>) {
   const t = useT();
   const columns = cols.map((c): ColumnDef<typeof tableFx, T> => ({ id: c.key, header: c.label, meta: { className: c.className, hideBelow: c.hideBelow } }));
   const renders = new Map(cols.map((c) => [c.key, c.render]));
-  const table = useTable({ features: tableFx, data: rows, columns, getRowId: (r) => rowKey(r) });
+  const table = useTable({ features: tableFx, data: rows, getRowId: (r) => rowKey(r), columns });
   return (
     <div className="overflow-hidden rounded-xl border">
       <Table className="text-[13px]">
@@ -562,11 +562,11 @@ export function ListRow({ id, selected, onClick, href, children, className }: { 
 /* ───────────── Charts: shadcn/ui's chart on Recharts (DEC-75); full width, `height` pixels tall ───────────── */
 const axisTick = { fontSize: 10 };
 /** Grouped bars, one group per label. `names` name the series in the tooltip and the legend under the chart. */
-export function BarChart({ labels, series, names, unit, height = 160, colors = ["#c9d8ee", "#005bea"] }: { labels: string[]; series: number[][]; names?: string[]; unit?: string; height?: number; colors?: string[] }) {
+export function BarChart({ labels, series, names, unit, height = 160, colors = ["#c9d8ee", "#005bea"] }: Readonly<{ labels: string[]; series: number[][]; names?: string[]; unit?: string; height?: number; colors?: string[] }>) {
   const t = useT();
   const max = Math.max(1, ...series.flat()) * 1.1;
-  const data = labels.map((label, i) => ({ label, ...Object.fromEntries(series.map((s, j) => [`s${j}`, s[i]])) }));
-  const config: ChartConfig = Object.fromEntries(series.map((_, j) => [`s${j}`, { label: names?.[j] ?? t("Value"), color: colors[j % colors.length] }]));
+  const data = labels.map((label, i) => ({ label, ...Object.fromEntries(series.map((s, j) => [`s${String(j)}`, s[i]])) }));
+  const config: ChartConfig = Object.fromEntries(series.map((_, j) => [`s${String(j)}`, { label: names?.[j] ?? t("Value"), color: colors[j % colors.length] }]));
   return (
     <ChartContainer config={config} className="aspect-auto w-full" style={{ height: height + (names ? 28 : 0) }}>
       <RBarChart data={data} margin={{ top: unit ? 14 : 6, right: 4, bottom: 0, left: 0 }} title={t("Bar chart")}>
@@ -576,7 +576,7 @@ export function BarChart({ labels, series, names, unit, height = 160, colors = [
         {unit && <text x="100%" y={10} dx={-2} textAnchor="end" fontSize={10} className="fill-muted-foreground">{unit}</text>}
         <ChartTooltip cursor={false} content={<ChartTooltipContent labelFormatter={(v) => (unit ? <>{v} <span className="font-normal text-muted-foreground">· {unit}</span></> : v)} />} />
         {names && <ChartLegend content={<ChartLegendContent />} />}
-        {series.map((_, j) => <Bar key={j} dataKey={`s${j}`} fill={`var(--color-s${j})`} radius={2} isAnimationActive={false} />)}
+        {series.map((_, j) => <Bar key={j} dataKey={`s${String(j)}`} fill={`var(--color-s${String(j)})`} radius={2} isAnimationActive={false} />)}
       </RBarChart>
     </ChartContainer>
   );
@@ -584,7 +584,7 @@ export function BarChart({ labels, series, names, unit, height = 160, colors = [
 
 /** A line chart; null points are gaps, never joined (a value between two gaps is a dot). `labels` spread evenly under
 the chart, `ticks` draw gridlines with their values, `shadeGaps` shades the gaps; `name` names the value in the tooltip. */
-export function LineChart({ points, min, max, threshold, height = 120, color = "var(--color-primary)", labels, ticks, shadeGaps, name }: { points: (number | null)[]; min?: number; max?: number; threshold?: number; height?: number; color?: string; labels?: string[]; ticks?: number[]; shadeGaps?: boolean; name?: string }) {
+export function LineChart({ points, min, max, threshold, height = 120, color = "var(--color-primary)", labels, ticks, shadeGaps, name }: Readonly<{ points: (number | null)[]; min?: number; max?: number; threshold?: number; height?: number; color?: string; labels?: string[]; ticks?: number[]; shadeGaps?: boolean; name?: string }>) {
   const t = useT();
   const vals = points.filter((p): p is number => p !== null);
   const lo = min ?? Math.min(...vals, threshold ?? Infinity);
@@ -618,7 +618,7 @@ export function LineChart({ points, min, max, threshold, height = 120, color = "
 }
 
 /** A progress bar (shadcn/ui's Progress); `label` names it for assistive technology (WCAG 4.1.2, IR359). */
-export function UtilBar({ pct, tone = "primary", label }: { pct: number | null; tone?: Tone; label?: string }) {
+export function UtilBar({ pct, tone = "primary", label }: Readonly<{ pct: number | null; tone?: Tone; label?: string }>) {
   return (
     <Progress value={pct} aria-label={label}
       className={cx("*:data-[slot=progress-track]:h-2", tone === "ok" ? "**:data-[slot=progress-indicator]:bg-ok" : tone === "warn" ? "**:data-[slot=progress-indicator]:bg-warn" : tone === "crit" ? "**:data-[slot=progress-indicator]:bg-crit" : undefined)} />

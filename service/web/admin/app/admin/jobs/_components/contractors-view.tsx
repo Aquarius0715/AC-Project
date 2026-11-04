@@ -24,7 +24,7 @@ type ModalState = null | { kind: "profile"; organizationId: string | null } | { 
 
 /** HQ contractor register (FR-A21, DD-A21, Figma Admin 06-9) from the Core API. Texts in the display language; the
 register's dates are Kuala Lumpur days, typed and shown so, and said so in another display time zone (IR291). */
-export function ContractorsView({ live }: { live: ContractorsLive }) {
+export function ContractorsView({ live }: Readonly<{ live: ContractorsLive }>) {
   const t = useT();
   const [modal, setModal] = useState<ModalState>(null);
   const [result, setResult] = useState<{ tone: "ok" | "crit" | "warn"; text: string } | null>(null);
@@ -47,7 +47,7 @@ export function ContractorsView({ live }: { live: ContractorsLive }) {
           )}
           <p className="mt-2 text-[11px] text-muted-foreground">{t("Contractor companies are partners, not users — HQ adds their staff in Access & roles, and their contractors in the partner app's Users.")}</p>
         </Card>
-        {d ? <ContractorDetail key={`${d.org.id}:${d.profile?.version ?? 0}`} d={d} open={setModal} /> : <Card title={t("Contractor")}><p className="text-[13px] text-muted-foreground">{t("missing" in live ? "That contractor no longer exists." : "Pick a contractor.")}</p></Card>}
+        {d ? <ContractorDetail key={`${d.org.id}:${String(d.profile?.version ?? 0)}`} d={d} open={setModal} /> : <Card title={t("Contractor")}><p className="text-[13px] text-muted-foreground">{t("missing" in live ? "That contractor no longer exists." : "Pick a contractor.")}</p></Card>}
       </div>
       {modal?.kind === "profile" && <ProfileModal live={live} d={d} organizationId={modal.organizationId} onClose={close} onFail={fail} />}
       {modal?.kind === "status" && d?.profile && <StatusModal d={d} onClose={close} onFail={fail} />}
@@ -58,7 +58,7 @@ export function ContractorsView({ live }: { live: ContractorsLive }) {
   );
 }
 
-function ContractorDetail({ d, open }: { d: Detail; open: (m: ModalState) => void }) {
+function ContractorDetail({ d, open }: Readonly<{ d: Detail; open: (m: ModalState) => void }>) {
   const i = useI18n(), { t } = i;
   const p = d.profile;
   const r = d.rates;
@@ -187,7 +187,7 @@ function RatesModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now: 
   const save = () => {
     setTried(true);
     if (Object.keys(errors).length > 0) return;
-    run(() => saveRateCard({ contractorOrgId: d.org.id, effectiveFrom: effectiveFrom!, currency, lines: chosen.map((l) => ({ workType: l.workType, amountMinor: Math.round(Number(l.amount) * 100), note: l.note.trim() || null })) }),
+    run(() => saveRateCard({ contractorOrgId: d.org.id, effectiveFrom: effectiveFrom!, lines: chosen.map((l) => ({ workType: l.workType, amountMinor: Math.round(Number(l.amount) * 100), note: l.note.trim() || null })), currency }),
       t("Rate card saved"), () => { onClose(t("Rate card v{v} saved — effective from {date}.", { v: d.rates.nextVersion, date: businessDay(effectiveFrom!, i.display.locale) })); }, onFail);
   };
   return (

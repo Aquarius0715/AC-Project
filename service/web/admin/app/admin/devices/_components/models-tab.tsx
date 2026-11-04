@@ -18,12 +18,12 @@ const toggle = <T,>(xs: T[], x: T, on: boolean) => (on ? [...new Set([...xs, x])
 /** Models: the capability register and editor (DD-A04). Saving an existing model writes the next capability version
 and moves its units to it; the version history is audit.list of the capability, read on explicit open. Texts in the
 display language; metric codes stay codes (IR295). */
-export function ModelsTab({ live }: { live: DevicesLive }) {
+export function ModelsTab({ live }: Readonly<{ live: DevicesLive }>) {
   const i = useI18n(), { t } = i;
   const [pending, run] = useAction();
   const [selId, setSelId] = useState<string | "new">(live.models[0]?.id ?? "new");
   const sel = selId === "new" ? null : live.models.find((m) => m.id === selId) ?? live.models[0] ?? null;
-  const key = sel ? `${sel.id}:${sel.version}` : "new";
+  const key = sel ? `${sel.id}:${String(sel.version)}` : "new";
   const [source, setSource] = useState(key);
   const [d, setD] = useState<CapabilityDraft>(capabilityDraft(sel?.cap));
   const [tried, setTried] = useState(false);
@@ -118,7 +118,7 @@ export function ModelsTab({ live }: { live: DevicesLive }) {
             {err("firmware") && <p className="mt-1 flex items-center gap-1 text-xs text-crit"><Icon name="error" />{err("firmware")}</p>}
           </section>
           {sel && <section className="rounded-xl bg-surface2 p-3"><h3 className="mb-1 text-[13px] font-bold">{t("Impact of this change")}</h3><ul className="list-disc pl-5 text-xs"><li>{t(units.length === 1 ? "1 unit{list} moves to capability version {v}" : "{n} units{list} move to capability version {v}", { n: units.length, list: units.length > 0 ? ` — ${units.map((u) => u.label).join(", ")}` : "", v: sel.version + 1 })}</li><li>{t("Automation rules that no longer fit are disabled, with the reason that the capabilities changed")}</li><li>{t("Unfinished commands keep their original content")}</li></ul></section>}
-          {sel && <Field label={t("Change reason · required for updates")} error={err("changeReason")} hint={`${d.changeReason.length} / 1000`}><Textarea value={d.changeReason} maxLength={1000} onChange={(e) => { set({ changeReason: e.target.value }); }} placeholder={t("Vendor bulletin: ventilation High not verified on the current batch.")} /></Field>}
+          {sel && <Field label={t("Change reason · required for updates")} error={err("changeReason")} hint={`${String(d.changeReason.length)} / 1000`}><Textarea value={d.changeReason} maxLength={1000} onChange={(e) => { set({ changeReason: e.target.value }); }} placeholder={t("Vendor bulletin: ventilation High not verified on the current batch.")} /></Field>}
           {live.canWrite && (
             <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-3">
               {sel && <span className="mr-auto text-[12px] text-muted-foreground">{isDirty ? `${t(changes.length === 1 ? "1 change" : "{n} changes", { n: changes.length })} · ${changes.join(", ")}` : t("No unsaved changes")}</span>}
@@ -130,7 +130,7 @@ export function ModelsTab({ live }: { live: DevicesLive }) {
         </div>
       </Card>
       <Modal open={history !== null} onClose={() => { setHistory(null); }} title={t("Version history · {name}", { name: sel?.name ?? "" })} footer={<Btn onClick={() => { setHistory(null); }}>{t("Close")}</Btn>}>
-        {history && history.length === 0 ? <p className="text-xs text-muted-foreground">{t("No saved versions in the last 12 months.")}</p> : <Timeline items={(history ?? []).map((h) => ({ time: showTime(h.at, i.display), title: `v${h.from ?? "—"} → v${h.to ?? "—"}${h.reason ? ` — ${h.reason}` : ""}`, detail: `${h.actor}${h.changes.length > 0 ? ` · ${t("changed {fields}", { fields: h.changes.join(", ") })}` : ""}` }))} />}
+        {history && history.length === 0 ? <p className="text-xs text-muted-foreground">{t("No saved versions in the last 12 months.")}</p> : <Timeline items={(history ?? []).map((h) => ({ time: showTime(h.at, i.display), title: `v${String(h.from ?? "—")} → v${String(h.to ?? "—")}${h.reason ? ` — ${h.reason}` : ""}`, detail: `${h.actor}${h.changes.length > 0 ? ` · ${t("changed {fields}", { fields: h.changes.join(", ") })}` : ""}` }))} />}
         <p className="text-[11px] text-muted-foreground">{t("From the audit log (audit.read); values are masked as recorded.")}</p>
       </Modal>
     </div>

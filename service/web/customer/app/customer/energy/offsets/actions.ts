@@ -24,7 +24,7 @@ export async function getQuote(input: { purpose: string; amountKg: number; perio
 /** offsets.simulate request: records a demo request for the quote (an expired or changed quote is CONFLICT). */
 export async function requestOffset(quoteId: string, quoteVersion: number): Promise<ActionResult<ApiOffsetRecord>> {
   try {
-    return { ok: true, value: await coreOp("offsets.simulate", { event: "request", quoteId, quoteVersion, demoConfirmed: true }, { write: true }) };
+    return { ok: true, value: await coreOp("offsets.simulate", { event: "request", demoConfirmed: true, quoteId, quoteVersion }, { write: true }) };
   } catch (error) {
     return failure(error);
   } finally {

@@ -127,9 +127,13 @@ export function noticeUnits(r: ApiRestriction, unit: (id: string) => UnitPlace |
     const n = unit(u.unitId);
     const release = releaseText[u.releaseState];
     return {
-      unitId: u.unitId, name: n ? `${n.name}${n.place ? ` · ${n.place}` : ""}` : u.unitId.slice(0, 8), apply: applyText[u.applyState] ? t(applyText[u.applyState]) : u.applyState,
-      release: release === undefined ? u.releaseState : release && t(release), releaseTone: u.releaseState === "released" ? "ok" : (u.releaseState === "failed" ? "crit" : "primary"),
-      note, tone: u.releaseState === "released" ? "ok" : u.applyState === "sent_unknown" ? "unknown" : u.applyState === "applied" ? "warn" : "primary",
+      unitId: u.unitId,
+      name: n ? `${n.name}${n.place ? ` · ${n.place}` : ""}` : u.unitId.slice(0, 8),
+      apply: applyText[u.applyState] ? t(applyText[u.applyState]) : u.applyState,
+      release: release === undefined ? u.releaseState : release && t(release),
+      releaseTone: u.releaseState === "released" ? "ok" : (u.releaseState === "failed" ? "crit" : "primary"),
+      tone: u.releaseState === "released" ? "ok" : u.applyState === "sent_unknown" ? "unknown" : u.applyState === "applied" ? "warn" : "primary",
+      note,
     };
   });
 }

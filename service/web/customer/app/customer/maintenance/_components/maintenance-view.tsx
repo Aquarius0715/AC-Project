@@ -29,7 +29,7 @@ const threeRows = (now: number, tz: string, start = 2): Row[] => [0, 1, 2].map((
 
 /** Customer maintenance (FR-C09, FR-C17, FR-C18, Figma Client 07a–07p) from the Core API. The tab is in the URL (tab=
 filter-care): the server reads only what the shown tab needs. */
-export function MaintenanceView({ live }: { live: MaintenanceLive }) {
+export function MaintenanceView({ live }: Readonly<{ live: MaintenanceLive }>) {
   const t = useT();
   const router = useRouter();
   const [going, startGo] = useTransition();
@@ -85,7 +85,7 @@ export function MaintenanceView({ live }: { live: MaintenanceLive }) {
               {shown.length === 0 && <p className="rounded-xl border border-line bg-surface p-4 text-center text-xs text-muted-foreground">{t(live.rows.length > 0 ? "No requests in this filter." : "No requests yet — “+ New maintenance request” asks HQ for a visit.")}</p>}
               <p className="text-[11px] text-muted-foreground">{t("“Scheduled” = a time is confirmed: one of your 3 preferred times, or a new time you accepted. Periodic plan visits are scheduled from your maintenance plan.")}</p>
             </div>
-            {d ? <JobDetail key={`${d.job.id}:${d.job.version}`} d={d} open={setModal} onDone={close} onFail={fail} />
+            {d ? <JobDetail key={`${d.job.id}:${String(d.job.version)}`} d={d} open={setModal} onDone={close} onFail={fail} />
               : ("missing" in live ? <Card title={t("Request")}><p className="text-[13px] text-muted-foreground">{t("That request no longer exists in your account.")}</p></Card> : null)}
           </div>
         </>
@@ -103,7 +103,7 @@ export function MaintenanceView({ live }: { live: MaintenanceLive }) {
 
 type Done = (text?: string, tone?: "ok" | "warn") => void;
 
-function JobDetail({ d, open, onDone, onFail }: { d: Detail; open: (m: ModalKind) => void; onDone: Done; onFail: (f: ActionFailure) => void }) {
+function JobDetail({ d, open, onDone, onFail }: Readonly<{ d: Detail; open: (m: ModalKind) => void; onDone: Done; onFail: (f: ActionFailure) => void }>) {
   const t = useT();
   const j = d.job;
   const [pending, run] = useAction();
@@ -177,7 +177,7 @@ interface ModalProps { onClose: Done; onFail: (f: ActionFailure) => void }
 /** Three preferred times: date, from, to (each 1–4 h, from tomorrow, all different — IR113). */
 // One group for the times: its error describes the group, which names it when focus enters (IR573); `firstId` lets a
 // failed submit focus the first date.
-function TimesInput({ rows, onChange, error, label, firstId }: { rows: Row[]; onChange: (r: Row[]) => void; error?: string | null; label?: string; firstId?: string }) {
+function TimesInput({ rows, onChange, error, label, firstId }: Readonly<{ rows: Row[]; onChange: (r: Row[]) => void; error?: string | null; label?: string; firstId?: string }>) {
   const t = useT();
   const { timeZone } = useDisplay();
   const titleId = useId(), errorId = useId();
@@ -224,13 +224,13 @@ function NewRequest({ live, prefill, onClose, onFail }: ModalProps & { live: Mai
       requestAnimationFrame(() => document.getElementById(bad)?.focus());
       return;
     }
-    run(() => createRequest({ unitId, type, symptom: sym, slots, contactWindow: contact }), t("Request sent"), (v) => { onClose(t("Request {job} sent with 3 preferred times — nothing is booked until a time is confirmed.", { job: v.id.slice(0, 8) })); router.push(`/customer/maintenance?jobId=${v.id}`); }, onFail);
+    run(() => createRequest({ unitId, type, slots, symptom: sym, contactWindow: contact }), t("Request sent"), (v) => { onClose(t("Request {job} sent with 3 preferred times — nothing is booked until a time is confirmed.", { job: v.id.slice(0, 8) })); router.push(`/customer/maintenance?jobId=${v.id}`); }, onFail);
   };
   return (
     <Modal open wide onClose={() => { onClose(); }} title={t("New maintenance request")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={submit}>{t("Submit request")}</Btn></>}>
       <Field label={t("Unit")}><Select id={ids.unit} value={unitId} onChange={(e) => { setUnitId(e.target.value); }}>{live.units.map((u) => <option key={u.id} value={u.id}>{u.name}{u.place ? ` · ${u.place}` : ""}</option>)}</Select></Field>
       <Field label={t("Type")}><Choice value={type} onChange={setType} options={[{ id: "reactive", label: t("Repair") }, { id: "preventive", label: t("Preventive") }]} /></Field>
-      <Field label={t("Symptoms (10–2000 characters)")} error={tried ? symErr ?? undefined : undefined} hint={`${symptomLength(sym)} / 2000`}><Textarea id={ids.sym} value={sym} onChange={(e) => { setSym(e.target.value); }} placeholder={t("Cold air is weak and there is water dripping from the indoor unit.")} /></Field>
+      <Field label={t("Symptoms (10–2000 characters)")} error={tried ? symErr ?? undefined : undefined} hint={`${String(symptomLength(sym))} / 2000`}><Textarea id={ids.sym} value={sym} onChange={(e) => { setSym(e.target.value); }} placeholder={t("Cold air is weak and there is water dripping from the indoor unit.")} /></Field>
       <TimesInput rows={rows} onChange={setRows} error={tried ? slotErr : null} firstId={ids.times} />
       <Field label={t("Contact window (optional)")} hint={t("Use HH:mm for times (example: Weekdays 09:00-18:00) — no phone numbers or e-mail addresses")} error={tried ? cErr ?? undefined : undefined}><Input id={ids.contact} value={contact} maxLength={200} onChange={(e) => { setContact(e.target.value); }} /></Field>
       <Banner>{t("Nothing is booked yet — you will see “Scheduled” once a time is confirmed. Any time outside your 3 options needs your approval.")}</Banner>
@@ -253,7 +253,7 @@ function DeclineModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now
   const send = () => {
     setTried(true);
     if (err || comment.length > 1000) return;
-    run(() => respondProposal(j.id, j.version, d.proposal!.id, { decision: "decline", declineReason: reason, comment, slots: give ? slots : [] }), t("Declined"), () => { onClose(t(give ? "Declined — HQ looks at your 3 new times." : "Declined — HQ will look again."), "warn"); }, onFail);
+    run(() => respondProposal(j.id, j.version, d.proposal!.id, { decision: "decline", declineReason: reason, slots: give ? slots : [], comment }), t("Declined"), () => { onClose(t(give ? "Declined — HQ looks at your 3 new times." : "Declined — HQ will look again."), "warn"); }, onFail);
   };
   return (
     <Modal open wide onClose={() => { onClose(); }} title={t("Decline the proposed time")} footer={<><Btn onClick={() => { onClose(); }}>{t("Back")}</Btn><Btn variant="primary" disabled={pending} onClick={send}>{t(give ? "Decline & send new times" : "Decline")}</Btn></>}>
@@ -351,7 +351,7 @@ function NoteModal({ d, onClose, onFail }: ModalProps & { d: Detail }) {
   const isBad = !text.trim() || text.length > 2000;
   return (
     <Modal open onClose={() => { onClose(); }} title={t("Add a note for {job}", { job: j.id.slice(0, 8) })} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (isBad) return; run(() => addNote(j.id, j.version, text), t("Note sent"), () => { onClose(t("Note sent — HQ, the service partner and the technician can read it.")); }, onFail); }}>{t("Send note")}</Btn></>}>
-      <Field label={t("Note to the HQ coordinator (1–2000 characters)")} error={tried && isBad ? t("Write 1–2000 characters") : undefined} hint={`${text.length} / 2000`}><Textarea value={text} maxLength={2000} onChange={(e) => { setText(e.target.value); }} placeholder={t("Please call 30 minutes before arriving — the gate code changed to 4821.")} /></Field>
+      <Field label={t("Note to the HQ coordinator (1–2000 characters)")} error={tried && isBad ? t("Write 1–2000 characters") : undefined} hint={`${String(text.length)} / 2000`}><Textarea value={text} maxLength={2000} onChange={(e) => { setText(e.target.value); }} placeholder={t("Please call 30 minutes before arriving — the gate code changed to 4821.")} /></Field>
       <Banner>{t("A note can’t change the visit time or the technician. To move the visit, write it here — HQ sends you a new time to accept. Notes are kept in the job history.")}</Banner>
     </Modal>
   );

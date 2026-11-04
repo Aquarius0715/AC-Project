@@ -90,5 +90,5 @@ export function coreRequest(operation: string, input: unknown): CoreRequest | nu
     const qs = q.toString();
     return { method: route.method, path: qs ? `${path}?${qs}` : path };
   }
-  return { method: route.method, path, body: JSON.stringify(rest) };
+  return { method: route.method, body: JSON.stringify(rest), path };
 }

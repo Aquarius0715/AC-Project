@@ -26,7 +26,7 @@ const refusal = (f: ActionFailure, t: T): string | null => {
 /** Payout statements of the company (FR-P10): approved and paid statements only, lines priced by the rate card,
 questions to HQ on a line; corrections come back as adjustments on the next statement. Texts in the user's display
 language; the dates come formatted from the loader (IR279). */
-export function PayoutsView({ live }: { live: PayoutsLive }) {
+export function PayoutsView({ live }: Readonly<{ live: PayoutsLive }>) {
   const t = useT();
   const locale = useLocale();
   const nav = useUrlPatch();

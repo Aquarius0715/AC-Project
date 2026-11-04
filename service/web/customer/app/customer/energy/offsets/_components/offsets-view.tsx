@@ -20,7 +20,7 @@ const stateTone = { demo_requested: "primary", demo_purchased: "primary", demo_r
 
 /** Carbon offsets (FR-C13) in API mode: a demo quote (offsets.preview, no record) and a demo request (offsets.simulate
 request) for the energy selection. Nothing real is bought or retired; savings never become a tradable balance. */
-export function OffsetsView({ live }: { live: Live }) {
+export function OffsetsView({ live }: Readonly<{ live: Live }>) {
   type Quote = ApiQuote & { estimatedAmountMinor: number | null; currency: string | null };
   const t = useT();
   const display = useDisplay();

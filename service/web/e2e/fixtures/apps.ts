@@ -11,7 +11,7 @@ export interface App {
   state: string;
 }
 
-const url = (name: string, port: number) => (process.env[name] ?? `http://localhost:${port}`).replace(/\/$/, "");
+const url = (name: string, port: number) => (process.env[name] ?? `http://localhost:${String(port)}`).replace(/\/$/, "");
 const state = (id: string) => path.resolve(__dirname, "../.auth", `${id}.json`);
 
 export const APPS: App[] = [

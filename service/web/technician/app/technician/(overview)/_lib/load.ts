@@ -39,16 +39,22 @@ export async function loadOverview(sp: { tab?: string; sort?: string }) {
   const today = rows.filter((r) => r.today);
   const klToday = new Date(nowMs + 8 * 3_600_000).toISOString().slice(0, 10);
   return {
-    now: now.toISOString(), tab, sort, sorts: SORTS.map((s) => ({ id: s.id, text: t("Sort: {sort}", { sort: t(s.text) }) })),
+    now: now.toISOString(),
+    sorts: SORTS.map((s) => ({ id: s.id, text: t("Sort: {sort}", { sort: t(s.text) }) })),
     title: tab === "today" ? t("Today — sorted by severity, deadline, progress") : t("All assigned — sorted by {sort}", { sort: t(spec.word) }),
     tabs: TABS.map((x) => ({ id: x.id, label: t(x.label), count: x.id === "today" ? today.length : rows.length })),
     kpis: kpis(summary.counts, rows, t),
     pending: rows.filter((r) => r.ackPending),
     rows: tab === "today" ? today : rows,
     readOnly: today.filter((r) => r.opensAt),
-    timeline: dayTimeline(rows, nowMs), todayRows: today, day: t("Today · {day}", { day: klDay(klToday, display.locale, true) }), otherZone: display.timeZone !== "Asia/Kuala_Lumpur",
+    timeline: dayTimeline(rows, nowMs),
+    todayRows: today,
+    day: t("Today · {day}", { day: klDay(klToday, display.locale, true) }),
+    otherZone: display.timeZone !== "Asia/Kuala_Lumpur",
     alerts: alertRows(alerts, names, jobOfUnit, i),
     reports: reportRows(rows, t),
+    tab,
+    sort,
   };
 }
 

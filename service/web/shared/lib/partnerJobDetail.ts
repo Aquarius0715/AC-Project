@@ -44,7 +44,7 @@ const STATUS_WORDS: Record<string, string> = {
 /** A job status inside a sentence (“the job is on hold”), in the display language. */
 export const statusWord = (status: string, t: T = en) => (STATUS_WORDS[status] ? t(STATUS_WORDS[status]) : status.replaceAll('_', " "));
 /** “1st”, “2nd”, “3rd”, “4th” … in English, “ke-1” in Malay. */
-export const ordinal = (n: number, locale: "en" | "ms" = "en") => (locale === "ms" ? `ke-${n}` : `${n}${n % 10 === 1 && n % 100 !== 11 ? "st" : n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th"}`);
+export const ordinal = (n: number, locale: "en" | "ms" = "en") => (locale === "ms" ? `ke-${String(n)}` : `${String(n)}${n % 10 === 1 && n % 100 !== 11 ? "st" : n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th"}`);
 
 /** Whether a member holds every required qualification, valid at the instant and not revoked. */
 export function qualified(m: ApiMember, required: string[], at: string): boolean {

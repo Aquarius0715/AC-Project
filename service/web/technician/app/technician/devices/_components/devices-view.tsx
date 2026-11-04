@@ -36,7 +36,7 @@ const dot: Record<string, string> = { ok: "bg-ok", crit: "bg-crit", warn: "bg-wa
 /** IoT devices of the technician's assigned units (FR-T11) and one device's events (FR-T12): every write runs under the
 unit's assigned job (IR94), one device operation at a time; events keep detection, evidence and response apart.
 Texts in the user's display language; the times come formatted from the loader (IR287). */
-export function TechDevicesView({ live }: { live: TechDevicesLive }) {
+export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
   const t = useT();
   const nav = useUrlPatch();
   const router = useRouter();

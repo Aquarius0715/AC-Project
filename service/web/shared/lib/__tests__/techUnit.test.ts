@@ -12,7 +12,7 @@ const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const NOW = Date.parse("2026-09-14T01:35:00Z"); // 09:35 in Kuala Lumpur
 const ALL = componentGroups.flatMap((g) => g.keys);
 const m = (metric: string, value: number | null, unit: string, quality = "valid", observedAt = "2026-09-14T01:35:00Z") =>
-  ({ id: metric, unitId: "u1", sensorId: "s", metric, value, unit, observedAt, origin: "measured", quality, qualityReason: null });
+  ({ id: metric, unitId: "u1", sensorId: "s", origin: "measured", qualityReason: null, metric, value, unit, observedAt, quality });
 const unit = {
   id: "unit-online-rto", displayName: "Bedroom AC", type: "split", connection: "online", lastSeenAt: "2026-09-14T01:34:00Z", installedAt: "2025-03-01T00:00:00Z", capabilityVersion: 3,
   serviceScope: ["indoor", "outdoor", "electrical"], components: ALL,
@@ -27,7 +27,7 @@ const alerts = [
   { id: "a2", unitId: "u1", type: "maintenance", severity: "normal", status: "resolved", causeCode: "unknown", evidenceKind: "inferred", evidenceText: "Cleaning due.", detectedAt: "2026-09-10T01:00:00Z", acknowledgedAt: null, resolvedAt: "2026-09-13T03:00:00Z", resolutionReason: "Filter cleaned" },
 ] as ApiAlert[];
 const ev = (id: string, eventType: ApiDeviceEventFull["eventType"], occurredAt: string, recovery: ApiDeviceEventFull["recovery"] = null) =>
-  ({ id, version: 1, deviceId: "d1", eventType, evidenceSource: "heartbeat", occurredAt, restoredAt: null, alertIds: [], recovery, responseNotes: [] }) as ApiDeviceEventFull;
+  ({ id, eventType, occurredAt, recovery, version: 1, deviceId: "d1", evidenceSource: "heartbeat", restoredAt: null, alertIds: [], responseNotes: [] }) as ApiDeviceEventFull;
 const jobs = [
   { projection: "summary", id: "job-contractor-a", version: 3, unitId: "u1", type: "reactive", status: "in_progress", severity: "warning", dueAt: "2026-09-15T00:00:00Z", requestedSlot: { startAt: "2026-09-14T02:00:00Z", endAt: "2026-09-14T04:00:00Z" }, scheduledSlot: { startAt: "2026-09-14T02:00:00Z", endAt: "2026-09-14T04:00:00Z" } },
   { projection: "history", jobId: "job-c01-0000", type: "preventive", status: "completed", completedAt: "2026-06-12T04:00:00Z" },

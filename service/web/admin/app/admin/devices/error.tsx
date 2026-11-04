@@ -2,6 +2,6 @@
 
 import { RouteError } from "@ac/web/components/RouteStates";
 
-export default function SegmentError({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
+export default function SegmentError({ error, retry }: Readonly<{ error: Error & { digest?: string }; retry: () => void }>) {
   return <RouteError what="Devices & models" error={error} retry={retry} />;
 }

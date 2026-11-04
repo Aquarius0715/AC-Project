@@ -145,12 +145,29 @@ export function policyRows(policies: ApiPolicy[], customers: ApiCustomerName[], 
       });
       const owner = p.ownerMembershipId ? member.get(p.ownerMembershipId) : undefined;
       return {
-        id: p.id, version: p.version, kind: p.kind, name: p.name, group: p.kind === "default_alert" ? t("DEFAULT · ON EVERY UNIT") : customerName.toUpperCase(),
-        sub, on: p.enabled, units: p.kind === "default_alert" ? t("every unit") : t(p.unitIds.length === 1 ? "1 unit" : "{n} units", { n: p.unitIds.length }),
-        customerId: p.customerId ?? null, customerName, priority: p.priority, timezone: p.timezone, metric: p.metric ?? "temperature", operator: op,
-        threshold: p.threshold ?? 0, recovery: p.recoveryThreshold ?? 0, duration: p.durationSeconds ?? 60, severity: p.severity ?? "warning",
-        cooldown: p.cooldownMinutes ?? 5, escalate: p.escalateAfterMinutes ?? 60, channels: p.channels ?? ["inApp"], recipients, activeWindow: p.activeWindow ?? null,
-        madeBy: owner?.displayName ?? "", unitIds: p.unitIds, unitNames: p.unitIds.map((id) => unitName.get(id) ?? id),
+        id: p.id,
+        version: p.version,
+        kind: p.kind,
+        name: p.name,
+        group: p.kind === "default_alert" ? t("DEFAULT · ON EVERY UNIT") : customerName.toUpperCase(),
+        on: p.enabled,
+        units: p.kind === "default_alert" ? t("every unit") : t(p.unitIds.length === 1 ? "1 unit" : "{n} units", { n: p.unitIds.length }),
+        customerId: p.customerId ?? null,
+        priority: p.priority,
+        timezone: p.timezone,
+        metric: p.metric ?? "temperature",
+        operator: op,
+        threshold: p.threshold ?? 0,
+        recovery: p.recoveryThreshold ?? 0,
+        duration: p.durationSeconds ?? 60,
+        severity: p.severity ?? "warning",
+        cooldown: p.cooldownMinutes ?? 5,
+        escalate: p.escalateAfterMinutes ?? 60,
+        channels: p.channels ?? ["inApp"],
+        activeWindow: p.activeWindow ?? null,
+        madeBy: owner?.displayName ?? "",
+        unitIds: p.unitIds,
+        unitNames: p.unitIds.map((id) => unitName.get(id) ?? id),
         rules: (p.rules ?? []).map((r) => {
           return {
             ruleKey: r.ruleKey, name: r.name, category: r.category ?? "", metric: r.metric ?? "", operator: r.operator ?? "gte", threshold: r.threshold ?? 0,
@@ -162,6 +179,9 @@ export function policyRows(policies: ApiPolicy[], customers: ApiCustomerName[], 
             ruleKey: x.ruleKey, customerId: x.customerId, enabled: x.enabled, version: x.version, reason: x.reason, by: member.get(x.changedByMembershipId)?.displayName ?? "", at: x.updatedAt,
           };
         }),
+        sub,
+        customerName,
+        recipients,
       };
     });
 }
@@ -182,9 +202,34 @@ priority 50; the condition of the Figma example (temperature ≥ 30 °C for 60 s
 notified yet. The owner is fixed once it is saved. */
 export function newPolicyDraft(customer: { id: string; name: string }, timezone: string, from?: DefaultRule): AdminPolicy {
   const draft: AdminPolicy = {
-    id: "", version: 0, kind: "alert", name: "", group: customer.name.toUpperCase(), sub: "", on: false, units: "", customerId: customer.id, customerName: customer.name,
-    priority: 50, timezone, metric: "temperature", operator: "gte", threshold: 30, recovery: 28, duration: 60, severity: "warning", cooldown: 5, escalate: 60,
-    channels: ["inApp"], recipients: [], activeWindow: null, madeBy: "", unitIds: [], unitNames: [], rules: [], settings: [],
+    id: "",
+    version: 0,
+    kind: "alert",
+    name: "",
+    group: customer.name.toUpperCase(),
+    sub: "",
+    on: false,
+    units: "",
+    customerId: customer.id,
+    customerName: customer.name,
+    priority: 50,
+    metric: "temperature",
+    operator: "gte",
+    threshold: 30,
+    recovery: 28,
+    duration: 60,
+    severity: "warning",
+    cooldown: 5,
+    escalate: 60,
+    channels: ["inApp"],
+    recipients: [],
+    activeWindow: null,
+    madeBy: "",
+    unitIds: [],
+    unitNames: [],
+    rules: [],
+    settings: [],
+    timezone,
   };
   // “Copy as a <customer> policy →” (DD-A05 item 9): the rule's name and condition, for a metric a policy may watch
   if (!from || !copyable(from)) return draft;

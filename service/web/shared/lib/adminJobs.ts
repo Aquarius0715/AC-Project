@@ -307,9 +307,9 @@ export function newJobErrors(f: { unitId: string; symptom: string; slots: Slot[]
   for (const [i, x] of f.slots.entries()) {
     const h = (Date.parse(x.endAt) - Date.parse(x.startAt)) / 3_600_000;
     const day = new Date(Date.parse(x.startAt) + 8 * 3_600_000).toISOString().slice(0, 10);
-    if (!(h >= 1 && h <= 4)) e[`slot${i}`] = t("Each time is 1–4 hours long.");
-    else if (day <= today) e[`slot${i}`] = t("Times start on a later day than today (Kuala Lumpur).");
-    else if (keys.has(x.startAt + x.endAt)) e[`slot${i}`] = t("The times must differ.");
+    if (!(h >= 1 && h <= 4)) e[`slot${String(i)}`] = t("Each time is 1–4 hours long.");
+    else if (day <= today) e[`slot${String(i)}`] = t("Times start on a later day than today (Kuala Lumpur).");
+    else if (keys.has(x.startAt + x.endAt)) e[`slot${String(i)}`] = t("The times must differ.");
     keys.add(x.startAt + x.endAt);
   }
   return e;
@@ -356,7 +356,7 @@ export function reportCard(j: ApiHqJob, r: ApiWorkReport, byUser: Map<string, st
     // Figma 06-1 “Items that need rework”: the items needing attention (ticked), the readings, and the photos (shared with
     // the contractor's dialog, IR609)
     rework: reworkItems(inspectionRows(r.items, t, r.attachmentRefs), readings, photos, t),
-    parts: [...r.parts.map((p): [string, string] => [`${p.name} × ${p.quantity}`, `${p.source.replaceAll('_', " ")}${p.replacesComponentKey ? ` · ${t("replaces {part}", { part: p.replacesComponentKey.replaceAll('_', " ") })}` : ""}`]),
+    parts: [...r.parts.map((p): [string, string] => [`${p.name} × ${String(p.quantity)}`, `${p.source.replaceAll('_', " ")}${p.replacesComponentKey ? ` · ${t("replaces {part}", { part: p.replacesComponentKey.replaceAll('_', " ") })}` : ""}`]),
       ...r.refrigerant.map((x): [string, string] => [t("{refrigerant} · cylinder {id}", { refrigerant: x.refrigerant, id: x.cylinderId }), t("recovered {recovered} kg · charged {charged} kg · leak check {check}", { recovered: x.recoveredKg, charged: x.chargedKg, check: x.leakCheck.replaceAll('_', " ") })])],
     next: r.nextAction?.kind === "follow_up" ? t("Follow-up {date} — {note}", { date: r.nextAction.date.slice(0, 10), note: r.nextAction.note }) : t("No follow-up needed"),
     signOff: r.signOff ? (r.signOff.absentReason ? t("Customer absent — {reason}", { reason: r.signOff.absentReason }) : t("Signed by {name} {time}", { name: r.signOff.signerName, time: showTime(r.signOff.signedAt, display) })) : t("Not signed"),

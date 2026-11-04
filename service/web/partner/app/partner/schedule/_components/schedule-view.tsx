@@ -21,7 +21,7 @@ const cellTone: Record<WeekCell["kind"], string> = {
 
 /** The contractor's schedule & assignments (FR-P03, Figma Contractor 03-1…03-10) from the Core API. Texts in the user's
 display language; the job's times come formatted from the loader, the team's week is in Kuala Lumpur time (IR275). */
-export function ScheduleView({ live }: { live: ScheduleLive }) {
+export function ScheduleView({ live }: Readonly<{ live: ScheduleLive }>) {
   const t = useT();
   const patch = useUrlPatch();
   const sel = live.selected;
@@ -60,7 +60,7 @@ export function ScheduleView({ live }: { live: ScheduleLive }) {
             {live.rows.map((r) => (
               <div key={r.id} className="border-t border-line py-2 first:border-0">
                 <div className="flex items-center justify-between gap-2 text-xs"><b>{r.short}</b><span className={cx("font-semibold", toneText[r.leftTone])}>{r.left}</span></div>
-                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface2"><div className={cx("h-full rounded-full", barTone[r.leftTone])} style={{ width: `${r.ended ? 100 : r.elapsedPct}%` }} /></div>
+                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface2"><div className={cx("h-full rounded-full", barTone[r.leftTone])} style={{ width: `${String(r.ended ? 100 : r.elapsedPct)}%` }} /></div>
                 <div className="mt-1 text-[11px] text-muted-foreground">{r.windowText}</div>
               </div>
             ))}
@@ -78,7 +78,7 @@ type Selected = NonNullable<ScheduleLive["selected"]>;
 interface Choice { tech: string; setTech: (v: string) => void; end: string; setEnd: (v: string) => void }
 
 /** The form and the week of the selected job share the chosen technician and end (the week's “This proposal”). */
-function Workspace({ sel, week, members, zone, otherZone }: { sel: Selected; week: ScheduleLive["week"]; members: ScheduleLive["members"]; zone: string; otherZone: boolean }) {
+function Workspace({ sel, week, members, zone, otherZone }: Readonly<{ sel: Selected; week: ScheduleLive["week"]; members: ScheduleLive["members"]; zone: string; otherZone: boolean }>) {
   const firstEligible = sel.candidates.find((c) => c.eligible && c.id !== sel.currentId) ?? sel.candidates.find((c) => c.eligible);
   const [tech, setTech] = useState(firstEligible?.id ?? "");
   const [end, setEnd] = useState(sel.text.end);
@@ -98,7 +98,7 @@ function proposed(sel: Selected, end: string, zone: string) {
   return sel.mode.kind === "extend" && endAt ? { startAt: sel.mode.slot.startAt, endAt } : sel.mode.slot;
 }
 
-function AssignCard({ sel, choice, zone, otherZone }: { sel: Selected; choice: Choice; zone: string; otherZone: boolean }) {
+function AssignCard({ sel, choice, zone, otherZone }: Readonly<{ sel: Selected; choice: Choice; zone: string; otherZone: boolean }>) {
   const t = useT();
   const m = sel.mode;
   const [pending, run] = useAction();
@@ -184,11 +184,11 @@ function AssignCard({ sel, choice, zone, otherZone }: { sel: Selected; choice: C
   );
 }
 
-function WeekCard({ week, members, sel, choice, zone }: { week: NonNullable<ScheduleLive["week"]>; members: ScheduleLive["members"]; sel: Selected; choice: Choice; zone: string }) {
+function WeekCard({ week, members, sel, choice, zone }: Readonly<{ week: NonNullable<ScheduleLive["week"]>; members: ScheduleLive["members"]; sel: Selected; choice: Choice; zone: string }>) {
   const t = useT();
   const slot = proposed(sel, choice.end, zone);
   const isUnchanged = choice.tech === sel.currentId && slot?.endAt === sel.mode.slot?.endAt; // the current booking, not a proposal
-  const proposal = slot && sel.mode.kind !== "blocked" && choice.tech && !isUnchanged ? { technicianId: choice.tech, slot, short: sel.short } : null;
+  const proposal = slot && sel.mode.kind !== "blocked" && choice.tech && !isUnchanged ? { technicianId: choice.tech, short: sel.short, slot } : null;
   const rows = weekGrid(week.dates, members, week.capacity, new Map(Object.entries(week.jobsOf)), proposal, t);
   return (
     <Card title={week.title} action={<Link href="/partner/team" className="text-xs font-semibold text-primary">{t("Team & capacity")} <Icon name="arrowRight" /></Link>}>

@@ -14,7 +14,7 @@ import { AdminOverviewView } from "./_components/overview-view";
 
 const quiet = <T,>(p: Promise<T>) => p.catch((error) => { if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return null; throw error; });
 
-export default async function AdminOverviewPage({ searchParams }: PageProps<"/admin">) {
+export default async function AdminOverviewPage({ searchParams }: Readonly<PageProps<"/admin">>) {
   await connection();
   if (!apiMode()) return <AdminOverviewDemo />;
   const sp = await searchParams;
@@ -44,8 +44,15 @@ export default async function AdminOverviewPage({ searchParams }: PageProps<"/ad
   const waiting = (await waitingPage)?.total ?? null;
   return (
     <AdminOverviewView live={{
-      period: { kind, from: period.from, to: period.to, error: period.error ?? null, label: period.label }, custom: { from: one("from") ?? "", to: one("to") ?? "" },
-      customers, customerId, properties, propertyId, summary, asOf: summary ? asOfText(summary.asOf ?? now.toISOString(), period.label, i) : null, waiting,
+      period: { kind, from: period.from, to: period.to, error: period.error ?? null, label: period.label },
+      custom: { from: one("from") ?? "", to: one("to") ?? "" },
+      asOf: summary ? asOfText(summary.asOf ?? now.toISOString(), period.label, i) : null,
+      customers,
+      customerId,
+      properties,
+      propertyId,
+      summary,
+      waiting,
     }} />
   );
 }

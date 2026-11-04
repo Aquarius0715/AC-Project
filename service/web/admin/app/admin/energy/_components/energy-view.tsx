@@ -27,7 +27,7 @@ const kpi = (label: string, value: string, sub: string, tone?: "ok" | "crit" | "
 /** Energy-saving analysis (FR-A13) in API mode: the scope, period and baseline live in the URL and the server reads
 energy.summary; baselines are listed for their scope and saved as new versions with a Server Action. Texts in the
 display language; periods are typed and shown in Kuala Lumpur time, which the labels name (IR296). */
-export function EnergyView({ live }: { live: EnergyLive }) {
+export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
   const t = useT();
   const nav = useUrlPatch();
   return (
@@ -38,7 +38,7 @@ export function EnergyView({ live }: { live: EnergyLive }) {
   );
 }
 
-function Analysis({ live, a }: { live: EnergyLive; a: NonNullable<EnergyLive["analysis"]> }) {
+function Analysis({ live, a }: Readonly<{ live: EnergyLive; a: NonNullable<EnergyLive["analysis"]> }>) {
   const t = useT();
   const nav = useUrlPatch();
   const units = live.units.filter((u) => !live.scope.customerId || u.customerId === live.scope.customerId);
@@ -89,13 +89,13 @@ function Analysis({ live, a }: { live: EnergyLive; a: NonNullable<EnergyLive["an
   );
 }
 
-function Baselines({ live, l }: { live: EnergyLive; l: NonNullable<EnergyLive["list"]> }) {
+function Baselines({ live, l }: Readonly<{ live: EnergyLive; l: NonNullable<EnergyLive["list"]> }>) {
   const t = useT();
   const nav = useUrlPatch();
   const [pending, run] = useAction();
   const [creating, setCreating] = useState(false);
   const sel = creating ? null : l.rows.find((r) => r.id === l.selectedId) ?? null;
-  const key = creating ? "new" : (sel ? `${sel.id}:${sel.version}` : "none");
+  const key = creating ? "new" : (sel ? `${sel.id}:${String(sel.version)}` : "none");
   const [source, setSource] = useState(key);
   const [d, setD] = useState<BaselineDraft>(baselineDraft(sel?.b));
   const [tried, setTried] = useState(false);

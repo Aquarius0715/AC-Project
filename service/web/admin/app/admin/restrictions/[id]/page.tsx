@@ -15,7 +15,7 @@ import { ExceptionDemo } from "./_components/exception-demo";
 import { ExceptionView } from "./_components/exception-view";
 
 
-export default async function AdminRestrictionPage({ params }: PageProps<"/admin/restrictions/[id]">) {
+export default async function AdminRestrictionPage({ params }: Readonly<PageProps<"/admin/restrictions/[id]">>) {
   interface Page<T> { items: T[] }
   await connection();
   const { id } = await params;
@@ -39,10 +39,15 @@ export default async function AdminRestrictionPage({ params }: PageProps<"/admin
   const audit = canAudit ? await coreOp<Page<ApiAudit>>("audit.list", { limit: 100, filters: { targetKind: "restriction", targetId: id, from, to }, sort: { field: "occurredAt", direction: "asc" } }) : null;
   return (
     <ExceptionView live={{
-      now: now.toISOString(), r, units: unitRows(r, new Map(units.items.map((u) => [u.id, u.displayName])), new Map(), i),
-      canWrite: perms.has("restriction.write"), canOverride: perms.has("restriction.override"), canAudit,
-      period: activePeriod(r, now, i), intent: intentText(r, i),
+      now: now.toISOString(),
+      units: unitRows(r, new Map(units.items.map((u) => [u.id, u.displayName])), new Map(), i),
+      canWrite: perms.has("restriction.write"),
+      canOverride: perms.has("restriction.override"),
+      period: activePeriod(r, now, i),
+      intent: intentText(r, i),
       audit: audit?.items.map((a) => auditItem(a, i)) ?? [],
+      r,
+      canAudit,
     }} />
   );
 }

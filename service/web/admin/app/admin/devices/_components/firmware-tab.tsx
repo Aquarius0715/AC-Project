@@ -20,7 +20,7 @@ const waveWord: Record<WaveState, [string, "ok" | "primary" | "warn" | "crit" | 
 pause / resume / abort / retry, and scheduling a new campaign (start at least 24 hours ahead). Texts in the display
 language; the start is typed and shown in the user's display time zone, the install window is the device's local
 time (IR295). */
-export function FirmwareTab({ live }: { live: DevicesLive }) {
+export function FirmwareTab({ live }: Readonly<{ live: DevicesLive }>) {
   const i = useI18n(), { t } = i, zone = i.display.timeZone;
   const nav = useUrlPatch();
   const [pending, run] = useAction();
@@ -61,7 +61,7 @@ export function FirmwareTab({ live }: { live: DevicesLive }) {
             const pct = inWave.length > 0 ? Math.round((ok * 100) / inWave.length) : 0;
             return <div key={w.label}><div className="mb-1 flex items-center justify-between gap-2 text-xs"><b>{t("Wave {n} · {percent} %", { n: n + 1, percent: w.percent })}</b><span className="flex items-center gap-2 text-muted-foreground">{t("{done} / {total} succeeded", { done: ok, total: inWave.length })}<Badge tone={chip}>{t(word)}</Badge></span></div><UtilBar pct={pct} tone={pct >= 95 ? "ok" : "primary"} label={t("Wave {n} · {percent} %", { n: n + 1, percent: w.percent })} /></div>;
           })}</div>
-          <div className="mt-3"><SummaryList items={[[t("Succeeded / installing / pending"), `${sel.c.progress.succeeded} / ${sel.c.progress.installing} / ${sel.c.progress.pending}`], [t("Failed"), t("{n} · failed devices keep their old version", { n: sel.c.progress.failed })], [t("Skipped"), t("{n} · busy, offline or tampered", { n: sel.c.progress.skipped })], ...(sel.c.reason ? [[t("Reason"), sel.c.reason] as [string, string]] : [])]} /></div>
+          <div className="mt-3"><SummaryList items={[[t("Succeeded / installing / pending"), `${String(sel.c.progress.succeeded)} / ${String(sel.c.progress.installing)} / ${String(sel.c.progress.pending)}`], [t("Failed"), t("{n} · failed devices keep their old version", { n: sel.c.progress.failed })], [t("Skipped"), t("{n} · busy, offline or tampered", { n: sel.c.progress.skipped })], ...(sel.c.reason ? [[t("Reason"), sel.c.reason] as [string, string]] : [])]} /></div>
           <h3 className="mb-1 mt-4 text-[13px] font-bold">{t("Devices")}</h3>
           <div className="flex flex-col gap-1">{sel.c.results.map((r) => <div key={r.deviceId} className="flex items-center justify-between gap-2 border-t border-line py-1.5 text-[13px]"><span className="min-w-0">{serial.get(r.deviceId) ?? r.deviceId.slice(0, 8)} <span className="text-xs text-muted-foreground">{t("wave {n}", { n: r.waveIndex + 1 })}{r.reasonKey ? ` · ${resultReason(r.reasonKey, t)}` : ""}</span></span><span className="flex shrink-0 items-center gap-2">{r.at && <span className="text-xs text-muted-foreground">{showTime(r.at, i.display)}</span>}<Badge tone={r.status === "succeeded" ? "ok" : r.status === "failed" ? "crit" : r.status === "skipped" ? "warn" : "muted"}>{t(resultWord[r.status] ?? r.status)}</Badge>{live.canWrite && (r.status === "failed" || r.status === "skipped") && ["running", "paused"].includes(sel.state) && <Btn size="sm" disabled={pending} onClick={() => control("retry_device", r.deviceId)}>{t("Retry")}</Btn>}</span></div>)}</div>
         </Card>

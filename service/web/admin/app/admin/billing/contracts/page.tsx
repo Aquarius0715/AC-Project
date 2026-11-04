@@ -18,7 +18,7 @@ export default async function AdminContractsPage(props: PageProps<"/admin/billin
   return withAccess("Contracts", ["contract.read", "asset.read"], () => AdminContractsPageContent(props));
 }
 
-async function AdminContractsPageContent({ searchParams }: PageProps<"/admin/billing/contracts">) {
+async function AdminContractsPageContent({ searchParams }: Readonly<PageProps<"/admin/billing/contracts">>) {
   await connection();
   if (!apiMode()) return <ContractsView />;
   const sp = await searchParams;

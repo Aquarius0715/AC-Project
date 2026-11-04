@@ -40,7 +40,7 @@ export async function loadSchedule(sp: { jobId?: string; sort?: string }) {
   const unitNames = new Map(units.map((u) => [u.id, u.displayName]));
   const rows = jobs.map((j) => scheduleRow(j, nowMs, unitNames, names, i)).filter((r): r is ScheduleRow => !!r);
   // a job whose delegation has ended reads as history and is not listed: nothing to assign there (IR624)
-  const base = { now: now.toISOString(), sort, sorts: SORTS.map((s) => ({ id: s.id, text: t(s.text) })), rows, members, zone: display.timeZone, otherZone: display.timeZone !== KL };
+  const base = { now: now.toISOString(), sorts: SORTS.map((s) => ({ id: s.id, text: t(s.text) })), zone: display.timeZone, otherZone: display.timeZone !== KL, sort, rows, members };
   const picked = rows.find((r) => r.id === sp.jobId) ?? rows[0];
   if (!picked) return { ...base, selected: null, week: null };
   const job = await coreOp<ApiPartnerJobDetail>("jobs.get", { jobId: picked.id }).catch((error) => {
@@ -69,19 +69,30 @@ export async function loadSchedule(sp: { jobId?: string; sort?: string }) {
     ...base,
     members: technicians, // the week's rows (IR624)
     selected: {
-      id: picked.id, short: picked.short, label, version: job.projection === "detail" ? job.version : job.jobVersion, mode, currentId,
+      id: picked.id,
+      short: picked.short,
+      version: job.projection === "detail" ? job.version : job.jobVersion,
       ack: job.projection === "detail" && job.assignment ? { status: job.assignment.acknowledgement, reason: job.assignment.cantMakeReason, alternative } : null,
-      window: picked.window, required, candidates: slot ? candidates(technicians, new Set(eligible), required, slot, day, currentId, t) : [],
+      window: picked.window,
+      candidates: slot ? candidates(technicians, new Set(eligible), required, slot, day, currentId, t) : [],
       text: {
         window: picked.window ? showSpan(picked.window.from, picked.window.until, display) : null,
         slot: slot ? showSpan(slot.startAt, slot.endAt, display) : null, start: slot ? showTime(slot.startAt, display) : null,
         end: slot ? local(slot.endAt) : "", alternative: alternative ? showSpan(alternative.startAt, alternative.endAt, display) : null,
       },
+      label,
+      mode,
+      currentId,
+      required,
     },
     week: {
-      from: week.from, dates, capacity, jobsOf: Object.fromEntries(booked) as Record<string, { short: string; slot: Slot }[]>,
-      title: t("Team schedule — week of {day}", { day: klDay(week.from, display.locale) }), today: klDate(now.toISOString()),
-      days: dates.map((d) => showDay(`${d}T04:00:00Z`, { locale: display.locale, timeZone: KL })), // noon in Kuala Lumpur
+      from: week.from,
+      jobsOf: Object.fromEntries(booked) as Record<string, { short: string; slot: Slot }[]>,
+      title: t("Team schedule — week of {day}", { day: klDay(week.from, display.locale) }),
+      today: klDate(now.toISOString()),
+      days: dates.map((d) => showDay(`${d}T04:00:00Z`, { locale: display.locale, timeZone: KL })),
+      dates,
+      capacity,
     },
   };
 }

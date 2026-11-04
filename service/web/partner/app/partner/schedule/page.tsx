@@ -7,7 +7,7 @@ import { ScheduleDemo } from "./_components/schedule-demo";
 import { ScheduleView } from "./_components/schedule-view";
 import { loadSchedule } from "./_lib/load";
 
-export default async function PartnerSchedulePage({ searchParams }: PageProps<"/partner/schedule">) {
+export default async function PartnerSchedulePage({ searchParams }: Readonly<PageProps<"/partner/schedule">>) {
   await connection();
   const sp = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);

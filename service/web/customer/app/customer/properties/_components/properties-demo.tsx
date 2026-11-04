@@ -27,12 +27,12 @@ const roomUnits: Record<string, { id: string; name: string; temp: number; w: num
   kitchen: [{ id: "unit-kitchen-a", name: "Kitchen AC", temp: 27.2, w: 545, state: "running" }],
 };
 const groupUnits: Record<string, GUnit[]> = {
-  ws: Array.from({ length: 8 }, (_, i) => ({ id: `ws-ac-0${i + 1}`, name: `WS-AC 0${i + 1}`, temp: i === 2 || i === 7 ? null : 24 + (i % 3) * 0.5, w: i === 2 || i === 7 ? null : 580 + i * 10, state: (i === 5 ? "unknown" : (i === 2 ? "stopped" : "running")) as GUnit["state"], online: i !== 5 })),
+  ws: Array.from({ length: 8 }, (_, i) => ({ id: `ws-ac-0${String(i + 1)}`, name: `WS-AC 0${String(i + 1)}`, temp: i === 2 || i === 7 ? null : 24 + (i % 3) * 0.5, w: i === 2 || i === 7 ? null : 580 + i * 10, state: (i === 5 ? "unknown" : (i === 2 ? "stopped" : "running")) as GUnit["state"], online: i !== 5 })),
   bedroom: [{ id: "unit-online-rto", name: "Bedroom AC", temp: 28, w: 680, state: "running", online: true }, { id: "unit-bedroom-2", name: "Bedroom AC #2", temp: 27, w: 0, state: "stopped", online: true }],
   meeting: [{ id: "unit-meeting", name: "Meeting room AC", temp: 25, w: 600, state: "running", online: true, min: 24 }, { id: "unit-meeting-2", name: "Meeting AC 2", temp: 25.5, w: 590, state: "running", online: true }],
 };
 
-function TreeRow({ n, depth, sel, onSel, onRename }: { n: Node; depth: number; sel: string; onSel: (id: string) => void; onRename: (n: Node) => void }) {
+function TreeRow({ n, depth, sel, onSel, onRename }: Readonly<{ n: Node; depth: number; sel: string; onSel: (id: string) => void; onRename: (n: Node) => void }>) {
   return (
     <>
       <div className={cx("flex items-center gap-2 rounded-lg px-2 py-1.5", sel === n.id ? "bg-primary-soft" : "hover:bg-surface2")} style={{ paddingLeft: 8 + depth * 16 }}>

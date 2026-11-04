@@ -41,10 +41,18 @@ export async function loadHistory(sp: { jobId?: string; tab?: string; sort?: str
   const outside = period === "90d" && listed.rows.length === 0 ? (await collect(false)).rows.length : 0;
   const counts = tabCounts(listed.rows);
   const base = {
-    now: now.toISOString(), tab, sort, period, company: who.organizationName || t("your company"),
-    sorts: SORTS.map((s) => ({ id: s.id, text: t("Sort: {sort}", { sort: t(s.text) }) })), periods: PERIODS.map((p) => ({ id: p.id, text: t("Period: {period}", { period: t(p.label) }) })),
-    tabs: TABS.map((x) => ({ id: x.id, label: t(x.label), count: counts[x.id] })), rows: visibleRows(listed.rows, tab, sort), total: listed.total, outside,
+    now: now.toISOString(),
+    company: who.organizationName || t("your company"),
+    sorts: SORTS.map((s) => ({ id: s.id, text: t("Sort: {sort}", { sort: t(s.text) }) })),
+    periods: PERIODS.map((p) => ({ id: p.id, text: t("Period: {period}", { period: t(p.label) }) })),
+    tabs: TABS.map((x) => ({ id: x.id, label: t(x.label), count: counts[x.id] })),
+    rows: visibleRows(listed.rows, tab, sort),
+    total: listed.total,
     options: listed.rows.map((r) => ({ id: r.id, label: `${r.short} · ${r.title}` })),
+    tab,
+    sort,
+    period,
+    outside,
   };
   if (!sp.jobId) return { ...base, detail: null };
   let hit = listed.rows.find((r) => r.id === sp.jobId);

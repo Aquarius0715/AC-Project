@@ -70,9 +70,12 @@ export function changeCard(intent: Extract<ResolvedIntent, { kind: "change" }>, 
   const range = u ? controlLayout(u.capabilities).temperature : null; // a model without control takes no temperature (IR537)
   const current = intent.before.celsius === null ? t("not known") : t("{value} °C (confirmed by the device)", { value: intent.before.celsius });
   return {
-    target: u ? placeOf(u) : intent.unitId.slice(0, 8), unit: u?.displayName ?? intent.unitId.slice(0, 8), current, requested: `${intent.celsius} °C`,
+    target: u ? placeOf(u) : intent.unitId.slice(0, 8),
+    unit: u?.displayName ?? intent.unitId.slice(0, 8),
+    requested: `${String(intent.celsius)} °C`,
     range: range ? t("{min}–{max} °C · step {step}", { min: range.min, max: range.max, step: range.step }) : t("not supported"),
     supported: !!range && intent.celsius >= range.min && intent.celsius <= range.max,
+    current,
   };
 }
 

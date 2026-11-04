@@ -20,7 +20,7 @@ export default async function AdminMRVPage(props: PageProps<"/admin/mrv">) {
   return withAccess("MRV", ["mrv.read"], () => AdminMRVPageContent(props));
 }
 
-async function AdminMRVPageContent({ searchParams }: PageProps<"/admin/mrv">) {
+async function AdminMRVPageContent({ searchParams }: Readonly<PageProps<"/admin/mrv">>) {
   await connection();
   if (!apiMode()) return <MRVDemo />;
   const sp = await searchParams;
@@ -50,7 +50,7 @@ async function AdminMRVPageContent({ searchParams }: PageProps<"/admin/mrv">) {
     const list = await coreOp<Page<ApiMRVReport>>("mrv.list", { limit: 100, filters });
     const rows = reportRows(list.items, customers, i.t);
     const id = rows.find((r) => r.id === one("reportId"))?.id ?? rows[0]?.id;
-    live.reports = { rows, scope: { organizationId: one("organizationId"), unitId: one("unitId"), status, from: one("from") ?? "", to: one("to") ?? "" } };
+    live.reports = { rows, scope: { organizationId: one("organizationId"), unitId: one("unitId"), from: one("from") ?? "", to: one("to") ?? "", status } };
     if (id) {
       const wanted = Number(one("reportVersion"));
       const [versions, latest] = await Promise.all([

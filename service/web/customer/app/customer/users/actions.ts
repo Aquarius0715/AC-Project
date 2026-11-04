@@ -19,7 +19,7 @@ async function run<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
 }
 
 export async function inviteUser(customerId: string, email: string, clientRole: "owner" | "member", displayName: string) {
-  return run(() => coreOp<{ id: string }>("clientUsers.save", { customerId, email: email.trim(), clientRole, displayName: displayName.trim() }, { write: true }).then(() => null));
+  return run(() => coreOp<{ id: string }>("clientUsers.save", { customerId, clientRole, email: email.trim(), displayName: displayName.trim() }, { write: true }).then(() => null));
 }
 /** A user's role and access (status), with a reason; the e-mail is sent unchanged. */
 export async function updateUser(id: string, version: number, customerId: string, email: string, clientRole: "owner" | "member", status: "active" | "disabled" | null, reason: string) {

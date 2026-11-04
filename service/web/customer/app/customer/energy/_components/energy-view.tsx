@@ -21,7 +21,7 @@ const colors = ["#005bea", "#f59e0b", "#10b981", "#8b5cf6"];
 
 /** Energy & cost (FR-C06) in API mode: the period, units (up to 4) and baseline live in the URL; every figure comes from
 energy.summary (IR68 wording: Reduction / Increase / No change / Cannot calculate). */
-export function EnergyView({ live }: { live: EnergyLive }) {
+export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
   const t = useT();
   const nav = useUrlPatch();
   const [view, setView] = useState<"chart" | "table">("chart");
@@ -123,7 +123,7 @@ export function EnergyView({ live }: { live: EnergyLive }) {
 const sectionLabel = { energy_cost: "Energy & cost by AC (kWh, MYR)", month_comparison: "Comparison with last month", co2_offsets: "CO₂ and offsets", alerts_maintenance: "Alerts & maintenance done" } as const;
 type Section = keyof typeof sectionLabel;
 
-function ExportModal({ live, onClose }: { live: EnergyLive; onClose: () => void }) {
+function ExportModal({ live, onClose }: Readonly<{ live: EnergyLive; onClose: () => void }>) {
   const t = useT();
   const locale = useLocale();
   const [pending, run] = useAction();
@@ -137,7 +137,7 @@ function ExportModal({ live, onClose }: { live: EnergyLive; onClose: () => void 
   const label = (m: string) => new Date(`${m}-01T00:00:00Z`).toLocaleDateString(intlTag(locale), { month: "long", year: "numeric", timeZone: "UTC" });
   const err = props.length === 0 ? t("Choose at least one location") : (sections.length === 0 ? t("Choose at least one section") : undefined);
   const download = () => {
-    const input: ReportInput = { month, propertyIds: props, sections, format };
+    const input: ReportInput = { propertyIds: props, month, sections, format };
     const prefs = live.prefs && email !== live.prefs.monthlyReportEmail ? { locale: live.prefs.locale as "en" | "ms", timezone: live.prefs.timezone, value: email } : null;
     run(() => exportReport(input, prefs), t("Report ready"), setFile);
   };

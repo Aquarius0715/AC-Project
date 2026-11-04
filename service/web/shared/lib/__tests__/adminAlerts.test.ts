@@ -62,7 +62,7 @@ describe("HQ alerts and alert policies", () => {
     expect(HQ_METRICS).toEqual(["temperature", "humidity", "co2", "pm25", "refrigerant_pressure", "vibration", "power"]); // IR66 item 3
     // IR120 item 3: a whole priority 0–100 and 1–20 recipients
     expect(policyErrors({ ...p, priority: 50.5, recipients: [] })).toEqual({ priority: "A whole number 0–100", recipients: "Add at least one recipient" });
-    expect(policyErrors({ ...p, priority: 101, recipients: Array.from({ length: 21 }, (_, n) => ({ id: `m-${n}`, label: "", role: "" })) })).toEqual({ priority: "A whole number 0–100", recipients: "At most 20 recipients" });
+    expect(policyErrors({ ...p, priority: 101, recipients: Array.from({ length: 21 }, (_, n) => ({ id: `m-${String(n)}`, label: "", role: "" })) })).toEqual({ priority: "A whole number 0–100", recipients: "At most 20 recipients" });
     // “Only if …”: at least one day and two different HH:mm times (IR120 item 3)
     const win = (weekdays: number[], startLocal: string, endLocal: string) => policyErrors({ ...p, activeWindow: { weekdays, startLocal, endLocal } }).activeWindow;
     expect([win([1, 2, 3, 4, 5], "08:00", "19:00"), win([6, 7], "22:00", "06:00")]).toEqual([undefined, undefined]); // past midnight is allowed

@@ -30,7 +30,7 @@ export default async function AdminBillingPage(props: PageProps<"/admin/billing"
   return withAccess("Billing", ["billing.read", "asset.read"], () => AdminBillingPageContent(props));
 }
 
-async function AdminBillingPageContent({ searchParams }: PageProps<"/admin/billing">) {
+async function AdminBillingPageContent({ searchParams }: Readonly<PageProps<"/admin/billing">>) {
   await connection();
   if (!apiMode()) return <BillingView />;
   const sp = await searchParams;
@@ -54,7 +54,12 @@ async function AdminBillingPageContent({ searchParams }: PageProps<"/admin/billi
   const rows = invoiceRows(invoices.items, contracts.items, customers.items, now, i);
   const orgCustomer = new Map(customers.items.map((c) => [c.organizationId, c.id]));
   const live: BillingLive = {
-    tab, scope, months: monthsText(months.from, months.to, i), rows, contracts: contractOptions(contracts.items, customers.items, i.t), inquiries: inquiryRows(inquiries.items, customers.items, i),
+    tab,
+    scope,
+    rows,
+    months: monthsText(months.from, months.to, i),
+    contracts: contractOptions(contracts.items, customers.items, i.t),
+    inquiries: inquiryRows(inquiries.items, customers.items, i),
     customers: customers.items.map((c) => ({ id: c.id, name: c.name })),
     properties: properties.items.filter((p) => !p.archived).map((p) => ({ id: p.id, name: p.name, customerId: orgCustomer.get(p.customerOrgId) ?? "" })),
     contractsOfCustomer: contracts.items.map((k) => ({ id: k.id, customerId: k.customerId })),

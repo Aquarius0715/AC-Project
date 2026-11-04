@@ -7,7 +7,7 @@ import { expectAccessible } from "../../fixtures/a11y";
 test("HQ adds a new contractor company with its profile; the same name again is refused", async ({ page }) => {
   await page.goto("/admin/jobs?tab=contractors");
   const main = page.getByRole("main");
-  const company = `E2E Aircon ${Date.now()}`;
+  const company = `E2E Aircon ${String(Date.now())}`;
   const add = async () => {
     await main.getByRole("button", { name: "Add contractor" }).click();
     const dialog = page.getByRole("dialog");

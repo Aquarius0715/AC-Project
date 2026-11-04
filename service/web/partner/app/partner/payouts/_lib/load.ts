@@ -62,10 +62,13 @@ export async function loadPayouts(opts: { statementId?: string; period?: string;
   const rows = lineRows(selected, new Map(labels.filter((l): l is [string, JobLabel] => !!l)), inReview, i);
   const s = selected;
   live.selected = {
-    statement: s, kpis: kpis(s, card ? `${card.id.slice(0, 8)} v${card.version}` : null, i), rows, questions: questionRows(s, rows, t),
+    statement: s,
+    kpis: kpis(s, card ? `${card.id.slice(0, 8)} v${String(card.version)}` : null, i),
+    questions: questionRows(s, rows, t),
     title: t("{id} · {period} · lines", { id: s.id.slice(0, 8), period: periodLabel(s.period, display.locale) }),
-    sub: t(s.status === "paid" ? "Rate card {card} · paid {date}" : "Rate card {card} · pays {date}", { card: card ? `rc ${card.id.slice(0, 8)} v${card.version}` : t("set by HQ"), date: s.status === "paid" ? (s.paidAt ? showDate(s.paidAt, display) : "—") : businessDay(s.payDate, display.locale) }),
+    sub: t(s.status === "paid" ? "Rate card {card} · paid {date}" : "Rate card {card} · pays {date}", { card: card ? `rc ${card.id.slice(0, 8)} v${String(card.version)}` : t("set by HQ"), date: s.status === "paid" ? (s.paidAt ? showDate(s.paidAt, display) : "—") : businessDay(s.payDate, display.locale) }),
     totals: [[t("Gross"), money(s.grossMinor, s.currency)], [t("Deductions"), money(-s.deductionsMinor, s.currency)], [t("Net payable"), money(s.netMinor, s.currency)]],
+    rows,
   };
   return live;
 }

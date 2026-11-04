@@ -18,7 +18,7 @@ const contractTone = { Active: "ok", Upcoming: "primary", Expired: "muted" } as 
 
 /** Contracts & payments (FR-C10) in API mode: the contract and the invoice status filter live in the URL; the page is
 read-only — payments start on the invoice page. Texts in the user's display language (IR267). */
-export function PaymentsView({ live }: { live: PaymentsLive }) {
+export function PaymentsView({ live }: Readonly<{ live: PaymentsLive }>) {
   const t = useT();
   const nav = useUrlPatch();
   const sel = live.cards.find((c) => c.id === live.selected) ?? null;

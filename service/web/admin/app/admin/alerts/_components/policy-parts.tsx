@@ -17,7 +17,7 @@ const FALL = [1.2, 1.1, 1, 0.95, 0.93, 0.97, 1.03, 1.1, 1.15];
 
 /** The condition (Figma Admin 38:5 / 268:2): metric, comparison, threshold, duration and recovery, the chart, and
 whether the recovery lies on the safe side. A default rule's metric is fixed (`fixedMetric`). */
-export function ConditionFields({ c, onChange, errors, tried, fixedMetric }: { c: Condition; onChange: (p: Partial<Condition>) => void; errors: Record<string, string>; tried: boolean; fixedMetric?: boolean }) {
+export function ConditionFields({ c, onChange, errors, tried, fixedMetric }: Readonly<{ c: Condition; onChange: (p: Partial<Condition>) => void; errors: Record<string, string>; tried: boolean; fixedMetric?: boolean }>) {
   const t = useT();
   const unit = metricUnit[c.metric] ?? "";
   return (
@@ -39,7 +39,7 @@ export function ConditionFields({ c, onChange, errors, tried, fixedMetric }: { c
 }
 
 /** “Only if …” (DD-A05 item 10): the days and local hours in the policy's time zone, or any time (null). */
-export function WindowEditor({ value, onChange, timezone, error }: { value: Window | null | undefined; onChange: (w: Window | null) => void; timezone: string; error?: string }) {
+export function WindowEditor({ value, onChange, timezone, error }: Readonly<{ value: Window | null | undefined; onChange: (w: Window | null) => void; timezone: string; error?: string }>) {
   const t = useT();
   const set = (w: Partial<Window>) => value && onChange({ ...value, ...w });
   return (
@@ -48,7 +48,7 @@ export function WindowEditor({ value, onChange, timezone, error }: { value: Wind
       {value ? (
         <div className="flex flex-wrap items-center gap-2">
           <Btn size="sm" onClick={() => set({ weekdays: [1, 2, 3, 4, 5] })}>{t("Mon–Fri")}</Btn><Btn size="sm" onClick={() => set({ weekdays: [1, 2, 3, 4, 5, 6, 7] })}>{t("Every day")}</Btn>
-          {DAYS.map((d, i) => <Plain key={d} type="button" aria-pressed={value.weekdays.includes(i + 1)} onClick={() => set({ weekdays: value.weekdays.includes(i + 1) ? value.weekdays.filter((x) => x !== i + 1) : [...value.weekdays, i + 1].sort() })} className={cx("rounded-control border px-2 py-1 text-xs font-semibold", value.weekdays.includes(i + 1) ? "border-primary bg-primary-soft text-primary" : "border-line")}>{t(d)}</Plain>)}
+          {DAYS.map((d, i) => <Plain key={d} type="button" aria-pressed={value.weekdays.includes(i + 1)} onClick={() => set({ weekdays: value.weekdays.includes(i + 1) ? value.weekdays.filter((x) => x !== i + 1) : [...value.weekdays, i + 1].toSorted() })} className={cx("rounded-control border px-2 py-1 text-xs font-semibold", value.weekdays.includes(i + 1) ? "border-primary bg-primary-soft text-primary" : "border-line")}>{t(d)}</Plain>)}
           <Input aria-label={t("From")} type="time" className="w-32" value={value.startLocal} onChange={(e) => set({ startLocal: e.target.value })} /> – <Input aria-label={t("To")} type="time" className="w-32" value={value.endLocal} onChange={(e) => set({ endLocal: e.target.value })} />
           <span className="text-xs text-muted-foreground">{timezone}</span>
         </div>

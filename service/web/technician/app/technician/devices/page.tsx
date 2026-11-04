@@ -9,7 +9,7 @@ import { DevicesView } from "@ac/web/components/TechDevices";
 import { loadDevices } from "./_lib/load";
 import { TechDevicesView } from "./_components/devices-view";
 
-export default async function TechnicianDevicesPage({ searchParams }: PageProps<"/technician/devices">) {
+export default async function TechnicianDevicesPage({ searchParams }: Readonly<PageProps<"/technician/devices">>) {
   await connection();
   if (!apiMode()) return <DevicesView />;
   const sp = await searchParams;

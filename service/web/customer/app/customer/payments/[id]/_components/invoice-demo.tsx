@@ -8,7 +8,7 @@ import { Icon } from "@ac/web/components/Icon";
 type Phase = "choose" | "processing" | "confirmed" | "failed";
 
 /** The Phase 1A demo of /customer/payments/[id] (fixtures; DATA_SOURCE≠API). */
-export function InvoiceDemo({ id, tab }: { id: string; tab?: string }) { // SCR-C11 tabs: payment (default) · restriction · inquiry
+export function InvoiceDemo({ id, tab }: Readonly<{ id: string; tab?: string }>) { // SCR-C11 tabs: payment (default) · restriction · inquiry
   const toast = useToast();
   const [phase, setPhase] = useState<Phase>("choose");
   const [method, setMethod] = useState<"credit" | "debit" | "bank">("credit");

@@ -74,7 +74,7 @@ describe("the server-side session store", () => {
     const cookie = await createSessionCookie(session());
     for (let m = 20; m < ABSOLUTE_SECONDS / 60; m += 20) {
       later(20);
-      expect(await loadSession(cookie), `${m} min`).not.toBeNull();
+      expect(await loadSession(cookie), `${String(m)} min`).not.toBeNull();
     }
     later(20);
     expect([await loadSession(cookie), kv.data.size]).toEqual([null, 0]);

@@ -6,7 +6,7 @@ const jump = "rounded-control bg-primary-soft px-3 py-2 text-[13px] font-semibol
 
 /** The Demo controls layout of Figma Client 10e (FR-X05), shared by the browser demo and API mode: the dashed notice,
 Demo clock · Scenario · Reset in one row, and the Trigger failures tiles. */
-export function DemoFrame({ clock, scenario, reset, triggers, above }: { clock: React.ReactNode; scenario: React.ReactNode; reset: React.ReactNode; triggers: React.ReactNode; above?: React.ReactNode }) {
+export function DemoFrame({ clock, scenario, reset, triggers, above }: Readonly<{ clock: React.ReactNode; scenario: React.ReactNode; reset: React.ReactNode; triggers: React.ReactNode; above?: React.ReactNode }>) {
   const t = useT();
   return (
     <div className="flex flex-col gap-4">
@@ -24,7 +24,7 @@ export function DemoFrame({ clock, scenario, reset, triggers, above }: { clock: 
   );
 }
 
-export function ClockFace({ time, onMinute, onHour, disabled }: { time: string; onMinute: () => void; onHour: () => void; disabled?: boolean }) {
+export function ClockFace({ time, onMinute, onHour, disabled }: Readonly<{ time: string; onMinute: () => void; onHour: () => void; disabled?: boolean }>) {
   const t = useT();
   return (
     <>
@@ -39,7 +39,7 @@ export function ClockFace({ time, onMinute, onHour, disabled }: { time: string; 
 }
 
 /** One trigger tile: icon, name and what it does; a tile that cannot run here says why. */
-export function TriggerTile({ icon, title, sub, onClick, disabled, tone }: { icon: IconName; title: string; sub: string; onClick?: () => void; disabled?: boolean; tone?: "ok" }) {
+export function TriggerTile({ icon, title, sub, onClick, disabled, tone }: Readonly<{ icon: IconName; title: string; sub: string; onClick?: () => void; disabled?: boolean; tone?: "ok" }>) {
   return (
     <Plain type="button" onClick={onClick} disabled={disabled || !onClick} className={cx("flex min-w-0 flex-col items-start gap-0.5 rounded-xl border border-line bg-surface px-3 py-2.5 text-left hover:bg-surface2 disabled:cursor-not-allowed disabled:opacity-60", tone === "ok" && "border-[#86efac]")}>
       <span className="flex items-center gap-2 text-[13px] font-semibold"><Icon name={icon} className={cx("text-crit", tone === "ok" && "text-ok")} />{title}</span>

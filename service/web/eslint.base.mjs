@@ -80,6 +80,12 @@ export function webConfig(tsconfigRootDir) {
         "unicorn/prefer-temporal": "off",
         // TypeScript's lib does not declare Iterator.concat yet, so a call to it does not type-check
         "unicorn/prefer-iterator-concat": "off",
+        // file names follow the kind of module, and the design documents cite them: React components in PascalCase
+        // (AppShell.tsx), modules in camelCase (adminAlerts.ts), Next.js route files and shadcn/ui components in
+        // kebab-case
+        "unicorn/filename-case": ["error", { cases: { camelCase: true, kebabCase: true, pascalCase: true } }],
+        // JSX callbacks return their element in parentheses ((u) => (<li>…</li>)), React's convention
+        "unicorn/consistent-arrow-return-style": "off",
       },
     },
     // The repository's lint rules (CLAUDE.md):
@@ -99,8 +105,15 @@ export function webConfig(tsconfigRootDir) {
         // 3: no raw HTML
         "react/no-danger": "error",
         // 4-2: the cyclomatic count adds every case of a flat switch or lookup, so it takes Go's limit (30);
-        // sonarjs/cognitive-complexity judges how hard the code is to follow
+        // sonarjs/cognitive-complexity is the measure Go's gocognit takes, with its limit (30)
         "sonarjs/cyclomatic-complexity": ["error", { threshold: 30 }],
+        "sonarjs/cognitive-complexity": ["error", 30],
+        // 2: names say what a value is, and are not lengthened only for a rule: DOM and React attributes (checked,
+        // disabled), the contract's fields (enabled, online) and predicates (overlaps, fits) are not renamed is…/has…
+        "unicorn/consistent-boolean-name": "off",
+        // 4-2: a member of a new value reads as one expression (new Date(x).toISOString(), new Set(xs).size); a
+        // variable for each would only lengthen the code
+        "unicorn/no-unreadable-new-expression": "off",
         // 2: the conventional short names stay short. props, ref, params, req, res and env are the platform's and
         // React's; e, i, j, acc, prev, fn and el the usual names in handlers, loops, reducers and state updaters
         "unicorn/name-replacements": [

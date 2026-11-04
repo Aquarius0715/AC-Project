@@ -11,7 +11,7 @@ import { mailpitUp, setupLink } from "../../fixtures/mailpit";
 test("a technician the contractor adds sets a password from the e-mail and signs in as themselves", async ({ page, app, browser }) => {
   test.skip(app.id !== "partner", "partner only");
   test.skip(!(await mailpitUp()), "needs the local Mailpit inbox");
-  const email = `e2e-signin-${Date.now()}@example.com`;
+  const email = `e2e-signin-${String(Date.now())}@example.com`;
   await page.goto("/partner/users");
   await page.getByRole("button", { name: "Add user" }).click();
   const dialog = page.getByRole("dialog");

@@ -63,7 +63,7 @@ export async function testPolicy(policyId: string, unitId: string, metric: strin
     const at = (await coreNow()).toISOString();
     const input: OpInput<"automations.simulate"> = {
       eventId: crypto.randomUUID(), occurredAt: at, phase: "condition", unitIds: [unitId],
-      facts: [{ unitId, metric: metric as OpInput<"automations.simulate">["facts"][number]["metric"], value, unit: metricUnit[metric] ?? "", observedAt: at, quality: "valid" }],
+      facts: [{ unitId, value, metric: metric as OpInput<"automations.simulate">["facts"][number]["metric"], unit: metricUnit[metric] ?? "", observedAt: at, quality: "valid" }],
     };
     const r = await coreOp<{ notifications: NotificationDecision[] }>("automations.simulate", input);
     return { ok: true, decision: r.notifications.find((n) => n.policyId === policyId && n.unitId === unitId) ?? null };

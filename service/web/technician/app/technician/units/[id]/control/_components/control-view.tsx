@@ -17,7 +17,7 @@ import { Icon } from "@ac/web/components/Icon";
 /** Diagnostic control (FR-T10, Figma Technician 02-18…02-28) in API mode: one diagnostic command or one test run at a
 time for the assigned job, each confirmed first; device acknowledgements and the run's end are shown only when the
 device reports them. Texts in the user's display language; the times come formatted from the loader (IR286). */
-export function ControlView({ live }: { live: ControlLive }) {
+export function ControlView({ live }: Readonly<{ live: ControlLive }>) {
   const t = useT();
   const router = useRouter();
   const [pending, run] = useAction();
@@ -68,7 +68,7 @@ export function ControlView({ live }: { live: ControlLive }) {
     const kind = confirm;
     setConfirm(null);
     if (kind === "cmd") {
-      run(() => sendDiagnostic({ unitId: live.unit.id, jobId: job.id, action: actionOf(action), reason, expectedUnitVersion: live.unit.version }),
+      run(() => sendDiagnostic({ unitId: live.unit.id, jobId: job.id, action: actionOf(action), expectedUnitVersion: live.unit.version, reason }),
         (c) => t("{id} sent — waiting for the device", { id: c.id.slice(0, 8) }), () => { setErrors({}); setRefused(null); }, failed);
     } else {
       run(() => {

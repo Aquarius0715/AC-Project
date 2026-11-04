@@ -19,7 +19,7 @@ const barTone: Record<AxisRow["tone"], string> = { primary: "bg-primary", muted:
 
 /** The HQ dashboard (FR-A01, DD-A01, Figma Admin 01) from one admin.summary: scope and period in the URL. Texts in the
 user's display language; the as-of time and the period come formatted from the page (IR289). */
-export function AdminOverviewView({ live }: { live: Live }) {
+export function AdminOverviewView({ live }: Readonly<{ live: Live }>) {
   const t = useT();
   const router = useRouter();
   const patch = useUrlPatch();
@@ -57,7 +57,7 @@ export function AdminOverviewView({ live }: { live: Live }) {
   );
 }
 
-function Sections({ s, links, waiting }: { s: AdminSummary; links: ReturnType<typeof overviewLinks>; waiting: number | null }) {
+function Sections({ s, links, waiting }: Readonly<{ s: AdminSummary; links: ReturnType<typeof overviewLinks>; waiting: number | null }>) {
   const t = useT();
   const k = kpisFrom(s, t);
   const f = forecastView(s.energyForecast, t);
@@ -77,7 +77,7 @@ function Sections({ s, links, waiting }: { s: AdminSummary; links: ReturnType<ty
         <Kpi label={t("Unresolved alerts")} value={k.alerts} tone={k.alerts ? "warn" : undefined} sub={t("open or acknowledged · critical and warning")} href={links.alerts} link={t("View alerts")} />
         <Kpi label={t("Energy used (actual)")} value={k.kwh} sub={k.kwhSub} href={links.energy} link={t("Energy analysis")} />
         <Kpi label={t("Overdue billing")} value={k.billing} tone={bill.forbidden ? undefined : (bill.overdue ? "crit" : undefined)} sub={k.billingSub} href={bill.forbidden ? undefined : links.billing} link={bill.forbidden ? undefined : t("Open overdue")} />
-        <Kpi label={t("Maintenance jobs (period)")} value={k.jobs} sub={jobs.filter((j) => j.count).map((j) => `${j.label} ${j.count}`).join(" · ") || t("no jobs in the period")} href={links.jobs()} link={t("Open jobs")} />
+        <Kpi label={t("Maintenance jobs (period)")} value={k.jobs} sub={jobs.filter((j) => j.count).map((j) => `${j.label} ${String(j.count)}`).join(" · ") || t("no jobs in the period")} href={links.jobs()} link={t("Open jobs")} />
         <Kpi label={t("Connection")} value={t("{n} online", { n: k.online })} sub={t("offline {offline} · unknown/connecting/error {unknown}", { offline: k.offline, unknown: k.connUnknown })} href={links.connection("online")} link={t("Open units")} />
       </div>
       <Card title={<span className="flex flex-wrap items-center gap-2">{t("Energy-saving forecast")} <Badge tone="warn">{t("Forecast (prorated assumed baseline, demo)")}</Badge></span>} action={<TextLink href={links.energy}>{t("Energy analysis")} <Icon name="arrowRight" /></TextLink>}>
@@ -125,16 +125,16 @@ function Sections({ s, links, waiting }: { s: AdminSummary; links: ReturnType<ty
   );
 }
 
-function Tile({ label, value, sub, tone }: { label: string; value: string; sub: string; tone?: "ok" | "crit" | "muted" }) {
+function Tile({ label, value, sub, tone }: Readonly<{ label: string; value: string; sub: string; tone?: "ok" | "crit" | "muted" }>) {
   return <div className="rounded-xl bg-surface2 p-3"><div className="text-[11px] text-muted-foreground">{label}</div><b className={cx(tone === "ok" && "text-ok", tone === "crit" && "text-crit")}>{value}</b><div className="text-[10px] text-muted-foreground">{sub}</div></div>;
 }
 
-function Axis({ rows }: { rows: AxisRow[] }) {
+function Axis({ rows }: Readonly<{ rows: AxisRow[] }>) {
   const t = useT();
   return (
     <>
-      <div className="mb-2 flex h-2.5 w-full overflow-hidden rounded-full bg-surface2" role="img" aria-label={rows.map((r) => `${r.label} ${r.count}`).join(", ")}>
-        {rows.map((r) => (r.pct > 0 ? <div key={r.key} className={barTone[r.tone]} style={{ width: `${r.pct}%` }} /> : null))}
+      <div className="mb-2 flex h-2.5 w-full overflow-hidden rounded-full bg-surface2" role="img" aria-label={rows.map((r) => `${r.label} ${String(r.count)}`).join(", ")}>
+        {rows.map((r) => (r.pct > 0 ? <div key={r.key} className={barTone[r.tone]} style={{ width: `${String(r.pct)}%` }} /> : null))}
       </div>
       {rows.map((r) => (
         <div key={r.key} className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 py-1 text-[13px]">

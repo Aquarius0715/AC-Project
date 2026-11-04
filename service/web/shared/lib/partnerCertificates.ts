@@ -104,18 +104,44 @@ export function certRows(members: ApiTeamMember[], certs: ApiCert[], jobs: CertJ
       if (grant) {
         const s = state(Date.parse(grant.validUntil!));
         rows.push({
-          key: `${m.id}:${code}`, technicianId: m.id, technician: m.displayName, code, name: qualificationLabel(code, t),
+          key: `${m.id}:${code}`,
+          technicianId: m.id,
+          technician: m.displayName,
+          name: qualificationLabel(code, t),
           detail: t(upload === "pending" ? "granted by HQ · the upload waits for HQ" : (upload === "rejected" ? "granted by HQ · the upload was rejected" : "granted by HQ · no certificate on file")),
-          expires: businessDay(grant.validUntil!, locale), expiresAt: grant.validUntil!, status: s.status, badge: badgeOf(s.status, s.days), days: s.days,
-          blocks: blocks(m.id, code, Date.parse(grant.validUntil!)), cert: null, renewalPending: upload === "pending", training: null, actions: isActive && upload !== "pending" ? ["add"] : [],
+          expires: businessDay(grant.validUntil!, locale),
+          expiresAt: grant.validUntil!,
+          status: s.status,
+          badge: badgeOf(s.status, s.days),
+          days: s.days,
+          blocks: blocks(m.id, code, Date.parse(grant.validUntil!)),
+          cert: null,
+          renewalPending: upload === "pending",
+          training: null,
+          actions: isActive && upload !== "pending" ? ["add"] : [],
+          code,
         });
         continue;
       }
       const needed = blocks(m.id, code, -Infinity);
       if (needed.length > 0) {
         rows.push({
-          key: `${m.id}:${code}`, technicianId: m.id, technician: m.displayName, code, name: qualificationLabel(code, t), detail: t("not held"), expires: "—", expiresAt: null,
-          status: "not_held", badge: badgeOf("not_held", null), days: null, blocks: needed, cert: null, renewalPending: false, training: null, actions: isActive ? ["add"] : [],
+          key: `${m.id}:${code}`,
+          technicianId: m.id,
+          technician: m.displayName,
+          name: qualificationLabel(code, t),
+          detail: t("not held"),
+          expires: "—",
+          expiresAt: null,
+          status: "not_held",
+          badge: badgeOf("not_held", null),
+          days: null,
+          blocks: needed,
+          cert: null,
+          renewalPending: false,
+          training: null,
+          actions: isActive ? ["add"] : [],
+          code,
         });
       }
     }
@@ -187,4 +213,4 @@ export function certificateRefusal(f: { code: string; messageKey: string; fieldE
   return { fields, text: Object.keys(fields).length > 0 ? null : t("Check the input.") };
 }
 /** “412 KB”, “2.4 MB”: a file's size as the form shows it. */
-export const fileSize = (bytes: number) => (bytes < 1_000_000 ? `${Math.max(1, Math.round(bytes / 1000))} KB` : `${Math.round(bytes / 100_000) / 10} MB`);
+export const fileSize = (bytes: number) => (bytes < 1_000_000 ? `${String(Math.max(1, Math.round(bytes / 1000)))} KB` : `${String(Math.round(bytes / 100_000) / 10)} MB`);

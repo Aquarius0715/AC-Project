@@ -12,7 +12,7 @@ import { TechUnitView } from "./_components/unit-view";
 import { loadTechUnit } from "./_lib/load";
 import { Icon } from "@ac/web/components/Icon";
 
-export default async function TechnicianUnitPage({ params, searchParams }: PageProps<"/technician/units/[id]">) {
+export default async function TechnicianUnitPage({ params, searchParams }: Readonly<PageProps<"/technician/units/[id]">>) {
   const { id } = await params;
   const sp = await searchParams;
   await connection();

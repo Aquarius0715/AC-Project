@@ -86,7 +86,7 @@ describe("payoutPdf", () => {
     const xref = Number(/startxref\n(\d+)/.exec(pdf)![1]);
     expect(pdf.slice(xref, xref + 4)).toBe("xref");
     const offsets = [...pdf.matchAll(/(\d{10}) 00000 n/g)].map((m) => Number(m[1]));
-    for (const [i, o] of offsets.entries()) expect(pdf.slice(o, o + `${i + 1} 0 obj`.length)).toBe(`${i + 1} 0 obj`);
+    for (const [i, o] of offsets.entries()) expect(pdf.slice(o, o + `${String(i + 1)} 0 obj`.length)).toBe(`${String(i + 1)} 0 obj`);
     const length = Number(/\/Length (\d+) >>\nstream\n/.exec(pdf)![1]);
     const stream = /stream\n([\s\S]*?)\nendstream/.exec(pdf)![1];
     expect(stream.length).toBe(length);

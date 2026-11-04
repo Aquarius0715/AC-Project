@@ -73,8 +73,16 @@ export function memberRows(ms: ApiMember[], orgs: ApiOrganization[], now: Date, 
   return ms.filter((m): m is ApiMember & { role: Role } => m.role !== "client").map((m) => {
     const orgName = org.get(m.organizationId) ?? t("organization");
     return {
-      id: m.id, version: m.version, name: m.displayName, role: m.role, m, org: orgName, active: isActive(m, now), revoked: !!m.revokedAt, validity: validity(m, i),
+      id: m.id,
+      version: m.version,
+      name: m.displayName,
+      role: m.role,
+      org: orgName,
+      active: isActive(m, now),
+      revoked: !!m.revokedAt,
+      validity: validity(m, i),
       label: `${roleWord(m.role, m.employment, t)} · ${orgName}`,
+      m,
     };
   });
 }

@@ -30,8 +30,12 @@ export async function GET(req: NextRequest) {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      grant_type: "authorization_code", code, code_verifier: pending.verifier, redirect_uri: `${cfg.appUrl}/bff/auth/callback`,
-      client_id: cfg.clientId, client_secret: cfg.clientSecret,
+      grant_type: "authorization_code",
+      code_verifier: pending.verifier,
+      redirect_uri: `${cfg.appUrl}/bff/auth/callback`,
+      client_id: cfg.clientId,
+      client_secret: cfg.clientSecret,
+      code,
     }),
   });
   if (!token.ok) return NextResponse.redirect(new URL("/login?error=token", cfg.appUrl));

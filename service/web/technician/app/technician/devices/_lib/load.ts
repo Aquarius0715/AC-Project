@@ -60,11 +60,18 @@ export async function loadDevices(opts: { selected?: string; unitId?: string; jo
   const alertIds = [...new Set((evs?.items ?? []).flatMap((e) => e.alertIds))];
   const alerts = new Map((await Promise.all(alertIds.map((a) => quiet(coreOp<ApiAlertLite>("alerts.get", { id: a }))))).filter((a): a is ApiAlertLite => !!a).map((a) => [a.id, a]));
   live.device = {
-    detail: d, row: rows.find((r) => r.id === id)!, jobId, tiles: deviceTiles(d, newerFirmware(d.firmwareVersion, candidates), now.getTime(), evs ? openFaults(evs.items) : {}, i), sensors: sensorRows(d, i),
-    unit: unit ? { name: unit.displayName, place: unit.location.pathLabels.join(" › "), model: `${unit.capabilities.manufacturer} ${unit.capabilities.model} v${unit.capabilityVersion}` } : null,
-    firmware: newerVersions(d.firmwareVersion, candidates), firmwareCard: firmwareCard(d, ops?.items ?? [], i),
-    operations: operationRows(ops?.items ?? [], d.firmwareVersion, i), calibrations: (cals?.items ?? []).map((c) => calibrationText(c, i)),
-    events: evs ? eventRows(evs.items, alerts, now.getTime(), i) : null, eventsLocked: opts.events && !evs,
+    detail: d,
+    row: rows.find((r) => r.id === id)!,
+    tiles: deviceTiles(d, newerFirmware(d.firmwareVersion, candidates), now.getTime(), evs ? openFaults(evs.items) : {}, i),
+    sensors: sensorRows(d, i),
+    unit: unit ? { name: unit.displayName, place: unit.location.pathLabels.join(" › "), model: `${unit.capabilities.manufacturer} ${unit.capabilities.model} v${String(unit.capabilityVersion)}` } : null,
+    firmware: newerVersions(d.firmwareVersion, candidates),
+    firmwareCard: firmwareCard(d, ops?.items ?? [], i),
+    operations: operationRows(ops?.items ?? [], d.firmwareVersion, i),
+    calibrations: (cals?.items ?? []).map((c) => calibrationText(c, i)),
+    events: evs ? eventRows(evs.items, alerts, now.getTime(), i) : null,
+    eventsLocked: opts.events && !evs,
+    jobId,
   };
   return live;
 }

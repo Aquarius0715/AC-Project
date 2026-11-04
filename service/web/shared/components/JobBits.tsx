@@ -29,7 +29,7 @@ export function JobStatusBadge({ s, client }: { s: JobStatus; client?: boolean }
 }
 
 export const RANKS = ["1st", "2nd", "3rd"];
-export function Rank({ i }: { i: number }) {
+export function Rank({ i }: Readonly<{ i: number }>) {
   const t = useT();
   return <span className="inline-grid w-10 shrink-0 place-items-center rounded-lg bg-primary-soft py-0.5 text-xs font-semibold text-primary">{t(RANKS[i])}</span>;
 }
@@ -37,7 +37,7 @@ export function Rank({ i }: { i: number }) {
 export const WINDOWS = ["09:00–11:00", "10:00–12:00", "13:00–15:00", "14:00–16:00", "16:00–18:00"];
 
 /** Three preferred times (1st = most preferred). Used by the request, decline and reschedule dialogs. */
-export function PreferredSlotsInput({ value, onChange, error, label = "Preferred times — give 3 options (1st = most preferred)", hint }: { value: Slot[]; onChange: (v: Slot[]) => void; error?: string; label?: string; hint?: string }) {
+export function PreferredSlotsInput({ value, onChange, error, label = "Preferred times — give 3 options (1st = most preferred)", hint }: Readonly<{ value: Slot[]; onChange: (v: Slot[]) => void; error?: string; label?: string; hint?: string }>) {
   const set = (i: number, p: Partial<Slot>) => { onChange(value.map((s, k) => (k === i ? { ...s, ...p } : s))); };
   return (
     <fieldset className="flex flex-col gap-2">
@@ -62,7 +62,7 @@ export function preferredError(v: Slot[], today = "2026-09-22"): string | undefi
   return undefined;
 }
 
-export function SlotLine({ i, slot, struck, note }: { i: number; slot: Slot; struck?: boolean; note?: React.ReactNode }) {
+export function SlotLine({ i, slot, struck, note }: Readonly<{ i: number; slot: Slot; struck?: boolean; note?: React.ReactNode }>) {
   return (
     <div className="flex flex-wrap items-center gap-2 text-[13px]">
       <Rank i={i} />

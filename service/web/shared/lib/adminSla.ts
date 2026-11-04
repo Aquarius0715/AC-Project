@@ -30,7 +30,7 @@ export function periodOf(key: string | undefined, now: number): { id: string; fr
   const p = PERIODS.find((x) => x.id === key) ?? PERIODS[1];
   return { id: p.id, from: new Date(now - p.days * 86_400_000).toISOString(), to: new Date(now).toISOString() };
 }
-const pct = (v: number | null) => (v === null ? "—" : `${Math.round(v)} %`);
+const pct = (v: number | null) => (v === null ? "—" : `${String(Math.round(v))} %`);
 const plans = (targets: ApiTargetView[], used: PlanType[]) => targets.filter((x) => x.state !== "scheduled" && used.includes(x.planType));
 /** “target 95 %” for one plan type, “targets 85–95 % by plan” when the customers' plans differ. */
 function targetText(values: number[], t: T): string {
@@ -90,7 +90,7 @@ export function breachText(b: ApiBreach, t: T = en): string {
 const KIND: Record<string, string> = { response: "Response", arrival: "Arrival", first_time_fix: "First-time fix", overdue: "Overdue" };
 /** The recent breaches (newest first, at most 50) with the customer and Open job →. */
 export const breachRows = (sc: ApiScorecard, names: Map<string, string>, t: T = en) =>
-  sc.breaches.map((b, i) => ({ key: `${b.jobId}:${b.kind}:${i}`, jobId: b.jobId, short: b.jobId.slice(0, 8), text: `${names.get(b.customerId) ?? t("customer")} · ${breachText(b, t)}`, kind: KIND[b.kind] ? t(KIND[b.kind]) : b.kind, tone: (b.kind === "overdue" ? "crit" : "warn") as Tone }));
+  sc.breaches.map((b, i) => ({ key: `${b.jobId}:${b.kind}:${String(i)}`, jobId: b.jobId, short: b.jobId.slice(0, 8), text: `${names.get(b.customerId) ?? t("customer")} · ${breachText(b, t)}`, kind: KIND[b.kind] ? t(KIND[b.kind]) : b.kind, tone: (b.kind === "overdue" ? "crit" : "warn") as Tone }));
 
 /** The targets per plan type for the edit dialog: the one in effect (or the default) and a scheduled one, if any. */
 export function targetsByPlan(targets: ApiTargetView[], i: I18n = EN) {
@@ -100,7 +100,9 @@ export function targetsByPlan(targets: ApiTargetView[], i: I18n = EN) {
     const next = targets.filter((x) => x.planType === plan && x.state === "scheduled");
     const since = now.state === "default" ? t("default") : t("v{v} since {date}", { v: now.version, date: showDate(now.effectiveFrom, display) });
     return {
-      plan, label: planName(plan, t), now,
+      plan,
+      now,
+      label: planName(plan, t),
       line: `${since}: ${t("≤ {h} h · arrival {a} % · first-time fix {f} %", { h: now.responseHours, a: now.arrivalInWindowPercent, f: now.firstTimeFixPercent })}`,
       scheduled: next.map((x) => t("v{v} from {time}: ≤ {h} h · {a} % · {f} %", { v: x.version, time: showTime(x.effectiveFrom, display), h: x.responseHours, a: x.arrivalInWindowPercent, f: x.firstTimeFixPercent })),
     };

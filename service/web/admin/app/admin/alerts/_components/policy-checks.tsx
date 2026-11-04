@@ -16,14 +16,23 @@ const TONE = { ok: "text-ok", warn: "text-warn", crit: "text-crit", muted: "text
 /** Notification preview (DD-A05 item 7, Figma Admin 38:5 / 268:2, IR348): what one recipient is shown for one of the
 policy's units — `notifications.preview` of the alert template with the policy's (or rule's) severity, as the
 notifier sends it. Read while the section is shown; nothing is stored. The demo shows the same row from its fixture. */
-export function NotificationPreview({ recipients, severity, customerName, unit, demo }: { recipients: PolicyRecipient[]; severity: Severity; customerName: string; unit: Unit | null; demo: boolean }) {
+export function NotificationPreview({ recipients, severity, customerName, unit, demo }: Readonly<{ recipients: PolicyRecipient[]; severity: Severity; customerName: string; unit: Unit | null; demo: boolean }>) {
   const t = useT();
   const i18n = useI18n();
   const [as, setAs] = useState("");
   const who = recipients.find((r) => r.id === as) ?? recipients[0] ?? null;
   const fixture: ApiNotification | null = demo && unit ? {
-    id: "preview", version: 1, type: "fault", sourceAlertId: null, target: { kind: "unit", id: unit.id }, templateKey: "alert", severity,
-    params: { targetName: unit.name, at: "2026-09-14T01:00:00Z", status: "open", reason: null, message: null }, channel: "inApp", occurredAt: "2026-09-14T01:00:00Z", readAt: null,
+    id: "preview",
+    version: 1,
+    type: "fault",
+    sourceAlertId: null,
+    target: { kind: "unit", id: unit.id },
+    templateKey: "alert",
+    params: { targetName: unit.name, at: "2026-09-14T01:00:00Z", status: "open", reason: null, message: null },
+    channel: "inApp",
+    occurredAt: "2026-09-14T01:00:00Z",
+    readAt: null,
+    severity,
   } : null;
   const preview = useOp<ApiNotification, ApiNotification | null>("notifications.preview",
     { target: { kind: "unit", id: unit?.id ?? "" }, templateKey: "alert", channel: "inApp", recipientMembershipId: who?.id ?? "", severity }, fixture, (d) => d, !!unit && !!who);
@@ -73,15 +82,15 @@ const demoDecision = (p: Tested, unitId: string, value: number): NotificationDec
 /** Test with demo data (DD-A05 item 7, Figma Admin 38:5 / 268:2, IR348): the saved policy — or the default policy's saved
 rule — evaluated against one synthetic, valid reading on one of its units (`automations.simulate`; the demo evaluation
 takes the reading as lasting the duration). Nothing is stored. */
-export function DemoTest({ saved, dirty, unit, demo }: { saved: Tested; dirty: boolean; unit: Unit | null; demo: boolean }) {
+export function DemoTest({ saved, dirty, unit, demo }: Readonly<{ saved: Tested; dirty: boolean; unit: Unit | null; demo: boolean }>) {
   const t = useT();
   const toast = useToast();
   const [pending, startTransition] = useTransition();
   const [value, setValue] = useState(String(saved.threshold));
   const [result, setResult] = useState<{ tone: keyof typeof TONE; text: string } | null>(null);
-  const [of, setOf] = useState(`${saved.id}@${saved.version}`);
-  if (of !== `${saved.id}@${saved.version}`) { // another policy or a newer version: start again
-    setOf(`${saved.id}@${saved.version}`);
+  const [of, setOf] = useState(`${saved.id}@${String(saved.version)}`);
+  if (of !== `${saved.id}@${String(saved.version)}`) { // another policy or a newer version: start again
+    setOf(`${saved.id}@${String(saved.version)}`);
     setValue(String(saved.threshold));
     setResult(null);
   }
@@ -120,7 +129,7 @@ export function DemoTest({ saved, dirty, unit, demo }: { saved: Tested; dirty: b
 }
 
 /** The default policy notifies the active users of the unit's customer in-app (IR155 item 3): they are previewed. */
-export function DefaultRulePreview({ unit, customerName, severity, demo }: { unit: Unit; customerName: string; severity: Severity; demo: boolean }) {
+export function DefaultRulePreview({ unit, customerName, severity, demo }: Readonly<{ unit: Unit; customerName: string; severity: Severity; demo: boolean }>) {
   const t = useT();
   const users = useOp<{ items: ApiRecipient[] }, ApiRecipient[]>("notifications.recipients", { target: { kind: "unit", id: unit.id }, templateKey: "alert", channel: "inApp", role: "client", query: { limit: 20 } },
     demo ? [{ id: "customer-a", role: "client", displayLabel: "customer-a", allowedChannels: ["inApp", "email"] }] : [], (d) => d.items);

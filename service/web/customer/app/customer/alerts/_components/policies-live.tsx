@@ -37,7 +37,7 @@ export function PoliciesLive({ p, onDone, onFail }: Props) {
   return p.editor ? <PolicyEditor p={p} editor={p.editor} onDone={onDone} onFail={onFail} /> : <PolicyList p={p} onDone={onDone} onFail={onFail} />;
 }
 
-function PolicyList({ p, onDone, onFail }: Props) {
+function PolicyList({ p, onDone, onFail }: Readonly<Props>) {
   const t = useT();
   const [pending, run] = useAction();
   const [remove, setRemove] = useState<PolicyCard | null>(null);
@@ -93,7 +93,7 @@ function PolicyList({ p, onDone, onFail }: Props) {
   );
 }
 
-function DeleteModal({ c, version, onClose, onFail }: { c: PolicyCard; version: number; onClose: (text?: string) => void; onFail: (f: ActionFailure) => void }) {
+function DeleteModal({ c, version, onClose, onFail }: Readonly<{ c: PolicyCard; version: number; onClose: (text?: string) => void; onFail: (f: ActionFailure) => void }>) {
   const t = useT();
   const [pending, run] = useAction();
   const router = useRouter();

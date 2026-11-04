@@ -94,7 +94,7 @@ describe("one icon library (DEC-74)", () => {
     const problems = files.flatMap((file) => {
       return texts(file).flatMap(({ line, text, button }) => {
         const why = iconProblem(text) ?? (button && signButton(text) ? `the sign ${text.trim()} as a button's only content` : null);
-        return why ? [`${relative(root, file)}:${line} ${JSON.stringify(text.trim().slice(0, 60))} — ${why}; use <Icon name="…" /> (shared/components/Icon.tsx)`] : [];
+        return why ? [`${relative(root, file)}:${String(line)} ${JSON.stringify(text.trim().slice(0, 60))} — ${why}; use <Icon name="…" /> (shared/components/Icon.tsx)`] : [];
       });
     });
     expect(problems).toEqual([]);

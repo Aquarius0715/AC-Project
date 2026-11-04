@@ -59,12 +59,20 @@ export function recordRows(rs: ApiOffsetRecord[], customers: { id: string; name:
   return rs.map((r) => {
     const current = r.attempts.find((a) => a.id === r.currentAttemptId) ?? null;
     return {
-      id: r.id, version: r.version, customer: name.get(r.customerId) ?? t("customer"), amount: `${kg3(r.amountKg)} kgCO₂e`, state: r.state, stateText: stateWord(r.state, t), current, r,
-      currentText: current ? attemptText(current, i) : null, events: r.eventHistory.map((e) => eventItem(e, i)),
+      id: r.id,
+      version: r.version,
+      customer: name.get(r.customerId) ?? t("customer"),
+      amount: `${kg3(r.amountKg)} kgCO₂e`,
+      state: r.state,
+      stateText: stateWord(r.state, t),
+      currentText: current ? attemptText(current, i) : null,
+      events: r.eventHistory.map((e) => eventItem(e, i)),
       stage: r.state === "failed" ? -1 : stageOf[r.state] ?? 0,
       next: r.state === "demo_requested" ? t("Next: confirm the demo purchase") : r.state === "demo_purchased" ? t("Next: demo retirement")
         : r.state === "demo_retired" ? t("{certificate} · retired", { certificate: r.demoCertificateRef ?? "DEMO-…" })
         : r.previousState === "demo_purchased" ? t("Retirement failed · previous: {state}", { state: stateWord(r.previousState, t) }) : t("Purchase failed · previous: {state}", { state: stateWord(r.previousState, t) }),
+      current,
+      r,
     };
   });
 }

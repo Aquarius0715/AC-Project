@@ -19,7 +19,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function Runner({ result, after, failed }: { result: Result; after: (v: string) => void; failed: () => void }) {
+function Runner({ result, after, failed }: Readonly<{ result: Result; after: (v: string) => void; failed: () => void }>) {
   const [pending, run] = useAction();
   return <button disabled={pending} onClick={() => { run(async () => result, (v: string) => `Saved ${v}`, after, failed); }}>go</button>;
 }

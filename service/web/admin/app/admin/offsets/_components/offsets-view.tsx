@@ -24,7 +24,7 @@ const blank: QuoteDraft = { customerId: "", unitIds: [], from: "", to: "", purpo
 purchase / retirement / failure / retry are Server Actions. Nothing here is a real credit, certificate or market.
 Texts in the display language; a quote's period is typed in Kuala Lumpur time, its expiry shown in the user's display
 time zone (IR298). */
-export function OffsetsView({ live }: { live: Live }) {
+export function OffsetsView({ live }: Readonly<{ live: Live }>) {
   const i = useI18n(), { t } = i;
   const nav = useUrlPatch();
   const [pending, run] = useAction();

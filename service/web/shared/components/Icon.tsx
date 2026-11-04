@@ -126,7 +126,7 @@ export type IconName = keyof typeof ICONS;
 
 const cls = (...a: (string | false | undefined)[]) => a.filter(Boolean).join(" ");
 
-export function Icon({ name, className, label, filled }: { name: IconName; className?: string; label?: string; filled?: boolean }) {
+export function Icon({ name, className, label, filled }: Readonly<{ name: IconName; className?: string; label?: string; filled?: boolean }>) {
   const Drawing = ICONS[name];
   return (
     <Drawing

@@ -27,7 +27,7 @@ const summary = (over: Record<string, unknown>) => {
   }) as unknown as ApiPartnerJob;
 };
 const cap = (id: string, date: string, avail: [string, string][], assigned: [string, string][], am: number, unavailability: string | null = null): ApiCapacity =>
-  ({ membershipId: id, date, availableSlots: avail.map(([s, e]) => slot(s, e)), assignedSlots: assigned.map(([s, e]) => slot(s, e)), availableMinutes: am, assignedMinutes: 0, unavailability });
+  ({ membershipId: id, availableSlots: avail.map(([s, e]) => slot(s, e)), assignedSlots: assigned.map(([s, e]) => slot(s, e)), availableMinutes: am, assignedMinutes: 0, date, unavailability });
 const workday = (d: string): [string, string] => [`${d}T01:00:00Z`, `${d}T09:00:00Z`];
 
 describe("partner schedule", () => {

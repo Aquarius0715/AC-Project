@@ -5,7 +5,7 @@ import { EN, i18nOf } from "@ac/web/lib/i18n";
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Kuala_Lumpur" });
 const NOW = Date.parse("2026-09-14T01:35:00Z"); // 09:35 in Kuala Lumpur
 const reading = (id: string, metric: string, value: number | null, unit: string, at: string, origin: ApiEvidenceCandidate["origin"] = "measured"): ApiEvidenceCandidate =>
-  ({ id, kind: "remeasurement", observedAt: at, metric, value, unit, origin, quality: "valid", eventType: null });
+  ({ id, metric, value, unit, origin, kind: "remeasurement", observedAt: at, quality: "valid", eventType: null });
 const items: ApiEvidenceCandidate[] = [
   reading("m-temp", "temperature", 26.4, "°C", "2026-09-14T01:20:00Z"),
   reading("m-co2", "co2", 650, "ppm", "2026-09-14T01:15:00Z", "inspection"),
@@ -35,7 +35,7 @@ describe("alert resolution evidence (IR327)", () => {
     expect(evidenceHeading(false, EN.t)).toEqual({ title: "Resolution evidence · optional", sub: "A policy alert may also be resolved by hand without evidence" });
     expect(evidenceProblem(true, [], EN.t)).toBe("Pick at least one evidence record — this alert has no policy");
     expect([evidenceProblem(true, ["m-temp"], EN.t), evidenceProblem(false, [], EN.t)]).toEqual([null, null]);
-    expect(evidenceProblem(false, Array.from({ length: MAX_EVIDENCE + 1 }, (_, i) => `m${i}`), EN.t)).toBe("Pick at most 20 evidence records");
+    expect(evidenceProblem(false, Array.from({ length: MAX_EVIDENCE + 1 }, (_, i) => `m${String(i)}`), EN.t)).toBe("Pick at most 20 evidence records");
   });
 
   it("says why the Core API refused the evidence, and nothing for another refusal", () => {

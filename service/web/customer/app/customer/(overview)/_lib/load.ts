@@ -103,7 +103,7 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
         const card = ruleCard(a, u ? { name: u.displayName, path: place.get(u.id)?.place ?? "", property: properties.find((p) => p.id === u.propertyId)?.name ?? "" } : null, nexts[k], !!consent?.granted, i);
         const line = nexts[k] ? t("Next run: {when} · {unit}", { when: nextRunText(nexts[k]!, nowMs, i), unit: u?.displayName ?? "AC" })
           : (triggerOf(a) === "location" ? t("{when} · location consent: {state}", { when: card.when, state: t(consent?.granted ? "granted" : "not granted") }) : card.when);
-        return { id: a.id, name: a.name, line, status: card.status };
+        return { id: a.id, name: a.name, status: card.status, line };
       }),
     },
   };

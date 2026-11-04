@@ -35,16 +35,16 @@ const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 /** “60 s”, “15 min”, “3 h”. */
 export function durationText(s: number): string {
-  if (s >= 3600 && s % 3600 === 0) return `${s / 3600} h`;
-  if (s >= 60 && s % 60 === 0) return `${s / 60} min`;
-  return `${s} s`;
+  if (s >= 3600 && s % 3600 === 0) return `${String(s / 3600)} h`;
+  if (s >= 60 && s % 60 === 0) return `${String(s / 60)} min`;
+  return `${String(s)} s`;
 }
 /** “Room temperature ≥ 30 °C for 60 s”, “No heartbeat for 15 min”. */
 export function conditionText(c: { metric: string; operator: Operator; threshold: number; durationSeconds: number }, t: T = en): string {
   if (c.metric === "heartbeat_gap") return t("No heartbeat for {n} min", { n: c.threshold });
   const unit = metricUnit[c.metric] ?? "";
-  const value = unit === "%" || unit === "cycles/h" ? `${c.threshold}${unit === "%" ? " %" : " cycles / h"}` : `${c.threshold}${unit ? ` ${unit}` : ""}`;
-  return t("{metric} {op} {value} for {duration}", { metric: label[c.metric] ? t(label[c.metric]) : c.metric, op: opSymbol[c.operator], value, duration: durationText(c.durationSeconds) });
+  const value = unit === "%" || unit === "cycles/h" ? `${String(c.threshold)}${unit === "%" ? " %" : " cycles / h"}` : `${String(c.threshold)}${unit ? ` ${unit}` : ""}`;
+  return t("{metric} {op} {value} for {duration}", { metric: label[c.metric] ? t(label[c.metric]) : c.metric, op: opSymbol[c.operator], duration: durationText(c.durationSeconds), value });
 }
 /** “on weekdays”, “on weekends”, “on Mon, Wed”, or "" for every day. */
 const daysText = (weekdays: number[], t: T) => {
@@ -73,7 +73,7 @@ export function defaultRuleRows(p: ApiDefaultPolicy, customerId: string | null, 
     const s = mine.get(r.ruleKey)!;
     return t("Turned off: “{rule}” — no alerts from this rule on any of your ACs (turned off {by}, {date}). HQ still sees device status.", { rule: r.name, by: t(s.changedByMembershipId === me ? "by you" : "by the account owner"), date: showDate(s.updatedAt, i.display) });
   });
-  return { rows, on: rows.filter((r) => r.enabled).length, notes };
+  return { on: rows.filter((r) => r.enabled).length, rows, notes };
 }
 
 export interface PolicyCard {
@@ -145,7 +145,7 @@ export function summaryText(f: PolicyForm, t: T = en): string {
   const what = f.metric === "co2" || f.metric === "pm25" ? label[f.metric] : (label[f.metric] ? t(label[f.metric]) : f.metric).toLowerCase();
   const isUp = f.operator === "gt" || f.operator === "gte";
   return t(isUp ? "{verb} when {what} stays {op} {value} {unit} for {duration}{window}. Clears below {recovery} {unit}." : "{verb} when {what} stays {op} {value} {unit} for {duration}{window}. Clears above {recovery} {unit}.",
-    { verb, what, op: opSymbol[f.operator], value: f.threshold || "…", unit, duration: s === null ? "…" : durationText(s), window: win, recovery: f.recovery || "…" }).replaceAll(/ +/g, " ");
+    { verb, what, unit, op: opSymbol[f.operator], value: f.threshold || "…", duration: s === null ? "…" : durationText(s), window: win, recovery: f.recovery || "…" }).replaceAll(/ +/g, " ");
 }
 /** policies.save input (AlertPolicyInput): the form plus the hidden fields — new: the session membership as recipient,
 escalation 60, cooldown 5, the Preferences time zone, priority 50; edit: the policy's own (IR120). */

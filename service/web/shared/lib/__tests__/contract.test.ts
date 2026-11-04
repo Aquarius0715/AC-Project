@@ -87,7 +87,7 @@ describe("the web's calls against the Core API contract (IR312)", () => {
       const visit = (n: ts.Node) => {
         if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && ["coreOp", "callOp", "coreAll"].includes(n.expression.text) && n.arguments[0] && ts.isStringLiteral(n.arguments[0])) {
           const op = n.arguments[0].text;
-          const where = `${relative(web, f)}:${sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1}`;
+          const where = `${relative(web, f)}:${String(sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1)}`;
           const fields = inputs.get(op);
           if (!fields) problems.push(`${where} ${op}: not an operation of the contract`);
           const arg = n.arguments[1];
@@ -132,7 +132,10 @@ describe("the browser's calls through the BFF relay", () => {
       const visit = (n: ts.Node) => {
         if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && ["callOp", "useOp"].includes(n.expression.text) && n.arguments[0] && ts.isStringLiteral(n.arguments[0])) {
           calls++;
-          if (coreWrites.has(n.arguments[0].text)) problems.push(`${relative(web, f)}:${sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1} ${n.arguments[0].text}`);
+          if (coreWrites.has(n.arguments[0].text)) {
+        const line = sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1;
+        problems.push(`${relative(web, f)}:${String(line)} ${n.arguments[0].text}`);
+      }
         }
         ts.forEachChild(n, visit);
       };

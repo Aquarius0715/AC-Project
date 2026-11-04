@@ -35,9 +35,13 @@ export async function loadAlerts(sp: Record<string, string | string[] | undefine
   const pid = one(sp.policyId);
   const editing = pid === "new" ? null : policies.find((p) => p.id === pid) ?? null;
   return {
-    now: now.toISOString(), display, tab, severity, unreadOnly: isUnreadOnly, unitId: units.some((u) => u.id === unitId) ? unitId! : null,
+    now: now.toISOString(),
+    unreadOnly: isUnreadOnly,
+    unitId: units.some((u) => u.id === unitId) ? unitId! : null,
     units: units.map((u) => ({ id: u.id, name: u.displayName, place: place.get(u.id)?.place ?? "" })).sort((a, b) => a.name.localeCompare(b.name)),
-    alertCount: summary.counts.alertCount, total: all.length, unread: all.filter((a) => a.unread.length).length,
+    alertCount: summary.counts.alertCount,
+    total: all.length,
+    unread: all.filter((a) => a.unread.length).length,
     rows: isUnreadOnly ? all.filter((a) => a.unread.length) : all,
     policies: {
       count: policies.length + (def ? 1 : 0), owner: me.clientRole === "owner", customerId: me.customerId, membershipId: me.membershipId, timezone: prefs?.timezone ?? "Asia/Kuala_Lumpur",
@@ -46,6 +50,9 @@ export async function loadAlerts(sp: Record<string, string | string[] | undefine
       // the editor (policyId=new or an own policy's id, Figma 06f); an unknown id shows the list
       editor: pid === "new" ? { policy: null, form: policyForm(null), attached: [] as string[] } : (editing ? { policy: editing, form: policyForm(editing), attached: editing.unitIds.map((id) => place.get(id)?.name ?? "AC") } : null),
     },
+    display,
+    tab,
+    severity,
   };
 }
 

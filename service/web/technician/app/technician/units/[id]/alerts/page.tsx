@@ -10,7 +10,7 @@ import { MockAlertEvidence } from "./_components/mock-evidence";
 import { loadAlerts } from "./_lib/load";
 import { Icon } from "@ac/web/components/Icon";
 
-export default async function TechnicianAlertsPage({ params, searchParams }: PageProps<"/technician/units/[id]/alerts">) {
+export default async function TechnicianAlertsPage({ params, searchParams }: Readonly<PageProps<"/technician/units/[id]/alerts">>) {
   const { id } = await params;
   const sp = await searchParams;
   await connection();

@@ -6,7 +6,7 @@ import type { ApiCommand } from "@ac/web/lib/units";
 const callOp = vi.hoisted(() => vi.fn());
 vi.mock("@ac/web/lib/ops", () => ({ callOp }));
 
-const cmd = (status: ApiCommand["status"]): ApiCommand => ({ id: "c1", action: { kind: "set_temperature", celsius: 24 }, status, requestedAt: "2026-09-15T01:45:01Z", failureCode: status === "failed" ? "OFFLINE" : null });
+const cmd = (status: ApiCommand["status"]): ApiCommand => ({ id: "c1", action: { kind: "set_temperature", celsius: 24 }, requestedAt: "2026-09-15T01:45:01Z", failureCode: status === "failed" ? "OFFLINE" : null, status });
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => {

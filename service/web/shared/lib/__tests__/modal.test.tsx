@@ -6,7 +6,7 @@ import { Modal } from "@ac/web/components/ui";
 
 afterEach(cleanup);
 
-function Harness({ fields = true, inner = false }: { fields?: boolean; inner?: boolean }) {
+function Harness({ fields = true, inner = false }: Readonly<{ fields?: boolean; inner?: boolean }>) {
   const [open, setOpen] = useState(false);
   const [second, setSecond] = useState(false);
   return (
@@ -20,7 +20,7 @@ function Harness({ fields = true, inner = false }: { fields?: boolean; inner?: b
   );
 }
 // a list whose row the dialog removes: the row's button opened it, so focus goes to the list (IR612)
-function Removal({ start = ["a"] }: { start?: string[] }) {
+function Removal({ start = ["a"] }: Readonly<{ start?: string[] }>) {
   const [rows, setRows] = useState(start);
   const [open, setOpen] = useState(false);
   const gone = useRef(false);

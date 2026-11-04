@@ -21,7 +21,7 @@ const kinds: ActionKind[] = ["defer", "exempt", "cancel", "override"];
 /** Grace periods, exceptions, cancellation and manual release (FR-A10) in API mode. Each action card states the
 transition for the current state before saving (IR96 / IR35); every action needs a reason and the version read.
 Texts in the display language; the grace or exception end is typed in the display time zone (IR301). */
-export function ExceptionView({ live }: { live: Live }) {
+export function ExceptionView({ live }: Readonly<{ live: Live }>) {
   const i = useI18n(), { t } = i, zone = i.display.timeZone;
   const [pending, run] = useAction();
   const { r } = live;
@@ -72,7 +72,7 @@ export function ExceptionView({ live }: { live: Live }) {
               );
             })}</div>
             {isNeedsDate && <div className="mt-4 max-w-xs"><Field label={t("Until · future, at most 90 days")} error={tried ? dateErr : undefined} hint={t("Expiry never reapplies the restriction — conditions are checked again · times in {zone}", { zone })}><Input type="datetime-local" value={until} onChange={(e) => { setUntil(e.target.value); }} /></Field></div>}
-            <div className="mt-3"><Field label={t("Reason · required")} error={tried ? reasonErr : undefined} hint={`${reason.length} / 1000`}><Textarea value={reason} maxLength={1000} onChange={(e) => { setReason(e.target.value); }} /></Field></div>
+            <div className="mt-3"><Field label={t("Reason · required")} error={tried ? reasonErr : undefined} hint={`${String(reason.length)} / 1000`}><Textarea value={reason} maxLength={1000} onChange={(e) => { setReason(e.target.value); }} /></Field></div>
             <div className="mt-3 flex justify-end"><Btn variant={act === "override" ? "danger" : "primary"} disabled={pending || !outcome.allowed || !allowedFor(act)} onClick={save}>{button[act]}</Btn></div>
           </Card>
           <Card title={t("What happens")}><ul className="list-disc pl-5 text-[13px]"><li>{outcome.result}</li><li>{t("A release still needs per-unit evidence (released or not required)")}</li><li>{t("Cause invoices stay unpaid — no action here settles billing")}</li><li>{t("Before/after, expiry, reason and your name are recorded in the audit log")}</li></ul></Card>
@@ -89,7 +89,7 @@ export function ExceptionView({ live }: { live: Live }) {
             {isRelease && <Banner>{t("Release view (restriction.override only): billing fields are not shown.")}</Banner>}
             <SummaryList items={[
               [t("Policy"), policyText(r.policy, t)], [t("Units"), live.units.map((u) => `${u.name} · ${u.apply}/${u.release}`).join(", ") || "—"],
-              ...(isRelease ? [] : [[t("Cause invoices"), `${r.causeInvoiceIds?.length ?? 0}`] as [string, string]]),
+              ...(isRelease ? [] : [[t("Cause invoices"), String(r.causeInvoiceIds?.length ?? 0)] as [string, string]]),
               [t("Grace / exception"), live.period ?? t("none")], [t("Release intent"), live.intent],
               [t("Your permissions"), [live.canWrite && "restriction.write", live.canOverride && "restriction.override", live.canAudit && "audit.read"].filter(Boolean).join(" · ") || t("read only")],
             ]} />

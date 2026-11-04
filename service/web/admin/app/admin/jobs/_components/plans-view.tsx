@@ -25,7 +25,7 @@ const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 /** HQ maintenance plans (FR-A06 Plans tab, DD-A06 item 9, D16, Figma Admin 06 283:2 / 360:414) from the Core API. Texts
 in the display language; the next date is typed and shown in the display time zone, the first render's dates come
 from the loader (IR291). */
-export function PlansView({ live }: { live: PlansLive }) {
+export function PlansView({ live }: Readonly<{ live: PlansLive }>) {
   const t = useT();
   const [creating, setCreating] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -49,7 +49,7 @@ export function PlansView({ live }: { live: PlansLive }) {
             ))}</div>
           )}
         </Card>
-        {sel ? <PlanDetail key={`${sel.plan.id}:${sel.plan.version}`} d={sel} now={Date.parse(live.now)} notice={notice?.planId === sel.plan.id ? notice : null} setNotice={setNotice} />
+        {sel ? <PlanDetail key={`${sel.plan.id}:${String(sel.plan.version)}`} d={sel} now={Date.parse(live.now)} notice={notice?.planId === sel.plan.id ? notice : null} setNotice={setNotice} />
           : <Card title={t("Plan")}><p className="text-[13px] text-muted-foreground">{t("missing" in live ? "That plan no longer exists in your scope." : (live.rows.length > 0 ? "Pick a plan." : "No plan yet."))}</p></Card>}
       </div>
       {creating && <NewPlanModal live={live} onClose={() => { setCreating(false); }} onCreated={(id) => { setCreating(false); setNotice({ planId: id, kind: "saved", text: t("Plan created — Generate job creates the job of its first occurrence.") }); }} href={href} />}
@@ -57,7 +57,7 @@ export function PlansView({ live }: { live: PlansLive }) {
   );
 }
 
-function PlanDetail({ d, now, notice, setNotice }: { d: Detail; now: number; notice: Notice | null; setNotice: (n: Notice | null) => void }) {
+function PlanDetail({ d, now, notice, setNotice }: Readonly<{ d: Detail; now: number; notice: Notice | null; setNotice: (n: Notice | null) => void }>) {
   const i = useI18n(), { t } = i, zone = i.display.timeZone;
   const p = d.plan;
   const [pending, run] = useAction();
@@ -66,7 +66,7 @@ function PlanDetail({ d, now, notice, setNotice }: { d: Detail; now: number; not
   const nextIso = next ? fromZonedInput(next, zone) || null : null;
   const isNextChanged = !!nextIso && Date.parse(nextIso) !== Date.parse(p.nextDueAt);
   const isDirty = every !== p.recurrence.intervalMonths || isNextChanged;
-  const errors = planErrors({ unitId: p.unitId, every, nextDueAt: isNextChanged ? nextIso : p.nextDueAt }, now, t);
+  const errors = planErrors({ unitId: p.unitId, nextDueAt: isNextChanged ? nextIso : p.nextDueAt, every }, now, t);
   const anchor = nextIso ? anchorOf(isNextChanged ? null : p, isNextChanged ? nextIso : p.nextDueAt) : p.anchorDay;
   // the saved plan's following date comes from the loader; an edit computes it here
   const then = isDirty ? (nextIso ? planDate(nextOccurrence(isNextChanged ? nextIso : p.nextDueAt, every, anchor), i.display) : null) : d.texts.then;
@@ -123,7 +123,7 @@ function PlanDetail({ d, now, notice, setNotice }: { d: Detail; now: number; not
 }
 
 /** + New plan (plans.save without an id): the unit, every 1–12 months and the first date (display zone → UTC). */
-function NewPlanModal({ live, onClose, onCreated, href }: { live: PlansLive; onClose: () => void; onCreated: (id: string) => void; href: (id: string) => string }) {
+function NewPlanModal({ live, onClose, onCreated, href }: Readonly<{ live: PlansLive; onClose: () => void; onCreated: (id: string) => void; href: (id: string) => string }>) {
   const i = useI18n(), { t } = i, zone = i.display.timeZone;
   const router = useRouter();
   const now = Date.parse(live.now);
@@ -140,7 +140,7 @@ function NewPlanModal({ live, onClose, onCreated, href }: { live: PlansLive; onC
     setTried(true);
     setRefusal(null);
     if (Object.keys(errors).length > 0) return;
-    run(() => savePlan({ id: null, version: null, unitId, intervalMonths: every, nextDueAt: nextIso! }), t("Plan created"), (v) => { onCreated(v.id); router.push(href(v.id)); }, (f) => { setRefusal(planRefusal(f, t)); });
+    run(() => savePlan({ id: null, version: null, intervalMonths: every, nextDueAt: nextIso!, unitId }), t("Plan created"), (v) => { onCreated(v.id); router.push(href(v.id)); }, (f) => { setRefusal(planRefusal(f, t)); });
   };
   const groups = [...new Set(live.units.map((u) => u.customer))];
   const anchor = nextIso ? new Date(nextIso).getUTCDate() : null;

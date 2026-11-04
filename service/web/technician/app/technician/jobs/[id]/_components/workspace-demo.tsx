@@ -22,7 +22,7 @@ export function WorkspaceDemo({ id }: { id: string }) {
 }
 
 /** Assignment from the shared store (IR113): accept (受領) or “can’t make this time”. */
-function LiveAssignment({ j }: { j: Job }) {
+function LiveAssignment({ j }: Readonly<{ j: Job }>) {
   const toast = useToast();
   const [cant, setCant] = useState(false);
   const [reason, setReason] = useState<"training" | "overrun" | "sick" | "other">("other");
@@ -59,7 +59,7 @@ function LiveAssignment({ j }: { j: Job }) {
   );
 }
 
-function Workspace({ id }: { id: string }) {
+function Workspace({ id }: Readonly<{ id: string }>) {
   type R = "normal" | "attention" | "not_inspected" | "not_applicable" | null;
   const toast = useToast();
   // URL key `tab` selects the checklist group (SCR-T04: indoor default · outdoor · electrical, IR115).
@@ -93,7 +93,7 @@ function Workspace({ id }: { id: string }) {
   const submit = () => {
     const e: string[] = [];
     const nul = all.length - done;
-    if (nul) e.push(`${nul} items still null — each needs a result, or not_inspected / not_applicable with a reason.`);
+    if (nul) e.push(`${String(nul)} items still null — each needs a result, or not_inspected / not_applicable with a reason.`);
     if (work.trim().length < 10) e.push("Work performed must be 10–4000 characters.");
     for (const [k, v] of Object.entries(res)) { if ((v === "not_inspected" || v === "not_applicable") && !why[k]?.trim()) e.push(`${k}: reason required.`); }
     setErrs(e);
@@ -148,7 +148,7 @@ function Workspace({ id }: { id: string }) {
         <Field label="Replaces checklist item (optional)"><Select><option>—</option><option>Filter (Attention)</option></Select></Field>
       </Modal>
       <Modal open={signModal} onClose={() => { setSignModal(false); }} title="Customer sign-off" footer={<><Btn onClick={() => { setSignModal(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setSigned("Ms Tan · 11:52"); setSignModal(false); toast("Signature saved for report v2"); }}>Save signature</Btn></>}>
-        <SummaryList items={[["Report", "draft v2 · 7 / 18 results"], ["Parts", `${parts.length} lines`], ["Time on site", "10:05 – now"]]} />
+        <SummaryList items={[["Report", "draft v2 · 7 / 18 results"], ["Parts", `${String(parts.length)} lines`], ["Time on site", "10:05 – now"]]} />
         <Field label="Signer name"><Input defaultValue="Ms Tan" /></Field>
         <div className="grid h-32 place-items-center rounded-xl border border-dashed border-line text-xs text-muted-foreground"><span className="flex items-center gap-1"><Icon name="signature" />Sign here</span></div>
         <p className="text-[11px] text-muted-foreground">The signature is bound to this report version; saving the draft again clears it.</p>
@@ -162,7 +162,7 @@ function Workspace({ id }: { id: string }) {
   );
 }
 
-function PartsView({ parts, readOnly, onRemove }: { parts: { p: string; c: string; src: string; q: number; lot: string }[]; readOnly: boolean; onRemove: (i: number) => void }) {
+function PartsView({ parts, readOnly, onRemove }: Readonly<{ parts: { p: string; c: string; src: string; q: number; lot: string }[]; readOnly: boolean; onRemove: (i: number) => void }>) {
   return (
     <div className="flex flex-col gap-3">
       <DataTable rowKey={(r) => r.p} rows={parts} cols={[{ key: "p", label: "Part", render: (r) => <div><b>{r.p}</b><div className="text-[11px] text-muted-foreground">{r.c}</div></div> }, { key: "s", label: "Source", render: (r) => r.src }, { key: "q", label: "Qty", render: (r) => r.q }, { key: "l", label: "Lot / serial", render: (r) => r.lot }, { key: "x", label: "", render: (r) => <Plain disabled={readOnly} className="text-xs font-semibold text-primary" onClick={() => { onRemove(parts.indexOf(r)); }}>Remove</Plain> }]} />

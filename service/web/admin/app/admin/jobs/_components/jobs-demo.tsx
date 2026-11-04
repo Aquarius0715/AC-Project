@@ -15,7 +15,7 @@ const plans = [
 type Tab = "jobs" | "plans" | "contractors" | "sla";
 
 /** The Phase 1A demo of the maintenance coordinator (fixture jobs, plans, contractors and SLA). */
-export function JobsDemo({ jobId, tab: initial }: { jobId?: string; tab?: string }) {
+export function JobsDemo({ jobId, tab: initial }: Readonly<{ jobId?: string; tab?: string }>) {
   const sp = { jobId, tab: initial };
   const jobs = useJobs();
   const [tab, setTab] = useState<Tab>((["plans", "contractors", "sla"].includes(sp.tab ?? "") ? sp.tab : "jobs") as Tab);
@@ -89,7 +89,7 @@ export function PlansDemo() {
 function rowLine(j: Job) {
   if (j.followUpClass === "pending") return `Follow-up of ${j.followUpOf} · classify by 09-23 11:05`;
   switch (j.status) {
-    case "requested": { return j.declined ? `Client declined · round ${j.round} · ${j.preferred.length} new times` : `${j.preferred.length} preferred times · book one or propose`;
+    case "requested": { return j.declined ? `Client declined · round ${String(j.round)} · ${String(j.preferred.length)} new times` : `${String(j.preferred.length)} preferred times · book one or propose`;
     }
     case "time_proposed": { return `Proposed ${fmt(j.proposal?.slot)} · reply by ${j.proposal?.replyBy}`;
     }
@@ -104,7 +104,7 @@ function rowLine(j: Job) {
   }
 }
 
-function JobDetail({ j, open }: { j: Job; open: (m: { kind: "book"; slot: Slot } | { kind: "propose" } | { kind: "reason"; what: "rework" | "hold" | "reassign" } | { kind: "classify" }) => void }) {
+function JobDetail({ j, open }: Readonly<{ j: Job; open: (m: { kind: "book"; slot: Slot } | { kind: "propose" } | { kind: "reason"; what: "rework" | "hold" | "reassign" } | { kind: "classify" }) => void }>) {
   const toast = useToast();
   const fits = j.preferred.map(fitFor);
   const isAnyFit = fits.some((f) => f.fits !== "none");
@@ -138,7 +138,7 @@ function JobDetail({ j, open }: { j: Job; open: (m: { kind: "book"; slot: Slot }
       {j.status === "requested" && j.followUpClass !== "pending" && (
         <>
           {j.declined && <Banner tone="crit" icon="error"><b>Client declined the proposed time · {j.declined.at}</b><br />Reason: {j.declined.reason}{j.declined.comment ? ` — “${j.declined.comment}”` : ""}. Held capacity was released.</Banner>}
-          <Card title={`Client’s preferred times${j.round > 1 ? ` (round ${j.round})` : ""} — book one of these`} sub="Availability: qualification + overlap + travel">
+          <Card title={`Client’s preferred times${j.round > 1 ? ` (round ${String(j.round)})` : ""} — book one of these`} sub="Availability: qualification + overlap + travel">
             <DataTable rowKey={(r) => r.i + ""} rows={j.preferred.map((s, i) => ({ s, i, f: fits[i] }))} cols={[
               { key: "r", label: "Rank", render: (r) => <Rank i={r.i} /> },
               { key: "t", label: "Time", render: (r) => <b>{longDate(r.s)}</b> },
@@ -202,7 +202,7 @@ function JobDetail({ j, open }: { j: Job; open: (m: { kind: "book"; slot: Slot }
   );
 }
 
-function BookModal({ j, slot, onClose }: { j: Job; slot: Slot; onClose: () => void }) {
+function BookModal({ j, slot, onClose }: Readonly<{ j: Job; slot: Slot; onClose: () => void }>) {
   const toast = useToast();
   const f = fitFor(slot);
   const [d, setD] = useState<"internal" | "contractor">(f.fits === "both" || f.fits === "internal" ? "internal" : "contractor");
@@ -225,7 +225,7 @@ function BookModal({ j, slot, onClose }: { j: Job; slot: Slot; onClose: () => vo
   );
 }
 
-function ProposeModal({ j, onClose }: { j: Job; onClose: () => void }) {
+function ProposeModal({ j, onClose }: Readonly<{ j: Job; onClose: () => void }>) {
   const toast = useToast();
   const [date, setDate] = useState("2026-10-01");
   const [win, setWin] = useState("10:00–12:00");
@@ -252,7 +252,7 @@ function ProposeModal({ j, onClose }: { j: Job; onClose: () => void }) {
   );
 }
 
-function NewJobModal({ onClose, onDone }: { onClose: () => void; onDone: (id: string) => void }) {
+function NewJobModal({ onClose, onDone }: Readonly<{ onClose: () => void; onDone: (id: string) => void }>) {
   const toast = useToast();
   const [sym, setSym] = useState("");
   const [slots, setSlots] = useState<Slot[]>([{ date: "2026-10-05", win: "10:00–12:00" }, { date: "2026-10-06", win: "14:00–16:00" }, { date: "2026-10-07", win: "09:00–11:00" }]);
@@ -268,7 +268,7 @@ function NewJobModal({ onClose, onDone }: { onClose: () => void; onDone: (id: st
   );
 }
 
-function ClassifyModal({ j, onClose }: { j: Job; onClose: () => void }) {
+function ClassifyModal({ j, onClose }: Readonly<{ j: Job; onClose: () => void }>) {
   const toast = useToast();
   const [cls, setCls] = useState<"rework" | "new_request">("rework");
   const [r, setR] = useState("");
@@ -284,7 +284,7 @@ function ClassifyModal({ j, onClose }: { j: Job; onClose: () => void }) {
   );
 }
 
-function ReasonModal({ what, j, onClose }: { what: "rework" | "hold" | "reassign"; j: Job; onClose: () => void }) {
+function ReasonModal({ what, j, onClose }: Readonly<{ what: "rework" | "hold" | "reassign"; j: Job; onClose: () => void }>) {
   const toast = useToast();
   const [r, setR] = useState("");
   const [tried, setTried] = useState(false);

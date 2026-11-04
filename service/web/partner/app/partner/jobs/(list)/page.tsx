@@ -6,7 +6,7 @@ import { JobsDemo } from "./_components/jobs-demo";
 import { JobsView } from "./_components/jobs-view";
 import { loadJobs } from "./_lib/load";
 
-export default async function PartnerJobsPage({ searchParams }: PageProps<"/partner/jobs">) {
+export default async function PartnerJobsPage({ searchParams }: Readonly<PageProps<"/partner/jobs">>) {
   await connection();
   const sp = await searchParams;
   const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);

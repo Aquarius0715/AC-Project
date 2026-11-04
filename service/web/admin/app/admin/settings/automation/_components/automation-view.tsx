@@ -23,12 +23,12 @@ const compares: { id: Compare; label: string }[] = [{ id: "gt", label: ">" }, { 
 /** HQ automation policies (FR-A11) in API mode: the scope and the selected policy live in the URL; saving, simulating
 and firing (demo) are Server Actions. Tier order: capabilities / restrictions → HQ policies → customer rules. Texts
 in the display language (IR303). */
-export function AutomationView({ live }: { live: Live }) {
+export function AutomationView({ live }: Readonly<{ live: Live }>) {
   const t = useT();
   const nav = useUrlPatch();
   const [pending, run] = useAction();
   const sel = live.isNew ? null : live.selected;
-  const key = sel ? `${sel.id}:${sel.version}` : "new";
+  const key = sel ? `${sel.id}:${String(sel.version)}` : "new";
   const [source, setSource] = useState(key);
   const [d, setD] = useState<AutoDraft>(autoDraft(sel ?? undefined));
   const [tried, setTried] = useState(false);

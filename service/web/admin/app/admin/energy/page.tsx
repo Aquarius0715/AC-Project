@@ -21,7 +21,7 @@ export default async function AdminEnergyPage(props: PageProps<"/admin/energy">)
   return withAccess("Energy analysis", ["energy.read", "asset.read"], () => AdminEnergyPageContent(props));
 }
 
-async function AdminEnergyPageContent({ searchParams }: PageProps<"/admin/energy">) {
+async function AdminEnergyPageContent({ searchParams }: Readonly<PageProps<"/admin/energy">>) {
   interface Unit { id: string; displayName: string; customerOrgId: string; propertyId: string; archived: boolean }
   await connection();
   if (!apiMode()) return <EnergyDemo />;
@@ -40,7 +40,10 @@ async function AdminEnergyPageContent({ searchParams }: PageProps<"/admin/energy
   const unitOptions = units.items.filter((u) => !u.archived).map((u) => ({ id: u.id, label: u.displayName, customerId: customerOfOrg.get(u.customerOrgId) ?? "", propertyId: u.propertyId }));
   const scope = { customerId: one("customerId"), propertyId: one("propertyId"), unitId: one("unitId") };
   const live: EnergyLive = {
-    tab, canWrite: perms.has("energy.write"), scope, units: unitOptions,
+    tab,
+    scope,
+    canWrite: perms.has("energy.write"),
+    units: unitOptions,
     customers: customers.items.map((c) => ({ id: c.id, name: c.name })),
     properties: properties.items.filter((p) => !p.archived).map((p) => ({ id: p.id, name: p.name, customerId: customerOfOrg.get(p.customerOrgId) ?? "" })),
     baselines: baselineRows(all.items, i.t),
@@ -61,7 +64,7 @@ async function AdminEnergyPageContent({ searchParams }: PageProps<"/admin/energy
         error = actionMessage({ code: error_.error.code, messageKey: error_.error.messageKey, fieldErrors: error_.error.fieldErrors ?? {}, retryAfterSeconds: error_.error.retryAfterSeconds }, i.t);
       }
     }
-    live.analysis = { unitIds, from: klLocal(from), to: klLocal(to), baselineId: baseline?.id ?? null, summary: summary ? summaryView(summary, i) : null, error };
+    live.analysis = { from: klLocal(from), to: klLocal(to), baselineId: baseline?.id ?? null, summary: summary ? summaryView(summary, i) : null, unitIds, error };
   } else {
     const filters = {
       ...(scope.customerId && { customerId: scope.customerId }), ...(scope.propertyId && { propertyId: scope.propertyId }), ...(scope.unitId && { unitId: scope.unitId }),

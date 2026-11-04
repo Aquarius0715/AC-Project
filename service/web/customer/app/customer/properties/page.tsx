@@ -17,7 +17,7 @@ import { roomUnits } from "@ac/web/lib/clientProperties";
 import { PropertiesDemo } from "./_components/properties-demo";
 import { PropertiesView, type PropertiesLive } from "./_components/properties-view";
 
-export default async function CustomerPropertiesPage({ searchParams }: PageProps<"/customer/properties">) {
+export default async function CustomerPropertiesPage({ searchParams }: Readonly<PageProps<"/customer/properties">>) {
   await connection();
   if (!apiMode()) return <PropertiesDemo />;
   const sp = await searchParams;
@@ -40,13 +40,18 @@ export default async function CustomerPropertiesPage({ searchParams }: PageProps
   const place = (u: ApiUnitRow) => [tree.find((p) => p.id === u.propertyId)?.name ?? "", spacePath(u.spaceId, spaces)].filter(Boolean).join(" › ");
   const p = sel?.property;
   const live: PropertiesLive = {
-    tree, selection: sel, owner: me.clientRole === "owner", filter: isFiltered ? { powerState: powerState ?? null, connections: conns, total: units.length } : null,
-    units: roomUnits(details, i).map((r) => ({ ...r, place: place(units.find((u) => u.id === r.id)!) })), details,
+    tree,
+    details,
+    selection: sel,
+    owner: me.clientRole === "owner",
+    filter: isFiltered ? { powerState: powerState ?? null, connections: conns, total: units.length } : null,
+    units: roomUnits(details, i).map((r) => ({ ...r, place: place(units.find((u) => u.id === r.id)!) })),
     summary: p ? {
       kind: p.kind, floors: flatten(p.spaces).filter((s) => s.kind === "floor").map((s) => s.name), rooms: p.rooms, inRooms: p.units - p.unassigned, unassigned: p.unassigned,
       edited: i.t("{date} · version {n}", { date: showDate(p.updatedAt, display), n: p.version }),
     } : null,
-    mode: one("mode") === "group" ? "group" : "single", selectedUnits: (one("unitIds") ?? "").split(",").filter(Boolean),
+    mode: one("mode") === "group" ? "group" : "single",
+    selectedUnits: (one("unitIds") ?? "").split(",").filter(Boolean),
   };
   return <PropertiesView live={live} />;
 }

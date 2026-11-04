@@ -24,7 +24,7 @@ export function qrPath(text: string): QrPath {
       if (!row[x]) continue;
       let w = 1;
       while (x + w < size && row[x + w]) w++;
-      path += `M${x} ${y}h${w}v1h-${w}z`;
+      path += `M${String(x)} ${String(y)}h${String(w)}v1h-${String(w)}z`;
       x += w - 1;
     }
   }

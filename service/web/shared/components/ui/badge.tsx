@@ -40,11 +40,11 @@ function Badge({
       },
       props
     ),
-    render,
     state: {
       slot: "badge",
       variant,
     },
+    render,
   })
 }
 

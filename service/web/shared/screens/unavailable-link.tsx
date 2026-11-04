@@ -6,7 +6,7 @@ import type { T } from "@ac/web/lib/i18n";
 
 /** The one way on from Page unavailable (IR57), as its primary button: a signed-in user back to their Overview, anyone
 else to sign in (IR571). */
-export async function UnavailableLink({ t, className }: { t: T; className?: string }) {
+export async function UnavailableLink({ t, className }: Readonly<{ t: T; className?: string }>) {
   const s = apiMode() ? await getSession() : null;
   return <LinkBtn href={s ? roleHome[s.role] : "/login"} variant="primary" className={className}>{t(s ? "Go to Overview" : "Go to sign in")} <Icon name="arrowRight" /></LinkBtn>;
 }

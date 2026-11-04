@@ -106,7 +106,7 @@ async function coreCall<T>(operation: string, input: unknown, opts: CoreOptions)
   if (req.body !== undefined) headers["Content-Type"] = "application/json";
   if (opts.write) headers["Idempotency-Key"] = opts.idempotencyKey ?? crypto.randomUUID();
   if (opts.expectedVersion !== undefined) headers["X-Expected-Version"] = String(opts.expectedVersion);
-  const res = await fetch(`${process.env.CORE_API_URL ?? "http://localhost:8080"}${req.path}`, { method: req.method, headers, body: req.body, cache: "no-store" });
+  const res = await fetch(`${process.env.CORE_API_URL ?? "http://localhost:8080"}${req.path}`, { method: req.method, body: req.body, cache: "no-store", headers });
   const body = await res.json().catch(() => null);
   // the Core API no longer takes this sign-in (HQ signed the user out everywhere, IR384, or the membership ended): the
   // stored session goes too, so the next page asks to sign in; the caller still gets the refusal (IR385)

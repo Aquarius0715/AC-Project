@@ -31,10 +31,26 @@ const demoTimeline = (time: string, st: AlertState): AdminAlert["timeline"] => {
 };
 const demoAlert = (id: string, title: string, time: string, sev: Severity, meta: string): AdminAlert => {
   return {
-    id, version: 1, title, time, sev, meta, state: "open", st: ST.open, unitId: "unit-online-rto", customerId: "customer-a", policyless: id !== "alert-temp-a", inferred: true,
-    unit: "Bedroom AC · unit-online-rto", context: "customer-a · Home A › 1F › Bedroom · Running · Online",
-    evidence: "inferred — “Demo: cooling load rose while the outdoor temperature was stable.”", cause: "window_open (suspected)", observed: `${time} MYT`, detected: `${time} MYT`,
-    evidenceRecords: "none attached", timeline: demoTimeline(time, "open"),
+    id,
+    title,
+    time,
+    sev,
+    meta,
+    version: 1,
+    state: "open",
+    st: ST.open,
+    unitId: "unit-online-rto",
+    customerId: "customer-a",
+    policyless: id !== "alert-temp-a",
+    inferred: true,
+    unit: "Bedroom AC · unit-online-rto",
+    context: "customer-a · Home A › 1F › Bedroom · Running · Online",
+    evidence: "inferred — “Demo: cooling load rose while the outdoor temperature was stable.”",
+    cause: "window_open (suspected)",
+    observed: `${time} MYT`,
+    detected: `${time} MYT`,
+    evidenceRecords: "none attached",
+    timeline: demoTimeline(time, "open"),
   };
 };
 const seedAlerts: AdminAlert[] = [
@@ -55,7 +71,7 @@ interface Live { tab: "alerts" | "policies"; q: Query; scope: Scope; scopeName: 
 
 /** HQ alerts and alert policies. `live` comes from the Server Component in API mode (writes are Server Actions that
 re-render the route); the demo keeps its fixture rows in local state. Texts in the display language (IR292). */
-export function AdminAlertsView({ live }: { live?: Live }) {
+export function AdminAlertsView({ live }: Readonly<{ live?: Live }>) {
   const t = useT();
   const i18n = useI18n();
   const now = useNow();
@@ -221,7 +237,7 @@ export function AdminAlertsView({ live }: { live?: Live }) {
             <EvidencePicker rows={evRows} policyless={a.policyless} picked={sendable} onChange={setPicked} loading={evidence.loading} error={evidence.error ? t("The evidence could not be loaded — close the dialog and try again.") : (tried ? evProblem : null)} />
           </>
         )}
-        <Field label={t("Resolution reason · required")} hint={`${reason.length} / 1000`} error={tried && !reason.trim() ? t("A reason is required") : (tried && reason.length > 1000 ? t("At most 1000 characters") : undefined)}><Textarea value={reason} onChange={(e) => { setReason(e.target.value); }} /></Field>
+        <Field label={t("Resolution reason · required")} hint={`${String(reason.length)} / 1000`} error={tried && !reason.trim() ? t("A reason is required") : (tried && reason.length > 1000 ? t("At most 1000 characters") : undefined)}><Textarea value={reason} onChange={(e) => { setReason(e.target.value); }} /></Field>
         <p className="text-[11px] text-muted-foreground">{t("Resolved alerts stay in history. If the condition returns, a new alert is created.")}</p>
       </Modal>
     </Page>

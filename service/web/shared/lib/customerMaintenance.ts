@@ -100,7 +100,7 @@ export const followUpText = (c: ApiClientJob["followUpClass"], t: T = en) => t(c
 const RANK = ["1st", "2nd", "3rd"];
 /** The preferred times with the booked one marked (request origin, open jobs). */
 export function preferredLines(j: ApiClientJob, i: I18n = EN): { text: string; note: string | null }[] {
-  return j.origin === "periodic_plan" || ["completed", "cancelled"].includes(j.status) ? [] : j.preferredSlots.map((s, k) => ({ text: `${RANK[k] ? i.t(RANK[k]) : `${k + 1}`} · ${slotLong(s, i)}`, note: sameSlot(s, j.scheduledSlot) ? i.t("booked") : null }));
+  return j.origin === "periodic_plan" || ["completed", "cancelled"].includes(j.status) ? [] : j.preferredSlots.map((s, k) => ({ text: `${RANK[k] ? i.t(RANK[k]) : String(k + 1)} · ${slotLong(s, i)}`, note: sameSlot(s, j.scheduledSlot) ? i.t("booked") : null }));
 }
 
 /** The proposal to answer (Figma 07k): who proposes, the time, who comes, the message and the reply deadline. */
@@ -158,7 +158,7 @@ export function preferredError(slots: Slot[], now: number, count = 3, t: T = en)
     const h = (Date.parse(s.endAt) - Date.parse(s.startAt)) / 3_600_000;
     if (!(h >= 1 && h <= 4)) return t("Each time is 1–4 hours long.");
     if (new Date(Date.parse(s.startAt) + 8 * 3_600_000).toISOString().slice(0, 10) <= today) return t("Times start on a later day than today (Kuala Lumpur).");
-    const k = `${Date.parse(s.startAt)}-${Date.parse(s.endAt)}`;
+    const k = `${String(Date.parse(s.startAt))}-${String(Date.parse(s.endAt))}`;
     if (keys.has(k)) return t(count === 3 ? "The 3 times must be different." : "The times must be different.");
     keys.add(k);
   }

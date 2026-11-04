@@ -30,9 +30,9 @@ export function conditionText(c: AutoCondition, t: T = en): string {
     }
     case "peak": { return t(c.active ? "When a peak period is active" : "When no peak period is active");
     }
-    case "tariff": { return `${subjectText("tariff", t)} ${cmp[c.operator]} ${c.value} MYR/kWh`;
+    case "tariff": { return `${subjectText("tariff", t)} ${cmp[c.operator]} ${String(c.value)} MYR/kWh`;
     }
-    default: { return `${subjectText(c.type, t)} ${cmp[c.operator]} ${c.value} kW`;
+    default: { return `${subjectText(c.type, t)} ${cmp[c.operator]} ${String(c.value)} kW`;
     }
   }
 }

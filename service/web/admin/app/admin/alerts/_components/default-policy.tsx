@@ -18,19 +18,19 @@ const SHOWN = 20; // the customers listed before the search-select (DD-A05 item 
 severity as the HQ template — saved for every unit at the policy's version — and, for that rule, the switch of each
 customer with an optional reason (policies.setDefaultRule). A rule whose metric a policy may watch can be copied as a
 customer's policy. The key, name, category and metric of a rule are fixed (IR120 item 2). */
-export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, onCopy, demo }: {
+export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, onCopy, demo }: Readonly<{
   p: AdminPolicy; customers: { id: string; name: string }[]; units: { id: string; name: string; customerId: string | null }[]; canWrite: boolean;
   copyFor: { id: string; name: string } | null; onCopy: (ruleKey: string) => void; demo: boolean;
-}) {
+}>) {
   const t = useT();
   const i18n = useI18n();
   const toast = useToast();
   const [pending, startTransition] = useTransition();
   const [rules, setRules] = useState(p.rules);
-  const [of, setOf] = useState(`${p.id}@${p.version}`);
+  const [of, setOf] = useState(`${p.id}@${String(p.version)}`);
   const [tried, setTried] = useState(false);
-  if (of !== `${p.id}@${p.version}`) {
-    setOf(`${p.id}@${p.version}`);
+  if (of !== `${p.id}@${String(p.version)}`) {
+    setOf(`${p.id}@${String(p.version)}`);
     setRules(p.rules);
     setTried(false);
   }
@@ -49,7 +49,7 @@ export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, on
   const changed = ruleChanges({ ...p, rules }, p);
   const status = tried && broken.length > 0 ? t(broken.length === 1 ? "1 rule to fix · nothing saved: {names}" : "{n} rules to fix · nothing saved: {names}", { n: broken.length, names: broken.map((r) => r.name).join(", ") })
     : (changed.length > 0 ? `${t(changed.length === 1 ? "1 rule changed" : "{n} rules changed", { n: changed.length })} · ${changed.join(", ")}` : t("No unsaved changes"));
-  const sorted = [...customers].sort((a, b) => a.name.localeCompare(b.name));
+  const sorted = [...customers].toSorted((a, b) => a.name.localeCompare(b.name));
   const listed = [...sorted.slice(0, SHOWN), ...sorted.slice(SHOWN).filter((c) => more.includes(c.id))];
   const setting = (customerId: string) => p.settings.find((s) => s.ruleKey === rule.ruleKey && s.customerId === customerId);
   // the demo test runs the saved rule on a unit of the scoped customer, else of any customer (the default policy is on
@@ -156,7 +156,7 @@ export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, on
         <Modal open onClose={() => { setSwitching(null); }} title={t(switching.on ? "Switch “{rule}” on for {name}" : "Switch “{rule}” off for {name}", { rule: rule.name, name: switching.customer.name })}
           footer={<><Btn onClick={() => { setSwitching(null); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending || reason.length > 500} onClick={confirmSwitch}>{t(switching.on ? "Switch on" : "Switch off")}</Btn></>}>
           <p className="text-[13px] text-muted-foreground">{t(switching.on ? "The rule runs again on every unit of {name}." : "The rule stops on every unit of {name}; its limit stays the HQ template for everyone else.", { name: switching.customer.name })}</p>
-          <Field label={t("Reason · optional")} hint={`${reason.length} / 500`} error={reason.length > 500 ? t("At most 500 characters") : undefined}><Textarea value={reason} onChange={(e) => { setReason(e.target.value); }} /></Field>
+          <Field label={t("Reason · optional")} hint={`${String(reason.length)} / 500`} error={reason.length > 500 ? t("At most 500 characters") : undefined}><Textarea value={reason} onChange={(e) => { setReason(e.target.value); }} /></Field>
         </Modal>
       )}
     </Card>

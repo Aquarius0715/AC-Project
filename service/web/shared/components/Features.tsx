@@ -7,7 +7,7 @@ import { Icon } from "./Icon";
 import { Button } from "@ac/web/components/ui/button";
 
 /* ───── Client · Energy export (FR-C16) ───── */
-export function ExportReportModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function ExportReportModal({ open, onClose }: Readonly<{ open: boolean; onClose: () => void }>) {
   const toast = useToast();
   const [fmt, setFmt] = useState<"pdf" | "csv">("pdf");
   const [monthly, setMonthly] = useState(false);
@@ -28,7 +28,7 @@ export function ExportReportModal({ open, onClose }: { open: boolean; onClose: (
 
 /* ───── Client · Group control (FR-C14, IR109) ───── */
 export interface GUnit { id: string; name: string; temp: number | null; w: number | null; state: "running" | "stopped" | "unknown"; online: boolean; min?: number }
-export function GroupControl({ space, units }: { space: string; units: GUnit[] }) {
+export function GroupControl({ space, units }: Readonly<{ space: string; units: GUnit[] }>) {
   const toast = useToast();
   const [sel, setSel] = useState<string[]>(units.filter((u) => u.online).slice(0, 4).map((u) => u.id));
   const [power, setPower] = useState<"on" | "off">("on");
@@ -44,12 +44,12 @@ export function GroupControl({ space, units }: { space: string; units: GUnit[] }
         {units.map((u) => (
           <Button key={u.id} variant="outline" disabled={!u.online} onClick={() => { toggle(u.id); }} aria-pressed={sel.includes(u.id)} className={cx("h-auto justify-start rounded-xl p-3 text-left font-normal whitespace-normal disabled:opacity-60", sel.includes(u.id) ? "border-2 border-primary bg-primary-soft/50" : "border-line bg-surface")}>
             <div className="flex items-center justify-between"><b className="text-[13px]">{u.name}</b><Icon name={sel.includes(u.id) ? "checked" : "unchecked"} className="text-sm" /></div>
-            <div className="text-[11px] text-muted-foreground">{u.temp === null ? "—" : `${u.temp} °C · ${u.w} W`}</div>
+            <div className="text-[11px] text-muted-foreground">{u.temp === null ? "—" : `${String(u.temp)} °C · ${u.w} W`}</div>
             <div className="mt-1 flex gap-1"><PowerBadge s={u.state} />{!u.online && <Badge tone="unknown">Offline</Badge>}{u.min && <Badge tone="warn">min {u.min} °C</Badge>}</div>
           </Button>
         ))}
       </div>
-      <Card title={`Apply to ${sel.length} selected ACs`}>
+      <Card title={`Apply to ${String(sel.length)} selected ACs`}>
         <div className="flex flex-wrap items-center gap-4">
           <Choice value={power} onChange={setPower} options={[{ id: "on", label: "On" }, { id: "off", label: "Off" }]} />
           <div className="flex items-center gap-2"><Btn size="sm" onClick={() => { setTemp((t) => Math.max(16, t - 1)); }} aria-label="Lower the temperature"><Icon name="remove" /></Btn><b className="w-14 text-center">{temp} °C</b><Btn size="sm" onClick={() => { setTemp((t) => Math.min(30, t + 1)); }} aria-label="Raise the temperature"><Icon name="add" /></Btn></div>
@@ -58,8 +58,8 @@ export function GroupControl({ space, units }: { space: string; units: GUnit[] }
         </div>
         <p className="mt-2 text-[11px] text-muted-foreground">Each AC gets its own command and confirmation (same as single control). One space only · owner role only.</p>
       </Card>
-      <Modal open={review} onClose={() => { setReview(false); }} title={`Send to ${chosen.length} ACs in ${space}?`} footer={<><Btn onClick={() => { setReview(false); }}>Back</Btn><Btn variant="primary" onClick={() => { setReview(false); toast(`${chosen.length} commands sent — results arrive per AC`); }}>Send {chosen.length} commands</Btn></>}>
-        <DataTable rowKey={(r) => r.id} rows={chosen} cols={[{ key: "n", label: "AC", render: (r) => <b>{r.name}</b> }, { key: "c", label: "Change", render: (r) => (r.min && temp < r.min ? <span className="text-warn">Set to {r.min} °C (restriction)</span> : `${power === "on" ? "On" : "Off"} · ${temp} °C · ${mode}`) }]} />
+      <Modal open={review} onClose={() => { setReview(false); }} title={`Send to ${String(chosen.length)} ACs in ${space}?`} footer={<><Btn onClick={() => { setReview(false); }}>Back</Btn><Btn variant="primary" onClick={() => { setReview(false); toast(`${String(chosen.length)} commands sent — results arrive per AC`); }}>Send {chosen.length} commands</Btn></>}>
+        <DataTable rowKey={(r) => r.id} rows={chosen} cols={[{ key: "n", label: "AC", render: (r) => <b>{r.name}</b> }, { key: "c", label: "Change", render: (r) => (r.min && temp < r.min ? <span className="text-warn">Set to {r.min} °C (restriction)</span> : `${power === "on" ? "On" : "Off"} · ${String(temp)} °C · ${mode}`) }]} />
         <Banner>Offline or restricted ACs are skipped or clamped and shown per AC. There is no rollback across ACs.</Banner>
       </Modal>
     </div>
@@ -67,12 +67,12 @@ export function GroupControl({ space, units }: { space: string; units: GUnit[] }
 }
 
 /* ───── Admin · CSV import (FR-A18) ───── */
-export function ImportCsvModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function ImportCsvModal({ open, onClose }: Readonly<{ open: boolean; onClose: () => void }>) {
   const toast = useToast();
   const [step, setStep] = useState(0);
   const close = () => { setStep(0); onClose(); };
   return (
-    <Modal wide open={open} onClose={close} title={`Import units from CSV · ${step + 1} / 2`} footer={step === 0 ? <><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setStep(1); }}>Preview <Icon name="arrowRight" /></Btn></> : <><Btn onClick={() => { setStep(0); }}><Icon name="arrowLeft" /> Back</Btn><Btn variant="primary" onClick={() => { close(); toast("22 rows imported · 2 skipped · undo available for 30 min"); }}>Import 22 rows</Btn></>}>
+    <Modal wide open={open} onClose={close} title={`Import units from CSV · ${String(step + 1)} / 2`} footer={step === 0 ? <><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setStep(1); }}>Preview <Icon name="arrowRight" /></Btn></> : <><Btn onClick={() => { setStep(0); }}><Icon name="arrowLeft" /> Back</Btn><Btn variant="primary" onClick={() => { close(); toast("22 rows imported · 2 skipped · undo available for 30 min"); }}>Import 22 rows</Btn></>}>
       <Steps steps={["Upload & mapping", "Preview"]} current={step} />
       {step === 0 ? <>
         <Field label="Customer" hint="Rows are created under this customer only. Properties / floors / rooms that do not exist are created."><Select><option>customer-a · Tan household</option><option>customer-b · Lim Trading Sdn Bhd</option></Select></Field>

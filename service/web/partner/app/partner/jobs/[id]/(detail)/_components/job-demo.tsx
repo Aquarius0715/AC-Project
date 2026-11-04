@@ -11,14 +11,14 @@ const cap = [["tech-external-a", "Refrigerant handling · valid to 2027-03-31", 
 type S = "offer" | "accepted" | "declined" | "expired" | "proposed";
 
 /** The Phase 1A demo offer / job detail (DATA_SOURCE=mock): the shared job store and the seeded offer job-p09. */
-export function JobDemo({ id }: { id: string }) {
+export function JobDemo({ id }: Readonly<{ id: string }>) {
   const live = useJobs().find((j) => j.id === id && j.contractor === "contractor-a" && j.id !== "job-p09");
   if (id === "job-b-offer") return <Page className="max-w-xl"><Card title="This page isn’t available" sub="The page doesn’t exist, or your account can’t open it." /></Page>;
   return live ? <LiveOffer j={live} /> : <StaticOffer id={id} />;
 }
 
 /** Offer backed by the shared job store (e.g. job-c07 after the client accepted HQ’s proposal). */
-function LiveOffer({ j }: { j: Job }) {
+function LiveOffer({ j }: Readonly<{ j: Job }>) {
   const toast = useToast();
   const [modal, setModal] = useState<null | "decline" | "propose">(null);
   const pending = j.partnerProposal && (j.partnerProposal.status === "pending" || j.partnerProposal.status === "sent_to_client");
@@ -63,7 +63,7 @@ function LiveOffer({ j }: { j: Job }) {
   );
 }
 
-function ProposeTimeModal({ j, onClose, onDone }: { j: Pick<Job, "id" | "scheduled">; onClose: () => void; onDone: (slot: { date: string; win: string }, tech: string, reason: string) => void }) {
+function ProposeTimeModal({ j, onClose, onDone }: Readonly<{ j: Pick<Job, "id" | "scheduled">; onClose: () => void; onDone: (slot: { date: string; win: string }, tech: string, reason: string) => void }>) {
   const [date, setDate] = useState("2026-10-02");
   const [win, setWin] = useState("14:00–16:00");
   const [tech, setTech] = useState("tech-external-a");
@@ -80,7 +80,7 @@ function ProposeTimeModal({ j, onClose, onDone }: { j: Pick<Job, "id" | "schedul
   );
 }
 
-function DeclineModal({ id, onClose, onDone }: { id: string; onClose: () => void; onDone: (r: string) => void }) {
+function DeclineModal({ id, onClose, onDone }: Readonly<{ id: string; onClose: () => void; onDone: (r: string) => void }>) {
   const [why, setWhy] = useState("");
   const [tried, setTried] = useState(false);
   return (
@@ -91,7 +91,7 @@ function DeclineModal({ id, onClose, onDone }: { id: string; onClose: () => void
 }
 
 /** Seeded offer job-p09 (periodic plan visit) kept as in the Figma states 02-7…02-10. */
-function StaticOffer({ id }: { id: string }) {
+function StaticOffer({ id }: Readonly<{ id: string }>) {
   const toast = useToast();
   const [s, setS] = useState<S>("offer");
   const [modal, setModal] = useState<null | "decline" | "propose">(null);

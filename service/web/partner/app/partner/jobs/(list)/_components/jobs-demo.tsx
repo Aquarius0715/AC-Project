@@ -10,7 +10,7 @@ import { fmt, useJobs } from "@ac/web/lib/jobs";
 type Row = PJob & { origin: "request" | "plan" };
 
 /** The Phase 1A demo job list (DATA_SOURCE=mock): the fixture jobs and the shared job store. */
-export function JobsDemo({ status }: { status?: string }) {
+export function JobsDemo({ status }: Readonly<{ status?: string }>) {
   type T = "all" | "Offered" | "Active" | "Review" | "Completed";
   const live = useJobs().filter((j) => j.contractor === "contractor-a" && pjobs.every((p) => p.id !== j.id) && j.status !== "cancelled");
   const [tab, setTab] = useState<T>(status === "offered" ? "Offered" : "all");
@@ -33,7 +33,7 @@ export function JobsDemo({ status }: { status?: string }) {
   const count = (t: T) => rows.filter((j) => match(j, t)).length;
   return (
     <Page>
-      <PageHead title="Jobs" sub={`contractor-a only · ${rows.length} this week`} />
+      <PageHead title="Jobs" sub={`contractor-a only · ${String(rows.length)} this week`} />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Tabs value={tab} onChange={setTab} tabs={(["all", "Offered", "Active", "Review", "Completed"] as T[]).map((t) => ({ id: t, label: t === "all" ? "All" : t, count: count(t) }))} />
         <Select aria-label="Origin" className="w-auto" value={origin} onChange={(e) => { setOrigin(e.target.value as typeof origin); }}><option value="all">Origin: All</option><option value="request">Origin: Client request</option><option value="plan">Origin: Periodic plan</option></Select>

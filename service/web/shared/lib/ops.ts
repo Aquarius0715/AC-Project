@@ -17,7 +17,7 @@ export async function callOp<T>(...[operation, input, opts = {}]: OpArgs<WriteOp
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (opts.write) headers["Idempotency-Key"] = opts.idempotencyKey ?? crypto.randomUUID();
   if (opts.expectedVersion !== undefined) headers["X-Expected-Version"] = String(opts.expectedVersion);
-  const res = await fetch(`/bff/ops/${operation}`, { method: "POST", headers, body: JSON.stringify(input ?? {})});
+  const res = await fetch(`/bff/ops/${operation}`, { method: "POST", body: JSON.stringify(input ?? {}), headers });
   const body = await res.json().catch(() => null);
   if (!res.ok) {
     throw new OpError(res.status, body ?? { code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {}, correlationId: "", retryAfterSeconds: null });

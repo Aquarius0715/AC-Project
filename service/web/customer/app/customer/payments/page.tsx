@@ -15,7 +15,7 @@ import { PaymentsDemo } from "./_components/payments-demo";
 import { PaymentsView } from "./_components/payments-view";
 
 
-export default async function CustomerPaymentsPage({ searchParams }: PageProps<"/customer/payments">) {
+export default async function CustomerPaymentsPage({ searchParams }: Readonly<PageProps<"/customer/payments">>) {
   interface Unit { id: string; displayName: string; propertyId: string; spaceId: string | null }
   await connection();
   if (!apiMode()) return <PaymentsDemo />;
@@ -48,5 +48,5 @@ export default async function CustomerPaymentsPage({ searchParams }: PageProps<"
       }
     }
   }
-  return <PaymentsView live={{ cards, selected: sel?.id ?? null, status, invoices: clientInvoiceRows(shown, now, i18n), total: all.length, notice, otherZone: display.timeZone !== KL }} />;
+  return <PaymentsView live={{ cards, status, notice, selected: sel?.id ?? null, invoices: clientInvoiceRows(shown, now, i18n), total: all.length, otherZone: display.timeZone !== KL }} />;
 }

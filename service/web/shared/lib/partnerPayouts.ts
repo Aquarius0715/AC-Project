@@ -81,12 +81,19 @@ export function lineRows(s: ApiPayoutStatement, jobs: Map<string, JobLabel>, rev
     const j = jobs.get(l.jobId);
     const status: LineStatus = l.kind === "deduction" ? "deduction" : (l.kind === "adjustment" ? "adjustment" : "accepted");
     return {
-      key: l.id, lineId: l.id, jobId: l.jobId, job: l.jobId.slice(0, 8),
+      key: l.id,
+      lineId: l.id,
+      jobId: l.jobId,
+      job: l.jobId.slice(0, 8),
       work: status === "deduction" ? t("Rework deduction") : (status === "adjustment" ? t(l.note ? "Adjustment" : "Adjustment from HQ") : j?.title ?? t(workLabel[l.workType])),
       sub: status === "deduction" ? (l.note ?? t("report returned for rework")) : (status === "adjustment" ? (l.note ?? null) : j?.sub ?? (l.note ?? null)),
-      accepted: l.acceptedAt ? showDayMonth(l.acceptedAt, display) : "—", status, statusText: t(STATUS_TEXT[status]),
+      accepted: l.acceptedAt ? showDayMonth(l.acceptedAt, display) : "—",
+      statusText: t(STATUS_TEXT[status]),
       tone: status === "deduction" ? "warn" : (status === "adjustment" ? "primary" : "ok"),
-      amount: amount(status === "deduction" ? -Math.abs(l.amountMinor) : l.amountMinor), question: byLine.get(l.id) ?? null, askable: s.status === "approved",
+      amount: amount(status === "deduction" ? -Math.abs(l.amountMinor) : l.amountMinor),
+      question: byLine.get(l.id) ?? null,
+      askable: s.status === "approved",
+      status,
     };
   });
   for (const j of reviewing) {
@@ -129,13 +136,13 @@ export function payoutPdf(s: ApiPayoutStatement, rows: LineRow[], company: strin
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
     "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
-    "<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>", `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>", `<< /Length ${String(stream.length)} >>\nstream\n${stream}\nendstream`,
   ];
   let out = "%PDF-1.4\n";
   const offsets: number[] = [];
-  for (const [k, o] of objects.entries()) { offsets.push(out.length); out += `${k + 1} 0 obj\n${o}\nendobj\n`; }
+  for (const [k, o] of objects.entries()) { offsets.push(out.length); out += `${String(k + 1)} 0 obj\n${o}\nendobj\n`; }
   const xref = out.length;
-  out += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.map((o) => `${String(o).padStart(10, "0")} 00000 n \n`).join("")}`;
-  out += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  out += `xref\n0 ${String(objects.length + 1)}\n0000000000 65535 f \n${offsets.map((o) => `${String(o).padStart(10, "0")} 00000 n \n`).join("")}`;
+  out += `trailer\n<< /Size ${String(objects.length + 1)} /Root 1 0 R >>\nstartxref\n${String(xref)}\n%%EOF\n`;
   return out;
 }

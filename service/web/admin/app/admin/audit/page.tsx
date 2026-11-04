@@ -31,7 +31,7 @@ export default async function AdminAuditPage(props: PageProps<"/admin/audit">) {
   return withAccess("Audit", ["audit.read"], () => AdminAuditPageContent(props));
 }
 
-async function AdminAuditPageContent({ searchParams }: PageProps<"/admin/audit">) {
+async function AdminAuditPageContent({ searchParams }: Readonly<PageProps<"/admin/audit">>) {
   interface Page<T> { items: T[]; total: number }
   await connection();
   if (!apiMode()) return <AuditView />;
@@ -49,8 +49,17 @@ async function AdminAuditPageContent({ searchParams }: PageProps<"/admin/audit">
   const rows = page.items.map((a) => auditRow(a, i, now.getTime()));
   const names = new Map(members.map((m) => [m.userId, m.displayName]));
   const live: AuditLive = {
-    tab, rows, total: page.total, filters, searched: isSearched, actors: actorOptions(members, rows, filters.actorId), kinds: targetKinds(rows, filters.targetKind),
-    selected: null, entryMissing: false, trace: [], related: null,
+    tab,
+    rows,
+    filters,
+    total: page.total,
+    searched: isSearched,
+    actors: actorOptions(members, rows, filters.actorId),
+    kinds: targetKinds(rows, filters.targetKind),
+    selected: null,
+    entryMissing: false,
+    trace: [],
+    related: null,
   };
   if (tab === "log") {
     const wanted = one("entryId");

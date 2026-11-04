@@ -12,8 +12,8 @@ const open = async (browser: Browser, a: App): Promise<Page> =>
 test("HQ revokes a contractor's technician, who then stays out: the contractor cannot bring them back", async ({ browser }) => {
   test.setTimeout(180_000);
   const stamp = Date.now();
-  const name = `E2E Revoked ${stamp}`;
-  const email = `e2e-revoked-${stamp}@example.com`;
+  const name = `E2E Revoked ${String(stamp)}`;
+  const email = `e2e-revoked-${String(stamp)}@example.com`;
   const partner = await open(browser, app("partner"));
   const row = (text: string) => partner.getByRole("row").filter({ hasText: text });
   const dialog = partner.getByRole("dialog");

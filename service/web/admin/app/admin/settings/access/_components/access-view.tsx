@@ -25,14 +25,14 @@ interface Live {
 the URL; saving and revoking are members.save through a Server Action (a revoke sets validUntil to now). The
 organization filter and the scope targets are search-selects (DD-A03, IR321). Texts in the display language; the
 valid period is typed in the display time zone (IR302). */
-export function AccessView({ live }: { live: Live }) {
+export function AccessView({ live }: Readonly<{ live: Live }>) {
   const i = useI18n(), { t } = i, zone = i.display.timeZone;
   const nav = useUrlPatch();
   const [pending, run] = useAction();
   const [q, setQ] = useState("");
   const isMissing = live.selected === "missing";
   const sel = live.selected === "new" || isMissing ? null : live.rows.find((r) => r.id === live.selected) ?? null;
-  const key = sel ? `${sel.id}:${sel.version}` : "new";
+  const key = sel ? `${sel.id}:${String(sel.version)}` : "new";
   const [source, setSource] = useState(key);
   const [d, setD] = useState<MemberDraft>(memberDraft(sel?.m, live.tenantId, zone, live.now));
   const [tried, setTried] = useState(false);

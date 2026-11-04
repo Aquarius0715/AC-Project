@@ -54,7 +54,7 @@ const noReminder = { recipient: "", channel: "email", reason: "", preview: "" };
 scope and selection live in the URL; writes are Server Actions that re-render the route); the demo keeps fixtures.
 Texts in the display language; billing periods, due dates and pay dates are Kuala Lumpur days, named so when the
 display time zone is another one, and HQ types them as Kuala Lumpur days (IR299). */
-export function BillingView({ live }: { live?: BillingLive }) {
+export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
   const i = useI18n(), { t } = i;
   const toast = useToast();
   const router = useRouter();
@@ -279,7 +279,7 @@ const shortId = (id: string) => (/^[0-9a-f-]{36}$/.test(id) ? id.slice(0, 8) : i
 
 /** The restrictions this invoice is a cause of (DD-A08 step 6): their IDs with a link each to the restriction on the
 Restrictions screen, which checks restriction.read itself; their state and units are not read here (IR321). */
-function RelatedRestrictions({ ids }: { ids: string[] }) {
+function RelatedRestrictions({ ids }: Readonly<{ ids: string[] }>) {
   const { t } = useI18n();
   return (
     <Card title={t(ids.length > 1 ? "Related restrictions" : "Related restriction")}>
@@ -298,7 +298,7 @@ function RelatedRestrictions({ ids }: { ids: string[] }) {
 }
 
 /** The billing months of the scope (IR321): Kuala Lumpur months, the first not after the last; either may stay open. */
-function BillingMonths({ from, to, onChange }: { from?: string; to?: string; onChange: (from: string | null, to: string | null) => void }) {
+function BillingMonths({ from, to, onChange }: Readonly<{ from?: string; to?: string; onChange: (from: string | null, to: string | null) => void }>) {
   const { t } = useI18n();
   const [f, setF] = useState({ from: from ?? "", to: to ?? "" });
   const [source, setSource] = useState(`${from}:${to}`);
@@ -325,7 +325,7 @@ type Act = <T>(fn: () => Promise<ActionResult<T>>, ok: string | ((v: T) => strin
 /** The contractor payouts tab (FR-A23, DD-A23, Figma Admin 699:22119): the statement period, contractor and status
 filters in the URL, the statements table, Generate drafts for a month that has ended, and the selected statement
 with its lines, questions and actions. Every write needs billing.payment and is audited (IR322). */
-function PayoutsTab({ live, nav, act, pending }: { live: BillingLive; nav: (patch: Record<string, string | null>) => void; act: Act; pending: boolean }) {
+function PayoutsTab({ live, nav, act, pending }: Readonly<{ live: BillingLive; nav: (patch: Record<string, string | null>) => void; act: Act; pending: boolean }>) {
   const i = useI18n(), { t } = i;
   const p = live.payouts ?? { contractors: [], lastClosed: "" };
   const rows = live.statements ?? [];

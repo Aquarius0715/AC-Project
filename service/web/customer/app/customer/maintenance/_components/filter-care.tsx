@@ -17,7 +17,7 @@ interface Props { f: Filters; owner: boolean; onRequest: (p: CleaningPrefill) =>
 
 /** Filter care (FR-C18, DD-C18, Figma Client 07j) from the Core API: run time since the cleaning per AC, areas with many
 ACs folded into a summary row, Request cleaning / Mark cleaned and the owner's reminder settings. */
-export function FilterCareTab({ f, owner, onRequest, onDone, onFail }: Props) {
+export function FilterCareTab({ f, owner, onRequest, onDone, onFail }: Readonly<Props>) {
   const t = useT();
   const [open, setOpen] = useState<string[]>([]);
   const [edit, setEdit] = useState(false);
@@ -59,7 +59,7 @@ export function FilterCareTab({ f, owner, onRequest, onDone, onFail }: Props) {
   };
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
-      <Card title={t("Filters by AC")} sub={t("Run time since the last cleaning, from telemetry · reminder at {hours}", { hours: f.settings.thresholdHours ? `${f.settings.thresholdHours} h` : t("{n} h (model default)", { n: DEFAULT_FILTER_HOURS }) })}>
+      <Card title={t("Filters by AC")} sub={t("Run time since the last cleaning, from telemetry · reminder at {hours}", { hours: f.settings.thresholdHours ? `${String(f.settings.thresholdHours)} h` : t("{n} h (model default)", { n: DEFAULT_FILTER_HOURS }) })}>
         <ScrollX className="rounded-xl border border-line">
           <table className="w-full border-collapse text-left text-[13px]">
             <thead>
@@ -89,11 +89,11 @@ export function FilterCareTab({ f, owner, onRequest, onDone, onFail }: Props) {
   );
 }
 
-function Progress({ pct, tone, text }: { pct: number | null; tone: "ok" | "warn" | "crit" | "unknown" | "primary" | "muted"; text: string }) {
+function Progress({ pct, tone, text }: Readonly<{ pct: number | null; tone: "ok" | "warn" | "crit" | "unknown" | "primary" | "muted"; text: string }>) {
   return <div className="w-36"><UtilBar pct={pct} tone={tone} label={text} /><div className="mt-1 text-[11px] text-muted-foreground">{text}</div></div>;
 }
 
-function ReminderModal({ init, onClose, onFail }: { init: ReminderForm; onClose: (text?: string) => void; onFail: (f: ActionFailure) => void }) {
+function ReminderModal({ init, onClose, onFail }: Readonly<{ init: ReminderForm; onClose: (text?: string) => void; onFail: (f: ActionFailure) => void }>) {
   const t = useT();
   const [form, setForm] = useState(init);
   const [tried, setTried] = useState(false);

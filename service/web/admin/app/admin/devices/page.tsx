@@ -33,7 +33,7 @@ export default async function AdminDevicesPage(props: PageProps<"/admin/devices"
   return withAccess("Devices & models", ["device.read"], () => AdminDevicesPageContent(props));
 }
 
-async function AdminDevicesPageContent({ searchParams }: PageProps<"/admin/devices">) {
+async function AdminDevicesPageContent({ searchParams }: Readonly<PageProps<"/admin/devices">>) {
   interface Page<T> { items: T[] }
   await connection();
   if (!apiMode()) return <DevicesDemo />;
@@ -78,7 +78,7 @@ async function AdminDevicesPageContent({ searchParams }: PageProps<"/admin/devic
       live.device = {
         detail: d, row: live.rows.find((r) => r.id === id)!,
         tiles: deviceTiles(d, newerFirmware(d.firmwareVersion, candidates), now.getTime(), openFaults(events.items), i), sensors: sensorRows(d, i),
-        unit: unit ? { name: unit.displayName, place: unit.location.pathLabels.join(" › "), model: `${unit.capabilities.manufacturer} ${unit.capabilities.model} v${unit.capabilityVersion}` } : null,
+        unit: unit ? { name: unit.displayName, place: unit.location.pathLabels.join(" › "), model: `${unit.capabilities.manufacturer} ${unit.capabilities.model} v${String(unit.capabilityVersion)}` } : null,
         firmware: newerVersions(d.firmwareVersion, candidates), firmwareCard: firmwareCard(d, ops.items, i),
         operations: operationRows(ops.items, d.firmwareVersion, i), calibrations: cals.items.map((c) => calibrationText(c, i)),
         events: eventRows(events.items, new Map(alerts.filter((a): a is ApiAlertLite => !!a).map((a) => [a.id, a])), now.getTime(), i),

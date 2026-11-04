@@ -26,7 +26,7 @@ export async function quoteOffset(input: { customerId: string; purpose: string; 
 
 /** offsets.simulate request: the quote becomes a demo_requested record. */
 export async function requestOffset(quoteId: string, quoteVersion: number) {
-  return run(() => coreOp<{ id: string }>("offsets.simulate", { event: "request", quoteId, quoteVersion, demoConfirmed: true }, { write: true }).then((r) => r.id));
+  return run(() => coreOp<{ id: string }>("offsets.simulate", { event: "request", demoConfirmed: true, quoteId, quoteVersion }, { write: true }).then((r) => r.id));
 }
 
 /** offsets.simulate purchase_confirm / retire / fail of the current attempt (a fresh event ID per click). */
@@ -36,5 +36,5 @@ export async function simulateOffset(recordId: string, version: number, attemptI
 
 /** offsets.simulate retry of the failed current attempt. */
 export async function retryOffset(recordId: string, version: number, attemptId: string) {
-  return run(() => coreOp("offsets.simulate", { event: "retry", recordId, attemptId, demoConfirmed: true }, { write: true, expectedVersion: version }).then(() => null));
+  return run(() => coreOp("offsets.simulate", { event: "retry", demoConfirmed: true, recordId, attemptId }, { write: true, expectedVersion: version }).then(() => null));
 }

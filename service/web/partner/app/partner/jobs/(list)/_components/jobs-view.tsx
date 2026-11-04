@@ -14,7 +14,7 @@ const toneText = { warn: "text-warn", crit: "text-crit", ok: "text-ok", primary:
 /** The contractor job list (FR-P01, Figma Contractor 02-1…02-6) from the Core API: status tabs with counts, sort and
 period in the URL (the overview's period, so the KPI counts match), one row per job and cursor paging. Texts in the
 user's display language (IR271). */
-export function JobsView({ live }: { live: JobsLive }) {
+export function JobsView({ live }: Readonly<{ live: JobsLive }>) {
   const t = useT();
   const patch = useUrlPatch();
   const reset = { cursor: null, page: null };

@@ -18,7 +18,7 @@ deviceId detail as the technician's device screen draws it — tiles, the bound 
 sensors with Calibrate… (a small button like the device actions, IR576), the operation and calibration history and the events. Register, bind, connection check,
 calibration and firmware update are Server Actions. Texts in the display language; times in the user's display time
 zone; metric and evidence codes stay codes (IR295, IR319). */
-export function DeviceTab({ live }: { live: DevicesLive }) {
+export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
   const t = useT();
   const nav = useUrlPatch();
   const [pending, run] = useAction();

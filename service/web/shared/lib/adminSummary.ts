@@ -83,7 +83,7 @@ export function forecastView(f: ApiForecast | null | undefined, t: T = en): Fore
   const b = f.baselineSnapshot;
   return {
     state: "ok", saved: direction(f.forecastSavedKWh, "kWh", t), rate: f.forecastSavingPercentage === null ? { text: "—", tone: "muted" } : direction(f.forecastSavingPercentage, "%", t),
-    baseline: { value: kwh(f.predictedBaselineKWh), sub: b ? `${f.baselineRef?.id.slice(0, 8) ?? b.id.slice(0, 8)} v${f.baselineRef?.version ?? b.version} · ${b.method}${b.baselineKWh === null ? "" : ` · ${thousands(b.baselineKWh)} kWh`}` : t("baseline") },
+    baseline: { value: kwh(f.predictedBaselineKWh), sub: b ? `${f.baselineRef?.id.slice(0, 8) ?? b.id.slice(0, 8)} v${String(f.baselineRef?.version ?? b.version)} · ${b.method}${b.baselineKWh === null ? "" : ` · ${thousands(b.baselineKWh)} kWh`}` : t("baseline") },
     actual: { value: kwh(f.predictedActualKWh), sub: t("{actual} on valid slots ÷ {valid} × {expected} unit-min", { actual: f.actualKWhOnValidSlots === null ? "—" : kwh(f.actualKWhOnValidSlots), valid: thousands(f.validUnitMinutes), expected: thousands(f.expectedUnitMinutes) }) },
     coverage: t("{valid} / {expected} unit-min", { valid: thousands(f.validUnitMinutes), expected: thousands(f.expectedUnitMinutes) }), warnings: f.qualityWarnings.map((x) => warningShort(x, t)),
   };

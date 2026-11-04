@@ -40,7 +40,7 @@ export function RestrictionsView({ live }: { live: RestrictionsLive }) {
   return live ? <Manager live={live} /> : <Page><EmptyState title={t("No access")}>{t("Restrictions need restriction.read, restriction.write or restriction.override.")}</EmptyState></Page>;
 }
 
-function Manager({ live }: { live: NonNullable<RestrictionsLive> }) {
+function Manager({ live }: Readonly<{ live: NonNullable<RestrictionsLive> }>) {
   const t = useT();
   const nav = useUrlPatch();
   const [pending, run] = useAction();
@@ -124,7 +124,7 @@ function Manager({ live }: { live: NonNullable<RestrictionsLive> }) {
   );
 }
 
-function ScheduleModal({ open, onClose, contracts, now, onDone }: { open: boolean; onClose: () => void; contracts: ScheduleContract[]; now: Date; onDone: (id: string) => void }) {
+function ScheduleModal({ open, onClose, contracts, now, onDone }: Readonly<{ open: boolean; onClose: () => void; contracts: ScheduleContract[]; now: Date; onDone: (id: string) => void }>) {
   const i = useI18n(), { t } = i, zone = i.display.timeZone;
   const [pending, run] = useAction();
   const [contractId, setContractId] = useState("");
@@ -155,8 +155,14 @@ function ScheduleModal({ open, onClose, contracts, now, onDone }: { open: boolea
     if (!k || Object.keys(errors).length > 0) return;
     run(() => {
       return scheduleRestriction({
-        contractId: k.id, expectedContractVersion: k.version, causeInvoiceIds: k.invoices.map((x) => x.id), unitIds,
-        policy: kind === "power_off" ? { kind } : { kind, minimumCoolingSetpoint: sp }, executeAfter: at, reason: reason.trim(), rulesVersion: k.rulesVersion,
+        contractId: k.id,
+        expectedContractVersion: k.version,
+        causeInvoiceIds: k.invoices.map((x) => x.id),
+        policy: kind === "power_off" ? { kind } : { kind, minimumCoolingSetpoint: sp },
+        executeAfter: at,
+        reason: reason.trim(),
+        rulesVersion: k.rulesVersion,
+        unitIds,
       });
     }, t("Restriction scheduled — the notice was sent"), (id) => { setTried(false); setUnitIds([]); setReason(""); onDone(id); });
   };
@@ -165,7 +171,7 @@ function ScheduleModal({ open, onClose, contracts, now, onDone }: { open: boolea
       <Field label={t("Contract (eligible RTO)")} error={tried ? errors.contractId : undefined}><Select value={contractId} onChange={(e) => { setContractId(e.target.value); setUnitIds([]); }}><option value="">{t("Select…")}</option>{contracts.map((c) => <option key={c.id} value={c.id}>{c.label} · {t("rules {rules}", { rules: c.rulesVersion })}</option>)}</Select></Field>
       {k && <>
         <p className="text-xs">{t(k.recipients === 1 ? "Cause invoices (all overdue unpaid of the contract, fixed): {list} · notice to 1 active client" : "Cause invoices (all overdue unpaid of the contract, fixed): {list} · notice to {n} active clients", { list: k.invoices.length > 0 ? k.invoices.map((x) => x.number).join(", ") : t("none"), n: k.recipients })}</p>
-        <div><p className="mb-1 text-[13px] font-semibold">{t("Units")}</p><div className="flex flex-col gap-1">{k.units.map((u) => <Check key={u.id} disabled={!!u.blocked} checked={unitIds.includes(u.id)} onChange={(on) => { setUnitIds(on ? [...unitIds, u.id] : unitIds.filter((x) => x !== u.id)); }} label={<span>{u.name} <span className="text-xs text-muted-foreground">{u.blocked ? `— ${u.blocked}` : (u.temperature ? `${u.temperature.min}–${u.temperature.max} °C` : t("no temperature setpoint"))}</span></span>} />)}</div>{tried && errors.unitIds && <p className="mt-1 text-xs text-crit">{errors.unitIds}</p>}</div>
+        <div><p className="mb-1 text-[13px] font-semibold">{t("Units")}</p><div className="flex flex-col gap-1">{k.units.map((u) => <Check key={u.id} disabled={!!u.blocked} checked={unitIds.includes(u.id)} onChange={(on) => { setUnitIds(on ? [...unitIds, u.id] : unitIds.filter((x) => x !== u.id)); }} label={<span>{u.name} <span className="text-xs text-muted-foreground">{u.blocked ? `— ${u.blocked}` : (u.temperature ? `${String(u.temperature.min)}–${String(u.temperature.max)} °C` : t("no temperature setpoint"))}</span></span>} />)}</div>{tried && errors.unitIds && <p className="mt-1 text-xs text-crit">{errors.unitIds}</p>}</div>
       </>}
       <div className="grid-fluid" style={{ ["--min" as string]: "190px" }}>
         <Field label={t("Policy")}><Select value={kind} onChange={(e) => { setKind(e.target.value as Policy["kind"]); }}><option value="temperature_limit">{t("Temperature limit")}</option><option value="power_off">{t("Power off")}</option></Select></Field>

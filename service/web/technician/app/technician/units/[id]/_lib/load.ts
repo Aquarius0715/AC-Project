@@ -96,17 +96,30 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
   const back = sp.jobId ? `/technician/jobs/${sp.jobId}` : "/technician";
   const alertsHref = `/technician/units/${id}/alerts${job ? `?jobId=${job}` : ""}`;
   return {
-    kind: "live" as const, id, short: id.slice(0, 8), name: d.displayName, back, tab, metric, period, connection: d.connection,
+    kind: "live" as const,
+    short: id.slice(0, 8),
+    name: d.displayName,
+    connection: d.connection,
     tabs: [{ id: "register" as const, label: t("Register") }, { id: "monitoring" as const, label: t("Monitoring") }],
     periods: PERIODS.map((p) => ({ id: p, label: t(p) })),
     stopped: stoppedBanner(d, nowMs, i),
-    register: registerRows(d, i), components: componentCards(d, i), componentCount: d.components.length,
-    tiles: liveTiles(d, nowMs, i), chart: seriesChart(metric, unitOf(metric), points.items, period, nowMs, i, points.total, points.complete),
+    register: registerRows(d, i),
+    components: componentCards(d, i),
+    componentCount: d.components.length,
+    tiles: liveTiles(d, nowMs, i),
+    chart: seriesChart(metric, unitOf(metric), points.items, period, nowMs, i, points.total, points.complete),
     others: otherMetrics(d, metric, Object.fromEntries(others.map((m, k) => [m, more[k].items])), period, nowMs, i,
       Object.fromEntries(others.map((m, k) => [m, more[k].complete ? 0 : more[k].total]))),
     events: windowEvents(alerts, events, period, nowMs, i),
-    history: jobRows(jobs, i), alerts: openAlerts(alerts, nowMs, i).map((a) => ({ ...a, href: `${alertsHref}${job ? "&" : "?"}alertId=${a.id}` })), alertsHref,
+    history: jobRows(jobs, i),
+    alerts: openAlerts(alerts, nowMs, i).map((a) => ({ ...a, href: `${alertsHref}${job ? "&" : "?"}alertId=${a.id}` })),
     controlHref: control ? `/technician/units/${id}/control?jobId=${control}` : null,
+    id,
+    back,
+    tab,
+    metric,
+    period,
+    alertsHref,
   };
 }
 

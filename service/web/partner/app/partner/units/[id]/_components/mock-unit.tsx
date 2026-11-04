@@ -6,7 +6,7 @@ import { BarChart, Banner, Card, ConnBadge, Page, SummaryList, Plain } from "@ac
 import { Icon } from "@ac/web/components/Icon";
 
 /** Phase 1A demo view of the contractor unit page (fixture values). */
-export function MockPartnerUnit({ id }: { id: string }) {
+export function MockPartnerUnit({ id }: Readonly<{ id: string }>) {
   const [ended, setEnded] = useState(false);
   return (
     <Page>

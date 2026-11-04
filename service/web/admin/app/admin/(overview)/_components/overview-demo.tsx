@@ -21,13 +21,13 @@ export function AdminOverviewDemo() {
       {isEmpty && <Banner tone="warn">Zero units in scope — nothing to show yet.</Banner>}
       <div className="grid-fluid" style={{ ["--min"as string]: "200px" }}>
         <Kpi label="Active customers" value={isEmpty ? 0 : k.customers} sub="Customer active (IR40)" href="/admin/units" link="Open" />
-        <Kpi label="Target units" value={isEmpty ? 0 : k.units} sub={`Running ${k.on} · Stopped ${k.off} · unknown ${k.unknown} · archived excluded`} href="/admin/units" link="Open" />
-        <Kpi label="Operation rate" value={isEmpty ? "—" : k.rate} sub={`Running ${k.on} / known ${k.on + k.off} · unknown ${k.unknown} not in denominator`} href="/admin/units?powerState=on" link="Open" />
+        <Kpi label="Target units" value={isEmpty ? 0 : k.units} sub={`Running ${String(k.on)} · Stopped ${String(k.off)} · unknown ${String(k.unknown)} · archived excluded`} href="/admin/units" link="Open" />
+        <Kpi label="Operation rate" value={isEmpty ? "—" : k.rate} sub={`Running ${String(k.on)} / known ${String(k.on + k.off)} · unknown ${String(k.unknown)} not in denominator`} href="/admin/units?powerState=on" link="Open" />
         <Kpi label="Unresolved alerts" value={isEmpty ? 0 : k.alerts} tone="warn" sub="open/acknowledged · critical and warning (IR51)" href="/admin/alerts" link="Open" />
         <Kpi label="Energy used (actual)" value={isEmpty ? "—" : k.kwh} sub={k.kwhSub} href="/admin/energy" link="Open" />
         <Kpi label="Overdue billing" value={k.billing} tone="crit" sub={k.billingSub} href="/admin/billing?overdueOnly=true" link="Open" />
         <Kpi label="Maintenance jobs (period)" value={k.jobs} sub="all statuses in the period" href="/admin/jobs" link="Open" />
-        <Kpi label="Connection" value={`${k.online} online`} sub={`offline ${k.offline} · unknown/connecting/error ${k.connUnknown}`} href="/admin/units?connections=online" link="Open" />
+        <Kpi label="Connection" value={`${String(k.online)} online`} sub={`offline ${String(k.offline)} · unknown/connecting/error ${String(k.connUnknown)}`} href="/admin/units?connections=online" link="Open" />
       </div>
       <Card title="Energy-saving forecast" sub="Forecast (prorated assumed baseline, demo)" action={<TextLink href="/admin/energy">Energy analysis <Icon name="arrowRight" /></TextLink>}>
         <div className="grid-fluid" style={{ ["--min"as string]: "180px" }}>

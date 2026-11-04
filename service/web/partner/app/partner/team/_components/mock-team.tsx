@@ -68,7 +68,7 @@ export function MockTeam() {
   );
 }
 
-function Certs({ onUpload }: { onUpload: () => void }) {
+function Certs({ onUpload }: Readonly<{ onUpload: () => void }>) {
   const rows = [
     { t: "tech-external-a", c: "Split-unit refrigerant handling", until: "2027-03-31", st: "Valid" },
     { t: "tech-external-a", c: "Electrical basics", until: "2026-10-15", st: "Expiring · 14 d" },

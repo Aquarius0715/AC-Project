@@ -12,7 +12,7 @@ import { renameLocation } from "../properties/actions";
 
 export interface Renaming { kind: "property" | "space" | "unit"; id: string; version: number; name: string; where: string }
 
-export function RenameModal({ r, onClose, demo = false }: { r: Renaming; onClose: () => void; demo?: boolean }) {
+export function RenameModal({ r, onClose, demo = false }: Readonly<{ r: Renaming; onClose: () => void; demo?: boolean }>) {
   const t = useT();
   const toast = useToast();
   const [pending, run] = useAction();

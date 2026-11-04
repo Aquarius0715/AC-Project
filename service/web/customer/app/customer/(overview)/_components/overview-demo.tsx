@@ -30,7 +30,7 @@ export function OverviewDemo() {
       {stale && <Banner tone="warn" action={<Btn size="sm" onClick={() => { setStale(false); }}><Icon name="refresh" />Retry</Btn>}>Offline — showing values last loaded at 09:12. Remote actions are disabled until the connection returns.</Banner>}
 
       <div className="grid-fluid" style={{ ["--min" as string]: "210px" }}>
-        <Kpi label="Running" badge={<PowerBadge s="running" />} value={counts.powerOn} sub={`of ${counts.total} units · latest observation per unit`} href="/customer/properties?powerState=on" link="View running units" />
+        <Kpi label="Running" badge={<PowerBadge s="running" />} value={counts.powerOn} sub={`of ${String(counts.total)} units · latest observation per unit`} href="/customer/properties?powerState=on" link="View running units" />
         <Kpi label="Stopped" badge={<PowerBadge s="stopped" />} value={counts.powerOff} sub="Stopped — confirmed by the device" href="/customer/properties?powerState=off" link="View stopped units" />
         <Kpi label="Unknown" badge={<PowerBadge s="unknown" />} value={counts.powerUnknown} sub="Offline or missing data — counted here, never as running/normal" href="/customer/properties?connections=offline" link="View unknown units" />
         <Kpi label="Needs attention" badge={<SeverityBadge s="warning" />} value={2} tone="warn" sub="Unresolved warnings · +2 reminders & info (not counted)" href="/customer/alerts" link="Open alerts" />

@@ -19,7 +19,7 @@ evidence, resolution — acknowledge, and resolve with a reason and the evidence
 history and what it relates to;
 the unit's other alerts to switch to (?alertId=). Texts in the user's display language; the times come formatted from
 the loader (IR284). Acknowledge and resolve are Server Actions with the alert version (IR87, IR94). */
-export function AlertEvidenceView({ live }: { live: AlertsLive }) {
+export function AlertEvidenceView({ live }: Readonly<{ live: AlertsLive }>) {
   const t = useT();
   const toast = useToast();
   const patch = useUrlPatch();

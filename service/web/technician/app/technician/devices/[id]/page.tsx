@@ -9,7 +9,7 @@ import { DevicesView } from "@ac/web/components/TechDevices";
 import { loadDevices } from "../_lib/load";
 import { TechDevicesView } from "../_components/devices-view";
 
-export default async function TechnicianDeviceEventsPage({ params }: PageProps<"/technician/devices/[id]">) {
+export default async function TechnicianDeviceEventsPage({ params }: Readonly<PageProps<"/technician/devices/[id]">>) {
   const { id } = await params;
   await connection();
   if (!apiMode()) return <DevicesView initial={id} />;

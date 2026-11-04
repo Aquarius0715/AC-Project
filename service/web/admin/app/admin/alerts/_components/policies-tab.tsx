@@ -30,10 +30,34 @@ const CHANNEL: Record<Channel, string> = { inApp: "In-app", email: "Email", what
 const demoRecipients: PolicyRecipient[] = [{ id: "customer-a", label: "customer-a", role: "client" }, { id: "hq-operator", label: "hq-operator", role: "HQ" }];
 const demoPolicy = (id: string, name: string, sub: string, metric: string, threshold: number, recovery: number, duration: number, on: boolean, units: string[]): AdminPolicy => {
   return {
-    id, version: 1, kind: "alert", name, group: "CUSTOMER-A", sub, on, units: units.length === 1 ? "1 unit" : `${units.length} units`, customerId: "customer-a", customerName: "customer-a",
-    priority: 50, timezone: "Asia/Kuala_Lumpur", metric, operator: "gte", threshold, recovery, duration, severity: "warning", cooldown: 5, escalate: 60, channels: ["inApp", "email"],
-    recipients: demoRecipients, activeWindow: null, madeBy: "hq-operator", unitIds: units, unitNames: units.map((u) => (u === "unit-online-rto" ? "Bedroom AC" : "Bedroom AC #2")),
-    rules: [], settings: [],
+    id,
+    name,
+    sub,
+    on,
+    metric,
+    threshold,
+    recovery,
+    duration,
+    version: 1,
+    kind: "alert",
+    group: "CUSTOMER-A",
+    units: units.length === 1 ? "1 unit" : `${String(units.length)} units`,
+    customerId: "customer-a",
+    customerName: "customer-a",
+    priority: 50,
+    timezone: "Asia/Kuala_Lumpur",
+    operator: "gte",
+    severity: "warning",
+    cooldown: 5,
+    escalate: 60,
+    channels: ["inApp", "email"],
+    recipients: demoRecipients,
+    activeWindow: null,
+    madeBy: "hq-operator",
+    unitIds: units,
+    unitNames: units.map((u) => (u === "unit-online-rto" ? "Bedroom AC" : "Bedroom AC #2")),
+    rules: [],
+    settings: [],
   };
 };
 // the six default rules (IR120 item 1) and customer-a's offline rule switched off
@@ -66,11 +90,11 @@ export interface PolicySel { policyId: string | null; newFor: string | null; fro
 the selected one. A new policy (`sel.newFor`, started by “+ New policy”) starts as DD-A05 says (display time zone,
 off, priority 50) and is created by Save policy. Recipients are added from notifications.recipients; Delete policy
 detaches it from every unit. The demo keeps its fixture policies and saves nothing. */
-export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, onCopy }: {
+export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, onCopy }: Readonly<{
   pols: AdminPolicy[]; live?: PoliciesLive; sel: PolicySel; select: (policyId: string | null, newFor?: string | null) => void; showOff?: boolean;
   /** the scoped customer a default rule is copied for, else the copy asks for the owner (onCopy) */
   copyFor: { id: string; name: string } | null; onCopy: (ruleKey: string) => void;
-}) {
+}>) {
   const t = useT();
   const toast = useToast();
   const [pending, startTransition] = useTransition();
@@ -84,7 +108,7 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
   const fromRule = sel.from ? pols.find((x) => x.kind === "default_alert")?.rules.find((r) => r.ruleKey === sel.from) : undefined;
   const p = owner ? newPolicyDraft(owner, live?.timezone ?? "Asia/Kuala_Lumpur", fromRule)
     : (sel.newFor || isMissing ? null : pols.find((x) => x.id === sel.policyId) ?? pols.find((x) => x.kind === "alert") ?? pols[0] ?? null);
-  const key = owner ? `new:${owner.id}:${fromRule?.ruleKey ?? ""}` : (p ? `${p.id}@${p.version}` : "");
+  const key = owner ? `new:${owner.id}:${fromRule?.ruleKey ?? ""}` : (p ? `${p.id}@${String(p.version)}` : "");
   const [draft, setDraft] = useState<AdminPolicy | null>(p);
   const [draftOf, setDraftOf] = useState(key);
   const [tried, setTried] = useState(false);
@@ -247,7 +271,7 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
 
 /** “+ New policy” asks for the owner customer first — nobody is chosen for HQ unless the alerts are scoped to one
 customer — and the owner cannot change once the policy is saved (DD-A05 item 8). */
-export function NewPolicyModal({ customers, initial, onClose, onStart }: { customers: { id: string; name: string }[]; initial?: string; onClose: () => void; onStart: (customerId: string) => void }) {
+export function NewPolicyModal({ customers, initial, onClose, onStart }: Readonly<{ customers: { id: string; name: string }[]; initial?: string; onClose: () => void; onStart: (customerId: string) => void }>) {
   const t = useT();
   const [c, setC] = useState(customers.some((x) => x.id === initial) ? initial! : "");
   return (
@@ -262,7 +286,7 @@ export function NewPolicyModal({ customers, initial, onClose, onStart }: { custo
 
 /** The recipients notifications.recipients lists for the alerts of one of the customer's units: its clients and HQ
 members with alert.read (IR120 item 3, IR345), read only while the dialog is open. */
-function RecipientPicker({ unitId, customer, chosen, demo, onClose, onAdd }: { unitId: string | null; customer: string; chosen: string[]; demo: boolean; onClose: () => void; onAdd: (rs: PolicyRecipient[]) => void }) {
+function RecipientPicker({ unitId, customer, chosen, demo, onClose, onAdd }: Readonly<{ unitId: string | null; customer: string; chosen: string[]; demo: boolean; onClose: () => void; onAdd: (rs: PolicyRecipient[]) => void }>) {
   const t = useT();
   const cands = useOp<{ items: ApiRecipient[] }, ApiRecipient[]>("notifications.recipients", { target: { kind: "unit", id: unitId ?? "" }, templateKey: "alert", channel: "inApp", query: { limit: 100 } },
     demo ? demoCandidates : [], (d) => d.items, !!unitId);

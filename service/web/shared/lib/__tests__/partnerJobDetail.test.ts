@@ -14,7 +14,7 @@ const members = [
   { id: "m-c", userId: "u-c", displayName: "coordinator", role: "contractor" },
 ] as unknown as ApiMember[];
 const cap = (id: string, date: string, avail: [string, string][], assigned: [string, string][], am: number | null, as = 0): ApiCapacity =>
-  ({ membershipId: id, date, availableSlots: avail.map(([s, e]) => slot(s, e)), assignedSlots: assigned.map(([s, e]) => slot(s, e)), availableMinutes: am, assignedMinutes: as, unavailability: null });
+  ({ membershipId: id, availableSlots: avail.map(([s, e]) => slot(s, e)), assignedSlots: assigned.map(([s, e]) => slot(s, e)), availableMinutes: am, assignedMinutes: as, unavailability: null, date });
 
 describe("partner job detail", () => {
   it("checks qualifications at the visit and labels them", () => {
@@ -58,7 +58,7 @@ describe("partner job detail", () => {
   });
 
   it("builds the status timeline from the events", () => {
-    const ev = (action: string, at: string) => ({ id: action, jobId: "j", actorUserId: null, action, occurredAt: at });
+    const ev = (action: string, at: string) => ({ id: action, jobId: "j", actorUserId: null, occurredAt: at, action });
     const events = [ev("job.created", "2026-09-13T01:00:00Z"), ev("job.offered", "2026-09-13T10:20:00Z"), ev("offer.accepted", "2026-09-14T02:02:00Z")];
     const t = timeline("accepted", events, false, "periodic_plan");
     expect(t[0].sub).toBe("periodic plan");

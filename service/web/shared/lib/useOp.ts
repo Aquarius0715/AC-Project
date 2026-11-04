@@ -52,7 +52,7 @@ The fetch result is stored with the request it answers; `loading` is derived (no
 export function useOp<T, R>(...[operation, input, mock, map, enabled = true]: [...OpCall, mock: R, map: (data: T) => R, enabled?: boolean]): { data: R; loading: boolean; error: OpError | null; source: "mock" | "api" | null } {
   const session = useBffSession();
   const rev = useRevision();
-  const request = `${operation}|${JSON.stringify(input)}|${rev}`;
+  const request = `${operation}|${JSON.stringify(input)}|${String(rev)}`;
   const [state, setState] = useState<{ request: string | null; data: R; error: OpError | null }>({ request: null, data: mock, error: null });
   const isActive = session?.dataSource === "api" && enabled;
   // callers pass a new input object and an inline projection on every render: the read uses the latest of both, and

@@ -62,7 +62,7 @@ export function nextBox(p: ApiPlan, now: number, dirty: boolean, generated: { oc
   const text = generated ? t("{date} was just generated as {job}. Next due advanced to {next}.", { date: planDate(generated.occurrenceAt, i.display), job: generated.jobId.slice(0, 8), next })
     : (t(isPast ? "The next date has passed — move it forward and save the plan first (no automatic catch-up)." : "Not generated yet. Generating creates one periodic job (requested) for this date — generating the same date again is rejected."));
   const why = isPast ? t("The next date has passed.") : (dirty ? t("Save the plan first.") : null);
-  return { title: t("Next occurrence · {date}", { date: next }), text, generate: !why, why };
+  return { title: t("Next occurrence · {date}", { date: next }), generate: !why, text, why };
 }
 
 /** The CONFLICT banner after a refused Generate job (Figma 360:414): the date that already has its job, or the plan

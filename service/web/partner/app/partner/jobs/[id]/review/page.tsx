@@ -9,7 +9,7 @@ import { loadReview } from "./_lib/load";
 import { ReviewDemo } from "./_components/review-demo";
 import { ReviewView } from "./_components/review-view";
 
-export default async function PartnerReviewPage({ params }: PageProps<"/partner/jobs/[id]/review">) {
+export default async function PartnerReviewPage({ params }: Readonly<PageProps<"/partner/jobs/[id]/review">>) {
   const { id } = await params;
   await connection();
   if (!apiMode()) return <ReviewDemo id={id} />;

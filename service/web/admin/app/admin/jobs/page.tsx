@@ -18,7 +18,7 @@ export default async function AdminJobsPage(props: PageProps<"/admin/jobs">) {
   return withAccess("Maintenance jobs", ["job.read", "asset.read"], () => AdminJobsPageContent(props));
 }
 
-async function AdminJobsPageContent({ searchParams }: PageProps<"/admin/jobs">) {
+async function AdminJobsPageContent({ searchParams }: Readonly<PageProps<"/admin/jobs">>) {
   await connection();
   const sp = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);

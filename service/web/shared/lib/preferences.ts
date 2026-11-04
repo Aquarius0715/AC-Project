@@ -18,7 +18,7 @@ export function zoneOffset(tz: string, at: Date): string {
   const minute = Math.floor(at.getTime() / 60_000) * 60_000;
   const min = Math.round((Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute) - minute) / 60_000);
   const abs = Math.abs(min);
-  return `UTC${min < 0 ? "−" : "+"}${Math.floor(abs / 60)}${abs % 60 ? `:${String(abs % 60).padStart(2, "0")}` : ""}`;
+  return `UTC${min < 0 ? "−" : "+"}${String(Math.floor(abs / 60))}${abs % 60 ? `:${String(abs % 60).padStart(2, "0")}` : ""}`;
 }
 
 /** The time zone options, the saved zone first when it is not one of the usual ones. */

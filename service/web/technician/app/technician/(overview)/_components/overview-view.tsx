@@ -10,7 +10,7 @@ import { Icon } from "@ac/web/components/Icon";
 
 /** The technician overview (FR-T01, Figma Technician 01-1…01-5) from the Core API. Texts in the user's display
 language; the times come formatted from the loader — today's timeline in Kuala Lumpur hours (IR281). */
-export function OverviewView({ live }: { live: OverviewLive }) {
+export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
   const t = useT();
   const patch = useUrlPatch();
   const all = live.tabs.find((x) => x.id === "all")!.count;
@@ -58,8 +58,8 @@ export function OverviewView({ live }: { live: OverviewLive }) {
             <div className="relative min-w-[480px]">
               <div className="flex justify-between text-[11px] text-muted-foreground">{live.timeline.hours.map((h) => <span key={h}>{h}</span>)}</div>
               <div className="relative mt-1 h-10 rounded-lg bg-surface2">
-                {live.timeline.blocks.map((b) => <div key={b.id} className={cx("absolute top-2 h-6 truncate rounded px-2 text-[11px] leading-6", b.current ? "bg-primary text-white" : "border border-dashed border-primary bg-primary-soft text-primary")} style={{ left: `${b.left}%`, width: `${b.width}%` }}>{b.short}</div>)}
-                {live.timeline.nowPct !== null && <span className="absolute inset-y-0 w-0.5 bg-crit" style={{ left: `${live.timeline.nowPct}%` }} />}
+                {live.timeline.blocks.map((b) => <div key={b.id} className={cx("absolute top-2 h-6 truncate rounded px-2 text-[11px] leading-6", b.current ? "bg-primary text-white" : "border border-dashed border-primary bg-primary-soft text-primary")} style={{ left: `${String(b.left)}%`, width: `${String(b.width)}%` }}>{b.short}</div>)}
+                {live.timeline.nowPct !== null && <span className="absolute inset-y-0 w-0.5 bg-crit" style={{ left: `${String(live.timeline.nowPct)}%` }} />}
               </div>
             </div>
           </ScrollX>

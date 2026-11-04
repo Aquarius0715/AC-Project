@@ -21,7 +21,7 @@ const OPEN = ["assigned", "in_progress", "on_hold", "rework_requested"]; // the 
 
 type State = { kind: "idle" } | { kind: "busy" } | { kind: "matched"; code: string; at: string; match: QrMatch } | { kind: "refused"; title: string; text: string; absent: boolean };
 
-export function QrScan({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function QrScan({ open, onClose }: Readonly<{ open: boolean; onClose: () => void }>) {
   const i18n = useI18n();
   const { t } = i18n;
   const [code, setCode] = useState("");
@@ -47,7 +47,7 @@ export function QrScan({ open, onClose }: { open: boolean; onClose: () => void }
       ]);
       const at = (now ?? new Date()).toISOString();
       const name = units.data.find((u) => u.id === r.unitId)?.displayName;
-      setState({ kind: "matched", code: c, at, match: qrMatch(r, unit, job, Date.parse(at), { name, locked: isLocked }, i18n) });
+      setState({ kind: "matched", code: c, match: qrMatch(r, unit, job, Date.parse(at), { name, locked: isLocked }, i18n), at });
     } catch (error) {
       if (!(error instanceof OpError)) throw error;
       setState({ kind: "refused", ...qrRefusal(error.error, t) });

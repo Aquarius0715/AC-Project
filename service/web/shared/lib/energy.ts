@@ -15,7 +15,13 @@ const BOUNDARY_TEXT = "AC equipment input electricity (excludes shared equipment
 export function roundAway(x: number, digits: number): number {
   if (!Number.isFinite(x)) return x;
   const a = String(Math.abs(x));
-  const r = /e/i.test(a) ? Math.round(Math.abs(x) * 10 ** digits + Number.EPSILON) / 10 ** digits : Number(`${Math.round(Number(`${a}e${digits}`))}e-${digits}`);
+  let r: number;
+  if (/e/i.test(a)) {
+    r = Math.round(Math.abs(x) * 10 ** digits + Number.EPSILON) / 10 ** digits;
+  } else {
+    const shifted = Math.round(Number(`${a}e${String(digits)}`)); // decimal shift: no binary rounding error
+    r = Number(`${String(shifted)}e-${String(digits)}`);
+  }
   return r === 0 ? 0 : Math.sign(x) * r;
 }
 const nf = (digits: number) => new Intl.NumberFormat("en-MY", { minimumFractionDigits: digits, maximumFractionDigits: digits });
@@ -103,7 +109,7 @@ export function summaryView(s: ApiEnergySummary, i: I18n = EN): SummaryView {
       [tr("Boundary"), `${s.boundaryId} — ${s.boundary === BOUNDARY_TEXT ? tr(BOUNDARY_TEXT) : s.boundary}`],
       [tr("Baseline"), b ? tr("v{version} · {method} · {from} → {to} · {n} units", { version: b.version, method: b.method, from: klStamp(b.period.from), to: klStamp(b.period.to), n: b.unitIds.length }) : tr("none selected")],
       ...(b ? [[tr("Baseline assumptions"), b.assumptions] as [string, string]] : []),
-      [tr("Emission factor"), f ? `${f.region} ${f.year} v${f.version} · ${f.kgCO2ePerKWh} kgCO₂e/kWh · ${f.source}` : tr("missing")],
+      [tr("Emission factor"), f ? `${f.region} ${String(f.year)} v${String(f.version)} · ${String(f.kgCO2ePerKWh)} kgCO₂e/kWh · ${f.source}` : tr("missing")],
       [tr("Tariff"), s.tariffVersion], [tr("Coverage"), s.coverage === null ? "—" : tr("{pct}% of expected readings", { pct: coveragePct(s.coverage) })],
     ],
     warnings: s.qualityWarnings.map((w) => warning(w, tr)),

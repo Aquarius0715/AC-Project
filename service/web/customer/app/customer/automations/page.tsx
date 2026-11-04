@@ -14,7 +14,7 @@ import { consentCard, ruleCard, triggerOf, type ApiAutomation, type ApiConsent, 
 import { AutomationsDemo } from "./_components/automations-demo";
 import { AutomationsView, type AutomationsLive } from "./_components/automations-view";
 
-export default async function CustomerAutomationsPage({ searchParams }: PageProps<"/customer/automations">) {
+export default async function CustomerAutomationsPage({ searchParams }: Readonly<PageProps<"/customer/automations">>) {
   await connection();
   if (!apiMode()) return <AutomationsDemo />;
   const sp = await searchParams;
@@ -31,7 +31,7 @@ export default async function CustomerAutomationsPage({ searchParams }: PageProp
   const propertyName = new Map(properties.map((p) => [p.id, p.name]));
   const acs = units.filter((u) => !u.archived).map((u) => {
     const property = propertyName.get(u.propertyId) ?? "";
-    return { id: u.id, name: u.displayName, property, path: [property, spacePath(u.spaceId, spaces)].filter(Boolean).join(" › ") };
+    return { id: u.id, name: u.displayName, path: [property, spacePath(u.spaceId, spaces)].filter(Boolean).join(" › "), property };
   }).sort((a, b) => a.path.localeCompare(b.path) || a.name.localeCompare(b.name));
   const ac = new Map(acs.map((u) => [u.id, u]));
   const nextRuns = new Map(await Promise.all(rules.filter((r) => r.kind === "schedule" && r.enabled).map(async (r) =>
@@ -45,7 +45,11 @@ export default async function CustomerAutomationsPage({ searchParams }: PageProp
     for (const [i, d] of details.entries()) { caps[acs[i].id] = d?.capabilities ?? null; }
   }
   const live: AutomationsLive = {
-    rules, acs, caps, timezone: prefs.timezone || "Asia/Kuala_Lumpur", editing,
+    rules,
+    acs,
+    caps,
+    editing,
+    timezone: prefs.timezone || "Asia/Kuala_Lumpur",
     cards: rules.map((r) => ruleCard(r, ac.get(r.unitIds[0]) ?? null, nextRuns.get(r.id) ?? null, isGranted, i)),
     consent: consent ? { version: consent.version, ...consentCard(consent, location.length, location.filter((r) => r.disabledReason === "consent_revoked").length, i) } : { version: null, ...consentCard(null, 0, 0, i) },
     nextRuns: Object.fromEntries(nextRuns),

@@ -33,9 +33,9 @@ type Msg =
   | { kind: "confirm"; intent: Change; unit: ApiUnitDetail | null }
   | { kind: "progress"; id: number; p: Progress; unitId: string; question: string };
 
-function Frame({ title, state, children, footer, lang, setLang, onClose, context, t }: {
+function Frame({ title, state, children, footer, lang, setLang, onClose, context, t }: Readonly<{
   title: string; state: string; children: ReactNode; footer: ReactNode; lang: Locale; setLang?: (l: Locale) => void; onClose: () => void; context: string; t: T;
-}) {
+}>) {
   return (
     <Sheet open onOpenChange={(next) => { if (!next) onClose(); }}>
       <SheetContent side="right" showCloseButton={false} aria-label={title} className="gap-0 bg-surface p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-[420px]">
@@ -54,7 +54,7 @@ function Frame({ title, state, children, footer, lang, setLang, onClose, context
   );
 }
 
-function LiveAssistant({ onClose, context }: { onClose: () => void; context: string }) {
+function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; context: string }>) {
   const i = useI18n();
   const [lang, setLangState] = useState<Locale>(i.display.locale);
   const t = translator(lang); // the assistant's own language; times stay in the user's time zone
@@ -106,9 +106,9 @@ function LiveAssistant({ onClose, context }: { onClose: () => void; context: str
         const units = await Promise.all(r.candidates.map((c) => unit(c.unitId)));
         const status = Object.fromEntries(r.candidates.map((c, n) => {
           const u = units[n];
-          return [c.unitId, u ? t(u.connection === "online" ? "Online · confirmed {value}" : "Offline · last confirmed {value}", { value: u.observedState.celsius === null ? "—" : `${u.observedState.celsius} °C` }) : ""];
+          return [c.unitId, u ? t(u.connection === "online" ? "Online · confirmed {value}" : "Offline · last confirmed {value}", { value: u.observedState.celsius === null ? "—" : `${String(u.observedState.celsius)} °C` }) : ""];
         }));
-        add({ kind: "candidates", question, via, groups: candidateGroups(r.candidates), status });
+        add({ kind: "candidates", groups: candidateGroups(r.candidates), question, via, status });
         setState("confirm");
       } else if (r.kind === "temperature") {
         const u = await unit(r.unitId);
@@ -140,7 +140,7 @@ function LiveAssistant({ onClose, context }: { onClose: () => void; context: str
     const measured = m.unit?.latestMeasurements.find((x) => x.metric === "temperature" && x.quality === "valid")?.value ?? null;
     const show = (c: typeof r.value) => {
       const p = progressOf(c, card.unit, m.intent.celsius, m.intent.before.celsius, measured, t, display);
-      setMsgs((s) => (s.some((x) => x.kind === "progress" && x.id === id) ? s.map((x) => (x.kind === "progress" && x.id === id ? { ...x, p } : x)) : [...s, { kind: "progress", id, p, unitId: m.intent.unitId, question }]));
+      setMsgs((s) => (s.some((x) => x.kind === "progress" && x.id === id) ? s.map((x) => (x.kind === "progress" && x.id === id ? { ...x, p } : x)) : [...s, { kind: "progress", unitId: m.intent.unitId, id, p, question }]));
     };
     const final = await waitForCommand(r.value, show).catch(() => null);
     setState(final?.status === "acknowledged" ? "success" : (final && ["failed", "expired", "cancelled"].includes(final.status) ? "failure" : "sending"));
@@ -212,9 +212,9 @@ function LiveAssistant({ onClose, context }: { onClose: () => void; context: str
 
 /** Which room, then which AC (Figma 09d): nothing is chosen for the user, and Continue asks again with the chosen
 unit (selectedUnitId, IR65). A room with one AC needs no second choice. */
-function CandidatePicker({ m, t, busy, onPick, onCancel }: {
+function CandidatePicker({ m, t, busy, onPick, onCancel }: Readonly<{
   m: Extract<Msg, { kind: "candidates" }>; t: T; busy: boolean; onPick: (unitId: string) => void; onCancel: () => void;
-}) {
+}>) {
   const isSeveral = m.groups.length > 1;
   const [room, setRoom] = useState(isSeveral ? -1 : 0);
   const [picked, setPicked] = useState<string | null>(null);
@@ -248,7 +248,7 @@ function CandidatePicker({ m, t, busy, onPick, onCancel }: {
   );
 }
 
-function RadioCard({ value, title, detail }: { value: string; title: string; detail: string }) {
+function RadioCard({ value, title, detail }: Readonly<{ value: string; title: string; detail: string }>) {
   return (
     <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-line bg-surface px-2.5 py-2 hover:bg-primary-soft has-data-checked:border-primary has-data-checked:ring-1 has-data-checked:ring-primary">
       <RadioGroupItem value={value} className="mt-1" />
@@ -268,7 +268,7 @@ type DemoMsg =
 
 const demoUnits = ["Bedroom AC", "Bedroom AC #2", "Living room AC", "Kitchen AC", "Study AC"];
 
-function DemoAssistant({ onClose, context }: { onClose: () => void; context: string }) {
+function DemoAssistant({ onClose, context }: Readonly<{ onClose: () => void; context: string }>) {
   const [msgs, setMsgs] = useState<DemoMsg[]>([{ kind: "bot", text: "Hi! Ask about temperatures, change a setting, or ask for help." }]);
   const [text, setText] = useState("");
   const [listening, setListening] = useState(false);
@@ -290,10 +290,10 @@ function DemoAssistant({ onClose, context }: { onClose: () => void; context: str
   };
 
   const send = (target: string, temp: number) => {
-    setMsgs((s) => [...s.filter((m) => m.kind !== "confirm"), { kind: "status", tone: "info", text: `Sending: ${target} → ${temp}°C …` }]);
+    setMsgs((s) => [...s.filter((m) => m.kind !== "confirm"), { kind: "status", tone: "info", text: `Sending: ${target} → ${String(temp)}°C …` }]);
     setTimeout(() => {
       const isFail = temp < 16 || temp > 30;
-      setMsgs((s) => [...s, isFail ? { kind: "status", tone: "crit", text: `Failed — ${temp}°C is outside the allowed range 16–30°C. Nothing was changed.` } : { kind: "status", tone: "ok", text: `Done — ${target} set to ${temp}°C (acknowledged by device).` }]);
+      setMsgs((s) => [...s, isFail ? { kind: "status", tone: "crit", text: `Failed — ${String(temp)}°C is outside the allowed range 16–30°C. Nothing was changed.` } : { kind: "status", tone: "ok", text: `Done — ${target} set to ${String(temp)}°C (acknowledged by device).` }]);
     }, 1200);
   };
 
@@ -323,7 +323,7 @@ function DemoAssistant({ onClose, context }: { onClose: () => void; context: str
           if (m.kind === "confirm") return (
             <div key={n} className="rounded-2xl border border-line bg-surface p-3 text-[13px]">
               <div className="mb-2 font-bold">I understood:</div>
-              <SummaryList items={[["Intent", "Change set temperature"], ["Target", `Home A › 1F › Bedroom › ${m.target}`], ["Current", "26°C (confirmed by device)"], ["Requested", `${m.temp}°C`], ["Allowed range", "16–30°C · step 1"]]} />
+              <SummaryList items={[["Intent", "Change set temperature"], ["Target", `Home A › 1F › Bedroom › ${m.target}`], ["Current", "26°C (confirmed by device)"], ["Requested", `${String(m.temp)}°C`], ["Allowed range", "16–30°C · step 1"]]} />
               <p className="my-2 text-xs text-muted-foreground">Only {m.target} changes. Same permission checks as Unit Control.</p>
               <div className="flex gap-2"><Btn variant="primary" size="sm" onClick={() => { send(m.target, m.temp); }}>Confirm & send</Btn><Btn size="sm" onClick={() => { setMsgs((s) => [...s.filter((x) => x.kind !== "confirm"), { kind: "bot", text: "Cancelled — nothing was sent." }]); }}>Cancel</Btn></div>
             </div>);

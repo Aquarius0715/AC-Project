@@ -13,7 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   await connection(); // every page renders per request, so it carries that request's CSP nonce (Next.js CSP guide, IR354)
   const { locale } = await coreDisplay(); // the page speaks the user's display language (WCAG 3.1.1, IR489); English before sign-in
   return (

@@ -38,7 +38,7 @@ const periodName = (p: string, locale: Locale) =>
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 const nextMonth = (ym: string) => {
   const [y, m] = ym.split("-").map(Number);
-  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
+  return m === 12 ? `${String(y + 1)}-01` : `${String(y)}-${String(m + 1).padStart(2, "0")}`;
 };
 /** The billing months of the URL (`from` / `to`, YYYY-MM, Kuala Lumpur months, IR299, IR321) as invoices.list filters
 on the period start: [the first day of `from`, the first day of the month after `to`). A malformed month is dropped,
@@ -84,10 +84,21 @@ export function invoiceRows(invoices: ApiInvoice[], contracts: ApiContract[], cu
     const name = methodName(i.paymentMethod, t) ?? t("Method not selected");
     const paymentState = i.paymentStatus ? paymentWord(i.paymentStatus, t) : null;
     return {
-      id: i.id, version: i.version, number: i.number, amt: money(i.amountMinor, i.currency), amountMinor: i.amountMinor, currency: i.currency,
+      id: i.id,
+      version: i.version,
+      number: i.number,
+      amt: money(i.amountMinor, i.currency),
+      amountMinor: i.amountMinor,
+      currency: i.currency,
       meta: `${(k && customer.get(k.customerId)) ?? t("customer")} · ${k ? t("{plan} contract v{version}", { plan: k.planType, version: i.contractVersion }) : i.contractId} · ${billingMonth(i.period.from, locale)}`,
-      method: paymentState ? `${name} · ${paymentState}` : name, methodName: name, paymentState, st, customerId: k?.customerId ?? "", contractId: i.contractId,
-      period: `${businessDay(i.period.from, locale)} → ${businessDay(i.period.to, locale)}`, due: businessDay(i.dueAt, locale),
+      method: paymentState ? `${name} · ${paymentState}` : name,
+      methodName: name,
+      customerId: k?.customerId ?? "",
+      contractId: i.contractId,
+      period: `${businessDay(i.period.from, locale)} → ${businessDay(i.period.to, locale)}`,
+      due: businessDay(i.dueAt, locale),
+      paymentState,
+      st,
     };
   });
 }
@@ -169,7 +180,7 @@ export function statementRows(statements: ApiStatement[], orgs: ApiOrganization[
 /** The last month that has ended in Kuala Lumpur (YYYY-MM): payout drafts are generated for ended months only. */
 export function lastClosedMonth(now: Date): string {
   const [y, m] = zonedParts(now.toISOString(), KL).date.slice(0, 7).split("-").map(Number);
-  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+  return m === 1 ? `${String(y - 1)}-12` : `${String(y)}-${String(m - 1).padStart(2, "0")}`;
 }
 
 /** The statement detail; `payable` is whether its pay date has come (approved → paid only on or after it). The pay

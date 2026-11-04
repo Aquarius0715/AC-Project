@@ -53,7 +53,7 @@ const MAX_PHOTOS = 10, MAX_BYTES = 5 << 20;
 unit's service scope, readings, parts and refrigerant, photos, the work report with its next action, the customer's
 sign-off and the submission for quality review. The draft lives on this page until saved (autosave after edits).
 Texts in the user's display language; the times the page loaded with come formatted from the loader (IR282). */
-export function WorkspaceView({ live }: { live: WorkspaceLive }) {
+export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
   type Rep = Pick<ApiTechReport, "id" | "version" | "attachmentRefs" | "signOff">;
   const { job } = live;
   const i18n = useI18n();
@@ -107,7 +107,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
   const issues: Issue[] | null = checked ? submitIssues(draft, photos, now, t) : null;
   const photoUrl = (a: { id: string }) => {
     const r = rep ?? live.report;
-    return r ? `/technician/jobs/${job.id}/photos/${a.id}?reportId=${r.id}&reportVersion=${r.version}` : "";
+    return r ? `/technician/jobs/${job.id}/photos/${a.id}?reportId=${r.id}&reportVersion=${String(r.version)}` : "";
   };
 
   const save = (after?: (r: Rep) => void) => {
@@ -226,7 +226,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-4 xl:col-span-2">
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <Card title={<Tabs value={tab} onChange={setTab} tabs={groups.map((g) => ({ id: g.group, label: `${g.label} (${g.total})${g.issues ? ` · ${t(g.issues === 1 ? "1 issue" : "{n} issues", { n: g.issues })}` : ""}` }))} />}>
+            <Card title={<Tabs value={tab} onChange={setTab} tabs={groups.map((g) => ({ id: g.group, label: `${g.label} (${String(g.total)})${g.issues ? ` · ${t(g.issues === 1 ? "1 issue" : "{n} issues", { n: g.issues })}` : ""}` }))} />}>
               {items.length === 0 ? <EmptyState title={t("No components")}>{t("This unit’s service scope has no components in {group}.", { group: t(groupLabel[tab]) })}</EmptyState> : (
                 <ul className="divide-y divide-line">{items.map((it) => (
                   <li key={it.componentKey} className="py-2.5">
@@ -252,7 +252,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
               <Card title={t("Checklist progress")}>
                 {groups.map((g) => {
                   return (
-                    <div key={g.group} className="mb-2"><div className="mb-1 flex justify-between text-xs"><b>{g.label}</b><span className="text-muted-foreground">{g.done} / {g.total}</span></div><UtilBar pct={g.total ? (g.done / g.total) * 100 : 0} tone={g.issues ? "warn" : "primary"}  label={`${g.label} ${g.done} / ${g.total}`} /></div>
+                    <div key={g.group} className="mb-2"><div className="mb-1 flex justify-between text-xs"><b>{g.label}</b><span className="text-muted-foreground">{g.done} / {g.total}</span></div><UtilBar pct={g.total ? (g.done / g.total) * 100 : 0} tone={g.issues ? "warn" : "primary"}  label={`${g.label} ${String(g.done)} / ${String(g.total)}`} /></div>
                   );
                 })}
                 {isEditable && <p className="text-[11px] text-muted-foreground">{issues?.length ? t(issues.length === 1 ? "1 issue blocks submit — it is listed above Submit report." : "{n} issues block submit — they are listed above Submit report.", { n: issues.length }) : t("{n} items still empty — each needs a result, or not inspected / not applicable with a reason, before submit.", { n: draft.items.filter((x) => x.result === null).length })}</p>}
@@ -295,7 +295,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
             {view === "parts" && (
               <div className="flex flex-col gap-3">
                 {draft.parts.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No parts used.")}</p> : (
-                  <DataTable rowKey={(p) => `${p.name}-${draft.parts.indexOf(p)}`} rows={draft.parts} cols={[
+                  <DataTable rowKey={(p) => `${p.name}-${String(draft.parts.indexOf(p))}`} rows={draft.parts} cols={[
                     { key: "p", label: t("Part"), render: (p) => <div><b>{p.name}</b><div className="text-[11px] text-muted-foreground">{p.catalogCode ?? t("custom")}{p.replacesComponentKey ? ` · ${t("replaces {part}", { part: label(p.replacesComponentKey) })}` : ""}</div></div> },
                     { key: "s", label: t("Source"), render: (p) => t(sources.find((x) => x.id === p.source)?.label ?? p.source) }, { key: "q", label: t("Qty"), render: (p) => p.quantity },
                     { key: "l", label: t("Lot / serial"), render: (p) => p.lotSerial ?? "—" },
@@ -321,7 +321,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
           </Card>
         </div>
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title={t("Work report — {version}", { version: rep ? t("draft v{version}", { version: rep.version }) : (live.report ? `v${live.report.version}` : t("not started")) })}>
+          <Card title={t("Work report — {version}", { version: rep ? t("draft v{version}", { version: rep.version }) : (live.report ? `v${String(live.report.version)}` : t("not started")) })}>
             {issues && issues.length > 0 && <Banner tone="crit"><b>{t(issues.length === 1 ? "Not submitted — 1 issue:" : "Not submitted — {n} issues:", { n: issues.length })}</b> {issues.slice(0, 6).map((x) => x.text).join(" · ")}{issues.length > 6 ? " · …" : ""}. {t("The draft is kept.")}</Banner>}
             {isEditable && win.notice && <div className="mt-2"><Banner tone="warn">{win.notice}</Banner></div>}
             {!isInWork && !live.report && <p className="text-[13px] text-muted-foreground">{t("The report opens when you check in at the site.")}</p>}
@@ -404,7 +404,7 @@ const openView = new Map<string, View>();
 /** The check-in form's fields by id: one dialog per page, and a refusal from the Core API focuses its field. */
 const CHECK_IN_IDS: Record<CheckInField, string> = { distance: "check-in-distance", qr: "check-in-qr", reason: "check-in-reason" };
 
-function CheckInModal({ open, unitId, pending, errors, setErrors, onClose, onCheckIn }: { open: boolean; unitId: string; pending: boolean; errors: CheckInErrors; setErrors: (e: CheckInErrors) => void; onClose: () => void; onCheckIn: (method: "location_qr" | "manual", distance: number | null, qr: string | null, reason: string | null) => void }) {
+function CheckInModal({ open, unitId, pending, errors, setErrors, onClose, onCheckIn }: Readonly<{ open: boolean; unitId: string; pending: boolean; errors: CheckInErrors; setErrors: (e: CheckInErrors) => void; onClose: () => void; onCheckIn: (method: "location_qr" | "manual", distance: number | null, qr: string | null, reason: string | null) => void }>) {
   const t = useT();
   const [method, setMethod] = useState<"location_qr" | "manual">("location_qr");
   const [distance, setDistance] = useState("40");
@@ -434,7 +434,7 @@ function CheckInModal({ open, unitId, pending, errors, setErrors, onClose, onChe
   );
 }
 
-function CantMakeModal({ open, pending, zone, onClose, onSend }: { open: boolean; pending: boolean; zone: string; onClose: () => void; onSend: (reason: string, slot: { startAt: string; endAt: string } | null) => void }) {
+function CantMakeModal({ open, pending, zone, onClose, onSend }: Readonly<{ open: boolean; pending: boolean; zone: string; onClose: () => void; onSend: (reason: string, slot: { startAt: string; endAt: string } | null) => void }>) {
   const t = useT();
   const [reason, setReason] = useState("");
   const [date, setDate] = useState("");
@@ -457,7 +457,7 @@ function CantMakeModal({ open, pending, zone, onClose, onSend }: { open: boolean
   );
 }
 
-function PartModal({ open, parts, components, onClose, onAdd }: { open: boolean; parts: WorkspaceLive["parts"]; components: WorkspaceLive["components"]; onClose: () => void; onAdd: (p: DraftPart) => void }) {
+function PartModal({ open, parts, components, onClose, onAdd }: Readonly<{ open: boolean; parts: WorkspaceLive["parts"]; components: WorkspaceLive["components"]; onClose: () => void; onAdd: (p: DraftPart) => void }>) {
   const t = useT();
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
@@ -475,7 +475,7 @@ function PartModal({ open, parts, components, onClose, onAdd }: { open: boolean;
     // a refused part takes the focus to the field to fix (IR625, as IR621)
     const bad = PART_FIELDS.find((k) => e[k]);
     if (bad) { focusField(`part-${bad}`); return; }
-    onAdd({ name: label, quantity: Number(qty), catalogCode: picked?.code ?? null, source, lotSerial: lot.trim() || null, replacesComponentKey: replaces || null, oldPartDisposal: replaces ? (disposal || "disposed_on_site") : null, receiptAttachmentId: null });
+    onAdd({ name: label, quantity: Number(qty), catalogCode: picked?.code ?? null, lotSerial: lot.trim() || null, replacesComponentKey: replaces || null, oldPartDisposal: replaces ? (disposal || "disposed_on_site") : null, receiptAttachmentId: null, source });
     setCode(""); setName(""); setQty("1"); setLot(""); setReplaces(""); setDisposal("");
   };
   return (
@@ -496,7 +496,7 @@ function PartModal({ open, parts, components, onClose, onAdd }: { open: boolean;
   );
 }
 
-function RefrigerantModal({ open, onClose, onAdd }: { open: boolean; onClose: () => void; onAdd: (r: DraftRefrigerant) => void }) {
+function RefrigerantModal({ open, onClose, onAdd }: Readonly<{ open: boolean; onClose: () => void; onAdd: (r: DraftRefrigerant) => void }>) {
   const t = useT();
   const [kind, setKind] = useState<DraftRefrigerant["refrigerant"]>("R32");
   const [cylinder, setCylinder] = useState("");
@@ -530,7 +530,7 @@ function RefrigerantModal({ open, onClose, onAdd }: { open: boolean; onClose: ()
   );
 }
 
-function SignModal({ open, pending, summary, onClose, onSign }: { open: boolean; pending: boolean; summary: string; onClose: () => void; onSign: (form: FormData) => void }) {
+function SignModal({ open, pending, summary, onClose, onSign }: Readonly<{ open: boolean; pending: boolean; summary: string; onClose: () => void; onSign: (form: FormData) => void }>) {
   const t = useT();
   const canvas = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
@@ -586,7 +586,7 @@ function SignModal({ open, pending, summary, onClose, onSign }: { open: boolean;
 }
 
 /** A report photo streamed through the DAL route; a photo whose file is gone (404) or unreadable shows a tile instead. */
-function Photo({ src, name }: { src: string; name: string }) {
+function Photo({ src, name }: Readonly<{ src: string; name: string }>) {
   const t = useT();
   const [broken, setBroken] = useState(false);
   if (broken) return <span title={name} className="grid h-16 w-20 place-items-center rounded-lg border border-dashed border-line bg-surface2 px-1 text-center text-[10px] leading-tight text-muted-foreground">{t("Photo unavailable")}</span>;

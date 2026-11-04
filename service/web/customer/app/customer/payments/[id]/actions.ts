@@ -23,7 +23,7 @@ const write = (version?: number) => (version === undefined ? { write: true } : {
 invoice is paid only after a confirmation event (DD-C11). */
 export async function startPayment(invoiceId: string, version: number, method: "demo_credit_card" | "demo_debit_card") {
   return run(async () => {
-    const p = await coreOp<ClientPayment>("payments.simulate", { event: "initiate", invoiceId, method, demoConfirmed: true }, write(version));
+    const p = await coreOp<ClientPayment>("payments.simulate", { event: "initiate", demoConfirmed: true, invoiceId, method }, write(version));
     await coreOp("payments.simulate", { event: "processing", paymentId: p.id, eventId: crypto.randomUUID(), paymentReference: demoReference(p.id) }, write(p.version));
     return p.id;
   });
@@ -34,14 +34,14 @@ export async function demoOutcome(paymentId: string, version: number, event: "pr
 }
 /** Payment instructions only: no Payment is created and the invoice stays unpaid. */
 export async function paymentInstructions(invoiceId: string, version: number) {
-  return run(() => coreOp<{ params: PreviewParams }>("payments.simulate", { event: "instructions", invoiceId, demoConfirmed: true }, write(version)).then((n) => n.params));
+  return run(() => coreOp<{ params: PreviewParams }>("payments.simulate", { event: "instructions", demoConfirmed: true, invoiceId }, write(version)).then((n) => n.params));
 }
 /** notifications.preview of the payment message for one channel (nothing is stored or sent). */
 export async function previewMessage(invoiceId: string, channel: "email" | "whatsapp") {
   return run(async () => {
     const me = await corePrincipal();
     const n = await coreOp<{ params: PreviewParams; templateKey: string; channel: string }>("notifications.preview",
-      { target: { kind: "invoice", id: invoiceId }, templateKey: "payment", channel, recipientMembershipId: me.membershipId });
+      { target: { kind: "invoice", id: invoiceId }, templateKey: "payment", recipientMembershipId: me.membershipId, channel });
     return { params: n.params, templateKey: n.templateKey, channel: n.channel };
   });
 }

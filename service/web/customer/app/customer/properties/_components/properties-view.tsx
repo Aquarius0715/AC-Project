@@ -33,7 +33,7 @@ const kind = (t: T, k: string) => t(kindLabel[k] ?? k);
 
 /** Units & locations (FR-C02) in API mode: the structure is read only (HQ manages it) except renaming; a room lists its
 air conditioners, and owners can send one change to several of them (Group control, FR-C14). */
-export function PropertiesView({ live }: { live: PropertiesLive }) {
+export function PropertiesView({ live }: Readonly<{ live: PropertiesLive }>) {
   const t = useT();
   const nav = useUrlPatch();
   const [renaming, setRenaming] = useState<Renaming | null>(null);
@@ -66,7 +66,7 @@ export function PropertiesView({ live }: { live: PropertiesLive }) {
   );
 }
 
-function Row({ depth, selected, onClick, icon, name, tag, meta, onRename }: { depth: number; selected: boolean; onClick: () => void; icon: IconName; name: string; tag?: string; meta?: string; onRename?: () => void }) {
+function Row({ depth, selected, onClick, icon, name, tag, meta, onRename }: Readonly<{ depth: number; selected: boolean; onClick: () => void; icon: IconName; name: string; tag?: string; meta?: string; onRename?: () => void }>) {
   const t = useT();
   return (
     <div className={cx("flex items-center gap-2 rounded-lg px-2 py-1.5", selected ? "bg-primary-soft" : "hover:bg-surface2")} style={{ paddingLeft: 8 + depth * 16 }}>
@@ -83,7 +83,7 @@ function Row({ depth, selected, onClick, icon, name, tag, meta, onRename }: { de
     </div>
   );
 }
-function SpaceRow({ s, p, depth, selId, go, rename }: { s: TreeSpace; p: TreeProperty; depth: number; selId: string; go: (x: Record<string, string | null>) => void; rename: (r: Renaming) => void }) {
+function SpaceRow({ s, p, depth, selId, go, rename }: Readonly<{ s: TreeSpace; p: TreeProperty; depth: number; selId: string; go: (x: Record<string, string | null>) => void; rename: (r: Renaming) => void }>) {
   const t = useT();
   return (
     <>
@@ -94,7 +94,7 @@ function SpaceRow({ s, p, depth, selId, go, rename }: { s: TreeSpace; p: TreePro
   );
 }
 
-function UnitRows({ units }: { units: (RoomUnit & { place: string })[] }) {
+function UnitRows({ units }: Readonly<{ units: (RoomUnit & { place: string })[] }>) {
   const t = useT();
   return (
     <div className="flex flex-col gap-2">
@@ -109,7 +109,7 @@ function UnitRows({ units }: { units: (RoomUnit & { place: string })[] }) {
 }
 
 const connLabel: Record<string, string> = { online: "Online", offline: "Offline", unknown: "Unknown", connecting: "Connecting", error: "Error" };
-function FilteredUnits({ live, clear }: { live: PropertiesLive; clear: () => void }) {
+function FilteredUnits({ live, clear }: Readonly<{ live: PropertiesLive; clear: () => void }>) {
   const t = useT();
   const f = live.filter!;
   const label = [f.powerState && t("Power: {state}", { state: t(powerLabel[f.powerState]) }), f.connections.length > 0 && t("Connection: {states}", { states: f.connections.map((c) => t(connLabel[c] ?? c)).join(", ") })].filter(Boolean).join(" · ");
@@ -120,7 +120,7 @@ function FilteredUnits({ live, clear }: { live: PropertiesLive; clear: () => voi
   );
 }
 
-function Panel({ live, sel, rename, go }: { live: PropertiesLive; sel: Selection; rename: (r: Renaming) => void; go: (x: Record<string, string | null>) => void }) {
+function Panel({ live, sel, rename, go }: Readonly<{ live: PropertiesLive; sel: Selection; rename: (r: Renaming) => void; go: (x: Record<string, string | null>) => void }>) {
   const t = useT();
   const p = sel.property;
   if (sel.kind === "property") {
@@ -130,7 +130,7 @@ function Panel({ live, sel, rename, go }: { live: PropertiesLive; sel: Selection
         <div className="text-[13px] text-muted-foreground">{t("My properties")} › <b className="text-ink">{p.name}</b></div>
         <Card title={<span className="flex items-center gap-2">{p.name}<Badge tone="muted" icon="home">{kind(t, p.kind)}</Badge></span>}
           action={<Btn size="sm" onClick={() => { rename({ kind: "property", id: p.id, version: p.version, name: p.name, where: t("{name} · {kind} (property)", { name: p.name, kind: kind(t, p.kind) }) }); }}><Icon name="edit" />{t("Rename")}</Btn>}>
-          <SummaryList cols={2} items={[[t("Type"), kind(t, s.kind)], [t("Floors"), s.floors.length > 0 ? `${s.floors.length} (${s.floors.join(", ")})` : t("none")], [t("Rooms"), s.rooms], [t("Air conditioners"), t("{inRooms} in rooms · {unassigned} unassigned", { inRooms: s.inRooms, unassigned: s.unassigned })], [t("Last edited"), s.edited]]} />
+          <SummaryList cols={2} items={[[t("Type"), kind(t, s.kind)], [t("Floors"), s.floors.length > 0 ? `${String(s.floors.length)} (${s.floors.join(", ")})` : t("none")], [t("Rooms"), s.rooms], [t("Air conditioners"), t("{inRooms} in rooms · {unassigned} unassigned", { inRooms: s.inRooms, unassigned: s.unassigned })], [t("Last edited"), s.edited]]} />
           <div className="my-4 rounded-xl bg-surface2 p-4 text-center"><div className="font-bold">{t("Select a room to see its air conditioners")}</div><div className="text-xs text-muted-foreground">{t("Floor → Room → Air conditioner. Each room lists every AC inside it; open one to control it.")}</div></div>
           {live.units.length > 0 && <>
             <div className="mb-2 text-[13px] font-bold">{t("? Unassigned units ({n})", { n: live.units.length })} <span className="text-xs font-normal text-muted-foreground">{t("Not in any room")}</span></div>
@@ -181,7 +181,7 @@ function Panel({ live, sel, rename, go }: { live: PropertiesLive; sel: Selection
 // ---- group control (FR-C14) ----
 
 interface Track { status: "Sending" | "Waiting" | "Confirmed" | "Failed"; note: string }
-function GroupPanel({ live, space }: { live: PropertiesLive; space: string }) {
+function GroupPanel({ live, space }: Readonly<{ live: PropertiesLive; space: string }>) {
   const i = useI18n();
   const { t } = i;
   const toast = useToast();

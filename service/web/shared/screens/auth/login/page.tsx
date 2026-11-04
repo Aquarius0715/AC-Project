@@ -12,7 +12,7 @@ const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 /** Sign-in of one role's app (FR-X01, DDC-07, SCR-X-login, Figma Login frames), rendered on the server (IR251): the data
 source and the kept returnTo decide where Continue goes, and a sign-in that came back says why. `others` are the
 base URLs of the other apps (plain links: separate apps). */
-export function LoginScreen({ role, others = {}, params = {}, api }: { role: Role; others?: AppLinks; params?: Params; api: boolean }) {
+export function LoginScreen({ role, others = {}, params = {}, api }: Readonly<{ role: Role; others?: AppLinks; params?: Params; api: boolean }>) {
   const cfg = ROLES[role];
   const href = continueHref(api, role, safeReturnTo(role, one(params.returnTo)));
   const error = loginError(one(params.error));

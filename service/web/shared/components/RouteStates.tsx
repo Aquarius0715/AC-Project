@@ -8,7 +8,7 @@ import { Btn, Card, Page } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { signInAgainHref } from "@ac/web/lib/login";
 
-export function RouteLoading({ what }: { what: string }) {
+export function RouteLoading({ what }: Readonly<{ what: string }>) {
   const t = useT();
   return (
     <Page>
@@ -17,7 +17,7 @@ export function RouteLoading({ what }: { what: string }) {
   );
 }
 
-export function RouteError({ what, error, retry }: { what: string; error: Error & { digest?: string }; retry: () => void }) {
+export function RouteError({ what, error, retry }: Readonly<{ what: string; error: Error & { digest?: string }; retry: () => void }>) {
   const t = useT();
   // a page that failed because the session was refused (IR385): the DAL dropped it, so sign in again and come back
   useEffect(() => {

@@ -4,7 +4,7 @@
 import { test, expect } from "../../fixtures/test";
 import type { Page } from "@playwright/test";
 
-const NAME = `E2E too hot ${Date.now() % 100_000}`;
+const NAME = `E2E too hot ${String(Date.now() % 100_000)}`;
 
 async function deleteE2EPolicies(page: Page) {
   await page.goto("/customer/alerts?tab=policies");

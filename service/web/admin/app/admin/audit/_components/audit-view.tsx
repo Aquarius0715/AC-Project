@@ -42,7 +42,7 @@ export interface AuditLive {
 where every filter and selection is in the URL and the server reads again; the demo filters its seed rows locally.
 Read only: nothing here creates, edits, deletes or exports an entry. Texts in the display language; the period's days
 are the display time zone's (IR304, IR320). */
-export function AuditView({ live }: { live?: AuditLive }) {
+export function AuditView({ live }: Readonly<{ live?: AuditLive }>) {
   const i = useI18n(), { t } = i, zone = i.display.timeZone;
   const patch = useUrlPatch();
   const [urlTab, setUrlTab] = useUrlTab<"log" | "devices">({ log: "log", devices: "devices" }, "log");
@@ -96,7 +96,7 @@ export function AuditView({ live }: { live?: AuditLive }) {
   };
   const open = (id: string) => { if (live) patch({ entryId: id }); else setSelId(id); };
   const actors = live ? live.actors : [...new Map(seed.map((r) => [r.actorId, r.actor]))].map(([id, name]) => ({ id, name }));
-  const kinds = live ? live.kinds : [...new Set(seed.map((r) => r.targetKind))].sort();
+  const kinds = live ? live.kinds : [...new Set(seed.map((r) => r.targetKind))].toSorted();
   const related = live ? live.related : (sel?.id === "1" ? seedRelated : { restriction: null, command: null, job: null, unit: null });
   const trace = live ? live.trace : [];
   const corr = live ? live.filters.correlationId : f.correlationId; // the searched correlation ID (typing waits 300 ms)
@@ -173,14 +173,14 @@ export function AuditView({ live }: { live?: AuditLive }) {
   );
 }
 
-function FilterLink({ onClick, children }: { onClick: () => void; children: ReactNode }) {
+function FilterLink({ onClick, children }: Readonly<{ onClick: () => void; children: ReactNode }>) {
   return <Plain touch className="text-xs font-semibold text-primary hover:underline" onClick={onClick}>{children}</Plain>;
 }
 
 /** Why the list is empty: nothing was searched (an invalid period, Figma Admin 338:602), an unknown or out-of-scope
 correlation ID — they look the same (338:332) — no pending or failed entry, which only device commands have (IR604),
 or no match. */
-function NoEntries({ live, periodErr, corr, result }: { live?: AuditLive; periodErr?: string; corr: string; result: string }) {
+function NoEntries({ live, periodErr, corr, result }: Readonly<{ live?: AuditLive; periodErr?: string; corr: string; result: string }>) {
   const { t } = useI18n();
   if (periodErr || (live && !live.searched)) return <EmptyState title={t("Nothing was searched")}>{t("The period must start before it ends and cover at most 366 days. Earlier results are cleared so they are not mistaken for this search.")}</EmptyState>;
   if (corr) return <EmptyState title={t("No entries with this correlation ID")}>{t("This looks the same for an ID that does not exist and for one outside your managed scope. Clear the correlation ID or widen the period.")}</EmptyState>;
@@ -190,7 +190,7 @@ function NoEntries({ live, periodErr, corr, result }: { live?: AuditLive; period
 
 /** The restriction, command, job and unit of the entry and of its correlation (DD-A16 step 1). Each link opens the
 record's own screen, which checks its own permission; the command is read (commands.get) only when asked (SCR-A16). */
-function RelatedRecords({ related, demo }: { related: Related; demo: boolean }) {
+function RelatedRecords({ related, demo }: Readonly<{ related: Related; demo: boolean }>) {
   const { t } = useI18n();
   const line = (r: RelatedRef) => <span><span className="font-mono text-xs">{r.id.slice(0, 8)}</span> · {r.note}</span>;
   const row = (label: string, r: RelatedRef | null, none: string, link?: (r: RelatedRef) => ReactNode): [string, ReactNode] =>
@@ -209,7 +209,7 @@ function RelatedRecords({ related, demo }: { related: Related; demo: boolean }) 
   );
 }
 
-function CommandLine({ r, demo, line }: { r: RelatedRef; demo: boolean; line: ReactNode }) {
+function CommandLine({ r, demo, line }: Readonly<{ r: RelatedRef; demo: boolean; line: ReactNode }>) {
   type Loaded = { state: "idle" | "loading" } | { state: "done"; text: string; when: string; unitId: string | null } | { state: "error"; text: string };
   const { t, display } = useI18n();
   const [c, setC] = useState<Loaded>({ state: "idle" });
@@ -237,10 +237,10 @@ function CommandLine({ r, demo, line }: { r: RelatedRef; demo: boolean; line: Re
 
 /** The device events tab (Figma Admin 340:2): the devices the session may see, and only after one is picked its
 events in the period, newest first — no fallback to a first or every device (IR33). */
-function DeviceEvents({ device, f, periodErr, zone, live, onDate, onDevice, onEvent, onReset }: {
+function DeviceEvents({ device, f, periodErr, zone, live, onDate, onDevice, onEvent, onReset }: Readonly<{
   device: NonNullable<AuditLive["device"]>; f: AuditFilters; periodErr?: string; zone: string; live: boolean;
   onDate: (which: "from" | "to", v: string) => void; onDevice: (id: string) => void; onEvent: (id: string) => void; onReset: () => void;
-}) {
+}>) {
   const { t } = useI18n();
   const [pick, setPick] = useState<string | null>(null);
   const ev = device.events.find((e) => e.id === (live ? device.selected : pick)) ?? device.events[0] ?? null;

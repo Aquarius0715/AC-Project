@@ -18,7 +18,7 @@ type Open = { kind: "renew" | "add"; row: CertRow | null } | { kind: "training" 
 the KPIs; one row per technician and qualification with the jobs an ending certificate blocks; the assignment
 impact; renewals, new certificates and training requests. Texts in the user's display language; the dates come
 formatted from the loader (IR277). */
-export function Certifications({ live }: { live: Live }) {
+export function Certifications({ live }: Readonly<{ live: Live }>) {
   const t = useT();
   const patch = useUrlPatch();
   const c = live.certificates;
@@ -92,7 +92,7 @@ export function Certifications({ live }: { live: Live }) {
 
 /** Upload renewal (Figma 04-7) or a new certificate: the days are Kuala Lumpur days; the file is PDF, JPG or PNG of at
 most 10 MB; it stays “Pending HQ verification” and the current expiry counts until HQ approves (BR-P09). */
-function CertificateModal({ live, kind, row, onClose }: { live: Live; kind: "renew" | "add"; row: CertRow | null; onClose: () => void }) {
+function CertificateModal({ live, kind, row, onClose }: Readonly<{ live: Live; kind: "renew" | "add"; row: CertRow | null; onClose: () => void }>) {
   const t = useT();
   const [pending, run] = useAction();
   const c = live.certificates;
@@ -168,7 +168,7 @@ function CertificateModal({ live, kind, row, onClose }: { live: Live; kind: "ren
 }
 
 /** Request training for an expiring or expired certificate (certificates.requestTraining, note 1–1000). */
-function TrainingModal({ row, onClose }: { row: CertRow; onClose: () => void }) {
+function TrainingModal({ row, onClose }: Readonly<{ row: CertRow; onClose: () => void }>) {
   const t = useT();
   const [pending, run] = useAction();
   const [note, setNote] = useState("");
@@ -194,7 +194,7 @@ function TrainingModal({ row, onClose }: { row: CertRow; onClose: () => void }) 
   );
 }
 
-function ViewModal({ row, onClose }: { row: CertRow; onClose: () => void }) {
+function ViewModal({ row, onClose }: Readonly<{ row: CertRow; onClose: () => void }>) {
   const t = useT();
   return (
     <Modal open onClose={onClose} title={row.name} footer={<Btn onClick={onClose}>{t("Close")}</Btn>}>

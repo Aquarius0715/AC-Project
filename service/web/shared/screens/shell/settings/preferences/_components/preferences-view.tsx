@@ -25,7 +25,7 @@ export interface PreferencesLive {
 /** Preferences (FR-X01, FR-X08, DDC-07, Figma Client 10d/10g) from the Core API: language and time zone of the user,
 for a client the location consent and the monthly energy report e-mail (BR-C16), two-step verification; the
 microphone switch stays on this device. */
-export function PreferencesView({ live }: { live: PreferencesLive }) {
+export function PreferencesView({ live }: Readonly<{ live: PreferencesLive }>) {
   const t = useT();
   const [pending, run] = useAction();
   const [locale, setLocale] = useState(live.prefs.locale);
@@ -88,7 +88,7 @@ export function PreferencesView({ live }: { live: PreferencesLive }) {
   );
 }
 
-function TurnOn({ setupKey, qr, onClose }: { setupKey: string | null; qr: QrPath | null; onClose: () => void }) {
+function TurnOn({ setupKey, qr, onClose }: Readonly<{ setupKey: string | null; qr: QrPath | null; onClose: () => void }>) {
   const t = useT();
   const [pending, run] = useAction();
   const [code, setCode] = useState("");
@@ -114,7 +114,7 @@ function TurnOn({ setupKey, qr, onClose }: { setupKey: string | null; qr: QrPath
   );
 }
 
-function TurnOff({ onClose }: { onClose: () => void }) {
+function TurnOff({ onClose }: Readonly<{ onClose: () => void }>) {
   const t = useT();
   const [pending, run] = useAction();
   const [code, setCode] = useState("");

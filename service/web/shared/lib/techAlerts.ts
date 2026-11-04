@@ -79,8 +79,10 @@ export function alertView(a: ApiTechAlert, ctx: { alerts: ApiTechAlert[]; unit: 
   return {
     id: a.id, version: a.version, status: a.status, severity: a.severity, policyless: !a.policyId,
     banner: {
-      title: `${a.id.slice(0, 8)} · ${title}`, tone, state: a.status === "open" ? null : `${t(state)} · ${when((a.status === "resolved" ? a.resolvedAt : a.acknowledgedAt) ?? a.detectedAt)}`,
+      title: `${a.id.slice(0, 8)} · ${title}`,
+      state: a.status === "open" ? null : `${t(state)} · ${when((a.status === "resolved" ? a.resolvedAt : a.acknowledgedAt) ?? a.detectedAt)}`,
       sub: words ? words.policy : t("{kind} · no policy — it resolves only with a reason", { kind: t(KIND[a.evidenceKind] ?? "Evidence") }),
+      tone,
     },
     cards,
     resolution: {

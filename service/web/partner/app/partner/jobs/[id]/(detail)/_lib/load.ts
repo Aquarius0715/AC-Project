@@ -36,8 +36,10 @@ export async function loadJobDetail(jobId: string) {
   const { t } = i;
   if (job.projection === "history") {
     return {
-      kind: "history" as const, now, job,
+      kind: "history" as const,
       text: { completed: job.completedAt ? showTime(job.completedAt, display) : "—", snapshot: showTime(job.asOf, display), events: eventRows(job.ownDecisionEvents, i) },
+      now,
+      job,
     };
   }
   const members = await optional(coreAll<ApiMember>("members.list"), []);
@@ -53,7 +55,8 @@ export async function loadJobDetail(jobId: string) {
     const offers = Math.max(1, ev.filter((e) => e.action === "job.offered").length);
     const start = zonedParts(job.visitSlot.startAt, display.timeZone);
     return {
-      kind: "offer" as const, now, job, names, technicians, events: ev,
+      kind: "offer" as const,
+      events: ev,
       fits: fits(members, job.requiredQualifications, job.visitSlot, dates.map((date, k) => ({ date, capacity: days[k] })), "offer", undefined, i),
       text: {
         expires: showTime(job.offerExpiresAt, display), visit: showSpan(job.visitSlot.startAt, job.visitSlot.endAt, display),
@@ -62,6 +65,10 @@ export async function loadJobDetail(jobId: string) {
         // Propose another time: typed in the display time zone (NFR-08), the day after the fixed visit by default
         propose: { zone: display.timeZone, date: zonedParts(new Date(Date.parse(job.visitSlot.startAt) + 86_400_000).toISOString(), display.timeZone).date, from: start.time, to: zonedParts(job.visitSlot.endAt, display.timeZone).time },
       },
+      now,
+      job,
+      names,
+      technicians,
     };
   }
   const visit = job.assignment ? { startAt: job.assignment.scheduledStart, endAt: job.assignment.scheduledEnd } : job.offer?.visitSlot ?? job.requestedSlot;
@@ -76,7 +83,9 @@ export async function loadJobDetail(jobId: string) {
   const linked = alerts.filter((a): a is ApiAlert => !!a);
   const tech = job.assignment ? names[job.assignment.technicianMembershipId] ?? t("Technician") : null;
   return {
-    kind: "detail" as const, now, job, names, unit, events: ev, alerts: linked, required,
+    kind: "detail" as const,
+    events: ev,
+    alerts: linked,
     fits: fits(members, required, visit, dates.map((date, k) => ({ date, capacity: days[k] })), "detail", job.assignment?.technicianMembershipId, i),
     text: {
       tech, banner: detailBanner(job, tech, ms, i), steps: timeline(job.status, ev, !!job.assignment, job.origin, i),
@@ -87,6 +96,11 @@ export async function loadJobDetail(jobId: string) {
       raised: Object.fromEntries(linked.map((a) => [a.id, showTime(a.detectedAt, display)])),
       delegation: job.offer ? { left: delegationLeft(job.offer.accessValidUntil, ms, false, i), toSchedule: delegationLeft(job.offer.accessValidUntil, ms, true, i) } : null,
     },
+    now,
+    job,
+    names,
+    unit,
+    required,
   };
 }
 

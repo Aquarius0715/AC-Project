@@ -21,7 +21,7 @@ export default async function AdminOffsetsPage(props: PageProps<"/admin/offsets"
   return withAccess("Offsets", ["offset.read"], () => AdminOffsetsPageContent(props));
 }
 
-async function AdminOffsetsPageContent({ searchParams }: PageProps<"/admin/offsets">) {
+async function AdminOffsetsPageContent({ searchParams }: Readonly<PageProps<"/admin/offsets">>) {
   interface Unit { id: string; displayName: string; customerOrgId: string; archived: boolean }
   interface Page<T> { items: T[] }
   await connection();
@@ -48,7 +48,13 @@ async function AdminOffsetsPageContent({ searchParams }: PageProps<"/admin/offse
   const selectedId = wanted ? rows.find((r) => r.id === wanted)?.id ?? null : rows[0]?.id ?? null;
   return (
     <OffsetsView live={{
-      tab, canWrite: perms.has("offset.write"), rows, selectedId, recordMissing: !!wanted && !selectedId, scope: { customerId, status, created }, customers: names,
+      tab,
+      rows,
+      selectedId,
+      canWrite: perms.has("offset.write"),
+      recordMissing: !!wanted && !selectedId,
+      scope: { customerId, status, created },
+      customers: names,
       units: units.items.filter((u) => !u.archived).map((u) => ({ id: u.id, label: u.displayName, customerId: customerOfOrg.get(u.customerOrgId) ?? "" })),
     }} />
   );

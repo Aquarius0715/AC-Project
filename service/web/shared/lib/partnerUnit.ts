@@ -54,10 +54,12 @@ export function jobContext(j: Extract<ApiUnitJob, { projection: "summary" }>, na
   const span = from && to ? Date.parse(to) - Date.parse(from) : 0;
   const pct = span > 0 ? Math.min(100, Math.max(0, Math.round(((nowMs - Date.parse(from!)) / span) * 100))) : null;
   return {
-    id: j.id, techMissing: !tech, pct,
+    id: j.id,
+    techMissing: !tech,
     rows: [[t("Job"), `${j.id.slice(0, 8)} · ${typeLabel(j.type, t)}`], [t("Technician"), tech ?? t("Not assigned yet")], [t("Access window"), from && to ? showSpan(from, to, display) : "—"]],
     note: to && Date.parse(to) > nowMs ? t("Access ends in {left}. After that, live values are cleared and only a history snapshot remains.", { left: until(to, nowMs, t) })
       : t("Access ends with the accepted offer’s access window; after that only a history snapshot remains."),
+    pct,
   };
 }
 

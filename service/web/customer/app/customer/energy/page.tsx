@@ -15,7 +15,7 @@ import { EnergyDemo } from "./_components/energy-demo";
 import { EnergyView, type EnergyLive } from "./_components/energy-view";
 
 
-export default async function CustomerEnergyPage({ searchParams }: PageProps<"/customer/energy">) {
+export default async function CustomerEnergyPage({ searchParams }: Readonly<PageProps<"/customer/energy">>) {
   interface Preferences { locale: string; timezone: string; monthlyReportEmail: boolean }
   interface Unit { id: string; displayName: string }
   await connection();
@@ -36,9 +36,18 @@ export default async function CustomerEnergyPage({ searchParams }: PageProps<"/c
   const name = new Map(own.map((u) => [u.id, u.name]));
   const lastMonth = (() => { const d = new Date(now); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - 1); return klLocal(d.toISOString()).slice(0, 7); })();
   const live: EnergyLive = {
-    units: own, unitIds, period, baselines: options.map((b) => ({ id: b.id, label: baselineLabel(b) })), baselineId: baseline?.id ?? null,
-    summary: null, daily: [], compare: null, properties, prefs, lastMonth,
+    units: own,
+    baselines: options.map((b) => ({ id: b.id, label: baselineLabel(b) })),
+    baselineId: baseline?.id ?? null,
+    summary: null,
+    daily: [],
+    compare: null,
     query: selectionQuery({ unitIds, period: kind, from: one("from"), to: one("to"), baselineId: baseline?.id }),
+    unitIds,
+    period,
+    properties,
+    prefs,
+    lastMonth,
   };
   if (unitIds.length > 0 && !period.error) {
     try {

@@ -21,7 +21,7 @@ test("the policy editor's footer, Show disabled and a simulation with an added f
   await page.goto("/admin/settings/automation?policyId=new");
   const main = page.getByRole("main");
   await expect(main.getByRole("heading", { name: "Basics", exact: true })).toBeVisible();
-  await main.getByLabel("Name").fill(`E2E tariff policy ${Date.now()}`);
+  await main.getByLabel("Name").fill(`E2E tariff policy ${String(Date.now())}`);
   await main.getByRole("checkbox", { name: "Bedroom AC", exact: true }).check();
   await main.getByRole("button", { name: "Create policy" }).click();
   await page.waitForURL(/policyId=[0-9a-f-]{36}/);

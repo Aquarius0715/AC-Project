@@ -6,17 +6,22 @@ import { i18nOf, translator } from "@ac/web/lib/i18n";
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const ms = translator("ms");
 const NOW = Date.parse("2026-09-15T01:30:00Z"); // Tue 09:30 in Kuala Lumpur
-const grant = (code: string, validUntil = "2027-03-31T00:00:00Z", revokedAt: string | null = null) => ({ code, validFrom: "2025-04-01T00:00:00Z", validUntil, revokedAt });
+const grant = (code: string, validUntil = "2027-03-31T00:00:00Z", revokedAt: string | null = null) => ({ validFrom: "2025-04-01T00:00:00Z", code, validUntil, revokedAt });
 const member = (id: string, name: string, quals: ReturnType<typeof grant>[], validUntil: string | null = null): ApiTeamMember =>
-  ({ id, userId: `u-${id}`, organizationId: "org-a", displayName: name, role: "technician", employment: "external", validFrom: "2025-04-01T00:00:00+08:00", validUntil, qualifications: quals });
+  ({ id, validUntil, userId: `u-${id}`, organizationId: "org-a", displayName: name, role: "technician", employment: "external", validFrom: "2025-04-01T00:00:00+08:00", qualifications: quals });
 const a = member("m-a", "tech-external-a", [grant("demo_outdoor"), grant("demo_electrical", "2026-10-01T00:00:00Z")]);
 const a2 = member("m-b", "tech-external-a2", [grant("demo_indoor", "2027-01-31T00:00:00Z")]);
 const old = member("m-c", "tech-external-old", [grant("demo_outdoor", "2026-08-01T00:00:00Z")], "2026-08-01T00:00:00+08:00");
 const slot = (s: string, e: string) => ({ startAt: s, endAt: e });
 const cap = (id: string, date: string, assigned: [string, string][], available: number | null = 480, unavailability: string | null = null): ApiCapacity => {
   return {
-    membershipId: id, date, availableSlots: available ? [slot(`${date}T01:00:00Z`, `${date}T09:00:00Z`)] : [], assignedSlots: assigned.map(([s, e]) => slot(s, e)),
-    availableMinutes: available, assignedMinutes: assigned.reduce((m, [s, e]) => m + (Date.parse(e) - Date.parse(s)) / 60_000, 0), unavailability,
+    membershipId: id,
+    availableSlots: available ? [slot(`${date}T01:00:00Z`, `${date}T09:00:00Z`)] : [],
+    assignedSlots: assigned.map(([s, e]) => slot(s, e)),
+    availableMinutes: available,
+    assignedMinutes: assigned.reduce((m, [s, e]) => m + (Date.parse(e) - Date.parse(s)) / 60_000, 0),
+    date,
+    unavailability,
   };
 };
 const dates = ["2026-09-14", "2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18", "2026-09-19", "2026-09-20"];
@@ -105,7 +110,7 @@ describe("partner team & capacity", () => {
     const signer = (id: string) => ({ id, displayName: "E2E Signer" });
     const names = technicianNames([a, signer("m-s1"), signer("m-s2"), signer("m-s3")], new Map([["m-s1", "s1@example.com"], ["m-s2", "s2@example.com"], ["m-a", "a@example.com"]]));
     expect([...names.values()]).toEqual(["tech-external-a", "E2E Signer · s1@example.com", "E2E Signer · s2@example.com", "E2E Signer"]); // no e-mail known: the name only
-    const u = (id: string, membershipId: string | null, from: string, to: string, type = "annual_leave", note: string | null = null): ApiUnavailability => ({ id, version: 1, membershipId, from, to, type, note });
+    const u = (id: string, membershipId: string | null, from: string, to: string, type = "annual_leave", note: string | null = null): ApiUnavailability => ({ version: 1, id, membershipId, from, to, type, note });
     const rows = unavailabilityRows([u("u2", "m-s1", "2026-09-17", "2026-09-18", "training", "Refresher"), u("u1", "m-a", "2026-09-10", "2026-09-16"), u("u3", null, "2026-09-21", "2026-09-21", "public_holiday"), u("u4", "m-gone", "2026-09-30", "2026-09-30")], names, "2026-09-15");
     expect(rows.map((r) => [r.who, r.type, r.note, r.days, r.first, r.started])).toEqual([
       ["tech-external-a", "Annual leave", null, "Thu 10 – Wed 16 Sept", "2026-09-15", true],

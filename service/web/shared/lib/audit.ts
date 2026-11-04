@@ -103,7 +103,7 @@ export function auditRow(a: ApiAudit, i: I18n = EN, nowMs?: number): AuditRow {
     reason: reasonText(a, t),
     changes: fields.map((f) => {
       const before = a.maskedBefore?.[f] ?? "null", after = a.maskedAfter?.[f] ?? "null";
-      return { field: f, before, after, changed: before !== after };
+      return { field: f, changed: before !== after, before, after };
     }),
   };
 }
@@ -163,7 +163,7 @@ export function relatedRecords(sel: ApiAudit, group: ApiAudit[], i: I18n = EN): 
     const a = all.find((x) => x.targetRef.kind === kind);
     if (!a) return null;
     const via = a.id === sel.id ? "target" : "correlation";
-    return { id: a.targetRef.id, via, note: t(via === "target" ? "this entry’s target" : "same correlation ID") };
+    return { id: a.targetRef.id, note: t(via === "target" ? "this entry’s target" : "same correlation ID"), via };
   };
   const restriction = ref("restriction");
   if (restriction && sel.targetRef.kind === "restriction" && sel.targetRef.id === restriction.id) {

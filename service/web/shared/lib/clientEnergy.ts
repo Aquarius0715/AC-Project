@@ -59,7 +59,11 @@ export function compareRow(unitId: string, name: string, s: ApiEnergySummary, tr
   const difference = b ? isComparable ? b.baselineKWh === 0 ? tr("Cannot calculate — baseline is 0")
     : `${saving(t.savedKWh, " kWh", one, tr)} · ${saving(t.savingPercentage, "%", one, tr)}` : tr("Cannot calculate — baseline not comparable") : tr("No baseline for this unit");
   return {
-    unitId, name, actual: t.kWh === null ? "—" : one(t.kWh), baseline: b?.baselineKWh === null || !b ? "—" : one(b.baselineKWh), difference,
+    unitId,
+    name,
+    difference,
+    actual: t.kWh === null ? "—" : one(t.kWh),
+    baseline: b?.baselineKWh === null || !b ? "—" : one(b.baselineKWh),
     tone: isComparable && (t.savedKWh ?? 0) > 0 ? "ok" : (isComparable && (t.savedKWh ?? 0) < 0 ? "warn" : "muted"),
     coverage: s.coverage === null ? "—" : `${coveragePct(s.coverage)}%`,
   };

@@ -52,7 +52,7 @@ export const clientUserActions = {
     const users = load();
     const err = emailError(email, users);
     if (err) return err;
-    save([...users, { id: `cu-${Date.now()}`, name: name.trim() || null, email: email.trim(), role, status: "invited", lastSignIn: null, invitedBy: by, invitedAt: "2026-10-06" }]);
+    save([...users, { id: `cu-${String(Date.now())}`, name: name.trim() || null, email: email.trim(), status: "invited", lastSignIn: null, invitedBy: by, invitedAt: "2026-10-06", role }]);
     return;
   },
   /** clientUsers.resendInvite — invited users only, preview only. */

@@ -100,7 +100,7 @@ export function metricCard(metric: AirMetric, m: ApiMeasurement | undefined, has
   const setpoint = setsTemperature ? "Setpoint is on Unit Control" : "Set on the AC itself";
   const noAdvice = t(metric === "temperature" ? setpoint : (metric === "humidity" ? "Not enough data for advice" : "Not enough data for {metric} advice"), { metric: label });
   const unavailable = (sub: string, feed = { text: t("Unavailable"), tone: "unknown" as Tone, icon: "offline" as IconName }): MetricCard =>
-    ({ metric, label, unit, value: null, feed, status: { text: t("Not measured"), tone: "muted", icon: "dot" }, sub, advice: noAdvice, warn: false });
+    ({ metric, label, unit, feed, sub, value: null, status: { text: t("Not measured"), tone: "muted", icon: "dot" }, advice: noAdvice, warn: false });
   if (!hasSensor) return unavailable(t("No {metric} sensor on this model", { metric: label }), { text: t("Unsupported"), tone: "muted", icon: "unsupported" });
   if (!m) return unavailable(t("No reading yet"));
   const at = showClock(m.observedAt, display);
@@ -118,8 +118,15 @@ export function metricCard(metric: AirMetric, m: ApiMeasurement | undefined, has
     : metric === "pm25" ? (isHigh ? "Filter cleaning recommended (≥ 35 µg/m³)" : "No current advice")
     : metric === "temperature" ? setpoint : "No current advice");
   return {
-    metric, label, unit, value: airNumber(metric, m.value), feed: { text: t("Live"), tone: "ok", icon: "live" }, status,
-    sub: `${t("Observed {time}", { time: at })}${m.origin === "measured" ? "" : ` · ${t(originText[m.origin] ?? m.origin)}`}`, advice, warn: isHigh,
+    metric,
+    label,
+    unit,
+    status,
+    advice,
+    value: airNumber(metric, m.value),
+    feed: { text: t("Live"), tone: "ok", icon: "live" },
+    sub: `${t("Observed {time}", { time: at })}${m.origin === "measured" ? "" : ` · ${t(originText[m.origin] ?? m.origin)}`}`,
+    warn: isHigh,
   };
 }
 
@@ -169,7 +176,7 @@ export function allergenView(a: ApiAllergen | null, i: I18n = EN): { title: stri
   if (a.availability === "unsupported") return { title, badge: { text: t("Unsupported"), tone: "muted", icon: "unsupported" }, text: t("This unit cannot observe allergens — this does not mean “no allergens”.") };
   if (a.availability === "not_measured") return { title, badge: { text: t("Not measured"), tone: "muted", icon: "dot" }, text: t("No observation — this does not mean “no allergens”.") };
   if (!a.substance || !a.sourceLabel || !a.observedAt || !a.evidenceText) return { title, badge: { text: t("Unknown"), tone: "unknown", icon: "unknown" }, text: t("Incomplete observation — shown as unknown, this does not mean “no allergens”.") };
-  const value = a.value === null ? [] : [a.unit ? `${a.value} ${a.unit}` : t("Value unknown (no unit)")];
+  const value = a.value === null ? [] : [a.unit ? `${String(a.value)} ${a.unit}` : t("Value unknown (no unit)")];
   return {
     title: t("Allergen ({substance})", { substance: a.substance }), badge: { text: t("Detected"), tone: "warn", icon: "warning" },
     text: [...value, t("Source: {source}", { source: a.sourceLabel }), showClock(a.observedAt, display), evidenceText(a.evidenceText, t)].join(" · "),

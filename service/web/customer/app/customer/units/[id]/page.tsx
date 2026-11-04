@@ -30,7 +30,7 @@ async function restrictionHref(unitId: string): Promise<string | null> {
   return null;
 }
 
-export default async function CustomerUnitPage({ params }: PageProps<"/customer/units/[id]">) {
+export default async function CustomerUnitPage({ params }: Readonly<PageProps<"/customer/units/[id]">>) {
   const { id } = await params;
   await connection();
   if (!apiMode()) return <UnitView id={id} />;

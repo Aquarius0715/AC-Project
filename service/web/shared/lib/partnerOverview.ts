@@ -183,7 +183,7 @@ export function actions(jobs: PartnerJob[], now: number, names: Map<string, stri
   const rows: ActionRow[] = [];
   for (const j of jobs.filter((x) => x.status === "offered").sort((a, b) => Date.parse(a.offerExpiresAt ?? a.dueAt ?? "") - Date.parse(b.offerExpiresAt ?? b.dueAt ?? ""))) {
     const detail = j.offerExpiresAt ? t("Answer by {time} ({left} left)", { time: showTime(j.offerExpiresAt, display), left: until(j.offerExpiresAt, now, t) }) : t("Answer the offer");
-    rows.push({ kind: "offer", badge: t("Offer"), title: label(j, t), detail, href: `/partner/jobs/${j.id}`, button: t("Respond") });
+    rows.push({ kind: "offer", badge: t("Offer"), title: label(j, t), href: `/partner/jobs/${j.id}`, button: t("Respond"), detail });
   }
   for (const j of jobs.filter((x) => bucket(x, now) === "overdue")) {
     const ended = t("Work window ended {time}", { time: showTime(j.slot!.endAt, display) });
@@ -195,7 +195,7 @@ export function actions(jobs: PartnerJob[], now: number, names: Map<string, stri
   }
   for (const j of jobs.filter((x) => bucket(x, now) === "unassigned")) {
     const detail = j.dueAt ? t("No technician · due {time}", { time: showTime(j.dueAt, display) }) : t("No technician");
-    rows.push({ kind: "unassigned", badge: t("Accepted"), title: label(j, t), detail, href: `/partner/schedule?jobId=${j.id}`, button: t("Assign") });
+    rows.push({ kind: "unassigned", badge: t("Accepted"), title: label(j, t), href: `/partner/schedule?jobId=${j.id}`, button: t("Assign"), detail });
   }
   return rows;
 }
@@ -232,7 +232,7 @@ export function timeline(today: ApiCapacity[], members: ApiMember[], date: strin
       return { left, width: Math.max(right - left, 0), text: `${hhmm(s.startAt)}–${hhmm(s.endAt)}` };
     }).filter((b) => b.width > 0);
     const quals = (m.qualifications ?? []).filter((q) => !q.revokedAt).map((q) => shortQualification(q.code, t));
-    return { id: m.id, name: m.displayName, sub: quals.slice(0, 2).join(", ") || t("Technician"), blocks, off: c?.unavailability ? unavailabilityLabel(c.unavailability, t) : null };
+    return { id: m.id, name: m.displayName, sub: quals.slice(0, 2).join(", ") || t("Technician"), off: c?.unavailability ? unavailabilityLabel(c.unavailability, t) : null, blocks };
   }).sort((a, b) => Number(a.blocks.length === 0 && !a.off) - Number(b.blocks.length === 0 && !b.off) || (a.blocks[0]?.left ?? 100) - (b.blocks[0]?.left ?? 100) || a.name.localeCompare(b.name));
 }
 
@@ -254,7 +254,7 @@ export function capacity(days: ApiCapacity[][], members: ApiMember[], t: T = en)
   return members.filter((m) => m.role === "technician").sort((a, b) => of(b).assigned - of(a).assigned || a.displayName.localeCompare(b.displayName)).map((m) => {
     const s = of(m);
     const pct = s.available ? Math.min(100, Math.round((s.assigned / s.available) * 100)) : null;
-    return { id: m.id, name: m.displayName, text: `${h(s.assigned)} / ${s.available === null ? "—" : h(s.available)} · ${pct === null ? "—" : `${pct}%`}`, pct };
+    return { id: m.id, name: m.displayName, text: `${h(s.assigned)} / ${s.available === null ? "—" : h(s.available)} · ${pct === null ? "—" : `${String(pct)}%`}`, pct };
   });
 }
 

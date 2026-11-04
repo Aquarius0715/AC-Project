@@ -55,7 +55,8 @@ export async function loadWorkspace(jobId: string): Promise<WorkspaceLive | "not
     [a?.scheduledStart, a?.scheduledEnd, ...(r?.reviewHistory ?? []).map((h) => h.occurredAt)],
     a ? [[a.scheduledStart, a.scheduledEnd]] : []);
   return {
-    now: now.toISOString(), known, zone: display.timeZone,
+    now: now.toISOString(),
+    zone: display.timeZone,
     job: {
       id: job.id, version: job.version, status: job.status, type: job.type, unitId: job.unitId, symptom: job.symptom, alertCount: job.alertIds.length, origin: job.origin,
       assignment: job.assignment, timeOnSite: job.timeOnSite, draftReportRef: job.draftReportRef, reportRefs: job.reportRefs,
@@ -65,7 +66,9 @@ export async function loadWorkspace(jobId: string): Promise<WorkspaceLive | "not
     unitRefused: isRefused(unit) ? unit.refused : null,
     unitName: u?.displayName ?? (listed && !isRefused(listed) ? listed.items[0]?.displayName ?? null : null),
     components: componentsFor(u?.serviceScope ?? ["indoor", "outdoor", "electrical"]),
-    report: r, reportRefused: isRefused(report) ? report.refused : null,
+    report: r,
+    reportRefused: isRefused(report) ? report.refused : null,
     parts: isRefused(parts) ? [] : parts,
+    known,
   };
 }

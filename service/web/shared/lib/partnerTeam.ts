@@ -30,7 +30,7 @@ activeOnly (default true). */
 export function teamQuery(sp: { date?: string; qualification?: string; activeOnly?: string }, nowIso: string) {
   const today = klDate(nowIso);
   const qualification = (QUALIFICATION_CODES as readonly string[]).includes(sp.qualification ?? "") ? sp.qualification! : null;
-  return { date: isDate(sp.date) ? sp.date! : today, today, qualification, activeOnly: sp.activeOnly !== "false" };
+  return { date: isDate(sp.date) ? sp.date! : today, activeOnly: sp.activeOnly !== "false", today, qualification };
 }
 
 /** Whether a membership is valid now: [validFrom, validUntil). */
@@ -73,7 +73,7 @@ export function memberRows(members: ApiTeamMember[], week: ApiCapacity[][], dayI
     const free = freeSlots(c);
     const util = pct(c.assignedMinutes, c.availableMinutes);
     return {
-      ...row, util: util === null ? "—" : `${util}%`,
+      ...row, util: util === null ? "—" : `${String(util)}%`,
       day: { main: blocks.length > 0 ? blocks.join(", ") : t("No assignments"), sub: free.length > 0 ? t("{slots} free", { slots: free.join(", ") }) : t("fully booked") },
     };
   });
@@ -103,7 +103,7 @@ export function teamStats(members: ApiTeamMember[], week: ApiCapacity[][], dayIn
   const assigned = week.flatMap(mine).reduce((a, c) => a + c.assignedMinutes, 0), available = week.flatMap(mine).reduce((a, c) => a + (c.availableMinutes ?? 0), 0);
   const free = mine(week[dayIndex] ?? []).reduce((a, c) => a + Math.max(0, (c.availableMinutes ?? 0) - c.assignedMinutes), 0);
   const util = pct(assigned, available);
-  return { assigned: t("{n} h", { n: hours(assigned) }), available: t("{n} h", { n: hours(available) }), utilization: util === null ? "—" : `${util}%`, free: t("{n} h", { n: hours(free) }) };
+  return { assigned: t("{n} h", { n: hours(assigned) }), available: t("{n} h", { n: hours(available) }), utilization: util === null ? "—" : `${String(util)}%`, free: t("{n} h", { n: hours(free) }) };
 }
 
 export interface GrantRow { key: string; technician: string; name: string; sub: string; until: string; badge: { text: string; tone: "ok" | "warn" | "muted" } }

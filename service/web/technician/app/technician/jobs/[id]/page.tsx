@@ -11,7 +11,7 @@ import { WorkspaceDemo } from "./_components/workspace-demo";
 import { WorkspaceView } from "./_components/workspace-view";
 import { JobHistory } from "./_components/job-history";
 
-export default async function TechnicianJobPage({ params }: PageProps<"/technician/jobs/[id]">) {
+export default async function TechnicianJobPage({ params }: Readonly<PageProps<"/technician/jobs/[id]">>) {
   const { id } = await params;
   await connection();
   if (!apiMode()) return <WorkspaceDemo id={id} />;
@@ -19,5 +19,5 @@ export default async function TechnicianJobPage({ params }: PageProps<"/technici
   if (live === "not_found") notFound();
   if ("kind" in live) return <JobHistory card={live.card} />; // the viewing window ended (completion releases the assignment, IR234)
   // a new job or report version starts the editor from the server state (key); unsaved edits are saved before transitions
-  return <WorkspaceView key={`${live.job.version}:${live.report?.id ?? "-"}:${live.job.draftReportRef?.reportVersion ?? 0}`} live={live} />;
+  return <WorkspaceView key={`${String(live.job.version)}:${live.report?.id ?? "-"}:${String(live.job.draftReportRef?.reportVersion ?? 0)}`} live={live} />;
 }

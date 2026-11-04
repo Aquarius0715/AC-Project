@@ -9,7 +9,7 @@ import { Checkbox } from "@ac/web/components/ui/checkbox";
 type St = "Open" | "Acknowledged" | "Resolved";
 
 /** Phase 1A demo view (fixture evidence). */
-export function MockAlertEvidence({ id }: { id: string }) {
+export function MockAlertEvidence({ id }: Readonly<{ id: string }>) {
   const toast = useToast();
   const [st, setSt] = useState<St>("Open");
   const [reason, setReason] = useState("");

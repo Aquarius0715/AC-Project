@@ -16,7 +16,7 @@ const open = async (browser: Browser, a: App, signedIn = true): Promise<Page> =>
 test("a new HQ administrator sets a password and a one-time-code device, then signs in with both", async ({ browser }) => {
   test.setTimeout(240_000);
   test.skip(!(await mailpitUp()), "needs the local Mailpit inbox");
-  const email = `e2e-admin-${Date.now()}@example.com`;
+  const email = `e2e-admin-${String(Date.now())}@example.com`;
   const admin = await open(browser, app("admin"));
   const main = admin.getByRole("main");
 

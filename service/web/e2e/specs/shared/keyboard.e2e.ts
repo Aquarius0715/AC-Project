@@ -25,7 +25,7 @@ test("a dialog opened by keyboard keeps focus inside and returns it to its trigg
   for (let i = 0; i < 12; i++) {
     await page.keyboard.press("Tab");
     // past the last control focus lands on the dialog's focus guard, which hands it to the first one on the next frame
-    await expect.poll(inside, { message: `Tab ${i + 1} stays in the dialog`, timeout: 1000 }).toBe(true);
+    await expect.poll(inside, { message: `Tab ${String(i + 1)} stays in the dialog`, timeout: 1000 }).toBe(true);
   }
   await page.keyboard.press("Shift+Tab");
   await expect.poll(inside, { message: "Shift+Tab stays in the dialog", timeout: 1000 }).toBe(true);

@@ -12,7 +12,7 @@ const devices = [
   { id: "device-offline-rto", serial: "AC-DEMO-0003", dev: "device-offline-rto", unit: "unit-offline-rto · cap-split-std v1", fw: "fw v1", conn: "offline" as const, tamper: false },
 ];
 
-export function DevicesView({ initial }: { initial?: string }) {
+export function DevicesView({ initial }: Readonly<{ initial?: string }>) {
   type F = "all" | "online" | "offline" | "tamper";
   const toast = useToast();
   const [filter, setFilter] = useState<F>("all");

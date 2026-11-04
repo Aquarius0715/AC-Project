@@ -11,7 +11,7 @@ test("a contractor adds a technician, waits to resend the set-up e-mail, moves t
   await expect(page.locator("body")).not.toContainText(FAILED_PAGE);
   const row = (text: string) => page.getByRole("row").filter({ hasText: text });
   await expect(row("contractor-a (you)")).toContainText("Your account");
-  const email = `e2e-${Date.now()}@example.com`;
+  const email = `e2e-${String(Date.now())}@example.com`;
   await page.getByRole("button", { name: "Add user" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("button", { name: "Add user" }).click();
@@ -84,7 +84,7 @@ test("a contractor cannot give a technician access for more than a year", async 
   await page.getByRole("button", { name: "Add user" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Name").fill("Too Long");
-  await dialog.getByLabel("Email").fill(`e2e-long-${Date.now()}@example.com`);
+  await dialog.getByLabel("Email").fill(`e2e-long-${String(Date.now())}@example.com`);
   await dialog.getByRole("combobox", { name: "Role" }).selectOption("technician");
   await expectAccessible(page, '[role="dialog"]'); // the add dialog with the access end (IR360, IR461)
   await dialog.getByLabel("Access until").fill("2030-01-01");

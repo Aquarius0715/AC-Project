@@ -40,11 +40,14 @@ export async function loadAlerts(unitId: string, sp: { jobId?: string; alertId?:
       const job = sp.jobId ? await optional(coreOp<TechJobRead<{ assignment: { scheduledStart: string } | null }>>("jobs.get", { jobId: sp.jobId }), null) : null;
       const start = job?.projection === "detail" ? job.assignment?.scheduledStart ?? null : null;
       return {
-        kind: "unavailable" as const, title: t("Not started yet"), unitHref, back: t("Unit"),
+        kind: "unavailable" as const,
+        title: t("Not started yet"),
+        back: t("Unit"),
         text: start ? t("You can see this AC from {time}, when your work window starts.", { time: showTime(start, display) }) : t("Available from the work start time of your assigned job."),
+        unitHref,
       };
     }
-    return { kind: "unavailable" as const, title: t("Alerts aren’t available"), unitHref, back: t("Unit"), text: UNAVAILABLE[alerts.messageKey] ? t(UNAVAILABLE[alerts.messageKey]) : alerts.code };
+    return { kind: "unavailable" as const, title: t("Alerts aren’t available"), back: t("Unit"), text: UNAVAILABLE[alerts.messageKey] ? t(UNAVAILABLE[alerts.messageKey]) : alerts.code, unitHref };
   }
   const [unit, job, permissions] = await Promise.all([
     optional(coreOp<ApiUnitDetail>("units.get", { id: unitId }), null),
@@ -59,7 +62,7 @@ export async function loadAlerts(unitId: string, sp: { jobId?: string; alertId?:
   return {
     kind: "live" as const, unitId, unitHref, unitName: unit?.displayName ?? unitId.slice(0, 8),
     choices: alertChoices(alerts, nowMs, i), count: alerts.length,
-    alert: selected ? alertView(selected, { alerts, unit, job: job?.projection === "detail" ? { id: job.id, type: job.type } : null, canResolve }, nowMs, i) : null,
+    alert: selected ? alertView(selected, { alerts, unit, canResolve, job: job?.projection === "detail" ? { id: job.id, type: job.type } : null }, nowMs, i) : null,
     evidence, // null: nothing to cite (resolved, no alert.resolve) or not readable now
   };
 }

@@ -31,7 +31,7 @@ export function OverviewDemo() {
       </Card>
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title={`Needs your action (${actions.length + 5})`}>
+          <Card title={`Needs your action (${String(actions.length + 5)})`}>
             <ul className="divide-y divide-line">{[...actions, ["job-p09 · Lobby AC · customer-b", "Answer by 2026-09-22 01:00 (15 h left)", "/partner/jobs/job-p09"], ["job-p07 · Server room AC", "Work window ended 09-20 17:00", "/partner/schedule?jobId=job-p07"], ["job-p05 · Server room AC", "Report by tech-external-a · awaiting review", "/partner/jobs/job-p05/review"], ["job-p02 · Rooftop unit", "No technician · delegation ends 09-22 00:00", "/partner/schedule?jobId=job-p02"], ["job-p12 · Lobby AC", "No technician · delegation ends 09-24 18:00", "/partner/schedule?jobId=job-p12"]].map(([t, d, h]) => <li key={t}><Link href={h} className="flex items-center justify-between gap-2 py-2.5 hover:bg-surface2/50"><span><b className="text-[13px]">{t}</b><span className="block text-xs text-muted-foreground">{d}</span></span><span className="text-muted-foreground"><Icon name="chevronRight" /></span></Link></li>)}</ul>
           </Card>
           <Card title="Today · Mon 2026-09-21" action={<TextLink href="/partner/schedule">Schedule <Icon name="arrowRight" /></TextLink>}>

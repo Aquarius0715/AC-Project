@@ -9,7 +9,7 @@ import { MockTeam } from "./_components/mock-team";
 import { TeamView } from "./_components/team-view";
 import { loadTeam } from "./_lib/load";
 
-export default async function PartnerTeamPage({ searchParams }: PageProps<"/partner/team">) {
+export default async function PartnerTeamPage({ searchParams }: Readonly<PageProps<"/partner/team">>) {
   await connection();
   if (!apiMode()) return <MockTeam />;
   const sp = await searchParams;

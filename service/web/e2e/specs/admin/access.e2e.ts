@@ -74,7 +74,7 @@ test("HQ adds a new person with a membership, and revoking it ends the membershi
   await main.getByRole("button", { name: "New membership" }).click();
   await page.waitForURL(/membershipId=new/);
   await main.getByRole("button", { name: "New person" }).click();
-  const email = `e2e-hq-${Date.now()}@example.com`;
+  const email = `e2e-hq-${String(Date.now())}@example.com`;
   await main.getByRole("textbox", { name: /^Name/ }).fill("E2E Colleague");
   await main.getByRole("textbox", { name: /^Email/ }).fill(email);
   await main.getByRole("button", { name: "Admin", exact: true }).last().click(); // the role, after the role filter

@@ -8,7 +8,7 @@ import { evidenceHeading, togglePick, type EvidenceRow } from "@ac/web/lib/alert
 import { Icon } from "./Icon";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
 
-function Row({ title, sub, checked, disabled, onChange }: { title: string; sub: string; checked: boolean; disabled?: boolean; onChange?: (on: boolean) => void }) {
+function Row({ title, sub, checked, disabled, onChange }: Readonly<{ title: string; sub: string; checked: boolean; disabled?: boolean; onChange?: (on: boolean) => void }>) {
   return (
     <label className="flex items-start gap-2.5 border-t border-line py-2 text-[13px] first:border-0">
       <Checkbox className="mt-0.5 shrink-0" checked={checked} disabled={disabled} onCheckedChange={(v) => onChange?.(v)} />
@@ -17,7 +17,7 @@ function Row({ title, sub, checked, disabled, onChange }: { title: string; sub: 
   );
 }
 
-export function EvidencePicker({ rows, policyless, picked, onChange, loading, error }: { rows: EvidenceRow[]; policyless: boolean; picked: string[]; onChange: (ids: string[]) => void; loading?: boolean; error?: string | null }) {
+export function EvidencePicker({ rows, policyless, picked, onChange, loading, error }: Readonly<{ rows: EvidenceRow[]; policyless: boolean; picked: string[]; onChange: (ids: string[]) => void; loading?: boolean; error?: string | null }>) {
   const t = useT();
   const h = evidenceHeading(policyless, t);
   const attached = rows.filter((r) => r.kind === "detection");

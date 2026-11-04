@@ -12,7 +12,7 @@ import { periodKinds, periodRange, pickUnits, selectionQuery } from "@ac/web/lib
 import { OffsetsDemo } from "./_components/offsets-demo";
 import { OffsetsView } from "./_components/offsets-view";
 
-export default async function CustomerOffsetsPage({ searchParams }: PageProps<"/customer/energy/offsets">) {
+export default async function CustomerOffsetsPage({ searchParams }: Readonly<PageProps<"/customer/energy/offsets">>) {
   await connection();
   if (!apiMode()) return <OffsetsDemo />;
   const sp = await searchParams;
@@ -29,14 +29,17 @@ export default async function CustomerOffsetsPage({ searchParams }: PageProps<"/
     try {
       const s = await coreOp<ApiEnergySummary>("energy.summary", { from: period.from, to: period.to, unitIds, ...(one("baselineId") && { baselineId: one("baselineId") }) });
       const v = summaryView(s, i);
-      estimate = { emissions: v.emissions, savedEmissions: v.savedEmissions, comparable: v.comparable, factor: s.factorSnapshot ? `${s.factorSnapshot.region} ${s.factorSnapshot.year}` : i.t("emission factor missing") };
+      estimate = { emissions: v.emissions, savedEmissions: v.savedEmissions, comparable: v.comparable, factor: s.factorSnapshot ? `${s.factorSnapshot.region} ${String(s.factorSnapshot.year)}` : i.t("emission factor missing") };
     } catch (error) {
       if (!(error instanceof CoreError) || error.error.code !== "VALIDATION") throw error;
     }
   }
   const name = new Map(units.map((u) => [u.id, u.displayName]));
   return <OffsetsView live={{
-    unitIds, subject: unitIds.map((u) => name.get(u) ?? u.slice(0, 8)).join(", "), period: { from: period.from, to: period.to, label: period.label }, estimate,
+    unitIds,
+    estimate,
+    subject: unitIds.map((u) => name.get(u) ?? u.slice(0, 8)).join(", "),
+    period: { from: period.from, to: period.to, label: period.label },
     back: selectionQuery({ unitIds, period: kind, from: one("from"), to: one("to"), baselineId: one("baselineId") }),
     records: records.map((r) => ({ id: r.id, amountKg: r.amountKg, state: r.state, proof: r.demoCertificateRef ?? r.retirementRef ?? null, createdAt: r.createdAt })),
   }} />;

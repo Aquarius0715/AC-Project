@@ -8,7 +8,7 @@ import { JobDemo } from "./_components/job-demo";
 import { JobDetailView } from "./_components/job-view";
 import { loadJobDetail } from "./_lib/load";
 
-export default async function PartnerJobPage({ params }: PageProps<"/partner/jobs/[id]">) {
+export default async function PartnerJobPage({ params }: Readonly<PageProps<"/partner/jobs/[id]">>) {
   await connection();
   const { id } = await params;
   if (!apiMode()) return <JobDemo id={id} />;

@@ -15,7 +15,7 @@ test("HQ adds a client user, listed as not signed in yet, and removes them", asy
   await expectAccessible(page, '[role="dialog"]'); // the add dialog (IR360)
   await dialog.getByRole("button", { name: "Add user" }).click();
   await expect(dialog).toContainText("A name of 1–120 characters"); // nothing typed yet
-  const email = `e2e-client-${Date.now()}@example.com`;
+  const email = `e2e-client-${String(Date.now())}@example.com`;
   await dialog.getByRole("textbox", { name: /^Name/ }).fill("E2E Client");
   await dialog.getByRole("textbox", { name: /^Email/ }).fill(email);
   await dialog.getByRole("button", { name: "Add user" }).click();

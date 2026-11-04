@@ -19,9 +19,17 @@ const summary: ApiEnergySummary = {
   tariffVersion: "tariff-demo-1", boundaryId: "ac_input_electricity", boundary: "AC input", coverage: 1, qualityWarnings: ["modeled_baseline"],
 };
 const report: ApiMRVReport = {
-  id: "r1234567-aaaa", version: 2, createdAt: "2026-09-08T01:00:00Z", status: "draft", evidenceIds: [], scope: "scope_2", isDemo: true, incomplete: false, summary,
+  id: "r1234567-aaaa",
+  version: 2,
+  createdAt: "2026-09-08T01:00:00Z",
+  status: "draft",
+  evidenceIds: [],
+  scope: "scope_2",
+  isDemo: true,
+  incomplete: false,
   conditions: { from: "2026-08-31T16:00:00Z", to: "2026-09-07T16:00:00Z", unitIds: ["u1", "u2"], baselineId: "b1", baselineVersion: 2, factorId: "f1", factorVersion: 1, boundaryId: "ac_input_electricity", boundary: "AC input", organizationId: "org-a" },
   reviewHistory: [{ userId: "user-hq-0001", reportVersion: 1, comment: "Looks consistent", at: "2026-09-14T01:30:00Z" }],
+  summary,
 };
 const orgs = [{ id: "org-a", name: "Demo Customer A" }];
 const units = [{ id: "u1", label: "Lobby AC" }, { id: "u2", label: "Bedroom AC" }];

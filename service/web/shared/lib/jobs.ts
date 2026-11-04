@@ -130,10 +130,26 @@ function jobFromApi(j: ApiJob): Job {
   const id = j.id ?? j.jobId ?? "";
   const status = (j.displayStatus === "time_proposed" ? "time_proposed" : j.status) as JobStatus;
   return {
-    id, unitId: j.unitId ?? "", unit: j.unitId ? `Unit ${j.unitId.slice(0, 8)}` : "Unit", loc: "", customer: "", origin: j.origin === "periodic_plan" ? "plan" : "request",
-    type: typeLabel[j.type] ?? "Reactive", symptom: "", status, preferred: (j.preferredSlots ?? []).map((x) => slotOf(x)!), round: 1,
-    scheduled: slotOf(j.scheduledSlot ?? (j.projection === "offer" ? j.requestedSlot : null)), delivery: null, contractor: null, technician: null, techAck: null,
-    proposal: null, partnerProposal: null, declined: null, history: [],
+    id,
+    status,
+    unitId: j.unitId ?? "",
+    unit: j.unitId ? `Unit ${j.unitId.slice(0, 8)}` : "Unit",
+    loc: "",
+    customer: "",
+    origin: j.origin === "periodic_plan" ? "plan" : "request",
+    type: typeLabel[j.type] ?? "Reactive",
+    symptom: "",
+    preferred: (j.preferredSlots ?? []).map((x) => slotOf(x)!),
+    round: 1,
+    scheduled: slotOf(j.scheduledSlot ?? (j.projection === "offer" ? j.requestedSlot : null)),
+    delivery: null,
+    contractor: null,
+    technician: null,
+    techAck: null,
+    proposal: null,
+    partnerProposal: null,
+    declined: null,
+    history: [],
   };
 }
 
@@ -153,7 +169,7 @@ function update(id: string, fn: (j: Job) => Partial<Job>, log?: string) {
 }
 function notify(role: Note["role"], title: string, detail: string, href: string) {
   const s = load();
-  state = { ...s, notes: [{ id: `${Date.now()}-${Math.random()}`, role, title, detail, href, at: "just now", read: false }, ...s.notes] };
+  state = { ...s, notes: [{ id: `${String(Date.now())}-${String(Math.random())}`, at: "just now", read: false, role, title, detail, href }, ...s.notes] };
   save();
 }
 export const fmt = (s: Slot | null | undefined) => (s ? `${s.date.slice(5)} · ${s.win}` : "—");
@@ -179,17 +195,17 @@ export const jobActions = {
   /** HQ: book one of the client's own times — no client approval needed. */
   book(id: string, slot: Slot, delivery: "internal" | "contractor", who: string) {
     if (delivery === "internal") {
-      update(id, () => ({ status: "assigned", scheduled: slot, delivery, technician: who, contractor: null, techAck: { status: "pending" }, proposal: null }), `HQ booked ${fmt(slot)} · assigned ${who}`);
+      update(id, () => ({ status: "assigned", scheduled: slot, technician: who, contractor: null, techAck: { status: "pending" }, proposal: null, delivery }), `HQ booked ${fmt(slot)} · assigned ${who}`);
       notify("technician", `New assignment ${id}`, `${fmt(slot)} — accept or tell HQ you can’t make it`, `/technician/jobs/${id}`);
     } else {
-      update(id, () => ({ status: "offered", scheduled: slot, delivery, contractor: who, technician: null, techAck: null, proposal: null, partnerProposal: null }), `HQ offered ${id} to ${who} at ${fmt(slot)}`);
+      update(id, () => ({ status: "offered", scheduled: slot, contractor: who, technician: null, techAck: null, proposal: null, partnerProposal: null, delivery }), `HQ offered ${id} to ${who} at ${fmt(slot)}`);
       notify("contractor", `New offer ${id}`, `Visit time fixed: ${fmt(slot)} — accept, decline or propose another time`, `/partner/jobs/${id}`);
     }
     notify("client", `Booked: ${id}`, `${fmt(slot)} — one of your preferred times`, `/customer/maintenance?jobId=${id}`);
   },
   /** HQ: none of the preferred times fits → propose another time (client must accept). */
   propose(id: string, slot: Slot, who: string, message: string, replyBy: string) {
-    update(id, () => ({ status: "time_proposed", proposal: { by: "hq", slot, who, message, replyBy, status: "pending" } }), `HQ proposed ${fmt(slot)} (${who} held) · reply by ${replyBy}`);
+    update(id, () => ({ status: "time_proposed", proposal: { by: "hq", status: "pending", slot, who, message, replyBy } }), `HQ proposed ${fmt(slot)} (${who} held) · reply by ${replyBy}`);
     notify("client", `HQ proposed a new time for ${id}`, `${longDate(slot)} — accept or decline by ${replyBy}`, `/customer/maintenance?jobId=${id}`);
   },
   withdraw(id: string) { update(id, (j) => ({ status: "requested", proposal: j.proposal ? { ...j.proposal, status: "withdrawn" } : null }), "HQ withdrew the proposal"); notify("client", `Proposal withdrawn — ${id}`, "HQ will contact you again", `/customer/maintenance?jobId=${id}`); },
@@ -226,7 +242,7 @@ export const jobActions = {
   },
   /** Client asks for another time for a periodic plan visit. */
   requestOther(id: string, preferred: Slot[], comment: string) {
-    update(id, (j) => ({ status: "requested", preferred, round: j.round + 1, scheduled: null, technician: null, techAck: null }), `Client asked for another time${comment ? ` — “${comment}”` : ""}`);
+    update(id, (j) => ({ status: "requested", round: j.round + 1, scheduled: null, technician: null, techAck: null, preferred }), `Client asked for another time${comment ? ` — “${comment}”` : ""}`);
     notify("admin", `Client asked to move ${id}`, "3 new preferred times", `/admin/jobs?jobId=${id}`);
   },
   /** Client: coordination note on an open job (IR114) — never changes time, assignee or status. */
@@ -279,7 +295,7 @@ export const jobActions = {
     const j = load().jobs.find((x) => x.id === id);
     if (!j?.partnerProposal) return;
     const pp = j.partnerProposal;
-    update(id, () => ({ status: "time_proposed", proposal: { by: "contractor", slot: pp.slot, who: `${j.contractor} · ${pp.tech}`, message: pp.reason, replyBy, status: "pending" }, partnerProposal: { ...pp, status: "sent_to_client" } }), "HQ sent the partner’s time to the client");
+    update(id, () => ({ status: "time_proposed", proposal: { by: "contractor", slot: pp.slot, who: `${j.contractor} · ${pp.tech}`, message: pp.reason, status: "pending", replyBy }, partnerProposal: { ...pp, status: "sent_to_client" } }), "HQ sent the partner’s time to the client");
     notify("client", `Your service partner asks for another time — ${id}`, `${longDate(pp.slot)} — accept or decline`, `/customer/maintenance?jobId=${id}`);
   },
   keepTime(id: string) { update(id, (j) => ({ partnerProposal: j.partnerProposal ? { ...j.partnerProposal, status: "rejected" } : null }), "HQ kept the agreed time"); notify("contractor", `HQ kept the agreed time — ${id}`, "accept or decline the offer", `/partner/jobs/${id}`); },
@@ -292,7 +308,7 @@ export const jobActions = {
   },
   techCantMake(id: string, reason: string, alt: string) {
     const j = load().jobs.find((x) => x.id === id);
-    update(id, () => ({ techAck: { status: "cant_make", reason, alt, at: NOW } }), `${j?.technician} can’t make the time · ${reason}`);
+    update(id, () => ({ techAck: { status: "cant_make", at: NOW, reason, alt } }), `${j?.technician} can’t make the time · ${reason}`);
     notify(j?.delivery === "contractor" ? "contractor" : "admin", `${j?.technician} can’t make ${id}`, `${reason}${alt ? ` · could do ${alt}` : ""}`, j?.delivery === "contractor" ? "/partner/schedule" : `/admin/jobs?jobId=${id}`);
   },
 };

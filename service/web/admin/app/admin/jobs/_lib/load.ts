@@ -217,9 +217,13 @@ export async function loadContractors(sp: SP) {
   return {
     ...base,
     detail: {
-      org: { id: org.id, name: org.name }, profile, kpis: profile ? kpiTiles(profile.kpis, t) : null, facts: profile ? profileFacts(profile, nowMs, i) : null,
-      rates: rateCardView(cards, inEffect, nowMs, i), techs: technicianRows(mine, certs, nowMs, i),
+      org: { id: org.id, name: org.name },
+      kpis: profile ? kpiTiles(profile.kpis, t) : null,
+      facts: profile ? profileFacts(profile, nowMs, i) : null,
+      rates: rateCardView(cards, inEffect, nowMs, i),
+      techs: technicianRows(mine, certs, nowMs, i),
       pending: pendingCertificates(certs).map((c) => ({ id: c.id, version: c.version, technician: names.people.get(c.membershipId) ?? t("technician"), name: c.name, code: c.code, number: c.number, issuedAt: c.issuedAt, expiresAt: c.expiresAt, fileName: c.fileName, renewal: !!c.renewalOf })),
+      profile,
     },
   };
 }

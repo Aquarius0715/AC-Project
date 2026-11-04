@@ -20,7 +20,7 @@ export default async function AdminAccessPage(props: PageProps<"/admin/settings/
   return withAccess("Access & roles", ["identity.read", "asset.read"], () => AdminAccessPageContent(props));
 }
 
-async function AdminAccessPageContent({ searchParams }: PageProps<"/admin/settings/access">) {
+async function AdminAccessPageContent({ searchParams }: Readonly<PageProps<"/admin/settings/access">>) {
   await connection();
   if (!apiMode()) return <AccessDemo />;
   const sp = await searchParams;
@@ -44,8 +44,17 @@ async function AdminAccessPageContent({ searchParams }: PageProps<"/admin/settin
   const selected = wanted === "new" ? "new" : (wanted ? rows.find((r) => r.id === wanted)?.id ?? "missing" : rows[0]?.id ?? "new");
   return (
     <AccessView live={{
-      now: now.toISOString(), canWrite: perms.has("identity.write"), selfUserId: me.userId, tenantId: me.tenantId, scope: { role, status, organizationId }, rows, selected, users,
-      orgs, properties, units: units.map((u) => ({ id: u.id, name: u.displayName })),
+      now: now.toISOString(),
+      canWrite: perms.has("identity.write"),
+      selfUserId: me.userId,
+      tenantId: me.tenantId,
+      scope: { role, status, organizationId },
+      units: units.map((u) => ({ id: u.id, name: u.displayName })),
+      rows,
+      selected,
+      users,
+      orgs,
+      properties,
     }} />
   );
 }

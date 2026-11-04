@@ -176,9 +176,15 @@ export function eventRows(es: ApiDeviceEventFull[], alerts: Map<string, ApiAlert
       : e.eventType === "restored" ? (src ? t("recovers {event} {time}", { event: src.eventType, time: when(src.occurredAt) }) : t("recovers an earlier fault"))
       : as.length > 0 ? t(open ? "open · unacknowledged" : (as.every((a) => a.status === "resolved") ? "open · resolved" : "open · acknowledged")) : t("open");
     return {
-      id: e.id, version: e.version, time: when(e.occurredAt), type: e.eventType, tone: e.eventType === "tamper" ? "warn" : e.eventType === "restored" ? "ok" : e.eventType === "operation_failed" ? "muted" : "crit",
+      id: e.id,
+      version: e.version,
+      time: when(e.occurredAt),
+      type: e.eventType,
+      tone: e.eventType === "tamper" ? "warn" : e.eventType === "restored" ? "ok" : e.eventType === "operation_failed" ? "muted" : "crit",
       detail: `${eventCause(e, t)} · ${e.evidenceSource}${e.alertIds.length > 0 ? ` · ${t(e.alertIds.length === 1 ? "1 alert" : "{n} alerts", { n: e.alertIds.length })}` : ""}`,
-      recovery, notes: e.responseNotes.map((n) => `${when(n.at)} — ${n.message}`), alerts: as,
+      notes: e.responseNotes.map((n) => `${when(n.at)} — ${n.message}`),
+      alerts: as,
+      recovery,
     };
   });
 }

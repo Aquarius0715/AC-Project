@@ -17,7 +17,7 @@ import { Icon } from "@ac/web/components/Icon";
 
 /** HQ SLA by customer (FR-A22, DD-A22, Figma Admin 06-10) from the Core API. Texts in the display language; a target's
 start is typed and shown in the display time zone (IR291). */
-export function SlaView({ live }: { live: SlaLive }) {
+export function SlaView({ live }: Readonly<{ live: SlaLive }>) {
   const i = useI18n(), { t } = i;
   const patch = useUrlPatch();
   const [modal, setModal] = useState<null | "targets" | "job">(null);
@@ -70,7 +70,7 @@ export function SlaView({ live }: { live: SlaLive }) {
   );
 }
 
-function TargetsModal({ live, onClose, onFail }: { live: SlaLive; onClose: (text?: string) => void; onFail: (text: string) => void }) {
+function TargetsModal({ live, onClose, onFail }: Readonly<{ live: SlaLive; onClose: (text?: string) => void; onFail: (text: string) => void }>) {
   const i = useI18n(), { t } = i, zone = i.display.timeZone;
   const now = Date.parse(live.now);
   const [pending, run] = useAction();

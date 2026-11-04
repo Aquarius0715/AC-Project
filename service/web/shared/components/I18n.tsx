@@ -6,7 +6,7 @@ import { DEFAULT_DISPLAY, i18nOf, translate, type Display, type I18n, type T } f
 const DisplayContext = createContext<Display>(DEFAULT_DISPLAY);
 
 /** The display language and time zone of everything under the shell (FR-X01, IR258, IR259); AppShell sets them. */
-export function I18nProvider({ display, children }: { display: Display; children: React.ReactNode }) {
+export function I18nProvider({ display, children }: Readonly<{ display: Display; children: React.ReactNode }>) {
   // the page's language follows the display language (WCAG 3.1.1, IR489): the root layout sets it on the server, and this
   // keeps it in step in the browser demo, whose language lives in the tab
   useEffect(() => { document.documentElement.lang = display.locale; }, [display.locale]);

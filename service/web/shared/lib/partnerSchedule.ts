@@ -48,9 +48,17 @@ export function scheduleRow(j: ApiPartnerJob, now: number, units: Map<string, st
   const isOver = !!to && Date.parse(to) <= now;
   const isSoon = !!to && Date.parse(to) - now < 24 * 3_600_000;
   return {
-    id, short: id.slice(0, 8), title: j.projection === "offer" ? j.siteAddress ?? t("Accepted job") : units.get(j.unitId) ?? t("Unit"),
-    line, tone, window: from && to ? { from, until: to } : null, windowText: from && to ? showSpan(from, to, display) : "—",
-    left: to ? (isOver ? t("Ended") : t("{left} left", { left: until(to, now, t) })) : "—", ended: isOver, leftTone: isOver ? "crit" : (isSoon ? "warn" : "primary"), elapsedPct,
+    short: id.slice(0, 8),
+    title: j.projection === "offer" ? j.siteAddress ?? t("Accepted job") : units.get(j.unitId) ?? t("Unit"),
+    window: from && to ? { from, until: to } : null,
+    windowText: from && to ? showSpan(from, to, display) : "—",
+    left: to ? (isOver ? t("Ended") : t("{left} left", { left: until(to, now, t) })) : "—",
+    ended: isOver,
+    leftTone: isOver ? "crit" : (isSoon ? "warn" : "primary"),
+    id,
+    line,
+    tone,
+    elapsedPct,
   };
 }
 
@@ -72,34 +80,45 @@ export function formMode(j: ApiDetail | ApiOffer, label: string, now: number, na
   if (!slot) return { kind: "blocked", title: assign, slot: null, banner: { tone: "warn", text: t("No agreed visit time — HQ agrees one with the client first.") } };
   switch (j.status) {
     case "accepted": {
-      return { kind: "assign", title: assign, slot, endEditable: false, reasonRequired: false, button: t("Confirm assignment"), currentTech: null };
+      return { kind: "assign", title: assign, endEditable: false, reasonRequired: false, button: t("Confirm assignment"), currentTech: null, slot };
     }
     case "assigned": {
       if (ended(slot, now)) {
-        return { kind: "blocked", title: reschedule, slot, banner: { tone: "crit", text: t("Work window ended; reassignment required. The agreed time {slot} passed while the job is still “assigned”. A new time needs the client’s agreement — HQ proposes it; tell HQ in the job history.", { slot: span(slot) }) } };
+        return { kind: "blocked", title: reschedule, banner: { tone: "crit", text: t("Work window ended; reassignment required. The agreed time {slot} passed while the job is still “assigned”. A new time needs the client’s agreement — HQ proposes it; tell HQ in the job history.", { slot: span(slot) }) }, slot };
       }
       const why = j.assignment?.cantMakeReason;
       const name = current ?? t("technician");
       return {
-        kind: "reassign", title: t("Reassign — {job}", { job: label }), slot, endEditable: false, reasonRequired: false, button: t("Confirm reassignment"), currentTech: current,
+        kind: "reassign",
+        title: t("Reassign — {job}", { job: label }),
+        endEditable: false,
+        reasonRequired: false,
+        button: t("Confirm reassignment"),
+        currentTech: current,
         banner: j.assignment?.acknowledgement === "cant_make" ? {
           tone: "warn",
           text: why ? t("{name} can’t make this time: “{reason}”. Reassign another technician for the same agreed time, or ask HQ to propose a new time to the client.", { name, reason: why })
             : t("{name} can’t make this time. Reassign another technician for the same agreed time, or ask HQ to propose a new time to the client.", { name }),
         } : undefined,
+        slot,
       };
     }
     case "in_progress":
     case "on_hold":
     case "rework_requested": {
       return {
-        kind: "extend", title: ended(slot, now) ? reschedule : t("Reassign — {job} ({state})", { job: label, state: t(j.status === "in_progress" ? "in progress" : (j.status === "on_hold" ? "on hold" : "rework")) }), slot, endEditable: true, reasonRequired: true,
-        button: t("Confirm reassignment"), currentTech: current,
+        kind: "extend",
+        title: ended(slot, now) ? reschedule : t("Reassign — {job} ({state})", { job: label, state: t(j.status === "in_progress" ? "in progress" : (j.status === "on_hold" ? "on hold" : "rework")) }),
+        endEditable: true,
+        reasonRequired: true,
+        button: t("Confirm reassignment"),
+        currentTech: current,
         banner: ended(slot, now) ? { tone: "crit", text: t("Work window ended; reassignment required. The work window {slot} ended while the job is “{status}” — keep the start and set a later end (same or another technician).", { slot: span(slot), status: statusWord(j.status, t) }) } : undefined,
+        slot,
       };
     }
   }
-  return { kind: "blocked", title: assign, slot, banner: { tone: "muted", text: t("The job is {status} — nothing to schedule.", { status: statusWord(j.status, t) }) } };
+  return { kind: "blocked", title: assign, banner: { tone: "muted", text: t("The job is {status} — nothing to schedule.", { status: statusWord(j.status, t) }) }, slot };
 }
 
 /** The free spans of a capacity day in Kuala Lumpur hours: the available slots minus the assigned ones
@@ -144,12 +163,12 @@ export function candidates(members: ApiMember[], eligible: Set<string>, required
     const c = cap.get(m.id);
     const quals = (m.qualifications ?? []).filter((q) => !q.revokedAt).map((q) => qualificationLabel(q.code, t)).join(" · ") || t("no qualifications");
     const sub = `${quals} · ${freeText(c, t)}`;
-    if (eligible.has(m.id)) return { id: m.id, name: m.displayName, sub, badge: m.id === currentId ? { text: t("Current"), tone: "primary" } : { text: t("Qualified"), tone: "ok" }, eligible: true };
+    if (eligible.has(m.id)) return { id: m.id, name: m.displayName, badge: m.id === currentId ? { text: t("Current"), tone: "primary" } : { text: t("Qualified"), tone: "ok" }, eligible: true, sub };
     const missing = required.filter((r) => !qualified(m, [r], slot.startAt)).map((code) => qualificationLabel(code, t));
     const badge = missing.length > 0 ? { text: t("Missing: {list}", { list: missing.join(", ") }), tone: "warn" as Tone }
       : (c?.unavailability ? { text: t("Unavailable ({reason})", { reason: unavailabilityLabel(c.unavailability, t) }), tone: "warn" as Tone }
       : ({ text: c?.assignedSlots.some((s) => overlaps(s, slot)) ? t(m.id === currentId ? "Current · booked here" : "Busy at this time") : t("Not eligible"), tone: "muted" as Tone }));
-    return { id: m.id, name: m.displayName, sub, badge, eligible: false };
+    return { id: m.id, name: m.displayName, eligible: false, sub, badge };
   });
   return rows.sort((a, b) => Number(b.eligible) - Number(a.eligible) || a.name.localeCompare(b.name));
 }
@@ -174,7 +193,7 @@ export function weekGrid(dates: string[], members: ApiMember[], capacity: ApiCap
       if (c.assignedSlots.length > 0) {
         const s = c.assignedSlots[0];
         const job = (jobsOf.get(m.id) ?? []).find((j) => Date.parse(j.slot.startAt) < Date.parse(s.endAt) && Date.parse(s.startAt) < Date.parse(j.slot.endAt));
-        return { kind: "booked", text: `${hhmm(s.startAt)}–${hhmm(c.assignedSlots[c.assignedSlots.length - 1].endAt)}`, sub: [job?.short ?? t("booked"), c.assignedSlots.length > 1 ? `+${c.assignedSlots.length - 1}` : ""].filter(Boolean).join(" ") };
+        return { kind: "booked", text: `${hhmm(s.startAt)}–${hhmm(c.assignedSlots[c.assignedSlots.length - 1].endAt)}`, sub: [job?.short ?? t("booked"), c.assignedSlots.length > 1 ? `+${String(c.assignedSlots.length - 1)}` : ""].filter(Boolean).join(" ") };
       }
       return { kind: "free", text: t("free") };
     });

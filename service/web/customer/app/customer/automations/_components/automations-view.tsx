@@ -26,7 +26,7 @@ interface Notice { title: string; text: string }
 
 /** Automations & schedules (FR-C04/C05) in API mode: the rule list with location consent, and the editor at
 ?automationId=<id|new>. Saving never sends a Command; the server runs schedules and events (IR54). */
-export function AutomationsView({ live }: { live: AutomationsLive }) {
+export function AutomationsView({ live }: Readonly<{ live: AutomationsLive }>) {
   const patch = useUrlPatch();
   const [notice, setNotice] = useState<Notice | null>(null);
   if (live.editing) {
@@ -35,7 +35,7 @@ export function AutomationsView({ live }: { live: AutomationsLive }) {
   return <List live={live} notice={notice} setNotice={setNotice} create={() => { setNotice(null); patch({ automationId: "new" }); }} edit={(id) => { setNotice(null); patch({ automationId: id }); }} />;
 }
 
-function ConsentCard({ live, compact }: { live: AutomationsLive; compact?: boolean }) {
+function ConsentCard({ live, compact }: Readonly<{ live: AutomationsLive; compact?: boolean }>) {
   const t = useT();
   const [pending, run] = useAction();
   const c = live.consent;
@@ -55,7 +55,7 @@ function ConsentCard({ live, compact }: { live: AutomationsLive; compact?: boole
   );
 }
 
-function List({ live, notice, setNotice, create, edit }: { live: AutomationsLive; notice: Notice | null; setNotice: (n: Notice | null) => void; create: () => void; edit: (id: string) => void }) {
+function List({ live, notice, setNotice, create, edit }: Readonly<{ live: AutomationsLive; notice: Notice | null; setNotice: (n: Notice | null) => void; create: () => void; edit: (id: string) => void }>) {
   const t = useT();
   const [pending, run] = useAction();
   const [del, setDel] = useState<RuleCard | null>(null);
@@ -135,7 +135,7 @@ function useDebounced<T>(value: T, ms: number): T {
   return v;
 }
 
-function Editor({ live, onDone, onCancel }: { live: AutomationsLive; onDone: (n: Notice) => void; onCancel: () => void }) {
+function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; onDone: (n: Notice) => void; onCancel: () => void }>) {
   const i18n = useI18n();
   const { t } = i18n;
   const rule = live.editing === "new" ? null : live.rules.find((r) => r.id === live.editing) ?? null;
@@ -341,7 +341,7 @@ function Editor({ live, onDone, onCancel }: { live: AutomationsLive; onDone: (n:
 }
 
 /** Step 2 “Only if …” (Figma 03b/03e, IR215): up to three extra conditions that must all hold when the rule runs. */
-function OnlyIf({ draft, errors, set }: { draft: Draft; errors: Record<string, string>; set: (p: Partial<Draft>) => void }) {
+function OnlyIf({ draft, errors, set }: Readonly<{ draft: Draft; errors: Record<string, string>; set: (p: Partial<Draft>) => void }>) {
   const t = useT();
   const [adding, setAdding] = useState(false);
   const extras = fitExtras(draft);
@@ -373,7 +373,7 @@ function OnlyIf({ draft, errors, set }: { draft: Draft; errors: Record<string, s
             </span>
           )}
           <Btn size="sm" variant="ghost" className="ml-auto" aria-label={t("Remove {condition}", { condition: t(extraLabel[x.type]) })} onClick={() => { set({ extras: extras.filter((_, j) => j !== i) }); }}><Icon name="close" /></Btn>
-          {errors[`extra${i}`] && <span className="flex w-full items-center gap-1 text-xs font-medium text-crit"><Icon name="error" />{errors[`extra${i}`]}</span>}
+          {errors[`extra${String(i)}`] && <span className="flex w-full items-center gap-1 text-xs font-medium text-crit"><Icon name="error" />{errors[`extra${String(i)}`]}</span>}
         </div>
       ))}
       {errors.onlyIf && <p className="flex items-center gap-1 text-xs font-medium text-crit"><Icon name="error" />{errors.onlyIf}</p>}

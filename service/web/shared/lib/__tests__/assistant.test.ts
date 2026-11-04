@@ -16,9 +16,9 @@ const unit = (over: Partial<ApiUnitDetail> = {}) => {
     ...over,
   }) as unknown as ApiUnitDetail;
 };
-const change = (celsius: number, before: number | null = 26): Extract<ResolvedIntent, { kind: "change" }> => ({ kind: "change", unitId: "u-0001-aaaa", celsius, before: { power: true, celsius: before, observedAt: null }, expectedVersion: 7 });
+const change = (celsius: number, before: number | null = 26): Extract<ResolvedIntent, { kind: "change" }> => ({ kind: "change", unitId: "u-0001-aaaa", before: { power: true, celsius: before, observedAt: null }, expectedVersion: 7, celsius });
 const command = (status: ApiCommand["status"], failureCode: string | null = null, acknowledgedAt: string | null = null): ApiCommand =>
-  ({ id: "cmd-0240-aaaa", action: { kind: "set_temperature", celsius: 24 }, status, requestedAt: "2026-09-15T01:45:01Z", acknowledgedAt, expiresAt: "2026-09-15T01:45:31Z", failureCode });
+  ({ id: "cmd-0240-aaaa", action: { kind: "set_temperature", celsius: 24 }, requestedAt: "2026-09-15T01:45:01Z", expiresAt: "2026-09-15T01:45:31Z", status, acknowledgedAt, failureCode });
 
 describe("the customer assistant (FR-X02, D09, Figma Client 09a–09g)", () => {
   it("suggests only sentences the fixed grammar accepts, in each language", () => {

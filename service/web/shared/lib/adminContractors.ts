@@ -28,7 +28,7 @@ export interface ApiCertificate {
 export interface ApiTechnician { id: string; displayName: string; organizationId: string; role: string; validUntil: string | null; qualifications: { code: string; validFrom: string; validUntil: string; revokedAt: string | null }[] }
 type Tone = "ok" | "warn" | "crit" | "primary" | "muted";
 
-const pct = (v: number | null) => (v === null ? "—" : `${Math.round(v)} %`);
+const pct = (v: number | null) => (v === null ? "—" : `${String(Math.round(v))} %`);
 /** A register date in the user's language: “15 Oct”, the Kuala Lumpur day of a certificate or membership end. */
 const dayMonth = (iso: string, i: I18n) => showDayMonth(iso, { locale: i.display.locale, timeZone: KL });
 

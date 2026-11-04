@@ -86,7 +86,7 @@ export function readingRows(ms: ApiReportMeasurement[], t: T = en): [string, str
   const part = (key: string) => (componentShort[key] ?? componentLabel[key] ? t(componentShort[key] ?? componentLabel[key]) : key);
   return ms.map((m) => {
     return [`${metricLabel[m.metric] ? t(metricLabel[m.metric]) : m.metric}${m.componentKey ? ` (${part(m.componentKey)})` : ""}`,
-      m.value === null ? t("no value") : `${m.value} ${m.unit} · ${qualityNote[m.quality] ? t(qualityNote[m.quality]) : m.quality}${m.qualityReason ? ` (${m.qualityReason.replaceAll('_', " ")})` : ""}`];
+      m.value === null ? t("no value") : `${String(m.value)} ${m.unit} · ${qualityNote[m.quality] ? t(qualityNote[m.quality]) : m.quality}${m.qualityReason ? ` (${m.qualityReason.replaceAll('_', " ")})` : ""}`];
   });
 }
 /** “14 Sept, 9:05 – 11:40 am MYT (2 h 35 m)” from the job's time on site, in the display time zone (IR274). */
@@ -105,7 +105,7 @@ const leakCheckText: Record<string, string> = { pass: "passed", fail: "failed", 
 export function partLines(parts: ApiPart[], refrigerant: ApiRefrigerant[], t: T = en): [string, string][] {
   const code = (x: string, map: Record<string, string>) => (map[x] ? t(map[x]) : x.replaceAll('_', " "));
   return [
-    ...parts.map((p): [string, string] => [`${p.name} × ${p.quantity}`, [code(p.source, partSource), ...(p.replacesComponentKey ? [t("replaces {part}", { part: componentLabel[p.replacesComponentKey] ? t(componentLabel[p.replacesComponentKey]) : p.replacesComponentKey.replaceAll('_', " ") })] : [])].join(" · ")]),
+    ...parts.map((p): [string, string] => [`${p.name} × ${String(p.quantity)}`, [code(p.source, partSource), ...(p.replacesComponentKey ? [t("replaces {part}", { part: componentLabel[p.replacesComponentKey] ? t(componentLabel[p.replacesComponentKey]) : p.replacesComponentKey.replaceAll('_', " ") })] : [])].join(" · ")]),
     ...refrigerant.map((x): [string, string] => [t("{refrigerant} · cylinder {id}", { refrigerant: x.refrigerant, id: x.cylinderId }), t("recovered {recovered} kg · charged {charged} kg · leak check {check}", { recovered: x.recoveredKg, charged: x.chargedKg, check: code(x.leakCheck, leakCheckText) })]),
   ];
 }

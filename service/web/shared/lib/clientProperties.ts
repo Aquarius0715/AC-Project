@@ -28,7 +28,7 @@ export function roomUnits(ds: ApiUnitDetail[], i: I18n = EN): RoomUnit[] {
     const kw = metric(d, "power");
     return {
       id: d.id, version: d.version, name: d.displayName, set: set || t("No setting reported yet"), temp: temp === null ? "—" : t("{temp} °C room", { temp: one(temp) }),
-      watts: kw === null ? "—" : `${Math.round(kw * 1000)} W`, power: d.effectivePowerState === "on" ? "running" : (d.effectivePowerState === "off" ? "stopped" : "unknown"),
+      watts: kw === null ? "—" : `${String(Math.round(kw * 1000))} W`, power: d.effectivePowerState === "on" ? "running" : (d.effectivePowerState === "off" ? "stopped" : "unknown"),
       conn: d.connection, seen: d.lastSeenAt ? showClock(d.lastSeenAt, i.display) : null, online: d.connection === "online",
     };
   });
@@ -47,7 +47,7 @@ export function groupPlan(ds: ApiUnitDetail[], ch: GroupChange, i: I18n = EN): P
   return ds.map((d) => {
     const o = d.observedState;
     const cap = d.capabilities;
-    const skip = (note: string): PlanRow => ({ id: d.id, name: d.displayName, change: "—", result: "Skipped", note, actions: [] });
+    const skip = (note: string): PlanRow => ({ id: d.id, name: d.displayName, change: "—", result: "Skipped", actions: [], note });
     if (d.connection !== "online") return skip(d.lastSeenAt ? t("Offline since {time} — not sent", { time: showClock(d.lastSeenAt, i.display) }) : t("Offline — not sent"));
     if (!cap.control) return skip(t("No remote control on this model"));
     if (d.controlAvailability.state === "blocked") return skip(t("Control blocked ({reason})", { reason: d.controlAvailability.reasonKey.replace(/^errors?\./, "").replaceAll('_', " ") }));
@@ -70,7 +70,7 @@ export function groupPlan(ds: ApiUnitDetail[], ch: GroupChange, i: I18n = EN): P
         }
         if (o.celsius !== c) {
           actions.push({ kind: "set_temperature", celsius: c });
-          parts.push(`${o.celsius ?? "?"} → ${c} °C`);
+          parts.push(`${String(o.celsius ?? "?")} → ${String(c)} °C`);
         }
       }
       if (cap.modeControl && cap.modes.includes(ch.mode) && o.mode !== ch.mode) {

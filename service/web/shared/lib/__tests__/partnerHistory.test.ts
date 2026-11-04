@@ -13,14 +13,14 @@ const slot = (s: string, e: string) => ({ startAt: s, endAt: e });
 const members = [{ id: "m-a", userId: "u-a", displayName: "tech-external-a", role: "technician" }, { id: "m-c", userId: "u-c", displayName: "contractor-a", role: "contractor" }] as unknown as ApiMember[];
 const names = new Map(members.map((m) => [m.id, m.displayName]));
 const units = new Map([["u1", "Office AC"]]);
-const ev = (id: string, action: string, at: string, note: ApiEvent["note"] = null, actor: string | null = "u-c"): ApiEvent => ({ id, jobId: "j", actorUserId: actor, action, occurredAt: at, note });
+const ev = (id: string, action: string, at: string, note: ApiEvent["note"] = null, actor: string | null = "u-c"): ApiEvent => ({ jobId: "j", actorUserId: actor, occurredAt: at, id, action, note });
 const summary = (over: Record<string, unknown>, evs: ApiEvent[] = []) => {
   return ({
     projection: "summary", id: "job-1-aaaa", version: 7, unitId: "u1", type: "reactive", status: "in_progress", dueAt: "x", requestedSlot: slot("a", "b"), scheduledSlot: slot("2026-09-21T01:00:00Z", "2026-09-21T03:00:00Z"),
     assignmentId: "as", displayStatus: "in_progress", technicianMembershipId: "m-a", assignmentAcknowledgement: "accepted", accessValidFrom: "2026-09-14T00:00:00Z", accessValidUntil: "2026-09-25T16:00:00Z", origin: "client_request", eventSummary: eventSummary(evs), ...over,
   }) as unknown as ApiPartnerJob;
 };
-const history = (jobId: string, evs: ApiEvent[]) => ({ projection: "history", jobId, type: "periodic", status: "completed", completedAt: null, asOf: "2026-09-20T16:00:00Z", ownDecisionEvents: evs }) as ApiPartnerJob;
+const history = (jobId: string, evs: ApiEvent[]) => ({ projection: "history", type: "periodic", status: "completed", completedAt: null, asOf: "2026-09-20T16:00:00Z", ownDecisionEvents: evs, jobId }) as ApiPartnerJob;
 const events = [
   ev("e1", "offer.accepted", "2026-09-18T00:30:00Z"),
   ev("e2", "note.added", "2026-09-20T06:05:00Z", { visibility: "internal", message: "Missing filter photo" }),

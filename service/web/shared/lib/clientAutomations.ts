@@ -158,9 +158,19 @@ export function ruleCard(a: ApiAutomation, unit: { name: string; path: string; p
   const skipped = !note && a.lastRun?.outcome === "skipped" ? t("Last evaluation skipped {when} — {reason}", { when: runText(a.lastRun.at, a.timezone, i), reason: decisionText[a.lastRun.reason ?? ""] ? t(decisionText[a.lastRun.reason ?? ""]) : a.lastRun.reason ?? t("no reason recorded") }) : null;
   const isNeedsConsent = trigger === "location" && !consentGranted;
   return {
-    id: a.id, version: a.version, name: a.name, trigger, when: whenText(a, place, t), then: thenText(a, t), steps: ruleSteps(a, t), enabled: a.enabled, status, note, skipped,
+    id: a.id,
+    version: a.version,
+    name: a.name,
+    when: whenText(a, place, t),
+    then: thenText(a, t),
+    steps: ruleSteps(a, t),
+    enabled: a.enabled,
     place: `${where}${a.enabled && nextStart ? t(" · next run {when}", { when: runText(nextStart, a.timezone, i) }) : ""}`,
     toggle: { allowed: (!isNeedsConsent || a.enabled) && !!unit, hint: isNeedsConsent && !a.enabled ? t("Grant location consent first") : (unit ? null : t("The AC is no longer available")) },
+    trigger,
+    status,
+    note,
+    skipped,
   };
 }
 
@@ -189,7 +199,7 @@ const extraOf = (x: ExtraDraft): ExtraCondition => (x.type === "weather" ? { typ
 const extraDraftOf = (x: ExtraCondition): ExtraDraft => (x.type === "weather" ? { type: "weather", operator: x.operator, value: String(x.value) } : x);
 /** The option key of an action; every UnitAction of the contract has one, so a saved rule edits back unchanged (IR314). */
 export const actionKey = (a: UnitAction): string => {
-  return a.kind === "set_power" ? `power:${a.power ? "on" : "off"}` : a.kind === "set_temperature" ? `temp:${a.celsius}` : a.kind === "set_mode" ? `mode:${a.mode}`
+  return a.kind === "set_power" ? `power:${a.power ? "on" : "off"}` : a.kind === "set_temperature" ? `temp:${String(a.celsius)}` : a.kind === "set_mode" ? `mode:${a.mode}`
     : a.kind === "set_fan" ? `fan:${a.fanLevel}` : `vent:${a.level}`;
 };
 export function actionOf(key: string): UnitAction {
@@ -202,9 +212,28 @@ export function actionOf(key: string): UnitAction {
 }
 export function newDraft(unitId: string, timezone: string): Draft {
   return {
-    id: null, version: null, name: "", trigger: "schedule", unitId, others: [], timezone, enabled: false, priority: 50,
-    weekdays: [1, 2, 3, 4, 5], startLocal: "18:00", endLocal: "22:00", endsNextDay: false, startAction: "temp:25", endAction: "power:off",
-    occupied: false, event: "arrival", localTime: "18:00", operator: "gte", value: "33", action: "temp:25", extras: [],
+    id: null,
+    version: null,
+    name: "",
+    trigger: "schedule",
+    others: [],
+    enabled: false,
+    priority: 50,
+    weekdays: [1, 2, 3, 4, 5],
+    startLocal: "18:00",
+    endLocal: "22:00",
+    endsNextDay: false,
+    startAction: "temp:25",
+    endAction: "power:off",
+    occupied: false,
+    event: "arrival",
+    localTime: "18:00",
+    operator: "gte",
+    value: "33",
+    action: "temp:25",
+    extras: [],
+    unitId,
+    timezone,
   };
 }
 export function draftOf(a: ApiAutomation): Draft {
@@ -270,8 +299,8 @@ export function draftErrors(d: Draft, tr: T = en): Record<string, string> {
   if (d.trigger === "routine" && !hhmm.test(d.localTime)) e.localTime = "HH:mm";
   if (d.trigger === "weather" && !(d.value.trim() !== "" && Number(d.value) >= -50 && Number(d.value) <= 100)) e.value = tr("−50 to 100 °C");
   for (const [i, x] of fitExtras(d).entries()) {
-    if (x.type === "weekday" && x.weekdays.length === 0) e[`extra${i}`] = tr("Choose at least one weekday");
-    if (x.type === "weather" && !(x.value.trim() !== "" && Number(x.value) >= -50 && Number(x.value) <= 100)) e[`extra${i}`] = tr("−50 to 100 °C");
+    if (x.type === "weekday" && x.weekdays.length === 0) e[`extra${String(i)}`] = tr("Choose at least one weekday");
+    if (x.type === "weather" && !(x.value.trim() !== "" && Number(x.value) >= -50 && Number(x.value) <= 100)) e[`extra${String(i)}`] = tr("−50 to 100 °C");
   }
   return e;
 }
@@ -305,7 +334,7 @@ setting first, then its value (`short` is the value alone, `label` the whole act
 export function actionOptions(c: Caps | null, t: T = en): ActionGroup[] {
   if (!c) return [];
   const temps: ActionGroup["options"] = [];
-  if (c.control && c.temperature) for (let x = c.temperature.min; x <= c.temperature.max; x += c.temperature.step || 1) temps.push({ key: `temp:${x}`, label: t("Set temperature {celsius}°C", { celsius: x }), short: `${x}°C` });
+  if (c.control && c.temperature) for (let x = c.temperature.min; x <= c.temperature.max; x += c.temperature.step || 1) temps.push({ key: `temp:${String(x)}`, label: t("Set temperature {celsius}°C", { celsius: x }), short: `${String(x)}°C` });
   const out: ActionGroup[] = [];
   if (c.control) out.push({ id: "power", group: t("Power"), options: [{ key: "power:on", label: t("Power ON"), short: t("ON") }, { key: "power:off", label: t("Power OFF"), short: t("OFF") }] });
   if (temps.length > 0) out.push({ id: "temp", group: t("Temperature"), options: temps });
@@ -336,7 +365,7 @@ export function summaryText(d: Draft, unit: string, place: string, t: T = en): s
     switch (a.kind) {
       case "set_power": { return t(a.power ? "{unit} power ON" : "{unit} power OFF", { unit });
       }
-      case "set_temperature": { return t("set {unit} to {value}", { unit, value: `${a.celsius}°C` });
+      case "set_temperature": { return t("set {unit} to {value}", { unit, value: `${String(a.celsius)}°C` });
       }
       case "set_mode": { return t("set {unit} to {value}", { unit, value: t("mode {mode}", { mode: (modeWord[a.mode] ? t(modeWord[a.mode]) : a.mode).toLowerCase() }) });
       }

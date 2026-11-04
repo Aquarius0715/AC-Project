@@ -7,7 +7,7 @@ import { OverviewDemo } from "./_components/overview-demo";
 import { OverviewView } from "./_components/overview-view";
 import { loadOverview } from "./_lib/load";
 
-export default async function PartnerOverviewPage({ searchParams }: PageProps<"/partner">) {
+export default async function PartnerOverviewPage({ searchParams }: Readonly<PageProps<"/partner">>) {
   await connection();
   if (!apiMode()) return <OverviewDemo />;
   const sp = await searchParams;

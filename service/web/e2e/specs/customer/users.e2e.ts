@@ -38,7 +38,7 @@ test("the add dialog refuses a missing name, a bad or existing address and adds 
 test("the owner adds a user, changes the role and removes them", async ({ page }) => {
   await page.goto("/customer/users");
   await expect(page.locator("main tr", { hasText: "(you)" })).toContainText("Your account");
-  const email = `e2e-${Date.now()}@example.com`;
+  const email = `e2e-${String(Date.now())}@example.com`;
   await page.getByRole("button", { name: "Add user" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Name").fill("E2E Owner");

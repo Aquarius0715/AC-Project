@@ -4,7 +4,7 @@ import * as React from "react"
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover"
 import { cn } from "cn"
 
-function Popover({ ...props }: PopoverPrimitive.Root.Props) {
+function Popover({ ...props }: Readonly<PopoverPrimitive.Root.Props>) {
   return <PopoverPrimitive.Root data-slot="popover" {...props} />
 }
 
@@ -56,7 +56,7 @@ function PopoverHeader({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-function PopoverTitle({ className, ...props }: PopoverPrimitive.Title.Props) {
+function PopoverTitle({ className, ...props }: Readonly<PopoverPrimitive.Title.Props>) {
   return (
     <PopoverPrimitive.Title
       data-slot="popover-title"
@@ -69,7 +69,7 @@ function PopoverTitle({ className, ...props }: PopoverPrimitive.Title.Props) {
 function PopoverDescription({
   className,
   ...props
-}: PopoverPrimitive.Description.Props) {
+}: Readonly<PopoverPrimitive.Description.Props>) {
   return (
     <PopoverPrimitive.Description
       data-slot="popover-description"

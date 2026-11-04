@@ -12,7 +12,7 @@ afterEach(() => {
 });
 
 const relay = (operation: string, body: unknown, headers: Record<string, string> = { origin: "http://localhost:3000", host: "localhost:3000", "sec-fetch-site": "same-origin" }) =>
-  POST(new NextRequest(`http://localhost:3000/bff/ops/${operation}`, { method: "POST", headers, body: JSON.stringify(body) }), { params: Promise.resolve({ operation }) });
+  POST(new NextRequest(`http://localhost:3000/bff/ops/${operation}`, { method: "POST", body: JSON.stringify(body), headers }), { params: Promise.resolve({ operation }) });
 
 // IR358: the BFF relay serves the app's own pages only (CSRF)
 describe("POST /bff/ops/<operation>", () => {
@@ -45,7 +45,7 @@ describe("the relay's input limit", () => {
     return JSON.stringify({ jobId: "00000000-0000-4000-8000-000000000001", message: "x".repeat(bytes - shell.length), visibility: "internal" });
   };
   const post = (body: BodyInit, headers: Record<string, string> = same) =>
-    POST(new NextRequest("http://localhost:3000/bff/ops/jobs.addNote", { method: "POST", headers, body, duplex: "half" } as never), { params: Promise.resolve({ operation: "jobs.addNote" }) });
+    POST(new NextRequest("http://localhost:3000/bff/ops/jobs.addNote", { method: "POST", duplex: "half", headers, body } as never), { params: Promise.resolve({ operation: "jobs.addNote" }) });
 
   it("passes an input of exactly 1 MiB on and refuses one byte more without calling the Core API", async () => {
     vi.stubEnv("DATA_SOURCE", "api");

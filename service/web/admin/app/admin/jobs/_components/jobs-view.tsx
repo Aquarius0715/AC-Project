@@ -28,7 +28,7 @@ const nextDay = (date: string) => new Date(Date.parse(`${date}T00:00:00Z`) + 86_
 /** HQ maintenance jobs (FR-A06, Figma Admin 06-1, 06-11…06-18): the Jobs tab from the Core API (Plans, Contractors and
 SLA are PlansView, ContractorsView and SlaView). Texts in the user's display language; the times of the first render
 come formatted from the loader, the dialogs format and read times in the display time zone (IR290, NFR-08). */
-export function JobsView({ live }: { live: JobsLive }) {
+export function JobsView({ live }: Readonly<{ live: JobsLive }>) {
   const t = useT();
   const patch = useUrlPatch();
   const [creating, setCreating] = useState(!!live.newJob); // opened by ?new=<unitId> (an alert's Request maintenance)
@@ -47,7 +47,7 @@ export function JobsView({ live }: { live: JobsLive }) {
 interface Fresh { id: string; book: boolean }
 // New job opened from another tab hands the created job over here (browser module state; never set during rendering).
 
-function JobsTab({ live, patch, fresh, onFresh }: { live: JobsLive; patch: (p: Record<string, string | null>) => void; fresh: Fresh | null; onFresh: () => void }) {
+function JobsTab({ live, patch, fresh, onFresh }: Readonly<{ live: JobsLive; patch: (p: Record<string, string | null>) => void; fresh: Fresh | null; onFresh: () => void }>) {
   const t = useT();
   const q = live.q;
   const sel = live.detail;
@@ -89,7 +89,7 @@ function JobsTab({ live, patch, fresh, onFresh }: { live: JobsLive; patch: (p: R
 }
 
 
-function JobDetail({ d, live, fresh, onFresh }: { d: Detail; live: JobsLive; fresh: Fresh | null; onFresh: () => void }) {
+function JobDetail({ d, live, fresh, onFresh }: Readonly<{ d: Detail; live: JobsLive; fresh: Fresh | null; onFresh: () => void }>) {
   type ModalState = null | { kind: "book"; row: PreferredRow; fresh?: boolean } | { kind: "propose" } | { kind: "reason"; what: "hold" | "resume" | "cancel" | "reassign" } | { kind: "classify" }
     | { kind: "review"; decision: "accept" | "return" } | { kind: "cost" } | { kind: "extend" } | { kind: "report" };
   const t = useT();
@@ -98,7 +98,7 @@ function JobDetail({ d, live, fresh, onFresh }: { d: Detail; live: JobsLive; fre
   // Right after New job: “Next: choose delivery” opens step 2 on the 1st preferred time still ahead; “Save as requested” says so.
   const [modal, setModal] = useState<ModalState>(() => {
     const row = fresh?.book ? d.preferred.find((r) => Date.parse(r.slot.startAt) > now) : undefined;
-    return row ? { kind: "book", row, fresh: true } : null;
+    return row ? { kind: "book", fresh: true, row } : null;
   });
   const [pending, run] = useAction();
   const [result, setResult] = useState<{ tone: "ok" | "crit" | "warn"; text: string } | null>(() => (fresh && !fresh.book ? { tone: "ok", text: t("Job created as requested — book one of the preferred times or propose another.") } : null));
@@ -292,7 +292,7 @@ function BookModal({ d, live, row: first, fresh, onClose, onFail }: ModalProps &
   );
 }
 
-function ProposeModal({ d, live, onClose, onFail }: ModalProps) {
+function ProposeModal({ d, live, onClose, onFail }: Readonly<ModalProps>) {
   const i = useI18n(), { t } = i, zone = i.display.timeZone;
   const j = d.job;
   const now = Date.parse(live.now);
@@ -357,7 +357,7 @@ function ReasonModal({ d, live, what, onClose, onFail }: ModalProps & { what: "h
   );
 }
 
-function ClassifyModal({ d, onClose, onFail }: Omit<ModalProps, "live">) {
+function ClassifyModal({ d, onClose, onFail }: Readonly<Omit<ModalProps, "live">>) {
   const t = useT();
   const j = d.job;
   const [pending, run] = useAction();
@@ -381,7 +381,7 @@ function LinkedPhotos({ names }: { names: string[] }) {
   return names.length > 0 ? <span className="flex items-center gap-1 text-xs text-muted-foreground"><Icon name="camera" />{t("Linked photos: {names}", { names: names.join(", ") })}</span> : null;
 }
 
-function ReportRows({ rows }: { rows: NonNullable<Detail["report"]>["rows"] }) {
+function ReportRows({ rows }: Readonly<{ rows: NonNullable<Detail["report"]>["rows"] }>) {
   const t = useT();
   const row = (r: (typeof rows)[number]) => <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5 text-[13px]"><span>{r.label}{r.reason && <span className="text-xs text-muted-foreground"> · {r.reason}</span>}<LinkedPhotos names={r.photos} /></span><Badge tone={r.tone}>{r.result}</Badge></li>;
   const ok = rows.filter((r) => r.tone === "ok");
@@ -394,7 +394,7 @@ function ReportRows({ rows }: { rows: NonNullable<Detail["report"]>["rows"] }) {
 }
 
 /** “Open report →”: the whole report — every inspection result, readings, photos, parts and refrigerant, the work performed, the next action, the sign-off and the review history. */
-function ReportModal({ report: r, draft, onClose }: { report: NonNullable<Detail["report"]>; draft: boolean; onClose: () => void }) {
+function ReportModal({ report: r, draft, onClose }: Readonly<{ report: NonNullable<Detail["report"]>; draft: boolean; onClose: () => void }>) {
   const t = useT();
   return (
     <Modal open wide onClose={onClose} title={r.title} footer={<Btn onClick={onClose}>{t("Close")}</Btn>}>
@@ -440,7 +440,7 @@ function ReviewModal({ d, report, decision, onClose, onFail }: Omit<ModalProps, 
   );
 }
 
-function CostModal({ d, onClose, onFail }: Omit<ModalProps, "live">) {
+function CostModal({ d, onClose, onFail }: Readonly<Omit<ModalProps, "live">>) {
   const t = useT();
   const j = d.job;
   const [pending, run] = useAction();
@@ -496,7 +496,7 @@ const JOB_TYPES = [{ id: "reactive" as const, label: "Repair" }, { id: "preventi
 
 /** New job (DD-A06 item 8, Figma 06-1 New job): step 1 creates the job (requested) with the customer's preferred times
 asked by phone; “Save as requested” stops there, “Next: choose delivery” opens step 2 (the booking dialog) on it. */
-export function NewJobModal({ live, initial, onClose, onCreated }: { live: { now: string; units: JobsLive["units"]; q: { unitId?: string } }; initial?: { unitId: string; symptom: string }; onClose: () => void; onCreated?: (f: Fresh) => void }) {
+export function NewJobModal({ live, initial, onClose, onCreated }: Readonly<{ live: { now: string; units: JobsLive["units"]; q: { unitId?: string } }; initial?: { unitId: string; symptom: string }; onClose: () => void; onCreated?: (f: Fresh) => void }>) {
   const i = useI18n(), { t } = i, zone = i.display.timeZone;
   const router = useRouter();
   const now = Date.parse(live.now);
@@ -541,7 +541,7 @@ export function NewJobModal({ live, initial, onClose, onCreated }: { live: { now
         {times.map((x, n) => (
           <div key={n} className="flex flex-wrap items-end gap-2">
             <span className="mb-2 w-8 text-xs font-semibold text-primary">{t(RANK[n])}</span>
-            <Field label={t("Date {n}", { n: n + 1 })} error={tried ? errors[`slot${n}`] : undefined}><Input type="date" value={x.date} onChange={(e) => { set(n, "date", e.target.value); }} /></Field>
+            <Field label={t("Date {n}", { n: n + 1 })} error={tried ? errors[`slot${String(n)}`] : undefined}><Input type="date" value={x.date} onChange={(e) => { set(n, "date", e.target.value); }} /></Field>
             <Field label={t("From {n}", { n: n + 1 })}><Input type="time" value={x.from} onChange={(e) => { set(n, "from", e.target.value); }} /></Field>
             <Field label={t("To {n}", { n: n + 1 })}><Input type="time" value={x.to} onChange={(e) => { set(n, "to", e.target.value); }} /></Field>
             {n > 0 && <Btn size="sm" className="mb-1" onClick={() => { setTimes(times.filter((_, m) => m !== n)); }}>{t("Remove")}</Btn>}

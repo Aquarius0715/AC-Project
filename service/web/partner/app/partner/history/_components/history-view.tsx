@@ -16,7 +16,7 @@ const dot: Record<string, string> = { ok: "bg-ok/15 text-ok", warn: "bg-warn/15 
 
 /** The contractor's job history (FR-P07, FR-P08, Figma Contractor 05-1…05-6) from the Core API. Texts in the user's
 display language; the times come formatted from the loader and the Server Action (IR278). */
-export function HistoryView({ live }: { live: HistoryLive }) {
+export function HistoryView({ live }: Readonly<{ live: HistoryLive }>) {
   if (live.detail) return <Detail key={live.detail.missing ? live.detail.id : live.detail.row.id} live={live} detail={live.detail} />;
   return <List live={live} />;
 }
@@ -24,7 +24,7 @@ export function HistoryView({ live }: { live: HistoryLive }) {
 const keep = (live: HistoryLive) => [live.tab === "all" ? "" : `tab=${live.tab}`, live.sort === "latest" ? "" : `sort=${live.sort}`, live.period === "90d" ? "" : `period=${live.period}`].filter(Boolean).join("&");
 const hrefOf = (live: HistoryLive, jobId?: string) => { const q = [jobId ? `jobId=${jobId}` : "", keep(live)].filter(Boolean).join("&"); return `/partner/history${q ? `?${q}` : ""}`; };
 
-function List({ live }: { live: HistoryLive }) {
+function List({ live }: Readonly<{ live: HistoryLive }>) {
   const t = useT();
   const patch = useUrlPatch();
   const all = live.tabs.find((x) => x.id === "all")!.count;
@@ -69,7 +69,7 @@ function List({ live }: { live: HistoryLive }) {
 type Detail = NonNullable<HistoryLive["detail"]>;
 interface SessionPreview { id: string; title: string; sub: string }
 
-function Detail({ live, detail }: { live: HistoryLive; detail: Detail }) {
+function Detail({ live, detail }: Readonly<{ live: HistoryLive; detail: Detail }>) {
   const t = useT();
   const patch = useUrlPatch();
   const [view, setView] = useState<"all" | "customer" | "internal">("all");
@@ -121,12 +121,12 @@ function Detail({ live, detail }: { live: HistoryLive; detail: Detail }) {
   );
 }
 
-function Crumb({ live, text }: { live: HistoryLive; text: string }) {
+function Crumb({ live, text }: Readonly<{ live: HistoryLive; text: string }>) {
   const t = useT();
   return <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href={hrefOf(live)} className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Job history")}</Link> › <b className="text-ink">{text}</b></div>;
 }
 
-function Compose({ detail, onPreview }: { detail: Extract<Detail, { missing: false }>; onPreview: (p: SessionPreview) => void }) {
+function Compose({ detail, onPreview }: Readonly<{ detail: Extract<Detail, { missing: false }>; onPreview: (p: SessionPreview) => void }>) {
   const t = useT();
   const r = detail.row, mode = detail.mode;
   const [pending, run] = useAction();
@@ -147,7 +147,7 @@ function Compose({ detail, onPreview }: { detail: Extract<Detail, { missing: fal
     setTried(true);
     if (!message.trim() || isTooLong || !chosen) return;
     const ch = channels.some((c) => c.id === channel) ? channel : "inApp";
-    run(() => communicate({ jobId: r.id, version: r.version, saveNote: mode.kind === "note", message, visibility, templateKey: template as Communication["templateKey"], channel: ch as Communication["channel"], recipientMembershipId: chosen.id }),
+    run(() => communicate({ jobId: r.id, version: r.version, saveNote: mode.kind === "note", templateKey: template as Communication["templateKey"], channel: ch as Communication["channel"], recipientMembershipId: chosen.id, message, visibility }),
       t(mode.kind === "note" ? "Note saved + preview created" : "Preview created"),
       (v) => {
         const label = ROLES.find((x) => x.id === role)?.label ?? role;

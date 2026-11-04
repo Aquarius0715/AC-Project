@@ -73,10 +73,22 @@ export function filterRow(s: ApiFilterStatus, u: FilterUnit | undefined, nowMs: 
   const isOffline = !!u && u.connection !== "online";
   const last = s.lastCleanedAt ? t(s.lastCleanedBy === "technician" ? "cleaned by technician {date}" : "last cleaned {date}", { date: monthDay(s.lastCleanedAt, i.display) }) : t("no cleaning recorded yet");
   return {
-    unitId: s.unitId, unit: u?.name ?? t("Unit"), place: u?.place ?? "", spaceId: u?.spaceId ?? null, offline: isOffline,
-    last, jobId: s.lastCleanedBy === "technician" ? s.lastCleaningJobId : null,
-    run: h == null ? "—" : t(s.lastCleanedAt ? "{n} h since cleaning" : "{n} h so far", { n: Math.round(h) }), runNote: h == null ? t(isOffline ? "offline" : "no power readings") : null,
-    pct, progress, state: s.status, threshold: s.thresholdHours, hours: h, days, fallbackDays: s.fallbackDays,
+    unitId: s.unitId,
+    unit: u?.name ?? t("Unit"),
+    place: u?.place ?? "",
+    spaceId: u?.spaceId ?? null,
+    offline: isOffline,
+    jobId: s.lastCleanedBy === "technician" ? s.lastCleaningJobId : null,
+    run: h == null ? "—" : t(s.lastCleanedAt ? "{n} h since cleaning" : "{n} h so far", { n: Math.round(h) }),
+    runNote: h == null ? t(isOffline ? "offline" : "no power readings") : null,
+    state: s.status,
+    threshold: s.thresholdHours,
+    hours: h,
+    fallbackDays: s.fallbackDays,
+    last,
+    pct,
+    progress,
+    days,
   };
 }
 
@@ -90,9 +102,13 @@ export function filterGroup(key: string, rows: FilterRow[], t: T = en): FilterGr
   const due = n("overdue") + n("due_soon");
   const name = rows[0].place.split(" › ").pop() || t("Area");
   return {
-    key, title: t("{name} · {n} ACs", { name, n: rows.length }), place: rows[0].place, run: parts.length > 0 ? parts.join(" · ") : t("all OK"),
-    pct, progress: pct == null ? t("run time unknown") : t("{pct} % of {n} h (average)", { pct, n: rows[0].threshold }),
+    title: t("{name} · {n} ACs", { name, n: rows.length }),
+    place: rows[0].place,
+    run: parts.length > 0 ? parts.join(" · ") : t("all OK"),
+    progress: pct == null ? t("run time unknown") : t("{pct} % of {n} h (average)", { pct, n: rows[0].threshold }),
     badge: due ? { label: t("{n} due", { n: due }), tone: n("overdue") ? "crit" : "warn" } : (n("unknown") === rows.length ? { label: t("Unknown"), tone: "unknown" } : { label: t("OK"), tone: "ok" }),
+    key,
+    pct,
     rows,
   };
 }

@@ -19,7 +19,7 @@ import { RestrictionsView, type RestrictionsLive } from "./_components/restricti
 
 const active = new Set<RestrictionState>(["scheduled", "requested", "applied", "release_requested"]);
 
-export default async function AdminRestrictionsPage({ searchParams }: PageProps<"/admin/restrictions">) {
+export default async function AdminRestrictionsPage({ searchParams }: Readonly<PageProps<"/admin/restrictions">>) {
   interface Unit { id: string; displayName: string; modelId: string; archived: boolean }
   interface Page<T> { items: T[] }
   await connection();
@@ -57,7 +57,15 @@ export default async function AdminRestrictionsPage({ searchParams }: PageProps<
   const causes = invoicesOf.filter((x) => causeIds.has(x.id)).sort((a, b) => a.number.localeCompare(b.number))
     .map((x) => ({ id: x.id, label: `${x.number} · ${customerName.get(contractOf.get(x.contractId)?.customerId ?? "") ?? t("customer")}` }));
   const live: RestrictionsLive = {
-    now: now.toISOString(), full: isFull, canWrite, canUnits: perms.has("asset.read"), scope, rows, counts, contracts: contracts.items.map((k) => ({ id: k.id, label: contractLabel(k.id) })), causes,
+    now: now.toISOString(),
+    full: isFull,
+    canUnits: perms.has("asset.read"),
+    contracts: contracts.items.map((k) => ({ id: k.id, label: contractLabel(k.id) })),
+    canWrite,
+    scope,
+    rows,
+    counts,
+    causes,
   };
 
   const id = rows.find((r) => r.id === one("restrictionId"))?.id ?? rows[0]?.id;
@@ -73,7 +81,10 @@ export default async function AdminRestrictionsPage({ searchParams }: PageProps<
     const isAllPaid = causes.length > 0 && causes.every((c) => c.paid);
     const notices = r.noticeNotificationIds?.length ?? 0;
     live.selected = {
-      r, contract: contractLabel(r.contractId), causes, allPaid: isAllPaid,
+      r,
+      causes,
+      contract: contractLabel(r.contractId),
+      allPaid: isAllPaid,
       units: unitRows(r, names, new Map(commands.filter((c): c is ApiCommand => !!c).map((c) => [c.id, c])), i),
       texts: {
         notice: t(notices === 1 ? "{time} · 1 client notice" : "{time} · {n} client notices", { time: showTime(r.noticeAt, display), n: notices }),

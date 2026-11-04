@@ -70,7 +70,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ operation:
   }
   const base = process.env.CORE_API_URL ?? "http://localhost:8080";
   try {
-    const upstream = await fetch(`${base}${call.path}`, { method: call.method, headers, body: call.body, cache: "no-store" });
+    const upstream = await fetch(`${base}${call.path}`, { method: call.method, body: call.body, cache: "no-store", headers });
     return new NextResponse(await upstream.text(), { status: upstream.status, headers: { "Content-Type": "application/json" } });
   } catch {
     return domainError(503, "UNAVAILABLE", "error.unavailable");

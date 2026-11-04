@@ -7,7 +7,7 @@ import { HistoryDemo } from "./_components/history-demo";
 import { HistoryView } from "./_components/history-view";
 import { loadHistory } from "./_lib/load";
 
-export default async function PartnerHistoryPage({ searchParams }: PageProps<"/partner/history">) {
+export default async function PartnerHistoryPage({ searchParams }: Readonly<PageProps<"/partner/history">>) {
   await connection();
   const sp = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);

@@ -15,7 +15,7 @@ const hours = Array.from({ length: (DAY_END - DAY_START) / 2 + 1 }, (_, i) => DA
 the period's progress by status, what needs the company's action, today's timeline, the team's capacity and the
 recent job activity. The period (URL from/to) applies to every section, as on the job list. Texts in the user's
 display language (IR270); the period and today's timeline are Kuala Lumpur days and hours. */
-export function OverviewView({ live }: { live: OverviewLive }) {
+export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
   const t = useT();
   const patch = useUrlPatch();
   const { progress: pr } = live;
@@ -37,7 +37,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
       <Card title={t("Job progress — {period}", { period })} action={<TextLink href="/partner/jobs">{t("Open all jobs")} <Icon name="arrowRight" /></TextLink>}>
         <p className="mb-2 text-xs text-muted-foreground">{pr.total ? t(pr.total === 1 ? "{n} job · {done} completed ({pct}%) · counts use the same period as the Jobs list" : "{n} jobs · {done} completed ({pct}%) · counts use the same period as the Jobs list", { n: pr.total, done: pr.counts.completed, pct: pr.completedPct }) : t("No jobs yet — offers from HQ to your company will appear here and in Jobs.")}</p>
         <div className="flex h-3 w-full overflow-hidden rounded-full bg-surface2" role="img" aria-label={t("Jobs by status")}>
-          {pr.total > 0 && BUCKETS.map((b) => pr.counts[b.id] > 0 && <div key={b.id} className={cx("h-full", b.tone)} style={{ width: `${(pr.counts[b.id] / pr.total) * 100}%` }} title={`${t(b.label)}: ${pr.counts[b.id]}`} />)}
+          {pr.total > 0 && BUCKETS.map((b) => pr.counts[b.id] > 0 && <div key={b.id} className={cx("h-full", b.tone)} style={{ width: `${String((pr.counts[b.id] / pr.total) * 100)}%` }} title={`${t(b.label)}: ${String(pr.counts[b.id])}`} />)}
         </div>
         <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           {BUCKETS.map((b) => <li key={b.id} className="flex items-center gap-1.5"><span className={cx("inline-block h-2.5 w-2.5 rounded-full", b.tone)} />{t(b.label)} <b className="text-ink">{pr.counts[b.id]}</b></li>)}
@@ -79,9 +79,9 @@ export function OverviewView({ live }: { live: OverviewLive }) {
                 <div key={r.id} className="grid grid-cols-[104px_1fr] items-center border-t border-line py-2 text-xs">
                   <span><b>{r.name}</b><span className="block text-[11px] text-muted-foreground">{r.sub}</span></span>
                   <div className="relative h-8 rounded-lg bg-surface2">
-                    {r.blocks.map((b) => <div key={b.text} className="absolute top-1 h-6 truncate rounded bg-primary px-2 text-[11px] leading-6 text-white" style={{ left: `${b.left}%`, width: `${b.width}%` }}>{b.text}</div>)}
+                    {r.blocks.map((b) => <div key={b.text} className="absolute top-1 h-6 truncate rounded bg-primary px-2 text-[11px] leading-6 text-white" style={{ left: `${String(b.left)}%`, width: `${String(b.width)}%` }}>{b.text}</div>)}
                     {r.blocks.length === 0 && <span className="absolute inset-0 grid place-items-center text-[11px] text-muted-foreground">{r.off ? t("Unavailable · {reason}", { reason: r.off }) : t("Free all day")}</span>}
-                    {live.today.nowPct > 0 && live.today.nowPct < 100 && <span className="absolute inset-y-0 w-px bg-crit" style={{ left: `${live.today.nowPct}%` }} aria-hidden />}
+                    {live.today.nowPct > 0 && live.today.nowPct < 100 && <span className="absolute inset-y-0 w-px bg-crit" style={{ left: `${String(live.today.nowPct)}%` }} aria-hidden />}
                   </div>
                 </div>
               ))}

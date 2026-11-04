@@ -8,7 +8,7 @@ import { i18nOf } from "@ac/web/lib/i18n";
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const NOW = Date.parse("2026-09-14T01:35:00Z"); // 09:35 in Kuala Lumpur
 const m = (metric: string, value: number | null, unit: string, quality: "valid" | "stale" | "suspect" | "missing" = "valid") =>
-  ({ id: metric, unitId: "u1", sensorId: "s", metric, value, unit, observedAt: "2026-09-14T01:35:00Z", origin: "measured" as const, quality, qualityReason: null });
+  ({ id: metric, unitId: "u1", sensorId: "s", observedAt: "2026-09-14T01:35:00Z", origin: "measured" as const, qualityReason: null, metric, value, unit, quality });
 const unit = {
   id: "unit-p-rooftop", displayName: "Rooftop unit", connection: "online", lastSeenAt: "2026-09-14T01:35:00Z", serviceScope: ["indoor", "outdoor"],
   location: { pathLabels: ["customer-b", "Tower A rooftop"], address: null, accessInstructions: null }, capabilities: { manufacturer: "cap-split-std", model: "v2" },

@@ -7,7 +7,7 @@ import { useState } from "react";
 import { Badge, Banner, Btn, Card, Field, Modal, Page, SummaryList, Textarea, useToast } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
 
-export function ReviewDemo({ id }: { id: string }) {
+export function ReviewDemo({ id }: Readonly<{ id: string }>) {
   const toast = useToast();
   const [state, setState] = useState<"pending" | "accepted" | "returned">("pending");
   const [ret, setRet] = useState(false);

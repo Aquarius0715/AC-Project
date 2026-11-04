@@ -35,7 +35,7 @@ const dot: Record<EvidenceRow["tone"], string> = { ok: "bg-ok", warn: "bg-warn",
 /** Quality review of a submitted report (FR-P05): the technician's evidence, the DD-P05 evidence check, accept or
 return with a reason; the reviewer never edits the original records and cannot approve their own contribution.
 Texts in the user's display language; the times come formatted from the loader (IR274). */
-export function ReviewView({ live }: { live: ReviewLive }) {
+export function ReviewView({ live }: Readonly<{ live: ReviewLive }>) {
   const t = useT();
   const [pending, run] = useAction();
   const [ret, setRet] = useState(false);

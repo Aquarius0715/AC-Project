@@ -79,8 +79,11 @@ export async function reportProblem(form: FormData) {
     }));
     const start = String(form.get("visitStart") ?? ""), end = String(form.get("visitEnd") ?? "");
     const j = await coreOp<{ id: string }>("jobs.reportProblem", {
-      jobId: String(form.get("jobId")), reasonCode: String(form.get("reasonCode")) as OpInput<"jobs.reportProblem">["reasonCode"], details: String(form.get("details") ?? "").trim(), photos,
+      jobId: String(form.get("jobId")),
+      reasonCode: String(form.get("reasonCode")) as OpInput<"jobs.reportProblem">["reasonCode"],
+      details: String(form.get("details") ?? "").trim(),
       preferredSlot: start && end ? { startAt: start, endAt: end } : null,
+      photos,
     }, write(Number(form.get("version"))));
     return { id: j.id };
   });

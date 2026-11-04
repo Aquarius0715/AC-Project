@@ -64,7 +64,7 @@ export function registerRows(d: ApiTechUnit, i: I18n = EN): Register {
   const n = groups.reduce((s, g) => s + g.n, 0), list = groups.map((g) => t(COUNT[g.group], { n: g.n })).join(", ");
   return {
     rows, missing: rows.some(([, v]) => v === none),
-    note: t(groups.length === 1 ? "{n} components in 1 group ({list}) — inspect them in the job workspace." : "{n} components across {g} groups ({list}) — inspect them in the job workspace.", { n, g: groups.length, list }),
+    note: t(groups.length === 1 ? "{n} components in 1 group ({list}) — inspect them in the job workspace." : "{n} components across {g} groups ({list}) — inspect them in the job workspace.", { g: groups.length, n, list }),
   };
 }
 
@@ -139,9 +139,12 @@ export function seriesChart(metric: string, unit: string, items: Point[], p: Per
   const name = `${label(metric, t)}${unit ? ` (${unit})` : ""}`;
   return {
     title: p === "7d" ? t("{metric} · last 7 days (Kuala Lumpur calendar days)", { metric: name }) : t("{metric} · last {period} (rolling)", { metric: name, period: t(p === "1h" ? "1 h" : "24 h") }),
-    points, labels: [start, "", "", "", t("now")], gap, empty: points.every((v) => v === null),
+    labels: [start, "", "", "", t("now")],
+    empty: points.every((v) => v === null),
     count: isCut ? null : t(n === 1 ? "1 measurement in this period" : "{n} measurements in this period", { n }),
     cut: isCut ? t("Showing the latest {n} of {total} readings — earlier readings in this period are not loaded.", { n: items.length, total }) : null,
+    points,
+    gap,
   };
 }
 

@@ -14,7 +14,7 @@ export interface DemoLive { clock: string; devices: DeviceOption[] | null; hidde
 /** Demo controls in API mode (FR-X05, IR154, IR249; Figma Client 10e): the Core API scenario clock moves forward, a
 device the signed-in role can see loses its connection or gets it back, and the session can be expired; the reset and
 the transport delay exist only in the browser demo and say so. */
-export function DemoView({ live }: { live: DemoLive }) {
+export function DemoView({ live }: Readonly<{ live: DemoLive }>) {
   const t = useT();
   const [pending, run] = useAction();
   const [expiring, startExpire] = useTransition();

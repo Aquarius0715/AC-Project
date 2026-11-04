@@ -24,7 +24,7 @@ const connectionWord: Record<string, string> = { online: "Online", offline: "Off
 
 /** The contractor's offer or job (FR-P02, FR-P08, Figma Contractor 02-7…02-14) from the Core API, by projection.
 Texts in the user's display language; the times come formatted from the loader (IR272). */
-export function JobDetailView({ live }: { live: JobDetailLive }) {
+export function JobDetailView({ live }: Readonly<{ live: JobDetailLive }>) {
   const t = useT();
   if (live.kind === "offer") return <OfferView live={live} />;
   if (live.kind === "detail") return <DetailView live={live} />;
@@ -43,12 +43,12 @@ export function JobDetailView({ live }: { live: JobDetailLive }) {
   );
 }
 
-function Crumb({ text }: { text: string }) {
+function Crumb({ text }: Readonly<{ text: string }>) {
   const t = useT();
   return <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href="/partner/jobs" className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Jobs")}</Link> › <b className="text-ink">{text}</b></div>;
 }
 
-function FitCard({ title, rows, note, footer }: { title: string; rows: FitRow[]; note: string; footer?: React.ReactNode }) {
+function FitCard({ title, rows, note, footer }: Readonly<{ title: string; rows: FitRow[]; note: string; footer?: React.ReactNode }>) {
   const t = useT();
   return (
     <Card title={title} action={<Link className="text-xs font-semibold text-primary" href="/partner/team">{t("Team & capacity")} <Icon name="arrowRight" /></Link>}>
@@ -68,7 +68,7 @@ function FitCard({ title, rows, note, footer }: { title: string; rows: FitRow[];
   );
 }
 
-function OfferView({ live }: { live: Extract<JobDetailLive, { kind: "offer" }> }) {
+function OfferView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "offer" }> }>) {
   const t = useT();
   const j: ApiOffer = live.job;
   const x = live.text;
@@ -136,7 +136,7 @@ function OfferView({ live }: { live: Extract<JobDetailLive, { kind: "offer" }> }
 }
 
 /** Propose another time (Figma 02-8): date and times typed in the user's display time zone (NFR-08). */
-function ProposeModal({ j, x, technicians, onClose, onSend, pending }: { j: ApiOffer; x: Extract<JobDetailLive, { kind: "offer" }>["text"]; technicians: { id: string; name: string }[]; onClose: () => void; onSend: (slot: { startAt: string; endAt: string }, tech: string, reason: string) => void; pending: boolean }) {
+function ProposeModal({ j, x, technicians, onClose, onSend, pending }: Readonly<{ j: ApiOffer; x: Extract<JobDetailLive, { kind: "offer" }>["text"]; technicians: { id: string; name: string }[]; onClose: () => void; onSend: (slot: { startAt: string; endAt: string }, tech: string, reason: string) => void; pending: boolean }>) {
   const t = useT();
   const [date, setDate] = useState(x.propose.date);
   const [from, setFrom] = useState(x.propose.from);
@@ -161,7 +161,7 @@ function ProposeModal({ j, x, technicians, onClose, onSend, pending }: { j: ApiO
   );
 }
 
-function DetailView({ live }: { live: Extract<JobDetailLive, { kind: "detail" }> }) {
+function DetailView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "detail" }> }>) {
   const t = useT();
   const j: ApiDetail = live.job;
   const x = live.text;

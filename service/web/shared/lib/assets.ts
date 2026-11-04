@@ -119,7 +119,7 @@ export function registerKpis(rows: CustomerRow[], us: ApiUnitRow[], t: T = en) {
   const names = active.flatMap((r) => r.propertyNames);
   return {
     customers: active.length, inactive: rows.length - active.length, properties: names.length,
-    propertyNames: names.length > 3 ? `${names.slice(0, 3).join(" · ")} +${names.length - 3}` : names.join(" · ") || t("none yet"),
+    propertyNames: names.length > 3 ? `${names.slice(0, 3).join(" · ")} +${String(names.length - 3)}` : names.join(" · ") || t("none yet"),
     units: units.length, power: t("Running {on} · Stopped {off} · unknown {unknown}", { on: n("on"), off: n("off"), unknown: n("unknown") }),
     attention: active.filter((r) => r.alerts > 0 || (r.standing?.overdue ?? 0) > 0 || !!r.standing?.restriction).length,
   };
@@ -152,7 +152,7 @@ export function locationTree(ps: ApiPropertyRow[], ss: ApiSpaceRow[], us: ApiUni
     return live.filter((s) => s.propertyId === propertyId && s.parentSpaceId === parent).sort(byName).map((s) => {
       const children = build(propertyId, s.id);
       const direct = us.filter((u) => u.spaceId === s.id).length;
-      return { id: s.id, version: s.version, kind: s.kind, name: s.name, propertyId, parentSpaceId: parent, direct, units: direct + children.reduce((n, c) => n + c.units, 0), children };
+      return { id: s.id, version: s.version, kind: s.kind, name: s.name, parentSpaceId: parent, units: direct + children.reduce((n, c) => n + c.units, 0), propertyId, direct, children };
     });
   };
   return ps.filter((p) => p.customerOrgId === orgId && !p.archived).sort(byName).map((p) => {
@@ -232,7 +232,7 @@ export const reasonError = (reason: string, t: T = translator("en")) => (between
 export interface UnitRow { id: string; version: number; name: string; model: string; location: string; power: "running" | "stopped" | "unknown"; conn: Connection; alerts: number; policies: string }
 const power = { on: "running", off: "stopped", unknown: "unknown" } as const;
 /** The model as the table shows it ("ventilation-demo v3": capability model and the unit's capability version). */
-export const modelLabel = (u: Pick<ApiUnitRow, "modelId" | "capabilityVersion">, models: Map<string, string>) => `${models.get(u.modelId) ?? u.modelId.slice(0, 8)} v${u.capabilityVersion}`;
+export const modelLabel = (u: Pick<ApiUnitRow, "modelId" | "capabilityVersion">, models: Map<string, string>) => `${models.get(u.modelId) ?? u.modelId.slice(0, 8)} v${String(u.capabilityVersion)}`;
 export function unitRows(us: ApiUnitRow[], ss: ApiSpaceRow[], models: Map<string, string>, t: T = en): UnitRow[] {
   return [...us].sort((a, b) => a.displayName.localeCompare(b.displayName)).map((u) => {
     return {
@@ -317,7 +317,7 @@ export function conditionText(p: { metric?: string; operator?: Operator; thresho
   const m = p.metric ?? "";
   const w = p.activeWindow ? `, ${days(p.activeWindow.weekdays, i)}${p.activeWindow.startLocal}–${p.activeWindow.endLocal}` : "";
   const cond = m === "heartbeat_gap" ? `${t("No heartbeat for {n} min", { n: p.threshold ?? 0 })}${w}` // the gap itself is the duration (minutes)
-    : `${metricLabel[m] ? t(metricLabel[m]) : m} ${opSymbol[p.operator ?? "gte"]} ${p.threshold ?? 0} ${metricUnit[m] ?? ""} ${t("for {duration}", { duration: duration(p.durationSeconds ?? 0, t) })}${w}`;
+    : `${metricLabel[m] ? t(metricLabel[m]) : m} ${opSymbol[p.operator ?? "gte"]} ${String(p.threshold ?? 0)} ${metricUnit[m] ?? ""} ${t("for {duration}", { duration: duration(p.durationSeconds ?? 0, t) })}${w}`;
   return p.severity ? `${cond} → ${t(sevLabel[p.severity])}` : cond;
 }
 export interface PolicyLine { id: string; version: number; kind: "alert" | "default_alert"; name: string; type: string; condition: string; madeBy: string; units: number; enabled: boolean }
@@ -406,9 +406,20 @@ export function coverageRows(cs: ApiCoverage[], x: { unit: (id: string) => { nam
     const statusText = c.status === "contract" ? t("Covered by contract") : c.status === "under_warranty" ? t("Under warranty")
       : c.status === "expiring" ? t("Ends in {n} d · no contract", { n: days ?? 0 }) : t(c.warrantyEndsAt ? "Warranty ended · no contract" : "No warranty · no contract");
     return {
-      unitId: c.unitId, unit: u?.name ?? c.unitId.slice(0, 8), sub: [c.unitId.slice(0, 8), u?.place].filter(Boolean).join(" · "), customerId: c.customerId, customer: x.customer(c.customerId),
-      model: x.model(c.modelId), ends: c.warrantyEndsAt ? businessDay(c.warrantyEndsAt, i.display.locale) : "—", endsDate: klDate(c.warrantyEndsAt), endsAt: c.warrantyEndsAt, days, contractIds: c.contractIds, contracts: c.contractIds.map(x.contract).join(", ") || "—",
-      status: c.status, statusText,
+      unitId: c.unitId,
+      unit: u?.name ?? c.unitId.slice(0, 8),
+      sub: [c.unitId.slice(0, 8), u?.place].filter(Boolean).join(" · "),
+      customerId: c.customerId,
+      customer: x.customer(c.customerId),
+      model: x.model(c.modelId),
+      ends: c.warrantyEndsAt ? businessDay(c.warrantyEndsAt, i.display.locale) : "—",
+      endsDate: klDate(c.warrantyEndsAt),
+      endsAt: c.warrantyEndsAt,
+      contractIds: c.contractIds,
+      contracts: c.contractIds.map(x.contract).join(", ") || "—",
+      status: c.status,
+      days,
+      statusText,
     };
   }).sort((a, b) => (a.endsAt === b.endsAt ? a.unit.localeCompare(b.unit) : a.endsAt === null ? 1 : b.endsAt === null ? -1 : a.endsAt.localeCompare(b.endsAt)));
 }
@@ -438,11 +449,18 @@ export interface ClaimCandidate { jobId: string; version: number; unit: string; 
 interface Part { name: string; quantity: number; catalogCode: string | null }
 interface Cost { kind: "estimate" | "actual"; amountMinor: number; currency: Currency }
 export function claimCandidate(j: { id: string; version: number; type: string; completedAt: string | null; costs: Cost[] }, parts: Part[], unit: string, i: I18n = EN): ClaimCandidate {
-  const label = parts.map((p) => `${p.name}${p.catalogCode ? ` ${p.catalogCode}` : ""} ×${p.quantity}`).join(", ");
+  const label = parts.map((p) => `${p.name}${p.catalogCode ? ` ${p.catalogCode}` : ""} ×${String(p.quantity)}`).join(", ");
   const actual = j.costs.filter((c) => c.kind === "actual");
   return {
-    jobId: j.id, version: j.version, unit, type: j.type, completed: j.completedAt ? showDate(j.completedAt, i.display) : "—", parts: label || i.t("parts listed in the report"),
-    partLabel: label.slice(0, 120), amountMinor: actual.length > 0 ? actual.reduce((n, c) => n + c.amountMinor, 0) : null, currency: actual[0]?.currency ?? "MYR",
+    jobId: j.id,
+    version: j.version,
+    type: j.type,
+    completed: j.completedAt ? showDate(j.completedAt, i.display) : "—",
+    parts: label || i.t("parts listed in the report"),
+    partLabel: label.slice(0, 120),
+    amountMinor: actual.length > 0 ? actual.reduce((n, c) => n + c.amountMinor, 0) : null,
+    currency: actual[0]?.currency ?? "MYR",
+    unit,
   };
 }
 

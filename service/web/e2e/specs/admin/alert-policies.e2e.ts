@@ -24,7 +24,7 @@ test.afterEach(async ({ page }) => {
 });
 
 test("HQ creates an alert policy for a customer, edits it and deletes it", async ({ page }) => {
-  const name = `E2E too hot ${Date.now()}`;
+  const name = `E2E too hot ${String(Date.now())}`;
   await page.goto("/admin/alerts?tab=policies");
   const main = page.getByRole("main");
   await main.getByRole("button", { name: "New policy" }).click();
@@ -102,7 +102,7 @@ test("the unit page's new-policy link opens a draft for that customer", async ({
 // off hides a disabled policy unless it is open; a unit scope lists the policies attached to that unit (the seed has
 // only the default policy); switching tabs keeps the scope.
 test("the Policies tab's scope, Show disabled and a scoped new policy with active hours", async ({ page }) => {
-  const name = `E2E office hours ${Date.now()}`;
+  const name = `E2E office hours ${String(Date.now())}`;
   await page.goto("/admin/alerts?tab=policies");
   const main = page.getByRole("main");
   await selectForURL(page, main.getByRole("combobox", { name: "Customer" }), { label: "Demo Customer A" }, /customerId=/);
@@ -154,7 +154,7 @@ const relay = async (page: import("@playwright/test").Page, op: string, input: u
   return page.evaluate(async ({ op, input, version }) => {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (version !== undefined) Object.assign(headers, { "Idempotency-Key": crypto.randomUUID(), "X-Expected-Version": String(version) });
-    const r = await fetch(`/bff/ops/${op}`, { method: "POST", headers, body: JSON.stringify(input) });
+    const r = await fetch(`/bff/ops/${op}`, { method: "POST", body: JSON.stringify(input), headers });
     return { status: r.status, body: await r.json() };
   }, { op, input, version });
 };
@@ -189,11 +189,11 @@ test("the default policy's rules, a customer's switch and a rule copied as a cus
   await threshold.fill("340");
   await expect(main).toContainText("1 rule changed · Refrigerant low pressure");
   await main.getByRole("button", { name: "Save policy" }).click();
-  await expect(main).toContainText(`Policy v${before.version + 1}`);
+  await expect(main).toContainText(`Policy v${String(before.version + 1)}`);
   await expect(main).toContainText("No unsaved changes");
   await threshold.fill("350");
   await main.getByRole("button", { name: "Save policy" }).click();
-  await expect(main).toContainText(`Policy v${before.version + 2}`);
+  await expect(main).toContainText(`Policy v${String(before.version + 2)}`);
 
   // one customer's switch, with a reason, then back on
   const row = (name: string) => main.locator("div").filter({ has: page.getByRole("switch", { name: `Refrigerant low pressure for ${name}` }) }).last();
@@ -229,7 +229,7 @@ test("the default policy's rules, a customer's switch and a rule copied as a cus
 // threshold is 45 °C, far above the demo's readings, so the policy never alerts for real while it is on; deleting it
 // detaches it again.
 test("the notification preview and the demo test of a policy attached to a unit", async ({ page }) => {
-  const name = `E2E hot room ${Date.now()}`;
+  const name = `E2E hot room ${String(Date.now())}`;
   await page.goto("/admin/alerts?tab=policies");
   const main = page.getByRole("main");
   await selectForURL(page, main.getByRole("combobox", { name: "Customer" }), { label: "Demo Customer A" }, /customerId=/);

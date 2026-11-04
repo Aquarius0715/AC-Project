@@ -77,7 +77,7 @@ test("a registered device is not bound yet, and Bind starts from its planned uni
   const main = page.getByRole("main");
   await main.getByRole("button", { name: "Register device" }).click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByRole("textbox", { name: /^Serial/ }).fill(`AC-E2E-${Date.now()}`);
+  await dialog.getByRole("textbox", { name: /^Serial/ }).fill(`AC-E2E-${String(Date.now())}`);
   const planned = dialog.getByRole("combobox", { name: /^Planned unit/ });
   await planned.selectOption({ index: 1 });
   const unit = (await planned.locator("option:checked").innerText()).trim();

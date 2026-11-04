@@ -13,7 +13,7 @@ import { Icon } from "@ac/web/components/Icon";
 
 /** Customer overview (FR-C01, DD-C01, Figma Client 01a) from the Core API: the scope and period live in the URL; the
 texts and times follow the user's display language and time zone (IR260). */
-export function OverviewView({ live }: { live: OverviewLive }) {
+export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
   const t = useT();
   const router = useRouter();
   const patch = useUrlPatch();

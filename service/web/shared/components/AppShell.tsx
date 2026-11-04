@@ -30,7 +30,7 @@ export function useStoredRole(): Role {
 const signOut = "flex w-full items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold text-crit hover:bg-crit-soft/50";
 const SHARED = SHARED_PAGES.map((s) => ({ ...s, icon: (s.href === "/notifications" ? "notifications" : "preferences") as IconName }));
 
-function NavLink({ href, label, icon, badge, active }: { href: string; label: string; icon: IconName; badge?: string; active: boolean }) {
+function NavLink({ href, label, icon, badge, active }: Readonly<{ href: string; label: string; icon: IconName; badge?: string; active: boolean }>) {
   return (
     <Link href={href} aria-current={active ? "page" : undefined} className={cx("flex items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold", active ? "bg-primary-soft text-primary" : "text-ink hover:bg-surface2")}>
       <Icon name={icon} className={cx("text-[15px]", active ? "text-primary" : "text-muted-foreground")} />
@@ -43,7 +43,7 @@ function NavLink({ href, label, icon, badge, active }: { href: string; label: st
 interface NavItem { href: string; label: string; icon: IconName; badge?: string; match?: string[] }
 /** The role's sidebar items with the active one: the longest matching path, where an item whose href carries a query
 (Sidebar › Assigned jobs = /technician?tab=all) wins on its path only when the query matches too. */
-function RoleNav({ items, base, pathname, search }: { items: NavItem[]; base: string; pathname: string; search: string }) {
+function RoleNav({ items, base, pathname, search }: Readonly<{ items: NavItem[]; base: string; pathname: string; search: string }>) {
   const query = new URLSearchParams(search);
   const score = (href: string, match?: string[]) => {
     const hits = [href, ...(match ?? [])].filter((h) => {
@@ -57,14 +57,14 @@ function RoleNav({ items, base, pathname, search }: { items: NavItem[]; base: st
   const activeHref = best ? items.find((i) => score(i.href, i.match) === best)?.href : undefined;
   return <nav className="flex flex-col gap-0.5">{items.map((i) => <NavLink key={i.href} {...i} active={i.href === activeHref} />)}</nav>;
 }
-function RoleNavWithQuery(props: { items: NavItem[]; base: string; pathname: string }) {
+function RoleNavWithQuery(props: Readonly<{ items: NavItem[]; base: string; pathname: string }>) {
   return <RoleNav {...props} search={useSearchParams().toString()} />; // the search params need a Suspense boundary (static routes)
 }
 
 /** The app frame. In API mode the layout passes `live` (IR241): the organization as the scope label, the signed-in user
 in the chip, the sidebar badges counted by the Core API (no badge for 0) and the user's display language and time
 zone (IR258, IR259); the demo keeps the fixed ones, the language chosen in this browser and Asia/Kuala_Lumpur. */
-export function AppShell({ role: forced, live, children }: { role?: Role; live?: ShellLive; children: React.ReactNode }) {
+export function AppShell({ role: forced, live, children }: Readonly<{ role?: Role; live?: ShellLive; children: React.ReactNode }>) {
   const detected = useStoredRole();
   const role = forced ?? detected;
   const cfg = ROLES[role];

@@ -18,7 +18,7 @@ function useCandidates({ unitIds, from, to }: Period, enabled: boolean) {
 /** “Evidence to attach” of a new report or version (DD-A14 item 6, Figma Admin 324:2, IR349): the chosen attachments as
 chips, and “+ Add evidence” listing the photos of accepted work reports on the draft's units uploaded in its period.
 mrv.saveDraft keeps up to 20. */
-export function EvidencePicker({ ids, onChange, period, units }: { ids: string[]; onChange: (ids: string[]) => void; period: Period; units: Units }) {
+export function EvidencePicker({ ids, onChange, period, units }: Readonly<{ ids: string[]; onChange: (ids: string[]) => void; period: Period; units: Units }>) {
   const i = useI18n();
   const { t } = i;
   const [open, setOpen] = useState(false);
@@ -61,7 +61,7 @@ export function EvidencePicker({ ids, onChange, period, units }: { ids: string[]
 }
 
 /** The evidence of a saved report version by name, unit and upload time; an attachment that is no longer a candidate of the report's units and period keeps its ID. */
-export function EvidenceList({ ids, period, units }: { ids: string[]; period: Period; units: Units }) {
+export function EvidenceList({ ids, period, units }: Readonly<{ ids: string[]; period: Period; units: Units }>) {
   const i = useI18n();
   const { t } = i;
   const cands = useCandidates(period, ids.length > 0);

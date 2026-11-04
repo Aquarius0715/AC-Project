@@ -18,9 +18,26 @@ interface Live { scope: Scope; rows: ContractRow[]; counts: Record<PlanType | "a
 const demoCustomers = [{ id: "customer-a", name: "customer-a" }, { id: "customer-b", name: "customer-b" }];
 const demoRow = (id: string, cust: string, planType: PlanType, unitIds: string[], priceMinor: number, start: string, end: string, eligible: boolean, restrictionIds: string[]): ContractRow => {
   return {
-    id, version: 1, planType, plan: planLabel[planType], customerId: cust, cust, unitIds, units: `${unitIds.length} unit${unitIds.length === 1 ? "" : "s"}`, priceMinor, currency: "MYR",
-    price: money(priceMinor, "MYR"), startAt: `${start}T00:00:00+08:00`, endAt: `${end}T00:00:00+08:00`, start, end, period: `${start} → ${end}`, restrictionEligible: eligible, rulesVersion: eligible ? "demo-v1" : null,
-    restrictionIds, recovery: false,
+    id,
+    planType,
+    cust,
+    unitIds,
+    priceMinor,
+    start,
+    end,
+    restrictionIds,
+    version: 1,
+    plan: planLabel[planType],
+    customerId: cust,
+    units: `${String(unitIds.length)} unit${unitIds.length === 1 ? "" : "s"}`,
+    currency: "MYR",
+    price: money(priceMinor, "MYR"),
+    startAt: `${start}T00:00:00+08:00`,
+    endAt: `${end}T00:00:00+08:00`,
+    period: `${start} → ${end}`,
+    restrictionEligible: eligible,
+    rulesVersion: eligible ? "demo-v1" : null,
+    recovery: false,
   };
 };
 const seedRows = [
@@ -47,7 +64,7 @@ const blankDraft = (customerId = ""): ContractDraft => ({ customerId, unitIds: [
 /** Contract plans (FR-A07). `live` comes from the Server Component in API mode: the scope and the selected contract
 live in the URL, saving is a Server Action that writes a new version and re-renders the route; the demo keeps the
 fixture rows. Texts in the display language; contract dates are Kuala Lumpur days, typed as such (IR300). */
-export function ContractsView({ live }: { live?: Live }) {
+export function ContractsView({ live }: Readonly<{ live?: Live }>) {
   const t = useT();
   const toast = useToast();
   const router = useRouter();
@@ -72,7 +89,7 @@ export function ContractsView({ live }: { live?: Live }) {
   const sel = creating ? null : rows.find((r) => r.id === (live ? live.selectedId : demoSel)) ?? rows[0] ?? null;
 
   // the form restarts from each selected contract version (adjust state during render, not in an effect)
-  const key = creating ? "new" : (sel ? `${sel.id}:${sel.version}` : "none");
+  const key = creating ? "new" : (sel ? `${sel.id}:${String(sel.version)}` : "none");
   const [source, setSource] = useState(key);
   const [d, setD] = useState<ContractDraft>(sel ? draftOf(sel) : blankDraft());
   const [tried, setTried] = useState(false);
@@ -107,7 +124,7 @@ export function ContractsView({ live }: { live?: Live }) {
         setDemoRows((l) => {
           return l.map((r) => {
             return (r.id === sel.id ? {
-              ...r, planType: d.planType, plan: planLabel[d.planType], unitIds: d.unitIds, units: `${d.unitIds.length} unit${d.unitIds.length === 1 ? "" : "s"}`,
+              ...r, planType: d.planType, plan: planLabel[d.planType], unitIds: d.unitIds, units: `${String(d.unitIds.length)} unit${d.unitIds.length === 1 ? "" : "s"}`,
               priceMinor: minor, price: money(minor, d.currency), currency: d.currency, end: d.end, period: `${r.start} → ${d.end}`, version: r.version + 1,
               restrictionEligible: isEligible, rulesVersion: isEligible ? d.rulesVersion.trim() : null,
             } : r);

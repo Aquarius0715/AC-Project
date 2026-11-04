@@ -73,11 +73,22 @@ export function historyRow(j: ApiPartnerJob, now: number, units: Map<string, str
   const delegation = until ? t(Date.parse(until) <= now ? "ended {time}" : "until {time}", { time: showTime(until, display) }) : "—";
   const tab = ACTIVE.has(j.status) ? "active" : j.status === "submitted" ? "review" : j.status === "completed" ? "completed" : null;
   return {
-    id: j.id, short: j.id.slice(0, 8), title: units.get(j.unitId) ?? typeLabel(j.type, t), origin: j.origin ?? null, version: j.version, ended: false, status: j.status, tab, unit: units.get(j.unitId) ?? null,
+    id: j.id,
+    short: j.id.slice(0, 8),
+    title: units.get(j.unitId) ?? typeLabel(j.type, t),
+    origin: j.origin ?? null,
+    version: j.version,
+    ended: false,
+    status: j.status,
+    unit: units.get(j.unitId) ?? null,
     sub: [t(s.count === 1 ? "1 event" : "{n} events", { n: s.count }), t("{n} customer-visible", { n: s.customerVisible }), t(s.notes === 1 ? "1 note" : "{n} notes", { n: s.notes }), t("delegation {state}", { state: delegation })].join(" · "),
-    delegation, tech: tech ? { name: tech, sub: t(ack ? ack : "assigned") } : { name: t("Unassigned"), sub: j.status === "accepted" ? t("assign in Schedule") : "—", tone: j.status === "accepted" ? "crit" : undefined },
-    last, lastAt: last ? Date.parse(last.at) : 0, overdue: isOverdue,
+    tech: tech ? { name: tech, sub: t(ack ? ack : "assigned") } : { name: t("Unassigned"), sub: j.status === "accepted" ? t("assign in Schedule") : "—", tone: j.status === "accepted" ? "crit" : undefined },
+    lastAt: last ? Date.parse(last.at) : 0,
+    overdue: isOverdue,
     badge: isOverdue ? { text: t("Overdue"), tone: "crit" } : { text: statusLabel(j.status, t), tone: STATUS_TONE[j.status] ?? "muted" },
+    tab,
+    delegation,
+    last,
   };
 }
 
@@ -97,7 +108,7 @@ export function eventItem(e: ApiEvent, byUser: Map<string, string>, i: I18n = EN
   const actor = e.actorUserId ? byUser.get(e.actorUserId) ?? null : t("system");
   const detail = [e.note ? `“${e.note.message}” · ${t(e.note.visibility)}` : "", actor ? t("by {name}", { name: actor }) : ""].filter(Boolean).join(" · ");
   const tone = /reviewed|accepted|completed/.test(e.action) ? "ok" : (/rework|cant_make|held|cancel|problem/.test(e.action) ? "warn" : undefined);
-  return { id: e.id, title: eventTitle(e.action, t), detail, at: showTime(e.occurredAt, display), badge: customerVisible(e) ? "customer" : "internal", tone };
+  return { id: e.id, title: eventTitle(e.action, t), at: showTime(e.occurredAt, display), badge: customerVisible(e) ? "customer" : "internal", detail, tone };
 }
 /** Who acted, by user: the company's members by name and the signed-in user as “you”. */
 export const byUser = (members: ApiMember[], me?: string, t: T = en) => new Map([...members.map((m) => [m.userId, m.displayName] as const), ...(me ? [[me, t("you")] as const] : [])]);

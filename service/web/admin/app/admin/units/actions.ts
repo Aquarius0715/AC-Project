@@ -91,7 +91,7 @@ export async function setDefaultRule(policyId: string, ruleKey: string, customer
 // ---- client users (FR-A17): adding (the account at once, IR461), role / sign-in changes with a reason, removal, set-up
 // e-mail again and reset previews ----
 export async function inviteClientUser(customerId: string, email: string, clientRole: "owner" | "member", displayName: string) {
-  return run(() => coreOp<{ id: string }>("clientUsers.save", { customerId, email: email.trim(), clientRole, displayName: displayName.trim() }, write()).then((u) => u.id));
+  return run(() => coreOp<{ id: string }>("clientUsers.save", { customerId, clientRole, email: email.trim(), displayName: displayName.trim() }, write()).then((u) => u.id));
 }
 export async function updateClientUser(id: string, version: number, input: { customerId: string; email: string; clientRole: "owner" | "member"; status?: "active" | "disabled"; reason: string }) {
   return run(() => coreOp("clientUsers.save", { id, ...input, reason: input.reason.trim() }, write(version)).then(() => null));
@@ -126,6 +126,6 @@ export async function importUndo(importId: string, version: number, reason: stri
 
 // ---- warranty (FR-A19) ----
 export async function recordWarrantyClaim(jobId: string, version: number, partLabel: string, amountMinor: number, currency: OpInput<"jobs.recordWarrantyClaim">["currency"], reason: string) {
-  return run(() => coreOp("jobs.recordWarrantyClaim", { jobId, partLabel: partLabel.trim(), amountMinor, currency, reason: reason.trim() }, write(version)).then(() => null));
+  return run(() => coreOp("jobs.recordWarrantyClaim", { jobId, amountMinor, currency, partLabel: partLabel.trim(), reason: reason.trim() }, write(version)).then(() => null));
 }
 

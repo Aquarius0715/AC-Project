@@ -34,7 +34,7 @@ export async function saveReportDraft(conditions: MRVConditions, evidenceIds: st
 
 /** mrv.recordReview of the latest version (a demo review, not external certification). */
 export async function recordReview(reportId: string, version: number, reviewComment: string) {
-  return run(() => coreOp<{ version: number }>("mrv.recordReview", { reportId, reportVersion: version, reviewComment }, { write: true, expectedVersion: version }).then((r) => r.version));
+  return run(() => coreOp<{ version: number }>("mrv.recordReview", { reportVersion: version, reportId, reviewComment }, { write: true, expectedVersion: version }).then((r) => r.version));
 }
 
 /** factors.save: a new factor or the next version (id + the version it was read at). */

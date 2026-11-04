@@ -63,8 +63,8 @@ export function mrvView(p: ApiMRVPreview, orgs: { id: string; name: string }[], 
       [tr("Units"), p.conditions.unitIds.map((id) => unit.get(id) ?? id.slice(0, 8)).join(", ")],
       [tr("Period"), `${klStamp(p.conditions.from)} → ${klStamp(p.conditions.to)} (Asia/Kuala_Lumpur)`],
       [tr("Boundary"), `${p.conditions.boundaryId} — ${p.conditions.boundary}`],
-      [tr("Baseline"), b ? `v${p.conditions.baselineVersion} · ${b.method} · ${b.baselineKWh === null ? tr("no value") : `${one(b.baselineKWh)} kWh`}` : `v${p.conditions.baselineVersion}`],
-      [tr("Emission factor"), f ? `v${p.conditions.factorVersion} · ${f.region} · ${f.year} · ${f.kgCO2ePerKWh} kgCO₂e/kWh` : tr("Calculation incomplete — factor missing")],
+      [tr("Baseline"), b ? `v${String(p.conditions.baselineVersion)} · ${b.method} · ${b.baselineKWh === null ? tr("no value") : `${one(b.baselineKWh)} kWh`}` : `v${String(p.conditions.baselineVersion)}`],
+      [tr("Emission factor"), f ? `v${String(p.conditions.factorVersion)} · ${f.region} · ${String(f.year)} · ${String(f.kgCO2ePerKWh)} kgCO₂e/kWh` : tr("Calculation incomplete — factor missing")],
       [tr("Factor source"), f?.source ?? "—"], [tr("Coverage"), s.coverage],
     ],
   };
@@ -76,7 +76,7 @@ const ref = (s: string) => {
   const [id, v] = s.split("@", 2);
   return { id, version: Number(v) };
 };
-export const versionKey = (id: string, version: number) => `${id}@${version}`;
+export const versionKey = (id: string, version: number) => `${id}@${String(version)}`;
 
 export function mrvDraftErrors(d: MRVDraft, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};

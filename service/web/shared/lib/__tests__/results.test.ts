@@ -107,7 +107,7 @@ function check(): { checked: number; problems: string[] } {
       const visit = (n: ts.Node) => {
         if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && calls.has(n.expression.text) && n.arguments[0] && ts.isStringLiteral(n.arguments[0])) {
           const op = n.arguments[0].text, fn = n.expression.text;
-          const where = `${relative(web, f)}:${sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1} ${op}`;
+          const where = `${relative(web, f)}:${String(sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1)} ${op}`;
           let result = resultOf(op);
           let own: ts.Type | undefined;
           if (n.typeArguments?.length) own = c.getTypeFromTypeNode(n.typeArguments[0]);

@@ -56,14 +56,14 @@ const clearUnit = { unitId: null };
 /** Customers & units (FR-A02) in API mode: the register, then one customer's location tree, units and unit edit. The
 customer, location, unit and unit filters live in the URL; every write is a Server Action and re-renders the page.
 Texts in the display language; the first render's times come formatted from the page (IR293). */
-export function UnitsView({ live }: { live: UnitsLive | null }) {
+export function UnitsView({ live }: Readonly<{ live: UnitsLive | null }>) {
   if (!live) return <NeedsAccess what="Customers & units" permission="asset.read" />; // as every HQ page says it (IR582)
   return live.customer ? <CustomerScreen live={live} c={live.customer} /> : <CustomerList live={live} />;
 }
 
 // ---- the register ----
 
-function CustomerList({ live }: { live: UnitsLive }) {
+function CustomerList({ live }: Readonly<{ live: UnitsLive }>) {
   const t = useT();
   const nav = useUrlPatch();
   const [pending, run] = useAction();
@@ -122,7 +122,7 @@ function CustomerList({ live }: { live: UnitsLive }) {
   );
 }
 
-function CustomerModal({ row, pending, onClose, onSave }: { row?: CustomerRow; pending: boolean; onClose: () => void; onSave: (d: CustomerDraft) => void }) {
+function CustomerModal({ row, pending, onClose, onSave }: Readonly<{ row?: CustomerRow; pending: boolean; onClose: () => void; onSave: (d: CustomerDraft) => void }>) {
   const t = useT();
   const [d, setD] = useState<CustomerDraft>(customerDraft(row));
   const [tried, setTried] = useState(false);
@@ -150,7 +150,7 @@ type ModalState =
   | null | { kind: "customer" } | { kind: "property"; p?: TreeProperty } | { kind: "space"; propertyId: string; parentSpaceId: string | null; spaceKind: TreeSpace["kind"] }
   | { kind: "rename"; p?: TreeProperty; s?: TreeSpace } | { kind: "archive"; p?: TreeProperty; s?: TreeSpace } | { kind: "unit"; propertyId: string; spaceId: string };
 
-function CustomerScreen({ live, c }: { live: UnitsLive; c: CustomerLive }) {
+function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive }>) {
   const t = useT();
   const nav = useUrlPatch();
   const [pending, run] = useAction();
@@ -243,7 +243,7 @@ function CustomerScreen({ live, c }: { live: UnitsLive; c: CustomerLive }) {
   );
 }
 
-function Node({ depth, selected, onClick, icon, name, meta, menu }: { depth: number; selected: boolean; onClick: () => void; icon: IconName; name: string; meta: string; menu?: React.ReactNode }) {
+function Node({ depth, selected, onClick, icon, name, meta, menu }: Readonly<{ depth: number; selected: boolean; onClick: () => void; icon: IconName; name: string; meta: string; menu?: React.ReactNode }>) {
   return (
     <div className={cx("flex items-center gap-1 rounded-lg pr-1", selected ? "bg-primary-soft/60" : "hover:bg-surface2/70")} style={{ paddingLeft: depth * 14 }}>
       <Plain type="button" onClick={onClick} aria-pressed={selected} className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left text-[13px]">
@@ -253,13 +253,13 @@ function Node({ depth, selected, onClick, icon, name, meta, menu }: { depth: num
     </div>
   );
 }
-function SpaceNode({ s, depth, selId, nav, canWrite, setM }: { s: TreeSpace; depth: number; selId: string; nav: Nav; canWrite: boolean; setM: (m: ModalState) => void }) {
+function SpaceNode({ s, depth, selId, nav, canWrite, setM }: Readonly<{ s: TreeSpace; depth: number; selId: string; nav: Nav; canWrite: boolean; setM: (m: ModalState) => void }>) {
   const t = useT();
   const isContainer = s.kind === "floor" || s.kind === "area";
   return (
     <>
       <Node depth={depth} selected={selId === s.id} onClick={() => { nav({ locationId: s.id, ...clearUnit }); }} icon={s.children.length > 0 ? "chevronDown" : "chevronRight"} name={s.name}
-        meta={`${t(kindLabel[s.kind])}${s.units ? ` · ${s.units}` : ""}`} menu={canWrite && <LocationMenu onRename={() => { setM({ kind: "rename", s }); }} onDelete={() => { setM({ kind: "archive", s }); }} />} />
+        meta={`${t(kindLabel[s.kind])}${s.units ? ` · ${String(s.units)}` : ""}`} menu={canWrite && <LocationMenu onRename={() => { setM({ kind: "rename", s }); }} onDelete={() => { setM({ kind: "archive", s }); }} />} />
       {s.children.map((x) => <SpaceNode key={x.id} s={x} depth={depth + 1} selId={selId} nav={nav} canWrite={canWrite} setM={setM} />)}
       {canWrite && isContainer && <AddLink depth={depth + 1} onClick={() => { setM({ kind: "space", propertyId: s.propertyId, parentSpaceId: s.id, spaceKind: "room" }); }}><Icon name="add" /> {t("Add room")}</AddLink>}
     </>
@@ -270,7 +270,7 @@ const AddLink = ({ depth, onClick, children }: { depth: number; onClick: () => v
     <Plain touch type="button" onClick={onClick} className="block py-1 text-left text-[12px] font-semibold text-primary pointer-coarse:justify-start" style={{ paddingLeft: depth * 14 + 8 }}>{children}</Plain>
   );
 };
-function LocationMenu({ onRename, onDelete }: { onRename: () => void; onDelete: () => void }) {
+function LocationMenu({ onRename, onDelete }: Readonly<{ onRename: () => void; onDelete: () => void }>) {
   const t = useT();
   return (
     <ActionMenu label={t("Location actions")} onChoose={(v) => (v === "rename" ? onRename() : v === "delete" && onDelete())}>
@@ -279,7 +279,7 @@ function LocationMenu({ onRename, onDelete }: { onRename: () => void; onDelete: 
   );
 }
 
-function LocationCard({ c, sel, canWrite, active, setM }: { c: CustomerLive; sel: Selection; canWrite: boolean; active: boolean; setM: (m: ModalState) => void }) {
+function LocationCard({ c, sel, canWrite, active, setM }: Readonly<{ c: CustomerLive; sel: Selection; canWrite: boolean; active: boolean; setM: (m: ModalState) => void }>) {
   const t = useT();
   if (sel.kind === "unassigned") {
     return <Card title={t("Unassigned")} sub={t("{property} · units without a room or floor", { property: sel.property.name })}><p className="text-[13px] text-muted-foreground">{t("These units belong to the property but no floor or room. Open a unit and pick its space under Location.")}</p></Card>;
@@ -307,7 +307,7 @@ function LocationCard({ c, sel, canWrite, active, setM }: { c: CustomerLive; sel
   );
 }
 
-function UnitsCard({ c, sel, nav, canWrite, onNew }: { c: CustomerLive; sel: Selection; nav: Nav; canWrite: boolean; onNew: () => void }) {
+function UnitsCard({ c, sel, nav, canWrite, onNew }: Readonly<{ c: CustomerLive; sel: Selection; nav: Nav; canWrite: boolean; onNew: () => void }>) {
   const t = useT();
   const [q, setQ] = useState(c.filter.search);
   const rows = c.units.filter((u) => !q.trim() || u.name.toLowerCase().includes(q.trim().toLowerCase()) || u.id.toLowerCase().includes(q.trim().toLowerCase()));
@@ -346,10 +346,10 @@ function UnitsCard({ c, sel, nav, canWrite, onNew }: { c: CustomerLive; sel: Sel
 
 // ---- unit edit ----
 
-function UnitEdit({ live, c, x, nav, run, pending }: { live: UnitsLive; c: CustomerLive; x: UnitLive; nav: Nav; run: Run; pending: boolean }) {
+function UnitEdit({ live, c, x, nav, run, pending }: Readonly<{ live: UnitsLive; c: CustomerLive; x: UnitLive; nav: Nav; run: Run; pending: boolean }>) {
   const t = useT();
   const u = x.u;
-  const key = `${u.id}:${u.version}`;
+  const key = `${u.id}:${String(u.version)}`;
   const [source, setSource] = useState(key);
   const [d, setD] = useState<UnitDraft>(unitDraft(u));
   const [tried, setTried] = useState(false);
@@ -441,7 +441,7 @@ function UnitEdit({ live, c, x, nav, run, pending }: { live: UnitsLive; c: Custo
 
 // ---- alert policies tab ----
 
-function PoliciesTab({ c, run, pending }: { c: CustomerLive; run: Run; pending: boolean }) {
+function PoliciesTab({ c, run, pending }: Readonly<{ c: CustomerLive; run: Run; pending: boolean }>) {
   const t = useT();
   const router = useRouter();
   if (!c.policies) return <EmptyState title={t("Alert policies need alert.policy.read")}>{t("Ask an identity administrator for Alert policies access.")}</EmptyState>;
@@ -478,7 +478,7 @@ function PoliciesTab({ c, run, pending }: { c: CustomerLive; run: Run; pending: 
 
 // ---- modals ----
 
-function PropertyModal({ p, pending, onClose, onSave }: { p?: TreeProperty; pending: boolean; onClose: () => void; onSave: (d: PropertyDraft) => void }) {
+function PropertyModal({ p, pending, onClose, onSave }: Readonly<{ p?: TreeProperty; pending: boolean; onClose: () => void; onSave: (d: PropertyDraft) => void }>) {
   const t = useT();
   const [d, setD] = useState<PropertyDraft>(propertyDraft(p));
   const [tried, setTried] = useState(false);
@@ -496,7 +496,7 @@ function PropertyModal({ p, pending, onClose, onSave }: { p?: TreeProperty; pend
   );
 }
 
-function SpaceModal({ c, init, pending, onClose, onSave }: { c: CustomerLive; init: { propertyId: string; parentSpaceId: string | null; spaceKind: TreeSpace["kind"] }; pending: boolean; onClose: () => void; onSave: (x: { propertyId: string; parentSpaceId: string | null; kind: TreeSpace["kind"]; name: string }) => void }) {
+function SpaceModal({ c, init, pending, onClose, onSave }: Readonly<{ c: CustomerLive; init: { propertyId: string; parentSpaceId: string | null; spaceKind: TreeSpace["kind"] }; pending: boolean; onClose: () => void; onSave: (x: { propertyId: string; parentSpaceId: string | null; kind: TreeSpace["kind"]; name: string }) => void }>) {
   const t = useT();
   const [propertyId, setPropertyId] = useState(init.propertyId);
   const [parent, setParent] = useState(init.parentSpaceId ?? "");
@@ -507,7 +507,7 @@ function SpaceModal({ c, init, pending, onClose, onSave }: { c: CustomerLive; in
   const parents = p ? flatten(p.spaces) : [];
   const e = nameError(name, t);
   return (
-    <Modal open onClose={onClose} title={t("Add location")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!e) onSave({ propertyId, parentSpaceId: parent || null, kind, name: name.trim() }); }}>{t(addKind[kind])}</Btn></>}>
+    <Modal open onClose={onClose} title={t("Add location")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!e) onSave({ propertyId, kind, parentSpaceId: parent || null, name: name.trim() }); }}>{t(addKind[kind])}</Btn></>}>
       <div className="flex flex-col gap-3">
         <Field label={t("Property")}><Select value={propertyId} onChange={(x) => { setPropertyId(x.target.value); setParent(""); }}>{c.tree.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Select></Field>
         <Field label={t("Kind · required")} hint={t("floor · area · room · space (under the parent you pick)")}><Select value={kind} onChange={(x) => { setKind(x.target.value as TreeSpace["kind"]); }}>{(["floor", "area", "room", "space"] as const).map((k) => <option key={k} value={k}>{t(kindLabel[k])}</option>)}</Select></Field>
@@ -521,7 +521,7 @@ function SpaceModal({ c, init, pending, onClose, onSave }: { c: CustomerLive; in
   );
 }
 
-function RenameModal({ name, where, pending, onClose, onSave }: { name: string; where: string; pending: boolean; onClose: () => void; onSave: (name: string) => void }) {
+function RenameModal({ name, where, pending, onClose, onSave }: Readonly<{ name: string; where: string; pending: boolean; onClose: () => void; onSave: (name: string) => void }>) {
   const t = useT();
   const [v, setV] = useState(name);
   const [tried, setTried] = useState(false);
@@ -537,7 +537,7 @@ function RenameModal({ name, where, pending, onClose, onSave }: { name: string; 
   );
 }
 
-function ArchiveLocationModal({ p, s, pending, onClose, onSave }: { p?: TreeProperty; s?: TreeSpace; pending: boolean; onClose: () => void; onSave: (reason: string) => void }) {
+function ArchiveLocationModal({ p, s, pending, onClose, onSave }: Readonly<{ p?: TreeProperty; s?: TreeSpace; pending: boolean; onClose: () => void; onSave: (reason: string) => void }>) {
   const t = useT();
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
@@ -557,7 +557,7 @@ function ArchiveLocationModal({ p, s, pending, onClose, onSave }: { p?: TreeProp
   );
 }
 
-function NewUnitModal({ live, c, init, pending, onClose, onSave }: { live: UnitsLive; c: CustomerLive; init: { propertyId: string; spaceId: string }; pending: boolean; onClose: () => void; onSave: (d: UnitDraft) => void }) {
+function NewUnitModal({ live, c, init, pending, onClose, onSave }: Readonly<{ live: UnitsLive; c: CustomerLive; init: { propertyId: string; spaceId: string }; pending: boolean; onClose: () => void; onSave: (d: UnitDraft) => void }>) {
   const t = useT();
   const [d, setD] = useState<UnitDraft>({ ...unitDraft(undefined, init.propertyId, init.spaceId), modelId: c.models[0]?.id ?? "" });
   const [tried, setTried] = useState(false);
@@ -588,7 +588,7 @@ function NewUnitModal({ live, c, init, pending, onClose, onSave }: { live: Units
   );
 }
 
-function RelocateModal({ u, from, to, pending, onClose, onSave }: { u: ApiUnitDetail; from: string; to: string; pending: boolean; onClose: () => void; onSave: (reason: string) => void }) {
+function RelocateModal({ u, from, to, pending, onClose, onSave }: Readonly<{ u: ApiUnitDetail; from: string; to: string; pending: boolean; onClose: () => void; onSave: (reason: string) => void }>) {
   const t = useT();
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
@@ -604,7 +604,7 @@ function RelocateModal({ u, from, to, pending, onClose, onSave }: { u: ApiUnitDe
   );
 }
 
-function DeleteUnitModal({ x, pending, onClose, onArchive, onDelete }: { x: UnitLive; pending: boolean; onClose: () => void; onArchive: (reason: string) => void; onDelete: (reason: string) => void }) {
+function DeleteUnitModal({ x, pending, onClose, onArchive, onDelete }: Readonly<{ x: UnitLive; pending: boolean; onClose: () => void; onArchive: (reason: string) => void; onDelete: (reason: string) => void }>) {
   const t = useT();
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
@@ -634,7 +634,7 @@ function DeleteUnitModal({ x, pending, onClose, onArchive, onDelete }: { x: Unit
   );
 }
 
-function AttachModal({ c, unit, attached, pending, onClose, onSave }: { c: CustomerLive; unit: string; attached: string[]; pending: boolean; onClose: () => void; onSave: (ids: string[]) => void }) {
+function AttachModal({ c, unit, attached, pending, onClose, onSave }: Readonly<{ c: CustomerLive; unit: string; attached: string[]; pending: boolean; onClose: () => void; onSave: (ids: string[]) => void }>) {
   const t = useT();
   const [pick, setPick] = useState<string[]>([]);
   const options = (c.policies ?? []).filter((p) => p.kind === "alert");
@@ -660,7 +660,7 @@ function AttachModal({ c, unit, attached, pending, onClose, onSave }: { c: Custo
 
 // ---- client users (FR-A17) ----
 
-function UsersTab({ live, c, run, pending }: { live: UnitsLive; c: CustomerLive; run: Run; pending: boolean }) {
+function UsersTab({ live, c, run, pending }: Readonly<{ live: UnitsLive; c: CustomerLive; run: Run; pending: boolean }>) {
   const t = useT();
   const [invite, setInvite] = useState(false);
   const [change, setChange] = useState<null | { u: ClientUserRow; kind: "role" | "status" | "remove" | "signout" }>(null);
@@ -708,7 +708,7 @@ function UsersTab({ live, c, run, pending }: { live: UnitsLive; c: CustomerLive;
 }
 
 /** Adds a client user: the account is created at once and gets a set-up e-mail (IR461). */
-function InviteModal({ c, pending, onClose, onSave }: { c: CustomerLive; pending: boolean; onClose: () => void; onSave: (email: string, role: "owner" | "member", name: string) => void }) {
+function InviteModal({ c, pending, onClose, onSave }: Readonly<{ c: CustomerLive; pending: boolean; onClose: () => void; onSave: (email: string, role: "owner" | "member", name: string) => void }>) {
   const t = useT();
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -727,7 +727,7 @@ function InviteModal({ c, pending, onClose, onSave }: { c: CustomerLive; pending
   );
 }
 
-function ClientUserModal({ change, pending, onClose, onSave }: { change: { u: ClientUserRow; kind: "role" | "status" | "remove" | "signout" }; pending: boolean; onClose: () => void; onSave: (role: "owner" | "member", reason: string) => void }) {
+function ClientUserModal({ change, pending, onClose, onSave }: Readonly<{ change: { u: ClientUserRow; kind: "role" | "status" | "remove" | "signout" }; pending: boolean; onClose: () => void; onSave: (role: "owner" | "member", reason: string) => void }>) {
   const t = useT();
   const { u, kind } = change;
   const [role, setRole] = useState<"owner" | "member">(u.role === "owner" ? "member" : "owner");
@@ -761,7 +761,7 @@ function download(name: string, text: string) {
   URL.revokeObjectURL(url);
 }
 
-function WarrantyTab({ live }: { live: UnitsLive }) {
+function WarrantyTab({ live }: Readonly<{ live: UnitsLive }>) {
   const t = useT();
   const [pending, run] = useAction();
   const [f, setF] = useState<CoverageFilter>({ customerId: "", coverage: "", within: "" });
@@ -824,7 +824,7 @@ function WarrantyTab({ live }: { live: UnitsLive }) {
   );
 }
 
-function ClaimModal({ x, pending, onClose, onSave }: { x: ClaimCandidate; pending: boolean; onClose: () => void; onSave: (label: string, amountMinor: number, reason: string) => void }) {
+function ClaimModal({ x, pending, onClose, onSave }: Readonly<{ x: ClaimCandidate; pending: boolean; onClose: () => void; onSave: (label: string, amountMinor: number, reason: string) => void }>) {
   const t = useT();
   const [label, setLabel] = useState(x.partLabel);
   const [value, setValue] = useState(x.amountMinor ? (x.amountMinor / 100).toFixed(2) : "");
@@ -846,7 +846,7 @@ function ClaimModal({ x, pending, onClose, onSave }: { x: ClaimCandidate; pendin
 
 // ---- CSV import (FR-A18) ----
 
-function ImportWizard({ live, onClose }: { live: UnitsLive; onClose: () => void }) {
+function ImportWizard({ live, onClose }: Readonly<{ live: UnitsLive; onClose: () => void }>) {
   const i = useI18n(), { t } = i;
   const [pending, run] = useAction();
   const [customerId, setCustomerId] = useState(live.activeCustomers[0]?.id ?? "");
@@ -863,7 +863,7 @@ function ImportWizard({ live, onClose }: { live: UnitsLive; onClose: () => void 
   const pick = async (f: File | undefined) => {
     if (!f) return;
     const text = await f.text();
-    setFile({ name: f.name, text, size: f.size });
+    setFile({ name: f.name, size: f.size, text });
     setMapping(autoMapping(csvShape(text).header));
     setPreview(null);
   };
@@ -880,7 +880,7 @@ function ImportWizard({ live, onClose }: { live: UnitsLive; onClose: () => void 
         <div className="flex flex-col gap-3">
           <Banner tone={result.state === "undone" ? "warn" : "ok"}>{result.state === "undone"
             ? t("The imported units, rooms and properties are archived again and their devices unbound.")
-            : t("{units} created for {customer} · {locations} and {properties} added · {rows} skipped.", { units: units(t, result.createdUnitIds.length), customer, locations: count(t, result.createdSpaceIds.length, "1 location", "{n} locations"), properties: count(t, result.createdPropertyIds.length, "1 property", "{n} properties"), rows: count(t, result.skippedRowNumbers.length, "1 row", "{n} rows") })}</Banner>
+            : t("{units} created for {customer} · {locations} and {properties} added · {rows} skipped.", { units: units(t, result.createdUnitIds.length), locations: count(t, result.createdSpaceIds.length, "1 location", "{n} locations"), properties: count(t, result.createdPropertyIds.length, "1 property", "{n} properties"), rows: count(t, result.skippedRowNumbers.length, "1 row", "{n} rows"), customer })}</Banner>
           {result.state === "imported" && <SummaryList items={[[t("Skipped rows"), result.skippedRowNumbers.join(", ") || t("none")], [t("Undo possible until"), t("{time} — only while no unit has telemetry or jobs", { time: showTime(result.undoUntil, i.display) })]]} />}
           {isUndoable && <>
             <Field label={t("Undo reason")} error={tried && reasonError(undoReason, t) ? reasonError(undoReason, t) : undefined}><Textarea rows={2} value={undoReason} onChange={(v) => { setUndoReason(v.target.value); }} /></Field>

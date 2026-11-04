@@ -9,7 +9,7 @@ import { i18nOf } from "@ac/web/lib/i18n";
 const NOW = "2026-09-21T01:30:00Z"; // Mon 09:30 in Kuala Lumpur
 const now = Date.parse(NOW);
 const slot = (s: string, e: string) => ({ startAt: s, endAt: e });
-const offer = (id: string, status: "offered" | "accepted", exp = "2026-09-21T17:00:00Z"): ApiPartnerJob => ({ projection: "offer", status, jobId: id, jobVersion: 2, offerId: `o-${id}`, type: "reactive", siteAddress: "Jalan 1, KL", requestedSlot: slot("2026-09-22T01:00:00Z", "2026-09-22T03:00:00Z"), dueAt: "2026-09-24T10:00:00Z", offerExpiresAt: exp, visitSlot: slot("2026-09-22T01:00:00Z", "2026-09-22T03:00:00Z") });
+const offer = (id: string, status: "offered" | "accepted", exp = "2026-09-21T17:00:00Z"): ApiPartnerJob => ({ projection: "offer", jobId: id, jobVersion: 2, offerId: `o-${id}`, type: "reactive", siteAddress: "Jalan 1, KL", requestedSlot: slot("2026-09-22T01:00:00Z", "2026-09-22T03:00:00Z"), dueAt: "2026-09-24T10:00:00Z", offerExpiresAt: exp, visitSlot: slot("2026-09-22T01:00:00Z", "2026-09-22T03:00:00Z"), status });
 const summary = (id: string, status: string, over: Partial<Extract<ApiPartnerJob, { projection: "summary" }>> = {}): ApiPartnerJob => ({ projection: "summary", id, eventSummary: { count: 0, customerVisible: 0, notes: 0, latest: null }, version: 3, unitId: `u-${id}`, type: "periodic", status, dueAt: "2026-09-25T00:00:00Z", requestedSlot: slot("2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z"), scheduledSlot: null, assignmentId: null, displayStatus: status, technicianMembershipId: null, ...over });
 const members: ApiMember[] = [
   { id: "m-a", userId: "user-a", displayName: "tech-external-a", role: "technician", qualifications: [{ code: "demo_refrigerant", revokedAt: null }] },
@@ -107,7 +107,7 @@ describe("partner overview", () => {
       { id: "m-f", userId: "user-f", displayName: "until next month", role: "technician", validUntil: "2026-10-21T00:00:00Z" },
     ];
     expect(onTeam(team, now).map((m) => m.id)).toEqual(["m-a", "m-b", "m-f"]); // no coordinator, no revoked or ended access
-    const day = (id: string, assignedMinutes: number): ApiCapacity => ({ membershipId: id, date: "2026-09-21", availableSlots: [], assignedSlots: assignedMinutes ? [slot("2026-09-21T06:00:00Z", "2026-09-21T08:00:00Z")] : [], availableMinutes: 480, assignedMinutes, unavailability: id === "m-f" ? "annual_leave" : null });
+    const day = (id: string, assignedMinutes: number): ApiCapacity => ({ membershipId: id, date: "2026-09-21", availableSlots: [], assignedSlots: assignedMinutes ? [slot("2026-09-21T06:00:00Z", "2026-09-21T08:00:00Z")] : [], availableMinutes: 480, unavailability: id === "m-f" ? "annual_leave" : null, assignedMinutes });
     const crew = onTeam(team, now);
     expect(capacity([[day("m-a", 0), day("m-b", 120), day("m-f", 0)]], crew).map((r) => r.id)).toEqual(["m-b", "m-a", "m-f"]); // most assigned first, then by name
     expect(timeline([day("m-a", 0), day("m-b", 120), day("m-f", 0)], crew, "2026-09-21").map((r) => r.id)).toEqual(["m-b", "m-f", "m-a"]); // work, then away, then free

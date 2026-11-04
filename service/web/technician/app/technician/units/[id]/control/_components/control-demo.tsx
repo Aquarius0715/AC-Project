@@ -6,7 +6,7 @@ import { Banner, Btn, Card, Field, Input, Modal, Page, Select, SummaryList, Text
 import { Icon } from "@ac/web/components/Icon";
 
 /** The Phase 1A demo of diagnostic control (fixtures; DATA_SOURCE=API uses ControlView). */
-export function ControlDemo({ id }: { id: string }) {
+export function ControlDemo({ id }: Readonly<{ id: string }>) {
   const toast = useToast();
   const isRestricted = id === "unit-limited";
   const [reason, setReason] = useState("Confirming mode change resolves reported airflow complaint.");

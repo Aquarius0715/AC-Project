@@ -14,7 +14,7 @@ const acts: [A, string, string, string][] = [
 ];
 
 /** The Phase 1A demo of the exception screen (fixture restriction). */
-export function ExceptionDemo({ id }: { id: string }) {
+export function ExceptionDemo({ id }: Readonly<{ id: string }>) {
   const toast = useToast();
   const [act, setAct] = useState<A>("exempt");
   const [until, setUntil] = useState("2026-10-15");
@@ -35,7 +35,7 @@ export function ExceptionDemo({ id }: { id: string }) {
           <Card title="Choose an action" sub="restrictions.defer / exempt / cancel / override">
             <div className="grid-fluid" style={{ ["--min"as string]: "220px" }}>{acts.map(([k, l, op, d]) => <Plain key={k} disabled={k === "override" && !hasOverride} onClick={() => { setAct(k); }} aria-pressed={act === k} className={`rounded-xl border p-3 text-left disabled:opacity-50 ${act === k ? "border-primary bg-primary-soft/60" : "border-line hover:bg-surface2"}`}><b className="text-[13px]">{l}</b><div className="font-mono text-[10px] text-muted-foreground">{op}</div><div className="mt-1 text-xs text-muted-foreground">{d}</div></Plain>)}</div>
             {isNeedsDate && <div className="mt-4 max-w-xs"><Field label="Exception until · required, future" error={dateErr} hint="Expiry does not reapply the restriction automatically — conditions are checked again"><Input type="date" value={until} onChange={(e) => { setUntil(e.target.value); }} /></Field></div>}
-            <div className="mt-3"><Field label="Reason · required" error={tried && !reason.trim() ? "A reason is required" : undefined} hint={`${reason.length} / 1000`}><Textarea value={reason} onChange={(e) => { setReason(e.target.value); }} /></Field></div>
+            <div className="mt-3"><Field label="Reason · required" error={tried && !reason.trim() ? "A reason is required" : undefined} hint={`${String(reason.length)} / 1000`}><Textarea value={reason} onChange={(e) => { setReason(e.target.value); }} /></Field></div>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><Check label="demo: I hold restriction.override" checked={hasOverride} onChange={setHasOverride} /><Btn variant={act === "override" ? "danger" : "primary"} disabled={done} onClick={run}>Apply {acts.find((a) => a[0] === act)![1].toLowerCase()}</Btn></div>
           </Card>
           <Card title="What happens"><ul className="list-disc pl-5 text-[13px]"><li>State: applied → release_requested; a remove command is sent to unit-limited</li><li>Released only after the unit confirms (per-unit evidence)</li><li>invoice-overdue-a stays unpaid — billing is not settled</li><li>Before/after, expiry, reason and your name are recorded in the audit log</li></ul></Card>

@@ -20,7 +20,7 @@ import { InvoiceDemo } from "./_components/invoice-demo";
 import { InvoiceView, type InvoiceLive } from "./_components/invoice-view";
 
 
-export default async function CustomerInvoicePage({ params, searchParams }: PageProps<"/customer/payments/[id]">) {
+export default async function CustomerInvoicePage({ params, searchParams }: Readonly<PageProps<"/customer/payments/[id]">>) {
   interface Reminder { id: string; channel: string; occurredAt: string; target: { kind: string; id: string } }
   interface Unit { id: string; displayName: string; propertyId: string; spaceId: string | null }
   const { id } = await params;
@@ -75,7 +75,10 @@ export default async function CustomerInvoicePage({ params, searchParams }: Page
   }
   const st = invoiceStatus(inv, now);
   const live: InvoiceLive = {
-    tab, otherZone: display.timeZone !== KL, whatsapp: whatsappReady,
+    tab,
+    restriction,
+    otherZone: display.timeZone !== KL,
+    whatsapp: whatsappReady,
     invoice: {
       id: inv.id, version: inv.version, number: inv.number, amount: amount(inv.amountMinor, inv.currency),
       due: t("Due {date} · billing period {month}", { date: businessDay(inv.dueAt, loc), month: billingMonth(inv.period.from, loc) }), dueDate: businessDay(inv.dueAt, loc), status: st, payable: st === "Unpaid" || st === "Overdue",
@@ -84,9 +87,11 @@ export default async function CustomerInvoicePage({ params, searchParams }: Page
       name: contract.name, id: contract.id,
       scope: `${t(contract.units.length === 1 ? "{n} unit" : "{n} units", { n: contract.units.length })}${contract.units.length > 0 ? ` (${contract.units.map((u) => u.name).join(", ")})` : ""}`,
     },
-    payments: paymentLines(inv.paymentRefs, i18n), open: open && { id: open.id, version: open.version, status: open.status, method: open.method },
+    payments: paymentLines(inv.paymentRefs, i18n),
+    open: open && { id: open.id, version: open.version, status: open.status, method: open.method },
     last: last && { status: last.status, reference: last.paymentReference, method: last.method, id: last.id },
-    restriction, inquiries: inquiryLines(inquiries, i18n), inquiryId: one("inquiryId") ?? null,
+    inquiries: inquiryLines(inquiries, i18n),
+    inquiryId: one("inquiryId") ?? null,
     reminders: reminders.map((n) => ({ id: n.id, channel: n.channel, at: showDate(n.occurredAt, display) })),
   };
   return <InvoiceView live={live} />;

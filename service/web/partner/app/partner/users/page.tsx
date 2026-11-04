@@ -10,7 +10,7 @@ import { klDate } from "@ac/web/lib/partnerTeam";
 import { UsersDemo } from "./_components/users-demo";
 import { UsersLive } from "./_components/users-live";
 
-export default async function PartnerUsersPage({ searchParams }: PageProps<"/partner/users">) {
+export default async function PartnerUsersPage({ searchParams }: Readonly<PageProps<"/partner/users">>) {
   await connection();
   if (!apiMode()) return <UsersDemo />;
   const sp = await searchParams;
@@ -21,5 +21,5 @@ export default async function PartnerUsersPage({ searchParams }: PageProps<"/par
   ]);
   if (!all) return <UsersLive live={null} />;
   const rows = partnerUserRows(all, me.membershipId, i18nOf(display), now);
-  return <UsersLive live={{ company: identity.organizationName, status, rows: status ? rows.filter((r) => r.status === status) : rows, all: all.map((u) => ({ id: u.id, email: u.email })), today: klDate(now.toISOString()) }} />;
+  return <UsersLive live={{ company: identity.organizationName, rows: status ? rows.filter((r) => r.status === status) : rows, all: all.map((u) => ({ id: u.id, email: u.email })), today: klDate(now.toISOString()), status }} />;
 }

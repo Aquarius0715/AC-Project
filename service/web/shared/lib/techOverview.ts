@@ -76,9 +76,20 @@ export function techRow(j: ApiTechJobRow, now: number, units: Map<string, string
   const left = s && !isBefore && !isEnded && (j.status === "assigned" || j.status === "in_progress") ? Math.ceil((Date.parse(s.endAt) - now) / 60_000) : null;
   const ending = left !== null && left <= WARN_MINUTES ? t("window ends in {n} min", { n: left }) : "";
   return {
-    id: j.id, short: j.id.slice(0, 8), title: units.get(j.unitId) ?? t("Unit"), origin: j.origin ?? null, status: j.status, severity: j.severity,
-    line: [typeLabel(j.type, t), s ? t("window {slot}", { slot: slotText }) : "", alert, note, ending].filter(Boolean).join(" · "), badge, today: isToday(s, now), slot: s, slotText,
-    ackPending: j.status === "assigned" && ack === "pending", opensAt: isBefore && s ? s.startAt : null, opens,
+    id: j.id,
+    short: j.id.slice(0, 8),
+    title: units.get(j.unitId) ?? t("Unit"),
+    origin: j.origin ?? null,
+    status: j.status,
+    severity: j.severity,
+    line: [typeLabel(j.type, t), s ? t("window {slot}", { slot: slotText }) : "", alert, note, ending].filter(Boolean).join(" · "),
+    today: isToday(s, now),
+    slot: s,
+    ackPending: j.status === "assigned" && ack === "pending",
+    opensAt: isBefore && s ? s.startAt : null,
+    badge,
+    slotText,
+    opens,
   };
 }
 
@@ -101,10 +112,10 @@ export function dayTimeline(rows: TechJobRow[], now: number): { hours: string[];
   const pct = (ms: number) => Math.min(100, Math.max(0, ((ms - day) / 3_600_000 - START_H) / (END_H - START_H) * 100));
   const blocks = rows.filter((r) => r.today && r.slot).map((r) => {
     const left = pct(Date.parse(r.slot!.startAt)), right = pct(Date.parse(r.slot!.endAt));
-    return { id: r.id, short: r.short, left, width: Math.max(right - left, 2), text: `${windowText(r.slot!, now)} · ${r.short}`, current: r.status === "in_progress" };
+    return { id: r.id, short: r.short, width: Math.max(right - left, 2), text: `${windowText(r.slot!, now)} · ${r.short}`, current: r.status === "in_progress", left };
   });
   const n = ((now - day) / 3_600_000);
-  return { hours: ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00"], blocks, nowPct: n >= START_H && n <= END_H ? pct(now) : null, now: hhmm(new Date(now).toISOString()) };
+  return { hours: ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00"], nowPct: n >= START_H && n <= END_H ? pct(now) : null, now: hhmm(new Date(now).toISOString()), blocks };
 }
 
 export interface AlertRow { id: string; title: string; sub: string; severity: ApiAlert["severity"]; href: string }

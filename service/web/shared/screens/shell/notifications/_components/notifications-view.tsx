@@ -26,7 +26,7 @@ const readFailure = (f: ActionFailure, t: T) => {
 };
 
 /** The inbox. `rows` come from the Server Component in API mode; without them the Phase 1A demo rows are shown. */
-export function NotificationsView({ rows }: { rows?: InboxRow[] }) {
+export function NotificationsView({ rows }: Readonly<{ rows?: InboxRow[] }>) {
   const t = useT();
   const role = useStoredRole();
   const live = useNotes(role);

@@ -21,7 +21,7 @@ const cellTone: Record<WeekCell["kind"], string> = {
 activeOnly, the technicians with the chosen day, the team's week, the qualification grants and unavailable days —
 added in a dialog, listed while upcoming and removed from a chosen day on (IR612).
 Texts in the user's display language; every date and time comes formatted from the loader (IR276). */
-export function TeamView({ live }: { live: TeamLive }) {
+export function TeamView({ live }: Readonly<{ live: TeamLive }>) {
   const t = useT();
   const [tab, setTab] = useUrlTab<"members" | "certs">({ members: "overview", certs: "certifications" }, "members");
   const tabs = <div><Tabs value={tab} onChange={setTab} tabs={[{ id: "members", label: t("Members") }, { id: "certs", label: t("Certifications") }]} /></div>;
@@ -39,7 +39,7 @@ export function TeamView({ live }: { live: TeamLive }) {
   return <Team live={live} tab={tab} tabs={tabs} />;
 }
 
-function Team({ live, tab, tabs }: { live: Live; tab: "members" | "certs"; tabs: React.ReactNode }) {
+function Team({ live, tab, tabs }: Readonly<{ live: Live; tab: "members" | "certs"; tabs: React.ReactNode }>) {
   const t = useT();
   const patch = useUrlPatch();
   const [open, setOpen] = useState(false);
@@ -136,7 +136,7 @@ function Team({ live, tab, tabs }: { live: Live; tab: "members" | "certs"; tabs:
 /** Remove unavailable days (IR612): from the row's first day — or today, once it has started — all of it goes; a later
 day keeps the days before it. The effect is said before the confirm; members.clearUnavailability sends the row's
 version, so a row someone changed meanwhile is refused and the list reloads. */
-function RemoveDays({ row, open, onClose }: { row: UnavailabilityRow; open: boolean; onClose: () => void }) {
+function RemoveDays({ row, open, onClose }: Readonly<{ row: UnavailabilityRow; open: boolean; onClose: () => void }>) {
   const t = useT();
   const locale = useLocale();
   const [pending, run] = useAction();
@@ -166,7 +166,7 @@ function RemoveDays({ row, open, onClose }: { row: UnavailabilityRow; open: bool
   );
 }
 
-function WeekCard({ live }: { live: Live }) {
+function WeekCard({ live }: Readonly<{ live: Live }>) {
   const t = useT();
   const w = live.week;
   return (
@@ -199,7 +199,7 @@ function WeekCard({ live }: { live: Live }) {
 
 /** Add unavailable days (Figma 04-8): technician or the whole company, Kuala Lumpur days, type and note; the confirmed
 assignments in the days are listed before saving and kept by the save (DD-P06). */
-function UnavailableDays({ live, onClose }: { live: Live; onClose: () => void }) {
+function UnavailableDays({ live, onClose }: Readonly<{ live: Live; onClose: () => void }>) {
   const t = useT();
   const [pending, run] = useAction();
   const [form, setForm] = useState<UnavailabilityForm>({ membershipId: live.technicians[0]?.id ?? "", from: live.query.date, to: live.query.date, type: "annual_leave", note: "" });

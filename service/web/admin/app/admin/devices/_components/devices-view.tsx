@@ -25,7 +25,7 @@ export interface DevicesLive {
 
 /** The device registry in API mode: the tab, the selected device and campaign live in the URL; each tab reads its data
 on the server and writes through Server Actions. Texts in the display language (IR295). */
-export function DevicesView({ live }: { live: DevicesLive }) {
+export function DevicesView({ live }: Readonly<{ live: DevicesLive }>) {
   const t = useT();
   const nav = useUrlPatch();
   return (

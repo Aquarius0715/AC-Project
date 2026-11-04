@@ -23,7 +23,7 @@ const seedPolicies = [
 ];
 
 /** Alerts and alert policies of the Phase 1A demo (seed rows); API mode renders AlertsLiveView (alerts-live.tsx). */
-export function AlertsView({ rows = seed }: { rows?: Alert[] }) {
+export function AlertsView({ rows = seed }: Readonly<{ rows?: Alert[] }>) {
   const [tab, setTab] = useUrlTab<"alerts" | "policies">({ alerts: "overview", policies: "policies" }, "alerts");
   // local list (read flags) restarts from each new remote result: adjust state during render, not in an effect
   const [list, setList] = useState(rows);

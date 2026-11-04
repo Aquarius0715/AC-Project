@@ -10,7 +10,7 @@ import { Icon } from "@ac/web/components/Icon";
 context with its access window, past work, alert evidence, readings and the last 24 hours — or, after the
 delegation, the job's history snapshot. Texts in the user's display language; the times come formatted from the
 loader (IR280). */
-export function PartnerUnitDetail({ live }: { live: UnitLive }) {
+export function PartnerUnitDetail({ live }: Readonly<{ live: UnitLive }>) {
   const t = useT();
   if (live.kind === "snapshot") {
     return (

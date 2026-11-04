@@ -30,7 +30,7 @@ const minute = (ms: number) => new Date(ms).toISOString().slice(0, 16) + ":00Z";
 /** A metric over the window, whole: the hourly averages of its valid readings (bucketMinutes, IR605, IR608) — up to 400
 of the newest readings covered only the last hours of the day. */
 async function series(unitId: string, metric: OpInput<"telemetry.series">["metric"], from: number, to: number): Promise<Point[]> {
-  const r = await coreOp<SeriesPage>("telemetry.series", { from: minute(from), to: minute(to), unitIds: [unitId], metric, bucketMinutes: 60, query: {} });
+  const r = await coreOp<SeriesPage>("telemetry.series", { from: minute(from), to: minute(to), unitIds: [unitId], bucketMinutes: 60, query: {}, metric });
   return (r.buckets ?? []).filter((b) => b.count > 0).map((b) => ({ value: b.value, observedAt: b.start }));
 }
 
@@ -45,8 +45,12 @@ export async function loadUnit(id: string, jobId?: string) {
     const h = await coreOp<ApiPartnerJobDetail>("jobs.get", { jobId }).catch((error) => { if (gone(error)) return null; throw error; });
     if (!h || h.projection !== "history") return null;
     return {
-      kind: "snapshot" as const, id, jobId: h.jobId, title: t("Job history snapshot — {id}", { id: h.jobId.slice(0, 8) }), rows: snapshotRows(h, i),
+      kind: "snapshot" as const,
+      jobId: h.jobId,
+      title: t("Job history snapshot — {id}", { id: h.jobId.slice(0, 8) }),
+      rows: snapshotRows(h, i),
       banner: t("Access to this unit ended {when} (delegation period). Reading it again was refused, and live values are not shown any more.", { when: showTime(h.asOf, display) }),
+      id,
     };
   }
   const [alerts, jobs, members] = await Promise.all([
@@ -60,11 +64,17 @@ export async function loadUnit(id: string, jobId?: string) {
   const names = new Map(members.map((m) => [m.id, m.displayName]));
   const unitOf = (m: string) => d.latestMeasurements.find((x) => x.metric === m)?.unit ?? "";
   return {
-    kind: "live" as const, id, name: d.displayName,
+    kind: "live" as const,
+    name: d.displayName,
     banner: job ? t("Diagnosis-scoped view for {job} — no billing, payments, or other contracts.", { job: job.id.slice(0, 8) }) : t("Diagnosis-scoped view for your accepted job — no billing, payments, or other contracts."),
-    register: registerRows(d, i), context: job ? jobContext(job, names, nowMs, i) : null, past: pastWork(jobs, i), alerts: evidenceRows(alerts, i), readings: readingRows(d, i),
+    register: registerRows(d, i),
+    context: job ? jobContext(job, names, nowMs, i) : null,
+    past: pastWork(jobs, i),
+    alerts: evidenceRows(alerts, i),
+    readings: readingRows(d, i),
     charts: metrics.map((m, k) => chart(m, unitOf(m), points[k], nowMs, i)),
-    window: showSpan(new Date(nowMs - 86_400_000).toISOString(), now.toISOString(), display), // the charts' last 24 hours
+    window: showSpan(new Date(nowMs - 86_400_000).toISOString(), now.toISOString(), display),
+    id,
   };
 }
 

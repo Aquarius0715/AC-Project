@@ -23,7 +23,7 @@ export function useTechJobs(today = false): TechRow[] {
   return [...rows, ...tjobs.filter((t) => !today || t.today)];
 }
 
-export function JobList({ jobs }: { jobs: TechRow[] }) {
+export function JobList({ jobs }: Readonly<{ jobs: TechRow[] }>) {
   if (jobs.length === 0) return <EmptyState title="No assigned jobs today">Jobs assigned to you appear here.</EmptyState>;
   return (
     <div className="flex flex-col gap-2">

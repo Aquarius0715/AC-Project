@@ -49,7 +49,7 @@ describe("HQ device registry", () => {
   it("words the runner's results and each wave's state (BR-A20, IR339)", () => {
     expect([resultReason("errors.device_offline"), resultReason("errors.install_timeout"), resultReason("error.checksum_mismatch"), resultReason(null)])
       .toEqual(["Skipped — offline", "Failed — no answer within 60 s; the old version is kept", "checksum mismatch", ""]);
-    const r = (waveIndex: number, status: ApiCampaign["results"][number]["status"]) => ({ deviceId: `d${waveIndex}${status}`, waveIndex, status, reasonKey: null, at: null });
+    const r = (waveIndex: number, status: ApiCampaign["results"][number]["status"]) => ({ deviceId: `d${String(waveIndex)}${status}`, reasonKey: null, at: null, waveIndex, status });
     const waves = [{ label: "Pilot", percent: 34 }, { label: "All", percent: 100 }, { label: "Rest", percent: 100 }];
     const results = [r(0, "succeeded"), r(0, "succeeded"), r(1, "succeeded"), r(1, "failed"), r(2, "pending")];
     expect(waveStates({ waves, results, state: "running" })).toEqual(["done", "running", "waiting"]);

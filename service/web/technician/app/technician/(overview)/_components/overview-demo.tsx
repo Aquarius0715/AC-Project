@@ -8,7 +8,7 @@ import { JobList, useTechJobs } from "@ac/web/components/TechJobList";
 import { Icon } from "@ac/web/components/Icon";
 
 /** The Phase 1A demo of the technician overview (fixture jobs and the in-browser job store). */
-export function OverviewDemo({ tab: initial }: { tab?: string }) {
+export function OverviewDemo({ tab: initial }: Readonly<{ tab?: string }>) {
   const [tab, setTab] = useState<"today" | "all">(initial === "all" ? "all" : "today");
   const all = useTechJobs();
   const jobs = tab === "today" ? all.filter((j) => j.today) : all;

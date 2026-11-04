@@ -17,7 +17,7 @@ const grid: [string, string, string[]][] = [["tech-external-a", "Refrigerant · 
 const days = ["Mon 21", "Tue 22", "Wed 23", "Thu 24", "Fri 25", "Sat 26", "Sun 27"];
 
 /** The Phase 1A demo of the schedule (fixture jobs and the in-browser job store). */
-export function ScheduleDemo({ jobId }: { jobId?: string }) {
+export function ScheduleDemo({ jobId }: Readonly<{ jobId?: string }>) {
   const toast = useToast();
   const store = useJobs();
   const live = store.filter((j) => j.contractor === "contractor-a" && (j.status === "accepted" || j.status === "assigned") && staticJobs.every((s) => s.id !== j.id));

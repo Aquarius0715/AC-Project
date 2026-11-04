@@ -12,7 +12,7 @@ import { Icon } from "@ac/web/components/Icon";
 maintenance history and open alerts, the latest values and one metric over a period — the metric and the period in
 the URL (`metric` opens Monitoring, `period`). Texts in the user's display language; the times come formatted from
 the loader (IR283). */
-export function TechUnitView({ live }: { live: UnitLive }) {
+export function TechUnitView({ live }: Readonly<{ live: UnitLive }>) {
   const t = useT();
   const patch = useUrlPatch();
   const setPeriod = (p: Period) => { patch({ period: p === "24h" ? null : p }); };
@@ -99,7 +99,7 @@ export function TechUnitView({ live }: { live: UnitLive }) {
   );
 }
 
-function TileBox({ tile }: { tile: Tile }) {
+function TileBox({ tile }: Readonly<{ tile: Tile }>) {
   return (
     <div className="rounded-xl bg-surface2 p-3">
       <div className="text-[11px] text-muted-foreground">{tile.label}</div>
@@ -109,7 +109,7 @@ function TileBox({ tile }: { tile: Tile }) {
   );
 }
 
-function Series({ chart }: { chart: SeriesChart }) {
+function Series({ chart }: Readonly<{ chart: SeriesChart }>) {
   const t = useT();
   return (
     <div className="mt-3">

@@ -17,7 +17,7 @@ export function PaymentsDemo() {
   return (
     <Page>
       <div className="split-rev">
-        <Card title={`CONTRACTS (${contracts.length})`} className="self-start">
+        <Card title={`CONTRACTS (${String(contracts.length)})`} className="self-start">
           <div className="flex flex-col gap-2">{contracts.map((c) => <ListRow key={c.id} selected={sel.id === c.id} onClick={() => { setSel(c); }}><div className="min-w-0"><b>{c.name}</b><div className="truncate text-xs text-muted-foreground">{c.sub}</div></div></ListRow>)}</div>
           <p className="mt-3 text-[11px] text-muted-foreground">Contract expiry does not stop monitoring or control.</p>
         </Card>
@@ -27,7 +27,7 @@ export function PaymentsDemo() {
             <h3 className="mt-4 mb-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Contract scope — equipment this contract relates to</h3>
             <div className="flex flex-col divide-y divide-line">{sel.units.map(([n, l]) => <div key={n} className="flex flex-wrap items-center justify-between gap-2 py-2 text-[13px]"><span><b>{n}</b><span className="block text-xs text-muted-foreground">{l}</span></span><TextLink href="/customer/properties">View unit <Icon name="chevronRight" /></TextLink></div>)}</div>
           </Card>
-          <Card title="Invoices for this contract" sub={`${sel.invoices.length} invoices`}>
+          <Card title="Invoices for this contract" sub={`${String(sel.invoices.length)} invoices`}>
             <div className="flex flex-col gap-2">
               {sel.invoices.map(([id, due, amt, st]) => (
                 <div key={id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3">

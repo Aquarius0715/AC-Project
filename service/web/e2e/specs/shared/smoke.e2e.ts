@@ -36,13 +36,13 @@ async function crawl(page: Page, app: App, lang = "en", wideFont = false, touch 
     if (!res || res.status() >= 400 || FAILED_PAGE.test(text)) out.failed.push(`${path} (${res?.status() ?? "no response"})`);
     for (const v of await axeViolations(page)) out.inaccessible.push(`${path}: ${v}`);
     const sideways = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-    if (sideways > 1) out.wide.push(`${path}: ${sideways}px`);
+    if (sideways > 1) out.wide.push(`${path}: ${String(sideways)}px`);
     if (touch) { // a shared control under the 44 px touch target (IR615)
       const small = await page.locator(TOUCH_CONTROLS).evaluateAll((els) => {
         return els.flatMap((el) => {
           const r = el.getBoundingClientRect();
           const name = (el.getAttribute("aria-label") ?? el.textContent ?? "").trim().slice(0, 30);
-          return r.width > 0 && r.height > 0 && r.height < 43.5 ? [`${el.getAttribute("data-slot")} "${name}" ${Math.round(r.height)}px`] : [];
+          return r.width > 0 && r.height > 0 && r.height < 43.5 ? [`${el.getAttribute("data-slot")} "${name}" ${String(Math.round(r.height))}px`] : [];
         });
       });
       for (const x of small) out.small.push(`${path}: ${x}`);

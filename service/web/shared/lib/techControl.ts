@@ -30,7 +30,7 @@ export function actionCode(a: CommandAction): string {
   switch (a.kind) {
     case "set_power": { return `set_power = ${a.power ? "ON" : "OFF"}`;
     }
-    case "set_temperature": { return `set_temperature = ${a.celsius} °C`;
+    case "set_temperature": { return `set_temperature = ${String(a.celsius)} °C`;
     }
     case "set_mode": { return `set_mode = ${a.mode}`;
     }
@@ -38,7 +38,7 @@ export function actionCode(a: CommandAction): string {
     }
     case "ventilate": { return `ventilate = ${a.level}`;
     }
-    case "apply_restriction": { return `apply_restriction = ${a.policy.kind === "power_off" ? "power_off" : `min ${a.policy.minimumCoolingSetpoint} °C`}`;
+    case "apply_restriction": { return `apply_restriction = ${a.policy.kind === "power_off" ? "power_off" : `min ${String(a.policy.minimumCoolingSetpoint)} °C`}`;
     }
     case "remove_restriction": { return "remove_restriction";
     }
@@ -62,7 +62,7 @@ export function historyRows(cs: ApiCommandRow[], runs: ApiRun[], i: I18n = EN): 
     const badge = isStart && run?.state === "running" ? { text: t("Running"), tone: "primary" as const }
       : c.status === "acknowledged" ? { text: t("Acked"), tone: "ok" as const } : c.status === "failed" ? { text: t("Rejected"), tone: "crit" as const }
       : c.status === "expired" ? { text: t("No response"), tone: "crit" as const } : c.status === "cancelled" ? { text: t("Cancelled"), tone: "muted" as const } : { text: t("Waiting"), tone: "warn" as const };
-    return { id: c.id, at: clock(c.requestedAt, i), title, sub: `${c.id.slice(0, 8)} · ${outcome}${ends}`, badge, run: !!run };
+    return { id: c.id, at: clock(c.requestedAt, i), sub: `${c.id.slice(0, 8)} · ${outcome}${ends}`, run: !!run, title, badge };
   });
 }
 
@@ -106,7 +106,7 @@ export function stateTiles(d: { observedState: { power: boolean | null; celsius:
   return [
     { label: t("Power"), value: o.power === null ? t("Unknown") : t(o.power ? "On" : "Off") },
     { label: t("Mode"), value: o.mode ? word(o.mode, MODE_LABEL, t) : "—" },
-    { label: t("Setpoint"), value: o.celsius === null ? "—" : `${o.celsius} °C` },
+    { label: t("Setpoint"), value: o.celsius === null ? "—" : `${String(o.celsius)} °C` },
     { label: t("Fan"), value: o.fanLevel ? word(o.fanLevel, FAN_LABEL, t) : "—" },
     { label: t("Room"), value: room && room.value !== null ? `${airNumber("temperature", room.value)} °C${room.quality === "valid" ? "" : ` (${t(QUALITY[room.quality] ?? room.quality)})`}` : "—", warn: !!room && room.value !== null && room.value >= 30 },
   ];
@@ -122,7 +122,7 @@ export const windowText = (from: string, to: string, i: I18n = EN) => showSpan(f
 export function capabilityText(d: Pick<ApiUnitDetail, "capabilities" | "capabilityVersion">, t: T = en): string {
   const c = d.capabilities;
   const list = [
-    c.modeControl && c.modes.length > 0 ? `set_mode (${c.modes.join("/")})` : null, c.temperature ? `set_temperature ${c.temperature.min}–${c.temperature.max} °C` : null,
+    c.modeControl && c.modes.length > 0 ? `set_mode (${c.modes.join("/")})` : null, c.temperature ? `set_temperature ${String(c.temperature.min)}–${String(c.temperature.max)} °C` : null,
     c.fanControl && c.fanLevels.length > 0 ? `set_fan (${c.fanLevels.join("/")})` : null, t("test run 1–15 min"),
   ].filter(Boolean).join(", ");
   return t("Capability v{version} allows: {list}.", { version: d.capabilityVersion, list });

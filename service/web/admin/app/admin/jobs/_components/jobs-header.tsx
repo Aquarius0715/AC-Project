@@ -13,7 +13,7 @@ const keep = (q: Scope, extra: Record<string, string> = {}) => {
 
 /** The tabs of /admin/jobs with their counts and the tab's create button (Figma 06-1, 283:2); the customer → property →
 unit scope is shared, so the tab links keep it (DD-A06 item 5). Texts in the display language (IR290). */
-export function JobsTabs({ tab, counts, q, action }: { tab: string; counts: { jobs: number; plans: number; contractors: number }; q: Scope; action?: React.ReactNode }) {
+export function JobsTabs({ tab, counts, q, action }: Readonly<{ tab: string; counts: { jobs: number; plans: number; contractors: number }; q: Scope; action?: React.ReactNode }>) {
   const t = useT();
   const tabs = [{ id: "jobs", label: "Jobs", count: counts.jobs }, { id: "plans", label: "Plans", count: counts.plans }, { id: "contractors", label: "Contractors", count: counts.contractors }, { id: "sla", label: "SLA by customer" }];
   return (
@@ -30,7 +30,7 @@ type Clear = "jobId" | "planId" | "alertId" | "policyId" | "new" | "from";
 
 /** The scope selects; changing one clears the narrower ones and the selection (`clear`: the selected job, plan, alert
 or policy, or a new policy's draft). `children` follow the count on the right (the Policies tab's Show disabled). */
-export function ScopeBar({ scope, q, text, clear, children }: { scope: { customers: { id: string; name: string }[]; properties: { id: string; name: string }[]; units: { id: string; name: string }[] }; q: Scope; text: string; clear: Clear | Clear[]; children?: React.ReactNode }) {
+export function ScopeBar({ scope, q, text, clear, children }: Readonly<{ scope: { customers: { id: string; name: string }[]; properties: { id: string; name: string }[]; units: { id: string; name: string }[] }; q: Scope; text: string; clear: Clear | Clear[]; children?: React.ReactNode }>) {
   const t = useT();
   const patch = useUrlPatch();
   const cleared = Object.fromEntries((Array.isArray(clear) ? clear : [clear]).map((k) => [k, null]));

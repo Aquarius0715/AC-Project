@@ -16,7 +16,7 @@ const unit = {
   id: "u1", displayName: "Bedroom AC", location: { pathLabels: ["Home A", "1F", "Bedroom"], address: null, accessInstructions: null },
   latestMeasurements: [{ id: "m1", unitId: "u1", sensorId: "s", metric: "temperature", value: 30.4, unit: "°C", observedAt: "2026-09-14T01:35:00Z", origin: "measured", quality: "valid", qualityReason: null }],
 } as unknown as ApiUnitDetail;
-const ctx = { alerts: [base, earlier], unit, job: { id: "job-t07-0000", type: "preventive" }, canResolve: false };
+const ctx = { alerts: [base, earlier], job: { id: "job-t07-0000", type: "preventive" }, canResolve: false, unit };
 
 describe("technician alert evidence", () => {
   it("words the rule that raised the alert (IR284, D08)", () => {

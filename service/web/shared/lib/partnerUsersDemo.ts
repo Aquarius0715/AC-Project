@@ -44,7 +44,7 @@ export const partnerUserDemo = {
   invite(email: string, role: PartnerRole, now: string, name = "", accessUntil: string | null = null) {
     const us = load();
     if (us.some((u) => u.email.toLowerCase() === email.trim().toLowerCase())) return "errors.email_taken";
-    const id = `pu-${Date.now()}`;
+    const id = `pu-${String(Date.now())}`;
     save([...us, { id, version: 1, organizationId: ORG, membershipId: `m-${id}`, email: email.trim(), displayName: name.trim() || null, partnerRole: role, status: "invited", lastSignInAt: null,
       accessUntil: role === "technician" ? accessUntil : null, invitedAt: now, invitedByMembershipId: DEMO_SELF }]);
     return;

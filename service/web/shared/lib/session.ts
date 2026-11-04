@@ -100,8 +100,12 @@ export function sessionFromTokens(t: { access_token: string; refresh_token?: str
   // own keys only: `in` would also accept inherited names such as "constructor"
   if (!claims.tenant_id || !claims.membership_id || typeof role !== "string" || !Object.hasOwn(roleHome, role)) return null;
   return {
-    accessToken: t.access_token, refreshToken: t.refresh_token ?? previousRefresh, tenantId: String(claims.tenant_id), membershipId: String(claims.membership_id),
-    role, expiresAt: Math.floor(Date.now() / 1000) + t.expires_in,
+    accessToken: t.access_token,
+    refreshToken: t.refresh_token ?? previousRefresh,
+    tenantId: String(claims.tenant_id),
+    membershipId: String(claims.membership_id),
+    expiresAt: Math.floor(Date.now() / 1000) + t.expires_in,
+    role,
   };
 }
 

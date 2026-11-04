@@ -8,7 +8,7 @@ const ms = translator("ms");
 const NOW = Date.parse("2026-09-15T01:30:00Z"); // Tue 09:30 in Kuala Lumpur
 const KL = (d: string) => `${d}T00:00:00+08:00`;
 const member = (id: string, name: string, quals: { code: string; validUntil: string }[], validUntil: string | null = null): ApiTeamMember =>
-  ({ id, userId: `u-${id}`, organizationId: "org-a", displayName: name, role: "technician", employment: "external", validFrom: KL("2025-04-01"), validUntil, qualifications: quals.map((q) => ({ ...q, validFrom: KL("2025-04-01"), revokedAt: null })) });
+  ({ id, validUntil, userId: `u-${id}`, organizationId: "org-a", displayName: name, role: "technician", employment: "external", validFrom: KL("2025-04-01"), qualifications: quals.map((q) => ({ ...q, validFrom: KL("2025-04-01"), revokedAt: null })) });
 const a = member("m-a", "tech-external-a", [{ code: "demo_outdoor", validUntil: KL("2027-03-31") }, { code: "demo_electrical", validUntil: KL("2026-10-15") }]);
 const b = member("m-b", "tech-external-b", [], KL("2026-08-01"));
 const cert = (id: string, over: Partial<ApiCert>): ApiCert => {

@@ -31,7 +31,7 @@ export interface AirLive {
 /** Air quality (FR-C07) in API mode: the room's sensor readings with read-time quality, the IR99 guidance, the IR98
 allergen observation, the series of one metric and the manual ventilation log (IR110 — nothing is sent to the AC).
 Texts in the user's display language (IR266). */
-export function AirQualityView({ live }: { live: AirLive | null }) {
+export function AirQualityView({ live }: Readonly<{ live: AirLive | null }>) {
   const t = useT();
   const patch = useUrlPatch();
   const router = useRouter();
@@ -125,7 +125,7 @@ export function AirQualityView({ live }: { live: AirLive | null }) {
 }
 
 /** Log ventilation (Figma Client 05c): room, method, duration and the current CO2 the record keeps (co2AtLog). */
-function LogModal({ spaceId, unitId, path, co2Now, onClose }: { spaceId: string; unitId: string; path: string; co2Now: string | null; onClose: () => void }) {
+function LogModal({ spaceId, unitId, path, co2Now, onClose }: Readonly<{ spaceId: string; unitId: string; path: string; co2Now: string | null; onClose: () => void }>) {
   const t = useT();
   const [pending, run] = useAction();
   const [method, setMethod] = useState<VentMethod>("window_opened");

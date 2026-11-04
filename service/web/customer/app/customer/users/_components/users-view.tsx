@@ -21,7 +21,7 @@ const API_FIELDS: Record<string, FieldKey> = { displayName: "name", email: "emai
 account exists at once and the sign-in service e-mails the set-up link), resends that e-mail until they sign in,
 changes roles, disables / enables and removes users, each change after the adding with a reason; the own row has no
 actions and the last active owner cannot be demoted, disabled or removed. Texts in the display language. */
-export function UsersView({ live }: { live: { customerId: string; customer: string; rows: ClientUserRow[]; all: { id: string; email: string }[] } | null }) {
+export function UsersView({ live }: Readonly<{ live: { customerId: string; customer: string; rows: ClientUserRow[]; all: { id: string; email: string }[] } | null }>) {
   type Role = "owner" | "member";
   const t = useT();
   const [pending, run] = useAction();

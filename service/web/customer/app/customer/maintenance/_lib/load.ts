@@ -39,7 +39,7 @@ export async function loadMaintenance(sp: Record<string, string | string[] | und
   const active = units.filter((u) => !u.archived);
   // new=<unitId>: open New request for that unit (an alert's “Request repair”, Figma Client 06g)
   const newFor = active.some((u) => u.id === one(sp.new)) ? one(sp.new)! : null;
-  const common = { now: now.toISOString(), display, page, owner: me.clientRole === "owner", newFor, units: active.map((u) => ({ id: u.id, ...unitOf(u.id) })) };
+  const common = { now: now.toISOString(), owner: me.clientRole === "owner", units: active.map((u) => ({ id: u.id, ...unitOf(u.id) })), display, page, newFor };
   if (page === "filters") {
     const [items, settings] = await Promise.all([coreAll<ApiFilterStatus>("filterCare.list"), coreOp<ApiFilterSettings>("filterCare.getSettings", {})]);
     const lines = filterLines(items, units.map((u) => ({ id: u.id, ...unitOf(u.id), spaceId: u.spaceId, connection: u.connection })), nowMs, i);
@@ -78,7 +78,7 @@ export async function loadMaintenance(sp: Record<string, string | string[] | und
       history: [...events].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)).slice(0, 8).map((e) => ({ id: e.id, time: showTime(e.occurredAt, display), title: e.note ? t(e.actorUserId === me.userId ? "You added a note" : "Note from the coordinator") : clientEventTitle(e.action, jobEventTitle, t) })),
       report: report ? {
         version: report.version, accepted: report.acceptedAt ? showTime(report.acceptedAt, display) : null, items: inspectionRows(report.items, t).map((r) => ({ id: r.id, label: r.label, result: r.result ? t(resultText[r.result].label) : "—", tone: r.result ? resultText[r.result].tone : "muted", reason: r.reason })),
-        readings: readingRows(report.measurements, t), parts: report.parts.map((p) => `${p.name} × ${p.quantity}`), workText: report.workText, photos,
+        readings: readingRows(report.measurements, t), parts: report.parts.map((p) => `${p.name} × ${String(p.quantity)}`), workText: report.workText, photos,
       } : null,
     },
   };

@@ -61,12 +61,20 @@ export function inboxAlerts(alerts: ApiAlert[], notes: AlertNote[], unit: (id: s
       : (a.status === "acknowledged" ? { state: "acknowledged" as const, text: t("Acknowledged"), tone: "primary" as const, detail: a.acknowledgedAt ? t("Acknowledged {when} · still unresolved", { when: stamp(a.acknowledgedAt) }) : t("Acknowledged · still unresolved") }
       : { state: "open" as const, text: t("Unresolved"), tone: a.severity === "normal" ? "muted" as const : "warn" as const, detail: t("Open — not resolved yet") });
     return {
-      id: a.id, unitId: a.unitId, type: a.type, title: alertTitle(a, t), severity: a.severity,
-      cause: kindOf(a), kind: t(kindLabel[kindOf(a)]), kindIcon: kindIcon[kindOf(a)],
+      id: a.id,
+      unitId: a.unitId,
+      type: a.type,
+      title: alertTitle(a, t),
+      severity: a.severity,
+      cause: kindOf(a),
+      kind: t(kindLabel[kindOf(a)]),
+      kindIcon: kindIcon[kindOf(a)],
       where: t("{where} · detected {when}", { where: u ? `${u.name}${u.place ? ` · ${u.place}` : ""}` : "AC", when: stamp(a.detectedAt) }),
       evidence: `${t(evidenceLabel[a.evidenceKind] ?? "Evidence")}: ${evidenceText(a.evidenceText, t)}`,
-      group: attn(a) ? "attn" : "info", status,
-      unread: mine.filter((n) => n.readAt === null).map((n) => ({ id: n.id, version: n.version })), notes: mine.length,
+      group: attn(a) ? "attn" : "info",
+      unread: mine.filter((n) => n.readAt === null).map((n) => ({ id: n.id, version: n.version })),
+      notes: mine.length,
+      status,
     };
   });
 }

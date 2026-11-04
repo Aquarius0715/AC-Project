@@ -75,7 +75,7 @@ export function HistoryDemo() {
                   <p className="text-[11px] text-muted-foreground">No real sending. Free-form external recipients and other-job recipients are rejected. Internal notes stay hidden from customers.</p>
                 </div>
               </Card>
-              <Card title={`Previews on ${job} (${previews.length})`}>{previews.map((p, i) => <div key={i} className="border-t border-line py-2 text-[13px] first:border-0"><b>{p.k}</b><div className="text-xs text-muted-foreground">{p.d}</div></div>)}<p className="mt-1 text-[11px] text-muted-foreground">deliveryState stays “preview” — nothing is sent in phase 1A.</p></Card>
+              <Card title={`Previews on ${job} (${String(previews.length)})`}>{previews.map((p, i) => <div key={i} className="border-t border-line py-2 text-[13px] first:border-0"><b>{p.k}</b><div className="text-xs text-muted-foreground">{p.d}</div></div>)}<p className="mt-1 text-[11px] text-muted-foreground">deliveryState stays “preview” — nothing is sent in phase 1A.</p></Card>
             </div>
           </div>
         </>

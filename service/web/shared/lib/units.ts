@@ -56,7 +56,7 @@ export function controlLayout(cap: ApiUnitDetail["capabilities"] | null): Contro
   if (!cap.control) return { control: false, temperature: null, modes: [], fans: [], review: false };
   const modes = cap.modeControl ? cap.modes : [];
   const fans = cap.fanControl ? cap.fanLevels : [];
-  return { control: true, temperature: cap.temperature, modes, fans, review: cap.temperature !== null || modes.length > 0 || fans.length > 0 };
+  return { control: true, temperature: cap.temperature, review: cap.temperature !== null || modes.length > 0 || fans.length > 0, modes, fans };
 }
 
 /** Whether the unit page's remote control sets the model's temperature (its temperature row): only then do other

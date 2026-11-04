@@ -30,7 +30,7 @@ const API_FIELDS: Record<string, FieldKey> = { displayName: "name", email: "emai
 
 /** Users (FR-P11, IR461): the contractor's company accounts, with the actions each row allows; one dialog at a time
 (add, access end, disable, enable, remove), each change after the adding with a reason. */
-export function UsersView({ data, ops, onStatus, sends = false }: { data: UsersData | null; ops: UsersOps; onStatus: (s: PartnerStatus | null) => void; sends?: boolean }) {
+export function UsersView({ data, ops, onStatus, sends = false }: Readonly<{ data: UsersData | null; ops: UsersOps; onStatus: (s: PartnerStatus | null) => void; sends?: boolean }>) {
   const t = useT();
   const [pending, run] = useAction();
   const [dialog, setDialog] = useState<Dialog | null>(null);

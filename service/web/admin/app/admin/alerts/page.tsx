@@ -19,15 +19,19 @@ const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((error)
 const SEVERITIES: Severity[] = ["critical", "warning", "normal"];
 const STATES: AlertState[] = ["open", "acknowledged", "resolved"];
 
-export default async function AdminAlertsPage({ searchParams }: PageProps<"/admin/alerts">) {
+export default async function AdminAlertsPage({ searchParams }: Readonly<PageProps<"/admin/alerts">>) {
   interface Page<T> { items: T[] }
   await connection();
   if (!apiMode()) return <AdminAlertsView />;
   const sp = await searchParams;
   const severity = SEVERITIES.find((s) => s === one(sp.severity)) ?? null;
   const q = {
-    customerId: one(sp.customerId), propertyId: one(sp.propertyId), unitId: one(sp.unitId), severity,
-    status: STATES.find((s) => s === one(sp.status)) ?? "open", alertId: one(sp.alertId) ?? null,
+    customerId: one(sp.customerId),
+    propertyId: one(sp.propertyId),
+    unitId: one(sp.unitId),
+    status: STATES.find((s) => s === one(sp.status)) ?? "open",
+    alertId: one(sp.alertId) ?? null,
+    severity,
   };
   const scope = { ...(q.customerId && { customerId: q.customerId }), ...(q.propertyId && { propertyId: q.propertyId }), ...(q.unitId && { unitId: q.unitId }) };
   const filters = { ...scope, ...(severity && { severity }) };
@@ -63,7 +67,7 @@ export default async function AdminAlertsPage({ searchParams }: PageProps<"/admi
   return (
     <AdminAlertsView
       live={{
-        tab: sp.tab === "policies" ? "policies" : "alerts", q,
+        tab: sp.tab === "policies" ? "policies" : "alerts",
         scope: {
           customers: customers.items.map((c) => ({ id: c.id, name: c.name })),
           properties: properties.filter((p) => !custOrg || p.customerOrgId === custOrg).map((p) => ({ id: p.id, name: p.name })),
@@ -77,6 +81,7 @@ export default async function AdminAlertsPage({ searchParams }: PageProps<"/admi
           customers: customers.items.filter((c) => c.status !== "inactive").map((c) => ({ id: c.id, name: c.name })),
           units: units.items.filter((u) => !u.archived).map((u) => ({ id: u.id, name: u.displayName, customerId: custByOrg.get(u.customerOrgId) ?? null })),
         },
+        q,
       }}
     />
   );

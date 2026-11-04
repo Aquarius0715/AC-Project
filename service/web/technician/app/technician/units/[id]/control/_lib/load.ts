@@ -31,15 +31,18 @@ export async function loadControl(unitId: string, jobId: string | null) {
     const job = jobId ? await coreOp<JobRead>("jobs.get", { jobId }).catch(() => null) : null;
     const start = job?.projection === "detail" ? job.assignment?.scheduledStart ?? null : null;
     return {
-      kind: "not_started" as const, title: t("Not started yet"), back: t("Unit"), unitHref,
+      kind: "not_started" as const,
+      title: t("Not started yet"),
+      back: t("Unit"),
       text: start ? t("Diagnostic control opens at {time}, when your work window starts.", { time: showTime(start, display) }) : t("Available from the work start time of your assigned job."),
+      unitHref,
     };
   }
   const unit = {
     id: d.id, name: d.displayName, version: d.version, connection: d.connection, tiles: stateTiles(d, t), observed: observedText(d.observedState.observedAt, i), pending: d.pendingCommands.length,
     options: actionOptions(d.capabilities, t), capabilityText: `${capabilityText(d, t)} ${connectionText(d.connection, t)}`, restriction: restrictionText(d, t), blocked: blockedText(d, t), current: stateTiles(d, t).filter((x, k) => k < 4).map((x) => x.value).join(" · "),
   };
-  const base = { kind: "live" as const, unitHref, unit, canDiagnose: perms.has("control.diagnose") };
+  const base = { kind: "live" as const, canDiagnose: perms.has("control.diagnose"), unitHref, unit };
   if (!jobId) return { ...base, job: null, run: null, banner: null, active: false, history: [] };
   const read = await coreOp<JobRead>("jobs.get", { jobId }).catch((error) => { if (gone(error)) return null; throw error; });
   const job = read?.projection === "detail" ? read : null;

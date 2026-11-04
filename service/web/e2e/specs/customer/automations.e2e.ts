@@ -29,7 +29,7 @@ test("a schedule previews its next runs, is saved off and deleted", async ({ pag
   await page.goto("/customer/automations");
   await page.getByRole("button", { name: "Create automation" }).first().click();
   await page.waitForURL(/automationId=new/);
-  const name = `E2E schedule ${Date.now()}`;
+  const name = `E2E schedule ${String(Date.now())}`;
   await page.getByLabel("Name").fill(name);
   // the default schedule (weekdays 18:00 → 22:00) in the Preferences zone: each run with its end time
   const runs = page.getByText("Next runs", { exact: true }).locator("..");

@@ -27,7 +27,7 @@ export interface MRVLive {
 /** The digital MRV demo workspace (FR-A14) in API mode: filters, the selected report and version live in the URL;
 previews, drafts, demo reviews and factor versions are Server Actions. Every figure stays "Demo — unverified". Texts
 in the display language; report periods are typed and shown in Kuala Lumpur time, which the labels name (IR297). */
-export function MRVView({ live }: { live: MRVLive }) {
+export function MRVView({ live }: Readonly<{ live: MRVLive }>) {
   const t = useT();
   const nav = useUrlPatch();
   return (
@@ -38,7 +38,7 @@ export function MRVView({ live }: { live: MRVLive }) {
   );
 }
 
-function FiguresGrid({ v }: { v: Figures }) {
+function FiguresGrid({ v }: Readonly<{ v: Figures }>) {
   const t = useT();
   if (v.incomplete) return <Banner tone="warn">{t("Calculation incomplete — a factor, the boundary or full coverage is missing, so nothing is shown as zero.")}</Banner>;
   const tiles: [string, string, string][] = [
@@ -56,7 +56,7 @@ function FiguresGrid({ v }: { v: Figures }) {
   );
 }
 
-function Reports({ live, r }: { live: MRVLive; r: NonNullable<MRVLive["reports"]> }) {
+function Reports({ live, r }: Readonly<{ live: MRVLive; r: NonNullable<MRVLive["reports"]> }>) {
   const i = useI18n(), { t } = i;
   const nav = useUrlPatch();
   const [pending, run] = useAction();
@@ -146,13 +146,13 @@ function Reports({ live, r }: { live: MRVLive; r: NonNullable<MRVLive["reports"]
   );
 }
 
-function Factors({ live }: { live: MRVLive }) {
+function Factors({ live }: Readonly<{ live: MRVLive }>) {
   const t = useT();
   const [pending, run] = useAction();
   const [selId, setSelId] = useState<string | "new">(live.factors[0]?.id ?? "new");
   const sel = selId === "new" ? null : live.factors.find((f) => f.id === selId) ?? live.factors[0] ?? null;
   const blank: FactorDraft = { region: "", year: "2026", kgCO2ePerKWh: "", source: t("Demo (fictional)") };
-  const key = sel ? `${sel.id}:${sel.version}` : "new";
+  const key = sel ? `${sel.id}:${String(sel.version)}` : "new";
   const [source, setSource] = useState(key);
   const [d, setD] = useState<FactorDraft>(sel ? { region: sel.region, year: String(sel.year), kgCO2ePerKWh: String(sel.kgCO2ePerKWh), source: sel.source } : blank);
   const [tried, setTried] = useState(false);

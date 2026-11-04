@@ -9,7 +9,7 @@ import { MockPartnerUnit } from "./_components/mock-unit";
 import { PartnerUnitDetail } from "./_components/unit-detail";
 import { loadUnit } from "./_lib/load";
 
-export default async function PartnerUnitPage({ params, searchParams }: PageProps<"/partner/units/[id]">) {
+export default async function PartnerUnitPage({ params, searchParams }: Readonly<PageProps<"/partner/units/[id]">>) {
   const { id } = await params;
   await connection();
   if (!apiMode()) return <MockPartnerUnit id={id} />;

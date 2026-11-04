@@ -19,7 +19,7 @@ export default async function AdminAutomationPage(props: PageProps<"/admin/setti
   return withAccess("Automation policies", ["automation.policy.read", "asset.read", "device.read"], () => AdminAutomationPageContent(props));
 }
 
-async function AdminAutomationPageContent({ searchParams }: PageProps<"/admin/settings/automation">) {
+async function AdminAutomationPageContent({ searchParams }: Readonly<PageProps<"/admin/settings/automation">>) {
   await connection();
   if (!apiMode()) return <AutomationDemo />;
   const sp = await searchParams;
@@ -42,13 +42,18 @@ async function AdminAutomationPageContent({ searchParams }: PageProps<"/admin/se
   const selected = id === "new" ? null : await coreOp<ApiAutoPolicy>("policies.get", { policyId: id });
   return (
     <AutomationView live={{
-      now: now.toISOString(), canWrite: perms.has("automation.policy.write"), scope, groups: policyGroups(policies.items, customerOfUnit, t), selected, isNew: id === "new",
+      now: now.toISOString(),
+      canWrite: perms.has("automation.policy.write"),
+      groups: policyGroups(policies.items, customerOfUnit, t),
+      isNew: id === "new",
       customers: customers.items.map((c) => ({ id: c.id, name: c.name })),
       properties: properties.items.filter((p) => !p.archived).map((p) => ({ id: p.id, name: p.name, customerId: customerOfOrg.get(p.customerOrgId)?.id ?? "" })),
       units: units.items.filter((u) => !u.archived).map((u) => {
         const k = capOf.get(u.modelId);
         return { id: u.id, name: u.displayName, customerId: customerOfOrg.get(u.customerOrgId)?.id ?? "", propertyId: u.propertyId, temperature: k?.temperature ?? null, ventilation: k?.ventilation ?? false };
       }),
+      scope,
+      selected,
     }} />
   );
 }

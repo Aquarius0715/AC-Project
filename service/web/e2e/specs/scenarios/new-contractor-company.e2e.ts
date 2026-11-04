@@ -16,8 +16,8 @@ test("HQ adds a contractor company and its first contractor, who signs in to the
   test.setTimeout(240_000);
   test.skip(!(await mailpitUp()), "needs the local Mailpit inbox");
   const stamp = Date.now();
-  const company = `E2E Partner ${stamp}`;
-  const email = `e2e-boss-${stamp}@example.com`;
+  const company = `E2E Partner ${String(stamp)}`;
+  const email = `e2e-boss-${String(stamp)}@example.com`;
   const admin = await open(browser, app("admin"));
 
   await test.step("HQ adds the company with its profile", async () => {

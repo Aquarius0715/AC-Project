@@ -24,7 +24,7 @@ const REASONS: Record<string, string> = { "errors.unit_busy": "another command i
 /** Unit detail and remote control. In API mode the Server Component passes the unit, its room, the policies and the
 scenario's now; the texts and times follow the user's display language and time zone (FR-X01, IR44, IR259), and a
 time of another day keeps its date (IR613). */
-export function UnitView({ id, detail, room: roomRows, policies, defaults = null, history = [], restrictionHref = null, nowMs = 0 }: { id: string; detail?: ApiUnitDetail; room?: UnitRow[]; policies?: PolicyOption[]; defaults?: { on: number; n: number } | null; history?: ApiCommand[]; restrictionHref?: string | null; nowMs?: number }) {
+export function UnitView({ id, detail, room: roomRows, policies, defaults = null, history = [], restrictionHref = null, nowMs = 0 }: Readonly<{ id: string; detail?: ApiUnitDetail; room?: UnitRow[]; policies?: PolicyOption[]; defaults?: { on: number; n: number } | null; history?: ApiCommand[]; restrictionHref?: string | null; nowMs?: number }>) {
   interface Cmd { id: string; text: string; when: string; bad?: boolean }
   const t = useT();
   const display = useDisplay();
@@ -154,7 +154,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
             {(isApi ? roomUnits.data : siblings).map((s) => (
               <Link key={s.id} href={`/customer/units/${s.id}`} className={cx("rounded-xl border p-3", s.id === id ? "border-primary bg-primary-soft/60" : "border-line hover:bg-surface2/60")}>
                 <div className="flex items-center justify-between font-bold">{s.name}{s.id === id && <Badge tone="primary">{t("Selected")}</Badge>}</div>
-                <div className="text-xs text-muted-foreground">{t("{temp}°C room", { temp: s.temp ?? "—" })}{s.power === null ? "" : ` · ${s.power} W`}</div>
+                <div className="text-xs text-muted-foreground">{t("{temp}°C room", { temp: s.temp ?? "—" })}{s.power === null ? "" : ` · ${String(s.power)} W`}</div>
               </Link>
             ))}
           </div>
@@ -166,7 +166,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
             {isOffline ? <Banner tone="warn">{t("This AC is offline. Remote actions are disabled until the connection returns. Last seen {when}.", { when: unit.obs })}</Banner> : (
               <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
                 <Stat label={t("Room temperature (measured)")} value={room?.text ?? "—"} sub={room ? t("observed {at}", { at: room.at }) : t("no recent measurement")} />
-                <Stat label={t("Confirmed setting")} value={d ? `${d.observedState.celsius ?? "—"}°C · ${modeWord(d.observedState.mode)} · ${fanWord(d.observedState.fanLevel)}` : `26°C · ${t("Cool")} · ${t("Mid")}`} sub={d ? t("reported {at}", { at: showRecent(d.observedState.observedAt, nowMs, display) }) : t("acknowledged by device")} />
+                <Stat label={t("Confirmed setting")} value={d ? `${String(d.observedState.celsius ?? "—")}°C · ${modeWord(d.observedState.mode)} · ${fanWord(d.observedState.fanLevel)}` : `26°C · ${t("Cool")} · ${t("Mid")}`} sub={d ? t("reported {at}", { at: showRecent(d.observedState.observedAt, nowMs, display) }) : t("acknowledged by device")} />
                 <Stat label={t("Humidity")} value={hum?.text ?? "—"} sub={hum ? t("observed {at}", { at: hum.at }) : t("no recent measurement")} />
               </div>
             )}
@@ -179,7 +179,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
             <div className="flex flex-col gap-4">
               <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="font-semibold">{t("Power")}</div><div className="text-xs text-muted-foreground">{t("Sent as its own command")}</div></div><Toggle on={isOn} disabled={isDisabled || waiting || policy?.kind === "power_off"} onChange={(v) => { if (!(isDisabled || waiting || policy?.kind === "power_off")) togglePower(v); }} label={t("Power")} /></div>
               {tempRange && <div className="flex flex-wrap items-center justify-between gap-2">
-                <div><div className="font-semibold">{t("Set temperature")}</div><div className="text-xs text-muted-foreground">{t("{min}–{max}°C · step {step}°C · confirmed {confirmed}°C", { min, max, step: cap.step, confirmed })}</div></div>
+                <div><div className="font-semibold">{t("Set temperature")}</div><div className="text-xs text-muted-foreground">{t("{min}–{max}°C · step {step}°C · confirmed {confirmed}°C", { min, max, confirmed, step: cap.step })}</div></div>
                 <div className="flex items-center gap-2"><Btn disabled={isDisabled || temp - cap.step < min} onClick={() => { setTemp((t) => t - cap.step); setEdited((e) => ({ ...e, temp: true })); }} aria-label={t("Lower the temperature")}><Icon name="remove" /></Btn><span className="w-14 text-center text-lg font-bold">{temp}°C</span><Btn disabled={isDisabled || temp + cap.step > max} onClick={() => { setTemp((t) => t + cap.step); setEdited((e) => ({ ...e, temp: true })); }} aria-label={t("Raise the temperature")}><Icon name="add" /></Btn></div>
               </div>}
               {isShowMode && <div><div className="mb-1 font-semibold">{t("Mode")}</div><Choice value={mode} disabled={isDisabled} onChange={(m) => { setMode(m); setEdited((e) => ({ ...e, mode: true })); }} options={modes.map((m) => ({ id: m, label: t(MODE_LABEL[m]) }))} /></div>}

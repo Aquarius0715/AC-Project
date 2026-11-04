@@ -44,7 +44,7 @@ export async function offerToContractor(jobId: string, version: number, input: {
 
 /** jobs.proposeSlot: one other time with the held capacity, a message (1–1000) and a reply deadline (≤ 7 days). */
 export async function proposeSlot(jobId: string, version: number, slot: Slot, hold: { kind: "internal"; membershipId: string } | { kind: "contractor"; contractorOrgId: string; technicianMembershipId: null }, message: string, replyBy: string) {
-  return run(() => coreOp("jobs.proposeSlot", { jobId, slot, hold, message: message.trim(), replyBy }, write(version)));
+  return run(() => coreOp("jobs.proposeSlot", { jobId, slot, hold, replyBy, message: message.trim() }, write(version)));
 }
 
 /** jobs.withdrawProposal: take the pending proposal back. */

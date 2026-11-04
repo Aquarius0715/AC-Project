@@ -17,7 +17,7 @@ import { Icon } from "@ac/web/components/Icon";
 /** The customer alert inbox (FR-C08, DD-C08, Figma Client 06a/06b/06g) and the Alert policies tab (FR-C15, 06e/06f) from
 the Core API: filters in the URL, read state from the membership's notifications (opening an alert marks them read; the
 alert itself stays as it is). */
-export function AlertsLiveView({ live }: { live: AlertsLive }) {
+export function AlertsLiveView({ live }: Readonly<{ live: AlertsLive }>) {
   const t = useT();
   const patch = useUrlPatch();
   const [open, setOpen] = useState<InboxAlert | null>(null);

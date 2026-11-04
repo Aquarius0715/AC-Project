@@ -7,7 +7,7 @@ import { OverviewDemo } from "./_components/overview-demo";
 import { OverviewView } from "./_components/overview-view";
 import { loadOverview } from "./_lib/load";
 
-export default async function TechnicianOverviewPage({ searchParams }: PageProps<"/technician">) {
+export default async function TechnicianOverviewPage({ searchParams }: Readonly<PageProps<"/technician">>) {
   await connection();
   const sp = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);

@@ -36,7 +36,7 @@ const channelName: Record<string, string> = { email: "Email", whatsapp: "WhatsAp
 /** Invoice / demo payment (FR-C11) and the cooling-restriction notice (FR-C12) in API mode. No card data is ever asked
 for; an invoice is paid only after the confirmation event, and a restriction is never shown released before the
 units confirm. Texts in the user's display language (IR267). */
-export function InvoiceView({ live }: { live: InvoiceLive }) {
+export function InvoiceView({ live }: Readonly<{ live: InvoiceLive }>) {
   const t = useT();
   const nav = useUrlPatch();
   const i = live.invoice;
@@ -53,7 +53,7 @@ export function InvoiceView({ live }: { live: InvoiceLive }) {
   );
 }
 
-function PaymentTab({ live }: { live: InvoiceLive }) {
+function PaymentTab({ live }: Readonly<{ live: InvoiceLive }>) {
   type Choice3 = "demo_credit_card" | "demo_debit_card" | "instructions";
   const t = useT();
   const [pending, run] = useAction();
@@ -144,7 +144,7 @@ function PaymentTab({ live }: { live: InvoiceLive }) {
   );
 }
 
-function RestrictionBanner({ live }: { live: InvoiceLive }) {
+function RestrictionBanner({ live }: Readonly<{ live: InvoiceLive }>) {
   const t = useT();
   const n = live.restriction!.notice;
   if (!n.live) return null;
@@ -156,7 +156,7 @@ function RestrictionBanner({ live }: { live: InvoiceLive }) {
   );
 }
 
-function RestrictionTab({ live }: { live: InvoiceLive }) {
+function RestrictionTab({ live }: Readonly<{ live: InvoiceLive }>) {
   const t = useT();
   const r = live.restriction!;
   return (
@@ -181,12 +181,12 @@ function RestrictionTab({ live }: { live: InvoiceLive }) {
   );
 }
 
-function InquiryTab({ live }: { live: InvoiceLive }) {
+function InquiryTab({ live }: Readonly<{ live: InvoiceLive }>) {
   const t = useT();
   return <InquiryCard title={t("Inquiries about invoice {number}", { number: live.invoice.number })} lines={live.inquiries} input={{ subjectType: "payment", invoiceId: live.invoice.id }} selected={live.inquiryId} />;
 }
 
-function InquiryCard({ title, lines, input, selected }: { title: string; lines: InquiryLine[]; input: { subjectType: "payment"; invoiceId: string } | { subjectType: "restriction"; restrictionId: string }; selected?: string | null }) {
+function InquiryCard({ title, lines, input, selected }: Readonly<{ title: string; lines: InquiryLine[]; input: { subjectType: "payment"; invoiceId: string } | { subjectType: "restriction"; restrictionId: string }; selected?: string | null }>) {
   const t = useT();
   const [pending, run] = useAction();
   const [message, setMessage] = useState("");

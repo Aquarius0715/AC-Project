@@ -31,11 +31,11 @@ export async function createInvoice(n: NewInvoice) {
 }
 
 export async function recordManualPayment(invoiceId: string, version: number, paymentReference: string, amountMinor: number, currency: OpInput<"payments.recordManual">["currency"], reason: string) {
-  return run(() => coreOp("payments.recordManual", { invoiceId, paymentReference, confirmedAmountMinor: amountMinor, currency, reason }, { write: true, expectedVersion: version }).then(() => null));
+  return run(() => coreOp("payments.recordManual", { confirmedAmountMinor: amountMinor, invoiceId, paymentReference, currency, reason }, { write: true, expectedVersion: version }).then(() => null));
 }
 
 export async function confirmCardPayment(paymentId: string, version: number, paymentReference: string, amountMinor: number, currency: OpInput<"payments.confirm">["currency"], reason: string) {
-  return run(() => coreOp("payments.confirm", { paymentId, paymentReference, confirmedAmountMinor: amountMinor, currency, reason }, { write: true, expectedVersion: version }).then(() => null));
+  return run(() => coreOp("payments.confirm", { confirmedAmountMinor: amountMinor, paymentId, paymentReference, currency, reason }, { write: true, expectedVersion: version }).then(() => null));
 }
 
 /** notifications.preview of a payment reminder (a read: nothing is sent, the route is not re-rendered). */
