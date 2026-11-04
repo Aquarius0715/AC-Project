@@ -1,7 +1,8 @@
 "use client";
 
 import { useId, useRef, useState } from "react";
-import { Badge, Banner, Btn, Card, DataTable, EmptyState, Field, Input, LinkButton, Modal, Page, PageHead, Select, Textarea } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, DataTable, EmptyState, Field, Input, LinkButton, Modal, Page, PageHead, Select, Textarea, type Tone } from "@ac/web/components/ui";
+import type { T } from "@ac/web/lib/i18n";
 import { useT } from "@ac/web/components/I18n";
 import { Icon } from "@ac/web/components/Icon";
 import { useAction } from "@ac/web/lib/useAction";
@@ -25,6 +26,28 @@ type Dialog =
   | { kind: "access" | "disable" | "enable" | "remove"; row: PartnerUserRow };
 /** The dialog's fields, top to bottom, and the Core API fields that land on them. */
 type FieldKey = "name" | "email" | "until" | "reason";
+
+/** A user's status: HQ's revocation first, then an ended access, then the account's own status. */
+function statusTone(u: PartnerUserRow): Tone {
+  if (u.revoked) return "crit";
+  if (u.ended) return "muted";
+  if (u.status === "active") return "ok";
+  if (u.status === "invited") return "warn";
+  return "muted";
+}
+function statusText(u: PartnerUserRow, t: T): string {
+  if (u.revoked) return t("Access ended by HQ");
+  if (u.ended) return t("Access ended");
+  return t(statusLabel[u.status]);
+}
+/** Why Disable or Remove is missing from a row, or null when nothing needs saying. */
+function actionHint(u: PartnerUserRow, t: T): string | null {
+  if (u.you) return t("Your account");
+  if (u.revoked) return t("Only HQ can give the access back");
+  if (u.lastContractor) return t("Last active contractor");
+  if (u.booked) return t("Has an assigned job — reassign it first");
+  return null;
+}
 const FIELDS: FieldKey[] = ["name", "email", "until", "reason"];
 const API_FIELDS: Record<string, FieldKey> = { displayName: "name", email: "email", accessUntil: "until", reason: "reason" };
 
@@ -94,7 +117,7 @@ export function UsersView({ data, ops, onStatus, sends = false }: Readonly<{ dat
   }[dialog.kind] : "";
   const action = dialog ? { invite: t("Add user"), access: t("Save access"), disable: t("Disable"), enable: t("Enable"), remove: t("Remove") }[dialog.kind] : "";
   const roleBadge = (u: PartnerUserRow) => <Badge tone={u.role === "contractor" ? "primary" : "muted"}>{t(roleLabel[u.role])}</Badge>;
-  const statusBadge = (u: PartnerUserRow) => <Badge tone={u.revoked ? "crit" : u.ended ? "muted" : u.status === "active" ? "ok" : u.status === "invited" ? "warn" : "muted"}>{u.revoked ? t("Access ended by HQ") : (t(u.ended ? "Access ended" : statusLabel[u.status]))}</Badge>;
+  const statusBadge = (u: PartnerUserRow) => <Badge tone={statusTone(u)}>{statusText(u, t)}</Badge>;
   return (
     <Page>
       <PageHead title={data.company ? t("Users of {company}", { company: data.company }) : t("Users")} sub={t("Contractors and technicians of your company who can sign in. You can add, disable and remove them.")}
@@ -119,7 +142,7 @@ export function UsersView({ data, ops, onStatus, sends = false }: Readonly<{ dat
             { key: "a", label: t("Actions"), render: (u) => {
               const a = u.actions;
               // why Disable or Remove is missing, next to what is still offered (a technician's access end, IR461)
-              const hint = u.you ? t("Your account") : u.revoked ? t("Only HQ can give the access back") : u.lastContractor ? t("Last active contractor") : u.booked ? t("Has an assigned job — reassign it first") : null;
+              const hint = actionHint(u, t);
               if (!a.resend && !a.access && !a.disable && !a.enable && !a.remove) return <span className="text-xs text-muted-foreground">{hint ?? "—"}</span>;
               return (
                 <div className="flex flex-wrap items-center gap-1">

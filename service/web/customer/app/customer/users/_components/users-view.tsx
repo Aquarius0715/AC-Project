@@ -1,7 +1,8 @@
 "use client";
 
 import { useId, useRef, useState } from "react";
-import { Badge, Banner, Btn, Card, DataTable, Field, Input, LinkButton, Modal, Page, PageHead, Select, Textarea } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, DataTable, Field, Input, LinkButton, Modal, Page, PageHead, Select, Textarea, type Tone } from "@ac/web/components/ui";
+import type { T } from "@ac/web/lib/i18n";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { fieldErrorTexts, type ActionFailure } from "@ac/web/lib/actionMessage";
@@ -15,6 +16,19 @@ type Dialog = { kind: "invite" } | { kind: "role" | "disable" | "enable" | "remo
 /** The dialog's fields, top to bottom, and the Core API fields that land on them. */
 type FieldKey = "name" | "email" | "reason";
 const FIELDS: FieldKey[] = ["name", "email", "reason"];
+
+/** The role a dialog starts with: the other role when changing it, the user's own otherwise, member for a new user. */
+function initialRole(d: Dialog): ClientUserRow["role"] {
+  if (!("row" in d)) return "member";
+  if (d.kind !== "role") return d.row.role;
+  return d.row.role === "owner" ? "member" : "owner";
+}
+/** An account's own status badge: active, not signed in yet, or disabled. */
+function accountStatus(u: ClientUserRow, t: T): { tone: Tone; text: string } {
+  if (u.status === "active") return { tone: "ok", text: t("Active") };
+  if (u.status === "invited") return { tone: "warn", text: t("Not signed in yet") };
+  return { tone: "muted", text: t("Disabled") };
+}
 const API_FIELDS: Record<string, FieldKey> = { displayName: "name", email: "email", reason: "reason" };
 
 /** Users (FR-C19, IR417, IR461) in API mode: the owner manages the customer's users — adds members and owners (the
@@ -46,7 +60,7 @@ export function UsersView({ live }: Readonly<{ live: { customerId: string; custo
   }
   const open = (d: Dialog) => {
     setDialog(d); setTried(false); setReason(""); setServer({}); gone.current = false;
-    setEmail(""); setUserName(""); setRole("row" in d ? (d.kind === "role" ? (d.row.role === "owner" ? "member" : "owner") : d.row.role) : "member");
+    setEmail(""); setUserName(""); setRole(initialRole(d));
   };
   const close = () => { setDialog(null); };
   const isAdding = dialog?.kind === "invite";
@@ -76,11 +90,19 @@ export function UsersView({ live }: Readonly<{ live: { customerId: string; custo
     const status = dialog.kind === "disable" ? "disabled" : "active";
     run(() => updateUser(r.id, r.version, live.customerId, r.email, r.role, status, reason), t(status === "disabled" ? "{name} disabled — they can no longer sign in" : "{name} enabled again", { name: name(r) }), close, refused);
   };
-  const title = dialog ? dialog.kind === "invite" ? (live.customer ? t("Add a user to {company}", { company: live.customer }) : t("Add a user"))
-    : t({ role: "Change role of {name}", disable: "Disable {name}", enable: "Enable {name}", remove: "Remove {name}" }[dialog.kind], { name: name(dialog.row) }) : "";
+  const dialogTitle = (): string => {
+    if (!dialog) return "";
+    if (dialog.kind === "invite") return live.customer ? t("Add a user to {company}", { company: live.customer }) : t("Add a user");
+    return t({ role: "Change role of {name}", disable: "Disable {name}", enable: "Enable {name}", remove: "Remove {name}" }[dialog.kind], { name: name(dialog.row) });
+  };
+  const title = dialogTitle();
   const action = dialog ? t({ invite: "Add user", role: "Change role", disable: "Disable", enable: "Enable", remove: "Remove" }[dialog.kind]) : "";
   const roleBadge = (u: ClientUserRow) => <Badge tone={u.role === "owner" ? "primary" : "muted"}>{t(u.role === "owner" ? "Owner" : "Member")}</Badge>;
-  const statusBadge = (u: ClientUserRow) => u.revoked ? <Badge tone="crit">{t("Access ended by HQ")}</Badge> : <Badge tone={u.status === "active" ? "ok" : (u.status === "invited" ? "warn" : "muted")}>{t(u.status === "active" ? "Active" : (u.status === "invited" ? "Not signed in yet" : "Disabled"))}</Badge>;
+  const statusBadge = (u: ClientUserRow) => {
+    if (u.revoked) return <Badge tone="crit">{t("Access ended by HQ")}</Badge>;
+    const s = accountStatus(u, t);
+    return <Badge tone={s.tone}>{s.text}</Badge>;
+  };
   return (
     <Page>
       <PageHead title={live.customer ? t("Users of {customer}", { customer: live.customer }) : t("Users")} sub={t("People who can sign in to this customer app. As an owner you add users, change their role and access, and remove them.")} action={<Btn variant="primary" onClick={() => { open({ kind: "invite" }); }}><Icon name="add" /> {t("Add user")}</Btn>} />
