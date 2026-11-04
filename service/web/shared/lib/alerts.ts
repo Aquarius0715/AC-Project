@@ -20,8 +20,11 @@ insulation — that is only suspected, never a fault (BIZ-17, IR315); a maintena
 else a fault. */
 export type AlertKind = "inspection" | "load" | "maintenance" | "quality" | "fault";
 const kindOf = (a: Pick<ApiAlert, "type" | "causeCode" | "evidenceKind">): AlertKind => {
-  return a.evidenceKind === "inspection" ? "inspection" : a.causeCode === "window_open" || a.causeCode === "insulation_loss" ? "load"
-    : a.type === "maintenance" ? "maintenance" : a.type === "quality" ? "quality" : "fault";
+  if (a.evidenceKind === "inspection") return "inspection";
+  if (a.causeCode === "window_open" || a.causeCode === "insulation_loss") return "load";
+  if (a.type === "maintenance") return "maintenance";
+  if (a.type === "quality") return "quality";
+  return "fault";
 };
 const kindLabel: Record<AlertKind, string> = { inspection: "Inspection record", load: "Load cause (possible)", maintenance: "Maintenance reminder", quality: "Air quality", fault: "Fault" };
 const kindIcon: Record<AlertKind, IconName> = { inspection: "edit", load: "home", maintenance: "time", quality: "airQuality", fault: "error" };
@@ -52,14 +55,17 @@ export function inboxAlerts(alerts: ApiAlert[], notes: AlertNote[], unit: (id: s
   const { t, display } = i;
   const stamp = (iso: string) => showTime(iso, display);
   const attn = (a: ApiAlert) => a.status !== "resolved" && a.severity !== "normal";
+  // resolved with when and why, acknowledged but unresolved, or open
+  const statusOf = (a: ApiAlert): InboxAlert["status"] => {
+    if (a.status === "resolved") return { state: "resolved", text: t("Resolved"), tone: "ok", detail: [a.resolvedAt ? t("Resolved {when}", { when: stamp(a.resolvedAt) }) : t("Resolved"), a.resolutionReason && resolutionText(a.resolutionReason, t)].filter(Boolean).join(" · ") };
+    if (a.status === "acknowledged") return { state: "acknowledged", text: t("Acknowledged"), tone: "primary", detail: a.acknowledgedAt ? t("Acknowledged {when} · still unresolved", { when: stamp(a.acknowledgedAt) }) : t("Acknowledged · still unresolved") };
+    return { state: "open", text: t("Unresolved"), tone: a.severity === "normal" ? "muted" : "warn", detail: t("Open — not resolved yet") };
+  };
   const order = [...alerts].toSorted((x, y) => Number(attn(y)) - Number(attn(x)) || rank[x.severity] - rank[y.severity] || y.detectedAt.localeCompare(x.detectedAt));
   return order.map((a): InboxAlert => {
     const u = unit(a.unitId);
     const mine = notes.filter((n) => n.sourceAlertId === a.id);
-    const isResolved = a.status === "resolved";
-    const status = isResolved ? { state: "resolved" as const, text: t("Resolved"), tone: "ok" as const, detail: [a.resolvedAt ? t("Resolved {when}", { when: stamp(a.resolvedAt) }) : t("Resolved"), a.resolutionReason && resolutionText(a.resolutionReason, t)].filter(Boolean).join(" · ") }
-      : (a.status === "acknowledged" ? { state: "acknowledged" as const, text: t("Acknowledged"), tone: "primary" as const, detail: a.acknowledgedAt ? t("Acknowledged {when} · still unresolved", { when: stamp(a.acknowledgedAt) }) : t("Acknowledged · still unresolved") }
-      : { state: "open" as const, text: t("Unresolved"), tone: a.severity === "normal" ? "muted" as const : "warn" as const, detail: t("Open — not resolved yet") });
+    const status = statusOf(a);
     return {
       id: a.id,
       unitId: a.unitId,
@@ -69,7 +75,7 @@ export function inboxAlerts(alerts: ApiAlert[], notes: AlertNote[], unit: (id: s
       cause: kindOf(a),
       kind: t(kindLabel[kindOf(a)]),
       kindIcon: kindIcon[kindOf(a)],
-      where: t("{where} · detected {when}", { where: u ? `${u.name}${u.place ? ` · ${u.place}` : ""}` : "AC", when: stamp(a.detectedAt) }),
+      where: t("{where} · detected {when}", { where: u ? [u.name, u.place].filter(Boolean).join(" · ") : "AC", when: stamp(a.detectedAt) }),
       evidence: `${t(evidenceLabel[a.evidenceKind] ?? "Evidence")}: ${evidenceText(a.evidenceText, t)}`,
       group: attn(a) ? "attn" : "info",
       unread: mine.filter((n) => n.readAt === null).map((n) => ({ id: n.id, version: n.version })),

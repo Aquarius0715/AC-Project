@@ -61,7 +61,13 @@ export function monthsText(from: string | undefined, to: string | undefined, i: 
 }
 export { money } from "@ac/web/lib/money";
 import { money } from "@ac/web/lib/money";
-const methodName = (m: string | null, t: T) => (m === "demo_credit_card" ? t("Credit card") : (m === "demo_debit_card" ? t("Debit card") : m));
+/** An amount with its sign: + for an addition, a minus sign for a deduction. */
+const signedMoney = (minor: number, currency: string) => `${minor > 0 ? "+" : "−"}${money(Math.abs(minor), currency)}`;
+const methodName = (m: string | null, t: T) => {
+  if (m === "demo_credit_card") return t("Credit card");
+  if (m === "demo_debit_card") return t("Debit card");
+  return m;
+};
 /** A payment's status as the screen words it; another code stays as it is. */
 export const paymentWord = (s: string, t: T = en) =>
   ({ initiated: t("initiated"), processing: t("processing"), confirmed: t("confirmed"), failed: t("failed") })[s] ?? s;
@@ -130,7 +136,7 @@ export function invoiceDetail(d: ApiInvoiceDetail, t: T = en): InvoiceDetail {
 export function inquiryRows(inquiries: ApiInquiry[], customers: ApiCustomer[], i: I18n = EN): InquiryRow[] {
   const { t } = i;
   const customer = new Map(customers.map((c) => [c.id, c.name]));
-  return [...inquiries].toSorted((a, b) => (a.state === b.state ? b.createdAt.localeCompare(a.createdAt) : (a.state === "received" ? -1 : 1))).map((q) => {
+  return [...inquiries].toSorted((a, b) => Number(b.state === "received") - Number(a.state === "received") || b.createdAt.localeCompare(a.createdAt)).map((q) => {
     return {
       id: q.id, version: q.version, cust: customer.get(q.customerId) ?? t("customer"), kind: t(q.subjectType === "payment" ? "Payment" : "Cooling restriction"), at: showTime(q.createdAt, i.display),
       text: `“${q.message}”`, state: q.state, reply: q.reply, invoiceId: q.invoiceId, restrictionId: q.restrictionId,
@@ -168,11 +174,16 @@ const statusLabel = { draft: "Draft", approved: "Approved", paid: "Paid" } as co
 export function statementRows(statements: ApiStatement[], orgs: ApiOrganization[], i: I18n = EN): StatementRow[] {
   const org = new Map(orgs.map((o) => [o.id, o.name]));
   const day = (iso: string) => businessDay(iso, i.display.locale);
+  const statusText = (s: ApiStatement) => {
+    if (s.status === "approved") return i.t("Approved · pays {date}", { date: day(s.payDate) });
+    if (s.status !== "paid") return i.t("Draft");
+    return s.paidAt ? i.t("Paid {date}", { date: day(s.paidAt) }) : i.t("Paid");
+  };
   return [...statements].toSorted((a, b) => b.period.localeCompare(a.period) || a.contractorOrgId.localeCompare(b.contractorOrgId)).map((s) => {
     return {
       id: s.id, version: s.version, contractor: org.get(s.contractorOrgId) ?? i.t("contractor"), period: periodName(s.period, i.display.locale), status: statusLabel[s.status],
       jobs: new Set(s.lines.map((l) => l.jobId)).size, net: money(s.netMinor, s.currency),
-      statusText: s.status === "approved" ? i.t("Approved · pays {date}", { date: day(s.payDate) }) : s.status === "paid" ? (s.paidAt ? i.t("Paid {date}", { date: day(s.paidAt) }) : i.t("Paid")) : i.t("Draft"),
+      statusText: statusText(s),
       queryCount: s.queries.length, openQueries: s.queries.filter((q) => q.state === "open").length,
     };
   });
@@ -200,7 +211,7 @@ export function statementDetail(s: ApiStatement, orgs: ApiOrganization[], now: D
     queries: s.queries.map((q) => {
       return {
         id: q.id, line: line.get(q.lineId)?.jobId ?? q.lineId, topic: topic[q.topic] ?? q.topic, message: q.message, state: state[q.state] ?? q.state, open: q.state === "open", reply: q.reply,
-        adjustment: q.adjustmentMinor === null ? null : `${q.adjustmentMinor > 0 ? "+" : "−"}${money(Math.abs(q.adjustmentMinor), s.currency)}`,
+        adjustment: q.adjustmentMinor === null ? null : signedMoney(q.adjustmentMinor, s.currency),
       };
     }),
   };

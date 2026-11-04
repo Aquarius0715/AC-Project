@@ -11,6 +11,8 @@ const dayMs = 86_400_000;
 const addDays = (ymd: string, n: number) => new Date(Date.parse(`${ymd}T00:00:00Z`) + n * dayMs).toISOString().slice(0, 10);
 const fmt = (iso: string, locale: Locale) => new Date(iso).toLocaleString(intlTag(locale), { timeZone: "Asia/Kuala_Lumpur", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).replaceAll(/[\u00A0\u2009\u202F]/g, " ");
 
+// the days of a preset period; the month is the remaining preset
+const SPAN_DAYS = new Map<PeriodKind, number>([["today", 1], ["7d", 7]]);
 export interface Period { kind: PeriodKind; from: string; to: string; label: string; days: number; error?: string }
 /** [from, to) of a period choice: whole Kuala Lumpur days up to the current minute of the business clock (today, the
 last 7 or 30 days), or the custom range (KL datetime-local values, at most 366 days, DD-C06). */
@@ -22,13 +24,14 @@ export function periodRange(kind: PeriodKind, now: Date, custom: { from?: string
     from = klInstant(custom.from ? custom.from : `${addDays(today, -6)}T00:00`);
     to = custom.to ? klInstant(custom.to) : minute;
   } else {
-    const days = kind === "today" ? 1 : (kind === "7d" ? 7 : 30);
+    const days = SPAN_DAYS.get(kind) ?? 30;
     from = klInstant(`${addDays(klLocal(now.toISOString()).slice(0, 10), -(days - 1))}T00:00`);
     to = minute;
   }
   const span = Date.parse(to) - Date.parse(from);
   const days = Math.max(1, Math.ceil(span / dayMs));
-  const error = (span > 0) ? (span > 366 * dayMs ? i.t("At most 366 days") : undefined) : i.t("The end must be after the start");
+  const tooLong = span > 366 * dayMs ? i.t("At most 366 days") : undefined;
+  const error = span > 0 ? tooLong : i.t("The end must be after the start");
   const l = i.display.locale;
   return { kind, from, to, days, error, label: i.t(days === 1 ? "{from} – {to} ({n} day) · {zone}" : "{from} – {to} ({n} days) · {zone}", { from: fmt(from, l), to: fmt(to, l), n: days, zone: "Asia/Kuala_Lumpur" }) };
 }
@@ -52,19 +55,30 @@ export const baselineLabel = (b: ApiBaseline) => `${b.method} · ${one(b.baselin
 
 /** One unit of the comparison table (Figma Client 04b): actual, baseline, IR68 difference and coverage. */
 export interface CompareRow { unitId: string; name: string; actual: string; baseline: string; difference: string; tone: "ok" | "warn" | "muted"; coverage: string }
+/** The saving against the unit's baseline, or why there is none to show. */
+function baselineDifference(s: ApiEnergySummary, tr: T): string {
+  const b = s.baselineSnapshot;
+  if (!b) return tr("No baseline for this unit");
+  if (s.totals.savedKWh === null) return tr("Cannot calculate — baseline not comparable");
+  if (b.baselineKWh === 0) return tr("Cannot calculate — baseline is 0");
+  return `${saving(s.totals.savedKWh, " kWh", one, tr)} · ${saving(s.totals.savingPercentage, "%", one, tr)}`;
+}
+/** A saving is ok, a higher use than the baseline a warning, and no comparison or no change muted. */
+function savingTone(saved: number | null): "ok" | "warn" | "muted" {
+  if (saved === null || saved === 0) return "muted";
+  return saved > 0 ? "ok" : "warn";
+}
 export function compareRow(unitId: string, name: string, s: ApiEnergySummary, tr: T = translator("en")): CompareRow {
   const t = s.totals;
   const b = s.baselineSnapshot;
-  const isComparable = t.savedKWh !== null;
-  const difference = b ? isComparable ? b.baselineKWh === 0 ? tr("Cannot calculate — baseline is 0")
-    : `${saving(t.savedKWh, " kWh", one, tr)} · ${saving(t.savingPercentage, "%", one, tr)}` : tr("Cannot calculate — baseline not comparable") : tr("No baseline for this unit");
+  const difference = baselineDifference(s, tr);
   return {
     unitId,
     name,
     difference,
     actual: t.kWh === null ? "—" : one(t.kWh),
     baseline: b?.baselineKWh === null || !b ? "—" : one(b.baselineKWh),
-    tone: isComparable && (t.savedKWh ?? 0) > 0 ? "ok" : (isComparable && (t.savedKWh ?? 0) < 0 ? "warn" : "muted"),
+    tone: savingTone(t.savedKWh),
     coverage: s.coverage === null ? "—" : `${coveragePct(s.coverage)}%`,
   };
 }
