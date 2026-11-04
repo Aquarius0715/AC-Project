@@ -46,7 +46,10 @@ the code the badge tone keys on; the view translates it. */
 export function contractCards(cs: ClientContract[], unit: (id: string) => UnitPlace | undefined, now: Date, i: I18n = EN): ContractCard[] {
   const { t, display: { locale } } = i;
   const ms = now.getTime();
-  const status = (k: ApiContract): ContractCard["status"] => (ms < Date.parse(k.startAt) ? "Upcoming" : (ms >= Date.parse(k.endAt) ? "Expired" : "Active"));
+  const status = (k: ApiContract): ContractCard["status"] => {
+    if (ms < Date.parse(k.startAt)) return "Upcoming";
+    return ms >= Date.parse(k.endAt) ? "Expired" : "Active";
+  };
   const rank = { Active: 0, Upcoming: 1, Expired: 2 };
   return [...cs].toSorted((a, b) => rank[status(a)] - rank[status(b)] || b.startAt.localeCompare(a.startAt)).map((k) => {
     return {
@@ -75,7 +78,10 @@ export function clientInvoiceRows(is: ApiInvoice[], now: Date, i: I18n = EN): Cl
 /** The status filter of the URL as invoices.list filters (overdue = overdueOnly, all = none). */
 export type StatusFilter = "all" | "unpaid" | "overdue" | "processing" | "paid";
 export const statusFilters: StatusFilter[] = ["all", "unpaid", "overdue", "processing", "paid"];
-export const statusQuery = (f: StatusFilter) => (f === "all" ? {} : (f === "overdue" ? { overdueOnly: true } : { status: f }));
+export function statusQuery(f: StatusFilter): { overdueOnly?: true; status?: Exclude<StatusFilter, "all" | "overdue"> } {
+  if (f === "all") return {};
+  return f === "overdue" ? { overdueOnly: true } : { status: f };
+}
 
 // ---- one invoice (FR-C11) ----
 
@@ -103,8 +109,13 @@ export const demoReference = (paymentId: string) => `DEMO-PAY-${paymentId.replac
 
 const live = new Set<RestrictionState>(["scheduled", "requested", "applied", "release_requested"]);
 export interface RestrictionNotice { id: string; state: RestrictionState; label: string; policy: string; units: string; live: boolean }
+/** A unit's name with its place in the given brackets, or the start of its ID when it is unknown. */
+function unitLabel(id: string, u: UnitPlace | undefined, around: (place: string) => string): string {
+  if (!u) return id.slice(0, 8);
+  return u.place ? `${u.name}${around(u.place)}` : u.name;
+}
 export function restrictionNotice(r: ApiRestriction, unit: (id: string) => UnitPlace | undefined, t: T = en): RestrictionNotice {
-  const names = r.unitIds.map((id) => { const u = unit(id); return u ? `${u.name}${u.place ? ` (${u.place})` : ""}` : id.slice(0, 8); });
+  const names = r.unitIds.map((id) => unitLabel(id, unit(id), (place) => ` (${place})`));
   return {
     id: r.id, state: r.state, label: t(stateLabel[r.state]), policy: policyText(r.policy, t), live: live.has(r.state),
     units: t(r.unitIds.length === 1 ? "{n} unit in scope · {names}" : "{n} units in scope · {names}", { n: r.unitIds.length, names: names.join(", ") }),
@@ -113,6 +124,15 @@ export function restrictionNotice(r: ApiRestriction, unit: (id: string) => UnitP
 export interface NoticeUnit { unitId: string; name: string; apply: string; release: string; releaseTone: "ok" | "crit" | "primary"; note: string; tone: "warn" | "ok" | "unknown" | "primary" | "muted" }
 const applyText: Record<string, string> = { not_sent: "Not sent yet", sent_unknown: "Result unknown", applied: "Applied", not_applied: "Not applied" };
 const releaseText: Record<string, string> = { none: "", waiting_reconcile: "Waiting for reconciliation", requested: "Release sent", released: "Released", not_required: "Release not needed", failed: "Release failed" };
+const PENDING_TEXT: Record<string, string> = { offline: "the unit is offline", device_operation_running: "the unit is busy with a device update" };
+const COMMAND_TEXT: Record<string, string> = { failed: "last command failed", expired: "last command expired" };
+const RELEASE_TONE = new Map<string, NoticeUnit["releaseTone"]>([["released", "ok"], ["failed", "crit"]]);
+/** A unit's colour: released, its result unknown, restricted, or on its way. */
+function unitTone(u: ApiRestriction["perUnit"][number]): NoticeUnit["tone"] {
+  if (u.releaseState === "released") return "ok";
+  if (u.applyState === "sent_unknown") return "unknown";
+  return u.applyState === "applied" ? "warn" : "primary";
+}
 /** Per-unit state as the customer sees it: never “released” before the unit confirms (FR-C12). */
 export function noticeUnits(r: ApiRestriction, unit: (id: string) => UnitPlace | undefined, commands: Map<string, ApiCommand>, t: T = en): NoticeUnit[] {
   return r.perUnit.map((u) => {
@@ -120,19 +140,19 @@ export function noticeUnits(r: ApiRestriction, unit: (id: string) => UnitPlace |
     const deviceCommand = last ? commands.get(last) : undefined;
     const waiting = u.releaseState === "requested" && deviceCommand && (deviceCommand.status === "requested" || deviceCommand.status === "sent");
     const note = [
-      u.pendingReason === "offline" ? t("the unit is offline") : (u.pendingReason === "device_operation_running" ? t("the unit is busy with a device update") : null),
+      textOf(PENDING_TEXT, u.pendingReason, t),
       waiting ? t("waiting for the unit to confirm") : null,
-      deviceCommand?.status === "failed" ? t("last command failed") : (deviceCommand?.status === "expired" ? t("last command expired") : null),
+      textOf(COMMAND_TEXT, deviceCommand?.status, t),
     ].filter(Boolean).join(" · ");
     const n = unit(u.unitId);
     const release = releaseText[u.releaseState];
     return {
       unitId: u.unitId,
-      name: n ? `${n.name}${n.place ? ` · ${n.place}` : ""}` : u.unitId.slice(0, 8),
+      name: unitLabel(u.unitId, n, (place) => ` · ${place}`),
       apply: textOf(applyText, u.applyState, t) ?? u.applyState,
       release: release === undefined ? u.releaseState : release && t(release),
-      releaseTone: u.releaseState === "released" ? "ok" : (u.releaseState === "failed" ? "crit" : "primary"),
-      tone: u.releaseState === "released" ? "ok" : u.applyState === "sent_unknown" ? "unknown" : u.applyState === "applied" ? "warn" : "primary",
+      releaseTone: RELEASE_TONE.get(u.releaseState) ?? "primary",
+      tone: unitTone(u),
       note,
     };
   });
@@ -142,13 +162,17 @@ const eventTitle: Record<string, string> = {
   "payments.release": "Release requested after payment", "restrictions.cancel": "Cancelled — release requested", "restrictions.override": "Release requested by HQ",
   "restriction.released": "Released", "restrictions.defer": "Grace period granted", "restrictions.exempt": "Exception granted",
 };
+function eventTone(action: string): { tone?: "warn" | "ok" } {
+  if (action === "restriction.applied") return { tone: "warn" };
+  return action === "restriction.released" ? { tone: "ok" } : {};
+}
 /** The state events the customer may see (IR42 projection), then the pending “Released” step. */
 export function noticeTimeline(r: ApiRestriction, i: I18n = EN): { time: string; title: string; tone?: "warn" | "ok" }[] {
   const { t, display } = i;
   const items: { time: string; title: string; tone?: "warn" | "ok" }[] = (r.events ?? []).map((e) => {
     return {
       time: showTime(e.occurredAt, display), title: textOf(eventTitle, e.action, t) ?? e.action,
-      ...(e.action === "restriction.applied" ? { tone: "warn" as const } : (e.action === "restriction.released" ? { tone: "ok" as const } : {})),
+      ...eventTone(e.action),
     };
   });
   if (r.state !== "released" && r.state !== "cancelled") items.push({ time: "—", title: t("Released (only when every unit confirms)"), tone: "ok" });
@@ -167,19 +191,28 @@ export const inquiryLines = (is: ApiInquiry[], i: I18n = EN): InquiryLine[] => {
     };
   });
 };
+const PREVIEW_BODY: Record<InvoiceStatus, string> = {
+  Paid: "Hello, {number} ({amount}) is paid — thank you.",
+  Processing: "Hello, your payment for {number} ({amount}) is being processed. It is not paid yet.",
+  Overdue: "Hello, {number} ({amount}) was due on {date}. Pay with a demo card or view payment instructions in the app.",
+  Unpaid: "Hello, {number} ({amount}) is due on {date}. Pay with a demo card or view payment instructions in the app.",
+};
 /** The payment message of a channel for this invoice (notifications.preview checks the channel; the text uses the
 invoice itself, whose due date and amount the preview parameters do not carry), in the recipient's language. */
 export function previewText(channel: string, inv: { number: string; amount: string; dueDate: string; status: InvoiceStatus }, t: T = en): { subject: string | null; body: string } {
   const p = { number: inv.number, amount: inv.amount, date: inv.dueDate };
-  const subject = channel === "email" ? t(inv.status === "Paid" ? "Payment received — {number}" : "Payment reminder — {number}", p) : null;
-  const body = inv.status === "Paid" ? t("Hello, {number} ({amount}) is paid — thank you.", p)
-    : (inv.status === "Processing" ? t("Hello, your payment for {number} ({amount}) is being processed. It is not paid yet.", p)
-    : t(inv.status === "Overdue" ? "Hello, {number} ({amount}) was due on {date}. Pay with a demo card or view payment instructions in the app." : "Hello, {number} ({amount}) is due on {date}. Pay with a demo card or view payment instructions in the app.", p));
-  return { subject, body };
+  const subjectText = inv.status === "Paid" ? "Payment received — {number}" : "Payment reminder — {number}";
+  const subject = channel === "email" ? t(subjectText, p) : null;
+  return { subject, body: t(PREVIEW_BODY[inv.status], p) };
 }
 
 // ---- the overview's notice (DEC-90, IR610) ----
 
+/** What a restriction in force does to the customer's units. */
+function restrictedText(policy: ApiRestriction["policy"], n: number, t: T): string {
+  if (policy.kind === "power_off") return t(n === 1 ? "{n} unit is switched off until it is paid" : "{n} units are switched off until it is paid", { n });
+  return t(n === 1 ? "Cooling is limited to {value} °C or warmer on {n} unit until it is paid" : "Cooling is limited to {value} °C or warmer on {n} units until it is paid", { n, value: policy.minimumCoolingSetpoint });
+}
 /** One line of the overview's notice: what is due or restricted, and where to act on it. */
 export interface DueLine { text: string; href: string; link: string }
 /** The customer overview's notice while something is due or restricted (DEC-90, IR610): the overdue invoice with Pay
@@ -197,9 +230,7 @@ export function dueNotice(overdue: Pick<ApiInvoice, "id" | "number" | "amountMin
     const n = r.unitIds.length;
     const text = r.state === "scheduled"
       ? t("A restriction starts {time} unless it is paid — {policy}", { time: showTime(r.executeAfter, display), policy: policyText(r.policy, t) })
-      : (r.policy.kind === "power_off"
-        ? t(n === 1 ? "{n} unit is switched off until it is paid" : "{n} units are switched off until it is paid", { n })
-        : t(n === 1 ? "Cooling is limited to {value} °C or warmer on {n} unit until it is paid" : "Cooling is limited to {value} °C or warmer on {n} units until it is paid", { n, value: r.policy.minimumCoolingSetpoint }));
+      : restrictedText(r.policy, n, t);
     lines.push({ text, href: `/customer/payments/${restriction.invoiceId}?tab=restriction&restrictionId=${r.id}`, link: t("View restriction details") });
   }
   return lines;

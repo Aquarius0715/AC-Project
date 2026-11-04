@@ -45,7 +45,12 @@ const STATUS_WORDS: Record<string, string> = {
 /** A job status inside a sentence (“the job is on hold”), in the display language. */
 export const statusWord = (status: string, t: T = en) => (textOf(STATUS_WORDS, status, t) ?? status.replaceAll('_', " "));
 /** “1st”, “2nd”, “3rd”, “4th” … in English, “ke-1” in Malay. */
-export const ordinal = (n: number, locale: "en" | "ms" = "en") => (locale === "ms" ? `ke-${String(n)}` : `${String(n)}${n % 10 === 1 && n % 100 !== 11 ? "st" : n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th"}`);
+export function ordinal(n: number, locale: "en" | "ms" = "en"): string {
+  if (locale === "ms") return `ke-${String(n)}`;
+  const teen = n % 100 >= 11 && n % 100 <= 13;
+  const suffix = teen ? "th" : (["th", "st", "nd", "rd"].at(n % 10) ?? "th");
+  return `${String(n)}${suffix}`;
+}
 
 /** Whether a member holds every required qualification, valid at the instant and not revoked. */
 export function qualified(m: ApiMember, required: string[], at: string): boolean {
@@ -58,6 +63,22 @@ export const freeHours = (c: ApiCapacity | undefined) => (!c || c.availableMinut
 const overlaps = (a: Slot, b: Slot) => Date.parse(a.startAt) < Date.parse(b.endAt) && Date.parse(b.startAt) < Date.parse(a.endAt);
 const inside = (inner: Slot, outer: Slot) => Date.parse(outer.startAt) <= Date.parse(inner.startAt) && Date.parse(inner.endAt) <= Date.parse(outer.endAt);
 
+/** Who can take the visit first: fits (1), busy at the visit (2), not qualified (3); the assigned one is 0. */
+function fitRank(isOk: boolean, isFree: boolean): number {
+  if (!isOk) return 3;
+  return isFree ? 1 : 2;
+}
+/** A candidate's badge: the fit text when free, busy at the visit, or the not-qualified text. */
+function fitBadge(isOk: boolean, isFree: boolean, fit: string, notOk: string, t: T): FitRow["badge"] {
+  if (!isOk) return { text: t(notOk), tone: "muted" };
+  return isFree ? { text: t(fit), tone: "ok" } : { text: t("Busy at the visit"), tone: "warn" };
+}
+/** The visit days as one range (“Mon 22 – Wed 24”), one day, or nothing. */
+function daySpan(days: { date: string }[], locale: "en" | "ms"): string {
+  const first = days.at(0), last = days.at(-1);
+  if (!first || !last) return "";
+  return days.length > 1 ? `${klDay(first.date, locale)} – ${klDay(last.date, locale)}` : klDay(first.date, locale);
+}
 export interface FitRow { id: string; name: string; sub: string; days: { label: string; text: string; free: boolean }[]; badge: { text: string; tone: "ok" | "warn" | "muted" } }
 /** Can the company take the visit: each technician's qualification, free hours on the visit day and the next days, and
 whether the visit slot lies in an available slot and clear of assigned ones (members.capacity). The offer (Figma
@@ -79,23 +100,23 @@ export function fits(members: ApiMember[], required: string[], visit: Slot, days
     const lacking = required.filter((r) => !qualified(m, [r], visit.startAt)).map((r) => qualificationLabel(r, t)).join(", ");
     if (mode === "detail") {
       const hours = cap.reduce((sum, c) => sum + (freeHours(c) ?? 0), 0);
-      const span = days.length > 1 ? `${klDay(days[0].date, locale)} – ${klDay(days[days.length - 1].date, locale)}` : (days[0] ? klDay(days[0].date, locale) : "");
-      rank[m.id] = m.id === assignedId ? 0 : isOk ? isFree ? 1 : 2 : 3;
+      const span = daySpan(days, locale);
+      rank[m.id] = m.id === assignedId ? 0 : fitRank(isOk, isFree);
       if (m.id === assignedId) return { id: m.id, name: m.displayName, days: [], sub: isOk ? t("Qualified · assigned to this job") : t("Missing {list} · assigned to this job", { list: lacking }), badge: { text: t("Assigned"), tone: isOk ? "ok" : "warn" } };
       return {
         id: m.id, name: m.displayName, days: [],
         sub: isOk ? t("Qualified · {hours} free {days}", { hours: hoursText(hours), days: span }) : t("Missing {list}", { list: lacking }),
-        badge: isOk ? (isFree ? { text: t("Best fit"), tone: "ok" } : { text: t("Busy at the visit"), tone: "warn" }) : { text: t("Not eligible"), tone: "muted" },
+        badge: fitBadge(isOk, isFree, "Best fit", "Not eligible", t),
       };
     }
-    rank[m.id] = isOk ? (isFree ? 1 : 2) : 3;
+    rank[m.id] = fitRank(isOk, isFree);
     return {
       id: m.id, name: m.displayName, sub: isOk ? quals.join(" · ") || t("qualified") : t("missing {list}", { list: lacking }),
       days: days.map((d, k) => {
         const h = freeHours(cap[k]);
         return { label: new Date(`${d.date}T00:00:00Z`).toLocaleDateString(intlTag(locale), { weekday: "short", timeZone: "UTC" }), text: h === null ? "—" : hoursText(h), free: !!h };
       }),
-      badge: isOk ? (isFree ? { text: t("Fits"), tone: "ok" } : { text: t("Busy at the visit"), tone: "warn" }) : { text: t("Not qualified"), tone: "muted" },
+      badge: fitBadge(isOk, isFree, "Fits", "Not qualified", t),
     };
   });
   return rows.toSorted((a, b) => rank[a.id] - rank[b.id] || a.name.localeCompare(b.name));
@@ -103,23 +124,40 @@ export function fits(members: ApiMember[], required: string[], visit: Slot, days
 
 export interface Step { label: string; at: string | null; atText: string | null; sub: string; state: "done" | "current" | "todo" }
 const ORDER = ["requested", "offered", "accepted", "assigned", "in_progress", "submitted", "completed"];
+/** The step a status has reached: on hold and rework sit on in progress (accepted before a technician), cancelled on requested. */
+function reachedStep(status: string, hasTechnician: boolean): number {
+  if (status === "on_hold" || status === "rework_requested") return ORDER.indexOf(hasTechnician ? "in_progress" : "accepted");
+  return ORDER.indexOf(status === "cancelled" ? "requested" : status);
+}
+const ORIGIN_TEXT = new Map([["periodic_plan", "periodic plan"], ["client_request", "client request"]]);
+function stepState(k: number, reached: number, status: string): Step["state"] {
+  if (k < reached) return "done";
+  if (k > reached) return "todo";
+  return status === "completed" ? "done" : "current";
+}
 /** The status timeline of a delegated job (Figma 02-11) from its events; on hold and rework show on the current step.
 `atText` is the step's time in the user's display time zone (IR44). */
 export function timeline(status: string, events: ApiJobEvent[], hasTechnician: boolean, origin?: string, i: I18n = EN): Step[] {
   const { t, display } = i;
   const at = (actions: string[]) => [...events].filter((e) => actions.includes(e.action)).toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))[0]?.occurredAt ?? null;
-  const reached = status === "on_hold" || status === "rework_requested" ? ORDER.indexOf(hasTechnician ? "in_progress" : "accepted") : ORDER.indexOf(status === "cancelled" ? "requested" : status);
+  const reached = reachedStep(status, hasTechnician);
   const steps: [string, string[], string][] = [
-    ["Requested", ["job.created"], origin === "periodic_plan" ? "periodic plan" : (origin === "client_request" ? "client request" : "by the client or the plan")], ["Offered", ["job.offered"], "HQ offered your company"], ["Accepted", ["offer.accepted"], "you"],
+    ["Requested", ["job.created"], ORIGIN_TEXT.get(origin ?? "") ?? "by the client or the plan"], ["Offered", ["job.offered"], "HQ offered your company"], ["Accepted", ["offer.accepted"], "you"],
     ["Assigned", ["job.assigned"], "from Schedule"], ["In progress", ["job.checked_in", "job.started"], "technician checks in on site"],
     ["Submitted", ["job.submitted"], "report sent for your review"], ["Completed", ["job.reviewed"], "after the quality review"],
   ];
   return steps.map(([label, actions, sub], k) => {
     const when_ = at(actions);
-    return { label: t(label), at: when_, atText: when_ ? showTime(when_, display) : null, sub: t(sub), state: k < reached ? "done" : k === reached ? (status === "completed" ? "done" : "current") : "todo" };
+    return { label: t(label), at: when_, atText: when_ ? showTime(when_, display) : null, sub: t(sub), state: stepState(k, reached, status) };
   });
 }
 
+/** The technician's answer to the assignment, for the job banner. */
+function technicianAck(a: ApiDetail["assignment"], t: T): string {
+  if (a?.acknowledgement === "accepted") return t("accepted by the technician");
+  if (a?.acknowledgement !== "cant_make") return t("awaiting the technician’s acceptance");
+  return a.cantMakeReason ? t("the technician can’t make it (“{reason}”) — reassign in Schedule", { reason: a.cantMakeReason }) : t("the technician can’t make it — reassign in Schedule");
+}
 /** The banner of a delegated job's state (Figma 02-11…02-13), with its times in the user's display time zone. */
 export function detailBanner(j: ApiDetail, techName: string | null, now: number, i: I18n = EN): { tone: "ok" | "warn" | "crit" | "primary"; text: string } | null {
   const { t, display } = i;
@@ -133,9 +171,7 @@ export function detailBanner(j: ApiDetail, techName: string | null, now: number,
       const a = j.assignment;
       const ended = a && Date.parse(a.scheduledEnd) <= now;
       if (ended) return { tone: "crit", text: t("The work window ended {time} without a submitted report — extend or reassign in Schedule.", { time: showTime(a.scheduledEnd, display) }) };
-      const ack = a?.acknowledgement === "accepted" ? t("accepted by the technician")
-        : a?.acknowledgement === "cant_make" ? (a.cantMakeReason ? t("the technician can’t make it (“{reason}”) — reassign in Schedule", { reason: a.cantMakeReason }) : t("the technician can’t make it — reassign in Schedule"))
-        : t("awaiting the technician’s acceptance");
+      const ack = technicianAck(a, t);
       const slot = a ? showSpan(a.scheduledStart, a.scheduledEnd, display) : "";
       return { tone: a?.acknowledgement === "cant_make" ? "warn" : "ok", text: t(j.status === "in_progress" ? "In progress — {name} · {slot} · {ack}." : "Assigned — {name} · {slot} · {ack}.", { name: techName ?? t("technician"), slot, ack }) };
     }
