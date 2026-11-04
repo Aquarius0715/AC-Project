@@ -19,8 +19,17 @@ export interface EnergyLive {
 }
 const colors = ["#005bea", "#f59e0b", "#10b981", "#8b5cf6"];
 
+/** The savings colour: an increase warns, a saving is OK; nothing when the baseline is not comparable. */
+function savingTone(s: { comparable: boolean; increase: boolean }): "warn" | "ok" | undefined {
+  if (!s.comparable) return undefined;
+  return s.increase ? "warn" : "ok";
+}
 /** Energy & cost (FR-C06) in API mode: the period, units (up to 4) and baseline live in the URL; every figure comes from
 energy.summary (IR68 wording: Reduction / Increase / No change / Cannot calculate). */
+function savingClass(s: { comparable: boolean; increase: boolean }): string {
+  if (!s.comparable) return "text-muted-foreground";
+  return s.increase ? "text-warn" : "text-ok";
+}
 export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
   const t = useT();
   const nav = useUrlPatch();
@@ -30,12 +39,33 @@ export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
   const [to, setTo] = useState(klLocal(live.period.to));
   const s = live.summary;
   const r = live.raw;
+  const noSavings = t(live.baselineId ? "Cannot calculate — baseline not comparable for this period" : "No baseline selected");
   const names = new Map(live.units.map((u) => [u.id, u.name]));
   const setUnits = (ids: string[]) => { nav({ unitIds: ids.join(","), baselineId: null }); };
   const isMulti = live.unitIds.length > 1;
   const subject = isMulti ? t("{n} units", { n: live.unitIds.length }) : names.get(live.unitIds[0]) ?? "—";
+  const chartSub = t(r?.baseline === null ? "kWh per day · {subject}" : "kWh per day · {subject} · baseline shown as an even daily share", { subject });
   const days = t(live.period.days === 1 ? "{n} day" : "{n} days", { n: live.period.days });
   if (live.units.length === 0) return <Page><Banner>{t("No air conditioner is registered yet — energy appears here once HQ adds your units.")}</Banner></Page>;
+  // the card's body: no readings, the chart (per unit, or actual against the baseline) or the table
+  const chartBody = (s: NonNullable<typeof live.summary>, r: NonNullable<typeof live.raw>) => {
+    if (view === "chart" && live.daily.every((d) => !d.actual)) return <p className="rounded-xl bg-surface2 p-4 text-center text-[13px] text-muted-foreground">{t("No valid power readings in this period — the chart appears once the units report minute readings (coverage {coverage}).", { coverage: s.coverage })}</p>;
+    if (view === "chart") {
+      if (isMulti) return live.compare?.series ? <BarChart labels={live.daily.map((d) => d.label)} series={live.compare.series} names={live.unitIds.map((u) => names.get(u) ?? u)} unit="kWh" height={200} colors={colors} /> : <p className="text-[13px] text-muted-foreground">{t("The per-unit daily chart covers up to 7 days — see the table for this period.")}</p>;
+      return r.baseline === null ? <BarChart labels={live.daily.map((d) => d.label)} series={[live.daily.map((d) => d.actual ?? 0)]} names={[t("Actual (measured)")]} colors={["#005bea"]} unit="kWh" height={200} /> : <BarChart labels={live.daily.map((d) => d.label)} series={[live.daily.map((d) => d.baseline ?? 0), live.daily.map((d) => d.actual ?? 0)]} names={[t("Baseline (normal operation)"), t("Actual (measured)")]} unit="kWh" height={200} />;
+    }
+    return isMulti && live.compare ? (
+              <DataTable rows={live.compare.rows} rowKey={(x) => x.unitId} cols={[
+                { key: "u", label: t("Unit"), render: (x) => <b>{x.name}</b> }, { key: "a", label: t("Actual (kWh)"), render: (x) => x.actual }, { key: "b", label: t("Baseline (kWh)"), render: (x) => x.baseline },
+                { key: "d", label: t("Difference vs baseline"), render: (x) => <Badge tone={x.tone}>{x.difference}</Badge> }, { key: "c", label: t("Coverage"), render: (x) => x.coverage },
+              ]} />
+            ) : (
+              <DataTable rows={live.daily} rowKey={(d) => d.label} cols={[
+                { key: "d", label: t("Day"), render: (d) => d.label }, { key: "a", label: t("Actual (kWh)"), render: (d) => (d.actual === null ? "—" : one(d.actual)) },
+                { key: "b", label: t("Baseline (kWh)"), render: (d) => (d.baseline === null ? "—" : one(d.baseline)) },
+              ]} />
+            );
+  };
   return (
     <Page>
       <Card>
@@ -78,30 +108,13 @@ export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
         <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
           <Kpi label={t("Actual energy")} value={r.kWh === null ? "—" : one(r.kWh)} unit={r.kWh === null ? undefined : "kWh"} sub={t("{subject} · {days} · coverage {coverage}", { subject, days, coverage: s.coverage })} />
           <Kpi label={t("Estimated cost")} value={s.cost.split(" ", 1)[0]} unit={s.cost === "—" ? undefined : s.cost.split(" ", 2)[1]} sub={t("{tariff} · taxes excluded", { tariff: r.tariff })} />
-          <Kpi label={t("Savings vs baseline")} value={s.comparable ? s.difference : "—"} tone={s.comparable ? (s.increase ? "warn" : "ok") : undefined}
-            sub={s.comparable ? t("{percent} · {cost} vs {baseline} baseline", { percent: s.percent, cost: s.savedCost, baseline: s.baseline }) : t(live.baselineId ? "Cannot calculate — baseline not comparable for this period" : "No baseline selected")} />
+          <Kpi label={t("Savings vs baseline")} value={s.comparable ? s.difference : "—"} tone={savingTone(s)}
+            sub={s.comparable ? t("{percent} · {cost} vs {baseline} baseline", { percent: s.percent, cost: s.savedCost, baseline: s.baseline }) : noSavings} />
           <Kpi label={t("Data coverage")} value={s.coverage} sub={t(r.coverage === 1 ? "All expected minutes observed" : "Missing readings are not filled in")} />
         </div>
-        <Card title={t(isMulti ? "Daily actual energy by unit" : "Daily energy — Actual vs Baseline")} sub={isMulti ? t("kWh per day · max 4 units · baselines are compared in the table") : t(r.baseline === null ? "kWh per day · {subject}" : "kWh per day · {subject} · baseline shown as an even daily share", { subject })}
+        <Card title={t(isMulti ? "Daily actual energy by unit" : "Daily energy — Actual vs Baseline")} sub={isMulti ? t("kWh per day · max 4 units · baselines are compared in the table") : chartSub}
           action={<Tabs value={view} onChange={setView} tabs={[{ id: "chart", label: t("Chart") }, { id: "table", label: t("Table") }]} />}>
-          {view === "chart" && live.daily.every((d) => !d.actual) ? <p className="rounded-xl bg-surface2 p-4 text-center text-[13px] text-muted-foreground">{t("No valid power readings in this period — the chart appears once the units report minute readings (coverage {coverage}).", { coverage: s.coverage })}</p>
-            : view === "chart" ? (isMulti ? (live.compare?.series
-            ? <BarChart labels={live.daily.map((d) => d.label)} series={live.compare.series} names={live.unitIds.map((u) => names.get(u) ?? u)} unit="kWh" height={200} colors={colors} />
-            : <p className="text-[13px] text-muted-foreground">{t("The per-unit daily chart covers up to 7 days — see the table for this period.")}</p>)
-            : r.baseline === null
-              ? <BarChart labels={live.daily.map((d) => d.label)} series={[live.daily.map((d) => d.actual ?? 0)]} names={[t("Actual (measured)")]} colors={["#005bea"]} unit="kWh" height={200} />
-              : <BarChart labels={live.daily.map((d) => d.label)} series={[live.daily.map((d) => d.baseline ?? 0), live.daily.map((d) => d.actual ?? 0)]} names={[t("Baseline (normal operation)"), t("Actual (measured)")]} unit="kWh" height={200} />)
-            : isMulti && live.compare ? (
-              <DataTable rows={live.compare.rows} rowKey={(x) => x.unitId} cols={[
-                { key: "u", label: t("Unit"), render: (x) => <b>{x.name}</b> }, { key: "a", label: t("Actual (kWh)"), render: (x) => x.actual }, { key: "b", label: t("Baseline (kWh)"), render: (x) => x.baseline },
-                { key: "d", label: t("Difference vs baseline"), render: (x) => <Badge tone={x.tone}>{x.difference}</Badge> }, { key: "c", label: t("Coverage"), render: (x) => x.coverage },
-              ]} />
-            ) : (
-              <DataTable rows={live.daily} rowKey={(d) => d.label} cols={[
-                { key: "d", label: t("Day"), render: (d) => d.label }, { key: "a", label: t("Actual (kWh)"), render: (d) => (d.actual === null ? "—" : one(d.actual)) },
-                { key: "b", label: t("Baseline (kWh)"), render: (d) => (d.baseline === null ? "—" : one(d.baseline)) },
-              ]} />
-            )}
+          {chartBody(s, r)}
           {isMulti && <p className="mt-3 text-[11px] text-muted-foreground">{t("Totals across units are shown only when all units share the same calculation boundary; increases are labelled, never shown as a negative saving.")}</p>}
           {s.warnings.length > 0 && <div className="mt-3"><Banner tone="warn">{s.warnings.join(" · ")}</Banner></div>}
           <details className="mt-3 text-[12px]"><summary className="cursor-pointer font-semibold text-muted-foreground">{t("Calculation conditions")}</summary><div className="mt-2"><SummaryList items={s.conditions} /></div></details>
@@ -109,7 +122,7 @@ export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
         <Card title={t("Carbon impact")} sub={t("Same period & units as above · {factor}", { factor: r.factor ?? t("emission factor missing") })} action={<LinkButton size="sm" href={`/customer/energy/offsets?${live.query}`}>{t("Offset these emissions")}<Icon name="arrowRight" /></LinkButton>}>
           <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
             <div><div className="text-xs text-muted-foreground">{t("Estimated emissions")}</div><div className="text-2xl font-bold">{s.emissions}</div><div className="text-[11px] text-muted-foreground">{r.kWh === null ? t("no valid readings") : t("{kWh} kWh actual × factor", { kWh: one(r.kWh) })}</div></div>
-            <div><div className="text-xs text-muted-foreground">{t("Estimated savings vs baseline")}</div><div className={`text-2xl font-bold ${s.comparable ? (s.increase ? "text-warn" : "text-ok") : "text-muted-foreground"}`}>{s.savedEmissions}</div><div className="text-[11px] text-muted-foreground">{s.comparable ? `${s.baseline} → ${s.actual}` : t("needs a comparable baseline")}</div></div>
+            <div><div className="text-xs text-muted-foreground">{t("Estimated savings vs baseline")}</div><div className={`text-2xl font-bold ${savingClass(s)}`}>{s.savedEmissions}</div><div className="text-[11px] text-muted-foreground">{s.comparable ? `${s.baseline} → ${s.actual}` : t("needs a comparable baseline")}</div></div>
             <div><div className="text-xs text-muted-foreground">{t("Offsets")} <Badge tone="muted">{t("Optional")}</Badge></div><div className="text-[13px]">{t("Get a demo quote and request an offset for these emissions — demo only")}</div></div>
           </div>
           <p className="mt-3 text-[11px] text-muted-foreground">{t("Estimates only. Savings are not a tradable balance and are not converted into carbon credits.")}</p>
@@ -135,7 +148,8 @@ function ExportModal({ live, onClose }: Readonly<{ live: EnergyLive; onClose: ()
   const [email, setEmail] = useState(live.prefs?.monthlyReportEmail ?? false);
   const [file, setFile] = useState<ReportFile | null>(null);
   const label = (m: string) => new Date(`${m}-01T00:00:00Z`).toLocaleDateString(intlTag(locale), { month: "long", year: "numeric", timeZone: "UTC" });
-  const errorText = props.length === 0 ? t("Choose at least one location") : (sections.length === 0 ? t("Choose at least one section") : undefined);
+  const sectionError = sections.length === 0 ? t("Choose at least one section") : undefined;
+  const errorText = props.length === 0 ? t("Choose at least one location") : sectionError;
   const download = () => {
     const input: ReportInput = { propertyIds: props, month, sections, format };
     const prefs = live.prefs && email !== live.prefs.monthlyReportEmail ? { locale: live.prefs.locale as "en" | "ms", timezone: live.prefs.timezone, value: email } : null;

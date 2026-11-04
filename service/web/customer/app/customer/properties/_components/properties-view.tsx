@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Banner, Btn, Card, Choice, ConnBadge, cx, DataTable, EmptyState, Field, Modal, Page, PowerBadge, SummaryList, useToast, Plain } from "@ac/web/components/ui";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
-import type { Connection, PowerState, Selection, TreeProperty, TreeSpace } from "@ac/web/lib/assets";
+import { selectionId, type Connection, type PowerState, type Selection, type TreeProperty, type TreeSpace } from "@ac/web/lib/assets";
 import { changeText, groupPlan, type GroupChange, type PlanRow, type RoomUnit } from "@ac/web/lib/clientProperties";
 import { historyRow, type ApiCommand, type ApiUnitDetail } from "@ac/web/lib/units";
 import { waitForCommand } from "@ac/web/lib/unitCommands";
@@ -33,12 +33,15 @@ const kind = (t: T, k: string) => t(kindLabel[k] ?? k);
 
 /** Units & locations (FR-C02) in API mode: the structure is read only (HQ manages it) except renaming; a room lists its
 air conditioners, and owners can send one change to several of them (Group control, FR-C14). */
+// a command's state and a group test's result as a badge colour (primary for the others)
+const TRY_TONE = new Map<string, "ok" | "crit" | "warn">([["Confirmed", "ok"], ["Failed", "crit"], ["Waiting", "warn"]]);
+const RESULT_TONE = new Map<string, "unknown" | "warn" | "muted">([["Skipped", "unknown"], ["Clamped", "warn"], ["No change", "muted"]]);
 export function PropertiesView({ live }: Readonly<{ live: PropertiesLive }>) {
   const t = useT();
   const nav = useUrlPatch();
   const [renaming, setRenaming] = useState<Renaming | null>(null);
   const sel = live.selection;
-  const selId = sel ? sel.kind === "property" ? sel.property.id : sel.kind === "space" ? sel.space.id : `unassigned:${sel.property.id}` : "";
+  const selId = selectionId(sel);
   const go = (patch: Record<string, string | null>) => { nav({ propertyId: null, spaceId: null, unassignedOnly: null, mode: null, unitIds: null, powerState: null, connections: null, ...patch }); };
   if (live.tree.length === 0) return <Page><EmptyState title={t("No properties yet")}>{t("HQ registers your homes and offices with their rooms and air conditioners; they appear here once set up.")}</EmptyState></Page>;
   return (
@@ -229,8 +232,8 @@ function GroupPanel({ live, space }: Readonly<{ live: PropertiesLive; space: str
             <Plain key={u.id} type="button" disabled={sending} onClick={() => { toggle(u.id); }} aria-pressed={sel.includes(u.id)}
               className={cx("rounded-xl border p-3 text-left disabled:opacity-60", sel.includes(u.id) ? "border-2 border-primary bg-primary-soft/50" : "border-line bg-surface")}>
               <div className="flex items-center justify-between"><b className="text-[13px]">{u.name}</b><Icon name={sel.includes(u.id) ? "checked" : "unchecked"} className="text-sm" /></div>
-              <div className="text-[11px] text-muted-foreground">{u.online ? (u.temp === "—" && u.watts === "—" ? t("no recent reading") : `${u.temp} · ${u.watts}`) : null}{!u.online && u.seen && t("last seen {when}", { when: u.seen })}{!u.online && !u.seen && t("no connection yet")}</div>
-              <div className="mt-1 flex flex-wrap gap-1"><PowerBadge s={u.power} /><ConnBadge s={u.conn} />{tr && <Badge tone={tr.status === "Confirmed" ? "ok" : tr.status === "Failed" ? "crit" : tr.status === "Waiting" ? "warn" : "primary"}>{t(tr.status)}</Badge>}</div>
+              <div className="text-[11px] text-muted-foreground">{u.online && (u.temp === "—" && u.watts === "—" ? t("no recent reading") : `${u.temp} · ${u.watts}`)}{!u.online && u.seen && t("last seen {when}", { when: u.seen })}{!u.online && !u.seen && t("no connection yet")}</div>
+              <div className="mt-1 flex flex-wrap gap-1"><PowerBadge s={u.power} /><ConnBadge s={u.conn} />{tr && <Badge tone={TRY_TONE.get(tr.status) ?? "primary"}>{t(tr.status)}</Badge>}</div>
               {(tr?.status === "Failed" || tr?.status === "Waiting") && <div className={cx("mt-1 text-[11px]", tr.status === "Failed" ? "text-crit" : "text-warn")}>{tr.note}</div>}
             </Plain>
           );
@@ -258,7 +261,7 @@ function GroupPanel({ live, space }: Readonly<{ live: PropertiesLive; space: str
           <DataTable rowKey={(r) => r.id} rows={review} cols={[
             { key: "n", label: "AC", render: (r) => <b>{r.name}</b> },
             { key: "c", label: t("Change"), render: (r) => <>{r.change}{r.note && <div className="text-[11px] text-warn">{r.note}</div>}</> },
-            { key: "r", label: t("Result"), render: (r) => <Badge tone={r.result === "Skipped" ? "unknown" : r.result === "Clamped" ? "warn" : r.result === "No change" ? "muted" : "primary"}>{t(r.result)}</Badge> },
+            { key: "r", label: t("Result"), render: (r) => <Badge tone={RESULT_TONE.get(r.result) ?? "primary"}>{t(r.result)}</Badge> },
           ]} />
           <div className="mt-2"><Banner>{t("After sending, each card shows Sending → Confirmed / Failed. Failed ACs can be retried one by one; there is no rollback across ACs.")}</Banner></div>
         </Modal>

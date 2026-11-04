@@ -177,6 +177,12 @@ export type Selection =
   | { kind: "property"; property: TreeProperty }
   | { kind: "space"; property: TreeProperty; space: TreeSpace; path: string }
   | { kind: "unassigned"; property: TreeProperty };
+/** The tree's id of a selection: a property, a space, or a property's unassigned units ("" for none). */
+export function selectionId(sel: Selection | null): string {
+  if (!sel) return "";
+  if (sel.kind === "property") return sel.property.id;
+  return sel.kind === "space" ? sel.space.id : `unassigned:${sel.property.id}`;
+}
 export function selection(tree: TreeProperty[], locationId: string | undefined, ss: ApiSpaceRow[]): Selection | null {
   if (locationId?.startsWith("unassigned:")) {
     const p = tree.find((x) => x.id === locationId.slice(11));

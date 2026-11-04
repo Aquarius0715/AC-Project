@@ -10,7 +10,7 @@ import { showTime, type T } from "@ac/web/lib/i18n";
 import {
   autoMapping, changedFields, connections, contractMatch, coverageCsv, coverageMatch, csvShape, customerDraft, customerErrors, customerMatch, errorReportCsv, flatten,
   importFields, importMessage, importPlace, importTemplate, inviteError, nameError, powerStates, profileLabel, propertyDraft, propertyErrors, propertyInput, reasonError,
-  relocates, unitDraft, unitErrors, unitInput,
+  relocates, selectionId, unitDraft, unitErrors, unitInput,
   type ApiImportPreview, type ApiUnitDetail, type ApiUnitImport, type ClaimCandidate, type ClientUserRow, type Connection, type ContractFilter, type CoverageFilter,
   type CoverageRow, type coverageKpis, type CustomerDraft, type CustomerRow, type PolicyLine, type PowerState, type Profile, type PropertyDraft, type RuleLine, type Scope,
   type Selection, type TreeProperty, type TreeSpace, type UnitDraft, type UnitRow, type registerKpis,
@@ -50,12 +50,6 @@ const connLabel: Record<Connection, string> = { online: "Online", offline: "Offl
 const scopeLabel: Record<Scope, string> = { indoor: "indoor", outdoor: "outdoor", electrical: "electrical" };
 /** “1 unit” / “3 units” in the display language: the singular and the plural key of one count. */
 const count = (t: T, n: number, one: string, many: string) => t(n === 1 ? one : many, { n });
-/** The tree's id of a selection: a property, a space, or a property's unassigned units. */
-function selectionId(sel: Selection | null): string {
-  if (!sel) return "";
-  if (sel.kind === "property") return sel.property.id;
-  return sel.kind === "space" ? sel.space.id : `unassigned:${sel.property.id}`;
-}
 /** A customer row's contract line: the restriction (its state), the overdue invoices, or none; and where it links. */
 function standingLine(s: CustomerRow["standing"], customerId: string, t: T): { sub: string; href?: string; link?: string } {
   const r = s?.restriction;
