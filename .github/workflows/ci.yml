@@ -25,6 +25,10 @@ concurrency:
 env:
   GOTOOLCHAIN: auto
 
+defaults:
+  run:
+    shell: bash # a job container's default shell is sh, and the Go suites' steps use pipefail
+
 jobs:
   go-lint:
     name: Go lint (gofmt, vet, golangci-lint, generated files, Swagger)

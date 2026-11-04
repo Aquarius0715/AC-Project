@@ -8975,3 +8975,4 @@ A private repository has 2,000 free Actions minutes a month on GitHub's runners,
    - `deploy/test/add-runners.sh` installs them as `~/actions-runner-2` and `-3`, each with the label `ac-test` and a service of its own, from one registration token.
    - The token is read without echo and reaches `config.sh` through `ACTIONS_RUNNER_INPUT_TOKEN`, which the runner reads and clears, never on a command line.
    - Each runner takes one job at a time in its own work directory. The cache volumes are shared, and Go's and npm's caches are safe to use concurrently.
+8. **bash in the job containers.** The two Go suites failed at `go test` with "set: Illegal option -o pipefail": a job container's steps run in `sh` by default. `ci.yml` sets `defaults.run.shell: bash`. On the runner, the web jobs and the document validators passed in their containers, as did the suites' set-up (the PostgreSQL service through socat, the test databases).
