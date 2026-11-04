@@ -25,6 +25,7 @@ func assembled(t *testing.T) *server.Server {
 			Addr:              "",
 			Clock:             nil,
 			DemoOps:           false,
+			DemoShared:        false,
 			DemoStart:         time.Time{},
 			Logger:            nil,
 			Domains:           nil,

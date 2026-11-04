@@ -73,6 +73,7 @@ func run() error {
 			Addr:              "",
 			Clock:             nil,
 			DemoOps:           false,
+			DemoShared:        false,
 			DemoStart:         time.Time{},
 			Logger:            nil,
 			Domains:           nil,

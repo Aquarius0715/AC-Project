@@ -43,7 +43,8 @@ Shared test environment (DEC-93, DEC-94): pushing a tag such as `test1.0.0r2` on
 the commit's CI passed it builds the images there and starts them, with the build and deploy logs on the Actions tab. CI
 runs on that runner too on every push, and E2E every night and by hand (DEC-95).
 The apps open at `http://<server>:3200` (customer), `:3201` (partner), `:3202` (technician) and `:3203` (HQ), Keycloak at
-`:8281` and Mailpit at `:8225`. The server's one-time set-up is `bash deploy/test/setup.sh` from a checkout, then the
+`:8281` and Mailpit at `:8225`. Its data are the default users and the real devices only, on the real clock: `customer-a`
+sees the two real units, and there is no demo data or mock fleet (DEC-96). The server's one-time set-up is `bash deploy/test/setup.sh` from a checkout, then the
 runner's registration (container design §6).
 
 Profiles: `infra` (PostgreSQL, Valkey, LocalStack, Mosquitto, Keycloak, Mailpit, mocks), `backend` (+ API services and

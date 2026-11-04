@@ -47,14 +47,19 @@ type Config struct {
 	DatabaseReaderURL string
 	Addr              string
 	Clock             func() time.Time
-	DemoOps           bool              // demo environment only: demo.advanceClock / demo.trigger (IR154)
-	DemoStart         time.Time         // demo scenario clock at start (fixture.clock, IR36); zero keeps the base clock
-	Logger            *slog.Logger      // Echo's application logger (Echo v5 uses log/slog); nil keeps Echo's default
-	Domains           []string          // business domains this service serves (IR180); empty = all (tests)
-	IdentityURL       string            // identity-api base URL for principals (IR181); empty = read identity tables
-	InternalToken     string            // shared token of internal service-to-service endpoints
-	ServiceURLs       map[string]string // base URL per domain for internal queries of unserved domains (IR190)
-	PrincipalTTL      time.Duration     // principal cache of RemoteSource: 0 = 30 s, negative = no cache (IR181)
+	DemoOps           bool // demo environment only: demo.advanceClock / demo.trigger (IR154)
+	// the scenario clock is the one shared through platform.demo_clock (the services and workers of a stack, IR168);
+	// false keeps one local to the process (tests)
+	DemoShared bool
+	// where the shared scenario clock starts (fixture.clock, IR36; DEMO_CLOCK_START); zero starts it on the base clock
+	// (DEMO_CLOCK_START=now, DEC-96)
+	DemoStart     time.Time
+	Logger        *slog.Logger      // Echo's application logger (Echo v5 uses log/slog); nil keeps Echo's default
+	Domains       []string          // business domains this service serves (IR180); empty = all (tests)
+	IdentityURL   string            // identity-api base URL for principals (IR181); empty = read identity tables
+	InternalToken string            // shared token of internal service-to-service endpoints
+	ServiceURLs   map[string]string // base URL per domain for internal queries of unserved domains (IR190)
+	PrincipalTTL  time.Duration     // principal cache of RemoteSource: 0 = 30 s, negative = no cache (IR181)
 	// shared scenario clock of several services in one binary (tests); overrides DemoStart
 	DemoClock  ScenarioClock
 	WriteLimit ops.WriteLimiter // writes per membership and minute (IR375); nil = no limit
@@ -140,8 +145,8 @@ func New(ctx context.Context, cfg Config, verifier auth.Verifier) (*Server, erro
 	return srv, nil
 }
 
-// newDemoOps is demo.* with its scenario clock: the configured one, the clock shared in the database when the scenario
-// has a start, or one local to the process. In the demo the registry runs on that clock.
+// newDemoOps is demo.* with its scenario clock: the configured one, the clock shared in the database, or one local to
+// the process. In the demo the registry runs on that clock.
 func newDemoOps(
 	ctx context.Context,
 	cfg Config,
@@ -162,8 +167,8 @@ func newDemoOps(
 
 	if cfg.DemoClock != nil {
 		demo.clock = cfg.DemoClock
-	} else if !cfg.DemoStart.IsZero() {
-		// starts at fixture.clock, runs in real time, shared with the workers (IR36, IR168)
+	} else if cfg.DemoShared {
+		// starts at fixture.clock or on the real clock, runs in real time, shared with the workers (IR36, IR168, DEC-96)
 		shared, err := democlock.Open(ctx, txm.Writer, reg.Clock, cfg.DemoStart)
 		if err != nil {
 			return nil, apperr.Wrap(err, "democlock.Open")

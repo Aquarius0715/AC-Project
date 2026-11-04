@@ -144,6 +144,7 @@ func serverCfg(t *testing.T, opt func(*apiserver.Config)) *apiserver.Server {
 		DatabaseReaderURL: "",
 		Addr:              "",
 		DemoOps:           false,
+		DemoShared:        false,
 		DemoStart:         time.Time{},
 		Logger:            nil,
 		Domains:           nil,

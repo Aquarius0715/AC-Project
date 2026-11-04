@@ -138,6 +138,7 @@ func newCluster(t *testing.T) splitCluster {
 			DatabaseReaderURL: "",
 			Addr:              "",
 			DemoOps:           false,
+			DemoShared:        false,
 			DemoStart:         time.Time{},
 			Logger:            nil,
 			Domains:           nil,

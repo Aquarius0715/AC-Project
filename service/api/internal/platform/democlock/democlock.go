@@ -31,8 +31,8 @@ type Clock struct {
 	loadedAt time.Time
 }
 
-// Open makes sure the shared row exists (the first process starts the scenario at start; later processes keep the
-// stored offset) and returns the clock.
+// Open makes sure the shared row exists (the first process starts the scenario at start, or on the base clock when
+// start is zero; later processes keep the stored offset) and returns the clock.
 func Open(
 	ctx context.Context,
 	pool *pgxpool.Pool,
@@ -130,12 +130,20 @@ func (c *Clock) load(ctx context.Context) error {
 // DefaultStart is fixture.clock (docs/04-agentic-sdlc/fixture-contract.json).
 const DefaultStart = "2026-09-14T01:00:00Z"
 
-// StartFromEnv is the scenario start: DEMO_CLOCK_START, else fixture.clock. Every process uses the same value, so
-// whichever starts first creates the same row.
+// RealTime is the DEMO_CLOCK_START that runs the scenario on the real clock: the shared offset is 0 (the shared test
+// environment, whose data are the real devices', DEC-96).
+const RealTime = "now"
+
+// StartFromEnv is the scenario start: DEMO_CLOCK_START, else fixture.clock; the zero time for RealTime, which Open
+// starts at offset 0. Every process uses the same value, so whichever starts first creates the same row.
 func StartFromEnv(getenv func(string) string) (time.Time, error) {
 	v := getenv("DEMO_CLOCK_START")
 	if v == "" {
 		v = DefaultStart
+	}
+
+	if v == RealTime {
+		return time.Time{}, nil
 	}
 
 	out, err := time.Parse(time.RFC3339, v)

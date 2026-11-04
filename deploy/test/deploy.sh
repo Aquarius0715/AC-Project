@@ -5,11 +5,12 @@
 # checkout, so the build and deploy logs show on the Actions tab.
 #
 # A deployment builds the tag's images one at a time, with the tag as the image tag (the images of the last KEEP
-# deployed tags stay), and starts the compose project ac-test: compose.yaml with deploy/test/compose.test.yaml on top
-# and the server's environment file ~/ac-test/env (deploy/test/setup.sh writes it). The data stays from one deployment
-# to the next, except when the migrations changed: version 1 is edited in place before the first release and never
-# applied again to a database that has it, so the data is then built again from the seed. A deployment that fails
-# brings back the tag before it.
+# deployed tags stay), and starts the compose project ac-test: compose.yaml with deploy/test/compose.test.yaml and
+# deploy/test/compose.live.yaml on top and the server's environment file ~/ac-test/env (deploy/test/setup.sh writes
+# it). The data are the fixture's accounts and the real devices at customer-a, on the real clock (DEC-96). They stay
+# from one deployment to the next, except when the migrations or compose.live.yaml changed: version 1 is edited in
+# place before the first release and never applied again to a database that has it, so the data is then built again
+# from the seed. A deployment that fails brings back the tag before it.
 #
 #   deploy.sh deploy TAG   deploys the tag (the workflow; by hand, from a checkout that has the tag)
 #   deploy.sh boot         after a reboot: the stack again, then the API services once Keycloak answers, as they load
@@ -30,6 +31,8 @@ PROJECT=ac-test
 KEEP=3
 API_SERVICES=(gateway identity-api equipment-api maintenance-api billing-api energy-api)
 MIGRATIONS=service/api/internal/migrations
+LIVE=deploy/test/compose.live.yaml # this environment's data (DEC-96); a tag before it has none
+LEFT_OUT=mock-fleet                # the profile compose.live.yaml moves the mock fleet's services to
 
 log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 
@@ -41,12 +44,15 @@ state() { cat "$STATE/$1" 2>/dev/null || true; }
 # person's own and may hold any character)
 setting() { sed -n "s/^$1=//p" "$SETTINGS" | tail -n 1 | sed -e "s/^'\(.*\)'$/\1/" -e 's/^"\(.*\)"$/\1/'; }
 
-# compose for the tag $1, on the tree
+# compose for the tag $1, on the tree, with this environment's data on the real clock
 compose() {
-  local tag=$1
+  local tag=$1 files=(-f "$REPO/compose.yaml" -f "$REPO/deploy/test/compose.test.yaml")
   shift
-  IMAGE_TAG=$tag docker compose -p "$PROJECT" --progress plain --env-file "$SETTINGS" \
-    -f "$REPO/compose.yaml" -f "$REPO/deploy/test/compose.test.yaml" --profile full --profile iot "$@"
+  if [ -f "$REPO/$LIVE" ]; then
+    files+=(-f "$REPO/$LIVE")
+  fi
+  IMAGE_TAG=$tag DEMO_CLOCK_START=now docker compose -p "$PROJECT" --progress plain --env-file "$SETTINGS" \
+    "${files[@]}" --profile full --profile iot "$@"
 }
 
 checkout() { git -C "$REPO" checkout --quiet --force --detach "refs/tags/$1"; }
@@ -117,6 +123,20 @@ prepare() {
   return "$result"
 }
 
+# removes the containers of the services this environment leaves out (the mock fleet's): compose keeps a container
+# whose service left the active profiles, even when it removes orphans
+leave_out() {
+  local tag=$1 all active service out=()
+  all=$(compose "$tag" --profile "$LEFT_OUT" config --services) || return 1
+  active=$(compose "$tag" config --services) || return 1
+  for service in $all; do
+    grep -qxF "$service" <<<"$active" || out+=("$service")
+  done
+  if [ "${#out[@]}" -gt 0 ]; then
+    compose "$tag" rm --stop --force "${out[@]}" || return 1
+  fi
+}
+
 # checks out the tag $1, builds and starts it; $2 is 1 when the data is built again from the seed
 deploy() {
   local tag=$1 fresh=$2
@@ -125,16 +145,16 @@ deploy() {
   step "writing the realm and the broker logins"
   prepare || return 1
   build "$tag" || return 1
+  step "removing the services this environment leaves out"
+  leave_out "$tag" || return 1
   if [ "$fresh" = 1 ]; then
-    step "removing the data (the migrations changed)"
+    step "removing the data"
     compose "$tag" down --volumes --remove-orphans || return 1
   fi
   step "starting the stack"
   compose "$tag" up -d --remove-orphans || return 1
   step "waiting for the apps and Keycloak"
   ready 900 || return 1
-  step "loading the mock fleet's history"
-  compose "$tag" run --rm mock-history || return 1 # the mock fleet's 30 days up to the scenario clock
   end_step
   STEP=
 }
@@ -151,24 +171,31 @@ prune() {
   done
 }
 
-# deploys the tag $1: from the seed again when the migrations changed since the deployed tag; back to that tag when it
-# fails. A deployment that works leaves the tree and this script for the boot unit.
+# what the data of the tag $1 are built from: the migrations, and this environment's data settings
+data_of() {
+  git -C "$REPO" rev-parse "refs/tags/$1:$MIGRATIONS" || return 1
+  git -C "$REPO" rev-parse --quiet --verify "refs/tags/$1:$LIVE" || echo none
+}
+
+# deploys the tag $1: from the seed again when what the data are built from changed since the deployed tag; back to
+# that tag when it fails. A deployment that works leaves the tree and this script for the boot unit.
 release() {
-  local tag=$1 schema fresh=0 previous
+  local tag=$1 data fresh=0 previous
   if ! git -C "$REPO" rev-parse --quiet --verify "refs/tags/$tag" >/dev/null; then
     log "$tag is not a tag of $REPO"
     return 1
   fi
-  schema=$(git -C "$REPO" rev-parse "refs/tags/$tag:$MIGRATIONS")
+  data=$(data_of "$tag") || return 1
   previous=$(state deployed)
-  if [ -n "$previous" ] && [ "$(state schema)" != "$schema" ]; then
+  if [ -n "$previous" ] && [ "$(state data)" != "$data" ]; then
     fresh=1
-    log "$tag: the migrations changed since $previous; the data is built again from the seed"
+    log "$tag: the migrations or the data settings changed since $previous; the data is built again from the seed"
   fi
   log "deploying $tag ($(git -C "$REPO" rev-parse --short "refs/tags/$tag^{commit}")) after ${previous:-nothing}"
   if deploy "$tag" "$fresh"; then # each step returns its own failure
     printf '%s\n' "$tag" >"$STATE/deployed"
-    printf '%s\n' "$schema" >"$STATE/schema"
+    printf '%s\n' "$data" >"$STATE/data"
+    rm -f "$STATE/schema" # the migrations alone, the record before DEC-96
     printf '%s\n' "$REPO" >"$STATE/repo"
     install -m 700 "$REPO/deploy/test/deploy.sh" "$ROOT/deploy.sh"
     prune "$tag"

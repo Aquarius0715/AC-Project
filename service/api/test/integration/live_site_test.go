@@ -69,7 +69,7 @@ func TestLiveSiteSeeds(t *testing.T) {
 
 	listed := people()
 
-	applyLiveErr := seed.ApplyLive(ctx, txn, clock())
+	applyLiveErr := seed.ApplyLive(ctx, txn, site, clock())
 	if applyLiveErr != nil {
 		t.Fatalf("apply: %v", applyLiveErr)
 	}
@@ -272,7 +272,7 @@ func TestLiveSiteSeeds(t *testing.T) {
 		t.Fatal(execErr)
 	}
 
-	applyLiveErr = seed.ApplyLive(ctx, txn, clock().Add(time.Hour))
+	applyLiveErr = seed.ApplyLive(ctx, txn, site, clock().Add(time.Hour))
 	if applyLiveErr != nil {
 		t.Fatalf("second apply: %v", applyLiveErr)
 	}

@@ -165,6 +165,7 @@ func TestBootstrapAdmin(t *testing.T) {
 			DatabaseReaderURL: "",
 			Addr:              "",
 			DemoOps:           false,
+			DemoShared:        false,
 			DemoStart:         time.Time{},
 			Logger:            nil,
 			IdentityURL:       "",
