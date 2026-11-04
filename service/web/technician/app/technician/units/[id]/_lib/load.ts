@@ -5,7 +5,7 @@
 // from the unit's device (devices.list, devices.events). Before the work window starts the page says when it opens
 // (IR76, jobs.get of the URL's job). Texts in the user's display language; every time is formatted here (IR283).
 import "server-only";
-import { coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreDisplay, coreNow, coreOp, CoreError, orWhenRefused, coreItems } from "@ac/web/lib/dal";
 import { i18nOf, showTime } from "@ac/web/lib/i18n";
 import type { ApiAlert } from "@ac/web/lib/alerts";
 import type { TechJobRead } from "@ac/web/lib/techJob";
@@ -20,12 +20,7 @@ import {
 interface Page<T> { items: T[]; nextCursor?: string | null; total?: number }
 /** telemetry.series: a page of readings, or with bucketMinutes the period's averages (AirSeries.buckets, IR605). */
 type SeriesPage = Page<Point> & { buckets: { start: string; value: number | null; count: number }[] | null };
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error: unknown) => {
-    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
-    throw error;
-  });
-};
+const optional = orWhenRefused;
 const gone = (e: unknown) => e instanceof CoreError && (e.error.code === "NOT_FOUND" || e.error.code === "FORBIDDEN" || !!e.error.fieldErrors.id);
 
 /** The readings of a metric in the period. A day and a week come whole, as 5- and 60-minute averages of their valid
@@ -80,16 +75,16 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
   const unitOf = (m: string) => d.latestMeasurements.find((x) => x.metric === m)?.unit ?? "";
   const others = tab === "monitoring" ? d.latestMeasurements.filter((m) => m.metric !== metric).slice(0, 3).map((m) => m.metric) : [];
   const [alerts, jobs, points, more, devices] = await Promise.all([
-    optional(coreOp<Page<ApiAlert>>("alerts.list", { limit: 50, filters: { unitId: id } }).then((r) => r.items), [] as ApiAlert[]),
-    optional(coreOp<Page<ApiTechJobRow>>("jobs.list", { limit: 20, filters: { unitId: id } }).then((r) => r.items), [] as ApiTechJobRow[]),
+    optional(coreItems<ApiAlert>("alerts.list", { limit: 50, filters: { unitId: id } }), [] as ApiAlert[]),
+    optional(coreItems<ApiTechJobRow>("jobs.list", { limit: 20, filters: { unitId: id } }), [] as ApiTechJobRow[]),
     optional(series(id, metric, from, to, period, 4), NONE),
     Promise.all(others.map((m) => optional(series(id, m, from, to, period, 1), NONE))),
-    tab === "monitoring" ? optional(coreOp<Page<{ id: string }>>("devices.list", { limit: 5, filters: { unitId: id } }).then((r) => r.items), []) : Promise.resolve([]),
+    tab === "monitoring" ? optional(coreItems<{ id: string }>("devices.list", { limit: 5, filters: { unitId: id } }), []) : Promise.resolve([]),
   ]);
   const eventLists = await Promise.all(devices.map((x) => {
-    return optional(coreOp<Page<ApiDeviceEventFull>>("devices.events", {
+    return optional(coreItems<ApiDeviceEventFull>("devices.events", {
       id: x.id, query: { limit: 50, filters: { from: new Date(from).toISOString(), to: new Date(to + 1000).toISOString() } },
-    }).then((r) => r.items), [] as ApiDeviceEventFull[]);
+    }), [] as ApiDeviceEventFull[]);
   }));
   const events = eventLists.flat();
   const control = controlJob(jobs, sp.jobId);

@@ -7,7 +7,7 @@
 // times are formatted here, in the display time zone, whose days the period filter takes too (IR282, IR304). The
 // Phase 1A demo keeps the fixture log.
 import { connection } from "next/server";
-import { apiMode, coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { apiMode, coreAll, coreDisplay, coreNow, coreOp, orWhenRefused } from "@ac/web/lib/dal";
 import {
   actorOptions, auditDeviceEvents, auditFilters, auditQuery, auditRow, correlationQuery, correlationTrace, periodError, periodInstants, relatedRecords, targetKinds,
   type ApiAudit, type ApiAuditDeviceEvent,
@@ -20,12 +20,7 @@ import { queryReader } from "@ac/web/lib/searchParams";
 
 interface Device { id: string; serial: string; unitId: string | null }
 // a part the session may not read (FORBIDDEN, NOT_FOUND) is left out; UNAVAILABLE and TIMEOUT still fail the page
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error: unknown) => {
-    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
-    throw error;
-  });
-};
+const optional = orWhenRefused;
 
 // a role without the page's read permission sees which one it needs, not a failure (IR582)
 export default async function AdminAuditPage(props: PageProps<"/admin/audit">) {

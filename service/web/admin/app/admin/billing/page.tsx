@@ -7,7 +7,7 @@
 // the display language; billing periods, due dates and pay dates are Kuala Lumpur business days, and the inquiry times
 // are formatted here, in the display time zone (IR282, IR299). The Phase 1A demo keeps the fixture rows.
 import { connection } from "next/server";
-import { apiMode, coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { apiMode, coreAll, coreDisplay, coreNow, coreOp, orWhenRefused, coreAllPage } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
 import {
   billingMonths, contractOptions, inquiryRows, invoiceDetail, invoiceRows, lastClosedMonth, monthsText, statementDetail, statementRows,
@@ -19,12 +19,7 @@ import { queryReader } from "@ac/web/lib/searchParams";
 
 interface Page<T> { items: T[] }
 // a part the session may not read (FORBIDDEN, NOT_FOUND) is left out; UNAVAILABLE and TIMEOUT still fail the page
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error: unknown) => {
-    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
-    throw error;
-  });
-};
+const optional = orWhenRefused;
 
 // a role without the page's read permission sees which one it needs, not a failure (IR582)
 export default async function AdminBillingPage(props: PageProps<"/admin/billing">) {
@@ -46,9 +41,9 @@ async function AdminBillingPageContent({ searchParams }: Readonly<PageProps<"/ad
   const [now, display, invoices, contracts, customers, properties, inquiries] = await Promise.all([
     coreNow(), coreDisplay(),
     coreOp<Page<ApiInvoice>>("invoices.list", { limit: 100, filters }),
-    coreAll<ApiContract>("contracts.list").then((items) => ({ items, total: items.length })),
-    coreAll<ApiCustomer>("customers.list").then((items) => ({ items, total: items.length })),
-    coreAll<ApiProperty>("properties.list").then((items) => ({ items, total: items.length })),
+    coreAllPage<ApiContract>("contracts.list"),
+    coreAllPage<ApiCustomer>("customers.list"),
+    coreAllPage<ApiProperty>("properties.list"),
     coreOp<Page<ApiInquiry>>("inquiries.list", { limit: 100 }),
   ]);
   const i = i18nOf(display);

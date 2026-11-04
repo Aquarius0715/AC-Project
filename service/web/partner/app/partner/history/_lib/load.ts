@@ -6,18 +6,13 @@
 // A job outside the period is looked up without it.
 // Texts in the user's display language; every time is formatted here, in their display time zone (IR278).
 import "server-only";
-import { coreAll, coreDisplay, coreIdentity, coreNow, coreOp, corePrincipal, CoreError } from "@ac/web/lib/dal";
+import { coreAll, coreDisplay, coreIdentity, coreNow, coreOp, corePrincipal, orWhenRefused, coreItems } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
 import { byUser, eventItem, HISTORY_STATUSES, historyRow, noteMode, PERIODS, periodOf, SORTS, sortOf, tabCounts, TABS, tabOf, visibleRows, type ApiEvent, type HistoryRow } from "@ac/web/lib/partnerHistory";
 import type { ApiMember, ApiPartnerJob } from "@ac/web/lib/partnerOverview";
 
 export interface ApiRecipient { id: string; role: string; displayLabel: string; allowedChannels: string[] }
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error: unknown) => {
-    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
-    throw error;
-  });
-};
+const optional = orWhenRefused;
 export async function loadHistory(sp: { jobId?: string; tab?: string; sort?: string; period?: string }) {
   interface Page<T> { items: T[]; total: number }
   const [now, display, who] = await Promise.all([coreNow(), coreDisplay(), coreIdentity()]);
@@ -64,7 +59,7 @@ export async function loadHistory(sp: { jobId?: string; tab?: string; sort?: str
   if (!hit) return { ...base, detail: { missing: true as const, id: sp.jobId } };
   const [principal, events] = await Promise.all([ // the job's newest 100 events, newest first
     corePrincipal(),
-    optional(coreOp<Page<ApiEvent>>("jobs.events", { jobId: hit.id, query: { limit: 100, sort: { field: "occurredAt", direction: "desc" } } }).then((r) => r.items), [] as ApiEvent[]),
+    optional(coreItems<ApiEvent>("jobs.events", { jobId: hit.id, query: { limit: 100, sort: { field: "occurredAt", direction: "desc" } } }), [] as ApiEvent[]),
   ]);
   const users = byUser(members, principal.userId, t);
   const items = [...events].toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || b.id.localeCompare(a.id)).map((e) => eventItem(e, users, i));

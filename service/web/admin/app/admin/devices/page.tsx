@@ -4,7 +4,7 @@
 // deviceId, campaignId). Writes are Server Actions (actions.ts). The Phase 1A demo keeps the fixture register. Texts and
 // times of the first render are formatted here in the user's language and display time zone (IR295).
 import { connection } from "next/server";
-import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePermissions, CoreError } from "@ac/web/lib/dal";
+import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePermissions, orWhenForbidden, orAbsent, coreAllPage } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
 import {
   campaignRows, deviceRows, modelRows,
@@ -20,14 +20,10 @@ import { DevicesDemo } from "./_components/devices-demo";
 import { DevicesView, type DevicesLive } from "./_components/devices-view";
 import { queryReader } from "@ac/web/lib/searchParams";
 
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((error: unknown) => { // members the session may not read (no identity.read)
-  if (error instanceof CoreError && error.error.code === "FORBIDDEN") return fallback;
-  throw error;
-});
-const absent = <T,>(p: Promise<T>) => p.catch((error: unknown) => { // an alert or unit HQ cannot read (archived, another tenant) reads as absent
-  if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return null;
-  throw error;
-});
+// members the session may not read (no identity.read)
+const optional = orWhenForbidden;
+// an alert or unit HQ cannot read (archived, another tenant) reads as absent
+const absent = orAbsent;
 
 // a role without the page's read permission sees which one it needs, not a failure (IR582)
 export default async function AdminDevicesPage(props: PageProps<"/admin/devices">) {
@@ -43,8 +39,8 @@ async function AdminDevicesPageContent({ searchParams }: Readonly<PageProps<"/ad
   const tab = one("tab") === "devices" ? "devices" : (one("tab") === "firmware" ? "firmware" : "models");
   const [now, perms, display, caps, units, devices] = await Promise.all([
     coreNow(), corePermissions(), coreDisplay(),
-    coreAll<ApiCapability>("capabilities.list").then((items) => ({ items, total: items.length })),
-    coreAll<ApiUnitLite>("units.list").then((items) => ({ items, total: items.length })),
+    coreAllPage<ApiCapability>("capabilities.list"),
+    coreAllPage<ApiUnitLite>("units.list"),
     coreOp<Page<ApiDevice>>("devices.list", { limit: 100 }),
   ]);
   const i = i18nOf(display);

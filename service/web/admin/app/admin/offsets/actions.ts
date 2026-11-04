@@ -31,10 +31,10 @@ export async function requestOffset(quoteId: string, quoteVersion: number) {
 
 /** offsets.simulate purchase_confirm / retire / fail of the current attempt (a fresh event ID per click). */
 export async function simulateOffset(recordId: string, version: number, attemptId: string, event: "purchase_confirm" | "retire" | "fail") {
-  return run(() => coreOp("offsets.simulate", { event, recordId, attemptId, eventId: crypto.randomUUID(), demoConfirmed: true }, { write: true, expectedVersion: version }).then(() => null));
+  return run(async () => { await coreOp("offsets.simulate", { event, recordId, attemptId, eventId: crypto.randomUUID(), demoConfirmed: true }, { write: true, expectedVersion: version }); return null; });
 }
 
 /** offsets.simulate retry of the failed current attempt. */
 export async function retryOffset(recordId: string, version: number, attemptId: string) {
-  return run(() => coreOp("offsets.simulate", { event: "retry", demoConfirmed: true, recordId, attemptId }, { write: true, expectedVersion: version }).then(() => null));
+  return run(async () => { await coreOp("offsets.simulate", { event: "retry", demoConfirmed: true, recordId, attemptId }, { write: true, expectedVersion: version }); return null; });
 }

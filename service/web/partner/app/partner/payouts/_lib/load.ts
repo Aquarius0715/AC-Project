@@ -4,7 +4,7 @@
 // and the delegated jobs still in quality review (jobs.list status submitted) for the “Not included” rows. Texts in
 // the user's display language; every date is formatted here, on the server (IR279).
 import "server-only";
-import { coreAll, coreDisplay, coreIdentity, coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreAll, coreDisplay, coreIdentity, coreOp, orAbsent } from "@ac/web/lib/dal";
 import { i18nOf, showDate } from "@ac/web/lib/i18n";
 import { businessDay } from "@ac/web/lib/clientBilling";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
@@ -13,12 +13,7 @@ import { kpis, lineRows, money, periodLabel, questionRows, statementRows, topicL
 import type { PayoutsLive } from "../_components/payouts-view";
 import { byText } from "@ac/web/lib/order";
 
-const quiet = <T,>(p: Promise<T>) => {
-  return p.catch((error: unknown) => {
-    if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return null;
-    throw error;
-  });
-};
+const quiet = orAbsent;
 const unitName = async (id: string | undefined, cache: Map<string, Promise<string | null>>) => {
   if (!id) return null;
   if (!cache.has(id)) cache.set(id, quiet(coreOp<ApiUnitDetail>("units.get", { id })).then((u) => (u ? `${u.displayName} · ${u.location.pathLabels[0] ?? ""}`.replace(/ · $/, "") : null)));

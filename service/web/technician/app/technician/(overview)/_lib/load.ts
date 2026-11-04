@@ -5,18 +5,13 @@
 // display language; every time is formatted here — today and its timeline in Kuala Lumpur, instants in the user's
 // display time zone (IR281).
 import "server-only";
-import { coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreAll, coreDisplay, coreNow, coreOp, orWhenRefused, coreItems } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
 import type { ApiAlert } from "@ac/web/lib/alerts";
 import { klDay } from "@ac/web/lib/partnerOverview";
 import { alertRows, dayTimeline, kpis, reportRows, SORTS, sortOf, TABS, tabOf, techRow, type ApiTechCounts, type ApiTechJobRow, type TechJobRow } from "@ac/web/lib/techOverview";
 
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error: unknown) => {
-    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
-    throw error;
-  });
-};
+const optional = orWhenRefused;
 
 export async function loadOverview(sp: { tab?: string; sort?: string }) {
   interface Page<T> { items: T[]; total: number }
@@ -30,7 +25,7 @@ export async function loadOverview(sp: { tab?: string; sort?: string }) {
     coreOp<{ counts: ApiTechCounts }>("summaries.get", { kind: "technician", filters: {} }),
     coreOp<Page<ApiTechJobRow>>("jobs.list", { sort: { field: spec.field, direction: spec.direction }, limit: 100 }),
     optional(coreAll<{ id: string; displayName: string }>("units.list"), []),
-    optional(coreOp<Page<ApiAlert>>("alerts.list", { sort: { field: "severity", direction: "desc" }, limit: 50 }).then((r) => r.items), [] as ApiAlert[]),
+    optional(coreItems<ApiAlert>("alerts.list", { sort: { field: "severity", direction: "desc" }, limit: 50 }), [] as ApiAlert[]),
   ]);
   const names = new Map(units.map((u) => [u.id, u.displayName]));
   const rows = list.items.map((j) => techRow(j, nowMs, names, i)).filter((r): r is TechJobRow => !!r);

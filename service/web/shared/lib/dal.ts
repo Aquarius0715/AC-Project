@@ -54,6 +54,52 @@ export async function coreAll<T>(...[operation, query = {}, max = 1000]: ListArg
   return out.slice(0, max);
 }
 
+/** Every item of a list and how many there are. */
+export interface AllItems<T> { items: T[]; total: number }
+
+/** coreAll as a page: every item and their count. */
+export async function coreAllPage<T>(...args: ListArgs): Promise<AllItems<T>> {
+  const items = await coreAll<T>(...args);
+  return { items, total: items.length };
+}
+
+/** The items of one page of a list operation. */
+export async function coreItems<T>(...args: OpArgs<CoreOptions>): Promise<T[]> {
+  const page = await coreOp<{ items: T[] }>(...args);
+  return page.items;
+}
+
+/** A read a page can do without: `fallback` when the Core API refuses it, except UNAVAILABLE and TIMEOUT, which
+still fail the page (it is not readable now, not refused). */
+export async function orWhenRefused<T, F>(read: Promise<T>, fallback: F): Promise<T | F> {
+  try {
+    return await read;
+  } catch (error) {
+    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
+    throw error;
+  }
+}
+
+/** `fallback` when the session may not read it (FORBIDDEN); every other failure still fails. */
+export async function orWhenForbidden<T, F>(read: Promise<T>, fallback: F): Promise<T | F> {
+  try {
+    return await read;
+  } catch (error) {
+    if (error instanceof CoreError && error.error.code === "FORBIDDEN") return fallback;
+    throw error;
+  }
+}
+
+/** null for a record the session cannot see (FORBIDDEN, or NOT_FOUND: archived or another tenant's). */
+export async function orAbsent<T>(read: Promise<T>): Promise<T | null> {
+  try {
+    return await read;
+  } catch (error) {
+    if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return null;
+    throw error;
+  }
+}
+
 /** session.get once per render pass: the principal and the response meta. */
 const coreSession = cache(() => coreCall<{ permissions?: string[]; userId?: string; membershipId?: string; tenantId?: string; clientRole?: "owner" | "member" | null; displayName?: string; organizationName?: string; organizationId?: string; customerId?: string | null }>("session.get", {}, {}));
 

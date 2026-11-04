@@ -26,10 +26,10 @@ export async function registerDevice(serial: string, sensorTypes: Metric[], unit
 }
 /** devices.bind to another assigned unit; a reason is required and the device gets new sensor IDs (SR24). */
 export async function bindDevice(deviceId: string, version: number, unitId: string, jobId: string, reason: string) {
-  return run(() => coreOp("devices.bind", { deviceId, unitId, jobId, reason: reason.trim() }, { write: true, expectedVersion: version }).then(() => null));
+  return run(async () => { await coreOp("devices.bind", { deviceId, unitId, jobId, reason: reason.trim() }, { write: true, expectedVersion: version }); return null; });
 }
 export async function checkDevice(deviceId: string, version: number, jobId: string) {
-  return run(() => coreOp("devices.check", { id: deviceId, jobId }, { write: true, expectedVersion: version }).then(() => null));
+  return run(async () => { await coreOp("devices.check", { id: deviceId, jobId }, { write: true, expectedVersion: version }); return null; });
 }
 /** devices.calibrate at the current business time (a demo record; earlier readings stay unchanged). */
 export async function calibrateSensor(deviceId: string, version: number, sensorId: string, metric: Metric, unit: OpInput<"devices.calibrate">["unit"], referenceValue: number, measuredValue: number, jobId: string) {
@@ -41,13 +41,13 @@ export async function calibrateSensor(deviceId: string, version: number, sensorI
   });
 }
 export async function updateFirmware(deviceId: string, version: number, firmwareVersion: string, jobId: string) {
-  return run(() => coreOp("devices.updateFirmware", { deviceId, firmwareVersion, jobId }, { write: true, expectedVersion: version }).then(() => null));
+  return run(async () => { await coreOp("devices.updateFirmware", { deviceId, firmwareVersion, jobId }, { write: true, expectedVersion: version }); return null; });
 }
 /** devices.addResponseNote on one device event (its version); the device's physical state does not change. */
 export async function addResponseNote(deviceId: string, eventId: string, eventVersion: number, responseNote: string) {
-  return run(() => coreOp("devices.addResponseNote", { deviceId, eventId, responseNote: responseNote.trim() }, { write: true, expectedVersion: eventVersion }).then(() => null));
+  return run(async () => { await coreOp("devices.addResponseNote", { deviceId, eventId, responseNote: responseNote.trim() }, { write: true, expectedVersion: eventVersion }); return null; });
 }
 /** alerts.acknowledge of an alert raised by a device event (its version). Reconnection never clears it (DD-T12). */
 export async function acknowledgeAlert(alertId: string, version: number) {
-  return run(() => coreOp("alerts.acknowledge", { alertId }, { write: true, expectedVersion: version }).then(() => null));
+  return run(async () => { await coreOp("alerts.acknowledge", { alertId }, { write: true, expectedVersion: version }); return null; });
 }

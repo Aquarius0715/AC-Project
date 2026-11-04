@@ -5,19 +5,14 @@
 // Before the work window the page says when it opens (IR76). Texts in the user's display language; every time is
 // formatted here (IR284).
 import "server-only";
-import { coreDisplay, coreNow, coreOp, corePermissions, CoreError } from "@ac/web/lib/dal";
+import { coreDisplay, coreNow, coreOp, corePermissions, CoreError, orWhenRefused, coreItems } from "@ac/web/lib/dal";
 import { i18nOf, showTime, textOf } from "@ac/web/lib/i18n";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { alertChoices, alertView, selectAlert, type ApiTechAlert } from "@ac/web/lib/techAlerts";
 import { evidenceRows, type ApiEvidenceCandidate } from "@ac/web/lib/alertEvidence";
 import type { TechJobRead } from "@ac/web/lib/techJob";
 
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error: unknown) => {
-    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
-    throw error;
-  });
-};
+const optional = orWhenRefused;
 const UNAVAILABLE: Record<string, string> = {
   "errors.assignment_ended": "Your work window on this unit has ended.",
   "errors.assignment_required": "You need an active assignment on this unit to see its alerts.",
@@ -31,7 +26,7 @@ export async function loadAlerts(unitId: string, sp: { jobId?: string; alertId?:
   const { t } = i;
   const nowMs = now.getTime();
   const unitHref = `/technician/units/${unitId}${sp.jobId ? `?jobId=${sp.jobId}` : ""}`;
-  const alerts = await coreOp<Page<ApiTechAlert>>("alerts.list", { limit: 50, filters: { unitId } }).then((r) => r.items).catch((error: unknown) => {
+  const alerts = await coreItems<ApiTechAlert>("alerts.list", { limit: 50, filters: { unitId } }).catch((error: unknown) => {
     if (error instanceof CoreError && error.status < 500) return error.error;
     throw error; // error.tsx
   });

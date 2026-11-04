@@ -6,7 +6,7 @@
 // settings or their defaults (filterCare.getSettings, IR238). Texts and times in the user's display language and time
 // zone (IR262).
 import "server-only";
-import { coreAll, coreDisplay, coreNow, coreOp, corePrincipal, CoreError } from "@ac/web/lib/dal";
+import { coreAll, coreDisplay, coreNow, coreOp, corePrincipal, CoreError, coreItems } from "@ac/web/lib/dal";
 import { i18nOf, showDate, showTime } from "@ac/web/lib/i18n";
 import { unitPlaces } from "@ac/web/lib/clientBilling";
 import { jobEventTitle } from "@ac/web/lib/partnerOverview";
@@ -62,7 +62,7 @@ export async function loadMaintenance(sp: Record<string, string | string[] | und
   if (!job || job.projection !== "detail") return { ...base, detail: null, missing: pick };
   const ref = job.reportRefs[job.reportRefs.length - 1];
   const [events, report] = await Promise.all([
-    quiet(coreOp<{ items: ApiClientEvent[] }>("jobs.events", { jobId: job.id, query: { limit: 100 } }).then((r) => r.items), [] as ApiClientEvent[]),
+    quiet(coreItems<ApiClientEvent>("jobs.events", { jobId: job.id, query: { limit: 100 } }), [] as ApiClientEvent[]),
     ref ? quiet(coreOp<ApiWorkReport>("reports.get", { jobId: job.id, reportId: ref.reportId, reportVersion: ref.reportVersion }), null) : Promise.resolve(null),
   ]);
   const loaded = report ? await Promise.all(report.attachmentRefs.filter((a) => a.status === "ready" && a.size <= 2_000_000).slice(0, 4).map(async (a) => {

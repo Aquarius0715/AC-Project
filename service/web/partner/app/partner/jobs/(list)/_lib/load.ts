@@ -5,17 +5,12 @@
 // the first page. Texts in the user's display language, slots and deadlines in their time zone, the period in
 // Kuala Lumpur days (IR271).
 import "server-only";
-import { coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreAll, coreDisplay, coreNow, coreOp, CoreError, orWhenRefused } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
 import { jobRow, pages, PAGE_SIZE, sortOf, sortSpec, SORTS, TABS, tabFilters, tabOf } from "@ac/web/lib/partnerJobs";
 import { period, periodChoice, type ApiMember, type ApiPartnerJob } from "@ac/web/lib/partnerOverview";
 
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error: unknown) => {
-    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
-    throw error;
-  });
-};
+const optional = orWhenRefused;
 const stale = (e: unknown) => e instanceof CoreError && (!!e.error.fieldErrors.cursor || e.error.messageKey === "error.cursorExpired");
 
 export async function loadJobs(sp: { tab?: string; sort?: string; from?: string; to?: string; cursor?: string; page?: string }) {

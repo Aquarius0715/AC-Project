@@ -4,7 +4,7 @@
 // user's display language; the as-of time and the period are formatted here (IR289). The Phase 1A demo keeps the
 // fixture KPIs.
 import { connection } from "next/server";
-import { apiMode, coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { apiMode, coreAll, coreDisplay, coreNow, coreOp, CoreError, orAbsent } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
 import { periodKinds, periodRange } from "@ac/web/lib/clientEnergy";
 import { asOfText, type AdminSummary } from "@ac/web/lib/adminSummary";
@@ -13,7 +13,7 @@ import { AdminOverviewDemo } from "./_components/overview-demo";
 import { AdminOverviewView } from "./_components/overview-view";
 import { queryReader } from "@ac/web/lib/searchParams";
 
-const quiet = <T,>(p: Promise<T>) => p.catch((error: unknown) => { if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return null; throw error; });
+const quiet = orAbsent;
 
 export default async function AdminOverviewPage({ searchParams }: Readonly<PageProps<"/admin">>) {
   await connection();

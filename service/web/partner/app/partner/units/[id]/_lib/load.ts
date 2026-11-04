@@ -5,7 +5,7 @@
 // unit reads as not found; with the URL's jobId the page then shows that job's history snapshot (Figma: delegation
 // ended while open). Texts in the user's display language; every time is formatted here (IR280).
 import "server-only";
-import { coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreAll, coreDisplay, coreNow, coreOp, CoreError, orWhenRefused, coreItems } from "@ac/web/lib/dal";
 import { i18nOf, showSpan, showTime } from "@ac/web/lib/i18n";
 import type { ApiAlert } from "@ac/web/lib/alerts";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
@@ -18,12 +18,7 @@ interface Page<T> { items: T[]; nextCursor?: string | null }
 /** telemetry.series with bucketMinutes: the period's averages (AirSeries.buckets, IR605). */
 type SeriesPage = Page<Point> & { buckets: { start: string; value: number | null; count: number }[] | null };
 interface Point { value: number | null; observedAt: string; quality?: string; unit?: string }
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error: unknown) => {
-    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
-    throw error;
-  });
-};
+const optional = orWhenRefused;
 const gone = (e: unknown) => e instanceof CoreError && (e.error.code === "NOT_FOUND" || e.error.code === "FORBIDDEN" || !!e.error.fieldErrors.id);
 const minute = (ms: number) => new Date(ms).toISOString().slice(0, 16) + ":00Z";
 
@@ -54,8 +49,8 @@ export async function loadUnit(id: string, jobId?: string) {
     };
   }
   const [alerts, jobs, members] = await Promise.all([
-    optional(coreOp<Page<ApiAlert>>("alerts.list", { limit: 20, filters: { unitId: id } }).then((r) => r.items), [] as ApiAlert[]),
-    optional(coreOp<Page<ApiUnitJob>>("jobs.list", { limit: 50, filters: { unitId: id } }).then((r) => r.items), [] as ApiUnitJob[]),
+    optional(coreItems<ApiAlert>("alerts.list", { limit: 20, filters: { unitId: id } }), [] as ApiAlert[]),
+    optional(coreItems<ApiUnitJob>("jobs.list", { limit: 50, filters: { unitId: id } }), [] as ApiUnitJob[]),
     optional(coreAll<ApiMember>("members.list"), [] as ApiMember[]),
   ]);
   const metrics = chartMetrics(d);

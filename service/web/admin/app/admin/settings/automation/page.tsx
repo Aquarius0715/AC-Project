@@ -3,7 +3,7 @@
 // customers, properties and capabilities. Saving, simulating and firing are Server Actions (actions.ts). Texts in the
 // display language (IR303). The Phase 1A demo keeps the fixture policies.
 import { connection } from "next/server";
-import { coreAll, apiMode, coreDisplay, coreNow, coreOp, corePermissions } from "@ac/web/lib/dal";
+import { apiMode, coreDisplay, coreNow, coreOp, corePermissions, coreAllPage } from "@ac/web/lib/dal";
 import { translator } from "@ac/web/lib/i18n";
 import type { ApiCustomer, ApiProperty } from "@ac/web/lib/billing";
 import type { ApiCapability } from "@ac/web/lib/devices";
@@ -29,11 +29,11 @@ async function AdminAutomationPageContent({ searchParams }: Readonly<PageProps<"
   const filters = { kind: "automation", ...(scope.customerId && { customerId: scope.customerId }), ...(scope.propertyId && { propertyId: scope.propertyId }), ...(scope.unitId && { unitId: scope.unitId }) };
   const [now, perms, display, policies, units, customers, properties, caps] = await Promise.all([
     coreNow(), corePermissions(), coreDisplay(),
-    coreAll<ApiAutoPolicy>("policies.list", { filters }).then((items) => ({ items, total: items.length })),
-    coreAll<Unit>("units.list").then((items) => ({ items, total: items.length })),
-    coreAll<ApiCustomer>("customers.list").then((items) => ({ items, total: items.length })),
-    coreAll<ApiProperty>("properties.list").then((items) => ({ items, total: items.length })),
-    coreAll<ApiCapability>("capabilities.list").then((items) => ({ items, total: items.length })),
+    coreAllPage<ApiAutoPolicy>("policies.list", { filters }),
+    coreAllPage<Unit>("units.list"),
+    coreAllPage<ApiCustomer>("customers.list"),
+    coreAllPage<ApiProperty>("properties.list"),
+    coreAllPage<ApiCapability>("capabilities.list"),
   ]);
   const customerOfOrg = new Map(customers.items.map((c) => [c.organizationId, c]));
   const t = translator(display.locale);

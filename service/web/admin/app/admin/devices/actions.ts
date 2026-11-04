@@ -50,11 +50,11 @@ export async function registerDevice(serial: string, sensorTypes: Metric[], unit
 }
 
 export async function bindDevice(deviceId: string, version: number, unitId: string, reason: string) {
-  return run(() => coreOp("devices.bind", { deviceId, unitId, reason }, { write: true, expectedVersion: version }).then(() => null));
+  return run(async () => { await coreOp("devices.bind", { deviceId, unitId, reason }, { write: true, expectedVersion: version }); return null; });
 }
 
 export async function checkDevice(deviceId: string, version: number) {
-  return run(() => coreOp("devices.check", { id: deviceId }, { write: true, expectedVersion: version }).then(() => null));
+  return run(async () => { await coreOp("devices.check", { id: deviceId }, { write: true, expectedVersion: version }); return null; });
 }
 
 export async function calibrateSensor(deviceId: string, version: number, sensorId: string, metric: Metric, unit: OpInput<"devices.calibrate">["unit"], referenceValue: number, measuredValue: number) {
@@ -67,7 +67,7 @@ export async function calibrateSensor(deviceId: string, version: number, sensorI
 }
 
 export async function updateFirmware(deviceId: string, version: number, firmwareVersion: string) {
-  return run(() => coreOp("devices.updateFirmware", { deviceId, firmwareVersion }, { write: true, expectedVersion: version }).then(() => null));
+  return run(async () => { await coreOp("devices.updateFirmware", { deviceId, firmwareVersion }, { write: true, expectedVersion: version }); return null; });
 }
 
 /** firmwareCampaigns.schedule; `startAt` is the instant the form read in the user's display time zone (NFR-08). */
@@ -81,5 +81,5 @@ export async function scheduleCampaign(d: CampaignDraft, startAt: string) {
 }
 
 export async function controlCampaign(campaignId: string, version: number, action: "pause" | "resume" | "abort" | "retry_device", deviceId?: string, reason?: string) {
-  return run(() => coreOp("firmwareCampaigns.control", { campaignId, action, ...(deviceId && { deviceId }), ...(reason && { reason }) }, { write: true, expectedVersion: version }).then(() => null));
+  return run(async () => { await coreOp("firmwareCampaigns.control", { campaignId, action, ...(deviceId && { deviceId }), ...(reason && { reason }) }, { write: true, expectedVersion: version }); return null; });
 }

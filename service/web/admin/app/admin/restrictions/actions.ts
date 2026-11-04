@@ -26,26 +26,26 @@ export async function scheduleRestriction(input: ScheduleInput) {
   return run(() => coreOp<{ id: string }>("restrictions.schedule", input, { write: true }).then((r) => r.id));
 }
 export async function executeRestriction(id: string, version: number, confirmedRulesVersion: string) {
-  return run(() => coreOp("restrictions.execute", { restrictionId: id, confirmedRulesVersion }, write(version)).then(() => null));
+  return run(async () => { await coreOp("restrictions.execute", { restrictionId: id, confirmedRulesVersion }, write(version)); return null; });
 }
 export async function requestRelease(id: string, version: number) {
-  return run(() => coreOp("restrictions.release", { restrictionId: id }, write(version)).then(() => null));
+  return run(async () => { await coreOp("restrictions.release", { restrictionId: id }, write(version)); return null; });
 }
 export async function retryUnits(id: string, version: number, unitIds: string[], phase: "apply" | "release", confirmedRulesVersion: string, reason: string) {
-  return run(() => coreOp("restrictions.retry", { restrictionId: id, unitIds, phase, confirmedRulesVersion, reason }, write(version)).then(() => null));
+  return run(async () => { await coreOp("restrictions.retry", { restrictionId: id, unitIds, phase, confirmedRulesVersion, reason }, write(version)); return null; });
 }
 export async function reconcileUnits(id: string, version: number, unitIds: string[]) {
-  return run(() => coreOp("restrictions.reconcile", { restrictionId: id, unitIds }, write(version)).then(() => null));
+  return run(async () => { await coreOp("restrictions.reconcile", { restrictionId: id, unitIds }, write(version)); return null; });
 }
 export async function deferRestriction(id: string, version: number, until: string, reason: string) {
-  return run(() => coreOp("restrictions.defer", { restrictionId: id, until, reason }, write(version)).then(() => null));
+  return run(async () => { await coreOp("restrictions.defer", { restrictionId: id, until, reason }, write(version)); return null; });
 }
 export async function exemptRestriction(id: string, version: number, until: string, reason: string) {
-  return run(() => coreOp("restrictions.exempt", { restrictionId: id, until, reason }, write(version)).then(() => null));
+  return run(async () => { await coreOp("restrictions.exempt", { restrictionId: id, until, reason }, write(version)); return null; });
 }
 export async function cancelRestriction(id: string, version: number, reason: string) {
-  return run(() => coreOp("restrictions.cancel", { restrictionId: id, reason }, write(version)).then(() => null));
+  return run(async () => { await coreOp("restrictions.cancel", { restrictionId: id, reason }, write(version)); return null; });
 }
 export async function overrideRestriction(id: string, version: number, reason: string) {
-  return run(() => coreOp("restrictions.override", { restrictionId: id, reason }, write(version)).then(() => null));
+  return run(async () => { await coreOp("restrictions.override", { restrictionId: id, reason }, write(version)); return null; });
 }

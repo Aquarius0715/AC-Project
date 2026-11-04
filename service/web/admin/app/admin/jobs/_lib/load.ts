@@ -8,7 +8,7 @@
 // the selected plan and jobs.list (the unit's periodic jobs) for the status of each generated occurrence.
 import "server-only";
 import { evidenceText } from "@ac/web/lib/evidence";
-import { coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreAll, coreDisplay, coreNow, coreOp, CoreError, orWhenRefused, coreItems } from "@ac/web/lib/dal";
 import { i18nOf, showTime, textOf } from "@ac/web/lib/i18n";
 import { alertTitle } from "@ac/web/lib/alerts";
 import { jobEventTitle, type ApiJobEvent } from "@ac/web/lib/partnerOverview";
@@ -21,12 +21,7 @@ import { contractorRows, kpiTiles, pendingCertificates, profileFacts, rateCardVi
 interface Page<T> { items: T[]; total: number }
 interface Org { id: string; name: string; kind: string; status: string }
 interface Member { id: string; userId: string; displayName: string; role: string; employment: string | null; organizationId: string; validUntil: string | null; qualifications: ApiTechnician["qualifications"] }
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error: unknown) => {
-    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
-    throw error;
-  });
-};
+const optional = orWhenRefused;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 type SP = Record<string, string | string[] | undefined>;
@@ -108,12 +103,12 @@ export async function loadJobs(sp: SP) {
   if (!job) return { ...base, detail: null, missing: pick };
   const ref = job.reportRefs?.[job.reportRefs.length - 1];
   const [events, unit, eligible, report] = await Promise.all([
-    optional(coreOp<Page<ApiJobEvent>>("jobs.events", { jobId: job.id, query: { limit: 100 } }).then((r) => r.items), [] as ApiJobEvent[]),
+    optional(coreItems<ApiJobEvent>("jobs.events", { jobId: job.id, query: { limit: 100 } }), [] as ApiJobEvent[]),
     optional(coreOp<{ displayName: string; location: { pathLabels: string[] } }>("units.get", { id: job.unitId }), null),
     job.status === "requested" && job.slotProposal?.status !== "pending"
       ? Promise.all(agreedSlots(job).map((s) => {
         return Date.parse(s.startAt) <= nowMs ? Promise.resolve([] as { id: string; displayName: string }[])
-          : optional(coreOp<Page<{ id: string; displayName: string }>>("members.eligible", { jobId: job.id, startAt: s.startAt, endAt: s.endAt, query: { limit: 20 } }).then((r) => r.items), [] as { id: string; displayName: string }[]);
+          : optional(coreItems<{ id: string; displayName: string }>("members.eligible", { jobId: job.id, startAt: s.startAt, endAt: s.endAt, query: { limit: 20 } }), [] as { id: string; displayName: string }[]);
       }))
       : Promise.resolve([] as { id: string; displayName: string }[][]),
     ref ? optional(coreOp<ApiWorkReport>("reports.get", { jobId: job.id, reportId: ref.reportId, reportVersion: ref.reportVersion }), null) : Promise.resolve(null),

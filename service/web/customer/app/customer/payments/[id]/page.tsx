@@ -7,7 +7,7 @@
 // business days, every event time is in the user's display time zone (IR267). The Phase 1A demo keeps the fixtures.
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
-import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePrincipal, CoreError } from "@ac/web/lib/dal";
+import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePrincipal, CoreError, coreItems } from "@ac/web/lib/dal";
 import { amount } from "@ac/web/lib/energy";
 import { i18nOf, showDate, showTime } from "@ac/web/lib/i18n";
 import { invoiceStatus, type ApiInquiry, type ApiInvoiceDetail } from "@ac/web/lib/billing";
@@ -43,7 +43,7 @@ export default async function CustomerInvoicePage({ params, searchParams }: Read
   const [now, contracts, units, properties, spaces, restrictions, inquiries, reminders, display, whatsappReady] = await Promise.all([
     coreNow(), coreAll<ClientContract>("contracts.list"), coreAll<Unit>("units.list"), coreAll<{ id: string; name: string }>("properties.list"),
     coreAll<{ id: string; name: string; parentSpaceId: string | null }>("spaces.list"),
-    coreOp<{ items: ApiRestriction[] }>("restrictions.forInvoice", { invoiceId: id, query: { limit: 20 } }).then((p) => p.items),
+    coreItems<ApiRestriction>("restrictions.forInvoice", { invoiceId: id, query: { limit: 20 } }),
     coreAll<ApiInquiry>("inquiries.list", { filters: { invoiceId: id } }),
     coreAll<Reminder>("notifications.list", { filters: { type: "payment_reminder" } }).then((ns) => ns.filter((n) => n.target.kind === "invoice" && n.target.id === id)),
     coreDisplay(), whatsapp,

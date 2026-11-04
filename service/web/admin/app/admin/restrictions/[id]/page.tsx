@@ -7,7 +7,7 @@
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import { EmptyState, Page as Screen } from "@ac/web/components/ui";
-import { coreAll, apiMode, coreDisplay, coreNow, coreOp, corePermissions, CoreError } from "@ac/web/lib/dal";
+import { apiMode, coreDisplay, coreNow, coreOp, corePermissions, CoreError, coreAllPage } from "@ac/web/lib/dal";
 import { auditItem, type ApiAudit } from "@ac/web/lib/audit";
 import { i18nOf } from "@ac/web/lib/i18n";
 import { activePeriod, intentText, unitRows, type ApiRestriction } from "@ac/web/lib/restrictions";
@@ -31,7 +31,7 @@ export default async function AdminRestrictionPage({ params }: Readonly<PageProp
       if (error instanceof CoreError && error.error.code === "NOT_FOUND") notFound();
       throw error;
     }),
-    perms.has("asset.read") ? coreAll<{ id: string; displayName: string }>("units.list").then((items) => ({ items, total: items.length })) : Promise.resolve({ items: [] as { id: string; displayName: string }[] }),
+    perms.has("asset.read") ? coreAllPage<{ id: string; displayName: string }>("units.list") : Promise.resolve({ items: [] as { id: string; displayName: string }[] }),
   ]);
   const canAudit = perms.has("audit.read");
   const from = new Date(now.getTime() - 365 * 24 * 3600 * 1000).toISOString();

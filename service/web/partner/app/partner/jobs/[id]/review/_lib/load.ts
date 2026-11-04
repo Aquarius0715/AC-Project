@@ -4,7 +4,7 @@
 // (units.get) and the ready photos (attachments.getContent as data URLs, at most 6 of ≤ 2 MB). Texts in the user's
 // display language; every time is formatted here, on the server, in their display time zone (IR274).
 import "server-only";
-import { coreAll, coreDisplay, coreOp, corePrincipal, CoreError } from "@ac/web/lib/dal";
+import { coreAll, coreDisplay, coreOp, corePrincipal, orAbsent } from "@ac/web/lib/dal";
 import { i18nOf, intlTag, showTime } from "@ac/web/lib/i18n";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 import {
@@ -13,10 +13,8 @@ import {
 } from "@ac/web/lib/partnerReview";
 import type { ReviewLive } from "../_components/review-view";
 
-const quiet = <T,>(p: Promise<T>) => p.catch((error: unknown) => { // outside the caller's scope or window the row reads as absent
-  if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return null;
-  throw error;
-});
+// outside the caller's scope or window the row reads as absent
+const quiet = orAbsent;
 
 export async function loadReview(jobId: string): Promise<ReviewLive> {
   interface Member { userId: string; displayName: string | null }

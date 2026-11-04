@@ -4,7 +4,7 @@
 // (actions.ts). Texts in the display language; contract periods are Kuala Lumpur days (IR300). The Phase 1A demo keeps
 // the fixture rows.
 import { connection } from "next/server";
-import { apiMode, coreAll, coreDisplay } from "@ac/web/lib/dal";
+import { apiMode, coreAll, coreDisplay, coreAllPage } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
 import type { ApiCustomer, ApiProperty } from "@ac/web/lib/billing";
 import { contractRows, unitOptions, type ApiContractFull, type ApiUnitBrief, type PlanType } from "@ac/web/lib/contracts";
@@ -32,9 +32,9 @@ async function AdminContractsPageContent({ searchParams }: Readonly<PageProps<"/
     coreAll<ApiContractFull>("contracts.list"),
     Object.keys(where).length > 0 ? coreAll<ApiContractFull>("contracts.list", { filters: where }) : null, // the plan counts of the scope
     kind ? coreAll<ApiContractFull>("contracts.list", { filters: { ...where, kind } }) : null,
-    coreAll<ApiCustomer>("customers.list").then((items) => ({ items, total: items.length })),
-    coreAll<ApiProperty>("properties.list").then((items) => ({ items, total: items.length })),
-    coreAll<ApiUnitBrief>("units.list").then((items) => ({ items, total: items.length })),
+    coreAllPage<ApiCustomer>("customers.list"),
+    coreAllPage<ApiProperty>("properties.list"),
+    coreAllPage<ApiUnitBrief>("units.list"),
   ]);
   const ofScope = inScope ?? all;
   const counts = Object.fromEntries([["all", ofScope.length], ...plans.map((p) => [p, ofScope.filter((k) => k.planType === p).length])]) as Record<PlanType | "all", number>;

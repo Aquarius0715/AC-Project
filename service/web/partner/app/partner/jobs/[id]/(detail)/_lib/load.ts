@@ -6,24 +6,18 @@
 // server (IR272): instants in the user's display time zone, the capacity days as Kuala Lumpur dates; the view only
 // translates fixed texts.
 import "server-only";
-import { coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreAll, coreDisplay, coreNow, coreOp, CoreError, orWhenRefused, coreItems } from "@ac/web/lib/dal";
 import { i18nOf, showClock, showSpan, showTime, zonedParts } from "@ac/web/lib/i18n";
 import type { ApiAlert } from "@ac/web/lib/alerts";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { delegationLeft, detailBanner, eventRows, fits, ordinal, qualified, requiredFor, timeline, type ApiPartnerJobDetail } from "@ac/web/lib/partnerJobDetail";
 import { until, type ApiCapacity, type ApiJobEvent, type ApiMember } from "@ac/web/lib/partnerOverview";
 
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error: unknown) => {
-    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
-    throw error;
-  });
-};
+const optional = orWhenRefused;
 const klDate = (iso: string) => new Date(Date.parse(iso) + 8 * 3_600_000).toISOString().slice(0, 10);
 const plusDays = (date: string, n: number) => new Date(Date.parse(`${date}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 
 export async function loadJobDetail(jobId: string) {
-  interface Page<T> { items: T[] }
   const job = await coreOp<ApiPartnerJobDetail>("jobs.get", { jobId }).catch((error: unknown) => {
     if (error instanceof CoreError && (error.error.code === "NOT_FOUND" || error.error.code === "FORBIDDEN")) return null; // another company's job reads as absent (D01)
     throw error;
@@ -43,8 +37,8 @@ export async function loadJobDetail(jobId: string) {
     };
   }
   const members = await optional(coreAll<ApiMember>("members.list"), []);
-  const capacityOf = (date: string) => optional(coreOp<Page<ApiCapacity>>("members.capacity", { date, query: { limit: 100 } }).then((r) => r.items), []);
-  const events = optional(coreOp<Page<ApiJobEvent>>("jobs.events", { jobId, query: { limit: 100 } }).then((r) => r.items), []);
+  const capacityOf = (date: string) => optional(coreItems<ApiCapacity>("members.capacity", { date, query: { limit: 100 } }), []);
+  const events = optional(coreItems<ApiJobEvent>("jobs.events", { jobId, query: { limit: 100 } }), []);
   const names = Object.fromEntries(members.map((m) => [m.id, m.displayName]));
   if (job.projection === "offer") {
     const first = klDate(job.visitSlot.startAt);

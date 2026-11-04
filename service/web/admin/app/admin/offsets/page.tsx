@@ -5,7 +5,7 @@
 // simulated purchase / retirement / failure / retry are Server Actions (actions.ts). Texts in the display language; the
 // attempt and event times are formatted here, in the display time zone (IR282, IR298). The Phase 1A demo keeps fixtures.
 import { connection } from "next/server";
-import { coreAll, apiMode, coreDisplay, coreNow, coreOp, corePermissions } from "@ac/web/lib/dal";
+import { apiMode, coreDisplay, coreNow, coreOp, corePermissions, coreAllPage } from "@ac/web/lib/dal";
 import type { ApiCustomer } from "@ac/web/lib/billing";
 import { i18nOf } from "@ac/web/lib/i18n";
 import { recordRows, type ApiOffsetRecord } from "@ac/web/lib/offsets";
@@ -39,8 +39,8 @@ async function AdminOffsetsPageContent({ searchParams }: Readonly<PageProps<"/ad
   const [perms, display, records, customers, units] = await Promise.all([
     corePermissions(), coreDisplay(),
     coreOp<Page<ApiOffsetRecord>>("offsets.list", { limit: 100, filters }),
-    coreAll<ApiCustomer>("customers.list").then((items) => ({ items, total: items.length })),
-    coreAll<Unit>("units.list").then((items) => ({ items, total: items.length })),
+    coreAllPage<ApiCustomer>("customers.list"),
+    coreAllPage<Unit>("units.list"),
   ]);
   const customerOfOrg = new Map(customers.items.map((c) => [c.organizationId, c.id]));
   const names = customers.items.map((c) => ({ id: c.id, name: c.name }));

@@ -7,7 +7,7 @@
 // projection without billing fields. Writes are Server Actions (actions.ts). Texts in the display language; the times
 // of the first render are formatted here, in the display time zone (IR282, IR301). The Phase 1A demo keeps the fixtures.
 import { connection } from "next/server";
-import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePermissions } from "@ac/web/lib/dal";
+import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePermissions, coreAllPage } from "@ac/web/lib/dal";
 import type { ApiContract, ApiCustomer, ApiInvoice } from "@ac/web/lib/billing";
 import type { ApiCapability } from "@ac/web/lib/devices";
 import { i18nOf, showTime } from "@ac/web/lib/i18n";
@@ -37,11 +37,11 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
   const filters = { ...(scope.contractId && { contractId: scope.contractId }), ...(scope.invoiceId && { invoiceId: scope.invoiceId }), ...(status && { status }) };
   const [scoped, units] = await Promise.all([
     coreOp<Page<ApiRestriction>>("restrictions.list", { limit: 100, filters }),
-    perms.has("asset.read") ? coreAll<Unit>("units.list").then((items) => ({ items, total: items.length })) : Promise.resolve({ items: [] as Unit[] }), // override-only callers see unit IDs
+    perms.has("asset.read") ? coreAllPage<Unit>("units.list") : Promise.resolve({ items: [] as Unit[] }), // override-only callers see unit IDs
   ]);
   const names = new Map(units.items.map((u) => [u.id, u.displayName]));
   const [contracts, customers] = isFull
-    ? await Promise.all([coreAll<ApiContract & { rulesVersion: string | null }>("contracts.list").then((items) => ({ items, total: items.length })), coreAll<ApiCustomer>("customers.list").then((items) => ({ items, total: items.length }))])
+    ? await Promise.all([coreAllPage<ApiContract & { rulesVersion: string | null }>("contracts.list"), coreAllPage<ApiCustomer>("customers.list")])
     : [{ items: [] }, { items: [] }];
   const customerName = new Map(customers.items.map((c) => [c.id, c.name]));
   const contractLabel = (id?: string) => {
@@ -98,7 +98,7 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
   if (canWrite) { // the schedule form: eligible contracts, their overdue unpaid invoices, units and recipients
     const [overdue, caps, clients] = await Promise.all([
       coreOp<Page<ApiInvoice>>("invoices.list", { limit: 100, filters: { overdueOnly: true } }),
-      coreAll<ApiCapability>("capabilities.list").then((items) => ({ items, total: items.length })),
+      coreAllPage<ApiCapability>("capabilities.list"),
       coreOp<Page<{ customerId: string; status: string }>>("clientUsers.list", { limit: 100, filters: { status: "active" } }),
     ]);
     const busy = new Map<string, string>();

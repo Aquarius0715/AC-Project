@@ -31,11 +31,11 @@ export async function createInvoice(n: NewInvoice) {
 }
 
 export async function recordManualPayment(invoiceId: string, version: number, paymentReference: string, amountMinor: number, currency: OpInput<"payments.recordManual">["currency"], reason: string) {
-  return run(() => coreOp("payments.recordManual", { confirmedAmountMinor: amountMinor, invoiceId, paymentReference, currency, reason }, { write: true, expectedVersion: version }).then(() => null));
+  return run(async () => { await coreOp("payments.recordManual", { confirmedAmountMinor: amountMinor, invoiceId, paymentReference, currency, reason }, { write: true, expectedVersion: version }); return null; });
 }
 
 export async function confirmCardPayment(paymentId: string, version: number, paymentReference: string, amountMinor: number, currency: OpInput<"payments.confirm">["currency"], reason: string) {
-  return run(() => coreOp("payments.confirm", { confirmedAmountMinor: amountMinor, paymentId, paymentReference, currency, reason }, { write: true, expectedVersion: version }).then(() => null));
+  return run(async () => { await coreOp("payments.confirm", { confirmedAmountMinor: amountMinor, paymentId, paymentReference, currency, reason }, { write: true, expectedVersion: version }); return null; });
 }
 
 /** notifications.preview of a payment reminder (a read: nothing is sent, the route is not re-rendered). */
@@ -48,11 +48,11 @@ export async function previewReminder(invoiceId: string, recipientMembershipId: 
 }
 
 export async function sendReminder(invoiceId: string, version: number, recipientMembershipId: string, channel: OpInput<"invoices.remind">["channel"], reason: string) {
-  return run(() => coreOp("invoices.remind", { invoiceId, recipientMembershipId, channel, reason }, { write: true, expectedVersion: version }).then(() => null));
+  return run(async () => { await coreOp("invoices.remind", { invoiceId, recipientMembershipId, channel, reason }, { write: true, expectedVersion: version }); return null; });
 }
 
 export async function answerInquiry(inquiryId: string, version: number, reply: string) {
-  return run(() => coreOp("inquiries.answer", { inquiryId, reply }, { write: true, expectedVersion: version }).then(() => null));
+  return run(async () => { await coreOp("inquiries.answer", { inquiryId, reply }, { write: true, expectedVersion: version }); return null; });
 }
 
 export async function generatePayouts(period: string) {
@@ -60,9 +60,9 @@ export async function generatePayouts(period: string) {
 }
 
 export async function transitionStatement(statementId: string, version: number, action: "approve" | "mark_paid") {
-  return run(() => coreOp("payouts.transition", { statementId, action }, { write: true, expectedVersion: version }).then(() => null));
+  return run(async () => { await coreOp("payouts.transition", { statementId, action }, { write: true, expectedVersion: version }); return null; });
 }
 
 export async function resolvePayoutQuery(statementId: string, version: number, queryId: string, reply: string, adjustmentMinor: number | null) {
-  return run(() => coreOp("payouts.resolveQuery", { statementId, queryId, reply, ...(adjustmentMinor && { adjustmentMinor }) }, { write: true, expectedVersion: version }).then(() => null));
+  return run(async () => { await coreOp("payouts.resolveQuery", { statementId, queryId, reply, ...(adjustmentMinor && { adjustmentMinor }) }, { write: true, expectedVersion: version }); return null; });
 }

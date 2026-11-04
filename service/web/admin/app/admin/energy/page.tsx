@@ -5,7 +5,7 @@
 // display language; the analysis and baseline periods are Kuala Lumpur business time and say so (IR296). The Phase 1A
 // demo keeps the fixture baselines.
 import { connection } from "next/server";
-import { coreAll, apiMode, coreDisplay, coreNow, coreOp, CoreError, corePermissions } from "@ac/web/lib/dal";
+import { coreAll, apiMode, coreDisplay, coreNow, coreOp, CoreError, corePermissions, coreAllPage } from "@ac/web/lib/dal";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import type { ApiCustomer, ApiProperty } from "@ac/web/lib/billing";
 import { baselineRows, klInstant, klLocal, summaryView, type ApiBaseline, type ApiEnergySummary } from "@ac/web/lib/energy";
@@ -31,10 +31,10 @@ async function AdminEnergyPageContent({ searchParams }: Readonly<PageProps<"/adm
   const tab = one("tab") === "baselines" ? "baselines" : "analysis";
   const [now, perms, display, customers, properties, units, all] = await Promise.all([
     coreNow(), corePermissions(), coreDisplay(),
-    coreAll<ApiCustomer>("customers.list").then((items) => ({ items, total: items.length })),
-    coreAll<ApiProperty>("properties.list").then((items) => ({ items, total: items.length })),
-    coreAll<Unit>("units.list").then((items) => ({ items, total: items.length })),
-    coreAll<ApiBaseline>("baselines.list").then((items) => ({ items, total: items.length })),
+    coreAllPage<ApiCustomer>("customers.list"),
+    coreAllPage<ApiProperty>("properties.list"),
+    coreAllPage<Unit>("units.list"),
+    coreAllPage<ApiBaseline>("baselines.list"),
   ]);
   const i = i18nOf(display);
   const customerOfOrg = new Map(customers.items.map((c) => [c.organizationId, c.id]));

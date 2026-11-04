@@ -7,19 +7,14 @@
 // qualifications a booked job's unit needs, IR277). Texts in the user's display language; every date and time is
 // formatted here, on the server (IR276).
 import "server-only";
-import { coreAll, coreDisplay, coreIdentity, coreNow, coreOp, corePrincipal, CoreError } from "@ac/web/lib/dal";
+import { coreAll, coreDisplay, coreIdentity, coreNow, coreOp, corePrincipal, orWhenRefused, coreItems } from "@ac/web/lib/dal";
 import { i18nOf, showDay, showSpan } from "@ac/web/lib/i18n";
 import { klDay, weekOf, type ApiCapacity, type ApiPartnerJob } from "@ac/web/lib/partnerOverview";
 import { qualificationLabel, requiredFor } from "@ac/web/lib/partnerJobDetail";
 import { activeNow, grantRows, KL, listed, memberRows, QUALIFICATION_CODES, technicianNames, teamQuery, teamStats, UNAVAILABILITY_TYPES, unavailabilityRows, weekday, weekRows, type ApiTeamMember, type ApiUnavailability, type TeamJob } from "@ac/web/lib/partnerTeam";
 import { CERT_STATUSES, certKpis, certQuery, certRows, impact, WINDOWS, type ApiCert, type CertJob } from "@ac/web/lib/partnerCertificates";
 
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error: unknown) => {
-    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
-    throw error;
-  });
-};
+const optional = orWhenRefused;
 const plusDays = (date: string, n: number) => new Date(Date.parse(`${date}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 const noon = (date: string) => `${date}T04:00:00Z`; // 12:00 in Kuala Lumpur
 const STATUS_TEXT: Record<string, string> = { valid: "Valid", expiring: "Expiring", expired: "Expired", pending: "Pending HQ verification", rejected: "Rejected", not_held: "Not held" };
@@ -50,7 +45,7 @@ export async function loadTeam(sp: TeamParams) {
   const current = members.filter((m) => activeNow(m, nowMs)); // capacity and assignments exist only for these
   const shown = listed(members, q, nowMs);
   const [capacity, booked, certs, units, unavailable] = await Promise.all([
-    Promise.all(dates.map((date) => optional(coreOp<Page<ApiCapacity>>("members.capacity", { date, query: { limit: 100 } }).then((r) => r.items), []))),
+    Promise.all(dates.map((date) => optional(coreItems<ApiCapacity>("members.capacity", { date, query: { limit: 100 } }), []))),
     Promise.all(current.map((m) => optional(coreOp<Page<ApiPartnerJob>>("jobs.list", { filters: { membershipId: m.id }, limit: 100 }), { items: [], total: 0 })
       .then((r) => r.items.flatMap((j): (TeamJob & { unitId: string })[] => (j.projection === "summary" && j.scheduledSlot && j.status !== "completed" && j.status !== "cancelled" // completion releases the assignment (IR234)
         ? [{ jobId: j.id, short: j.id.slice(0, 8), technicianId: m.id, slot: j.scheduledSlot, text: showSpan(j.scheduledSlot.startAt, j.scheduledSlot.endAt, display), unitId: j.unitId }] : []))))),

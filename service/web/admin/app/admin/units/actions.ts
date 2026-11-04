@@ -64,7 +64,7 @@ export async function saveSpace(input: SpaceInput, version?: number) {
 }
 /** properties.archive / spaces.archive (CONFLICT while it still holds units or child spaces). */
 export async function archiveLocation(kind: "property" | "space", id: string, version: number, reason: string) {
-  return run(() => coreOp(kind === "property" ? "properties.archive" : "spaces.archive", { id, reason }, write(version)).then(() => null));
+  return run(async () => { await coreOp(kind === "property" ? "properties.archive" : "spaces.archive", { id, reason }, write(version)); return null; });
 }
 
 export interface UnitInput {
@@ -76,18 +76,18 @@ export async function saveUnit(input: UnitInput, version?: number) {
 }
 /** units.archive takes the unit out of use and keeps its ID and history (D05: CONFLICT while it is still in use). */
 export async function archiveUnit(id: string, version: number, reason: string) {
-  return run(() => coreOp("units.archive", { id, reason }, write(version)).then(() => null));
+  return run(async () => { await coreOp("units.archive", { id, reason }, write(version)); return null; });
 }
 /** units.delete removes a unit registered by mistake (CONFLICT once it had contracts, jobs or IoT). */
 export async function deleteUnit(id: string, version: number, reason: string) {
-  return run(() => coreOp("units.delete", { id, reason }, write(version)).then(() => null));
+  return run(async () => { await coreOp("units.delete", { id, reason }, write(version)); return null; });
 }
 export async function setUnitPolicies(unitId: string, version: number, alertPolicyIds: string[]) {
-  return run(() => coreOp("units.setAlertPolicies", { unitId, alertPolicyIds }, write(version)).then(() => null));
+  return run(async () => { await coreOp("units.setAlertPolicies", { unitId, alertPolicyIds }, write(version)); return null; });
 }
 /** policies.setDefaultRule for this customer (version 0 creates the setting). */
 export async function setDefaultRule(policyId: string, ruleKey: string, customerId: string, enabled: boolean, version: number) {
-  return run(() => coreOp("policies.setDefaultRule", { policyId, ruleKey, customerId, enabled }, write(version)).then(() => null));
+  return run(async () => { await coreOp("policies.setDefaultRule", { policyId, ruleKey, customerId, enabled }, write(version)); return null; });
 }
 
 // ---- client users (FR-A17): adding (the account at once, IR461), role / sign-in changes with a reason, removal, set-up
@@ -96,23 +96,23 @@ export async function inviteClientUser(customerId: string, email: string, client
   return run(() => coreOp<{ id: string }>("clientUsers.save", { customerId, clientRole, email: email.trim(), displayName: displayName.trim() }, write()).then((u) => u.id));
 }
 export async function updateClientUser(id: string, version: number, input: { customerId: string; email: string; clientRole: "owner" | "member"; status?: "active" | "disabled"; reason: string }) {
-  return run(() => coreOp("clientUsers.save", { id, ...input, reason: input.reason.trim() }, write(version)).then(() => null));
+  return run(async () => { await coreOp("clientUsers.save", { id, ...input, reason: input.reason.trim() }, write(version)); return null; });
 }
 export async function removeClientUser(id: string, version: number, reason: string) {
-  return run(() => coreOp("clientUsers.remove", { id, reason: reason.trim() }, write(version)).then(() => null));
+  return run(async () => { await coreOp("clientUsers.remove", { id, reason: reason.trim() }, write(version)); return null; });
 }
 /** members.revokeSessions for the client user's membership: every session of the user ends at once; the access stays
 (Figma Admin 02-15 → 03-8, IR384, IR385). */
 export async function signOutEverywhere(membershipId: string, reason: string) {
-  return run(() => coreOp("members.revokeSessions", { membershipId, reason: reason.trim() }, write()).then(() => null));
+  return run(async () => { await coreOp("members.revokeSessions", { membershipId, reason: reason.trim() }, write()); return null; });
 }
 /** clientUsers.resendInvite sends the set-up e-mail again, through the identity provider (IR461). */
 export async function resendInvite(id: string) {
-  return run(() => coreOp("clientUsers.resendInvite", { id }, { write: true }).then(() => null));
+  return run(async () => { await coreOp("clientUsers.resendInvite", { id }, { write: true }); return null; });
 }
 /** auth.previewPasswordReset answers the same generic preview for every address (IR145). */
 export async function previewPasswordReset(email: string) {
-  return run(() => coreOp("auth.previewPasswordReset", { demoEmail: email }).then(() => null));
+  return run(async () => { await coreOp("auth.previewPasswordReset", { demoEmail: email }); return null; });
 }
 
 // ---- CSV import (FR-A18): preview (writes nothing), import once, undo within 24 h ----
@@ -128,6 +128,6 @@ export async function importUndo(importId: string, version: number, reason: stri
 
 // ---- warranty (FR-A19) ----
 export async function recordWarrantyClaim(jobId: string, version: number, partLabel: string, amountMinor: number, currency: OpInput<"jobs.recordWarrantyClaim">["currency"], reason: string) {
-  return run(() => coreOp("jobs.recordWarrantyClaim", { jobId, amountMinor, currency, partLabel: partLabel.trim(), reason: reason.trim() }, write(version)).then(() => null));
+  return run(async () => { await coreOp("jobs.recordWarrantyClaim", { jobId, amountMinor, currency, partLabel: partLabel.trim(), reason: reason.trim() }, write(version)); return null; });
 }
 

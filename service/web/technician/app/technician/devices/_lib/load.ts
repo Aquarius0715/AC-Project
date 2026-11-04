@@ -4,7 +4,7 @@
 // its events with their alerts (T12). Register candidates are assigned units without a bound device. Texts in the
 // user's display language; every time is formatted here (IR287).
 import "server-only";
-import { coreAll, coreDisplay, coreNow, coreOp, corePermissions, CoreError } from "@ac/web/lib/dal";
+import { coreAll, coreDisplay, coreNow, coreOp, corePermissions, orAbsent } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
 import { statusWord } from "@ac/web/lib/partnerJobDetail";
 import type { ApiCalibration, ApiDevice, ApiDeviceDetail, ApiDeviceOperation } from "@ac/web/lib/devices";
@@ -15,10 +15,8 @@ import {
 } from "@ac/web/lib/techDevices";
 import type { TechDevicesLive } from "../_components/devices-view";
 
-const quiet = <T,>(p: Promise<T>) => p.catch((error: unknown) => { // a unit before the work window or outside the job scope reads as absent
-  if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return null;
-  throw error;
-});
+// a unit before the work window or outside the job scope reads as absent
+const quiet = orAbsent;
 
 export async function loadDevices(options: { selected?: string; unitId?: string; jobId?: string; events: boolean }): Promise<TechDevicesLive> {
   type Unit = ApiUnitDetail & { capabilities: ApiUnitDetail["capabilities"] & { firmwareCandidates?: string[] } };

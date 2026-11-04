@@ -5,17 +5,15 @@
 // property → unit), severity, status and selected alert live in the URL (DD-A05 item 5, Figma Admin 256:2, IR318); so do
 // the Policies tab's selected policy (`policyId`) and the owner customer of a new one (`new`, DD-A05 item 8, IR345).
 import { connection } from "next/server";
-import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePermissions, CoreError } from "@ac/web/lib/dal";
+import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePermissions, CoreError, orWhenForbidden, coreAllPage } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
 import { adminAlertRows, policyRows, type AlertState, type ApiAdminAlert, type ApiCustomerName, type ApiMemberName, type ApiPolicy, type ApiUnitName, type Severity } from "@ac/web/lib/adminAlerts";
 import { NeedsAccess } from "@ac/web/components/NeedsAccess";
 import { AdminAlertsView } from "./_components/alerts-view";
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((error: unknown) => { // names the session may not read (no identity.read or job.read)
-  if (error instanceof CoreError && error.error.code === "FORBIDDEN") return fallback;
-  throw error;
-});
+// names the session may not read (no identity.read or job.read)
+const optional = orWhenForbidden;
 const SEVERITIES: Severity[] = ["critical", "warning", "normal"];
 const STATES: AlertState[] = ["open", "acknowledged", "resolved"];
 
@@ -49,11 +47,11 @@ export default async function AdminAlertsPage({ searchParams }: Readonly<PagePro
   const [now, perms, display, alertsRead, unitsRead, customersRead, propertiesRead, policiesRead, members, defaultsRead] = await Promise.all([
     coreNow(), corePermissions(), coreDisplay(),
     need(coreOp<Page<ApiAdminAlert>>("alerts.list", { limit: 100, filters }), "alert.read"), // every status in the scope: the tiles count them
-    need(coreAll<ApiUnitName & { propertyId: string; archived?: boolean }>("units.list").then((items) => ({ items, total: items.length })), "asset.read"),
-    need(coreAll<ApiCustomerName & { status?: "active" | "inactive" }>("customers.list").then((items) => ({ items, total: items.length })), "asset.read"),
+    need(coreAllPage<ApiUnitName & { propertyId: string; archived?: boolean }>("units.list"), "asset.read"),
+    need(coreAllPage<ApiCustomerName & { status?: "active" | "inactive" }>("customers.list"), "asset.read"),
     need(coreAll<{ id: string; name: string; customerOrgId: string }>("properties.list"), "asset.read"),
-    need(coreAll<ApiPolicy>("policies.list", { filters: scope }).then((items) => ({ items, total: items.length })), "alert.policy.read"),
-    optional(coreAll<ApiMemberName>("members.list").then((items) => ({ items, total: items.length })), { items: [], total: 0 }),
+    need(coreAllPage<ApiPolicy>("policies.list", { filters: scope }), "alert.policy.read"),
+    optional(coreAllPage<ApiMemberName>("members.list"), { items: [], total: 0 }),
     need(coreOp<Page<ApiPolicy>>("policies.list", { limit: 1, filters: { kind: "default_alert" } }), "alert.policy.read"),
   ]);
   const missing = [alertsRead, unitsRead, customersRead, propertiesRead, policiesRead, defaultsRead].find((r): r is { missing: string } => !!r && typeof r === "object" && "missing" in r);
