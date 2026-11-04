@@ -11,12 +11,13 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
-// TestLiveSiteSeeds: the live site (DEC-86, DEC-87, DEC-89, DEC-91) adds a customer of its own with an invited owner
-// whose sign-in account is asked for once and, on the customer's property and room, the air conditioner on a model
-// that offers the remote power only and node_2's sensor unit on one with no control, each with an online module that
-// has its sensors and an active binding; a unit mirrors its module. A second run adds nothing, asks for no second
-// account and leaves a connection that changed since alone, and a unit the site gained since the first comes in
-// online. It runs in a transaction that is rolled back, so the shared test database keeps only the fixture.
+// TestLiveSiteSeeds: the live site (DEC-86, DEC-89, DEC-91, DEC-92) adds, on a property of the fixture's Demo Customer
+// B with one room, the air conditioner on a model that offers the remote power only and node_2's sensor unit on one
+// with no control, each with an online module that has its sensors and an active binding; a unit mirrors its module.
+// The customer's client, customer-b, keeps the access without the fixture's end date, and the site adds no person. A
+// second run adds nothing, clears an end date set since, leaves a connection that changed since alone, and brings in
+// a unit the site gained since the first, online. It runs in a transaction that is rolled back, so the shared test
+// database keeps only the fixture.
 //
 //nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestLiveSiteSeeds(t *testing.T) {
@@ -36,11 +37,6 @@ func TestLiveSiteSeeds(t *testing.T) {
 	}
 	defer func() { _ = txn.Rollback(ctx) }() // the test never commits
 
-	applyLiveErr := seed.ApplyLive(ctx, txn, clock())
-	if applyLiveErr != nil {
-		t.Fatalf("apply: %v", applyLiveErr)
-	}
-
 	site := seed.LiveSite()
 	count := func(sql string, args ...any) int {
 		var total int
@@ -53,7 +49,31 @@ func TestLiveSiteSeeds(t *testing.T) {
 		return total
 	}
 
-	org, owner := seed.ID(site.CustomerOrgID), seed.ID(site.Owner.Membership)
+	org, client := seed.ID(site.CustomerOrgID), seed.ID(site.Client)
+	ends := func() int { // the client's membership with an end date
+		return count(
+			`SELECT count(*) FROM identity.memberships WHERE id = $1 AND valid_until IS NOT NULL`,
+			client,
+		)
+	}
+	people := func() int {
+		return count(
+			`SELECT count(*) FROM identity.client_users WHERE customer_id = $1`,
+			seed.ID(site.Customer),
+		)
+	}
+
+	if ends() != 1 {
+		t.Fatal("the fixture's customer-b has no end of access to clear")
+	}
+
+	listed := people()
+
+	applyLiveErr := seed.ApplyLive(ctx, txn, clock())
+	if applyLiveErr != nil {
+		t.Fatalf("apply: %v", applyLiveErr)
+	}
+
 	if total := count(
 		`SELECT count(*) FROM identity.organizations o JOIN assets.customers c ON c.organization_id = o.id
 		WHERE o.id = $1 AND o.kind = 'customer' AND o.status = 'active' AND c.id = $2 AND c.name = $3 AND o.tenant_id = $4`,
@@ -62,55 +82,24 @@ func TestLiveSiteSeeds(t *testing.T) {
 		site.CustomerName,
 		seed.ID(site.Tenant),
 	); total != 1 {
-		t.Errorf("the live customer is missing (%d)", total)
+		t.Errorf("the live site's customer is not the fixture's %s (%d)", site.CustomerName, total)
 	}
 
 	if total := count(
-		`SELECT count(*) FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id
-		JOIN identity.client_users x ON x.membership_id = m.id AND x.customer_id = $3 AND x.client_role = 'owner' AND x.status
-		= 'invited'
-		WHERE m.id = $1 AND m.organization_id = $2 AND m.role = 'client' AND m.client_role = 'owner' AND m.valid_until IS NULL
-		AND u.email = $4`,
-		owner,
+		`SELECT count(*) FROM identity.memberships WHERE id = $1 AND organization_id = $2 AND role = 'client'
+		AND valid_until IS NULL AND revoked_at IS NULL`,
+		client,
 		org,
-		seed.ID(site.Customer),
-		site.Owner.Email,
 	); total != 1 {
-		t.Errorf("the live customer's invited owner is missing (%d)", total)
-	}
-
-	if n := count(
-		`SELECT count(*) FROM identity.membership_permissions WHERE membership_id = $1 AND permission = 'control.execute'`,
-		owner,
-	); n != 1 {
-		t.Error("the owner lacks a client's permissions")
-	}
-
-	if n := count(
-		`SELECT count(*) FROM identity.membership_scopes WHERE membership_id = $1 AND kind = 'organization' AND ref_id = $2`,
-		owner,
-		org,
-	); n != 1 {
-		t.Error("the owner is not scoped to the live customer")
-	}
-
-	if n := count(
-		`SELECT count(*) FROM identity.consents WHERE membership_id = $1 AND purpose = 'location_automation' AND NOT granted`,
-		owner,
-	); n != 1 {
-		t.Error("the owner has no initial location consent")
-	}
-
-	accounts := func() int {
-		return count(
-			`SELECT count(*) FROM platform.outbox WHERE aggregate_id = $1 AND event_type = 'AccountRequested'
-			AND payload->>'role' = 'client' AND payload->>'userId' = $2`,
-			owner,
-			seed.ID(site.Owner.User).String(),
+		t.Errorf(
+			"the client %s does not keep an open access to the customer (%d)",
+			site.Client,
+			total,
 		)
 	}
-	if n := accounts(); n != 1 {
-		t.Errorf("%d sign-in accounts asked for, want 1", n)
+
+	if n := people(); n != listed {
+		t.Errorf("the site changed the customer's user list: %d people, before %d", n, listed)
 	}
 
 	for _, module := range site.Modules() {
@@ -273,9 +262,23 @@ func TestLiveSiteSeeds(t *testing.T) {
 		t.Fatal(execErr)
 	}
 
+	_, execErr = txn.Exec(
+		ctx,
+		`UPDATE identity.memberships SET valid_until = $2 WHERE id = $1`,
+		client,
+		clock().Add(24*time.Hour),
+	)
+	if execErr != nil {
+		t.Fatal(execErr)
+	}
+
 	applyLiveErr = seed.ApplyLive(ctx, txn, clock().Add(time.Hour))
 	if applyLiveErr != nil {
 		t.Fatalf("second apply: %v", applyLiveErr)
+	}
+
+	if ends() != 0 {
+		t.Error("the second start left the client's end date set since")
 	}
 
 	kept := liveConnection(ctx, t, txn, seed.ID(site.Device))
@@ -328,15 +331,12 @@ func TestLiveSiteSeeds(t *testing.T) {
 		}
 	}
 
-	if n := accounts(); n != 1 {
-		t.Errorf("the second start asked for the sign-in account again (%d)", n)
-	}
-
-	if n := count(
-		`SELECT count(*) FROM identity.client_users WHERE customer_id = $1`,
-		seed.ID(site.Customer),
-	); n != 1 {
-		t.Errorf("%d users on the live customer's list, want 1", n)
+	if n := people(); n != listed {
+		t.Errorf(
+			"the second start changed the customer's user list: %d people, before %d",
+			n,
+			listed,
+		)
 	}
 }
 
@@ -366,40 +366,4 @@ func liveConnection(
 	}
 
 	return got
-}
-
-// TestLiveSiteRefusesATakenAddress: the owner's address held by another person stops the seed instead of giving the
-// live customer someone else's account.
-//
-//nolint:paralleltest // the integration tests share one server and the seeded test database
-func TestLiveSiteRefusesATakenAddress(t *testing.T) {
-	server(t)
-
-	ctx := context.Background()
-
-	conn, err := pgx.Connect(ctx, testDB("postgres"))
-	if err != nil {
-		t.Skip(err)
-	}
-	defer func() { _ = conn.Close(ctx) }()
-
-	txn, err := conn.Begin(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = txn.Rollback(ctx) }() // the test never commits
-
-	_, execErr := txn.Exec(
-		ctx,
-		`INSERT INTO identity.users (email, display_name) VALUES ($1, 'Someone else')`,
-		seed.LiveSite().Owner.Email,
-	)
-	if execErr != nil {
-		t.Fatal(execErr)
-	}
-
-	applyLiveErr := seed.ApplyLive(ctx, txn, clock())
-	if applyLiveErr == nil {
-		t.Fatal("the seed took an address another person holds")
-	}
 }

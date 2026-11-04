@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.496.0 / Created: 2026-09-14 / Updated: 2026-11-04 / Status: Draft for review / Language: English
+Version: 0.497.0 / Created: 2026-09-14 / Updated: 2026-11-04 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -100,6 +100,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.497.0 (2026-11-04): The default clients split demo and real: customer-a has the demo data and the mock fleet, customer-b the real devices, all from the seed (DEC-92, IR628).
 0.496.0 (2026-11-04): node_2's room readings have a unit of their own, "Live · node_2 sensors", beside the live Daikin air conditioner (DEC-91, IR627).
 0.495.0 (2026-11-03): Every screen speaks in words — no error codes, spec IDs, status codes or code names (IR626).
 0.494.0 (2026-11-03): Parts and refrigerant name the field to fix, and pausing keeps the technician where they were (IR625).

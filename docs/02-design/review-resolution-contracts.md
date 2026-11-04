@@ -8831,3 +8831,29 @@ The user asked to take node_2's data in. node_2 now reports the room too: on 202
 6. **Development stack.** The migrate and bridge images were rebuilt, and migrate ran again ("Live · Daikin AC, Live · node_2 sensors"). The new unit came in online with its two sensors and binding, and change capture copied it to the billing, energy and notify domains.
    - After the bridge restarted, node_2's readings landed on the sensor unit every minute (28.9 °C, 60.2 %). The air conditioner kept node_1's temperature and humidity and node_2's power.
    - The data was read only, and no command was sent.
+
+## IR628 customer-a sees the demo data, customer-b the real devices (DEC-92) — 2026-11-04
+
+The user wants a test deployment that other people can open and that shows the same state from the seed alone. The default client users split it: customer-a with the demo data only, customer-b with the real devices' data. The other default users stay as they are. Asked about the details, the user took the three recommendations: the mock fleet moves to customer-a, the live site's own customer leaves the seed but stays in the development database, and customer-b has no end of access.
+
+1. **Live site on Demo Customer B (`seed.LiveSite`, `ApplyLive`).** The property "Live sensors" with its room, the air conditioner and node_2's sensor unit is now Demo Customer B's. The seed no longer makes a customer, an owner, an account request or a set-up e-mail of its own: "Live Sensor Customer" (DEC-87, IR525) is gone from the seed, and the fixture's customer-b is the client who sees the site. The fixture must be loaded first.
+2. **customer-b keeps its access.** The fixture's memberships end on 2026-10-01 on the scenario clock, about 17 days after a fresh seed.
+   - While the live site is seeded, `ApplyLive` clears customer-b's end date and raises the membership's version. An end date set later is cleared at the next start.
+   - A revoked access stays revoked.
+   - customer-a and the other users keep the fixture's dates.
+3. **Mock fleet on Demo Customer A (`devicesim/fleet.json`).** The 20 simulated air conditioners, one per state pattern, moved from customer B to customer A.
+   - customer-a sees every state in the demo. customer-b sees only the real devices and the fixture's Home B.
+   - The IoT demo signs in as customer-a (`docker/iot-demo.sh`, `iot-demo.e2e.ts`).
+4. **Docs.** The README and the container design say who sees what. DEC-87 is superseded.
+5. **Tests.**
+   - `TestLiveSiteSeeds`: the site's customer is the fixture's Demo Customer B. customer-b's fixture end date is cleared, and one set later is cleared at the next start. The site adds no one to the customer's user list.
+   - `TestLiveSiteRefusesATakenAddress` went with the owner.
+   - The integration tests do not load the mock fleet, which keeps its own test.
+6. **Development stack.** One transaction moved the existing records with their history:
+   - the mock fleet's property, 20 units, 18 bindings, 14 open alerts and 14 filter reminders to Demo Customer A;
+   - the live site's property, 2 units, 2 bindings and 2 resolved alerts to Demo Customer B.
+
+   Readings and commands follow their units. Change capture updated the energy and notify copies. migrate then ran with the new seed ("live sensor site of Demo Customer B ready"), which cleared customer-b's end date, and the bridge restarted. "Live Sensor Customer" stays with its two owners and no units.
+   - Signed in, customer-b's overview lists Bedroom AC B, Live · Daikin AC (29.8 °C, 57.1 %, 8 W) and Live · node_2 sensors (29.6 °C, 59.1 %). customer-a's lists its four units and the 19 active mock units.
+   - The customer, HQ and scenario E2E passed on this stack with Node 26: customer 43 passed, admin and scenarios 63 passed, the skips by design. One customer run on Node 23 failed only for want of `Uint8Array.toHex`.
+   - No command was sent.
