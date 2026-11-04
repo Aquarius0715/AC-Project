@@ -19,7 +19,7 @@ interface Page<T> { items: T[]; nextCursor?: string | null }
 type SeriesPage = Page<Point> & { buckets: { start: string; value: number | null; count: number }[] | null };
 interface Point { value: number | null; observedAt: string; quality?: string; unit?: string }
 const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error) => {
+  return p.catch((error: unknown) => {
     if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
     throw error;
   });
@@ -39,10 +39,10 @@ export async function loadUnit(id: string, jobId?: string) {
   const i = i18nOf(display);
   const { t } = i;
   const nowMs = now.getTime();
-  const d = await coreOp<ApiUnitDetail>("units.get", { id }).catch((error) => { if (gone(error)) return null; throw error; });
+  const d = await coreOp<ApiUnitDetail>("units.get", { id }).catch((error: unknown) => { if (gone(error)) return null; throw error; });
   if (!d) {
     if (!jobId) return null; // not one of the company's units now: not found
-    const h = await coreOp<ApiPartnerJobDetail>("jobs.get", { jobId }).catch((error) => { if (gone(error)) return null; throw error; });
+    const h = await coreOp<ApiPartnerJobDetail>("jobs.get", { jobId }).catch((error: unknown) => { if (gone(error)) return null; throw error; });
     if (!h || h.projection !== "history") return null;
     return {
       kind: "snapshot" as const,

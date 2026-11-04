@@ -12,8 +12,8 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname, ".."),
   turbopack: { root: path.join(__dirname, "..") },
   // the security headers of network architecture §6 on every response (IR354); the page CSP comes from proxy.ts
-  async headers() {
-    return [{ source: "/:path*", headers: [
+  headers() {
+    return Promise.resolve([{ source: "/:path*", headers: [
       { key: "X-Content-Type-Options", value: "nosniff" },
       { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
       { key: "X-Frame-Options", value: "DENY" },
@@ -23,7 +23,7 @@ const nextConfig: NextConfig = {
     ] }, {
       // the BFF answers carry the session and Core API data: never stored by the browser, as the gateway's (IR407, IR434)
       source: "/bff/:path*", headers: [{ key: "Cache-Control", value: "no-store" }],
-    }];
+    }]);
   },
   experimental: { serverActions: { bodySizeLimit: "11mb" } }, // a certificate file of up to 10 MB (DD-P09, IR277)
 };

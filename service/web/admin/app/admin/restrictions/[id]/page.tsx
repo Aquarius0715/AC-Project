@@ -27,7 +27,7 @@ export default async function AdminRestrictionPage({ params }: Readonly<PageProp
     return <Screen><EmptyState title={t("No access")}>{t("Restrictions need restriction.read, restriction.write or restriction.override.")}</EmptyState></Screen>;
   }
   const [r, units] = await Promise.all([
-    coreOp<ApiRestriction>("restrictions.get", { id }).catch((error) => {
+    coreOp<ApiRestriction>("restrictions.get", { id }).catch((error: unknown) => {
       if (error instanceof CoreError && error.error.code === "NOT_FOUND") notFound();
       throw error;
     }),

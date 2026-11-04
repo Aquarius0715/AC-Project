@@ -14,7 +14,7 @@ import type { PayoutsLive } from "../_components/payouts-view";
 import { byText } from "@ac/web/lib/order";
 
 const quiet = <T,>(p: Promise<T>) => {
-  return p.catch((error) => {
+  return p.catch((error: unknown) => {
     if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return null;
     throw error;
   });

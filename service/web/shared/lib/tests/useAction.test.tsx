@@ -21,13 +21,13 @@ afterEach(() => {
 
 function Runner({ result, after, failed }: Readonly<{ result: Result; after: (v: string) => void; failed: () => void }>) {
   const [pending, run] = useAction();
-  return <button disabled={pending} onClick={() => { run(async () => result, (v: string) => `Saved ${v}`, after, failed); }}>go</button>;
+  return <button disabled={pending} onClick={() => { run(() => Promise.resolve(result), (v: string) => `Saved ${v}`, after, failed); }}>go</button>;
 }
 
 const press = async (result: Result) => {
   const after = vi.fn(), failed = vi.fn();
   render(<ToastProvider><Runner result={result} after={after} failed={failed} /></ToastProvider>);
-  await act(async () => { screen.getByRole("button", { name: "go" }).click(); });
+  await act(() => { screen.getByRole("button", { name: "go" }).click(); return Promise.resolve(); });
   return { after, failed };
 };
 

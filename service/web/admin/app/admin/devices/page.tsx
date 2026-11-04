@@ -20,11 +20,11 @@ import { DevicesDemo } from "./_components/devices-demo";
 import { DevicesView, type DevicesLive } from "./_components/devices-view";
 import { queryReader } from "@ac/web/lib/searchParams";
 
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((error) => { // members the session may not read (no identity.read)
+const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((error: unknown) => { // members the session may not read (no identity.read)
   if (error instanceof CoreError && error.error.code === "FORBIDDEN") return fallback;
   throw error;
 });
-const absent = <T,>(p: Promise<T>) => p.catch((error) => { // an alert or unit HQ cannot read (archived, another tenant) reads as absent
+const absent = <T,>(p: Promise<T>) => p.catch((error: unknown) => { // an alert or unit HQ cannot read (archived, another tenant) reads as absent
   if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return null;
   throw error;
 });

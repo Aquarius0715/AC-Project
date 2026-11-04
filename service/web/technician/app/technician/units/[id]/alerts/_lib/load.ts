@@ -13,7 +13,7 @@ import { evidenceRows, type ApiEvidenceCandidate } from "@ac/web/lib/alertEviden
 import type { TechJobRead } from "@ac/web/lib/techJob";
 
 const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error) => {
+  return p.catch((error: unknown) => {
     if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
     throw error;
   });
@@ -31,7 +31,7 @@ export async function loadAlerts(unitId: string, sp: { jobId?: string; alertId?:
   const { t } = i;
   const nowMs = now.getTime();
   const unitHref = `/technician/units/${unitId}${sp.jobId ? `?jobId=${sp.jobId}` : ""}`;
-  const alerts = await coreOp<Page<ApiTechAlert>>("alerts.list", { limit: 50, filters: { unitId } }).then((r) => r.items).catch((error) => {
+  const alerts = await coreOp<Page<ApiTechAlert>>("alerts.list", { limit: 50, filters: { unitId } }).then((r) => r.items).catch((error: unknown) => {
     if (error instanceof CoreError && error.status < 500) return error.error;
     throw error; // error.tsx
   });

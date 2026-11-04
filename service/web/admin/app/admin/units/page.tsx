@@ -96,7 +96,7 @@ export default async function AdminUnitsPage({ searchParams }: Readonly<PageProp
     has("alert.read", "alert.policy.read")
       ? Promise.all((["open", "acknowledged"] as const).map((status) => coreAll<Alert>("alerts.list", { filters: { customerId: cust.id, status } }))).then((x) => x.flat())
       : Promise.resolve(null),
-    unitId ? coreOp<ApiUnitDetail>("units.get", { id: unitId }).catch((error) => (error instanceof CoreError && error.status === 404 ? null : Promise.reject(error))) : Promise.resolve(null),
+    unitId ? coreOp<ApiUnitDetail>("units.get", { id: unitId }).catch((error: unknown) => (error instanceof CoreError && error.status === 404 ? null : Promise.reject(error))) : Promise.resolve(null),
   ]);
   const clientUsers = await coreAll<ApiClientUser>("clientUsers.list", { filters: { customerId: cust.id } });
   const d = detail && detail.customerOrgId === cust.orgId ? detail : null;

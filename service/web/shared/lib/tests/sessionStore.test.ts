@@ -8,20 +8,26 @@ const kv = vi.hoisted(() => {
   const live = (k: string) => { const r = data.get(k); if (r && r.until <= Date.now()) data.delete(k); return data.get(k); };
   const api = {
     down: false,
-    getEx: vi.fn(async (k: string, o: { value: number }) => { if (api.down) throw new Error("connection lost"); const r = live(k); if (!r) return null; r.until = Date.now() + o.value * 1000; return r.value; }),
-    set: vi.fn(async (k: string, v: string, o: { expiration: { value: number }; condition?: "XX" }) => {
-      if (api.down) throw new Error("connection lost");
-      if (o.condition === "XX" && !live(k)) return null;
-      data.set(k, { value: v, until: Date.now() + o.expiration.value * 1000 });
-      return "OK";
+    getEx: vi.fn((k: string, o: { value: number }) => {
+      if (api.down) return Promise.reject(new Error("connection lost"));
+      const r = live(k);
+      if (!r) return Promise.resolve(null);
+      r.until = Date.now() + o.value * 1000;
+      return Promise.resolve(r.value);
     }),
-    del: vi.fn(async (k: string) => (data.delete(k) ? 1 : 0)),
+    set: vi.fn((k: string, v: string, o: { expiration: { value: number }; condition?: "XX" }) => {
+      if (api.down) return Promise.reject(new Error("connection lost"));
+      if (o.condition === "XX" && !live(k)) return Promise.resolve(null);
+      data.set(k, { value: v, until: Date.now() + o.expiration.value * 1000 });
+      return Promise.resolve("OK");
+    }),
+    del: vi.fn((k: string) => Promise.resolve(data.delete(k) ? 1 : 0)),
   };
   return { data, api };
 });
 vi.mock("server-only", () => ({}));
-vi.mock("next/headers", () => ({ cookies: async () => ({ get: vi.fn(), set: vi.fn(), delete: vi.fn() }) }));
-vi.mock("@redis/client", () => ({ createClient: () => { const c = { on: () => c, connect: async () => c, ...kv.api }; return c; } }));
+vi.mock("next/headers", () => ({ cookies: () => Promise.resolve({ get: vi.fn(), set: vi.fn(), delete: vi.fn() }) }));
+vi.mock("@redis/client", () => ({ createClient: () => { const c = { on: () => c, connect: () => Promise.resolve(c), ...kv.api }; return c; } }));
 
 import { ABSOLUTE_SECONDS, createSessionCookie, dropSession, loadSession, renewSessionCookie, seal, unseal, type Session } from "@ac/web/lib/session";
 

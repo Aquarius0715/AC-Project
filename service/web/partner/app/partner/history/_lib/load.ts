@@ -13,7 +13,7 @@ import type { ApiMember, ApiPartnerJob } from "@ac/web/lib/partnerOverview";
 
 export interface ApiRecipient { id: string; role: string; displayLabel: string; allowedChannels: string[] }
 const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error) => {
+  return p.catch((error: unknown) => {
     if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
     throw error;
   });

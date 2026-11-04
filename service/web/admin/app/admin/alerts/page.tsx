@@ -12,7 +12,7 @@ import { NeedsAccess } from "@ac/web/components/NeedsAccess";
 import { AdminAlertsView } from "./_components/alerts-view";
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((error) => { // names the session may not read (no identity.read or job.read)
+const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((error: unknown) => { // names the session may not read (no identity.read or job.read)
   if (error instanceof CoreError && error.error.code === "FORBIDDEN") return fallback;
   throw error;
 });
@@ -41,7 +41,7 @@ export default async function AdminAlertsPage({ searchParams }: Readonly<PagePro
   // a read the role may not make answers the permission it needs: the first one missing names the page's state, instead
   // of a failure with Try again (IR581)
   const need = <T,>(p: Promise<T>, permission: string): Promise<T | { missing: string }> => {
-    return p.catch((error) => {
+    return p.catch((error: unknown) => {
       if (error instanceof CoreError && error.error.code === "FORBIDDEN") return { missing: permission };
       throw error;
     });

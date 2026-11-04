@@ -15,7 +15,7 @@ import {
 } from "@ac/web/lib/techDevices";
 import type { TechDevicesLive } from "../_components/devices-view";
 
-const quiet = <T,>(p: Promise<T>) => p.catch((error) => { // a unit before the work window or outside the job scope reads as absent
+const quiet = <T,>(p: Promise<T>) => p.catch((error: unknown) => { // a unit before the work window or outside the job scope reads as absent
   if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return null;
   throw error;
 });

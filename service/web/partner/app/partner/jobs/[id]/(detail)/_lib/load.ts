@@ -14,7 +14,7 @@ import { delegationLeft, detailBanner, eventRows, fits, ordinal, qualified, requ
 import { until, type ApiCapacity, type ApiJobEvent, type ApiMember } from "@ac/web/lib/partnerOverview";
 
 const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error) => {
+  return p.catch((error: unknown) => {
     if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
     throw error;
   });
@@ -24,7 +24,7 @@ const plusDays = (date: string, n: number) => new Date(Date.parse(`${date}T00:00
 
 export async function loadJobDetail(jobId: string) {
   interface Page<T> { items: T[] }
-  const job = await coreOp<ApiPartnerJobDetail>("jobs.get", { jobId }).catch((error) => {
+  const job = await coreOp<ApiPartnerJobDetail>("jobs.get", { jobId }).catch((error: unknown) => {
     if (error instanceof CoreError && (error.error.code === "NOT_FOUND" || error.error.code === "FORBIDDEN")) return null; // another company's job reads as absent (D01)
     throw error;
   });

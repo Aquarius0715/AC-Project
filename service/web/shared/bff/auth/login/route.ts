@@ -5,7 +5,7 @@ import { OIDC_COOKIE, oidcConfig, oidcCookieOptions, safeReturnTo, seal } from "
 // GET /bff/auth/login?login_hint=<demo user>&returnTo=<path>[&reauth=1]: starts the OIDC authorization-code flow with
 // PKCE. reauth=1 asks the identity provider for the password again (prompt=login): after HQ signed the user out
 // everywhere, its single sign-on would answer with the old sign-in, which the Core API refuses (IR385).
-export async function GET(req: NextRequest) {
+export function GET(req: NextRequest) {
   const config = oidcConfig();
   const state = randomBytes(16).toString("base64url");
   const verifier = randomBytes(32).toString("base64url");
@@ -26,5 +26,5 @@ export async function GET(req: NextRequest) {
   }).toString();
   const res = NextResponse.redirect(url);
   res.cookies.set(OIDC_COOKIE, seal({ state, verifier, returnTo: safeReturnTo(returnTo), reauth: isReauth }), oidcCookieOptions());
-  return res;
+  return Promise.resolve(res);
 }

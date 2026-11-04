@@ -22,7 +22,7 @@ export default async function CustomerAutomationsPage({ searchParams }: Readonly
   const [prefs, rules, units, properties, spaces, consent, display] = await Promise.all([
     coreOp<{ timezone: string }>("preferences.get", {}), coreAll<ApiAutomation>("automations.list"), coreAll<ApiUnitRow>("units.list"),
     coreAll<ApiPropertyRow>("properties.list"), coreAll<ApiSpaceRow>("spaces.list"),
-    coreOp<ApiConsent>("consents.get", { purpose: "location_automation" }).catch((error) => {
+    coreOp<ApiConsent>("consents.get", { purpose: "location_automation" }).catch((error: unknown) => {
       if (error instanceof CoreError && error.error.code === "NOT_FOUND") return null; // no consent record: location rules unavailable
       throw error;
     }), coreDisplay(),

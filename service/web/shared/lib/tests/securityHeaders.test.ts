@@ -7,7 +7,7 @@ import { STYLE_HASHES } from "@ac/web/lib/styleHashes.gen";
 
 // the proxy reads the session module, which is server code
 vi.mock("server-only", () => ({}));
-vi.mock("next/headers", () => ({ cookies: async () => ({ get: vi.fn(), set: vi.fn(), delete: vi.fn() }) }));
+vi.mock("next/headers", () => ({ cookies: () => Promise.resolve({ get: vi.fn(), set: vi.fn(), delete: vi.fn() }) }));
 
 afterEach(() => vi.unstubAllEnvs());
 

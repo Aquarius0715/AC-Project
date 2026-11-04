@@ -21,7 +21,7 @@ interface Page<T> { items: T[]; nextCursor?: string | null; total?: number }
 /** telemetry.series: a page of readings, or with bucketMinutes the period's averages (AirSeries.buckets, IR605). */
 type SeriesPage = Page<Point> & { buckets: { start: string; value: number | null; count: number }[] | null };
 const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error) => {
+  return p.catch((error: unknown) => {
     if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
     throw error;
   });
@@ -59,7 +59,7 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
   const i = i18nOf(display);
   const { t } = i;
   const nowMs = now.getTime();
-  const d = await coreOp<ApiTechUnit>("units.get", { id }).catch(async (error) => {
+  const d = await coreOp<ApiTechUnit>("units.get", { id }).catch((error: unknown) => {
     if (error instanceof CoreError && error.error.messageKey === "errors.assignment_not_started") return "not_started" as const;
     if (gone(error)) return null;
     throw error;

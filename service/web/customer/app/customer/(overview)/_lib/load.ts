@@ -69,7 +69,7 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
       if (r) restriction = { r, invoiceId };
     }
     return dueNotice(overdue, restriction, i);
-  })().catch((error) => { if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return null; throw error; });
+  })().catch((error: unknown) => { if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return null; throw error; });
   const inScope = automations.filter((a) => a.unitIds.some((u) => ids.includes(u))).toSorted((a, b) => Number(b.enabled) - Number(a.enabled) || a.name.localeCompare(b.name));
   const shown = inScope.slice(0, 3);
   const [summary, sums, co2, nexts, dueLines] = await Promise.all([

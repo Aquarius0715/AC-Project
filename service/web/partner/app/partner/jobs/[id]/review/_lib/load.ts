@@ -13,7 +13,7 @@ import {
 } from "@ac/web/lib/partnerReview";
 import type { ReviewLive } from "../_components/review-view";
 
-const quiet = <T,>(p: Promise<T>) => p.catch((error) => { // outside the caller's scope or window the row reads as absent
+const quiet = <T,>(p: Promise<T>) => p.catch((error: unknown) => { // outside the caller's scope or window the row reads as absent
   if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return null;
   throw error;
 });

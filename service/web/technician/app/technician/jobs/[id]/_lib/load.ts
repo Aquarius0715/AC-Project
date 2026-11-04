@@ -21,7 +21,7 @@ type JobRead = ApiTechHistory | {
 } | { projection: "offer" };
 interface Refused { refused: string } // FORBIDDEN / NOT_FOUND with the reason (e.g. errors.assignment_not_started)
 const quiet = <T,>(p: Promise<T>): Promise<T | Refused> => {
-  return p.catch((error) => {
+  return p.catch((error: unknown) => {
     if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return { refused: error.error.messageKey };
     throw error;
   });
@@ -30,7 +30,7 @@ const isRefused = (x: unknown): x is Refused => !!x && typeof x === "object" && 
 
 export async function loadWorkspace(jobId: string): Promise<WorkspaceLive | "not_found" | { kind: "history"; card: ReturnType<typeof historyCard> }> {
   interface Part { code: string; name: string; vanStockQuantity: number | null }
-  const job = await coreOp<JobRead>("jobs.get", { jobId }).catch((error) => {
+  const job = await coreOp<JobRead>("jobs.get", { jobId }).catch((error: unknown) => {
     if (error instanceof CoreError && (error.error.code === "NOT_FOUND" || error.error.code === "FORBIDDEN" || error.error.fieldErrors.jobId)) return null;
     throw error;
   });

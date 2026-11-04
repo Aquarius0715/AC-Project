@@ -13,7 +13,7 @@ export default async function TechnicianDeviceEventsPage({ params }: Readonly<Pa
   const { id } = await params;
   await connection();
   if (!apiMode()) return <DevicesView initial={id} />;
-  const live = await loadDevices({ selected: id, events: true }).catch((error) => {
+  const live = await loadDevices({ selected: id, events: true }).catch((error: unknown) => {
     if (error instanceof CoreError && (error.error.code === "NOT_FOUND" || error.error.code === "FORBIDDEN")) notFound();
     throw error;
   });

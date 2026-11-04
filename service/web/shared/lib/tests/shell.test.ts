@@ -11,8 +11,8 @@ vi.mock("@ac/web/lib/dal", () => {
   return {
     apiMode: () => api.on,
     coreOp: (...a: unknown[]) => coreOp(...a),
-    coreIdentity: async () => ({ displayName: "Tan Wei", organizationName: "Demo Customer A" }),
-    coreDisplay: async () => ({ language: "en", timeZone: "Asia/Kuala_Lumpur" }),
+    coreIdentity: () => Promise.resolve({ displayName: "Tan Wei", organizationName: "Demo Customer A" }),
+    coreDisplay: () => Promise.resolve({ language: "en", timeZone: "Asia/Kuala_Lumpur" }),
   };
 });
 
@@ -31,30 +31,27 @@ describe("loadShell", () => {
   });
 
   it("shows the customer's unread notifications and alerts", async () => {
-    coreOp.mockImplementation(async (op: string) => (op === "notifications.list" ? { total: 2 } : { counts: { alertCount: 3 } }));
+    coreOp.mockImplementation((op: string) => Promise.resolve(op === "notifications.list" ? { total: 2 } : { counts: { alertCount: 3 } }));
     const shell = await loadShell("client");
     expect(shell).toMatchObject({ user: "Tan Wei", organization: "Demo Customer A", badges: { "/notifications": 2, "/customer/alerts": 3 } });
   });
 
   it("shows the contractor's offers waiting for an answer", async () => {
-    coreOp.mockImplementation(async (op: string) => (op === "notifications.list" ? { total: 0 } : { counts: { offerCount: 4 } }));
+    coreOp.mockImplementation((op: string) => Promise.resolve(op === "notifications.list" ? { total: 0 } : { counts: { offerCount: 4 } }));
     const shell = await loadShell("contractor");
     expect(shell?.badges).toEqual({ "/notifications": 0, "/partner/jobs": 4 });
   });
 
   it("sums HQ's critical and warning alerts over open and acknowledged", async () => {
-    coreOp.mockImplementation(async (op: string, input: { filters: { severity?: string; status?: string } }) =>
-      op === "notifications.list" ? { total: 1 } : { total: input.filters.severity === "critical" ? (input.filters.status === "open" ? 2 : 1) : 5 });
+    coreOp.mockImplementation((op: string, input: { filters: { severity?: string; status?: string } }) =>
+      Promise.resolve(op === "notifications.list" ? { total: 1 } : { total: input.filters.severity === "critical" ? (input.filters.status === "open" ? 2 : 1) : 5 }));
     const shell = await loadShell("admin");
     expect(shell?.badges).toEqual({ "/notifications": 1, "/admin/alerts": 2 + 1 + 5 + 5 });
     expect(coreOp.mock.calls.filter(([op]) => op === "alerts.list")).toHaveLength(4);
   });
 
   it("drops a badge whose count cannot be read", async () => {
-    coreOp.mockImplementation(async (op: string) => {
-      if (op === "summaries.get") throw new Error("unavailable");
-      return { total: 6 };
-    });
+    coreOp.mockImplementation((op: string) => (op === "summaries.get" ? Promise.reject(new Error("unavailable")) : Promise.resolve({ total: 6 })));
     const shell = await loadShell("client");
     expect(shell?.badges).toEqual({ "/notifications": 6 });
   });

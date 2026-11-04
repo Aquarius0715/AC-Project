@@ -10,7 +10,7 @@ import { i18nOf, showClock } from "@ac/web/lib/i18n";
 import { actions, activity, capacity, hhmm, klDay, kpis, onTeam, partnerJob, period, periodChoice, progress, timeline, timelinePct, type ApiCapacity, type ApiCounts, type ApiJobEvent, type ApiMember, type ApiPartnerJob } from "@ac/web/lib/partnerOverview";
 
 const KL = "Asia/Kuala_Lumpur";
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((error) => {
+const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((error: unknown) => {
   if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback; // not readable now: empty section
   throw error;
 });

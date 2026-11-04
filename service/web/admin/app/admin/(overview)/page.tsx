@@ -13,7 +13,7 @@ import { AdminOverviewDemo } from "./_components/overview-demo";
 import { AdminOverviewView } from "./_components/overview-view";
 import { queryReader } from "@ac/web/lib/searchParams";
 
-const quiet = <T,>(p: Promise<T>) => p.catch((error) => { if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return null; throw error; });
+const quiet = <T,>(p: Promise<T>) => p.catch((error: unknown) => { if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return null; throw error; });
 
 export default async function AdminOverviewPage({ searchParams }: Readonly<PageProps<"/admin">>) {
   await connection();

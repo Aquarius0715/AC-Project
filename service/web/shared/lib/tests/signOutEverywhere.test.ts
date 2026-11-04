@@ -6,16 +6,16 @@ import { NextRequest } from "next/server";
 const jar = vi.hoisted(() => ({ value: undefined as string | undefined, get: vi.fn(), set: vi.fn(), delete: vi.fn() }));
 const kv = vi.hoisted(() => new Map<string, string>());
 vi.mock("server-only", () => ({}));
-vi.mock("next/headers", () => ({ cookies: async () => ({ ...jar, get: () => (jar.value ? { value: jar.value } : undefined) }) }));
+vi.mock("next/headers", () => ({ cookies: () => Promise.resolve({ ...jar, get: () => (jar.value ? { value: jar.value } : undefined) }) }));
 vi.mock("next/navigation", () => ({ redirect: (to: string) => { throw new Error(`redirect ${to}`); } }));
 vi.mock("@redis/client", () => {
   return {
     createClient: () => {
       const c = {
-        on: () => c, connect: async () => c,
-        getEx: async (k: string) => kv.get(k) ?? null,
-        set: async (k: string, v: string, o: { condition?: string }) => (o.condition === "XX" && !kv.has(k) ? null : (kv.set(k, v), "OK")),
-        del: async (k: string) => (kv.delete(k) ? 1 : 0),
+        on: () => c, connect: () => Promise.resolve(c),
+        getEx: (k: string) => Promise.resolve(kv.get(k) ?? null),
+        set: (k: string, v: string, o: { condition?: string }) => Promise.resolve(o.condition === "XX" && !kv.has(k) ? null : (kv.set(k, v), "OK")),
+        del: (k: string) => Promise.resolve(kv.delete(k) ? 1 : 0),
       };
       return c;
     },
@@ -49,7 +49,7 @@ afterEach(() => {
 describe("a session the Core API refuses", () => {
   it("is dropped from the store by the DAL, and the caller still gets the refusal", async () => {
     jar.value = await createSessionCookie(session);
-    vi.stubGlobal("fetch", vi.fn(async () => json(401, revoked)));
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(json(401, revoked))));
     await expect(coreOp("units.list", { limit: 5 })).rejects.toBeInstanceOf(CoreError);
     expect([await loadSession(jar.value), kv.size]).toEqual([null, 0]);
   });
@@ -71,7 +71,7 @@ describe("signing in again after a revocation", () => {
   });
 
   const signIn = (pending: { reauth?: boolean; returnTo?: string | null }, coreAnswer: Response) => {
-    vi.stubGlobal("fetch", vi.fn(async (url: string) => (url.includes("/protocol/openid-connect/token") ? json(200, { access_token: token, refresh_token: "r-1", expires_in: 300 }) : coreAnswer)));
+    vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(url.includes("/protocol/openid-connect/token") ? json(200, { access_token: token, refresh_token: "r-1", expires_in: 300 }) : coreAnswer)));
     const cookie = seal({ state: "s-1", verifier: "v-1", returnTo: "/customer/alerts", ...pending });
     return callback(new NextRequest("http://localhost:3000/bff/auth/callback?code=c-1&state=s-1", { headers: { cookie: `${OIDC_COOKIE}=${cookie}` } }));
   };

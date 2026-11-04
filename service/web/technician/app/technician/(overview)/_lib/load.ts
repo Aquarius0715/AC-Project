@@ -12,7 +12,7 @@ import { klDay } from "@ac/web/lib/partnerOverview";
 import { alertRows, dayTimeline, kpis, reportRows, SORTS, sortOf, TABS, tabOf, techRow, type ApiTechCounts, type ApiTechJobRow, type TechJobRow } from "@ac/web/lib/techOverview";
 
 const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error) => {
+  return p.catch((error: unknown) => {
     if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
     throw error;
   });

@@ -5,7 +5,7 @@ import { SESSION_COOKIE, seal, type Session } from "@ac/web/lib/session";
 // the Data Access Layer (Next.js authentication guide) runs on the server: the cookie jar and redirect come from Next
 const jar = vi.hoisted(() => ({ get: vi.fn() }));
 vi.mock("server-only", () => ({}));
-vi.mock("next/headers", () => ({ cookies: async () => jar }));
+vi.mock("next/headers", () => ({ cookies: () => Promise.resolve(jar) }));
 vi.mock("next/navigation", () => ({ redirect: (to: string) => { throw new Error(`NEXT_REDIRECT ${to}`); } }));
 
 const NOW = Date.parse("2026-09-15T01:00:00Z");
@@ -14,9 +14,9 @@ type Call = [string, RequestInit & { headers: Record<string, string> }];
 /** The CoreError a call is refused with (a call that succeeds fails the test). */
 const refusal = (p: Promise<unknown>) => p.then(() => { throw new Error("the call succeeded"); }, (error: unknown) => error as CoreError);
 const reply = (...bodies: [number, unknown][]) => {
-  const f = vi.fn(async () => {
+  const f = vi.fn(() => {
     const [status, body] = bodies.length > 1 ? bodies.shift()! : bodies[0];
-    return new Response(typeof body === "string" ? body : JSON.stringify(body), { status });
+    return Promise.resolve(new Response(typeof body === "string" ? body : JSON.stringify(body), { status }));
   });
   vi.stubGlobal("fetch", f);
   return f as unknown as { mock: { calls: Call[] } };

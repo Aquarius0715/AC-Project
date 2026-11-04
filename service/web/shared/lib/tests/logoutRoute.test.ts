@@ -5,17 +5,17 @@ import { createSessionCookie, loadSession, SESSION_COOKIE, seal, type Session } 
 import { POST } from "@ac/web/bff/auth/logout/route";
 
 vi.mock("server-only", () => ({}));
-vi.mock("next/headers", () => ({ cookies: async () => ({ get: vi.fn(), set: vi.fn(), delete: vi.fn() }) }));
+vi.mock("next/headers", () => ({ cookies: () => Promise.resolve({ get: vi.fn(), set: vi.fn(), delete: vi.fn() }) }));
 // the session store, used only where a test sets SESSION_STORE_URL (IR382)
 const kv = vi.hoisted(() => new Map<string, string>());
 vi.mock("@redis/client", () => {
   return {
     createClient: () => {
       const c = {
-        on: () => c, connect: async () => c,
-        getEx: async (k: string) => kv.get(k) ?? null,
-        set: async (k: string, v: string, o: { condition?: string }) => (o.condition === "XX" && !kv.has(k) ? null : (kv.set(k, v), "OK")),
-        del: async (k: string) => (kv.delete(k) ? 1 : 0),
+        on: () => c, connect: () => Promise.resolve(c),
+        getEx: (k: string) => Promise.resolve(kv.get(k) ?? null),
+        set: (k: string, v: string, o: { condition?: string }) => Promise.resolve(o.condition === "XX" && !kv.has(k) ? null : (kv.set(k, v), "OK")),
+        del: (k: string) => Promise.resolve(kv.delete(k) ? 1 : 0),
       };
       return c;
     },
@@ -34,7 +34,7 @@ const dropped = (res: Response) => (res.headers.get("set-cookie") ?? "").startsW
 // IR357: sign-out ends the identity provider's session of the sign-in, then drops the BFF session
 describe("POST /bff/auth/logout", () => {
   it("ends the provider's session with the session's refresh token and returns to sign-in", async () => {
-    const fetch = vi.fn(async () => new Response(null, { status: 204 }));
+    const fetch = vi.fn(() => Promise.resolve(new Response(null, { status: 204 })));
     vi.stubGlobal("fetch", fetch);
     const res = await signOut(seal(session));
     expect(fetch).toHaveBeenCalledTimes(1);
@@ -42,7 +42,7 @@ describe("POST /bff/auth/logout", () => {
     expect([res.status, res.headers.get("location"), dropped(res)]).toEqual([303, "http://localhost:3000/login", true]);
   });
   it("still signs out when the provider cannot be reached, and calls nothing without a session", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("fetch failed"); }));
+    vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new TypeError("fetch failed"))));
     const failed = await signOut(seal(session));
     expect([failed.status, dropped(failed)]).toEqual([303, true]);
     const fetch = vi.fn();
@@ -53,7 +53,7 @@ describe("POST /bff/auth/logout", () => {
   it("on https drops the __Host- session cookie with Secure and Path=/, as a browser requires (IR374)", async () => {
     vi.stubEnv("APP_URL", "https://ac.example.com");
     vi.stubEnv("SESSION_SECRET", "test-".padEnd(32, "s"));
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 204 })));
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response(null, { status: 204 }))));
     vi.resetModules();
     const { POST: post } = await import("@ac/web/bff/auth/logout/route");
     const s = await import("@ac/web/lib/session");
@@ -77,7 +77,7 @@ describe("POST /bff/auth/logout", () => {
 describe("POST /bff/auth/logout with the session store", () => {
   it("deletes the stored session and ends the provider's session with the stored refresh token", async () => {
     vi.stubEnv("SESSION_STORE_URL", "redis://store.test:6379");
-    const fetch = vi.fn(async () => new Response(null, { status: 204 }));
+    const fetch = vi.fn(() => Promise.resolve(new Response(null, { status: 204 })));
     vi.stubGlobal("fetch", fetch);
     const cookie = await createSessionCookie(session);
     const copy = cookie;

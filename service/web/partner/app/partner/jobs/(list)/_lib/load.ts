@@ -11,7 +11,7 @@ import { jobRow, pages, PAGE_SIZE, sortOf, sortSpec, SORTS, TABS, tabFilters, ta
 import { period, periodChoice, type ApiMember, type ApiPartnerJob } from "@ac/web/lib/partnerOverview";
 
 const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error) => {
+  return p.catch((error: unknown) => {
     if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
     throw error;
   });
@@ -28,7 +28,7 @@ export async function loadJobs(sp: { tab?: string; sort?: string; from?: string;
   const tab = tabOf(sp.tab), sort = sortOf(sp.sort);
   const query = (cursor?: string) => coreOp<Page<ApiPartnerJob>>("jobs.list", { filters: tabFilters(tab, p.fromAt, p.toAt), sort: sortSpec(sort), limit: PAGE_SIZE, ...(cursor && { cursor }) });
   let isRestarted = false;
-  const list = await query(sp.cursor).catch((error) => {
+  const list = await query(sp.cursor).catch((error: unknown) => {
     if (!sp.cursor || !stale(error)) throw error;
     isRestarted = true; // the list changed since the cursor was issued
     return query();

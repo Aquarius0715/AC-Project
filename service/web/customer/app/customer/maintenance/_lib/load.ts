@@ -18,7 +18,7 @@ import { filterLines, reminderForm, reminderLines, type ApiFilterSettings, type 
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 const quiet = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error) => {
+  return p.catch((error: unknown) => {
     if (error instanceof CoreError && (error.error.code === "NOT_FOUND" || error.error.code === "FORBIDDEN")) return fallback;
     throw error;
   });

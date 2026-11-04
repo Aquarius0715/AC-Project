@@ -22,7 +22,7 @@ interface Page<T> { items: T[]; total: number }
 interface Org { id: string; name: string; kind: string; status: string }
 interface Member { id: string; userId: string; displayName: string; role: string; employment: string | null; organizationId: string; validUntil: string | null; qualifications: ApiTechnician["qualifications"] }
 const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error) => {
+  return p.catch((error: unknown) => {
     if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
     throw error;
   });
@@ -101,7 +101,7 @@ export async function loadJobs(sp: SP) {
   };
   const pick = one(sp.jobId) ?? rows[0]?.id;
   if (!pick) return { ...base, detail: null };
-  const job = await coreOp<ApiHqJob>("jobs.get", { jobId: pick }).catch((error) => {
+  const job = await coreOp<ApiHqJob>("jobs.get", { jobId: pick }).catch((error: unknown) => {
     if (error instanceof CoreError && error.error.code === "NOT_FOUND") return null;
     throw error;
   });
@@ -169,7 +169,7 @@ export async function loadPlans(sp: SP) {
   const base = { ...head, q, rows, plansTotal: plans.length };
   const pick = one(sp.planId) ?? rows[0]?.id;
   if (!pick) return { ...base, detail: null };
-  const plan = await coreOp<ApiPlan>("plans.get", { id: pick }).catch((error) => {
+  const plan = await coreOp<ApiPlan>("plans.get", { id: pick }).catch((error: unknown) => {
     if (error instanceof CoreError && error.error.code === "NOT_FOUND") return null;
     throw error;
   });

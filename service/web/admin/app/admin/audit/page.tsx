@@ -21,7 +21,7 @@ import { queryReader } from "@ac/web/lib/searchParams";
 interface Device { id: string; serial: string; unitId: string | null }
 // a part the session may not read (FORBIDDEN, NOT_FOUND) is left out; UNAVAILABLE and TIMEOUT still fail the page
 const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error) => {
+  return p.catch((error: unknown) => {
     if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
     throw error;
   });

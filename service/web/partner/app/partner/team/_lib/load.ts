@@ -15,7 +15,7 @@ import { activeNow, grantRows, KL, listed, memberRows, QUALIFICATION_CODES, tech
 import { CERT_STATUSES, certKpis, certQuery, certRows, impact, WINDOWS, type ApiCert, type CertJob } from "@ac/web/lib/partnerCertificates";
 
 const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
-  return p.catch((error) => {
+  return p.catch((error: unknown) => {
     if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
     throw error;
   });

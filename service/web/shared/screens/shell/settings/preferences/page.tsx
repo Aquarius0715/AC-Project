@@ -18,7 +18,7 @@ export default async function PreferencesPage() {
   const [prefs, twoFactor, consent, now, identity] = await Promise.all([
     coreOp<PreferencesLive["prefs"]>("preferences.get", {}),
     coreOp<PreferencesLive["twoFactor"]>("twoFactor.get", {}),
-    isClient ? coreOp<NonNullable<PreferencesLive["consent"]>>("consents.get", { purpose: "location_automation" }).catch((error) => {
+    isClient ? coreOp<NonNullable<PreferencesLive["consent"]>>("consents.get", { purpose: "location_automation" }).catch((error: unknown) => {
       if (error instanceof CoreError && error.error.code === "NOT_FOUND") return null;
       throw error;
     }) : Promise.resolve(null),

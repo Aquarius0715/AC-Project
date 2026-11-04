@@ -6,7 +6,7 @@ import { SESSION_COOKIE, cookieKey, cookieOptions, endIdpSession, jwtClaims, nee
 // the BFF session (backend architecture §5) is server code: next/headers is the request's cookie jar
 const jar = vi.hoisted(() => ({ get: vi.fn(), set: vi.fn(), delete: vi.fn() }));
 vi.mock("server-only", () => ({}));
-vi.mock("next/headers", () => ({ cookies: async () => jar }));
+vi.mock("next/headers", () => ({ cookies: () => Promise.resolve(jar) }));
 
 const NOW = Date.parse("2026-09-15T01:00:00Z");
 const b64 = (v: unknown) => Buffer.from(JSON.stringify(v)).toString("base64url");
@@ -105,7 +105,7 @@ describe("a session from the identity provider's tokens", () => {
 });
 
 describe("refreshing the access token", () => {
-  const answer = (status: number, body: unknown) => vi.fn(async () => Response.json(body, { status, headers: { "Content-Type": "application/json" } }));
+  const answer = (status: number, body: unknown) => vi.fn(() => Promise.resolve(Response.json(body, { status, headers: { "Content-Type": "application/json" } })));
 
   it("is due 30 seconds before the access token expires", () => {
     expect([needsRefresh(session({ expiresAt: NOW / 1000 + 31 })), needsRefresh(session({ expiresAt: NOW / 1000 + 30 })), needsRefresh(session({ expiresAt: NOW / 1000 - 1 }))]).toEqual([false, true, true]);
@@ -127,7 +127,7 @@ describe("refreshing the access token", () => {
     expect(await refresh(session())).toBeNull();
     vi.stubGlobal("fetch", answer(400, { error: "invalid_grant" }));
     expect(await refresh(session())).toBeNull();
-    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("fetch failed"); }));
+    vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new TypeError("fetch failed"))));
     expect(await refresh(session())).toBeNull();
     const fetch = vi.fn();
     vi.stubGlobal("fetch", fetch);
@@ -141,7 +141,7 @@ describe("ending the identity provider's session", () => {
   it("posts the refresh token with the client's credentials to the internal logout endpoint", async () => {
     vi.stubEnv("OIDC_INTERNAL_ISSUER", "http://keycloak:8080/realms/ac");
     vi.stubEnv("OIDC_APP_CLIENT_SECRET", "test-client-secret");
-    const fetch = vi.fn(async () => new Response(null, { status: 204 }));
+    const fetch = vi.fn(() => Promise.resolve(new Response(null, { status: 204 })));
     vi.stubGlobal("fetch", fetch);
     expect(await endIdpSession("r-1")).toBe(true);
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
@@ -150,9 +150,9 @@ describe("ending the identity provider's session", () => {
     expect(init.signal).toBeInstanceOf(AbortSignal); // never waits long for the provider
   });
   it("answers false when the provider refuses or cannot be reached", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error: "invalid_grant" }, { status: 400 })));
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(Response.json({ error: "invalid_grant" }, { status: 400 }))));
     expect(await endIdpSession("r-1")).toBe(false);
-    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("fetch failed"); }));
+    vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new TypeError("fetch failed"))));
     expect(await endIdpSession("r-1")).toBe(false);
   });
 });
@@ -168,7 +168,7 @@ describe("reading the session in a route handler", () => {
 
   it("refreshes an expiring session and rewrites the cookie", async () => {
     jar.get.mockReturnValue({ value: seal(session({ expiresAt: NOW / 1000 + 10 })) });
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ access_token: token(claims), refresh_token: "r-2", expires_in: 300 })));
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(Response.json({ access_token: token(claims), refresh_token: "r-2", expires_in: 300 }))));
     expect(await readSession()).toMatchObject({ refreshToken: "r-2", expiresAt: NOW / 1000 + 300 });
     const [name, value, options] = jar.set.mock.calls[0];
     expect([name, unseal<Session>(value)?.refreshToken, options.maxAge]).toEqual([SESSION_COOKIE, "r-2", 1800]);
@@ -176,7 +176,7 @@ describe("reading the session in a route handler", () => {
 
   it("clears the cookie when the refresh fails, and ignores a missing or forged cookie", async () => {
     jar.get.mockReturnValue({ value: seal(session({ expiresAt: NOW / 1000 + 10 })) });
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 401 })));
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response("{}", { status: 401 }))));
     expect(await readSession()).toBeNull();
     expect(jar.set).toHaveBeenCalledWith(SESSION_COOKIE, "", expect.objectContaining({ path: "/", maxAge: 0 })); // removed with the attributes it was set with (IR374)
     jar.get.mockReturnValue(undefined);
