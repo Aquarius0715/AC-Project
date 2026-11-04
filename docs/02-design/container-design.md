@@ -188,7 +188,7 @@ Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`,
 
 ## 6. CI pipeline
 
-As built (GitHub Actions, IR550), every push to `main` and every pull request runs two workflows:
+As built (GitHub Actions, IR550), every push to `main` and every pull request runs two workflows, and a test tag a third (`deploy-test.yml`, below):
 - `.github/workflows/ci.yml`, seven parallel jobs:
   - `go-lint`: gofmt, vet and golangci-lint (`make lint`: every linter of `.golangci.yml` at 0 issues), and the generated catalog, routes, contracts and Swagger must be current;
   - `go-test` and `go-test-cluster`: the Go suites on a fresh PostgreSQL test database, the second against the split services;
@@ -198,29 +198,24 @@ As built (GitHub Actions, IR550), every push to `main` and every pull request ru
 
 Actions are pinned by commit SHA, and `.github/dependabot.yml` proposes their updates weekly. Before a push, `sh scripts/check.sh` runs the checks of `ci.yml` locally.
 
-**Shared test environment (as built, DEC-93, IR629).** A tag `test<major>.<minor>.<patch>r<n>` (for example `test1.0.0r0`) deploys the whole stack to the lab server. That is the machine of the real sensor nodes' broker, and others open the apps there from the lab network. The tag must be on a commit of `main` whose CI passed.
-- **The server pulls.** The server is on the lab network, out of GitHub's reach, and the repository is public, so there is no self-hosted runner and no way in from outside. A systemd timer runs `deploy/test/deploy.sh` every minute.
-  - It fetches the tags and takes the newest test tag.
-  - It checks that the tag's commit is on `main` and that the CI workflow passed on it (GitHub's public API).
-  - Going back is a new tag on the older commit.
-- **The server builds.** GitHub's container registry keeps new packages private, so pulling from it would need a token on the server. The server builds the images itself instead, one at a time because other projects run there. Each image is tagged with the git tag (`IMAGE_TAG`), and the images of the last three deployed tags stay.
+**Shared test environment (as built, DEC-93, DEC-94, IR629, IR631).** A tag `test<major>.<minor>.<patch>r<n>` (for example `test1.0.0r2`) deploys the whole stack to the lab server, the machine of the real sensor nodes' broker, where others open the apps from the lab network. The tag's commit must be on `main` and its CI must have passed. The build and deploy logs show on the Actions tab.
+- **A runner on the server.** The repository is private (DEC-94), and the server is registered as its self-hosted runner, label `ac-test`. The runner reaches GitHub from the inside, so the lab network needs no way in, and only the collaborators' code reaches it.
+  - `.github/workflows/deploy-test.yml` runs on a test tag and checks the tag out.
+  - It checks that the tag's commit is on `main`, then waits for the CI workflow on it (`deploy/test/ci_gate.py`, with the job's token).
+  - It masks the environment file's passwords, secrets, tokens and keys in the log, then runs `deploy/test/deploy.sh deploy TAG` from the checkout.
+  - One deployment runs at a time; a newer tag waiting replaces an older one that waits. Going back is a new tag on the older commit.
+- **The server builds.** The images are built on the server one at a time, because other projects run there, with the full build output in the log. Each is tagged with the git tag (`IMAGE_TAG`), and the images of the last three deployed tags stay. Each step of `deploy.sh` is a group of its own in the log.
 - **The stack.** It runs as the compose project `ac-test`: `compose.yaml` with `deploy/test/compose.test.yaml`, and the server's environment file `~/ac-test/env`. `deploy/test/setup.sh` writes that file once; only its user can read it, and it is never committed.
   - **Ports:** the apps are published on 3200–3203, Keycloak on 8281 and Mailpit on 8225, on all addresses. The stores, brokers and APIs are not published, because the server's own services use 3000, 5432 and 1883. The long-running services restart with the server, and Keycloak keeps its data in a volume.
   - **Secrets:** the file gives the environment its own values for the secrets that are local defaults in compose.yaml: the Keycloak admin password, the three client secrets, the session secret, the internal token, the session store password and the broker keys. `deploy/test/realm.py` writes the realm from `realm-ac.json` with those secrets and the test URLs. The demo users keep their passwords.
   - **Plain HTTP:** the apps are served over HTTP at the server's address. The session cookies are not `Secure` on HTTP. The browser code that called `crypto.randomUUID`, which a page outside a secure context lacks, now calls `randomId`: the operation relay's idempotency key and HQ's automation simulation.
   - **Real nodes:** `REAL_MQTT_URL` names the broker on the same server, and `REAL_MQTT_COMMANDS=1` lets the app switch the real air conditioner.
 - **Data.** It stays from one deployment to the next. When the migrations changed since the deployed tag, the data is built again from the seed, because version 1 is edited in place before the first release. `deploy.sh reset` does the same by hand.
-- **Failures and reboots.** A failed deployment brings back the tag before it, and a tag is tried three times at most. After a reboot, the first check starts the stack and restarts the API services once Keycloak answers (IR419).
-- **Progress on GitHub (IR630).** With `GITHUB_DEPLOY_TOKEN` in the environment file, each tag is a deployment of the environment `test`, shown under the repository's Deployments.
-  - The token is a fine-grained token of this repository with only the Deployments permission (read and write).
-  - Its status follows the steps: queued while CI runs, in progress at each step (checking out, the realm, each image as n/13, starting, waiting for the apps, the mock fleet's history), then success, or failure with the step that failed and the tag brought back.
-  - `deploy/test/github.py` reads the token from the file, so the token never appears on a command line. Nothing it sends names the server.
-  - A tag that changes the deploy scripts is deployed by its own scripts: the check checks the tag out and runs its `deploy.sh`.
+- **Failures and reboots.** A failed deployment brings back the tag before it and marks the run red, naming the step. After a reboot, the unit `ac-test-boot` runs `deploy.sh boot`: the stack starts again, and the API services restart once Keycloak answers (IR419).
 - **On the server:**
-  - `journalctl -u ac-test-deploy -f` shows the progress.
-  - `bash ~/ac-test/repo/deploy/test/deploy.sh status` shows the deployed tag and the containers.
-  - `deploy.sh reset` builds the data again from the seed.
-  - `deploy.sh deploy TAG` deploys a tag now, without the checks.
+  - `bash ~/ac-test/deploy.sh status` shows the deployed tag and the containers.
+  - `bash ~/ac-test/deploy.sh reset` builds the data again from the seed.
+- **First version (IR629, IR630).** At first a timer on the server pulled the tags, read the CI result from the public API, and reported each step as a GitHub deployment status. `setup.sh` removes that timer.
 
 Planned for the AWS target (DEC-68):
 1. Build every image with `docker buildx` for `linux/arm64` and `linux/amd64`, with the unit tests in the build stage.

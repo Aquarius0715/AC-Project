@@ -1,0 +1,54 @@
+# The shared test environment's deployment (DEC-93, DEC-94, IR631). A tag test<major>.<minor>.<patch>r<n> runs this
+# workflow on the lab server's self-hosted runner (label ac-test), so the build and deploy logs show here. The job checks
+# the tag out, waits until its commit is on main and its CI passed, and runs deploy/test/deploy.sh from the checkout
+# with the server's environment file (~/ac-test/env, which never leaves the server). One deployment runs at a time; a
+# newer tag waiting replaces an older one that waits. The repository is private, so only its collaborators' code reaches
+# the runner.
+name: Test deployment
+
+on:
+  push:
+    tags: ["test[0-9]+.[0-9]+.[0-9]+r[0-9]+"]
+
+permissions:
+  actions: read # the CI run of the tag's commit
+  contents: read
+
+concurrency:
+  group: test-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to the lab server
+    runs-on: [self-hosted, ac-test]
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # main, and the deployed tag: a failure brings it back, and the migrations are compared
+      - name: the tag is on main, and its CI passed
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_REF_NAME is not on main: not deployed"
+            exit 1
+          fi
+          python3 deploy/test/ci_gate.py "$GITHUB_SHA" 60
+      - name: keep the server's secrets out of the log
+        run: |
+          # the values of the environment file's passwords, secrets, tokens and keys are masked from here on
+          while IFS= read -r line; do
+            key=${line%%=*} value=${line#*=}
+            value=${value#\'} value=${value%\'}
+            case "$key" in
+            *PASSWORD | *SECRET | *TOKEN | *_KEY)
+              if [ -n "$value" ]; then echo "::add-mask::$value"; fi
+              ;;
+            esac
+          done <"$HOME/ac-test/env"
+      - name: deploy ${{ github.ref_name }}
+        env:
+          AC_TEST_REPO: ${{ github.workspace }}
+        run: bash deploy/test/deploy.sh deploy "$GITHUB_REF_NAME"

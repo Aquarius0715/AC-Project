@@ -1,20 +1,21 @@
 #!/usr/bin/env bash
-# One-time set-up of the shared test environment on the lab server (DEC-93). Run it there as the user who will own the
-# environment; that user needs Docker without sudo, and sudo is asked once, for the systemd units:
+# One-time set-up of the shared test environment on the lab server (DEC-93, DEC-94). Run it there, from a checkout of
+# the repository, as the user who will own the environment and run the GitHub Actions runner; that user needs Docker
+# without sudo, and sudo is asked once, for the systemd unit:
 #
-#   git clone https://github.com/Aquarius0715/AC-Project.git ~/ac-test/repo
-#   bash ~/ac-test/repo/deploy/test/setup.sh
+#   bash deploy/test/setup.sh
 #
 # It asks for the address others open and the real broker's login, writes ~/ac-test/env (this user only) with its own
-# random secrets, and installs the timer that runs deploy.sh every minute. Nothing is deployed until a tag
-# test<major>.<minor>.<patch>r<n> is pushed. Running it again keeps the environment file, asks for what it lacks (the
-# GitHub token of the deployment status, IR630) and reinstalls the timer.
+# random secrets, and installs the unit ac-test-boot, which starts the deployed tag again after a reboot. The
+# deployments themselves run on the runner (.github/workflows/deploy-test.yml): the steps to register it come at the
+# end. Running it again keeps the environment file, puts the boot unit back and removes the timer of the first version
+# (IR629), which pulled the tags itself.
 set -euo pipefail
 
-REPO_URL=https://github.com/Aquarius0715/AC-Project.git
+HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=${AC_TEST_ROOT:-$HOME/ac-test}
 SETTINGS=$ROOT/env
-UNIT=ac-test-deploy
+UNIT=ac-test-boot
 
 fail() {
   echo "setup: $*" >&2
@@ -29,9 +30,6 @@ docker ps >/dev/null 2>&1 || fail "$(id -un) cannot use Docker without sudo (add
 
 install -d -m 700 "$ROOT" "$ROOT/state"
 chmod 700 "$ROOT"
-if [ ! -d "$ROOT/repo/.git" ]; then
-  git clone --quiet "$REPO_URL" "$ROOT/repo"
-fi
 
 if [ ! -f "$SETTINGS" ]; then
   default_host=$(hostname -I | awk '{print $1}')
@@ -82,53 +80,47 @@ else
   echo "keeping $SETTINGS"
 fi
 
-if ! grep -q '^GITHUB_DEPLOY_TOKEN=' "$SETTINGS"; then
-  echo "Optional: a fine-grained GitHub token of this repository with the Deployments permission (read and write) shows"
-  echo "each deployment's progress on GitHub (the repository's Deployments, environment test). Enter skips it."
-  read -rsp "GitHub token (GITHUB_DEPLOY_TOKEN): " github_token
-  echo
-  if [ -n "$github_token" ]; then
-    case "$github_token" in
-    *"'"*) fail "a token with a single quote cannot be written here; write $SETTINGS by hand" ;;
-    esac
-    umask 077
-    printf "# the progress on GitHub's Deployments (deploy/test/github.py)\nGITHUB_DEPLOY_TOKEN='%s'\n" "$github_token" >>"$SETTINGS"
-    echo "added GITHUB_DEPLOY_TOKEN to $SETTINGS"
-  fi
+# the first version's timer pulled the tags itself (IR629); the runner deploys them now
+if [ -f /etc/systemd/system/ac-test-deploy.timer ] || [ -f /etc/systemd/system/ac-test-deploy.service ]; then
+  sudo systemctl disable --now ac-test-deploy.timer >/dev/null 2>&1 || true
+  sudo rm -f /etc/systemd/system/ac-test-deploy.timer /etc/systemd/system/ac-test-deploy.service
+  echo "removed the timer ac-test-deploy"
 fi
 
+# the boot unit runs the deploy script of the last deployment (each deployment leaves it there)
+if [ ! -f "$ROOT/deploy.sh" ]; then
+  install -m 700 "$HERE/deploy.sh" "$ROOT/deploy.sh"
+fi
 sudo tee "/etc/systemd/system/$UNIT.service" >/dev/null <<EOF
 [Unit]
-Description=AC Project shared test environment: deploys new test tags (deploy/test/deploy.sh)
+Description=AC Project shared test environment: starts the deployed tag again after a reboot (deploy.sh boot)
 After=docker.service network-online.target
 Wants=network-online.target
+Requires=docker.service
 
 [Service]
 Type=oneshot
 User=$(id -un)
 Environment=AC_TEST_ROOT=$ROOT
-ExecStart=/usr/bin/env bash $ROOT/repo/deploy/test/deploy.sh
-TimeoutStartSec=90min
-EOF
-sudo tee "/etc/systemd/system/$UNIT.timer" >/dev/null <<EOF
-[Unit]
-Description=AC Project shared test environment: a check for new test tags every minute
-
-[Timer]
-OnBootSec=2min
-OnUnitInactiveSec=1min
+ExecStart=/usr/bin/env bash $ROOT/deploy.sh boot
+TimeoutStartSec=30min
 
 [Install]
-WantedBy=timers.target
+WantedBy=multi-user.target
 EOF
 sudo systemctl daemon-reload
-sudo systemctl enable --now "$UNIT.timer"
+sudo systemctl enable "$UNIT.service" >/dev/null
+echo "installed the unit $UNIT (after a reboot)"
 
 cat <<EOF
 
-The timer is on. Push a tag such as test1.0.0r0 on a commit of main whose CI passed; within a minute or two this
-server builds and starts it (the first build takes a while). Then:
-  apps      $(grep '^CUSTOMER_WEB_URL=' "$SETTINGS" | cut -d= -f2-) (customer), :3201 partner, :3202 technician, :3203 HQ
-  progress  journalctl -u $UNIT -f
-  state     bash $ROOT/repo/deploy/test/deploy.sh status
+Next, register this server as the repository's self-hosted runner, as $(id -un):
+  1. GitHub: the repository's Settings > Actions > Runners > New self-hosted runner > Linux, x64.
+  2. Here, in ~/actions-runner, run the commands that page shows. To ./config.sh add: --labels ac-test
+  3. Then: sudo ./svc.sh install $(id -un) && sudo ./svc.sh start
+Then a tag such as test1.0.0r2 on a commit of main runs the workflow "Test deployment" on this server: the Actions
+tab shows its build and deploy logs, and the apps open at $(grep '^CUSTOMER_WEB_URL=' "$SETTINGS" | cut -d= -f2-)
+(customer), :3201 partner, :3202 technician, :3203 HQ. On this server:
+  state     bash $ROOT/deploy.sh status
+  reset     bash $ROOT/deploy.sh reset
 EOF

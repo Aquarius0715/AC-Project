@@ -8919,3 +8919,28 @@ The first test deployment, `test1.0.0r0`, could be followed only in the server's
    - with CI passed on a tag that changes the scripts, the script re-ran from the tag, sent the step statuses in order, then success, and recorded the tag as deployed;
    - a failing build sent a failure naming "building the images (1/2)" and the way back, then started the tag before;
    - the token went in the Authorization header only.
+
+## IR631 The test deployment runs on the lab server's runner, with its logs on Actions (DEC-94) — 2026-11-04
+
+The user wanted the build and deploy logs on GitHub Actions. IR630 showed only the steps, and only under Deployments. That needs the deployment to run as an Actions job on the server. A self-hosted runner on a public repository would run fork pull requests' code there, so the user chose to make the repository private and register the server as its runner.
+
+1. **The workflow (`.github/workflows/deploy-test.yml`).** It runs on a push of a tag `test<major>.<minor>.<patch>r<n>`, on the runner with the label `ac-test`. Its steps:
+   - It checks the tag out with the history.
+   - It refuses a commit that is not on `main`.
+   - It waits for the CI workflow of the commit: `deploy/test/ci_gate.py` uses the job's token with `actions: read`. It prints each change of the run's progress, fails when CI fails, and waits 60 minutes at most.
+   - It masks the values of the environment file's passwords, secrets, tokens and keys in the log.
+   - It runs `deploy/test/deploy.sh deploy TAG` from the checkout.
+
+   One deployment runs at a time, and a newer tag waiting replaces an older one that waits.
+2. **`deploy.sh` for the runner.**
+   - Each step is a group of its own in the log, and the image builds print their full output.
+   - A failure is an error annotation that names the step and the tag brought back.
+   - A deployment that works records its tree, and copies the script to `~/ac-test/deploy.sh` for the boot unit.
+   - The pull of the tags, the public-API CI check and the GitHub reports of IR629 and IR630 are removed, with `deploy/test/github.py`. The runner's token and the Actions run replace them, and the server keeps no GitHub token.
+3. **`setup.sh`.** It keeps the environment file and removes the first version's timer. It installs the unit `ac-test-boot`, which runs `deploy.sh boot` after a reboot: the stack starts again, and the API services restart once Keycloak answers (IR419). It ends with the runner's registration steps.
+4. **Checked with stubs.** The real scripts ran in a sandbox, with Docker and the API replaced by stubs:
+   - a first deployment, and one with the same migrations (data kept);
+   - one with changed migrations (data rebuilt once);
+   - a failing build, with its error annotation, the tag before brought back and the deployed tag unchanged;
+   - the boot step, and the status;
+   - the CI gate: a pass after two reads, a failure, the timeout, and the token sent only as a header.
