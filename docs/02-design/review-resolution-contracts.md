@@ -8969,3 +8969,4 @@ A private repository has 2,000 free Actions minutes a month on GitHub's runners,
    - The CI gate's read-once mode answered 0, 3, 3 and 1 for a passed, a running, a not-started and a failed CI.
 
    The workflows themselves first run once the runner is registered.
+5. **Fixed after the merge.** GitHub refused `e2e.yml` on every push ("context runner is not allowed here"), because the job's `env` named `${{ runner.temp }}`, and only steps see the runner context. The first step now hands the settings path to the later steps through `GITHUB_ENV`. `.github/actionlint.yaml` names the runner label, so `docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint` checks the four workflows with no finding. On the server the runner took its first CI jobs in their containers: Vitest and ESLint passed.
