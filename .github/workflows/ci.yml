@@ -37,8 +37,12 @@ jobs:
     defaults: { run: { working-directory: service/api } }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: python3 (make swagger)
-        run: apt-get update -qq && apt-get install -y -qq python3 >/dev/null
+      - name: python3 (make swagger), and git trusts the workspace
+        run: |
+          apt-get update -qq && apt-get install -y -qq python3 >/dev/null
+          # the runner's user owns the workspace and the container works as root: without this git takes it for no
+          # repository, and the generated-files check's git diff only prints its usage (exit 129)
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: gofmt
         run: |
           out=$(gofmt -l .)
