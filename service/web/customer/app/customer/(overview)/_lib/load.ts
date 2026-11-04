@@ -7,7 +7,7 @@
 // user's display language and time zone (coreDisplay, IR260).
 import "server-only";
 import { coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
-import { i18nOf } from "@ac/web/lib/i18n";
+import { byCount, i18nOf } from "@ac/web/lib/i18n";
 import { dueNotice, unitPlaces, type ClientContract } from "@ac/web/lib/clientBilling";
 import type { ApiInvoice } from "@ac/web/lib/billing";
 import type { ApiRestriction } from "@ac/web/lib/restrictions";
@@ -41,7 +41,8 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
   const period = periodRange(kind, now);
   const prev = previousRange(period);
   const week = dayRanges(periodRange("7d", now).from, period.to, display.locale).slice(-7);
-  const filters = sel.unitId ? { unitId: sel.unitId } : (sel.propertyId ? { propertyId: sel.propertyId } : {});
+  const propertyFilter = sel.propertyId ? { propertyId: sel.propertyId } : {};
+  const filters = sel.unitId ? { unitId: sel.unitId } : propertyFilter;
   const baseline = baselinesFor(baselines, ids)[0];
   const sum = (from: string, to: string, b?: string) => coreOp<ApiEnergySummary>("energy.summary", { from, to, unitIds: ids, ...(b && { baselineId: b }) });
   const energy = ids.length > 0 ? Promise.all([
@@ -79,9 +80,13 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
   ]);
   const unitName = new Map(units.map((u) => [u.id, u.displayName]));
   const n = sel.scope.length;
-  const scopeText = sel.unitId ? unitName.get(sel.unitId)!
-    : (sel.propertyName ? t(n === 1 ? "{n} unit in {property}" : "{n} units in {property}", { n, property: sel.propertyName })
-    : t(n === 1 ? "all {n} unit" : "all {n} units", { n }));
+  // the selected unit, the units of the selected property, or all units
+  const scopeTextOf = (): string => {
+    if (sel.unitId) return unitName.get(sel.unitId) ?? t("Unit");
+    if (sel.propertyName) return byCount(n, { one: t("{n} unit in {property}", { n, property: sel.propertyName }), many: t("{n} units in {property}", { n, property: sel.propertyName }) });
+    return byCount(n, { one: t("all {n} unit", { n }), many: t("all {n} units", { n }) });
+  };
+  const scopeText = scopeTextOf();
   const roomOf = (u: OverviewUnit) => (u.spaceId ? spaces.find((s) => s.id === u.spaceId)?.name : null) ?? properties.find((p) => p.id === u.propertyId)?.name ?? t("Room");
   return {
     due: dueLines,
@@ -102,8 +107,9 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
       items: shown.map((a, k) => {
         const u = units.find((x) => x.id === a.unitIds[0]);
         const card = ruleCard(a, u ? { name: u.displayName, path: place.get(u.id)?.place ?? "", property: properties.find((p) => p.id === u.propertyId)?.name ?? "" } : null, nexts[k], !!consent?.granted, i);
-        const line = nexts[k] ? t("Next run: {when} · {unit}", { when: nextRunText(nexts[k], nowMs, i), unit: u?.displayName ?? "AC" })
-          : (triggerOf(a) === "location" ? t("{when} · location consent: {state}", { when: card.when, state: t(consent?.granted ? "granted" : "not granted") }) : card.when);
+        const consentWord = t(consent?.granted ? "granted" : "not granted");
+        const idle = triggerOf(a) === "location" ? t("{when} · location consent: {state}", { when: card.when, state: consentWord }) : card.when;
+        const line = nexts[k] ? t("Next run: {when} · {unit}", { when: nextRunText(nexts[k], nowMs, i), unit: u?.displayName ?? "AC" }) : idle;
         return { id: a.id, name: a.name, status: card.status, line };
       }),
     },

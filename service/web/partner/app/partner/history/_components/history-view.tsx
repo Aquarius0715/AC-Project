@@ -10,8 +10,9 @@ import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { CHANNELS, channelText, communicationRefusal, ROLES, TEMPLATES, type TimelineItem } from "@ac/web/lib/partnerHistory";
 import { communicate, type Communication, type CommunicationFailure } from "../actions";
 import type { HistoryLive } from "../_lib/load";
-import { Icon } from "@ac/web/components/Icon";
+import { Icon, type IconName } from "@ac/web/components/Icon";
 
+const EVENT_ICON = new Map<string, IconName>([["warn", "alert"], ["ok", "check"]]);
 const dot: Record<string, string> = { ok: "bg-ok/15 text-ok", warn: "bg-warn/15 text-warn", none: "bg-primary/10 text-primary" };
 
 /** The contractor's job history (FR-P07, FR-P08, Figma Contractor 05-1…05-6) from the Core API. Texts in the user's
@@ -28,6 +29,11 @@ function List({ live }: Readonly<{ live: HistoryLive }>) {
   const t = useT();
   const patch = useUrlPatch();
   const all = live.tabs.find((x) => x.id === "all")!.count;
+  // no rows: older jobs outside the 90 days, or none at all
+  const emptyState = () => {
+    if (live.outside > 0) return <EmptyState title={t("No jobs in the last 90 days")} action={<Btn size="sm" onClick={() => { patch({ period: "all" }); }}>{t("Show all time")}</Btn>}>{t(live.outside === 1 ? "1 job of your company is older than 90 days — it shows under all time." : "{n} jobs of your company are older than 90 days — they show under all time.", { n: live.outside })}</EmptyState>;
+    return <EmptyState title={t(all ? "No jobs in this view" : "No jobs yet")}>{t("Jobs appear here once your company accepts an offer.")}</EmptyState>;
+  };
   return (
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -40,9 +46,7 @@ function List({ live }: Readonly<{ live: HistoryLive }>) {
         </div>
       </div>
       <Card title={t("Your jobs — {company} only · choose a job to open its history", { company: live.company })}>
-        {live.rows.length === 0 ? (live.outside > 0
-          ? <EmptyState title={t("No jobs in the last 90 days")} action={<Btn size="sm" onClick={() => { patch({ period: "all" }); }}>{t("Show all time")}</Btn>}>{t(live.outside === 1 ? "1 job of your company is older than 90 days — it shows under all time." : "{n} jobs of your company are older than 90 days — they show under all time.", { n: live.outside })}</EmptyState>
-          : <EmptyState title={t(all ? "No jobs in this view" : "No jobs yet")}>{t("Jobs appear here once your company accepts an offer.")}</EmptyState>) : (
+        {live.rows.length === 0 ? emptyState() : (
           <ScrollX>
             <table className="w-full min-w-[880px] text-[13px]">
               <thead><tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground"><th className="py-2 font-semibold">{t("Job")}</th><th className="py-2 font-semibold">{t("Technician")}</th><th className="py-2 font-semibold">{t("Last event")}</th><th className="py-2 font-semibold">{t("Status")}</th><th /></tr></thead>
@@ -100,7 +104,7 @@ function Detail({ live, detail }: Readonly<{ live: HistoryLive; detail: Detail }
             {items.length === 0 && <li className="py-3 text-[13px] text-muted-foreground">{t("No events in this view.")}</li>}
             {items.map((e) => (
               <li key={e.id} className="flex items-start gap-3 border-t border-line py-2.5 first:border-0">
-                <span aria-hidden className={cx("grid h-7 w-7 shrink-0 place-items-center rounded-lg text-xs", dot[e.tone ?? "none"])}><Icon name={e.tone === "warn" ? "alert" : (e.tone === "ok" ? "check" : "dot")} /></span>
+                <span aria-hidden className={cx("grid h-7 w-7 shrink-0 place-items-center rounded-lg text-xs", dot[e.tone ?? "none"])}><Icon name={EVENT_ICON.get(e.tone ?? "") ?? "dot"} /></span>
                 <span className="min-w-0 flex-1"><b className="block text-[13px]">{e.title}</b><span className="block text-[11px] text-muted-foreground">{[e.detail, e.at].filter(Boolean).join(" · ")}</span></span>
                 <Badge tone={e.badge === "customer" ? "primary" : "muted"}>{t(e.badge)}</Badge>
               </li>
@@ -142,6 +146,7 @@ function Compose({ detail, onPreview }: Readonly<{ detail: Extract<Detail, { mis
   const [result, setResult] = useState<{ tone: "ok" | "crit" | "warn"; text: string } | null>(null);
   const channels = CHANNELS.filter((c) => !chosen || chosen.allowedChannels.includes(c.id));
   const isTooLong = message.trim().length > 2000;
+  const lengthError = isTooLong ? t("At most 2000 characters") : undefined;
   const isClosed = mode.kind === "closed";
   const send = () => {
     setTried(true);
@@ -152,10 +157,10 @@ function Compose({ detail, onPreview }: Readonly<{ detail: Extract<Detail, { mis
       (v) => {
         const label = ROLES.find((x) => x.id === role)?.label ?? role;
         onPreview({ id: v.preview.id, title: `${template} → ${label} (${chosen.displayLabel})`, sub: [ch, t(v.preview.deliveryState), v.noteSaved ? t("note {visibility}", { visibility: t(visibility) }) : "", v.preview.at].filter(Boolean).join(" · ") });
+        const savedText = t(visibility === "internal" ? "Saved the note (internal) and created the {channel} preview for {name}. Nothing was sent; internal notes stay hidden from the customer." : "Saved the note (customer-visible) and created the {channel} preview for {name}. Nothing was sent.", { channel: channelText(ch, t), name: chosen.displayLabel });
         setResult({
           tone: "ok",
-          text: v.noteSaved ? t(visibility === "internal" ? "Saved the note (internal) and created the {channel} preview for {name}. Nothing was sent; internal notes stay hidden from the customer." : "Saved the note (customer-visible) and created the {channel} preview for {name}. Nothing was sent.", { channel: channelText(ch, t), name: chosen.displayLabel })
-            : t("Created the {channel} preview for {name}. Nothing was sent.", { channel: channelText(ch, t), name: chosen.displayLabel }),
+          text: v.noteSaved ? savedText : t("Created the {channel} preview for {name}. Nothing was sent.", { channel: channelText(ch, t), name: chosen.displayLabel }),
         });
         if (!v.noteSaved) {
           return;
@@ -182,7 +187,7 @@ function Compose({ detail, onPreview }: Readonly<{ detail: Extract<Detail, { mis
         </Field>
         {ofRole.length > 1 && <Field label={t("Recipient")}><Select value={chosen?.id ?? ""} onChange={(e) => { setRecipient(e.target.value); }}>{ofRole.map((p) => <option key={p.id} value={p.id}>{p.displayLabel}</option>)}</Select></Field>}
         <Field label={t("Channel")}><Select value={channels.some((c) => c.id === channel) ? channel : "inApp"} disabled={isClosed} onChange={(e) => { setChannel(e.target.value); }}>{channels.map((c) => <option key={c.id} value={c.id}>{t("{channel} · preview only", { channel: c.id })}</option>)}</Select></Field>
-        <Field label={t("Message (1–2000 chars)")} error={tried && !message.trim() ? t("A message is required — nothing was saved") : (isTooLong ? t("At most 2000 characters") : undefined)}>
+        <Field label={t("Message (1–2000 chars)")} error={tried && !message.trim() ? t("A message is required — nothing was saved") : lengthError}>
           <Textarea value={message} disabled={isClosed} onChange={(e) => { setMessage(e.target.value); }} placeholder={t("Schedule moved to 2026-09-22 09:00–11:00 due to technician availability.")} />
         </Field>
         <div className="flex flex-wrap justify-end gap-2"><Btn disabled={pending || isClosed} onClick={() => { setMessage(""); setTried(false); setResult(null); }}>{t("Clear")}</Btn><Btn variant="primary" disabled={pending || isClosed || !chosen} onClick={send} className="h-auto min-h-8 max-w-full whitespace-normal text-left">{mode.add && <Icon name="add" />}{mode.button}</Btn></div>
