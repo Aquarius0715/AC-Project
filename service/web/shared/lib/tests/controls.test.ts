@@ -34,7 +34,7 @@ function sources(): string[] {
   const out: string[] = [];
   const walk = (dir: string) => {
     for (const name of readdirSync(dir)) {
-      if (["node_modules", ".next", "__tests__"].includes(name)) continue;
+      if (["node_modules", ".next", "tests"].includes(name)) continue;
       const path = join(dir, name);
       if (statSync(path).isDirectory()) walk(path);
       else if (name.endsWith(".tsx") && !path.startsWith(FACADE) && path !== FACADE + ".tsx") out.push(path);

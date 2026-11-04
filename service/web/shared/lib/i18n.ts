@@ -2,7 +2,7 @@
 // Malay dictionary (lib/i18n-ms.ts, a draft until Business / UI / UX review it) and stays English when it has no entry,
 // with a warning in development (IR44). The language never changes stored values, units, IDs or UTC times. As in the
 // Next.js internationalization guide, the dictionary is a plain object and the locale comes from the server (the
-// user's Preferences). lib/__tests__/i18n.test.ts keeps the code's texts and the dictionary's keys the same (NFR-07).
+// user's Preferences). lib/tests/i18n.test.ts keeps the code's texts and the dictionary's keys the same (NFR-07).
 import { ms } from "@ac/web/lib/i18n-ms";
 
 export type Locale = "en" | "ms";

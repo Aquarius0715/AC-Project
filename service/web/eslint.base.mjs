@@ -59,7 +59,7 @@ export function webConfig(tsconfigRootDir) {
     { plugins: { sonarjs }, rules: everyRule("sonarjs", sonarjs) },
     { plugins: { security }, rules: everyRule("security", security) },
     comments.recommended,
-    { files: ["**/__tests__/**", "**/*.test.{ts,tsx}"], ...vitest.configs.recommended },
+    { files: ["**/tests/**", "**/*.test.{ts,tsx}"], ...vitest.configs.recommended },
     // Where a rule needs a fact of this project, or contradicts a contract or platform it has to follow:
     {
       rules: {
@@ -151,7 +151,7 @@ export function webConfig(tsconfigRootDir) {
     {
       // 4-2: a test reads as one scenario from its set-up to its assertions; cutting it up only to meet a size or
       // complexity limit hides its steps
-      files: ["**/__tests__/**", "**/*.test.{ts,tsx}", "e2e/**", "**/*.e2e.ts"],
+      files: ["**/tests/**", "**/*.test.{ts,tsx}", "e2e/**", "**/*.e2e.ts"],
       rules: {
         "sonarjs/cognitive-complexity": "off",
         "sonarjs/cyclomatic-complexity": "off",
@@ -163,7 +163,7 @@ export function webConfig(tsconfigRootDir) {
       // code that also runs in the browser: Next.js targets Safari 16.4 and later, which lacks these newer built-ins
       // (Iterator helpers, RegExp.escape, Uint8Array base64/hex, explicit resource management); the tests and the E2E
       // specs run on Node and keep the rules
-      ignores: ["**/__tests__/**", "**/*.test.{ts,tsx}", "e2e/**", "**/*.e2e.ts"],
+      ignores: ["**/tests/**", "**/*.test.{ts,tsx}", "e2e/**", "**/*.e2e.ts"],
       rules: {
         "unicorn/prefer-dispose": "off",
         "unicorn/prefer-iterator-to-array": "off",

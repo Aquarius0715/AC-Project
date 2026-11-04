@@ -58,7 +58,7 @@ Validate each screen's cases that add detail to the source (AT-*-SRC) together w
   - Sort hints are words ("most severe first").
   - A native `<option>` cannot hold an icon, so its text is words.
 - **Accessibility.** An icon next to text is aria-hidden. An icon-only button or menu always has a label, and so does a button whose text is hidden at phone width (IR487).
-- **The guard.** `shared/lib/__tests__/icons.test.ts` reads every UI string of the four apps and the Malay dictionary. It fails on:
+- **The guard.** `shared/lib/tests/icons.test.ts` reads every UI string of the four apps and the Malay dictionary. It fails on:
   - a symbol character;
   - an arrow at the start or end of a text;
   - "+ " before a label;

@@ -14,7 +14,7 @@ import { byCodeUnit } from "@ac/web/lib/order";
 //   TestResultsMatchContract holds every operation's Go result type to it, so the Core API answers no field outside
 //   the contract and none of it is missing (IR392).
 // After a contract change, regenerate both with
-// UPDATE_CONTRACT_INPUTS=1 npx vitest run shared/lib/__tests__/contractInputs.test.ts
+// UPDATE_CONTRACT_INPUTS=1 npx vitest run shared/lib/tests/contractInputs.test.ts
 const gen = fileURLToPath(new URL("../contracts.gen.ts", import.meta.url));
 const snapshot = fileURLToPath(new URL("../contractInputs.gen.json", import.meta.url));
 const resultsSnapshot = fileURLToPath(new URL("../contractResults.gen.json", import.meta.url));

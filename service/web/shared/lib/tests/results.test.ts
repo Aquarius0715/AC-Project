@@ -102,7 +102,7 @@ function check(): { checked: number; problems: string[] } {
     };
     for (const sf of program.getSourceFiles()) {
       const f = sf.fileName;
-      if (!f.startsWith(dir + "/") || /node_modules|\/\.next\/|__tests__|\.d\.ts$/.test(f) || seen.has(f)) continue; // shared files once, by shared
+      if (!f.startsWith(dir + "/") || /node_modules|\/\.next\/|\/tests\/|\.d\.ts$/.test(f) || seen.has(f)) continue; // shared files once, by shared
       seen.add(f);
       const visit = (n: ts.Node) => {
         if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && calls.has(n.expression.text) && n.arguments[0] && ts.isStringLiteral(n.arguments[0])) {

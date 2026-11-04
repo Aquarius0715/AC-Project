@@ -35,7 +35,7 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
   const sources = (dir: string): string[] => {
     return readdirSync(dir).flatMap((f) => {
       const path = join(dir, f);
-      if (["node_modules", ".next", "__tests__", "e2e"].includes(f)) return [];
+      if (["node_modules", ".next", "tests", "e2e"].includes(f)) return [];
       return statSync(path).isDirectory() ? sources(path) : (/\.tsx?$/.test(f) && !f.endsWith("i18n-ms.ts") ? [path] : []);
     });
   };

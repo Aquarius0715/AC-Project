@@ -66,7 +66,7 @@ function sources(): string[] {
   const files: string[] = [];
   const walk = (d: string) => {
     for (const e of readdirSync(d, { withFileTypes: true })) {
-      if (["node_modules", ".next", "__tests__", "e2e"].includes(e.name)) continue;
+      if (["node_modules", ".next", "tests", "e2e"].includes(e.name)) continue;
       const p = join(d, e.name);
       if (e.isDirectory()) walk(p);
       else if (/\.tsx?$/.test(e.name)) files.push(p);
