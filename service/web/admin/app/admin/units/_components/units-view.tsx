@@ -50,6 +50,26 @@ const connLabel: Record<Connection, string> = { online: "Online", offline: "Offl
 const scopeLabel: Record<Scope, string> = { indoor: "indoor", outdoor: "outdoor", electrical: "electrical" };
 /** “1 unit” / “3 units” in the display language: the singular and the plural key of one count. */
 const count = (t: T, n: number, one: string, many: string) => t(n === 1 ? one : many, { n });
+/** The tree's id of a selection: a property, a space, or a property's unassigned units. */
+function selectionId(sel: Selection | null): string {
+  if (!sel) return "";
+  if (sel.kind === "property") return sel.property.id;
+  return sel.kind === "space" ? sel.space.id : `unassigned:${sel.property.id}`;
+}
+/** A customer row's contract line: the restriction (its state), the overdue invoices, or none; and where it links. */
+function standingLine(s: CustomerRow["standing"], customerId: string, t: T): { sub: string; href?: string; link?: string } {
+  const r = s?.restriction;
+  if (r) {
+    return r.state === "active" ? { sub: t("Restriction active") }
+      : { sub: t("Restriction {state}", { state: t(r.state.replace("_", " ")) }), href: `/admin/restrictions?restrictionId=${r.id}`, link: t("View restriction") };
+  }
+  return s?.overdue ? { sub: count(t, s.overdue, "1 invoice overdue", "{n} invoices overdue"), href: `/admin/billing?customerId=${customerId}&overdueOnly=true`, link: t("View invoices") }
+    : { sub: t("no overdue invoice") };
+}
+const POWER_STATE = new Map<string, "running" | "stopped">([["on", "running"], ["off", "stopped"]]);
+const USER_TONE = new Map<string, "ok" | "warn">([["active", "ok"], ["invited", "warn"]]);
+const USER_STATUS = new Map([["active", "Active"], ["invited", "Not signed in yet"]]);
+const RESULT_TONE = new Map<string, "ok" | "warn">([["ready", "ok"], ["warning", "warn"]]);
 const units = (t: T, n: number) => count(t, n, "1 unit", "{n} units");
 const clearUnit = { unitId: null };
 
@@ -160,7 +180,7 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
   const s = r.standing;
   const canWrite = live.canWrite;
   const sel = c.selection;
-  const selId = sel ? sel.kind === "property" ? sel.property.id : sel.kind === "space" ? sel.space.id : `unassigned:${sel.property.id}` : "";
+  const selId = selectionId(sel);
   const addUnitHere = () => { setM({ kind: "unit", propertyId: sel?.property.id ?? c.tree[0]?.id ?? "", spaceId: sel?.kind === "space" ? sel.space.id : "" }); };
   const unitsTotal = c.tree.reduce((n, p) => n + p.units, 0);
   return (
@@ -189,16 +209,14 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
         <Kpi label={t("Operation")} value={r.operation} sub={t("Running {on} / known {known}", { on: r.running, known: r.known })} />
         <Kpi label={t("Open alerts")} value={r.alerts} tone={r.alerts ? "warn" : undefined} sub={c.alertsSub ?? t("severity needs alert.read")} href="/admin/alerts" link={t("Alerts")} />
         {s ? <Kpi label={t("Overdue billing")} value={s.overdueAmount ?? t("None")} tone={s.overdue ? "crit" : undefined}
-          sub={s.restriction ? (s.restriction.state === "active" ? t("Restriction active") : t("Restriction {state}", { state: t(s.restriction.state.replace("_", " ")) })) : (s.overdue ? count(t, s.overdue, "1 invoice overdue", "{n} invoices overdue") : t("no overdue invoice"))}
-          href={s.restriction && s.restriction.state !== "active" ? `/admin/restrictions?restrictionId=${s.restriction.id}` : (s.overdue ? `/admin/billing?customerId=${r.id}&overdueOnly=true` : undefined)}
-          link={s.restriction && s.restriction.state !== "active" ? t("View restriction") : (s.overdue ? t("View invoices") : undefined)} />
+          {...standingLine(s, r.id, t)} />
           : <Kpi label={t("Overdue billing")} value="—" sub={t("needs billing.read")} />}
       </div>
       <Tabs value={c.tab} onChange={(v) => { nav({ tab: v === "overview" ? null : v, unitId: null }); }} tabs={[
         { id: "overview" as const, label: t("Units & locations"), count: unitsTotal }, { id: "users" as const, label: t("Users"), count: c.users.length },
         { id: "policies" as const, label: t("Alert policies"), count: c.policies?.length ?? "—" },
       ]} />
-      {c.tab === "policies" ? <PoliciesTab c={c} run={run} pending={pending} /> : (c.tab === "users" ? <UsersTab live={live} c={c} run={run} pending={pending} /> : (
+      {c.tab === "policies" && <PoliciesTab c={c} run={run} pending={pending} />}{c.tab === "users" && <UsersTab live={live} c={c} run={run} pending={pending} />}{c.tab !== "policies" && c.tab !== "users" && (
         <div className="split-rev">
           <Card title={t("Locations")} action={canWrite && <Btn size="sm" onClick={() => { setM({ kind: "property" }); }}><Icon name="add" /> {t("Add property")}</Btn>} className="self-start">
             {c.tree.length === 0 ? <EmptyState title={t("No properties yet")}>{t(canWrite ? "Add the customer’s home or office first." : "HQ has not registered a property yet.")}</EmptyState> : (
@@ -224,7 +242,7 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
             </>}
           </div>
         </div>
-      ))}
+      )}
       {m?.kind === "customer" && <CustomerModal row={r} pending={pending} onClose={close} onSave={(d) => { run(() => updateCustomer(r.id, r.version, { id: r.orgId, version: r.orgVersion ?? 1, name: r.billingName, status: r.orgStatus }, { billingName: d.billingName, name: d.name, serviceProfile: d.profile, status: d.status }), t("Customer saved"), close); }} />}
       {m?.kind === "property" && <PropertyModal p={m.p} pending={pending} onClose={close} onSave={(d) => { run(() => saveProperty(propertyInput(d, r.orgId, m.p?.id), m.p?.version), t(m.p ? "Property saved" : "Property added"), (id) => { close(); nav({ locationId: id, ...clearUnit }); }); }} />}
       {m?.kind === "space" && <SpaceModal c={c} init={m} pending={pending} onClose={close} onSave={(x) => { run(() => saveSpace(x), t("{kind} “{name}” added", { kind: t(kindLabel[x.kind]), name: x.name }), (id) => { close(); nav({ locationId: id, ...clearUnit }); }); }} />}
@@ -307,12 +325,17 @@ function LocationCard({ c, sel, canWrite, active, setM }: Readonly<{ c: Customer
   );
 }
 
+/** The units card's title for the selected place. */
+function unitsTitle(sel: Selection, t: T): string {
+  if (sel.kind === "property") return t("All units in {name}", { name: sel.property.name });
+  return sel.kind === "space" ? t("Units in {name}", { name: sel.space.name }) : t("Unassigned units in {name}", { name: sel.property.name });
+}
 function UnitsCard({ c, sel, nav, canWrite, onNew }: Readonly<{ c: CustomerLive; sel: Selection; nav: Nav; canWrite: boolean; onNew: () => void }>) {
   const t = useT();
   const [q, setQ] = useState(c.filter.search);
   const rows = c.units.filter((u) => !q.trim() || u.name.toLowerCase().includes(q.trim().toLowerCase()) || u.id.toLowerCase().includes(q.trim().toLowerCase()));
   const isFiltered = !!c.filter.powerState || c.filter.connections.length > 0;
-  const title = sel.kind === "property" ? t("All units in {name}", { name: sel.property.name }) : (sel.kind === "space" ? t("Units in {name}", { name: sel.space.name }) : t("Unassigned units in {name}", { name: sel.property.name }));
+  const title = unitsTitle(sel, t);
   const conn = (x: Connection) => t(connLabel[x]);
   return (
     <Card title={`${title} · ${String(isFiltered || q.trim() ? t("{n} of {total}", { n: rows.length, total: c.total }) : c.total)}`} action={canWrite && <Btn size="sm" variant="primary" onClick={onNew}><Icon name="add" /> {t("New unit")}</Btn>}>
@@ -375,7 +398,7 @@ function UnitEdit({ live, c, x, nav, run, pending }: Readonly<{ live: UnitsLive;
   const attachedIds = x.attached.filter((p) => p.kind === "alert").map((p) => p.id);
   return (
     <>
-      <Card title={<span className="flex flex-wrap items-center gap-2">{u.displayName}<PowerBadge s={u.effectivePowerState === "on" ? "running" : (u.effectivePowerState === "off" ? "stopped" : "unknown")} /><ConnBadge s={u.connection} />{x.seen && <span className="text-[11px] font-normal text-muted-foreground">{t("seen {time}", { time: x.seen })}</span>}{u.activeAlertCount > 0 && <Badge tone="warn" icon="warning">{count(t, u.activeAlertCount, "1 open alert", "{n} open alerts")}</Badge>}</span>}
+      <Card title={<span className="flex flex-wrap items-center gap-2">{u.displayName}<PowerBadge s={POWER_STATE.get(u.effectivePowerState) ?? "unknown"} /><ConnBadge s={u.connection} />{x.seen && <span className="text-[11px] font-normal text-muted-foreground">{t("seen {time}", { time: x.seen })}</span>}{u.activeAlertCount > 0 && <Badge tone="warn" icon="warning">{count(t, u.activeAlertCount, "1 open alert", "{n} open alerts")}</Badge>}</span>}
         sub={<>{u.id.slice(0, 8)} · {t("version {v}", { v: u.version })} · <Plain touch type="button" className="font-semibold text-primary" onClick={() => { nav({ unitId: null, locationId: u.archived ? null : u.spaceId ?? `unassigned:${u.propertyId}` }); }}><Icon name="chevronLeft" /> {t("back to {place}", { place: back })}</Plain></>}
         action={live.canWrite && !u.archived && <Btn size="sm" variant="danger" onClick={() => { setModal("delete"); }}>{t("Delete unit…")}</Btn>}>
         {u.archived && <div className="mb-3"><Banner tone="warn">{t("Read only — {note}. Deleted (archived) units are left out of lists, summaries and totals.", { note: x.archivedNote ?? "" })}</Banner></div>}
@@ -396,7 +419,7 @@ function UnitEdit({ live, c, x, nav, run, pending }: Readonly<{ live: UnitsLive;
           <Field label={t("Installed at")} hint={t("A Kuala Lumpur day · leave empty for “Not registered”")} error={fieldError("installedAt")}><Input type="date" max={live.todayKL} value={d.installedAt} disabled={isRo} onChange={(e) => { set({ installedAt: e.target.value }); }} /></Field>
           <Field label={t("Warranty end")} hint={t("Manufacturer warranty; coverage also counts active maintenance contracts")} error={fieldError("warrantyEnd")}><Input type="date" min={d.installedAt || undefined} value={d.warrantyEnd} disabled={isRo} onChange={(e) => { set({ warrantyEnd: e.target.value }); }} /></Field>
           <Field label={t("IoT device")} hint={x.device ? t("Rebinding is done in Devices and keeps the command history on the unit.") : undefined}>
-            <div className="flex min-h-9 items-center gap-2 text-[13px]">{x.device ? <><b>{x.device.serial}</b><ConnBadge s={x.device.connection} /><TextLink href={`/admin/devices?tab=devices&deviceId=${x.device.id}`}>{t("Devices")} <Icon name="chevronRight" /></TextLink></> : (x.deviceKnown ? <span className="text-muted-foreground">{t("No device bound")}</span> : <span className="text-muted-foreground">{t("Needs device.read")}</span>)}</div>
+            <div className="flex min-h-9 items-center gap-2 text-[13px]">{x.device ? <><b>{x.device.serial}</b><ConnBadge s={x.device.connection} /><TextLink href={`/admin/devices?tab=devices&deviceId=${x.device.id}`}>{t("Devices")} <Icon name="chevronRight" /></TextLink></> : null}{!x.device && x.deviceKnown && <span className="text-muted-foreground">{t("No device bound")}</span>}{!x.device && !x.deviceKnown && <span className="text-muted-foreground">{t("Needs device.read")}</span>}</div>
           </Field>
           <Field label={t("Service scope")} hint={t("Target inspection groups")} error={fieldError("serviceScope")}>
             <div className="flex flex-wrap gap-3">{scopes.map((sc) => <Check key={sc} label={t(scopeLabel[sc])} disabled={isRo} checked={d.serviceScope.includes(sc)} onChange={(on) => { set({ serviceScope: on ? [...d.serviceScope, sc] : d.serviceScope.filter((v) => v !== sc) }); }} />)}</div>
@@ -677,7 +700,7 @@ function UsersTab({ live, c, run, pending }: Readonly<{ live: UnitsLive; c: Cust
         <DataTable rows={c.users} rowKey={(u) => u.id} cols={[
           { key: "u", label: t("User"), render: (u) => <><b>{u.name ?? u.email}</b><div className="text-xs text-muted-foreground">{u.sub}</div></> },
           { key: "r", label: t("Role"), render: (u) => <Badge tone={u.role === "owner" ? "primary" : "muted"}>{t(u.role === "owner" ? "Owner" : "Member")}</Badge> },
-          { key: "s", label: t("Status"), render: (u) => <Badge tone={u.status === "active" ? "ok" : (u.status === "invited" ? "warn" : "muted")}>{t(u.status === "active" ? "Active" : (u.status === "invited" ? "Not signed in yet" : "Disabled"))}</Badge> },
+          { key: "s", label: t("Status"), render: (u) => <Badge tone={USER_TONE.get(u.status) ?? "muted"}>{t(USER_STATUS.get(u.status) ?? "Disabled")}</Badge> },
           { key: "l", label: t("Last sign-in"), render: (u) => u.lastSignIn, hideBelow: "md" },
           { key: "c", label: t("Notification channels"), render: (u) => u.channels, hideBelow: "md" },
           { key: "a", label: "", render: (u) => canWrite && (
@@ -699,9 +722,12 @@ function UsersTab({ live, c, run, pending }: Readonly<{ live: UnitsLive; c: Cust
         const close = () => { setChange(null); };
         if (kind === "remove") { run(() => removeClientUser(u.id, u.version, reason), t("{email} removed from {name}", { email: u.email, name: c.row.name }), close); return; }
         if (kind === "signout") { run(() => signOutEverywhere(u.membershipId ?? "", reason), t("Signed out everywhere — every session of {email} has ended", { email: u.email }), close); return; }
-        const status = kind === "status" ? (u.status === "disabled" ? "active" : "disabled") : undefined;
+        const next = u.status === "disabled" ? "active" : "disabled";
+        const status = kind === "status" ? next : undefined;
+        const roleDone = role === "owner" ? "Role changed to Owner" : "Role changed to Member";
+        const signInDone = status === "active" ? "Sign-in enabled" : "Sign-in disabled";
         run(() => updateClientUser(u.id, u.version, { customerId: c.row.id, email: u.email, clientRole: role, ...(status && { status }), reason }),
-          t(kind === "role" ? (role === "owner" ? "Role changed to Owner" : "Role changed to Member") : (status === "active" ? "Sign-in enabled" : "Sign-in disabled")), close);
+          t(kind === "role" ? roleDone : signInDone), close);
       }} />}
     </Card>
   );
@@ -727,6 +753,16 @@ function InviteModal({ c, pending, onClose, onSave }: Readonly<{ c: CustomerLive
   );
 }
 
+/** The dialog title of a change to a client user (English; translated by the caller). */
+function userChangeTitle(kind: string, status: string): string {
+  switch (kind) {
+    case "role": { return "Change role of {email}"; }
+    case "remove": { return "Remove {email}?"; }
+    case "signout": { return "Sign out {email} everywhere?"; }
+    default: { return status === "disabled" ? "Enable sign-in for {email}" : "Disable sign-in for {email}"; }
+  }
+}
+const USER_CHANGE_SAVE = new Map([["remove", "Remove user"], ["signout", "Sign out everywhere"]]);
 function ClientUserModal({ change, pending, onClose, onSave }: Readonly<{ change: { u: ClientUserRow; kind: "role" | "status" | "remove" | "signout" }; pending: boolean; onClose: () => void; onSave: (role: "owner" | "member", reason: string) => void }>) {
   const t = useT();
   const { u, kind } = change;
@@ -734,9 +770,10 @@ function ClientUserModal({ change, pending, onClose, onSave }: Readonly<{ change
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
   const e = reasonError(reason, t);
-  const title = t(kind === "role" ? "Change role of {email}" : kind === "remove" ? "Remove {email}?" : kind === "signout" ? "Sign out {email} everywhere?" : u.status === "disabled" ? "Enable sign-in for {email}" : "Disable sign-in for {email}", { email: u.email });
+  const title = t(userChangeTitle(kind, u.status), { email: u.email });
+  const saveText = USER_CHANGE_SAVE.get(kind) ?? "Save";
   return (
-    <Modal open onClose={onClose} title={title} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant={kind === "remove" || kind === "signout" ? "danger" : "primary"} disabled={pending} onClick={() => { setTried(true); if (!e) onSave(kind === "role" ? role : u.role, reason.trim()); }}>{t(kind === "remove" ? "Remove user" : (kind === "signout" ? "Sign out everywhere" : "Save"))}</Btn></>}>
+    <Modal open onClose={onClose} title={title} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant={kind === "remove" || kind === "signout" ? "danger" : "primary"} disabled={pending} onClick={() => { setTried(true); if (!e) onSave(kind === "role" ? role : u.role, reason.trim()); }}>{t(saveText)}</Btn></>}>
       <div className="flex flex-col gap-3">
         {kind === "role" && <Field label={t("New role")}><Choice value={role} onChange={(v: "owner" | "member") => { setRole(v); }} options={[{ id: "member", label: t("Member") }, { id: "owner", label: t("Owner") }]} /></Field>}
         {kind === "remove" && <p className="text-[13px] text-muted-foreground">{t("The user loses access to the customer app; their membership ends now. The history stays in the audit log.")}</p>}
@@ -806,7 +843,7 @@ function WarrantyTab({ live }: Readonly<{ live: UnitsLive }>) {
         <p className="mt-2 text-[11px] text-muted-foreground">{t("The warranty end is set on the unit (unit edit › Warranty end) or by the CSV import. Coverage = an active maintenance contract, otherwise the warranty; fewer than 90 days left counts as ending.")}</p>
       </Card>
       <Card title={t("Warranty on jobs")} sub={t("Jobs completed while the unit’s warranty ran whose accepted report lists replaced parts — the parts cost is claimable from the manufacturer until a claim is filed.")}>
-        {w.claims === null ? <p className="text-[13px] text-muted-foreground">{t("Claimable jobs need job.read.")}</p> : (w.claims.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No claimable job right now.")}</p> : (
+        {w.claims === null && <p className="text-[13px] text-muted-foreground">{t("Claimable jobs need job.read.")}</p>}{w.claims?.length === 0 && <p className="text-[13px] text-muted-foreground">{t("No claimable job right now.")}</p>}{w.claims && w.claims.length > 0 && (
           <div className="flex flex-col">
             {w.claims.map((x) => (
               <div key={x.jobId} className="flex flex-wrap items-center gap-3 border-t border-line py-2.5 text-[13px] first:border-0">
@@ -816,7 +853,7 @@ function WarrantyTab({ live }: Readonly<{ live: UnitsLive }>) {
               </div>
             ))}
           </div>
-        ))}
+        )}
       </Card>
       {claim && <ClaimModal x={claim} pending={pending} onClose={() => { setClaim(null); }}
         onSave={(label, minor, reason) => { run(() => recordWarrantyClaim(claim.jobId, claim.version, label, minor, claim.currency, reason), t("Warranty claim filed for {unit}", { unit: claim.unit }), () => { setClaim(null); }); }} />}
@@ -904,7 +941,7 @@ function ImportWizard({ live, onClose }: Readonly<{ live: UnitsLive; onClose: ()
             { key: "n", label: t("Row"), render: (r) => r.rowNumber },
             { key: "l", label: t("Location / unit"), render: (r) => <><b>{importPlace(r)}</b><div className="text-xs text-muted-foreground">{r.unitName || "—"}</div></> },
             { key: "m", label: t("Model · serial"), render: (r) => `${r.modelCode || "—"} · ${r.serial ?? "—"}`, hideBelow: "sm" },
-            { key: "r", label: t("Result"), render: (r) => <span className="flex items-start gap-2"><Badge tone={r.result === "ready" ? "ok" : (r.result === "warning" ? "warn" : "crit")}>{t(resultLabel[r.result])}</Badge><span className="text-xs">{importMessage(r, t)}</span></span> },
+            { key: "r", label: t("Result"), render: (r) => <span className="flex items-start gap-2"><Badge tone={RESULT_TONE.get(r.result) ?? "crit"}>{t(resultLabel[r.result])}</Badge><span className="text-xs">{importMessage(r, t)}</span></span> },
           ]} />
           <p className="text-[11px] text-muted-foreground">{t("Nothing is written until you import. Error rows are skipped; the import runs as one change set, is recorded in the audit log and can be undone for 24 h while no unit has telemetry or jobs. The preview expires after 30 minutes.")}</p>
         </div>

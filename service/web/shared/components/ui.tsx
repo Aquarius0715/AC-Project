@@ -57,18 +57,31 @@ export function Badge({ tone = "muted", icon, children, className }: Readonly<{ 
 }
 
 // the state badges speak the display language (IR258); the state values themselves stay as stored
-export function PowerBadge({ s }: { s: "running" | "stopped" | "unknown" }) {
+export function PowerBadge({ s }: Readonly<{ s: "running" | "stopped" | "unknown" }>) {
   const t = useT();
-  return s === "running" ? <Badge tone="ok" icon="running">{t("Running")}</Badge> : (s === "stopped" ? <Badge tone="muted" icon="stopped">{t("Stopped")}</Badge> : <Badge tone="unknown" icon="unknown">{t("Unknown")}</Badge>);
+  switch (s) {
+    case "running": { return <Badge tone="ok" icon="running">{t("Running")}</Badge>; }
+    case "stopped": { return <Badge tone="muted" icon="stopped">{t("Stopped")}</Badge>; }
+    case "unknown": { return <Badge tone="unknown" icon="unknown">{t("Unknown")}</Badge>; }
+  }
 }
-export function ConnBadge({ s }: { s: "online" | "offline" | "connecting" | "unknown" | "error" }) {
+export function ConnBadge({ s }: Readonly<{ s: "online" | "offline" | "connecting" | "unknown" | "error" }>) {
   const t = useT();
-  return s === "online" ? <Badge tone="ok" icon="online">{t("Online")}</Badge> : s === "offline" ? <Badge tone="unknown" icon="offline">{t("Offline")}</Badge> : s === "error" ? <Badge tone="crit" icon="error">{t("Error")}</Badge>
-    : s === "unknown" ? <Badge tone="unknown" icon="unknown">{t("Unknown")}</Badge> : <Badge tone="primary" icon="refresh">{t("Connecting")}</Badge>;
+  switch (s) {
+    case "online": { return <Badge tone="ok" icon="online">{t("Online")}</Badge>; }
+    case "offline": { return <Badge tone="unknown" icon="offline">{t("Offline")}</Badge>; }
+    case "error": { return <Badge tone="crit" icon="error">{t("Error")}</Badge>; }
+    case "unknown": { return <Badge tone="unknown" icon="unknown">{t("Unknown")}</Badge>; }
+    case "connecting": { return <Badge tone="primary" icon="refresh">{t("Connecting")}</Badge>; }
+  }
 }
-export function SeverityBadge({ s }: { s: "critical" | "warning" | "normal" }) {
+export function SeverityBadge({ s }: Readonly<{ s: "critical" | "warning" | "normal" }>) {
   const t = useT();
-  return s === "critical" ? <Badge tone="crit" icon="critical">{t("Critical")}</Badge> : (s === "warning" ? <Badge tone="warn" icon="warning">{t("Warning")}</Badge> : <Badge tone="primary" icon="info">{t("Info")}</Badge>);
+  switch (s) {
+    case "critical": { return <Badge tone="crit" icon="critical">{t("Critical")}</Badge>; }
+    case "warning": { return <Badge tone="warn" icon="warning">{t("Warning")}</Badge>; }
+    case "normal": { return <Badge tone="primary" icon="info">{t("Info")}</Badge>; }
+  }
 }
 export function OnOffBadge({ on }: { on: boolean }) {
   const t = useT();
@@ -182,12 +195,15 @@ export function Stat({ label, value, sub }: Readonly<{ label: string; value: Rea
   );
 }
 
+// a banner's border and background, and its icon, per tone (primary for the others)
+const BANNER_CLS = new Map<Tone, string>([["warn", "border-[#fdba74] bg-warn-soft/60"], ["crit", "border-crit bg-crit-soft/60"], ["ok", "border-[#86efac] bg-ok-soft/60"]]);
+const BANNER_ICON = new Map<Tone, IconName>([["warn", "warning"], ["crit", "error"], ["ok", "success"]]);
 /** A message line: the shadcn/ui Alert in the tone's colours, an alert only when critical (otherwise a status). */
 export function Banner({ tone = "primary", icon, children, action }: Readonly<{ tone?: Tone; icon?: IconName; children: React.ReactNode; action?: React.ReactNode }>) {
-  const bd = tone === "warn" ? "border-[#fdba74] bg-warn-soft/60" : tone === "crit" ? "border-crit bg-crit-soft/60" : tone === "ok" ? "border-[#86efac] bg-ok-soft/60" : "border-border bg-primary-soft/50";
+  const bd = BANNER_CLS.get(tone) ?? "border-border bg-primary-soft/50";
   return (
     <Alert role={tone === "crit" ? "alert" : "status"} className={cn("flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl px-3.5 py-2.5 text-[13px] *:[svg]:translate-y-0", bd)}>
-      <Icon name={icon ?? (tone === "warn" ? "warning" : tone === "crit" ? "error" : tone === "ok" ? "success" : "info")} className="text-[15px]" />
+      <Icon name={icon ?? BANNER_ICON.get(tone) ?? "info"} className="text-[15px]" />
       {/* the text keeps at least 15rem: on a narrow screen the action goes below it instead of squeezing it */}
       <div className="min-w-0 flex-[1_1_15rem]">{children}</div>
       {action}
@@ -234,12 +250,18 @@ export function SummaryList({ items, cols = 1 }: Readonly<{ items: [string, Reac
   );
 }
 
+// a step's text and its number disc: the current one, the done ones and the rest
+const STEP_CLS = { current: ["text-primary", "bg-primary text-white"], done: ["text-ok", "bg-ok-soft"], todo: ["text-muted-foreground", "bg-surface2"] } as const;
+const stepCls = (i: number, current: number) => {
+  if (i === current) return STEP_CLS.current;
+  return i < current ? STEP_CLS.done : STEP_CLS.todo;
+};
 export function Steps({ steps, current }: Readonly<{ steps: string[]; current: number }>) {
   return (
     <ol className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold">
       {steps.map((s, i) => (
-        <li key={s} className={cx("flex items-center gap-1.5", i === current ? "text-primary" : (i < current ? "text-ok" : "text-muted-foreground"))}>
-          <span className={cx("grid h-5 w-5 place-items-center rounded-full text-[11px]", i === current ? "bg-primary text-white" : (i < current ? "bg-ok-soft" : "bg-surface2"))}>{i < current ? <Icon name="check" /> : i + 1}</span>
+        <li key={s} className={cx("flex items-center gap-1.5", stepCls(i, current)[0])}>
+          <span className={cx("grid h-5 w-5 place-items-center rounded-full text-[11px]", stepCls(i, current)[1])}>{i < current ? <Icon name="check" /> : i + 1}</span>
           {s}
         </li>
       ))}
@@ -247,13 +269,14 @@ export function Steps({ steps, current }: Readonly<{ steps: string[]; current: n
   );
 }
 
+const DOT_CLS = new Map<Tone, string>([["crit", "bg-crit"], ["warn", "bg-warn"], ["ok", "bg-ok"]]);
 export function Timeline({ items }: Readonly<{ items: { time: string; title: React.ReactNode; detail?: React.ReactNode; tone?: Tone }[] }>) {
   return (
     <ol className="flex flex-col gap-3">
       {items.map((it, i) => (
         <li key={i} className="grid grid-cols-[84px_14px_1fr] items-start gap-2 text-[13px]">
           <span className="text-xs text-muted-foreground">{it.time}</span>
-          <span className={cx("mt-1.5 h-2.5 w-2.5 rounded-full", it.tone === "crit" ? "bg-crit" : it.tone === "warn" ? "bg-warn" : it.tone === "ok" ? "bg-ok" : "bg-primary")} />
+          <span className={cx("mt-1.5 h-2.5 w-2.5 rounded-full", (it.tone && DOT_CLS.get(it.tone)) ?? "bg-primary")} />
           <div className="min-w-0">
             <div className="font-semibold">{it.title}</div>
             {it.detail && <div className="text-xs text-muted-foreground">{it.detail}</div>}
@@ -296,7 +319,8 @@ export function Field({ label, hint, error, children, className, labelHidden }: 
     <Tag role={isGroup ? "group" : undefined} aria-label={isGroup ? label : undefined} className={cx("flex min-w-0 flex-col gap-1 text-xs text-ink", className)}>
       <span aria-hidden={isGroup || undefined} className={cx("font-semibold", labelHidden && "sr-only")}>{label}</span>
       {field}
-      {error ? <span className="flex items-center gap-1 font-medium text-crit"><Icon name="error" />{error}</span> : (hint ? <span className="font-normal text-muted-foreground">{hint}</span> : null)}
+      {error ? <span className="flex items-center gap-1 font-medium text-crit"><Icon name="error" />{error}</span> : null}
+      {!error && hint ? <span className="font-normal text-muted-foreground">{hint}</span> : null}
     </Tag>
   );
 }
@@ -498,7 +522,8 @@ export interface Col<T> { key: string; label: string; render: (r: T) => React.Re
 // the columns' meta type, given to TanStack through its type-only columnMeta slot
 const columnMeta: { className?: string; hideBelow?: "sm" | "md" } = {};
 const tableFx = tableFeatures({ columnMeta });
-const hideCls = (m?: { hideBelow?: "sm" | "md" }) => (m?.hideBelow === "sm" ? "max-sm:hidden" : (m?.hideBelow === "md" ? "max-md:hidden" : undefined));
+const HIDE_CLS = new Map([["sm", "max-sm:hidden"], ["md", "max-md:hidden"]]);
+const hideCls = (m?: { hideBelow?: "sm" | "md" }) => (m?.hideBelow ? HIDE_CLS.get(m.hideBelow) : undefined);
 /** A cell's content under one component type for good. A column's `render` is a new function on every render of the
 page, and FlexRender mounts a function as a component, so each render remounted every cell: a row's button that
 opened a dialog was gone when the dialog closed, and focus fell to the page (IR620). */
@@ -584,6 +609,11 @@ export function BarChart({ labels, series, names, unit, height = 160, colors = [
   );
 }
 
+/** An axis label sits at the start of the first tick, the end of the last, and the middle of the others. */
+function tickAnchor(index: number, count: number): "start" | "end" | "middle" {
+  if (index === 0) return "start";
+  return index === count - 1 ? "end" : "middle";
+}
 /** A line chart; null points are gaps, never joined (a value between two gaps is a dot). `labels` spread evenly under
 the chart, `ticks` draw gridlines with their values, `shadeGaps` shades the gaps; `name` names the value in the tooltip. */
 export function LineChart({ points, min, max, threshold, height = 120, color = "var(--color-primary)", labels, ticks, shadeGaps, name }: Readonly<{ points: (number | null)[]; min?: number; max?: number; threshold?: number; height?: number; color?: string; labels?: string[]; ticks?: number[]; shadeGaps?: boolean; name?: string }>) {
@@ -607,7 +637,7 @@ export function LineChart({ points, min, max, threshold, height = 120, color = "
       <RLineChart data={data} margin={{ top: 8, right: 6, bottom: labels ? 0 : 4, left: 6 }} title={t("Line chart")}>
         {ticks && <CartesianGrid vertical={false} />}
         <XAxis type="number" dataKey="i" domain={[0, last]} hide={!labels} ticks={labels?.map((_, k) => at(k))} interval={0} tickLine={false} axisLine={false}
-          tick={({ x, y, index }) => <text x={x} y={y} dy={8} fontSize={10} className="fill-muted-foreground" textAnchor={index === 0 ? "start" : (index === (labels?.length ?? 0) - 1 ? "end" : "middle")}>{labels?.[index]}</text>} />
+          tick={({ x, y, index }) => <text x={x} y={y} dy={8} fontSize={10} className="fill-muted-foreground" textAnchor={tickAnchor(index, labels?.length ?? 0)}>{labels?.[index]}</text>} />
         <YAxis domain={[lo, hi]} hide={!ticks} ticks={ticks} mirror tickLine={false} axisLine={false} tick={axisTick} />
         {shadeGaps && vals.length > 0 && gaps.map(([a, b]) => <ReferenceArea key={a} x1={Math.max(0, a - 0.5)} x2={Math.min(last, b + 0.5)} fill="#94a3b8" fillOpacity={0.14} />)}
         {threshold !== undefined && <ReferenceLine y={threshold} stroke="var(--color-crit)" strokeDasharray="4 3" />}
@@ -619,11 +649,12 @@ export function LineChart({ points, min, max, threshold, height = 120, color = "
   );
 }
 
+const BAR_CLS = new Map<Tone, string>([["ok", "**:data-[slot=progress-indicator]:bg-ok"], ["warn", "**:data-[slot=progress-indicator]:bg-warn"], ["crit", "**:data-[slot=progress-indicator]:bg-crit"]]);
 /** A progress bar (shadcn/ui's Progress); `label` names it for assistive technology (WCAG 4.1.2, IR359). */
 export function UtilizationBar({ pct, tone = "primary", label }: Readonly<{ pct: number | null; tone?: Tone; label?: string }>) {
   return (
     <Progress value={pct} aria-label={label}
-      className={cx("*:data-[slot=progress-track]:h-2", tone === "ok" ? "**:data-[slot=progress-indicator]:bg-ok" : tone === "warn" ? "**:data-[slot=progress-indicator]:bg-warn" : tone === "crit" ? "**:data-[slot=progress-indicator]:bg-crit" : undefined)} />
+      className={cx("*:data-[slot=progress-track]:h-2", BAR_CLS.get(tone))} />
   );
 }
 
