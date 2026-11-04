@@ -38,6 +38,13 @@ live site to Demo Customer B and the IoT bridge records the nodes' readings ther
 also lets the app switch the real air conditioner on and off. `customer-b` keeps its access past the demo data's end
 of access (DEC-86, DEC-89, DEC-92; what the nodes must send: backend architecture §9).
 
+Shared test environment (DEC-93): pushing a tag such as `test1.0.0r0` on a commit of `main` whose CI passed deploys
+the stack to the lab server, the real nodes' broker's machine. Its timer checks the tags every minute, builds the images
+there and starts them; the apps open at `http://<server>:3200` (customer), `:3201` (partner), `:3202` (technician) and
+`:3203` (HQ), Keycloak at `:8281` and Mailpit at `:8225`. The one-time set-up on the server is `git clone
+https://github.com/Aquarius0715/AC-Project.git ~/ac-test/repo && bash ~/ac-test/repo/deploy/test/setup.sh` (container
+design §6).
+
 Profiles: `infra` (PostgreSQL, Valkey, LocalStack, Mosquitto, Keycloak, Mailpit, mocks), `backend` (+ API services and
 workers), `full` (+ the four apps), `iot` (bridge, simulator, mock history), `obs`, `stripe`.
 

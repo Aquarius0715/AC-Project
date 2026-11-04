@@ -35,3 +35,6 @@ service/web/e2e/test-results/
 service/web/e2e/playwright-report/
 # broker password file stamp (hash of the local keys, docker/mosquitto/passwd.sh)
 docker/mosquitto/.passwd.keys
+
+# Python byte code (deploy/test/realm.py, docs/tools)
+__pycache__/

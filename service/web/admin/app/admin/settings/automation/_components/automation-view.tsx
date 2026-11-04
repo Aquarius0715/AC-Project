@@ -5,6 +5,7 @@ import { Badge, Banner, Btn, Card, Check, Choice, DataTable, DemoBadge, EmptySta
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
+import { randomId } from "@ac/web/lib/randomId";
 import {
   actionText, autoDraft, autoErrors, autoInput, conditionText, decisionWord, disabledReasonWord, evaluationInput, factOf, reasonWord, subjectText,
   type ApiAutoPolicy, type AutoCondition, type AutoDraft, type Compare, type FactRow, type PolicyGroup,
@@ -64,7 +65,7 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
   const evaluate = (fire: boolean) => {
     if (facts.length === 0) return;
     // the Server Action stamps the Core API's current tick (IR491); a repeated Fire sends its event's own tick
-    const input = evaluationInput(d.type, facts, new Date(live.now), fire ? (event?.id ?? crypto.randomUUID()) : crypto.randomUUID());
+    const input = evaluationInput(d.type, facts, new Date(live.now), fire ? (event?.id ?? randomId()) : randomId());
     if (!fire) { run(() => simulateAuto(input), t("Simulated — no commands created"), (rows) => { setResults({ fired: false, rows }); }); return; }
     run(() => fireAuto(input, event?.id === input.eventId ? event.at : undefined), t("Fired (demo) — commands go through the shared command rules"), (v) => {
       setEvent({ id: input.eventId, at: v.at });

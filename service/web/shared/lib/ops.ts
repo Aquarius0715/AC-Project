@@ -1,6 +1,7 @@
 // Browser client for the BFF operation relay (/bff/ops/<operation>). Errors are thrown as DomainError values with the
 // code / messageKey / fieldErrors of service-contracts.ts.
 import type { OpArgs } from "@ac/web/lib/opTypes";
+import { randomId } from "@ac/web/lib/randomId";
 
 export interface DomainError { code: string; messageKey: string; fieldErrors: Record<string, string>; correlationId: string; retryAfterSeconds: number | null }
 
@@ -15,7 +16,7 @@ export interface WriteOptions { expectedVersion?: number; idempotencyKey?: strin
 /** One operation through the BFF; the input is typed by the contract (IR313). */
 export async function callOp<T>(...[operation, input, opts = {}]: OpArgs<WriteOptions & { write?: boolean }>): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (opts.write) headers["Idempotency-Key"] = opts.idempotencyKey ?? crypto.randomUUID();
+  if (opts.write) headers["Idempotency-Key"] = opts.idempotencyKey ?? randomId(); // also over HTTP (DEC-93)
   if (opts.expectedVersion !== undefined) headers["X-Expected-Version"] = String(opts.expectedVersion);
   const res = await fetch(`/bff/ops/${operation}`, { method: "POST", body: JSON.stringify(input ?? {}), headers });
   const body = await res.json().catch(() => null);
