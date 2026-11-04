@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Check, EmptyState, Field, Input, ListRow, Modal, Select, SummaryList, Textarea, UtilBar } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, EmptyState, Field, Input, ListRow, Modal, Select, SummaryList, Textarea, UtilizationBar } from "@ac/web/components/ui";
 import { useI18n } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -59,7 +59,7 @@ export function FirmwareTab({ live }: Readonly<{ live: DevicesLive }>) {
             const [word, chip] = waveWord[waveStates(sel.c)[n]];
             const ok = inWave.filter((r) => r.status === "succeeded").length;
             const pct = inWave.length > 0 ? Math.round((ok * 100) / inWave.length) : 0;
-            return <div key={w.label}><div className="mb-1 flex items-center justify-between gap-2 text-xs"><b>{t("Wave {n} · {percent} %", { n: n + 1, percent: w.percent })}</b><span className="flex items-center gap-2 text-muted-foreground">{t("{done} / {total} succeeded", { done: ok, total: inWave.length })}<Badge tone={chip}>{t(word)}</Badge></span></div><UtilBar pct={pct} tone={pct >= 95 ? "ok" : "primary"} label={t("Wave {n} · {percent} %", { n: n + 1, percent: w.percent })} /></div>;
+            return <div key={w.label}><div className="mb-1 flex items-center justify-between gap-2 text-xs"><b>{t("Wave {n} · {percent} %", { n: n + 1, percent: w.percent })}</b><span className="flex items-center gap-2 text-muted-foreground">{t("{done} / {total} succeeded", { done: ok, total: inWave.length })}<Badge tone={chip}>{t(word)}</Badge></span></div><UtilizationBar pct={pct} tone={pct >= 95 ? "ok" : "primary"} label={t("Wave {n} · {percent} %", { n: n + 1, percent: w.percent })} /></div>;
           })}</div>
           <div className="mt-3"><SummaryList items={[[t("Succeeded / installing / pending"), `${String(sel.c.progress.succeeded)} / ${String(sel.c.progress.installing)} / ${String(sel.c.progress.pending)}`], [t("Failed"), t("{n} · failed devices keep their old version", { n: sel.c.progress.failed })], [t("Skipped"), t("{n} · busy, offline or tampered", { n: sel.c.progress.skipped })], ...(sel.c.reason ? [[t("Reason"), sel.c.reason] as [string, string]] : [])]} /></div>
           <h3 className="mb-1 mt-4 text-[13px] font-bold">{t("Devices")}</h3>

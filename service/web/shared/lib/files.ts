@@ -26,8 +26,8 @@ export function uploadName(name: string): string {
   if (chars.length === 0) return "upload";
   if (chars.length <= 200) return clean;
   const dot = clean.lastIndexOf(".");
-  const ext = dot > 0 && clean.length - dot <= 10 ? clean.slice(dot) : "";
-  return Array.from(clean.slice(0, clean.length - ext.length)).slice(0, 200 - Array.from(ext).length).join("").trimEnd() + ext;
+  const suffix = dot > 0 && clean.length - dot <= 10 ? clean.slice(dot) : "";
+  return Array.from(clean.slice(0, clean.length - suffix.length)).slice(0, 200 - Array.from(suffix).length).join("").trimEnd() + suffix;
 }
 
 /** A Content-Disposition value for a stored file's name (RFC 6266): a plain-ASCII fallback in filename and the full

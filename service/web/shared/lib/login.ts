@@ -10,8 +10,8 @@ export function safeReturnTo(role: Role, asked: string | undefined): string {
 
 /** API mode: the BFF OIDC sign-in with the demo identity as login hint; the browser demo opens the role home. */
 export function continueHref(api: boolean, role: Role, returnTo: string): string {
-  const cfg = ROLES[role];
-  return api ? `/bff/auth/login?login_hint=${encodeURIComponent(cfg.loginUser)}&returnTo=${encodeURIComponent(returnTo)}` : cfg.base;
+  const config = ROLES[role];
+  return api ? `/bff/auth/login?login_hint=${encodeURIComponent(config.loginUser)}&returnTo=${encodeURIComponent(returnTo)}` : config.base;
 }
 
 const ORDER: Role[] = ["client", "admin", "contractor", "technician"];

@@ -2,7 +2,7 @@
 
 /** Features confirmed from the Figma proposals on 2026-10-02 (FR-C14, C16, A18–A20, A23). */
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Check, Choice, DataTable, Field, Input, Kpi, ListRow, Modal, PowerBadge, Select, Steps, SummaryList,  UtilBar, cx, useToast } from "./ui";
+import { Badge, Banner, Btn, Card, Check, Choice, DataTable, Field, Input, Kpi, ListRow, Modal, PowerBadge, Select, Steps, SummaryList,  UtilizationBar, cx, useToast } from "./ui";
 import { Icon } from "./Icon";
 import { Button } from "@ac/web/components/ui/button";
 
@@ -32,7 +32,7 @@ export function GroupControl({ space, units }: Readonly<{ space: string; units: 
   const toast = useToast();
   const [sel, setSel] = useState<string[]>(units.filter((u) => u.online).slice(0, 4).map((u) => u.id));
   const [power, setPower] = useState<"on" | "off">("on");
-  const [temp, setTemp] = useState(24);
+  const [setpoint, setTemperature] = useState(24);
   const [mode, setMode] = useState<"cool" | "auto" | "fan">("cool");
   const [review, setReview] = useState(false);
   const toggle = (id: string) => { setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id])); };
@@ -52,14 +52,14 @@ export function GroupControl({ space, units }: Readonly<{ space: string; units: 
       <Card title={`Apply to ${String(sel.length)} selected ACs`}>
         <div className="flex flex-wrap items-center gap-4">
           <Choice value={power} onChange={setPower} options={[{ id: "on", label: "On" }, { id: "off", label: "Off" }]} />
-          <div className="flex items-center gap-2"><Btn size="sm" onClick={() => { setTemp((t) => Math.max(16, t - 1)); }} aria-label="Lower the temperature"><Icon name="remove" /></Btn><b className="w-14 text-center">{temp} °C</b><Btn size="sm" onClick={() => { setTemp((t) => Math.min(30, t + 1)); }} aria-label="Raise the temperature"><Icon name="add" /></Btn></div>
+          <div className="flex items-center gap-2"><Btn size="sm" onClick={() => { setTemperature((t) => Math.max(16, t - 1)); }} aria-label="Lower the temperature"><Icon name="remove" /></Btn><b className="w-14 text-center">{setpoint} °C</b><Btn size="sm" onClick={() => { setTemperature((t) => Math.min(30, t + 1)); }} aria-label="Raise the temperature"><Icon name="add" /></Btn></div>
           <Choice value={mode} onChange={setMode} options={[{ id: "cool", label: "Cool" }, { id: "auto", label: "Auto" }, { id: "fan", label: "Fan" }]} />
           <Btn variant="primary" disabled={sel.length === 0} onClick={() => { setReview(true); }}>Review & send</Btn>
         </div>
         <p className="mt-2 text-[11px] text-muted-foreground">Each AC gets its own command and confirmation (same as single control). One space only · owner role only.</p>
       </Card>
       <Modal open={review} onClose={() => { setReview(false); }} title={`Send to ${String(chosen.length)} ACs in ${space}?`} footer={<><Btn onClick={() => { setReview(false); }}>Back</Btn><Btn variant="primary" onClick={() => { setReview(false); toast(`${String(chosen.length)} commands sent — results arrive per AC`); }}>Send {chosen.length} commands</Btn></>}>
-        <DataTable rowKey={(r) => r.id} rows={chosen} cols={[{ key: "n", label: "AC", render: (r) => <b>{r.name}</b> }, { key: "c", label: "Change", render: (r) => (r.min && temp < r.min ? <span className="text-warn">Set to {r.min} °C (restriction)</span> : `${power === "on" ? "On" : "Off"} · ${String(temp)} °C · ${mode}`) }]} />
+        <DataTable rowKey={(r) => r.id} rows={chosen} cols={[{ key: "n", label: "AC", render: (r) => <b>{r.name}</b> }, { key: "c", label: "Change", render: (r) => (r.min && setpoint < r.min ? <span className="text-warn">Set to {r.min} °C (restriction)</span> : `${power === "on" ? "On" : "Off"} · ${String(setpoint)} °C · ${mode}`) }]} />
         <Banner>Offline or restricted ACs are skipped or clamped and shown per AC. There is no rollback across ACs.</Banner>
       </Modal>
     </div>
@@ -129,7 +129,7 @@ export function FirmwareCampaigns() {
         <ListRow><div className="min-w-0 flex-1"><b className="text-[13px]">fw-2.0.0-pilot</b><div className="text-[11px] text-muted-foreground">CTRL-A1 · 5 devices</div></div><Badge tone="ok">Completed</Badge></ListRow>
       </Card>
       <Card title="fw-2.0.0-rollout" sub="Auto-pause if failures exceed 5 % within a wave" action={<Btn size="sm" onClick={() => { setPaused((p) => !p); toast(paused ? "Campaign resumed" : "Campaign paused", "warn"); }}>{paused ? "Resume" : "Pause"}</Btn>}>
-        <div className="flex flex-col gap-3">{waves.map(([l, p, d]) => <div key={l}><div className="mb-1 flex justify-between text-xs"><b>{l}</b><span className="text-muted-foreground">{d}</span></div><UtilBar pct={p} tone={p >= 95 ? "ok" : "primary"} /></div>)}</div>
+        <div className="flex flex-col gap-3">{waves.map(([l, p, d]) => <div key={l}><div className="mb-1 flex justify-between text-xs"><b>{l}</b><span className="text-muted-foreground">{d}</span></div><UtilizationBar pct={p} tone={p >= 95 ? "ok" : "primary"} /></div>)}</div>
         <div className="mt-3"><SummaryList items={[["Succeeded / installing / pending", "47 / 4 / 34"], ["Failed", "2 · old version kept (AC-DEMO-0003 checksum mismatch → rolled back to 1.9.2)"], ["Skipped", "3 · offline / busy (AC-DEMO-0002 test run job-t12)"]]} /></div>
       </Card>
       <Modal open={modal} onClose={() => { setModal(false); }} title="New firmware campaign" footer={<><Btn onClick={() => { setModal(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setModal(false); toast("Campaign scheduled"); }}>Schedule</Btn></>}>

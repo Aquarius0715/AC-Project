@@ -5,7 +5,7 @@
 // when control opens (IR76). URL key: jobId. The Phase 1A demo keeps the fixtures.
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
-import { Card, LinkBtn, Page } from "@ac/web/components/ui";
+import { Card, LinkButton, Page } from "@ac/web/components/ui";
 import { apiMode } from "@ac/web/lib/dal";
 import { ControlDemo } from "./_components/control-demo";
 import { ControlView } from "./_components/control-view";
@@ -20,5 +20,5 @@ export default async function TechnicianControlPage({ params, searchParams }: Re
   const jobId = typeof sp.jobId === "string" && sp.jobId ? sp.jobId : null; // the job the commands belong to (IR94)
   const live = await loadControl(id, jobId);
   if (!live) notFound();
-  return live.kind === "not_started" ? <Page className="max-w-xl"><Card title={live.title} sub={live.text}><LinkBtn href={live.unitHref} size="sm"><Icon name="arrowLeft" />{live.back}</LinkBtn></Card></Page> : <ControlView live={live} />;
+  return live.kind === "not_started" ? <Page className="max-w-xl"><Card title={live.title} sub={live.text}><LinkButton href={live.unitHref} size="sm"><Icon name="arrowLeft" />{live.back}</LinkButton></Card></Page> : <ControlView live={live} />;
 }

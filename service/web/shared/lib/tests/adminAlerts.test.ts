@@ -112,7 +112,7 @@ describe("HQ alerts in Malay with the display time zone (IR292)", () => {
 });
 
 describe("the default policy's rules and the customers' switches (DD-A05 item 9, Figma 268:2, IR347)", () => {
-  const def = (over: Partial<ApiPolicy> = {}): ApiPolicy => {
+  const defaults = (over: Partial<ApiPolicy> = {}): ApiPolicy => {
     return {
       id: "def", version: 3, kind: "default_alert", name: "Default policy", unitIds: [], timezone: "Asia/Kuala_Lumpur", enabled: true, priority: 0, customerId: null,
       rules: [
@@ -123,7 +123,7 @@ describe("the default policy's rules and the customers' switches (DD-A05 item 9,
       ...over,
     };
   };
-  const [p] = policyRows([def()], customers, [{ id: "m-hq", displayName: "hq-operator", role: "admin" }]);
+  const [p] = policyRows([defaults()], customers, [{ id: "m-hq", displayName: "hq-operator", role: "admin" }]);
 
   it("keeps each rule's condition and names who switched a rule for a customer", () => {
     expect(p.rules.map((r) => [r.ruleKey, r.metric, r.operator, r.threshold, r.recovery, r.duration, r.severity])).toEqual([

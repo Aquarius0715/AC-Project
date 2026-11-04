@@ -67,12 +67,12 @@ zone (IR258, IR259); the demo keeps the fixed ones, the language chosen in this 
 export function AppShell({ role: forced, live, children }: Readonly<{ role?: Role; live?: ShellLive; children: React.ReactNode }>) {
   const detected = useStoredRole();
   const role = forced ?? detected;
-  const cfg = ROLES[role];
+  const config = ROLES[role];
   const stored = useStoredValue(LOCALE_KEY);
   const display: Display = live ? live.display : { ...DEFAULT_DISPLAY, locale: isLocale(stored) ? stored : "en" };
   const t = (text: string) => translate(display.locale, text);
-  const scope = live ? (live.organization || cfg.scope).toUpperCase() : cfg.scope;
-  const [roleWord, persona] = cfg.chip.split(" — ", 2);
+  const scope = live ? (live.organization || config.scope).toUpperCase() : config.scope;
+  const [roleWord, persona] = config.chip.split(" — ", 2);
   const chip = `${t(roleWord)} — ${live ? live.user || t("signed in") : persona}`;
   const count = (href: string) => (live?.badges[href] ? String(live.badges[href]) : undefined);
   const pathname = usePathname();
@@ -90,7 +90,7 @@ export function AppShell({ role: forced, live, children }: Readonly<{ role?: Rol
   const [qr, setQr] = useState(false);
   const unread = useJobStore().notes.filter((n) => n.role === role && !n.read).length;
 
-  const items = (live ? cfg.nav.map((i) => ({ ...i, badge: count(i.href) })) : cfg.nav).map((i) => ({ ...i, label: t(i.label) }));
+  const items = (live ? config.nav.map((i) => ({ ...i, badge: count(i.href) })) : config.nav).map((i) => ({ ...i, label: t(i.label) }));
   // the page's name: the menu item with the longest matching path (/customer/units/x is "Units & locations")
   const label = pageLabel(role, pathname);
   const title = label ? t(label) : "AC Project";
@@ -101,12 +101,12 @@ export function AppShell({ role: forced, live, children }: Readonly<{ role?: Rol
 
   const sidebar = (
     <>
-          <Link href={cfg.base} className="mb-3 flex items-center gap-2.5">
+          <Link href={config.base} className="mb-3 flex items-center gap-2.5">
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-lg text-white"><Icon name="cooling" /></span>
-            <span className="leading-tight"><span className="block text-[15px] font-bold">{cfg.app}</span><span className="block text-[11px] text-muted-foreground">{t(cfg.sub)}</span></span>
+            <span className="leading-tight"><span className="block text-[15px] font-bold">{config.app}</span><span className="block text-[11px] text-muted-foreground">{t(config.sub)}</span></span>
           </Link>
           <div className="px-3 pb-1 text-[10px] font-bold tracking-wider text-muted-foreground">{scope}</div>
-          <Suspense fallback={<RoleNav items={items} base={cfg.base} pathname={pathname} search="" />}><RoleNavWithQuery items={items} base={cfg.base} pathname={pathname} /></Suspense>
+          <Suspense fallback={<RoleNav items={items} base={config.base} pathname={pathname} search="" />}><RoleNavWithQuery items={items} base={config.base} pathname={pathname} /></Suspense>
           <div className="my-2 border-t border-line" />
           <nav className="flex flex-col gap-0.5">
             {role === "client" && isOwner && <NavLink href="/customer/users" label={t("Users")} icon="users" active={pathname === "/customer/users"} />}

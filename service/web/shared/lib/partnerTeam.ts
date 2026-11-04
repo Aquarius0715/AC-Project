@@ -71,9 +71,9 @@ export function memberRows(members: ApiTeamMember[], week: ApiCapacity[][], dayI
       return job ? t("{slots} assigned ({job})", { slots: `${hhmm(s.startAt)}–${hhmm(s.endAt)}`, job: job.short }) : t("{slots} assigned", { slots: `${hhmm(s.startAt)}–${hhmm(s.endAt)}` });
     });
     const free = freeSlots(c);
-    const util = pct(c.assignedMinutes, c.availableMinutes);
+    const usage = pct(c.assignedMinutes, c.availableMinutes);
     return {
-      ...row, util: util === null ? "—" : `${String(util)}%`,
+      ...row, util: usage === null ? "—" : `${String(usage)}%`,
       day: { main: blocks.length > 0 ? blocks.join(", ") : t("No assignments"), sub: free.length > 0 ? t("{slots} free", { slots: free.join(", ") }) : t("fully booked") },
     };
   });
@@ -102,8 +102,8 @@ export function teamStats(members: ApiTeamMember[], week: ApiCapacity[][], dayIn
   const mine = (d: ApiCapacity[]) => d.filter((c) => ids.has(c.membershipId));
   const assigned = week.flatMap(mine).reduce((a, c) => a + c.assignedMinutes, 0), available = week.flatMap(mine).reduce((a, c) => a + (c.availableMinutes ?? 0), 0);
   const free = mine(week[dayIndex] ?? []).reduce((a, c) => a + Math.max(0, (c.availableMinutes ?? 0) - c.assignedMinutes), 0);
-  const util = pct(assigned, available);
-  return { assigned: t("{n} h", { n: hours(assigned) }), available: t("{n} h", { n: hours(available) }), utilization: util === null ? "—" : `${String(util)}%`, free: t("{n} h", { n: hours(free) }) };
+  const usage = pct(assigned, available);
+  return { assigned: t("{n} h", { n: hours(assigned) }), available: t("{n} h", { n: hours(available) }), utilization: usage === null ? "—" : `${String(usage)}%`, free: t("{n} h", { n: hours(free) }) };
 }
 
 export interface GrantRow { key: string; technician: string; name: string; sub: string; until: string; badge: { text: string; tone: "ok" | "warn" | "muted" } }

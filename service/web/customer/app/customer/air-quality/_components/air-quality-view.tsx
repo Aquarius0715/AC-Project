@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, ConnBadge, cx, DataTable, EmptyState, Field, LineChart, LinkBtn, Modal, Page, Select, SummaryList, Tabs, Plain } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, ConnBadge, cx, DataTable, EmptyState, Field, LineChart, LinkButton, Modal, Page, Select, SummaryList, Tabs, Plain } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -38,7 +38,7 @@ export function AirQualityView({ live }: Readonly<{ live: AirLive | null }>) {
   const [view, setView] = useState<"chart" | "table">("chart");
   const [open, setOpen] = useState(false);
   if (!live) {
-    return <Page><EmptyState title={t("No air conditioners yet")} action={<LinkBtn href="/customer/properties" size="sm">{t("Units & locations")}</LinkBtn>}>{t("Air quality is read from the sensors of your units. Once a unit is registered its readings appear here.")}</EmptyState></Page>;
+    return <Page><EmptyState title={t("No air conditioners yet")} action={<LinkButton href="/customer/properties" size="sm">{t("Units & locations")}</LinkButton>}>{t("Air quality is read from the sensors of your units. Once a unit is registered its readings appear here.")}</EmptyState></Page>;
   }
   const room = live.rooms.find((r) => r.key === live.roomKey)!;
   const c = live.chart;
@@ -77,7 +77,7 @@ export function AirQualityView({ live }: Readonly<{ live: AirLive | null }>) {
         ))}
       </div>
       <Card><div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]"><b>{live.allergen.title}</b><Badge tone={live.allergen.badge.tone} icon={live.allergen.badge.icon}>{live.allergen.badge.text}</Badge><span className="text-xs text-muted-foreground">{live.allergen.text}</span></div></Card>
-      {live.clean && <Banner tone="warn" action={<LinkBtn size="sm" href="/customer/maintenance">{t("Maintenance")}</LinkBtn>}>{live.clean}</Banner>}
+      {live.clean && <Banner tone="warn" action={<LinkButton size="sm" href="/customer/maintenance">{t("Maintenance")}</LinkButton>}>{live.clean}</Banner>}
       <Banner tone={live.strip.tone} action={<Btn size="sm" variant={live.strip.tone === "warn" ? "primary" : "secondary"} disabled={!live.spaceId} title={live.spaceId ? undefined : t("Logs belong to a room — this unit is not in one")} onClick={() => { setOpen(true); }}>{t("Log ventilation")}</Btn>}>
         <b>{live.strip.title}</b><div className="text-xs text-muted-foreground">{live.strip.text}{!live.spaceId && ` ${t("Ventilation logs belong to a room — HQ sets up the rooms, so ask HQ to place this unit in one.")}`}</div>
       </Banner>

@@ -74,8 +74,8 @@ export async function rateJob(jobId: string, version: number, stars: OpInput<"jo
 export async function reportProblem(form: FormData) {
   return run(async () => {
     const photos = await Promise.all(form.getAll("photos").filter((f): f is File => f instanceof File && f.size > 0).map(async (f) => {
-      const buf = Buffer.from(await f.arrayBuffer());
-      return { name: uploadName(f.name), mime: uploadType(buf, f.type) as OpInput<"jobs.reportProblem">["photos"][number]["mime"], size: f.size, bytes: buf.toString("base64") }; // the API refuses any other type
+      const buffer = Buffer.from(await f.arrayBuffer());
+      return { name: uploadName(f.name), mime: uploadType(buffer, f.type) as OpInput<"jobs.reportProblem">["photos"][number]["mime"], size: f.size, bytes: buffer.toString("base64") }; // the API refuses any other type
     }));
     const start = String(form.get("visitStart") ?? ""), end = String(form.get("visitEnd") ?? "");
     const j = await coreOp<{ id: string }>("jobs.reportProblem", {

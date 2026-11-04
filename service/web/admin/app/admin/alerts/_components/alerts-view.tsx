@@ -123,9 +123,9 @@ export function AdminAlertsView({ live }: Readonly<{ live?: Live }>) {
   const [tried, setTried] = useState(false);
   // the evidence candidates, read only while the Resolve dialog is open (IR327); the demo lists its fixture readings
   const evidence = useOp<{ items: ApiEvidenceCandidate[] }, ApiEvidenceCandidate[]>("alerts.evidence", { alertId: a?.id ?? "", query: { limit: 100 } }, live ? [] : demoEvidence, (d) => d.items, resolve && !!a);
-  const evRows = evidenceRows(evidence.data, (now ?? new Date()).getTime(), i18n);
-  const sendable = picked.filter((id) => evRows.some((r) => r.id === id)); // a refreshed list drops what is no longer a candidate
-  const evProblem = a ? evidenceProblem(a.policyless, sendable, t) : null;
+  const eventRows = evidenceRows(evidence.data, (now ?? new Date()).getTime(), i18n);
+  const sendable = picked.filter((id) => eventRows.some((r) => r.id === id)); // a refreshed list drops what is no longer a candidate
+  const eventProblem = a ? evidenceProblem(a.policyless, sendable, t) : null;
 
   const act = (fn: () => Promise<ActionResult>, ok: string, after?: () => void, failed?: () => void) => {
     startTransition(async () => {
@@ -148,7 +148,7 @@ export function AdminAlertsView({ live }: Readonly<{ live?: Live }>) {
   };
   const doResolve = () => {
     setTried(true);
-    if (!a || !reason.trim() || reason.length > 1000 || evProblem) return;
+    if (!a || !reason.trim() || reason.length > 1000 || eventProblem) return;
     // a refused evidence ID re-reads the candidates (invalidate)
     if (live) { act(() => resolveAlert(a.id, a.version, reason.trim(), sendable), t("Alert resolved"), () => { setResolve(false); setReason(""); setPicked([]); setTried(false); }, invalidate); return; }
     demoState(a.id, "resolved");
@@ -234,7 +234,7 @@ export function AdminAlertsView({ live }: Readonly<{ live?: Live }>) {
         {a && (
           <>
             <p className="text-xs text-muted-foreground">{a.id} · {a.title}</p>
-            <EvidencePicker rows={evRows} policyless={a.policyless} picked={sendable} onChange={setPicked} loading={evidence.loading} error={evidence.error ? t("The evidence could not be loaded — close the dialog and try again.") : (tried ? evProblem : null)} />
+            <EvidencePicker rows={eventRows} policyless={a.policyless} picked={sendable} onChange={setPicked} loading={evidence.loading} error={evidence.error ? t("The evidence could not be loaded — close the dialog and try again.") : (tried ? eventProblem : null)} />
           </>
         )}
         <Field label={t("Resolution reason · required")} hint={`${String(reason.length)} / 1000`} error={tried && !reason.trim() ? t("A reason is required") : (tried && reason.length > 1000 ? t("At most 1000 characters") : undefined)}><Textarea value={reason} onChange={(e) => { setReason(e.target.value); }} /></Field>

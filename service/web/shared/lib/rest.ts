@@ -17,17 +17,17 @@ type Json = Record<string, unknown>;
 const isObject = (v: unknown): v is Json => typeof v === "object" && v !== null && !Array.isArray(v);
 const pathParams = (path: string) => [...path.matchAll(/\{([^}]+)\}/g)].map((m) => m[1]);
 
-function lookup(obj: Json, at: string[]): unknown {
-  let cur: unknown = obj;
+function lookup(node: Json, at: string[]): unknown {
+  let current: unknown = node;
   for (const key of at) {
-    if (!isObject(cur)) return undefined;
-    cur = cur[key];
+    if (!isObject(current)) return undefined;
+    current = current[key];
   }
-  return cur;
+  return current;
 }
 
-function take(obj: Json, at: string[]): unknown {
-  const parent = lookup(obj, at.slice(0, -1));
+function take(node: Json, at: string[]): unknown {
+  const parent = lookup(node, at.slice(0, -1));
   if (!isObject(parent)) return undefined;
   const v = parent[at[at.length - 1]];
   delete parent[at[at.length - 1]];
@@ -53,8 +53,8 @@ function pick(routes: readonly CoreRoute[], input: Json): CoreRoute {
   return best;
 }
 
-function flatten(q: URLSearchParams, prefix: string, obj: Json, top: boolean) {
-  for (const [k, v] of Object.entries(obj)) {
+function flatten(q: URLSearchParams, prefix: string, node: Json, top: boolean) {
+  for (const [k, v] of Object.entries(node)) {
     if (v === null || v === undefined) continue;
     if (Array.isArray(v)) {
       if (v.length === 0) q.append(prefix + k, ""); // the empty list

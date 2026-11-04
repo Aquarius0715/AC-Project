@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Badge, Banner, Card, cx, EmptyState, Kpi, LinkBtn, Page, Select, TextLink, UtilBar, ScrollX } from "@ac/web/components/ui";
+import { Badge, Banner, Card, cx, EmptyState, Kpi, LinkButton, Page, Select, TextLink, UtilizationBar, ScrollX } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { BUCKETS, DAY_END, DAY_START, OVERVIEW_ROWS, type ActionRow } from "@ac/web/lib/partnerOverview";
@@ -54,7 +54,7 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
                       <Badge tone={badgeTone[a.kind]}>{a.badge}</Badge>
                       <span className="min-w-0"><b className="block truncate text-[13px]">{a.title}</b><span className="block text-xs text-muted-foreground">{a.detail}</span></span>
                     </span>
-                    <LinkBtn size="sm" href={a.href}>{a.button}</LinkBtn>
+                    <LinkButton size="sm" href={a.href}>{a.button}</LinkButton>
                   </li>
                 ))}
               </ul>
@@ -63,7 +63,7 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
           <Card title={t("Team capacity — {period}", { period })} action={<TextLink href="/partner/team">{t("Team & capacity")} <Icon name="arrowRight" /></TextLink>}>
             {live.capacity.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No technicians in your company yet.")}</p> : live.capacity.slice(0, OVERVIEW_ROWS).map((c) => {
               return (
-                <div key={c.id} className="mb-3"><div className="mb-1 flex justify-between text-xs"><b>{c.name}</b><span className="text-muted-foreground">{c.text}</span></div><UtilBar pct={c.pct} tone={c.pct !== null && c.pct >= 90 ? "warn" : "primary"} label={`${c.name}: ${c.text}`} /></div>
+                <div key={c.id} className="mb-3"><div className="mb-1 flex justify-between text-xs"><b>{c.name}</b><span className="text-muted-foreground">{c.text}</span></div><UtilizationBar pct={c.pct} tone={c.pct !== null && c.pct >= 90 ? "warn" : "primary"} label={`${c.name}: ${c.text}`} /></div>
               );
             })}
             {live.capacity.length > OVERVIEW_ROWS && <p className="mb-2"><TextLink href="/partner/team">{t("{n} more technicians", { n: live.capacity.length - OVERVIEW_ROWS })} <Icon name="arrowRight" /></TextLink></p>}

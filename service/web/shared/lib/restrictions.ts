@@ -80,7 +80,7 @@ export function unitRows(r: ApiRestriction, names: Map<string, string>, commands
   return r.perUnit.map((u) => {
     const last = (ids: string[]) => (ids.length > 0 ? commands.get(ids[ids.length - 1]) : undefined);
     const a = last(u.applyCommandIds);
-    const rel = last(u.releaseCommandIds);
+    const releaseId = last(u.releaseCommandIds);
     const status = (c: ApiCommand) => `${command[c.status] ?? c.status}${c.failureCode ? ` (${c.failureCode})` : ""}`;
     return {
       unitId: u.unitId, name: names.get(u.unitId) ?? u.unitId.slice(0, 8), apply: apply[u.applyState] ?? u.applyState, release: release[u.releaseState] ?? u.releaseState, pending: pending(u.pendingReason),
@@ -89,7 +89,7 @@ export function unitRows(r: ApiRestriction, names: Map<string, string>, commands
       retryApply: r.state === "requested" && (u.applyState === "not_sent" || u.applyState === "not_applied"),
       retryRelease: r.state === "release_requested" && (u.releaseState === "failed" || (u.releaseState === "none" && u.applyState === "applied")),
       reconcile: ["requested", "applied", "release_requested"].includes(r.state) && u.applyState === "sent_unknown",
-      commands: [a && t("apply {status}", { status: status(a) }), rel && t("remove {status}", { status: status(rel) })].filter(Boolean).join(" · ") || "—",
+      commands: [a && t("apply {status}", { status: status(a) }), releaseId && t("remove {status}", { status: status(releaseId) })].filter(Boolean).join(" · ") || "—",
     };
   });
 }

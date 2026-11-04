@@ -32,9 +32,9 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
 
   // NFR-07 / IR44 key check: the English texts the code translates and the dictionary's keys are the same set
   const root = resolve(__dirname, "../../..");
-  const sources = (dir: string): string[] => {
-    return readdirSync(dir).flatMap((f) => {
-      const path = join(dir, f);
+  const sources = (directory: string): string[] => {
+    return readdirSync(directory).flatMap((f) => {
+      const path = join(directory, f);
       if (["node_modules", ".next", "tests", "e2e"].includes(f)) return [];
       return statSync(path).isDirectory() ? sources(path) : (/\.tsx?$/.test(f) && !f.endsWith("i18n-ms.ts") ? [path] : []);
     });
@@ -58,7 +58,7 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
 
   // it searches the whole code once per key: seconds of work, beyond the default 5 s while the other files run beside it
   it("has no Malay entry the code no longer shows", () => {
-    const dynamic = new Set(Object.values(ROLES).flatMap((cfg) => [cfg.sub, cfg.chip.split(" — ", 1)[0], ...cfg.nav.map((i) => i.label)]));
+    const dynamic = new Set(Object.values(ROLES).flatMap((config) => [config.sub, config.chip.split(" — ", 1)[0], ...config.nav.map((i) => i.label)]));
     expect(Object.keys(ms).filter((key) => !dynamic.has(key) && !code.includes(JSON.stringify(key)))).toEqual([]);
   }, 30_000);
 
@@ -95,10 +95,10 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
   });
 
   it("names every sidebar item and the role words of the four apps in Malay", () => {
-    for (const cfg of Object.values(ROLES)) {
-      for (const item of cfg.nav.filter((i) => i.label !== "MRV")) expect(ms[item.label], item.label).toBeTruthy();
-      expect(ms[cfg.sub], cfg.sub).toBeTruthy();
-      const word = cfg.chip.split(" — ", 1)[0]; // the role chip of the header
+    for (const config of Object.values(ROLES)) {
+      for (const item of config.nav.filter((i) => i.label !== "MRV")) expect(ms[item.label], item.label).toBeTruthy();
+      expect(ms[config.sub], config.sub).toBeTruthy();
+      const word = config.chip.split(" — ", 1)[0]; // the role chip of the header
       expect(ms[word], word).toBeTruthy();
     }
   });

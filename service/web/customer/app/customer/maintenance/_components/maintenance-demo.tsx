@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Choice, DataTable, Field, Input, ListRow, Modal, Page, PageHead, Select, SummaryList, Tabs, Textarea, Timeline, UtilBar, cx, useToast, Plain } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Choice, DataTable, Field, Input, ListRow, Modal, Page, PageHead, Select, SummaryList, Tabs, Textarea, Timeline, UtilizationBar, cx, useToast, Plain } from "@ac/web/components/ui";
 import { JobStatusBadge, OriginBadge, PreferredSlotsInput, SlotLine, preferredError } from "@ac/web/components/JobBits";
 import { Job, JobStatus, Slot, fitFor, fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
 import { units } from "@ac/web/lib/client";
@@ -156,8 +156,8 @@ function NewRequest({ open, onClose, onDone }: Readonly<{ open: boolean; onClose
   const [sym, setSym] = useState("");
   const [slots, setSlots] = useState<Slot[]>(blank());
   const [tried, setTried] = useState(false);
-  const symErr = tried && (symptomLength(sym) < 10 || symptomLength(sym) > 2000) ? "Symptoms must be 10–2000 characters" : undefined;
-  const slotErr = tried ? preferredError(slots) : undefined;
+  const symError = tried && (symptomLength(sym) < 10 || symptomLength(sym) > 2000) ? "Symptoms must be 10–2000 characters" : undefined;
+  const slotError = tried ? preferredError(slots) : undefined;
   const submit = () => {
     setTried(true);
     if (sym.trim().length < 10 || sym.length > 2000 || preferredError(slots)) return;
@@ -169,8 +169,8 @@ function NewRequest({ open, onClose, onDone }: Readonly<{ open: boolean; onClose
     <Modal open={open} onClose={onClose} title="New maintenance request" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={submit}>Submit request</Btn></>}>
       <Field label="Unit"><Select value={unitId} onChange={(e) => { setUnitId(e.target.value); }}>{units.map((u) => <option key={u.id} value={u.id}>{u.name} · {u.loc}</option>)}</Select></Field>
       <Field label="Type"><Choice value={type} onChange={setType} options={[{ id: "Reactive", label: "Reactive" }, { id: "Preventive", label: "Preventive" }]} /></Field>
-      <Field label="Symptoms (10–2000 characters)" error={symErr} hint={`${String(symptomLength(sym))} / 2000`}><Textarea value={sym} onChange={(e) => { setSym(e.target.value); }} placeholder="Cold air is weak and there is water dripping from the indoor unit." /></Field>
-      <PreferredSlotsInput value={slots} onChange={setSlots} error={slotErr} />
+      <Field label="Symptoms (10–2000 characters)" error={symError} hint={`${String(symptomLength(sym))} / 2000`}><Textarea value={sym} onChange={(e) => { setSym(e.target.value); }} placeholder="Cold air is weak and there is water dripping from the indoor unit." /></Field>
+      <PreferredSlotsInput value={slots} onChange={setSlots} error={slotError} />
       <Banner>Nothing is booked yet — you will see “Scheduled” once a time is confirmed. Any time outside your 3 options needs your approval.</Banner>
     </Modal>
   );
@@ -182,7 +182,7 @@ function DeclineModal({ open, j, onClose, onDone }: Readonly<{ open: boolean; j:
   const [give, setGive] = useState(true);
   const [slots, setSlots] = useState<Slot[]>([{ date: "2026-10-02", win: "14:00–16:00" }, { date: "2026-10-05", win: "10:00–12:00" }, { date: "2026-10-06", win: "14:00–16:00" }]);
   const [tried, setTried] = useState(false);
-  const err = tried && give ? preferredError(slots) : undefined;
+  const errorText = tried && give ? preferredError(slots) : undefined;
   const label = { not_home: "I’m not at home then", too_late: "Too late for me", other: "Other" }[reason];
   return (
     <Modal open={open} onClose={onClose} title="Decline the proposed time" footer={<><Btn onClick={onClose}>Back</Btn><Btn variant="primary" onClick={() => { setTried(true); if (give && preferredError(slots)) return; jobActions.decline(j.id, label, comment.trim(), give ? slots : []); onDone(); }}>{give ? "Decline & send new times" : "Decline"}</Btn></>}>
@@ -190,7 +190,7 @@ function DeclineModal({ open, j, onClose, onDone }: Readonly<{ open: boolean; j:
       <Field label="Reason"><Choice value={reason} onChange={setReason} options={[{ id: "not_home", label: "I’m not at home then" }, { id: "too_late", label: "Too late for me" }, { id: "other", label: "Other" }]} /></Field>
       <Field label="Comment to HQ (optional)"><Input value={comment} onChange={(e) => { setComment(e.target.value); }} placeholder="Away on Oct 1. Any weekday afternoon next week works." /></Field>
       <label className="flex items-center gap-2 text-[13px]"><Checkbox className="h-4 w-4 accent-[#005bea]" checked={give} onCheckedChange={(v) => { setGive(v); }} />Give 3 new preferred times (recommended)</label>
-      {give && <PreferredSlotsInput value={slots} onChange={setSlots} error={err} label="New preferred times" hint="Declining never cancels the request — use “Cancel request” for that." />}
+      {give && <PreferredSlotsInput value={slots} onChange={setSlots} error={errorText} label="New preferred times" hint="Declining never cancels the request — use “Cancel request” for that." />}
       <Banner>HQ looks again and either books one of your times or sends another proposal.</Banner>
     </Modal>
   );
@@ -200,11 +200,11 @@ function OtherTimeModal({ open, j, onClose, onDone }: Readonly<{ open: boolean; 
   const [slots, setSlots] = useState<Slot[]>([{ date: "2026-12-09", win: "09:00–11:00" }, { date: "2026-12-10", win: "14:00–16:00" }, { date: "2026-12-11", win: "09:00–11:00" }]);
   const [comment, setComment] = useState("");
   const [tried, setTried] = useState(false);
-  const err = tried ? preferredError(slots) : undefined;
+  const errorText = tried ? preferredError(slots) : undefined;
   return (
     <Modal open={open} onClose={onClose} title="Request another time" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (preferredError(slots)) return; jobActions.requestOther(j.id, slots, comment.trim()); onDone(); }}>Send to HQ</Btn></>}>
       <p className="text-xs text-muted-foreground">{j.id} · periodic visit {fmt(j.scheduled)} · up to 48 h before the visit</p>
-      <PreferredSlotsInput value={slots} onChange={setSlots} error={err} />
+      <PreferredSlotsInput value={slots} onChange={setSlots} error={errorText} />
       <Field label="Comment (optional)"><Input value={comment} onChange={(e) => { setComment(e.target.value); }} /></Field>
     </Modal>
   );
@@ -231,13 +231,13 @@ function ProblemModal({ open, j, onClose, onDone }: Readonly<{ open: boolean; j:
   const [d, setD] = useState("");
   const [visit, setVisit] = useState("2026-09-25");
   const [tried, setTried] = useState(false);
-  const [err, setErr] = useState<string | undefined>();
+  const [errorText, setError] = useState<string | undefined>();
   return (
-    <Modal open={open} onClose={onClose} title={`Report a problem — ${j.id}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (d.trim().length < 10 || d.length > 2000) return; const r = jobActions.reportProblem(j.id, PROBLEM[reason], d.trim(), visit); if ("error" in r) { setErr(r.error); return; } setD(""); setTried(false); onDone(r.id); }}>Send report</Btn></>}>
+    <Modal open={open} onClose={onClose} title={`Report a problem — ${j.id}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (d.trim().length < 10 || d.length > 2000) return; const r = jobActions.reportProblem(j.id, PROBLEM[reason], d.trim(), visit); if ("error" in r) { setError(r.error); return; } setD(""); setTried(false); onDone(r.id); }}>Send report</Btn></>}>
       <Field label="What happened?"><Choice value={reason} onChange={setReason} options={[{ id: "same", label: "Same problem again" }, { id: "new", label: "New damage" }, { id: "incomplete", label: "Work not completed" }, { id: "other", label: "Other" }]} /></Field>
       <Field label="Details (10–2000 characters)" error={tried && (d.trim().length < 10 || d.length > 2000) ? "Describe the problem (10–2000 characters)" : undefined}><Textarea value={d} onChange={(e) => { setD(e.target.value); }} /></Field>
       <Field label="Preferred visit (optional)"><Input type="date" value={visit} onChange={(e) => { setVisit(e.target.value); }} /></Field>
-      {err && <Banner tone="crit">{err}</Banner>}
+      {errorText && <Banner tone="crit">{errorText}</Banner>}
       <Banner>Creates a follow-up request linked to {j.id} (“Under HQ review”). HQ decides within 1 business day: rework (free) or a new request.</Banner>
     </Modal>
   );
@@ -250,14 +250,14 @@ function FollowUpBadge({ j }: { j: Job }) {
 function NoteModal({ open, j, onClose, onDone }: Readonly<{ open: boolean; j: Job; onClose: () => void; onDone: () => void }>) {
   const [t, setT] = useState("");
   const [tried, setTried] = useState(false);
-  const [err, setErr] = useState<string | undefined>();
+  const [errorText, setError] = useState<string | undefined>();
   const isBad = !t.trim() || t.length > 2000;
   return (
-    <Modal open={open} onClose={onClose} title={`Add a note for ${j.id}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (isBad) return; const e = jobActions.addNote(j.id, t); if (e) { setErr(e); return; } setT(""); setTried(false); onDone(); }}>Send note</Btn></>}>
+    <Modal open={open} onClose={onClose} title={`Add a note for ${j.id}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (isBad) return; const e = jobActions.addNote(j.id, t); if (e) { setError(e); return; } setT(""); setTried(false); onDone(); }}>Send note</Btn></>}>
       <Field label="Note to the HQ coordinator (1–2000 characters)" error={tried && isBad ? "Write 1–2000 characters" : undefined} hint={`${String(t.length)} / 2000 · Visible to: HQ coordinator${j.delivery === "contractor" ? ` · ${orDash(j.contractor)}` : ""}${j.technician ? ` · assigned technician (${j.technician})` : ""}`}>
         <Textarea value={t} onChange={(e) => { setT(e.target.value); }} placeholder="Please call 30 minutes before arriving — the gate code changed to 4821." />
       </Field>
-      {err && <Banner tone="crit">{err}</Banner>}
+      {errorText && <Banner tone="crit">{errorText}</Banner>}
       <Banner>A note can’t change the visit time or the technician. To move the visit, write it here — HQ sends you a new time to accept. Notes are kept in the job history.</Banner>
     </Modal>
   );
@@ -288,7 +288,7 @@ function FilterCare({ onRequest }: Readonly<{ onRequest: () => void }>) {
         <DataTable rowKey={(r) => r.unit} rows={rows} cols={[
           { key: "u", label: "AC", render: (r) => <div><b>{r.unit}</b><div className="text-[11px] text-muted-foreground">{r.loc}</div></div> },
           { key: "h", label: "Run time", render: (r) => `${String(r.h)} h since cleaning` },
-          { key: "p", label: "Progress", render: (r) => <div className="w-28"><UtilBar pct={Math.min(100, (r.h / 250) * 100)} tone={r.st === "Overdue" ? "crit" : (r.st === "Due soon" ? "warn" : "ok")} /></div>, hideBelow: "sm" },
+          { key: "p", label: "Progress", render: (r) => <div className="w-28"><UtilizationBar pct={Math.min(100, (r.h / 250) * 100)} tone={r.st === "Overdue" ? "crit" : (r.st === "Due soon" ? "warn" : "ok")} /></div>, hideBelow: "sm" },
           { key: "s", label: "Status", render: (r) => <Badge tone={r.st === "Overdue" ? "crit" : (r.st === "Due soon" ? "warn" : "ok")}>{r.st}</Badge> },
           { key: "a", label: "", render: (r) => r.st === "Overdue" ? <Btn size="sm" variant="primary" onClick={onRequest}>Request cleaning</Btn> : <Btn size="sm" onClick={() => { setRows((s) => s.map((x) => (x.unit === r.unit ? { ...x, h: 0, st: "OK", loc: x.loc.split(" · ", 1)[0] + " · cleaned by you just now" } : x))); toast("Marked cleaned — counter reset"); }}>Mark cleaned</Btn> },
         ]} />

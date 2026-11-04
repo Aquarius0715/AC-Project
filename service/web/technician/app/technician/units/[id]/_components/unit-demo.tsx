@@ -16,7 +16,7 @@ export function TechUnitDemo({ id }: Readonly<{ id: string }>) {
   const [lost, setLost] = useState(false);
   if (id === "unit-other-customer") return <Page className="max-w-xl"><Card title="This page isn’t available" sub="Not in your assignments (NOT_FOUND)." /></Page>;
   const isMissing = id === "unit-non-rto";
-  const temp = [26, 26, 25, 25, null, null, 26, 27, 28, 29, 30, 30.4];
+  const setpoint = [26, 26, 25, 25, null, null, 26, 27, 28, 29, 30, 30.4];
   return (
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-2"><div><h1 className="text-lg font-bold">Bedroom AC · {id}</h1><div className="mt-1 flex gap-2"><ConnBadge s={lost ? "offline" : "online"} /></div></div><Tabs value={tab} onChange={setTab} tabs={[{ id: "register", label: "Register" }, { id: "monitoring", label: "Monitoring" }]} /></div>
@@ -38,7 +38,7 @@ export function TechUnitDemo({ id }: Readonly<{ id: string }>) {
         <div className="split">
           <Card title="Temperature · last 24 h (rolling)" action={<Tabs value={win} onChange={setWin} tabs={[{ id: "1h", label: "1h" }, { id: "24h", label: "24h" }, { id: "7d", label: "7d" }]} />}>
             <div className="mb-3 grid-fluid" style={{ ["--min"as string]: "130px" }}>{[["Temperature", "24.5°C", "observed 09:41:02"], ["Power", "1200 W", "updated 2s ago"], ["Operation", "Cooling", "observed 09:41:02"], ["Connection", lost ? "Offline" : "Online", "last seen 09:41"]].map(([a, b, c]) => <div key={a} className="rounded-xl bg-surface2 p-2.5"><div className="text-[11px] text-muted-foreground">{a}</div><b>{b}</b><div className="text-[10px] text-muted-foreground">{c}</div></div>)}</div>
-            <LineChart points={temp} min={22} max={32} threshold={30} height={170} labels={["24 h ago", "", "", "", "now"]} />
+            <LineChart points={setpoint} min={22} max={32} threshold={30} height={170} labels={["24 h ago", "", "", "", "now"]} />
             <p className="mt-1 text-[11px] text-muted-foreground">no data 03:00–05:10 (gap not connected) · alert ≥ 30 °C. Reordered/duplicate demo events never roll values backward.</p>
           </Card>
           <div className="flex min-w-0 flex-col gap-4">

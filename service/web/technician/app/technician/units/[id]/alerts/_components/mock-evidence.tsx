@@ -13,12 +13,12 @@ export function MockAlertEvidence({ id }: Readonly<{ id: string }>) {
   const toast = useToast();
   const [st, setSt] = useState<St>("Open");
   const [reason, setReason] = useState("");
-  const [msg, setMsg] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [canResolve, setCanResolve] = useState(false);
   const resolve = () => {
-    if (!canResolve) { setMsg("FORBIDDEN — you don’t have alert.resolve. Resolution needs a remeasurement below 28°C sustained for 60 seconds."); return; }
-    if (!reason.trim()) { setMsg("A resolution reason is required (1–1000 characters)."); return; }
-    setSt("Resolved"); setMsg(null); toast("Alert resolved after remeasurement");
+    if (!canResolve) { setMessage("FORBIDDEN — you don’t have alert.resolve. Resolution needs a remeasurement below 28°C sustained for 60 seconds."); return; }
+    if (!reason.trim()) { setMessage("A resolution reason is required (1–1000 characters)."); return; }
+    setSt("Resolved"); setMessage(null); toast("Alert resolved after remeasurement");
   };
   return (
     <Page>
@@ -32,7 +32,7 @@ export function MockAlertEvidence({ id }: Readonly<{ id: string }>) {
           </div>
           <Card title="Resolution" sub="Automatic resolution requires a remeasurement below 28°C sustained for 60 seconds — or a reason below with alert.resolve permission.">
             <Field label="Resolution reason (required, 1–1000 characters)"><Textarea value={reason} onChange={(e) => { setReason(e.target.value); }} placeholder="e.g. Confirmed on-site that airflow is restored after filter cleaning." /></Field>
-            {msg && <div className="mt-2"><Banner tone="crit">{msg}</Banner></div>}
+            {message && <div className="mt-2"><Banner tone="crit">{message}</Banner></div>}
             <div className="mt-3 flex flex-wrap items-center gap-2"><Btn disabled={st !== "Open"} onClick={() => { setSt("Acknowledged"); toast("Alert acknowledged"); }}>Acknowledge</Btn><Btn variant="primary" disabled={st === "Resolved"} onClick={resolve}>Resolve alert</Btn><label className="ml-auto flex items-center gap-1.5 text-[11px] text-muted-foreground"><Checkbox checked={canResolve} onCheckedChange={(v) => { setCanResolve(v); }} /> demo: I have alert.resolve</label></div>
             <p className="mt-2 text-[11px] text-muted-foreground">Recurrence after resolution creates a new alertId with previousAlertId linking back to this event.</p>
           </Card>

@@ -20,33 +20,33 @@ async function revokedSignIn(s: Session): Promise<boolean> {
 // GET /bff/auth/callback: exchanges the code, reads tenant / membership / role claims and starts the session: a new
 // stored record and its sealed ID in the cookie (IR382), or the sealed session itself without the store.
 export async function GET(req: NextRequest) {
-  const cfg = oidcConfig();
+  const config = oidcConfig();
   const pending = unseal<Pending>(req.cookies.get(OIDC_COOKIE)?.value);
   const code = req.nextUrl.searchParams.get("code");
   if (!pending || !code || req.nextUrl.searchParams.get("state") !== pending.state) {
-    return NextResponse.redirect(new URL("/login?error=state", cfg.appUrl));
+    return NextResponse.redirect(new URL("/login?error=state", config.appUrl));
   }
-  const token = await fetch(`${cfg.internalIssuer}/protocol/openid-connect/token`, {
+  const token = await fetch(`${config.internalIssuer}/protocol/openid-connect/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       grant_type: "authorization_code",
       code_verifier: pending.verifier,
-      redirect_uri: `${cfg.appUrl}/bff/auth/callback`,
-      client_id: cfg.clientId,
-      client_secret: cfg.clientSecret,
+      redirect_uri: `${config.appUrl}/bff/auth/callback`,
+      client_id: config.clientId,
+      client_secret: config.clientSecret,
       code,
     }),
   });
-  if (!token.ok) return NextResponse.redirect(new URL("/login?error=token", cfg.appUrl));
+  if (!token.ok) return NextResponse.redirect(new URL("/login?error=token", config.appUrl));
   const t = (await token.json()) as { access_token: string; refresh_token?: string; expires_in: number };
   const session = sessionFromTokens(t);
-  if (!session) return NextResponse.redirect(new URL("/login?error=membership", cfg.appUrl));
-  if (session.role !== APP_ROLE) return NextResponse.redirect(new URL("/login?error=role", cfg.appUrl)); // another role's app
+  if (!session) return NextResponse.redirect(new URL("/login?error=membership", config.appUrl));
+  if (session.role !== APP_ROLE) return NextResponse.redirect(new URL("/login?error=role", config.appUrl)); // another role's app
   // signed out everywhere after this sign-in (IR384): ask for the password once (prompt=login), then give up (IR385)
   if (await revokedSignIn(session)) {
-    if (pending.reauth) return NextResponse.redirect(new URL("/login?error=revoked", cfg.appUrl));
-    const again = new URL("/bff/auth/login", cfg.appUrl);
+    if (pending.reauth) return NextResponse.redirect(new URL("/login?error=revoked", config.appUrl));
+    const again = new URL("/bff/auth/login", config.appUrl);
     again.searchParams.set("reauth", "1");
     if (pending.returnTo) again.searchParams.set("returnTo", pending.returnTo);
     const res = NextResponse.redirect(again);
@@ -57,9 +57,9 @@ export async function GET(req: NextRequest) {
   try {
     cookie = await createSessionCookie(session, req.cookies.get(SESSION_COOKIE)?.value); // a new ID: no session fixation
   } catch {
-    return NextResponse.redirect(new URL("/login?error=session", cfg.appUrl)); // the store did not answer
+    return NextResponse.redirect(new URL("/login?error=session", config.appUrl)); // the store did not answer
   }
-  const res = NextResponse.redirect(new URL(pending.returnTo ?? roleHome[session.role], cfg.appUrl));
+  const res = NextResponse.redirect(new URL(pending.returnTo ?? roleHome[session.role], config.appUrl));
   res.cookies.set(SESSION_COOKIE, cookie, cookieOptions());
   res.cookies.set(OIDC_COOKIE, "", oidcCookieOptions(0));
   return res;

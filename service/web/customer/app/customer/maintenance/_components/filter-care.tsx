@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Fragment, useState } from "react";
-import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, Modal, SummaryList, UtilBar, cx, Plain, ScrollX } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, Modal, SummaryList, UtilizationBar, cx, Plain, ScrollX } from "@ac/web/components/ui";
 import { useAction } from "@ac/web/lib/useAction";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { cleaningSymptom, DEFAULT_FILTER_HOURS, filterStatus, reminderErrors, reminderInput, type FilterGroup, type FilterRow, type ReminderForm } from "@ac/web/lib/customerFilterCare";
@@ -90,7 +90,7 @@ export function FilterCareTab({ f, owner, onRequest, onDone, onFail }: Readonly<
 }
 
 function Progress({ pct, tone, text }: Readonly<{ pct: number | null; tone: "ok" | "warn" | "crit" | "unknown" | "primary" | "muted"; text: string }>) {
-  return <div className="w-36"><UtilBar pct={pct} tone={tone} label={text} /><div className="mt-1 text-[11px] text-muted-foreground">{text}</div></div>;
+  return <div className="w-36"><UtilizationBar pct={pct} tone={tone} label={text} /><div className="mt-1 text-[11px] text-muted-foreground">{text}</div></div>;
 }
 
 function ReminderModal({ init, onClose, onFail }: Readonly<{ init: ReminderForm; onClose: (text?: string) => void; onFail: (f: ActionFailure) => void }>) {
@@ -98,22 +98,22 @@ function ReminderModal({ init, onClose, onFail }: Readonly<{ init: ReminderForm;
   const [form, setForm] = useState(init);
   const [tried, setTried] = useState(false);
   const [pending, run] = useAction();
-  const err = reminderErrors(form, t);
+  const errorText = reminderErrors(form, t);
   const set = (p: Partial<ReminderForm>) => { setForm((s) => ({ ...s, ...p })); };
   const save = () => {
     setTried(true);
-    if (err.hours || err.days) return;
+    if (errorText.hours || errorText.days) return;
     run(() => saveReminders(reminderInput(form)), t("Reminders saved"), () => { onClose(t("Reminder settings saved.")); }, onFail);
   };
   return (
     <Modal open onClose={() => { onClose(); }} title={t("Edit reminders")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t("Save reminders")}</Btn></>}>
-      <Field label={t("Remind at")} error={tried ? err.hours : undefined} hint={t("Hours the AC runs before the filter needs cleaning")}>
+      <Field label={t("Remind at")} error={tried ? errorText.hours : undefined} hint={t("Hours the AC runs before the filter needs cleaning")}>
         <div className="flex flex-wrap items-center gap-2">
           <Choice value={form.useDefault ? "default" : "custom"} onChange={(v) => { set({ useDefault: v === "default" }); }} options={[{ id: "default", label: t("Model default ({n} h)", { n: DEFAULT_FILTER_HOURS }) }, { id: "custom", label: t("Custom") }]} />
           {!form.useDefault && <><Input aria-label={t("Hours of running")} inputMode="numeric" className="w-24" value={form.hours} onChange={(e) => { set({ hours: e.target.value }); }} /><span className="text-[13px] font-normal">h (50–2000)</span></>}
         </div>
       </Field>
-      <Field label={t("Also remind every (days, when run time is unknown)")} error={tried ? err.days : undefined} hint={t("7–180 days since the last cleaning — used while an AC is offline or has no power readings")}>
+      <Field label={t("Also remind every (days, when run time is unknown)")} error={tried ? errorText.days : undefined} hint={t("7–180 days since the last cleaning — used while an AC is offline or has no power readings")}>
         <Input inputMode="numeric" className="w-24" value={form.days} onChange={(e) => { set({ days: e.target.value }); }} />
       </Field>
       <Field label={t("Who")}>

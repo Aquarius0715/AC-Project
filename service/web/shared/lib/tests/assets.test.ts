@@ -52,14 +52,14 @@ describe("HQ customers & units", () => {
   it("words the policies' conditions and the default rules", () => {
     expect(conditionText(policy({ activeWindow: { weekdays: [1, 2, 3, 4, 5], startLocal: "08:00", endLocal: "19:00" } }))).toBe("Temperature ≥ 30 °C for 60 s, weekdays 08:00–19:00 → Warning");
     expect(conditionText(policy({ metric: "heartbeat_gap", threshold: 10, severity: undefined, activeWindow: { weekdays: [1, 3], startLocal: "22:00", endLocal: "06:00" } }))).toBe("No heartbeat for 10 min, Mon, Wed 22:00–06:00");
-    const def = policy({ id: "def", kind: "default_alert", name: "Default policy", rules: [{ ruleKey: "co2", name: "CO₂ high", metric: "co2", operator: "gte", threshold: 1200, durationSeconds: 900, category: "ventilation" }],
+    const defaults = policy({ id: "def", kind: "default_alert", name: "Default policy", rules: [{ ruleKey: "co2", name: "CO₂ high", metric: "co2", operator: "gte", threshold: 1200, durationSeconds: 900, category: "ventilation" }],
       ruleSettings: [{ ruleKey: "co2", customerId: "c1", enabled: false, version: 2, reason: "office closed", updatedAt: "2026-09-10T02:00:00Z" }] });
-    expect(defaultRules(def)[0]).toMatchObject({ condition: "CO₂ (ppm) ≥ 1200 ppm for 15 min", enabled: false, note: "Off since 10 Sept 2026 · office closed" });
-    expect(policyLines([policy({}), def], ["u1"], () => "customer-a").map((p) => [p.name, p.type, p.condition, p.madeBy])).toEqual([
+    expect(defaultRules(defaults)[0]).toMatchObject({ condition: "CO₂ (ppm) ≥ 1200 ppm for 15 min", enabled: false, note: "Off since 10 Sept 2026 · office closed" });
+    expect(policyLines([policy({}), defaults], ["u1"], () => "customer-a").map((p) => [p.name, p.type, p.condition, p.madeBy])).toEqual([
       ["Default policy", "Default", "1 rule · 0 on for this customer", "HQ (template)"], ["Bedroom too hot", "Temperature", "Temperature ≥ 30 °C for 60 s → Warning", "customer-a"],
     ]);
     // the default policy's system name in the display language; a policy's own name as written (IR499)
-    expect(policyLines([policy({}), def], ["u1"], () => "customer-a", i18nOf({ locale: "ms", timeZone: "UTC" })).map((p) => p.name)).toEqual(["Polisi lalai", "Bedroom too hot"]);
+    expect(policyLines([policy({}), defaults], ["u1"], () => "customer-a", i18nOf({ locale: "ms", timeZone: "UTC" })).map((p) => p.name)).toEqual(["Polisi lalai", "Bedroom too hot"]);
   });
 
   it("shows coverage with Kuala Lumpur warranty days and the import messages", () => {

@@ -63,8 +63,8 @@ describe("partner schedule", () => {
     const past = slot("2026-09-20T02:00:00Z", "2026-09-20T04:00:00Z");
     const gone = formMode(detail({ status: "assigned", scheduledSlot: past, assignment: asg(past) }), "job-1", NOW, names);
     expect([gone.kind, gone.banner?.tone]).toEqual(["blocked", "crit"]);
-    const ext = formMode(detail({ status: "in_progress", scheduledSlot: past, assignment: asg(past) }), "job-1", NOW, names);
-    expect(ext.kind === "extend" && [ext.title, ext.endEditable, ext.reasonRequired, ext.banner?.tone]).toEqual(["Reschedule — job-1", true, true, "crit"]);
+    const extension = formMode(detail({ status: "in_progress", scheduledSlot: past, assignment: asg(past) }), "job-1", NOW, names);
+    expect(extension.kind === "extend" && [extension.title, extension.endEditable, extension.reasonRequired, extension.banner?.tone]).toEqual(["Reschedule — job-1", true, true, "crit"]);
     const running = formMode(detail({ status: "in_progress", scheduledSlot: visit, assignment: asg(visit, "accepted") }), "job-1", NOW, names);
     expect(running.kind === "extend" && [running.title, running.banner]).toEqual(["Reassign — job-1 (in progress)", undefined]);
     const offer = { projection: "offer", status: "accepted", jobId: "job-2", visitSlot: visit, accessValidFrom: "2026-09-22T00:00:00Z" } as unknown as ApiOffer;

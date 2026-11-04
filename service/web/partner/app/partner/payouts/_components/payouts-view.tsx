@@ -33,7 +33,7 @@ export function PayoutsView({ live }: Readonly<{ live: PayoutsLive }>) {
   const [pending, run] = useAction();
   const [ask, setAsk] = useState<null | { lineId: string }>(null);
   const [topic, setTopic] = useState<ApiPayoutQuestion["topic"]>("amount");
-  const [msg, setMsg] = useState("");
+  const [notice, setMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [refused, setRefused] = useState<string | null>(null);
   const sel = live.selected;
@@ -41,11 +41,11 @@ export function PayoutsView({ live }: Readonly<{ live: PayoutsLive }>) {
   const askable = sel?.rows.filter((r) => r.askable && r.lineId && !r.question) ?? [];
   const questionError = t("Enter your question (1–2000 characters)");
   const send = () => {
-    const m = msg.trim();
+    const m = notice.trim();
     if (!sel || !ask) return;
     if (m.length === 0 || m.length > 2000) { setError(questionError); return; }
     setError(null);
-    run(() => askHq(sel.statement.id, sel.statement.version, ask.lineId, topic, m), t("Question sent — HQ answers on the statement"), () => { setAsk(null); setMsg(""); setRefused(null); },
+    run(() => askHq(sel.statement.id, sel.statement.version, ask.lineId, topic, m), t("Question sent — HQ answers on the statement"), () => { setAsk(null); setMessage(""); setRefused(null); },
       (f) => { setRefused(refusal(f, t)); if (f.fieldErrors.message) setError(questionError); });
   };
   const download = () => {
@@ -103,7 +103,7 @@ export function PayoutsView({ live }: Readonly<{ live: PayoutsLive }>) {
       <Modal open={!!ask} onClose={() => { setAsk(null); }} title={t("Ask HQ about this line")} footer={<><Btn onClick={() => { setAsk(null); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={send}>{t("Send")}</Btn></>}>
         <Field label={t("Line")}><Select value={ask?.lineId ?? ""} onChange={(e) => { setAsk({ lineId: e.target.value }); }}>{askable.map((r) => <option key={r.lineId} value={r.lineId!}>{r.job} · {r.work} · {r.amount} {sel?.statement.currency}</option>)}</Select></Field>
         <Field label={t("Topic")}><Select value={topic} onChange={(e) => { setTopic(e.target.value as ApiPayoutQuestion["topic"]); }}>{live.topics.map((x) => <option key={x.id} value={x.id}>{x.text}</option>)}</Select></Field>
-        <Field label={t("Question (required, 1–2000 characters)")} error={error ?? undefined}><Textarea value={msg} maxLength={2000} onChange={(e) => { setMsg(e.target.value); }} placeholder={t("The 2nd return was caused by a missing part from HQ stock.")} /></Field>
+        <Field label={t("Question (required, 1–2000 characters)")} error={error ?? undefined}><Textarea value={notice} maxLength={2000} onChange={(e) => { setMessage(e.target.value); }} placeholder={t("The 2nd return was caused by a missing part from HQ stock.")} /></Field>
         <Banner>{t("HQ answers on the statement and in the job’s history. If HQ agrees, an adjustment line is added to your next statement; this statement stays approved.")}</Banner>
       </Modal>
     </Page>

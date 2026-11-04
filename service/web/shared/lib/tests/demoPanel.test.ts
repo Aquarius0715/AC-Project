@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { advanceTarget, clockText, demoRefusal, deviceOptions, nextSequence, openFault, type ApiDeviceEvent } from "@ac/web/lib/demoPanel";
 
-const ev = (over: Partial<ApiDeviceEvent>): ApiDeviceEvent => ({ id: "e", eventType: "communication_lost", sequence: 1, occurredAt: "2026-09-14T01:00:00Z", restoredAt: null, ...over });
+const event = (over: Partial<ApiDeviceEvent>): ApiDeviceEvent => ({ id: "e", eventType: "communication_lost", sequence: 1, occurredAt: "2026-09-14T01:00:00Z", restoredAt: null, ...over });
 
 describe("Demo controls in API mode (FR-X05, IR249)", () => {
   it("shows the scenario clock in UTC and moves it forward", () => {
@@ -10,9 +10,9 @@ describe("Demo controls in API mode (FR-X05, IR249)", () => {
   });
 
   it("finds the open connection fault and the next sequence", () => {
-    const events = [ev({ id: "old", sequence: 3, restoredAt: "2026-09-14T02:00:00Z" }), ev({ id: "open", sequence: 7 }), ev({ id: "tamper", eventType: "tamper", sequence: 9 }), ev({ id: "back", eventType: "restored", sequence: 4 })];
+    const events = [event({ id: "old", sequence: 3, restoredAt: "2026-09-14T02:00:00Z" }), event({ id: "open", sequence: 7 }), event({ id: "tamper", eventType: "tamper", sequence: 9 }), event({ id: "back", eventType: "restored", sequence: 4 })];
     expect(openFault(events)?.id).toBe("open");
-    expect([openFault([ev({ restoredAt: "2026-09-14T02:00:00Z" })]), openFault([])]).toEqual([null, null]);
+    expect([openFault([event({ restoredAt: "2026-09-14T02:00:00Z" })]), openFault([])]).toEqual([null, null]);
     expect([nextSequence(events), nextSequence([])]).toEqual([10, 1]);
   });
 

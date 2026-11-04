@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Card, LinkBtn, ListRow, Page, SummaryList, TextLink } from "@ac/web/components/ui";
+import { Badge, Banner, Card, LinkButton, ListRow, Page, SummaryList, TextLink } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
 
 const contracts = [
@@ -32,14 +32,14 @@ export function PaymentsDemo() {
               {sel.invoices.map(([id, due, amt, st]) => (
                 <div key={id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3">
                   <div><b>{id}</b><div className="text-xs text-muted-foreground">{due}</div></div>
-                  <div className="flex items-center gap-3"><b>{amt}</b>{st === "unpaid" ? <><Badge tone="crit">Unpaid</Badge><LinkBtn size="sm" variant="primary" href={`/customer/payments/${id}`}>Pay</LinkBtn></> : <><Badge tone="ok" icon="check">Paid</Badge><Link href={`/customer/payments/${id}`} className="text-muted-foreground" aria-label={`Open invoice ${id}`}><Icon name="chevronRight" /></Link></>}</div>
+                  <div className="flex items-center gap-3"><b>{amt}</b>{st === "unpaid" ? <><Badge tone="crit">Unpaid</Badge><LinkButton size="sm" variant="primary" href={`/customer/payments/${id}`}>Pay</LinkButton></> : <><Badge tone="ok" icon="check">Paid</Badge><Link href={`/customer/payments/${id}`} className="text-muted-foreground" aria-label={`Open invoice ${id}`}><Icon name="chevronRight" /></Link></>}</div>
                 </div>
               ))}
               {sel.invoices.length === 0 && <p className="text-xs text-muted-foreground">No invoices.</p>}
             </div>
             <p className="mt-2 text-[11px] text-muted-foreground">Paid invoices have no payment button. “Processing” is not paid.</p>
           </Card>
-          {sel.id === "contract-rto-a" && <Banner tone="warn" action={<LinkBtn size="sm" href="/customer/payments/invoice-overdue-a?tab=restriction">Details</LinkBtn>}><b>Cooling restriction active</b><div className="text-xs">1 unit in scope · Lobby AC (Office A) — minimum cooling setpoint 24 °C applied. Related to payment, but separate from it: paying does not restore cooling immediately.</div></Banner>}
+          {sel.id === "contract-rto-a" && <Banner tone="warn" action={<LinkButton size="sm" href="/customer/payments/invoice-overdue-a?tab=restriction">Details</LinkButton>}><b>Cooling restriction active</b><div className="text-xs">1 unit in scope · Lobby AC (Office A) — minimum cooling setpoint 24 °C applied. Related to payment, but separate from it: paying does not restore cooling immediately.</div></Banner>}
         </div>
       </div>
     </Page>

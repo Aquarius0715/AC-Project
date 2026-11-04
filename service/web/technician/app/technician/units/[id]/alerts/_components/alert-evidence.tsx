@@ -25,20 +25,20 @@ export function AlertEvidenceView({ live }: Readonly<{ live: AlertsLive }>) {
   const patch = useUrlPatch();
   const [reason, setReason] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const a = live.alert;
   const act = async (op: "acknowledge" | "resolve") => {
     if (!a) return;
     const ids = picked.filter((id) => live.evidence?.some((r) => r.id === id)); // a re-read list drops what is no longer a candidate
-    if (op === "resolve" && !reason.trim()) { setMsg(t("A resolution reason is required (1–1000 characters).")); return; }
+    if (op === "resolve" && !reason.trim()) { setMessage(t("A resolution reason is required (1–1000 characters).")); return; }
     const problem = op === "resolve" && live.evidence ? evidenceProblem(a.policyless, ids, t) : null;
-    if (problem) { setMsg(problem); return; }
+    if (problem) { setMessage(problem); return; }
     setBusy(true);
-    setMsg(null);
+    setMessage(null);
     const res = op === "resolve" ? await resolveAlert(a.id, a.version, reason.trim(), ids) : await acknowledgeAlert(a.id, a.version);
     setBusy(false);
-    if (!res.ok) { setMsg(evidenceRefusal(res.fieldErrors, t) ?? refusal(res, a.resolution.forbidden, t)); return; }
+    if (!res.ok) { setMessage(evidenceRefusal(res.fieldErrors, t) ?? refusal(res, a.resolution.forbidden, t)); return; }
     toast(t(op === "resolve" ? "Alert resolved" : "Alert acknowledged"));
     setReason("");
     setPicked([]);
@@ -63,7 +63,7 @@ export function AlertEvidenceView({ live }: Readonly<{ live: AlertsLive }>) {
             ))}
           </div>
           <Card title={t("Resolution")}>
-            {msg && <div className="mb-3"><Banner tone="crit">{msg}</Banner></div>}
+            {message && <div className="mb-3"><Banner tone="crit">{message}</Banner></div>}
             {a.resolution.done ? <Banner tone="ok">{a.resolution.done}</Banner> : (
               <>
                 {a.resolution.info && <Banner>{a.resolution.info}</Banner>}
@@ -87,7 +87,7 @@ export function AlertEvidenceView({ live }: Readonly<{ live: AlertsLive }>) {
               {live.count > 1 && (
                 <Card title={t("Alerts on this unit ({n})", { n: live.count })}>
                   {live.choices.map((x) => (
-                    <Plain key={x.id} type="button" onClick={() => { setMsg(null); setPicked([]); patch({ alertId: x.id }); }} className={cx("flex w-full items-center justify-between gap-2 border-t border-line py-2 text-left first:border-0", x.id === a.id && "font-bold")}>
+                    <Plain key={x.id} type="button" onClick={() => { setMessage(null); setPicked([]); patch({ alertId: x.id }); }} className={cx("flex w-full items-center justify-between gap-2 border-t border-line py-2 text-left first:border-0", x.id === a.id && "font-bold")}>
                       <span className="min-w-0"><span className="block text-[13px]">{x.title}</span><span className="text-xs font-normal text-muted-foreground">{x.sub}</span></span><SeverityBadge s={x.severity} />
                     </Plain>
                   ))}

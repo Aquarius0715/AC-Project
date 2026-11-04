@@ -72,7 +72,7 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
       setResults({ fired: true, rows: v.results });
     });
   };
-  const err = (k: string) => (tried ? errors[k] : undefined);
+  const fieldError = (k: string) => (tried ? errors[k] : undefined);
   const preview = autoInput(d);
   return (
     <Page>
@@ -96,15 +96,15 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
               {sel?.disabledReason && <Banner tone="warn">{t("Disabled automatically: {reason}. Review the policy before enabling it again.", { reason: disabledReasonWord(sel.disabledReason, t) })}</Banner>}
               <h3 className="-mb-3 text-[13px] font-bold">{t("Basics")}</h3>
               <section className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
-                <Field label={t("Name")} error={err("name")}><Input value={d.name} maxLength={120} onChange={(e) => { set({ name: e.target.value }); }} /></Field>
-                <Field label={t("Priority")} hint={t("0–100 · higher wins in its tier")} error={err("priority")}><Input type="number" value={d.priority} onChange={(e) => { set({ priority: e.target.value }); }} /></Field>
-                <Field label={t("Timezone")} error={err("timezone")}><Input value={d.timezone} onChange={(e) => { set({ timezone: e.target.value }); }} /></Field>
+                <Field label={t("Name")} error={fieldError("name")}><Input value={d.name} maxLength={120} onChange={(e) => { set({ name: e.target.value }); }} /></Field>
+                <Field label={t("Priority")} hint={t("0–100 · higher wins in its tier")} error={fieldError("priority")}><Input type="number" value={d.priority} onChange={(e) => { set({ priority: e.target.value }); }} /></Field>
+                <Field label={t("Timezone")} error={fieldError("timezone")}><Input value={d.timezone} onChange={(e) => { set({ timezone: e.target.value }); }} /></Field>
                 <div className="self-end pb-2"><Check label={t("Enabled")} checked={d.enabled} onChange={(v) => { set({ enabled: v }); }} /></div>
               </section>
               <section>
                 <h3 className="mb-1 text-[13px] font-bold">{t("Units")}</h3>
                 <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px]">{live.units.map((u) => <Check key={u.id} label={u.name} checked={d.unitIds.includes(u.id)} onChange={(on) => { set({ unitIds: on ? [...d.unitIds, u.id] : d.unitIds.filter((x) => x !== u.id) }); setFacts((f) => (on ? [...f, { unitId: u.id, value: "", quality: "valid" }] : f.filter((x) => x.unitId !== u.id))); }} />)}</div>
-                {err("unitIds") && <p className="mt-1 text-xs text-crit">{err("unitIds")}</p>}
+                {fieldError("unitIds") && <p className="mt-1 text-xs text-crit">{fieldError("unitIds")}</p>}
               </section>
               <section>
                 <h3 className="mb-1 text-[13px] font-bold">{t("When")}</h3>
@@ -112,7 +112,7 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
                 <Choice value={d.type} onChange={(type) => { set({ type }); }} options={[{ id: "occupancy", label: t("Occupancy") }, { id: "tariff", label: t("Tariff") }, { id: "peak", label: t("Peak") }, { id: "solar", label: t("Solar") }, { id: "battery", label: t("Battery") }]} />
                 <div className="mt-2 flex flex-wrap items-end gap-2 text-[13px]">
                   {d.type === "occupancy" || d.type === "peak" ? <Select aria-label={t("Condition")} className="w-auto" value={String(d.flag)} onChange={(e) => { set({ flag: e.target.value === "true" }); }}><option value="true">{t(d.type === "occupancy" ? "When the room is occupied" : "When a peak period is active")}</option><option value="false">{t(d.type === "occupancy" ? "When the room is not occupied" : "When no peak period is active")}</option></Select>
-                    : <><span className="pb-2">{subjectText(d.type, t)}</span><Select aria-label={t("Comparison")} className="w-auto" value={d.operator} onChange={(e) => { set({ operator: e.target.value as Compare }); }}>{compares.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</Select><div className="w-24"><Field label="" error={err("value")}><Input aria-label={t("Value")} type="number" step="0.1" value={d.value} onChange={(e) => { set({ value: e.target.value }); }} /></Field></div><span className="pb-2">{d.type === "tariff" ? "MYR / kWh" : "kW"}</span></>}
+                    : <><span className="pb-2">{subjectText(d.type, t)}</span><Select aria-label={t("Comparison")} className="w-auto" value={d.operator} onChange={(e) => { set({ operator: e.target.value as Compare }); }}>{compares.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</Select><div className="w-24"><Field label="" error={fieldError("value")}><Input aria-label={t("Value")} type="number" step="0.1" value={d.value} onChange={(e) => { set({ value: e.target.value }); }} /></Field></div><span className="pb-2">{d.type === "tariff" ? "MYR / kWh" : "kW"}</span></>}
                 </div>
               </section>
               <section>
@@ -120,7 +120,7 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
                 <p className="mb-2 text-xs text-muted-foreground">{t("Only actions every target unit supports, and that no active restriction blocks, can run.")}</p>
                 <div className="flex flex-wrap items-end gap-2 text-[13px]">
                   <Select aria-label={t("Action")} className="w-auto" value={d.actionKind} onChange={(e) => { set({ actionKind: e.target.value as AutoDraft["actionKind"] }); }}><option value="set_temperature">{t("Set the temperature")}</option><option value="set_power">{t("Set the power")}</option><option value="set_mode">{t("Set the mode")}</option><option value="set_fan">{t("Set the fan")}</option><option value="ventilate">{t("Ventilate")}</option></Select>
-                  {d.actionKind === "set_temperature" && <><div className="w-24"><Field label="" error={err("celsius")}><Input aria-label={t("Temperature (°C)")} type="number" value={d.celsius} onChange={(e) => { set({ celsius: e.target.value }); }} /></Field></div><span className="pb-2">°C {range ? t("(targets allow {min}–{max} °C)", { min: range.min, max: range.max }) : ""}</span></>}
+                  {d.actionKind === "set_temperature" && <><div className="w-24"><Field label="" error={fieldError("celsius")}><Input aria-label={t("Temperature (°C)")} type="number" value={d.celsius} onChange={(e) => { set({ celsius: e.target.value }); }} /></Field></div><span className="pb-2">°C {range ? t("(targets allow {min}–{max} °C)", { min: range.min, max: range.max }) : ""}</span></>}
                   {d.actionKind === "set_power" && <Select aria-label={t("Power")} className="w-auto" value={String(d.power)} onChange={(e) => { set({ power: e.target.value === "true" }); }}><option value="false">{t("off")}</option><option value="true">{t("on")}</option></Select>}
                   {d.actionKind === "set_mode" && <Select aria-label={t("Mode")} className="w-auto" value={d.mode} onChange={(e) => { set({ mode: e.target.value as AutoDraft["mode"] }); }}><option value="cool">{t("cool")}</option><option value="dry">{t("dry")}</option><option value="fan">{t("fan")}</option></Select>}
                   {(d.actionKind === "set_fan" || d.actionKind === "ventilate") && <Select aria-label={t("Level")} className="w-auto" value={d.level} onChange={(e) => { set({ level: e.target.value as AutoDraft["level"] }); }}><option value="low">{t("low")}</option><option value="mid">{t("mid")}</option><option value="high">{t("high")}</option></Select>}

@@ -117,8 +117,8 @@ export function policyForm(p?: ApiAlertPolicy | null): PolicyForm {
     start: p.activeWindow?.startLocal ?? "08:00", end: p.activeWindow?.endLocal ?? "19:00", severity: p.severity, email: p.channels.includes("email"),
   };
 }
-const num = (v: string) => (v.trim() !== "" && Number.isFinite(Number(v)) ? Number(v) : null);
-const seconds = (f: PolicyForm) => { const d = num(f.duration); return d === null ? null : Math.round(f.unit === "min" ? d * 60 : d); };
+const toNumber = (v: string) => (v.trim() !== "" && Number.isFinite(Number(v)) ? Number(v) : null);
+const seconds = (f: PolicyForm) => { const d = toNumber(f.duration); return d === null ? null : Math.round(f.unit === "min" ? d * 60 : d); };
 /** The editor's checks (DD-C15; the API checks them again): name 1–120, numbers, the recovery direction, 1 s–24 h, a
 window with days and different times. */
 /** The editor's checked fields, top to bottom, and their element ids: a refused save focuses the first one (IR623). */
@@ -128,7 +128,7 @@ export function policyErrors(f: PolicyForm, tr: T = en): Partial<Record<"name" |
   const e: Partial<Record<"name" | "threshold" | "recovery" | "duration" | "window", string>> = {};
   const name = f.name.trim();
   if (!name || name.length > 120) e.name = tr("Name is 1–120 characters.");
-  const t = num(f.threshold), r = num(f.recovery), s = seconds(f);
+  const t = toNumber(f.threshold), r = toNumber(f.recovery), s = seconds(f);
   if (t === null) e.threshold = tr("Enter a number.");
   if (r === null) e.recovery = tr("Enter a number.");
   else if (t !== null) { const bad = recoveryError(f.operator, t, r, tr); if (bad) e.recovery = bad; }

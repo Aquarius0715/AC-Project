@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Badge, Banner, Card, Choice, EmptyState, LinkBtn, ListRow, Page, SummaryList, TextLink } from "@ac/web/components/ui";
+import { Badge, Banner, Card, Choice, EmptyState, LinkButton, ListRow, Page, SummaryList, TextLink } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { stateTone } from "@ac/web/lib/restrictions";
@@ -23,7 +23,7 @@ export function PaymentsView({ live }: Readonly<{ live: PaymentsLive }>) {
   const nav = useUrlPatch();
   const sel = live.cards.find((c) => c.id === live.selected) ?? null;
   if (!sel) {
-    return <Page><EmptyState title={t("No contract — general maintenance")} action={<LinkBtn href="/customer" size="sm">{t("Back to monitoring")}</LinkBtn>}>{t("Your units are monitored and controlled without a contract; invoices appear here once HQ sets up a contract.")}</EmptyState></Page>;
+    return <Page><EmptyState title={t("No contract — general maintenance")} action={<LinkButton href="/customer" size="sm">{t("Back to monitoring")}</LinkButton>}>{t("Your units are monitored and controlled without a contract; invoices appear here once HQ sets up a contract.")}</EmptyState></Page>;
   }
   return (
     <Page>
@@ -55,7 +55,7 @@ export function PaymentsView({ live }: Readonly<{ live: PaymentsLive }>) {
                 <div key={i.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3">
                   <div><b>{i.number}</b><div className="text-xs text-muted-foreground">{i.due}</div></div>
                   <div className="flex items-center gap-3"><b>{i.amount}</b><Badge tone={statusTone[i.status]} icon={i.status === "Overdue" ? "alert" : (i.status === "Paid" ? "check" : undefined)}>{t(i.status)}</Badge>
-                    {i.payable ? <LinkBtn size="sm" variant="primary" href={`/customer/payments/${i.id}`}>{t("Pay now")}</LinkBtn> : <Link href={`/customer/payments/${i.id}`} className="text-muted-foreground" aria-label={t("Open {number}", { number: i.number })}><Icon name="chevronRight" /></Link>}</div>
+                    {i.payable ? <LinkButton size="sm" variant="primary" href={`/customer/payments/${i.id}`}>{t("Pay now")}</LinkButton> : <Link href={`/customer/payments/${i.id}`} className="text-muted-foreground" aria-label={t("Open {number}", { number: i.number })}><Icon name="chevronRight" /></Link>}</div>
                 </div>
               ))}
               {live.invoices.length === 0 && <p className="text-xs text-muted-foreground">{t(live.total ? "No invoice matches this filter." : "No invoices yet — this is not an overdue payment.")}</p>}
@@ -63,7 +63,7 @@ export function PaymentsView({ live }: Readonly<{ live: PaymentsLive }>) {
             <p className="mt-2 text-[11px] text-muted-foreground">{t("Paid invoices have no payment button. “Processing” is not paid.")}{live.otherZone && ` ${t("Due dates and contract periods are Kuala Lumpur dates (Asia/Kuala_Lumpur).")}`}</p>
           </Card>
           {live.notice && (
-            <Banner tone={live.notice.state === "release_requested" ? "primary" : "warn"} action={<LinkBtn size="sm" href={`/customer/payments/${live.notice.invoiceId}?tab=restriction&restrictionId=${live.notice.id}`}>{t("View restriction details")}</LinkBtn>}>
+            <Banner tone={live.notice.state === "release_requested" ? "primary" : "warn"} action={<LinkButton size="sm" href={`/customer/payments/${live.notice.invoiceId}?tab=restriction&restrictionId=${live.notice.id}`}>{t("View restriction details")}</LinkButton>}>
               <span className="flex flex-wrap items-center gap-2"><b>{t(live.notice.state === "release_requested" ? "Cooling restriction — release requested" : "Cooling restriction active")}</b><Badge tone={stateTone(live.notice.state)}>{live.notice.label}</Badge></span>
               <div className="text-xs">{t("{units} — {policy}. Related to payment, but separate from it: paying does not restore cooling immediately.", { units: live.notice.units, policy: live.notice.policy })}</div>
             </Banner>

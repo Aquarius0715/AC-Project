@@ -93,7 +93,7 @@ export function autoDraft(p?: ApiAutoPolicy, timezone = "Asia/Kuala_Lumpur"): Au
     mode: a?.kind === "set_mode" ? a.mode : "cool", level: a?.kind === "set_fan" ? a.fanLevel : (a?.kind === "ventilate" ? a.level : "low"),
   };
 }
-export function autoErrors(d: AutoDraft, tempRange: { min: number; max: number } | null, t: T = en): Record<string, string> {
+export function autoErrors(d: AutoDraft, temperatureRange: { min: number; max: number } | null, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
   if ([...d.name.trim()].length === 0 || [...d.name.trim()].length > 120) e.name = t("1–120 characters");
   const pr = Number(d.priority);
@@ -104,7 +104,7 @@ export function autoErrors(d: AutoDraft, tempRange: { min: number; max: number }
   if (d.actionKind === "set_temperature") {
     const c = Number(d.celsius);
     if (!Number.isFinite(c)) e.celsius = t("A temperature");
-    else if (tempRange && (c < tempRange.min || c > tempRange.max)) e.celsius = t("Within {min}–{max} °C on every target unit", { min: tempRange.min, max: tempRange.max });
+    else if (temperatureRange && (c < temperatureRange.min || c > temperatureRange.max)) e.celsius = t("Within {min}–{max} °C on every target unit", { min: temperatureRange.min, max: temperatureRange.max });
   }
   return e;
 }

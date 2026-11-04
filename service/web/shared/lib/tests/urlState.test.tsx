@@ -4,7 +4,7 @@
 // as null instead of throwing.
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { setSearchParam, setStoredValue, useSearchParam, useStoredValue } from "@ac/web/lib/urlState";
+import { setSearchParameter, setStoredValue, useSearchParameter, useStoredValue } from "@ac/web/lib/urlState";
 
 afterEach(() => {
   cleanup();
@@ -16,20 +16,20 @@ afterEach(() => {
 describe("URL query state", () => {
   it("sets and removes a parameter without navigation and re-renders the readers", () => {
     history.replaceState(null, "", "/customer/units?tab=list");
-    const { result } = renderHook(() => useSearchParam("unitId"));
+    const { result } = renderHook(() => useSearchParameter("unitId"));
     expect(result.current).toBeNull();
     const length = history.length;
-    act(() => { setSearchParam("unitId", "u-1"); });
+    act(() => { setSearchParameter("unitId", "u-1"); });
     expect(result.current).toBe("u-1");
     expect(location.search).toBe("?tab=list&unitId=u-1");
     expect(history.length).toBe(length); // replaced, not pushed
-    act(() => { setSearchParam("unitId", null); });
+    act(() => { setSearchParameter("unitId", null); });
     expect(result.current).toBeNull();
     expect(location.search).toBe("?tab=list");
   });
 
   it("follows the back and forward buttons (popstate)", () => {
-    const { result } = renderHook(() => useSearchParam("tab"));
+    const { result } = renderHook(() => useSearchParameter("tab"));
     history.replaceState(null, "", "/?tab=history");
     act(() => {
       globalThis.dispatchEvent(new PopStateEvent("popstate"));

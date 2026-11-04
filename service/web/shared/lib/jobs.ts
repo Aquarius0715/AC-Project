@@ -258,11 +258,11 @@ export const jobActions = {
   /** Client: “Report a problem” on a completed job → requested follow-up job, pending HQ classification (FR-C17). */
   reportProblem(fromId: string, reason: string, details: string, visit: string) {
     const s = load();
-    const src = s.jobs.find((x) => x.id === fromId);
-    if (!src || src.status !== "completed") return { error: "CONFLICT — only completed jobs can be reported" };
+    const source = s.jobs.find((x) => x.id === fromId);
+    if (!source || source.status !== "completed") return { error: "CONFLICT — only completed jobs can be reported" };
     const n = s.jobs.filter((j) => /^job-c\d+$/.test(j.id)).map((j) => +j.id.slice(5)).reduce((a, b) => Math.max(a, b), 0) + 1;
     const id = `job-c${String(n).padStart(2, "0")}`;
-    const job = req(id, { unitId: src.unitId, unit: src.unit, loc: src.loc, type: "Reactive", symptom: `${reason} — ${details}`, status: "requested", followUpOf: fromId, followUpClass: "pending",
+    const job = req(id, { unitId: source.unitId, unit: source.unit, loc: source.loc, type: "Reactive", symptom: `${reason} — ${details}`, status: "requested", followUpOf: fromId, followUpClass: "pending",
       preferred: visit ? [{ date: visit, win: "09:00–12:00" }] : [], history: [{ at: NOW, text: `customer-a reported a problem on ${fromId} — follow-up created, under HQ review` }] });
     state = { ...s, jobs: [job, ...s.jobs] };
     save();

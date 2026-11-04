@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, LinkBtn, Modal, Select, SeverityBadge, Toggle, cx, Plain, ScrollX } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, LinkButton, Modal, Select, SeverityBadge, Toggle, cx, Plain, ScrollX } from "@ac/web/components/ui";
 import { useAction } from "@ac/web/lib/useAction";
 import { focusField } from "@ac/web/lib/focusField";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
@@ -50,7 +50,7 @@ function PolicyList({ p, onDone, onFail }: Readonly<Props>) {
     <>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div><h2 className="text-[15px] font-bold">{t("Alert policies")}</h2><p className="max-w-xl text-xs text-muted-foreground">{t("A policy is a set of limits. It only runs on the ACs you attach it to (open an AC › Alert policies). Every AC also has the default policy.")}</p></div>
-        <LinkBtn href={`${base}&policyId=new`} variant="primary"><Icon name="add" /> {t("Create policy")}</LinkBtn>
+        <LinkButton href={`${base}&policyId=new`} variant="primary"><Icon name="add" /> {t("Create policy")}</LinkButton>
       </div>
       {d && (
         <Card title={<span className="flex flex-wrap items-center gap-2">{t("Default policy")} <Badge tone="primary">{t("Default · set by HQ")}</Badge><Badge tone="primary">{t("{on} of {n} rules on", { on: d.on, n: d.rows.length })}</Badge></span>} action={<span className="text-[11px] text-muted-foreground">{t("Limits set by HQ · on / off is set by the account owner")}</span>}>
@@ -121,18 +121,18 @@ function PolicyEditor({ p, editor, onDone, onFail }: Props & { editor: NonNullab
   const [f, setF] = useState<PolicyForm>(editor.form);
   const [tried, setTried] = useState(false);
   const [remove, setRemove] = useState(false);
-  const err = policyErrors(f, t);
+  const errorText = policyErrors(f, t);
   const set = (x: Partial<PolicyForm>) => { setF((s) => ({ ...s, ...x })); };
   const unit = metricUnit[f.metric] ?? "";
   const isUp = f.operator === "gt" || f.operator === "gte";
   // the condition sentence shows one problem at a time; its field is marked and named by that line
-  const conditionErr = err.threshold ? "threshold" : err.recovery ? "recovery" : err.duration ? "duration" : null;
-  const isShowCondition = !!conditionErr && (tried || f.recovery !== editor.form.recovery || f.threshold !== editor.form.threshold);
-  const invalid = (k: "threshold" | "recovery" | "duration") => (isShowCondition && conditionErr === k ? { "aria-invalid": true, "aria-describedby": "policy-condition-error" } : {});
+  const conditionError = errorText.threshold ? "threshold" : errorText.recovery ? "recovery" : errorText.duration ? "duration" : null;
+  const isShowCondition = !!conditionError && (tried || f.recovery !== editor.form.recovery || f.threshold !== editor.form.threshold);
+  const invalid = (k: "threshold" | "recovery" | "duration") => (isShowCondition && conditionError === k ? { "aria-invalid": true, "aria-describedby": "policy-condition-error" } : {});
   const save = () => {
     setTried(true);
     // a refused save takes the focus to the first field to fix, top to bottom (IR586, IR623)
-    const bad = POLICY_FIELDS.find((k) => err[k]);
+    const bad = POLICY_FIELDS.find((k) => errorText[k]);
     if (bad) { focusField(policyFieldId(bad)); return; }
     if (!p.customerId) return;
     run(() => savePolicy(policyInput(f, editor.policy, { customerId: p.customerId!, membershipId: p.membershipId, timezone: p.timezone }), editor.policy?.version ?? null), t("Policy saved"),
@@ -142,7 +142,7 @@ function PolicyEditor({ p, editor, onDone, onFail }: Props & { editor: NonNullab
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
       <Card>
         <div className="mb-3 text-[13px]"><Link href={base} className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Alert policies")}</Link> › {t(editor.policy ? "Edit alert policy" : "Create alert policy")}</div>
-        <Field label={t("Name")} error={tried ? err.name : undefined}><Input id={policyFieldId("name")} value={f.name} maxLength={120} onChange={(e) => { set({ name: e.target.value }); }} /></Field>
+        <Field label={t("Name")} error={tried ? errorText.name : undefined}><Input id={policyFieldId("name")} value={f.name} maxLength={120} onChange={(e) => { set({ name: e.target.value }); }} /></Field>
         <h3 className="mt-4 text-[13px] font-bold">{t("1 · When …")} <span className="font-normal text-muted-foreground">{t("What to watch")}</span></h3>
         <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
           {metricGroups.map((g) => (
@@ -161,7 +161,7 @@ function PolicyEditor({ p, editor, onDone, onFail }: Props & { editor: NonNullab
             <Select aria-label={t("Duration unit")} className="w-24" value={f.unit} onChange={(e) => { set({ unit: e.target.value as "s" | "min" }); }}><option value="min">min</option><option value="s">s</option></Select>
           </div>
           <div className="flex flex-wrap items-center gap-2">{t(isUp ? "Recover when it drops below" : "Recover when it rises above")} <Input id={policyFieldId("recovery")} aria-label={t("Recovery")} {...invalid("recovery")} inputMode="decimal" className="w-24" value={f.recovery} onChange={(e) => { set({ recovery: e.target.value }); }} />{unit}</div>
-          {conditionErr ? isShowCondition && <p id="policy-condition-error" className="flex items-center gap-1 text-xs text-crit"><Icon name="error" />{err[conditionErr]}</p>
+          {conditionError ? isShowCondition && <p id="policy-condition-error" className="flex items-center gap-1 text-xs text-crit"><Icon name="error" />{errorText[conditionError]}</p>
             : <p className="flex items-center gap-1 text-xs text-ok"><Icon name="check" />{t(isUp ? "Recovery {recovery} {unit} is below the {threshold} {unit} limit · unit fixed to {unit} for this metric" : "Recovery {recovery} {unit} is above the {threshold} {unit} limit · unit fixed to {unit} for this metric", { recovery: f.recovery, threshold: f.threshold, unit })}</p>}
         </div>
         <h3 className="mt-4 text-[13px] font-bold">{t("2 · Only if …")} <span className="font-normal text-muted-foreground">{t("(optional) Limit when the policy is checked")}</span></h3>
@@ -175,7 +175,7 @@ function PolicyEditor({ p, editor, onDone, onFail }: Props & { editor: NonNullab
               <span className="text-xs text-muted-foreground">{editor.policy?.timezone ?? p.timezone}</span>
             </div>
           )}
-          {tried && err.window && <p className="flex items-center gap-1 text-xs text-crit"><Icon name="error" />{err.window}</p>}
+          {tried && errorText.window && <p className="flex items-center gap-1 text-xs text-crit"><Icon name="error" />{errorText.window}</p>}
         </div>
         <h3 className="mt-4 text-[13px] font-bold">{t("3 · Then …")} <span className="font-normal text-muted-foreground">{t("How loud the alert is and who hears about it")}</span></h3>
         <div className="mt-2 flex flex-col gap-2 text-[13px]">

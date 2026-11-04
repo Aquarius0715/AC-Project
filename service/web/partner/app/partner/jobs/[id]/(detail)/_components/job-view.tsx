@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Field, Input, LinkBtn, Modal, Page, Select, SummaryList, Textarea } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Field, Input, LinkButton, Modal, Page, Select, SummaryList, Textarea } from "@ac/web/components/ui";
 import { OriginBadge } from "@ac/web/components/JobBits";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
@@ -85,7 +85,7 @@ function OfferView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "of
   const short = j.jobId.slice(0, 8);
   const quals = j.requiredQualifications.map((q) => qualificationLabel(q, t));
   if (declined) {
-    return <Page narrow><Crumb text={t("{id} · declined", { id: short })} /><Banner tone="warn" action={<LinkBtn size="sm" href="/partner/jobs">{t("Back to jobs")}</LinkBtn>}>{t("Declined with your reason — HQ was notified and the job is no longer offered to your company.")}</Banner></Page>;
+    return <Page narrow><Crumb text={t("{id} · declined", { id: short })} /><Banner tone="warn" action={<LinkButton size="sm" href="/partner/jobs">{t("Back to jobs")}</LinkButton>}>{t("Declined with your reason — HQ was notified and the job is no longer offered to your company.")}</Banner></Page>;
   }
   return (
     <Page narrow>
@@ -94,7 +94,7 @@ function OfferView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "of
       {isOpen && <Banner tone="warn">{t(p.status === "sent_to_client" ? "HQ asked the client about your proposed time ({slot} · {name}) — the offer stays reserved for you; Accept is disabled until it is answered." : "Your proposed time is with HQ ({slot} · {name}) — the offer stays reserved for you; Accept is disabled until it is answered.", { slot: x.proposal ?? "", name: live.names[p.technicianMembershipId] ?? t("technician") })}</Banner>}
       {p?.status === "approved" && <Banner tone="ok">{t("The client approved your proposed time — the visit is now {slot}. Accept the offer to continue.", { slot: x.visit })}</Banner>}
       {(p?.status === "declined" || p?.status === "kept") && <Banner tone="warn">{t("Your time change was not taken — the agreed time stays {slot}. Accept or decline.", { slot: x.visit })}</Banner>}
-      {j.status === "accepted" && <Banner tone="ok" action={<LinkBtn size="sm" variant="primary" href={`/partner/schedule?jobId=${j.jobId}`}>{t("Assign technician")} <Icon name="arrowRight" /></LinkBtn>}>{t("Accepted — the delegation period starts {time}; unit details open then. Assign your technician for exactly {slot}.", { time: x.accessFrom, slot: x.visit })}</Banner>}
+      {j.status === "accepted" && <Banner tone="ok" action={<LinkButton size="sm" variant="primary" href={`/partner/schedule?jobId=${j.jobId}`}>{t("Assign technician")} <Icon name="arrowRight" /></LinkButton>}>{t("Accepted — the delegation period starts {time}; unit details open then. Assign your technician for exactly {slot}.", { time: x.accessFrom, slot: x.visit })}</Banner>}
       <Card title={t("{id} · Offer from HQ", { id: short })} action={j.status === "offered" ? <Badge tone="warn">{t("Expires {time}", { time: x.expires })}</Badge> : <Badge tone="primary">{t("Accepted")}</Badge>}>
         <Banner>{t("Before acceptance: job type, registered installation address and required qualifications only. No live telemetry, entry instructions or billing.")}</Banner>
         <div className="mt-3"><SummaryList items={[
@@ -192,10 +192,10 @@ function DetailView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "d
               [t("Scheduled slot"), x.scheduled ? `${x.scheduled} · ${x.tech ?? "—"}` : <b key="n" className="text-crit">{t("Not assigned yet")}</b>],
             ]} />
             <div className="mt-4 flex flex-wrap gap-2">
-              {isNeedsTech && <LinkBtn variant="primary" href={`/partner/schedule?jobId=${j.id}`}>{t(j.assignment ? "Reassign technician" : "Assign technician")}<Icon name="arrowRight" /></LinkBtn>}
-              {j.status === "submitted" && <LinkBtn variant="primary" href={`/partner/jobs/${j.id}/review`}>{t("Review report")} <Icon name="arrowRight" /></LinkBtn>}
-              <LinkBtn href={`/partner/units/${j.unitId}?jobId=${j.id}`}>{t("Open unit")} <Icon name="arrowRight" /></LinkBtn>
-              <LinkBtn href={`/partner/history?jobId=${j.id}`}>{t("Job history")} <Icon name="arrowRight" /></LinkBtn>
+              {isNeedsTech && <LinkButton variant="primary" href={`/partner/schedule?jobId=${j.id}`}>{t(j.assignment ? "Reassign technician" : "Assign technician")}<Icon name="arrowRight" /></LinkButton>}
+              {j.status === "submitted" && <LinkButton variant="primary" href={`/partner/jobs/${j.id}/review`}>{t("Review report")} <Icon name="arrowRight" /></LinkButton>}
+              <LinkButton href={`/partner/units/${j.unitId}?jobId=${j.id}`}>{t("Open unit")} <Icon name="arrowRight" /></LinkButton>
+              <LinkButton href={`/partner/history?jobId=${j.id}`}>{t("Job history")} <Icon name="arrowRight" /></LinkButton>
             </div>
           </Card>
           <Card title={t("Target unit — {name}", { name: u?.displayName ?? t("not readable now") })} action={<Link className="text-xs font-semibold text-primary" href={`/partner/units/${j.unitId}?jobId=${j.id}`}>{t("Open unit")} <Icon name="arrowRight" /></Link>}>

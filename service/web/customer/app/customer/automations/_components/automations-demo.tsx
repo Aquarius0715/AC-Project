@@ -30,15 +30,15 @@ export function AutomationsDemo() {
   const [del, setDel] = useState<Auto | null>(null);
   const [step, setStep] = useState<"form" | "review">("form");
   const [f, setF] = useState({ name: "", kind: "Schedule", time: "18:00", temp: "25", unit: "Bedroom AC" });
-  const [err, setErr] = useState<Record<string, string>>({});
+  const [errorText, setError] = useState<Record<string, string>>({});
 
-  const open = (a: Auto | "new") => { setEdit(a); setStep("form"); setErr({}); setF(a === "new" ? { name: "", kind: "Schedule", time: "18:00", temp: "25", unit: "Bedroom AC" } : { name: a.name, kind: a.kind, time: "18:00", temp: "25", unit: a.unit.split(" · ", 1)[0] }); };
+  const open = (a: Auto | "new") => { setEdit(a); setStep("form"); setError({}); setF(a === "new" ? { name: "", kind: "Schedule", time: "18:00", temp: "25", unit: "Bedroom AC" } : { name: a.name, kind: a.kind, time: "18:00", temp: "25", unit: a.unit.split(" · ", 1)[0] }); };
   const review = () => {
     const e: Record<string, string> = {};
     if (!f.name.trim()) e.name = "Name is required";
     const t = +f.temp; if (!(t >= 16 && t <= 30)) e.temp = "16–30°C only (device capability)";
     if (f.kind === "Location" && !consent) e.kind = "Location consent is withdrawn — grant it to use location triggers";
-    setErr(e); if (Object.keys(e).length === 0) setStep("review");
+    setError(e); if (Object.keys(e).length === 0) setStep("review");
   };
   const save = () => {
     if (edit === "new") setList((l) => [...l, { id: "n" + Date.now(), name: f.name, kind: f.kind, icon: f.kind === "Location" ? "location" : "schedule", when: f.kind === "Schedule" ? "Every day at " + f.time : "Arrival at Home A", steps: f.kind === "Schedule" ? [start(f.time, `Set temperature ${f.temp}°C`), end("22:00", "Power OFF")] : then(`Set temperature ${f.temp}°C`), unit: f.unit, on: true }]);
@@ -97,12 +97,12 @@ export function AutomationsDemo() {
       <Modal open={!!edit} onClose={() => { setEdit(null); }} wide title={step === "review" ? "Review / Test result" : (edit === "new" ? "Create automation" : "Edit automation")} footer={step === "form" ? <><Btn onClick={() => { setEdit(null); }}>Cancel</Btn><Btn variant="primary" onClick={review}>Review</Btn></> : <><Btn onClick={() => { setStep("form"); }}><Icon name="arrowLeft" /> Back</Btn><Btn variant="primary" onClick={save}>Save automation</Btn></>}>
         {step === "form" ? (
           <>
-            <Field label="Name" error={err.name}><Input value={f.name} onChange={(e) => { setF({ ...f, name: e.target.value }); }} placeholder="e.g. Weekday pre-cool" /></Field>
-            <Field label="Trigger" error={err.kind}><Choice value={f.kind as "Schedule"} onChange={(v) => { setF({ ...f, kind: v }); }} options={["Schedule", "Location", "Presence", "Weather"].map((k) => ({ id: k as "Schedule", label: k }))} /></Field>
+            <Field label="Name" error={errorText.name}><Input value={f.name} onChange={(e) => { setF({ ...f, name: e.target.value }); }} placeholder="e.g. Weekday pre-cool" /></Field>
+            <Field label="Trigger" error={errorText.kind}><Choice value={f.kind as "Schedule"} onChange={(v) => { setF({ ...f, kind: v }); }} options={["Schedule", "Location", "Presence", "Weather"].map((k) => ({ id: k as "Schedule", label: k }))} /></Field>
             <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
               <Field label="Air conditioner"><Select value={f.unit} onChange={(e) => { setF({ ...f, unit: e.target.value }); }}>{["Bedroom AC", "Bedroom AC #2", "Living room AC", "Kitchen AC", "Study AC"].map((u) => <option key={u}>{u}</option>)}</Select></Field>
               {f.kind === "Schedule" && <Field label="Time"><Input type="time" value={f.time} onChange={(e) => { setF({ ...f, time: e.target.value }); }} /></Field>}
-              <Field label="Set temperature (°C)" error={err.temp}><Input type="number" value={f.temp} onChange={(e) => { setF({ ...f, temp: e.target.value }); }} /></Field>
+              <Field label="Set temperature (°C)" error={errorText.temp}><Input type="number" value={f.temp} onChange={(e) => { setF({ ...f, temp: e.target.value }); }} /></Field>
             </div>
             {f.kind === "Location" && <Banner tone={consent ? "ok" : "warn"}>{consent ? "Location consent granted — demo location events only." : "Location consent withdrawn."}</Banner>}
           </>

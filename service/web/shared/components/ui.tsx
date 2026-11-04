@@ -77,18 +77,18 @@ export function OnOffBadge({ on }: { on: boolean }) {
 export const DemoBadge = () => <Badge tone="warn" className="uppercase tracking-wide">Demo</Badge>;
 
 /* ───────────── Buttons ───────────── */
-type BtnVariant = "primary" | "secondary" | "ghost" | "danger";
+type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 // the product's button names on the shadcn/ui Button variants; ghost keeps the primary colour of a text action
 const variantOf = { primary: "default", secondary: "outline", ghost: "ghost", danger: "destructive" } as const;
-const variantCls = (v: BtnVariant) => cn(v === "secondary" && "bg-card", v === "ghost" && "text-primary hover:bg-accent hover:text-primary");
+const variantCls = (v: ButtonVariant) => cn(v === "secondary" && "bg-card", v === "ghost" && "text-primary hover:bg-accent hover:text-primary");
 const sizeOf = (size: "sm" | "md") => (size === "sm" ? "sm" : "default");
-const btnCls = (v: BtnVariant, size: "sm" | "md") => cn(buttonVariants({ variant: variantOf[v], size: sizeOf(size) }), variantCls(v));
+const buttonClass = (v: ButtonVariant, size: "sm" | "md") => cn(buttonVariants({ variant: variantOf[v], size: sizeOf(size) }), variantCls(v));
 
-export function Btn({ variant = "secondary", size = "md", className, ...p }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: BtnVariant; size?: "sm" | "md" }) {
+export function Btn({ variant = "secondary", size = "md", className, ...p }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant; size?: "sm" | "md" }) {
   return <Button type="button" {...p} variant={variantOf[variant]} size={sizeOf(size)} className={cn(variantCls(variant), className)} />;
 }
-export function LinkBtn({ href, variant = "secondary", size = "md", className, children }: Readonly<{ href: string; variant?: BtnVariant; size?: "sm" | "md"; className?: string; children: React.ReactNode }>) {
-  return <Link href={href} className={cx(btnCls(variant, size), className)}>{children}</Link>;
+export function LinkButton({ href, variant = "secondary", size = "md", className, children }: Readonly<{ href: string; variant?: ButtonVariant; size?: "sm" | "md"; className?: string; children: React.ReactNode }>) {
+  return <Link href={href} className={cx(buttonClass(variant, size), className)}>{children}</Link>;
 }
 export function TextLink({ href, children, className }: Readonly<{ href: string; children: React.ReactNode; className?: string }>) {
   return <Link href={href} className={cx("text-xs font-semibold text-primary hover:underline", className)}>{children}</Link>;
@@ -460,13 +460,13 @@ export function Modal({ open, title, onClose, children, footer, wide, finalFocus
 
 
 /* ───────────── Toast ───────────── */
-const ToastCtx = createContext<(msg: string, tone?: Tone) => void>(() => {});
+const ToastCtx = createContext<(notice: string, tone?: Tone) => void>(() => {});
 export const useToast = () => useContext(ToastCtx);
 /** The toasts: shadcn/ui's Sonner. Sonner announces through one polite region, so an error carries its text in an alert
 (announced at once) and every other result in a status (UX-06, IR362). */
 export function ToastProvider({ children }: Readonly<{ children: React.ReactNode }>) {
-  const push = useCallback((msg: string, tone: Tone = "ok") => {
-    const body = <span role={tone === "crit" ? "alert" : "status"}>{msg}</span>;
+  const push = useCallback((notice: string, tone: Tone = "ok") => {
+    const body = <span role={tone === "crit" ? "alert" : "status"}>{notice}</span>;
     switch (tone) {
     case "crit": {
     toast.error(body);
@@ -620,7 +620,7 @@ export function LineChart({ points, min, max, threshold, height = 120, color = "
 }
 
 /** A progress bar (shadcn/ui's Progress); `label` names it for assistive technology (WCAG 4.1.2, IR359). */
-export function UtilBar({ pct, tone = "primary", label }: Readonly<{ pct: number | null; tone?: Tone; label?: string }>) {
+export function UtilizationBar({ pct, tone = "primary", label }: Readonly<{ pct: number | null; tone?: Tone; label?: string }>) {
   return (
     <Progress value={pct} aria-label={label}
       className={cx("*:data-[slot=progress-track]:h-2", tone === "ok" ? "**:data-[slot=progress-indicator]:bg-ok" : tone === "warn" ? "**:data-[slot=progress-indicator]:bg-warn" : tone === "crit" ? "**:data-[slot=progress-indicator]:bg-crit" : undefined)} />

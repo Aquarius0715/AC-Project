@@ -22,12 +22,12 @@ export function useSearch(): string {
 }
 
 /** One query parameter, or null. */
-export function useSearchParam(key: string): string | null {
+export function useSearchParameter(key: string): string | null {
   return new URLSearchParams(useSearch()).get(key);
 }
 
 /** Replaces one query parameter without navigation (D10 URL state). */
-export function setSearchParam(key: string, value: string | null) {
+export function setSearchParameter(key: string, value: string | null) {
   const u = new URL(location.href);
   if (value === null) u.searchParams.delete(key);
   else u.searchParams.set(key, value);

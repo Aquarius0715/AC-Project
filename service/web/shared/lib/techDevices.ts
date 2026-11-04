@@ -171,9 +171,9 @@ export function eventRows(es: ApiDeviceEventFull[], alerts: Map<string, ApiAlert
   return es.map((e) => {
     const as = e.alertIds.map((id) => alerts.get(id)).filter((a): a is ApiAlertLite => !!a);
     const open = as.filter((a) => a.status === "open").length;
-    const src = e.recovery ? byId.get(e.recovery.sourceEventId) : undefined;
+    const source = e.recovery ? byId.get(e.recovery.sourceEventId) : undefined;
     const recovery = e.restoredAt ? t("restored {time}", { time: when(e.restoredAt) })
-      : e.eventType === "restored" ? (src ? t("recovers {event} {time}", { event: src.eventType, time: when(src.occurredAt) }) : t("recovers an earlier fault"))
+      : e.eventType === "restored" ? (source ? t("recovers {event} {time}", { event: source.eventType, time: when(source.occurredAt) }) : t("recovers an earlier fault"))
       : as.length > 0 ? t(open ? "open · unacknowledged" : (as.every((a) => a.status === "resolved") ? "open · resolved" : "open · acknowledged")) : t("open");
     return {
       id: e.id,

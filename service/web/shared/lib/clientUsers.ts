@@ -50,8 +50,8 @@ export const clientUserActions = {
   /** clientUsers.save without id: the account exists at once (IR461), listed as not signed in yet. */
   invite(email: string, role: ClientRole, by: string, name = "") {
     const users = load();
-    const err = emailError(email, users);
-    if (err) return err;
+    const error = emailError(email, users);
+    if (error) return error;
     save([...users, { id: `cu-${String(Date.now())}`, name: name.trim() || null, email: email.trim(), status: "invited", lastSignIn: null, invitedBy: by, invitedAt: "2026-10-06", role }]);
     return;
   },

@@ -43,10 +43,10 @@ export function iconProblem(text: string): string | null {
 
 function sources(): string[] {
   const out: string[] = [];
-  const walk = (dir: string) => {
-    for (const name of readdirSync(dir)) {
+  const walk = (directory: string) => {
+    for (const name of readdirSync(directory)) {
       if (["node_modules", ".next", "tests"].includes(name)) continue;
-      const path = join(dir, name);
+      const path = join(directory, name);
       if (statSync(path).isDirectory()) walk(path);
       else if (/\.tsx?$/.test(name) && !/\.(gen|d)\.ts$/.test(name)) out.push(path);
     }

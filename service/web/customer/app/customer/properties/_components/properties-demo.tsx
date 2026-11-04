@@ -55,12 +55,12 @@ export function PropertiesDemo() {
   const [sel, setSel] = useState("home-a");
   const [renaming, setRenaming] = useState<Node | null>(null);
   const [name, setName] = useState("");
-  const [err, setErr] = useState<string>();
+  const [errorText, setError] = useState<string>();
   const [mode, setMode] = useState<"single" | "group">("single");
-  const startRename = (n: Node) => { setRenaming(n); setName(n.name); setErr(undefined); };
+  const startRename = (n: Node) => { setRenaming(n); setName(n.name); setError(undefined); };
   const save = () => {
-    if (!name.trim()) { setErr("Name is required (1–120 characters)"); return; }
-    if (name.trim().toLowerCase() === "office a" && renaming?.id !== "office-a") { setErr("A location with this name already exists"); return; }
+    if (!name.trim()) { setError("Name is required (1–120 characters)"); return; }
+    if (name.trim().toLowerCase() === "office a" && renaming?.id !== "office-a") { setError("A location with this name already exists"); return; }
     toast(`Renamed to “${name}”`); setRenaming(null);
   };
   const us = roomUnits[sel];
@@ -103,7 +103,7 @@ export function PropertiesDemo() {
         </Card>
       </div>
       <Modal open={!!renaming} onClose={() => { setRenaming(null); }} title={`Rename ${renaming?.name ?? "location"}`} footer={<><Btn onClick={() => { setRenaming(null); }}>Cancel</Btn><Btn variant="primary" onClick={save}>Save</Btn></>}>
-        <Field label="Name" error={err} hint="Try “Office A” to see the duplicate-name validation."><Input value={name} onChange={(e) => { setName(e.target.value); }} autoFocus /></Field>
+        <Field label="Name" error={errorText} hint="Try “Office A” to see the duplicate-name validation."><Input value={name} onChange={(e) => { setName(e.target.value); }} autoFocus /></Field>
       </Modal>
     </Page>
   );

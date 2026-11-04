@@ -60,7 +60,7 @@ export function AuditView({ live }: Readonly<{ live?: AuditLive }>) {
   const [shown, setShown] = useState(5);
   const [selId, setSelId] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const periodErr = periodError(f, t);
+  const periodProblem = periodError(f, t);
   const all = live ? live.rows : seed;
   const rows = live ? all : all.filter((l) => {
     return (f.result === "All" || l.res === f.result) && (!f.correlationId || l.corr.includes(f.correlationId)) && (!f.actorId || l.actorId === f.actorId)
@@ -115,7 +115,7 @@ export function AuditView({ live }: Readonly<{ live?: AuditLive }>) {
         <>
           <Card title={t("Filter")}>
             <div className="grid-fluid" style={{ ["--min" as string]: "170px" }}>
-              <Field label={t("From")} error={periodErr} hint={periodErr ? undefined : t("Days in {zone}", { zone })}><Input type="date" value={f.from} onChange={(e) => { changeDate("from", e.target.value); }} /></Field>
+              <Field label={t("From")} error={periodProblem} hint={periodProblem ? undefined : t("Days in {zone}", { zone })}><Input type="date" value={f.from} onChange={(e) => { changeDate("from", e.target.value); }} /></Field>
               <Field label={t("To")}><Input type="date" value={f.to} onChange={(e) => { changeDate("to", e.target.value); }} /></Field>
               <Field label={t("Actor")}><Select value={f.actorId} onChange={(e) => { search({ actorId: e.target.value }); }}><option value="">{t("Actor: All")}</option>{actors.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field>
               <Field label={t("Target")}><Select value={f.targetKind} onChange={(e) => { search({ targetKind: e.target.value, targetId: "" }); }}><option value="">{t("Target: All")}</option>{kinds.map((k) => <option key={k} value={k}>{k}</option>)}</Select></Field>
@@ -132,7 +132,7 @@ export function AuditView({ live }: Readonly<{ live?: AuditLive }>) {
           </Card>
           <div className="split-rev">
             <Card title={corr ? t("Correlation {id}", { id: corr }) : t("Audit log · newest first")} className="self-start">
-              {rows.length === 0 ? <NoEntries live={live} periodErr={periodErr} corr={corr} result={f.result} /> : (
+              {rows.length === 0 ? <NoEntries live={live} periodErr={periodProblem} corr={corr} result={f.result} /> : (
                 <div className="flex flex-col gap-2">{rows.map((l) => (
                   <ListRow key={l.id} selected={sel?.id === l.id} onClick={() => { open(l.id); }}>
                     <div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{l.op}</b><Badge tone={resultTone(l.res)}>{resultWord(l.res, t)}</Badge></div><div className="truncate text-[11px] text-muted-foreground">{l.target}</div><div className="truncate text-[11px] text-muted-foreground">{l.actor} ({l.role}) · {l.at} · {l.corr}</div></div>
@@ -168,7 +168,7 @@ export function AuditView({ live }: Readonly<{ live?: AuditLive }>) {
           </div>
         </>
       ) : device && (
-        <DeviceEvents device={device} f={f} periodErr={periodErr} zone={zone} live={!!live} onDate={changeDate} onDevice={(id) => { if (live) patch({ deviceId: id || null, eventId: null });; }} onEvent={(id) => live && patch({ eventId: id })} onReset={reset} />
+        <DeviceEvents device={device} f={f} periodErr={periodProblem} zone={zone} live={!!live} onDate={changeDate} onDevice={(id) => { if (live) patch({ deviceId: id || null, eventId: null });; }} onEvent={(id) => live && patch({ eventId: id })} onReset={reset} />
       )}
     </Page>
   );
@@ -218,9 +218,9 @@ function CommandLine({ r, demo, line }: Readonly<{ r: RelatedRef; demo: boolean;
     if (demo) { setC({ state: "done", text: t("Set temperature {celsius}°C", { celsius: 24 }), when: "09-20 10:14", unitId: null }); return; }
     setC({ state: "loading" });
     try {
-      const cmd = await callOp<ApiCommand & { unitId: string }>("commands.get", { id: r.id });
-      const h = historyRow(cmd, t, display);
-      setC({ state: "done", text: h.text, when: h.when, unitId: cmd.unitId });
+      const deviceCommand = await callOp<ApiCommand & { unitId: string }>("commands.get", { id: r.id });
+      const h = historyRow(deviceCommand, t, display);
+      setC({ state: "done", text: h.text, when: h.when, unitId: deviceCommand.unitId });
     } catch (error) {
       const code = error instanceof OpError ? error.error.code : "";
       setC({ state: "error", text: t(code === "FORBIDDEN" ? "You may not read this command — it needs control.execute, restriction.read, restriction.override or automation.policy.read."
@@ -244,7 +244,7 @@ function DeviceEvents({ device, f, periodErr, zone, live, onDate, onDevice, onEv
 }>) {
   const { t } = useI18n();
   const [pick, setPick] = useState<string | null>(null);
-  const ev = device.events.find((e) => e.id === (live ? device.selected : pick)) ?? device.events[0] ?? null;
+  const event = device.events.find((e) => e.id === (live ? device.selected : pick)) ?? device.events[0] ?? null;
   return (
     <>
       <Card title={t("Filter")}>
@@ -263,22 +263,22 @@ function DeviceEvents({ device, f, periodErr, zone, live, onDate, onDevice, onEv
           <Card title={t("Device events · newest first")} className="self-start">
             {device.events.length === 0 ? <EmptyState title={t("No device events in this period")}>{t(periodErr ? "The period must start before it ends and cover at most 366 days." : "This device recorded no events in the period.")}</EmptyState> : (
               <div className="flex flex-col gap-2">{device.events.map((e) => (
-                <ListRow key={e.id} selected={ev?.id === e.id} onClick={() => { if (live) onEvent(e.id); else setPick(e.id); }}>
+                <ListRow key={e.id} selected={event?.id === e.id} onClick={() => { if (live) onEvent(e.id); else setPick(e.id); }}>
                   <div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{e.title}</b><Badge tone={e.tone}>{e.type}</Badge></div><div className="truncate text-[11px] text-muted-foreground">{e.meta}</div><div className="truncate text-[11px] text-muted-foreground">{e.state}</div></div>
                 </ListRow>
               ))}</div>
             )}
           </Card>
-          {ev && (
-            <Card title={<span className="flex flex-wrap items-center gap-2">{ev.title}{ev.badge && <Badge tone={ev.badge.tone}>{ev.badge.text}</Badge>}</span>} sub={device.label ?? undefined} className="self-start">
-              <SummaryList items={ev.facts} />
+          {event && (
+            <Card title={<span className="flex flex-wrap items-center gap-2">{event.title}{event.badge && <Badge tone={event.badge.tone}>{event.badge.text}</Badge>}</span>} sub={device.label ?? undefined} className="self-start">
+              <SummaryList items={event.facts} />
               <h3 className="mt-4 mb-2 text-[13px] font-bold">{t("Linked alerts and audit")}</h3>
               <SummaryList items={[
-                ...ev.alerts.map((a): [string, ReactNode] => [t("Alert"), <span key={a.id} className="flex flex-wrap items-center justify-between gap-2"><span>{a.text}</span><TextLink href={a.href}>{t("Open alert")} <Icon name="arrowRight" /></TextLink></span>]),
-                [t("Audit"), <span key="audit" className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-xs">device_event · {ev.id.slice(0, 8)}</span><TextLink href={`/admin/audit?targetKind=device_event&targetId=${ev.id}`}>{t("Filter log")} <Icon name="arrowRight" /></TextLink></span>],
+                ...event.alerts.map((a): [string, ReactNode] => [t("Alert"), <span key={a.id} className="flex flex-wrap items-center justify-between gap-2"><span>{a.text}</span><TextLink href={a.href}>{t("Open alert")} <Icon name="arrowRight" /></TextLink></span>]),
+                [t("Audit"), <span key="audit" className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-xs">device_event · {event.id.slice(0, 8)}</span><TextLink href={`/admin/audit?targetKind=device_event&targetId=${event.id}`}>{t("Filter log")} <Icon name="arrowRight" /></TextLink></span>],
               ]} />
               <h3 className="mt-4 mb-2 text-[13px] font-bold">{t("Response notes (read-only here)")}</h3>
-              {ev.notes.length === 0 ? <p className="text-xs text-muted-foreground">{t("No response notes.")}</p> : <ul className="flex flex-col gap-2">{ev.notes.map((n, k) => <li key={k} className="rounded-lg border border-line px-3 py-2 text-[13px]">“{n.text}”<div className="text-[11px] text-muted-foreground">{n.by}</div></li>)}</ul>}
+              {event.notes.length === 0 ? <p className="text-xs text-muted-foreground">{t("No response notes.")}</p> : <ul className="flex flex-col gap-2">{event.notes.map((n, k) => <li key={k} className="rounded-lg border border-line px-3 py-2 text-[13px]">“{n.text}”<div className="text-[11px] text-muted-foreground">{n.by}</div></li>)}</ul>}
               <p className="mt-2 rounded-lg bg-primary-soft/50 px-3 py-2 text-[11px] text-muted-foreground">{t("Notes are added from Devices & models (device.write), not here.")}</p>
             </Card>
           )}

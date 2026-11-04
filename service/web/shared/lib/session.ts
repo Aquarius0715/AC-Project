@@ -112,12 +112,12 @@ export function sessionFromTokens(t: { access_token: string; refresh_token?: str
 /** Exchanges the refresh token for a new access token (same tenant and membership), or null. */
 export async function refresh(s: Session): Promise<Session | null> {
   if (!s.refreshToken) return null;
-  const cfg = oidcConfig();
+  const roleConfig = oidcConfig();
   try {
-    const r = await fetch(`${cfg.internalIssuer}/protocol/openid-connect/token`, {
+    const r = await fetch(`${roleConfig.internalIssuer}/protocol/openid-connect/token`, {
       method: "POST", cache: "no-store",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: s.refreshToken, client_id: cfg.clientId, client_secret: cfg.clientSecret }),
+      body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: s.refreshToken, client_id: roleConfig.clientId, client_secret: roleConfig.clientSecret }),
     });
     if (!r.ok) return null;
     const next = sessionFromTokens(await r.json(), s.refreshToken);
@@ -132,12 +132,12 @@ export async function refresh(s: Session): Promise<Session | null> {
 its refresh token, IR357): Keycloak's back-channel logout, the refresh token posted with the client's credentials
 to the internal logout endpoint. False when the provider refused or did not answer within 3 seconds. */
 export async function endIdpSession(refreshToken: string): Promise<boolean> {
-  const cfg = oidcConfig();
+  const roleConfig = oidcConfig();
   try {
-    const r = await fetch(`${cfg.internalIssuer}/protocol/openid-connect/logout`, {
+    const r = await fetch(`${roleConfig.internalIssuer}/protocol/openid-connect/logout`, {
       method: "POST", cache: "no-store",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ refresh_token: refreshToken, client_id: cfg.clientId, client_secret: cfg.clientSecret }),
+      body: new URLSearchParams({ refresh_token: refreshToken, client_id: roleConfig.clientId, client_secret: roleConfig.clientSecret }),
       signal: AbortSignal.timeout(3000),
     });
     return r.ok;

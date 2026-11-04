@@ -26,7 +26,7 @@ export function AssistantPanel({ open, onClose, context, live }: { open: boolean
 }
 
 type Change = Extract<ResolvedIntent, { kind: "change" }>;
-type Msg =
+type ChatMessage =
   | { kind: "user"; text: string; via: "text" | "voice" }
   | { kind: "bot"; text: string; tone?: "crit" }
   | { kind: "candidates"; question: string; via: "text" | "voice"; groups: CandidateGroup[]; status: Record<string, string> }
@@ -60,7 +60,7 @@ function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
   const t = translator(lang); // the assistant's own language; times stay in the user's time zone
   const display = { ...i.display, locale: lang };
   const ex = examples(lang);
-  const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [msgs, setMsgs] = useState<ChatMessage[]>([]);
   const [state, setState] = useState<PanelState>("idle");
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -79,8 +79,8 @@ function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
   }
   // a block body: scrollIntoView returns a Promise in current browsers, which React would call as the cleanup
   useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [msgs, state]);
-  const add = (...m: Msg[]) => { setMsgs((s) => [...s, ...m]); };
-  const drop = (kind: Msg["kind"]) => { setMsgs((s) => s.filter((m) => m.kind !== kind)); };
+  const add = (...m: ChatMessage[]) => { setMsgs((s) => [...s, ...m]); };
+  const drop = (kind: ChatMessage["kind"]) => { setMsgs((s) => s.filter((m) => m.kind !== kind)); };
   const failure = (e: unknown) => (e instanceof OpError ? actionMessage({ code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors ?? {}, retryAfterSeconds: e.error.retryAfterSeconds }, t) : t("The assistant is unavailable — try again."));
   const unit = (id: string) => callOp<ApiUnitDetail>("units.get", { id }).catch(() => null);
   // D09: a language change discards an unconfirmed intent but keeps what was typed
@@ -126,7 +126,7 @@ function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
     }
   };
 
-  const confirm = async (m: Extract<Msg, { kind: "confirm" }>, question: string) => {
+  const confirm = async (m: Extract<ChatMessage, { kind: "confirm" }>, question: string) => {
     drop("confirm");
     setState("sending");
     const card = changeCard(m.intent, m.unit, t);
@@ -150,7 +150,7 @@ function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
     add({ kind: "bot", text: t("The microphone is off on this device, so voice input is unavailable. Type your request instead, or turn the microphone on in Preferences.") });
     input.current?.focus();
   };
-  const lastQuestion = [...msgs].reverse().find((m): m is Extract<Msg, { kind: "user" }> => m.kind === "user")?.text ?? "";
+  const lastQuestion = [...msgs].reverse().find((m): m is Extract<ChatMessage, { kind: "user" }> => m.kind === "user")?.text ?? "";
 
   return (
     <Frame title={t("Assistant")} state={stateText(state, t)} lang={lang} setLang={setLang} onClose={onClose} context={context} t={t}
@@ -213,7 +213,7 @@ function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
 /** Which room, then which AC (Figma 09d): nothing is chosen for the user, and Continue asks again with the chosen
 unit (selectedUnitId, IR65). A room with one AC needs no second choice. */
 function CandidatePicker({ m, t, busy, onPick, onCancel }: Readonly<{
-  m: Extract<Msg, { kind: "candidates" }>; t: T; busy: boolean; onPick: (unitId: string) => void; onCancel: () => void;
+  m: Extract<ChatMessage, { kind: "candidates" }>; t: T; busy: boolean; onPick: (unitId: string) => void; onCancel: () => void;
 }>) {
   const isSeveral = m.groups.length > 1;
   const [room, setRoom] = useState(isSeveral ? -1 : 0);
@@ -259,7 +259,7 @@ function RadioCard({ value, title, detail }: Readonly<{ value: string; title: st
 
 // ---- the Phase 1A demo (DATA_SOURCE=demo): simulated answers, no Core API ----
 
-type DemoMsg =
+type DemoChatMessage =
   | { kind: "user"; text: string; via: "text" | "voice" }
   | { kind: "bot"; text: string }
   | { kind: "confirm"; target: string; temp: number }
@@ -269,7 +269,7 @@ type DemoMsg =
 const demoUnits = ["Bedroom AC", "Bedroom AC #2", "Living room AC", "Kitchen AC", "Study AC"];
 
 function DemoAssistant({ onClose, context }: Readonly<{ onClose: () => void; context: string }>) {
-  const [msgs, setMsgs] = useState<DemoMsg[]>([{ kind: "bot", text: "Hi! Ask about temperatures, change a setting, or ask for help." }]);
+  const [msgs, setMsgs] = useState<DemoChatMessage[]>([{ kind: "bot", text: "Hi! Ask about temperatures, change a setting, or ask for help." }]);
   const [text, setText] = useState("");
   const [listening, setListening] = useState(false);
   const [lang, setLang] = useState<Locale>("en");
@@ -277,23 +277,23 @@ function DemoAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
   useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [msgs, listening]);
 
   const interpret = (q: string, via: "text" | "voice") => {
-    const add = (...m: DemoMsg[]) => { setMsgs((s) => [...s, ...m]); };
+    const add = (...m: DemoChatMessage[]) => { setMsgs((s) => [...s, ...m]); };
     add({ kind: "user", text: q, via });
-    const temp = (/(\d{2})/.exec(q))?.[1];
+    const setpoint = (/(\d{2})/.exec(q))?.[1];
     const named = demoUnits.find((u) => q.toLowerCase().includes(u.toLowerCase().replace(" #2", "")));
-    if (/set|change/i.test(q) && temp) {
-      if (named) add({ kind: "confirm", target: named, temp: +temp }); else add({ kind: "ask", options: ["Bedroom AC", "Bedroom AC #2"], temp: +temp }); return;
+    if (/set|change/i.test(q) && setpoint) {
+      if (named) add({ kind: "confirm", target: named, temp: +setpoint }); else add({ kind: "ask", options: ["Bedroom AC", "Bedroom AC #2"], temp: +setpoint }); return;
     }
     if (/temperature/i.test(q)) { add({ kind: "bot", text: "Bedroom AC is 28.0 °C (observed 09:12). Bedroom AC #2 is 27.0 °C." }); return; }
     if (/help|schedule/i.test(q)) { add({ kind: "bot", text: "Schedules run an action at a set time on one AC. Create one in Automations & schedules › Create automation." }); return; }
     add({ kind: "bot", text: "I can read temperatures, change a setting (always confirmed first) or explain features." });
   };
 
-  const send = (target: string, temp: number) => {
-    setMsgs((s) => [...s.filter((m) => m.kind !== "confirm"), { kind: "status", tone: "info", text: `Sending: ${target} → ${String(temp)}°C …` }]);
+  const send = (target: string, setpoint: number) => {
+    setMsgs((s) => [...s.filter((m) => m.kind !== "confirm"), { kind: "status", tone: "info", text: `Sending: ${target} → ${String(setpoint)}°C …` }]);
     setTimeout(() => {
-      const isFail = temp < 16 || temp > 30;
-      setMsgs((s) => [...s, isFail ? { kind: "status", tone: "crit", text: `Failed — ${String(temp)}°C is outside the allowed range 16–30°C. Nothing was changed.` } : { kind: "status", tone: "ok", text: `Done — ${target} set to ${String(temp)}°C (acknowledged by device).` }]);
+      const isFail = setpoint < 16 || setpoint > 30;
+      setMsgs((s) => [...s, isFail ? { kind: "status", tone: "crit", text: `Failed — ${String(setpoint)}°C is outside the allowed range 16–30°C. Nothing was changed.` } : { kind: "status", tone: "ok", text: `Done — ${target} set to ${String(setpoint)}°C (acknowledged by device).` }]);
     }, 1200);
   };
 

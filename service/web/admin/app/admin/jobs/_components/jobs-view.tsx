@@ -246,10 +246,10 @@ function BookModal({ d, live, row: first, fresh, onClose, onFail }: ModalProps &
   const [tech, setTech] = useState(row.people[0]?.id ?? "");
   const active = live.contractors.filter((c) => c.status === "active");
   const [org, setOrg] = useState(active[0]?.id ?? "");
-  const def = offerDefaults(row.slot, now);
-  const [expires, setExpires] = useState(zonedInput(def.offerExpiresAt, zone));
-  const [from, setFrom] = useState(zonedInput(def.accessValidFrom, zone));
-  const [until, setUntil] = useState(zonedInput(def.accessValidUntil, zone));
+  const defaults = offerDefaults(row.slot, now);
+  const [expires, setExpires] = useState(zonedInput(defaults.offerExpiresAt, zone));
+  const [from, setFrom] = useState(zonedInput(defaults.accessValidFrom, zone));
+  const [until, setUntil] = useState(zonedInput(defaults.accessValidUntil, zone));
   const pick = (r: number) => {
     const next = ahead.find((x) => x.rank === r)!;
     const nd = offerDefaults(next.slot, now);
@@ -303,17 +303,17 @@ function ProposeModal({ d, live, onClose, onFail }: Readonly<ModalProps>) {
   const [to, setTo] = useState("12:00");
   const options = [...live.internalTechs.map((x) => ({ id: `i:${x.id}`, label: t("{name} (HQ)", { name: x.name }) })), ...live.contractors.filter((c) => c.status === "active").map((c) => ({ id: `c:${c.id}`, label: t("{name} (offer)", { name: c.name }) }))];
   const [who, setWho] = useState(options[0]?.id ?? "");
-  const [msg, setMsg] = useState("");
+  const [notice, setMessage] = useState("");
   const [reply, setReply] = useState("48");
   const [tried, setTried] = useState(false);
   const slot = { startAt: zonedInstant(date, from, zone), endAt: zonedInstant(date, to, zone) }; // typed in the display time zone (NFR-08)
   const isPreferred = j.preferredSlots.some((s) => s.startAt === slot.startAt && s.endAt === slot.endAt);
   const send = () => {
     setTried(true);
-    if (!msg.trim() || isPreferred || from >= to || !who) return;
+    if (!notice.trim() || isPreferred || from >= to || !who) return;
     const hold = who.startsWith("i:") ? { kind: "internal" as const, membershipId: who.slice(2) } : { kind: "contractor" as const, contractorOrgId: who.slice(2), technicianMembershipId: null };
     const replyBy = new Date(Math.min(now + Number(reply) * 3_600_000, Date.parse(slot.startAt))).toISOString();
-    run(() => proposeSlot(j.id, j.version, slot, hold, msg, replyBy), t("Proposal sent — waiting for the client"), () => { onClose(t("Proposed {slot} to the client (reply by {time}).", { slot: slotText(slot, i), time: showTime(replyBy, i.display) })); }, onFail);
+    run(() => proposeSlot(j.id, j.version, slot, hold, notice, replyBy), t("Proposal sent — waiting for the client"), () => { onClose(t("Proposed {slot} to the client (reply by {time}).", { slot: slotText(slot, i), time: showTime(replyBy, i.display) })); }, onFail);
   };
   return (
     <Modal open onClose={() => { onClose(); }} title={t("Propose another time to the client")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={send}>{t("Send proposal")}</Btn></>}>
@@ -325,7 +325,7 @@ function ProposeModal({ d, live, onClose, onFail }: Readonly<ModalProps>) {
       </div>
       {isPreferred && <p className="flex items-center gap-1 text-xs text-crit"><Icon name="error" />{t("This is one of the client’s own times — book it directly instead.")}</p>}
       <Field label={t("Capacity held for the time")}><Select value={who} onChange={(e) => { setWho(e.target.value); }}>{options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</Select></Field>
-      <Field label={t("Message to the client · required (1–1000)")} error={tried && !msg.trim() ? t("A message is required") : undefined}><Textarea value={msg} maxLength={1000} onChange={(e) => { setMsg(e.target.value); }} placeholder={t("All qualified technicians are booked on your times. The earliest free slot is Thursday morning.")} /></Field>
+      <Field label={t("Message to the client · required (1–1000)")} error={tried && !notice.trim() ? t("A message is required") : undefined}><Textarea value={notice} maxLength={1000} onChange={(e) => { setMessage(e.target.value); }} placeholder={t("All qualified technicians are booked on your times. The earliest free slot is Thursday morning.")} /></Field>
       <Field label={t("Reply by")}><Select value={reply} onChange={(e) => { setReply(e.target.value); }}>{["24", "48", "72"].map((h) => <option key={h} value={h}>{t("{n} h", { n: h })}</option>)}</Select></Field>
       <Banner>{t("The client sees “Time proposed” with Accept / Decline. Accept → booked with the held capacity. Decline → the client sends new times.")}</Banner>
     </Modal>

@@ -72,9 +72,9 @@ describe("HQ audit log (FR-A16, DD-A16, SCR-A16)", () => {
 
   it("finds the related restriction, command, job and unit; the trace keeps every entry of the correlation", () => {
     const sel = entry({});
-    const cmd = entry({ id: "a2", action: "commands.create", targetRef: { kind: "command", id: "c1" }, occurredAt: "2026-09-15T00:30:05Z", result: "pending" });
+    const deviceCommand = entry({ id: "a2", action: "commands.create", targetRef: { kind: "command", id: "c1" }, occurredAt: "2026-09-15T00:30:05Z", result: "pending" });
     const fin = entry({ id: "a3", action: "commands.create", targetRef: { kind: "command", id: "c1" }, occurredAt: "2026-09-15T00:30:09Z", actorName: null, actorId: "system-demo", actorRoleAtTime: "system", reason: null });
-    expect(relatedRecords(sel, [fin, cmd, sel])).toEqual({
+    expect(relatedRecords(sel, [fin, deviceCommand, sel])).toEqual({
       restriction: { id: "r1", via: "target", note: "Applied · exception until 20 Sept 2026, 8:00 am MYT — as this entry recorded it" },
       command: { id: "c1", via: "correlation", note: "same correlation ID" }, job: null, unit: null,
     });
@@ -82,7 +82,7 @@ describe("HQ audit log (FR-A16, DD-A16, SCR-A16)", () => {
       restriction: null, command: null, job: { id: "j1", via: "target", note: "this entry’s target" }, unit: { id: "u1", via: "correlation", note: "same correlation ID" },
     });
     expect(relatedRecords(entry({ maskedAfter: {} }), []).restriction?.note).toBe("this entry’s target"); // nothing recorded: no state
-    expect(correlationTrace([fin, cmd, sel]).map((x) => [x.id, x.title])).toEqual([["a1", "restrictions.defer · Success"], ["a2", "commands.create · Pending"], ["a3", "commands.create · Success"]]);
+    expect(correlationTrace([fin, deviceCommand, sel]).map((x) => [x.id, x.title])).toEqual([["a1", "restrictions.defer · Success"], ["a2", "commands.create · Pending"], ["a3", "commands.create · Success"]]);
     expect([correlationTrace([sel]), correlationTrace([])]).toEqual([[], []]); // an entry on its own has no trace
   });
 

@@ -48,11 +48,11 @@ describe("customer automation sentences (FR-C04, FR-C05, IR260)", () => {
     expect(summaryText({ ...d, endsNextDay: true, endLocal: "06:00", startAction: "temp:24" }, "Bedroom AC", "Home A", ms)).toBe("Apabila Hari bekerja pada 18:00 → tetapkan Bedroom AC kepada 24°C. Pada 06:00 (hari berikutnya) → Bedroom AC kuasa MATI.");
     expect(draftErrors({ ...d, name: "", weekdays: [], startLocal: "18:00", endLocal: "18:00" }, ms)).toEqual({ name: "1–120 aksara", weekdays: "Pilih sekurang-kurangnya satu hari", endLocal: "Mula dan tamat tidak boleh sama — bukan operasi 24 jam" });
     expect(apiErrors({ "draft.endsNextDay": "errors.over_24_hours", name: "error.length" }, ms)).toEqual({ endsNextDay: "Paling lama 24 jam", name: "1–120 aksara" });
-    const opts = actionOptions({ control: true, modeControl: true, fanControl: false, temperature: { min: 24, max: 25, step: 1 }, modes: ["cool"], fanLevels: [] }, ms);
-    expect(opts.map((g) => [g.group, g.options.map((o) => o.label)])).toEqual([["Kuasa", ["Kuasa HIDUP", "Kuasa MATI"]], ["Suhu", ["Tetapkan suhu 24°C", "Tetapkan suhu 25°C"]], ["Mod", ["Mod Sejuk"]]]);
+    const choices = actionOptions({ control: true, modeControl: true, fanControl: false, temperature: { min: 24, max: 25, step: 1 }, modes: ["cool"], fanLevels: [] }, ms);
+    expect(choices.map((g) => [g.group, g.options.map((o) => o.label)])).toEqual([["Kuasa", ["Kuasa HIDUP", "Kuasa MATI"]], ["Suhu", ["Tetapkan suhu 24°C", "Tetapkan suhu 25°C"]], ["Mod", ["Mod Sejuk"]]]);
     // the editor picks the setting, then its value: ids, the short value words, and where a switch starts
-    expect(opts.map((g) => [g.id, g.options.map((o) => o.short)])).toEqual([["power", ["HIDUP", "MATI"]], ["temp", ["24°C", "25°C"]], ["mode", ["Sejuk"]]]);
-    expect([actionGroupOf("temp:25"), actionGroupOf("power:on"), firstAction(opts, "temp"), firstAction(opts, "power"), firstAction(opts, "mode"), firstAction(opts, "fan")])
+    expect(choices.map((g) => [g.id, g.options.map((o) => o.short)])).toEqual([["power", ["HIDUP", "MATI"]], ["temp", ["24°C", "25°C"]], ["mode", ["Sejuk"]]]);
+    expect([actionGroupOf("temp:25"), actionGroupOf("power:on"), firstAction(choices, "temp"), firstAction(choices, "power"), firstAction(choices, "mode"), firstAction(choices, "fan")])
       .toEqual(["temp", "power", "temp:24", "power:on", "mode:cool", ""]);
     // the schedule test: a Monday start, its end, and the first day not selected (Saturday)
     const runs = [{ automationId: null, phase: "schedule_start" as const, at: "2026-09-18T10:00:00Z", action: { kind: "set_power" as const, power: true } }, { automationId: null, phase: "schedule_end" as const, at: "2026-09-18T14:00:00Z", action: { kind: "set_power" as const, power: false } }];

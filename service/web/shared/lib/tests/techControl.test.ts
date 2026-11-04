@@ -8,7 +8,7 @@ import type { ApiUnitDetail } from "@ac/web/lib/units";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 
-const cmd = (over: Partial<ApiCommandRow> = {}): ApiCommandRow => ({ id: "cmd-00000001", action: { kind: "set_mode", mode: "cool" }, status: "acknowledged", requestedAt: "2026-09-14T01:00:00Z", acknowledgedAt: "2026-09-14T01:00:05Z", failureCode: null, reason: "test", diagnosticRunId: null, source: "diagnostic", ...over });
+const deviceCommand = (over: Partial<ApiCommandRow> = {}): ApiCommandRow => ({ id: "cmd-00000001", action: { kind: "set_mode", mode: "cool" }, status: "acknowledged", requestedAt: "2026-09-14T01:00:00Z", acknowledgedAt: "2026-09-14T01:00:05Z", failureCode: null, reason: "test", diagnosticRunId: null, source: "diagnostic", ...over });
 const run = (over: Partial<ApiRun> = {}): ApiRun => {
   return {
     id: "run-1", version: 1, jobId: "job", unitId: "unit", startAction: { kind: "set_power", power: true }, endAction: { kind: "set_power", power: false }, durationMinutes: 5, reason: "test",
@@ -35,8 +35,8 @@ describe("action text", () => {
 describe("historyRows", () => {
   it("describes plain commands by their device outcome", () => {
     const rows = historyRows([
-      cmd(), cmd({ id: "cmd-00000002", status: "failed", failureCode: "DEVICE_REJECTED", acknowledgedAt: null }), cmd({ id: "cmd-00000003", status: "expired", acknowledgedAt: null }),
-      cmd({ id: "cmd-00000004", status: "requested", acknowledgedAt: null }), cmd({ id: "cmd-00000005", status: "cancelled", acknowledgedAt: null }),
+      deviceCommand(), deviceCommand({ id: "cmd-00000002", status: "failed", failureCode: "DEVICE_REJECTED", acknowledgedAt: null }), deviceCommand({ id: "cmd-00000003", status: "expired", acknowledgedAt: null }),
+      deviceCommand({ id: "cmd-00000004", status: "requested", acknowledgedAt: null }), deviceCommand({ id: "cmd-00000005", status: "cancelled", acknowledgedAt: null }),
     ], []);
     expect(rows[0]).toEqual({ id: "cmd-00000001", at: "9:00 am MYT", title: "set_mode = cool", sub: "cmd-0000 · acknowledged 9:00 am MYT", badge: { text: "Acked", tone: "ok" }, run: false });
     expect(rows[1]).toMatchObject({ sub: "cmd-0000 · rejected by the device (DEVICE_REJECTED)", badge: { text: "Rejected", tone: "crit" } });
@@ -46,10 +46,10 @@ describe("historyRows", () => {
   });
   it("names the test run of its start and end commands", () => {
     const r = run({ endCommandId: "cmd-end" });
-    const rows = historyRows([cmd({ id: "cmd-start", requestedAt: "2026-09-14T01:04:00Z", acknowledgedAt: "2026-09-14T01:05:00Z" }), cmd({ id: "cmd-end", status: "requested", acknowledgedAt: null })], [r]);
+    const rows = historyRows([deviceCommand({ id: "cmd-start", requestedAt: "2026-09-14T01:04:00Z", acknowledgedAt: "2026-09-14T01:05:00Z" }), deviceCommand({ id: "cmd-end", status: "requested", acknowledgedAt: null })], [r]);
     expect(rows[0]).toMatchObject({ title: "test run start (Power ON, 5 min)", sub: "cmd-star · acknowledged 9:05 am MYT · ends 9:10 am MYT", badge: { text: "Running", tone: "primary" }, run: true });
     expect(rows[1]).toMatchObject({ title: "test run end (Power OFF)", badge: { text: "Waiting", tone: "warn" }, run: true });
-    expect(historyRows([cmd({ id: "cmd-start" })], [run({ state: "completed" })])[0].badge.text).toBe("Acked");
+    expect(historyRows([deviceCommand({ id: "cmd-start" })], [run({ state: "completed" })])[0].badge.text).toBe("Acked");
   });
 });
 
@@ -108,7 +108,7 @@ describe("capability, restriction and refusals (IR286)", () => {
     expect([fieldText("error.range"), fieldText("errors.unit_busy")]).toEqual(["1–15 minutes", "unit busy"]);
   });
   it("speaks Malay with the display time zone", () => {
-    expect(historyRows([cmd()], [], MS)[0]).toMatchObject({ at: "10:00 PG GMT+9", sub: "cmd-0000 · diakui 10:00 PG GMT+9", badge: { text: "Diakui" } });
+    expect(historyRows([deviceCommand()], [], MS)[0]).toMatchObject({ at: "10:00 PG GMT+9", sub: "cmd-0000 · diakui 10:00 PG GMT+9", badge: { text: "Diakui" } });
     expect(runBanner(run(), MS)?.title).toBe("Berjalan — tamat 10:10 PG GMT+9 (permulaan diakui 10:05 PG GMT+9)");
     expect(stateTiles({ observedState: { power: true, celsius: 24, mode: "cool", fanLevel: "low", observedAt: null }, latestMeasurements: [] }, MS.t).map((x) => x.label)).toEqual(["Kuasa", "Mod", "Titik set", "Kipas", "Bilik"]);
     expect(capabilityText(unit, MS.t)).toBe("Versi keupayaan v3 membenarkan: set_mode (cool/dry/fan), set_temperature 16–30 °C, set_fan (low/mid/high), larian ujian 1–15 min.");

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Badge, Banner, Btn, Card, cx, EmptyState, Field, Input, LinkBtn, Modal, Page, Select, Tabs, TextLink, UtilBar, ScrollX } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, cx, EmptyState, Field, Input, LinkButton, Modal, Page, Select, Tabs, TextLink, UtilizationBar, ScrollX } from "@ac/web/components/ui";
 import { useLocale, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -31,7 +31,7 @@ export function TeamView({ live }: Readonly<{ live: TeamLive }>) {
         <div className="flex justify-center">{tabs}</div>
         <Card title={t("Roster not found")}>
           <p className="text-[13px] text-muted-foreground">{t("You can only see {company}’s own technicians. Changing the company ID in the URL does not reveal another company’s roster.", { company: live.company })}</p>
-          <div className="mt-3"><LinkBtn href="/partner/team" variant="primary" size="sm">{t("Back to my team")}</LinkBtn></div>
+          <div className="mt-3"><LinkButton href="/partner/team" variant="primary" size="sm">{t("Back to my team")}</LinkButton></div>
         </Card>
       </Page>
     );
@@ -65,7 +65,7 @@ function Team({ live, tab, tabs }: Readonly<{ live: Live; tab: "members" | "cert
         </Btn>
       </div>
       <Card title={`${t("Technicians — {company}", { company: live.company })}${q.activeOnly ? ` · ${t("{n} active", { n: live.activeCount })}` : ""}`}
-        action={<div className="flex flex-wrap gap-2"><LinkBtn href="/partner/schedule" size="sm">{t("Open schedule")} <Icon name="arrowRight" /></LinkBtn><Btn size="sm" onClick={() => { setOpen(true); }} disabled={live.technicians.length === 0}><Icon name="add" /> {t("Unavailable days")}</Btn></div>}>
+        action={<div className="flex flex-wrap gap-2"><LinkButton href="/partner/schedule" size="sm">{t("Open schedule")} <Icon name="arrowRight" /></LinkButton><Btn size="sm" onClick={() => { setOpen(true); }} disabled={live.technicians.length === 0}><Icon name="add" /> {t("Unavailable days")}</Btn></div>}>
         {isNone ? (
           <div className="py-6 text-center">
             <b className="text-[13px]">{t("No {company} technicians hold this qualification", { company: live.company })}</b>
@@ -81,7 +81,7 @@ function Team({ live, tab, tabs }: Readonly<{ live: Live; tab: "members" | "cert
                 {r.active && (
                   <div className="w-44">
                     <div className="mb-1 flex justify-between gap-2 text-[11px]"><span className="text-muted-foreground">{live.week.short}</span><b>{r.week.text}</b></div>
-                    <UtilBar pct={r.week.pct} label={`${r.name}: ${r.week.text}`} />
+                    <UtilizationBar pct={r.week.pct} label={`${r.name}: ${r.week.text}`} />
                   </div>
                 )}
                 <div className="min-w-[180px] text-right"><span className={cx("block text-xs", r.day.tone === "crit" ? "text-crit" : (r.day.tone === "warn" ? "text-warn" : "text-ink"))}>{r.day.main}</span><span className="block text-[11px] text-muted-foreground">{r.day.sub}</span></div>
@@ -207,7 +207,7 @@ function UnavailableDays({ live, onClose }: Readonly<{ live: Live; onClose: () =
   const [server, setServer] = useState<Record<string, string>>({});
   const [refused, setRefused] = useState<string | null>(null);
   const local = tried ? unavailabilityErrors(form, t) : {};
-  const err = (k: "from" | "to" | "type" | "note") => (local as Record<string, string | undefined>)[k] ?? server[k];
+  const fieldError = (k: "from" | "to" | "type" | "note") => (local as Record<string, string | undefined>)[k] ?? server[k];
   const set = (p: Partial<UnavailabilityForm>) => { setForm({ ...form, ...p }); setServer({}); setRefused(null); };
   const conflicts = unavailabilityConflicts(live.jobs, form);
   const names = new Map(live.technicians.map((x) => [x.id, x.name]));
@@ -226,7 +226,7 @@ function UnavailableDays({ live, onClose }: Readonly<{ live: Live; onClose: () =
   return (
     <Modal open onClose={onClose} title={t("Add unavailable days")} footer={<>
       <Btn onClick={onClose}>{t("Cancel")}</Btn>
-      <LinkBtn href={conflicts[0] ? `/partner/schedule?jobId=${conflicts[0].jobId}` : "/partner/schedule"}>{t("Open schedule")} <Icon name="arrowRight" /></LinkBtn>
+      <LinkButton href={conflicts[0] ? `/partner/schedule?jobId=${conflicts[0].jobId}` : "/partner/schedule"}>{t("Open schedule")} <Icon name="arrowRight" /></LinkButton>
       <Btn variant="primary" disabled={pending} onClick={save}>{t("Save")}</Btn>
     </>}>
       <Field label={t("Technician")}>
@@ -236,13 +236,13 @@ function UnavailableDays({ live, onClose }: Readonly<{ live: Live; onClose: () =
         </Select>
       </Field>
       <div className="grid-fluid" style={{ ["--min" as string]: "150px" }}>
-        <Field label={t("From")} error={err("from")}><Input type="date" value={form.from} onChange={(e) => { set({ from: e.target.value }); }} /></Field>
-        <Field label={t("To")} error={err("to")}><Input type="date" value={form.to} min={form.from} onChange={(e) => { set({ to: e.target.value }); }} /></Field>
-        <Field label={t("Type")} error={err("type")}>
+        <Field label={t("From")} error={fieldError("from")}><Input type="date" value={form.from} onChange={(e) => { set({ from: e.target.value }); }} /></Field>
+        <Field label={t("To")} error={fieldError("to")}><Input type="date" value={form.to} min={form.from} onChange={(e) => { set({ to: e.target.value }); }} /></Field>
+        <Field label={t("Type")} error={fieldError("type")}>
           <Select value={form.type} onChange={(e) => { set({ type: e.target.value }); }}>{live.types.map((x) => <option key={x.id} value={x.id}>{x.text}</option>)}</Select>
         </Field>
       </div>
-      <Field label={t("Note (optional)")} error={err("note")}><Input value={form.note} maxLength={500} onChange={(e) => { set({ note: e.target.value }); }} /></Field>
+      <Field label={t("Note (optional)")} error={fieldError("note")}><Input value={form.note} maxLength={500} onChange={(e) => { set({ note: e.target.value }); }} /></Field>
       {conflicts.length > 0 && <Banner tone="warn">{t(conflicts.length === 1 ? "Conflicts with 1 confirmed assignment: {list}. Saving keeps the assignment — reassign it in Schedule & assignments." : "Conflicts with {n} confirmed assignments: {list}. Saving keeps the assignments — reassign them in Schedule & assignments.", { n: conflicts.length, list })}</Banner>}
       {refused && <Banner tone="crit">{refused}</Banner>}
       <p className="text-[11px] text-muted-foreground">

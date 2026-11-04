@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
-import { BarChart, LineChart, UtilBar } from "@ac/web/components/ui";
+import { BarChart, LineChart, UtilizationBar } from "@ac/web/components/ui";
 
 // jsdom lays nothing out: give the chart's box a size, as a browser would, so that Recharts draws (the legend stays 0 high)
 const box = (width: number, height: number) => ({ width, height, top: 0, left: 0, right: width, bottom: height, x: 0, y: 0, toJSON: () => ({}) });
@@ -56,7 +56,7 @@ describe("charts", () => {
   });
 
   it("names a progress bar and leaves an unknown value out", () => {
-    render(<><UtilBar pct={40} tone="warn" label="Filter life" /><UtilBar pct={null} label="Unknown" /></>);
+    render(<><UtilizationBar pct={40} tone="warn" label="Filter life" /><UtilizationBar pct={null} label="Unknown" /></>);
     const [known, unknown] = screen.getAllByRole("progressbar");
     expect([known.getAttribute("aria-label"), known.getAttribute("aria-valuenow"), unknown.getAttribute("aria-label"), unknown.getAttribute("aria-valuenow")]).toEqual(["Filter life", "40", "Unknown", null]);
   });

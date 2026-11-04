@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Banner, Card, Kpi, Page, TextLink, UtilBar } from "@ac/web/components/ui";
+import { Banner, Card, Kpi, Page, TextLink, UtilizationBar } from "@ac/web/components/ui";
 import { fmt, useJobs } from "@ac/web/lib/jobs";
 import { Icon } from "@ac/web/components/Icon";
 
@@ -49,7 +49,7 @@ export function OverviewDemo() {
         </div>
         <div className="flex min-w-0 flex-col gap-4">
           <Card title="Team capacity — this week" action={<TextLink href="/partner/team">Team <Icon name="arrowRight" /></TextLink>}>
-            {[["tech-external-a", 25, "10 h / 40 h · 25%"], ["tech-external-a2", 10, "4 h / 40 h · 10%"]].map(([n, p, l]) => <div key={n as string} className="mb-3"><div className="mb-1 flex justify-between text-xs"><b>{n}</b><span className="text-muted-foreground">{l}</span></div><UtilBar pct={p as number} /></div>)}
+            {[["tech-external-a", 25, "10 h / 40 h · 25%"], ["tech-external-a2", 10, "4 h / 40 h · 10%"]].map(([n, p, l]) => <div key={n as string} className="mb-3"><div className="mb-1 flex justify-between text-xs"><b>{n}</b><span className="text-muted-foreground">{l}</span></div><UtilizationBar pct={p as number} /></div>)}
             <p className="text-[11px] text-muted-foreground">Utilization = assigned hours ÷ available hours. Undefined hours show “—”.</p>
           </Card>
           <Card title="Recent activity" action={<TextLink href="/partner/history">History <Icon name="arrowRight" /></TextLink>}>

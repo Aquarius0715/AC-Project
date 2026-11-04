@@ -20,7 +20,7 @@ const quiet = <T,>(p: Promise<T>) => p.catch((error) => { // a unit before the w
   throw error;
 });
 
-export async function loadDevices(opts: { selected?: string; unitId?: string; jobId?: string; events: boolean }): Promise<TechDevicesLive> {
+export async function loadDevices(options: { selected?: string; unitId?: string; jobId?: string; events: boolean }): Promise<TechDevicesLive> {
   type Unit = ApiUnitDetail & { capabilities: ApiUnitDetail["capabilities"] & { firmwareCandidates?: string[] } };
   interface JobRow { projection: string; id?: string; unitId?: string; status?: string }
   interface UnitRow { id: string; displayName: string; archived: boolean }
@@ -36,7 +36,7 @@ export async function loadDevices(opts: { selected?: string; unitId?: string; jo
   const free = units.filter((u) => !u.archived && !bound.has(u.id) && jobFor(u.id, myJobs));
   const freeDetails = await Promise.all(free.map((u) => quiet(coreOp<Unit>("units.get", { id: u.id }))));
   const live: TechDevicesLive = {
-    rows, canMaintain: perms.has("device.maintain"), canAcknowledge: perms.has("alert.read"), events: opts.events, device: null, // acknowledging needs alert.read (IR284)
+    rows, canMaintain: perms.has("device.maintain"), canAcknowledge: perms.has("alert.read"), events: options.events, device: null, // acknowledging needs alert.read (IR284)
     register: free.flatMap((u, i) => {
       const d = freeDetails[i];
       return d ? [{ unitId: u.id, label: `${d.displayName} · ${d.location.pathLabels.join(" › ")}`, model: `${d.capabilities.manufacturer} ${d.capabilities.model}`,
@@ -44,17 +44,17 @@ export async function loadDevices(opts: { selected?: string; unitId?: string; jo
     }),
     rebind: units.filter((u) => !u.archived && jobFor(u.id, myJobs)).map((u) => ({ unitId: u.id, label: u.displayName, jobId: jobFor(u.id, myJobs)! })),
   };
-  const id = rows.find((r) => r.id === opts.selected)?.id ?? rows.find((r) => opts.unitId && r.unitId === opts.unitId)?.id ?? rows[0]?.id;
+  const id = rows.find((r) => r.id === options.selected)?.id ?? rows.find((r) => options.unitId && r.unitId === options.unitId)?.id ?? rows[0]?.id;
   if (!id) return live;
   const d = await coreOp<ApiDeviceDetail & { activeOperation: (ApiDeviceOperation & { startedAt?: string | null; expiresAt?: string }) | null }>("devices.get", { id });
   const unit = d.unitId ? await quiet(coreOp<Unit>("units.get", { id: d.unitId })) : null;
-  const jobId = (opts.jobId && myJobs.some((j) => j.id === opts.jobId && j.unitId === d.unitId) ? opts.jobId : null) ?? jobFor(d.unitId, myJobs);
+  const jobId = (options.jobId && myJobs.some((j) => j.id === options.jobId && j.unitId === d.unitId) ? options.jobId : null) ?? jobFor(d.unitId, myJobs);
   const candidates = unit?.capabilities.firmwareCandidates ?? [];
   const isMaintain = live.canMaintain && !!jobId;
   const [ops, cals, evs] = await Promise.all([
-    isMaintain && !opts.events ? quiet(coreOp<{ items: (ApiDeviceOperation & { startedAt?: string | null; expiresAt?: string })[] }>("devices.operations", { deviceId: id, query: { limit: 20, sort: { field: "createdAt", direction: "desc" } } })) : null,
-    isMaintain && !opts.events ? quiet(coreOp<{ items: ApiCalibration[] }>("devices.calibrations", { deviceId: id, query: { limit: 20, sort: { field: "createdAt", direction: "desc" } } })) : null,
-    opts.events ? quiet(coreOp<{ items: ApiDeviceEventFull[] }>("devices.events", { id, query: { limit: 50 } })) : null, // FORBIDDEN without an assignment on the unit
+    isMaintain && !options.events ? quiet(coreOp<{ items: (ApiDeviceOperation & { startedAt?: string | null; expiresAt?: string })[] }>("devices.operations", { deviceId: id, query: { limit: 20, sort: { field: "createdAt", direction: "desc" } } })) : null,
+    isMaintain && !options.events ? quiet(coreOp<{ items: ApiCalibration[] }>("devices.calibrations", { deviceId: id, query: { limit: 20, sort: { field: "createdAt", direction: "desc" } } })) : null,
+    options.events ? quiet(coreOp<{ items: ApiDeviceEventFull[] }>("devices.events", { id, query: { limit: 50 } })) : null, // FORBIDDEN without an assignment on the unit
 
   ]);
   const alertIds = [...new Set((evs?.items ?? []).flatMap((e) => e.alertIds))];
@@ -71,7 +71,7 @@ export async function loadDevices(opts: { selected?: string; unitId?: string; jo
     operations: operationRows(ops?.items ?? [], d.firmwareVersion, i),
     calibrations: (cals?.items ?? []).map((c) => calibrationText(c, i)),
     events: evs ? eventRows(evs.items, alerts, now.getTime(), i) : null,
-    eventsLocked: opts.events && !evs,
+    eventsLocked: options.events && !evs,
     jobId,
   };
   return live;

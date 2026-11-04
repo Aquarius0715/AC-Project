@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, DataTable, Field, Input, LinkBtn, Modal, Page, PageHead, Select, useToast } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, DataTable, Field, Input, LinkButton, Modal, Page, PageHead, Select, useToast } from "@ac/web/components/ui";
 import { CURRENT_CLIENT, ClientUser, clientUserActions, emailError, useClientUsers } from "@ac/web/lib/clientUsers";
 import { Icon } from "@ac/web/components/Icon";
 
@@ -16,15 +16,15 @@ export function UsersDemo() {
   const [name, setName] = useState("");
   const [tried, setTried] = useState(false);
   const [role, setRole] = useState<"member" | "owner">("member");
-  const err = tried ? emailError(email, users) : undefined;
-  const nameErr = tried && ([...name.trim()].length === 0 || [...name.trim()].length > 120) ? "A name of 1–120 characters" : undefined;
+  const errorText = tried ? emailError(email, users) : undefined;
+  const nameError = tried && ([...name.trim()].length === 0 || [...name.trim()].length > 120) ? "A name of 1–120 characters" : undefined;
 
   if (CURRENT_CLIENT.role !== "owner") {
     return (
       <Page>
         <Card title="Page unavailable">
           <p className="text-[13px] text-muted-foreground">This page doesn’t exist or you don’t have access to it.</p>
-          <div className="mt-3"><LinkBtn href="/customer" variant="primary">Go to your home (or sign in)</LinkBtn></div>
+          <div className="mt-3"><LinkButton href="/customer" variant="primary">Go to your home (or sign in)</LinkButton></div>
         </Card>
       </Page>
     );
@@ -69,8 +69,8 @@ export function UsersDemo() {
       <p className="text-[11px] text-muted-foreground">Nothing is sent in the demo (FR-C19, IR461).</p>
 
       <Modal open={open} onClose={close} title="Add a user to customer-a" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={send}>Add user</Btn></>}>
-        <Field label="Name" error={nameErr}><Input value={name} maxLength={120} onChange={(e) => { setName(e.target.value); }} placeholder="Lim Ka Wai" /></Field>
-        <Field label="Email" error={err}><Input type="email" value={email} onChange={(e) => { setEmail(e.target.value); }} placeholder="lim.ka@example.com" /></Field>
+        <Field label="Name" error={nameError}><Input value={name} maxLength={120} onChange={(e) => { setName(e.target.value); }} placeholder="Lim Ka Wai" /></Field>
+        <Field label="Email" error={errorText}><Input type="email" value={email} onChange={(e) => { setEmail(e.target.value); }} placeholder="lim.ka@example.com" /></Field>
         <Field label="Role" hint="Owners manage users and everything members can do; members use the app."><Select aria-label="Role" value={role} onChange={(e) => { setRole(e.target.value as "member" | "owner"); }}><option value="member">Member</option><option value="owner">Owner</option></Select></Field>
         <Banner>Their account is created now and they get an e-mail to set their password. They see only customer-a’s properties and units; until they sign in they are listed as “Not signed in yet”. Demo: nothing is sent.</Banner>
       </Modal>

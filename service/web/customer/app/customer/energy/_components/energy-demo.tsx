@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { BarChart, Btn, Card, Check, DataTable, Kpi, LinkBtn, Page, Tabs, Badge } from "@ac/web/components/ui";
+import { BarChart, Btn, Card, Check, DataTable, Kpi, LinkButton, Page, Tabs, Badge } from "@ac/web/components/ui";
 import { ExportReportModal } from "@ac/web/components/Features";
 import { week } from "@ac/web/lib/client";
 import { Icon } from "@ac/web/components/Icon";
@@ -50,7 +50,7 @@ export function EnergyDemo() {
         ) : <DataTable rows={days.map((d, i) => ({ d, a: actual[i], b: base[i] }))} rowKey={(r) => r.d} cols={[{ key: "d", label: "Day", render: (r) => r.d }, { key: "a", label: "Actual (kWh)", render: (r) => r.a }, { key: "b", label: "Baseline (kWh)", render: (r) => r.b }, { key: "s", label: "Difference", render: (r) => (r.b - r.a).toFixed(1) }]} />}
         <p className="mt-3 text-xs text-muted-foreground"><Icon name="time" /> <b>Peak window 17:00–21:00</b> — 34% of energy used in peak · highest draw 1.2 kW (Thu 18:40) · pre-cooling before 17:00 lowers peak cost</p>
       </Card>
-      <Card title="Carbon impact" sub="Same period & units as above · factor-demo-2026 (0.5 kgCO2e/kWh, demo factor)" action={<LinkBtn size="sm" href="/customer/energy/offsets">Offset these emissions<Icon name="arrowRight" /></LinkBtn>}>
+      <Card title="Carbon impact" sub="Same period & units as above · factor-demo-2026 (0.5 kgCO2e/kWh, demo factor)" action={<LinkButton size="sm" href="/customer/energy/offsets">Offset these emissions<Icon name="arrowRight" /></LinkButton>}>
         <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
           <div><div className="text-xs text-muted-foreground">Estimated emissions</div><div className="text-2xl font-bold">{(sumA * 0.5).toFixed(1)} <span className="text-sm text-muted-foreground">kgCO2e</span></div><div className="text-[11px] text-muted-foreground">{sumA} kWh actual × factor</div></div>
           <div><div className="text-xs text-muted-foreground">Estimated savings vs baseline</div><div className="text-2xl font-bold text-ok">{(saved * 0.5).toFixed(1)} <span className="text-sm text-muted-foreground">kgCO2e</span></div><div className="text-[11px] text-muted-foreground">{sumB} → {sumA} kWh</div></div>

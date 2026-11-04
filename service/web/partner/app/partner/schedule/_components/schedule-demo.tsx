@@ -32,16 +32,16 @@ export function ScheduleDemo({ jobId }: Readonly<{ jobId?: string }>) {
   const [end, setEnd] = useState("2026-09-21T12:00");
   const [reason, setReason] = useState("");
   const [assigned, setAssigned] = useState<string[]>([]);
-  const [msg, setMsg] = useState<{ tone: "crit" | "ok" | "warn"; t: string } | null>(null);
+  const [message, setMessage] = useState<{ tone: "crit" | "ok" | "warn"; t: string } | null>(null);
   const isInProg = sel.id === "job-contractor-a" || sel.id === "job-p07";
   const save = () => {
-    if (lj) { jobActions.partnerAssign(lj.id, tech); setMsg({ tone: "ok", t: `Assigned ${tech} to ${lj.id} for ${fmt(lj.scheduled)}. The technician must accept.` }); toast("Technician assigned — waiting for acceptance"); return; }
+    if (lj) { jobActions.partnerAssign(lj.id, tech); setMessage({ tone: "ok", t: `Assigned ${tech} to ${lj.id} for ${fmt(lj.scheduled)}. The technician must accept.` }); toast("Technician assigned — waiting for acceptance"); return; }
     const we = new Date(sel.id === "job-p02" ? "2026-09-22T00:00" : "2026-09-24T18:00");
-    if (isInProg && !reason.trim()) { setMsg({ tone: "crit", t: "Reason required when reassigning a job already in progress (VALIDATION)." }); return; }
-    if (new Date(start) >= new Date(end)) { setMsg({ tone: "crit", t: "Start must be before end." }); return; }
-    if (new Date(end) > we) { setMsg({ tone: "crit", t: "Slot is outside the delegation period (VALIDATION)." }); return; }
-    if (tech === "tech-external-a" && start.startsWith("2026-09-21T09")) { setMsg({ tone: "warn", t: "Overlaps a confirmed schedule for tech-external-a (CONFLICT)." }); return; }
-    setAssigned((a) => [...a, sel.id]); setMsg({ tone: "ok", t: `Assigned ${tech} to ${sel.id}. Notifications sent (preview).` }); toast("Technician assigned");
+    if (isInProg && !reason.trim()) { setMessage({ tone: "crit", t: "Reason required when reassigning a job already in progress (VALIDATION)." }); return; }
+    if (new Date(start) >= new Date(end)) { setMessage({ tone: "crit", t: "Start must be before end." }); return; }
+    if (new Date(end) > we) { setMessage({ tone: "crit", t: "Slot is outside the delegation period (VALIDATION)." }); return; }
+    if (tech === "tech-external-a" && start.startsWith("2026-09-21T09")) { setMessage({ tone: "warn", t: "Overlaps a confirmed schedule for tech-external-a (CONFLICT)." }); return; }
+    setAssigned((a) => [...a, sel.id]); setMessage({ tone: "ok", t: `Assigned ${tech} to ${sel.id}. Notifications sent (preview).` }); toast("Technician assigned");
   };
   return (
     <Page>
@@ -49,7 +49,7 @@ export function ScheduleDemo({ jobId }: Readonly<{ jobId?: string }>) {
       <div className="split-rev">
         <div className="flex min-w-0 flex-col gap-4 self-start">
           <Card title="Accepted jobs" sub="status, earliest stage first">
-            <div className="flex flex-col gap-2">{jobs.map((j) => <ListRow key={j.id} selected={sel.id === j.id} onClick={() => { setSel(j); setMsg(null); }}><div className="min-w-0"><div className="flex flex-wrap items-center gap-1.5"><b className="text-[13px]">{j.id} · {j.unit}</b>{j.live && <OriginBadge origin={store.find((x) => x.id === j.id)?.origin ?? "request"} />}</div><div className="text-xs text-muted-foreground">{assigned.includes(j.id) ? "Assigned · awaiting technician acceptance" : j.st}</div></div></ListRow>)}</div>
+            <div className="flex flex-col gap-2">{jobs.map((j) => <ListRow key={j.id} selected={sel.id === j.id} onClick={() => { setSel(j); setMessage(null); }}><div className="min-w-0"><div className="flex flex-wrap items-center gap-1.5"><b className="text-[13px]">{j.id} · {j.unit}</b>{j.live && <OriginBadge origin={store.find((x) => x.id === j.id)?.origin ?? "request"} />}</div><div className="text-xs text-muted-foreground">{assigned.includes(j.id) ? "Assigned · awaiting technician acceptance" : j.st}</div></div></ListRow>)}</div>
           </Card>
           <Card title="Delegation windows" sub="Work must fit inside each window. Access ends automatically at the end time.">
             {jobs.map((j) => <div key={j.id} className="flex flex-wrap justify-between gap-1 border-t border-line py-2 text-xs first:border-0"><span><b>{j.id}</b><span className="block text-muted-foreground">{j.win}</span></span><Badge tone={j.left === "Ended" ? "crit" : "muted"}>{j.left}</Badge></div>)}
@@ -66,7 +66,7 @@ export function ScheduleDemo({ jobId }: Readonly<{ jobId?: string }>) {
             {isInProg && <div className="mt-3"><Field label="Reassign reason (required)" hint="Reassigning a job already in progress requires a reason and immediately revokes the previous technician's access."><Textarea value={reason} onChange={(e) => { setReason(e.target.value); }} /></Field></div>}
             <p className="mt-2 flex items-center gap-1 text-xs text-ok"><Icon name="check" />No overlapping confirmed schedule for {tech} in this window.</p>
             {lj?.techAck && <div className="mt-3"><Banner tone={lj.techAck.status === "accepted" ? "ok" : (lj.techAck.status === "cant_make" ? "warn" : "primary")}>{lj.techAck.status === "accepted" ? `${orDash(lj.technician)} accepted the assignment (${orDash(lj.techAck.at)})` : (lj.techAck.status === "cant_make" ? `${orDash(lj.technician)} can’t make this time: “${orDash(lj.techAck.reason)}”${lj.techAck.alt ? ` · could do ${lj.techAck.alt}` : ""}. Reassign another technician below, or ask HQ to propose a new time to the client.` : `Waiting for ${orDash(lj.technician)} to accept the assignment.`)}</Banner></div>}
-            {msg && <div className="mt-3"><Banner tone={msg.tone}>{msg.t}</Banner></div>}
+            {message && <div className="mt-3"><Banner tone={message.tone}>{message.t}</Banner></div>}
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><span className="text-[11px] text-muted-foreground">Hint: start 09:00 shows the overlap conflict · end after window shows validation.</span><Btn variant="primary" onClick={save}>{isInProg || lj?.status === "assigned" ? "Reassign" : "Assign technician"}</Btn></div>
           </Card>
           <Card title="Team schedule — week of 09-21" action={<Link href="/partner/team" className="text-xs font-semibold text-primary">Team & capacity <Icon name="arrowRight" /></Link>}>

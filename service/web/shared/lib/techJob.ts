@@ -95,11 +95,11 @@ export function draftFrom(r: ApiTechReport | null, components: { group: Group; k
 
 /** The jobs.saveDraft body of a draft: trimmed reasons (empty → null), numeric readings in their metric's unit. */
 export function draftInput(jobId: string, reportId: string | null, d: Draft): OpInput<"jobs.saveDraft"> {
-  const num = (v: string) => (v.trim() === "" || !Number.isFinite(Number(v)) ? null : Number(v));
+  const toNumber = (v: string) => (v.trim() === "" || !Number.isFinite(Number(v)) ? null : Number(v));
   return {
     jobId, ...(reportId && { reportId }),
     items: d.items.map((it) => ({ componentGroup: it.componentGroup, componentKey: it.componentKey as ComponentKey, result: it.result, reason: it.reason.trim() || null, evidenceIds: it.evidenceIds })),
-    measurements: d.readings.map((m) => ({ ...(m.id && { id: m.id }), componentKey: m.componentKey as ComponentKey, metric: m.metric, value: num(m.value), unit: metricUnit[m.metric], observedAt: m.observedAt })),
+    measurements: d.readings.map((m) => ({ ...(m.id && { id: m.id }), componentKey: m.componentKey as ComponentKey, metric: m.metric, value: toNumber(m.value), unit: metricUnit[m.metric], observedAt: m.observedAt })),
     parts: d.parts.map((p) => ({ ...p, name: p.name.trim(), replacesComponentKey: p.replacesComponentKey as ComponentKey | null })), refrigerant: d.refrigerant, workText: d.workText,
     nextAction: d.nextAction.kind === "none" ? { kind: "none" as const } : { kind: "follow_up" as const, date: d.nextAction.date, note: d.nextAction.note.trim() },
     attachmentIds: d.attachmentIds,

@@ -25,7 +25,7 @@ const unitName = async (id: string | undefined, cache: Map<string, Promise<strin
   return cache.get(id)!;
 };
 
-export async function loadPayouts(opts: { statementId?: string; period?: string; status?: string }): Promise<PayoutsLive> {
+export async function loadPayouts(options: { statementId?: string; period?: string; status?: string }): Promise<PayoutsLive> {
   interface JobRow { projection: string; id?: string; jobId?: string; type: string; status: string; unitId?: string; completedAt?: string | null }
   interface RateCard { id: string; version: number; effectiveFrom: string }
   const [all, reviewing, display, who] = await Promise.all([
@@ -35,12 +35,12 @@ export async function loadPayouts(opts: { statementId?: string; period?: string;
   ]);
   const i = i18nOf(display);
   const { t } = i;
-  const status = opts.status === "approved" || opts.status === "paid" ? opts.status : null;
-  const shown = all.filter((s) => (!opts.period || s.period === opts.period) && (!status || s.status === status));
-  const selected = shown.find((s) => s.id === opts.statementId) ?? shown[0] ?? null;
+  const status = options.status === "approved" || options.status === "paid" ? options.status : null;
+  const shown = all.filter((s) => (!options.period || s.period === options.period) && (!status || s.status === status));
+  const selected = shown.find((s) => s.id === options.statementId) ?? shown[0] ?? null;
   const units = new Map<string, Promise<string | null>>();
   const live: PayoutsLive = {
-    periods: [...new Set(all.map((s) => s.period))].toSorted(byText).reverse().map((p) => ({ value: p, text: periodLabel(p, display.locale) })), period: opts.period ?? "", status: status ?? "",
+    periods: [...new Set(all.map((s) => s.period))].toSorted(byText).reverse().map((p) => ({ value: p, text: periodLabel(p, display.locale) })), period: options.period ?? "", status: status ?? "",
     statements: statementRows(shown, i), selected: null, company: who.organizationName || t("your company"),
     topics: (Object.keys(topicLabel) as (keyof typeof topicLabel)[]).map((x) => ({ id: x, text: t(topicLabel[x]) })),
   };

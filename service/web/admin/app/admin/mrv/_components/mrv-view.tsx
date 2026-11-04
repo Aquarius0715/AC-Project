@@ -170,7 +170,7 @@ function Factors({ live }: Readonly<{ live: MRVLive }>) {
     if (Object.keys(errors).length > 0) return;
     run(() => saveFactor(factorInput(d, sel?.id), sel?.version), (f) => (sel ? t("Saved as factor version {v}", { v: f.version }) : t("Factor created")), (f) => { setSelId(f.id); });
   };
-  const err = (k: string) => (tried ? errors[k] : undefined);
+  const fieldError = (k: string) => (tried ? errors[k] : undefined);
   return (
     <div className="split-rev">
       <Card title={t("Emission factors")} action={live.canFactors && <Btn size="sm" onClick={() => { setSelId("new"); }}><Icon name="add" /> {t("New factor")}</Btn>} className="self-start">
@@ -179,11 +179,11 @@ function Factors({ live }: Readonly<{ live: MRVLive }>) {
       </Card>
       <Card title={sel ? <span className="inline-flex flex-wrap items-center gap-2">{sel.region} · {sel.year}{isDirty && <Badge tone="warn">{t("Editing → v{v}", { v: sel.version + 1 })}</Badge>}</span> : t("New factor")} sub={sel ? t("Version {v} · saving creates version {next}", { v: sel.version, next: sel.version + 1 }) : t("Saving creates version 1")}>
         <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
-          <Field label={t("Region")} error={err("region")}><Input value={d.region} maxLength={120} onChange={(e) => { setD({ ...d, region: e.target.value }); }} /></Field>
-          <Field label={t("Year")} error={err("year")}><Input type="number" value={d.year} onChange={(e) => { setD({ ...d, year: e.target.value }); }} /></Field>
-          <Field label={t("kgCO₂e/kWh (fixed unit)")} error={err("kgCO2ePerKWh")}><Input type="number" step="0.001" value={d.kgCO2ePerKWh} onChange={(e) => { setD({ ...d, kgCO2ePerKWh: e.target.value }); }} /></Field>
+          <Field label={t("Region")} error={fieldError("region")}><Input value={d.region} maxLength={120} onChange={(e) => { setD({ ...d, region: e.target.value }); }} /></Field>
+          <Field label={t("Year")} error={fieldError("year")}><Input type="number" value={d.year} onChange={(e) => { setD({ ...d, year: e.target.value }); }} /></Field>
+          <Field label={t("kgCO₂e/kWh (fixed unit)")} error={fieldError("kgCO2ePerKWh")}><Input type="number" step="0.001" value={d.kgCO2ePerKWh} onChange={(e) => { setD({ ...d, kgCO2ePerKWh: e.target.value }); }} /></Field>
         </div>
-        <div className="mt-3"><Field label={t("Source (state that it is a demo)")} error={err("source")}><Input value={d.source} maxLength={500} onChange={(e) => { setD({ ...d, source: e.target.value }); }} /></Field></div>
+        <div className="mt-3"><Field label={t("Source (state that it is a demo)")} error={fieldError("source")}><Input value={d.source} maxLength={500} onChange={(e) => { setD({ ...d, source: e.target.value }); }} /></Field></div>
         {sel && <p className="mt-3 rounded-xl bg-surface2 p-3 text-xs">{t("Existing reports keep the factor version they reference.")}</p>}
         {live.canFactors && (
           <div className="mt-3 flex flex-wrap items-center justify-end gap-2">

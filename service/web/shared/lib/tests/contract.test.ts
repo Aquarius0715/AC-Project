@@ -19,7 +19,7 @@ interface Field { literals: (string | number | boolean)[] | null } // the litera
 function contractInputs(): Map<string, Map<string, Field>> {
   const program = ts.createProgram([contractFile], { strict: true, noEmit: true });
   const checker = program.getTypeChecker();
-  const src = program.getSourceFile(contractFile)!;
+  const source = program.getSourceFile(contractFile)!;
   const literalsOf = (t: ts.Type): Field["literals"] => {
     const parts = t.isUnion() ? t.types : [t];
     const values: (string | number | boolean)[] = [];
@@ -32,7 +32,7 @@ function contractInputs(): Map<string, Map<string, Field>> {
     return values.length > 0 ? values : null;
   };
   const out = new Map<string, Map<string, Field>>();
-  ts.forEachChild(src, (n) => {
+  ts.forEachChild(source, (n) => {
     if (!ts.isTypeAliasDeclaration(n) || n.name.text !== "OperationContracts") return;
     for (const op of checker.getPropertiesOfType(checker.getTypeAtLocation(n.name))) {
       const input = checker.getTypeOfSymbolAtLocation(op, n).getProperty("input");
@@ -90,10 +90,10 @@ describe("the web's calls against the Core API contract (IR312)", () => {
           const where = `${relative(web, f)}:${String(sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1)}`;
           const fields = inputs.get(op);
           if (!fields) problems.push(`${where} ${op}: not an operation of the contract`);
-          const arg = n.arguments[1];
-          if (fields && arg && ts.isObjectLiteralExpression(arg)) {
+          const argument = n.arguments[1];
+          if (fields && argument && ts.isObjectLiteralExpression(argument)) {
             calls++;
-            for (const p of arg.properties) {
+            for (const p of argument.properties) {
               const key = name(p);
               if (!key || ts.isSpreadAssignment(p)) continue;
               const field = fields.get(key);
@@ -102,9 +102,9 @@ describe("the web's calls against the Core API contract (IR312)", () => {
               const value = init && (ts.isNumericLiteral(init) ? Number(init.text) : ts.isStringLiteral(init) ? init.text : init.kind === ts.SyntaxKind.TrueKeyword ? true : init.kind === ts.SyntaxKind.FalseKeyword ? false : undefined);
               if (field.literals && value !== undefined && value !== null && !field.literals.includes(value)) problems.push(`${where} ${op}: ${key} ${JSON.stringify(value)} is not one of ${JSON.stringify(field.literals)}`);
             }
-            const prop = (o: ts.ObjectLiteralExpression, k: string) => o.properties.find((p): p is ts.PropertyAssignment => ts.isPropertyAssignment(p) && name(p) === k);
-            const q = prop(arg, "query");
-            const fp = prop(arg, "filters") ?? (q && ts.isObjectLiteralExpression(q.initializer) ? prop(q.initializer, "filters") : undefined);
+            const property = (o: ts.ObjectLiteralExpression, k: string) => o.properties.find((p): p is ts.PropertyAssignment => ts.isPropertyAssignment(p) && name(p) === k);
+            const q = property(argument, "query");
+            const fp = property(argument, "filters") ?? (q && ts.isObjectLiteralExpression(q.initializer) ? property(q.initializer, "filters") : undefined);
             if (fp && ts.isObjectLiteralExpression(fp.initializer)) {
               for (const p of fp.initializer.properties) {
                 const key = name(p);

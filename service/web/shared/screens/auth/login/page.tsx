@@ -13,7 +13,7 @@ const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 source and the kept returnTo decide where Continue goes, and a sign-in that came back says why. `others` are the
 base URLs of the other apps (plain links: separate apps). */
 export function LoginScreen({ role, others = {}, params = {}, api }: Readonly<{ role: Role; others?: AppLinks; params?: Params; api: boolean }>) {
-  const cfg = ROLES[role];
+  const config = ROLES[role];
   const href = continueHref(api, role, safeReturnTo(role, one(params.returnTo)));
   const error = loginError(one(params.error));
   const names = otherServices(role);
@@ -22,15 +22,15 @@ export function LoginScreen({ role, others = {}, params = {}, api }: Readonly<{ 
       <span className="absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-control border border-line bg-surface px-3 py-1.5 text-xs font-semibold" aria-label="Language: English, the only language in this build"><Icon name="language" /> English</span>
       <div className="w-full max-w-[350px] rounded-2xl border border-line bg-surface p-6 text-center shadow-sm">
         <span aria-hidden className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-xl bg-primary text-xl text-white"><Icon name="cooling" /></span>
-        <h1 className="text-lg font-bold">AC Project — {cfg.loginTitle}</h1>
-        <p className="mt-1 text-[13px] text-muted-foreground">{cfg.loginSub}</p>
+        <h1 className="text-lg font-bold">AC Project — {config.loginTitle}</h1>
+        <p className="mt-1 text-[13px] text-muted-foreground">{config.loginSub}</p>
         <div className="mt-2"><Badge className="uppercase tracking-wide">Not real authentication</Badge></div>
         {error && <div className="mt-4 text-left"><Banner tone="crit">{error}</Banner></div>}
         <div className="mt-4 flex items-center gap-3 rounded-xl bg-primary-soft/70 p-3 text-left">
           <span aria-hidden className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary text-sm text-white"><Icon name="account" /></span>
-          <span className="min-w-0"><span className="block text-[13px] font-bold">{cfg.loginUser}</span><span className="block text-[11px] text-muted-foreground">{cfg.loginDesc}</span></span>
+          <span className="min-w-0"><span className="block text-[13px] font-bold">{config.loginUser}</span><span className="block text-[11px] text-muted-foreground">{config.loginDesc}</span></span>
         </div>
-        <ContinueLink role={role} href={href}>Continue as {cfg.loginUser} <Icon name="arrowRight" /></ContinueLink>
+        <ContinueLink role={role} href={href}>Continue as {config.loginUser} <Icon name="arrowRight" /></ContinueLink>
         <p className="mt-4 text-[11px] text-muted-foreground">Looking for a different AC Project service?{" "}
           {names.map((r, i) => {
             return (

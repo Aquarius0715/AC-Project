@@ -5,7 +5,7 @@
 // the fixture.
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
-import { Card, LinkBtn, Page } from "@ac/web/components/ui";
+import { Card, LinkButton, Page } from "@ac/web/components/ui";
 import { apiMode } from "@ac/web/lib/dal";
 import { TechUnitDemo } from "./_components/unit-demo";
 import { TechUnitView } from "./_components/unit-view";
@@ -23,7 +23,7 @@ export default async function TechnicianUnitPage({ params, searchParams }: Reado
   if (live.kind === "not_started") {
     return (
       <Page className="max-w-xl">
-        <Card title={live.title} sub={live.text}>{live.job && <LinkBtn href={live.job.href} size="sm" variant="primary">{live.job.label}<Icon name="arrowRight" /></LinkBtn>}</Card>
+        <Card title={live.title} sub={live.text}>{live.job && <LinkButton href={live.job.href} size="sm" variant="primary">{live.job.label}<Icon name="arrowRight" /></LinkButton>}</Card>
       </Page>
     );
   }

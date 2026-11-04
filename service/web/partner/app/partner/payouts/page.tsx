@@ -8,12 +8,12 @@ import { loadPayouts } from "./_lib/load";
 import { PayoutsDemo } from "./_components/payouts-demo";
 import { PayoutsView } from "./_components/payouts-view";
 
-const str = (v: string | string[] | undefined) => (typeof v === "string" && v ? v : undefined);
+const singleText = (v: string | string[] | undefined) => (typeof v === "string" && v ? v : undefined);
 
 export default async function PartnerPayoutsPage({ searchParams }: Readonly<PageProps<"/partner/payouts">>) {
   await connection();
   if (!apiMode()) return <PayoutsDemo />;
   const sp = await searchParams;
-  const live = await loadPayouts({ statementId: str(sp.statementId), period: str(sp.period), status: str(sp.status) });
+  const live = await loadPayouts({ statementId: singleText(sp.statementId), period: singleText(sp.period), status: singleText(sp.status) });
   return <PayoutsView live={live} />;
 }

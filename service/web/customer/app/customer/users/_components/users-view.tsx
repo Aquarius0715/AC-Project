@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useRef, useState } from "react";
-import { Badge, Banner, Btn, Card, DataTable, Field, Input, LinkBtn, Modal, Page, PageHead, Select, Textarea } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, DataTable, Field, Input, LinkButton, Modal, Page, PageHead, Select, Textarea } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { fieldErrorTexts, type ActionFailure } from "@ac/web/lib/actionMessage";
@@ -39,7 +39,7 @@ export function UsersView({ live }: Readonly<{ live: { customerId: string; custo
       <Page>
         <Card title={t("Page unavailable")}>
           <p className="text-[13px] text-muted-foreground">{t("This page doesn’t exist or you don’t have access to it.")}</p>
-          <div className="mt-3"><LinkBtn href="/customer" variant="primary">{t("Go to your home (or sign in)")}</LinkBtn></div>
+          <div className="mt-3"><LinkButton href="/customer" variant="primary">{t("Go to your home (or sign in)")}</LinkButton></div>
         </Card>
       </Page>
     );
@@ -50,16 +50,16 @@ export function UsersView({ live }: Readonly<{ live: { customerId: string; custo
   };
   const close = () => { setDialog(null); };
   const isAdding = dialog?.kind === "invite";
-  const emailErr = isAdding ? inviteError(email, live.all, t) : undefined;
-  const nameErr = isAdding ? nameError(userName, t) : undefined;
-  const reasonErr = dialog && !isAdding ? reasonError(reason, t) : undefined;
+  const emailError = isAdding ? inviteError(email, live.all, t) : undefined;
+  const nameProblem = isAdding ? nameError(userName, t) : undefined;
+  const reasonProblem = dialog && !isAdding ? reasonError(reason, t) : undefined;
   const name = (r: ClientUserRow) => r.name ?? r.email;
   const edit = (k: FieldKey) => { setServer((s) => (s[k] ? { ...s, [k]: undefined } : s)); };
   const submit = () => {
     setTried(true);
     if (!dialog) return;
     // a refused submit takes focus to the first field to fix, top to bottom (IR586, IR593)
-    const local: Partial<Record<FieldKey, string>> = { name: nameErr, email: emailErr, reason: reasonErr };
+    const local: Partial<Record<FieldKey, string>> = { name: nameProblem, email: emailError, reason: reasonProblem };
     const bad = FIELDS.find((k) => local[k]);
     if (bad) { focusField(ids[bad]); return; }
     // what the Core API refuses on a field (an address someone else still holds, IR462) shows under it as well
@@ -118,8 +118,8 @@ export function UsersView({ live }: Readonly<{ live: { customerId: string; custo
       <Banner>{t("Your customer always keeps one active owner, and you can’t change your own account. A user keeps their e-mail — to change it, remove them and add them again. For a password reset, contact HQ. Only owners see this page.")}</Banner>
       <p className="text-[11px] text-muted-foreground">{t("The set-up e-mail comes from the sign-in service; in development it arrives in the local Mailpit inbox.")}</p>
       <Modal open={!!dialog} onClose={close} title={title} finalFocus={() => (gone.current ? document.querySelector("#users-list") : true)} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant={dialog?.kind === "remove" || dialog?.kind === "disable" ? "danger" : "primary"} disabled={pending} onClick={submit}>{action}</Btn></>}>
-        {isAdding && <Field label={t("Name")} error={(tried ? nameErr : undefined) ?? server.name}><Input id={ids.name} value={userName} maxLength={120} onChange={(e) => { setUserName(e.target.value); edit("name"); }} placeholder="Lim Ka Wai" /></Field>}
-        {isAdding && <Field label={t("Email")} error={(tried ? emailErr : undefined) ?? server.email}><Input id={ids.email} type="email" value={email} onChange={(e) => { setEmail(e.target.value); edit("email"); }} placeholder="lim.ka@example.com" /></Field>}
+        {isAdding && <Field label={t("Name")} error={(tried ? nameProblem : undefined) ?? server.name}><Input id={ids.name} value={userName} maxLength={120} onChange={(e) => { setUserName(e.target.value); edit("name"); }} placeholder="Lim Ka Wai" /></Field>}
+        {isAdding && <Field label={t("Email")} error={(tried ? emailError : undefined) ?? server.email}><Input id={ids.email} type="email" value={email} onChange={(e) => { setEmail(e.target.value); edit("email"); }} placeholder="lim.ka@example.com" /></Field>}
         {(isAdding || dialog?.kind === "role") && (
           <Field label={t("Role")} hint={t("Owners manage users and everything members can do; members use the app.")}>
             <Select aria-label={t("Role")} value={role} onChange={(e) => { setRole(e.target.value as Role); }}>
@@ -131,7 +131,7 @@ export function UsersView({ live }: Readonly<{ live: { customerId: string; custo
         {isAdding && <Banner>{t("Their account is created now and they get an e-mail to set their password. They see only your properties and units; until they sign in they are listed as “Not signed in yet”.")}</Banner>}
         {dialog?.kind === "disable" && <Banner tone="warn">{t("Their access ends now. You can enable them again later.")}</Banner>}
         {dialog?.kind === "remove" && <Banner tone="warn">{t(dialog.row.status === "invited" ? "Their account is removed before they signed in." : "Their access ends now and they leave your user list.")}</Banner>}
-        {dialog && dialog.kind !== "invite" && <Field label={t("Reason")} error={(tried ? reasonErr : undefined) ?? server.reason}><Textarea id={ids.reason} value={reason} onChange={(e) => { setReason(e.target.value); edit("reason"); }} placeholder={t("e.g. moved to another team")} /></Field>}
+        {dialog && dialog.kind !== "invite" && <Field label={t("Reason")} error={(tried ? reasonProblem : undefined) ?? server.reason}><Textarea id={ids.reason} value={reason} onChange={(e) => { setReason(e.target.value); edit("reason"); }} placeholder={t("e.g. moved to another team")} /></Field>}
       </Modal>
     </Page>
   );

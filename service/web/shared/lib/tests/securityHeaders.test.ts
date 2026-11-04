@@ -24,8 +24,8 @@ describe("the page Content-Security-Policy", () => {
     });
   });
   it("adds what next dev needs, and upgrades requests over HTTPS", () => {
-    const dev = directives(contentSecurityPolicy("n", { dev: true, https: false, formActions: [] }));
-    expect([dev["script-src"], dev["style-src"], dev["form-action"]]).toEqual(["'self' 'nonce-n' 'strict-dynamic' 'unsafe-eval'", "'self' 'unsafe-inline'", "'self'"]);
+    const development = directives(contentSecurityPolicy("n", { dev: true, https: false, formActions: [] }));
+    expect([development["script-src"], development["style-src"], development["form-action"]]).toEqual(["'self' 'nonce-n' 'strict-dynamic' 'unsafe-eval'", "'self' 'unsafe-inline'", "'self'"]);
     expect(contentSecurityPolicy("n", { dev: false, https: true, formActions: [] }).endsWith("; upgrade-insecure-requests")).toBe(true);
   });
   it("makes a fresh nonce each time and reads origins", () => {

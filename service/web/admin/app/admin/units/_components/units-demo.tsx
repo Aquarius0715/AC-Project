@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { setSearchParam, useSearchParam } from "@ac/web/lib/urlState";
+import { setSearchParameter, useSearchParameter } from "@ac/web/lib/urlState";
 import { ImportCsvModal, WarrantyTab } from "@ac/web/components/Features";
 import { ClientRole, ClientUser, clientUserActions, emailError, useClientUsers } from "@ac/web/lib/clientUsers";
 import { nameError } from "@ac/web/lib/partnerUsers";
@@ -26,16 +26,16 @@ export function UnitsDemo() {
   const toast = useToast();
   const [q, setQ] = useState("");
   // URL state is the source of truth (SCR-A02: customerId + tab=overview|users|policies|warranty, Figma 02-15 / 02-16 / 02-19)
-  const urlTab = useSearchParam("tab");
-  const urlCustomer = useSearchParam("customerId");
+  const urlTab = useSearchParameter("tab");
+  const urlCustomer = useSearchParameter("customerId");
   const cust = customers.find((x) => x.id === urlCustomer) ?? null;
   const top: "customers" | "warranty" = !cust && urlTab === "warranty" ? "warranty" : "customers";
   const tab: "units" | "users" | "policies" = urlTab === "users" || urlTab === "policies" ? urlTab : "units";
-  const setTop = (t: "customers" | "warranty") => { setSearchParam("tab", t === "warranty" ? "warranty" : "overview"); };
-  const setTab = (t: "units" | "users" | "policies") => { setSearchParam("tab", t === "units" ? "overview" : t); };
+  const setTop = (t: "customers" | "warranty") => { setSearchParameter("tab", t === "warranty" ? "warranty" : "overview"); };
+  const setTab = (t: "units" | "users" | "policies") => { setSearchParameter("tab", t === "units" ? "overview" : t); };
   const setCust = (c: Cust | null) => {
-    setSearchParam("customerId", c ? c.id : null);
-    setSearchParam("tab", "overview");
+    setSearchParameter("customerId", c ? c.id : null);
+    setSearchParameter("tab", "overview");
   };
   const [imp, setImp] = useState(false);
   const [status, setStatus] = useState<"active" | "all">("active");
@@ -47,7 +47,7 @@ export function UnitsDemo() {
   const [tried, setTried] = useState(false);
   const rows = customers.filter((c) => (status === "all" || c.status === "active") && (!q || (c.id + c.name).toLowerCase().includes(q.toLowerCase())));
   const close = () => { setModal(null); setTried(false); setName(""); setReason(""); };
-  const nameErr = tried && !name.trim() ? "Name is required (1–120 characters)" : undefined;
+  const nameProblem = tried && !name.trim() ? "Name is required (1–120 characters)" : undefined;
 
   if (!cust) {
     return (
@@ -62,7 +62,7 @@ export function UnitsDemo() {
           <p className="mt-2 text-[11px] text-muted-foreground">{rows.length} of 3 · sorted by name · Inactive customers appear only with Status: All (IR40). Archived properties/spaces/units never appear in lists, summaries, or KPI denominators (IR39).</p>
         </Card>
         </>}
-        <Modal open={modal === "customer"} onClose={close} title="New customer" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!name.trim()) return; toast(`Customer “${name}” created`); close(); }}>Create</Btn></>}><Field label="Customer name" error={nameErr}><Input value={name} onChange={(e) => { setName(e.target.value); }} /></Field></Modal>
+        <Modal open={modal === "customer"} onClose={close} title="New customer" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!name.trim()) return; toast(`Customer “${name}” created`); close(); }}>Create</Btn></>}><Field label="Customer name" error={nameProblem}><Input value={name} onChange={(e) => { setName(e.target.value); }} /></Field></Modal>
       </Page>
     );
   }
@@ -92,10 +92,10 @@ export function UnitsDemo() {
       {tab === "users" && <ClientUsersTab />}
       {tab === "policies" && <Card title="Customer › Alert policies" sub="customer-a policies only">{[["Bedroom too hot", "2 units"], ["Stuffy office", "2 units"], ["Night humidity", "0 units · Off"]].map(([a, b]) => <div key={a} className="flex justify-between border-t border-line py-2 text-[13px] first:border-0"><b>{a}</b><span className="text-muted-foreground">{b}</span></div>)}</Card>}
 
-      <Modal open={modal === "location" || modal === "rename"} onClose={close} title={modal === "rename" ? "Rename location" : "Add location"} footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!name.trim()) return; toast("Location saved"); close(); }}>Save</Btn></>}><Field label="Name" error={nameErr}><Input value={name} onChange={(e) => { setName(e.target.value); }} /></Field></Modal>
+      <Modal open={modal === "location" || modal === "rename"} onClose={close} title={modal === "rename" ? "Rename location" : "Add location"} footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!name.trim()) return; toast("Location saved"); close(); }}>Save</Btn></>}><Field label="Name" error={nameProblem}><Input value={name} onChange={(e) => { setName(e.target.value); }} /></Field></Modal>
       <Modal open={modal === "delete"} onClose={close} title="Delete location" footer={<Btn onClick={close}>Close</Btn>}><Banner tone="crit">CONFLICT — this location still has units. Move or delete them first.</Banner></Modal>
       <Modal open={modal === "deleteUnit"} onClose={close} title="Delete unit" footer={<Btn onClick={close}>Close</Btn>}><Banner tone="crit">CONFLICT — unit is in use (contract scope / open jobs). It cannot be deleted.</Banner></Modal>
-      <Modal open={modal === "unit"} onClose={close} title="New unit in Bedroom" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!name.trim()) return; toast("Unit created"); close(); }}>Create</Btn></>}><Field label="Unit name" error={nameErr}><Input value={name} onChange={(e) => { setName(e.target.value); }} /></Field><Field label="Model"><Select><option>ventilation-demo v3</option><option>cap-split-std v1</option></Select></Field></Modal>
+      <Modal open={modal === "unit"} onClose={close} title="New unit in Bedroom" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!name.trim()) return; toast("Unit created"); close(); }}>Create</Btn></>}><Field label="Unit name" error={nameProblem}><Input value={name} onChange={(e) => { setName(e.target.value); }} /></Field><Field label="Model"><Select><option>ventilation-demo v3</option><option>cap-split-std v1</option></Select></Field></Modal>
       <Modal open={modal === "move"} onClose={close} title="Change location" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!reason.trim()) return; toast("Location changed"); close(); }}>Save</Btn></>}><Field label="New location"><Select><option>Home A › 1F › Kitchen</option><option>Home A › 2F › Study</option></Select></Field><Field label="Reason" error={tried && !reason.trim() ? "A reason is required" : undefined}><Input value={reason} onChange={(e) => { setReason(e.target.value); }} /></Field></Modal>
       <Modal open={modal === "attach"} onClose={close} title="Attach policies to Bedroom AC" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { toast("Policy attached"); close(); }}>Attach</Btn></>}><Field label="customer-a policies only"><Select><option>Bedroom too hot</option><option>Stuffy office</option><option>Night humidity</option></Select></Field></Modal>
     </Page>
@@ -112,8 +112,8 @@ function ClientUsersTab() {
   const [name, setName] = useState("");
   const [role, setRole] = useState<ClientRole>("member");
   const [tried, setTried] = useState(false);
-  const err = tried ? emailError(email, users) : undefined;
-  const nameErr = tried ? nameError(name) : undefined;
+  const errorText = tried ? emailError(email, users) : undefined;
+  const nameProblem = tried ? nameError(name) : undefined;
   const close = () => { setOpen(false); setTried(false); setEmail(""); setName(""); setRole("member"); };
   const run = (e: string | undefined, ok: string) => { toast(e ?? ok, e ? "warn" : undefined); };
   const act = (u: ClientUser, a: string) => {
@@ -134,8 +134,8 @@ function ClientUsersTab() {
       ]} />
       <p className="mt-2 text-[11px] text-muted-foreground">Client users have no permission editor — the customer’s owners also manage them from the customer app (Users: add, roles, access, remove). Contractors manage their own staff in the partner app; HQ sets permissions and access periods in Access &amp; roles. The last active owner cannot be demoted, disabled or removed.</p>
       <Modal open={open} onClose={close} title="Add client user" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (nameError(name)) return; const e = clientUserActions.invite(email, role, "hq-operator", name); if (e) return; toast(`${name.trim()} added — nothing is sent in the demo`); close(); }}>Add user</Btn></>}>
-        <Field label="Name" error={nameErr}><Input value={name} maxLength={120} onChange={(e) => { setName(e.target.value); }} /></Field>
-        <Field label="Email" hint="One account per person; the set-up e-mail goes to this address" error={err}><Input type="email" value={email} onChange={(e) => { setEmail(e.target.value); }} /></Field>
+        <Field label="Name" error={nameProblem}><Input value={name} maxLength={120} onChange={(e) => { setName(e.target.value); }} /></Field>
+        <Field label="Email" hint="One account per person; the set-up e-mail goes to this address" error={errorText}><Input type="email" value={email} onChange={(e) => { setEmail(e.target.value); }} /></Field>
         <Field label="Role"><Select value={role} onChange={(e) => { setRole(e.target.value as ClientRole); }}><option value="member">Member</option><option value="owner">Owner</option></Select></Field>
       </Modal>
     </Card>

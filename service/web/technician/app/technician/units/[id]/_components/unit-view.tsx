@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Badge, Banner, Card, ConnBadge, LineChart, LinkBtn, Page, SeverityBadge, SummaryList, Tabs, TextLink, cx, Plain } from "@ac/web/components/ui";
+import { Badge, Banner, Card, ConnBadge, LineChart, LinkButton, Page, SeverityBadge, SummaryList, Tabs, TextLink, cx, Plain } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import type { Period, SeriesChart, Tile } from "@ac/web/lib/techUnit";
@@ -30,8 +30,8 @@ export function TechUnitView({ live }: Readonly<{ live: UnitLive }>) {
               <SummaryList items={live.register.rows} />
               <p className="mt-2 rounded-xl bg-primary-soft/40 px-3 py-2 text-[11px] text-muted-foreground"><Icon name="info" /> {live.register.note}</p>
               <div className="mt-3 flex flex-col gap-2">
-                <LinkBtn href={live.alertsHref} size="sm">{t("Alert evidence")} <Icon name="arrowRight" /></LinkBtn>
-                {live.controlHref ? <LinkBtn href={live.controlHref} size="sm">{t("Diagnostics")} <Icon name="arrowRight" /></LinkBtn> : <p className="text-[11px] text-muted-foreground">{t("Diagnostic control opens for a job you are assigned to on this AC (assigned or in progress).")}</p>}
+                <LinkButton href={live.alertsHref} size="sm">{t("Alert evidence")} <Icon name="arrowRight" /></LinkButton>
+                {live.controlHref ? <LinkButton href={live.controlHref} size="sm">{t("Diagnostics")} <Icon name="arrowRight" /></LinkButton> : <p className="text-[11px] text-muted-foreground">{t("Diagnostic control opens for a job you are assigned to on this AC (assigned or in progress).")}</p>}
               </div>
               {live.register.missing && <p className="mt-2 text-[11px] text-muted-foreground">{t("Missing values are never filled from similar models or today’s date.")}</p>}
             </Card>

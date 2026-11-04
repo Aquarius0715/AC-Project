@@ -212,14 +212,14 @@ function NewRequest({ live, prefill, onClose, onFail }: ModalProps & { live: Mai
   const [contact, setContact] = useState("");
   const [tried, setTried] = useState(false);
   const slots = rows.map((r) => toSlot(r, timeZone));
-  const symErr = symptomLength(sym) < 10 || symptomLength(sym) > 2000 ? t("Symptoms must be 10–2000 characters") : null;
-  const slotErr = preferredError(slots, now, 3, t);
-  const cErr = contactError(contact, t);
+  const symError = symptomLength(sym) < 10 || symptomLength(sym) > 2000 ? t("Symptoms must be 10–2000 characters") : null;
+  const slotError = preferredError(slots, now, 3, t);
+  const cError = contactError(contact, t);
   const ids = { unit: useId(), sym: useId(), times: useId(), contact: useId() };
   const submit = () => {
     setTried(true);
     // a failed submit takes focus to the first field to fix, top to bottom (IR573)
-    const bad = unitId ? symErr ? ids.sym : slotErr ? ids.times : cErr ? ids.contact : null : ids.unit;
+    const bad = unitId ? symError ? ids.sym : slotError ? ids.times : cError ? ids.contact : null : ids.unit;
     if (bad) {
       requestAnimationFrame(() => document.getElementById(bad)?.focus());
       return;
@@ -230,9 +230,9 @@ function NewRequest({ live, prefill, onClose, onFail }: ModalProps & { live: Mai
     <Modal open wide onClose={() => { onClose(); }} title={t("New maintenance request")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={submit}>{t("Submit request")}</Btn></>}>
       <Field label={t("Unit")}><Select id={ids.unit} value={unitId} onChange={(e) => { setUnitId(e.target.value); }}>{live.units.map((u) => <option key={u.id} value={u.id}>{u.name}{u.place ? ` · ${u.place}` : ""}</option>)}</Select></Field>
       <Field label={t("Type")}><Choice value={type} onChange={setType} options={[{ id: "reactive", label: t("Repair") }, { id: "preventive", label: t("Preventive") }]} /></Field>
-      <Field label={t("Symptoms (10–2000 characters)")} error={tried ? symErr ?? undefined : undefined} hint={`${String(symptomLength(sym))} / 2000`}><Textarea id={ids.sym} value={sym} onChange={(e) => { setSym(e.target.value); }} placeholder={t("Cold air is weak and there is water dripping from the indoor unit.")} /></Field>
-      <TimesInput rows={rows} onChange={setRows} error={tried ? slotErr : null} firstId={ids.times} />
-      <Field label={t("Contact window (optional)")} hint={t("Use HH:mm for times (example: Weekdays 09:00-18:00) — no phone numbers or e-mail addresses")} error={tried ? cErr ?? undefined : undefined}><Input id={ids.contact} value={contact} maxLength={200} onChange={(e) => { setContact(e.target.value); }} /></Field>
+      <Field label={t("Symptoms (10–2000 characters)")} error={tried ? symError ?? undefined : undefined} hint={`${String(symptomLength(sym))} / 2000`}><Textarea id={ids.sym} value={sym} onChange={(e) => { setSym(e.target.value); }} placeholder={t("Cold air is weak and there is water dripping from the indoor unit.")} /></Field>
+      <TimesInput rows={rows} onChange={setRows} error={tried ? slotError : null} firstId={ids.times} />
+      <Field label={t("Contact window (optional)")} hint={t("Use HH:mm for times (example: Weekdays 09:00-18:00) — no phone numbers or e-mail addresses")} error={tried ? cError ?? undefined : undefined}><Input id={ids.contact} value={contact} maxLength={200} onChange={(e) => { setContact(e.target.value); }} /></Field>
       <Banner>{t("Nothing is booked yet — you will see “Scheduled” once a time is confirmed. Any time outside your 3 options needs your approval.")}</Banner>
     </Modal>
   );
@@ -249,10 +249,10 @@ function DeclineModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now
   const [rows, setRows] = useState<Row[]>(threeRows(now, timeZone, 3));
   const [tried, setTried] = useState(false);
   const slots = rows.map((r) => toSlot(r, timeZone));
-  const err = give ? preferredError(slots, now, 3, t) : null;
+  const errorText = give ? preferredError(slots, now, 3, t) : null;
   const send = () => {
     setTried(true);
-    if (err || comment.length > 1000) return;
+    if (errorText || comment.length > 1000) return;
     run(() => respondProposal(j.id, j.version, d.proposal!.id, { decision: "decline", declineReason: reason, slots: give ? slots : [], comment }), t("Declined"), () => { onClose(t(give ? "Declined — HQ looks at your 3 new times." : "Declined — HQ will look again."), "warn"); }, onFail);
   };
   return (
@@ -261,7 +261,7 @@ function DeclineModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now
       <Field label={t("Reason")}><Choice value={reason} onChange={setReason} options={[{ id: "not_home", label: t("I’m not at home then") }, { id: "too_late", label: t("Too late for me") }, { id: "other", label: t("Other") }]} /></Field>
       <Field label={t("Comment to HQ (optional, up to 1000)")}><Input value={comment} maxLength={1000} onChange={(e) => { setComment(e.target.value); }} placeholder={t("Away that day. Any weekday afternoon next week works.")} /></Field>
       <label className="flex items-center gap-2 text-[13px]"><Checkbox className="h-4 w-4 accent-[#005bea]" checked={give} onCheckedChange={(v) => { setGive(v); }} />{t("Give 3 new preferred times (recommended)")}</label>
-      {give && <TimesInput rows={rows} onChange={setRows} error={tried ? err : null} label={t("New preferred times")} />}
+      {give && <TimesInput rows={rows} onChange={setRows} error={tried ? errorText : null} label={t("New preferred times")} />}
       <Banner>{t("HQ looks again and either books one of your times or sends another proposal. Declining never cancels the request.")}</Banner>
     </Modal>
   );
@@ -276,11 +276,11 @@ function OtherTimeModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; n
   const [comment, setComment] = useState("");
   const [tried, setTried] = useState(false);
   const slots = rows.map((r) => toSlot(r, display.timeZone));
-  const err = preferredError(slots, now, 3, t);
+  const errorText = preferredError(slots, now, 3, t);
   return (
-    <Modal open wide onClose={() => { onClose(); }} title={t("Request another time")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (err) return; run(() => requestReschedule(j.id, j.version, slots, comment), t("Sent to HQ"), () => { onClose(t("Asked HQ for another time — the visit goes back to booking with your 3 times.")); }, onFail); }}>{t("Send to HQ")}</Btn></>}>
+    <Modal open wide onClose={() => { onClose(); }} title={t("Request another time")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (errorText) return; run(() => requestReschedule(j.id, j.version, slots, comment), t("Sent to HQ"), () => { onClose(t("Asked HQ for another time — the visit goes back to booking with your 3 times.")); }, onFail); }}>{t("Send to HQ")}</Btn></>}>
       <p className="text-xs text-muted-foreground">{t("{job} · periodic visit {when} · up to 48 h before the visit", { job: j.id.slice(0, 8), when: j.scheduledSlot ? showTime(j.scheduledSlot.startAt, display) : "" })}</p>
-      <TimesInput rows={rows} onChange={setRows} error={tried ? err : null} />
+      <TimesInput rows={rows} onChange={setRows} error={tried ? errorText : null} />
       <Field label={t("Comment (optional, up to 1000)")}><Input value={comment} maxLength={1000} onChange={(e) => { setComment(e.target.value); }} /></Field>
     </Modal>
   );
@@ -318,12 +318,12 @@ function ProblemModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now
   const [visit, setVisit] = useState<Row | null>(null);
   const [tried, setTried] = useState(false);
   const total = files.reduce((a, f) => a + f.size, 0);
-  const fileErr = files.length > 5 ? t("Up to 5 photos.") : files.some((f) => !["image/jpeg", "image/png"].includes(f.type) || f.size > 5 * 1024 * 1024) ? t("Photos must be JPEG or PNG up to 5 MiB each.") : total > 5.5 * 1024 * 1024 ? t("The photos together may be 5.5 MB at most.") : null;
-  const detErr = details.trim().length < 10 || details.length > 2000 ? t("Describe the problem (10–2000 characters)") : null;
-  const visitErr = visit ? preferredError([toSlot(visit, timeZone)], now, 1, t) : null;
+  const fileError = files.length > 5 ? t("Up to 5 photos.") : files.some((f) => !["image/jpeg", "image/png"].includes(f.type) || f.size > 5 * 1024 * 1024) ? t("Photos must be JPEG or PNG up to 5 MiB each.") : total > 5.5 * 1024 * 1024 ? t("The photos together may be 5.5 MB at most.") : null;
+  const detailError = details.trim().length < 10 || details.length > 2000 ? t("Describe the problem (10–2000 characters)") : null;
+  const visitError = visit ? preferredError([toSlot(visit, timeZone)], now, 1, t) : null;
   const send = () => {
     setTried(true);
-    if (detErr || fileErr || visitErr) return;
+    if (detailError || fileError || visitError) return;
     const form = new FormData();
     form.set("jobId", j.id); form.set("version", String(j.version)); form.set("reasonCode", reason); form.set("details", details);
     for (const f of files) form.append("photos", f);
@@ -333,10 +333,10 @@ function ProblemModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now
   return (
     <Modal open wide onClose={() => { onClose(); }} title={t("Report a problem — {job}", { job: j.id.slice(0, 8) })} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={send}>{t("Send report")}</Btn></>}>
       <Field label={t("What happened?")}><Choice value={reason} onChange={setReason} options={PROBLEMS.map((p) => ({ ...p, label: t(p.label) }))} /></Field>
-      <Field label={t("Details (10–2000 characters)")} error={tried ? detErr ?? undefined : undefined}><Textarea value={details} maxLength={2000} onChange={(e) => { setDetails(e.target.value); }} /></Field>
-      <Field label={t("Photos (optional, up to 5 JPEG/PNG)")} error={fileErr ?? undefined}><Input type="file" accept="image/jpeg,image/png" multiple onChange={(e) => { setFiles(Array.from(e.target.files ?? [])); }} className="text-[13px]" /></Field>
+      <Field label={t("Details (10–2000 characters)")} error={tried ? detailError ?? undefined : undefined}><Textarea value={details} maxLength={2000} onChange={(e) => { setDetails(e.target.value); }} /></Field>
+      <Field label={t("Photos (optional, up to 5 JPEG/PNG)")} error={fileError ?? undefined}><Input type="file" accept="image/jpeg,image/png" multiple onChange={(e) => { setFiles(Array.from(e.target.files ?? [])); }} className="text-[13px]" /></Field>
       <label className="flex items-center gap-2 text-[13px]"><Checkbox className="h-4 w-4 accent-[#005bea]" checked={!!visit} onCheckedChange={(v) => { setVisit(v ? threeRows(now, timeZone)[0] : null); }} />{t("Suggest a visit time")}</label>
-      {visit && <TimesInput rows={[visit]} onChange={(r) => { setVisit(r[0]); }} error={tried ? visitErr : null} label={t("Preferred visit")} />}
+      {visit && <TimesInput rows={[visit]} onChange={(r) => { setVisit(r[0]); }} error={tried ? visitError : null} label={t("Preferred visit")} />}
       <Banner>{t("Creates a follow-up request linked to {job} (“Under HQ review”). HQ decides within 1 business day: rework (free) or a new request.", { job: j.id.slice(0, 8) })}</Banner>
     </Modal>
   );

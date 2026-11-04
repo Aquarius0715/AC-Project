@@ -35,13 +35,13 @@ const reading = (u: ApiUnit, metric: string) => {
 
 /** The row's room temperature, humidity and power (W) are the unit's latest readings, never its setting. */
 export function unitRowFromApi(u: ApiUnit): UnitRow {
-  const temp = reading(u, "temperature"), hum = reading(u, "humidity"), power = reading(u, "power");
+  const setpoint = reading(u, "temperature"), hum = reading(u, "humidity"), power = reading(u, "power");
   return {
     id: u.id,
     name: u.displayName,
     loc: "",
     obs: u.connection === "online" ? hhmm(u.observedState.observedAt) : `last seen ${hhmm(u.lastSeenAt)}`,
-    temp: temp && Math.round(temp.value! * 10) / 10,
+    temp: setpoint && Math.round(setpoint.value! * 10) / 10,
     hum: hum && Math.round(hum.value!),
     power: power && Math.round(power.unit === "kW" ? power.value! * 1000 : power.value!),
     state: u.effectivePowerState === "on" ? "running" : (u.effectivePowerState === "off" ? "stopped" : "unknown"),

@@ -22,9 +22,9 @@ function check(): { checked: number; problems: string[] } {
   const problems: string[] = [];
   let checked = 0;
   for (const p of projects) {
-    const dir = join(web, p);
-    const cfg = ts.readConfigFile(join(dir, "tsconfig.json"), ts.sys.readFile);
-    const parsed = ts.parseJsonConfigFileContent(cfg.config, ts.sys, dir);
+    const directory = join(web, p);
+    const roleConfig = ts.readConfigFile(join(directory, "tsconfig.json"), ts.sys.readFile);
+    const parsed = ts.parseJsonConfigFileContent(roleConfig.config, ts.sys, directory);
     const program = ts.createProgram(parsed.fileNames, { ...parsed.options, noEmit: true, incremental: false });
     const c = program.getTypeChecker();
     const gen = program.getSourceFiles().find((f) => f.fileName.endsWith("shared/lib/contracts.gen.ts"))!;
@@ -35,7 +35,7 @@ function check(): { checked: number; problems: string[] } {
       const r = s && c.getTypeOfSymbol(s).getProperty("result");
       return r ? c.getTypeOfSymbol(r) : null;
     };
-    const str = (t: ts.Type) => c.typeToString(t, undefined, ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.InTypeAlias);
+    const singleText = (t: ts.Type) => c.typeToString(t, undefined, ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.InTypeAlias);
     const variants = (t: ts.Type) => (t.isUnion() ? t.types : [t]);
     const isObject = (t: ts.Type) => !!(t.flags & ts.TypeFlags.Object) || (t.isIntersection() && t.types.every((x) => x.flags & ts.TypeFlags.Object));
     const literal = ts.TypeFlags.StringLiteral | ts.TypeFlags.NumberLiteral | ts.TypeFlags.BooleanLiteral;
@@ -54,12 +54,12 @@ function check(): { checked: number; problems: string[] } {
       for (const [k, v] of literals(own)) if (a.has(k) && !overlap(a.get(k)!, v)) return false;
       return true;
     };
-    const compare = (src: ts.Type, dst: ts.Type, path: string, depth: number, out: string[], top: boolean): void => {
-      if (c.isTypeAssignableTo(src, dst)) return;
+    const compare = (source: ts.Type, target: ts.Type, path: string, depth: number, out: string[], top: boolean): void => {
+      if (c.isTypeAssignableTo(source, target)) return;
       const at = path || "(result)";
-      if (depth > 6) { out.push(`${at}: contract ${str(src)}, web ${str(dst)}`); return; }
-      if (c.isTypeAssignableTo(c.getNullType(), src) && !c.isTypeAssignableTo(c.getNullType(), dst)) out.push(`${at}: may be null in the contract`);
-      const s = c.getNonNullableType(src), d = c.getNonNullableType(dst);
+      if (depth > 6) { out.push(`${at}: contract ${singleText(source)}, web ${singleText(target)}`); return; }
+      if (c.isTypeAssignableTo(c.getNullType(), source) && !c.isTypeAssignableTo(c.getNullType(), target)) out.push(`${at}: may be null in the contract`);
+      const s = c.getNonNullableType(source), d = c.getNonNullableType(target);
       if (c.isTypeAssignableTo(s, d)) return;
       if (c.isArrayType(s) && c.isArrayType(d)) { compare(c.getTypeArguments(s as ts.TypeReference)[0], c.getTypeArguments(d as ts.TypeReference)[0], `${path}[]`, depth + 1, out, top); return; }
       if (s.isUnion() && !(s.flags & ts.TypeFlags.Boolean) && variants(s).some(isObject)) {
@@ -74,14 +74,14 @@ function check(): { checked: number; problems: string[] } {
           return;
         }
         if (top && dv.every((x) => !(isObject(x) && keys.some((k) => !!x.getProperty(k))))) {
-          out.push(`${at}: name the ${keys.join(" / ")} the screen reads (the contract has ${sv.map((m) => str(literals(m).get(keys[0])!)).join(", ")})`);
+          out.push(`${at}: name the ${keys.join(" / ")} the screen reads (the contract has ${sv.map((m) => singleText(literals(m).get(keys[0])!)).join(", ")})`);
           return;
         }
         for (const m of top ? sv.filter((v) => dv.some((x) => fits(v, x))) : sv) {
           if (dv.some((x) => c.isTypeAssignableTo(m, x))) continue;
           const own = dv.find((x) => isObject(m) && isObject(x) && literals(m).size > 0 && literals(x).size > 0 && fits(m, x) && fits(x, m));
           if (own || dv.length === 1) compare(m, own ?? d, path, depth + 1, out, false);
-          else out.push(`${at}: the web does not cover ${str(m)}`);
+          else out.push(`${at}: the web does not cover ${singleText(m)}`);
         }
         return;
       }
@@ -98,11 +98,11 @@ function check(): { checked: number; problems: string[] } {
         }
         return;
       }
-      out.push(`${at}: contract ${str(src)}, web ${str(dst)}`);
+      out.push(`${at}: contract ${singleText(source)}, web ${singleText(target)}`);
     };
     for (const sf of program.getSourceFiles()) {
       const f = sf.fileName;
-      if (!f.startsWith(dir + "/") || /node_modules|\/\.next\/|\/tests\/|\.d\.ts$/.test(f) || seen.has(f)) continue; // shared files once, by shared
+      if (!f.startsWith(directory + "/") || /node_modules|\/\.next\/|\/tests\/|\.d\.ts$/.test(f) || seen.has(f)) continue; // shared files once, by shared
       seen.add(f);
       const visit = (n: ts.Node) => {
         if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && calls.has(n.expression.text) && n.arguments[0] && ts.isStringLiteral(n.arguments[0])) {
@@ -113,8 +113,8 @@ function check(): { checked: number; problems: string[] } {
           if (n.typeArguments?.length) own = c.getTypeFromTypeNode(n.typeArguments[0]);
           else { // inferred from the context (a typed variable or return)
             const sig = c.getResolvedSignature(n);
-            const ret = sig && c.getReturnTypeOfSignature(sig);
-            own = ret?.symbol?.getName() === "Promise" ? c.getTypeArguments(ret as ts.TypeReference)[0] : ret;
+            const returned = sig && c.getReturnTypeOfSignature(sig);
+            own = returned?.symbol?.getName() === "Promise" ? c.getTypeArguments(returned as ts.TypeReference)[0] : returned;
             if (fn === "coreAll" && own && c.isArrayType(own)) own = c.getTypeArguments(own as ts.TypeReference)[0];
           }
           if (fn === "coreAll" && result) {

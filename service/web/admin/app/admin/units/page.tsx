@@ -168,9 +168,9 @@ async function unitLive(d: ApiUnitDetail, x: Ctx): Promise<UnitLive> {
     ...(d.pendingCommandIds.length > 0 ? [{ label: t(d.pendingCommandIds.length === 1 ? "1 pending command" : "{n} pending commands", { n: d.pendingCommandIds.length }), href: null }] : []),
   ];
   const byId = new Map((x.policies ?? []).map((p) => [p.id, p]));
-  const def = x.policies?.find((p) => p.kind === "default_alert");
+  const defaults = x.policies?.find((p) => p.kind === "default_alert");
   const attached = [
-    ...(def ? [{ id: def.id, kind: "default_alert" as const, name: def.name, type: t("Default"), condition: t((def.rules?.length ?? 0) === 1 ? "1 rule · ventilation and fault causes" : "{n} rules · ventilation and fault causes", { n: def.rules?.length ?? 0 }), madeBy: t("Always attached"), on: t((def.rules?.length ?? 0) === 1 ? "{on} of 1 rule on" : "{on} of {n} rules on", { on: defaultRules(def, x.i).filter((r) => r.enabled).length, n: def.rules?.length ?? 0 }) }] : []),
+    ...(defaults ? [{ id: defaults.id, kind: "default_alert" as const, name: defaults.name, type: t("Default"), condition: t((defaults.rules?.length ?? 0) === 1 ? "1 rule · ventilation and fault causes" : "{n} rules · ventilation and fault causes", { n: defaults.rules?.length ?? 0 }), madeBy: t("Always attached"), on: t((defaults.rules?.length ?? 0) === 1 ? "{on} of 1 rule on" : "{on} of {n} rules on", { on: defaultRules(defaults, x.i).filter((r) => r.enabled).length, n: defaults.rules?.length ?? 0 }) }] : []),
     ...d.alertPolicyIds.map((id) => {
       const p = byId.get(id);
       const metric = p?.metric ?? "";
@@ -196,12 +196,12 @@ async function warrantyLive(coverage: ApiCoverage[], x: { has: (...p: string[]) 
   const { t, display } = x.i;
   const caps = x.has("dashboard.read", "device.read") ? await coreAll<ApiCapability>("capabilities.list") : [];
   const unit = new Map(x.units.map((u) => [u.id, u]));
-  const prop = new Map(x.properties.map((p) => [p.id, p.name]));
+  const propertyRow = new Map(x.properties.map((p) => [p.id, p.name]));
   const customer = new Map(x.rows.map((r) => [r.id, r.name]));
   const model = new Map(caps.map((k) => [k.id, `${k.manufacturer} ${k.model}`]));
   const contract = new Map((x.contracts ?? []).map((k) => [k.id, t("{plan} until {date}", { plan: k.planType.toUpperCase(), date: businessDay(k.endAt, display.locale) })]));
   const rows = coverageRows(coverage, {
-    unit: (id) => { const u = unit.get(id); return u && { name: u.displayName, place: prop.get(u.propertyId) ?? "" }; },
+    unit: (id) => { const u = unit.get(id); return u && { name: u.displayName, place: propertyRow.get(u.propertyId) ?? "" }; },
     customer: (id) => customer.get(id) ?? id.slice(0, 8), model: (id) => model.get(id) ?? id.slice(0, 8), contract: (id) => contract.get(id) ?? t("contract {id}", { id: id.slice(0, 8) }),
   }, await coreNow(), x.i);
   let claims: ClaimCandidate[] | null = null;

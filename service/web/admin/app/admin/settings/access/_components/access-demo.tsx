@@ -51,10 +51,10 @@ export function AccessDemo() {
   const [checked, setChecked] = useState<string[]>(preset.admin);
   const [reason, setReason] = useState("");
   const [end, setEnd] = useState("");
-  const [msg, setMsg] = useState<{ t: "crit" | "ok" | "warn"; m: string } | null>(null);
+  const [message, setMessage] = useState<{ t: "crit" | "ok" | "warn"; m: string } | null>(null);
   const [revoke, setRevoke] = useState(false);
   const list = users.filter((u) => !q || (u.id + u.role + u.email).toLowerCase().includes(q.toLowerCase()));
-  const pick = (u: U | "new") => { setSel(u); setMsg(null); const r = u === "new" ? "contractor" : u.role2; setRole(r); setChecked(preset[r]); setReason(""); setEnd(u !== "new" && u.id.startsWith("tech-external") ? "" : ""); };
+  const pick = (u: U | "new") => { setSel(u); setMessage(null); const r = u === "new" ? "contractor" : u.role2; setRole(r); setChecked(preset[r]); setReason(""); setEnd(u !== "new" && u.id.startsWith("tech-external") ? "" : ""); };
   const choose = (r: U["role2"]) => { setRole(r); setChecked(preset[r]); };
   const total = all.length;
   const has = (p?: string) => !!p && checked.includes(p);
@@ -62,12 +62,12 @@ export function AccessDemo() {
   // Write includes Read: turning Write on also turns Read on, and Read stays locked while Write is on.
   const setWrite = (r: Row, v: boolean) => { setChecked((c) => (v ? [...new Set([...c, r.write!, ...(r.read ? [r.read] : [])])] : c.filter((x) => x !== r.write))); };
   const save = () => {
-    if (!reason.trim()) { setMsg({ t: "crit", m: "Change reason is required (1–1000 characters)." }); return; }
-    if (role === "technician" && sel !== "new" && sel.role.includes("external") && !end) { setMsg({ t: "crit", m: "External technicians need a “Valid until” end date (VALIDATION)." }); return; }
-    if (checked.includes("restriction.override") && sel !== "new" && sel.id === "hq-operator") { setMsg({ t: "crit", m: "FORBIDDEN — you cannot grant yourself restriction.override." }); return; }
-    setMsg({ t: "ok", m: "Saved — scopeVersion incremented and recorded in the audit log." }); toast("Access saved");
+    if (!reason.trim()) { setMessage({ t: "crit", m: "Change reason is required (1–1000 characters)." }); return; }
+    if (role === "technician" && sel !== "new" && sel.role.includes("external") && !end) { setMessage({ t: "crit", m: "External technicians need a “Valid until” end date (VALIDATION)." }); return; }
+    if (checked.includes("restriction.override") && sel !== "new" && sel.id === "hq-operator") { setMessage({ t: "crit", m: "FORBIDDEN — you cannot grant yourself restriction.override." }); return; }
+    setMessage({ t: "ok", m: "Saved — scopeVersion incremented and recorded in the audit log." }); toast("Access saved");
   };
-  const cur = sel === "new" ? null : sel;
+  const current = sel === "new" ? null : sel;
   return (
     <Page>
       <div className="split-rev">
@@ -76,14 +76,14 @@ export function AccessDemo() {
           <div className="flex flex-col gap-1.5">{list.map((u) => <ListRow key={u.id} selected={sel !== "new" && sel.id === u.id} onClick={() => { pick(u); }}><div className="min-w-0"><b className="text-[13px]">{u.id}</b><div className="truncate text-[11px] text-muted-foreground">{u.role}</div></div></ListRow>)}</div>
           <p className="mt-3 text-[11px] text-muted-foreground">Client accounts are not listed here — they are managed per customer in Customers & units › Users.</p>
         </Card>
-        <Card title={cur ? cur.id : "New user"} sub={cur ? `${cur.email} · scopeVersion 1 · last changed 2026-09-02 by hq-operator` : "Identity & role"}>
+        <Card title={current ? current.id : "New user"} sub={current ? `${current.email} · scopeVersion 1 · last changed 2026-09-02 by hq-operator` : "Identity & role"}>
           <div className="flex flex-col gap-5">
             <section>
               <h3 className="mb-2 text-[13px] font-bold">Identity & role</h3>
               <p className="mb-2 text-xs text-muted-foreground">Choosing a role only pre-checks its typical permissions; every permission below stays editable.</p>
               <div className="grid-fluid" style={{ ["--min"as string]: "220px" }}>
-                <Field label="Organization"><Select defaultValue={cur?.org}><option>HQ (tenant)</option><option>contractor-a</option></Select></Field>
-                <Field label="Person (email)"><Input defaultValue={cur?.email ?? ""} placeholder="name@example.com" /></Field>
+                <Field label="Organization"><Select defaultValue={current?.org}><option>HQ (tenant)</option><option>contractor-a</option></Select></Field>
+                <Field label="Person (email)"><Input defaultValue={current?.email ?? ""} placeholder="name@example.com" /></Field>
               </div>
               <div className="mt-3"><div className="mb-1 text-xs font-semibold">Role</div><Choice value={role} onChange={choose} options={[{ id: "admin", label: "Admin" }, { id: "contractor", label: "Contractor" }, { id: "technician", label: "Technician" }]} /><p className="mt-1 text-[11px] text-muted-foreground">Client role is not offered here (Customers & units › Users).</p></div>
             </section>
@@ -98,12 +98,12 @@ export function AccessDemo() {
               <p className="mt-2 text-[11px] text-muted-foreground">Write includes Read (Read is locked on while Write is on). Actions are independent of Read / Write.</p>
             </section>
             <Field label="Change reason · required" hint="1–1000 characters. Stored in the audit log."><Textarea value={reason} onChange={(e) => { setReason(e.target.value); }} /></Field>
-            {msg && <Banner tone={msg.t}>{msg.m}</Banner>}
-            <div className="flex flex-wrap justify-end gap-2">{cur && <Btn variant="danger" onClick={() => { setRevoke(true); }}>Revoke access…</Btn>}<Btn variant="primary" onClick={save}>Save changes</Btn></div>
+            {message && <Banner tone={message.t}>{message.m}</Banner>}
+            <div className="flex flex-wrap justify-end gap-2">{current && <Btn variant="danger" onClick={() => { setRevoke(true); }}>Revoke access…</Btn>}<Btn variant="primary" onClick={save}>Save changes</Btn></div>
           </div>
         </Card>
       </div>
-      <Modal open={revoke} onClose={() => { setRevoke(false); }} title={`Revoke access — ${cur?.id ?? "—"}`} footer={<><Btn onClick={() => { setRevoke(false); }}>Cancel</Btn><Btn variant="danger" onClick={() => { setRevoke(false); toast("Access revoked — user is now Inactive", "warn"); }}>Revoke</Btn></>}><p className="text-[13px]">Revoking sets “Valid until” to now. The user stays listed as Inactive.</p></Modal>
+      <Modal open={revoke} onClose={() => { setRevoke(false); }} title={`Revoke access — ${current?.id ?? "—"}`} footer={<><Btn onClick={() => { setRevoke(false); }}>Cancel</Btn><Btn variant="danger" onClick={() => { setRevoke(false); toast("Access revoked — user is now Inactive", "warn"); }}>Revoke</Btn></>}><p className="text-[13px]">Revoking sets “Valid until” to now. The user stays listed as Inactive.</p></Modal>
     </Page>
   );
 }

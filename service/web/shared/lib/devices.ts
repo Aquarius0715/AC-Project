@@ -82,7 +82,7 @@ export function capabilityDraft(k?: ApiCapability): CapabilityDraft {
   };
 }
 
-const num = (s: string) => (s.trim() === "" ? NaN : Number(s));
+const toNumber = (s: string) => (s.trim() === "" ? NaN : Number(s));
 
 /** The capability rules of DD-A04 (boundary cases) checked before capabilities.save; the API checks them again. */
 export function capabilityErrors(d: CapabilityDraft, update: boolean, t: T = en): Record<string, string> {
@@ -93,7 +93,7 @@ export function capabilityErrors(d: CapabilityDraft, update: boolean, t: T = en)
   if (d.modeControl && d.modes.length === 0) e.modes = t("Choose at least one mode");
   if (d.fanControl && d.fanLevels.length === 0) e.fanLevels = t("Choose at least one fan level");
   if (d.temperatureOn) {
-    const [min, max, step] = [num(d.min), num(d.max), num(d.step)];
+    const [min, max, step] = [toNumber(d.min), toNumber(d.max), toNumber(d.step)];
     if (!(min < max)) e.temperature = t("min must be below max");
     else if (!(step > 0 && step <= max - min)) e.temperature = t("0 < step ≤ max − min");
   }
@@ -102,7 +102,7 @@ export function capabilityErrors(d: CapabilityDraft, update: boolean, t: T = en)
   for (const s of d.sensors) {
     if (seen.has(s.metric)) e.sensors = t("One sensor per metric ({metric} twice)", { metric: s.metric });
     seen.add(s.metric);
-    const v = num(s.staleAfterSeconds);
+    const v = toNumber(s.staleAfterSeconds);
     if (!(Number.isInteger(v) && v >= 10 && v <= 86_400)) e.sensors = t("Stale after must be 10–86400 seconds");
   }
   if (d.firmware.some((x) => x.length > 32)) e.firmware = t("Firmware versions are at most 32 characters");
@@ -115,17 +115,17 @@ export function capabilityInput(d: CapabilityDraft, id?: string): OpInput<"capab
   return {
     ...(id && { id, changeReason: d.changeReason.trim() }),
     manufacturer: d.manufacturer.trim(), model: d.model.trim(), control: d.control, modeControl: d.modeControl, fanControl: d.fanControl,
-    temperature: d.temperatureOn ? { min: num(d.min), max: num(d.max), step: num(d.step) } : null,
+    temperature: d.temperatureOn ? { min: toNumber(d.min), max: toNumber(d.max), step: toNumber(d.step) } : null,
     modes: d.modeControl ? d.modes : [], fanLevels: d.fanControl ? d.fanLevels : [], ventilation: d.ventilation, ventilationLevels: d.ventilation ? d.ventilationLevels : [],
-    sensors: d.sensors.map((s) => ({ metric: s.metric, unit: metricUnit[s.metric], staleAfterSeconds: num(s.staleAfterSeconds), boundaryId: s.metric === "power" ? "ac_input_electricity" : null })),
+    sensors: d.sensors.map((s) => ({ metric: s.metric, unit: metricUnit[s.metric], staleAfterSeconds: toNumber(s.staleAfterSeconds), boundaryId: s.metric === "power" ? "ac_input_electricity" : null })),
     firmwareCandidates: [...new Set(d.firmware.map((x) => x.trim()).filter(Boolean))],
   };
 }
 
 const CAPABILITY_PARTS: [string, (d: CapabilityDraft) => unknown][] = [
   ["identity", (d) => [d.manufacturer.trim(), d.model.trim()]], ["controls", (d) => [d.control, d.modeControl, d.fanControl, d.temperatureOn]],
-  ["temperature", (d) => (d.temperatureOn ? [num(d.min), num(d.max), num(d.step)] : null)], ["modes", (d) => [...d.modes].toSorted(byText)], ["fan levels", (d) => [...d.fanLevels].toSorted(byText)],
-  ["ventilation levels", (d) => [d.ventilation, [...d.ventilationLevels].toSorted(byText)]], ["sensors", (d) => d.sensors.map((x) => [x.metric, num(x.staleAfterSeconds)])],
+  ["temperature", (d) => (d.temperatureOn ? [toNumber(d.min), toNumber(d.max), toNumber(d.step)] : null)], ["modes", (d) => [...d.modes].toSorted(byText)], ["fan levels", (d) => [...d.fanLevels].toSorted(byText)],
+  ["ventilation levels", (d) => [d.ventilation, [...d.ventilationLevels].toSorted(byText)]], ["sensors", (d) => d.sensors.map((x) => [x.metric, toNumber(x.staleAfterSeconds)])],
   ["firmware candidates", (d) => d.firmware],
 ];
 /** What a model's draft changes against its saved capability (Figma Admin 106:3 “1 change · ventilation levels”); the

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Badge, Banner, BarChart, Card, ConnBadge, LinkBtn, Page, SeverityBadge, SummaryList, UtilBar, cx } from "@ac/web/components/ui";
+import { Badge, Banner, BarChart, Card, ConnBadge, LinkButton, Page, SeverityBadge, SummaryList, UtilizationBar, cx } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import type { UnitLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
@@ -19,7 +19,7 @@ export function PartnerUnitDetail({ live }: Readonly<{ live: UnitLive }>) {
         <Card title={live.title} className="max-w-xl">
           <SummaryList items={live.rows} />
           <p className="mt-2 text-[11px] text-muted-foreground">{t("Only your own acceptance / decline and work records are kept. Past access never re-opens customer data.")}</p>
-          <div className="mt-3"><LinkBtn href="/partner/jobs" variant="primary" size="sm">{t("Back to Jobs")}</LinkBtn></div>
+          <div className="mt-3"><LinkButton href="/partner/jobs" variant="primary" size="sm">{t("Back to Jobs")}</LinkButton></div>
         </Card>
       </Page>
     );
@@ -39,7 +39,7 @@ export function PartnerUnitDetail({ live }: Readonly<{ live: UnitLive }>) {
             {live.context ? (
               <>
                 <SummaryList items={live.context.rows.map(([k, v], n): [string, React.ReactNode] => [k, n === 1 && live.context!.techMissing ? <span key="t" className="font-semibold text-crit">{v}</span> : v])} />
-                {live.context.pct !== null && <div className="mt-2"><UtilBar pct={live.context.pct} tone={live.context.pct >= 80 ? "crit" : "primary"} label={live.context.note} /></div>}
+                {live.context.pct !== null && <div className="mt-2"><UtilizationBar pct={live.context.pct} tone={live.context.pct >= 80 ? "crit" : "primary"} label={live.context.note} /></div>}
                 <p className="mt-2 text-[11px] text-muted-foreground">{live.context.note}</p>
               </>
             ) : <p className="text-[13px] text-muted-foreground">{t("No current job of your company on this unit.")}</p>}

@@ -64,9 +64,9 @@ export async function uploadPhoto(form: FormData) {
   const jobId = String(form.get("jobId")), reportId = String(form.get("reportId")), version = Number(form.get("reportVersion"));
   const file = form.get("file");
   if (!(file instanceof File)) return { ok: false as const, code: "VALIDATION", messageKey: "error.validation", fieldErrors: { file: "error.required" } };
-  const buf = Buffer.from(await file.arrayBuffer());
+  const buffer = Buffer.from(await file.arrayBuffer());
   return run(async () => {
-    await coreOp("attachments.add", { jobId, reportId, file: { name: uploadName(file.name), mime: uploadType(buf, file.type) as OpInput<"attachments.add">["file"]["mime"], size: file.size, bytes: buf.toString("base64") } }, { write: true, expectedVersion: version });
+    await coreOp("attachments.add", { jobId, reportId, file: { name: uploadName(file.name), mime: uploadType(buffer, file.type) as OpInput<"attachments.add">["file"]["mime"], size: file.size, bytes: buffer.toString("base64") } }, { write: true, expectedVersion: version });
     return reportState(await coreOp<ApiTechReport>("reports.get", { jobId, reportId, reportVersion: version + 1 }));
   });
 }

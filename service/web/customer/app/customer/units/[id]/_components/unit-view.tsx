@@ -25,7 +25,7 @@ const REASONS: Record<string, string> = { "errors.unit_busy": "another command i
 scenario's now; the texts and times follow the user's display language and time zone (FR-X01, IR44, IR259), and a
 time of another day keeps its date (IR613). */
 export function UnitView({ id, detail, room: roomRows, policies, defaults = null, history = [], restrictionHref = null, nowMs = 0 }: Readonly<{ id: string; detail?: ApiUnitDetail; room?: UnitRow[]; policies?: PolicyOption[]; defaults?: { on: number; n: number } | null; history?: ApiCommand[]; restrictionHref?: string | null; nowMs?: number }>) {
-  interface Cmd { id: string; text: string; when: string; bad?: boolean }
+  interface CommandRow { id: string; text: string; when: string; bad?: boolean }
   const t = useT();
   const display = useDisplay();
   const toast = useToast();
@@ -40,7 +40,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
   const policy = d?.effectiveControlPolicy.state === "restricted" ? d.effectiveControlPolicy.policy : null;
   const isRestricted = d ? policy?.kind === "temperature_limit" : id === "unit-limited";
   const isBlocked = d?.controlAvailability.state === "blocked";
-  const [temp, setTemp] = useState(24);
+  const [setpoint, setTemperature] = useState(24);
   const [mode, setMode] = useState<"cool" | "dry" | "fan">("cool");
   const [fan, setFan] = useState<"low" | "mid" | "high">("mid");
   const [edited, setEdited] = useState<{ temp?: boolean; mode?: boolean; fan?: boolean }>({}); // settings the user changed since the last report
@@ -53,7 +53,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
   if (d && reported !== seenReport) {
     setSeenReport(reported);
     setEdited({});
-    if (d.observedState.celsius !== null) setTemp(d.observedState.celsius);
+    if (d.observedState.celsius !== null) setTemperature(d.observedState.celsius);
     if (d.observedState.mode) setMode(d.observedState.mode);
     if (d.observedState.fanLevel) setFan(d.observedState.fanLevel);
   }
@@ -72,21 +72,21 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
   const [mockOn, setOn] = useState(unit.state === "running");
   const isOn = d ? d.observedState.power === true : mockOn;
   const [sent, setSent] = useState<ApiCommand[]>([]);
-  const [mockHist, setHist] = useState<Cmd[]>([
+  const [mockHist, setHist] = useState<CommandRow[]>([
     { id: "cmd-0230", text: "Set power ON", when: "09:15" },
     { id: "cmd-0229", text: "Set mode COOL", when: "Yesterday 21:02" },
     { id: "cmd-0228", text: "Set fan MID", when: "Yesterday 21:02" },
     { id: "cmd-0227", text: "Set temperature 15°C — rejected: below model minimum 16°C", when: "Yesterday 19:40", bad: true },
   ]);
   // this screen's sends (live status) over the stored history (commands.list, IR216), newest first
-  const hist: Cmd[] = d ? [...sent, ...[...history, ...d.pendingCommands].filter((p, i, all) => sent.every((x) => x.id !== p.id) && all.findIndex((x) => x.id === p.id) === i)]
+  const hist: CommandRow[] = d ? [...sent, ...[...history, ...d.pendingCommands].filter((p, i, all) => sent.every((x) => x.id !== p.id) && all.findIndex((x) => x.id === p.id) === i)]
     .toSorted((a, b) => b.requestedAt.localeCompare(a.requestedAt)).map((c) => historyRow(c, t, display)) : mockHist;
   // the model's capabilities decide what can be set (deterministic contracts: control=false forbids ordinary actions,
   // temperature=null temperature changes; AT-X06); the demo screen shows a full model
   const layout = controlLayout(d?.capabilities ?? null);
   const isControllable = layout.control;
-  const tempRange = layout.temperature;
-  const cap = tempRange ?? { min: 16, max: 30, step: 1 };
+  const temperatureRange = layout.temperature;
+  const cap = temperatureRange ?? { min: 16, max: 30, step: 1 };
   const { modes, fans } = layout;
   const isShowMode = modes.length > 0;
   const isShowFan = fans.length > 0;
@@ -102,13 +102,13 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
   const fail = (e: unknown) => { toast(e instanceof OpError ? t("Not sent: {reason}", { reason: reason(e.error.messageKey, e.error.code) }) : t("Not sent"), "warn"); };
   const modeWord = (m: string | null) => (m && m in MODE_LABEL ? t(MODE_LABEL[m as keyof typeof MODE_LABEL]) : m ?? "—");
   const fanWord = (f: string | null) => (f && f in FAN_LABEL ? t(FAN_LABEL[f as keyof typeof FAN_LABEL]) : f ?? "—");
-  const changeText = (a: UnitAction) => (a.kind === "set_temperature" ? t("Set temperature {from}°C → {to}°C", { from: confirmed, to: temp }) : a.kind === "set_mode" ? t("Mode → {mode}", { mode: modeWord(mode) }) : a.kind === "set_fan" ? t("Fan → {fan}", { fan: fanWord(fan) }) : "");
+  const changeText = (a: UnitAction) => (a.kind === "set_temperature" ? t("Set temperature {from}°C → {to}°C", { from: confirmed, to: setpoint }) : a.kind === "set_mode" ? t("Mode → {mode}", { mode: modeWord(mode) }) : a.kind === "set_fan" ? t("Fan → {fan}", { fan: fanWord(fan) }) : "");
   const changes = (): UnitAction[] => {
     if (!d) return [];
     const a: UnitAction[] = [];
     if (!d.capabilities.control) return a;
     // only what the user changed: a setting the AC has not reported starts from a default that is no change
-    if (d.capabilities.temperature && edited.temp && temp !== d.observedState.celsius) a.push({ kind: "set_temperature", celsius: temp });
+    if (d.capabilities.temperature && edited.temp && setpoint !== d.observedState.celsius) a.push({ kind: "set_temperature", celsius: setpoint });
     if (isShowMode && edited.mode && mode !== d.observedState.mode) a.push({ kind: "set_mode", mode });
     if (isShowFan && edited.fan && fan !== d.observedState.fanLevel) a.push({ kind: "set_fan", fanLevel: fan });
     return a;
@@ -135,15 +135,15 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
     }
   };
   const togglePower = (v: boolean) => (d ? void sendApi([{ kind: "set_power", power: v }]) : (setOn(v), toast(t(v ? "Power ON sent" : "Power OFF sent"))));
-  const savePolicies = (ids: string[], msg: string, tone?: "warn") => {
-    if (!d) return setAttached(ids), toast(msg, tone);
-    setUnitAlertPolicies(id, ids).then((res) => { if (res.ok) toast(msg, tone); else toast(t("Not saved: {reason}", { reason: reason(res.messageKey, res.code) }), "warn"); }, fail);
+  const savePolicies = (ids: string[], message: string, tone?: "warn") => {
+    if (!d) return setAttached(ids), toast(message, tone);
+    setUnitAlertPolicies(id, ids).then((res) => { if (res.ok) toast(message, tone); else toast(t("Not saved: {reason}", { reason: reason(res.messageKey, res.code) }), "warn"); }, fail);
   };
   const send = () => {
     setConfirm(false);
     if (d) return void sendApi(changes());
     setWaiting(true);
-    setTimeout(() => { setWaiting(false); setHist((h) => [{ id: "cmd-0231", text: t("Set temperature {celsius}°C", { celsius: temp }), when: t("now") }, ...h]); toast(t("{name}: {celsius}°C acknowledged by device", { name: unit.name, celsius: temp })); }, 1500);
+    setTimeout(() => { setWaiting(false); setHist((h) => [{ id: "cmd-0231", text: t("Set temperature {celsius}°C", { celsius: setpoint }), when: t("now") }, ...h]); toast(t("{name}: {celsius}°C acknowledged by device", { name: unit.name, celsius: setpoint })); }, 1500);
   };
   return (
     <Page>
@@ -178,14 +178,14 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
             {isControllable ? (
             <div className="flex flex-col gap-4">
               <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="font-semibold">{t("Power")}</div><div className="text-xs text-muted-foreground">{t("Sent as its own command")}</div></div><Toggle on={isOn} disabled={isDisabled || waiting || policy?.kind === "power_off"} onChange={(v) => { if (!(isDisabled || waiting || policy?.kind === "power_off")) togglePower(v); }} label={t("Power")} /></div>
-              {tempRange && <div className="flex flex-wrap items-center justify-between gap-2">
+              {temperatureRange && <div className="flex flex-wrap items-center justify-between gap-2">
                 <div><div className="font-semibold">{t("Set temperature")}</div><div className="text-xs text-muted-foreground">{t("{min}–{max}°C · step {step}°C · confirmed {confirmed}°C", { min, max, confirmed, step: cap.step })}</div></div>
-                <div className="flex items-center gap-2"><Btn disabled={isDisabled || temp - cap.step < min} onClick={() => { setTemp((t) => t - cap.step); setEdited((e) => ({ ...e, temp: true })); }} aria-label={t("Lower the temperature")}><Icon name="remove" /></Btn><span className="w-14 text-center text-lg font-bold">{temp}°C</span><Btn disabled={isDisabled || temp + cap.step > max} onClick={() => { setTemp((t) => t + cap.step); setEdited((e) => ({ ...e, temp: true })); }} aria-label={t("Raise the temperature")}><Icon name="add" /></Btn></div>
+                <div className="flex items-center gap-2"><Btn disabled={isDisabled || setpoint - cap.step < min} onClick={() => { setTemperature((t) => t - cap.step); setEdited((e) => ({ ...e, temp: true })); }} aria-label={t("Lower the temperature")}><Icon name="remove" /></Btn><span className="w-14 text-center text-lg font-bold">{setpoint}°C</span><Btn disabled={isDisabled || setpoint + cap.step > max} onClick={() => { setTemperature((t) => t + cap.step); setEdited((e) => ({ ...e, temp: true })); }} aria-label={t("Raise the temperature")}><Icon name="add" /></Btn></div>
               </div>}
               {isShowMode && <div><div className="mb-1 font-semibold">{t("Mode")}</div><Choice value={mode} disabled={isDisabled} onChange={(m) => { setMode(m); setEdited((e) => ({ ...e, mode: true })); }} options={modes.map((m) => ({ id: m, label: t(MODE_LABEL[m]) }))} /></div>}
               {isShowFan && <div><div className="mb-1 font-semibold">{t("Fan speed")}</div><Choice value={fan} disabled={isDisabled} onChange={(f) => { setFan(f); setEdited((e) => ({ ...e, fan: true })); }} options={fans.map((f) => ({ id: f, label: t(FAN_LABEL[f]) }))} /></div>}
               {layout.review && ( // a model with the power only sends it at once: nothing to review (Figma 02o)
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 p-3 text-xs"><span><b>{t((d ? changes().length : 1) === 1 ? "{n} change:" : "{n} changes:", { n: d ? changes().length : 1 })}</b> {d ? changes().map(changeText).join(" · ") || t("No change yet") : t("Set temperature {from}°C → {to}°C", { from: 26, to: temp })}<br /><span className="text-muted-foreground">{t("Target: {name} only · you will confirm before sending", { name: unit.name })}</span></span><Btn variant="primary" disabled={isDisabled || waiting || (d !== null && changes().length === 0)} onClick={() => { setConfirm(true); }}>{t(waiting ? "Waiting for device…" : "Review & send")}</Btn></div>
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 p-3 text-xs"><span><b>{t((d ? changes().length : 1) === 1 ? "{n} change:" : "{n} changes:", { n: d ? changes().length : 1 })}</b> {d ? changes().map(changeText).join(" · ") || t("No change yet") : t("Set temperature {from}°C → {to}°C", { from: 26, to: setpoint })}<br /><span className="text-muted-foreground">{t("Target: {name} only · you will confirm before sending", { name: unit.name })}</span></span><Btn variant="primary" disabled={isDisabled || waiting || (d !== null && changes().length === 0)} onClick={() => { setConfirm(true); }}>{t(waiting ? "Waiting for device…" : "Review & send")}</Btn></div>
               )}
               {waiting && <Banner>{t("Waiting for device response… The result is shown only after the device acknowledges (fails after 30 s).")}</Banner>}
               {isOffline && ( // Figma 02h: nothing is sent to an offline AC; a repair request is the way forward (IR243, IR315)
@@ -199,7 +199,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
           </Card>
           <div className="split-even">
             <Card title={t("Live telemetry")}><SummaryList items={d ? [[t("Power draw"), pow ? `${pow.text} · ${pow.at}` : "—"], [t("Connection"), textOf(CONNECTION, d.connection, t) ?? d.connection], [t("Last seen"), showTime(d.lastSeenAt, display)], [t("Room temp"), room ? `${room.text} · ${room.at}` : "—"], [t("Humidity"), hum ? `${hum.text} · ${hum.at}` : "—"]] : [[t("Power draw"), "742 W · 09:12:30"], ["Wi-Fi", "RSSI −52 dBm (strong)"], [t("Last heartbeat"), "2 s ago"], [t("Room temp"), "28.0 °C · 09:12:30"], [t("Humidity"), "60 % · 09:12:30"]]} /></Card>
-            <Card title={t("Device information")}><SummaryList items={d ? [[t("Model"), `${d.capabilities.manufacturer} ${d.capabilities.model}`], [t("Remote control"), t(d.capabilities.control ? "supported" : "not supported")], [t("Capabilities"), tempRange ? t("Modes {modes} · fan {fans} · {min}–{max}°C step {step}", { modes: d.capabilities.modes.map(modeWord).join("/") || "—", fans: d.capabilities.fanLevels.map(fanWord).join("/") || "—", min: tempRange.min, max: tempRange.max, step: tempRange.step }) : t("Modes {modes} · fan {fans} · no temperature setting", { modes: d.capabilities.modes.map(modeWord).join("/") || "—", fans: d.capabilities.fanLevels.map(fanWord).join("/") || "—" })]] : [[t("Model"), "Split 1.5HP (demo)"], [t("Firmware"), "v2.4.1"], [t("Protocol"), "MQTT/TLS"], [t("Uptime"), "14d 8h"], [t("Capabilities"), "Modes cool/dry/fan · fan low/mid/high · 16–30°C step 1"]]} /></Card>
+            <Card title={t("Device information")}><SummaryList items={d ? [[t("Model"), `${d.capabilities.manufacturer} ${d.capabilities.model}`], [t("Remote control"), t(d.capabilities.control ? "supported" : "not supported")], [t("Capabilities"), temperatureRange ? t("Modes {modes} · fan {fans} · {min}–{max}°C step {step}", { modes: d.capabilities.modes.map(modeWord).join("/") || "—", fans: d.capabilities.fanLevels.map(fanWord).join("/") || "—", min: temperatureRange.min, max: temperatureRange.max, step: temperatureRange.step }) : t("Modes {modes} · fan {fans} · no temperature setting", { modes: d.capabilities.modes.map(modeWord).join("/") || "—", fans: d.capabilities.fanLevels.map(fanWord).join("/") || "—" })]] : [[t("Model"), "Split 1.5HP (demo)"], [t("Firmware"), "v2.4.1"], [t("Protocol"), "MQTT/TLS"], [t("Uptime"), "14d 8h"], [t("Capabilities"), "Modes cool/dry/fan · fan low/mid/high · 16–30°C step 1"]]} /></Card>
           </div>
           <Card title={t("Alert policies on this AC")} sub={t("Limits that raise alerts for this AC. Policies are made in Alerts › Alert policies.")}>
             <div className="flex flex-col gap-2 text-[13px]"><div className="rounded-xl border border-line p-3"><b>{t("Default policy")}</b><div className="text-xs text-muted-foreground">{t("{n} rules · ventilation (CO₂, PM2.5) + fault causes · Always attached · {on} of {n} rules on", { n: defaults?.n ?? 6, on: defaults?.on ?? 5 })}</div></div>{customerPolicies.filter((pl) => attached.includes(pl.id)).map((pl) => <div key={pl.id} className="rounded-xl border border-line p-3"><b>{pl.name}</b><div className="text-xs text-muted-foreground">{pl.rule}</div><Btn size="sm" className="mt-2" onClick={() => { savePolicies(attached.filter((y) => y !== pl.id), t("Detached from this AC only"), "warn"); }}>{t("Detach")}</Btn></div>)}<Btn size="sm" variant="ghost" onClick={() => { setPicked([]); setAttachOpen(true); }}><Icon name="add" /> {t("Attach policy")}</Btn></div>
@@ -211,7 +211,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
         </div>
       </div>
       <Modal open={confirm} onClose={() => { setConfirm(false); }} title={t("Confirm command")} footer={<><Btn onClick={() => { setConfirm(false); }}>{t("Cancel")}</Btn><Btn variant="primary" onClick={send}>{t("Send to {name}", { name: unit.name })}</Btn></>}>
-        <SummaryList items={[[t("Target"), `${unit.loc} › ${unit.name}`], [t("Change"), d ? changes().map(changeText).join(" · ") : t("Set temperature {from}°C → {to}°C", { from: 26, to: temp })], [t("Mode / fan"), `${modeWord(mode)} / ${fanWord(fan)}`]]} />
+        <SummaryList items={[[t("Target"), `${unit.loc} › ${unit.name}`], [t("Change"), d ? changes().map(changeText).join(" · ") : t("Set temperature {from}°C → {to}°C", { from: 26, to: setpoint })], [t("Mode / fan"), `${modeWord(mode)} / ${fanWord(fan)}`]]} />
         <p className="text-xs text-muted-foreground">{t("Only {name} changes. The result shows after the device acknowledges.", { name: unit.name })}</p>
       </Modal>
       <Modal open={attachOpen} onClose={() => { setAttachOpen(false); }} title={t("Attach a policy to {name}", { name: unit.name })} footer={<><Btn onClick={() => { setAttachOpen(false); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={picked.length === 0} onClick={() => { savePolicies([...attached, ...picked], t(picked.length > 1 ? "{n} policies attached to this AC" : "{n} policy attached to this AC", { n: picked.length })); setAttachOpen(false); }}>{t("Attach")}</Btn></>}>

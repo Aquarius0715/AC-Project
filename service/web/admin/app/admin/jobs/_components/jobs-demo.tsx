@@ -230,11 +230,11 @@ function ProposeModal({ j, onClose }: Readonly<{ j: Job; onClose: () => void }>)
   const [date, setDate] = useState("2026-10-01");
   const [win, setWin] = useState("10:00–12:00");
   const [who, setWho] = useState("contractor-a · tech-external-a");
-  const [msg, setMsg] = useState("All qualified technicians are booked Sep 28–30. The earliest free slot is Thursday morning. Sorry for the wait.");
+  const [messageText, setMessage] = useState("All qualified technicians are booked Sep 28–30. The earliest free slot is Thursday morning. Sorry for the wait.");
   const [tried, setTried] = useState(false);
   const isPre = j.preferred.some((s) => s.date === date && s.win === win);
   return (
-    <Modal open onClose={onClose} title="Propose another time to the client" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!msg.trim() || isPre) return; jobActions.propose(j.id, { date, win }, who, msg.trim(), "09-24 18:00"); toast("Proposal sent — waiting for the client"); onClose(); }}>Send proposal</Btn></>}>
+    <Modal open onClose={onClose} title="Propose another time to the client" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!messageText.trim() || isPre) return; jobActions.propose(j.id, { date, win }, who, messageText.trim(), "09-24 18:00"); toast("Proposal sent — waiting for the client"); onClose(); }}>Send proposal</Btn></>}>
       <p className="text-xs text-muted-foreground">{j.id} · {j.customer} · {j.unit}</p>
       <div className="rounded-xl border-2 border-primary bg-primary-soft/50 p-3">
         <div className="mb-2 flex items-center justify-between"><b className="text-[13px] text-primary">Option A</b><Badge tone="ok">Fits · capacity held</Badge></div>
@@ -245,7 +245,7 @@ function ProposeModal({ j, onClose }: Readonly<{ j: Job; onClose: () => void }>)
         <Field label="Who does it" className="mt-2"><Select value={who} onChange={(e) => { setWho(e.target.value); }}><option>contractor-a · tech-external-a</option><option>tech-internal-a</option></Select></Field>
         {isPre && <p className="mt-1 flex items-center gap-1 text-xs text-crit"><Icon name="error" />This is one of the client’s own times — book it directly instead.</p>}
       </div>
-      <Field label="Message to the client · required" error={tried && !msg.trim() ? "A message is required" : undefined}><Textarea value={msg} onChange={(e) => { setMsg(e.target.value); }} /></Field>
+      <Field label="Message to the client · required" error={tried && !messageText.trim() ? "A message is required" : undefined}><Textarea value={messageText} onChange={(e) => { setMessage(e.target.value); }} /></Field>
       <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}><Field label="Reply by"><Select><option>09-24 18:00 (48 h)</option><option>09-23 18:00 (24 h)</option></Select></Field><Field label="If no reply"><Select><option>Keep “Requested” and call the client</option></Select></Field></div>
       <Banner>The client sees “Time proposed” with Accept / Decline. Accept → booked automatically with the held partner. Decline → the client sends new times. Held capacity is released on decline or timeout.</Banner>
     </Modal>
@@ -257,12 +257,12 @@ function NewJobModal({ onClose, onDone }: Readonly<{ onClose: () => void; onDone
   const [sym, setSym] = useState("");
   const [slots, setSlots] = useState<Slot[]>([{ date: "2026-10-05", win: "10:00–12:00" }, { date: "2026-10-06", win: "14:00–16:00" }, { date: "2026-10-07", win: "09:00–11:00" }]);
   const [tried, setTried] = useState(false);
-  const err = tried ? preferredError(slots) : undefined;
+  const errorText = tried ? preferredError(slots) : undefined;
   return (
     <Modal open onClose={onClose} title="New maintenance job" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (sym.trim().length < 10 || preferredError(slots)) return; const id = jobActions.create({ unitId: "unit-online-rto", unit: "Bedroom AC", loc: "Home A › 1F › Bedroom", type: "Reactive", symptom: sym.trim(), preferred: slots }); toast(`${id} created as Requested`); onDone(id); }}>Create as requested</Btn></>}>
       <Field label="Customer · unit"><Select><option>customer-a · Bedroom AC (unit-online-rto)</option></Select></Field>
       <Field label="Symptom / scope (10+ characters)" error={tried && sym.trim().length < 10 ? "Enter at least 10 characters" : undefined}><Textarea value={sym} onChange={(e) => { setSym(e.target.value); }} placeholder="Customer called: unit leaks water at night." /></Field>
-      <PreferredSlotsInput value={slots} onChange={setSlots} error={err} label="Customer’s preferred times (asked on the phone)" hint="Same rule as client requests: book one of these, or propose another time for the customer to accept." />
+      <PreferredSlotsInput value={slots} onChange={setSlots} error={errorText} label="Customer’s preferred times (asked on the phone)" hint="Same rule as client requests: book one of these, or propose another time for the customer to accept." />
       <p className="text-[11px] text-muted-foreground">Periodic visits are created from Plans, not here.</p>
     </Modal>
   );

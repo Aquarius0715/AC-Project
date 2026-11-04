@@ -36,14 +36,14 @@ export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, on
     setTried(false);
   }
   const [key, setKey] = useState(p.rules[0]?.ruleKey ?? "");
-  const idx = Math.max(0, rules.findIndex((r) => r.ruleKey === key));
-  const rule = rules[idx];
+  const index = Math.max(0, rules.findIndex((r) => r.ruleKey === key));
+  const rule = rules[index];
   const [more, setMore] = useState<string[]>([]); // customers past the first 20 picked in the search-select
   const [switching, setSwitching] = useState<{ customer: { id: string; name: string }; on: boolean } | null>(null);
   const [reason, setReason] = useState("");
   if (!rule) return <Card title={t("Default policy")}><p className="text-[13px] text-muted-foreground">{t("The default policy has no rules.")}</p></Card>;
 
-  const edit = (patch: Partial<DefaultRule>) => { setRules((rs) => rs.map((r, i) => (i === idx ? { ...r, ...patch } : r))); };
+  const edit = (patch: Partial<DefaultRule>) => { setRules((rs) => rs.map((r, i) => (i === index ? { ...r, ...patch } : r))); };
   const errorsOf = (r: DefaultRule) => conditionErrors(r, t);
   const errors = errorsOf(rule);
   const broken = rules.filter((r) => Object.keys(errorsOf(r)).length);
@@ -86,7 +86,7 @@ export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, on
 
   return (
     <Card title={<span className="inline-flex flex-wrap items-center gap-2">{t("Default policy")} › {rule.name}<Badge tone="muted">{t("Policy v{n}", { n: p.version })}</Badge></span>}
-      sub={`${p.id} · ${t("HQ template")} · ${t("rule {n} of {total}", { n: idx + 1, total: rules.length })}`} action={<Badge tone="ok">{t("Enabled (template)")}</Badge>}>
+      sub={`${p.id} · ${t("HQ template")} · ${t("rule {n} of {total}", { n: index + 1, total: rules.length })}`} action={<Badge tone="ok">{t("Enabled (template)")}</Badge>}>
       <div className="flex flex-col gap-5">
         <Banner tone="warn" action={canWrite && copyable(rule) ? <Btn size="sm" onClick={() => { onCopy(rule.ruleKey); }}>{copyFor ? t("Copy as a {customer} policy", { customer: copyFor.name }) : t("Copy as a customer policy")}<Icon name="arrowRight" /></Btn> : undefined}>
           <span><b>{t("Default policy rule — runs on every unit of every customer")}</b><span className="block text-xs">{t("Saving changes affects all units. Customers and HQ can add their own policies on top; this rule cannot be detached from a unit.")}</span>

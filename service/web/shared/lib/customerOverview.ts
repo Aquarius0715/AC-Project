@@ -75,8 +75,8 @@ export interface EnergyCard { sub: string; total: string | null; delta: { text: 
 const previousName: Record<OverviewPeriod, string> = { today: "yesterday at this time", "7d": "the 7 days before", "30d": "the 30 days before" };
 /** The energy card: the period's kWh and its change against the previous period; bars for the last 7 days (dark)
 against the 7 days before (light). A missing value is never a 0 kWh total. */
-export function energyCard(kind: OverviewPeriod, cur: ApiEnergySummary | null, prev: ApiEnergySummary | null, week: { label: string; kWh: number | null }[], before: (number | null)[], scope: string, i: I18n = EN): EnergyCard {
-  const total = cur?.totals.kWh ?? null;
+export function energyCard(kind: OverviewPeriod, selected: ApiEnergySummary | null, prev: ApiEnergySummary | null, week: { label: string; kWh: number | null }[], before: (number | null)[], scope: string, i: I18n = EN): EnergyCard {
+  const total = selected?.totals.kWh ?? null;
   const was = prev?.totals.kWh ?? null;
   const delta = total !== null && was !== null && was > 0 ? Math.round(((total - was) / was) * 100) : null;
   return {
@@ -89,10 +89,10 @@ export function energyCard(kind: OverviewPeriod, cur: ApiEnergySummary | null, p
 export interface EmissionsCard { total: string | null; factor: string | null; baseline: string | null; saved: string | null }
 /** Estimated emissions of the period (the factor of energy.summary) and, with a comparable baseline, its emissions and
 the estimated saving — an estimate, never a tradable balance. */
-export function emissionsCard(cur: ApiEnergySummary | null, baselineLabel: string | null, i: I18n = EN): EmissionsCard {
-  const e = cur?.totals.emissionsKg ?? null;
-  const saved = cur?.totals.savedEmissionsKg ?? null;
-  const f = cur?.factorSnapshot ?? null;
+export function emissionsCard(selected: ApiEnergySummary | null, baselineLabel: string | null, i: I18n = EN): EmissionsCard {
+  const e = selected?.totals.emissionsKg ?? null;
+  const saved = selected?.totals.savedEmissionsKg ?? null;
+  const f = selected?.factorSnapshot ?? null;
   return {
     total: e === null ? null : one(e), factor: f ? i.t("{region} {year} · {factor} kgCO₂e/kWh (demo factor)", { region: f.region, year: f.year, factor: f.kgCO2ePerKWh }) : null,
     baseline: e === null || saved === null ? null : `${one(e + saved)} kgCO₂e${baselineLabel ? ` (${baselineLabel})` : ""}`, saved: saved === null ? null : `${one(saved)} kgCO₂e`,

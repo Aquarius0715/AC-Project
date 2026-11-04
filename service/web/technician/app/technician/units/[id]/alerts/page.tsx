@@ -3,7 +3,7 @@
 // acknowledge and resolve are Server Actions. Before the work window the page says when it opens (IR76). The Phase 1A
 // demo keeps the fixture.
 import { connection } from "next/server";
-import { Card, LinkBtn, Page } from "@ac/web/components/ui";
+import { Card, LinkButton, Page } from "@ac/web/components/ui";
 import { apiMode } from "@ac/web/lib/dal";
 import { AlertEvidenceView } from "./_components/alert-evidence";
 import { MockAlertEvidence } from "./_components/mock-evidence";
@@ -20,7 +20,7 @@ export default async function TechnicianAlertsPage({ params, searchParams }: Rea
   if (live.kind === "unavailable") {
     return (
       <Page className="max-w-xl">
-        <Card title={live.title} sub={live.text}><LinkBtn href={live.unitHref} size="sm"><Icon name="arrowLeft" />{live.back}</LinkBtn></Card>
+        <Card title={live.title} sub={live.text}><LinkButton href={live.unitHref} size="sm"><Icon name="arrowLeft" />{live.back}</LinkButton></Card>
       </Page>
     );
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, BarChart, Banner, Btn, Card, Check, Choice, DataTable, DemoBadge, Field, Input, Kpi, LinkBtn, Modal, Page, Select, SummaryList, Tabs, Plain } from "@ac/web/components/ui";
+import { Badge, BarChart, Banner, Btn, Card, Check, Choice, DataTable, DemoBadge, Field, Input, Kpi, LinkButton, Modal, Page, Select, SummaryList, Tabs, Plain } from "@ac/web/components/ui";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { klLocal, one, type SummaryView } from "@ac/web/lib/energy";
@@ -106,7 +106,7 @@ export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
           {s.warnings.length > 0 && <div className="mt-3"><Banner tone="warn">{s.warnings.join(" · ")}</Banner></div>}
           <details className="mt-3 text-[12px]"><summary className="cursor-pointer font-semibold text-muted-foreground">{t("Calculation conditions")}</summary><div className="mt-2"><SummaryList items={s.conditions} /></div></details>
         </Card>
-        <Card title={t("Carbon impact")} sub={t("Same period & units as above · {factor}", { factor: r.factor ?? t("emission factor missing") })} action={<LinkBtn size="sm" href={`/customer/energy/offsets?${live.query}`}>{t("Offset these emissions")}<Icon name="arrowRight" /></LinkBtn>}>
+        <Card title={t("Carbon impact")} sub={t("Same period & units as above · {factor}", { factor: r.factor ?? t("emission factor missing") })} action={<LinkButton size="sm" href={`/customer/energy/offsets?${live.query}`}>{t("Offset these emissions")}<Icon name="arrowRight" /></LinkButton>}>
           <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
             <div><div className="text-xs text-muted-foreground">{t("Estimated emissions")}</div><div className="text-2xl font-bold">{s.emissions}</div><div className="text-[11px] text-muted-foreground">{r.kWh === null ? t("no valid readings") : t("{kWh} kWh actual × factor", { kWh: one(r.kWh) })}</div></div>
             <div><div className="text-xs text-muted-foreground">{t("Estimated savings vs baseline")}</div><div className={`text-2xl font-bold ${s.comparable ? (s.increase ? "text-warn" : "text-ok") : "text-muted-foreground"}`}>{s.savedEmissions}</div><div className="text-[11px] text-muted-foreground">{s.comparable ? `${s.baseline} → ${s.actual}` : t("needs a comparable baseline")}</div></div>
@@ -135,14 +135,14 @@ function ExportModal({ live, onClose }: Readonly<{ live: EnergyLive; onClose: ()
   const [email, setEmail] = useState(live.prefs?.monthlyReportEmail ?? false);
   const [file, setFile] = useState<ReportFile | null>(null);
   const label = (m: string) => new Date(`${m}-01T00:00:00Z`).toLocaleDateString(intlTag(locale), { month: "long", year: "numeric", timeZone: "UTC" });
-  const err = props.length === 0 ? t("Choose at least one location") : (sections.length === 0 ? t("Choose at least one section") : undefined);
+  const errorText = props.length === 0 ? t("Choose at least one location") : (sections.length === 0 ? t("Choose at least one section") : undefined);
   const download = () => {
     const input: ReportInput = { propertyIds: props, month, sections, format };
     const prefs = live.prefs && email !== live.prefs.monthlyReportEmail ? { locale: live.prefs.locale as "en" | "ms", timezone: live.prefs.timezone, value: email } : null;
     run(() => exportReport(input, prefs), t("Report ready"), setFile);
   };
   return (
-    <Modal open onClose={onClose} title={t("Export report")} footer={<><Btn onClick={onClose}>{t("Close")}</Btn>{!file && <Btn variant="primary" disabled={pending || !!err} onClick={download}>{t("Download")}</Btn>}</>}>
+    <Modal open onClose={onClose} title={t("Export report")} footer={<><Btn onClick={onClose}>{t("Close")}</Btn>{!file && <Btn variant="primary" disabled={pending || !!errorText} onClick={download}>{t("Download")}</Btn>}</>}>
       {file ? (
         <div className="flex flex-col gap-3">
           <Banner tone="ok" action={<DemoBadge />}><b>{t("Report ready")}</b><div className="text-xs">{t("{file} · {kb} KB · {format} — a demo file: nothing is downloaded or e-mailed.", { file: file.fileName, kb: Math.max(1, Math.round(file.size / 1024)), format: file.mime === "text/csv" ? "CSV" : "PDF" })}</div></Banner>
@@ -155,7 +155,7 @@ function ExportModal({ live, onClose }: Readonly<{ live: EnergyLive; onClose: ()
           <Field label={t("Include")}><div className="flex flex-col gap-1">{(Object.keys(sectionLabel) as Section[]).map((k) => <Check key={k} label={t(sectionLabel[k])} checked={sections.includes(k)} onChange={(on) => { setSections(on ? [...sections, k] : sections.filter((x) => x !== k)); }} />)}</div></Field>
           <Field label={t("Format")}><Choice value={format} onChange={(v: "pdf" | "csv") => { setFormat(v); }} options={[{ id: "pdf", label: "PDF" }, { id: "csv", label: t("CSV (raw data)") }]} /></Field>
           {live.prefs && <Check label={t("Email this report to me every month")} checked={email} onChange={setEmail} />}
-          {err && <p className="text-xs text-crit">{err}</p>}
+          {errorText && <p className="text-xs text-crit">{errorText}</p>}
         </div>
       )}
     </Modal>

@@ -103,9 +103,9 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
     run(() => updateFirmware(dv.detail.id, dv.detail.version, fw, dv.jobId!), t("Firmware update to {version} requested", { version: fw }), ok(), failed);
   };
   const saveNote = () => {
-    const ev = dv?.events?.find((x) => x.id === note.eventId);
-    if (!ev || note.text.trim().length === 0 || note.text.trim().length > 1000) { setErrors({ responseNote: t("A note of 1–1000 characters") }); return; }
-    run(() => addResponseNote(dv!.detail.id, ev.id, ev.version, note.text), t("Response note added — the device state is unchanged"), ok(), failed);
+    const event = dv?.events?.find((x) => x.id === note.eventId);
+    if (!event || note.text.trim().length === 0 || note.text.trim().length > 1000) { setErrors({ responseNote: t("A note of 1–1000 characters") }); return; }
+    run(() => addResponseNote(dv!.detail.id, event.id, event.version, note.text), t("Response note added — the device state is unchanged"), ok(), failed);
   };
 
   return (

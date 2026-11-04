@@ -24,10 +24,10 @@ export function roomUnits(ds: ApiUnitDetail[], i: I18n = EN): RoomUnit[] {
   return [...ds].toSorted((a, b) => a.displayName.localeCompare(b.displayName)).map((d) => {
     const o = d.observedState;
     const set = [o.celsius === null ? null : t("Set {celsius}°C", { celsius: o.celsius }), o.mode ? t(modeLabel[o.mode]) : null, o.fanLevel ? t("Fan {level}", { level: t(fanLabel[o.fanLevel]) }) : null].filter(Boolean).join(" · ");
-    const temp = metric(d, "temperature");
+    const temperatureText = metric(d, "temperature");
     const kw = metric(d, "power");
     return {
-      id: d.id, version: d.version, name: d.displayName, set: set || t("No setting reported yet"), temp: temp === null ? "—" : t("{temp} °C room", { temp: one(temp) }),
+      id: d.id, version: d.version, name: d.displayName, set: set || t("No setting reported yet"), temp: temperatureText === null ? "—" : t("{temp} °C room", { temp: one(temperatureText) }),
       watts: kw === null ? "—" : `${String(Math.round(kw * 1000))} W`, power: d.effectivePowerState === "on" ? "running" : (d.effectivePowerState === "off" ? "stopped" : "unknown"),
       conn: d.connection, seen: d.lastSeenAt ? showClock(d.lastSeenAt, i.display) : null, online: d.connection === "online",
     };

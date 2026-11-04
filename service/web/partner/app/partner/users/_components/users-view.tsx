@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useRef, useState } from "react";
-import { Badge, Banner, Btn, Card, DataTable, EmptyState, Field, Input, LinkBtn, Modal, Page, PageHead, Select, Textarea } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, DataTable, EmptyState, Field, Input, LinkButton, Modal, Page, PageHead, Select, Textarea } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { Icon } from "@ac/web/components/Icon";
 import { useAction } from "@ac/web/lib/useAction";
@@ -48,7 +48,7 @@ export function UsersView({ data, ops, onStatus, sends = false }: Readonly<{ dat
       <Page>
         <Card title={t("Page unavailable")}>
           <p className="text-[13px] text-muted-foreground">{t("This page doesn’t exist or you don’t have access to it.")}</p>
-          <div className="mt-3"><LinkBtn href="/partner" variant="primary">{t("Go to your home (or sign in)")}</LinkBtn></div>
+          <div className="mt-3"><LinkButton href="/partner" variant="primary">{t("Go to your home (or sign in)")}</LinkButton></div>
         </Card>
       </Page>
     );
@@ -60,16 +60,16 @@ export function UsersView({ data, ops, onStatus, sends = false }: Readonly<{ dat
   };
   const close = () => { setDialog(null); };
   const isAdding = dialog?.kind === "invite";
-  const emailErr = isAdding ? partnerInviteError(email, data.all, t) : undefined;
-  const nameErr = isAdding ? nameError(name, t) : undefined;
-  const untilErr = (isAdding && role === "technician") || dialog?.kind === "access" ? accessError(until, data.today, t) : undefined;
-  const reasonErr = dialog && !isAdding ? reasonError(reason, t) : undefined;
+  const emailError = isAdding ? partnerInviteError(email, data.all, t) : undefined;
+  const nameProblem = isAdding ? nameError(name, t) : undefined;
+  const untilError = (isAdding && role === "technician") || dialog?.kind === "access" ? accessError(until, data.today, t) : undefined;
+  const reasonProblem = dialog && !isAdding ? reasonError(reason, t) : undefined;
   const edit = (k: FieldKey) => { setServer((s) => (s[k] ? { ...s, [k]: undefined } : s)); };
   const submit = () => {
     setTried(true);
     if (!dialog) return;
     // a refused submit takes focus to the first field to fix, top to bottom (IR586, IR593)
-    const local: Partial<Record<FieldKey, string>> = { name: nameErr, email: emailErr, until: untilErr, reason: reasonErr };
+    const local: Partial<Record<FieldKey, string>> = { name: nameProblem, email: emailError, until: untilError, reason: reasonProblem };
     const bad = FIELDS.find((k) => local[k]);
     if (bad) { focusField(ids[bad]); return; }
     // what the Core API refuses on a field (an address someone else still holds, IR462) shows under it as well
@@ -140,20 +140,20 @@ export function UsersView({ data, ops, onStatus, sends = false }: Readonly<{ dat
       <p className="text-[11px] text-muted-foreground">{t(sends ? "The set-up e-mail comes from the sign-in service; in development it arrives in the local Mailpit inbox." : "Nothing is sent in the demo.")}</p>
       <Modal open={!!dialog} onClose={close} title={title} finalFocus={() => (gone.current ? document.querySelector("#users-list") : true)} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant={dialog?.kind === "remove" || dialog?.kind === "disable" ? "danger" : "primary"} disabled={pending} onClick={submit}>{action}</Btn></>}>
         {isAdding && <>
-          <Field label={t("Name")} error={(tried ? nameErr : undefined) ?? server.name}><Input id={ids.name} value={name} maxLength={120} onChange={(e) => { setName(e.target.value); edit("name"); }} placeholder="Lim Wei Ming" /></Field>
-          <Field label={t("Email")} error={(tried ? emailErr : undefined) ?? server.email}><Input id={ids.email} type="email" value={email} onChange={(e) => { setEmail(e.target.value); edit("email"); }} placeholder="lim.tech@example.com" /></Field>
+          <Field label={t("Name")} error={(tried ? nameProblem : undefined) ?? server.name}><Input id={ids.name} value={name} maxLength={120} onChange={(e) => { setName(e.target.value); edit("name"); }} placeholder="Lim Wei Ming" /></Field>
+          <Field label={t("Email")} error={(tried ? emailError : undefined) ?? server.email}><Input id={ids.email} type="email" value={email} onChange={(e) => { setEmail(e.target.value); edit("email"); }} placeholder="lim.tech@example.com" /></Field>
           <Field label={t("Role")} hint={t("Contractors manage jobs, the team and users; technicians do the work on site.")}>
             <Select aria-label={t("Role")} value={role} onChange={(e) => { setRole(e.target.value as PartnerRole); }}>{PARTNER_ROLES.map((r) => <option key={r} value={r}>{t(roleLabel[r])}</option>)}</Select>
           </Field>
         </>}
         {((isAdding && role === "technician") || dialog?.kind === "access") &&
-          <Field label={t("Access until")} hint={t("The last day they can sign in, at most a year ahead (Kuala Lumpur time).")} error={(tried ? untilErr : undefined) ?? server.until}>
+          <Field label={t("Access until")} hint={t("The last day they can sign in, at most a year ahead (Kuala Lumpur time).")} error={(tried ? untilError : undefined) ?? server.until}>
             <Input id={ids.until} type="date" value={until} min={data.today} max={addDays(data.today, ACCESS_MAX_DAYS)} onChange={(e) => { setUntil(e.target.value); edit("until"); }} />
           </Field>}
         {isAdding && <Banner>{t("Their account is created now and they get an e-mail to set their password; until they sign in they are listed as “Not signed in yet”.")}</Banner>}
         {dialog?.kind === "disable" && <Banner tone="warn">{t("Their access ends now. Enabling them again restores their access period, if it has not ended.")}</Banner>}
         {dialog?.kind === "remove" && <Banner tone="warn">{t(dialog.row.status === "invited" ? "Their account is removed before they signed in." : "Their access ends now and they leave your company's user list.")}</Banner>}
-        {dialog && dialog.kind !== "invite" && <Field label={t("Reason")} error={(tried ? reasonErr : undefined) ?? server.reason}><Textarea id={ids.reason} value={reason} onChange={(e) => { setReason(e.target.value); edit("reason"); }} placeholder={t("e.g. on leave until October")} /></Field>}
+        {dialog && dialog.kind !== "invite" && <Field label={t("Reason")} error={(tried ? reasonProblem : undefined) ?? server.reason}><Textarea id={ids.reason} value={reason} onChange={(e) => { setReason(e.target.value); edit("reason"); }} placeholder={t("e.g. on leave until October")} /></Field>}
       </Modal>
     </Page>
   );

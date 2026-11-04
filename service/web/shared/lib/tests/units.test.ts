@@ -4,7 +4,7 @@ import { actionText, controlLayout, historyRow, latest, setsTemperature, type Ap
 
 const ms = translator("ms");
 const tokyo = { locale: "en" as const, timeZone: "Asia/Tokyo" };
-const cmd = (over: Partial<ApiCommand>): ApiCommand => ({ id: "cmd-12345678-abcd", action: { kind: "set_temperature", celsius: 24 }, status: "acknowledged", requestedAt: "2026-09-14T01:00:00Z", failureCode: null, ...over });
+const deviceCommand = (over: Partial<ApiCommand>): ApiCommand => ({ id: "cmd-12345678-abcd", action: { kind: "set_temperature", celsius: 24 }, status: "acknowledged", requestedAt: "2026-09-14T01:00:00Z", failureCode: null, ...over });
 
 describe("unit commands and readings in the display language and time zone (FR-X01, IR44, IR259)", () => {
   it("words every command in English and Malay, the stored values unchanged", () => {
@@ -18,16 +18,16 @@ describe("unit commands and readings in the display language and time zone (FR-X
       .toEqual(["Set ventilation HIGH", "Apply restriction: Temperature limit — cooling setpoint ≥ 26 °C", "Apply restriction: Power off", "Remove restriction"]);
     expect([actionText({ kind: "ventilate", level: "low" }, ms), actionText(limit, ms), actionText(remove, ms)])
       .toEqual(["Tetapkan pengudaraan RENDAH", "Kenakan sekatan: Had suhu — suhu tetapan penyejukan ≥ 26 °C", "Tarik balik sekatan"]);
-    expect(historyRow(cmd({ action: limit, source: "restriction" })).text).toBe("Apply restriction: Temperature limit — cooling setpoint ≥ 26 °C — acknowledged by device · by a restriction");
+    expect(historyRow(deviceCommand({ action: limit, source: "restriction" })).text).toBe("Apply restriction: Temperature limit — cooling setpoint ≥ 26 °C — acknowledged by device · by a restriction");
   });
 
   it("states a command's outcome and source, with the IR44 time of the request", () => {
-    expect(historyRow(cmd({}))).toEqual({ id: "cmd-1234", text: "Set temperature 24°C — acknowledged by device", when: "14 Sept 2026, 9:00 am MYT", bad: false });
-    expect(historyRow(cmd({ status: "failed", failureCode: "device_rejected", source: "automation" }), ms, { locale: "ms", timeZone: "Asia/Tokyo" }))
+    expect(historyRow(deviceCommand({}))).toEqual({ id: "cmd-1234", text: "Set temperature 24°C — acknowledged by device", when: "14 Sept 2026, 9:00 am MYT", bad: false });
+    expect(historyRow(deviceCommand({ status: "failed", failureCode: "device_rejected", source: "automation" }), ms, { locale: "ms", timeZone: "Asia/Tokyo" }))
       .toEqual({ id: "cmd-1234", text: "Tetapkan suhu 24°C — gagal (device_rejected) · oleh automasi", when: "14 Sep 2026, 10:00 PG GMT+9", bad: true });
-    expect(historyRow(cmd({ status: "expired" }), undefined, tokyo)).toMatchObject({ text: "Set temperature 24°C — no device response (expired)", when: "14 Sept 2026, 10:00 am GMT+9", bad: true });
+    expect(historyRow(deviceCommand({ status: "expired" }), undefined, tokyo)).toMatchObject({ text: "Set temperature 24°C — no device response (expired)", when: "14 Sept 2026, 10:00 am GMT+9", bad: true });
     // the assistant's confirmed change (IR306); a command from Unit Control (UI) carries no label
-    expect([historyRow(cmd({ source: "voice" })).text, historyRow(cmd({ source: "voice" }), ms).text, historyRow(cmd({ source: "ui" })).text])
+    expect([historyRow(deviceCommand({ source: "voice" })).text, historyRow(deviceCommand({ source: "voice" }), ms).text, historyRow(deviceCommand({ source: "ui" })).text])
       .toEqual(["Set temperature 24°C — acknowledged by device · by voice", "Tetapkan suhu 24°C — disahkan oleh peranti · melalui suara", "Set temperature 24°C — acknowledged by device"]);
   });
 

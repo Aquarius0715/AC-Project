@@ -26,7 +26,7 @@ const alerts = [
   { id: "a1", unitId: "u1", type: "sensor", severity: "warning", status: "acknowledged", causeCode: "window_open", evidenceKind: "inferred", evidenceText: "Cooling load rose while the outdoor temperature was stable.", detectedAt: "2026-09-14T01:12:00Z", acknowledgedAt: "2026-09-14T01:20:00Z", resolvedAt: null, resolutionReason: null },
   { id: "a2", unitId: "u1", type: "maintenance", severity: "normal", status: "resolved", causeCode: "unknown", evidenceKind: "inferred", evidenceText: "Cleaning due.", detectedAt: "2026-09-10T01:00:00Z", acknowledgedAt: null, resolvedAt: "2026-09-13T03:00:00Z", resolutionReason: "Filter cleaned" },
 ] as ApiAlert[];
-const ev = (id: string, eventType: ApiDeviceEventFull["eventType"], occurredAt: string, recovery: ApiDeviceEventFull["recovery"] = null) =>
+const event = (id: string, eventType: ApiDeviceEventFull["eventType"], occurredAt: string, recovery: ApiDeviceEventFull["recovery"] = null) =>
   ({ id, eventType, occurredAt, recovery, version: 1, deviceId: "d1", evidenceSource: "heartbeat", restoredAt: null, alertIds: [], responseNotes: [] }) as ApiDeviceEventFull;
 const jobs = [
   { projection: "summary", id: "job-contractor-a", version: 3, unitId: "u1", type: "reactive", status: "in_progress", severity: "warning", dueAt: "2026-09-15T00:00:00Z", requestedSlot: { startAt: "2026-09-14T02:00:00Z", endAt: "2026-09-14T04:00:00Z" }, scheduledSlot: { startAt: "2026-09-14T02:00:00Z", endAt: "2026-09-14T04:00:00Z" } },
@@ -95,12 +95,12 @@ describe("technician unit screen", () => {
   });
 
   it("lists the period's alert and device events, newest first", () => {
-    const events = [ev("e1", "communication_lost", "2026-09-13T19:00:00Z"), ev("e2", "restored", "2026-09-13T21:10:00Z", { axis: "connection", sourceEventId: "e1", value: "online" }), ev("e3", "tamper", "2026-09-10T00:00:00Z")];
+    const events = [event("e1", "communication_lost", "2026-09-13T19:00:00Z"), event("e2", "restored", "2026-09-13T21:10:00Z", { axis: "connection", sourceEventId: "e1", value: "online" }), event("e3", "tamper", "2026-09-10T00:00:00Z")];
     expect(windowEvents(alerts, events, "24h", NOW).map((e) => [e.time, e.title, e.badge.text])).toEqual([
       ["today 9:20 am MYT", "Alert acknowledged — Possible open window", "Acknowledged"], ["today 9:12 am MYT", "Alert raised — Possible open window", "Warning"],
       ["today 5:10 am MYT", "Data resumed", "Connectivity"], ["today 3:00 am MYT", "Updates stopped", "Connectivity"], ["yesterday 11:00 am MYT", "Alert resolved — Filter cleaning reminder", "Resolved"],
     ]);
-    expect(windowEvents([], [ev("e4", "restored", "2026-09-14T01:00:00Z", { axis: "tamper", sourceEventId: "e3", value: "clear" })], "1h", NOW)[0]).toMatchObject({ title: "Tamper cleared", badge: { text: "Tamper", tone: "ok" } });
+    expect(windowEvents([], [event("e4", "restored", "2026-09-14T01:00:00Z", { axis: "tamper", sourceEventId: "e3", value: "clear" })], "1h", NOW)[0]).toMatchObject({ title: "Tamper cleared", badge: { text: "Tamper", tone: "ok" } });
   });
 
   it("lists the technician's jobs on the unit and the job control works for", () => {

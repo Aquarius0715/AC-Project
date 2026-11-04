@@ -140,13 +140,13 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
   const { t } = i18n;
   const rule = live.editing === "new" ? null : live.rules.find((r) => r.id === live.editing) ?? null;
   const [draft, setDraft] = useState<Draft>(() => (rule ? draftOf(rule) : newDraft(live.acs[0]?.id ?? "", live.timezone)));
-  const [apiErr, setApiErr] = useState<Record<string, string>>({});
+  const [apiError, setApiError] = useState<Record<string, string>>({});
   const [shown, setShown] = useState(false); // client checks shown after the first Save / Test
   const [test, setTest] = useState<TestRow[] | null>(null);
   const [pending, run] = useAction();
-  const set = (p: Partial<Draft>) => { setDraft((d) => ({ ...d, ...p })); setApiErr({}); };
+  const set = (p: Partial<Draft>) => { setDraft((d) => ({ ...d, ...p })); setApiError({}); };
   const local = draftErrors(draft, t);
-  const errors = { ...(shown && local), ...apiErr };
+  const errors = { ...(shown && local), ...apiError };
   const isSched = draft.trigger === "schedule";
   const isScheduleOk = isSched && !local.weekdays && !local.startLocal && !local.endLocal && !local.endsNextDay;
   const preview = useOp<ApiOccurrence[], ApiOccurrence[]>("automations.nextRuns", { draft: scheduleDraft(useDebounced(draft, 400)), count: 8 }, [], (d) => d, isScheduleOk);
@@ -168,7 +168,7 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
       const next = a.kind === "schedule" && a.enabled ? preview.data.find((o) => o.phase === "schedule_start") : undefined;
       onDone({ title: t("Automation saved"), text: next ? t("“{name}” saved · next run {when} ({zone}). Saving sends no command now.", { name: a.name, when: runText(next.at, a.timezone, i18n), zone: a.timezone })
         : t(a.enabled ? "“{name}” saved · on. Saving sends no command now." : "“{name}” saved · off — switch it on to run it. Saving sends no command now.", { name: a.name }) });
-    }, (f) => { setApiErr(apiErrors(f.fieldErrors, t)); });
+    }, (f) => { setApiError(apiErrors(f.fieldErrors, t)); });
   };
   const runTest = () => {
     setShown(true);

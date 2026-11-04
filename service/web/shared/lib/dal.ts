@@ -36,8 +36,8 @@ export interface CoreOptions { write?: boolean; expectedVersion?: number; idempo
 
 /** Calls one Core API operation as the signed-in membership at its REST route (IR222) and returns `data`
 (DomainError → CoreError). The input is typed by the contract (IR313). */
-export async function coreOp<T>(...[operation, input, opts = {}]: OpArgs<CoreOptions>): Promise<T> {
-  const { data } = await coreCall<T>(operation, input, opts);
+export async function coreOp<T>(...[operation, input, options = {}]: OpArgs<CoreOptions>): Promise<T> {
+  const { data } = await coreCall<T>(operation, input, options);
   return data;
 }
 
@@ -100,7 +100,7 @@ export const corePermissions = cache(async (): Promise<Set<string>> => {
   return new Set(data.permissions);
 });
 
-async function coreCall<T>(operation: string, input: unknown, opts: CoreOptions): Promise<{ data: T; meta?: { snapshotAt?: string } }> {
+async function coreCall<T>(operation: string, input: unknown, options: CoreOptions): Promise<{ data: T; meta?: { snapshotAt?: string } }> {
   const s = await verifySession();
   const req = coreRequest(operation, input);
   if (!req) throw new CoreError(404, { code: "NOT_FOUND", messageKey: "error.unknownOperation", fieldErrors: {}, correlationId: "", retryAfterSeconds: null });
@@ -110,8 +110,8 @@ async function coreCall<T>(operation: string, input: unknown, opts: CoreOptions)
     "X-Membership-Id": s.membershipId,
   };
   if (req.body !== undefined) headers["Content-Type"] = "application/json";
-  if (opts.write) headers["Idempotency-Key"] = opts.idempotencyKey ?? crypto.randomUUID();
-  if (opts.expectedVersion !== undefined) headers["X-Expected-Version"] = String(opts.expectedVersion);
+  if (options.write) headers["Idempotency-Key"] = options.idempotencyKey ?? crypto.randomUUID();
+  if (options.expectedVersion !== undefined) headers["X-Expected-Version"] = String(options.expectedVersion);
   const res = await fetch(`${process.env.CORE_API_URL ?? "http://localhost:8080"}${req.path}`, { method: req.method, body: req.body, cache: "no-store", headers });
   const body = await res.json().catch(() => null);
   // the Core API no longer takes this sign-in (HQ signed the user out everywhere, IR384, or the membership ended): the

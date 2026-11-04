@@ -186,11 +186,11 @@ export function selection(tree: TreeProperty[], locationId: string | undefined, 
 /** The space path under the property ("1F › Bedroom"); "" for none. */
 export function spacePath(spaceId: string | null, ss: ApiSpaceRow[]): string {
   const names: string[] = [];
-  let cur = ss.find((s) => s.id === spaceId);
-  while (cur) {
-    names.unshift(cur.name);
-    const parent = cur.parentSpaceId;
-    cur = parent ? ss.find((s) => s.id === parent) : undefined;
+  let currentRow = ss.find((s) => s.id === spaceId);
+  while (currentRow) {
+    names.unshift(currentRow.name);
+    const parent = currentRow.parentSpaceId;
+    currentRow = parent ? ss.find((s) => s.id === parent) : undefined;
   }
   return names.join(" › ");
 }

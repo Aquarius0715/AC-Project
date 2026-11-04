@@ -58,8 +58,8 @@ describe("partner job detail", () => {
   });
 
   it("builds the status timeline from the events", () => {
-    const ev = (action: string, at: string) => ({ id: action, jobId: "j", actorUserId: null, occurredAt: at, action });
-    const events = [ev("job.created", "2026-09-13T01:00:00Z"), ev("job.offered", "2026-09-13T10:20:00Z"), ev("offer.accepted", "2026-09-14T02:02:00Z")];
+    const event = (action: string, at: string) => ({ id: action, jobId: "j", actorUserId: null, occurredAt: at, action });
+    const events = [event("job.created", "2026-09-13T01:00:00Z"), event("job.offered", "2026-09-13T10:20:00Z"), event("offer.accepted", "2026-09-14T02:02:00Z")];
     const t = timeline("accepted", events, false, "periodic_plan");
     expect(t[0].sub).toBe("periodic plan");
     expect(t.map((s) => [s.label, s.state, s.at])).toEqual([

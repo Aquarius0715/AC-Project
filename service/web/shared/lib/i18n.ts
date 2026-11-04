@@ -45,14 +45,14 @@ const plain = (s: string) => s.replaceAll(/[\u00A0\u2009\u202F]/g, " ");
 
 /** `opts` in the user's language and display time zone with the zone's abbreviation (unless `withZone` is false); a
 zone this runtime does not know falls back to the default one. */
-function zoned(iso: string | null, d: Display, opts: Intl.DateTimeFormatOptions, withZone = true): string {
+function zoned(iso: string | null, d: Display, options: Intl.DateTimeFormatOptions, withZone = true): string {
   if (!iso) return "—";
   const at = new Date(iso);
   const tag = intlTag(d.locale);
   for (const timeZone of [d.timeZone, DEFAULT_DISPLAY.timeZone]) {
     try {
       const zone = withZone ? new Intl.DateTimeFormat(tag, { timeZone, timeZoneName: "short" }).formatToParts(at).find((p) => p.type === "timeZoneName")?.value : undefined;
-      const text = plain(at.toLocaleString(tag, { ...opts, timeZone }));
+      const text = plain(at.toLocaleString(tag, { ...options, timeZone }));
       return zone ? `${text} ${zone}` : text;
     } catch {
       // RangeError: unknown time zone

@@ -23,7 +23,7 @@ export interface UnitPlace { name: string; place: string }
 /** Unit names with their location path ("Home A › 1F › Bedroom") from units.list, properties.list and spaces.list. */
 export function unitPlaces(us: { id: string; displayName: string; propertyId: string; spaceId: string | null }[], ps: { id: string; name: string }[],
   ss: { id: string; name: string; parentSpaceId: string | null }[]): Map<string, UnitPlace> {
-  const prop = new Map(ps.map((p) => [p.id, p.name]));
+  const property = new Map(ps.map((p) => [p.id, p.name]));
   const space = new Map(ss.map((x) => [x.id, x]));
   const path = (id: string | null) => {
     const out: string[] = [];
@@ -34,7 +34,7 @@ export function unitPlaces(us: { id: string; displayName: string; propertyId: st
     }
     return out;
   };
-  return new Map(us.map((u) => [u.id, { name: u.displayName, place: [prop.get(u.propertyId) ?? "", ...path(u.spaceId)].filter(Boolean).join(" › ") }]));
+  return new Map(us.map((u) => [u.id, { name: u.displayName, place: [property.get(u.propertyId) ?? "", ...path(u.spaceId)].filter(Boolean).join(" › ") }]));
 }
 export type ClientContract = ApiContract & { activeRestrictionIds?: string[] };
 export interface ContractCard {
@@ -117,12 +117,12 @@ const releaseText: Record<string, string> = { none: "", waiting_reconcile: "Wait
 export function noticeUnits(r: ApiRestriction, unit: (id: string) => UnitPlace | undefined, commands: Map<string, ApiCommand>, t: T = en): NoticeUnit[] {
   return r.perUnit.map((u) => {
     const last = u.releaseCommandIds.at(-1) ?? u.applyCommandIds.at(-1);
-    const cmd = last ? commands.get(last) : undefined;
-    const waiting = u.releaseState === "requested" && cmd && (cmd.status === "requested" || cmd.status === "sent");
+    const deviceCommand = last ? commands.get(last) : undefined;
+    const waiting = u.releaseState === "requested" && deviceCommand && (deviceCommand.status === "requested" || deviceCommand.status === "sent");
     const note = [
       u.pendingReason === "offline" ? t("the unit is offline") : (u.pendingReason === "device_operation_running" ? t("the unit is busy with a device update") : null),
       waiting ? t("waiting for the unit to confirm") : null,
-      cmd?.status === "failed" ? t("last command failed") : (cmd?.status === "expired" ? t("last command expired") : null),
+      deviceCommand?.status === "failed" ? t("last command failed") : (deviceCommand?.status === "expired" ? t("last command expired") : null),
     ].filter(Boolean).join(" · ");
     const n = unit(u.unitId);
     const release = releaseText[u.releaseState];

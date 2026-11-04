@@ -77,7 +77,7 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
     () => revokeMember(memberInput({ ...d, permissions: sel.m.permissions, scopes: sel.m.scopes, reason: revoke.trim() }, sel.id, zone), sel.version), // ends now (IR492)
     t("Access revoked — the membership is now inactive"), () => { revoked.current = true; setRevoke(null); });
   const doSignOut = () => sel && signOut !== null && signOut.trim() && run(() => signOutEverywhere(sel.id, signOut), t("Signed out everywhere — every session of {name} has ended", { name: sel.name }), () => { setSignOut(null); });
-  const err = (k: string) => (tried ? errors[k] : undefined);
+  const fieldError = (k: string) => (tried ? errors[k] : undefined);
   const shown = live.rows.filter((r) => !q || `${r.name} ${r.label}`.toLowerCase().includes(q.toLowerCase()));
   return (
     <Page>
@@ -107,10 +107,10 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
               <div className="grid-fluid" style={{ ["--min" as string]: "220px" }}>
                 {isNew && live.canWrite && <div className="col-span-full"><Choice value={d.newUser ? "new" : "existing"} onChange={(v: string) => { set({ newUser: v === "new" }); }} options={[{ id: "existing", label: t("Existing user") }, { id: "new", label: t("New person") }]} /></div>}
                 {isNew && d.newUser ? <>
-                  <Field label={t("Name")} error={err("newUser.displayName")}><Input id={memberFieldId("newUser.displayName")} value={d.newName} maxLength={120} onChange={(e) => { set({ newName: e.target.value }); }} /></Field>
-                  <Field label={t("Email")} error={err("newUser.email")} hint={t("Their account is created now; the set-up e-mail goes to this address")}><Input id={memberFieldId("newUser.email")} type="email" value={d.newEmail} onChange={(e) => { set({ newEmail: e.target.value }); }} /></Field>
-                </> : <Field label={t("User")} error={err("userId")} hint={isNew ? undefined : t("Fixed after creation")}><Select id={memberFieldId("userId")} value={d.userId} disabled={!isNew || !live.canWrite} onChange={(e) => { set({ userId: e.target.value }); }}><option value="">{t("Select…")}</option>{live.users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</Select></Field>}
-                <Field label={t("Organization")} error={err("organizationId")} hint={isNew ? undefined : t("Fixed after creation")}><Select id={memberFieldId("organizationId")} value={d.organizationId} disabled={!isNew || !live.canWrite} onChange={(e) => { chooseOrg(e.target.value); }}><option value="">{t("Select…")}</option>{orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</Select></Field>
+                  <Field label={t("Name")} error={fieldError("newUser.displayName")}><Input id={memberFieldId("newUser.displayName")} value={d.newName} maxLength={120} onChange={(e) => { set({ newName: e.target.value }); }} /></Field>
+                  <Field label={t("Email")} error={fieldError("newUser.email")} hint={t("Their account is created now; the set-up e-mail goes to this address")}><Input id={memberFieldId("newUser.email")} type="email" value={d.newEmail} onChange={(e) => { set({ newEmail: e.target.value }); }} /></Field>
+                </> : <Field label={t("User")} error={fieldError("userId")} hint={isNew ? undefined : t("Fixed after creation")}><Select id={memberFieldId("userId")} value={d.userId} disabled={!isNew || !live.canWrite} onChange={(e) => { set({ userId: e.target.value }); }}><option value="">{t("Select…")}</option>{live.users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</Select></Field>}
+                <Field label={t("Organization")} error={fieldError("organizationId")} hint={isNew ? undefined : t("Fixed after creation")}><Select id={memberFieldId("organizationId")} value={d.organizationId} disabled={!isNew || !live.canWrite} onChange={(e) => { chooseOrg(e.target.value); }}><option value="">{t("Select…")}</option>{orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</Select></Field>
               </div>
               <div className="mt-3"><div className="mb-1 text-xs font-semibold">{t("Role")}</div>{isNew ? <Choice value={d.role} onChange={chooseRole} options={roles} /> : <Badge tone="primary">{roleWord(d.role, d.role === "technician" ? d.employment : null, t)}</Badge>}<p className="mt-1 text-[11px] text-muted-foreground">{t("Choosing a role only pre-checks its typical permissions; every permission below stays editable. The client role is not offered here.")}</p></div>
               {d.role === "technician" && <div className="mt-3 max-w-xs"><Field label={t("Employment")}><Select value={d.employment} disabled={!isNew || !live.canWrite} onChange={(e) => { set({ employment: e.target.value as MemberDraft["employment"], organizationId: "" }); }}><option value="internal">{t("Internal (HQ field team)")}</option><option value="external">{t("External (contractor)")}</option></Select></Field></div>}
@@ -122,14 +122,14 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
                 : <>
                   <div className="flex flex-wrap gap-1.5">{d.scopes.map((s) => <span key={`${s.kind}:${s.id}`} className="inline-flex items-center gap-1 rounded-full bg-surface2 px-2.5 py-1 text-xs">{kindWord[s.kind] ?? s.kind} · {scopeName(s)}{live.canWrite && <Plain aria-label={t("Remove scope")} onClick={() => { set({ scopes: d.scopes.filter((x) => x !== s) }); }}><Icon name="close" /></Plain>}</span>)}{d.scopes.length === 0 && <span className="text-xs text-muted-foreground">{t("No targets — zero business targets.")}</span>}</div>
                   {live.canWrite && <div className="mt-2 flex flex-wrap items-end gap-2"><Field label={t("Add scope")}><Select id={memberFieldId("scopes")} value={scopeKind} onChange={(e) => { setScopeKind(e.target.value as typeof scopeKind); setScopeId(""); }}><option value="unit">{t("Unit")}</option><option value="property">{t("Property")}</option><option value="organization">{t("Customer organization")}</option></Select></Field><Field label={t("Target")}><SearchSelect className="w-64" label={t("Target")} value={scopeId} onChange={setScopeId} placeholder={t("Type to search…")} options={targets.filter((x) => d.scopes.every((s) => s.id !== x.id)).map((x) => ({ id: x.id, label: x.name }))} /></Field><Btn size="sm" disabled={!scopeId} onClick={() => { set({ scopes: [...d.scopes, { kind: scopeKind, id: scopeId }] }); setScopeId(""); }}><Icon name="add" /> {t("Add")}</Btn></div>}
-                  {err("scopes") && <p className="mt-1 text-xs text-crit">{err("scopes")}</p>}
+                  {fieldError("scopes") && <p className="mt-1 text-xs text-crit">{fieldError("scopes")}</p>}
                 </>)}
             </section>
             <section>
               <h3 className="mb-2 text-[13px] font-bold">{t("Valid period")}</h3>
               <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
-                <Field label={t("Valid from")} error={err("validFrom")} hint={t("Times in {zone}", { zone })}><Input id={memberFieldId("validFrom")} type="datetime-local" value={d.validFrom} disabled={!live.canWrite} onChange={(e) => { set({ validFrom: e.target.value }); }} /></Field>
-                <Field label={t("Valid until")} error={err("validUntil")} hint={t(d.role === "technician" && d.employment === "external" ? "Required for external technicians" : "Optional — revoking sets it to now")}><Input id={memberFieldId("validUntil")} type="datetime-local" value={d.validUntil} disabled={!live.canWrite} onChange={(e) => { set({ validUntil: e.target.value }); }} /></Field>
+                <Field label={t("Valid from")} error={fieldError("validFrom")} hint={t("Times in {zone}", { zone })}><Input id={memberFieldId("validFrom")} type="datetime-local" value={d.validFrom} disabled={!live.canWrite} onChange={(e) => { set({ validFrom: e.target.value }); }} /></Field>
+                <Field label={t("Valid until")} error={fieldError("validUntil")} hint={t(d.role === "technician" && d.employment === "external" ? "Required for external technicians" : "Optional — revoking sets it to now")}><Input id={memberFieldId("validUntil")} type="datetime-local" value={d.validUntil} disabled={!live.canWrite} onChange={(e) => { set({ validUntil: e.target.value }); }} /></Field>
               </div>
             </section>
             <section>
@@ -141,10 +141,10 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
                   <td><div className="flex flex-wrap gap-x-3 gap-y-2">{(r.actions ?? []).map((a) => <Check key={a} label={<span className="font-mono text-xs">{a}</span>} checked={has(a)} disabled={blocked(a)} onChange={(v) => { toggle(a, v); }} />)}{!r.actions && <span className="text-muted-foreground">—</span>}</div></td></tr>
               ))}</tbody></table></ScrollX>
               <p className="mt-2 text-[11px] text-muted-foreground">{t("Write includes Read (Read is locked on while Write is on). Actions are independent of Read/Write — e.g. billing.write issues invoices but confirming payments needs billing.payment; mrv.write drafts reports but recording a review needs mrv.review and changing emission factors needs mrv.factors.")}{isSelf ? ` ${t("identity.write and restriction.override cannot be granted to yourself.")}` : ""}</p>
-              {err("permissions") && <p className="mt-1 text-xs text-crit">{err("permissions")}</p>}
+              {fieldError("permissions") && <p className="mt-1 text-xs text-crit">{fieldError("permissions")}</p>}
             </section>
             {live.canWrite && <>
-              <Field label={t("Change reason · required")} error={err("reason")} hint={t("1–1000 characters, stored in the audit log")}><Textarea id={memberFieldId("reason")} value={d.reason} maxLength={1000} onChange={(e) => { set({ reason: e.target.value }); }} /></Field>
+              <Field label={t("Change reason · required")} error={fieldError("reason")} hint={t("1–1000 characters, stored in the audit log")}><Textarea id={memberFieldId("reason")} value={d.reason} maxLength={1000} onChange={(e) => { set({ reason: e.target.value }); }} /></Field>
               <div className="flex flex-wrap justify-end gap-2">{sel?.active && <Btn variant="danger" disabled={pending} onClick={() => { revoked.current = false; setRevoke(""); }}>{t("Revoke access…")}</Btn>}{sel?.active && <Btn disabled={pending} onClick={() => { setSignOut(""); }}>{t("Sign out everywhere…")}</Btn>}<Btn variant="primary" disabled={pending} onClick={save}>{t(sel ? "Save changes" : "Create membership")}</Btn></div>
             </>}
           </div>

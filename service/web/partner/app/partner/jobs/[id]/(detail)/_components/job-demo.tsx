@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Field, Input, Modal, Page, Select, SummaryList, Textarea, LinkBtn, useToast, Plain } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Field, Input, Modal, Page, Select, SummaryList, Textarea, LinkButton, useToast, Plain } from "@ac/web/components/ui";
 import { JobStatusBadge, OriginBadge, WINDOWS } from "@ac/web/components/JobBits";
 import { Job, fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
 import { Icon } from "@ac/web/components/Icon";
@@ -25,7 +25,7 @@ function LiveOffer({ j }: Readonly<{ j: Job }>) {
   return (
     <Page>
       <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href="/partner/jobs" className="font-semibold text-primary"><Icon name="arrowLeft" /> Jobs</Link> › {j.id} · {j.unit} · <JobStatusBadge s={j.status} /></div>
-      {j.status === "accepted" && <Banner tone="ok" action={<LinkBtn size="sm" variant="primary" href={`/partner/schedule?jobId=${j.id}`}>Assign technician <Icon name="arrowRight" /></LinkBtn>}>Accepted — assign your technician for exactly {fmt(j.scheduled)}.</Banner>}
+      {j.status === "accepted" && <Banner tone="ok" action={<LinkButton size="sm" variant="primary" href={`/partner/schedule?jobId=${j.id}`}>Assign technician <Icon name="arrowRight" /></LinkButton>}>Accepted — assign your technician for exactly {fmt(j.scheduled)}.</Banner>}
       {(j.status === "assigned" || j.status === "in_progress") && <Banner tone="ok">Assigned to {j.technician} · {j.techAck?.status === "accepted" ? "accepted by the technician" : (j.techAck?.status === "cant_make" ? "technician can’t make it — reassign in Schedule" : "waiting for the technician to accept")}.</Banner>}
       {j.status === "time_proposed" && <Banner tone="warn">HQ has asked the client about your proposed time. You will be notified of the answer.</Banner>}
       {j.partnerProposal?.status === "approved" && j.status === "offered" && <Banner tone="ok">The client approved your time ({fmt(j.scheduled)}). Accept the offer to continue.</Banner>}
@@ -106,7 +106,7 @@ function StaticOffer({ id }: Readonly<{ id: string }>) {
         <Card title={`${id} · Offer from HQ`} sub="Before acceptance: job type, registered installation address, and required qualifications only. No live telemetry, entry instructions, or billing.">
           <SummaryList items={[["Origin", <OriginBadge key="o" origin="plan" />], ["Job type", "Periodic inspection"], ["Installation address", "12 Jalan Ampang, Kuala Lumpur (registered)"], ["Required qualification", "Split-unit refrigerant handling"], ["Visit time (fixed)", "2026-09-16 10:00–12:00 · from the periodic plan"], ["Access period if accepted", "2026-09-14 01:00 – 2026-09-22 00:00"], ["Offer / delegation terms", "offer-p09-1 · terms v3"]]} />
           {s === "offer" && <div className="mt-4 flex flex-col gap-2"><Btn onClick={() => { setModal("propose"); }}>Propose another time…</Btn><div className="flex gap-2"><Btn variant="danger" className="flex-1" onClick={() => { setModal("decline"); }}>Decline…</Btn><Btn variant="primary" className="flex-1" onClick={() => { setS("accepted"); toast("Offer accepted"); }}>Accept job</Btn></div></div>}
-          {s === "accepted" && <div className="mt-4"><LinkBtn variant="primary" href="/partner/schedule?jobId=job-p02">Assign technician <Icon name="arrowRight" /></LinkBtn></div>}
+          {s === "accepted" && <div className="mt-4"><LinkButton variant="primary" href="/partner/schedule?jobId=job-p02">Assign technician <Icon name="arrowRight" /></LinkButton></div>}
         </Card>
         <div className="flex min-w-0 flex-col gap-4">
           <Card title="Can your team take it? — visit 09-16 10:00–12:00" action={<Link className="text-xs font-semibold text-primary" href="/partner/team">Team & capacity <Icon name="arrowRight" /></Link>}>

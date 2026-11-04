@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Badge, Banner, Btn, Card, Check, Choice, ConnBadge, cx, DataTable, EmptyState, Field, Input, Kpi, LinkBtn, Modal, Page, PowerBadge, Search, Select, SummaryList, Tabs, Textarea, TextLink, Toggle, ActionMenu, Plain } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, Choice, ConnBadge, cx, DataTable, EmptyState, Field, Input, Kpi, LinkButton, Modal, Page, PowerBadge, Search, Select, SummaryList, Tabs, Textarea, TextLink, Toggle, ActionMenu, Plain } from "@ac/web/components/ui";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -127,13 +127,13 @@ function CustomerModal({ row, pending, onClose, onSave }: Readonly<{ row?: Custo
   const [d, setD] = useState<CustomerDraft>(customerDraft(row));
   const [tried, setTried] = useState(false);
   const e = customerErrors(d, t);
-  const err = (k: string) => (tried ? e[k] : undefined);
+  const fieldError = (k: string) => (tried ? e[k] : undefined);
   const save = () => { setTried(true); if (Object.keys(e).length === 0) onSave(d); };
   return (
     <Modal open onClose={onClose} title={row ? t("Edit {name}", { name: row.name }) : t("New customer")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t(row ? "Save customer" : "Create customer")}</Btn></>}>
       <div className="flex flex-col gap-3">
-        <Field label={t("Billing name · required")} hint={t("1–120 characters. Two customers cannot share a billing name.")} error={err("billingName")}><Input value={d.billingName} onChange={(x) => { setD({ ...d, billingName: x.target.value }); }} /></Field>
-        <Field label={t("Customer display name · required")} hint={t("1–120 characters")} error={err("name")}><Input value={d.name} onChange={(x) => { setD({ ...d, name: x.target.value }); }} /></Field>
+        <Field label={t("Billing name · required")} hint={t("1–120 characters. Two customers cannot share a billing name.")} error={fieldError("billingName")}><Input value={d.billingName} onChange={(x) => { setD({ ...d, billingName: x.target.value }); }} /></Field>
+        <Field label={t("Customer display name · required")} hint={t("1–120 characters")} error={fieldError("name")}><Input value={d.name} onChange={(x) => { setD({ ...d, name: x.target.value }); }} /></Field>
         <Field label={t("Service profile · required")}><Choice value={d.profile} onChange={(v: Profile) => { setD({ ...d, profile: v }); }} options={(Object.keys(profileLabel) as Profile[]).map((p) => ({ id: p, label: t(profileLabel[p]) }))} /></Field>
         <Field label={t("Status")} hint={t(row ? "A customer that still has units, contracts or open jobs cannot be deactivated." : "Inactive customers cannot get new units.")}>
           <Select value={d.status} onChange={(x) => { setD({ ...d, status: x.target.value as "active" | "inactive" }); }}><option value="active">{t("Active")}</option><option value="inactive">{t("Inactive")}</option></Select>
@@ -361,7 +361,7 @@ function UnitEdit({ live, c, x, nav, run, pending }: Readonly<{ live: UnitsLive;
   }
   const isRo = !live.canWrite || u.archived;
   const errors = unitErrors(d, live.todayKL, t);
-  const err = (k: string) => (tried ? errors[k] : undefined);
+  const fieldError = (k: string) => (tried ? errors[k] : undefined);
   const changes = changedFields(u, d, t);
   const set = (patch: Partial<UnitDraft>) => { setD((v) => ({ ...v, ...patch })); };
   const place = `${d.propertyId}|${d.spaceId}`;
@@ -380,25 +380,25 @@ function UnitEdit({ live, c, x, nav, run, pending }: Readonly<{ live: UnitsLive;
         action={live.canWrite && !u.archived && <Btn size="sm" variant="danger" onClick={() => { setModal("delete"); }}>{t("Delete unit…")}</Btn>}>
         {u.archived && <div className="mb-3"><Banner tone="warn">{t("Read only — {note}. Deleted (archived) units are left out of lists, summaries and totals.", { note: x.archivedNote ?? "" })}</Banner></div>}
         <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
-          <Field label={t("Name")} error={err("displayName")}><Input value={d.displayName} disabled={isRo} onChange={(e) => { set({ displayName: e.target.value }); }} /></Field>
-          <Field label={t("Location")} hint={t("Changing it relocates the unit — a reason is asked on save; the old location stays in the history.")} error={err("propertyId")}>
+          <Field label={t("Name")} error={fieldError("displayName")}><Input value={d.displayName} disabled={isRo} onChange={(e) => { set({ displayName: e.target.value }); }} /></Field>
+          <Field label={t("Location")} hint={t("Changing it relocates the unit — a reason is asked on save; the old location stays in the history.")} error={fieldError("propertyId")}>
             <Select value={place} disabled={isRo} onChange={(e) => { const [propertyId, spaceId] = e.target.value.split("|", 2); set({ propertyId, spaceId }); }}>
               {c.places.every((p) => `${p.propertyId}|${p.spaceId}` !== place) && <option value={place}>{t("{place} (current)", { place: x.path })}</option>}
               {c.places.map((p) => <option key={`${p.propertyId}|${p.spaceId}`} value={`${p.propertyId}|${p.spaceId}`}>{p.label}</option>)}
             </Select>
           </Field>
-          <Field label={t("Model")} hint={t(c.models.length > 0 ? "From capabilities.list · type split (fixed)" : "Models need device.read — the current model stays")} error={err("modelId")}>
+          <Field label={t("Model")} hint={t(c.models.length > 0 ? "From capabilities.list · type split (fixed)" : "Models need device.read — the current model stays")} error={fieldError("modelId")}>
             <Select value={d.modelId} disabled={isRo || c.models.length === 0} onChange={(e) => { set({ modelId: e.target.value }); }}>
               {c.models.every((k) => k.id !== d.modelId) && <option value={d.modelId}>{x.model}</option>}
               {c.models.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
             </Select>
           </Field>
-          <Field label={t("Installed at")} hint={t("A Kuala Lumpur day · leave empty for “Not registered”")} error={err("installedAt")}><Input type="date" max={live.todayKL} value={d.installedAt} disabled={isRo} onChange={(e) => { set({ installedAt: e.target.value }); }} /></Field>
-          <Field label={t("Warranty end")} hint={t("Manufacturer warranty; coverage also counts active maintenance contracts")} error={err("warrantyEnd")}><Input type="date" min={d.installedAt || undefined} value={d.warrantyEnd} disabled={isRo} onChange={(e) => { set({ warrantyEnd: e.target.value }); }} /></Field>
+          <Field label={t("Installed at")} hint={t("A Kuala Lumpur day · leave empty for “Not registered”")} error={fieldError("installedAt")}><Input type="date" max={live.todayKL} value={d.installedAt} disabled={isRo} onChange={(e) => { set({ installedAt: e.target.value }); }} /></Field>
+          <Field label={t("Warranty end")} hint={t("Manufacturer warranty; coverage also counts active maintenance contracts")} error={fieldError("warrantyEnd")}><Input type="date" min={d.installedAt || undefined} value={d.warrantyEnd} disabled={isRo} onChange={(e) => { set({ warrantyEnd: e.target.value }); }} /></Field>
           <Field label={t("IoT device")} hint={x.device ? t("Rebinding is done in Devices and keeps the command history on the unit.") : undefined}>
             <div className="flex min-h-9 items-center gap-2 text-[13px]">{x.device ? <><b>{x.device.serial}</b><ConnBadge s={x.device.connection} /><TextLink href={`/admin/devices?tab=devices&deviceId=${x.device.id}`}>{t("Devices")} <Icon name="chevronRight" /></TextLink></> : (x.deviceKnown ? <span className="text-muted-foreground">{t("No device bound")}</span> : <span className="text-muted-foreground">{t("Needs device.read")}</span>)}</div>
           </Field>
-          <Field label={t("Service scope")} hint={t("Target inspection groups")} error={err("serviceScope")}>
+          <Field label={t("Service scope")} hint={t("Target inspection groups")} error={fieldError("serviceScope")}>
             <div className="flex flex-wrap gap-3">{scopes.map((sc) => <Check key={sc} label={t(scopeLabel[sc])} disabled={isRo} checked={d.serviceScope.includes(sc)} onChange={(on) => { set({ serviceScope: on ? [...d.serviceScope, sc] : d.serviceScope.filter((v) => v !== sc) }); }} />)}</div>
           </Field>
         </div>
@@ -448,7 +448,7 @@ function PoliciesTab({ c, run, pending }: Readonly<{ c: CustomerLive; run: Run; 
   return (
     <>
       <Card title={t("Alert policies of {name}", { name: c.row.name })} sub={t("Policies belong to the customer. Each unit picks which of them it carries (unit edit › Alert policies). Air-quality limits are alert policies too.")}
-        action={<LinkBtn size="sm" variant="primary" href={`/admin/alerts?tab=policies&customerId=${c.row.id}&new=${c.row.id}`}><Icon name="add" /> {t("New policy for {name}", { name: c.row.name })}</LinkBtn>}>
+        action={<LinkButton size="sm" variant="primary" href={`/admin/alerts?tab=policies&customerId=${c.row.id}&new=${c.row.id}`}><Icon name="add" /> {t("New policy for {name}", { name: c.row.name })}</LinkButton>}>
         <DataTable rows={c.policies} rowKey={(p) => p.id} onRowClick={(p) => { router.push(`/admin/alerts?tab=policies&customerId=${c.row.id}&policyId=${p.id}`); }} cols={[
           { key: "n", label: t("Policy"), render: (p) => <><b>{p.name}</b>{!p.enabled && <Badge className="ml-2">{t("Off")}</Badge>}</> },
           { key: "t", label: t("Type"), render: (p) => <Badge tone={p.kind === "default_alert" ? "primary" : "muted"}>{p.type}</Badge> },
@@ -483,14 +483,14 @@ function PropertyModal({ p, pending, onClose, onSave }: Readonly<{ p?: TreePrope
   const [d, setD] = useState<PropertyDraft>(propertyDraft(p));
   const [tried, setTried] = useState(false);
   const e = propertyErrors(d, t);
-  const err = (k: string) => (tried ? e[k] : undefined);
+  const fieldError = (k: string) => (tried ? e[k] : undefined);
   return (
     <Modal open onClose={onClose} title={p ? t("Edit {name}", { name: p.name }) : t("Add property")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (Object.keys(e).length === 0) onSave(d); }}>{t(p ? "Save property" : "Add property")}</Btn></>}>
       <div className="flex flex-col gap-3">
         <Field label={t("Kind · required")}><Choice value={d.kind} onChange={(v: "home" | "office") => { setD({ ...d, kind: v }); }} options={[{ id: "home", label: t("Home") }, { id: "office", label: t("Office") }]} /></Field>
-        <Field label={t("Name · required")} hint={t("1–120 characters, unique among the customer’s properties")} error={err("name")}><Input value={d.name} onChange={(x) => { setD({ ...d, name: x.target.value }); }} /></Field>
-        <Field label={t("Address")} hint={t("0–500 characters · fictional values only; shown as the site address")} error={err("address")}><Input value={d.address} onChange={(x) => { setD({ ...d, address: x.target.value }); }} /></Field>
-        <Field label={t("Access instructions")} hint={t("0–1000 characters · visible to a contractor only after acceptance, within the valid period")} error={err("accessInstructions")}><Textarea rows={3} value={d.accessInstructions} onChange={(x) => { setD({ ...d, accessInstructions: x.target.value }); }} /></Field>
+        <Field label={t("Name · required")} hint={t("1–120 characters, unique among the customer’s properties")} error={fieldError("name")}><Input value={d.name} onChange={(x) => { setD({ ...d, name: x.target.value }); }} /></Field>
+        <Field label={t("Address")} hint={t("0–500 characters · fictional values only; shown as the site address")} error={fieldError("address")}><Input value={d.address} onChange={(x) => { setD({ ...d, address: x.target.value }); }} /></Field>
+        <Field label={t("Access instructions")} hint={t("0–1000 characters · visible to a contractor only after acceptance, within the valid period")} error={fieldError("accessInstructions")}><Textarea rows={3} value={d.accessInstructions} onChange={(x) => { setD({ ...d, accessInstructions: x.target.value }); }} /></Field>
       </div>
     </Modal>
   );
@@ -562,7 +562,7 @@ function NewUnitModal({ live, c, init, pending, onClose, onSave }: Readonly<{ li
   const [d, setD] = useState<UnitDraft>({ ...unitDraft(undefined, init.propertyId, init.spaceId), modelId: c.models[0]?.id ?? "" });
   const [tried, setTried] = useState(false);
   const e = unitErrors(d, live.todayKL, t);
-  const err = (k: string) => (tried ? e[k] : undefined);
+  const fieldError = (k: string) => (tried ? e[k] : undefined);
   const set = (patch: Partial<UnitDraft>) => { setD((v) => ({ ...v, ...patch })); };
   const p = c.tree.find((x) => x.id === d.propertyId);
   return (
@@ -570,17 +570,17 @@ function NewUnitModal({ live, c, init, pending, onClose, onSave }: Readonly<{ li
       <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
         <p className="text-[12px] text-muted-foreground sm:col-span-2">{t("The location and the model must belong to this customer.")}</p>
         <Field label={t("Customer · fixed")}><Input value={c.row.name} disabled /></Field>
-        <Field label={t("Location · required")} error={err("propertyId")}><Select value={d.propertyId} onChange={(x) => { set({ propertyId: x.target.value, spaceId: "" }); }}>{c.tree.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Select></Field>
+        <Field label={t("Location · required")} error={fieldError("propertyId")}><Select value={d.propertyId} onChange={(x) => { set({ propertyId: x.target.value, spaceId: "" }); }}>{c.tree.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Select></Field>
         <Field label={t("Room / space · optional")} hint={t("Same property only. Leave empty for no room or floor.")}>
           <Select value={d.spaceId} onChange={(x) => { set({ spaceId: x.target.value }); }}><option value="">{t("— not assigned —")}</option>{(p ? flatten(p.spaces) : []).map((x) => <option key={x.id} value={x.id}>{x.name} ({t(kindLabel[x.kind])})</option>)}</Select>
         </Field>
-        <Field label={t("Model · required")} hint={t(c.models.length > 0 ? "From capabilities.list" : "Models need device.read")} error={err("modelId")}>
+        <Field label={t("Model · required")} hint={t(c.models.length > 0 ? "From capabilities.list" : "Models need device.read")} error={fieldError("modelId")}>
           <Select value={d.modelId} onChange={(x) => { set({ modelId: x.target.value }); }}>{c.models.length === 0 && <option value="">{t("no model available")}</option>}{c.models.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</Select>
         </Field>
-        <Field label={t("Display name · required")} hint={t("1–120 characters, unique in its room")} error={err("displayName")}><Input value={d.displayName} onChange={(x) => { set({ displayName: x.target.value }); }} /></Field>
-        <Field label={t("Installed at · optional")} hint={t("A Kuala Lumpur day · leave empty for “Not registered”")} error={err("installedAt")}><Input type="date" max={live.todayKL} value={d.installedAt} onChange={(x) => { set({ installedAt: x.target.value }); }} /></Field>
-        <Field label={t("Warranty end · optional")} error={err("warrantyEnd")}><Input type="date" min={d.installedAt || undefined} value={d.warrantyEnd} onChange={(x) => { set({ warrantyEnd: x.target.value }); }} /></Field>
-        <Field label={t("Service scope · required · type: split (fixed)")} error={err("serviceScope")} className="sm:col-span-2">
+        <Field label={t("Display name · required")} hint={t("1–120 characters, unique in its room")} error={fieldError("displayName")}><Input value={d.displayName} onChange={(x) => { set({ displayName: x.target.value }); }} /></Field>
+        <Field label={t("Installed at · optional")} hint={t("A Kuala Lumpur day · leave empty for “Not registered”")} error={fieldError("installedAt")}><Input type="date" max={live.todayKL} value={d.installedAt} onChange={(x) => { set({ installedAt: x.target.value }); }} /></Field>
+        <Field label={t("Warranty end · optional")} error={fieldError("warrantyEnd")}><Input type="date" min={d.installedAt || undefined} value={d.warrantyEnd} onChange={(x) => { set({ warrantyEnd: x.target.value }); }} /></Field>
+        <Field label={t("Service scope · required · type: split (fixed)")} error={fieldError("serviceScope")} className="sm:col-span-2">
           <div className="flex flex-wrap gap-3">{scopes.map((sc) => <Check key={sc} label={t(scopeLabel[sc])} checked={d.serviceScope.includes(sc)} onChange={(on) => { set({ serviceScope: on ? [...d.serviceScope, sc] : d.serviceScope.filter((v) => v !== sc) }); }} />)}</div>
         </Field>
       </div>

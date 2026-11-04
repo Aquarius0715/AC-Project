@@ -42,12 +42,12 @@ export function ExceptionView({ live }: Readonly<{ live: Live }>) {
   const outcome = actionOutcome(act, r.state, t);
   const untilAt = until ? zonedInstant(until.slice(0, 10), until.slice(11, 16), zone) : "";
   const untilMs = untilAt ? Date.parse(untilAt) : NaN;
-  const dateErr = isNeedsDate && !(untilMs > now.getTime() && untilMs <= now.getTime() + 90 * 24 * 3600 * 1000) ? t("A future date within 90 days") : undefined;
-  const reasonErr = reason.trim().length === 0 || reason.length > 1000 ? t("A reason is required (1–1000 characters)") : undefined;
+  const dateError = isNeedsDate && !(untilMs > now.getTime() && untilMs <= now.getTime() + 90 * 24 * 3600 * 1000) ? t("A future date within 90 days") : undefined;
+  const reasonError = reason.trim().length === 0 || reason.length > 1000 ? t("A reason is required (1–1000 characters)") : undefined;
   const isRelease = r.projection === "release";
   const save = () => {
     setTried(true);
-    if (!outcome.allowed || reasonErr || (isNeedsDate && dateErr)) return;
+    if (!outcome.allowed || reasonError || (isNeedsDate && dateError)) return;
     const why = reason.trim();
     const fn = act === "defer" ? () => deferRestriction(r.id, r.version, untilAt, why)
       : act === "exempt" ? () => exemptRestriction(r.id, r.version, untilAt, why)
@@ -71,8 +71,8 @@ export function ExceptionView({ live }: Readonly<{ live: Live }>) {
                 </Plain>
               );
             })}</div>
-            {isNeedsDate && <div className="mt-4 max-w-xs"><Field label={t("Until · future, at most 90 days")} error={tried ? dateErr : undefined} hint={t("Expiry never reapplies the restriction — conditions are checked again · times in {zone}", { zone })}><Input type="datetime-local" value={until} onChange={(e) => { setUntil(e.target.value); }} /></Field></div>}
-            <div className="mt-3"><Field label={t("Reason · required")} error={tried ? reasonErr : undefined} hint={`${String(reason.length)} / 1000`}><Textarea value={reason} maxLength={1000} onChange={(e) => { setReason(e.target.value); }} /></Field></div>
+            {isNeedsDate && <div className="mt-4 max-w-xs"><Field label={t("Until · future, at most 90 days")} error={tried ? dateError : undefined} hint={t("Expiry never reapplies the restriction — conditions are checked again · times in {zone}", { zone })}><Input type="datetime-local" value={until} onChange={(e) => { setUntil(e.target.value); }} /></Field></div>}
+            <div className="mt-3"><Field label={t("Reason · required")} error={tried ? reasonError : undefined} hint={`${String(reason.length)} / 1000`}><Textarea value={reason} maxLength={1000} onChange={(e) => { setReason(e.target.value); }} /></Field></div>
             <div className="mt-3 flex justify-end"><Btn variant={act === "override" ? "danger" : "primary"} disabled={pending || !outcome.allowed || !allowedFor(act)} onClick={save}>{button[act]}</Btn></div>
           </Card>
           <Card title={t("What happens")}><ul className="list-disc pl-5 text-[13px]"><li>{outcome.result}</li><li>{t("A release still needs per-unit evidence (released or not required)")}</li><li>{t("Cause invoices stay unpaid — no action here settles billing")}</li><li>{t("Before/after, expiry, reason and your name are recorded in the audit log")}</li></ul></Card>

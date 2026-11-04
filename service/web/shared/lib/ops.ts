@@ -14,10 +14,10 @@ export class OpError extends Error {
 export interface WriteOptions { expectedVersion?: number; idempotencyKey?: string }
 
 /** One operation through the BFF; the input is typed by the contract (IR313). */
-export async function callOp<T>(...[operation, input, opts = {}]: OpArgs<WriteOptions & { write?: boolean }>): Promise<T> {
+export async function callOp<T>(...[operation, input, options = {}]: OpArgs<WriteOptions & { write?: boolean }>): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (opts.write) headers["Idempotency-Key"] = opts.idempotencyKey ?? randomId(); // also over HTTP (DEC-93)
-  if (opts.expectedVersion !== undefined) headers["X-Expected-Version"] = String(opts.expectedVersion);
+  if (options.write) headers["Idempotency-Key"] = options.idempotencyKey ?? randomId(); // also over HTTP (DEC-93)
+  if (options.expectedVersion !== undefined) headers["X-Expected-Version"] = String(options.expectedVersion);
   const res = await fetch(`/bff/ops/${operation}`, { method: "POST", body: JSON.stringify(input ?? {}), headers });
   const body = await res.json().catch(() => null);
   if (!res.ok) {

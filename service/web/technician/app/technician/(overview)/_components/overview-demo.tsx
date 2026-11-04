@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Banner, Card, Kpi, LinkBtn, Page, SeverityBadge, Tabs, TextLink, UtilBar } from "@ac/web/components/ui";
+import { Banner, Card, Kpi, LinkButton, Page, SeverityBadge, Tabs, TextLink, UtilizationBar } from "@ac/web/components/ui";
 import { fmt, useJobs } from "@ac/web/lib/jobs";
 import { JobList, useTechJobs } from "@ac/web/components/TechJobList";
 import { Icon } from "@ac/web/components/Icon";
@@ -18,7 +18,7 @@ export function OverviewDemo({ tab: initial }: Readonly<{ tab?: string }>) {
       <div className="grid-fluid" style={{ ["--min"as string]: "180px" }}>
         <Kpi label="Assigned units" value={2} sub="in your assignments" /><Kpi label="Not started" value={1} sub="job-t07" /><Kpi label="Overdue" value={0} tone="ok" sub="No overdue jobs" />
       </div>
-      {pending.map((j) => <Banner key={j.id} tone="warn" icon="mail" action={<LinkBtn size="sm" variant="primary" href={`/technician/jobs/${j.id}`}>Review & accept</LinkBtn>}><b>New assignment to accept — {j.id} · {j.unit} · {fmt(j.scheduled)}</b> · assigned by {j.contractor ?? "HQ"}. The visit time was agreed with the client.</Banner>)}
+      {pending.map((j) => <Banner key={j.id} tone="warn" icon="mail" action={<LinkButton size="sm" variant="primary" href={`/technician/jobs/${j.id}`}>Review & accept</LinkButton>}><b>New assignment to accept — {j.id} · {j.unit} · {fmt(j.scheduled)}</b> · assigned by {j.contractor ?? "HQ"}. The visit time was agreed with the client.</Banner>)}
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">
           <Tabs value={tab} onChange={setTab} tabs={[{ id: "today", label: "Today", count: 2 }, { id: "all", label: "All assigned", count: all.length }]} />
@@ -37,7 +37,7 @@ export function OverviewDemo({ tab: initial }: Readonly<{ tab?: string }>) {
             <p className="mt-1 text-[11px] text-muted-foreground">Only units in your assignments. Finishing a job does not resolve its alert.</p>
           </Card>
           <Card title="My reports">
-            <div className="flex flex-col gap-3 text-[13px]"><div><b>job-contractor-a · draft v2</b><div className="mb-1 text-xs text-muted-foreground">7 / 18 · Indoor 7/8 · Outdoor 0/5 · Electrical 0/5</div><UtilBar pct={39} /></div><div><b>job-p05 · returned</b><div className="text-xs text-muted-foreground">“Photo evidence missing” — resume as v2</div></div><div><b>job-p09 · v1 submitted</b><div className="text-xs text-muted-foreground">awaiting quality review · read-only</div></div></div>
+            <div className="flex flex-col gap-3 text-[13px]"><div><b>job-contractor-a · draft v2</b><div className="mb-1 text-xs text-muted-foreground">7 / 18 · Indoor 7/8 · Outdoor 0/5 · Electrical 0/5</div><UtilizationBar pct={39} /></div><div><b>job-p05 · returned</b><div className="text-xs text-muted-foreground">“Photo evidence missing” — resume as v2</div></div><div><b>job-p09 · v1 submitted</b><div className="text-xs text-muted-foreground">awaiting quality review · read-only</div></div></div>
           </Card>
         </div>
       </div>

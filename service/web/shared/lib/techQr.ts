@@ -24,11 +24,11 @@ export const scanCode = (raw: string) => raw.trim();
 export interface QrMatch { title: string; sub: string; job: { label: string; text: string; tone: "ok" | "primary" } | null; unitHref: string; jobHref: string | null }
 /** The matched card: the unit with its location and model, and the user's job on it (today's, or the next one). Before
 the work window units.get is FORBIDDEN (IR94): the card then names the unit from the user's unit list and says so. */
-export function qrMatch(r: ApiQrResolution, unit: ApiQrUnit | null, job: ApiQrJob | null, now: number, opts: { name?: string; locked?: boolean } = {}, i: I18n = EN): QrMatch {
+export function qrMatch(r: ApiQrResolution, unit: ApiQrUnit | null, job: ApiQrJob | null, now: number, options: { name?: string; locked?: boolean } = {}, i: I18n = EN): QrMatch {
   const { t, display } = i;
-  const title = unit?.displayName ?? opts.name ?? t("Assigned unit");
+  const title = unit?.displayName ?? options.name ?? t("Assigned unit");
   const sub = unit ? [unit.location.pathLabels.join(" › "), `${unit.capabilities.manufacturer} ${unit.capabilities.model}`].filter(Boolean).join(" · ")
-    : (opts.locked ? t("Unit details open when your work window starts.") : "");
+    : (options.locked ? t("Unit details open when your work window starts.") : "");
   let card: QrMatch["job"] = null;
   if (r.jobId) {
     const j = job?.projection === "detail" ? job : null;

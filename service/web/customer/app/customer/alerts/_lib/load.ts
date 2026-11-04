@@ -31,7 +31,7 @@ export async function loadAlerts(sp: Record<string, string | string[] | undefine
   const i = i18nOf(display);
   const place = unitPlaces(units, properties, spaces);
   const all = inboxAlerts(alerts, notes, (id) => place.get(id), i);
-  const def = defaults[0] ?? null;
+  const defaultPolicy = defaults[0] ?? null;
   const pid = one(sp.policyId);
   const editing = pid === "new" ? null : policies.find((p) => p.id === pid) ?? null;
   return {
@@ -44,8 +44,8 @@ export async function loadAlerts(sp: Record<string, string | string[] | undefine
     unread: all.filter((a) => a.unread.length).length,
     rows: isUnreadOnly ? all.filter((a) => a.unread.length) : all,
     policies: {
-      count: policies.length + (def ? 1 : 0), owner: me.clientRole === "owner", customerId: me.customerId, membershipId: me.membershipId, timezone: prefs?.timezone ?? "Asia/Kuala_Lumpur",
-      defaults: def ? { id: def.id, ...defaultRuleRows(def, me.customerId, me.membershipId, i) } : null,
+      count: policies.length + (defaultPolicy ? 1 : 0), owner: me.clientRole === "owner", customerId: me.customerId, membershipId: me.membershipId, timezone: prefs?.timezone ?? "Asia/Kuala_Lumpur",
+      defaults: defaultPolicy ? { id: defaultPolicy.id, ...defaultRuleRows(defaultPolicy, me.customerId, me.membershipId, i) } : null,
       cards: policyCards(policies, (id) => place.get(id)?.name, i.t), list: policies,
       // the editor (policyId=new or an own policy's id, Figma 06f); an unknown id shows the list
       editor: pid === "new" ? { policy: null, form: policyForm(null), attached: [] as string[] } : (editing ? { policy: editing, form: policyForm(editing), attached: editing.unitIds.map((id) => place.get(id)?.name ?? "AC") } : null),
