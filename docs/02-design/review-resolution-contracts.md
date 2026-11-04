@@ -8944,3 +8944,27 @@ The user wanted the build and deploy logs on GitHub Actions. IR630 showed only t
    - a failing build, with its error annotation, the tag before brought back and the deployed tag unchanged;
    - the boot step, and the status;
    - the CI gate: a pass after two reads, a failure, the timeout, and the token sent only as a header.
+
+## IR632 CI and E2E run on the lab server's runner too (DEC-95) — 2026-11-04
+
+A private repository has 2,000 free Actions minutes a month on GitHub's runners, and CI with E2E used about an hour a push. The user asked to run them on the lab server's runner as well.
+
+1. **CI (`ci.yml`).** All seven jobs run on the runner (`[self-hosted, ac-test]`), each in a container of its own: `golang:1.26-bookworm` for the Go jobs, `node:26-bookworm` for the web jobs and `python:3.12-bookworm` for the docs.
+   - **Isolation.** The dependencies' code (npm install scripts, test tools) runs in the container. It does not run on the server, and it does not reach `~/ac-test/env`. The runner does not pass the Docker socket into a job container (its source mounts only the work, temp, tool and action directories).
+   - **Caches.** Docker volumes keep the Go module and build caches (`ac-ci-go`, `ac-ci-cache`) and the npm cache (`ac-ci-npm`) between runs.
+   - **PostgreSQL.** The Go suites' PostgreSQL service has no published port, because the server's own PostgreSQL has 5432. `socat` serves it at `localhost:5432` in the job container, where the tests look, so the tests keep their URLs.
+   - **Ownership.** A container works as root. Each job hands its workspace back to the runner's user at the end, or the next checkout could not clean it.
+2. **E2E (`e2e.yml`).** It runs on the runner's Docker, beside the server's services and the test environment.
+   - **The stack.** It is the compose project `ac-e2e` (`IMAGE_TAG=e2e`), built one image at a time. Its apps listen on `127.0.0.1:3300–3303`. Its stores and brokers are not published (`deploy/test/compose.test.yaml`). Keycloak 8081 and Mailpit 8025 keep their ports, because the specs open them.
+   - **The realm.** `deploy/test/realm.py` writes the realm with these URLs and random client secrets.
+   - **Playwright.** It runs in `mcr.microsoft.com/playwright:v1.64.1-noble` as the runner's user, on the host network, with its npm cache kept in `~/.cache/ac-e2e-npm`.
+   - **Teardown.** The stack is removed at the end. One run at a time.
+3. **The deployment no longer waits for CI on the runner.** A deployment job that waited for CI would hold the only runner that CI needs. `ci_gate.py` with 0 minutes reads once, and exits 3 while CI still runs.
+   - When the tag is pushed, it deploys at once if CI passed on the commit already; otherwise the run ends with a notice.
+   - When CI completes on a push to main, `deploy-test.yml` also runs (`workflow_run`). It deploys the newest test tag on that commit unless that tag is deployed already.
+4. **Checked.**
+   - The four workflows parse, and their shell steps parse.
+   - The container images exist: `golang:1.26-bookworm`, `node:26-bookworm`, `python:3.12-bookworm`, `postgres:18` and `mcr.microsoft.com/playwright:v1.64.1-noble`.
+   - The CI gate's read-once mode answered 0, 3, 3 and 1 for a passed, a running, a not-started and a failed CI.
+
+   The workflows themselves first run once the runner is registered.

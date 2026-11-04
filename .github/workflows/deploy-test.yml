@@ -1,17 +1,24 @@
-# The shared test environment's deployment (DEC-93, DEC-94, IR631). A tag test<major>.<minor>.<patch>r<n> runs this
-# workflow on the lab server's self-hosted runner (label ac-test), so the build and deploy logs show here. The job checks
-# the tag out, waits until its commit is on main and its CI passed, and runs deploy/test/deploy.sh from the checkout
-# with the server's environment file (~/ac-test/env, which never leaves the server). One deployment runs at a time; a
-# newer tag waiting replaces an older one that waits. The repository is private, so only its collaborators' code reaches
-# the runner.
+# The shared test environment's deployment (DEC-93, DEC-94, IR631), on the lab server's self-hosted runner (label
+# ac-test), so the build and deploy logs show here. A tag test<major>.<minor>.<patch>r<n> on a commit of main deploys
+# that commit once its CI passed:
+# - pushing the tag deploys at once when CI passed on the commit already;
+# - while that CI still runs, the run ends, and the CI's own completion deploys the newest test tag on its commit.
+# CI runs on the same runner, so a deployment never holds it waiting. The job runs deploy/test/deploy.sh from the
+# checkout with the server's environment file (~/ac-test/env, which never leaves the server), whose secrets are masked
+# in the log. One deployment runs at a time; a newer one waiting replaces an older one that waits. The repository is
+# private, so only its collaborators' code reaches the runner.
 name: Test deployment
 
 on:
   push:
     tags: ["test[0-9]+.[0-9]+.[0-9]+r[0-9]+"]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
 
 permissions:
-  actions: read # the CI run of the tag's commit
+  actions: read # the CI run of the commit
   contents: read
 
 concurrency:
@@ -21,22 +28,50 @@ concurrency:
 jobs:
   deploy:
     name: Deploy to the lab server
+    # a tag push, or a CI run that passed on a push to main
+    if: github.event_name == 'push' || (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success')
     runs-on: [self-hosted, ac-test]
-    timeout-minutes: 150
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0 # main, and the deployed tag: a failure brings it back, and the migrations are compared
-      - name: the tag is on main, and its CI passed
+          fetch-depth: 0 # main, the tags, and the deployed tag: a failure brings it back, and the migrations are compared
+      - name: the tag to deploy
+        id: pick
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
-            echo "::error::$GITHUB_REF_NAME is not on main: not deployed"
-            exit 1
+          pattern='^test[0-9]+[.][0-9]+[.][0-9]+r[0-9]+$'
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            tag=$GITHUB_REF_NAME sha=$GITHUB_SHA
+            if ! git merge-base --is-ancestor "$sha" origin/main; then
+              echo "::error::$tag is not on main: not deployed"
+              exit 1
+            fi
+            result=0
+            python3 deploy/test/ci_gate.py "$sha" 0 || result=$?
+            if [ "$result" = 3 ]; then
+              echo "::notice::CI on ${sha:0:8} still runs; $tag is deployed when it passes"
+              exit 0
+            elif [ "$result" != 0 ]; then
+              exit 1
+            fi
+          else
+            sha=$RUN_SHA
+            tag=$(git tag --points-at "$sha" | grep -E "$pattern" | sort -V | tail -n 1 || true)
+            if [ -z "$tag" ]; then
+              echo "No test tag on ${sha:0:8}: nothing to deploy."
+              exit 0
+            fi
           fi
-          python3 deploy/test/ci_gate.py "$GITHUB_SHA" 60
+          if [ "$tag" = "$(cat "$HOME/ac-test/state/deployed" 2>/dev/null || true)" ]; then
+            echo "$tag is deployed already."
+            exit 0
+          fi
+          echo "tag=$tag" >>"$GITHUB_OUTPUT"
       - name: keep the server's secrets out of the log
+        if: steps.pick.outputs.tag != ''
         run: |
           # the values of the environment file's passwords, secrets, tokens and keys are masked from here on
           while IFS= read -r line; do
@@ -48,7 +83,9 @@ jobs:
               ;;
             esac
           done <"$HOME/ac-test/env"
-      - name: deploy ${{ github.ref_name }}
+      - name: deploy ${{ steps.pick.outputs.tag }}
+        if: steps.pick.outputs.tag != ''
         env:
           AC_TEST_REPO: ${{ github.workspace }}
-        run: bash deploy/test/deploy.sh deploy "$GITHUB_REF_NAME"
+          TAG: ${{ steps.pick.outputs.tag }}
+        run: bash deploy/test/deploy.sh deploy "$TAG"

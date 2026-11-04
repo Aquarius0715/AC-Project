@@ -188,22 +188,28 @@ Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`,
 
 ## 6. CI pipeline
 
-As built (GitHub Actions, IR550), every push to `main` and every pull request runs two workflows, and a test tag a third (`deploy-test.yml`, below):
+As built (GitHub Actions, IR550), every push to `main` and every pull request runs two workflows, and a test tag a third (`deploy-test.yml`, below). All three run on the lab server, the repository's self-hosted runner (label `ac-test`, DEC-94, DEC-95, IR632), so the private repository's Actions minutes stay unused:
 - `.github/workflows/ci.yml`, seven parallel jobs:
   - `go-lint`: gofmt, vet and golangci-lint (`make lint`: every linter of `.golangci.yml` at 0 issues), and the generated catalog, routes, contracts and Swagger must be current;
   - `go-test` and `go-test-cluster`: the Go suites on a fresh PostgreSQL test database, the second against the split services;
   - `web-lint`, `web-typecheck` and `web-test`: ESLint, TypeScript and Vitest of the four apps and the shared package;
   - `docs`: the document validators.
-- `.github/workflows/e2e.yml`: the compose stack (`--profile full`, built from the commit, with random broker keys), 30 days of mock fleet history and the Playwright suite. Changes to documentation only skip it.
+- `.github/workflows/e2e.yml`: the compose stack (`--profile full`, built from the commit one image at a time, with random broker keys and client secrets), 30 days of mock fleet history and the Playwright suite. Changes to documentation only skip it.
+  - The stack is the compose project `ac-e2e`, beside the server's own services and the test environment. Its apps listen on `127.0.0.1:3300–3303`, because Grafana has 3000. Its stores and brokers are not published (`deploy/test/compose.test.yaml`), because the server's PostgreSQL has 5432 and the real broker 1883. Keycloak (8081) and Mailpit (8025), which the specs open, keep their ports.
+  - Playwright runs in its own image as the runner's user, and the stack is removed at the end. One run at a time.
+
+Each `ci.yml` job runs in a container of its own (`golang:1.26`, `node:26`, `python:3.12`), so the dependencies' code never runs on the server itself, and the job reaches only its workspace. The runner does not pass the Docker socket into job containers.
+- Docker volumes keep the Go and npm caches from one run to the next.
+- The Go suites reach their PostgreSQL service at `localhost:5432` through `socat`, where the tests look.
+- A container works as root, so each job hands its workspace back to the runner's user at the end, or the next checkout could not clean it.
 
 Actions are pinned by commit SHA, and `.github/dependabot.yml` proposes their updates weekly. Before a push, `sh scripts/check.sh` runs the checks of `ci.yml` locally.
 
 **Shared test environment (as built, DEC-93, DEC-94, IR629, IR631).** A tag `test<major>.<minor>.<patch>r<n>` (for example `test1.0.0r2`) deploys the whole stack to the lab server, the machine of the real sensor nodes' broker, where others open the apps from the lab network. The tag's commit must be on `main` and its CI must have passed. The build and deploy logs show on the Actions tab.
 - **A runner on the server.** The repository is private (DEC-94), and the server is registered as its self-hosted runner, label `ac-test`. The runner reaches GitHub from the inside, so the lab network needs no way in, and only the collaborators' code reaches it.
-  - `.github/workflows/deploy-test.yml` runs on a test tag and checks the tag out.
-  - It checks that the tag's commit is on `main`, then waits for the CI workflow on it (`deploy/test/ci_gate.py`, with the job's token).
+  - `.github/workflows/deploy-test.yml` deploys a test tag whose commit is on `main` once the CI workflow passed on it. Pushing the tag deploys at once when CI passed already (`deploy/test/ci_gate.py`, with the job's token). While that CI still runs, the run ends, and the CI's own completion deploys the newest test tag on its commit. CI runs on the same runner, so a deployment never holds it waiting.
   - It masks the environment file's passwords, secrets, tokens and keys in the log, then runs `deploy/test/deploy.sh deploy TAG` from the checkout.
-  - One deployment runs at a time; a newer tag waiting replaces an older one that waits. Going back is a new tag on the older commit.
+  - One deployment runs at a time; a newer one waiting replaces an older one that waits. Going back is a new tag on the older commit.
 - **The server builds.** The images are built on the server one at a time, because other projects run there, with the full build output in the log. Each is tagged with the git tag (`IMAGE_TAG`), and the images of the last three deployed tags stay. Each step of `deploy.sh` is a group of its own in the log.
 - **The stack.** It runs as the compose project `ac-test`: `compose.yaml` with `deploy/test/compose.test.yaml`, and the server's environment file `~/ac-test/env`. `deploy/test/setup.sh` writes that file once; only its user can read it, and it is never committed.
   - **Ports:** the apps are published on 3200–3203, Keycloak on 8281 and Mailpit on 8225, on all addresses. The stores, brokers and APIs are not published, because the server's own services use 3000, 5432 and 1883. The long-running services restart with the server, and Keycloak keeps its data in a volume.

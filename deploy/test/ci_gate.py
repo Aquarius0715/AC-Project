@@ -1,11 +1,11 @@
-"""Waits until the CI workflow passed on a commit (DEC-94): the test deployment workflow runs it on the lab server's
-runner before deploy.sh, so a tag deploys only a commit whose lint and tests passed. It reads the job's token from
-GITHUB_TOKEN (actions: read), never from a command line that other users of the server could see, and prints each
-change of the CI run's progress.
+"""Tells whether the CI workflow passed on a commit (DEC-94): the test deployment workflow asks it before deploy.sh, so
+a tag deploys only a commit whose lint and tests passed. It reads the job's token from GITHUB_TOKEN (actions: read),
+never from a command line that other users of the server could see, and prints each change of the CI run's progress.
 
 usage: GITHUB_TOKEN=... GITHUB_REPOSITORY=owner/name python3 deploy/test/ci_gate.py SHA [MINUTES]
-  exit 0 when CI passed; 1 when it failed, or did not pass within MINUTES (60). GITHUB_API_URL and CI_GATE_POLL_SECONDS
-  change the API and the pause between two reads (tests).
+  exit 0 when CI passed; 1 when it failed, or did not pass within MINUTES (60). MINUTES 0 reads once and exits 3 while
+  CI still runs: the CI runs on the same runner, so the deployment workflow must not hold it waiting. GITHUB_API_URL
+  and CI_GATE_POLL_SECONDS change the API and the pause between two reads (tests).
 """
 
 import json
@@ -58,6 +58,9 @@ def main() -> int:
             print(f"::error::{WORKFLOW} on {sha[:8]} ended {runs[0].get('conclusion')}: not deployed", flush=True)
             return 1
         now = progress(repo, runs[0]) if runs else "not started yet"
+        if minutes == 0:
+            print(f"{WORKFLOW} on {sha[:8]}: {now}", flush=True)
+            return 3
         if now != last:
             print(f"waiting for {WORKFLOW} on {sha[:8]}: {now}", flush=True)
             last = now
