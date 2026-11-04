@@ -184,6 +184,13 @@ export function webConfig(tsconfigRootDir) {
       ],
       rules: { "sonarjs/file-name-differ-from-class": "off" },
     },
+    {
+      // a route of an app is a file Next.js requires at its path; the four apps share their screens and BFF routes,
+      // so an app's entry re-exports the shared module (`export { default } from "@ac/web/screens/…"`). That is the
+      // route, not a barrel: nothing else imports it, and bundling is per route
+      files: ["**/app/**/{page,layout,template,default,error,global-error,loading,not-found,forbidden,unauthorized,route}.{ts,tsx}"],
+      rules: { "unicorn/no-barrel-files": "off" },
+    },
     { linterOptions: { reportUnusedDisableDirectives: "error" } },
     // generated files are fixed by their generators (make swagger / go run ./cmd/gen/ops), never by hand or by a fix
     globalIgnores([
