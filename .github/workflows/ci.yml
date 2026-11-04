@@ -82,6 +82,9 @@ jobs:
           --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
     env:
       PG_ADMIN_URL: postgres://postgres:local@localhost:5432/postgres?sslmode=disable
+      # the runner's user owns the workspace and the container works as root, so git takes it for no repository: go
+      # list of the main packages then fails at their VCS stamp ("error obtaining VCS status"), which tests never need
+      GOFLAGS: -buildvcs=false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: the database at localhost:5432, where the tests look (socat to the service)
@@ -125,6 +128,9 @@ jobs:
           --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
     env:
       PG_ADMIN_URL: postgres://postgres:local@localhost:5432/postgres?sslmode=disable
+      # the runner's user owns the workspace and the container works as root, so git takes it for no repository: go
+      # list of the main packages then fails at their VCS stamp ("error obtaining VCS status"), which tests never need
+      GOFLAGS: -buildvcs=false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: the database at localhost:5432, where the tests look (socat to the service)
