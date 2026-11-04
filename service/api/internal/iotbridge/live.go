@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -19,7 +20,7 @@ var (
 	// errNotLiveNode refuses a message from a node the live site does not have.
 	errNotLiveNode = errors.New("is not a live-site node")
 	// errNoLiveSensor refuses a reading for a sensor the live module does not have.
-	errNoLiveSensor = errors.New("the live module has no sensor")
+	errNoLiveSensor = errors.New("the live site has no sensor")
 )
 
 // LiveField is one field of a real sensor node's message and the sensor of the live module it is recorded as (DEC-86,
@@ -36,20 +37,48 @@ type LiveField struct {
 // kWPerWatt scales the meter's power in W to the sensor's kW.
 const kWPerWatt = 0.001
 
-// LiveNodes are the real sensor nodes and the fields the bridge records from each: node_1 measures the room
-// (temperature, humidity; also pressure, gas resistance and altitude, which the platform has no metric for) and
-// node_2 the air conditioner's supply (power in W; also voltage, current and cumulative energy, which the platform
-// derives from power instead). Both report one JSON message every 5 seconds on smarthome/ac/<node>/sensors.
+// LiveNodes are the real sensor nodes and the fields the bridge records from each. Both measure the room (temperature,
+// humidity; also pressure, gas resistance and altitude, which the platform has no metric for): node_1 for the air
+// conditioner, node_2 for its own sensor unit (DEC-91). node_2 also measures the air conditioner's supply (power in W;
+// also voltage, current and cumulative energy, which the platform derives from power instead). Both report one JSON
+// message every 5 seconds on smarthome/ac/<node>/sensors.
 func LiveNodes() map[string][]LiveField {
 	return map[string][]LiveField{
 		"node_1": {
-			{Field: "temp", Sensor: "sensor-live-temperature", Scale: 1, Gate: "temp"},
+			{Field: fieldTemp, Sensor: "sensor-live-temperature", Scale: 1, Gate: fieldTemp},
 			{Field: sensorHumidity, Sensor: "sensor-live-humidity", Scale: 1, Gate: sensorHumidity},
 		},
 		"node_2": {
 			{Field: sensorPower, Sensor: "sensor-live-power", Scale: kWPerWatt, Gate: "voltage"},
+			{Field: fieldTemp, Sensor: "sensor-live-node-2-temperature", Scale: 1, Gate: fieldTemp},
+			{
+				Field:  sensorHumidity,
+				Sensor: "sensor-live-node-2-humidity",
+				Scale:  1,
+				Gate:   sensorHumidity,
+			},
 		},
 	}
+}
+
+// ModuleNodes are the nodes a live module hears from: those with a field recorded on one of its sensors.
+func ModuleNodes(module seed.LiveModule) []string {
+	own := map[string]bool{}
+	for _, sensor := range module.Sensors {
+		own[sensor.Name] = true
+	}
+
+	var nodes []string
+
+	for node, fields := range LiveNodes() {
+		if slices.ContainsFunc(fields, func(field LiveField) bool { return own[field.Sensor] }) {
+			nodes = append(nodes, node)
+		}
+	}
+
+	slices.Sort(nodes)
+
+	return nodes
 }
 
 // LiveNode is the node a topic carries: the level before the last, sensors (smarthome/ac/<node>/sensors); "" for any
@@ -63,13 +92,14 @@ func LiveNode(topic string) string {
 	return parts[len(parts)-2]
 }
 
-// LiveTriggers converts one node message received at `at` on the scenario clock into readings of the live unit and
-// module (seed.LiveSite: both nodes are one module, DEC-89). Each reading is stamped at the start of its scenario
-// minute (the slot energy counts, D07), and its event ID is the node, field and minute, so the API keeps one reading
-// per sensor and minute. The same readings then go to the unit's alert policies as facts (a demo automation trigger,
-// IR529), and the module's heartbeat comes last: a state report with no settings (the nodes report none), which the
-// API takes as heard only (IR528) and which keeps the unit's last seen time current. A node the bridge does not know is
-// an error; a message with nothing measured gives no triggers.
+// LiveTriggers converts one node message received at `at` on the scenario clock into readings of the live units and
+// modules (seed.LiveSite: both nodes are the air conditioner's module, DEC-89; node_2's room readings have a unit of
+// their own, DEC-91). Each reading is stamped at the start of its scenario minute (the slot energy counts, D07), and
+// its event ID is the node, field and minute, so the API keeps one reading per sensor and minute. The same readings
+// then go to their units' alert policies as facts (a demo automation trigger, IR529), and the heartbeat of each module
+// a reading came from comes last: a state report with no settings (the nodes report none), which the API takes as
+// heard only (IR528) and which keeps the unit's last seen time current. A node the bridge does not know is an error; a
+// message with nothing measured gives no triggers.
 func LiveTriggers(node string, payload []byte, when time.Time) ([]Trigger, error) {
 	fields, ok := LiveNodes()[node]
 	if !ok {
@@ -90,10 +120,17 @@ func LiveTriggers(node string, payload []byte, when time.Time) ([]Trigger, error
 	if err != nil || len(out) == 0 {
 		return nil, err
 	}
-	// the same readings as facts of the unit's alert policies (IR529): a rule over a threshold alerts and notifies
+	// the same readings as facts of their units' alert policies (IR529): a rule over a threshold alerts and notifies
 	facts := make([]Fact, 0, len(out))
+
+	var units []uuid.UUID
+
 	for _, tr := range out {
 		measurement := tr.Measurement
+		if !slices.Contains(units, measurement.UnitID) {
+			units = append(units, measurement.UnitID)
+		}
+
 		facts = append(
 			facts,
 			Fact{
@@ -112,16 +149,23 @@ func LiveTriggers(node string, payload []byte, when time.Time) ([]Trigger, error
 		liveEvaluation(
 			fmt.Sprintf("live/%s/automation/%s", node, slot.Format(time.RFC3339)),
 			slot,
+			units,
 			facts,
 		),
-		liveHeartbeat(slot),
 	)
+
+	for _, module := range seed.LiveSite().Modules() { // the modules in the site's order, each heard once
+		if slices.Contains(units, seed.ID(module.Unit)) {
+			out = append(out, liveHeartbeat(seed.ID(module.Device), slot))
+		}
+	}
 
 	return out, nil
 }
 
-// liveReadings are the readings of one node message: each field the node measured (its gate is not zero) on the live
-// module's sensor it is recorded as, at the minute slot, with the node, field and minute as its event ID.
+// liveReadings are the readings of one node message: each field the node measured (its gate is not zero) on the
+// sensor it is recorded as and that sensor's unit, at the minute slot, with the node, field and minute as its event
+// ID.
 func liveReadings(
 	node string,
 	fields []LiveField,
@@ -135,8 +179,12 @@ func liveReadings(
 	}
 
 	sensors := map[string]seed.LiveSensor{}
-	for _, s := range seed.LiveSite().Sensors {
-		sensors[s.Name] = s
+	unitOf := map[string]string{}
+
+	for _, module := range seed.LiveSite().Modules() {
+		for _, sensor := range module.Sensors {
+			sensors[sensor.Name], unitOf[sensor.Name] = sensor, module.Unit
+		}
 	}
 
 	var out []Trigger
@@ -170,9 +218,7 @@ func liveReadings(
 			OccurredAt: slot,
 			EventType:  "telemetry",
 			Measurement: &Measurement{
-				UnitID: seed.ID(
-					seed.LiveSite().Unit,
-				),
+				UnitID:     seed.ID(unitOf[liveSensor.Name]),
 				SensorID:   seed.ID(liveSensor.Name),
 				Metric:     liveSensor.Metric,
 				Value:      &value,
@@ -189,12 +235,10 @@ func liveReadings(
 	return out, nil
 }
 
-// liveHeartbeat is the live module's heartbeat of the minute slot: a state report with no settings (the nodes report
+// liveHeartbeat is a live module's heartbeat of the minute slot: a state report with no settings (the nodes report
 // none), which the API takes as heard only (IR528). It is one a minute for the module, whichever node is heard first:
-// both nodes send the same body.
-func liveHeartbeat(slot time.Time) Trigger {
-	dev := seed.ID(seed.LiveSite().Device)
-
+// every node of the module sends the same body.
+func liveHeartbeat(dev uuid.UUID, slot time.Time) Trigger {
 	return Trigger{
 		ScenarioID: Scenario,
 		EventID: uuid.NewSHA1(
@@ -220,8 +264,8 @@ func liveHeartbeat(slot time.Time) Trigger {
 	}
 }
 
-// liveEvaluation is a demo automation trigger of the live unit's facts, with an event ID from key.
-func liveEvaluation(key string, when time.Time, facts []Fact) Trigger {
+// liveEvaluation is a demo automation trigger of the facts of live units, with an event ID from key.
+func liveEvaluation(key string, when time.Time, units []uuid.UUID, facts []Fact) Trigger {
 	event := uuid.NewSHA1(seed.Namespace(), []byte(key))
 
 	return Trigger{
@@ -232,7 +276,7 @@ func liveEvaluation(key string, when time.Time, facts []Fact) Trigger {
 		Event: &Evaluation{
 			EventID:    event,
 			OccurredAt: when,
-			UnitIDs:    []uuid.UUID{seed.ID(seed.LiveSite().Unit)},
+			UnitIDs:    units,
 			Facts:      facts,
 			Phase:      "condition",
 		}, CommandID: nil, Measurement: nil, DeviceID: nil, State: nil, BindingID: nil, Sequence: nil, Kind: "",
@@ -243,19 +287,21 @@ func liveEvaluation(key string, when time.Time, facts []Fact) Trigger {
 // gapTenths is the step of the heartbeat gap the bridge sends: it is floored to a tenth of a minute.
 const gapTenths = 10
 
-// LiveGapTrigger reports, at the scenario minute slot, how long the live module has gone unheard: the longest time in
-// minutes since a node's last message (heartbeat_gap). The default rule ac_offline alerts at 15 minutes and resolves
-// under 1 (IR120), so a node that stops, or a broker out of reach, is noticed without the nodes' help (IR529).
-func LiveGapTrigger(gap time.Duration, slot time.Time) Trigger {
+// LiveGapTrigger reports, at the scenario minute slot, how long a live unit's module has gone unheard: the longest time
+// in minutes since the last message of one of its nodes (heartbeat_gap). The default rule ac_offline alerts at 15
+// minutes and resolves under 1 (IR120), so a node that stops, or a broker out of reach, is noticed without the nodes'
+// help (IR529).
+func LiveGapTrigger(unit uuid.UUID, gap time.Duration, slot time.Time) Trigger {
 	slot = slot.UTC()
 	minutes := math.Floor(gap.Minutes()*gapTenths) / gapTenths
 
 	return liveEvaluation(
-		"live/gap/"+slot.Format(time.RFC3339),
+		"live/gap/"+unit.String()+"/"+slot.Format(time.RFC3339),
 		slot,
+		[]uuid.UUID{unit},
 		[]Fact{
 			{
-				UnitID:     seed.ID(seed.LiveSite().Unit),
+				UnitID:     unit,
 				Metric:     "heartbeat_gap",
 				Value:      minutes,
 				Unit:       "min",
@@ -266,15 +312,15 @@ func LiveGapTrigger(gap time.Duration, slot time.Time) Trigger {
 	)
 }
 
-// The live module goes offline once a node has gone unheard for LiveOfflineAfter and comes back once every node has
-// been heard within LiveOnlineWithin (the gap is the longest of the nodes'): a command sent while its node is silent
-// never arrives, and the client's unit page disables its controls while the AC is offline (IR532).
+// A live module goes offline once one of its nodes has gone unheard for LiveOfflineAfter and comes back once each of
+// them has been heard within LiveOnlineWithin (its gap is the longest of its nodes'): a command sent while its node is
+// silent never arrives, and the client's unit page disables its controls while the AC is offline (IR532).
 const (
 	LiveOfflineAfter = 3 * time.Minute
 	LiveOnlineWithin = time.Minute
 )
 
-// ConnectionFault is devices.connectionFault's answer for the live module: its binding, its open connection fault (the
+// ConnectionFault is devices.connectionFault's answer for a live module: its binding, its open connection fault (the
 // DeviceEvent a restored names) and the newest sequence on the axis.
 type ConnectionFault struct {
 	BindingID *uuid.UUID `json:"bindingId"`
@@ -282,12 +328,13 @@ type ConnectionFault struct {
 	Sequence  int64      `json:"sequence"`
 }
 
-// LiveConnectionTrigger is the device event that brings the live module's connection in line with the heartbeat gap:
+// LiveConnectionTrigger is the device event that brings a live module's connection in line with its heartbeat gap:
 // communication_lost once a node has been silent for LiveOfflineAfter while the API has no open fault, and restored,
 // naming the open fault, once every node is heard again. ok is false when the connection already matches, or while the
 // module is unbound. The sequence follows the API's newest on the axis, and the event IDs come from the binding and
 // sequence or the fault, so a repeat is one event.
 func LiveConnectionTrigger(
+	dev uuid.UUID,
 	fault ConnectionFault,
 	gap time.Duration,
 	when time.Time,
@@ -310,7 +357,7 @@ func LiveConnectionTrigger(
 		}, false
 	}
 
-	dev, seq := seed.ID(seed.LiveSite().Device), fault.Sequence+1
+	seq := fault.Sequence + 1
 
 	trigger := Trigger{
 		ScenarioID:  Scenario,
@@ -390,8 +437,8 @@ func (h *LiveHeard) Heard(node string, at time.Time) {
 	}
 }
 
-// Gap is the longest time any live node has gone unheard at now.
-func (h *LiveHeard) Gap(now time.Time) time.Duration {
+// GapOf is the longest time one of the nodes has gone unheard at now: a module's gap is that of its nodes.
+func (h *LiveHeard) GapOf(nodes []string, now time.Time) time.Duration {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -399,7 +446,7 @@ func (h *LiveHeard) Gap(now time.Time) time.Duration {
 
 	var gap time.Duration
 
-	for node := range LiveNodes() {
+	for _, node := range nodes {
 		last, ok := h.last[node]
 		if !ok {
 			last = h.start

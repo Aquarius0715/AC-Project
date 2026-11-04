@@ -20,6 +20,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 
@@ -231,7 +232,7 @@ func local(ctx context.Context, conn *pgx.Conn) error {
 		log.Printf(
 			"migrate: live sensor site of %s ready (%s)",
 			seed.LiveSite().CustomerName,
-			seed.LiveSite().UnitName,
+			strings.Join(seed.LiveSite().UnitNames(), ", "),
 		)
 	}
 

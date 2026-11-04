@@ -238,7 +238,7 @@ func temperatureHistory(
 	unit uuid.UUID,
 	window historyWindow,
 ) (int64, error) {
-	tempID := ID(devicesim.SensorName(pattern, fleetSensor("temperature")))
+	tempID := ID(devicesim.SensorName(pattern, fleetSensor(keyTemperature)))
 
 	tag, err := txn.Exec(
 		ctx,
@@ -290,7 +290,7 @@ func airHistory(
 	var total int64
 
 	for _, reading := range []struct{ metric, unit, on, off string }{
-		{"humidity", "%", `52 + 4 * sin(pi() * extract(hour from t AT TIME ZONE 'Asia/Kuala_Lumpur') / 12) + 4 * ` +
+		{keyHumidity, "%", `52 + 4 * sin(pi() * extract(hour from t AT TIME ZONE 'Asia/Kuala_Lumpur') / 12) + 4 * ` +
 			`j`, `66 + 5 * sin(pi() * (extract(hour from t AT TIME ZONE 'Asia/Kuala_Lumpur') - 6) / 12) + 4 * j`},
 		{"co2", "ppm", `600 + 350 * sin(pi() * ((extract(hour from t AT TIME ZONE 'Asia/Kuala_Lumpur') + extract(minute ` +
 			`from t) / 60.0) - 8) / 14) + 80 * j`, `430 + 40 * j`},

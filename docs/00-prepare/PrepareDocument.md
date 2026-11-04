@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.495.0
+version: 0.496.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -186,6 +186,7 @@ Small text and controls are adjusted for readability and usability in work scree
 | DEC-88 | (Superseded by DEC-89.) Each real sensor node is a device of its own on a unit of its own, because a unit has at most one active device: node_1 (room temperature and humidity) and node_2 (power), each with its own monitoring-only model, both in Live Sensor Customer's Sensor room | User request in this conversation, 2026-10-30 (“もう一つデバイスがあるはずなので、それも同じ組織に入れてください”); reflected in IR526 |
 | DEC-89 | Both real nodes serve one Daikin air conditioner: they are one module on one unit ("Live · Daikin AC"). The app switches it on and off through node_1's infrared LED, and sending to the nodes' broker is on (`REAL_MQTT_COMMANDS=1`). Power on sends the firmware's COOL24 and power off sends OFF; the other settings wait for a firmware that takes them | User answers in this conversation, 2026-10-30 (“同じエアコン（1台）”, “有効にしてよい”, the firmware and “DAIKINです”); reflected in IR528 |
 | DEC-90 | The UX loop's proposals of 2026-11-02 are taken as recommended. Build: (1) HQ Overview counts what waits for HQ regardless of the period; (3) on touch screens every control is at least 44 px; (4) the customer overview names an overdue invoice and the restriction it caused; (5) contractors list and remove their technicians' unavailable days, and same-name technicians show their e-mail; (6) a technician keeps the notices of a job whose assignment ended while its history snapshot is theirs; (7) a contractor's notice of an offer withdrawn before acceptance has no link; (8) a job history without a completion counts in the period by its delegation's end; (9) `telemetry.series` returns server-side averages for long windows; (10) a policy without a cooldown notifies once per open alert; (11) the partner's Return for rework lists the items to redo, as HQ's does; (12) the development simulator and bridge behave like real modules; (13) the audit log records denied writes, throttled, and then pending and failed results. Keep as built: (2) contractor capacity per preferred time stays out of Phase 1A | User decision in this conversation, 2026-11-02 (“すべて推奨どおりお願いします”); reflected from IR600 on |
+| DEC-91 | node_2 reports the room too (temperature and humidity next to its power), so its temperature and humidity go to a sensor unit of their own, "Live · node_2 sensors", in the same Sensor room: a module has one sensor per metric, and node_1's readings stay the air conditioner's. Its model has no remote control. node_2's power stays on "Live · Daikin AC", and each unit's connection and AC offline follow its own nodes | User request in this conversation, 2026-11-04 (“node_2を取り込んでください”), and the answer “別ユニットを追加”; reflected in IR627 |
 
 **DEC-10 (design proposal)**: Preserve work status on reassignment. Release restrictions only after all cause invoices fixed at notice time are paid. Release does not automatically power units on or restore previous set temperatures. Manual payment recording, test-run end confirmation, and viewing saved reports are specified for the 1A demo. This does not mean company approval of commercial rules. See [input/output contract DDC-08](../02-design/implementation-contracts.md#ddc-08-multi-resource-revisit-and-cross-role-contracts).
 
@@ -287,6 +288,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.496.0: node_2's room temperature and humidity are recorded on a sensor unit of their own, "Live · node_2 sensors" (DEC-91, IR627). Phase 1A unchanged.
 0.495.0: The four apps show no error codes, spec IDs, status codes or code names, and guards keep it so (IR626). Phase 1A unchanged.
 0.494.0: The technician's Add part and Refrigerant refuse under the field concerned; pausing keeps Time on site open and the focus on its button (IR625). Phase 1A unchanged.
 0.493.0: The partner schedule leaves former technicians and ended delegations out, and its assignment notes lose the Japanese term (IR624). Phase 1A unchanged.
