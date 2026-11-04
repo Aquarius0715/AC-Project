@@ -188,7 +188,7 @@ Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`,
 
 ## 6. CI pipeline
 
-As built (GitHub Actions, IR550), every push to `main` and every pull request runs `ci.yml`. `e2e.yml` runs every night on `main` and by hand, and a test tag runs `deploy-test.yml` (below). All three run on the lab server, the repository's self-hosted runner (label `ac-test`, DEC-94, DEC-95, IR632), so the private repository's Actions minutes stay unused:
+As built (GitHub Actions, IR550), every push to `main` and every pull request runs `ci.yml`. `e2e.yml` runs every night on `main` and by hand, and a test tag runs `deploy-test.yml` (below). All three run on the lab server, three self-hosted runners of the repository (label `ac-test`; `deploy/test/add-runners.sh` adds the second and third), DEC-94, DEC-95, IR632. The jobs of a push run in parallel, and the private repository's Actions minutes stay unused:
 - `.github/workflows/ci.yml`, seven parallel jobs:
   - `go-lint`: gofmt, vet and golangci-lint (`make lint`: every linter of `.golangci.yml` at 0 issues), and the generated catalog, routes, contracts and Swagger must be current;
   - `go-test` and `go-test-cluster`: the Go suites on a fresh PostgreSQL test database, the second against the split services;
@@ -198,7 +198,7 @@ As built (GitHub Actions, IR550), every push to `main` and every pull request ru
   - The stack is the compose project `ac-e2e`, beside the server's own services and the test environment. Its apps listen on `127.0.0.1:3300–3303`, because Grafana has 3000. Its stores and brokers are not published (`deploy/test/compose.test.yaml`), because the server's PostgreSQL has 5432 and the real broker 1883. Keycloak (8081) and Mailpit (8025), which the specs open, keep their ports.
   - Playwright runs in its own image as the runner's user, and the stack is removed at the end. One run at a time.
 
-Each `ci.yml` job runs in a container of its own (`golang:1.26`, `node:26`, `python:3.12`), so the dependencies' code never runs on the server itself, and the job reaches only its workspace. The runner does not pass the Docker socket into job containers.
+Each `ci.yml` job runs in a container of its own (`golang:1.26-trixie`, `node:26`, `python:3.12`), so the dependencies' code never runs on the server itself, and the job reaches only its workspace. The runner does not pass the Docker socket into job containers.
 - Docker volumes keep the Go and npm caches from one run to the next.
 - The Go suites reach their PostgreSQL service at `localhost:5432` through `socat`, where the tests look.
 - A container works as root, so each job hands its workspace back to the runner's user at the end, or the next checkout could not clean it.

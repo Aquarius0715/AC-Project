@@ -29,12 +29,14 @@ jobs:
     runs-on: [self-hosted, ac-test]
     timeout-minutes: 75
     env:
-      SETTINGS: ${{ runner.temp }}/e2e.env
       IMAGE_TAG: e2e
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: local settings (random broker keys and client secrets, never real secrets)
         run: |
+          # the job's env cannot read the runner context: the path goes to the later steps through GITHUB_ENV
+          SETTINGS=$RUNNER_TEMP/e2e.env
+          echo "SETTINGS=$SETTINGS" >>"$GITHUB_ENV"
           cp .env.local.example "$SETTINGS"
           for key in MQTT_DEVICE_SIM_KEY MQTT_IOT_BRIDGE_KEY; do
             sed -i "s/^$key=.*/$key=$(openssl rand -hex 24)/" "$SETTINGS"
