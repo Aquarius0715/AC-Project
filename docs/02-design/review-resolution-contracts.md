@@ -8857,3 +8857,41 @@ The user wants a test deployment that other people can open and that shows the s
    - Signed in, customer-b's overview lists Bedroom AC B, Live · Daikin AC (29.8 °C, 57.1 %, 8 W) and Live · node_2 sensors (29.6 °C, 59.1 %). customer-a's lists its four units and the 19 active mock units.
    - The customer, HQ and scenario E2E passed on this stack with Node 26: customer 43 passed, admin and scenarios 63 passed, the skips by design. One customer run on Node 23 failed only for want of `Uint8Array.toHex`.
    - No command was sent.
+
+## IR629 A test tag deploys the stack to the lab server (DEC-93) — 2026-11-04
+
+The user wants continuous deployment: pushing a tag like `test1.0.0r0` deploys the stack to the server of the real nodes' broker, where others open it. The server, as the user checked it, runs Ubuntu 26.04 (x86_64, 24 cores, 18 GiB of memory free) with Docker 29.9 and Compose v5.6. It is on the lab network, it reaches github.com and ghcr.io, and it runs other projects too: Grafana on 3000, Supabase on 5432 and the broker in Docker on 1883. The repository is public. The user runs the one-time set-up, takes HTTP on the server's address and ports, allows the real air conditioner's commands, and wants the data built again only when the schema changed.
+
+1. **The server pulls (`deploy/test/deploy.sh`).** A systemd timer runs the script every minute. It fetches the tags and takes the newest `test<major>.<minor>.<patch>r<n>`, then deploys it if two checks pass:
+   - the tag's commit is on `main`;
+   - the CI workflow passed on that commit (GitHub's public API, no token).
+
+   GitHub-hosted runners cannot reach the server. A self-hosted runner on a public repository would run the code of pull requests from forks on the machine that also switches the real air conditioner.
+2. **The server builds the images.** GitHub's container registry keeps a new package private, so the server would need a token, or each of the 13 images would have to be made public by hand. The server builds the images one at a time, tagged with the git tag (`IMAGE_TAG`), and keeps those of the last three deployed tags.
+3. **compose.yaml takes the deployment's values.** The default of each variable is this machine's value, so the local stack renders the same as before. The only addition is `APP_URL_*`, at the Go defaults, for the e-mail links:
+   - the apps' and Keycloak's URLs (`*_WEB_URL`, `KEYCLOAK_URL`);
+   - the published address and ports (`PUBLISH_ADDR`, `*_PORT`);
+   - the image tag, the realm file, and the secrets that were local values (Keycloak admin password, client secrets, session secret, internal token).
+4. **`deploy/test/compose.test.yaml`.**
+   - Only the apps (3200–3203), Keycloak (8281) and Mailpit (8225) are published, on all addresses.
+   - The stores, brokers and APIs stay inside the compose networks.
+   - The long-running services restart with the server.
+   - Keycloak keeps its data in a volume, so a recreated container keeps the accounts set up since the import.
+5. **The environment file (`deploy/test/setup.sh`).**
+   - It asks for the address and the real broker's login, then writes `~/ac-test/env` for its user only, with random secrets.
+   - `deploy/test/realm.py` writes the realm from `realm-ac.json` with the test URLs and those client secrets. The demo users keep their passwords.
+   - `docker/mosquitto/passwd.sh` reads another settings file through `ENV_FILE`.
+   - The settings file is never sourced by the shell, because the broker password may hold any character.
+6. **Plain HTTP works.**
+   - The session cookies are not `Secure` on HTTP (`session.ts`).
+   - The browser code that called `crypto.randomUUID` calls the new `randomId`. A page outside a secure context lacks `crypto.randomUUID`, and without the change the operation relay's writes and HQ's automation simulation failed there. `randomId` uses `getRandomValues` outside a secure context (`randomId.test.ts`).
+   - Two HQ specs made their relay's idempotency keys in the page; they now make them in Node, so the suite runs against such a page too.
+7. **Data, failures and reboots.**
+   - The data stays between deployments. When the migrations changed since the deployed tag, it is built again from the seed (version 1 is edited in place before the first release); `deploy.sh reset` does it by hand.
+   - A failed deployment brings back the tag before it, and a tag is tried three times.
+   - After a reboot, the first check starts the stack and restarts the API services once Keycloak answers (IR419).
+8. **Checked on this Mac as a trial.** The script deployed a local tag under the project `ac-test`, at the Mac's LAN address (10.100.1.2), without the real broker, beside the development stack.
+   - Keycloak and the four apps answered there. On those HTTP addresses the smoke crawl passed for the customer app and HQ (6), and the HQ automation and alert-policy specs, the technician's QR scan and the customer assistant passed.
+   - `deploy.sh reset` rebuilt the data and Keycloak's volume from the seed (scenario clock back to 14 Sept), and the four apps signed in again (12 passed).
+   - The CI check read `success` for a commit of main and `pending` for an unknown one.
+   - The trial was then removed (containers, volumes, the 13 images). The development stack ran on, untouched.

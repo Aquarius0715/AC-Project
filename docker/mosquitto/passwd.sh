@@ -3,9 +3,10 @@
 # Each demo client logs in with its own key: device-sim (the simulated modules) and iot-bridge (the bridge to the demo
 # trigger). The keys are passed in the environment, not on the command line. Run after changing a key:
 #   sh docker/mosquitto/passwd.sh && docker compose restart mosquitto
+# ENV_FILE names another settings file than .env.local (the shared test environment's, deploy/test/deploy.sh).
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
-env_file="$here/../../.env.local"
+env_file="${ENV_FILE:-$here/../../.env.local}"
 [ -f "$env_file" ] || { echo "missing $env_file (copy .env.local.example and generate the keys)" >&2; exit 1; }
 set -a
 # shellcheck disable=SC1090
@@ -14,7 +15,8 @@ set +a
 : "${MQTT_DEVICE_SIM_KEY:?set in .env.local}" "${MQTT_IOT_BRIDGE_KEY:?set in .env.local}"
 # the file only changes when a key changes: a stamp (git-ignored) keeps a hash of the keys it was written from
 stamp="$here/.passwd.keys"
-sum=$(printf '%s\n%s\n' "$MQTT_IOT_BRIDGE_KEY" "$MQTT_DEVICE_SIM_KEY" | shasum -a 256 | cut -d' ' -f1)
+sha256() { if command -v sha256sum >/dev/null 2>&1; then sha256sum; else shasum -a 256; fi; }
+sum=$(printf '%s\n%s\n' "$MQTT_IOT_BRIDGE_KEY" "$MQTT_DEVICE_SIM_KEY" | sha256 | cut -d' ' -f1)
 if [ -f "$stamp" ] && [ "$(cat "$stamp")" = "$sum" ] && grep -q '^device-sim:' "$here/passwd" 2>/dev/null; then
   echo "broker password file is up to date"
   exit 0

@@ -1,0 +1,29 @@
+# The shared test environment (DEC-93): compose.yaml with this file on top, run by deploy/test/deploy.sh on the lab
+# server with the settings of its environment file (deploy/test/setup.sh writes it). Only the four apps, Keycloak and
+# Mailpit are published, on the ports and the address that file names. The stores, the brokers and the APIs stay inside
+# the compose networks, so they never meet the server's own services on their ports (PostgreSQL 5432, the real broker
+# 1883). The services come back after a reboot, and Keycloak keeps its data in a volume, so a recreated container keeps
+# the accounts and the one-time-code devices set up since the realm was imported.
+services:
+  postgres: { ports: !reset [], restart: unless-stopped }
+  valkey: { ports: !reset [], restart: unless-stopped }
+  localstack: { ports: !reset [], restart: unless-stopped }
+  mosquitto: { ports: !reset [], restart: unless-stopped }
+  gateway: { ports: !reset [] }
+  webhook: { ports: !reset [] }
+  jaeger: { ports: !reset [] }
+  mailpit: { restart: unless-stopped }
+  stripe-mock: { restart: unless-stopped }
+  weather-mock: { restart: unless-stopped }
+  keycloak:
+    restart: unless-stopped
+    volumes: [keycloak-data:/opt/keycloak/data]
+  customer-web-api: { restart: unless-stopped }
+  partner-web-api: { restart: unless-stopped }
+  technician-web-api: { restart: unless-stopped }
+  admin-web-api: { restart: unless-stopped }
+  iot-bridge: { restart: unless-stopped }
+  device-sim: { restart: unless-stopped }
+
+volumes:
+  keycloak-data: {}

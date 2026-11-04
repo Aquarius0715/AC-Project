@@ -1,18 +1,21 @@
 // HQ automation policies (FR-A11, DD-A11, Figma Admin 106:5 / 361:7456, IR323): the editor's Basics, the save footer
 // (No unsaved changes / Discard), Show disabled, and Simulate with + Add fact — a tariff fact and an added solar fact
 // that is missing — run without creating a command. The test creates one policy, disabled so that no evaluation runs
-// it, and deletes it again in afterEach through the app's operation relay (policies.delete with its version).
+// it, and deletes it again in afterEach through the app's operation relay (policies.delete with its version). The
+// relay's idempotency key is made here, not in the page: crypto.randomUUID is missing from a page served over plain
+// HTTP, as the shared test environment's are (DEC-93).
+import { randomUUID } from "node:crypto";
 import { test, expect } from "../../fixtures/test";
 
 let created: { id: string; version: number } | null = null;
 
 test.afterEach(async ({ page }) => {
   if (!created) return;
-  const status = await page.evaluate(async ({ id, version }) => {
+  const status = await page.evaluate(async ({ id, version, key }) => {
     return (await fetch("/bff/ops/policies.delete", {
-      method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID(), "X-Expected-Version": String(version) }, body: JSON.stringify({ policyId: id }),
+      method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": key, "X-Expected-Version": String(version) }, body: JSON.stringify({ policyId: id }),
     })).status;
-  }, created);
+  }, { ...created, key: randomUUID() });
   expect(status).toBe(200);
   created = null;
 });

@@ -106,7 +106,7 @@ Local stand-ins for the AWS managed services:
 | Weather source | `wiremock` (`docker/wiremock`) | Fixed demo responses |
 | CloudWatch / X-Ray | OpenTelemetry collector + Jaeger | Same OTLP exporter configuration |
 
-Compose networks mirror the network zones: `edge` (browser-facing web, webhook, Keycloak), `app` (application services), `data` (data stand-ins). Only ports needed for development are published to the host. As built (IR373, IR382), the ports of PostgreSQL, Valkey, LocalStack, Mosquitto, Keycloak, the gateway, the webhook receiver and Jaeger are bound to `127.0.0.1`, so only this machine reaches them. They have local passwords or none: the database superuser, the identity provider's admin console, the anonymous broker, the session store without a password. The web apps' ports stay open to the network for showing the demo on other devices. Signing in from another device does not work in any case, because the issuer is `localhost`.
+Compose networks mirror the network zones: `edge` (browser-facing web, webhook, Keycloak), `app` (application services), `data` (data stand-ins). Only ports needed for development are published to the host. As built (IR373, IR382), the ports of PostgreSQL, Valkey, LocalStack, Mosquitto, Keycloak, the gateway, the webhook receiver and Jaeger are bound to `127.0.0.1`, so only this machine reaches them. They have local passwords or none: the database superuser, the identity provider's admin console, the anonymous broker, the session store without a password. The web apps' ports are bound to `127.0.0.1` as well. The apps', Keycloak's and Mailpit's ports take their address from `PUBLISH_ADDR` and their numbers from the `*_PORT` variables, and the issuer and the apps' URLs come from `KEYCLOAK_URL` and `*_WEB_URL`. The defaults are this machine's; only the shared test environment (§6) changes them, with secrets of its own.
 
 Configuration is twelve-factor: every service reads environment variables only. The variable names are the same locally (compose) and on ECS (task definitions); only the values differ.
 
@@ -197,6 +197,25 @@ As built (GitHub Actions, IR550), every push to `main` and every pull request ru
 - `.github/workflows/e2e.yml`: the compose stack (`--profile full`, built from the commit, with random broker keys), 30 days of mock fleet history and the Playwright suite. Changes to documentation only skip it.
 
 Actions are pinned by commit SHA, and `.github/dependabot.yml` proposes their updates weekly. Before a push, `sh scripts/check.sh` runs the checks of `ci.yml` locally.
+
+**Shared test environment (as built, DEC-93, IR629).** A tag `test<major>.<minor>.<patch>r<n>` (for example `test1.0.0r0`) deploys the whole stack to the lab server. That is the machine of the real sensor nodes' broker, and others open the apps there from the lab network. The tag must be on a commit of `main` whose CI passed.
+- **The server pulls.** The server is on the lab network, out of GitHub's reach, and the repository is public, so there is no self-hosted runner and no way in from outside. A systemd timer runs `deploy/test/deploy.sh` every minute.
+  - It fetches the tags and takes the newest test tag.
+  - It checks that the tag's commit is on `main` and that the CI workflow passed on it (GitHub's public API).
+  - Going back is a new tag on the older commit.
+- **The server builds.** GitHub's container registry keeps new packages private, so pulling from it would need a token on the server. The server builds the images itself instead, one at a time because other projects run there. Each image is tagged with the git tag (`IMAGE_TAG`), and the images of the last three deployed tags stay.
+- **The stack.** It runs as the compose project `ac-test`: `compose.yaml` with `deploy/test/compose.test.yaml`, and the server's environment file `~/ac-test/env`. `deploy/test/setup.sh` writes that file once; only its user can read it, and it is never committed.
+  - **Ports:** the apps are published on 3200–3203, Keycloak on 8281 and Mailpit on 8225, on all addresses. The stores, brokers and APIs are not published, because the server's own services use 3000, 5432 and 1883. The long-running services restart with the server, and Keycloak keeps its data in a volume.
+  - **Secrets:** the file gives the environment its own values for the secrets that are local defaults in compose.yaml: the Keycloak admin password, the three client secrets, the session secret, the internal token, the session store password and the broker keys. `deploy/test/realm.py` writes the realm from `realm-ac.json` with those secrets and the test URLs. The demo users keep their passwords.
+  - **Plain HTTP:** the apps are served over HTTP at the server's address. The session cookies are not `Secure` on HTTP. The browser code that called `crypto.randomUUID`, which a page outside a secure context lacks, now calls `randomId`: the operation relay's idempotency key and HQ's automation simulation.
+  - **Real nodes:** `REAL_MQTT_URL` names the broker on the same server, and `REAL_MQTT_COMMANDS=1` lets the app switch the real air conditioner.
+- **Data.** It stays from one deployment to the next. When the migrations changed since the deployed tag, the data is built again from the seed, because version 1 is edited in place before the first release. `deploy.sh reset` does the same by hand.
+- **Failures and reboots.** A failed deployment brings back the tag before it, and a tag is tried three times at most. After a reboot, the first check starts the stack and restarts the API services once Keycloak answers (IR419).
+- **On the server:**
+  - `journalctl -u ac-test-deploy -f` shows the progress.
+  - `bash ~/ac-test/repo/deploy/test/deploy.sh status` shows the deployed tag and the containers.
+  - `deploy.sh reset` builds the data again from the seed.
+  - `deploy.sh deploy TAG` deploys a tag now, without the checks.
 
 Planned for the AWS target (DEC-68):
 1. Build every image with `docker buildx` for `linux/arm64` and `linux/amd64`, with the unit tests in the build stage.

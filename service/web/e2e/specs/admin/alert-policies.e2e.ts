@@ -2,7 +2,10 @@
 // customer first; the draft starts off, at priority 50; Save policy checks the name and the recipients before anything
 // is sent; recipients come from notifications.recipients; the created policy opens by its policyId; an edit shows in the
 // footer; Delete policy removes it. A policy left behind by a failed run is deleted in afterEach through the app's
-// operation relay (policies.delete with its version). The unit page's “+ New policy for …” opens the same draft.
+// operation relay (policies.delete with its version). The unit page's “+ New policy for …” opens the same draft. The
+// relay's idempotency keys are made here, not in the page: crypto.randomUUID is missing from a page served over plain
+// HTTP, as the shared test environment's are (DEC-93).
+import { randomUUID } from "node:crypto";
 import { test, expect } from "../../fixtures/test";
 import { expectAccessible } from "../../fixtures/a11y";
 import { selectForURL } from "../../fixtures/select";
@@ -11,14 +14,14 @@ let created: string | null = null;
 
 test.afterEach(async ({ page }) => {
   if (!created) return;
-  const status = await page.evaluate(async (id) => {
+  const status = await page.evaluate(async ({ id, key }) => {
     const got = await fetch("/bff/ops/policies.get", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ policyId: id }) });
     if (got.status === 404) return 200; // the test deleted it
     const { data } = await got.json();
     return (await fetch("/bff/ops/policies.delete", {
-      method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID(), "X-Expected-Version": String(data.version) }, body: JSON.stringify({ policyId: id }),
+      method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": key, "X-Expected-Version": String(data.version) }, body: JSON.stringify({ policyId: id }),
     })).status;
-  }, created);
+  }, { id: created, key: randomUUID() });
   expect(status).toBe(200);
   created = null;
 });
@@ -151,12 +154,12 @@ test("the Policies tab's scope, Show disabled and a scoped new policy with activ
 // cannot be copied. afterEach puts the limits and the switch back through the operation relay if a run stopped halfway.
 interface DefaultPolicy { id: string; version: number; rules: { ruleKey: string; threshold: number }[]; ruleSettings: { ruleKey: string; customerId: string; enabled: boolean; version: number }[] }
 const relay = async (page: import("@playwright/test").Page, op: string, input: unknown, version?: number) => {
-  return page.evaluate(async ({ op, input, version }) => {
+  return page.evaluate(async ({ op, input, version, key }) => {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (version !== undefined) Object.assign(headers, { "Idempotency-Key": crypto.randomUUID(), "X-Expected-Version": String(version) });
+    if (version !== undefined) Object.assign(headers, { "Idempotency-Key": key, "X-Expected-Version": String(version) });
     const r = await fetch(`/bff/ops/${op}`, { method: "POST", body: JSON.stringify(input), headers });
     return { status: r.status, body: await r.json() };
-  }, { op, input, version });
+  }, { op, input, version, key: randomUUID() });
 };
 let before: DefaultPolicy | null = null;
 
