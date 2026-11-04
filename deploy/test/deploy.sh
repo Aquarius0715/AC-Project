@@ -9,7 +9,9 @@
 # version 1 is edited in place before the first release and never applied again to a database that has it, so the
 # data is then built again from the seed. A deployment that fails leaves the one before running, and a tag is tried
 # ATTEMPTS times at most. After a reboot it starts the stack and restarts the API services once Keycloak answers: they
-# load its token keys at start (IR419).
+# load its token keys at start (IR419). With GITHUB_DEPLOY_TOKEN in the environment file, each tag is a deployment of
+# the environment "test" on GitHub, with its status at each step (deploy/test/github.py, IR630). A tag that changes
+# these scripts is deployed by its own scripts.
 #
 #   deploy.sh              one check (what the timer runs)
 #   deploy.sh status       the deployed tag, the last failures and the containers
@@ -52,13 +54,30 @@ compose() {
 
 checkout() { git -C "$REPO" checkout --quiet --force --detach "refs/tags/$1"; }
 
+# owner/name of the repository on GitHub (GITHUB_REPOSITORY overrides it, and GITHUB_API_URL the API, for tests)
+slug() {
+  if [ -n "${GITHUB_REPOSITORY:-}" ]; then
+    echo "$GITHUB_REPOSITORY"
+  else
+    git -C "$REPO" remote get-url origin | sed -E 's#^(https://github\.com/|git@github\.com:)##; s#\.git$##'
+  fi
+}
+
+# the tag $1's deployment status $2 on GitHub, described by $3, when the environment file has GITHUB_DEPLOY_TOKEN and
+# the checked-out tree has the reporter; a report that fails is logged and never stops the deployment
+report() {
+  if [ -z "$(setting GITHUB_DEPLOY_TOKEN)" ] || [ ! -f "$REPO/deploy/test/github.py" ]; then
+    return 0
+  fi
+  python3 "$REPO/deploy/test/github.py" "$SETTINGS" "$(slug)" "$STATE" "$@" 2>/dev/null ||
+    log "GitHub: the status $2 of $1 was not sent"
+}
+
 # the CI workflow's result for the commit $1 on GitHub's public API: success, pending (not finished, or the API out of
 # reach) or the conclusion that failed
 ci_result() {
-  local slug
-  slug=$(git -C "$REPO" remote get-url origin | sed -E 's#^(https://github\.com/|git@github\.com:)##; s#\.git$##')
   curl -fsS --max-time 20 -H 'Accept: application/vnd.github+json' \
-    "https://api.github.com/repos/$slug/actions/runs?head_sha=$1&per_page=50" 2>/dev/null |
+    "${GITHUB_API_URL:-https://api.github.com}/repos/$(slug)/actions/runs?head_sha=$1&per_page=50" 2>/dev/null |
     python3 -c '
 import json, sys
 runs = [r for r in json.load(sys.stdin).get("workflow_runs", []) if r.get("name") == "CI"]
@@ -99,7 +118,11 @@ for name, service in sorted(json.load(sys.stdin)["services"].items()):
         seen.add(service.get("image"))
         print(name)
 ') || return 1
+  local total i=0
+  total=$(wc -w <<<"$services" | tr -d ' ')
   for service in $services; do
+    i=$((i + 1))
+    step "$tag" "building the images ($i/$total)"
     compose "$tag" build --quiet "$service" || return 1
   done
 }
@@ -116,17 +139,30 @@ prepare() {
   return "$result"
 }
 
+# the step of the tag $1's deployment now ($2): in the log, on GitHub, and in a failure's description
+STEP=
+step() {
+  STEP=$2
+  report "$1" in_progress "$2"
+}
+
 # checks out the tag $1, builds and starts it; $2 is 1 when the data is built again from the seed
 deploy() {
   local tag=$1 fresh=$2
+  step "$tag" "checking out"
   checkout "$tag" || return 1
+  step "$tag" "writing the realm and the broker logins"
   prepare || return 1
   build "$tag" || return 1
   if [ "$fresh" = 1 ]; then
+    step "$tag" "removing the data (the migrations changed)"
     compose "$tag" down --volumes --remove-orphans || return 1
   fi
+  step "$tag" "starting the stack"
   compose "$tag" up -d --remove-orphans || return 1
+  step "$tag" "waiting for the apps and Keycloak"
   ready 900 || return 1
+  step "$tag" "loading the mock fleet's history"
   compose "$tag" run --rm mock-history >/dev/null || return 1 # the mock fleet's 30 days up to the scenario clock
 }
 
@@ -144,6 +180,11 @@ prune() {
 
 status() {
   echo "deployed: $(state deployed) (since $(stat -c %y "$STATE/deployed" 2>/dev/null || echo never))"
+  if [ -n "$(setting GITHUB_DEPLOY_TOKEN)" ]; then
+    echo "GitHub: each deployment shows under the repository's Deployments (environment test)"
+  else
+    echo "GitHub: not reported (no GITHUB_DEPLOY_TOKEN in $SETTINGS)"
+  fi
   if [ -s "$STATE/failures" ]; then
     echo "failed tries: $(tail -n 5 "$STATE/failures" | tr '\n' ' ')"
   fi
@@ -183,6 +224,7 @@ check() {
   sha=$(git -C "$REPO" rev-parse "refs/tags/$tag^{commit}")
   if ! git -C "$REPO" merge-base --is-ancestor "$sha" origin/main; then
     log "$tag: ${sha:0:8} is not on main; not deployed"
+    report "$tag" error "not deployed: ${sha:0:8} is not on main"
     printf '%s\n' "$tag" "$tag" "$tag" >>"$STATE/failures"
     return 1
   fi
@@ -190,14 +232,22 @@ check() {
   if [ "$result" = pending ]; then
     if [ "$(state waiting)" != "$tag" ]; then
       log "$tag: waiting for CI on ${sha:0:8}"
+      report "$tag" queued "waiting for CI on ${sha:0:8}"
       printf '%s\n' "$tag" >"$STATE/waiting"
     fi
     return 0
   fi
   if [ "$result" != success ]; then
     log "$tag: CI on ${sha:0:8} ended $result; not deployed"
+    report "$tag" error "not deployed: CI on ${sha:0:8} ended $result"
     printf '%s\n' "$tag" "$tag" "$tag" >>"$STATE/failures"
     return 1
+  fi
+  # a tag that changes these scripts is deployed by its own (the new script reads main whole, so this one is replaced)
+  if [ -z "${AC_TEST_REEXEC:-}" ] && ! git -C "$REPO" diff --quiet HEAD "refs/tags/$tag" -- deploy/test; then
+    log "$tag: going on with its own deploy scripts"
+    checkout "$tag" || return 1
+    AC_TEST_REEXEC=1 exec bash "$REPO/deploy/test/deploy.sh"
   fi
   release "$tag" "$sha"
 }
@@ -220,14 +270,18 @@ release() {
     boot_id >"$STATE/boot"
     prune "$tag"
     log "$tag is live: $(setting CUSTOMER_WEB_URL)"
+    report "$tag" success "live"
     return 0
   fi
   printf '%s\n' "$tag" >>"$STATE/failures"
-  log "$tag failed (try $((${tries:-0} + 1)) of $ATTEMPTS)"
+  log "$tag failed while $STEP (try $((${tries:-0} + 1)) of $ATTEMPTS)"
   if [ -n "$previous" ]; then
+    report "$tag" failure "failed while $STEP (try $((${tries:-0} + 1)) of $ATTEMPTS); back to $previous"
     log "back to $previous"
     { checkout "$previous" && prepare && compose "$previous" up -d --remove-orphans; } ||
       log "$previous did not start again"
+  else
+    report "$tag" failure "failed while $STEP (try $((${tries:-0} + 1)) of $ATTEMPTS)"
   fi
   return 1
 }
@@ -246,7 +300,11 @@ main() {
       return 1
     fi
     log "$(state deployed): the data again from the seed"
-    deploy "$(state deployed)" 1
+    if ! deploy "$(state deployed)" 1; then # each step returns its own failure
+      report "$(state deployed)" failure "the reset failed while $STEP"
+      return 1
+    fi
+    report "$(state deployed)" success "live, the data built again from the seed"
     ;;
   deploy)
     if [ -z "${2:-}" ]; then
