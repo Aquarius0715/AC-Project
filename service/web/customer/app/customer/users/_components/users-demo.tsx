@@ -54,7 +54,7 @@ export function UsersDemo() {
         <DataTable rows={users} rowKey={(u) => u.id} cols={[
           { key: "u", label: "User", render: (u) => <div><b>{u.name ? `${u.name}${u.id === CURRENT_CLIENT.userId ? " (you)" : ""}` : u.email}</b><div className="text-xs text-muted-foreground">{u.name ? u.email : `invited ${u.invitedAt ?? ""} by ${u.invitedBy ?? "—"}`}</div></div> },
           { key: "r", label: "Role", render: (u) => <Badge tone={u.role === "owner" ? "primary" : "muted"}>{u.role === "owner" ? "Owner" : "Member"}</Badge> },
-          { key: "s", label: "Status", render: (u) => <Badge tone={u.status === "active" ? "ok" : (u.status === "invited" ? "warn" : "muted")}>{u.status === "active" ? "Active" : (u.status === "invited" ? "Not signed in yet" : "Disabled")}</Badge> },
+          { key: "s", label: "Status", render: (u) => <Badge tone={u.status === "active" ? "ok" : (u.status === "invited" ? "warn" : "muted")}>{u.status === "active" ? "Active" : null}{u.status !== "active" && u.status === "invited" && "Not signed in yet"}{u.status !== "active" && u.status !== "invited" && "Disabled"}</Badge> },
           { key: "l", label: "Last sign-in", render: (u) => u.lastSignIn ?? "—", hideBelow: "sm" },
           { key: "a", label: "Actions", render: (u) => (u.id === CURRENT_CLIENT.userId ? <span className="text-xs text-muted-foreground">Your account</span> : (
             <div className="flex flex-wrap gap-1">

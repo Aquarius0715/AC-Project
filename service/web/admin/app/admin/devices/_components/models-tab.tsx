@@ -102,7 +102,7 @@ export function ModelsTab({ live }: Readonly<{ live: DevicesLive }>) {
                 const on = runningOn(v);
                 return (
                   <span key={v} className="inline-flex items-center gap-1.5 rounded-control border border-primary/40 bg-primary-soft px-2.5 py-1 text-xs">
-                    <b>{v}</b><span className="text-muted-foreground">{on ? t(on === 1 ? "current on 1 device" : "current on {n} devices", { n: on }) : (n === d.firmware.length - 1 ? t("latest") : "")}</span>
+                    <b>{v}</b><span className="text-muted-foreground">{on ? t(on === 1 ? "current on 1 device" : "current on {n} devices", { n: on }) : null}{!on && n === d.firmware.length - 1 && t("latest")}{!on && n !== d.firmware.length - 1 && ""}</span>
                     <Plain touch type="button" aria-label={t("Remove {name}", { name: v })} className="text-muted-foreground hover:text-ink" onClick={() => { set({ firmware: d.firmware.filter((x) => x !== v) }); }}><Icon name="close" /></Plain>
                   </span>
                 );

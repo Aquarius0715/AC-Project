@@ -49,7 +49,7 @@ export function InvoiceView({ live }: Readonly<{ live: InvoiceLive }>) {
         ...(live.restriction ? [{ id: "restriction" as const, label: t("Cooling restriction") }] : []),
         { id: "inquiry" as const, label: t("Inquiries"), count: live.inquiries.length },
       ]} />
-      {live.tab === "restriction" && live.restriction ? <RestrictionTab live={live} /> : (live.tab === "inquiry" ? <InquiryTab live={live} /> : <PaymentTab live={live} />)}
+      {live.tab === "restriction" && live.restriction ? <RestrictionTab live={live} /> : null}{!(live.tab === "restriction" && live.restriction) && live.tab === "inquiry" && <InquiryTab live={live} />}{!(live.tab === "restriction" && live.restriction) && live.tab !== "inquiry" && <PaymentTab live={live} />}
     </Page>
   );
 }

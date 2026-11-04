@@ -168,11 +168,11 @@ function Panel({ live, sel, rename, go }: Readonly<{ live: PropertiesLive; sel: 
             })}
           </div>
         )}
-        {mode === "group" ? <GroupPanel key={s.id} live={{ ...live, units: direct, details: live.details.filter((d) => d.spaceId === s.id) }} space={s.name} /> : (live.units.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No air conditioner in this {kind}.", { kind: kind(t, s.kind).toLowerCase() })}</p> : <>
+        {mode === "group" ? <GroupPanel key={s.id} live={{ ...live, units: direct, details: live.details.filter((d) => d.spaceId === s.id) }} space={s.name} /> : null}{mode !== "group" && live.units.length === 0 && <p className="text-[13px] text-muted-foreground">{t("No air conditioner in this {kind}.", { kind: kind(t, s.kind).toLowerCase() })}</p>}{mode !== "group" && live.units.length > 0 && <>
           <div className="mb-2 flex items-center justify-between text-[13px]"><b>{t("Air conditioners in this {kind} ({n})", { kind: kind(t, s.kind).toLowerCase(), n: live.units.length })}</b></div>
           <UnitRows units={live.units} />
           <div className="mt-3"><Banner>{t(live.owner ? "Each AC has its own control screen; Group control sends one setting to several ACs in a space. Unit membership is managed in HQ’s unit register." : "Each AC has its own control screen. Unit membership is managed in HQ’s unit register.")}</Banner></div>
-        </>)}
+        </>}
       </Card>
     </>
   );
@@ -229,7 +229,7 @@ function GroupPanel({ live, space }: Readonly<{ live: PropertiesLive; space: str
             <Plain key={u.id} type="button" disabled={sending} onClick={() => { toggle(u.id); }} aria-pressed={sel.includes(u.id)}
               className={cx("rounded-xl border p-3 text-left disabled:opacity-60", sel.includes(u.id) ? "border-2 border-primary bg-primary-soft/50" : "border-line bg-surface")}>
               <div className="flex items-center justify-between"><b className="text-[13px]">{u.name}</b><Icon name={sel.includes(u.id) ? "checked" : "unchecked"} className="text-sm" /></div>
-              <div className="text-[11px] text-muted-foreground">{u.online ? (u.temp === "—" && u.watts === "—" ? t("no recent reading") : `${u.temp} · ${u.watts}`) : (u.seen ? t("last seen {when}", { when: u.seen }) : t("no connection yet"))}</div>
+              <div className="text-[11px] text-muted-foreground">{u.online ? (u.temp === "—" && u.watts === "—" ? t("no recent reading") : `${u.temp} · ${u.watts}`) : null}{!u.online && u.seen && t("last seen {when}", { when: u.seen })}{!u.online && !u.seen && t("no connection yet")}</div>
               <div className="mt-1 flex flex-wrap gap-1"><PowerBadge s={u.power} /><ConnBadge s={u.conn} />{tr && <Badge tone={tr.status === "Confirmed" ? "ok" : tr.status === "Failed" ? "crit" : tr.status === "Waiting" ? "warn" : "primary"}>{t(tr.status)}</Badge>}</div>
               {(tr?.status === "Failed" || tr?.status === "Waiting") && <div className={cx("mt-1 text-[11px]", tr.status === "Failed" ? "text-crit" : "text-warn")}>{tr.note}</div>}
             </Plain>

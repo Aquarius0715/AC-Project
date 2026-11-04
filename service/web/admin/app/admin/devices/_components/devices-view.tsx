@@ -34,7 +34,7 @@ export function DevicesView({ live }: Readonly<{ live: DevicesLive }>) {
         { id: "models", label: t("Models"), count: live.models.length }, { id: "devices", label: t("IoT devices"), count: live.devices.length },
         { id: "firmware", label: t("Firmware campaigns"), count: live.campaigns?.length },
       ]} />
-      {live.tab === "models" ? <ModelsTab live={live} /> : (live.tab === "devices" ? <DeviceTab live={live} /> : <FirmwareTab live={live} />)}
+      {live.tab === "models" ? <ModelsTab live={live} /> : null}{live.tab !== "models" && live.tab === "devices" && <DeviceTab live={live} />}{live.tab !== "models" && live.tab !== "devices" && <FirmwareTab live={live} />}
     </Page>
   );
 }

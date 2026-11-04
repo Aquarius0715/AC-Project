@@ -181,7 +181,7 @@ export function ContractsView({ live }: Readonly<{ live?: Live }>) {
               </section>
               <section>
                 <h3 className="mb-2 text-[13px] font-bold">{t("Plan")}</h3>
-                <div className="max-w-sm"><Field label={t("Plan type")}><Select value={d.planType} disabled={isBlocked} onChange={(e) => { set({ planType: e.target.value as PlanType }); }}>{plans.map((p) => <option key={p} value={p}>{p === "rto" ? t("RTO — Rent to Own") : (p === "general" ? t("General — maintenance") : planWord(p, t))}</option>)}</Select></Field></div>
+                <div className="max-w-sm"><Field label={t("Plan type")}><Select value={d.planType} disabled={isBlocked} onChange={(e) => { set({ planType: e.target.value as PlanType }); }}>{plans.map((p) => <option key={p} value={p}>{p === "rto" ? t("RTO — Rent to Own") : null}{p !== "rto" && p === "general" && t("General — maintenance")}{p !== "rto" && p !== "general" && planWord(p, t)}</option>)}</Select></Field></div>
               </section>
               <section className="grid-fluid" style={{ ["--min" as string]: "150px" }}>
                 <Field label={t("Start")} error={tried ? errors.start : undefined} hint={t("Dates are Kuala Lumpur days ({zone}).", { zone: KL })}><Input type="date" value={d.start} disabled={isBlocked} onChange={(e) => { set({ start: e.target.value }); }} /></Field>

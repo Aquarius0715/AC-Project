@@ -181,7 +181,7 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
               )}
               {live.events && dv.eventsLocked ? (
                 <Banner>{t("Device events open while you have an assignment on {unit}. Ask HQ or your coordinator if you need them now.", { unit: dv.unit?.name ?? t("this unit") })}</Banner>
-              ) : (dv.events ? (
+              ) : null}{!(live.events && dv.eventsLocked) && dv.events && (
                 <div>
                   <div className="mb-2 flex items-baseline gap-2"><b className="text-[15px]">{t("Device events")}</b><span className="text-xs text-muted-foreground">{t("connection, power and tamper are separate events")}</span></div>
                   {dv.events.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No device events.")}</p> : (
@@ -208,7 +208,7 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
                     </div>
                   )}
                 </div>
-              ) : (
+              )}{!(live.events && dv.eventsLocked) && !dv.events && (
                 <>
                   <div>
                     <b className="text-[15px]">{t("Sensors ({n}) · from the unit’s capability", { n: dv.sensors.length })}</b>
@@ -239,7 +239,7 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
                     <div className="mt-2 rounded-xl border border-dashed border-line px-3 py-2 text-xs text-muted-foreground">{dv.calibrations.length === 0 ? t("No calibrations recorded.") : dv.calibrations.map((c, i) => <div key={i}>{c}</div>)}</div>
                   </div>
                 </>
-              ))}
+              )}
             </div>
           </Card>
         ) : <Card title={t("Device")}><EmptyState title={t("No device selected")}>{t("Choose a device from the list.")}</EmptyState></Card>}

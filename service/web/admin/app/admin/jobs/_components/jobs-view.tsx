@@ -199,7 +199,7 @@ function JobDetail({ d, live, fresh, onFresh }: Readonly<{ d: Detail; live: Jobs
             </span>}
           </div>
         </Card>
-      ) : (d.draft ? <Card title={t("Work report")}><p className="text-[13px] text-muted-foreground">{t("The technician is drafting the report — nothing submitted yet.")}</p></Card> : null)}
+      ) : null}{!d.report && d.draft && <Card title={t("Work report")}><p className="text-[13px] text-muted-foreground">{t("The technician is drafting the report — nothing submitted yet.")}</p></Card>}{!d.report && !d.draft && null}
 
       <Card title={t("Costs")} action={<Btn size="sm" disabled={pending || j.status === "cancelled"} title={j.status === "cancelled" ? t("A cancelled job’s costs cannot change.") : undefined} onClick={() => { setModal({ kind: "cost" }); }}><Icon name="add" /> {t("Add cost line")}</Btn>}>
         {d.costs.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No cost lines yet — add estimates before the work and actuals after it.")}</p> : (

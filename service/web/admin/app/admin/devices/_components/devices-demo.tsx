@@ -40,7 +40,7 @@ export function DevicesDemo() {
   return (
     <Page>
       <Tabs value={tab} onChange={setTab} tabs={[{ id: "models", label: "Models", count: 2 }, { id: "devices", label: "IoT devices", count: 5 }, { id: "firmware", label: "Firmware campaigns", count: 1 }]} />
-      {tab === "firmware" ? <FirmwareCampaigns /> : (tab === "models" ? (
+      {tab === "firmware" ? <FirmwareCampaigns /> : null}{tab !== "firmware" && tab === "models" && (
         <div className="split-rev">
           <Card title="Models" sub="tenant-a" action={<Btn size="sm" onClick={() => { setModal("newModel"); }}><Icon name="add" /> New</Btn>} className="self-start">
             <div className="flex flex-col gap-2">{models.map((x) => <ListRow key={x.id} selected={m.id === x.id} onClick={() => { setM(x); }}><div className="min-w-0"><b className="text-[13px]">{x.name}</b> {x.tag && <Badge tone="primary">{x.tag}</Badge>}<div className="text-[11px] text-muted-foreground">{x.cap}</div><div className="text-[11px] text-muted-foreground">{x.used}</div></div></ListRow>)}</div>
@@ -63,7 +63,7 @@ export function DevicesDemo() {
             </Card>
           </div>
         </div>
-      ) : (
+      )}{tab !== "firmware" && tab !== "models" && (
         <div className="split-rev">
           <Card title="IoT devices" action={<Btn size="sm" onClick={() => { setModal("register"); }}><Icon name="add" /> Register device</Btn>} className="self-start">
             <div className="mb-2"><Search placeholder="Search serial, device or unit…" value={q} onChange={setQ} /></div>
@@ -76,7 +76,7 @@ export function DevicesDemo() {
             {d.tamper && <Card title="Tamper + device events" tone="crit"><Timeline items={[{ time: "09-22 08:41", title: "Cover opened while powered · tamper_signal", detail: "open · unacknowledged", tone: "crit" }, { time: "09-22 08:33", title: "Dedicated demo power signal lost", tone: "warn" }, { time: "09-22 08:12", title: "Missed 3 heartbeats", tone: "warn" }]} /></Card>}
           </div>
         </div>
-      ))}
+      )}
       <Modal open={modal === "register"} onClose={() => { setModal(null); }} title="Register device" footer={<><Btn onClick={() => { setModal(null); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!mf.serial.trim()) return; toast("Device registered"); setModal(null); setTried(false); }}>Register</Btn></>}><Field label="Serial" error={tried && !mf.serial.trim() ? "Serial is required" : undefined}><Input value={mf.serial} onChange={(e) => { setMf({ ...mf, serial: e.target.value }); }} /></Field><Field label="Model"><Select>{models.map((x) => <option key={x.id}>{x.name}</option>)}</Select></Field><Field label="Bind to unit"><Input placeholder="unit-…" /></Field></Modal>
       <Modal open={modal === "calibrate"} onClose={() => { setModal(null); }} title="Calibrate sensor" footer={<><Btn onClick={() => { setModal(null); }}>Cancel</Btn><Btn variant="primary" onClick={() => { toast("Calibration recorded"); setModal(null); }}>Record</Btn></>}><div className="grid-fluid" style={{ ["--min"as string]: "140px" }}><Field label="Reference"><Input defaultValue="25.0" /></Field><Field label="Measured"><Input defaultValue="25.3" /></Field></div></Modal>
       <Modal open={modal === "rebind"} onClose={() => { setModal(null); }} title="Rebind device" footer={<><Btn onClick={() => { setModal(null); }}>Cancel</Btn><Btn variant="primary" onClick={() => { toast("Device rebound"); setModal(null); }}>Rebind</Btn></>}><Field label="New unit"><Input placeholder="unit-…" /></Field><Field label="Reason"><Textarea /></Field></Modal>

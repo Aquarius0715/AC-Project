@@ -51,9 +51,7 @@ export function NotificationPreview({ recipients, severity, customerName, unit, 
       {unit ? (who ? (
           <>
             <p className="mb-2 text-xs text-muted-foreground">{t("What {name} sees for {unit} (notifications.preview · in-app).", { name: who.label, unit: unit.name })}</p>
-            {preview.loading ? <p className="text-xs text-muted-foreground">{t("Loading the preview…")}</p>
-              : (preview.error ? <p className="text-xs text-crit">{preview.error.error.messageKey === "errors.recipient_ineligible" ? t("{name} cannot get this notification: they may not see {unit}.", { name: who.label, unit: unit.name }) : t("The preview could not be loaded — try again.")}</p>
-              : row && preview.data && (
+            {preview.loading ? <p className="text-xs text-muted-foreground">{t("Loading the preview…")}</p> : null}{!preview.loading && preview.error && <p className="text-xs text-crit">{preview.error.error.messageKey === "errors.recipient_ineligible" ? t("{name} cannot get this notification: they may not see {unit}.", { name: who.label, unit: unit.name }) : t("The preview could not be loaded — try again.")}</p>}{!preview.loading && !preview.error && row && preview.data && (
                 <div className="flex items-start gap-3 rounded-xl border border-line bg-surface2/60 px-3 py-2.5">
                   {preview.data.severity && <SeverityBadge s={preview.data.severity} />}
                   <div className="min-w-0 flex-1 text-[13px]">
@@ -62,7 +60,7 @@ export function NotificationPreview({ recipients, severity, customerName, unit, 
                     <div className="mt-1 text-xs text-muted-foreground">{t("Open unit")} <Icon name="arrowRight" /> · {t("Request maintenance")} <Icon name="arrowRight" /></div>
                   </div>
                 </div>
-              ))}
+              )}
           </>
         )
         : <p className="text-xs text-muted-foreground">{t("Add a recipient to see what they are shown.")}</p>)
