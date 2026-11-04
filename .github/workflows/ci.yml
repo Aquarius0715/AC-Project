@@ -7,6 +7,12 @@
 # code then never runs on the server itself, and the job reaches only its workspace. Docker volumes keep the Go and npm caches
 # from one run to the next. A container works as root, so each job hands its workspace back to the runner's user at the end, or
 # the next checkout could not clean it.
+#
+# The three runners take the jobs in three lanes, longest first, so that the run lasts about as long as its longest job (the
+# runner picks queued jobs in no fixed order, and a long job started last made a run up to 11 minutes). Mean durations of
+# November 2026: docs 380 s | go-test-cluster 215 s -> web-lint 67 s -> go-lint 30 s | go-test 185 s -> web-typecheck 70 s ->
+# web-test 50 s. A job in a lane waits for the one before it with needs, and runs even when that one failed (!cancelled()),
+# so every check still reports.
 name: CI
 
 on:
@@ -32,6 +38,8 @@ defaults:
 jobs:
   go-lint:
     name: Go lint (gofmt, vet, golangci-lint, generated files, Swagger)
+    needs: web-lint
+    if: ${{ !cancelled() }}
     runs-on: [self-hosted, ac-test]
     container: { image: "golang:1.26-trixie", volumes: ["ac-ci-go:/go/pkg/mod", "ac-ci-cache:/root/.cache"] }
     defaults: { run: { working-directory: service/api } }
@@ -135,6 +143,8 @@ jobs:
 
   web-lint:
     name: Web lint (ESLint)
+    needs: go-test-cluster
+    if: ${{ !cancelled() }}
     runs-on: [self-hosted, ac-test]
     container: { image: "node:26-bookworm", volumes: ["ac-ci-npm:/root/.npm"] }
     defaults: { run: { working-directory: service/web } }
@@ -149,6 +159,8 @@ jobs:
 
   web-typecheck:
     name: Web typecheck
+    needs: go-test
+    if: ${{ !cancelled() }}
     runs-on: [self-hosted, ac-test]
     container: { image: "node:26-bookworm", volumes: ["ac-ci-npm:/root/.npm"] }
     defaults: { run: { working-directory: service/web } }
@@ -163,6 +175,8 @@ jobs:
 
   web-test:
     name: Web unit tests (Vitest)
+    needs: web-typecheck
+    if: ${{ !cancelled() }}
     runs-on: [self-hosted, ac-test]
     container: { image: "node:26-bookworm", volumes: ["ac-ci-npm:/root/.npm"] }
     defaults: { run: { working-directory: service/web } }
