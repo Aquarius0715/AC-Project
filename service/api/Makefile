@@ -23,31 +23,38 @@ test-unit:
 # a fresh test database runs each suite in about a minute; one that kept every earlier run's rows took 12–20 minutes
 TEST_TIMEOUT ?= 30m
 
-# DB integration tests of the HTTP API (test/integration, black box through internal/server) on a fresh ac_test
-test-integration: testdb
-	$(GO) test -count=1 -timeout $(TEST_TIMEOUT) ./test/...
+# the integration suite runs in SHARDS processes at once, each on a fresh database of its own (scripts/test-shards.sh:
+# ac_test_s1 ... for one server, ac_test_cluster_s1 ... for the split services)
+SHARDS ?= 3
+shards = SHARDS=$(SHARDS) TIMEOUT=$(TEST_TIMEOUT) sh scripts/test-shards.sh
+
+# DB integration tests of the HTTP API (test/integration, black box through internal/server)
+test-integration:
+	$(shards)
 
 # the integration suite against the split services: one server per domain on its own database role behind the
-# gateway (IR194); any cross-domain table access fails. Its own fresh database ac_test_cluster, so it can run beside
-# make test (make test-all).
-test-cluster: testdb-cluster test-cluster-run
+# gateway (IR194); any cross-domain table access fails. Its own fresh databases (ac_test_cluster_s1 ...), so it can run
+# beside make test (make test-all).
+test-cluster: test-cluster-run
 
 # everything on a fresh ac_test (AC_TEST_DATABASE_URL / AC_TEST_OWNER_DATABASE_URL override it for the package tests)
 test: testdb test-run
 
+# the packages on ac_test, then the integration suite in its shards
 test-run:
 	$(GO) vet ./...
-	$(GO) test -count=1 -timeout $(TEST_TIMEOUT) ./...
+	$(GO) test -count=1 -timeout $(TEST_TIMEOUT) $$($(GO) list ./... | grep -v /test/)
+	RESET=$(RESET) $(shards)
 
 test-cluster-run:
-	AC_TEST_DB=ac_test_cluster AC_TEST_CLUSTER=1 $(GO) test -count=1 -timeout $(TEST_TIMEOUT) ./test/...
+	RESET=$(RESET) CLUSTER=1 $(shards)
 
 # both suites at once, each on its own database (about the time of the slower one). The databases are rebuilt one
 # after the other first: their migrations update the cluster-wide login roles. The full logs stay in .test-all/.
-test-all: testdb testdb-cluster
-	@mkdir -p .test-all; \
-	$(MAKE) test-run > .test-all/test.log 2>&1 & a=$$!; \
-	$(MAKE) test-cluster-run > .test-all/test-cluster.log 2>&1 & b=$$!; \
+test-all: testdb
+	@RESET=only $(shards) && RESET=only CLUSTER=1 $(shards) && mkdir -p .test-all; \
+	$(MAKE) test-run RESET=0 > .test-all/test.log 2>&1 & a=$$!; \
+	$(MAKE) test-cluster-run RESET=0 > .test-all/test-cluster.log 2>&1 & b=$$!; \
 	wait $$a; ra=$$?; wait $$b; rb=$$?; \
 	grep -E '^(FAIL|--- FAIL|panic)' .test-all/test.log; echo "make test: exit $$ra"; \
 	grep -E '^(FAIL|--- FAIL|panic)' .test-all/test-cluster.log; echo "make test-cluster: exit $$rb"; \
