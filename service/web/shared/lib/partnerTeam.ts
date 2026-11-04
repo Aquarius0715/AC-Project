@@ -193,7 +193,10 @@ one's e-mail (their partner user), so the right one is picked; without an e-mail
 export function technicianNames(members: { id: string; displayName: string }[], emails: Map<string, string>): Map<string, string> {
   const count = new Map<string, number>();
   for (const m of members) count.set(m.displayName, (count.get(m.displayName) ?? 0) + 1);
-  return new Map(members.map((m) => [m.id, (count.get(m.displayName) ?? 0) > 1 && emails.get(m.id) ? `${m.displayName} · ${emails.get(m.id)}` : m.displayName]));
+  return new Map(members.map((m) => {
+    const email = emails.get(m.id);
+    return [m.id, email && (count.get(m.displayName) ?? 0) > 1 ? `${m.displayName} · ${email}` : m.displayName];
+  }));
 }
 
 /** Kuala Lumpur days as text in the user's language: “Wed 16 Sept” or “Wed 16 – Fri 18 Sept”. */

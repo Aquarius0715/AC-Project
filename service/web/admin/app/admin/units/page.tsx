@@ -75,7 +75,7 @@ export default async function AdminUnitsPage({ searchParams }: Readonly<PageProp
   // a unit link without its customer (the audit's related records, IR320) goes to the unit under its customer
   const unitOrg = !one("customerId") && one("unitId") ? units.find((u) => u.id === one("unitId"))?.customerOrgId : undefined;
   const owner = unitOrg ? rows.find((r) => r.orgId === unitOrg) : undefined;
-  if (owner) redirect(`/admin/units?customerId=${owner.id}&unitId=${one("unitId")}`);
+  if (owner) redirect(`/admin/units?customerId=${owner.id}&unitId=${one("unitId") ?? ""}`);
   const cust = rows.find((r) => r.id === one("customerId"));
   if (!cust) {
     const coverage = has("asset.read", "contract.read") ? await coreAll<ApiCoverage>("units.coverage") : null;

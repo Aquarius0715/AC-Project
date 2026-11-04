@@ -44,7 +44,7 @@ export function GroupControl({ space, units }: Readonly<{ space: string; units: 
         {units.map((u) => (
           <Button key={u.id} variant="outline" disabled={!u.online} onClick={() => { toggle(u.id); }} aria-pressed={sel.includes(u.id)} className={cx("h-auto justify-start rounded-xl p-3 text-left font-normal whitespace-normal disabled:opacity-60", sel.includes(u.id) ? "border-2 border-primary bg-primary-soft/50" : "border-line bg-surface")}>
             <div className="flex items-center justify-between"><b className="text-[13px]">{u.name}</b><Icon name={sel.includes(u.id) ? "checked" : "unchecked"} className="text-sm" /></div>
-            <div className="text-[11px] text-muted-foreground">{u.temp === null ? "—" : `${String(u.temp)} °C · ${u.w} W`}</div>
+            <div className="text-[11px] text-muted-foreground">{u.temp === null ? "—" : `${String(u.temp)} °C · ${String(u.w ?? "—")} W`}</div>
             <div className="mt-1 flex gap-1"><PowerBadge s={u.state} />{!u.online && <Badge tone="unknown">Offline</Badge>}{u.min && <Badge tone="warn">min {u.min} °C</Badge>}</div>
           </Button>
         ))}

@@ -55,8 +55,9 @@ export function progressText(r: ApiRestriction, i: I18n = EN): string {
   const released = r.perUnit.filter((u) => u.releaseState === "released" || u.releaseState === "not_required").length;
   const offline = r.perUnit.filter((u) => u.pendingReason === "offline").length;
   const busy = r.perUnit.filter((u) => u.pendingReason === "device_operation_running").length; // waiting for a check or firmware update (D03)
-  const tail = [offline && t("{n} offline", { n: offline }), busy && t("{n} waiting for a device operation", { n: busy })].filter(Boolean).map((x) => ` · ${x}`).join("");
   if (r.state === "scheduled") return t("executes after {time}", { time: showTime(r.executeAfter, i.display) });
+  const notes = [...(offline > 0 ? [t("{n} offline", { n: offline })] : []), ...(busy > 0 ? [t("{n} waiting for a device operation", { n: busy })] : [])];
+  const tail = notes.map((x) => ` · ${x}`).join("");
   if (r.state === "requested" || r.state === "applied") return `${t("{done}/{n} applied", { done: applied, n })}${tail}`;
   if (r.state === "release_requested") return `${t("{done}/{n} released", { done: released, n })}${tail}`;
   return r.state === "released" ? t("{n} released", { n }) : t("cancelled");

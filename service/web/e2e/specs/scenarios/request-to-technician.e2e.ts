@@ -20,7 +20,7 @@ test("a customer request reaches the partner's technician", async ({ browser }) 
   test.setTimeout(240_000);
   const customer = await open(browser, app("customer"));
   const admin = await open(browser, app("admin"));
-  let jobId: string | null = null;
+  let jobId = "";
   let unitName = "";
   try {
     await test.step("the customer asks for a visit", async () => {
@@ -33,11 +33,11 @@ test("a customer request reaches the partner's technician", async ({ browser }) 
       unitName = selected.split(" · ", 1)[0];
       expect(unitName).not.toBe("");
       if ((await dialog.getByLabel("Date 1", { exact: true }).inputValue()) <= "2026-09-20") {
-        for (const [n, date] of [[1, "2026-09-21"], [2, "2026-09-22"], [3, "2026-09-23"]] as const) await dialog.getByLabel(`Date ${n}`, { exact: true }).fill(date);
+        for (const [n, date] of [[1, "2026-09-21"], [2, "2026-09-22"], [3, "2026-09-23"]] as const) await dialog.getByLabel(`Date ${String(n)}`, { exact: true }).fill(date);
       }
       await dialog.getByRole("button", { name: "Submit request" }).click();
       await customer.waitForURL(/jobId=/);
-      jobId = new URL(customer.url()).searchParams.get("jobId");
+      jobId = new URL(customer.url()).searchParams.get("jobId") ?? "";
       expect(jobId).toMatch(/^[0-9a-f-]{36}$/);
     });
 
@@ -74,7 +74,7 @@ test("a customer request reaches the partner's technician", async ({ browser }) 
       await partner.waitForURL(/\/partner\/units\/[^/?]+\?jobId=/);
       const main = partner.getByRole("main");
       for (const name of ["Unit register", "Job context", "Alert evidence", "Readings (diagnosis only)"]) await expect(main.getByRole("heading", { name, exact: true })).toBeVisible();
-      await expect(main).toContainText(`Diagnosis-scoped view for ${jobId!.slice(0, 8)}`);
+      await expect(main).toContainText(`Diagnosis-scoped view for ${jobId.slice(0, 8)}`);
       await expect(main).toContainText("Read-only — no remote-control actions available to contractors.");
       await expect(main.getByRole("button", { name: /power|temperature/i })).toHaveCount(0); // no control
     });
@@ -86,7 +86,7 @@ test("a customer request reaches the partner's technician", async ({ browser }) 
       await tech.locator(`main a[href="/technician/jobs/${jobId}"]`).first().click();
       await expect(tech.getByRole("main")).not.toContainText("This page isn’t available");
       // before the work window the unit itself is not open, yet the page names it, and the banner names the visit once (IR570)
-      await expect(tech.getByRole("main")).toContainText(`${jobId!.slice(0, 8)} · ${unitName} — assigned`);
+      await expect(tech.getByRole("main")).toContainText(`${jobId.slice(0, 8)} · ${unitName} — assigned`);
       await expect(tech.getByRole("main")).not.toContainText("New assignment for Starts");
       await tech.getByRole("button", { name: "Accept assignment" }).click();
       await expect(tech.getByText("Assignment accepted").first()).toBeVisible();

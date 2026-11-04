@@ -48,7 +48,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
   const [renaming, setRenaming] = useState(false); // Rename of the AC (Figma 02e, DD-C03, IR315)
   // API mode: start the controls from the device-reported setting when another unit or a newer report arrives
   // (adjust state during render, React "You might not need an effect")
-  const reported = d ? `${d.id}|${d.observedState.observedAt}` : null;
+  const reported = d ? `${d.id}|${d.observedState.observedAt ?? ""}` : null;
   const [seenReport, setSeenReport] = useState<string | null>(null);
   if (d && reported !== seenReport) {
     setSeenReport(reported);

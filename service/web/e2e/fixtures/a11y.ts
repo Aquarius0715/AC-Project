@@ -20,7 +20,7 @@ export async function axeViolations(page: Page, scope?: string): Promise<string[
     return violations;
   }, [scope ?? null, TAGS] as const);
   return found.filter((v) => v.impact === "critical" || v.impact === "serious")
-    .map((v) => `${v.id} (${v.impact}) ×${String(v.nodes.length)} — ${v.help} — ${v.nodes[0]?.target.join(" ") ?? ""}`);
+    .map((v) => `${v.id} (${v.impact ?? ""}) ×${String(v.nodes.length)} — ${v.help} — ${v.nodes[0]?.target.join(" ") ?? ""}`);
 }
 
 /** Fails the test on any critical or serious violation of the page or of `scope` (a dialog: `[role="dialog"]`). */

@@ -44,7 +44,7 @@ export function weekOf(nowIso: string): { from: string; to: string } {
 export function period(nowIso: string, from?: string, to?: string): { from: string; to: string; fromAt: string; toAt: string; days: string[]; label: string } {
   const ok = (d?: string) => !!d && /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(Date.parse(`${d}T00:00:00Z`));
   let p = weekOf(nowIso);
-  if (ok(from) && ok(to) && from! <= to! && Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`) <= 365 * day) p = { from: from!, to: to! };
+  if (ok(from) && ok(to) && from! <= to! && Date.parse(`${to ?? ""}T00:00:00Z`) - Date.parse(`${from ?? ""}T00:00:00Z`) <= 365 * day) p = { from: from!, to: to! };
   const start = Date.parse(`${p.from}T00:00:00Z`) - KL_OFFSET, end = Date.parse(`${p.to}T00:00:00Z`) - KL_OFFSET + day;
   const days: string[] = [];
   for (let t = start; t < end && days.length < 31; t += day) days.push(ymd(t));

@@ -31,7 +31,7 @@ export default async function CustomerPropertiesPage({ searchParams }: Readonly<
   const conns = (one("connections") ?? "").split(",").filter((c): c is Connection => (connections as string[]).includes(c));
   const isFiltered = !one("spaceId") && !one("propertyId") && (!!powerState || conns.length > 0);
   const sel = one("spaceId") ? selection(tree, one("spaceId"), spaces)
-    : (one("unassignedOnly") === "true" && one("propertyId") ? selection(tree, `unassigned:${one("propertyId")}`, spaces)
+    : (one("unassignedOnly") === "true" && one("propertyId") ? selection(tree, `unassigned:${one("propertyId") ?? ""}`, spaces)
     : selection(tree, one("propertyId"), spaces));
   // the units whose detail the panel needs: the KPI filter, a room / area (descendants included) or the property's unassigned units
   const shown = isFiltered ? filterUnits(units, { powerState, connections: conns, search: "" })

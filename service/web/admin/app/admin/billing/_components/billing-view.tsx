@@ -301,9 +301,9 @@ function RelatedRestrictions({ ids }: Readonly<{ ids: string[] }>) {
 function BillingMonths({ from, to, onChange }: Readonly<{ from?: string; to?: string; onChange: (from: string | null, to: string | null) => void }>) {
   const { t } = useI18n();
   const [f, setF] = useState({ from: from ?? "", to: to ?? "" });
-  const [source, setSource] = useState(`${from}:${to}`);
-  if (source !== `${from}:${to}`) { // the fields restart from each new URL (adjust state during render)
-    setSource(`${from}:${to}`);
+  const [source, setSource] = useState(`${from ?? ""}:${to ?? ""}`);
+  if (source !== `${from ?? ""}:${to ?? ""}`) { // the fields restart from each new URL (adjust state during render)
+    setSource(`${from ?? ""}:${to ?? ""}`);
     setF({ from: from ?? "", to: to ?? "" });
   }
   const isReversed = !!f.from && !!f.to && f.from > f.to;

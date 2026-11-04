@@ -274,7 +274,7 @@ test("the notification preview and the demo test of a policy attached to a unit"
   await main.getByRole("button", { name: "Attach policy" }).click();
   await page.getByRole("dialog").getByRole("checkbox", { name: new RegExp(name) }).check();
   await page.getByRole("dialog").getByRole("button", { name: "Attach 1 policy" }).click();
-  await main.locator(`a[href*="policyId=${created}"]`).click();
+  await main.locator(`a[href*="policyId=${created ?? ""}"]`).click();
   await page.waitForURL((u) => u.searchParams.get("policyId") === created && u.searchParams.has("unitId"));
   await expect(main).toContainText("Attached to 1 unit of Demo Customer A: Bedroom AC");
 

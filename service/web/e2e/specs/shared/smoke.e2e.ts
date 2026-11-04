@@ -33,7 +33,7 @@ async function crawl(page: Page, app: App, lang = "en", wideFont = false, touch 
     const res = await page.goto(path, { waitUntil: "networkidle" });
     if (wideFont) await page.addStyleTag({ content: "*{font-family: Verdana, 'DejaVu Sans', sans-serif !important}" });
     const text = await page.locator("body").innerText();
-    if (!res || res.status() >= 400 || FAILED_PAGE.test(text)) out.failed.push(`${path} (${res?.status() ?? "no response"})`);
+    if (!res || res.status() >= 400 || FAILED_PAGE.test(text)) out.failed.push(`${path} (${String(res?.status() ?? "no response")})`);
     for (const v of await axeViolations(page)) out.inaccessible.push(`${path}: ${v}`);
     const sideways = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     if (sideways > 1) out.wide.push(`${path}: ${String(sideways)}px`);
@@ -42,13 +42,14 @@ async function crawl(page: Page, app: App, lang = "en", wideFont = false, touch 
         return els.flatMap((el) => {
           const r = el.getBoundingClientRect();
           const name = (el.getAttribute("aria-label") ?? el.textContent ?? "").trim().slice(0, 30);
-          return r.width > 0 && r.height > 0 && r.height < 43.5 ? [`${el.getAttribute("data-slot")} "${name}" ${String(Math.round(r.height))}px`] : [];
+          const slot = el.getAttribute("data-slot") ?? "";
+          return r.width > 0 && r.height > 0 && r.height < 43.5 ? [`${slot} "${name}" ${String(Math.round(r.height))}px`] : [];
         });
       });
       for (const x of small) out.small.push(`${path}: ${x}`);
     }
     const declared = await page.locator("html").getAttribute("lang");
-    if (declared !== lang) out.otherLang.push(`${path}: ${declared}`);
+    if (declared !== lang) out.otherLang.push(`${path}: ${declared ?? ""}`);
     const title = await page.title(); // the page's name, then the product (WCAG 2.4.2, IR490)
     if (!/^.+ — AC Project$/.test(title)) out.untitled.push(`${path}: ${title}`);
     const links = await page.locator("a[href^='/']").evaluateAll((as) => as.map((a) => a.getAttribute("href") ?? ""));

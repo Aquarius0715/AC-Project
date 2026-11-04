@@ -215,7 +215,7 @@ export const jobActions = {
     if (!j?.proposal) return;
     const p = j.proposal;
     if (p.by === "contractor") {
-      update(id, () => ({ status: "offered", scheduled: p.slot, proposal: { ...p, status: "accepted" }, partnerProposal: j.partnerProposal ? { ...j.partnerProposal, status: "approved" } : null }), `Client approved ${fmt(p.slot)} proposed by ${j.contractor}`);
+      update(id, () => ({ status: "offered", scheduled: p.slot, proposal: { ...p, status: "accepted" }, partnerProposal: j.partnerProposal ? { ...j.partnerProposal, status: "approved" } : null }), `Client approved ${fmt(p.slot)} proposed by ${j.contractor ?? "—"}`);
       notify("contractor", `Client approved your time for ${id}`, `${fmt(p.slot)} — accept the offer`, `/partner/jobs/${id}`);
     } else if (p.who.startsWith("contractor")) {
       update(id, () => ({ status: "offered", scheduled: p.slot, delivery: "contractor", contractor: p.who.split(" ", 1)[0], proposal: { ...p, status: "accepted" } }), `Client accepted ${fmt(p.slot)} → offered to ${p.who.split(" ", 1)[0]}`);
@@ -275,7 +275,7 @@ export const jobActions = {
     if (!j || j.followUpClass !== "pending") return "CONFLICT — already classified";
     if (!reason.trim() || reason.length > 1000) return "A reason is required (1–1000 characters)";
     update(id, () => ({ followUpClass: cls, followUpReason: reason.trim() }), `HQ classified the follow-up as ${cls === "rework" ? "rework (free)" : "a new request"} · ${reason.trim()}`);
-    notify("client", `${id}: ${cls === "rework" ? "Rework (free)" : "New request"}`, `HQ reviewed your problem report on ${j.followUpOf}`, `/customer/maintenance?jobId=${id}`);
+    notify("client", `${id}: ${cls === "rework" ? "Rework (free)" : "New request"}`, `HQ reviewed your problem report on ${j.followUpOf ?? "—"}`, `/customer/maintenance?jobId=${id}`);
     return;
   },
   /* ---- contractor ---- */
@@ -295,21 +295,21 @@ export const jobActions = {
     const j = load().jobs.find((x) => x.id === id);
     if (!j?.partnerProposal) return;
     const pp = j.partnerProposal;
-    update(id, () => ({ status: "time_proposed", proposal: { by: "contractor", slot: pp.slot, who: `${j.contractor} · ${pp.tech}`, message: pp.reason, status: "pending", replyBy }, partnerProposal: { ...pp, status: "sent_to_client" } }), "HQ sent the partner’s time to the client");
+    update(id, () => ({ status: "time_proposed", proposal: { by: "contractor", slot: pp.slot, who: `${j.contractor ?? "—"} · ${pp.tech}`, message: pp.reason, status: "pending", replyBy }, partnerProposal: { ...pp, status: "sent_to_client" } }), "HQ sent the partner’s time to the client");
     notify("client", `Your service partner asks for another time — ${id}`, `${longDate(pp.slot)} — accept or decline`, `/customer/maintenance?jobId=${id}`);
   },
   keepTime(id: string) { update(id, (j) => ({ partnerProposal: j.partnerProposal ? { ...j.partnerProposal, status: "rejected" } : null }), "HQ kept the agreed time"); notify("contractor", `HQ kept the agreed time — ${id}`, "accept or decline the offer", `/partner/jobs/${id}`); },
   /* ---- technician ---- */
   techAccept(id: string) {
     const j = load().jobs.find((x) => x.id === id);
-    update(id, () => ({ techAck: { status: "accepted", at: NOW } }), `${j?.technician} accepted the assignment`);
-    notify(j?.delivery === "contractor" ? "contractor" : "admin", `${j?.technician} accepted ${id}`, fmt(j?.scheduled), j?.delivery === "contractor" ? "/partner/schedule" : `/admin/jobs?jobId=${id}`);
-    notify("client", `Technician confirmed — ${id}`, `${j?.technician} · ${fmt(j?.scheduled)}`, `/customer/maintenance?jobId=${id}`);
+    update(id, () => ({ techAck: { status: "accepted", at: NOW } }), `${j?.technician ?? "—"} accepted the assignment`);
+    notify(j?.delivery === "contractor" ? "contractor" : "admin", `${j?.technician ?? "—"} accepted ${id}`, fmt(j?.scheduled), j?.delivery === "contractor" ? "/partner/schedule" : `/admin/jobs?jobId=${id}`);
+    notify("client", `Technician confirmed — ${id}`, `${j?.technician ?? "—"} · ${fmt(j?.scheduled)}`, `/customer/maintenance?jobId=${id}`);
   },
   techCantMake(id: string, reason: string, alt: string) {
     const j = load().jobs.find((x) => x.id === id);
-    update(id, () => ({ techAck: { status: "cant_make", at: NOW, reason, alt } }), `${j?.technician} can’t make the time · ${reason}`);
-    notify(j?.delivery === "contractor" ? "contractor" : "admin", `${j?.technician} can’t make ${id}`, `${reason}${alt ? ` · could do ${alt}` : ""}`, j?.delivery === "contractor" ? "/partner/schedule" : `/admin/jobs?jobId=${id}`);
+    update(id, () => ({ techAck: { status: "cant_make", at: NOW, reason, alt } }), `${j?.technician ?? "—"} can’t make the time · ${reason}`);
+    notify(j?.delivery === "contractor" ? "contractor" : "admin", `${j?.technician ?? "—"} can’t make ${id}`, `${reason}${alt ? ` · could do ${alt}` : ""}`, j?.delivery === "contractor" ? "/partner/schedule" : `/admin/jobs?jobId=${id}`);
   },
 };
 

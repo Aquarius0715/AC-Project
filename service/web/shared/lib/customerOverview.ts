@@ -113,7 +113,7 @@ export function attentionCard(alerts: ApiAlert[], units: OverviewUnit[], nowMs: 
   const info = open.filter((a) => a.severity === "normal");
   const titles = [...new Set(info.map((a) => alertTitle(a, i.t).toLowerCase()))];
   return {
-    items: warn.slice(0, max).map((a) => ({ id: a.id, title: alertTitle(a, i.t), severity: a.severity as "critical" | "warning", where: `${names.get(a.unitId)} · ${whenText(a.detectedAt, nowMs, i)}` })),
+    items: warn.slice(0, max).map((a) => ({ id: a.id, title: alertTitle(a, i.t), severity: a.severity as "critical" | "warning", where: `${names.get(a.unitId) ?? "—"} · ${whenText(a.detectedAt, nowMs, i)}` })),
     more: Math.max(0, warn.length - max), info: { count: info.length, text: titles.join(", ") },
   };
 }

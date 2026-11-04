@@ -103,7 +103,7 @@ export function AccessDemo() {
           </div>
         </Card>
       </div>
-      <Modal open={revoke} onClose={() => { setRevoke(false); }} title={`Revoke access — ${cur?.id}`} footer={<><Btn onClick={() => { setRevoke(false); }}>Cancel</Btn><Btn variant="danger" onClick={() => { setRevoke(false); toast("Access revoked — user is now Inactive", "warn"); }}>Revoke</Btn></>}><p className="text-[13px]">Revoking sets “Valid until” to now. The user stays listed as Inactive.</p></Modal>
+      <Modal open={revoke} onClose={() => { setRevoke(false); }} title={`Revoke access — ${cur?.id ?? "—"}`} footer={<><Btn onClick={() => { setRevoke(false); }}>Cancel</Btn><Btn variant="danger" onClick={() => { setRevoke(false); toast("Access revoked — user is now Inactive", "warn"); }}>Revoke</Btn></>}><p className="text-[13px]">Revoking sets “Valid until” to now. The user stays listed as Inactive.</p></Modal>
     </Page>
   );
 }

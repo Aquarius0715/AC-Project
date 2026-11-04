@@ -12,7 +12,7 @@ export function OverviewDemo() {
   const actions: [string, string, string][] = [
     ...live.filter((j) => j.status === "offered" && j.partnerProposal?.status !== "pending").map((j): [string, string, string] => [`${j.id} · ${j.unit} · ${j.customer}`, `New offer · visit ${fmt(j.scheduled)} (fixed) — accept, decline or propose another time`, `/partner/jobs/${j.id}`]),
     ...live.filter((j) => j.status === "accepted").map((j): [string, string, string] => [`${j.id} · ${j.unit}`, `Accepted · assign a technician for ${fmt(j.scheduled)}`, `/partner/schedule?jobId=${j.id}`]),
-    ...live.filter((j) => j.techAck?.status === "cant_make").map((j): [string, string, string] => [`${j.id} · ${j.unit}`, `${j.technician} can’t make ${fmt(j.scheduled)} — reassign`, `/partner/schedule?jobId=${j.id}`]),
+    ...live.filter((j) => j.techAck?.status === "cant_make").map((j): [string, string, string] => [`${j.id} · ${j.unit}`, `${j.technician ?? "—"} can’t make ${fmt(j.scheduled)} — reassign`, `/partner/schedule?jobId=${j.id}`]),
   ];
   return (
     <Page>

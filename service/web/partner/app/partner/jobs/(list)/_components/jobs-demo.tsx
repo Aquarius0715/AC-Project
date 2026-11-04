@@ -6,6 +6,7 @@ import { Badge, EmptyState, ErrorState, Page, PageHead, Select, Tabs, Plain } fr
 import { OriginBadge } from "@ac/web/components/JobBits";
 import { PJob, pjobs } from "@ac/web/lib/partner";
 import { fmt, useJobs } from "@ac/web/lib/jobs";
+import { orDash } from "@ac/web/lib/text";
 
 type Row = PJob & { origin: "request" | "plan" };
 
@@ -21,7 +22,7 @@ export function JobsDemo({ status }: Readonly<{ status?: string }>) {
     const isPend = j.partnerProposal?.status === "pending" || j.partnerProposal?.status === "sent_to_client";
     return {
       id: j.id, unit: j.unit, cust: j.customer, origin: j.origin,
-      line: isOffered ? (isPend ? `Time change proposed · waiting for the client` : `Offered by HQ · visit ${fmt(j.scheduled)} (fixed)`) : (j.status === "accepted" ? "Accepted · assign a technician for the agreed time" : `Assigned ${j.technician} · ${fmt(j.scheduled)}`),
+      line: isOffered ? (isPend ? `Time change proposed · waiting for the client` : `Offered by HQ · visit ${fmt(j.scheduled)} (fixed)`) : (j.status === "accepted" ? "Accepted · assign a technician for the agreed time" : `Assigned ${orDash(j.technician)} · ${fmt(j.scheduled)}`),
       tech: j.technician, techSub: j.technician ? (j.techAck?.status === "accepted" ? "accepted" : j.techAck?.status === "cant_make" ? "can’t make it" : "awaiting acceptance") : "not assignable before acceptance",
       slot: fmt(j.scheduled), deadline: isOffered ? "Answer by 09-25 12:00" : "", status: isOffered ? "Offered" : "Active",
       label: isOffered ? (isPend ? "Time proposed" : "Offered") : (j.status === "accepted" ? "Unassigned" : "Assigned"), tone: isPend ? "warn" : "primary",

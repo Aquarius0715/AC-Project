@@ -139,7 +139,7 @@ export function policyRows(policies: ApiPolicy[], customers: ApiCustomerName[], 
       const rules = p.rules?.length ?? 0;
       const sub = p.kind === "default_alert"
         ? t(rules === 1 ? "1 rule · ventilation (CO₂, PM2.5) + fault causes" : "{n} rules · ventilation (CO₂, PM2.5) + fault causes", { n: rules })
-        : `${metricLabel[metric] ? t(metricLabel[metric]) : metric} ${opSymbol[op]} ${p.threshold} ${metricUnit[metric] ?? ""} ${t("for {n} s", { n: p.durationSeconds ?? 0 })}`;
+        : `${metricLabel[metric] ? t(metricLabel[metric]) : metric} ${opSymbol[op]} ${String(p.threshold ?? "—")} ${metricUnit[metric] ?? ""} ${t("for {n} s", { n: p.durationSeconds ?? 0 })}`;
       const recipients = (p.recipientMembershipIds ?? []).map((id) => {
         const m = member.get(id);
         return { id, label: m?.displayName || id, role: m ? recipientRole(m.role, t) : "" };

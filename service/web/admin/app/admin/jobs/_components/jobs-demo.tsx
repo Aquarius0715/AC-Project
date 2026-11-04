@@ -87,19 +87,19 @@ export function PlansDemo() {
 }
 
 function rowLine(j: Job) {
-  if (j.followUpClass === "pending") return `Follow-up of ${j.followUpOf} · classify by 09-23 11:05`;
+  if (j.followUpClass === "pending") return `Follow-up of ${j.followUpOf ?? "—"} · classify by 09-23 11:05`;
   switch (j.status) {
     case "requested": { return j.declined ? `Client declined · round ${String(j.round)} · ${String(j.preferred.length)} new times` : `${String(j.preferred.length)} preferred times · book one or propose`;
     }
-    case "time_proposed": { return `Proposed ${fmt(j.proposal?.slot)} · reply by ${j.proposal?.replyBy}`;
+    case "time_proposed": { return `Proposed ${fmt(j.proposal?.slot)} · reply by ${j.proposal?.replyBy ?? "—"}`;
     }
-    case "offered": { return j.partnerProposal?.status === "pending" ? `${j.contractor} proposes ${fmt(j.partnerProposal.slot)} · needs client OK` : `Offer to ${j.contractor} · ${fmt(j.scheduled)}`;
+    case "offered": { return j.partnerProposal?.status === "pending" ? `${j.contractor ?? "—"} proposes ${fmt(j.partnerProposal.slot)} · needs client OK` : `Offer to ${j.contractor ?? "—"} · ${fmt(j.scheduled)}`;
     }
-    case "accepted": { return `${j.contractor} accepted · assign technician`;
+    case "accepted": { return `${j.contractor ?? "—"} accepted · assign technician`;
     }
-    case "assigned": { return `${j.delivery === "contractor" ? j.contractor + " · " : "Internal · "}${j.technician} · ${j.techAck?.status === "accepted" ? "accepted" : (j.techAck?.status === "cant_make" ? "can’t make it" : "awaiting acceptance")}`;
+    case "assigned": { return `${j.delivery === "contractor" ? j.contractor + " · " : "Internal · "}${j.technician ?? "—"} · ${j.techAck?.status === "accepted" ? "accepted" : (j.techAck?.status === "cant_make" ? "can’t make it" : "awaiting acceptance")}`;
     }
-    default: { return `${j.delivery === "contractor" ? j.contractor : "Internal"} · ${j.technician ?? "—"} · ${fmt(j.scheduled)}`;
+    default: { return `${(j.delivery === "contractor" ? j.contractor : "Internal") ?? "—"} · ${j.technician ?? "—"} · ${fmt(j.scheduled)}`;
     }
   }
 }
@@ -110,7 +110,7 @@ function JobDetail({ j, open }: Readonly<{ j: Job; open: (m: { kind: "book"; slo
   const isAnyFit = fits.some((f) => f.fits !== "none");
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      <Card title={<span className="flex flex-wrap items-center gap-2">{j.id} · {j.unit} <JobStatusBadge s={j.status} /><OriginBadge origin={j.origin} /></span>} sub={`${j.type} · ${j.customer} · ${j.loc}${j.planId ? ` · ${j.planId} (${j.planVisit})` : ""}`} action={<div className="flex gap-2"><Btn size="sm" onClick={() => { open({ kind: "reason", what: "hold" }); }}>Hold…</Btn><Btn size="sm" variant="danger" onClick={() => { jobActions.cancel(j.id, "cancelled by HQ"); toast("Job cancelled", "warn"); }}>Cancel…</Btn></div>}>
+      <Card title={<span className="flex flex-wrap items-center gap-2">{j.id} · {j.unit} <JobStatusBadge s={j.status} /><OriginBadge origin={j.origin} /></span>} sub={`${j.type} · ${j.customer} · ${j.loc}${j.planId ? ` · ${j.planId} (${j.planVisit ?? "—"})` : ""}`} action={<div className="flex gap-2"><Btn size="sm" onClick={() => { open({ kind: "reason", what: "hold" }); }}>Hold…</Btn><Btn size="sm" variant="danger" onClick={() => { jobActions.cancel(j.id, "cancelled by HQ"); toast("Job cancelled", "warn"); }}>Cancel…</Btn></div>}>
         <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
           {[["Symptom", j.symptom], ["Needs", j.type === "Periodic" ? "General maintenance" : "Refrigerant handling · 2 h"], ["Scheduled", j.scheduled ? longDate(j.scheduled) : "not booked"], ["Contact", "9:00–18:00 · call before arriving"]].map(([k, v]) => <div key={k} className="rounded-xl bg-surface2 p-3"><div className="text-[11px] text-muted-foreground">{k}</div><div className="text-[13px] font-semibold">{v}</div></div>)}
         </div>
@@ -168,7 +168,7 @@ function JobDetail({ j, open }: Readonly<{ j: Job; open: (m: { kind: "book"; slo
         <Card title={j.delivery === "contractor" ? "Delivery · offer to contractor" : "Delivery · internal"}>
           <SummaryList items={[
             ["Agreed time", j.scheduled ? `${longDate(j.scheduled)} (${j.origin === "plan" ? "from plan" : "client-approved"})` : "—"],
-            ...(j.delivery === "contractor" ? [["Contractor", `${j.contractor} · ${j.status === "offered" ? "offer open · expires 09-25 12:00" : "accepted"}`] as [string, string]] : []),
+            ...(j.delivery === "contractor" ? [["Contractor", `${j.contractor ?? "—"} · ${j.status === "offered" ? "offer open · expires 09-25 12:00" : "accepted"}`] as [string, string]] : []),
             ["Technician", j.technician ? `${j.technician} · ${j.techAck?.status === "accepted" ? `accepted ${j.techAck.at ?? ""}` : (j.techAck?.status === "cant_make" ? "can’t make this time" : "awaiting acceptance")}` : "not assigned yet"],
           ]} />
           {j.techAck?.status === "cant_make" && <div className="mt-3"><Banner tone="warn" action={<span className="flex gap-2">{j.delivery === "internal" && <Btn size="sm" onClick={() => { open({ kind: "reason", what: "reassign" }); }}>Reassign…</Btn>}<Btn size="sm" variant="primary" onClick={() => { open({ kind: "propose" }); }}>Propose another time…</Btn></span>}>{j.technician}: “{j.techAck.reason}”{j.techAck.alt ? ` · could do ${j.techAck.alt}` : ""}. Any new time needs the client’s approval.</Banner></div>}
@@ -176,15 +176,15 @@ function JobDetail({ j, open }: Readonly<{ j: Job; open: (m: { kind: "book"; slo
       )}
 
       {j.status === "offered" && j.partnerProposal?.status === "pending" && (
-        <Card tone="warn" title={<span className="inline-flex items-center gap-1.5"><Icon name="swap" />{`${j.contractor} proposes a different time`}</span>} action={<Badge tone="warn">Needs client approval</Badge>}>
-          <SummaryList items={[["Agreed with client", <s key="s" className="text-muted-foreground">{fmt(j.scheduled)}</s>], ["Proposed by contractor", <b key="b">{longDate(j.partnerProposal.slot)} · {j.partnerProposal.tech}</b>], ["Reason", `“${j.partnerProposal.reason}” — ${j.contractor}, ${j.partnerProposal.sentAt}`]]} />
+        <Card tone="warn" title={<span className="inline-flex items-center gap-1.5"><Icon name="swap" />{`${j.contractor ?? "—"} proposes a different time`}</span>} action={<Badge tone="warn">Needs client approval</Badge>}>
+          <SummaryList items={[["Agreed with client", <s key="s" className="text-muted-foreground">{fmt(j.scheduled)}</s>], ["Proposed by contractor", <b key="b">{longDate(j.partnerProposal.slot)} · {j.partnerProposal.tech}</b>], ["Reason", `“${j.partnerProposal.reason}” — ${j.contractor ?? "—"}, ${j.partnerProposal.sentAt}`]]} />
           <div className="mt-3 flex flex-wrap justify-end gap-2"><Btn onClick={() => { toast("Use “+ New job › Offer” to choose another contractor (demo)"); }}>Offer to another contractor…</Btn><Btn onClick={() => { jobActions.keepTime(j.id); toast("Agreed time kept"); }}>Keep {fmt(j.scheduled)} · ask again</Btn><Btn variant="primary" onClick={() => { jobActions.forwardPartner(j.id, "09-25 12:00"); toast("Sent to the client for approval"); }}>Send to client for approval</Btn></div>
           <p className="mt-2 text-[11px] text-muted-foreground">An agreed time never changes without the client’s OK. The offer stays reserved for {j.contractor} while the client decides.</p>
         </Card>
       )}
 
       {j.status === "submitted" && (
-        <Card title="Work report · version 1" sub={`Submitted by ${j.technician}`}>
+        <Card title="Work report · version 1" sub={`Submitted by ${j.technician ?? "—"}`}>
           <SummaryList items={[["Filter cleaned", "Normal"], ["Drain line", "Normal"], ["Refrigerant pressure", "Normal · 412 kPa"], ["Airflow", "Needs attention · reduced on Low"]]} />
           {j.delivery === "contractor" ? <p className="mt-2 text-xs text-muted-foreground">Outsourced job — the contractor reviews first; HQ reviews only on escalation.</p> : <>
             <p className="mt-2 text-xs text-ok">You did not contribute to this report, so you can review it (self-approval is rejected).</p>
@@ -278,7 +278,7 @@ function ClassifyModal({ j, onClose }: Readonly<{ j: Job; onClose: () => void }>
     <Modal open onClose={onClose} title="Classify follow-up request" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (isBad) return; const e = jobActions.classifyFollowUp(j.id, cls, r); if (e) { toast(e, "warn"); return; } toast(cls === "rework" ? "Classified as rework (free) — book the client’s preferred visit" : "Classified as a new request — book it like any client request"); onClose(); }}>Classify</Btn></>}>
       <p className="text-xs text-muted-foreground">{j.id} · {j.customer} · {j.unit} — follow-up of {j.followUpOf}</p>
       <Field label="Classification · required"><Choice value={cls} onChange={setCls} options={[{ id: "rework", label: "Rework (free)" }, { id: "new_request", label: "New request" }]} /></Field>
-      <Field label="Reason · required (1–1000 characters)" error={tried && isBad ? "A reason is required (1–1000 characters)" : undefined}><Textarea value={r} onChange={(e) => { setR(e.target.value); }} placeholder={`Drain pan still overflowing — same leak as ${j.followUpOf}.`} /></Field>
+      <Field label="Reason · required (1–1000 characters)" error={tried && isBad ? "A reason is required (1–1000 characters)" : undefined}><Textarea value={r} onChange={(e) => { setR(e.target.value); }} placeholder={`Drain pan still overflowing — same leak as ${j.followUpOf ?? "—"}.`} /></Field>
       <Banner>Set once — cannot be changed later. The job stays “Requested” and is booked like any client request; the client sees “Rework (free)” or “New request” instead of “Under HQ review”.</Banner>
     </Modal>
   );

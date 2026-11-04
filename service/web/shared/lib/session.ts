@@ -43,7 +43,7 @@ a session and fails closed (IR367). Plain-http local runs keep the local default
 export function cookieKey(): Buffer {
   const secret = process.env.SESSION_SECRET || undefined;
   if (oidcConfig().appUrl.startsWith("https") && (secret === undefined || secret.length < MIN_SECRET_LENGTH || secret.includes("change-me"))) {
-    throw new Error(`SESSION_SECRET of at least ${MIN_SECRET_LENGTH} characters, not the local value, is required on https`);
+    throw new Error(`SESSION_SECRET of at least ${String(MIN_SECRET_LENGTH)} characters, not the local value, is required on https`);
   }
   return Buffer.from(hkdfSync("sha256", secret ?? LOCAL_SECRET, "", "ac bff session cookie", 32));
 }

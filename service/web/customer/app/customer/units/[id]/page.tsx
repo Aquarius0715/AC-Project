@@ -56,7 +56,7 @@ export default async function CustomerUnitPage({ params }: Readonly<PageProps<"/
   const options: PolicyOption[] = policies.items
     .filter((p) => p.kind === "alert")
     // in words, as the Alert policies tab says it (IR623): "Room temperature ≥ 30 °C for 10 min → Warning"
-    .map((p) => ({ id: p.id, name: p.name, rule: `${conditionText({ metric: p.metric ?? "", operator: (p.operator ?? "gte") as Operator, threshold: p.threshold ?? 0, durationSeconds: p.durationSeconds ?? 0 }, t)} → ${p.severity && severity[p.severity] ? t(severity[p.severity]) : p.severity}` }));
+    .map((p) => ({ id: p.id, name: p.name, rule: `${conditionText({ metric: p.metric ?? "", operator: (p.operator ?? "gte") as Operator, threshold: p.threshold ?? 0, durationSeconds: p.durationSeconds ?? 0 }, t)} → ${(p.severity && severity[p.severity] ? t(severity[p.severity]) : p.severity) ?? "—"}` }));
   // the default policy's rules on for this customer, as the owner switched them (IR623)
   const def = policies.items.find((p) => p.kind === "default_alert") as unknown as ApiDefaultPolicy | undefined;
   const defaults = def ? { on: defaultRuleRows(def, me.customerId, me.membershipId, i).on, n: def.rules.length } : null;

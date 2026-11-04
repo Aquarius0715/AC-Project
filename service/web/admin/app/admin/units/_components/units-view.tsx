@@ -315,7 +315,7 @@ function UnitsCard({ c, sel, nav, canWrite, onNew }: Readonly<{ c: CustomerLive;
   const title = sel.kind === "property" ? t("All units in {name}", { name: sel.property.name }) : (sel.kind === "space" ? t("Units in {name}", { name: sel.space.name }) : t("Unassigned units in {name}", { name: sel.property.name }));
   const conn = (x: Connection) => t(connLabel[x]);
   return (
-    <Card title={`${title} · ${isFiltered || q.trim() ? t("{n} of {total}", { n: rows.length, total: c.total }) : c.total}`} action={canWrite && <Btn size="sm" variant="primary" onClick={onNew}><Icon name="add" /> {t("New unit")}</Btn>}>
+    <Card title={`${title} · ${String(isFiltered || q.trim() ? t("{n} of {total}", { n: rows.length, total: c.total }) : c.total)}`} action={canWrite && <Btn size="sm" variant="primary" onClick={onNew}><Icon name="add" /> {t("New unit")}</Btn>}>
       {isFiltered && <div className="mb-3"><Banner action={<Btn size="sm" onClick={() => { nav({ powerState: null, connections: null }); }}>{t("Clear filters")}</Btn>}>
         {t("Filtered by {filters} — clear the filter to see all {units}.", { filters: [c.filter.powerState && t("Power: {state}", { state: t(powerLabel[c.filter.powerState]) }), c.filter.connections.length && t("Connection: {state}", { state: c.filter.connections.map(conn).join(", ") })].filter(Boolean).join(" · "), units: units(t, c.total) })}
       </Banner></div>}

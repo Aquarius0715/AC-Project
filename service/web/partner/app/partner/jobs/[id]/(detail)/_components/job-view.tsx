@@ -189,7 +189,7 @@ function DetailView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "d
               [t("Required qualification"), live.required.map((q) => qualificationLabel(q, t)).join(" · ") || "—"],
               [t("Visit time (fixed)"), `${x.visit} · ${originLabel(j.origin, t)}`],
               [t("Delegation (access) period"), x.access ?? "—"],
-              [t("Scheduled slot"), x.scheduled ? `${x.scheduled} · ${x.tech}` : <b key="n" className="text-crit">{t("Not assigned yet")}</b>],
+              [t("Scheduled slot"), x.scheduled ? `${x.scheduled} · ${x.tech ?? "—"}` : <b key="n" className="text-crit">{t("Not assigned yet")}</b>],
             ]} />
             <div className="mt-4 flex flex-wrap gap-2">
               {isNeedsTech && <LinkBtn variant="primary" href={`/partner/schedule?jobId=${j.id}`}>{t(j.assignment ? "Reassign technician" : "Assign technician")}<Icon name="arrowRight" /></LinkBtn>}
@@ -209,7 +209,7 @@ function DetailView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "d
                   ]} />
                   <SummaryList items={[
                     [t("Open alerts"), live.alerts.length > 0 ? <span key="a" className="text-crit">{live.alerts.length} · {alertTitle(live.alerts[0], t)}</span> : t("none")],
-                    [t("Last reading"), reading ? `${reading.metric.replaceAll('_', " ")} ${reading.value} ${reading.unit}` : "—"],
+                    [t("Last reading"), reading ? `${reading.metric.replaceAll('_', " ")} ${String(reading.value ?? "—")} ${reading.unit}` : "—"],
                     [t("Maintenance scope"), u.serviceScope.map((s) => (scopeLabel[s] ? t(scopeLabel[s]) : s)).join(" · ")],
                   ]} />
                 </div>

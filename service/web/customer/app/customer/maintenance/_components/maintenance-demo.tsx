@@ -8,6 +8,7 @@ import { units } from "@ac/web/lib/client";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
 import { symptomLength } from "@ac/web/lib/customerMaintenance";
+import { orDash } from "@ac/web/lib/text";
 
 type StatusTab = "all" | "reply" | "requested" | "scheduled" | "progress" | "completed" | "cancelled";
 const tabOf = (s: JobStatus): StatusTab =>
@@ -92,11 +93,11 @@ function Detail({ j, onClose, open }: Readonly<{ j: Job; onClose: () => void; op
     <Card title={j.id} sub={`${j.unit} — ${j.origin === "plan" ? "periodic inspection" : j.symptom.slice(0, 40)}`} action={<div className="flex items-center gap-2"><JobStatusBadge s={j.status} client /><Btn size="sm" variant="ghost" aria-label="Close" onClick={onClose}><Icon name="close" /></Btn></div>} className="self-start">
       <SummaryList items={[
         ["Unit", `${j.unit} · ${j.loc}`],
-        ["Origin · type", j.origin === "plan" ? `Periodic plan · ${j.planId} · visit ${j.planVisit}` : `Client request · ${j.type}`],
+        ["Origin · type", j.origin === "plan" ? `Periodic plan · ${orDash(j.planId)} · visit ${orDash(j.planVisit)}` : `Client request · ${j.type}`],
         ...(j.followUpOf ? [["Follow-up of", <span key="f" className="flex flex-wrap items-center gap-2">{j.followUpOf}<FollowUpBadge j={j} /></span>] as [string, React.ReactNode]] : []),
         ...(j.origin === "request" ? [["Request", `“${j.symptom}”`] as [string, string]] : []),
         ...(j.scheduled && j.status !== "time_proposed" ? [[j.origin === "plan" ? "Scheduled" : "Confirmed time", `${longDate(j.scheduled)}${j.origin === "plan" ? " · set by HQ from your plan" : ""}`] as [string, string]] : []),
-        ...(j.technician && j.techAck?.status === "accepted" ? [["Technician", `${j.technician}${j.delivery === "contractor" ? ` (${j.contractor})` : " · HQ"}`] as [string, string]] : []),
+        ...(j.technician && j.techAck?.status === "accepted" ? [["Technician", `${j.technician}${j.delivery === "contractor" ? ` (${orDash(j.contractor)})` : " · HQ"}`] as [string, string]] : []),
       ]} />
       {j.origin === "request" && j.preferred.length > 0 && j.status !== "completed" && j.status !== "cancelled" && (
         <div className="mt-3 flex flex-col gap-1.5">
@@ -253,7 +254,7 @@ function NoteModal({ open, j, onClose, onDone }: Readonly<{ open: boolean; j: Jo
   const isBad = !t.trim() || t.length > 2000;
   return (
     <Modal open={open} onClose={onClose} title={`Add a note for ${j.id}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (isBad) return; const e = jobActions.addNote(j.id, t); if (e) { setErr(e); return; } setT(""); setTried(false); onDone(); }}>Send note</Btn></>}>
-      <Field label="Note to the HQ coordinator (1–2000 characters)" error={tried && isBad ? "Write 1–2000 characters" : undefined} hint={`${String(t.length)} / 2000 · Visible to: HQ coordinator${j.delivery === "contractor" ? ` · ${j.contractor}` : ""}${j.technician ? ` · assigned technician (${j.technician})` : ""}`}>
+      <Field label="Note to the HQ coordinator (1–2000 characters)" error={tried && isBad ? "Write 1–2000 characters" : undefined} hint={`${String(t.length)} / 2000 · Visible to: HQ coordinator${j.delivery === "contractor" ? ` · ${orDash(j.contractor)}` : ""}${j.technician ? ` · assigned technician (${j.technician})` : ""}`}>
         <Textarea value={t} onChange={(e) => { setT(e.target.value); }} placeholder="Please call 30 minutes before arriving — the gate code changed to 4821." />
       </Field>
       {err && <Banner tone="crit">{err}</Banner>}

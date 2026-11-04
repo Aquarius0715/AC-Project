@@ -74,7 +74,7 @@ export function InvoiceDemo({ id, tab }: Readonly<{ id: string; tab?: string }>)
         </div>
       </div>
       <Banner tone="warn" action={<Link className="text-xs font-semibold text-primary" href={`/customer/payments/${id}?tab=restriction`}>View restriction <Icon name="arrowRight" /></Link>}><b>Cooling restriction active</b> — 1 unit in scope · Lobby AC (Office A) — minimum cooling setpoint 24 °C. Paying does not restore cooling immediately.</Banner>
-      <Modal open={!!preview} onClose={() => { setPreview(null); }} title={`${preview} preview`} footer={<Btn onClick={() => { setPreview(null); }}>Close</Btn>}><p className="rounded-xl bg-surface2 p-3 text-[13px]">Your invoice invoice-overdue-a (120.00 MYR) was due on 10 Sep. Pay by card or view payment instructions in the app.</p><p className="text-xs text-muted-foreground">Preview only — nothing was sent.</p></Modal>
+      <Modal open={!!preview} onClose={() => { setPreview(null); }} title={`${preview ?? ""} preview`} footer={<Btn onClick={() => { setPreview(null); }}>Close</Btn>}><p className="rounded-xl bg-surface2 p-3 text-[13px]">Your invoice invoice-overdue-a (120.00 MYR) was due on 10 Sep. Pay by card or view payment instructions in the app.</p><p className="text-xs text-muted-foreground">Preview only — nothing was sent.</p></Modal>
     </Page>
   );
 }

@@ -170,7 +170,7 @@ function JobDetail({ d, live, fresh, onFresh }: Readonly<{ d: Detail; live: Jobs
 
       {pp?.status === "pending" && j.offer && (
         <Card tone="warn" title={<span className="inline-flex items-center gap-1.5"><Icon name="swap" />{t("{name} proposes a different time", { name: live.contractors.find((x) => x.id === j.offer!.contractorOrgId)?.name ?? t("The contractor") })}</span>} action={<Badge tone="warn">{t("Needs the client’s approval")}</Badge>}>
-          <SummaryList items={[[t("Agreed with the client"), <s key="s" className="text-muted-foreground">{d.texts.agreed}</s>], [t("Proposed by the contractor"), <b key="b">{d.texts.partnerSlot} · {d.partnerTech}</b>], [t("Reason"), `“${pp.reason}” — ${d.texts.partnerSent}`]]} />
+          <SummaryList items={[[t("Agreed with the client"), <s key="s" className="text-muted-foreground">{d.texts.agreed}</s>], [t("Proposed by the contractor"), <b key="b">{d.texts.partnerSlot} · {d.partnerTech}</b>], [t("Reason"), `“${pp.reason}” — ${d.texts.partnerSent ?? "—"}`]]} />
           <div className="mt-3 flex flex-wrap justify-end gap-2">
             <Btn disabled={pending} onClick={() => { run(() => resolvePartnerSlot(j.id, j.version, pp.id, "keep"), t("Agreed time kept"), () => { close(t("Kept the agreed time — the contractor can accept or decline it.")); }, failed); }}>{t("Keep the agreed time")}</Btn>
             <Btn variant="primary" disabled={pending} onClick={() => { run(() => resolvePartnerSlot(j.id, j.version, pp.id, "send_to_client", new Date(Math.min(now + 48 * 3_600_000, Date.parse(pp.slot.startAt))).toISOString()), t("Sent to the client"), () => { close(t("Sent to the client for approval (reply within 48 h).")); }, failed); }}>{t("Send to client for approval")}</Btn>

@@ -48,7 +48,7 @@ function LiveAssignment({ j }: Readonly<{ j: Job }>) {
           {ack === "accepted" && <div className="mt-3"><Btn variant="primary" disabled className="w-full">Start job (opens check-in)</Btn></div>}
         </Card>
       </div>
-      <Modal open={cant} onClose={() => { setCant(false); }} title="Can’t make this time" footer={<><Btn onClick={() => { setCant(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!comment.trim()) return; jobActions.techCantMake(j.id, comment.trim(), alt); setCant(false); toast(`Sent to ${coord}`, "warn"); }}>Send to {coord}</Btn></>}>
+      <Modal open={cant} onClose={() => { setCant(false); }} title="Can’t make this time" footer={<><Btn onClick={() => { setCant(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!comment.trim()) return; jobActions.techCantMake(j.id, comment.trim(), alt); setCant(false); toast(`Sent to ${coord ?? "—"}`, "warn"); }}>Send to {coord}</Btn></>}>
         <p className="text-xs text-muted-foreground">{j.id} · {fmt(j.scheduled)} · assigned by {coord}</p>
         <Field label="Reason"><Choice value={reason} onChange={setReason} options={[{ id: "training", label: "Training / course" }, { id: "overrun", label: "Another job runs over" }, { id: "sick", label: "Sick" }, { id: "other", label: "Other" }]} /></Field>
         <Field label="Comment (required)" error={tried && !comment.trim() ? "Tell your coordinator why" : undefined}><Input value={comment} onChange={(e) => { setComment(e.target.value); }} placeholder="Medical appointment on 10-01 morning." /></Field>

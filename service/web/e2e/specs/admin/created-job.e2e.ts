@@ -7,7 +7,7 @@ test("a job created as requested shows its result, once, from the URL", async ({
   await page.goto("/admin/jobs");
   const link = page.locator('a[href*="jobId="]').first();
   await expect(link).toBeVisible();
-  const jobId = new URL((await link.getAttribute("href")) ?? "", page.url()).searchParams.get("jobId");
+  const jobId = new URL((await link.getAttribute("href")) ?? "", page.url()).searchParams.get("jobId") ?? "";
   expect(jobId).toBeTruthy();
   await page.goto(`/admin/jobs?jobId=${jobId}&created=requested`);
   await expect(page.getByText(/Job created as requested/).first()).toBeVisible();
