@@ -32,14 +32,40 @@ type LiveOwner struct {
 	Email, Name                  string
 }
 
-// Site is a site the seed adds outside the fixture, by the fixture-style names of its records.
+// LiveModule is a unit of the live site with its model and its module, by fixture-style names: the air conditioner,
+// or a node's own sensor unit. A module has one sensor of a metric, so the readings of a node that repeat another
+// node's metrics go to a unit of their own (DEC-91).
+type LiveModule struct {
+	Unit, UnitName, Device, Serial, Binding string
+	Capability, Manufacturer, Model         string
+	Control                                 bool // the model takes power commands
+	Sensors                                 []LiveSensor
+}
+
+// Site is a site the seed adds outside the fixture, by the fixture-style names of its records: its customer and owner,
+// its place, the air conditioner (the embedded module) and the nodes' own sensor units.
 type Site struct {
-	Tenant, CustomerOrgID, Customer, CustomerName     string
-	Owner                                             LiveOwner
-	Property, Floor, Room                             string
-	Capability, Manufacturer, Model, UnitName, Serial string
-	Unit, Device, Binding                             string
-	Sensors                                           []LiveSensor
+	LiveModule
+
+	Tenant, CustomerOrgID, Customer, CustomerName string
+	Owner                                         LiveOwner
+	Property, Floor, Room                         string
+	SensorUnits                                   []LiveModule
+}
+
+// Modules are the site's units with their modules: the air conditioner first.
+func (site Site) Modules() []LiveModule {
+	return append([]LiveModule{site.LiveModule}, site.SensorUnits...)
+}
+
+// UnitNames are the names of the site's units, in the order of Modules.
+func (site Site) UnitNames() []string {
+	names := make([]string, 0, len(site.SensorUnits)+1)
+	for _, module := range site.Modules() {
+		names = append(names, module.UnitName)
+	}
+
+	return names
 }
 
 // liveStaleAfterSeconds is when a live reading goes stale: two missed minutes (the bridge sends one reading a minute).
@@ -51,9 +77,10 @@ type liveExec func(what, sql string, args ...any) error
 // LiveSite is where the readings of real sensor nodes land (DEC-86, IR524): a customer of its own (DEC-87, IR525)
 // with one Daikin air conditioner (DEC-89, IR528). The two nodes in front of it make one module: node_1 measures the
 // room, node_2 the air conditioner's supply, and node_1's infrared LED switches it on and off. The model offers the
-// power only, the one setting the nodes' firmware takes (ON, OFF and a cooling preset). The IoT bridge subscribes to
-// the nodes' broker (REAL_MQTT_URL), sends their readings to these sensors and the power commands to node_1.
-// Development only.
+// power only, the one setting the nodes' firmware takes (ON, OFF and a cooling preset). node_2 measures the room too
+// since November 2026; its temperature and humidity go to a sensor unit of its own in the same room (DEC-91, IR627).
+// The IoT bridge subscribes to the nodes' broker (REAL_MQTT_URL), sends their readings to these sensors and the power
+// commands to node_1. Development only.
 func LiveSite() Site {
 	return Site{
 		Tenant:        demoTenant,
@@ -67,34 +94,64 @@ func LiveSite() Site {
 			Email:      "live-sensors@example.com",
 			Name:       "Live Sensor Owner",
 		},
-		Property:     "property-live-sensors",
-		Floor:        "space-live-1f",
-		Room:         "space-live-room",
-		Capability:   "cap-live-daikin",
-		Manufacturer: "Daikin",
-		Model:        "IR via node_1",
-		UnitName:     "Live · Daikin AC",
-		Serial:       "node_1+node_2",
-		Unit:         "unit-live-ac",
-		Device:       "device-live-ac",
-		Binding:      "binding-live-ac",
-		Sensors: []LiveSensor{
-			{Name: "sensor-live-temperature", Metric: "temperature", Unit: "°C", Boundary: ""},
-			{Name: "sensor-live-humidity", Metric: "humidity", Unit: "%", Boundary: ""},
+		Property: "property-live-sensors",
+		Floor:    "space-live-1f",
+		Room:     "space-live-room",
+		LiveModule: LiveModule{
+			Capability:   "cap-live-daikin",
+			Manufacturer: "Daikin",
+			Model:        "IR via node_1",
+			Control:      true,
+			UnitName:     "Live · Daikin AC",
+			Serial:       "node_1+node_2",
+			Unit:         "unit-live-ac",
+			Device:       "device-live-ac",
+			Binding:      "binding-live-ac",
+			Sensors: []LiveSensor{
+				{Name: "sensor-live-temperature", Metric: keyTemperature, Unit: "°C", Boundary: ""},
+				{Name: "sensor-live-humidity", Metric: keyHumidity, Unit: "%", Boundary: ""},
+				{
+					Name:     "sensor-live-power",
+					Metric:   keyPower,
+					Unit:     "kW",
+					Boundary: "ac_input_electricity",
+				},
+			},
+		},
+		SensorUnits: []LiveModule{
 			{
-				Name:     "sensor-live-power",
-				Metric:   keyPower,
-				Unit:     "kW",
-				Boundary: "ac_input_electricity",
+				Capability:   "cap-live-node-2-sensors",
+				Manufacturer: "ESP32 node",
+				Model:        "BME680 on node_2",
+				Control:      false,
+				UnitName:     "Live · node_2 sensors",
+				Serial:       "node_2",
+				Unit:         "unit-live-node-2-sensors",
+				Device:       "device-live-node-2-sensors",
+				Binding:      "binding-live-node-2-sensors",
+				Sensors: []LiveSensor{
+					{
+						Name:     "sensor-live-node-2-temperature",
+						Metric:   keyTemperature,
+						Unit:     "°C",
+						Boundary: "",
+					},
+					{
+						Name:     "sensor-live-node-2-humidity",
+						Metric:   keyHumidity,
+						Unit:     "%",
+						Boundary: "",
+					},
+				},
 			},
 		},
 	}
 }
 
-// ApplyLive adds the live site to a seeded database: the live customer and its owner (liveOwner), the model (remote
-// power only), a property with one room, the air conditioner and its module, online as of now. Records that exist
-// are kept (ON CONFLICT DO NOTHING), so it can run on every start. Development only: tests and production
-// never load it.
+// ApplyLive adds the live site to a seeded database: the live customer and its owner (liveOwner), a property with one
+// room, and in it the air conditioner (remote power only) and the nodes' sensor units, each with its model and its
+// module, online as of now. Records that exist are kept (ON CONFLICT DO NOTHING), so it can run on every start, and a
+// unit added to the site comes in at the next start. Development only: tests and production never load it.
 func ApplyLive(ctx context.Context, txn pgx.Tx, now time.Time) error {
 	site := LiveSite()
 	tenant := ID(site.Tenant)
@@ -139,27 +196,35 @@ func ApplyLive(ctx context.Context, txn pgx.Tx, now time.Time) error {
 		return err
 	}
 
-	err = liveModel(exec, site, tenant)
-	if err != nil {
-		return err
-	}
-
 	err = livePlace(exec, site, tenant)
 	if err != nil {
 		return err
 	}
 
-	err = liveUnit(exec, site, tenant, now)
-	if err != nil {
-		return err
+	for _, module := range site.Modules() {
+		err := liveModel(exec, module, tenant)
+		if err != nil {
+			return err
+		}
+
+		err = liveUnit(exec, site, module, tenant, now)
+		if err != nil {
+			return err
+		}
+
+		err = liveModuleOf(ctx, txn, exec, site, module, tenant, now)
+		if err != nil {
+			return err
+		}
 	}
 
-	return liveModule(ctx, txn, exec, site, tenant, now)
+	return nil
 }
 
-// liveModel adds the live air conditioner's model: remote power only, no mode, fan or temperature setting (the
-// deterministic contracts take empty lists and a null temperature), with the module's sensors.
-func liveModel(exec liveExec, site Site, tenant uuid.UUID) error {
+// liveModel adds a live unit's model with the module's sensors: the air conditioner's offers the remote power only, a
+// sensor unit's no control; neither has a mode, fan or temperature setting (the deterministic contracts take empty
+// lists and a null temperature).
+func liveModel(exec liveExec, module LiveModule, tenant uuid.UUID) error {
 	type capSensor struct {
 		Metric            string  `json:"metric"`
 		Unit              string  `json:"unit"`
@@ -167,8 +232,8 @@ func liveModel(exec liveExec, site Site, tenant uuid.UUID) error {
 		BoundaryID        *string `json:"boundaryId"`
 	}
 
-	sensors := make([]capSensor, 0, len(site.Sensors))
-	for _, sensor := range site.Sensors {
+	sensors := make([]capSensor, 0, len(module.Sensors))
+	for _, sensor := range module.Sensors {
 		capSens := capSensor{
 			Metric:            sensor.Metric,
 			Unit:              sensor.Unit,
@@ -192,12 +257,13 @@ func liveModel(exec liveExec, site Site, tenant uuid.UUID) error {
 		`INSERT INTO devices.capabilities (id, version, tenant_id, manufacturer, model, control, mode_control, fan_control,
 			temperature,
 		modes, fan_levels, ventilation, ventilation_levels, sensors, firmware_candidates, is_current)
-		VALUES ($1,1,$2,$3,$4,true,false,false,NULL,'{}','{}',false,'{}',$5,'{}',true) ON CONFLICT DO NOTHING`,
-		ID(site.Capability),
+		VALUES ($1,1,$2,$3,$4,$6,false,false,NULL,'{}','{}',false,'{}',$5,'{}',true) ON CONFLICT DO NOTHING`,
+		ID(module.Capability),
 		tenant,
-		site.Manufacturer,
-		site.Model,
+		module.Manufacturer,
+		module.Model,
 		capSensors,
+		module.Control,
 	)
 }
 
@@ -238,10 +304,9 @@ func livePlace(exec liveExec, site Site, tenant uuid.UUID) error {
 	)
 }
 
-// liveUnit adds the live air conditioner in the room as of now; its settings are unknown until a command sets them
-// (the nodes report none).
-func liveUnit(exec liveExec, site Site, tenant uuid.UUID, now time.Time) error {
-	// the air conditioner'site settings are unknown until a command sets them (the nodes report none)
+// liveUnit adds a live unit in the room as of now; the air conditioner's settings are unknown until a command sets
+// them (the nodes report none).
+func liveUnit(exec liveExec, site Site, module LiveModule, tenant uuid.UUID, now time.Time) error {
 	state, marshalErr := json.Marshal(
 		map[string]any{
 			keyPower:      nil,
@@ -261,28 +326,29 @@ func liveUnit(exec liveExec, site Site, tenant uuid.UUID, now time.Time) error {
 			installed_at,
 		service_scope, archived, capability_version, observed_state, observed_restriction, version, warranty_ends_at)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,NULL,'{indoor,outdoor,electrical}',false,1,$8,NULL,1,NULL) ON CONFLICT DO NOTHING`,
-		ID(site.Unit),
+		ID(module.Unit),
 		tenant,
 		ID(site.CustomerOrgID),
 		ID(site.Property),
 		ID(site.Room),
-		site.UnitName,
-		ID(site.Capability),
+		module.UnitName,
+		ID(module.Capability),
 		state,
 	)
 }
 
-// liveModule adds the live site's module, online as of now, with its sensors and its binding to the unit; the unit
+// liveModuleOf adds a live unit's module, online as of now, with its sensors and its binding to the unit; the unit
 // mirrors a new module's connection and last seen (IR47), while a module from an earlier start keeps its own.
-func liveModule(
+func liveModuleOf(
 	ctx context.Context,
 	txn pgx.Tx,
 	exec liveExec,
 	site Site,
+	module LiveModule,
 	tenant uuid.UUID,
 	now time.Time,
 ) error {
-	unit, device, binding := ID(site.Unit), ID(site.Device), ID(site.Binding)
+	unit, device, binding := ID(module.Unit), ID(module.Device), ID(module.Binding)
 
 	added, err := txn.Exec(
 		ctx,
@@ -292,7 +358,7 @@ func liveModule(
 		CONFLICT DO NOTHING`,
 		device,
 		tenant,
-		site.Serial,
+		module.Serial,
 		binding,
 		unit,
 		ID("system-demo"),
@@ -302,7 +368,7 @@ func liveModule(
 		return fmt.Errorf("live site module: %w", err)
 	}
 
-	for _, liveSensor := range site.Sensors {
+	for _, liveSensor := range module.Sensors {
 		var boundary *string
 		if liveSensor.Boundary != "" {
 			boundary = &liveSensor.Boundary
@@ -346,7 +412,7 @@ func liveModule(
 	if added.RowsAffected() == 0 { // a module from an earlier start keeps its connection and last seen
 		return nil
 	}
-	// the unit mirrors its new module'site connection and last seen (IR47)
+	// the unit mirrors its new module's connection and last seen (IR47)
 	return exec(
 		"unit connection",
 		`UPDATE assets.units SET connection = 'online', last_seen_at = $2 WHERE id = $1`,

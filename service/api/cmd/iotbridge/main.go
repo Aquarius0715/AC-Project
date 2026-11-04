@@ -308,7 +308,7 @@ func startLive(
 		"iot-bridge: live sensors from %s (%s) → %s of %s",
 		strconv.Quote(host),
 		strconv.Quote(topic),
-		seed.LiveSite().UnitName,
+		strings.Join(seed.LiveSite().UnitNames(), ", "),
 		seed.LiveSite().CustomerName,
 	)
 
@@ -640,11 +640,11 @@ func sendCommand(
 // the internal service token and the tenant.
 type liveAPI struct{ equipment, token, tenant string }
 
-// reportGap runs once a minute for the live module. Its connection follows the heartbeat gap (IR532): offline once a
-// node has been silent for 3 minutes, online again once every node is heard (device events of its binding, the open
-// fault read back from the API, so a restart of the bridge picks it up). Then it sends how long the module has gone
-// unheard (heartbeat_gap), so the default rule ac_offline alerts when the nodes stop or their broker is out of reach
-// and resolves when they are back (IR529).
+// reportGap runs once a minute for each live module. Its connection follows the heartbeat gap of its nodes (IR532):
+// offline once one of them has been silent for 3 minutes, online again once every one is heard (device events of its
+// binding, the open fault read back from the API, so a restart of the bridge picks it up). Then it sends how long the
+// module has gone unheard (heartbeat_gap) for its unit, so the default rule ac_offline alerts when the nodes stop or
+// their broker is out of reach and resolves when they are back (IR529).
 func reportGap(
 	ctx context.Context,
 	heard *iotbridge.LiveHeard,
@@ -656,7 +656,15 @@ func reportGap(
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 
-	rep := &logging.Repeats{Logf: log.Printf, Every: 0, Now: nil}
+	modules := seed.LiveSite().Modules()
+
+	reps := make(
+		[]*logging.Repeats,
+		len(modules),
+	) // one per module, so that one's failures do not hide another's
+	for i := range reps {
+		reps[i] = &logging.Repeats{Logf: log.Printf, Every: 0, Now: nil}
+	}
 
 	for {
 		select {
@@ -664,41 +672,60 @@ func reportGap(
 			return
 		case now := <-ticker.C:
 			when := now.Add(clock.offset() - clockMargin).UTC()
-			gap := heard.Gap(now)
-
-			f, err := fetchConnectionFault(ctx, httpc, api, seed.ID(seed.LiveSite().Device))
-			if err != nil {
-				rep.Failed(fmt.Sprintf("live connection: %v", err))
-			} else if trigger, ok := iotbridge.LiveConnectionTrigger(f, gap, when); ok {
-				err := send(ctx, httpc, endpoint, trigger)
-				if err != nil && !recorded(err) {
-					rep.Failed(fmt.Sprintf("live connection %s: %v", trigger.Kind, err))
-				} else {
-					log.Printf(
-						"live module %s: %s (nodes unheard for %s)",
-						seed.LiveSite().UnitName,
-						trigger.Kind,
-						gap.Round(time.Second),
-					)
-				}
+			for i, module := range modules {
+				gap := heard.GapOf(iotbridge.ModuleNodes(module), now)
+				reportModuleGap(ctx, httpc, endpoint, api, reps[i], module, gap, when)
 			}
-
-			sendErr := send(
-				ctx,
-				httpc,
-				endpoint,
-				iotbridge.LiveGapTrigger(gap, when.Truncate(time.Minute)),
-			)
-			if sendErr != nil &&
-				!recorded(sendErr) {
-				rep.Failed(fmt.Sprintf("live heartbeat gap: %v", sendErr))
-
-				continue
-			}
-
-			rep.OK("live heartbeat gap")
 		}
 	}
+}
+
+// reportModuleGap is a live module's report of one minute: its connection brought in line with the gap of its nodes,
+// then that gap for its unit.
+func reportModuleGap(
+	ctx context.Context,
+	httpc *http.Client,
+	endpoint string,
+	api liveAPI,
+	rep *logging.Repeats,
+	module seed.LiveModule,
+	gap time.Duration,
+	when time.Time,
+) {
+	dev := seed.ID(module.Device)
+
+	f, err := fetchConnectionFault(ctx, httpc, api, dev)
+	if err != nil {
+		rep.Failed(fmt.Sprintf("live connection of %s: %v", module.UnitName, err))
+	} else if trigger, ok := iotbridge.LiveConnectionTrigger(dev, f, gap, when); ok {
+		err := send(ctx, httpc, endpoint, trigger)
+		if err != nil && !recorded(err) {
+			rep.Failed(
+				fmt.Sprintf("live connection %s of %s: %v", trigger.Kind, module.UnitName, err),
+			)
+		} else {
+			log.Printf(
+				"live module %s: %s (nodes unheard for %s)",
+				module.UnitName,
+				trigger.Kind,
+				gap.Round(time.Second),
+			)
+		}
+	}
+
+	sendErr := send(
+		ctx,
+		httpc,
+		endpoint,
+		iotbridge.LiveGapTrigger(seed.ID(module.Unit), gap, when.Truncate(time.Minute)),
+	)
+	if sendErr != nil && !recorded(sendErr) {
+		rep.Failed(fmt.Sprintf("live heartbeat gap of %s: %v", module.UnitName, sendErr))
+
+		return
+	}
+
+	rep.OK("live heartbeat gap of " + module.UnitName)
 }
 
 // fetchConnectionFault reads the live module's connection axis (devices.connectionFault, IR532).

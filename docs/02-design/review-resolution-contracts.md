@@ -8810,3 +8810,24 @@ Found in the UX loop: UX-40 listed 16 HQ texts that named codes, and UX-44 (HQ's
    - The unit tests that expected the old texts now expect the words: plans, SLA, contractors, HQ jobs, the test run and alert evidence.
    - The e2e expectations for alert policies and contracts follow.
    - On the development stack, HQ's Billing showed the overdue invoice, the payment reminder form and the related restriction in words. axe passed, with no sideways scroll at 1920 or 1280.
+
+## IR627 node_2's room readings are recorded on a sensor unit of their own (DEC-91) — 2026-11-04
+
+The user asked to take node_2's data in. node_2 now reports the room too: on 2026-11-04 its message carried 28.3 °C and 58.4 %, with pressure and gas, next to its power fields; before, those fields were 0. A module has one sensor per metric (`devices.sensors` is unique per device and metric), and node_1's temperature and humidity are the air conditioner's. Of the ways to record node_2's, the user chose a unit of its own (recommended).
+
+1. **Seed (`seed.LiveSite`, `ApplyLive`).** The site lists its units with their modules (`Modules`): the air conditioner first, then the nodes' sensor units (`SensorUnits`).
+   - The new unit is "Live · node_2 sensors" in the same Sensor room. Its model, "ESP32 node BME680 on node_2", has no remote control and lists temperature and humidity. Its module, serial node_2, has the two sensors and an active binding.
+   - `ApplyLive` adds each unit's model, unit and module and keeps what exists. A running stack gains the unit at migrate's next start, online as of then.
+2. **Readings (`internal/iotbridge/live.go`).** node_2's `temp` and `humidity` go to the sensor unit's sensors while non-zero, as node_1's do; its `power` stays on the air conditioner.
+   - A reading names its sensor's unit, the minute's alert evaluation names every unit with a reading, and each module with a reading gets its heartbeat.
+   - So a node_2 message with all its fields gives six triggers: three readings, one evaluation and two heartbeats.
+3. **Connection and AC offline per module (`cmd/iotbridge`).** Every minute the bridge reports each module on its own. Its gap is the longest silence of its nodes (`ModuleNodes`: node_1 and node_2 for the air conditioner, node_2 for the sensor unit).
+   - The module's connection follows that gap (IR532), and `heartbeat_gap` goes to its unit (IR529).
+   - Each module keeps its own repeat log, so one module's failures do not hide another's.
+4. **Unchanged.** Commands still go to the air conditioner only (DEC-89). The sensor unit's page shows no controls (IR533). Its readings feed the customer's alert policies as any unit's do.
+5. **Tests.**
+   - `live_test.go`: node_2's room readings land on the sensor unit with its heartbeat, one evaluation covers both units, and the room readings come without the meter's. The gap is taken over a set of nodes and sent per unit, and each module gets its own connection event. Sensor names are unique on the site, metrics are unique per module, and each module hears from its own nodes.
+   - `TestLiveSiteSeeds` checks both units' models, units, modules, sensors and bindings. It also checks that a unit the site gained after the first start comes in online, while a connection that changed is kept.
+6. **Development stack.** The migrate and bridge images were rebuilt, and migrate ran again ("Live · Daikin AC, Live · node_2 sensors"). The new unit came in online with its two sensors and binding, and change capture copied it to the billing, energy and notify domains.
+   - After the bridge restarted, node_2's readings landed on the sensor unit every minute (28.9 °C, 60.2 %). The air conditioner kept node_1's temperature and humidity and node_2's power.
+   - The data was read only, and no command was sent.

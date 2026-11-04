@@ -229,14 +229,14 @@ Modelling rules:
 | Device security | Mutual TLS, per-device certificates, topic-level access policy, tamper and power-loss events raised as device events (FR-T12). |
 | Offline behaviour | Modules buffer telemetry while offline and upload with original observedAt; commands are never queued on the device beyond expiresAt. |
 
-**Real sensor nodes in development (DEC-86 to DEC-89).** The development stack also takes a site's own ESP32 nodes from their own MQTT broker (`REAL_MQTT_URL` in `.env.local`). This is what the system expects of the nodes' firmware:
+**Real sensor nodes in development (DEC-86 to DEC-89, DEC-91).** The development stack also takes a site's own ESP32 nodes from their own MQTT broker (`REAL_MQTT_URL` in `.env.local`). This is what the system expects of the nodes' firmware:
 
 - **Readings.** Each node publishes a JSON message about every 5 seconds on `smarthome/ac/<node>/sensors`. The message has `device_id`, `timestamp` and the fields `temp`, `humidity`, `pressure`, `gas`, `approx_altitude`, `voltage`, `current`, `power` (W) and `energy` (kWh); a field the node does not measure is 0.
   - The bridge tells the nodes apart by the topic, times the readings on the stack's demo clock (not by `timestamp`) and skips retained messages.
-  - It records `temp` (°C) and `humidity` (%) of node_1 while non-zero, and `power` of node_2 in kW while its `voltage` is non-zero. The other fields have no platform metric.
+  - It records `temp` (°C) and `humidity` (%) while non-zero: node_1's on the air conditioner, node_2's on its own sensor unit, "Live · node_2 sensors" (DEC-91). It records `power` of node_2 in kW on the air conditioner while its `voltage` is non-zero. The other fields have no platform metric.
   - It keeps one message per node and scenario minute, and passes its readings to the customer's alert policies.
 - **Commands.** The app's power on and off become the plain-text firmware commands `COOL24` (cooling at 24 °C) and `OFF`. They go at QoS 1 to `smarthome/ac/<node>/command` of the command node (`REAL_MQTT_COMMAND_NODE`, node_1 by default), only with `REAL_MQTT_COMMANDS=1`. Infrared is one-way, so a command counts as acknowledged once the broker takes it.
-- **Connection.** The bridge takes the module offline once either node has gone unheard for 3 minutes, and brings it back once both have reported within the last minute (IR532). The default rule raises AC offline once a node has gone unheard for 15 minutes (IR529).
+- **Connection.** Each module follows its own nodes: the air conditioner's are node_1 and node_2, the sensor unit's is node_2. The bridge takes a module offline once one of its nodes has gone unheard for 3 minutes, and brings it back once each has reported within the last minute (IR532). The default rule raises AC offline on a unit once one of its nodes has gone unheard for 15 minutes (IR529).
 - **OPEN (firmware).** Full remote control needs two firmware changes on the device team's side:
   - a JSON command with the power, temperature, mode and fan level, which the firmware's infrared library (IRremoteESP8266 `IRDaikinESP`) can send;
   - a state message after each send, which the bridge would forward as the module's reported state and acknowledgement.

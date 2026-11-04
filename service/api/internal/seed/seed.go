@@ -407,7 +407,7 @@ func (s *seeding) organizations() error {
 // actors inserts each actor's person and membership with its permissions, qualification grants and scopes.
 func (s *seeding) actors() error {
 	for _, actor := range s.fixture.Actors {
-		// the realm'scope account of the actor names this membership in its claims (IR462)
+		// the realm's account of the actor names this membership in its claims (IR462)
 		err := s.exec(
 			`INSERT INTO identity.users (id, email, display_name, sign_in_membership_id) VALUES ($1,$2,$3,$4) ON CONFLICT DO
 				NOTHING`,
