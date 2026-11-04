@@ -37,7 +37,7 @@ compose run --rm mock-history
 cat <<'EOF'
 
 IoT demo is running.
-  Customer app  http://localhost:3000   sign in as customer-b  → Units & locations › Mock fleet,
+  Customer app  http://localhost:3000   sign in as customer-a  → Units & locations › Mock fleet,
                                          Energy & cost (30d), Air quality (temperature, CO2, PM2.5, humidity)
   HQ app        http://localhost:3003   sign in as hq-operator → devices and alerts of every customer
   Passwords: the local demo realm (docker/keycloak/realm-ac.json).

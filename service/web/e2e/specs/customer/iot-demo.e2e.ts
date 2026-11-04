@@ -1,4 +1,4 @@
-// IoT demo (docker/iot-demo.sh): customer B sees the mock fleet's long series — 30 days of daily energy and a week of
+// IoT demo (docker/iot-demo.sh): customer A sees the mock fleet's long series — 30 days of daily energy and a week of
 // CO2 — read from the readings the simulated IoT modules send through the broker and the bridge, joined to the seeded
 // history. Skipped on a stack without the mock fleet (it is loaded only with SEED_MOCK_FLEET=1).
 import { createHash } from "node:crypto";
@@ -22,7 +22,7 @@ test("the mock fleet's readings make a month of energy and a week of CO2", async
   expect(unit).toBe("d795afbf-17a2-5797-9191-28040315244b");
   const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
   const page = await context.newPage();
-  await signIn(page, app, "customer-b");
+  await signIn(page, app, "customer-a"); // the mock fleet is customer A's (DEC-92)
 
   await page.goto(`${app.url}/customer/energy?unitIds=${unit}&period=30d`);
   test.skip(!(await page.getByText("Mock · cooling, on").first().isVisible().catch(() => false)), "no mock fleet on this stack (SEED_MOCK_FLEET)");

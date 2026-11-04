@@ -1,6 +1,6 @@
 {
   "note": "Mock fleet: one air conditioner (unit) and its IoT module per state pattern, so every state can be seen on the screens. Loaded in development only (SEED_MOCK_FLEET=1), never in tests or production. IDs are fixture-style names; the API IDs come from seed.ID.",
-  "customerOrgId": "org-customer-b",
+  "customerOrgId": "org-customer-a",
   "property": {
     "id": "property-mock-fleet",
     "kind": "office",
