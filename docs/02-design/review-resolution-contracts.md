@@ -8919,3 +8919,53 @@ The first test deployment, `test1.0.0r0`, could be followed only in the server's
    - with CI passed on a tag that changes the scripts, the script re-ran from the tag, sent the step statuses in order, then success, and recorded the tag as deployed;
    - a failing build sent a failure naming "building the images (1/2)" and the way back, then started the tag before;
    - the token went in the Authorization header only.
+
+## IR631 The test deployment runs on the lab server's runner, with its logs on Actions (DEC-94) — 2026-11-04
+
+The user wanted the build and deploy logs on GitHub Actions. IR630 showed only the steps, and only under Deployments. That needs the deployment to run as an Actions job on the server. A self-hosted runner on a public repository would run fork pull requests' code there, so the user chose to make the repository private and register the server as its runner.
+
+1. **The workflow (`.github/workflows/deploy-test.yml`).** It runs on a push of a tag `test<major>.<minor>.<patch>r<n>`, on the runner with the label `ac-test`. Its steps:
+   - It checks the tag out with the history.
+   - It refuses a commit that is not on `main`.
+   - It waits for the CI workflow of the commit: `deploy/test/ci_gate.py` uses the job's token with `actions: read`. It prints each change of the run's progress, fails when CI fails, and waits 60 minutes at most.
+   - It masks the values of the environment file's passwords, secrets, tokens and keys in the log.
+   - It runs `deploy/test/deploy.sh deploy TAG` from the checkout.
+
+   One deployment runs at a time, and a newer tag waiting replaces an older one that waits.
+2. **`deploy.sh` for the runner.**
+   - Each step is a group of its own in the log, and the image builds print their full output.
+   - A failure is an error annotation that names the step and the tag brought back.
+   - A deployment that works records its tree, and copies the script to `~/ac-test/deploy.sh` for the boot unit.
+   - The pull of the tags, the public-API CI check and the GitHub reports of IR629 and IR630 are removed, with `deploy/test/github.py`. The runner's token and the Actions run replace them, and the server keeps no GitHub token.
+3. **`setup.sh`.** It keeps the environment file and removes the first version's timer. It installs the unit `ac-test-boot`, which runs `deploy.sh boot` after a reboot: the stack starts again, and the API services restart once Keycloak answers (IR419). It ends with the runner's registration steps.
+4. **Checked with stubs.** The real scripts ran in a sandbox, with Docker and the API replaced by stubs:
+   - a first deployment, and one with the same migrations (data kept);
+   - one with changed migrations (data rebuilt once);
+   - a failing build, with its error annotation, the tag before brought back and the deployed tag unchanged;
+   - the boot step, and the status;
+   - the CI gate: a pass after two reads, a failure, the timeout, and the token sent only as a header.
+
+## IR632 CI and E2E run on the lab server's runner too (DEC-95) — 2026-11-04
+
+A private repository has 2,000 free Actions minutes a month on GitHub's runners, and CI with E2E used about an hour a push. The user asked to run them on the lab server's runner as well.
+
+1. **CI (`ci.yml`).** All seven jobs run on the runner (`[self-hosted, ac-test]`), each in a container of its own: `golang:1.26-bookworm` for the Go jobs, `node:26-bookworm` for the web jobs and `python:3.12-bookworm` for the docs.
+   - **Isolation.** The dependencies' code (npm install scripts, test tools) runs in the container. It does not run on the server, and it does not reach `~/ac-test/env`. The runner does not pass the Docker socket into a job container (its source mounts only the work, temp, tool and action directories).
+   - **Caches.** Docker volumes keep the Go module and build caches (`ac-ci-go`, `ac-ci-cache`) and the npm cache (`ac-ci-npm`) between runs.
+   - **PostgreSQL.** The Go suites' PostgreSQL service has no published port, because the server's own PostgreSQL has 5432. `socat` serves it at `localhost:5432` in the job container, where the tests look, so the tests keep their URLs.
+   - **Ownership.** A container works as root. Each job hands its workspace back to the runner's user at the end, or the next checkout could not clean it.
+2. **E2E (`e2e.yml`).** It runs on the runner's Docker, beside the server's services and the test environment.
+   - **The stack.** It is the compose project `ac-e2e` (`IMAGE_TAG=e2e`), built one image at a time. Its apps listen on `127.0.0.1:3300–3303`. Its stores and brokers are not published (`deploy/test/compose.test.yaml`). Keycloak 8081 and Mailpit 8025 keep their ports, because the specs open them.
+   - **The realm.** `deploy/test/realm.py` writes the realm with these URLs and random client secrets.
+   - **Playwright.** It runs in `mcr.microsoft.com/playwright:v1.64.1-noble` as the runner's user, on the host network, with its npm cache kept in `~/.cache/ac-e2e-npm`.
+   - **Teardown.** The stack is removed at the end. One run at a time.
+   - **When.** It takes 20 to 25 minutes on the only runner, so it runs every night on `main` at 02:00 in the lab (WIB, 19:00 UTC) and by hand on any branch, no longer on each push and pull request. The user asked whether to drop E2E, and chose this, the recommendation, over running it by hand only or deleting it. GitHub mails a failed night, and the specs still run locally (`npm run e2e`).
+3. **The deployment no longer waits for CI on the runner.** A deployment job that waited for CI would hold the only runner that CI needs. `ci_gate.py` with 0 minutes reads once, and exits 3 while CI still runs.
+   - When the tag is pushed, it deploys at once if CI passed on the commit already; otherwise the run ends with a notice.
+   - When CI completes on a push to main, `deploy-test.yml` also runs (`workflow_run`). It deploys the newest test tag on that commit unless that tag is deployed already.
+4. **Checked.**
+   - The four workflows parse, and their shell steps parse.
+   - The container images exist: `golang:1.26-bookworm`, `node:26-bookworm`, `python:3.12-bookworm`, `postgres:18` and `mcr.microsoft.com/playwright:v1.64.1-noble`.
+   - The CI gate's read-once mode answered 0, 3, 3 and 1 for a passed, a running, a not-started and a failed CI.
+
+   The workflows themselves first run once the runner is registered.

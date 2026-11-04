@@ -38,13 +38,13 @@ live site to Demo Customer B and the IoT bridge records the nodes' readings ther
 also lets the app switch the real air conditioner on and off. `customer-b` keeps its access past the demo data's end
 of access (DEC-86, DEC-89, DEC-92; what the nodes must send: backend architecture §9).
 
-Shared test environment (DEC-93): pushing a tag such as `test1.0.0r0` on a commit of `main` whose CI passed deploys
-the stack to the lab server, the real nodes' broker's machine. Its timer checks the tags every minute, builds the images
-there and starts them; the apps open at `http://<server>:3200` (customer), `:3201` (partner), `:3202` (technician) and
-`:3203` (HQ), Keycloak at `:8281` and Mailpit at `:8225`. The one-time set-up on the server is `git clone
-https://github.com/Aquarius0715/AC-Project.git ~/ac-test/repo && bash ~/ac-test/repo/deploy/test/setup.sh` (container
-design §6). With a GitHub token in the server's environment file, each deployment's progress shows under the
-repository's Deployments (environment `test`).
+Shared test environment (DEC-93, DEC-94): pushing a tag such as `test1.0.0r2` on a commit of `main` runs the workflow
+"Test deployment" on the lab server, the real nodes' broker's machine, which is the repository's self-hosted runner. Once
+the commit's CI passed it builds the images there and starts them, with the build and deploy logs on the Actions tab. CI
+runs on that runner too on every push, and E2E every night and by hand (DEC-95).
+The apps open at `http://<server>:3200` (customer), `:3201` (partner), `:3202` (technician) and `:3203` (HQ), Keycloak at
+`:8281` and Mailpit at `:8225`. The server's one-time set-up is `bash deploy/test/setup.sh` from a checkout, then the
+runner's registration (container design §6).
 
 Profiles: `infra` (PostgreSQL, Valkey, LocalStack, Mosquitto, Keycloak, Mailpit, mocks), `backend` (+ API services and
 workers), `full` (+ the four apps), `iot` (bridge, simulator, mock history), `obs`, `stripe`.
