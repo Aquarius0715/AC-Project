@@ -34,7 +34,8 @@ export async function checkDevice(deviceId: string, version: number, jobId: stri
 /** devices.calibrate at the current business time (a demo record; earlier readings stay unchanged). */
 export async function calibrateSensor(deviceId: string, version: number, sensorId: string, metric: Metric, unit: OpInput<"devices.calibrate">["unit"], referenceValue: number, measuredValue: number, jobId: string) {
   return run(async () => {
-    const calibratedAt = (await coreNow()).toISOString();
+    const now = await coreNow();
+    const calibratedAt = now.toISOString();
     await coreOp("devices.calibrate", { deviceId, sensorId, metric, unit, referenceValue, measuredValue, calibratedAt, jobId }, { write: true, expectedVersion: version });
     return null;
   });

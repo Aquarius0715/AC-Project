@@ -32,8 +32,10 @@ export async function createCustomer(input: CustomerInput) {
       org = await coreOp<ApiOrgRow>("organizations.save", { name: billingName, kind: "customer", status: "active" }, write());
     } catch (error) {
       if (!(error instanceof CoreError && error.error.messageKey === "error.duplicateName")) throw error;
-      const same = (await coreAll<ApiOrgRow>("organizations.list", { filters: { kind: "customer" } })).find((o) => o.name.trim().toLowerCase() === billingName.toLowerCase());
-      const taken = same && (await Promise.all((["active", "inactive"] as const).map((status) => coreAll<ApiCustomerRow>("customers.list", { filters: { organizationId: same.id, status } })))).flat().length > 0;
+      const customers = await coreAll<ApiOrgRow>("organizations.list", { filters: { kind: "customer" } });
+      const same = customers.find((o) => o.name.trim().toLowerCase() === billingName.toLowerCase());
+      const lists = same ? await Promise.all((["active", "inactive"] as const).map((status) => coreAll<ApiCustomerRow>("customers.list", { filters: { organizationId: same.id, status } }))) : [];
+      const taken = lists.flat().length > 0;
       if (!same || taken) throw error;
       org = same;
     }

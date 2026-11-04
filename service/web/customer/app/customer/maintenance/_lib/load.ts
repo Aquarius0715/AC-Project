@@ -65,10 +65,11 @@ export async function loadMaintenance(sp: Record<string, string | string[] | und
     quiet(coreOp<{ items: ApiClientEvent[] }>("jobs.events", { jobId: job.id, query: { limit: 100 } }).then((r) => r.items), [] as ApiClientEvent[]),
     ref ? quiet(coreOp<ApiWorkReport>("reports.get", { jobId: job.id, reportId: ref.reportId, reportVersion: ref.reportVersion }), null) : Promise.resolve(null),
   ]);
-  const photos = report ? (await Promise.all(report.attachmentRefs.filter((a) => a.status === "ready" && a.size <= 2_000_000).slice(0, 4).map(async (a) => {
+  const loaded = report ? await Promise.all(report.attachmentRefs.filter((a) => a.status === "ready" && a.size <= 2_000_000).slice(0, 4).map(async (a) => {
     const b = await quiet(coreOp<{ mime: string; bytes: string }>("attachments.getContent", { jobId: job.id, reportId: report.id, reportVersion: report.version, attachmentId: a.id }), null);
     return b ? { id: a.id, name: a.name, url: `data:${b.mime};base64,${b.bytes}` } : null;
-  }))).filter((p): p is { id: string; name: string; url: string } => !!p) : [];
+  })) : [];
+  const photos = loaded.filter((p): p is { id: string; name: string; url: string } => !!p);
   const u = unitOf(job.unitId);
   return {
     ...base,

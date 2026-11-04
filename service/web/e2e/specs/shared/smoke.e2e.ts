@@ -79,7 +79,8 @@ test("every linked page of the app renders", async ({ page, app }) => {
   // a client-side navigation names the new page too
   await page.goto(app.home);
   const link = page.locator(`aside nav a[href^="${app.home}/"]`).first(); // a menu page below the home, without a query
-  const name = (await link.locator("span.flex-1").innerText()).trim(); // the label without its badge
+  const label = await link.locator("span.flex-1").innerText();
+  const name = label.trim(); // the label without its badge
   await link.click();
   await expect(page).toHaveTitle(`${name} — AC Project`);
 });

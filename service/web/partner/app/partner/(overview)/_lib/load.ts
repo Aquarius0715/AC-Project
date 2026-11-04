@@ -39,7 +39,8 @@ export async function loadOverview(sp: { from?: string; to?: string }) {
   ]);
   // activity: the events of the jobs that moved last (open ones first), newest first
   const recent = [...jobs].toSorted((a, b) => Number(a.status === "completed") - Number(b.status === "completed") || Date.parse(b.dueAt ?? "") - Date.parse(a.dueAt ?? "")).slice(0, 8);
-  const events = (await Promise.all(recent.map((j) => optional(coreOp<Page<ApiJobEvent>>("jobs.events", { jobId: j.id, query: { limit: 100 } }).then((r) => r.items), [])))).flat();
+  const eventLists = await Promise.all(recent.map((j) => optional(coreOp<Page<ApiJobEvent>>("jobs.events", { jobId: j.id, query: { limit: 100 } }).then((r) => r.items), [])));
+  const events = eventLists.flat();
   const names = new Map(members.map((m) => [m.id, m.displayName]));
   const ms = now.getTime();
   return {

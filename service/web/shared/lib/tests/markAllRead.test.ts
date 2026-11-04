@@ -30,6 +30,7 @@ describe("Mark all as read", () => {
   });
   it("marks nothing when the Core API is unreachable", async () => {
     dal.coreOp.mockRejectedValueOnce(new TypeError("fetch failed"));
-    expect((await markAllRead(["n1"])).failure?.code).toBe("UNAVAILABLE");
+    const result = await markAllRead(["n1"]);
+    expect(result.failure?.code).toBe("UNAVAILABLE");
   });
 });

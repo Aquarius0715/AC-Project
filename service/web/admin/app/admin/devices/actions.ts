@@ -59,7 +59,8 @@ export async function checkDevice(deviceId: string, version: number) {
 
 export async function calibrateSensor(deviceId: string, version: number, sensorId: string, metric: Metric, unit: OpInput<"devices.calibrate">["unit"], referenceValue: number, measuredValue: number) {
   return run(async () => {
-    const calibratedAt = (await coreNow()).toISOString();
+    const now = await coreNow();
+    const calibratedAt = now.toISOString();
     await coreOp("devices.calibrate", { deviceId, sensorId, metric, unit, referenceValue, measuredValue, calibratedAt }, { write: true, expectedVersion: version });
     return null;
   });

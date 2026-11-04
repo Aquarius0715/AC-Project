@@ -93,7 +93,9 @@ describe("the server-side session store", () => {
     const first = await createSessionCookie(session());
     const second = await createSessionCookie(session({ membershipId: "m-2" }), first);
     expect(second).not.toBe(first);
-    expect([await loadSession(first), (await loadSession(second))?.membershipId, kv.data.size]).toEqual([null, "m-2", 1]);
+    const dropped = await loadSession(first);
+    const kept = await loadSession(second);
+    expect([dropped, kept?.membershipId, kv.data.size]).toEqual([null, "m-2", 1]);
   });
 
   it("refuses a cookie that carries the session itself, an altered cookie and a short ID", async () => {

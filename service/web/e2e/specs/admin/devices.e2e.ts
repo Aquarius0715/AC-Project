@@ -9,9 +9,15 @@ test("the device list filters by state and the detail shows the device as Figma 
   await page.goto("/admin/devices?tab=devices");
   const main = page.getByRole("main");
   const list = main.getByRole("heading", { name: "Devices", exact: true }).locator('xpath=ancestor::*[self::section or @data-slot="card"][1]');
-  const serials = async () => (await list.getByRole("button").allInnerTexts()).map((x) => x.split("\n", 1)[0].trim());
+  const serials = async () => {
+    const texts = await list.getByRole("button").allInnerTexts();
+    return texts.map((x) => x.split("\n", 1)[0].trim());
+  };
   await expect(list.getByRole("button").first()).toBeVisible();
-  const seed = async () => (await serials()).filter((x) => x.startsWith("AC-DEMO-"));
+  const seed = async () => {
+    const all = await serials();
+    return all.filter((x) => x.startsWith("AC-DEMO-"));
+  };
   const all = await serials();
   expect(all).toEqual([...all].toSorted((a, b) => a.localeCompare(b))); // sorted by serial
   await main.getByRole("button", { name: /^Offline\s*\d+$/ }).click();
@@ -80,7 +86,8 @@ test("a registered device is not bound yet, and Bind starts from its planned uni
   await dialog.getByRole("textbox", { name: /^Serial/ }).fill(`AC-E2E-${String(Date.now())}`);
   const planned = dialog.getByRole("combobox", { name: /^Planned unit/ });
   await planned.selectOption({ index: 1 });
-  const unit = (await planned.locator("option:checked").innerText()).trim();
+  const unitText = await planned.locator("option:checked").innerText();
+  const unit = unitText.trim();
   await dialog.getByRole("button", { name: "Register", exact: true }).click();
   await expect(page.getByText("Device registered — bind it to the unit once it is installed").first()).toBeVisible();
   await page.waitForURL(/deviceId=/);

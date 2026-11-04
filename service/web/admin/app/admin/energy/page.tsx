@@ -70,7 +70,7 @@ async function AdminEnergyPageContent({ searchParams }: Readonly<PageProps<"/adm
       ...(scope.customerId && { customerId: scope.customerId }), ...(scope.propertyId && { propertyId: scope.propertyId }), ...(scope.unitId && { unitId: scope.unitId }),
       ...(one("from") && { from: klInstant(one("from")!) }), ...(one("to") && { to: klInstant(one("to")!) }),
     };
-    const scoped = Object.keys(filters).length > 0 ? (await coreAll<ApiBaseline>("baselines.list", { filters }).then((items) => ({ items, total: items.length }))).items : all.items;
+    const scoped = Object.keys(filters).length > 0 ? await coreAll<ApiBaseline>("baselines.list", { filters }) : all.items;
     const rows = baselineRows(scoped, i.t);
     live.list = { rows, from: one("from") ?? "", to: one("to") ?? "", selectedId: rows.find((r) => r.id === one("baselineId"))?.id ?? rows[0]?.id ?? null };
   }

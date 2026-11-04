@@ -16,7 +16,8 @@ export async function axeViolations(page: Page, scope?: string): Promise<string[
   await page.evaluate(AXE);
   const found = await page.evaluate(async ([s, tags]) => {
     const axe = (globalThis as unknown as { axe: { run: (c: unknown, o: object) => Promise<{ violations: Violation[] }> } }).axe;
-    return (await axe.run(s ? { include: [s] } : document, { runOnly: { type: "tag", values: tags } })).violations;
+    const { violations } = await axe.run(s ? { include: [s] } : document, { runOnly: { type: "tag", values: tags } });
+    return violations;
   }, [scope ?? null, TAGS] as const);
   return found.filter((v) => v.impact === "critical" || v.impact === "serious")
     .map((v) => `${v.id} (${v.impact}) ×${String(v.nodes.length)} — ${v.help} — ${v.nodes[0]?.target.join(" ") ?? ""}`);

@@ -12,9 +12,10 @@ let created: { id: string; version: number } | null = null;
 test.afterEach(async ({ page }) => {
   if (!created) return;
   const status = await page.evaluate(async ({ id, version, key }) => {
-    return (await fetch("/bff/ops/policies.delete", {
+    const deleted = await fetch("/bff/ops/policies.delete", {
       method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": key, "X-Expected-Version": String(version) }, body: JSON.stringify({ policyId: id }),
-    })).status;
+    });
+    return deleted.status;
   }, { ...created, key: randomUUID() });
   expect(status).toBe(200);
   created = null;

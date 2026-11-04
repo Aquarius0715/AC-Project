@@ -36,7 +36,10 @@ export async function savePreferences(input: { locale: "en" | "ms"; timezone: st
 
 /** twoFactor.enable with the 6-digit code: the recovery codes are shown once. */
 export async function enableTwoFactor(code: string) {
-  return run(async () => (await coreOp<{ recoveryCodes: string[] }>("twoFactor.enable", { code }, { write: true })).recoveryCodes);
+  return run(async () => {
+    const { recoveryCodes } = await coreOp<{ recoveryCodes: string[] }>("twoFactor.enable", { code }, { write: true });
+    return recoveryCodes;
+  });
 }
 
 /** twoFactor.disable with the 6-digit code. */

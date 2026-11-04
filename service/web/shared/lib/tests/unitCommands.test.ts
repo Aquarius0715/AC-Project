@@ -23,7 +23,8 @@ describe("following a command until the device answers (D04, Unit Control and th
     await vi.advanceTimersByTimeAsync(1999);
     expect(callOp).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(2001);
-    expect((await done).status).toBe("acknowledged");
+    const acknowledged = await done;
+    expect(acknowledged.status).toBe("acknowledged");
     expect(seen).toEqual(["requested", "sent", "acknowledged"]);
     expect(callOp.mock.calls).toEqual([["commands.get", { id: "c1" }], ["commands.get", { id: "c1" }]]);
   });
@@ -31,7 +32,8 @@ describe("following a command until the device answers (D04, Unit Control and th
   it("does not poll a command that is already final", async () => {
     for (const s of ["acknowledged", "failed", "expired", "cancelled"] as const) {
       const seen: string[] = [];
-      expect((await waitForCommand(cmd(s), (c) => seen.push(c.status))).status).toBe(s);
+      const final = await waitForCommand(cmd(s), (c) => seen.push(c.status));
+      expect(final.status).toBe(s);
       expect(seen).toEqual([s]);
     }
     expect(callOp).not.toHaveBeenCalled();
@@ -41,7 +43,8 @@ describe("following a command until the device answers (D04, Unit Control and th
     callOp.mockResolvedValue(cmd("sent"));
     const done = waitForCommand(cmd("sent"), () => {});
     await vi.advanceTimersByTimeAsync(50_000);
-    expect((await done).status).toBe("sent");
+    const sent = await done;
+    expect(sent.status).toBe("sent");
     expect(callOp).toHaveBeenCalledTimes(25);
   });
 

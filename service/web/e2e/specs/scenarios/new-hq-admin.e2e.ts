@@ -10,8 +10,10 @@ import { totpBase32 } from "../../fixtures/auth";
 import { mailpitUp, setupLink } from "../../fixtures/mailpit";
 
 const app = (id: App["id"]) => APPS.find((a) => a.id === id)!;
-const open = async (browser: Browser, a: App, signedIn = true): Promise<Page> =>
-  (await browser.newContext({ baseURL: a.url, viewport: { width: 1920, height: 1080 }, ...(signedIn ? { storageState: a.state } : { storageState: { cookies: [], origins: [] } }) })).newPage();
+const open = async (browser: Browser, a: App, signedIn = true): Promise<Page> => {
+  const context = await browser.newContext({ baseURL: a.url, viewport: { width: 1920, height: 1080 }, ...(signedIn ? { storageState: a.state } : { storageState: { cookies: [], origins: [] } }) });
+  return context.newPage();
+};
 
 test("a new HQ administrator sets a password and a one-time-code device, then signs in with both", async ({ browser }) => {
   test.setTimeout(240_000);
@@ -60,7 +62,8 @@ test("a new HQ administrator sets a password and a one-time-code device, then si
         await me.locator("#password-new").press("Enter");
       } else if (page === "device") { // the key in text instead of the QR code
         await me.getByRole("link", { name: /Unable to scan/ }).click();
-        key = (await me.locator("#kc-totp-secret-key").innerText()).trim();
+        const secret = await me.locator("#kc-totp-secret-key").innerText();
+        key = secret.trim();
         expect(key).toMatch(/^[A-Z2-7 ]{16,}$/);
         await me.locator("#totp").fill(totpBase32(key));
         await me.locator("#userLabel").fill("E2E phone");

@@ -36,12 +36,14 @@ const press = async (result: Result) => {
 describe("useAction", () => {
   it("shows the success toast and runs after", async () => {
     const { after, failed } = await press({ ok: true, value: "unit-1" });
-    expect([(await screen.findByRole("status")).textContent, after.mock.calls, failed.mock.calls.length, assign.mock.calls.length]).toEqual(["Saved unit-1", [["unit-1"]], 0, 0]);
+    const status = await screen.findByRole("status");
+    expect([status.textContent, after.mock.calls, failed.mock.calls.length, assign.mock.calls.length]).toEqual(["Saved unit-1", [["unit-1"]], 0, 0]);
   });
 
   it("shows a refusal as an error toast and runs failed", async () => {
     const { after, failed } = await press({ ok: false, code: "CONFLICT", messageKey: "error.versionConflict", fieldErrors: {} });
-    expect((await screen.findByRole("alert")).textContent).not.toBe("");
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).not.toBe("");
     expect([after.mock.calls.length, failed.mock.calls.length, assign.mock.calls.length]).toEqual([0, 1, 0]);
   });
 

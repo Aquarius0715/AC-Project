@@ -41,7 +41,8 @@ export default async function AdminOverviewPage({ searchParams }: Readonly<PageP
       throw error;
     }
   }
-  const waiting = (await waitingPage)?.total ?? null;
+  const waitingTotal = await waitingPage;
+  const waiting = waitingTotal?.total ?? null;
   return (
     <AdminOverviewView live={{
       period: { kind, from: period.from, to: period.to, error: period.error ?? null, label: period.label },

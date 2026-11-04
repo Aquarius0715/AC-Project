@@ -9,8 +9,10 @@ import { APPS, type App } from "../../fixtures/apps";
 import { mailpitUp, setupLink } from "../../fixtures/mailpit";
 
 const app = (id: App["id"]) => APPS.find((a) => a.id === id)!;
-const open = async (browser: Browser, a: App, signedIn = true): Promise<Page> =>
-  (await browser.newContext({ baseURL: a.url, viewport: { width: 1920, height: 1080 }, ...(signedIn ? { storageState: a.state } : { storageState: { cookies: [], origins: [] } }) })).newPage();
+const open = async (browser: Browser, a: App, signedIn = true): Promise<Page> => {
+  const context = await browser.newContext({ baseURL: a.url, viewport: { width: 1920, height: 1080 }, ...(signedIn ? { storageState: a.state } : { storageState: { cookies: [], origins: [] } }) });
+  return context.newPage();
+};
 
 test("HQ adds a contractor company and its first contractor, who signs in to the partner app", async ({ browser }) => {
   test.setTimeout(240_000);

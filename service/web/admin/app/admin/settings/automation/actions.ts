@@ -27,7 +27,8 @@ type Evaluation = OpInput<"automations.simulate">;
 /** The current minute of the Core API clock: an evaluation is for the current tick (IR21), so the time the page loaded
 would be refused once a minute had passed (IR491). */
 async function tick(): Promise<string> {
-  return new Date(Math.floor((await coreNow()).getTime() / 60_000) * 60_000).toISOString();
+  const now = await coreNow();
+  return new Date(Math.floor(now.getTime() / 60_000) * 60_000).toISOString();
 }
 const atTick = (input: Evaluation, at: string): Evaluation => ({ ...input, occurredAt: at, facts: input.facts.map((f) => ({ ...f, observedAt: at })) });
 

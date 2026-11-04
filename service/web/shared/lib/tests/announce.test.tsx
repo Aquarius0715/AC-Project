@@ -26,7 +26,9 @@ describe("announcements", () => {
     render(<ToastProvider><Pusher /></ToastProvider>);
     act(() => { screen.getByRole("button", { name: "ok" }).click(); screen.getByRole("button", { name: "crit" }).click(); });
     // Sonner adds a toast on the next timer tick
-    expect((await screen.findByRole("alert")).textContent).toBe("Not saved: CONFLICT");
-    expect((await screen.findByRole("status")).textContent).toBe("Saved");
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe("Not saved: CONFLICT");
+    const status = await screen.findByRole("status");
+    expect(status.textContent).toBe("Saved");
   });
 });

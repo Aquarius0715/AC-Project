@@ -38,13 +38,15 @@ describe("loadShell", () => {
 
   it("shows the contractor's offers waiting for an answer", async () => {
     coreOp.mockImplementation(async (op: string) => (op === "notifications.list" ? { total: 0 } : { counts: { offerCount: 4 } }));
-    expect((await loadShell("contractor"))?.badges).toEqual({ "/notifications": 0, "/partner/jobs": 4 });
+    const shell = await loadShell("contractor");
+    expect(shell?.badges).toEqual({ "/notifications": 0, "/partner/jobs": 4 });
   });
 
   it("sums HQ's critical and warning alerts over open and acknowledged", async () => {
     coreOp.mockImplementation(async (op: string, input: { filters: { severity?: string; status?: string } }) =>
       op === "notifications.list" ? { total: 1 } : { total: input.filters.severity === "critical" ? (input.filters.status === "open" ? 2 : 1) : 5 });
-    expect((await loadShell("admin"))?.badges).toEqual({ "/notifications": 1, "/admin/alerts": 2 + 1 + 5 + 5 });
+    const shell = await loadShell("admin");
+    expect(shell?.badges).toEqual({ "/notifications": 1, "/admin/alerts": 2 + 1 + 5 + 5 });
     expect(coreOp.mock.calls.filter(([op]) => op === "alerts.list")).toHaveLength(4);
   });
 
@@ -53,6 +55,7 @@ describe("loadShell", () => {
       if (op === "summaries.get") throw new Error("unavailable");
       return { total: 6 };
     });
-    expect((await loadShell("client"))?.badges).toEqual({ "/notifications": 6 });
+    const shell = await loadShell("client");
+    expect(shell?.badges).toEqual({ "/notifications": 6 });
   });
 });

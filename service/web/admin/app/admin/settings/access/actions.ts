@@ -24,7 +24,8 @@ export async function saveMember(input: OpInput<"members.save">, version?: numbe
 /** Revoke access: members.save with the access ending now — the Core API's clock when HQ confirms, not the time the
 page loaded, so the record says when the access really ended (IR492). */
 export async function revokeMember(input: OpInput<"members.save">, version: number): Promise<ActionResult<{ id: string; version: number }>> {
-  return saveMember({ ...input, validUntil: (await coreNow()).toISOString() }, version);
+  const now = await coreNow();
+  return saveMember({ ...input, validUntil: now.toISOString() }, version);
 }
 
 /** members.revokeSessions: ends every session of the membership's user in this tenant at once (Figma Admin 03-8). */

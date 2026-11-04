@@ -26,6 +26,8 @@ describe("a certificate document as a response", () => {
   it("passes the API's refusals on", async () => {
     dal.coreOp.mockRejectedValueOnce(new dal.CoreError({ code: "NOT_FOUND", messageKey: "error.notFound" }));
     dal.coreOp.mockRejectedValueOnce(new dal.CoreError({ code: "FORBIDDEN", messageKey: "error.forbidden" }));
-    expect([(await documentResponse("x")).status, (await documentResponse("x")).status]).toEqual([404, 403]);
+    const missing = await documentResponse("x");
+    const denied = await documentResponse("x");
+    expect([missing.status, denied.status]).toEqual([404, 403]);
   });
 });

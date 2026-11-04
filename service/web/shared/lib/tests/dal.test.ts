@@ -58,7 +58,8 @@ describe("calling the Core API as the signed-in membership (IR222)", () => {
     const e = await refusal(coreOp("units.get", { id: "u1" }));
     expect([e instanceof CoreError, e.status, e.error, e.message]).toEqual([true, 422, refused, "VALIDATION: error.invalid"]);
     reply([502, "<html>bad gateway</html>"]);
-    expect((await refusal(coreOp("units.get", { id: "u1" }))).error).toMatchObject({ code: "UNAVAILABLE", messageKey: "error.unavailable" });
+    const unavailable = await refusal(coreOp("units.get", { id: "u1" }));
+    expect(unavailable.error).toMatchObject({ code: "UNAVAILABLE", messageKey: "error.unavailable" });
   });
 
   it("refuses an operation outside the catalog without calling anything", async () => {
@@ -100,7 +101,8 @@ describe("the session's principal, clock and display settings", () => {
     reply([200, { data: { userId: "u-1", membershipId: "m-1", organizationId: "o-1", tenantId: "t-1", clientRole: "owner", permissions: ["units.read"] }, meta: { snapshotAt: "2026-09-14T01:00:00Z" } }]);
     expect(await corePrincipal()).toEqual({ userId: "u-1", membershipId: "m-1", organizationId: "o-1", tenantId: "t-1", clientRole: "owner", customerId: null });
     expect([...(await corePermissions())]).toEqual(["units.read"]);
-    expect((await coreNow()).toISOString()).toBe("2026-09-14T01:00:00.000Z");
+    const now = await coreNow();
+    expect(now.toISOString()).toBe("2026-09-14T01:00:00.000Z");
   });
 
   it("uses the saved language and time zone, and the defaults when they are unknown or unreadable", async () => {

@@ -58,7 +58,8 @@ export async function loadDevices(opts: { selected?: string; unitId?: string; jo
 
   ]);
   const alertIds = [...new Set((evs?.items ?? []).flatMap((e) => e.alertIds))];
-  const alerts = new Map((await Promise.all(alertIds.map((a) => quiet(coreOp<ApiAlertLite>("alerts.get", { id: a }))))).filter((a): a is ApiAlertLite => !!a).map((a) => [a.id, a]));
+  const fetched = await Promise.all(alertIds.map((a) => quiet(coreOp<ApiAlertLite>("alerts.get", { id: a }))));
+  const alerts = new Map(fetched.filter((a): a is ApiAlertLite => !!a).map((a) => [a.id, a]));
   live.device = {
     detail: d,
     row: rows.find((r) => r.id === id)!,

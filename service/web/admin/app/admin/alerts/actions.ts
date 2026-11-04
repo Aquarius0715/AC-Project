@@ -34,7 +34,8 @@ result names the saved policy so the editor can select a new one (IR345). */
 export async function savePolicy(policy: AdminPolicy): Promise<ActionResult & { id?: string }> {
   let id: string | undefined;
   const r = await run(async () => {
-    id = (await coreOp<{ id: string }>("policies.save", alertPolicyInput(policy), { write: true, ...(policy.id && { expectedVersion: policy.version }) })).id;
+    const saved = await coreOp<{ id: string }>("policies.save", alertPolicyInput(policy), { write: true, ...(policy.id && { expectedVersion: policy.version }) });
+    id = saved.id;
   });
   return r.ok ? { ...r, id } : r;
 }
@@ -60,7 +61,8 @@ metric on one of its units, at the Core API's clock. A read: nothing is stored a
 result is this policy's decision for the unit, or null when it did not run there. */
 export async function testPolicy(policyId: string, unitId: string, metric: string, value: number): Promise<Exclude<ActionResult, { ok: true }> | { ok: true; decision: NotificationDecision | null }> {
   try {
-    const at = (await coreNow()).toISOString();
+    const now = await coreNow();
+    const at = now.toISOString();
     const input: OpInput<"automations.simulate"> = {
       eventId: crypto.randomUUID(), occurredAt: at, phase: "condition", unitIds: [unitId],
       facts: [{ unitId, value, metric: metric as OpInput<"automations.simulate">["facts"][number]["metric"], unit: metricUnit[metric] ?? "", observedAt: at, quality: "valid" }],

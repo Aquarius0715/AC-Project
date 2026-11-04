@@ -60,7 +60,8 @@ test("Request cleaning opens New request for that AC, prefilled", async ({ page 
   const request = page.locator("main tr").getByRole("button", { name: "Request cleaning" });
   test.skip((await request.count()) === 0, "no AC is overdue for cleaning (the seed's Meeting room AC is, until someone marks it cleaned)");
   const row = page.locator("main tr", { has: page.getByRole("button", { name: "Request cleaning" }) }).first(); // the inner locator is relative to the row
-  const unit = ((await row.locator("td").first().innerText()).split("\n", 1)[0] ?? "").trim();
+  const cell = await row.locator("td").first().innerText();
+  const unit = (cell.split("\n", 1)[0] ?? "").trim();
   await request.first().click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();

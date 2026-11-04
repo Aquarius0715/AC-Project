@@ -38,7 +38,8 @@ export async function loadHistory(sp: { jobId?: string; tab?: string; sort?: str
   const listed = await collect(period === "90d");
   // an empty period says how many jobs lie outside it (IR589): a job counts by its requested visit, a history by its
   // completion or, without one, by when its delegation ended (IR29, IR614)
-  const outside = period === "90d" && listed.rows.length === 0 ? (await collect(false)).rows.length : 0;
+  const wider = period === "90d" && listed.rows.length === 0 ? await collect(false) : null;
+  const outside = wider?.rows.length ?? 0;
   const counts = tabCounts(listed.rows);
   const base = {
     now: now.toISOString(),
@@ -56,7 +57,10 @@ export async function loadHistory(sp: { jobId?: string; tab?: string; sort?: str
   };
   if (!sp.jobId) return { ...base, detail: null };
   let hit = listed.rows.find((r) => r.id === sp.jobId);
-  if (!hit && period === "90d") hit = (await collect(false)).rows.find((r) => r.id === sp.jobId); // older than the period
+  if (!hit && period === "90d") {
+    const all = await collect(false);
+    hit = all.rows.find((r) => r.id === sp.jobId); // older than the period
+  }
   if (!hit) return { ...base, detail: { missing: true as const, id: sp.jobId } };
   const [principal, events] = await Promise.all([ // the job's newest 100 events, newest first
     corePrincipal(),

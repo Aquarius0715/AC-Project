@@ -54,8 +54,9 @@ export async function loadPayouts(opts: { statementId?: string; period?: string;
       return [jobId, { title: `${typeLabel(j.type, t)}${unit ? ` · ${unit.split(" · ", 1)[0]}` : ""}`, sub: unit ? unit.split(" · ").slice(1).join(" · ") || null : (j.projection === "history" ? t("customer details closed with the delegation") : null) }];
     })),
     Promise.all((reviewing?.items ?? []).filter((j) => j.projection === "detail" || j.projection === "summary").slice(0, 10).map(async (j): Promise<ReviewingJob> => {
+      const name = await unitName(j.unitId, units);
       return {
-        id: j.id ?? j.jobId ?? "", type: j.type, unitName: (await unitName(j.unitId, units))?.split(" · ", 1)[0] ?? null,
+        id: j.id ?? j.jobId ?? "", type: j.type, unitName: name?.split(" · ", 1)[0] ?? null,
       };
     })),
   ]);

@@ -210,7 +210,8 @@ export async function loadSession(cookie: string | undefined): Promise<Session |
   const id = idOf(cookie);
   if (!id) return null;
   try {
-    const rec = unseal<Stored>((await timed((await timed(c)).getEx(keyOf(id), { type: "EX", value: SESSION_MAX_AGE }))) ?? undefined);
+    const client = await timed(c);
+    const rec = unseal<Stored>((await timed(client.getEx(keyOf(id), { type: "EX", value: SESSION_MAX_AGE }))) ?? undefined);
     if (!rec) return null;
     if (Date.now() / 1000 - rec.startedAt >= ABSOLUTE_SECONDS) {
       await dropSession(cookie);
@@ -229,7 +230,8 @@ export async function createSessionCookie(s: Session, previous?: string): Promis
   if (!c) return seal(s);
   const id = randomBytes(32).toString("base64url");
   const rec: Stored = { session: s, startedAt: Math.floor(Date.now() / 1000) };
-  await timed((await timed(c)).set(keyOf(id), seal(rec), { expiration: { type: "EX", value: SESSION_MAX_AGE } }));
+  const client = await timed(c);
+  await timed(client.set(keyOf(id), seal(rec), { expiration: { type: "EX", value: SESSION_MAX_AGE } }));
   await dropSession(previous);
   return seal({ sid: id });
 }
@@ -259,7 +261,8 @@ export async function dropSession(cookie: string | undefined): Promise<void> {
   const id = c ? idOf(cookie) : null;
   if (!c || !id) return;
   try {
-    await timed((await timed(c)).del(keyOf(id)));
+    const client = await timed(c);
+    await timed(client.del(keyOf(id)));
   } catch (error) {
     console.warn(`session store: ${(error as Error).message}`);
   }

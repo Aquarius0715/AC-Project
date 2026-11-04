@@ -37,10 +37,11 @@ export async function loadReview(jobId: string): Promise<ReviewLive> {
     coreOp<ApiWorkReport>("reports.get", { jobId: id, reportId: ref.reportId, reportVersion: ref.reportVersion }),
     Promise.all((job.alertIds ?? []).map((a) => quiet(coreOp<ApiAlertLite>("alerts.get", { id: a })))),
   ]);
-  const photos = (await Promise.all(r.attachmentRefs.filter((a) => a.status === "ready" && a.size <= 2_000_000).slice(0, 6).map(async (a) => {
+  const loaded = await Promise.all(r.attachmentRefs.filter((a) => a.status === "ready" && a.size <= 2_000_000).slice(0, 6).map(async (a) => {
     const b = await quiet(coreOp<{ mime: string; bytes: string }>("attachments.getContent", { jobId: id, reportId: r.id, reportVersion: r.version, attachmentId: a.id }));
     return b ? { id: a.id, name: a.name, url: `data:${b.mime};base64,${b.bytes}` } : null;
-  }))).filter((p): p is { id: string; name: string; url: string } => !!p);
+  }));
+  const photos = loaded.filter((p): p is { id: string; name: string; url: string } => !!p);
   const author = names.get(r.authorId) ?? t("technician {id}", { id: r.authorId.slice(0, 8) });
   const check = evidenceCheck(r, names, t);
   const last = [...r.reviewHistory].toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))[0] ?? null;

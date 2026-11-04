@@ -4,6 +4,7 @@
 // row has no actions.
 import { test, expect, FAILED_PAGE } from "../../fixtures/test";
 import { expectAccessible } from "../../fixtures/a11y";
+import { answers, messageCount } from "../../fixtures/mailpit";
 
 test("a contractor adds a technician, waits to resend the set-up e-mail, moves the access end and removes them, and cannot disable its booked technician", async ({ page, app }) => {
   test.skip(app.id !== "partner", "partner only");
@@ -29,8 +30,8 @@ test("a contractor adds a technician, waits to resend the set-up e-mail, moves t
   await expect(page.getByText("The set-up e-mail was sent a moment ago — send it again in 5 min").first()).toBeVisible();
   // the sign-in service sends the set-up e-mail to the local Mailpit inbox (IR461); skipped on a stack without Mailpit
   const search = `http://localhost:8025/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`;
-  if ((await fetch(search).catch(() => null))?.ok) {
-    await expect.poll(async () => ((await (await fetch(search)).json()) as { messages_count: number }).messages_count, { timeout: 30_000 }).toBeGreaterThanOrEqual(1);
+  if (await answers(search)) {
+    await expect.poll(() => messageCount(search), { timeout: 30_000 }).toBeGreaterThanOrEqual(1);
   }
 
   // the access end moves, with a reason
@@ -60,8 +61,8 @@ test("a contractor adds a technician, waits to resend the set-up e-mail, moves t
   await expect(page.getByText(`E2E Contractor added — a set-up e-mail is on its way to ${email}`).first()).toBeVisible();
   await expect(row(email)).toContainText("Contractor");
   await expect(row(email)).toContainText("Not signed in yet");
-  if ((await fetch(search).catch(() => null))?.ok) {
-    await expect.poll(async () => ((await (await fetch(search)).json()) as { messages_count: number }).messages_count, { timeout: 30_000 }).toBeGreaterThanOrEqual(2);
+  if (await answers(search)) {
+    await expect.poll(() => messageCount(search), { timeout: 30_000 }).toBeGreaterThanOrEqual(2);
   }
   await row(email).getByRole("button", { name: "Remove" }).click();
   await dialog.getByLabel("Reason").fill("Not joining after all");

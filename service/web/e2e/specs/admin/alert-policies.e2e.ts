@@ -18,9 +18,10 @@ test.afterEach(async ({ page }) => {
     const got = await fetch("/bff/ops/policies.get", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ policyId: id }) });
     if (got.status === 404) return 200; // the test deleted it
     const { data } = await got.json();
-    return (await fetch("/bff/ops/policies.delete", {
+    const deleted = await fetch("/bff/ops/policies.delete", {
       method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": key, "X-Expected-Version": String(data.version) }, body: JSON.stringify({ policyId: id }),
-    })).status;
+    });
+    return deleted.status;
   }, { id: created, key: randomUUID() });
   expect(status).toBe(200);
   created = null;
@@ -165,17 +166,23 @@ let before: DefaultPolicy | null = null;
 
 test.afterEach(async ({ page }) => {
   if (!before) return;
-  const now = (await relay(page, "policies.list", { limit: 1, filters: { kind: "default_alert" } })).body.data.items[0] as DefaultPolicy;
-  if (JSON.stringify(now.rules) !== JSON.stringify(before.rules)) expect((await relay(page, "policies.save", { id: now.id, kind: "default_alert", rules: before.rules }, now.version)).status).toBe(200);
+  const listed = await relay(page, "policies.list", { limit: 1, filters: { kind: "default_alert" } });
+  const now = listed.body.data.items[0] as DefaultPolicy;
+  if (JSON.stringify(now.rules) !== JSON.stringify(before.rules)) {
+    const saved = await relay(page, "policies.save", { id: now.id, kind: "default_alert", rules: before.rules }, now.version);
+    expect(saved.status).toBe(200);
+  }
   for (const s of now.ruleSettings.filter((x) => !x.enabled && before!.ruleSettings.every((b) => !(b.ruleKey === x.ruleKey && b.customerId === x.customerId) || b.enabled))) {
-    expect((await relay(page, "policies.setDefaultRule", { policyId: now.id, ruleKey: s.ruleKey, customerId: s.customerId, enabled: true }, s.version)).status).toBe(200);
+    const switched = await relay(page, "policies.setDefaultRule", { policyId: now.id, ruleKey: s.ruleKey, customerId: s.customerId, enabled: true }, s.version);
+    expect(switched.status).toBe(200);
   }
   before = null;
 });
 
 test("the default policy's rules, a customer's switch and a rule copied as a customer policy", async ({ page }) => {
   await page.goto("/admin/alerts?tab=policies");
-  before = (await relay(page, "policies.list", { limit: 1, filters: { kind: "default_alert" } })).body.data.items[0] as DefaultPolicy;
+  const listed = await relay(page, "policies.list", { limit: 1, filters: { kind: "default_alert" } });
+  before = listed.body.data.items[0] as DefaultPolicy;
   const main = page.getByRole("main");
   const list = main.locator('section, [data-slot="card"]').filter({ has: page.getByRole("heading", { name: "Alert policies", exact: true }) });
   await list.getByRole("button", { name: /Default policy/ }).click();

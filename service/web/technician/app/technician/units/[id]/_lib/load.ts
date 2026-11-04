@@ -86,11 +86,12 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
     Promise.all(others.map((m) => optional(series(id, m, from, to, period, 1), NONE))),
     tab === "monitoring" ? optional(coreOp<Page<{ id: string }>>("devices.list", { limit: 5, filters: { unitId: id } }).then((r) => r.items), []) : Promise.resolve([]),
   ]);
-  const events = (await Promise.all(devices.map((x) => {
+  const eventLists = await Promise.all(devices.map((x) => {
     return optional(coreOp<Page<ApiDeviceEventFull>>("devices.events", {
       id: x.id, query: { limit: 50, filters: { from: new Date(from).toISOString(), to: new Date(to + 1000).toISOString() } },
     }).then((r) => r.items), [] as ApiDeviceEventFull[]);
-  }))).flat();
+  }));
+  const events = eventLists.flat();
   const control = controlJob(jobs, sp.jobId);
   const job = control ?? sp.jobId ?? null; // the job the alert evidence opens with
   const back = sp.jobId ? `/technician/jobs/${sp.jobId}` : "/technician";

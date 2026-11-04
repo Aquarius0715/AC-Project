@@ -14,7 +14,8 @@ import type { ListArgs, OpArgs } from "@ac/web/lib/opTypes";
 before pages render (Server Components cannot write cookies), so an expired token here means the refresh failed.
 Memoized per render pass. */
 export const getSession = cache(async (): Promise<Session | null> => {
-  const s = await loadSession((await cookies()).get(SESSION_COOKIE)?.value);
+  const jar = await cookies();
+  const s = await loadSession(jar.get(SESSION_COOKIE)?.value);
   return s && !needsRefresh(s) ? s : null;
 });
 
@@ -36,7 +37,8 @@ export interface CoreOptions { write?: boolean; expectedVersion?: number; idempo
 /** Calls one Core API operation as the signed-in membership at its REST route (IR222) and returns `data`
 (DomainError → CoreError). The input is typed by the contract (IR313). */
 export async function coreOp<T>(...[operation, input, opts = {}]: OpArgs<CoreOptions>): Promise<T> {
-  return (await coreCall<T>(operation, input, opts)).data;
+  const { data } = await coreCall<T>(operation, input, opts);
+  return data;
 }
 
 /** Every item of a list operation: follows nextCursor with the same filters and sort (SR14), up to `max` items. */
@@ -44,7 +46,8 @@ export async function coreAll<T>(...[operation, query = {}, max = 1000]: ListArg
   const out: T[] = [];
   let cursor: string | null = null;
   do {
-    const page: { items: T[]; nextCursor: string | null } = (await coreCall<{ items: T[]; nextCursor: string | null }>(operation, { ...query, limit: 100, ...(cursor && { cursor }) }, {})).data;
+    const response: { data: { items: T[]; nextCursor: string | null } } = await coreCall<{ items: T[]; nextCursor: string | null }>(operation, { ...query, limit: 100, ...(cursor && { cursor }) }, {});
+    const page = response.data;
     out.push(...page.items);
     cursor = page.nextCursor;
   } while (cursor && out.length < max);
@@ -92,7 +95,10 @@ export const coreDisplay = cache(async (): Promise<Display> => {
 });
 
 /** The signed-in membership's permissions (session.get), for permission-scoped sections; the API still authorizes. */
-export const corePermissions = cache(async (): Promise<Set<string>> => new Set((await coreSession()).data.permissions));
+export const corePermissions = cache(async (): Promise<Set<string>> => {
+  const { data } = await coreSession();
+  return new Set(data.permissions);
+});
 
 async function coreCall<T>(operation: string, input: unknown, opts: CoreOptions): Promise<{ data: T; meta?: { snapshotAt?: string } }> {
   const s = await verifySession();
@@ -110,7 +116,10 @@ async function coreCall<T>(operation: string, input: unknown, opts: CoreOptions)
   const body = await res.json().catch(() => null);
   // the Core API no longer takes this sign-in (HQ signed the user out everywhere, IR384, or the membership ended): the
   // stored session goes too, so the next page asks to sign in; the caller still gets the refusal (IR385)
-  if (res.status === 401) await dropSession((await cookies()).get(SESSION_COOKIE)?.value);
+  if (res.status === 401) {
+    const jar = await cookies();
+    await dropSession(jar.get(SESSION_COOKIE)?.value);
+  }
   if (!res.ok) throw new CoreError(res.status, body ?? { code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {}, correlationId: "", retryAfterSeconds: null });
   return body as { data: T; meta?: { snapshotAt?: string } };
 }

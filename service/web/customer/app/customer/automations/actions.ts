@@ -35,7 +35,8 @@ export async function updateConsent(granted: boolean, version: number) {
 rules decide, nothing is stored or sent. */
 export async function testEvent(unitId: string, facts: Omit<OpInput<"automations.simulate">["facts"][number], "unitId" | "observedAt">[]) {
   return run(async () => {
-    const at = new Date(Math.floor((await coreNow()).getTime() / 60_000) * 60_000).toISOString();
+    const now = await coreNow();
+    const at = new Date(Math.floor(now.getTime() / 60_000) * 60_000).toISOString();
     const r = await coreOp<{ results: ApiDecision[] }>("automations.simulate", {
       eventId: crypto.randomUUID(), occurredAt: at, unitIds: [unitId], phase: "condition", facts: facts.map((f) => ({ ...f, unitId, observedAt: at })),
     });

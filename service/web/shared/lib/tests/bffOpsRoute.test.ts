@@ -31,7 +31,8 @@ describe("POST /bff/ops/<operation>", () => {
     vi.stubGlobal("fetch", fetch);
     const evil = { origin: "https://evil.example", host: "localhost:3000", "sec-fetch-site": "cross-site" };
     for (const res of [await relay("units.get", { id: "x" }, evil), await relay("jobs.cancel", { jobId: "00000000-0000-4000-8000-000000000001", cancelReason: "x" }, evil)]) {
-      expect([res.status, (await res.json()).messageKey]).toEqual([403, "errors.cross_site_request"]);
+      const body: unknown = await res.json();
+      expect([res.status, body]).toMatchObject([403, { messageKey: "errors.cross_site_request" }]);
     }
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -52,10 +53,12 @@ describe("the relay's input limit", () => {
     const fetch = vi.fn(async () => new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetch);
     expect(note(1 << 20).length).toBe(1 << 20);
-    expect((await post(note(1 << 20))).status).toBe(200);
+    const accepted = await post(note(1 << 20));
+    expect(accepted.status).toBe(200);
     expect(fetch).toHaveBeenCalledTimes(1);
     const res = await post(note((1 << 20) + 1));
-    expect([res.status, (await res.json()).messageKey]).toEqual([422, "error.bodyTooLarge"]);
+    const body: unknown = await res.json();
+    expect([res.status, body]).toMatchObject([422, { messageKey: "error.bodyTooLarge" }]);
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
@@ -66,7 +69,8 @@ describe("the relay's input limit", () => {
     const chunk = new Uint8Array(64 * 1024).fill(0x20);
     const endless = new ReadableStream<Uint8Array>({ pull(c) { pulled++; c.enqueue(chunk); } }); // a client that never stops sending
     const res = await post(endless);
-    expect([res.status, (await res.json()).messageKey]).toEqual([422, "error.bodyTooLarge"]);
+    const body: unknown = await res.json();
+    expect([res.status, body]).toMatchObject([422, { messageKey: "error.bodyTooLarge" }]);
     expect(pulled).toBeLessThan(20); // 1 MiB is 16 chunks: reading stopped there
   });
 });

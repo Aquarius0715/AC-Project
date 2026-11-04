@@ -61,7 +61,8 @@ test("a copy of the session cookie stops working at sign-out", async ({ browser,
   try {
     const page = await context.newPage();
     await signIn(page, app);
-    const copy = (await context.cookies()).filter((c) => c.name.includes("ac_session_"));
+    const cookies = await context.cookies();
+    const copy = cookies.filter((c) => c.name.includes("ac_session_"));
     expect(copy).toHaveLength(1);
     await other.addCookies(copy);
     const elsewhere = await other.newPage();

@@ -40,7 +40,8 @@ export async function checkIn(jobId: string, version: number, method: "location_
   let qrUnitId: string | null = null;
   if (method === "location_qr" && qrCode) {
     try {
-      qrUnitId = (await coreOp<{ unitId: string }>("units.resolveQr", { code: qrCode })).unitId;
+      const resolved = await coreOp<{ unitId: string }>("units.resolveQr", { code: qrCode });
+      qrUnitId = resolved.unitId;
     } catch (error) {
       return error instanceof CoreError && error.error.code === "NOT_FOUND" ? { ok: false, code: "VALIDATION", messageKey: "error.validation", fieldErrors: { qrUnitId: "errors.qr_unit_mismatch" } } : failed(error);
     }

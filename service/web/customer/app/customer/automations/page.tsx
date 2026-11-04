@@ -34,8 +34,10 @@ export default async function CustomerAutomationsPage({ searchParams }: Readonly
     return { id: u.id, name: u.displayName, path: [property, spacePath(u.spaceId, spaces)].filter(Boolean).join(" › "), property };
   }).toSorted((a, b) => a.path.localeCompare(b.path) || a.name.localeCompare(b.name));
   const ac = new Map(acs.map((u) => [u.id, u]));
-  const nextRuns = new Map(await Promise.all(rules.filter((r) => r.kind === "schedule" && r.enabled).map(async (r) =>
-    [r.id, (await coreOp<ApiOccurrence[]>("automations.nextRuns", { automationId: r.id, count: 8 })).find((o) => o.phase === "schedule_start")?.at ?? null] as const)));
+  const nextRuns = new Map(await Promise.all(rules.filter((r) => r.kind === "schedule" && r.enabled).map(async (r) => {
+    const runs = await coreOp<ApiOccurrence[]>("automations.nextRuns", { automationId: r.id, count: 8 });
+    return [r.id, runs.find((o) => o.phase === "schedule_start")?.at ?? null] as const;
+  })));
   const isGranted = consent?.granted ?? false;
   const location = rules.filter((r) => triggerOf(r) === "location");
   // the editor's ACs with their capabilities (action options), read only while editing

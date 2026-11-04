@@ -206,13 +206,14 @@ async function warrantyLive(coverage: ApiCoverage[], x: { has: (...p: string[]) 
   let claims: ClaimCandidate[] | null = null;
   if (x.has("job.read")) {
     const ids = [...new Set(coverage.flatMap((c) => c.claimableJobIds))];
-    claims = (await Promise.all(ids.map(async (jobId) => {
+    const candidates = await Promise.all(ids.map(async (jobId) => {
       const j = await coreOp<JobForClaim>("jobs.get", { jobId }).catch(() => null);
       if (!j) return null;
       const ref = j.reportRefs.at(-1);
       const r = ref ? await coreOp<Report>("reports.get", { jobId, reportId: ref.reportId, reportVersion: ref.reportVersion }).catch(() => null) : null;
       return claimCandidate(j, r?.parts ?? [], unit.get(j.unitId)?.displayName ?? j.unitId.slice(0, 8), x.i);
-    }))).filter((c): c is ClaimCandidate => !!c);
+    }));
+    claims = candidates.filter((c): c is ClaimCandidate => !!c);
   }
   return { rows, claims, kpis: coverageKpis(rows, t), customers: x.rows, canClaim: x.has("job.write") };
 }

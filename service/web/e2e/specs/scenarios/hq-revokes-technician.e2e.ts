@@ -6,8 +6,10 @@ import { test, expect } from "../../fixtures/test";
 import { APPS, type App } from "../../fixtures/apps";
 
 const app = (id: App["id"]) => APPS.find((a) => a.id === id)!;
-const open = async (browser: Browser, a: App): Promise<Page> =>
-  (await browser.newContext({ baseURL: a.url, viewport: { width: 1920, height: 1080 }, storageState: a.state })).newPage();
+const open = async (browser: Browser, a: App): Promise<Page> => {
+  const context = await browser.newContext({ baseURL: a.url, viewport: { width: 1920, height: 1080 }, storageState: a.state });
+  return context.newPage();
+};
 
 test("HQ revokes a contractor's technician, who then stays out: the contractor cannot bring them back", async ({ browser }) => {
   test.setTimeout(180_000);

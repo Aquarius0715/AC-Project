@@ -120,10 +120,11 @@ export async function loadJobs(sp: SP) {
   ]);
   const byUser = new Map(members.map((m) => [m.userId, m.displayName]));
   const sp2 = job.slotProposal, pp = job.partnerSlotProposal;
-  const photos = report ? (await Promise.all(report.attachmentRefs.filter((a) => a.status === "ready" && a.size <= 2_000_000).slice(0, 4).map(async (a) => {
+  const loaded = report ? await Promise.all(report.attachmentRefs.filter((a) => a.status === "ready" && a.size <= 2_000_000).slice(0, 4).map(async (a) => {
     const b = await optional(coreOp<{ mime: string; bytes: string }>("attachments.getContent", { jobId: job.id, reportId: report.id, reportVersion: report.version, attachmentId: a.id }), null);
     return b ? { id: a.id, name: a.name, url: `data:${b.mime};base64,${b.bytes}` } : null;
-  }))).filter((p): p is { id: string; name: string; url: string } => !!p) : [];
+  })) : [];
+  const photos = loaded.filter((p): p is { id: string; name: string; url: string } => !!p);
   const costs = job.costs ?? [];
   return {
     ...base,

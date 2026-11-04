@@ -29,6 +29,8 @@ describe("a stored report photo as a response", () => {
   it("passes the API's refusals on", async () => {
     dal.coreOp.mockRejectedValueOnce(new dal.CoreError({ code: "NOT_FOUND", messageKey: "error.notFound" }));
     dal.coreOp.mockRejectedValueOnce(new dal.CoreError({ code: "FORBIDDEN", messageKey: "errors.assignment_ended" }));
-    expect([(await open()).status, (await open()).status]).toEqual([404, 403]);
+    const missing = await open();
+    const denied = await open();
+    expect([missing.status, denied.status]).toEqual([404, 403]);
   });
 });
