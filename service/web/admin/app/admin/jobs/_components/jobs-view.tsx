@@ -8,7 +8,7 @@ import { JobStatusBadge, OriginBadge } from "@ac/web/components/JobBits";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
-import { showTime, zonedInstant } from "@ac/web/lib/i18n";
+import { showTime, zonedInstant, type T } from "@ac/web/lib/i18n";
 import { contractorNames, costLineOf, extendDefault, fromZonedInput, hqRefusal, longSlot, money, jobRequestErrors, offerDefaults, returnReason, slotText, tomorrowIn, zonedInput, type CostLine, type PreferredRow } from "@ac/web/lib/adminJobs";
 import { typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { JobStatus } from "@ac/web/lib/jobs";
@@ -22,6 +22,17 @@ import { Checkbox } from "@ac/web/components/ui/checkbox";
 type Detail = NonNullable<JobsLive["detail"]>;
 const TYPES = [{ id: "", label: "All" }, { id: "reactive", label: "Repair" }, { id: "periodic", label: "Periodic" }, { id: "preventive", label: "Preventive" }];
 const RANK = ["1st", "2nd", "3rd"];
+// a step's dot and label by its state; a step to do keeps the plain dot and a done step the plain label
+const STEP_DOT = new Map<string, string>([["done", "bg-primary text-white"], ["current", "border-2 border-primary text-primary"]]);
+const STEP_LABEL = new Map<string, string>([["todo", "text-muted-foreground"], ["current", "font-semibold text-primary"]]);
+/** The booking card's title: the plan occurrence, or the client's preferred times with their round after the first. */
+function preferredTitle(isPlan: boolean, round: number, t: T): string {
+  if (isPlan) return t("Plan occurrence — book this time");
+  if (round > 1) return t("Client’s preferred times (round {round}) — book one of these", { round });
+  return t("Client’s preferred times — book one of these");
+}
+/** A banner or card tone: ok and warn as they are, any other tone as the default. */
+const okOrWarn = (tone: string) => (tone === "ok" || tone === "warn" ? tone : undefined);
 /** The calendar day after `date` (YYYY-MM-DD), whatever the time zone. */
 const nextDay = (date: string) => new Date(Date.parse(`${date}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
 
@@ -119,7 +130,7 @@ function JobDetail({ d, live, fresh, onFresh }: Readonly<{ d: Detail; live: Jobs
           {c.resume && <Btn size="sm" disabled={pending} onClick={() => { setModal({ kind: "reason", what: "resume" }); }}>{t("Resume…")}</Btn>}
           <Btn size="sm" variant="danger" disabled={pending || !c.cancel} title={c.cancelWhy ?? undefined} onClick={() => { setModal({ kind: "reason", what: "cancel" }); }}>{t("Cancel…")}</Btn>
         </div>}>
-        <ol className="flex flex-wrap gap-4">{d.steps.map((s, i) => <li key={s.label} className="flex items-center gap-1.5 text-xs"><span className={cx("grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold", s.state === "done" ? "bg-primary text-white" : (s.state === "current" ? "border-2 border-primary text-primary" : "border border-line text-muted-foreground"))}>{s.state === "done" ? <Icon name="check" /> : i + 1}</span><span className={s.state === "todo" ? "text-muted-foreground" : (s.state === "current" ? "font-semibold text-primary" : "")}>{s.label}</span></li>)}</ol>
+        <ol className="flex flex-wrap gap-4">{d.steps.map((s, i) => <li key={s.label} className="flex items-center gap-1.5 text-xs"><span className={cx("grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold", STEP_DOT.get(s.state) ?? "border border-line text-muted-foreground")}>{s.state === "done" ? <Icon name="check" /> : i + 1}</span><span className={STEP_LABEL.get(s.state) ?? ""}>{s.label}</span></li>)}</ol>
         {!c.cancel && c.cancelWhy && <p className="mt-2 text-[11px] text-muted-foreground">{j.contractorOrgId ? "" : `${t("Internal delivery skips Offered / Accepted.")} `}{t("Cancel: {why}", { why: c.cancelWhy })}</p>}
         <div className="mt-3 grid-fluid" style={{ ["--min" as string]: "180px" }}>
           {d.facts.map((f) => <div key={f.label} className="rounded-xl border border-line p-3"><div className="text-[11px] text-muted-foreground">{f.label}</div><div className="text-[13px] font-semibold">{f.value}</div><div className="text-[11px] text-muted-foreground">{f.sub}</div></div>)}
@@ -138,7 +149,7 @@ function JobDetail({ d, live, fresh, onFresh }: Readonly<{ d: Detail; live: Jobs
         <>
           {sp?.status === "declined" && <Banner tone="crit" icon="error"><b>{t("The client declined the proposed time")}{d.texts.declinedAt ? ` · ${d.texts.declinedAt}` : ""}</b> — {sp.declineReason?.replaceAll('_', " ")}{sp.declineComment ? `: “${sp.declineComment}”` : ""}. {t("Held capacity was released; the client sent new preferred times (round {round}).", { round: j.preferenceRound })}</Banner>}
           {d.preferred.length > 0 ? (
-            <Card title={d.preferred[0].plan ? t("Plan occurrence — book this time") : (j.preferenceRound > 1 ? t("Client’s preferred times (round {round}) — book one of these", { round: j.preferenceRound }) : t("Client’s preferred times — book one of these"))} sub={t("HQ technicians free and qualified for each time")}>
+            <Card title={preferredTitle(d.preferred[0].plan, j.preferenceRound, t)} sub={t("HQ technicians free and qualified for each time")}>
               <ScrollX><table className="w-full min-w-[640px] text-[13px]">
                 <thead><tr className="text-left text-[11px] uppercase text-muted-foreground"><th className="py-1.5">{t("Rank")}</th><th>{t("Time")}</th><th>{t("HQ technicians")}</th><th>{t("Contractors")}</th><th>{t("Action")}</th></tr></thead>
                 <tbody>{d.preferred.map((r) => <tr key={r.rank} className="border-t border-line"><td className="py-2"><span className="rounded-lg bg-primary-soft px-2 py-0.5 text-xs font-semibold text-primary">{r.plan ? t("Plan") : t(RANK[r.rank - 1] ?? "{n}th", { n: r.rank })}</span></td><td className="font-semibold">{r.text}</td><td className={cx("text-xs", r.fits ? "text-ok" : "text-muted-foreground")}>{r.hq}</td><td className="text-xs text-muted-foreground">{t("{names} — confirm in the offer", { names: contractorNames(live.contractors.filter((x) => x.status === "active").map((x) => x.name), t) })}</td><td><Btn size="sm" variant="primary" disabled={pending || Date.parse(r.slot.startAt) <= now} onClick={() => { setModal({ kind: "book", row: r }); }}>{t("Use this time")}</Btn></td></tr>)}</tbody>
@@ -164,7 +175,7 @@ function JobDetail({ d, live, fresh, onFresh }: Readonly<{ d: Detail; live: Jobs
       {d.delivery && (
         <Card title={d.delivery.title} action={d.extend ? <Btn size="sm" disabled={pending} onClick={() => { setModal({ kind: "extend" }); }}>{t("Extend access…")}</Btn> : undefined}>
           <SummaryList items={d.delivery.lines} />
-          {d.delivery.ack && <div className="mt-3"><Banner tone={d.delivery.ack.tone === "ok" ? "ok" : (d.delivery.ack.tone === "warn" ? "warn" : undefined)} action={d.delivery.cantMake ? <span className="flex gap-2">{d.delivery.kind === "internal" && <Btn size="sm" disabled={pending} onClick={() => { setModal({ kind: "reason", what: "reassign" }); }}>{t("Reassign…")}</Btn>}</span> : undefined}>{d.delivery.ack.text}</Banner></div>}
+          {d.delivery.ack && <div className="mt-3"><Banner tone={okOrWarn(d.delivery.ack.tone)} action={d.delivery.cantMake ? <span className="flex gap-2">{d.delivery.kind === "internal" && <Btn size="sm" disabled={pending} onClick={() => { setModal({ kind: "reason", what: "reassign" }); }}>{t("Reassign…")}</Btn>}</span> : undefined}>{d.delivery.ack.text}</Banner></div>}
         </Card>
       )}
 
@@ -180,7 +191,7 @@ function JobDetail({ d, live, fresh, onFresh }: Readonly<{ d: Detail; live: Jobs
       )}
 
       {d.report ? (
-        <Card title={d.report.title} sub={d.report.sub} tone={d.report.tone === "warn" ? "warn" : (d.report.tone === "ok" ? "ok" : undefined)}
+        <Card title={d.report.title} sub={d.report.sub} tone={okOrWarn(d.report.tone)}
           action={<Plain type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => { setModal({ kind: "report" }); }}>{t("Open report")} <Icon name="arrowRight" /></Plain>}>
           <ReportRows rows={d.report.rows} />
           {d.report.readings.length > 0 && <div className="mt-2"><SummaryList items={d.report.readings} /></div>}
@@ -346,7 +357,13 @@ function ReasonModal({ d, live, what, onClose, onFail }: ModalProps & { what: "h
     if (!r.trim() || r.length > 1000 || (what === "reassign" && !tech)) return;
     const slot = j.assignment ? { startAt: j.assignment.scheduledStart, endAt: j.assignment.scheduledEnd } : j.scheduledSlot!;
     const done = t({ hold: "Job put on hold — scheduling and reports are blocked.", resume: "Job resumed.", cancel: "Job cancelled.", reassign: "Reassigned — the new technician must accept." }[what]);
-    run(() => what === "hold" ? holdJob(j.id, j.version, r) : what === "resume" ? resumeJob(j.id, j.version, r) : what === "cancel" ? cancelJob(j.id, j.version, r) : assignInternal(j.id, j.version, tech, slot, r), done, () => { onClose(done); }, onFail);
+    const send = () => {
+      if (what === "hold") return holdJob(j.id, j.version, r);
+      if (what === "resume") return resumeJob(j.id, j.version, r);
+      if (what === "cancel") return cancelJob(j.id, j.version, r);
+      return assignInternal(j.id, j.version, tech, slot, r);
+    };
+    run(send, done, () => { onClose(done); }, onFail);
   };
   return (
     <Modal open onClose={() => { onClose(); }} title={title} footer={<><Btn onClick={() => { onClose(); }}>{t("Back")}</Btn><Btn variant={what === "cancel" ? "danger" : "primary"} disabled={pending} onClick={confirm}>{t("Confirm")}</Btn></>}>
@@ -419,7 +436,8 @@ function ReviewModal({ d, report, decision, onClose, onFail }: Omit<ModalProps, 
   const [r, setR] = useState("");
   const [tried, setTried] = useState(false);
   const reason = decision === "return" ? returnReason(items, r, t) : r.trim();
-  const error = r.trim() ? (reason.length > 1000 ? t("{n} / 1000 characters with the ticked items", { n: reason.length }) : undefined) : t("A reason is required");
+  const tooLong = reason.length > 1000 ? t("{n} / 1000 characters with the ticked items", { n: reason.length }) : undefined;
+  const error = r.trim() ? tooLong : t("A reason is required");
   const confirm = () => {
     setTried(true);
     if (error) return;

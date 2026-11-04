@@ -7,7 +7,7 @@ import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { focusField } from "@ac/web/lib/focusField";
 import { metricUnit, type Metric } from "@ac/web/lib/devices";
-import { zonedInstant, type T, textOf } from "@ac/web/lib/i18n";
+import { byCount, zonedInstant, type T, textOf } from "@ac/web/lib/i18n";
 import { typeLabel } from "@ac/web/lib/partnerJobDetail";
 import { actionMessage, fieldErrorTexts, type ActionFailure } from "@ac/web/lib/actionMessage";
 import {
@@ -41,10 +41,11 @@ const FORBIDDEN: Record<string, string> = {
   "errors.assignment_not_started": "your work window has not started", "errors.assignment_ended": "your work window has ended", "errors.assignment_required": "you are not assigned to this job",
 };
 const refusal = (f: ActionFailure, t: T): string => {
-  return f.messageKey === "errors.report_version_changed" || f.messageKey === "error.versionConflict" ? t("The report or job changed elsewhere; reload the page to continue from the latest version.")
-    : f.code === "CONFLICT" ? t("The job is not in a state that allows this (on hold, submitted or cancelled); the page shows the latest state.")
-    : f.code === "FORBIDDEN" ? t("Not allowed: {reason}.", { reason: textOf(FORBIDDEN, f.messageKey, t) ?? f.messageKey.replace(/^errors?\./, "").replaceAll('_', " ") })
-    : f.code === "UNAVAILABLE" ? t("Not sent; your draft is kept on this page. Try again.") : actionMessage(f, t);
+  if (f.messageKey === "errors.report_version_changed" || f.messageKey === "error.versionConflict") return t("The report or job changed elsewhere; reload the page to continue from the latest version.");
+  if (f.code === "CONFLICT") return t("The job is not in a state that allows this (on hold, submitted or cancelled); the page shows the latest state.");
+  if (f.code === "FORBIDDEN") return t("Not allowed: {reason}.", { reason: textOf(FORBIDDEN, f.messageKey, t) ?? f.messageKey.replace(/^errors?\./, "").replaceAll('_', " ") });
+  if (f.code === "UNAVAILABLE") return t("Not sent; your draft is kept on this page. Try again.");
+  return actionMessage(f, t);
 }; // field errors, the write limit's wait and other codes (IR380)
 const LEAK: Record<string, string> = { pass: "passed", fail: "failed", not_done: "not done" };
 const MAX_PHOTOS = 10, MAX_BYTES = 5 << 20;
@@ -95,6 +96,12 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
   // the visit and its start alone: the banners name the time once (UX-03); the Work window line keeps the full state
   const visit = job.assignment ? f.span(job.assignment.scheduledStart, job.assignment.scheduledEnd) : "";
   const opens = job.assignment ? f.stamp(job.assignment.scheduledStart) : "";
+  // the accepted assignment's banner: before the window, after it, or on site
+  const acceptedText = (): string => {
+    if (win.phase === "before") return t("Read-only until the window opens at {time} — Start is disabled before then.", { time: opens });
+    if (win.phase === "ended") return t("The work window has ended — ask your coordinator to reschedule.");
+    return t("On site: Start job opens Check in (location + unit QR); checking in starts the work.");
+  };
   const isInWork = job.status === "in_progress";
   const isPaused = !!job.timeOnSite?.pauses?.some((p) => !p.to);
   const isEditable = isInWork && win.phase !== "ended" && win.phase !== "before";
@@ -170,6 +177,20 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
   );
   const label = (key: string) => t(componentLabel[key] ?? key);
   const netKg = draft.refrigerant.reduce((s, r) => s + r.chargedKg - r.recoveredKg, 0);
+  const netSign = netKg >= 0 ? "+" : "−";
+  // the report version: the editable draft's, else the last report's
+  const versionText = (): string => {
+    if (rep) return t("draft v{version}", { version: rep.version });
+    if (live.report) return `v${String(live.report.version)}`;
+    return t("not started");
+  };
+  // the add buttons of the readings and parts tabs while the report is editable
+  const viewAction = () => {
+    if (!isEditable) return null;
+    if (view === "readings") return <Btn size="sm" onClick={() => { addReading(tab === "outdoor" ? "refrigerant_pipe" : live.components[0]?.key ?? "filter"); }}><Icon name="add" /> {t("Add reading")}</Btn>;
+    if (view === "parts") return <span className="flex gap-2"><Btn size="sm" onClick={() => { setModal("part"); }}><Icon name="add" /> {t("Add part")}</Btn><Btn size="sm" onClick={() => { setModal("refrigerant"); }}><Icon name="add" /> {t("Refrigerant")}</Btn></span>;
+    return null;
+  };
   const addReading = (key: string) => { edit((d) => ({ ...d, readings: [...d.readings, { componentKey: key, metric: "temperature", value: "", observedAt: new Date(now).toISOString() }] })); };
   // a finding's own readings and linked report photos, with “+ Add reading” and “+ Link photo” on a finding that needs
   // attention or already has evidence (Figma Technician 423:204, DD-T04–T06 step 1, IR352)
@@ -216,7 +237,7 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
       {refused && <Banner tone="crit">{refused}</Banner>}
       {job.status === "assigned" && ack === "pending" && <Banner tone="primary" action={<span className="flex gap-2"><Btn size="sm" variant="primary" disabled={pending} onClick={() => { run(() => acknowledge(job.id, job.version, "accept", null, null), t("Assignment accepted"), () => { remountFocus = { jobId: job.id, id: "job-title" }; }, failed); }}><Icon name="check" />{t("Accept assignment")}</Btn><Btn size="sm" disabled={pending} onClick={() => { setModal("cant"); }}>{t("Can’t make this time…")}</Btn></span>}>{t("New assignment for {window}. Accepting tells your coordinator and HQ you will attend; the client then sees your name.", { window: visit })}</Banner>}
       {job.status === "assigned" && ack === "cant_make" && <Banner tone="warn">{job.assignment?.cantMakeReason ? t("You said you can’t make this time (“{reason}”). Your coordinator reassigns the job or asks the client for another time.", { reason: job.assignment.cantMakeReason }) : t("You said you can’t make this time. Your coordinator reassigns the job or asks the client for another time.")}</Banner>}
-      {job.status === "assigned" && ack === "accepted" && <Banner tone={win.phase === "before" ? "primary" : "ok"} action={<Btn size="sm" variant="primary" disabled={pending || win.phase !== "open" && win.phase !== "ending"} onClick={() => { setCheckInError({}); setModal("checkin"); }}>{t("Start job (check in)")}</Btn>}>{win.phase === "before" ? t("Read-only until the window opens at {time} — Start is disabled before then.", { time: opens }) : (t(win.phase === "ended" ? "The work window has ended — ask your coordinator to reschedule." : "On site: Start job opens Check in (location + unit QR); checking in starts the work."))}</Banner>}
+      {job.status === "assigned" && ack === "accepted" && <Banner tone={win.phase === "before" ? "primary" : "ok"} action={<Btn size="sm" variant="primary" disabled={pending || win.phase !== "open" && win.phase !== "ending"} onClick={() => { setCheckInError({}); setModal("checkin"); }}>{t("Start job (check in)")}</Btn>}>{acceptedText()}</Banner>}
       {job.status === "on_hold" && <Banner tone="warn">{t("On hold by HQ — saving and submitting are blocked. Your saved draft is kept; continue when HQ resumes the job.")}</Banner>}
       {job.status === "submitted" && <Banner tone="ok">{t("Submitted v{version} — read-only, awaiting quality review.", { version: job.reportRefs[job.reportRefs.length - 1]?.reportVersion ?? "" })}</Banner>}
       {job.status === "completed" && <Banner tone="ok">{t("Accepted — the job is completed and the report is visible to the customer.")}</Banner>}
@@ -226,7 +247,7 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-4 xl:col-span-2">
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <Card title={<Tabs value={tab} onChange={setTab} tabs={groups.map((g) => ({ id: g.group, label: `${g.label} (${String(g.total)})${g.issues ? ` · ${t(g.issues === 1 ? "1 issue" : "{n} issues", { n: g.issues })}` : ""}` }))} />}>
+            <Card title={<Tabs value={tab} onChange={setTab} tabs={groups.map((g) => ({ id: g.group, label: `${g.label} (${String(g.total)})${g.issues ? ` · ${byCount(g.issues, { one: t("1 issue"), many: t("{n} issues", { n: g.issues }) })}` : ""}` }))} />}>
               {items.length === 0 ? <EmptyState title={t("No components")}>{t("This unit’s service scope has no components in {group}.", { group: t(groupLabel[tab]) })}</EmptyState> : (
                 <ul className="divide-y divide-line">{items.map((it) => (
                   <li key={it.componentKey} className="py-2.5">
@@ -238,9 +259,8 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
                         </Select></div>
                       ) : readOnlyResult(it.result)}
                     </div>
-                    {it.result && it.result !== "normal" && (isEditable
-                      ? <div className="mt-1.5"><Input placeholder={t("Reason (required for {result})", { result: t(results.find((r) => r.id === it.result)?.label ?? "") })} maxLength={1000} value={it.reason} onChange={(e) => { edit((d) => ({ ...d, items: d.items.map((x) => (x.componentKey === it.componentKey ? { ...x, reason: e.target.value } : x)) })); }} /></div>
-                      : (it.reason ? <div className="text-xs text-muted-foreground">{t("Reason: {reason}", { reason: it.reason })}</div> : null))}
+                    {isEditable && it.result && it.result !== "normal" ? <div className="mt-1.5"><Input placeholder={t("Reason (required for {result})", { result: t(results.find((r) => r.id === it.result)?.label ?? "") })} maxLength={1000} value={it.reason} onChange={(e) => { edit((d) => ({ ...d, items: d.items.map((x) => (x.componentKey === it.componentKey ? { ...x, reason: e.target.value } : x)) })); }} /></div> : null}
+                    {!isEditable && it.result && it.result !== "normal" && it.reason ? <div className="text-xs text-muted-foreground">{t("Reason: {reason}", { reason: it.reason })}</div> : null}
                     {evidence(it)}
                     {issueOf(it.componentKey) && <p className="mt-1 text-xs text-crit">{issueOf(it.componentKey)}</p>}
                   </li>
@@ -255,7 +275,7 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
                     <div key={g.group} className="mb-2"><div className="mb-1 flex justify-between text-xs"><b>{g.label}</b><span className="text-muted-foreground">{g.done} / {g.total}</span></div><UtilizationBar pct={g.total ? (g.done / g.total) * 100 : 0} tone={g.issues ? "warn" : "primary"}  label={`${g.label} ${String(g.done)} / ${String(g.total)}`} /></div>
                   );
                 })}
-                {isEditable && <p className="text-[11px] text-muted-foreground">{issues?.length ? t(issues.length === 1 ? "1 issue blocks submit — it is listed above Submit report." : "{n} issues block submit — they are listed above Submit report.", { n: issues.length }) : t("{n} items still empty — each needs a result, or not inspected / not applicable with a reason, before submit.", { n: draft.items.filter((x) => x.result === null).length })}</p>}
+                {isEditable && <p className="text-[11px] text-muted-foreground">{issues?.length ? byCount(issues.length, { one: t("1 issue blocks submit — it is listed above Submit report."), many: t("{n} issues block submit — they are listed above Submit report.", { n: issues.length }) }) : t("{n} items still empty — each needs a result, or not inspected / not applicable with a reason, before submit.", { n: draft.items.filter((x) => x.result === null).length })}</p>}
               </Card>
               <Card title={t("Job & unit")} action={<Link className="text-xs font-semibold text-primary" href={`/technician/units/${job.unitId}?jobId=${job.id}`}>{t("Unit")} <Icon name="arrowRight" /></Link>}>
                 <SummaryList items={[
@@ -275,8 +295,7 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
             </div>
           </div>
           <Card title={<Tabs value={view} onChange={setView} tabs={[{ id: "readings", label: t("Readings"), count: draft.readings.length }, { id: "parts", label: t("Parts & refrigerant"), count: draft.parts.length + draft.refrigerant.length }, { id: "time", label: t("Time on site") }]} />}
-            action={view === "readings" && isEditable ? <Btn size="sm" onClick={() => { addReading(tab === "outdoor" ? "refrigerant_pipe" : live.components[0]?.key ?? "filter"); }}><Icon name="add" /> {t("Add reading")}</Btn>
-              : (view === "parts" && isEditable ? <span className="flex gap-2"><Btn size="sm" onClick={() => { setModal("part"); }}><Icon name="add" /> {t("Add part")}</Btn><Btn size="sm" onClick={() => { setModal("refrigerant"); }}><Icon name="add" /> {t("Refrigerant")}</Btn></span> : null)}>
+            action={viewAction()}>
             {view === "readings" && (draft.readings.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No readings yet. Record each measurement with its unit and the component it belongs to — an unmeasured value is left empty, never 0.")}</p> : (
               <ScrollX><table className="w-full min-w-[560px] text-[13px]">
                 <thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th className="py-1">{t("Metric")}</th><th>{t("Value")}</th><th>{t("Unit")}</th><th>{t("Linked item")}</th><th>{t("Observed")}</th><th /></tr></thead>
@@ -321,14 +340,14 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
           </Card>
         </div>
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title={t("Work report — {version}", { version: rep ? t("draft v{version}", { version: rep.version }) : (live.report ? `v${String(live.report.version)}` : t("not started")) })}>
+          <Card title={t("Work report — {version}", { version: versionText() })}>
             {issues && issues.length > 0 && <Banner tone="crit"><b>{t(issues.length === 1 ? "Not submitted — 1 issue:" : "Not submitted — {n} issues:", { n: issues.length })}</b> {issues.slice(0, 6).map((x) => x.text).join(" · ")}{issues.length > 6 ? " · …" : ""}. {t("The draft is kept.")}</Banner>}
             {isEditable && win.notice && <div className="mt-2"><Banner tone="warn">{win.notice}</Banner></div>}
             {!isInWork && !live.report && <p className="text-[13px] text-muted-foreground">{t("The report opens when you check in at the site.")}</p>}
             {(isInWork || live.report) && (
               <div className="mt-2 flex flex-col gap-3">
                 <Field label={t("Work performed & next action (10–4000 characters)")}>{isEditable ? <Textarea value={draft.workText} maxLength={4000} className="min-h-[110px]" onChange={(e) => { edit((d) => ({ ...d, workText: e.target.value })); }} /> : <p className="font-normal">{draft.workText || "—"}</p>}</Field>
-                <p className="text-[13px] font-semibold">{t(draft.parts.length === 1 ? "Replacement parts: 1 line" : "Replacement parts: {n} lines", { n: draft.parts.length })}{draft.refrigerant.length > 0 ? ` · ${draft.refrigerant[0].refrigerant} ${netKg >= 0 ? "+" : "−"}${Math.abs(netKg).toFixed(2)} kg` : ""} <Plain type="button" className="text-xs text-primary" onClick={() => { setView("parts"); }}>{t("(see Parts & refrigerant)")}</Plain></p>
+                <p className="text-[13px] font-semibold">{t(draft.parts.length === 1 ? "Replacement parts: 1 line" : "Replacement parts: {n} lines", { n: draft.parts.length })}{draft.refrigerant.length > 0 ? ` · ${draft.refrigerant[0].refrigerant} ${netSign}${Math.abs(netKg).toFixed(2)} kg` : ""} <Plain type="button" className="text-xs text-primary" onClick={() => { setView("parts"); }}>{t("(see Parts & refrigerant)")}</Plain></p>
                 <div>
                   <p className="mb-1 text-xs font-semibold">{t("Photos (JPEG/PNG, ≤5 MiB, ≤{max})", { max: MAX_PHOTOS })}</p>
                   <div className="flex flex-wrap gap-2">

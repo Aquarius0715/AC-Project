@@ -8,11 +8,12 @@ import { useOp } from "@ac/web/lib/useOp";
 import { inboxRow, type ApiNotification } from "@ac/web/lib/notifications";
 import { metricLabel, metricUnit, recipientRole, testOutcome, type ApiRecipient, type NotificationDecision, type Operator, type PolicyRecipient, type Severity } from "@ac/web/lib/adminAlerts";
 import { testPolicy } from "../actions";
-import { Icon } from "@ac/web/components/Icon";
+import { Icon, type IconName } from "@ac/web/components/Icon";
 import { textOf } from "@ac/web/lib/i18n";
 
 interface Unit { id: string; name: string }
 const TONE = { ok: "text-ok", warn: "text-warn", crit: "text-crit", muted: "text-muted-foreground" } as const;
+const TONE_ICON = new Map<keyof typeof TONE, IconName>([["ok", "success"], ["crit", "error"], ["warn", "warning"]]);
 
 /** Notification preview (DD-A05 item 7, Figma Admin 38:5 / 268:2, IR348): what one recipient is shown for one of the
 policy's units — `notifications.preview` of the alert template with the policy's (or rule's) severity, as the
@@ -21,7 +22,7 @@ export function NotificationPreview({ recipients, severity, customerName, unit, 
   const t = useT();
   const i18n = useI18n();
   const [as, setAs] = useState("");
-  const who = recipients.find((r) => r.id === as) ?? recipients[0] ?? null;
+  const who = recipients.find((r) => r.id === as) ?? recipients.at(0) ?? null;
   const fixture: ApiNotification | null = demo && unit ? {
     id: "preview",
     version: 1,
@@ -48,7 +49,7 @@ export function NotificationPreview({ recipients, severity, customerName, unit, 
           </Select>
         )}
       </div>
-      {unit ? (who ? (
+      {unit && who ? (
           <>
             <p className="mb-2 text-xs text-muted-foreground">{t("What {name} sees for {unit} (notifications.preview · in-app).", { name: who.label, unit: unit.name })}</p>
             {preview.loading ? <p className="text-xs text-muted-foreground">{t("Loading the preview…")}</p> : null}{!preview.loading && preview.error && <p className="text-xs text-crit">{preview.error.error.messageKey === "errors.recipient_ineligible" ? t("{name} cannot get this notification: they may not see {unit}.", { name: who.label, unit: unit.name }) : t("The preview could not be loaded — try again.")}</p>}{!preview.loading && !preview.error && row && preview.data && (
@@ -62,9 +63,9 @@ export function NotificationPreview({ recipients, severity, customerName, unit, 
                 </div>
               )}
           </>
-        )
-        : <p className="text-xs text-muted-foreground">{t("Add a recipient to see what they are shown.")}</p>)
-        : <p className="text-xs text-muted-foreground">{t("The preview needs a unit of {customer}, and it has none yet.", { customer: customerName })}</p>}
+        ) : null}
+      {unit && !who ? <p className="text-xs text-muted-foreground">{t("Add a recipient to see what they are shown.")}</p> : null}
+      {unit ? null : <p className="text-xs text-muted-foreground">{t("The preview needs a unit of {customer}, and it has none yet.", { customer: customerName })}</p>}
     </section>
   );
 }
@@ -74,9 +75,18 @@ export interface Tested { id: string; version: number; metric: string; operator:
 
 /** The demo's outcome without the Core API: the policy's own condition on the reading. */
 const demoDecision = (p: Tested, unitId: string, value: number): NotificationDecision => {
-  const isMeets = p.operator === "gt" ? value > p.threshold : p.operator === "gte" ? value >= p.threshold : p.operator === "lt" ? value < p.threshold : value <= p.threshold;
-  return { unitId, policyId: p.id, decision: p.on && isMeets ? "selected" : "suppressed", reason: p.on ? (isMeets ? null : "not_due") : "disabled" };
+  if (!p.on) return { unitId, policyId: p.id, decision: "suppressed", reason: "disabled" };
+  const isMeets = meets(p.operator, value, p.threshold);
+  return { unitId, policyId: p.id, decision: isMeets ? "selected" : "suppressed", reason: isMeets ? null : "not_due" };
 };
+
+/** Whether the reading meets the condition `value <operator> threshold`. */
+function meets(operator: Operator, value: number, threshold: number): boolean {
+  if (operator === "gt") return value > threshold;
+  if (operator === "gte") return value >= threshold;
+  if (operator === "lt") return value < threshold;
+  return value <= threshold;
+}
 
 /** Test with demo data (DD-A05 item 7, Figma Admin 38:5 / 268:2, IR348): the saved policy — or the default policy's saved
 rule — evaluated against one synthetic, valid reading on one of its units (`automations.simulate`; the demo evaluation
@@ -109,7 +119,7 @@ export function DemoTest({ saved, dirty, unit, demo }: Readonly<{ saved: Tested;
     <section>
       <h3 className="mb-1 text-[13px] font-bold">{t("Test with demo data")}</h3>
       <p className="mb-2 text-xs text-muted-foreground">{t("Evaluates the saved policy against a synthetic reading on one of its units (automations.simulate). The reading counts as lasting the policy's duration; nothing is stored.")}</p>
-      {saved.id ? (unit ? (
+      {unit && saved.id ? (
           <>
             {dirty && <p className="mb-1 text-xs text-warn">{t("Unsaved changes are not tested: the saved version is.")}</p>}
             <div className="flex flex-wrap items-center gap-2 text-[13px]">
@@ -118,11 +128,11 @@ export function DemoTest({ saved, dirty, unit, demo }: Readonly<{ saved: Tested;
               <span>{unitSymbol}</span><span>{t("on {name}", { name: unit.name })}</span>
               <Btn size="sm" disabled={pending} onClick={run}>{t("Evaluate (demo)")}</Btn>
             </div>
-            {result && <p role="status" className={cx("mt-1 flex items-start gap-1.5 text-xs", TONE[result.tone])}><Icon name={result.tone === "ok" ? "success" : result.tone === "crit" ? "error" : result.tone === "warn" ? "warning" : "info"} className="mt-px" />{result.text}</p>}
+            {result && <p role="status" className={cx("mt-1 flex items-start gap-1.5 text-xs", TONE[result.tone])}><Icon name={TONE_ICON.get(result.tone) ?? "info"} className="mt-px" />{result.text}</p>}
           </>
-        )
-        : <p className="text-xs text-muted-foreground">{t("Attach the policy to a unit first: the test runs on one of its units.")}</p>)
-        : <p className="text-xs text-muted-foreground">{t("Save the policy first: the test evaluates the saved version.")}</p>}
+        ) : null}
+      {!unit && saved.id ? <p className="text-xs text-muted-foreground">{t("Attach the policy to a unit first: the test runs on one of its units.")}</p> : null}
+      {saved.id ? null : <p className="text-xs text-muted-foreground">{t("Save the policy first: the test evaluates the saved version.")}</p>}
     </section>
   );
 }
