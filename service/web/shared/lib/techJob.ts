@@ -118,13 +118,15 @@ export function itemPhotos(d: Draft, key: string, photos: PhotoRef[]): { linked:
     free: photos.filter((p) => p.status === "ready" && !ids.includes(p.id)),
   };
 }
+/** The ids with `id` added once (on) or removed (off). */
+function toggled(ids: string[], id: string, on: boolean): string[] {
+  if (!on) return ids.filter((e) => e !== id);
+  return ids.includes(id) ? ids : [...ids, id];
+}
 /** Links a report photo to a component's finding (`on`) or unlinks it; a photo is linked to a finding at most once. */
 export function linkPhoto(d: Draft, key: string, id: string, on: boolean): Draft {
   return {
-    ...d, items: d.items.map((x) => {
-      return (x.componentKey === key ? { ...x, evidenceIds: on ? (x.evidenceIds.includes(id) ? x.evidenceIds : [...x.evidenceIds, id]) : x.evidenceIds.filter((e) => e !== id) }
-        : x);
-    }),
+    ...d, items: d.items.map((x) => (x.componentKey === key ? { ...x, evidenceIds: toggled(x.evidenceIds, id, on) } : x)),
   };
 }
 
@@ -230,6 +232,16 @@ export interface TimeOnSite {
 const duration = (mins: number, t: T) => (mins >= 60 ? t("{h} h {m} min", { h: Math.floor(mins / 60), m: mins % 60 }) : t("{n} min", { n: mins }));
 /** The instants of a time on site, for the loader to format. */
 export const timeInstants = (ts: TimeOnSite | null | undefined) => [ts?.arrivedAt, ts?.startedAt, ts?.finishedAt, ...(ts?.pauses ?? []).flatMap((p) => [p.from, p.to])];
+/** How the technician checked in: manually with the reason, or by QR at a distance from the site. */
+function checkInPlace(ts: TimeOnSite, t: T): string {
+  if (ts.checkInMethod === "manual") return t("manual — {reason}", { reason: ts.checkInReason ?? t("no reason") });
+  return ts.distanceMeters == null ? "—" : t("{m} m from site · QR matched", { m: Math.round(ts.distanceMeters) });
+}
+/** The ended pauses: how many and how long in all. */
+function pausesText(count: number, pausedMs: number, t: T): string {
+  if (count === 0) return "—";
+  return `${t(count === 1 ? "1 pause" : "{n} pauses", { n: count })} · ${duration(Math.round(pausedMs / 60_000), t)}`;
+}
 export function timeRows(ts: TimeOnSite | null | undefined, now: number, f: Fmt = EN_FMT): [string, string][] {
   const { t } = f;
   if (!ts?.arrivedAt && !ts?.startedAt) return [[t("Arrived"), t("not checked in")]];
@@ -240,9 +252,9 @@ export function timeRows(ts: TimeOnSite | null | undefined, now: number, f: Fmt 
   const minutes = ts.onSiteMinutes ?? Math.max(0, Math.floor((((ts.finishedAt ? Date.parse(ts.finishedAt) : now) - from) - paused) / 60_000));
   return [
     [t("Arrived"), `${f.clock(ts.arrivedAt ?? ts.startedAt!)} · ${t(ts.checkInMethod === "manual" ? "manual check-in" : "checked in")}`],
-    [t("Location"), ts.checkInMethod === "manual" ? t("manual — {reason}", { reason: ts.checkInReason ?? t("no reason") }) : (ts.distanceMeters == null ? "—" : t("{m} m from site · QR matched", { m: Math.round(ts.distanceMeters) }))],
+    [t("Location"), checkInPlace(ts, t)],
     [t("Started"), ts.startedAt ? f.clock(ts.startedAt) : "—"],
-    [t("Paused"), open ? t("since {time}", { time: f.clock(open.from) }) : (pauses.length > 0 ? `${t(pauses.length === 1 ? "1 pause" : "{n} pauses", { n: pauses.length })} · ${duration(Math.round(paused / 60_000), t)}` : "—")],
+    [t("Paused"), open ? t("since {time}", { time: f.clock(open.from) }) : pausesText(pauses.length, paused, t)],
     [t("Finished"), ts.finishedAt ? f.clock(ts.finishedAt) : t("— (on submit)")],
     [t("On-site time"), duration(minutes, t)],
   ];
@@ -252,6 +264,18 @@ export function timeRows(ts: TimeOnSite | null | undefined, now: number, f: Fmt 
 and ready photos — the first save creates it without a reload) above the submitted versions with their review. */
 export interface VersionRow { title: string; sub: string; badge: { text: string; tone: "primary" | "ok" | "warn" | "muted" } }
 export interface DraftVersion { version: number; results: number; photos: number; savedAt: string | null }
+/** A submitted version with its review: accepted or returned (when, why), or awaiting review. */
+function reviewedVersion(version: number, rv: ApiTechReport["reviewHistory"][number] | undefined, f: Fmt): VersionRow {
+  const { t } = f;
+  if (!rv) return { title: t("v{version} · {state}", { version, state: t("submitted") }), sub: t("awaiting quality review"), badge: { text: t("Submitted"), tone: "primary" } };
+  const isAccepted = rv.decision === "accept";
+  const reason = rv.reason ? ` — ${rv.reason}` : "";
+  return {
+    title: t("v{version} · {state}", { version, state: t(isAccepted ? "accepted" : "returned") }),
+    sub: `${f.stamp(rv.occurredAt)}${reason}`,
+    badge: isAccepted ? { text: t("Accepted"), tone: "ok" } : { text: t("Returned"), tone: "warn" },
+  };
+}
 export function versionRows(draft: DraftVersion | null, reportRefs: { reportVersion: number }[], reviews: ApiTechReport["reviewHistory"], f: Fmt = EN_FMT): VersionRow[] {
   const { t } = f;
   const rows: VersionRow[] = [];
@@ -263,11 +287,7 @@ export function versionRows(draft: DraftVersion | null, reportRefs: { reportVers
   }
   for (const ref of [...reportRefs].reverse()) {
     const rv = reviews.findLast((h) => h.reportVersion === ref.reportVersion);
-    rows.push({
-      title: t("v{version} · {state}", { version: ref.reportVersion, state: t(rv ? (rv.decision === "accept" ? "accepted" : "returned") : "submitted") }),
-      sub: rv ? `${f.stamp(rv.occurredAt)}${rv.reason ? ` — ${rv.reason}` : ""}` : t("awaiting quality review"),
-      badge: rv?.decision === "accept" ? { text: t("Accepted"), tone: "ok" } : (rv?.decision === "return" ? { text: t("Returned"), tone: "warn" } : { text: t("Submitted"), tone: "primary" }),
-    });
+    rows.push(reviewedVersion(ref.reportVersion, rv, f));
   }
   return rows;
 }
@@ -283,21 +303,30 @@ export interface ApiTechHistory {
   projection: "history"; jobId: string; type: string; status: string; asOf: string; completedAt: string | null;
   redactedReportSummary: { hasReport: boolean; acceptance: "accepted" | "not_accepted" };
 }
+function reportOutcome(r: ApiTechHistory["redactedReportSummary"]): string {
+  if (!r.hasReport) return "No report from your assignment";
+  return r.acceptance === "accepted" ? "Accepted in the quality review" : "Submitted — not accepted while you were assigned";
+}
+/** Why the job is no longer shown: completed, cancelled, or the assignment ended or changed. */
+function endedNote(status: string): string {
+  if (status === "completed") return "Your time is free for other jobs. The report, the unit and its devices stay with HQ and the customer.";
+  if (status === "cancelled") return "The job was cancelled, so the job details and the unit are no longer shown to you.";
+  return "Your work window ended, or HQ or your coordinator changed the assignment, so the job details and the unit are no longer shown to you.";
+}
 /** A job whose viewing window ended (IR49): completed — the assignment ended with it (IR234) — or reassigned / cancelled,
 read as the snapshot frozen when it ended (IR124). */
 export function historyCard(h: ApiTechHistory, i: I18n = EN) {
   const { t, display } = i;
   const isDone = h.status === "completed";
-  const report = h.redactedReportSummary.hasReport ? t(h.redactedReportSummary.acceptance === "accepted" ? "Accepted in the quality review" : "Submitted — not accepted while you were assigned") : t("No report from your assignment");
+  const report = t(reportOutcome(h.redactedReportSummary));
+  const completed = h.completedAt ? t("Completed {time}", { time: showDate(h.completedAt, display) }) : t("Completed");
   return {
     title: `${h.jobId.slice(0, 8)} · ${typeLabel(h.type, t)}`, sub: t(isDone ? "Completed — your assignment ended with the job" : "Your assignment on this job has ended"),
     rows: [
-      [t("Status"), isDone ? (h.completedAt ? t("Completed {time}", { time: showDate(h.completedAt, display) }) : t("Completed")) : t("{status} when your assignment ended", { status: statusWord(h.status, t) })],
+      [t("Status"), isDone ? completed : t("{status} when your assignment ended", { status: statusWord(h.status, t) })],
       [t("Your report"), report], [t("Assignment ended"), showTime(h.asOf, display)],
     ] as [string, string][],
-    note: t(isDone ? "Your time is free for other jobs. The report, the unit and its devices stay with HQ and the customer."
-      : (h.status === "cancelled" ? "The job was cancelled, so the job details and the unit are no longer shown to you."
-      : "Your work window ended, or HQ or your coordinator changed the assignment, so the job details and the unit are no longer shown to you.")), // the snapshot does not say which (IR590)
+    note: t(endedNote(h.status)), // the snapshot does not say which (IR590)
     back: t("Overview"),
   };
 }

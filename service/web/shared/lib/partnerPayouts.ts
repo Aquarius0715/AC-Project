@@ -57,7 +57,7 @@ export function kpis(s: ApiPayoutStatement, rateCard: string | null, i: I18n = E
   return [
     { label: t("Jobs paid"), value: String(jobs), sub: t("review-accepted in {month}", { month: monthName(s.period, display.locale) }) },
     { label: t("Gross"), value: money(s.grossMinor, s.currency), sub: rateCard ? t("rate card {card}", { card: rateCard }) : t("rate card set by HQ") },
-    { label: t("Deductions"), value: money(-s.deductionsMinor, s.currency), sub: deductions ? t(deductions === 1 ? "1 rework deduction" : "{n} rework deductions", { n: deductions }) : t("none") },
+    { label: t("Deductions"), value: money(-s.deductionsMinor, s.currency), sub: deductionsText(deductions, t) },
     {
       label: t("Net payable"), value: money(s.netMinor, s.currency), sub: "",
       badge: s.status === "paid" ? { label: s.paidAt ? t("Paid {date}", { date: showDate(s.paidAt, display) }) : t("Paid"), tone: "ok" } : { label: t("Approved · pays {date}", { date: businessDay(s.payDate, display.locale) }), tone: "primary" },
@@ -71,6 +71,23 @@ export interface LineRow {
   tone: "ok" | "warn" | "primary" | "muted"; amount: string; question: ApiPayoutQuestion | null; askable: boolean;
 }
 const STATUS_TEXT: Record<LineStatus, string> = { accepted: "Accepted", deduction: "Deduction", adjustment: "Adjustment", not_included: "Not included" };
+function deductionsText(n: number, t: T): string {
+  if (n === 0) return t("none");
+  return t(n === 1 ? "1 rework deduction" : "{n} rework deductions", { n });
+}
+const LINE_TONE = new Map<LineStatus, "warn" | "primary">([["deduction", "warn"], ["adjustment", "primary"]]);
+/** A statement line's work: a rework deduction, an HQ adjustment, or the job's title (its work type when unknown). */
+function lineWork(status: LineStatus, l: ApiPayoutStatement["lines"][number], j: JobLabel | undefined, t: T): string {
+  if (status === "deduction") return t("Rework deduction");
+  if (status === "adjustment") return t(l.note ? "Adjustment" : "Adjustment from HQ");
+  return j?.title ?? t(workLabel[l.workType]);
+}
+/** The line's second row: the note, the job's sub line, or why a deduction was made. */
+function lineSub(status: LineStatus, l: ApiPayoutStatement["lines"][number], j: JobLabel | undefined, t: T): string | null {
+  if (status === "deduction") return l.note ?? t("report returned for rework");
+  if (status === "adjustment") return l.note ?? null;
+  return j?.sub ?? l.note ?? null;
+}
 /** The lines table (Figma 06-1): charges, deductions and adjustments of the statement, then the company's jobs
 still in quality review as “Not included · next statement” (AT-P10-B). */
 export function lineRows(s: ApiPayoutStatement, jobs: Map<string, JobLabel>, reviewing: ReviewingJob[], i: I18n = EN): LineRow[] {
@@ -79,17 +96,17 @@ export function lineRows(s: ApiPayoutStatement, jobs: Map<string, JobLabel>, rev
   const inStatement = new Set(s.lines.map((l) => l.jobId));
   const rows: LineRow[] = s.lines.map((l) => {
     const j = jobs.get(l.jobId);
-    const status: LineStatus = l.kind === "deduction" ? "deduction" : (l.kind === "adjustment" ? "adjustment" : "accepted");
+    const status: LineStatus = l.kind === "deduction" || l.kind === "adjustment" ? l.kind : "accepted";
     return {
       key: l.id,
       lineId: l.id,
       jobId: l.jobId,
       job: l.jobId.slice(0, 8),
-      work: status === "deduction" ? t("Rework deduction") : (status === "adjustment" ? t(l.note ? "Adjustment" : "Adjustment from HQ") : j?.title ?? t(workLabel[l.workType])),
-      sub: status === "deduction" ? (l.note ?? t("report returned for rework")) : (status === "adjustment" ? (l.note ?? null) : j?.sub ?? (l.note ?? null)),
+      work: lineWork(status, l, j, t),
+      sub: lineSub(status, l, j, t),
       accepted: l.acceptedAt ? showDayMonth(l.acceptedAt, display) : "—",
       statusText: t(STATUS_TEXT[status]),
-      tone: status === "deduction" ? "warn" : (status === "adjustment" ? "primary" : "ok"),
+      tone: LINE_TONE.get(status) ?? "ok",
       amount: amount(status === "deduction" ? -Math.abs(l.amountMinor) : l.amountMinor),
       question: byLine.get(l.id) ?? null,
       askable: s.status === "approved",
@@ -120,12 +137,13 @@ export function questionRows(s: ApiPayoutStatement, rows: LineRow[], t: T = en) 
   });
 }
 
+const STATEMENT_STATUS = new Map([["paid", "Paid"], ["approved", "Approved"]]);
 /** A one-page PDF (Courier, PDF 1.4) of the statement: header, lines and totals in the user's language. ASCII only —
 other characters print as “-” — the result is a byte string the browser wraps in a Blob. */
 export function payoutPdf(s: ApiPayoutStatement, rows: LineRow[], company: string, t: T = en, locale: Locale = "en"): string {
   const col = (x: string, w: number) => (x.length > w ? x.slice(0, w - 1) + "…" : x).padEnd(w);
   const text = [
-    `${t("PAYOUT STATEMENT")} ${s.id.slice(0, 8)}  ${periodLabel(s.period, locale)}`, `${company}  -  ${t(s.status === "paid" ? "Paid" : (s.status === "approved" ? "Approved" : "Draft")).toUpperCase()}  -  ${t("pay date {date}", { date: s.payDate.slice(0, 10) })}`, "",
+    `${t("PAYOUT STATEMENT")} ${s.id.slice(0, 8)}  ${periodLabel(s.period, locale)}`, `${company}  -  ${t(STATEMENT_STATUS.get(s.status) ?? "Draft").toUpperCase()}  -  ${t("pay date {date}", { date: s.payDate.slice(0, 10) })}`, "",
     `${col(t("Job"), 10)} ${col(t("Work"), 36)} ${col(t("Accepted"), 9)} ${t("Amount").padStart(12)}`, "-".repeat(70),
     ...rows.filter((r) => r.lineId).map((r) => `${col(r.job, 10)} ${col(r.work, 36)} ${col(r.accepted, 9)} ${r.amount.padStart(12)}`), "-".repeat(70),
     `${t("Gross").padEnd(57)} ${money(s.grossMinor, s.currency).padStart(12)}`, `${t("Deductions").padEnd(57)} ${money(-s.deductionsMinor, s.currency).padStart(12)}`,

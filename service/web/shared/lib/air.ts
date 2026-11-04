@@ -49,9 +49,10 @@ export const metricInfo: Record<AirMetric, { label: string; tab: string; unit: s
 
 const KL = "Asia/Kuala_Lumpur";
 const nf =(digits: number) => new Intl.NumberFormat("en-MY", { minimumFractionDigits: digits, maximumFractionDigits: digits, useGrouping: false });
+const DIGITS = new Map([["temperature", 1], ["humidity", 1], ["co2", 0], ["pm25", 0]]);
 /** IR44: temperature and humidity with one decimal, ppm and µg/m³ as integers, rounded half away from zero; other metrics as received. */
 export function airNumber(metric: string, v: number): string {
-  const digits = metric === "temperature" || metric === "humidity" ? 1 : (metric === "co2" || metric === "pm25" ? 0 : null);
+  const digits = DIGITS.get(metric) ?? null;
   return digits === null ? String(v) : nf(digits).format(roundAway(v, digits));
 }
 
@@ -90,6 +91,23 @@ export interface MetricCard {
 }
 const reasonText: Record<string, string> = { unit_mismatch: "unit mismatch", non_finite: "not a number", out_of_range: "out of range", invalid_time: "invalid time" };
 const originText: Record<string, string> = { estimated: "estimated", inspection: "inspection" };
+/** The advice line when there is no reading to advise on. */
+function noAdviceText(metric: AirMetric, setpoint: string): string {
+  if (metric === "temperature") return setpoint;
+  return metric === "humidity" ? "Not enough data for advice" : "Not enough data for {metric} advice";
+}
+/** A reading against its guide: measured (no guide), high, or within the guide. */
+function guideStatus(guide: number | null, isHigh: boolean, t: T): MetricCard["status"] {
+  if (guide === null) return { text: t("Measured"), tone: "muted", icon: "live" };
+  return isHigh ? { text: t("High"), tone: "warn", icon: "warning" } : { text: t("Within guide"), tone: "ok", icon: "check" };
+}
+/** What to do about a reading: ventilate (CO₂), clean the filter (PM2.5), the setpoint (temperature), or nothing. */
+function adviceText(metric: AirMetric, isHigh: boolean, setpoint: string): string {
+  if (metric === "temperature") return setpoint;
+  if (isHigh && metric === "co2") return "Ventilation recommended (≥ 1000 ppm)";
+  if (isHigh && metric === "pm25") return "Filter cleaning recommended (≥ 35 µg/m³)";
+  return "No current advice";
+}
 /** The card in the display language; reading times are the IR44 time of day in the user's display time zone (IR260). */
 export function metricCard(metric: AirMetric, m: ApiMeasurement | undefined, hasSensor: boolean, i: I18n = EN, setsTemperature = true): MetricCard {
   const { t, display } = i;
@@ -98,7 +116,7 @@ export function metricCard(metric: AirMetric, m: ApiMeasurement | undefined, has
   // the temperature points to the unit's remote control when that sets it (controlLayout's temperature); a model
   // without control, or with the power alone, is set on the AC itself (IR527, IR544)
   const setpoint = setsTemperature ? "Setpoint is on Unit Control" : "Set on the AC itself";
-  const noAdvice = t(metric === "temperature" ? setpoint : (metric === "humidity" ? "Not enough data for advice" : "Not enough data for {metric} advice"), { metric: label });
+  const noAdvice = t(noAdviceText(metric, setpoint), { metric: label });
   const unavailable = (sub: string, feed = { text: t("Unavailable"), tone: "unknown" as Tone, icon: "offline" as IconName }): MetricCard =>
     ({ metric, label, unit, feed, sub, value: null, status: { text: t("Not measured"), tone: "muted", icon: "dot" }, advice: noAdvice, warn: false });
   if (!hasSensor) return unavailable(t("No {metric} sensor on this model", { metric: label }), { text: t("Unsupported"), tone: "muted", icon: "unsupported" });
@@ -113,10 +131,8 @@ export function metricCard(metric: AirMetric, m: ApiMeasurement | undefined, has
   }
   if (m.value === null) return unavailable(t(metric === "humidity" ? "No reading (null) — not 0% · {time}" : "No reading (null) · {time}", { time: at }), { text: t("Unknown"), tone: "unknown", icon: "unknown" });
   const isHigh = guide !== null && m.value >= guide;
-  const status = guide === null ? { text: t("Measured"), tone: "muted" as Tone, icon: "live" as IconName } : (isHigh ? { text: t("High"), tone: "warn" as Tone, icon: "warning" as IconName } : { text: t("Within guide"), tone: "ok" as Tone, icon: "check" as IconName });
-  const advice = t(metric === "co2" ? (isHigh ? "Ventilation recommended (≥ 1000 ppm)" : "No current advice")
-    : metric === "pm25" ? (isHigh ? "Filter cleaning recommended (≥ 35 µg/m³)" : "No current advice")
-    : metric === "temperature" ? setpoint : "No current advice");
+  const status = guideStatus(guide, isHigh, t);
+  const advice = t(adviceText(metric, isHigh, setpoint));
   return {
     metric,
     label,
@@ -194,7 +210,8 @@ export function airWindow(period: AirPeriod, now: Date): AirWindow {
   const to = Math.floor(now.getTime() / 60_000) * 60_000;
   return { period, from: new Date(to - (period === "1h" ? 60 : 1440) * 60_000).toISOString(), to: new Date(to).toISOString(), slotMs: 300_000 };
 }
-export const windowTitle = (p: AirPeriod, t: T = en) => t(p === "1h" ? "last hour" : (p === "24h" ? "last 24 hours" : "last 7 days"));
+const WINDOW_TITLE = new Map([["1h", "last hour"], ["24h", "last 24 hours"]]);
+export const windowTitle = (p: AirPeriod, t: T = en) => t(WINDOW_TITLE.get(p) ?? "last 7 days");
 /** The chart's sub line: unit, room and the window — its end in the display time zone with the zone's abbreviation, and for 7 days the Kuala Lumpur calendar day it starts on. */
 export function windowSub(w: AirWindow, unit: string, room: string, i: I18n = EN): string {
   const { t, display } = i;
