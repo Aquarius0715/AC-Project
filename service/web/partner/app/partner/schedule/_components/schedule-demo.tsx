@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, EmptyState, Field, Input, ListRow, Page, Select, Textarea, cx, useToast } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, EmptyState, Field, Input, ListRow, Page, Select, Textarea, cx, useToast, type Tone } from "@ac/web/components/ui";
 import { OriginBadge } from "@ac/web/components/JobBits";
 import { fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
 import { Icon } from "@ac/web/components/Icon";
@@ -15,6 +15,15 @@ const staticJobs = [
   { id: "job-p07", unit: "Server room AC", st: "Work window ended · reassignment required", win: "09-15 08:00 → 09-20 17:00", left: "Ended" },
 ];
 const grid: [string, string, string[]][] = [["tech-external-a", "Refrigerant · 32 h avail.", ["10–12 job-p02", "09–13 job-contractor-a", "free", "13–17 job-c11", "free", "no hours", "no hours"]], ["tech-external-a2", "General · 40 h avail.", ["free", "free", "10–15 job-c09", "09–17 Leave", "09–12 job-c12", "no hours", "no hours"]]];
+// the technician's answer and its banner tone; no answer yet is awaiting acceptance in the primary tone
+const ACK_WORD = new Map([["accepted", "accepted"], ["cant_make", "can’t make it"]]);
+const ACK_TONE = new Map<string, Tone>([["accepted", "ok"], ["cant_make", "warn"]]);
+/** A schedule cell's colours: free, no working hours, leave, or booked. */
+function cellTone(c: string): string {
+  if (c === "free") return "bg-ok-soft text-ok";
+  if (c === "no hours") return "bg-surface2 text-muted-foreground";
+  return c.includes("Leave") ? "bg-warn-soft text-warn" : "bg-primary-soft text-primary";
+}
 const days = ["Mon 21", "Tue 22", "Wed 23", "Thu 24", "Fri 25", "Sat 26", "Sun 27"];
 
 /** The Phase 1A demo of the schedule (fixture jobs and the in-browser job store). */
@@ -22,7 +31,7 @@ export function ScheduleDemo({ jobId }: Readonly<{ jobId?: string }>) {
   const toast = useToast();
   const store = useJobs();
   const live = store.filter((j) => j.contractor === "contractor-a" && (j.status === "accepted" || j.status === "assigned") && staticJobs.every((s) => s.id !== j.id));
-  const jobs = [...live.map((j) => ({ id: j.id, unit: j.unit, st: j.status === "accepted" ? "Accepted · awaiting assignment" : `Assigned · ${orDash(j.technician)} · ${j.techAck?.status === "accepted" ? "accepted" : (j.techAck?.status === "cant_make" ? "can’t make it" : "awaiting acceptance")}`, win: `${orDash(j.scheduled?.date.slice(5))} 00:00 → ${orDash(j.scheduled?.date.slice(5))} 23:59`, left: "fixed time", live: true })), ...staticJobs.map((j) => ({ ...j, live: false }))];
+  const jobs = [...live.map((j) => ({ id: j.id, unit: j.unit, st: j.status === "accepted" ? "Accepted · awaiting assignment" : `Assigned · ${orDash(j.technician)} · ${ACK_WORD.get(j.techAck?.status ?? "") ?? "awaiting acceptance"}`, win: `${orDash(j.scheduled?.date.slice(5))} 00:00 → ${orDash(j.scheduled?.date.slice(5))} 23:59`, left: "fixed time", live: true })), ...staticJobs.map((j) => ({ ...j, live: false }))];
   const [selId, setSelId] = useState(jobId ?? jobs[0].id);
   const sel = jobs.find((j) => j.id === selId) ?? jobs[0];
   const setSel = (j: (typeof jobs)[number]) => { setSelId(j.id); };
@@ -65,12 +74,12 @@ export function ScheduleDemo({ jobId }: Readonly<{ jobId?: string }>) {
             </div>
             {isInProg && <div className="mt-3"><Field label="Reassign reason (required)" hint="Reassigning a job already in progress requires a reason and immediately revokes the previous technician's access."><Textarea value={reason} onChange={(e) => { setReason(e.target.value); }} /></Field></div>}
             <p className="mt-2 flex items-center gap-1 text-xs text-ok"><Icon name="check" />No overlapping confirmed schedule for {tech} in this window.</p>
-            {lj?.techAck && <div className="mt-3"><Banner tone={lj.techAck.status === "accepted" ? "ok" : (lj.techAck.status === "cant_make" ? "warn" : "primary")}>{lj.techAck.status === "accepted" ? `${orDash(lj.technician)} accepted the assignment (${orDash(lj.techAck.at)})` : null}{lj.techAck.status !== "accepted" && lj.techAck.status === "cant_make" && `${orDash(lj.technician)} can’t make this time: “${orDash(lj.techAck.reason)}”${lj.techAck.alt ? ` · could do ${lj.techAck.alt}` : ""}. Reassign another technician below, or ask HQ to propose a new time to the client.`}{lj.techAck.status !== "accepted" && lj.techAck.status !== "cant_make" && `Waiting for ${orDash(lj.technician)} to accept the assignment.`}</Banner></div>}
+            {lj?.techAck && <div className="mt-3"><Banner tone={ACK_TONE.get(lj.techAck.status) ?? "primary"}>{lj.techAck.status === "accepted" ? `${orDash(lj.technician)} accepted the assignment (${orDash(lj.techAck.at)})` : null}{lj.techAck.status !== "accepted" && lj.techAck.status === "cant_make" && `${orDash(lj.technician)} can’t make this time: “${orDash(lj.techAck.reason)}”${lj.techAck.alt ? ` · could do ${lj.techAck.alt}` : ""}. Reassign another technician below, or ask HQ to propose a new time to the client.`}{lj.techAck.status !== "accepted" && lj.techAck.status !== "cant_make" && `Waiting for ${orDash(lj.technician)} to accept the assignment.`}</Banner></div>}
             {message && <div className="mt-3"><Banner tone={message.tone}>{message.t}</Banner></div>}
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><span className="text-[11px] text-muted-foreground">Hint: start 09:00 shows the overlap conflict · end after window shows validation.</span><Btn variant="primary" onClick={save}>{isInProg || lj?.status === "assigned" ? "Reassign" : "Assign technician"}</Btn></div>
           </Card>
           <Card title="Team schedule — week of 09-21" action={<Link href="/partner/team" className="text-xs font-semibold text-primary">Team & capacity <Icon name="arrowRight" /></Link>}>
-            <div className="scroll-x"><table className="w-full min-w-[640px] text-[11px]"><thead><tr><th className="p-1 text-left" />{days.map((d) => <th key={d} className="p-1 text-left text-muted-foreground">{d}</th>)}</tr></thead><tbody>{grid.map(([n, q, cells]) => <tr key={n} className="border-t border-line"><td className="p-1.5"><b className="text-xs">{n}</b><div className="text-muted-foreground">{q}</div></td>{cells.map((c, i) => <td key={i} className="p-1"><div className={cx("rounded-lg px-1.5 py-1", c === "free" ? "bg-ok-soft text-ok" : c === "no hours" ? "bg-surface2 text-muted-foreground" : c.includes("Leave") ? "bg-warn-soft text-warn" : "bg-primary-soft text-primary")}>{c}</div></td>)}</tr>)}</tbody></table></div>
+            <div className="scroll-x"><table className="w-full min-w-[640px] text-[11px]"><thead><tr><th className="p-1 text-left" />{days.map((d) => <th key={d} className="p-1 text-left text-muted-foreground">{d}</th>)}</tr></thead><tbody>{grid.map(([n, q, cells]) => <tr key={n} className="border-t border-line"><td className="p-1.5"><b className="text-xs">{n}</b><div className="text-muted-foreground">{q}</div></td>{cells.map((c, i) => <td key={i} className="p-1"><div className={cx("rounded-lg px-1.5 py-1", cellTone(c))}>{c}</div></td>)}</tr>)}</tbody></table></div>
             <p className="mt-2 flex flex-wrap gap-3 text-[11px] text-muted-foreground"><span><i className="mr-1 inline-block h-2 w-2 rounded-sm bg-primary-soft" />Confirmed assignment</span><span><i className="mr-1 inline-block h-2 w-2 rounded-sm bg-warn-soft" />Leave / unavailable</span><span><i className="mr-1 inline-block h-2 w-2 rounded-sm bg-surface2" />No available hours</span></p>
             <p className="text-[11px] text-muted-foreground">Only own-company technicians are shown. Times in Asia/Kuala_Lumpur. Overlap with a confirmed block is rejected on save (CONFLICT).</p>
           </Card>

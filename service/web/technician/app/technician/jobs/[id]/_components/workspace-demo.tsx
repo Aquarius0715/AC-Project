@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Badge, Banner, Btn, Card, Choice, DataTable, Field, Input, Modal, Page, Select, SummaryList, Tabs, Textarea, UtilizationBar, cx, useToast, Plain } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Choice, DataTable, Field, Input, Modal, Page, Select, SummaryList, Tabs, Textarea, UtilizationBar, cx, useToast, Plain, type Tone } from "@ac/web/components/ui";
 import { OriginBadge } from "@ac/web/components/JobBits";
 import { Job, fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
 import { Icon } from "@ac/web/components/Icon";
@@ -59,6 +59,11 @@ function LiveAssignment({ j }: Readonly<{ j: Job }>) {
   );
 }
 
+// the demo jobs' starting status (others are in progress) and the badge tone of a status (others warn)
+const DEMO_STATUS = new Map([["job-t07", "Assigned"], ["job-p09", "Submitted"]]);
+const STATUS_TONE = new Map<string, Tone>([["Submitted", "ok"], ["Assigned", "primary"]]);
+// a chosen result's colours: attention warns, normal is ok, the others are plain choices
+const CHOSEN = new Map<string, string>([["attention", "border-warn bg-warn-soft text-warn"], ["normal", "border-ok bg-ok-soft text-ok"]]);
 function Workspace({ id }: Readonly<{ id: string }>) {
   type R = "normal" | "attention" | "not_inspected" | "not_applicable" | null;
   const toast = useToast();
@@ -76,7 +81,7 @@ function Workspace({ id }: Readonly<{ id: string }>) {
   const [why, setWhy] = useState<Record<string, string>>({ Filter: "heavy dust buildup, recommend replacement", Outlet: "no accessible outlet in this installation" });
   const [readings, setReadings] = useState([["Supply air temperature", "14.2", "°C", "Evaporator coil"], ["Return air temperature", "25.8", "°C", "Evaporator coil"], ["Filter pressure drop", "118", "Pa", "Filter"], ["Blower motor current", "1.9", "A", "Blower motor"]]);
   const [work, setWork] = useState("Cleaned filter, inspected coil and blower — all normal except filter (dust buildup, recommend replacement). No parts used yet.");
-  const [status, setStatus] = useState(id === "job-t07" ? "Assigned" : (id === "job-p09" ? "Submitted" : "In progress"));
+  const [status, setStatus] = useState(DEMO_STATUS.get(id) ?? "In progress");
   const [errs, setErrs] = useState<string[]>([]);
   const [confirm, setConfirm] = useState(false);
   const [view, setView] = useState<"readings" | "parts" | "time">("readings");
@@ -99,9 +104,15 @@ function Workspace({ id }: Readonly<{ id: string }>) {
     setErrs(e);
     if (e.length === 0) setConfirm(true);
   };
+  // the add button of the readings and parts tabs
+  const viewAction = () => {
+    if (view === "readings") return <Btn size="sm" disabled={isReadOnly} onClick={() => { setReadings((r) => [...r, ["New reading", "", "", ""]]); }}><Icon name="add" /> Add reading</Btn>;
+    if (view === "parts") return <Btn size="sm" disabled={isReadOnly} onClick={() => { setPartModal(true); }}><Icon name="add" /> Add part</Btn>;
+    return null;
+  };
   return (
     <Page>
-      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href="/technician" className="font-semibold text-primary"><Icon name="arrowLeft" /> Overview</Link><b className="text-ink">{id} · Bedroom AC</b><Badge tone={status === "Submitted" ? "ok" : (status === "Assigned" ? "primary" : "warn")}>{status}</Badge></div>
+      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href="/technician" className="font-semibold text-primary"><Icon name="arrowLeft" /> Overview</Link><b className="text-ink">{id} · Bedroom AC</b><Badge tone={STATUS_TONE.get(status) ?? "warn"}>{status}</Badge></div>
       {status === "Assigned" && <Banner action={<span className="flex gap-2"><Btn size="sm" disabled>Start job</Btn><Btn size="sm" variant="ghost" onClick={() => { setCheckIn(true); }}>Preview check-in</Btn></span>}>Read-only until the window opens at 14:00 — Start is disabled before then. On site, Start job opens Check in (location + unit QR).</Banner>}
       {status === "Submitted" && <Banner tone="ok">Submitted v1 — read-only, awaiting quality review.</Banner>}
       {status === "In progress" && <Banner tone="warn">Work window ends in 15 min — unsaved input will be discarded at 12:00.</Banner>}
@@ -115,14 +126,14 @@ function Workspace({ id }: Readonly<{ id: string }>) {
               {groups[tab].map((k) => (
                 <li key={k} className="py-2.5">
                   <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[13px] font-semibold">{k}</span>
-                    <div className="flex flex-wrap gap-1">{([["normal", "Normal"], ["attention", "Attention"], ["not_inspected", "Not inspected"], ["not_applicable", "N/A"]] as const).map(([v, l]) => <Plain key={v} disabled={isReadOnly} onClick={() => { setRes((r) => ({ ...r, [k]: v })); }} aria-pressed={res[k] === v} className={cx("rounded-lg border px-2.5 py-1 text-xs font-semibold disabled:opacity-60", res[k] === v ? (v === "attention" ? "border-warn bg-warn-soft text-warn" : v === "normal" ? "border-ok bg-ok-soft text-ok" : "border-primary bg-primary-soft text-primary") : "border-line hover:bg-surface2")}>{l}</Plain>)}</div></div>
+                    <div className="flex flex-wrap gap-1">{([["normal", "Normal"], ["attention", "Attention"], ["not_inspected", "Not inspected"], ["not_applicable", "N/A"]] as const).map(([v, l]) => <Plain key={v} disabled={isReadOnly} onClick={() => { setRes((r) => ({ ...r, [k]: v })); }} aria-pressed={res[k] === v} className={cx("rounded-lg border px-2.5 py-1 text-xs font-semibold disabled:opacity-60", res[k] === v ? (CHOSEN.get(v) ?? "border-primary bg-primary-soft text-primary") : "border-line hover:bg-surface2")}>{l}</Plain>)}</div></div>
                   {(res[k] === "attention" || res[k] === "not_inspected" || res[k] === "not_applicable") && <div className="mt-1.5"><Input disabled={isReadOnly} placeholder="Reason…" value={why[k] ?? ""} onChange={(e) => { setWhy((w) => ({ ...w, [k]: e.target.value })); }} /></div>}
                 </li>
               ))}
             </ul>
             <p className="mt-2 text-[11px] text-muted-foreground">Initial result is always null — normal is never preselected. Not inspected/not applicable require a reason.</p>
           </Card>
-          <Card title={<Tabs value={view} onChange={setView} tabs={[{ id: "readings", label: "Readings", count: readings.length }, { id: "parts", label: "Parts & refrigerant", count: parts.length }, { id: "time", label: "Time on site" }]} />} action={view === "readings" ? <Btn size="sm" disabled={isReadOnly} onClick={() => { setReadings((r) => [...r, ["New reading", "", "", ""]]); }}><Icon name="add" /> Add reading</Btn> : (view === "parts" ? <Btn size="sm" disabled={isReadOnly} onClick={() => { setPartModal(true); }}><Icon name="add" /> Add part</Btn> : null)}>
+          <Card title={<Tabs value={view} onChange={setView} tabs={[{ id: "readings", label: "Readings", count: readings.length }, { id: "parts", label: "Parts & refrigerant", count: parts.length }, { id: "time", label: "Time on site" }]} />} action={viewAction()}>
             {view === "parts" ? <PartsView parts={parts} readOnly={isReadOnly} onRemove={(i) => { setParts((p) => p.filter((_, k) => k !== i)); }} /> : null}{view !== "parts" && view === "time" && <TimeView />}{view !== "parts" && view !== "time" && <div className="scroll-x"><table className="w-full min-w-[460px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th>Metric</th><th>Value</th><th>Unit</th><th>Linked item</th></tr></thead><tbody>{readings.map((r, i) => <tr key={i} className="border-t border-line">{r.map((c, j) => <td key={j} className="py-1.5 pr-2"><Input disabled={isReadOnly} value={c} onChange={(e) => { setReadings((rs) => rs.map((x, a) => (a === i ? x.map((y, b) => (b === j ? e.target.value : y)) : x))); }} /></td>)}</tr>)}</tbody></table></div>}
           </Card>
           <Card title="Work report — draft v2">
