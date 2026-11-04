@@ -129,7 +129,7 @@ export function slaCsv(rows: SlaRow[], period: { from: string; to: string }, i: 
   const { t, display } = i;
   const day = (iso: string) => zonedParts(iso, display.timeZone).date;
   const head = ["Customer", "Plan", "Jobs", "Response", "Arrival", "First-time fix", "Rating", "Overdue", "Status", "Period from", "Period to"].map((h) => t(h));
-  return [head, ...rows.map((r) => [r.name, r.plan, r.jobs, r.response, r.arrival, r.ftf, r.rating, r.overdue, r.status.label, day(period.from), day(period.to)])].map((l) => l.map(csvQuoted).join(",")).join("\n") + "\n";
+  return [head, ...rows.map((r) => [r.name, r.plan, r.jobs, r.response, r.arrival, r.ftf, r.rating, r.overdue, r.status.label, day(period.from), day(period.to)])].map((l) => l.map((item) => csvQuoted(item)).join(",")).join("\n") + "\n";
 }
 
 /** Readable refusals of sla.saveTargets. */

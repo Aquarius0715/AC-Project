@@ -32,7 +32,7 @@ function contract(): { inputs: Record<string, string[]>; results: Record<string,
     else if (t.flags & ts.TypeFlags.Object) for (const p of c.getPropertiesOfType(t)) out.add(p.getName());
   };
   const sorted = (t: ts.Type) => { const set = new Set<string>(); fields(t, set); return [...set].toSorted(byCodeUnit); };
-  const variants = (t: ts.Type): ts.Type[] => (t.isUnion() ? t.types.flatMap(variants) : [t]);
+  const variants = (t: ts.Type): ts.Type[] => (t.isUnion() ? t.types.flatMap((item) => variants(item)) : [t]);
   const element = (t: ts.Type) => (c.isArrayType(t) ? c.getIndexInfoOfType(t, ts.IndexKind.Number)?.type ?? null : null);
   const inputs: Record<string, string[]> = {};
   const results: Record<string, ResultFields> = {};
@@ -46,7 +46,7 @@ function contract(): { inputs: Record<string, string[]>; results: Record<string,
       continue;
     }
     const items = variants(result).map((v) => v.getProperty("items")).filter((p): p is ts.Symbol => !!p).map((p) => element(c.getTypeOfSymbol(p))).filter((e): e is ts.Type => !!e);
-    results[op.getName()] = { fields: sorted(result), items: items.length > 0 ? [...new Set(items.flatMap(sorted))].toSorted(byCodeUnit) : null };
+    results[op.getName()] = { fields: sorted(result), items: items.length > 0 ? [...new Set(items.flatMap((item) => sorted(item)))].toSorted(byCodeUnit) : null };
   }
   return { inputs, results };
 }

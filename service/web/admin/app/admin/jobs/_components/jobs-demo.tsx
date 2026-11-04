@@ -106,7 +106,7 @@ function rowLine(j: Job) {
 
 function JobDetail({ j, open }: Readonly<{ j: Job; open: (m: { kind: "book"; slot: Slot } | { kind: "propose" } | { kind: "reason"; what: "rework" | "hold" | "reassign" } | { kind: "classify" }) => void }>) {
   const toast = useToast();
-  const fits = j.preferred.map(fitFor);
+  const fits = j.preferred.map((item) => fitFor(item));
   const isAnyFit = fits.some((f) => f.fits !== "none");
   return (
     <div className="flex min-w-0 flex-col gap-4">

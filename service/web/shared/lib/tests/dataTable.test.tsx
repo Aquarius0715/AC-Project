@@ -21,7 +21,7 @@ describe("DataTable", () => {
     render(<DataTable cols={cols} rows={units} rowKey={(u) => u.id} />);
     const [head, ...body] = screen.getAllByRole("row");
     expect(within(head).getAllByRole("columnheader").map((c) => c.textContent)).toEqual(["Unit", "Status"]);
-    expect(body.map(cells)).toEqual([["Bedroom AC", "Online"], ["Office AC", "Offline"]]);
+    expect(body.map((item) => cells(item))).toEqual([["Bedroom AC", "Online"], ["Office AC", "Offline"]]);
     // a column's classes reach its header and its cells; hideBelow hides it on a narrow screen
     const status = [within(head).getAllByRole("columnheader")[1], within(body[0]).getAllByRole("cell")[1]];
     expect(status.map((c) => [c.classList.contains("max-sm:hidden"), c.classList.contains("text-right")])).toEqual([[true, true], [true, true]]);

@@ -387,8 +387,8 @@ function ReportRows({ rows }: Readonly<{ rows: NonNullable<Detail["report"]>["ro
   const ok = rows.filter((r) => r.tone === "ok");
   return (
     <>
-      <ul className="divide-y divide-line">{rows.filter((r) => r.tone !== "ok").map(row)}</ul>
-      {ok.length > 0 && <details className="border-t border-line pt-1.5 text-[13px]"><summary className="cursor-pointer text-muted-foreground">{t(ok.length === 1 ? "1 check OK" : "{n} checks OK", { n: ok.length })}</summary><ul className="divide-y divide-line">{ok.map(row)}</ul></details>}
+      <ul className="divide-y divide-line">{rows.filter((r) => r.tone !== "ok").map((item) => row(item))}</ul>
+      {ok.length > 0 && <details className="border-t border-line pt-1.5 text-[13px]"><summary className="cursor-pointer text-muted-foreground">{t(ok.length === 1 ? "1 check OK" : "{n} checks OK", { n: ok.length })}</summary><ul className="divide-y divide-line">{ok.map((item) => row(item))}</ul></details>}
     </>
   );
 }

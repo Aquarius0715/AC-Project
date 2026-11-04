@@ -239,7 +239,7 @@ export function blankDraft(unitId: string, timezone: string): Draft {
 export function draftOf(a: ApiAutomation): Draft {
   const d = blankDraft(a.unitIds[0] ?? "", a.timezone);
   const base = { ...d, id: a.id, version: a.version, name: a.name, enabled: a.enabled, priority: a.priority, trigger: triggerOf(a), others: a.unitIds.slice(1), // rules saved elsewhere may target more ACs: kept
-    extras: (a.onlyIf ?? []).map(extraDraftOf) };
+    extras: (a.onlyIf ?? []).map((item) => extraDraftOf(item)) };
   if (a.kind === "schedule") {
     return { ...base, weekdays: a.weekdays, startLocal: a.startLocal, endLocal: a.endLocal, endsNextDay: a.endsNextDay, startAction: actionKey(a.startAction), endAction: actionKey(a.endAction) };
   }
@@ -264,7 +264,7 @@ export function conditionOf(d: Draft): ClientCondition {
 /** automations.save input (one AC per rule on this screen, Figma 03b “Action for one AC”). */
 export function saveInput(d: Draft): OpInput<"automations.save"> {
   const base = { ...(d.id && { id: d.id }), name: d.name.trim(), unitIds: [d.unitId, ...d.others.filter((u) => u !== d.unitId)], timezone: d.timezone, enabled: d.enabled, priority: d.priority,
-    onlyIf: fitExtras(d).map(extraOf) };
+    onlyIf: fitExtras(d).map((item) => extraOf(item)) };
   return d.trigger === "schedule"
     ? { ...base, kind: "schedule", weekdays: [...d.weekdays].toSorted((a, b) => a - b), startLocal: d.startLocal, endLocal: d.endLocal, endsNextDay: d.endsNextDay, startAction: actionOf(d.startAction), endAction: actionOf(d.endAction) }
     : { ...base, kind: "event", condition: conditionOf(d), action: actionOf(d.action) };

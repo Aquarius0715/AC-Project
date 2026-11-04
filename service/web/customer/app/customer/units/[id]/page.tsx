@@ -60,5 +60,5 @@ export default async function CustomerUnitPage({ params }: Readonly<PageProps<"/
   // the default policy's rules on for this customer, as the owner switched them (IR623)
   const defaultPolicy = policies.items.find((p) => p.kind === "default_alert") as unknown as ApiDefaultPolicy | undefined;
   const defaults = defaultPolicy ? { on: defaultRuleRows(defaultPolicy, me.customerId, me.membershipId, i).on, n: defaultPolicy.rules.length } : null;
-  return <UnitView id={id} detail={detail} room={room.items.map(unitRowFromApi)} policies={options} defaults={defaults} history={history.items} restrictionHref={restriction} nowMs={now.getTime()} />;
+  return <UnitView id={id} detail={detail} room={room.items.map((item) => unitRowFromApi(item))} policies={options} defaults={defaults} history={history.items} restrictionHref={restriction} nowMs={now.getTime()} />;
 }

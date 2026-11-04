@@ -156,7 +156,7 @@ function jobFromApi(j: ApiJob): Job {
 /** Jobs for the screens: the shared demo store in mock mode, jobs.list (caller projection) with DATA_SOURCE=API. */
 export const useJobs = () => {
   const local = useJobStore().jobs;
-  return useOp<{ items: ApiJob[] }, Job[]>("jobs.list", { limit: 100 }, local, (p) => p.items.map(jobFromApi)).data;
+  return useOp<{ items: ApiJob[] }, Job[]>("jobs.list", { limit: 100 }, local, (p) => p.items.map((item) => jobFromApi(item))).data;
 };
 /** Non-React read (tests, scripts). */
 export const getJobState = () => load();

@@ -29,8 +29,8 @@ export function EvidencePicker({ rows, policyless, picked, onChange, loading, er
       <p className="mb-1 text-[11px] text-muted-foreground">{h.sub}</p>
       {loading ? <p className="py-2 text-xs text-muted-foreground">{t("Loading the evidence…")}</p> : (
         <div className="flex flex-col">
-          {later.length > 0 ? later.map(row) : <p className="py-2 text-xs text-muted-foreground">{t("No remeasurement since detection yet — remeasure the unit or record an inspection.")}</p>}
-          {attached.length > 0 ? attached.map(row) : <Row title={t("Evidence attached to this alert")} sub={t("none attached")} checked={false} disabled />}
+          {later.length > 0 ? later.map((item) => row(item)) : <p className="py-2 text-xs text-muted-foreground">{t("No remeasurement since detection yet — remeasure the unit or record an inspection.")}</p>}
+          {attached.length > 0 ? attached.map((item) => row(item)) : <Row title={t("Evidence attached to this alert")} sub={t("none attached")} checked={false} disabled />}
         </div>
       )}
       {error && <p className="flex items-center gap-1 pb-2 text-xs font-medium text-crit"><Icon name="error" />{error}</p>}

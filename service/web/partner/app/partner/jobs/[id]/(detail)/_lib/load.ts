@@ -49,7 +49,7 @@ export async function loadJobDetail(jobId: string) {
   if (job.projection === "offer") {
     const first = klDate(job.visitSlot.startAt);
     const dates = [0, 1, 2, 3, 4].map((n) => plusDays(first, n));
-    const [days, event] = await Promise.all([Promise.all(dates.map(capacityOf)), events]);
+    const [days, event] = await Promise.all([Promise.all(dates.map((item) => capacityOf(item))), events]);
     const technicians = members.filter((m) => m.role === "technician" && qualified(m, job.requiredQualifications, job.visitSlot.startAt)).map((m) => ({ id: m.id, name: m.displayName }));
     const p = job.partnerSlotProposal;
     const offers = Math.max(1, event.filter((e) => e.action === "job.offered").length);
@@ -77,7 +77,7 @@ export async function loadJobDetail(jobId: string) {
     optional(coreOp<ApiUnitDetail>("units.get", { id: job.unitId }), null),
     events,
     Promise.all(job.alertIds.map((id) => optional(coreOp<ApiAlert>("alerts.get", { id }), null))),
-    Promise.all(dates.map(capacityOf)),
+    Promise.all(dates.map((item) => capacityOf(item))),
   ]);
   const required = requiredFor(unit?.serviceScope ?? []);
   const linked = alerts.filter((a): a is ApiAlert => !!a);

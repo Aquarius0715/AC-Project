@@ -62,9 +62,9 @@ function check(): { checked: number; problems: string[] } {
       const s = c.getNonNullableType(source), d = c.getNonNullableType(target);
       if (c.isTypeAssignableTo(s, d)) return;
       if (c.isArrayType(s) && c.isArrayType(d)) { compare(c.getTypeArguments(s as ts.TypeReference)[0], c.getTypeArguments(d as ts.TypeReference)[0], `${path}[]`, depth + 1, out, top); return; }
-      if (s.isUnion() && !(s.flags & ts.TypeFlags.Boolean) && variants(s).some(isObject)) {
+      if (s.isUnion() && !(s.flags & ts.TypeFlags.Boolean) && variants(s).some((item) => isObject(item))) {
         const sv = variants(s), dv = variants(d);
-        const keys = sv.every(isObject)
+        const keys = sv.every((item) => isObject(item))
           ? [...literals(sv[0]).keys()].filter((k) => sv.every((m) => literals(m).has(k)) && sv.every((m, i) => sv.every((n, j) => i === j || !overlap(literals(m).get(k)!, literals(n).get(k)!))))
           : [];
         if (top && keys.length === 0) { // the input picks the variant

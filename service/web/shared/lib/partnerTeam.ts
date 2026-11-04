@@ -100,7 +100,7 @@ export function weekRows(members: ApiTeamMember[], week: ApiCapacity[][], t: T =
 export function teamStats(members: ApiTeamMember[], week: ApiCapacity[][], dayIndex: number, t: T = en) {
   const ids = new Set(members.map((m) => m.id));
   const mine = (d: ApiCapacity[]) => d.filter((c) => ids.has(c.membershipId));
-  const assigned = week.flatMap(mine).reduce((a, c) => a + c.assignedMinutes, 0), available = week.flatMap(mine).reduce((a, c) => a + (c.availableMinutes ?? 0), 0);
+  const assigned = week.flatMap((item) => mine(item)).reduce((a, c) => a + c.assignedMinutes, 0), available = week.flatMap((item) => mine(item)).reduce((a, c) => a + (c.availableMinutes ?? 0), 0);
   const free = mine(week[dayIndex] ?? []).reduce((a, c) => a + Math.max(0, (c.availableMinutes ?? 0) - c.assignedMinutes), 0);
   const usage = pct(assigned, available);
   return { assigned: t("{n} h", { n: hours(assigned) }), available: t("{n} h", { n: hours(available) }), utilization: usage === null ? "—" : `${String(usage)}%`, free: t("{n} h", { n: hours(free) }) };

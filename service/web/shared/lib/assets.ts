@@ -417,7 +417,7 @@ export function coverageRows(cs: ApiCoverage[], x: { unit: (id: string) => { nam
       endsDate: klDate(c.warrantyEndsAt),
       endsAt: c.warrantyEndsAt,
       contractIds: c.contractIds,
-      contracts: c.contractIds.map(x.contract).join(", ") || "—",
+      contracts: c.contractIds.map((id) => x.contract(id)).join(", ") || "—",
       status: c.status,
       days,
       statusText,
@@ -439,7 +439,7 @@ export const coverageMatch = (r: CoverageRow, f: CoverageFilter) => {
   return (!f.customerId || r.customerId === f.customerId) && (!f.coverage || r.status === f.coverage)
     && (!f.within || (r.days !== null && r.days > 0 && r.days <= Number(f.within)));
 };
-export const toCsv = (header: string[], rows: string[][]) => [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\n") + "\n";
+export const toCsv = (header: string[], rows: string[][]) => [header, ...rows].map((r) => r.map((item) => csvCell(item)).join(",")).join("\n") + "\n";
 export const coverageCsv = (rows: CoverageRow[]) => {
   return toCsv(["unit", "unit_id", "customer", "model", "warranty_end", "maintenance_contract", "status"],
     rows.map((r) => [r.unit, r.unitId, r.customer, r.model, r.endsDate, r.contracts === "—" ? "" : r.contracts, r.statusText]));

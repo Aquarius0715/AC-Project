@@ -50,7 +50,7 @@ export function HistoryDemo() {
   const jobs = useOp<{ items: ApiJobRow[] }, ReturnType<typeof jobOptions> | null>("jobs.list", { limit: 100 }, null, (p) => jobOptions(p.items));
   const isApi = jobs.source === "api";
   const sel = isApi ? (jobs.data?.find((j) => j.id === job) ?? null) : null;
-  const evs = useOp<{ items: ApiEvent[] }, TimelineEvent[] | null>("jobs.events", { jobId: isApi ? job : "", query: { limit: 100, sort: { field: "occurredAt", direction: "desc" } } }, null, (p) => p.items.map(eventRow), !!sel);
+  const evs = useOp<{ items: ApiEvent[] }, TimelineEvent[] | null>("jobs.events", { jobId: isApi ? job : "", query: { limit: 100, sort: { field: "occurredAt", direction: "desc" } } }, null, (p) => p.items.map((item) => eventRow(item)), !!sel);
   const all: TimelineEvent[] = isApi ? (sel ? (evs.data ?? []) : []) : events;
   const shown = all.filter((e) => f === "all" || (f === "customer" ? e.c : !e.c));
   return (

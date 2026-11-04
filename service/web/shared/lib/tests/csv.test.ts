@@ -6,8 +6,8 @@ import { coverageCsv, errorReportCsv } from "@ac/web/lib/assets";
 // IR368: an exported cell never runs as a spreadsheet formula (CSV injection)
 describe("CSV export cells", () => {
   it("keeps a formula-like cell as text and leaves numbers and plain text alone", () => {
-    expect(["=HYPERLINK(\"http://x\",\"y\")", "+1+1", "-2+3", "@SUM(A1)", "\tx", "\rx"].map(csvText)).toEqual(["'=HYPERLINK(\"http://x\",\"y\")", "'+1+1", "'-2+3", "'@SUM(A1)", "'\tx", "'\rx"]);
-    expect(["-12.5", "+60123456789", "42", "Bedroom AC", "—", "a=b", ""].map(csvText)).toEqual(["-12.5", "+60123456789", "42", "Bedroom AC", "—", "a=b", ""]);
+    expect(["=HYPERLINK(\"http://x\",\"y\")", "+1+1", "-2+3", "@SUM(A1)", "\tx", "\rx"].map((item) => csvText(item))).toEqual(["'=HYPERLINK(\"http://x\",\"y\")", "'+1+1", "'-2+3", "'@SUM(A1)", "'\tx", "'\rx"]);
+    expect(["-12.5", "+60123456789", "42", "Bedroom AC", "—", "a=b", ""].map((item) => csvText(item))).toEqual(["-12.5", "+60123456789", "42", "Bedroom AC", "—", "a=b", ""]);
     expect([csvCell("=1+1"), csvCell('=A1,"x"'), csvCell("a\rb"), csvQuoted("=1"), csvQuoted(7)]).toEqual(["'=1+1", `"'=A1,""x"""`, `"a\rb"`, `"'=1"`, `"7"`]);
   });
 

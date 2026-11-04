@@ -135,7 +135,7 @@ describe("the default policy's rules and the customers' switches (DD-A05 item 9,
   });
 
   it("copies only a rule whose metric a policy may watch, with its name and condition", () => {
-    expect(p.rules.map(copyable)).toEqual([true, false]); // heartbeat_gap is not one of the HQ metrics
+    expect(p.rules.map((item) => copyable(item))).toEqual([true, false]); // heartbeat_gap is not one of the HQ metrics
     const d = blankPolicyDraft({ id: "c-a", name: "Demo Customer A" }, "Asia/Tokyo", p.rules[0]);
     expect([d.id, d.name, d.metric, d.operator, d.threshold, d.recovery, d.duration, d.severity, d.on, d.timezone, d.customerId]).toEqual(["", "Refrigerant low pressure", "refrigerant_pressure", "lte", 350, 380, 120, "critical", false, "Asia/Tokyo", "c-a"]);
     expect(blankPolicyDraft({ id: "c-a", name: "A" }, "UTC", p.rules[1]).metric).toBe("temperature"); // not copyable: the plain draft

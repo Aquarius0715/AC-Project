@@ -34,7 +34,7 @@ export const customerVisible = (e: ApiJobEvent & { note?: ApiEvent["note"] }) =>
 counted this way. */
 export function eventSummary(events: (ApiJobEvent & { note?: ApiEvent["note"] })[]): ApiEventSummary {
   const latest = [...events].toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || b.id.localeCompare(a.id))[0];
-  return { count: events.length, customerVisible: events.filter(customerVisible).length, notes: events.filter((e) => e.note).length, latest: latest ? { action: latest.action, occurredAt: latest.occurredAt } : null };
+  return { count: events.length, customerVisible: events.filter((item) => customerVisible(item)).length, notes: events.filter((e) => e.note).length, latest: latest ? { action: latest.action, occurredAt: latest.occurredAt } : null };
 }
 const ACTIVE = new Set(["accepted", "assigned", "in_progress", "on_hold", "rework_requested"]);
 const STATUS_LABEL: Record<string, string> = {

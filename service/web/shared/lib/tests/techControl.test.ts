@@ -63,7 +63,7 @@ describe("run banner and state", () => {
     expect(runBanner(run({ state: "start_failed", failureCode: "TIMEOUT" }))).toMatchObject({ tone: "crit", text: "The device reported TIMEOUT · no end command is needed." });
     expect(runBanner(run({ state: "end_failed" }))?.text).toBe("The unit may still be running; check it on site.");
     expect(runBanner(run({ state: "end_blocked" }))?.title).toMatch(/^End blocked/);
-    expect([null, run({ state: "completed" }), run({ state: "end_failed" })].map(runActive)).toEqual([false, false, false]);
+    expect([null, run({ state: "completed" }), run({ state: "end_failed" })].map((item) => runActive(item))).toEqual([false, false, false]);
     expect(["awaiting_start", "running", "end_requested"].map((s) => runActive(run({ state: s as ApiRun["state"] })))).toEqual([true, true, true]);
   });
 });

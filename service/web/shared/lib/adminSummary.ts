@@ -31,7 +31,7 @@ export function kpisFrom(a: AdminSummary, t: T = en): Kpis {
     rate: a.operatingRate === null ? "—" : `${a.operatingRate.toFixed(1)}%`, alerts: a.alertCount,
     kwh: e?.totals.kWh == null ? "—" : `${e.totals.kWh.toFixed(1)} kWh`,
     kwhSub: t("measured · coverage {coverage} · cost {cost}", { coverage: e?.coverage == null ? "—" : `${coveragePct(e.coverage, 0)}%`, cost: e?.totals.amountMinor == null ? "—" : formatMoney(e.totals.amountMinor, "MYR") }),
-    billing: a.billingVisibility === "forbidden" ? t("Not permitted") : (a.amountsByCurrency ?? []).map(money).join(" · ") || "0.00 MYR",
+    billing: a.billingVisibility === "forbidden" ? t("Not permitted") : (a.amountsByCurrency ?? []).map((item) => money(item)).join(" · ") || "0.00 MYR",
     billingSub: a.billingVisibility === "forbidden" ? t("billing.read required") : t(overdue === 1 ? "1 overdue invoice · unpaid, per currency" : "{n} overdue invoices · unpaid, per currency", { n: overdue }),
     jobs: Object.values(a.jobCounts).reduce((x, y) => x + y, 0), online: a.online, offline: a.offline, connUnknown: a.unknown,
   };

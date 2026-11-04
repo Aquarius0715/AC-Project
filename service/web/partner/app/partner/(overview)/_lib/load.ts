@@ -34,7 +34,7 @@ export async function loadOverview(sp: { from?: string; to?: string }) {
   const today = new Date(now.getTime() + 8 * 3_600_000).toISOString().slice(0, 10);
   const capacityOf = (date: string) => optional(coreOp<Page<ApiCapacity>>("members.capacity", { date, query: { limit: 100 } }).then((r) => r.items), []);
   const [days, todayCapacity] = await Promise.all([
-    Promise.all(p.days.map(capacityOf)),
+    Promise.all(p.days.map((item) => capacityOf(item))),
     p.days.includes(today) ? Promise.resolve(null) : capacityOf(today),
   ]);
   // activity: the events of the jobs that moved last (open ones first), newest first

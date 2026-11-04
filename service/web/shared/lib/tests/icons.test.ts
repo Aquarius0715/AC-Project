@@ -27,7 +27,7 @@ const iconChar = (c: string) => SYMBOL.test(c) || (PICTOGRAPH.test(c) && !ARROW.
 
 /** Why a UI text uses a character as an icon, or null when it does not. */
 export function iconProblem(text: string): string | null {
-  const symbol = [...text].find(iconChar);
+  const symbol = [...text].find((item) => iconChar(item));
   if (symbol) return `the symbol ${symbol} (U+${symbol.codePointAt(0)!.toString(16).toUpperCase()})`;
   const chars = [...text.trim()];
   if (chars.length === 0) return null;
