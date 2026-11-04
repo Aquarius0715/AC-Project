@@ -18,9 +18,15 @@ export interface EnergyLive {
   list?: { rows: BaselineRow[]; from: string; to: string; selectedId: string | null };
 }
 
+const TEXT_TONE = new Map([["ok", "text-ok"], ["crit", "text-crit"], ["muted", "text-muted-foreground"]]);
+/** The difference's tone: muted when not comparable, otherwise an increase is critical and a saving ok. */
+function differenceTone(comparable: boolean, increase: boolean): "ok" | "crit" | "muted" {
+  if (!comparable) return "muted";
+  return increase ? "crit" : "ok";
+}
 const kpi = (label: string, value: string, sub: string, tone?: "ok" | "crit" | "muted") => {
   return (
-    <div className="rounded-2xl border border-line bg-surface p-4"><div className="text-xs text-muted-foreground">{label}</div><div className={`text-xl font-bold ${tone === "ok" ? "text-ok" : tone === "crit" ? "text-crit" : tone === "muted" ? "text-muted-foreground" : ""}`}>{value}</div><div className="text-[11px] text-muted-foreground">{sub}</div></div>
+    <div className="rounded-2xl border border-line bg-surface p-4"><div className="text-xs text-muted-foreground">{label}</div><div className={`text-xl font-bold ${TEXT_TONE.get(tone ?? "") ?? ""}`}>{value}</div><div className="text-[11px] text-muted-foreground">{sub}</div></div>
   );
 };
 
@@ -70,7 +76,7 @@ function Analysis({ live, a }: Readonly<{ live: EnergyLive; a: NonNullable<Energ
           <div className="grid-fluid" style={{ ["--min" as string]: "190px" }}>
             {kpi(t("Actual"), s.actual, t("coverage {pct}", { pct: s.coverage }))}
             {kpi(t("Baseline"), s.baseline, t(a.baselineId ? "the selected baseline version" : "none selected"))}
-            {kpi(t("Difference"), s.difference, t("{percent} · not adjusted", { percent: s.percent }), s.comparable ? (s.increase ? "crit" : "ok") : "muted")}
+            {kpi(t("Difference"), s.difference, t("{percent} · not adjusted", { percent: s.percent }), differenceTone(s.comparable, s.increase))}
             {kpi(t("Emissions"), s.emissions, t("{saved} · demo factor", { saved: s.savedEmissions }))}
           </div>
           <div className="split">
@@ -95,7 +101,8 @@ function Baselines({ live, l }: Readonly<{ live: EnergyLive; l: NonNullable<Ener
   const [pending, run] = useAction();
   const [creating, setCreating] = useState(false);
   const sel = creating ? null : l.rows.find((r) => r.id === l.selectedId) ?? null;
-  const key = creating ? "new" : (sel ? `${sel.id}:${String(sel.version)}` : "none");
+  const selKey = sel ? `${sel.id}:${String(sel.version)}` : "none";
+  const key = creating ? "new" : selKey;
   const [source, setSource] = useState(key);
   const [d, setD] = useState<BaselineDraft>(baselineDraft(sel?.b));
   const [tried, setTried] = useState(false);

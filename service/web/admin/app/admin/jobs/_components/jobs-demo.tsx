@@ -86,6 +86,14 @@ export function PlansDemo() {
   );
 }
 
+// the technician's answer on a row, and in the detail with its time; no answer yet is awaiting acceptance
+const ACK_WORD = new Map([["accepted", "accepted"], ["cant_make", "can’t make it"]]);
+function techAnswer(j: Job): string {
+  if (j.techAck?.status === "accepted") return `accepted ${j.techAck.at ?? ""}`;
+  return j.techAck?.status === "cant_make" ? "can’t make this time" : "awaiting acceptance";
+}
+// the reason dialog's title and done message; reassigning names the job
+const REASON_TEXT = new Map([["rework", { title: "Return for rework", done: "Returned for rework" }], ["hold", { title: "Put on hold", done: "Job put on hold" }]]);
 function rowLine(j: Job) {
   if (j.followUpClass === "pending") return `Follow-up of ${j.followUpOf ?? "—"} · classify by 09-23 11:05`;
   switch (j.status) {
@@ -97,7 +105,8 @@ function rowLine(j: Job) {
     }
     case "accepted": { return `${j.contractor ?? "—"} accepted · assign technician`;
     }
-    case "assigned": { return `${j.delivery === "contractor" ? j.contractor + " · " : "Internal · "}${j.technician ?? "—"} · ${j.techAck?.status === "accepted" ? "accepted" : (j.techAck?.status === "cant_make" ? "can’t make it" : "awaiting acceptance")}`;
+    case "assigned": { const via = j.delivery === "contractor" ? `${j.contractor ?? "—"} · ` : "Internal · ";
+      return `${via}${j.technician ?? "—"} · ${ACK_WORD.get(j.techAck?.status ?? "") ?? "awaiting acceptance"}`;
     }
     default: { return `${(j.delivery === "contractor" ? j.contractor : "Internal") ?? "—"} · ${j.technician ?? "—"} · ${fmt(j.scheduled)}`;
     }
@@ -106,6 +115,7 @@ function rowLine(j: Job) {
 
 function JobDetail({ j, open }: Readonly<{ j: Job; open: (m: { kind: "book"; slot: Slot } | { kind: "propose" } | { kind: "reason"; what: "rework" | "hold" | "reassign" } | { kind: "classify" }) => void }>) {
   const toast = useToast();
+  const agreedBy = j.origin === "plan" ? "from plan" : "client-approved";
   const fits = j.preferred.map((item) => fitFor(item));
   const isAnyFit = fits.some((f) => f.fits !== "none");
   return (
@@ -167,9 +177,9 @@ function JobDetail({ j, open }: Readonly<{ j: Job; open: (m: { kind: "book"; slo
       {(j.status === "offered" || j.status === "accepted" || j.status === "assigned" || j.status === "in_progress") && (
         <Card title={j.delivery === "contractor" ? "Delivery · offer to contractor" : "Delivery · internal"}>
           <SummaryList items={[
-            ["Agreed time", j.scheduled ? `${longDate(j.scheduled)} (${j.origin === "plan" ? "from plan" : "client-approved"})` : "—"],
+            ["Agreed time", j.scheduled ? `${longDate(j.scheduled)} (${agreedBy})` : "—"],
             ...(j.delivery === "contractor" ? [["Contractor", `${j.contractor ?? "—"} · ${j.status === "offered" ? "offer open · expires 09-25 12:00" : "accepted"}`] as [string, string]] : []),
-            ["Technician", j.technician ? `${j.technician} · ${j.techAck?.status === "accepted" ? `accepted ${j.techAck.at ?? ""}` : (j.techAck?.status === "cant_make" ? "can’t make this time" : "awaiting acceptance")}` : "not assigned yet"],
+            ["Technician", j.technician ? `${j.technician} · ${techAnswer(j)}` : "not assigned yet"],
           ]} />
           {j.techAck?.status === "cant_make" && <div className="mt-3"><Banner tone="warn" action={<span className="flex gap-2">{j.delivery === "internal" && <Btn size="sm" onClick={() => { open({ kind: "reason", what: "reassign" }); }}>Reassign…</Btn>}<Btn size="sm" variant="primary" onClick={() => { open({ kind: "propose" }); }}>Propose another time…</Btn></span>}>{j.technician}: “{j.techAck.reason}”{j.techAck.alt ? ` · could do ${j.techAck.alt}` : ""}. Any new time needs the client’s approval.</Banner></div>}
         </Card>
@@ -288,9 +298,11 @@ function ReasonModal({ what, j, onClose }: Readonly<{ what: "rework" | "hold" | 
   const toast = useToast();
   const [r, setR] = useState("");
   const [tried, setTried] = useState(false);
-  const title = what === "rework" ? "Return for rework" : (what === "hold" ? "Put on hold" : `Reassign ${j.id}`);
+  const known = REASON_TEXT.get(what);
+  const title = known?.title ?? `Reassign ${j.id}`;
+  const done = known?.done ?? "Reassigned — tech-internal-b must accept";
   return (
-    <Modal open onClose={onClose} title={title} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!r.trim()) return; if (what === "reassign") jobActions.book(j.id, j.scheduled!, "internal", "tech-internal-b"); toast(what === "rework" ? "Returned for rework" : (what === "hold" ? "Job put on hold" : "Reassigned — tech-internal-b must accept"), "warn"); onClose(); }}>Confirm</Btn></>}>
+    <Modal open onClose={onClose} title={title} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!r.trim()) return; if (what === "reassign") jobActions.book(j.id, j.scheduled!, "internal", "tech-internal-b"); toast(done, "warn"); onClose(); }}>Confirm</Btn></>}>
       {what === "reassign" && <Field label="New technician (same agreed time)"><Select><option>tech-internal-b · Available</option></Select></Field>}
       <Field label="Reason (required)" error={tried && !r.trim() ? "A reason is required" : undefined}><Textarea value={r} onChange={(e) => { setR(e.target.value); }} /></Field>
     </Modal>

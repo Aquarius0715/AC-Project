@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Check, DemoBadge, EmptyState, Field, Input, ListRow, Modal, Page, Select, Steps, SummaryList, Tabs, Textarea, Timeline } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, DemoBadge, EmptyState, Field, Input, ListRow, Modal, Page, Select, Steps, SummaryList, Tabs, Textarea, Timeline, type Tone } from "@ac/web/components/ui";
 import { useI18n } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
-import { showTime } from "@ac/web/lib/i18n";
+import { showTime, textOf } from "@ac/web/lib/i18n";
 import { conceptText, kg3, quoteErrors, quoteInput, type ApiQuote, type QuoteDraft, type RecordRow } from "@ac/web/lib/offsets";
 import { quoteOffset, requestOffset, retryOffset, simulateOffset } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
@@ -17,7 +17,10 @@ interface Live {
   /** the record filters of the URL (IR324) and whether the URL's recordId is outside them */
   scope: { customerId?: string; status?: RecordRow["state"]; created: "7d" | "30d" | "90d" | "all" }; recordMissing: boolean;
 }
-const tone = (s: RecordRow["state"]) => (s === "demo_retired" ? "ok" : s === "failed" ? "crit" : s === "demo_purchased" ? "primary" : "warn");
+// a record's tone by its state (a request still open warns) and the words of the states
+const STATE_TONE = new Map<RecordRow["state"], Tone>([["demo_retired", "ok"], ["failed", "crit"], ["demo_purchased", "primary"]]);
+const tone = (s: RecordRow["state"]): Tone => STATE_TONE.get(s) ?? "warn";
+const STATE_WORD: Record<string, string> = { demo_requested: "Demo requested", demo_purchased: "Demo purchased", demo_retired: "Demo retired", failed: "Failed" };
 const blank: QuoteDraft = { customerId: "", unitIds: [], from: "", to: "", purpose: "", amountKg: "" };
 
 /** The offset demo registry (FR-A15) in API mode: records come from the server; quotes, requests and the simulated
@@ -62,7 +65,7 @@ export function OffsetsView({ live }: Readonly<{ live: Live }>) {
         <div className="flex flex-wrap items-end gap-3">
           <span className="pb-2 text-xs font-semibold text-muted-foreground">{t("Filter")}</span>
           <Field label={t("Customer")}><Select value={live.scope.customerId ?? ""} onChange={(e) => { nav({ customerId: e.target.value || null, recordId: null }); }}><option value="">{t("All customers")}</option>{live.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
-          <Field label={t("Status")}><Select value={live.scope.status ?? ""} onChange={(e) => { nav({ status: e.target.value || null, recordId: null }); }}><option value="">{t("All statuses")}</option>{(["demo_requested", "demo_purchased", "demo_retired", "failed"] as const).map((x) => <option key={x} value={x}>{t(x === "demo_requested" ? "Demo requested" : x === "demo_purchased" ? "Demo purchased" : x === "demo_retired" ? "Demo retired" : "Failed")}</option>)}</Select></Field>
+          <Field label={t("Status")}><Select value={live.scope.status ?? ""} onChange={(e) => { nav({ status: e.target.value || null, recordId: null }); }}><option value="">{t("All statuses")}</option>{(["demo_requested", "demo_purchased", "demo_retired", "failed"] as const).map((x) => <option key={x} value={x}>{textOf(STATE_WORD, x, t) ?? x}</option>)}</Select></Field>
           <Field label={t("Created")}><Select value={live.scope.created} onChange={(e) => { nav({ created: e.target.value === "30d" ? null : e.target.value, recordId: null }); }}><option value="7d">{t("Last 7 days")}</option><option value="30d">{t("Last 30 days")}</option><option value="90d">{t("Last 90 days")}</option><option value="all">{t("All time")}</option></Select></Field>
         </div>
         <div className="split-rev">

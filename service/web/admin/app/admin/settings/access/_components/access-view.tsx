@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Badge, Banner, Btn, Card, Check, Choice, EmptyState, Field, Input, ListRow, Modal, Page, Search, SearchSelect, Select, Textarea, Plain, ScrollX } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, Choice, EmptyState, Field, Input, ListRow, Modal, Page, Search, SearchSelect, Select, Textarea, Plain, ScrollX, type Tone } from "@ac/web/components/ui";
 import { useI18n } from "@ac/web/components/I18n";
 import { showTime } from "@ac/web/lib/i18n";
 import { useAction } from "@ac/web/lib/useAction";
@@ -21,6 +21,11 @@ interface Live {
   users: { id: string; name: string }[]; orgs: ApiOrganization[]; properties: { id: string; name: string }[]; units: { id: string; name: string }[];
 }
 
+/** A membership's tone: active, revoked by HQ, or inactive. */
+function memberTone(u: { active: boolean; revoked: boolean }): Tone {
+  if (u.active) return "ok";
+  return u.revoked ? "crit" : "muted";
+}
 /** Access & roles (FR-A03) in API mode: the organization / role / status filters and the selected membership live in
 the URL; saving and revoking are members.save through a Server Action (a revoke sets validUntil to now). The
 organization filter and the scope targets are search-selects (DD-A03, IR321). Texts in the display language; the
@@ -55,16 +60,35 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
   const toggle = (p: string, on: boolean) => { set({ permissions: on ? [...new Set([...d.permissions, p])] : d.permissions.filter((x) => x !== p) }); };
   const setWrite = (r: PermissionRow, on: boolean) => { set({ permissions: on ? [...new Set([...d.permissions, r.write!, ...(r.read ? [r.read] : [])])] : d.permissions.filter((x) => x !== r.write) }); };
   const blocked = (p: string) => !allowed.includes(p) || !live.canWrite || (isSelf && selfBlocked.includes(p) && !(sel?.m.permissions ?? []).includes(p));
+  // a role's starting scope: the tenant for HQ, the chosen organization for a contractor, none for a technician
+  const roleScopes = (r: Role): ScopeRef[] => {
+    if (r === "admin") return [{ kind: "tenant", id: live.tenantId }];
+    if (r === "contractor" && d.organizationId) return [{ kind: "organization", id: d.organizationId }];
+    return [];
+  };
   const chooseRole = (r: Role) => {
-    const scopes: ScopeRef[] = r === "admin" ? [{ kind: "tenant", id: live.tenantId }] : (r === "contractor" && d.organizationId ? [{ kind: "organization", id: d.organizationId }] : []);
-    set({ role: r, permissions: roleDefaults[r], organizationId: "", scopes });
+    set({ role: r, permissions: roleDefaults[r], organizationId: "", scopes: roleScopes(r) });
   };
   const chooseOrg = (id: string) => { set({ organizationId: id, scopes: d.role === "contractor" ? [{ kind: "organization", id }] : d.scopes }); };
   const orgs = live.orgs.filter((o) => o.kind === orgKind(d.role, d.employment));
   const customers = live.orgs.filter((o) => o.kind === "customer");
-  const targets = scopeKind === "unit" ? live.units : (scopeKind === "property" ? live.properties : customers.map((o) => ({ id: o.id, name: o.name })));
+  const scopeTargets = () => {
+    if (scopeKind === "unit") return live.units;
+    if (scopeKind === "property") return live.properties;
+    return customers.map((o) => ({ id: o.id, name: o.name }));
+  };
+  const targets = scopeTargets();
   const kindWord = { tenant: t("Tenant"), unit: t("Unit"), property: t("Property"), organization: t("Customer organization") };
-  const scopeName = (s: ScopeRef) => (s.kind === "tenant" ? t("All customers (tenant)") : (s.kind === "unit" ? live.units : (s.kind === "property" ? live.properties : live.orgs)).find((x) => x.id === s.id)?.name ?? s.id.slice(0, 8));
+  const scopeList = (kind: ScopeRef["kind"]): { id: string; name: string }[] => {
+    if (kind === "unit") return live.units;
+    if (kind === "property") return live.properties;
+    return live.orgs;
+  };
+  const scopeName = (s: ScopeRef) => (s.kind === "tenant" ? t("All customers (tenant)") : scopeList(s.kind).find((x) => x.id === s.id)?.name ?? s.id.slice(0, 8));
+  const memberWord = (u: { active: boolean; revoked: boolean }) => {
+    if (u.active) return t("Active");
+    return t(u.revoked ? "Revoked" : "Inactive");
+  };
   const roles = [{ id: "admin" as const, label: t("Admin") }, { id: "contractor" as const, label: t("Contractor") }, { id: "technician" as const, label: t("Technician") }];
   const save = () => {
     setTried(true);
@@ -90,7 +114,7 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
       <div className="split-rev">
         <Card title={t("Memberships")} sub={t("{n} · HQ, contractor and technician", { n: live.rows.length })} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => { nav({ membershipId: "new" }); }}><Icon name="add" /> {t("New membership")}</Btn>} className="self-start">
           <div className="mb-2"><Search placeholder={t("Search name or organization…")} value={q} onChange={setQ} /></div>
-          {shown.length === 0 ? <EmptyState title={t("No memberships")}>{t("No membership matches these filters.")}</EmptyState> : <div className="flex flex-col gap-1.5">{shown.map((u) => <ListRow key={u.id} id={`member-row-${u.id}`} selected={sel?.id === u.id} onClick={() => { nav({ membershipId: u.id }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{u.name}</b><Badge tone={u.active ? "ok" : (u.revoked ? "crit" : "muted")}>{u.active ? t("Active") : (t(u.revoked ? "Revoked" : "Inactive"))}</Badge></div><div className="truncate text-[11px] text-muted-foreground">{u.label}</div></div></ListRow>)}</div>}
+          {shown.length === 0 ? <EmptyState title={t("No memberships")}>{t("No membership matches these filters.")}</EmptyState> : <div className="flex flex-col gap-1.5">{shown.map((u) => <ListRow key={u.id} id={`member-row-${u.id}`} selected={sel?.id === u.id} onClick={() => { nav({ membershipId: u.id }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{u.name}</b><Badge tone={memberTone(u)}>{memberWord(u)}</Badge></div><div className="truncate text-[11px] text-muted-foreground">{u.label}</div></div></ListRow>)}</div>}
           <p className="mt-3 text-[11px] text-muted-foreground">{t("Client accounts are not listed here — they are managed per customer in Customers & units › Users.")}</p>
         </Card>
         {isMissing ? (

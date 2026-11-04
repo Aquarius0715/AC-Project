@@ -7,7 +7,7 @@ import { Banner, Btn, Card, EmptyState, Field, Input, ListRow, Modal, Page, Sele
 import { JobStatusBadge } from "@ac/web/components/JobBits";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
-import { zonedParts } from "@ac/web/lib/i18n";
+import { byCount, zonedParts } from "@ac/web/lib/i18n";
 import { fromZonedInput, zonedInput } from "@ac/web/lib/adminJobs";
 import { anchorOf, cadence, everyText, generateConflict, nextBox, nextOccurrence, planDate, planErrors, planRefusal } from "@ac/web/lib/adminPlans";
 import type { JobStatus } from "@ac/web/lib/jobs";
@@ -31,6 +31,11 @@ export function PlansView({ live }: Readonly<{ live: PlansLive }>) {
   const [notice, setNotice] = useState<Notice | null>(null);
   const sel = live.detail;
   const href = (id: string) => `/admin/jobs?${new URLSearchParams({ ...Object.fromEntries(Object.entries(live.q).filter(([, v]) => v) as [string, string][]), tab: "plans", planId: id })}`;
+  // the detail pane without a selected plan: the selected one is gone, or none is picked yet
+  const emptyText = () => {
+    if ("missing" in live) return t("That plan no longer exists in your scope.");
+    return t(live.rows.length > 0 ? "Pick a plan." : "No plan yet.");
+  };
   return (
     <Page className="max-w-[1440px]">
       <JobsTabs tab="plans" counts={live.counts} q={live.q} action={<Btn variant="primary" size="sm" onClick={() => { setCreating(true); }}><Icon name="add" /> {t("New plan")}</Btn>} />
@@ -50,7 +55,7 @@ export function PlansView({ live }: Readonly<{ live: PlansLive }>) {
           )}
         </Card>
         {sel ? <PlanDetail key={`${sel.plan.id}:${String(sel.plan.version)}`} d={sel} now={Date.parse(live.now)} notice={notice?.planId === sel.plan.id ? notice : null} setNotice={setNotice} />
-          : <Card title={t("Plan")}><p className="text-[13px] text-muted-foreground">{t("missing" in live ? "That plan no longer exists in your scope." : (live.rows.length > 0 ? "Pick a plan." : "No plan yet."))}</p></Card>}
+          : <Card title={t("Plan")}><p className="text-[13px] text-muted-foreground">{emptyText()}</p></Card>}
       </div>
       {creating && <NewPlanModal live={live} onClose={() => { setCreating(false); }} onCreated={(id) => { setCreating(false); setNotice({ planId: id, kind: "saved", text: t("Plan created — Generate job creates the job of its first occurrence.") }); }} href={href} />}
     </Page>
@@ -67,9 +72,12 @@ function PlanDetail({ d, now, notice, setNotice }: Readonly<{ d: Detail; now: nu
   const isNextChanged = !!nextIso && Date.parse(nextIso) !== Date.parse(p.nextDueAt);
   const isDirty = every !== p.recurrence.intervalMonths || isNextChanged;
   const errors = planErrors({ unitId: p.unitId, nextDueAt: isNextChanged ? nextIso : p.nextDueAt, every }, now, t);
-  const anchor = nextIso ? anchorOf(isNextChanged ? null : p, isNextChanged ? nextIso : p.nextDueAt) : p.anchorDay;
+  const due = isNextChanged ? nextIso : p.nextDueAt;
+  const anchorPlan = isNextChanged ? null : p; // a changed next date starts a new anchor
+  const anchor = nextIso ? anchorOf(anchorPlan, due) : p.anchorDay;
   // the saved plan's following date comes from the loader; an edit computes it here
-  const then = isDirty ? (nextIso ? planDate(nextOccurrence(isNextChanged ? nextIso : p.nextDueAt, every, anchor), i.display) : null) : d.texts.then;
+  const following = nextIso ? planDate(nextOccurrence(due, every, anchor), i.display) : null;
+  const then = isDirty ? following : d.texts.then;
   const box = nextBox(p, now, isDirty, notice?.kind === "generated" ? notice : null, i, d.texts.next);
   const conflict = notice?.kind === "conflict" ? generateConflict(p, notice.attempted, i) : null;
   const save = () => {
@@ -147,7 +155,7 @@ function NewPlanModal({ live, onClose, onCreated, href }: Readonly<{ live: Plans
   return (
     <Modal open onClose={onClose} title={t("New maintenance plan")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t("Create plan")}</Btn></>}>
       {refusal && <Banner tone="crit">{refusal}</Banner>}
-      <Field label={t("Unit · required")} error={tried ? errors.unitId : undefined} hint={existing.length > 0 ? t(existing.length === 1 ? "This unit already has 1 plan ({plans})." : "This unit already has {n} plans ({plans}).", { n: existing.length, plans: existing.map((r) => r.line.toLowerCase()).join("; ") }) : undefined}>
+      <Field label={t("Unit · required")} error={tried ? errors.unitId : undefined} hint={existing.length > 0 ? byCount(existing.length, { one: t("This unit already has 1 plan ({plans}).", { plans: existing.map((r) => r.line.toLowerCase()).join("; ") }), many: t("This unit already has {n} plans ({plans}).", { n: existing.length, plans: existing.map((r) => r.line.toLowerCase()).join("; ") }) }) : undefined}>
         <Select value={unitId} onChange={(e) => { setUnitId(e.target.value); }}>{groups.map((g) => <optgroup key={g} label={g}>{live.units.filter((u) => u.customer === g).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>)}</Select>
       </Field>
       <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
