@@ -15,6 +15,7 @@ import { useT } from "@ac/web/components/I18n";
 import { deletePolicy, savePolicy, setDefaultRule } from "../actions";
 import type { AlertsLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
+import { byCount, type T } from "@ac/web/lib/i18n";
 
 type Live = AlertsLive["policies"];
 interface Props { p: Live; onDone: (text: string) => void; onFail: (f: ActionFailure) => void }
@@ -106,12 +107,20 @@ function DeleteModal({ c, version, onClose, onFail }: Readonly<{ c: PolicyCard; 
       router.replace(base, { scroll: false });
       requestAnimationFrame(takeListFocus);
     }, onFail); }}>{t("Delete policy")}</Btn></>}>
-      <p className="text-[13px]">{n ? t(n === 1 ? "It is detached from {n} AC first: {units}." : "It is detached from {n} ACs first: {units}.", { n, units: c.attached.join(", ") }) : t("It is not attached to any AC.")} {t("The default policy can’t be deleted.")}</p>
+      <p className="text-[13px]">{byCount(n, { none: t("It is not attached to any AC."), one: t("It is detached from {n} AC first: {units}.", { n, units: c.attached.join(", ") }), many: t("It is detached from {n} ACs first: {units}.", { n, units: c.attached.join(", ") }) })} {t("The default policy can’t be deleted.")}</p>
     </Modal>
   );
 }
 
 const ops: Operator[] = ["gte", "gt", "lte", "lt"];
+/** What the condition sentence is about: the air metric by its symbol, else the metric group. */
+function conditionSubject(f: PolicyForm, t: T): string {
+  if (f.metric === "co2") return "CO₂";
+  if (f.metric === "pm25") return "PM2.5";
+  if (f.group === "temperature") return t("room temperature");
+  if (f.group === "humidity") return t("humidity");
+  return t("power");
+}
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function PolicyEditor({ p, editor, onDone, onFail }: Props & { editor: NonNullable<Live["editor"]> }) {
@@ -126,7 +135,13 @@ function PolicyEditor({ p, editor, onDone, onFail }: Props & { editor: NonNullab
   const unit = metricUnit[f.metric] ?? "";
   const isUp = f.operator === "gt" || f.operator === "gte";
   // the condition sentence shows one problem at a time; its field is marked and named by that line
-  const conditionError = errorText.threshold ? "threshold" : errorText.recovery ? "recovery" : errorText.duration ? "duration" : null;
+  const firstConditionError = () => {
+    if (errorText.threshold) return "threshold";
+    if (errorText.recovery) return "recovery";
+    if (errorText.duration) return "duration";
+    return null;
+  };
+  const conditionError = firstConditionError();
   const isShowCondition = !!conditionError && (tried || f.recovery !== editor.form.recovery || f.threshold !== editor.form.threshold);
   const invalid = (k: "threshold" | "recovery" | "duration") => (isShowCondition && conditionError === k ? { "aria-invalid": true, "aria-describedby": "policy-condition-error" } : {});
   const save = () => {
@@ -154,7 +169,7 @@ function PolicyEditor({ p, editor, onDone, onFail }: Props & { editor: NonNullab
         {f.group === "air" && <div className="mt-2"><Choice value={f.metric as "co2"} onChange={(v) => { set({ metric: v }); }} options={[{ id: "co2", label: "CO₂ (ppm)" }, { id: "pm25" as "co2", label: "PM2.5 (µg/m³)" }]} /></div>}
         <div className="mt-3 flex flex-col gap-2 rounded-xl bg-surface2 p-3 text-[13px]">
           <div className="flex flex-wrap items-center gap-2">
-            {t("Alert when {what} is", { what: f.metric === "co2" ? "CO₂" : (f.metric === "pm25" ? "PM2.5" : t(f.group === "temperature" ? "room temperature" : (f.group === "humidity" ? "humidity" : "power"))) })}
+            {t("Alert when {what} is", { what: conditionSubject(f, t) })}
             <Select aria-label={t("Operator")} className="w-20" value={f.operator} onChange={(e) => { set({ operator: e.target.value as Operator }); }}>{ops.map((o) => <option key={o} value={o}>{opSymbol[o]}</option>)}</Select>
             <Input id={policyFieldId("threshold")} aria-label={t("Threshold")} {...invalid("threshold")} inputMode="decimal" className="w-24" value={f.threshold} onChange={(e) => { set({ threshold: e.target.value }); }} />{t("{unit} continuously for", { unit })}
             <Input id={policyFieldId("duration")} aria-label={t("Duration")} {...invalid("duration")} inputMode="numeric" className="w-20" value={f.duration} onChange={(e) => { set({ duration: e.target.value }); }} />

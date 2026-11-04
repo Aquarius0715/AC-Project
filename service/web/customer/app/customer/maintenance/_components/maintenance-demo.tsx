@@ -11,8 +11,11 @@ import { symptomLength } from "@ac/web/lib/customerMaintenance";
 import { orDash } from "@ac/web/lib/text";
 
 type StatusTab = "all" | "reply" | "requested" | "scheduled" | "progress" | "completed" | "cancelled";
-const tabOf = (s: JobStatus): StatusTab =>
-  s === "time_proposed" ? "reply" : s === "requested" ? "requested" : s === "offered" || s === "accepted" || s === "assigned" ? "scheduled" : s === "completed" ? "completed" : s === "cancelled" ? "cancelled" : "progress";
+// the status tab of a job; the statuses of work under way count as in progress
+const TAB_OF = new Map<JobStatus, StatusTab>([
+  ["time_proposed", "reply"], ["requested", "requested"], ["offered", "scheduled"], ["accepted", "scheduled"], ["assigned", "scheduled"], ["completed", "completed"], ["cancelled", "cancelled"],
+]);
+const tabOf = (s: JobStatus): StatusTab => TAB_OF.get(s) ?? "progress";
 const ORDER: JobStatus[] = ["time_proposed", "requested", "in_progress", "rework_requested", "submitted", "offered", "accepted", "assigned", "on_hold", "completed", "cancelled"];
 const blank = (): Slot[] => [{ date: "2026-09-28", win: "14:00–16:00" }, { date: "2026-09-29", win: "10:00–12:00" }, { date: "2026-09-30", win: "09:00–11:00" }];
 
@@ -21,7 +24,9 @@ function scheduleLine(j: Job) {
   if (j.status === "requested") return { icon: "time" as IconName, text: `Preferred ${fmt(j.preferred[0])}${j.preferred.length > 1 ? ` · +${String(j.preferred.length - 1)} more` : ""} (not confirmed yet)` };
   if (j.status === "completed") return { icon: "success" as IconName, text: `Completed ${fmt(j.scheduled)} · report available` };
   if (j.status === "cancelled") return { icon: "cancelled" as IconName, text: "Cancelled" };
-  return { icon: "time" as IconName, text: `${j.origin === "plan" ? "Scheduled" : "Confirmed"} ${fmt(j.scheduled)}${j.technician && j.techAck?.status === "accepted" ? ` · ${j.technician}` : (j.status === "offered" ? " · booking the technician" : "")}` };
+  const booking = j.status === "offered" ? " · booking the technician" : "";
+  const who = j.technician && j.techAck?.status === "accepted" ? ` · ${j.technician}` : booking;
+  return { icon: "time" as IconName, text: `${j.origin === "plan" ? "Scheduled" : "Confirmed"} ${fmt(j.scheduled)}${who}` };
 }
 
 /** The Phase 1A demo of /customer/maintenance (fixture store); API mode renders MaintenanceView. */
@@ -105,7 +110,8 @@ function Detail({ j, onClose, open }: Readonly<{ j: Job; onClose: () => void; op
           {j.preferred.map((s, i) => {
             const chosen = j.scheduled && s.date === j.scheduled.date && s.win === j.scheduled.win;
             const isNone = j.status === "time_proposed" && fitFor(s).fits === "none";
-            return <SlotLine key={i} i={i} slot={s} struck={isNone} note={chosen ? "booked" : (isNone ? "Not available — no qualified technician free" : undefined)} />;
+            const unavailable = isNone ? "Not available — no qualified technician free" : undefined;
+            return <SlotLine key={i} i={i} slot={s} struck={isNone} note={chosen ? "booked" : unavailable} />;
           })}
         </div>
       )}
@@ -243,8 +249,10 @@ function ProblemModal({ open, j, onClose, onDone }: Readonly<{ open: boolean; j:
   );
 }
 
-function FollowUpBadge({ j }: { j: Job }) {
-  return j.followUpClass === "rework" ? <Badge tone="ok">Rework (free)</Badge> : (j.followUpClass === "new_request" ? <Badge tone="primary">New request</Badge> : <Badge tone="warn">Under HQ review</Badge>);
+function FollowUpBadge({ j }: Readonly<{ j: Job }>) {
+  if (j.followUpClass === "rework") return <Badge tone="ok">Rework (free)</Badge>;
+  if (j.followUpClass === "new_request") return <Badge tone="primary">New request</Badge>;
+  return <Badge tone="warn">Under HQ review</Badge>;
 }
 
 function NoteModal({ open, j, onClose, onDone }: Readonly<{ open: boolean; j: Job; onClose: () => void; onDone: () => void }>) {
@@ -279,6 +287,11 @@ const filters = [
   { unit: "Lobby AC", loc: "Office A · last cleaned Aug 12", h: 120, st: "OK" as const },
   { unit: "Living room AC", loc: "Home A › 1F · cleaned by technician Sep 8 (job-c02)", h: 41, st: "OK" as const },
 ];
+/** A filter's tone by its cleaning status. */
+function filterTone(st: string): "crit" | "warn" | "ok" {
+  if (st === "Overdue") return "crit";
+  return st === "Due soon" ? "warn" : "ok";
+}
 function FilterCare({ onRequest }: Readonly<{ onRequest: () => void }>) {
   const toast = useToast();
   const [rows, setRows] = useState(filters);
@@ -288,8 +301,8 @@ function FilterCare({ onRequest }: Readonly<{ onRequest: () => void }>) {
         <DataTable rowKey={(r) => r.unit} rows={rows} cols={[
           { key: "u", label: "AC", render: (r) => <div><b>{r.unit}</b><div className="text-[11px] text-muted-foreground">{r.loc}</div></div> },
           { key: "h", label: "Run time", render: (r) => `${String(r.h)} h since cleaning` },
-          { key: "p", label: "Progress", render: (r) => <div className="w-28"><UtilizationBar pct={Math.min(100, (r.h / 250) * 100)} tone={r.st === "Overdue" ? "crit" : (r.st === "Due soon" ? "warn" : "ok")} /></div>, hideBelow: "sm" },
-          { key: "s", label: "Status", render: (r) => <Badge tone={r.st === "Overdue" ? "crit" : (r.st === "Due soon" ? "warn" : "ok")}>{r.st}</Badge> },
+          { key: "p", label: "Progress", render: (r) => <div className="w-28"><UtilizationBar pct={Math.min(100, (r.h / 250) * 100)} tone={filterTone(r.st)} /></div>, hideBelow: "sm" },
+          { key: "s", label: "Status", render: (r) => <Badge tone={filterTone(r.st)}>{r.st}</Badge> },
           { key: "a", label: "", render: (r) => r.st === "Overdue" ? <Btn size="sm" variant="primary" onClick={onRequest}>Request cleaning</Btn> : <Btn size="sm" onClick={() => { setRows((s) => s.map((x) => (x.unit === r.unit ? { ...x, h: 0, st: "OK", loc: x.loc.split(" · ", 1)[0] + " · cleaned by you just now" } : x))); toast("Marked cleaned — counter reset"); }}>Mark cleaned</Btn> },
         ]} />
         <p className="mt-2 text-[11px] text-muted-foreground">Run time counts hours the AC was running. Unknown connection → “Unknown”.</p>

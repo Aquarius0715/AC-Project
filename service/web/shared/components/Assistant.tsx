@@ -13,7 +13,7 @@ import { waitForCommand } from "@ac/web/lib/unitCommands";
 import { useStoredValue } from "@ac/web/lib/urlState";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { sendVoiceChange } from "@ac/web/screens/shell/assistant/actions";
-import { Icon } from "./Icon";
+import { Icon, type IconName } from "./Icon";
 import { Sheet, SheetContent } from "@ac/web/components/ui/sheet";
 import { Button } from "@ac/web/components/ui/button";
 import { orNull } from "@ac/web/lib/promises";
@@ -27,6 +27,18 @@ export function AssistantPanel({ open, onClose, context, live }: { open: boolean
 }
 
 type Change = Extract<ResolvedIntent, { kind: "change" }>;
+
+/** A command card's or status line's look by tone: done, failed, or anything else as still in progress. */
+interface Look { soft: string; text: string; icon: IconName }
+const TONE_LOOK = new Map<string, Look>([["ok", { soft: "bg-ok-soft", text: "text-ok", icon: "success" }], ["crit", { soft: "bg-crit-soft", text: "text-crit", icon: "error" }]]);
+const PENDING_LOOK: Look = { soft: "bg-primary-soft", text: "text-primary", icon: "refresh" };
+const lookOf = (tone: string): Look => TONE_LOOK.get(tone) ?? PENDING_LOOK;
+
+/** An AC's connection and its last confirmed setting, for choosing between candidates. */
+function connectionText(u: ApiUnitDetail, t: T): string {
+  const value = u.observedState.celsius === null ? "—" : `${String(u.observedState.celsius)} °C`;
+  return t(u.connection === "online" ? "Online · confirmed {value}" : "Offline · last confirmed {value}", { value });
+}
 type ChatMessage =
   | { kind: "user"; text: string; via: "text" | "voice" }
   | { kind: "bot"; text: string; tone?: "crit" }
@@ -107,7 +119,7 @@ function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
         const units = await Promise.all(r.candidates.map((c) => unit(c.unitId)));
         const status = Object.fromEntries(r.candidates.map((c, n) => {
           const u = units[n];
-          return [c.unitId, u ? t(u.connection === "online" ? "Online · confirmed {value}" : "Offline · last confirmed {value}", { value: u.observedState.celsius === null ? "—" : `${String(u.observedState.celsius)} °C` }) : ""];
+          return [c.unitId, u ? connectionText(u, t) : ""];
         }));
         add({ kind: "candidates", groups: candidateGroups(r.candidates), question, via, status });
         setState("confirm");
@@ -144,7 +156,8 @@ function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
       setMsgs((s) => (s.some((x) => x.kind === "progress" && x.id === id) ? s.map((x) => (x.kind === "progress" && x.id === id ? { ...x, p } : x)) : [...s, { kind: "progress", unitId: m.intent.unitId, id, p, question }]));
     };
     const final = await orNull(waitForCommand(r.value, show));
-    setState(final?.status === "acknowledged" ? "success" : (final && ["failed", "expired", "cancelled"].includes(final.status) ? "failure" : "sending"));
+    const unsettled = ["failed", "expired", "cancelled"].includes(final?.status ?? "") ? "failure" : "sending";
+    setState(final?.status === "acknowledged" ? "success" : unsettled);
   };
   const voice = () => {
     if (isMic) { setState("listening"); return; }
@@ -189,8 +202,8 @@ function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
               </div>);
           }
           return (
-            <div key={n} className={cx("rounded-2xl px-3 py-2 text-[13px]", m.p.tone === "ok" ? "bg-ok-soft" : (m.p.tone === "crit" ? "bg-crit-soft" : "bg-primary-soft"))}>
-              <b className={m.p.tone === "ok" ? "text-ok" : (m.p.tone === "crit" ? "text-crit" : "text-primary")}><Icon name={m.p.tone === "ok" ? "success" : (m.p.tone === "crit" ? "error" : "refresh")} /> {m.p.title}</b>
+            <div key={n} className={cx("rounded-2xl px-3 py-2 text-[13px]", lookOf(m.p.tone).soft)}>
+              <b className={lookOf(m.p.tone).text}><Icon name={lookOf(m.p.tone).icon} /> {m.p.title}</b>
               {m.p.rows && <div className="mt-1"><SummaryList items={m.p.rows} /></div>}
               <p className="mt-1 text-xs">{m.p.detail}</p>
               {m.p.tone !== "info" && <div className="mt-2 flex flex-wrap items-center gap-2">{m.p.tone === "crit" && <Btn size="sm" disabled={busy} onClick={() => ask(m.question, "text")}>{t("Try again")}</Btn>}<Link className="text-xs font-semibold text-primary" href={`/customer/units/${m.unitId}`}>{t("Open Unit Control")}</Link>{m.p.tone === "ok" && <span className="text-[11px] text-muted-foreground">{t("Undo is a new command")}</span>}</div>}
@@ -333,7 +346,7 @@ function DemoAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
               Which AC did you mean? I never guess the target.
               <div className="mt-2 flex flex-wrap gap-2">{m.options.map((o) => <Btn key={o} size="sm" onClick={() => { setMsgs((s) => [...s.filter((x) => x.kind !== "ask"), { kind: "confirm", target: o, temp: m.temp }]); }}>{o}</Btn>)}</div>
             </div>);
-          return <div key={n} className={cx("rounded-xl px-3 py-2 text-[13px] font-semibold", m.tone === "ok" ? "bg-ok-soft text-ok" : (m.tone === "crit" ? "bg-crit-soft text-crit" : "bg-primary-soft text-primary"))}><Icon name={m.tone === "ok" ? "success" : (m.tone === "crit" ? "error" : "refresh")} /> {m.text}</div>;
+          return <div key={n} className={cx("rounded-xl px-3 py-2 text-[13px] font-semibold", lookOf(m.tone).soft, lookOf(m.tone).text)}><Icon name={lookOf(m.tone).icon} /> {m.text}</div>;
         })}
         {listening && <div className="self-center rounded-full bg-primary-soft px-4 py-2 text-xs font-bold text-primary"><Icon name="mic" /> Listening… speak now</div>}
         <div ref={end} />
