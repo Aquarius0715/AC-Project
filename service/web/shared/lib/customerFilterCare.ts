@@ -63,15 +63,26 @@ export interface FilterGroup {
 }
 export type FilterLine = { kind: "unit"; row: FilterRow } | { kind: "group"; group: FilterGroup };
 
+/** How far a filter is to its next cleaning: % of the run-time threshold, else % of the fallback days, else unknown. */
+function filterProgress(h: number | null | undefined, days: number | null, s: ApiFilterStatus, t: T): { pct: number | null; text: string } {
+  if (h != null) {
+    const pct = Math.min(100, Math.round((h / s.thresholdHours) * 100));
+    return { pct, text: t("{pct} % of {n} h", { pct, n: s.thresholdHours }) };
+  }
+  if (days == null) return { pct: null, text: t("run time unknown") };
+  const pct = Math.min(100, Math.round((days / s.fallbackDays) * 100));
+  return { pct, text: t("{pct} % of {n} days", { pct, n: s.fallbackDays }) };
+}
 /** One row per AC (IR134 items 1–3): run time and % of the threshold, or the fallback days since the last cleaning. */
 export function filterRow(s: ApiFilterStatus, u: FilterUnit | undefined, nowMs: number, i: I18n = EN): FilterRow {
   const { t } = i;
   const h = s.runHoursSinceCleaning;
   const days = s.lastCleanedAt ? Math.max(0, Math.floor((nowMs - Date.parse(s.lastCleanedAt)) / 86_400_000)) : null;
-  const pct = h == null ? (days == null ? null : Math.min(100, Math.round((days / s.fallbackDays) * 100))) : Math.min(100, Math.round((h / s.thresholdHours) * 100));
-  const progress = h == null ? (days == null ? t("run time unknown") : t("{pct} % of {n} days", { pct: pct!, n: s.fallbackDays })) : t("{pct} % of {n} h", { pct: pct!, n: s.thresholdHours });
+  const { pct, text: progress } = filterProgress(h, days, s, t);
   const isOffline = !!u && u.connection !== "online";
-  const last = s.lastCleanedAt ? t(s.lastCleanedBy === "technician" ? "cleaned by technician {date}" : "last cleaned {date}", { date: monthDay(s.lastCleanedAt, i.display) }) : t("no cleaning recorded yet");
+  const lastText = s.lastCleanedBy === "technician" ? "cleaned by technician {date}" : "last cleaned {date}";
+  const last = s.lastCleanedAt ? t(lastText, { date: monthDay(s.lastCleanedAt, i.display) }) : t("no cleaning recorded yet");
+  const runText = s.lastCleanedAt ? "{n} h since cleaning" : "{n} h so far";
   return {
     unitId: s.unitId,
     unit: u?.name ?? t("Unit"),
@@ -79,7 +90,7 @@ export function filterRow(s: ApiFilterStatus, u: FilterUnit | undefined, nowMs: 
     spaceId: u?.spaceId ?? null,
     offline: isOffline,
     jobId: s.lastCleanedBy === "technician" ? s.lastCleaningJobId : null,
-    run: h == null ? "—" : t(s.lastCleanedAt ? "{n} h since cleaning" : "{n} h so far", { n: Math.round(h) }),
+    run: h == null ? "—" : t(runText, { n: Math.round(h) }),
     runNote: h == null ? t(isOffline ? "offline" : "no power readings") : null,
     state: s.status,
     threshold: s.thresholdHours,
@@ -92,6 +103,11 @@ export function filterRow(s: ApiFilterStatus, u: FilterUnit | undefined, nowMs: 
   };
 }
 
+/** A group's badge: how many are due (critical when one is overdue), unknown when no AC reports, or OK. */
+function groupBadge(due: number, isOverdue: boolean, isUnknown: boolean, t: T): FilterGroup["badge"] {
+  if (due) return { label: t("{n} due", { n: due }), tone: isOverdue ? "crit" : "warn" };
+  return isUnknown ? { label: t("Unknown"), tone: "unknown" } : { label: t("OK"), tone: "ok" };
+}
 /** The summary of an area's ACs: “2 due soon · 1 offline”, the average progress and “2 due”. */
 export function filterGroup(key: string, rows: FilterRow[], t: T = en): FilterGroup {
   const n = (st: FilterState) => rows.filter((r) => r.state === st).length;
@@ -106,7 +122,7 @@ export function filterGroup(key: string, rows: FilterRow[], t: T = en): FilterGr
     place: rows[0].place,
     run: parts.length > 0 ? parts.join(" · ") : t("all OK"),
     progress: pct == null ? t("run time unknown") : t("{pct} % of {n} h (average)", { pct, n: rows[0].threshold }),
-    badge: due ? { label: t("{n} due", { n: due }), tone: n("overdue") ? "crit" : "warn" } : (n("unknown") === rows.length ? { label: t("Unknown"), tone: "unknown" } : { label: t("OK"), tone: "ok" }),
+    badge: groupBadge(due, n("overdue") > 0, n("unknown") === rows.length, t),
     key,
     pct,
     rows,
@@ -135,8 +151,8 @@ export function filterLines(items: ApiFilterStatus[], units: FilterUnit[], nowMs
 /** The symptom line of a cleaning request opened from the tab (New request prefilled, type preventive), in the
 display language — the client still edits it before sending. */
 export const cleaningSymptom = (r: FilterRow, t: T = en) => {
-  return r.hours == null ? (r.days == null ? t("Filter cleaning: the filter is due for cleaning.") : t("Filter cleaning: {n} days since the last cleaning (reminder every {days} days).", { n: r.days, days: r.fallbackDays }))
-    : t("Filter cleaning: {n} h of running since the last cleaning (reminder at {threshold} h).", { n: Math.round(r.hours), threshold: r.threshold });
+  if (r.hours != null) return t("Filter cleaning: {n} h of running since the last cleaning (reminder at {threshold} h).", { n: Math.round(r.hours), threshold: r.threshold });
+  return r.days == null ? t("Filter cleaning: the filter is due for cleaning.") : t("Filter cleaning: {n} days since the last cleaning (reminder every {days} days).", { n: r.days, days: r.fallbackDays });
 };
 
 /** The Reminders card (Figma 07j). */

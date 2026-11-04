@@ -205,3 +205,9 @@ export function textOf(table: Readonly<Partial<Record<string, string>>>, key: st
   const text = texts.get(key);
   return text ? t(text) : undefined;
 }
+
+/** byCount picks the already translated text for a count: `none` for 0 (when given), `one` for 1, else `many`. */
+export function byCount(n: number, texts: { none?: string; one: string; many: string }): string {
+  if (n === 0 && texts.none !== undefined) return texts.none;
+  return n === 1 ? texts.one : texts.many;
+}

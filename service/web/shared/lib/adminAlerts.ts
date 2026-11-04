@@ -2,7 +2,7 @@
 // members.list projected for the admin alerts screen. Pure code shared by the Server Component and the client view;
 // Vitest covers it. Texts in the display language (`i` / `t`, IR292); times IR44 in the user's display time zone, with
 // "today / yesterday" for the days next to now. Cause codes and evidence texts stay as the Core API records them.
-import { EN, relativeTime, showDate, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
+import { EN, relativeTime, showDate, showTime, translator, type I18n, type T, textOf, byCount } from "@ac/web/lib/i18n";
 import { evidenceText, resolutionText } from "@ac/web/lib/evidence";
 import { alertTitle } from "@ac/web/lib/alerts";
 import type { OpInput } from "@ac/web/lib/opTypes";
@@ -119,7 +119,7 @@ export function adminAlertRows(alerts: ApiAdminAlert[], units: ApiUnitName[], cu
         evidence: `${textOf(evidenceKind, a.evidenceKind, t) ?? a.evidenceKind} — “${evidenceText(a.evidenceText, t)}”`,
         cause: a.causeCode === "unknown" ? t("not determined") : t("{cause} (suspected)", { cause: a.causeCode }),
         observed: showTime(a.observedAt, display), detected: showTime(a.detectedAt, display),
-        evidenceRecords: a.evidenceIds.length > 0 ? t(a.evidenceIds.length === 1 ? "1 attached" : "{n} attached", { n: a.evidenceIds.length }) : t("none attached"), timeline,
+        evidenceRecords: byCount(a.evidenceIds.length, { none: t("none attached"), one: t("1 attached"), many: t("{n} attached", { n: a.evidenceIds.length }) }), timeline,
       };
     });
 }
@@ -131,14 +131,15 @@ export function policyRows(policies: ApiPolicy[], customers: ApiCustomerName[], 
   const unitName = new Map(units.map((u) => [u.id, u.displayName]));
   return policies
     .filter((p): p is ApiPolicy & { kind: "alert" | "default_alert" } => p.kind === "alert" || p.kind === "default_alert")
-    .toSorted((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : (a.kind === "default_alert" ? -1 : 1)))
+    // the default policy first, then by name
+    .toSorted((a, b) => Number(b.kind === "default_alert") - Number(a.kind === "default_alert") || a.name.localeCompare(b.name))
     .map((p) => {
       const customerName = p.customerId ? cust.get(p.customerId) ?? t("customer") : "";
       const op = p.operator ?? "gte";
       const metric = p.metric ?? "";
       const rules = p.rules?.length ?? 0;
       const sub = p.kind === "default_alert"
-        ? t(rules === 1 ? "1 rule · ventilation (CO₂, PM2.5) + fault causes" : "{n} rules · ventilation (CO₂, PM2.5) + fault causes", { n: rules })
+        ? byCount(rules, { one: t("1 rule · ventilation (CO₂, PM2.5) + fault causes"), many: t("{n} rules · ventilation (CO₂, PM2.5) + fault causes", { n: rules }) })
         : `${textOf(metricLabel, metric, t) ?? metric} ${opSymbol[op]} ${String(p.threshold ?? "—")} ${metricUnit[metric] ?? ""} ${t("for {n} s", { n: p.durationSeconds ?? 0 })}`;
       const recipients = (p.recipientMembershipIds ?? []).map((id) => {
         const m = member.get(id);
@@ -152,7 +153,7 @@ export function policyRows(policies: ApiPolicy[], customers: ApiCustomerName[], 
         name: p.name,
         group: p.kind === "default_alert" ? t("DEFAULT · ON EVERY UNIT") : customerName.toUpperCase(),
         on: p.enabled,
-        units: p.kind === "default_alert" ? t("every unit") : t(p.unitIds.length === 1 ? "1 unit" : "{n} units", { n: p.unitIds.length }),
+        units: p.kind === "default_alert" ? t("every unit") : byCount(p.unitIds.length, { one: t("1 unit"), many: t("{n} units", { n: p.unitIds.length }) }),
         customerId: p.customerId ?? null,
         priority: p.priority,
         timezone: p.timezone,
@@ -309,7 +310,14 @@ export function alertPolicyInput(p: AdminPolicy): OpInput<"policies.save"> {
 
 /** NotificationDecision of service-contracts.ts: one policy's outcome for one unit in automations.simulate. */
 export interface NotificationDecision { unitId: string; policyId: string; decision: "selected" | "suppressed" | "failed"; reason: "not_due" | "quality" | "disabled" | "owner_forbidden" | "cooldown" | "no_recipient" | null }
-const holds = (op: Operator, v: number, threshold: number) => (op === "gt" ? v > threshold : op === "gte" ? v >= threshold : op === "lt" ? v < threshold : v <= threshold);
+function holds(op: Operator, v: number, threshold: number): boolean {
+  switch (op) {
+    case "gt": { return v > threshold; }
+    case "gte": { return v >= threshold; }
+    case "lt": { return v < threshold; }
+    case "lte": { return v <= threshold; }
+  }
+}
 /** What “Test with demo data” found for a synthetic reading (DD-A05 item 7, IR348), in words and a tone; null means the
 policy did not run on the unit (no longer attached). */
 export function testOutcome(d: NotificationDecision | null, p: Pick<AdminPolicy, "metric" | "operator" | "threshold">, value: number, unitName: string, t: T = en): { tone: "ok" | "warn" | "crit" | "muted"; text: string } {

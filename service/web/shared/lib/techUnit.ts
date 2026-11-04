@@ -4,7 +4,7 @@
 // connection is down (DD-T03) — and one metric over 1 h or 24 h (rolling) or 7 days (Kuala Lumpur calendar days) with
 // the other metrics and the events of that period. Pure code shared by the server loader and the view; Vitest covers
 // it. Texts in the display language (`i`, IR283); instants in the user's display time zone (IR44).
-import { EN, relativeTime, showClock, showDate, showDayMonth, showSpan, type I18n, type T, textOf } from "@ac/web/lib/i18n";
+import { EN, relativeTime, showClock, showDate, showDayMonth, showSpan, type I18n, type T, textOf, byCount } from "@ac/web/lib/i18n";
 import { evidenceText, resolutionText } from "@ac/web/lib/evidence";
 import { alertTitle, type ApiAlert } from "@ac/web/lib/alerts";
 import { metricLabel } from "@ac/web/lib/adminAlerts";
@@ -83,13 +83,20 @@ export interface Tile { label: string; value: string; sub: string; tone?: "crit"
 const QUALITY: Record<string, string> = { stale: "stale", suspect: "suspect", missing: "missing" };
 const MODE: Record<string, string> = { cool: "Cooling", dry: "Drying", fan: "Fan only" };
 const CONNECTION: Record<string, string> = { online: "Online", offline: "Offline", unknown: "Unknown", connecting: "Connecting", error: "Error" };
+/** What the AC is doing: off, its mode when known, on, or unknown. */
+function operationText(s: ApiTechUnit["observedState"], t: T): string {
+  if (s.power === null) return "—";
+  if (!s.power) return t("Off");
+  return textOf(MODE, s.mode, t) ?? t("On");
+}
 /** The latest values (Figma tiles): temperature, power, operation and connection, each with its time — “last known”
 while the unit is not online, so nothing reads as live (DD-T03). A reading of stale, suspect or missing quality keeps
 its quality beside the value (IR213). */
 export function liveTiles(d: ApiTechUnit, nowMs: number, i: I18n = EN): Record<"temperature" | "power" | "operation" | "connection", Tile> {
   const { t } = i;
   const isDown = d.connection !== "online";
-  const seen = (iso: string | null) => (iso ? t(isDown ? "last known · observed {time}" : "observed {time}", { time: relativeTime(iso, nowMs, i) }) : "—");
+  const seenText = isDown ? "last known · observed {time}" : "observed {time}";
+  const seen = (iso: string | null) => (iso ? t(seenText, { time: relativeTime(iso, nowMs, i) }) : "—");
   const reading = (metric: string): Tile => {
     const m = d.latestMeasurements.find((x) => x.metric === metric);
     if (!m || m.value === null) return { label: label(metric, t), value: "—", sub: m ? seen(m.observedAt) : t("no reading") };
@@ -99,7 +106,7 @@ export function liveTiles(d: ApiTechUnit, nowMs: number, i: I18n = EN): Record<"
   const s = d.observedState;
   return {
     temperature: reading("temperature"), power: reading("power"),
-    operation: { label: t("Operation"), value: s.power === null ? "—" : s.power ? s.mode && MODE[s.mode] ? t(MODE[s.mode]) : t("On") : t("Off"), sub: seen(s.observedAt) },
+    operation: { label: t("Operation"), value: operationText(s, t), sub: seen(s.observedAt) },
     connection: {
       label: t("Connection"), value: t(CONNECTION[d.connection] ?? d.connection), tone: isDown ? "crit" : undefined,
       sub: d.lastSeenAt ? t("last seen {time}", { time: relativeTime(d.lastSeenAt, nowMs, i) }) : t("never seen"),
@@ -114,6 +121,11 @@ export function stoppedBanner(d: ApiTechUnit, nowMs: number, i: I18n = EN): stri
 }
 
 export interface SeriesChart { title: string; points: (number | null)[]; labels: string[]; gap: string | null; count: string | null; cut: string | null; empty: boolean }
+/** The chart's first label: the Kuala Lumpur day for 7 days, the day and time for 24 h, the time for 1 h. */
+function windowStart(at: string, p: Period, display: I18n["display"]): string {
+  if (p === "7d") return showDayMonth(at, { ...display, timeZone: "Asia/Kuala_Lumpur" });
+  return p === "24h" ? `${showDayMonth(at, display)}, ${showClock(at, display, false)}` : showClock(at, display, false);
+}
 /** One metric over the period: 12 equal slots with the latest valid reading in each (stale, suspect and missing ones
 are not plotted), the empty slots between readings named as a gap that stays unconnected. A `complete` series — the
 period's averages (IR606) — counts the period's readings (`total`); otherwise, when the period holds more readings
@@ -133,7 +145,7 @@ export function seriesChart(metric: string, unit: string, items: Point[], p: Per
     gap = t("no data {span} (gap not connected)", { span: showSpan(new Date(from + k * slot).toISOString(), new Date(from + (end + 1) * slot).toISOString(), display) });
   }
   const at = new Date(from).toISOString();
-  const start = p === "7d" ? showDayMonth(at, { ...display, timeZone: "Asia/Kuala_Lumpur" }) : (p === "24h" ? `${showDayMonth(at, display)}, ${showClock(at, display, false)}` : showClock(at, display, false));
+  const start = windowStart(at, p, display);
   const isCut = !complete && total > items.length;
   const n = complete ? total : items.length;
   const name = `${label(metric, t)}${unit ? ` (${unit})` : ""}`;
@@ -141,7 +153,7 @@ export function seriesChart(metric: string, unit: string, items: Point[], p: Per
     title: p === "7d" ? t("{metric} · last 7 days (Kuala Lumpur calendar days)", { metric: name }) : t("{metric} · last {period} (rolling)", { metric: name, period: t(p === "1h" ? "1 h" : "24 h") }),
     labels: [start, "", "", "", t("now")],
     empty: points.every((v) => v === null),
-    count: isCut ? null : t(n === 1 ? "1 measurement in this period" : "{n} measurements in this period", { n }),
+    count: isCut ? null : byCount(n, { one: t("1 measurement in this period"), many: t("{n} measurements in this period", { n }) }),
     cut: isCut ? t("Showing the latest {n} of {total} readings — earlier readings in this period are not loaded.", { n: items.length, total }) : null,
     points,
     gap,
@@ -149,6 +161,8 @@ export function seriesChart(metric: string, unit: string, items: Point[], p: Per
 }
 
 export interface MiniMetric { metric: string; label: string; value: string; sub: string; points: (number | null)[]; cut: boolean; tone?: "warn" }
+/** A reading's quality beside its value, when it is not valid. */
+const qualityNote = (quality: string, t: T) => (quality === "valid" ? "" : ` (${textOf(QUALITY, quality, t) ?? quality})`);
 /** Up to three other metrics of the unit with their latest value and the period's slots (Figma: humidity, power,
 supply air); `cut` when the period holds more readings (`totals`) than were loaded (IR598). */
 export function otherMetrics(d: ApiTechUnit, shown: string, series: Record<string, Point[]>, p: Period, nowMs: number, i: I18n = EN, totals: Record<string, number> = {}): MiniMetric[] {
@@ -157,7 +171,7 @@ export function otherMetrics(d: ApiTechUnit, shown: string, series: Record<strin
   return d.latestMeasurements.filter((m) => m.metric !== shown).slice(0, 3).map((m) => {
     return {
       metric: m.metric, label: label(m.metric, t), tone: m.quality === "valid" ? undefined : "warn" as const,
-      value: m.value === null ? "—" : `${airNumber(m.metric, m.value)} ${m.unit}${m.quality === "valid" ? "" : ` (${t(QUALITY[m.quality] ?? m.quality)})`}`,
+      value: m.value === null ? "—" : `${airNumber(m.metric, m.value)} ${m.unit}${qualityNote(m.quality, t)}`,
       sub: t(d.connection === "online" ? "observed {time}" : "last known · observed {time}", { time: relativeTime(m.observedAt, nowMs, i) }),
       points: bucket(series[m.metric] ?? [], new Date(from), new Date(to), 12), cut: (totals[m.metric] ?? 0) > (series[m.metric]?.length ?? 0),
     };

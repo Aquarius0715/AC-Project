@@ -30,7 +30,17 @@ export const stateLabel: Record<RestrictionState, string> = { scheduled: "Schedu
 /** A state as the screens word it. */
 export const stateWord = (s: RestrictionState, t: T = en) =>
   ({ scheduled: t("Scheduled"), requested: t("Requested"), applied: t("Applied"), release_requested: t("Release requested"), released: t("Released"), cancelled: t("Cancelled") })[s] ?? s;
-export const stateTone = (s: RestrictionState) => (s === "applied" ? "warn" : s === "released" ? "ok" : s === "cancelled" ? "muted" : s === "release_requested" ? "unknown" : "primary");
+/** The colour of a restriction state's badge. */
+export type StateTone = "warn" | "ok" | "muted" | "unknown" | "primary";
+const STATE_TONE = new Map<RestrictionState, StateTone>([["applied", "warn"], ["released", "ok"], ["cancelled", "muted"], ["release_requested", "unknown"]]);
+export const stateTone = (s: RestrictionState): StateTone => STATE_TONE.get(s) ?? "primary";
+/** Which restriction the unit reports it is under, and when it said so. */
+function observedText(u: ApiRestriction["perUnit"][number], restrictionId: string, i: I18n): string {
+  const { t } = i;
+  if (!u.observedRestriction) return t("none observed");
+  const which = t(u.observedRestriction.restrictionId === restrictionId ? "this restriction" : "another restriction");
+  return u.observedAt ? `${which} · ${showTime(u.observedAt, i.display)}` : which;
+}
 export const policyText = (p: Policy, t: T = en) => (p.kind === "power_off" ? t("Power off") : t("Temperature limit — cooling setpoint ≥ {value} °C", { value: p.minimumCoolingSetpoint }));
 /** Where a release intent came from, worded. */
 export const sourceWord = (s: NonNullable<ReleaseIntent>["source"], t: T = en) =>
@@ -76,7 +86,8 @@ export function unitRows(r: ApiRestriction, names: Map<string, string>, commands
     none: t("none"), waiting_reconcile: t("waiting for reconciliation"), requested: t("requested"), released: t("released"), not_required: t("not required"), failed: t("failed"),
   };
   const command: Record<ApiCommand["status"], string> = { requested: t("requested"), sent: t("sent"), acknowledged: t("acknowledged"), failed: t("failed"), expired: t("expired"), cancelled: t("cancelled") };
-  const pending = (p: string | null) => (p === "offline" ? t("offline") : (p === "device_operation_running" ? t("a device operation is running") : p));
+  const pendingText = new Map([["offline", t("offline")], ["device_operation_running", t("a device operation is running")]]);
+  const pending = (p: string | null) => (p === null ? null : pendingText.get(p) ?? p);
   return r.perUnit.map((u) => {
     const last = (ids: string[]) => (ids.length > 0 ? commands.get(ids[ids.length - 1]) : undefined);
     const a = last(u.applyCommandIds);
@@ -84,8 +95,7 @@ export function unitRows(r: ApiRestriction, names: Map<string, string>, commands
     const status = (c: ApiCommand) => `${command[c.status] ?? c.status}${c.failureCode ? ` (${c.failureCode})` : ""}`;
     return {
       unitId: u.unitId, name: names.get(u.unitId) ?? u.unitId.slice(0, 8), apply: apply[u.applyState] ?? u.applyState, release: release[u.releaseState] ?? u.releaseState, pending: pending(u.pendingReason),
-      observed: u.observedRestriction
-        ? `${t(u.observedRestriction.restrictionId === r.id ? "this restriction" : "another restriction")}${u.observedAt ? ` · ${showTime(u.observedAt, i.display)}` : ""}` : t("none observed"),
+      observed: observedText(u, r.id, i),
       retryApply: r.state === "requested" && (u.applyState === "not_sent" || u.applyState === "not_applied"),
       retryRelease: r.state === "release_requested" && (u.releaseState === "failed" || (u.releaseState === "none" && u.applyState === "applied")),
       reconcile: ["requested", "applied", "release_requested"].includes(r.state) && u.applyState === "sent_unknown",
