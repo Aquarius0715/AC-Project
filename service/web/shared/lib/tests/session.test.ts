@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SESSION_COOKIE, cookieKey, cookieOptions, endIdpSession, jwtClaims, needsRefresh, oidcConfig, readSession, refresh, roleHome, safeReturnTo, seal, sessionFromTokens, unseal, unsealAs, type Session } from "@ac/web/lib/session";
 import { z } from "zod";
 import { must } from "./must";
-import { bodyText } from "./http";
+import { bodyText, sentCall } from "./http";
 import { without } from "@ac/web/lib/omit";
 
 // the BFF session (backend architecture §5) is server code: next/headers is the request's cookie jar
@@ -123,7 +123,7 @@ describe("refreshing the access token", () => {
     const fetch = answer(200, { access_token: token(claims), refresh_token: "r-2", expires_in: 300 });
     vi.stubGlobal("fetch", fetch);
     expect(await refresh(session())).toMatchObject({ refreshToken: "r-2", tenantId: "t-1", membershipId: "m-1", expiresAt: NOW / 1000 + 300 });
-    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    const [url, init] = sentCall(fetch.mock.calls);
     expect(url).toBe("https://keycloak:8080/realms/ac/protocol/openid-connect/token");
     expect(Object.fromEntries(new URLSearchParams(bodyText(init)))).toEqual({ grant_type: "refresh_token", refresh_token: "r-1", client_id: "ac-web", client_secret: "test-client-secret" });
   });
@@ -154,7 +154,7 @@ describe("ending the identity provider's session", () => {
     const fetch = vi.fn(() => Promise.resolve(new Response(null, { status: 204 })));
     vi.stubGlobal("fetch", fetch);
     expect(await endIdpSession("r-1")).toBe(true);
-    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    const [url, init] = sentCall(fetch.mock.calls);
     expect([url, init.method]).toEqual(["https://keycloak:8080/realms/ac/protocol/openid-connect/logout", "POST"]);
     expect(Object.fromEntries(new URLSearchParams(bodyText(init)))).toEqual({ refresh_token: "r-1", client_id: "ac-web", client_secret: "test-client-secret" });
     expect(init.signal).toBeInstanceOf(AbortSignal); // never waits long for the provider

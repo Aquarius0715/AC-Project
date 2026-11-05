@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import { sentCall } from "./http";
 import { POST } from "@ac/web/bff/ops/[operation]/route";
 
 vi.mock("server-only", () => ({}));
@@ -23,7 +24,7 @@ describe("POST /bff/ops/<operation>", () => {
     vi.stubGlobal("fetch", fetch);
     const res = await relay("units.get", { id: "00000000-0000-4000-8000-000000000001" });
     expect([res.status, await res.json()]).toEqual([200, { data: { id: "u-1" } }]);
-    expect((fetch.mock.calls[0] as unknown as [string, RequestInit])[0]).toBe("https://core:8080/v1/units/00000000-0000-4000-8000-000000000001");
+    expect(sentCall(fetch.mock.calls)[0]).toBe("https://core:8080/v1/units/00000000-0000-4000-8000-000000000001");
   });
   it("refuses another site's read or write without calling the Core API", async () => {
     vi.stubEnv("DATA_SOURCE", "api");
