@@ -5,6 +5,7 @@ import { CURRENT_CLIENT } from "@ac/web/lib/clientUsers";
 import { Badge, Btn, Card, Check, Choice, ErrorState, Field, Input, Modal, Page, Select, SeverityBadge, SummaryList, Tabs, Toggle, cx, useToast, Plain, ScrollX } from "@ac/web/components/ui";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
 import { type Alert } from "@ac/web/lib/alerts";
+import { type Severity } from "@ac/web/lib/adminAlerts";
 import { Icon } from "@ac/web/components/Icon";
 
 const seed: Alert[] = [
@@ -15,6 +16,7 @@ const seed: Alert[] = [
   { id: "alert-fw", title: "Firmware update available", sev: "normal", kind: "System information", kindIcon: "refresh", icon: "info", where: "Living room AC · v2.4.1 ready · 3 days ago", ev: "Installed by HQ/technician. No action needed.", group: "info", read: true },
 ];
 
+const RULE_SEVERITY = new Map<string, Severity>([["Info", "normal"], ["Warning", "warning"], ["Critical", "critical"]]);
 const defaultRules = [["Ventilation", "CO₂ ≥ 1000 ppm for 10 min", "Warning", true], ["Dust / filter", "PM2.5 ≥ 35 µg/m³ for 30 min", "Warning", true], ["Refrigerant low pressure", "Refrigerant pressure ≤ 350 kPa for 120 s", "Critical", true], ["Compressor short-cycling", "≥ 4 cycles / h for 3 h", "Warning", true], ["Clogged filter", "Airflow drop ≥ 30 % vs. baseline for 1 h", "Info", true], ["AC offline", "No heartbeat for 15 min", "Warning", false]] as const;
 const seedPolicies = [
   { id: "p1", name: "Bedroom too hot", when: "Room temperature ≥ 30 °C for 60 s · recover below 28 °C", response: "Warning · notify in-app + email", att: "Attached to 2 ACs: Bedroom AC, Bedroom AC #2", on: true },
@@ -75,7 +77,7 @@ export function PoliciesPanel() {
   const [rules, setRules] = useState(defaultRules.map((r) => r[3]));
   const [policies, setPolicies] = useState(seedPolicies);
   const [edit, setEdit] = useState<string | null>(null);
-  const [f, setF] = useState({ name: "", metric: "co2", op: "≥", val: "1200", dur: "15", rec: "1000", sev: "warning" });
+  const [f, setF] = useState<{ name: string; metric: string; op: string; val: string; dur: string; rec: string; sev: Severity }>({ name: "", metric: "co2", op: "≥", val: "1200", dur: "15", rec: "1000", sev: "warning" });
   const isRecOk = +f.rec < +f.val;
   // policies.setDefaultRule is owner-only in the customer app (FR-C15, IR115); members see the rules read-only.
   const isOwner = CURRENT_CLIENT.role === "owner";
@@ -85,7 +87,7 @@ export function PoliciesPanel() {
           <Card title="Default policy" sub="Limits set by HQ · on / off is set by the account owner">
             <p className="mb-3 text-xs text-muted-foreground">Covers ventilation and the usual causes of breakdowns. It is attached to every AC and cannot be detached or edited, but the account owner can switch each rule on or off for your account (all your ACs). Ask HQ if a limit should change.</p>
             {!isOwner && <p className="mb-3 text-xs text-warn">Only the account owner can change this.</p>}
-            <ScrollX><table className="w-full text-left text-[13px]"><thead className="text-[11px] uppercase text-muted-foreground"><tr><th className="py-1.5 pr-3">Rule</th><th className="pr-3">Condition</th><th className="pr-3">Severity</th><th>On</th></tr></thead><tbody>{defaultRules.map((r, i) => <tr key={r[0]} className="border-t border-line"><td className="py-2 pr-3 font-semibold">{r[0]}</td><td className="pr-3">{r[1]}</td><td className="pr-3"><SeverityBadge s={(r[2] === "Info" ? "normal" : r[2].toLowerCase()) as "warning"} /></td><td><Toggle on={rules[i] ?? false} disabled={!isOwner} onChange={(v) => { setRules((s) => s.map((x, j) => (j === i ? v : x))); }} label={r[0]} /></td></tr>)}</tbody></table></ScrollX>
+            <ScrollX><table className="w-full text-left text-[13px]"><thead className="text-[11px] uppercase text-muted-foreground"><tr><th className="py-1.5 pr-3">Rule</th><th className="pr-3">Condition</th><th className="pr-3">Severity</th><th>On</th></tr></thead><tbody>{defaultRules.map((r, i) => <tr key={r[0]} className="border-t border-line"><td className="py-2 pr-3 font-semibold">{r[0]}</td><td className="pr-3">{r[1]}</td><td className="pr-3"><SeverityBadge s={RULE_SEVERITY.get(r[2]) ?? "normal"} /></td><td><Toggle on={rules[i] ?? false} disabled={!isOwner} onChange={(v) => { setRules((s) => s.map((x, j) => (j === i ? v : x))); }} label={r[0]} /></td></tr>)}</tbody></table></ScrollX>
             {!rules[5] && <p className="mt-2 text-xs text-warn">Turned off: “AC offline” — no alerts for heartbeat loss on any of your ACs. HQ still sees device status.</p>}
           </Card>
           <div className="text-[13px] font-bold">Your policies <span className="text-xs font-normal text-muted-foreground">{policies.length} · added on top of the default policy · a policy belongs to your account and can be attached to many ACs</span></div>
@@ -108,7 +110,7 @@ export function PoliciesPanel() {
           <Field label="Recover below"><Input type="number" value={f.rec} onChange={(e) => { setF({ ...f, rec: e.target.value }); }} /></Field>
         </div>
         <p className={cx("flex items-center gap-1 text-xs", isRecOk ? "text-ok" : "text-crit")}><Icon name={isRecOk ? "check" : "error"} />{isRecOk ? `Recovery ${f.rec} is below the ${f.val} limit` : `Recovery must be below the ${f.val} limit`}</p>
-        <Field label="Severity"><Choice value={f.sev as "warning"} onChange={(v) => { setF({ ...f, sev: v }); }} options={[{ id: "normal" as "warning", label: "Info" }, { id: "warning", label: "Warning" }, { id: "critical" as "warning", label: "Critical" }]} /></Field>
+        <Field label="Severity"><Choice<Severity> value={f.sev} onChange={(v) => { setF({ ...f, sev: v }); }} options={[{ id: "normal", label: "Info" }, { id: "warning", label: "Warning" }, { id: "critical", label: "Critical" }]} /></Field>
         <p className="text-[11px] text-muted-foreground">WhatsApp is only available after you allow it in Preferences. Missing or stale readings never trigger — they show “not measured”.</p>
       </Modal>
     </>

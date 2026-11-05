@@ -8,6 +8,7 @@ import { useAction } from "@ac/web/lib/useAction";
 import { focusField } from "@ac/web/lib/focusField";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { metricUnit, opSymbol, type Operator, type Severity } from "@ac/web/lib/adminAlerts";
+import { oneOf } from "@ac/web/lib/oneOf";
 import {
   metricGroups, metricOfGroup, POLICY_FIELDS, policyErrors, policyFieldId, policyInput, summaryText, toggledInput, type PolicyCard, type PolicyForm,
 } from "@ac/web/lib/customerPolicies";
@@ -171,14 +172,14 @@ function PolicyEditor({ p, editor, onDone, onFail }: Props & { editor: NonNullab
             </Plain>
           ))}
         </div>
-        {f.group === "air" && <div className="mt-2"><Choice value={f.metric as "co2"} onChange={(v) => { set({ metric: v }); }} options={[{ id: "co2", label: "CO₂ (ppm)" }, { id: "pm25" as "co2", label: "PM2.5 (µg/m³)" }]} /></div>}
+        {f.group === "air" && <div className="mt-2"><Choice<string> value={f.metric} onChange={(v) => { set({ metric: v }); }} options={[{ id: "co2", label: "CO₂ (ppm)" }, { id: "pm25", label: "PM2.5 (µg/m³)" }]} /></div>}
         <div className="mt-3 flex flex-col gap-2 rounded-xl bg-surface2 p-3 text-[13px]">
           <div className="flex flex-wrap items-center gap-2">
             {t("Alert when {what} is", { what: conditionSubject(f, t) })}
-            <Select aria-label={t("Operator")} className="w-20" value={f.operator} onChange={(e) => { set({ operator: e.target.value as Operator }); }}>{ops.map((o) => <option key={o} value={o}>{opSymbol[o]}</option>)}</Select>
+            <Select aria-label={t("Operator")} className="w-20" value={f.operator} onChange={(e) => { set({ operator: oneOf(ops, e.target.value, f.operator) }); }}>{ops.map((o) => <option key={o} value={o}>{opSymbol[o]}</option>)}</Select>
             <Input id={policyFieldId("threshold")} aria-label={t("Threshold")} {...invalid("threshold")} inputMode="decimal" className="w-24" value={f.threshold} onChange={(e) => { set({ threshold: e.target.value }); }} />{t("{unit} continuously for", { unit })}
             <Input id={policyFieldId("duration")} aria-label={t("Duration")} {...invalid("duration")} inputMode="numeric" className="w-20" value={f.duration} onChange={(e) => { set({ duration: e.target.value }); }} />
-            <Select aria-label={t("Duration unit")} className="w-24" value={f.unit} onChange={(e) => { set({ unit: e.target.value as "s" | "min" }); }}><option value="min">min</option><option value="s">s</option></Select>
+            <Select aria-label={t("Duration unit")} className="w-24" value={f.unit} onChange={(e) => { set({ unit: oneOf(["s", "min"] as const, e.target.value, f.unit) }); }}><option value="min">min</option><option value="s">s</option></Select>
           </div>
           <div className="flex flex-wrap items-center gap-2">{t(isUp ? "Recover when it drops below" : "Recover when it rises above")} <Input id={policyFieldId("recovery")} aria-label={t("Recovery")} {...invalid("recovery")} inputMode="decimal" className="w-24" value={f.recovery} onChange={(e) => { set({ recovery: e.target.value }); }} />{unit}</div>
           {conditionError ? isShowCondition && <p id="policy-condition-error" className="flex items-center gap-1 text-xs text-crit"><Icon name="error" />{errorText[conditionError]}</p>
