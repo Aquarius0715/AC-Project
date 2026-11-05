@@ -5,6 +5,7 @@
 // Texts in the display language (`t` / `i`, IR278); every instant is formatted for the user's display time zone.
 import { EN, relativeTime, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { jobEventTitle, type ApiEventSummary, type ApiJobEvent, type ApiMember, type ApiPartnerJob } from "@ac/web/lib/partnerOverview";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 
 const en = translator("en");
@@ -15,10 +16,10 @@ export const TABS = [
   { id: "all", label: "All" }, { id: "active", label: "Active" }, { id: "review", label: "Review" }, { id: "completed", label: "Completed" }, { id: "ended", label: "Delegation ended" },
 ] as const;
 export type HistoryTab = (typeof TABS)[number]["id"];
-export const tabOf = (v?: string): HistoryTab => (TABS.some((t) => t.id === v) ? (v as HistoryTab) : "all");
+export const tabOf = (v = ""): HistoryTab => oneOf(TABS.map((t) => t.id), v, "all");
 export const SORTS = [{ id: "latest", text: "Latest event first" }, { id: "status", text: "Status, earliest stage first" }] as const;
 export type HistorySort = (typeof SORTS)[number]["id"];
-export const sortOf = (v?: string): HistorySort => (SORTS.some((s) => s.id === v) ? (v as HistorySort) : "latest");
+export const sortOf = (v = ""): HistorySort => oneOf(SORTS.map((s) => s.id), v, "latest");
 export const PERIODS = [{ id: "90d", label: "last 90 days" }, { id: "all", label: "all time" }] as const;
 export type HistoryPeriod = (typeof PERIODS)[number]["id"];
 export const periodOf = (v?: string): HistoryPeriod => (v === "all" ? "all" : "90d");
@@ -109,7 +110,10 @@ export function visibleRows(rows: HistoryRow[], tab: HistoryTab, sort: HistorySo
   const shown = rows.filter((r) => tab === "all" || r.tab === tab);
   return shown.toSorted((a, b) => (sort === "status" ? order.indexOf(a.status) - order.indexOf(b.status) : 0) || b.lastAt - a.lastAt || a.id.localeCompare(b.id));
 }
-export const tabCounts = (rows: HistoryRow[]) => Object.fromEntries(TABS.map((t) => [t.id, t.id === "all" ? rows.length : rows.filter((r) => r.tab === t.id).length])) as Record<HistoryTab, number>;
+export const tabCounts = (rows: HistoryRow[]): Record<HistoryTab, number> => {
+  const countOf = (tab: HistoryRow["tab"]) => rows.filter((r) => r.tab === tab).length;
+  return { all: rows.length, active: countOf("active"), review: countOf("review"), completed: countOf("completed"), ended: countOf("ended") };
+};
 
 export interface TimelineItem { id: string; title: string; detail: string; at: string; badge: "customer" | "internal"; tone?: "ok" | "warn" }
 /** One timeline row: the event's title, its note (in quotes, with the visibility) and who acted — “you”, a member of the
