@@ -4,37 +4,20 @@ import { useState } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, ListRow, Modal, Page, Search, Select, Textarea, useToast } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
 import { type NonEmpty } from "@ac/web/lib/lists";
+import { type PermissionRow, permissionRows as rows } from "@ac/web/lib/members";
 
+const HQ = "HQ (tenant)";
+const CONTRACTOR_A = "contractor-a";
 interface U { id: string; role: string; org: string; email: string; role2: "admin" | "contractor" | "technician" }
 const users: NonEmpty<U> = [
-  { id: "hq-operator", role: "Admin · HQ", org: "HQ (tenant)", email: "r.operator@hq.example", role2: "admin" },
-  { id: "hq-restriction-manager", role: "Admin · HQ", org: "HQ (tenant)", email: "r.lim@hq.example", role2: "admin" },
-  { id: "aziz.contractor-a", role: "Contractor · contractor-a", org: "contractor-a", email: "aziz@contractor-a.example", role2: "contractor" },
-  { id: "tech-internal-a", role: "Technician · internal · HQ field team", org: "HQ (tenant)", email: "ali@hq.example", role2: "technician" },
-  { id: "tech-external-b", role: "Technician · external · contractor-a", org: "contractor-a", email: "b@contractor-a.example", role2: "technician" },
-  { id: "tech-external-old", role: "Technician · external · contractor-a", org: "contractor-a", email: "old@contractor-a.example", role2: "technician" },
+  { id: "hq-operator", role: "Admin · HQ", org: HQ, email: "r.operator@hq.example", role2: "admin" },
+  { id: "hq-restriction-manager", role: "Admin · HQ", org: HQ, email: "r.lim@hq.example", role2: "admin" },
+  { id: "aziz.contractor-a", role: "Contractor · contractor-a", org: CONTRACTOR_A, email: "aziz@contractor-a.example", role2: "contractor" },
+  { id: "tech-internal-a", role: "Technician · internal · HQ field team", org: HQ, email: "ali@hq.example", role2: "technician" },
+  { id: "tech-external-b", role: "Technician · external · contractor-a", org: CONTRACTOR_A, email: "b@contractor-a.example", role2: "technician" },
+  { id: "tech-external-old", role: "Technician · external · contractor-a", org: CONTRACTOR_A, email: "old@contractor-a.example", role2: "technician" },
 ];
-// 38 canonical permissions (BR-A03, IR107/IR115): resource rows with READ / WRITE plus independent actions.
-interface Row { res: string; read?: string; write?: string; actions?: string[] }
-const rows: Row[] = [
-  { res: "Dashboard", read: "dashboard.read" },
-  { res: "Customers & units", read: "asset.read", write: "asset.write" },
-  { res: "Users & roles", read: "identity.read", write: "identity.write" },
-  { res: "Devices & models", read: "device.read", write: "device.write", actions: ["device.maintain"] },
-  { res: "AC control", actions: ["control.execute", "control.diagnose"] },
-  { res: "Alerts", read: "alert.read", actions: ["alert.resolve"] },
-  { res: "Alert policies", read: "alert.policy.read", write: "alert.policy.write" },
-  { res: "Maintenance jobs", read: "job.read", write: "job.write" },
-  { res: "Contracts", read: "contract.read", write: "contract.write" },
-  { res: "Billing", read: "billing.read", write: "billing.write", actions: ["billing.payment"] },
-  { res: "Restrictions", read: "restriction.read", write: "restriction.write", actions: ["restriction.override"] },
-  { res: "Automation policies", read: "automation.policy.read", write: "automation.policy.write" },
-  { res: "Energy", read: "energy.read", write: "energy.write" },
-  { res: "MRV", read: "mrv.read", write: "mrv.write", actions: ["mrv.review", "mrv.factors"] },
-  { res: "Offsets", read: "offset.read", write: "offset.write" },
-  { res: "Audit", read: "audit.read" },
-  { res: "Partners", actions: ["partner.accept", "partner.assign", "partner.review"] },
-];
+// 38 canonical permissions (BR-A03, IR107/IR115): resource rows with READ / WRITE plus independent actions (shared matrix).
 const all = rows.flatMap((r) => [r.read, r.write, ...(r.actions ?? [])].filter(Boolean) as string[]);
 const notAdmin = new Set(["partner.accept", "partner.assign", "partner.review", "device.maintain", "control.diagnose", "restriction.write", "restriction.override"]);
 const preset: Record<U["role2"], string[]> = {
@@ -61,7 +44,7 @@ export function AccessDemo() {
   const has = (p?: string) => !!p && checked.includes(p);
   const set = (p: string, v: boolean) => { setChecked((c) => (v ? [...new Set([...c, p])] : c.filter((x) => x !== p))); };
   // Write includes Read: turning Write on also turns Read on, and Read stays locked while Write is on.
-  const setWrite = (r: Row, v: boolean) => {
+  const setWrite = (r: PermissionRow, v: boolean) => {
     const { write, read } = r;
     if (!write) return;
     setChecked((c) => (v ? [...new Set([...c, write, ...(read ? [read] : [])])] : c.filter((x) => x !== write)));
