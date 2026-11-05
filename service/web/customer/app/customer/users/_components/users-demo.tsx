@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Badge, Banner, Btn, Card, DataTable, Field, Input, LinkButton, Modal, Page, PageHead, Select, useToast, type Tone } from "@ac/web/components/ui";
 import { CURRENT_CLIENT, ClientUser, clientUserActions, emailError, useClientUsers } from "@ac/web/lib/clientUsers";
 import { Icon } from "@ac/web/components/Icon";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { codePoints } from "@ac/web/lib/text";
 
 const youMark = (id: string) => (id === CURRENT_CLIENT.userId ? " (you)" : "");
@@ -76,7 +77,7 @@ export function UsersDemo() {
       <Modal open={open} onClose={close} title="Add a user to customer-a" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={send}>Add user</Btn></>}>
         <Field label="Name" error={nameError}><Input value={name} maxLength={120} onChange={(e) => { setName(e.target.value); }} placeholder="Lim Ka Wai" /></Field>
         <Field label="Email" error={errorText}><Input type="email" value={email} onChange={(e) => { setEmail(e.target.value); }} placeholder="lim.ka@example.com" /></Field>
-        <Field label="Role" hint="Owners manage users and everything members can do; members use the app."><Select aria-label="Role" value={role} onChange={(e) => { setRole(e.target.value as "member" | "owner"); }}><option value="member">Member</option><option value="owner">Owner</option></Select></Field>
+        <Field label="Role" hint="Owners manage users and everything members can do; members use the app."><Select aria-label="Role" value={role} onChange={(e) => { setRole(oneOf(["member", "owner"] as const, e.target.value, role)); }}><option value="member">Member</option><option value="owner">Owner</option></Select></Field>
         <Banner>Their account is created now and they get an e-mail to set their password. They see only customer-a’s properties and units; until they sign in they are listed as “Not signed in yet”. Demo: nothing is sent.</Banner>
       </Modal>
     </Page>

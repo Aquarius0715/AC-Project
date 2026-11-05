@@ -14,6 +14,7 @@ import {
 } from "@ac/web/lib/restrictions";
 import { executeRestriction, reconcileUnits, requestRelease, retryUnits, scheduleRestriction } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
+import { oneOf } from "@ac/web/lib/oneOf";
 import type { RestrictionRecoveryCase } from "@ac/web/lib/contracts.gen";
 
 interface ScheduleContract {
@@ -179,7 +180,7 @@ function ScheduleModal({ open, onClose, contracts, now, onDone }: Readonly<{ ope
         <div><p className="mb-1 text-[13px] font-semibold">{t("Units")}</p><div className="flex flex-col gap-1">{k.units.map((u) => <Check key={u.id} disabled={!!u.blocked} checked={unitIds.includes(u.id)} onChange={(on) => { setUnitIds(on ? [...unitIds, u.id] : unitIds.filter((x) => x !== u.id)); }} label={<span>{u.name} <span className="text-xs text-muted-foreground">{u.blocked ? `— ${u.blocked}` : null}{!u.blocked && u.temperature && `${String(u.temperature.min)}–${String(u.temperature.max)} °C`}{!u.blocked && !u.temperature && t("no temperature setpoint")}</span></span>} />)}</div>{tried && errors.unitIds && <p className="mt-1 text-xs text-crit">{errors.unitIds}</p>}</div>
       </>}
       <div className="grid-fluid" style={{ ["--min" as string]: "190px" }}>
-        <Field label={t("Policy")}><Select value={kind} onChange={(e) => { setKind(e.target.value as Policy["kind"]); }}><option value="temperature_limit">{t("Temperature limit")}</option><option value="power_off">{t("Power off")}</option></Select></Field>
+        <Field label={t("Policy")}><Select value={kind} onChange={(e) => { setKind(oneOf(["temperature_limit", "power_off"] as const, e.target.value, kind)); }}><option value="temperature_limit">{t("Temperature limit")}</option><option value="power_off">{t("Power off")}</option></Select></Field>
         {kind === "temperature_limit" && <Field label={t("Minimum cooling setpoint (°C)")} error={tried ? errors.setpoint : undefined}><Input type="number" value={setpoint} onChange={(e) => { setSetpoint(e.target.value); }} /></Field>}
         <Field label={t("Execute after")} error={tried ? errors.executeAfter : undefined} hint={t("The notice is sent now; at least 24 h ahead · times in {zone}", { zone })}><Input type="datetime-local" value={executeAfter} onChange={(e) => { setExecuteAfter(e.target.value); }} /></Field>
       </div>

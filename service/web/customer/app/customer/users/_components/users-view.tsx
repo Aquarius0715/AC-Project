@@ -11,6 +11,7 @@ import { inviteError, type ClientUserRow } from "@ac/web/lib/assets";
 import { nameError, reasonError } from "@ac/web/lib/partnerUsers";
 import { inviteUser, removeUser, resendInvite, updateUser } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { without } from "@ac/web/lib/omit";
 
 type Dialog = { kind: "invite" } | { kind: "role" | "disable" | "enable" | "remove"; row: ClientUserRow };
@@ -145,7 +146,7 @@ export function UsersView({ live }: Readonly<{ live: { customerId: string; custo
         {isAdding && <Field label={t("Email")} error={(tried ? emailError : undefined) ?? server.email}><Input id={ids.email} type="email" value={email} onChange={(e) => { setEmail(e.target.value); edit("email"); }} placeholder="lim.ka@example.com" /></Field>}
         {(isAdding || dialog?.kind === "role") && (
           <Field label={t("Role")} hint={t("Owners manage users and everything members can do; members use the app.")}>
-            <Select aria-label={t("Role")} value={role} onChange={(e) => { setRole(e.target.value as Role); }}>
+            <Select aria-label={t("Role")} value={role} onChange={(e) => { setRole(oneOf(["member", "owner"] as const, e.target.value, role)); }}>
               <option value="member">{t("Member")}</option>
               <option value="owner">{t("Owner")}</option>
             </Select>

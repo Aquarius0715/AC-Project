@@ -8,6 +8,7 @@ import { units } from "@ac/web/lib/client";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
 import { symptomLength } from "@ac/web/lib/customerMaintenance";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { orDash } from "@ac/web/lib/text";
 
 type StatusTab = "all" | "reply" | "requested" | "scheduled" | "progress" | "completed" | "cancelled";
@@ -55,7 +56,7 @@ export function MaintenanceDemo({ jobId, initialTab }: Readonly<{ jobId?: string
           <PageHead title="My requests" sub={`${String(jobs.length)} requests · sorted by status (business order)`} action={<Btn variant="primary" onClick={() => { setModal("new"); }}><Icon name="add" /> New maintenance request</Btn>} />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Tabs value={tab} onChange={setTab} tabs={([["all", "All"], ["reply", "Needs your reply"], ["requested", "Requested"], ["scheduled", "Scheduled"], ["progress", "In progress"], ["completed", "Completed"], ["cancelled", "Cancelled"]] as [StatusTab, string][]).filter(([t]) => t !== "reply" || replyCount > 0).map(([id, label]) => ({ id, label, count: count(id) }))} />
-            <Select aria-label="Origin" value={origin} onChange={(e) => { setOrigin(e.target.value as typeof origin); }} className="w-auto"><option value="all">Origin: All</option><option value="request">Origin: Client request</option><option value="plan">Origin: Periodic plan</option></Select>
+            <Select aria-label="Origin" value={origin} onChange={(e) => { setOrigin(oneOf(["all", "request", "plan"] as const, e.target.value, origin)); }} className="w-auto"><option value="all">Origin: All</option><option value="request">Origin: Client request</option><option value="plan">Origin: Periodic plan</option></Select>
           </div>
           <div className={cx("grid gap-4", sel ? "grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" : "grid-cols-1")}>
             <div className="flex min-w-0 flex-col gap-2">

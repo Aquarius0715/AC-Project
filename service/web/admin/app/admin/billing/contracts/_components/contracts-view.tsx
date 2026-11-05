@@ -13,6 +13,7 @@ import { saveContract } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
 import { byCount } from "@ac/web/lib/i18n";
 
+import { oneOf } from "@ac/web/lib/oneOf";
 import { nonEmpty } from "@ac/web/lib/lists";
 
 const CUSTOMER_A = "customer-a";
@@ -208,13 +209,13 @@ export function ContractsView({ live }: Readonly<{ live?: Live }>) {
               </section>
               <section>
                 <h3 className="mb-2 text-[13px] font-bold">{t("Plan")}</h3>
-                <div className="max-w-sm"><Field label={t("Plan type")}><Select value={d.planType} disabled={isBlocked} onChange={(e) => { set({ planType: e.target.value as PlanType }); }}>{plans.map((p) => <option key={p} value={p}>{p === "rto" ? t("RTO — Rent to Own") : null}{p !== "rto" && p === "general" && t("General — maintenance")}{p !== "rto" && p !== "general" && planWord(p, t)}</option>)}</Select></Field></div>
+                <div className="max-w-sm"><Field label={t("Plan type")}><Select value={d.planType} disabled={isBlocked} onChange={(e) => { set({ planType: oneOf(plans, e.target.value, d.planType) }); }}>{plans.map((p) => <option key={p} value={p}>{p === "rto" ? t("RTO — Rent to Own") : null}{p !== "rto" && p === "general" && t("General — maintenance")}{p !== "rto" && p !== "general" && planWord(p, t)}</option>)}</Select></Field></div>
               </section>
               <section className="grid-fluid" style={{ ["--min" as string]: "150px" }}>
                 <Field label={t("Start")} error={tried ? errors.start : undefined} hint={t("Dates are Kuala Lumpur days ({zone}).", { zone: KL })}><Input type="date" value={d.start} disabled={isBlocked} onChange={(e) => { set({ start: e.target.value }); }} /></Field>
                 <Field label={t("End")} error={tried ? errors.end : undefined} hint={t("Must be after the start")}><Input type="date" value={d.end} disabled={isBlocked} onChange={(e) => { set({ end: e.target.value }); }} /></Field>
                 <Field label={t("Price")} error={tried ? errors.price : undefined} hint="≥ 0"><Input type="number" min="0" step="0.01" value={d.price} disabled={isBlocked} onChange={(e) => { set({ price: e.target.value }); }} /></Field>
-                <Field label={t("Currency")}><Select value={d.currency} disabled={isBlocked} onChange={(e) => { set({ currency: e.target.value as "MYR" | "USD" }); }}><option>MYR</option><option>USD</option></Select></Field>
+                <Field label={t("Currency")}><Select value={d.currency} disabled={isBlocked} onChange={(e) => { set({ currency: oneOf(["MYR", "USD"] as const, e.target.value, d.currency) }); }}><option>MYR</option><option>USD</option></Select></Field>
               </section>
               <section>
                 <h3 className="mb-1 text-[13px] font-bold">{t("Restriction eligibility")}</h3>
