@@ -196,15 +196,15 @@ interface StoreClient {
 
 let client: Promise<StoreClient> | null = null;
 
-/** The client once connected; a failed connection clears it so the next request tries again. */
-async function connected(c: { connect: () => Promise<unknown> }): Promise<StoreClient> {
+/** The client once connected, as the three commands this module uses; a failed connection clears it. */
+async function connected(c: StoreClient & { connect: () => Promise<unknown> }): Promise<StoreClient> {
   try {
     await c.connect();
   } catch (error: unknown) {
     client = null;
     throw error;
   }
-  return c as unknown as StoreClient;
+  return c;
 }
 
 /** The store's client, connected once per process; null without SESSION_STORE_URL (the cookie carries the session). A
