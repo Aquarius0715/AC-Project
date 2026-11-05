@@ -85,7 +85,7 @@ const qualityNote: Record<string, string> = { valid: "recorded", suspect: "suspe
 const componentShort: Record<string, string> = { filter: "filter", refrigerant_pipe: "refrigerant", wiring: "wiring" };
 /** Readings recorded (Figma 03): “Refrigerant pressure · 4.6 bar · within spec” from the inspection measurements. */
 export function readingRows(ms: ApiReportMeasurement[], t: T = en): [string, string][] {
-  const part = (key: string) => (componentShort[key] ?? componentLabel[key] ? t(componentShort[key] ?? componentLabel[key]) : key);
+  const part = (key: string) => (textOf(componentShort, key, t) ?? textOf(componentLabel, key, t) ?? key);
   return ms.map((m) => {
     const reason = m.qualityReason ? ` (${m.qualityReason.replaceAll('_', " ")})` : "";
     return [`${textOf(metricLabel, m.metric, t) ?? m.metric}${m.componentKey ? ` (${part(m.componentKey)})` : ""}`,
@@ -132,7 +132,7 @@ export function evidenceCheck(r: ApiWorkReport, names: Map<string, string>, t: T
       { label: t("Not-applicable reasons"), value: needReason.length > 0 ? t("{n} / {total} given", { n: withReason, total: needReason.length }) : t("none needed"), tone: withReason === needReason.length ? "ok" : "warn" },
       { label: t("Photos"), value: t("{n} attached", { n: photos }), tone: photos ? "ok" : "muted" },
       { label: t("Readings"), value: t("{n} recorded", { n: r.measurements.length }), tone: r.measurements.length > 0 ? "ok" : "muted" },
-      { label: t("Contributors to v{version}", { version: r.version }), value: contributors.length === 1 ? t("{name} only", { name: contributors[0] }) : contributors.join(", ") || "—", tone: "ok" },
+      { label: t("Contributors to v{version}", { version: r.version }), value: contributors.length === 1 ? t("{name} only", { name: contributors[0] ?? "" }) : contributors.join(", ") || "—", tone: "ok" },
     ],
     acceptable: missing.length === 0, missing,
   };

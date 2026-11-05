@@ -38,10 +38,10 @@ describe("HQ contractor register", () => {
   it("shows the KPI tiles and the profile facts", () => {
     expect(kpiTiles(kpis).map((t) => [t.label, t.value])).toEqual([["Offer acceptance", "92 %"], ["Arrival in window", "96 %"], ["Report accepted first time", "84 %"], ["Customer rating", "4.6"], ["Rework rate", "8 %"]]);
     const empty = kpiTiles({ ...kpis, offerAcceptance: null, averageRating: null, ratingCount: 0, reworkRate: 12.5 });
-    expect([empty[0].value, empty[0].sub, empty[3].value, empty[3].sub, empty[4].tone]).toEqual(["—", "no answered offers · 90 d", "—", "0 ratings (Client)", "warn"]);
+    expect([empty[0]?.value, empty[0]?.sub, empty[3]?.value, empty[3]?.sub, empty[4]?.tone]).toEqual(["—", "no answered offers · 90 d", "—", "0 ratings (Client)", "warn"]);
     expect(profileFacts(profile({}), NOW)).toEqual([["Registration", "SSM 202301012345"], ["Service areas", "Kuala Lumpur, Selangor"], ["Delegation period", "1 Apr 2026 – 31 Jan 2027"], ["Contact", "ops@contractor-a.example"], ["Insurance", "valid to 31 Jan 2027"]]); // Kuala Lumpur days
-    expect(profileFacts(profile({ insuranceValidUntil: "2026-08-01T00:00:00Z" }), NOW)[4][1]).toBe("expired 1 Aug 2026");
-    expect(profileFacts(profile({ insuranceValidUntil: null }), NOW)[4][1]).toBe("not recorded — the delegation runs a year");
+    expect(profileFacts(profile({ insuranceValidUntil: "2026-08-01T00:00:00Z" }), NOW)[4]?.[1]).toBe("expired 1 Aug 2026");
+    expect(profileFacts(profile({ insuranceValidUntil: null }), NOW)[4]?.[1]).toBe("not recorded — the delegation runs a year");
   });
 
   it("shows the rate card in effect and the scheduled ones", () => {
@@ -88,8 +88,8 @@ describe("HQ contractor register in Malay (IR291)", () => {
     expect(kpiTiles(kpis, MS.t).map((k) => k.label)).toEqual(["Penerimaan tawaran", "Ketibaan dalam tetingkap", "Laporan diterima kali pertama", "Penilaian pelanggan", "Kadar kerja semula"]);
     expect(profileFacts(profile({ insuranceValidUntil: "2027-01-30T16:00:00Z" }), NOW, MS)[4]).toEqual(["Insurans", "sah hingga 31 Jan 2027"]); // 00:00 on the 31st in Kuala Lumpur, whatever the display zone
     const v = rateCardView([{ id: "rc-3", version: 3, contractorOrgId: "org-a", effectiveFrom: "2026-05-31T16:00:00Z", currency: "MYR", lines: [{ workType: "repair_base", amountMinor: 47_000, note: null }] }], "rc-3", NOW, MS);
-    expect([v.current?.title, v.current?.lines[0].label]).toEqual(["Kad kadar v3 (dari 1 Jun 2026)", "Pembaikan — lawatan asas"]);
-    expect(technicianRows([tech({})], [cert({})], NOW, MS)[0].badge.label).toBe("1 hampir tamat · 15 Okt");
+    expect([v.current?.title, v.current?.lines[0]?.label]).toEqual(["Kad kadar v3 (dari 1 Jun 2026)", "Pembaikan — lawatan asas"]);
+    expect(technicianRows([tech({})], [cert({})], NOW, MS)[0]?.badge.label).toBe("1 hampir tamat · 15 Okt");
     expect(contractorRefusal({ code: "NOT_FOUND", messageKey: "error.notFound", fieldErrors: {} }, MS.t)).toBe("Kontraktor atau sijil tidak lagi wujud.");
   });
 });

@@ -27,10 +27,10 @@ describe("a request in the maintenance demo", () => {
   it("is booked at a preferred time for an internal technician, or offered to a contractor", () => {
     jobActions.book("job-c07", slot, "internal", "tech-internal-a");
     expect(job("job-c07")).toMatchObject({ status: "assigned", scheduled: slot, delivery: "internal", technician: "tech-internal-a", techAck: { status: "pending" } });
-    expect([notes("technician")[0].title, notes("client")[0].title]).toEqual(["New assignment job-c07", "Booked: job-c07"]);
+    expect([notes("technician")[0]?.title, notes("client")[0]?.title]).toEqual(["New assignment job-c07", "Booked: job-c07"]);
     jobActions.book("job-internal-a", slot, "contractor", "contractor-a");
     expect(job("job-internal-a")).toMatchObject({ status: "offered", delivery: "contractor", contractor: "contractor-a", technician: null });
-    expect(notes("contractor")[0].title).toBe("New offer job-internal-a");
+    expect(notes("contractor")[0]?.title).toBe("New offer job-internal-a");
   });
 
   it("follows HQ's proposal: accepted with whoever was held, declined with new times, or withdrawn", () => {
@@ -49,7 +49,7 @@ describe("a request in the maintenance demo", () => {
     jobActions.propose("job-c07", slot, "tech-internal-a", "Or then?", "09-24");
     jobActions.withdraw("job-c07");
     expect(job("job-c07")).toMatchObject({ status: "requested", proposal: { status: "withdrawn" } });
-    expect(notes("client")[0].title).toBe("Proposal withdrawn — job-c07");
+    expect(notes("client")[0]?.title).toBe("Proposal withdrawn — job-c07");
   });
 
   it("forwards a contractor's time to the customer, who approves it, or HQ keeps the agreed time", () => {
@@ -79,7 +79,7 @@ describe("notes, follow-ups and answers in the maintenance demo", () => {
     expect(jobActions.addNote("job-c07", " Gate code 4821 ")).toBeUndefined();
     expect(job("job-c07").notes?.at(-1)).toMatchObject({ by: "customer-a", text: "Gate code 4821" });
     jobActions.addNote("job-a11", "Parking at the back");
-    expect(notes("contractor")[0].title).toBe("Client note on job-a11");
+    expect(notes("contractor")[0]?.title).toBe("Client note on job-a11");
   });
 
   it("opens a follow-up from a completed job only, and classifies it once", () => {
@@ -90,7 +90,7 @@ describe("notes, follow-ups and answers in the maintenance demo", () => {
     expect(jobActions.classifyFollowUp(id, "rework", "same fault")).toBeUndefined();
     expect(job(id)).toMatchObject({ followUpClass: "rework", followUpReason: "same fault" });
     expect(jobActions.classifyFollowUp(id, "new_request", "again")).toBe("CONFLICT — already classified");
-    expect(notes("client")[0].title).toBe(`${id}: Rework (free)`);
+    expect(notes("client")[0]?.title).toBe(`${id}: Rework (free)`);
   });
 
   it("takes the contractor's and the technician's answers, and the customer's cancellation", () => {
@@ -100,10 +100,10 @@ describe("notes, follow-ups and answers in the maintenance demo", () => {
     expect(job("job-a11")).toMatchObject({ status: "assigned", technician: "tech-external-a", techAck: { status: "pending" } });
     jobActions.techCantMake("job-a11", "sick", "09-26 AM");
     expect(job("job-a11").techAck).toMatchObject({ status: "cant_make", reason: "sick", alt: "09-26 AM" });
-    expect(notes("contractor")[0].title).toBe("tech-external-a can’t make job-a11"); // the contractor's own job
+    expect(notes("contractor")[0]?.title).toBe("tech-external-a can’t make job-a11"); // the contractor's own job
     jobActions.techAccept("job-c05");
     expect(job("job-c05").techAck?.status).toBe("accepted");
-    expect(notes("client")[0].title).toBe("Technician confirmed — job-c05");
+    expect(notes("client")[0]?.title).toBe("Technician confirmed — job-c05");
     jobActions.book("job-internal-a", slot, "contractor", "contractor-a");
     jobActions.partnerDecline("job-internal-a", "no free hours");
     expect(job("job-internal-a")).toMatchObject({ status: "requested", contractor: null, delivery: null, scheduled: null });
@@ -113,9 +113,9 @@ describe("notes, follow-ups and answers in the maintenance demo", () => {
 
   it("marks a notice read and resets to the seed", () => {
     jobActions.cancel("job-c07", "moved out");
-    const n = notes("admin")[0];
-    jobActions.markRead(n.id);
-    expect(notes("admin")[0].read).toBe(true);
+    const n = must(notes("admin")[0]);
+    jobActions.markRead(must(n?.id));
+    expect(notes("admin")[0]?.read).toBe(true);
     jobActions.reset();
     expect([job("job-c07").status, getJobState().notes]).toEqual(["requested", []]);
   });

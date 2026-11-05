@@ -36,13 +36,13 @@ describe("KPIs", () => {
   it("counts distinct paid jobs and deductions and shows the pay date", () => {
     const k = kpis(statement(), "e8c270a5 v3");
     expect(k.map((x) => [x.label, x.value])).toEqual([["Jobs paid", "3"], ["Gross", "MYR 1,280.00"], ["Deductions", "− MYR 120.00"], ["Net payable", "MYR 1,160.00"]]);
-    expect(k[0].sub).toBe("review-accepted in August");
-    expect(k[1].sub).toBe("rate card e8c270a5 v3");
-    expect(k[2].sub).toBe("1 rework deduction");
-    expect(k[3].badge).toEqual({ label: "Approved · pays 15 Sept 2026", tone: "primary" });
-    expect(kpis(statement({ status: "paid", paidAt: "2026-09-15T02:00:00Z", deductionsMinor: 0, lines: [line()] }), null)[3].badge).toEqual({ label: "Paid 15 Sept 2026", tone: "ok" });
-    expect(kpis(statement({ lines: [line()] }), null)[2].sub).toBe("none");
-    expect(kpis(statement(), null)[1].sub).toBe("rate card set by HQ");
+    expect(k[0]?.sub).toBe("review-accepted in August");
+    expect(k[1]?.sub).toBe("rate card e8c270a5 v3");
+    expect(k[2]?.sub).toBe("1 rework deduction");
+    expect(k[3]?.badge).toEqual({ label: "Approved · pays 15 Sept 2026", tone: "primary" });
+    expect(kpis(statement({ status: "paid", paidAt: "2026-09-15T02:00:00Z", deductionsMinor: 0, lines: [line()] }), null)[3]?.badge).toEqual({ label: "Paid 15 Sept 2026", tone: "ok" });
+    expect(kpis(statement({ lines: [line()] }), null)[2]?.sub).toBe("none");
+    expect(kpis(statement(), null)[1]?.sub).toBe("rate card set by HQ");
   });
 });
 
@@ -56,8 +56,8 @@ describe("lines table", () => {
       ["job-bbbb", "Rework deduction", "12 Aug", "deduction", "Deduction", "− 120.00"], ["job-cccc", "Repair", "20 Aug", "accepted", "Accepted", "450.00"],
       ["job-dddd", "Adjustment from HQ", "—", "adjustment", "Adjustment", "− 50.00"], ["job-eeee", "Periodic inspection", "—", "not_included", "Not included", "—"],
     ]);
-    expect(rows[0].sub).toBe("Home A");
-    expect(rows[2].sub).toBe("report returned for rework");
+    expect(rows[0]?.sub).toBe("Home A");
+    expect(rows[2]?.sub).toBe("report returned for rework");
     expect(rows[5]).toMatchObject({ lineId: null, askable: false, sub: "awaiting quality review", tone: "muted" });
     expect(rows.slice(0, 5).every((r) => r.askable)).toBe(true);
   });
@@ -89,8 +89,8 @@ describe("payoutPdf", () => {
     const offsets = [...pdf.matchAll(/(\d{10}) 00000 n/g)].map((m) => Number(m[1]));
     for (const [i, o] of offsets.entries()) expect(pdf.slice(o, o + `${String(i + 1)} 0 obj`.length)).toBe(`${String(i + 1)} 0 obj`);
     const length = Number(must(/\/Length (\d+) >>\nstream\n/.exec(pdf))[1]);
-    const stream = must(/stream\n([\s\S]*?)\nendstream/.exec(pdf))[1];
-    expect(stream.length).toBe(length);
+    const stream = must(must(/stream\n([\s\S]*?)\nendstream/.exec(pdf))[1]);
+    expect(stream?.length).toBe(length);
   });
 });
 

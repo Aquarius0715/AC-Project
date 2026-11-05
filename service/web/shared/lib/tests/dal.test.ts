@@ -16,7 +16,7 @@ type Call = [string, RequestInit & { headers: Record<string, string> }];
 const refusal = (p: Promise<unknown>) => p.then(() => { throw new Error("the call succeeded"); }, (error: unknown) => error as CoreError);
 const reply = (...bodies: [number, unknown][]) => {
   const f = vi.fn(() => {
-    const [status, body] = bodies.length > 1 ? must(bodies.shift()) : bodies[0];
+    const [status, body] = must(bodies.length > 1 ? bodies.shift() : bodies[0]);
     return Promise.resolve(new Response(typeof body === "string" ? body : JSON.stringify(body), { status }));
   });
   vi.stubGlobal("fetch", f);
@@ -38,7 +38,7 @@ describe("calling the Core API as the signed-in membership (IR222)", () => {
     vi.stubEnv("CORE_API_URL", "http://gateway:8080");
     const f = reply([200, { data: { id: "u1" } }]);
     expect(await coreOp("units.get", { id: "u1" })).toEqual({ id: "u1" });
-    const [url, init] = f.mock.calls[0];
+    const [url, init] = must(f.mock.calls[0]);
     expect([url, init.method, init.body, init.cache]).toEqual(["http://gateway:8080/v1/units/u1", "GET", undefined, "no-store"]);
     expect(init.headers).toEqual({ Authorization: "Bearer access-1", "X-Tenant-Id": "t-1", "X-Membership-Id": "m-1" }); // no body, no write: no other header
   });
@@ -46,11 +46,11 @@ describe("calling the Core API as the signed-in membership (IR222)", () => {
   it("marks a write with an idempotency key and the expected version", async () => {
     const f = reply([200, { data: { id: "c1" } }]);
     await coreOp("commands.create", { unitId: "u1", action: { kind: "set_power", power: true }, expectedUnitVersion: 3 }, { write: true, idempotencyKey: "key-1", expectedVersion: 7 });
-    const [url, init] = f.mock.calls[0];
+    const [url, init] = must(f.mock.calls[0]);
     expect([url, init.method, JSON.parse(String(init.body)).unitId]).toEqual(["http://localhost:8080/v1/commands", "POST", "u1"]);
     expect(init.headers).toMatchObject({ "Content-Type": "application/json", "Idempotency-Key": "key-1", "X-Expected-Version": "7" });
     await coreOp("commands.create", { unitId: "u1", action: { kind: "set_power", power: true }, expectedUnitVersion: 3 }, { write: true });
-    expect(f.mock.calls[1][1].headers["Idempotency-Key"]).toMatch(/^[0-9a-f-]{36}$/); // a fresh key per intent when none is given
+    expect(f.mock.calls[1]?.[1].headers["Idempotency-Key"]).toMatch(/^[0-9a-f-]{36}$/); // a fresh key per intent when none is given
   });
 
   it("turns a refusal into a CoreError with the API's DomainError, and an unreadable one into UNAVAILABLE", async () => {

@@ -5,6 +5,7 @@ import {
   type ApiCapacity, type ApiMember, type ApiPartnerJob, type PartnerJob,
 } from "@ac/web/lib/partnerOverview";
 import { i18nOf } from "@ac/web/lib/i18n";
+import { must } from "./must";
 
 const NOW = "2026-09-21T01:30:00Z"; // Mon 09:30 in Kuala Lumpur
 const now = Date.parse(NOW);
@@ -63,8 +64,8 @@ describe("partner overview", () => {
       ["Reports to review", 1, "p05 · Server room AC · awaiting review", "/partner/jobs/p05/review"],
       ["Overdue", 1, "Past the due date or the work window", "/partner/jobs?tab=active&from=2026-09-21&to=2026-09-27"],
     ]);
-    expect(tiles[1].tone).toBe("warn");
-    expect(tiles[4].tone).toBe("crit");
+    expect(tiles[1]?.tone).toBe("warn");
+    expect(tiles[4]?.tone).toBe("crit");
     const empty = kpis({ offerCount: 0, activeCount: 0, reviewCount: 0, overdueCount: 0 }, [], now, names);
     expect(empty.map((t) => t.sub)).toEqual(["No open offers", "—", "—", "—", "—"]);
     expect(empty.every((t) => !t.tone)).toBe(true);
@@ -78,8 +79,8 @@ describe("partner overview", () => {
       ["unassigned", "x01 · Jalan 1, KL", "Assign", "/partner/schedule?jobId=x01"],
       ["unassigned", "p02 · Rooftop unit", "Assign", "/partner/schedule?jobId=p02"],
     ]);
-    const overdue = actions(fixture(), now, names)[1];
-    expect(overdue.detail).toBe("Work window ended 20 Sept 2026, 5:00 pm MYT · tech-external-a"); // IR44
+    const overdue = must(actions(fixture(), now, names)[1]);
+    expect(overdue?.detail).toBe("Work window ended 20 Sept 2026, 5:00 pm MYT · tech-external-a"); // IR44
   });
 
   it("draws today's timeline and the week's capacity per technician", () => {
@@ -91,7 +92,7 @@ describe("partner overview", () => {
       { id: "m-a", name: "tech-external-a", sub: "refrigerant", blocks: [{ left: 20, width: 20, text: "10:00–12:00" }], off: null },
       { id: "m-b", name: "tech-external-a2", sub: "Technician", blocks: [], off: null },
     ]);
-    const week = capacity([today, [{ ...today[0], date: "2026-09-22", assignedMinutes: 480 }, { membershipId: "m-b", date: "2026-09-22", availableSlots: [], assignedSlots: [], availableMinutes: null, assignedMinutes: 0, unavailability: "leave" }]], members);
+    const week = capacity([today, [{ ...must(today[0]), date: "2026-09-22", assignedMinutes: 480 }, { membershipId: "m-b", date: "2026-09-22", availableSlots: [], assignedSlots: [], availableMinutes: null, assignedMinutes: 0, unavailability: "leave" }]], members);
     expect(week).toEqual([
       { id: "m-a", name: "tech-external-a", text: "10 h / 16 h · 63%", pct: 63 },
       { id: "m-b", name: "tech-external-a2", text: "0 h / — · —", pct: null },

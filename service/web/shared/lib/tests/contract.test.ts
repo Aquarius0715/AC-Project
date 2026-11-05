@@ -64,7 +64,7 @@ function contractInputs(): Map<string, Map<string, Field>> {
 function catalogFilters(): Map<string, string[]> {
   const out = new Map<string, string[]>();
   for (const m of readFileSync(catalogFile, "utf8").matchAll(/\{Name: "([\w.]+)".*?Filters: (nil|\[\]string\{([^}]*)\})\}/g)) {
-    out.set(m[1], m[2] === "nil" ? [] : [...m[3].matchAll(/"([^"]+)"/g)].map((x) => x[1]));
+    out.set(must(m[1]), m[2] === "nil" ? [] : [...must(m[3]).matchAll(/"([^"]+)"/g)].map((x) => must(x[1])));
   }
   return out;
 }

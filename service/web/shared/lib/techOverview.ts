@@ -138,7 +138,8 @@ export interface ReportRow { id: string; title: string; sub: string; badge: { te
 const REPORTS: Record<string, [string, string, Tone]> = {
   in_progress: ["draft in progress", "Draft", "warn"], rework_requested: ["returned — resume as a new version", "Rework", "warn"], submitted: ["awaiting quality review · read-only", "Submitted", "primary"],
 };
+const reportOf = (status: string): [string, string, Tone] => REPORTS[status] ?? [status, status, "muted"]; // an unknown state as it is
 /** The reports by state: drafts in progress, returned for rework, submitted for review. */
 export function reportRows(rows: TechJobRow[], t: T = en): ReportRow[] {
-  return rows.filter((r) => REPORTS[r.status]).map((r) => ({ id: r.id, title: `${r.short} · ${r.title}`, sub: t(REPORTS[r.status][0]), badge: { text: t(REPORTS[r.status][1]), tone: REPORTS[r.status][2] } }));
+  return rows.filter((r) => REPORTS[r.status]).map((r) => ({ id: r.id, title: `${r.short} · ${r.title}`, sub: t(reportOf(r.status)[0]), badge: { text: t(reportOf(r.status)[1]), tone: reportOf(r.status)[2] } }));
 }

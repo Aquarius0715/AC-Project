@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, ConnBadge, Field, Input, ListRow, Modal, Page, Search, Tabs, Textarea, Timeline, useToast, Plain } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
+import { nonEmpty } from "@ac/web/lib/lists";
 
-const devices = [
+const devices = nonEmpty([
   { id: "ac-001", serial: "AC-001", dev: "device-ac-001", unit: "unit-t11-new · ventilation-demo v3", fw: "fw v1 → v2", conn: "online" as const, tamper: false },
   { id: "device-online-rto", serial: "AC-DEMO-0001", dev: "device-online-rto", unit: "unit-online-rto · ventilation-demo v3", fw: "fw v1", conn: "online" as const, tamper: false },
   { id: "device-tamper", serial: "AC-DEMO-0002", dev: "device-tamper", unit: "unit-non-rto · cap-split-std v1", fw: "fw v1", conn: "offline" as const, tamper: true },
   { id: "device-offline-rto", serial: "AC-DEMO-0003", dev: "device-offline-rto", unit: "unit-offline-rto · cap-split-std v1", fw: "fw v1", conn: "offline" as const, tamper: false },
-];
+]);
 
 export function DevicesView({ initial }: Readonly<{ initial?: string }>) {
   type F = "all" | "online" | "offline" | "tamper";
@@ -39,7 +40,7 @@ export function DevicesView({ initial }: Readonly<{ initial?: string }>) {
   const duplicate = devices.some((d) => d.serial.toLowerCase() === f.serial.toLowerCase()) ? "Duplicate serial (CONFLICT)" : undefined;
   return (
     <Page>
-      <Tabs value={filter} onChange={setFilter} tabs={(["all", "online", "offline", "tamper"] as F[]).map((k) => ({ id: k, label: k[0].toUpperCase() + k.slice(1), count: count(k) }))} />
+      <Tabs value={filter} onChange={setFilter} tabs={(["all", "online", "offline", "tamper"] as F[]).map((k) => ({ id: k, label: k.charAt(0).toUpperCase() + k.slice(1), count: count(k) }))} />
       <div className="split-rev">
         <Card title="Devices — assigned units" sub="your jobs only" action={<Btn size="sm" onClick={() => { setReg(true); }}><Icon name="add" /> Register</Btn>} className="self-start">
           <div className="mb-2"><Search placeholder="Search serial, device or unit…" value={q} onChange={setQ} /></div>
@@ -60,7 +61,7 @@ export function DevicesView({ initial }: Readonly<{ initial?: string }>) {
             {fw === "ok" && <div className="mt-3"><Banner tone="ok">Firmware v2.0 succeeded — history appended.</Banner></div>}
           </Card>
           <Card title="Sensors (5)" sub="from the unit’s capability v3">
-            <div className="scroll-x"><table className="w-full min-w-[420px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th>Metric</th><th>Unit</th><th>Stale after</th><th>Last calibrated</th><th /></tr></thead><tbody>{[["temperature", "°C"], ["humidity", "%"], ["co2", "ppm"], ["pm25", "µg/m³"], ["power", "kW"]].map(([m, u], i) => <tr key={m} className="border-t border-line"><td className="py-2">{m}</td><td>{u}</td><td>120 s</td><td>{i === 0 && sel.id === "ac-001" ? "2026-09-21 09:40" : "Never"}</td><td><Plain className="text-xs font-semibold text-primary" onClick={() => { setCal(m); }}>Calibrate <Icon name="arrowRight" /></Plain></td></tr>)}</tbody></table></div>
+            <div className="scroll-x"><table className="w-full min-w-[420px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th>Metric</th><th>Unit</th><th>Stale after</th><th>Last calibrated</th><th /></tr></thead><tbody>{([["temperature", "°C"], ["humidity", "%"], ["co2", "ppm"], ["pm25", "µg/m³"], ["power", "kW"]] as const).map(([m, u], i) => <tr key={m} className="border-t border-line"><td className="py-2">{m}</td><td>{u}</td><td>120 s</td><td>{i === 0 && sel.id === "ac-001" ? "2026-09-21 09:40" : "Never"}</td><td><Plain className="text-xs font-semibold text-primary" onClick={() => { setCal(m); }}>Calibrate <Icon name="arrowRight" /></Plain></td></tr>)}</tbody></table></div>
           </Card>
           <div className="split-even">
             <Card title="Operation history"><div className="text-[13px]">{[["firmware", "2026-09-21 09:14", "v1 → v2"], ["check", "2026-09-21 09:12", "heartbeat confirmed"]].map(([k, t, d]) => <div key={t} className="flex flex-wrap justify-between gap-2 border-t border-line py-2 first:border-0"><span><b>{k}</b> · {d}</span><span className="text-xs text-muted-foreground">{t}</span></div>)}</div></Card>

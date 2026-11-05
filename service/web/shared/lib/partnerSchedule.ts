@@ -199,10 +199,10 @@ export function weekGrid(dates: string[], members: ApiMember[], capacity: ApiCap
       if (proposal && proposal.technicianId === m.id && dayOf(proposal.slot.startAt) === date) return { kind: "proposal", text: `${hhmm(proposal.slot.startAt)}–${hhmm(proposal.slot.endAt)}`, sub: proposal.short };
       if (c?.unavailability) return { kind: "leave", text: t(LEAVE.has(c.unavailability) ? "Leave" : "Unavailable"), sub: unavailabilityLabel(c.unavailability, t) };
       if (!c?.availableMinutes) return { kind: "none", text: t("no hours") };
-      if (c.assignedSlots.length > 0) {
-        const s = c.assignedSlots[0];
+      const s = c.assignedSlots[0], lastSlot = c.assignedSlots.at(-1);
+      if (s && lastSlot) {
         const job = (jobsOf.get(m.id) ?? []).find((j) => Date.parse(j.slot.startAt) < Date.parse(s.endAt) && Date.parse(s.startAt) < Date.parse(j.slot.endAt));
-        return { kind: "booked", text: `${hhmm(s.startAt)}–${hhmm(c.assignedSlots[c.assignedSlots.length - 1].endAt)}`, sub: [job?.short ?? t("booked"), c.assignedSlots.length > 1 ? `+${String(c.assignedSlots.length - 1)}` : ""].filter(Boolean).join(" ") };
+        return { kind: "booked", text: `${hhmm(s.startAt)}–${hhmm(lastSlot.endAt)}`, sub: [job?.short ?? t("booked"), c.assignedSlots.length > 1 ? `+${String(c.assignedSlots.length - 1)}` : ""].filter(Boolean).join(" ") };
       }
       return { kind: "free", text: t("free") };
     });

@@ -62,7 +62,7 @@ export function policyGroups(ps: ApiAutoPolicy[], customerOfUnit: Map<string, st
   const groups = new Map<string, PolicyGroup>();
   for (const p of [...ps].toSorted((a, b) => b.priority - a.priority || a.id.localeCompare(b.id))) {
     const customers = new Set(p.unitIds.map((u) => customerOfUnit.get(u) ?? t("unknown customer")));
-    const key = customers.size === 1 ? [...customers][0] : ACROSS;
+    const key = (customers.size === 1 ? [...customers][0] : undefined) ?? ACROSS;
     const g = groups.get(key) ?? { label: key === ACROSS ? t("Across customers") : key, rows: [] };
     g.rows.push({
       id: p.id, version: p.version, name: p.name, sentence: `${conditionText(p.condition, t)} → ${actionText(p.action, t)}`, priority: p.priority, enabled: p.enabled,

@@ -30,6 +30,7 @@ vi.mock("next/headers", () => ({ cookies: () => Promise.resolve({ get: vi.fn(), 
 vi.mock("@redis/client", () => ({ createClient: () => { const c = { on: () => c, connect: () => Promise.resolve(c), ...kv.api }; return c; } }));
 
 import { ABSOLUTE_SECONDS, createSessionCookie, dropSession, loadSession, renewSessionCookie, seal, unseal, type Session } from "@ac/web/lib/session";
+import { must } from "./must";
 
 const NOW = Date.parse("2026-09-15T01:00:00Z");
 const session = (over: Partial<Session> = {}): Session => ({ accessToken: "header.claims.sig", refreshToken: "refresh:r-1", tenantId: "t-1", membershipId: "m-1", role: "client", expiresAt: NOW / 1000 + 300, ...over });
@@ -52,7 +53,7 @@ describe("the server-side session store", () => {
     const cookie = await createSessionCookie(session());
     const id = unseal<{ sid: string }>(cookie)?.sid ?? "";
     expect([Object.keys(unseal<object>(cookie) ?? {}), id.length]).toEqual([["sid"], 43]);
-    const [key, rec] = [...kv.data][0];
+    const [key, rec] = must([...kv.data][0]);
     expect(key).toBe(`ac:session:${createHash("sha256").update(id).digest("hex")}`); // the key reveals no cookie
     // the markers hold ":" and "." around words, which base64url ciphertext cannot reproduce by chance
     expect([rec.value.includes("header.claims.sig"), rec.value.includes("refresh:r-1"), kv.data.size]).toEqual([false, false, 1]);
@@ -106,7 +107,7 @@ describe("the server-side session store", () => {
 
   it("refuses a cookie that carries the session itself, an altered cookie and a short ID", async () => {
     const cookie = await createSessionCookie(session());
-    const [iv, body] = cookie.split(".", 2);
+    const [iv = "", body = ""] = cookie.split(".", 2);
     // an altered cookie: its last two characters replaced by others (a cookie that already ends in "xx" gets "yy")
     const altered = `${iv}.${body.slice(0, -2)}${body.endsWith("xx") ? "yy" : "xx"}`;
     expect([await loadSession(seal(session())), await loadSession(altered), await loadSession(seal({ sid: "short" })), await loadSession(undefined)])

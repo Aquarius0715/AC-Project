@@ -15,7 +15,7 @@ export interface CoreRequest { method: CoreRoute["method"]; path: string; body?:
 
 type Json = Record<string, unknown>;
 const isObject = (v: unknown): v is Json => typeof v === "object" && v !== null && !Array.isArray(v);
-const pathParams = (path: string) => [...path.matchAll(/\{([^}]+)\}/g)].map((m) => m[1]);
+const pathParams = (path: string) => [...path.matchAll(/\{([^}]+)\}/g)].map((m) => m[1] ?? "");
 
 function lookup(node: Json, at: string[]): unknown {
   let current: unknown = node;
@@ -28,9 +28,11 @@ function lookup(node: Json, at: string[]): unknown {
 
 function take(node: Json, at: string[]): unknown {
   const parent = lookup(node, at.slice(0, -1));
-  if (!isObject(parent)) return undefined;
-  const v = parent[at[at.length - 1]];
-  delete parent[at[at.length - 1]];
+  const key = at.at(-1);
+  if (key === undefined || !isObject(parent)) return undefined;
+  // the key is a path parameter's name from the generated route table, read and removed as an own property
+  const v: unknown = Reflect.get(parent, key);
+  Reflect.deleteProperty(parent, key);
   return v;
 }
 
@@ -54,6 +56,7 @@ function pick(routes: readonly CoreRoute[], input: Json): CoreRoute {
     best = r;
     score = names.length;
   }
+  if (!best) throw new Error("an operation has at least one route");
   return best;
 }
 

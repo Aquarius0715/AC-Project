@@ -52,7 +52,8 @@ const restrictionRank: Record<string, number> = { applied: 0, requested: 1, rele
 function unknownRestriction(mine: ApiContractLite[], restrictions: ApiRestrictionLite[] | null): Standing["restriction"] {
   if (restrictions !== null) return null;
   const k = mine.find((x) => x.activeRestrictionIds.length > 0);
-  return k ? { id: k.activeRestrictionIds[0], state: "active", contractId: k.id } : null;
+  const id = k?.activeRestrictionIds[0];
+  return k && id ? { id, state: "active", contractId: k.id } : null;
 }
 export function standing(customerId: string, contracts: ApiContractLite[], overdue: ApiInvoiceLite[], restrictions: ApiRestrictionLite[] | null, now: Date): Standing {
   const t = now.getTime();
@@ -60,10 +61,10 @@ export function standing(customerId: string, contracts: ApiContractLite[], overd
   const ids = new Set(mine.map((k) => k.id));
   const current = mine.filter((k) => Date.parse(k.startAt) <= t && t < Date.parse(k.endAt));
   const due = overdue.filter((i) => ids.has(i.contractId));
-  const r = (restrictions ?? []).filter((x): x is ApiRestrictionLite & { contractId: string } => !!x.contractId && ids.has(x.contractId) && x.state in restrictionRank).toSorted((a, b) => restrictionRank[a.state] - restrictionRank[b.state])[0];
+  const r = (restrictions ?? []).filter((x): x is ApiRestrictionLite & { contractId: string } => !!x.contractId && ids.has(x.contractId) && x.state in restrictionRank).toSorted((a, b) => (restrictionRank[a.state] ?? 9) - (restrictionRank[b.state] ?? 9))[0];
   return {
     plans: [...new Set(current.map((k) => k.planType))], contracts: current.length, contractUnits: new Set(current.flatMap((k) => k.unitIds)).size, overdue: due.length,
-    overdueAmount: due.length > 0 ? amount(due.reduce((n, i) => n + i.amountMinor, 0), due[0].currency) : null,
+    overdueAmount: due.length > 0 ? amount(due.reduce((n, i) => n + i.amountMinor, 0), due[0]?.currency ?? "MYR") : null,
     restriction: r ? { id: r.id, state: r.state, contractId: r.contractId } : unknownRestriction(mine, restrictions),
   };
 }
@@ -75,7 +76,7 @@ export function standingMarks(status: "active" | "inactive", s: Standing | null,
   if (!s) return [];
   const out: Mark[] = [];
   if (s.overdue) out.push({ label: t("Overdue"), tone: "crit", icon: "alert" });
-  if (s.restriction) out.push({ label: t(restrictionLabel[s.restriction.state]), tone: "warn" });
+  if (s.restriction) out.push({ label: textOf(restrictionLabel, s.restriction.state, t) ?? s.restriction.state, tone: "warn" });
   if (out.length === 0) out.push(s.contracts ? { label: t("Good standing"), tone: "ok" } : { label: t("No contract"), tone: "muted" });
   return out;
 }
@@ -527,7 +528,7 @@ export function csvShape(text: string): { header: string[]; rows: number } {
   let cell = "", isQuoted = false;
   const t = text.replace(/^\uFEFF/, "");
   for (let i = 0; i < t.length; i++) {
-    const ch = t[i];
+    const ch = t.charAt(i);
     if (isQuoted) {
       if (ch === '"' && t[i + 1] === '"') { cell += '"'; i++; } else if (ch === '"') isQuoted = false; else cell += ch;
     } else switch (ch) {

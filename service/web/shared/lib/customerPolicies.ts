@@ -60,7 +60,7 @@ const daysText = (weekdays: number[], t: T) => {
   if (days.length === 7) return "";
   if (key === "1,2,3,4,5") return t("on weekdays");
   if (key === "6,7") return t("on weekends");
-  return t("on {days}", { days: days.map((d) => t(dayNames[d - 1])).join(", ") });
+  return t("on {days}", { days: days.map((d) => t(dayNames[d - 1] ?? String(d))).join(", ") });
 };
 /** “only 08:00–19:00 on weekdays”, “only 22:00–06:00”, “only 09:00–12:00 on Sat, Sun”. */
 export function windowText(w: PolicyWindow, t: T = en): string {
@@ -167,10 +167,10 @@ export function summaryText(f: PolicyForm, t: T = en): string {
   const d = f.windowOn && f.weekdays.length > 0 ? daysText(f.weekdays, t) : "";
   const daysPart = d ? `${d} ` : "";
   const win = f.windowOn && f.weekdays.length > 0 ? ` ${daysPart}${f.start}–${f.end}` : "";
-  const what = f.metric === "co2" || f.metric === "pm25" ? label[f.metric] : (textOf(label, f.metric, t) ?? f.metric).toLowerCase();
+  const what = f.metric === "co2" || f.metric === "pm25" ? label[f.metric] ?? f.metric : (textOf(label, f.metric, t) ?? f.metric).toLowerCase();
   const isUp = f.operator === "gt" || f.operator === "gte";
   return t(isUp ? "{verb} when {what} stays {op} {value} {unit} for {duration}{window}. Clears below {recovery} {unit}." : "{verb} when {what} stays {op} {value} {unit} for {duration}{window}. Clears above {recovery} {unit}.",
-    { verb, what, unit, op: opSymbol[f.operator], value: f.threshold || "…", duration: s === null ? "…" : durationText(s), window: win, recovery: f.recovery || "…" }).replaceAll(/ +/g, " ");
+    { verb, what, unit, op: opSymbol[f.operator] ?? f.operator, value: f.threshold || "…", duration: s === null ? "…" : durationText(s), window: win, recovery: f.recovery || "…" }).replaceAll(/ +/g, " ");
 }
 /** policies.save input (AlertPolicyInput): the form plus the hidden fields — new: the session membership as recipient,
 escalation 60, cooldown 5, the Preferences time zone, priority 50; edit: the policy's own (IR120). */

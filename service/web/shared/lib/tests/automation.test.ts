@@ -30,7 +30,7 @@ describe("HQ automation policies (FR-A11, DD-A11)", () => {
       policy({ id: "p2", priority: 40 }), policy({}), policy({ id: "p3", unitIds: ["u1", "u2"], enabled: false, disabledReason: "consent_revoked" }), policy({ id: "p4", unitIds: ["u9"] }),
     ], customerOf);
     expect(groups.map((g) => [g.label, g.rows.map((r) => r.id)])).toEqual([["Across customers", ["p3"]], ["Demo Customer A", ["p1", "p2"]], ["unknown customer", ["p4"]]]);
-    expect(groups[0].rows[0]).toMatchObject({ sentence: "When the electricity tariff is > 0.6 MYR/kWh → set the temperature to 26 °C", enabled: false, disabledReason: "consent revoked" });
+    expect(groups[0]?.rows[0]).toMatchObject({ sentence: "When the electricity tariff is > 0.6 MYR/kWh → set the temperature to 26 °C", enabled: false, disabledReason: "consent revoked" });
   });
 
   it("checks a draft and builds the policies.save input", () => {
@@ -68,7 +68,7 @@ describe("HQ automation policies in Malay (IR303)", () => {
     const t = translator("ms");
     expect(`${conditionText({ type: "tariff", operator: "gt", value: 0.6, unit: "MYR_per_kWh" }, t)} → ${actionText({ kind: "set_mode", mode: "cool" }, t)}`).toBe("Apabila tarif elektrik > 0.6 MYR/kWh → tukar ke mod sejuk");
     expect([actionText({ kind: "set_power", power: true }, t), actionText({ kind: "set_fan", fanLevel: "mid" }, t)]).toEqual(["hidupkan AC", "tetapkan kipas kepada sederhana"]);
-    expect(policyGroups([policy({ unitIds: ["u1", "u2"] })], customerOf, t)[0].label).toBe("Merentas pelanggan");
+    expect(policyGroups([policy({ unitIds: ["u1", "u2"] })], customerOf, t)[0]?.label).toBe("Merentas pelanggan");
     expect(autoErrors({ ...autoDraft(), name: "", unitIds: [] }, null, t)).toEqual({ name: "1–120 aksara", unitIds: "Pilih sekurang-kurangnya satu unit" });
     expect([reasonWord("restricted", t), decisionWord("selected", t), decisionWord("requested", t), disabledReasonWord("consent_revoked", t)]).toEqual(["disekat oleh sekatan aktif", "dipilih", "diminta", "persetujuan ditarik balik"]);
     expect([reasonWord("superseded"), reasonWord("superseded", t)]).toEqual(["superseded by a schedule starting in the same minute", "digantikan oleh jadual yang bermula pada minit yang sama"]); // IR504

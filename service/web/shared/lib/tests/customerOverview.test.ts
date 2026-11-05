@@ -50,12 +50,12 @@ describe("customer overview", () => {
 
   it("shows the measured room temperature, humidity and power — never the AC setting", () => {
     const [r] = overviewRows([unit("u1", { latestMeasurements: [m("temperature", 28), m("humidity", 60.04), m("power", 0.68)] })], () => "Home A › Bedroom");
-    expect([r.temp, r.hum, r.power, r.observed, r.state, r.place]).toEqual(["28.0", "60.0", "680", "9:12 am MYT", "running", "Home A › Bedroom"]);
+    expect([r?.temp, r?.hum, r?.power, r?.observed, r?.state, r?.place]).toEqual(["28.0", "60.0", "680", "9:12 am MYT", "running", "Home A › Bedroom"]);
     const [stale] = overviewRows([unit("u2", { latestMeasurements: [m("temperature", 30, { quality: "stale" })], connection: "offline", effectivePowerState: "unknown", lastSeenAt: "2026-09-12T10:40:00Z" })], () => "");
-    expect([stale.temp, stale.hum, stale.power, stale.observed, stale.state, stale.conn]).toEqual([null, null, null, "last seen 12 Sept 2026, 6:40 pm MYT", "unknown", "offline"]);
+    expect([stale?.temp, stale?.hum, stale?.power, stale?.observed, stale?.state, stale?.conn]).toEqual([null, null, null, "last seen 12 Sept 2026, 6:40 pm MYT", "unknown", "offline"]);
     // the user's language and display time zone (IR260)
-    expect(overviewRows([unit("u3", { connection: "offline", lastSeenAt: "2026-09-12T10:40:00Z" })], () => "", MS_TOKYO)[0].observed).toBe("kali terakhir dilihat 12 Sep 2026, 7:40 PTG GMT+9");
-    expect(overviewRows([unit("u4", { connection: "offline", lastSeenAt: null })], () => "", MS_TOKYO)[0].observed).toBe("kali terakhir dilihat tidak pernah");
+    expect(overviewRows([unit("u3", { connection: "offline", lastSeenAt: "2026-09-12T10:40:00Z" })], () => "", MS_TOKYO)[0]?.observed).toBe("kali terakhir dilihat 12 Sep 2026, 7:40 PTG GMT+9");
+    expect(overviewRows([unit("u4", { connection: "offline", lastSeenAt: null })], () => "", MS_TOKYO)[0]?.observed).toBe("kali terakhir dilihat tidak pernah");
   });
 
   it("compares the energy of the period and keeps missing values apart from 0", () => {

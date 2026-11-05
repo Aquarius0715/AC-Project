@@ -86,7 +86,7 @@ describe("HQ maintenance jobs", () => {
     expect(hqRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { startAt: "errors.slot_not_agreed" } })).toBe("Start at: only one of the client’s preferred times (or an accepted proposal) can be booked");
     // in Malay, with the field named in words; every refusal text has a Malay entry (IR493)
     expect(hqRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { contactWindow: "error.length" } }, translator("ms"))).toBe("Contact window: sehingga 200 aksara");
-    expect(hqRefusal({ code: "CONFLICT", messageKey: "errors.proposal_pending", fieldErrors: {} }, translator("ms"))).toBe(ms["Not saved: {reason}."].replace("{reason}", ms["a proposal is already waiting for the client — withdraw it first"]));
+    expect(hqRefusal({ code: "CONFLICT", messageKey: "errors.proposal_pending", fieldErrors: {} }, translator("ms"))).toBe(ms["Not saved: {reason}."]?.replace("{reason}", must(ms["a proposal is already waiting for the client — withdraw it first"])));
     expect(HQ_REFUSAL_KEYS.filter((k) => !(k in ms))).toEqual([]);
     expect(hqRefusal({ code: "CONFLICT", messageKey: "errors.proposal_pending", fieldErrors: {} })).toBe("Not saved: a proposal is already waiting for the client — withdraw it first.");
     expect(hqRefusal({ code: "NOT_FOUND", messageKey: "error.notFound", fieldErrors: {} })).toBe("The job no longer exists in your scope.");
@@ -195,8 +195,8 @@ describe("HQ Jobs tab in Malay with the display time zone (IR290)", () => {
     expect(periodChip({ from: "2026-09-13T16:00:00.000Z", to: "2026-09-14T01:00:00.000Z" }, MS)).toMatch(/^Masa diminta 14 Sep.* GMT\+9$/);
     expect(stepper("accepted", false, MS.t).map((s) => s.label).slice(0, 3)).toEqual(["Diminta", "Ditawarkan", "Diterima"]);
     const f = facts(job({}), names, MS);
-    expect([f[0].label, f[0].sub, f[2].value]).toEqual(["Tetingkap yang diminta", "masa pilihan pertama pelanggan", "belum ditempah"]);
-    expect(f[0].value).toMatch(/GMT\+9$/); // 11:00 – 1:00 in Tokyo, the client's 10:00–12:00 in Kuala Lumpur
+    expect([f[0]?.label, f[0]?.sub, f[2]?.value]).toEqual(["Tetingkap yang diminta", "masa pilihan pertama pelanggan", "belum ditempah"]);
+    expect(f[0]?.value).toMatch(/GMT\+9$/); // 11:00 – 1:00 in Tokyo, the client's 10:00–12:00 in Kuala Lumpur
     expect(controls("in_progress", MS.t).cancelWhy).toBe("Tangguhkan kerja dahulu.");
     expect(jobRequestErrors({ unitId: "", symptom: "x", slots: [slot("2026-09-21T06:00:00Z", "2026-09-21T08:00:00Z")] }, NOW, MS.t)).toEqual({ unitId: "Pilih unit.", symptom: "Terangkan simptom dalam 10–2000 aksara.", slot0: "Masa bermula pada hari selepas hari ini (Kuala Lumpur)." });
     expect(hqRefusal({ code: "NOT_FOUND", messageKey: "error.notFound", fieldErrors: {} }, MS.t)).toBe("Kerja ini tidak lagi wujud dalam skop anda.");

@@ -2,6 +2,7 @@ import { createCipheriv, randomBytes } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SESSION_COOKIE, cookieKey, cookieOptions, endIdpSession, jwtClaims, needsRefresh, oidcConfig, readSession, refresh, roleHome, safeReturnTo, seal, sessionFromTokens, unseal, type Session } from "@ac/web/lib/session";
+import { must } from "./must";
 
 // the BFF session (backend architecture §5) is server code: next/headers is the request's cookie jar
 const jar = vi.hoisted(() => ({ get: vi.fn(), set: vi.fn(), delete: vi.fn() }));
@@ -28,17 +29,18 @@ describe("the sealed session cookie (AES-256-GCM, IR333)", () => {
   it("opens what it sealed and refuses anything altered", () => {
     const t = seal({ a: 1, b: "x" });
     expect(unseal(t)).toEqual({ a: 1, b: "x" });
-    const [iv, body] = t.split(".", 2);
-    const flip = (v: string, i: number) => { const b = Buffer.from(v, "base64url"); b[i] ^= 1; return b.toString("base64url"); };
+    const [ivPart, bodyPart] = t.split(".", 2);
+    const iv = must(ivPart), body = must(bodyPart);
+    const flip = (v: string, i: number) => { const b = Buffer.from(v, "base64url"); b[i] = (b[i] ?? 0) ^ 1; return b.toString("base64url"); };
     expect([unseal(`${flip(iv, 0)}.${body}`), unseal(`${iv}.${flip(body, 0)}`), unseal(`${iv}.${flip(body, Buffer.from(body, "base64url").length - 1)}`),
-      unseal(`${iv}.`), unseal(`.${body}`), unseal(iv), unseal(`${t}.x`), unseal(`${iv.slice(2)}.${body}`), unseal(undefined), unseal("")])
+      unseal(`${iv}.`), unseal(`.${body}`), unseal(iv), unseal(`${t}.x`), unseal(`${iv?.slice(2)}.${body}`), unseal(undefined), unseal("")])
       .toEqual([null, null, null, null, null, null, null, null, null, null]);
   });
 
   it("keeps the tokens unreadable to the browser and never repeats a value", () => {
     const s = session();
     const t = seal(s);
-    const plain = Buffer.from(t.split(".", 2)[1], "base64url").toString("latin1");
+    const plain = Buffer.from(must(t.split(".", 2)[1]), "base64url").toString("latin1");
     expect([plain.includes("accessToken"), plain.includes("r-1"), t.includes(Buffer.from(JSON.stringify(s)).toString("base64url").slice(0, 16))]).toEqual([false, false, false]);
     expect(seal(s)).not.toBe(t); // a fresh IV each time
     expect(unseal<Session>(t)).toEqual(s);
@@ -170,7 +172,7 @@ describe("reading the session in a route handler", () => {
     jar.get.mockReturnValue({ value: seal(session({ expiresAt: NOW / 1000 + 10 })) });
     vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(Response.json({ access_token: token(claims), refresh_token: "r-2", expires_in: 300 }))));
     expect(await readSession()).toMatchObject({ refreshToken: "r-2", expiresAt: NOW / 1000 + 300 });
-    const [name, value, options] = jar.set.mock.calls[0];
+    const [name, value, options] = must(jar.set.mock.calls[0]);
     expect([name, unseal<Session>(value)?.refreshToken, options.maxAge]).toEqual([SESSION_COOKIE, "r-2", 1800]);
   });
 

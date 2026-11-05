@@ -21,18 +21,18 @@ const FIXED = new Set([
 
 /** Texts written with values in them: the stored form, the dictionary key and its values. */
 const TEMPLATES: [RegExp, string, (m: RegExpMatchArray) => Params][] = [
-  [/^Cleaning due \((\d+) h of run time since the last cleaning\)\. Not a fault\.$/, "Cleaning due ({hours} h of run time since the last cleaning). Not a fault.", (m) => ({ hours: m[1] })],
-  [/^Cleaning due \((\d+) h of run time, no cleaning recorded\)\. Not a fault\.$/, "Cleaning due ({hours} h of run time, no cleaning recorded). Not a fault.", (m) => ({ hours: m[1] })],
-  [/^Cleaning due \((\d+) days since the last cleaning, run time unknown\)\. Not a fault\.$/, "Cleaning due ({days} days since the last cleaning, run time unknown). Not a fault.", (m) => ({ days: m[1] })],
-  [/^Device (\S+) reported its cover opened while powered \(tamper_signal\)$/, "Device {serial} reported its cover opened while powered", (m) => ({ serial: m[1] })],
-  [/^Demo event: (\S+) (\S+) threshold$/, "Demo event: {metric} {operator} threshold", (m) => ({ metric: m[1], operator: m[2] })],
+  [/^Cleaning due \((\d+) h of run time since the last cleaning\)\. Not a fault\.$/, "Cleaning due ({hours} h of run time since the last cleaning). Not a fault.", (m) => ({ hours: m[1] ?? "" })],
+  [/^Cleaning due \((\d+) h of run time, no cleaning recorded\)\. Not a fault\.$/, "Cleaning due ({hours} h of run time, no cleaning recorded). Not a fault.", (m) => ({ hours: m[1] ?? "" })],
+  [/^Cleaning due \((\d+) days since the last cleaning, run time unknown\)\. Not a fault\.$/, "Cleaning due ({days} days since the last cleaning, run time unknown). Not a fault.", (m) => ({ days: m[1] ?? "" })],
+  [/^Device (\S+) reported its cover opened while powered \(tamper_signal\)$/, "Device {serial} reported its cover opened while powered", (m) => ({ serial: m[1] ?? "" })],
+  [/^Demo event: (\S+) (\S+) threshold$/, "Demo event: {metric} {operator} threshold", (m) => ({ metric: m[1] ?? "", operator: m[2] ?? "" })],
 ];
 
 /** Resolution reasons the system writes: a cleaned filter, a recovery case resolved, a policy's sustained recovery
 (D08). A reason a person typed when resolving stays as written. */
 const REASONS = new Set(["filter cleaned", "recovery resolved"]);
 const REASON_TEMPLATES: typeof TEMPLATES = [
-  [/^Recovered: (\S+) (\S+) ([<>]) (\S+) for (\d+) s \(D08\)$/, "Recovered: {metric} {value} {dir} {threshold} for {seconds} s", (m) => ({ metric: m[1], value: m[2], dir: m[3], threshold: m[4], seconds: m[5] })],
+  [/^Recovered: (\S+) (\S+) ([<>]) (\S+) for (\d+) s \(D08\)$/, "Recovered: {metric} {value} {dir} {threshold} for {seconds} s", (m) => ({ metric: m[1] ?? "", value: m[2] ?? "", dir: m[3] ?? "", threshold: m[4] ?? "", seconds: m[5] ?? "" })],
 ];
 
 function known(stored: string, t: T, fixed: Set<string>, templates: typeof TEMPLATES): string {

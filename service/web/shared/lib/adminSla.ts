@@ -36,7 +36,7 @@ const plans = (targets: ApiTargetView[], used: PlanType[]) => targets.filter((x)
 function targetText(values: number[], t: T): string {
   const u = [...new Set(values)].toSorted((a, b) => a - b);
   if (u.length === 0) return t("no target");
-  return u.length === 1 ? t("target {n} %", { n: u[0] }) : t("targets {from}–{to} % by plan", { from: u[0], to: u[u.length - 1] });
+  return u.length === 1 ? t("target {n} %", { n: u[0] ?? 0 }) : t("targets {from}–{to} % by plan", { from: u[0] ?? 0, to: u.at(-1) ?? 0 });
 }
 /** How far below its target a value is: more than 10 points is critical. */
 const severity = (gap: number) => (gap > 10 ? "crit" : "warn");
@@ -53,7 +53,7 @@ export function slaTiles(sc: ApiScorecard, t: T = en): { label: string; value: s
   const arrival = Math.min(...ts.map((x) => x.arrivalInWindowPercent));
   const ftf = Math.min(...ts.map((x) => x.firstTimeFixPercent));
   return [
-    { label: hours.length === 1 ? t("Response ≤ {n} h", { n: hours[0] }) : t("Response within target"), value: pct(m.responseWithinTarget), sub: hours.length === 1 ? t("target 100 % of jobs") : t("≤ {hours} h by plan · target 100 %", { hours: hours.join(" / ") }), tone: below(m.responseWithinTarget, 100) },
+    { label: hours.length === 1 ? t("Response ≤ {n} h", { n: hours[0] ?? 0 }) : t("Response within target"), value: pct(m.responseWithinTarget), sub: hours.length === 1 ? t("target 100 % of jobs") : t("≤ {hours} h by plan · target 100 %", { hours: hours.join(" / ") }), tone: below(m.responseWithinTarget, 100) },
     { label: t("Arrival in window"), value: pct(m.arrivalInWindow), sub: targetText(ts.map((x) => x.arrivalInWindowPercent), t), tone: below(m.arrivalInWindow, arrival) },
     { label: t("First-time fix"), value: pct(m.firstTimeFix), sub: targetText(ts.map((x) => x.firstTimeFixPercent), t), tone: below(m.firstTimeFix, ftf) },
     { label: t("Avg. customer rating"), value: m.averageRating === null ? "—" : m.averageRating.toFixed(1), icon: m.averageRating === null ? undefined : "star", sub: t(m.ratingCount === 1 ? "1 rating" : "{n} ratings", { n: m.ratingCount }) },

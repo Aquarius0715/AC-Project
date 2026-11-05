@@ -16,7 +16,7 @@ describe("HQ contracts (FR-A07, DD-A07)", () => {
   it("rows contracts with their Kuala Lumpur days for the inputs and as the user reads them", () => {
     const [a, b] = contractRows([contract({}), contract({ id: "k2", customerId: "cx", unitIds: ["u3"], planType: "general", restrictionEligible: false, rulesVersion: null })], customers);
     expect(a).toMatchObject({ plan: "RTO", cust: "Demo Customer A", units: "2 units", price: "120.50 MYR", start: "2026-01-01", end: "2027-01-01", period: "1 Jan 2026 → 1 Jan 2027" });
-    expect([b.plan, b.cust, b.units]).toEqual(["General", "customer", "1 unit"]);
+    expect([b?.plan, b?.cust, b?.units]).toEqual(["General", "customer", "1 unit"]);
     expect(unitOptions(
       [{ id: "u1", customerOrgId: "org-a", propertyId: "p1", displayName: "Lobby AC", archived: false }, { id: "u9", customerOrgId: "org-a", propertyId: "p1", displayName: "Old", archived: true }, { id: "u5", customerOrgId: "org-x", propertyId: "p1", displayName: "Other", archived: false }],
       customers, [{ id: "p1", customerOrgId: "org-a", name: "Office A", archived: false }], [contract({})],
@@ -39,7 +39,7 @@ describe("HQ contracts in Malay with the display time zone (IR300)", () => {
   it("words plans, rows and checks; the days stay Kuala Lumpur days", () => {
     const t = translator("ms");
     const [r] = contractRows([contract({ planType: "environment" })], [], MS);
-    expect([r.plan, r.cust, r.units, r.start, r.period]).toEqual(["Alam sekitar", "pelanggan", "2 unit", "2026-01-01", "1 Jan 2026 → 1 Jan 2027"]); // not Tokyo's days
+    expect([r?.plan, r?.cust, r?.units, r?.start, r?.period]).toEqual(["Alam sekitar", "pelanggan", "2 unit", "2026-01-01", "1 Jan 2026 → 1 Jan 2027"]); // not Tokyo's days
     expect([planWord("rto", t), planWord("general", t), planWord("energy", t)]).toEqual(["RTO", "Umum", "Tenaga"]);
     expect(draftErrors(draft({ unitIds: [], end: "2025-01-01" }), t)).toEqual({ unitIds: "Masukkan sekurang-kurangnya satu unit", end: "Tamat mesti selepas mula" });
   });

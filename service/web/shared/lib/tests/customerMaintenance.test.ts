@@ -41,7 +41,7 @@ describe("customer maintenance", () => {
       ["job-c-done", "completed", "request", "Repair", "Completed · visit 8 Sept, 10:00 – 11:00 am MYT · report available", false],
     ]);
     // one preferred time: no "+0 more"
-    expect(clientRows([row({ id: "job-one", preferredSlots: row({}).preferredSlots.slice(0, 1) })], () => unit)[0].line).toBe("Preferred 16 Sept, 10:00 am – 12:00 pm MYT (not confirmed yet)");
+    expect(clientRows([row({ id: "job-one", preferredSlots: row({}).preferredSlots.slice(0, 1) })], () => unit)[0]?.line).toBe("Preferred 16 Sept, 10:00 am – 12:00 pm MYT (not confirmed yet)");
   });
 
   it("shows the detail facts, the preferred times and the technician once accepted", () => {
@@ -84,7 +84,7 @@ describe("customer maintenance", () => {
     expect(preferredError(three, NOW)).toBeNull();
     expect(preferredError(three.slice(0, 2), NOW)).toBe("Give 3 preferred times.");
     expect(preferredError([slot("2026-09-14T06:00:00Z", "2026-09-14T08:00:00Z"), ...three.slice(1)], NOW)).toBe("Times start on a later day than today (Kuala Lumpur).");
-    expect(preferredError([three[0], three[0], three[1]], NOW)).toBe("The 3 times must be different.");
+    expect(preferredError([must(three[0]), must(three[0]), must(three[1])], NOW)).toBe("The 3 times must be different.");
     expect(preferredError([slot("2026-09-16T02:00:00Z", "2026-09-16T08:00:00Z"), ...three.slice(1)], NOW)).toBe("Each time is 1–4 hours long.");
     expect([contactError("Weekdays 09:00-18:00"), contactError("call +60 12-345 6789"), contactError("me@x.com")]).toEqual([null, expect.stringMatching(/No e-mail/), expect.stringMatching(/No e-mail/)]);
     expect(notesOf([{ id: "e1", action: "note.added", occurredAt: "2026-09-14T01:00:00Z", actorUserId: "me", note: { visibility: "customer", message: "Gate code 4821" } }, { id: "e2", action: "job.created", occurredAt: "2026-09-13T01:00:00Z", actorUserId: "me", note: null }], "me"))
@@ -99,7 +99,7 @@ describe("customer maintenance", () => {
     const t = translator("ms");
     const one = slot("2026-09-16T02:00:00Z", "2026-09-16T04:00:00Z");
     const [row] = clientRows([{ projection: "summary", id: "job-1-aaaa", version: 1, unitId: "u1", type: "reactive", status: "requested", displayStatus: "requested", origin: "client_request", dueAt: "2026-09-20T00:00:00Z", requestedSlot: one, scheduledSlot: null, preferredSlots: [one, one, one], assignmentAcknowledgement: null }], () => ({ name: "Bedroom AC", place: "" }), i);
-    expect([row.type, row.line]).toEqual(["Pembaikan", "Pilihan 16 Sep, 11:00 PG – 1:00 PTG GMT+9 · +2 lagi (belum disahkan)"]);
+    expect([row?.type, row?.line]).toEqual(["Pembaikan", "Pilihan 16 Sep, 11:00 PG – 1:00 PTG GMT+9 · +2 lagi (belum disahkan)"]);
     expect(preferredError([one, { startAt: "", endAt: "" }, one], NOW, 3, t)).toBe("Masukkan tarikh dan kedua-dua masa bagi setiap masa pilihan.");
     expect(contactError("call 0123456789", t)).toMatch(/^Tiada alamat e-mel/);
     expect(clientJobRefusal({ code: "CONFLICT", messageKey: "error.versionConflict", fieldErrors: {} }, t)).toBe("Tidak disimpan: permintaan telah berubah — keadaan terkini dipaparkan.");

@@ -52,8 +52,8 @@ export function weekdaysText(ds: number[], sentence = false, t: T = en): string 
   if (s.length === 7) return t("Every day");
   if (s.join(',') === "1,2,3,4,5") return t("Weekdays");
   if (s.join(',') === "6,7") return t("Weekends");
-  const names = s.map((d) => t(dayShort[d - 1]));
-  return sentence && names.length > 1 ? t("{list} & {last}", { list: names.slice(0, -1).join(", "), last: names[names.length - 1] }) : names.join(", ");
+  const names = s.map((d) => t(dayShort[d - 1] ?? String(d)));
+  return sentence && names.length > 1 ? t("{list} & {last}", { list: names.slice(0, -1).join(", "), last: names.at(-1) ?? "" }) : names.join(", ");
 }
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const modeWord: Record<string, string> = { cool: "Cool", dry: "Dry", fan: "Fan" };
@@ -68,7 +68,7 @@ export function actionLabel(a: UnitAction, t: T = en): string {
     }
     case "set_fan": { return t("Fan {level}", { level: textOf(fanWord, a.fanLevel, t) ?? cap(a.fanLevel) });
     }
-    case "ventilate": { return t("Ventilate {level}", { level: fanWord[a.level] ? t(fanWord[a.level]).toLowerCase() : a.level });
+    case "ventilate": { return t("Ventilate {level}", { level: textOf(fanWord, a.level, t)?.toLowerCase() ?? a.level });
     }
   }
 }
@@ -152,7 +152,7 @@ export interface RuleCard {
 /** A rule's switch: on, disabled by the system (with the reason) or switched off. */
 function ruleStatus(a: ApiAutomation, t: T): RuleCard["status"] {
   if (a.enabled) return { text: t("On"), tone: "ok" };
-  return a.disabledReason ? { text: t("Disabled · {reason}", { reason: t(reasonText[a.disabledReason]) }), tone: "warn" } : { text: t("Off"), tone: "muted" };
+  return a.disabledReason ? { text: t("Disabled · {reason}", { reason: textOf(reasonText, a.disabledReason, t) ?? a.disabledReason }), tone: "warn" } : { text: t("Off"), tone: "muted" };
 }
 /** Why a disabled rule will not run, for the reasons the system disables it. */
 function disabledNote(a: ApiAutomation, i: I18n): string | null {
@@ -387,7 +387,7 @@ export function actionOptions(c: Caps | null, t: T = en): ActionGroup[] {
 
 /** The setting an action key changes (`temp:24` → temp). */
 export function actionGroupOf(key: string): string {
-  return key.split(":", 1)[0];
+  return key.split(":", 1)[0] ?? key;
 }
 
 /** The action to start from when the setting is switched to `id`: 24 °C for temperature when the AC offers it (else the
@@ -395,8 +395,8 @@ middle of its range), otherwise the first value. Empty when the AC has no such s
 export function firstAction(groups: ActionGroup[], id: string): string {
   const g = groups.find((x) => x.id === id);
   if (!g || g.options.length === 0) return "";
-  if (id === "temp") return (g.options.find((o) => o.key === "temp:24") ?? g.options[Math.floor(g.options.length / 2)]).key;
-  return g.options[0].key;
+  if (id === "temp") return (g.options.find((o) => o.key === "temp:24") ?? g.options[Math.floor(g.options.length / 2)])?.key ?? "";
+  return g.options[0]?.key ?? "";
 }
 
 /** The editor summary (Figma 03b/03e right panel). */
@@ -459,8 +459,9 @@ export function scheduleTest(runs: ApiOccurrence[], d: Draft, unit: string, i: I
       const at = new Date(Date.parse(start.at) + k * 86_400_000).toISOString();
       const wd = new Date(at).toLocaleDateString("en-US", { timeZone: d.timezone, weekday: "short" }); // the index, not the label
       const iso = dayShort.indexOf(wd) + 1;
+      const dayName = t(dayLong[iso - 1] ?? String(iso));
       if (iso > 0 && !d.weekdays.includes(iso)) {
-        rows.push({ at, title: t("{when} — no match", { when: runText(at, d.timezone, i) }), detail: t("{day} is not selected — nothing would be sent", { day: t(dayLong[iso - 1]) }), tone: "muted" });
+        rows.push({ at, title: t("{when} — no match", { when: runText(at, d.timezone, i) }), detail: t("{day} is not selected — nothing would be sent", { day: dayName }), tone: "muted" });
         break;
       }
     }

@@ -5,6 +5,8 @@ import {
   type ApiCampaign, type ApiCapability, type ApiDevice, type CampaignDraft,
 } from "@ac/web/lib/devices";
 import { i18nOf } from "@ac/web/lib/i18n";
+import { must } from "./must";
+const firstRow = (...args: Parameters<typeof campaignRows>) => must(campaignRows(...args)[0]); // a campaign row the test expects
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const NOW = new Date("2026-09-14T01:00:00Z"); // 09:00 in Kuala Lumpur, 10:00 in Tokyo
@@ -36,14 +38,14 @@ describe("HQ device registry", () => {
       checksum: "sha256:9f3c0e5d7a1b2c3da1", createdAt: "2026-09-14T01:00:00Z", createdByMembershipId: "m-hq" };
     expect(campaignRows([c], [cap])[0]).toMatchObject({ model: "DemoAir SPL-100", versions: "any → v2", start: "16 Sept 2026, 10:00 am MYT" });
     // the facts above the waves (Figma Admin 04-9)
-    expect(campaignFacts(campaignRows([c], [cap])[0])).toEqual([
+    expect(campaignFacts(firstRow([c], [cap]))).toEqual([
       ["Model / version", "DemoAir SPL-100 · any → v2 (signed, sha256 9f3c…a1)"], ["Window", "02:00–05:00 device local time"], ["Auto-pause", "failure rate > 5 % in a wave"],
       ["Starts", "16 Sept 2026, 10:00 am MYT"], ["Created", "14 Sept 2026, 9:00 am MYT"],
     ]);
     // the scheduling member's name where the session may read members (IR344)
-    expect(campaignFacts(campaignRows([c], [cap], undefined, new Map([["m-hq", "hq-operator"]]))[0]).at(-1)).toEqual(["Created", "hq-operator · 14 Sept 2026, 9:00 am MYT"]);
+    expect(campaignFacts(firstRow([c], [cap], undefined, new Map([["m-hq", "hq-operator"]]))).at(-1)).toEqual(["Created", "hq-operator · 14 Sept 2026, 9:00 am MYT"]);
     expect([shortChecksum("sha256:abcd"), shortChecksum("plain0123456789")]).toEqual(["sha256 abcd", "plai…89"]);
-    expect(campaignFacts(campaignRows([c], [cap], MS)[0], MS).map(([k]) => k)).toEqual(["Model / versi", "Tetingkap", "Jeda automatik", "Bermula", "Dicipta"]);
+    expect(campaignFacts(firstRow([c], [cap], MS), MS).map(([k]) => k)).toEqual(["Model / versi", "Tetingkap", "Jeda automatik", "Bermula", "Dicipta"]);
   });
 
   it("words the runner's results and each wave's state (BR-A20, IR339)", () => {
@@ -62,7 +64,7 @@ describe("HQ device registry", () => {
 describe("HQ device registry in Malay with the display time zone (IR295)", () => {
   it("words the rows, operations and campaign checks", () => {
     expect(modelRows([cap], units, [], MS)[0]).toMatchObject({ used: "1 unit · 0 peranti", updated: "10 Sep 2026, 11:00 PG GMT+9" });
-    expect(deviceRows([device({ unitId: null })], units, MS.t)[0].unit).toBe("Tidak terikat");
+    expect(deviceRows([device({ unitId: null })], units, MS.t)[0]?.unit).toBe("Tidak terikat");
     expect(campaignErrors(draft({ modelId: "" }), NOW, "Asia/Tokyo", MS.t)).toEqual({ modelId: "Pilih model" });
     expect(campaignRows([{ ...({} as ApiCampaign), id: "k", version: 1, modelId: "x", fromVersions: [], targetVersion: "v2", deviceIds: [], startAt: "2026-09-16T02:00:00Z", state: "paused" }], [], MS)[0])
       .toMatchObject({ model: "model", versions: "mana-mana → v2", start: "16 Sep 2026, 11:00 PG GMT+9" });

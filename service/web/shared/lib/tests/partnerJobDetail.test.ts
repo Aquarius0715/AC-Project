@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { decisionRefusal, delegationLeft, detailBanner, eventRows, fits, freeHours, qualificationLabel, qualified, timeline, type ApiDetail } from "@ac/web/lib/partnerJobDetail";
 import type { ApiCapacity, ApiMember } from "@ac/web/lib/partnerOverview";
 import { i18nOf } from "@ac/web/lib/i18n";
+import { must } from "./must";
 
 const MS_TOKYO = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 
@@ -19,10 +20,10 @@ const cap = (id: string, date: string, avail: [string, string][], assigned: [str
 describe("partner job detail", () => {
   it("checks qualifications at the visit and labels them", () => {
     expect(qualificationLabel("demo_outdoor")).toBe("Outdoor unit work");
-    expect(qualified(members[0], ["demo_indoor", "demo_electrical"], "2026-09-22T01:00:00Z")).toBe(true);
-    expect(qualified(members[1], ["demo_indoor", "demo_electrical"], "2026-09-22T01:00:00Z")).toBe(false);
-    expect(qualified({ ...members[0], qualifications: quals(["demo_indoor"], { revokedAt: "2026-09-10T00:00:00Z" }) }, ["demo_indoor"], "2026-09-22T01:00:00Z")).toBe(false);
-    expect(qualified(members[0], ["demo_indoor"], "2027-04-01T00:00:00Z")).toBe(false); // expired by the visit
+    expect(qualified(must(members[0]), ["demo_indoor", "demo_electrical"], "2026-09-22T01:00:00Z")).toBe(true);
+    expect(qualified(must(members[1]), ["demo_indoor", "demo_electrical"], "2026-09-22T01:00:00Z")).toBe(false);
+    expect(qualified({ ...must(members[0]), qualifications: quals(["demo_indoor"], { revokedAt: "2026-09-10T00:00:00Z" }) }, ["demo_indoor"], "2026-09-22T01:00:00Z")).toBe(false);
+    expect(qualified(must(members[0]), ["demo_indoor"], "2027-04-01T00:00:00Z")).toBe(false); // expired by the visit
     expect(freeHours(cap("m-a", "d", [], [], 480, 120))).toBe(6);
     expect(freeHours(cap("m-a", "d", [], [], null))).toBeNull();
   });
@@ -38,18 +39,18 @@ describe("partner job detail", () => {
       ["tech-external-a", "Fits", "8 h,0 h"],
       ["tech-external-a2", "Not qualified", "8 h,—"],
     ]);
-    expect(rows[1].sub).toBe("missing Electrical work");
-    expect(rows[0].days[0].label).toBe("Tue");
+    expect(rows[1]?.sub).toBe("missing Electrical work");
+    expect(rows[0]?.days[0]?.label).toBe("Tue");
     const busy = fits(members, ["demo_indoor"], visit, [{ date: "2026-09-22", capacity: [cap("m-a", "2026-09-22", [["2026-09-22T01:00:00Z", "2026-09-22T09:00:00Z"]], [["2026-09-22T03:00:00Z", "2026-09-22T05:00:00Z"]], 480, 120)] }]);
-    expect(busy[0].badge).toEqual({ text: "Busy at the visit", tone: "warn" });
+    expect(busy[0]?.badge).toEqual({ text: "Busy at the visit", tone: "warn" });
     const detail = fits(members, ["demo_indoor", "demo_electrical"], visit, days, "detail");
     expect(detail.map((r) => [r.sub, r.badge.text, r.days.length])).toEqual([["Qualified · 8 h free 22 Sept – 23 Sept", "Best fit", 0], ["Missing Electrical work", "Not eligible", 0]]);
     expect(fits(members, ["demo_indoor", "demo_electrical"], visit, days, "offer", undefined, MS_TOKYO).map((r) => [r.sub, r.badge.text, r.days.map((d) => `${d.label} ${d.text}`)])).toEqual([
       ["Kerja unit dalaman · Kerja unit luaran · Kerja elektrik", "Sesuai", ["Sel 8 j", "Rab 0 j"]], ["tiada Kerja elektrik", "Tidak layak", ["Sel 8 j", "Rab —"]],
     ]); // Kuala Lumpur days, in Malay
-    expect(fits(members, ["demo_indoor", "demo_electrical"], visit, days, "detail", undefined, MS_TOKYO)[0].sub).toBe("Layak · 8 j lapang 22 Sep – 23 Sep");
+    expect(fits(members, ["demo_indoor", "demo_electrical"], visit, days, "detail", undefined, MS_TOKYO)[0]?.sub).toBe("Layak · 8 j lapang 22 Sep – 23 Sep");
     const own = fits(members, ["demo_indoor"], visit, [{ date: "2026-09-22", capacity: [cap("m-a", "2026-09-22", [["2026-09-22T01:00:00Z", "2026-09-22T09:00:00Z"]], [["2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"]], 480, 120)] }], "detail", "m-a");
-    expect([own[0].badge.text, own[0].sub]).toEqual(["Assigned", "Qualified · assigned to this job"]);
+    expect([own[0]?.badge.text, own[0]?.sub]).toEqual(["Assigned", "Qualified · assigned to this job"]);
     // whoever can take the visit comes first, whatever order the API lists the team in (IR569)
     const reversed = [...members].reverse();
     expect(fits(reversed, ["demo_indoor", "demo_electrical"], visit, days).map((r) => r.badge.text)).toEqual(["Fits", "Not qualified"]);
@@ -61,7 +62,7 @@ describe("partner job detail", () => {
     const event = (action: string, at: string) => ({ id: action, jobId: "j", actorUserId: null, occurredAt: at, action });
     const events = [event("job.created", "2026-09-13T01:00:00Z"), event("job.offered", "2026-09-13T10:20:00Z"), event("offer.accepted", "2026-09-14T02:02:00Z")];
     const t = timeline("accepted", events, false, "periodic_plan");
-    expect(t[0].sub).toBe("periodic plan");
+    expect(t[0]?.sub).toBe("periodic plan");
     expect(t.map((s) => [s.label, s.state, s.at])).toEqual([
       ["Requested", "done", "2026-09-13T01:00:00Z"], ["Offered", "done", "2026-09-13T10:20:00Z"], ["Accepted", "current", "2026-09-14T02:02:00Z"],
       ["Assigned", "todo", null], ["In progress", "todo", null], ["Submitted", "todo", null], ["Completed", "todo", null],

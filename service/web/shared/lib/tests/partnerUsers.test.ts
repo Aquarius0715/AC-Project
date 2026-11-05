@@ -28,34 +28,34 @@ describe("partnerUserRows (FR-P11)", () => {
   });
   it("keeps the company's last active contractor: no disable, no remove", () => {
     const rows = partnerUserRows([user({ id: "boss", membershipId: "m1", partnerRole: "contractor", status: "active", displayName: "Boss" })], "someone-else");
-    expect(rows[0].lastContractor).toBe(true);
-    expect(rows[0].actions.disable || rows[0].actions.remove).toBe(false);
+    expect(rows[0]?.lastContractor).toBe(true);
+    expect([rows[0]?.actions.disable, rows[0]?.actions.remove]).toEqual([false, false]);
   });
   it("reads an active account whose access end has passed as ended: no disable, only remove", () => {
     const [r] = partnerUserRows([user({ id: "e", displayName: "Old", status: "active", membershipId: "m", accessUntil: "2026-10-01T00:00:00Z" })], null, undefined, new Date("2026-10-02T00:00:00Z"));
-    expect(r.ended).toBe(true);
-    expect(r.actions).toEqual({ resend: false, access: true, disable: false, enable: false, remove: true });
-    expect(partnerUserRows([user({ id: "e", displayName: "Old", status: "active", membershipId: "m", accessUntil: "2026-10-01T00:00:00Z" })], null, undefined, new Date("2026-09-15T00:00:00Z"))[0].ended).toBe(false);
+    expect(r?.ended).toBe(true);
+    expect(r?.actions).toEqual({ resend: false, access: true, disable: false, enable: false, remove: true });
+    expect(partnerUserRows([user({ id: "e", displayName: "Old", status: "active", membershipId: "m", accessUntil: "2026-10-01T00:00:00Z" })], null, undefined, new Date("2026-09-15T00:00:00Z"))[0]?.ended).toBe(false);
   });
   it("leaves only removing to an account whose access HQ ended (IR508)", () => {
     const revoked = (status: "active" | "disabled") => partnerUserRows([user({ id: "r", displayName: "Gone", membershipId: "m", accessUntil: "2026-10-01T00:00:00Z", revokedAt: "2026-10-01T00:00:00Z", status })], null, undefined, new Date("2026-10-02T00:00:00Z"))[0];
-    expect([revoked("active").revoked, revoked("active").actions, revoked("disabled").actions]).toEqual([
+    expect([revoked("active")?.revoked, revoked("active")?.actions, revoked("disabled")?.actions]).toEqual([
       true, { resend: false, access: false, disable: false, enable: false, remove: true }, { resend: false, access: false, disable: false, enable: false, remove: true }]);
   });
   it("reads a technician not signed in yet whose access end has passed as ended: no resend until the end moves (IR461)", () => {
     const [r] = partnerUserRows([user({ id: "n", displayName: "Late", membershipId: "m", accessUntil: "2026-10-01T00:00:00Z" })], null, undefined, new Date("2026-10-02T00:00:00Z"));
-    expect(r.ended).toBe(true);
-    expect(r.actions).toEqual({ resend: false, access: true, disable: false, enable: false, remove: true });
+    expect(r?.ended).toBe(true);
+    expect(r?.actions).toEqual({ resend: false, access: true, disable: false, enable: false, remove: true });
   });
   it("keeps a technician who holds an assigned job: no disable, no remove until it is reassigned (IR432)", () => {
     const [r] = partnerUserRows([user({ id: "b", displayName: "Busy", status: "active", membershipId: "m", booked: true })], null);
-    expect(r.booked).toBe(true);
-    expect(r.actions).toEqual({ resend: false, access: true, disable: false, enable: false, remove: false }); // a later end is still set
+    expect(r?.booked).toBe(true);
+    expect(r?.actions).toEqual({ resend: false, access: true, disable: false, enable: false, remove: false }); // a later end is still set
   });
   it("enables a disabled account; an invite from before IR461 (no account) has no access end and no resend", () => {
     const [d, i] = partnerUserRows([user({ id: "d", displayName: "A", status: "disabled", membershipId: "m" }), user({ id: "i", displayName: "B" })], null);
-    expect(d.actions.enable).toBe(true);
-    expect([i.access, i.actions.resend, i.actions.access]).toEqual(["—", false, false]);
+    expect(d?.actions.enable).toBe(true);
+    expect([i?.access, i?.actions.resend, i?.actions.access]).toEqual(["—", false, false]);
   });
 });
 

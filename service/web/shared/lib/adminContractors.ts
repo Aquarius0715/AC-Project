@@ -109,7 +109,7 @@ export function technicianRows(technicians: ApiTechnician[], certs: ApiCertifica
     let badge: TechRow["badge"];
     if (ended) badge = { label: t("Expired"), tone: "muted" };
     else if (pending) badge = { label: t("{n} awaiting verification", { n: pending }), tone: "primary" };
-    else if (expiring.length > 0) badge = { label: t("{n} expiring · {date}", { n: expiring.length, date: dayMonth(expiring.map((c) => c.expiresAt).toSorted(byText)[0], i) }), tone: "warn" };
+    else if (expiring.length > 0) badge = { label: t("{n} expiring · {date}", { n: expiring.length, date: dayMonth(expiring.map((c) => c.expiresAt).toSorted(byText)[0] ?? "", i) }), tone: "warn" };
     else if (quals.length === 0 || !soonest) badge = { label: t(quals.length > 0 ? "Expired" : "None"), tone: quals.length > 0 ? "crit" : "muted" };
     else if (Date.parse(soonest.validUntil) - now <= 30 * 86_400_000) badge = { label: t("expiring · {date}", { date: dayMonth(soonest.validUntil, i) }), tone: "warn" };
     else badge = { label: t("Valid"), tone: "ok" };

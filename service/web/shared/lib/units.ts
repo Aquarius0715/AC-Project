@@ -4,7 +4,7 @@
 import { airNumber } from "@ac/web/lib/air";
 import type { Metric, RestrictionAction, UnitAction as AnyUnitAction, UnitSymbol } from "@ac/web/lib/contracts.gen";
 import { policyText } from "@ac/web/lib/restrictions";
-import { DEFAULT_DISPLAY, showClock, showRecent, showTime, translator, type Display, type T } from "@ac/web/lib/i18n";
+import { DEFAULT_DISPLAY, showClock, showRecent, showTime, translator, type Display, type T, textOf } from "@ac/web/lib/i18n";
 
 type Mode = "cool" | "dry" | "fan";
 type Fan = "low" | "mid" | "high";
@@ -110,7 +110,7 @@ const sourceText: Record<string, string> = { voice: " · by voice", automation: 
 /** One command history row: the sentence, its state and who sent it, and when it was requested (IR44 time). */
 export function historyRow(c: ApiCommand, t: T = en, display: Display = DEFAULT_DISPLAY) {
   const isBad = c.status === "failed" || c.status === "expired";
-  const by = c.source && sourceText[c.source] ? t(sourceText[c.source]) : "";
+  const by = (c.source ? textOf(sourceText, c.source, t) : undefined) ?? "";
   return { id: c.id.slice(0, 8), text: `${actionText(c.action, t)} — ${t(statusText[c.status])}${c.failureCode && c.status === "failed" ? ` (${c.failureCode})` : ""}${by}`, when: showTime(c.requestedAt, display), bad: isBad };
 }
 

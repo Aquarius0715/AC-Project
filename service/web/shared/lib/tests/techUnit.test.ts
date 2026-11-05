@@ -7,6 +7,7 @@ import type { ApiAlert } from "@ac/web/lib/alerts";
 import type { ApiTechJobRow } from "@ac/web/lib/techOverview";
 import type { ApiDeviceEventFull } from "@ac/web/lib/techDevices";
 import { i18nOf } from "@ac/web/lib/i18n";
+import { must } from "./must";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const NOW = Date.parse("2026-09-14T01:35:00Z"); // 09:35 in Kuala Lumpur
@@ -109,7 +110,7 @@ describe("technician unit screen", () => {
       { id: "job-c01-0000", title: "job-c01- · Preventive maintenance", sub: "completed 12 Jun 2026", badge: { text: "completed", tone: "ok" } },
     ]);
     const assigned = { ...jobs[0], id: "job-t07", status: "assigned" } as ApiTechJobRow;
-    expect([controlJob(jobs), controlJob([assigned, ...jobs]), controlJob([assigned, ...jobs], "job-t07"), controlJob([jobs[1]])]).toEqual(["job-contractor-a", "job-contractor-a", "job-t07", null]);
+    expect([controlJob(jobs), controlJob([assigned, ...jobs]), controlJob([assigned, ...jobs], "job-t07"), controlJob([must(jobs[1])])]).toEqual(["job-contractor-a", "job-contractor-a", "job-t07", null]);
     expect(openAlerts(alerts, NOW)).toEqual([{
       id: "a1", title: "Possible open window", severity: "warning", sub: "Cooling load rose while the outdoor temperature was stable. · today 9:12 am MYT",
       ack: "Acknowledged today 9:20 am MYT. Completing the job does not resolve it.",
@@ -120,6 +121,6 @@ describe("technician unit screen", () => {
     expect(registerRows(unit, MS).rows.slice(1, 3)).toEqual([["Pengilang / model", "AC-Co / ventilation-demo v3"], ["Konfigurasi", "Split"]]);
     expect(liveTiles(offline, NOW, MS).connection).toEqual({ label: "Sambungan", value: "Luar talian", sub: "kali terakhir dilihat hari ini 10:34 PG GMT+9", tone: "crit" });
     expect(seriesChart("temperature", "°C", [], "24h", NOW, MS).title).toBe("Suhu (°C) · 24 j terakhir (bergerak)");
-    expect(openAlerts(alerts, NOW, MS)[0].ack).toBe("Diakui hari ini 10:20 PG GMT+9. Menyelesaikan kerja tidak menyelesaikan amaran ini.");
+    expect(openAlerts(alerts, NOW, MS)[0]?.ack).toBe("Diakui hari ini 10:20 PG GMT+9. Menyelesaikan kerja tidak menyelesaikan amaran ini.");
   });
 });

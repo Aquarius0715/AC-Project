@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { checkInErrors, CHECK_IN_API_FIELDS, componentsFor, partErrors, refrigerantErrors, draftFrom, draftInput, fmtOf, followUpText, groupOf, historyCard, itemPhotos, knownOf, linkPhoto, progress, submitIssues, timeRows, versionRows, warnAt, windowState, type ApiTechReport, type Draft } from "@ac/web/lib/techJob";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
+import { must } from "./must";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 
@@ -42,7 +43,7 @@ describe("draft", () => {
   });
   it("builds the saveDraft body with trimmed reasons and numeric readings", () => {
     const d = draftFrom(report(), all);
-    d.items[1] = { ...d.items[1], result: "normal", reason: ' '.repeat(3) };
+    d.items[1] = { ...must(d.items[1]), result: "normal", reason: ' '.repeat(3) };
     d.readings.push({ componentKey: "compressor", metric: "vibration", value: "", observedAt: "2026-09-14T02:20:00Z" });
     d.nextAction = { kind: "follow_up", date: "2026-10-01T00:00:00.000Z", note: "  replace filter  " };
     const body = draftInput("job", "rep", d);
@@ -72,7 +73,8 @@ describe("photos linked to a finding", () => {
     expect(linkPhoto(d1, "filter", "a1", false).items.find((i) => i.componentKey === "filter")?.evidenceIds).toEqual([]);
   });
   it("keeps a linked photo the report no longer lists by its ID", () => {
-    const d = draftFrom(report({ items: [{ ...report().items[0], evidenceIds: ["0123456789abcdef"] }] }), all);
+    const first = must(report().items[0]);
+    const d = draftFrom(report({ items: [{ ...first, evidenceIds: ["0123456789abcdef"] }] }), all);
     expect(itemPhotos(d, "filter", photos).linked).toEqual([{ id: "0123456789abcdef", name: "01234567", status: "missing" }]);
   });
 });
@@ -87,8 +89,8 @@ describe("submit checks", () => {
   it("passes a complete draft", () => { expect(submitIssues(complete(), report().attachmentRefs, NOW)).toEqual([]); });
   it("lists every blocking issue with its group", () => {
     const d = complete();
-    d.items[7] = { ...d.items[7], result: null };
-    d.items[4] = { ...d.items[4], result: "not_inspected", reason: "" };
+    d.items[7] = { ...must(d.items[7]), result: null };
+    d.items[4] = { ...must(d.items[4]), result: "not_inspected", reason: "" };
     d.readings.push({ componentKey: "fan", metric: "vibration", value: "abc", observedAt: "2026-09-14T02:00:00Z" });
     d.workText = "short";
     d.nextAction = { kind: "follow_up", date: "2026-09-01T00:00:00Z", note: "" };
@@ -155,8 +157,8 @@ describe("the server's formatting and Malay (IR282)", () => {
   it("words the checks, time on site, versions and the history in Malay", () => {
     const ms = translator("ms");
     const d = draftFrom(null, componentsFor(["indoor"]));
-    expect(submitIssues(d, [], NOW, ms)[0].text).toBe("Dalaman › Penapis tiada keputusan");
-    expect(progress(d, [], ms)[0].label).toBe("Dalaman");
+    expect(submitIssues(d, [], NOW, ms)[0]?.text).toBe("Dalaman › Penapis tiada keputusan");
+    expect(progress(d, [], ms)[0]?.label).toBe("Dalaman");
     expect(timeRows(null, NOW, fmtOf(MS))).toEqual([["Tiba", "belum daftar masuk"]]);
     expect(versionRows(null, [{ reportVersion: 1 }], [], fmtOf(MS))).toEqual([{ title: "v1 · dihantar", sub: "menunggu semakan kualiti", badge: { text: "Dihantar", tone: "primary" } }]);
     expect(followUpText({ kind: "follow_up", date: "2026-09-25T01:00:00Z", note: "Replace filter" }, MS)).toBe("Susulan 25 Sep 2026 — Replace filter");

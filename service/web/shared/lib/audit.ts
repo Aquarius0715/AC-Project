@@ -3,7 +3,7 @@
 // shared by the Server Component and the client view. Texts in the display language and instants in the display time
 // zone; the period's days are the display time zone's days too (`i` / `zone`, IR304). Actions, target kinds and IDs,
 // correlation IDs, field names, event types and evidence sources stay codes (IR304, IR320).
-import { EN, relativeTime, showTime, translator, zonedInstant, zonedParts, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, relativeTime, showTime, translator, zonedInstant, zonedParts, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { AuditView } from "@ac/web/lib/contracts.gen";
 import { stateWord, states, type RestrictionState } from "@ac/web/lib/restrictions";
@@ -121,7 +121,7 @@ const DENIAL: Record<string, string> = {
   "error.forbidden": "Refused — the role may not do this",
   "error.notFound": "Refused — not found in the actor's scope",
 };
-export const reasonText = (a: Pick<ApiAudit, "result" | "reason">, t: T = en): string | null => (a.result === "denied" && a.reason && DENIAL[a.reason] ? t(DENIAL[a.reason]) : a.reason);
+export const reasonText = (a: Pick<ApiAudit, "result" | "reason">, t: T = en): string | null => ((a.result === "denied" && a.reason ? textOf(DENIAL, a.reason, t) : undefined) ?? a.reason);
 
 /** An entry as a timeline item (the restriction exception screen's audit card, IR301; the correlation trace, IR320). */
 export const auditItem = (a: ApiAudit, i: I18n = EN) => {

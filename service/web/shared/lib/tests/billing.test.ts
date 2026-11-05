@@ -4,6 +4,7 @@ import {
   type ApiContract, type ApiCustomer, type ApiInquiry, type ApiInvoice, type ApiStatement,
 } from "@ac/web/lib/billing";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
+import { must } from "./must";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const NOW = new Date("2026-09-15T01:00:00Z");
@@ -29,7 +30,7 @@ describe("HQ billing (FR-A08, FR-A23, DD-A08)", () => {
     const [a, b] = invoiceRows([invoice({}), invoice({ id: "i2", contractId: "kx", paymentMethod: "demo_credit_card", paymentStatus: "processing", status: "processing" })], contracts, customers, NOW);
     expect(a).toMatchObject({ amt: "120.00 MYR", meta: "Demo Customer A · rto contract v1 · August 2026", method: "Method not selected", methodName: "Method not selected", paymentState: null, st: "Overdue", period: "1 Aug 2026 → 1 Sept 2026", due: "10 Sept 2026" });
     expect(b).toMatchObject({ meta: "customer · kx · August 2026", method: "Credit card · processing", methodName: "Credit card", paymentState: "processing", customerId: "" });
-    expect([totals([a, b], ["Overdue", "Processing"]), totals([a], ["Paid"])]).toEqual(["240.00 MYR", "0.00"]);
+    expect([totals([must(a), must(b)], ["Overdue", "Processing"]), totals([must(a)], ["Paid"])]).toEqual(["240.00 MYR", "0.00"]);
   });
 
   it("words the payments of an invoice, inquiries, contracts and payout statements", () => {
@@ -46,7 +47,7 @@ describe("HQ billing (FR-A08, FR-A23, DD-A08)", () => {
     expect(inquiryRows([{ ...iq, id: "q0", state: "answered", createdAt: "2026-09-15T00:00:00Z", subjectType: "restriction" }, iq], customers).map((r) => [r.id, r.kind, r.at, r.text])).toEqual([
       ["q1", "Payment", "14 Sept 2026, 10:00 am MYT", "“Paid already”"], ["q0", "Cooling restriction", "15 Sept 2026, 8:00 am MYT", "“Paid already”"],
     ]); // received first
-    expect(contractOptions(contracts, [])[0].label).toBe("customer · rto · 120.00 MYR");
+    expect(contractOptions(contracts, [])[0]?.label).toBe("customer · rto · 120.00 MYR");
     expect(statementRows([statement], [{ id: "org-p", name: "CoolFix", kind: "contractor" }])).toEqual([{
       id: "s1", version: 2, contractor: "CoolFix", period: "Aug 2026", status: "Approved", jobs: 2, net: "250.00 MYR", statusText: "Approved · pays 15 Sept 2026", queryCount: 2, openQueries: 1,
     }]);
@@ -86,6 +87,6 @@ describe("HQ billing in Malay with the display time zone (IR299)", () => {
     const iq: ApiInquiry = { id: "q1", version: 1, customerId: "cx", invoiceId: null, restrictionId: "r1", subjectType: "restriction", message: "Why?", state: "received", reply: null, createdAt: "2026-09-14T02:00:00Z" };
     expect(inquiryRows([iq], customers, MS)[0]).toMatchObject({ cust: "pelanggan", kind: "Sekatan penyejukan", at: "14 Sep 2026, 11:00 PG GMT+9" });
     const s = statementDetail(statement, [], NOW, MS);
-    expect([s.period, s.payDate, s.lines[0].work, s.lines[1].kind, s.queries[0].state, s.queries[1].state]).toEqual(["Ogo 2026", "15 Sep 2026", "Pembaikan", "potongan", "terbuka", "dilaraskan"]);
+    expect([s.period, s.payDate, s.lines[0]?.work, s.lines[1]?.kind, s.queries[0]?.state, s.queries[1]?.state]).toEqual(["Ogo 2026", "15 Sep 2026", "Pembaikan", "potongan", "terbuka", "dilaraskan"]);
   });
 });

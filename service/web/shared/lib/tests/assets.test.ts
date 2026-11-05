@@ -33,7 +33,7 @@ describe("HQ customers & units", () => {
     expect(standingOf("c-a", [{ ...k, activeRestrictionIds: [] }], [], null, NOW).restriction).toBeNull();
     const rows = customerRows([{ id: "c1", version: 1, name: "Demo Customer A", status: "active", organizationId: "org-a", serviceProfile: "rto", createdAt: "2026-04-01T00:00:00Z" }],
       [{ id: "org-a", version: 2, name: "Customer A Sdn Bhd", kind: "customer", status: "active" }], [], [unit({}), unit({ id: "u2", effectivePowerState: "off" })], () => null);
-    expect([rows[0].since, rows[0].operation, rows[0].billingName]).toEqual(["Apr 2026", "50.0%", "Customer A Sdn Bhd"]);
+    expect([rows[0]?.since, rows[0]?.operation, rows[0]?.billingName]).toEqual(["Apr 2026", "50.0%", "Customer A Sdn Bhd"]);
     expect(registerKpis(rows, [unit({}), unit({ id: "u2", effectivePowerState: "unknown" })])).toMatchObject({ customers: 1, propertyNames: "none yet", power: "Running 1 · Stopped 0 · unknown 1" });
   });
 
@@ -46,7 +46,7 @@ describe("HQ customers & units", () => {
       displayName: "1–120 characters", installedAt: "An installation date cannot be in the future", serviceScope: "Choose at least one inspection group",
     });
     expect(changedFields(unit({}), { ...d, displayName: "Bedroom AC 2", spaceId: "" })).toEqual(["Name", "Location"]);
-    expect(placeOptions([{ id: "p1", version: 1, kind: "home", name: "Home A", address: null, accessInstructions: null, updatedAt: "", units: 0, unassigned: 0, floors: 0, rooms: 0, spaces: [] }], [])[0].label).toBe("Home A (no space)");
+    expect(placeOptions([{ id: "p1", version: 1, kind: "home", name: "Home A", address: null, accessInstructions: null, updatedAt: "", units: 0, unassigned: 0, floors: 0, rooms: 0, spaces: [] }], [])[0]?.label).toBe("Home A (no space)");
   });
 
   it("words the policies' conditions and the default rules", () => {
@@ -86,7 +86,7 @@ describe("HQ customers & units in Malay with the display time zone (IR293)", () 
     expect(conditionText(policy({ severity: undefined, durationSeconds: 900, activeWindow: { weekdays: [1, 3], startLocal: "22:00", endLocal: "06:00" } }), MS)).toMatch(/^Suhu ≥ 30 °C selama 15 min, Isn, Rab 22:00–06:00$/);
     const rows = coverageRows([{ unitId: "u1", customerId: "c1", modelId: "m1", warrantyEndsAt: "2026-10-09T16:00:00Z", contractIds: [], status: "expiring", claimableJobIds: [] }],
       { unit: () => {}, customer: () => "A", model: () => "M", contract: () => "" }, NOW, MS);
-    expect([rows[0].ends, rows[0].statusText]).toEqual(["10 Okt 2026", "Tamat dalam 26 h · tiada kontrak"]); // the Kuala Lumpur day, in Malay
+    expect([rows[0]?.ends, rows[0]?.statusText]).toEqual(["10 Okt 2026", "Tamat dalam 26 h · tiada kontrak"]); // the Kuala Lumpur day, in Malay
     expect(unitErrors({ ...unitDraft(unit({})), modelId: "" }, "2026-09-14", MS.t)).toEqual({ modelId: "Pilih model" });
     expect(changedFields(unit({}), { ...unitDraft(unit({})), warrantyEnd: "" }, MS.t)).toEqual(["Tamat waranti"]);
   });

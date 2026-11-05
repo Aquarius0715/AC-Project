@@ -93,10 +93,10 @@ export const NOTIFICATION_KEYS = [...Object.values(statusWords), ...Object.value
 
 function messageText(message: string, display: Display): string {
   const m = firmwareNotice.exec(message);
-  const month = m ? MONTHS.indexOf(m[2]) : -1;
+  const month = m ? MONTHS.indexOf(m[2] ?? "") : -1;
   if (!m || month < 0) return evidenceText(message, translator(display.locale)); // a filter reminder's message is its evidence (IR480)
-  const day = `${m[3]}-${String(month + 1).padStart(2, "0")}-${m[1].padStart(2, "0")}T00:00:00Z`;
-  return translate(display.locale, FIRMWARE_NOTICE, { date: showDate(day, { locale: display.locale, timeZone: "UTC" }), from: m[4], to: m[5] });
+  const day = `${m[3] ?? ""}-${String(month + 1).padStart(2, "0")}-${(m[1] ?? "").padStart(2, "0")}T00:00:00Z`;
+  return translate(display.locale, FIRMWARE_NOTICE, { date: showDate(day, { locale: display.locale, timeZone: "UTC" }), from: m[4] ?? "", to: m[5] ?? "" });
 }
 
 /** One inbox row in the user's display language and time zone (FR-X01, IR258). The message, the reason and the status

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { candidateGroups, changeCard, examples, groupSummary, helpText, placeOf, progressOf, roomOf, stateText, temperatureText, type ResolvedIntent } from "@ac/web/lib/assistant";
 import { DEFAULT_DISPLAY, translator } from "@ac/web/lib/i18n";
 import type { ApiCommand, ApiUnitDetail } from "@ac/web/lib/units";
+import { must } from "./must";
 
 const en = translator("en"), ms = translator("ms");
 const TOKYO = { locale: "ms" as const, timeZone: "Asia/Tokyo" };
@@ -24,7 +25,7 @@ describe("the customer assistant (FR-X02, D09, Figma Client 09a–09g)", () => {
   it("suggests only sentences the fixed grammar accepts, in each language", () => {
     for (const locale of ["en", "ms"] as const) {
       const ex = examples(locale);
-      expect([ex.temperature, ex.change, ex.help].map((s, i) => grammar[locale][i].test(s))).toEqual([true, true, true]);
+      expect([ex.temperature, ex.change, ex.help].map((s, i) => grammar[locale][i]?.test(s))).toEqual([true, true, true]);
     }
     expect(examples("ms").change).toBe("tetapkan Bedroom kepada 24 darjah");
     expect([helpText(en).startsWith("Ask “temperature <room>”"), helpText(ms).startsWith("Tanya “suhu <bilik>”")]).toEqual([true, true]); // the help speaks its language's grammar
@@ -58,7 +59,7 @@ describe("the customer assistant (FR-X02, D09, Figma Client 09a–09g)", () => {
       { path: "Home A › 1F › Bedroom", units: [{ unitId: "u-online-rto", name: "Bedroom AC", label: "Bedroom AC · u-online" }, { unitId: "u-non-rto-x", name: "Bedroom AC", label: "Bedroom AC · u-non-rt" }] },
       { path: "Office A › 2F › Bedroom", units: [{ unitId: "u-office-aa", name: "Office Bedroom AC", label: "Office Bedroom AC" }] },
     ]);
-    expect([roomOf(groups), groupSummary(groups[0], en), groupSummary(groups[1], en), groupSummary(groups[0], ms)])
+    expect([roomOf(groups), groupSummary(must(groups[0]), en), groupSummary(must(groups[1]), en), groupSummary(must(groups[0]), ms)])
       .toEqual(["Bedroom", "2 ACs: Bedroom AC · u-online, Bedroom AC · u-non-rt", "1 AC: Office Bedroom AC", "2 AC: Bedroom AC · u-online, Bedroom AC · u-non-rt"]);
     // different names in one room need no ID; a top-level room keeps its property in the path
     expect(candidateGroups([{ unitId: "a", pathLabel: "Home A > Bedroom > Bedroom AC" }, { unitId: "b", pathLabel: "Home A > Bedroom > Bedroom AC #2" }]))

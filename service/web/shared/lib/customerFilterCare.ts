@@ -117,12 +117,12 @@ export function filterGroup(key: string, rows: FilterRow[], t: T = en): FilterGr
   const known = rows.filter((r) => r.hours != null && r.pct != null);
   const pct = known.length > 0 ? Math.round(known.reduce((a, r) => a + (r.pct ?? 0), 0) / known.length) : null;
   const due = n("overdue") + n("due_soon");
-  const name = rows[0].place.split(" › ").pop() || t("Area");
+  const name = rows[0]?.place.split(" › ").pop() || t("Area");
   return {
     title: t("{name} · {n} ACs", { name, n: rows.length }),
-    place: rows[0].place,
+    place: rows[0]?.place ?? "",
     run: parts.length > 0 ? parts.join(" · ") : t("all OK"),
-    progress: pct == null ? t("run time unknown") : t("{pct} % of {n} h (average)", { pct, n: rows[0].threshold }),
+    progress: pct == null ? t("run time unknown") : t("{pct} % of {n} h (average)", { pct, n: rows[0]?.threshold ?? 0 }),
     badge: groupBadge(due, n("overdue") > 0, n("unknown") === rows.length, t),
     key,
     pct,

@@ -89,7 +89,7 @@ describe("HQ digital MRV in Malay with the display time zone (IR297)", () => {
     expect([v.energyVsBaseline, v.emissionsVsBaseline, v.conditions.map(([k]) => k)]).toEqual([
       "Peningkatan 14.8 kWh", "Peningkatan 8.7 kgCO₂e", ["Organisasi", "Unit", "Tempoh", "Sempadan", "Garis dasar", "Faktor pelepasan", "Sumber faktor", "Liputan"],
     ]);
-    expect(v.conditions[2][1]).toBe("2026-09-01 00:00 → 2026-09-08 00:00 (Asia/Kuala_Lumpur)"); // the period stays Kuala Lumpur time, named so
+    expect(v.conditions[2]?.[1]).toBe("2026-09-01 00:00 → 2026-09-08 00:00 (Asia/Kuala_Lumpur)"); // the period stays Kuala Lumpur time, named so
     expect([statusWord("draft", t), statusWord("demo_reviewed", t), statusWord("other", t)]).toEqual(["draf", "disemak (demo)", "other"]);
     expect(reviewItems(report, MS)).toEqual([{ time: "14 Sep 2026, 10:30 PG GMT+9", title: "“Looks consistent”", detail: "versi 1 · user-hq-" }]);
     expect(mrvDraftErrors(draft({ factor: "" }), t)).toEqual({ factor: "Pilih versi faktor pelepasan" });
@@ -103,7 +103,7 @@ describe("MRV evidence candidates (DD-A14 item 6, IR349)", () => {
     expect(evidenceRows([a, { ...a, id: "att-2", unitId: "u9" }], [{ id: "u1", label: "Bedroom AC" }])).toEqual([
       { id: "att-1", name: "meter.png", sub: "Bedroom AC · uploaded 13 Sept 2026, 10:30 am MYT" }, { id: "att-2", name: "meter.png", sub: "u9 · uploaded 13 Sept 2026, 10:30 am MYT" },
     ]);
-    expect(evidenceRows([a], [], i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" }))[0].sub).toBe("u1 · dimuat naik 13 Sep 2026, 11:30 PG GMT+9");
+    expect(evidenceRows([a], [], i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" }))[0]?.sub).toBe("u1 · dimuat naik 13 Sep 2026, 11:30 PG GMT+9");
     expect(MAX_EVIDENCE).toBe(20);
   });
 });

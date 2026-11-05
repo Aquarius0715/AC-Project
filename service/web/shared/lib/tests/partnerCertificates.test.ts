@@ -41,15 +41,15 @@ describe("partner certifications", () => {
       ["tech-external-a", "Split-unit refrigerant handling", "RH-2024-0811 · issued 31 Mar 2024", "31 Mar 2027", "Valid", [], ["view"]],
       ["tech-external-b", "Refrigerant handling", "RH-2022-0310 · issued 1 Sept 2022", "1 Sept 2026", "Expired", [], ["view"]], // the membership ended: no new upload
     ]);
-    expect(certRows([a], certs, [job], 30, NOW)[0].badge.text).toBe("Expiring · 30 d");
+    expect(certRows([a], certs, [job], 30, NOW)[0]?.badge.text).toBe("Expiring · 30 d");
     expect(certRows([a], certs, [job], 30, Date.parse("2026-09-10T00:00:00Z"))[0]).toMatchObject({ status: "valid", badge: { text: "Valid" } }); // 35 days left with a 30-day window
   });
 
   it("notes a pending renewal, a training request and a rejected first upload", () => {
     const [electrical] = certRows([a], [...certs, renewal], [job], 60, NOW);
-    expect([electrical.renewalPending, electrical.actions, electrical.cert]).toEqual([true, ["view", "training"], { id: "c1", version: 1, number: "EB-2023-1120", fileName: "eb.pdf" }]); // the document opens from View (IR436)
-    const trained = certRows([a], [cert("c1", { trainingRequestedAt: "2026-09-12T02:00:00Z" })], [], 60, NOW)[0];
-    expect([trained.training, trained.actions]).toEqual(["Training requested 12 Sept 2026", ["view", "renew"]]);
+    expect([electrical?.renewalPending, electrical?.actions, electrical?.cert]).toEqual([true, ["view", "training"], { id: "c1", version: 1, number: "EB-2023-1120", fileName: "eb.pdf" }]); // the document opens from View (IR436)
+    const trained = must(certRows([a], [cert("c1", { trainingRequestedAt: "2026-09-12T02:00:00Z" })], [], 60, NOW)[0]);
+    expect([trained?.training, trained?.actions]).toEqual(["Training requested 12 Sept 2026", ["view", "renew"]]);
     const first = certRows([member("m-c", "tech-external-a2", [])], [cert("c9", { membershipId: "m-c", code: "other", name: "Working at height", status: "rejected", createdAt: "2026-09-01T00:00:00Z" })], [], 60, NOW);
     expect(first.map((r) => [r.name, r.badge.text, r.actions])).toEqual([["Working at height", "Rejected", ["view", "renew"]]]);
     const turnedDown = must(certRows([a], [cert("c7", { code: "demo_outdoor", name: "Outdoor licence", status: "rejected" })], [], 60, NOW).find((r) => r.code === "demo_outdoor"));

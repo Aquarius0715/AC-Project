@@ -219,7 +219,7 @@ export const jobActions = {
       update(id, () => ({ status: "offered", scheduled: p.slot, proposal: { ...p, status: "accepted" }, partnerProposal: j.partnerProposal ? { ...j.partnerProposal, status: "approved" } : null }), `Client approved ${fmt(p.slot)} proposed by ${j.contractor ?? "—"}`);
       notify("contractor", `Client approved your time for ${id}`, `${fmt(p.slot)} — accept the offer`, `/partner/jobs/${id}`);
     } else if (p.who.startsWith("contractor")) {
-      update(id, () => ({ status: "offered", scheduled: p.slot, delivery: "contractor", contractor: p.who.split(" ", 1)[0], proposal: { ...p, status: "accepted" } }), `Client accepted ${fmt(p.slot)} → offered to ${p.who.split(" ", 1)[0]}`);
+      update(id, () => ({ status: "offered", scheduled: p.slot, delivery: "contractor", contractor: p.who.split(" ", 1)[0] ?? p.who, proposal: { ...p, status: "accepted" } }), `Client accepted ${fmt(p.slot)} → offered to ${p.who.split(" ", 1)[0] ?? p.who}`);
       notify("contractor", `New offer ${id}`, `Visit time agreed with the client: ${fmt(p.slot)}`, `/partner/jobs/${id}`);
     } else {
       update(id, () => ({ status: "assigned", scheduled: p.slot, delivery: "internal", technician: p.who, techAck: { status: "pending" }, proposal: { ...p, status: "accepted" } }), `Client accepted ${fmt(p.slot)} → assigned ${p.who}`);

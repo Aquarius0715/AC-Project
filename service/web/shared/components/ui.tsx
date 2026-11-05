@@ -626,7 +626,8 @@ export function LineChart({ points, min, max, threshold, height = 120, color = "
   const gaps: [number, number][] = [];
   for (const [i, p] of points.entries()) {
     if (p !== null) continue;
-    if (gaps.length > 0 && gaps[gaps.length - 1][1] === i - 1) gaps[gaps.length - 1][1] = i;
+    const last = gaps.at(-1);
+      if (last?.[1] === i - 1) last[1] = i;
     else gaps.push([i, i]);
   }
   const isolated = (i: number) => points[i] !== null && (i === 0 || points[i - 1] === null) && (i === last || points[i + 1] === null);

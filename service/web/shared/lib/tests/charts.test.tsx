@@ -58,6 +58,6 @@ describe("charts", () => {
   it("names a progress bar and leaves an unknown value out", () => {
     render(<><UtilizationBar pct={40} tone="warn" label="Filter life" /><UtilizationBar pct={null} label="Unknown" /></>);
     const [known, unknown] = screen.getAllByRole("progressbar");
-    expect([known.getAttribute("aria-label"), known.getAttribute("aria-valuenow"), unknown.getAttribute("aria-label"), unknown.getAttribute("aria-valuenow")]).toEqual(["Filter life", "40", "Unknown", null]);
+    expect([known?.getAttribute("aria-label"), known?.getAttribute("aria-valuenow"), unknown?.getAttribute("aria-label"), unknown?.getAttribute("aria-valuenow")]).toEqual(["Filter life", "40", "Unknown", null]);
   });
 });

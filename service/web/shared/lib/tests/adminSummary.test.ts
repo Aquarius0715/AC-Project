@@ -73,7 +73,7 @@ describe("HQ overview in Malay with the display time zone (IR289)", () => {
     expect(forecastView(forecast(), MS.t)).toMatchObject({ saved: { text: "Jangkaan pengurangan 9.9 kWh" }, coverage: "1,080 / 2,700 unit-min" });
     expect(forecastView(null, MS.t)).toMatchObject({ text: "Tidak dapat dikira" });
     const a = axisRows(s, overviewLinks({ customerId: null, propertyId: null }), MS.t);
-    expect([a.power[0].label, a.connection[1].label]).toEqual(["Berjalan", "Luar talian"]);
+    expect([a.power[0]?.label, a.connection[1]?.label]).toEqual(["Berjalan", "Luar talian"]);
     expect(jobRows(s.jobCounts, overviewLinks({ customerId: null, propertyId: null }), MS.t).slice(0, 2).map((j) => j.label)).toEqual(["diminta", "ditawarkan"]);
   });
 });

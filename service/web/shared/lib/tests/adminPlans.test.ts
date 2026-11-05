@@ -55,7 +55,7 @@ describe("HQ maintenance plans", () => {
 describe("HQ maintenance plans in Malay with the display time zone (IR291)", () => {
   it("words the rows, the box and the refusals, with the dates in the display zone", () => {
     const rows = planRows([plan({ nextDueAt: "2026-12-07T16:30:00Z" })], new Map([["u-living", "Living room AC"]]), new Map(), MS);
-    expect([rows[0].line, rows[0].next, rows[0].customer]).toEqual(["Setiap 3 bulan · hari 8", "Seterusnya 8 Dis 2026", "pelanggan"]); // 01:30 on the 8th in Tokyo, the 7th in UTC
+    expect([rows[0]?.line, rows[0]?.next, rows[0]?.customer]).toEqual(["Setiap 3 bulan · hari 8", "Seterusnya 8 Dis 2026", "pelanggan"]); // 01:30 on the 8th in Tokyo, the 7th in UTC
     expect([cadence(3, MS.t), cadence(2, MS.t), everyText(1, MS.t)]).toEqual(["suku tahunan", "setiap 2 bulan", "Setiap bulan"]);
     expect(nextBox(plan({}), NOW, true, null, MS)).toMatchObject({ title: "Kejadian seterusnya · 8 Dis 2026", why: "Simpan pelan dahulu." });
     expect(nextBox(plan({}), NOW, false, null, MS, "server text").title).toBe("Kejadian seterusnya · server text"); // the page passes the server's date

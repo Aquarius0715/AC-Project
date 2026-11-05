@@ -4,6 +4,7 @@ import {
   type ApiFilterSettings, type ApiFilterStatus, type FilterUnit,
 } from "@ac/web/lib/customerFilterCare";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
+import { must } from "./must";
 
 const NOW = Date.parse("2026-09-14T01:00:00Z"); // Mon 09:00 KL
 const st = (over: Partial<ApiFilterStatus>): ApiFilterStatus => {
@@ -21,7 +22,7 @@ describe("customer filter care", () => {
     expect([r.run, r.progress, r.last]).toEqual(["212 j sejak pembersihan", "85 % daripada 250 j", "kali terakhir dibersihkan 30 Ogo"]);
     const many = ["a", "b", "c", "d"].map((id) => st({ unitId: id, status: id === "a" ? "overdue" : "ok" }));
     const [line] = filterLines(many, many.map((m) => unit(m.unitId)), NOW, i);
-    expect(line.kind === "group" && [line.group.title, line.group.run, line.group.badge.label]).toEqual(["1F · 4 AC", "1 tertunggak", "1 perlu"]);
+    expect(line?.kind === "group" && [line?.group.title, line?.group.run, line?.group.badge.label]).toEqual(["1F · 4 AC", "1 tertunggak", "1 perlu"]);
     const t = translator("ms");
     expect(reminderLines(settings, t)).toEqual([["Ingatkan pada", "250 j (lalai model)"], ["Juga ingatkan", "setiap 30 hari jika masa berjalan tidak diketahui"], ["Hantar melalui", "Aplikasi sahaja"], ["Siapa", "Pemilik lokasi"]]);
     expect([cleaningSymptom(r, t), filterRefusal({ code: "FORBIDDEN", messageKey: "", fieldErrors: {} }, t)]).toEqual(["Pembersihan penapis: 212 j berjalan sejak pembersihan terakhir (peringatan pada 250 j).", "Tidak disimpan: hanya pemilik akaun boleh mengubah peringatan."]);
@@ -52,10 +53,10 @@ describe("customer filter care", () => {
       area("o1", { runHoursSinceCleaning: 230 }), area("o2", { runHoursSinceCleaning: 210 }), area("o3", { runHoursSinceCleaning: 100, status: "ok" }),
       area("o4", { runHoursSinceCleaning: null, lastCleanedAt: null, lastCleanedBy: null, status: "unknown" }, "offline"),
     ];
-    const items = [st({ unitId: "m1", runHoursSinceCleaning: 268, status: "overdue" }), g[0][0], g[1][0], st({ unitId: "b1", status: "ok", runHoursSinceCleaning: 20 }), g[2][0], g[3][0]];
+    const items = [st({ unitId: "m1", runHoursSinceCleaning: 268, status: "overdue" }), must(g[0]?.[0]), must(g[1]?.[0]), st({ unitId: "b1", status: "ok", runHoursSinceCleaning: 20 }), must(g[2]?.[0]), must(g[3]?.[0])];
     const lines = filterLines(items, [unit("m1", { spaceId: "s-meet" }), unit("b1", { spaceId: null }), ...g.map((x) => x[1])], NOW);
     expect(lines.map((l) => (l.kind === "unit" ? l.row.unitId : l.group.key))).toEqual(["m1", "s-open", "b1"]);
-    const sum = lines[1].kind === "group" ? lines[1].group : null;
+    const sum = lines[1]?.kind === "group" ? lines[1]?.group : null;
     expect([sum?.title, sum?.place, sum?.run, sum?.pct, sum?.progress, sum?.badge, sum?.rows.length]).toEqual([
       "Open office · 4 ACs", "Office A › Open office", "2 due soon · 1 offline", 72, "72 % of 250 h (average)", { label: "2 due", tone: "warn" }, 4,
     ]);

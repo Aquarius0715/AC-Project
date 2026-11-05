@@ -47,7 +47,7 @@ function RoleNav({ items, base, pathname, search }: Readonly<{ items: NavItem[];
   const query = new URLSearchParams(search);
   const score = (href: string, match?: string[]) => {
     const hits = [href, ...(match ?? [])].filter((h) => {
-      const [path, q] = h.split("?", 2);
+      const [path = "", q] = h.split("?", 2);
       if (q) return pathname === path && [...new URLSearchParams(q)].every(([k, v]) => query.get(k) === v);
       return path === base ? pathname === path : pathname === path || pathname.startsWith(path + "/");
     });
@@ -72,7 +72,7 @@ export function AppShell({ role: forced, live, children }: Readonly<{ role?: Rol
   const display: Display = live ? live.display : { ...DEFAULT_DISPLAY, locale: isLocale(stored) ? stored : "en" };
   const t = (text: string) => translate(display.locale, text);
   const scope = live ? (live.organization || config.scope).toUpperCase() : config.scope;
-  const [roleWord, persona] = config.chip.split(" — ", 2);
+  const [roleWord = "", persona = ""] = config.chip.split(" — ", 2);
   const chip = `${t(roleWord)} — ${live ? live.user || t("signed in") : persona}`;
   const count = (href: string) => (live?.badges[href] ? String(live.badges[href]) : undefined);
   const pathname = usePathname();

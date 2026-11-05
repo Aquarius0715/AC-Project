@@ -22,9 +22,9 @@ const ch: GroupChange = { power: true, celsius: 24, mode: "dry", fan: "high" };
 describe("units & locations: the room list and group control (FR-C02, FR-C14, IR263)", () => {
   it("lists each AC with its setting, measured room temperature and power — in either language", () => {
     const [r] = roomUnits([unit("a")]);
-    expect([r.set, r.temp, r.watts, r.power, r.seen]).toEqual(["Set 26°C · Cool · Fan mid", "27.0 °C room", "680 W", "running", "9:10 am MYT"]);
+    expect([r?.set, r?.temp, r?.watts, r?.power, r?.seen]).toEqual(["Set 26°C · Cool · Fan mid", "27.0 °C room", "680 W", "running", "9:10 am MYT"]);
     const [m] = roomUnits([unit("a", { observedState: { power: null, celsius: null, mode: null, fanLevel: null, observedAt: null }, latestMeasurements: [] })], MS);
-    expect([m.set, m.temp, m.watts, m.seen]).toEqual(["Belum ada tetapan dilaporkan", "—", "—", "10:10 PG GMT+9"]);
+    expect([m?.set, m?.temp, m?.watts, m?.seen]).toEqual(["Belum ada tetapan dilaporkan", "—", "—", "10:10 PG GMT+9"]);
   });
 
   it("plans one command per changed setting, clamps to the model and a restriction, and skips what cannot be sent", () => {
@@ -45,7 +45,7 @@ describe("units & locations: the room list and group control (FR-C02, FR-C14, IR
 
   it("words the plan in Malay; the result stays the plan's code", () => {
     const [ok, off] = groupPlan([unit("ok"), unit("off", { connection: "offline", lastSeenAt: null })], ch, MS);
-    expect([ok.result, ok.change, off.note]).toEqual(["Will send", "26 → 24 °C, Kering, Kipas tinggi", "Luar talian — tidak dihantar"]);
+    expect([ok?.result, ok?.change, off?.note]).toEqual(["Will send", "26 → 24 °C, Kering, Kipas tinggi", "Luar talian — tidak dihantar"]);
     expect(changeText(ch, translator("ms"))).toBe("Kuasa Hidup · 24 °C · Kering · Kipas tinggi");
   });
 });

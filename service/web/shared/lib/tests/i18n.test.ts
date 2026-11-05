@@ -6,6 +6,7 @@ import { ms } from "@ac/web/lib/i18n-ms";
 import { ROLES } from "@ac/web/lib/nav";
 import { consentNote } from "@ac/web/lib/preferences";
 import { byText } from "@ac/web/lib/order";
+import { must } from "./must";
 
 describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
   it("keeps English as the key and falls back to it when Malay has no entry", () => {
@@ -26,7 +27,7 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
   });
 
   it("keeps every placeholder of an English key in its Malay text", () => {
-    const names = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).toSorted(byText);
+    const names = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map((m) => must(m[1])).toSorted(byText);
     for (const [en, text] of Object.entries(ms)) expect(names(text), en).toEqual(names(en));
   });
 
@@ -46,7 +47,7 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
     const literals = [
       ...code.matchAll(/\b(?:t\(|translate\(\s*[\w.]+,)\s*"((?:[^"\\]|\\.)*)"/g),
       ...code.matchAll(/<Route(?:Loading|Error) what="((?:[^"\\]|\\.)*)"/g), // the route states translate what loads (IR269)
-    ].map((m) => JSON.parse(`"${m[1]}"`) as string);
+    ].map((m) => JSON.parse(`"${m[1] ?? ""}"`) as string);
     expect(literals.length).toBeGreaterThan(100);
     expect([...new Set(literals.filter((text) => !(text in ms)))]).toEqual([]);
   });
@@ -67,7 +68,8 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
     const files = ["customer/app", "partner/app", "technician/app", "admin/app", "shared/lib", "shared/components", "shared/screens"].flatMap((d) => sources(join(root, d)));
     const strings = files.flatMap((f) => {
       return [...readFileSync(f, "utf8").matchAll(/"((?:[^"\\\n]|\\.)*)"/g)].flatMap((m) => {
-        try { return [JSON.parse(`"${m[1]}"`) as string]; } catch { return []; }
+        const literal = `"${m[1] ?? ""}"`; // the string literal as written in the source
+        try { return [JSON.parse(literal) as string]; } catch { return []; }
       });
     });
     const texts = [...new Set(strings.filter((text) => text in ms))]; // every literal the dictionary translates, maps of texts included
@@ -99,7 +101,7 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
     for (const config of Object.values(ROLES)) {
       for (const item of config.nav.filter((i) => i.label !== "MRV")) expect(ms[item.label], item.label).toBeTruthy();
       expect(ms[config.sub], config.sub).toBeTruthy();
-      const word = config.chip.split(" — ", 1)[0]; // the role chip of the header
+      const word = must(config.chip.split(" — ", 1)[0]); // the role chip of the header
       expect(ms[word], word).toBeTruthy();
     }
   });

@@ -47,17 +47,17 @@ describe("techDeviceRows / filterOf", () => {
     // HQ's No sensors chip (Figma Admin 246:2, IR319): a device without sensors
     const bare = techDeviceRows([device({ id: "n", serial: "AC-N", sensors: [] }), device({ id: "s", serial: "AC-S", sensors: [{ id: "s1", metric: "temperature", unit: "°C", staleAfterSeconds: 120, calibratedAt: null }] })], new Map(), NOW);
     expect([bare.map((r) => r.sensors > 0), bare.filter(filterOf("nosensors")).map((r) => r.id), HQ_FILTERS.map((f) => f.id)]).toEqual([[false, true], ["n"], ["all", "online", "offline", "tamper", "nosensors"]]);
-    expect(rows[0].unit).toBe("Bedroom AC");
-    expect(rows[1].unit).toBe("Unbound");
+    expect(rows[0]?.unit).toBe("Bedroom AC");
+    expect(rows[1]?.unit).toBe("Unbound");
   });
   it("says a registered device is not bound yet, with its planned unit (D05, IR467)", () => {
     const [planned] = techDeviceRows([device({ id: "p", serial: "AC-P", unitId: null, targetUnitId: "unit-1" })], names, NOW);
-    expect([planned.unit, planned.unitId, planned.targetUnitId]).toEqual(["Not bound yet — planned for Bedroom AC", null, "unit-1"]);
+    expect([planned?.unit, planned?.unitId, planned?.targetUnitId]).toEqual(["Not bound yet — planned for Bedroom AC", null, "unit-1"]);
   });
   it("shows the age of the last heartbeat only while the device is not online", () => {
-    expect(rows[0].connText).toBeNull();
-    expect(rows[1].connText).toBe("30 s ago");
-    expect(rows[2].connText).toBeNull();
+    expect(rows[0]?.connText).toBeNull();
+    expect(rows[1]?.connText).toBe("30 s ago");
+    expect(rows[2]?.connText).toBeNull();
   });
   it("filters all / online / offline (any non-online) / tamper", () => {
     expect(rows.filter(filterOf("all")).length).toBe(3);
@@ -83,12 +83,12 @@ describe("deviceTiles", () => {
     const [conn, power, tamper, fw] = deviceTiles(detail(), "v2", NOW);
     expect(conn).toMatchObject({ value: "Online", dot: "ok", sub: "last seen 30 s ago" });
     // a long silence reads in hours up to two days, then in days (IR613)
-    const seen = (lastSeenAt: string) => deviceTiles(detail({ connection: "offline", lastSeenAt }), "v2", NOW)[0].sub;
+    const seen = (lastSeenAt: string) => deviceTiles(detail({ connection: "offline", lastSeenAt }), "v2", NOW)[0]?.sub;
     expect([seen("2026-09-13T00:05:00Z"), seen("2026-09-04T19:05:00Z")]).toEqual(["last seen 25 h ago", "last seen 9 d ago"]);
     expect(power).toMatchObject({ value: "ON", dot: "primary" });
     expect(tamper).toMatchObject({ value: "Clear", dot: "ok", sub: "no removal detected" });
     expect(fw).toMatchObject({ value: "v1", sub: "v2 available" });
-    expect(deviceTiles(detail(), null, NOW)[3].sub).toBe("latest");
+    expect(deviceTiles(detail(), null, NOW)[3]?.sub).toBe("latest");
   });
   it("explains a running check and dates the open faults of each axis (T12)", () => {
     expect(deviceTiles(detail({ connection: "connecting" }), null, NOW)[0]).toMatchObject({ value: "Connecting", dot: "primary", sub: "check running — waiting for the device" });
@@ -101,7 +101,7 @@ describe("deviceTiles", () => {
   it("points to the events when a fault has no dated event", () => {
     const [conn, , tamper] = deviceTiles(detail({ connection: "error", tamper: "detected" }), null, NOW);
     expect(conn).toMatchObject({ value: "Error", dot: "crit", sub: "last seen 30 s ago" });
-    expect(tamper.sub).toBe("cover opened — see device events");
+    expect(tamper?.sub).toBe("cover opened — see device events");
   });
 });
 
@@ -144,7 +144,7 @@ describe("operation history", () => {
       op({ id: "6", status: "failed", failureCode: "TIMEOUT" }),
     ], "v1");
     expect(rows.map((r) => r.detail)).toEqual(["heartbeat confirmed", "waiting for the heartbeat", "starts within a second", "v1 → v2", "v2 installed", "no confirmation within 60 s"]);
-    expect(rows[1].time).toBe("14 Sept 2026, 9:00 am MYT"); // startedAt, else createdAt
+    expect(rows[1]?.time).toBe("14 Sept 2026, 9:00 am MYT"); // startedAt, else createdAt
     expect(rows[0]).toMatchObject({ id: "1", kind: "Connection check", status: "succeeded", statusText: "Succeeded" });
   });
   it("names the running operation in words, not as an enum (IR585)", () => {
@@ -181,13 +181,13 @@ describe("device events (T12)", () => {
     const rows = eventRows(es, alerts, NOW);
     expect(rows[0]).toMatchObject({ tone: "ok", detail: "Connection restored · heartbeat", recovery: "recovers communication_lost today 9:00 am MYT", time: "today 9:10 am MYT" });
     expect(rows[1]).toMatchObject({ tone: "warn", detail: "Cover opened while powered · tamper_signal · 2 alerts", recovery: "open · unacknowledged", notes: ["today 9:02 am MYT — Cover refitted"] });
-    expect(rows[1].alerts.map((a) => a.id)).toEqual(["al-1"]);
-    expect(rows[2].recovery).toBe("open · acknowledged");
-    expect(rows[3].recovery).toBe("open · resolved");
+    expect(rows[1]?.alerts.map((a) => a.id)).toEqual(["al-1"]);
+    expect(rows[2]?.recovery).toBe("open · acknowledged");
+    expect(rows[3]?.recovery).toBe("open · resolved");
     expect(rows[4]).toMatchObject({ tone: "crit", detail: "Missed heartbeats (not proof of power loss) · heartbeat", recovery: "restored today 9:10 am MYT" });
-    expect(rows[5].tone).toBe("muted");
+    expect(rows[5]?.tone).toBe("muted");
     expect(rows[6]).toMatchObject({ tone: "crit", detail: "Dedicated demo power signal lost · power_signal", recovery: "open" });
-    expect(eventRows([event({ eventType: "restored", recovery: { axis: "power", sourceEventId: "gone", value: "on" } })], new Map(), NOW)[0].recovery).toBe("recovers an earlier fault");
+    expect(eventRows([event({ eventType: "restored", recovery: { axis: "power", sourceEventId: "gone", value: "on" } })], new Map(), NOW)[0]?.recovery).toBe("recovers an earlier fault");
   });
   it("lists each open alert once for the acknowledge links", () => {
     const rows = eventRows([event({ id: "a", alertIds: ["al-1"] }), event({ id: "b", eventType: "restored", alertIds: ["al-1"], recovery: { axis: "connection", sourceEventId: "a", value: "online" } }), event({ id: "c", alertIds: ["al-2"] })],
@@ -199,8 +199,8 @@ describe("device events (T12)", () => {
 describe("the device screens in Malay with the display time zone (IR287)", () => {
   it("words the tiles, the history and the events", () => {
     const [conn, power, tamper, fw] = deviceTiles(detail(), null, NOW, {}, MS);
-    expect([conn.label, conn.value, conn.sub, power.label, power.value, tamper.value, fw.sub]).toEqual(["Sambungan", "Dalam talian", "kali terakhir dilihat 30 s lalu", "Isyarat kuasa", "HIDUP", "Tiada gangguan", "terkini"]);
-    expect(deviceTiles(detail(), null, NOW)[2].value).toBe("Clear"); // English shows the text after the context
+    expect([conn?.label, conn?.value, conn?.sub, power?.label, power?.value, tamper?.value, fw?.sub]).toEqual(["Sambungan", "Dalam talian", "kali terakhir dilihat 30 s lalu", "Isyarat kuasa", "HIDUP", "Tiada gangguan", "terkini"]);
+    expect(deviceTiles(detail(), null, NOW)[2]?.value).toBe("Clear"); // English shows the text after the context
     expect(operationRows([op()], "v1", MS)[0]).toMatchObject({ kind: "Semakan sambungan", statusText: "Berjaya", detail: "denyutan disahkan" });
     expect(eventRows([event()], new Map(), NOW, MS)[0]).toMatchObject({ time: "hari ini 10:00 PG GMT+9", detail: "Denyutan terlepas (bukan bukti kehilangan kuasa) · heartbeat", recovery: "terbuka" });
     expect(failureText("TIMEOUT", MS.t)).toBe("tiada pengesahan dalam 60 s");

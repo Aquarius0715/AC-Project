@@ -157,7 +157,7 @@ export function stepper(status: string, internal: boolean, t: T = en): Step[] {
     if (status === "completed" || k < at) return "done";
     return k === at ? "current" : "todo";
   };
-  return all.map((s, k) => ({ label: t(labels[s]), state: stateOf(k) }));
+  return all.map((s, k) => ({ label: t(labels[s] ?? s), state: stateOf(k) }));
 }
 
 /** The four facts of the detail: requested window, due, scheduled slot, symptom with the contact window. */
@@ -297,7 +297,7 @@ export function hqRefusal(f: { code: string; messageKey: string; fieldErrors: Re
   const word = (k: string | undefined) => (k ? t(k) : undefined);
   const fields = Object.entries(f.fieldErrors ?? {}).map(([k, v]) => `${fieldName(k)}: ${word(HQ_FIELD_TEXT[`${k}:${v}`]) ?? word(HQ_REFUSAL_TEXT[v]) ?? v}`);
   if (fields.length > 0) return fields.join(" · ");
-  if (HQ_REFUSAL_TEXT[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved: {reason}.", { reason: t(HQ_REFUSAL_TEXT[f.messageKey]) }) : `${t(HQ_REFUSAL_TEXT[f.messageKey])}.`;
+  if (HQ_REFUSAL_TEXT[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved: {reason}.", { reason: textOf(HQ_REFUSAL_TEXT, f.messageKey, t) ?? f.messageKey }) : `${textOf(HQ_REFUSAL_TEXT, f.messageKey, t) ?? f.messageKey}.`;
   if (f.code === "NOT_FOUND") return t("The job no longer exists in your scope.");
   return actionMessage({ ...f, fieldErrors: {} }, t); // the write limit's wait and other codes (IR380)
 }

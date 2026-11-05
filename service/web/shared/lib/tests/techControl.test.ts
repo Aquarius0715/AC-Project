@@ -49,7 +49,7 @@ describe("historyRows", () => {
     const rows = historyRows([deviceCommand({ id: "cmd-start", requestedAt: "2026-09-14T01:04:00Z", acknowledgedAt: "2026-09-14T01:05:00Z" }), deviceCommand({ id: "cmd-end", status: "requested", acknowledgedAt: null })], [r]);
     expect(rows[0]).toMatchObject({ title: "test run start (Power ON, 5 min)", sub: "cmd-star · acknowledged 9:05 am MYT · ends 9:10 am MYT", badge: { text: "Running", tone: "primary" }, run: true });
     expect(rows[1]).toMatchObject({ title: "test run end (Power OFF)", badge: { text: "Waiting", tone: "warn" }, run: true });
-    expect(historyRows([deviceCommand({ id: "cmd-start" })], [run({ state: "completed" })])[0].badge.text).toBe("Acked");
+    expect(historyRows([deviceCommand({ id: "cmd-start" })], [run({ state: "completed" })])[0]?.badge.text).toBe("Acked");
   });
 });
 
@@ -72,11 +72,11 @@ describe("state tiles", () => {
   it("shows the observed state and the room temperature with its quality", () => {
     const tiles = stateTiles({ observedState: { power: true, celsius: 24, mode: "cool", fanLevel: "auto", observedAt: "2026-09-14T01:00:00Z" }, latestMeasurements: [{ metric: "temperature", value: 31.26, quality: "valid" }] });
     expect(tiles.map((t) => [t.label, t.value])).toEqual([["Power", "On"], ["Mode", "Cool"], ["Setpoint", "24 °C"], ["Fan", "Auto"], ["Room", "31.3 °C"]]);
-    expect(tiles[4].warn).toBe(true);
+    expect(tiles[4]?.warn).toBe(true);
     const unknown = stateTiles({ observedState: { power: null, celsius: null, mode: null, fanLevel: null, observedAt: null }, latestMeasurements: [{ metric: "temperature", value: 25, quality: "stale" }] });
     expect(unknown.map((t) => t.value)).toEqual(["Unknown", "—", "—", "—", "25.0 °C (stale)"]);
-    expect(unknown[4].warn).toBe(false);
-    expect(stateTiles({ observedState: { power: false, celsius: 22, mode: "dry", fanLevel: "low", observedAt: null }, latestMeasurements: [] })[4].value).toBe("—");
+    expect(unknown[4]?.warn).toBe(false);
+    expect(stateTiles({ observedState: { power: false, celsius: 22, mode: "dry", fanLevel: "low", observedAt: null }, latestMeasurements: [] })[4]?.value).toBe("—");
   });
   it("prints the observation time and the work window", () => {
     expect(observedText("2026-09-14T01:00:05Z")).toBe("observed 9:00 am MYT");

@@ -81,7 +81,8 @@ export function airSelection(rooms: AirRoom[], unitId?: string, spaceId?: string
   const byUnit = unitId ? rooms.find((r) => r.units.some((u) => u.id === unitId)) : undefined;
   if (byUnit && unitId) return { room: byUnit, unitId };
   const room = rooms.find((r) => r.spaceId !== null && r.spaceId === spaceId) ?? rooms[0];
-  return room ? { room, unitId: room.units[0].id } : null;
+  const first = room?.units[0];
+  return room && first ? { room, unitId: first.id } : null;
 }
 
 /** One metric card (Figma Client 05a/05b): the feed badge, value, status, observation line and advice. A stale, null or
@@ -229,16 +230,15 @@ export function airSlots(items: ApiMeasurement[], w: AirWindow): AirSlot[] {
   const from = Date.parse(w.from);
   const to = Date.parse(w.to);
   const n = Math.max(1, Math.ceil((to - from) / w.slotMs));
-  const sum = new Array<number>(n).fill(0);
-  const cnt = new Array<number>(n).fill(0);
+  const slots = Array.from({ length: n }, () => ({ sum: 0, n: 0 })); // each slot's total and count of valid readings
   for (const m of items) {
     const t = Date.parse(m.observedAt);
-    if (m.quality !== "valid" || m.value === null || t < from || t >= to) continue;
-    const i = Math.floor((t - from) / w.slotMs);
-    sum[i] += m.value;
-    cnt[i] += 1;
+    const slot = t >= from && t < to ? slots.at(Math.floor((t - from) / w.slotMs)) : undefined; // only readings inside the window
+    if (!slot || m.value === null || m.quality !== "valid") continue;
+    slot.sum += m.value;
+    slot.n += 1;
   }
-  return sum.map((s, i) => ({ start: new Date(from + i * w.slotMs).toISOString(), avg: cnt[i] ? s / cnt[i] : null, n: cnt[i] }));
+  return slots.map((s, i) => ({ start: new Date(from + i * w.slotMs).toISOString(), avg: s.n ? s.sum / s.n : null, n: s.n }));
 }
 /** Five x-axis labels from the window start to now (Figma 05a “09:12 yesterday … 09:12 now”) in the display time zone,
 which the sub line names. */

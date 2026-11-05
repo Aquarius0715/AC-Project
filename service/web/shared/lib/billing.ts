@@ -37,7 +37,7 @@ const periodName = (p: string, locale: Locale) =>
 
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 const nextMonth = (ym: string) => {
-  const [y, m] = ym.split("-").map(Number);
+  const [y = 0, m = 1] = ym.split("-").map(Number);
   return m === 12 ? `${String(y + 1)}-01` : `${String(y)}-${String(m + 1).padStart(2, "0")}`;
 };
 /** The billing months of the URL (`from` / `to`, YYYY-MM, Kuala Lumpur months, IR299, IR321) as invoices.list filters
@@ -190,7 +190,7 @@ export function statementRows(statements: ApiStatement[], orgs: ApiOrganization[
 }
 /** The last month that has ended in Kuala Lumpur (YYYY-MM): payout drafts are generated for ended months only. */
 export function lastClosedMonth(now: Date): string {
-  const [y, m] = zonedParts(now.toISOString(), KL).date.slice(0, 7).split("-").map(Number);
+  const [y = 0, m = 1] = zonedParts(now.toISOString(), KL).date.slice(0, 7).split("-").map(Number);
   return m === 1 ? `${String(y - 1)}-12` : `${String(y)}-${String(m - 1).padStart(2, "0")}`;
 }
 
@@ -199,6 +199,7 @@ date is a Kuala Lumpur business day. `names` are the members' names, for who app
 export function statementDetail(s: ApiStatement, orgs: ApiOrganization[], now: Date, i: I18n = EN, names = new Map<string, string>()): StatementDetail {
   const { t } = i;
   const [row] = statementRows([s], orgs, i);
+  if (!row) throw new Error("a statement has its row");
   const line = new Map(s.lines.map((l) => [l.id, l]));
   const work: Record<string, string> = { periodic_inspection: t("Periodic inspection"), repair_base: t("Repair"), emergency: t("Emergency call-out"), rework_deduction: t("Rework deduction") };
   const kind: Record<string, string> = { charge: t("charge"), deduction: t("deduction"), adjustment: t("adjustment") };

@@ -46,6 +46,7 @@ export function ruleWords(r: ApiAlertRule, t: T) {
 const KIND: Record<string, string> = { demo_observation: "Observed (demo)", inferred: "Suspected", inspection: "Inspection record" };
 const ORIGIN: Record<string, string> = { measured: "Measured", estimated: "Estimated", inspection: "Inspection" };
 const QUALITY: Record<string, string> = { valid: "good", stale: "stale", suspect: "suspect", missing: "missing" };
+const OPEN: [string, Tone] = ["Open", "crit"]; // an alert of an unknown status reads as open
 const STATE: Record<string, [string, Tone]> = { open: ["Open", "crit"], acknowledged: ["Acknowledged", "warn"], resolved: ["Resolved", "ok"] };
 
 export interface EvidenceCard { kind: string; title: string; value: string; sub: string }
@@ -82,7 +83,7 @@ export function alertView(a: ApiTechAlert, ctx: { alerts: ApiTechAlert[]; unit: 
   const when = (iso: string) => relativeTime(iso, nowMs, i);
   const rule = a.rule ?? null, words = rule ? ruleWords(rule, t) : null;
   const title = rule?.name ?? alertTitle(a, t);
-  const [state, tone] = STATE[a.status] ?? STATE.open;
+  const [state, tone] = STATE[a.status] ?? OPEN;
   const cards: EvidenceCard[] = [{ kind: t(KIND[a.evidenceKind] ?? "Evidence"), title: t("Evidence at detection"), value: evidenceText(a.evidenceText, t), sub: t("observed {time}", { time: when(a.observedAt) }) }];
   const m = rule ? ctx.unit?.latestMeasurements.find((x) => x.metric === rule.metric) : undefined;
   if (m) {
@@ -128,7 +129,7 @@ export function alertView(a: ApiTechAlert, ctx: { alerts: ApiTechAlert[]; unit: 
 const RANK: Record<string, number> = { critical: 0, warning: 1, normal: 2 };
 /** The alert the page opens: the URL's, else the worst unresolved one, else the newest. */
 export function selectAlert(alerts: ApiTechAlert[], alertId?: string): ApiTechAlert | null {
-  const open = alerts.filter((a) => a.status !== "resolved").toSorted((a, b) => RANK[a.severity] - RANK[b.severity] || b.detectedAt.localeCompare(a.detectedAt));
+  const open = alerts.filter((a) => a.status !== "resolved").toSorted((a, b) => (RANK[a.severity] ?? 9) - (RANK[b.severity] ?? 9) || b.detectedAt.localeCompare(a.detectedAt));
   return alerts.find((a) => a.id === alertId) ?? open[0] ?? [...alerts].toSorted((a, b) => b.detectedAt.localeCompare(a.detectedAt))[0] ?? null;
 }
 /** The unit's alerts to choose from: title, state and when each was detected, unresolved first. */
@@ -136,7 +137,7 @@ export function alertChoices(alerts: ApiTechAlert[], nowMs: number, i: I18n = EN
   const { t } = i;
   return [...alerts].toSorted((a, b) => Number(a.status === "resolved") - Number(b.status === "resolved") || b.detectedAt.localeCompare(a.detectedAt)).map((a) => {
     return {
-      id: a.id, title: a.rule?.name ?? alertTitle(a, t), sub: `${t((STATE[a.status] ?? STATE.open)[0])} · ${relativeTime(a.detectedAt, nowMs, i)}`, severity: a.severity,
+      id: a.id, title: a.rule?.name ?? alertTitle(a, t), sub: `${t((STATE[a.status] ?? OPEN)[0])} · ${relativeTime(a.detectedAt, nowMs, i)}`, severity: a.severity,
     };
   });
 }
@@ -152,7 +153,8 @@ const REFUSED: Record<string, string> = {
 /** A refused acknowledge or resolve in words; a missing alert.resolve says how the alert can still resolve. */
 export function refusal(r: { code: string; messageKey: string; retryAfterSeconds?: number | null }, forbidden: string, t: T): string {
   if (r.messageKey === "error.forbidden") return forbidden;
-  if (REFUSED[r.messageKey]) return t(REFUSED[r.messageKey]); // in words, without the error code (IR590)
+  const known = REFUSED[r.messageKey];
+  if (known) return t(known); // in words, without the error code (IR590)
   if (r.code === "VALIDATION") return t("A resolution reason is required (1–1000 characters).");
   if (r.code === "UNAVAILABLE" || r.code === "TIMEOUT") return t("Not sent; your reason is kept. Try again.");
   return actionMessage({ ...r, fieldErrors: {} }, t); // the write limit's wait and other codes (IR380)

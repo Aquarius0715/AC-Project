@@ -78,7 +78,7 @@ export function mrvView(p: ApiMRVPreview, orgs: { id: string; name: string }[], 
 /** The new-report form (DD-A14 fields): baseline and factor are chosen with their versions. */
 export interface MRVDraft { organizationId: string; unitIds: string[]; from: string; to: string; baseline: string; factor: string; boundaryId: BoundaryId; boundary: string }
 const ref = (s: string) => {
-  const [id, v] = s.split("@", 2);
+  const [id = "", v] = s.split("@", 2);
   return { id, version: Number(v) };
 };
 export const versionKey = (id: string, version: number) => `${id}@${String(version)}`;

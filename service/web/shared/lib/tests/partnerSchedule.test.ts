@@ -48,8 +48,8 @@ describe("partner schedule", () => {
       ["Lobby AC", "On hold by HQ", "warn"],
       ["2 Demo Avenue", "Accepted · delegation starts 22 Sept 2026, 8:00 am MYT", "muted"],
     ]);
-    expect([rows[0].windowText, rows[0].left, rows[0].leftTone, rows[0].elapsedPct, rows[0].ended]).toEqual(["20 Sept, 9:30 am – 22 Sept, 9:30 am MYT", "1 d left", "primary", 50, false]);
-    expect([rows[3].left, rows[3].leftTone, rows[3].ended]).toEqual(["Ended", "crit", true]);
+    expect([rows[0]?.windowText, rows[0]?.left, rows[0]?.leftTone, rows[0]?.elapsedPct, rows[0]?.ended]).toEqual(["20 Sept, 9:30 am – 22 Sept, 9:30 am MYT", "1 d left", "primary", 50, false]);
+    expect([rows[3]?.left, rows[3]?.leftTone, rows[3]?.ended]).toEqual(["Ended", "crit", true]);
     expect(scheduleRow({ projection: "history", jobId: "h", type: "reactive", status: "completed", completedAt: null, asOf: "2026-09-20T16:00:00Z", ownDecisionEvents: [] }, NOW, units, names)).toBeNull();
     expect(sortOf("dueAt")).toBe("dueAt");
     expect(sortOf("nope")).toBe("status");
@@ -87,26 +87,26 @@ describe("partner schedule", () => {
     expect(rows.map((c) => [c.name, c.badge.text, c.eligible])).toEqual([
       ["tech-external-a", "Qualified", true], ["tech-external-a2", "Missing: Electrical work", false], ["tech-external-a3", "Unavailable (annual leave)", false],
     ]);
-    expect(rows[0].sub).toBe("Indoor unit work · Outdoor unit work · Electrical work · free 09:00–13:00, 15:00–17:00");
+    expect(rows[0]?.sub).toBe("Indoor unit work · Outdoor unit work · Electrical work · free 09:00–13:00, 15:00–17:00");
     const busy = candidates(members, new Set(), ["demo_indoor"], visit, [cap("m-a", "2026-09-22", [workday("2026-09-22")], [["2026-09-22T01:00:00Z", "2026-09-22T09:00:00Z"]], 480)], null);
-    expect(busy[0].badge.text).toBe("Busy at this time");
-    expect(candidates(members, new Set(["m-a"]), ["demo_indoor"], visit, [], "m-a")[0].badge.text).toBe("Current");
+    expect(busy[0]?.badge.text).toBe("Busy at this time");
+    expect(candidates(members, new Set(["m-a"]), ["demo_indoor"], visit, [], "m-a")[0]?.badge.text).toBe("Current");
   });
 
   it("builds the team's week with jobs, leave and the proposal", () => {
     const dates = ["2026-09-21", "2026-09-22", "2026-09-23"];
     const week = [
-      [cap("m-a", dates[0], [workday(dates[0])], [["2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z"]], 480), cap("m-b", dates[0], [workday(dates[0])], [], 480)],
-      [cap("m-a", dates[1], [workday(dates[1])], [], 480), cap("m-b", dates[1], [], [], 0, "annual_leave")],
-      [cap("m-a", dates[2], [], [], 0), cap("m-b", dates[2], [workday(dates[2])], [], 480)],
+      [cap("m-a", must(dates[0]), [workday(must(dates[0]))], [["2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z"]], 480), cap("m-b", must(dates[0]), [workday(must(dates[0]))], [], 480)],
+      [cap("m-a", must(dates[1]), [workday(must(dates[1]))], [], 480), cap("m-b", must(dates[1]), [], [], 0, "annual_leave")],
+      [cap("m-a", must(dates[2]), [], [], 0), cap("m-b", must(dates[2]), [workday(must(dates[2]))], [], 480)],
     ];
     const jobsOf = new Map([["m-a", [{ short: "job-9", slot: slot("2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z") }]]]);
     const rows = weekGrid(dates, members.slice(0, 2), week, jobsOf, { technicianId: "m-a", slot: visit, short: "job-1" });
-    expect(rows[0].cells).toEqual([{ kind: "booked", text: "10:00–12:00", sub: "job-9" }, { kind: "proposal", text: "10:00–12:00", sub: "job-1" }, { kind: "none", text: "no hours" }]);
-    expect(rows[1].cells).toEqual([{ kind: "free", text: "free" }, { kind: "leave", text: "Leave", sub: "annual leave" }, { kind: "free", text: "free" }]);
-    const training = weekGrid(dates.slice(0, 1), members.slice(1, 2), [[cap("m-b", dates[0], [], [], 0, "training")]], new Map(), null);
-    expect(training[0].cells).toEqual([{ kind: "leave", text: "Unavailable", sub: "training" }]);
-    expect([rows[0].sub, rows[1].sub]).toEqual(["Indoor, Outdoor, Electrical · 16 h avail.", "Indoor · 16 h avail."]);
+    expect(rows[0]?.cells).toEqual([{ kind: "booked", text: "10:00–12:00", sub: "job-9" }, { kind: "proposal", text: "10:00–12:00", sub: "job-1" }, { kind: "none", text: "no hours" }]);
+    expect(rows[1]?.cells).toEqual([{ kind: "free", text: "free" }, { kind: "leave", text: "Leave", sub: "annual leave" }, { kind: "free", text: "free" }]);
+    const training = weekGrid(dates.slice(0, 1), members.slice(1, 2), [[cap("m-b", must(dates[0]), [], [], 0, "training")]], new Map(), null);
+    expect(training[0]?.cells).toEqual([{ kind: "leave", text: "Unavailable", sub: "training" }]);
+    expect([rows[0]?.sub, rows[1]?.sub]).toEqual(["Indoor, Outdoor, Electrical · 16 h avail.", "Indoor · 16 h avail."]);
   });
 
   it("states the refusals of the assignment", () => {
@@ -137,7 +137,7 @@ describe("partner schedule", () => {
       ["Kerja unit dalaman · Kerja unit luaran · Kerja elektrik · tiada jam", "Tidak tersedia (cuti sakit)"],
     ]);
     const week = weekGrid(["2026-09-22"], members.slice(0, 1), [[cap("m-a", "2026-09-22", [], [], 0, "sick")]], new Map(), null, ms);
-    expect([week[0].sub, week[0].cells]).toEqual(["Dalaman, Luaran, Elektrik · 0 j tersedia", [{ kind: "leave", text: "Cuti", sub: "cuti sakit" }]]);
+    expect([week[0]?.sub, week[0]?.cells]).toEqual(["Dalaman, Luaran, Elektrik · 0 j tersedia", [{ kind: "leave", text: "Cuti", sub: "cuti sakit" }]]);
     expect(assignRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { reason: "error.required" } }, "tech-external-a", ms)).toBe("Sebab: diperlukan (1–1000 aksara)");
     expect(assignRefusal({ code: "CONFLICT", messageKey: "errors.assignment_overlap", fieldErrors: {} }, "tech-external-a", ms)).toBe("Bertindih dengan jadual yang disahkan untuk tech-external-a — pilih juruteknik lain.");
   });

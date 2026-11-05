@@ -21,12 +21,12 @@ describe("alert resolution evidence (IR327)", () => {
       { id: "e-restored", kind: "device_event", title: "Device event · today 9:12 am MYT", sub: "The device's signal is back" },
       { id: "0b6c2f4e-0000-4000-8000-000000000001", kind: "detection", title: "Evidence attached to this alert", sub: "0b6c2f4e · observed today 7:50 am MYT" },
     ]);
-    expect(evidenceRows([reading("m-x", "refrigerant_pressure", null, "kPa", "2026-09-12T01:20:00Z")], NOW)[0].title).toBe("Remeasurement · Refrigerant pressure — · 12 Sept 2026, 9:20 am MYT");
+    expect(evidenceRows([reading("m-x", "refrigerant_pressure", null, "kPa", "2026-09-12T01:20:00Z")], NOW)[0]?.title).toBe("Remeasurement · Refrigerant pressure — · 12 Sept 2026, 9:20 am MYT");
   });
 
   it("words the rows in the display language", () => {
     const [r] = evidenceRows(items.slice(0, 1), NOW, MS);
-    expect([r.title.startsWith("Pengukuran semula · "), r.sub]).toEqual([true, "diukur · sah"]);
+    expect([r?.title.startsWith("Pengukuran semula · "), r?.sub]).toEqual([true, "diukur · sah"]);
     expect(evidenceHeading(true, MS.t).title).toBe("Bukti penyelesaian · wajib");
   });
 

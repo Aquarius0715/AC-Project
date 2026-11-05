@@ -119,7 +119,7 @@ export function fits(members: ApiMember[], required: string[], visit: Slot, days
       badge: fitBadge(isOk, isFree, "Fits", "Not qualified", t),
     };
   });
-  return rows.toSorted((a, b) => rank[a.id] - rank[b.id] || a.name.localeCompare(b.name));
+  return rows.toSorted((a, b) => (rank[a.id] ?? 9) - (rank[b.id] ?? 9) || a.name.localeCompare(b.name));
 }
 
 export interface Step { label: string; at: string | null; atText: string | null; sub: string; state: "done" | "current" | "todo" }
@@ -234,5 +234,5 @@ export function decisionRefusal(f: { code: string; messageKey: string; fieldErro
 /** The job event rows of a history snapshot or the detail's history card, the times in the display time zone. */
 export const eventRows = (events: ApiJobEvent[], i: I18n = EN) => {
   return [...events].toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))
-    .map((e) => ({ id: e.id, at: showTime(e.occurredAt, i.display), text: jobEventTitle[e.action] ? i.t(jobEventTitle[e.action]) : e.action.replaceAll(/[._]/g, " ") }));
+    .map((e) => ({ id: e.id, at: showTime(e.occurredAt, i.display), text: textOf(jobEventTitle, e.action, i.t) ?? e.action.replaceAll(/[._]/g, " ") }));
 };

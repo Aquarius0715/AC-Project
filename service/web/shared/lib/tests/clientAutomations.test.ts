@@ -31,7 +31,7 @@ describe("customer automation sentences (FR-C04, FR-C05, IR260)", () => {
   it("builds the card: status, next run, a withdrawn consent and the toggle hint", () => {
     expect(ruleCard(schedule, unit, "2026-09-14T10:00:00Z", true).steps).toEqual([ // one row each: the start and the end at their times
       { key: "start", label: "Start", time: "18:00", action: "Power ON" }, { key: "end", label: "End", time: "22:00", action: "Power OFF" }]);
-    expect(ruleCard({ ...schedule, endsNextDay: true } as ApiAutomation, unit, null, true).steps[1].time).toBe("22:00 next day");
+    expect(ruleCard({ ...schedule, endsNextDay: true } as ApiAutomation, unit, null, true).steps[1]?.time).toBe("22:00 next day");
     const superseded = { ...schedule, lastRun: { at: "2026-09-14T14:00:00Z", outcome: "skipped", reason: "superseded", commandId: null } } as ApiAutomation; // IR504
     expect([ruleCard(superseded, unit, null, true).skipped, ruleCard(superseded, unit, null, true, MS).skipped]).toEqual([
       "Last evaluation skipped Mon, 14 Sept, 22:00 MYT — another schedule starts at the same time and takes over",
@@ -77,7 +77,7 @@ describe("ventilation in a customer rule (DD-C05 “within unit capabilities”,
   const fresh: Caps = { control: true, modeControl: false, fanControl: false, temperature: null, modes: [], fanLevels: [], ventilation: true, ventilationLevels: ["low", "high"] };
   it("offers ventilation on a model with a fresh-air function, and the AC settings only with control", () => {
     expect(actionOptions(fresh).map((g) => g.group)).toEqual(["Power", "Ventilation"]);
-    expect(actionOptions(fresh)[1].options).toEqual([{ key: "vent:low", label: "Ventilate low", short: "Low" }, { key: "vent:high", label: "Ventilate high", short: "High" }]);
+    expect(actionOptions(fresh)[1]?.options).toEqual([{ key: "vent:low", label: "Ventilate low", short: "Low" }, { key: "vent:high", label: "Ventilate high", short: "High" }]);
     expect(actionOptions({ ...fresh, control: false }).map((g) => g.group)).toEqual(["Ventilation"]);
     expect(actionOptions({ ...fresh, ventilation: false }).map((g) => g.group)).toEqual(["Power"]);
   });

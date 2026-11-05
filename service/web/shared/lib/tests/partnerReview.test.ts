@@ -5,6 +5,7 @@ import {
 } from "@ac/web/lib/partnerReview";
 import { componentGroups, componentLabel } from "@ac/web/lib/techJob";
 import { i18nOf } from "@ac/web/lib/i18n";
+import { must } from "./must";
 
 const MS_TOKYO = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 
@@ -27,13 +28,14 @@ describe("inspection rows", () => {
     const rows = inspectionRows(report().items);
     expect(rows.map((r) => r.label)).toEqual(["Indoor unit — filter condition", "Outdoor unit — compressor", "Electrical — wiring insulation"]);
     expect(rows[2]).toMatchObject({ result: "not_applicable", reason: "No exposed wiring" });
-    expect(inspectionRows([item({ componentKey: "new_part" })])[0].label).toBe("Indoor unit — new part");
+    expect(inspectionRows([item({ componentKey: "new_part" })])[0]?.label).toBe("Indoor unit — new part");
   });
   it("names each item and result as the technician's checklist does (IR597)", () => {
     // the reviewer reads the words the technician chose from: “refrigerant pipe” is an item, its pressure a reading
     for (const { group, keys } of componentGroups) for (const key of keys) {
-      const label = inspectionRows([item({ componentGroup: group, componentKey: key })])[0].label.split(" — ", 2)[1];
-      expect(label.startsWith(componentLabel[key].toLowerCase()), `${key}: ${label}`).toBe(true);
+      const label = must(inspectionRows([item({ componentGroup: group, componentKey: key })])[0]?.label.split(" — ", 2)[1]);
+      const word = must(componentLabel[key]).toLowerCase();
+      expect(label.startsWith(word), `${key}: ${label}`).toBe(true);
     }
     expect(Object.values(resultText).map((x) => x.label)).toEqual(["Normal", "Attention", "Not inspected", "Not applicable"]);
   });
@@ -49,17 +51,17 @@ describe("inspection rows", () => {
     ]);
     expect(reworkItems(rows.slice(3), [], 2)).toEqual([{ label: "Photos — add more evidence", checked: false }]); // a normal item needs no rework
     expect(returnReason(["Indoor unit — filter condition — attention (Dusty)"], " Clean it again. ")).toBe("Rework: Indoor unit — filter condition — attention (Dusty). Clean it again.");
-    expect(reworkItems(inspectionRows([item({ componentKey: "filter", result: "attention", reason: "Dusty" })], MS_TOKYO.t), [], 1, MS_TOKYO.t)[0].label).toBe("Unit dalaman — keadaan penapis — perhatian (Dusty)");
+    expect(reworkItems(inspectionRows([item({ componentKey: "filter", result: "attention", reason: "Dusty" })], MS_TOKYO.t), [], 1, MS_TOKYO.t)[0]?.label).toBe("Unit dalaman — keadaan penapis — perhatian (Dusty)");
   });
   it("names the photos linked to a finding (IR352)", () => {
     const r = report({ items: [item({ result: "attention", reason: "Dusty", evidenceIds: ["a1", "fedcba9876543210"] })] });
-    expect(inspectionRows(r.items, undefined, r.attachmentRefs)[0].photos).toEqual(["p1.png", "fedcba98"]); // a photo the report no longer lists keeps its ID
-    expect(inspectionRows(report().items)[0].photos).toEqual([]);
+    expect(inspectionRows(r.items, undefined, r.attachmentRefs)[0]?.photos).toEqual(["p1.png", "fedcba98"]); // a photo the report no longer lists keeps its ID
+    expect(inspectionRows(report().items)[0]?.photos).toEqual([]);
   });
   it("prints readings with their quality", () => {
     expect(readingRows(report().measurements)).toEqual([["Refrigerant pressure (refrigerant)", "460 kPa · recorded"]]);
     expect(readingRows([{ id: "m", metric: "temperature", value: null, unit: "°C", quality: "missing", observedAt: "" }])).toEqual([["Supply air temperature", "no value"]]);
-    expect(readingRows([{ id: "m", componentKey: "outlet", metric: "temperature", value: 20, unit: "°C", quality: "suspect", qualityReason: "unit_mismatch", observedAt: "" }])[0][1]).toBe("20 °C · suspect reading (unit mismatch)");
+    expect(readingRows([{ id: "m", componentKey: "outlet", metric: "temperature", value: 20, unit: "°C", quality: "suspect", qualityReason: "unit_mismatch", observedAt: "" }])[0]?.[1]).toBe("20 °C · suspect reading (unit mismatch)");
   });
   it("formats the time on site", () => {
     expect(timeOnSiteText(null)).toBe("not recorded");
@@ -86,8 +88,8 @@ describe("evidence check (DD-P05 step 2)", () => {
     expect(c.rows[0]).toMatchObject({ value: "2 / 3 recorded", tone: "warn" });
     expect(c.rows[1]).toMatchObject({ value: "0 / 1 given", tone: "warn" });
     expect(c.rows[2]).toMatchObject({ value: "0 attached", tone: "muted" });
-    expect(c.rows[4].value).toBe("tech-external-a, hq");
-    expect(evidenceCheck(report({ items: [item()] }), names).rows[1].value).toBe("none needed");
+    expect(c.rows[4]?.value).toBe("tech-external-a, hq");
+    expect(evidenceCheck(report({ items: [item()] }), names).rows[1]?.value).toBe("none needed");
   });
 });
 

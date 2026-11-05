@@ -76,7 +76,7 @@ describe("HQ access & roles in Malay with the display time zone (IR302)", () => 
     const t = translator("ms");
     expect([roleWord("technician", "internal", t), roleWord("contractor", null, t), resourceWord("Users & roles", t), resourceWord("Something new", t)]).toEqual(["Juruteknik · dalaman", "Kontraktor", "Pengguna & peranan", "Something new"]);
     expect(validity(member({ validUntil: null }), MS)).toBe("1 Sep 2026, 9:00 PG GMT+9 → terbuka");
-    expect(memberRows([member({ organizationId: "x" })], [], NOW, MS)[0].label).toBe("Juruteknik · luaran · organisasi");
+    expect(memberRows([member({ organizationId: "x" })], [], NOW, MS)[0]?.label).toBe("Juruteknik · luaran · organisasi");
     expect(memberErrors(draft({ userId: "", reason: "" }), { selfUserId: "me" }, t)).toEqual({ userId: "Pilih pengguna", reason: "Sebab perubahan diperlukan (1–1000 aksara)" });
   });
 });

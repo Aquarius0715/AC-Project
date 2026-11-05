@@ -77,7 +77,7 @@ export function certRows(members: ApiTeamMember[], certs: ApiCert[], jobs: CertJ
     }
     // a renewal of an "other" certificate joins its original
     for (const [k, list] of [...groups]) {
-      const of = list[0].renewalOf;
+      const of = list[0]?.renewalOf;
       const target = of ? groups.get(`other:${of}`) : undefined;
       if (!(k.startsWith("other:") && target)) {
         continue;
@@ -90,8 +90,10 @@ export function certRows(members: ApiTeamMember[], certs: ApiCert[], jobs: CertJ
       const onFile = list.filter((c) => c.status === "valid" || c.status === "expiring" || c.status === "expired").toSorted((a, b) => Date.parse(b.expiresAt) - Date.parse(a.expiresAt))[0];
       const pending = list.filter((c) => c.status === "pending_verification").toSorted((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
       const rejected = list.filter((c) => c.status === "rejected").toSorted((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
-      if (!onFile && (m.qualifications ?? []).some((q) => q.code === k && !q.revokedAt && q.validUntil)) { viaGrant.set(k, pending ? "pending" : "rejected"); continue; }
-      const shown = onFile ?? pending ?? rejected;
+      const isViaGrant = !onFile && (m.qualifications ?? []).some((q) => q.code === k && !q.revokedAt && q.validUntil);
+      if (isViaGrant) viaGrant.set(k, pending ? "pending" : "rejected");
+      const shown = onFile ?? pending ?? rejected; // a group holds at least one certificate on file, pending or rejected
+      if (isViaGrant || !shown) continue;
       const s = onFile ? state(Date.parse(onFile.expiresAt)) : { status: (pending ? "pending" : "rejected") as CertStatus, days: null };
       const ends = Date.parse(shown.expiresAt);
       const training = onFile?.trainingRequestedAt ? t("Training requested {date}", { date: businessDay(onFile.trainingRequestedAt, locale) }) : null;
@@ -175,10 +177,10 @@ export function certKpis(rows: CertRow[], certs: ApiCert[], within: number, t: T
 /** The assignment impact (Figma 04-6): the first job an expiring, expired or missing qualification blocks. */
 export function impact(rows: CertRow[], jobs: CertJob[], t: T = en) {
   const row = rows.filter((r) => r.blocks.length && (r.status === "expiring" || r.status === "expired" || r.status === "not_held"))
-    .map((r) => ({ r, job: jobs.find((j) => j.jobId === r.blocks[0].jobId) })).filter((x): x is { r: CertRow; job: CertJob } => x.job !== undefined).toSorted((a, b) => Date.parse(a.job.slot.startAt) - Date.parse(b.job.slot.startAt))[0];
+    .map((r) => ({ r, job: jobs.find((j) => j.jobId === r.blocks[0]?.jobId) })).filter((x): x is { r: CertRow; job: CertJob } => x.job !== undefined).toSorted((a, b) => Date.parse(a.job.slot.startAt) - Date.parse(b.job.slot.startAt))[0];
   if (!row) return null;
   const { r, job } = row;
-  const day = r.blocks[0].day;
+  const day = r.blocks[0]?.day ?? "";
   const lapseText = () => {
     if (r.status === "not_held") return t("{name} does not hold {cert}. {job} ({unit}, {day}) needs it — add the certificate or reassign.", { name: r.technician, cert: r.name, job: job.short, unit: job.unit, day });
     return t(r.status === "expired" ? "{cert} of {name} expired {date}. {job} ({unit}, {day}) needs it — renew it or reassign." : "{cert} of {name} expires {date}. {job} ({unit}, {day}) needs it — renew before then or reassign.",

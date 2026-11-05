@@ -52,7 +52,7 @@ export function candidateGroups(candidates: { unitId: string; pathLabel: string 
 }
 /** A room choice's ACs, “2 ACs: Bedroom AC, Bedroom AC #2”. */
 export const groupSummary = (g: CandidateGroup, t: T) =>
-  g.units.length === 1 ? t("1 AC: {name}", { name: g.units[0].label }) : t("{count} ACs: {names}", { count: g.units.length, names: g.units.map((u) => u.label).join(", ") });
+  g.units.length === 1 ? t("1 AC: {name}", { name: g.units[0]?.label ?? "" }) : t("{count} ACs: {names}", { count: g.units.length, names: g.units.map((u) => u.label).join(", ") });
 /** The room the request named, as the matched rooms are called (“Bedroom”). */
 export const roomOf = (groups: CandidateGroup[]) => groups[0]?.path.split(" › ").pop() ?? "";
 

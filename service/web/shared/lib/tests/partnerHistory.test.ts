@@ -41,7 +41,7 @@ describe("partner job history", () => {
     expect([overdue.badge, overdue.overdue, overdue.sub, overdue.last]).toEqual([{ text: "Overdue", tone: "crit" }, true, "0 events · 0 customer-visible · 0 notes · delegation until 26 Sept 2026, 12:00 am MYT", null]);
     const unassigned = historyRowOf(summary({ status: "accepted", technicianMembershipId: null, assignmentAcknowledgement: null }), NOW, units, names);
     expect(unassigned.tech).toEqual({ name: "Unassigned", sub: "assign in Schedule", tone: "crit" });
-    const h = historyRowOf(history("job-9-hhhh", [events[0]]), NOW, units, names);
+    const h = historyRowOf(history("job-9-hhhh", [must(events[0])]), NOW, units, names);
     expect([h.tab, h.ended, h.sub, h.badge.text, h.version]).toEqual(["ended", true, "1 own decision event · delegation ended 21 Sept 2026, 12:00 am MYT (read-only snapshot)", "Completed", null]);
     expect(historyRow({ projection: "offer", status: "offered" } as unknown as ApiPartnerJob, NOW, units, names)).toBeNull();
   });
@@ -62,11 +62,11 @@ describe("partner job history", () => {
 
   it("builds the timeline rows and who can see them", () => {
     const users = byUser(members, "u-me");
-    expect(customerVisible(events[1])).toBe(false);
+    expect(customerVisible(must(events[1]))).toBe(false);
     expect([customerVisible(auditEvent("p", "partner_proposal.sent", "2026-09-20T00:00:00Z")), customerVisible(auditEvent("k", "job.costs_saved", "2026-09-20T00:00:00Z"))]).toEqual([false, false]); // IR442
     expect(eventSummary([...events, auditEvent("p", "partner_proposal.sent", "2026-09-22T00:00:00Z")])).toEqual({ count: 5, customerVisible: 3, notes: 2, latest: { action: "partner_proposal.sent", occurredAt: "2026-09-22T00:00:00Z" } });
-    expect(eventItem(events[1], users)).toEqual({ id: "e2", title: "Note added", detail: "“Missing filter photo” · internal · by contractor-a", at: "20 Sept 2026, 2:05 pm MYT", badge: "internal", tone: undefined });
-    expect(eventItem(events[3], users)).toMatchObject({ badge: "customer", detail: "“Arriving at 09:00” · customer" }); // someone outside the company is not named
+    expect(eventItem(must(events[1]), users)).toEqual({ id: "e2", title: "Note added", detail: "“Missing filter photo” · internal · by contractor-a", at: "20 Sept 2026, 2:05 pm MYT", badge: "internal", tone: undefined });
+    expect(eventItem(must(events[3]), users)).toMatchObject({ badge: "customer", detail: "“Arriving at 09:00” · customer" }); // someone outside the company is not named
     expect(eventItem(auditEvent("m", "offer.accepted", "2026-09-20T00:00:00Z", null, "u-me"), users).detail).toBe("by you");
     expect([channelText("inApp"), channelText("email"), channelText("whatsapp")]).toEqual(["in-app", "email", "WhatsApp"]);
     expect(eventItem(auditEvent("r", "job.rework_started", "2026-09-20T00:00:00Z", null, null), users)).toMatchObject({ detail: "by system", tone: "warn", badge: "customer" });
@@ -88,9 +88,9 @@ describe("partner job history", () => {
       "4 peristiwa · 3 boleh dilihat pelanggan · 2 nota · delegasi hingga 26 Sep 2026, 1:00 PG GMT+9", "menerima slot",
       { title: "Kerja dimulakan", at: "2026-09-21T01:05:00Z", when: "hari ini 10:05 PG GMT+9" }, "Sedang berjalan",
     ]);
-    const h = historyRowOf(history("job-9-hhhh", [events[0]]), NOW, units, names, MS);
+    const h = historyRowOf(history("job-9-hhhh", [must(events[0])]), NOW, units, names, MS);
     expect([h.title, h.sub, h.delegation, h.tech.sub]).toEqual(["Pemeriksaan berkala", "1 peristiwa keputusan sendiri · delegasi tamat 21 Sep 2026, 1:00 PG GMT+9 (rakaman baca sahaja)", "tamat — sejarah sahaja", "tidak ditunjukkan selepas delegasi"]);
-    expect(eventItem(events[1], byUser(members, "u-me", ms), MS)).toMatchObject({ title: "Nota ditambah", detail: "“Missing filter photo” · dalaman · oleh contractor-a", at: "20 Sep 2026, 3:05 PTG GMT+9" });
+    expect(eventItem(must(events[1]), byUser(members, "u-me", ms), MS)).toMatchObject({ title: "Nota ditambah", detail: "“Missing filter photo” · dalaman · oleh contractor-a", at: "20 Sep 2026, 3:05 PTG GMT+9" });
     expect(eventItem(auditEvent("m", "offer.accepted", "2026-09-20T00:00:00Z", null, "u-me"), byUser(members, "u-me", ms), MS).detail).toBe("oleh anda");
     expect(noteMode({ ended: false, status: "completed" }, ms)).toEqual({ kind: "preview", button: "Cipta pratonton", add: true, text: "Nota ditutup untuk kerja yang selesai — hanya pratonton dicipta." });
     expect(communicationRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { message: "error.required" } }, ms)).toBe("Mesej: diperlukan");

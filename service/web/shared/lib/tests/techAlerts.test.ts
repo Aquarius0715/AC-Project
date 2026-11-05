@@ -53,9 +53,9 @@ describe("technician alert evidence", () => {
     expect(v.resolution).toMatchObject({ info: null, done: "Resolved today 9:30 am MYT — Window closed. Acknowledged today 9:25 am MYT.", note: "Completing the job alone never resolves an alert. If the condition returns, a new alert is created that links back to alert alert-wi." });
     expect(v.history.map((h) => h.title)).toEqual(["Resolved", "Acknowledged", "Raised"]);
     expect(v.related.map((r) => r[1])).toEqual(["—", "u1", "No policy", "—", "none", "done today 9:30 am MYT"]);
-    expect(alertView({ ...base, rule: null }, { ...ctx, canResolve: false }, NOW).related[5][1]).toBe("no — ask a user with alert.resolve");
-    expect(alertView(base, { ...ctx, canResolve: true }, NOW).related[5][1]).toBe("with a reason, or by a remeasurement");
-    expect(alertView({ ...base, rule: null }, { ...ctx, canResolve: true }, NOW).related[5][1]).toBe("with a reason");
+    expect(alertView({ ...base, rule: null }, { ...ctx, canResolve: false }, NOW).related[5]?.[1]).toBe("no — ask a user with alert.resolve");
+    expect(alertView(base, { ...ctx, canResolve: true }, NOW).related[5]?.[1]).toBe("with a reason, or by a remeasurement");
+    expect(alertView({ ...base, rule: null }, { ...ctx, canResolve: true }, NOW).related[5]?.[1]).toBe("with a reason");
   });
 
   it("opens the URL's alert, else the worst unresolved, and words refusals", () => {

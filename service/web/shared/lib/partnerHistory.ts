@@ -93,7 +93,7 @@ export function historyRow(j: ApiPartnerJob, now: number, units: Map<string, str
     status: j.status,
     unit: units.get(j.unitId) ?? null,
     sub: [t(s.count === 1 ? "1 event" : "{n} events", { n: s.count }), t("{n} customer-visible", { n: s.customerVisible }), t(s.notes === 1 ? "1 note" : "{n} notes", { n: s.notes }), t("delegation {state}", { state: delegation })].join(" · "),
-    tech: tech ? { name: tech, sub: t(ack ? ack : "assigned") } : { name: t("Unassigned"), sub: j.status === "accepted" ? t("assign in Schedule") : "—", tone: j.status === "accepted" ? "crit" : undefined },
+    tech: tech ? { name: tech, sub: t(ack ?? "assigned") } : { name: t("Unassigned"), sub: j.status === "accepted" ? t("assign in Schedule") : "—", tone: j.status === "accepted" ? "crit" : undefined },
     lastAt: last ? Date.parse(last.at) : 0,
     overdue: isOverdue,
     badge: isOverdue ? { text: t("Overdue"), tone: "crit" } : { text: statusLabel(j.status, t), tone: STATUS_TONE[j.status] ?? "muted" },

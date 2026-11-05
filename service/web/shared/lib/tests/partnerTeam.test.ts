@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { clearEffect, clearError, dayRange, grantRows, listed, memberRows, teamQuery, teamStats, technicianNames, unavailabilityConflicts, unavailabilityErrors, unavailabilityRefusal, unavailabilityRows, weekday, weekRows, type ApiTeamMember, type ApiUnavailability, type TeamJob } from "@ac/web/lib/partnerTeam";
 import type { ApiCapacity } from "@ac/web/lib/partnerOverview";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
+import { must } from "./must";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const ms = translator("ms");
@@ -56,17 +57,17 @@ describe("partner team & capacity", () => {
       id: "m-a", name: "tech-external-a", sub: "Outdoor unit work · Electrical work · active since Apr 2025", active: true,
       week: { text: "4 h / 40 h", pct: 10 }, day: { main: "09:00–13:00 assigned", sub: "13:00–17:00 free" }, util: "50%",
     });
-    expect(rows[1].day).toEqual({ main: "13:00–17:00 assigned (job-p12)", sub: "09:00–13:00 free" });
+    expect(rows[1]?.day).toEqual({ main: "13:00–17:00 assigned (job-p12)", sub: "09:00–13:00 free" });
     expect(rows[2]).toMatchObject({ sub: "Outdoor unit work · expired 1 Aug 2026", active: false, day: { main: "Expired — cannot be assigned", tone: "crit" }, util: "—" });
     expect(memberRows([a], week, 5, [], NOW)[0]).toMatchObject({ day: { main: "No available hours set", sub: "—" }, util: "—" }); // Saturday
     expect(memberRows([a2], week, 3, [], NOW)[0]).toMatchObject({ day: { main: "Unavailable · annual leave", tone: "warn" }, util: "—" });
-    expect(memberRows([a], week, 0, [], NOW)[0].day).toEqual({ main: "No assignments", sub: "09:00–17:00 free" });
+    expect(memberRows([a], week, 0, [], NOW)[0]?.day).toEqual({ main: "No assignments", sub: "09:00–17:00 free" });
   });
 
   it("builds the team's week and its totals", () => {
     const rows = weekRows([a, a2], week);
-    expect(rows[0].cells.map((c) => c.text)).toEqual(["0 / 8 h", "4 / 8 h", "0 / 8 h", "0 / 8 h", "0 / 8 h", "—", "—"]);
-    expect(rows[1].cells.slice(1, 4)).toEqual([{ text: "4 / 8 h", kind: "busy" }, { text: "0 / 8 h", kind: "free" }, { text: "annual leave", kind: "off" }]);
+    expect(rows[0]?.cells.map((c) => c.text)).toEqual(["0 / 8 h", "4 / 8 h", "0 / 8 h", "0 / 8 h", "0 / 8 h", "—", "—"]);
+    expect(rows[1]?.cells.slice(1, 4)).toEqual([{ text: "4 / 8 h", kind: "busy" }, { text: "0 / 8 h", kind: "free" }, { text: "annual leave", kind: "off" }]);
     expect(teamStats([a, a2], week, 1)).toEqual({ assigned: "8 h", available: "80 h", utilization: "10%", free: "8 h" });
     expect(teamStats([], week, 1)).toEqual({ assigned: "0 h", available: "0 h", utilization: "—", free: "0 h" });
   });
@@ -118,24 +119,24 @@ describe("partner team & capacity", () => {
       ["All technicians", "Public holiday", null, "Mon, 21 Sept", "2026-09-21", false],
       ["Technician", "Annual leave", null, "Wed, 30 Sept", "2026-09-30", false],
     ]);
-    expect(clearError(rows[0], "2026-09-14", "en")).toBe("Choose a day from Tue, 15 Sept to Wed, 16 Sept"); // the past days stay
-    expect(clearError(rows[0], "2026-09-17", "en")).toBe("Choose a day from Tue, 15 Sept to Wed, 16 Sept");
-    expect(clearError(rows[0], "", "en")).not.toBeNull();
-    expect(clearError(rows[0], "2026-09-15", "en")).toBeNull();
-    expect(clearEffect(rows[1], "2026-09-17", "en")).toBe("All of these days are removed.");
-    expect(clearEffect(rows[1], "2026-09-18", "en")).toBe("Still unavailable: Thu, 17 Sept; the days from Fri, 18 Sept on are removed.");
-    expect(clearEffect(rows[0], "2026-09-15", "en")).toBe("Still unavailable: Thu 10 – Mon 14 Sept; the days from Tue, 15 Sept on are removed. Days before today stay recorded.");
+    expect(clearError(must(rows[0]), "2026-09-14", "en")).toBe("Choose a day from Tue, 15 Sept to Wed, 16 Sept"); // the past days stay
+    expect(clearError(must(rows[0]), "2026-09-17", "en")).toBe("Choose a day from Tue, 15 Sept to Wed, 16 Sept");
+    expect(clearError(must(rows[0]), "", "en")).not.toBeNull();
+    expect(clearError(must(rows[0]), "2026-09-15", "en")).toBeNull();
+    expect(clearEffect(must(rows[1]), "2026-09-17", "en")).toBe("All of these days are removed.");
+    expect(clearEffect(must(rows[1]), "2026-09-18", "en")).toBe("Still unavailable: Thu, 17 Sept; the days from Fri, 18 Sept on are removed.");
+    expect(clearEffect(must(rows[0]), "2026-09-15", "en")).toBe("Still unavailable: Thu 10 – Mon 14 Sept; the days from Tue, 15 Sept on are removed. Days before today stay recorded.");
     expect(dayRange("2026-09-29", "2026-10-02", "ms")).toBe("Sel, 29 Sep – Jum, 2 Okt");
     expect(unavailabilityRows([u("u3", null, "2026-09-21", "2026-09-21", "public_holiday")], names, "2026-09-15", MS)[0]).toMatchObject({ who: "Semua juruteknik", type: "Cuti umum", days: "Isn, 21 Sep" });
-    expect(clearEffect(rows[1], "2026-09-18", "ms", ms)).toBe("Masih tidak tersedia: Kha, 17 Sep; hari mulai Jum, 18 Sep dibuang.");
+    expect(clearEffect(must(rows[1]), "2026-09-18", "ms", ms)).toBe("Masih tidak tersedia: Kha, 17 Sep; hari mulai Jum, 18 Sep dibuang.");
   });
 
   it("words the team in Malay with Kuala Lumpur days (IR276)", () => {
     const rows = memberRows([a, a2, old], week, 1, [job], NOW, MS);
-    expect([rows[0].sub, rows[0].week.text, rows[0].day]).toEqual(["Kerja unit luaran · Kerja elektrik · aktif sejak Apr 2025", "4 j / 40 j", { main: "09:00–13:00 ditugaskan", sub: "13:00–17:00 lapang" }]);
-    expect(rows[2].day.main).toBe("Tamat tempoh — tidak boleh ditugaskan");
-    expect(memberRows([a], week, 5, [], NOW, MS)[0].day.main).toBe("Tiada jam tersedia ditetapkan");
-    expect(weekRows([a2], week, ms)[0].cells[3]).toEqual({ text: "cuti tahunan", kind: "off" });
+    expect([rows[0]?.sub, rows[0]?.week.text, rows[0]?.day]).toEqual(["Kerja unit luaran · Kerja elektrik · aktif sejak Apr 2025", "4 j / 40 j", { main: "09:00–13:00 ditugaskan", sub: "13:00–17:00 lapang" }]);
+    expect(rows[2]?.day.main).toBe("Tamat tempoh — tidak boleh ditugaskan");
+    expect(memberRows([a], week, 5, [], NOW, MS)[0]?.day.main).toBe("Tiada jam tersedia ditetapkan");
+    expect(weekRows([a2], week, ms)[0]?.cells[3]).toEqual({ text: "cuti tahunan", kind: "off" });
     expect(teamStats([a, a2], week, 1, ms).assigned).toBe("8 j");
     expect(grantRows([a], NOW, MS).map((g) => [g.name, g.sub, g.badge.text])).toEqual([
       ["Kerja elektrik", "tech-external-a · akan tamat 1 Okt 2026", "Hampir tamat · 16 hari"], ["Kerja unit dalaman", "tidak dipegang", "—"],

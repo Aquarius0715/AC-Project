@@ -62,11 +62,11 @@ function check(): { checked: number; problems: string[] } {
       if (c.isTypeAssignableTo(c.getNullType(), source) && !c.isTypeAssignableTo(c.getNullType(), target)) out.push(`${at}: may be null in the contract`);
       const s = c.getNonNullableType(source), d = c.getNonNullableType(target);
       if (c.isTypeAssignableTo(s, d)) return;
-      if (c.isArrayType(s) && c.isArrayType(d)) { compare(c.getTypeArguments(s as ts.TypeReference)[0], c.getTypeArguments(d as ts.TypeReference)[0], `${path}[]`, depth + 1, out, top); return; }
+      if (c.isArrayType(s) && c.isArrayType(d)) { compare(must(c.getTypeArguments(s as ts.TypeReference)[0]), must(c.getTypeArguments(d as ts.TypeReference)[0]), `${path}[]`, depth + 1, out, top); return; }
       if (s.isUnion() && !(s.flags & ts.TypeFlags.Boolean) && variants(s).some((item) => isObject(item))) {
         const sv = variants(s), dv = variants(d);
         const keys = sv.every((item) => isObject(item))
-          ? [...literals(sv[0]).keys()].filter((k) => sv.every((m) => literals(m).has(k)) && sv.every((m, i) => sv.every((n, j) => i === j || !overlap(must(literals(m).get(k)), must(literals(n).get(k))))))
+          ? [...literals(must(sv[0])).keys()].filter((k) => sv.every((m) => literals(m).has(k)) && sv.every((m, i) => sv.every((n, j) => i === j || !overlap(must(literals(m).get(k)), must(literals(n).get(k))))))
           : [];
         if (top && keys.length === 0) { // the input picks the variant
           if (sv.some((m) => c.isTypeAssignableTo(m, d))) return;
@@ -75,7 +75,8 @@ function check(): { checked: number; problems: string[] } {
           return;
         }
         if (top && dv.every((x) => !(isObject(x) && keys.some((k) => !!x.getProperty(k))))) {
-          out.push(`${at}: name the ${keys.join(" / ")} the screen reads (the contract has ${sv.map((m) => singleText(must(literals(m).get(keys[0])))).join(", ")})`);
+          const firstKey = must(keys[0]);
+          out.push(`${at}: name the ${keys.join(" / ")} the screen reads (the contract has ${sv.map((m) => singleText(must(literals(m).get(firstKey)))).join(", ")})`);
           return;
         }
         for (const m of top ? sv.filter((v) => dv.some((x) => fits(v, x))) : sv) {
@@ -111,7 +112,7 @@ function check(): { checked: number; problems: string[] } {
           const where = `${relative(web, f)}:${String(sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1)} ${op}`;
           let result = resultOf(op);
           let own: ts.Type | undefined;
-          if (n.typeArguments?.length) own = c.getTypeFromTypeNode(n.typeArguments[0]);
+          if (n.typeArguments?.length) own = c.getTypeFromTypeNode(must(n.typeArguments[0]));
           else { // inferred from the context (a typed variable or return)
             const sig = c.getResolvedSignature(n);
             const returned = sig && c.getReturnTypeOfSignature(sig);
@@ -120,7 +121,7 @@ function check(): { checked: number; problems: string[] } {
           }
           if (fn === "coreAll" && result) {
             const items = result.getProperty("items");
-            result = items ? c.getTypeArguments(c.getTypeOfSymbol(items) as ts.TypeReference)[0] : null;
+            result = items ? c.getTypeArguments(c.getTypeOfSymbol(items) as ts.TypeReference)[0] ?? null : null;
           }
           if (!result) problems.push(`${where}: the contract has no result for it`);
           else if (own && !(own.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown))) {

@@ -4,6 +4,7 @@ import {
   type ApiAudit, type ApiAuditDeviceEvent,
 } from "@ac/web/lib/audit";
 import { EN, i18nOf, translator } from "@ac/web/lib/i18n";
+import { must } from "./must";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const NOW = new Date("2026-09-15T01:00:00Z"); // 09:00 in Kuala Lumpur, 10:00 in Tokyo
@@ -90,7 +91,8 @@ describe("HQ audit log (FR-A16, DD-A16, SCR-A16)", () => {
     const names = new Map([["user-0001", "hq-operator"]]), units = new Map([["u1", "Bedroom AC"]]);
     const alerts = new Map([["al1", { id: "al1", version: 1, status: "acknowledged" as const, type: "tamper", severity: "warning" }]]);
     const back = event({ id: "e41", eventType: "restored", evidenceSource: "heartbeat", sequence: 40, occurredAt: "2026-09-14T22:00:00Z", alertIds: [], responseNotes: [], recovery: { axis: "connection", sourceEventId: "e39", value: "online" } });
-    const [t, r] = auditDeviceEvents([event({}), back], alerts, names, units, NOW.getTime());
+    const [first, second] = auditDeviceEvents([event({}), back], alerts, names, units, NOW.getTime());
+    const t = must(first), r = must(second);
     expect(t).toMatchObject({ title: "Tamper · removal suspected", type: "tamper", tone: "warn", meta: "tamper_signal · seq 42 · today 8:41 am MYT", badge: { text: "Not restored", tone: "crit" } });
     expect(Object.fromEntries(t.facts)).toEqual({
       "Event type": "tamper", Evidence: "tamper_signal — Cover opened while powered", Sequence: "42 (previous 40 — 1 missing)", "Unit at the time": "Bedroom AC", Occurred: "15 Sept 2026, 8:41 am MYT",
@@ -99,8 +101,9 @@ describe("HQ audit log (FR-A16, DD-A16, SCR-A16)", () => {
     expect(t.alerts).toEqual([{ id: "al1", text: "tamper · acknowledged", href: "/admin/alerts?alertId=al1&status=acknowledged" }]);
     expect(t.notes).toEqual([{ text: "Customer confirms nobody touched the unit.", by: "hq-operator · 15 Sept 2026, 8:50 am MYT" }]);
     expect([r.badge, Object.fromEntries(r.facts).Sequence, Object.fromEntries(r.facts)["Restored at"], Object.fromEntries(r.facts).Evidence]).toEqual([null, "40", undefined, "heartbeat — Connection restored"]);
-    const [gapless] = auditDeviceEvents([event({}), event({ id: "e41", sequence: 41 })], new Map(), new Map(), new Map(), NOW.getTime());
-    expect([Object.fromEntries(gapless.facts).Sequence, gapless.alerts[0].href, gapless.notes[0].by.startsWith("user-000 · ")]).toEqual(["42 (previous 41 — no gap)", "/admin/alerts?alertId=al1", true]);
+    const [noGap] = auditDeviceEvents([event({}), event({ id: "e41", sequence: 41 })], new Map(), new Map(), new Map(), NOW.getTime());
+    const gapless = must(noGap);
+    expect([Object.fromEntries(gapless.facts).Sequence, gapless.alerts[0]?.href, gapless.notes[0]?.by.startsWith("user-000 · ")]).toEqual(["42 (previous 41 — no gap)", "/admin/alerts?alertId=al1", true]);
   });
 });
 
@@ -112,7 +115,8 @@ describe("HQ audit log in Malay with the display time zone (IR304)", () => {
     expect(periodError({ from: "2026-09-10", to: "2026-09-01" }, t)).toBe("Tempoh mesti mula < tamat, paling lama 366 hari");
     expect(auditItem(entry({}), MS).title).toBe("restrictions.defer · Berjaya");
     expect(relatedRecords(entry({}), [], MS).restriction?.note).toBe("Dikenakan · pengecualian hingga 20 Sep 2026, 9:00 PG GMT+9 — seperti direkodkan oleh entri ini");
-    const [e] = auditDeviceEvents([event({})], new Map(), new Map(), new Map(), NOW.getTime(), MS);
+    const [one] = auditDeviceEvents([event({})], new Map(), new Map(), new Map(), NOW.getTime(), MS);
+    const e = must(one);
     expect([e.title, e.badge?.text, Object.fromEntries(e.facts)["Dipulihkan pada"]]).toEqual(["Gangguan · penanggalan disyaki", "Tidak dipulihkan", "— belum lagi"]);
   });
 });

@@ -220,11 +220,12 @@ now — or how many are overdue and their total, with View invoices — and the 
 units, with View restriction details: the restriction's own detail, as the unit page links it (IR583). Nothing when
 nothing is overdue. */
 export function dueNotice(overdue: Pick<ApiInvoice, "id" | "number" | "amountMinor" | "currency">[], restriction: { r: Pick<ApiRestriction, "id" | "state" | "policy" | "unitIds" | "executeAfter">; invoiceId: string } | null, i: I18n = EN): DueLine[] | null {
-  if (overdue.length === 0) return null;
+  const [first] = overdue;
+  if (!first) return null;
   const { t, display } = i;
   const lines: DueLine[] = [overdue.length === 1
-    ? { text: t("Invoice {number} is overdue — {amount}", { number: overdue[0].number, amount: money(overdue[0].amountMinor, overdue[0].currency) }), href: `/customer/payments/${overdue[0].id}`, link: t("Pay now") }
-    : { text: t("{n} invoices are overdue — {amount} in total", { n: overdue.length, amount: money(overdue.reduce((sum, x) => sum + x.amountMinor, 0), overdue[0].currency) }), href: "/customer/payments?status=overdue", link: t("View invoices") }];
+    ? { text: t("Invoice {number} is overdue — {amount}", { number: first.number, amount: money(first.amountMinor, first.currency) }), href: `/customer/payments/${first.id}`, link: t("Pay now") }
+    : { text: t("{n} invoices are overdue — {amount} in total", { n: overdue.length, amount: money(overdue.reduce((sum, x) => sum + x.amountMinor, 0), first.currency) }), href: "/customer/payments?status=overdue", link: t("View invoices") }];
   const r = restriction?.r;
   if (r && live.has(r.state)) {
     const n = r.unitIds.length;

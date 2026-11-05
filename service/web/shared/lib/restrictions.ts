@@ -89,7 +89,7 @@ export function unitRows(r: ApiRestriction, names: Map<string, string>, commands
   const pendingText = new Map([["offline", t("offline")], ["device_operation_running", t("a device operation is running")]]);
   const pending = (p: string | null) => (p === null ? null : pendingText.get(p) ?? p);
   return r.perUnit.map((u) => {
-    const last = (ids: string[]) => (ids.length > 0 ? commands.get(ids[ids.length - 1]) : undefined);
+    const last = (ids: string[]) => { const id = ids.at(-1); return id ? commands.get(id) : undefined; };
     const a = last(u.applyCommandIds);
     const releaseId = last(u.releaseCommandIds);
     const status = (c: ApiCommand) => `${command[c.status] ?? c.status}${c.failureCode ? ` (${c.failureCode})` : ""}`;

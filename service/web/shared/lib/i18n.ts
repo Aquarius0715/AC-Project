@@ -131,7 +131,7 @@ export function showSpan(startIso: string, endIso: string, d: Display = DEFAULT_
 function wallMs(ms: number, timeZone: string): number {
   const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" })
     .formatToParts(ms).map((x) => [x.type, x.value]));
-  return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);
+  return Date.UTC(Number(p.year ?? 0), Number(p.month ?? 1) - 1, Number(p.day ?? 1), Number(p.hour ?? 0), Number(p.minute ?? 0), Number(p.second ?? 0)); // Intl gives every part asked for
 }
 const knownZone = (tz: string) => {
   try {

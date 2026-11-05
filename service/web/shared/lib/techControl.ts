@@ -176,7 +176,8 @@ const CODES: Record<string, string> = {
 /** The DomainError of a refused diagnostic write, in the words of Figma Technician 02 (IR46 / IR47 / D04); null for a
 VALIDATION that only marks fields. */
 export function refusal(f: { code: string; messageKey: string; retryAfterSeconds?: number | null }, t: T = en): string | null {
-  if (REFUSED[f.messageKey]) return t(REFUSED[f.messageKey]);
+  const known = REFUSED[f.messageKey];
+  if (known) return t(known);
   return textOf(CODES, f.code, t) ?? (f.code === "VALIDATION" ? null : actionMessage({ ...f, fieldErrors: {} }, t)); // the write limit's wait (IR380)
 }
 const FIELD: Record<string, string> = { "error.length": "1–1000 characters", "error.required": "Required", "error.range": "1–15 minutes", "error.unsupportedAction": "Not supported by this AC", "error.invalid": "Not valid" };

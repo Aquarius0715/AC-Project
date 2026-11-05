@@ -38,7 +38,7 @@ export function metricOf(d: ApiTechUnit, v?: string): Metric {
   const measured = d.latestMeasurements.map((m) => m.metric);
   const asked = measured.find((m) => m === v);
   if (asked) return asked;
-  return measured.includes("temperature") || measured.length === 0 ? "temperature" : measured[0];
+  return measured.includes("temperature") ? "temperature" : measured[0] ?? "temperature";
 }
 const label = (metric: string, t: T) => (textOf(metricLabel, metric, t) ?? metric.replaceAll('_', " "));
 
@@ -179,6 +179,7 @@ export function otherMetrics(d: ApiTechUnit, shown: string, series: Record<strin
 }
 
 export interface WindowEvent { id: string; at: string; time: string; title: string; sub: string; badge: { text: string; tone: Tone } }
+const INFO = { text: "Info", tone: "primary" as Tone }; // an alert of an unknown severity reads as information
 const SEVERITY: Record<string, { text: string; tone: Tone }> = { critical: { text: "Critical", tone: "crit" }, warning: { text: "Warning", tone: "warn" }, normal: { text: "Info", tone: "primary" } };
 const DEVICE: Record<ApiDeviceEventFull["eventType"], [string, string, string, Tone]> = {
   communication_lost: ["Updates stopped", "missed heartbeats — the values are frozen and not shown as live", "Connectivity", "primary"],
@@ -198,7 +199,7 @@ export function windowEvents(alerts: ApiAlert[], events: ApiDeviceEventFull[], p
   const inside = (iso?: string | null): iso is string => !!iso && Date.parse(iso) >= from && Date.parse(iso) <= to;
   const out: Omit<WindowEvent, "time">[] = [];
   for (const a of alerts) {
-    const title = alertTitle(a, t), sev = SEVERITY[a.severity] ?? SEVERITY.normal;
+    const title = alertTitle(a, t), sev = SEVERITY[a.severity] ?? INFO;
     if (inside(a.detectedAt)) out.push({ id: `${a.id}:raised`, at: a.detectedAt, title: t("Alert raised — {title}", { title }), sub: evidenceText(a.evidenceText, t), badge: { text: t(sev.text), tone: sev.tone } });
     if (inside(a.acknowledgedAt)) out.push({ id: `${a.id}:acknowledged`, at: a.acknowledgedAt, title: t("Alert acknowledged — {title}", { title }), sub: "", badge: { text: t("Acknowledged"), tone: "primary" } });
     if (inside(a.resolvedAt)) out.push({ id: `${a.id}:resolved`, at: a.resolvedAt, title: t("Alert resolved — {title}", { title }), sub: a.resolutionReason ? resolutionText(a.resolutionReason, t) : "", badge: { text: t("Resolved"), tone: "ok" } });
@@ -240,7 +241,7 @@ const ACTIVE: Record<string, number> = { in_progress: 0, assigned: 1, rework_req
 /** The job diagnostic control works for (DD-T10, IR94): the URL's job when it is one of the technician's active jobs on
 the unit, else the one in progress, then assigned or returned for rework; null without one. */
 export function controlJob(jobs: ApiTechJobRow[], jobId?: string): string | null {
-  const active = jobs.filter((j): j is Extract<ApiTechJobRow, { projection: "summary" }> => j.projection === "summary" && j.status in ACTIVE).toSorted((a, b) => ACTIVE[a.status] - ACTIVE[b.status]);
+  const active = jobs.filter((j): j is Extract<ApiTechJobRow, { projection: "summary" }> => j.projection === "summary" && j.status in ACTIVE).toSorted((a, b) => (ACTIVE[a.status] ?? 9) - (ACTIVE[b.status] ?? 9));
   return (active.find((j) => j.id === jobId) ?? active[0])?.id ?? null;
 }
 
@@ -249,7 +250,7 @@ const RANK: Record<string, number> = { critical: 0, warning: 1, normal: 2 };
 /** The unit's unresolved alerts, worst and newest first, each with its evidence and who acknowledged it — finishing the job never resolves one. */
 export function openAlerts(alerts: ApiAlert[], nowMs: number, i: I18n = EN): OpenAlert[] {
   const { t } = i;
-  return alerts.filter((a) => a.status !== "resolved").toSorted((a, b) => RANK[a.severity] - RANK[b.severity] || b.detectedAt.localeCompare(a.detectedAt)).map((a) => {
+  return alerts.filter((a) => a.status !== "resolved").toSorted((a, b) => (RANK[a.severity] ?? 9) - (RANK[b.severity] ?? 9) || b.detectedAt.localeCompare(a.detectedAt)).map((a) => {
     return {
       id: a.id, title: alertTitle(a, t), severity: a.severity, sub: `${evidenceText(a.evidenceText, t)} · ${relativeTime(a.detectedAt, nowMs, i)}`,
       ack: `${a.acknowledgedAt ? t("Acknowledged {time}.", { time: relativeTime(a.acknowledgedAt, nowMs, i) }) : t("Acknowledged by nobody yet.")} ${t("Completing the job does not resolve it.")}`,

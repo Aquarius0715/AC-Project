@@ -233,10 +233,11 @@ function CandidatePicker({ m, t, busy, onPick, onCancel }: Readonly<{
   const [room, setRoom] = useState(isSeveral ? -1 : 0);
   const [picked, setPicked] = useState<string | null>(null);
   const g = m.groups[room];
-  const chosen = g?.units.length === 1 ? g.units[0].unitId : picked;
+  const only = g?.units.length === 1 ? g.units[0] : undefined; // a room with one AC needs no choice
+  const chosen = only?.unitId ?? picked;
   return (
     <div className="rounded-2xl bg-surface2 p-3 text-[13px]">
-      <b>{isSeveral ? t("Which {room} did you mean?", { room: roomOf(m.groups) }) : t("Which AC in {path} did you mean?", { path: g.path })}</b>
+      <b>{isSeveral ? t("Which {room} did you mean?", { room: roomOf(m.groups) }) : t("Which AC in {path} did you mean?", { path: g?.path ?? "" })}</b>
       <p className="text-xs text-muted-foreground">{t("I found more than one. I won’t choose for you.")}</p>
       {isSeveral && (
         <fieldset className="mt-2 flex flex-col gap-1.5">

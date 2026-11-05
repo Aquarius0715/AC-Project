@@ -33,7 +33,7 @@ describe("HQ SLA by customer", () => {
       ["Avg. customer rating", "4.5", "27 ratings", undefined], ["Open & overdue", "1", "2 breaches in the period", "crit"],
     ]);
     const one = slaTiles(sc({ customers: [{ ...metrics, customerId: "c-a", planType: "rto", jobCount: 1, status: "on_track" }], totals: { ...metrics, arrivalInWindow: null, openOverdue: 0 }, breaches: [] }));
-    expect([one[1].value, one[1].sub, one[4].sub, one[4].tone]).toEqual(["—", "target 95 %", "0 breaches in the period", undefined]);
+    expect([one[1]?.value, one[1]?.sub, one[4]?.sub, one[4]?.tone]).toEqual(["—", "target 95 %", "0 breaches in the period", undefined]);
   });
 
   it("lists customers and breaches", () => {
@@ -63,8 +63,8 @@ describe("HQ SLA by customer in Malay with the display time zone (IR291)", () =>
     expect(breachText({ ...took, kind: "overdue", tookMinutes: null, limitMinutes: null }, MS.t)).toBe("terbuka melepasi masa akhirnya");
     expect(slaTiles(sc(), MS.t).map((x) => x.label)).toEqual(["Respons ≤ 4 j", "Ketibaan dalam tetingkap", "Pembaikan kali pertama", "Purata penilaian pelanggan", "Terbuka & tertunggak"]);
     const rows = slaRows(sc(), [{ id: "c-a", name: "A", organizationId: "o-a" }], [], [], MS.t);
-    expect([rows[0].sub, rows[0].status.label, rows[1].name]).toEqual(["tiada premis · 0 unit", "Mengikut sasaran", "pelanggan"]);
-    expect(targetsByPlan(sc().targets, MS)[1].scheduled[0]).toMatch(/^v1 dari 1 Okt 2026, 9:00 PG GMT\+9: ≤ 2 j/); // the start in the display zone
+    expect([rows[0]?.sub, rows[0]?.status.label, rows[1]?.name]).toEqual(["tiada premis · 0 unit", "Mengikut sasaran", "pelanggan"]);
+    expect(targetsByPlan(sc().targets, MS)[1]?.scheduled[0]).toMatch(/^v1 dari 1 Okt 2026, 9:00 PG GMT\+9: ≤ 2 j/); // the start in the display zone
     expect(slaCsv(rows.slice(0, 1), sc().period, MS).split("\n", 1)[0]).toBe('"Pelanggan","Pelan","Kerja","Respons","Ketibaan","Pembaikan kali pertama","Penilaian","Tertunggak","Status","Tempoh dari","Tempoh hingga"');
   });
 });

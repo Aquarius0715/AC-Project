@@ -21,7 +21,7 @@ export default async function DemoPage() {
   const listed = (devices ?? []).slice(0, 20);
   const histories = await Promise.all(listed.map((d) => orNull(coreItems<ApiDeviceEvent>("devices.events", { id: d.id, query: { limit: 100 } }))));
   const faults = new Map<string, string>();
-  for (const [i, h] of histories.entries()) { const f = h && openFault(h); if (f) faults.set(listed[i].id, f.id); }
+  for (const [i, h] of histories.entries()) { const f = h && openFault(h); const device = listed[i]; if (f && device) faults.set(device.id, f.id); }
   const usable = listed.filter((_, i) => histories[i] !== null);
   return <DemoView live={{ clock: clockText(now.toISOString()), devices: devices && deviceOptions(usable, new Map(units.map((u) => [u.id, u.displayName])), faults), hidden: listed.length - usable.length }} />;
 }

@@ -4,6 +4,7 @@ import { NextRequest } from "next/server";
 import { contentSecurityPolicy, HSTS, makeNonce as makeNonce, originOf, sameOriginRequest } from "@ac/web/lib/securityHeaders";
 import { authProxy } from "@ac/web/proxy";
 import { STYLE_HASHES } from "@ac/web/lib/styleHashes.gen";
+import { must } from "./must";
 
 // the proxy reads the session module, which is server code
 vi.mock("server-only", () => ({}));
@@ -11,7 +12,7 @@ vi.mock("next/headers", () => ({ cookies: () => Promise.resolve({ get: vi.fn(), 
 
 afterEach(() => vi.unstubAllEnvs());
 
-const directives = (csp: string) => Object.fromEntries(csp.split("; ").map((d) => [d.split(" ", 1)[0], d.split(" ").slice(1).join(" ")]));
+const directives = (csp: string): Record<string, string> => Object.fromEntries(csp.split("; ").map((d) => [d.split(" ", 1)[0] ?? "", d.split(" ").slice(1).join(" ")]));
 
 // IR354: the security headers of network architecture §6, the page CSP as in the Next.js CSP guide
 describe("the page Content-Security-Policy", () => {
@@ -43,7 +44,7 @@ describe("the proxy's security headers", () => {
     vi.stubEnv("OIDC_ISSUER", "https://id.example.com/realms/ac");
     const res = await authProxy(new NextRequest("http://localhost:3000/customer"), "client");
     const csp = cspOf(res.headers);
-    const nonce = (/'nonce-([^']+)'/.exec(csp))?.[1];
+    const nonce = must((/'nonce-([^']+)'/.exec(csp))?.[1]);
     expect(nonce).toBeTruthy();
     expect(directives(csp)["form-action"]).toBe("'self' https://id.example.com");
     // NextResponse.next({ request: { headers } }) forwards the request headers as x-middleware-request-*

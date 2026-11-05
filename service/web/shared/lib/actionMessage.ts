@@ -90,7 +90,8 @@ export function actionMessage(r: ActionFailure, t: T = translator("en")): string
     }
     return r.retryAfterSeconds ? t("Too many changes in a short time — try again in {s} s", { s: r.retryAfterSeconds }) : t("Too many changes in a short time — try again shortly");
   }
-  if (keyText[r.messageKey]) return t(keyText[r.messageKey]);
+  const known = keyText[r.messageKey];
+  if (known) return t(known);
   if (r.messageKey.startsWith("errors.")) return humanize(r.messageKey);
   return textOf(codeText, r.code, t) ?? `${r.code}: ${humanize(r.messageKey)}`;
 }
