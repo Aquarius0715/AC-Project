@@ -10,6 +10,7 @@ import { coreRequest } from "@ac/web/lib/rest";
 import { DEFAULT_DISPLAY, isLocale, type Display } from "@ac/web/lib/i18n";
 import type { ListArgs, OpArgs } from "@ac/web/lib/opTypes";
 import { orNull } from "@ac/web/lib/promises";
+import { filled } from "@ac/web/lib/filled";
 
 /** The session of the cookie (sealed, or stored under the sealed ID it holds, IR382), or null. proxy.ts refreshes tokens
 before pages render (Server Components cannot write cookies), so an expired token here means the refresh failed.
@@ -135,7 +136,7 @@ shell and the screens that show times read the same answer. Unreadable preferenc
 export const coreDisplay = cache(async (): Promise<Display> => {
   try {
     const p = await coreOp<{ locale?: string; timezone?: string }>("preferences.get", {});
-    return { locale: isLocale(p.locale) ? p.locale : DEFAULT_DISPLAY.locale, timeZone: p.timezone || DEFAULT_DISPLAY.timeZone };
+    return { locale: isLocale(p.locale) ? p.locale : DEFAULT_DISPLAY.locale, timeZone: filled(p.timezone) ?? DEFAULT_DISPLAY.timeZone };
   } catch {
     return DEFAULT_DISPLAY;
   }

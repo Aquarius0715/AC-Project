@@ -4,6 +4,7 @@
 // display language (`i`, IR265).
 import { coveragePct, klInstant, klLocal, klStamp, one, saving, type ApiBaseline, type ApiEnergySummary } from "@ac/web/lib/energy";
 import { EN, intlTag, showDay, translator, type I18n, type Locale, type T } from "@ac/web/lib/i18n";
+import { filled } from "@ac/web/lib/filled";
 
 export type PeriodKind = "today" | "7d" | "30d" | "custom";
 export const periodKinds: PeriodKind[] = ["today", "7d", "30d", "custom"];
@@ -21,7 +22,7 @@ export function periodRange(kind: PeriodKind, now: Date, custom: { from?: string
   let from: string, to: string;
   if (kind === "custom") {
     const today = klLocal(now.toISOString()).slice(0, 10);
-    from = klInstant(custom.from ? custom.from : `${addDays(today, -6)}T00:00`);
+    from = klInstant(filled(custom.from) ?? `${addDays(today, -6)}T00:00`);
     to = custom.to ? klInstant(custom.to) : minute;
   } else {
     const days = SPAN_DAYS.get(kind) ?? 30;

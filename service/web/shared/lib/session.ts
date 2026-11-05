@@ -7,6 +7,7 @@ import "server-only";
 import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { createClient } from "@redis/client";
+import { filled } from "@ac/web/lib/filled";
 
 export interface Session {
   accessToken: string;
@@ -41,7 +42,7 @@ a missing, empty or short secret is refused rather than replaced by the local on
 (IR430: it is long enough, but it is in the repository), so a deployment without its own secret cannot seal or open
 a session and fails closed (IR367). Plain-http local runs keep the local default. */
 export function cookieKey(): Buffer {
-  const secret = process.env.SESSION_SECRET || undefined;
+  const secret = filled(process.env.SESSION_SECRET);
   if (oidcConfig().appUrl.startsWith("https") && (secret === undefined || secret.length < MIN_SECRET_LENGTH || secret.includes("change-me"))) {
     throw new Error(`SESSION_SECRET of at least ${String(MIN_SECRET_LENGTH)} characters, not the local value, is required on https`);
   }

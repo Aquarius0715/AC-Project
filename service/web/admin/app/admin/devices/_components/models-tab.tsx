@@ -80,7 +80,7 @@ export function ModelsTab({ live }: Readonly<{ live: DevicesLive }>) {
           <section>
             <h3 className="mb-1 text-[13px] font-bold">{t("Modes & fan")}</h3>
             <div className="flex flex-wrap gap-x-6 gap-y-2 text-[13px]">{modes.map((m: Mode) => <Check key={m} label={t(modeLabel[m])} checked={d.modes.includes(m)} disabled={!d.modeControl} onChange={(v) => { set({ modes: toggle(d.modes, m, v) }); }} />)}{fans.map((f: Fan) => <Check key={f} label={t("Fan {level}", { level: t(levelLabel[f]) })} checked={d.fanLevels.includes(f)} disabled={!d.fanControl} onChange={(v) => { set({ fanLevels: toggle(d.fanLevels, f, v) }); }} />)}</div>
-            {(fieldError("modes") || fieldError("fanLevels")) && <p className="mt-1 text-xs text-crit">{fieldError("modes") ?? fieldError("fanLevels")}</p>}
+            {(fieldError("modes") ?? fieldError("fanLevels")) !== undefined && <p className="mt-1 text-xs text-crit">{fieldError("modes") ?? fieldError("fanLevels")}</p>}
           </section>
           <section>
             <h3 className="mb-1 text-[13px] font-bold">{t("Ventilation")}</h3>

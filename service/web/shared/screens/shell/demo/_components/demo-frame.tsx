@@ -41,7 +41,7 @@ export function ClockFace({ time, onMinute, onHour, disabled }: Readonly<{ time:
 /** One trigger tile: icon, name and what it does; a tile that cannot run here says why. */
 export function TriggerTile({ icon, title, sub, onClick, disabled, tone }: Readonly<{ icon: IconName; title: string; sub: string; onClick?: () => void; disabled?: boolean; tone?: "ok" }>) {
   return (
-    <Plain type="button" onClick={onClick} disabled={disabled || !onClick} className={cx("flex min-w-0 flex-col items-start gap-0.5 rounded-xl border border-line bg-surface px-3 py-2.5 text-left hover:bg-surface2 disabled:cursor-not-allowed disabled:opacity-60", tone === "ok" && "border-[#86efac]")}>
+    <Plain type="button" onClick={onClick} disabled={disabled === true || !onClick} className={cx("flex min-w-0 flex-col items-start gap-0.5 rounded-xl border border-line bg-surface px-3 py-2.5 text-left hover:bg-surface2 disabled:cursor-not-allowed disabled:opacity-60", tone === "ok" && "border-[#86efac]")}>
       <span className="flex items-center gap-2 text-[13px] font-semibold"><Icon name={icon} className={cx("text-crit", tone === "ok" && "text-ok")} />{title}</span>
       <span className="text-[11px] text-muted-foreground">{sub}</span>
     </Plain>

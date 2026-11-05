@@ -8,6 +8,7 @@ import { alertTitle } from "@ac/web/lib/alerts";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { Metric as ContractMetric } from "@ac/web/lib/contracts.gen";
 import { byNumber, byText } from "@ac/web/lib/order";
+import { filled } from "@ac/web/lib/filled";
 
 const en = translator("en");
 
@@ -143,7 +144,7 @@ export function policyRows(policies: ApiPolicy[], customers: ApiCustomerName[], 
         : `${textOf(metricLabel, metric, t) ?? metric} ${opSymbol[op]} ${String(p.threshold ?? "—")} ${metricUnit[metric] ?? ""} ${t("for {n} s", { n: p.durationSeconds ?? 0 })}`;
       const recipients = (p.recipientMembershipIds ?? []).map((id) => {
         const m = member.get(id);
-        return { id, label: m?.displayName || id, role: m ? recipientRole(m.role, t) : "" };
+        return { id, label: filled(m?.displayName) ?? id, role: m ? recipientRole(m.role, t) : "" };
       });
       const owner = p.ownerMembershipId ? member.get(p.ownerMembershipId) : undefined;
       return {

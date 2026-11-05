@@ -113,7 +113,7 @@ function CertificateModal({ live, kind, row, onClose }: Readonly<{ live: Live; k
     setTried(true);
     const e = certificateErrors(form, t);
     // a refused submit takes focus to the first field to fix, top to bottom (IR593, as IR586)
-    const bad = (Object.keys(ids) as (keyof typeof ids)[]).find((k) => e[k] || (k === "file" && !file));
+    const bad = (Object.keys(ids) as (keyof typeof ids)[]).find((k) => e[k] !== undefined || (k === "file" && !file));
     if (bad) { focusField(ids[bad]); return; }
     if (!file) return;
     const data = new FormData();

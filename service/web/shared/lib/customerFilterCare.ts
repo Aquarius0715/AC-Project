@@ -5,6 +5,7 @@
 // display time zone (`i`, IR262).
 import { EN, intlTag, translator, type Display, type I18n, type T } from "@ac/web/lib/i18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
+import { filled } from "@ac/web/lib/filled";
 
 const en = translator("en");
 
@@ -117,7 +118,7 @@ export function filterGroup(key: string, rows: FilterRow[], t: T = en): FilterGr
   const known = rows.filter((r) => r.hours != null && r.pct != null);
   const pct = known.length > 0 ? Math.round(known.reduce((a, r) => a + (r.pct ?? 0), 0) / known.length) : null;
   const due = n("overdue") + n("due_soon");
-  const name = rows[0]?.place.split(" › ").pop() || t("Area");
+  const name = filled(rows[0]?.place.split(" › ").pop()) ?? t("Area");
   return {
     title: t("{name} · {n} ACs", { name, n: rows.length }),
     place: rows[0]?.place ?? "",

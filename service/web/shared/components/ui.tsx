@@ -118,7 +118,7 @@ overflow stays visible for the menus that still open inside a card. */
 export function Card({ title, sub, action, children, className, pad = true, tone }: Readonly<{ title?: React.ReactNode; sub?: React.ReactNode; action?: React.ReactNode; children?: React.ReactNode; className?: string; pad?: boolean; tone?: "crit" | "warn" | "ok" }>) {
   return (
     <UICard className={cn("min-w-0 overflow-visible", !pad && "pb-0", tone === "crit" && "ring-crit", tone === "warn" && "ring-[#fdba74]", tone === "ok" && "ring-[#86efac]", className)}>
-      {(title || action) && (
+      {(Boolean(title) || Boolean(action)) && (
         // the title keeps at least 12rem: a wide action (a row of filters) goes below it on a narrow card instead of
         // squeezing it into a column; a small one stays beside it
         <CardHeader className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
@@ -354,7 +354,7 @@ height, padding, radius and weight are reset here rather than in each screen. */
 export const Plain = ({ className, touch, ...p }: React.ComponentProps<typeof Button> & { touch?: boolean }) => {
   // a chip (aria-pressed) or a tab (role tab) is a control of its own: on a touch screen it is 44 px tall like the
   // shared ones, its label centred (IR617); so is an action marked `touch` — an icon or a text action — 44×44 (IR618)
-  const isControl = touch || p["aria-pressed"] !== undefined || p.role === "tab";
+  const isControl = touch === true || p["aria-pressed"] !== undefined || p.role === "tab";
   return <Button {...p} data-plain="" variant="ghost" className={cn("inline-block h-auto min-w-0 pointer-coarse:min-h-0 shrink gap-0 rounded-none p-0 font-[inherit] whitespace-normal justify-start leading-[inherit] [font-size:inherit] [letter-spacing:inherit] active:translate-y-0 disabled:opacity-100 [&_svg:not([class*='size-'])]:size-auto",
     isControl && "pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center", touch && "pointer-coarse:min-w-11 pointer-coarse:justify-center", className)} />;
 };

@@ -18,6 +18,7 @@ import {
 } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
 import { type NonEmpty } from "@ac/web/lib/lists";
+import { filled } from "@ac/web/lib/filled";
 
 /** A recipient's role in words (IR499). */
 const ROLE_WORD: Record<string, string> = { client: "Client", admin: "Admin", contractor: "Contractor", technician: "Technician" };
@@ -336,7 +337,7 @@ function BillingMonths({ from, to, onChange }: Readonly<{ from?: string; to?: st
     <>
       <Field label={t("Billing months from")} error={isReversed ? t("The first month must not be after the last") : undefined}><Input type="month" value={f.from} onChange={(e) => { change({ ...f, from: e.target.value }); }} /></Field>
       <Field label={t("Billing months to")}><Input type="month" value={f.to} onChange={(e) => { change({ ...f, to: e.target.value }); }} /></Field>
-      {(from || to) && <Btn size="sm" onClick={() => { change({ from: "", to: "" }); }}>{t("All months")} <Icon name="close" /></Btn>}
+      {(filled(from) ?? filled(to)) !== undefined && <Btn size="sm" onClick={() => { change({ from: "", to: "" }); }}>{t("All months")} <Icon name="close" /></Btn>}
     </>
   );
 }
@@ -356,7 +357,7 @@ function PayoutsTab({ live, nav, act, pending }: Readonly<{ live: BillingLive; n
   const [answers, setAnswers] = useState<Record<string, { reply: string; adjustment: string }>>({});
   const answer = (id: string) => answers[id] ?? { reply: "", adjustment: "" };
   const setAnswer = (id: string, patch: Partial<{ reply: string; adjustment: string }>) => { setAnswers((a) => ({ ...a, [id]: { ...answer(id), ...patch } })); };
-  const isFiltered = !!(p.period || p.contractorOrgId || p.status);
+  const isFiltered = [p.period, p.contractorOrgId, p.status].some((v) => filled(v) !== undefined);
   const isEnded = /^\d{4}-\d{2}$/.test(month) && month <= p.lastClosed;
   const generate = () => { act(() => generatePayouts(month), (n) => t(n === 1 ? "1 draft statement generated for {period}" : "{n} draft statements generated for {period}", { n, period: month }), () => { setGenerating(false); nav({ period: month, status: null, statementId: null }); }); };
   const tone = (s: StatementRow["status"]) => STATEMENT_TONE.get(s) ?? "primary";
