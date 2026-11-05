@@ -12,6 +12,9 @@ import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { uploadName, uploadType } from "@ac/web/lib/files";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import { formText } from "@ac/web/lib/formData";
+import { formValue } from "@ac/web/lib/formValue";
+import { imageMime } from "@ac/web/lib/uploads";
+import { problemReason } from "@ac/web/lib/customerMaintenance";
 
 interface Slot { startAt: string; endAt: string }
 type Result<T> = { ok: true; value: T } | ({ ok: false } & ActionFailure);
@@ -77,12 +80,12 @@ export async function reportProblem(form: FormData) {
   return run(async () => {
     const photos = await Promise.all(form.getAll("photos").filter((f): f is File => f instanceof File && f.size > 0).map(async (f) => {
       const buffer = Buffer.from(await f.arrayBuffer());
-      return { name: uploadName(f.name), mime: uploadType(buffer, f.type) as OpInput<"jobs.reportProblem">["photos"][number]["mime"], size: f.size, bytes: buffer.toString("base64") }; // the API refuses any other type
+      return { name: uploadName(f.name), mime: formValue(imageMime, uploadType(buffer, f.type), "photos"), size: f.size, bytes: buffer.toString("base64") }; // the API refuses any other type
     }));
     const start = formText(form, "visitStart"), end = formText(form, "visitEnd");
     const j = await coreOp<{ id: string }>("jobs.reportProblem", {
       jobId: formText(form, "jobId"),
-      reasonCode: formText(form, "reasonCode") as OpInput<"jobs.reportProblem">["reasonCode"],
+      reasonCode: formValue(problemReason, formText(form, "reasonCode"), "reasonCode"),
       details: formText(form, "details").trim(),
       preferredSlot: start && end ? { startAt: start, endAt: end } : null,
       photos,

@@ -11,6 +11,8 @@ import type { ApiTechReport } from "@ac/web/lib/techJob";
 import { uploadName, uploadType } from "@ac/web/lib/files";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import { formText } from "@ac/web/lib/formData";
+import { formValue } from "@ac/web/lib/formValue";
+import { imageMime } from "@ac/web/lib/uploads";
 
 type Result<T> = { ok: true; value: T } | ({ ok: false } & ActionFailure);
 const failed = (e: unknown): Result<never> => {
@@ -67,7 +69,7 @@ export async function uploadPhoto(form: FormData) {
   if (!(file instanceof File)) return { ok: false as const, code: "VALIDATION", messageKey: "error.validation", fieldErrors: { file: "error.required" } };
   const buffer = Buffer.from(await file.arrayBuffer());
   return run(async () => {
-    await coreOp("attachments.add", { jobId, reportId, file: { name: uploadName(file.name), mime: uploadType(buffer, file.type) as OpInput<"attachments.add">["file"]["mime"], size: file.size, bytes: buffer.toString("base64") } }, { write: true, expectedVersion: version });
+    await coreOp("attachments.add", { jobId, reportId, file: { name: uploadName(file.name), mime: formValue(imageMime, uploadType(buffer, file.type), "file"), size: file.size, bytes: buffer.toString("base64") } }, { write: true, expectedVersion: version });
     return reportState(await coreOp<ApiTechReport>("reports.get", { jobId, reportId, reportVersion: version + 1 }));
   });
 }
@@ -80,10 +82,10 @@ export async function signOff(form: FormData) {
   const png = form.get("signature"), photo = form.get("sitePhoto"), absent = formText(form, "absentReason").trim();
   const signature = typeof png === "string" && png ? { name: "signature.png", mime: "image/png" as const, size: Buffer.from(png, "base64").length, bytes: png } : null;
   const photoBytes = photo instanceof File && photo.size > 0 ? Buffer.from(await photo.arrayBuffer()) : null;
-  const sitePhoto = photo instanceof File && photoBytes ? { name: uploadName(photo.name), mime: uploadType(photoBytes, photo.type) as OpInput<"attachments.add">["file"]["mime"], size: photo.size, bytes: photoBytes.toString("base64") } : undefined;
+  const sitePhoto = () => (photo instanceof File && photoBytes ? { name: uploadName(photo.name), mime: formValue(imageMime, uploadType(photoBytes, photo.type), "sitePhoto"), size: photo.size, bytes: photoBytes.toString("base64") } : undefined);
   return run(async () => {
     return reportState(await coreOp<ApiTechReport>("reports.signOff", {
-      jobId, reportId, reportVersion, signerName, signature, ...(!signature && { absentReason: absent, sitePhoto }),
+      jobId, reportId, reportVersion, signerName, signature, ...(!signature && { absentReason: absent, sitePhoto: sitePhoto() }),
     }, { write: true, expectedVersion: reportVersion }));
   });
 }

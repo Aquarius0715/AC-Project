@@ -7,6 +7,10 @@ import { EN, showDate, showSpan, showTime, translator, type I18n, type T, textOf
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import type { Slot } from "@ac/web/lib/partnerOverview";
 import type { IconName } from "@ac/web/components/Icon";
+import { z } from "zod";
+
+/** The reasons a client gives when reporting a problem with a completed job (jobs.reportProblem). */
+export const problemReason = z.enum(["same_problem", "new_damage", "not_completed", "other"]);
 import { codePoints } from "@ac/web/lib/text";
 
 export interface ApiClientRow {
