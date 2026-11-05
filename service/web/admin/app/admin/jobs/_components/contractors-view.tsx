@@ -16,6 +16,7 @@ import { NewJobModal } from "./jobs-view";
 import { Icon } from "@ac/web/components/Icon";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
 import { codePoints } from "@ac/web/lib/text";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { byCount } from "@ac/web/lib/i18n";
 
 type Detail = NonNullable<ContractorsLive["detail"]>;
@@ -196,7 +197,7 @@ function RatesModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now: 
       <p className="text-xs text-muted-foreground">{base ? `${t("Starts from {card}.", { card: base.since })} ` : ""}{t("A rate card never changes once saved — each edit is a new version from a future date.")}</p>
       <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
         <Field label={t("Effective from · required")} hint={t("A Kuala Lumpur day, from 00:00")} error={tried ? errors.effectiveFrom : undefined}><Input type="date" value={from} onChange={(e) => { setFrom(e.target.value); }} /></Field>
-        <Field label={t("Currency")}><Select value={currency} onChange={(e) => { setCurrency(e.target.value as "MYR" | "USD"); }}><option value="MYR">MYR</option><option value="USD">USD</option></Select></Field>
+        <Field label={t("Currency")}><Select value={currency} onChange={(e) => { setCurrency(oneOf(["MYR", "USD"] as const, e.target.value, currency)); }}><option value="MYR">MYR</option><option value="USD">USD</option></Select></Field>
       </div>
       <div className="flex flex-col gap-2">
         {lines.map((l, n) => (

@@ -13,7 +13,8 @@ const groups: Record<string, string[]> = {
   outdoor: ["Compressor", "Condenser coil", "Fan motor", "Refrigerant line", "Service valve"],
   electrical: ["Wiring insulation", "Capacitor", "Breaker", "Terminals", "Grounding"],
 };
-const labels = { indoor: "Indoor (8)", outdoor: "Outdoor (5)", electrical: "Electrical (5)" };
+type GroupTab = "indoor" | "outdoor" | "electrical";
+const groupTabs: { id: GroupTab; label: string }[] = [{ id: "indoor", label: "Indoor (8)" }, { id: "outdoor", label: "Outdoor (5)" }, { id: "electrical", label: "Electrical (5)" }];
 
 // The Phase 1A demo view (shared job store and fixture rows) of the job workspace; the page renders it outside DATA_SOURCE=API.
 export function WorkspaceDemo({ id }: { id: string }) {
@@ -70,7 +71,7 @@ function Workspace({ id }: Readonly<{ id: string }>) {
   // URL key `tab` selects the checklist group (SCR-T04: indoor default · outdoor · electrical, IR115).
   const sp = useSearchParams();
   const initialTab = sp.get("tab");
-  const [tab, setTabState] = useState<"indoor" | "outdoor" | "electrical">(initialTab === "outdoor" || initialTab === "electrical" ? initialTab : "indoor");
+  const [tab, setTabState] = useState<GroupTab>(initialTab === "outdoor" || initialTab === "electrical" ? initialTab : "indoor");
   const setTab = (t: "indoor" | "outdoor" | "electrical") => {
     setTabState(t);
     const u = new URL(location.href);
@@ -121,7 +122,7 @@ function Workspace({ id }: Readonly<{ id: string }>) {
       {errs.length > 0 && <Banner tone="crit"><b>Can’t submit:</b><ul className="list-disc pl-5 text-xs">{errs.slice(0, 5).map((e) => <li key={e}>{e}</li>)}</ul></Banner>}
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title="Inspection checklist" action={<Tabs value={tab} onChange={setTab} tabs={(Object.keys(groups)).map((g) => ({ id: g as "indoor", label: labels[g as "indoor"] }))} />}>
+          <Card title="Inspection checklist" action={<Tabs value={tab} onChange={setTab} tabs={groupTabs} />}>
             <ul className="divide-y divide-line">
               {(groups[tab] ?? []).map((k) => (
                 <li key={k} className="py-2.5">

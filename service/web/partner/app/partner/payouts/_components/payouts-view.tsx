@@ -8,6 +8,7 @@ import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { textOf, type T } from "@ac/web/lib/i18n";
 import { payoutPdf, type ApiPayoutQuestion, type ApiPayoutStatement, type Kpi as KpiRow, type LineRow, type StatementRow } from "@ac/web/lib/partnerPayouts";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { askHq } from "../actions";
 
 export interface PayoutsLive {
@@ -105,7 +106,7 @@ export function PayoutsView({ live }: Readonly<{ live: PayoutsLive }>) {
       </div>
       <Modal open={!!ask} onClose={() => { setAsk(null); }} title={t("Ask HQ about this line")} footer={<><Btn onClick={() => { setAsk(null); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={send}>{t("Send")}</Btn></>}>
         <Field label={t("Line")}><Select value={ask?.lineId ?? ""} onChange={(e) => { setAsk({ lineId: e.target.value }); }}>{askable.map((r) => <option key={r.lineId} value={r.lineId}>{r.job} · {r.work} · {r.amount} {sel?.statement.currency}</option>)}</Select></Field>
-        <Field label={t("Topic")}><Select value={topic} onChange={(e) => { setTopic(e.target.value as ApiPayoutQuestion["topic"]); }}>{live.topics.map((x) => <option key={x.id} value={x.id}>{x.text}</option>)}</Select></Field>
+        <Field label={t("Topic")}><Select value={topic} onChange={(e) => { setTopic(oneOf(live.topics.map((x) => x.id), e.target.value, topic)); }}>{live.topics.map((x) => <option key={x.id} value={x.id}>{x.text}</option>)}</Select></Field>
         <Field label={t("Question (required, 1–2000 characters)")} error={error ?? undefined}><Textarea value={notice} maxLength={2000} onChange={(e) => { setMessage(e.target.value); }} placeholder={t("The 2nd return was caused by a missing part from HQ stock.")} /></Field>
         <Banner>{t("HQ answers on the statement and in the job’s history. If HQ agrees, an adjustment line is added to your next statement; this statement stays approved.")}</Banner>
       </Modal>

@@ -99,7 +99,7 @@ export function AutomationsDemo() {
         {step === "form" ? (
           <>
             <Field label="Name" error={errorText.name}><Input value={f.name} onChange={(e) => { setF({ ...f, name: e.target.value }); }} placeholder="e.g. Weekday pre-cool" /></Field>
-            <Field label="Trigger" error={errorText.kind}><Choice value={f.kind as "Schedule"} onChange={(v) => { setF({ ...f, kind: v }); }} options={["Schedule", "Location", "Presence", "Weather"].map((k) => ({ id: k as "Schedule", label: k }))} /></Field>
+            <Field label="Trigger" error={errorText.kind}><Choice<string> value={f.kind} onChange={(v) => { setF({ ...f, kind: v }); }} options={["Schedule", "Location", "Presence", "Weather"].map((k) => ({ id: k, label: k }))} /></Field>
             <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
               <Field label="Air conditioner"><Select value={f.unit} onChange={(e) => { setF({ ...f, unit: e.target.value }); }}>{["Bedroom AC", "Bedroom AC #2", "Living room AC", "Kitchen AC", "Study AC"].map((u) => <option key={u}>{u}</option>)}</Select></Field>
               {f.kind === "Schedule" && <Field label="Time"><Input type="time" value={f.time} onChange={(e) => { setF({ ...f, time: e.target.value }); }} /></Field>}

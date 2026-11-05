@@ -6,6 +6,7 @@ import { Badge, EmptyState, ErrorState, Page, PageHead, Select, Tabs, Plain } fr
 import { OriginBadge } from "@ac/web/components/JobBits";
 import { PJob, pjobs } from "@ac/web/lib/partner";
 import { fmt, useJobs } from "@ac/web/lib/jobs";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { orDash } from "@ac/web/lib/text";
 
 type Row = PJob & { origin: "request" | "plan" };
@@ -58,7 +59,7 @@ export function JobsDemo({ status }: Readonly<{ status?: string }>) {
       <PageHead title="Jobs" sub={`contractor-a only · ${String(rows.length)} this week`} />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Tabs value={tab} onChange={setTab} tabs={(["all", "Offered", "Active", "Review", "Completed"] as T[]).map((t) => ({ id: t, label: t === "all" ? "All" : t, count: count(t) }))} />
-        <Select aria-label="Origin" className="w-auto" value={origin} onChange={(e) => { setOrigin(e.target.value as typeof origin); }}><option value="all">Origin: All</option><option value="request">Origin: Client request</option><option value="plan">Origin: Periodic plan</option></Select>
+        <Select aria-label="Origin" className="w-auto" value={origin} onChange={(e) => { setOrigin(oneOf(["all", "request", "plan"] as const, e.target.value, origin)); }}><option value="all">Origin: All</option><option value="request">Origin: Client request</option><option value="plan">Origin: Periodic plan</option></Select>
       </div>
       {state === "error" && <ErrorState title="Couldn’t refresh jobs (stale)" onRetry={() => { setState("ok"); }}>Showing last loaded values. Retry to refresh.</ErrorState>}
       {state === "empty" ? <EmptyState title="No jobs yet">HQ offers will appear here.</EmptyState> : (

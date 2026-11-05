@@ -6,6 +6,7 @@ import { windowText } from "@ac/web/lib/customerPolicies";
 import { HQ_METRICS, metricLabel, metricUnit, opSymbol, type ApiPolicy, type Operator } from "@ac/web/lib/adminAlerts";
 import { Icon } from "@ac/web/components/Icon";
 import { byNumber } from "@ac/web/lib/order";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { textOf } from "@ac/web/lib/i18n";
 
 type Window = NonNullable<ApiPolicy["activeWindow"]>;
@@ -28,7 +29,7 @@ export function ConditionFields({ c, onChange, errors, tried, fixedMetric }: Rea
         {fixedMetric
           ? <Field label={t("Metric")} hint={unit && t("unit fixed: {unit}", { unit })}><Input readOnly value={textOf(metricLabel, c.metric, t) ?? c.metric} /></Field>
           : <Field label={t("Metric")}><Select value={c.metric} onChange={(e) => { onChange({ metric: e.target.value }); }}>{HQ_METRICS.map((k) => <option key={k} value={k}>{(textOf(metricLabel, k, t) ?? k)}</option>)}</Select></Field>}
-        <Field label={t("Comparison")}><Select value={c.operator} onChange={(e) => { onChange({ operator: e.target.value as Operator }); }}>{OPERATORS.map((o) => <option key={o} value={o}>{opSymbol[o]}</option>)}</Select></Field>
+        <Field label={t("Comparison")}><Select value={c.operator} onChange={(e) => { onChange({ operator: oneOf(OPERATORS, e.target.value, c.operator) }); }}>{OPERATORS.map((o) => <option key={o} value={o}>{opSymbol[o]}</option>)}</Select></Field>
         <Field label={t("Alert when {op}", { op: opSymbol[c.operator] })} error={tried ? errors.threshold : undefined}><Input type="number" value={c.threshold} onChange={(e) => { onChange({ threshold: +e.target.value }); }} /></Field>
         <Field label={t("For (s)")} error={tried ? errors.duration : undefined}><Input type="number" value={c.duration} onChange={(e) => { onChange({ duration: +e.target.value }); }} /></Field>
         <Field label={t("Recover")} error={errors.recovery}><Input type="number" value={c.recovery} onChange={(e) => { onChange({ recovery: +e.target.value }); }} /></Field>
