@@ -37,7 +37,8 @@ async function AdminContractsPageContent({ searchParams }: Readonly<PageProps<"/
     coreAllPage<ApiUnitBrief>("units.list"),
   ]);
   const ofScope = inScope ?? all;
-  const counts = Object.fromEntries([["all", ofScope.length], ...plans.map((p) => [p, ofScope.filter((k) => k.planType === p).length])]) as Record<PlanType | "all", number>;
+  const countOf = (plan: PlanType) => ofScope.filter((k) => k.planType === plan).length;
+  const counts: Record<PlanType | "all", number> = { all: ofScope.length, rto: countOf("rto"), general: countOf("general"), energy: countOf("energy"), environment: countOf("environment") };
   const rows = contractRows(scoped ?? ofScope, customers.items, i18nOf(display));
   return (
     <ContractsView

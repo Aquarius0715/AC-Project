@@ -171,7 +171,7 @@ export const BUCKETS: { id: Exclude<Bucket, "other">; label: string; tone: strin
 ];
 /** The progress bar: jobs per bucket with the same period as the list. */
 export function progress(jobs: PartnerJob[], now: number) {
-  const counts = Object.fromEntries(BUCKETS.map((b) => [b.id, 0])) as Record<Exclude<Bucket, "other">, number>;
+  const counts: Record<Exclude<Bucket, "other">, number> = { offered: 0, unassigned: 0, active: 0, overdue: 0, review: 0, completed: 0 };
   for (const j of jobs) {
     const b = bucket(j, now);
     if (b !== "other") counts[b]++;

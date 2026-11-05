@@ -51,7 +51,8 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
     return `${customerName.get(k.customerId) ?? t("customer")} · ${t("{plan} contract v{version}", { plan: k.planType, version: k.version })}`;
   };
   const rows = restrictionRows(scoped.items, contractLabel, i);
-  const counts = Object.fromEntries(states.map((s) => [s, rows.filter((r) => r.state === s).length])) as Record<RestrictionState, number>;
+  const countOf = (state: RestrictionState) => rows.filter((r) => r.state === state).length;
+  const counts: Record<RestrictionState, number> = { scheduled: countOf("scheduled"), requested: countOf("requested"), applied: countOf("applied"), release_requested: countOf("release_requested"), released: countOf("released"), cancelled: countOf("cancelled") };
   // every restriction (the scope may narrow the list): the cause invoices of the filter and the units under restriction
   const all = Object.keys(filters).length > 0 ? await coreOp<Page<ApiRestriction>>("restrictions.list", { limit: 100 }) : scoped;
   const invoicesOf = isFull ? await coreAll<ApiInvoice>("invoices.list") : [];
