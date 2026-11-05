@@ -13,7 +13,15 @@ vi.mock("next/navigation", () => ({ redirect: (to: string) => { throw new Error(
 const NOW = Date.parse("2026-09-15T01:00:00Z");
 const session: Session = { accessToken: "access-1", refreshToken: "r-1", tenantId: "t-1", membershipId: "m-1", role: "client", expiresAt: NOW / 1000 + 300 };
 /** The CoreError a call is refused with (a call that succeeds fails the test). */
-const refusal = (p: Promise<unknown>) => p.then(() => { throw new Error("the call succeeded"); }, (error: unknown) => error as CoreError);
+const refusal = async (p: Promise<unknown>): Promise<CoreError> => {
+  try {
+    await p;
+  } catch (error: unknown) {
+    if (error instanceof CoreError) return error;
+    throw error;
+  }
+  throw new Error("the call succeeded");
+};
 const reply = (...bodies: [number, unknown][]) => {
   type Call = [string, RequestInit & { headers: Record<string, string> }];
   const f = vi.fn(() => {

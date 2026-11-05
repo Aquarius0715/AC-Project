@@ -42,7 +42,7 @@ export function UsersView({ live }: Readonly<{ live: { customerId: string; custo
   const [pending, run] = useAction();
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [email, setEmail] = useState("");
-  const [userName, setUserName] = useState("");
+  const [username, setUsername] = useState("");
   const [role, setRole] = useState<Role>("member");
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
@@ -61,12 +61,12 @@ export function UsersView({ live }: Readonly<{ live: { customerId: string; custo
   }
   const open = (d: Dialog) => {
     setDialog(d); setTried(false); setReason(""); setServer({}); gone.current = false;
-    setEmail(""); setUserName(""); setRole(initialRole(d));
+    setEmail(""); setUsername(""); setRole(initialRole(d));
   };
   const close = () => { setDialog(null); };
   const isAdding = dialog?.kind === "invite";
   const emailError = isAdding ? inviteError(email, live.all, t) : undefined;
-  const nameProblem = isAdding ? nameError(userName, t) : undefined;
+  const nameProblem = isAdding ? nameError(username, t) : undefined;
   const reasonProblem = dialog && !isAdding ? reasonError(reason, t) : undefined;
   const name = (r: ClientUserRow) => r.name ?? r.email;
   const edit = (k: FieldKey) => { setServer((s) => (s[k] ? without(s, k) : s)); };
@@ -84,7 +84,7 @@ export function UsersView({ live }: Readonly<{ live: { customerId: string; custo
       const first = FIELDS.find((k) => fields[k]);
       if (first) focusField(ids[first]);
     };
-    if (dialog.kind === "invite") { run(() => inviteUser(live.customerId, email, role, userName), t("{name} added — a set-up e-mail is on its way to {email}", { name: userName.trim(), email: email.trim() }), close, refused); return; }
+    if (dialog.kind === "invite") { run(() => inviteUser(live.customerId, email, role, username), t("{name} added — a set-up e-mail is on its way to {email}", { name: username.trim(), email: email.trim() }), close, refused); return; }
     const r = dialog.row;
     if (dialog.kind === "remove") { run(() => removeUser(r.id, r.version, reason), t("{name} removed", { name: name(r) }), () => { gone.current = true; close(); }, refused); return; }
     if (dialog.kind === "role") { run(() => updateUser(r.id, r.version, live.customerId, r.email, role, null, reason), t(role === "owner" ? "{name} is now an owner" : "{name} is now a member", { name: name(r) }), close, refused); return; }
@@ -141,7 +141,7 @@ export function UsersView({ live }: Readonly<{ live: { customerId: string; custo
       <Banner>{t("Your customer always keeps one active owner, and you can’t change your own account. A user keeps their e-mail — to change it, remove them and add them again. For a password reset, contact HQ. Only owners see this page.")}</Banner>
       <p className="text-[11px] text-muted-foreground">{t("The set-up e-mail comes from the sign-in service; in development it arrives in the local Mailpit inbox.")}</p>
       <Modal open={!!dialog} onClose={close} title={title} finalFocus={() => (gone.current ? document.querySelector("#users-list") : true)} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant={dialog?.kind === "remove" || dialog?.kind === "disable" ? "danger" : "primary"} disabled={pending} onClick={submit}>{action}</Btn></>}>
-        {isAdding && <Field label={t("Name")} error={(tried ? nameProblem : undefined) ?? server.name}><Input id={ids.name} value={userName} maxLength={120} onChange={(e) => { setUserName(e.target.value); edit("name"); }} placeholder="Lim Ka Wai" /></Field>}
+        {isAdding && <Field label={t("Name")} error={(tried ? nameProblem : undefined) ?? server.name}><Input id={ids.name} value={username} maxLength={120} onChange={(e) => { setUsername(e.target.value); edit("name"); }} placeholder="Lim Ka Wai" /></Field>}
         {isAdding && <Field label={t("Email")} error={(tried ? emailError : undefined) ?? server.email}><Input id={ids.email} type="email" value={email} onChange={(e) => { setEmail(e.target.value); edit("email"); }} placeholder="lim.ka@example.com" /></Field>}
         {(isAdding || dialog?.kind === "role") && (
           <Field label={t("Role")} hint={t("Owners manage users and everything members can do; members use the app.")}>

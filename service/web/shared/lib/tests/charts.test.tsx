@@ -24,7 +24,7 @@ describe("charts", () => {
     expect(screen.getByRole("application", { name: "Line chart" })).toBeTruthy(); // Recharts' keyboard layer moves the tooltip
     const line = container.querySelector(".recharts-line-curve");
     expect(pieces(line?.getAttribute("d") ?? null)).toBe(2); // 1–2 and 4–5; 7 stands alone
-    expect(container.querySelectorAll("svg circle")).toHaveLength(1); // Recharts draws the dots in a layer of their own
+    expect(container.querySelectorAll(":scope svg circle")).toHaveLength(1); // Recharts draws the dots in a layer of their own
     expect(container.querySelectorAll(".recharts-reference-area")).toHaveLength(2); // both gaps shaded
     expect(container.querySelectorAll(".recharts-reference-line")).toHaveLength(1); // the threshold
   });
@@ -38,7 +38,7 @@ describe("charts", () => {
     const { container } = render(<BarChart labels={["Mon", "Tue", "Wed"]} series={[[1, 2, 3], [2, 3, 4]]} names={["7 days before", "Last 7 days"]} unit="kWh" />);
     expect(screen.getByRole("application", { name: "Bar chart" })).toBeTruthy();
     expect(container.querySelectorAll(".recharts-bar-rectangle")).toHaveLength(6);
-    expect([...(container.querySelector(".recharts-legend-wrapper > div")?.children ?? [])].map((x) => x.textContent)).toEqual(["7 days before", "Last 7 days"]);
+    expect([...(container.querySelector(":scope .recharts-legend-wrapper > div")?.children ?? [])].map((x) => x.textContent)).toEqual(["7 days before", "Last 7 days"]);
     expect(container.textContent).toContain("kWh");
   });
 

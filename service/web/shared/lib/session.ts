@@ -177,6 +177,17 @@ interface StoreClient {
 
 let client: Promise<StoreClient> | null = null;
 
+/** The client once connected; a failed connection clears it so the next request tries again. */
+async function connected(c: { connect: () => Promise<unknown> }): Promise<StoreClient> {
+  try {
+    await c.connect();
+  } catch (error: unknown) {
+    client = null;
+    throw error;
+  }
+  return c as unknown as StoreClient;
+}
+
 /** The store's client, connected once per process; null without SESSION_STORE_URL (the cookie carries the session). A
 failed connection is tried again by the next request; commands fail at once while it is down (no offline queue). */
 function store(): Promise<StoreClient> | null {
@@ -185,10 +196,7 @@ function store(): Promise<StoreClient> | null {
   if (!client) {
     const c = createClient({ url, disableOfflineQueue: true, socket: { connectTimeout: STORE_TIMEOUT_MS, reconnectStrategy: (n: number) => Math.min(100 * 2 ** n, 2000) } });
     c.on("error", (e: Error) => { console.warn(`session store: ${e.message}`); });
-    client = c.connect().then(() => c as unknown as StoreClient, (error: unknown) => {
-      client = null;
-      throw error;
-    });
+    client = connected(c);
   }
   return client;
 }

@@ -39,7 +39,7 @@ export function useBffSession(): BffSession | null {
   const [s, setS] = useState<BffSession | null>(null);
   useEffect(() => {
     let isLive = true;
-    bffSession().then((v) => { if (isLive) setS(v); });
+    void bffSession().then((v) => { if (isLive) setS(v); }); // bffSession never rejects: a failed read is the mock session
     return () => {
       isLive = false;
     };

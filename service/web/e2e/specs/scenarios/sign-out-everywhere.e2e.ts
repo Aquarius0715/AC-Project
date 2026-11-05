@@ -4,7 +4,7 @@
 // leaves one audit entry and a revocation time on customer-b's membership.
 import { test, expect } from "../../fixtures/test";
 import { APPS, type App } from "../../fixtures/apps";
-import { enterPassword, signIn } from "../../fixtures/auth";
+import { enterPassword, settles, signIn } from "../../fixtures/auth";
 import { must } from "../../fixtures/must";
 
 const app = (id: App["id"]) => must(APPS.find((a) => a.id === id));
@@ -47,7 +47,7 @@ test("HQ signs a client user out everywhere, and the password signs them in agai
       // the first page drops the refused session and its error state sends the browser to sign-in; a page that showed
       // no error leaves it to the next one, which finds no session
       await user.goto("/customer");
-      if (!(await user.waitForURL(/\/login/, { timeout: 10_000 }).then(() => true, () => false))) await user.goto("/customer");
+      if (!(await settles(user.waitForURL(/\/login/, { timeout: 10_000 }), true, false))) await user.goto("/customer");
       await expect(user).toHaveURL(/\/login/);
     });
 

@@ -52,6 +52,15 @@ export function totpBase32(key: string, at = Date.now()): string {
   return String((h.readUInt32BE(o) & 0x7F_FF_FF_FF) % 1_000_000).padStart(6, "0");
 }
 
+/** `ok` when the wait ends in time, `timedOut` when it fails (a Playwright wait rejects on its timeout). */
+export async function settles<T>(wait: Promise<unknown>, ok: T, timedOut: T): Promise<T> {
+  try {
+    await wait;
+    return ok;
+  } catch {
+    return timedOut;
+  }
+}
 const home = (app: App) => (u: URL) => u.origin === new URL(app.url).origin && (u.pathname === app.home || u.pathname.startsWith(app.home + "/"));
 
 /** `as` signs in another account of the same role (the identity provider's username field takes it). */
@@ -77,12 +86,13 @@ export async function signIn(page: Page, app: App, as = app.user): Promise<void>
     // page or the refusal is waited for, not a fixed time: 8 s once ran out on a slow first page, and the retry then
     // waited for a code field that never came.
     const refused = page.locator("#input-error-otp, #input-error-otp-code, #input-error-totp").or(page.getByText(/invalid authenticator code/i)).first();
+    const atHome = home(app);
     for (let attempt = 0; attempt < 2; attempt++) {
       await page.locator("#otp").fill(totp(otpSecretOf(as)));
       await page.locator("#kc-login").click();
       const outcome = await Promise.race([
-        page.waitForURL(home(app), { timeout: 60_000 }).then(() => "home", () => "slow"),
-        refused.waitFor({ timeout: 60_000 }).then(() => "refused", () => "slow"),
+        settles(page.waitForURL(atHome, { timeout: 60_000 }), "home", "slow"),
+        settles(refused.waitFor({ timeout: 60_000 }), "refused", "slow"),
       ]);
       if (outcome !== "refused") break;
       await page.waitForTimeout(31_000 - (Date.now() % 30_000));

@@ -39,8 +39,14 @@ export default async function CustomerInvoicePage({ params, searchParams }: Read
   }
   // WhatsApp reaches only an account with a phone number: without one the preview is offered disabled, with its reason
   // (IR578); if the check fails the button stays, and a refusal still reads in words
-  const whatsapp = Promise.all([corePrincipal(), coreOp<{ items: { id: string }[] }>("notifications.recipients", { target: { kind: "invoice", id }, templateKey: "payment", channel: "whatsapp", query: { limit: 100 } })])
-    .then(([me, r]) => r.items.some((x) => x.id === me.membershipId), () => true);
+  const whatsapp = (async () => {
+    try {
+      const [me, r] = await Promise.all([corePrincipal(), coreOp<{ items: { id: string }[] }>("notifications.recipients", { target: { kind: "invoice", id }, templateKey: "payment", channel: "whatsapp", query: { limit: 100 } })]);
+      return r.items.some((x) => x.id === me.membershipId);
+    } catch {
+      return true;
+    }
+  })();
   const [now, contracts, units, properties, spaces, restrictions, inquiries, reminders, display, whatsappReady] = await Promise.all([
     coreNow(), coreAll<ClientContract>("contracts.list"), coreAll<Unit>("units.list"), coreAll<{ id: string; name: string }>("properties.list"),
     coreAll<{ id: string; name: string; parentSpaceId: string | null }>("spaces.list"),

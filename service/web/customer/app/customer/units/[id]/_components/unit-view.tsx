@@ -152,7 +152,16 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
       toast(message, tone);
       return;
     }
-    setUnitAlertPolicies(id, ids).then((res) => { if (res.ok) toast(message, tone); else toast(t("Not saved: {reason}", { reason: reason(res.messageKey, res.code) }), "warn"); }, fail);
+    const report = (res: Awaited<ReturnType<typeof setUnitAlertPolicies>>) => {
+      if (res.ok) toast(message, tone); else toast(t("Not saved: {reason}", { reason: reason(res.messageKey, res.code) }), "warn");
+    };
+    void (async () => {
+      try {
+        report(await setUnitAlertPolicies(id, ids));
+      } catch (error: unknown) {
+        fail(error);
+      }
+    })();
   };
   const send = () => {
     setConfirm(false);

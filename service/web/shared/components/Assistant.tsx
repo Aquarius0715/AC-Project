@@ -173,7 +173,7 @@ function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
           return;
         }
 
-        ask(text.trim(), "text"); setText(""); }}>
+        void ask(text.trim(), "text"); setText(""); }}>
           <Input ref={input} value={text} onChange={(e) => { setText(e.target.value); }} placeholder={t("Type a message…")} aria-label={t("Message")} maxLength={200} className="min-w-0 flex-1 text-[13px]" />
           <Button type="button" size="icon" disabled={busy || state === "listening"} onClick={voice} aria-label={t("Voice input")} className={cx("size-10 rounded-full text-white disabled:opacity-50", isMic ? "bg-primary" : "bg-muted-foreground")}><Icon name="mic" className="text-lg" /></Button>
         </form>
@@ -189,7 +189,7 @@ function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
           if (m.kind === "bot") return <div key={n} className={cx("max-w-[90%] rounded-2xl rounded-bl-sm px-3 py-2 text-[13px]", m.tone === "crit" ? "bg-crit-soft text-crit" : "bg-surface2")}>{m.text}</div>;
           if (m.kind === "candidates") return (
             <CandidatePicker key={n} m={m} t={t} busy={busy}
-              onPick={(unitId) => { drop("candidates"); ask(m.question, m.via, unitId); }}
+              onPick={(unitId) => { drop("candidates"); void ask(m.question, m.via, unitId); }}
               onCancel={() => { drop("candidates"); setState("idle"); add({ kind: "bot", text: t("Cancelled — nothing was sent.") }); }} />);
           if (m.kind === "confirm") {
             const card = changeCard(m.intent, m.unit, t);
@@ -214,7 +214,7 @@ function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
             <b className="text-primary"><Icon name="live" /> {t("Listening…")}</b>
             <p className="mt-1">“{ex.change}”</p>
             <p className="text-[11px] text-muted-foreground">{t("Live transcript (demo — no real microphone) · tap Stop when done")}</p>
-            <div className="mt-2"><Btn size="sm" variant="primary" onClick={() => { setState("idle"); ask(ex.change, "voice"); }}>{t("Stop")}</Btn></div>
+            <div className="mt-2"><Btn size="sm" variant="primary" onClick={() => { setState("idle"); void ask(ex.change, "voice"); }}>{t("Stop")}</Btn></div>
           </div>
         )}
         {busy && <p className="text-xs text-muted-foreground">{t("Thinking…")}</p>}
