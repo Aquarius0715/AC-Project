@@ -5,6 +5,7 @@ import { Badge, Banner, Btn, Card, Choice, DataTable, Field, Input, Kpi, ListRow
 import { JobStatusBadge, OriginBadge, PreferredSlotsInput, Rank, preferredError } from "@ac/web/components/JobBits";
 import { Job, JobStatus, Slot, fitFor, fmt, jobActions, longDate, statusLabel, useJobs } from "@ac/web/lib/jobs";
 import { Icon } from "@ac/web/components/Icon";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { nonEmpty } from "@ac/web/lib/lists";
 
 const PIPE: JobStatus[] = ["requested", "time_proposed", "offered", "accepted", "assigned", "in_progress", "submitted", "rework_requested", "completed", "on_hold"];
@@ -19,7 +20,7 @@ export function JobsDemo({ jobId, tab: initial }: Readonly<{ jobId?: string; tab
   type Tab = "jobs" | "plans" | "contractors" | "sla";
   const sp = { jobId, tab: initial };
   const jobs = useJobs();
-  const [tab, setTab] = useState<Tab>((["plans", "contractors", "sla"].includes(sp.tab ?? "") ? sp.tab : "jobs") as Tab);
+  const [tab, setTab] = useState<Tab>(oneOf(["plans", "contractors", "sla"] as const, sp.tab ?? "", "jobs"));
   const [selId, setSelId] = useState(sp.jobId ?? "job-c07");
   const [origin, setOrigin] = useState<"all" | "request" | "plan">("all");
   const [delivery, setDelivery] = useState<"all" | "internal" | "contractor">("all");
@@ -38,8 +39,8 @@ export function JobsDemo({ jobId, tab: initial }: Readonly<{ jobId?: string; tab
           </div></div>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap gap-2">
-              <Select className="w-auto" aria-label="Origin" value={origin} onChange={(e) => { setOrigin(e.target.value as typeof origin); }}><option value="all">Origin: All</option><option value="request">Origin: Client request</option><option value="plan">Origin: Periodic plan</option></Select>
-              <Select className="w-auto" aria-label="Delivery" value={delivery} onChange={(e) => { setDelivery(e.target.value as typeof delivery); }}><option value="all">Delivery: All</option><option value="internal">Delivery: Internal</option><option value="contractor">Delivery: Contractor</option></Select>
+              <Select className="w-auto" aria-label="Origin" value={origin} onChange={(e) => { setOrigin(oneOf(["all", "request", "plan"] as const, e.target.value, origin)); }}><option value="all">Origin: All</option><option value="request">Origin: Client request</option><option value="plan">Origin: Periodic plan</option></Select>
+              <Select className="w-auto" aria-label="Delivery" value={delivery} onChange={(e) => { setDelivery(oneOf(["all", "internal", "contractor"] as const, e.target.value, delivery)); }}><option value="all">Delivery: All</option><option value="internal">Delivery: Internal</option><option value="contractor">Delivery: Contractor</option></Select>
               {stage && <Btn size="sm" variant="ghost" onClick={() => { setStage(null); }}><Icon name="close" />{statusLabel[stage]}</Btn>}
             </div>
             <Btn variant="primary" onClick={() => { setModal({ kind: "new" }); }}><Icon name="add" /> New job</Btn>
