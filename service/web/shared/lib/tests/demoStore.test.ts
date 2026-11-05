@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { readDemo, readDemoAs, writeDemo } from "@ac/web/lib/demoStore";
+import { readDemoAs, writeDemo } from "@ac/web/lib/demoStore";
+
+const idRows = z.array(z.object({ id: z.string() }));
 
 describe("Phase 1A demo stores (FR-X05, IR257)", () => {
   afterEach(() => { vi.restoreAllMocks(); sessionStorage.clear(); });
@@ -10,21 +12,21 @@ describe("Phase 1A demo stores (FR-X05, IR257)", () => {
   it("keeps the demo data in the tab across navigations", () => {
     navigation("navigate");
     writeDemo("k", [{ id: "j1" }]);
-    expect(readDemo("k")).toEqual([{ id: "j1" }]);
+    expect(readDemoAs("k", idRows)).toEqual([{ id: "j1" }]);
     expect(localStorage.getItem("k")).toBeNull(); // per tab, not per browser
   });
 
   it("brings back the seed after a reload", () => {
     writeDemo("k", [{ id: "j1" }]);
     navigation("reload");
-    expect(readDemo("k")).toBeNull();
+    expect(readDemoAs("k", z.unknown())).toBeNull();
     expect(sessionStorage.getItem("k")).toBeNull();
   });
 
   it("falls back to the seed when storage is blocked or the value is unreadable", () => {
     navigation("navigate");
     sessionStorage.setItem("k", "{not json");
-    expect(readDemo("k")).toBeNull();
+    expect(readDemoAs("k", z.unknown())).toBeNull();
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("blocked"); });
     expect(() => { writeDemo("k", 1); }).not.toThrow();
   });

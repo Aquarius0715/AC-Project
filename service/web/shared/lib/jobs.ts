@@ -8,7 +8,8 @@ seed, FR-X05). Phase 1A only: with DATA_SOURCE=API the job screens write through
 stay local and return their refusals at once.
 */
 import { useSyncExternalStore } from "react";
-import { readDemo, writeDemo } from "@ac/web/lib/demoStore";
+import { z } from "zod";
+import { readDemoAs, writeDemo } from "@ac/web/lib/demoStore";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { useOp } from "@ac/web/lib/useOp";
 
@@ -52,6 +53,26 @@ export interface Job {
   rating?: number;
 }
 export interface Note { id: string; role: "client" | "admin" | "contractor" | "technician"; title: string; detail: string; href: string; at: string; read: boolean }
+
+/* What the tab may have saved (read back with these shapes; anything else brings back the seed). */
+const slot = z.object({ date: z.string(), win: z.string() }) satisfies z.ZodType<Slot>;
+const techAck = z.object({ status: z.enum(["pending", "accepted", "cant_make"]), reason: z.string().optional(), alt: z.string().optional(), at: z.string().optional() }) satisfies z.ZodType<TechAck>;
+const proposal = z.object({ slot, by: z.enum(["hq", "contractor"]), who: z.string(), message: z.string(), replyBy: z.string(), status: z.enum(["pending", "accepted", "declined", "withdrawn"]) }) satisfies z.ZodType<Proposal>;
+const partnerProposal = z.object({ slot, tech: z.string(), reason: z.string(), sentAt: z.string(), status: z.enum(["pending", "sent_to_client", "rejected", "approved", "withdrawn"]) }) satisfies z.ZodType<PartnerProposal>;
+const declined = z.object({ reason: z.string(), comment: z.string(), at: z.string() });
+const historyEntry = z.object({ at: z.string(), text: z.string() });
+const clientNote = z.object({ by: z.string(), text: z.string(), at: z.string() });
+const job = z.object({
+  id: z.string(), unitId: z.string(), unit: z.string(), loc: z.string(), customer: z.string(), origin: z.enum(["request", "plan"]),
+  type: z.enum(["Reactive", "Preventive", "Periodic"]), planId: z.string().optional(), planVisit: z.string().optional(), symptom: z.string(),
+  status: z.enum(jobStatuses), preferred: z.array(slot), round: z.number(), scheduled: slot.nullable(), delivery: z.enum(["internal", "contractor"]).nullable(),
+  contractor: z.string().nullable(), technician: z.string().nullable(), techAck: techAck.nullable(), proposal: proposal.nullable(), partnerProposal: partnerProposal.nullable(),
+  declined: declined.nullable(), history: z.array(historyEntry), notes: z.array(clientNote).optional(),
+  followUpOf: z.string().optional(), followUpClass: z.enum(["pending", "rework", "new_request"]).optional(), followUpReason: z.string().optional(), rating: z.number().optional(),
+}) satisfies z.ZodType<Job>;
+const note = z.object({
+  id: z.string(), role: z.enum(["client", "admin", "contractor", "technician"]), title: z.string(), detail: z.string(), href: z.string(), at: z.string(), read: z.boolean(),
+}) satisfies z.ZodType<Note>;
 
 const KEY = "ac-jobs-v2";
 const NKEY = "ac-job-notes-v2";
@@ -118,7 +139,7 @@ let state: State | null = null;
 const listeners = new Set<() => void>();
 const load = (): State => {
   if (state) return state;
-  state = { jobs: readDemo<Job[]>(KEY) ?? SEED, notes: readDemo<Note[]>(NKEY) ?? [] };
+  state = { jobs: readDemoAs(KEY, z.array(job)) ?? SEED, notes: readDemoAs(NKEY, z.array(note)) ?? [] };
   return state;
 };
 const save = () => {
