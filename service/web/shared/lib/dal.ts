@@ -10,6 +10,7 @@ import { coreRequest } from "@ac/web/lib/rest";
 import { DEFAULT_DISPLAY, isLocale, type Display } from "@ac/web/lib/i18n";
 import type { ListArgs, OpArgs } from "@ac/web/lib/opTypes";
 import { orNull } from "@ac/web/lib/promises";
+import { answerOf } from "@ac/web/lib/answer";
 import { filled } from "@ac/web/lib/filled";
 
 /** The session of the cookie (sealed, or stored under the sealed ID it holds, IR382), or null. proxy.ts refreshes tokens
@@ -172,7 +173,9 @@ async function coreCall<T>(operation: string, input: unknown, options: CoreOptio
     await dropSession(jar.get(SESSION_COOKIE)?.value);
   }
   if (!res.ok) throw new CoreError(domainError(body), { status: res.status });
-  return body as { data: T; meta?: { snapshotAt?: string } };
+  const answer = answerOf<T>(body);
+  if (!answer) throw new CoreError(domainError(null), { status: res.status }); // a success without an envelope reads as unavailable
+  return answer;
 }
 
 export const apiMode = () => process.env.DATA_SOURCE === "api";

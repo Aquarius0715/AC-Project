@@ -4,6 +4,7 @@ import type { OpArgs } from "@ac/web/lib/opTypes";
 import { randomId } from "@ac/web/lib/randomId";
 import { orNull } from "@ac/web/lib/promises";
 
+import { answerOf } from "@ac/web/lib/answer";
 import { domainError, type DomainError } from "@ac/web/lib/domainError";
 
 export type { DomainError } from "@ac/web/lib/domainError";
@@ -29,5 +30,7 @@ export async function callOp<T>(...[operation, input, options = {}]: OpArgs<Writ
   if (!res.ok) {
     throw new OpError(domainError(body), { status: res.status });
   }
-  return (body as { data: T }).data;
+  const answer = answerOf<T>(body);
+  if (!answer) throw new OpError(domainError(null), { status: res.status }); // a success without an envelope reads as unavailable
+  return answer.data;
 }
