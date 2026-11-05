@@ -156,7 +156,10 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
   };
   const send = () => {
     setConfirm(false);
-    if (d) return void sendApi(changes());
+    if (d) {
+      void sendApi(changes());
+      return;
+    }
     setWaiting(true);
     setTimeout(() => { setWaiting(false); setHist((h) => [{ id: "cmd-0231", text: t("Set temperature {celsius}°C", { celsius: setpoint }), when: t("now") }, ...h]); toast(t("{name}: {celsius}°C acknowledged by device", { name: unit.name, celsius: setpoint })); }, 1500);
   };

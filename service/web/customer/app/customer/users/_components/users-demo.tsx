@@ -45,7 +45,7 @@ export function UsersDemo() {
     toast(`${name.trim()} added — nothing is sent in the demo`);
     close();
   };
-  const done = (refused: string | undefined, ok: string) => { toast(refused ?? ok, refused ? "warn" : undefined); };
+  const done = (refused: string | null, ok: string) => { toast(refused ?? ok, refused ? "warn" : undefined); };
   const resend = (u: ClientUser) => {
     const e = clientUserActions.resend(u.id);
     toast(e ?? `Set-up e-mail re-sent to ${u.email} — nothing is sent in the demo`, e ? "warn" : undefined);

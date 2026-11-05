@@ -42,6 +42,7 @@ export const emailError = (email: string, users: ClientUser[]) => {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return "Enter a valid e-mail address";
   const dup = users.find((u) => u.email.toLowerCase() === e.toLowerCase());
   if (dup) return `This person is already a user of customer-a (${dup.name ?? dup.email} · ${dup.role === "owner" ? "Owner" : "Member"}). E-mails are matched without case.`;
+  return null;
 };
 
 export const clientUserActions = {
@@ -52,25 +53,29 @@ export const clientUserActions = {
     const error = emailError(email, users);
     if (error) return error;
     save([...users, { id: `cu-${String(Date.now())}`, name: name.trim() || null, email: email.trim(), status: "invited", lastSignIn: null, invitedBy: by, invitedAt: "2026-10-06", role }]);
+    return null;
   },
   /** clientUsers.resendInvite — invited users only, preview only. */
-  resend: (id: string) => load().find((u) => u.id === id)?.status === "invited" ? undefined : "Only invited users can be re-invited",
+  resend: (id: string) => load().find((u) => u.id === id)?.status === "invited" ? null : "Only invited users can be re-invited",
   /** HQ only (DD-A17): the last active owner cannot be demoted, disabled or removed. */
   setRole(id: string, role: ClientRole) {
     const users = load();
     if (role === "member" && users.filter((u) => u.role === "owner" && u.status === "active" && u.id !== id).length === 0) return "CONFLICT — the last active owner cannot be demoted";
     save(users.map((u) => (u.id === id ? { ...u, role } : u)));
+    return null;
   },
   setStatus(id: string, status: "active" | "disabled") {
     const users = load();
     const u = users.find((x) => x.id === id);
     if (status === "disabled" && u?.role === "owner" && users.filter((x) => x.role === "owner" && x.status === "active" && x.id !== id).length === 0) return "CONFLICT — the last active owner cannot be disabled";
     save(users.map((x) => (x.id === id ? { ...x, status } : x)));
+    return null;
   },
   remove(id: string) {
     const users = load();
     const u = users.find((x) => x.id === id);
     if (u?.role === "owner" && users.filter((x) => x.role === "owner" && x.status === "active" && x.id !== id).length === 0) return "CONFLICT — the last active owner cannot be removed";
     save(users.filter((x) => x.id !== id));
+    return null;
   },
 };

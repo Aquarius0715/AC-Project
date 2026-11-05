@@ -154,12 +154,13 @@ export function ScrollX({ label, className, children }: Readonly<{ label?: strin
   const [overflows, setOverflows] = useState(false);
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
-    const check = () => { setOverflows(el.scrollWidth > el.clientWidth + 1); };
-    check();
+    const check = () => { if (el) setOverflows(el.scrollWidth > el.clientWidth + 1); };
     const observer = new ResizeObserver(check);
-    observer.observe(el);
-    for (const child of el.children) observer.observe(child);
+    if (el) {
+      check();
+      observer.observe(el);
+      for (const child of el.children) observer.observe(child);
+    }
     return () => { observer.disconnect(); };
   }, []);
   // relative: an absolutely positioned descendant (a visually hidden column header) is clipped with the table instead

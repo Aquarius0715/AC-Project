@@ -81,7 +81,10 @@ test("voice input follows the device's microphone consent and falls back to text
 test("an ambiguous room is asked, never guessed: the room, then the AC", async ({ page }) => {
   let real = "";
   await page.route("**/bff/ops/voice.resolveIntent", async (route) => {
-    if ((route.request().postDataJSON() as { selectedUnitId?: string }).selectedUnitId) return route.continue();
+    if ((route.request().postDataJSON() as { selectedUnitId?: string }).selectedUnitId) {
+      await route.continue();
+      return;
+    }
     const response = await route.fetch();
     const json = (await response.json()) as { data: { unitId: string } };
     real = json.data.unitId;

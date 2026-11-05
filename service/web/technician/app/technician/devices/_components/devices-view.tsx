@@ -63,9 +63,8 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
   const ok = (after?: () => void) => () => { setRefused(null); close(); after?.(); };
   const isBusy = !!dv?.detail.activeOperation;
   useEffect(() => { // an operation starts on the scheduler and finishes with the device's answer or at its deadline (IR67)
-    if (!isBusy) return;
-    const t = setInterval(() => { router.refresh(); }, 4000);
-    return () => { clearInterval(t); };
+    const t = isBusy ? setInterval(() => { router.refresh(); }, 4000) : null;
+    return () => { if (t) clearInterval(t); };
   }, [isBusy, router]);
   const canWrite = live.canMaintain && !!dv?.jobId;
   const regUnit = live.register.find((u) => u.unitId === reg.unitId);

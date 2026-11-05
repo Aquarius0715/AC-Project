@@ -76,7 +76,7 @@ describe("notes, follow-ups and answers in the maintenance demo", () => {
   it("refuses a note on a closed job or an empty one at once, and tells the contractor of its own job", () => {
     expect(jobActions.addNote(completed.id, "Call first")).toBe("CONFLICT — notes are only possible on open jobs");
     expect(jobActions.addNote("job-c07", "  ")).toBe("Write 1–2000 characters");
-    expect(jobActions.addNote("job-c07", " Gate code 4821 ")).toBeUndefined();
+    expect(jobActions.addNote("job-c07", " Gate code 4821 ")).toBeNull();
     expect(job("job-c07").notes?.at(-1)).toMatchObject({ by: "customer-a", text: "Gate code 4821" });
     jobActions.addNote("job-a11", "Parking at the back");
     expect(notes("contractor")[0]?.title).toBe("Client note on job-a11");
@@ -87,7 +87,7 @@ describe("notes, follow-ups and answers in the maintenance demo", () => {
     const { id } = jobActions.reportProblem(completed.id, "same_problem", "still dripping", "2026-10-06") as { id: string };
     expect(job(id)).toMatchObject({ status: "requested", followUpOf: completed.id, followUpClass: "pending", unitId: completed.unitId, preferred: [{ date: "2026-10-06", win: "09:00–12:00" }] });
     expect(jobActions.classifyFollowUp(id, "rework", " ")).toBe("A reason is required (1–1000 characters)");
-    expect(jobActions.classifyFollowUp(id, "rework", "same fault")).toBeUndefined();
+    expect(jobActions.classifyFollowUp(id, "rework", "same fault")).toBeNull();
     expect(job(id)).toMatchObject({ followUpClass: "rework", followUpReason: "same fault" });
     expect(jobActions.classifyFollowUp(id, "new_request", "again")).toBe("CONFLICT — already classified");
     expect(notes("client")[0]?.title).toBe(`${id}: Rework (free)`);

@@ -254,6 +254,7 @@ export const jobActions = {
     update(id, (x) => ({ notes: [...(x.notes ?? []), { by: "customer-a", text: text.trim(), at: NOW }] }), `Client note: “${text.trim()}”`);
     notify("admin", `Client note on ${id}`, text.trim().slice(0, 80), `/admin/jobs?jobId=${id}`);
     if (j.delivery === "contractor") notify("contractor", `Client note on ${id}`, text.trim().slice(0, 80), `/partner/jobs/${id}`);
+    return null;
   },
   /** Client: “Report a problem” on a completed job → requested follow-up job, pending HQ classification (FR-C17). */
   reportProblem(fromId: string, reason: string, details: string, visit: string) {
@@ -276,6 +277,7 @@ export const jobActions = {
     if (!reason.trim() || reason.length > 1000) return "A reason is required (1–1000 characters)";
     update(id, () => ({ followUpClass: cls, followUpReason: reason.trim() }), `HQ classified the follow-up as ${cls === "rework" ? "rework (free)" : "a new request"} · ${reason.trim()}`);
     notify("client", `${id}: ${cls === "rework" ? "Rework (free)" : "New request"}`, `HQ reviewed your problem report on ${j.followUpOf ?? "—"}`, `/customer/maintenance?jobId=${id}`);
+    return null;
   },
   /* ---- contractor ---- */
   partnerAccept(id: string) { update(id, () => ({ status: "accepted", partnerProposal: null }), "contractor-a accepted the offer"); notify("admin", `contractor-a accepted ${id}`, "assign a technician next", `/admin/jobs?jobId=${id}`); },

@@ -309,9 +309,9 @@ function getPayloadConfigFromPayload(
   config: ChartConfig,
   payload: unknown,
   key: string
-) {
+): ChartConfig[string] | null {
   if (typeof payload !== "object" || payload === null) {
-    return
+    return null
   }
 
   const payloadPayload =
@@ -338,7 +338,7 @@ function getPayloadConfigFromPayload(
     ]
   }
 
-  return configLabelKey in config ? config[configLabelKey] : config[key]
+  return (configLabelKey in config ? config[configLabelKey] : config[key]) ?? null
 }
 
 export {

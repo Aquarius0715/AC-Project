@@ -35,9 +35,8 @@ export function ControlView({ live }: Readonly<{ live: ControlLive }>) {
   const [refused, setRefused] = useState<string | null>(null);
   const ids = { reason: useId(), durationMinutes: useId(), trReason: useId() };
   useEffect(() => { // device acknowledgements and run states arrive on the server: refresh while something is open
-    if (!live.active) return;
-    const timer = setInterval(() => { router.refresh(); }, 4000);
-    return () => { clearInterval(timer); };
+    const timer = live.active ? setInterval(() => { router.refresh(); }, 4000) : null;
+    return () => { if (timer) clearInterval(timer); };
   }, [live.active, router]);
   const back = <div className="flex flex-wrap items-center gap-2 text-[13px]"><Link href={live.unitHref} className="font-semibold text-primary" aria-label={t("Back")}><Icon name="chevronLeft" /></Link><h1 className="text-base font-bold">{t("Diagnostic control")}</h1><span className="text-muted-foreground">· {live.unit.name}</span></div>;
   if (!live.canDiagnose) return <Page>{back}<EmptyState title={t("No diagnostic permission")}>{t("Diagnostic control needs control.diagnose on an assigned job. Ask HQ if you should have it.")}</EmptyState></Page>;

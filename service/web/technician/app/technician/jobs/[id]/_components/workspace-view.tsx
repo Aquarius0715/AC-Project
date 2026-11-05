@@ -127,9 +127,8 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
   // the timer restarts with each edit, not with every render; the save it runs reads the latest draft (useEffectEvent)
   const autosave = useEffectEvent(() => { save(); });
   useEffect(() => {
-    if (!dirty || !isEditable || pending) return;
-    const t = setTimeout(() => { autosave(); }, 20_000);
-    return () => { clearTimeout(t); };
+    const t = dirty && isEditable && !pending ? setTimeout(() => { autosave(); }, 20_000) : null;
+    return () => { if (t) clearTimeout(t); };
   }, [draft, dirty, isEditable, pending]);
   const withSaved = (fn: (r: Rep) => void) => { if (dirty || !rep) save(fn); else fn(rep); };
   const addPhotos = (files: FileList | null) => {

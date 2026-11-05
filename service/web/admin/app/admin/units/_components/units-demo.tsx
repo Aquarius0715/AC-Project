@@ -118,7 +118,7 @@ function ClientUsersTab() {
   const errorText = tried ? emailError(email, users) : undefined;
   const nameProblem = tried ? nameError(name) : undefined;
   const close = () => { setOpen(false); setTried(false); setEmail(""); setName(""); setRole("member"); };
-  const run = (e: string | undefined, ok: string) => { toast(e ?? ok, e ? "warn" : undefined); };
+  const run = (e: string | null, ok: string) => { toast(e ?? ok, e ? "warn" : undefined); };
   const act = (u: ClientUser, a: string) => {
     switch (a) {
       case "resend": { run(clientUserActions.resend(u.id), `Set-up e-mail re-sent to ${u.email} — nothing is sent in the demo`); break; }
