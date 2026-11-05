@@ -6,11 +6,10 @@ import { Badge, Banner, Btn, Card, Field, Page, SummaryList, Textarea, Timeline,
 import { Icon } from "@ac/web/components/Icon";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
 
-type St = "Open" | "Acknowledged" | "Resolved";
-
 const ALERT_TONE = new Map<string, Tone>([["Resolved", "ok"], ["Acknowledged", "primary"]]); // open alerts warn
 /** Phase 1A demo view (fixture evidence). */
 export function MockAlertEvidence({ id }: Readonly<{ id: string }>) {
+  type St = "Open" | "Acknowledged" | "Resolved";
   const toast = useToast();
   const [st, setSt] = useState<St>("Open");
   const [reason, setReason] = useState("");

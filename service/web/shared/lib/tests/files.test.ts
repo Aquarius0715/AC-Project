@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { codePoints, contentDisposition, uploadName, uploadType } from "@ac/web/lib/files";
+import { contentDisposition, uploadName, uploadType } from "@ac/web/lib/files";
+import { codePoints } from "@ac/web/lib/text";
 
 const bytes = (...b: (number | string)[]) => Uint8Array.from(b.flatMap((x) => (typeof x === "string" ? Array.from(x, (c) => c.charCodeAt(0)) : x)));
 
@@ -27,8 +28,8 @@ describe("file names (IR368)", () => {
     expect([uploadName("photo.jpg"), uploadName("写真 1.jpg"), uploadName("  padded.png  "), uploadName("a\r\nb.png"), uploadName("photo\u{202E}gpj.exe"),
       uploadName("dir/sub\\x.png"), uploadName("\0\u{200E}"), uploadName("")]).toEqual(["photo.jpg", "写真 1.jpg", "padded.png", "ab.png", "photogpj.exe", "dir_sub_x.png", "upload", "upload"]);
     const long = uploadName("x".repeat(300) + ".jpeg");
-    expect([codePoints(long).length, long.endsWith(".jpeg")]).toEqual([200, true]);
-    expect(codePoints(uploadName("写".repeat(250)))).toHaveLength(200);
+    expect([codePoints(long), long.endsWith(".jpeg")]).toEqual([200, true]);
+    expect(codePoints(uploadName("写".repeat(250)))).toBe(200);
   });
 
   it("names a stored file in a header any name fits: an ASCII fallback and the UTF-8 name", () => {

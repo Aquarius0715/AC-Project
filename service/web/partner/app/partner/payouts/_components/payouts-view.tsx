@@ -43,8 +43,8 @@ export function PayoutsView({ live }: Readonly<{ live: PayoutsLive }>) {
   const askable = sel?.rows.filter((r): r is typeof r & { lineId: string } => r.askable && !!r.lineId && !r.question) ?? [];
   const questionError = t("Enter your question (1–2000 characters)");
   const send = () => {
-    const m = notice.trim();
     if (!sel || !ask) return;
+    const m = notice.trim();
     if (m.length === 0 || m.length > 2000) { setError(questionError); return; }
     setError(null);
     run(() => askHq(sel.statement.id, sel.statement.version, ask.lineId, topic, m), t("Question sent — HQ answers on the statement"), () => { setAsk(null); setMessage(""); setRefused(null); },

@@ -30,8 +30,8 @@ export function AlertEvidenceView({ live }: Readonly<{ live: AlertsLive }>) {
   const a = live.alert;
   const act = async (op: "acknowledge" | "resolve") => {
     if (!a) return;
-    const ids = picked.filter((id) => live.evidence?.some((r) => r.id === id)); // a re-read list drops what is no longer a candidate
     if (op === "resolve" && !reason.trim()) { setMessage(t("A resolution reason is required (1–1000 characters).")); return; }
+    const ids = picked.filter((id) => live.evidence?.some((r) => r.id === id)); // a re-read list drops what is no longer a candidate
     const problem = op === "resolve" && live.evidence ? evidenceProblem(a.policyless, ids, t) : null;
     if (problem) { setMessage(problem); return; }
     setBusy(true);

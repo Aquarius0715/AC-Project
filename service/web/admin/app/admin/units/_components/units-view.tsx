@@ -899,19 +899,6 @@ function ImportWizard({ live, onClose }: Readonly<{ live: UnitsLive; onClose: ()
   const isTooBig = !!file && file.size > 900_000;
   const missing = importFields.filter((x) => x.required && !mapping[x.key]);
   const customer = live.activeCustomers.find((x) => x.id === customerId)?.name ?? "";
-  const pick = async (f: File | undefined) => {
-    if (!f) return;
-    const text = await f.text();
-    setFile({ name: f.name, size: f.size, text });
-    setMapping(autoMapping(csvShape(text).header));
-    setPreview(null);
-  };
-  const validate = () => {
-    setTried(true);
-    if (!file || !customerId || missing.length > 0 || isTooBig) return;
-    run(() => importPreview(customerId, file.name, file.text, Object.fromEntries(Object.entries(mapping).filter(([, v]) => v))),
-      (p) => t("{n} of {total} rows can be imported", { n: p.readyCount + p.warningCount, total: p.rows.length }), setPreview);
-  };
   if (result) {
     const isUndoable = result.state === "imported" && Date.parse(result.undoUntil) > Date.parse(live.now); // the business clock of the last render
     return (
@@ -950,6 +937,19 @@ function ImportWizard({ live, onClose }: Readonly<{ live: UnitsLive; onClose: ()
       </Modal>
     );
   }
+  const pick = async (f: File | undefined) => {
+    if (!f) return;
+    const text = await f.text();
+    setFile({ name: f.name, size: f.size, text });
+    setMapping(autoMapping(csvShape(text).header));
+    setPreview(null);
+  };
+  const validate = () => {
+    setTried(true);
+    if (!file || !customerId || missing.length > 0 || isTooBig) return;
+    run(() => importPreview(customerId, file.name, file.text, Object.fromEntries(Object.entries(mapping).filter(([, v]) => v))),
+      (p) => t("{n} of {total} rows can be imported", { n: p.readyCount + p.warningCount, total: p.rows.length }), setPreview);
+  };
   return (
     <Modal open wide onClose={onClose} title={t("Import units from CSV · 1 / 2")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={validate}>{t("Validate")} <Icon name="arrowRight" /></Btn></>}>
       <div className="flex flex-col gap-3">

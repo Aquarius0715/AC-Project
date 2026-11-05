@@ -18,8 +18,6 @@ import {
 } from "@ac/web/lib/techUnit";
 
 interface Page<T> { items: T[]; nextCursor?: string | null; total?: number }
-/** telemetry.series: a page of readings, or with bucketMinutes the period's averages (AirSeries.buckets, IR605). */
-type SeriesPage = Page<Point> & { buckets: { start: string; value: number | null; count: number }[] | null };
 const optional = orWhenRefused;
 const gone = (e: unknown) => e instanceof CoreError && (e.error.code === "NOT_FOUND" || e.error.code === "FORBIDDEN" || !!e.error.fieldErrors.id);
 
@@ -27,6 +25,8 @@ const gone = (e: unknown) => e instanceof CoreError && (e.error.code === "NOT_FO
 readings (bucketMinutes, IR605, IR606); an hour comes as its readings, newest first, up to `pages` pages of 100
 (telemetry.series pages its query), with how many the period holds, so a cut hour says what is not loaded (IR598). */
 async function series(unitId: string, metric: OpInput<"telemetry.series">["metric"], from: number, to: number, period: Period, pages: number): Promise<{ items: Point[]; total: number; complete: boolean }> {
+  /** telemetry.series: a page of readings, or with bucketMinutes the period's averages (AirSeries.buckets, IR605). */
+  type SeriesPage = Page<Point> & { buckets: { start: string; value: number | null; count: number }[] | null };
   const range = { from: new Date(from).toISOString(), to: new Date(to + 1000).toISOString(), unitIds: [unitId], metric };
   if (period !== "1h") {
     const r: SeriesPage = await coreOp<SeriesPage>("telemetry.series", { ...range, bucketMinutes: period === "24h" ? 5 : 60, query: {} });

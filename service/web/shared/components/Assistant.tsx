@@ -272,18 +272,17 @@ function RadioCard({ value, title, detail }: Readonly<{ value: string; title: st
   );
 }
 
-// ---- the Phase 1A demo (DATA_SOURCE=demo): simulated answers, no Core API ----
+const demoUnits = ["Bedroom AC", "Bedroom AC #2", "Living room AC", "Kitchen AC", "Study AC"];
 
-type DemoChatMessage =
+function DemoAssistant({ onClose, context }: Readonly<{ onClose: () => void; context: string }>) {
+  // ---- the Phase 1A demo (DATA_SOURCE=demo): simulated answers, no Core API ----
+
+  type DemoChatMessage =
   | { kind: "user"; text: string; via: "text" | "voice" }
   | { kind: "bot"; text: string }
   | { kind: "confirm"; target: string; temp: number }
   | { kind: "ask"; options: string[]; temp: number }
   | { kind: "status"; tone: "info" | "ok" | "crit"; text: string };
-
-const demoUnits = ["Bedroom AC", "Bedroom AC #2", "Living room AC", "Kitchen AC", "Study AC"];
-
-function DemoAssistant({ onClose, context }: Readonly<{ onClose: () => void; context: string }>) {
   const [msgs, setMsgs] = useState<DemoChatMessage[]>([{ kind: "bot", text: "Hi! Ask about temperatures, change a setting, or ask for help." }]);
   const [text, setText] = useState("");
   const [listening, setListening] = useState(false);

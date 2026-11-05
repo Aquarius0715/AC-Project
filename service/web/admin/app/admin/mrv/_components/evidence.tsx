@@ -65,8 +65,8 @@ export function EvidenceList({ ids, period, units }: Readonly<{ ids: string[]; p
   const i = useI18n();
   const { t } = i;
   const cands = useCandidates(period, ids.length > 0);
-  const byId = new Map(evidenceRows(cands.data, units, i).map((r) => [r.id, r]));
   if (ids.length === 0) return <p className="text-xs text-muted-foreground">{t("No evidence attached.")}</p>;
+  const byId = new Map(evidenceRows(cands.data, units, i).map((r) => [r.id, r]));
   return (
     <ul className="flex flex-col gap-1 text-[13px]">
       {ids.map((id) => {

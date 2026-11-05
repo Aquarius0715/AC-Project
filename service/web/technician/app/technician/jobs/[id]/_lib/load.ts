@@ -11,14 +11,6 @@ import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { componentsFor, historyCard, knownOf, timeInstants, warnAt, type ApiTechHistory, type ApiTechReport, type TimeOnSite } from "@ac/web/lib/techJob";
 import type { WorkspaceLive } from "../_components/workspace-view";
 
-/** jobs.get for the technician: the detail while the job is theirs, the snapshot after the window (IR124); an offer
-projection is a contractor's and reads as not found here. */
-type JobRead = ApiTechHistory | {
-  projection: "detail"; id: string; version: number; status: string; type: string; unitId: string; symptom: string; alertIds: string[];
-  origin: string; dueAt: string | null; timeOnSite: TimeOnSite | null; draftReportRef: { reportId: string; reportVersion: number } | null;
-  reportRefs: { reportId: string; reportVersion: number }[]; problemPhotos?: { id: string; name: string; status: string }[];
-  assignment: { scheduledStart: string; scheduledEnd: string; status: string; acknowledgement: "pending" | "accepted" | "cant_make"; cantMakeReason: string | null } | null;
-} | { projection: "offer" };
 interface Refused { refused: string } // FORBIDDEN / NOT_FOUND with the reason (e.g. errors.assignment_not_started)
 const quiet = <T,>(p: Promise<T>): Promise<T | Refused> => {
   return p.catch((error: unknown) => {
@@ -29,6 +21,14 @@ const quiet = <T,>(p: Promise<T>): Promise<T | Refused> => {
 const isRefused = (x: unknown): x is Refused => !!x && typeof x === "object" && "refused" in x;
 
 export async function loadWorkspace(jobId: string): Promise<WorkspaceLive | "not_found" | { kind: "history"; card: ReturnType<typeof historyCard> }> {
+  /** jobs.get for the technician: the detail while the job is theirs, the snapshot after the window (IR124); an offer
+  projection is a contractor's and reads as not found here. */
+  type JobRead = ApiTechHistory | {
+  projection: "detail"; id: string; version: number; status: string; type: string; unitId: string; symptom: string; alertIds: string[];
+  origin: string; dueAt: string | null; timeOnSite: TimeOnSite | null; draftReportRef: { reportId: string; reportVersion: number } | null;
+  reportRefs: { reportId: string; reportVersion: number }[]; problemPhotos?: { id: string; name: string; status: string }[];
+  assignment: { scheduledStart: string; scheduledEnd: string; status: string; acknowledgement: "pending" | "accepted" | "cant_make"; cantMakeReason: string | null } | null;
+  } | { projection: "offer" };
   interface Part { code: string; name: string; vanStockQuantity: number | null }
   const job = await coreOp<JobRead>("jobs.get", { jobId }).catch((error: unknown) => {
     if (error instanceof CoreError && (error.error.code === "NOT_FOUND" || error.error.code === "FORBIDDEN" || error.error.fieldErrors.jobId)) return null;

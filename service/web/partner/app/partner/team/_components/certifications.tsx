@@ -12,13 +12,13 @@ import type { TeamLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
 
 type Live = Extract<TeamLive, { notFound: false }>;
-type Open = { kind: "renew" | "add"; row: CertRow | null } | { kind: "training" | "view"; row: CertRow } | null;
 
 /** The Certifications tab (FR-P09, Figma Contractor 04-6/04-7): filters by technician, status and the expiring window;
 the KPIs; one row per technician and qualification with the jobs an ending certificate blocks; the assignment
 impact; renewals, new certificates and training requests. Texts in the user's display language; the dates come
 formatted from the loader (IR277). */
 export function Certifications({ live }: Readonly<{ live: Live }>) {
+  type Open = { kind: "renew" | "add"; row: CertRow | null } | { kind: "training" | "view"; row: CertRow } | null;
   const t = useT();
   const patch = useUrlPatch();
   const c = live.certificates;

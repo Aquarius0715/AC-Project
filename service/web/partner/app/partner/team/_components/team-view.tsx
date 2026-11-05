@@ -47,11 +47,11 @@ function Team({ live, tab, tabs }: Readonly<{ live: Live; tab: "members" | "cert
   const [open, setOpen] = useState(false);
   // the remove dialog stays mounted while it closes, so its focus handling runs (n renews its state for each opening)
   const [removing, setRemoving] = useState<{ row: UnavailabilityRow; open: boolean; n: number } | null>(null);
-  const q = live.query;
   if (live.total === 0) {
     return <Page>{tabs}<EmptyState title={t("No technicians")}>{t("No technicians in your company yet. Add them in Users.")}</EmptyState></Page>;
   }
   if (tab === "certs") return <Page>{tabs}<Certifications live={live} /></Page>;
+  const q = live.query;
   const isNone = live.rows.length === 0;
   return (
     <Page>

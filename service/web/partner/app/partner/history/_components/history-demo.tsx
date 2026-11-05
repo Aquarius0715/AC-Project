@@ -40,10 +40,10 @@ const events = [
   { t: "2026-09-18 08:30", title: "Job accepted", d: "contractor-a accepted HQ offer", c: false },
   { t: "2026-09-17 16:00", title: "Offer received from HQ", d: "offer-c04-1 · terms v3 · by hq-operator", c: false },
 ];
-type F = "all" | "customer" | "internal";
 
 /** The Phase 1A demo of the job history (fixture events; the BFF reads in API mode moved to the server page). */
 export function HistoryDemo() {
+  type F = "all" | "customer" | "internal";
   const toast = useToast();
   const [job, setJob] = useState("job-p03");
   const [f, setF] = useState<F>("all");

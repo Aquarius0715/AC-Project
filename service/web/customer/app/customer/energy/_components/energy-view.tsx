@@ -134,9 +134,9 @@ export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
 }
 
 const sectionLabel = { energy_cost: "Energy & cost by AC (kWh, MYR)", month_comparison: "Comparison with last month", co2_offsets: "CO₂ and offsets", alerts_maintenance: "Alerts & maintenance done" } as const;
-type Section = keyof typeof sectionLabel;
 
 function ExportModal({ live, onClose }: Readonly<{ live: EnergyLive; onClose: () => void }>) {
+  type Section = keyof typeof sectionLabel;
   const t = useT();
   const locale = useLocale();
   const [pending, run] = useAction();

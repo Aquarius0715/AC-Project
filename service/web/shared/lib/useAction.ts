@@ -6,11 +6,10 @@ import { useT } from "@ac/web/components/I18n";
 import { signInAgainHref, signedOutReason } from "@ac/web/lib/login";
 import { actionMessage, type ActionFailure } from "@ac/web/lib/actionMessage";
 
-type Result<T> = { ok: true; value: T } | ({ ok: false } & ActionFailure);
-
 /** Runs a Server Action in a transition: a toast on success (text or from the value) and the readable failure in the
 display language otherwise (IR269); `after` runs only on success. Returns [pending, run]. */
 export function useAction() {
+  type Result<T> = { ok: true; value: T } | ({ ok: false } & ActionFailure);
   const t = useT();
   const toast = useToast();
   const [pending, start] = useTransition();

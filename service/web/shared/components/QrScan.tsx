@@ -18,11 +18,10 @@ import { Icon } from "@ac/web/components/Icon";
 import { Button } from "@ac/web/components/ui/button";
 import { orNull } from "@ac/web/lib/promises";
 
-const OPEN = ["assigned", "in_progress", "on_hold", "rework_requested"]; // the jobs units.resolveQr opens (IR230)
-
-type State = { kind: "idle" } | { kind: "busy" } | { kind: "matched"; code: string; at: string; match: QrMatch } | { kind: "refused"; title: string; text: string; absent: boolean };
-
 export function QrScan({ open, onClose }: Readonly<{ open: boolean; onClose: () => void }>) {
+  const OPEN = ["assigned", "in_progress", "on_hold", "rework_requested"]; // the jobs units.resolveQr opens (IR230)
+
+  type State = { kind: "idle" } | { kind: "busy" } | { kind: "matched"; code: string; at: string; match: QrMatch } | { kind: "refused"; title: string; text: string; absent: boolean };
   const i18n = useI18n();
   const { t } = i18n;
   const [code, setCode] = useState("");

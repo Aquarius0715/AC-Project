@@ -13,10 +13,10 @@ const plans = nonEmpty([
   { id: "plan-living-a", name: "Living room AC — periodic inspection & filter cleaning", rule: "Every 3 months · day 8 · customer-a · next visit 2026-12-08", unit: "Living room AC", delivery: "Internal · tech-internal-b" },
   { id: "plan-lobby-b", name: "Lobby AC — quarterly inspection", rule: "Every 3 months · day 1 · customer-b · next 2026-11-01", unit: "Lobby AC", delivery: "Offer to contractor-a" },
 ]);
-type Tab = "jobs" | "plans" | "contractors" | "sla";
 
 /** The Phase 1A demo of the maintenance coordinator (fixture jobs, plans, contractors and SLA). */
 export function JobsDemo({ jobId, tab: initial }: Readonly<{ jobId?: string; tab?: string }>) {
+  type Tab = "jobs" | "plans" | "contractors" | "sla";
   const sp = { jobId, tab: initial };
   const jobs = useJobs();
   const [tab, setTab] = useState<Tab>((["plans", "contractors", "sla"].includes(sp.tab ?? "") ? sp.tab : "jobs") as Tab);

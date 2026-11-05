@@ -57,7 +57,6 @@ export function jobRow(raw: ApiPartnerJob, now: number, units: Map<string, strin
   const origin = "origin" in raw ? (raw as { origin?: string }).origin ?? null : null;
   const b = bucket(j, now);
   const detail = `/partner/jobs/${j.id}`;
-  const none = { name: "—", sub: "" };
   if (raw.projection === "offer" && raw.status === "offered") {
     const proposal = (raw as { partnerSlotProposal?: { status: string } | null }).partnerSlotProposal;
     const pending = proposal && (proposal.status === "pending" || proposal.status === "sent_to_client");
@@ -98,6 +97,7 @@ export function jobRow(raw: ApiPartnerJob, now: number, units: Map<string, strin
       title,
     };
   }
+  const none = { name: "—", sub: "" };
   const due = j.dueAt ? t("Due {time}", { time: at(j.dueAt) }) : "";
   const known = ack[(raw as { assignmentAcknowledgement?: string | null }).assignmentAcknowledgement ?? ""];
   const technician = tech ? { name: tech, ...(known ? { sub: t(known.sub), ...(known.tone && { tone: known.tone, subTone: known.tone }) } : { sub: t("assigned") }) } : null;

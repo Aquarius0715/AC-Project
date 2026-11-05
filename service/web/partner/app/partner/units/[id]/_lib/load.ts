@@ -15,8 +15,6 @@ import { chart, chartMetrics, contextJob, evidenceRows, jobContext, pastWork, re
 import type { OpInput } from "@ac/web/lib/opTypes";
 
 interface Page<T> { items: T[]; nextCursor?: string | null }
-/** telemetry.series with bucketMinutes: the period's averages (AirSeries.buckets, IR605). */
-type SeriesPage = Page<Point> & { buckets: { start: string; value: number | null; count: number }[] | null };
 interface Point { value: number | null; observedAt: string; quality?: string; unit?: string }
 const optional = orWhenRefused;
 const gone = (e: unknown) => e instanceof CoreError && (e.error.code === "NOT_FOUND" || e.error.code === "FORBIDDEN" || !!e.error.fieldErrors.id);
@@ -25,6 +23,8 @@ const minute = (ms: number) => new Date(ms).toISOString().slice(0, 16) + ":00Z";
 /** A metric over the window, whole: the hourly averages of its valid readings (bucketMinutes, IR605, IR608) — up to 400
 of the newest readings covered only the last hours of the day. */
 async function series(unitId: string, metric: OpInput<"telemetry.series">["metric"], from: number, to: number): Promise<Point[]> {
+  /** telemetry.series with bucketMinutes: the period's averages (AirSeries.buckets, IR605). */
+  type SeriesPage = Page<Point> & { buckets: { start: string; value: number | null; count: number }[] | null };
   const r = await coreOp<SeriesPage>("telemetry.series", { from: minute(from), to: minute(to), unitIds: [unitId], bucketMinutes: 60, query: {}, metric });
   return (r.buckets ?? []).filter((b) => b.count > 0).map((b) => ({ value: b.value, observedAt: b.start }));
 }

@@ -5,16 +5,14 @@ import { useState } from "react";
 import { Badge, Banner, Btn, Card, DemoBadge, Modal, Page, SummaryList, Timeline, useToast, Plain } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
 
-type Phase = "choose" | "processing" | "confirmed" | "failed";
-
 /** The Phase 1A demo of /customer/payments/[id] (fixtures; DATA_SOURCE≠API). */
 export function InvoiceDemo({ id, tab }: Readonly<{ id: string; tab?: string }>) { // SCR-C11 tabs: payment (default) · restriction · inquiry
+  type Phase = "choose" | "processing" | "confirmed" | "failed";
   const toast = useToast();
   const [phase, setPhase] = useState<Phase>("choose");
   const [method, setMethod] = useState<"credit" | "debit" | "bank">("credit");
   const [preview, setPreview] = useState<string | null>(null);
   const [reminders, setReminders] = useState(false);
-  const isPaid = id !== "invoice-overdue-a" && id !== "invoice-sep-a";
 
   if (tab === "restriction") {
     return (
@@ -35,6 +33,7 @@ export function InvoiceDemo({ id, tab }: Readonly<{ id: string; tab?: string }>)
       </Page>
     );
   }
+  const isPaid = id !== "invoice-overdue-a" && id !== "invoice-sep-a";
 
   const pay = () => {
     setPhase("processing");

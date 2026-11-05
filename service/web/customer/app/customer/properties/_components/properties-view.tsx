@@ -40,10 +40,10 @@ export function PropertiesView({ live }: Readonly<{ live: PropertiesLive }>) {
   const t = useT();
   const nav = useUrlPatch();
   const [renaming, setRenaming] = useState<Renaming | null>(null);
+  if (live.tree.length === 0) return <Page><EmptyState title={t("No properties yet")}>{t("HQ registers your homes and offices with their rooms and air conditioners; they appear here once set up.")}</EmptyState></Page>;
   const sel = live.selection;
   const selId = selectionId(sel);
   const go = (patch: Record<string, string | null>) => { nav({ propertyId: null, spaceId: null, unassignedOnly: null, mode: null, unitIds: null, powerState: null, connections: null, ...patch }); };
-  if (live.tree.length === 0) return <Page><EmptyState title={t("No properties yet")}>{t("HQ registers your homes and offices with their rooms and air conditioners; they appear here once set up.")}</EmptyState></Page>;
   return (
     <Page>
       <div className="split-rev">

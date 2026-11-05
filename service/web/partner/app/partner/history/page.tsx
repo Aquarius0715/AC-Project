@@ -10,8 +10,8 @@ import { loadHistory } from "./_lib/load";
 export default async function PartnerHistoryPage({ searchParams }: Readonly<PageProps<"/partner/history">>) {
   await connection();
   const sp = await searchParams;
-  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   if (!apiMode()) return <HistoryDemo />;
+  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const live = await loadHistory({ jobId: one(sp.jobId), tab: one(sp.tab), sort: one(sp.sort), period: one(sp.period) });
   return <HistoryView live={live} />;
 }

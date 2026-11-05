@@ -1,3 +1,4 @@
+import { characters, codePoints } from "@ac/web/lib/text";
 // Uploads (IR308): the Core API stores and serves a file only as what its bytes are — the PNG signature, the JPEG
 // start-of-image marker or the PDF header. The browser's File.type follows the file name, so the Server Actions send
 // the type of the bytes instead; a file that is none of these keeps the browser's type and is refused by the API.
@@ -18,19 +19,16 @@ export function uploadType(bytes: Uint8Array, browserType: string): string {
 // label, and the bytes and their type are what count.
 const UNSAFE_NAME = /[\u0000-\u001F\u007F-\u009F\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/g;
 
-/** A text's code points, the characters the Core API counts (Go counts runes). */
-export const codePoints = (s: string): string[] => s.match(/./gsu) ?? [];
-
 /** An upload's name as the API accepts it: unsafe characters dropped, "/" and "\" made "_", at most 200 characters
 (the extension kept), "upload" when nothing is left. */
 export function uploadName(name: string): string {
   const clean = name.replaceAll(UNSAFE_NAME, "").replaceAll(/[/\\]/g, "_").trim();
-  const chars = codePoints(clean);
+  const chars = characters(clean);
   if (chars.length === 0) return "upload";
   if (chars.length <= 200) return clean;
   const dot = clean.lastIndexOf(".");
   const suffix = dot > 0 && clean.length - dot <= 10 ? clean.slice(dot) : "";
-  return codePoints(clean.slice(0, clean.length - suffix.length)).slice(0, 200 - codePoints(suffix).length).join("").trimEnd() + suffix;
+  return characters(clean.slice(0, clean.length - suffix.length)).slice(0, 200 - codePoints(suffix)).join("").trimEnd() + suffix;
 }
 
 // the HTTP status of a file the Core API refused: forbidden, not found, or any other failure as a bad gateway

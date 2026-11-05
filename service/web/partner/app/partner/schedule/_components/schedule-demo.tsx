@@ -47,8 +47,8 @@ export function ScheduleDemo({ jobId }: Readonly<{ jobId?: string }>) {
   const isInProg = sel.id === "job-contractor-a" || sel.id === "job-p07";
   const save = () => {
     if (lj) { jobActions.partnerAssign(lj.id, tech); setMessage({ tone: "ok", t: `Assigned ${tech} to ${lj.id} for ${fmt(lj.scheduled)}. The technician must accept.` }); toast("Technician assigned — waiting for acceptance"); return; }
-    const we = new Date(sel.id === "job-p02" ? "2026-09-22T00:00" : "2026-09-24T18:00");
     if (isInProg && !reason.trim()) { setMessage({ tone: "crit", t: "Reason required when reassigning a job already in progress (VALIDATION)." }); return; }
+    const we = new Date(sel.id === "job-p02" ? "2026-09-22T00:00" : "2026-09-24T18:00");
     if (new Date(start) >= new Date(end)) { setMessage({ tone: "crit", t: "Start must be before end." }); return; }
     if (new Date(end) > we) { setMessage({ tone: "crit", t: "Slot is outside the delegation period (VALIDATION)." }); return; }
     if (tech === "tech-external-a" && start.startsWith("2026-09-21T09")) { setMessage({ tone: "warn", t: "Overlaps a confirmed schedule for tech-external-a (CONFLICT)." }); return; }

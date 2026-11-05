@@ -24,7 +24,6 @@ display language; the job's times come formatted from the loader, the team's wee
 export function ScheduleView({ live }: Readonly<{ live: ScheduleLive }>) {
   const t = useT();
   const patch = useUrlPatch();
-  const sel = live.selected;
   if (live.rows.length === 0) {
     return (
       <Page>
@@ -34,6 +33,7 @@ export function ScheduleView({ live }: Readonly<{ live: ScheduleLive }>) {
       </Page>
     );
   }
+  const sel = live.selected;
   return (
     <Page>
       <div className="split-rev">

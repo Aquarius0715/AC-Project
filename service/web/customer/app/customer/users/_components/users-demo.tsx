@@ -21,8 +21,6 @@ export function UsersDemo() {
   const [name, setName] = useState("");
   const [tried, setTried] = useState(false);
   const [role, setRole] = useState<"member" | "owner">("member");
-  const errorText = tried ? emailError(email, users) : undefined;
-  const nameError = tried && (codePoints(name.trim()) === 0 || codePoints(name.trim()) > 120) ? "A name of 1–120 characters" : undefined;
 
   if (CURRENT_CLIENT.role !== "owner") {
     return (
@@ -34,6 +32,8 @@ export function UsersDemo() {
       </Page>
     );
   }
+  const errorText = tried ? emailError(email, users) : undefined;
+  const nameError = tried && (codePoints(name.trim()) === 0 || codePoints(name.trim()) > 120) ? "A name of 1–120 characters" : undefined;
 
   const close = () => { setOpen(false); setTried(false); setEmail(""); setName(""); setRole("member"); };
   const send = () => {

@@ -26,8 +26,8 @@ export async function loadControl(unitId: string, jobId: string | null) {
     if (gone(error)) return null;
     throw error;
   });
-  const unitHref = `/technician/units/${unitId}${jobId ? `?jobId=${jobId}` : ""}`;
   if (d === null) return null; // not in the technician's assignments: not found (IR169)
+  const unitHref = `/technician/units/${unitId}${jobId ? `?jobId=${jobId}` : ""}`;
   if (d === "not_started") { // IR76: the start time from the URL's job
     const job = jobId ? await orNull(coreOp<JobRead>("jobs.get", { jobId })) : null;
     const start = job?.projection === "detail" ? job.assignment?.scheduledStart ?? null : null;

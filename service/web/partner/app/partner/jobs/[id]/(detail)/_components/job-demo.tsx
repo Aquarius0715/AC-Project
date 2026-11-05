@@ -8,7 +8,6 @@ import { Job, fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
 import { Icon } from "@ac/web/components/Icon";
 
 const cap = [["tech-external-a", "Refrigerant handling · valid to 2027-03-31", ["4 h", "4 h", "8 h", "—", "—"]], ["tech-external-a2", "No refrigerant qualification", ["—", "—", "—", "—", "—"]]] as const;
-type S = "offer" | "accepted" | "declined" | "expired" | "proposed";
 
 /** The Phase 1A demo offer / job detail (DATA_SOURCE=mock): the shared job store and the seeded offer job-p09. */
 export function JobDemo({ id }: Readonly<{ id: string }>) {
@@ -92,6 +91,7 @@ function DeclineModal({ id, onClose, onDone }: Readonly<{ id: string; onClose: (
 
 /** Seeded offer job-p09 (periodic plan visit) kept as in the Figma states 02-7…02-10. */
 function StaticOffer({ id }: Readonly<{ id: string }>) {
+  type S = "offer" | "accepted" | "declined" | "expired" | "proposed";
   const toast = useToast();
   const [s, setS] = useState<S>("offer");
   const [modal, setModal] = useState<null | "decline" | "propose">(null);

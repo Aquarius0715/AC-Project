@@ -11,9 +11,9 @@ const jobs = [["requested", 1], ["offered", 0], ["accepted", 0], ["assigned", 1]
 export function AdminOverviewDemo() {
   const kpis: Kpis = mockKpis;
   const [state, setState] = useState<"ok" | "loading" | "error" | "empty">("ok");
-  const k = kpis;
   if (state === "error") return <Page><ErrorState title="Couldn’t load the dashboard" onRetry={() => { setState("ok"); }}>Initial load failed — nothing is shown as zero.</ErrorState></Page>;
   if (state === "loading") return <Page><div className="grid-fluid" style={{ ["--min"as string]: "200px" }}>{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-2xl bg-surface2" />)}</div><Btn onClick={() => { setState("ok"); }}>Finish loading</Btn></Page>;
+  const k = kpis;
   const isEmpty = state === "empty";
   return (
     <Page>
