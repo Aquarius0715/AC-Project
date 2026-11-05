@@ -2,6 +2,7 @@
 // the dialog, Tab and Shift+Tab stay inside it, Escape closes it and focus returns to the trigger. One dialog per app;
 // opening them changes nothing, and nothing in them is refused by the CSP.
 import { test, expect } from "../../fixtures/test";
+import { must } from "../../fixtures/must";
 
 const DIALOGS: Record<string, [path: string, trigger: string | RegExp]> = {
   customer: ["/customer/users", "Add user"],
@@ -11,7 +12,7 @@ const DIALOGS: Record<string, [path: string, trigger: string | RegExp]> = {
 };
 
 test("a dialog opened by keyboard keeps focus inside and returns it to its trigger", async ({ page, app }) => {
-  const [path, name] = DIALOGS[app.id];
+  const [path, name] = must(DIALOGS[app.id]);
   // the dialog's parts (the shadcn/ui Dialog on Base UI, DEC-75) add nothing the CSP refuses
   await page.addInitScript(() => { document.addEventListener("securitypolicyviolation", (e) => ((globalThis as unknown as { refused: string[] }).refused ??= []).push(e.violatedDirective)); });
   await page.goto(path);

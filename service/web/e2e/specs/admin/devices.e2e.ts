@@ -11,7 +11,7 @@ test("the device list filters by state and the detail shows the device as Figma 
   const list = main.getByRole("heading", { name: "Devices", exact: true }).locator('xpath=ancestor::*[self::section or @data-slot="card"][1]');
   const serials = async () => {
     const texts = await list.getByRole("button").allInnerTexts();
-    return texts.map((x) => x.split("\n", 1)[0].trim());
+    return texts.map((x) => (x.split("\n", 1)[0] ?? "").trim());
   };
   await expect(list.getByRole("button").first()).toBeVisible();
   const seed = async () => {

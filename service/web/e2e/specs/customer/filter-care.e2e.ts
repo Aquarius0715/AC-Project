@@ -65,7 +65,7 @@ test("Request cleaning opens New request for that AC, prefilled", async ({ page 
   await request.first().click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
-  expect(await dialog.locator("select").first().evaluate((s: HTMLSelectElement) => s.options[s.selectedIndex].text)).toContain(unit);
+  expect(await dialog.locator("select").first().evaluate((s: HTMLSelectElement) => s.options[s.selectedIndex]?.text ?? "")).toContain(unit);
   await expect(dialog.getByRole("button", { name: "Preventive" })).toHaveAttribute("aria-pressed", "true");
   await expect(dialog.locator("textarea")).not.toHaveValue("");
   await dialog.getByRole("button", { name: "Cancel" }).click();

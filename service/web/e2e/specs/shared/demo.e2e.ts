@@ -3,6 +3,7 @@
 // session. The clock is moved only with E2E_ADVANCE_CLOCK=1, because the demo clock never goes back.
 import { test, expect } from "../../fixtures/test";
 import { signIn } from "../../fixtures/auth";
+import { must } from "../../fixtures/must";
 
 test("the panel is labelled demo and shows the Core API clock", async ({ page }) => {
   await page.goto("/demo");
@@ -31,7 +32,7 @@ test("a device loses its connection and gets it back", async ({ page }) => {
   const online = options.findIndex((o) => o.endsWith(' · online') && !o.startsWith("Mock · "));
   test.skip(online === -1, "no online device to take offline");
   await select.selectOption({ index: online });
-  const unit = options[online].split(" · ", 1)[0];
+  const unit = must(options[online]).split(" · ", 1)[0] ?? "";
   await page.getByRole("button", { name: /Device offline/ }).click();
   await expect(page.getByText(`${unit}: connection lost`)).toBeVisible();
   await expect(select.locator("option:checked")).toHaveText(/ · offline · fault open$/);

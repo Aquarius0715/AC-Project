@@ -7,6 +7,7 @@ import path from "node:path";
 import { createHmac } from "node:crypto";
 import type { Page } from "@playwright/test";
 import type { App } from "./apps";
+import { must } from "./must";
 
 interface Credential { type: string; value?: string; secretData?: string }
 const REALM = path.resolve(__dirname, "../../../../docker/keycloak/realm-ac.json");
@@ -34,7 +35,7 @@ export function totp(secret: string, at = Date.now()): string {
   const counter = Buffer.alloc(8);
   counter.writeBigUInt64BE(BigInt(Math.floor(at / 30_000)));
   const h = createHmac("sha1", Buffer.from(secret, "utf8")).update(counter).digest();
-  const o = h[h.length - 1] & 15;
+  const o = must(h.at(-1)) & 15;
   return String((h.readUInt32BE(o) & 0x7F_FF_FF_FF) % 1_000_000).padStart(6, "0");
 }
 
@@ -47,7 +48,7 @@ export function totpBase32(key: string, at = Date.now()): string {
   const counter = Buffer.alloc(8);
   counter.writeBigUInt64BE(BigInt(Math.floor(at / 30_000)));
   const h = createHmac("sha1", bytes).update(counter).digest();
-  const o = h[h.length - 1] & 15;
+  const o = must(h.at(-1)) & 15;
   return String((h.readUInt32BE(o) & 0x7F_FF_FF_FF) % 1_000_000).padStart(6, "0");
 }
 

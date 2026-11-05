@@ -43,7 +43,8 @@ test("the audit log keeps its filters and the open entry in the URL", async ({ p
   await expect(fact(detail.first(), "Role at the time")).toContainText("kept as recorded, not rewritten by the current membership");
   const targetText = await fact(detail.first(), "Target").locator("span.font-mono").innerText();
   const target = targetText.trim(); // "kind · id"
-  const [kind, id] = target.split(" · ", 2);
+  const [kindText, idText] = target.split(" · ", 2);
+  const kind = must(kindText, "the target kind"), id = must(idText, "the target id");
 
   // Filter by target keeps the entry open; every shown entry has that target; the chip clears it
   await detail.first().getByRole("button", { name: "Filter by target" }).click();

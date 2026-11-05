@@ -9,7 +9,7 @@ test("a job-status row opens the Jobs tab for that period", async ({ page }) => 
   await expect(rows.first()).toBeVisible();
   const texts = await rows.allInnerTexts();
   const i = Math.max(0, texts.findIndex((t) => /\s[1-9]\d*$/.test(t.replaceAll(/\s+/g, " ").trim())));
-  const count = Number((/(\d+)$/.exec(texts[i].replaceAll(/\s+/g, " ").trim()))?.[1] ?? 0);
+  const count = Number((/(\d+)$/.exec(must(texts[i]).replaceAll(/\s+/g, " ").trim()))?.[1] ?? 0);
   const href = must((await rows.nth(i).getAttribute("href")));
   expect(href).toMatch(/[?&]from=.+&to=.+/);
   await rows.nth(i).click();

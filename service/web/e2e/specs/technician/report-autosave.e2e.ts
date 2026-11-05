@@ -40,7 +40,7 @@ test("the report autosaves once, 20 s after the last edit", async ({ browser }) 
     const edited = Date.now();
     await result.selectOption({ label: "Normal" });
     await page.waitForResponse((r) => r.request().method() === "POST" && new URL(r.url()).pathname.startsWith("/technician/jobs/") && r.request().postData() !== null, { timeout: 60_000 });
-    const firstSave = saves[0];
+    const firstSave = must(saves[0], "the first save");
     expect(firstSave - edited).toBeGreaterThanOrEqual(18_000);
     await page.waitForTimeout(3000);
     expect(saves).toHaveLength(1);

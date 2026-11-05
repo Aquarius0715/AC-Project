@@ -31,7 +31,7 @@ test("a customer request reaches the partner's technician", async ({ browser }) 
       await dialog.getByLabel(/Symptoms/).fill("E2E scenario: water drips from the indoor unit.");
       await dialog.getByLabel(/Contact window/).fill("Weekdays 09:00-18:00");
       const selected = await dialog.getByRole("combobox", { name: "Unit", exact: true }).evaluate((s: HTMLSelectElement) => s.selectedOptions[0]?.text ?? "");
-      unitName = selected.split(" · ", 1)[0];
+      unitName = selected.split(" · ", 1)[0] ?? "";
       expect(unitName).not.toBe("");
       if ((await dialog.getByLabel("Date 1", { exact: true }).inputValue()) <= "2026-09-20") {
         for (const [n, date] of [[1, "2026-09-21"], [2, "2026-09-22"], [3, "2026-09-23"]] as const) await dialog.getByLabel(`Date ${String(n)}`, { exact: true }).fill(date);

@@ -37,7 +37,7 @@ test("the alerts tab filters in the URL and opens a job or the unit from an aler
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: /New maintenance job/ })).toBeVisible();
   await expect(dialog.locator("textarea")).toHaveValue(/^Alert [0-9a-f]{8}: Possible open window — /); // the symptom from the alert
-  expect(await dialog.locator("select").first().evaluate((s: HTMLSelectElement) => s.options[s.selectedIndex].text)).toContain("Bedroom AC");
+  expect(await dialog.locator("select").first().evaluate((s: HTMLSelectElement) => s.options[s.selectedIndex]?.text ?? "")).toContain("Bedroom AC");
   await dialog.getByRole("button", { name: "Cancel" }).click(); // nothing is created
   await expect(dialog).toHaveCount(0);
   await page.waitForURL((u) => !u.searchParams.has("new"));

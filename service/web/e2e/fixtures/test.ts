@@ -1,9 +1,10 @@
 // The test object of the suite: every project passes its app (fixtures/apps.ts) as the `app` option.
 import { test as base,  } from "@playwright/test";
 import { APPS, type App } from "./apps";
+import { must } from "./must";
 
 export const test = base.extend<object, { app: App }>({
-  app: [APPS[0], { option: true, scope: "worker" }],
+  app: [must(APPS[0]), { option: true, scope: "worker" }],
   // page.goto waits until the app's page has hydrated (UIProviders sets <html data-hydrated>): a click or a keystroke
   // before that is lost, which made specs flaky on a busy CI runner. Only the app's own HTML pages carry the mark.
   page: async ({ page, baseURL }, use) => {
