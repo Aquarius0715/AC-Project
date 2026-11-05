@@ -17,6 +17,7 @@ import type { MaintenanceLive } from "../_lib/load";
 import { FilterCareTab, type CleaningPrefill } from "./filter-care";
 import { Icon } from "@ac/web/components/Icon";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
+import { oneOf } from "@ac/web/lib/oneOf";
 
 type Detail = NonNullable<MaintenanceLive["detail"]>;
 interface Slot { startAt: string; endAt: string }
@@ -67,7 +68,7 @@ export function MaintenanceView({ live }: Readonly<{ live: MaintenanceLive }>) {
         <PageHead title={t("My requests")} sub={t(live.rows.length === 1 ? "{n} request · sorted by status (business order)" : "{n} requests · sorted by status (business order)", { n: live.rows.length })} action={<Btn variant="primary" onClick={() => { setModal("new"); }}><Icon name="add" /> {t("New maintenance request")}</Btn>} />
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Tabs value={tab} onChange={setTab} tabs={STATUS_TABS.filter(([s]) => s !== "reply" || replies > 0).map(([id, label]) => ({ id, label: t(label), count: count(id) }))} />
-          <Select aria-label={t("Origin")} value={origin} onChange={(e) => { setOrigin(e.target.value as typeof origin); }} className="w-auto"><option value="all">{t("Origin: All")}</option><option value="request">{t("Origin: Client request")}</option><option value="plan">{t("Origin: Periodic plan")}</option></Select>
+          <Select aria-label={t("Origin")} value={origin} onChange={(e) => { setOrigin(oneOf(["all", "request", "plan"] as const, e.target.value, origin)); }} className="w-auto"><option value="all">{t("Origin: All")}</option><option value="request">{t("Origin: Client request")}</option><option value="plan">{t("Origin: Periodic plan")}</option></Select>
         </div>
         <div className={cx("grid gap-4", d ? "grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" : "grid-cols-1")}>
           <div className="flex min-w-0 flex-col gap-2">
@@ -305,13 +306,14 @@ function RateModal({ d, onClose, onFail }: ModalProps & { d: Detail }) {
   const t = useT();
   const j = d.job;
   const [pending, run] = useAction();
-  const [stars, setStars] = useState(j.rating?.stars ?? 0);
+  const STARS = [1, 2, 3, 4, 5] as const;
+  const [stars, setStars] = useState<(typeof STARS)[number] | 0>(STARS.find((s) => s === j.rating?.stars) ?? 0);
   const [tags, setTags] = useState<string[]>(j.rating?.tags ?? []);
   const [comment, setComment] = useState(j.rating?.comment ?? "");
   const [tried, setTried] = useState(false);
   return (
-    <Modal open onClose={() => { onClose(); }} title={t(j.rating ? "Edit rating {job}" : "Confirm & rate {job}", { job: j.id.slice(0, 8) })} footer={<><Btn onClick={() => { onClose(); }}>{t("Not now")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!stars) return; run(() => rateJob(j.id, j.version, stars as 1 | 2 | 3 | 4 | 5, tags, comment), t("Thanks — rating saved"), () => { onClose(t(j.rating ? "Thanks — rating updated ({stars} of 5 stars)." : "Thanks — job confirmed and rated ({stars} of 5 stars).", { stars })); }, onFail); }}>{t(j.rating ? "Save rating" : "Confirm & submit")}</Btn></>}>
-      <Field label={t("How was the service? (required)")} error={tried && !stars ? t("Choose 1–5 stars") : undefined}><div className="flex gap-1 text-2xl">{[1, 2, 3, 4, 5].map((n) => <Plain key={n} type="button" aria-label={t("{n} stars", { n })} aria-pressed={n === stars} onClick={() => { setStars(n); }} className={n <= stars ? "text-[#f59e0b]" : "text-line"}><Icon name="star" filled /></Plain>)}</div></Field>
+    <Modal open onClose={() => { onClose(); }} title={t(j.rating ? "Edit rating {job}" : "Confirm & rate {job}", { job: j.id.slice(0, 8) })} footer={<><Btn onClick={() => { onClose(); }}>{t("Not now")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!stars) return; run(() => rateJob(j.id, j.version, stars, tags, comment), t("Thanks — rating saved"), () => { onClose(t(j.rating ? "Thanks — rating updated ({stars} of 5 stars)." : "Thanks — job confirmed and rated ({stars} of 5 stars).", { stars })); }, onFail); }}>{t(j.rating ? "Save rating" : "Confirm & submit")}</Btn></>}>
+      <Field label={t("How was the service? (required)")} error={tried && !stars ? t("Choose 1–5 stars") : undefined}><div className="flex gap-1 text-2xl">{STARS.map((n) => <Plain key={n} type="button" aria-label={t("{n} stars", { n })} aria-pressed={n === stars} onClick={() => { setStars(n); }} className={n <= stars ? "text-[#f59e0b]" : "text-line"}><Icon name="star" filled /></Plain>)}</div></Field>
       {/* the tags are stored in English (the API's values); only their labels follow the language */}
       <Field label={t("What went well? (optional)")}><div className="flex flex-wrap gap-1.5">{RATING_TAGS.map((tag) => <Plain key={tag} type="button" aria-pressed={tags.includes(tag)} onClick={() => { setTags((s) => (s.includes(tag) ? s.filter((x) => x !== tag) : [...s, tag])); }} className={cx("rounded-full border px-3 py-1 text-xs font-semibold", tags.includes(tag) ? "border-primary bg-primary-soft text-primary" : "border-line")}>{t(tag)}</Plain>)}</div></Field>
       {stars > 0 && stars <= 2 && <Banner tone="warn">{t("What went wrong? You can also “Report a problem” — HQ then looks at it as a follow-up.")}</Banner>}
