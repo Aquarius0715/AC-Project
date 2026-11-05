@@ -8,6 +8,7 @@ import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { baselineDraft, baselineErrors, baselineInput, type BaselineDraft, type BaselineRow, type SummaryView } from "@ac/web/lib/energy";
 import { focusField } from "@ac/web/lib/focusField";
 import { saveBaseline } from "../actions";
+import { keysOf } from "@ac/web/lib/keysOf";
 import { Icon } from "@ac/web/components/Icon";
 
 interface UnitOption { id: string; label: string; customerId: string; propertyId: string }
@@ -122,7 +123,7 @@ function Baselines({ live, l }: Readonly<{ live: EnergyLive; l: NonNullable<Ener
   const save = () => {
     setTried(true);
     // a failed save takes focus to the first field to fix, top to bottom (IR586, as IR573)
-    const bad = (Object.keys(ids) as (keyof typeof ids)[]).find((k) => errors[k]);
+    const bad = keysOf(ids).find((k) => errors[k]);
     if (bad) { focusField(ids[bad]); return; }
     run(() => saveBaseline(baselineInput(d, sel?.id), sel?.version), (b) => (sel ? t("Saved as baseline version {v}", { v: b.version }) : t("Baseline created")), (b) => { setCreating(false); nav({ baselineId: b.id }); });
   };

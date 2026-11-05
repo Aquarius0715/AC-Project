@@ -9,6 +9,7 @@ import type { CompareRow, Period, PeriodKind } from "@ac/web/lib/clientEnergy";
 import { intlTag } from "@ac/web/lib/i18n";
 import { useLocale, useT } from "@ac/web/components/I18n";
 import { exportReport, type ReportFile, type ReportInput } from "../actions";
+import { keysOf } from "@ac/web/lib/keysOf";
 import { Icon } from "@ac/web/components/Icon";
 
 export interface EnergyLive {
@@ -166,7 +167,7 @@ function ExportModal({ live, onClose }: Readonly<{ live: EnergyLive; onClose: ()
         <div className="flex flex-col gap-3">
           <Field label={t("Month")} hint={t("Completed months only")}><Select value={month} onChange={(e) => { setMonth(e.target.value); }}>{months.map((m) => <option key={m} value={m}>{label(m)}</option>)}</Select></Field>
           <Field label={t("Locations")}><div className="flex flex-wrap gap-3">{live.properties.map((p) => <Check key={p.id} label={p.name} checked={props.includes(p.id)} onChange={(on) => { setProps(on ? [...props, p.id] : props.filter((x) => x !== p.id)); }} />)}</div></Field>
-          <Field label={t("Include")}><div className="flex flex-col gap-1">{(Object.keys(sectionLabel) as Section[]).map((k) => <Check key={k} label={t(sectionLabel[k])} checked={sections.includes(k)} onChange={(on) => { setSections(on ? [...sections, k] : sections.filter((x) => x !== k)); }} />)}</div></Field>
+          <Field label={t("Include")}><div className="flex flex-col gap-1">{keysOf(sectionLabel).map((k) => <Check key={k} label={t(sectionLabel[k])} checked={sections.includes(k)} onChange={(on) => { setSections(on ? [...sections, k] : sections.filter((x) => x !== k)); }} />)}</div></Field>
           <Field label={t("Format")}><Choice value={format} onChange={(v: "pdf" | "csv") => { setFormat(v); }} options={[{ id: "pdf", label: "PDF" }, { id: "csv", label: t("CSV (raw data)") }]} /></Field>
           {live.prefs && <Check label={t("Email this report to me every month")} checked={email} onChange={setEmail} />}
           {errorText && <p className="text-xs text-crit">{errorText}</p>}

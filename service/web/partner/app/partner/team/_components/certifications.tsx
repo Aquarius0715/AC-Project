@@ -9,6 +9,7 @@ import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { certificateErrors, certificateRefusal, fileSize, FILE_TYPES, type CertForm, type CertRow } from "@ac/web/lib/partnerCertificates";
 import { requestTraining, submitCertificate } from "../actions";
 import type { TeamLive } from "../_lib/load";
+import { keysOf } from "@ac/web/lib/keysOf";
 import { Icon } from "@ac/web/components/Icon";
 
 type Live = Extract<TeamLive, { notFound: false }>;
@@ -113,7 +114,7 @@ function CertificateModal({ live, kind, row, onClose }: Readonly<{ live: Live; k
     setTried(true);
     const e = certificateErrors(form, t);
     // a refused submit takes focus to the first field to fix, top to bottom (IR593, as IR586)
-    const bad = (Object.keys(ids) as (keyof typeof ids)[]).find((k) => e[k] !== undefined || (k === "file" && !file));
+    const bad = keysOf(ids).find((k) => e[k] !== undefined || (k === "file" && !file));
     if (bad) { focusField(ids[bad]); return; }
     if (!file) return;
     const data = new FormData();

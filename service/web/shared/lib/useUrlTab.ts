@@ -1,5 +1,6 @@
 "use client";
 
+import { keysOf } from "@ac/web/lib/keysOf";
 import { setSearchParameter, useSearchParameter } from "@ac/web/lib/urlState";
 
 /**
@@ -9,6 +10,6 @@ read through an external store (no effect, no Suspense boundary) and written wit
 */
 export function useUrlTab<T extends string>(map: Record<T, string>, fallback: T): [T, (t: T) => void] {
   const v = useSearchParameter("tab");
-  const tab = (Object.keys(map) as T[]).find((key) => map[key] === v) ?? fallback;
+  const tab = keysOf(map).find((key) => map[key] === v) ?? fallback;
   return [tab, (t: T) => { setSearchParameter("tab", map[t]); }];
 }

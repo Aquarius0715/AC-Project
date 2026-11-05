@@ -8,6 +8,7 @@ import { EN, showDate, showTime, translator, zonedParts, type I18n, type T, text
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { planLabel } from "@ac/web/lib/contracts";
 import { csvQuoted } from "@ac/web/lib/csv";
+import { keysOf } from "@ac/web/lib/keysOf";
 import type { IconName } from "@ac/web/components/Icon";
 
 const en = translator("en");
@@ -100,7 +101,7 @@ export const breachRows = (sc: ApiScorecard, names: Map<string, string>, t: T = 
 export function targetsByPlan(targets: ApiTargetView[], i: I18n = EN) {
   const { t, display } = i;
   // a plan type without a target in force is not shown
-  const current = (Object.keys(planLabel) as PlanType[]).map((plan) => ({ plan, now: targets.find((x) => x.planType === plan && x.state !== "scheduled") }));
+  const current = keysOf(planLabel).map((plan) => ({ plan, now: targets.find((x) => x.planType === plan && x.state !== "scheduled") }));
   return current.filter((x): x is { plan: PlanType; now: ApiTargetView } => x.now !== undefined).map(({ plan, now }) => {
     const next = targets.filter((x) => x.planType === plan && x.state === "scheduled");
     const since = now.state === "default" ? t("default") : t("v{v} since {date}", { v: now.version, date: showDate(now.effectiveFrom, display) });

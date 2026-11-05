@@ -11,6 +11,7 @@ import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { typeLabel } from "@ac/web/lib/partnerJobDetail";
 import { kpis, lineRows, money, periodLabel, questionRows, statementRows, topicLabel, type ApiPayoutStatement, type JobLabel, type ReviewingJob } from "@ac/web/lib/partnerPayouts";
 import type { PayoutsLive } from "../_components/payouts-view";
+import { keysOf } from "@ac/web/lib/keysOf";
 import { byText } from "@ac/web/lib/order";
 
 const quiet = orAbsent;
@@ -40,7 +41,7 @@ export async function loadPayouts(options: { statementId?: string; period?: stri
   const live: PayoutsLive = {
     periods: [...new Set(all.map((s) => s.period))].toSorted(byText).toReversed().map((p) => ({ value: p, text: periodLabel(p, display.locale) })), period: options.period ?? "", status: status ?? "",
     statements: statementRows(shown, i), selected: null, company: who.organizationName || t("your company"),
-    topics: (Object.keys(topicLabel) as (keyof typeof topicLabel)[]).map((x) => ({ id: x, text: t(topicLabel[x]) })),
+    topics: keysOf(topicLabel).map((x) => ({ id: x, text: t(topicLabel[x]) })),
   };
   if (!selected) return live;
   const [cards, labels, inReview] = await Promise.all([

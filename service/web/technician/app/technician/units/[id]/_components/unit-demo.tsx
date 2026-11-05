@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Banner, Card, ConnBadge, LineChart, Page, SeverityBadge, SummaryList, Tabs, Plain } from "@ac/web/components/ui";
+import { keysOf } from "@ac/web/lib/keysOf";
 import { Icon } from "@ac/web/components/Icon";
 
 const comps = { Indoor: ["Filter: attention (2026-06-12)"], Outdoor: ["All normal (2026-06-12)"], Electrical: ["Capacitor not inspected — reason given"] };
@@ -25,7 +26,7 @@ export function TechUnitDemo({ id }: Readonly<{ id: string }>) {
         <div className="split">
           <div className="flex min-w-0 flex-col gap-4">
             <Card title="Unit register"><SummaryList cols={2} items={[["Location", "customer-a · Home A › 1F › Bedroom"], ["Manufacturer / model", isMissing ? "Not registered" : "AC-Co / ventilation-demo v3"], ["Configuration", isMissing ? "Not registered" : "Split · 2.5 kW · R32"], ["Installed", isMissing ? "Not registered" : "2025-03-01"], ["Capability version", "3"], ["Maintenance scope", "Indoor · Outdoor · Electrical"]]} /><p className="mt-2 text-xs text-muted-foreground">18 components across 3 groups (8 indoor, 5 outdoor, 5 electrical) — see Job Workspace for inspection.</p></Card>
-            <Card title="Components (18) · last inspection"><div className="grid-fluid" style={{ ["--min"as string]: "200px" }}>{(Object.keys(comps) as (keyof typeof comps)[]).map((g) => <div key={g} className="rounded-xl bg-surface2 p-3"><b className="text-[13px]">{g} · {counts[g]} components</b>{comps[g].map((c) => <div key={c} className="text-xs text-muted-foreground">{c}</div>)}</div>)}</div></Card>
+            <Card title="Components (18) · last inspection"><div className="grid-fluid" style={{ ["--min"as string]: "200px" }}>{keysOf(comps).map((g) => <div key={g} className="rounded-xl bg-surface2 p-3"><b className="text-[13px]">{g} · {counts[g]} components</b>{comps[g].map((c) => <div key={c} className="text-xs text-muted-foreground">{c}</div>)}</div>)}</div></Card>
             <Card title="Maintenance history">{[["job-contractor-a · Reactive", "today 10:00–12:00 · you"], ["job-c01 · Preventive", "2026-06-12 · filter replaced"], ["job-a17 · Installation check", "2025-03-01 · commissioning"]].map(([a, b]) => <div key={a} className="border-t border-line py-2 text-[13px] first:border-0"><b>{a}</b><div className="text-xs text-muted-foreground">{b}</div></div>)}</Card>
           </div>
           <div className="flex min-w-0 flex-col gap-4">
