@@ -209,12 +209,10 @@ function ChartTooltipContent({
                               "my-0.5": isNestLabel && indicator === "dashed",
                             }
                           )}
-                          style={
-                            {
-                              "--color-bg": indicatorColor,
-                              "--color-border": indicatorColor,
-                            } as CSSProperties
-                          }
+                          style={cssVariables({
+                            "--color-bg": indicatorColor,
+                            "--color-border": indicatorColor,
+                          })}
                         />
                       )
                     )}
@@ -304,6 +302,17 @@ function ChartLegendContent({
   )
 }
 
+/** A string property of an object of unknown shape, or undefined. */
+function stringAt(source: object, key: string): string | undefined {
+  const value: unknown = Reflect.get(source, key)
+  return typeof value === "string" ? value : undefined
+}
+
+/** Inline CSS custom properties (a style prop takes them only as CSSProperties). */
+function cssVariables(variables: Record<`--${string}`, string | undefined>): CSSProperties {
+  return Object.assign({}, variables)
+}
+
 function getPayloadConfigFromPayload(
   config: ChartConfig,
   payload: unknown,
@@ -320,22 +329,10 @@ function getPayloadConfigFromPayload(
       ? payload.payload
       : undefined
 
-  let configLabelKey: string = key
-
-  if (
-    key in payload &&
-    typeof payload[key as keyof typeof payload] === "string"
-  ) {
-    configLabelKey = payload[key as keyof typeof payload]
-  } else if (
-    payloadPayload &&
-    key in payloadPayload &&
-    typeof payloadPayload[key as keyof typeof payloadPayload] === "string"
-  ) {
-    configLabelKey = payloadPayload[
-      key as keyof typeof payloadPayload
-    ]
-  }
+  const configLabelKey =
+    stringAt(payload, key) ??
+    (payloadPayload ? stringAt(payloadPayload, key) : undefined) ??
+    key
 
   return (configLabelKey in config ? config[configLabelKey] : config[key]) ?? null
 }
