@@ -61,30 +61,42 @@ const req = (id: string, p: Partial<Job> & Pick<Job, "unitId" | "unit" | "loc" |
   };
 };
 
+const BEDROOM_LOC = "Home A › 1F › Bedroom";
+const WIN_AFTERNOON = "14:00–16:00";
+const WIN_LATE_MORNING = "10:00–12:00";
+const WIN_MORNING = "09:00–11:00";
+const DAY_0915 = "2026-09-15";
+const TECH_INTERNAL_A = "tech-internal-a";
+const CONTRACTOR_A = "contractor-a";
+const UNIT_NON_RTO = "unit-non-rto";
+const LIVING_UNIT = "Living room AC";
+const LIVING_LOC = "Home A › 1F › Living room";
+const PLAN_LIVING_A = "plan-living-a";
+
 export const SEED: Job[] = [
-  req("job-c07", { unitId: "unit-bedroom-2", unit: "Bedroom AC #2", loc: "Home A › 1F › Bedroom", type: "Reactive", symptom: "Cold air is weak and there is water dripping from the indoor unit.", status: "requested",
-    preferred: [{ date: "2026-09-28", win: "14:00–16:00" }, { date: "2026-09-29", win: "10:00–12:00" }, { date: "2026-09-30", win: "09:00–11:00" }],
+  req("job-c07", { unitId: "unit-bedroom-2", unit: "Bedroom AC #2", loc: BEDROOM_LOC, type: "Reactive", symptom: "Cold air is weak and there is water dripping from the indoor unit.", status: "requested",
+    preferred: [{ date: "2026-09-28", win: WIN_AFTERNOON }, { date: "2026-09-29", win: WIN_LATE_MORNING }, { date: "2026-09-30", win: WIN_MORNING }],
     history: [{ at: "09-22 09:14", text: "customer-a submitted the request with 3 preferred times" }] }),
-  req("job-c04", { unitId: "unit-online-rto", unit: "Bedroom AC", loc: "Home A › 1F › Bedroom", type: "Reactive", symptom: "AC is making a rattling noise and airflow feels weaker than usual since yesterday evening.", status: "in_progress",
-    preferred: [{ date: "2026-09-15", win: "10:00–12:00" }, { date: "2026-09-16", win: "14:00–16:00" }, { date: "2026-09-17", win: "09:00–11:00" }], scheduled: { date: "2026-09-15", win: "10:00–12:00" }, delivery: "internal", technician: "tech-internal-a", techAck: { status: "accepted", at: "09-14 21:05" },
+  req("job-c04", { unitId: "unit-online-rto", unit: "Bedroom AC", loc: BEDROOM_LOC, type: "Reactive", symptom: "AC is making a rattling noise and airflow feels weaker than usual since yesterday evening.", status: "in_progress",
+    preferred: [{ date: DAY_0915, win: WIN_LATE_MORNING }, { date: "2026-09-16", win: WIN_AFTERNOON }, { date: "2026-09-17", win: WIN_MORNING }], scheduled: { date: DAY_0915, win: WIN_LATE_MORNING }, delivery: "internal", technician: TECH_INTERNAL_A, techAck: { status: "accepted", at: "09-14 21:05" },
     history: [{ at: "09-14 20:10", text: "Requested with 3 preferred times" }, { at: "09-14 21:00", text: "HQ booked the 1st preferred time · tech-internal-a" }, { at: "09-15 10:05", text: "Technician on site" }] }),
   req("job-c05", { unitId: "unit-kitchen-a", unit: "Kitchen AC", loc: "Home A › 1F › Kitchen", type: "Preventive", symptom: "Yearly preventive check before the hot season.", status: "assigned",
-    preferred: [{ date: "2026-09-25", win: "09:00–11:00" }, { date: "2026-09-26", win: "09:00–11:00" }, { date: "2026-09-28", win: "09:00–11:00" }], scheduled: { date: "2026-09-25", win: "09:00–11:00" }, delivery: "contractor", contractor: "contractor-a", technician: "tech-external-a2", techAck: { status: "accepted", at: "09-21 08:30" },
+    preferred: [{ date: "2026-09-25", win: WIN_MORNING }, { date: "2026-09-26", win: WIN_MORNING }, { date: "2026-09-28", win: WIN_MORNING }], scheduled: { date: "2026-09-25", win: WIN_MORNING }, delivery: "contractor", contractor: CONTRACTOR_A, technician: "tech-external-a2", techAck: { status: "accepted", at: "09-21 08:30" },
     history: [{ at: "09-20 10:00", text: "Requested with 3 preferred times" }, { at: "09-20 11:00", text: "Offered to contractor-a at the 1st preferred time" }, { at: "09-21 08:30", text: "tech-external-a2 accepted the assignment" }] }),
-  req("job-c03", { unitId: "unit-non-rto", unit: "Living room AC", loc: "Home A › 1F › Living room", type: "Reactive", symptom: "Unit trips the breaker after 10 minutes.", status: "rework_requested", scheduled: { date: "2026-08-22", win: "14:00–16:00" }, delivery: "internal", technician: "tech-internal-a", techAck: { status: "accepted" },
+  req("job-c03", { unitId: UNIT_NON_RTO, unit: LIVING_UNIT, loc: LIVING_LOC, type: "Reactive", symptom: "Unit trips the breaker after 10 minutes.", status: "rework_requested", scheduled: { date: "2026-08-22", win: WIN_AFTERNOON }, delivery: "internal", technician: TECH_INTERNAL_A, techAck: { status: "accepted" },
     history: [{ at: "08-22 16:30", text: "Report returned by HQ for rework" }] }),
-  req("job-c02", { unitId: "unit-non-rto", unit: "Living room AC", loc: "Home A › 1F › Living room", origin: "plan", planId: "plan-living-a", planVisit: "3 of 4", type: "Periodic", symptom: "Periodic inspection & filter cleaning", status: "completed", scheduled: { date: "2026-09-08", win: "09:00–11:00" }, delivery: "internal", technician: "tech-internal-b", techAck: { status: "accepted" },
+  req("job-c02", { unitId: UNIT_NON_RTO, unit: LIVING_UNIT, loc: LIVING_LOC, origin: "plan", planId: PLAN_LIVING_A, planVisit: "3 of 4", type: "Periodic", symptom: "Periodic inspection & filter cleaning", status: "completed", scheduled: { date: "2026-09-08", win: WIN_MORNING }, delivery: "internal", technician: "tech-internal-b", techAck: { status: "accepted" },
     history: [{ at: "09-08 15:00", text: "Report accepted by HQ" }] }),
-  req("job-c08", { unitId: "unit-non-rto", unit: "Living room AC", loc: "Home A › 1F › Living room", origin: "plan", planId: "plan-living-a", planVisit: "4 of 4", type: "Periodic", symptom: "Periodic inspection & filter cleaning", status: "assigned", scheduled: { date: "2026-12-08", win: "09:00–11:00" }, delivery: "internal", technician: "tech-internal-b", techAck: { status: "accepted", at: "11-09 09:00" },
+  req("job-c08", { unitId: UNIT_NON_RTO, unit: LIVING_UNIT, loc: LIVING_LOC, origin: "plan", planId: PLAN_LIVING_A, planVisit: "4 of 4", type: "Periodic", symptom: "Periodic inspection & filter cleaning", status: "assigned", scheduled: { date: "2026-12-08", win: WIN_MORNING }, delivery: "internal", technician: "tech-internal-b", techAck: { status: "accepted", at: "11-09 09:00" },
     history: [{ at: "11-08 09:00", text: "Generated from plan-living-a · client notified" }] }),
   req("job-c01", { unitId: "unit-study-a", unit: "Study AC", loc: "Home A › 2F › Study", type: "Reactive", symptom: "Unit shows offline.", status: "cancelled", history: [{ at: "09-02 10:00", text: "Cancelled by client · resolved itself" }] }),
-  req("job-internal-a", { unitId: "unit-online-rto", unit: "Bedroom AC", loc: "Home A › 1F › Bedroom", type: "Reactive", symptom: "Unit shows offline since 08:12.", status: "requested",
-    preferred: [{ date: "2026-09-24", win: "10:00–12:00" }, { date: "2026-10-05", win: "14:00–16:00" }, { date: "2026-10-06", win: "10:00–12:00" }], history: [{ at: "09-14 08:20", text: "Requested by HQ on behalf of customer-a (phone)" }] }),
-  req("job-a11", { unitId: "unit-p-rooftop", unit: "Rooftop unit", loc: "Office B › Roof", customer: "customer-b", type: "Reactive", symptom: "Loud compressor noise.", status: "offered", scheduled: { date: "2026-09-24", win: "09:00–12:00" }, delivery: "contractor", contractor: "contractor-a",
+  req("job-internal-a", { unitId: "unit-online-rto", unit: "Bedroom AC", loc: BEDROOM_LOC, type: "Reactive", symptom: "Unit shows offline since 08:12.", status: "requested",
+    preferred: [{ date: "2026-09-24", win: WIN_LATE_MORNING }, { date: "2026-10-05", win: WIN_AFTERNOON }, { date: "2026-10-06", win: WIN_LATE_MORNING }], history: [{ at: "09-14 08:20", text: "Requested by HQ on behalf of customer-a (phone)" }] }),
+  req("job-a11", { unitId: "unit-p-rooftop", unit: "Rooftop unit", loc: "Office B › Roof", customer: "customer-b", type: "Reactive", symptom: "Loud compressor noise.", status: "offered", scheduled: { date: "2026-09-24", win: "09:00–12:00" }, delivery: "contractor", contractor: CONTRACTOR_A,
     history: [{ at: "09-21 09:00", text: "Re-offered to contractor-a after decline" }] }),
-  req("job-a06", { unitId: "unit-non-rto", unit: "Living room AC", loc: "Home A › 1F › Living room", origin: "plan", planId: "plan-living-a", planVisit: "Jun occurrence (2 of 4, visit moved to Sep 15)", type: "Periodic", symptom: "Periodic filter cleaning", status: "submitted", scheduled: { date: "2026-09-15", win: "10:00–12:00" }, delivery: "internal", technician: "tech-internal-a", techAck: { status: "accepted" },
+  req("job-a06", { unitId: UNIT_NON_RTO, unit: LIVING_UNIT, loc: LIVING_LOC, origin: "plan", planId: PLAN_LIVING_A, planVisit: "Jun occurrence (2 of 4, visit moved to Sep 15)", type: "Periodic", symptom: "Periodic filter cleaning", status: "submitted", scheduled: { date: DAY_0915, win: WIN_LATE_MORNING }, delivery: "internal", technician: TECH_INTERNAL_A, techAck: { status: "accepted" },
     history: [{ at: "09-15 11:48", text: "Report v1 submitted" }] }),
-  req("job-p09", { unitId: "unit-p-lobby", unit: "Lobby AC", loc: "Level 2 lobby", customer: "customer-b", origin: "plan", planId: "plan-lobby-b", planVisit: "quarterly", type: "Periodic", symptom: "Quarterly inspection", status: "submitted", scheduled: { date: "2026-09-16", win: "10:00–12:00" }, delivery: "contractor", contractor: "contractor-a", technician: "tech-external-a", techAck: { status: "accepted" },
+  req("job-p09", { unitId: "unit-p-lobby", unit: "Lobby AC", loc: "Level 2 lobby", customer: "customer-b", origin: "plan", planId: "plan-lobby-b", planVisit: "quarterly", type: "Periodic", symptom: "Quarterly inspection", status: "submitted", scheduled: { date: "2026-09-16", win: WIN_LATE_MORNING }, delivery: "contractor", contractor: CONTRACTOR_A, technician: "tech-external-a", techAck: { status: "accepted" },
     history: [{ at: "09-19 16:00", text: "Report v1 submitted · awaiting contractor review" }] }),
 ];
 
