@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { alertChoices, alertView, durationText, refusal, ruleWords, selectAlert, type ApiTechAlert } from "@ac/web/lib/techAlerts";
 import { EN, i18nOf } from "@ac/web/lib/i18n";
-import type { ApiUnitDetail } from "@ac/web/lib/units";
+import { unitDetail } from "./unitFixture";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const NOW = Date.parse("2026-09-14T01:35:00Z"); // 09:35 in Kuala Lumpur
@@ -12,10 +12,10 @@ const base: ApiTechAlert = {
   previousAlertId: "alert-temp-0", policyId: "p1", rule,
 };
 const earlier: ApiTechAlert = { ...base, id: "alert-temp-0", status: "resolved", detectedAt: "2026-09-02T02:00:00Z", resolvedAt: "2026-09-02T03:00:00Z", previousAlertId: null };
-const unit = {
+const unit = unitDetail({
   id: "u1", displayName: "Bedroom AC", location: { pathLabels: ["Home A", "1F", "Bedroom"], address: null, accessInstructions: null },
   latestMeasurements: [{ id: "m1", unitId: "u1", sensorId: "s", metric: "temperature", value: 30.4, unit: "°C", observedAt: "2026-09-14T01:35:00Z", origin: "measured", quality: "valid", qualityReason: null }],
-} as unknown as ApiUnitDetail;
+});
 const ctx = { alerts: [base, earlier], job: { id: "job-t07-0000", type: "preventive" }, canResolve: false, unit };
 
 describe("technician alert evidence", () => {

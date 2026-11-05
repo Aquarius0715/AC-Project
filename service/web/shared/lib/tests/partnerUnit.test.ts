@@ -3,18 +3,24 @@ import { chart, chartMetrics, contextJob, evidenceRows, jobContext, pastWork, re
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 import type { ApiAlert } from "@ac/web/lib/alerts";
 import type { ApiHistory } from "@ac/web/lib/partnerJobDetail";
+import { unitDetail } from "./unitFixture";
 import { i18nOf } from "@ac/web/lib/i18n";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const NOW = Date.parse("2026-09-14T01:35:00Z"); // 09:35 in Kuala Lumpur
-const m = (metric: string, value: number | null, unit: string, quality: "valid" | "stale" | "suspect" | "missing" = "valid") =>
+type Reading = ApiUnitDetail["latestMeasurements"][number];
+const m = (metric: Reading["metric"], value: number | null, unit: Reading["unit"], quality: Reading["quality"] = "valid"): Reading =>
   ({ id: metric, unitId: "u1", sensorId: "s", observedAt: "2026-09-14T01:35:00Z", origin: "measured" as const, qualityReason: null, metric, value, unit, quality });
-const unit = {
+const unit = unitDetail({
   id: "unit-p-rooftop", displayName: "Rooftop unit", connection: "online", lastSeenAt: "2026-09-14T01:35:00Z", serviceScope: ["indoor", "outdoor"],
-  location: { pathLabels: ["customer-b", "Tower A rooftop"], address: null, accessInstructions: null }, capabilities: { manufacturer: "cap-split-std", model: "v2" },
+  location: { pathLabels: ["customer-b", "Tower A rooftop"], address: null, accessInstructions: null },
+  capabilities: {
+    manufacturer: "cap-split-std", model: "v2", control: true, modeControl: true, fanControl: true, temperature: { min: 18, max: 30, step: 1 }, modes: ["cool", "dry", "fan"],
+    fanLevels: ["low", "mid", "high"], ventilation: false, ventilationLevels: [], sensors: [],
+  },
   observedState: { power: true, celsius: 22, mode: "cool", fanLevel: "mid", observedAt: "2026-09-14T01:35:00Z" },
   latestMeasurements: [m("temperature", 14.2, "°C"), m("refrigerant_pressure", 310, "kPa"), m("vibration", 2.1, "mm/s", "suspect")],
-} as unknown as ApiUnitDetail;
+});
 const job: ApiUnitJob = { projection: "summary", id: "job-p02-aaaa", type: "reactive", status: "accepted", scheduledSlot: null, technicianMembershipId: null, accessValidFrom: "2026-09-13T17:00:00Z", accessValidUntil: "2026-09-14T16:00:00Z" };
 
 describe("partner unit view", () => {

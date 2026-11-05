@@ -64,7 +64,7 @@ describe("run banner and state", () => {
     expect(runBanner(run({ state: "end_failed" }))?.text).toBe("The unit may still be running; check it on site.");
     expect(runBanner(run({ state: "end_blocked" }))?.title).toMatch(/^End blocked/);
     expect([null, run({ state: "completed" }), run({ state: "end_failed" })].map((item) => runActive(item))).toEqual([false, false, false]);
-    expect(["awaiting_start", "running", "end_requested"].map((s) => runActive(run({ state: s as ApiRun["state"] })))).toEqual([true, true, true]);
+    expect((["awaiting_start", "running", "end_requested"] as const).map((s) => runActive(run({ state: s })))).toEqual([true, true, true]);
   });
 });
 
@@ -86,15 +86,18 @@ describe("state tiles", () => {
 });
 
 describe("capability, restriction and refusals (IR286)", () => {
-  const unit = {
+  const unit: Pick<ApiUnitDetail, "capabilityVersion" | "connection" | "capabilities" | "effectiveControlPolicy" | "controlAvailability"> = {
     capabilityVersion: 3, connection: "online",
-    capabilities: { modeControl: true, modes: ["cool", "dry", "fan"], temperature: { min: 16, max: 30, step: 1 }, fanControl: true, fanLevels: ["low", "mid", "high"] },
+    capabilities: {
+      manufacturer: "AC-Co", model: "m1", control: true, modeControl: true, modes: ["cool", "dry", "fan"], temperature: { min: 16, max: 30, step: 1 }, fanControl: true, fanLevels: ["low", "mid", "high"],
+      ventilation: false, ventilationLevels: [], sensors: [],
+    },
     effectiveControlPolicy: { state: "restricted", phase: "active", policy: { kind: "temperature_limit", minimumCoolingSetpoint: 24 } },
     controlAvailability: { state: "blocked", reasonKey: "control.reconciliation_required" },
-  } as unknown as ApiUnitDetail;
+  };
   it("words what the unit allows and why control waits", () => {
     expect(capabilityText(unit)).toBe("Capability v3 allows: set_mode (cool/dry/fan), set_temperature 16–30 °C, set_fan (low/mid/high), test run 1–15 min.");
-    expect([restrictionText(unit), restrictionText({ effectiveControlPolicy: { state: "restricted", phase: "active", policy: { kind: "power_off" } } } as unknown as ApiUnitDetail), restrictionText({ effectiveControlPolicy: { state: "unrestricted" } })])
+    expect([restrictionText(unit), restrictionText({ effectiveControlPolicy: { state: "restricted", phase: "active", policy: { kind: "power_off" } } }), restrictionText({ effectiveControlPolicy: { state: "unrestricted" } })])
       .toEqual(["min 24 °C", "power off only", null]);
     expect(blockedText(unit)).toBe("the unit must be reconciled after a restriction");
     expect(blockedText({ controlAvailability: { state: "available" } })).toBeNull();
