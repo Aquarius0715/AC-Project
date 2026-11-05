@@ -9,7 +9,9 @@
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
-import { certDates } from "@ac/web/lib/partnerCertificates";
+import { certDates, certificateCode } from "@ac/web/lib/partnerCertificates";
+import { formValue } from "@ac/web/lib/formValue";
+import { documentMime } from "@ac/web/lib/uploads";
 import { uploadName, uploadType } from "@ac/web/lib/files";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import { formText } from "@ac/web/lib/formData";
@@ -52,8 +54,8 @@ export async function submitCertificate(form: FormData): Promise<Result<{ id: st
     const bytes = file instanceof File ? Buffer.from(await file.arrayBuffer()) : Buffer.alloc(0);
     const renewalOf = text("renewalOf");
     const c = await coreOp<{ id: string }>("certificates.submit", {
-      membershipId: text("membershipId"), code: text("code") as OpInput<"certificates.submit">["code"], name: text("name"), number: text("number"), ...certDates({ issued: text("issued"), expires: text("expires") }),
-      file: { name: file instanceof File ? uploadName(file.name) : "", mime: (file instanceof File ? uploadType(bytes, file.type) : "") as OpInput<"certificates.submit">["file"]["mime"], size: bytes.length, bytes: bytes.toString("base64") },
+      membershipId: text("membershipId"), code: formValue(certificateCode, text("code"), "code"), name: text("name"), number: text("number"), ...certDates({ issued: text("issued"), expires: text("expires") }),
+      file: { name: file instanceof File ? uploadName(file.name) : "", mime: formValue(documentMime, file instanceof File ? uploadType(bytes, file.type) : "", "file"), size: bytes.length, bytes: bytes.toString("base64") },
       ...(renewalOf && { renewalOf }),
     }, { write: true });
     refresh();
