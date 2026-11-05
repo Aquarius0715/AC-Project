@@ -12,7 +12,8 @@ import { codePoints } from "@ac/web/lib/text";
 const en = translator("en");
 export type Mode = "cool" | "dry" | "fan";
 export type Fan = "low" | "mid" | "high";
-export type Metric = "temperature" | "humidity" | "co2" | "pm25" | "power" | "vibration" | "refrigerant_pressure" | "compressor_cycles" | "airflow_drop" | "heartbeat_gap";
+export const metrics = ["temperature", "humidity", "co2", "pm25", "power", "vibration", "refrigerant_pressure", "compressor_cycles", "airflow_drop", "heartbeat_gap"] as const;
+export type Metric = (typeof metrics)[number];
 export type Connection = "online" | "offline" | "unknown" | "connecting" | "error";
 
 /** The fixed unit of each metric (DD-A04 boundary cases). */
@@ -20,7 +21,6 @@ export const metricUnit: Record<Metric, UnitSymbol> = {
   temperature: "°C", humidity: "%", co2: "ppm", pm25: "µg/m³", power: "kW", vibration: "mm/s", refrigerant_pressure: "kPa", compressor_cycles: "cycles/h",
   airflow_drop: "%", heartbeat_gap: "min",
 };
-export const metrics = Object.keys(metricUnit) as Metric[];
 export const modes: Mode[] = ["cool", "dry", "fan"];
 export const fans: Fan[] = ["low", "mid", "high"];
 
