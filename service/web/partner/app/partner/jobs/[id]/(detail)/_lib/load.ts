@@ -55,9 +55,9 @@ export async function loadJobDetail(jobId: string) {
       text: {
         expires: showTime(job.offerExpiresAt, display), visit: showSpan(job.visitSlot.startAt, job.visitSlot.endAt, display),
         access: showSpan(job.accessValidFrom, job.accessValidUntil, display), accessFrom: showTime(job.accessValidFrom, display), offered: showTime(job.offeredAt, display),
-        left: until(job.offerExpiresAt, ms, t), proposal: p ? showSpan(p.slot.startAt, p.slot.endAt, display) : null, offers, nth: ordinal(offers, display.locale),
+        left: until(job.offerExpiresAt, ms, t), proposal: p ? showSpan(p.slot.startAt, p.slot.endAt, display) : null, nth: ordinal(offers, display.locale),
         // Propose another time: typed in the display time zone (NFR-08), the day after the fixed visit by default
-        propose: { zone: display.timeZone, date: zonedParts(new Date(Date.parse(job.visitSlot.startAt) + 86_400_000).toISOString(), display.timeZone).date, from: start.time, to: zonedParts(job.visitSlot.endAt, display.timeZone).time },
+        propose: { zone: display.timeZone, date: zonedParts(new Date(Date.parse(job.visitSlot.startAt) + 86_400_000).toISOString(), display.timeZone).date, from: start.time, to: zonedParts(job.visitSlot.endAt, display.timeZone).time }, offers,
       },
       now,
       job,

@@ -55,10 +55,10 @@ export async function loadAlerts(unitId: string, sp: { jobId?: string; alertId?:
     ? await optional(coreOp<Page<ApiEvidenceCandidate>>("alerts.evidence", { alertId: selected.id, query: { limit: 100 } }).then((r) => evidenceRows(r.items, nowMs, i)), null)
     : null;
   return {
-    kind: "live" as const, unitId, unitHref, unitName: unit?.displayName ?? unitId.slice(0, 8),
+    kind: "live" as const, unitName: unit?.displayName ?? unitId.slice(0, 8),
     choices: alertChoices(alerts, nowMs, i), count: alerts.length,
     alert: selected ? alertView(selected, { alerts, unit, canResolve, job: job?.projection === "detail" ? { id: job.id, type: job.type } : null }, nowMs, i) : null,
-    evidence, // null: nothing to cite (resolved, no alert.resolve) or not readable now
+    unitId, unitHref, evidence, // null: nothing to cite (resolved, no alert.resolve) or not readable now
   };
 }
 

@@ -50,14 +50,13 @@ export async function loadReview(jobId: string): Promise<ReviewLive> {
   return {
     ...base,
     report: {
-      id: r.id, version: r.version, author, submitted: r.submittedAt ? showTime(r.submittedAt, display) : null, items: inspectionRows(r.items, t, r.attachmentRefs), readings: readingRows(r.measurements, t),
+      id: r.id, version: r.version, submitted: r.submittedAt ? showTime(r.submittedAt, display) : null, items: inspectionRows(r.items, t, r.attachmentRefs), readings: readingRows(r.measurements, t),
       // the return dialog's “Items that need rework”, as HQ's (IR609)
       rework: reworkItems(inspectionRows(r.items, t, r.attachmentRefs), readingRows(r.measurements, t), r.attachmentRefs.filter((a) => a.status === "ready").length, t),
-      parts: partLines(r.parts, r.refrigerant, t), signOff: r.signOff ? `${r.signOff.signerName} · ${showTime(r.signOff.signedAt, display)}` : null, workText: r.workText, next, photos,
-      timeOnSite: timeOnSiteText(job.timeOnSite, i), evidence: check.rows, acceptable: check.acceptable, missing: check.missing,
+      parts: partLines(r.parts, r.refrigerant, t), signOff: r.signOff ? `${r.signOff.signerName} · ${showTime(r.signOff.signedAt, display)}` : null, workText: r.workText, timeOnSite: timeOnSiteText(job.timeOnSite, i), evidence: check.rows, acceptable: check.acceptable, missing: check.missing,
       allowed: r.reviewAvailability.allowed, blocked: availabilityText(r.reviewAvailability, job.status, t),
       versions: [...versionRows(job, r, author, names, i), ...alertRows(alerts.filter((a): a is ApiAlertLite => !!a), i), dueRow(job, i)],
-      last: last ? { decision: last.decision, version: last.reportVersion, reason: last.reason } : null,
+      last: last ? { decision: last.decision, version: last.reportVersion, reason: last.reason } : null, author, next, photos,
     },
   };
 }

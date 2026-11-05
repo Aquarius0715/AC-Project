@@ -126,7 +126,7 @@ export async function loadJobs(sp: SP) {
   return {
     ...base,
     detail: {
-      job, title: names.units.get(job.unitId) ?? unit?.displayName ?? t("Unit"), customer: names.customers.get(unitOrg.get(job.unitId) ?? "") ?? t("customer"), location: unit?.location.pathLabels.join(" › ") ?? "",
+      title: names.units.get(job.unitId) ?? unit?.displayName ?? t("Unit"), customer: names.customers.get(unitOrg.get(job.unitId) ?? "") ?? t("customer"), location: unit?.location.pathLabels.join(" › ") ?? "",
       steps: stepper(job.status, !job.contractorOrgId, t), facts: facts(job, names, i), delivery: delivery(job, names, nowMs, i), controls: controls(job.status, t),
       preferred: preferredRows(job, eligible, nowMs, i),
       history: [...events].toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)).slice(0, 12).map((e) => {
@@ -145,8 +145,8 @@ export async function loadJobs(sp: SP) {
         accessUntil: job.offer ? showTime(job.offer.accessValidUntil, i.display) : null,
       },
       report: report ? { ...reportCard(job, report, byUser, i), photos } : null, draft: !!job.draftReportRef,
-      costs, totals: costTotals(costs),
-      extend: job.offer?.decision === "accept" && !["completed", "cancelled"].includes(job.status) ? { until: job.offer.accessValidUntil } : null,
+      totals: costTotals(costs),
+      extend: job.offer?.decision === "accept" && !["completed", "cancelled"].includes(job.status) ? { until: job.offer.accessValidUntil } : null, job, costs,
     },
   };
 }

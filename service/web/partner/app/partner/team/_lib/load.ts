@@ -60,7 +60,7 @@ export async function loadTeam(sp: TeamParams) {
   const inWeek = shown.rows.filter((m) => activeNow(m, nowMs));
   const from = klDay(week.from, locale);
   return {
-    notFound: false as const, company, query: q, otherZone: display.timeZone !== KL,
+    notFound: false as const, query: q, otherZone: display.timeZone !== KL,
     technicians: current.map((m) => ({ id: m.id, name: m.displayName })), total: members.length, activeCount: current.length,
     unavailable: unavailabilityRows(unavailable, names, q.today, i),
     rows: memberRows(shown.rows, capacity, dayIndex, jobs, nowMs, i), hidden: shown.hidden, expired: shown.expired,
@@ -77,14 +77,13 @@ export async function loadTeam(sp: TeamParams) {
     grants: grantRows(shown.rows, nowMs, i),
     qualifications: QUALIFICATION_CODES.map((code) => ({ code, text: qualificationLabel(code, t) })),
     types: UNAVAILABILITY_TYPES.map((x) => ({ id: x.id, text: t(x.text) })),
-    jobs,
     certificates: {
       query: cq, rows: everyRow.filter((r) => !cq.status || r.status === cq.status), kpis: certKpis(everyRow, certs, cq.within, t), impact: impact(everyRow, certJobs, t),
       people: members.map((m) => ({ id: m.id, name: m.displayName, active: activeNow(m, nowMs) })),
       windows: WINDOWS.map((w) => ({ value: String(w), text: t("{n} days", { n: w }) })),
       statuses: CERT_STATUSES.map((x) => ({ value: x, text: textOf(STATUS_TEXT, x, t) ?? x })),
       codes: [...QUALIFICATION_CODES, "other" as const].map((code) => ({ code, text: code === "other" ? t("Other") : qualificationLabel(code, t) })),
-    },
+    }, company, jobs,
   };
 }
 

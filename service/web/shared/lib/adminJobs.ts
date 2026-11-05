@@ -404,8 +404,7 @@ export function reportCard(j: ApiHqJob, r: ApiWorkReport, byUser: Map<string, st
   const submittedText = j.reportRefs.length > 1 ? "Resubmitted {time}" : "Submitted {time}";
   const submitted = r.submittedAt ? t(submittedText, { time: showTime(r.submittedAt, display) }) : t("Not submitted");
   return {
-    id: r.id, version: r.version, title: t("Work report · version {version}", { version: r.version }), author, rows, readings, workText: r.workText, mode, decide: isDecide, note,
-    sub: t("{submitted} by {author} · {checks} · {photos}", {
+    id: r.id, version: r.version, title: t("Work report · version {version}", { version: r.version }), workText: r.workText, decide: isDecide, sub: t("{submitted} by {author} · {checks} · {photos}", {
       submitted, author, checks: t(r.items.length === 1 ? "1 check" : "{n} checks", { n: r.items.length }), photos: t(photos === 1 ? "1 photo" : "{n} photos", { n: photos }),
     }),
     tone: cardTone(isDecide, mode, j.status),
@@ -421,7 +420,7 @@ export function reportCard(j: ApiHqJob, r: ApiWorkReport, byUser: Map<string, st
         text: `${t(h.decision === "accept" ? "v{version} accepted {time} by {name}" : "v{version} returned {time} by {name}", { version: h.reportVersion, time: showTime(h.occurredAt, display), name: byUser.get(h.reviewerUserId) ?? t("reviewer") })}${h.reason ? ` — “${h.reason}”` : ""}`,
         tone: h.decision === "accept" ? "ok" : "warn",
       };
-    }),
+    }), author, rows, readings, mode, note,
   };
 }
 export { returnReason } from "@ac/web/lib/partnerReview"; // the HQ dialog's reason, shared with the contractor's (IR609)

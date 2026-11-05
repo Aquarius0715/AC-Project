@@ -108,7 +108,6 @@ export function alertView(a: ApiTechAlert, ctx: { alerts: ApiTechAlert[]; unit: 
       sub: words ? words.policy : t("{kind} · no policy — it resolves only with a reason", { kind: t(KIND[a.evidenceKind] ?? "Evidence") }),
       tone,
     },
-    cards,
     resolution: {
       info: a.status === "resolved" ? null : resolutionInfo(words, t),
       done: a.status === "resolved" ? [t("Resolved {time} — {reason}.", { time: when(a.resolvedAt ?? a.detectedAt), reason: a.resolutionReason ? resolutionText(a.resolutionReason, t) : t("no reason recorded") }), a.acknowledgedAt ? t("Acknowledged {time}.", { time: when(a.acknowledgedAt) }) : ""].filter(Boolean).join(" ") : null,
@@ -117,12 +116,11 @@ export function alertView(a: ApiTechAlert, ctx: { alerts: ApiTechAlert[]; unit: 
       forbidden: words ? t("Not resolved — you don’t have alert.resolve. The alert resolves automatically once a remeasurement stays {recovery}, or ask a permitted user.", { recovery: words.recovery })
         : t("Not resolved — you don’t have alert.resolve. Ask a permitted user to resolve it."),
     },
-    history,
     related: [
       [t("Job"), ctx.job ? `${ctx.job.id.slice(0, 8)} · ${typeLabel(ctx.job.type, t)}` : "—"], [t("Unit"), unit], [t("Policy"), rule ? rule.name : t("No policy")],
       [t("Recovery rule"), words ? words.recovery : "—"], [t("Previous alert"), previous],
       [t("You can resolve"), resolver],
-    ],
+    ], cards, history,
   };
 }
 

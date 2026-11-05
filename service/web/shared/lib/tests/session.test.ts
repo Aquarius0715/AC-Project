@@ -116,13 +116,13 @@ describe("refreshing the access token", () => {
   });
 
   it("posts the refresh grant to the internal token endpoint and keeps the same tenant and membership", async () => {
-    vi.stubEnv("OIDC_INTERNAL_ISSUER", "http://keycloak:8080/realms/ac");
+    vi.stubEnv("OIDC_INTERNAL_ISSUER", "https://keycloak:8080/realms/ac");
     vi.stubEnv("OIDC_APP_CLIENT_SECRET", "test-client-secret");
     const fetch = answer(200, { access_token: token(claims), refresh_token: "r-2", expires_in: 300 });
     vi.stubGlobal("fetch", fetch);
     expect(await refresh(session())).toMatchObject({ refreshToken: "r-2", tenantId: "t-1", membershipId: "m-1", expiresAt: NOW / 1000 + 300 });
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("http://keycloak:8080/realms/ac/protocol/openid-connect/token");
+    expect(url).toBe("https://keycloak:8080/realms/ac/protocol/openid-connect/token");
     expect(Object.fromEntries(new URLSearchParams(bodyText(init)))).toEqual({ grant_type: "refresh_token", refresh_token: "r-1", client_id: "ac-web", client_secret: "test-client-secret" });
   });
 
@@ -143,13 +143,13 @@ describe("refreshing the access token", () => {
 // IR357: sign-out ends the identity provider's session (backend architecture §6)
 describe("ending the identity provider's session", () => {
   it("posts the refresh token with the client's credentials to the internal logout endpoint", async () => {
-    vi.stubEnv("OIDC_INTERNAL_ISSUER", "http://keycloak:8080/realms/ac");
+    vi.stubEnv("OIDC_INTERNAL_ISSUER", "https://keycloak:8080/realms/ac");
     vi.stubEnv("OIDC_APP_CLIENT_SECRET", "test-client-secret");
     const fetch = vi.fn(() => Promise.resolve(new Response(null, { status: 204 })));
     vi.stubGlobal("fetch", fetch);
     expect(await endIdpSession("r-1")).toBe(true);
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
-    expect([url, init.method]).toEqual(["http://keycloak:8080/realms/ac/protocol/openid-connect/logout", "POST"]);
+    expect([url, init.method]).toEqual(["https://keycloak:8080/realms/ac/protocol/openid-connect/logout", "POST"]);
     expect(Object.fromEntries(new URLSearchParams(bodyText(init)))).toEqual({ refresh_token: "r-1", client_id: "ac-web", client_secret: "test-client-secret" });
     expect(init.signal).toBeInstanceOf(AbortSignal); // never waits long for the provider
   });

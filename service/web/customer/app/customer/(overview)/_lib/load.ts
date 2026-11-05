@@ -90,8 +90,7 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
   const roomOf = (u: OverviewUnit) => (u.spaceId ? spaces.find((s) => s.id === u.spaceId)?.name : null) ?? properties.find((p) => p.id === u.propertyId)?.name ?? t("Room");
   return {
     due: dueLines,
-    now: now.toISOString(), period: kind, periodLabel: t(periodLabel[kind]), note: periodNote(kind, period, i), asOf: summary.asOf, display,
-    properties: properties.filter((p) => !p.archived).map((p) => ({ id: p.id, name: p.name })), propertyId: sel.propertyId, propertyName: sel.propertyName,
+    now: now.toISOString(), period: kind, periodLabel: t(periodLabel[kind]), note: periodNote(kind, period, i), asOf: summary.asOf, properties: properties.filter((p) => !p.archived).map((p) => ({ id: p.id, name: p.name })), propertyId: sel.propertyId, propertyName: sel.propertyName,
     units: sel.inProperty.map((u) => ({ id: u.id, name: u.displayName })), unitId: sel.unitId,
     counts: summary.counts,
     rows: overviewRows(sel.scope, (u) => place.get(u.id)?.place ?? "", i),
@@ -112,7 +111,7 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
         const line = nexts[k] ? t("Next run: {when} · {unit}", { when: nextRunText(nexts[k], nowMs, i), unit: u?.displayName ?? "AC" }) : idle;
         return { id: a.id, name: a.name, status: card.status, line };
       }),
-    },
+    }, display,
   };
 }
 

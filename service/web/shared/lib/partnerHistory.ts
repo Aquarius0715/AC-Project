@@ -73,8 +73,8 @@ export function historyRow(j: ApiPartnerJob, now: number, units: Map<string, str
       id: j.jobId, short: j.jobId.slice(0, 8), title: typeLabel(j.type, t), origin: null, version: null, ended: true, status: j.status, tab: "ended", unit: null,
       // when the delegation ended: the period counts a history without completion by it (IR614)
       sub: t(s.count === 1 ? "1 own decision event · delegation ended {time} (read-only snapshot)" : "{n} own decision events · delegation ended {time} (read-only snapshot)", { n: s.count, time: showTime(j.asOf, display) }),
-      delegation: t("ended — history only"), tech: { name: "—", sub: t("not shown after the delegation") }, last, lastAt: last ? Date.parse(last.at) : 0,
-      badge: { text: statusLabel(j.status, t), tone: STATUS_TONE[j.status] ?? "muted" }, overdue: false,
+      delegation: t("ended — history only"), tech: { name: "—", sub: t("not shown after the delegation") }, lastAt: last ? Date.parse(last.at) : 0,
+      badge: { text: statusLabel(j.status, t), tone: STATUS_TONE[j.status] ?? "muted" }, overdue: false, last,
     };
   }
   const tech = j.technicianMembershipId ? names.get(j.technicianMembershipId) ?? t("technician") : null;

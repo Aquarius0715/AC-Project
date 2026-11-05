@@ -18,12 +18,12 @@ const relay = (operation: string, body: unknown, headers: Record<string, string>
 describe("POST /bff/ops/<operation>", () => {
   it("relays a read to its Core API route", async () => {
     vi.stubEnv("DATA_SOURCE", "api");
-    vi.stubEnv("CORE_API_URL", "http://core:8080");
+    vi.stubEnv("CORE_API_URL", "https://core:8080");
     const fetch = vi.fn(() => Promise.resolve(Response.json({ data: { id: "u-1" } }, { status: 200 })));
     vi.stubGlobal("fetch", fetch);
     const res = await relay("units.get", { id: "00000000-0000-4000-8000-000000000001" });
     expect([res.status, await res.json()]).toEqual([200, { data: { id: "u-1" } }]);
-    expect((fetch.mock.calls[0] as unknown as [string, RequestInit])[0]).toBe("http://core:8080/v1/units/00000000-0000-4000-8000-000000000001");
+    expect((fetch.mock.calls[0] as unknown as [string, RequestInit])[0]).toBe("https://core:8080/v1/units/00000000-0000-4000-8000-000000000001");
   });
   it("refuses another site's read or write without calling the Core API", async () => {
     vi.stubEnv("DATA_SOURCE", "api");

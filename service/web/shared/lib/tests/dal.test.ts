@@ -36,11 +36,11 @@ afterEach(() => {
 
 describe("calling the Core API as the signed-in membership (IR222)", () => {
   it("sends the operation's REST route with the token, tenant and membership", async () => {
-    vi.stubEnv("CORE_API_URL", "http://gateway:8080");
+    vi.stubEnv("CORE_API_URL", "https://gateway:8080");
     const f = reply([200, { data: { id: "u1" } }]);
     expect(await coreOp("units.get", { id: "u1" })).toEqual({ id: "u1" });
     const [url, init] = must(f.mock.calls[0]);
-    expect([url, init.method, init.body, init.cache]).toEqual(["http://gateway:8080/v1/units/u1", "GET", undefined, "no-store"]);
+    expect([url, init.method, init.body, init.cache]).toEqual(["https://gateway:8080/v1/units/u1", "GET", undefined, "no-store"]);
     expect(init.headers).toEqual({ Authorization: "Bearer access-1", "X-Tenant-Id": "t-1", "X-Membership-Id": "m-1" }); // no body, no write: no other header
   });
 

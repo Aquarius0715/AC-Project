@@ -54,13 +54,14 @@ describe("the proxy's security headers", () => {
     const again = await authProxy(new NextRequest("http://localhost:3000/customer"), "client");
     expect(cspOf(again.headers)).not.toBe(csp); // a fresh nonce per request
   });
+  // the request reaches the app over plain HTTP from the TLS edge: x-forwarded-proto says the browser used HTTPS
   it("adds HSTS behind an HTTPS edge, in API mode too, and redirects a signed-out user", async () => {
     vi.stubEnv("DATA_SOURCE", "api");
-    const req = new NextRequest("http://app.internal:3000/settings/preferences", { headers: { "x-forwarded-proto": "https" } });
+    const req = new NextRequest("http://localhost:3000/settings/preferences", { headers: { "x-forwarded-proto": "https" } });
     const res = await authProxy(req, "client");
     expect(res.status).toBe(307); // no session: to sign-in
     expect(res.headers.get("location")).toContain("/login?returnTo=%2Fsettings%2Fpreferences");
-    const open = await authProxy(new NextRequest("http://app.internal:3000/login", { headers: { "x-forwarded-proto": "https" } }), "client");
+    const open = await authProxy(new NextRequest("http://localhost:3000/login", { headers: { "x-forwarded-proto": "https" } }), "client");
     expect(open.headers.get("strict-transport-security")).toBe(HSTS);
     expect(cspOf(open.headers)).toContain("upgrade-insecure-requests");
   });

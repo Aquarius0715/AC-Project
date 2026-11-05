@@ -33,7 +33,7 @@ describe("coreRequest", () => {
 
   it("names no route when a path parameter is a dot segment (IR372)", () => {
     // fetch resolves "." and ".." (and %2E forms) in a URL path, which would send the call to another path
-    expect(new URL("http://core/v1/jobs/../reports/r1/attachments/a1/content").pathname).toBe("/v1/reports/r1/attachments/a1/content");
+    expect(new URL("https://core/v1/jobs/../reports/r1/attachments/a1/content").pathname).toBe("/v1/reports/r1/attachments/a1/content");
     for (const v of [".", ".."]) {
       expect(coreRequest("units.get", { id: v })).toBeNull();
       expect(coreRequest("attachments.getContent", { jobId: v, reportId: "r1", reportVersion: 1, attachmentId: "a1" })).toBeNull();

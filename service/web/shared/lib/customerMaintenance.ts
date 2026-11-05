@@ -82,7 +82,7 @@ export function clientRows(rows: ApiClientRow[], unit: (id: string) => { name: s
       default: { line = `${t(isPlan ? "Scheduled {slot}" : "Confirmed {slot}", { slot: j.scheduledSlot ? slot(j.scheduledSlot) : "" })}${j.assignmentAcknowledgement === "accepted" ? t(" · technician confirmed") : ""}`;
       }
     }
-    return { id: j.id, short: j.id.slice(0, 8), unit: u.name, place: u.place, origin: isPlan ? "plan" : "request", type: t(isPlan ? "Periodic inspection" : TYPE[j.type] ?? j.type), status: j.displayStatus, tab: tabOf(j.displayStatus), line, icon, warn: isWarn };
+    return { id: j.id, short: j.id.slice(0, 8), unit: u.name, place: u.place, origin: isPlan ? "plan" : "request", type: t(isPlan ? "Periodic inspection" : TYPE[j.type] ?? j.type), status: j.displayStatus, tab: tabOf(j.displayStatus), warn: isWarn, line, icon };
   });
 }
 
