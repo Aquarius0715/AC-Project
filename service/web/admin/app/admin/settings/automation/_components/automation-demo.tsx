@@ -24,7 +24,11 @@ export function AutomationDemo() {
   const [fired, setFired] = useState(false);
   const [conflict, setConflict] = useState(false);
   const temperatureError = +setpoint < 16 || +setpoint > 30 ? "Outside 16–30 °C on at least one unit" : undefined;
-  const simulate = () => { setResult(facts.map((f) => (f.value === "" ? { unit: f.unit, d: "missing_data — tariff reading unavailable, action skipped" } : (+f.value > +inputValue ? { unit: f.unit, d: `${sel.name} → set ${setpoint} °C` } : { unit: f.unit, d: "no rule matched" })))); };
+  const outcome = (f: (typeof facts)[number]) => {
+    if (f.value === "") return { unit: f.unit, d: "missing_data — tariff reading unavailable, action skipped" };
+    return +f.value > +inputValue ? { unit: f.unit, d: `${sel.name} → set ${setpoint} °C` } : { unit: f.unit, d: "no rule matched" };
+  };
+  const simulate = () => { setResult(facts.map((f) => outcome(f))); };
   return (
     <Page>
       <div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">HQ automation policies · highest priority first</span><Check label="Show disabled" checked={showOff} onChange={setShowOff} /></div>

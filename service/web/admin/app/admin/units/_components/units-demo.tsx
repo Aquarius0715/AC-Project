@@ -102,6 +102,9 @@ export function UnitsDemo() {
   );
 }
 
+// a client user's status badge; any other status is disabled
+const USER_TONE = new Map<string, "ok" | "warn">([["active", "ok"], ["invited", "warn"]]);
+const USER_STATUS = new Map([["active", "Active"], ["invited", "Not signed in yet"]]);
 /** FR-A17 — HQ manages every client user; owners also manage them from the customer app (FR-C19, IR417). Adding a user
 creates their account at once (IR461); the demo sends nothing. */
 function ClientUsersTab() {
@@ -128,7 +131,7 @@ function ClientUsersTab() {
       <DataTable rows={users} rowKey={(u) => u.id} cols={[
         { key: "u", label: "User", render: (u) => <><b>{u.name ?? u.email}</b><div className="text-xs text-muted-foreground">{u.name ? u.email : `invited ${u.invitedAt ?? ""} by ${u.invitedBy ?? "—"}`}</div></> },
         { key: "r", label: "Role", render: (u) => <Badge tone={u.role === "owner" ? "primary" : "muted"}>{u.role === "owner" ? "Owner" : "Member"}</Badge> },
-        { key: "s", label: "Status", render: (u) => <Badge tone={u.status === "active" ? "ok" : (u.status === "invited" ? "warn" : "muted")}>{u.status === "active" ? "Active" : null}{u.status !== "active" && u.status === "invited" && "Not signed in yet"}{u.status !== "active" && u.status !== "invited" && "Disabled"}</Badge> },
+        { key: "s", label: "Status", render: (u) => <Badge tone={USER_TONE.get(u.status) ?? "muted"}>{USER_STATUS.get(u.status) ?? "Disabled"}</Badge> },
         { key: "l", label: "Last sign-in", render: (u) => u.lastSignIn ?? "—", hideBelow: "md" },
         { key: "a", label: "", render: (u) => <ActionMenu label="Actions" onChoose={(v) => { act(u, v); }}><option value="role">Change role (Owner / Member)</option>{u.status === "invited" && <option value="resend">Resend set-up e-mail</option>}<option value="reset">Reset password</option><option value="disable">{u.status === "disabled" ? "Enable sign-in" : "Disable sign-in"}</option><option value="remove">Remove from customer</option></ActionMenu> },
       ]} />

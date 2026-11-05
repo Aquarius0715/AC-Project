@@ -115,6 +115,8 @@ export async function loadJobs(sp: SP) {
   ]);
   const byUser = new Map(members.map((m) => [m.userId, m.displayName]));
   const sp2 = job.slotProposal, pp = job.partnerSlotProposal;
+  // who holds HQ's proposed time: an HQ technician or a contractor
+  const holdName = (hold: NonNullable<typeof sp2>["hold"]) => (hold.kind === "internal" ? names.people.get(hold.membershipId) ?? t("HQ technician") : names.orgs.get(hold.contractorOrgId) ?? t("contractor"));
   const loaded = report ? await Promise.all(report.attachmentRefs.filter((a) => a.status === "ready" && a.size <= 2_000_000).slice(0, 4).map(async (a) => {
     const b = await optional(coreOp<{ mime: string; bytes: string }>("attachments.getContent", { jobId: job.id, reportId: report.id, reportVersion: report.version, attachmentId: a.id }), null);
     return b ? { id: a.id, name: a.name, url: `data:${b.mime};base64,${b.bytes}` } : null;
@@ -133,7 +135,7 @@ export async function loadJobs(sp: SP) {
         };
       }),
       partnerTech: pp ? names.people.get(pp.technicianMembershipId) ?? t("technician") : null,
-      holdWho: sp2 ? (sp2.hold.kind === "internal" ? names.people.get(sp2.hold.membershipId) ?? t("HQ technician") : names.orgs.get(sp2.hold.contractorOrgId) ?? t("contractor")) : null,
+      holdWho: sp2 ? holdName(sp2.hold) : null,
       // the times the detail shows on its first render, formatted here in the display time zone (IR290)
       texts: {
         // the plan occurrence is an instant: its date in the display zone, as on the Plans tab (IR291)

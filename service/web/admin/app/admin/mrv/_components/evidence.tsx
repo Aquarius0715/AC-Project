@@ -44,10 +44,10 @@ export function EvidencePicker({ ids, onChange, period, units }: Readonly<{ ids:
       {!isReady && <p className="mt-1 text-[11px] text-muted-foreground">{t("Choose the units and the period first: the candidates are their work-report photos.")}</p>}
       {open && isReady && (
         <div className="mt-2 flex flex-col gap-1.5 rounded-xl border border-line p-3">
-          {cands.loading ? <p className="text-xs text-muted-foreground">{t("Loading the attachments…")}</p>
-            : cands.error ? <p className="text-xs text-crit">{t("The attachments could not be loaded — try again.")}</p>
-            : rows.length === 0 ? <p className="text-xs text-muted-foreground">{t("No photos of accepted work reports on these units in this period.")}</p>
-            : rows.map((r) => {
+          {cands.loading ? <p className="text-xs text-muted-foreground">{t("Loading the attachments…")}</p> : null}
+          {!cands.loading && cands.error ? <p className="text-xs text-crit">{t("The attachments could not be loaded — try again.")}</p> : null}
+          {!cands.loading && !cands.error && rows.length === 0 ? <p className="text-xs text-muted-foreground">{t("No photos of accepted work reports on these units in this period.")}</p> : null}
+          {!cands.loading && !cands.error && rows.map((r) => {
               return (
                 <Check key={r.id} checked={ids.includes(r.id)} disabled={!ids.includes(r.id) && ids.length >= MAX_EVIDENCE} onChange={(on) => { onChange(on ? [...ids, r.id] : ids.filter((x) => x !== r.id)); }}
                   label={<span><b>{r.name}</b><span className="block text-xs text-muted-foreground">{r.sub}</span></span>} />

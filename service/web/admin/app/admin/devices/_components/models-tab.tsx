@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Badge, Btn, Card, Check, EmptyState, Field, Input, ListRow, Modal, Select, Textarea, Timeline, Plain, ScrollX } from "@ac/web/components/ui";
 import { useI18n } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
-import { showTime } from "@ac/web/lib/i18n";
+import { byCount, showTime } from "@ac/web/lib/i18n";
 import { capabilityChanges, capabilityDraft, capabilityErrors, capabilityInput, fans, firmwareProblem, metrics, metricUnit, modes, type CapabilityDraft, type Fan, type Metric, type Mode } from "@ac/web/lib/devices";
 import { metricText } from "@ac/web/lib/techDevices";
 import { capabilityHistory, saveCapability, type HistoryEntry } from "../actions";
@@ -102,7 +102,7 @@ export function ModelsTab({ live }: Readonly<{ live: DevicesLive }>) {
                 const on = runningOn(v);
                 return (
                   <span key={v} className="inline-flex items-center gap-1.5 rounded-control border border-primary/40 bg-primary-soft px-2.5 py-1 text-xs">
-                    <b>{v}</b><span className="text-muted-foreground">{on ? t(on === 1 ? "current on 1 device" : "current on {n} devices", { n: on }) : null}{!on && n === d.firmware.length - 1 && t("latest")}{!on && n !== d.firmware.length - 1 && ""}</span>
+                    <b>{v}</b><span className="text-muted-foreground">{byCount(on, { none: "", one: t("current on 1 device"), many: t("current on {n} devices", { n: on }) })}{!on && n === d.firmware.length - 1 && t("latest")}{!on && n !== d.firmware.length - 1 && ""}</span>
                     <Plain touch type="button" aria-label={t("Remove {name}", { name: v })} className="text-muted-foreground hover:text-ink" onClick={() => { set({ firmware: d.firmware.filter((x) => x !== v) }); }}><Icon name="close" /></Plain>
                   </span>
                 );
@@ -121,7 +121,7 @@ export function ModelsTab({ live }: Readonly<{ live: DevicesLive }>) {
           {sel && <Field label={t("Change reason · required for updates")} error={fieldError("changeReason")} hint={`${String(d.changeReason.length)} / 1000`}><Textarea value={d.changeReason} maxLength={1000} onChange={(e) => { set({ changeReason: e.target.value }); }} placeholder={t("Vendor bulletin: ventilation High not verified on the current batch.")} /></Field>}
           {live.canWrite && (
             <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-3">
-              {sel && <span className="mr-auto text-[12px] text-muted-foreground">{isDirty ? `${t(changes.length === 1 ? "1 change" : "{n} changes", { n: changes.length })} · ${changes.join(", ")}` : t("No unsaved changes")}</span>}
+              {sel && <span className="mr-auto text-[12px] text-muted-foreground">{isDirty ? `${byCount(changes.length, { one: t("1 change"), many: t("{n} changes", { n: changes.length }) })} · ${changes.join(", ")}` : t("No unsaved changes")}</span>}
               {!sel && live.models[0] && <Btn onClick={() => { setSelId(live.models[0].id); }}>{t("Cancel")}</Btn>}
               {sel && <Btn disabled={pending || !isDirty} onClick={() => { setD(capabilityDraft(sel.cap)); setTried(false); setAdding(null); }}>{t("Discard")}</Btn>}
               <Btn variant="primary" disabled={pending || (!!sel && !isDirty)} onClick={save}>{sel ? t("Save as capability v{v}", { v: sel.version + 1 }) : t("Create model")}</Btn>

@@ -91,6 +91,7 @@ function Reports({ live, r }: Readonly<{ live: MRVLive; r: NonNullable<MRVLive["
     run(() => recordReview(sel.report.id, sel.report.version, comment.trim()), (v) => t("Demo review recorded — version {v}", { v }), () => { setComment(""); nav({ reportVersion: null }); });
   };
   const orgUnits = d ? live.units.filter((u) => u.organizationId === d.organizationId) : [];
+  const isReviewed = sel?.report.status === "demo_reviewed";
   return (
     <>
       <div className="flex flex-wrap items-end gap-3">
@@ -116,10 +117,10 @@ function Reports({ live, r }: Readonly<{ live: MRVLive; r: NonNullable<MRVLive["
             <Card title={t("Evidence")}><EvidenceList ids={sel.report.evidenceIds} units={live.units} period={{ unitIds: sel.report.conditions.unitIds, from: sel.report.conditions.from, to: sel.report.conditions.to }} /></Card>
             <Card title={t("Demo review")}>
               {sel.review.length > 0 && <Timeline items={sel.review} />}
-              {sel.report.status === "demo_reviewed" ? <p className="text-xs text-muted-foreground">{t("This version is demo reviewed. Sending the same review again returns the existing result.")}</p>
-                : isLatest ? sel.view.incomplete ? <p className="text-xs text-muted-foreground">{t("An incomplete calculation cannot be reviewed.")}</p>
-                : live.canReview && <><Field label={t("Review comment")}><Textarea value={comment} maxLength={1000} onChange={(e) => { setComment(e.target.value); }} /></Field><div className="mt-2"><Btn variant="primary" disabled={pending || !comment.trim()} onClick={doReview}>{t("Submit demo review")}</Btn></div></>
-                : <p className="text-xs text-muted-foreground">{t("Only the latest version can be reviewed.")}</p>}
+              {isReviewed ? <p className="text-xs text-muted-foreground">{t("This version is demo reviewed. Sending the same review again returns the existing result.")}</p> : null}
+              {isLatest && !isReviewed && sel.view.incomplete ? <p className="text-xs text-muted-foreground">{t("An incomplete calculation cannot be reviewed.")}</p> : null}
+              {isLatest && !isReviewed && !sel.view.incomplete && live.canReview ? <><Field label={t("Review comment")}><Textarea value={comment} maxLength={1000} onChange={(e) => { setComment(e.target.value); }} /></Field><div className="mt-2"><Btn variant="primary" disabled={pending || !comment.trim()} onClick={doReview}>{t("Submit demo review")}</Btn></div></> : null}
+              {isLatest ? null : <p className="text-xs text-muted-foreground">{t("Only the latest version can be reviewed.")}</p>}
             </Card>
           </div>
         ) : <Card title={t("Report")}><EmptyState title={t("Nothing selected")}>{t("Choose a report or create one.")}</EmptyState></Card>}

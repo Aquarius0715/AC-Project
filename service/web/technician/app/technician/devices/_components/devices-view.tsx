@@ -3,13 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Badge, Banner, Btn, Card, Check, ConnBadge, cx, EmptyState, Field, Input, ListRow, Modal, Page, Search, Select, Textarea, Plain, ScrollX, type Tone } from "@ac/web/components/ui";
-import type { T } from "@ac/web/lib/i18n";
+import { Badge, Banner, Btn, Card, Check, ConnBadge, cx, EmptyState, Field, Input, ListRow, Modal, Page, Search, Select, Textarea, Plain, ScrollX } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import type { ApiDeviceDetail, Metric } from "@ac/web/lib/devices";
-import { deviceFieldText, deviceRefusal, FILTERS, filterOf, followFilter, openAlerts, operationLabel, type EventRow, type Filter, type OperationRow, type TechDeviceRow, metricText } from "@ac/web/lib/techDevices";
+import { connectionDot, deviceFieldText, deviceRefusal, FILTERS, filterOf, firmwareCardLook, firmwareSub, followFilter, operationTone, openAlerts, operationLabel, type EventRow, type Filter, type OperationRow, type TechDeviceRow, metricText } from "@ac/web/lib/techDevices";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { acknowledgeAlert, addResponseNote, bindDevice, calibrateSensor, checkDevice, registerDevice, updateFirmware } from "../actions";
 import type { UnitSymbol } from "@ac/web/lib/contracts.gen";
@@ -32,15 +31,6 @@ export interface TechDevicesLive {
   };
 }
 
-// the connection filter's dot (unknown warns), the firmware card's colours and an operation's tone (others are under way)
-const CONN_DOT = new Map([["online", "bg-ok"], ["offline", "bg-crit"]]);
-const CARD_TONE = new Map<string, string>([["crit", "border-crit bg-crit-soft/40"], ["ok", "border-[#86efac] bg-ok-soft/40"]]);
-const OPERATION_TONE = new Map<string, Tone>([["succeeded", "ok"], ["failed", "crit"]]);
-/** The firmware action's line: running, the newer versions on offer, or none. */
-function firmwareSub(isRunning: boolean, versions: string[], t: T): string {
-  if (isRunning) return t("running…");
-  return versions.length > 0 ? t("{version} available", { version: versions.join(", ") }) : t("no newer candidate");
-}
 const dot: Record<string, string> = { ok: "bg-ok", crit: "bg-crit", warn: "bg-warn", primary: "bg-primary", muted: "bg-line" };
 
 /** IoT devices of the technician's assigned units (FR-T11) and one device's events (FR-T12): every write runs under the
@@ -124,7 +114,7 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
         <div className="flex flex-wrap gap-2">{counts.map(({ f, label, n }) => (
           <Plain key={f} type="button" aria-pressed={filter === f} onClick={() => { setFilter(f); const next = live.events ? null : followFilter(live.rows, f, dv?.row.id ?? null); if (next) nav({ deviceId: next }); }}
             className={cx("flex items-center gap-1.5 rounded-full border px-3 py-1 text-[13px] font-semibold", filter === f ? "border-ink bg-ink text-white" : "border-line bg-surface")}>
-            {f !== "all" && <span className={cx("h-2 w-2 rounded-full", CONN_DOT.get(f) ?? "bg-warn")} />}{label} <span className="text-xs opacity-70">{n}</span>
+            {f !== "all" && <span className={cx("h-2 w-2 rounded-full", connectionDot(f))} />}{label} <span className="text-xs opacity-70">{n}</span>
           </Plain>
         ))}</div>
         <div className="flex flex-wrap items-center gap-2"><div className="w-64"><Search placeholder={t("Search serial, device or unit…")} value={q} onChange={setQ} /></div>
@@ -183,7 +173,7 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
               {live.canMaintain && !dv.jobId && <p className="-mt-2 text-xs text-muted-foreground">{t("Device work runs under your assigned job on this unit — there is none now, so the device is read-only.")}</p>}
               {isBusy && <p className="-mt-2 text-xs text-muted-foreground">{t("One device operation at a time ({operation}) — the others wait; control commands are locked during an update.", { operation: dv.detail.activeOperation ? operationLabel(dv.detail.activeOperation, t) : "" })}</p>}
               {dv.firmwareCard && (
-                <div className={cx("rounded-xl border p-3", CARD_TONE.get(dv.firmwareCard.tone) ?? "border-primary bg-primary-soft/40")}>
+                <div className={cx("rounded-xl border p-3", firmwareCardLook(dv.firmwareCard.tone))}>
                   <div className="flex items-center justify-between gap-2"><b className="text-[13px]">{dv.firmwareCard.title}</b><Badge tone={dv.firmwareCard.tone}>{dv.firmwareCard.status}</Badge></div>
                   {dv.firmwareCard.tone === "primary" && <div className="mt-2 h-1.5 rounded-full bg-primary" />}
                   <p className="mt-1 text-[11px] text-muted-foreground">{dv.firmwareCard.text}</p>
@@ -239,7 +229,7 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
                         <thead className="bg-surface2 text-left text-[11px] uppercase text-muted-foreground"><tr><th className="px-3 py-2">{t("Kind")}</th><th>{t("Started")}</th><th>{t("Detail")}</th><th>{t("Status")}</th></tr></thead>
                         <tbody>{dv.operations.map((o) => (
                           <tr key={o.id} className="border-t border-line"><td className="px-3 py-2 font-semibold">{o.kind}</td><td className="text-xs">{o.time}</td><td className="text-xs">{o.detail}</td>
-                            <td className="pr-3"><Badge tone={OPERATION_TONE.get(o.status) ?? "primary"}>{o.statusText}</Badge></td></tr>
+                            <td className="pr-3"><Badge tone={operationTone(o.status)}>{o.statusText}</Badge></td></tr>
                         ))}</tbody>
                       </table></ScrollX>
                     )}

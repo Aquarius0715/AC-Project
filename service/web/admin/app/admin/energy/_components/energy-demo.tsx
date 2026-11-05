@@ -25,25 +25,33 @@ export function EnergyDemo() {
   const isMismatch = b.units.slice().toSorted(byText).join(',') !== units.slice().toSorted(byText).join(',');
   const diff = b.kwh - actual;
   const isInc = diff < 0;
+  const trend = isInc ? "Increase" : "Reduction";
+  // one unit always stays selected
+  const toggleUnit = (u: string, on: boolean) => {
+    setUnits((s) => {
+      if (on) return [...s, u];
+      return s.length > 1 ? s.filter((x) => x !== u) : s;
+    });
+  };
   return (
     <Page>
       <Tabs value={tab} onChange={setTab} tabs={[{ id: "analysis", label: "Analysis" }, { id: "baselines", label: "Baselines", count: 2 }]} />
       {tab === "analysis" ? (
         <>
           <Card title="Scope">
-            <div className="flex flex-wrap items-end gap-4"><div className="flex flex-wrap items-center gap-3 text-[13px]">{allUnits.map((u) => <Check key={u} label={u} checked={units.includes(u)} onChange={(v) => { setUnits((s) => (v ? [...s, u] : (s.length > 1 ? s.filter((x) => x !== u) : s))); }} />)}</div><div className="min-w-[200px]"><Field label="Baseline"><Select value={bid} onChange={(e) => { setBid(e.target.value); }}>{baselines.map((x) => <option key={x.id}>{x.id}</option>)}</Select></Field></div><div className="w-32"><Field label="Actual (kWh, demo)"><Input type="number" value={actual} onChange={(e) => { setActual(+e.target.value); }} /></Field></div></div>
+            <div className="flex flex-wrap items-end gap-4"><div className="flex flex-wrap items-center gap-3 text-[13px]">{allUnits.map((u) => <Check key={u} label={u} checked={units.includes(u)} onChange={(v) => { toggleUnit(u, v); }} />)}</div><div className="min-w-[200px]"><Field label="Baseline"><Select value={bid} onChange={(e) => { setBid(e.target.value); }}>{baselines.map((x) => <option key={x.id}>{x.id}</option>)}</Select></Field></div><div className="w-32"><Field label="Actual (kWh, demo)"><Input type="number" value={actual} onChange={(e) => { setActual(+e.target.value); }} /></Field></div></div>
             <p className="mt-2 text-xs">{isMismatch ? <span className="inline-flex items-center gap-1 text-crit"><Icon name="error" />Unit set mismatch → no difference can be calculated.</span> : <span className="inline-flex items-center gap-1 text-ok"><Icon name="check" />comparable</span>}</p>
           </Card>
           <div className="grid-fluid" style={{ ["--min"as string]: "190px" }}>
             <div className="rounded-2xl border border-line bg-surface p-4"><div className="text-xs text-muted-foreground">Actual</div><div className="text-2xl font-bold">{actual.toFixed(1)} kWh</div><div className="text-[11px] text-muted-foreground">measured · coverage 100%</div></div>
             <div className="rounded-2xl border border-line bg-surface p-4"><div className="text-xs text-muted-foreground">Baseline</div><div className="text-2xl font-bold">{b.kwh.toFixed(1)} kWh</div><div className="text-[11px] text-muted-foreground">demo_fixed · fictional value</div></div>
-            <div className="rounded-2xl border border-line bg-surface p-4"><div className="text-xs text-muted-foreground">Difference</div>{isMismatch ? <div className="text-xl font-bold text-muted-foreground">Cannot calculate</div> : <div className={`text-2xl font-bold ${isInc ? "text-crit" : "text-ok"}`}>{isInc ? "Increase" : "Reduction"} {Math.abs(diff).toFixed(1)} kWh</div>}<div className="text-[11px] text-muted-foreground">{isMismatch ? "Different unit set" : `${isInc ? "Increase" : "Reduction"} ${Math.abs((diff / b.kwh) * 100).toFixed(1)}% · not adjusted`}</div></div>
-            <div className="rounded-2xl border border-line bg-surface p-4"><div className="text-xs text-muted-foreground">Emissions</div><div className="text-2xl font-bold">{(actual * 0.5).toFixed(1)} kgCO₂e</div><div className="text-[11px] text-muted-foreground">{isMismatch ? "—" : `${isInc ? "Increase" : "Reduction"} ${Math.abs(diff * 0.5).toFixed(1)} kgCO₂e · demo factor`}</div></div>
+            <div className="rounded-2xl border border-line bg-surface p-4"><div className="text-xs text-muted-foreground">Difference</div>{isMismatch ? <div className="text-xl font-bold text-muted-foreground">Cannot calculate</div> : <div className={`text-2xl font-bold ${isInc ? "text-crit" : "text-ok"}`}>{trend} {Math.abs(diff).toFixed(1)} kWh</div>}<div className="text-[11px] text-muted-foreground">{isMismatch ? "Different unit set" : `${trend} ${Math.abs((diff / b.kwh) * 100).toFixed(1)}% · not adjusted`}</div></div>
+            <div className="rounded-2xl border border-line bg-surface p-4"><div className="text-xs text-muted-foreground">Emissions</div><div className="text-2xl font-bold">{(actual * 0.5).toFixed(1)} kgCO₂e</div><div className="text-[11px] text-muted-foreground">{isMismatch ? "—" : `${trend} ${Math.abs(diff * 0.5).toFixed(1)} kgCO₂e · demo factor`}</div></div>
           </div>
           <div className="split">
             <Card title="Baseline vs actual">
               <div className="flex flex-col gap-3">{[["Baseline", b.kwh, "#c9d8ee"], ["Actual", actual, "#005bea"]].map(([l, v, c]) => <div key={l as string}><div className="mb-1 flex justify-between text-xs"><span>{l as string}</span><b>{(v as number).toFixed(1)} kWh</b></div><div className="h-5 rounded bg-surface2"><div className="h-full rounded" style={{ width: `${String(Math.min(100, ((v as number) / Math.max(b.kwh, actual, 1)) * 100))}%`, background: c as string }} /></div></div>)}</div>
-              <div className="mt-3 grid-fluid" style={{ ["--min"as string]: "150px" }}><div className="text-xs"><span className="text-muted-foreground">Cost (actual)</span><br /><b>{(actual * 0.5).toFixed(2)} MYR</b></div><div className="text-xs"><span className="text-muted-foreground">Saved cost</span><br /><b>{isMismatch ? "—" : `${isInc ? "Increase" : "Reduction"} ${Math.abs(diff * 0.5).toFixed(2)} MYR`}</b></div><div className="text-xs"><span className="text-muted-foreground">Tariff</span><br /><b>tariff-demo-v1</b></div></div>
+              <div className="mt-3 grid-fluid" style={{ ["--min"as string]: "150px" }}><div className="text-xs"><span className="text-muted-foreground">Cost (actual)</span><br /><b>{(actual * 0.5).toFixed(2)} MYR</b></div><div className="text-xs"><span className="text-muted-foreground">Saved cost</span><br /><b>{isMismatch ? "—" : `${trend} ${Math.abs(diff * 0.5).toFixed(2)} MYR`}</b></div><div className="text-xs"><span className="text-muted-foreground">Tariff</span><br /><b>tariff-demo-v1</b></div></div>
               <p className="mt-3 text-xs text-muted-foreground">How differences are shown: actual below baseline → “Reduction”; actual above baseline → “Increase” (e.g. 100 → 120 kWh shows Increase 20.0 kWh / 20.0%). Negative savings are never hidden or clamped to zero. No baseline or 0 kWh baseline → “Cannot calculate” for the percentage.</p>
             </Card>
             <Card title="Calculation conditions"><SummaryList items={[["Boundary", "ac_input_electricity — AC input electricity only"], ["Baseline", `${b.id} v1 · demo_fixed · 2026-09-14 08:00–09:00`], ["Baseline assumptions", "Fixed demo baseline for the exact unit set and hour"], ["Emission factor", "factor-demo-2026 v1 · 0.5 kgCO₂e/kWh · demo, not a real regional factor"], ["Coverage", "100% of expected readings"], ["Quality warnings", isMismatch ? "Different unit set — difference blocked" : "none"]]} /><p className="mt-2 text-[11px] text-muted-foreground">Missing readings, a different unit set or boundary would be listed here and block the difference.</p></Card>

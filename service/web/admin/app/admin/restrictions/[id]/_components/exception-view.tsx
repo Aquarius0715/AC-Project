@@ -49,13 +49,17 @@ export function ExceptionView({ live }: Readonly<{ live: Live }>) {
     setTried(true);
     if (!outcome.allowed || reasonError || (isNeedsDate && dateError)) return;
     const why = reason.trim();
-    const fn = act === "defer" ? () => deferRestriction(r.id, r.version, untilAt, why)
-      : act === "exempt" ? () => exemptRestriction(r.id, r.version, untilAt, why)
-      : act === "cancel" ? () => cancelRestriction(r.id, r.version, why) : () => overrideRestriction(r.id, r.version, why);
-    run(fn, recorded[act], () => { setReason(""); setTried(false); });
+    const send = () => {
+      if (act === "defer") return deferRestriction(r.id, r.version, untilAt, why);
+      if (act === "exempt") return exemptRestriction(r.id, r.version, untilAt, why);
+      if (act === "cancel") return cancelRestriction(r.id, r.version, why);
+      return overrideRestriction(r.id, r.version, why);
+    };
+    run(send, recorded[act], () => { setReason(""); setTried(false); });
   };
   // IR96: override-only callers see reconcile / release retry only for an override release intent or unresolved recovery
   const isFollowUp = live.canWrite || (live.canOverride && (r.releaseIntent?.source === "override" || r.recoveryCases.some((c) => c.state !== "resolved")));
+  const needs = (k: string) => t(k === "override" ? "Needs restriction.override" : "Needs restriction.write");
   return (
     <Page>
       <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href={`/admin/restrictions?restrictionId=${r.id}`} className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Restrictions")}</Link>/ <b className="text-ink">{r.id.slice(0, 8)}</b> <Badge tone={stateTone(r.state)}>{stateWord(r.state, t)}</Badge></div>
@@ -67,7 +71,7 @@ export function ExceptionView({ live }: Readonly<{ live: Live }>) {
               const isPermitted = allowedFor(k);
               return (
                 <Plain key={k} disabled={!isPermitted || !o.allowed} onClick={() => { setAct(k); }} aria-pressed={act === k} className={`rounded-xl border p-3 text-left disabled:opacity-50 ${act === k ? "border-primary bg-primary-soft/60" : "border-line hover:bg-surface2"}`}>
-                  <b className="text-[13px]">{label[k]}</b><div className="font-mono text-[10px] text-muted-foreground">{ops[k]}</div><div className="mt-1 text-xs text-muted-foreground">{isPermitted ? o.result : (t(k === "override" ? "Needs restriction.override" : "Needs restriction.write"))}</div>
+                  <b className="text-[13px]">{label[k]}</b><div className="font-mono text-[10px] text-muted-foreground">{ops[k]}</div><div className="mt-1 text-xs text-muted-foreground">{isPermitted ? o.result : needs(k)}</div>
                 </Plain>
               );
             })}</div>

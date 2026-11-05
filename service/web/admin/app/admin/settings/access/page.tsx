@@ -42,7 +42,13 @@ async function AdminAccessPageContent({ searchParams }: Readonly<PageProps<"/adm
   const rows = memberRows(members, orgs, now, i18nOf(display)).filter((r) => status !== "inactive" || !r.active);
   const users = [...new Map((everyone ?? members).filter((m) => m.role !== "client").map((m) => [m.userId, m.displayName]))].map(([id, name]) => ({ id, name }));
   const wanted = one("membershipId");
-  const selected = wanted === "new" ? "new" : (wanted ? rows.find((r) => r.id === wanted)?.id ?? "missing" : rows[0]?.id ?? "new");
+  // the asked membership, a new one, or the first; an asked one that is gone is missing
+  const selectedOf = () => {
+    if (wanted === "new") return "new";
+    if (wanted) return rows.find((r) => r.id === wanted)?.id ?? "missing";
+    return rows[0]?.id ?? "new";
+  };
+  const selected = selectedOf();
   return (
     <AccessView live={{
       now: now.toISOString(),

@@ -76,7 +76,7 @@ function Sections({ s, links, waiting }: Readonly<{ s: AdminSummary; links: Retu
         <Kpi label={t("Operation rate")} value={k.rate} sub={t("Running {on} / known {known} · unknown {unknown} not in denominator", { on: k.on, known: k.on + k.off, unknown: k.unknown })} href={links.power("on")} link={t("Units running")} />
         <Kpi label={t("Unresolved alerts")} value={k.alerts} tone={k.alerts ? "warn" : undefined} sub={t("open or acknowledged · critical and warning")} href={links.alerts} link={t("View alerts")} />
         <Kpi label={t("Energy used (actual)")} value={k.kwh} sub={k.kwhSub} href={links.energy} link={t("Energy analysis")} />
-        <Kpi label={t("Overdue billing")} value={k.billing} tone={bill.forbidden ? undefined : (bill.overdue ? "crit" : undefined)} sub={k.billingSub} href={bill.forbidden ? undefined : links.billing} link={bill.forbidden ? undefined : t("Open overdue")} />
+        <Kpi label={t("Overdue billing")} value={k.billing} tone={!bill.forbidden && bill.overdue ? "crit" : undefined} sub={k.billingSub} href={bill.forbidden ? undefined : links.billing} link={bill.forbidden ? undefined : t("Open overdue")} />
         <Kpi label={t("Maintenance jobs (period)")} value={k.jobs} sub={jobs.filter((j) => j.count).map((j) => `${j.label} ${String(j.count)}`).join(" · ") || t("no jobs in the period")} href={links.jobs()} link={t("Open jobs")} />
         <Kpi label={t("Connection")} value={t("{n} online", { n: k.online })} sub={t("offline {offline} · unknown/connecting/error {unknown}", { offline: k.offline, unknown: k.connUnknown })} href={links.connection("online")} link={t("Open units")} />
       </div>

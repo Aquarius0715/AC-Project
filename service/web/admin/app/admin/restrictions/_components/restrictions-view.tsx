@@ -50,7 +50,11 @@ function Manager({ live }: Readonly<{ live: NonNullable<RestrictionsLive> }>) {
   const [confirmRules, setConfirmRules] = useState(false);
   const [retry, setRetry] = useState<null | { phase: "apply" | "release"; unitIds: string[]; reason: string }>(null);
   const [scheduling, setScheduling] = useState(false);
-  const step = r ? (r.state === "cancelled" ? -1 : lifecycleStates.indexOf(r.state)) : 0;
+  const stepOf = () => {
+    if (!r) return 0;
+    return r.state === "cancelled" ? -1 : lifecycleStates.indexOf(r.state);
+  };
+  const step = stepOf();
   const exec = sel?.texts.execute ?? null;
   const release = sel?.texts.release ?? null;
   const recovery = { pending: t("pending"), removing: t("removing"), resolved: t("resolved") };

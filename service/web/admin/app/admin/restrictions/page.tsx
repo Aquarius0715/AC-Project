@@ -47,7 +47,8 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
   const customerName = new Map(customers.items.map((c) => [c.id, c.name]));
   const contractLabel = (id?: string) => {
     const k = contracts.items.find((c) => c.id === id);
-    return k ? `${customerName.get(k.customerId) ?? t("customer")} · ${t("{plan} contract v{version}", { plan: k.planType, version: k.version })}` : (t(isFull ? "contract" : "release view"));
+    if (!k) return t(isFull ? "contract" : "release view");
+    return `${customerName.get(k.customerId) ?? t("customer")} · ${t("{plan} contract v{version}", { plan: k.planType, version: k.version })}`;
   };
   const rows = restrictionRows(scoped.items, contractLabel, i);
   const counts = Object.fromEntries(states.map((s) => [s, rows.filter((r) => r.state === s).length])) as Record<RestrictionState, number>;
@@ -114,7 +115,8 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
         units: k.unitIds.map((u) => {
           const unit = units.items.find((x) => x.id === u);
           const c = unit ? cap.get(unit.modelId) : undefined;
-          return { id: u, name: names.get(u) ?? u.slice(0, 8), blocked: !unit || unit.archived ? t("archived") : busy.get(u) ?? (c?.control ? null : t("no power control")), temperature: c?.temperature ?? null };
+          const noControl = c?.control ? null : t("no power control");
+          return { id: u, name: names.get(u) ?? u.slice(0, 8), blocked: !unit || unit.archived ? t("archived") : busy.get(u) ?? noControl, temperature: c?.temperature ?? null };
         }),
       };
     });

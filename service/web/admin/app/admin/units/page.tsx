@@ -115,9 +115,10 @@ export default async function AdminUnitsPage({ searchParams }: Readonly<PageProp
       limit: 1, filters: { targetKind: sel.kind, targetId: sel.kind === "property" ? sel.property.id : sel.space.id, from: new Date(now.getTime() - 365 * day).toISOString(), to: new Date(now.getTime() + day).toISOString() },
     }).then((p) => p.items[0] ?? null)
     : null;
+  const askedTab = one("tab");
   const customer: CustomerLive = {
     row: cust,
-    tab: one("tab") === "policies" ? "policies" : (one("tab") === "users" ? "users" : "overview"),
+    tab: askedTab === "policies" || askedTab === "users" ? askedTab : "overview",
     selection: sel,
     places: placeOptions(tree, spaces, t),
     users: clientUserRows(clientUsers, (m) => memberName.get(m) ?? t("{name} owner", { name: cust.name }), undefined, i),
@@ -178,6 +179,11 @@ async function unitLive(d: ApiUnitDetail, x: Ctx): Promise<UnitLive> {
       return { id, kind: "alert" as const, name: p?.name ?? id.slice(0, 8), type: textOf(metricLabel, metric, t) ?? metric, condition: p ? conditionText(p, x.i) : t("policy outside this view"), madeBy: p ? t("Made by {name}", { name: x.memberName.get(p.ownerMembershipId) ?? x.customerName }) : "", on: p && !p.enabled ? t("Off") : "" };
     }),
   ];
+  // when and why the unit was taken out of use, and by whom
+  const archivedText = () => {
+    if (!archived) return t("Taken out of use");
+    return [t("Taken out of use {date}", { date: showDate(archived.occurredAt, display) }), ...(archived.reason ? [t("reason: {reason}", { reason: archived.reason })] : []), x.memberName.get(archived.actorId) ?? t("HQ")].join(" · ");
+  };
   return {
     u: d,
     path: d.location.pathLabels.join(" › "),
@@ -185,7 +191,7 @@ async function unitLive(d: ApiUnitDetail, x: Ctx): Promise<UnitLive> {
     device: device ? { id: device.id, serial: device.serial, connection: device.connection } : null,
     deviceKnown: devices !== null,
     blockers: x.has("job.read", "device.read") || x.contracts ? blockers : null,
-    archivedNote: d.archived ? (archived ? [t("Taken out of use {date}", { date: showDate(archived.occurredAt, display) }), ...(archived.reason ? [t("reason: {reason}", { reason: archived.reason })] : []), x.memberName.get(archived.actorId) ?? t("HQ")].join(" · ") : t("Taken out of use")) : null,
+    archivedNote: d.archived ? archivedText() : null,
     seen: d.lastSeenAt ? relativeTime(d.lastSeenAt, nowMs, x.i) : null,
     attached,
   };

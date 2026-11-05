@@ -7,6 +7,20 @@ import { EN, relativeTime, showClock, showTime, translator, type I18n, type T, t
 import type { ApiCalibration, ApiDevice, ApiDeviceDetail, ApiDeviceOperation, Connection } from "@ac/web/lib/devices";
 import { metricLabel } from "@ac/web/lib/adminAlerts";
 
+// the device screens' colours (technician and HQ): the connection filter's dot (unknown warns), the firmware card and an
+// operation's tone (anything else is still under way)
+const CONN_DOT = new Map([["online", "bg-ok"], ["offline", "bg-crit"]]);
+const CARD_LOOK = new Map([["crit", "border-crit bg-crit-soft/40"], ["ok", "border-[#86efac] bg-ok-soft/40"]]);
+const OPERATION_TONE = new Map<string, "ok" | "crit">([["succeeded", "ok"], ["failed", "crit"]]);
+export const connectionDot = (filter: string): string => CONN_DOT.get(filter) ?? "bg-warn";
+export const firmwareCardLook = (tone: string): string => CARD_LOOK.get(tone) ?? "border-primary bg-primary-soft/40";
+export const operationTone = (status: string): "ok" | "crit" | "primary" => OPERATION_TONE.get(status) ?? "primary";
+/** The firmware action's line: running, the newer versions on offer, or none. */
+export function firmwareSub(isRunning: boolean, versions: string[], t: T): string {
+  if (isRunning) return t("running…");
+  return versions.length > 0 ? t("{version} available", { version: versions.join(", ") }) : t("no newer candidate");
+}
+
 const en = translator("en");
 
 /** DeviceEvent of service-contracts.ts. */

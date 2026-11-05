@@ -16,6 +16,7 @@ import { NewJobModal } from "./jobs-view";
 import { Icon } from "@ac/web/components/Icon";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
 import { codePoints } from "@ac/web/lib/text";
+import { byCount } from "@ac/web/lib/i18n";
 
 type Detail = NonNullable<ContractorsLive["detail"]>;
 /** The organization choice of a company still to create (IR465). */
@@ -86,7 +87,7 @@ function ContractorDetail({ d, open }: Readonly<{ d: Detail; open: (m: ModalStat
           {d.techs.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No technician memberships in this organization.")}</p> : (
             <ul className="divide-y divide-line">{d.techs.map((x) => <li key={x.id} className="flex items-center justify-between gap-2 py-2"><span className="min-w-0"><b className="block text-[13px]">{x.name}</b><span className="text-[11px] text-muted-foreground">{x.sub}</span></span><Badge tone={x.badge.tone}>{x.badge.label}</Badge></li>)}</ul>
           )}
-          <div className="mt-3"><Banner>{d.pending.length > 0 ? t(d.pending.length === 1 ? "1 renewal upload is waiting for verification." : "{n} renewal uploads are waiting for verification.", { n: d.pending.length }) : t("No renewal uploads are waiting for verification.")} {t("Certificates uploaded by the contractor need HQ verification before they count.")}</Banner></div>
+          <div className="mt-3"><Banner>{byCount(d.pending.length, { none: t("No renewal uploads are waiting for verification."), one: t("1 renewal upload is waiting for verification."), many: t("{n} renewal uploads are waiting for verification.", { n: d.pending.length }) })} {t("Certificates uploaded by the contractor need HQ verification before they count.")}</Banner></div>
           <div className="mt-3"><Btn size="sm" variant={d.pending.length > 0 ? "primary" : "secondary"} disabled={d.pending.length === 0} onClick={() => { open({ kind: "verify" }); }}>{t("Verify uploads ({n})", { n: d.pending.length })}</Btn></div>
           <p className="mt-2 text-[11px] text-muted-foreground">{t("KPIs: last 90 days. Customer rating comes from the Client “Confirm & rate” step after completion; SLA targets per plan are in the SLA tab.")}{i.display.timeZone !== KL && ` ${t("The days are Kuala Lumpur days.")}`}</p>
         </Card>
