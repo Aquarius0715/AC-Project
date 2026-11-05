@@ -10,7 +10,7 @@ import { saveDefaultRules, switchDefaultRule } from "../actions";
 import { ConditionFields, WindowEditor } from "./policy-parts";
 import { DefaultRulePreview, DemoTest } from "./policy-checks";
 import { Icon } from "@ac/web/components/Icon";
-import { textOf } from "@ac/web/lib/i18n";
+import { byCount, textOf } from "@ac/web/lib/i18n";
 
 const CATEGORY: Record<string, string> = { air_quality: "Air quality", fault: "Fault", maintenance: "Maintenance", connection: "Connection" };
 const SHOWN = 20; // the customers listed before the search-select (DD-A05 item 9, Figma 268:2)
@@ -48,8 +48,14 @@ export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, on
   const errors = errorsOf(rule);
   const broken = rules.filter((r) => Object.keys(errorsOf(r)).length);
   const changed = ruleChanges({ ...p, rules }, p);
-  const status = tried && broken.length > 0 ? t(broken.length === 1 ? "1 rule to fix · nothing saved: {names}" : "{n} rules to fix · nothing saved: {names}", { n: broken.length, names: broken.map((r) => r.name).join(", ") })
-    : (changed.length > 0 ? `${t(changed.length === 1 ? "1 rule changed" : "{n} rules changed", { n: changed.length })} · ${changed.join(", ")}` : t("No unsaved changes"));
+  // the save line: the rules to fix after a refused save, else the unsaved changes
+  const statusText = () => {
+    const names = broken.map((r) => r.name).join(", ");
+    if (tried && broken.length > 0) return byCount(broken.length, { one: t("1 rule to fix · nothing saved: {names}", { names }), many: t("{n} rules to fix · nothing saved: {names}", { n: broken.length, names }) });
+    if (changed.length === 0) return t("No unsaved changes");
+    return `${byCount(changed.length, { one: t("1 rule changed"), many: t("{n} rules changed", { n: changed.length }) })} · ${changed.join(", ")}`;
+  };
+  const status = statusText();
   const sorted = [...customers].toSorted((a, b) => a.name.localeCompare(b.name));
   const listed = [...sorted.slice(0, SHOWN), ...sorted.slice(SHOWN).filter((c) => more.includes(c.id))];
   const setting = (customerId: string) => p.settings.find((s) => s.ruleKey === rule.ruleKey && s.customerId === customerId);
@@ -84,6 +90,11 @@ export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, on
     });
   };
 
+  // why the demo test cannot run: no test unit, the rule off everywhere in scope, or a metric without synthetic readings
+  const untestable = () => {
+    if (!copyable(rule)) return t("A synthetic reading cannot be entered for this rule's metric.");
+    return t(inScope.length > 0 ? "The rule is off for every customer in scope, so it cannot be tested here." : "There is no unit to test the rule on.");
+  };
   return (
     <Card title={<span className="inline-flex flex-wrap items-center gap-2">{t("Default policy")} › {rule.name}<Badge tone="muted">{t("Policy v{n}", { n: p.version })}</Badge></span>}
       sub={`${p.id} · ${t("HQ template")} · ${t("rule {n} of {total}", { n: index + 1, total: rules.length })}`} action={<Badge tone="ok">{t("Enabled (template)")}</Badge>}>
@@ -138,8 +149,7 @@ export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, on
           <DemoTest key={rule.ruleKey} saved={{ id: p.id, version: p.version, metric: savedRule.metric, operator: savedRule.operator, threshold: savedRule.threshold, on: true }}
             dirty={changed.includes(rule.name)} unit={{ id: testUnit.id, name: testUnit.name }} demo={demo} />
         ) : (
-          <section><h3 className="mb-1 text-[13px] font-bold">{t("Test with demo data")}</h3><p className="text-xs text-muted-foreground">{t(copyable(rule) ? (inScope.length > 0 ? "The rule is off for every customer in scope, so it cannot be tested here." : "There is no unit to test the rule on.")
-            : "A synthetic reading cannot be entered for this rule's metric.")}</p></section>
+          <section><h3 className="mb-1 text-[13px] font-bold">{t("Test with demo data")}</h3><p className="text-xs text-muted-foreground">{untestable()}</p></section>
         )}
         <section><h3 className="mb-1 text-[13px] font-bold">{t("Owner & units")}</h3>
           <div className="text-xs font-semibold">{t("Owner")}</div><div className="mt-1"><Badge tone="primary">{t("HQ default (all customers)")}</Badge></div>

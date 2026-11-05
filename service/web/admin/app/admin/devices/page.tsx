@@ -36,7 +36,8 @@ async function AdminDevicesPageContent({ searchParams }: Readonly<PageProps<"/ad
   if (!apiMode()) return <DevicesDemo />;
   const sp = await searchParams;
   const one = queryReader(sp);
-  const tab = one("tab") === "devices" ? "devices" : (one("tab") === "firmware" ? "firmware" : "models");
+  const asked = one("tab");
+  const tab = asked === "devices" || asked === "firmware" ? asked : "models";
   const [now, perms, display, caps, units, devices] = await Promise.all([
     coreNow(), corePermissions(), coreDisplay(),
     coreAllPage<ApiCapability>("capabilities.list"),

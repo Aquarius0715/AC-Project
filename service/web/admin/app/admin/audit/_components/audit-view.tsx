@@ -3,6 +3,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { Badge, Banner, Btn, Card, Choice, DataTable, EmptyState, Field, Input, ListRow, Page, Select, SummaryList, Tabs, TextLink, Timeline, Plain } from "@ac/web/components/ui";
 import { useI18n } from "@ac/web/components/I18n";
+import type { T } from "@ac/web/lib/i18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
 import { callOp, OpError } from "@ac/web/lib/ops";
@@ -11,6 +12,11 @@ import { periodError, resultTone, resultWord, type AuditDeviceEvent, type AuditF
 import { Icon } from "@ac/web/components/Icon";
 import { byText } from "@ac/web/lib/order";
 
+/** Why a related command could not be read: not permitted, out of scope or gone, or anything else. */
+function commandFailure(code: string, t: T): string {
+  if (code === "FORBIDDEN") return t("You may not read this command — it needs control.execute, restriction.read, restriction.override or automation.policy.read.");
+  return t(code === "NOT_FOUND" ? "This command is outside your scope or no longer exists." : "The command could not be loaded — try again.");
+}
 const seed: AuditRow[] = [
   { id: "1", op: "restriction.override", target: "restriction · restriction-a41", targetKind: "restriction", targetId: "restriction-a41", versions: "version 3 → 4", actor: "hq-operator", actorId: "hq-operator", role: "admin", at: "09-22 09:14", occurred: "2026-09-22 09:14 (Asia/Kuala_Lumpur)", corr: "corr-7f21a9", res: "Success", reason: "Customer requested a short exception while the invoice is under review.",
     changes: [{ field: "exception.until", before: "null", after: "2026-09-29 00:00", changed: true }, { field: "exception.reason", before: "null", after: "Invoice under review", changed: true }, { field: "contactPhone", before: "***masked***", after: "***masked***", changed: false }, { field: "state", before: "applied", after: "applied", changed: false }] },
@@ -98,7 +104,8 @@ export function AuditView({ live }: Readonly<{ live?: AuditLive }>) {
   const open = (id: string) => { if (live) patch({ entryId: id }); else setSelId(id); };
   const actors = live ? live.actors : [...new Map(seed.map((r) => [r.actorId, r.actor]))].map(([id, name]) => ({ id, name }));
   const kinds = live ? live.kinds : [...new Set(seed.map((r) => r.targetKind))].toSorted(byText);
-  const related = live ? live.related : (sel?.id === "1" ? seedRelated : { restriction: null, command: null, job: null, unit: null });
+  const demoRelated = sel?.id === "1" ? seedRelated : { restriction: null, command: null, job: null, unit: null }; // the demo links only its first entry
+  const related = live ? live.related : demoRelated;
   const trace = live ? live.trace : [];
   const corr = live ? live.filters.correlationId : f.correlationId; // the searched correlation ID (typing waits 300 ms)
   const device = live ? live.device : { options: [{ id: "device-online-rto", label: "device-online-rto · unit-online-rto" }], deviceId: "device-online-rto", missing: false, label: "device-online-rto · unit-online-rto", total: seedEvents.length, events: seedEvents, selected: null };
@@ -223,8 +230,7 @@ function CommandLine({ r, demo, line }: Readonly<{ r: RelatedRef; demo: boolean;
       setC({ state: "done", text: h.text, when: h.when, unitId: deviceCommand.unitId });
     } catch (error) {
       const code = error instanceof OpError ? error.error.code : "";
-      setC({ state: "error", text: t(code === "FORBIDDEN" ? "You may not read this command — it needs control.execute, restriction.read, restriction.override or automation.policy.read."
-        : (code === "NOT_FOUND" ? "This command is outside your scope or no longer exists." : "The command could not be loaded — try again.")) });
+      setC({ state: "error", text: commandFailure(code, t) });
     }
   };
   return (

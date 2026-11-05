@@ -31,7 +31,12 @@ async function AdminBillingPageContent({ searchParams }: Readonly<PageProps<"/ad
   if (!apiMode()) return <BillingView />;
   const sp = await searchParams;
   const one = queryReader(sp);
-  const tab = one("tab") === "payouts" ? "payouts" : (one("tab") === "inquiries" || (!one("tab") && one("inquiryId") && !one("invoiceId")) ? "inquiries" : "invoices");
+  // the asked tab, or the inquiries when only an inquiry is named
+  const tabOf = () => {
+    if (one("tab") === "payouts") return "payouts";
+    return one("tab") === "inquiries" || (!one("tab") && one("inquiryId") && !one("invoiceId")) ? "inquiries" : "invoices";
+  };
+  const tab = tabOf();
   const months = billingMonths(one("from"), one("to"));
   const scope = { customerId: one("customerId"), propertyId: one("propertyId"), contractId: one("contractId"), overdueOnly: one("overdueOnly") === "true", from: months.from, to: months.to };
   const filters = {

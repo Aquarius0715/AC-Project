@@ -21,12 +21,13 @@ const ST: Record<AlertState, string> = { open: "Open", acknowledged: "Acknowledg
 const LIST: Record<AlertState, string> = { open: "Open alerts", acknowledged: "Acknowledged alerts", resolved: "Resolved alerts" };
 const SEVERITY: [Severity, string][] = [["critical", "Severity: Critical"], ["warning", "Severity: Warning"], ["normal", "Severity: Info"]];
 // the Phase 1A demo's fixture rows (their data stays English, as the other demo screens)
+const STATE_TITLE = new Map([["resolved", "Resolved"], ["acknowledged", "Acknowledged — waiting for resolution"]]);
 const demoTimeline = (time: string, st: AlertState): AdminAlert["timeline"] => {
   return [
     { time, title: "Alert detected", detail: "Load increase with stable outdoor temperature", tone: "warn" },
     { time: "08:50", title: "Notified customer-a · In-app", detail: "deliveryState: simulated" },
     { time: "08:52", title: "customer-a read the notification", detail: "Reading a notification does not acknowledge or resolve the alert" },
-    { time: "—", title: st === "resolved" ? "Resolved" : (st === "acknowledged" ? "Acknowledged — waiting for resolution" : "Waiting for acknowledgement"), detail: "", tone: st === "resolved" ? "ok" : undefined },
+    { time: "—", title: STATE_TITLE.get(st) ?? "Waiting for acknowledgement", detail: "", tone: st === "resolved" ? "ok" : undefined },
   ];
 };
 const demoAlert = (id: string, title: string, time: string, sev: Severity, meta: string): AdminAlert => {
@@ -159,6 +160,8 @@ export function AdminAlertsView({ live }: Readonly<{ live?: Live }>) {
   const openish = al.filter((x) => x.state !== "resolved");
   const scopeName = live?.scopeName ?? t("all customers");
 
+  const evidenceError = tried ? eventProblem : null;
+  const reasonTooLong = tried && reason.length > 1000 ? t("At most 1000 characters") : undefined;
   return (
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -234,10 +237,10 @@ export function AdminAlertsView({ live }: Readonly<{ live?: Live }>) {
         {a && (
           <>
             <p className="text-xs text-muted-foreground">{a.id} · {a.title}</p>
-            <EvidencePicker rows={eventRows} policyless={a.policyless} picked={sendable} onChange={setPicked} loading={evidence.loading} error={evidence.error ? t("The evidence could not be loaded — close the dialog and try again.") : (tried ? eventProblem : null)} />
+            <EvidencePicker rows={eventRows} policyless={a.policyless} picked={sendable} onChange={setPicked} loading={evidence.loading} error={evidence.error ? t("The evidence could not be loaded — close the dialog and try again.") : evidenceError} />
           </>
         )}
-        <Field label={t("Resolution reason · required")} hint={`${String(reason.length)} / 1000`} error={tried && !reason.trim() ? t("A reason is required") : (tried && reason.length > 1000 ? t("At most 1000 characters") : undefined)}><Textarea value={reason} onChange={(e) => { setReason(e.target.value); }} /></Field>
+        <Field label={t("Resolution reason · required")} hint={`${String(reason.length)} / 1000`} error={tried && !reason.trim() ? t("A reason is required") : reasonTooLong}><Textarea value={reason} onChange={(e) => { setReason(e.target.value); }} /></Field>
         <p className="text-[11px] text-muted-foreground">{t("Resolved alerts stay in history. If the condition returns, a new alert is created.")}</p>
       </Modal>
     </Page>

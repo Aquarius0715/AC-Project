@@ -14,6 +14,7 @@ import { sendDiagnostic, startTestRun } from "../actions";
 import type { ControlLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
 
+const RESULT_LOOK = new Map([["ok", "bg-ok-soft text-ok"], ["crit", "bg-crit-soft text-crit"]]);
 /** Diagnostic control (FR-T10, Figma Technician 02-18…02-28) in API mode: one diagnostic command or one test run at a
 time for the assigned job, each confirmed first; device acknowledgements and the run's end are shown only when the
 device reports them. Texts in the user's display language; the times come formatted from the loader (IR286). */
@@ -92,6 +93,10 @@ export function ControlView({ live }: Readonly<{ live: ControlLive }>) {
     run(() => sendDiagnostic({ unitId: live.unit.id, jobId: job.id, action: r.endAction, reason: t("End of test run sent again: {reason}", { reason: r.reason }).slice(0, 1000), expectedUnitVersion: live.unit.version }),
       (c) => t("{id} sent — waiting for the device", { id: c.id.slice(0, 8) }), () => { setErrors({}); setRefused(null); }, failed);
   };
+  const runLabel = () => {
+    if (live.run && live.active) return t("Start test run (running)");
+    return t(live.run?.state === "completed" ? "Start new test run" : "Start test run");
+  };
   return (
     <Page>
       {back}
@@ -108,7 +113,7 @@ export function ControlView({ live }: Readonly<{ live: ControlLive }>) {
             </div>
             <div className="mt-3"><Field label={t("Reason (required)")} error={errors.reason}><Textarea id={ids.reason} value={reason} maxLength={1000} placeholder={t("Why this command is needed for the diagnosis")} onChange={(e) => { setReason(e.target.value); }} /></Field></div>
             <div className="mt-3 flex justify-end"><Btn variant="primary" disabled={pending || isBusy || options.length === 0} onClick={() => { review("cmd"); }}>{t("Review & send")}</Btn></div>
-            {latest && <p className={`mt-3 rounded-xl px-3 py-2 text-xs font-semibold ${latest.badge.tone === "ok" ? "bg-ok-soft text-ok" : (latest.badge.tone === "crit" ? "bg-crit-soft text-crit" : "bg-surface2 text-muted-foreground")}`}>{latest.title} — {latest.sub}</p>}
+            {latest && <p className={`mt-3 rounded-xl px-3 py-2 text-xs font-semibold ${RESULT_LOOK.get(latest.badge.tone) ?? "bg-surface2 text-muted-foreground"}`}>{latest.title} — {latest.sub}</p>}
           </Card>
           <Card title={t("Current unit state")} action={<span className="text-xs text-muted-foreground">{live.unit.observed}</span>}>
             <div className="grid-fluid" style={{ ["--min" as string]: "120px" }}>
@@ -136,7 +141,7 @@ export function ControlView({ live }: Readonly<{ live: ControlLive }>) {
             {live.banner && <div className="mt-3"><Banner tone={live.banner.tone}><b>{live.banner.title}</b><div className="text-xs">{live.banner.text}</div></Banner></div>}
             {live.run?.state === "end_failed" && <div className="mt-2"><Btn className="w-full" variant="danger" disabled={pending || live.active || !job.inWindow} onClick={retryEnd}>{t("Retry end command")}</Btn>{!job.inWindow && <p className="mt-1 text-[11px] text-muted-foreground">{t("Retry not available — no authorization")}</p>}</div>}
             {live.run?.state === "end_blocked" && <p className="mt-2 text-[11px] text-muted-foreground">{t("Retry not available — no authorization")}</p>}
-            <div className="mt-3"><Btn className="w-full" disabled={pending || isBusy || options.length === 0} onClick={() => { review("run"); }}>{t(live.run && live.active ? "Start test run (running)" : (live.run?.state === "completed" ? "Start new test run" : "Start test run"))}</Btn></div>
+            <div className="mt-3"><Btn className="w-full" disabled={pending || isBusy || options.length === 0} onClick={() => { review("run"); }}>{runLabel()}</Btn></div>
             <p className="mt-2 text-[11px] text-muted-foreground">{t("1–15 minutes only. Reason required. Cannot start during firmware updates or an unfinished command.")}</p>
           </Card>
           <Card title={t("Authorization")}>

@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Field, Page, SummaryList, Textarea, Timeline, useToast } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Field, Page, SummaryList, Textarea, Timeline, useToast, type Tone } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
 
 type St = "Open" | "Acknowledged" | "Resolved";
 
+const ALERT_TONE = new Map<string, Tone>([["Resolved", "ok"], ["Acknowledged", "primary"]]); // open alerts warn
 /** Phase 1A demo view (fixture evidence). */
 export function MockAlertEvidence({ id }: Readonly<{ id: string }>) {
   const toast = useToast();
@@ -23,7 +24,7 @@ export function MockAlertEvidence({ id }: Readonly<{ id: string }>) {
   return (
     <Page>
       <div className="text-[13px] text-muted-foreground"><Link href={`/technician/units/${id}`} className="font-semibold text-primary"><Icon name="arrowLeft" /> Unit</Link> › Alert evidence · {id}</div>
-      <div className="flex flex-wrap items-center gap-2"><h1 className="text-lg font-bold">alert-temp-a · Bedroom too hot</h1><Badge tone={st === "Resolved" ? "ok" : (st === "Acknowledged" ? "primary" : "warn")}>{st}</Badge></div>
+      <div className="flex flex-wrap items-center gap-2"><h1 className="text-lg font-bold">alert-temp-a · Bedroom too hot</h1><Badge tone={ALERT_TONE.get(st) ?? "warn"}>{st}</Badge></div>
       <p className="text-xs text-muted-foreground">Policy: temperature ≥ 30°C, recovery ≤ 28°C, duration 60s</p>
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">
