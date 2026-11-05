@@ -7,7 +7,7 @@ import { bodyText } from "./http";
 import { without } from "@ac/web/lib/omit";
 
 // the BFF session (backend architecture §5) is server code: next/headers is the request's cookie jar
-const jar = vi.hoisted(() => ({ get: vi.fn(), set: vi.fn(), delete: vi.fn() }));
+const jar = vi.hoisted(() => ({ get: vi.fn(), set: vi.fn<(name: string, value: string, options: { maxAge?: number }) => void>(), delete: vi.fn() }));
 vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ cookies: () => Promise.resolve(jar) }));
 

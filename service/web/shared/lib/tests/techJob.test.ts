@@ -24,7 +24,7 @@ describe("components", () => {
   it("follows the unit's service scope in canonical order", () => {
     expect(all).toHaveLength(18);
     expect(componentsFor(["indoor"]).map((c) => c.key)).toEqual(["filter", "evaporator_coil", "blower_motor", "blower_fan", "drain_pipe", "drain_pan", "outlet", "louver"]);
-    expect(componentsFor(["electrical", "outdoor"]).map((c) => c.group)).toEqual([...new Array(5).fill("outdoor"), ...new Array(5).fill("electrical")]);
+    expect(componentsFor(["electrical", "outdoor"]).map((c) => c.group)).toEqual([...Array.from({ length: 5 }, () => "outdoor"), ...Array.from({ length: 5 }, () => "electrical")]);
     expect(componentsFor([])).toEqual([]);
     expect(groupOf("compressor")).toBe("outdoor");
     expect(groupOf("nope")).toBeNull();

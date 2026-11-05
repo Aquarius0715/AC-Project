@@ -108,7 +108,9 @@ describe("notes, follow-ups and answers in the maintenance demo", () => {
     jobActions.partnerDecline("job-internal-a", "no free hours");
     expect(job("job-internal-a")).toMatchObject({ status: "requested", contractor: null, delivery: null, scheduled: null });
     jobActions.cancel("job-c07", "moved out");
-    expect(job("job-c07")).toMatchObject({ status: "cancelled", history: expect.arrayContaining([expect.objectContaining({ text: "Cancelled by client · moved out" })]) });
+    const cancelled = job("job-c07");
+    expect(cancelled.status).toBe("cancelled");
+    expect(cancelled.history.map((h) => h.text)).toContain("Cancelled by client · moved out");
   });
 
   it("marks a notice read and resets to the seed", () => {

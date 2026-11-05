@@ -18,9 +18,11 @@ test.afterEach(async ({ page }) => {
   const status = await page.evaluate(async ({ id, key }) => {
     const got = await fetch("/bff/ops/policies.get", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ policyId: id }) });
     if (got.status === 404) return 200; // the test deleted it
-    const { data } = await got.json();
+    const body: unknown = await got.json();
+    const data: unknown = typeof body === "object" && body !== null ? Reflect.get(body, "data") : null;
+    const version: unknown = typeof data === "object" && data !== null ? Reflect.get(data, "version") : null;
     const deleted = await fetch("/bff/ops/policies.delete", {
-      method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": key, "X-Expected-Version": String(data.version) }, body: JSON.stringify({ policyId: id }),
+      method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": key, "X-Expected-Version": typeof version === "number" ? String(version) : "" }, body: JSON.stringify({ policyId: id }),
     });
     return deleted.status;
   }, { id: created, key: randomUUID() });
@@ -155,12 +157,27 @@ test("the Policies tab's scope, Show disabled and a scoped new policy with activ
 // asked, the draft carries the rule's name and condition, nothing is saved); a rule whose metric no policy may watch
 // cannot be copied. afterEach puts the limits and the switch back through the operation relay if a run stopped halfway.
 interface DefaultPolicy { id: string; version: number; rules: { ruleKey: string; threshold: number }[]; ruleSettings: { ruleKey: string; customerId: string; enabled: boolean; version: number }[] }
+const isObject = (v: unknown): v is object => typeof v === "object" && v !== null;
+/** The default policy in a policies.list answer: its id, version and the two lists the test restores, checked. */
+function firstDefault(body: unknown): DefaultPolicy {
+  const data: unknown = isObject(body) ? Reflect.get(body, "data") : null;
+  const items: unknown = isObject(data) ? Reflect.get(data, "items") : null;
+  const p: unknown = Array.isArray(items) ? items.at(0) : null;
+  const isPolicy = (x: unknown): x is DefaultPolicy => {
+    if (!isObject(x)) return false;
+    const hasIdentity = typeof Reflect.get(x, "id") === "string" && typeof Reflect.get(x, "version") === "number";
+    return hasIdentity && Array.isArray(Reflect.get(x, "rules")) && Array.isArray(Reflect.get(x, "ruleSettings"));
+  };
+  if (!isPolicy(p)) throw new Error("policies.list returned no default policy");
+  return p;
+}
 const relay = async (page: import("@playwright/test").Page, op: string, input: unknown, version?: number) => {
   return page.evaluate(async ({ op, input, version, key }) => {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (version !== undefined) Object.assign(headers, { "Idempotency-Key": key, "X-Expected-Version": String(version) });
     const r = await fetch(`/bff/ops/${op}`, { method: "POST", body: JSON.stringify(input), headers });
-    return { status: r.status, body: await r.json() };
+    const body: unknown = await r.json();
+    return { status: r.status, body };
   }, { op, input, version, key: randomUUID() });
 };
 let before: DefaultPolicy | null = null;
@@ -168,7 +185,7 @@ let before: DefaultPolicy | null = null;
 test.afterEach(async ({ page }) => {
   if (!before) return;
   const listed = await relay(page, "policies.list", { limit: 1, filters: { kind: "default_alert" } });
-  const now = listed.body.data.items[0] as DefaultPolicy;
+  const now = firstDefault(listed.body);
   if (JSON.stringify(now.rules) !== JSON.stringify(before.rules)) {
     const saved = await relay(page, "policies.save", { id: now.id, kind: "default_alert", rules: before.rules }, now.version);
     expect(saved.status).toBe(200);
@@ -183,7 +200,7 @@ test.afterEach(async ({ page }) => {
 test("the default policy's rules, a customer's switch and a rule copied as a customer policy", async ({ page }) => {
   await page.goto("/admin/alerts?tab=policies");
   const listed = await relay(page, "policies.list", { limit: 1, filters: { kind: "default_alert" } });
-  before = listed.body.data.items[0] as DefaultPolicy;
+  before = firstDefault(listed.body);
   const main = page.getByRole("main");
   const list = main.locator('section, [data-slot="card"]').filter({ has: page.getByRole("heading", { name: "Alert policies", exact: true }) });
   await list.getByRole("button", { name: /Default policy/ }).click();

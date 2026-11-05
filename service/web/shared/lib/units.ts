@@ -130,7 +130,7 @@ export function latest(d: ApiUnitDetail, metric: string, t: T = en, display: Dis
 // ComponentKeys are techJob's componentGroups.
 /** Buckets measurements into n equal slots (latest value per slot; null where no valid measurement). */
 export function bucket(items: { value: number | null; observedAt: string; quality?: string }[], from: Date, to: Date, n = 12): (number | null)[] {
-  const out: (number | null)[] = new Array(n).fill(null);
+  const out: (number | null)[] = Array.from({ length: n }, () => null);
   const span = to.getTime() - from.getTime();
   for (const m of [...items].toSorted((a, b) => a.observedAt.localeCompare(b.observedAt))) {
     if (m.value === null || (m.quality && m.quality !== "valid")) continue;
