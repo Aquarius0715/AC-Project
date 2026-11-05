@@ -114,7 +114,7 @@ function groupBadge(due: number, isOverdue: boolean, isUnknown: boolean, t: T): 
 export function filterGroup(key: string, rows: FilterRow[], t: T = en): FilterGroup {
   const n = (st: FilterState) => rows.filter((r) => r.state === st).length;
   const offline = rows.filter((r) => r.offline).length;
-  const parts = [n("overdue") && t("{n} overdue", { n: n("overdue") }), n("due_soon") && t("{n} due soon", { n: n("due_soon") }), offline && t("{n} offline", { n: offline })].filter(Boolean) as string[];
+  const parts = [n("overdue") && t("{n} overdue", { n: n("overdue") }), n("due_soon") && t("{n} due soon", { n: n("due_soon") }), offline && t("{n} offline", { n: offline })].filter((part): part is string => typeof part === "string" && part !== "");
   const known = rows.filter((r) => r.hours != null && r.pct != null);
   const pct = known.length > 0 ? Math.round(known.reduce((a, r) => a + (r.pct ?? 0), 0) / known.length) : null;
   const due = n("overdue") + n("due_soon");

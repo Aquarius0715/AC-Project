@@ -62,6 +62,8 @@ export const roleWord = (role: Role, employment: ApiMember["employment"], t: T =
   return t(employment === "external" ? "Technician · external" : "Technician · internal");
 };
 export const allPermissions = permissionRows.flatMap((r) => [r.read, r.write, ...(r.actions ?? [])].filter((p): p is string => !!p));
+/** A permission this app knows (the matrix is the contract's list); anything else is not sent. */
+const isPermission = (p: string): p is Permission => allPermissions.includes(p);
 /** Permissions each role may hold (members.save rules). */
 export const allowedFor: Record<Role, string[]> = {
   admin: allPermissions, contractor: [...PARTNER_ACTIONS], technician: ["alert.read", "alert.resolve", CONTROL_DIAGNOSE, DEVICE_MAINTAIN],
@@ -158,7 +160,7 @@ export function memberInput(d: MemberDraft, id?: string, zone = "Asia/Kuala_Lump
     ...(id && { id }), organizationId: d.organizationId, role: d.role, employment: d.role === "technician" ? d.employment : null,
     // a new person goes as newUser, with no user ID yet (IR461)
     ...(!id && d.creatingUser ? { userId: NO_USER, "newUser": { email: d.inviteEmail.trim(), displayName: d.inviteName.trim() } } : { userId: d.userId }),
-    permissions: d.permissions as Permission[], scopes: d.scopes, validFrom: zonedFrom(d.validFrom, zone), validUntil: d.validUntil ? zonedFrom(d.validUntil, zone) : null, reason: d.reason.trim(),
+    permissions: d.permissions.filter(isPermission), scopes: d.scopes, validFrom: zonedFrom(d.validFrom, zone), validUntil: d.validUntil ? zonedFrom(d.validUntil, zone) : null, reason: d.reason.trim(),
   };
 }
 

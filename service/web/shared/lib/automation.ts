@@ -159,7 +159,7 @@ export function autoInput(d: AutoDraft, id?: string): Extract<OpInput<"policies.
 }
 
 /** The fact a condition type reads (IR16 metric/unit table) and how the simulator row is entered. */
-export const factOf: Record<AutoCondition["type"], { metric: string; unit: string; boolean: boolean }> = {
+export const factOf: Record<AutoCondition["type"], { metric: Fact["metric"]; unit: string; boolean: boolean }> = {
   occupancy: { metric: "occupied", unit: "boolean", boolean: true }, peak: { metric: "peak", unit: "boolean", boolean: true },
   tariff: { metric: "tariff", unit: "MYR_per_kWh", boolean: false }, solar: { metric: "solar", unit: "kW", boolean: false }, battery: { metric: "battery", unit: "kW", boolean: false },
 };
@@ -180,7 +180,7 @@ export function evaluationInput(type: AutoCondition["type"], rows: FactRow[], no
     facts: rows.map((r) => {
       const f = factOf[r.kind ?? type];
       return {
-        unitId: r.unitId, metric: f.metric as Fact["metric"], unit: f.unit, observedAt: at, quality: r.quality,
+        unitId: r.unitId, metric: f.metric, unit: f.unit, observedAt: at, quality: r.quality,
         value: factValue(r.value, f),
       };
     }),
