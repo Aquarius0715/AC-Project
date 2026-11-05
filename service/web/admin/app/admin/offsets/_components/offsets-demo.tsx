@@ -6,12 +6,15 @@ import { useUrlTab } from "@ac/web/lib/useUrlTab";
 import { Icon } from "@ac/web/components/Icon";
 import { type NonEmpty } from "@ac/web/lib/lists";
 
+const CUSTOMER_A = "customer-a";
+const DEMO_KIND = "Demo offset";
+const OPERATOR_CONFIRMED = "hq-operator · demoConfirmed";
 interface O { id: string; cust: string; kind: string; amt: string; st: string; stage: number; tone: "primary" | "ok" | "warn" | "crit" }
 const seed: NonEmpty<O> = [
-  { id: "offset-0231", cust: "customer-a", kind: "Demo offset", amt: "1.000", st: "DEMO-CERT-0231 · 09-12 14:20", stage: 4, tone: "ok" },
-  { id: "offset-0198", cust: "customer-a", kind: "Demo offset", amt: "2.500", st: "Next: demo retirement · 09-14 10:05", stage: 3, tone: "primary" },
+  { id: "offset-0231", cust: CUSTOMER_A, kind: DEMO_KIND, amt: "1.000", st: "DEMO-CERT-0231 · 09-12 14:20", stage: 4, tone: "ok" },
+  { id: "offset-0198", cust: CUSTOMER_A, kind: DEMO_KIND, amt: "2.500", st: "Next: demo retirement · 09-14 10:05", stage: 3, tone: "primary" },
   { id: "offset-0212", cust: "customer-b", kind: "Pilot offset", amt: "0.750", st: "Awaiting demo purchase confirmation", stage: 2, tone: "warn" },
-  { id: "offset-0175", cust: "customer-a", kind: "Demo offset", amt: "0.500", st: "Purchase failed · previous: Demo requested", stage: -1, tone: "crit" },
+  { id: "offset-0175", cust: CUSTOMER_A, kind: DEMO_KIND, amt: "0.500", st: "Purchase failed · previous: Demo requested", stage: -1, tone: "crit" },
 ];
 const stages = ["Quoted", "Demo requested", "Demo purchased", "Demo retired"];
 
@@ -40,7 +43,7 @@ export function OffsetsDemo() {
             <Card title="Record details"><SummaryList items={[["Quote", `quote-${sel.id.slice(-4)} · version 1 · expires 09-14 10:15`], ["Amount", `${sel.amt} kgCO₂e`], ["Provider / scheme", "Not selected · demo"], ["Current attempt", "attempt-01"], ["Demo certificate", sel.stage === 4 ? "DEMO-CERT-0231 (demo — not a real certificate)" : "Shown only after demo retirement (DEMO-…)"]]} /></Card>
             {sel.stage === 3 && <Card title="Next step · Demo retirement"><Check label="I understand this is a demo retirement. It does not retire a real credit." checked={ack} onChange={setAck} /><p className="my-1 text-[11px] text-muted-foreground">Disabled until confirmed. Retiring before purchase is not possible.</p><Btn variant="primary" disabled={!ack} onClick={() => { upd({ stage: 4, st: "DEMO-CERT-" + sel.id.slice(-4) + " · just now", tone: "ok" }); toast("Demo retired"); }}>Retire (demo)</Btn></Card>}
             {sel.stage === 2 && <Card title="Next step · Demo purchase"><Btn variant="primary" onClick={() => { upd({ stage: 3, st: "Next: demo retirement" }); toast("Demo purchase confirmed"); }}>Confirm simulated purchase</Btn></Card>}
-            <Card title="Event history" action={<a className="text-xs font-semibold text-primary" href="/admin/audit">Open in audit <Icon name="arrowRight" /></a>}><Timeline items={[{ time: "09-14 10:05", title: "purchase_confirm · evt-0198-03 · attempt-01", detail: "hq-operator · demoConfirmed" }, { time: "09-14 10:02", title: "request · quote-0198 v1", detail: "hq-operator · demoConfirmed" }, { time: "09-14 10:00", title: "offsets.preview · 2.500 kgCO₂e", detail: "hq-operator · demoConfirmed" }]} /></Card>
+            <Card title="Event history" action={<a className="text-xs font-semibold text-primary" href="/admin/audit">Open in audit <Icon name="arrowRight" /></a>}><Timeline items={[{ time: "09-14 10:05", title: "purchase_confirm · evt-0198-03 · attempt-01", detail: OPERATOR_CONFIRMED }, { time: "09-14 10:02", title: "request · quote-0198 v1", detail: OPERATOR_CONFIRMED }, { time: "09-14 10:00", title: "offsets.preview · 2.500 kgCO₂e", detail: OPERATOR_CONFIRMED }]} /></Card>
           </div>
         </div>
       ) : (
