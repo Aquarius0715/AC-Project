@@ -18,6 +18,7 @@ import {
 } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
 import { type NonEmpty } from "@ac/web/lib/lists";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { filled } from "@ac/web/lib/filled";
 
 /** A recipient's role in words (IR499). */
@@ -44,6 +45,7 @@ const AUG_DUE = "2026-09-10";
 const CONTRACT_RTO_A = "contract-rto-a";
 const INVOICE_OVERDUE_A = "invoice-overdue-a";
 const NO_METHOD = "Method not selected";
+const channelIds = ["inApp", "email", "whatsapp"] as const satisfies readonly Channel[];
 const row = (r: Omit<InvoiceRow, "methodName" | "paymentState">): InvoiceRow => ({ ...r, methodName: r.method.split(" · ", 1)[0] ?? r.method, paymentState: r.method.split(" · ", 2)[1] ?? null });
 const seed: NonEmpty<InvoiceRow> = [
   row({ id: "invoice-general-b", number: "invoice-general-b", version: 1, amt: "50.00 MYR", amountMinor: 5000, currency: "MYR", meta: "customer-b · contract-general-b · Aug 2026", method: "Debit card · failed", st: "Unpaid", customerId: CUSTOMER_B, contractId: "contract-general-b", period: AUG_PERIOD, due: AUG_DUE }),
@@ -136,7 +138,7 @@ export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
   const recipients = live?.recipients ?? [];
   const recipient = recipients.find((r) => r.id === reminder.recipient) ?? recipients[0];
   const channels: string[] = live ? recipient?.allowedChannels ?? [] : ["whatsapp", "email"];
-  const channel = channels.includes(reminder.channel) ? reminder.channel : channels[0] ?? "email";
+  const channel = oneOf(channelIds, channels.includes(reminder.channel) ? reminder.channel : channels[0] ?? "email", "email");
   const channelName = (c: string) => {
     if (c === "whatsapp") return "WhatsApp";
     return t(c === "email" ? "Email" : "In-app");
@@ -176,7 +178,7 @@ export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
   const message = sel && (reminder.preview || !live) ? previewText(channel, { number: reminder.preview || sel.number, amount: sel.amt, dueDate: sel.due, status: "Overdue" }, t) : null;
   const preview = () => {
     if (!sel || !recipient || !reminder.reason.trim()) return;
-    act(() => previewReminder(sel.id, recipient.id, channel as Channel, reminder.reason.trim()), t("Preview ready — nothing is sent yet"), (name) => { setReminder((r) => ({ ...r, preview: name })); });
+    act(() => previewReminder(sel.id, recipient.id, channel, reminder.reason.trim()), t("Preview ready — nothing is sent yet"), (name) => { setReminder((r) => ({ ...r, preview: name })); });
   };
   const send = () => {
     if (!sel || !reminder.reason.trim()) return;
@@ -185,7 +187,7 @@ export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
       toast(t("Reminder queued (simulated)")); return;
     }
     if (!recipient) return;
-    act(() => sendReminder(sel.id, sel.version, recipient.id, channel as Channel, reminder.reason.trim()), t("Reminder recorded (delivery simulated)"), () => { setReminder(noReminder); });
+    act(() => sendReminder(sel.id, sel.version, recipient.id, channel, reminder.reason.trim()), t("Reminder recorded (delivery simulated)"), () => { setReminder(noReminder); });
   };
 
   // inquiries
