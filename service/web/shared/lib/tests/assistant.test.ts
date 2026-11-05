@@ -3,6 +3,7 @@ import { candidateGroups, changeCard, examples, groupSummary, helpText, placeOf,
 import { DEFAULT_DISPLAY, translator } from "@ac/web/lib/i18n";
 import type { ApiCommand, ApiUnitDetail } from "@ac/web/lib/units";
 import { must } from "./must";
+import { unitDetail } from "./unitFixture";
 import { without } from "@ac/web/lib/omit";
 
 const en = translator("en"), ms = translator("ms");
@@ -13,10 +14,11 @@ const grammar = {
   ms: [/^suhu (.+)$/i, /^tetapkan (.+) kepada (\d{1,3}) darjah$/i, /^bantuan$/i],
 };
 const unit = (over: Partial<ApiUnitDetail> = {}) => {
-  return ({
-    displayName: "Bedroom AC", location: { pathLabels: ["Home A", "1F", "Bedroom"], address: null, accessInstructions: null }, capabilities: { control: true, modeControl: true, fanControl: true, modes: ["cool"], fanLevels: ["mid"], temperature: { min: 16, max: 30, step: 1 } },
+  return unitDetail({
+    displayName: "Bedroom AC", location: { pathLabels: ["Home A", "1F", "Bedroom"], address: null, accessInstructions: null },
+    capabilities: { manufacturer: "AC-Co", model: "m1", control: true, modeControl: true, fanControl: true, modes: ["cool"], fanLevels: ["mid"], temperature: { min: 16, max: 30, step: 1 }, ventilation: false, ventilationLevels: [], sensors: [] },
     ...over,
-  }) as unknown as ApiUnitDetail;
+  });
 };
 const change = (celsius: number, before: number | null = 26): Extract<ResolvedIntent, { kind: "change" }> => ({ kind: "change", unitId: "u-0001-aaaa", before: { power: true, celsius: before, observedAt: null }, expectedVersion: 7, celsius });
 const command = (status: ApiCommand["status"], failureCode: string | null = null, acknowledgedAt: string | null = null): ApiCommand =>

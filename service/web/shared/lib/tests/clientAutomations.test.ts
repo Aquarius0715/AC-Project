@@ -7,7 +7,7 @@ import { i18nOf, translator } from "@ac/web/lib/i18n";
 const ms = translator("ms");
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const base = { id: "a1", version: 1, createdAt: "", updatedAt: "2026-09-10T02:00:00Z", name: "Evening cool", unitIds: ["u1"], ownerMembershipId: "m", timezone: "Asia/Kuala_Lumpur", enabled: true, priority: 1, disabledReason: null, onlyIf: [], lastRun: null };
-const schedule = { ...base, kind: "schedule", weekdays: [1, 2, 3, 4, 5], startLocal: "18:00", endLocal: "22:00", endsNextDay: false, startAction: { kind: "set_power", power: true }, endAction: { kind: "set_power", power: false } } as ApiAutomation;
+const schedule: Extract<ApiAutomation, { kind: "schedule" }> = { ...base, kind: "schedule", weekdays: [1, 2, 3, 4, 5], startLocal: "18:00", endLocal: "22:00", endsNextDay: false, startAction: { kind: "set_power", power: true }, endAction: { kind: "set_power", power: false } };
 const unit = { name: "Bedroom AC", path: "Home A › Bedroom", property: "Home A" };
 
 describe("customer automation sentences (FR-C04, FR-C05, IR260)", () => {
@@ -31,7 +31,7 @@ describe("customer automation sentences (FR-C04, FR-C05, IR260)", () => {
   it("builds the card: status, next run, a withdrawn consent and the toggle hint", () => {
     expect(ruleCard(schedule, unit, "2026-09-14T10:00:00Z", true).steps).toEqual([ // one row each: the start and the end at their times
       { key: "start", label: "Start", time: "18:00", action: "Power ON" }, { key: "end", label: "End", time: "22:00", action: "Power OFF" }]);
-    expect(ruleCard({ ...schedule, endsNextDay: true } as ApiAutomation, unit, null, true).steps[1]?.time).toBe("22:00 next day");
+    expect(ruleCard({ ...schedule, endsNextDay: true }, unit, null, true).steps[1]?.time).toBe("22:00 next day");
     const superseded = { ...schedule, lastRun: { at: "2026-09-14T14:00:00Z", outcome: "skipped", reason: "superseded", commandId: null } } as ApiAutomation; // IR504
     expect([ruleCard(superseded, unit, null, true).skipped, ruleCard(superseded, unit, null, true, MS).skipped]).toEqual([
       "Last evaluation skipped Mon, 14 Sept, 22:00 MYT — another schedule starts at the same time and takes over",
