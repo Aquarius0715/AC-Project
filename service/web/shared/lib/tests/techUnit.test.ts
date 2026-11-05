@@ -12,16 +12,21 @@ import { must } from "./must";
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const NOW = Date.parse("2026-09-14T01:35:00Z"); // 09:35 in Kuala Lumpur
 const ALL = componentGroups.flatMap((g) => g.keys);
-const m = (metric: string, value: number | null, unit: string, quality = "valid", observedAt = "2026-09-14T01:35:00Z") =>
+type Reading = ApiTechUnit["latestMeasurements"][number];
+const m = (metric: Reading["metric"], value: number | null, unit: Reading["unit"], quality: Reading["quality"] = "valid", observedAt = "2026-09-14T01:35:00Z"): Reading =>
   ({ id: metric, unitId: "u1", sensorId: "s", origin: "measured", qualityReason: null, metric, value, unit, observedAt, quality });
-const unit = {
-  id: "unit-online-rto", displayName: "Bedroom AC", type: "split", connection: "online", lastSeenAt: "2026-09-14T01:34:00Z", installedAt: "2025-03-01T00:00:00Z", capabilityVersion: 3,
+const unit: ApiTechUnit = {
+  id: "unit-online-rto", version: 1, spaceId: null, alertPolicyIds: [], effectivePowerState: "on", displayName: "Bedroom AC", type: "split", connection: "online", lastSeenAt: "2026-09-14T01:34:00Z", installedAt: "2025-03-01T00:00:00Z", capabilityVersion: 3,
   serviceScope: ["indoor", "outdoor", "electrical"], components: ALL,
   location: { pathLabels: ["customer-a", "Home A", "1F", "Bedroom"], address: null, accessInstructions: null },
-  capabilities: { manufacturer: "AC-Co", model: "ventilation-demo v3" },
+  capabilities: {
+    manufacturer: "AC-Co", model: "ventilation-demo v3", control: true, modeControl: true, fanControl: true, temperature: { min: 18, max: 30, step: 1 }, modes: ["cool", "dry", "fan"],
+    fanLevels: ["low", "mid", "high"], ventilation: false, ventilationLevels: [], sensors: [],
+  },
+  effectiveControlPolicy: { state: "unrestricted" }, controlAvailability: { state: "available" }, pendingCommands: [],
   observedState: { power: true, celsius: 24, mode: "cool", fanLevel: "mid", observedAt: "2026-09-14T01:34:30Z" },
   latestMeasurements: [m("temperature", 24.5, "°C"), m("power", 1.2, "kW"), m("humidity", 60, "%", "stale")],
-} as unknown as ApiTechUnit;
+};
 const offline = { ...unit, connection: "offline" } as ApiTechUnit;
 const alerts = [
   { id: "a1", unitId: "u1", type: "sensor", severity: "warning", status: "acknowledged", causeCode: "window_open", evidenceKind: "inferred", evidenceText: "Cooling load rose while the outdoor temperature was stable.", detectedAt: "2026-09-14T01:12:00Z", acknowledgedAt: "2026-09-14T01:20:00Z", resolvedAt: null, resolutionReason: null },
@@ -29,10 +34,10 @@ const alerts = [
 ] as ApiAlert[];
 const event = (id: string, eventType: ApiDeviceEventFull["eventType"], occurredAt: string, recovery: ApiDeviceEventFull["recovery"] = null) =>
   ({ id, eventType, occurredAt, recovery, version: 1, deviceId: "d1", evidenceSource: "heartbeat", restoredAt: null, alertIds: [], responseNotes: [] }) as ApiDeviceEventFull;
-const jobs = [
-  { projection: "summary", id: "job-contractor-a", version: 3, unitId: "u1", type: "reactive", status: "in_progress", severity: "warning", dueAt: "2026-09-15T00:00:00Z", requestedSlot: { startAt: "2026-09-14T02:00:00Z", endAt: "2026-09-14T04:00:00Z" }, scheduledSlot: { startAt: "2026-09-14T02:00:00Z", endAt: "2026-09-14T04:00:00Z" } },
-  { projection: "history", jobId: "job-c01-0000", type: "preventive", status: "completed", completedAt: "2026-06-12T04:00:00Z" },
-] as ApiTechJobRow[];
+const running: Extract<ApiTechJobRow, { projection: "summary" }> = {
+  projection: "summary", id: "job-contractor-a", version: 3, unitId: "u1", type: "reactive", status: "in_progress", severity: "warning", dueAt: "2026-09-15T00:00:00Z", requestedSlot: { startAt: "2026-09-14T02:00:00Z", endAt: "2026-09-14T04:00:00Z" }, scheduledSlot: { startAt: "2026-09-14T02:00:00Z", endAt: "2026-09-14T04:00:00Z" },
+};
+const jobs: ApiTechJobRow[] = [running, { projection: "history", jobId: "job-c01-0000", type: "preventive", status: "completed", completedAt: "2026-06-12T04:00:00Z" }];
 
 describe("technician unit screen", () => {
   it("reads the register, never filling what is missing (DD-T02)", () => {
@@ -66,7 +71,7 @@ describe("technician unit screen", () => {
     expect([periodOf("1h"), periodOf("7d"), periodOf("x"), periodOf()]).toEqual(["1h", "7d", "24h", "24h"]);
     expect(new Date(periodRange("7d", NOW).from).toISOString()).toBe("2026-09-07T16:00:00.000Z"); // 8 Sept 00:00 in Kuala Lumpur
     expect(periodRange("1h", NOW)).toEqual({ from: NOW - 3_600_000, to: NOW });
-    expect([metricOf(unit, "humidity"), metricOf(unit, "co2"), metricOf(unit), metricOf({ ...unit, latestMeasurements: [m("power", 1, "kW")] } as ApiTechUnit)]).toEqual(["humidity", "temperature", "temperature", "power"]);
+    expect([metricOf(unit, "humidity"), metricOf(unit, "co2"), metricOf(unit), metricOf({ ...unit, latestMeasurements: [m("power", 1, "kW")] })]).toEqual(["humidity", "temperature", "temperature", "power"]);
     const items = [
       { value: 25, observedAt: "2026-09-13T02:00:00Z" }, { value: 26, observedAt: "2026-09-13T04:30:00Z" }, { value: 24.5, observedAt: "2026-09-14T01:00:00Z" },
       { value: 40, observedAt: "2026-09-14T01:10:00Z", quality: "suspect" },
@@ -109,7 +114,7 @@ describe("technician unit screen", () => {
       { id: "job-contractor-a", title: "job-cont · Repair", sub: "14 Sept, 10:00 am – 12:00 pm MYT", badge: { text: "in progress", tone: "warn" } },
       { id: "job-c01-0000", title: "job-c01- · Preventive maintenance", sub: "completed 12 Jun 2026", badge: { text: "completed", tone: "ok" } },
     ]);
-    const assigned = { ...jobs[0], id: "job-t07", status: "assigned" } as ApiTechJobRow;
+    const assigned: ApiTechJobRow = { ...running, id: "job-t07", status: "assigned" };
     expect([controlJob(jobs), controlJob([assigned, ...jobs]), controlJob([assigned, ...jobs], "job-t07"), controlJob([must(jobs[1])])]).toEqual(["job-contractor-a", "job-contractor-a", "job-t07", null]);
     expect(openAlerts(alerts, NOW)).toEqual([{
       id: "a1", title: "Possible open window", severity: "warning", sub: "Cooling load rose while the outdoor temperature was stable. · today 9:12 am MYT",
