@@ -12,12 +12,21 @@ import { dayInstant, draftErrors, planLabel, planWord, priceMinor, type Contract
 import { saveContract } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
 import { byCount } from "@ac/web/lib/i18n";
+
 import { nonEmpty } from "@ac/web/lib/lists";
+
+const CUSTOMER_A = "customer-a";
+const CUSTOMER_B = "customer-b";
+const UNIT_NON_RTO = "unit-non-rto";
+const CONTRACT_RTO_A = "contract-rto-a";
+const UNIT_OFFLINE_RTO = "unit-offline-rto";
+const UNIT_LIMITED = "unit-limited";
+const UNIT_OTHER_CUSTOMER = "unit-other-customer";
 
 interface Scope { customerId?: string; unitId?: string; kind?: PlanType }
 interface Live { scope: Scope; rows: ContractRow[]; counts: Record<PlanType | "all", number>; selectedId: string | null; customers: { id: string; name: string }[]; units: UnitOption[] }
 
-const demoCustomers = [{ id: "customer-a", name: "customer-a" }, { id: "customer-b", name: "customer-b" }];
+const demoCustomers = [{ id: CUSTOMER_A, name: CUSTOMER_A }, { id: CUSTOMER_B, name: CUSTOMER_B }];
 const demoRow = (id: string, cust: string, planType: PlanType, unitIds: string[], priceMinor: number, start: string, end: string, eligible: boolean, restrictionIds: string[]): ContractRow => {
   return {
     id,
@@ -43,16 +52,16 @@ const demoRow = (id: string, cust: string, planType: PlanType, unitIds: string[]
   };
 };
 const seedRows = nonEmpty([
-  demoRow("contract-general-a", "customer-a", "general", ["unit-non-rto"], 5000, "2026-01-01", "2027-01-01", false, []),
-  demoRow("contract-rto-a", "customer-a", "rto", ["unit-online-rto", "unit-offline-rto", "unit-limited"], 12_000, "2026-01-01", "2027-01-01", true, ["restriction-limited-a"]),
-  demoRow("contract-rto-b", "customer-b", "rto", ["unit-other-customer"], 8500, "2026-03-01", "2027-03-01", true, []),
+  demoRow("contract-general-a", CUSTOMER_A, "general", [UNIT_NON_RTO], 5000, "2026-01-01", "2027-01-01", false, []),
+  demoRow(CONTRACT_RTO_A, CUSTOMER_A, "rto", ["unit-online-rto", UNIT_OFFLINE_RTO, UNIT_LIMITED], 12_000, "2026-01-01", "2027-01-01", true, ["restriction-limited-a"]),
+  demoRow("contract-rto-b", CUSTOMER_B, "rto", [UNIT_OTHER_CUSTOMER], 8500, "2026-03-01", "2027-03-01", true, []),
 ]);
 const seedUnits: UnitOption[] = [
-  { id: "unit-online-rto", customerId: "customer-a", label: "Bedroom AC · unit-online-rto", where: "Home A › 1F › Bedroom", otherContracts: ["contract-rto-a"] },
-  { id: "unit-offline-rto", customerId: "customer-a", label: "unit-offline-rto", where: "Home A › 2F › Study", otherContracts: ["contract-rto-a"] },
-  { id: "unit-limited", customerId: "customer-a", label: "unit-limited", where: "Home A › 1F › Living room", otherContracts: ["contract-rto-a"] },
-  { id: "unit-non-rto", customerId: "customer-a", label: "unit-non-rto", where: "Home B", otherContracts: ["contract-general-a"] },
-  { id: "unit-other-customer", customerId: "customer-b", label: "unit-other-customer", where: "Home B", otherContracts: ["contract-rto-b"] },
+  { id: "unit-online-rto", customerId: CUSTOMER_A, label: "Bedroom AC · unit-online-rto", where: "Home A › 1F › Bedroom", otherContracts: [CONTRACT_RTO_A] },
+  { id: UNIT_OFFLINE_RTO, customerId: CUSTOMER_A, label: UNIT_OFFLINE_RTO, where: "Home A › 2F › Study", otherContracts: [CONTRACT_RTO_A] },
+  { id: UNIT_LIMITED, customerId: CUSTOMER_A, label: UNIT_LIMITED, where: "Home A › 1F › Living room", otherContracts: [CONTRACT_RTO_A] },
+  { id: UNIT_NON_RTO, customerId: CUSTOMER_A, label: UNIT_NON_RTO, where: "Home B", otherContracts: ["contract-general-a"] },
+  { id: UNIT_OTHER_CUSTOMER, customerId: CUSTOMER_B, label: UNIT_OTHER_CUSTOMER, where: "Home B", otherContracts: ["contract-rto-b"] },
 ];
 const plans: PlanType[] = ["rto", "general", "energy", "environment"];
 const draftOf = (r: ContractRow): ContractDraft => {
