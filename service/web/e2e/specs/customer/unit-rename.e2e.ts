@@ -33,7 +33,7 @@ test("the unit screen renames its AC and gives it back its name", async ({ page 
   await page.goto("/customer");
   const links = page.getByRole("main").locator('a[href^="/customer/units/"]');
   await links.filter({ hasText: SEED }).first().waitFor(); // the overview's unit table streams in
-  href = await links.evaluateAll((as) => as.find((a) => (a.textContent ?? "").includes("Bedroom AC"))?.getAttribute("href") ?? null);
+  href = await links.evaluateAll((as) => as.find((a) => a.textContent.includes("Bedroom AC"))?.getAttribute("href") ?? null);
   expect(href).toBeTruthy();
   await page.goto(must(href));
   await rename(page, SEED, TEMP);

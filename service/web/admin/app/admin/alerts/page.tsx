@@ -54,7 +54,7 @@ export default async function AdminAlertsPage({ searchParams }: Readonly<PagePro
     optional(coreAllPage<ApiMemberName>("members.list"), { items: [], total: 0 }),
     need(coreOp<Page<ApiPolicy>>("policies.list", { limit: 1, filters: { kind: "default_alert" } }), "alert.policy.read"),
   ]);
-  const missing = [alertsRead, unitsRead, customersRead, propertiesRead, policiesRead, defaultsRead].find((r): r is { missing: string } => !!r && typeof r === "object" && "missing" in r);
+  const missing = [alertsRead, unitsRead, customersRead, propertiesRead, policiesRead, defaultsRead].find((r): r is { missing: string } => typeof r === "object" && "missing" in r);
   if (missing) return <NeedsAccess what="Alert policies" permission={missing.missing} />;
   const read = <T,>(r: T | { missing: string }) => r as T; // none is missing past this point
   const [alerts, units, customers, properties, policies, defaults] = [read(alertsRead), read(unitsRead), read(customersRead), read(propertiesRead), read(policiesRead), read(defaultsRead)];

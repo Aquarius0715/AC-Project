@@ -114,7 +114,7 @@ export function chart(metric: string, unit: string, items: { value: number | nul
   const values = bucket(items, from, to, 12);
   const latest = [...values].reverse().find((v) => v !== null);
   return {
-    metric, title: `${label(metric, t)} (${unit})`, now: latest === undefined || latest === null ? t("no reading") : t("now {value}", { value: airNumber(metric, latest) }),
+    metric, title: `${label(metric, t)} (${unit})`, now: latest === undefined ? t("no reading") : t("now {value}", { value: airNumber(metric, latest) }),
     labels: values.map((_, k) => showClock(new Date(from.getTime() + k * 2 * 3_600_000).toISOString(), display, false)), values: values.map((v) => v ?? 0),
   };
 }

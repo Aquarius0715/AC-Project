@@ -177,7 +177,7 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
   const toggleChannel = (c: Channel, on: boolean) => draft && set("channels", on ? [...new Set([...draft.channels, c])] : draft.channels.filter((x) => x !== c));
   // Show disabled off hides the disabled policies, but never the one that is open
   const listed = pols.filter((x) => showOff || x.on || (!isNew && x.id === draft?.id));
-  const groups = [...new Set([...listed.map((x) => x.group), ...(isNew && draft ? [draft.group] : [])])];
+  const groups = [...new Set([...listed.map((x) => x.group), ...(isNew ? [draft.group] : [])])];
 
   return (
     <>
@@ -187,7 +187,7 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
             <div key={g} className="mb-3">
               <div className="mb-1 text-[10px] font-bold tracking-wide text-muted-foreground">{g}</div>
               <div className="flex flex-col gap-2">
-                {isNew && draft?.group === g && (
+                {isNew && draft.group === g && (
                   <ListRow selected><div className="min-w-0 flex-1"><b className="text-[13px]">{draft.name.trim() || t("New alert policy")}</b><div className="text-[11px] text-muted-foreground">{t("not saved yet")}</div></div></ListRow>
                 )}
                 {listed.filter((x) => x.group === g).map((x) => (

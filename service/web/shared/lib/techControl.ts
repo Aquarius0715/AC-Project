@@ -80,8 +80,8 @@ export function historyRows(cs: ApiCommandRow[], runs: ApiRun[], i: I18n = EN): 
     const isStart = !!run && run.startCommandId === c.id;
     const title = run ? runTitle(run, isStart, t) : actionCode(c.action);
     const outcome = commandOutcome(c, i);
-    const ends = isStart && run?.state === "running" && run.endAt ? ` · ${t("ends {time}", { time: clock(run.endAt, i) })}` : "";
-    const badge = isStart && run?.state === "running" ? { text: t("Running"), tone: "primary" as const } : commandBadge(c.status, t);
+    const ends = isStart && run.state === "running" && run.endAt ? ` · ${t("ends {time}", { time: clock(run.endAt, i) })}` : "";
+    const badge = isStart && run.state === "running" ? { text: t("Running"), tone: "primary" as const } : commandBadge(c.status, t);
     return { id: c.id, at: clock(c.requestedAt, i), sub: `${c.id.slice(0, 8)} · ${outcome}${ends}`, run: !!run, title, badge };
   });
 }

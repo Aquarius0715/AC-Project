@@ -114,7 +114,7 @@ describe("notes, follow-ups and answers in the maintenance demo", () => {
   it("marks a notice read and resets to the seed", () => {
     jobActions.cancel("job-c07", "moved out");
     const n = must(notes("admin")[0]);
-    jobActions.markRead(must(n?.id));
+    jobActions.markRead(n.id);
     expect(notes("admin")[0]?.read).toBe(true);
     jobActions.reset();
     expect([job("job-c07").status, getJobState().notes]).toEqual(["requested", []]);

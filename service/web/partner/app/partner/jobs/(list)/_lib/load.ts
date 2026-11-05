@@ -22,12 +22,15 @@ export async function loadJobs(sp: { tab?: string; sort?: string; from?: string;
   const p = period(nowIso, sp.from, sp.to);
   const tab = tabOf(sp.tab), sort = sortOf(sp.sort);
   const query = (cursor?: string) => coreOp<Page<ApiPartnerJob>>("jobs.list", { filters: tabFilters(tab, p.fromAt, p.toAt), sort: sortSpec(sort), limit: PAGE_SIZE, ...(cursor && { cursor }) });
-  let isRestarted = false;
-  const list = await query(sp.cursor).catch((error: unknown) => {
-    if (!sp.cursor || !stale(error)) throw error;
-    isRestarted = true; // the list changed since the cursor was issued
-    return query();
-  });
+  const firstPage = async () => {
+    try {
+      return { list: await query(sp.cursor), isRestarted: false };
+    } catch (error: unknown) {
+      if (!sp.cursor || !stale(error)) throw error;
+      return { list: await query(), isRestarted: true }; // the list changed since the cursor was issued
+    }
+  };
+  const { list, isRestarted } = await firstPage();
   const [counts, units, members] = await Promise.all([
     Promise.all(TABS.map(async (t) => { const r = await coreOp<Page<unknown>>("jobs.list", { filters: tabFilters(t.id, p.fromAt, p.toAt), limit: 1 }); return r.total; })),
     optional(coreAll<{ id: string; displayName: string }>("units.list"), []),

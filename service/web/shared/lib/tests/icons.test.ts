@@ -35,10 +35,10 @@ export function iconProblem(text: string): string | null {
   if (chars.length === 0) return null;
   const first = must(chars[0]), last = must(chars[chars.length - 1]);
   const lead = must(/^[ \t]*/.exec(text))[0], trail = must(/[ \t]*$/.exec(text))[0];
-  const isSeparatorFirst = lead.length > 0 && /^[ \t]/.test(text.slice(lead.length + must(first?.length)));
-  const isSeparatorLast = trail.length > 0 && /[ \t]$/.test(text.slice(0, text.length - trail.length - must(last?.length)));
-  if (ARROW.test(must(first)) && !isSeparatorFirst) return `the arrow ${first} before the text`;
-  if (ARROW.test(must(last)) && !isSeparatorLast) return `the arrow ${last} after the text`;
+  const isSeparatorFirst = lead.length > 0 && /^[ \t]/.test(text.slice(lead.length + first.length));
+  if (ARROW.test(first) && !isSeparatorFirst) return `the arrow ${first} before the text`;
+  const isSeparatorLast = trail.length > 0 && /[ \t]$/.test(text.slice(0, text.length - trail.length - last.length));
+  if (ARROW.test(last) && !isSeparatorLast) return `the arrow ${last} after the text`;
   if (/^\s*\+ \p{Lu}/u.test(text)) return `"+ " before the label`;
   return null;
 }

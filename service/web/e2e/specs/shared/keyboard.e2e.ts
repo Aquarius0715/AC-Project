@@ -4,6 +4,9 @@
 import { test, expect } from "../../fixtures/test";
 import { must } from "../../fixtures/must";
 
+// the CSP violations the page saw, collected in the browser by the init script below
+declare global { var refused: string[] | undefined; }
+
 const DIALOGS: Record<string, [path: string, trigger: string | RegExp]> = {
   customer: ["/customer/users", "Add user"],
   partner: ["/partner/team", "Unavailable days"],
@@ -14,7 +17,7 @@ const DIALOGS: Record<string, [path: string, trigger: string | RegExp]> = {
 test("a dialog opened by keyboard keeps focus inside and returns it to its trigger", async ({ page, app }) => {
   const [path, name] = must(DIALOGS[app.id]);
   // the dialog's parts (the shadcn/ui Dialog on Base UI, DEC-75) add nothing the CSP refuses
-  await page.addInitScript(() => { document.addEventListener("securitypolicyviolation", (e) => ((globalThis as unknown as { refused: string[] }).refused ??= []).push(e.violatedDirective)); });
+  await page.addInitScript(() => { document.addEventListener("securitypolicyviolation", (e) => (globalThis.refused ??= []).push(e.violatedDirective)); });
   await page.goto(path);
   const trigger = page.getByRole("button", { name }).first();
   await trigger.focus();
@@ -33,7 +36,7 @@ test("a dialog opened by keyboard keeps focus inside and returns it to its trigg
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
   await expect(trigger).toBeFocused();
-  expect(await page.evaluate(() => (globalThis as unknown as { refused?: string[] }).refused ?? []), "CSP violations").toEqual([]);
+  expect(await page.evaluate(() => globalThis.refused ?? []), "CSP violations").toEqual([]);
 });
 
 // Every page starts with a skip link (IR568): the first Tab shows "Skip to main content", Enter moves focus to the page,

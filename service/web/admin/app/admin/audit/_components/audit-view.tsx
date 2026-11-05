@@ -81,7 +81,7 @@ export function AuditView({ live }: Readonly<{ live?: AuditLive }>) {
     const merged = { ...f, ...next };
     setF(merged);
     if (!live) return;
-    patch({ ...Object.fromEntries(Object.entries(next).map(([k, v]) => [k, k === "result" && v === "All" ? null : String(v ?? "")])), limit: null, ...(!keepEntry && { entryId: null, eventId: null }) });
+    patch({ ...Object.fromEntries(Object.entries(next).map(([k, v]) => [k, k === "result" && v === "All" ? null : String(v)])), limit: null, ...(!keepEntry && { entryId: null, eventId: null }) });
   };
   const typeCorr = (v: string) => {
     setF((x) => ({ ...x, correlationId: v }));

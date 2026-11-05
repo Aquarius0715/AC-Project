@@ -82,7 +82,7 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
     return customers.map((o) => ({ id: o.id, name: o.name }));
   };
   const targets = scopeTargets();
-  const kindWord = { tenant: t("Tenant"), unit: t("Unit"), property: t("Property"), organization: t("Customer organization") };
+  const kindWord: Partial<Record<ScopeRef["kind"], string>> = { tenant: t("Tenant"), unit: t("Unit"), property: t("Property"), organization: t("Customer organization") };
   const scopeList = (kind: ScopeRef["kind"]): { id: string; name: string }[] => {
     if (kind === "unit") return live.units;
     if (kind === "property") return live.properties;

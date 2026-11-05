@@ -58,7 +58,7 @@ export function techRow(j: ApiTechJobRow, now: number, units: Map<string, string
   const isBefore = !!s && Date.parse(s.startAt) > now;
   const isEnded = !!s && Date.parse(s.endAt) <= now && (j.status === "assigned" || j.status === "in_progress");
   const ack = j.assignmentAcknowledgement ?? null;
-  const opens = isBefore && s ? relativeTime(s.startAt, now, i) : null;
+  const opens = isBefore ? relativeTime(s.startAt, now, i) : null;
   let badge: TechJobRow["badge"], note: string;
   if (j.status === "assigned" && ack === "pending") [badge, note] = [{ text: t("Not accepted"), tone: "warn" }, t("new assignment — review and accept it")];
   else if (j.status === "assigned" && ack === "cant_make") [badge, note] = [{ text: t("Can’t make it"), tone: "warn" }, t("you said you can’t make it — waiting for your contractor or HQ")];
@@ -87,7 +87,7 @@ export function techRow(j: ApiTechJobRow, now: number, units: Map<string, string
     today: isToday(s, now),
     slot: s,
     ackPending: j.status === "assigned" && ack === "pending",
-    opensAt: isBefore && s ? s.startAt : null,
+    opensAt: isBefore ? s.startAt : null,
     badge,
     slotText,
     opens,

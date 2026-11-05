@@ -21,7 +21,7 @@ export async function callOp<T>(...[operation, input, options = {}]: OpArgs<Writ
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (options.write) headers["Idempotency-Key"] = options.idempotencyKey ?? randomId(); // also over HTTP (DEC-93)
   if (options.expectedVersion !== undefined) headers["X-Expected-Version"] = String(options.expectedVersion);
-  const res = await fetch(`/bff/ops/${operation}`, { method: "POST", body: JSON.stringify(input ?? {}), headers });
+  const res = await fetch(`/bff/ops/${operation}`, { method: "POST", body: JSON.stringify(input), headers });
   const body = await orNull(res.json());
   if (!res.ok) {
     throw new OpError(res.status, domainError(body));

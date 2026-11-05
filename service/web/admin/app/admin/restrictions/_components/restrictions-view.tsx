@@ -14,6 +14,7 @@ import {
 } from "@ac/web/lib/restrictions";
 import { executeRestriction, reconcileUnits, requestRelease, retryUnits, scheduleRestriction } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
+import type { RestrictionRecoveryCase } from "@ac/web/lib/contracts.gen";
 
 interface ScheduleContract {
   id: string; version: number; label: string; rulesVersion: string; recipients: number; invoices: { id: string; number: string }[];
@@ -57,7 +58,7 @@ function Manager({ live }: Readonly<{ live: NonNullable<RestrictionsLive> }>) {
   const step = stepOf();
   const exec = sel?.texts.execute ?? null;
   const release = sel?.texts.release ?? null;
-  const recovery = { pending: t("pending"), removing: t("removing"), resolved: t("resolved") };
+  const recovery: Partial<Record<RestrictionRecoveryCase["state"], string>> = { pending: t("pending"), removing: t("removing"), resolved: t("resolved") };
   return (
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -79,7 +80,7 @@ function Manager({ live }: Readonly<{ live: NonNullable<RestrictionsLive> }>) {
         <Card title={t("Restrictions")} sub={t("newest first")} className="self-start">
           {live.rows.length === 0 ? <EmptyState title={t("No restrictions")}>{t("No restriction matches this scope.")}</EmptyState> : <div className="flex flex-col gap-2">{live.rows.map((x) => <ListRow key={x.id} selected={r?.id === x.id} onClick={() => { setConfirmRules(false); nav({ restrictionId: x.id }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{x.id.slice(0, 8)}</b><Badge tone={stateTone(x.state)}>{stateWord(x.state, t)}</Badge></div><div className="text-[11px] text-muted-foreground">{x.label}</div><div className="text-[11px] text-muted-foreground">{x.policy} · {t(x.units === 1 ? "1 unit" : "{n} units", { n: x.units })} · {x.progress}</div></div></ListRow>)}</div>}
         </Card>
-        {r && sel ? (
+        {r ? (
           <div className="flex min-w-0 flex-col gap-4">
             <Card title={t("Restriction {id}", { id: r.id.slice(0, 8) })} sub={t("{contract} · rules {rules} · version {v}", { contract: sel.contract, rules: r.rulesVersion, v: r.version })} action={<Link className="text-xs font-semibold text-primary" href={`/admin/restrictions/${r.id}`}>{t("Exception / override")} <Icon name="arrowRight" /></Link>}>
               {step >= 0 ? <Steps steps={lifecycleStates.map((s) => stateWord(s, t))} current={step} /> : <Banner tone="muted">{t("Cancelled — no further commands.")}</Banner>}

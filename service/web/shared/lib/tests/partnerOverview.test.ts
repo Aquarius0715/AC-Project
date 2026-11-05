@@ -80,7 +80,7 @@ describe("partner overview", () => {
       ["unassigned", "p02 · Rooftop unit", "Assign", "/partner/schedule?jobId=p02"],
     ]);
     const overdue = must(actions(fixture(), now, names)[1]);
-    expect(overdue?.detail).toBe("Work window ended 20 Sept 2026, 5:00 pm MYT · tech-external-a"); // IR44
+    expect(overdue.detail).toBe("Work window ended 20 Sept 2026, 5:00 pm MYT · tech-external-a"); // IR44
   });
 
   it("draws today's timeline and the week's capacity per technician", () => {

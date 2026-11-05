@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { ROLES, ROLE_KEY, Role, roleFromPath, type ShellLive, SHARED_PAGES, documentTitle, pageLabel } from "@ac/web/lib/nav";
+import { isRole, ROLES, ROLE_KEY, Role, roleFromPath, type ShellLive, SHARED_PAGES, documentTitle, pageLabel } from "@ac/web/lib/nav";
 import { Badge, Banner, Btn, Modal, SummaryList, ToastProvider, cx } from "./ui";
 import { Icon, type IconName } from "./Icon";
 import { useJobStore } from "@ac/web/lib/jobs";
@@ -20,11 +20,12 @@ import { Button } from "@ac/web/components/ui/button";
 export function useStoredRole(): Role {
   const pathname = usePathname();
   const fromPath = roleFromPath(pathname);
-  const saved = useStoredValue(ROLE_KEY) as Role | null; // last role, external store (no effect)
+  const stored = useStoredValue(ROLE_KEY); // last role, external store (no effect)
+  const saved = stored !== null && isRole(stored) ? stored : null;
   useEffect(() => {
     if (fromPath) setStoredValue(ROLE_KEY, fromPath); // sync the external system only
   }, [fromPath]);
-  return fromPath ?? (saved && ROLES[saved] ? saved : "client");
+  return fromPath ?? saved ?? "client";
 }
 
 const signOut = "flex w-full items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold text-crit hover:bg-crit-soft/50";

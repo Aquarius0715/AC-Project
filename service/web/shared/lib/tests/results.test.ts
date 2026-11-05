@@ -116,7 +116,7 @@ function check(): { checked: number; problems: string[] } {
           else { // inferred from the context (a typed variable or return)
             const sig = c.getResolvedSignature(n);
             const returned = sig && c.getReturnTypeOfSignature(sig);
-            own = returned?.symbol?.getName() === "Promise" ? c.getTypeArguments(returned as ts.TypeReference)[0] : returned;
+            own = returned?.getSymbol()?.getName() === "Promise" ? c.getTypeArguments(returned as ts.TypeReference)[0] : returned;
             if (fn === "coreAll" && own && c.isArrayType(own)) own = c.getTypeArguments(own as ts.TypeReference)[0];
           }
           if (fn === "coreAll" && result) {

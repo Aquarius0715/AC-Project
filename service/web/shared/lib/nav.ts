@@ -116,6 +116,8 @@ export const ROLES: Record<Role, RoleConfig> = {
 export const ROLE_KEY = "ac-role";
 // each role's path prefix, in the order they are tried
 const ROLE_PREFIX: [string, Role][] = [["/customer", "client"], ["/partner", "contractor"], ["/technician", "technician"], ["/admin", "admin"]];
+/** A stored or sent role name that is one of the four roles. */
+export const isRole = (v: string): v is Role => Object.hasOwn(ROLES, v);
 export const roleFromPath = (p: string): Role | null => ROLE_PREFIX.find(([prefix]) => p.startsWith(prefix))?.[1] ?? null;
 
 /** The shared pages every role's shell lists below its menu (FR-X01, FR-X07). */

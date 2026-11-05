@@ -6,12 +6,12 @@ import { BarChart, LineChart, UtilizationBar } from "@ac/web/components/ui";
 // jsdom lays nothing out: give the chart's box a size, as a browser would, so that Recharts draws (the legend stays 0 high)
 const box = (width: number, height: number) => ({ width, height, top: 0, left: 0, right: width, bottom: height, x: 0, y: 0, toJSON: () => ({}) });
 beforeAll(() => {
-  globalThis.ResizeObserver ??= class { observe() {} unobserve() {} disconnect() {} } as unknown as typeof ResizeObserver;
+  vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} }); // jsdom has none
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
     return this.classList.contains("recharts-responsive-container") ? box(600, 200) : box(0, 0);
   });
 });
-afterAll(() => vi.restoreAllMocks());
+afterAll(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 afterEach(cleanup);
 
 // the drawn pieces of a path: a move followed by at least one line (a lone move draws nothing)
@@ -45,7 +45,7 @@ describe("charts", () => {
   it("labels a small scale with distinct ticks, not the same whole number twice", () => {
     const { container } = render(<BarChart labels={["a", "b"]} series={[[0.9, 0.4]]} />);
     // the value ticks are the numbers; the labels under the bars are the category names
-    const ticks = [...container.querySelectorAll(".recharts-cartesian-axis-tick-value")].map((x) => x.textContent ?? "").filter((t) => /^\d/.test(t));
+    const ticks = [...container.querySelectorAll(".recharts-cartesian-axis-tick-value")].map((x) => x.textContent).filter((t) => /^\d/.test(t));
     expect(ticks.length).toBeGreaterThan(1);
     expect(new Set(ticks).size).toBe(ticks.length);
   });

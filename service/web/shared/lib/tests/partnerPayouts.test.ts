@@ -83,14 +83,14 @@ describe("payoutPdf", () => {
     expect(pdf).toContain("Contractor \\(A\\) - demo"); // parentheses escaped, non-ASCII replaced
     expect(pdf).toContain("(Net payable");
     expect(pdf).not.toMatch(/[^\x00-\x7F]/);
-    expect((pdf.match(/\) Tj/g) ?? []).length).toBe(16); // 2 header + blank + column head + rule + 4 statement lines (Not included rows are left out) + rule + 3 totals + blank + 2 notes
+    expect(pdf.match(/\) Tj/g) ?? []).toHaveLength(16); // 2 header + blank + column head + rule + 4 statement lines (Not included rows are left out) + rule + 3 totals + blank + 2 notes
     const xref = Number(must(/startxref\n(\d+)/.exec(pdf))[1]);
     expect(pdf.slice(xref, xref + 4)).toBe("xref");
     const offsets = [...pdf.matchAll(/(\d{10}) 00000 n/g)].map((m) => Number(m[1]));
     for (const [i, o] of offsets.entries()) expect(pdf.slice(o, o + `${String(i + 1)} 0 obj`.length)).toBe(`${String(i + 1)} 0 obj`);
     const length = Number(must(/\/Length (\d+) >>\nstream\n/.exec(pdf))[1]);
     const stream = must(must(/stream\n([\s\S]*?)\nendstream/.exec(pdf))[1]);
-    expect(stream?.length).toBe(length);
+    expect(stream).toHaveLength(length);
   });
 });
 
