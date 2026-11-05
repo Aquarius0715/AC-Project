@@ -104,8 +104,9 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
       coreOp<Page<{ customerId: string; status: string }>>("clientUsers.list", { limit: 100, filters: { status: "active" } }),
     ]);
     const busy = new Map<string, string>();
-    for (const x of all.items) if (active.has(x.state)) for (const u of x.unitIds) busy.set(u, t("under restriction {id} ({state})", { id: x.id.slice(0, 8), state: stateWord(x.state, t) }));
-    for (const x of all.items) for (const c of x.recoveryCases) if (c.state !== "resolved") busy.set(c.unitId, t("unresolved recovery case"));
+    const restricted = all.items.filter((x) => active.has(x.state)).flatMap((x) => x.unitIds.map((u) => [u, t("under restriction {id} ({state})", { id: x.id.slice(0, 8), state: stateWord(x.state, t) })] as const));
+    const recovering = all.items.flatMap((x) => x.recoveryCases).filter((c) => c.state !== "resolved").map((c) => [c.unitId, t("unresolved recovery case")] as const);
+    for (const [u, why] of [...restricted, ...recovering]) busy.set(u, why);
     const cap = new Map(caps.items.map((k) => [k.id, k]));
     const term = (k: ApiContract) => Date.parse(k.startAt) <= now.getTime() && now.getTime() < Date.parse(k.endAt);
     live.schedule = contracts.items.filter((k) => k.planType === "rto" && k.restrictionEligible && k.rulesVersion && term(k)).map((k) => {

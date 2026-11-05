@@ -523,34 +523,29 @@ export const importFields = [
 export const importTemplate = toCsv(importFields.map((f) => f.key), [["Office A", "2F", "Meeting room 2", "Meeting room AC #2", "SPL-100", "", "2026-01-10", "2027-01-10"]]);
 /** The header cells and the number of records of a CSV text (RFC 4180 quotes; a BOM is ignored). */
 export function csvShape(text: string): { header: string[]; rows: number } {
-  let row: string[] = []; // the record being read
-  const records: string[][] = [row];
-  let cell = "", isQuoted = false;
+  const records: string[][] = [[]];
+  const at = { cell: "", isQuoted: false }; // the cell being read, and whether it is inside quotes
+  const endCell = () => { records.at(-1)?.push(at.cell); at.cell = ""; };
+  // inside quotes: a doubled quote is one quote, a single one ends the quoting, anything else is text
+  const quoted = (ch: string, next: string | undefined): number => {
+    if (ch !== '"') at.cell += ch;
+    else if (next === '"') { at.cell += '"'; return 2; }
+    else at.isQuoted = false;
+    return 1;
+  };
+  // outside quotes: a quote starts quoting, a comma ends the cell, CR, LF or CRLF ends the record
+  const plain = (ch: string, next: string | undefined): number => {
+    switch (ch) {
+      case '"': { at.isQuoted = true; return 1; }
+      case ",": { endCell(); return 1; }
+      case "\n":
+      case "\r": { endCell(); records.push([]); return ch === "\r" && next === "\n" ? 2 : 1; }
+      default: { at.cell += ch; return 1; }
+    }
+  };
   const t = text.replace(/^\u{FEFF}/u, "");
-  for (let i = 0; i < t.length; i++) {
-    const ch = t.charAt(i);
-    if (isQuoted) {
-      if (ch === '"' && t[i + 1] === '"') { cell += '"'; i++; } else if (ch === '"') isQuoted = false; else cell += ch;
-    } else switch (ch) {
- case '"': {
- isQuoted = true;
- break;
- }
- case ",": { row.push(cell); cell = ""; 
- break;
- }
- case "\n": 
- case "\r": {
-      if (ch === "\r" && t[i + 1] === "\n") i++;
-      row.push(cell); cell = ""; row = []; records.push(row);
-    
- break;
- }
- default: { cell += ch;
- }
- }
-  }
-  row.push(cell);
+  for (let i = 0; i < t.length;) i += (at.isQuoted ? quoted : plain)(t.charAt(i), t[i + 1]);
+  endCell();
   const full = records.filter((r) => r.some((c) => c.trim() !== ""));
   return { header: (full[0] ?? []).map((h) => h.trim()), rows: Math.max(0, full.length - 1) };
 }

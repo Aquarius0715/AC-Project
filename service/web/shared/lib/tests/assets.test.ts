@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
+import { csvShape,
   changedFields, claimCandidate, conditionText, coverageCsv, coverageKpis, coverageRows, customerRows, defaultRules, errorReportCsv, importMessage, placeOptions, policyLines,
   registerKpis, standing as standingOf, standingMarks, unitDraft, unitErrors, unitRows, type ApiCoverage, type ApiCustomerPolicy, type ApiImportRow, type ApiUnitRow, type Standing,
 } from "@ac/web/lib/assets";
@@ -92,5 +92,14 @@ describe("HQ customers & units in Malay with the display time zone (IR293)", () 
     expect([rows[0]?.ends, rows[0]?.statusText]).toEqual(["10 Okt 2026", "Tamat dalam 26 h · tiada kontrak"]); // the Kuala Lumpur day, in Malay
     expect(unitErrors({ ...unitDraft(unit({})), modelId: "" }, "2026-09-14", MS.t)).toEqual({ modelId: "Pilih model" });
     expect(changedFields(unit({}), { ...unitDraft(unit({})), warrantyEnd: "" }, MS.t)).toEqual(["Tamat waranti"]);
+  });
+});
+
+// the import file's shape (RFC 4180): quoted commas, doubled quotes and line breaks stay in a cell; CR, LF and CRLF
+// end a record; a BOM and blank records are ignored
+describe("csvShape", () => {
+  it("reads quoted cells and every line ending", () => {
+    expect(csvShape('\u{FEFF}a,"b,c","d""e"\r\n1,2,3\n\n4,5,6\n')).toEqual({ header: ["a", "b,c", 'd"e'], rows: 2 });
+    expect([csvShape("x\ry\r\nz"), csvShape(""), csvShape('"q\nr",s\n1,2')]).toEqual([{ header: ["x"], rows: 2 }, { header: [], rows: 0 }, { header: ["q\nr", "s"], rows: 1 }]);
   });
 });

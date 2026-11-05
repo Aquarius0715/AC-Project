@@ -178,9 +178,14 @@ export function webConfig(tsconfigRootDir) {
       rules: { "sonarjs/no-reference-error": "off" },
     },
     {
-      // Next.js fixes these file names; the default export names the route's own component
+      // Next.js fixes these file names; the default export names the route's own component. shared/screens keeps the
+      // same layout (screens/<route>/page.tsx) because each file is the route an app re-exports; PostCSS and ESLint
+      // read their configs under fixed names
       files: [
         "**/app/**/{page,layout,template,default,error,global-error,loading,not-found,forbidden,unauthorized,route}.{ts,tsx}",
+        "**/screens/**/{page,layout,template,default,error,global-error,loading,not-found,forbidden,unauthorized,route}.{ts,tsx}",
+        "**/postcss.config.mjs",
+        "**/eslint.*config.mjs",
       ],
       rules: { "sonarjs/file-name-differ-from-class": "off" },
     },
