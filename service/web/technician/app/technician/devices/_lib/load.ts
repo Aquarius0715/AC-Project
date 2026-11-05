@@ -27,7 +27,7 @@ export async function loadDevices(options: { selected?: string; unitId?: string;
   ]);
   const i = i18nOf(display);
   const { t } = i;
-  const myJobs: TechJob[] = jobs.filter((j) => j.projection === "summary" && j.id && j.unitId).map((j) => ({ id: j.id!, unitId: j.unitId!, status: j.status ?? "" }));
+  const myJobs: TechJob[] = jobs.filter((j): j is typeof j & { id: string; unitId: string } => j.projection === "summary" && !!j.id && !!j.unitId).map((j) => ({ id: j.id, unitId: j.unitId, status: j.status ?? "" }));
   const names = new Map(units.map((u) => [u.id, u.displayName]));
   const rows = techDeviceRows(devices, names, now.getTime(), t);
   const bound = new Set(devices.map((d) => d.unitId).filter(Boolean));
@@ -40,10 +40,11 @@ export async function loadDevices(options: { selected?: string; unitId?: string;
       return d ? [{ unitId: u.id, label: `${d.displayName} · ${d.location.pathLabels.join(" › ")}`, model: `${d.capabilities.manufacturer} ${d.capabilities.model}`,
         sensors: d.capabilities.sensors.map((s) => s.metric), jobs: myJobs.filter((j) => j.unitId === u.id).map((j) => ({ id: j.id, label: `${j.id.slice(0, 8)} · ${statusWord(j.status, t)}` })) }] : [];
     }),
-    rebind: units.filter((u) => !u.archived && jobFor(u.id, myJobs)).map((u) => ({ unitId: u.id, label: u.displayName, jobId: jobFor(u.id, myJobs)! })),
+    rebind: units.filter((u) => !u.archived).map((u) => ({ unitId: u.id, label: u.displayName, jobId: jobFor(u.id, myJobs) })).filter((r): r is typeof r & { jobId: string } => !!r.jobId),
   };
-  const id = rows.find((r) => r.id === options.selected)?.id ?? rows.find((r) => options.unitId && r.unitId === options.unitId)?.id ?? rows[0]?.id;
-  if (!id) return live;
+  const row = rows.find((r) => r.id === options.selected) ?? rows.find((r) => options.unitId && r.unitId === options.unitId) ?? rows.at(0);
+  if (!row) return live;
+  const { id } = row;
   const d = await coreOp<ApiDeviceDetail & { activeOperation: (ApiDeviceOperation & { startedAt?: string | null; expiresAt?: string }) | null }>("devices.get", { id });
   const unit = d.unitId ? await quiet(coreOp<Unit>("units.get", { id: d.unitId })) : null;
   const jobId = (options.jobId && myJobs.some((j) => j.id === options.jobId && j.unitId === d.unitId) ? options.jobId : null) ?? jobFor(d.unitId, myJobs);
@@ -60,7 +61,6 @@ export async function loadDevices(options: { selected?: string; unitId?: string;
   const alerts = new Map(fetched.filter((a): a is ApiAlertLite => !!a).map((a) => [a.id, a]));
   live.device = {
     detail: d,
-    row: rows.find((r) => r.id === id)!,
     tiles: deviceTiles(d, newerFirmware(d.firmwareVersion, candidates), now.getTime(), evs ? openFaults(evs.items) : {}, i),
     sensors: sensorRows(d, i),
     unit: unit ? { name: unit.displayName, place: unit.location.pathLabels.join(" › "), model: `${unit.capabilities.manufacturer} ${unit.capabilities.model} v${String(unit.capabilityVersion)}` } : null,
@@ -71,6 +71,7 @@ export async function loadDevices(options: { selected?: string; unitId?: string;
     events: evs ? eventRows(evs.items, alerts, now.getTime(), i) : null,
     eventsLocked: options.events && !evs,
     jobId,
+    row,
   };
   return live;
 }

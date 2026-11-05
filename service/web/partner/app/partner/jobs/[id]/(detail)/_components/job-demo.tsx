@@ -39,7 +39,7 @@ function LiveOffer({ j }: Readonly<{ j: Job }>) {
             ["Installation address", "Home A, Kuala Lumpur (registered)"],
             ["Required qualification", "Split-unit refrigerant handling"],
             ["Visit time (fixed)", pending ? <s key="s" className="text-muted-foreground">{fmt(j.scheduled)}</s> : <b key="b">{j.scheduled ? longDate(j.scheduled) : "—"} · {j.origin === "plan" ? "from the periodic plan" : "agreed with the client"}</b>],
-            ...(pending ? [["Your proposal", <b key="p" className="text-warn">{longDate(j.partnerProposal!.slot)} · sent {j.partnerProposal!.sentAt}</b>] as [string, React.ReactNode]] : []),
+            ...(pending && j.partnerProposal ? [["Your proposal", <b key="p" className="text-warn">{longDate(j.partnerProposal.slot)} · sent {j.partnerProposal.sentAt}</b>] as [string, React.ReactNode]] : []),
             ["Offer / delegation terms", `offer-${j.id.slice(4)}-1 · terms v3`],
           ]} /></div>
           {j.status === "offered" && (

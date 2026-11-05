@@ -64,8 +64,8 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
     const [overdue, contracts] = await Promise.all([coreAll<ApiInvoice>("invoices.list", { filters: { overdueOnly: true } }), coreAll<ClientContract>("contracts.list")]);
     const k = contracts.find((c) => (c.activeRestrictionIds ?? []).length > 0 && overdue.some((x) => x.contractId === c.id));
     let restriction: { r: ApiRestriction; invoiceId: string } | null = null;
-    if (k) {
-      const invoiceId = overdue.find((x) => x.contractId === k.id)!.id;
+    const invoiceId = k ? overdue.find((x) => x.contractId === k.id)?.id : undefined; // the contract's overdue invoice
+    if (k && invoiceId) {
       const page = await coreOp<{ items: ApiRestriction[] }>("restrictions.forInvoice", { invoiceId, query: { limit: 10 } });
       const r = page.items.find((x) => (k.activeRestrictionIds ?? []).includes(x.id));
       if (r) restriction = { r, invoiceId };

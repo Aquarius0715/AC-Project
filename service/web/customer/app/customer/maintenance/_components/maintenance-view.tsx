@@ -58,11 +58,12 @@ export function MaintenanceView({ live }: Readonly<{ live: MaintenanceLive }>) {
         onDone={(text) => { setResult({ tone: "ok", text }); }} onFail={(f) => { setResult({ tone: f.code === "FORBIDDEN" ? "warn" : "crit", text: filterRefusal(f, t) }); }} />
   ) : <Card title={t("Filters by AC")}><p className="text-[13px] text-muted-foreground">{t("Loading filter care…")}</p></Card>);
   const requestsBody = () => {
+    const { rateBanner } = live;
     if (going) return <Card title={t("My requests")}><p className="text-[13px] text-muted-foreground">{t("Loading your requests…")}</p></Card>;
     return (
       <>
         {replies > 0 && <Banner tone="warn" icon="swap" action={<Btn size="sm" variant="primary" onClick={() => { setTab("reply"); const r = live.rows.find((x) => x.tab === "reply"); if (r) open(r.id); }}>{t("Review")}</Btn>}>{t("A new visit time needs your reply ({n}). Nothing is booked until you accept.", { n: replies })}</Banner>}
-        {live.rateBanner && <Banner tone="ok" icon="check" action={<Btn size="sm" variant="primary" onClick={() => { open(live.rateBanner!.jobId); }}>{t("Confirm & rate")}</Btn>}><b>{live.rateBanner.text}</b> {t("Is everything working? Your confirmation closes the job.")}</Banner>}
+        {rateBanner && <Banner tone="ok" icon="check" action={<Btn size="sm" variant="primary" onClick={() => { open(rateBanner.jobId); }}>{t("Confirm & rate")}</Btn>}><b>{rateBanner.text}</b> {t("Is everything working? Your confirmation closes the job.")}</Banner>}
         <PageHead title={t("My requests")} sub={t(live.rows.length === 1 ? "{n} request · sorted by status (business order)" : "{n} requests · sorted by status (business order)", { n: live.rows.length })} action={<Btn variant="primary" onClick={() => { setModal("new"); }}><Icon name="add" /> {t("New maintenance request")}</Btn>} />
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Tabs value={tab} onChange={setTab} tabs={STATUS_TABS.filter(([s]) => s !== "reply" || replies > 0).map(([id, label]) => ({ id, label: t(label), count: count(id) }))} />
@@ -108,6 +109,7 @@ export function MaintenanceView({ live }: Readonly<{ live: MaintenanceLive }>) {
 type Done = (text?: string, tone?: "ok" | "warn") => void;
 
 function JobDetail({ d, open, onDone, onFail }: Readonly<{ d: Detail; open: (m: ModalKind) => void; onDone: Done; onFail: (f: ActionFailure) => void }>) {
+  const { proposal } = d;
   const t = useT();
   const j = d.job;
   const [pending, run] = useAction();
@@ -132,7 +134,7 @@ function JobDetail({ d, open, onDone, onFail }: Readonly<{ d: Detail; open: (m: 
           <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
             <span className="mr-auto text-[11px] text-warn">{t("Accepting books this time. Declining keeps your request open.")}</span>
             <Btn variant="danger" disabled={pending} onClick={() => { open("decline"); }}>{t("Decline…")}</Btn>
-            <Btn variant="primary" disabled={pending} onClick={() => { run(() => respondProposal(j.id, j.version, d.proposal!.id, { decision: "accept" }), t("Time accepted"), () => { onDone(t("Time accepted — {when} is booked; the technician confirms it next.", { when: d.proposal!.when })); }, onFail); }}><Icon name="check" />{t("Accept this time")}</Btn>
+            <Btn variant="primary" disabled={pending} onClick={() => { if (!proposal) { return; } run(() => respondProposal(j.id, j.version, proposal.id, { decision: "accept" }), t("Time accepted"), () => { onDone(t("Time accepted — {when} is booked; the technician confirms it next.", { when: proposal.when })); }, onFail); }}><Icon name="check" />{t("Accept this time")}</Btn>
           </div>
         </div>
       )}
@@ -251,6 +253,7 @@ function NewRequest({ live, prefill, onClose, onFail }: ModalProps & { live: Mai
 }
 
 function DeclineModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now: number }) {
+  const { proposal } = d;
   const t = useT();
   const { timeZone } = useDisplay();
   const j = d.job;
@@ -264,8 +267,8 @@ function DeclineModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now
   const errorText = give ? preferredError(slots, now, 3, t) : null;
   const send = () => {
     setTried(true);
-    if (errorText || comment.length > 1000) return;
-    run(() => respondProposal(j.id, j.version, d.proposal!.id, { decision: "decline", declineReason: reason, slots: give ? slots : [], comment }), t("Declined"), () => { onClose(t(give ? "Declined — HQ looks at your 3 new times." : "Declined — HQ will look again."), "warn"); }, onFail);
+    if (!proposal || errorText || comment.length > 1000) return;
+    run(() => respondProposal(j.id, j.version, proposal.id, { decision: "decline", declineReason: reason, slots: give ? slots : [], comment }), t("Declined"), () => { onClose(t(give ? "Declined — HQ looks at your 3 new times." : "Declined — HQ will look again."), "warn"); }, onFail);
   };
   return (
     <Modal open wide onClose={() => { onClose(); }} title={t("Decline the proposed time")} footer={<><Btn onClick={() => { onClose(); }}>{t("Back")}</Btn><Btn variant="primary" disabled={pending} onClick={send}>{t(give ? "Decline & send new times" : "Decline")}</Btn></>}>

@@ -118,7 +118,7 @@ function CertificateModal({ live, kind, row, onClose }: Readonly<{ live: Live; k
     if (!file) return;
     const data = new FormData();
     for (const [k, v] of Object.entries({ membershipId: form.membershipId, code: form.code, name: form.name, number: form.number, issued: form.issued, expires: form.expires })) data.set(k, v);
-    if (renew) data.set("renewalOf", row.cert!.id);
+    if (renew) data.set("renewalOf", renew.id);
     data.set("file", file);
     run(() => submitCertificate(data), t("Submitted for HQ verification — it counts for eligibility once HQ approves it."), onClose,
       (f) => { const r = certificateRefusal(f, t); setServer(r.fields); setRefused(r.text); });
@@ -129,7 +129,7 @@ function CertificateModal({ live, kind, row, onClose }: Readonly<{ live: Live; k
       <Btn variant="primary" disabled={pending} onClick={save}>{t("Submit for verification")}</Btn>
     </>}>
       {renew ? (
-        <SummaryList items={[[t("Technician"), row.technician], [t("Current"), t("{number} · expires {date}", { number: row.cert!.number, date: row.expires })]]} />
+        <SummaryList items={[[t("Technician"), row.technician], [t("Current"), t("{number} · expires {date}", { number: renew.number, date: row.expires })]]} />
       ) : (
         <>
           <Field label={t("Technician")} error={fieldError("membershipId")}>
@@ -177,8 +177,9 @@ function TrainingModal({ row, onClose }: Readonly<{ row: CertRow; onClose: () =>
   const isBad = note.trim().length === 0 || note.trim().length > 1000;
   const save = () => {
     setTried(true);
-    if (isBad) return;
-    run(() => requestTraining(row.cert!.id, row.cert!.version, note), t("Training requested."), onClose, (f) => { setRefused(certificateRefusal(f, t).text ?? t("Check the input.")); });
+    const { cert } = row;
+    if (isBad || !cert) return;
+    run(() => requestTraining(cert.id, cert.version, note), t("Training requested."), onClose, (f) => { setRefused(certificateRefusal(f, t).text ?? t("Check the input.")); });
   };
   return (
     <Modal open onClose={onClose} title={t("Request training — {name}", { name: row.name })} footer={<>

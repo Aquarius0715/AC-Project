@@ -38,7 +38,7 @@ export function PartnerUnitDetail({ live }: Readonly<{ live: UnitLive }>) {
           <Card title={t("Job context")} action={live.context && <Link className="text-xs font-semibold text-primary" href={`/partner/jobs/${live.context.id}`}>{t("Job")} <Icon name="arrowRight" /></Link>}>
             {live.context ? (
               <>
-                <SummaryList items={live.context.rows.map(([k, v], n): [string, React.ReactNode] => [k, n === 1 && live.context!.techMissing ? <span key="t" className="font-semibold text-crit">{v}</span> : v])} />
+                <SummaryList items={live.context.rows.map(([k, v], n): [string, React.ReactNode] => [k, n === 1 && live.context?.techMissing ? <span key="t" className="font-semibold text-crit">{v}</span> : v])} />
                 {live.context.pct !== null && <div className="mt-2"><UtilizationBar pct={live.context.pct} tone={live.context.pct >= 80 ? "crit" : "primary"} label={live.context.note} /></div>}
                 <p className="mt-2 text-[11px] text-muted-foreground">{live.context.note}</p>
               </>

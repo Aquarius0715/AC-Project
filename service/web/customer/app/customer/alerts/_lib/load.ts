@@ -39,7 +39,7 @@ export async function loadAlerts(sp: Record<string, string | string[] | undefine
   return {
     now: now.toISOString(),
     unreadOnly: isUnreadOnly,
-    unitId: units.some((u) => u.id === unitId) ? unitId! : null,
+    unitId: units.find((u) => u.id === unitId)?.id ?? null,
     units: units.map((u) => ({ id: u.id, name: u.displayName, place: place.get(u.id)?.place ?? "" })).toSorted((a, b) => a.name.localeCompare(b.name)),
     alertCount: summary.counts.alertCount,
     total: all.length,

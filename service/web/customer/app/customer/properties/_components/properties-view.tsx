@@ -114,7 +114,8 @@ function UnitRows({ units }: Readonly<{ units: (RoomUnit & { place: string })[] 
 const connLabel: Record<string, string> = { online: "Online", offline: "Offline", unknown: "Unknown", connecting: "Connecting", error: "Error" };
 function FilteredUnits({ live, clear }: Readonly<{ live: PropertiesLive; clear: () => void }>) {
   const t = useT();
-  const f = live.filter!;
+  const f = live.filter;
+  if (!f) return null;
   const label = [f.powerState && t("Power: {state}", { state: t(powerLabel[f.powerState]) }), f.connections.length > 0 && t("Connection: {states}", { states: f.connections.map((c) => t(connLabel[c] ?? c)).join(", ") })].filter(Boolean).join(" · ");
   return (
     <Card title={t("Air conditioners · {filter}", { filter: label })} sub={t("{n} of {total}", { n: live.units.length, total: f.total })} action={<Btn size="sm" onClick={clear}>{t("Clear filter")}</Btn>}>
@@ -127,7 +128,8 @@ function Panel({ live, sel, rename, go }: Readonly<{ live: PropertiesLive; sel: 
   const t = useT();
   const p = sel.property;
   if (sel.kind === "property") {
-    const s = live.summary!;
+    const s = live.summary;
+    if (!s) return null;
     return (
       <>
         <div className="text-[13px] text-muted-foreground">{t("My properties")} › <b className="text-ink">{p.name}</b></div>

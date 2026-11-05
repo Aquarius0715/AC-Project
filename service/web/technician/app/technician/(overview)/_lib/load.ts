@@ -20,7 +20,7 @@ export async function loadOverview(sp: { tab?: string; sort?: string }) {
   const i = i18nOf(display);
   const { t } = i;
   const tab = tabOf(sp.tab), sort = sortOf(sp.sort);
-  const spec = SORTS.find((s) => s.id === sort)!;
+  const spec = SORTS.find((s) => s.id === sort) ?? SORTS[0];
   const [summary, list, units, alerts] = await Promise.all([
     coreOp<{ counts: ApiTechCounts }>("summaries.get", { kind: "technician", filters: {} }),
     coreOp<Page<ApiTechJobRow>>("jobs.list", { sort: { field: spec.field, direction: spec.direction }, limit: 100 }),

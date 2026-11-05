@@ -167,7 +167,8 @@ function NewRequest({ open, onClose, onDone }: Readonly<{ open: boolean; onClose
   const submit = () => {
     setTried(true);
     if (sym.trim().length < 10 || sym.length > 2000 || preferredError(slots)) return;
-    const u = units.find((x) => x.id === unitId)!;
+    const u = units.find((x) => x.id === unitId);
+    if (!u) return;
     const id = jobActions.create({ unitId, type, unit: u.name, loc: u.loc, symptom: sym.trim(), preferred: slots });
     setTried(false); setSym(""); setSlots(blank()); onDone(id);
   };

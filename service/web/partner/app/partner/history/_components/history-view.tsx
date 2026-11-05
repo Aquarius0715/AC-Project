@@ -28,7 +28,7 @@ const hrefOf = (live: HistoryLive, jobId?: string) => { const q = [jobId ? `jobI
 function List({ live }: Readonly<{ live: HistoryLive }>) {
   const t = useT();
   const patch = useUrlPatch();
-  const all = live.tabs.find((x) => x.id === "all")!.count;
+  const all = live.tabs.find((x) => x.id === "all")?.count ?? 0;
   // no rows: older jobs outside the 90 days, or none at all
   const emptyState = () => {
     if (live.outside > 0) return <EmptyState title={t("No jobs in the last 90 days")} action={<Btn size="sm" onClick={() => { patch({ period: "all" }); }}>{t("Show all time")}</Btn>}>{t(live.outside === 1 ? "1 job of your company is older than 90 days — it shows under all time." : "{n} jobs of your company are older than 90 days — they show under all time.", { n: live.outside })}</EmptyState>;

@@ -21,7 +21,7 @@ export async function loadReview(jobId: string): Promise<ReviewLive> {
   const [job, me, members, display] = await Promise.all([coreOp<ApiReviewJob>("jobs.get", { jobId }), corePrincipal(), coreAll<Member>("members.list"), coreDisplay()]);
   const i = i18nOf(display);
   const { t } = i;
-  const names = new Map(members.filter((m) => m.displayName).map((m) => [m.userId, m.displayName!]));
+  const names = new Map(members.filter((m): m is typeof m & { displayName: string } => !!m.displayName).map((m) => [m.userId, m.displayName]));
   names.set(me.userId, t("you")); // the signed-in reviewer is not in the technician list (members.list)
   const id = job.id ?? job.jobId ?? jobId;
   const unit = job.projection === "detail" && job.unitId ? await quiet(coreOp<ApiUnitDetail>("units.get", { id: job.unitId })) : null;

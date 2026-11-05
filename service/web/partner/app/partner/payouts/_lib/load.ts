@@ -16,8 +16,11 @@ import { byText } from "@ac/web/lib/order";
 const quiet = orAbsent;
 const unitName = async (id: string | undefined, cache: Map<string, Promise<string | null>>) => {
   if (!id) return null;
-  if (!cache.has(id)) cache.set(id, quiet(coreOp<ApiUnitDetail>("units.get", { id })).then((u) => (u ? `${u.displayName} · ${u.location.pathLabels[0] ?? ""}`.replace(/ · $/, "") : null)));
-  return cache.get(id)!;
+  const cached = cache.get(id);
+  if (cached) return cached;
+  const name = quiet(coreOp<ApiUnitDetail>("units.get", { id })).then((u) => (u ? `${u.displayName} · ${u.location.pathLabels[0] ?? ""}`.replace(/ · $/, "") : null));
+  cache.set(id, name);
+  return name;
 };
 
 export async function loadPayouts(options: { statementId?: string; period?: string; status?: string }): Promise<PayoutsLive> {

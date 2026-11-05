@@ -13,7 +13,7 @@ language; the times come formatted from the loader — today's timeline in Kuala
 export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
   const t = useT();
   const patch = useUrlPatch();
-  const all = live.tabs.find((x) => x.id === "all")!.count;
+  const all = live.tabs.find((x) => x.id === "all")?.count ?? 0;
   return (
     <Page>
       <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>

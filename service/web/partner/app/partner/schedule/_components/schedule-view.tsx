@@ -93,10 +93,12 @@ function Workspace({ sel, week, members, zone, otherZone }: Readonly<{ sel: Sele
 
 /** The slot the form proposes: the agreed or current one, or the same start with the chosen end — typed in the user's
 display time zone (NFR-08) — while extending. */
-function proposed(sel: Selected, end: string, zone: string) {
-  const endAt = sel.mode.kind === "extend" && end ? zonedInstant(end.slice(0, 10), end.slice(11, 16), zone) : "";
-  return sel.mode.kind === "extend" && endAt ? { startAt: sel.mode.slot.startAt, endAt } : sel.mode.slot;
+function proposedSlot(mode: Exclude<Selected["mode"], { kind: "blocked" }>, end: string, zone: string) {
+  const endAt = mode.kind === "extend" && end ? zonedInstant(end.slice(0, 10), end.slice(11, 16), zone) : "";
+  return mode.kind === "extend" && endAt ? { startAt: mode.slot.startAt, endAt } : mode.slot;
 }
+// a blocked selection has no slot to change
+const proposed = (sel: Selected, end: string, zone: string) => (sel.mode.kind === "blocked" ? sel.mode.slot : proposedSlot(sel.mode, end, zone));
 
 function AssignCard({ sel, choice, zone, otherZone }: Readonly<{ sel: Selected; choice: Choice; zone: string; otherZone: boolean }>) {
   const t = useT();
@@ -120,7 +122,7 @@ function AssignCard({ sel, choice, zone, otherZone }: Readonly<{ sel: Selected; 
       </Card>
     );
   }
-  const slot = proposed(sel, end, zone)!;
+  const slot = proposedSlot(m, end, zone);
   const endOk = !m.endEditable || (end && Date.parse(slot.endAt) >= Date.parse(m.slot.endAt));
   const isReasonMissing = m.reasonRequired && !reason.trim();
   const isSame = tech === sel.currentId && (!m.endEditable || slot.endAt === m.slot.endAt);

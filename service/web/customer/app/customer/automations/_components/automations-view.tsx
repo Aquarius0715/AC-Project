@@ -53,7 +53,8 @@ function ConsentCard({ live, compact }: Readonly<{ live: AutomationsLive; compac
   const t = useT();
   const [pending, run] = useAction();
   const c = live.consent;
-  const flip = () => c.version !== null && run(() => updateConsent(!c.granted, c.version!), t(c.granted ? "Location consent withdrawn — location automations are off" : "Location consent granted"));
+  const consentVersion = c.version;
+  const flip = () => consentVersion !== null && run(() => updateConsent(!c.granted, consentVersion), t(c.granted ? "Location consent withdrawn — location automations are off" : "Location consent granted"));
   const badgeIcon = c.tone === "warn" ? "unsupported" : "dot";
   const badge = <Badge tone={CONSENT_TONE.get(c.tone) ?? "muted"} icon={c.granted ? "check" : badgeIcon}>{c.title}</Badge>;
   const withdrawText = compact ? "Withdraw" : "Withdraw consent";
@@ -77,8 +78,11 @@ function List({ live, notice, setNotice, create, edit }: Readonly<{ live: Automa
   const [pending, run] = useAction();
   const [del, setDel] = useState<RuleCard | null>(null);
   const on = live.cards.filter((c) => c.enabled).length;
-  const rule = (id: string) => live.rules.find((r) => r.id === id)!;
-  const toggle = (c: RuleCard) => { run(() => saveAutomation({ ...saveInput(draftOf(rule(c.id))), enabled: !c.enabled }, c.version), t(c.enabled ? "“{name}” switched off" : "“{name}” switched on", { name: c.name })); };
+  const toggle = (c: RuleCard) => {
+    const rule = live.rules.find((r) => r.id === c.id);
+    if (!rule) return;
+    run(() => saveAutomation({ ...saveInput(draftOf(rule)), enabled: !c.enabled }, c.version), t(c.enabled ? "“{name}” switched off" : "“{name}” switched on", { name: c.name }));
+  };
   const remove = (c: RuleCard) => {
     run(() => deleteAutomation(c.id, c.version), t("“{name}” deleted", { name: c.name }), () => {
       setDel(null);

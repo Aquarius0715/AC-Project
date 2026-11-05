@@ -38,7 +38,7 @@ export async function loadJobs(sp: { tab?: string; sort?: string; from?: string;
   const cursorPage = sp.cursor ? 2 : 1; // a cursor without a page number is past the first page
   const page = isRestarted ? 1 : Number(sp.page) || cursorPage;
   return {
-    tab, sort, sortText: t(SORTS.find((s) => s.id === sort)!.text), restarted: isRestarted,
+    tab, sort, sortText: t((SORTS.find((s) => s.id === sort) ?? SORTS[0]).text), restarted: isRestarted,
     tabs: TABS.map((tb, k) => ({ id: tb.id, label: t(tb.label), count: counts[k] })),
     sorts: SORTS.map((s) => ({ id: s.id, label: t("Sort: {sort}", { sort: t(s.label) }) })),
     ...periodChoice(p, nowIso, i), // period + periods

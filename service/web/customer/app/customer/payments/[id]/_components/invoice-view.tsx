@@ -100,8 +100,8 @@ function PaymentTab({ live }: Readonly<{ live: InvoiceLive }>) {
               </div>
             </div>
           )}
-          {isConfirmed && <div className="mt-4"><Banner tone="ok"><b>{t("Payment confirmed")}</b><div className="text-xs">{t("Reference {reference} · {method}. The invoice is now paid.", { reference: live.last!.reference ?? "—", method: methodText(live.last!.method, "recorded by HQ") })}{live.restriction?.notice.live ? ` ${t("A cooling-restriction release is requested — cooling returns only after the units confirm.")}` : ""}</div></Banner></div>}
-          {isFailed && <div className="mt-4"><Banner tone="crit"><b>{t("Payment failed")}</b><div className="text-xs">{t("Demo payment {id} failed. Nothing was charged; the invoice is still unpaid. Your method is kept — you can try again.", { id: live.last!.id.slice(0, 8) })}</div></Banner></div>}
+          {isConfirmed && live.last && <div className="mt-4"><Banner tone="ok"><b>{t("Payment confirmed")}</b><div className="text-xs">{t("Reference {reference} · {method}. The invoice is now paid.", { reference: live.last.reference ?? "—", method: methodText(live.last.method, "recorded by HQ") })}{live.restriction?.notice.live ? ` ${t("A cooling-restriction release is requested — cooling returns only after the units confirm.")}` : ""}</div></Banner></div>}
+          {isFailed && live.last && <div className="mt-4"><Banner tone="crit"><b>{t("Payment failed")}</b><div className="text-xs">{t("Demo payment {id} failed. Nothing was charged; the invoice is still unpaid. Your method is kept — you can try again.", { id: live.last.id.slice(0, 8) })}</div></Banner></div>}
           {i.payable && !open && (
             <>
               <h3 className="mb-2 mt-4 text-[13px] font-bold">{t("Payment method")}</h3>
@@ -152,8 +152,8 @@ function PaymentTab({ live }: Readonly<{ live: InvoiceLive }>) {
 
 function RestrictionBanner({ live }: Readonly<{ live: InvoiceLive }>) {
   const t = useT();
-  const n = live.restriction!.notice;
-  if (!n.live) return null;
+  const n = live.restriction?.notice;
+  if (!n?.live) return null;
   return (
     <Banner tone={n.state === "release_requested" ? "primary" : "warn"} action={<Link className="text-xs font-semibold text-primary" href={`/customer/payments/${live.invoice.id}?tab=restriction&restrictionId=${n.id}`}>{t("View restriction details")} <Icon name="arrowRight" /></Link>}>
       <span className="flex flex-wrap items-center gap-2"><b>{t(n.state === "release_requested" ? "Cooling restriction — release requested" : "Cooling restriction active")}</b><Badge tone={stateTone(n.state)}>{n.label}</Badge></span>
@@ -164,7 +164,8 @@ function RestrictionBanner({ live }: Readonly<{ live: InvoiceLive }>) {
 
 function RestrictionTab({ live }: Readonly<{ live: InvoiceLive }>) {
   const t = useT();
-  const r = live.restriction!;
+  const r = live.restriction;
+  if (!r) return null;
   return (
     <>
       <Card title={t("Cooling restriction · {id}", { id: r.notice.id.slice(0, 8) })} sub={live.contract ? `${live.contract.name} · ${live.contract.id.slice(0, 8)}` : undefined} action={<Badge tone={stateTone(r.notice.state)}>{r.notice.label}</Badge>}>

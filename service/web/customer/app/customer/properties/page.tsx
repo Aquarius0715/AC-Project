@@ -40,6 +40,10 @@ export default async function CustomerPropertiesPage({ searchParams }: Readonly<
   };
   const shown = isFiltered ? filterUnits(units, { powerState, connections: conns, search: "" }) : selectedUnits();
   const details = await Promise.all(shown.map((u) => coreOp<ApiUnitDetail>("units.get", { id: u.id })));
+  const placeOf = (id: string) => {
+    const unit = units.find((u) => u.id === id);
+    return unit ? place(unit) : "";
+  };
   const place = (u: ApiUnitRow) => [tree.find((p) => p.id === u.propertyId)?.name ?? "", spacePath(u.spaceId, spaces)].filter(Boolean).join(" › ");
   const p = sel?.property;
   const live: PropertiesLive = {
@@ -48,7 +52,7 @@ export default async function CustomerPropertiesPage({ searchParams }: Readonly<
     selection: sel,
     owner: me.clientRole === "owner",
     filter: isFiltered ? { powerState: powerState ?? null, connections: conns, total: units.length } : null,
-    units: roomUnits(details, i).map((r) => ({ ...r, place: place(units.find((u) => u.id === r.id)!) })),
+    units: roomUnits(details, i).map((r) => ({ ...r, place: placeOf(r.id) })),
     summary: p ? {
       kind: p.kind, floors: flatten(p.spaces).filter((s) => s.kind === "floor").map((s) => s.name), rooms: p.rooms, inRooms: p.units - p.unassigned, unassigned: p.unassigned,
       edited: i.t("{date} · version {n}", { date: showDate(p.updatedAt, display), n: p.version }),

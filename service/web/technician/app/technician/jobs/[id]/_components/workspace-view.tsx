@@ -231,6 +231,8 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
     );
   };
 
+  const returnReason = live.report?.reviewHistory.at(-1)?.reason; // HQ's reason for the last return, if it gave one
+  const signature = (rep ?? live.report)?.signOff;
   return (
     <Page>
       {head}
@@ -241,7 +243,7 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
       {job.status === "on_hold" && <Banner tone="warn">{t("On hold by HQ — saving and submitting are blocked. Your saved draft is kept; continue when HQ resumes the job.")}</Banner>}
       {job.status === "submitted" && <Banner tone="ok">{t("Submitted v{version} — read-only, awaiting quality review.", { version: job.reportRefs[job.reportRefs.length - 1]?.reportVersion ?? "" })}</Banner>}
       {job.status === "completed" && <Banner tone="ok">{t("Accepted — the job is completed and the report is visible to the customer.")}</Banner>}
-      {job.status === "rework_requested" && <Banner tone="warn" action={<Btn size="sm" variant="primary" disabled={pending || win.phase === "ended"} onClick={() => { run(() => resumeRework(job.id, job.version), t("Rework resumed — continue in the new draft"), () => { remountFocus = { jobId: job.id, id: "job-title" }; }, failed); }}>{t("Resume rework")}</Btn>}>{live.report?.reviewHistory.at(-1)?.reason ? t("Returned for rework — “{reason}”. Resume to continue as a new draft version; the returned version stays as it was.", { reason: live.report.reviewHistory.at(-1)!.reason! }) : t("Returned for rework. Resume to continue as a new draft version; the returned version stays as it was.")}</Banner>}
+      {job.status === "rework_requested" && <Banner tone="warn" action={<Btn size="sm" variant="primary" disabled={pending || win.phase === "ended"} onClick={() => { run(() => resumeRework(job.id, job.version), t("Rework resumed — continue in the new draft"), () => { remountFocus = { jobId: job.id, id: "job-title" }; }, failed); }}>{t("Resume rework")}</Btn>}>{returnReason ? t("Returned for rework — “{reason}”. Resume to continue as a new draft version; the returned version stays as it was.", { reason: returnReason }) : t("Returned for rework. Resume to continue as a new draft version; the returned version stays as it was.")}</Banner>}
       {isInWork && win.phase === "ended" && <Banner tone="crit">{t("The work window ended — unsaved input was discarded and the job can no longer be edited. Ask your coordinator.")}</Banner>}
       {live.reportRefused && <Banner tone="warn">{t("The report is not readable now ({reason}).", { reason: textOf(FORBIDDEN, live.reportRefused, t) ?? live.reportRefused.replace(/^errors?\./, "").replaceAll('_', " ") })}</Banner>}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
@@ -373,7 +375,7 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
                   ) : <p className="font-normal">{followUpText(draft.nextAction, i18n)}</p>}
                 </Field>
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 p-3">
-                  <div><b className="text-[13px]">{t("Customer sign-off")}</b><div>{(rep ?? live.report)?.signOff ? <Badge tone="ok">{t("Signed · {name} · {time}", { name: (rep ?? live.report)!.signOff!.signerName, time: f.clock((rep ?? live.report)!.signOff!.signedAt) })}</Badge> : <Badge tone="warn">{t("Not signed")}</Badge>}</div></div>
+                  <div><b className="text-[13px]">{t("Customer sign-off")}</b><div>{signature ? <Badge tone="ok">{t("Signed · {name} · {time}", { name: signature.signerName, time: f.clock(signature.signedAt) })}</Badge> : <Badge tone="warn">{t("Not signed")}</Badge>}</div></div>
                   {isEditable && <Btn size="sm" disabled={pending} onClick={() => { setModal("sign"); }}>{t((rep ?? live.report)?.signOff ? "Sign again" : "Get signature")}</Btn>}
                 </div>
                 {isEditable && <div className="flex flex-wrap justify-end gap-2"><Btn disabled={pending || !dirty && !!rep} onClick={() => { save(); }}>{t("Save draft")}</Btn><Btn variant="primary" disabled={pending} onClick={trySubmit}>{t("Submit report")}</Btn></div>}
@@ -592,8 +594,8 @@ function SignModal({ open, pending, summary, onClose, onSign }: Readonly<{ open:
       ) : (
         <div>
           <canvas ref={canvas} width={560} height={160} aria-label={t("Signature pad")} className="h-32 w-full touch-none rounded-xl border border-dashed border-line bg-surface"
-            onPointerDown={(e) => { drawing.current = true; const c = e.currentTarget.getContext("2d")!; const [x, y] = point(e); c.lineWidth = 2.5; c.lineCap = "round"; c.strokeStyle = "#0f172a"; c.beginPath(); c.moveTo(x, y); e.currentTarget.setPointerCapture(e.pointerId); }}
-            onPointerMove={(e) => { if (!drawing.current) return; const c = e.currentTarget.getContext("2d")!; const [x, y] = point(e); c.lineTo(x, y); c.stroke(); setDrawn(true); }}
+            onPointerDown={(e) => { drawing.current = true; const c = e.currentTarget.getContext("2d"); if (!c) { return; } const [x, y] = point(e); c.lineWidth = 2.5; c.lineCap = "round"; c.strokeStyle = "#0f172a"; c.beginPath(); c.moveTo(x, y); e.currentTarget.setPointerCapture(e.pointerId); }}
+            onPointerMove={(e) => { const c = e.currentTarget.getContext("2d"); if (!c || !drawing.current) { return; } const [x, y] = point(e); c.lineTo(x, y); c.stroke(); setDrawn(true); }}
             onPointerUp={() => { drawing.current = false; }} />
           <div className="mt-1 flex justify-between text-[11px] text-muted-foreground"><span className="flex items-center gap-1"><Icon name="signature" />{t("Sign here")}</span><Plain type="button" className="font-semibold text-primary" onClick={clear}>{t("Clear")}</Plain></div>
         </div>

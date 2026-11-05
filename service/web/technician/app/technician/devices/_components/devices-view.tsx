@@ -95,17 +95,19 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
     if (cal.reference.trim() === "" || !Number.isFinite(+cal.reference)) e.referenceValue = t("Enter a number");
     if (cal.measured.trim() === "" || !Number.isFinite(+cal.measured)) e.measuredValue = t("Enter a number");
     setErrors(e);
-    if (Object.keys(e).length > 0 || !dv || !s || !dv.jobId) return;
-    run(() => calibrateSensor(dv.detail.id, dv.detail.version, s.id, s.metric, s.unit, +cal.reference, +cal.measured, dv.jobId!), t("Calibration recorded — earlier readings unchanged"), ok(), failed);
+    const jobId = dv?.jobId;
+    if (Object.keys(e).length > 0 || !dv || !s || !jobId) return;
+    run(() => calibrateSensor(dv.detail.id, dv.detail.version, s.id, s.metric, s.unit, +cal.reference, +cal.measured, jobId), t("Calibration recorded — earlier readings unchanged"), ok(), failed);
   };
   const firmware = () => {
-    if (!dv || !fw || !dv.jobId) { setErrors({ firmwareVersion: t("Choose a version") }); return; }
-    run(() => updateFirmware(dv.detail.id, dv.detail.version, fw, dv.jobId!), t("Firmware update to {version} requested", { version: fw }), ok(), failed);
+    const jobId = dv?.jobId;
+    if (!dv || !fw || !jobId) { setErrors({ firmwareVersion: t("Choose a version") }); return; }
+    run(() => updateFirmware(dv.detail.id, dv.detail.version, fw, jobId), t("Firmware update to {version} requested", { version: fw }), ok(), failed);
   };
   const saveNote = () => {
     const event = dv?.events?.find((x) => x.id === note.eventId);
-    if (!event || note.text.trim().length === 0 || note.text.trim().length > 1000) { setErrors({ responseNote: t("A note of 1–1000 characters") }); return; }
-    run(() => addResponseNote(dv!.detail.id, event.id, event.version, note.text), t("Response note added — the device state is unchanged"), ok(), failed);
+    if (!dv || !event || note.text.trim().length === 0 || note.text.trim().length > 1000) { setErrors({ responseNote: t("A note of 1–1000 characters") }); return; }
+    run(() => addResponseNote(dv.detail.id, event.id, event.version, note.text), t("Response note added — the device state is unchanged"), ok(), failed);
   };
 
   return (
@@ -160,7 +162,7 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
               {live.canMaintain && (
                 <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
                   {[
-                    { label: t("Check connection"), sub: t("ping the device"), act: () => { run(() => checkDevice(dv.detail.id, dv.detail.version, dv.jobId!), t("Connection check requested"), ok(), failed); }, off: false },
+                    { label: t("Check connection"), sub: t("ping the device"), act: () => { const jobId = dv.jobId; if (jobId) run(() => checkDevice(dv.detail.id, dv.detail.version, jobId), t("Connection check requested"), ok(), failed); }, off: false },
                     { label: t("Calibrate sensor"), sub: t("reference vs measured"), act: () => { setCal({ sensorId: dv.detail.sensors[0]?.id ?? "", reference: "", measured: "" }); setErrors({}); setModal("calibrate"); }, off: dv.detail.sensors.length === 0 },
                     { label: t("Update firmware"), sub: firmwareSub(dv.detail.activeOperation?.kind === "firmware", dv.firmware, t), act: () => { setFw(dv.firmware[dv.firmware.length - 1] ?? ""); setErrors({}); setModal("firmware"); }, off: dv.firmware.length === 0 },
                   ].map((a) => (
@@ -198,7 +200,7 @@ export function TechDevicesView({ live }: Readonly<{ live: TechDevicesLive }>) {
                   )}
                   {dv.events.length > 0 && (live.canMaintain || live.canAcknowledge) && (
                     <div className="mt-2 flex flex-wrap items-center gap-3">
-                      {live.canMaintain && <Btn size="sm" disabled={pending || !canWrite} onClick={() => { setNote({ eventId: dv.events![0].id, text: "" }); setErrors({}); setModal("note"); }}>{t("Add response note…")}</Btn>}
+                      {live.canMaintain && <Btn size="sm" disabled={pending || !canWrite} onClick={() => { setNote({ eventId: dv.events?.[0]?.id ?? "", text: "" }); setErrors({}); setModal("note"); }}>{t("Add response note…")}</Btn>}
                       {live.canAcknowledge && openAlerts(dv.events).map((a) => {
                         return (
                           <Plain key={a.id} type="button" disabled={pending} className="text-[13px] font-semibold text-primary disabled:opacity-50"

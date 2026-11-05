@@ -45,8 +45,9 @@ function PolicyList({ p, onDone, onFail }: Readonly<Props>) {
   const d = p.defaults;
   const fail = (f: ActionFailure) => { onFail(f); };
   useEffect(() => { takeListFocus(); }, []);
+  const { customerId } = p;
   const toggleRule = (ruleKey: string, name: string, on: boolean, version: number) =>
-    d && p.customerId && run(() => setDefaultRule(d.id, ruleKey, p.customerId!, on, version), t(on ? "“{name}” on" : "“{name}” off", { name }), () => { onDone(t(on ? "Default rule “{name}” switched on for all your ACs." : "Default rule “{name}” switched off for all your ACs.", { name })); }, fail);
+    d && customerId && run(() => setDefaultRule(d.id, ruleKey, customerId, on, version), t(on ? "“{name}” on" : "“{name}” off", { name }), () => { onDone(t(on ? "Default rule “{name}” switched on for all your ACs." : "Default rule “{name}” switched off for all your ACs.", { name })); }, fail);
   return (
     <>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -74,7 +75,8 @@ function PolicyList({ p, onDone, onFail }: Readonly<Props>) {
       {p.cards.map((c) => (
         <Card key={c.id} title={<span id={`policy-title-${c.id}`} tabIndex={-1} className="flex flex-wrap items-center gap-2 rounded outline-none focus-visible:ring-2 focus-visible:ring-ring/50">{c.name}<Badge tone="muted">{c.badge}</Badge><Badge tone={c.enabled ? "ok" : "muted"}>{t(c.enabled ? "On" : "Off")}</Badge></span>}
           action={<span className="flex items-center gap-2 text-xs text-muted-foreground">{t(c.enabled ? "On" : "Off")}<Toggle on={c.enabled} disabled={pending} label={c.name} onChange={(v) => {
-            const pol = p.list.find((x) => x.id === c.id)!;
+            const pol = p.list.find((x) => x.id === c.id);
+            if (!pol) return;
             run(() => savePolicy(toggledInput(pol, v), pol.version), t(v ? "Policy on" : "Policy off"), () => { onDone(t(v ? "“{name}” switched on." : "“{name}” switched off.", { name: c.name })); }, fail);
           }} /></span>}>
           <div className="flex flex-wrap items-end justify-between gap-3">
@@ -149,8 +151,9 @@ function PolicyEditor({ p, editor, onDone, onFail }: Props & { editor: NonNullab
     // a refused save takes the focus to the first field to fix, top to bottom (IR586, IR623)
     const bad = POLICY_FIELDS.find((k) => errorText[k]);
     if (bad) { focusField(policyFieldId(bad)); return; }
-    if (!p.customerId) return;
-    run(() => savePolicy(policyInput(f, editor.policy, { customerId: p.customerId!, membershipId: p.membershipId, timezone: p.timezone }), editor.policy?.version ?? null), t("Policy saved"),
+    const { customerId } = p;
+    if (!customerId) return;
+    run(() => savePolicy(policyInput(f, editor.policy, { customerId, membershipId: p.membershipId, timezone: p.timezone }), editor.policy?.version ?? null), t("Policy saved"),
       (id) => { listFocus = `policy-title-${id}`; onDone(t(editor.policy ? "“{name}” saved." : "“{name}” saved — attach it on an AC’s page.", { name: f.name.trim() })); router.replace(base, { scroll: false }); }, onFail);
   };
   return (

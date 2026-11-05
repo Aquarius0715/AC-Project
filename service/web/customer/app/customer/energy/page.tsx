@@ -68,7 +68,8 @@ export default async function CustomerEnergyPage({ searchParams }: Readonly<Page
           const [s, byDay] = await Promise.all([sum([u], period.from, period.to, b?.id), days.length <= 7 ? Promise.all(days.map((d) => sum([u], d.from, d.to))) : Promise.resolve(null)]);
           return { row: compareRow(u, name.get(u) ?? u.slice(0, 8), s, i.t), byDay: byDay?.map((x) => x.totals.kWh ?? 0) ?? null };
         }));
-        live.compare = { rows: rows.map((r) => r.row), series: rows.every((r) => r.byDay) ? rows.map((r) => r.byDay!) : null };
+        const byDays = rows.map((r) => r.byDay); // the daily series only when every unit has one
+        live.compare = { rows: rows.map((r) => r.row), series: byDays.every((d): d is number[] => d !== null) ? byDays : null };
       }
     } catch (error) {
       if (!(error instanceof CoreError) || error.error.code !== "VALIDATION") throw error; // an unusable period or unit set shows on the page

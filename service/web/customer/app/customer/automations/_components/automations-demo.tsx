@@ -115,7 +115,7 @@ export function AutomationsDemo() {
           </>
         )}
       </Modal>
-      <Modal open={!!del} onClose={() => { setDel(null); }} title="Delete automation?" footer={<><Btn onClick={() => { setDel(null); }}>Cancel</Btn><Btn variant="danger" onClick={() => { setList((l) => l.filter((x) => x.id !== del!.id)); toast(`“${del!.name}” removed`); setDel(null); }}>Delete</Btn></>}>
+      <Modal open={!!del} onClose={() => { setDel(null); }} title="Delete automation?" footer={<><Btn onClick={() => { setDel(null); }}>Cancel</Btn><Btn variant="danger" onClick={() => { if (!del) { return; } setList((l) => l.filter((x) => x.id !== del.id)); toast(`“${del.name}” removed`); setDel(null); }}>Delete</Btn></>}>
         <p className="text-[13px]">“{del?.name}” will stop running. Past command history is kept.</p>
       </Modal>
     </Page>

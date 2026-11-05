@@ -41,7 +41,7 @@ export function AirQualityView({ live }: Readonly<{ live: AirLive | null }>) {
   if (!live) {
     return <Page><EmptyState title={t("No air conditioners yet")} action={<LinkButton href="/customer/properties" size="sm">{t("Units & locations")}</LinkButton>}>{t("Air quality is read from the sensors of your units. Once a unit is registered its readings appear here.")}</EmptyState></Page>;
   }
-  const room = live.rooms.find((r) => r.key === live.roomKey)!;
+  const room = live.rooms.find((r) => r.key === live.roomKey) ?? live.rooms[0];
   const c = live.chart;
   const info = metricInfo[live.metric];
   const label = t(info.label);
