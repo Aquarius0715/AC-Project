@@ -7,6 +7,7 @@ import { EN, showTime, translator, zonedInstant, type I18n, type T, textOf } fro
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { UnitSymbol } from "@ac/web/lib/contracts.gen";
 import { byText } from "@ac/web/lib/order";
+import { z } from "zod";
 import { codePoints } from "@ac/web/lib/text";
 
 const en = translator("en");
@@ -14,6 +15,8 @@ export type Mode = "cool" | "dry" | "fan";
 export type Fan = "low" | "mid" | "high";
 export const metrics = ["temperature", "humidity", "co2", "pm25", "power", "vibration", "refrigerant_pressure", "compressor_cycles", "airflow_drop", "heartbeat_gap"] as const;
 export type Metric = (typeof metrics)[number];
+/** A metric as a form or request value (for Server Actions to validate with). */
+export const metricSchema = z.enum(metrics);
 export type Connection = "online" | "offline" | "unknown" | "connecting" | "error";
 
 /** The fixed unit of each metric (DD-A04 boundary cases). */

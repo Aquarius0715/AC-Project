@@ -7,7 +7,8 @@
 import { metricUnit, opSymbol, recoveryError, type Channel, type Operator, type Severity } from "@ac/web/lib/adminAlerts";
 import { EN, showDate, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import type { OpInput } from "@ac/web/lib/opTypes";
-import type { Metric as ContractMetric } from "@ac/web/lib/contracts.gen";
+import { metrics } from "@ac/web/lib/devices";
+import { oneOfOrThrow } from "@ac/web/lib/oneOf";
 import { byNumber } from "@ac/web/lib/order";
 
 const en = translator("en");
@@ -179,7 +180,7 @@ export function policyInput(f: PolicyForm, existing: ApiAlertPolicy | null, ctx:
     ...(existing && { id: existing.id }), kind: "alert" as const, name: f.name.trim(), customerId: ctx.customerId,
     timezone: existing?.timezone ?? ctx.timezone, enabled: existing?.enabled ?? true, priority: existing?.priority ?? 50,
     recipientMembershipIds: existing?.recipientMembershipIds ?? [ctx.membershipId], escalateAfterMinutes: existing?.escalateAfterMinutes ?? 60, cooldownMinutes: existing?.cooldownMinutes ?? 5,
-    channels: (f.email ? ["inApp", "email"] : ["inApp"]), metric: f.metric as ContractMetric, operator: f.operator, threshold: Number(f.threshold), recoveryThreshold: Number(f.recovery),
+    channels: (f.email ? ["inApp", "email"] : ["inApp"]), metric: oneOfOrThrow(metrics, f.metric, "metric"), operator: f.operator, threshold: Number(f.threshold), recoveryThreshold: Number(f.recovery),
     durationSeconds: seconds(f) ?? 0, activeWindow: f.windowOn ? { weekdays: [...f.weekdays].toSorted(byNumber), startLocal: f.start, endLocal: f.end } : null, severity: f.severity,
   };
 }
