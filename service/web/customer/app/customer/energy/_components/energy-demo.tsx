@@ -20,7 +20,13 @@ export function EnergyDemo() {
   const [sel, setSel] = useState<string[]>(["Bedroom AC"]);
   const [view, setView] = useState<"chart" | "table">("chart");
   const [exp, setExp] = useState(false);
-  const toggle = (u: string) => { setSel((s) => (s.includes(u) ? (s.length > 1 ? s.filter((x) => x !== u) : s) : (s.length >= 4 ? s : [...s, u]))); };
+  // one unit always stays selected, and at most four are compared
+  const toggle = (u: string) => {
+    setSel((s) => {
+      if (s.includes(u)) return s.length > 1 ? s.filter((x) => x !== u) : s;
+      return s.length >= 4 ? s : [...s, u];
+    });
+  };
   const actual = days.map((_, i) => +sel.reduce((a, u) => a + perUnit[u].actual[i], 0).toFixed(1));
   const base = days.map((_, i) => sel.reduce((a, u) => a + perUnit[u].base[i], 0));
   const sumA = +actual.reduce((a, b) => a + b, 0).toFixed(1);

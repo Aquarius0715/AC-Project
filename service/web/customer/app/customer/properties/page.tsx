@@ -31,12 +31,14 @@ export default async function CustomerPropertiesPage({ searchParams }: Readonly<
   const powerState = powerStates.find((p) => p === one("powerState"));
   const conns = (one("connections") ?? "").split(",").filter((c): c is Connection => (connections as string[]).includes(c));
   const isFiltered = !one("spaceId") && !one("propertyId") && (!!powerState || conns.length > 0);
-  const sel = one("spaceId") ? selection(tree, one("spaceId"), spaces)
-    : (one("unassignedOnly") === "true" && one("propertyId") ? selection(tree, `unassigned:${one("propertyId") ?? ""}`, spaces)
-    : selection(tree, one("propertyId"), spaces));
+  const propertySel = one("unassignedOnly") === "true" && one("propertyId") ? selection(tree, `unassigned:${one("propertyId") ?? ""}`, spaces) : selection(tree, one("propertyId"), spaces);
+  const sel = one("spaceId") ? selection(tree, one("spaceId"), spaces) : propertySel;
   // the units whose detail the panel needs: the KPI filter, a room / area (descendants included) or the property's unassigned units
-  const shown = isFiltered ? filterUnits(units, { powerState, connections: conns, search: "" })
-    : sel ? sel.kind === "property" ? units.filter((u) => u.propertyId === sel.property.id && u.spaceId === null) : unitsAt(sel, units) : [];
+  const selectedUnits = () => {
+    if (!sel) return [];
+    return sel.kind === "property" ? units.filter((u) => u.propertyId === sel.property.id && u.spaceId === null) : unitsAt(sel, units);
+  };
+  const shown = isFiltered ? filterUnits(units, { powerState, connections: conns, search: "" }) : selectedUnits();
   const details = await Promise.all(shown.map((u) => coreOp<ApiUnitDetail>("units.get", { id: u.id })));
   const place = (u: ApiUnitRow) => [tree.find((p) => p.id === u.propertyId)?.name ?? "", spacePath(u.spaceId, spaces)].filter(Boolean).join(" › ");
   const p = sel?.property;

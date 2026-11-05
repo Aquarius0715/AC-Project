@@ -46,6 +46,7 @@ export function AutomationsDemo() {
     toast("Automation saved"); setEdit(null);
   };
   const onCount = list.filter((a) => a.on).length;
+  const formTitle = edit === "new" ? "Create automation" : "Edit automation";
   return (
     <Page>
       <PageHead title="Your automations" sub={`${String(list.length)} automations · ${String(onCount)} on · each rule controls one AC · checked again when it runs`} action={<Btn variant="primary" onClick={() => { open("new"); }}><Icon name="add" /> Create automation</Btn>} />
@@ -94,7 +95,7 @@ export function AutomationsDemo() {
       )}
       <p className="text-xs text-muted-foreground">Priority when rules overlap: device capabilities & active restrictions → HQ policy → your automations. List order is not run priority. Missing condition data never counts as a match.</p>
 
-      <Modal open={!!edit} onClose={() => { setEdit(null); }} wide title={step === "review" ? "Review / Test result" : (edit === "new" ? "Create automation" : "Edit automation")} footer={step === "form" ? <><Btn onClick={() => { setEdit(null); }}>Cancel</Btn><Btn variant="primary" onClick={review}>Review</Btn></> : <><Btn onClick={() => { setStep("form"); }}><Icon name="arrowLeft" /> Back</Btn><Btn variant="primary" onClick={save}>Save automation</Btn></>}>
+      <Modal open={!!edit} onClose={() => { setEdit(null); }} wide title={step === "review" ? "Review / Test result" : formTitle} footer={step === "form" ? <><Btn onClick={() => { setEdit(null); }}>Cancel</Btn><Btn variant="primary" onClick={review}>Review</Btn></> : <><Btn onClick={() => { setStep("form"); }}><Icon name="arrowLeft" /> Back</Btn><Btn variant="primary" onClick={save}>Save automation</Btn></>}>
         {step === "form" ? (
           <>
             <Field label="Name" error={errorText.name}><Input value={f.name} onChange={(e) => { setF({ ...f, name: e.target.value }); }} placeholder="e.g. Weekday pre-cool" /></Field>

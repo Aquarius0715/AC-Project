@@ -35,6 +35,7 @@ export async function loadAlerts(sp: Record<string, string | string[] | undefine
   const defaultPolicy = defaults[0] ?? null;
   const pid = one(sp.policyId);
   const editing = pid === "new" ? null : policies.find((p) => p.id === pid) ?? null;
+  const edited = editing ? { policy: editing, form: policyForm(editing), attached: editing.unitIds.map((id) => place.get(id)?.name ?? "AC") } : null;
   return {
     now: now.toISOString(),
     unreadOnly: isUnreadOnly,
@@ -49,7 +50,7 @@ export async function loadAlerts(sp: Record<string, string | string[] | undefine
       defaults: defaultPolicy ? { id: defaultPolicy.id, ...defaultRuleRows(defaultPolicy, me.customerId, me.membershipId, i) } : null,
       cards: policyCards(policies, (id) => place.get(id)?.name, i.t), list: policies,
       // the editor (policyId=new or an own policy's id, Figma 06f); an unknown id shows the list
-      editor: pid === "new" ? { policy: null, form: policyForm(null), attached: [] as string[] } : (editing ? { policy: editing, form: policyForm(editing), attached: editing.unitIds.map((id) => place.get(id)?.name ?? "AC") } : null),
+      editor: pid === "new" ? { policy: null, form: policyForm(null), attached: [] as string[] } : edited,
     },
     display,
     tab,

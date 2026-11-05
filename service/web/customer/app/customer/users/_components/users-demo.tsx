@@ -1,11 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, DataTable, Field, Input, LinkButton, Modal, Page, PageHead, Select, useToast } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, DataTable, Field, Input, LinkButton, Modal, Page, PageHead, Select, useToast, type Tone } from "@ac/web/components/ui";
 import { CURRENT_CLIENT, ClientUser, clientUserActions, emailError, useClientUsers } from "@ac/web/lib/clientUsers";
 import { Icon } from "@ac/web/components/Icon";
 import { codePoints } from "@ac/web/lib/text";
 
+const youMark = (id: string) => (id === CURRENT_CLIENT.userId ? " (you)" : "");
+// a user's status badge; any other status is disabled
+const USER_TONE = new Map<string, Tone>([["active", "ok"], ["invited", "warn"]]);
+const USER_STATUS = new Map([["active", "Active"], ["invited", "Not signed in yet"]]);
 /** FR-C19 / IR417 / IR461 — the customer owner lists users, adds members and owners (the account exists at once), resends
 the set-up e-mail, changes roles, disables / enables and removes users (Figma Client 11a–11e); the demo applies
 changes at once. */
@@ -52,9 +56,9 @@ export function UsersDemo() {
       <PageHead title="Users of customer-a" sub="People who can sign in to this customer app. As an owner you add users, change their role and access, and remove them." action={<Btn variant="primary" onClick={() => { setOpen(true); }}><Icon name="add" /> Add user</Btn>} />
       <Card pad={false}>
         <DataTable rows={users} rowKey={(u) => u.id} cols={[
-          { key: "u", label: "User", render: (u) => <div><b>{u.name ? `${u.name}${u.id === CURRENT_CLIENT.userId ? " (you)" : ""}` : u.email}</b><div className="text-xs text-muted-foreground">{u.name ? u.email : `invited ${u.invitedAt ?? ""} by ${u.invitedBy ?? "—"}`}</div></div> },
+          { key: "u", label: "User", render: (u) => <div><b>{u.name ? `${u.name}${youMark(u.id)}` : u.email}</b><div className="text-xs text-muted-foreground">{u.name ? u.email : `invited ${u.invitedAt ?? ""} by ${u.invitedBy ?? "—"}`}</div></div> },
           { key: "r", label: "Role", render: (u) => <Badge tone={u.role === "owner" ? "primary" : "muted"}>{u.role === "owner" ? "Owner" : "Member"}</Badge> },
-          { key: "s", label: "Status", render: (u) => <Badge tone={u.status === "active" ? "ok" : (u.status === "invited" ? "warn" : "muted")}>{u.status === "active" ? "Active" : null}{u.status !== "active" && u.status === "invited" && "Not signed in yet"}{u.status !== "active" && u.status !== "invited" && "Disabled"}</Badge> },
+          { key: "s", label: "Status", render: (u) => <Badge tone={USER_TONE.get(u.status) ?? "muted"}>{USER_STATUS.get(u.status) ?? "Disabled"}</Badge> },
           { key: "l", label: "Last sign-in", render: (u) => u.lastSignIn ?? "—", hideBelow: "sm" },
           { key: "a", label: "Actions", render: (u) => (u.id === CURRENT_CLIENT.userId ? <span className="text-xs text-muted-foreground">Your account</span> : (
             <div className="flex flex-wrap gap-1">

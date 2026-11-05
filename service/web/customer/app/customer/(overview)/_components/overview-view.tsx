@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { Badge, Banner, BarChart, Btn, Card, ConnBadge, Kpi, LineChart, Page, PowerBadge, Select, SeverityBadge, Tabs, TextLink } from "@ac/web/components/ui";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { OVERVIEW_PERIODS, type OverviewPeriod } from "@ac/web/lib/customerOverview";
-import { showClock } from "@ac/web/lib/i18n";
+import { byCount, showClock } from "@ac/web/lib/i18n";
 import { useT } from "@ac/web/components/I18n";
 import type { OverviewLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
@@ -60,7 +60,7 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
           <Kpi label={t("Running")} badge={<PowerBadge s="running" />} value={c.powerOn} sub={live.propertyName ? t("{units} in {property} · latest observation", { units: units(c.total), property: live.propertyName }) : t("{units} · latest observation", { units: units(c.total) })} href="/customer/properties?powerState=on" link={t("View running units")} />
           <Kpi label={t("Stopped")} badge={<PowerBadge s="stopped" />} value={c.powerOff} sub={t("Stopped — confirmed by the device")} href="/customer/properties?powerState=off" link={t("View stopped units")} />
           <Kpi label={t("Unknown")} badge={<PowerBadge s="unknown" />} value={c.powerUnknown} sub={t("Offline or missing data — counted here, never as running/normal")} href="/customer/properties?connections=offline" link={t("View unknown units")} />
-          <Kpi label={t("Needs attention")} badge={<SeverityBadge s="warning" />} value={c.alertCount} tone={c.alertCount ? "warn" : undefined} sub={`${t("Unresolved warnings")}${a.info.count ? t(a.info.count === 1 ? " · +{n} reminder & info (not counted)" : " · +{n} reminders & info (not counted)", { n: a.info.count }) : ""}`} href="/customer/alerts" link={t("link::Open alerts")} />
+          <Kpi label={t("Needs attention")} badge={<SeverityBadge s="warning" />} value={c.alertCount} tone={c.alertCount ? "warn" : undefined} sub={`${t("Unresolved warnings")}${byCount(a.info.count, { none: "", one: t(" · +{n} reminder & info (not counted)", { n: 1 }), many: t(" · +{n} reminders & info (not counted)", { n: a.info.count }) })}`} href="/customer/alerts" link={t("link::Open alerts")} />
         </div>
         <Card title={t("Energy used")} sub={live.energy?.sub ?? t("No units in this selection")} action={<span className="text-xs text-muted-foreground">kWh</span>}>
           {live.energy ? <>

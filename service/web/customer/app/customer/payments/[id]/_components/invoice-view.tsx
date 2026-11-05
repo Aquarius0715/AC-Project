@@ -10,7 +10,7 @@ import type { InvoiceStatus } from "@ac/web/lib/billing";
 import { stateTone } from "@ac/web/lib/restrictions";
 import { methodLabel, previewText, type InquiryLine, type NoticeUnit, type PaymentLine, type PreviewParams, type RestrictionNotice } from "@ac/web/lib/clientBilling";
 import { demoOutcome, paymentInstructions, previewMessage, sendInquiry, startPayment } from "../actions";
-import { Icon } from "@ac/web/components/Icon";
+import { Icon, type IconName } from "@ac/web/components/Icon";
 import { textOf } from "@ac/web/lib/i18n";
 
 export interface InvoiceLive {
@@ -30,6 +30,7 @@ export interface InvoiceLive {
   inquiries: InquiryLine[]; inquiryId: string | null; reminders: { id: string; channel: string; at: string }[];
 }
 const statusTone = { Overdue: "crit", Unpaid: "warn", Processing: "primary", Paid: "ok" } as const;
+const STATUS_ICON = new Map<string, IconName>([["Overdue", "alert"], ["Paid", "check"], ["Processing", "refresh"]]);
 const paymentTone = { initiated: "primary", processing: "primary", confirmed: "ok", failed: "crit" } as const;
 const paymentLabel = { initiated: "Initiated", processing: "Processing", confirmed: "Paid", failed: "Failed" } as const;
 const channelName: Record<string, string> = { email: "Email", whatsapp: "WhatsApp", inApp: "In-app" };
@@ -74,11 +75,15 @@ function PaymentTab({ live }: Readonly<{ live: InvoiceLive }>) {
     ["demo_credit_card", "Credit card (demo)", "Simulated card payment — no card details"], ["demo_debit_card", "Debit card (demo)", "Simulated card payment — no card details"],
     ["instructions", "Payment instructions", "Bank transfer details — viewing them does not pay the invoice"],
   ] as const;
+  const payLabel = () => {
+    if (method === "instructions") return t("View instructions");
+    return t(isFailed ? "Try again — Demo" : "Continue to payment — Demo");
+  };
   return (
     <>
       <Banner tone="warn" action={<DemoBadge />}>{t("Demo payment — no real money moves. No card number, CVV or expiry is collected.")}</Banner>
       <div className="split">
-        <Card title={t(i.status === "Paid" ? "Amount paid" : "Amount due")} action={<Badge tone={statusTone[i.status]} icon={i.status === "Overdue" ? "alert" : i.status === "Paid" ? "check" : i.status === "Processing" ? "refresh" : undefined}>{t(i.status)}</Badge>}>
+        <Card title={t(i.status === "Paid" ? "Amount paid" : "Amount due")} action={<Badge tone={statusTone[i.status]} icon={STATUS_ICON.get(i.status)}>{t(i.status)}</Badge>}>
           <div className="text-[32px] font-bold">{i.amount.split(" ", 1)[0]} <span className="text-base text-muted-foreground">{i.amount.split(" ", 2)[1]}</span></div>
           <p className="text-xs text-muted-foreground">{i.due}{live.otherZone && ` · ${t("Kuala Lumpur date (Asia/Kuala_Lumpur)")}`}</p>
           <SummaryList items={[[t("Contract"), live.contract ? `${live.contract.name} · ${live.contract.id.slice(0, 8)}` : "—"], [t("Contract scope"), live.contract?.scope ?? "—"]]} />
@@ -107,7 +112,7 @@ function PaymentTab({ live }: Readonly<{ live: InvoiceLive }>) {
                   );
                 })}
               </div>
-              <div className="mt-3 flex justify-end"><Btn variant="primary" disabled={pending} onClick={pay}>{t(method === "instructions" ? "View instructions" : (isFailed ? "Try again — Demo" : "Continue to payment — Demo"))}</Btn></div>
+              <div className="mt-3 flex justify-end"><Btn variant="primary" disabled={pending} onClick={pay}>{payLabel()}</Btn></div>
             </>
           )}
         </Card>

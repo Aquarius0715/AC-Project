@@ -6,7 +6,7 @@ import { useT } from "@ac/web/components/I18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { stateTone } from "@ac/web/lib/restrictions";
 import type { ClientInvoiceRow, ContractCard, RestrictionNotice, StatusFilter } from "@ac/web/lib/clientBilling";
-import { Icon } from "@ac/web/components/Icon";
+import { Icon, type IconName } from "@ac/web/components/Icon";
 
 export interface PaymentsLive {
   cards: ContractCard[]; selected: string | null; status: StatusFilter; invoices: ClientInvoiceRow[]; total: number; notice: (RestrictionNotice & { invoiceId: string }) | null;
@@ -14,6 +14,7 @@ export interface PaymentsLive {
   otherZone: boolean;
 }
 const statusTone = { Overdue: "crit", Unpaid: "warn", Processing: "primary", Paid: "ok" } as const;
+const STATUS_ICON = new Map<string, IconName>([["Overdue", "alert"], ["Paid", "check"]]);
 const contractTone = { Active: "ok", Upcoming: "primary", Expired: "muted" } as const;
 
 /** Contracts & payments (FR-C10) in API mode: the contract and the invoice status filter live in the URL; the page is
@@ -54,7 +55,7 @@ export function PaymentsView({ live }: Readonly<{ live: PaymentsLive }>) {
               {live.invoices.map((i) => (
                 <div key={i.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3">
                   <div><b>{i.number}</b><div className="text-xs text-muted-foreground">{i.due}</div></div>
-                  <div className="flex items-center gap-3"><b>{i.amount}</b><Badge tone={statusTone[i.status]} icon={i.status === "Overdue" ? "alert" : (i.status === "Paid" ? "check" : undefined)}>{t(i.status)}</Badge>
+                  <div className="flex items-center gap-3"><b>{i.amount}</b><Badge tone={statusTone[i.status]} icon={STATUS_ICON.get(i.status)}>{t(i.status)}</Badge>
                     {i.payable ? <LinkButton size="sm" variant="primary" href={`/customer/payments/${i.id}`}>{t("Pay now")}</LinkButton> : <Link href={`/customer/payments/${i.id}`} className="text-muted-foreground" aria-label={t("Open {number}", { number: i.number })}><Icon name="chevronRight" /></Link>}</div>
                 </div>
               ))}

@@ -40,12 +40,18 @@ export function InvoiceDemo({ id, tab }: Readonly<{ id: string; tab?: string }>)
     setPhase("processing");
     setTimeout(() => { setPhase(method === "debit" ? "failed" : "confirmed"); }, 1800);
   };
+  // the amount card's badge: paid, confirmed or processing in this demo, else unpaid
+  const amountBadge = () => {
+    if (isPaid) return <Badge tone="ok" icon="check">Paid</Badge>;
+    if (phase === "confirmed") return <Badge tone="ok" icon="check">Confirmed</Badge>;
+    return phase === "processing" ? <Badge tone="primary">Processing</Badge> : <Badge tone="crit">Unpaid</Badge>;
+  };
   return (
     <Page>
       <div className="text-[13px] text-muted-foreground"><Link href="/customer/payments" className="font-semibold text-primary"><Icon name="arrowLeft" /> Contracts & payments</Link> › Invoice {id}</div>
       <Banner tone="warn" action={<DemoBadge />}>Demo payment — no real money moves. No card number, CVV or expiry is collected.</Banner>
       <div className="split">
-        <Card title="Amount due" action={isPaid ? <Badge tone="ok" icon="check">Paid</Badge> : phase === "confirmed" ? <Badge tone="ok" icon="check">Confirmed</Badge> : phase === "processing" ? <Badge tone="primary">Processing</Badge> : <Badge tone="crit">Unpaid</Badge>}>
+        <Card title="Amount due" action={amountBadge()}>
           <div className="text-[32px] font-bold">120.00 <span className="text-base text-muted-foreground">MYR</span></div>
           <p className="text-xs text-muted-foreground">Due Sep 10, 2026 · issued Aug 27</p>
           <SummaryList items={[["Contract", "RTO Plan · contract-rto-a"], ["Contract scope", "3 units (Bedroom AC, Meeting room AC, Lobby AC)"]]} />

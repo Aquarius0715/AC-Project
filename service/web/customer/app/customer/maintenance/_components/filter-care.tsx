@@ -47,7 +47,7 @@ export function FilterCareTab({ f, owner, onRequest, onDone, onFail }: Readonly<
         <tr className="border-t border-line bg-surface2/40">
           <td className="px-3 py-2.5"><b>{g.title}</b><div className="text-[11px] text-muted-foreground">{g.place}</div></td>
           <td className="whitespace-nowrap px-3 py-2.5">{g.run}</td>
-          <td className="px-3 py-2.5 max-sm:hidden"><Progress pct={g.pct} tone={g.badge.tone === "crit" ? "crit" : (g.badge.tone === "warn" ? "warn" : "primary")} text={g.progress} /></td>
+          <td className="px-3 py-2.5 max-sm:hidden"><Progress pct={g.pct} tone={g.badge.tone === "crit" || g.badge.tone === "warn" ? g.badge.tone : "primary"} text={g.progress} /></td>
           <td className="px-3 py-2.5"><Badge tone={g.badge.tone}>{g.badge.label}</Badge></td>
           <td className="px-3 py-2.5 text-right">
             <Plain type="button" aria-expanded={isShown} className="text-[13px] font-semibold text-primary hover:underline" onClick={() => { setOpen((s) => (isShown ? s.filter((k) => k !== g.key) : [...s, g.key])); }}>{isShown ? t("Hide") : t("View {n}", { n: g.rows.length })}</Plain>

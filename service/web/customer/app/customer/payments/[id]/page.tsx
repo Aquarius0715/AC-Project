@@ -56,7 +56,8 @@ export default async function CustomerInvoicePage({ params, searchParams }: Read
   const contract = contractCards(contracts.filter((k) => k.id === inv.contractId), (u) => place.get(u), now, i18n)[0] ?? null;
   const { open, last } = paymentPhase(inv.paymentRefs);
   const r = restrictions.find((x) => x.id === one("restrictionId")) ?? restrictions.find((x) => ["scheduled", "requested", "applied", "release_requested"].includes(x.state)) ?? restrictions[0] ?? null;
-  const tab = one("tab") === "restriction" && r ? "restriction" : (one("tab") === "inquiry" ? "inquiry" : "payment");
+  const asked = one("tab") === "inquiry" ? "inquiry" : "payment";
+  const tab = one("tab") === "restriction" && r ? "restriction" : asked;
   let restriction: InvoiceLive["restriction"] = null;
   if (r) {
     const ids = r.perUnit.flatMap((u) => [u.applyCommandIds.at(-1), u.releaseCommandIds.at(-1)]).filter((x): x is string => !!x);
@@ -67,12 +68,13 @@ export default async function CustomerInvoicePage({ params, searchParams }: Read
     const byId = new Map(commands.filter((c): c is ApiCommand => !!c).map((c) => [c.id, c]));
     const notice = restrictionNotice(r, (u) => place.get(u), t);
     const causes = (r.causeInvoiceIds ?? []).length;
+    const releasedBy = (source: string) => t(source === "payment" ? "automatically after payment confirmation" : "by HQ");
     restriction = {
       notice, units: noticeUnits(r, (u) => place.get(u), byId, t), timeline: noticeTimeline(r, i18n), inquiries: inquiryLines(about, i18n),
       reason: causes > 1 ? t("{n} unpaid invoices, including {number}", { n: causes, number: inv.number })
         : t("Unpaid invoice {number} ({amount}, due {date})", { number: inv.number, amount: amount(inv.amountMinor, inv.currency), date: businessDay(inv.dueAt, loc) }),
       noticeAt: t("{date} · in-app (demo)", { date: showDate(r.noticeAt, display) }), start: `${showTime(r.executeAfter, display)} — ${notice.policy}`,
-      released: r.releaseIntent ? `${showTime(r.releaseIntent.at, display)} — ${t(r.releaseIntent.source === "payment" ? "automatically after payment confirmation" : "by HQ")}` : t("not yet — all cause invoices must be paid"),
+      released: r.releaseIntent ? `${showTime(r.releaseIntent.at, display)} — ${releasedBy(r.releaseIntent.source)}` : t("not yet — all cause invoices must be paid"),
     };
   }
   const st = invoiceStatus(inv, now);
