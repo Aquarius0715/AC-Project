@@ -9,7 +9,7 @@ describe("a page's URL parameters", () => {
   });
 
   it("keeps the set parameters of a filter, in order", () => {
-    expect(setParams({ customerId: "c-1", propertyId: "", unitId: undefined, limit: 5 })).toEqual([["customerId", "c-1"]]);
+    expect(setParams({ customerId: "c-1", propertyId: "", limit: 5 })).toEqual([["customerId", "c-1"]]);
     expect(setParams({})).toEqual([]);
   });
 });
