@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { readDemo, writeDemo } from "@ac/web/lib/demoStore";
+import { z } from "zod";
+import { readDemo, readDemoAs, writeDemo } from "@ac/web/lib/demoStore";
 
 describe("Phase 1A demo stores (FR-X05, IR257)", () => {
   afterEach(() => { vi.restoreAllMocks(); sessionStorage.clear(); });
@@ -26,5 +27,15 @@ describe("Phase 1A demo stores (FR-X05, IR257)", () => {
     expect(readDemo("k")).toBeNull();
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("blocked"); });
     expect(() => { writeDemo("k", 1); }).not.toThrow();
+  });
+
+  it("keeps a saved value only when it has the expected shape", () => {
+    navigation("navigate");
+    const rows = z.array(z.object({ id: z.string(), n: z.number() }));
+    writeDemo("k", [{ id: "j1", n: 1 }]);
+    expect(readDemoAs("k", rows)).toEqual([{ id: "j1", n: 1 }]);
+    writeDemo("k", [{ id: "j1", n: "1" }]); // an older release stored the number as text
+    expect(readDemoAs("k", rows)).toBeNull();
+    expect(readDemoAs("none", rows)).toBeNull();
   });
 });

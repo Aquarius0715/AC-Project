@@ -7,10 +7,16 @@ Demo only: adding users and set-up e-mail resends are previews; state lives in t
 restores the seed, FR-X05).
 */
 import { useSyncExternalStore } from "react";
-import { readDemo, writeDemo } from "@ac/web/lib/demoStore";
+import { z } from "zod";
+import { readDemoAs, writeDemo } from "@ac/web/lib/demoStore";
 
 export type ClientRole = "owner" | "member";
 export interface ClientUser { id: string; name: string | null; email: string; role: ClientRole; status: "invited" | "active" | "disabled"; lastSignIn: string | null; invitedBy?: string; invitedAt?: string }
+
+const clientUser = z.object({
+  id: z.string(), name: z.string().nullable(), email: z.string(), role: z.enum(["owner", "member"]), status: z.enum(["invited", "active", "disabled"]),
+  lastSignIn: z.string().nullable(), invitedBy: z.string().optional(), invitedAt: z.string().optional(),
+}) satisfies z.ZodType<ClientUser>;
 
 const KEY = "ac-client-users-v1";
 export const CLIENT_USERS_SEED: ClientUser[] = [
@@ -25,7 +31,7 @@ let state: ClientUser[] | null = null;
 const listeners = new Set<() => void>();
 const load = () => {
   if (state) return state;
-  state = readDemo<ClientUser[]>(KEY) ?? CLIENT_USERS_SEED;
+  state = readDemoAs(KEY, z.array(clientUser)) ?? CLIENT_USERS_SEED;
   return state;
 };
 const save = (next: ClientUser[]) => {
