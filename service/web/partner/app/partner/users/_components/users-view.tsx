@@ -8,7 +8,8 @@ import { Icon } from "@ac/web/components/Icon";
 import { useAction } from "@ac/web/lib/useAction";
 import { fieldErrorTexts, type ActionFailure } from "@ac/web/lib/actionMessage";
 import { focusField } from "@ac/web/lib/focusField";
-import { ACCESS_MAX_DAYS, accessEnd, accessError, addDays, nameError, PARTNER_ROLES, PARTNER_STATUSES, partnerInviteError, reasonError, roleLabel, statusLabel, type PartnerRole, type PartnerStatus, type PartnerUserRow } from "@ac/web/lib/partnerUsers";
+import { ACCESS_MAX_DAYS, accessEnd, accessError, addDays, nameError, PARTNER_ROLES, PARTNER_STATUSES, partnerInviteError, reasonError, roleLabel, statusFilter, statusLabel, type PartnerRole, type PartnerStatus, type PartnerUserRow } from "@ac/web/lib/partnerUsers";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { without } from "@ac/web/lib/omit";
 
 type Result = { ok: true; value: null } | ({ ok: false } & ActionFailure);
@@ -125,7 +126,7 @@ export function UsersView({ data, ops, onStatus, sends = false }: Readonly<{ dat
         action={<Btn variant="primary" onClick={() => { open({ kind: "invite" }); }}><Icon name="add" /> {t("Add user")}</Btn>} />
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[13px] font-semibold">{t("Status")}</span>
-        <Select aria-label={t("Status")} className="w-48" value={data.status ?? ""} onChange={(e) => { onStatus((e.target.value || null) as PartnerStatus | null); }}>
+        <Select aria-label={t("Status")} className="w-48" value={data.status ?? ""} onChange={(e) => { onStatus(statusFilter(e.target.value)); }}>
           <option value="">{t("All")}</option>
           {PARTNER_STATUSES.map((s) => <option key={s} value={s}>{t(statusLabel[s])}</option>)}
         </Select>
@@ -167,7 +168,7 @@ export function UsersView({ data, ops, onStatus, sends = false }: Readonly<{ dat
           <Field label={t("Name")} error={(tried ? nameProblem : undefined) ?? server.name}><Input id={ids.name} value={name} maxLength={120} onChange={(e) => { setName(e.target.value); edit("name"); }} placeholder="Lim Wei Ming" /></Field>
           <Field label={t("Email")} error={(tried ? emailError : undefined) ?? server.email}><Input id={ids.email} type="email" value={email} onChange={(e) => { setEmail(e.target.value); edit("email"); }} placeholder="lim.tech@example.com" /></Field>
           <Field label={t("Role")} hint={t("Contractors manage jobs, the team and users; technicians do the work on site.")}>
-            <Select aria-label={t("Role")} value={role} onChange={(e) => { setRole(e.target.value as PartnerRole); }}>{PARTNER_ROLES.map((r) => <option key={r} value={r}>{t(roleLabel[r])}</option>)}</Select>
+            <Select aria-label={t("Role")} value={role} onChange={(e) => { setRole(oneOf(PARTNER_ROLES, e.target.value, role)); }}>{PARTNER_ROLES.map((r) => <option key={r} value={r}>{t(roleLabel[r])}</option>)}</Select>
           </Field>
         </>}
         {((isAdding && role === "technician") || dialog?.kind === "access") &&

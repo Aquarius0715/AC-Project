@@ -11,6 +11,7 @@ import {
 } from "@ac/web/lib/air";
 import { logVentilation } from "../actions";
 import { Icon, type IconName } from "@ac/web/components/Icon";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { byCount } from "@ac/web/lib/i18n";
 
 type Tone = MetricCard["feed"]["tone"];
@@ -146,7 +147,7 @@ function LogModal({ spaceId, unitId, path, co2Now, onClose }: Readonly<{ spaceId
     <Modal open title={t("Log ventilation")} onClose={onClose} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t("Save log")}</Btn></>}>
       <SummaryList items={[
         [t("Room"), path],
-        [t("Method"), <Field key="m" label={t("Method")} className="[&>span:first-child]:sr-only" error={errors.method && t("Choose a method")}><Select className="w-auto self-start py-1" value={method} onChange={(e) => { setMethod(e.target.value as VentMethod); }}>{ventMethods.map((m) => <option key={m.id} value={m.id}>{t(m.label)}</option>)}</Select></Field>],
+        [t("Method"), <Field key="m" label={t("Method")} className="[&>span:first-child]:sr-only" error={errors.method && t("Choose a method")}><Select className="w-auto self-start py-1" value={method} onChange={(e) => { setMethod(oneOf(ventMethods.map((m) => m.id), e.target.value, method)); }}>{ventMethods.map((m) => <option key={m.id} value={m.id}>{t(m.label)}</option>)}</Select></Field>],
         [t("Duration"), <Field key="d" label={t("Duration")} className="[&>span:first-child]:sr-only" error={errors.durationMinutes && t("1–240 minutes")}><Select className="w-auto self-start py-1" value={minutes} onChange={(e) => { setMinutes(Number(e.target.value)); }}>{ventDurations.map((n) => <option key={n} value={n}>{t("{n} min", { n })}</option>)}</Select></Field>],
         [t("Current CO2"), co2Now ?? t("Not measured — the log keeps no CO2 value")],
       ]} />

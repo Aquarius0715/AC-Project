@@ -12,6 +12,7 @@ import {
 } from "@ac/web/lib/mrv";
 import { previewReport, recordReview, saveFactor, saveReportDraft } from "../actions";
 import { EvidenceList, EvidencePicker } from "./evidence";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { Icon } from "@ac/web/components/Icon";
 
 interface UnitOption { id: string; label: string; organizationId: string }
@@ -133,7 +134,7 @@ function Reports({ live, r }: Readonly<{ live: MRVLive; r: NonNullable<MRVLive["
             <Field label={t("End")}><Input type="datetime-local" value={d.to} onChange={(e) => { setD({ to: e.target.value }); }} /></Field>
             <Field label={t("Baseline version")} error={tried ? errors.baseline : undefined}><Select value={d.baseline} onChange={(e) => { setD({ baseline: e.target.value }); }}><option value="">{t("Select…")}</option>{live.baselines.map((b) => <option key={b.id} value={versionKey(b.id, b.version)}>{b.id.slice(0, 8)} v{b.version} · {b.value} · {b.units}</option>)}</Select></Field>
             <Field label={t("Emission factor version")} error={tried ? errors.factor : undefined}><Select value={d.factor} onChange={(e) => { setD({ factor: e.target.value }); }}><option value="">{t("Select…")}</option>{live.factors.map((f) => <option key={f.id} value={versionKey(f.id, f.version)}>{f.region} {f.year} v{f.version} · {f.kgCO2ePerKWh}</option>)}</Select></Field>
-            <Field label={t("Boundary")}><Select value={d.boundaryId} onChange={(e) => { setD({ boundaryId: e.target.value as MRVDraft["boundaryId"] }); }}><option value="ac_input_electricity">ac_input_electricity</option><option value="whole_building_electricity">whole_building_electricity</option></Select></Field>
+            <Field label={t("Boundary")}><Select value={d.boundaryId} onChange={(e) => { setD({ boundaryId: oneOf(["ac_input_electricity", "whole_building_electricity"] as const, e.target.value, d.boundaryId) }); }}><option value="ac_input_electricity">ac_input_electricity</option><option value="whole_building_electricity">whole_building_electricity</option></Select></Field>
           </div>
           <Field label={t("Boundary description")} error={tried ? errors.boundary : undefined}><Input value={d.boundary} maxLength={500} onChange={(e) => { setD({ boundary: e.target.value }); }} placeholder={t("AC unit input electricity only")} /></Field>
           <div><p className="mb-1 text-[13px] font-semibold">{t("Units")}</p>{d.organizationId ? <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px]">{orgUnits.map((u) => <Check key={u.id} label={u.label} checked={d.unitIds.includes(u.id)} onChange={(on) => { setD({ unitIds: on ? [...d.unitIds, u.id] : d.unitIds.filter((x) => x !== u.id) }); }} />)}</div> : <p className="text-xs text-muted-foreground">{t("Choose the organization first.")}</p>}{tried && errors.unitIds && <p className="mt-1 text-xs text-crit">{errors.unitIds}</p>}</div>
