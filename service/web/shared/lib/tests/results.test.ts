@@ -3,6 +3,10 @@ import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
+
+const isReference = (type: ts.Type): type is ts.TypeReference => "target" in type;
+/** The type arguments of an array or Promise type (none for any other type). */
+const typeArguments = (c: ts.TypeChecker, type: ts.Type): readonly ts.Type[] => (isReference(type) ? c.getTypeArguments(type) : []);
 import { must } from "./must";
 
 // The web's result types against the Core API contract (IR314). For every coreOp / coreAll / callOp / useOp call with a
@@ -62,7 +66,7 @@ function check(): { checked: number; problems: string[] } {
       if (c.isTypeAssignableTo(c.getNullType(), source) && !c.isTypeAssignableTo(c.getNullType(), target)) out.push(`${at}: may be null in the contract`);
       const s = c.getNonNullableType(source), d = c.getNonNullableType(target);
       if (c.isTypeAssignableTo(s, d)) return;
-      if (c.isArrayType(s) && c.isArrayType(d)) { compare(must(c.getTypeArguments(s as ts.TypeReference)[0]), must(c.getTypeArguments(d as ts.TypeReference)[0]), `${path}[]`, depth + 1, out, top); return; }
+      if (c.isArrayType(s) && c.isArrayType(d)) { compare(must(typeArguments(c, s)[0]), must(typeArguments(c, d)[0]), `${path}[]`, depth + 1, out, top); return; }
       if (s.isUnion() && !(s.flags & ts.TypeFlags.Boolean) && variants(s).some((item) => isObject(item))) {
         const sv = variants(s), dv = variants(d);
         const keys = sv.every((item) => isObject(item))
@@ -117,12 +121,12 @@ function check(): { checked: number; problems: string[] } {
           else { // inferred from the context (a typed variable or return)
             const sig = c.getResolvedSignature(n);
             const returned = sig && c.getReturnTypeOfSignature(sig);
-            own = returned?.getSymbol()?.getName() === "Promise" ? c.getTypeArguments(returned as ts.TypeReference)[0] : returned;
-            if (fn === "coreAll" && own && c.isArrayType(own)) own = c.getTypeArguments(own as ts.TypeReference)[0];
+            own = returned?.getSymbol()?.getName() === "Promise" ? typeArguments(c, returned)[0] : returned;
+            if (fn === "coreAll" && own && c.isArrayType(own)) own = typeArguments(c, own)[0];
           }
           if (fn === "coreAll" && result) {
             const items = result.getProperty("items");
-            result = items ? c.getTypeArguments(c.getTypeOfSymbol(items) as ts.TypeReference)[0] ?? null : null;
+            result = items ? typeArguments(c, c.getTypeOfSymbol(items))[0] ?? null : null;
           }
           if (!result) problems.push(`${where}: the contract has no result for it`);
           else if (own && !(own.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown))) {

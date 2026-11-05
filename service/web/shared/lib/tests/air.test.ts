@@ -53,11 +53,18 @@ describe("air-quality metric cards (FR-C07, IR44, IR99, IR213, IR260)", () => {
   });
 });
 
+const property = (id: string, name: string): ApiPropertyRow => ({ id, name, version: 1, customerOrgId: "org-1", kind: "home", address: null, accessInstructions: null, archived: false, updatedAt: "2026-09-01T00:00:00Z" });
+const space = (id: string, parentSpaceId: string | null, name: string, kind: ApiSpaceRow["kind"]): ApiSpaceRow => ({ id, parentSpaceId, kind, name, version: 1, propertyId: "p1", archived: false });
+const unit = (id: string, spaceId: string | null, displayName: string): ApiUnitRow => ({
+  id, spaceId, displayName, version: 1, customerOrgId: "org-1", propertyId: "p1", modelId: "model-1", type: "split", installedAt: null, serviceScope: [], alertPolicyIds: [], archived: false,
+  capabilityVersion: 1, connection: "online", lastSeenAt: null, warrantyEndsAt: null, effectivePowerState: "on", activeAlertCount: 0,
+});
+
 describe("the air-quality screen in the display language and time zone (FR-C07, IR266)", () => {
   const NOW = new Date("2026-09-14T01:12:40Z"); // Mon 09:12 KL
-  const ps = [{ id: "p1", name: "Home A", archived: false }] as unknown as ApiPropertyRow[];
-  const ss = [{ id: "s1", propertyId: "p1", parentSpaceId: null, name: "1F", archived: false }, { id: "s2", propertyId: "p1", parentSpaceId: "s1", name: "Bedroom", archived: false }] as unknown as ApiSpaceRow[];
-  const us = [{ id: "u1", propertyId: "p1", spaceId: "s2", displayName: "Bedroom AC", archived: false }, { id: "u2", propertyId: "p1", spaceId: null, displayName: "Porch AC", archived: false }] as unknown as ApiUnitRow[];
+  const ps = [property("p1", "Home A")];
+  const ss = [space("s1", null, "1F", "floor"), space("s2", "s1", "Bedroom", "room")];
+  const us = [unit("u1", "s2", "Bedroom AC"), unit("u2", null, "Porch AC")];
 
   it("names the rooms, the guidance and the cleaning note in Malay", () => {
     expect(airRooms(ps, ss, us).map((r) => r.label)).toEqual(["Bedroom · Home A › 1F", "Not in a room · Home A"]);
