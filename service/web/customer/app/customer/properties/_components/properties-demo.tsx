@@ -120,7 +120,7 @@ export function PropertiesDemo() {
         </Card>
       </div>
       <Modal open={!!renaming} onClose={() => { setRenaming(null); }} title={`Rename ${renaming?.name ?? "location"}`} footer={<><Btn onClick={() => { setRenaming(null); }}>Cancel</Btn><Btn variant="primary" onClick={save}>Save</Btn></>}>
-        <Field label="Name" error={errorText} hint="Try “Office A” to see the duplicate-name validation."><Input value={name} onChange={(e) => { setName(e.target.value); }} autoFocus /></Field>
+        <Field label="Name" error={errorText} hint="Try “Office A” to see the duplicate-name validation."><Input value={name} onChange={(e) => { setName(e.target.value); }} /></Field>
       </Modal>
     </Page>
   );

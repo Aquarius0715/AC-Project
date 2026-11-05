@@ -235,7 +235,7 @@ function CommandLine({ r, demo, line }: Readonly<{ r: RelatedRef; demo: boolean;
   };
   return (
     <span className="flex flex-col gap-1">
-      <span className="flex flex-wrap items-center justify-between gap-2">{line}{c.state !== "done" && <Btn size="sm" disabled={c.state === "loading"} onClick={load}>{t("Load command")}</Btn>}</span>
+      <span className="flex flex-wrap items-center justify-between gap-2">{line}{c.state !== "done" && <Btn size="sm" disabled={c.state === "loading"} onClick={() => { void load(); }}>{t("Load command")}</Btn>}</span>
       {c.state === "done" && <span className="flex flex-wrap items-center justify-between gap-2 text-xs"><span>{c.text} · {c.when}</span>{c.unitId && <TextLink href={`/admin/units?unitId=${c.unitId}`}>{t("Open unit")} <Icon name="arrowRight" /></TextLink>}</span>}
       {c.state === "error" && <span className="text-xs text-crit">{c.text}</span>}
     </span>

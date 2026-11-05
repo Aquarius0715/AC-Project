@@ -36,7 +36,7 @@ export function RenameModal({ r, onClose, demo = false }: Readonly<{ r: Renaming
       <div className="flex flex-col gap-3">
         <p className="text-[13px] text-muted-foreground">{t("Only the name changes. Floors, rooms and units stay as they are — HQ manages the structure.")}</p>
         <SummaryList items={[[t(r.kind === "unit" ? "AC" : "Location"), r.where]]} />
-        <Field label={t("New name")} hint={t("1–120 characters, unique among its siblings. HQ and technicians see the new name too.")} error={errorText}><Input value={name} onChange={(e) => { setName(e.target.value); setError(undefined); }} autoFocus /></Field>
+        <Field label={t("New name")} hint={t("1–120 characters, unique among its siblings. HQ and technicians see the new name too.")} error={errorText}><Input value={name} onChange={(e) => { setName(e.target.value); setError(undefined); }} /></Field>
       </div>
     </Modal>
   );

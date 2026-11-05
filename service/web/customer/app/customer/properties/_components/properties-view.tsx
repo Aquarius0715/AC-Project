@@ -258,7 +258,7 @@ function GroupPanel({ live, space }: Readonly<{ live: PropertiesLive; space: str
       </Card>
       {review && (
         <Modal open wide onClose={() => { setReview(null); }} title={t(review.length === 1 ? "Send to {n} selected AC in {space}?" : "Send to {n} selected ACs in {space}?", { n: review.length, space })}
-          footer={<><Btn onClick={() => { setReview(null); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={review.every((r) => r.actions.length === 0)} onClick={() => send(review.filter((r) => r.actions.length))}>{t(review.filter((r) => r.actions.length).length === 1 ? "Send to {n} AC" : "Send to {n} ACs", { n: review.filter((r) => r.actions.length).length })}</Btn></>}>
+          footer={<><Btn onClick={() => { setReview(null); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={review.every((r) => r.actions.length === 0)} onClick={() => { void send(review.filter((r) => r.actions.length)); }}>{t(review.filter((r) => r.actions.length).length === 1 ? "Send to {n} AC" : "Send to {n} ACs", { n: review.filter((r) => r.actions.length).length })}</Btn></>}>
           <p className="mb-2 text-[13px] font-semibold">{changeText(ch, t)}</p>
           <DataTable rowKey={(r) => r.id} rows={review} cols={[
             { key: "n", label: "AC", render: (r) => <b>{r.name}</b> },

@@ -43,6 +43,12 @@ export function webConfig(tsconfigRootDir) {
     },
     { files: ["**/*.{js,mjs,cjs}"], extends: [tseslint.configs.disableTypeChecked] }, // config files have no types
     { rules: nextPlugins["jsx-a11y"].flatConfigs.strict.rules },
+    // the shared form controls render a native control, so a <label> around one of them is associated with it
+    {
+      rules: {
+        "jsx-a11y/label-has-associated-control": ["error", { controlComponents: ["Input", "Checkbox", "Switch", "Textarea", "NativeSelect"], assert: "either", depth: 3 }],
+      },
+    },
     { rules: { ...nextPlugins.react.configs.recommended.rules, ...nextPlugins.react.configs["jsx-runtime"].rules } },
     { rules: nextPlugins["react-hooks"].configs.flat["recommended-latest"].rules },
     {

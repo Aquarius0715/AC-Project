@@ -65,7 +65,7 @@ function RoleNavWithQuery(props: Readonly<{ items: NavItem[]; base: string; path
 /** The app frame. In API mode the layout passes `live` (IR241): the organization as the scope label, the signed-in user
 in the chip, the sidebar badges counted by the Core API (no badge for 0) and the user's display language and time
 zone (IR258, IR259); the demo keeps the fixed ones, the language chosen in this browser and Asia/Kuala_Lumpur. */
-export function AppShell({ role: forced, live, children }: Readonly<{ role?: Role; live?: ShellLive; children: React.ReactNode }>) {
+export function AppShell({ appRole: forced, live, children }: Readonly<{ appRole?: Role; live?: ShellLive; children: React.ReactNode }>) {
   const detected = useStoredRole();
   const role = forced ?? detected;
   const config = ROLES[role];

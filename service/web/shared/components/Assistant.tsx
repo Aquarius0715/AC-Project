@@ -182,7 +182,7 @@ function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4" aria-live="polite">
         <div className="max-w-[90%] rounded-2xl rounded-bl-sm bg-surface2 px-3 py-2 text-[13px]">{t("Hi! Ask about temperatures, change a setting, or ask for help.")}
           <div className="mt-2 text-[11px] font-semibold text-muted-foreground">{t("Try")}</div>
-          <div className="mt-1 flex flex-col gap-1 text-xs">{[ex.temperature, ex.change, ex.help].map((s) => <Button key={s} variant="outline" size="sm" disabled={busy} className="h-auto justify-start bg-surface px-2 py-1 text-left font-normal whitespace-normal hover:bg-primary-soft" onClick={() => ask(s, "text")}>“{s}”</Button>)}</div>
+          <div className="mt-1 flex flex-col gap-1 text-xs">{[ex.temperature, ex.change, ex.help].map((s) => <Button key={s} variant="outline" size="sm" disabled={busy} className="h-auto justify-start bg-surface px-2 py-1 text-left font-normal whitespace-normal hover:bg-primary-soft" onClick={() => { void ask(s, "text"); }}>“{s}”</Button>)}</div>
         </div>
         {msgs.map((m, n) => {
           if (m.kind === "user") return <div key={n} className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-[13px] text-white">{m.text}<div className="text-[10px]">{t(m.via === "voice" ? "You · voice" : "You · text")}</div></div>;
@@ -198,7 +198,7 @@ function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
                 <div className="mb-2 font-bold">{t("I understood:")}</div>
                 <SummaryList items={[[t("Intent"), t("Change set temperature")], [t("Target"), card.target], [t("Current"), card.current], [t("Requested"), card.requested], [t("Allowed range"), card.range]]} />
                 <p className="my-2 text-xs text-muted-foreground">{card.supported ? t("Only {unit} changes. Same permission checks as Unit Control.", { unit: card.unit }) : t("{value} is outside what {unit} supports — sending it will be refused, nothing changes.", { value: card.requested, unit: card.unit })}</p>
-                <div className="flex gap-2"><Btn size="sm" onClick={() => { drop("confirm"); setState("idle"); add({ kind: "bot", text: t("Cancelled — nothing was sent.") }); }}>{t("Cancel")}</Btn><Btn variant="primary" size="sm" disabled={busy} onClick={() => confirm(m, lastQuestion)}>{t("Confirm")}</Btn></div>
+                <div className="flex gap-2"><Btn size="sm" onClick={() => { drop("confirm"); setState("idle"); add({ kind: "bot", text: t("Cancelled — nothing was sent.") }); }}>{t("Cancel")}</Btn><Btn variant="primary" size="sm" disabled={busy} onClick={() => { void confirm(m, lastQuestion); }}>{t("Confirm")}</Btn></div>
               </div>);
           }
           return (
@@ -206,7 +206,7 @@ function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
               <b className={lookOf(m.p.tone).text}><Icon name={lookOf(m.p.tone).icon} /> {m.p.title}</b>
               {m.p.rows && <div className="mt-1"><SummaryList items={m.p.rows} /></div>}
               <p className="mt-1 text-xs">{m.p.detail}</p>
-              {m.p.tone !== "info" && <div className="mt-2 flex flex-wrap items-center gap-2">{m.p.tone === "crit" && <Btn size="sm" disabled={busy} onClick={() => ask(m.question, "text")}>{t("Try again")}</Btn>}<Link className="text-xs font-semibold text-primary" href={`/customer/units/${m.unitId}`}>{t("Open Unit Control")}</Link>{m.p.tone === "ok" && <span className="text-[11px] text-muted-foreground">{t("Undo is a new command")}</span>}</div>}
+              {m.p.tone !== "info" && <div className="mt-2 flex flex-wrap items-center gap-2">{m.p.tone === "crit" && <Btn size="sm" disabled={busy} onClick={() => { void ask(m.question, "text"); }}>{t("Try again")}</Btn>}<Link className="text-xs font-semibold text-primary" href={`/customer/units/${m.unitId}`}>{t("Open Unit Control")}</Link>{m.p.tone === "ok" && <span className="text-[11px] text-muted-foreground">{t("Undo is a new command")}</span>}</div>}
             </div>);
         })}
         {state === "listening" && (

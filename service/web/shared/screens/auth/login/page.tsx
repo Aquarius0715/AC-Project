@@ -12,7 +12,7 @@ const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 /** Sign-in of one role's app (FR-X01, DDC-07, SCR-X-login, Figma Login frames), rendered on the server (IR251): the data
 source and the kept returnTo decide where Continue goes, and a sign-in that came back says why. `others` are the
 base URLs of the other apps (plain links: separate apps). */
-export function LoginScreen({ role, others = {}, params = {}, api }: Readonly<{ role: Role; others?: AppLinks; params?: Params; api: boolean }>) {
+export function LoginScreen({ appRole: role, others = {}, params = {}, api }: Readonly<{ appRole: Role; others?: AppLinks; params?: Params; api: boolean }>) {
   const config = ROLES[role];
   const href = continueHref(api, role, safeReturnTo(role, one(params.returnTo)));
   const error = loginError(one(params.error));
@@ -30,7 +30,7 @@ export function LoginScreen({ role, others = {}, params = {}, api }: Readonly<{ 
           <span aria-hidden className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary text-sm text-white"><Icon name="account" /></span>
           <span className="min-w-0"><span className="block text-[13px] font-bold">{config.loginUser}</span><span className="block text-[11px] text-muted-foreground">{config.loginDesc}</span></span>
         </div>
-        <ContinueLink role={role} href={href}>Continue as {config.loginUser} <Icon name="arrowRight" /></ContinueLink>
+        <ContinueLink appRole={role} href={href}>Continue as {config.loginUser} <Icon name="arrowRight" /></ContinueLink>
         <p className="mt-4 text-[11px] text-muted-foreground">Looking for a different AC Project service?{" "}
           {names.map((r, i) => {
             return (

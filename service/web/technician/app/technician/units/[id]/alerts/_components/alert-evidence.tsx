@@ -50,7 +50,7 @@ export function AlertEvidenceView({ live }: Readonly<{ live: AlertsLive }>) {
         <>
           <div className={cx("flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3", BANNER[a.banner.tone])}>
             <div className="min-w-0"><b className="block text-[15px]">{a.banner.title}</b><span className="text-xs">{a.banner.sub}</span></div>
-            <div className="flex items-center gap-2"><SeverityBadge s={a.severity} />{a.status === "open" ? <Btn size="sm" disabled={busy} onClick={() => act("acknowledge")}>{t("Acknowledge")}</Btn> : <b className="text-xs">{a.banner.state}</b>}</div>
+            <div className="flex items-center gap-2"><SeverityBadge s={a.severity} />{a.status === "open" ? <Btn size="sm" disabled={busy} onClick={() => { void act("acknowledge"); }}>{t("Acknowledge")}</Btn> : <b className="text-xs">{a.banner.state}</b>}</div>
           </div>
           <div className="grid-fluid" style={{ ["--min" as string]: "260px" }}>
             {a.cards.map((c) => (
@@ -69,7 +69,7 @@ export function AlertEvidenceView({ live }: Readonly<{ live: AlertsLive }>) {
                 {a.resolution.info && <Banner>{a.resolution.info}</Banner>}
                 {live.evidence && <div className="mt-3"><EvidencePicker rows={live.evidence} policyless={a.policyless} picked={picked.filter((id) => live.evidence?.some((r) => r.id === id))} onChange={setPicked} /></div>}
                 <div className="mt-3"><Field label={t("Resolution reason (required, 1–1000 characters)")}><Textarea value={reason} maxLength={1000} placeholder={t("e.g. Confirmed on site that airflow is restored after filter cleaning.")} onChange={(e) => { setReason(e.target.value); }} /></Field></div>
-                <div className="mt-3"><Btn variant="primary" className="w-full" disabled={busy} onClick={() => act("resolve")}>{t("Resolve alert")}</Btn></div>
+                <div className="mt-3"><Btn variant="primary" className="w-full" disabled={busy} onClick={() => { void act("resolve"); }}>{t("Resolve alert")}</Btn></div>
               </>
             )}
             <p className="mt-2 text-[11px] text-muted-foreground">{a.resolution.note}</p>

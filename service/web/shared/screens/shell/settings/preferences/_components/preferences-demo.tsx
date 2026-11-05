@@ -55,7 +55,7 @@ export function PreferencesDemo() {
               <b>1&nbsp;&nbsp;{t("Scan with an authenticator app")}</b>
               <div className="text-xs text-muted-foreground">{t("or enter key")}&nbsp;&nbsp;<span className="font-mono">{groupKey(DEMO_KEY)}</span></div>
               <b>2&nbsp;&nbsp;{t("Enter the 6-digit code")}</b>
-              <CodeInput label={t("6-digit code")} value={code} onChange={setCode} autoFocus />
+              <CodeInput label={t("6-digit code")} value={code} onChange={setCode} />
               <b>3&nbsp;&nbsp;{t("Save your 8 recovery codes (shown after verifying)")}</b>
             </div>
           </div>

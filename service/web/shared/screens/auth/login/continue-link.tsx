@@ -7,7 +7,7 @@ const cls = "mt-4 flex w-full items-center justify-center gap-1.5 rounded-contro
 
 /** Continue on the sign-in page. The BFF sign-in (API mode) is a full navigation to the identity provider; the browser
 demo opens the role home and remembers the chosen role for the shared screens' frame. */
-export function ContinueLink({ role, href, children }: Readonly<{ role: Role; href: string; children: React.ReactNode }>) {
+export function ContinueLink({ appRole: role, href, children }: Readonly<{ appRole: Role; href: string; children: React.ReactNode }>) {
   if (href.startsWith("/bff/")) return <a href={href} className={cls}>{children}</a>;
   return <Link onClick={() => { try { localStorage.setItem(ROLE_KEY, role); } catch {} }} href={href} className={cls}>{children}</Link>;
 }
