@@ -12,7 +12,7 @@ export interface Slot { startAt: string; endAt: string }
 
 /** jobs.list rows of a contractor (IR23): the offer before the access window, the summary inside it, the history after. */
 export type ApiPartnerJob =
-  | { projection: "offer"; status: "offered" | "accepted"; jobId: string; jobVersion: number; offerId: string; type: string; siteAddress: string | null; requestedSlot: Slot; dueAt: string; offerExpiresAt: string; visitSlot: Slot | null; accessValidFrom?: string; accessValidUntil?: string }
+  | { projection: "offer"; status: "offered" | "accepted"; jobId: string; jobVersion: number; offerId: string; type: string; siteAddress: string | null; requestedSlot: Slot; dueAt: string; offerExpiresAt: string; visitSlot: Slot | null; accessValidFrom?: string; accessValidUntil?: string; origin?: string; partnerSlotProposal?: { status: string } | null }
   | { projection: "summary"; id: string; version: number; unitId: string; type: string; status: string; dueAt: string; requestedSlot: Slot; scheduledSlot: Slot | null; assignmentId: string | null; displayStatus: string; technicianMembershipId: string | null; assignmentAcknowledgement?: "pending" | "accepted" | "cant_make" | null; accessValidFrom?: string | null; accessValidUntil?: string | null; origin?: string; eventSummary: ApiEventSummary }
   | { projection: "history"; jobId: string; type: string; status: string; completedAt: string | null; asOf: string; ownDecisionEvents: ApiJobEvent[] };
 /** jobs.list's count of a summary's events (IR506): what the caller reads with jobs.events, and what the customer reads. */

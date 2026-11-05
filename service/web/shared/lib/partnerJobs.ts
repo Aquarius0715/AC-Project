@@ -23,13 +23,15 @@ export function tabFilters(tab: TabId, fromAt: string, toAt: string): NonNullabl
 }
 
 export const SORTS = [
-  { id: "status:asc", label: "Status, earliest stage first", text: "status, then deadline" }, { id: "status:desc", label: "Status, latest stage first", text: "status (last first)" },
-  { id: "dueAt:asc", label: "Deadline, soonest first", text: "deadline (soonest first)" }, { id: "dueAt:desc", label: "Deadline, latest first", text: "deadline (latest first)" },
-  { id: "severity:desc", label: "Unit urgency, most urgent first", text: "unit urgency" },
+  { id: "status:asc", field: "status", direction: "asc", label: "Status, earliest stage first", text: "status, then deadline" }, { id: "status:desc", field: "status", direction: "desc", label: "Status, latest stage first", text: "status (last first)" },
+  { id: "dueAt:asc", field: "dueAt", direction: "asc", label: "Deadline, soonest first", text: "deadline (soonest first)" }, { id: "dueAt:desc", field: "dueAt", direction: "desc", label: "Deadline, latest first", text: "deadline (latest first)" },
+  { id: "severity:desc", field: "severity", direction: "desc", label: "Unit urgency, most urgent first", text: "unit urgency" },
 ] as const;
 export type SortId = (typeof SORTS)[number]["id"];
 export const sortOf = (v?: string): SortId => (SORTS.find((s) => s.id === v)?.id ?? "status:asc");
-export const sortSpec = (id: SortId): NonNullable<OpInput<"jobs.list">["sort"]> => { const [field, direction] = id.split(":", 2); return { field, direction } as NonNullable<OpInput<"jobs.list">["sort"]>; }; // SortId names only the catalog's sorts
+type SortSpec = NonNullable<OpInput<"jobs.list">["sort"]>;
+const SORT_SPECS = new Map(SORTS.map((sort): [SortId, SortSpec] => [sort.id, { field: sort.field, direction: sort.direction }]));
+export const sortSpec = (id: SortId): SortSpec => SORT_SPECS.get(id) ?? { field: "status", direction: "asc" };
 
 export const PAGE_SIZE = 25;
 
@@ -58,7 +60,7 @@ export function jobRow(raw: ApiPartnerJob, now: number, units: Map<string, strin
   const b = bucket(j, now);
   const detail = `/partner/jobs/${j.id}`;
   if (raw.projection === "offer" && raw.status === "offered") {
-    const proposal = (raw as { partnerSlotProposal?: { status: string } | null }).partnerSlotProposal;
+    const proposal = raw.partnerSlotProposal;
     const pending = proposal && (proposal.status === "pending" || proposal.status === "sent_to_client");
     const left = until(raw.offerExpiresAt, now, t);
     return {
