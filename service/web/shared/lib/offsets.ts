@@ -33,14 +33,14 @@ export interface RecordRow {
 
 /** A record state as the screens word it (the customer offsets page uses the same words). */
 export function stateWord(s: ApiOffsetRecord["state"] | null, t: T = en): string {
-  const words: Record<ApiOffsetRecord["state"], string> = { demo_requested: t("Demo requested"), demo_purchased: t("Demo purchased"), demo_retired: t("Demo retired"), failed: t("Failed") };
+  const words: Partial<Record<ApiOffsetRecord["state"], string>> = { demo_requested: t("Demo requested"), demo_purchased: t("Demo purchased"), demo_retired: t("Demo retired"), failed: t("Failed") };
   return s ? words[s] ?? s : "—";
 }
 
 /** An attempt: its stage, status and start in the display time zone. */
 export function attemptText(a: Attempt, i: I18n = EN): string {
   const { t } = i;
-  const status: Record<Attempt["status"], string> = { pending: t("pending"), succeeded: t("succeeded"), failed: t("failed") };
+  const status: Partial<Record<Attempt["status"], string>> = { pending: t("pending"), succeeded: t("succeeded"), failed: t("failed") };
   return t("{stage} · {status} · started {time}", { stage: t(a.stage === "purchase" ? "purchase" : "retirement"), status: status[a.status] ?? a.status, time: showTime(a.startedAt, i.display) });
 }
 

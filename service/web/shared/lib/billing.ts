@@ -69,8 +69,10 @@ const methodName = (m: string | null, t: T) => {
   return m;
 };
 /** A payment's status as the screen words it; another code stays as it is. */
-export const paymentWord = (s: string, t: T = en) =>
-  ({ initiated: t("initiated"), processing: t("processing"), confirmed: t("confirmed"), failed: t("failed") })[s] ?? s;
+export const paymentWord = (s: string, t: T = en) => {
+  const words: Partial<Record<string, string>> = { initiated: t("initiated"), processing: t("processing"), confirmed: t("confirmed"), failed: t("failed") };
+  return words[s] ?? s; // a value the API adds before this table does
+};
 
 /** Invoice state for HQ: unpaid past its due date is overdue (IR04). */
 export function invoiceStatus(i: Pick<ApiInvoice, "status" | "dueAt">, now: Date): InvoiceStatus {
@@ -163,7 +165,10 @@ export interface StatementRow {
   statusText: string; queryCount: number; openQueries: number;
 }
 /** A statement's status, a line's kind, a question's topic and state as the screen words them. */
-export const statementWord = (s: StatementRow["status"], t: T = en) => ({ Draft: t("Draft"), Approved: t("Approved"), Paid: t("Paid") })[s] ?? s;
+export const statementWord = (s: StatementRow["status"], t: T = en) => {
+  const words: Partial<Record<StatementRow["status"], string>> = { Draft: t("Draft"), Approved: t("Approved"), Paid: t("Paid") };
+  return words[s] ?? s; // a value the API adds before this table does
+};
 export type StatementDetail = StatementRow & {
   gross: string; deductions: string; payDate: string; payable: boolean; approvedBy: string | null; paidAt: string | null;
   lines: { id: string; job: string; work: string; kind: string; amount: string; note: string }[];

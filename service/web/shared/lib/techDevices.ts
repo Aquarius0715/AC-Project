@@ -101,8 +101,8 @@ export function openFaults(es: ApiDeviceEventFull[]): OpenFaults {
   return out;
 }
 
-const connDot: Record<Connection, string> = { online: "ok", connecting: "primary", unknown: "muted", offline: "crit", error: "crit" };
-const CONNECTION: Record<Connection, string> = { online: "Online", connecting: "Connecting", unknown: "Unknown", offline: "Offline", error: "Error" };
+const connDot: Partial<Record<Connection, string>> = { online: "ok", connecting: "primary", unknown: "muted", offline: "crit", error: "crit" };
+const CONNECTION: Partial<Record<Connection, string>> = { online: "Online", connecting: "Connecting", unknown: "Unknown", offline: "Offline", error: "Error" };
 /** The four tiles (Connection, Power signal, Tamper, Firmware) with their evidence lines; with the T12 events a fault
 line shows when it was detected (Figma 03 “lost 08:12”). */
 // the power signal tile: what it reads and its dot
@@ -154,8 +154,8 @@ const FAILURE: Record<string, string> = {
 /** Why a device operation failed (IR67, REV19-018). */
 export const failureText = (code: string | null | undefined, t: T = en) => textOf(FAILURE, code, t) ?? code ?? t("no result");
 
-const KIND: Record<ApiDeviceOperation["kind"], string> = { check: "Connection check", calibrate: "Calibration", firmware: "Firmware update" };
-const STATUS: Record<ApiDeviceOperation["status"], string> = { queued: "Queued", running: "Running", succeeded: "Succeeded", failed: "Failed" };
+const KIND: Partial<Record<ApiDeviceOperation["kind"], string>> = { check: "Connection check", calibrate: "Calibration", firmware: "Firmware update" };
+const STATUS: Partial<Record<ApiDeviceOperation["status"], string>> = { queued: "Queued", running: "Running", succeeded: "Succeeded", failed: "Failed" };
 /** An operation in words, as “Connection check · Queued”. */
 export const operationLabel = (o: Pick<ApiDeviceOperation, "kind" | "status">, t: T = en) => `${t(KIND[o.kind] ?? o.kind)} · ${t(STATUS[o.status] ?? o.status)}`;
 /** One operation of the T11 history (Figma 03: started, “v1 → v2”, “heartbeat confirmed”). */

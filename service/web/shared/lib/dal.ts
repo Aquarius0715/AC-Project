@@ -5,7 +5,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { dropSession, loadSession, needsRefresh, SESSION_COOKIE, type Session } from "@ac/web/lib/session";
-import type { DomainError } from "@ac/web/lib/ops";
+import { domainError, type DomainError } from "@ac/web/lib/domainError";
 import { coreRequest } from "@ac/web/lib/rest";
 import { DEFAULT_DISPLAY, isLocale, type Display } from "@ac/web/lib/i18n";
 import type { ListArgs, OpArgs } from "@ac/web/lib/opTypes";
@@ -167,7 +167,7 @@ async function coreCall<T>(operation: string, input: unknown, options: CoreOptio
     const jar = await cookies();
     await dropSession(jar.get(SESSION_COOKIE)?.value);
   }
-  if (!res.ok) throw new CoreError(res.status, body ?? { code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {}, correlationId: "", retryAfterSeconds: null });
+  if (!res.ok) throw new CoreError(res.status, domainError(body));
   return body as { data: T; meta?: { snapshotAt?: string } };
 }
 

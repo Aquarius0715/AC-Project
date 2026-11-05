@@ -28,8 +28,10 @@ export const states: RestrictionState[] = ["scheduled", "requested", "applied", 
 export const lifecycleStates: RestrictionState[] = ["scheduled", "requested", "applied", "release_requested", "released"];
 export const stateLabel: Record<RestrictionState, string> = { scheduled: "Scheduled", requested: "Requested", applied: "Applied", release_requested: "Release requested", released: "Released", cancelled: "Cancelled" };
 /** A state as the screens word it. */
-export const stateWord = (s: RestrictionState, t: T = en) =>
-  ({ scheduled: t("Scheduled"), requested: t("Requested"), applied: t("Applied"), release_requested: t("Release requested"), released: t("Released"), cancelled: t("Cancelled") })[s] ?? s;
+export const stateWord = (s: RestrictionState, t: T = en) => {
+  const words: Partial<Record<RestrictionState, string>> = { scheduled: t("Scheduled"), requested: t("Requested"), applied: t("Applied"), release_requested: t("Release requested"), released: t("Released"), cancelled: t("Cancelled") };
+  return words[s] ?? s; // a value the API adds before this table does
+};
 /** The colour of a restriction state's badge. */
 export type StateTone = "warn" | "ok" | "muted" | "unknown" | "primary";
 const STATE_TONE = new Map<RestrictionState, StateTone>([["applied", "warn"], ["released", "ok"], ["cancelled", "muted"], ["release_requested", "unknown"]]);
@@ -43,8 +45,10 @@ function observedText(u: ApiRestriction["perUnit"][number], restrictionId: strin
 }
 export const policyText = (p: Policy, t: T = en) => (p.kind === "power_off" ? t("Power off") : t("Temperature limit — cooling setpoint ≥ {value} °C", { value: p.minimumCoolingSetpoint }));
 /** Where a release intent came from, worded. */
-export const sourceWord = (s: NonNullable<ReleaseIntent>["source"], t: T = en) =>
-  ({ payment: t("payment"), exception: t("exception"), override: t("override"), manual: t("manual"), cancel: t("cancellation") })[s] ?? s;
+export const sourceWord = (s: NonNullable<ReleaseIntent>["source"], t: T = en) => {
+  const words: Partial<Record<NonNullable<ReleaseIntent>["source"], string>> = { payment: t("payment"), exception: t("exception"), override: t("override"), manual: t("manual"), cancel: t("cancellation") };
+  return words[s] ?? s; // a value the API adds before this table does
+};
 /** The release intent with its time in the display time zone, or "none". */
 export const intentText = (r: Pick<ApiRestriction, "releaseIntent">, i: I18n = EN) => (r.releaseIntent ? `${sourceWord(r.releaseIntent.source, i.t)} · ${showTime(r.releaseIntent.at, i.display)}` : i.t("none"));
 
@@ -81,11 +85,11 @@ export function restrictionRows(rs: ApiRestriction[], contractLabel: (id?: strin
 export interface UnitRow { unitId: string; name: string; apply: string; release: string; observed: string; pending: string | null; retryApply: boolean; retryRelease: boolean; reconcile: boolean; commands: string }
 export function unitRows(r: ApiRestriction, names: Map<string, string>, commands: Map<string, ApiCommand>, i: I18n = EN): UnitRow[] {
   const { t } = i;
-  const apply: Record<PerUnit["applyState"], string> = { not_sent: t("not sent"), sent_unknown: t("sent, result unknown"), applied: t("applied"), not_applied: t("not applied") };
-  const release: Record<PerUnit["releaseState"], string> = {
+  const apply: Partial<Record<PerUnit["applyState"], string>> = { not_sent: t("not sent"), sent_unknown: t("sent, result unknown"), applied: t("applied"), not_applied: t("not applied") };
+  const release: Partial<Record<PerUnit["releaseState"], string>> = {
     none: t("none"), waiting_reconcile: t("waiting for reconciliation"), requested: t("requested"), released: t("released"), not_required: t("not required"), failed: t("failed"),
   };
-  const command: Record<ApiCommand["status"], string> = { requested: t("requested"), sent: t("sent"), acknowledged: t("acknowledged"), failed: t("failed"), expired: t("expired"), cancelled: t("cancelled") };
+  const command: Partial<Record<ApiCommand["status"], string>> = { requested: t("requested"), sent: t("sent"), acknowledged: t("acknowledged"), failed: t("failed"), expired: t("expired"), cancelled: t("cancelled") };
   const pendingText = new Map([["offline", t("offline")], ["device_operation_running", t("a device operation is running")]]);
   const pending = (p: string | null) => (p === null ? null : pendingText.get(p) ?? p);
   return r.perUnit.map((u) => {

@@ -63,7 +63,7 @@ async function AdminEnergyPageContent({ searchParams }: Readonly<PageProps<"/adm
         summary = await coreOp<ApiEnergySummary>("energy.summary", { from, to, unitIds, ...(baseline && { baselineId: baseline.id }) });
       } catch (error_) {
         if (!(error_ instanceof CoreError) || error_.error.code !== "VALIDATION") throw error_; // an unusable period or unit set shows next to the form
-        error = actionMessage({ code: error_.error.code, messageKey: error_.error.messageKey, fieldErrors: error_.error.fieldErrors ?? {}, retryAfterSeconds: error_.error.retryAfterSeconds }, i.t);
+        error = actionMessage({ code: error_.error.code, messageKey: error_.error.messageKey, fieldErrors: error_.error.fieldErrors, retryAfterSeconds: error_.error.retryAfterSeconds }, i.t);
       }
     }
     live.analysis = { from: klLocal(from), to: klLocal(to), baselineId: baseline?.id ?? null, summary: summary ? summaryView(summary, i) : null, unitIds, error };

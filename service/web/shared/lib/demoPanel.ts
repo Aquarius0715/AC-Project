@@ -30,7 +30,7 @@ export function deviceOptions(devices: ApiDevice[], unitNames: Map<string, strin
 
 /** What a refused demo operation means for the person at the panel. */
 export function demoRefusal(f: ActionFailure): string {
-  const keys = new Set([f.messageKey, ...Object.values(f.fieldErrors ?? {})]);
+  const keys = new Set([f.messageKey, ...Object.values(f.fieldErrors)]);
   if (keys.has("errors.demo_only")) return "Demo operations are off in this environment";
   if (keys.has("errors.clock_backwards")) return "The clock only moves forward — reload and try again";
   if (keys.has("errors.binding_mismatch")) return "The device was rebound — reload to pick it again";

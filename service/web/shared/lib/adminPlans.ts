@@ -88,7 +88,7 @@ export function planRefusal(f: { code: string; messageKey: string; fieldErrors: 
     "error.past": "must be in the future", "error.invalid": "not a valid value (monthly, every 1–12 months)", "error.required": "required",
   };
   const word = (k: string) => (textOf(keys, k, t) ?? k);
-  const fields = Object.entries(f.fieldErrors ?? {}).map(([k, v]) => `${k}: ${word(v)}`);
+  const fields = Object.entries(f.fieldErrors).map(([k, v]) => `${k}: ${word(v)}`);
   if (fields.length > 0) return fields.join(" · ");
   if (keys[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved: {reason}.", { reason: word(f.messageKey) }) : `${word(f.messageKey)}.`;
   if (f.code === "NOT_FOUND") return t("The plan or its unit no longer exists in your scope.");

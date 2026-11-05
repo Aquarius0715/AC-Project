@@ -191,7 +191,7 @@ export const reminderInput = (f: ReminderForm) => {
 export function filterRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null }, t: T = en): string {
   if (f.code === "FORBIDDEN") return t("Not saved: only the account owner can change the reminders.");
   if (f.code === "NOT_FOUND") return t("Not saved: that AC is no longer in your account.");
-  const fe = f.fieldErrors ?? {};
+  const fe = f.fieldErrors;
   if (fe.unitId === "error.unitArchived") return t("Not saved: that AC is archived.");
   if (fe.thresholdHours) return t("Not saved: remind at 50–2000 h of running, or use the model default.");
   if (fe.fallbackDays) return t("Not saved: the fallback is 7–180 days.");

@@ -63,7 +63,10 @@ export function temperatureText(m: Measurement | null, unit: string, t: T, displ
   return m.quality === "valid" ? t("{unit} is {value} °C (measured {time}).", { unit, value: one(m.value), time: at })
     : t("{unit} last read {value} °C at {time} — the reading is {quality}.", { unit, value: one(m.value), time: at, quality: qualityWord(m.quality, t) });
 }
-const qualityWord = (q: Measurement["quality"], t: T) => ({ valid: t("valid"), missing: t("missing"), stale: t("stale"), suspect: t("suspect") })[q] ?? q;
+const qualityWord = (q: Measurement["quality"], t: T) => {
+  const words: Partial<Record<Measurement["quality"], string>> = { valid: t("valid"), missing: t("missing"), stale: t("stale"), suspect: t("suspect") };
+  return words[q] ?? q; // a value the API adds before this table does
+};
 
 /** The confirmation card of a change (Figma 09c): target, current setting, requested setting and the allowed range. */
 export function changeCard(intent: Extract<ResolvedIntent, { kind: "change" }>, u: ApiUnitDetail | null, t: T) {

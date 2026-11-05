@@ -201,7 +201,7 @@ export function clientJobRefusal(f: { code: string; messageKey: string; fieldErr
     "errors.contact_details_forbidden": "no e-mail addresses or phone numbers in the contact window", "error.length": "wrong length", "error.count": "wrong number of entries",
     "error.invalidFile": "photos must be JPEG or PNG up to 5 MiB", "error.unitArchived": "the unit is archived", "error.required": "required", "error.invalid": "not a valid value",
   };
-  const fields = Object.entries(f.fieldErrors ?? {}).map(([k, v]) => `${k}: ${textOf(keys, v, t) ?? v}`);
+  const fields = Object.entries(f.fieldErrors).map(([k, v]) => `${k}: ${textOf(keys, v, t) ?? v}`);
   if (fields.length > 0) return fields.join(" · ");
   if (keys[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved: {reason}.", { reason: textOf(keys, f.messageKey, t) ?? f.messageKey }) : `${textOf(keys, f.messageKey, t) ?? f.messageKey}.`;
   if (f.code === "NOT_FOUND") return t("The request no longer exists.");

@@ -7,7 +7,7 @@ import type { OpInput } from "@ac/web/lib/opTypes";
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
 const failure = (e: unknown): ActionResult<never> => {
   return (e instanceof CoreError
-    ? { ok: false, messageKey: e.error.messageKey, code: e.error.code, fieldErrors: e.error.fieldErrors ?? {}, retryAfterSeconds: e.error.retryAfterSeconds }
+    ? { ok: false, messageKey: e.error.messageKey, code: e.error.code, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds }
     : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} });
 };
 

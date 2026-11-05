@@ -18,7 +18,10 @@ export interface ApiUnitBrief { id: string; customerOrgId: string; propertyId: s
 
 export const planLabel: Record<PlanType, string> = { rto: "RTO", general: "General", energy: "Energy", environment: "Environment" };
 /** A plan type as the screen words it. */
-export const planWord = (p: PlanType, t: T = en) => ({ rto: t("RTO"), general: t("General"), energy: t("Energy"), environment: t("Environment") })[p] ?? p;
+export const planWord = (p: PlanType, t: T = en) => {
+  const words: Partial<Record<PlanType, string>> = { rto: t("RTO"), general: t("General"), energy: t("Energy"), environment: t("Environment") };
+  return words[p] ?? p; // a value the API adds before this table does
+};
 
 export interface ContractRow {
   id: string; version: number; planType: PlanType; plan: string; customerId: string; cust: string; unitIds: string[]; units: string;

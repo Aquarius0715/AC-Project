@@ -38,8 +38,16 @@ export function conditionText(c: AutoCondition, t: T = en): string {
   }
 }
 /** A mode or a fan / ventilation level, worded. */
-export const modeWord = (m: "cool" | "dry" | "fan", t: T = en) => ({ cool: t("cool"), dry: t("dry"), fan: t("fan") })[m] ?? m;
-export const levelWord = (l: "low" | "mid" | "high", t: T = en) => ({ low: t("low"), mid: t("mid"), high: t("high") })[l] ?? l;
+type Mode = "cool" | "dry" | "fan";
+type Level = "low" | "mid" | "high";
+export const modeWord = (m: Mode, t: T = en) => {
+  const words: Partial<Record<Mode, string>> = { cool: t("cool"), dry: t("dry"), fan: t("fan") };
+  return words[m] ?? m; // a value the API adds before this table does
+};
+export const levelWord = (l: Level, t: T = en) => {
+  const words: Partial<Record<Level, string>> = { low: t("low"), mid: t("mid"), high: t("high") };
+  return words[l] ?? l; // a value the API adds before this table does
+};
 export function actionText(a: UnitAction, t: T = en): string {
   switch (a.kind) {
     case "set_power": { return t(a.power ? "turn the AC on" : "turn the AC off");
@@ -75,8 +83,10 @@ export function policyGroups(ps: ApiAutoPolicy[], customerOfUnit: Map<string, st
 }
 
 /** Why a policy was turned off automatically, worded; another code stays as it is. */
-export const disabledReasonWord = (r: string, t: T = en) =>
-  ({ consent_revoked: t("consent revoked"), capability_changed: t("capability changed"), unit_archived: t("unit archived") })[r] ?? r;
+export const disabledReasonWord = (r: string, t: T = en) => {
+  const words: Partial<Record<string, string>> = { consent_revoked: t("consent revoked"), capability_changed: t("capability changed"), unit_archived: t("unit archived") };
+  return words[r] ?? r; // a value the API adds before this table does
+};
 
 /** The editor form (DD-A11 fields, IR07 shared inputs). */
 export interface AutoDraft {
@@ -182,4 +192,7 @@ export function reasonWord(reason: string, t: T = en): string {
   return words[reason] ?? reason;
 }
 /** A per-unit decision, worded. */
-export const decisionWord = (d: string, t: T = en) => ({ selected: t("selected"), suppressed: t("suppressed"), requested: t("requested"), failed: t("failed") })[d] ?? d;
+export const decisionWord = (d: string, t: T = en) => {
+  const words: Partial<Record<string, string>> = { selected: t("selected"), suppressed: t("suppressed"), requested: t("requested"), failed: t("failed") };
+  return words[d] ?? d; // a value the API adds before this table does
+};

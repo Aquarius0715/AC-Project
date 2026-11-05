@@ -94,7 +94,7 @@ function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
   useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [msgs, state]);
   const add = (...m: ChatMessage[]) => { setMsgs((s) => [...s, ...m]); };
   const drop = (kind: ChatMessage["kind"]) => { setMsgs((s) => s.filter((m) => m.kind !== kind)); };
-  const failure = (e: unknown) => (e instanceof OpError ? actionMessage({ code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors ?? {}, retryAfterSeconds: e.error.retryAfterSeconds }, t) : t("The assistant is unavailable — try again."));
+  const failure = (e: unknown) => (e instanceof OpError ? actionMessage({ code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds }, t) : t("The assistant is unavailable — try again."));
   const unit = (id: string) => orNull(callOp<ApiUnitDetail>("units.get", { id }));
   // D09: a language change discards an unconfirmed intent but keeps what was typed
   const setLang = (l: Locale) => {

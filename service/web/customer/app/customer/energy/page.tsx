@@ -73,7 +73,7 @@ export default async function CustomerEnergyPage({ searchParams }: Readonly<Page
       }
     } catch (error) {
       if (!(error instanceof CoreError) || error.error.code !== "VALIDATION") throw error; // an unusable period or unit set shows on the page
-      live.error = actionMessage({ code: error.error.code, messageKey: error.error.messageKey, fieldErrors: error.error.fieldErrors ?? {}, retryAfterSeconds: error.error.retryAfterSeconds }, i.t);
+      live.error = actionMessage({ code: error.error.code, messageKey: error.error.messageKey, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds }, i.t);
     }
   }
   return <EnergyView live={live} />;

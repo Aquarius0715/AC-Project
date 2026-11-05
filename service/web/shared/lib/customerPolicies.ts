@@ -191,7 +191,7 @@ export function policyRefusal(f: { code: string; messageKey: string; fieldErrors
   if (f.code === "FORBIDDEN") return t("Not saved: only the account owner can switch default rules.");
   if (f.code === "CONFLICT") return t("Not saved: this policy changed meanwhile — the latest version is shown.");
   if (f.code === "NOT_FOUND") return t("Not saved: this policy no longer exists.");
-  const fe = f.fieldErrors ?? {};
+  const fe = f.fieldErrors;
   if (fe.recoveryThreshold) return t("Not saved: the recovery value must be on the safe side of the limit.");
   if (fe.durationSeconds) return t("Not saved: the duration is 1 s to 24 h.");
   if (fe.activeWindow || fe["activeWindow.weekdays"]) return t("Not saved: check the days and times of “Only if”.");

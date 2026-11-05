@@ -4,7 +4,9 @@ import type { OpArgs } from "@ac/web/lib/opTypes";
 import { randomId } from "@ac/web/lib/randomId";
 import { orNull } from "@ac/web/lib/promises";
 
-export interface DomainError { code: string; messageKey: string; fieldErrors: Record<string, string>; correlationId: string; retryAfterSeconds: number | null }
+import { domainError, type DomainError } from "@ac/web/lib/domainError";
+
+export type { DomainError } from "@ac/web/lib/domainError";
 
 export class OpError extends Error {
   constructor(public readonly status: number, public readonly error: DomainError) {
@@ -22,7 +24,7 @@ export async function callOp<T>(...[operation, input, options = {}]: OpArgs<Writ
   const res = await fetch(`/bff/ops/${operation}`, { method: "POST", body: JSON.stringify(input ?? {}), headers });
   const body = await orNull(res.json());
   if (!res.ok) {
-    throw new OpError(res.status, body ?? { code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {}, correlationId: "", retryAfterSeconds: null });
+    throw new OpError(res.status, domainError(body));
   }
   return (body as { data: T }).data;
 }

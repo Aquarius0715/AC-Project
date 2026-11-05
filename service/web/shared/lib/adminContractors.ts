@@ -158,7 +158,7 @@ export function contractorRefusal(f: { code: string; messageKey: string; fieldEr
     "error.count": "wrong number of entries", "error.invalid": "not a valid value", "error.length": "too long", "error.required": "required", "error.past": "must be in the future",
   };
   const word = (k: string) => (textOf(keys, k, t) ?? k);
-  const fields = Object.entries(f.fieldErrors ?? {}).map(([k, v]) => `${k}: ${word(v)}`);
+  const fields = Object.entries(f.fieldErrors).map(([k, v]) => `${k}: ${word(v)}`);
   if (fields.length > 0) return fields.join(" · ");
   if (keys[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved: {reason}.", { reason: word(f.messageKey) }) : `${word(f.messageKey)}.`;
   if (f.code === "NOT_FOUND") return t("The contractor or the certificate no longer exists.");
