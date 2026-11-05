@@ -27,7 +27,7 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
     <Page>
       <div className="flex flex-wrap items-center justify-end gap-3 text-xs text-muted-foreground">
         <span>{t("Updated {time} · your company’s jobs only", { time: live.updated })}</span>
-        <Select aria-label={t("Period")} className="w-auto" value={live.period.value} onChange={(e) => { const [from, to] = e.target.value.split("|", 2); patch({ from, to }); }}>
+        <Select aria-label={t("Period")} className="w-auto" value={live.period.value} onChange={(e) => { const [from = "", to = ""] = e.target.value.split("|", 2); patch({ from, to }); }}>
           {live.period.custom && <option value={live.period.value}>{live.period.label}</option>}
           {live.periods.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
         </Select>

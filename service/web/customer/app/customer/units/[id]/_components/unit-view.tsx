@@ -16,7 +16,7 @@ import { Icon } from "@ac/web/components/Icon";
 
 export interface PolicyOption { id: string; name: string; rule: string }
 
-const siblings = [units[0], units[1]];
+const siblings = units.slice(0, 2); // the demo room holds the first two units
 
 const CONNECTION: Record<string, string> = { online: "Online", offline: "Offline", unknown: "Unknown", connecting: "Connecting", error: "Error" };
 const REASONS: Record<string, string> = { "errors.unit_busy": "another command is still waiting for this AC", "error.versionConflict": "this AC changed — reload and try again", "control.restriction_active": "a service restriction limits this setting", "control.reconciliation_required": "HQ is checking this AC" };

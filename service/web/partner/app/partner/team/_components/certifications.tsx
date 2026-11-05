@@ -98,7 +98,7 @@ function CertificateModal({ live, kind, row, onClose }: Readonly<{ live: Live; k
   const c = live.certificates;
   const renew = kind === "renew" && row?.cert;
   const [form, setForm] = useState<CertForm>({
-    membershipId: row?.technicianId ?? c.people.find((p) => p.active)?.id ?? "", code: row?.code ?? "demo_indoor", name: row?.name ?? c.codes[0].text,
+    membershipId: row?.technicianId ?? c.people.find((p) => p.active)?.id ?? "", code: row?.code ?? "demo_indoor", name: row?.name ?? c.codes[0]?.text ?? "",
     number: "", issued: "", expires: "", file: null,
   });
   const [file, setFile] = useState<File | null>(null);

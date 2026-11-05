@@ -1,9 +1,10 @@
 import type { ApiMeasurement } from "@ac/web/lib/air";
 import { runState } from "@ac/web/lib/units";
+import type { NonEmpty } from "@ac/web/lib/lists";
 
 export interface UnitRow { id: string; name: string; loc: string; obs: string; temp: number | null; hum: number | null; power: number | null; state: "running" | "stopped" | "unknown"; conn: "online" | "offline" }
 
-export const units: UnitRow[] = [
+export const units: NonEmpty<UnitRow> = [
   { id: "unit-online-rto", name: "Bedroom AC", loc: "Home A › 1F › Bedroom", obs: "09:12", temp: 28, hum: 60, power: 680, state: "running", conn: "online" },
   { id: "unit-bedroom-2", name: "Bedroom AC #2", loc: "Home A › 1F › Bedroom", obs: "09:12", temp: 27, hum: 58, power: 0, state: "stopped", conn: "online" },
   { id: "unit-non-rto", name: "Living room AC", loc: "Home A › 1F › Living room", obs: "09:11", temp: 26.5, hum: 55, power: 510, state: "running", conn: "online" },

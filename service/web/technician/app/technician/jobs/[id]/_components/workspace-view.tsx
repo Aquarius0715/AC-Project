@@ -132,8 +132,8 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
   }, [draft, dirty, isEditable, pending]);
   const withSaved = (fn: (r: Rep) => void) => { if (dirty || !rep) save(fn); else fn(rep); };
   const addPhotos = (files: FileList | null) => {
-    if (!files?.length) return;
-    const file = files[0];
+    const file = files?.[0];
+    if (!file) return;
     if (!["image/jpeg", "image/png"].includes(file.type) || file.size > MAX_BYTES || photos.length >= MAX_PHOTOS) {
       setPhotoError(t("“{name}” was not added — only JPEG/PNG up to 5 MiB, max {max} photos. Saved text and photos are kept.", { name: file.name, max: MAX_PHOTOS }));
       return;
@@ -349,7 +349,7 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
             {(isInWork || live.report) && (
               <div className="mt-2 flex flex-col gap-3">
                 <Field label={t("Work performed & next action (10–4000 characters)")}>{isEditable ? <Textarea value={draft.workText} maxLength={4000} className="min-h-[110px]" onChange={(e) => { edit((d) => ({ ...d, workText: e.target.value })); }} /> : <p className="font-normal">{draft.workText || "—"}</p>}</Field>
-                <p className="text-[13px] font-semibold">{t(draft.parts.length === 1 ? "Replacement parts: 1 line" : "Replacement parts: {n} lines", { n: draft.parts.length })}{draft.refrigerant.length > 0 ? ` · ${draft.refrigerant[0].refrigerant} ${netSign}${Math.abs(netKg).toFixed(2)} kg` : ""} <Plain type="button" className="text-xs text-primary" onClick={() => { setView("parts"); }}>{t("(see Parts & refrigerant)")}</Plain></p>
+                <p className="text-[13px] font-semibold">{t(draft.parts.length === 1 ? "Replacement parts: 1 line" : "Replacement parts: {n} lines", { n: draft.parts.length })}{draft.refrigerant.length > 0 ? ` · ${draft.refrigerant[0]?.refrigerant ?? ""} ${netSign}${Math.abs(netKg).toFixed(2)} kg` : ""} <Plain type="button" className="text-xs text-primary" onClick={() => { setView("parts"); }}>{t("(see Parts & refrigerant)")}</Plain></p>
                 <div>
                   <p className="mb-1 text-xs font-semibold">{t("Photos (JPEG/PNG, ≤5 MiB, ≤{max})", { max: MAX_PHOTOS })}</p>
                   <div className="flex flex-wrap gap-2">
@@ -463,7 +463,7 @@ function CantMakeModal({ open, pending, zone, onClose, onSend }: Readonly<{ open
   const [error, setError] = useState<string | null>(null);
   const send = () => {
     if (reason.trim().length === 0) { setError(t("Tell your coordinator why (1–1000 characters)")); return; }
-    const [from, to] = window.split("-", 2);
+    const [from = "", to = ""] = window.split("-", 2);
     onSend(reason.trim(), date ? { startAt: zonedInstant(date, from, zone), endAt: zonedInstant(date, to, zone) } : null); // typed in the display time zone (NFR-08)
   };
   return (
@@ -576,7 +576,7 @@ function SignModal({ open, pending, summary, onClose, onSign }: Readonly<{ open:
       form.set("absentReason", reason.trim()); form.set("sitePhoto", photo);
     } else {
       if (!drawn || !canvas.current) { setError(t("Ask the customer to sign in the box")); return; }
-      form.set("signature", canvas.current.toDataURL("image/png").split(",", 2)[1]);
+      form.set("signature", canvas.current.toDataURL("image/png").split(",", 2)[1] ?? "");
     }
     setError(null);
     onSign(form);

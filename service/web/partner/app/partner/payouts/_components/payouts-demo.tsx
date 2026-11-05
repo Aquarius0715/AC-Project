@@ -4,12 +4,13 @@
 
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, DataTable, Field, Kpi, ListRow, Modal, Page, Select, SummaryList, Textarea, useToast } from "@ac/web/components/ui";
+import { nonEmpty } from "@ac/web/lib/lists";
 
-const statements = [
+const statements = nonEmpty([
   { id: "stmt-2026-09", period: "September 2026", st: "Approved", total: "1,990.00 MYR", pay: "Pays 10-15" },
   { id: "stmt-2026-08", period: "August 2026", st: "Paid", total: "1,760.00 MYR", pay: "Paid 09-15" },
   { id: "stmt-2026-07", period: "July 2026", st: "Paid", total: "2,040.00 MYR", pay: "Paid 08-15" },
-];
+]);
 const lines = [
   { job: "job-contractor-a", d: "Repair · Bedroom AC", amt: "450.00", note: "" },
   { job: "job-p02", d: "Periodic inspection · unit-p-rooftop", amt: "380.00", note: "" },

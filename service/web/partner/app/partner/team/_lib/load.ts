@@ -8,7 +8,7 @@
 // formatted here, on the server (IR276).
 import "server-only";
 import { coreAll, coreDisplay, coreIdentity, coreNow, coreOp, corePrincipal, orWhenRefused, coreItems } from "@ac/web/lib/dal";
-import { i18nOf, showDay, showSpan } from "@ac/web/lib/i18n";
+import { i18nOf, showDay, showSpan, textOf } from "@ac/web/lib/i18n";
 import { klDay, weekOf, type ApiCapacity, type ApiPartnerJob } from "@ac/web/lib/partnerOverview";
 import { qualificationLabel, requiredFor } from "@ac/web/lib/partnerJobDetail";
 import { activeNow, grantRows, KL, listed, memberRows, QUALIFICATION_CODES, technicianNames, teamQuery, teamStats, UNAVAILABILITY_TYPES, unavailabilityRows, weekday, weekRows, type ApiTeamMember, type ApiUnavailability, type TeamJob } from "@ac/web/lib/partnerTeam";
@@ -82,7 +82,7 @@ export async function loadTeam(sp: TeamParams) {
       query: cq, rows: everyRow.filter((r) => !cq.status || r.status === cq.status), kpis: certKpis(everyRow, certs, cq.within, t), impact: impact(everyRow, certJobs, t),
       people: members.map((m) => ({ id: m.id, name: m.displayName, active: activeNow(m, nowMs) })),
       windows: WINDOWS.map((w) => ({ value: String(w), text: t("{n} days", { n: w }) })),
-      statuses: CERT_STATUSES.map((x) => ({ value: x, text: t(STATUS_TEXT[x]) })),
+      statuses: CERT_STATUSES.map((x) => ({ value: x, text: textOf(STATUS_TEXT, x, t) ?? x })),
       codes: [...QUALIFICATION_CODES, "other" as const].map((code) => ({ code, text: code === "other" ? t("Other") : qualificationLabel(code, t) })),
     },
   };

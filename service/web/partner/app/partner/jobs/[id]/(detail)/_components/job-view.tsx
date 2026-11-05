@@ -211,7 +211,7 @@ function DetailView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "d
                     [t("Connection"), x.seen ? t("{state} · seen {time}", { state: connection, time: x.seen }) : connection],
                   ]} />
                   <SummaryList items={[
-                    [t("Open alerts"), live.alerts.length > 0 ? <span key="a" className="text-crit">{live.alerts.length} · {alertTitle(live.alerts[0], t)}</span> : t("none")],
+                    [t("Open alerts"), live.alerts.length > 0 ? <span key="a" className="text-crit">{live.alerts.length} · {live.alerts[0] ? alertTitle(live.alerts[0], t) : ""}</span> : t("none")],
                     [t("Last reading"), reading ? `${reading.metric.replaceAll('_', " ")} ${String(reading.value ?? "—")} ${reading.unit}` : "—"],
                     [t("Maintenance scope"), u.serviceScope.map((s) => (textOf(scopeLabel, s, t) ?? s)).join(" · ")],
                   ]} />

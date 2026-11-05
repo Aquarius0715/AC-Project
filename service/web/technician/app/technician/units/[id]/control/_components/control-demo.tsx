@@ -16,7 +16,7 @@ export function ControlDemo({ id }: Readonly<{ id: string }>) {
   const [trReason, setTrReason] = useState("Verify cooling recovers after coil clean.");
   const [confirm, setConfirm] = useState<null | "cmd" | "test">(null);
   const [errs, setErrs] = useState<string[]>([]);
-  const [hist, setHist] = useState([["09:41", "test run start (Power ON, 5 min)", "cmd-0418 · acknowledged 09:41:03 · ends 09:46"], ["09:40", "set_mode = cool", "cmd-0417 · acknowledged 09:40:02 · mode confirmed by device"], ["09:32", "set_temperature = 15 °C", "cmd-0416 · rejected — below model minimum 16 °C (VALIDATION)"], ["09:30", "read state", "cmd-0415 · acknowledged 09:30:01"]]);
+  const [hist, setHist] = useState<[string, string, string][]>([["09:41", "test run start (Power ON, 5 min)", "cmd-0418 · acknowledged 09:41:03 · ends 09:46"], ["09:40", "set_mode = cool", "cmd-0417 · acknowledged 09:40:02 · mode confirmed by device"], ["09:32", "set_temperature = 15 °C", "cmd-0416 · rejected — below model minimum 16 °C (VALIDATION)"], ["09:30", "read state", "cmd-0415 · acknowledged 09:30:01"]]);
   const [run, setRun] = useState<"running" | "ended" | null>("running");
   const check = (kind: "cmd" | "test") => {
     const e: string[] = [];

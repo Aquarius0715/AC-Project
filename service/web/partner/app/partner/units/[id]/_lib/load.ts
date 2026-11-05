@@ -67,7 +67,7 @@ export async function loadUnit(id: string, jobId?: string) {
     past: pastWork(jobs, i),
     alerts: evidenceRows(alerts, i),
     readings: readingRows(d, i),
-    charts: metrics.map((m, k) => chart(m, unitOf(m), points[k], nowMs, i)),
+    charts: metrics.map((m, k) => chart(m, unitOf(m), points[k] ?? [], nowMs, i)),
     window: showSpan(new Date(nowMs - 86_400_000).toISOString(), now.toISOString(), display),
     id,
   };

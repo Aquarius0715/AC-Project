@@ -50,7 +50,7 @@ export async function loadPayouts(options: { statementId?: string; period?: stri
       if (!j) return null;
       const unit = j.projection === "detail" ? await unitName(j.unitId, units) : null;
       const closed = j.projection === "history" ? t("customer details closed with the delegation") : null;
-      return [jobId, { title: `${typeLabel(j.type, t)}${unit ? ` · ${unit.split(" · ", 1)[0]}` : ""}`, sub: unit ? unit.split(" · ").slice(1).join(" · ") || null : closed }];
+      return [jobId, { title: `${typeLabel(j.type, t)}${unit ? ` · ${unit.split(" · ", 1)[0] ?? unit}` : ""}`, sub: unit ? unit.split(" · ").slice(1).join(" · ") || null : closed }];
     })),
     Promise.all((reviewing?.items ?? []).filter((j) => j.projection === "detail" || j.projection === "summary").slice(0, 10).map(async (j): Promise<ReviewingJob> => {
       const name = await unitName(j.unitId, units);
