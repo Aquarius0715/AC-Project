@@ -9,6 +9,8 @@ import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePermissions, CoreEr
 import { i18nOf } from "@ac/web/lib/i18n";
 import { adminAlertRows, policyRows, type AlertState, type ApiAdminAlert, type ApiCustomerName, type ApiMemberName, type ApiPolicy, type ApiUnitName, type Severity } from "@ac/web/lib/adminAlerts";
 import { NeedsAccess } from "@ac/web/components/NeedsAccess";
+
+const ASSET_READ = "asset.read";
 import { AdminAlertsView } from "./_components/alerts-view";
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
@@ -47,9 +49,9 @@ export default async function AdminAlertsPage({ searchParams }: Readonly<PagePro
   const [now, perms, display, alertsRead, unitsRead, customersRead, propertiesRead, policiesRead, members, defaultsRead] = await Promise.all([
     coreNow(), corePermissions(), coreDisplay(),
     need(coreOp<Page<ApiAdminAlert>>("alerts.list", { limit: 100, filters }), "alert.read"), // every status in the scope: the tiles count them
-    need(coreAllPage<ApiUnitName & { propertyId: string; archived?: boolean }>("units.list"), "asset.read"),
-    need(coreAllPage<ApiCustomerName & { status?: "active" | "inactive" }>("customers.list"), "asset.read"),
-    need(coreAll<{ id: string; name: string; customerOrgId: string }>("properties.list"), "asset.read"),
+    need(coreAllPage<ApiUnitName & { propertyId: string; archived?: boolean }>("units.list"), ASSET_READ),
+    need(coreAllPage<ApiCustomerName & { status?: "active" | "inactive" }>("customers.list"), ASSET_READ),
+    need(coreAll<{ id: string; name: string; customerOrgId: string }>("properties.list"), ASSET_READ),
     need(coreAllPage<ApiPolicy>("policies.list", { filters: scope }), "alert.policy.read"),
     optional(coreAllPage<ApiMemberName>("members.list"), { items: [], total: 0 }),
     need(coreOp<Page<ApiPolicy>>("policies.list", { limit: 1, filters: { kind: "default_alert" } }), "alert.policy.read"),

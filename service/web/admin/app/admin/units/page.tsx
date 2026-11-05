@@ -25,6 +25,9 @@ import {
 import { UnitsDemo } from "./_components/units-demo";
 import { UnitsView, type CustomerLive, type UnitLive, type UnitsLive } from "./_components/units-view";
 import { queryReader } from "@ac/web/lib/searchParams";
+
+const RESTRICTION_READ = "restriction.read";
+const DEVICE_READ = "device.read";
 import { orNull } from "@ac/web/lib/promises";
 
 interface Audit { occurredAt: string; actorId: string; reason: string | null }
@@ -46,8 +49,8 @@ export default async function AdminUnitsPage({ searchParams }: Readonly<PageProp
   const { t } = i;
   const has = (...p: string[]) => p.some((x) => perms.has(x));
   if (!has("asset.read")) return <UnitsView live={null} />;
-  const canContracts = has("contract.read", "billing.read", "restriction.read");
-  const canInvoices = has("billing.read", "restriction.read");
+  const canContracts = has("contract.read", "billing.read", RESTRICTION_READ);
+  const canInvoices = has("billing.read", RESTRICTION_READ);
   const [active, inactive, orgs, properties, units, contracts, overdue, restrictions, members] = await Promise.all([
     coreAll<ApiCustomerRow>("customers.list", { filters: { status: "active" } }),
     coreAll<ApiCustomerRow>("customers.list", { filters: { status: "inactive" } }),
@@ -56,7 +59,7 @@ export default async function AdminUnitsPage({ searchParams }: Readonly<PageProp
     coreAll<ApiUnitRow>("units.list"),
     canContracts ? coreAll<ApiContractLite>("contracts.list") : Promise.resolve(null),
     canInvoices ? coreAll<ApiInvoiceLite>("invoices.list", { filters: { overdueOnly: true } }) : Promise.resolve(null),
-    has("restriction.read") ? coreAll<ApiRestrictionLite>("restrictions.list") : Promise.resolve(null),
+    has(RESTRICTION_READ) ? coreAll<ApiRestrictionLite>("restrictions.list") : Promise.resolve(null),
     has("identity.read") ? coreAll<Member>("members.list") : Promise.resolve([] as Member[]),
   ]);
   const standingOf = (c: ApiCustomerRow) => (contracts && overdue ? standing(c.id, contracts, overdue, restrictions, now) : null);
@@ -92,7 +95,7 @@ export default async function AdminUnitsPage({ searchParams }: Readonly<PageProp
   const unitId = one("unitId");
   const [spaces, caps, policies, openAlerts, detail] = await Promise.all([
     Promise.all(props.map((p) => coreAll<ApiSpaceRow>("spaces.list", { filters: { propertyId: p.id } }))).then((x) => x.flat()),
-    has("dashboard.read", "device.read") ? coreAll<ApiCapability>("capabilities.list") : Promise.resolve([] as ApiCapability[]),
+    has("dashboard.read", DEVICE_READ) ? coreAll<ApiCapability>("capabilities.list") : Promise.resolve([] as ApiCapability[]),
     canPolicies ? coreAll<ApiCustomerPolicy>("policies.list", { filters: { customerId: cust.id } }) : Promise.resolve(null),
     has("alert.read", "alert.policy.read")
       ? Promise.all((["open", "acknowledged"] as const).map((status) => coreAll<Alert>("alerts.list", { filters: { customerId: cust.id, status } }))).then((x) => x.flat())
@@ -154,7 +157,7 @@ async function unitLive(d: ApiUnitDetail, x: Ctx): Promise<UnitLive> {
   interface Job { projection: "summary"; id: string; type: string; status: string }
   const [jobs, devices, archived] = await Promise.all([
     x.has("job.read") && !d.archived ? coreAll<Job>("jobs.list", { filters: { unitId: d.id } }) : Promise.resolve(null),
-    x.has("device.read") ? coreAll<Device>("devices.list", { filters: { unitId: d.id } }) : Promise.resolve(null),
+    x.has(DEVICE_READ) ? coreAll<Device>("devices.list", { filters: { unitId: d.id } }) : Promise.resolve(null),
     d.archived && x.has("audit.read")
       ? coreOp<{ items: Audit[] }>("audit.list", { limit: 1, filters: { targetKind: "unit", targetId: d.id, action: "units.archive", from: new Date(x.now.getTime() - 365 * day).toISOString(), to: new Date(x.now.getTime() + day).toISOString() } }).then((p) => p.items[0] ?? null)
       : Promise.resolve(null),
@@ -190,7 +193,7 @@ async function unitLive(d: ApiUnitDetail, x: Ctx): Promise<UnitLive> {
     model: `${modelLabel(d, x.models)} · split`,
     device: device ? { id: device.id, serial: device.serial, connection: device.connection } : null,
     deviceKnown: devices !== null,
-    blockers: x.has("job.read", "device.read") || x.contracts ? blockers : null,
+    blockers: x.has("job.read", DEVICE_READ) || x.contracts ? blockers : null,
     archivedNote: d.archived ? archivedText() : null,
     seen: d.lastSeenAt ? relativeTime(d.lastSeenAt, nowMs, x.i) : null,
     attached,
@@ -201,7 +204,7 @@ async function unitLive(d: ApiUnitDetail, x: Ctx): Promise<UnitLive> {
 replaced parts can still be claimed from the manufacturer (job.read for the parts, job.write to file the claim). */
 async function warrantyLive(coverage: ApiCoverage[], x: { has: (...p: string[]) => boolean; units: ApiUnitRow[]; properties: ApiPropertyRow[]; rows: { id: string; name: string }[]; contracts: ApiContractLite[] | null; i: I18n }) {
   const { t, display } = x.i;
-  const caps = x.has("dashboard.read", "device.read") ? await coreAll<ApiCapability>("capabilities.list") : [];
+  const caps = x.has("dashboard.read", DEVICE_READ) ? await coreAll<ApiCapability>("capabilities.list") : [];
   const unit = new Map(x.units.map((u) => [u.id, u]));
   const propertyRow = new Map(x.properties.map((p) => [p.id, p.name]));
   const customer = new Map(x.rows.map((r) => [r.id, r.name]));
