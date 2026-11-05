@@ -20,26 +20,31 @@ export interface ApiMember {
 }
 export interface ApiOrganization { id: string; name: string; kind: "customer" | "contractor" | "operator"; status: string }
 
+const IDENTITY_WRITE = "identity.write";
+const DEVICE_MAINTAIN = "device.maintain";
+const CONTROL_DIAGNOSE = "control.diagnose";
+const RESTRICTION_OVERRIDE = "restriction.override";
+const PARTNER_ACTIONS = ["partner.accept", "partner.assign", "partner.review"];
 /** The permission matrix: one row per resource with Read / Write and independent actions (IR107). */
 export interface PermissionRow { res: string; read?: string; write?: string; actions?: string[] }
 export const permissionRows: PermissionRow[] = [
   { res: "Dashboard", read: "dashboard.read" },
   { res: "Customers & units", read: "asset.read", write: "asset.write" },
-  { res: "Users & roles", read: "identity.read", write: "identity.write" },
-  { res: "Devices & models", read: "device.read", write: "device.write", actions: ["device.maintain"] },
-  { res: "AC control", actions: ["control.execute", "control.diagnose"] },
+  { res: "Users & roles", read: "identity.read", write: IDENTITY_WRITE },
+  { res: "Devices & models", read: "device.read", write: "device.write", actions: [DEVICE_MAINTAIN] },
+  { res: "AC control", actions: ["control.execute", CONTROL_DIAGNOSE] },
   { res: "Alerts", read: "alert.read", actions: ["alert.resolve"] },
   { res: "Alert policies", read: "alert.policy.read", write: "alert.policy.write" },
   { res: "Maintenance jobs", read: "job.read", write: "job.write" },
   { res: "Contracts", read: "contract.read", write: "contract.write" },
   { res: "Billing", read: "billing.read", write: "billing.write", actions: ["billing.payment"] },
-  { res: "Restrictions", read: "restriction.read", write: "restriction.write", actions: ["restriction.override"] },
+  { res: "Restrictions", read: "restriction.read", write: "restriction.write", actions: [RESTRICTION_OVERRIDE] },
   { res: "Automation policies", read: "automation.policy.read", write: "automation.policy.write" },
   { res: "Energy", read: "energy.read", write: "energy.write" },
   { res: "MRV", read: "mrv.read", write: "mrv.write", actions: ["mrv.review", "mrv.factors"] },
   { res: "Offsets", read: "offset.read", write: "offset.write" },
   { res: "Audit", read: "audit.read" },
-  { res: "Partners", actions: ["partner.accept", "partner.assign", "partner.review"] },
+  { res: "Partners", actions: [...PARTNER_ACTIONS] },
 ];
 /** A matrix resource as the screen words it. */
 export function resourceWord(res: string, t: T = en): string {
@@ -59,13 +64,13 @@ export const roleWord = (role: Role, employment: ApiMember["employment"], t: T =
 export const allPermissions = permissionRows.flatMap((r) => [r.read, r.write, ...(r.actions ?? [])].filter((p): p is string => !!p));
 /** Permissions each role may hold (members.save rules). */
 export const allowedFor: Record<Role, string[]> = {
-  admin: allPermissions, contractor: ["partner.accept", "partner.assign", "partner.review"], technician: ["alert.read", "alert.resolve", "control.diagnose", "device.maintain"],
+  admin: allPermissions, contractor: [...PARTNER_ACTIONS], technician: ["alert.read", "alert.resolve", CONTROL_DIAGNOSE, DEVICE_MAINTAIN],
 };
 /** The defaults a role choice pre-checks; every permission stays editable within the role's allowed set. */
-const adminDefaults = allPermissions.filter((p) => !["partner.accept", "partner.assign", "partner.review", "device.maintain", "control.diagnose", "restriction.write", "restriction.override", "identity.write"].includes(p));
+const adminDefaults = allPermissions.filter((p) => ![...PARTNER_ACTIONS, DEVICE_MAINTAIN, CONTROL_DIAGNOSE, "restriction.write", RESTRICTION_OVERRIDE, IDENTITY_WRITE].includes(p));
 export const roleDefaults: Record<Role, string[]> = { admin: adminDefaults, contractor: allowedFor.contractor, technician: allowedFor.technician };
 /** Granting these to one's own user is FORBIDDEN (another identity administrator must do it). */
-export const selfBlocked = ["identity.write", "restriction.override"];
+export const selfBlocked = [IDENTITY_WRITE, RESTRICTION_OVERRIDE];
 
 export const isActive = (m: Pick<ApiMember, "validFrom" | "validUntil">, now: Date) => Date.parse(m.validFrom) <= now.getTime() && (!m.validUntil || Date.parse(m.validUntil) > now.getTime());
 
