@@ -7,9 +7,10 @@ import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { randomId } from "@ac/web/lib/randomId";
 import {
-  actionText, autoDraft, autoErrors, autoInput, conditionText, decisionWord, disabledReasonWord, evaluationInput, factOf, reasonWord, subjectText,
+  acModes, actionKinds, actionText, autoDraft, autoErrors, autoInput, conditionText, decisionWord, disabledReasonWord, evaluationInput, factOf, factQualities, fanLevels, reasonWord, subjectText,
   type ApiAutoPolicy, type AutoCondition, type AutoDraft, type Compare, type FactRow, type PolicyGroup,
 } from "@ac/web/lib/automation";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { fireAuto, saveAutoPolicy, simulateAuto } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
 
@@ -118,18 +119,18 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
                 <Choice value={d.type} onChange={(type) => { set({ type }); }} options={[{ id: "occupancy", label: t("Occupancy") }, { id: "tariff", label: t("Tariff") }, { id: "peak", label: t("Peak") }, { id: "solar", label: t("Solar") }, { id: "battery", label: t("Battery") }]} />
                 <div className="mt-2 flex flex-wrap items-end gap-2 text-[13px]">
                   {d.type === "occupancy" || d.type === "peak" ? <Select aria-label={t("Condition")} className="w-auto" value={String(d.flag)} onChange={(e) => { set({ flag: e.target.value === "true" }); }}><option value="true">{t(d.type === "occupancy" ? "When the room is occupied" : "When a peak period is active")}</option><option value="false">{t(d.type === "occupancy" ? "When the room is not occupied" : "When no peak period is active")}</option></Select>
-                    : <><span className="pb-2">{subjectText(d.type, t)}</span><Select aria-label={t("Comparison")} className="w-auto" value={d.operator} onChange={(e) => { set({ operator: e.target.value as Compare }); }}>{compares.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</Select><div className="w-24"><Field label="" error={fieldError("value")}><Input aria-label={t("Value")} type="number" step="0.1" value={d.value} onChange={(e) => { set({ value: e.target.value }); }} /></Field></div><span className="pb-2">{d.type === "tariff" ? "MYR / kWh" : "kW"}</span></>}
+                    : <><span className="pb-2">{subjectText(d.type, t)}</span><Select aria-label={t("Comparison")} className="w-auto" value={d.operator} onChange={(e) => { set({ operator: oneOf(compares.map((c) => c.id), e.target.value, d.operator) }); }}>{compares.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</Select><div className="w-24"><Field label="" error={fieldError("value")}><Input aria-label={t("Value")} type="number" step="0.1" value={d.value} onChange={(e) => { set({ value: e.target.value }); }} /></Field></div><span className="pb-2">{d.type === "tariff" ? "MYR / kWh" : "kW"}</span></>}
                 </div>
               </section>
               <section>
                 <h3 className="mb-1 text-[13px] font-bold">{t("Then")}</h3>
                 <p className="mb-2 text-xs text-muted-foreground">{t("Only actions every target unit supports, and that no active restriction blocks, can run.")}</p>
                 <div className="flex flex-wrap items-end gap-2 text-[13px]">
-                  <Select aria-label={t("Action")} className="w-auto" value={d.actionKind} onChange={(e) => { set({ actionKind: e.target.value as AutoDraft["actionKind"] }); }}><option value="set_temperature">{t("Set the temperature")}</option><option value="set_power">{t("Set the power")}</option><option value="set_mode">{t("Set the mode")}</option><option value="set_fan">{t("Set the fan")}</option><option value="ventilate">{t("Ventilate")}</option></Select>
+                  <Select aria-label={t("Action")} className="w-auto" value={d.actionKind} onChange={(e) => { set({ actionKind: oneOf(actionKinds, e.target.value, d.actionKind) }); }}><option value="set_temperature">{t("Set the temperature")}</option><option value="set_power">{t("Set the power")}</option><option value="set_mode">{t("Set the mode")}</option><option value="set_fan">{t("Set the fan")}</option><option value="ventilate">{t("Ventilate")}</option></Select>
                   {d.actionKind === "set_temperature" && <><div className="w-24"><Field label="" error={fieldError("celsius")}><Input aria-label={t("Temperature (°C)")} type="number" value={d.celsius} onChange={(e) => { set({ celsius: e.target.value }); }} /></Field></div><span className="pb-2">°C {range ? t("(targets allow {min}–{max} °C)", { min: range.min, max: range.max }) : ""}</span></>}
                   {d.actionKind === "set_power" && <Select aria-label={t("Power")} className="w-auto" value={String(d.power)} onChange={(e) => { set({ power: e.target.value === "true" }); }}><option value="false">{t("off")}</option><option value="true">{t("on")}</option></Select>}
-                  {d.actionKind === "set_mode" && <Select aria-label={t("Mode")} className="w-auto" value={d.mode} onChange={(e) => { set({ mode: e.target.value as AutoDraft["mode"] }); }}><option value="cool">{t("cool")}</option><option value="dry">{t("dry")}</option><option value="fan">{t("fan")}</option></Select>}
-                  {(d.actionKind === "set_fan" || d.actionKind === "ventilate") && <Select aria-label={t("Level")} className="w-auto" value={d.level} onChange={(e) => { set({ level: e.target.value as AutoDraft["level"] }); }}><option value="low">{t("low")}</option><option value="mid">{t("mid")}</option><option value="high">{t("high")}</option></Select>}
+                  {d.actionKind === "set_mode" && <Select aria-label={t("Mode")} className="w-auto" value={d.mode} onChange={(e) => { set({ mode: oneOf(acModes, e.target.value, d.mode) }); }}><option value="cool">{t("cool")}</option><option value="dry">{t("dry")}</option><option value="fan">{t("fan")}</option></Select>}
+                  {(d.actionKind === "set_fan" || d.actionKind === "ventilate") && <Select aria-label={t("Level")} className="w-auto" value={d.level} onChange={(e) => { set({ level: oneOf(fanLevels, e.target.value, d.level) }); }}><option value="low">{t("low")}</option><option value="mid">{t("mid")}</option><option value="high">{t("high")}</option></Select>}
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">{conditionText(preview.condition, t)} → {actionText(preview.action, t)}.</p>
               </section>
@@ -150,9 +151,9 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
                 return (
                   <tr key={i} className="border-t border-line">
                     <td className="py-2 pr-2"><Select aria-label={t("Unit")} value={f.unitId} onChange={(e) => { editFact(i, { unitId: e.target.value }); }}>{sel.unitIds.map((u) => <option key={u} value={u}>{name(u)}</option>)}</Select></td>
-                    <td className="pr-2"><Select aria-label={t("Fact")} value={f.kind ?? d.type} onChange={(e) => { editFact(i, { kind: e.target.value as AutoCondition["type"], value: "" }); }}>{kinds.map((k) => <option key={k.id} value={k.id}>{k.label} · {factOf[k.id].metric}</option>)}</Select></td>
+                    <td className="pr-2"><Select aria-label={t("Fact")} value={f.kind ?? d.type} onChange={(e) => { editFact(i, { kind: oneOf(kinds.map((k) => k.id), e.target.value, f.kind ?? d.type), value: "" }); }}>{kinds.map((k) => <option key={k.id} value={k.id}>{k.label} · {factOf[k.id].metric}</option>)}</Select></td>
                     <td className="pr-2">{fact.boolean ? <Select aria-label={t("Value")} value={f.value} onChange={(e) => { editFact(i, { value: e.target.value }); }}><option value="">{t("— no reading")}</option><option value="true">{t("true")}</option><option value="false">{t("false")}</option></Select> : <Input aria-label={t("Value")} type="number" step="0.1" value={f.value} placeholder={t("— no reading")} onChange={(e) => { editFact(i, { value: e.target.value }); }} />}</td>
-                    <td className="pr-2"><Select aria-label={t("Quality")} value={f.quality} onChange={(e) => { editFact(i, { quality: e.target.value as FactRow["quality"] }); }}><option value="valid">{t("valid")}</option><option value="stale">{t("stale")}</option><option value="suspect">{t("suspect")}</option><option value="missing">{t("missing")}</option></Select></td>
+                    <td className="pr-2"><Select aria-label={t("Quality")} value={f.quality} onChange={(e) => { editFact(i, { quality: oneOf(factQualities, e.target.value, f.quality) }); }}><option value="valid">{t("valid")}</option><option value="stale">{t("stale")}</option><option value="suspect">{t("suspect")}</option><option value="missing">{t("missing")}</option></Select></td>
                     <td><Plain aria-label={t("Remove the fact")} className="text-muted-foreground hover:text-crit" onClick={() => { removeFact(i); }}><Icon name="close" /></Plain></td>
                   </tr>
                 );

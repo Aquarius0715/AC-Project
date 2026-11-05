@@ -15,6 +15,11 @@ export type AutoCondition =
 export type UnitAction =
   | { kind: "set_power"; power: boolean } | { kind: "set_temperature"; celsius: number } | { kind: "set_mode"; mode: "cool" | "dry" | "fan" }
   | { kind: "set_fan"; fanLevel: "low" | "mid" | "high" } | { kind: "ventilate"; level: "low" | "mid" | "high" };
+/** What a form control can choose, in the order the screen lists it. */
+export const actionKinds = ["set_power", "set_temperature", "set_mode", "set_fan", "ventilate"] as const satisfies readonly UnitAction["kind"][];
+export const acModes = ["cool", "dry", "fan"] as const;
+export const fanLevels = ["low", "mid", "high"] as const;
+export const factQualities = ["valid", "missing", "stale", "suspect"] as const;
 /** Policy (kind automation) of service-contracts.ts. */
 export interface ApiAutoPolicy {
   id: string; version: number; kind: "automation"; name: string; unitIds: string[]; ownerMembershipId: string; timezone: string; enabled: boolean; priority: number;
