@@ -150,7 +150,7 @@ function JobDetail({ d, open, onDone, onFail }: Readonly<{ d: Detail; open: (m: 
           <p className="mt-3 text-[13px] font-bold">{t("Completed report")} {d.report ? <span className="text-xs font-normal text-muted-foreground">v{d.report.version}{d.report.accepted ? t(" · accepted {when}", { when: d.report.accepted }) : ""}</span> : <span className="text-xs font-normal text-muted-foreground">{t("visible once HQ accepts it")}</span>}</p>
           {d.report && (
             <>
-              <ul className="divide-y divide-line">{d.report.items.filter((i) => i.tone !== "ok").map((i) => <li key={i.id} className="flex items-center justify-between gap-2 py-1 text-[13px]"><span>{i.label}{i.reason && <span className="text-xs text-muted-foreground"> · {i.reason}</span>}</span><Badge tone={i.tone as "ok"}>{i.result}</Badge></li>)}</ul>
+              <ul className="divide-y divide-line">{d.report.items.filter((i) => i.tone !== "ok").map((i) => <li key={i.id} className="flex items-center justify-between gap-2 py-1 text-[13px]"><span>{i.label}{i.reason && <span className="text-xs text-muted-foreground"> · {i.reason}</span>}</span><Badge tone={i.tone}>{i.result}</Badge></li>)}</ul>
               <p className="mt-1 text-xs text-muted-foreground">{t("{n} checks OK", { n: d.report.items.filter((i) => i.tone === "ok").length })}{d.report.parts.length > 0 ? t(" · parts: {parts}", { parts: d.report.parts.join(", ") }) : t(" · no parts replaced")}</p>
               {d.report.readings.length > 0 && <div className="mt-2"><SummaryList items={d.report.readings} /></div>}
               {d.report.workText && <p className="mt-2 text-xs">{d.report.workText}</p>}
