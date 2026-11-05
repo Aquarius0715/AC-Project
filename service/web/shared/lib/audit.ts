@@ -5,8 +5,8 @@
 // correlation IDs, field names, event types and evidence sources stay codes (IR304, IR320).
 import { EN, relativeTime, showTime, translator, zonedInstant, zonedParts, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import type { OpInput } from "@ac/web/lib/opTypes";
-import type { AuditView } from "@ac/web/lib/contracts.gen";
-import { stateWord, states, type RestrictionState } from "@ac/web/lib/restrictions";
+import { stateWord, states } from "@ac/web/lib/restrictions";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { eventCause, eventRows, type ApiAlertLite, type ApiDeviceEventFull } from "@ac/web/lib/techDevices";
 import { byText } from "@ac/web/lib/order";
 
@@ -28,7 +28,9 @@ export interface ApiAudit {
 export interface AuditFilters { from: string; to: string; actorId: string; targetKind: string; targetId: string; correlationId: string; result: AuditResult | "All"; limit: number }
 
 const KL = "Asia/Kuala_Lumpur";
-const results: AuditResult[] = ["Success", "Denied", "Failed", "Pending"];
+/** The API's result and the word the screen files it under. */
+const RESULT_WORDS: [ApiAudit["result"], AuditResult][] = [["success", "Success"], ["denied", "Denied"], ["failed", "Failed"], ["pending", "Pending"]];
+const results = RESULT_WORDS.map(([, word]) => word);
 /** A result as the screen words it. */
 export const resultWord = (r: string, t: T = en) => ({ Success: t("Success"), Denied: t("Denied"), Failed: t("Failed"), Pending: t("Pending") })[r] ?? r;
 /** The badge tone of a result. */
@@ -37,7 +39,7 @@ export const resultTone = (r: AuditResult) => RESULT_TONE.get(r) ?? "primary";
 /** The role an entry recorded, worded (it is never rewritten). */
 export const roleAtTimeWord = (r: string, t: T = en) =>
   ({ admin: t("Admin"), contractor: t("Contractor"), technician: t("Technician"), client: t("Client"), system: t("System") })[r] ?? r;
-const resultOf = (r: ApiAudit["result"]) => (r.charAt(0).toUpperCase() + r.slice(1)) as AuditResult;
+const resultOf = (r: ApiAudit["result"]): AuditResult => RESULT_WORDS.find(([wire]) => wire === r)?.[1] ?? "Pending";
 
 /** The screen's filters from the URL; the default period is the 30 days up to the Core API business clock, as days of the display time zone. */
 export function auditFilters(sp: Record<string, string | string[] | undefined>, now: Date, zone = KL): AuditFilters {
@@ -49,7 +51,7 @@ export function auditFilters(sp: Record<string, string | string[] | undefined>, 
     from: one("from") || day(now.getTime() - 30 * 86_400_000),
     to: one("to") || day(now.getTime() + 86_400_000),
     actorId: one("actorId"), targetKind: one("targetKind"), targetId: one("targetId"), correlationId: one("correlationId"),
-    result: (results as string[]).includes(res) ? (res as AuditResult) : "All",
+    result: oneOf(results, res, "All"),
     limit,
   };
 }
@@ -66,6 +68,7 @@ export const periodInstants = (f: Pick<AuditFilters, "from" | "to">, zone = KL) 
 
 /** audit.list input for the filters. */
 export function auditQuery(f: AuditFilters, zone = KL): OpInput<"audit.list"> {
+  const wire = RESULT_WORDS.find(([, word]) => word === f.result)?.[0];
   return {
     limit: f.limit,
     filters: {
@@ -74,7 +77,7 @@ export function auditQuery(f: AuditFilters, zone = KL): OpInput<"audit.list"> {
       ...(f.targetKind && { targetKind: f.targetKind }),
       ...(f.targetId && { targetId: f.targetId }),
       ...(f.correlationId && { correlationId: f.correlationId }),
-      ...((f.result !== "All") && { result: f.result.toLowerCase() as AuditView["result"] }),
+      ...(wire && { result: wire }),
     },
   };
 }
@@ -176,7 +179,8 @@ export function relatedRecords(sel: ApiAudit, group: ApiAudit[], i: I18n = EN): 
   const restriction = ref("restriction");
   if (restriction && sel.targetRef.kind === "restriction" && sel.targetRef.id === restriction.id) {
     const after = sel.maskedAfter ?? {};
-    const state = after.state && (states as string[]).includes(after.state) ? stateWord(after.state as RestrictionState, t) : after.state;
+    const known = after.state ? oneOf(states, after.state, undefined) : undefined;
+    const state = known ? stateWord(known, t) : after.state;
     const until = after["exception.until"] && !Number.isNaN(Date.parse(after["exception.until"])) ? t("exception until {time}", { time: showTime(after["exception.until"], i.display) }) : null;
     const recorded = [state, until].filter(Boolean).join(" · ");
     if (recorded) restriction.note = t("{state} — as this entry recorded it", { state: recorded });
