@@ -78,7 +78,7 @@ describe("calling the Core API as the signed-in membership (IR222)", () => {
     jar.get.mockReturnValue({ value: seal({ ...session, expiresAt: NOW / 1000 + 10 }) }); // expiring: the proxy's refresh failed
     expect(await getSession()).toBeNull();
     await expect(coreOp("units.get", { id: "u1" })).rejects.toThrow("NEXT_REDIRECT /login");
-    expect(f.mock.calls.length).toBe(0);
+    expect(f.mock.calls).toHaveLength(0);
   });
 });
 

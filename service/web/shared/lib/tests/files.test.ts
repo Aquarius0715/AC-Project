@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { contentDisposition, uploadName, uploadType } from "@ac/web/lib/files";
 import { codePoints } from "@ac/web/lib/text";
 
-const bytes = (...b: (number | string)[]) => Uint8Array.from(b.flatMap((x) => (typeof x === "string" ? Array.from(x, (c) => c.charCodeAt(0)) : x)));
+const bytes = (...b: (number | string)[]) => Uint8Array.from(b.flatMap((x) => (typeof x === "string" ? Array.from(x, (c) => c.codePointAt(0)) : x)));
 
 describe("the type of an upload is the type of its bytes (IR308)", () => {
   it("names PNG, JPEG and PDF by their leading bytes, whatever the file name says", () => {

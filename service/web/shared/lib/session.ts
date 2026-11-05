@@ -61,8 +61,8 @@ export function seal(value: object): string {
 }
 
 /** Opens a sealed cookie value; null when it is missing, altered, sealed with another key, or not JSON. */
-export function unseal<T>(token: string | undefined): T | null {
-  const [iv64, body64, extra] = (token ?? "").split(".", 3);
+export function unseal<T>(token: string | undefined = ""): T | null {
+  const [iv64, body64, extra] = token.split(".", 3);
   if (!iv64 || !body64 || extra !== undefined) return null;
   const iv = Buffer.from(iv64, "base64url"), body = Buffer.from(body64, "base64url");
   if (iv.length !== IV_BYTES || body.length <= TAG_BYTES) return null;

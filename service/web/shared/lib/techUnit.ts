@@ -135,9 +135,9 @@ on the customer's air chart). The 24 h axis starts with its day. */
 export function seriesChart(metric: string, unit: string, items: Point[], p: Period, nowMs: number, i: I18n = EN, total = items.length, complete = false): SeriesChart {
   const { t, display } = i;
   const { from, to } = periodRange(p, nowMs);
-  const points = bucket(items, new Date(from), new Date(to), 12);
+  const points = bucket(items, new Date(from), new Date(to));
   const slot = (to - from) / points.length;
-  const first = points.findIndex((v) => v !== null), last = points.length - 1 - points.toReversed().findIndex((v) => v !== null);
+  const first = points.findIndex((v) => v !== null), last = points.findLastIndex((v) => v !== null);
   let gap: string | null = null;
   for (let k = first + 1; first !== -1 && k < last && !gap; k++) {
     if (points[k] !== null) continue;
@@ -174,7 +174,7 @@ export function otherMetrics(d: ApiTechUnit, shown: string, series: Record<strin
       metric: m.metric, label: label(m.metric, t), tone: m.quality === "valid" ? undefined : "warn" as const,
       value: m.value === null ? "—" : `${airNumber(m.metric, m.value)} ${m.unit}${qualityNote(m.quality, t)}`,
       sub: t(d.connection === "online" ? "observed {time}" : "last known · observed {time}", { time: relativeTime(m.observedAt, nowMs, i) }),
-      points: bucket(series[m.metric] ?? [], new Date(from), new Date(to), 12), cut: (totals[m.metric] ?? 0) > (series[m.metric]?.length ?? 0),
+      points: bucket(series[m.metric] ?? [], new Date(from), new Date(to)), cut: (totals[m.metric] ?? 0) > (series[m.metric]?.length ?? 0),
     };
   });
 }

@@ -76,7 +76,7 @@ export default async function CustomerAirQualityPage({ searchParams }: Readonly<
       title: `${i.t(info.label)} — ${windowTitle(period, i.t)}`, sub: windowSub(w, info.unit, roomName, i), points, labels: axisLabels(w, i), guide: info.guide, ...range, ticks: axisTicks(range.min, range.max),
       hasSensor: sensors.has(metric), readings: series.total, total: series.total, valid: slots.some((s) => s.avg !== null), gaps: slots.some((s) => s.avg === null),
     },
-    rows: airRows(slots, metric, w.slotMs, i, null),
+    rows: airRows(slots, metric, w.slotMs, i),
     co2Now: co2Now(latest("co2"), display),
     history: logs ? { rows: logs.items.map((v) => ventRow(v, me.membershipId, names, now.getTime(), i)), total: logs.total } : null,
     metric,

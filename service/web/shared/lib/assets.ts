@@ -334,7 +334,7 @@ const days = (w: number[], i: I18n) => {
   return `${sorted.map((x) => dayName(x, i.display.locale)).join(", ")} `;
 };
 /** "Temperature ≥ 30 °C for 60 s, weekdays 08:00–19:00 → Warning", in the display language; the window's hours are the policy's local hours. */
-export function conditionText(p: { metric?: string; operator?: Operator; threshold?: number; durationSeconds?: number; activeWindow?: ApiCustomerPolicy["activeWindow"]; severity?: Severity }, i: I18n = EN): string {
+export function conditionText(p: { metric?: string; operator?: Operator; threshold?: number; durationSeconds?: number; activeWindow?: NonNullable<ApiCustomerPolicy["activeWindow"]> | null; severity?: Severity }, i: I18n = EN): string {
   const { t } = i;
   const m = p.metric ?? "";
   const w = p.activeWindow ? `, ${days(p.activeWindow.weekdays, i)}${p.activeWindow.startLocal}–${p.activeWindow.endLocal}` : "";

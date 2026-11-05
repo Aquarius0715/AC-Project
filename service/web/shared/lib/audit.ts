@@ -57,7 +57,8 @@ export function auditFilters(sp: Record<string, string | string[] | undefined>, 
 /** A valid period: start < end, at most 366 days (IR143). */
 export function periodError(f: Pick<AuditFilters, "from" | "to">, t: T = en): string | undefined {
   const a = Date.parse(f.from), b = Date.parse(f.to);
-  return !(a < b) || b - a > 366 * 86_400_000 ? t("Period must be start < end, at most 366 days") : undefined;
+  const isOrdered = !Number.isNaN(a) && !Number.isNaN(b) && a < b; // an unreadable date is not ordered
+  return !isOrdered || b - a > 366 * 86_400_000 ? t("Period must be start < end, at most 366 days") : undefined;
 }
 
 /** The period of the filters as instants: its days start at midnight in the display time zone (NFR-08). */
@@ -211,7 +212,7 @@ export function auditDeviceEvents(es: ApiAuditDeviceEvent[], alerts: Map<string,
   const seqs = es.map((e) => e.sequence).toSorted((a, b) => a - b);
   const withRows = es.map((e) => ({ e, r: rows.get(e.id) })).filter((x): x is { e: ApiAuditDeviceEvent; r: NonNullable<typeof x.r> } => x.r !== undefined);
   return withRows.map(({ e, r }) => {
-    const prev = seqs.toReversed().find((s) => s < e.sequence);
+    const prev = seqs.findLast((s) => s < e.sequence);
     const sequence = sequenceText(e.sequence, prev, t);
     const isFault = e.eventType !== "restored";
     return {

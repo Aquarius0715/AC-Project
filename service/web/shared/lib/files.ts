@@ -41,6 +41,6 @@ written into filename as it is makes the response throw (IR368). */
 export function contentDisposition(name: string, disposition: "inline" | "attachment" = "inline"): string {
   const clean = name.replaceAll(UNSAFE_NAME, "").trim() || "file";
   const ascii = clean.replaceAll(/[^\x20-\x7E]/g, "_").replaceAll(/["\\]/g, "");
-  const encoded = encodeURIComponent(clean).replaceAll(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+  const encoded = encodeURIComponent(clean).replaceAll(/['()*]/g, (c) => `%${(c.codePointAt(0) ?? 0).toString(16).toUpperCase()}`);
   return `${disposition}; filename="${ascii}"; filename*=UTF-8''${encoded}`;
 }

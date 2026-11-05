@@ -60,7 +60,7 @@ describe("techDeviceRows / filterOf", () => {
     expect(rows[2]?.connText).toBeNull();
   });
   it("filters all / online / offline (any non-online) / tamper", () => {
-    expect(rows.filter(filterOf("all")).length).toBe(3);
+    expect(rows.filter(filterOf("all"))).toHaveLength(3);
     expect(rows.filter(filterOf("online")).map((r) => r.id)).toEqual(["a"]);
     expect(rows.filter(filterOf("offline")).map((r) => r.id)).toEqual(["b", "c"]);
     expect(rows.filter(filterOf("tamper")).map((r) => r.id)).toEqual(["b"]);

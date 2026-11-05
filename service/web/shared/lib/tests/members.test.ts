@@ -43,7 +43,7 @@ describe("HQ access & roles (FR-A03, BR-A03, IR107)", () => {
     expect(zonedLocal("2026-09-15T01:00:00Z", "Asia/Tokyo")).toBe("2026-09-15T10:00"); // a saved instant in the form's zone
     expect(memberDraft().role).toBe("contractor");
     // a new membership starts now on the business clock, in the form's zone (IR622); an existing one keeps its own
-    expect([memberDraft(undefined, "", "Asia/Kuala_Lumpur", "2026-09-23T09:38:00Z").validFrom, memberDraft(undefined).validFrom, memberDraft(member({}), "", "Asia/Kuala_Lumpur", "2026-09-23T09:38:00Z").validFrom])
+    expect([memberDraft(undefined, "", "Asia/Kuala_Lumpur", "2026-09-23T09:38:00Z").validFrom, memberDraft().validFrom, memberDraft(member({}), "", "Asia/Kuala_Lumpur", "2026-09-23T09:38:00Z").validFrom])
       .toEqual(["2026-09-23T17:38", "", "2026-09-01T08:00"]);
   });
 

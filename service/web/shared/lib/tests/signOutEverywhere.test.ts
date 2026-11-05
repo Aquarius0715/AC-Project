@@ -57,7 +57,7 @@ describe("a session the Core API refuses", () => {
   });
 
   it("sends the browser to sign-in with why, and back to the page it was on", () => {
-    expect([signedOutReason("errors.session_revoked"), signedOutReason("error.membershipInvalid"), signedOutReason(undefined)]).toEqual(["revoked", "expired", "expired"]);
+    expect([signedOutReason("errors.session_revoked"), signedOutReason("error.membershipInvalid"), signedOutReason()]).toEqual(["revoked", "expired", "expired"]);
     expect(signInAgainHref("revoked", "/admin/units?customerId=c-1")).toBe("/login?error=revoked&returnTo=%2Fadmin%2Funits%3FcustomerId%3Dc-1");
   });
 });

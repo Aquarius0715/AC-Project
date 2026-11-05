@@ -76,7 +76,7 @@ export function certRows(members: ApiTeamMember[], certs: ApiCert[], jobs: CertJ
       groups.set(k, [...(groups.get(k) ?? []), c]);
     }
     // a renewal of an "other" certificate joins its original
-    for (const [k, list] of [...groups]) {
+    for (const [k, list] of groups) {
       const of = list[0]?.renewalOf;
       const target = of ? groups.get(`other:${of}`) : undefined;
       if (!(k.startsWith("other:") && target)) {
@@ -176,7 +176,7 @@ export function certKpis(rows: CertRow[], certs: ApiCert[], within: number, t: T
 
 /** The assignment impact (Figma 04-6): the first job an expiring, expired or missing qualification blocks. */
 export function impact(rows: CertRow[], jobs: CertJob[], t: T = en) {
-  const row = rows.filter((r) => r.blocks.length && (r.status === "expiring" || r.status === "expired" || r.status === "not_held"))
+  const row = rows.filter((r) => r.blocks.length > 0 && (r.status === "expiring" || r.status === "expired" || r.status === "not_held"))
     .map((r) => ({ r, job: jobs.find((j) => j.jobId === r.blocks[0]?.jobId) })).filter((x): x is { r: CertRow; job: CertJob } => x.job !== undefined).toSorted((a, b) => Date.parse(a.job.slot.startAt) - Date.parse(b.job.slot.startAt))[0];
   if (!row) return null;
   const { r, job } = row;

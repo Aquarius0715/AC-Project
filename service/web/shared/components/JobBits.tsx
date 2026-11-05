@@ -37,7 +37,7 @@ export function Rank({ i }: Readonly<{ i: number }>) {
 export const WINDOWS = ["09:00–11:00", "10:00–12:00", "13:00–15:00", "14:00–16:00", "16:00–18:00"];
 
 /** Three preferred times (1st = most preferred). Used by the request, decline and reschedule dialogs. */
-export function PreferredSlotsInput({ value, onChange, error, label = "Preferred times — give 3 options (1st = most preferred)", hint }: Readonly<{ value: Slot[]; onChange: (v: Slot[]) => void; error?: string; label?: string; hint?: string }>) {
+export function PreferredSlotsInput({ value, onChange, error, label = "Preferred times — give 3 options (1st = most preferred)", hint = "3 different times, at least 1 day ahead. HQ books one of them. If none can be met, HQ proposes another time — you accept or decline it." }: Readonly<{ value: Slot[]; onChange: (v: Slot[]) => void; error?: string; label?: string; hint?: string }>) {
   const set = (i: number, p: Partial<Slot>) => { onChange(value.map((s, k) => (k === i ? { ...s, ...p } : s))); };
   return (
     <fieldset className="flex flex-col gap-2">
@@ -49,7 +49,7 @@ export function PreferredSlotsInput({ value, onChange, error, label = "Preferred
           <Select aria-label={`${RANKS[i] ?? ""} preferred window`} value={s.win} onChange={(e) => { set(i, { win: e.target.value }); }} className="min-w-0 flex-1">{WINDOWS.map((w) => <option key={w}>{w}</option>)}</Select>
         </div>
       ))}
-      {error ? <span className="flex items-center gap-1 text-xs font-medium text-crit"><Icon name="error" />{error}</span> : <span className="text-[11px] text-muted-foreground">{hint ?? "3 different times, at least 1 day ahead. HQ books one of them. If none can be met, HQ proposes another time — you accept or decline it."}</span>}
+      {error ? <span className="flex items-center gap-1 text-xs font-medium text-crit"><Icon name="error" />{error}</span> : <span className="text-[11px] text-muted-foreground">{hint}</span>}
     </fieldset>
   );
 }

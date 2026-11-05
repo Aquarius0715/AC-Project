@@ -38,7 +38,7 @@ const REASON_TEMPLATES: typeof TEMPLATES = [
 function known(stored: string, t: T, fixed: Set<string>, templates: typeof TEMPLATES): string {
   if (fixed.has(stored)) return t(stored);
   for (const [form, key, values] of templates) {
-    const m = stored.match(form);
+    const m = form.exec(stored); // the templates have no g flag, so exec keeps no state
     if (m) return t(key, values(m));
   }
   return stored;

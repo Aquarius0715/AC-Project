@@ -44,7 +44,7 @@ async function crawl(page: Page, app: App, lang = "en", wideFont = false, touch 
         return els.flatMap((el) => {
           const r = el.getBoundingClientRect();
           const name = (el.getAttribute("aria-label") ?? el.textContent).trim().slice(0, 30);
-          const slot = el.getAttribute("data-slot") ?? "";
+          const slot = el.dataset.slot ?? "";
           return r.width > 0 && r.height > 0 && r.height < 43.5 ? `${slot} "${name}" ${String(Math.round(r.height))}px` : [];
         });
       });

@@ -43,7 +43,7 @@ describe("DataTable", () => {
     render(<DataTable cols={cols} rows={units} rowKey={(u) => u.id} onRowClick={open} selectedKey="u-2" />);
     const [, bedroom, office] = screen.getAllByRole("row");
     expect([bedroom?.getAttribute("tabindex"), office?.getAttribute("tabindex")]).toEqual(["0", "0"]);
-    expect([bedroom?.getAttribute("aria-current"), office?.getAttribute("aria-current"), office?.getAttribute("data-state")]).toEqual([null, "true", "selected"]);
+    expect([bedroom?.getAttribute("aria-current"), office?.getAttribute("aria-current"), office?.dataset.state]).toEqual([null, "true", "selected"]);
     fireEvent.click(within(must(bedroom)).getByText("Bedroom AC"));
     fireEvent.keyDown(must(office), { key: "Enter" });
     fireEvent.keyDown(must(bedroom), { key: " " });

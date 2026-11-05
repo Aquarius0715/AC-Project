@@ -123,7 +123,7 @@ export function autoErrors(d: AutoDraft, temperatureRange: { min: number; max: n
   if (!(Number.isSafeInteger(pr) && pr >= 0 && pr <= 100)) e.priority = t("An integer 0–100");
   if (!d.timezone.trim()) e.timezone = t("Required");
   if (d.unitIds.length === 0) e.unitIds = t("Choose at least one unit");
-  if ((d.type === "tariff" || d.type === "solar" || d.type === "battery") && (d.value.trim() === "" || !(Number(d.value) >= 0))) e.value = t("A value ≥ 0");
+  if ((d.type === "tariff" || d.type === "solar" || d.type === "battery") && (d.value.trim() === "" || Number.isNaN(Number(d.value)) || Number(d.value) < 0)) e.value = t("A value ≥ 0");
   if (d.actionKind === "set_temperature") {
     const c = Number(d.celsius);
     if (!Number.isFinite(c)) e.celsius = t("A temperature");

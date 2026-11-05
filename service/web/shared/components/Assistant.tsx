@@ -164,7 +164,7 @@ function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
     add({ kind: "bot", text: t("The microphone is off on this device, so voice input is unavailable. Type your request instead, or turn the microphone on in Preferences.") });
     input.current?.focus();
   };
-  const lastQuestion = msgs.toReversed().find((m): m is Extract<ChatMessage, { kind: "user" }> => m.kind === "user")?.text ?? "";
+  const lastQuestion = msgs.findLast((m): m is Extract<ChatMessage, { kind: "user" }> => m.kind === "user")?.text ?? "";
 
   return (
     <Frame title={t("Assistant")} state={stateText(state, t)} lang={lang} setLang={setLang} onClose={onClose} context={context} t={t}

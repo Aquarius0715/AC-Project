@@ -170,7 +170,7 @@ describe("HQ maintenance jobs", () => {
     expect(agreedSlots(planJob)).toEqual([slot("2026-12-08T02:00:00Z", "2026-12-08T03:00:00Z")]);
     expect(preferredRows(planJob, [[{ id: "m-int", displayName: "tech-internal-a" }]], NOW).map((r) => [r.rank, r.text, r.fits, r.plan])).toEqual([[1, "Tue, 8 Dec, 10:00 – 11:00 am MYT", true, true]]);
     expect(agreedSlots(job({ preferredSlots: [] }))).toEqual([]);
-    expect(agreedSlots(job({ planId: "plan-1", occurrenceAt: "2026-12-08T02:00:00Z" })).length).toBe(2); // the client asked for other times
+    expect(agreedSlots(job({ planId: "plan-1", occurrenceAt: "2026-12-08T02:00:00Z" }))).toHaveLength(2); // the client asked for other times
     expect(hqRow(row({ origin: "periodic_plan", preferredSlots: [], requestedSlot: slot("2026-12-08T02:00:00Z", "2026-12-08T03:00:00Z") }), NOW, names, unitOrg).line).toBe("plan occurrence 8 Dec, 10:00 – 11:00 am MYT · book it");
   });
 

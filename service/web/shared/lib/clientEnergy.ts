@@ -85,8 +85,8 @@ export function compareRow(unitId: string, name: string, s: ApiEnergySummary, tr
 }
 /** The URL's units (up to 4 of the customer's), else the first unit by name — the same default on Energy & cost and
 Offsets (IR265). */
-export function pickUnits(units: { id: string; displayName: string }[], parameter: string | undefined): string[] {
-  const picked = [...new Set((parameter ?? "").split(","))].filter((id) => units.some((u) => u.id === id)).slice(0, 4);
+export function pickUnits(units: { id: string; displayName: string }[], parameter: string | undefined = ""): string[] {
+  const picked = [...new Set(parameter.split(","))].filter((id) => units.some((u) => u.id === id)).slice(0, 4);
   return picked.length > 0 ? picked : [...units].toSorted((a, b) => a.displayName.localeCompare(b.displayName)).slice(0, 1).map((u) => u.id);
 }
 /** The energy screen's selection as URL parameters (also passed to the offsets page, FR-C13 “Based on Energy & cost”). */

@@ -33,7 +33,7 @@ export function iconProblem(text: string): string | null {
   if (symbol) return `the symbol ${symbol} (U+${must(symbol.codePointAt(0)).toString(16).toUpperCase()})`;
   const chars = characters(text.trim());
   if (chars.length === 0) return null;
-  const first = must(chars[0]), last = must(chars[chars.length - 1]);
+  const first = must(chars[0]), last = must(chars.at(-1));
   const lead = must(/^[ \t]*/.exec(text))[0], trail = must(/[ \t]*$/.exec(text))[0];
   const isSeparatorFirst = lead.length > 0 && /^[ \t]/.test(text.slice(lead.length + first.length));
   if (ARROW.test(first) && !isSeparatorFirst) return `the arrow ${first} before the text`;

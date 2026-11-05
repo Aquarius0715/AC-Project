@@ -22,7 +22,7 @@ describe("URL query state", () => {
     act(() => { setSearchParameter("unitId", "u-1"); });
     expect(result.current).toBe("u-1");
     expect(location.search).toBe("?tab=list&unitId=u-1");
-    expect(history.length).toBe(length); // replaced, not pushed
+    expect(history).toHaveLength(length); // replaced, not pushed
     act(() => { setSearchParameter("unitId", null); });
     expect(result.current).toBeNull();
     expect(location.search).toBe("?tab=list");

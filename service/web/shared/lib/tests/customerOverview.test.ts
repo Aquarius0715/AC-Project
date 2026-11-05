@@ -41,7 +41,7 @@ describe("customer overview", () => {
     const s = overviewScope(us, props, { propertyId: "office", unitId: "u1" }); // a unit of another property is ignored
     expect([s.propertyName, s.unitId, s.scope.map((u) => u.id)]).toEqual(["Office A", null, ["u2"]]);
     expect(overviewScope(us, props, { propertyId: "nope", unitId: "u2" }).scope.map((u) => u.id)).toEqual(["u2"]);
-    expect([periodOf("7d"), periodOf("x"), periodOf(undefined)]).toEqual(["7d", "today", "today"]);
+    expect([periodOf("7d"), periodOf("x"), periodOf()]).toEqual(["7d", "today", "today"]);
     expect(periodNote("today", { from: "2026-09-13T16:00:00Z", to: "2026-09-14T01:12:00Z" })).toBe("Today = 00:00–09:12 · Asia/Kuala_Lumpur");
     // the periods are Kuala Lumpur days, so the note stays in Kuala Lumpur time in either language
     expect(periodNote("7d", { from: "2026-09-07T16:00:00Z", to: "2026-09-14T01:12:00Z" }, MS_TOKYO)).toBe("7 hari lepas = 8 Sep 00:00 – 14 Sep 09:12 · Asia/Kuala_Lumpur");

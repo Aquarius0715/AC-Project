@@ -85,6 +85,12 @@ export function capabilityDraft(k?: ApiCapability): CapabilityDraft {
 
 const toNumber = (s: string) => (s.trim() === "" ? NaN : Number(s));
 
+/** The temperature range of a model: min below max (both numbers), and a step that fits in it. */
+function temperatureError(d: CapabilityDraft, t: T): string | null {
+  const [min, max, step] = [toNumber(d.min), toNumber(d.max), toNumber(d.step)];
+  if (Number.isNaN(min) || Number.isNaN(max) || min >= max) return t("min must be below max");
+  return step > 0 && step <= max - min ? null : t("0 < step ≤ max − min");
+}
 /** The capability rules of DD-A04 (boundary cases) checked before capabilities.save; the API checks them again. */
 export function capabilityErrors(d: CapabilityDraft, update: boolean, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
@@ -93,11 +99,8 @@ export function capabilityErrors(d: CapabilityDraft, update: boolean, t: T = en)
   if ((d.modeControl || d.fanControl || d.temperatureOn) && !d.control) e.control = t("Mode, fan or temperature control needs power control");
   if (d.modeControl && d.modes.length === 0) e.modes = t("Choose at least one mode");
   if (d.fanControl && d.fanLevels.length === 0) e.fanLevels = t("Choose at least one fan level");
-  if (d.temperatureOn) {
-    const [min, max, step] = [toNumber(d.min), toNumber(d.max), toNumber(d.step)];
-    if (!(min < max)) e.temperature = t("min must be below max");
-    else if (!(step > 0 && step <= max - min)) e.temperature = t("0 < step ≤ max − min");
-  }
+  const temperature = d.temperatureOn ? temperatureError(d, t) : null;
+  if (temperature) e.temperature = temperature;
   if (d.ventilation && (d.ventilationLevels.length === 0 || !d.ventilationLevels.includes("low"))) e.ventilationLevels = t("Ventilation levels must include Low");
   const seen = new Set<string>();
   for (const s of d.sensors) {
@@ -242,6 +245,6 @@ export function campaignErrors(d: CampaignDraft, now: Date, zone = "Asia/Kuala_L
   if (!(Number.isSafeInteger(ap) && ap >= 1 && ap <= 50)) e.autoPause = t("1–50 %");
   if (!/^\d{2}:\d{2}$/.test(d.startLocal) || !/^\d{2}:\d{2}$/.test(d.endLocal)) e.window = t("HH:MM – HH:MM");
   const at = Date.parse(campaignStart(d, zone));
-  if (!d.startAt || !(at >= now.getTime() + 24 * 3600 * 1000)) e.startAt = t("At least 24 hours ahead");
+  if (!d.startAt || Number.isNaN(at) || at < now.getTime() + 24 * 3600 * 1000) e.startAt = t("At least 24 hours ahead");
   return e;
 }

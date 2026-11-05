@@ -52,7 +52,7 @@ describe("the relay's input limit", () => {
     vi.stubEnv("DATA_SOURCE", "api");
     const fetch = vi.fn(() => Promise.resolve(new Response("{}", { status: 200 })));
     vi.stubGlobal("fetch", fetch);
-    expect(note(1 << 20).length).toBe(1 << 20);
+    expect(note(1 << 20)).toHaveLength(1 << 20);
     const accepted = await post(note(1 << 20));
     expect(accepted.status).toBe(200);
     expect(fetch).toHaveBeenCalledTimes(1);
