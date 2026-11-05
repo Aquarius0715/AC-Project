@@ -10,18 +10,21 @@ import { createClient } from "@redis/client";
 import { z } from "zod";
 import { filled } from "@ac/web/lib/filled";
 
+const roleSchema = z.enum(["client", "contractor", "technician", "admin"]);
+type Role = z.infer<typeof roleSchema>;
+
 export interface Session {
   accessToken: string;
   refreshToken: string | null;
   tenantId: string;
   membershipId: string;
-  role: "client" | "contractor" | "technician" | "admin";
+  role: Role;
   expiresAt: number; // epoch seconds of the access token
 }
 
 // One web app per role (IR178). AC_APP_ROLE is set at build time by each app's next.config; the cookie names carry
 // it because local apps share the host "localhost" (cookies are not separated by port).
-export const APP_ROLE = (process.env.AC_APP_ROLE ?? "client") as Session["role"];
+export const APP_ROLE = roleSchema.parse(process.env.AC_APP_ROLE ?? "client"); // an unknown role fails at start, not as a cookie name
 
 /** True when the app is served over HTTPS (APP_URL): its cookies are Secure and carry the cookie prefixes. */
 const httpsApp = () => oidcConfig().appUrl.startsWith("https");
@@ -102,7 +105,7 @@ export type TokenResponse = z.infer<typeof tokenResponse>;
 const sessionClaims = z.object({
   tenant_id: z.string().min(1),
   membership_id: z.string().min(1),
-  role: z.enum(["client", "contractor", "technician", "admin"]),
+  role: roleSchema,
 });
 
 /** Builds a session from a token response; null when the token lacks the tenant / membership / role claims. */
@@ -317,7 +320,7 @@ export const roleHome: Record<Session["role"], string> = { client: "/customer", 
 export function jwtClaims(token: string): Record<string, unknown> {
   const part = token.split(".", 2)[1] ?? "";
   try {
-    return JSON.parse(Buffer.from(part, "base64url").toString()) as Record<string, unknown>;
+    return z.record(z.string(), z.unknown()).catch({}).parse(JSON.parse(Buffer.from(part, "base64url").toString()));
   } catch {
     return {};
   }
