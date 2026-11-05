@@ -41,7 +41,7 @@ describe("following a command until the device answers (D04, Unit Control and th
 
   it("gives up after 50 s (25 reads: the window, the expiry grace of IR453 and a tick fit) and returns the last state it saw", async () => {
     callOp.mockResolvedValue(deviceCommand("sent"));
-    const done = waitForCommand(deviceCommand("sent"), () => {});
+    const done = waitForCommand(deviceCommand("sent"), vi.fn());
     await vi.advanceTimersByTimeAsync(50_000);
     const sent = await done;
     expect(sent.status).toBe("sent");
@@ -51,8 +51,9 @@ describe("following a command until the device answers (D04, Unit Control and th
   it("passes a failed read to the caller", async () => {
     callOp.mockRejectedValueOnce(new Error("UNAVAILABLE"));
     // the read fails on the first poll, 2 s in: the expectation waits while the fake clock moves
+    const waiting = waitForCommand(deviceCommand("sent"), vi.fn());
     await Promise.all([
-      expect(waitForCommand(deviceCommand("sent"), () => {})).rejects.toThrow("UNAVAILABLE"),
+      expect(waiting).rejects.toThrow("UNAVAILABLE"),
       vi.advanceTimersByTimeAsync(2000),
     ]);
   });

@@ -484,7 +484,7 @@ export function Modal({ open, title, onClose, children, footer, wide, finalFocus
 
 
 /* ───────────── Toast ───────────── */
-const ToastCtx = createContext<(notice: string, tone?: Tone) => void>(() => {});
+const ToastCtx = createContext<(notice: string, tone?: Tone) => void>(() => { /* outside a ToastProvider a notice has nowhere to show */ });
 export const useToast = () => useContext(ToastCtx);
 /** The toasts: shadcn/ui's Sonner. Sonner announces through one polite region, so an error carries its text in an alert
 (announced at once) and every other result in a status (UX-06, IR362). */

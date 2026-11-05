@@ -6,7 +6,7 @@ import { BarChart, LineChart, UtilizationBar } from "@ac/web/components/ui";
 // jsdom lays nothing out: give the chart's box a size, as a browser would, so that Recharts draws (the legend stays 0 high)
 const box = (width: number, height: number) => ({ width, height, top: 0, left: 0, right: width, bottom: height, x: 0, y: 0, toJSON: () => ({}) });
 beforeAll(() => {
-  vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} }); // jsdom has none
+  vi.stubGlobal("ResizeObserver", class { observe = vi.fn(); unobserve = vi.fn(); disconnect = vi.fn(); }); // jsdom has none
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
     return this.classList.contains("recharts-responsive-container") ? box(600, 200) : box(0, 0);
   });

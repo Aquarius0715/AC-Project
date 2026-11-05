@@ -23,7 +23,7 @@ export function RouteError({ what, error, retry }: Readonly<{ what: string; erro
   useEffect(() => {
     fetch("/bff/session", { cache: "no-store" }).then((r) => r.json()).then((s: { dataSource?: string; signedIn?: boolean }) => {
       if (s.dataSource === "api" && !s.signedIn) location.assign(signInAgainHref("expired", location.pathname + location.search));
-    }).catch(() => {});
+    }).catch(() => { /* no session answer: the error page stays as it is */ });
   }, []);
   return (
     <Page className="max-w-3xl">

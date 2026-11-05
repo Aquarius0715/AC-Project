@@ -213,7 +213,7 @@ function GroupPanel({ live, space }: Readonly<{ live: PropertiesLive; space: str
         const created = await sendPaced(() => sendCommand(r.id, a), wait(r.id));
         if (!created.ok) { setTrack((x) => ({ ...x, [r.id]: { status: "Failed", note: actionMessage(created, t) } })); return; }
         setTrack((x) => ({ ...x, [r.id]: { status: "Sending", note: "" } }));
-        const c: ApiCommand = await waitForCommand(created.value, () => {});
+        const c: ApiCommand = await waitForCommand(created.value, () => { /* the row already says Sending */ });
         if (c.status !== "acknowledged") { setTrack((x) => ({ ...x, [r.id]: { status: "Failed", note: historyRow(c, t, i.display).text } })); return; }
       }
       setTrack((x) => ({ ...x, [r.id]: { status: "Confirmed", note: r.change } }));

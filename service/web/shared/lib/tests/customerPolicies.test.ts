@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   conditionText, defaultRuleRows, durationText, POLICY_FIELDS, policyCards, policyErrors, policyFieldId, policyForm, policyInput, policyRefusal, summaryText, toggledInput, windowText,
   type ApiAlertPolicy, type ApiDefaultPolicy,
@@ -44,7 +44,7 @@ describe("customer alert policies", () => {
   it("writes each own policy's When and Then and its attached ACs", () => {
     const [c] = policyCards([policy({ channels: ["inApp", "email"] })], (id) => ({ u1: "Workstations AC 1", u2: "Workstations AC 2" })[id]);
     expect([c?.badge, c?.when, c?.then, c?.attachedText]).toEqual(["Air quality", "CO₂ ≥ 1200 ppm for 15 min · recover below 1000 ppm · only 08:00–19:00 on weekdays", "Warning · notify in-app + email", "Attached to 2 ACs: Workstations AC 1, Workstations AC 2"]);
-    expect(policyCards([policy({ unitIds: [], metric: "humidity", operator: "lte", threshold: 30, recoveryThreshold: 35, activeWindow: null, severity: "normal" })], () => {})[0])
+    expect(policyCards([policy({ unitIds: [], metric: "humidity", operator: "lte", threshold: 30, recoveryThreshold: 35, activeWindow: null, severity: "normal" })], vi.fn())[0])
       .toMatchObject({ when: "Humidity ≤ 30 % for 15 min · recover above 35 %", then: "Info · notify in-app", attachedText: "Not attached to any AC yet — attach it from an AC’s page" });
   });
 

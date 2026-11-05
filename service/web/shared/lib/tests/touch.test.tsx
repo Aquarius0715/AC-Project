@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { Btn, Choice, Input, Plain, Select, Tabs } from "@ac/web/components/ui";
 import { Button } from "@ac/web/components/ui/button";
@@ -18,8 +18,8 @@ describe("touch-sized controls", () => {
       <Button size="icon-sm" aria-label="More" />
       <Input aria-label="Name" />
       <Select aria-label="Type"><option>A</option></Select>
-      <Tabs value="a" onChange={() => {}} tabs={[{ id: "a", label: "One" }, { id: "b", label: "Two" }]} />
-      <Choice value="x" onChange={() => {}} options={[{ id: "x", label: "Cool" }, { id: "y", label: "Dry" }]} />
+      <Tabs value="a" onChange={vi.fn()} tabs={[{ id: "a", label: "One" }, { id: "b", label: "Two" }]} />
+      <Choice value="x" onChange={vi.fn()} options={[{ id: "x", label: "Cool" }, { id: "y", label: "Dry" }]} />
     </>);
     for (const name of ["Save", "Small", "One", "Cool"]) expect(coarse(screen.getByRole(/One|Two/.test(name) ? "tab" : "button", { name })), name).toContain("pointer-coarse:min-h-11");
     expect(coarse(screen.getByRole("button", { name: "More" }))).toEqual(expect.arrayContaining(["pointer-coarse:min-h-11", "pointer-coarse:min-w-11"]));

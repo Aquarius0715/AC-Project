@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const coreOp = vi.fn();
 const api = { on: true };
 vi.mock("server-only", () => ({}));
-vi.mock("next/server", () => ({ connection: async () => {} }));
+vi.mock("next/server", () => ({ connection: () => Promise.resolve() }));
 vi.mock("@ac/web/lib/dal", () => {
   return {
     apiMode: () => api.on,

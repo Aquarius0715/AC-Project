@@ -13,7 +13,7 @@ export const test = base.extend<object, { app: App }>({
       const response = await goto(url, options);
       const isOwn = !baseURL || new URL(page.url()).origin === new URL(baseURL).origin; // not the identity provider's pages
       if (isOwn && response?.headers()["content-type"]?.includes("text/html")) {
-        await page.waitForFunction(() => document.documentElement.dataset.hydrated === "1", null, { timeout: 15_000 }).catch(() => {});
+        await page.waitForFunction(() => document.documentElement.dataset.hydrated === "1", null, { timeout: 15_000 }).catch(() => { /* a page that never hydrates fails in its own assertions */ });
       }
       return response;
     };

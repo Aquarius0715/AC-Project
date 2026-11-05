@@ -4,7 +4,7 @@ import { NextRequest } from "next/server";
 import { POST } from "@ac/web/bff/ops/[operation]/route";
 
 vi.mock("server-only", () => ({}));
-vi.mock("next/headers", () => ({ cookies: () => Promise.resolve({ get: () => {}, set: vi.fn(), delete: vi.fn() }) }));
+vi.mock("next/headers", () => ({ cookies: () => Promise.resolve({ get: vi.fn(), set: vi.fn(), delete: vi.fn() }) }));
 
 afterEach(() => {
   vi.unstubAllEnvs();

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { Choice, Field, Input } from "@ac/web/components/ui";
 
@@ -16,7 +16,7 @@ describe("a form field with an error", () => {
     expect((box as HTMLInputElement).labels?.[0]?.textContent).toContain("Symptoms must be 10–2000 characters");
   });
   it("leaves a valid control and a group of choices unmarked", () => {
-    render(<><Field label="Contact window" hint="Use HH:mm"><Input /></Field><Field label="Type" error="Pick one"><Choice value="a" onChange={() => {}} options={[{ id: "a", label: "Repair" }, { id: "b", label: "Preventive" }]} /></Field></>);
+    render(<><Field label="Contact window" hint="Use HH:mm"><Input /></Field><Field label="Type" error="Pick one"><Choice value="a" onChange={vi.fn()} options={[{ id: "a", label: "Repair" }, { id: "b", label: "Preventive" }]} /></Field></>);
     expect(screen.getByRole("textbox", { name: /Contact window/ }).getAttribute("aria-invalid")).toBeNull();
     for (const b of screen.getAllByRole("button")) expect(b.getAttribute("aria-invalid")).toBeNull();
   });

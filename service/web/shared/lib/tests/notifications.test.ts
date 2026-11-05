@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { inboxAlerts, type ApiAlert } from "@ac/web/lib/alerts";
 import { inboxRow, NOTIFICATION_KEYS, type ApiNotification } from "@ac/web/lib/notifications";
 import { i18nOf } from "@ac/web/lib/i18n";
@@ -106,7 +106,7 @@ describe("inbox rows and alert rows", () => {
     expect(rows.map((r) => r.status.state)).toEqual(["open", "acknowledged", "resolved", "open"]);
     // a load cause is only suspected, never a fault (Figma 06a, DD-C08, IR315); an inspection record says so first
     expect(rows.map((r) => r.kind)).toEqual(["Fault", "Load cause (possible)", "Fault", "Maintenance reminder"]);
-    expect(inboxAlerts([alert("ins", "normal", "open", { causeCode: "insulation_loss", evidenceKind: "inspection" }), alert("loss", "warning", "open", { causeCode: "insulation_loss" })], [], () => {}).map((r) => r.kind))
+    expect(inboxAlerts([alert("ins", "normal", "open", { causeCode: "insulation_loss", evidenceKind: "inspection" }), alert("loss", "warning", "open", { causeCode: "insulation_loss" })], [], vi.fn()).map((r) => r.kind))
       .toEqual(["Load cause (possible)", "Inspection record"]);
     // the user's language and display time zone (IR261); a resolution reason the system wrote is worded too (IR481)
     const [, win, old] = inboxAlerts([alert("hot", "critical", "open"), alert("win", "warning", "acknowledged", { causeCode: "window_open", acknowledgedAt: "2026-09-14T01:30:00Z" }), alert("old", "critical", "resolved", { resolvedAt: "2026-09-14T02:00:00Z", resolutionReason: "filter cleaned" })],
