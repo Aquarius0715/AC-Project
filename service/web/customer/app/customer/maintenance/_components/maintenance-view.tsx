@@ -8,7 +8,6 @@ import { JobStatusBadge, OriginBadge } from "@ac/web/components/JobBits";
 import { useAction } from "@ac/web/lib/useAction";
 import { showTime, zonedInstant, zonedParts } from "@ac/web/lib/i18n";
 import { useDisplay, useT } from "@ac/web/components/I18n";
-import type { JobStatus } from "@ac/web/lib/jobs";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { clientJobRefusal, contactError, followUpText, PROBLEMS, preferredError, RATING_TAGS, STATUS_TABS, symptomLength, type StatusTab } from "@ac/web/lib/customerMaintenance";
 import { filterRefusal } from "@ac/web/lib/customerFilterCare";
@@ -79,7 +78,7 @@ export function MaintenanceView({ live }: Readonly<{ live: MaintenanceLive }>) {
                   <div className="text-xs text-muted-foreground">{r.place ? `${r.place} · ` : ""}{r.type}</div>
                   <div className={cx("flex items-center gap-1.5 text-xs", r.warn && "font-semibold text-warn")}><Icon name={r.icon} className="shrink-0" />{r.line}</div>
                 </div>
-                <JobStatusBadge s={r.status as JobStatus} client /><span className="text-muted-foreground"><Icon name="chevronRight" /></span>
+                <JobStatusBadge s={r.status} client /><span className="text-muted-foreground"><Icon name="chevronRight" /></span>
               </ListRow>
             ))}
             {shown.length === 0 && <p className="rounded-xl border border-line bg-surface p-4 text-center text-xs text-muted-foreground">{t(live.rows.length > 0 ? "No requests in this filter." : "No requests yet — “+ New maintenance request” asks HQ for a visit.")}</p>}
@@ -114,7 +113,7 @@ function JobDetail({ d, open, onDone, onFail }: Readonly<{ d: Detail; open: (m: 
   const t = useT();
   const j = d.job;
   const [pending, run] = useAction();
-  const status = (j.slotProposal?.status === "pending" ? "time_proposed" : j.status) as JobStatus;
+  const status = j.slotProposal?.status === "pending" ? "time_proposed" : j.status;
   const isClosed = j.status === "completed" || j.status === "cancelled";
   return (
     <Card title={j.id.slice(0, 8)} sub={`${d.unit.name} — ${j.origin === "periodic_plan" ? t("periodic inspection") : j.symptom.slice(0, 48)}`} className="self-start"

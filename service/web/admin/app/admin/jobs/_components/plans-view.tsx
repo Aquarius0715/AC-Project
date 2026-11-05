@@ -10,7 +10,6 @@ import { useAction } from "@ac/web/lib/useAction";
 import { byCount, zonedParts } from "@ac/web/lib/i18n";
 import { fromZonedInput, zonedInput } from "@ac/web/lib/adminJobs";
 import { anchorOf, cadence, everyText, generateConflict, nextBox, nextOccurrence, planDate, planErrors, planRefusal } from "@ac/web/lib/adminPlans";
-import type { JobStatus } from "@ac/web/lib/jobs";
 import { generateJob, savePlan } from "../actions";
 import type { PlansLive } from "../_lib/load";
 import { JobsTabs, ScopeBar } from "./jobs-header";
@@ -114,7 +113,7 @@ function PlanDetail({ d, now, notice, setNotice }: Readonly<{ d: Detail; now: nu
             <tbody>{d.occurrences.map((o) => (
               <tr key={o.jobId} className="border-t border-line">
                 <td className="py-2 font-semibold">{o.date}</td><td className="text-xs">{o.jobId.slice(0, 8)}</td>
-                <td>{o.status ? <JobStatusBadge s={o.status as JobStatus} /> : <span className="text-xs text-muted-foreground">—</span>}</td>
+                <td>{o.status ? <JobStatusBadge s={o.status} /> : <span className="text-xs text-muted-foreground">—</span>}</td>
                 <td className="text-right"><Link className="text-xs font-semibold text-primary hover:underline" href={`/admin/jobs?jobId=${o.jobId}`}>{t("Open job")} <Icon name="arrowRight" /></Link></td>
               </tr>
             ))}</tbody>

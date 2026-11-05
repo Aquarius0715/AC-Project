@@ -3,7 +3,8 @@
 import { Badge, Input, Select, cx } from "./ui";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import type { JobStatus, Origin, Slot } from "@ac/web/lib/jobs";
-import { statusLabel } from "@ac/web/lib/jobs";
+import { jobStatuses, statusLabel } from "@ac/web/lib/jobs";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { useT } from "./I18n";
 
 /** Where a job came from — shown on every role (IR113), in the display language. */
@@ -23,9 +24,12 @@ const statusIcon: Record<JobStatus, IconName> = { requested: "requested", time_p
 // A client sees one word for a booked visit: offered, accepted and assigned all read "Scheduled", like the tab they
 // are listed under and the request dialog's "you will see “Scheduled” once a time is confirmed" (IR574).
 const SCHEDULED = new Set<JobStatus>(["offered", "accepted", "assigned"]);
-export function JobStatusBadge({ s, client }: { s: JobStatus; client?: boolean }) {
+/** A job status as the API sent it: one this app does not know is shown as it came, in a muted badge. */
+export function JobStatusBadge({ s, client }: Readonly<{ s: string; client?: boolean }>) {
   const t = useT();
-  return client && SCHEDULED.has(s) ? <Badge tone="primary" icon="assigned">{t("Scheduled")}</Badge> : <Badge tone={statusTone[s]} icon={statusIcon[s]}>{t(statusLabel[s])}</Badge>;
+  const known = oneOf(jobStatuses, s, undefined);
+  if (known === undefined) return <Badge tone="muted">{s}</Badge>;
+  return client && SCHEDULED.has(known) ? <Badge tone="primary" icon="assigned">{t("Scheduled")}</Badge> : <Badge tone={statusTone[known]} icon={statusIcon[known]}>{t(statusLabel[known])}</Badge>;
 }
 
 export const RANKS = ["1st", "2nd", "3rd"];

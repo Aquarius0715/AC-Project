@@ -11,7 +11,6 @@ import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { showTime, zonedInstant, type T } from "@ac/web/lib/i18n";
 import { contractorNames, costLineOf, extendDefault, fromZonedInput, hqRefusal, longSlot, money, jobRequestErrors, offerDefaults, returnReason, slotText, tomorrowIn, zonedInput, type CostLine, type PreferredRow } from "@ac/web/lib/adminJobs";
 import { typeLabel } from "@ac/web/lib/partnerJobDetail";
-import type { JobStatus } from "@ac/web/lib/jobs";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { assignInternal, cancelJob, classifyFollowUp, createJob, extendAccess, holdJob, offerToContractor, proposeSlot, resolvePartnerSlot, resumeJob, reviewReport, saveCosts, withdrawProposal } from "../actions";
 import type { JobsLive } from "../_lib/load";
@@ -84,7 +83,7 @@ function JobsTab({ live, patch, fresh, onFresh }: Readonly<{ live: JobsLive; pat
             <div className="flex flex-col gap-1.5">{live.rows.map((r) => (
               <ListRow key={r.id} selected={!!sel && !("missing" in live) && sel.job.id === r.id} href={`/admin/jobs?${new URLSearchParams({ ...Object.fromEntries(Object.entries(q).filter(([, v]) => v)), ...((live.sort !== "status") && { sort: live.sort }), jobId: r.id })}`}>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{r.short} · {r.title}</b><JobStatusBadge s={r.badge.status as JobStatus} /></div>
+                  <div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{r.short} · {r.title}</b><JobStatusBadge s={r.badge.status} /></div>
                   <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground"><OriginBadge origin={r.origin === "periodic_plan" ? "plan" : "request"} />{r.customer} · {r.type}{r.badge.overdue && <Badge tone="crit">{t("!! Overdue")}</Badge>}</div>
                   <div className={cx("text-[11px]", r.lineTone === "warn" ? "text-warn" : "text-muted-foreground")}>{r.line}</div>
                 </div>
@@ -124,7 +123,7 @@ function JobDetail({ d, live, fresh, onFresh }: Readonly<{ d: Detail; live: Jobs
   return (
     <div className="flex min-w-0 flex-col gap-4">
       {result && <Banner tone={result.tone}>{result.text}</Banner>}
-      <Card title={<span className="flex flex-wrap items-center gap-2">{j.id.slice(0, 8)} · {d.title} <JobStatusBadge s={(sp?.status === "pending" ? "time_proposed" : j.status) as JobStatus} /><OriginBadge origin={j.origin === "periodic_plan" ? "plan" : "request"} /></span>}
+      <Card title={<span className="flex flex-wrap items-center gap-2">{j.id.slice(0, 8)} · {d.title} <JobStatusBadge s={sp?.status === "pending" ? "time_proposed" : j.status} /><OriginBadge origin={j.origin === "periodic_plan" ? "plan" : "request"} /></span>}
         sub={`${typeLabel(j.type, t)} · ${d.customer}${d.location ? ` · ${d.location}` : ""}${j.planId ? ` · ${t("plan occurrence {date}", { date: d.texts.occurrence ?? "" })}` : ""}`}
         action={<div className="flex gap-2">
           {c.hold && <Btn size="sm" disabled={pending} onClick={() => { setModal({ kind: "reason", what: "hold" }); }}>{t("Hold…")}</Btn>}

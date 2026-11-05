@@ -9,11 +9,13 @@ stay local and return their refusals at once.
 */
 import { useSyncExternalStore } from "react";
 import { readDemo, writeDemo } from "@ac/web/lib/demoStore";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { useOp } from "@ac/web/lib/useOp";
 
 export interface Slot { date: string; win: string }
 export type Origin = "request" | "plan";
-export type JobStatus = "requested" | "time_proposed" | "offered" | "accepted" | "assigned" | "in_progress" | "submitted" | "rework_requested" | "completed" | "cancelled" | "on_hold";
+export const jobStatuses = ["requested", "time_proposed", "offered", "accepted", "assigned", "in_progress", "submitted", "rework_requested", "completed", "cancelled", "on_hold"] as const;
+export type JobStatus = (typeof jobStatuses)[number];
 export interface Proposal { by: "hq" | "contractor"; slot: Slot; who: string; message: string; replyBy: string; status: "pending" | "accepted" | "declined" | "withdrawn" }
 export interface PartnerProposal { slot: Slot; tech: string; reason: string; sentAt: string; status: "pending" | "sent_to_client" | "rejected" | "approved" | "withdrawn" }
 export interface TechAck { status: "pending" | "accepted" | "cant_make"; reason?: string; alt?: string; at?: string }
@@ -141,7 +143,7 @@ const typeLabel: Record<string, Job["type"]> = { reactive: "Reactive", preventiv
 
 function jobFromApi(j: ApiJob): Job {
   const id = j.id ?? j.jobId ?? "";
-  const status = (j.displayStatus === "time_proposed" ? "time_proposed" : j.status) as JobStatus;
+  const status = oneOf(jobStatuses, j.displayStatus === "time_proposed" ? "time_proposed" : j.status, "requested"); // an unknown status reads as a new request
   return {
     id,
     status,
