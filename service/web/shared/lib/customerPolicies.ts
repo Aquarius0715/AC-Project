@@ -187,7 +187,7 @@ export function policyInput(f: PolicyForm, existing: ApiAlertPolicy | null, ctx:
 export const toggledInput = (p: ApiAlertPolicy, enabled: boolean) => ({ ...policyInput(policyForm(p), p, { customerId: p.customerId, membershipId: "", timezone: p.timezone }), enabled, channels: p.channels });
 
 /** A refused policy write in the client's words. */
-export function policyRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string> }, t: T = en): string {
+export function policyRefusal(f: { code: string; fieldErrors: Record<string, string> }, t: T = en): string {
   if (f.code === "FORBIDDEN") return t("Not saved: only the account owner can switch default rules.");
   if (f.code === "CONFLICT") return t("Not saved: this policy changed meanwhile — the latest version is shown.");
   if (f.code === "NOT_FOUND") return t("Not saved: this policy no longer exists.");

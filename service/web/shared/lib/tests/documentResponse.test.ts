@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 const dal = vi.hoisted(() => {
   class CoreError extends Error {
-    constructor(public error: { code: string; messageKey: string }) { super(error.code); }
+    constructor(public error: DomainError) { super(error.code); }
   }
   return { coreOp: vi.fn(), CoreError };
 });
@@ -13,6 +13,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@ac/web/lib/dal", () => dal);
 
 import { documentResponse } from "@ac/web/lib/documentResponse";
+import { domainError, type DomainError } from "@ac/web/lib/domainError";
 
 describe("a certificate document as a response", () => {
   it("is the file, inline, not stored", async () => {
@@ -24,8 +25,8 @@ describe("a certificate document as a response", () => {
     expect(Buffer.from(await res.arrayBuffer()).toString()).toBe("%PDF-1.4 x");
   });
   it("passes the API's refusals on", async () => {
-    dal.coreOp.mockRejectedValueOnce(new dal.CoreError({ code: "NOT_FOUND", messageKey: "error.notFound" }));
-    dal.coreOp.mockRejectedValueOnce(new dal.CoreError({ code: "FORBIDDEN", messageKey: "error.forbidden" }));
+    dal.coreOp.mockRejectedValueOnce(new dal.CoreError(domainError({ code: "NOT_FOUND", messageKey: "error.notFound" })));
+    dal.coreOp.mockRejectedValueOnce(new dal.CoreError(domainError({ code: "FORBIDDEN", messageKey: "error.forbidden" })));
     const missing = await documentResponse("x");
     const denied = await documentResponse("x");
     expect([missing.status, denied.status]).toEqual([404, 403]);

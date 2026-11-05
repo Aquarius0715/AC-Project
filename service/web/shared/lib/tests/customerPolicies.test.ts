@@ -63,14 +63,14 @@ describe("customer alert policies", () => {
     expect(fresh).toEqual({ kind: "alert", name: "Bedroom too hot", customerId: "cust-a", timezone: "Asia/Kuala_Lumpur", enabled: true, priority: 50, recipientMembershipIds: ["member"], escalateAfterMinutes: 60, cooldownMinutes: 5,
       channels: ["inApp"], metric: "temperature", operator: "gte", threshold: 30, recoveryThreshold: 28, durationSeconds: 60, activeWindow: null, severity: "warning" });
     expect(toggledInput(policy({ channels: ["inApp", "whatsapp"] }), false)).toMatchObject({ id: "p1", enabled: false, channels: ["inApp", "whatsapp"], durationSeconds: 900 });
-    expect(policyRefusal({ code: "FORBIDDEN", messageKey: "error.ownerOnly", fieldErrors: {} })).toMatch(/account owner/);
-    expect(policyRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { recoveryThreshold: "error.recoveryDirection" } })).toMatch(/safe side/);
+    expect(policyRefusal({ code: "FORBIDDEN", fieldErrors: {} })).toMatch(/account owner/);
+    expect(policyRefusal({ code: "VALIDATION", fieldErrors: { recoveryThreshold: "error.recoveryDirection" } })).toMatch(/safe side/);
     // the editor in Malay
     const t = translator("ms");
     expect(summaryText(f, t)).toBe("Ingatkan saya apabila CO₂ kekal ≥ 1200 ppm selama 15 min pada hari bekerja 08:00–19:00. Selesai di bawah 1000 ppm.");
     expect(policyErrors({ ...f, recovery: "1300", duration: "0" }, t)).toEqual({ recovery: "Pemulihan 1300 mesti di bawah ambang 1200 (arah untuk ≥)", duration: "Antara 1 s dan 24 j." });
     expect(policyCards([policy({ channels: ["inApp", "email"] })], () => "AC 1", t)[0]).toMatchObject({ badge: "Kualiti udara", then: "Peringatan · maklumkan melalui dalam aplikasi + e-mel", attachedText: "Dilampirkan pada 2 AC: AC 1, AC 1" });
-    expect(policyRefusal({ code: "CONFLICT", messageKey: "", fieldErrors: {} }, t)).toBe("Tidak disimpan: polisi ini telah berubah — versi terkini dipaparkan.");
+    expect(policyRefusal({ code: "CONFLICT", fieldErrors: {} }, t)).toBe("Tidak disimpan: polisi ini telah berubah — versi terkini dipaparkan.");
   });
 });
 

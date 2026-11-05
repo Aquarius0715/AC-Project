@@ -248,7 +248,7 @@ at least one day and two different HH:mm times. */
 export function policyErrors(p: Pick<AdminPolicy, "name" | "priority" | "duration" | "cooldown" | "escalate" | "operator" | "threshold" | "recovery" | "recipients" | "activeWindow">, t: T = en): Record<string, string> {
   const e: Record<string, string> = conditionErrors(p, t);
   if (!p.name.trim() || p.name.length > 120) e.name = t("1–120 characters");
-  if (!(Number.isInteger(p.priority) && p.priority >= 0 && p.priority <= 100)) e.priority = t("A whole number 0–100");
+  if (!(Number.isSafeInteger(p.priority) && p.priority >= 0 && p.priority <= 100)) e.priority = t("A whole number 0–100");
   if (!(p.cooldown >= 1 && p.cooldown <= 1440)) e.cooldown = t("1–1440");
   if (!(p.escalate >= 1 && p.escalate <= 1440)) e.escalate = t("1–1440");
   if (p.recipients.length === 0) e.recipients = t("Add at least one recipient");
@@ -260,7 +260,7 @@ export function policyErrors(p: Pick<AdminPolicy, "name" | "priority" | "duratio
 the safe side of the threshold, and an “Only if …” window with a day and two different HH:mm times. */
 export function conditionErrors(p: Pick<DefaultRule, "duration" | "operator" | "threshold" | "recovery" | "activeWindow">, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
-  if (!(Number.isInteger(p.duration) && p.duration >= 1 && p.duration <= 86_400)) e.duration = t("Duration must be 1–86400 s");
+  if (!(Number.isSafeInteger(p.duration) && p.duration >= 1 && p.duration <= 86_400)) e.duration = t("Duration must be 1–86400 s");
   const rec = recoveryError(p.operator, p.threshold, p.recovery, t);
   if (rec) e.recovery = rec;
   const w = p.activeWindow;

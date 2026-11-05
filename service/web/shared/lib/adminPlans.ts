@@ -48,7 +48,7 @@ export const anchorOf = (p: Pick<ApiPlan, "anchorDay" | "nextDueAt"> | null, nex
 export function planErrors(f: { unitId: string; every: number; nextDueAt: string | null }, now: number, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
   if (!f.unitId) e.unitId = t("Choose the unit.");
-  if (!Number.isInteger(f.every) || f.every < 1 || f.every > 12) e.every = t("Every 1–12 months.");
+  if (!Number.isSafeInteger(f.every) || f.every < 1 || f.every > 12) e.every = t("Every 1–12 months.");
   if (!f.nextDueAt || Number.isNaN(Date.parse(f.nextDueAt))) e.nextDueAt = t("Enter the next date and time.");
   else if (Date.parse(f.nextDueAt) <= now) e.nextDueAt = t("The next date must be in the future.");
   return e;

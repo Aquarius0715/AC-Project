@@ -186,7 +186,7 @@ const FIELD_TEXT: Record<string, Record<string, string>> = {
   note: { "error.length": "At most 500 characters" },
 };
 /** Readable refusals of members.setUnavailability: the fields it names, or the reason the whole form was refused. */
-export function unavailabilityRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string> }, t: T = en): { fields: Record<string, string>; text: string | null } {
+export function unavailabilityRefusal(f: { code: string; fieldErrors: Record<string, string> }, t: T = en): { fields: Record<string, string>; text: string | null } {
   if (f.code === "NOT_FOUND") return { fields: {}, text: t("That technician is no longer in your company — reload the page.") };
   if (f.code !== "VALIDATION") return { fields: {}, text: null }; // the toast says it (actionMessage)
   const fields = Object.fromEntries(Object.entries(f.fieldErrors).map(([k, v]) => [k, FIELD_TEXT[k]?.[v] ? t(FIELD_TEXT[k][v]) : v]));

@@ -54,7 +54,7 @@ export function ControlView({ live }: Readonly<{ live: ControlLive }>) {
     if (kind === "cmd" && (reason.trim().length === 0 || reason.trim().length > 1000)) e.reason = t("Reason is required (1–1000 characters)");
     if (kind === "run") {
       const n = Number(minutes);
-      if (!Number.isInteger(n) || n < 1 || n > 15) e.durationMinutes = t("A test run lasts 1–15 minutes");
+      if (!Number.isSafeInteger(n) || n < 1 || n > 15) e.durationMinutes = t("A test run lasts 1–15 minutes");
       if (trReason.trim().length === 0 || trReason.trim().length > 1000) e.trReason = t("Reason is required (1–1000 characters)");
     }
     setErrors(e);

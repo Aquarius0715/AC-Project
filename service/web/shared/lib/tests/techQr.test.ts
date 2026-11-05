@@ -25,9 +25,9 @@ describe("technician QR scan", () => {
   });
 
   it("names the refusals and reads the label", () => {
-    expect(qrRefusal({ code: "NOT_FOUND", messageKey: "error.notFound" })).toMatchObject({ title: "Page unavailable", absent: true });
-    expect(qrRefusal({ code: "VALIDATION", messageKey: "error.validation" }).title).toBe("Not a label");
-    expect(qrRefusal({ code: "UNAVAILABLE", messageKey: "error.unavailable" }).text).toBe("The label could not be checked — try again.");
+    expect(qrRefusal({ code: "NOT_FOUND" })).toMatchObject({ title: "Page unavailable", absent: true });
+    expect(qrRefusal({ code: "VALIDATION" }).title).toBe("Not a label");
+    expect(qrRefusal({ code: "UNAVAILABLE" }).text).toBe("The label could not be checked — try again.");
     expect(scanCode("  ac-unit:u1 ")).toBe("ac-unit:u1");
   });
 });
@@ -37,7 +37,7 @@ describe("the QR scan in Malay with the display time zone (IR288)", () => {
     const m = qrMatch({ unitId: "u1", jobId: "job-c-aaaa" }, unit, { projection: "detail", id: "job-c-aaaa", type: "reactive", status: "in_progress", scheduledSlot: { startAt: "2026-09-21T02:00:00Z", endAt: "2026-09-21T04:00:00Z" }, alertIds: ["a1", "a2"] }, NOW, {}, MS);
     expect(m.job).toEqual({ label: "Kerja anda hari ini: job-c-aa", text: "21 Sep, 11:00 PG – 1:00 PTG GMT+9 · Pembaikan · sedang berjalan · 2 amaran berpaut", tone: "ok" });
     expect(qrMatch({ unitId: "u1", jobId: null }, null, null, NOW, { locked: true }, MS)).toMatchObject({ title: "Unit yang ditugaskan", sub: "Butiran unit dibuka apabila tetingkap kerja anda bermula." });
-    expect(qrRefusal({ code: "NOT_FOUND", messageKey: "error.notFound" }, MS.t).title).toBe("Halaman tidak tersedia");
-    expect(qrRefusal({ code: "TIMEOUT", messageKey: "error.timeout" }, MS.t)).toMatchObject({ title: "Imbasan gagal", text: "Label tidak dapat disemak — cuba lagi.", absent: false });
+    expect(qrRefusal({ code: "NOT_FOUND" }, MS.t).title).toBe("Halaman tidak tersedia");
+    expect(qrRefusal({ code: "TIMEOUT" }, MS.t)).toMatchObject({ title: "Imbasan gagal", text: "Label tidak dapat disemak — cuba lagi.", absent: false });
   });
 });

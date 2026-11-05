@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 // the photo is read through the DAL: answer with a stored photo whose name is the user's
 const dal = vi.hoisted(() => {
   class CoreError extends Error {
-    constructor(public error: { code: string; messageKey: string }) { super(error.code); }
+    constructor(public error: DomainError) { super(error.code); }
   }
   return { coreOp: vi.fn(), CoreError };
 });
@@ -12,6 +12,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@ac/web/lib/dal", () => dal);
 
 import { attachmentResponse } from "@ac/web/lib/attachmentResponse";
+import { domainError, type DomainError } from "@ac/web/lib/domainError";
 
 const open = () => attachmentResponse({ jobId: "j1", reportId: "r1", reportVersion: 2, attachmentId: "a1" });
 
@@ -27,8 +28,8 @@ describe("a stored report photo as a response", () => {
     expect(res.headers.get("cache-control")).toBe("no-store"); // a signature is personal data (IR434)
   });
   it("passes the API's refusals on", async () => {
-    dal.coreOp.mockRejectedValueOnce(new dal.CoreError({ code: "NOT_FOUND", messageKey: "error.notFound" }));
-    dal.coreOp.mockRejectedValueOnce(new dal.CoreError({ code: "FORBIDDEN", messageKey: "errors.assignment_ended" }));
+    dal.coreOp.mockRejectedValueOnce(new dal.CoreError(domainError({ code: "NOT_FOUND", messageKey: "error.notFound" })));
+    dal.coreOp.mockRejectedValueOnce(new dal.CoreError(domainError({ code: "FORBIDDEN", messageKey: "errors.assignment_ended" })));
     const missing = await open();
     const denied = await open();
     expect([missing.status, denied.status]).toEqual([404, 403]);

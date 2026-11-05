@@ -119,7 +119,7 @@ export function autoErrors(d: AutoDraft, temperatureRange: { min: number; max: n
   const e: Record<string, string> = {};
   if (codePoints(d.name.trim()) === 0 || codePoints(d.name.trim()) > 120) e.name = t("1–120 characters");
   const pr = Number(d.priority);
-  if (!(Number.isInteger(pr) && pr >= 0 && pr <= 100)) e.priority = t("An integer 0–100");
+  if (!(Number.isSafeInteger(pr) && pr >= 0 && pr <= 100)) e.priority = t("An integer 0–100");
   if (!d.timezone.trim()) e.timezone = t("Required");
   if (d.unitIds.length === 0) e.unitIds = t("Choose at least one unit");
   if ((d.type === "tariff" || d.type === "solar" || d.type === "battery") && (d.value.trim() === "" || !(Number(d.value) >= 0))) e.value = t("A value ≥ 0");

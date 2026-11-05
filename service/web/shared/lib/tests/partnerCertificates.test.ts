@@ -93,11 +93,11 @@ describe("partner certifications", () => {
     expect(certificateErrors({ ...f, membershipId: "", name: "", issued: "", file: { name: "a.gif", type: "image/gif", size: 10 } })).toEqual({ membershipId: "Choose a technician", name: "1–120 characters", issued: "Choose the issue date", file: "Use a PDF, JPG or PNG file" });
     expect(certificateErrors({ ...f, file: { name: "big.pdf", type: "application/pdf", size: 10_000_001 } }).file).toBe("The file is larger than 10 MB");
     expect(certDates(f)).toEqual({ issuedAt: "2026-09-27T16:00:00.000Z", expiresAt: "2029-09-26T16:00:00.000Z" });
-    expect(certificateRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { expiresAt: "error.range", file: "error.invalidFile" } })).toEqual({
+    expect(certificateRefusal({ code: "VALIDATION", fieldErrors: { expiresAt: "error.range", file: "error.invalidFile" } })).toEqual({
       fields: { expires: "The expiry date must be after the issue date", file: "Use a PDF, JPG or PNG file of at most 10 MB" }, text: null,
     });
-    expect(certificateRefusal({ code: "NOT_FOUND", messageKey: "error.notFound", fieldErrors: {} }).text).toBe("That technician or certificate is no longer in your company — reload the page.");
-    expect(certificateRefusal({ code: "CONFLICT", messageKey: "error.versionConflict", fieldErrors: {} }).text).toBe("The certificate changed in the meantime — the page shows the latest state.");
+    expect(certificateRefusal({ code: "NOT_FOUND", fieldErrors: {} }).text).toBe("That technician or certificate is no longer in your company — reload the page.");
+    expect(certificateRefusal({ code: "CONFLICT", fieldErrors: {} }).text).toBe("The certificate changed in the meantime — the page shows the latest state.");
     expect([fileSize(412_000), fileSize(2_400_000), fileSize(10)]).toEqual(["412 KB", "2.4 MB", "1 KB"]);
   });
 

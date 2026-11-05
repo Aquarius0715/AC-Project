@@ -429,7 +429,7 @@ export function SearchSelect({ value, onChange, options, label, placeholder, lim
   const matches = !needle || needle === current?.label.toLowerCase() ? options : options.filter((o) => o.label.toLowerCase().includes(needle));
   return (
     <Combobox items={options} filteredItems={matches} limit={limit} value={current} openOnInputClick
-      itemToStringLabel={(o: { id: string; label: string }) => o.label} isItemEqualToValue={(a: { id: string }, b: { id: string }) => a.id === b.id}
+      itemToStringLabel={(o: (typeof options)[number]) => o.label} isItemEqualToValue={(a: (typeof options)[number], b: (typeof options)[number]) => a.id === b.id}
       onInputValueChange={(q) => { setQuery(q); }} onValueChange={(o) => { if (o && o.id !== value) onChange(o.id); }}>
       {/* the input opens the list (a click, the arrow keys); the chevron only shows that it is a list */}
       <ComboboxInput aria-label={label} placeholder={placeholder ?? t("Type to search…")} showTrigger={false} className={cn("w-full min-w-0", className)}>

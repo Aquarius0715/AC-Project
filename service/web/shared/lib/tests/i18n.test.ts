@@ -50,7 +50,7 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
   });
 
   // NFR-07 / IR44 key check: the English texts the code translates and the dictionary's keys are the same set
-  const root = resolve(__dirname, "../../..");
+  const root = resolve(import.meta.dirname, "../../..");
   const code = ["shared", "customer/app", "partner/app", "technician/app", "admin/app"].flatMap((d) => sources(join(root, d))).map((f) => readFileSync(f, "utf8")).join("\n");
 
   it("has a Malay text for every literal the code translates", () => {

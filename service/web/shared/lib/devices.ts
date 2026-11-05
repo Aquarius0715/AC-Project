@@ -104,7 +104,7 @@ export function capabilityErrors(d: CapabilityDraft, update: boolean, t: T = en)
     if (seen.has(s.metric)) e.sensors = t("One sensor per metric ({metric} twice)", { metric: s.metric });
     seen.add(s.metric);
     const v = toNumber(s.staleAfterSeconds);
-    if (!(Number.isInteger(v) && v >= 10 && v <= 86_400)) e.sensors = t("Stale after must be 10–86400 seconds");
+    if (!(Number.isSafeInteger(v) && v >= 10 && v <= 86_400)) e.sensors = t("Stale after must be 10–86400 seconds");
   }
   if (d.firmware.some((x) => x.length > 32)) e.firmware = t("Firmware versions are at most 32 characters");
   if (update && (codePoints(d.changeReason.trim()) === 0 || codePoints(d.changeReason.trim()) > 1000)) e.changeReason = t("A reason is required (1–1000 characters)");
@@ -226,7 +226,7 @@ labels are stored with the campaign, so they stay English data; the screen words
 export interface CampaignDraft { modelId: string; targetVersion: string; deviceIds: string[]; waves: string; startLocal: string; endLocal: string; autoPause: string; startAt: string }
 export function parseWaves(s: string): { label: string; percent: number }[] | null {
   const ps = s.split(",").map((x) => Number(x.replace("%", "").trim()));
-  if (ps.length === 0 || ps.some((p) => !Number.isInteger(p) || p < 1 || p > 100)) return null;
+  if (ps.length === 0 || ps.some((p) => !Number.isSafeInteger(p) || p < 1 || p > 100)) return null;
   for (let i = 1; i < ps.length; i++) if ((ps[i] ?? 0) <= (ps[i - 1] ?? 0)) return null;
   return ps.at(-1) === 100 ? ps.map((p, i) => ({ label: i === ps.length - 1 ? `Wave ${String(i + 1)} · 100 %` : `Wave ${String(i + 1)} · ${String(p)} %`, percent: p })) : null;
 }
@@ -239,7 +239,7 @@ export function campaignErrors(d: CampaignDraft, now: Date, zone = "Asia/Kuala_L
   if (d.deviceIds.length === 0) e.deviceIds = t("Choose at least one device");
   if (!parseWaves(d.waves)) e.waves = t("Ascending percentages ending at 100, e.g. 10, 50, 100");
   const ap = Number(d.autoPause);
-  if (!(Number.isInteger(ap) && ap >= 1 && ap <= 50)) e.autoPause = t("1–50 %");
+  if (!(Number.isSafeInteger(ap) && ap >= 1 && ap <= 50)) e.autoPause = t("1–50 %");
   if (!/^\d{2}:\d{2}$/.test(d.startLocal) || !/^\d{2}:\d{2}$/.test(d.endLocal)) e.window = t("HH:MM – HH:MM");
   const at = Date.parse(campaignStart(d, zone));
   if (!d.startAt || !(at >= now.getTime() + 24 * 3600 * 1000)) e.startAt = t("At least 24 hours ahead");

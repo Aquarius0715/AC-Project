@@ -100,11 +100,11 @@ describe("partner team & capacity", () => {
   });
 
   it("reads the refusals of members.setUnavailability", () => {
-    expect(unavailabilityRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { to: "error.range", type: "error.invalid" } })).toEqual({
+    expect(unavailabilityRefusal({ code: "VALIDATION", fieldErrors: { to: "error.range", type: "error.invalid" } })).toEqual({
       fields: { to: "The last day must be on or after the first day, at most 31 days", type: "Choose a type" }, text: null,
     });
-    expect(unavailabilityRefusal({ code: "NOT_FOUND", messageKey: "error.notFound", fieldErrors: {} }).text).toBe("That technician is no longer in your company — reload the page.");
-    expect(unavailabilityRefusal({ code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {} })).toEqual({ fields: {}, text: null });
+    expect(unavailabilityRefusal({ code: "NOT_FOUND", fieldErrors: {} }).text).toBe("That technician is no longer in your company — reload the page.");
+    expect(unavailabilityRefusal({ code: "UNAVAILABLE", fieldErrors: {} })).toEqual({ fields: {}, text: null });
   });
 
   it("lists the upcoming unavailable days and says what a removal does (IR612)", () => {

@@ -191,7 +191,7 @@ export function partErrors(label: string, qty: string, t: T = en): Partial<Recor
   const e: Partial<Record<PartField, string>> = {};
   if (!label.trim()) e.name = t("Choose a catalog part or name it");
   const n = Number(qty);
-  if (!Number.isInteger(n) || n < 1 || n > 999) e.qty = t("Quantity must be 1–999");
+  if (!Number.isSafeInteger(n) || n < 1 || n > 999) e.qty = t("Quantity must be 1–999");
   return e;
 }
 /** Refrigerant's fields and checks: the cylinder, and the kilograms recovered and charged, 0 or more (IR625). */

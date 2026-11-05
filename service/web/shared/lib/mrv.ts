@@ -119,7 +119,7 @@ export function factorErrors(d: FactorDraft, t: T = en): Record<string, string> 
   const e: Record<string, string> = {};
   if (codePoints(d.region.trim()) === 0 || codePoints(d.region.trim()) > 120) e.region = t("1–120 characters");
   const y = Number(d.year);
-  if (!(Number.isInteger(y) && y >= 2000 && y <= 2100)) e.year = t("A year 2000–2100");
+  if (!(Number.isSafeInteger(y) && y >= 2000 && y <= 2100)) e.year = t("A year 2000–2100");
   const k = Number(d.kgCO2ePerKWh);
   if (!(d.kgCO2ePerKWh.trim() !== "" && k > 0 && k <= 10)) e.kgCO2ePerKWh = t("Above 0 and at most 10 kgCO₂e/kWh");
   if (codePoints(d.source.trim()) === 0 || codePoints(d.source.trim()) > 500) e.source = t("1–500 characters, stating the demo source");

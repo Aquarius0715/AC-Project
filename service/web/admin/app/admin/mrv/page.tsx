@@ -59,7 +59,7 @@ async function AdminMRVPageContent({ searchParams }: Readonly<PageProps<"/admin/
         coreOp<Page<ApiMRVReport>>("mrv.versions", { id, query: { limit: 100 } }),
         coreOp<ApiMRVReport>("mrv.get", { id }),
       ]);
-      const shown = Number.isInteger(wanted) && wanted > 0 && wanted !== latest.version ? await coreOp<ApiMRVReport>("mrv.get", { id, reportVersion: wanted }) : latest;
+      const shown = Number.isSafeInteger(wanted) && wanted > 0 && wanted !== latest.version ? await coreOp<ApiMRVReport>("mrv.get", { id, reportVersion: wanted }) : latest;
       live.reports.selected = {
         report: shown, latestVersion: latest.version, versions: versions.items.map((v) => ({ version: v.version, status: v.status })),
         view: mrvView(shown, customers, unitOptions, i), review: reviewItems(shown, i),

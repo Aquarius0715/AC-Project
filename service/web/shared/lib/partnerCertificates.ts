@@ -218,7 +218,7 @@ const TEXT: Record<string, string> = {
   "error.invalid": "Not a valid choice",
 };
 /** Readable refusals of certificates.submit and certificates.requestTraining: the fields they name, or the reason. */
-export function certificateRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string> }, t: T = en): { fields: Record<string, string>; text: string | null } {
+export function certificateRefusal(f: { code: string; fieldErrors: Record<string, string> }, t: T = en): { fields: Record<string, string>; text: string | null } {
   if (f.code === "NOT_FOUND") return { fields: {}, text: t("That technician or certificate is no longer in your company — reload the page.") };
   if (f.code === "CONFLICT") return { fields: {}, text: t("The certificate changed in the meantime — the page shows the latest state.") };
   if (f.code !== "VALIDATION") return { fields: {}, text: null };

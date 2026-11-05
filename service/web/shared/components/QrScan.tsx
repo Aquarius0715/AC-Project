@@ -37,7 +37,7 @@ export function QrScan({ open, onClose }: Readonly<{ open: boolean; onClose: () 
   const close = () => { setState({ kind: "idle" }); setCode(""); onClose(); };
   const scan = async (raw: string) => {
     const c = scanCode(raw);
-    if (!c) { setState({ kind: "refused", ...qrRefusal({ code: "VALIDATION", messageKey: "error.validation" }, t) }); return; }
+    if (!c) { setState({ kind: "refused", ...qrRefusal({ code: "VALIDATION" }, t) }); return; }
     setState({ kind: "busy" });
     try {
       const r = await callOp<ApiQrResolution>("units.resolveQr", { code: c });

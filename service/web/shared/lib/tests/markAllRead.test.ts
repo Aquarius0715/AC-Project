@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // the inbox's Server Action calls the Core API through the DAL; refresh re-renders the page
 const dal = vi.hoisted(() => {
   class CoreError extends Error {
-    constructor(public error: { code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds: number | null }) { super(error.code); }
+    constructor(public error: DomainError) { super(error.code); }
   }
   return { coreOp: vi.fn(), CoreError };
 });
@@ -13,6 +13,7 @@ vi.mock("next/cache", () => ({ refresh: vi.fn() }));
 vi.mock("@ac/web/lib/dal", () => dal);
 
 import { markAllRead } from "@ac/web/screens/shell/notifications/actions";
+import { domainError, type DomainError } from "@ac/web/lib/domainError";
 
 beforeEach(() => dal.coreOp.mockReset());
 
@@ -25,7 +26,7 @@ describe("Mark all as read", () => {
     expect(dal.coreOp).toHaveBeenCalledWith("notifications.markAllRead", { ids: ["n1", "n2", "n3"] }, { write: true });
   });
   it("passes a refusal on, with the wait of the write limit", async () => {
-    dal.coreOp.mockRejectedValueOnce(new dal.CoreError({ code: "RATE_LIMITED", messageKey: "error.rateLimited", fieldErrors: {}, retryAfterSeconds: 12 }));
+    dal.coreOp.mockRejectedValueOnce(new dal.CoreError(domainError({ code: "RATE_LIMITED", messageKey: "error.rateLimited", fieldErrors: {}, retryAfterSeconds: 12 })));
     expect(await markAllRead(["n1"])).toEqual({ marked: 0, skipped: 0, failure: { code: "RATE_LIMITED", messageKey: "error.rateLimited", fieldErrors: {}, retryAfterSeconds: 12 } });
   });
   it("marks nothing when the Core API is unreachable", async () => {
