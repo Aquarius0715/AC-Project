@@ -36,6 +36,7 @@ export function DevicesView({ initial }: Readonly<{ initial?: string }>) {
     { t: "09-22 08:12", title: "Missed 3 heartbeats · heartbeat (not proof of power loss)", detail: "open", tone: "warn" },
     { t: "09-20 10:02", title: "check · DEVICE_TIMEOUT", detail: "retry succeeded 10:05" },
   ];
+  const duplicate = devices.some((d) => d.serial.toLowerCase() === f.serial.toLowerCase()) ? "Duplicate serial (CONFLICT)" : undefined;
   return (
     <Page>
       <Tabs value={filter} onChange={setFilter} tabs={(["all", "online", "offline", "tamper"] as F[]).map((k) => ({ id: k, label: k[0].toUpperCase() + k.slice(1), count: count(k) }))} />
@@ -69,7 +70,7 @@ export function DevicesView({ initial }: Readonly<{ initial?: string }>) {
         </div>
       </div>
       <Modal open={reg} onClose={() => { setReg(false); }} title="Register device" footer={<><Btn onClick={() => { setReg(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!f.serial.trim() || devices.some((d) => d.serial.toLowerCase() === f.serial.toLowerCase())) return; toast("Device registered"); setReg(false); }}>Register</Btn></>}>
-        <Field label="Serial" error={tried && !f.serial.trim() ? "Serial is required" : (devices.some((d) => d.serial.toLowerCase() === f.serial.toLowerCase()) ? "Duplicate serial (CONFLICT)" : undefined)}><Input value={f.serial} onChange={(e) => { setF({ ...f, serial: e.target.value }); }} placeholder="AC-002" /></Field>
+        <Field label="Serial" error={tried && !f.serial.trim() ? "Serial is required" : duplicate}><Input value={f.serial} onChange={(e) => { setF({ ...f, serial: e.target.value }); }} placeholder="AC-002" /></Field>
         <Field label="Unit to bind"><Input value={f.unit} onChange={(e) => { setF({ ...f, unit: e.target.value }); }} placeholder="unit-t11-new" /></Field>
       </Modal>
       <Modal open={!!cal} onClose={() => { setCal(null); }} title={`Calibrate ${cal ?? ""}`} footer={<><Btn onClick={() => { setCal(null); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setHist((h) => [`${cal ?? ""} · ref ${f.ref} / measured ${f.meas} · offset ${(+f.ref - +f.meas).toFixed(1)} · just now · you`, ...h]); setCal(null); toast("Calibration recorded"); }}>Record calibration</Btn></>}>

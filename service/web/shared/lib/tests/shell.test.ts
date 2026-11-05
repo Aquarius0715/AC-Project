@@ -18,6 +18,12 @@ vi.mock("@ac/web/lib/dal", () => {
 
 import { loadShell } from "@ac/web/lib/shell";
 
+// HQ's alerts per filter: 2 open and 1 acknowledged critical, 5 warnings each
+const alertTotal = (f: { severity?: string; status?: string }) => {
+  if (f.severity !== "critical") return 5;
+  return f.status === "open" ? 2 : 1;
+};
+
 beforeEach(() => {
   api.on = true;
   coreOp.mockReset();
@@ -44,7 +50,7 @@ describe("loadShell", () => {
 
   it("sums HQ's critical and warning alerts over open and acknowledged", async () => {
     coreOp.mockImplementation((op: string, input: { filters: { severity?: string; status?: string } }) =>
-      Promise.resolve(op === "notifications.list" ? { total: 1 } : { total: input.filters.severity === "critical" ? (input.filters.status === "open" ? 2 : 1) : 5 }));
+      Promise.resolve({ total: op === "notifications.list" ? 1 : alertTotal(input.filters) }));
     const shell = await loadShell("admin");
     expect(shell?.badges).toEqual({ "/notifications": 1, "/admin/alerts": 2 + 1 + 5 + 5 });
     expect(coreOp.mock.calls.filter(([op]) => op === "alerts.list")).toHaveLength(4);

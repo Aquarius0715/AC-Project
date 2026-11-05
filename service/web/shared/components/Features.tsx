@@ -2,7 +2,7 @@
 
 /** Features confirmed from the Figma proposals on 2026-10-02 (FR-C14, C16, A18–A20, A23). */
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Check, Choice, DataTable, Field, Input, Kpi, ListRow, Modal, PowerBadge, Select, Steps, SummaryList,  UtilizationBar, cx, useToast } from "./ui";
+import { Badge, Banner, Btn, Card, Check, Choice, DataTable, Field, Input, Kpi, ListRow, Modal, PowerBadge, Select, Steps, SummaryList,  UtilizationBar, cx, useToast, type Tone } from "./ui";
 import { Icon } from "./Icon";
 import { Button } from "@ac/web/components/ui/button";
 
@@ -37,6 +37,7 @@ export function GroupControl({ space, units }: Readonly<{ space: string; units: 
   const [review, setReview] = useState(false);
   const toggle = (id: string) => { setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id])); };
   const chosen = units.filter((u) => sel.includes(u.id));
+  const powerWord = power === "on" ? "On" : "Off";
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 px-3 py-2 text-[13px]"><b>{sel.length} selected</b><span className="flex gap-2"><Btn size="sm" onClick={() => { setSel(units.filter((u) => u.online).map((u) => u.id)); }}>Select all online ({units.filter((u) => u.online).length})</Btn><Btn size="sm" variant="ghost" onClick={() => { setSel([]); }}>Clear</Btn></span></div>
@@ -59,7 +60,7 @@ export function GroupControl({ space, units }: Readonly<{ space: string; units: 
         <p className="mt-2 text-[11px] text-muted-foreground">Each AC gets its own command and confirmation (same as single control). One space only · owner role only.</p>
       </Card>
       <Modal open={review} onClose={() => { setReview(false); }} title={`Send to ${String(chosen.length)} ACs in ${space}?`} footer={<><Btn onClick={() => { setReview(false); }}>Back</Btn><Btn variant="primary" onClick={() => { setReview(false); toast(`${String(chosen.length)} commands sent — results arrive per AC`); }}>Send {chosen.length} commands</Btn></>}>
-        <DataTable rowKey={(r) => r.id} rows={chosen} cols={[{ key: "n", label: "AC", render: (r) => <b>{r.name}</b> }, { key: "c", label: "Change", render: (r) => (r.min && setpoint < r.min ? <span className="text-warn">Set to {r.min} °C (restriction)</span> : `${power === "on" ? "On" : "Off"} · ${String(setpoint)} °C · ${mode}`) }]} />
+        <DataTable rowKey={(r) => r.id} rows={chosen} cols={[{ key: "n", label: "AC", render: (r) => <b>{r.name}</b> }, { key: "c", label: "Change", render: (r) => (r.min && setpoint < r.min ? <span className="text-warn">Set to {r.min} °C (restriction)</span> : `${powerWord} · ${String(setpoint)} °C · ${mode}`) }]} />
         <Banner>Offline or restricted ACs are skipped or clamped and shown per AC. There is no rollback across ACs.</Banner>
       </Modal>
     </div>
@@ -143,13 +144,14 @@ export function FirmwareCampaigns() {
 }
 
 /* ───── Admin · Contractor payouts (FR-A23) ───── */
+const STATEMENT_TONE = new Map<string, Tone>([["Paid", "ok"], ["Draft", "muted"]]);
 export function ContractorPayouts() {
   const toast = useToast();
   const [st, setSt] = useState<"Draft" | "Approved" | "Paid">("Approved");
   return (
     <div className="split-rev">
       <Card title="Statements · September 2026" action={<Btn size="sm" onClick={() => { toast("Draft statements regenerated for September"); }}>Generate</Btn>} className="self-start">
-        <ListRow selected><div className="min-w-0 flex-1"><b className="text-[13px]">contractor-a</b><div className="text-[11px] text-muted-foreground">stmt-2026-09-a · 5 jobs</div></div><Badge tone={st === "Paid" ? "ok" : (st === "Draft" ? "muted" : "primary")}>{st}</Badge></ListRow>
+        <ListRow selected><div className="min-w-0 flex-1"><b className="text-[13px]">contractor-a</b><div className="text-[11px] text-muted-foreground">stmt-2026-09-a · 5 jobs</div></div><Badge tone={STATEMENT_TONE.get(st) ?? "primary"}>{st}</Badge></ListRow>
         <ListRow><div className="min-w-0 flex-1"><b className="text-[13px]">contractor-b</b><div className="text-[11px] text-muted-foreground">stmt-2026-09-b · 3 jobs</div></div><Badge>Draft</Badge></ListRow>
       </Card>
       <Card title="contractor-a · stmt-2026-09-a" sub="Priced by the rate card effective at acceptance · pays 10-15" action={<span className="flex gap-2">{st === "Draft" && <Btn size="sm" variant="primary" onClick={() => { setSt("Approved"); }}>Approve</Btn>}{st === "Approved" && <Btn size="sm" variant="primary" onClick={() => { setSt("Paid"); toast("Marked paid"); }}>Mark paid</Btn>}</span>}>

@@ -24,6 +24,11 @@ export function DemoView({ live }: Readonly<{ live: DemoLive }>) {
   const ok = () => { setFailed(null); };
   const fail = (f: ActionFailure) => { setFailed(demoRefusal(f)); };
   const isBusy = pending || expiring;
+  // why the offline trigger has no device: none readable yet, none bound to a visible unit, or none for this role
+  const noDevice = () => {
+    if (live.hidden) return t("Your devices need a current assignment here");
+    return t(live.devices ? "No device is bound to a unit you can see" : "Devices are not visible to this role");
+  };
   return (
     <DemoFrame
       above={failed && <Banner tone="crit">{t("Not done: {reason}", { reason: t(failed) })}</Banner>}
@@ -37,7 +42,7 @@ export function DemoView({ live }: Readonly<{ live: DemoLive }>) {
           <div className="grid-fluid" style={{ ["--min" as string]: "240px" }}>
             {device?.fault
               ? <TriggerTile icon="online" tone="ok" title={t("Restore connection")} sub={t("Restored on {unit} · the open communication loss as its source", { unit: device.unit })} disabled={isBusy} onClick={() => { run(() => deviceSignal(device.id, true), t("{unit}: connection restored", { unit: device.unit }), ok, fail); }} />
-              : <TriggerTile icon="offline" title={t("Device offline")} sub={device ? t("Communication lost on {unit}", { unit: device.unit }) : t(live.hidden ? "Your devices need a current assignment here" : (live.devices ? "No device is bound to a unit you can see" : "Devices are not visible to this role"))} disabled={isBusy} onClick={device ? () => { run(() => deviceSignal(device.id, false), t("{unit}: connection lost", { unit: device.unit }), ok, fail); } : undefined} />}
+              : <TriggerTile icon="offline" title={t("Device offline")} sub={device ? t("Communication lost on {unit}", { unit: device.unit }) : noDevice()} disabled={isBusy} onClick={device ? () => { run(() => deviceSignal(device.id, false), t("{unit}: connection lost", { unit: device.unit }), ok, fail); } : undefined} />}
             <TriggerTile icon="time" title={t("Delay transport")} sub={t("3000 ms on commands.create · browser demo only")} disabled />
             <TriggerTile icon="signOut" title={t("Expire session")} sub={t("Session expired for the current membership")} disabled={isBusy} onClick={() => { startExpire(() => expireSession()); }} />
           </div>

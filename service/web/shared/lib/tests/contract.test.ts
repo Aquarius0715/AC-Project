@@ -11,6 +11,12 @@ import { coreWrites } from "@ac/web/lib/routes.gen";
 // service-contracts.ts; the API refuses unknown fields), only the filters the operation's catalog row allows (the REST
 // binding refuses others), and literal values the contract fixes (count: 8 of automations.nextRuns). Inputs built
 // elsewhere are typed by their own mappers' tests.
+// a field seen before keeps allowing anything, or allows the literals of both member types; a new field takes these
+const mergeLiterals = <V>(seen: V[] | null | undefined, lit: V[]): V[] | null => {
+  if (seen === undefined) return lit;
+  return seen === null ? null : [...new Set([...seen, ...lit])];
+};
+const KEYWORD_VALUE = new Map([[ts.SyntaxKind.TrueKeyword, true], [ts.SyntaxKind.FalseKeyword, false]]);
 const web = fileURLToPath(new URL("../../../", import.meta.url));
 const contractFile = join(web, "../../docs/02-design/service-contracts.ts");
 const catalogFile = join(web, "../api/internal/ops/catalog_gen.go");
@@ -44,7 +50,7 @@ function contractInputs(): Map<string, Map<string, Field>> {
           const lit = literalsOf(checker.getTypeOfSymbolAtLocation(p, n));
           // a field of several union members allows the literals of all of them; any non-literal type allows anything
           const before = fields.get(p.getName());
-          const literals = lit ? before ? before.literals === null ? null : [...new Set([...before.literals, ...lit])] : lit : null;
+          const literals = lit ? mergeLiterals(before?.literals, lit) : null;
           fields.set(p.getName(), { literals });
         }
       }
@@ -99,8 +105,11 @@ describe("the web's calls against the Core API contract (IR312)", () => {
               const field = fields.get(key);
               if (!field) { problems.push(`${where} ${op}: unknown field ${key}`); continue; }
               const init = ts.isPropertyAssignment(p) ? p.initializer : null;
-              const value = init && (ts.isNumericLiteral(init) ? Number(init.text) : ts.isStringLiteral(init) ? init.text : init.kind === ts.SyntaxKind.TrueKeyword ? true : init.kind === ts.SyntaxKind.FalseKeyword ? false : undefined);
-              if (field.literals && value !== undefined && value !== null && !field.literals.includes(value)) problems.push(`${where} ${op}: ${key} ${JSON.stringify(value)} is not one of ${JSON.stringify(field.literals)}`);
+              // the value of a literal initializer, or undefined for anything else
+              const keyword = init ? KEYWORD_VALUE.get(init.kind) : undefined;
+              const text = init && ts.isStringLiteral(init) ? init.text : keyword;
+              const value = init && ts.isNumericLiteral(init) ? Number(init.text) : text;
+              if (field.literals && value !== undefined && !field.literals.includes(value)) problems.push(`${where} ${op}: ${key} ${JSON.stringify(value)} is not one of ${JSON.stringify(field.literals)}`);
             }
             const property = (o: ts.ObjectLiteralExpression, k: string) => o.properties.find((p): p is ts.PropertyAssignment => ts.isPropertyAssignment(p) && name(p) === k);
             const q = property(argument, "query");

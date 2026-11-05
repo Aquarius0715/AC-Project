@@ -7,11 +7,12 @@ import type { ApiEnergySummary } from "@ac/web/lib/energy";
 import { i18nOf } from "@ac/web/lib/i18n";
 
 const MS_TOKYO = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
+const UNIT_OF = new Map([["power", "kW"], ["temperature", "°C"]]); // humidity in %
 
 const NOW = Date.parse("2026-09-14T01:12:30Z"); // Mon 09:12:30 KL
 const m = (metric: string, value: number | null, over: Record<string, unknown> = {}) => {
   return {
-    id: metric, unitId: "u1", sensorId: "s", metric, value, unit: metric === "power" ? "kW" : (metric === "temperature" ? "°C" : "%"), observedAt: "2026-09-14T01:12:00Z", origin: "measured" as const, quality: "valid" as const, qualityReason: null, ...over,
+    id: metric, unitId: "u1", sensorId: "s", metric, value, unit: UNIT_OF.get(metric) ?? "%", observedAt: "2026-09-14T01:12:00Z", origin: "measured" as const, quality: "valid" as const, qualityReason: null, ...over,
   };
 };
 const unit = (id: string, over: Partial<OverviewUnit> = {}): OverviewUnit => {
@@ -84,7 +85,8 @@ describe("customer overview", () => {
   });
 
   it("plots the hourly averages of the last 24 h, rounded, an hour without a valid reading empty (IR607)", () => {
-    const hours = Array.from({ length: 24 }, (_, k) => ({ value: k === 23 ? 1000.4 : (k === 5 ? 712.6 : null) }));
+    const sample = new Map([[23, 1000.4], [5, 712.6]]); // two hours with a value, the others without
+    const hours = Array.from({ length: 24 }, (_, k) => ({ value: sample.get(k) ?? null }));
     const pts = bucketPoints(hours);
     expect([pts.length, pts[23], pts[5], pts.filter((p) => p !== null).length]).toEqual([24, 1000, 713, 2]);
   });

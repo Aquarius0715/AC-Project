@@ -8,9 +8,10 @@ import { i18nOf, showClock, showDay } from "@ac/web/lib/i18n";
 import { setsTemperature, type ApiUnitDetail } from "@ac/web/lib/units";
 
 const MS_TOKYO = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
+const UNIT_OF = new Map([["co2", "ppm"], ["pm25", "µg/m³"], ["temperature", "°C"]]); // humidity in %
 const m = (metric: string, value: number | null, over: Partial<ApiMeasurement> = {}): ApiMeasurement => {
   return {
-    id: "m", unitId: "u", sensorId: "s", metric, value, unit: metric === "co2" ? "ppm" : metric === "pm25" ? "µg/m³" : metric === "temperature" ? "°C" : "%", observedAt: "2026-09-14T01:12:30Z", origin: "measured", quality: "valid", qualityReason: null, ...over,
+    id: "m", unitId: "u", sensorId: "s", metric, value, unit: UNIT_OF.get(metric) ?? "%", observedAt: "2026-09-14T01:12:30Z", origin: "measured", quality: "valid", qualityReason: null, ...over,
   };
 };
 

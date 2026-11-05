@@ -36,7 +36,8 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
     return readdirSync(directory).flatMap((f) => {
       const path = join(directory, f);
       if (["node_modules", ".next", "tests", "e2e"].includes(f)) return [];
-      return statSync(path).isDirectory() ? sources(path) : (/\.tsx?$/.test(f) && !f.endsWith("i18n-ms.ts") ? [path] : []);
+      if (statSync(path).isDirectory()) return sources(path);
+      return /\.tsx?$/.test(f) && !f.endsWith("i18n-ms.ts") ? [path] : [];
     });
   };
   const code = ["shared", "customer/app", "partner/app", "technician/app", "admin/app"].flatMap((d) => sources(join(root, d))).map((f) => readFileSync(f, "utf8")).join("\n");

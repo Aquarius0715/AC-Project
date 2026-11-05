@@ -89,6 +89,7 @@ export function AppShell({ role: forced, live, children }: Readonly<{ role?: Rol
   const [assistant, setAssistant] = useState(false);
   const [qr, setQr] = useState(false);
   const unread = useJobStore().notes.filter((n) => n.role === role && !n.read).length;
+  const unreadBadge = (href: string) => (live ? count(href) : String(3 + unread)); // the demo counts its own unread
 
   const items = (live ? config.nav.map((i) => ({ ...i, badge: count(i.href) })) : config.nav).map((i) => ({ ...i, label: t(i.label) }));
   // the page's name: the menu item with the longest matching path (/customer/units/x is "Units & locations")
@@ -111,7 +112,7 @@ export function AppShell({ role: forced, live, children }: Readonly<{ role?: Rol
           <nav className="flex flex-col gap-0.5">
             {role === "client" && isOwner && <NavLink href="/customer/users" label={t("Users")} icon="users" active={pathname === "/customer/users"} />}
             {role === "contractor" && <NavLink href="/partner/users" label={t("Users")} icon="users" active={pathname === "/partner/users"} />}
-            {SHARED.map((s) => <NavLink key={s.href} {...s} label={t(s.label)} active={pathname === s.href} badge={s.href === "/notifications" ? (live ? count(s.href) : String(3 + unread)) : undefined} />)}
+            {SHARED.map((s) => <NavLink key={s.href} {...s} label={t(s.label)} active={pathname === s.href} badge={s.href === "/notifications" ? unreadBadge(s.href) : undefined} />)}
             <Link href="/demo" className={cx("flex items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold text-warn hover:bg-warn-soft/50", pathname === "/demo" && "bg-warn-soft/60")}>
               <Icon name="demo" className="text-[15px]" />
               <span className="flex-1">{t("Demo controls")}</span>
