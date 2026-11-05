@@ -16,6 +16,7 @@ import { deleteAutomation, saveAutomation, testEvent, updateConsent } from "../a
 import { Icon } from "@ac/web/components/Icon";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@ac/web/components/ui/dropdown-menu";
 import { Button } from "@ac/web/components/ui/button";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
 
 interface Ac { id: string; name: string; property: string; path: string }
@@ -293,7 +294,7 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
             {draft.trigger === "location" && (
               <>
                 <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
-                  <Field label={t("Event")}><Select value={draft.event} onChange={(e) => { set({ event: e.target.value as Draft["event"] }); }}><option value="arrival">{t("Everyone arrives")}</option><option value="departure">{t("Everyone leaves")}</option></Select></Field>
+                  <Field label={t("Event")}><Select value={draft.event} onChange={(e) => { set({ event: oneOf(["arrival", "departure"] as const, e.target.value, draft.event) }); }}><option value="arrival">{t("Everyone arrives")}</option><option value="departure">{t("Everyone leaves")}</option></Select></Field>
                   <Field label={t("Place")} hint={t("Where the target AC is")}><Input value={ac?.property ?? "—"} readOnly className="bg-surface2" /></Field>
                 </div>
                 {errors.condition && <p className="flex items-center gap-1 text-xs font-medium text-crit"><Icon name="error" />{errors.condition}</p>}
@@ -305,7 +306,7 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
             )}
             {draft.trigger === "weather" && (
               <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">
-                <Field label={t("Outdoor temperature")}><Select value={draft.operator} onChange={(e) => { set({ operator: e.target.value as Draft["operator"] }); }}>{compares.map((c) => <option key={c} value={c}>{compareText(c)}</option>)}</Select></Field>
+                <Field label={t("Outdoor temperature")}><Select value={draft.operator} onChange={(e) => { set({ operator: oneOf(compares, e.target.value, draft.operator) }); }}>{compares.map((c) => <option key={c} value={c}>{compareText(c)}</option>)}</Select></Field>
                 <Field label={t("°C (demo weather)")} error={errors.value}><Input inputMode="decimal" value={draft.value} onChange={(e) => { set({ value: e.target.value }); }} /></Field>
               </div>
             )}
@@ -395,7 +396,7 @@ function OnlyIf({ draft, errors, set }: Readonly<{ draft: Draft; errors: Record<
           )}
           {x.type === "weather" && (
             <>
-              <Select className="w-auto py-1" value={x.operator} onChange={(e) => { put(i, { ...x, operator: e.target.value as typeof x.operator }); }}>{compares.map((c) => <option key={c} value={c}>{compareText(c)}</option>)}</Select>
+              <Select className="w-auto py-1" value={x.operator} onChange={(e) => { put(i, { ...x, operator: oneOf(compares, e.target.value, x.operator) }); }}>{compares.map((c) => <option key={c} value={c}>{compareText(c)}</option>)}</Select>
               <Input className="w-24 py-1" inputMode="decimal" value={x.value} onChange={(e) => { put(i, { ...x, value: e.target.value }); }} aria-label={t("Outdoor temperature °C")} /><span className="text-xs text-muted-foreground">{t("°C (demo weather)")}</span>
             </>
           )}
