@@ -6,16 +6,17 @@ import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePrincipal, CoreError } from "@ac/web/lib/dal";
 import { i18nOf, textOf } from "@ac/web/lib/i18n";
-import { conditionText, defaultRuleRows, type ApiDefaultPolicy } from "@ac/web/lib/customerPolicies";
-import { operators } from "@ac/web/lib/adminAlerts";
+import { conditionText, defaultRuleRows, type ApiAlertPolicy, type ApiDefaultPolicy } from "@ac/web/lib/customerPolicies";
 import { unitRowFromApi, type ApiUnit } from "@ac/web/lib/client";
 import type { ApiCommand, ApiUnitDetail } from "@ac/web/lib/units";
 import type { ApiRestriction } from "@ac/web/lib/restrictions";
 import { UnitView, type PolicyOption } from "./_components/unit-view";
-import { oneOf } from "@ac/web/lib/oneOf";
 import { orNull } from "@ac/web/lib/promises";
 
-interface ApiPolicy { id: string; name: string; kind: string; metric?: string; operator?: string; threshold?: number; durationSeconds?: number; severity?: string }
+/** A row of policies.list: the kind says which of the two shapes this page reads it is. */
+interface ApiPolicy { id: string; kind: string }
+const isAlert = (p: ApiPolicy): p is ApiAlertPolicy => p.kind === "alert";
+const isDefault = (p: ApiPolicy): p is ApiDefaultPolicy => p.kind === "default_alert";
 
 /** The detail of the unit's active restriction, found as Contracts & payments finds it — the contract with an active
 restriction, one of its invoices, restrictions.forInvoice (the customer has no restriction list) — or null (IR583). */
@@ -58,11 +59,11 @@ export default async function CustomerUnitPage({ params }: Readonly<PageProps<"/
   const i = i18nOf(display), { t } = i;
   const severity: Record<string, string> = { critical: "Critical", warning: "Warning", normal: "Info" };
   const options: PolicyOption[] = policies.items
-    .filter((p) => p.kind === "alert")
+    .filter(isAlert)
     // in words, as the Alert policies tab says it (IR623): "Room temperature ≥ 30 °C for 10 min → Warning"
-    .map((p) => ({ id: p.id, name: p.name, rule: `${conditionText({ metric: p.metric ?? "", operator: oneOf(operators, p.operator ?? "gte", "gte"), threshold: p.threshold ?? 0, durationSeconds: p.durationSeconds ?? 0 }, t)} → ${((p.severity ? textOf(severity, p.severity, t) : undefined) ?? p.severity) ?? "—"}` }));
+    .map((p) => ({ id: p.id, name: p.name, rule: `${conditionText(p, t)} → ${textOf(severity, p.severity, t) ?? p.severity}` }));
   // the default policy's rules on for this customer, as the owner switched them (IR623)
-  const defaultPolicy = policies.items.find((p) => p.kind === "default_alert") as unknown as ApiDefaultPolicy | undefined;
+  const defaultPolicy = policies.items.find(isDefault);
   const defaults = defaultPolicy ? { on: defaultRuleRows(defaultPolicy, me.customerId, me.membershipId, i).on, n: defaultPolicy.rules.length } : null;
   return <UnitView id={id} detail={detail} room={room.items.map((item) => unitRowFromApi(item))} policies={options} defaults={defaults} history={history.items} restrictionHref={restriction} nowMs={now.getTime()} />;
 }
