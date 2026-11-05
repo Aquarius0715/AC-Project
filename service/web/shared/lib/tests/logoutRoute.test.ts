@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { createSessionCookie, loadSession, SESSION_COOKIE, seal, type Session } from "@ac/web/lib/session";
 import { POST } from "@ac/web/bff/auth/logout/route";
+import { sentForm } from "./http";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ cookies: () => Promise.resolve({ get: vi.fn(), set: vi.fn(), delete: vi.fn() }) }));
@@ -38,7 +39,7 @@ describe("POST /bff/auth/logout", () => {
     vi.stubGlobal("fetch", fetch);
     const res = await signOut(seal(session));
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(new URLSearchParams(String((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body)).get("refresh_token")).toBe("r-1");
+    expect(sentForm(fetch.mock.calls).get("refresh_token")).toBe("r-1");
     expect([res.status, res.headers.get("location"), dropped(res)]).toEqual([303, "http://localhost:3000/login", true]);
   });
   it("still signs out when the provider cannot be reached, and calls nothing without a session", async () => {
@@ -83,7 +84,7 @@ describe("POST /bff/auth/logout with the session store", () => {
     const copy = cookie;
     const res = await signOut(cookie);
     expect([res.status, dropped(res), kv.size]).toEqual([303, true, 0]);
-    expect(new URLSearchParams(String((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body)).get("refresh_token")).toBe("r-1");
+    expect(sentForm(fetch.mock.calls).get("refresh_token")).toBe("r-1");
     expect(await loadSession(copy)).toBeNull();
   });
 });

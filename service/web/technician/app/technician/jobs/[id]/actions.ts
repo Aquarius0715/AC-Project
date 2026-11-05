@@ -10,6 +10,7 @@ import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import type { ApiTechReport } from "@ac/web/lib/techJob";
 import { uploadName, uploadType } from "@ac/web/lib/files";
 import type { OpInput } from "@ac/web/lib/opTypes";
+import { formText } from "@ac/web/lib/formData";
 
 type Result<T> = { ok: true; value: T } | ({ ok: false } & ActionFailure);
 const failed = (e: unknown): Result<never> => {
@@ -61,7 +62,7 @@ export async function saveDraft(body: OpInput<"jobs.saveDraft">, reportVersion: 
 
 /** attachments.add: one JPEG/PNG photo (≤ 5 MiB) from a form field; the draft version moves on and the sign-off is cleared. */
 export async function uploadPhoto(form: FormData) {
-  const jobId = String(form.get("jobId")), reportId = String(form.get("reportId")), version = Number(form.get("reportVersion"));
+  const jobId = formText(form, "jobId"), reportId = formText(form, "reportId"), version = Number(form.get("reportVersion"));
   const file = form.get("file");
   if (!(file instanceof File)) return { ok: false as const, code: "VALIDATION", messageKey: "error.validation", fieldErrors: { file: "error.required" } };
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -74,9 +75,9 @@ export async function uploadPhoto(form: FormData) {
 /** reports.signOff (FR-T15): the customer's signature (PNG drawn on the device), or an absence reason with a site
 photo, bound to this draft version (a later save clears it). */
 export async function signOff(form: FormData) {
-  const jobId = String(form.get("jobId")), reportId = String(form.get("reportId")), reportVersion = Number(form.get("reportVersion"));
-  const signerName = String(form.get("signerName") ?? "").trim();
-  const png = form.get("signature"), photo = form.get("sitePhoto"), absent = String(form.get("absentReason") ?? "").trim();
+  const jobId = formText(form, "jobId"), reportId = formText(form, "reportId"), reportVersion = Number(form.get("reportVersion"));
+  const signerName = formText(form, "signerName").trim();
+  const png = form.get("signature"), photo = form.get("sitePhoto"), absent = formText(form, "absentReason").trim();
   const signature = typeof png === "string" && png ? { name: "signature.png", mime: "image/png" as const, size: Buffer.from(png, "base64").length, bytes: png } : null;
   const photoBytes = photo instanceof File && photo.size > 0 ? Buffer.from(await photo.arrayBuffer()) : null;
   const sitePhoto = photo instanceof File && photoBytes ? { name: uploadName(photo.name), mime: uploadType(photoBytes, photo.type) as OpInput<"attachments.add">["file"]["mime"], size: photo.size, bytes: photoBytes.toString("base64") } : undefined;

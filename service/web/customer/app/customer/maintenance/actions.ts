@@ -11,6 +11,7 @@ import { coreOp, CoreError } from "@ac/web/lib/dal";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { uploadName, uploadType } from "@ac/web/lib/files";
 import type { OpInput } from "@ac/web/lib/opTypes";
+import { formText } from "@ac/web/lib/formData";
 
 interface Slot { startAt: string; endAt: string }
 type Result<T> = { ok: true; value: T } | ({ ok: false } & ActionFailure);
@@ -78,11 +79,11 @@ export async function reportProblem(form: FormData) {
       const buffer = Buffer.from(await f.arrayBuffer());
       return { name: uploadName(f.name), mime: uploadType(buffer, f.type) as OpInput<"jobs.reportProblem">["photos"][number]["mime"], size: f.size, bytes: buffer.toString("base64") }; // the API refuses any other type
     }));
-    const start = String(form.get("visitStart") ?? ""), end = String(form.get("visitEnd") ?? "");
+    const start = formText(form, "visitStart"), end = formText(form, "visitEnd");
     const j = await coreOp<{ id: string }>("jobs.reportProblem", {
-      jobId: String(form.get("jobId")),
-      reasonCode: String(form.get("reasonCode")) as OpInput<"jobs.reportProblem">["reasonCode"],
-      details: String(form.get("details") ?? "").trim(),
+      jobId: formText(form, "jobId"),
+      reasonCode: formText(form, "reasonCode") as OpInput<"jobs.reportProblem">["reasonCode"],
+      details: formText(form, "details").trim(),
       preferredSlot: start && end ? { startAt: start, endAt: end } : null,
       photos,
     }, write(Number(form.get("version"))));

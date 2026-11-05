@@ -12,6 +12,7 @@ import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { certDates } from "@ac/web/lib/partnerCertificates";
 import { uploadName, uploadType } from "@ac/web/lib/files";
 import type { OpInput } from "@ac/web/lib/opTypes";
+import { formText } from "@ac/web/lib/formData";
 
 type Result<T> = { ok: true; value: T } | ({ ok: false } & ActionFailure);
 const failure = (e: unknown): { ok: false } & ActionFailure => {
@@ -46,7 +47,7 @@ export async function clearUnavailability(id: string, version: number, from: str
 renewal, renewalOf. The certificate starts pending HQ verification. */
 export async function submitCertificate(form: FormData): Promise<Result<{ id: string }>> {
   const file = form.get("file");
-  const text = (k: string) => String(form.get(k) ?? "").trim();
+  const text = (k: string) => formText(form, k).trim();
   try {
     const bytes = file instanceof File ? Buffer.from(await file.arrayBuffer()) : Buffer.alloc(0);
     const renewalOf = text("renewalOf");

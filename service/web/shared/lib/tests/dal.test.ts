@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { coreAll, coreDisplay, CoreError, coreNow, coreOp, corePermissions, corePrincipal, getSession } from "@ac/web/lib/dal";
 import { SESSION_COOKIE, seal, type Session } from "@ac/web/lib/session";
 import { must } from "./must";
+import { bodyText } from "./http";
 
 // the Data Access Layer (Next.js authentication guide) runs on the server: the cookie jar and redirect come from Next
 const jar = vi.hoisted(() => ({ get: vi.fn() }));
@@ -47,7 +48,7 @@ describe("calling the Core API as the signed-in membership (IR222)", () => {
     const f = reply([200, { data: { id: "c1" } }]);
     await coreOp("commands.create", { unitId: "u1", action: { kind: "set_power", power: true }, expectedUnitVersion: 3 }, { write: true, idempotencyKey: "key-1", expectedVersion: 7 });
     const [url, init] = must(f.mock.calls[0]);
-    expect([url, init.method, JSON.parse(String(init.body)).unitId]).toEqual(["http://localhost:8080/v1/commands", "POST", "u1"]);
+    expect([url, init.method, JSON.parse(bodyText(init)).unitId]).toEqual(["http://localhost:8080/v1/commands", "POST", "u1"]);
     expect(init.headers).toMatchObject({ "Content-Type": "application/json", "Idempotency-Key": "key-1", "X-Expected-Version": "7" });
     await coreOp("commands.create", { unitId: "u1", action: { kind: "set_power", power: true }, expectedUnitVersion: 3 }, { write: true });
     expect(f.mock.calls[1]?.[1].headers["Idempotency-Key"]).toMatch(/^[0-9a-f-]{36}$/); // a fresh key per intent when none is given

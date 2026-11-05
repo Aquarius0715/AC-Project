@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SESSION_COOKIE, cookieKey, cookieOptions, endIdpSession, jwtClaims, needsRefresh, oidcConfig, readSession, refresh, roleHome, safeReturnTo, seal, sessionFromTokens, unseal, type Session } from "@ac/web/lib/session";
 import { must } from "./must";
+import { bodyText } from "./http";
 
 // the BFF session (backend architecture §5) is server code: next/headers is the request's cookie jar
 const jar = vi.hoisted(() => ({ get: vi.fn(), set: vi.fn(), delete: vi.fn() }));
@@ -121,7 +122,7 @@ describe("refreshing the access token", () => {
     expect(await refresh(session())).toMatchObject({ refreshToken: "r-2", tenantId: "t-1", membershipId: "m-1", expiresAt: NOW / 1000 + 300 });
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("http://keycloak:8080/realms/ac/protocol/openid-connect/token");
-    expect(Object.fromEntries(new URLSearchParams(String(init.body)))).toEqual({ grant_type: "refresh_token", refresh_token: "r-1", client_id: "ac-web", client_secret: "test-client-secret" });
+    expect(Object.fromEntries(new URLSearchParams(bodyText(init)))).toEqual({ grant_type: "refresh_token", refresh_token: "r-1", client_id: "ac-web", client_secret: "test-client-secret" });
   });
 
   it("gives nothing for another membership, a refused grant, a network failure or no refresh token", async () => {
@@ -148,7 +149,7 @@ describe("ending the identity provider's session", () => {
     expect(await endIdpSession("r-1")).toBe(true);
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     expect([url, init.method]).toEqual(["http://keycloak:8080/realms/ac/protocol/openid-connect/logout", "POST"]);
-    expect(Object.fromEntries(new URLSearchParams(String(init.body)))).toEqual({ refresh_token: "r-1", client_id: "ac-web", client_secret: "test-client-secret" });
+    expect(Object.fromEntries(new URLSearchParams(bodyText(init)))).toEqual({ refresh_token: "r-1", client_id: "ac-web", client_secret: "test-client-secret" });
     expect(init.signal).toBeInstanceOf(AbortSignal); // never waits long for the provider
   });
   it("answers false when the provider refuses or cannot be reached", async () => {

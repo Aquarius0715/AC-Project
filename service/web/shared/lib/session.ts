@@ -7,6 +7,7 @@ import "server-only";
 import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { createClient } from "@redis/client";
+import { z } from "zod";
 import { filled } from "@ac/web/lib/filled";
 
 export interface Session {
@@ -94,19 +95,24 @@ export function oidcCookieOptions(maxAge = 600) {
   return { httpOnly: true, sameSite: "lax" as const, secure: httpsApp(), path: "/bff/auth", maxAge };
 }
 
+/** The access token claims a session needs: the tenant, the membership and one of the four roles. */
+const sessionClaims = z.object({
+  tenant_id: z.string().min(1),
+  membership_id: z.string().min(1),
+  role: z.enum(["client", "contractor", "technician", "admin"]),
+});
+
 /** Builds a session from a token response; null when the token lacks the tenant / membership / role claims. */
 export function sessionFromTokens(t: { access_token: string; refresh_token?: string; expires_in: number }, previousRefresh: string | null = null): Session | null {
-  const claims = jwtClaims(t.access_token);
-  const role = claims.role as Session["role"] | undefined;
-  // own keys only: `in` would also accept inherited names such as "constructor"
-  if (!claims.tenant_id || !claims.membership_id || typeof role !== "string" || !Object.hasOwn(roleHome, role)) return null;
+  const claims = sessionClaims.safeParse(jwtClaims(t.access_token));
+  if (!claims.success) return null;
   return {
     accessToken: t.access_token,
     refreshToken: t.refresh_token ?? previousRefresh,
-    tenantId: String(claims.tenant_id),
-    membershipId: String(claims.membership_id),
+    tenantId: claims.data.tenant_id,
+    membershipId: claims.data.membership_id,
     expiresAt: Math.floor(Date.now() / 1000) + t.expires_in,
-    role,
+    role: claims.data.role,
   };
 }
 
