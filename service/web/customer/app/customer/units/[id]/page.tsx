@@ -7,11 +7,12 @@ import { notFound } from "next/navigation";
 import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePrincipal, CoreError } from "@ac/web/lib/dal";
 import { i18nOf, textOf } from "@ac/web/lib/i18n";
 import { conditionText, defaultRuleRows, type ApiDefaultPolicy } from "@ac/web/lib/customerPolicies";
-import type { Operator } from "@ac/web/lib/adminAlerts";
+import { operators } from "@ac/web/lib/adminAlerts";
 import { unitRowFromApi, type ApiUnit } from "@ac/web/lib/client";
 import type { ApiCommand, ApiUnitDetail } from "@ac/web/lib/units";
 import type { ApiRestriction } from "@ac/web/lib/restrictions";
 import { UnitView, type PolicyOption } from "./_components/unit-view";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { orNull } from "@ac/web/lib/promises";
 
 interface ApiPolicy { id: string; name: string; kind: string; metric?: string; operator?: string; threshold?: number; durationSeconds?: number; severity?: string }
@@ -59,7 +60,7 @@ export default async function CustomerUnitPage({ params }: Readonly<PageProps<"/
   const options: PolicyOption[] = policies.items
     .filter((p) => p.kind === "alert")
     // in words, as the Alert policies tab says it (IR623): "Room temperature ≥ 30 °C for 10 min → Warning"
-    .map((p) => ({ id: p.id, name: p.name, rule: `${conditionText({ metric: p.metric ?? "", operator: (p.operator ?? "gte") as Operator, threshold: p.threshold ?? 0, durationSeconds: p.durationSeconds ?? 0 }, t)} → ${((p.severity ? textOf(severity, p.severity, t) : undefined) ?? p.severity) ?? "—"}` }));
+    .map((p) => ({ id: p.id, name: p.name, rule: `${conditionText({ metric: p.metric ?? "", operator: oneOf(operators, p.operator ?? "gte", "gte"), threshold: p.threshold ?? 0, durationSeconds: p.durationSeconds ?? 0 }, t)} → ${((p.severity ? textOf(severity, p.severity, t) : undefined) ?? p.severity) ?? "—"}` }));
   // the default policy's rules on for this customer, as the owner switched them (IR623)
   const defaultPolicy = policies.items.find((p) => p.kind === "default_alert") as unknown as ApiDefaultPolicy | undefined;
   const defaults = defaultPolicy ? { on: defaultRuleRows(defaultPolicy, me.customerId, me.membershipId, i).on, n: defaultPolicy.rules.length } : null;

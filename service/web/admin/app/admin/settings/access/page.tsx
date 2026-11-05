@@ -11,8 +11,8 @@ import { i18nOf } from "@ac/web/lib/i18n";
 import { memberRows, type ApiMember, type ApiOrganization } from "@ac/web/lib/members";
 import { AccessDemo } from "./_components/access-demo";
 import { AccessView } from "./_components/access-view";
-import type { Role } from "@ac/web/lib/contracts.gen";
 import { withAccess } from "@ac/web/lib/withAccess";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { queryReader } from "@ac/web/lib/searchParams";
 
 
@@ -26,10 +26,10 @@ async function AdminAccessPageContent({ searchParams }: Readonly<PageProps<"/adm
   if (!apiMode()) return <AccessDemo />;
   const sp = await searchParams;
   const one = queryReader(sp);
-  const role = one("role") === "admin" || one("role") === "contractor" || one("role") === "technician" ? one("role") : undefined;
+  const role = oneOf(["admin", "contractor", "technician"] as const, one("role") ?? "", undefined);
   const status = one("status") === "active" || one("status") === "inactive" ? one("status") : undefined;
   const organizationId = one("organizationId");
-  const filters = { ...(role && { role: role as Role }), ...(status === "active" && { activeOnly: true }), ...(organizationId && { organizationId }) };
+  const filters = { ...(role && { role }), ...(status === "active" && { activeOnly: true }), ...(organizationId && { organizationId }) };
   const isFiltered = Object.keys(filters).length > 0;
   const [now, perms, me, display, members, everyone, orgs, properties, units] = await Promise.all([
     coreNow(), corePermissions(), corePrincipal(), coreDisplay(),
