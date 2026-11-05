@@ -64,4 +64,7 @@ export function evidenceRefusal(fieldErrors: Record<string, string> | undefined,
 }
 
 /** The picked IDs after ticking one on or off, in the order they were picked. */
-export const togglePick = (picked: string[], id: string, on: boolean): string[] => (on ? (picked.includes(id) ? picked : [...picked, id]) : picked.filter((x) => x !== id));
+export const togglePick = (picked: string[], id: string, on: boolean): string[] => {
+  if (!on) return picked.filter((x) => x !== id);
+  return picked.includes(id) ? picked : [...picked, id];
+};

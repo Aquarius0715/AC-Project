@@ -28,12 +28,18 @@ export function roundAway(x: number, digits: number): number {
 const nf = (digits: number) => new Intl.NumberFormat("en-MY", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 /** One decimal (energy, percentages, kgCO₂e). */
 export const one = (x: number) => nf(1).format(roundAway(x, 1));
+/** A baseline's total, or why there is none. */
+function baselineValue(b: { baselineKWh: number | null } | null | undefined, tr: T): string {
+  if (!b) return tr("No baseline");
+  return b.baselineKWh === null ? tr("No value") : `${one(b.baselineKWh)} kWh`;
+}
 /** Coverage (0–1) as a percentage, rounded as one() rounds, except that coverage below 1 never shows as 100: a
 period missing even one reading must not read 100.0% next to the partial-coverage warning. `digits` 0 is whole. */
 export function coveragePct(coverage: number, digits: 0 | 1 = 1): string {
   const x = coverage * 100;
   const shown = digits === 1 ? roundAway(x, 1) : Math.round(x);
-  const value = coverage < 1 && shown >= 100 ? (digits === 1 ? 99.9 : 99) : shown;
+  const below100 = digits === 1 ? 99.9 : 99; // incomplete coverage never rounds up to 100 %
+  const value = coverage < 1 && shown >= 100 ? below100 : shown;
   return digits === 1 ? nf(1).format(value) : String(value);
 }
 /** An amount in minor units as "120.00 MYR". */
@@ -99,7 +105,7 @@ export function summaryView(s: ApiEnergySummary, i: I18n = EN): SummaryView {
   const f = s.factorSnapshot;
   return {
     actual: t.kWh === null ? tr("No valid readings") : `${one(t.kWh)} kWh`,
-    baseline: b ? (b.baselineKWh === null ? tr("No value") : `${one(b.baselineKWh)} kWh`) : tr("No baseline"),
+    baseline: baselineValue(b, tr),
     difference: saving(t.savedKWh, " kWh", one, tr), percent: saving(t.savingPercentage, "%", one, tr),
     cost: t.amountMinor === null ? "—" : amount(t.amountMinor, s.currency),
     savedCost: t.savedAmountMinor === null ? tr("Cannot calculate") : saving(t.savedAmountMinor, "", (x) => amount(x, s.currency), tr),

@@ -59,9 +59,10 @@ date as text: the page passes the one the server formatted, so the first render 
 export function nextBox(p: ApiPlan, now: number, dirty: boolean, generated: { occurrenceAt: string; jobId: string } | null, i: I18n = EN, next = planDate(p.nextDueAt, i.display)): { title: string; text: string; generate: boolean; why: string | null } {
   const { t } = i;
   const isPast = Date.parse(p.nextDueAt) <= now;
-  const text = generated ? t("{date} was just generated as {job}. Next due advanced to {next}.", { date: planDate(generated.occurrenceAt, i.display), job: generated.jobId.slice(0, 8), next })
-    : (t(isPast ? "The next date has passed — move it forward and save the plan first (no automatic catch-up)." : "Not generated yet. Generating creates one periodic job (requested) for this date — generating the same date again is rejected."));
-  const why = isPast ? t("The next date has passed.") : (dirty ? t("Save the plan first.") : null);
+  const pending = t(isPast ? "The next date has passed — move it forward and save the plan first (no automatic catch-up)." : "Not generated yet. Generating creates one periodic job (requested) for this date — generating the same date again is rejected.");
+  const text = generated ? t("{date} was just generated as {job}. Next due advanced to {next}.", { date: planDate(generated.occurrenceAt, i.display), job: generated.jobId.slice(0, 8), next }) : pending;
+  const unsaved = dirty ? t("Save the plan first.") : null;
+  const why = isPast ? t("The next date has passed.") : unsaved;
   return { title: t("Next occurrence · {date}", { date: next }), generate: !why, text, why };
 }
 

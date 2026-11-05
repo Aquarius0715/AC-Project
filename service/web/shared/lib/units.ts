@@ -12,6 +12,10 @@ export type UnitAction = { kind: "set_power"; power: boolean } | { kind: "set_te
 /** What a stored command did (Command.action): a setting of the remote control, ventilation (an automation) or a
 restriction's apply / remove (IR314). */
 export type CommandAction = AnyUnitAction | RestrictionAction;
+/** A unit's run state from its effective power: running, stopped, or unknown without a reported state. */
+export type RunState = "running" | "stopped" | "unknown";
+const RUN_STATE = new Map<string, RunState>([["on", "running"], ["off", "stopped"]]);
+export const runState = (power: string | null | undefined): RunState => RUN_STATE.get(power ?? "") ?? "unknown";
 
 /** UnitDetail of service-contracts.ts (fields shown on the control screen). */
 export interface ApiUnitDetail {

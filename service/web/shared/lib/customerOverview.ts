@@ -11,6 +11,7 @@ import type { ApiPropertyRow, ApiUnitRow } from "@ac/web/lib/assets";
 import type { ApiEnergySummary } from "@ac/web/lib/energy";
 import type { IconName } from "@ac/web/components/Icon";
 import { byText } from "@ac/web/lib/order";
+import { runState } from "@ac/web/lib/units";
 
 export type OverviewPeriod = "today" | "7d" | "30d";
 export const OVERVIEW_PERIODS: { id: OverviewPeriod; label: string }[] = [{ id: "today", label: "Today" }, { id: "7d", label: "7d" }, { id: "30d", label: "30d" }];
@@ -55,7 +56,6 @@ export interface OverviewRow {
   id: string; name: string; place: string; observed: string; temp: string | null; hum: string | null; power: string | null;
   state: "running" | "stopped" | "unknown"; conn: "online" | "offline" | "connecting" | "unknown" | "error";
 }
-const POWER_STATE = new Map<string, OverviewRow["state"]>([["on", "running"], ["off", "stopped"]]);
 /** Down for less energy than before, up for more, a dash for the same. */
 function trendIcon(delta: number): IconName {
   if (delta < 0) return "arrowDown";
@@ -76,7 +76,7 @@ export function overviewRows(units: OverviewUnit[], place: (u: OverviewUnit) => 
       observed: u.connection === "online" ? reading : i.t("last seen {when}", { when: seen }),
       temp: current(t) === null ? null : airNumber("temperature", current(t)!), hum: current(h) === null ? null : airNumber("humidity", current(h)!),
       power: watts === null ? null : String(watts),
-      state: POWER_STATE.get(u.effectivePowerState) ?? "unknown", conn: u.connection,
+      state: runState(u.effectivePowerState), conn: u.connection,
     };
   });
 }

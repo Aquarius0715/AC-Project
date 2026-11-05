@@ -3,7 +3,7 @@
 // and jobs.get describe them. Pure code shared by the scan dialog; Vitest covers it. Texts in the display language
 // (`i` / `t`, IR288); the job's window is a span in the user's display time zone (IR44), while "today" is the Kuala
 // Lumpur day the work happens on, as on the overview (IR281).
-import { EN, showSpan, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { byCount, EN, showSpan, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { Slot } from "@ac/web/lib/partnerOverview";
 import type { TechJobRead } from "@ac/web/lib/techJob";
@@ -27,14 +27,14 @@ the work window units.get is FORBIDDEN (IR94): the card then names the unit from
 export function qrMatch(r: ApiQrResolution, unit: ApiQrUnit | null, job: ApiQrJob | null, now: number, options: { name?: string; locked?: boolean } = {}, i: I18n = EN): QrMatch {
   const { t, display } = i;
   const title = unit?.displayName ?? options.name ?? t("Assigned unit");
-  const sub = unit ? [unit.location.pathLabels.join(" › "), `${unit.capabilities.manufacturer} ${unit.capabilities.model}`].filter(Boolean).join(" · ")
-    : (options.locked ? t("Unit details open when your work window starts.") : "");
+  const locked = options.locked ? t("Unit details open when your work window starts.") : "";
+  const sub = unit ? [unit.location.pathLabels.join(" › "), `${unit.capabilities.manufacturer} ${unit.capabilities.model}`].filter(Boolean).join(" · ") : locked;
   let card: QrMatch["job"] = null;
   if (r.jobId) {
     const j = job?.projection === "detail" ? job : null;
     const s = j?.scheduledSlot ?? null;
     const isToday = !!s && klDate(Date.parse(s.startAt)) <= klDate(now) && klDate(now) <= klDate(Date.parse(s.endAt));
-    const alerts = j?.alertIds.length ? t(j.alertIds.length === 1 ? "1 linked alert" : "{n} linked alerts", { n: j.alertIds.length }) : "";
+    const alerts = j?.alertIds.length ? byCount(j.alertIds.length, { one: t("1 linked alert"), many: t("{n} linked alerts", { n: j.alertIds.length }) }) : "";
     card = {
       label: t(isToday ? "Your job today: {id}" : "Your next job: {id}", { id: r.jobId.slice(0, 8) }),
       text: [s ? showSpan(s.startAt, s.endAt, display) : "", j ? typeLabel(j.type, t) : "", j ? statusWord(j.status, t) : "", alerts].filter(Boolean).join(" · "), tone: isToday ? "ok" : "primary",

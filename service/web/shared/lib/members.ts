@@ -51,8 +51,11 @@ export function resourceWord(res: string, t: T = en): string {
   return words[res] ?? res;
 }
 /** A role (and a technician's employment) as the screen words it. */
-export const roleWord = (role: Role, employment: ApiMember["employment"], t: T = en) =>
-  role === "admin" ? t("Admin") : (role === "contractor" ? t("Contractor") : t(employment === "external" ? "Technician · external" : "Technician · internal"));
+export const roleWord = (role: Role, employment: ApiMember["employment"], t: T = en) => {
+  if (role === "admin") return t("Admin");
+  if (role === "contractor") return t("Contractor");
+  return t(employment === "external" ? "Technician · external" : "Technician · internal");
+};
 export const allPermissions = permissionRows.flatMap((r) => [r.read, r.write, ...(r.actions ?? [])].filter((p): p is string => !!p));
 /** Permissions each role may hold (members.save rules). */
 export const allowedFor: Record<Role, string[]> = {

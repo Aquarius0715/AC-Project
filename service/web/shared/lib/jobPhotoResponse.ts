@@ -3,7 +3,7 @@
 // copy (IR434).
 import "server-only";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
-import { contentDisposition } from "@ac/web/lib/files";
+import { contentDisposition, refusalStatus } from "@ac/web/lib/files";
 
 export async function jobPhotoResponse(jobId: string, attachmentId: string): Promise<Response> {
   try {
@@ -12,7 +12,7 @@ export async function jobPhotoResponse(jobId: string, attachmentId: string): Pro
       headers: { "Content-Type": blob.mime, "Cache-Control": "no-store", "Content-Disposition": contentDisposition(blob.name) },
     });
   } catch (error) {
-    if (error instanceof CoreError) return new Response(error.error.messageKey, { status: error.error.code === "FORBIDDEN" ? 403 : (error.error.code === "NOT_FOUND" ? 404 : 502) });
+    if (error instanceof CoreError) return new Response(error.error.messageKey, { status: refusalStatus(error.error.code) });
     throw error;
   }
 }

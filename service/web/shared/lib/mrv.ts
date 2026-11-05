@@ -35,7 +35,10 @@ export function reportRows(rs: ApiMRVReport[], orgs: { id: string; name: string 
 }
 
 /** A report version's status as the screen words it. */
-export const statusWord = (s: ApiMRVReport["status"] | string, t: T = en) => (s === "demo_reviewed" ? t("demo reviewed") : (s === "draft" ? t("draft") : s));
+export const statusWord = (s: ApiMRVReport["status"] | string, t: T = en) => {
+  if (s === "demo_reviewed") return t("demo reviewed");
+  return s === "draft" ? t("draft") : s;
+};
 
 /** The demo review history (DD-A14 step 5): each review at its time in the display time zone. */
 export const reviewItems = (r: ApiMRVReport, i: I18n = EN) =>
@@ -52,6 +55,7 @@ export function mrvView(p: ApiMRVPreview, orgs: { id: string; name: string }[], 
   const s = summaryView(p.summary, i);
   const unit = new Map(units.map((u) => [u.id, u.label]));
   const b = p.summary.baselineSnapshot;
+  const baselineTotal = b?.baselineKWh == null ? tr("no value") : `${one(b.baselineKWh)} kWh`;
   const f = p.summary.factorSnapshot;
   const isIncomplete = p.incomplete || t.kWh === null || t.emissionsKg === null;
   return {
@@ -64,7 +68,7 @@ export function mrvView(p: ApiMRVPreview, orgs: { id: string; name: string }[], 
       [tr("Units"), p.conditions.unitIds.map((id) => unit.get(id) ?? id.slice(0, 8)).join(", ")],
       [tr("Period"), `${klStamp(p.conditions.from)} → ${klStamp(p.conditions.to)} (Asia/Kuala_Lumpur)`],
       [tr("Boundary"), `${p.conditions.boundaryId} — ${p.conditions.boundary}`],
-      [tr("Baseline"), b ? `v${String(p.conditions.baselineVersion)} · ${b.method} · ${b.baselineKWh === null ? tr("no value") : `${one(b.baselineKWh)} kWh`}` : `v${String(p.conditions.baselineVersion)}`],
+      [tr("Baseline"), b ? `v${String(p.conditions.baselineVersion)} · ${b.method} · ${baselineTotal}` : `v${String(p.conditions.baselineVersion)}`],
       [tr("Emission factor"), f ? `v${String(p.conditions.factorVersion)} · ${f.region} · ${String(f.year)} · ${String(f.kgCO2ePerKWh)} kgCO₂e/kWh` : tr("Calculation incomplete — factor missing")],
       [tr("Factor source"), f?.source ?? "—"], [tr("Coverage"), s.coverage],
     ],

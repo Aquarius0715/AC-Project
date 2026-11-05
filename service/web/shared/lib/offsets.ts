@@ -59,6 +59,13 @@ export function recordRows(rs: ApiOffsetRecord[], customers: { id: string; name:
   const name = new Map(customers.map((c) => [c.id, c.name]));
   return rs.map((r) => {
     const current = r.attempts.find((a) => a.id === r.currentAttemptId) ?? null;
+    // the next step of a record, its certificate once retired, or which step failed
+    const nextText = () => {
+      if (r.state === "demo_requested") return t("Next: confirm the demo purchase");
+      if (r.state === "demo_purchased") return t("Next: demo retirement");
+      if (r.state === "demo_retired") return t("{certificate} · retired", { certificate: r.demoCertificateRef ?? "DEMO-…" });
+      return r.previousState === "demo_purchased" ? t("Retirement failed · previous: {state}", { state: stateWord(r.previousState, t) }) : t("Purchase failed · previous: {state}", { state: stateWord(r.previousState, t) });
+    };
     return {
       id: r.id,
       version: r.version,
@@ -69,9 +76,7 @@ export function recordRows(rs: ApiOffsetRecord[], customers: { id: string; name:
       currentText: current ? attemptText(current, i) : null,
       events: r.eventHistory.map((e) => eventItem(e, i)),
       stage: r.state === "failed" ? -1 : stageOf[r.state] ?? 0,
-      next: r.state === "demo_requested" ? t("Next: confirm the demo purchase") : r.state === "demo_purchased" ? t("Next: demo retirement")
-        : r.state === "demo_retired" ? t("{certificate} · retired", { certificate: r.demoCertificateRef ?? "DEMO-…" })
-        : r.previousState === "demo_purchased" ? t("Retirement failed · previous: {state}", { state: stateWord(r.previousState, t) }) : t("Purchase failed · previous: {state}", { state: stateWord(r.previousState, t) }),
+      next: nextText(),
       current,
       r,
     };

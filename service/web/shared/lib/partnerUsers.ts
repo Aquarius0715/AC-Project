@@ -46,10 +46,11 @@ export function partnerUserRows(us: ApiPartnerUser[], self: string | null, i: I1
     const isEnded = u.status !== "disabled" && !!now && !!u.accessUntil && Date.parse(u.accessUntil) <= now.getTime();
     const isBooked = !!u.booked && u.status === "active";
     const isRevoked = !!u.revokedAt;
+    const noEnd = isInvited ? "—" : t("No end date"); // an invitation has no access period yet
     return {
       id: u.id, version: u.version, email: u.email, name: u.displayName, role: u.partnerRole, status: u.status, you: isYou, lastContractor: isLastContractor, booked: isBooked, ended: isEnded, revoked: isRevoked,
       sub: u.displayName ? u.email : t("invited {date}", { date: showDate(u.invitedAt, i.display) }),
-      access: u.accessUntil ? showDate(u.accessUntil, i.display) : (isInvited ? "—" : t("No end date")),
+      access: u.accessUntil ? showDate(u.accessUntil, i.display) : noEnd,
       lastSignIn: u.lastSignInAt ? showTime(u.lastSignInAt, i.display) : "—",
       accessDate: u.accessUntil ? klDate(u.accessUntil) : null,
       actions: isYou

@@ -148,10 +148,12 @@ export interface DeviceRow { id: string; version: number; serial: string; unitId
 
 export function deviceRows(devices: ApiDevice[], units: ApiUnitLite[], t: T = en): DeviceRow[] {
   const name = new Map(units.map((u) => [u.id, u.displayName]));
+  // an unbound device: the unit it is planned for, or none
+  const planned = (target: string | null) => (target ? t("Not bound yet — planned for {unit}", { unit: name.get(target) ?? t("unit") }) : t("Unbound"));
   return devices.map((d) => {
     return {
       id: d.id, version: d.version, serial: d.serial, unitId: d.unitId, targetUnitId: d.targetUnitId ?? null, conn: d.connection, fw: d.firmwareVersion,
-      unit: d.unitId ? name.get(d.unitId) ?? t("unit") : (d.targetUnitId ? t("Not bound yet — planned for {unit}", { unit: name.get(d.targetUnitId) ?? t("unit") }) : t("Unbound")),
+      unit: d.unitId ? name.get(d.unitId) ?? t("unit") : planned(d.targetUnitId ?? null),
       tamper: d.tamper === "detected", power: d.powerSignal,
     };
   });

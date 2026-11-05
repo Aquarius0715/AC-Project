@@ -70,7 +70,8 @@ export function techRow(j: ApiTechJobRow, now: number, units: Map<string, string
   else if (j.status === "submitted") [badge, note] = [{ text: t("Submitted"), tone: "primary" }, t("awaiting quality review (read-only)")];
   else if (j.status === "completed") [badge, note] = [{ text: t("Completed"), tone: "ok" }, t("accepted in the quality review")];
   else [badge, note] = [{ text: statusWord(j.status, t), tone: "muted" }, ""];
-  const alert = j.severity === "critical" ? t("critical alert on the unit") : (j.severity === "warning" ? t("warning on the unit") : "");
+  const warning = j.severity === "warning" ? t("warning on the unit") : "";
+  const alert = j.severity === "critical" ? t("critical alert on the unit") : warning;
   const slotText = s ? showSpan(s.startAt, s.endAt, display) : "";
   // the last 15 minutes of an open window before unsaved input is discarded (IR89, Figma Technician 01)
   const left = s && !isBefore && !isEnded && (j.status === "assigned" || j.status === "in_progress") ? Math.ceil((Date.parse(s.endAt) - now) / 60_000) : null;

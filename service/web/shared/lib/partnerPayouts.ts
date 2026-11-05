@@ -129,9 +129,14 @@ export function questionRows(s: ApiPayoutStatement, rows: LineRow[], t: T = en) 
   return s.queries.map((q) => {
     const line = rows.find((r) => r.lineId === q.lineId);
     const tone: "warn" | "ok" = q.state === "open" ? "warn" : "ok";
+    const queryState = () => {
+      if (q.state === "open") return t("Waiting for HQ");
+      if (q.state !== "adjusted") return t("Answered");
+      return q.adjustmentMinor === null ? t("Adjusted on the next statement") : t("Adjusted {amount} on the next statement", { amount: money(q.adjustmentMinor, s.currency) });
+    };
     return {
       id: q.id, title: `${t(topicLabel[q.topic])} · ${line ? `${line.job} · ${line.work}` : t("statement")}`, message: q.message,
-      state: q.state === "open" ? t("Waiting for HQ") : q.state === "adjusted" ? (q.adjustmentMinor === null ? t("Adjusted on the next statement") : t("Adjusted {amount} on the next statement", { amount: money(q.adjustmentMinor, s.currency) })) : t("Answered"),
+      state: queryState(),
       reply: q.reply, tone,
     };
   });

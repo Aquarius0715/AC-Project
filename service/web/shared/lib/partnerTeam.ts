@@ -112,17 +112,23 @@ export interface GrantRow { key: string; technician: string; name: string; sub: 
 expired or revoked, and each register qualification nobody listed holds (“not held”). Dates are Kuala Lumpur days. */
 export function grantRows(members: ApiTeamMember[], nowMs: number, i: I18n = EN): GrantRow[] {
   const { t, display: { locale } } = i;
+  type Grant = NonNullable<ApiTeamMember["qualifications"]>[number];
+  // a grant's line and badge: revoked, expired, expiring within 30 days, or valid
+  const standing = (name: string, q: Grant, until: string): [string, GrantRow["badge"]] => {
+    if (q.revokedAt) return [t("{name} · revoked {date}", { name, date: businessDay(q.revokedAt, locale) }), { text: t("Revoked"), tone: "muted" }];
+    const end = q.validUntil ? Date.parse(q.validUntil) : Infinity;
+    if (end <= nowMs) return [t("{name} · expired {date}", { name, date: until }), { text: t("Expired"), tone: "muted" }];
+    const days = Math.ceil((end - nowMs) / DAY);
+    return days <= 30
+      ? [t("{name} · expires {date}", { name, date: until }), { text: t("Expiring · {n} d", { n: days }), tone: "warn" }]
+      : [t("{name} · valid to {date}", { name, date: until }), { text: t("Valid"), tone: "ok" }];
+  };
   const rows: GrantRow[] = [];
   for (const m of members) {
     if ((m.qualifications) != null) {
       for (const q of m.qualifications) {
-        const end = q.validUntil ? Date.parse(q.validUntil) : Infinity;
         const until = q.validUntil ? businessDay(q.validUntil, locale) : "—";
-        const days = Math.ceil((end - nowMs) / DAY);
-        const [sub, badge] = q.revokedAt ? [t("{name} · revoked {date}", { name: m.displayName, date: businessDay(q.revokedAt, locale) }), { text: t("Revoked"), tone: "muted" as const }]
-          : end <= nowMs ? [t("{name} · expired {date}", { name: m.displayName, date: until }), { text: t("Expired"), tone: "muted" as const }]
-          : days <= 30 ? [t("{name} · expires {date}", { name: m.displayName, date: until }), { text: t("Expiring · {n} d", { n: days }), tone: "warn" as const }]
-          : [t("{name} · valid to {date}", { name: m.displayName, date: until }), { text: t("Valid"), tone: "ok" as const }];
+        const [sub, badge] = standing(m.displayName, q, until);
         rows.push({ key: `${m.id}:${q.code}`, technician: m.displayName, name: qualificationLabel(q.code, t), sub, until, badge });
       }
     }

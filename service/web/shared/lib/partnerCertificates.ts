@@ -39,6 +39,11 @@ export interface CertRow {
   training: string | null; actions: ("view" | "renew" | "training" | "add")[];
 }
 
+/** A grant from HQ: the upload waiting or rejected, or no certificate on file. */
+function grantDetail(upload: string | undefined, t: T): string {
+  if (upload === "pending") return t("granted by HQ · the upload waits for HQ");
+  return t(upload === "rejected" ? "granted by HQ · the upload was rejected" : "granted by HQ · no certificate on file");
+}
 /** The rows (Figma 04-6): per technician and qualification the certificate on file — its latest one, with a pending
 renewal noted — else the HQ grant without a certificate on file, else “not held” when a booked job needs it. A
 valid certificate ending within the window is “Expiring”; the jobs that end after it are the ones it blocks. A
@@ -53,7 +58,8 @@ export function certRows(members: ApiTeamMember[], certs: ApiCert[], jobs: CertJ
     });
   const state = (endsAt: number): { status: CertStatus; days: number } => {
     const days = Math.ceil((endsAt - nowMs) / DAY);
-    return { status: endsAt <= nowMs ? "expired" : (days <= within ? "expiring" : "valid"), days };
+    const soon = days <= within ? "expiring" : "valid";
+    return { status: endsAt <= nowMs ? "expired" : soon, days };
   };
   const badgeOf = (s: CertStatus, days: number | null): CertRow["badge"] => {
     return ({
@@ -109,7 +115,7 @@ export function certRows(members: ApiTeamMember[], certs: ApiCert[], jobs: CertJ
           technicianId: m.id,
           technician: m.displayName,
           name: qualificationLabel(code, t),
-          detail: t(upload === "pending" ? "granted by HQ · the upload waits for HQ" : (upload === "rejected" ? "granted by HQ · the upload was rejected" : "granted by HQ · no certificate on file")),
+          detail: grantDetail(upload, t),
           expires: businessDay(grant.validUntil!, locale),
           expiresAt: grant.validUntil!,
           status: s.status,
@@ -172,9 +178,12 @@ export function impact(rows: CertRow[], jobs: CertJob[], t: T = en) {
   if (!row) return null;
   const { r, job } = row;
   const day = r.blocks[0].day;
-  const text = r.status === "not_held" ? t("{name} does not hold {cert}. {job} ({unit}, {day}) needs it — add the certificate or reassign.", { name: r.technician, cert: r.name, job: job.short, unit: job.unit, day })
-    : t(r.status === "expired" ? "{cert} of {name} expired {date}. {job} ({unit}, {day}) needs it — renew it or reassign." : "{cert} of {name} expires {date}. {job} ({unit}, {day}) needs it — renew before then or reassign.",
+  const lapseText = () => {
+    if (r.status === "not_held") return t("{name} does not hold {cert}. {job} ({unit}, {day}) needs it — add the certificate or reassign.", { name: r.technician, cert: r.name, job: job.short, unit: job.unit, day });
+    return t(r.status === "expired" ? "{cert} of {name} expired {date}. {job} ({unit}, {day}) needs it — renew it or reassign." : "{cert} of {name} expires {date}. {job} ({unit}, {day}) needs it — renew before then or reassign.",
       { cert: r.name, name: r.technician, date: r.expires, job: job.short, unit: job.unit, day });
+  };
+  const text = lapseText();
   return { text, jobId: job.jobId, rows: [[t("Job"), `${job.short} · ${job.unit}`], [t("Slot"), job.text], [t("Assigned"), r.technician], [t("Requires"), qualificationLabel(r.code, t)]] as [string, string][] };
 }
 

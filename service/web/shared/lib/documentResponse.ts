@@ -3,7 +3,7 @@
 // (IR368), and the browser keeps no copy (IR434).
 import "server-only";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
-import { contentDisposition } from "@ac/web/lib/files";
+import { contentDisposition, refusalStatus } from "@ac/web/lib/files";
 
 export async function documentResponse(certificateId: string): Promise<Response> {
   try {
@@ -12,7 +12,7 @@ export async function documentResponse(certificateId: string): Promise<Response>
       headers: { "Content-Type": content.mime, "Cache-Control": "no-store", "Content-Disposition": contentDisposition(content.name) },
     });
   } catch (error) {
-    if (error instanceof CoreError) return new Response(error.error.messageKey, { status: error.error.code === "FORBIDDEN" ? 403 : (error.error.code === "NOT_FOUND" ? 404 : 502) });
+    if (error instanceof CoreError) return new Response(error.error.messageKey, { status: refusalStatus(error.error.code) });
     throw error;
   }
 }

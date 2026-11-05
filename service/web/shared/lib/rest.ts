@@ -34,7 +34,11 @@ function take(node: Json, at: string[]): unknown {
   return v;
 }
 
-const text = (v: unknown): string => (v === null || v === undefined ? "" : typeof v === "string" ? v : typeof v === "number" || typeof v === "boolean" ? String(v) : JSON.stringify(v));
+const text = (v: unknown): string => {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "string") return v;
+  return typeof v === "number" || typeof v === "boolean" ? String(v) : JSON.stringify(v);
+};
 
 function pick(routes: readonly CoreRoute[], input: Json): CoreRoute {
   let best = routes[0];

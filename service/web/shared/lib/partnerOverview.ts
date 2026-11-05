@@ -49,7 +49,8 @@ export function period(nowIso: string, from?: string, to?: string): { from: stri
   const days: string[] = [];
   for (let t = start; t < end && days.length < 31; t += day) days.push(ymd(t));
   const week = weekOf(nowIso);
-  const label = p.from === week.from && p.to === week.to ? "This week" : p.from === shift(week, -7).from && p.to === shift(week, -7).to ? "Last week" : p.from === shift(week, 7).from && p.to === shift(week, 7).to ? "Next week" : "Period";
+  const named: [{ from: string; to: string }, string][] = [[week, "This week"], [shift(week, -7), "Last week"], [shift(week, 7), "Next week"]];
+  const label = named.find(([w]) => p.from === w.from && p.to === w.to)?.[1] ?? "Period";
   return { ...p, fromAt: new Date(start).toISOString(), toAt: new Date(end).toISOString(), days, label };
 }
 
@@ -148,12 +149,13 @@ export function kpis(counts: ApiCounts, jobs: PartnerJob[], now: number, names: 
   const review = jobs.filter((j) => j.status === "submitted");
   const active = Math.max(0, counts.activeCount - unassigned.length);
   const who = (id: string | null) => names.get(id ?? "") ?? t("Technician");
+  const nextVisit = (j: NonNullable<typeof next>) => t(j.status === "in_progress" ? "{name} on site from {time}" : "{name} starts {time}", { name: who(j.technicianId), time: relativeTime(j.slot!.startAt, now, i) });
   return [
     { label: t("Offers to answer"), value: counts.offerCount, sub: offers[0] ? t("{job} · expires in {left}", { job: offers[0].short, left: until(offers[0].offerExpiresAt!, now, t) }) : t("No open offers"), href: list("offered"), link: t("link::Open offers") },
     { label: t("Awaiting assignment"), value: unassigned.length, sub: unassigned.length > 0 ? t("Accepted, no technician yet") : "—", href: "/partner/schedule", link: t("Assign"), tone: unassigned.length > 0 ? "warn" : undefined },
     {
       label: t("In progress / scheduled"), value: active, href: list("active"), link: t("View jobs"),
-      sub: next ? t(next.status === "in_progress" ? "{name} on site from {time}" : "{name} starts {time}", { name: who(next.technicianId), time: relativeTime(next.slot!.startAt, now, i) }) : "—",
+      sub: next ? nextVisit(next) : "—",
     },
     { label: t("Reports to review"), value: counts.reviewCount, sub: review[0] ? t("{job} · awaiting review", { job: label(review[0], t) }) : "—", href: review.length === 1 ? `/partner/jobs/${review[0].id}/review` : list("review"), link: t("Review") },
     { label: t("Overdue"), value: counts.overdueCount, sub: counts.overdueCount ? t("Past the due date or the work window") : "—", href: list("active"), link: t("View"), tone: counts.overdueCount ? "crit" : undefined },

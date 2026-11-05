@@ -93,8 +93,11 @@ export function progressOf(c: ApiCommand, unit: string, celsius: number, before:
   if (c.status === "failed" || c.status === "expired" || c.status === "cancelled") {
     const kept = before === null ? t("Nothing changed.") : t("Nothing changed — the confirmed setting is still {value} °C.", { value: before });
     const ttl = c.expiresAt ? Math.round((Date.parse(c.expiresAt) - Date.parse(c.requestedAt)) / 1000) : null;
-    const why = c.status === "expired" ? (ttl ? t("The device did not answer within {seconds} s (expired).", { seconds: ttl }) : t("The device did not answer in time (expired)."))
-      : (c.status === "cancelled" ? t("The command was cancelled.") : t("The device refused it ({code}).", { code: c.failureCode ?? "—" }));
+    const failure = () => {
+      if (c.status === "expired") return ttl ? t("The device did not answer within {seconds} s (expired).", { seconds: ttl }) : t("The device did not answer in time (expired).");
+      return c.status === "cancelled" ? t("The command was cancelled.") : t("The device refused it ({code}).", { code: c.failureCode ?? "—" });
+    };
+    const why = failure();
     return { tone: "crit", title: t("Couldn’t change {unit}", { unit }), detail: `${why} ${kept}` };
   }
   return {

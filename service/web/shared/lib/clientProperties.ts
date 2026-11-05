@@ -4,7 +4,7 @@
 // zone (`i`, IR263).
 import { one } from "@ac/web/lib/energy";
 import { EN, showClock, translator, type I18n, type T } from "@ac/web/lib/i18n";
-import type { ApiUnitDetail, UnitAction } from "@ac/web/lib/units";
+import { runState, type ApiUnitDetail, type UnitAction } from "@ac/web/lib/units";
 
 type Mode = "cool" | "dry" | "fan";
 type Fan = "low" | "mid" | "high";
@@ -28,7 +28,7 @@ export function roomUnits(ds: ApiUnitDetail[], i: I18n = EN): RoomUnit[] {
     const kw = metric(d, "power");
     return {
       id: d.id, version: d.version, name: d.displayName, set: set || t("No setting reported yet"), temp: temperatureText === null ? "—" : t("{temp} °C room", { temp: one(temperatureText) }),
-      watts: kw === null ? "—" : `${String(Math.round(kw * 1000))} W`, power: d.effectivePowerState === "on" ? "running" : (d.effectivePowerState === "off" ? "stopped" : "unknown"),
+      watts: kw === null ? "—" : `${String(Math.round(kw * 1000))} W`, power: runState(d.effectivePowerState),
       conn: d.connection, seen: d.lastSeenAt ? showClock(d.lastSeenAt, i.display) : null, online: d.connection === "online",
     };
   });

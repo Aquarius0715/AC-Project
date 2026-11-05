@@ -1,4 +1,5 @@
 import type { ApiMeasurement } from "@ac/web/lib/air";
+import { runState } from "@ac/web/lib/units";
 
 export interface UnitRow { id: string; name: string; loc: string; obs: string; temp: number | null; hum: number | null; power: number | null; state: "running" | "stopped" | "unknown"; conn: "online" | "offline" }
 
@@ -44,7 +45,7 @@ export function unitRowFromApi(u: ApiUnit): UnitRow {
     temp: setpoint && Math.round(setpoint.value! * 10) / 10,
     hum: hum && Math.round(hum.value!),
     power: power && Math.round(power.unit === "kW" ? power.value! * 1000 : power.value!),
-    state: u.effectivePowerState === "on" ? "running" : (u.effectivePowerState === "off" ? "stopped" : "unknown"),
+    state: runState(u.effectivePowerState),
     conn: u.connection === "online" ? "online" : "offline",
   };
 }

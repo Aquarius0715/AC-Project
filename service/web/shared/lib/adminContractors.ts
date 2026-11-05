@@ -65,9 +65,10 @@ export function profileFacts(p: ApiProfile, now: number, i: I18n = EN): [string,
   const { t } = i;
   const day = (iso: string) => businessDay(iso, i.display.locale);
   const ins = p.insuranceValidUntil;
+  const insurance = (until: string) => (Date.parse(until) <= now ? t("expired {date}", { date: day(until) }) : t("valid to {date}", { date: day(until) }));
   return [
     [t("Registration"), p.registrationNo], [t("Service areas"), p.serviceAreas.join(", ")], [t("Delegation period"), `${day(p.delegation.from)} – ${day(p.delegation.to)}`],
-    [t("Contact"), p.contactEmail], [t("Insurance"), ins ? (Date.parse(ins) <= now ? t("expired {date}", { date: day(ins) }) : t("valid to {date}", { date: day(ins) })) : t("not recorded — the delegation runs a year")],
+    [t("Contact"), p.contactEmail], [t("Insurance"), ins ? insurance(ins) : t("not recorded — the delegation runs a year")],
   ];
 }
 

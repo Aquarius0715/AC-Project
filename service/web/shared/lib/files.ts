@@ -30,6 +30,10 @@ export function uploadName(name: string): string {
   return Array.from(clean.slice(0, clean.length - suffix.length)).slice(0, 200 - Array.from(suffix).length).join("").trimEnd() + suffix;
 }
 
+// the HTTP status of a file the Core API refused: forbidden, not found, or any other failure as a bad gateway
+const REFUSAL_STATUS = new Map([["FORBIDDEN", 403], ["NOT_FOUND", 404]]);
+export const refusalStatus = (code: string): number => REFUSAL_STATUS.get(code) ?? 502;
+
 /** A Content-Disposition value for a stored file's name (RFC 6266): a plain-ASCII fallback in filename and the full
 name in filename* (RFC 5987, UTF-8). Header values carry no characters above U+00FF, so a name such as "写真.jpg"
 written into filename as it is makes the response throw (IR368). */

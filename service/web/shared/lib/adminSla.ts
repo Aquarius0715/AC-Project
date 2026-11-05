@@ -35,8 +35,11 @@ const plans = (targets: ApiTargetView[], used: PlanType[]) => targets.filter((x)
 /** “target 95 %” for one plan type, “targets 85–95 % by plan” when the customers' plans differ. */
 function targetText(values: number[], t: T): string {
   const u = [...new Set(values)].toSorted((a, b) => a - b);
-  return u.length === 0 ? t("no target") : (u.length === 1 ? t("target {n} %", { n: u[0] }) : t("targets {from}–{to} % by plan", { from: u[0], to: u[u.length - 1] }));
+  if (u.length === 0) return t("no target");
+  return u.length === 1 ? t("target {n} %", { n: u[0] }) : t("targets {from}–{to} % by plan", { from: u[0], to: u[u.length - 1] });
 }
+/** How far below its target a value is: more than 10 points is critical. */
+const severity = (gap: number) => (gap > 10 ? "crit" : "warn");
 /** The plan type's name in the user's language. */
 const planName = (plan: string, t: T) => (textOf(planLabel, plan, t) ?? plan);
 
@@ -46,7 +49,7 @@ export function slaTiles(sc: ApiScorecard, t: T = en): { label: string; value: s
   const ts = plans(sc.targets, used.length > 0 ? used : ["general"]);
   const hours = [...new Set(ts.map((x) => x.responseHours))].toSorted((a, b) => a - b);
   const m = sc.totals;
-  const below = (v: number | null, target: number) => (v !== null && v < target ? (target - v > 10 ? "crit" : "warn") : undefined);
+  const below = (v: number | null, target: number) => (v !== null && v < target ? severity(target - v) : undefined);
   const arrival = Math.min(...ts.map((x) => x.arrivalInWindowPercent));
   const ftf = Math.min(...ts.map((x) => x.firstTimeFixPercent));
   return [

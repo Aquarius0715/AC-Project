@@ -80,6 +80,7 @@ export function filterRow(s: ApiFilterStatus, u: FilterUnit | undefined, nowMs: 
   const days = s.lastCleanedAt ? Math.max(0, Math.floor((nowMs - Date.parse(s.lastCleanedAt)) / 86_400_000)) : null;
   const { pct, text: progress } = filterProgress(h, days, s, t);
   const isOffline = !!u && u.connection !== "online";
+  const noReadings = t(isOffline ? "offline" : "no power readings");
   const lastText = s.lastCleanedBy === "technician" ? "cleaned by technician {date}" : "last cleaned {date}";
   const last = s.lastCleanedAt ? t(lastText, { date: monthDay(s.lastCleanedAt, i.display) }) : t("no cleaning recorded yet");
   const runText = s.lastCleanedAt ? "{n} h since cleaning" : "{n} h so far";
@@ -91,7 +92,7 @@ export function filterRow(s: ApiFilterStatus, u: FilterUnit | undefined, nowMs: 
     offline: isOffline,
     jobId: s.lastCleanedBy === "technician" ? s.lastCleaningJobId : null,
     run: h == null ? "—" : t(runText, { n: Math.round(h) }),
-    runNote: h == null ? t(isOffline ? "offline" : "no power readings") : null,
+    runNote: h == null ? noReadings : null,
     state: s.status,
     threshold: s.thresholdHours,
     hours: h,
