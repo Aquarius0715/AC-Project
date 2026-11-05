@@ -3,6 +3,7 @@
 // its Phase 1A demo (partnerUsersDemo.ts). Texts in the display language, times in the display time zone (IR267).
 import { EN, showDate, showTime, type I18n } from "@ac/web/lib/i18n";
 import { klDate, klStart } from "@ac/web/lib/partnerTeam";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { codePoints } from "@ac/web/lib/text";
 
 export type PartnerRole = "contractor" | "technician";
@@ -75,7 +76,7 @@ export function reasonError(reason: string, t = EN.t): string | undefined {
 }
 
 /** The status filter of the URL (`?status=`), or all. */
-export const statusFilter = (v: string | undefined): PartnerStatus | null => (PARTNER_STATUSES as string[]).includes(v ?? "") ? (v as PartnerStatus) : null;
+export const statusFilter = (v = ""): PartnerStatus | null => oneOf(PARTNER_STATUSES, v, null);
 
 /** A display name of 1–120 characters (trimmed), as a new user needs (IR461). */
 export function nameError(name: string, t = EN.t): string | undefined {

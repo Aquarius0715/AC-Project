@@ -9,6 +9,7 @@ import { EN, relativeTime, showSpan, showTime, translator, type I18n, type T, te
 import { alertTitle, type ApiAlert } from "@ac/web/lib/alerts";
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { Slot } from "@ac/web/lib/partnerOverview";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { WARN_MINUTES } from "@ac/web/lib/techJob";
 
 const en = translator("en");
@@ -27,7 +28,7 @@ export const SORTS = [
   { id: "status", text: "Progress, earliest stage first", word: "progress", field: "status", direction: "asc" },
 ] as const;
 export type TechSort = (typeof SORTS)[number]["id"];
-export const sortOf = (v?: string): TechSort => (SORTS.some((s) => s.id === v) ? (v as TechSort) : "severity");
+export const sortOf = (v = ""): TechSort => oneOf(SORTS.map((s) => s.id), v, "severity");
 
 type Tone = "ok" | "warn" | "crit" | "primary" | "muted";
 const KL = 8 * 3_600_000, DAY = 86_400_000;

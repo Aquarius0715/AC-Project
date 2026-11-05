@@ -8,6 +8,7 @@
 import { EN, showSpan, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { hhmm, onTeam, shortQualification, unavailabilityLabel, until, type ApiCapacity, type ApiMember, type ApiPartnerJob, type Slot } from "@ac/web/lib/partnerOverview";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { qualificationLabel, qualified, statusWord, type ApiDetail, type ApiOffer } from "@ac/web/lib/partnerJobDetail";
 
 const en = translator("en");
@@ -16,7 +17,7 @@ const en = translator("en");
 export const SCHEDULE_STATUSES = ["accepted", "assigned", "in_progress", "on_hold", "rework_requested"] as const;
 export const SORTS = [{ id: "status", text: "Status, earliest stage first" }, { id: "dueAt", text: "Deadline, soonest first" }] as const;
 export type ScheduleSort = (typeof SORTS)[number]["id"];
-export const sortOf = (v?: string): ScheduleSort => (SORTS.some((s) => s.id === v) ? (v as ScheduleSort) : "status");
+export const sortOf = (v = ""): ScheduleSort => oneOf(SORTS.map((s) => s.id), v, "status");
 
 type Tone = "crit" | "warn" | "ok" | "primary" | "muted";
 const ended = (s: Slot | null, now: number) => !!s && Date.parse(s.endAt) <= now;

@@ -10,6 +10,7 @@ import { klDay, type Slot } from "@ac/web/lib/partnerOverview";
 import { qualificationLabel } from "@ac/web/lib/partnerJobDetail";
 import type { ApiCertificate } from "@ac/web/lib/adminContractors";
 import { activeNow, klStart, QUALIFICATION_CODES, type ApiTeamMember } from "@ac/web/lib/partnerTeam";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { codePoints } from "@ac/web/lib/text";
 
 const en = translator("en");
@@ -28,7 +29,7 @@ export function certQuery(sp: { membershipId?: string; status?: string; expiring
   const within = WINDOWS.find((w) => String(w) === sp.expiringWithinDays) ?? 60;
   return {
     membershipId: sp.membershipId && technicianIds.includes(sp.membershipId) ? sp.membershipId : null,
-    status: (CERT_STATUSES as readonly string[]).includes(sp.status ?? "") ? (sp.status as CertStatus) : null, within,
+    status: oneOf(CERT_STATUSES, sp.status ?? "", null), within,
   };
 }
 

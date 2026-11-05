@@ -14,6 +14,7 @@ import { componentGroups, componentLabel, groupLabel, type Group } from "@ac/web
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { ApiTechJobRow } from "@ac/web/lib/techOverview";
 import type { ApiDeviceEventFull } from "@ac/web/lib/techDevices";
+import { oneOf } from "@ac/web/lib/oneOf";
 import type { Metric } from "@ac/web/lib/contracts.gen";
 
 /** units.get as the technician reads it (ACUnit.type is part of the unit). */
@@ -24,7 +25,7 @@ type Tone = "ok" | "warn" | "crit" | "primary" | "muted";
 const KL = 8 * 3_600_000, DAY = 86_400_000, HOUR = 3_600_000;
 export const PERIODS = ["1h", "24h", "7d"] as const;
 export type Period = (typeof PERIODS)[number];
-export const periodOf = (v?: string): Period => (PERIODS.includes(v as Period) ? (v as Period) : "24h");
+export const periodOf = (v = ""): Period => oneOf(PERIODS, v, "24h");
 /** The period of the series (DD-T03): 1 h and 24 h roll back from now; 7 days are the Kuala Lumpur calendar days up to
 today. */
 export function periodRange(p: Period, nowMs: number): { from: number; to: number } {
