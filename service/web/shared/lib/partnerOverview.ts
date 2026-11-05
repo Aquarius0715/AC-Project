@@ -96,8 +96,6 @@ export function partnerJob(j: ApiPartnerJob, units: Map<string, string>): Partne
 }
 
 export type Bucket = "offered" | "unassigned" | "active" | "overdue" | "review" | "completed" | "other";
-// a job with its visit window
-type Slotted = PartnerJob & { slot: Slot };
 /** The progress bucket of a job: overdue is an assigned or started job whose work window has ended (IR89). */
 export function bucket(j: PartnerJob, now: number): Bucket {
   switch (j.status) {
@@ -147,6 +145,7 @@ export function kpis(counts: ApiCounts, jobs: PartnerJob[], now: number, names: 
   const list = (tab: string) => `/partner/jobs?tab=${tab}${period ? `&from=${period.from}&to=${period.to}` : ""}`; // the list with the same period
   const offers = jobs.filter((j): j is Offered => j.status === "offered" && j.offerExpiresAt !== null).toSorted((a, b) => Date.parse(a.offerExpiresAt) - Date.parse(b.offerExpiresAt));
   const unassigned = jobs.filter((j) => bucket(j, now) === "unassigned");
+  type Slotted = PartnerJob & { slot: Slot }; // a job with its visit window
   const running = jobs.filter((j): j is Slotted => (j.status === "assigned" || j.status === "in_progress") && j.slot !== null).toSorted((a, b) => Date.parse(a.slot.startAt) - Date.parse(b.slot.startAt));
   const next = running.find((j) => j.status === "in_progress") ?? running.find((j) => Date.parse(j.slot.endAt) > now);
   const review = jobs.filter((j) => j.status === "submitted");
@@ -191,15 +190,18 @@ export function actions(jobs: PartnerJob[], now: number, names: Map<string, stri
     const detail = j.offerExpiresAt ? t("Answer by {time} ({left} left)", { time: showTime(j.offerExpiresAt, display), left: until(j.offerExpiresAt, now, t) }) : t("Answer the offer");
     rows.push({ kind: "offer", badge: t("Offer"), title: label(j, t), href: `/partner/jobs/${j.id}`, button: t("Respond"), detail });
   }
-  for (const j of jobs.filter((x): x is Slotted => x.slot !== null && bucket(x, now) === "overdue")) {
+  for (const j of jobs) {
+    if (j.slot === null || bucket(j, now) !== "overdue") continue;
     const ended = t("Work window ended {time}", { time: showTime(j.slot.endAt, display) });
     rows.push({ kind: "overdue", badge: t("Overdue"), title: label(j, t), detail: j.technicianId ? `${ended} · ${names.get(j.technicianId) ?? t("technician")}` : ended, href: `/partner/schedule?jobId=${j.id}`, button: t("Reassign") });
   }
-  for (const j of jobs.filter((x) => x.status === "submitted")) {
+  for (const j of jobs) {
+    if (j.status !== "submitted") continue;
     const by = j.technicianId ? t("Report by {name} · awaiting review", { name: names.get(j.technicianId) ?? t("your technician") }) : t("Report · awaiting review");
     rows.push({ kind: "review", badge: t("Submitted"), title: label(j, t), detail: by, href: `/partner/jobs/${j.id}/review`, button: t("Review") });
   }
-  for (const j of jobs.filter((x) => bucket(x, now) === "unassigned")) {
+  for (const j of jobs) {
+    if (bucket(j, now) !== "unassigned") continue;
     const detail = j.dueAt ? t("No technician · due {time}", { time: showTime(j.dueAt, display) }) : t("No technician");
     rows.push({ kind: "unassigned", badge: t("Accepted"), title: label(j, t), href: `/partner/schedule?jobId=${j.id}`, button: t("Assign"), detail });
   }

@@ -97,8 +97,7 @@ export interface AutoDraft {
 }
 /** The on/off flag of an occupancy or peak condition (false for the measured ones). */
 function conditionFlag(c: AutoCondition | undefined): boolean {
-  if (c?.type === "occupancy") return c.occupied;
-  return c?.type === "peak" ? c.active : false;
+  return c?.type === "occupancy" ? c.occupied : c?.type === "peak" && c.active;
 }
 /** The fan or ventilation level of an action ("low" for the others). */
 function actionLevel(a: UnitAction | undefined): AutoDraft["level"] {
@@ -112,7 +111,7 @@ export function autoDraft(p?: ApiAutoPolicy, timezone = "Asia/Kuala_Lumpur"): Au
     name: p?.name ?? "", priority: String(p?.priority ?? 50), timezone: p?.timezone ?? timezone, enabled: p?.enabled ?? false, unitIds: p?.unitIds ?? [],
     type: c?.type ?? "tariff", flag: conditionFlag(c),
     operator: c && "operator" in c ? c.operator : "gt", value: c && "value" in c ? String(c.value) : "0.6",
-    actionKind: a?.kind ?? "set_temperature", power: a?.kind === "set_power" ? a.power : false, celsius: a?.kind === "set_temperature" ? String(a.celsius) : "26",
+    actionKind: a?.kind ?? "set_temperature", power: a?.kind === "set_power" && a.power, celsius: a?.kind === "set_temperature" ? String(a.celsius) : "26",
     mode: a?.kind === "set_mode" ? a.mode : "cool", level: actionLevel(a),
   };
 }

@@ -142,7 +142,7 @@ export function feedback(j: ApiClientJob, now: number, i: I18n = EN): { kind: "r
   const { t } = i;
   if (j.status !== "completed") return { kind: "none", text: "", report: false };
   // jobs.reportProblem: within 7 days of completion (IR127 item 2), rated or not
-  const isOpen = j.completedAt ? now < Date.parse(j.completedAt) + 7 * 86_400_000 : true;
+  const isOpen = !j.completedAt || now < Date.parse(j.completedAt) + 7 * 86_400_000;
   const r = j.rating;
   if (!r) {
     return isOpen ? { kind: "rate", text: t("Is everything working? Your confirmation closes the job."), report: true } : { kind: "none", text: t("Confirmed automatically after 7 days."), report: false };

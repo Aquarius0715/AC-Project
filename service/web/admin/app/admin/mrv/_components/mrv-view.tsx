@@ -67,7 +67,7 @@ function Reports({ live, r }: Readonly<{ live: MRVLive; r: NonNullable<MRVLive["
   const [tried, setTried] = useState(false);
   const [from, setFrom] = useState(r.scope.from);
   const [to, setTo] = useState(r.scope.to);
-  const isLatest = sel ? sel.report.version === sel.latestVersion : false;
+  const isLatest = !!sel && sel.report.version === sel.latestVersion;
   const scopeUnits = live.units.filter((u) => !r.scope.organizationId || u.organizationId === r.scope.organizationId);
   const openDraft = (fromReport?: ApiMRVReport) => {
     setPreview(null);

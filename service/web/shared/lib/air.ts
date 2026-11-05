@@ -64,9 +64,9 @@ export function airRooms(ps: ApiPropertyRow[], ss: ApiSpaceRow[], us: ApiUnitRow
   const live = us.filter((u) => !u.archived && props.has(u.propertyId));
   const units = (keep: (u: ApiUnitRow) => boolean) => live.filter((item) => keep(item)).map((u) => ({ id: u.id, name: u.displayName })).toSorted((a, b) => a.name.localeCompare(b.name));
   const out: (AirRoom & { sort: string })[] = [];
-  for (const s of ss.filter((x) => !x.archived)) {
-    const property = props.get(s.propertyId);
-    if (property === undefined) continue; // a room of an archived property
+  for (const s of ss) {
+    const property = s.archived ? undefined : props.get(s.propertyId);
+    if (property === undefined) continue; // an archived room, or a room of an archived property
     const here = units((u) => u.spaceId === s.id);
     if (here.length > 0) out.push({ key: s.id, spaceId: s.id, label: `${s.name} · ${[property, spacePath(s.parentSpaceId, ss)].filter(Boolean).join(" › ")}`, path: `${property} › ${spacePath(s.id, ss)}`, units: here, sort: `${property}\0${spacePath(s.id, ss)}` });
   }

@@ -35,7 +35,7 @@ export function AlertsView({ rows = seed }: Readonly<{ rows?: Alert[] }>) {
   const [unread, setUnread] = useState(false);
   const [open, setOpen] = useState<Alert | null>(null);
   const [failed, setFailed] = useState(false);
-  const show = (a: Alert) => (unread ? !a.read : true);
+  const show = (a: Alert) => !unread || !a.read;
   const attn = list.filter((a) => a.group === "attn" && show(a));
   const info = list.filter((a) => a.group === "info" && show(a));
   const openAlert = (a: Alert) => { setOpen(a); setList((l) => l.map((x) => (x.id === a.id ? { ...x, read: true } : x))); };

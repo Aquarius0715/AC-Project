@@ -149,7 +149,7 @@ export function submitIssues(d: Draft, attachments: { id: string; name: string; 
   if (n < 10 || n > 4000) out.push({ key: null, group: null, text: t("Work performed must be 10–4000 characters") });
   if (d.nextAction.kind === "follow_up" && (!d.nextAction.date || Date.parse(d.nextAction.date) <= now || !d.nextAction.note.trim())) out.push({ key: null, group: null, text: t("A follow-up needs a future date and a note") });
   for (const [k, p] of d.parts.entries()) { if (p.quantity < 1 || p.quantity > 999) out.push({ key: null, group: null, text: t("Part {n} ({name}) needs a quantity of 1–999", { n: k + 1, name: p.name || t("unnamed") }) }); }
-  for (const a of attachments.filter((x) => d.attachmentIds.includes(x.id) && x.status !== "ready")) out.push({ key: null, group: null, text: t("Photo {name} is {state} — remove or retry it", { name: a.name, state: textOf(PHOTO_STATE, a.status, t) ?? a.status }) });
+  for (const a of attachments) if (d.attachmentIds.includes(a.id) && a.status !== "ready") out.push({ key: null, group: null, text: t("Photo {name} is {state} — remove or retry it", { name: a.name, state: textOf(PHOTO_STATE, a.status, t) ?? a.status }) });
   return out;
 }
 

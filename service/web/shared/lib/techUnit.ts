@@ -205,7 +205,8 @@ export function windowEvents(alerts: ApiAlert[], events: ApiDeviceEventFull[], p
     if (inside(a.acknowledgedAt)) out.push({ id: `${a.id}:acknowledged`, at: a.acknowledgedAt, title: t("Alert acknowledged — {title}", { title }), sub: "", badge: { text: t("Acknowledged"), tone: "primary" } });
     if (inside(a.resolvedAt)) out.push({ id: `${a.id}:resolved`, at: a.resolvedAt, title: t("Alert resolved — {title}", { title }), sub: a.resolutionReason ? resolutionText(a.resolutionReason, t) : "", badge: { text: t("Resolved"), tone: "ok" } });
   }
-  for (const e of events.filter((x) => inside(x.occurredAt))) {
+  for (const e of events) {
+    if (!inside(e.occurredAt)) continue;
     const back = e.eventType === "restored" && e.recovery ? RESTORED[e.recovery.axis] : undefined;
     const [title, sub, kind, tone]: [string, string, string, Tone] = back ? [back[0], back[1], back[2], "ok"] : DEVICE[e.eventType];
     out.push({ id: e.id, at: e.occurredAt, title: t(title), sub: t(sub), badge: { text: t(kind), tone } });

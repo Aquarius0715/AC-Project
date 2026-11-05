@@ -20,7 +20,8 @@ interface ApiPolicy { id: string; name: string; kind: string; metric?: string; o
 restriction, one of its invoices, restrictions.forInvoice (the customer has no restriction list) — or null (IR583). */
 async function restrictionHref(unitId: string): Promise<string | null> {
   const contracts = await coreAll<{ id: string; activeRestrictionIds?: string[] }>("contracts.list", { filters: { unitId } });
-  for (const k of contracts.filter((c) => c.activeRestrictionIds?.length)) {
+  for (const k of contracts) {
+    if (!k.activeRestrictionIds?.length) continue;
     const invoices = await coreAll<{ id: string; status: string }>("invoices.list", { filters: { contractId: k.id } });
     const unpaidFirst = [...invoices].toSorted((a, b) => Number(a.status === "paid") - Number(b.status === "paid")).slice(0, 3);
     for (const i of unpaidFirst) {

@@ -105,7 +105,8 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
 
   it("names every sidebar item and the role words of the four apps in Malay", () => {
     for (const config of Object.values(ROLES)) {
-      for (const item of config.nav.filter((i) => i.label !== "MRV")) expect(ms[item.label], item.label).toBeTruthy();
+      const translated = config.nav.filter((i) => i.label !== "MRV"); // the MRV label is the same in both languages
+      for (const item of translated) expect(ms[item.label], item.label).toBeTruthy();
       expect(ms[config.sub], config.sub).toBeTruthy();
       const word = must(config.chip.split(" — ", 1)[0]); // the role chip of the header
       expect(ms[word], word).toBeTruthy();

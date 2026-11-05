@@ -44,7 +44,7 @@ export function PlansView({ live }: Readonly<{ live: PlansLive }>) {
         <Card title={t("Recurring plans")} sub={t("next due, soonest first")} className="self-start">
           {live.rows.length === 0 ? <EmptyState title={t("No plans in this scope")}>{t("“+ New plan” sets up a recurring visit for a unit.")}</EmptyState> : (
             <div className="flex flex-col gap-1.5">{live.rows.map((r) => (
-              <ListRow key={r.id} selected={sel ? sel.plan.id === r.id : false} href={href(r.id)}>
+              <ListRow key={r.id} selected={sel?.plan.id === r.id} href={href(r.id)}>
                 <div className="min-w-0 flex-1">
                   <b className="block truncate text-[13px]">{r.unit} · {r.customer}</b>
                   <div className="text-[11px] text-muted-foreground">{r.short}</div>
