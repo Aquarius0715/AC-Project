@@ -6,11 +6,12 @@ import { useLocale, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
-import { clearEffect, clearError, dayRange, unavailabilityConflicts, unavailabilityErrors, unavailabilityRefusal, type UnavailabilityForm, type UnavailabilityRow, type WeekCell } from "@ac/web/lib/partnerTeam";
+import { clearEffect, clearError, dayRange, UNAVAILABILITY_TYPES, unavailabilityConflicts, unavailabilityErrors, unavailabilityRefusal, type UnavailabilityForm, type UnavailabilityRow, type WeekCell } from "@ac/web/lib/partnerTeam";
 import { clearUnavailability, setUnavailability } from "../actions";
 import { Certifications } from "./certifications";
 import type { TeamLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { byCount } from "@ac/web/lib/i18n";
 
 type Live = Extract<TeamLive, { notFound: false }>;
@@ -217,7 +218,7 @@ function UnavailableDays({ live, onClose }: Readonly<{ live: Live; onClose: () =
   const save = () => {
     setTried(true);
     if (Object.keys(unavailabilityErrors(form, t)).length > 0) return;
-    run(() => setUnavailability({ membershipId: form.membershipId || null, from: form.from, to: form.to, type: form.type as "annual_leave" | "sick" | "training" | "public_holiday" | "other", note: form.note.trim() || undefined }),
+    run(() => setUnavailability({ membershipId: form.membershipId || null, from: form.from, to: form.to, type: form.type, note: form.note.trim() || undefined }),
       (v) => {
         return byCount(v.conflicts, {
           none: t("Unavailable days saved — the available hours of those days are 0."),
@@ -244,7 +245,7 @@ function UnavailableDays({ live, onClose }: Readonly<{ live: Live; onClose: () =
         <Field label={t("From")} error={fieldError("from")}><Input type="date" value={form.from} onChange={(e) => { set({ from: e.target.value }); }} /></Field>
         <Field label={t("To")} error={fieldError("to")}><Input type="date" value={form.to} min={form.from} onChange={(e) => { set({ to: e.target.value }); }} /></Field>
         <Field label={t("Type")} error={fieldError("type")}>
-          <Select value={form.type} onChange={(e) => { set({ type: e.target.value }); }}>{live.types.map((x) => <option key={x.id} value={x.id}>{x.text}</option>)}</Select>
+          <Select value={form.type} onChange={(e) => { set({ type: oneOf(UNAVAILABILITY_TYPES.map((x) => x.id), e.target.value, form.type) }); }}>{live.types.map((x) => <option key={x.id} value={x.id}>{x.text}</option>)}</Select>
         </Field>
       </div>
       <Field label={t("Note (optional)")} error={fieldError("note")}><Input value={form.note} maxLength={500} onChange={(e) => { set({ note: e.target.value }); }} /></Field>

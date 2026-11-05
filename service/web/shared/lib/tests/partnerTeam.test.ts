@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clearEffect, clearError, dayRange, grantRows, listed, memberRows, teamQuery, teamStats, technicianNames, unavailabilityConflicts, unavailabilityErrors, unavailabilityRefusal, unavailabilityRows, weekday, weekRows, type ApiTeamMember, type ApiUnavailability, type TeamJob } from "@ac/web/lib/partnerTeam";
+import { clearEffect, clearError, dayRange, grantRows, listed, memberRows, teamQuery, teamStats, technicianNames, unavailabilityConflicts, unavailabilityErrors, unavailabilityRefusal, unavailabilityRows, weekday, weekRows, type ApiTeamMember, type UnavailabilityForm, type ApiUnavailability, type TeamJob } from "@ac/web/lib/partnerTeam";
 import type { ApiCapacity } from "@ac/web/lib/partnerOverview";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 import { must } from "./must";
@@ -85,7 +85,7 @@ describe("partner team & capacity", () => {
   });
 
   it("checks the unavailable days and finds the assignments they overlap", () => {
-    const f = { membershipId: "m-b", from: "2026-09-15", to: "2026-09-15", type: "annual_leave", note: "" };
+    const f: UnavailabilityForm = { membershipId: "m-b", from: "2026-09-15", to: "2026-09-15", type: "annual_leave", note: "" };
     expect(unavailabilityErrors(f)).toEqual({});
     expect(unavailabilityErrors({ ...f, from: "", to: "2026-09-14" })).toEqual({ from: "Choose the first day" });
     expect(unavailabilityErrors({ ...f, to: "2026-09-14" })).toEqual({ to: "The last day must be on or after the first day" });

@@ -155,7 +155,7 @@ export const UNAVAILABILITY_TYPES = [
   { id: "annual_leave", text: "Annual leave" }, { id: "training", text: "Training" }, { id: "public_holiday", text: "Public holiday" },
   { id: "sick", text: "Sick leave" }, { id: "other", text: "Other" },
 ] as const;
-export interface UnavailabilityForm { membershipId: string; from: string; to: string; type: string; note: string }
+export interface UnavailabilityForm { membershipId: string; from: string; to: string; type: (typeof UNAVAILABILITY_TYPES)[number]["id"]; note: string }
 
 /** The form's own checks before members.setUnavailability (DD-P06 Figma 04-8, IR111): dates, at most 31 days, a note
 of at most 500 characters. */
