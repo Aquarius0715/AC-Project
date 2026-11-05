@@ -96,6 +96,9 @@ export function oidcCookieOptions(maxAge = 600) {
 }
 
 /** The access token claims a session needs: the tenant, the membership and one of the four roles. */
+/** The identity provider's token endpoint answer (authorization code and refresh grants). */
+export const tokenResponse = z.object({ access_token: z.string(), refresh_token: z.string().optional(), expires_in: z.number() });
+export type TokenResponse = z.infer<typeof tokenResponse>;
 const sessionClaims = z.object({
   tenant_id: z.string().min(1),
   membership_id: z.string().min(1),
@@ -103,7 +106,7 @@ const sessionClaims = z.object({
 });
 
 /** Builds a session from a token response; null when the token lacks the tenant / membership / role claims. */
-export function sessionFromTokens(t: { access_token: string; refresh_token?: string; expires_in: number }, previousRefresh: string | null = null): Session | null {
+export function sessionFromTokens(t: TokenResponse, previousRefresh: string | null = null): Session | null {
   const claims = sessionClaims.safeParse(jwtClaims(t.access_token));
   if (!claims.success) return null;
   return {
@@ -127,7 +130,9 @@ export async function refresh(s: Session): Promise<Session | null> {
       body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: s.refreshToken, client_id: roleConfig.clientId, client_secret: roleConfig.clientSecret }),
     });
     if (!r.ok) return null;
-    const next = sessionFromTokens(await r.json(), s.refreshToken);
+    const tokens = tokenResponse.safeParse(await r.json());
+    if (!tokens.success) return null;
+    const next = sessionFromTokens(tokens.data, s.refreshToken);
     // a refreshed token must keep the selected tenant and membership
     return next?.tenantId === s.tenantId && next.membershipId === s.membershipId ? next : null;
   } catch {
@@ -234,7 +239,7 @@ export async function loadSession(cookie: string | undefined): Promise<Session |
     }
     return rec.session;
   } catch (error) {
-    console.warn(`session store: ${(error as Error).message}`);
+    console.warn(`session store: ${Error.isError(error) ? error.message : String(error)}`);
     return null;
   }
 }
@@ -264,7 +269,7 @@ export async function renewSessionCookie(cookie: string | undefined, s: Session)
     const ok = await timed(sc.set(keyOf(id), seal({ session: s, startedAt: rec.startedAt } satisfies Stored), { expiration: { type: "EX", value: SESSION_MAX_AGE }, condition: "XX" }));
     return ok === null ? null : cookie;
   } catch (error) {
-    console.warn(`session store: ${(error as Error).message}`);
+    console.warn(`session store: ${Error.isError(error) ? error.message : String(error)}`);
     return null;
   }
 }
@@ -279,7 +284,7 @@ export async function dropSession(cookie: string | undefined): Promise<void> {
     const client = await timed(c);
     await timed(client.del(keyOf(id)));
   } catch (error) {
-    console.warn(`session store: ${(error as Error).message}`);
+    console.warn(`session store: ${Error.isError(error) ? error.message : String(error)}`);
   }
 }
 

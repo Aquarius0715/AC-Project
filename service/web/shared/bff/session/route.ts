@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { readSession } from "@ac/web/lib/session";
+
+const coreSession = z.object({ data: z.object({ clientRole: z.string().nullish() }).optional(), meta: z.object({ snapshotAt: z.string().optional() }).optional() });
 
 // GET /bff/session: tells the browser which data source this deployment uses and who is signed in (no tokens).
 // serverNow is the Core API clock (the demo scenario clock in the demo environment, IR36) from Meta.snapshotAt;
@@ -16,9 +19,9 @@ export async function GET() {
         headers: { Authorization: `Bearer ${s.accessToken}`, "X-Tenant-Id": s.tenantId, "X-Membership-Id": s.membershipId },
       });
       if (r.ok) {
-        const body = (await r.json()) as { data?: { clientRole?: string | null }; meta?: { snapshotAt?: string } };
-        serverNow = body.meta?.snapshotAt ?? null;
-        clientRole = body.data?.clientRole ?? null;
+        const body = coreSession.safeParse(await r.json());
+        serverNow = body.success ? body.data.meta?.snapshotAt ?? null : null;
+        clientRole = body.success ? body.data.data?.clientRole ?? null : null;
       }
     } catch {
       serverNow = null;

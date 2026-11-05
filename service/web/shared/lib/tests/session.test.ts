@@ -131,6 +131,10 @@ describe("refreshing the access token", () => {
     expect(await refresh(session())).toBeNull();
     vi.stubGlobal("fetch", answer(400, { error: "invalid_grant" }));
     expect(await refresh(session())).toBeNull();
+    vi.stubGlobal("fetch", answer(200, { access_token: token(claims), expires_in: "300" })); // expires_in is not a number
+    expect(await refresh(session())).toBeNull();
+    vi.stubGlobal("fetch", answer(200, { refresh_token: "r-2", expires_in: 300 })); // no access token
+    expect(await refresh(session())).toBeNull();
     vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new TypeError("fetch failed"))));
     expect(await refresh(session())).toBeNull();
     const fetch = vi.fn();

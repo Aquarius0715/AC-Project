@@ -1,7 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { APP_ROLE, cookieOptions, createSessionCookie, OIDC_COOKIE, oidcConfig, oidcCookieOptions, roleHome, SESSION_COOKIE, sessionFromTokens, unseal, type Session } from "@ac/web/lib/session";
+import { APP_ROLE, cookieOptions, createSessionCookie, OIDC_COOKIE, oidcConfig, oidcCookieOptions, roleHome, SESSION_COOKIE, sessionFromTokens, tokenResponse, unseal, type Session } from "@ac/web/lib/session";
+import { z } from "zod";
 import { orNull } from "@ac/web/lib/promises";
 
+const refusal = z.object({ messageKey: z.string().optional() });
 interface Pending { state: string; verifier: string; returnTo: string | null; reauth?: boolean }
 
 /** True when the Core API refuses this sign-in because HQ signed the user out everywhere after it (IR384): the identity
@@ -12,7 +14,9 @@ async function revokedSignIn(s: Session): Promise<boolean> {
       cache: "no-store", signal: AbortSignal.timeout(3000),
       headers: { Authorization: `Bearer ${s.accessToken}`, "X-Tenant-Id": s.tenantId, "X-Membership-Id": s.membershipId },
     });
-    return r.status === 401 && ((await orNull(r.json())) as { messageKey?: string } | null)?.messageKey === "errors.session_revoked";
+    if (r.status !== 401) return false;
+    const body = refusal.safeParse(await orNull(r.json()));
+    return body.success && body.data.messageKey === "errors.session_revoked";
   } catch {
     return false;
   }
@@ -40,8 +44,9 @@ export async function GET(req: NextRequest) {
     }),
   });
   if (!token.ok) return NextResponse.redirect(new URL("/login?error=token", config.appUrl));
-  const t = (await token.json()) as { access_token: string; refresh_token?: string; expires_in: number };
-  const session = sessionFromTokens(t);
+  const tokens = tokenResponse.safeParse(await token.json());
+  if (!tokens.success) return NextResponse.redirect(new URL("/login?error=token", config.appUrl));
+  const session = sessionFromTokens(tokens.data);
   if (!session) return NextResponse.redirect(new URL("/login?error=membership", config.appUrl));
   if (session.role !== APP_ROLE) return NextResponse.redirect(new URL("/login?error=role", config.appUrl)); // another role's app
   // signed out everywhere after this sign-in (IR384): ask for the password once (prompt=login), then give up (IR385)
