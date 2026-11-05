@@ -37,19 +37,26 @@ export interface BillingLive {
   statementMissing?: boolean;
 }
 
+const CUSTOMER_B = "customer-b";
+const CUSTOMER_A = "customer-a";
+const AUG_PERIOD = "2026-08-01 → 2026-09-01";
+const AUG_DUE = "2026-09-10";
+const CONTRACT_RTO_A = "contract-rto-a";
+const INVOICE_OVERDUE_A = "invoice-overdue-a";
+const NO_METHOD = "Method not selected";
 const row = (r: Omit<InvoiceRow, "methodName" | "paymentState">): InvoiceRow => ({ ...r, methodName: r.method.split(" · ", 1)[0] ?? r.method, paymentState: r.method.split(" · ", 2)[1] ?? null });
 const seed: NonEmpty<InvoiceRow> = [
-  row({ id: "invoice-general-b", number: "invoice-general-b", version: 1, amt: "50.00 MYR", amountMinor: 5000, currency: "MYR", meta: "customer-b · contract-general-b · Aug 2026", method: "Debit card · failed", st: "Unpaid", customerId: "customer-b", contractId: "contract-general-b", period: "2026-08-01 → 2026-09-01", due: "2026-09-10" }),
-  row({ id: "invoice-jul-a", number: "invoice-jul-a", version: 1, amt: "120.00 MYR", amountMinor: 12_000, currency: "MYR", meta: "customer-a · contract-rto-a v1 · Jul 2026", method: "Method not selected · confirmed", st: "Paid", customerId: "customer-a", contractId: "contract-rto-a", period: "2026-07-01 → 2026-08-01", due: "2026-08-10" }),
-  row({ id: "invoice-overdue-a", number: "invoice-overdue-a", version: 1, amt: "120.00 MYR", amountMinor: 12_000, currency: "MYR", meta: "customer-a · contract-rto-a v1 · Aug 2026", method: "Method not selected", st: "Overdue", customerId: "customer-a", contractId: "contract-rto-a", period: "2026-08-01 → 2026-09-01", due: "2026-09-10" }),
-  row({ id: "invoice-overdue-b", number: "invoice-overdue-b", version: 1, amt: "85.00 MYR", amountMinor: 8500, currency: "MYR", meta: "customer-b · contract-rto-b v1 · Aug 2026", method: "Credit card · processing", st: "Processing", customerId: "customer-b", contractId: "contract-rto-b", period: "2026-08-01 → 2026-09-01", due: "2026-09-10" }),
-  row({ id: "invoice-sep-a", number: "invoice-sep-a", version: 1, amt: "50.00 MYR", amountMinor: 5000, currency: "MYR", meta: "customer-a · contract-general-a v1 · Sep 2026", method: "Method not selected", st: "Unpaid", customerId: "customer-a", contractId: "contract-general-a", period: "2026-09-01 → 2026-10-01", due: "2026-10-10" }),
+  row({ id: "invoice-general-b", number: "invoice-general-b", version: 1, amt: "50.00 MYR", amountMinor: 5000, currency: "MYR", meta: "customer-b · contract-general-b · Aug 2026", method: "Debit card · failed", st: "Unpaid", customerId: CUSTOMER_B, contractId: "contract-general-b", period: AUG_PERIOD, due: AUG_DUE }),
+  row({ id: "invoice-jul-a", number: "invoice-jul-a", version: 1, amt: "120.00 MYR", amountMinor: 12_000, currency: "MYR", meta: "customer-a · contract-rto-a v1 · Jul 2026", method: "Method not selected · confirmed", st: "Paid", customerId: CUSTOMER_A, contractId: CONTRACT_RTO_A, period: "2026-07-01 → 2026-08-01", due: "2026-08-10" }),
+  row({ id: INVOICE_OVERDUE_A, number: INVOICE_OVERDUE_A, version: 1, amt: "120.00 MYR", amountMinor: 12_000, currency: "MYR", meta: "customer-a · contract-rto-a v1 · Aug 2026", method: NO_METHOD, st: "Overdue", customerId: CUSTOMER_A, contractId: CONTRACT_RTO_A, period: AUG_PERIOD, due: AUG_DUE }),
+  row({ id: "invoice-overdue-b", number: "invoice-overdue-b", version: 1, amt: "85.00 MYR", amountMinor: 8500, currency: "MYR", meta: "customer-b · contract-rto-b v1 · Aug 2026", method: "Credit card · processing", st: "Processing", customerId: CUSTOMER_B, contractId: "contract-rto-b", period: AUG_PERIOD, due: AUG_DUE }),
+  row({ id: "invoice-sep-a", number: "invoice-sep-a", version: 1, amt: "50.00 MYR", amountMinor: 5000, currency: "MYR", meta: "customer-a · contract-general-a v1 · Sep 2026", method: NO_METHOD, st: "Unpaid", customerId: CUSTOMER_A, contractId: "contract-general-a", period: "2026-09-01 → 2026-10-01", due: "2026-10-10" }),
 ];
 const seedInquiries: NonEmpty<InquiryRow> = [
-  { id: "inquiry-a-01", version: 1, cust: "customer-a", kind: "payment", at: "09-21", text: "“I paid by bank transfer on 20 Sep — why is cooling still limited?”", state: "received", reply: null, invoiceId: "invoice-overdue-a", restrictionId: "restriction-limited-a" },
-  { id: "inquiry-b-02", version: 1, cust: "customer-b", kind: "billing", at: "09-19", text: "“Please resend the August invoice.”", state: "received", reply: null, invoiceId: null, restrictionId: null },
+  { id: "inquiry-a-01", version: 1, cust: CUSTOMER_A, kind: "payment", at: "09-21", text: "“I paid by bank transfer on 20 Sep — why is cooling still limited?”", state: "received", reply: null, invoiceId: INVOICE_OVERDUE_A, restrictionId: "restriction-limited-a" },
+  { id: "inquiry-b-02", version: 1, cust: CUSTOMER_B, kind: "billing", at: "09-19", text: "“Please resend the August invoice.”", state: "received", reply: null, invoiceId: null, restrictionId: null },
 ];
-const seedContracts: ContractOption[] = [{ id: "contract-rto-a", version: 1, label: "customer-a · rto · 120.00 MYR", priceMinor: 12_000, currency: "MYR" }, { id: "contract-general-a", version: 1, label: "customer-a · general · 50.00 MYR", priceMinor: 5000, currency: "MYR" }];
+const seedContracts: ContractOption[] = [{ id: CONTRACT_RTO_A, version: 1, label: "customer-a · rto · 120.00 MYR", priceMinor: 12_000, currency: "MYR" }, { id: "contract-general-a", version: 1, label: "customer-a · general · 50.00 MYR", priceMinor: 5000, currency: "MYR" }];
 const INVOICE_TONE = new Map<InvoiceStatus, "ok" | "crit" | "primary">([["Paid", "ok"], ["Overdue", "crit"], ["Processing", "primary"]]);
 const tone = (s: InvoiceStatus) => INVOICE_TONE.get(s) ?? "warn";
 /** The payment line of an invoice: paid, processing, the recorded payment's state, or none yet. */
@@ -144,7 +151,7 @@ export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
     if (!sel || !m.ref.trim() || Math.round(+m.amount * 100) !== sel.amountMinor || (live && !m.reason.trim())) return;
     if (live) { act(() => recordManualPayment(sel.id, sel.version, m.ref.trim(), sel.amountMinor, sel.currency, m.reason.trim()), t("Manual payment recorded"), close); return; }
     if (demoReminded) setConflict(true);
-    setDemoList((l) => l.map((x) => (x.id === sel.id ? { ...x, st: "Paid", method: "Method not selected · confirmed", methodName: "Method not selected", paymentState: "confirmed" } : x)));
+    setDemoList((l) => l.map((x) => (x.id === sel.id ? { ...x, st: "Paid", method: "Method not selected · confirmed", methodName: NO_METHOD, paymentState: "confirmed" } : x)));
     toast(t("Manual payment recorded"));
     close();
   };
