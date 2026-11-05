@@ -10,19 +10,20 @@ const historyRowOf = (...args: Parameters<typeof historyRow>) => must(historyRow
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const ms = translator("ms");
 
+type SummaryJob = Extract<ApiPartnerJob, { projection: "summary" }>;
 const NOW = Date.parse("2026-09-21T01:30:00Z"); // Mon 09:30 KL
 const slot = (s: string, e: string) => ({ startAt: s, endAt: e });
-const members = [{ id: "m-a", userId: "u-a", displayName: "tech-external-a", role: "technician" }, { id: "m-c", userId: "u-c", displayName: "contractor-a", role: "contractor" }] as unknown as ApiMember[];
+const members: ApiMember[] = [{ id: "m-a", userId: "u-a", displayName: "tech-external-a", role: "technician" }, { id: "m-c", userId: "u-c", displayName: "contractor-a", role: "contractor" }];
 const names = new Map(members.map((m) => [m.id, m.displayName]));
 const units = new Map([["u1", "Office AC"]]);
 const auditEvent = (id: string, action: string, at: string, note: ApiEvent["note"] = null, actor: string | null = "u-c"): ApiEvent => ({ jobId: "j", actorUserId: actor, occurredAt: at, id, action, note });
-const summary = (over: Record<string, unknown>, evs: ApiEvent[] = []) => {
+const summary = (over: Partial<SummaryJob>, evs: ApiEvent[] = []): SummaryJob => {
   return ({
     projection: "summary", id: "job-1-aaaa", version: 7, unitId: "u1", type: "reactive", status: "in_progress", dueAt: "x", requestedSlot: slot("a", "b"), scheduledSlot: slot("2026-09-21T01:00:00Z", "2026-09-21T03:00:00Z"),
     assignmentId: "as", displayStatus: "in_progress", technicianMembershipId: "m-a", assignmentAcknowledgement: "accepted", accessValidFrom: "2026-09-14T00:00:00Z", accessValidUntil: "2026-09-25T16:00:00Z", origin: "client_request", eventSummary: eventSummary(evs), ...over,
-  }) as unknown as ApiPartnerJob;
+  });
 };
-const history = (jobId: string, evs: ApiEvent[]) => ({ projection: "history", type: "periodic", status: "completed", completedAt: null, asOf: "2026-09-20T16:00:00Z", ownDecisionEvents: evs, jobId }) as ApiPartnerJob;
+const history = (jobId: string, evs: ApiEvent[]): ApiPartnerJob => ({ projection: "history", type: "periodic", status: "completed", completedAt: null, asOf: "2026-09-20T16:00:00Z", ownDecisionEvents: evs, jobId });
 const events = [
   auditEvent("e1", "offer.accepted", "2026-09-18T00:30:00Z"),
   auditEvent("e2", "note.added", "2026-09-20T06:05:00Z", { visibility: "internal", message: "Missing filter photo" }),
@@ -43,7 +44,7 @@ describe("partner job history", () => {
     expect(unassigned.tech).toEqual({ name: "Unassigned", sub: "assign in Schedule", tone: "crit" });
     const h = historyRowOf(history("job-9-hhhh", [must(events[0])]), NOW, units, names);
     expect([h.tab, h.ended, h.sub, h.badge.text, h.version]).toEqual(["ended", true, "1 own decision event · delegation ended 21 Sept 2026, 12:00 am MYT (read-only snapshot)", "Completed", null]);
-    expect(historyRow({ projection: "offer", status: "offered" } as unknown as ApiPartnerJob, NOW, units, names)).toBeNull();
+    expect(historyRow({ projection: "offer", status: "offered", jobId: "j", jobVersion: 1, offerId: "o", type: "reactive", siteAddress: null, requestedSlot: slot("a", "b"), dueAt: "x", offerExpiresAt: "x", visitSlot: null }, NOW, units, names)).toBeNull();
   });
 
   it("filters, counts and orders the rows", () => {

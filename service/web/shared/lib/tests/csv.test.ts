@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { csvCell, csvQuoted, csvText } from "@ac/web/lib/csv";
-import { coverageCsv, errorReportCsv } from "@ac/web/lib/assets";
+import { coverageCsv, errorReportCsv, type ApiImportRow, type CoverageRow } from "@ac/web/lib/assets";
 
 // IR368: an exported cell never runs as a spreadsheet formula (CSV injection)
 describe("CSV export cells", () => {
@@ -12,9 +12,14 @@ describe("CSV export cells", () => {
   });
 
   it("guards the exports built from names users and import files chose", () => {
-    const row = { unit: "=cmd|' /C calc'!A0", unitId: "u1", customer: "@Evil", model: "Daikin X", endsDate: "2026-10-10", contracts: "—", statusText: "-1+1" };
-    expect(coverageCsv([row as never]).split("\n", 2)[1]).toBe("'=cmd|' /C calc'!A0,u1,'@Evil,Daikin X,2026-10-10,,'-1+1");
-    const imported = { rowNumber: 2, propertyName: "=1+1", floorName: null, roomName: null, unitName: "+SUM(1)", modelCode: "SPL-100", serial: null, result: "error", messageKey: "error.invalid" };
-    expect(errorReportCsv([imported as never]).split("\n", 2)[1]?.startsWith("2,'=1+1,,,'+SUM(1),SPL-100,")).toBe(true);
+    const row: CoverageRow = {
+      unitId: "u1", unit: "=cmd|' /C calc'!A0", sub: "", customerId: "c1", customer: "@Evil", model: "Daikin X", ends: "", endsDate: "2026-10-10", endsAt: null, days: null,
+      contractIds: [], contracts: "—", status: "no_coverage", statusText: "-1+1",
+    };
+    expect(coverageCsv([row]).split("\n", 2)[1]).toBe("'=cmd|' /C calc'!A0,u1,'@Evil,Daikin X,2026-10-10,,'-1+1");
+    const imported: ApiImportRow = {
+      rowNumber: 2, propertyName: "=1+1", floorName: null, roomName: null, unitName: "+SUM(1)", modelCode: "SPL-100", serial: null, installedOn: null, warrantyEnd: null, result: "error", messageKey: "error.invalid",
+    };
+    expect(errorReportCsv([imported]).split("\n", 2)[1]?.startsWith("2,'=1+1,,,'+SUM(1),SPL-100,")).toBe(true);
   });
 });
