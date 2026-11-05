@@ -36,7 +36,7 @@ const EN_FMT = fmtOf(EN);
 
 export type Group = "indoor" | "outdoor" | "electrical";
 /** The component keys of each group in canonical order (maintenance.ComponentGroups of the Core API). */
-export const componentGroups: { group: Group; keys: string[] }[] = [
+export const componentGroups: { group: Group; keys: ComponentKey[] }[] = [
   { group: "indoor", keys: ["filter", "evaporator_coil", "blower_motor", "blower_fan", "drain_pipe", "drain_pan", "outlet", "louver"] },
   { group: "outdoor", keys: ["condenser_coil", "compressor", "fan", "blade", "refrigerant_pipe"] },
   { group: "electrical", keys: ["thermostat", "sensor", "capacitor", "contactor", "wiring"] },
@@ -47,7 +47,7 @@ export const componentLabel: Record<string, string> = {
   outlet: "Outlet", louver: "Louver", condenser_coil: "Condenser coil", compressor: "Compressor", fan: "Fan", blade: "Fan blade", refrigerant_pipe: "Refrigerant pipe",
   thermostat: "Thermostat", sensor: "Sensor", capacitor: "Capacitor", contactor: "Contactor", wiring: "Wiring insulation",
 };
-export const groupOf = (key: string): Group | null => componentGroups.find((g) => g.keys.includes(key))?.group ?? null;
+export const groupOf = (key: string): Group | null => componentGroups.find((g) => g.keys.some((k) => k === key))?.group ?? null;
 /** The components a report of this unit must cover: every key of the groups in the unit's service scope (IR100). */
 export const componentsFor = (scope: string[]) => componentGroups.filter((g) => scope.includes(g.group)).flatMap((g) => g.keys.map((key) => ({ group: g.group, key })));
 
@@ -61,8 +61,8 @@ export const readingMetrics: { metric: Metric; label: string }[] = [
 /** WorkReport of service-contracts.ts as the technician reads it. */
 export interface ApiTechReport {
   id: string; version: number; jobId: string; authorId: string; state?: string;
-  items: { id: string; componentGroup: Group; componentKey: string; result: Result; reason: string | null; evidenceIds: string[]; authorId: string; observedAt: string }[];
-  measurements: { id: string; componentKey?: string | null; metric: Metric; value: number | null; unit: string; observedAt: string; quality: string; qualityReason?: string | null }[];
+  items: { id: string; componentGroup: Group; componentKey: ComponentKey; result: Result; reason: string | null; evidenceIds: string[]; authorId: string; observedAt: string }[];
+  measurements: { id: string; componentKey?: ComponentKey | null; metric: Metric; value: number | null; unit: string; observedAt: string; quality: string; qualityReason?: string | null }[];
   parts: DraftPart[]; refrigerant: DraftRefrigerant[]; signOff: { signerName: string; signedAt: string; signatureAttachmentId: string | null; absentReason: string | null; reportVersion: number } | null;
   workText: string; nextAction: { kind: "none" } | { kind: "follow_up"; date: string; note: string } | null;
   attachmentRefs: { id: string; name: string; mime: string; size: number; status: "processing" | "ready" | "failed" }[]; submittedAt: string | null; acceptedAt: string | null;
@@ -70,11 +70,11 @@ export interface ApiTechReport {
 }
 export const checkResults = ["normal", "attention", "not_inspected", "not_applicable"] as const;
 export type Result = (typeof checkResults)[number] | null;
-export interface DraftItem { componentGroup: Group; componentKey: string; result: Result; reason: string; evidenceIds: string[] }
-export interface DraftReading { id?: string; componentKey: string; metric: Metric; value: string; observedAt: string }
+export interface DraftItem { componentGroup: Group; componentKey: ComponentKey; result: Result; reason: string; evidenceIds: string[] }
+export interface DraftReading { id?: string; componentKey: ComponentKey; metric: Metric; value: string; observedAt: string }
 export interface DraftPart {
   name: string; quantity: number; catalogCode: string | null; source: "van_stock" | "hq_warehouse" | "bought_locally"; lotSerial: string | null;
-  replacesComponentKey: string | null; oldPartDisposal: "disposed_on_site" | "returned" | null; receiptAttachmentId: string | null;
+  replacesComponentKey: ComponentKey | null; oldPartDisposal: "disposed_on_site" | "returned" | null; receiptAttachmentId: string | null;
 }
 export interface DraftRefrigerant { refrigerant: "R32" | "R410A"; cylinderId: string; recoveredKg: number; chargedKg: number; leakCheck: "pass" | "fail" | "not_done"; leakCheckMethod: string | null }
 export type NextAction = { kind: "none" } | { kind: "follow_up"; date: string; note: string };
@@ -82,14 +82,20 @@ export interface Draft { items: DraftItem[]; readings: DraftReading[]; parts: Dr
 
 /** The editable draft of a report: every required component in canonical order (null until a result is chosen — normal
 is never preselected, DD-T04), the readings as text so a half-typed value survives, and the other sections as saved. */
-export function draftFrom(r: ApiTechReport | null, components: { group: Group; key: string }[]): Draft {
+export function draftFrom(r: ApiTechReport | null, components: { group: Group; key: ComponentKey }[]): Draft {
   const items = components.map(({ group, key }) => {
     const it = r?.items.find((x) => x.componentKey === key);
     return { componentGroup: group, componentKey: key, result: it?.result ?? null, reason: it?.reason ?? "", evidenceIds: it?.evidenceIds ?? [] };
   });
+  const readings: DraftReading[] = [];
+  const measurements = r?.measurements ?? [];
+  for (const m of measurements) {
+    const componentKey = m.componentKey ?? components[0]?.key; // a reading without a component is entered on the first one
+    if (componentKey) readings.push({ componentKey, id: m.id, metric: m.metric, value: m.value === null ? "" : String(m.value), observedAt: m.observedAt });
+  }
   return {
     items,
-    readings: (r?.measurements ?? []).map((m) => ({ id: m.id, componentKey: m.componentKey ?? components[0]?.key ?? "", metric: m.metric, value: m.value === null ? "" : String(m.value), observedAt: m.observedAt })),
+    readings,
     parts: r?.parts ?? [], refrigerant: r?.refrigerant ?? [], workText: r?.workText ?? "",
     nextAction: r?.nextAction ?? { kind: "none" }, attachmentIds: (r?.attachmentRefs ?? []).filter((a) => a.status !== "failed").map((a) => a.id),
   };
@@ -100,9 +106,9 @@ export function draftInput(jobId: string, reportId: string | null, d: Draft): Op
   const toNumber = (v: string) => (v.trim() === "" || !Number.isFinite(Number(v)) ? null : Number(v));
   return {
     jobId, ...(reportId && { reportId }),
-    items: d.items.map((it) => ({ componentGroup: it.componentGroup, componentKey: it.componentKey as ComponentKey, result: it.result, reason: it.reason.trim() || null, evidenceIds: it.evidenceIds })),
-    measurements: d.readings.map((m) => ({ ...(m.id && { id: m.id }), componentKey: m.componentKey as ComponentKey, metric: m.metric, value: toNumber(m.value), unit: metricUnit[m.metric], observedAt: m.observedAt })),
-    parts: d.parts.map((p) => ({ ...p, name: p.name.trim(), replacesComponentKey: p.replacesComponentKey as ComponentKey | null })), refrigerant: d.refrigerant, workText: d.workText,
+    items: d.items.map((it) => ({ componentGroup: it.componentGroup, componentKey: it.componentKey, result: it.result, reason: it.reason.trim() || null, evidenceIds: it.evidenceIds })),
+    measurements: d.readings.map((m) => ({ ...(m.id && { id: m.id }), componentKey: m.componentKey, metric: m.metric, value: toNumber(m.value), unit: metricUnit[m.metric], observedAt: m.observedAt })),
+    parts: d.parts.map((p) => ({ ...p, name: p.name.trim(), replacesComponentKey: p.replacesComponentKey })), refrigerant: d.refrigerant, workText: d.workText,
     nextAction: d.nextAction.kind === "none" ? { kind: "none" as const } : { kind: "follow_up" as const, date: d.nextAction.date, note: d.nextAction.note.trim() },
     attachmentIds: d.attachmentIds,
   };

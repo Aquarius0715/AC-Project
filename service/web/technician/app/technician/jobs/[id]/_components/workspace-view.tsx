@@ -17,6 +17,7 @@ import {
 } from "@ac/web/lib/techJob";
 import { acknowledge, checkIn, pauseWork, resumeRework, saveDraft, signOff, submitReport, uploadPhoto } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
+import type { ComponentKey } from "@ac/web/lib/contracts.gen";
 import { without } from "@ac/web/lib/omit";
 
 export interface WorkspaceLive {
@@ -29,7 +30,7 @@ export interface WorkspaceLive {
   };
   unit: { name: string; place: string; access: string | null; model: string; scope: string[] } | null; unitRefused: string | null;
   unitName: string | null; // also before the window, when the unit itself is not open yet
-  components: { group: Group; key: string }[];
+  components: { group: Group; key: ComponentKey }[];
   report: ApiTechReport | null; reportRefused: string | null;
   parts: { code: string; name: string; vanStockQuantity: number | null }[];
 }
@@ -72,6 +73,7 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
     return () => { clearInterval(t); };
   }, [live.now]);
   const editableReport = job.draftReportRef && live.report?.version === job.draftReportRef.reportVersion ? live.report : null;
+  const componentKeys = live.components.map((c) => c.key);
   const [draft, setDraft] = useState<Draft>(() => draftFrom(editableReport ?? (job.status === "in_progress" ? null : live.report), live.components));
   const [rep, setRep] = useState<Rep | null>(editableReport);
   const [dirty, setDirty] = useState(false);
@@ -193,7 +195,7 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
     if (view === "parts") return <span className="flex gap-2"><Btn size="sm" onClick={() => { setModal("part"); }}><Icon name="add" /> {t("Add part")}</Btn><Btn size="sm" onClick={() => { setModal("refrigerant"); }}><Icon name="add" /> {t("Refrigerant")}</Btn></span>;
     return null;
   };
-  const addReading = (key: string) => { edit((d) => ({ ...d, readings: [...d.readings, { componentKey: key, metric: "temperature", value: "", observedAt: new Date(now).toISOString() }] })); };
+  const addReading = (key: ComponentKey) => { edit((d) => ({ ...d, readings: [...d.readings, { componentKey: key, metric: "temperature", value: "", observedAt: new Date(now).toISOString() }] })); };
   // a finding's own readings and linked report photos, with “+ Add reading” and “+ Link photo” on a finding that needs
   // attention or already has evidence (Figma Technician 423:204, DD-T04–T06 step 1, IR352)
   const evidence = (it: Draft["items"][number]) => {
@@ -308,7 +310,7 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
                     <td className="py-1.5 pr-2">{isEditable ? <Select aria-label={t("Metric")} value={m.metric} onChange={(e) => { edit((d) => ({ ...d, readings: d.readings.map((x, k) => (k === i ? { ...x, metric: oneOf(metricIds, e.target.value, x.metric) } : x)) })); }}>{readingMetrics.map((x) => <option key={x.metric} value={x.metric}>{t(x.label)}</option>)}</Select> : t(readingMetrics.find((x) => x.metric === m.metric)?.label ?? m.metric)}</td>
                     <td className="pr-2">{isEditable ? <Input inputMode="decimal" value={m.value} aria-invalid={m.value.trim() !== "" && !Number.isFinite(Number(m.value))} onChange={(e) => { edit((d) => ({ ...d, readings: d.readings.map((x, k) => (k === i ? { ...x, value: e.target.value } : x)) })); }} /> : m.value || "—"}</td>
                     <td className="pr-2 text-muted-foreground">{metricUnit[m.metric]}</td>
-                    <td className="pr-2">{isEditable ? <Select aria-label={t("Linked item")} value={m.componentKey} onChange={(e) => { edit((d) => ({ ...d, readings: d.readings.map((x, k) => (k === i ? { ...x, componentKey: e.target.value } : x)) })); }}>{live.components.map((c) => <option key={c.key} value={c.key}>{t(groupLabel[c.group])} › {label(c.key)}</option>)}</Select> : label(m.componentKey)}</td>
+                    <td className="pr-2">{isEditable ? <Select aria-label={t("Linked item")} value={m.componentKey} onChange={(e) => { edit((d) => ({ ...d, readings: d.readings.map((x, k) => (k === i ? { ...x, componentKey: oneOf(componentKeys, e.target.value, x.componentKey) } : x)) })); }}>{live.components.map((c) => <option key={c.key} value={c.key}>{t(groupLabel[c.group])} › {label(c.key)}</option>)}</Select> : label(m.componentKey)}</td>
                     <td className="pr-2 text-xs text-muted-foreground">{f.clock(m.observedAt)}</td>
                     <td>{isEditable && <Plain type="button" className="text-xs font-semibold text-primary" onClick={() => { edit((d) => ({ ...d, readings: d.readings.filter((_, k) => k !== i) })); }}>{t("Remove")}</Plain>}</td>
                   </tr>
@@ -487,7 +489,7 @@ function PartModal({ open, parts, components, onClose, onAdd }: Readonly<{ open:
   const [qty, setQty] = useState("1");
   const [source, setSource] = useState<DraftPart["source"]>("van_stock");
   const [lot, setLot] = useState("");
-  const [replaces, setReplaces] = useState("");
+  const [replaces, setReplaces] = useState<ComponentKey | "">("");
   const [disposal, setDisposal] = useState<"" | "disposed_on_site" | "returned">("");
   const [errors, setErrors] = useState<Partial<Record<(typeof PART_FIELDS)[number], string>>>({});
   const picked = parts.find((p) => p.code === code);
@@ -511,7 +513,7 @@ function PartModal({ open, parts, components, onClose, onAdd }: Readonly<{ open:
         <Field label={t("Lot / serial")}><Input value={lot} onChange={(e) => { setLot(e.target.value); }} /></Field>
       </div>
       <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
-        <Field label={t("Replaces checklist item (optional)")}><Select value={replaces} onChange={(e) => { setReplaces(e.target.value); }}><option value="">—</option>{components.map((c) => <option key={c.key} value={c.key}>{t(groupLabel[c.group])} › {t(componentLabel[c.key] ?? c.key)}</option>)}</Select></Field>
+        <Field label={t("Replaces checklist item (optional)")}><Select value={replaces} onChange={(e) => { setReplaces(oneOf(components.map((c) => c.key), e.target.value, "")); }}><option value="">—</option>{components.map((c) => <option key={c.key} value={c.key}>{t(groupLabel[c.group])} › {t(componentLabel[c.key] ?? c.key)}</option>)}</Select></Field>
         {replaces && <Field label={t("Old part")}><Select value={disposal} onChange={(e) => { setDisposal(oneOf(["disposed_on_site", "returned"] as const, e.target.value, "")); }}><option value="">{t("Disposed on site")}</option><option value="returned">{t("Returned")}</option></Select></Field>}
       </div>
       {source === "bought_locally" && <p className="text-[11px] text-muted-foreground">{t("Keep the receipt — attach a photo of it with the report photos.")}</p>}
