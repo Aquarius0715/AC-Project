@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import { coreWrites } from "@ac/web/lib/routes.gen";
+import { must } from "./must";
 
 // The web's calls against the Core API contract (IR312): every coreOp / callOp / coreAll call with a literal operation
 // and an object literal input may use only the input fields of OperationContracts[op] (docs/02-design/
@@ -25,7 +26,7 @@ interface Field { literals: (string | number | boolean)[] | null } // the litera
 function contractInputs(): Map<string, Map<string, Field>> {
   const program = ts.createProgram([contractFile], { strict: true, noEmit: true });
   const checker = program.getTypeChecker();
-  const source = program.getSourceFile(contractFile)!;
+  const source = must(program.getSourceFile(contractFile));
   const literalsOf = (t: ts.Type): Field["literals"] => {
     const parts = t.isUnion() ? t.types : [t];
     const values: (string | number | boolean)[] = [];

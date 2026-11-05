@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { accessEnd, accessError, addDays, nameError, partnerInviteError, partnerUserRows, reasonError, statusFilter, type ApiPartnerUser } from "@ac/web/lib/partnerUsers";
 import { PARTNER_USERS_SEED } from "@ac/web/lib/partnerUsersDemo";
+import { must } from "./must";
 
 const user = (p: Partial<ApiPartnerUser>): ApiPartnerUser => {
   return {
@@ -13,15 +14,15 @@ describe("partnerUserRows (FR-P11)", () => {
   it("sorts by name, marks the caller's own account and gives it no actions", () => {
     const rows = partnerUserRows(PARTNER_USERS_SEED, "contractor-a");
     expect(rows.map((r) => r.name ?? r.email)).toEqual(["contractor-a", "New Tech", "tech-external-a"]);
-    const self = rows.find((r) => r.you)!;
+    const self = must(rows.find((r) => r.you));
     expect(self.actions).toEqual({ resend: false, access: false, disable: false, enable: false, remove: false });
   });
   it("offers resend, access and remove on a technician not signed in yet; access, disable and remove on an active one (IR461)", () => {
     const rows = partnerUserRows(PARTNER_USERS_SEED, "contractor-a");
-    const added = rows.find((r) => r.status === "invited")!;
+    const added = must(rows.find((r) => r.status === "invited"));
     expect(added.actions).toEqual({ resend: true, access: true, disable: false, enable: false, remove: true });
     expect(added.accessDate).toBe("2026-12-31");
-    const tech = rows.find((r) => r.name === "tech-external-a")!;
+    const tech = must(rows.find((r) => r.name === "tech-external-a"));
     expect(tech.actions).toEqual({ resend: false, access: true, disable: true, enable: false, remove: true });
     expect(tech.access).toMatch(/2026/);
   });

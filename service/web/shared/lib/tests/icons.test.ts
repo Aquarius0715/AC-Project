@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import { characters } from "@ac/web/lib/text";
+import { must } from "./must";
 
 // One icon library (DEC-74, IR393–IR399): every icon of the four apps is a Lucide icon drawn by shared/components/Icon.
 // A character standing in for an icon comes back easily — an emoji, a symbol, an arrow at the end of a link, a "+"
@@ -29,11 +30,11 @@ const iconChar = (c: string) => SYMBOL.test(c) || (PICTOGRAPH.test(c) && !ARROW.
 /** Why a UI text uses a character as an icon, or null when it does not. */
 export function iconProblem(text: string): string | null {
   const symbol = characters(text).find((item) => iconChar(item));
-  if (symbol) return `the symbol ${symbol} (U+${symbol.codePointAt(0)!.toString(16).toUpperCase()})`;
+  if (symbol) return `the symbol ${symbol} (U+${must(symbol.codePointAt(0)).toString(16).toUpperCase()})`;
   const chars = characters(text.trim());
   if (chars.length === 0) return null;
   const first = chars[0], last = chars[chars.length - 1];
-  const lead = /^[ \t]*/.exec(text)![0], trail = /[ \t]*$/.exec(text)![0];
+  const lead = must(/^[ \t]*/.exec(text))[0], trail = must(/[ \t]*$/.exec(text))[0];
   const isSeparatorFirst = lead.length > 0 && /^[ \t]/.test(text.slice(lead.length + first.length));
   const isSeparatorLast = trail.length > 0 && /[ \t]$/.test(text.slice(0, text.length - trail.length - last.length));
   if (ARROW.test(first) && !isSeparatorFirst) return `the arrow ${first} before the text`;

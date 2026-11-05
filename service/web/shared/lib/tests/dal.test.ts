@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { coreAll, coreDisplay, CoreError, coreNow, coreOp, corePermissions, corePrincipal, getSession } from "@ac/web/lib/dal";
 import { SESSION_COOKIE, seal, type Session } from "@ac/web/lib/session";
+import { must } from "./must";
 
 // the Data Access Layer (Next.js authentication guide) runs on the server: the cookie jar and redirect come from Next
 const jar = vi.hoisted(() => ({ get: vi.fn() }));
@@ -15,7 +16,7 @@ type Call = [string, RequestInit & { headers: Record<string, string> }];
 const refusal = (p: Promise<unknown>) => p.then(() => { throw new Error("the call succeeded"); }, (error: unknown) => error as CoreError);
 const reply = (...bodies: [number, unknown][]) => {
   const f = vi.fn(() => {
-    const [status, body] = bodies.length > 1 ? bodies.shift()! : bodies[0];
+    const [status, body] = bodies.length > 1 ? must(bodies.shift()) : bodies[0];
     return Promise.resolve(new Response(typeof body === "string" ? body : JSON.stringify(body), { status }));
   });
   vi.stubGlobal("fetch", f);

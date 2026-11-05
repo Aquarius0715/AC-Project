@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { sendPaced } from "@ac/web/lib/writeLimit";
+import { must } from "./must";
 
 interface R { ok: boolean; code?: string; retryAfterSeconds?: number | null; n?: number }
 const limited = (retryAfterSeconds: number | null): R => ({ ok: false, code: "RATE_LIMITED", retryAfterSeconds });
@@ -9,7 +10,7 @@ const limited = (retryAfterSeconds: number | null): R => ({ ok: false, code: "RA
 describe("a write paced by the write limit", () => {
   it("waits the advised seconds and sends again until it goes through", async () => {
     const answers: R[] = [limited(12), limited(null), { ok: true, n: 3 }];
-    const send = vi.fn(() => Promise.resolve(answers.shift()!));
+    const send = vi.fn(() => Promise.resolve(must(answers.shift())));
     const onWait = vi.fn(), pause = vi.fn(async () => {});
     expect(await sendPaced(send, onWait, 5, pause)).toEqual({ ok: true, n: 3 });
     expect([send.mock.calls.length, onWait.mock.calls, pause.mock.calls]).toEqual([3, [[12], [5]], [[12_000], [5000]]]);
@@ -17,7 +18,7 @@ describe("a write paced by the write limit", () => {
   it("keeps the wait within 1–60 s", async () => {
     const answers: R[] = [limited(0), limited(600), { ok: true }];
     const onWait = vi.fn();
-    await sendPaced(() => Promise.resolve(answers.shift()!), onWait, 5, async () => {});
+    await sendPaced(() => Promise.resolve(must(answers.shift())), onWait, 5, async () => {});
     expect(onWait.mock.calls).toEqual([[1], [60]]);
   });
   it("gives up after the last try and returns the refusal", async () => {

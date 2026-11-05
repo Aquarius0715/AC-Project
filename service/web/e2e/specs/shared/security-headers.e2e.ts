@@ -2,10 +2,11 @@
 // nonce, which Next.js puts on its scripts, and nosniff, a referrer policy, no framing and no powerful browser features (IR383). Static assets carry the
 // static headers too. Runs in each app's project, signed in as its user; nothing is changed.
 import { test, expect } from "../../fixtures/test";
+import { must } from "../../fixtures/must";
 
 test("pages carry the CSP with a fresh nonce and the static security headers", async ({ page, app }) => {
   const res = await page.goto(app.home);
-  const h = res!.headers();
+  const h = must(res).headers();
   const csp = h["content-security-policy"] ?? "";
   const nonce = (/'nonce-([^']+)'/.exec(csp))?.[1] ?? "";
   expect(nonce, "a nonce in the CSP").not.toBe("");
@@ -13,7 +14,7 @@ test("pages carry the CSP with a fresh nonce and the static security headers", a
   expect(csp).not.toContain("unsafe-eval"); // a production build
   expect([h["x-content-type-options"], h["referrer-policy"], h["x-frame-options"]]).toEqual(["nosniff", "strict-origin-when-cross-origin", "DENY"]);
   expect(h["permissions-policy"]).toBe("camera=(), microphone=(), geolocation=(), payment=(), usb=(), display-capture=()"); // IR383
-  const html = await res!.text();
+  const html = await must(res).text();
   expect(html, "the framework's scripts carry the nonce").toContain(`nonce="${nonce}"`);
   expect(html.match(/<script(?![^>]*nonce=)[^>]*>/g) ?? [], "scripts without the nonce").toEqual([]);
   const again = await page.request.get(app.home);
@@ -21,7 +22,7 @@ test("pages carry the CSP with a fresh nonce and the static security headers", a
   const stylesheet = page.locator("link[rel=stylesheet]").first();
   await expect(stylesheet, "the app's stylesheet").toHaveAttribute("href", /./);
   const css = await stylesheet.getAttribute("href");
-  const served = await page.request.get(css!);
+  const served = await page.request.get(must(css));
   expect(served.headers()["x-content-type-options"]).toBe("nosniff");
 });
 

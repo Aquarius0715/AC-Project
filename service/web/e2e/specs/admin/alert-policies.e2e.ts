@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import { test, expect } from "../../fixtures/test";
 import { expectAccessible } from "../../fixtures/a11y";
 import { selectForURL } from "../../fixtures/select";
+import { must } from "../../fixtures/must";
 
 let created: string | null = null;
 
@@ -172,7 +173,7 @@ test.afterEach(async ({ page }) => {
     const saved = await relay(page, "policies.save", { id: now.id, kind: "default_alert", rules: before.rules }, now.version);
     expect(saved.status).toBe(200);
   }
-  for (const s of now.ruleSettings.filter((x) => !x.enabled && before!.ruleSettings.every((b) => !(b.ruleKey === x.ruleKey && b.customerId === x.customerId) || b.enabled))) {
+  for (const s of now.ruleSettings.filter((x) => !x.enabled && must(before).ruleSettings.every((b) => !(b.ruleKey === x.ruleKey && b.customerId === x.customerId) || b.enabled))) {
     const switched = await relay(page, "policies.setDefaultRule", { policyId: now.id, ruleKey: s.ruleKey, customerId: s.customerId, enabled: true }, s.version);
     expect(switched.status).toBe(200);
   }

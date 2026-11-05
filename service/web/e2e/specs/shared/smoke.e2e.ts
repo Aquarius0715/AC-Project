@@ -11,6 +11,7 @@ import { test, expect, FAILED_PAGE } from "../../fixtures/test";
 import { axeViolations } from "../../fixtures/a11y";
 import type { App } from "../../fixtures/apps";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
+import { must } from "../../fixtures/must";
 
 interface Crawl { seen: number; failed: string[]; inaccessible: string[]; wide: string[]; otherLang: string[]; untitled: string[]; small: string[] }
 
@@ -27,7 +28,7 @@ async function crawl(page: Page, app: App, lang = "en", wideFont = false, touch 
   const queue = [app.home];
   const out: Crawl = { seen: 0, failed: [], inaccessible: [], wide: [], otherLang: [], untitled: [], small: [] };
   while (queue.length > 0 && seen.size < 40) {
-    const path = queue.shift()!;
+    const path = must(queue.shift());
     if (seen.has(path)) continue;
     seen.add(path);
     const res = await page.goto(path, { waitUntil: "networkidle" });

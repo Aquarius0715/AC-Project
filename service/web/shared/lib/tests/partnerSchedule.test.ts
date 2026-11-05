@@ -3,6 +3,8 @@ import { assignRefusal, candidates, formMode, freeText, scheduleRow, scheduleTea
 import type { ApiDetail, ApiOffer } from "@ac/web/lib/partnerJobDetail";
 import type { ApiCapacity, ApiMember, ApiPartnerJob } from "@ac/web/lib/partnerOverview";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
+import { must } from "./must";
+const scheduleRowOf = (...args: Parameters<typeof scheduleRow>) => must(scheduleRow(...args)); // the scheduleRow a test expects
 
 const MS_TOKYO = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const ms = translator("ms");
@@ -33,11 +35,11 @@ const workday = (d: string): [string, string] => [`${d}T01:00:00Z`, `${d}T09:00:
 describe("partner schedule", () => {
   it("lists the jobs with their state and delegation window", () => {
     const rows = [
-      scheduleRow(summary({}), NOW, units, names)!,
-      scheduleRow(summary({ status: "assigned", scheduledSlot: visit, technicianMembershipId: "m-a", assignmentAcknowledgement: "cant_make" }), NOW, units, names)!,
-      scheduleRow(summary({ status: "in_progress", scheduledSlot: slot("2026-09-20T02:00:00Z", "2026-09-20T04:00:00Z"), technicianMembershipId: "m-a" }), NOW, units, names)!,
-      scheduleRow(summary({ status: "on_hold", accessValidUntil: "2026-09-21T01:00:00Z" }), NOW, units, names)!,
-      scheduleRow({ projection: "offer", status: "accepted", jobId: "job-2-bbbb", jobVersion: 2, offerId: "o", type: "reactive", siteAddress: "2 Demo Avenue", requestedSlot: visit, dueAt: "x", offerExpiresAt: "x", visitSlot: visit, accessValidFrom: "2026-09-22T00:00:00Z", accessValidUntil: "2026-09-26T00:00:00Z" }, NOW, units, names)!,
+      scheduleRowOf(summary({}), NOW, units, names),
+      scheduleRowOf(summary({ status: "assigned", scheduledSlot: visit, technicianMembershipId: "m-a", assignmentAcknowledgement: "cant_make" }), NOW, units, names),
+      scheduleRowOf(summary({ status: "in_progress", scheduledSlot: slot("2026-09-20T02:00:00Z", "2026-09-20T04:00:00Z"), technicianMembershipId: "m-a" }), NOW, units, names),
+      scheduleRowOf(summary({ status: "on_hold", accessValidUntil: "2026-09-21T01:00:00Z" }), NOW, units, names),
+      scheduleRowOf({ projection: "offer", status: "accepted", jobId: "job-2-bbbb", jobVersion: 2, offerId: "o", type: "reactive", siteAddress: "2 Demo Avenue", requestedSlot: visit, dueAt: "x", offerExpiresAt: "x", visitSlot: visit, accessValidFrom: "2026-09-22T00:00:00Z", accessValidUntil: "2026-09-26T00:00:00Z" }, NOW, units, names),
     ];
     expect(rows.map((r) => [r.title, r.line, r.tone ?? ""])).toEqual([
       ["Lobby AC", "Accepted · awaiting assignment", ""],
@@ -121,7 +123,7 @@ describe("partner schedule", () => {
   });
 
   it("words the schedule in Malay with the job's times in the display time zone (IR275)", () => {
-    const row = scheduleRow(summary({ status: "assigned", scheduledSlot: visit, technicianMembershipId: "m-a", assignmentAcknowledgement: null }), NOW, units, names, MS_TOKYO)!;
+    const row = scheduleRowOf(summary({ status: "assigned", scheduledSlot: visit, technicianMembershipId: "m-a", assignmentAcknowledgement: null }), NOW, units, names, MS_TOKYO);
     expect([row.line, row.windowText, row.left]).toEqual(["Ditugaskan · tech-external-a · menunggu penerimaan", "20 Sep, 10:30 PG – 22 Sep, 10:30 PG GMT+9", "1 hari lagi"]);
     const offer = { projection: "offer", status: "accepted", jobId: "job-2", visitSlot: visit, accessValidFrom: "2026-09-22T00:00:00Z" } as unknown as ApiOffer;
     expect(formMode(offer, "job-2", NOW, names, MS_TOKYO)).toMatchObject({ title: "Tugaskan — job-2", banner: { text: "Diterima — tempoh delegasi bermula 22 Sep 2026, 9:00 PG GMT+9; juruteknik boleh ditugaskan mulai ketika itu, tepat untuk 22 Sep, 11:00 PG – 1:00 PTG GMT+9." } });

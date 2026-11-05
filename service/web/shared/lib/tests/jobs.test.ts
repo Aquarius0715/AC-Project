@@ -1,14 +1,15 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from "vitest";
 import { fitFor, fmt, getJobState, jobActions, longDate, SEED, statusLabel, type Slot } from "@ac/web/lib/jobs";
+import { must } from "./must";
 
 // The Phase 1A maintenance demo (IR113, FR-X05): one store for the four apps of a tab. The actions are local and
 // synchronous, so a refusal comes back at once.
-const job = (id: string) => getJobState().jobs.find((j) => j.id === id)!;
+const job = (id: string) => must(getJobState().jobs.find((j) => j.id === id));
 const notes = (role: string) => getJobState().notes.filter((n) => n.role === role);
 const slot: Slot = { date: "2026-10-05", win: "14:00–16:00" };
 const prefs: Slot[] = [{ date: "2026-10-06", win: "10:00–12:00" }, { date: "2026-10-07", win: "10:00–12:00" }, { date: "2026-10-08", win: "10:00–12:00" }];
-const completed = SEED.find((j) => j.status === "completed")!;
+const completed = must(SEED.find((j) => j.status === "completed"));
 
 beforeEach(() => {
   sessionStorage.clear();

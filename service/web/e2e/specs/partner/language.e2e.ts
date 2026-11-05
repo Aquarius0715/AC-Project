@@ -6,6 +6,7 @@
 // English and the earlier zone come back at the end, or in afterEach when the test fails.
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
+import { must } from "../../fixtures/must";
 
 let zoneBefore: string | null = null;
 
@@ -38,7 +39,7 @@ test("the contractor screens in Malay keep Kuala Lumpur days and show instants i
   await page.goto("/partner/jobs?tab=completed");
   const done = main.locator("a[href^='/partner/jobs/']").first(); // a completed job inside its delegation: its quality review
   if (await done.count()) {
-    await page.goto(`${(await done.getAttribute("href"))!.split("?", 1)[0]}/review`);
+    await page.goto(`${must((await done.getAttribute("href"))).split("?", 1)[0]}/review`);
     await expect(main.getByRole("heading", { name: /^(Semakan bukti|Tiada laporan untuk disemak)$/ })).toBeVisible();
   }
   await page.goto("/partner/schedule");

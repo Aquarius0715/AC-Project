@@ -3,6 +3,7 @@ import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
+import { must } from "./must";
 
 // The web's result types against the Core API contract (IR314). For every coreOp / coreAll / callOp / useOp call with a
 // literal operation, the result type the caller names (or TypeScript infers from a typed variable) must accept
@@ -27,11 +28,11 @@ function check(): { checked: number; problems: string[] } {
     const parsed = ts.parseJsonConfigFileContent(roleConfig.config, ts.sys, directory);
     const program = ts.createProgram(parsed.fileNames, { ...parsed.options, noEmit: true, incremental: false });
     const c = program.getTypeChecker();
-    const gen = program.getSourceFiles().find((f) => f.fileName.endsWith("shared/lib/contracts.gen.ts"))!;
+    const gen = must(program.getSourceFiles().find((f) => f.fileName.endsWith("shared/lib/contracts.gen.ts")));
     let ops: ts.Type | undefined;
     ts.forEachChild(gen, (n) => { if (ts.isTypeAliasDeclaration(n) && n.name.text === "OperationContracts") ops = c.getTypeAtLocation(n.name); });
     const resultOf = (op: string) => {
-      const s = ops!.getProperty(op);
+      const s = must(ops).getProperty(op);
       const r = s && c.getTypeOfSymbol(s).getProperty("result");
       return r ? c.getTypeOfSymbol(r) : null;
     };
@@ -51,7 +52,7 @@ function check(): { checked: number; problems: string[] } {
     const overlap = (a: ts.Type, b: ts.Type) => variants(a).some((x) => variants(b).some((y) => c.isTypeAssignableTo(x, y) || c.isTypeAssignableTo(y, x)));
     const fits = (contract: ts.Type, own: ts.Type) => { // the literal fields both have can hold the same value
       const a = literals(contract);
-      for (const [k, v] of literals(own)) if (a.has(k) && !overlap(a.get(k)!, v)) return false;
+      for (const [k, v] of literals(own)) if (a.has(k) && !overlap(must(a.get(k)), v)) return false;
       return true;
     };
     const compare = (source: ts.Type, target: ts.Type, path: string, depth: number, out: string[], top: boolean): void => {
@@ -65,7 +66,7 @@ function check(): { checked: number; problems: string[] } {
       if (s.isUnion() && !(s.flags & ts.TypeFlags.Boolean) && variants(s).some((item) => isObject(item))) {
         const sv = variants(s), dv = variants(d);
         const keys = sv.every((item) => isObject(item))
-          ? [...literals(sv[0]).keys()].filter((k) => sv.every((m) => literals(m).has(k)) && sv.every((m, i) => sv.every((n, j) => i === j || !overlap(literals(m).get(k)!, literals(n).get(k)!))))
+          ? [...literals(sv[0]).keys()].filter((k) => sv.every((m) => literals(m).has(k)) && sv.every((m, i) => sv.every((n, j) => i === j || !overlap(must(literals(m).get(k)), must(literals(n).get(k))))))
           : [];
         if (top && keys.length === 0) { // the input picks the variant
           if (sv.some((m) => c.isTypeAssignableTo(m, d))) return;
@@ -74,7 +75,7 @@ function check(): { checked: number; problems: string[] } {
           return;
         }
         if (top && dv.every((x) => !(isObject(x) && keys.some((k) => !!x.getProperty(k))))) {
-          out.push(`${at}: name the ${keys.join(" / ")} the screen reads (the contract has ${sv.map((m) => singleText(literals(m).get(keys[0])!)).join(", ")})`);
+          out.push(`${at}: name the ${keys.join(" / ")} the screen reads (the contract has ${sv.map((m) => singleText(must(literals(m).get(keys[0])))).join(", ")})`);
           return;
         }
         for (const m of top ? sv.filter((v) => dv.some((x) => fits(v, x))) : sv) {

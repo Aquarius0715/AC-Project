@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import { byUser, channelText, CLIENT_HIDDEN_ACTIONS, communicationRefusal, customerVisible, eventItem, eventSummary, historyRow, noteMode, periodOf, sortOf, tabCounts, tabOf, visibleRows, type ApiEvent } from "@ac/web/lib/partnerHistory";
 import type { ApiMember, ApiPartnerJob } from "@ac/web/lib/partnerOverview";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
+import { must } from "./must";
+const historyRowOf = (...args: Parameters<typeof historyRow>) => must(historyRow(...args)); // the historyRow a test expects
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const ms = translator("ms");
@@ -30,26 +32,26 @@ const events = [
 
 describe("partner job history", () => {
   it("summarises a job with its events", () => {
-    const r = historyRow(summary({}, events), NOW, units, names)!;
+    const r = historyRowOf(summary({}, events), NOW, units, names);
     expect([r.title, r.sub, r.tech, r.last, r.badge, r.tab, r.delegation, r.version, r.origin]).toEqual([
       "Office AC", "4 events · 3 customer-visible · 2 notes · delegation until 26 Sept 2026, 12:00 am MYT", { name: "tech-external-a", sub: "accepted the slot" },
       { title: "Work started", at: "2026-09-21T01:05:00Z", when: "today 9:05 am MYT" }, { text: "In progress", tone: "primary" }, "active", "until 26 Sept 2026, 12:00 am MYT", 7, "client_request",
     ]);
-    const overdue = historyRow(summary({ status: "assigned", scheduledSlot: slot("2026-09-20T01:00:00Z", "2026-09-20T03:00:00Z") }), NOW, units, names)!;
+    const overdue = historyRowOf(summary({ status: "assigned", scheduledSlot: slot("2026-09-20T01:00:00Z", "2026-09-20T03:00:00Z") }), NOW, units, names);
     expect([overdue.badge, overdue.overdue, overdue.sub, overdue.last]).toEqual([{ text: "Overdue", tone: "crit" }, true, "0 events · 0 customer-visible · 0 notes · delegation until 26 Sept 2026, 12:00 am MYT", null]);
-    const unassigned = historyRow(summary({ status: "accepted", technicianMembershipId: null, assignmentAcknowledgement: null }), NOW, units, names)!;
+    const unassigned = historyRowOf(summary({ status: "accepted", technicianMembershipId: null, assignmentAcknowledgement: null }), NOW, units, names);
     expect(unassigned.tech).toEqual({ name: "Unassigned", sub: "assign in Schedule", tone: "crit" });
-    const h = historyRow(history("job-9-hhhh", [events[0]]), NOW, units, names)!;
+    const h = historyRowOf(history("job-9-hhhh", [events[0]]), NOW, units, names);
     expect([h.tab, h.ended, h.sub, h.badge.text, h.version]).toEqual(["ended", true, "1 own decision event · delegation ended 21 Sept 2026, 12:00 am MYT (read-only snapshot)", "Completed", null]);
     expect(historyRow({ projection: "offer", status: "offered" } as unknown as ApiPartnerJob, NOW, units, names)).toBeNull();
   });
 
   it("filters, counts and orders the rows", () => {
     const rows = [
-      historyRow(summary({ id: "a", status: "submitted" }, [auditEvent("x", "job.submitted", "2026-09-20T00:00:00Z")]), NOW, units, names)!,
-      historyRow(summary({ id: "b", status: "completed" }, [auditEvent("y", "job.reviewed", "2026-09-21T00:00:00Z")]), NOW, units, names)!,
-      historyRow(summary({ id: "c", status: "accepted" }, [auditEvent("z", "offer.accepted", "2026-09-19T00:00:00Z")]), NOW, units, names)!,
-      historyRow(history("d", []), NOW, units, names)!,
+      historyRowOf(summary({ id: "a", status: "submitted" }, [auditEvent("x", "job.submitted", "2026-09-20T00:00:00Z")]), NOW, units, names),
+      historyRowOf(summary({ id: "b", status: "completed" }, [auditEvent("y", "job.reviewed", "2026-09-21T00:00:00Z")]), NOW, units, names),
+      historyRowOf(summary({ id: "c", status: "accepted" }, [auditEvent("z", "offer.accepted", "2026-09-19T00:00:00Z")]), NOW, units, names),
+      historyRowOf(history("d", []), NOW, units, names),
     ];
     expect(tabCounts(rows)).toEqual({ all: 4, active: 1, review: 1, completed: 1, ended: 1 });
     expect(visibleRows(rows, "all", "latest").map((r) => r.id)).toEqual(["b", "a", "c", "d"]);
@@ -81,12 +83,12 @@ describe("partner job history", () => {
   });
 
   it("words the history in Malay with the times in the display time zone (IR278)", () => {
-    const r = historyRow(summary({}, events), NOW, units, names, MS)!;
+    const r = historyRowOf(summary({}, events), NOW, units, names, MS);
     expect([r.sub, r.tech.sub, r.last, r.badge.text]).toEqual([
       "4 peristiwa · 3 boleh dilihat pelanggan · 2 nota · delegasi hingga 26 Sep 2026, 1:00 PG GMT+9", "menerima slot",
       { title: "Kerja dimulakan", at: "2026-09-21T01:05:00Z", when: "hari ini 10:05 PG GMT+9" }, "Sedang berjalan",
     ]);
-    const h = historyRow(history("job-9-hhhh", [events[0]]), NOW, units, names, MS)!;
+    const h = historyRowOf(history("job-9-hhhh", [events[0]]), NOW, units, names, MS);
     expect([h.title, h.sub, h.delegation, h.tech.sub]).toEqual(["Pemeriksaan berkala", "1 peristiwa keputusan sendiri · delegasi tamat 21 Sep 2026, 1:00 PG GMT+9 (rakaman baca sahaja)", "tamat — sejarah sahaja", "tidak ditunjukkan selepas delegasi"]);
     expect(eventItem(events[1], byUser(members, "u-me", ms), MS)).toMatchObject({ title: "Nota ditambah", detail: "“Missing filter photo” · dalaman · oleh contractor-a", at: "20 Sep 2026, 3:05 PTG GMT+9" });
     expect(eventItem(auditEvent("m", "offer.accepted", "2026-09-20T00:00:00Z", null, "u-me"), byUser(members, "u-me", ms), MS).detail).toBe("oleh anda");

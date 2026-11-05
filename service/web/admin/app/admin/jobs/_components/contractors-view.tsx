@@ -52,7 +52,7 @@ export function ContractorsView({ live }: Readonly<{ live: ContractorsLive }>) {
         {d ? <ContractorDetail key={`${d.org.id}:${String(d.profile?.version ?? 0)}`} d={d} open={setModal} /> : <Card title={t("Contractor")}><p className="text-[13px] text-muted-foreground">{t("missing" in live ? "That contractor no longer exists." : "Pick a contractor.")}</p></Card>}
       </div>
       {modal?.kind === "profile" && <ProfileModal live={live} d={d} organizationId={modal.organizationId} onClose={close} onFail={fail} />}
-      {modal?.kind === "status" && d?.profile && <StatusModal d={d} onClose={close} onFail={fail} />}
+      {modal?.kind === "status" && d?.profile && <StatusModal p={d.profile} onClose={close} onFail={fail} />}
       {modal?.kind === "rates" && d && <RatesModal d={d} now={Date.parse(live.now)} onClose={close} onFail={fail} />}
       {modal?.kind === "verify" && d && <VerifyModal d={d} onClose={close} onFail={fail} />}
       {modal?.kind === "job" && <NewJobModal live={{ now: live.now, units: live.units, q: {} }} onClose={() => { setModal(null); }} />}
@@ -149,9 +149,8 @@ function ProfileModal({ live, d, organizationId, onClose, onFail }: ModalProps &
   );
 }
 
-function StatusModal({ d, onClose, onFail }: ModalProps & { d: Detail }) {
+function StatusModal({ p, onClose, onFail }: ModalProps & { p: NonNullable<Detail["profile"]> }) {
   const t = useT();
-  const p = d.profile!;
   const [pending, run] = useAction();
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);

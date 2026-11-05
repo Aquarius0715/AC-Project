@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { coreRequest } from "@ac/web/lib/rest";
 import { coreRoutes } from "@ac/web/lib/routes.gen";
+import { must } from "./must";
+const requestOf = (...args: Parameters<typeof coreRequest>) => must(coreRequest(...args)); // the coreRequest a test expects
 
 /** The query of a request path as name → all values. */
 const query = (path: string) => {
@@ -17,13 +19,13 @@ describe("coreRequest", () => {
     expect(coreRequest("filterCare.getSettings", {})).toEqual({ method: "GET", path: "/v1/filter-care/settings" });
     expect(coreRequest("alerts.evidence", { alertId: "a1", query: { limit: 100 } })).toEqual({ method: "GET", path: "/v1/alerts/a1/evidence?limit=100", body: undefined });
     // IR349: the MRV evidence candidates take their units and period in the query string
-    expect(query(coreRequest("attachments.list", { unitIds: ["u1", "u2"], from: "2026-09-01T00:00:00Z", to: "2026-09-14T00:00:00Z", query: { limit: 100 } })!.path))
+    expect(query(requestOf("attachments.list", { unitIds: ["u1", "u2"], from: "2026-09-01T00:00:00Z", to: "2026-09-14T00:00:00Z", query: { limit: 100 } }).path))
       .toEqual({ pathname: "/v1/attachments", out: { unitIds: ["u1", "u2"], from: ["2026-09-01T00:00:00Z"], to: ["2026-09-14T00:00:00Z"], limit: ["100"] } });
     for (const routes of Object.values(coreRoutes)) for (const r of routes) expect(r.path).toMatch(/^\/v1(\/([a-z0-9-]+|\{[A-Za-z]\w*(\.[A-Za-z]\w*)?\}))+$/);
   });
 
   it("sends a list read's paging query, filters, sort and lists in the query string", () => {
-    const r = coreRequest("jobs.list", { filters: { status: "open", unitIds: ["u1", "u2"], overdueOnly: false, statuses: [], origin: null }, sort: { field: "dueAt", direction: "asc" }, limit: 50, cursor: undefined })!;
+    const r = requestOf("jobs.list", { filters: { status: "open", unitIds: ["u1", "u2"], overdueOnly: false, statuses: [], origin: null }, sort: { field: "dueAt", direction: "asc" }, limit: 50, cursor: undefined });
     expect(r.method).toBe("GET");
     expect(r.body).toBeUndefined();
     expect(query(r.path)).toEqual({ pathname: "/v1/jobs", out: { status: ["open"], unitIds: ["u1", "u2"], overdueOnly: ["false"], statuses: [""], sort: ["dueAt:asc"], limit: ["50"] } });
@@ -38,18 +40,18 @@ describe("coreRequest", () => {
       expect(coreRequest("summaries.get", { kind: v, filters: {} })).toBeNull();
     }
     // dots inside a value stay one encoded segment
-    expect(coreRequest("units.get", { id: "../x" })!.path).toBe("/v1/units/..%2Fx");
-    expect(coreRequest("units.get", { id: "%2e%2e" })!.path).toBe("/v1/units/%252e%252e");
-    expect(new URL(`http://core${coreRequest("units.get", { id: "...", jobId: "j1" })!.path}`).pathname).toBe("/v1/units/...");
+    expect(requestOf("units.get", { id: "../x" }).path).toBe("/v1/units/..%2Fx");
+    expect(requestOf("units.get", { id: "%2e%2e" }).path).toBe("/v1/units/%252e%252e");
+    expect(new URL(`http://core${requestOf("units.get", { id: "...", jobId: "j1" }).path}`).pathname).toBe("/v1/units/...");
   });
 
   it("fills and encodes path parameters and keeps the other fields in the query", () => {
     expect(coreRequest("units.get", { id: "a/b c", jobId: "j1" })).toEqual({ method: "GET", path: "/v1/units/a%2Fb%20c?jobId=j1" });
     expect(coreRequest("session.get", undefined)).toEqual({ method: "GET", path: "/v1/session" });
-    const r = coreRequest("commands.list", { unitId: "u1", query: { limit: 20, sort: { field: "requestedAt", direction: "desc" } } })!;
+    const r = requestOf("commands.list", { unitId: "u1", query: { limit: 20, sort: { field: "requestedAt", direction: "desc" } } });
     expect(query(r.path)).toEqual({ pathname: "/v1/commands", out: { unitId: ["u1"], limit: ["20"], sort: ["requestedAt:desc"] } });
-    expect(query(coreRequest("sla.scorecard", { period: { from: "2026-08-01T00:00:00Z", to: "2026-09-01T00:00:00Z" } })!.path).out).toEqual({ "period.from": ["2026-08-01T00:00:00Z"], "period.to": ["2026-09-01T00:00:00Z"] });
-    expect(query(coreRequest("devices.events", { id: "d1", query: { limit: 50, filters: { from: "x" } } })!.path)).toEqual({ pathname: "/v1/devices/d1/events", out: { limit: ["50"], from: ["x"] } });
+    expect(query(requestOf("sla.scorecard", { period: { from: "2026-08-01T00:00:00Z", to: "2026-09-01T00:00:00Z" } }).path).out).toEqual({ "period.from": ["2026-08-01T00:00:00Z"], "period.to": ["2026-09-01T00:00:00Z"] });
+    expect(query(requestOf("devices.events", { id: "d1", query: { limit: 50, filters: { from: "x" } } }).path)).toEqual({ pathname: "/v1/devices/d1/events", out: { limit: ["50"], from: ["x"] } });
   });
 
   it("creates on the collection and updates on the item", () => {

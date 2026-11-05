@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { ms } from "@ac/web/lib/i18n-ms";
 import { agreedSlots, classifyBy, contractorNames, controls, costLineOf, costTotals, delivery, extendDefault, fromZonedInput, LISTED, money, jobRequestErrors as jobRequestErrors, periodChip, reportCard, returnReason, reviewModeOf, facts, filtersOf, hqRefusal, HQ_REFUSAL_KEYS, hqRow, longSlot, offerDefaults, preferredRows, slotText, sortOf, stageOf, stepper, tomorrowIn, zonedInput, type ApiHqJob, type ApiHqRow, type Names } from "@ac/web/lib/adminJobs";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
+import { must } from "./must";
+const deliveryOf = (...args: Parameters<typeof delivery>) => must(delivery(...args)); // the delivery a test expects
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 
@@ -60,9 +62,9 @@ describe("HQ maintenance jobs", () => {
     expect(facts(job({}), names).map((f) => [f.label, f.value, f.sub])).toEqual([
       ["Requested window", "22 Sept, 10:00 am – 12:00 pm MYT", "the client’s 1st preferred time"], ["Due", "22 Sept 2026, 12:00 pm MYT", "= requested end"], ["Scheduled", "not booked", "—"], ["Symptom", "Water dripping", "contact 9:00–18:00"],
     ]);
-    const internal = delivery(job({ status: "assigned", assignment: { technicianMembershipId: "m-int", scheduledStart: "2026-09-22T02:00:00Z", scheduledEnd: "2026-09-22T04:00:00Z", status: "active", acknowledgement: "cant_make", cantMakeReason: "sick", alternativeSlot: null } }), names, NOW)!;
+    const internal = deliveryOf(job({ status: "assigned", assignment: { technicianMembershipId: "m-int", scheduledStart: "2026-09-22T02:00:00Z", scheduledEnd: "2026-09-22T04:00:00Z", status: "active", acknowledgement: "cant_make", cantMakeReason: "sick", alternativeSlot: null } }), names, NOW);
     expect([internal.kind, internal.lines, internal.ack?.text, internal.cantMake]).toEqual(["internal", [["Technician", "tech-internal-a · assignment 22 Sept, 10:00 am – 12:00 pm MYT"]], "tech-internal-a can’t make this time: “sick”. Any new time needs the client’s approval.", true]);
-    const offered = delivery(job({ status: "offered", contractorOrgId: "org-c", offer: { id: "o", contractorOrgId: "org-c", visitSlot: slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"), offerExpiresAt: "2026-09-21T10:00:00Z", accessValidFrom: "2026-09-21T01:00:00Z", accessValidUntil: "2026-09-23T04:00:00Z", decision: null, decidedAt: null, declineReason: null } }), names, NOW)!;
+    const offered = deliveryOf(job({ status: "offered", contractorOrgId: "org-c", offer: { id: "o", contractorOrgId: "org-c", visitSlot: slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"), offerExpiresAt: "2026-09-21T10:00:00Z", accessValidFrom: "2026-09-21T01:00:00Z", accessValidUntil: "2026-09-23T04:00:00Z", decision: null, decidedAt: null, declineReason: null } }), names, NOW);
     expect([offered.title, offered.lines]).toEqual(["Delivery · contractor Demo Contractor A", [["Visit", "22 Sept, 10:00 am – 12:00 pm MYT · offer open · expires 21 Sept 2026, 6:00 pm MYT"], ["Access", "21 Sept, 9:00 am – 23 Sept, 12:00 pm MYT"], ["Technician", "not assigned by the contractor yet"]]]);
     expect(delivery(job({}), names, NOW)).toBeNull();
   });
@@ -173,7 +175,7 @@ describe("HQ maintenance jobs", () => {
   });
 
   it("shows a completed job's assignment as ended (IR234)", () => {
-    const done = delivery(job({ status: "completed", assignment: { technicianMembershipId: "m-int", scheduledStart: "2026-09-22T02:00:00Z", scheduledEnd: "2026-09-22T04:00:00Z", status: "completed", acknowledgement: "accepted", cantMakeReason: null, alternativeSlot: null } }), names, NOW)!;
+    const done = deliveryOf(job({ status: "completed", assignment: { technicianMembershipId: "m-int", scheduledStart: "2026-09-22T02:00:00Z", scheduledEnd: "2026-09-22T04:00:00Z", status: "completed", acknowledgement: "accepted", cantMakeReason: null, alternativeSlot: null } }), names, NOW);
     expect([done.lines, done.ack, done.cantMake]).toEqual([[["Technician", "tech-internal-a · assignment 22 Sept, 10:00 am – 12:00 pm MYT · ended at completion"]], { tone: "ok", text: "tech-internal-a completed the job — the assignment ended with it, so tech-internal-a’s time is free again." }, false]);
   });
 });

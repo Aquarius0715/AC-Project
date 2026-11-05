@@ -5,6 +5,8 @@ import {
   type ApiClientJob, type ApiClientRow,
 } from "@ac/web/lib/customerMaintenance";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
+import { must } from "./must";
+const proposalOf = (...args: Parameters<typeof proposalCard>) => must(proposalCard(...args)); // the proposalCard a test expects
 
 const NOW = Date.parse("2026-09-14T01:00:00Z"); // Mon 09:00 KL
 const slot = (s: string, e: string) => ({ startAt: s, endAt: e });
@@ -57,7 +59,7 @@ describe("customer maintenance", () => {
   });
 
   it("explains the proposal, the declined notice and the plan visit", () => {
-    const p = proposalCard(job({ slotProposal: { id: "p1", source: "hq", slot: slot("2026-09-19T06:00:00Z", "2026-09-19T08:00:00Z"), hold: { kind: "internal" }, message: "All booked on your times.", replyBy: "2026-09-16T01:00:00Z", status: "pending", decidedAt: null, declineReason: null, declineComment: null } }), NOW)!;
+    const p = proposalOf(job({ slotProposal: { id: "p1", source: "hq", slot: slot("2026-09-19T06:00:00Z", "2026-09-19T08:00:00Z"), hold: { kind: "internal" }, message: "All booked on your times.", replyBy: "2026-09-16T01:00:00Z", status: "pending", decidedAt: null, declineReason: null, declineComment: null } }), NOW);
     expect([p.title, p.when, p.who, p.replyBy, p.late]).toEqual(["HQ proposes a new time", "Sat, 19 Sept, 2:00 – 4:00 pm MYT", "An HQ technician (name shown once confirmed)", "16 Sept 2026, 9:00 am MYT", false]);
     expect(proposalCard(job({}), NOW)).toBeNull();
     expect(declinedNotice(job({ slotProposal: { ...p, hold: { kind: "internal" }, source: "hq", slot: slot("2026-09-19T06:00:00Z", "2026-09-19T08:00:00Z"), status: "declined", decidedAt: null, declineReason: "not_home", declineComment: null, replyBy: "" } }))).toBe("You declined the proposed time (not at home). HQ is looking at your new times.");
@@ -71,9 +73,9 @@ describe("customer maintenance", () => {
     expect(feedback(job({ status: "completed", completedAt: "2026-09-01T01:00:00Z" }), NOW).kind).toBe("none");
     const rated = job({ status: "completed", completedAt: "2026-09-13T01:00:00Z", rating: { stars: 4, tags: ["On time"], comment: null, ratedAt: "2026-09-13T02:00:00Z", editableUntil: "2026-09-20T02:00:00Z" } });
     expect(feedback(rated, NOW)).toEqual({ kind: "edit", stars: 4, report: true, text: " · On time · editable until 20 Sept 2026, 10:00 am MYT" });
-    expect(feedback({ ...rated, rating: { ...rated.rating!, editableUntil: "2026-09-13T03:00:00Z" } }, NOW).kind).toBe("rated");
+    expect(feedback({ ...rated, rating: { ...must(rated.rating), editableUntil: "2026-09-13T03:00:00Z" } }, NOW).kind).toBe("rated");
     // a problem can be reported within 7 days of completion only, rated or not (as jobs.reportProblem allows)
-    const late = { ...rated, completedAt: "2026-09-01T01:00:00Z", rating: { ...rated.rating!, ratedAt: "2026-09-07T02:00:00Z", editableUntil: "2026-09-14T02:00:00Z" } };
+    const late = { ...rated, completedAt: "2026-09-01T01:00:00Z", rating: { ...must(rated.rating), ratedAt: "2026-09-07T02:00:00Z", editableUntil: "2026-09-14T02:00:00Z" } };
     expect([feedback(late, NOW).kind, feedback(late, NOW).report]).toEqual(["edit", false]);
   });
 

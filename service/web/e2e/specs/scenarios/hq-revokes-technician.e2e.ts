@@ -4,8 +4,9 @@
 import type { Browser, Page } from "@playwright/test";
 import { test, expect } from "../../fixtures/test";
 import { APPS, type App } from "../../fixtures/apps";
+import { must } from "../../fixtures/must";
 
-const app = (id: App["id"]) => APPS.find((a) => a.id === id)!;
+const app = (id: App["id"]) => must(APPS.find((a) => a.id === id));
 const open = async (browser: Browser, a: App): Promise<Page> => {
   const context = await browser.newContext({ baseURL: a.url, viewport: { width: 1920, height: 1080 }, storageState: a.state });
   return context.newPage();

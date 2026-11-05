@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { alertRows, dayTimeline, isToday, kpis, reportRows, sortOf, tabOf, techRow, type ApiTechJobRow } from "@ac/web/lib/techOverview";
 import type { ApiAlert } from "@ac/web/lib/alerts";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
+import { must } from "./must";
+const techRowOf = (...args: Parameters<typeof techRow>) => must(techRow(...args)); // the techRow a test expects
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 
@@ -17,28 +19,28 @@ const row = (over: Record<string, unknown>) => {
 
 describe("technician overview", () => {
   it("states what the technician can do with each job", () => {
-    const later = techRow(row({}), NOW, units)!;
+    const later = techRowOf(row({}), NOW, units);
     expect([later.badge.text, later.line, later.today, later.opensAt, later.ackPending]).toEqual(["Work not started", "Repair · window 21 Sept, 2:00 – 4:00 pm MYT · opens today 2:00 pm MYT (read-only until then)", true, "2026-09-21T06:00:00Z", false]);
-    const pending = techRow(row({ assignmentAcknowledgement: "pending", scheduledSlot: slot("2026-09-23T02:00:00Z", "2026-09-23T04:00:00Z") }), NOW, units)!;
+    const pending = techRowOf(row({ assignmentAcknowledgement: "pending", scheduledSlot: slot("2026-09-23T02:00:00Z", "2026-09-23T04:00:00Z") }), NOW, units);
     expect([pending.badge, pending.ackPending, pending.today, pending.line]).toEqual([{ text: "Not accepted", tone: "warn" }, true, false, "Repair · window 23 Sept, 10:00 am – 12:00 pm MYT · new assignment — review and accept it"]);
-    expect(techRow(row({ status: "completed", scheduledSlot: slot("2026-09-14T00:00:00Z", "2026-09-20T00:00:00Z") }), NOW, units)!.slotText).toBe("14 Sept, 8:00 am – 20 Sept, 8:00 am MYT");
-    const running = techRow(row({ status: "in_progress", severity: "critical", scheduledSlot: slot("2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z") }), NOW, units)!;
+    expect(techRowOf(row({ status: "completed", scheduledSlot: slot("2026-09-14T00:00:00Z", "2026-09-20T00:00:00Z") }), NOW, units).slotText).toBe("14 Sept, 8:00 am – 20 Sept, 8:00 am MYT");
+    const running = techRowOf(row({ status: "in_progress", severity: "critical", scheduledSlot: slot("2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z") }), NOW, units);
     // 11:45: the last 15 minutes before unsaved input is discarded (IR89, Figma Technician 01)
     expect([running.badge.text, running.line]).toEqual(["In progress", "Repair · window 21 Sept, 10:00 am – 12:00 pm MYT · critical alert on the unit · report draft open · window ends in 15 min"]);
-    expect(techRow(row({ scheduledSlot: slot("2026-09-21T03:00:00Z", "2026-09-21T05:00:00Z") }), NOW, units)!.line).toBe("Repair · window 21 Sept, 11:00 am – 1:00 pm MYT · check in to start");
-    expect(techRow(row({ scheduledSlot: slot("2026-09-21T02:30:00Z", "2026-09-21T03:55:00Z") }), NOW, units)!.line).toBe("Repair · window 21 Sept, 10:30 – 11:55 am MYT · check in to start · window ends in 10 min");
-    expect(techRow(row({ status: "submitted", scheduledSlot: slot("2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z") }), NOW, units)!.line).not.toContain("window ends");
-    expect(techRow(row({ status: "in_progress", scheduledSlot: slot("2026-09-21T00:00:00Z", "2026-09-21T02:00:00Z") }), NOW, units)!.badge).toEqual({ text: "Work window ended", tone: "crit" });
-    expect(techRow(row({ status: "rework_requested" }), NOW, units)!.badge.text).toBe("Rework requested");
+    expect(techRowOf(row({ scheduledSlot: slot("2026-09-21T03:00:00Z", "2026-09-21T05:00:00Z") }), NOW, units).line).toBe("Repair · window 21 Sept, 11:00 am – 1:00 pm MYT · check in to start");
+    expect(techRowOf(row({ scheduledSlot: slot("2026-09-21T02:30:00Z", "2026-09-21T03:55:00Z") }), NOW, units).line).toBe("Repair · window 21 Sept, 10:30 – 11:55 am MYT · check in to start · window ends in 10 min");
+    expect(techRowOf(row({ status: "submitted", scheduledSlot: slot("2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z") }), NOW, units).line).not.toContain("window ends");
+    expect(techRowOf(row({ status: "in_progress", scheduledSlot: slot("2026-09-21T00:00:00Z", "2026-09-21T02:00:00Z") }), NOW, units).badge).toEqual({ text: "Work window ended", tone: "crit" });
+    expect(techRowOf(row({ status: "rework_requested" }), NOW, units).badge.text).toBe("Rework requested");
     expect(techRow({ projection: "history", jobId: "h", type: "periodic", status: "completed", completedAt: null }, NOW, units)).toBeNull();
     expect([tabOf("all"), tabOf("x"), sortOf("dueAt"), sortOf("x")]).toEqual(["all", "today", "dueAt", "severity"]);
   });
 
   it("fills the tiles, today's timeline and the side cards", () => {
     const rows = [
-      techRow(row({ id: "job-a", status: "in_progress", scheduledSlot: slot("2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z") }), NOW, units)!,
-      techRow(row({ id: "job-b" }), NOW, units)!,
-      techRow(row({ id: "job-c", status: "submitted", scheduledSlot: slot("2026-09-19T02:00:00Z", "2026-09-19T04:00:00Z") }), NOW, units)!,
+      techRowOf(row({ id: "job-a", status: "in_progress", scheduledSlot: slot("2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z") }), NOW, units),
+      techRowOf(row({ id: "job-b" }), NOW, units),
+      techRowOf(row({ id: "job-c", status: "submitted", scheduledSlot: slot("2026-09-19T02:00:00Z", "2026-09-19T04:00:00Z") }), NOW, units),
     ];
     expect(kpis({ total: 2, scheduledCount: 1, inProgressCount: 1, overdueCount: 0, assignedCount: 3 }, rows)).toEqual([
       { label: "Assigned units", value: 2, sub: "in your assignments" }, { label: "Not started", value: 1, sub: "job-b", tone: "warn" }, { label: "Overdue", value: 0, sub: "No overdue jobs", tone: "ok" },
@@ -60,11 +62,11 @@ describe("technician overview", () => {
   });
 
   it("words the overview in Malay with the windows in the display time zone (IR281)", () => {
-    const later = techRow(row({}), NOW, units, MS)!;
+    const later = techRowOf(row({}), NOW, units, MS);
     expect([later.badge.text, later.line]).toEqual(["Kerja belum dimulakan", "Pembaikan · tetingkap 21 Sep, 3:00–5:00 PTG GMT+9 · dibuka hari ini 3:00 PTG GMT+9 (baca sahaja sehingga itu)"]);
     expect(kpis({ total: 2, scheduledCount: 0, inProgressCount: 0, overdueCount: 0, assignedCount: 2 }, [later], translator("ms")).map((k) => [k.label, k.sub])).toEqual([
       ["Unit yang ditugaskan", "dalam tugasan anda"], ["Belum dimulakan", "job-1-aa"], ["Tertunggak", "Tiada kerja tertunggak"],
     ]);
-    expect(reportRows([techRow(row({ status: "submitted" }), NOW, units, MS)!], translator("ms"))).toEqual([{ id: "job-1-aaaa", title: "job-1-aa · Bedroom AC", sub: "menunggu semakan kualiti · baca sahaja", badge: { text: "Dihantar", tone: "primary" } }]);
+    expect(reportRows([techRowOf(row({ status: "submitted" }), NOW, units, MS)], translator("ms"))).toEqual([{ id: "job-1-aaaa", title: "job-1-aa · Bedroom AC", sub: "menunggu semakan kualiti · baca sahaja", badge: { text: "Dihantar", tone: "primary" } }]);
   });
 });

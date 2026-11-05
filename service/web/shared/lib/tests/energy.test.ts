@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { compareRow, dayRanges, periodRange, pickUnits, selectionQuery } from "@ac/web/lib/clientEnergy";
 import { amount, baselineErrors, baselineRows, coveragePct, one, roundAway, saving, summaryView, warning, type ApiEnergySummary, type BaselineDraft } from "@ac/web/lib/energy";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
+import { must } from "./must";
 
 const NOW = new Date("2026-09-14T01:30:20Z"); // Mon 09:30 KL
 const summary: ApiEnergySummary = {
@@ -89,7 +90,7 @@ describe("customer energy & cost (FR-C06, FR-C13)", () => {
     const t = translator("ms");
     const up = compareRow("u1", "Lobby", { ...summary, totals: { ...summary.totals, savedKWh: -2, savingPercentage: -1.5 } }, t);
     expect([up.difference, up.tone]).toEqual(["Peningkatan 2.0 kWh · Peningkatan 1.5%", "warn"]);
-    const zero = { ...summary, baselineSnapshot: { ...summary.baselineSnapshot!, baselineKWh: 0 } };
+    const zero = { ...summary, baselineSnapshot: { ...must(summary.baselineSnapshot), baselineKWh: 0 } };
     expect([
       compareRow("u1", "Lobby", empty, t).difference, compareRow("u1", "Lobby", { ...summary, totals: { ...summary.totals, savedKWh: null } }, t).difference, compareRow("u1", "Lobby", zero, t).difference,
     ]).toEqual(["Tiada garis dasar untuk unit ini", "Tidak dapat dikira — garis dasar tidak setanding", "Tidak dapat dikira — garis dasar ialah 0"]);
@@ -110,7 +111,7 @@ describe("customer energy & cost (FR-C06, FR-C13)", () => {
 
 describe("HQ energy baselines in the display language (IR296)", () => {
   it("words the baseline list and the form checks; the period stays Kuala Lumpur time", () => {
-    const b = summary.baselineSnapshot!;
+    const b = must(summary.baselineSnapshot);
     const ms = translator("ms");
     expect(baselineRows([b, { ...b, id: "b2", unitIds: ["u1"], baselineKWh: null }]).map((r) => [r.value, r.units, r.period])).toEqual([
       ["135.0 kWh", "2 units", "2026-09-01 00:00 → 2026-09-08 00:00"], ["no value", "1 unit", "2026-09-01 00:00 → 2026-09-08 00:00"],

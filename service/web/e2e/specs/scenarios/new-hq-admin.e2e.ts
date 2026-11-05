@@ -8,8 +8,9 @@ import { test, expect, FAILED_PAGE } from "../../fixtures/test";
 import { APPS, type App } from "../../fixtures/apps";
 import { totpBase32 } from "../../fixtures/auth";
 import { mailpitUp, setupLink } from "../../fixtures/mailpit";
+import { must } from "../../fixtures/must";
 
-const app = (id: App["id"]) => APPS.find((a) => a.id === id)!;
+const app = (id: App["id"]) => must(APPS.find((a) => a.id === id));
 const open = async (browser: Browser, a: App, signedIn = true): Promise<Page> => {
   const context = await browser.newContext({ baseURL: a.url, viewport: { width: 1920, height: 1080 }, ...(signedIn ? { storageState: a.state } : { storageState: { cookies: [], origins: [] } }) });
   return context.newPage();

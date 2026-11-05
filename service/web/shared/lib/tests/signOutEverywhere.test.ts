@@ -27,6 +27,8 @@ import { createSessionCookie, loadSession, OIDC_COOKIE, seal, unseal, type Sessi
 import { signedOutReason, signInAgainHref } from "@ac/web/lib/login";
 import { GET as login } from "@ac/web/bff/auth/login/route";
 import { GET as callback } from "@ac/web/bff/auth/callback/route";
+import { must } from "./must";
+const locationOf = (res: Response) => new URL(must(res.headers.get("location"))); // where a redirect leads
 
 const b64 = (v: unknown) => Buffer.from(JSON.stringify(v)).toString("base64url");
 const token = `${b64({ alg: "RS256" })}.${b64({ tenant_id: "t-1", membership_id: "m-1", role: "client" })}.sig`;
@@ -63,11 +65,11 @@ describe("a session the Core API refuses", () => {
 describe("signing in again after a revocation", () => {
   it("asks the identity provider for the password when reauth=1 (prompt=login), and only then", async () => {
     const again = await login(new NextRequest("http://localhost:3000/bff/auth/login?reauth=1&returnTo=/customer"));
-    const url = new URL(again.headers.get("location")!);
+    const url = locationOf(again);
     const state = unseal<{ reauth?: boolean; returnTo: string | null }>(again.cookies.get(OIDC_COOKIE)?.value);
     expect([url.searchParams.get("prompt"), state?.reauth, state?.returnTo]).toEqual(["login", true, "/customer"]);
     const plain = await login(new NextRequest("http://localhost:3000/bff/auth/login?returnTo=/customer"));
-    expect(new URL(plain.headers.get("location")!).searchParams.get("prompt")).toBeNull();
+    expect(locationOf(plain).searchParams.get("prompt")).toBeNull();
   });
 
   const signIn = (pending: { reauth?: boolean; returnTo?: string | null }, coreAnswer: Response) => {
@@ -78,18 +80,18 @@ describe("signing in again after a revocation", () => {
 
   it("turns a single sign-on answer with the old sign-in into one password prompt", async () => {
     const res = await signIn({}, json(401, revoked));
-    const to = new URL(res.headers.get("location")!);
+    const to = locationOf(res);
     expect([to.pathname, to.searchParams.get("reauth"), to.searchParams.get("returnTo"), kv.size]).toEqual(["/bff/auth/login", "1", "/customer/alerts", 0]);
   });
 
   it("gives up after the password prompt rather than looping", async () => {
     const res = await signIn({ reauth: true }, json(401, revoked));
-    expect([new URL(res.headers.get("location")!).pathname + new URL(res.headers.get("location")!).search, kv.size]).toEqual(["/login?error=revoked", 0]);
+    expect([locationOf(res).pathname + locationOf(res).search, kv.size]).toEqual(["/login?error=revoked", 0]);
   });
 
   it("starts the session when the Core API takes the sign-in", async () => {
     const res = await signIn({ reauth: true }, json(200, { data: {} }));
-    expect([new URL(res.headers.get("location")!).pathname, kv.size]).toEqual(["/customer/alerts", 1]);
+    expect([locationOf(res).pathname, kv.size]).toEqual(["/customer/alerts", 1]);
   });
 
   // open redirects (security check R380): a crafted returnTo goes through the sign-in, the password prompt after a
@@ -99,15 +101,15 @@ describe("signing in again after a revocation", () => {
     const origin = "http://localhost:3000";
     const kept = async (url: string) => {
       const res = await login(new NextRequest(url));
-      return unseal<{ returnTo: string | null; reauth?: boolean }>(res.cookies.get(OIDC_COOKIE)?.value)!;
+      return must(unseal<{ returnTo: string | null; reauth?: boolean }>(res.cookies.get(OIDC_COOKIE)?.value));
     };
     for (const returnTo of crafted) {
       const first = await kept(`${origin}/bff/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
       const refused = await signIn({ returnTo: first.returnTo }, json(401, revoked));
-      const hop = new URL(refused.headers.get("location")!);
+      const hop = locationOf(refused);
       const second = await kept(hop.toString());
       const signedIn = await signIn({ returnTo: second.returnTo, reauth: second.reauth }, json(200, { data: {} }));
-      const home = new URL(signedIn.headers.get("location")!);
+      const home = locationOf(signedIn);
       expect([returnTo, hop.origin, hop.pathname, home.origin]).toEqual([returnTo, origin, "/bff/auth/login", origin]);
     }
   });

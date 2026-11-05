@@ -2,6 +2,7 @@
 // detail — or, for a job whose delegation ended in the period, its history (IR614) — or shows the empty state when its
 // count is 0.
 import { test, expect } from "../../fixtures/test";
+import { must } from "../../fixtures/must";
 
 test("the status tabs keep the URL and open the jobs they list", async ({ page }) => {
   await page.goto("/partner/jobs");
@@ -21,7 +22,7 @@ test("the status tabs keep the URL and open the jobs they list", async ({ page }
   }
   const first = page.locator("main a[href^='/partner/jobs/']").first();
   test.skip((await first.count()) === 0, "no jobs for this contractor");
-  const href = (await first.getAttribute("href"))!;
+  const href = must((await first.getAttribute("href")));
   await first.click();
   await page.waitForURL((u) => u.pathname === href.split("?", 1)[0]);
   await expect(page.getByRole("main")).not.toContainText("This page isn’t available");

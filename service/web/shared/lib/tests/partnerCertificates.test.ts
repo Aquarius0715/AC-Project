@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { certDates, certificateErrors, certificateRefusal, certKpis, certQuery, certRows, fileSize, impact, type ApiCert, type CertForm, type CertJob } from "@ac/web/lib/partnerCertificates";
 import type { ApiTeamMember } from "@ac/web/lib/partnerTeam";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
+import { must } from "./must";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const ms = translator("ms");
@@ -51,9 +52,9 @@ describe("partner certifications", () => {
     expect([trained.training, trained.actions]).toEqual(["Training requested 12 Sept 2026", ["view", "renew"]]);
     const first = certRows([member("m-c", "tech-external-a2", [])], [cert("c9", { membershipId: "m-c", code: "other", name: "Working at height", status: "rejected", createdAt: "2026-09-01T00:00:00Z" })], [], 60, NOW);
     expect(first.map((r) => [r.name, r.badge.text, r.actions])).toEqual([["Working at height", "Rejected", ["view", "renew"]]]);
-    const turnedDown = certRows([a], [cert("c7", { code: "demo_outdoor", name: "Outdoor licence", status: "rejected" })], [], 60, NOW).find((r) => r.code === "demo_outdoor")!;
+    const turnedDown = must(certRows([a], [cert("c7", { code: "demo_outdoor", name: "Outdoor licence", status: "rejected" })], [], 60, NOW).find((r) => r.code === "demo_outdoor"));
     expect([turnedDown.detail, turnedDown.badge.text, turnedDown.actions]).toEqual(["granted by HQ · the upload was rejected", "Valid", ["add"]]); // the HQ grant still stands
-    const uploaded = certRows([a], [cert("c6", { code: "demo_outdoor", status: "pending_verification" })], [], 60, NOW).find((r) => r.code === "demo_outdoor")!;
+    const uploaded = must(certRows([a], [cert("c6", { code: "demo_outdoor", status: "pending_verification" })], [], 60, NOW).find((r) => r.code === "demo_outdoor"));
     expect([uploaded.detail, uploaded.badge.text, uploaded.renewalPending, uploaded.actions]).toEqual(["granted by HQ · the upload waits for HQ", "Valid", true, []]);
     const waiting = certRows([member("m-c", "tech-external-a2", [])], [cert("c8", { membershipId: "m-c", code: "demo_indoor", status: "pending_verification" })], [], 60, NOW);
     expect(waiting.map((r) => [r.badge.text, r.actions, r.blocks])).toEqual([["Pending HQ verification", ["view"], []]]);

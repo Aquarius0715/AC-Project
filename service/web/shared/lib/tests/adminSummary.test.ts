@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { asOfText, axisRows, billingView, forecastView, jobRows, kpisFrom, overviewLinks, type AdminSummary, type ApiForecast } from "@ac/web/lib/adminSummary";
 import { periodRange } from "@ac/web/lib/clientEnergy";
 import { i18nOf } from "@ac/web/lib/i18n";
+import { must } from "./must";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 
@@ -83,6 +84,7 @@ describe("HQ Jobs tab period (IR245)", () => {
     const q = { from: "2026-09-13T16:00:00.000Z", to: "2026-09-14T01:00:00.000Z", customerId: "c1" };
     expect(filtersOf(q, null)).toMatchObject({ customerId: "c1", from: q.from, to: q.to });
     expect([periodOfQuery({ from: q.to, to: q.from }), periodOfQuery({ from: "x", to: q.to }), periodOfQuery({})]).toEqual([null, null, null]);
-    expect(periodChip(periodOfQuery(q)!)).toBe("Requested time 14 Sept, 12:00 – 9:00 am MYT"); // one span in the display time zone (IR290)
+    const asked = must(periodOfQuery(q));
+    expect(periodChip(asked)).toBe("Requested time 14 Sept, 12:00 – 9:00 am MYT"); // one span in the display time zone (IR290)
   });
 });

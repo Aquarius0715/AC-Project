@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import { byCodeUnit } from "@ac/web/lib/order";
+import { must } from "./must";
 
 // The input and result fields of every operation in the Core API contract (OperationContracts[op] of contracts.gen.ts,
 // a copy of docs/02-design/service-contracts.ts): named types, intersections and unions resolved by the TypeScript
@@ -24,7 +25,7 @@ interface ResultFields { fields: string[]; items: string[] | null }
 function contract(): { inputs: Record<string, string[]>; results: Record<string, ResultFields> } {
   const program = ts.createProgram([gen], { strict: true, noEmit: true, skipLibCheck: true });
   const c = program.getTypeChecker();
-  const sf = program.getSourceFile(gen)!;
+  const sf = must(program.getSourceFile(gen));
   let ops: ts.Type | undefined;
   ts.forEachChild(sf, (n) => { if (ts.isTypeAliasDeclaration(n) && n.name.text === "OperationContracts") ops = c.getTypeAtLocation(n.name); });
   const fields = (t: ts.Type, out: Set<string>) => {
@@ -36,10 +37,11 @@ function contract(): { inputs: Record<string, string[]>; results: Record<string,
   const element = (t: ts.Type) => (c.isArrayType(t) ? c.getIndexInfoOfType(t, ts.IndexKind.Number)?.type ?? null : null);
   const inputs: Record<string, string[]> = {};
   const results: Record<string, ResultFields> = {};
-  for (const op of c.getPropertiesOfType(ops!).toSorted((a, b) => a.getName().localeCompare(b.getName()))) {
+  for (const op of c.getPropertiesOfType(must(ops)).toSorted((a, b) => a.getName().localeCompare(b.getName()))) {
     const contract = c.getTypeOfSymbol(op);
-    inputs[op.getName()] = sorted(c.getTypeOfSymbol(contract.getProperty("input")!));
-    const result = c.getTypeOfSymbol(contract.getProperty("result")!);
+    const input = must(contract.getProperty("input"));
+    inputs[op.getName()] = sorted(c.getTypeOfSymbol(input));
+    const result = c.getTypeOfSymbol(must(contract.getProperty("result")));
     const array = element(result);
     if (array) {
       results[op.getName()] = { fields: [], items: sorted(array) };

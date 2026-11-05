@@ -5,11 +5,12 @@
 import { test, expect } from "../../fixtures/test";
 import { APPS } from "../../fixtures/apps";
 import { signIn } from "../../fixtures/auth";
+import { must } from "../../fixtures/must";
 
 test.describe.configure({ timeout: 180_000 });
 
 test("the report autosaves once, 20 s after the last edit", async ({ browser }) => {
-  const app = APPS.find((a) => a.id === "technician")!;
+  const app = must(APPS.find((a) => a.id === "technician"));
   const ctx = await browser.newContext({ baseURL: app.url, storageState: { cookies: [], origins: [] }, viewport: { width: 1920, height: 1080 } });
   const page = await ctx.newPage();
   try {

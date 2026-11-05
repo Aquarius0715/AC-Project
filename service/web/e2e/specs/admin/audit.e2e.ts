@@ -8,6 +8,7 @@
 import type { Locator, Page } from "@playwright/test";
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, setDisplay } from "../../fixtures/display";
+import { must } from "../../fixtures/must";
 
 const card = (page: Page, heading: string | RegExp) => page.getByRole("main").locator('section, [data-slot="card"]').filter({ has: page.getByRole("heading", { name: heading, exact: typeof heading === "string" }) });
 /** The value of a SummaryList row of the open entry. */
@@ -66,11 +67,11 @@ test("the audit log keeps its filters and the open entry in the URL", async ({ p
   const open = card(page, /./).filter({ has: page.getByText("Role at the time", { exact: true }) }).first();
   await open.getByRole("button", { name: "Filter by actor" }).click();
   await page.waitForURL(/actorId=/);
-  const actor = new URL(page.url()).searchParams.get("actorId")!;
+  const actor = must(new URL(page.url()).searchParams.get("actorId"));
   await expect(main.getByRole("combobox", { name: "Actor" })).toHaveValue(actor);
   await open.getByRole("button", { name: "Filter by ID" }).click();
   await page.waitForURL(/correlationId=/);
-  const corr = new URL(page.url()).searchParams.get("correlationId")!;
+  const corr = must(new URL(page.url()).searchParams.get("correlationId"));
   await expect(main.getByRole("heading", { name: `Correlation ${corr}`, exact: true })).toBeVisible();
   await expect(main).toContainText(/\d+ entr(y|ies) with this correlation ID/);
 
@@ -109,7 +110,7 @@ test("device events load only for a picked device and link the event's audit tra
   if (await rows.count()) {
     await rows.first().click();
     await page.waitForURL(/eventId=[0-9a-f-]{36}/);
-    const eventId = new URL(page.url()).searchParams.get("eventId")!;
+    const eventId = must(new URL(page.url()).searchParams.get("eventId"));
     const detail = card(page, /./).filter({ has: page.getByRole("heading", { name: "Linked alerts and audit", exact: true }) });
     for (const label of ["Event type", "Evidence", "Sequence", "Unit at the time", "Occurred", "Recovery"]) await expect(detail.locator("dt", { hasText: new RegExp(`^${label}$`) })).toBeVisible();
     await expect(detail.getByRole("link", { name: "Filter log" })).toHaveAttribute("href", `/admin/audit?targetKind=device_event&targetId=${eventId}`);

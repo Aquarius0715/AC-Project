@@ -5,8 +5,9 @@
 import { test, expect } from "../../fixtures/test";
 import { APPS, type App } from "../../fixtures/apps";
 import { enterPassword, signIn } from "../../fixtures/auth";
+import { must } from "../../fixtures/must";
 
-const app = (id: App["id"]) => APPS.find((a) => a.id === id)!;
+const app = (id: App["id"]) => must(APPS.find((a) => a.id === id));
 
 test("HQ signs a client user out everywhere, and the password signs them in again", async ({ browser }) => {
   test.setTimeout(180_000);

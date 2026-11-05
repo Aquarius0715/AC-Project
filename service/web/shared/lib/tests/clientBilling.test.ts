@@ -7,6 +7,8 @@ import {
 } from "@ac/web/lib/clientBilling";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 import { policyText, type ApiCommand, type ApiRestriction } from "@ac/web/lib/restrictions";
+import { must } from "./must";
+const dueNoticeOf = (...args: Parameters<typeof dueNotice>) => must(dueNotice(...args)); // the dueNotice a test expects
 
 const MS_TOKYO = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const NOW = new Date("2026-09-14T01:00:00Z"); // Mon 09:00 KL
@@ -108,10 +110,10 @@ describe("the overview's notice (DEC-90, IR610)", () => {
   it("counts several invoices, words a power-off and a scheduled restriction, and says nothing when all is paid", () => {
     const two = [inv("i1", "INV-1", 12_000), inv("i2", "INV-2", 3050)];
     expect(dueNotice(two, null)).toEqual([{ text: "2 invoices are overdue — 150.50 MYR in total", href: "/customer/payments?status=overdue", link: "View invoices" }]);
-    expect(dueNotice(two, { r: { ...limit, policy: { kind: "power_off" }, unitIds: ["u1", "u2"] }, invoiceId: "i1" })![1].text).toBe("2 units are switched off until it is paid");
-    expect(dueNotice(two, { r: { ...limit, state: "scheduled" }, invoiceId: "i1" })![1].text).toBe("A restriction starts 15 Sept 2026, 8:00 am MYT unless it is paid — Temperature limit — cooling setpoint ≥ 24 °C");
+    expect(dueNoticeOf(two, { r: { ...limit, policy: { kind: "power_off" }, unitIds: ["u1", "u2"] }, invoiceId: "i1" })[1].text).toBe("2 units are switched off until it is paid");
+    expect(dueNoticeOf(two, { r: { ...limit, state: "scheduled" }, invoiceId: "i1" })[1].text).toBe("A restriction starts 15 Sept 2026, 8:00 am MYT unless it is paid — Temperature limit — cooling setpoint ≥ 24 °C");
     expect(dueNotice(two, { r: { ...limit, state: "released" }, invoiceId: "i1" })).toHaveLength(1); // a released restriction is not said
     expect(dueNotice([], { r: limit, invoiceId: "i1" })).toBeNull();
-    expect(dueNotice([inv("i1", "INV-1", 12_000)], { r: limit, invoiceId: "i1" }, MS_TOKYO)!.map((l) => l.link)).toEqual(["Bayar sekarang", "Lihat butiran sekatan"]);
+    expect(dueNoticeOf([inv("i1", "INV-1", 12_000)], { r: limit, invoiceId: "i1" }, MS_TOKYO).map((l) => l.link)).toEqual(["Bayar sekarang", "Lihat butiran sekatan"]);
   });
 });
