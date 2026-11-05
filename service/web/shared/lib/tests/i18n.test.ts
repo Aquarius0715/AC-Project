@@ -57,7 +57,7 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
     const literals = [
       ...code.matchAll(/\b(?:t\(|translate\(\s*[\w.]+,)\s*"((?:[^"\\]|\\.)*)"/g),
       ...code.matchAll(/<Route(?:Loading|Error) what="((?:[^"\\]|\\.)*)"/g), // the route states translate what loads (IR269)
-    ].map((m) => JSON.parse(`"${m[1] ?? ""}"`) as string);
+    ].map((m) => String(JSON.parse(`"${m[1] ?? ""}"`)));
     expect(literals.length).toBeGreaterThan(100);
     expect([...new Set(literals.filter((text) => !(text in ms)))]).toEqual([]);
   });

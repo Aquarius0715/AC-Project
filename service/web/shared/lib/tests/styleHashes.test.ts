@@ -24,7 +24,7 @@ function sonnerStylesheet(): { css: string; emptyFirst: boolean } {
   while (end < code.length && (code[end] !== '"' || code[end - 1] === "\\")) end++;
   const insert = code.slice(code.indexOf("function __insertCSS"), code.indexOf("}", code.indexOf("function __insertCSS")));
   return {
-    css: runInNewContext(code.slice(start, end + 1)) as string, // the string literal's value, as the browser gets it
+    css: String(runInNewContext(code.slice(start, end + 1))), // the string literal's value, as the browser gets it
     emptyFirst: insert.includes("head.appendChild(style)") && insert.indexOf("head.appendChild(style)") < insert.indexOf("createTextNode"),
   };
 }

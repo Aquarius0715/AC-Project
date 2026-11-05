@@ -13,7 +13,8 @@ describe("a form field with an error", () => {
     const box = screen.getByRole("textbox", { name: /Symptoms/ });
     expect(box.getAttribute("aria-invalid")).toBe("true");
     expect(box).toHaveProperty("labels");
-    expect((box as HTMLInputElement).labels?.[0]?.textContent).toContain("Symptoms must be 10–2000 characters");
+    const label = box instanceof HTMLInputElement ? box.labels?.[0]?.textContent : null;
+    expect(label).toContain("Symptoms must be 10–2000 characters");
   });
   it("leaves a valid control and a group of choices unmarked", () => {
     render(<><Field label="Contact window" hint="Use HH:mm"><Input /></Field><Field label="Type" error="Pick one"><Choice value="a" onChange={vi.fn()} options={[{ id: "a", label: "Repair" }, { id: "b", label: "Preventive" }]} /></Field></>);

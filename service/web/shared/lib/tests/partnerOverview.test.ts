@@ -41,7 +41,8 @@ describe("partner overview", () => {
     expect(p).toMatchObject({ from: "2026-09-21", to: "2026-09-27", fromAt: "2026-09-20T16:00:00.000Z", toAt: "2026-09-27T16:00:00.000Z", label: "This week" });
     expect(p.days).toHaveLength(7);
     expect(period(NOW, "2026-09-14", "2026-09-20").label).toBe("Last week");
-    expect(period(NOW, ...Object.values(shift(weekOf(NOW), 7)) as [string, string]).label).toBe("Next week");
+    const nextWeek = shift(weekOf(NOW), 7);
+    expect(period(NOW, nextWeek.from, nextWeek.to).label).toBe("Next week");
     expect(period(NOW, "2026-09-27", "2026-09-21").from).toBe("2026-09-21"); // reversed → this week
     expect(period(NOW, "2025-01-01", "2026-09-27").from).toBe("2026-09-21"); // longer than 366 days → this week
   });

@@ -87,7 +87,7 @@ describe("one icon library (DEC-74)", () => {
       ["+2 reminders", false], ["≤ 350 kPa", false], ["© 2026", false], ["26 °C", false], ["", false], ["⊘ Offline", true],
     ];
     expect(cases.filter(([text, icon]) => (iconProblem(text) !== null) !== icon).map(([text]) => text)).toEqual([]);
-    expect([["+", true], ["−", true], ["–", true], ["×", true], ["5", false], ["Add", false], ["%", false], ["°", false]].filter(([t, sign]) => signButton(t as string) !== sign)).toEqual([]);
+    expect(([["+", true], ["−", true], ["–", true], ["×", true], ["5", false], ["Add", false], ["%", false], ["°", false]] as const).filter(([t, sign]) => signButton(t) !== sign)).toEqual([]);
   });
 
   it("no UI string of the four apps uses a character as an icon", () => {

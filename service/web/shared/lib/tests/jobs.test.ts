@@ -84,7 +84,9 @@ describe("notes, follow-ups and answers in the maintenance demo", () => {
 
   it("opens a follow-up from a completed job only, and classifies it once", () => {
     expect(jobActions.reportProblem("job-c07", "same_problem", "still dripping", "")).toEqual({ error: "CONFLICT — only completed jobs can be reported" });
-    const { id } = jobActions.reportProblem(completed.id, "same_problem", "still dripping", "2026-10-06") as { id: string };
+    const reported = jobActions.reportProblem(completed.id, "same_problem", "still dripping", "2026-10-06");
+    expect(reported).toHaveProperty("id");
+    const id = "id" in reported ? reported.id ?? "" : "";
     expect(job(id)).toMatchObject({ status: "requested", followUpOf: completed.id, followUpClass: "pending", unitId: completed.unitId, preferred: [{ date: "2026-10-06", win: "09:00–12:00" }] });
     expect(jobActions.classifyFollowUp(id, "rework", " ")).toBe("A reason is required (1–1000 characters)");
     expect(jobActions.classifyFollowUp(id, "rework", "same fault")).toBeNull();
