@@ -13,20 +13,30 @@ const NOW = Date.parse("2026-09-21T01:30:00Z"); // Mon 09:30 KL
 const slot = (s: string, e: string) => ({ startAt: s, endAt: e });
 const visit = slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"); // Tue 10:00–12:00 KL
 const quals = (codes: string[]) => codes.map((code) => ({ code, validFrom: "2026-09-01T00:00:00Z", validUntil: "2027-03-31T00:00:00Z", revokedAt: null }));
-const members = [
+const members: ApiMember[] = [
   { id: "m-a", userId: "u-a", displayName: "tech-external-a", role: "technician", qualifications: quals(["demo_indoor", "demo_outdoor", "demo_electrical"]) },
   { id: "m-b", userId: "u-b", displayName: "tech-external-a2", role: "technician", qualifications: quals(["demo_indoor"]) },
   { id: "m-c", userId: "u-c", displayName: "tech-external-a3", role: "technician", qualifications: quals(["demo_indoor", "demo_outdoor", "demo_electrical"]) },
   { id: "m-d", userId: "u-d", displayName: "coordinator", role: "contractor" },
-] as unknown as ApiMember[];
+];
 const names = new Map(members.map((m) => [m.id, m.displayName]));
 const units = new Map([["u1", "Lobby AC"]]);
-const summary = (over: Record<string, unknown>) => {
+type SummaryJob = Extract<ApiPartnerJob, { projection: "summary" }>;
+const detail = (over: Partial<ApiDetail> = {}): ApiDetail => ({
+  projection: "detail", id: "job-1", version: 4, unitId: "u1", type: "reactive", status: "accepted", symptom: "x", origin: "client_request", alertIds: [], requestedSlot: visit, scheduledSlot: null,
+  dueAt: "2026-09-25T00:00:00Z", startedAt: null, completedAt: null, assignmentId: null, partnerSlotProposal: null, reportRefs: [], assignment: null,
+  offer: { id: "o", termsVersion: "t", visitSlot: visit, offeredAt: "x", accessValidFrom: "x", accessValidUntil: "x", decision: "accept", decidedAt: "x" }, ...over,
+});
+const acceptedOffer = (): ApiOffer => ({
+  projection: "offer", status: "accepted", jobId: "job-2", jobVersion: 1, offerId: "o-2", type: "reactive", siteAddress: null, requiredQualifications: [], requestedSlot: visit, dueAt: "2026-09-25T00:00:00Z",
+  offerExpiresAt: "2026-09-30T00:00:00Z", termsVersion: "t", origin: "client_request", visitSlot: visit, offeredAt: "x", accessValidFrom: "2026-09-22T00:00:00Z", accessValidUntil: "2026-09-25T00:00:00Z", partnerSlotProposal: null,
+});
+const summary = (over: Partial<SummaryJob>): SummaryJob => {
   return ({
     projection: "summary", id: "job-1-aaaa", version: 3, unitId: "u1", type: "reactive", status: "accepted", dueAt: "2026-09-25T00:00:00Z", requestedSlot: visit,
     scheduledSlot: null, assignmentId: null, displayStatus: "accepted", technicianMembershipId: null, assignmentAcknowledgement: null,
-    accessValidFrom: "2026-09-20T01:30:00Z", accessValidUntil: "2026-09-22T01:30:00Z", ...over,
-  }) as unknown as ApiPartnerJob;
+    accessValidFrom: "2026-09-20T01:30:00Z", accessValidUntil: "2026-09-22T01:30:00Z", eventSummary: { count: 0, customerVisible: 0, notes: 0, latest: null }, ...over,
+  });
 };
 const cap = (id: string, date: string, avail: [string, string][], assigned: [string, string][], am: number, unavailability: string | null = null): ApiCapacity =>
   ({ membershipId: id, availableSlots: avail.map(([s, e]) => slot(s, e)), assignedSlots: assigned.map(([s, e]) => slot(s, e)), availableMinutes: am, assignedMinutes: 0, date, unavailability });
@@ -56,7 +66,6 @@ describe("partner schedule", () => {
   });
 
   it("decides what the form of a job allows", () => {
-    const detail = (over: Record<string, unknown>) => ({ projection: "detail", id: "job-1", version: 4, unitId: "u1", type: "reactive", status: "accepted", scheduledSlot: null, assignment: null, offer: { id: "o", termsVersion: "t", visitSlot: visit, offeredAt: "x", accessValidFrom: "x", accessValidUntil: "x", decision: "accept", decidedAt: "x" }, ...over }) as unknown as ApiDetail;
     const asg = (s: { startAt: string; endAt: string }, ack = "pending", why: string | null = null) => ({ technicianMembershipId: "m-a", scheduledStart: s.startAt, scheduledEnd: s.endAt, status: "active", acknowledgement: ack, cantMakeReason: why });
     const a = formMode(detail({}), "job-1 · Lobby AC", NOW, names);
     expect(a.kind === "assign" && [a.title, a.slot, a.endEditable, a.reasonRequired, a.button]).toEqual(["Assign — job-1 · Lobby AC", visit, false, false, "Confirm assignment"]);
@@ -69,7 +78,7 @@ describe("partner schedule", () => {
     expect(extension.kind === "extend" && [extension.title, extension.endEditable, extension.reasonRequired, extension.banner?.tone]).toEqual(["Reschedule — job-1", true, true, "crit"]);
     const running = formMode(detail({ status: "in_progress", scheduledSlot: visit, assignment: asg(visit, "accepted") }), "job-1", NOW, names);
     expect(running.kind === "extend" && [running.title, running.banner]).toEqual(["Reassign — job-1 (in progress)", undefined]);
-    const offer = { projection: "offer", status: "accepted", jobId: "job-2", visitSlot: visit, accessValidFrom: "2026-09-22T00:00:00Z" } as unknown as ApiOffer;
+    const offer = acceptedOffer();
     expect(formMode(offer, "job-2", NOW, names)).toMatchObject({ kind: "blocked", banner: { text: "Accepted — the delegation period starts 22 Sept 2026, 8:00 am MYT; the technician can be assigned from then, for exactly 22 Sept, 10:00 am – 12:00 pm MYT." } });
     expect(formMode(detail({ status: "completed" }), "job-1", NOW, names).kind).toBe("blocked");
   });
@@ -125,11 +134,11 @@ describe("partner schedule", () => {
   it("words the schedule in Malay with the job's times in the display time zone (IR275)", () => {
     const row = scheduleRowOf(summary({ status: "assigned", scheduledSlot: visit, technicianMembershipId: "m-a", assignmentAcknowledgement: null }), NOW, units, names, MS_TOKYO);
     expect([row.line, row.windowText, row.left]).toEqual(["Ditugaskan · tech-external-a · menunggu penerimaan", "20 Sep, 10:30 PG – 22 Sep, 10:30 PG GMT+9", "1 hari lagi"]);
-    const offer = { projection: "offer", status: "accepted", jobId: "job-2", visitSlot: visit, accessValidFrom: "2026-09-22T00:00:00Z" } as unknown as ApiOffer;
+    const offer = acceptedOffer();
     expect(formMode(offer, "job-2", NOW, names, MS_TOKYO)).toMatchObject({ title: "Tugaskan — job-2", banner: { text: "Diterima — tempoh delegasi bermula 22 Sep 2026, 9:00 PG GMT+9; juruteknik boleh ditugaskan mulai ketika itu, tepat untuk 22 Sep, 11:00 PG – 1:00 PTG GMT+9." } });
-    const held = formMode({ projection: "detail", id: "job-1", version: 4, unitId: "u1", type: "reactive", status: "on_hold", scheduledSlot: visit, assignment: null, offer: null } as unknown as ApiDetail, "job-1", NOW, names, MS_TOKYO);
+    const held = formMode(detail({ status: "on_hold", scheduledSlot: visit, offer: null }), "job-1", NOW, names, MS_TOKYO);
     expect(held.kind === "extend" && [held.title, held.button]).toEqual(["Tugaskan semula — job-1 (ditangguhkan)", "Sahkan penugasan semula"]);
-    expect(formMode({ projection: "detail", id: "job-1", status: "submitted", scheduledSlot: visit, assignment: null, offer: null } as unknown as ApiDetail, "job-1", NOW, names, MS_TOKYO).banner?.text).toBe("Kerja ini dihantar — tiada apa-apa untuk dijadualkan.");
+    expect(formMode(detail({ status: "submitted", scheduledSlot: visit, offer: null }), "job-1", NOW, names, MS_TOKYO).banner?.text).toBe("Kerja ini dihantar — tiada apa-apa untuk dijadualkan.");
     const day = [cap("m-a", "2026-09-22", [workday("2026-09-22")], [], 480), cap("m-c", "2026-09-22", [], [], 0, "sick")];
     expect(candidates(members, new Set(["m-a"]), ["demo_indoor", "demo_electrical"], visit, day, null, ms).map((c) => [c.sub, c.badge.text])).toEqual([
       ["Kerja unit dalaman · Kerja unit luaran · Kerja elektrik · lapang 09:00–17:00", "Layak"],
@@ -148,8 +157,8 @@ describe("partner schedule", () => {
 // and week; the job's current technician stays, so the form can name whom it replaces
 describe("the schedule's team", () => {
   it("keeps the technicians who can still work, and the current one", () => {
-    const ended = { id: "m-e", userId: "u-e", displayName: "former", role: "technician", validUntil: "2026-09-20T00:00:00Z", qualifications: [] } as unknown as ApiMember;
-    const revoked = { id: "m-r", userId: "u-r", displayName: "revoked", role: "technician", revokedAt: "2026-09-19T00:00:00Z", qualifications: [] } as unknown as ApiMember;
+    const ended: ApiMember = { id: "m-e", userId: "u-e", displayName: "former", role: "technician", validUntil: "2026-09-20T00:00:00Z", qualifications: [] };
+    const revoked: ApiMember = { id: "m-r", userId: "u-r", displayName: "revoked", role: "technician", revokedAt: "2026-09-19T00:00:00Z", qualifications: [] };
     const all = [...members, ended, revoked];
     expect(scheduleTeam(all, NOW, null).map((m) => m.id)).toEqual(["m-a", "m-b", "m-c"]);
     expect(scheduleTeam(all, NOW, "m-e").map((m) => m.id)).toEqual(["m-a", "m-b", "m-c", "m-e"]);
