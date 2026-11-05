@@ -29,7 +29,11 @@ vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ cookies: () => Promise.resolve({ get: vi.fn(), set: vi.fn(), delete: vi.fn() }) }));
 vi.mock("@redis/client", () => ({ createClient: () => { const c = { on: () => c, connect: () => Promise.resolve(c), ...kv.api }; return c; } }));
 
-import { ABSOLUTE_SECONDS, createSessionCookie, dropSession, loadSession, renewSessionCookie, seal, unseal, type Session } from "@ac/web/lib/session";
+import { ABSOLUTE_SECONDS, createSessionCookie, dropSession, loadSession, renewSessionCookie, seal, unsealAs, type Session } from "@ac/web/lib/session";
+import { z } from "zod";
+
+const sealedSid = z.object({ sid: z.string() });
+const anyFields = z.record(z.string(), z.unknown());
 import { must } from "./must";
 
 const NOW = Date.parse("2026-09-15T01:00:00Z");
@@ -51,8 +55,9 @@ afterEach(() => {
 describe("the server-side session store", () => {
   it("keeps only a sealed random ID in the cookie, and no token in clear in the store", async () => {
     const cookie = await createSessionCookie(session());
-    const id = unseal<{ sid: string }>(cookie)?.sid ?? "";
-    expect([Object.keys(unseal<object>(cookie) ?? {}), id.length]).toEqual([["sid"], 43]);
+    const id = unsealAs(cookie, sealedSid)?.sid ?? "";
+    const fields = unsealAs(cookie, anyFields) ?? {};
+    expect([Object.keys(fields), id.length]).toEqual([["sid"], 43]);
     const [key, rec] = must([...kv.data][0]);
     expect(key).toBe(`ac:session:${createHash("sha256").update(id).digest("hex")}`); // the key reveals no cookie
     // the markers hold ":" and "." around words, which base64url ciphertext cannot reproduce by chance

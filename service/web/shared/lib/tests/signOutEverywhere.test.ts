@@ -23,7 +23,10 @@ vi.mock("@redis/client", () => {
 });
 
 import { coreOp, CoreError } from "@ac/web/lib/dal";
-import { createSessionCookie, loadSession, OIDC_COOKIE, seal, unseal, type Session } from "@ac/web/lib/session";
+import { createSessionCookie, loadSession, OIDC_COOKIE, seal, unsealAs, type Session } from "@ac/web/lib/session";
+import { z } from "zod";
+
+const signInState = z.object({ reauth: z.boolean().optional(), returnTo: z.string().nullable() });
 import { signedOutReason, signInAgainHref } from "@ac/web/lib/login";
 import { GET as login } from "@ac/web/bff/auth/login/route";
 import { GET as callback } from "@ac/web/bff/auth/callback/route";
@@ -66,7 +69,7 @@ describe("signing in again after a revocation", () => {
   it("asks the identity provider for the password when reauth=1 (prompt=login), and only then", async () => {
     const again = await login(new NextRequest("http://localhost:3000/bff/auth/login?reauth=1&returnTo=/customer"));
     const url = locationOf(again);
-    const state = unseal<{ reauth?: boolean; returnTo: string | null }>(again.cookies.get(OIDC_COOKIE)?.value);
+    const state = unsealAs(again.cookies.get(OIDC_COOKIE)?.value, signInState);
     expect([url.searchParams.get("prompt"), state?.reauth, state?.returnTo]).toEqual(["login", true, "/customer"]);
     const plain = await login(new NextRequest("http://localhost:3000/bff/auth/login?returnTo=/customer"));
     expect(locationOf(plain).searchParams.get("prompt")).toBeNull();
@@ -101,7 +104,7 @@ describe("signing in again after a revocation", () => {
     const origin = "http://localhost:3000";
     const kept = async (url: string) => {
       const res = await login(new NextRequest(url));
-      return must(unseal<{ returnTo: string | null; reauth?: boolean }>(res.cookies.get(OIDC_COOKIE)?.value));
+      return must(unsealAs(res.cookies.get(OIDC_COOKIE)?.value, signInState));
     };
     for (const returnTo of crafted) {
       const first = await kept(`${origin}/bff/auth/login?returnTo=${encodeURIComponent(returnTo)}`);

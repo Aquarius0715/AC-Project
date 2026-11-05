@@ -1,7 +1,8 @@
 import { createCipheriv, randomBytes } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { SESSION_COOKIE, cookieKey, cookieOptions, endIdpSession, jwtClaims, needsRefresh, oidcConfig, readSession, refresh, roleHome, safeReturnTo, seal, sessionFromTokens, unseal, type Session } from "@ac/web/lib/session";
+import { SESSION_COOKIE, cookieKey, cookieOptions, endIdpSession, jwtClaims, needsRefresh, oidcConfig, readSession, refresh, roleHome, safeReturnTo, seal, sessionFromTokens, unseal, unsealAs, type Session } from "@ac/web/lib/session";
+import { z } from "zod";
 import { must } from "./must";
 import { bodyText } from "./http";
 import { without } from "@ac/web/lib/omit";
@@ -14,6 +15,7 @@ vi.mock("next/headers", () => ({ cookies: () => Promise.resolve(jar) }));
 const NOW = Date.parse("2026-09-15T01:00:00Z");
 const b64 = (v: unknown) => Buffer.from(JSON.stringify(v)).toString("base64url");
 const token = (claims: Record<string, unknown>) => `${b64({ alg: "RS256" })}.${b64(claims)}.signature`;
+const tokenHolder = z.object({ refreshToken: z.string().nullable() });
 const claims = { tenant_id: "t-1", membership_id: "m-1", role: "client" };
 const session = (over: Partial<Session> = {}): Session => ({ accessToken: token(claims), refreshToken: "r-1", tenantId: "t-1", membershipId: "m-1", role: "client", expiresAt: NOW / 1000 + 300, ...over });
 
@@ -45,7 +47,7 @@ describe("the sealed session cookie (AES-256-GCM, IR333)", () => {
     const plain = Buffer.from(must(t.split(".", 2)[1]), "base64url").toString("latin1");
     expect([plain.includes("accessToken"), plain.includes("r-1"), t.includes(Buffer.from(JSON.stringify(s)).toString("base64url").slice(0, 16))]).toEqual([false, false, false]);
     expect(seal(s)).not.toBe(t); // a fresh IV each time
-    expect(unseal<Session>(t)).toEqual(s);
+    expect(unseal(t)).toEqual(s);
   });
 
   it("depends on the server's secret", () => {
@@ -179,7 +181,7 @@ describe("reading the session in a route handler", () => {
     vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(Response.json({ access_token: token(claims), refresh_token: "r-2", expires_in: 300 }))));
     expect(await readSession()).toMatchObject({ refreshToken: "r-2", expiresAt: NOW / 1000 + 300 });
     const [name, value, options] = must(jar.set.mock.calls[0]);
-    expect([name, unseal<Session>(value)?.refreshToken, options.maxAge]).toEqual([SESSION_COOKIE, "r-2", 1800]);
+    expect([name, unsealAs(value, tokenHolder)?.refreshToken, options.maxAge]).toEqual([SESSION_COOKIE, "r-2", 1800]);
   });
 
   it("clears the cookie when the refresh fails, and ignores a missing or forged cookie", async () => {

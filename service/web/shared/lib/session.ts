@@ -63,8 +63,14 @@ export function seal(value: object): string {
   return `${iv.toString("base64url")}.${body.toString("base64url")}`;
 }
 
+/** The sealed value when it also has the shape `schema` describes; null otherwise (a cookie of an older release too). */
+export function unsealAs<T>(token: string | undefined, schema: z.ZodType<T>): T | null {
+  const parsed = schema.safeParse(unseal(token));
+  return parsed.success ? parsed.data : null;
+}
+
 /** Opens a sealed cookie value; null when it is missing, altered, sealed with another key, or not JSON. */
-export function unseal<T>(token: string | undefined = ""): T | null {
+export function unseal(token: string | undefined = ""): unknown {
   const [iv64, body64, extra] = token.split(".", 3);
   if (!iv64 || !body64 || extra !== undefined) return null;
   const iv = Buffer.from(iv64, "base64url"), body = Buffer.from(body64, "base64url");
@@ -72,7 +78,7 @@ export function unseal<T>(token: string | undefined = ""): T | null {
   try {
     const d = createDecipheriv("aes-256-gcm", cookieKey(), iv);
     d.setAuthTag(body.subarray(body.length - TAG_BYTES));
-    return JSON.parse(Buffer.concat([d.update(body.subarray(0, body.length - TAG_BYTES)), d.final()]).toString("utf8")) as T;
+    return JSON.parse(Buffer.concat([d.update(body.subarray(0, body.length - TAG_BYTES)), d.final()]).toString("utf8"));
   } catch {
     return null;
   }
@@ -176,7 +182,12 @@ export function needsRefresh(s: Session): boolean {
 export const ABSOLUTE_SECONDS = 12 * 60 * 60;
 const STORE_TIMEOUT_MS = 2000;
 
-interface Stored { session: Session; startedAt: number } // epoch seconds of the sign-in
+const sessionSchema = z.object({
+  accessToken: z.string(), refreshToken: z.string().nullable(), tenantId: z.string(), membershipId: z.string(), role: roleSchema, expiresAt: z.number(),
+}) satisfies z.ZodType<Session>;
+const stored = z.object({ session: sessionSchema, startedAt: z.number() }); // startedAt: epoch seconds of the sign-in
+type Stored = z.infer<typeof stored>;
+const sealedId = z.object({ sid: z.string().min(43) });
 interface StoreClient {
   getEx(key: string, options: { type: "EX"; value: number }): Promise<string | null>;
   set(key: string, value: string, options: { expiration: { type: "EX"; value: number }; condition?: "XX" }): Promise<string | null>;
@@ -216,10 +227,7 @@ const timed = <T,>(p: Promise<T>): Promise<T> => {
   return Promise.race([p, late]).finally(() => { clearTimeout(timer); });
 };
 const keyOf = (id: string) => `ac:session:${createHash("sha256").update(id).digest("hex")}`;
-const idOf = (cookie: string | undefined) => {
-  const id = unseal<{ sid?: unknown }>(cookie)?.sid;
-  return typeof id === "string" && id.length >= 43 ? id : null;
-};
+const idOf = (cookie: string | undefined) => unsealAs(cookie, sealedId)?.sid ?? null;
 
 /** The session a cookie value names: in store mode the live record of its sealed ID (the read extends the idle
 lifetime), else the sealed session itself. Null when the cookie is missing, altered or of the other mode, when the
@@ -227,14 +235,13 @@ record was deleted or has expired, or when the store does not answer. */
 export async function loadSession(cookie: string | undefined): Promise<Session | null> {
   const c = store();
   if (!c) {
-    const s = unseal<Session>(cookie);
-    return s && typeof s.accessToken === "string" ? s : null;
+    return unsealAs(cookie, sessionSchema);
   }
   const id = idOf(cookie);
   if (!id) return null;
   try {
     const client = await timed(c);
-    const rec = unseal<Stored>((await timed(client.getEx(keyOf(id), { type: "EX", value: SESSION_MAX_AGE }))) ?? undefined);
+    const rec = unsealAs((await timed(client.getEx(keyOf(id), { type: "EX", value: SESSION_MAX_AGE }))) ?? undefined, stored);
     if (!rec) return null;
     if (Date.now() / 1000 - rec.startedAt >= ABSOLUTE_SECONDS) {
       await dropSession(cookie);
@@ -267,7 +274,7 @@ export async function renewSessionCookie(cookie: string | undefined, s: Session)
   if (!id || !cookie) return null;
   try {
     const sc = await timed(c);
-    const rec = unseal<Stored>((await timed(sc.getEx(keyOf(id), { type: "EX", value: SESSION_MAX_AGE }))) ?? undefined);
+    const rec = unsealAs((await timed(sc.getEx(keyOf(id), { type: "EX", value: SESSION_MAX_AGE }))) ?? undefined, stored);
     if (!rec) return null;
     const ok = await timed(sc.set(keyOf(id), seal({ session: s, startedAt: rec.startedAt } satisfies Stored), { expiration: { type: "EX", value: SESSION_MAX_AGE }, condition: "XX" }));
     return ok === null ? null : cookie;

@@ -1,10 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { APP_ROLE, cookieOptions, createSessionCookie, OIDC_COOKIE, oidcConfig, oidcCookieOptions, roleHome, SESSION_COOKIE, sessionFromTokens, tokenResponse, unseal, type Session } from "@ac/web/lib/session";
+import { APP_ROLE, cookieOptions, createSessionCookie, OIDC_COOKIE, oidcConfig, oidcCookieOptions, roleHome, SESSION_COOKIE, sessionFromTokens, tokenResponse, unsealAs, type Session } from "@ac/web/lib/session";
 import { z } from "zod";
 import { orNull } from "@ac/web/lib/promises";
 
 const refusal = z.object({ messageKey: z.string().optional() });
-interface Pending { state: string; verifier: string; returnTo: string | null; reauth?: boolean }
+const pendingSignIn = z.object({ state: z.string(), verifier: z.string(), returnTo: z.string().nullable(), reauth: z.boolean().optional() });
 
 /** True when the Core API refuses this sign-in because HQ signed the user out everywhere after it (IR384): the identity
 provider's single sign-on answered with the old sign-in. Any other answer, or none, lets the sign-in go on. */
@@ -26,7 +26,7 @@ async function revokedSignIn(s: Session): Promise<boolean> {
 // stored record and its sealed ID in the cookie (IR382), or the sealed session itself without the store.
 export async function GET(req: NextRequest) {
   const config = oidcConfig();
-  const pending = unseal<Pending>(req.cookies.get(OIDC_COOKIE)?.value);
+  const pending = unsealAs(req.cookies.get(OIDC_COOKIE)?.value, pendingSignIn);
   const code = req.nextUrl.searchParams.get("code");
   if (!pending || !code || req.nextUrl.searchParams.get("state") !== pending.state) {
     return NextResponse.redirect(new URL("/login?error=state", config.appUrl));
