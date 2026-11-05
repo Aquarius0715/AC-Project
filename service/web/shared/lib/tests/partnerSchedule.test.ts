@@ -137,7 +137,8 @@ describe("partner schedule", () => {
       ["Kerja unit dalaman · Kerja unit luaran · Kerja elektrik · tiada jam", "Tidak tersedia (cuti sakit)"],
     ]);
     const week = weekGrid(["2026-09-22"], members.slice(0, 1), [[cap("m-a", "2026-09-22", [], [], 0, "sick")]], new Map(), null, ms);
-    expect([week[0]?.sub, week[0]?.cells]).toEqual(["Dalaman, Luaran, Elektrik · 0 j tersedia", [{ kind: "leave", text: "Cuti", sub: "cuti sakit" }]]);
+    expect(week[0]?.sub).toBe("Dalaman, Luaran, Elektrik · 0 j tersedia");
+    expect(week[0]?.cells).toEqual([{ kind: "leave", text: "Cuti", sub: "cuti sakit" }]);
     expect(assignRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { reason: "error.required" } }, "tech-external-a", ms)).toBe("Sebab: diperlukan (1–1000 aksara)");
     expect(assignRefusal({ code: "CONFLICT", messageKey: "errors.assignment_overlap", fieldErrors: {} }, "tech-external-a", ms)).toBe("Bertindih dengan jadual yang disahkan untuk tech-external-a — pilih juruteknik lain.");
   });

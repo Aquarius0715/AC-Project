@@ -150,7 +150,7 @@ function Reports({ live, r }: Readonly<{ live: MRVLive; r: NonNullable<MRVLive["
 function Factors({ live }: Readonly<{ live: MRVLive }>) {
   const t = useT();
   const [pending, run] = useAction();
-  const [selId, setSelId] = useState<string | "new">(live.factors[0]?.id ?? "new");
+  const [selId, setSelId] = useState<string>(live.factors[0]?.id ?? "new");
   const sel = selId === "new" ? null : live.factors.find((f) => f.id === selId) ?? live.factors[0] ?? null;
   const firstFactor = live.factors[0];
   const blank: FactorDraft = { region: "", year: "2026", kgCO2ePerKWh: "", source: t("Demo (fictional)") };

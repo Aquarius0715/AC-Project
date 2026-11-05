@@ -9,7 +9,7 @@ export default function Forgot() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [errorText, setError] = useState<string>();
-  const submit = (e: React.FormEvent) => {
+  const submit = (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!/^\S+@\S+\.\S+$/.test(email)) { setError("Enter an email like name@example.com"); return; }
     setError(undefined);

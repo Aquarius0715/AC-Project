@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // the inbox's Server Action calls the Core API through the DAL; refresh re-renders the page
 const dal = vi.hoisted(() => {
   class CoreError extends Error {
-    constructor(public error: DomainError) { super(error.code); }
+    constructor(public error: DomainError, options?: ErrorOptions) { super(error.code, options); this.name = "CoreError"; }
   }
   return { coreOp: vi.fn(), CoreError };
 });

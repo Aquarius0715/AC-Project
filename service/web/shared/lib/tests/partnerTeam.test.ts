@@ -133,7 +133,8 @@ describe("partner team & capacity", () => {
 
   it("words the team in Malay with Kuala Lumpur days (IR276)", () => {
     const rows = memberRows([a, a2, old], week, 1, [job], NOW, MS);
-    expect([rows[0]?.sub, rows[0]?.week.text, rows[0]?.day]).toEqual(["Kerja unit luaran · Kerja elektrik · aktif sejak Apr 2025", "4 j / 40 j", { main: "09:00–13:00 ditugaskan", sub: "13:00–17:00 lapang" }]);
+    expect([rows[0]?.sub, rows[0]?.week.text]).toEqual(["Kerja unit luaran · Kerja elektrik · aktif sejak Apr 2025", "4 j / 40 j"]);
+    expect(rows[0]?.day).toEqual({ main: "09:00–13:00 ditugaskan", sub: "13:00–17:00 lapang" });
     expect(rows[2]?.day.main).toBe("Tamat tempoh — tidak boleh ditugaskan");
     expect(memberRows([a], week, 5, [], NOW, MS)[0]?.day.main).toBe("Tiada jam tersedia ditetapkan");
     expect(weekRows([a2], week, ms)[0]?.cells[3]).toEqual({ text: "cuti tahunan", kind: "off" });

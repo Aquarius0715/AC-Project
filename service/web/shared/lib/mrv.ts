@@ -35,7 +35,7 @@ export function reportRows(rs: ApiMRVReport[], orgs: { id: string; name: string 
 }
 
 /** A report version's status as the screen words it. */
-export const statusWord = (s: ApiMRVReport["status"] | string, t: T = en) => {
+export const statusWord = (s: string, t: T = en) => {
   if (s === "demo_reviewed") return t("demo reviewed");
   return s === "draft" ? t("draft") : s;
 };

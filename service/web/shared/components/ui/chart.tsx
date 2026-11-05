@@ -254,7 +254,6 @@ function ChartLegendContent({
   className,
   hideIcon = false,
   payload,
-  verticalAlign = "bottom",
   nameKey,
 }: ComponentProps<"div"> & {
   hideIcon?: boolean
@@ -270,7 +269,7 @@ function ChartLegendContent({
     <div
       className={cn(
         "flex items-center justify-center gap-4",
-        verticalAlign === "top" ? "pb-3" : "pt-3",
+        "pt-3", // the legend sits under the chart (Legend's default position)
         className
       )}
     >

@@ -41,7 +41,7 @@ export function AutomationsDemo() {
     setError(e); if (Object.keys(e).length === 0) setStep("review");
   };
   const save = () => {
-    if (edit === "new") setList((l) => [...l, { id: "n" + Date.now(), name: f.name, kind: f.kind, icon: f.kind === "Location" ? "location" : "schedule", when: f.kind === "Schedule" ? "Every day at " + f.time : "Arrival at Home A", steps: f.kind === "Schedule" ? [start(f.time, `Set temperature ${f.temp}°C`), end("22:00", "Power OFF")] : then(`Set temperature ${f.temp}°C`), unit: f.unit, on: true }]);
+    if (edit === "new") setList((l) => [...l, { id: `n${String(Date.now())}`, name: f.name, kind: f.kind, icon: f.kind === "Location" ? "location" : "schedule", when: f.kind === "Schedule" ? "Every day at " + f.time : "Arrival at Home A", steps: f.kind === "Schedule" ? [start(f.time, `Set temperature ${f.temp}°C`), end("22:00", "Power OFF")] : then(`Set temperature ${f.temp}°C`), unit: f.unit, on: true }]);
     else if (edit) setList((l) => l.map((x) => (x.id === edit.id ? { ...x, name: f.name, steps: x.steps.map((st, i) => (i === 0 ? { ...st, action: `Set temperature ${f.temp}°C` } : st)), unit: f.unit } : x)));
     toast("Automation saved"); setEdit(null);
   };

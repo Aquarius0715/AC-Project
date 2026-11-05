@@ -66,6 +66,8 @@ export function webConfig(tsconfigRootDir) {
     { plugins: { security }, rules: everyRule("security", security) },
     comments.recommended,
     { files: ["**/tests/**", "**/*.test.{ts,tsx}"], ...vitest.configs.recommended },
+    // Vitest's expect takes a message as its second argument (expect(value, "what failed"))
+    { files: ["**/tests/**", "**/*.test.{ts,tsx}"], rules: { "vitest/valid-expect": ["error", { maxArgs: 2 }] } },
     // Where a rule needs a fact of this project, or contradicts a contract or platform it has to follow:
     {
       rules: {

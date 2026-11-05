@@ -150,7 +150,7 @@ function JobDetail({ j, open }: Readonly<{ j: Job; open: (m: { kind: "book"; slo
         <>
           {j.declined && <Banner tone="crit" icon="error"><b>Client declined the proposed time · {j.declined.at}</b><br />Reason: {j.declined.reason}{j.declined.comment ? ` — “${j.declined.comment}”` : ""}. Held capacity was released.</Banner>}
           <Card title={`Client’s preferred times${j.round > 1 ? ` (round ${String(j.round)})` : ""} — book one of these`} sub="Availability: qualification + overlap + travel">
-            <DataTable rowKey={(r) => r.i + ""} rows={j.preferred.map((s, i) => ({ s, i, f: fits[i] })).filter((r): r is typeof r & { f: NonNullable<typeof r.f> } => r.f !== undefined)} cols={[
+            <DataTable rowKey={(r) => String(r.i)} rows={j.preferred.map((s, i) => ({ s, i, f: fits[i] })).filter((r): r is typeof r & { f: NonNullable<typeof r.f> } => r.f !== undefined)} cols={[
               { key: "r", label: "Rank", render: (r) => <Rank i={r.i} /> },
               { key: "t", label: "Time", render: (r) => <b>{longDate(r.s)}</b> },
               { key: "h", label: "HQ technicians", render: (r) => <span className="text-xs text-muted-foreground">{r.f.hq}</span>, hideBelow: "md" },

@@ -124,9 +124,9 @@ describe("versions & linked alert", () => {
     expect(dueRow(job({ assignment: { scheduledStart: "2026-09-14T00:00:00Z", scheduledEnd: "2026-09-20T00:00:00Z" } })).sub).toBe("work window 14 Sept, 8:00 am – 20 Sept, 8:00 am MYT");
     expect(dueRow(job({ dueAt: "2026-09-20T00:00:00Z" })).sub).toBe("due 20 Sept 2026, 8:00 am MYT");
     expect(dueRow(job()).sub).toBe("no window");
-    expect([alertRows([{ id: "a", type: "sensor", severity: "critical", status: "open", evidenceText: "Vibration anomaly", detectedAt: "2026-09-13T14:40:00Z" }], MS_TOKYO)[0], dueRow(job(), MS_TOKYO).sub]).toEqual([
-      { title: "Vibration anomaly (amaran)", sub: "13 Sep 2026, 11:40 PTG GMT+9 · kekal terbuka selepas penyelesaian", badge: { label: "Terbuka", tone: "crit" } }, "tiada tetingkap",
-    ]);
+    expect(alertRows([{ id: "a", type: "sensor", severity: "critical", status: "open", evidenceText: "Vibration anomaly", detectedAt: "2026-09-13T14:40:00Z" }], MS_TOKYO)[0])
+      .toEqual({ title: "Vibration anomaly (amaran)", sub: "13 Sep 2026, 11:40 PTG GMT+9 · kekal terbuka selepas penyelesaian", badge: { label: "Terbuka", tone: "crit" } });
+    expect(dueRow(job(), MS_TOKYO).sub).toBe("tiada tetingkap");
   });
 
   it("words the evidence check, refusals and parts in Malay (IR274)", () => {

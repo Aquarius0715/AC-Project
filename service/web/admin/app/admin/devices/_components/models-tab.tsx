@@ -21,7 +21,7 @@ display language; metric codes stay codes (IR295). */
 export function ModelsTab({ live }: Readonly<{ live: DevicesLive }>) {
   const i = useI18n(), { t } = i;
   const [pending, run] = useAction();
-  const [selId, setSelId] = useState<string | "new">(live.models[0]?.id ?? "new");
+  const [selId, setSelId] = useState<string>(live.models[0]?.id ?? "new");
   const sel = selId === "new" ? null : live.models.find((m) => m.id === selId) ?? live.models[0] ?? null;
   const key = sel ? `${sel.id}:${String(sel.version)}` : "new";
   const [source, setSource] = useState(key);

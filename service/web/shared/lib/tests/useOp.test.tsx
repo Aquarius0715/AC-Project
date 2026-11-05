@@ -54,7 +54,7 @@ describe("useOp", () => {
     callOp.mockResolvedValueOnce({ n: 3 });
     const { result } = renderHook(() => useOp<{ n: number }, number>("units.list", {}, 0, (d) => d.n));
     await waitFor(() => { expect(result.current.data).toBe(3); });
-    callOp.mockRejectedValueOnce(new OpError(503, { code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {}, correlationId: "c-1", retryAfterSeconds: null }));
+    callOp.mockRejectedValueOnce(new OpError({ code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {}, correlationId: "c-1", retryAfterSeconds: null }, { status: 503 }));
     act(() => { invalidate(); });
     await waitFor(() => { expect(result.current.error?.status).toBe(503); });
     expect(result.current.data).toBe(3);

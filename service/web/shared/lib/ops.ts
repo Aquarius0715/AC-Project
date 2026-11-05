@@ -9,8 +9,11 @@ import { domainError, type DomainError } from "@ac/web/lib/domainError";
 export type { DomainError } from "@ac/web/lib/domainError";
 
 export class OpError extends Error {
-  constructor(public readonly status: number, public readonly error: DomainError) {
-    super(`${error.code}: ${error.messageKey}`);
+  readonly status: number;
+  constructor(public readonly error: DomainError, options: ErrorOptions & { status: number }) {
+    super(`${error.code}: ${error.messageKey}`, options);
+    this.name = "OpError";
+    this.status = options.status;
   }
 }
 
@@ -24,7 +27,7 @@ export async function callOp<T>(...[operation, input, options = {}]: OpArgs<Writ
   const res = await fetch(`/bff/ops/${operation}`, { method: "POST", body: JSON.stringify(input), headers });
   const body: unknown = await orNull<unknown>(res.json());
   if (!res.ok) {
-    throw new OpError(res.status, domainError(body));
+    throw new OpError(domainError(body), { status: res.status });
   }
   return (body as { data: T }).data;
 }

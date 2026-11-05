@@ -53,7 +53,7 @@ export async function deviceSignal(deviceId: string, restore: boolean) {
       coreClockFresh(),
     ]);
     const fault = openFault(events.items);
-    if (restore && !fault) throw new CoreError(409, { code: "CONFLICT", messageKey: "errors.recovery_source_not_current", fieldErrors: {}, correlationId: "", retryAfterSeconds: null });
+    if (restore && !fault) throw new CoreError({ code: "CONFLICT", messageKey: "errors.recovery_source_not_current", fieldErrors: {}, correlationId: "", retryAfterSeconds: null }, { status: 409 });
     await coreOp("demo.trigger", {
       scenarioId: "demo-panel", eventId: crypto.randomUUID(), occurredAt: now.toISOString(), eventType: "device",
       deviceId, bindingId: device.bindingId, sequence: nextSequence(events.items),

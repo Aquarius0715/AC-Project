@@ -29,8 +29,11 @@ export const verifySession = cache(async (): Promise<Session> => {
 });
 
 export class CoreError extends Error {
-  constructor(public readonly status: number, public readonly error: DomainError) {
-    super(`${error.code}: ${error.messageKey}`);
+  readonly status: number;
+  constructor(public readonly error: DomainError, options: ErrorOptions & { status: number }) {
+    super(`${error.code}: ${error.messageKey}`, options);
+    this.name = "CoreError";
+    this.status = options.status;
   }
 }
 
@@ -151,7 +154,7 @@ export const corePermissions = cache(async (): Promise<Set<string>> => {
 async function coreCall<T>(operation: string, input: unknown, options: CoreOptions): Promise<{ data: T; meta?: { snapshotAt?: string } }> {
   const s = await verifySession();
   const req = coreRequest(operation, input);
-  if (!req) throw new CoreError(404, { code: "NOT_FOUND", messageKey: "error.unknownOperation", fieldErrors: {}, correlationId: "", retryAfterSeconds: null });
+  if (!req) throw new CoreError({ code: "NOT_FOUND", messageKey: "error.unknownOperation", fieldErrors: {}, correlationId: "", retryAfterSeconds: null }, { status: 404 });
   const headers: Record<string, string> = {
     Authorization: `Bearer ${s.accessToken}`,
     "X-Tenant-Id": s.tenantId,
@@ -168,7 +171,7 @@ async function coreCall<T>(operation: string, input: unknown, options: CoreOptio
     const jar = await cookies();
     await dropSession(jar.get(SESSION_COOKIE)?.value);
   }
-  if (!res.ok) throw new CoreError(res.status, domainError(body));
+  if (!res.ok) throw new CoreError(domainError(body), { status: res.status });
   return body as { data: T; meta?: { snapshotAt?: string } };
 }
 

@@ -30,7 +30,7 @@ export interface AuditFilters { from: string; to: string; actorId: string; targe
 const KL = "Asia/Kuala_Lumpur";
 const results: AuditResult[] = ["Success", "Denied", "Failed", "Pending"];
 /** A result as the screen words it. */
-export const resultWord = (r: AuditResult | string, t: T = en) => ({ Success: t("Success"), Denied: t("Denied"), Failed: t("Failed"), Pending: t("Pending") })[r] ?? r;
+export const resultWord = (r: string, t: T = en) => ({ Success: t("Success"), Denied: t("Denied"), Failed: t("Failed"), Pending: t("Pending") })[r] ?? r;
 /** The badge tone of a result. */
 const RESULT_TONE = new Map<AuditResult, "ok" | "warn" | "crit">([["Success", "ok"], ["Denied", "warn"], ["Failed", "crit"]]);
 export const resultTone = (r: AuditResult) => RESULT_TONE.get(r) ?? "primary";

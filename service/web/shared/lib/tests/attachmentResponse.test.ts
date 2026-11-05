@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 // the photo is read through the DAL: answer with a stored photo whose name is the user's
 const dal = vi.hoisted(() => {
   class CoreError extends Error {
-    constructor(public error: DomainError) { super(error.code); }
+    constructor(public error: DomainError, options?: ErrorOptions) { super(error.code, options); this.name = "CoreError"; }
   }
   return { coreOp: vi.fn(), CoreError };
 });
