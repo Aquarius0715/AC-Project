@@ -4,8 +4,8 @@
 // DATA_SOURCE=API the same screen reads the Core API through the BFF relay.
 import { useEffect, useEffectEvent, useState } from "react";
 import { z } from "zod";
-import { callOp, OpError } from "@ac/web/lib/ops";
-import type { OpArgs, OpCall } from "@ac/web/lib/opTypes";
+import { callRelay, OpError } from "@ac/web/lib/ops";
+import type { OpCall } from "@ac/web/lib/opTypes";
 
 export interface BffSession { dataSource: "mock" | "api"; signedIn: boolean; role: string | null; membershipId: string | null; clientRole: string | null; serverNow: string | null }
 
@@ -70,7 +70,7 @@ export function useOp<T, R>(...[operation, input, mock, map, enabled = true]: [.
   const isActive = session?.dataSource === "api" && enabled;
   // callers pass a new input object and an inline projection on every render: the read uses the latest of both, and
   // the request (operation, input and revision) decides when it runs again
-  const read = useEffectEvent(() => callOp<T>(...([operation, input] as OpArgs<never>)).then(map));
+  const read = useEffectEvent(() => callRelay<T>(operation, input).then(map));
   useEffect(() => {
     let isLive = isActive; // an inactive read does not run; its cleanup has nothing to stop
     if (isActive) {

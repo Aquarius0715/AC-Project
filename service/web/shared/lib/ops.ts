@@ -1,6 +1,6 @@
 // Browser client for the BFF operation relay (/bff/ops/<operation>). Errors are thrown as DomainError values with the
 // code / messageKey / fieldErrors of service-contracts.ts.
-import type { OpArgs } from "@ac/web/lib/opTypes";
+import type { OpArgs, OpName } from "@ac/web/lib/opTypes";
 import { randomId } from "@ac/web/lib/randomId";
 import { orNull } from "@ac/web/lib/promises";
 
@@ -21,7 +21,13 @@ export class OpError extends Error {
 export interface WriteOptions { expectedVersion?: number; idempotencyKey?: string }
 
 /** One operation through the BFF; the input is typed by the contract (IR313). */
-export async function callOp<T>(...[operation, input, options = {}]: OpArgs<WriteOptions & { write?: boolean }>): Promise<T> {
+export function callOp<T>(...[operation, input, options = {}]: OpArgs<WriteOptions & { write?: boolean }>): Promise<T> {
+  return callRelay<T>(operation, input, options);
+}
+
+/** The same call for a caller whose own signature already ties the input to the operation (useOp): the contract's input
+type of each operation is checked where the caller is typed, not here. */
+export async function callRelay<T>(operation: OpName, input: unknown, options: WriteOptions & { write?: boolean } = {}): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (options.write) headers["Idempotency-Key"] = options.idempotencyKey ?? randomId(); // also over HTTP (DEC-93)
   if (options.expectedVersion !== undefined) headers["X-Expected-Version"] = String(options.expectedVersion);

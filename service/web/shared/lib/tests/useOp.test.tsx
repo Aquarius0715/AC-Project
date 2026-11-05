@@ -6,7 +6,7 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const callOp = vi.fn();
-vi.mock("@ac/web/lib/ops", async (original) => ({ ...(await original<typeof import("@ac/web/lib/ops")>()), callOp: (...a: unknown[]) => callOp(...a) }));
+vi.mock("@ac/web/lib/ops", async (original) => ({ ...(await original<typeof import("@ac/web/lib/ops")>()), callRelay: (...a: unknown[]) => callOp(...a) }));
 
 function session(dataSource: "mock" | "api") {
   vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(Response.json({ dataSource, signedIn: true, role: "client", membershipId: "m-1", clientRole: "owner", serverNow: "2026-09-20T01:00:00Z" }))));
