@@ -71,7 +71,7 @@ export async function loadJobs(sp: SP) {
   const q: Query = { customerId: one(sp.customerId), propertyId: one(sp.propertyId), unitId: one(sp.unitId), origin: one(sp.origin), delivery: one(sp.delivery), assignee: one(sp.assignee), overdue: one(sp.overdue), type: one(sp.type), stage: stageOf(one(sp.stage)) ?? undefined, from: one(sp.from), to: one(sp.to) };
   const period = periodOfQuery(q);
   const sort = sortOf(one(sp.sort));
-  const spec = SORTS.find((s) => s.id === sort)!;
+  const spec = SORTS.find((s) => s.id === sort) ?? SORTS[0];
   const [counts, list, profiles] = await Promise.all([
     Promise.all(STAGES.map(async (s) => { const r = await coreOp<Page<unknown>>("jobs.list", { filters: { ...scope, ...period, ...s.filter }, limit: 1 }); return r.total; })),
     coreOp<Page<ApiHqRow>>("jobs.list", { filters: filtersOf(q, hq?.id ?? null), sort: { field: spec.field, direction: spec.direction }, limit: 100 }),

@@ -302,7 +302,7 @@ function ReasonModal({ what, j, onClose }: Readonly<{ what: "rework" | "hold" | 
   const title = known?.title ?? `Reassign ${j.id}`;
   const done = known?.done ?? "Reassigned — tech-internal-b must accept";
   return (
-    <Modal open onClose={onClose} title={title} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!r.trim()) return; if (what === "reassign") jobActions.book(j.id, j.scheduled!, "internal", "tech-internal-b"); toast(done, "warn"); onClose(); }}>Confirm</Btn></>}>
+    <Modal open onClose={onClose} title={title} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!r.trim()) return; if (what === "reassign" && j.scheduled) jobActions.book(j.id, j.scheduled, "internal", "tech-internal-b"); toast(done, "warn"); onClose(); }}>Confirm</Btn></>}>
       {what === "reassign" && <Field label="New technician (same agreed time)"><Select><option>tech-internal-b · Available</option></Select></Field>}
       <Field label="Reason (required)" error={tried && !r.trim() ? "A reason is required" : undefined}><Textarea value={r} onChange={(e) => { setR(e.target.value); }} /></Field>
     </Modal>

@@ -21,7 +21,7 @@ export function EnergyDemo() {
   const [actual, setActual] = useState(80);
   const [sel, setSel] = useState(baselines[0]);
   const [kwh, setKwh] = useState("100");
-  const b = baselines.find((x) => x.id === bid)!;
+  const b = baselines.find((x) => x.id === bid) ?? baselines[0];
   const isMismatch = b.units.slice().toSorted(byText).join(',') !== units.slice().toSorted(byText).join(',');
   const diff = b.kwh - actual;
   const isInc = diff < 0;

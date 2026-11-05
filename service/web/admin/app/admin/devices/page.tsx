@@ -57,8 +57,9 @@ async function AdminDevicesPageContent({ searchParams }: Readonly<PageProps<"/ad
     // history and the events (IR319)
     const names = new Map(units.items.map((u) => [u.id, u.displayName]));
     live.rows = techDeviceRows(devices.items, names, now.getTime(), i.t);
-    const id = live.rows.find((r) => r.id === one("deviceId"))?.id ?? live.rows[0]?.id;
-    if (id) {
+    const row = live.rows.find((r) => r.id === one("deviceId")) ?? live.rows.at(0);
+    if (row) {
+      const { id } = row;
       type Operation = ApiDeviceOperation & { startedAt?: string | null; expiresAt?: string };
       const q = { limit: 20 };
       const [d, ops, cals, events] = await Promise.all([
@@ -74,7 +75,7 @@ async function AdminDevicesPageContent({ searchParams }: Readonly<PageProps<"/ad
       const model = units.items.find((u) => u.id === d.unitId)?.modelId;
       const candidates = caps.items.find((k) => k.id === model)?.firmwareCandidates ?? [];
       live.device = {
-        detail: d, row: live.rows.find((r) => r.id === id)!,
+        row, detail: d,
         tiles: deviceTiles(d, newerFirmware(d.firmwareVersion, candidates), now.getTime(), openFaults(events.items), i), sensors: sensorRows(d, i),
         unit: unit ? { name: unit.displayName, place: unit.location.pathLabels.join(" › "), model: `${unit.capabilities.manufacturer} ${unit.capabilities.model} v${String(unit.capabilityVersion)}` } : null,
         firmware: newerVersions(d.firmwareVersion, candidates), firmwareCard: firmwareCard(d, ops.items, i),

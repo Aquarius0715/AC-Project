@@ -26,6 +26,7 @@ async function AdminMRVPageContent({ searchParams }: Readonly<PageProps<"/admin/
   if (!apiMode()) return <MRVDemo />;
   const sp = await searchParams;
   const one = queryReader(sp);
+  const fromQ = one("from"), toQ = one("to"); // the period asked in the URL
   const tab = one("tab") === "factors" ? "factors" : "reports";
   const [perms, display, orgs, units, baselines, factors] = await Promise.all([
     corePermissions(), coreDisplay(),
@@ -46,7 +47,7 @@ async function AdminMRVPageContent({ searchParams }: Readonly<PageProps<"/admin/
     const status = one("status") === "draft" || one("status") === "demo_reviewed" ? one("status") : undefined;
     const filters = {
       ...(one("organizationId") && { organizationId: one("organizationId") }), ...(one("unitId") && { unitId: one("unitId") }), ...(status && { status }),
-      ...(one("from") && { from: klInstant(one("from")!) }), ...(one("to") && { to: klInstant(one("to")!) }),
+      ...(fromQ && { from: klInstant(fromQ) }), ...(toQ && { to: klInstant(toQ) }),
     };
     const list = await coreOp<Page<ApiMRVReport>>("mrv.list", { limit: 100, filters });
     const rows = reportRows(list.items, customers, i.t);

@@ -60,7 +60,11 @@ export function AccessDemo() {
   const has = (p?: string) => !!p && checked.includes(p);
   const set = (p: string, v: boolean) => { setChecked((c) => (v ? [...new Set([...c, p])] : c.filter((x) => x !== p))); };
   // Write includes Read: turning Write on also turns Read on, and Read stays locked while Write is on.
-  const setWrite = (r: Row, v: boolean) => { setChecked((c) => (v ? [...new Set([...c, r.write!, ...(r.read ? [r.read] : [])])] : c.filter((x) => x !== r.write))); };
+  const setWrite = (r: Row, v: boolean) => {
+    const { write, read } = r;
+    if (!write) return;
+    setChecked((c) => (v ? [...new Set([...c, write, ...(read ? [read] : [])])] : c.filter((x) => x !== write)));
+  };
   const save = () => {
     if (!reason.trim()) { setMessage({ t: "crit", m: "Change reason is required (1–1000 characters)." }); return; }
     if (role === "technician" && sel !== "new" && sel.role.includes("external") && !end) { setMessage({ t: "crit", m: "External technicians need a “Valid until” end date (VALIDATION)." }); return; }
@@ -94,7 +98,7 @@ export function AccessDemo() {
             </section>
             <section>
               <h3 className="mb-2 text-[13px] font-bold">Permissions · {checked.length} of {total}</h3>
-              <div className="scroll-x"><table className="w-full min-w-[560px] text-left text-[13px]"><thead className="text-[11px] uppercase text-muted-foreground"><tr><th className="py-1.5 pr-3">Resource</th><th className="pr-3">Read</th><th className="pr-3">Write</th><th>Actions</th></tr></thead><tbody>{rows.map((r) => <tr key={r.res} className="border-t border-line"><td className="py-2 pr-3 font-semibold">{r.res}</td><td className="pr-3">{r.read ? <Check label={<span className="font-mono text-xs">{r.read}</span>} checked={has(r.read)} disabled={has(r.write)} onChange={(v) => { set(r.read!, v); }} /> : <span className="text-muted-foreground">—</span>}</td><td className="pr-3">{r.write ? <Check label={<span className="font-mono text-xs">{r.write}</span>} checked={has(r.write)} onChange={(v) => { setWrite(r, v); }} /> : <span className="text-muted-foreground">—</span>}</td><td><div className="flex flex-wrap gap-x-3 gap-y-1">{(r.actions ?? []).map((a) => <Check key={a} label={<span className="font-mono text-xs">{a}</span>} checked={has(a)} onChange={(v) => { set(a, v); }} />)}{!r.actions && <span className="text-muted-foreground">—</span>}</div></td></tr>)}</tbody></table></div>
+              <div className="scroll-x"><table className="w-full min-w-[560px] text-left text-[13px]"><thead className="text-[11px] uppercase text-muted-foreground"><tr><th className="py-1.5 pr-3">Resource</th><th className="pr-3">Read</th><th className="pr-3">Write</th><th>Actions</th></tr></thead><tbody>{rows.map((r) => <tr key={r.res} className="border-t border-line"><td className="py-2 pr-3 font-semibold">{r.res}</td><td className="pr-3">{r.read ? <Check label={<span className="font-mono text-xs">{r.read}</span>} checked={has(r.read)} disabled={has(r.write)} onChange={(v) => { if (r.read) set(r.read, v); }} /> : <span className="text-muted-foreground">—</span>}</td><td className="pr-3">{r.write ? <Check label={<span className="font-mono text-xs">{r.write}</span>} checked={has(r.write)} onChange={(v) => { setWrite(r, v); }} /> : <span className="text-muted-foreground">—</span>}</td><td><div className="flex flex-wrap gap-x-3 gap-y-1">{(r.actions ?? []).map((a) => <Check key={a} label={<span className="font-mono text-xs">{a}</span>} checked={has(a)} onChange={(v) => { set(a, v); }} />)}{!r.actions && <span className="text-muted-foreground">—</span>}</div></td></tr>)}</tbody></table></div>
               <p className="mt-2 text-[11px] text-muted-foreground">Write includes Read (Read is locked on while Write is on). Actions are independent of Read / Write.</p>
             </section>
             <Field label="Change reason · required" hint="1–1000 characters. Stored in the audit log."><Textarea value={reason} onChange={(e) => { setReason(e.target.value); }} /></Field>

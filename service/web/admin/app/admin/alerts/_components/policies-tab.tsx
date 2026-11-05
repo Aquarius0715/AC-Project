@@ -287,7 +287,7 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
 customer — and the owner cannot change once the policy is saved (DD-A05 item 8). */
 export function NewPolicyModal({ customers, initial, onClose, onStart }: Readonly<{ customers: { id: string; name: string }[]; initial?: string; onClose: () => void; onStart: (customerId: string) => void }>) {
   const t = useT();
-  const [c, setC] = useState(customers.some((x) => x.id === initial) ? initial! : "");
+  const [c, setC] = useState(customers.find((x) => x.id === initial)?.id ?? "");
   return (
     <Modal open onClose={onClose} title={t("New alert policy")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={!c} onClick={() => { onStart(c); }}>{t("Start the policy")}</Btn></>}>
       <p className="text-[13px] text-muted-foreground">{t("A policy belongs to one customer, and only that customer’s units can carry it. The owner cannot change once the policy is saved.")}</p>

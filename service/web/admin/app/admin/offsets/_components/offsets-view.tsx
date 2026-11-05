@@ -49,8 +49,9 @@ export function OffsetsView({ live }: Readonly<{ live: Live }>) {
   };
   const request = () => quote && confirmed && run(() => requestOffset(quote.id, quote.version), t("Demo request recorded"), (id) => { close(); setD(blank); nav({ recordId: id }); });
   const done = { purchase_confirm: t("Demo purchase confirmed"), retire: t("Demo retired"), fail: t("Failure recorded — the previous stage is kept") };
-  const step = (event: "purchase_confirm" | "retire" | "fail") => sel?.current && run(() => simulateOffset(sel.id, sel.version, sel.current!.id, event), done[event], () => { setAck(false); });
-  const retry = () => sel?.current && run(() => retryOffset(sel.id, sel.version, sel.current!.id), t("Retry started — a new attempt"), () => { setAck(false); });
+  const current = sel?.current; // the attempt the demo steps act on
+  const step = (event: "purchase_confirm" | "retire" | "fail") => sel && current && run(() => simulateOffset(sel.id, sel.version, current.id, event), done[event], () => { setAck(false); });
+  const retry = () => sel && current && run(() => retryOffset(sel.id, sel.version, current.id), t("Retry started — a new attempt"), () => { setAck(false); });
   return (
     <Page>
       <Banner tone="warn" action={<DemoBadge />}>{t("Demo only — quotes, purchases and retirements are simulated. No real credit, certificate, balance or market is involved.")}</Banner>

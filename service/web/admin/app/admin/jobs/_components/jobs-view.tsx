@@ -79,7 +79,7 @@ function JobsTab({ live, patch, fresh, onFresh }: Readonly<{ live: JobsLive; pat
         {live.periodChip && <Plain type="button" onClick={() => { patch({ from: null, to: null, jobId: null }); }} className="rounded-full bg-primary-soft px-3 py-1 text-xs font-semibold text-primary" aria-label={t("{period} — clear the requested-time period", { period: live.periodChip })}>{live.periodChip} <Icon name="close" /></Plain>}
       </div>
       <div className="split-rev">
-        <Card title={t("Jobs · all customers")} sub={live.sorts.find((s) => s.id === live.sort)!.text} className="self-start">
+        <Card title={t("Jobs · all customers")} sub={live.sorts.find((s) => s.id === live.sort)?.text ?? ""} className="self-start">
           {live.rows.length === 0 ? <EmptyState title={t("No jobs in this view")}>{t("Change the scope or the filters.")}</EmptyState> : (
             <div className="flex flex-col gap-1.5">{live.rows.map((r) => (
               <ListRow key={r.id} selected={sel && !("missing" in live) ? sel.job.id === r.id : false} href={`/admin/jobs?${new URLSearchParams({ ...Object.fromEntries(Object.entries(q).filter(([, v]) => v)), ...((live.sort !== "status") && { sort: live.sort }), jobId: r.id })}`}>
@@ -180,7 +180,7 @@ function JobDetail({ d, live, fresh, onFresh }: Readonly<{ d: Detail; live: Jobs
       )}
 
       {pp?.status === "pending" && j.offer && (
-        <Card tone="warn" title={<span className="inline-flex items-center gap-1.5"><Icon name="swap" />{t("{name} proposes a different time", { name: live.contractors.find((x) => x.id === j.offer!.contractorOrgId)?.name ?? t("The contractor") })}</span>} action={<Badge tone="warn">{t("Needs the client’s approval")}</Badge>}>
+        <Card tone="warn" title={<span className="inline-flex items-center gap-1.5"><Icon name="swap" />{t("{name} proposes a different time", { name: live.contractors.find((x) => x.id === j.offer?.contractorOrgId)?.name ?? t("The contractor") })}</span>} action={<Badge tone="warn">{t("Needs the client’s approval")}</Badge>}>
           <SummaryList items={[[t("Agreed with the client"), <s key="s" className="text-muted-foreground">{d.texts.agreed}</s>], [t("Proposed by the contractor"), <b key="b">{d.texts.partnerSlot} · {d.partnerTech}</b>], [t("Reason"), `“${pp.reason}” — ${d.texts.partnerSent ?? "—"}`]]} />
           <div className="mt-3 flex flex-wrap justify-end gap-2">
             <Btn disabled={pending} onClick={() => { run(() => resolvePartnerSlot(j.id, j.version, pp.id, "keep"), t("Agreed time kept"), () => { close(t("Kept the agreed time — the contractor can accept or decline it.")); }, failed); }}>{t("Keep the agreed time")}</Btn>
@@ -206,7 +206,7 @@ function JobDetail({ d, live, fresh, onFresh }: Readonly<{ d: Detail; live: Jobs
             <span className="min-w-0 flex-1 text-[11px] text-muted-foreground">{d.report.note}</span>
             {d.report.decide && <span className="flex gap-2">
               <Btn disabled={pending} onClick={() => { setModal({ kind: "review", decision: "return" }); }}>{t("Return for rework…")}</Btn>
-              <Btn variant="primary" disabled={pending} onClick={() => { if (d.report!.mode === "normal") run(() => reviewReport(j.id, j.version, d.report!.version, "accept", "normal", ""), t("Report accepted"), () => { close(t("Report accepted — the job is completed. Linked alerts stay open until they are resolved.")); }, failed); else setModal({ kind: "review", decision: "accept" }); }}>{t(d.report.mode === "normal" ? "Accept report" : "Accept report…")}</Btn>
+              <Btn variant="primary" disabled={pending} onClick={() => { const { report } = d; if (!report) { return; } if (report.mode === "normal") run(() => reviewReport(j.id, j.version, report.version, "accept", "normal", ""), t("Report accepted"), () => { close(t("Report accepted — the job is completed. Linked alerts stay open until they are resolved.")); }, failed); else setModal({ kind: "review", decision: "accept" }); }}>{t(d.report.mode === "normal" ? "Accept report" : "Accept report…")}</Btn>
             </span>}
           </div>
         </Card>
@@ -262,7 +262,8 @@ function BookModal({ d, live, row: first, fresh, onClose, onFail }: ModalProps &
   const [from, setFrom] = useState(zonedInput(defaults.accessValidFrom, zone));
   const [until, setUntil] = useState(zonedInput(defaults.accessValidUntil, zone));
   const pick = (r: number) => {
-    const next = ahead.find((x) => x.rank === r)!;
+    const next = ahead.find((x) => x.rank === r);
+    if (!next) return;
     const nd = offerDefaults(next.slot, now);
     setRank(r);
     setTech(next.people[0]?.id ?? "");
@@ -355,7 +356,8 @@ function ReasonModal({ d, live, what, onClose, onFail }: ModalProps & { what: "h
   const confirm = () => {
     setTried(true);
     if (!r.trim() || r.length > 1000 || (what === "reassign" && !tech)) return;
-    const slot = j.assignment ? { startAt: j.assignment.scheduledStart, endAt: j.assignment.scheduledEnd } : j.scheduledSlot!;
+    const slot = j.assignment ? { startAt: j.assignment.scheduledStart, endAt: j.assignment.scheduledEnd } : j.scheduledSlot;
+    if (!slot) return;
     const done = t({ hold: "Job put on hold — scheduling and reports are blocked.", resume: "Job resumed.", cancel: "Job cancelled.", reassign: "Reassigned — the new technician must accept." }[what]);
     const send = () => {
       if (what === "hold") return holdJob(j.id, j.version, r);

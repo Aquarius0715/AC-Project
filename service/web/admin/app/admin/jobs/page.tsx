@@ -22,8 +22,9 @@ async function AdminJobsPageContent({ searchParams }: Readonly<PageProps<"/admin
   await connection();
   const sp = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
-  const tab = ["plans", "contractors", "sla"].includes(one(sp.tab) ?? "") ? one(sp.tab)! : "jobs";
   if (!apiMode()) return <JobsDemo jobId={one(sp.jobId)} tab={one(sp.tab)} />;
+  const asked = one(sp.tab);
+  const tab = asked && ["plans", "contractors", "sla"].includes(asked) ? asked : "jobs";
   if (tab === "plans") return <PlansView live={await loadPlans(sp)} />;
   if (tab === "contractors") return <ContractorsView live={await loadContractors(sp)} />;
   if (tab === "sla") return <SlaView live={await loadSla(sp)} />;

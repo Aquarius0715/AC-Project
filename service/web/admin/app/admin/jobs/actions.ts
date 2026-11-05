@@ -31,6 +31,12 @@ const run = async (fn: () => Promise<unknown>): Promise<Result> => {
   }
 };
 const write = (version: number) => ({ write: true, expectedVersion: version });
+// an update writes over the version it read; a new record has none
+const writeOf = (input: { id: string | null; version: number | null }) => {
+  if (!input.id) return { write: true };
+  if (input.version === null) throw new Error("an update needs the version it changes");
+  return write(input.version);
+};
 
 /** jobs.assign: an internal technician for the agreed time (also a reassignment at the same slot with a reason). */
 export async function assignInternal(jobId: string, version: number, technicianMembershipId: string, slot: Slot, reason?: string) {
@@ -113,7 +119,7 @@ the future, stored in UTC with its UTC day as the anchor day). Returns the plan 
 export async function savePlan(input: { id: string | null; version: number | null; unitId: string; intervalMonths: number; nextDueAt: string }): Promise<Failure | { ok: true; value: { id: string } }> {
   try {
     const p = await coreOp<{ id: string }>("plans.save", { ...(input.id && { id: input.id }), unitId: input.unitId, recurrence: { kind: "monthly", intervalMonths: input.intervalMonths }, nextDueAt: input.nextDueAt },
-      input.id ? write(input.version!) : { write: true });
+      writeOf(input));
     refresh();
     return { ok: true, value: { id: p.id } };
   } catch (error) {
@@ -155,7 +161,7 @@ export async function createContractorOrganization(name: string) {
 export async function saveContractor(input: { id: string | null; version: number | null; organizationId: string; registrationNo: string; serviceAreas: string[]; contactEmail: string; insuranceValidUntil: string | null }) {
   return value(async () => {
     const p = await coreOp<{ id: string }>("contractors.save", { ...(input.id && { id: input.id }), organizationId: input.organizationId, registrationNo: input.registrationNo.trim(),
-      serviceAreas: input.serviceAreas, contactEmail: input.contactEmail.trim(), insuranceValidUntil: input.insuranceValidUntil }, input.id ? write(input.version!) : { write: true });
+      serviceAreas: input.serviceAreas, contactEmail: input.contactEmail.trim(), insuranceValidUntil: input.insuranceValidUntil }, writeOf(input));
     return { id: p.id };
   });
 }

@@ -103,7 +103,7 @@ export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
   const list = live ? live.rows : demoList;
   const [f, setF] = useState<"All" | InvoiceStatus>("All");
   const [demoSel, setDemoSel] = useState(seed[2].id);
-  const sel = list.find((x) => x.id === (live ? live.selectedInvoice?.id : demoSel)) ?? list[0] ?? null;
+  const sel = list.find((x) => x.id === (live ? live.selectedInvoice?.id : demoSel)) ?? list.at(0) ?? null;
   const detail = live?.selectedInvoice;
   const shown = list.filter((x) => f === "All" || x.st === f);
   const hasPayment = live ? (detail?.payments.length ?? 0) > 0 : sel?.paymentState != null;
@@ -184,7 +184,8 @@ export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
   const [demoIq, setDemoIq] = useState(seedInquiries[0].id);
   const [iqState, setIqState] = useState<"all" | "received" | "answered">("all");
   const iqShown = inquiries.filter((x) => iqState === "all" || x.state === iqState);
-  const iq = inquiries.find((x) => x.id === (live ? live.selectedInquiryId : demoIq)) ?? iqShown[0] ?? null;
+  const iq = inquiries.find((x) => x.id === (live ? live.selectedInquiryId : demoIq)) ?? iqShown.at(0) ?? null;
+  const iqInvoice = iq?.invoiceId ?? null; // the invoice an inquiry is about, opened from its card
   const [reply, setReply] = useState("");
   const linked = sel ? inquiries.filter((q) => q.invoiceId === sel.id) : [];
   const invoiceLabel = (id: string) => list.find((x) => x.id === id)?.number ?? id;
@@ -261,7 +262,7 @@ export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
             {iq && (
               <Card title={t("{kind} inquiry · {customer}", { kind: iq.kind, customer: iq.cust })} sub={t("received {time}", { time: iq.at })}>
                 <p className="rounded-xl bg-surface2 p-3 text-[13px]">{iq.text}</p>
-                <SummaryList items={[[t("Invoice"), iq.invoiceId ? <Plain key="i" className="font-semibold text-primary" onClick={() => { openInvoice(iq.invoiceId!); }}>{invoiceLabel(iq.invoiceId)} <Icon name="arrowRight" /></Plain> : "—"], [t("Restriction"), restrictionCell(iq.restrictionId, !!live)]]} />
+                <SummaryList items={[[t("Invoice"), iqInvoice ? <Plain key="i" className="font-semibold text-primary" onClick={() => { openInvoice(iqInvoice); }}>{invoiceLabel(iqInvoice)} <Icon name="arrowRight" /></Plain> : "—"], [t("Restriction"), restrictionCell(iq.restrictionId, !!live)]]} />
                 {iq.reply ? <p className="mt-3 text-[13px]"><b>{t("Reply:")}</b> {iq.reply}</p> : <>
                   <div className="mt-3"><Field label={t("Reply (in-app only)")} error={tried && !reply.trim() ? t("A reply is required") : undefined}><Textarea value={reply} onChange={(e) => { setReply(e.target.value); }} maxLength={2000} /></Field></div>
                   <p className="mt-1 text-[11px] text-muted-foreground">{t("A reply never changes invoices or restrictions.")}</p>

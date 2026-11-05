@@ -162,7 +162,8 @@ function CustomerModal({ row, pending, onClose, onSave }: Readonly<{ row?: Custo
 
 type ModalState =
   | null | { kind: "customer" } | { kind: "property"; p?: TreeProperty } | { kind: "space"; propertyId: string; parentSpaceId: string | null; spaceKind: TreeSpace["kind"] }
-  | { kind: "rename"; p?: TreeProperty; s?: TreeSpace } | { kind: "archive"; p?: TreeProperty; s?: TreeSpace } | { kind: "unit"; propertyId: string; spaceId: string };
+  // a location is a property or a space, never both
+  | { kind: "rename" | "archive"; p: TreeProperty; s?: undefined } | { kind: "rename" | "archive"; p?: undefined; s: TreeSpace } | { kind: "unit"; propertyId: string; spaceId: string };
 
 function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive }>) {
   const t = useT();
@@ -240,15 +241,15 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
       {m?.kind === "customer" && <CustomerModal row={r} pending={pending} onClose={close} onSave={(d) => { run(() => updateCustomer(r.id, r.version, { id: r.orgId, version: r.orgVersion ?? 1, name: r.billingName, status: r.orgStatus }, { billingName: d.billingName, name: d.name, serviceProfile: d.profile, status: d.status }), t("Customer saved"), close); }} />}
       {m?.kind === "property" && <PropertyModal p={m.p} pending={pending} onClose={close} onSave={(d) => { run(() => saveProperty(propertyInput(d, r.orgId, m.p?.id), m.p?.version), t(m.p ? "Property saved" : "Property added"), (id) => { close(); nav({ locationId: id, ...clearUnit }); }); }} />}
       {m?.kind === "space" && <SpaceModal c={c} init={m} pending={pending} onClose={close} onSave={(x) => { run(() => saveSpace(x), t("{kind} “{name}” added", { kind: t(kindLabel[x.kind]), name: x.name }), (id) => { close(); nav({ locationId: id, ...clearUnit }); }); }} />}
-      {m?.kind === "rename" && <RenameModal name={m.p?.name ?? m.s?.name ?? ""} where={m.p ? t("{kind} · property", { kind: t(kindLabel[m.p.kind]) }) : t(kindLabel[m.s!.kind])} pending={pending} onClose={close}
+      {m?.kind === "rename" && <RenameModal name={m.p?.name ?? m.s?.name ?? ""} where={m.p ? t("{kind} · property", { kind: t(kindLabel[m.p.kind]) }) : t(kindLabel[m.s.kind])} pending={pending} onClose={close}
         onSave={(name) => {
           run(() => {
             return (m.p ? saveProperty(propertyInput({ ...propertyDraft(m.p), name }, r.orgId, m.p.id), m.p.version)
-              : saveSpace({ id: m.s!.id, propertyId: m.s!.propertyId, parentSpaceId: m.s!.parentSpaceId, kind: m.s!.kind, name: name.trim() }, m.s!.version));
+              : saveSpace({ id: m.s.id, propertyId: m.s.propertyId, parentSpaceId: m.s.parentSpaceId, kind: m.s.kind, name: name.trim() }, m.s.version));
           }, t("Name saved"), close);
         }} />}
       {m?.kind === "archive" && <ArchiveLocationModal p={m.p} s={m.s} pending={pending} onClose={close}
-        onSave={(reason) => { run(() => archiveLocation(m.p ? "property" : "space", m.p?.id ?? m.s!.id, m.p?.version ?? m.s!.version, reason), t("Location deleted — its history stays in the audit log"), () => { close(); nav({ locationId: null, ...clearUnit }); }); }} />}
+        onSave={(reason) => { run(() => archiveLocation(m.p ? "property" : "space", m.p ? m.p.id : m.s.id, m.p ? m.p.version : m.s.version, reason), t("Location deleted — its history stays in the audit log"), () => { close(); nav({ locationId: null, ...clearUnit }); }); }} />}
       {m?.kind === "unit" && <NewUnitModal live={live} c={c} init={m} pending={pending} onClose={close}
         onSave={(d) => { run(() => saveUnit(unitInput(d, r.orgId)), t("Unit “{name}” registered", { name: d.displayName.trim() }), (id) => { close(); nav({ locationId: d.spaceId || d.propertyId, unitId: id }); }); }} />}
     </Page>
@@ -482,7 +483,7 @@ function PoliciesTab({ c, run, pending }: Readonly<{ c: CustomerLive; run: Run; 
               <div key={r.ruleKey} className="flex flex-wrap items-center gap-3 border-t border-line py-2.5 text-[13px] first:border-0">
                 <div className="min-w-0 flex-1"><b>{r.name}</b><div className="text-xs text-muted-foreground">{r.condition}{r.note ? ` · ${r.note}` : ""}</div></div>
                 <Toggle on={r.enabled} label={t(r.enabled ? "On" : "Off")} disabled={!c.canRules || pending}
-                  onChange={(on) => { run(() => setDefaultRule(c.rules!.policyId, r.ruleKey, c.row.id, on, r.version), t(on ? "{rule} switched on for {name}" : "{rule} switched off for {name}", { rule: r.name, name: c.row.name })); }} />
+                  onChange={(on) => { const { rules } = c; if (!rules) { return; } run(() => setDefaultRule(rules.policyId, r.ruleKey, c.row.id, on, r.version), t(on ? "{rule} switched on for {name}" : "{rule} switched off for {name}", { rule: r.name, name: c.row.name })); }} />
               </div>
             ))}
           </div>
@@ -564,7 +565,7 @@ function ArchiveLocationModal({ p, s, pending, onClose, onSave }: Readonly<{ p?:
   const isBlocked = children > 0 || held > 0;
   const e = reasonError(reason, t);
   return (
-    <Modal open onClose={onClose} title={t("Delete {name}?", { name })} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending || isBlocked} onClick={() => { setTried(true); if (!e) onSave(reason.trim()); }}>{t(p ? "Delete property" : deleteKind[s!.kind])}</Btn></>}>
+    <Modal open onClose={onClose} title={t("Delete {name}?", { name })} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending || isBlocked} onClick={() => { setTried(true); if (!e) onSave(reason.trim()); }}>{t(p ? "Delete property" : deleteKind[s?.kind ?? "room"])}</Btn></>}>
       <div className="flex flex-col gap-3">
         <p className="text-[13px] text-muted-foreground">{t("Deleting takes the location out of the customer’s tree (archived). Its history stays in the audit log.")}</p>
         {isBlocked && <Banner tone="crit">{t("{name} still contains {what}. Move or delete them first (unit › Location).", { name, what: [children && count(t, children, "1 location", "{n} locations"), held && units(t, held)].filter(Boolean).join(t(" and ")) })}</Banner>}
@@ -633,9 +634,9 @@ function DeleteUnitModal({ x, pending, onClose, onArchive, onDelete }: Readonly<
       <div className="flex flex-col gap-3">
         <p className="text-[13px] text-muted-foreground">{t("Removes the unit from lists, totals and candidates. Its history is kept (archived), and its active automations are switched off.")}</p>
         <SummaryList items={[[t("Unit"), `${x.u.displayName} · ${t("version {v}", { v: x.u.version })}`], [t("Location"), x.path]]} />
-        {isBlocked && (
+        {isBlocked && x.blockers && (
           <Banner tone="crit"><b>{t("This unit is still in use")}</b>
-            <ul className="mt-1 list-disc pl-4 [&>li]:leading-6">{x.blockers!.map((b) => <li key={b.label}>{b.href ? <TextLink href={b.href}>{b.label}</TextLink> : b.label}</li>)}</ul>
+            <ul className="mt-1 list-disc pl-4 [&>li]:leading-6">{x.blockers.map((b) => <li key={b.label}>{b.href ? <TextLink href={b.href}>{b.label}</TextLink> : b.label}</li>)}</ul>
             <div className="mt-1 text-[12px]">{t("End or move these first. Ended history alone does not block deletion.")}</div>
           </Banner>
         )}

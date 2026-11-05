@@ -188,9 +188,9 @@ function RatesModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now: 
   const errors = rateCardErrors({ effectiveFrom, lines: chosen }, now, t);
   const save = () => {
     setTried(true);
-    if (Object.keys(errors).length > 0) return;
-    run(() => saveRateCard({ contractorOrgId: d.org.id, effectiveFrom: effectiveFrom!, lines: chosen.map((l) => ({ workType: l.workType, amountMinor: Math.round(Number(l.amount) * 100), note: l.note.trim() || null })), currency }),
-      t("Rate card saved"), () => { onClose(t("Rate card v{v} saved — effective from {date}.", { v: d.rates.nextVersion, date: businessDay(effectiveFrom!, i.display.locale) })); }, onFail);
+    if (!effectiveFrom || Object.keys(errors).length > 0) return;
+    run(() => saveRateCard({ contractorOrgId: d.org.id, lines: chosen.map((l) => ({ workType: l.workType, amountMinor: Math.round(Number(l.amount) * 100), note: l.note.trim() || null })), effectiveFrom, currency }),
+      t("Rate card saved"), () => { onClose(t("Rate card v{v} saved — effective from {date}.", { v: d.rates.nextVersion, date: businessDay(effectiveFrom, i.display.locale) })); }, onFail);
   };
   return (
     <Modal open wide onClose={() => { onClose(); }} title={t("New rate card for {name} · v{v}", { name: d.org.name, v: d.rates.nextVersion })} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t("Save rate card")}</Btn></>}>

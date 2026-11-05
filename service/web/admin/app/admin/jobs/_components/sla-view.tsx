@@ -75,20 +75,21 @@ function TargetsModal({ live, onClose, onFail }: Readonly<{ live: SlaLive; onClo
   const now = Date.parse(live.now);
   const [pending, run] = useAction();
   const [plan, setPlan] = useState(live.targets[0].plan);
-  const current = live.targets.find((t) => t.plan === plan)!;
+  const current = live.targets.find((t) => t.plan === plan) ?? live.targets[0];
   const [f, setF] = useState({ responseHours: String(current.now.responseHours), arrival: String(current.now.arrivalInWindowPercent), ftf: String(current.now.firstTimeFixPercent), from: zonedInput(new Date(now + 5 * 60_000).toISOString(), zone) });
   const [tried, setTried] = useState(false);
   const effectiveFrom = f.from ? fromZonedInput(f.from, zone) || null : null; // typed in the display time zone (NFR-08)
   const errors = targetErrors({ responseHours: f.responseHours, arrival: f.arrival, ftf: f.ftf, effectiveFrom }, now, t);
   const pick = (p: string) => {
-    const t = live.targets.find((x) => x.plan === p)!;
+    const t = live.targets.find((x) => x.plan === p);
+    if (!t) return;
     setPlan(t.plan);
     setF({ ...f, responseHours: String(t.now.responseHours), arrival: String(t.now.arrivalInWindowPercent), ftf: String(t.now.firstTimeFixPercent) });
   };
   const save = () => {
     setTried(true);
-    if (Object.keys(errors).length > 0) return;
-    run(() => saveSlaTargets({ planType: plan, responseHours: Number(f.responseHours), arrivalInWindowPercent: Number(f.arrival), firstTimeFixPercent: Number(f.ftf), effectiveFrom: effectiveFrom! }), t("SLA targets saved"),
+    if (!effectiveFrom || Object.keys(errors).length > 0) return;
+    run(() => saveSlaTargets({ planType: plan, responseHours: Number(f.responseHours), arrivalInWindowPercent: Number(f.arrival), firstTimeFixPercent: Number(f.ftf), effectiveFrom }), t("SLA targets saved"),
       (v) => { onClose(t("{plan} targets v{v} saved — jobs created from {time} use them.", { plan: current.label, v: v.version, time: showTime(effectiveFrom, i.display) })); }, (r) => { onFail(slaRefusal(r, t)); });
   };
   return (

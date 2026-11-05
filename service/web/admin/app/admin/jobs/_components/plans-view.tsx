@@ -147,8 +147,8 @@ function NewPlanModal({ live, onClose, onCreated, href }: Readonly<{ live: Plans
   const save = () => {
     setTried(true);
     setRefusal(null);
-    if (Object.keys(errors).length > 0) return;
-    run(() => savePlan({ id: null, version: null, intervalMonths: every, nextDueAt: nextIso!, unitId }), t("Plan created"), (v) => { onCreated(v.id); router.push(href(v.id)); }, (f) => { setRefusal(planRefusal(f, t)); });
+    if (!nextIso || Object.keys(errors).length > 0) return;
+    run(() => savePlan({ id: null, version: null, intervalMonths: every, nextDueAt: nextIso, unitId }), t("Plan created"), (v) => { onCreated(v.id); router.push(href(v.id)); }, (f) => { setRefusal(planRefusal(f, t)); });
   };
   const groups = [...new Set(live.units.map((u) => u.customer))];
   const anchor = nextIso ? new Date(nextIso).getUTCDate() : null;

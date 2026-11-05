@@ -25,9 +25,9 @@ export default async function AdminOverviewPage({ searchParams }: Readonly<PageP
   const i = i18nOf(display);
   const period = periodRange(kind, now, { from: one("from"), to: one("to") }, i);
   const customers = await quiet(coreAll<{ id: string; name: string }>("customers.list"));
-  const customerId = customers?.some((c) => c.id === one("customerId")) ? one("customerId")! : null;
+  const customerId = customers?.find((c) => c.id === one("customerId"))?.id ?? null;
   const properties = customerId ? await quiet(coreAll<{ id: string; name: string }>("properties.list", { filters: { customerId } })) : null;
-  const propertyId = properties?.some((p) => p.id === one("propertyId")) ? one("propertyId")! : null;
+  const propertyId = properties?.find((p) => p.id === one("propertyId"))?.id ?? null;
   // what waits for HQ whatever its requested time — requests to book, offers declined or expired, follow-ups to classify
   // (DEC-90, IR611); a role without job.read sees no such tile
   const scope = { ...(customerId && { customerId }), ...(propertyId && { propertyId }) };

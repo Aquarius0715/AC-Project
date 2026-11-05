@@ -58,7 +58,11 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
   const allowed = allowedFor[d.role];
   const has = (p?: string) => !!p && d.permissions.includes(p);
   const toggle = (p: string, on: boolean) => { set({ permissions: on ? [...new Set([...d.permissions, p])] : d.permissions.filter((x) => x !== p) }); };
-  const setWrite = (r: PermissionRow, on: boolean) => { set({ permissions: on ? [...new Set([...d.permissions, r.write!, ...(r.read ? [r.read] : [])])] : d.permissions.filter((x) => x !== r.write) }); };
+  const setWrite = (r: PermissionRow, on: boolean) => {
+    const { write, read } = r;
+    if (!write) return;
+    set({ permissions: on ? [...new Set([...d.permissions, write, ...(read ? [read] : [])])] : d.permissions.filter((x) => x !== write) });
+  };
   const blocked = (p: string) => !allowed.includes(p) || !live.canWrite || (isSelf && selfBlocked.includes(p) && !(sel?.m.permissions ?? []).includes(p));
   // a role's starting scope: the tenant for HQ, the chosen organization for a contractor, none for a technician
   const roleScopes = (r: Role): ScopeRef[] => {
@@ -158,7 +162,7 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
               <h3 className="mb-2 text-[13px] font-bold">{t("Permissions · {n} of {total}", { n: d.permissions.length, total: allPermissions.length })}</h3>
               <ScrollX><table id={memberFieldId("permissions")} className="w-full min-w-[560px] text-left text-[13px]"><thead className="text-[11px] uppercase text-muted-foreground"><tr><th className="py-1.5 pr-3">{t("Resource")}</th><th className="pr-3">{t("permission::Read")}</th><th className="pr-3">{t("Write")}</th><th>{t("Actions")}</th></tr></thead><tbody>{permissionRows.map((r) => (
                 <tr key={r.res} className="border-t border-line"><td className="py-2 pr-3 font-semibold">{resourceWord(r.res, t)}</td>
-                  <td className="pr-3">{r.read ? <Check label={<span className="font-mono text-xs">{r.read}</span>} checked={has(r.read)} disabled={blocked(r.read) || has(r.write)} onChange={(v) => { toggle(r.read!, v); }} /> : <span className="text-muted-foreground">—</span>}</td>
+                  <td className="pr-3">{r.read ? <Check label={<span className="font-mono text-xs">{r.read}</span>} checked={has(r.read)} disabled={blocked(r.read) || has(r.write)} onChange={(v) => { if (r.read) toggle(r.read, v); }} /> : <span className="text-muted-foreground">—</span>}</td>
                   <td className="pr-3">{r.write ? <Check label={<span className="font-mono text-xs">{r.write}</span>} checked={has(r.write)} disabled={blocked(r.write)} onChange={(v) => { setWrite(r, v); }} /> : <span className="text-muted-foreground">—</span>}</td>
                   <td><div className="flex flex-wrap gap-x-3 gap-y-2">{(r.actions ?? []).map((a) => <Check key={a} label={<span className="font-mono text-xs">{a}</span>} checked={has(a)} disabled={blocked(a)} onChange={(v) => { toggle(a, v); }} />)}{!r.actions && <span className="text-muted-foreground">—</span>}</div></td></tr>
               ))}</tbody></table></ScrollX>
