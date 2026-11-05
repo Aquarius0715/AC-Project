@@ -13,7 +13,7 @@ export function ReviewDemo({ id }: Readonly<{ id: string }>) {
   const [isReturned, setReturned] = useState(false);
   const [why, setWhy] = useState("");
   const [tried, setTried] = useState(false);
-  const checks: [string, string, string][] = [["Indoor unit — filter condition", "Normal", "ok"], ["Outdoor unit — refrigerant pipe", "Normal", "ok"], ["Electrical — wiring insulation", "Not applicable", "muted"], ["Indoor unit — drain pipe", "Normal", "ok"]];
+  const checks = [["Indoor unit — filter condition", "Normal", "ok"], ["Outdoor unit — refrigerant pipe", "Normal", "ok"], ["Electrical — wiring insulation", "Not applicable", "muted"], ["Indoor unit — drain pipe", "Normal", "ok"]] as const;
   return (
     <Page>
       <div className="text-[13px] text-muted-foreground"><Link href="/partner/jobs" className="font-semibold text-primary"><Icon name="arrowLeft" /> Jobs</Link> › {id} · Quality review</div>
@@ -22,7 +22,7 @@ export function ReviewDemo({ id }: Readonly<{ id: string }>) {
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">
           <Card title="Submitted report — version 1" sub="tech-external-a · submitted 2026-09-20 16:40">
-            <ul className="divide-y divide-line">{checks.map(([t, r, tone]) => <li key={t} className="py-2 text-[13px]"><div className="flex flex-wrap items-center justify-between gap-2"><span>{t}</span><Badge tone={tone as "ok"}>{r}</Badge></div>{r === "Not applicable" && <div className="text-xs text-muted-foreground">Reason: unit has no exposed wiring in this installation</div>}</li>)}</ul>
+            <ul className="divide-y divide-line">{checks.map(([t, r, tone]) => <li key={t} className="py-2 text-[13px]"><div className="flex flex-wrap items-center justify-between gap-2"><span>{t}</span><Badge tone={tone}>{r}</Badge></div>{r === "Not applicable" && <div className="text-xs text-muted-foreground">Reason: unit has no exposed wiring in this installation</div>}</li>)}</ul>
             <h3 className="mt-4 mb-1 text-[13px] font-bold">Photos</h3><div className="grid-fluid" style={{ ["--min"as string]: "110px" }}>{[1, 2, 3].map((n) => <div key={n} className="grid aspect-[4/3] place-items-center rounded-xl bg-surface2 text-xs text-muted-foreground">Photo {n}</div>)}</div>
             <h3 className="mt-4 mb-1 text-[13px] font-bold">Work performed & next action</h3><p className="text-[13px]">Cleaned outdoor coil, checked refrigerant pressure (within spec), tested drainage flow. No parts replaced. Next: routine inspection in 6 months.</p>
             <h3 className="mt-4 mb-1 text-[13px] font-bold">Readings recorded</h3><SummaryList items={[["Refrigerant pressure, low side", "4.6 bar · within spec"], ["Supply air temperature", "13.9 °C · good"], ["Condensate flow test", "Pass · 2 min"], ["Time on site", "09:05 – 11:40 (2 h 35 m)"]]} />
