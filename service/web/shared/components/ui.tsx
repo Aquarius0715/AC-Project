@@ -292,7 +292,7 @@ export function Timeline({ items }: Readonly<{ items: { time: string; title: Rea
 /** A tab bar: the shadcn/ui Tabs (tablist and tabs; the screens draw the panels). `count` is a badge after the label. */
 export function Tabs<T extends string>({ tabs, value, onChange, className }: Readonly<{ tabs: { id: T; label: string; count?: number | string }[]; value: T; onChange: (v: T) => void; className?: string }>) {
   return (
-    <UITabs value={value} onValueChange={(v) => { onChange(v as T); }} className={cn("max-w-full", className)}>
+    <UITabs value={value} onValueChange={(v) => { const tab = tabs.find((x) => x.id === v); if (tab) onChange(tab.id); }} className={cn("max-w-full", className)}>
       <TabsList className="max-w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto">
         {tabs.map((t) => (
           <TabsTrigger key={t.id} value={t.id} className="flex-none px-3 py-1.5 text-[13px] font-semibold text-muted-foreground">
@@ -310,12 +310,13 @@ export function Field({ label, hint, error, children, className, labelHidden }: 
   // Only a single form control sits inside a <label>. Anything else — choice buttons, a set of checkboxes or buttons, a
   // read-only box — is a labelled group: inside a <label> a button takes the label as its name (IR230, IR238).
   // `labelHidden` keeps the label for assistive technology only, for a group that shows labels of its own.
-  const isControl = isValidElement(children) && (children.type === Input || children.type === Select || children.type === Textarea || ["input", "select", "textarea"].includes(children.type as string));
+  const element = isValidElement<{ "aria-invalid"?: boolean }>(children) ? children : null;
+  const isControl = element !== null && (element.type === Input || element.type === Select || element.type === Textarea || (typeof element.type === "string" && ["input", "select", "textarea"].includes(element.type)));
   const isGroup = !isControl;
   const Tag = isGroup ? "div" : "label";
   // an error marks its control invalid, so assistive technology tells which field to fix; the error text is part of
   // the label, and so of the control's name (IR573)
-  const field = isControl && error ? cloneElement(children as React.ReactElement<{ "aria-invalid"?: boolean }>, { "aria-invalid": true }) : children;
+  const field = element && isControl && error ? cloneElement(element, { "aria-invalid": true }) : children;
   return (
     <Tag role={isGroup ? "group" : undefined} aria-label={isGroup ? label : undefined} className={cx("flex min-w-0 flex-col gap-1 text-xs text-ink", className)}>
       <span aria-hidden={isGroup || undefined} className={cx("font-semibold", labelHidden && "sr-only")}>{label}</span>
@@ -401,7 +402,7 @@ export function Toggle({ on, onChange, label, disabled }: Readonly<{ on: boolean
 /** One choice of a few, shown as pressed buttons: the shadcn/ui ToggleGroup. The chosen one stays chosen when pressed again. */
 export function Choice<T extends string>({ options, value, onChange, disabled }: Readonly<{ options: { id: T; label: string }[]; value: T; onChange: (v: T) => void; disabled?: boolean }>) {
   return (
-    <ToggleGroup value={[value]} disabled={disabled} onValueChange={(v) => { const next = v.at(-1) as T | undefined; if (next !== undefined && next !== value) onChange(next); }} variant="outline" className="flex-wrap">
+    <ToggleGroup value={[value]} disabled={disabled} onValueChange={(v) => { const next = options.find((o) => o.id === v.at(-1)); if (next && next.id !== value) onChange(next.id); }} variant="outline" className="flex-wrap">
       {options.map((o) => <ToggleGroupItem key={o.id} value={o.id} className="px-3 text-[13px] font-semibold data-pressed:border-primary data-pressed:bg-primary-soft data-pressed:text-primary">{o.label}</ToggleGroupItem>)}
     </ToggleGroup>
   );
@@ -459,7 +460,7 @@ export function Modal({ open, title, onClose, children, footer, wide, finalFocus
   const firstStop = () => {
     const stop = (part: string) => {
       return [...(popup.current?.querySelectorAll<HTMLElement>(`[data-part="${CSS.escape(part)}"] :is(${FOCUSABLE})`) ?? [])]
-        .find((el) => !(el as HTMLButtonElement).disabled && el.tabIndex >= 0);
+        .find((el) => !el.matches(":disabled") && el.tabIndex >= 0);
     };
     return stop("body") ?? stop("footer") ?? stop("header") ?? true;
   };
