@@ -7,6 +7,7 @@ import { evidenceText, resolutionText } from "@ac/web/lib/evidence";
 import { alertTitle } from "@ac/web/lib/alerts";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { Metric as ContractMetric } from "@ac/web/lib/contracts.gen";
+import { oneOfOrThrow } from "@ac/web/lib/oneOf";
 import { byNumber, byText } from "@ac/web/lib/order";
 import { filled } from "@ac/web/lib/filled";
 
@@ -273,6 +274,8 @@ const ruleShape = (r: DefaultRule) => [r.operator, r.threshold, r.recovery, r.du
 export const ruleChanges = (draft: AdminPolicy, saved: AdminPolicy): string[] =>
   draft.rules.filter((r) => { const o = saved.rules.find((x) => x.ruleKey === r.ruleKey); return !o || JSON.stringify(ruleShape(r)) !== JSON.stringify(ruleShape(o)); }).map((r) => r.name);
 
+const ruleCategories = ["air_quality", "fault", "maintenance", "connection"] as const;
+const contractMetrics = ["temperature", "humidity", "co2", "pm25", "power", "vibration", "refrigerant_pressure", "compressor_cycles", "airflow_drop", "heartbeat_gap"] as const satisfies readonly ContractMetric[];
 /** policies.save input for the default policy's limits (DefaultPolicyInput, IR120 item 2): all six rules in their order
 with their fixed key, name, category and metric; saving changes them for every unit. */
 export function defaultRulesInput(p: AdminPolicy): OpInput<"policies.save"> {
@@ -280,7 +283,7 @@ export function defaultRulesInput(p: AdminPolicy): OpInput<"policies.save"> {
     id: p.id, kind: "default_alert" as const,
     rules: p.rules.map((r) => {
       return {
-        ruleKey: r.ruleKey, name: r.name, category: r.category as "air_quality" | "fault" | "maintenance" | "connection", metric: r.metric as ContractMetric,
+        ruleKey: r.ruleKey, name: r.name, category: oneOfOrThrow(ruleCategories, r.category, "rule category"), metric: oneOfOrThrow(contractMetrics, r.metric, "metric"),
         operator: r.operator, threshold: r.threshold, recoveryThreshold: r.recovery, durationSeconds: r.duration, activeWindow: r.activeWindow ?? null, severity: r.severity,
       };
     }),
@@ -304,7 +307,7 @@ export function alertPolicyInput(p: AdminPolicy): OpInput<"policies.save"> {
   return {
     // an alert policy always belongs to a customer (the Default policy is saved as default_alert)
     ...(p.id && { id: p.id }), kind: "alert" as const, name: p.name, timezone: p.timezone, enabled: p.on, priority: p.priority, customerId: p.customerId,
-    metric: p.metric as ContractMetric, operator: p.operator, threshold: p.threshold, recoveryThreshold: p.recovery, durationSeconds: p.duration,
+    metric: oneOfOrThrow(contractMetrics, p.metric, "metric"), operator: p.operator, threshold: p.threshold, recoveryThreshold: p.recovery, durationSeconds: p.duration,
     activeWindow: p.activeWindow ?? null, severity: p.severity, recipientMembershipIds: p.recipients.map((r) => r.id), channels: p.channels,
     escalateAfterMinutes: p.escalate, cooldownMinutes: p.cooldown,
   };
