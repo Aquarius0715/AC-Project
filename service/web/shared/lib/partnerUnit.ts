@@ -90,16 +90,18 @@ export function evidenceRows(alerts: ApiAlert[], i: I18n = EN) {
   });
 }
 
+/** A reading row of the unit card: a tone only for a reading that is not good. */
+interface ReadingRow { label: string; value: string; tone?: "warn" | "crit" }
 /** The latest readings (diagnosis only) with their quality in words, and the power state. */
-export function readingRows(d: ApiUnitDetail, i: I18n = EN): { rows: { label: string; value: string; tone?: "warn" | "crit" }[]; observed: string } {
+export function readingRows(d: ApiUnitDetail, i: I18n = EN): { rows: ReadingRow[]; observed: string } {
   const { t, display } = i;
-  const rows = d.latestMeasurements.map((m) => {
+  const rows = d.latestMeasurements.map((m): ReadingRow => {
     const q = QUALITY[m.quality] ?? { text: m.quality };
     return { label: label(m.metric, t), value: m.value === null ? `— · ${t(q.text)}` : `${airNumber(m.metric, m.value)} ${m.unit} · ${t(q.text)}`, tone: q.tone };
   });
   const s = d.observedState;
   const mode = s.mode ? ` · ${textOf(MODE_WORD, s.mode, t) ?? t("fan only")}` : "";
-  if (s.power !== null) rows.push({ label: t("Power state"), value: s.power ? `${t("On")}${mode}` : t("Off"), tone: undefined });
+  if (s.power !== null) rows.push({ label: t("Power state"), value: s.power ? `${t("On")}${mode}` : t("Off") });
   return { rows, observed: s.observedAt ? showTime(s.observedAt, display) : "—" };
 }
 

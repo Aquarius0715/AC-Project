@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SESSION_COOKIE, cookieKey, cookieOptions, endIdpSession, jwtClaims, needsRefresh, oidcConfig, readSession, refresh, roleHome, safeReturnTo, seal, sessionFromTokens, unseal, type Session } from "@ac/web/lib/session";
 import { must } from "./must";
 import { bodyText } from "./http";
+import { without } from "@ac/web/lib/omit";
 
 // the BFF session (backend architecture §5) is server code: next/headers is the request's cookie jar
 const jar = vi.hoisted(() => ({ get: vi.fn(), set: vi.fn(), delete: vi.fn() }));
@@ -94,7 +95,7 @@ describe("a session from the identity provider's tokens", () => {
   });
 
   it("refuses a token without the claims or with an unknown role", () => {
-    const bad = [{ ...claims, tenant_id: undefined }, { ...claims, membership_id: "" }, { ...claims, role: undefined }, { ...claims, role: "superuser" },
+    const bad = [without(claims, "tenant_id"), { ...claims, membership_id: "" }, without(claims, "role"), { ...claims, role: "superuser" },
       { ...claims, role: "constructor" }, { ...claims, role: "toString" }, { ...claims, role: "__proto__" }, { ...claims, role: 1 }];
     expect(bad.map((c) => sessionFromTokens({ access_token: token(c), expires_in: 300 }))).toEqual(bad.map(() => null));
     expect(sessionFromTokens({ access_token: "not-a-jwt", expires_in: 300 })).toBeNull();

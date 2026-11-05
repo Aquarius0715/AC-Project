@@ -3,6 +3,7 @@ import { candidateGroups, changeCard, examples, groupSummary, helpText, placeOf,
 import { DEFAULT_DISPLAY, translator } from "@ac/web/lib/i18n";
 import type { ApiCommand, ApiUnitDetail } from "@ac/web/lib/units";
 import { must } from "./must";
+import { without } from "@ac/web/lib/omit";
 
 const en = translator("en"), ms = translator("ms");
 const TOKYO = { locale: "ms" as const, timeZone: "Asia/Tokyo" };
@@ -76,7 +77,8 @@ describe("the customer assistant (FR-X02, D09, Figma Client 09a–09g)", () => {
     expect(progressOf(command("acknowledged", null, "2026-09-15T01:45:03Z"), "Bedroom AC", 24, 26, 28, en, DEFAULT_DISPLAY)).toEqual({ tone: "ok", title: "Done — Bedroom AC is set to 24 °C", detail: "Acknowledged by the device at 9:45 am MYT. Room temperature is still 28.0 °C (measured)." });
     expect(progressOf(command("acknowledged"), "Bedroom AC", 24, 26, null, en, DEFAULT_DISPLAY).detail).toBe("Acknowledged by the device.");
     expect(progressOf(command("expired"), "Bedroom AC", 24, 26, null, en, DEFAULT_DISPLAY)).toEqual({ tone: "crit", title: "Couldn’t change Bedroom AC", detail: "The device did not answer within 30 s (expired). Nothing changed — the confirmed setting is still 26 °C." });
-    expect(progressOf({ ...command("expired"), expiresAt: undefined }, "Bedroom AC", 24, 26, null, en, DEFAULT_DISPLAY).detail).toBe("The device did not answer in time (expired). Nothing changed — the confirmed setting is still 26 °C.");
+    const noExpiry = without(command("expired"), "expiresAt");
+    expect(progressOf(noExpiry, "Bedroom AC", 24, 26, null, en, DEFAULT_DISPLAY).detail).toBe("The device did not answer in time (expired). Nothing changed — the confirmed setting is still 26 °C.");
     expect(progressOf(command("failed", "OFFLINE"), "Bedroom AC", 24, null, null, en, DEFAULT_DISPLAY).detail).toBe("The device refused it (OFFLINE). Nothing changed.");
     expect(stateText("confirm", en)).toBe("Needs confirmation");
   });

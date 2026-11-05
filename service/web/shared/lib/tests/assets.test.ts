@@ -4,6 +4,7 @@ import {
   registerKpis, standing as standingOf, standingMarks, unitDraft, unitErrors, unitRows, type ApiCoverage, type ApiCustomerPolicy, type ApiImportRow, type ApiUnitRow, type Standing,
 } from "@ac/web/lib/assets";
 import { i18nOf } from "@ac/web/lib/i18n";
+import { without } from "@ac/web/lib/omit";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const NOW = new Date("2026-09-14T01:00:00Z"); // 09:00 in Kuala Lumpur
@@ -20,6 +21,8 @@ const policy = (over: Partial<ApiCustomerPolicy>): ApiCustomerPolicy => {
     id: "pol-1", version: 1, kind: "alert", name: "Bedroom too hot", unitIds: ["u1"], enabled: true, ownerMembershipId: "m-own", metric: "temperature", operator: "gte", threshold: 30, durationSeconds: 60, severity: "warning", ...over,
   };
 };
+/** A policy as an older answer sends it, without a severity. */
+const withoutSeverity = (over: Partial<ApiCustomerPolicy>) => without(policy(over), "severity");
 
 describe("HQ customers & units", () => {
   it("marks each customer's standing and counts the register", () => {
@@ -51,7 +54,7 @@ describe("HQ customers & units", () => {
 
   it("words the policies' conditions and the default rules", () => {
     expect(conditionText(policy({ activeWindow: { weekdays: [1, 2, 3, 4, 5], startLocal: "08:00", endLocal: "19:00" } }))).toBe("Temperature ≥ 30 °C for 60 s, weekdays 08:00–19:00 → Warning");
-    expect(conditionText(policy({ metric: "heartbeat_gap", threshold: 10, severity: undefined, activeWindow: { weekdays: [1, 3], startLocal: "22:00", endLocal: "06:00" } }))).toBe("No heartbeat for 10 min, Mon, Wed 22:00–06:00");
+    expect(conditionText(withoutSeverity({ metric: "heartbeat_gap", threshold: 10, activeWindow: { weekdays: [1, 3], startLocal: "22:00", endLocal: "06:00" } }))).toBe("No heartbeat for 10 min, Mon, Wed 22:00–06:00");
     const defaults = policy({ id: "def", kind: "default_alert", name: "Default policy", rules: [{ ruleKey: "co2", name: "CO₂ high", metric: "co2", operator: "gte", threshold: 1200, durationSeconds: 900, category: "ventilation" }],
       ruleSettings: [{ ruleKey: "co2", customerId: "c1", enabled: false, version: 2, reason: "office closed", updatedAt: "2026-09-10T02:00:00Z" }] });
     expect(defaultRules(defaults)[0]).toMatchObject({ condition: "CO₂ (ppm) ≥ 1200 ppm for 15 min", enabled: false, note: "Off since 10 Sept 2026 · office closed" });
@@ -83,7 +86,7 @@ describe("HQ customers & units in Malay with the display time zone (IR293)", () 
     expect(registerKpis([], [], MS.t)).toMatchObject({ propertyNames: "belum ada", power: "Berjalan 0 · Berhenti 0 · tidak diketahui 0" });
     expect(unitRows([unit({ spaceId: null })], [], new Map(), MS.t)[0]).toMatchObject({ location: "Belum ditugaskan", policies: "Lalai" });
     expect(conditionText(policy({ activeWindow: { weekdays: [6, 7], startLocal: "08:00", endLocal: "12:00" } }), MS)).toBe("Suhu ≥ 30 °C selama 60 s, hujung minggu 08:00–12:00 → Peringatan");
-    expect(conditionText(policy({ severity: undefined, durationSeconds: 900, activeWindow: { weekdays: [1, 3], startLocal: "22:00", endLocal: "06:00" } }), MS)).toMatch(/^Suhu ≥ 30 °C selama 15 min, Isn, Rab 22:00–06:00$/);
+    expect(conditionText(withoutSeverity({ durationSeconds: 900, activeWindow: { weekdays: [1, 3], startLocal: "22:00", endLocal: "06:00" } }), MS)).toMatch(/^Suhu ≥ 30 °C selama 15 min, Isn, Rab 22:00–06:00$/);
     const rows = coverageRows([{ unitId: "u1", customerId: "c1", modelId: "m1", warrantyEndsAt: "2026-10-09T16:00:00Z", contractIds: [], status: "expiring", claimableJobIds: [] }],
       { unit: vi.fn(), customer: () => "A", model: () => "M", contract: () => "" }, NOW, MS);
     expect([rows[0]?.ends, rows[0]?.statusText]).toEqual(["10 Okt 2026", "Tamat dalam 26 h · tiada kontrak"]); // the Kuala Lumpur day, in Malay

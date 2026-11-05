@@ -16,6 +16,7 @@ import {
 } from "@ac/web/lib/techJob";
 import { acknowledge, checkIn, pauseWork, resumeRework, saveDraft, signOff, submitReport, uploadPhoto } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
+import { without } from "@ac/web/lib/omit";
 
 export interface WorkspaceLive {
   now: string; known: Known; zone: string;
@@ -431,7 +432,7 @@ function CheckInModal({ open, unitId, pending, errors, setErrors, onClose, onChe
   const [distance, setDistance] = useState("40");
   const [qr, setQr] = useState(`ac-unit:${unitId}`);
   const [reason, setReason] = useState("");
-  const clear = (k: CheckInField) => { if (errors[k]) setErrors({ ...errors, [k]: undefined }); };
+  const clear = (k: CheckInField) => { if (errors[k]) setErrors(without(errors, k)); };
   const go = () => {
     const e = checkInErrors(method, distance, qr, reason, t);
     setErrors(e);
@@ -502,9 +503,9 @@ function PartModal({ open, parts, components, onClose, onAdd }: Readonly<{ open:
   return (
     <Modal open={open} onClose={onClose} title={t("Add part")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" onClick={add}>{t("Add")}</Btn></>}>
       <Field label={t("Part (catalog)")}><Select value={code} onChange={(e) => { setCode(e.target.value); }}><option value="">{t("Not in the catalog…")}</option>{parts.map((p) => <option key={p.code} value={p.code}>{p.name} · {p.code}{p.vanStockQuantity === null ? "" : ` · ${t("{n} in van", { n: p.vanStockQuantity })}`}</option>)}</Select></Field>
-      {!picked && <Field label={t("Part name")} error={errors.name}><Input id="part-name" value={name} maxLength={120} onChange={(e) => { setName(e.target.value); setErrors({ ...errors, name: undefined }); }} /></Field>}
+      {!picked && <Field label={t("Part name")} error={errors.name}><Input id="part-name" value={name} maxLength={120} onChange={(e) => { setName(e.target.value); setErrors(without(errors, "name")); }} /></Field>}
       <div className="grid-fluid" style={{ ["--min" as string]: "130px" }}>
-        <Field label={t("Qty")} error={errors.qty}><Input id="part-qty" inputMode="numeric" value={qty} onChange={(e) => { setQty(e.target.value); setErrors({ ...errors, qty: undefined }); }} /></Field>
+        <Field label={t("Qty")} error={errors.qty}><Input id="part-qty" inputMode="numeric" value={qty} onChange={(e) => { setQty(e.target.value); setErrors(without(errors, "qty")); }} /></Field>
         <Field label={t("Source")}><Select value={source} onChange={(e) => { setSource(e.target.value as DraftPart["source"]); }}>{sources.map((x) => <option key={x.id} value={x.id}>{t(x.label)}</option>)}</Select></Field>
         <Field label={t("Lot / serial")}><Input value={lot} onChange={(e) => { setLot(e.target.value); }} /></Field>
       </div>
@@ -526,7 +527,7 @@ function RefrigerantModal({ open, onClose, onAdd }: Readonly<{ open: boolean; on
   const [leak, setLeak] = useState<DraftRefrigerant["leakCheck"]>("pass");
   const [method, setMethod] = useState("electronic detector");
   const [errors, setErrors] = useState<Partial<Record<(typeof REFRIGERANT_FIELDS)[number], string>>>({});
-  const clear = (k: (typeof REFRIGERANT_FIELDS)[number]) => { setErrors((x) => ({ ...x, [k]: undefined })); };
+  const clear = (k: (typeof REFRIGERANT_FIELDS)[number]) => { setErrors((x) => without(x, k)); };
   const add = () => {
     const e = refrigerantErrors(cylinder, recovered, charged, t);
     setErrors(e);

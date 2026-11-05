@@ -11,6 +11,7 @@ import { inviteError, type ClientUserRow } from "@ac/web/lib/assets";
 import { nameError, reasonError } from "@ac/web/lib/partnerUsers";
 import { inviteUser, removeUser, resendInvite, updateUser } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
+import { without } from "@ac/web/lib/omit";
 
 type Dialog = { kind: "invite" } | { kind: "role" | "disable" | "enable" | "remove"; row: ClientUserRow };
 /** The dialog's fields, top to bottom, and the Core API fields that land on them. */
@@ -68,7 +69,7 @@ export function UsersView({ live }: Readonly<{ live: { customerId: string; custo
   const nameProblem = isAdding ? nameError(userName, t) : undefined;
   const reasonProblem = dialog && !isAdding ? reasonError(reason, t) : undefined;
   const name = (r: ClientUserRow) => r.name ?? r.email;
-  const edit = (k: FieldKey) => { setServer((s) => (s[k] ? { ...s, [k]: undefined } : s)); };
+  const edit = (k: FieldKey) => { setServer((s) => (s[k] ? without(s, k) : s)); };
   const submit = () => {
     setTried(true);
     if (!dialog) return;

@@ -29,7 +29,7 @@ describe("partner job list", () => {
     expect(jobRow(offered, NOW, units, names)).toEqual({
       id: "22222222-bbbb", title: "22222222 · 2 Demo Avenue", origin: null, href: "/partner/jobs/22222222-bbbb",
       line: "Offered by HQ · visit 22 Sept, 9:00 – 11:00 am MYT (fixed)", tech: { name: "—", sub: "not assignable before acceptance" },
-      slot: { main: "Answer by 22 Sept 2026, 12:30 am MYT", sub: "15 h left", tone: undefined }, badge: { text: "Offered", tone: "primary" },
+      slot: { main: "Answer by 22 Sept 2026, 12:30 am MYT", sub: "15 h left" }, badge: { text: "Offered", tone: "primary" },
     });
     const proposed = jobRow({ ...offered, partnerSlotProposal: { status: "sent_to_client" } } as ApiPartnerJob, NOW, units, names);
     expect(proposed.badge).toEqual({ text: "Time proposed", tone: "warn" });

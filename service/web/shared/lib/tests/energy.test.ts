@@ -67,7 +67,7 @@ describe("customer energy & cost (FR-C06, FR-C13)", () => {
   });
 
   it("takes whole Kuala Lumpur days up to the current minute and labels them in the display language (DD-C06)", () => {
-    expect(periodRange("today", NOW)).toEqual({ kind: "today", from: "2026-09-13T16:00:00.000Z", to: "2026-09-14T01:30:00.000Z", days: 1, error: undefined, label: "14 Sept, 00:00 – 14 Sept, 09:30 (1 day) · Asia/Kuala_Lumpur" });
+    expect(periodRange("today", NOW)).toEqual({ kind: "today", from: "2026-09-13T16:00:00.000Z", to: "2026-09-14T01:30:00.000Z", days: 1, label: "14 Sept, 00:00 – 14 Sept, 09:30 (1 day) · Asia/Kuala_Lumpur" });
     const i = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
     const week = periodRange("7d", NOW, {}, i);
     expect([week.from, week.days, week.label]).toEqual(["2026-09-07T16:00:00.000Z", 7, "8 Sep, 00:00 – 14 Sep, 09:30 (7 hari) · Asia/Kuala_Lumpur"]);

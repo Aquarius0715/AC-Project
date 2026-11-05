@@ -42,7 +42,7 @@ describe("partner unit view", () => {
     expect(evidenceRows(alerts)).toEqual([{ id: "a1", title: "Alert", severity: "warning", resolved: false, sub: "Suspected — amplitude 2.1x baseline · 13 Sept 2026, 10:40 pm MYT" }]);
     expect(readingRows(unit)).toEqual({
       observed: "14 Sept 2026, 9:35 am MYT",
-      rows: [{ label: "Temperature", value: "14.2 °C · good", tone: undefined }, { label: "Refrigerant pressure", value: "310 kPa · good", tone: undefined }, { label: "Vibration", value: "2.1 mm/s · suspect", tone: "crit" }, { label: "Power state", value: "On · cooling", tone: undefined }],
+      rows: [{ label: "Temperature", value: "14.2 °C · good" }, { label: "Refrigerant pressure", value: "310 kPa · good" }, { label: "Vibration", value: "2.1 mm/s · suspect", tone: "crit" }, { label: "Power state", value: "On · cooling" }],
     });
     expect(chartMetrics(unit)).toEqual(["vibration", "refrigerant_pressure"]);
     const c = chart("vibration", "mm/s", [{ value: 1, observedAt: "2026-09-13T03:00:00Z" }, { value: 2.1, observedAt: "2026-09-14T01:00:00Z" }, { value: 9, observedAt: "2026-09-14T01:10:00Z", quality: "suspect" }], NOW);

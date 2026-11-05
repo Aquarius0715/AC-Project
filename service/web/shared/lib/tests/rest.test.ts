@@ -17,7 +17,7 @@ describe("coreRequest", () => {
     expect(Object.keys(coreRoutes)).toHaveLength(212); // IR612 members.unavailability + members.clearUnavailability, IR437 jobs.getAttachment, IR436 certificates.getContent, IR416 partnerUsers.*, IR238 filterCare.getSettings, IR327 alerts.evidence, IR349 attachments.list, IR379 notifications.markAllRead, IR384 members.revokeSessions
     expect(Object.values(coreRoutes).flat()).toHaveLength(233);
     expect(coreRequest("filterCare.getSettings", {})).toEqual({ method: "GET", path: "/v1/filter-care/settings" });
-    expect(coreRequest("alerts.evidence", { alertId: "a1", query: { limit: 100 } })).toEqual({ method: "GET", path: "/v1/alerts/a1/evidence?limit=100", body: undefined });
+    expect(coreRequest("alerts.evidence", { alertId: "a1", query: { limit: 100 } })).toEqual({ method: "GET", path: "/v1/alerts/a1/evidence?limit=100" });
     // IR349: the MRV evidence candidates take their units and period in the query string
     expect(query(requestOf("attachments.list", { unitIds: ["u1", "u2"], from: "2026-09-01T00:00:00Z", to: "2026-09-14T00:00:00Z", query: { limit: 100 } }).path))
       .toEqual({ pathname: "/v1/attachments", out: { unitIds: ["u1", "u2"], from: ["2026-09-01T00:00:00Z"], to: ["2026-09-14T00:00:00Z"], limit: ["100"] } });
@@ -25,7 +25,7 @@ describe("coreRequest", () => {
   });
 
   it("sends a list read's paging query, filters, sort and lists in the query string", () => {
-    const r = requestOf("jobs.list", { filters: { status: "open", unitIds: ["u1", "u2"], overdueOnly: false, statuses: [], origin: null }, sort: { field: "dueAt", direction: "asc" }, limit: 50, cursor: undefined });
+    const r = requestOf("jobs.list", { filters: { status: "open", unitIds: ["u1", "u2"], overdueOnly: false, statuses: [], origin: null }, sort: { field: "dueAt", direction: "asc" }, limit: 50 });
     expect(r.method).toBe("GET");
     expect(r.body).toBeUndefined();
     expect(query(r.path)).toEqual({ pathname: "/v1/jobs", out: { status: ["open"], unitIds: ["u1", "u2"], overdueOnly: ["false"], statuses: [""], sort: ["dueAt:asc"], limit: ["50"] } });

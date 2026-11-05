@@ -65,7 +65,7 @@ describe("partner job history", () => {
     expect(customerVisible(must(events[1]))).toBe(false);
     expect([customerVisible(auditEvent("p", "partner_proposal.sent", "2026-09-20T00:00:00Z")), customerVisible(auditEvent("k", "job.costs_saved", "2026-09-20T00:00:00Z"))]).toEqual([false, false]); // IR442
     expect(eventSummary([...events, auditEvent("p", "partner_proposal.sent", "2026-09-22T00:00:00Z")])).toEqual({ count: 5, customerVisible: 3, notes: 2, latest: { action: "partner_proposal.sent", occurredAt: "2026-09-22T00:00:00Z" } });
-    expect(eventItem(must(events[1]), users)).toEqual({ id: "e2", title: "Note added", detail: "“Missing filter photo” · internal · by contractor-a", at: "20 Sept 2026, 2:05 pm MYT", badge: "internal", tone: undefined });
+    expect(eventItem(must(events[1]), users)).toEqual({ id: "e2", title: "Note added", detail: "“Missing filter photo” · internal · by contractor-a", at: "20 Sept 2026, 2:05 pm MYT", badge: "internal" });
     expect(eventItem(must(events[3]), users)).toMatchObject({ badge: "customer", detail: "“Arriving at 09:00” · customer" }); // someone outside the company is not named
     expect(eventItem(auditEvent("m", "offer.accepted", "2026-09-20T00:00:00Z", null, "u-me"), users).detail).toBe("by you");
     expect([channelText("inApp"), channelText("email"), channelText("whatsapp")]).toEqual(["in-app", "email", "WhatsApp"]);

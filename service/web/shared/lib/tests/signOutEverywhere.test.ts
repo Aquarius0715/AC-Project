@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 // the request's cookie jar and a session store kept in memory (GETEX / SET / DEL)
-const jar = vi.hoisted(() => ({ value: undefined as string | undefined, get: vi.fn(), set: vi.fn(), delete: vi.fn() }));
+const jar = vi.hoisted(() => ({ value: null as string | null, get: vi.fn(), set: vi.fn(), delete: vi.fn() }));
 const kv = vi.hoisted(() => new Map<string, string>());
 vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ cookies: () => Promise.resolve({ ...jar, get: () => (jar.value ? { value: jar.value } : undefined) }) }));
@@ -40,7 +40,7 @@ beforeEach(() => {
   vi.stubEnv("SESSION_STORE_URL", "redis://store.test:6379");
   vi.stubEnv("DATA_SOURCE", "api");
   kv.clear();
-  jar.value = undefined;
+  jar.value = null;
 });
 afterEach(() => {
   vi.unstubAllEnvs();
