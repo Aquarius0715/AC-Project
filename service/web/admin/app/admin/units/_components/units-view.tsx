@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import { Badge, Banner, Btn, Card, Check, Choice, ConnBadge, cx, DataTable, EmptyState, Field, Input, Kpi, LinkButton, Modal, Page, PowerBadge, Search, Select, SummaryList, Tabs, Textarea, TextLink, Toggle, ActionMenu, Plain } from "@ac/web/components/ui";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { showTime, type T, textOf } from "@ac/web/lib/i18n";
 import {
-  autoMapping, changedFields, connections, contractMatch, coverageCsv, coverageMatch, csvShape, customerDraft, customerErrors, customerMatch, errorReportCsv, flatten,
-  importFields, importMessage, importPlace, importTemplate, inviteError, nameError, powerStates, profileLabel, propertyDraft, propertyErrors, propertyInput, reasonError,
-  relocates, selectionId, unitDraft, unitErrors, unitInput,
+  autoMapping, changedFields, connections, contractFilters, contractMatch, coverageCsv, coverageMatch, csvShape, customerDraft, customerErrors, customerMatch, errorReportCsv, flatten,
+  importFields, importMessage, importPlace, importTemplate, inviteError, nameError, powerStates, profileLabel, profiles, propertyDraft, propertyErrors, propertyInput, reasonError,
+  relocates, selectionId, unitDraft, unitErrors, unitInput, coverageStatuses, withinDays,
   type ApiImportPreview, type ApiUnitDetail, type ApiUnitImport, type ClaimCandidate, type ClientUserRow, type Connection, type ContractFilter, type CoverageFilter,
   type CoverageRow, type coverageKpis, type CustomerDraft, type CustomerRow, type PolicyLine, type PowerState, type Profile, type PropertyDraft, type RuleLine, type Scope,
   type Selection, type TreeProperty, type TreeSpace, type UnitDraft, type UnitRow, type registerKpis,
@@ -108,9 +109,9 @@ function CustomerList({ live }: Readonly<{ live: UnitsLive }>) {
       <Card title={t("Customers")} sub={t("Select a customer to manage its properties, spaces and units")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => { setOpen(true); }}><Icon name="add" /> {t("New customer")}</Btn>}>
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <div className="min-w-[220px] flex-1 sm:max-w-sm"><Search placeholder={t("Search customer name, ID or property…")} value={q} onChange={setQ} /></div>
-          <Select aria-label={t("Status")} className="w-auto" value={status} onChange={(e) => { setStatus(e.target.value as "active" | "all"); }}><option value="active">{t("Status: Active")}</option><option value="all">{t("Status: All")}</option></Select>
+          <Select aria-label={t("Status")} className="w-auto" value={status} onChange={(e) => { setStatus(oneOf(["active", "all"] as const, e.target.value, status)); }}><option value="active">{t("Status: Active")}</option><option value="all">{t("Status: All")}</option></Select>
           {live.standingKnown && (
-            <Select aria-label={t("Contract")} className="w-auto" value={contract} onChange={(e) => { setContract(e.target.value as ContractFilter); }}>
+            <Select aria-label={t("Contract")} className="w-auto" value={contract} onChange={(e) => { setContract(oneOf(contractFilters, e.target.value, contract)); }}>
               <option value="all">{t("Contract: All")}</option><option value="overdue">{t("Overdue")}</option><option value="restricted">{t("Restriction")}</option><option value="good">{t("Good standing")}</option><option value="none">{t("No contract")}</option>
             </Select>
           )}
@@ -148,9 +149,9 @@ function CustomerModal({ row, pending, onClose, onSave }: Readonly<{ row?: Custo
       <div className="flex flex-col gap-3">
         <Field label={t("Billing name · required")} hint={t("1–120 characters. Two customers cannot share a billing name.")} error={fieldError("billingName")}><Input value={d.billingName} onChange={(x) => { setD({ ...d, billingName: x.target.value }); }} /></Field>
         <Field label={t("Customer display name · required")} hint={t("1–120 characters")} error={fieldError("name")}><Input value={d.name} onChange={(x) => { setD({ ...d, name: x.target.value }); }} /></Field>
-        <Field label={t("Service profile · required")}><Choice value={d.profile} onChange={(v: Profile) => { setD({ ...d, profile: v }); }} options={(Object.keys(profileLabel) as Profile[]).map((p) => ({ id: p, label: t(profileLabel[p]) }))} /></Field>
+        <Field label={t("Service profile · required")}><Choice value={d.profile} onChange={(v: Profile) => { setD({ ...d, profile: v }); }} options={profiles.map((p) => ({ id: p, label: t(profileLabel[p]) }))} /></Field>
         <Field label={t("Status")} hint={t(row ? "A customer that still has units, contracts or open jobs cannot be deactivated." : "Inactive customers cannot get new units.")}>
-          <Select value={d.status} onChange={(x) => { setD({ ...d, status: x.target.value as "active" | "inactive" }); }}><option value="active">{t("Active")}</option><option value="inactive">{t("Inactive")}</option></Select>
+          <Select value={d.status} onChange={(x) => { setD({ ...d, status: oneOf(["active", "inactive"] as const, x.target.value, d.status) }); }}><option value="active">{t("Active")}</option><option value="inactive">{t("Inactive")}</option></Select>
         </Field>
         {!row && <p className="text-[11px] text-muted-foreground">{t("Next step: add a property (home or office) for this customer.")}</p>}
       </div>
@@ -528,7 +529,7 @@ function SpaceModal({ c, init, pending, onClose, onSave }: Readonly<{ c: Custome
     <Modal open onClose={onClose} title={t("Add location")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!e) onSave({ propertyId, kind, parentSpaceId: parent || null, name: name.trim() }); }}>{t(addKind[kind])}</Btn></>}>
       <div className="flex flex-col gap-3">
         <Field label={t("Property")}><Select value={propertyId} onChange={(x) => { setPropertyId(x.target.value); setParent(""); }}>{c.tree.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Select></Field>
-        <Field label={t("Kind · required")} hint={t("floor · area · room · space (under the parent you pick)")}><Select value={kind} onChange={(x) => { setKind(x.target.value as TreeSpace["kind"]); }}>{(["floor", "area", "room", "space"] as const).map((k) => <option key={k} value={k}>{(textOf(kindLabel, k, t) ?? k)}</option>)}</Select></Field>
+        <Field label={t("Kind · required")} hint={t("floor · area · room · space (under the parent you pick)")}><Select value={kind} onChange={(x) => { setKind(oneOf(["floor", "area", "room", "space"] as const, x.target.value, kind)); }}>{(["floor", "area", "room", "space"] as const).map((k) => <option key={k} value={k}>{(textOf(kindLabel, k, t) ?? k)}</option>)}</Select></Field>
         <Field label={t("Parent")} hint={t("Same property only; floors and areas usually sit directly under the property")}>
           <Select value={parent} onChange={(x) => { setParent(x.target.value); }}><option value="">{t("{name} (top level)", { name: p?.name ?? t("Property") })}</option>{parents.map((x) => <option key={x.id} value={x.id}>{x.name} ({(textOf(kindLabel, x.kind, t) ?? x.kind)})</option>)}</Select>
         </Field>
@@ -814,11 +815,11 @@ function WarrantyTab({ live }: Readonly<{ live: UnitsLive }>) {
         <Select aria-label={t("Customer")} className="w-auto" value={f.customerId} onChange={(e) => { setF({ ...f, customerId: e.target.value }); }}>
           <option value="">{t("Customer: All")}</option>{w.customers.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
         </Select>
-        <Select aria-label={t("Coverage")} className="w-auto" value={f.coverage} onChange={(e) => { setF({ ...f, coverage: e.target.value as CoverageFilter["coverage"] }); }}>
+        <Select aria-label={t("Coverage")} className="w-auto" value={f.coverage} onChange={(e) => { setF({ ...f, coverage: oneOf(["", ...coverageStatuses], e.target.value, f.coverage) }); }}>
           <option value="">{t("Coverage: All")}</option><option value="contract">{t("Maintenance contract")}</option><option value="under_warranty">{t("Under warranty")}</option><option value="expiring">{t("Ending within 90 days")}</option><option value="no_coverage">{t("No coverage")}</option>
         </Select>
-        <Select aria-label={t("Ends within")} className="w-auto" value={f.within} onChange={(e) => { setF({ ...f, within: e.target.value as CoverageFilter["within"] }); }}>
-          <option value="">{t("Ends within: any")}</option>{["30", "90", "180", "365"].map((d) => <option key={d} value={d}>{t("Ends within: {n} days", { n: d })}</option>)}
+        <Select aria-label={t("Ends within")} className="w-auto" value={f.within} onChange={(e) => { setF({ ...f, within: oneOf(["", ...withinDays], e.target.value, f.within) }); }}>
+          <option value="">{t("Ends within: any")}</option>{withinDays.map((d) => <option key={d} value={d}>{t("Ends within: {n} days", { n: d })}</option>)}
         </Select>
       </div>
       <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>

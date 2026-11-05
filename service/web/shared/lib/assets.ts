@@ -13,7 +13,8 @@ import type { IconName } from "@ac/web/components/Icon";
 import { byText } from "@ac/web/lib/order";
 import { codePoints } from "@ac/web/lib/text";
 
-export type Profile = "rto" | "general" | "energy" | "environment";
+export const profiles = ["rto", "general", "energy", "environment"] as const;
+export type Profile = (typeof profiles)[number];
 export type Connection = "online" | "offline" | "unknown" | "connecting" | "error";
 export type PowerState = "on" | "off" | "unknown";
 export type Scope = "indoor" | "outdoor" | "electrical";
@@ -106,7 +107,8 @@ export function customerRows(cs: ApiCustomerRow[], orgs: ApiOrgRow[], ps: ApiPro
     };
   });
 }
-export type ContractFilter = "all" | "overdue" | "restricted" | "good" | "none";
+export const contractFilters = ["all", "overdue", "restricted", "good", "none"] as const;
+export type ContractFilter = (typeof contractFilters)[number];
 export function contractMatch(f: ContractFilter, r: CustomerRow): boolean {
   if (f === "all") return true;
   const s = r.standing;
@@ -418,7 +420,8 @@ export function inviteError(email: string, us: { email: string }[], t: T = trans
 
 // ---- warranty & coverage (FR-A19) ----
 
-export type CoverageStatus = "under_warranty" | "contract" | "expiring" | "no_coverage";
+export const coverageStatuses = ["under_warranty", "contract", "expiring", "no_coverage"] as const;
+export type CoverageStatus = (typeof coverageStatuses)[number];
 /** UnitCoverage of service-contracts.ts. */
 export interface ApiCoverage { unitId: string; customerId: string; modelId: string; warrantyEndsAt: string | null; contractIds: string[]; status: CoverageStatus; claimableJobIds: string[] }
 export interface CoverageRow {
@@ -477,7 +480,8 @@ export function coverageKpis(rows: CoverageRow[], t: T = en) {
     contractNames: contracts.length > 2 ? `${contracts.slice(0, 2).join(", ")} …` : contracts.join(", ") || t("none"),
   };
 }
-export interface CoverageFilter { customerId: string; coverage: "" | CoverageStatus; within: "" | "30" | "90" | "180" | "365" }
+export const withinDays = ["30", "90", "180", "365"] as const;
+export interface CoverageFilter { customerId: string; coverage: "" | CoverageStatus; within: "" | (typeof withinDays)[number] }
 export const coverageMatch = (r: CoverageRow, f: CoverageFilter) => {
   return (!f.customerId || r.customerId === f.customerId) && (!f.coverage || r.status === f.coverage)
     && (!f.within || (r.days !== null && r.days > 0 && r.days <= Number(f.within)));
