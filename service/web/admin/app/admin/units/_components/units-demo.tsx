@@ -6,6 +6,7 @@ import { ImportCsvModal, WarrantyTab } from "@ac/web/components/Features";
 import { ClientRole, ClientUser, clientUserActions, emailError, useClientUsers } from "@ac/web/lib/clientUsers";
 import { nameError } from "@ac/web/lib/partnerUsers";
 import { Badge, Banner, Btn, Card, DataTable, Field, Input, Kpi, ListRow, Modal, Page, PowerBadge, ConnBadge, Search, Select, SummaryList, Tabs, useToast, ActionMenu, Plain } from "@ac/web/components/ui";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { Icon } from "@ac/web/components/Icon";
 
 interface Cust { id: string; name: string; status: "active" | "inactive"; props: number; units: number; op: string; alerts: number | string; contract: string }
@@ -57,7 +58,7 @@ export function UnitsDemo() {
         {top === "warranty" ? <WarrantyTab /> : <>
         <div className="grid-fluid" style={{ ["--min"as string]: "180px" }}><Kpi label="Customers" value={2} sub="+1 inactive (not counted)" /><Kpi label="Properties" value={2} sub="Home A · Home B" /><Kpi label="Units" value={5} sub="Running 2 · Stopped 2 · unknown 1" /><Kpi label="Needs attention" value={1} tone="warn" sub="overdue billing / open alert" /></div>
         <Card title="Customers" sub="Select a customer to manage its properties, spaces, and units" action={<Btn size="sm" variant="primary" onClick={() => { setModal("customer"); }}><Icon name="add" /> New customer</Btn>}>
-          <div className="mb-3 flex flex-wrap items-center gap-3"><div className="min-w-[220px] flex-1 sm:max-w-sm"><Search placeholder="Search customer name, ID, or property…" value={q} onChange={setQ} /></div><Select aria-label="Status" className="w-auto" value={status} onChange={(e) => { setStatus(e.target.value as "all"); }}><option value="active">Status: Active</option><option value="all">Status: All</option></Select></div>
+          <div className="mb-3 flex flex-wrap items-center gap-3"><div className="min-w-[220px] flex-1 sm:max-w-sm"><Search placeholder="Search customer name, ID, or property…" value={q} onChange={setQ} /></div><Select aria-label="Status" className="w-auto" value={status} onChange={(e) => { setStatus(oneOf(["active", "all"] as const, e.target.value, status)); }}><option value="active">Status: Active</option><option value="all">Status: All</option></Select></div>
           <DataTable rows={rows} rowKey={(r) => r.id} onRowClick={(c) => { setCust(c); }} cols={[{ key: "c", label: "Customer", render: (c) => <><b>{c.id}</b><div className="text-xs text-muted-foreground">{c.name}</div></> }, { key: "s", label: "Status", render: (c) => <Badge tone={c.status === "active" ? "ok" : "unknown"}>{c.status}</Badge> }, { key: "p", label: "Properties", render: (c) => c.props, hideBelow: "sm" }, { key: "u", label: "Units", render: (c) => c.units }, { key: "o", label: "Operation", render: (c) => c.op, hideBelow: "md" }, { key: "a", label: "Alerts", render: (c) => c.alerts, hideBelow: "md" }, { key: "k", label: "Contract", render: (c) => c.contract, hideBelow: "md" }, { key: "x", label: "", render: () => <span className="text-muted-foreground"><Icon name="chevronRight" /></span> }]} />
           <p className="mt-2 text-[11px] text-muted-foreground">{rows.length} of 3 · sorted by name · Inactive customers appear only with Status: All (IR40). Archived properties/spaces/units never appear in lists, summaries, or KPI denominators (IR39).</p>
         </Card>
@@ -142,7 +143,7 @@ function ClientUsersTab() {
       <Modal open={open} onClose={close} title="Add client user" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (nameError(name)) return; const e = clientUserActions.invite(email, role, "hq-operator", name); if (e) return; toast(`${name.trim()} added — nothing is sent in the demo`); close(); }}>Add user</Btn></>}>
         <Field label="Name" error={nameProblem}><Input value={name} maxLength={120} onChange={(e) => { setName(e.target.value); }} /></Field>
         <Field label="Email" hint="One account per person; the set-up e-mail goes to this address" error={errorText}><Input type="email" value={email} onChange={(e) => { setEmail(e.target.value); }} /></Field>
-        <Field label="Role"><Select value={role} onChange={(e) => { setRole(e.target.value as ClientRole); }}><option value="member">Member</option><option value="owner">Owner</option></Select></Field>
+        <Field label="Role"><Select value={role} onChange={(e) => { setRole(oneOf(["member", "owner"] as const, e.target.value, role)); }}><option value="member">Member</option><option value="owner">Owner</option></Select></Field>
       </Modal>
     </Card>
   );
