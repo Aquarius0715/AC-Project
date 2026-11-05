@@ -3,10 +3,16 @@
 // Data-source switch for screens: in the Phase 1A demo (DATA_SOURCE=mock) screens keep their fixture data; with
 // DATA_SOURCE=API the same screen reads the Core API through the BFF relay.
 import { useEffect, useEffectEvent, useState } from "react";
+import { z } from "zod";
 import { callOp, OpError } from "@ac/web/lib/ops";
 import type { OpArgs, OpCall } from "@ac/web/lib/opTypes";
 
 export interface BffSession { dataSource: "mock" | "api"; signedIn: boolean; role: string | null; membershipId: string | null; clientRole: string | null; serverNow: string | null }
+
+const bffSessionSchema = z.object({
+  dataSource: z.enum(["mock", "api"]), signedIn: z.boolean(), role: z.string().nullable(), membershipId: z.string().nullable(), clientRole: z.string().nullable(), serverNow: z.string().nullable(),
+}) satisfies z.ZodType<BffSession>;
+const MOCK_SESSION: BffSession = { dataSource: "mock", signedIn: false, role: null, membershipId: null, clientRole: null, serverNow: null };
 
 let cached: Promise<BffSession> | null = null;
 
@@ -28,10 +34,17 @@ function useRevision(): number {
   return r;
 }
 
+async function readBffSession(): Promise<BffSession> {
+  try {
+    const r = await fetch("/bff/session", { cache: "no-store" });
+    return bffSessionSchema.parse(await r.json());
+  } catch {
+    return MOCK_SESSION; // an unreadable or unexpected answer is the mock session
+  }
+}
+
 export function bffSession(): Promise<BffSession> {
-  cached ??= fetch("/bff/session", { cache: "no-store" })
-    .then((r) => r.json() as Promise<BffSession>)
-    .catch(() => ({ dataSource: "mock", signedIn: false, role: null, membershipId: null, clientRole: null, serverNow: null }));
+  cached ??= readBffSession();
   return cached;
 }
 

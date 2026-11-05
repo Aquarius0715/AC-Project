@@ -34,6 +34,14 @@ describe("useOp", () => {
     expect(callOp).not.toHaveBeenCalled();
   });
 
+  it("reads an answer of another shape as the mock session", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(Response.json({ dataSource: "api", signedIn: "yes" }))));
+    const { useOp } = await load();
+    const { result } = renderHook(() => useOp<{ n: number }, number>("units.list", {}, 7, (d) => d.n));
+    await waitFor(() => { expect(result.current.source).toBe("mock"); });
+    expect(callOp).not.toHaveBeenCalled();
+  });
+
   it("reads and maps the operation in api mode, and reads again after invalidate", async () => {
     session("api");
     callOp.mockResolvedValueOnce({ n: 1 }).mockResolvedValueOnce({ n: 2 });
