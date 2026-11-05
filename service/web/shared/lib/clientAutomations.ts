@@ -6,6 +6,8 @@ import type { UnitAction } from "@ac/web/lib/contracts.gen";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { IconName } from "@ac/web/components/Icon";
 import { codePoints } from "@ac/web/lib/text";
+import { acModes, fanLevels } from "@ac/web/lib/automation";
+import { oneOf } from "@ac/web/lib/oneOf";
 
 const en = translator("en");
 
@@ -247,9 +249,9 @@ export function actionOf(key: string): UnitAction {
   const [k, v] = key.split(":", 2);
   if (k === "power") return { kind: "set_power", power: v === "on" };
   if (k === "temp") return { kind: "set_temperature", celsius: Number(v) };
-  if (k === "mode") return { kind: "set_mode", mode: v as "cool" | "dry" | "fan" };
-  if (k === "vent") return { kind: "ventilate", level: v as "low" | "mid" | "high" };
-  return { kind: "set_fan", fanLevel: v as "low" | "mid" | "high" };
+  if (k === "mode") return { kind: "set_mode", mode: oneOf(acModes, v ?? "", "cool") };
+  if (k === "vent") return { kind: "ventilate", level: oneOf(fanLevels, v ?? "", "mid") };
+  return { kind: "set_fan", fanLevel: oneOf(fanLevels, v ?? "", "mid") };
 }
 export function blankDraft(unitId: string, timezone: string): Draft {
   return {
