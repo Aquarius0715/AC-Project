@@ -3,18 +3,19 @@
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, DataTable, Field, Input, ListRow, Page, Select, useToast, cx } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
+import { nonEmpty } from "@ac/web/lib/lists";
 
-const pols = [
+const pols = nonEmpty([
   { id: "p-shave", name: "Peak shaving", sub: "When peak active → fan low", pri: 70, group: "ACROSS CUSTOMERS", on: true },
   { id: "policy-peak-a", name: "Peak-price pre-cool", sub: "When tariff > 0.6 MYR/kWh → set 26 °C", pri: 60, group: "CUSTOMER-A", on: true },
   { id: "p-occ", name: "Occupancy stop", sub: "When not occupied → power off", pri: 50, group: "CUSTOMER-A", on: true },
   { id: "p-solar", name: "Solar surplus cooling", sub: "When solar > 2 kW → set 24 °C", pri: 40, group: "CUSTOMER-A", on: false },
-];
+]);
 
 /** The Phase 1A demo of the HQ automation policies (fixture policies). */
 export function AutomationDemo() {
   const toast = useToast();
-  const [sel, setSel] = useState(pols[1]);
+  const [sel, setSel] = useState(pols[1] ?? pols[0]);
   const [showOff, setShowOff] = useState(true);
   const [trigger, setTrigger] = useState("Tariff");
   const [inputValue, setValue] = useState("0.6");

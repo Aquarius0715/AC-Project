@@ -17,6 +17,7 @@ import {
   answerInquiry, confirmCardPayment, createInvoice, generatePayouts, previewReminder, recordManualPayment, resolvePayoutQuery, sendReminder, transitionStatement, type ActionResult,
 } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
+import { type NonEmpty } from "@ac/web/lib/lists";
 
 /** A recipient's role in words (IR499). */
 const ROLE_WORD: Record<string, string> = { client: "Client", admin: "Admin", contractor: "Contractor", technician: "Technician" };
@@ -35,15 +36,15 @@ export interface BillingLive {
   statementMissing?: boolean;
 }
 
-const row = (r: Omit<InvoiceRow, "methodName" | "paymentState">): InvoiceRow => ({ ...r, methodName: r.method.split(" · ", 1)[0], paymentState: r.method.split(" · ", 2)[1] ?? null });
-const seed: InvoiceRow[] = [
+const row = (r: Omit<InvoiceRow, "methodName" | "paymentState">): InvoiceRow => ({ ...r, methodName: r.method.split(" · ", 1)[0] ?? r.method, paymentState: r.method.split(" · ", 2)[1] ?? null });
+const seed: NonEmpty<InvoiceRow> = [
   row({ id: "invoice-general-b", number: "invoice-general-b", version: 1, amt: "50.00 MYR", amountMinor: 5000, currency: "MYR", meta: "customer-b · contract-general-b · Aug 2026", method: "Debit card · failed", st: "Unpaid", customerId: "customer-b", contractId: "contract-general-b", period: "2026-08-01 → 2026-09-01", due: "2026-09-10" }),
   row({ id: "invoice-jul-a", number: "invoice-jul-a", version: 1, amt: "120.00 MYR", amountMinor: 12_000, currency: "MYR", meta: "customer-a · contract-rto-a v1 · Jul 2026", method: "Method not selected · confirmed", st: "Paid", customerId: "customer-a", contractId: "contract-rto-a", period: "2026-07-01 → 2026-08-01", due: "2026-08-10" }),
   row({ id: "invoice-overdue-a", number: "invoice-overdue-a", version: 1, amt: "120.00 MYR", amountMinor: 12_000, currency: "MYR", meta: "customer-a · contract-rto-a v1 · Aug 2026", method: "Method not selected", st: "Overdue", customerId: "customer-a", contractId: "contract-rto-a", period: "2026-08-01 → 2026-09-01", due: "2026-09-10" }),
   row({ id: "invoice-overdue-b", number: "invoice-overdue-b", version: 1, amt: "85.00 MYR", amountMinor: 8500, currency: "MYR", meta: "customer-b · contract-rto-b v1 · Aug 2026", method: "Credit card · processing", st: "Processing", customerId: "customer-b", contractId: "contract-rto-b", period: "2026-08-01 → 2026-09-01", due: "2026-09-10" }),
   row({ id: "invoice-sep-a", number: "invoice-sep-a", version: 1, amt: "50.00 MYR", amountMinor: 5000, currency: "MYR", meta: "customer-a · contract-general-a v1 · Sep 2026", method: "Method not selected", st: "Unpaid", customerId: "customer-a", contractId: "contract-general-a", period: "2026-09-01 → 2026-10-01", due: "2026-10-10" }),
 ];
-const seedInquiries: InquiryRow[] = [
+const seedInquiries: NonEmpty<InquiryRow> = [
   { id: "inquiry-a-01", version: 1, cust: "customer-a", kind: "payment", at: "09-21", text: "“I paid by bank transfer on 20 Sep — why is cooling still limited?”", state: "received", reply: null, invoiceId: "invoice-overdue-a", restrictionId: "restriction-limited-a" },
   { id: "inquiry-b-02", version: 1, cust: "customer-b", kind: "billing", at: "09-19", text: "“Please resend the August invoice.”", state: "received", reply: null, invoiceId: null, restrictionId: null },
 ];
@@ -99,10 +100,10 @@ export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
   const setTab = (id: Tab) => { if (live) nav({ tab: id === "invoices" ? null : id, invoiceId: null, inquiryId: null, statementId: null }); else setUrlTab(id); };
 
   // invoices
-  const [demoList, setDemoList] = useState(seed);
+  const [demoList, setDemoList] = useState<InvoiceRow[]>(seed);
   const list = live ? live.rows : demoList;
   const [f, setF] = useState<"All" | InvoiceStatus>("All");
-  const [demoSel, setDemoSel] = useState(seed[2].id);
+  const [demoSel, setDemoSel] = useState(seed[2]?.id ?? seed[0].id);
   const sel = list.find((x) => x.id === (live ? live.selectedInvoice?.id : demoSel)) ?? list.at(0) ?? null;
   const detail = live?.selectedInvoice;
   const shown = list.filter((x) => f === "All" || x.st === f);

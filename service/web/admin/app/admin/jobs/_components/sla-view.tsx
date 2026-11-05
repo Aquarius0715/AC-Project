@@ -64,18 +64,18 @@ export function SlaView({ live }: Readonly<{ live: SlaLive }>) {
           )}
         </Card>
       </div>
-      {modal === "targets" && <TargetsModal live={live} onClose={(text) => { setModal(null); if (text) setResult({ tone: "ok", text }); }} onFail={(text) => { setModal(null); setResult({ tone: "crit", text }); }} />}
+      {modal === "targets" && live.targets[0] && <TargetsModal live={live} first={live.targets[0]} onClose={(text) => { setModal(null); if (text) setResult({ tone: "ok", text }); }} onFail={(text) => { setModal(null); setResult({ tone: "crit", text }); }} />}
       {modal === "job" && <NewJobModal live={{ now: live.now, units: live.units, q: {} }} onClose={() => { setModal(null); }} />}
     </Page>
   );
 }
 
-function TargetsModal({ live, onClose, onFail }: Readonly<{ live: SlaLive; onClose: (text?: string) => void; onFail: (text: string) => void }>) {
+function TargetsModal({ live, first, onClose, onFail }: Readonly<{ live: SlaLive; first: SlaLive["targets"][number]; onClose: (text?: string) => void; onFail: (text: string) => void }>) {
   const i = useI18n(), { t } = i, zone = i.display.timeZone;
   const now = Date.parse(live.now);
   const [pending, run] = useAction();
-  const [plan, setPlan] = useState(live.targets[0].plan);
-  const current = live.targets.find((t) => t.plan === plan) ?? live.targets[0];
+  const [plan, setPlan] = useState(first.plan);
+  const current = live.targets.find((t) => t.plan === plan) ?? first;
   const [f, setF] = useState({ responseHours: String(current.now.responseHours), arrival: String(current.now.arrivalInWindowPercent), ftf: String(current.now.firstTimeFixPercent), from: zonedInput(new Date(now + 5 * 60_000).toISOString(), zone) });
   const [tried, setTried] = useState(false);
   const effectiveFrom = f.from ? fromZonedInput(f.from, zone) || null : null; // typed in the display time zone (NFR-08)

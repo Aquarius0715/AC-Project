@@ -5,11 +5,12 @@ import { Btn, Card, Check, Field, Input, ListRow, Page, Select, SummaryList, Tab
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
 import { Icon } from "@ac/web/components/Icon";
 import { byText } from "@ac/web/lib/order";
+import { nonEmpty } from "@ac/web/lib/lists";
 
-const baselines = [
+const baselines = nonEmpty([
   { id: "baseline-energy-100", name: "baseline-energy-100", sub: "unit-online-rto · 100.0 kWh · demo_fixed", kwh: 100, units: ["unit-online-rto"] },
   { id: "baseline-2units-100", name: "baseline-2units-100", sub: "unit-limited + unit-online-rto · 100.0 kWh", kwh: 100, units: ["unit-limited", "unit-online-rto"] },
-];
+]);
 const allUnits = ["unit-online-rto", "unit-limited", "unit-offline-rto"];
 
 /** The Phase 1A demo of the energy analysis (fixture baselines, editable actual value). */

@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useState } from "react";
 import { Badge, Btn, Card, DataTable, Field, Input, ListRow, Modal, Page, Select, Steps, SummaryList, useToast } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
+import { type NonEmpty } from "@ac/web/lib/lists";
 
 interface R { id: string; meta: string; policy: string; st: "Scheduled" | "Requested" | "Applied" | "Release requested" | "Released"; prog: string; tone: "primary" | "warn" | "ok" | "unknown" }
-const seed: R[] = [
+const seed: NonEmpty<R> = [
   { id: "restriction-limited-a", meta: "contract-rto-a · customer-a", policy: "Temperature limit ≥ 24 °C · 1 unit", st: "Applied", prog: "1/1 applied", tone: "warn" },
   { id: "restriction-rto-b", meta: "contract-rto-e · customer-e", policy: "Power off · 1 unit", st: "Scheduled", prog: "executes after 09-25 09:00", tone: "primary" },
   { id: "restriction-rto-c", meta: "contract-rto-c · customer-c", policy: "Power off · 2 units", st: "Released", prog: "released 09-08", tone: "ok" },
@@ -17,7 +18,7 @@ const flow = ["Scheduled", "Requested", "Applied", "Release requested", "Release
 /** The Phase 1A demo of the restriction manager (fixture restrictions). */
 export function RestrictionsDemo() {
   const toast = useToast();
-  const [list, setList] = useState(seed);
+  const [list, setList] = useState<(typeof seed)[number][]>(seed);
   const [sel, setSel] = useState(seed[0]);
   const [modal, setModal] = useState(false);
   const [f, setF] = useState({ contract: "", policy: "Temperature limit", exec: "", notice: "" });
@@ -33,9 +34,9 @@ export function RestrictionsDemo() {
       <div className="split-rev">
         <Card title="Restrictions" sub="restriction.read · sorted by ID" className="self-start"><div className="flex flex-col gap-2">{list.map((x) => <ListRow key={x.id} selected={sel.id === x.id} onClick={() => { setSel(x); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{x.id}</b><Badge tone={x.tone}>{x.st}</Badge></div><div className="text-[11px] text-muted-foreground">{x.meta}</div><div className="text-[11px] text-muted-foreground">{x.policy} · {x.prog}</div></div></ListRow>)}</div></Card>
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title={sel.id} sub={`${sel.meta.split(" · ", 1)[0]} v1 · customer-a · rules demo-v1 · version 3`} action={<Link className="text-xs font-semibold text-primary" href={`/admin/restrictions/${sel.id}`}>Exception / override <Icon name="arrowRight" /></Link>}>
+          <Card title={sel.id} sub={`${sel.meta.split(" · ", 1)[0] ?? sel.meta} v1 · customer-a · rules demo-v1 · version 3`} action={<Link className="text-xs font-semibold text-primary" href={`/admin/restrictions/${sel.id}`}>Exception / override <Icon name="arrowRight" /></Link>}>
             <Steps steps={flow} current={currentRow} />
-            <div className="mt-4"><SummaryList cols={2} items={[["Policy", sel.policy.split(" · ", 1)[0] + (sel.policy.includes("24") ? " — cooling setpoint ≥ 24 °C" : "")], ["Notice sent", "2026-09-12 08:00 · 1 client notified"], ["Executed after", "2026-09-13 08:00 · notice ≥ 24 h"], ["Grace / exception", "None"], ["Reason shown to the customer", "“Demo: invoice overdue since 2026-09-10”"]]} /></div>
+            <div className="mt-4"><SummaryList cols={2} items={[["Policy", `${sel.policy.split(" · ", 1)[0] ?? sel.policy}${sel.policy.includes("24") ? " — cooling setpoint ≥ 24 °C" : ""}`], ["Notice sent", "2026-09-12 08:00 · 1 client notified"], ["Executed after", "2026-09-13 08:00 · notice ≥ 24 h"], ["Grace / exception", "None"], ["Reason shown to the customer", "“Demo: invoice overdue since 2026-09-10”"]]} /></div>
             <div className="mt-3 flex flex-wrap gap-2">{sel.st === "Scheduled" && <Btn variant="primary" onClick={() => { setSt("Applied"); toast("Executed — restriction applied"); }}>Execute (confirm at executeAfter)</Btn>}{sel.st === "Release requested" && <><Btn onClick={() => { toast("Retry sent to offline unit", "warn"); }}>Retry</Btn><Btn onClick={() => { setSt("Released"); toast("Reconciled — released"); }}>Reconcile</Btn></>}{sel.st === "Applied" && <Btn onClick={() => { setSt("Release requested"); toast("Release requested"); }}>Request release…</Btn>}</div>
           </Card>
           <Card title="Cause invoices" action={<Link className="text-xs font-semibold text-primary" href="/admin/billing">Open in Billing <Icon name="arrowRight" /></Link>}><p className="text-[13px]"><b>invoice-overdue-a</b> · 120.00 MYR <span className="text-muted-foreground">Aug 2026 · due 09-10</span></p><p className="mt-1 text-xs text-muted-foreground">1 of 1 cause invoices unpaid. When every cause invoice is paid, this restriction moves to release_requested automatically.</p></Card>

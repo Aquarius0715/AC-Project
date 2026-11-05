@@ -87,7 +87,7 @@ export async function loadJobs(sp: SP) {
   const created = createdKind === "book" || createdKind === "requested" ? { id: one(sp.jobId) ?? "", book: createdKind === "book" } : null;
   const base = {
     ...head, q, requestDraft: jobRequest, created, period, periodChip: period ? periodChip(period, i) : null, sort, sorts: SORTS.map((x) => ({ id: x.id, text: t(x.text) })), total: list.total,
-    stages: STAGES.map((x, k) => ({ id: x.id, label: t(x.label), count: counts[k] })),
+    stages: STAGES.map((x, k) => ({ id: x.id, label: t(x.label), count: counts[k] ?? 0 })),
     deliveries: [{ id: "internal", name: t("Internal") }, ...contractors.map((c) => ({ id: c.id, name: c.name }))],
     assignees: members.filter((m) => m.role === "technician").map((m) => ({ id: m.id, name: m.displayName })),
     contractors: contractors.map((c) => ({ id: c.id, name: c.name, status: profiles.find((p) => p.organizationId === c.id)?.status === "suspended" ? "suspended" : c.status })),

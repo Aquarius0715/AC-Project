@@ -93,6 +93,7 @@ export async function extendAccess(jobId: string, version: number, accessValidUn
 more, due at or after the requested end, an optional contact window. Returns the new job's id. */
 export async function createJob(input: { unitId: string; type: OpInput<"jobs.create">["type"]; symptom: string; slots: Slot[]; dueAt: string | null; contactWindow: string }): Promise<{ ok: true; value: { id: string } } | ({ ok: false } & ActionFailure)> {
   const [first, ...alternatives] = input.slots;
+  if (!first) throw new Error("a job needs its 1st preferred time");
   try {
     const job = await coreOp<{ id: string }>("jobs.create", {
       unitId: input.unitId, type: input.type, symptom: input.symptom.trim(), requestedStart: first.startAt, requestedEnd: first.endAt, alternativeSlots: alternatives,

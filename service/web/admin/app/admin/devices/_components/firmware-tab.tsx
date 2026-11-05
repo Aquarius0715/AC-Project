@@ -59,7 +59,7 @@ export function FirmwareTab({ live }: Readonly<{ live: DevicesLive }>) {
           <div className="mb-3"><SummaryList cols={2} items={campaignFacts(sel, i)} /></div>
           <div className="flex flex-col gap-3">{sel.c.waves.map((w, n) => {
             const inWave = sel.c.results.filter((r) => r.waveIndex === n);
-            const [word, chip] = waveWord[waveStates(sel.c)[n]];
+            const [word, chip] = waveWord[waveStates(sel.c)[n] ?? "waiting"];
             const ok = inWave.filter((r) => r.status === "succeeded").length;
             const pct = inWave.length > 0 ? Math.round((ok * 100) / inWave.length) : 0;
             return <div key={w.label}><div className="mb-1 flex items-center justify-between gap-2 text-xs"><b>{t("Wave {n} · {percent} %", { n: n + 1, percent: w.percent })}</b><span className="flex items-center gap-2 text-muted-foreground">{t("{done} / {total} succeeded", { done: ok, total: inWave.length })}<Badge tone={chip}>{t(word)}</Badge></span></div><UtilizationBar pct={pct} tone={pct >= 95 ? "ok" : "primary"} label={t("Wave {n} · {percent} %", { n: n + 1, percent: w.percent })} /></div>;

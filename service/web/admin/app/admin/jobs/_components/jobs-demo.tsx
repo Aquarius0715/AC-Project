@@ -5,13 +5,14 @@ import { Badge, Banner, Btn, Card, Choice, DataTable, Field, Input, Kpi, ListRow
 import { JobStatusBadge, OriginBadge, PreferredSlotsInput, Rank, preferredError } from "@ac/web/components/JobBits";
 import { Job, JobStatus, Slot, fitFor, fmt, jobActions, longDate, statusLabel, useJobs } from "@ac/web/lib/jobs";
 import { Icon } from "@ac/web/components/Icon";
+import { nonEmpty } from "@ac/web/lib/lists";
 
 const PIPE: JobStatus[] = ["requested", "time_proposed", "offered", "accepted", "assigned", "in_progress", "submitted", "rework_requested", "completed", "on_hold"];
 const ORDER: JobStatus[] = ["requested", "time_proposed", "offered", "accepted", "assigned", "in_progress", "on_hold", "submitted", "rework_requested", "completed", "cancelled"];
-const plans = [
+const plans = nonEmpty([
   { id: "plan-living-a", name: "Living room AC — periodic inspection & filter cleaning", rule: "Every 3 months · day 8 · customer-a · next visit 2026-12-08", unit: "Living room AC", delivery: "Internal · tech-internal-b" },
   { id: "plan-lobby-b", name: "Lobby AC — quarterly inspection", rule: "Every 3 months · day 1 · customer-b · next 2026-11-01", unit: "Lobby AC", delivery: "Offer to contractor-a" },
-];
+]);
 type Tab = "jobs" | "plans" | "contractors" | "sla";
 
 /** The Phase 1A demo of the maintenance coordinator (fixture jobs, plans, contractors and SLA). */
@@ -149,7 +150,7 @@ function JobDetail({ j, open }: Readonly<{ j: Job; open: (m: { kind: "book"; slo
         <>
           {j.declined && <Banner tone="crit" icon="error"><b>Client declined the proposed time · {j.declined.at}</b><br />Reason: {j.declined.reason}{j.declined.comment ? ` — “${j.declined.comment}”` : ""}. Held capacity was released.</Banner>}
           <Card title={`Client’s preferred times${j.round > 1 ? ` (round ${String(j.round)})` : ""} — book one of these`} sub="Availability: qualification + overlap + travel">
-            <DataTable rowKey={(r) => r.i + ""} rows={j.preferred.map((s, i) => ({ s, i, f: fits[i] }))} cols={[
+            <DataTable rowKey={(r) => r.i + ""} rows={j.preferred.map((s, i) => ({ s, i, f: fits[i] })).filter((r): r is typeof r & { f: NonNullable<typeof r.f> } => r.f !== undefined)} cols={[
               { key: "r", label: "Rank", render: (r) => <Rank i={r.i} /> },
               { key: "t", label: "Time", render: (r) => <b>{longDate(r.s)}</b> },
               { key: "h", label: "HQ technicians", render: (r) => <span className="text-xs text-muted-foreground">{r.f.hq}</span>, hideBelow: "md" },
@@ -309,15 +310,15 @@ function ReasonModal({ what, j, onClose }: Readonly<{ what: "rework" | "hold" | 
   );
 }
 
-const contractors = [
+const contractors = nonEmpty([
   { id: "contractor-a", area: "KL, Selangor · 2 technicians", st: "Active" },
   { id: "contractor-b", area: "Penang · 3 technicians", st: "Active" },
   { id: "contractor-c", area: "Johor · offers suspended 09-20", st: "Suspended" },
-];
+]);
 export function Contractors() {
   const toast = useToast();
   const [sel, setSel] = useState(contractors[0]);
-  const [list, setList] = useState(contractors);
+  const [list, setList] = useState<(typeof contractors)[number][]>(contractors);
   return (
     <div className="split-rev">
       <Card title="Contractors" action={<Btn size="sm" onClick={() => { toast("Add contractor (demo)"); }}><Icon name="add" /> Add contractor</Btn>} className="self-start">

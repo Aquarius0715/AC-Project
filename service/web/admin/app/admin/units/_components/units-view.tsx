@@ -6,7 +6,7 @@ import { Badge, Banner, Btn, Card, Check, Choice, ConnBadge, cx, DataTable, Empt
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
-import { showTime, type T } from "@ac/web/lib/i18n";
+import { showTime, type T, textOf } from "@ac/web/lib/i18n";
 import {
   autoMapping, changedFields, connections, contractMatch, coverageCsv, coverageMatch, csvShape, customerDraft, customerErrors, customerMatch, errorReportCsv, flatten,
   importFields, importMessage, importPlace, importTemplate, inviteError, nameError, powerStates, profileLabel, propertyDraft, propertyErrors, propertyInput, reasonError,
@@ -218,7 +218,7 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
               <div className="flex flex-col gap-0.5">
                 {c.tree.map((p) => (
                   <div key={p.id}>
-                    <Node depth={0} selected={selId === p.id} onClick={() => { nav({ locationId: p.id, ...clearUnit }); }} icon="home" name={p.name} meta={`${t(kindLabel[p.kind])} · ${units(t, p.units)}`}
+                    <Node depth={0} selected={selId === p.id} onClick={() => { nav({ locationId: p.id, ...clearUnit }); }} icon="home" name={p.name} meta={`${(textOf(kindLabel, p.kind, t) ?? p.kind)} · ${units(t, p.units)}`}
                       menu={canWrite && <LocationMenu onRename={() => { setM({ kind: "rename", p }); }} onDelete={() => { setM({ kind: "archive", p }); }} />} />
                     {p.spaces.map((x) => <SpaceNode key={x.id} s={x} depth={1} selId={selId} nav={nav} canWrite={canWrite} setM={setM} />)}
                     {p.unassigned > 0 && <Node depth={1} selected={selId === `unassigned:${p.id}`} onClick={() => { nav({ locationId: `unassigned:${p.id}`, ...clearUnit }); }} icon="dot" name={t("Unassigned")} meta={units(t, p.unassigned)} />}
@@ -240,8 +240,8 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
       )}
       {m?.kind === "customer" && <CustomerModal row={r} pending={pending} onClose={close} onSave={(d) => { run(() => updateCustomer(r.id, r.version, { id: r.orgId, version: r.orgVersion ?? 1, name: r.billingName, status: r.orgStatus }, { billingName: d.billingName, name: d.name, serviceProfile: d.profile, status: d.status }), t("Customer saved"), close); }} />}
       {m?.kind === "property" && <PropertyModal p={m.p} pending={pending} onClose={close} onSave={(d) => { run(() => saveProperty(propertyInput(d, r.orgId, m.p?.id), m.p?.version), t(m.p ? "Property saved" : "Property added"), (id) => { close(); nav({ locationId: id, ...clearUnit }); }); }} />}
-      {m?.kind === "space" && <SpaceModal c={c} init={m} pending={pending} onClose={close} onSave={(x) => { run(() => saveSpace(x), t("{kind} “{name}” added", { kind: t(kindLabel[x.kind]), name: x.name }), (id) => { close(); nav({ locationId: id, ...clearUnit }); }); }} />}
-      {m?.kind === "rename" && <RenameModal name={m.p?.name ?? m.s?.name ?? ""} where={m.p ? t("{kind} · property", { kind: t(kindLabel[m.p.kind]) }) : t(kindLabel[m.s.kind])} pending={pending} onClose={close}
+      {m?.kind === "space" && <SpaceModal c={c} init={m} pending={pending} onClose={close} onSave={(x) => { run(() => saveSpace(x), t("{kind} “{name}” added", { kind: (textOf(kindLabel, x.kind, t) ?? x.kind), name: x.name }), (id) => { close(); nav({ locationId: id, ...clearUnit }); }); }} />}
+      {m?.kind === "rename" && <RenameModal name={m.p?.name ?? m.s?.name ?? ""} where={m.p ? t("{kind} · property", { kind: (textOf(kindLabel, m.p.kind, t) ?? m.p.kind) }) : (textOf(kindLabel, m.s.kind, t) ?? m.s.kind)} pending={pending} onClose={close}
         onSave={(name) => {
           run(() => {
             return (m.p ? saveProperty(propertyInput({ ...propertyDraft(m.p), name }, r.orgId, m.p.id), m.p.version)
@@ -272,7 +272,7 @@ function SpaceNode({ s, depth, selId, nav, canWrite, setM }: Readonly<{ s: TreeS
   return (
     <>
       <Node depth={depth} selected={selId === s.id} onClick={() => { nav({ locationId: s.id, ...clearUnit }); }} icon={s.children.length > 0 ? "chevronDown" : "chevronRight"} name={s.name}
-        meta={`${t(kindLabel[s.kind])}${s.units ? ` · ${String(s.units)}` : ""}`} menu={canWrite && <LocationMenu onRename={() => { setM({ kind: "rename", s }); }} onDelete={() => { setM({ kind: "archive", s }); }} />} />
+        meta={`${(textOf(kindLabel, s.kind, t) ?? s.kind)}${s.units ? ` · ${String(s.units)}` : ""}`} menu={canWrite && <LocationMenu onRename={() => { setM({ kind: "rename", s }); }} onDelete={() => { setM({ kind: "archive", s }); }} />} />
       {s.children.map((x) => <SpaceNode key={x.id} s={x} depth={depth + 1} selId={selId} nav={nav} canWrite={canWrite} setM={setM} />)}
       {canWrite && isContainer && <AddLink depth={depth + 1} onClick={() => { setM({ kind: "space", propertyId: s.propertyId, parentSpaceId: s.id, spaceKind: "room" }); }}><Icon name="add" /> {t("Add room")}</AddLink>}
     </>
@@ -300,22 +300,22 @@ function LocationCard({ c, sel, canWrite, active, setM }: Readonly<{ c: Customer
   if (sel.kind === "property") {
     const p = sel.property;
     return (
-      <Card title={p.name} sub={[t("{kind} · property", { kind: t(kindLabel[p.kind]) }), p.address, count(t, p.floors, "1 floor", "{n} floors"), count(t, p.rooms, "1 room", "{n} rooms"), units(t, p.units)].filter(Boolean).join(" · ")}
+      <Card title={p.name} sub={[t("{kind} · property", { kind: (textOf(kindLabel, p.kind, t) ?? p.kind) }), p.address, count(t, p.floors, "1 floor", "{n} floors"), count(t, p.rooms, "1 room", "{n} rooms"), units(t, p.units)].filter(Boolean).join(" · ")}
         action={canWrite && <div className="flex flex-wrap gap-2"><Btn size="sm" onClick={() => { setM({ kind: "rename", p }); }}>{t("Rename")}</Btn><Btn size="sm" onClick={() => { setM({ kind: "property", p }); }}>{t("Edit details")}</Btn>
           <Btn size="sm" onClick={() => { setM({ kind: "space", propertyId: p.id, parentSpaceId: null, spaceKind: p.kind === "office" ? "area" : "floor" }); }}><Icon name="add" /> {t(p.kind === "office" ? "Add floor / area" : "Add floor")}</Btn><Btn size="sm" variant="danger" onClick={() => { setM({ kind: "archive", p }); }}>{t("Delete")}</Btn></div>}>
-        <SummaryList cols={2} items={[[t("Type"), t(kindLabel[p.kind])], [t("Address"), p.address ?? "—"], [t("Access instructions"), p.accessInstructions ?? "—"], [t("Time zone"), "Asia/Kuala_Lumpur"], [t("Last edited"), c.lastEdit ?? "—"]]} />
+        <SummaryList cols={2} items={[[t("Type"), (textOf(kindLabel, p.kind, t) ?? p.kind)], [t("Address"), p.address ?? "—"], [t("Access instructions"), p.accessInstructions ?? "—"], [t("Time zone"), "Asia/Kuala_Lumpur"], [t("Last edited"), c.lastEdit ?? "—"]]} />
       </Card>
     );
   }
   const s = sel.space;
   const isHolds = s.kind === "room" || s.kind === "space";
   return (
-    <Card title={s.name} sub={`${t(kindLabel[s.kind])} · ${sel.path} · ${units(t, s.units)}`}
+    <Card title={s.name} sub={`${(textOf(kindLabel, s.kind, t) ?? s.kind)} · ${sel.path} · ${units(t, s.units)}`}
       action={canWrite && <div className="flex flex-wrap gap-2"><Btn size="sm" onClick={() => { setM({ kind: "rename", s }); }}>{t("Rename")}</Btn>
         {!isHolds && <Btn size="sm" onClick={() => { setM({ kind: "space", propertyId: s.propertyId, parentSpaceId: s.id, spaceKind: "room" }); }}><Icon name="add" /> {t("Add room")}</Btn>}
         <Btn size="sm" variant="danger" onClick={() => { setM({ kind: "archive", s }); }}>{t("Delete")}</Btn>
         {isHolds && active && <Btn size="sm" variant="primary" onClick={() => { setM({ kind: "unit", propertyId: s.propertyId, spaceId: s.id }); }}><Icon name="add" /> {t("New unit in {name}", { name: s.name })}</Btn>}</div>}>
-      <SummaryList cols={2} items={[[t("Kind"), t(kindLabel[s.kind])], [t("Child locations"), s.children.length || t("none")], [t("Units here"), s.direct], [t("Last edited"), c.lastEdit ?? "—"]]} />
+      <SummaryList cols={2} items={[[t("Kind"), (textOf(kindLabel, s.kind, t) ?? s.kind)], [t("Child locations"), s.children.length || t("none")], [t("Units here"), s.direct], [t("Last edited"), c.lastEdit ?? "—"]]} />
     </Card>
   );
 }
@@ -528,9 +528,9 @@ function SpaceModal({ c, init, pending, onClose, onSave }: Readonly<{ c: Custome
     <Modal open onClose={onClose} title={t("Add location")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!e) onSave({ propertyId, kind, parentSpaceId: parent || null, name: name.trim() }); }}>{t(addKind[kind])}</Btn></>}>
       <div className="flex flex-col gap-3">
         <Field label={t("Property")}><Select value={propertyId} onChange={(x) => { setPropertyId(x.target.value); setParent(""); }}>{c.tree.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Select></Field>
-        <Field label={t("Kind · required")} hint={t("floor · area · room · space (under the parent you pick)")}><Select value={kind} onChange={(x) => { setKind(x.target.value as TreeSpace["kind"]); }}>{(["floor", "area", "room", "space"] as const).map((k) => <option key={k} value={k}>{t(kindLabel[k])}</option>)}</Select></Field>
+        <Field label={t("Kind · required")} hint={t("floor · area · room · space (under the parent you pick)")}><Select value={kind} onChange={(x) => { setKind(x.target.value as TreeSpace["kind"]); }}>{(["floor", "area", "room", "space"] as const).map((k) => <option key={k} value={k}>{(textOf(kindLabel, k, t) ?? k)}</option>)}</Select></Field>
         <Field label={t("Parent")} hint={t("Same property only; floors and areas usually sit directly under the property")}>
-          <Select value={parent} onChange={(x) => { setParent(x.target.value); }}><option value="">{t("{name} (top level)", { name: p?.name ?? t("Property") })}</option>{parents.map((x) => <option key={x.id} value={x.id}>{x.name} ({t(kindLabel[x.kind])})</option>)}</Select>
+          <Select value={parent} onChange={(x) => { setParent(x.target.value); }}><option value="">{t("{name} (top level)", { name: p?.name ?? t("Property") })}</option>{parents.map((x) => <option key={x.id} value={x.id}>{x.name} ({(textOf(kindLabel, x.kind, t) ?? x.kind)})</option>)}</Select>
         </Field>
         <Field label={t("Name · required")} hint={t("1–120 characters, unique among its siblings")} error={tried ? e : undefined}><Input value={name} onChange={(x) => { setName(x.target.value); }} /></Field>
         <p className="text-[11px] text-muted-foreground">{t("A parent in another property, or a parent change that creates a cycle, is rejected with VALIDATION.")}</p>
@@ -590,7 +590,7 @@ function NewUnitModal({ live, c, init, pending, onClose, onSave }: Readonly<{ li
         <Field label={t("Customer · fixed")}><Input value={c.row.name} disabled /></Field>
         <Field label={t("Location · required")} error={fieldError("propertyId")}><Select value={d.propertyId} onChange={(x) => { set({ propertyId: x.target.value, spaceId: "" }); }}>{c.tree.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Select></Field>
         <Field label={t("Room / space · optional")} hint={t("Same property only. Leave empty for no room or floor.")}>
-          <Select value={d.spaceId} onChange={(x) => { set({ spaceId: x.target.value }); }}><option value="">{t("— not assigned —")}</option>{(p ? flatten(p.spaces) : []).map((x) => <option key={x.id} value={x.id}>{x.name} ({t(kindLabel[x.kind])})</option>)}</Select>
+          <Select value={d.spaceId} onChange={(x) => { set({ spaceId: x.target.value }); }}><option value="">{t("— not assigned —")}</option>{(p ? flatten(p.spaces) : []).map((x) => <option key={x.id} value={x.id}>{x.name} ({(textOf(kindLabel, x.kind, t) ?? x.kind)})</option>)}</Select>
         </Field>
         <Field label={t("Model · required")} hint={t(c.models.length > 0 ? "From capabilities.list" : "Models need device.read")} error={fieldError("modelId")}>
           <Select value={d.modelId} onChange={(x) => { set({ modelId: x.target.value }); }}>{c.models.length === 0 && <option value="">{t("no model available")}</option>}{c.models.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</Select>
@@ -830,8 +830,9 @@ function WarrantyTab({ live }: Readonly<{ live: UnitsLive }>) {
           { key: "k", label: t("Maintenance contract"), render: (r) => r.contracts, hideBelow: "md" },
           { key: "s", label: t("Status"), render: (r) => <Badge tone={coverageTone[r.status]}>{r.statusText}</Badge> },
           { key: "a", label: t("Action"), render: (r) => {
-            return (r.contractIds.length > 0
-              ? <TextLink href={`/admin/billing/contracts?contractId=${r.contractIds[0]}`}>{t("Open contract")}</TextLink>
+            const contractId = r.contractIds[0];
+            return (contractId
+              ? <TextLink href={`/admin/billing/contracts?contractId=${contractId}`}>{t("Open contract")}</TextLink>
               : <TextLink href={`/admin/billing/contracts?customerId=${r.customerId}&unitId=${r.unitId}`}>{t("Renewal offer")}</TextLink>);
           } },
         ]} />

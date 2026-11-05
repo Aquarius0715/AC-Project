@@ -12,6 +12,7 @@ import { dayInstant, draftErrors, planLabel, planWord, priceMinor, type Contract
 import { saveContract } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
 import { byCount } from "@ac/web/lib/i18n";
+import { nonEmpty } from "@ac/web/lib/lists";
 
 interface Scope { customerId?: string; unitId?: string; kind?: PlanType }
 interface Live { scope: Scope; rows: ContractRow[]; counts: Record<PlanType | "all", number>; selectedId: string | null; customers: { id: string; name: string }[]; units: UnitOption[] }
@@ -41,11 +42,11 @@ const demoRow = (id: string, cust: string, planType: PlanType, unitIds: string[]
     recovery: false,
   };
 };
-const seedRows = [
+const seedRows = nonEmpty([
   demoRow("contract-general-a", "customer-a", "general", ["unit-non-rto"], 5000, "2026-01-01", "2027-01-01", false, []),
   demoRow("contract-rto-a", "customer-a", "rto", ["unit-online-rto", "unit-offline-rto", "unit-limited"], 12_000, "2026-01-01", "2027-01-01", true, ["restriction-limited-a"]),
   demoRow("contract-rto-b", "customer-b", "rto", ["unit-other-customer"], 8500, "2026-03-01", "2027-03-01", true, []),
-];
+]);
 const seedUnits: UnitOption[] = [
   { id: "unit-online-rto", customerId: "customer-a", label: "Bedroom AC · unit-online-rto", where: "Home A › 1F › Bedroom", otherContracts: ["contract-rto-a"] },
   { id: "unit-offline-rto", customerId: "customer-a", label: "unit-offline-rto", where: "Home A › 2F › Study", otherContracts: ["contract-rto-a"] },
@@ -79,9 +80,9 @@ export function ContractsView({ live }: Readonly<{ live?: Live }>) {
     }
     router.replace(q.size > 0 ? `${pathname}?${q}` : pathname, { scroll: false });
   };
-  const [demoRows, setDemoRows] = useState(seedRows);
+  const [demoRows, setDemoRows] = useState<ContractRow[]>(seedRows);
   const [demoKind, setDemoKind] = useState<"all" | PlanType>("all");
-  const [demoSel, setDemoSel] = useState(seedRows[1].id);
+  const [demoSel, setDemoSel] = useState(seedRows[1]?.id ?? seedRows[0].id);
   const rows = live ? live.rows : demoRows.filter((r) => demoKind === "all" || r.planType === demoKind);
   const kind: "all" | PlanType = live ? live.scope.kind ?? "all" : demoKind;
   const customers = live ? live.customers : demoCustomers;

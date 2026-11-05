@@ -152,6 +152,7 @@ function Factors({ live }: Readonly<{ live: MRVLive }>) {
   const [pending, run] = useAction();
   const [selId, setSelId] = useState<string | "new">(live.factors[0]?.id ?? "new");
   const sel = selId === "new" ? null : live.factors.find((f) => f.id === selId) ?? live.factors[0] ?? null;
+  const firstFactor = live.factors[0];
   const blank: FactorDraft = { region: "", year: "2026", kgCO2ePerKWh: "", source: t("Demo (fictional)") };
   const key = sel ? `${sel.id}:${String(sel.version)}` : "new";
   const [source, setSource] = useState(key);
@@ -189,7 +190,7 @@ function Factors({ live }: Readonly<{ live: MRVLive }>) {
         {live.canFactors && (
           <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
             {sel && <span className="mr-auto text-[12px] text-muted-foreground">{t(isDirty ? "Unsaved changes" : "No unsaved changes")}</span>}
-            {!sel && live.factors[0] && <Btn onClick={() => { setSelId(live.factors[0].id); }}>{t("Cancel")}</Btn>}
+            {!sel && firstFactor && <Btn onClick={() => { setSelId(firstFactor.id); }}>{t("Cancel")}</Btn>}
             {sel && saved && <Btn disabled={pending || !isDirty} onClick={() => { setD(saved); setTried(false); }}>{t("Discard")}</Btn>}
             <Btn variant="primary" disabled={pending || (!!sel && !isDirty)} onClick={save}>{sel ? t("Save as v{n}", { n: sel.version + 1 }) : t("Create factor")}</Btn>
           </div>

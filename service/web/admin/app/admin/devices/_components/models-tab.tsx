@@ -51,6 +51,7 @@ export function ModelsTab({ live }: Readonly<{ live: DevicesLive }>) {
   };
   const available = metrics.filter((m) => d.sensors.every((s) => s.metric !== m));
   const pick = available.includes(addedSensor) ? addedSensor : available[0];
+  const firstModel = live.models[0];
   const save = () => {
     setTried(true);
     if (Object.keys(errors).length > 0) return;
@@ -91,7 +92,7 @@ export function ModelsTab({ live }: Readonly<{ live: DevicesLive }>) {
           <section>
             <h3 className="mb-2 text-[13px] font-bold">{t("Sensors")}</h3>
             <ScrollX><table className="w-full min-w-[420px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th>{t("Metric")}</th><th>{t("Unit")}</th><th>{t("Stale after (s)")}</th><th>{t("Boundary")}</th><th /></tr></thead><tbody>{d.sensors.map((s, n) => <tr key={s.metric} className="border-t border-line"><td className="py-1.5">{metricText(s.metric, t)}</td><td>{metricUnit[s.metric]}</td><td><Input type="number" className="w-28" aria-label={t("Stale after (s)")} value={s.staleAfterSeconds} onChange={(e) => { set({ sensors: d.sensors.map((x, j) => (j === n ? { ...x, staleAfterSeconds: e.target.value } : x)) }); }} /></td><td className="text-xs text-muted-foreground">{s.metric === "power" ? "ac_input_electricity" : "—"}</td><td><Plain touch type="button" className="text-xs text-crit" onClick={() => { set({ sensors: d.sensors.filter((_, j) => j !== n) }); }}>{t("Remove")}</Plain></td></tr>)}</tbody></table></ScrollX>
-            {available.length > 0 && <div className="mt-2 flex items-end gap-2"><Field label={t("Add sensor")}><Select value={pick} onChange={(e) => { setAddedSensor(e.target.value as Metric); }}>{available.map((m) => <option key={m} value={m}>{metricText(m, t)} ({metricUnit[m]})</option>)}</Select></Field><Btn size="sm" onClick={() => { set({ sensors: [...d.sensors, { metric: pick, staleAfterSeconds: "120" }] }); }}>{t("Add")}</Btn></div>}
+            {pick && <div className="mt-2 flex items-end gap-2"><Field label={t("Add sensor")}><Select value={pick} onChange={(e) => { setAddedSensor(e.target.value as Metric); }}>{available.map((m) => <option key={m} value={m}>{metricText(m, t)} ({metricUnit[m]})</option>)}</Select></Field><Btn size="sm" onClick={() => { set({ sensors: [...d.sensors, { metric: pick, staleAfterSeconds: "120" }] }); }}>{t("Add")}</Btn></div>}
             {fieldError("sensors") && <p className="mt-1 text-xs text-crit">{fieldError("sensors")}</p>}
           </section>
           <section aria-label={t("Firmware candidates")}>
@@ -122,7 +123,7 @@ export function ModelsTab({ live }: Readonly<{ live: DevicesLive }>) {
           {live.canWrite && (
             <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-3">
               {sel && <span className="mr-auto text-[12px] text-muted-foreground">{isDirty ? `${byCount(changes.length, { one: t("1 change"), many: t("{n} changes", { n: changes.length }) })} · ${changes.join(", ")}` : t("No unsaved changes")}</span>}
-              {!sel && live.models[0] && <Btn onClick={() => { setSelId(live.models[0].id); }}>{t("Cancel")}</Btn>}
+              {!sel && firstModel && <Btn onClick={() => { setSelId(firstModel.id); }}>{t("Cancel")}</Btn>}
               {sel && <Btn disabled={pending || !isDirty} onClick={() => { setD(capabilityDraft(sel.cap)); setTried(false); setAdding(null); }}>{t("Discard")}</Btn>}
               <Btn variant="primary" disabled={pending || (!!sel && !isDirty)} onClick={save}>{sel ? t("Save as capability v{v}", { v: sel.version + 1 }) : t("Create model")}</Btn>
             </div>

@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, ListRow, Modal, Page, Search, Select, Textarea, useToast } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
+import { type NonEmpty } from "@ac/web/lib/lists";
 
 interface U { id: string; role: string; org: string; email: string; role2: "admin" | "contractor" | "technician" }
-const users: U[] = [
+const users: NonEmpty<U> = [
   { id: "hq-operator", role: "Admin · HQ", org: "HQ (tenant)", email: "r.operator@hq.example", role2: "admin" },
   { id: "hq-restriction-manager", role: "Admin · HQ", org: "HQ (tenant)", email: "r.lim@hq.example", role2: "admin" },
   { id: "aziz.contractor-a", role: "Contractor · contractor-a", org: "contractor-a", email: "aziz@contractor-a.example", role2: "contractor" },
@@ -46,7 +47,7 @@ const preset: Record<U["role2"], string[]> = {
 export function AccessDemo() {
   const toast = useToast();
   const [q, setQ] = useState("");
-  const [sel, setSel] = useState<U | "new">(users[1]);
+  const [sel, setSel] = useState<U | "new">(users[1] ?? users[0]);
   const [role, setRole] = useState<U["role2"]>("admin");
   const [checked, setChecked] = useState<string[]>(preset.admin);
   const [reason, setReason] = useState("");

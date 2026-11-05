@@ -27,7 +27,7 @@ export function ConditionFields({ c, onChange, errors, tried, fixedMetric }: Rea
       <div className="grid-fluid" style={{ ["--min" as string]: "130px" }}>
         {fixedMetric
           ? <Field label={t("Metric")} hint={unit && t("unit fixed: {unit}", { unit })}><Input readOnly value={textOf(metricLabel, c.metric, t) ?? c.metric} /></Field>
-          : <Field label={t("Metric")}><Select value={c.metric} onChange={(e) => { onChange({ metric: e.target.value }); }}>{HQ_METRICS.map((k) => <option key={k} value={k}>{t(metricLabel[k])}</option>)}</Select></Field>}
+          : <Field label={t("Metric")}><Select value={c.metric} onChange={(e) => { onChange({ metric: e.target.value }); }}>{HQ_METRICS.map((k) => <option key={k} value={k}>{(textOf(metricLabel, k, t) ?? k)}</option>)}</Select></Field>}
         <Field label={t("Comparison")}><Select value={c.operator} onChange={(e) => { onChange({ operator: e.target.value as Operator }); }}>{OPERATORS.map((o) => <option key={o} value={o}>{opSymbol[o]}</option>)}</Select></Field>
         <Field label={t("Alert when {op}", { op: opSymbol[c.operator] })} error={tried ? errors.threshold : undefined}><Input type="number" value={c.threshold} onChange={(e) => { onChange({ threshold: +e.target.value }); }} /></Field>
         <Field label={t("For (s)")} error={tried ? errors.duration : undefined}><Input type="number" value={c.duration} onChange={(e) => { onChange({ duration: +e.target.value }); }} /></Field>
@@ -35,7 +35,7 @@ export function ConditionFields({ c, onChange, errors, tried, fixedMetric }: Rea
       </div>
       {/* an illustrative curve that crosses the threshold and comes back (not real readings) */}
       <div className="mt-2"><LineChart points={(c.operator === "lt" || c.operator === "lte" ? FALL : RISE).map((k) => Math.round(k * c.threshold * 10) / 10)} threshold={c.threshold} height={90} /></div>
-      <p className={cx("text-xs", errors.recovery ? "text-crit" : "text-ok")}><span className="inline-flex items-center gap-1"><Icon name={errors.recovery ? "error" : "check"} />{errors.recovery ? errors.recovery : t("Recovery {recovery} is on the safe side of the {threshold} threshold ({op})", { recovery: c.recovery, threshold: c.threshold, op: opSymbol[c.operator] })}</span></p>
+      <p className={cx("text-xs", errors.recovery ? "text-crit" : "text-ok")}><span className="inline-flex items-center gap-1"><Icon name={errors.recovery ? "error" : "check"} />{errors.recovery ?? t("Recovery {recovery} is on the safe side of the {threshold} threshold ({op})", { recovery: c.recovery, threshold: c.threshold, op: opSymbol[c.operator] })}</span></p>
     </>
   );
 }

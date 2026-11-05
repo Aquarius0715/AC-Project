@@ -166,7 +166,7 @@ async function unitLive(d: ApiUnitDetail, x: Ctx): Promise<UnitLive> {
     ...(x.contracts ?? []).filter((k) => k.unitIds.includes(d.id) && nowMs < Date.parse(k.endAt)).map((k) => ({ label: t("Unexpired contract ({plan}, until {date})", { plan: k.planType.toUpperCase(), date: businessDay(k.endAt, display.locale) }), href: `/admin/billing/contracts?contractId=${k.id}` })),
     ...(jobs ?? []).filter((j) => !done.has(j.status)).map((j) => ({ label: t("Active job ({type}, {status})", { type: typeLabel(j.type, t), status: statusWord(j.status, t) }), href: `/admin/jobs?jobId=${j.id}` })),
     ...(device ? [{ label: t("Active device binding ({serial})", { serial: device.serial }), href: `/admin/devices?tab=devices&deviceId=${device.id}` }] : []),
-    ...(x.restrictions ?? []).filter((r) => r.unitIds.includes(d.id) && r.state in restrictionState).map((r) => ({ label: t("Active restriction ({state})", { state: t(restrictionState[r.state]) }), href: `/admin/restrictions?restrictionId=${r.id}` })),
+    ...(x.restrictions ?? []).filter((r) => r.unitIds.includes(d.id) && r.state in restrictionState).map((r) => ({ label: t("Active restriction ({state})", { state: (textOf(restrictionState, r.state, t) ?? r.state) }), href: `/admin/restrictions?restrictionId=${r.id}` })),
     ...(d.pendingCommandIds.length > 0 ? [{ label: t(d.pendingCommandIds.length === 1 ? "1 pending command" : "{n} pending commands", { n: d.pendingCommandIds.length }), href: null }] : []),
   ];
   const byId = new Map((x.policies ?? []).map((p) => [p.id, p]));

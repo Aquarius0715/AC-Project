@@ -4,11 +4,12 @@ import { useState } from "react";
 import { Banner, Btn, Card, DataTable, Field, Input, ListRow, Modal, Page, Select, SummaryList, Tabs, Textarea, useToast, cx } from "@ac/web/components/ui";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
 import { Icon } from "@ac/web/components/Icon";
+import { nonEmpty } from "@ac/web/lib/lists";
 
-const reports = [
+const reports = nonEmpty([
   { id: "mrv-a14-a", meta: "org-customer-a · unit-online-rto · 09-14 08:00–09:00", sub: "40.0 kgCO₂e · v1", ok: true, versions: 1 },
   { id: "mrv-aug-a", meta: "org-customer-a · 3 units · Aug 2026", sub: "Calculation incomplete · v2", ok: false, versions: 2 },
-];
+]);
 
 /** The Phase 1A demo of the MRV workspace (fixture reports and factor). */
 export function MRVDemo() {

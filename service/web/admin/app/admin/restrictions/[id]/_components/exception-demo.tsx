@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useState } from "react";
 import { Banner, Btn, Card, Check, Field, Input, Page, SummaryList, Textarea, Timeline, useToast, Plain } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
+import type { NonEmpty } from "@ac/web/lib/lists";
 
 type A = "defer" | "exempt" | "cancel" | "override";
-const acts: [A, string, string, string][] = [
+const acts: NonEmpty<[A, string, string, string]> = [
   ["defer", "Grace period", "restrictions.defer", "Pause until a date; → release_requested (source: exception)"],
   ["exempt", "Exception", "restrictions.exempt", "Exempt until a date; → release_requested (source: exception)"],
   ["cancel", "Cancel", "restrictions.cancel", "Applied → release_requested (source: cancel). Does not assume nothing was applied"],

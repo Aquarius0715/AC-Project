@@ -119,6 +119,7 @@ function JobDetail({ d, live, fresh, onFresh }: Readonly<{ d: Detail; live: Jobs
   const failed = (f: ActionFailure) => { setResult({ tone: f.code === "CONFLICT" ? "warn" : "crit", text: hqRefusal(f, t) }); };
   const close = (text?: string) => { setModal(null); if (text) setResult({ tone: "ok", text }); };
   const sp = j.slotProposal, pp = j.partnerSlotProposal;
+  const firstPreferred = d.preferred[0];
   const c = d.controls;
   return (
     <div className="flex min-w-0 flex-col gap-4">
@@ -148,13 +149,13 @@ function JobDetail({ d, live, fresh, onFresh }: Readonly<{ d: Detail; live: Jobs
       {j.status === "requested" && sp?.status !== "pending" && j.followUpClass !== "pending" && (
         <>
           {sp?.status === "declined" && <Banner tone="crit" icon="error"><b>{t("The client declined the proposed time")}{d.texts.declinedAt ? ` · ${d.texts.declinedAt}` : ""}</b> — {sp.declineReason?.replaceAll('_', " ")}{sp.declineComment ? `: “${sp.declineComment}”` : ""}. {t("Held capacity was released; the client sent new preferred times (round {round}).", { round: j.preferenceRound })}</Banner>}
-          {d.preferred.length > 0 ? (
-            <Card title={preferredTitle(d.preferred[0].plan, j.preferenceRound, t)} sub={t("HQ technicians free and qualified for each time")}>
+          {firstPreferred ? (
+            <Card title={preferredTitle(firstPreferred.plan, j.preferenceRound, t)} sub={t("HQ technicians free and qualified for each time")}>
               <ScrollX><table className="w-full min-w-[640px] text-[13px]">
                 <thead><tr className="text-left text-[11px] uppercase text-muted-foreground"><th className="py-1.5">{t("Rank")}</th><th>{t("Time")}</th><th>{t("HQ technicians")}</th><th>{t("Contractors")}</th><th>{t("Action")}</th></tr></thead>
                 <tbody>{d.preferred.map((r) => <tr key={r.rank} className="border-t border-line"><td className="py-2"><span className="rounded-lg bg-primary-soft px-2 py-0.5 text-xs font-semibold text-primary">{r.plan ? t("Plan") : t(RANK[r.rank - 1] ?? "{n}th", { n: r.rank })}</span></td><td className="font-semibold">{r.text}</td><td className={cx("text-xs", r.fits ? "text-ok" : "text-muted-foreground")}>{r.hq}</td><td className="text-xs text-muted-foreground">{t("{names} — confirm in the offer", { names: contractorNames(live.contractors.filter((x) => x.status === "active").map((x) => x.name), t) })}</td><td><Btn size="sm" variant="primary" disabled={pending || Date.parse(r.slot.startAt) <= now} onClick={() => { setModal({ kind: "book", row: r }); }}>{t("Use this time")}</Btn></td></tr>)}</tbody>
               </table></ScrollX>
-              <p className="mt-2 text-[11px] text-muted-foreground">{t(d.preferred[0].plan ? "“Use this time” opens Assign internally / Offer to contractor with that time locked. HQ cannot book a time outside the plan occurrence without the client’s approval." : "“Use this time” opens Assign internally / Offer to contractor with that time locked. HQ cannot book a time outside these without the client’s approval.")}</p>
+              <p className="mt-2 text-[11px] text-muted-foreground">{t(firstPreferred.plan ? "“Use this time” opens Assign internally / Offer to contractor with that time locked. HQ cannot book a time outside the plan occurrence without the client’s approval." : "“Use this time” opens Assign internally / Offer to contractor with that time locked. HQ cannot book a time outside these without the client’s approval.")}</p>
             </Card>
           ) : <Banner>{t("No agreed time on this job (HQ request without alternatives) — propose a time to the client.")}</Banner>}
           <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#f5c473] bg-[#fff8ec] p-4">
@@ -534,7 +535,7 @@ export function NewJobModal({ live, initial, onClose, onCreated }: Readonly<{ li
   const slots = times.map((x) => ({ startAt: zonedInstant(x.date, x.from, zone), endAt: zonedInstant(x.date, x.to, zone) }));
   const errors = jobRequestErrors({ unitId, symptom, slots, contactWindow: contact }, now, t);
   const dueAt = due ? fromZonedInput(due, zone) : null;
-  const dueError = dueAt && Date.parse(dueAt) < Date.parse(slots[0].endAt) ? t("The due time cannot be before the end of the 1st time.") : undefined;
+  const dueError = dueAt && Date.parse(dueAt) < Date.parse(slots[0]?.endAt ?? "") ? t("The due time cannot be before the end of the 1st time.") : undefined;
   const set = (n: number, k: "date" | "from" | "to", v: string) => { setTimes(times.map((x, m) => (m === n ? { ...x, [k]: v } : x))); };
   const save = (book: boolean) => {
     setTried(true);
@@ -560,14 +561,14 @@ export function NewJobModal({ live, initial, onClose, onCreated }: Readonly<{ li
         <span className="text-[13px] font-semibold">{t("Customer’s preferred times")} <span className="font-normal text-muted-foreground">{t("· asked by phone · the 1st is the requested window, up to two more (each 1–4 h, from tomorrow) · times in {zone}", { zone })}</span></span>
         {times.map((x, n) => (
           <div key={n} className="flex flex-wrap items-end gap-2">
-            <span className="mb-2 w-8 text-xs font-semibold text-primary">{t(RANK[n])}</span>
+            <span className="mb-2 w-8 text-xs font-semibold text-primary">{t(RANK[n] ?? "")}</span>
             <Field label={t("Date {n}", { n: n + 1 })} error={tried ? errors[`slot${String(n)}`] : undefined}><Input type="date" value={x.date} onChange={(e) => { set(n, "date", e.target.value); }} /></Field>
             <Field label={t("From {n}", { n: n + 1 })}><Input type="time" value={x.from} onChange={(e) => { set(n, "from", e.target.value); }} /></Field>
             <Field label={t("To {n}", { n: n + 1 })}><Input type="time" value={x.to} onChange={(e) => { set(n, "to", e.target.value); }} /></Field>
             {n > 0 && <Btn size="sm" className="mb-1" onClick={() => { setTimes(times.filter((_, m) => m !== n)); }}>{t("Remove")}</Btn>}
           </div>
         ))}
-        {times.length < 3 && <div><Btn size="sm" onClick={() => { setTimes([...times, { ...times[times.length - 1], date: nextDay(times[times.length - 1].date) }]); }}><Icon name="add" /> {t("Add another time")}</Btn></div>}
+        {times.length < 3 && <div><Btn size="sm" onClick={() => { const last = times.at(-1); if (last) setTimes([...times, { ...last, date: nextDay(last.date) }]); }}><Icon name="add" /> {t("Add another time")}</Btn></div>}
       </div>
       <div className="grid-fluid" style={{ ["--min" as string]: "220px" }}>
         <Field label={t("Due · optional")} hint={t("Defaults to the end of the 1st time.")} error={tried ? dueError : undefined}><Input type="datetime-local" value={due} onChange={(e) => { setDue(e.target.value); }} /></Field>
