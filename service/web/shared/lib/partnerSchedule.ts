@@ -133,7 +133,8 @@ export function freeSlots(c: ApiCapacity | undefined): string[] {
   for (const a of c.availableSlots) {
     let start = Date.parse(a.startAt);
     const end = Date.parse(a.endAt);
-    for (const b of [...c.assignedSlots].toSorted((x, y) => Date.parse(x.startAt) - Date.parse(y.startAt))) {
+    const slots = [...c.assignedSlots].toSorted((x, y) => Date.parse(x.startAt) - Date.parse(y.startAt));
+    for (const b of slots) {
       const bs = Date.parse(b.startAt), be = Date.parse(b.endAt);
       if (be <= start || bs >= end) continue;
       if (bs > start) parts.push(`${hhmm(new Date(start).toISOString())}–${hhmm(new Date(bs).toISOString())}`);

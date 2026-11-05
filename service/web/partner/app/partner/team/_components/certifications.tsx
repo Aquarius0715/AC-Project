@@ -117,7 +117,8 @@ function CertificateModal({ live, kind, row, onClose }: Readonly<{ live: Live; k
     if (bad) { focusField(ids[bad]); return; }
     if (!file) return;
     const data = new FormData();
-    for (const [k, v] of Object.entries({ membershipId: form.membershipId, code: form.code, name: form.name, number: form.number, issued: form.issued, expires: form.expires })) data.set(k, v);
+    const fields = Object.entries({ membershipId: form.membershipId, code: form.code, name: form.name, number: form.number, issued: form.issued, expires: form.expires });
+    for (const [k, v] of fields) data.set(k, v);
     if (renew) data.set("renewalOf", renew.id);
     data.set("file", file);
     run(() => submitCertificate(data), t("Submitted for HQ verification — it counts for eligibility once HQ approves it."), onClose,

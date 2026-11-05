@@ -186,7 +186,8 @@ export interface ActionRow { kind: "offer" | "overdue" | "review" | "unassigned"
 export function actions(jobs: PartnerJob[], now: number, names: Map<string, string>, i: I18n = EN): ActionRow[] {
   const { t, display } = i;
   const rows: ActionRow[] = [];
-  for (const j of jobs.filter((x) => x.status === "offered").toSorted((a, b) => Date.parse(a.offerExpiresAt ?? a.dueAt ?? "") - Date.parse(b.offerExpiresAt ?? b.dueAt ?? ""))) {
+  const offered = jobs.filter((x) => x.status === "offered").toSorted((a, b) => Date.parse(a.offerExpiresAt ?? a.dueAt ?? "") - Date.parse(b.offerExpiresAt ?? b.dueAt ?? ""));
+  for (const j of offered) {
     const detail = j.offerExpiresAt ? t("Answer by {time} ({left} left)", { time: showTime(j.offerExpiresAt, display), left: until(j.offerExpiresAt, now, t) }) : t("Answer the offer");
     rows.push({ kind: "offer", badge: t("Offer"), title: label(j, t), href: `/partner/jobs/${j.id}`, button: t("Respond"), detail });
   }

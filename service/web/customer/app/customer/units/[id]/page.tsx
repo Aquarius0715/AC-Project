@@ -22,7 +22,8 @@ async function restrictionHref(unitId: string): Promise<string | null> {
   const contracts = await coreAll<{ id: string; activeRestrictionIds?: string[] }>("contracts.list", { filters: { unitId } });
   for (const k of contracts.filter((c) => c.activeRestrictionIds?.length)) {
     const invoices = await coreAll<{ id: string; status: string }>("invoices.list", { filters: { contractId: k.id } });
-    for (const i of [...invoices].toSorted((a, b) => Number(a.status === "paid") - Number(b.status === "paid")).slice(0, 3)) {
+    const unpaidFirst = [...invoices].toSorted((a, b) => Number(a.status === "paid") - Number(b.status === "paid")).slice(0, 3);
+    for (const i of unpaidFirst) {
       const page = await coreOp<{ items: ApiRestriction[] }>("restrictions.forInvoice", { invoiceId: i.id, query: { limit: 10 } });
       const r = page.items.find((x) => (k.activeRestrictionIds ?? []).includes(x.id) && x.unitIds.includes(unitId));
       if (r) return `/customer/payments/${i.id}?tab=restriction&restrictionId=${r.id}`;

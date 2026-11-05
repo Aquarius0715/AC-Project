@@ -41,12 +41,14 @@ function contractInputs(): Map<string, Map<string, Field>> {
   const out = new Map<string, Map<string, Field>>();
   ts.forEachChild(source, (n) => {
     if (!ts.isTypeAliasDeclaration(n) || n.name.text !== "OperationContracts") return;
-    for (const op of checker.getPropertiesOfType(checker.getTypeAtLocation(n.name))) {
+    const ops = checker.getPropertiesOfType(checker.getTypeAtLocation(n.name));
+    for (const op of ops) {
       const input = checker.getTypeOfSymbolAtLocation(op, n).getProperty("input");
       if (!input) continue;
       const t = checker.getTypeOfSymbolAtLocation(input, n);
       const fields = new Map<string, Field>();
-      for (const member of t.isUnion() ? t.types : [t]) {
+      const members = t.isUnion() ? t.types : [t];
+      for (const member of members) {
         for (const p of checker.getPropertiesOfType(member)) {
           const lit = literalsOf(checker.getTypeOfSymbolAtLocation(p, n));
           // a field of several union members allows the literals of all of them; any non-literal type allows anything
@@ -72,7 +74,8 @@ function catalogFilters(): Map<string, string[]> {
 function sources(): string[] {
   const files: string[] = [];
   const walk = (d: string) => {
-    for (const e of readdirSync(d, { withFileTypes: true })) {
+    const entries = readdirSync(d, { withFileTypes: true });
+    for (const e of entries) {
       if (["node_modules", ".next", "tests", "e2e"].includes(e.name)) continue;
       const p = join(d, e.name);
       if (e.isDirectory()) walk(p);

@@ -92,7 +92,8 @@ const faultAxis: Partial<Record<ApiDeviceEventFull["eventType"], keyof OpenFault
 export function openFaults(es: ApiDeviceEventFull[]): OpenFaults {
   const out: OpenFaults = {};
   const seen = new Set<string>();
-  for (const e of [...es].toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))) {
+  const newestFirst = [...es].toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt));
+  for (const e of newestFirst) {
     const k = faultAxis[e.eventType];
     if (!k || seen.has(k)) continue;
     seen.add(k);

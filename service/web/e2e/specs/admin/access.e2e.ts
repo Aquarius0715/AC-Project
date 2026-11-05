@@ -23,7 +23,8 @@ test("the organization filter narrows the memberships; an unknown membership is 
   await expect(org).toHaveValue("Demo Contractor A");
   const rows = main.locator("button[aria-pressed]");
   await expect(rows.first()).toBeVisible();
-  for (const label of await rows.locator("div.text-\\[11px\\]").allInnerTexts()) expect(label).toContain("Demo Contractor A");
+  const contractorLabels = await rows.locator("div.text-\\[11px\\]").allInnerTexts();
+  for (const label of contractorLabels) expect(label).toContain("Demo Contractor A");
   // Escape closes the list and keeps the choice
   await org.click();
   await org.press("Escape");
@@ -38,7 +39,8 @@ test("the organization filter narrows the memberships; an unknown membership is 
   await org.press("Enter");
   await page.waitForURL((u) => !!u.searchParams.get("organizationId") && u.searchParams.get("organizationId") !== before);
   await expect(org).toHaveValue("Demo HQ");
-  for (const label of await rows.locator("div.text-\\[11px\\]").allInnerTexts()) expect(label).toContain("Demo HQ");
+  const hqLabels = await rows.locator("div.text-\\[11px\\]").allInnerTexts();
+  for (const label of hqLabels) expect(label).toContain("Demo HQ");
 
   // a membership the list does not hold: no other membership opens in its place
   await page.goto("/admin/settings/access?role=admin&membershipId=00000000-0000-4000-8000-000000000000");

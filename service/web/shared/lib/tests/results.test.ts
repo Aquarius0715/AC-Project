@@ -79,7 +79,8 @@ function check(): { checked: number; problems: string[] } {
           out.push(`${at}: name the ${keys.join(" / ")} the screen reads (the contract has ${sv.map((m) => singleText(must(literals(m).get(firstKey)))).join(", ")})`);
           return;
         }
-        for (const m of top ? sv.filter((v) => dv.some((x) => fits(v, x))) : sv) {
+        const candidates = top ? sv.filter((v) => dv.some((x) => fits(v, x))) : sv;
+        for (const m of candidates) {
           if (dv.some((x) => c.isTypeAssignableTo(m, x))) continue;
           const own = dv.find((x) => isObject(m) && isObject(x) && literals(m).size > 0 && literals(x).size > 0 && fits(m, x) && fits(x, m));
           if (own || dv.length === 1) compare(m, own ?? d, path, depth + 1, out, false);

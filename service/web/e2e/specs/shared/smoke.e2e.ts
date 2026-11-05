@@ -35,7 +35,8 @@ async function crawl(page: Page, app: App, lang = "en", wideFont = false, touch 
     if (wideFont) await page.addStyleTag({ content: "*{font-family: Verdana, 'DejaVu Sans', sans-serif !important}" });
     const text = await page.locator("body").innerText();
     if (!res || res.status() >= 400 || FAILED_PAGE.test(text)) out.failed.push(`${path} (${String(res?.status() ?? "no response")})`);
-    for (const v of await axeViolations(page)) out.inaccessible.push(`${path}: ${v}`);
+    const violations = await axeViolations(page);
+    for (const v of violations) out.inaccessible.push(`${path}: ${v}`);
     const sideways = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     if (sideways > 1) out.wide.push(`${path}: ${String(sideways)}px`);
     if (touch) { // a shared control under the 44 px touch target (IR615)

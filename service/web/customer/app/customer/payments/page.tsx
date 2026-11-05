@@ -40,7 +40,8 @@ export default async function CustomerPaymentsPage({ searchParams }: Readonly<Pa
   // the active restriction of the contract, found through one of its invoices (the customer has no restriction list)
   let notice: (RestrictionNotice & { invoiceId: string }) | null = null;
   if (sel && sel.restrictionIds.length > 0) {
-    for (const i of [...all].toSorted((a, b) => (a.status === "paid" ? 1 : 0) - (b.status === "paid" ? 1 : 0)).slice(0, 3)) {
+    const unpaidFirst = [...all].toSorted((a, b) => (a.status === "paid" ? 1 : 0) - (b.status === "paid" ? 1 : 0)).slice(0, 3);
+    for (const i of unpaidFirst) {
       const page = await coreOp<{ items: ApiRestriction[] }>("restrictions.forInvoice", { invoiceId: i.id, query: { limit: 10 } });
       const r = page.items.find((x) => sel.restrictionIds.includes(x.id));
       if (r) {

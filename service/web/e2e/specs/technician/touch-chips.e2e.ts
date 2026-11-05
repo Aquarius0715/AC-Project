@@ -8,7 +8,8 @@ test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
 
 test("the job tabs and the device filters are touch-sized and filter", async ({ page }) => {
   const tall = async (loc: import("@playwright/test").Locator) => {
-    for (const box of await loc.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height))) expect(box).toBeGreaterThanOrEqual(43.5);
+    const heights = await loc.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height));
+    for (const box of heights) expect(box).toBeGreaterThanOrEqual(43.5);
   };
   await page.goto("/technician");
   const tabs = page.getByRole("main").getByRole("tab");

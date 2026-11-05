@@ -8,7 +8,8 @@ const requestOf = (...args: Parameters<typeof coreRequest>) => must(coreRequest(
 const query = (path: string) => {
   const u = new URL(`http://core${path}`);
   const out: Record<string, string[]> = {};
-  for (const k of new Set(u.searchParams.keys())) out[k] = u.searchParams.getAll(k);
+  const keys = new Set(u.searchParams.keys());
+  for (const k of keys) out[k] = u.searchParams.getAll(k);
   return { pathname: u.pathname, out };
 };
 

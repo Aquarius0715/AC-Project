@@ -68,7 +68,8 @@ const ACROSS = "\0across"; // the group key of policies spanning customers (sort
 /** The list grouped by the customer of the target units; policies spanning customers go under “Across customers”. */
 export function policyGroups(ps: ApiAutoPolicy[], customerOfUnit: Map<string, string>, t: T = en): PolicyGroup[] {
   const groups = new Map<string, PolicyGroup>();
-  for (const p of [...ps].toSorted((a, b) => b.priority - a.priority || a.id.localeCompare(b.id))) {
+  const byPriority = [...ps].toSorted((a, b) => b.priority - a.priority || a.id.localeCompare(b.id));
+  for (const p of byPriority) {
     const customers = new Set(p.unitIds.map((u) => customerOfUnit.get(u) ?? t("unknown customer")));
     const key = (customers.size === 1 ? [...customers][0] : undefined) ?? ACROSS;
     const g = groups.get(key) ?? { label: key === ACROSS ? t("Across customers") : key, rows: [] };

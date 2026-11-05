@@ -132,7 +132,8 @@ export function latest(d: ApiUnitDetail, metric: string, t: T = en, display: Dis
 export function bucket(items: { value: number | null; observedAt: string; quality?: string }[], from: Date, to: Date, n = 12): (number | null)[] {
   const out: (number | null)[] = Array.from({ length: n }, () => null);
   const span = to.getTime() - from.getTime();
-  for (const m of [...items].toSorted((a, b) => a.observedAt.localeCompare(b.observedAt))) {
+  const chronological = [...items].toSorted((a, b) => a.observedAt.localeCompare(b.observedAt));
+  for (const m of chronological) {
     if (m.value === null || (m.quality && m.quality !== "valid")) continue;
     const i = Math.min(n - 1, Math.floor(((new Date(m.observedAt).getTime() - from.getTime()) / span) * n));
     if (i >= 0) out[i] = m.value;
