@@ -9,12 +9,16 @@ import { Icon } from "@ac/web/components/Icon";
 // DATA_SOURCE=API: technicians of the company (members.list, IR172 displayName), a week of members.capacity and
 // members.setUnavailability. Qualification grants come from the memberships (contractors get no permissions/scopes, IR42).
 const CERT_TONE = new Map<string, Tone>([["Valid", "ok"], ["Expired", "muted"]]); // anything else is expiring
+const TECH_A = "tech-external-a";
+const Q_REFRIGERANT = "Split-unit refrigerant handling";
+const Q_ELECTRICAL = "Electrical basics";
+const Q_GENERAL = "General maintenance";
 const techs = [
-  { id: "tech-external-a", quals: ["Split-unit refrigerant handling", "Electrical basics"], sub: "Refrigerant handling · Electrical basics · active since 2025-04", asg: "09:00–13:00 assigned", free: "13:00–17:00 free", used: 10, tot: 40, week: ["2 / 8 h", "4 / 8 h", "0 / 8 h", "4 / 8 h", "0 / 8 h", "—", "—"], active: true },
-  { id: "tech-external-a2", quals: ["General maintenance"], sub: "General maintenance · active since 2026-02", asg: "13:00–17:00 assigned (job-p12)", free: "09:00–13:00 free", used: 8, tot: 40, week: ["0 / 8 h", "4 / 8 h", "4 / 8 h", "0 / 8 h", "0 / 8 h", "—", "—"], active: true },
+  { id: TECH_A, quals: [Q_REFRIGERANT, Q_ELECTRICAL], sub: "Refrigerant handling · Electrical basics · active since 2025-04", asg: "09:00–13:00 assigned", free: "13:00–17:00 free", used: 10, tot: 40, week: ["2 / 8 h", "4 / 8 h", "0 / 8 h", "4 / 8 h", "0 / 8 h", "—", "—"], active: true },
+  { id: "tech-external-a2", quals: [Q_GENERAL], sub: "General maintenance · active since 2026-02", asg: "13:00–17:00 assigned (job-p12)", free: "09:00–13:00 free", used: 8, tot: 40, week: ["0 / 8 h", "4 / 8 h", "4 / 8 h", "0 / 8 h", "0 / 8 h", "—", "—"], active: true },
   { id: "tech-external-old", quals: [], sub: "Expired membership", asg: "—", free: "—", used: 0, tot: 0, week: [], active: false },
 ];
-const quals: [string, string][] = [["Split-unit refrigerant handling", "tech-external-a · valid to 2027-03-31"], ["Electrical basics", "tech-external-a · expires 2026-10-15"], ["General maintenance", "tech-external-a2 · valid to 2027-01-31"], ["Gas leak detection", "not held"]];
+const quals: [string, string][] = [[Q_REFRIGERANT, "tech-external-a · valid to 2027-03-31"], [Q_ELECTRICAL, "tech-external-a · expires 2026-10-15"], [Q_GENERAL, "tech-external-a2 · valid to 2027-01-31"], ["Gas leak detection", "not held"]];
 
 /** Phase 1A demo team screen (fixture technicians). */
 export function MockTeam() {
@@ -60,7 +64,7 @@ export function MockTeam() {
         <Banner tone="warn">Conflicts with 1 confirmed assignment (job-c07 · 10-01 10:00–12:00). Reassign it or ask HQ to propose a new time to the client — the client must approve any time change.</Banner>
       </Modal>
       <Modal open={modal === "upload"} onClose={() => { setModal(null); }} title="Upload renewal — Electrical basics" footer={<><Btn onClick={() => { setModal(null); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setModal(null); toast("Renewal uploaded — pending HQ verification"); }}>Upload</Btn></>}>
-        <Field label="Technician"><Input disabled value="tech-external-a" /></Field>
+        <Field label="Technician"><Input disabled value={TECH_A} /></Field>
         <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}><Field label="Certificate no."><Input defaultValue="EB-2026-0442" /></Field><Field label="Valid until"><Input type="date" defaultValue="2028-10-15" /></Field></div>
         <div className="rounded-xl border border-dashed border-line p-4 text-center text-xs text-muted-foreground"><Icon name="upload" /> Drop a PDF / image (≤ 5 MiB)</div>
         <p className="text-[11px] text-muted-foreground">A pending renewal does not extend eligibility until HQ verifies it.</p>
@@ -71,9 +75,9 @@ export function MockTeam() {
 
 function Certs({ onUpload }: Readonly<{ onUpload: () => void }>) {
   const rows = [
-    { t: "tech-external-a", c: "Split-unit refrigerant handling", until: "2027-03-31", st: "Valid" },
-    { t: "tech-external-a", c: "Electrical basics", until: "2026-10-15", st: "Expiring · 14 d" },
-    { t: "tech-external-a2", c: "General maintenance", until: "2027-01-31", st: "Valid" },
+    { t: TECH_A, c: Q_REFRIGERANT, until: "2027-03-31", st: "Valid" },
+    { t: TECH_A, c: Q_ELECTRICAL, until: "2026-10-15", st: "Expiring · 14 d" },
+    { t: "tech-external-a2", c: Q_GENERAL, until: "2027-01-31", st: "Valid" },
     { t: "tech-external-b", c: "Refrigerant handling", until: "2026-09-01", st: "Expired" },
   ];
   return (
