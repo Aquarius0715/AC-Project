@@ -11,3 +11,8 @@ export function queryReader(params: SearchParams): (key: string) => string | und
     return typeof value === "string" && value !== "" ? value : undefined;
   };
 }
+
+/** The parameters of a filter that are set (text that is not empty), as URLSearchParams takes them. */
+export function setParams(filter: object): [string, string][] {
+  return Object.entries(filter).flatMap(([key, value]: [string, unknown]): [string, string][] => (typeof value === "string" && value !== "" ? [[key, value]] : []));
+}

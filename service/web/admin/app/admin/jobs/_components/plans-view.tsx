@@ -13,6 +13,7 @@ import { anchorOf, cadence, everyText, generateConflict, nextBox, nextOccurrence
 import { generateJob, savePlan } from "../actions";
 import type { PlansLive } from "../_lib/load";
 import { JobsTabs, ScopeBar } from "./jobs-header";
+import { setParams } from "@ac/web/lib/searchParams";
 import { Icon } from "@ac/web/components/Icon";
 
 type Detail = NonNullable<PlansLive["detail"]>;
@@ -29,7 +30,7 @@ export function PlansView({ live }: Readonly<{ live: PlansLive }>) {
   const [creating, setCreating] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const sel = live.detail;
-  const href = (id: string) => `/admin/jobs?${new URLSearchParams({ ...Object.fromEntries(Object.entries(live.q).filter(([, v]) => v) as [string, string][]), tab: "plans", planId: id })}`;
+  const href = (id: string) => `/admin/jobs?${new URLSearchParams([...setParams(live.q), ["tab", "plans"], ["planId", id]])}`;
   // the detail pane without a selected plan: the selected one is gone, or none is picked yet
   const emptyText = () => {
     if ("missing" in live) return t("That plan no longer exists in your scope.");
