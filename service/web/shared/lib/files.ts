@@ -18,16 +18,19 @@ export function uploadType(bytes: Uint8Array, browserType: string): string {
 // label, and the bytes and their type are what count.
 const UNSAFE_NAME = /[\u0000-\u001F\u007F-\u009F\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/g;
 
+/** A text's code points, the characters the Core API counts (Go counts runes). */
+export const codePoints = (s: string): string[] => s.match(/./gsu) ?? [];
+
 /** An upload's name as the API accepts it: unsafe characters dropped, "/" and "\" made "_", at most 200 characters
 (the extension kept), "upload" when nothing is left. */
 export function uploadName(name: string): string {
   const clean = name.replaceAll(UNSAFE_NAME, "").replaceAll(/[/\\]/g, "_").trim();
-  const chars = Array.from(clean);
+  const chars = codePoints(clean);
   if (chars.length === 0) return "upload";
   if (chars.length <= 200) return clean;
   const dot = clean.lastIndexOf(".");
   const suffix = dot > 0 && clean.length - dot <= 10 ? clean.slice(dot) : "";
-  return Array.from(clean.slice(0, clean.length - suffix.length)).slice(0, 200 - Array.from(suffix).length).join("").trimEnd() + suffix;
+  return codePoints(clean.slice(0, clean.length - suffix.length)).slice(0, 200 - codePoints(suffix).length).join("").trimEnd() + suffix;
 }
 
 // the HTTP status of a file the Core API refused: forbidden, not found, or any other failure as a bad gateway

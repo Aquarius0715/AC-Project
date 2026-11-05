@@ -400,7 +400,7 @@ export function Toggle({ on, onChange, label, disabled }: Readonly<{ on: boolean
 /** One choice of a few, shown as pressed buttons: the shadcn/ui ToggleGroup. The chosen one stays chosen when pressed again. */
 export function Choice<T extends string>({ options, value, onChange, disabled }: Readonly<{ options: { id: T; label: string }[]; value: T; onChange: (v: T) => void; disabled?: boolean }>) {
   return (
-    <ToggleGroup value={[value]} disabled={disabled} onValueChange={(v) => { const next = v[v.length - 1] as T | undefined; if (next !== undefined && next !== value) onChange(next); }} variant="outline" className="flex-wrap">
+    <ToggleGroup value={[value]} disabled={disabled} onValueChange={(v) => { const next = v.at(-1) as T | undefined; if (next !== undefined && next !== value) onChange(next); }} variant="outline" className="flex-wrap">
       {options.map((o) => <ToggleGroupItem key={o.id} value={o.id} className="px-3 text-[13px] font-semibold data-pressed:border-primary data-pressed:bg-primary-soft data-pressed:text-primary">{o.label}</ToggleGroupItem>)}
     </ToggleGroup>
   );

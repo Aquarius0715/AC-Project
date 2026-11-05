@@ -52,7 +52,7 @@ describe("partner job detail", () => {
     const own = fits(members, ["demo_indoor"], visit, [{ date: "2026-09-22", capacity: [cap("m-a", "2026-09-22", [["2026-09-22T01:00:00Z", "2026-09-22T09:00:00Z"]], [["2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"]], 480, 120)] }], "detail", "m-a");
     expect([own[0]?.badge.text, own[0]?.sub]).toEqual(["Assigned", "Qualified · assigned to this job"]);
     // whoever can take the visit comes first, whatever order the API lists the team in (IR569)
-    const reversed = [...members].reverse();
+    const reversed = members.toReversed();
     expect(fits(reversed, ["demo_indoor", "demo_electrical"], visit, days).map((r) => r.badge.text)).toEqual(["Fits", "Not qualified"]);
     expect(fits(reversed, ["demo_indoor", "demo_electrical"], visit, days, "detail").map((r) => r.badge.text)).toEqual(["Best fit", "Not eligible"]);
     expect(fits(members, ["demo_indoor", "demo_electrical"], visit, days, "detail", "m-b").map((r) => r.badge.text)).toEqual(["Assigned", "Best fit"]); // the assigned one first, even when not eligible

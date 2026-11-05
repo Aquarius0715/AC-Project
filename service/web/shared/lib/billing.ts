@@ -28,7 +28,7 @@ export interface ContractOption { id: string; version: number; label: string; pr
 export const KL = "Asia/Kuala_Lumpur";
 /** A contract or invoice date — a Kuala Lumpur business day — in the user's language: “10 Sept 2026”. */
 export const businessDay = (iso: string, locale: Locale = "en") => showDate(iso, { locale, timeZone: KL });
-const plain = (s: string) => s.replaceAll(/[\u00A0\u2009\u202F]/g, " ");
+const plain = (s: string) => s.replaceAll(/[\u{A0}\u{2009}\u{202F}]/gu, " ");
 /** The billing month of an invoice period in the user's language: “September 2026”. */
 export const billingMonth = (iso: string, locale: Locale = "en") => plain(new Date(iso).toLocaleDateString(intlTag(locale), { timeZone: KL, month: "long", year: "numeric" }));
 /** A YYYY-MM payout period in the user's language: “Sept 2026”. */

@@ -38,7 +38,7 @@ export async function loadPayouts(options: { statementId?: string; period?: stri
   const selected = shown.find((s) => s.id === options.statementId) ?? shown[0] ?? null;
   const units = new Map<string, Promise<string | null>>();
   const live: PayoutsLive = {
-    periods: [...new Set(all.map((s) => s.period))].toSorted(byText).reverse().map((p) => ({ value: p, text: periodLabel(p, display.locale) })), period: options.period ?? "", status: status ?? "",
+    periods: [...new Set(all.map((s) => s.period))].toSorted(byText).toReversed().map((p) => ({ value: p, text: periodLabel(p, display.locale) })), period: options.period ?? "", status: status ?? "",
     statements: statementRows(shown, i), selected: null, company: who.organizationName || t("your company"),
     topics: (Object.keys(topicLabel) as (keyof typeof topicLabel)[]).map((x) => ({ id: x, text: t(topicLabel[x]) })),
   };

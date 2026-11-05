@@ -211,7 +211,7 @@ export function auditDeviceEvents(es: ApiAuditDeviceEvent[], alerts: Map<string,
   const seqs = es.map((e) => e.sequence).toSorted((a, b) => a - b);
   const withRows = es.map((e) => ({ e, r: rows.get(e.id) })).filter((x): x is { e: ApiAuditDeviceEvent; r: NonNullable<typeof x.r> } => x.r !== undefined);
   return withRows.map(({ e, r }) => {
-    const prev = [...seqs].reverse().find((s) => s < e.sequence);
+    const prev = seqs.toReversed().find((s) => s < e.sequence);
     const sequence = sequenceText(e.sequence, prev, t);
     const isFault = e.eventType !== "restored";
     return {

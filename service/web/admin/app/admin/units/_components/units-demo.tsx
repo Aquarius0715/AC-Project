@@ -120,11 +120,14 @@ function ClientUsersTab() {
   const close = () => { setOpen(false); setTried(false); setEmail(""); setName(""); setRole("member"); };
   const run = (e: string | undefined, ok: string) => { toast(e ?? ok, e ? "warn" : undefined); };
   const act = (u: ClientUser, a: string) => {
-    if (a === "resend") run(clientUserActions.resend(u.id), `Set-up e-mail re-sent to ${u.email} — nothing is sent in the demo`);
-    if (a === "role") run(clientUserActions.setRole(u.id, u.role === "owner" ? "member" : "owner"), `Role changed to ${u.role === "owner" ? "Member" : "Owner"}`);
-    if (a === "reset") toast("Password reset preview created (generic message)");
-    if (a === "disable") run(clientUserActions.setStatus(u.id, u.status === "disabled" ? "active" : "disabled"), u.status === "disabled" ? "Sign-in enabled" : "Sign-in disabled");
-    if (a === "remove") run(clientUserActions.remove(u.id), `${u.email} removed from customer-a`);
+    switch (a) {
+      case "resend": { run(clientUserActions.resend(u.id), `Set-up e-mail re-sent to ${u.email} — nothing is sent in the demo`); break; }
+      case "role": { run(clientUserActions.setRole(u.id, u.role === "owner" ? "member" : "owner"), `Role changed to ${u.role === "owner" ? "Member" : "Owner"}`); break; }
+      case "reset": { toast("Password reset preview created (generic message)"); break; }
+      case "disable": { run(clientUserActions.setStatus(u.id, u.status === "disabled" ? "active" : "disabled"), u.status === "disabled" ? "Sign-in enabled" : "Sign-in disabled"); break; }
+      case "remove": { run(clientUserActions.remove(u.id), `${u.email} removed from customer-a`); break; }
+      default: // a menu item this demo does not act on
+    }
   };
   return (
     <Card title="Client users of customer-a" sub="People who sign in to the customer app. They only ever see customer-a’s properties and units." action={<Btn size="sm" variant="primary" onClick={() => { setOpen(true); }}><Icon name="add" /> Add user</Btn>}>

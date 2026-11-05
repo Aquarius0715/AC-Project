@@ -13,7 +13,7 @@ const en = translator("en");
 // The business-day helpers live with the billing types (HQ billing words its dates the same way, IR299).
 
 /** The same day without the year (“1 Sept”), for the start of a range whose end shows the year. */
-const plain = (s: string) => s.replaceAll(/[\u00A0\u2009\u202F]/g, " ");
+const plain = (s: string) => s.replaceAll(/[\u{A0}\u{2009}\u{202F}]/gu, " ");
 const businessDayShort = (iso: string, locale: Locale) => plain(new Date(iso).toLocaleDateString(intlTag(locale), { timeZone: KL, month: "short", day: "numeric" }));
 
 export const planName: Record<string, string> = { rto: "RTO Plan", general: "General maintenance", energy: "Energy service", environment: "Environment service" };

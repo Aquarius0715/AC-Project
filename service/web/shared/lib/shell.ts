@@ -19,11 +19,15 @@ export async function loadShell(role: Role): Promise<ShellLive | undefined> {
   await connection();
   if (!apiMode()) return undefined;
   const counts: Promise<[string, number | null]>[] = [quiet(total("notifications.list", { filters: { unreadOnly: true }, limit: 1 })).then((n) => ["/notifications", n])];
-  if (role === "client") counts.push(quiet(coreOp<{ counts: { alertCount: number } }>("summaries.get", { kind: "customer", filters: {} }).then((s) => s.counts.alertCount)).then((n) => ["/customer/alerts", n]));
-  if (role === "contractor") counts.push(quiet(coreOp<{ counts: { offerCount: number } }>("summaries.get", { kind: "partner", filters: {} }).then((s) => s.counts.offerCount)).then((n) => ["/partner/jobs", n]));
-  if (role === "admin") {
-    const parts = (["critical", "warning"] as const).flatMap((severity) => (["open", "acknowledged"] as const).map((status) => total("alerts.list", { filters: { severity, status }, limit: 1 })));
-    counts.push(quiet(Promise.all(parts).then((ns) => ns.reduce((a, b) => a + b, 0))).then((n) => ["/admin/alerts", n]));
+  switch (role) {
+    case "client": { counts.push(quiet(coreOp<{ counts: { alertCount: number } }>("summaries.get", { kind: "customer", filters: {} }).then((s) => s.counts.alertCount)).then((n) => ["/customer/alerts", n])); break; }
+    case "contractor": { counts.push(quiet(coreOp<{ counts: { offerCount: number } }>("summaries.get", { kind: "partner", filters: {} }).then((s) => s.counts.offerCount)).then((n) => ["/partner/jobs", n])); break; }
+    case "admin": {
+      const parts = (["critical", "warning"] as const).flatMap((severity) => (["open", "acknowledged"] as const).map((status) => total("alerts.list", { filters: { severity, status }, limit: 1 })));
+      counts.push(quiet(Promise.all(parts).then((ns) => ns.reduce((a, b) => a + b, 0))).then((n) => ["/admin/alerts", n]));
+      break;
+    }
+    case "technician": { break; } // the technician shell counts the notifications only
   }
   const [who, display, ...badges] = await Promise.all([coreIdentity().catch(() => ({ displayName: "", organizationName: "" })), coreDisplay(), ...counts]);
   return { user: who.displayName, organization: who.organizationName, badges: Object.fromEntries(badges.filter((b): b is [string, number] => b[1] !== null)), display };

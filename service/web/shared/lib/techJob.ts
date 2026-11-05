@@ -286,7 +286,7 @@ export function versionRows(draft: DraftVersion | null, reportRefs: { reportVers
       sub: `${t(draft.results === 1 ? "1 result" : "{n} results", { n: draft.results })} · ${t(draft.photos === 1 ? "1 photo" : "{n} photos", { n: draft.photos })}`, badge: { text: t("Draft"), tone: "warn" },
     });
   }
-  for (const ref of [...reportRefs].reverse()) {
+  for (const ref of reportRefs.toReversed()) {
     const rv = reviews.findLast((h) => h.reportVersion === ref.reportVersion);
     rows.push(reviewedVersion(ref.reportVersion, rv, f));
   }

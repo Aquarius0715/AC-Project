@@ -66,7 +66,7 @@ function check(): { checked: number; problems: string[] } {
       if (s.isUnion() && !(s.flags & ts.TypeFlags.Boolean) && variants(s).some((item) => isObject(item))) {
         const sv = variants(s), dv = variants(d);
         const keys = sv.every((item) => isObject(item))
-          ? [...literals(must(sv[0])).keys()].filter((k) => sv.every((m) => literals(m).has(k)) && sv.every((m, i) => sv.every((n, j) => i === j || !overlap(must(literals(m).get(k)), must(literals(n).get(k))))))
+          ? literals(must(sv[0])).keys().filter((k) => sv.every((m) => literals(m).has(k)) && sv.every((m, i) => sv.every((n, j) => i === j || !overlap(must(literals(m).get(k)), must(literals(n).get(k)))))).toArray()
           : [];
         if (top && keys.length === 0) { // the input picks the variant
           if (sv.some((m) => c.isTypeAssignableTo(m, d))) return;

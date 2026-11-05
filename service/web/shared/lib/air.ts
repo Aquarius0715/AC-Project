@@ -288,7 +288,7 @@ export function airRows(slots: AirSlot[], metric: AirMetric, slotMs: number, i: 
       note: t(gap.unloaded ? "Earlier readings are not loaded" : "Gap — not joined"), gap: true });
     gap = null;
   };
-  for (const s of [...slots].reverse()) {
+  for (const s of slots.toReversed()) {
     if (s.avg === null) {
       const isU = unloaded(s);
       if (gap && gap.unloaded !== isU) flush();

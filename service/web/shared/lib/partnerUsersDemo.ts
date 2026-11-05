@@ -55,7 +55,6 @@ export const partnerUserDemo = {
     const id = `pu-${String(Date.now())}`;
     save([...us, { id, version: 1, organizationId: ORG, membershipId: `m-${id}`, email: email.trim(), displayName: name.trim() || null, partnerRole: role, status: "invited", lastSignInAt: null,
       accessUntil: role === "technician" ? accessUntil : null, invitedAt: now, invitedByMembershipId: DEMO_SELF }]);
-    return;
   },
   /** A technician's access end (IR461). */
   setAccess(id: string, accessUntil: string) {
@@ -64,7 +63,6 @@ export const partnerUserDemo = {
     if (u?.partnerRole !== "technician") return "error.notFound";
     if (u.membershipId === DEMO_SELF) return "errors.own_account";
     save(us.map((x) => (x.id === id ? { ...x, accessUntil, version: x.version + 1 } : x)));
-    return;
   },
   setStatus(id: string, status: "active" | "disabled") {
     const us = load();
@@ -72,13 +70,11 @@ export const partnerUserDemo = {
     const no = status === "disabled" ? guard(us, u) : selfGuard(u);
     if (no) return no;
     save(us.map((x) => (x.id === id ? { ...x, status, version: x.version + 1 } : x)));
-    return;
   },
   remove(id: string) {
     const us = load();
     const no = guard(us, us.find((x) => x.id === id));
     if (no) return no;
     save(us.filter((x) => x.id !== id));
-    return;
   },
 };

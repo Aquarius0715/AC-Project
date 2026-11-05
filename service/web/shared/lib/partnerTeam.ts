@@ -211,7 +211,7 @@ export function technicianNames(members: { id: string; displayName: string }[], 
 export function dayRange(from: string, to: string, locale: Locale): string {
   const noon = (d: string) => new Date(`${d}T04:00:00Z`); // 12:00 in Kuala Lumpur
   const f = new Intl.DateTimeFormat(intlTag(locale), { weekday: "short", day: "numeric", month: "short", timeZone: KL });
-  return (from === to ? f.format(noon(from)) : f.formatRange(noon(from), noon(to))).replaceAll(/[\u00A0\u2009\u202F]/g, " ");
+  return (from === to ? f.format(noon(from)) : f.formatRange(noon(from), noon(to))).replaceAll(/[\u{A0}\u{2009}\u{202F}]/gu, " ");
 }
 
 /** The day before a date (YYYY-MM-DD). */

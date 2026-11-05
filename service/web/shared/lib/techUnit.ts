@@ -137,7 +137,7 @@ export function seriesChart(metric: string, unit: string, items: Point[], p: Per
   const { from, to } = periodRange(p, nowMs);
   const points = bucket(items, new Date(from), new Date(to), 12);
   const slot = (to - from) / points.length;
-  const first = points.findIndex((v) => v !== null), last = points.length - 1 - [...points].reverse().findIndex((v) => v !== null);
+  const first = points.findIndex((v) => v !== null), last = points.length - 1 - points.toReversed().findIndex((v) => v !== null);
   let gap: string | null = null;
   for (let k = first + 1; first !== -1 && k < last && !gap; k++) {
     if (points[k] !== null) continue;

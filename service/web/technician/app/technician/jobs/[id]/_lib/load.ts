@@ -41,7 +41,7 @@ export async function loadWorkspace(jobId: string): Promise<WorkspaceLive | "not
   const [now, unit] = await Promise.all([coreNow(), quiet(coreOp<ApiUnitDetail & { serviceScope?: string[] }>("units.get", { id: job.unitId }))]);
   // before the work window units.get refuses, but units.list still names the unit of the assignment, as the overview does (IR570)
   const listed = isRefused(unit) ? await quiet(coreOp<{ items: { displayName: string }[] }>("units.list", { limit: 1, filters: { unitIds: [job.unitId] } })) : null;
-  const ref = job.draftReportRef ?? job.reportRefs[job.reportRefs.length - 1] ?? null;
+  const ref = job.draftReportRef ?? job.reportRefs.at(-1) ?? null;
   const isEditable = job.status === "in_progress" && !!job.draftReportRef;
   const [report, parts] = await Promise.all([
     ref ? quiet(coreOp<ApiTechReport>("reports.get", { jobId, reportId: ref.reportId, reportVersion: ref.reportVersion })) : null,

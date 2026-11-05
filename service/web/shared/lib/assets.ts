@@ -39,7 +39,7 @@ export interface ApiRestrictionLite { id: string; contractId?: string; state: st
 const byName = <T extends { name: string }>(a: T, b: T) => a.name.localeCompare(b.name);
 const en = translator("en");
 /** “Apr 2026”: the month an account was created, in the user's language (a Kuala Lumpur month). */
-const monthYear = (iso: string, locale: Locale) => new Date(iso).toLocaleDateString(intlTag(locale), { month: "short", year: "numeric", timeZone: "Asia/Kuala_Lumpur" }).replaceAll(/[\u00A0\u2009\u202F]/g, " ");
+const monthYear = (iso: string, locale: Locale) => new Date(iso).toLocaleDateString(intlTag(locale), { month: "short", year: "numeric", timeZone: "Asia/Kuala_Lumpur" }).replaceAll(/[\u{A0}\u{2009}\u{202F}]/gu, " ");
 
 // ---- customers ----
 
@@ -526,7 +526,7 @@ export function csvShape(text: string): { header: string[]; rows: number } {
   let row: string[] = []; // the record being read
   const records: string[][] = [row];
   let cell = "", isQuoted = false;
-  const t = text.replace(/^\uFEFF/, "");
+  const t = text.replace(/^\u{FEFF}/u, "");
   for (let i = 0; i < t.length; i++) {
     const ch = t.charAt(i);
     if (isQuoted) {

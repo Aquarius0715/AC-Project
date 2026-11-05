@@ -41,7 +41,7 @@ export interface Display { locale: Locale; timeZone: string }
 export const DEFAULT_DISPLAY: Display = { locale: "en", timeZone: "Asia/Kuala_Lumpur" };
 
 /** Intl output with plain spaces: ICU puts narrow and thin spaces around times and ranges, and versions differ, so a time rendered on the server reads the same after hydration in any browser. */
-const plain = (s: string) => s.replaceAll(/[\u00A0\u2009\u202F]/g, " ");
+const plain = (s: string) => s.replaceAll(/[\u{A0}\u{2009}\u{202F}]/gu, " ");
 
 /** `opts` in the user's language and display time zone with the zone's abbreviation (unless `withZone` is false); a
 zone this runtime does not know falls back to the default one. */

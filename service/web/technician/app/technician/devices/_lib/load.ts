@@ -37,8 +37,8 @@ export async function loadDevices(options: { selected?: string; unitId?: string;
     rows, canMaintain: perms.has("device.maintain"), canAcknowledge: perms.has("alert.read"), events: options.events, device: null, // acknowledging needs alert.read (IR284)
     register: free.flatMap((u, i) => {
       const d = freeDetails[i];
-      return d ? [{ unitId: u.id, label: `${d.displayName} · ${d.location.pathLabels.join(" › ")}`, model: `${d.capabilities.manufacturer} ${d.capabilities.model}`,
-        sensors: d.capabilities.sensors.map((s) => s.metric), jobs: myJobs.filter((j) => j.unitId === u.id).map((j) => ({ id: j.id, label: `${j.id.slice(0, 8)} · ${statusWord(j.status, t)}` })) }] : [];
+      return d ? { unitId: u.id, label: `${d.displayName} · ${d.location.pathLabels.join(" › ")}`, model: `${d.capabilities.manufacturer} ${d.capabilities.model}`,
+        sensors: d.capabilities.sensors.map((s) => s.metric), jobs: myJobs.filter((j) => j.unitId === u.id).map((j) => ({ id: j.id, label: `${j.id.slice(0, 8)} · ${statusWord(j.status, t)}` })) } : [];
     }),
     rebind: units.filter((u) => !u.archived).map((u) => ({ unitId: u.id, label: u.displayName, jobId: jobFor(u.id, myJobs) })).filter((r): r is typeof r & { jobId: string } => !!r.jobId),
   };

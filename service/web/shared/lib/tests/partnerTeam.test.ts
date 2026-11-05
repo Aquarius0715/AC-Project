@@ -110,7 +110,7 @@ describe("partner team & capacity", () => {
   it("lists the upcoming unavailable days and says what a removal does (IR612)", () => {
     const signer = (id: string) => ({ id, displayName: "E2E Signer" });
     const names = technicianNames([a, signer("m-s1"), signer("m-s2"), signer("m-s3")], new Map([["m-s1", "s1@example.com"], ["m-s2", "s2@example.com"], ["m-a", "a@example.com"]]));
-    expect([...names.values()]).toEqual(["tech-external-a", "E2E Signer · s1@example.com", "E2E Signer · s2@example.com", "E2E Signer"]); // no e-mail known: the name only
+    expect(names.values().toArray()).toEqual(["tech-external-a", "E2E Signer · s1@example.com", "E2E Signer · s2@example.com", "E2E Signer"]); // no e-mail known: the name only
     const u = (id: string, membershipId: string | null, from: string, to: string, type = "annual_leave", note: string | null = null): ApiUnavailability => ({ version: 1, id, membershipId, from, to, type, note });
     const rows = unavailabilityRows([u("u2", "m-s1", "2026-09-17", "2026-09-18", "training", "Refresher"), u("u1", "m-a", "2026-09-10", "2026-09-16"), u("u3", null, "2026-09-21", "2026-09-21", "public_holiday"), u("u4", "m-gone", "2026-09-30", "2026-09-30")], names, "2026-09-15");
     expect(rows.map((r) => [r.who, r.type, r.note, r.days, r.first, r.started])).toEqual([

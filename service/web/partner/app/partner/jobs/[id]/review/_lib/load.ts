@@ -30,7 +30,7 @@ export async function loadReview(jobId: string): Promise<ReviewLive> {
     job: { id, version: job.version ?? 0, status: job.status, type: job.type, unit: unit ? `${unit.displayName} · ${unit.location.pathLabels.join(" › ")}` : unitRef },
     reviewer: me.userId, report: null,
   };
-  const ref = job.projection === "detail" ? job.reportRefs?.[job.reportRefs.length - 1] : undefined;
+  const ref = job.projection === "detail" ? job.reportRefs?.at(-1) : undefined;
   if (!ref) return base;
   const [r, alerts] = await Promise.all([
     coreOp<ApiWorkReport>("reports.get", { jobId: id, reportId: ref.reportId, reportVersion: ref.reportVersion }),
@@ -45,7 +45,7 @@ export async function loadReview(jobId: string): Promise<ReviewLive> {
   const check = evidenceCheck(r, names, t);
   const last = [...r.reviewHistory].toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))[0] ?? null;
   // a follow-up is a calendar date the technician picked: written as it is, in the user's language
-  const followDay = (d: string) => new Date(`${d.slice(0, 10)}T00:00:00Z`).toLocaleDateString(intlTag(display.locale), { timeZone: "UTC", dateStyle: "medium" }).replaceAll(/[\u00A0\u2009\u202F]/g, " ");
+  const followDay = (d: string) => new Date(`${d.slice(0, 10)}T00:00:00Z`).toLocaleDateString(intlTag(display.locale), { timeZone: "UTC", dateStyle: "medium" }).replaceAll(/[\u{A0}\u{2009}\u{202F}]/gu, " ");
   const next = r.nextAction?.kind === "follow_up" ? t("follow-up {date} — {note}", { date: followDay(r.nextAction.date), note: r.nextAction.note }) : t("no follow-up needed");
   return {
     ...base,

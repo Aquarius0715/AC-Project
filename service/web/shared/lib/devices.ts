@@ -228,7 +228,7 @@ export function parseWaves(s: string): { label: string; percent: number }[] | nu
   const ps = s.split(",").map((x) => Number(x.replace("%", "").trim()));
   if (ps.length === 0 || ps.some((p) => !Number.isInteger(p) || p < 1 || p > 100)) return null;
   for (let i = 1; i < ps.length; i++) if ((ps[i] ?? 0) <= (ps[i - 1] ?? 0)) return null;
-  return ps[ps.length - 1] === 100 ? ps.map((p, i) => ({ label: i === ps.length - 1 ? `Wave ${String(i + 1)} · 100 %` : `Wave ${String(i + 1)} · ${String(p)} %`, percent: p })) : null;
+  return ps.at(-1) === 100 ? ps.map((p, i) => ({ label: i === ps.length - 1 ? `Wave ${String(i + 1)} · 100 %` : `Wave ${String(i + 1)} · ${String(p)} %`, percent: p })) : null;
 }
 /** The campaign's start as an instant: the datetime-local value read in the display time zone ("" while empty). */
 export const campaignStart = (d: Pick<CampaignDraft, "startAt">, zone: string) => (d.startAt ? zonedInstant(d.startAt.slice(0, 10), d.startAt.slice(11, 16), zone) : "");

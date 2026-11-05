@@ -60,7 +60,7 @@ export async function loadMaintenance(sp: Record<string, string | string[] | und
   if (!pick) return { ...base, detail: null };
   const job = await quiet(coreOp<ApiClientJob>("jobs.get", { jobId: pick }), null);
   if (job?.projection !== "detail") return { ...base, detail: null, missing: pick };
-  const ref = job.reportRefs[job.reportRefs.length - 1];
+  const ref = job.reportRefs.at(-1);
   const [events, report] = await Promise.all([
     quiet(coreItems<ApiClientEvent>("jobs.events", { jobId: job.id, query: { limit: 100 } }), [] as ApiClientEvent[]),
     ref ? quiet(coreOp<ApiWorkReport>("reports.get", { jobId: job.id, reportId: ref.reportId, reportVersion: ref.reportVersion }), null) : Promise.resolve(null),

@@ -684,9 +684,15 @@ function UsersTab({ live, c, run, pending }: Readonly<{ live: UnitsLive; c: Cust
   const [change, setChange] = useState<null | { u: ClientUserRow; kind: "role" | "status" | "remove" | "signout" }>(null);
   const canWrite = live.canWrite;
   const act = (u: ClientUserRow, a: string) => {
-    if (a === "role" || a === "status" || a === "remove" || a === "signout") setChange({ u, kind: a });
-    if (a === "resend") run(() => resendInvite(u.id), t("Set-up e-mail sent again to {email}", { email: u.email }));
-    if (a === "reset") run(() => previewPasswordReset(u.email), t("Password reset preview created — the same generic message for every address"));
+    switch (a) {
+      case "role":
+      case "status":
+      case "remove":
+      case "signout": { setChange({ u, kind: a }); break; }
+      case "resend": { run(() => resendInvite(u.id), t("Set-up e-mail sent again to {email}", { email: u.email })); break; }
+      case "reset": { run(() => previewPasswordReset(u.email), t("Password reset preview created — the same generic message for every address")); break; }
+      default: // a menu item that opens nothing here
+    }
   };
   return (
     <Card title={t("Client users of {name}", { name: c.row.name })} sub={t("People who sign in to the customer app. They only ever see {name}’s properties and units.", { name: c.row.name })}

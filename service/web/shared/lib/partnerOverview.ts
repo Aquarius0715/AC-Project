@@ -64,7 +64,7 @@ export function shift(p: { from: string; to: string }, n: number) {
 on the server: a browser's ICU can write a month differently, and the page would not hydrate. */
 export function klDay(d: string, locale: Locale, weekday = false): string {
   return new Date(`${d}T00:00:00Z`).toLocaleDateString(intlTag(locale), { timeZone: "UTC", day: "numeric", month: "short", ...(weekday && { weekday: "short" }) })
-    .replaceAll(/[\u00A0\u2009\u202F]/g, " ").replace(",", "");
+    .replaceAll(/[\u{A0}\u{2009}\u{202F}]/gu, " ").replace(",", "");
 }
 /** The period inside section titles ("Job progress — this week"). */
 const periodWord: Record<string, string> = { "This week": "this week", "Last week": "last week", "Next week": "next week" };

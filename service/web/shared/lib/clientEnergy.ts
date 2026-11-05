@@ -10,7 +10,7 @@ export type PeriodKind = "today" | "7d" | "30d" | "custom";
 export const periodKinds: PeriodKind[] = ["today", "7d", "30d", "custom"];
 const dayMs = 86_400_000;
 const addDays = (ymd: string, n: number) => new Date(Date.parse(`${ymd}T00:00:00Z`) + n * dayMs).toISOString().slice(0, 10);
-const fmt = (iso: string, locale: Locale) => new Date(iso).toLocaleString(intlTag(locale), { timeZone: "Asia/Kuala_Lumpur", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).replaceAll(/[\u00A0\u2009\u202F]/g, " ");
+const fmt = (iso: string, locale: Locale) => new Date(iso).toLocaleString(intlTag(locale), { timeZone: "Asia/Kuala_Lumpur", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).replaceAll(/[\u{A0}\u{2009}\u{202F}]/gu, " ");
 
 // the days of a preset period; the month is the remaining preset
 const SPAN_DAYS = new Map<PeriodKind, number>([["today", 1], ["7d", 7]]);
