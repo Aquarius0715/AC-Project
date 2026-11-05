@@ -6,7 +6,8 @@ partnerUsers.* (own account untouched, the last active contractor kept, an accep
 State lives in the tab (lib/demoStore: a reload or /demo reset restores the seed, FR-X05); nothing is sent.
 */
 import { useSyncExternalStore } from "react";
-import { readDemo, writeDemo } from "@ac/web/lib/demoStore";
+import { z } from "zod";
+import { readDemoAs, writeDemo } from "@ac/web/lib/demoStore";
 import type { ApiPartnerUser, PartnerRole } from "@ac/web/lib/partnerUsers";
 
 const KEY = "ac-partner-users-v1";
@@ -23,9 +24,15 @@ export const PARTNER_USERS_SEED: ApiPartnerUser[] = [
   { id: "pu-invite", version: 1, organizationId: ORG, membershipId: "m-pu-invite", email: "new.tech@example.com", displayName: "New Tech", partnerRole: "technician", status: "invited", lastSignInAt: null, accessUntil: "2026-12-31T15:59:59Z", invitedAt: "2026-09-12T02:00:00Z", invitedByMembershipId: DEMO_SELF },
 ];
 
+const partnerUser = z.object({
+  id: z.string(), version: z.number(), organizationId: z.string(), membershipId: z.string().nullable(), email: z.string(), displayName: z.string().nullable(),
+  partnerRole: z.enum(["contractor", "technician"]), status: z.enum(["invited", "active", "disabled"]), lastSignInAt: z.string().nullable(),
+  accessUntil: z.string().nullable(), invitedAt: z.string(), invitedByMembershipId: z.string(), booked: z.boolean().optional(), revokedAt: z.string().nullable().optional(),
+}) satisfies z.ZodType<ApiPartnerUser>;
+
 let state: ApiPartnerUser[] | null = null;
 const listeners = new Set<() => void>();
-const load = () => (state ??= readDemo<ApiPartnerUser[]>(KEY) ?? PARTNER_USERS_SEED);
+const load = () => (state ??= readDemoAs(KEY, z.array(partnerUser)) ?? PARTNER_USERS_SEED);
 const save = (next: ApiPartnerUser[]) => {
   state = next;
   writeDemo(KEY, next);
