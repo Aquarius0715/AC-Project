@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useId, useMemo, type CSSProperties, type ComponentProps, type ComponentType, type ReactNode } from "react"
 import { cn } from "cn"
+import { cssVariables } from "@ac/web/lib/cssVariables"
 import { Legend, ResponsiveContainer, Tooltip, type DefaultLegendContentProps, type DefaultTooltipContentProps, type TooltipValueType } from "recharts"
 
 // The themes a config colour may name; the product draws the light one (chartColors below)
@@ -306,11 +307,6 @@ function ChartLegendContent({
 function stringAt(source: object, key: string): string | undefined {
   const value: unknown = Reflect.get(source, key)
   return typeof value === "string" ? value : undefined
-}
-
-/** Inline CSS custom properties (a style prop takes them only as CSSProperties). */
-function cssVariables(variables: Record<`--${string}`, string | undefined>): CSSProperties {
-  return Object.assign({}, variables)
 }
 
 function getPayloadConfigFromPayload(
