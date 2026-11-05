@@ -154,7 +154,7 @@ export const guidanceText: Record<Guidance, string> = {
   ventilate: "Ventilation recommended", ventilate_manual: "Ventilate manually, for example by opening a window", clean: "Filter cleaning and inspection recommended",
   none: "No current guidance", unavailable: "Not enough data to provide guidance",
 };
-const validValue = (m?: ApiMeasurement) => (m && m.quality === "valid" && m.value !== null ? m.value : null);
+const validValue = (m?: ApiMeasurement) => (m?.quality === "valid" && m.value !== null ? m.value : null);
 export function airGuidance(co2: ApiMeasurement | undefined, pm25: ApiMeasurement | undefined, freshAir: boolean): Guidance[] {
   const c = validValue(co2);
   const p = validValue(pm25);

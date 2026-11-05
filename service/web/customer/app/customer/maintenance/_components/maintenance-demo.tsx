@@ -108,7 +108,7 @@ function Detail({ j, onClose, open }: Readonly<{ j: Job; onClose: () => void; op
         <div className="mt-3 flex flex-col gap-1.5">
           <b className="text-[13px]">Your preferred times{j.round > 1 ? ` (round ${String(j.round)})` : ""}</b>
           {j.preferred.map((s, i) => {
-            const chosen = j.scheduled && s.date === j.scheduled.date && s.win === j.scheduled.win;
+            const chosen = s.date === j.scheduled?.date && s.win === j.scheduled.win;
             const isNone = j.status === "time_proposed" && fitFor(s).fits === "none";
             const unavailable = isNone ? "Not available — no qualified technician free" : undefined;
             return <SlotLine key={i} i={i} slot={s} struck={isNone} note={chosen ? "booked" : unavailable} />;

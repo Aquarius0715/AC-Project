@@ -260,7 +260,7 @@ export const jobActions = {
   reportProblem(fromId: string, reason: string, details: string, visit: string) {
     const s = load();
     const source = s.jobs.find((x) => x.id === fromId);
-    if (!source || source.status !== "completed") return { error: "CONFLICT — only completed jobs can be reported" };
+    if (source?.status !== "completed") return { error: "CONFLICT — only completed jobs can be reported" };
     const n = s.jobs.filter((j) => /^job-c\d+$/.test(j.id)).map((j) => +j.id.slice(5)).reduce((a, b) => Math.max(a, b), 0) + 1;
     const id = `job-c${String(n).padStart(2, "0")}`;
     const job = req(id, { unitId: source.unitId, unit: source.unit, loc: source.loc, type: "Reactive", symptom: `${reason} — ${details}`, status: "requested", followUpOf: fromId, followUpClass: "pending",
@@ -273,7 +273,7 @@ export const jobActions = {
   /** HQ: classify a follow-up once (jobs.classifyFollowUp, IR114). */
   classifyFollowUp(id: string, cls: "rework" | "new_request", reason: string) {
     const j = load().jobs.find((x) => x.id === id);
-    if (!j || j.followUpClass !== "pending") return "CONFLICT — already classified";
+    if (j?.followUpClass !== "pending") return "CONFLICT — already classified";
     if (!reason.trim() || reason.length > 1000) return "A reason is required (1–1000 characters)";
     update(id, () => ({ followUpClass: cls, followUpReason: reason.trim() }), `HQ classified the follow-up as ${cls === "rework" ? "rework (free)" : "a new request"} · ${reason.trim()}`);
     notify("client", `${id}: ${cls === "rework" ? "Rework (free)" : "New request"}`, `HQ reviewed your problem report on ${j.followUpOf ?? "—"}`, `/customer/maintenance?jobId=${id}`);

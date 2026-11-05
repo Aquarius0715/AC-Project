@@ -61,7 +61,7 @@ export const partnerUserDemo = {
   setAccess(id: string, accessUntil: string) {
     const us = load();
     const u = us.find((x) => x.id === id);
-    if (!u || u.partnerRole !== "technician") return "error.notFound";
+    if (u?.partnerRole !== "technician") return "error.notFound";
     if (u.membershipId === DEMO_SELF) return "errors.own_account";
     save(us.map((x) => (x.id === id ? { ...x, accessUntil, version: x.version + 1 } : x)));
     return;

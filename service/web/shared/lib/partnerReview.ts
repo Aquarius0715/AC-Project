@@ -119,7 +119,7 @@ export interface EvidenceRow { label: string; value: string; tone: "ok" | "warn"
 export function evidenceCheck(r: ApiWorkReport, names: Map<string, string>, t: T = en): { rows: EvidenceRow[]; acceptable: boolean; missing: string[] } {
   const recorded = r.items.filter((x) => x.result !== null).length;
   const needReason = r.items.filter((x) => x.result !== null && x.result !== "normal");
-  const withReason = needReason.filter((x) => x.reason && x.reason.trim()).length;
+  const withReason = needReason.filter((x) => x.reason?.trim()).length;
   const photos = r.attachmentRefs.filter((a) => a.status === "ready").length;
   const contributors = [...new Set(r.items.map((x) => x.authorId))].map((id) => names.get(id) ?? id.slice(0, 8));
   const missing: string[] = [];

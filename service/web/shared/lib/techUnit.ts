@@ -99,7 +99,8 @@ export function liveTiles(d: ApiTechUnit, nowMs: number, i: I18n = EN): Record<"
   const seen = (iso: string | null) => (iso ? t(seenText, { time: relativeTime(iso, nowMs, i) }) : "—");
   const reading = (metric: string): Tile => {
     const m = d.latestMeasurements.find((x) => x.metric === metric);
-    if (!m || m.value === null) return { label: label(metric, t), value: "—", sub: m ? seen(m.observedAt) : t("no reading") };
+    if (!m) return { label: label(metric, t), value: "—", sub: t("no reading") };
+    if (m.value === null) return { label: label(metric, t), value: "—", sub: seen(m.observedAt) };
     const isBad = m.quality !== "valid";
     return { label: label(metric, t), value: `${airNumber(metric, m.value)} ${m.unit}${isBad ? ` (${t(QUALITY[m.quality] ?? m.quality)})` : ""}`, sub: seen(m.observedAt), tone: isBad ? "warn" : undefined };
   };

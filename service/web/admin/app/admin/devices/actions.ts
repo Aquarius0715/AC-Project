@@ -39,7 +39,7 @@ export async function capabilityHistory(capabilityId: string) {
     return page.items.map((a): HistoryEntry => {
       return {
         at: a.occurredAt, actor: a.actorId, from: a.previousVersion, to: a.nextVersion, reason: a.reason,
-        changes: Object.keys({ ...a.maskedBefore, ...a.maskedAfter }).filter((k) => (a.maskedBefore ?? {})[k] !== (a.maskedAfter ?? {})[k]),
+        changes: Object.keys({ ...a.maskedBefore, ...a.maskedAfter }).filter((k) => a.maskedBefore?.[k] !== a.maskedAfter?.[k]),
       };
     });
   }, false);

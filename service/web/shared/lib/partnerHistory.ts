@@ -29,7 +29,7 @@ type Tone = "ok" | "warn" | "crit" | "primary" | "muted";
 API's clientHiddenActions (maintenance/jobs.go) lists them; partnerHistory.test.ts keeps the two in step. */
 export const CLIENT_HIDDEN_ACTIONS = ["job.costs_saved", "job.warranty_claim_filed", "partner_proposal.sent", "partner_proposal.withdrawn", "partner_proposal.kept"];
 /** The customer reads every event except internal notes and the hidden actions (jobs.events for clients, IR42, IR442). */
-export const customerVisible = (e: ApiJobEvent & { note?: ApiEvent["note"] }) => !(e.note && e.note.visibility === "internal") && !CLIENT_HIDDEN_ACTIONS.includes(e.action);
+export const customerVisible = (e: ApiJobEvent & { note?: ApiEvent["note"] }) => e.note?.visibility !== "internal" && !CLIENT_HIDDEN_ACTIONS.includes(e.action);
 /** The counts of a list of events as jobs.list gives them for a summary (IR506); a history's own decision events are
 counted this way. */
 export function eventSummary(events: (ApiJobEvent & { note?: ApiEvent["note"] })[]): ApiEventSummary {

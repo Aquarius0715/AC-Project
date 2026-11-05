@@ -88,14 +88,16 @@ function baselineSub(f: ApiForecast, t: T): string {
   const total = b.baselineKWh === null ? "" : ` · ${thousands(b.baselineKWh)} kWh`;
   return `${f.baselineRef?.id.slice(0, 8) ?? b.id.slice(0, 8)} v${String(f.baselineRef?.version ?? b.version)} · ${b.method}${total}`;
 }
+/** The forecast card without a forecast: why there is none, and the other warnings. */
+function noForecast(w: string[], t: T): ForecastView {
+  const why = NONE_REASONS.find((x) => w.includes(x)) ?? null;
+  // the badges name the other warnings in words; the one the title already says is not repeated (IR577)
+  return { state: "none", text: noneTitle(why, t), warnings: w.filter((x) => x !== why).map((x) => warningShort(x, t)) };
+}
 /** The energy-saving forecast card (IR78): a forecast from a prorated demo_fixed baseline, never a measured saving. */
 export function forecastView(f: ApiForecast | null | undefined, t: T = en): ForecastView {
-  if (!f || f.forecastSavedKWh === null || f.predictedBaselineKWh === null || f.predictedActualKWh === null) {
-    const w = f?.qualityWarnings ?? [];
-    const why = NONE_REASONS.find((x) => w.includes(x)) ?? null;
-    // the badges name the other warnings in words; the one the title already says is not repeated (IR577)
-    return { state: "none", text: noneTitle(why, t), warnings: w.filter((x) => x !== why).map((x) => warningShort(x, t)) };
-  }
+  if (!f) return noForecast([], t);
+  if (f.forecastSavedKWh === null || f.predictedBaselineKWh === null || f.predictedActualKWh === null) return noForecast(f.qualityWarnings, t);
   return {
     state: "ok", saved: direction(f.forecastSavedKWh, "kWh", t), rate: f.forecastSavingPercentage === null ? { text: "—", tone: "muted" } : direction(f.forecastSavingPercentage, "%", t),
     baseline: { value: kwh(f.predictedBaselineKWh), sub: baselineSub(f, t) },

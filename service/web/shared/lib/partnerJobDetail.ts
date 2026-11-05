@@ -59,7 +59,10 @@ export function qualified(m: ApiMember, required: string[], at: string): boolean
 }
 
 /** Free hours of a capacity day (available minus assigned; “—” without a working pattern). */
-export const freeHours = (c: ApiCapacity | undefined) => (!c || c.availableMinutes === null ? null : Math.max(0, Math.round(((c.availableMinutes - c.assignedMinutes) / 60) * 10) / 10));
+export const freeHours = (c: ApiCapacity | undefined) => {
+  if (!c) return null;
+  return c.availableMinutes === null ? null : Math.max(0, Math.round(((c.availableMinutes - c.assignedMinutes) / 60) * 10) / 10);
+};
 const overlaps = (a: Slot, b: Slot) => Date.parse(a.startAt) < Date.parse(b.endAt) && Date.parse(b.startAt) < Date.parse(a.endAt);
 const inside = (inner: Slot, outer: Slot) => Date.parse(outer.startAt) <= Date.parse(inner.startAt) && Date.parse(inner.endAt) <= Date.parse(outer.endAt);
 

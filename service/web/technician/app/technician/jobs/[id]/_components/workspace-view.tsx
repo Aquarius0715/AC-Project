@@ -68,7 +68,7 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
     const t = setInterval(() => { setNow(Date.now() + offset); }, 30_000);
     return () => { clearInterval(t); };
   }, [live.now]);
-  const editableReport = job.draftReportRef && live.report && live.report.version === job.draftReportRef.reportVersion ? live.report : null;
+  const editableReport = job.draftReportRef && live.report?.version === job.draftReportRef.reportVersion ? live.report : null;
   const [draft, setDraft] = useState<Draft>(() => draftFrom(editableReport ?? (job.status === "in_progress" ? null : live.report), live.components));
   const [rep, setRep] = useState<Rep | null>(editableReport);
   const [dirty, setDirty] = useState(false);

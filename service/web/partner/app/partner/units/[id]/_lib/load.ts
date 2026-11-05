@@ -38,7 +38,7 @@ export async function loadUnit(id: string, jobId?: string) {
   if (!d) {
     if (!jobId) return null; // not one of the company's units now: not found
     const h = await coreOp<ApiPartnerJobDetail>("jobs.get", { jobId }).catch((error: unknown) => { if (gone(error)) return null; throw error; });
-    if (!h || h.projection !== "history") return null;
+    if (h?.projection !== "history") return null;
     return {
       kind: "snapshot" as const,
       jobId: h.jobId,

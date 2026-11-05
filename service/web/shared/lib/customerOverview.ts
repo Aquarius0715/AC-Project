@@ -51,7 +51,7 @@ export function previousRange(p: { from: string; to: string }): { from: string; 
 }
 
 const latestOf = (u: OverviewUnit, metric: string) => u.latestMeasurements.find((m) => m.metric === metric);
-const current = (m?: ApiMeasurement) => (m && m.quality === "valid" && m.value !== null ? m.value : null);
+const current = (m?: ApiMeasurement) => (m?.quality === "valid" && m.value !== null ? m.value : null);
 
 export interface OverviewRow {
   id: string; name: string; place: string; observed: string; temp: string | null; hum: string | null; power: string | null;

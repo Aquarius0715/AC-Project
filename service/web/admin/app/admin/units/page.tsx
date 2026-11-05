@@ -100,7 +100,7 @@ export default async function AdminUnitsPage({ searchParams }: Readonly<PageProp
     unitId ? coreOp<ApiUnitDetail>("units.get", { id: unitId }).catch((error: unknown) => (error instanceof CoreError && error.status === 404 ? null : Promise.reject(error))) : Promise.resolve(null),
   ]);
   const clientUsers = await coreAll<ApiClientUser>("clientUsers.list", { filters: { customerId: cust.id } });
-  const d = detail && detail.customerOrgId === cust.orgId ? detail : null;
+  const d = detail?.customerOrgId === cust.orgId ? detail : null;
   const models = new Map(caps.map((k) => [k.id, k.model]));
   const memberName = new Map(members.map((m) => [m.id, m.displayName]));
   const tree = locationTree(props, spaces, orgUnits, cust.orgId);

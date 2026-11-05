@@ -51,7 +51,7 @@ export async function loadMaintenance(sp: Record<string, string | string[] | und
   const done = await Promise.all(list.filter((j) => j.projection === "summary" && j.status === "completed")
     .toSorted((a, b) => Date.parse(b.scheduledSlot?.startAt ?? b.dueAt) - Date.parse(a.scheduledSlot?.startAt ?? a.dueAt)).slice(0, 3)
     .map((j) => quiet(coreOp<ApiClientJob>("jobs.get", { jobId: j.id }), null)));
-  const toRate = done.find((j) => j && j.projection === "detail" && feedback(j, nowMs).kind === "rate") ?? null;
+  const toRate = done.find((j) => j?.projection === "detail" && feedback(j, nowMs).kind === "rate") ?? null;
   const base = {
     ...common, rows, filters: null,
     rateBanner: toRate ? { jobId: toRate.id, text: t(toRate.completedAt ? "Work finished — {job} · {unit} · {date}." : "Work finished — {job} · {unit}.", { job: toRate.id.slice(0, 8), unit: unitOf(toRate.unitId).name, date: toRate.completedAt ? showDate(toRate.completedAt, display) : "" }) } : null,
@@ -59,7 +59,7 @@ export async function loadMaintenance(sp: Record<string, string | string[] | und
   const pick = one(sp.jobId);
   if (!pick) return { ...base, detail: null };
   const job = await quiet(coreOp<ApiClientJob>("jobs.get", { jobId: pick }), null);
-  if (!job || job.projection !== "detail") return { ...base, detail: null, missing: pick };
+  if (job?.projection !== "detail") return { ...base, detail: null, missing: pick };
   const ref = job.reportRefs[job.reportRefs.length - 1];
   const [events, report] = await Promise.all([
     quiet(coreItems<ApiClientEvent>("jobs.events", { jobId: job.id, query: { limit: 100 } }), [] as ApiClientEvent[]),

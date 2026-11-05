@@ -115,7 +115,7 @@ export function preferredLines(j: ApiClientJob, i: I18n = EN): { text: string; n
 export function proposalCard(j: ApiClientJob, now: number, i: I18n = EN) {
   const { t } = i;
   const p = j.slotProposal;
-  if (!p || p.status !== "pending") return null;
+  if (p?.status !== "pending") return null;
   return {
     id: p.id, title: t(p.source === "contractor" ? "Your service partner asks for another time (via HQ)" : "HQ proposes a new time"), when: slotLong(p.slot, i),
     who: t(p.hold.kind === "contractor" ? "A service partner technician (name shown once assigned)" : "An HQ technician (name shown once confirmed)"),

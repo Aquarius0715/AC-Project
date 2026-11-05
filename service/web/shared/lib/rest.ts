@@ -90,7 +90,8 @@ export function coreRequest(operation: string, input: unknown): CoreRequest | nu
     if (value === "." || value === "..") return null;
     path = path.replace(`{${name}}`, encodeURIComponent(value));
   }
-  if (route.fixed && text(rest[route.fixed[0]]) === route.fixed[1]) delete rest[route.fixed[0]];
+  const [fixedKey, fixedValue] = route.fixed ?? [];
+  if (fixedKey !== undefined && text(Reflect.get(rest, fixedKey)) === fixedValue) Reflect.deleteProperty(rest, fixedKey);
   if (route.method === "GET" || route.method === "DELETE") {
     const q = new URLSearchParams();
     flatten(q, "", rest, true);

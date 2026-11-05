@@ -192,7 +192,7 @@ export function DeviceTab({ live }: Readonly<{ live: DevicesLive }>) {
         <p className="text-[11px] text-muted-foreground">{t("Recorded at the current time as a demo calibration.")}</p>
       </Modal>
       <Modal open={modal === "firmware"} onClose={close} title={t("Update firmware")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending || !fw} onClick={firmware}>{t("Queue update")}</Btn></>}>
-        {dv && dv.firmware.length === 0 ? <p className="text-xs text-muted-foreground">{t("The unit model lists no firmware candidates.")}</p> : <Field label={t("Target version")} error={tried && !fw ? t("Choose a version") : undefined}><Select value={fw} onChange={(e) => { setFw(e.target.value); }}><option value="">{t("Select…")}</option>{dv?.firmware.map((v) => <option key={v} value={v} disabled={v === dv.detail.firmwareVersion}>{v === dv.detail.firmwareVersion ? t("{version} (current)", { version: v }) : v}</option>)}</Select></Field>}
+        {dv?.firmware.length === 0 ? <p className="text-xs text-muted-foreground">{t("The unit model lists no firmware candidates.")}</p> : <Field label={t("Target version")} error={tried && !fw ? t("Choose a version") : undefined}><Select value={fw} onChange={(e) => { setFw(e.target.value); }}><option value="">{t("Select…")}</option>{dv?.firmware.map((v) => <option key={v} value={v} disabled={v === dv.detail.firmwareVersion}>{v === dv.detail.firmwareVersion ? t("{version} (current)", { version: v }) : v}</option>)}</Select></Field>}
         <p className="text-[11px] text-muted-foreground">{t("Only an online device accepts an update; a failure keeps the current version.")}</p>
       </Modal>
     </div>

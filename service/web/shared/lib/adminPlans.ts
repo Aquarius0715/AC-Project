@@ -42,7 +42,7 @@ export function nextOccurrence(iso: string, months: number, anchorDay: number): 
   return new Date(first + (Math.min(anchorDay, last) - 1) * 86_400_000).toISOString();
 }
 /** The anchor day a save stores: the UTC day of a changed next date, otherwise the plan's (IR130 item 1). */
-export const anchorOf = (p: Pick<ApiPlan, "anchorDay" | "nextDueAt"> | null, nextDueAt: string) => (p && p.nextDueAt === nextDueAt ? p.anchorDay : new Date(nextDueAt).getUTCDate());
+export const anchorOf = (p: Pick<ApiPlan, "anchorDay" | "nextDueAt"> | null, nextDueAt: string) => (p?.nextDueAt === nextDueAt ? p.anchorDay : new Date(nextDueAt).getUTCDate());
 
 /** The plan form checks: every 1–12 months, the next date in the future (the unit only when creating). */
 export function planErrors(f: { unitId: string; every: number; nextDueAt: string | null }, now: number, t: T = en): Record<string, string> {

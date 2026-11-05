@@ -18,7 +18,7 @@ export interface RoomUnit {
   conn: ApiUnitDetail["connection"]; seen: string | null; online: boolean;
 }
 /** The latest reading of a metric when it is current (valid, IR213); a stale, suspect or null reading shows “—”. */
-const metric = (d: ApiUnitDetail, m: string) => { const x = d.latestMeasurements.find((r) => r.metric === m); return x && x.quality === "valid" ? x.value : null; };
+const metric = (d: ApiUnitDetail, m: string) => { const x = d.latestMeasurements.find((r) => r.metric === m); return x?.quality === "valid" ? x.value : null; };
 export function roomUnits(ds: ApiUnitDetail[], i: I18n = EN): RoomUnit[] {
   const { t } = i;
   return [...ds].toSorted((a, b) => a.displayName.localeCompare(b.displayName)).map((d) => {

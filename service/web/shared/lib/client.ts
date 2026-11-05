@@ -32,7 +32,7 @@ const hhmm = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString("en
 /** The latest valid reading of a metric (IR213): a stale, suspect or missing one is no current value. */
 const reading = (u: ApiUnit, metric: string) => {
   const m = u.latestMeasurements?.find((x) => x.metric === metric);
-  return m && m.quality === "valid" && m.value !== null ? { unit: m.unit, value: m.value } : null;
+  return m?.quality === "valid" && m.value !== null ? { unit: m.unit, value: m.value } : null;
 };
 
 /** The row's room temperature, humidity and power (W) are the unit's latest readings, never its setting. */

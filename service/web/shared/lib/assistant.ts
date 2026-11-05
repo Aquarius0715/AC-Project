@@ -58,10 +58,11 @@ export const roomOf = (groups: CandidateGroup[]) => groups[0]?.path.split(" › 
 
 /** The answer to a temperature question: the latest reading, or why there is none (never a zero). */
 export function temperatureText(m: Measurement | null, unit: string, t: T, display: Display): string {
-  if (!m || m.value === null) return t("{unit} has no temperature reading yet.", { unit });
+  const value = m?.value ?? null;
+  if (m === null || value === null) return t("{unit} has no temperature reading yet.", { unit });
   const at = showClock(m.observedAt, display);
-  return m.quality === "valid" ? t("{unit} is {value} °C (measured {time}).", { unit, value: one(m.value), time: at })
-    : t("{unit} last read {value} °C at {time} — the reading is {quality}.", { unit, value: one(m.value), time: at, quality: qualityWord(m.quality, t) });
+  return m.quality === "valid" ? t("{unit} is {value} °C (measured {time}).", { unit, value: one(value), time: at })
+    : t("{unit} last read {value} °C at {time} — the reading is {quality}.", { unit, value: one(value), time: at, quality: qualityWord(m.quality, t) });
 }
 const qualityWord = (q: Measurement["quality"], t: T) => {
   const words: Partial<Record<Measurement["quality"], string>> = { valid: t("valid"), missing: t("missing"), stale: t("stale"), suspect: t("suspect") };

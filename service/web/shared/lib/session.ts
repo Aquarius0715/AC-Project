@@ -122,7 +122,7 @@ export async function refresh(s: Session): Promise<Session | null> {
     if (!r.ok) return null;
     const next = sessionFromTokens(await r.json(), s.refreshToken);
     // a refreshed token must keep the selected tenant and membership
-    return next && next.tenantId === s.tenantId && next.membershipId === s.membershipId ? next : null;
+    return next?.tenantId === s.tenantId && next.membershipId === s.membershipId ? next : null;
   } catch {
     return null;
   }

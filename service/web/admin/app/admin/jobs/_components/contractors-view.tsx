@@ -102,7 +102,7 @@ function ProfileModal({ live, d, organizationId, onClose, onFail }: ModalProps &
   const t = useT();
   const router = useRouter();
   const [pending, run] = useAction();
-  const existing = d?.profile && d.profile.organizationId === organizationId ? d.profile : null;
+  const existing = organizationId !== null && d?.profile?.organizationId === organizationId ? d.profile : null;
   // a company without a profile, or a new one created first (IR465); once created it stays chosen, so trying again
   // after a refused profile adds the profile only
   const [org, setOrg] = useState(organizationId ?? live.withoutProfile[0]?.id ?? NEW_COMPANY);

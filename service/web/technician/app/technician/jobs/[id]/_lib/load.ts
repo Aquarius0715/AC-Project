@@ -37,7 +37,7 @@ export async function loadWorkspace(jobId: string): Promise<WorkspaceLive | "not
   const display = await coreDisplay();
   const i = i18nOf(display);
   if (job?.projection === "history") return { kind: "history", card: historyCard(job, i) }; // window ended: completed (IR234) or reassigned
-  if (!job || job.projection !== "detail") return "not_found";
+  if (job?.projection !== "detail") return "not_found";
   const [now, unit] = await Promise.all([coreNow(), quiet(coreOp<ApiUnitDetail & { serviceScope?: string[] }>("units.get", { id: job.unitId }))]);
   // before the work window units.get refuses, but units.list still names the unit of the assignment, as the overview does (IR570)
   const listed = isRefused(unit) ? await quiet(coreOp<{ items: { displayName: string }[] }>("units.list", { limit: 1, filters: { unitIds: [job.unitId] } })) : null;
