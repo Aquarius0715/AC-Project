@@ -56,10 +56,10 @@ export const STAGES = [
   { id: "completed", label: "Completed", filter: { status: "completed" } }, { id: "on_hold", label: "On hold", filter: { status: "on_hold" } },
 ] as const;
 export type Stage = (typeof STAGES)[number]["id"];
-export const stageOf = (v?: string): Stage | null => (STAGES.some((s) => s.id === v) ? (v as Stage) : null);
+export const stageOf = (v = ""): Stage | null => oneOf(STAGES.map((s) => s.id), v, null);
 export const SORTS = [{ id: "status", text: "Status, earliest stage first", field: "status", direction: "asc" }, { id: "dueAt", text: "Deadline, soonest first", field: "dueAt", direction: "asc" }, { id: "severity", text: "Severity, most severe first", field: "severity", direction: "desc" }] as const;
 export type HqSort = (typeof SORTS)[number]["id"];
-export const sortOf = (v?: string): HqSort => (SORTS.some((s) => s.id === v) ? (v as HqSort) : "status");
+export const sortOf = (v = ""): HqSort => oneOf(SORTS.map((s) => s.id), v, "status");
 
 export interface Query { customerId?: string; propertyId?: string; unitId?: string; origin?: string; delivery?: string; assignee?: string; overdue?: string; type?: string; stage?: string; from?: string; to?: string }
 /** The requested-time period of the list (URL from / to, ISO instants; the HQ overview's job counts, IR245): both valid
@@ -307,6 +307,7 @@ export interface CostLine { kind: "estimate" | "actual"; description: string; vi
 export { money } from "@ac/web/lib/money";
 import { money } from "@ac/web/lib/money";
 import { codePoints } from "@ac/web/lib/text";
+import { oneOf } from "@ac/web/lib/oneOf";
 /** Estimate and actual totals per currency, never converted (“80.00 MYR + 6.20 USD”). */
 export function costTotals(lines: CostLine[]): { estimate: string; actual: string } {
   const total = (kind: CostLine["kind"]) => {
