@@ -5,9 +5,9 @@ import { partnerUserRows, type PartnerStatus } from "@ac/web/lib/partnerUsers";
 import { DEMO_SELF, partnerUserDemo, usePartnerUsersDemo } from "@ac/web/lib/partnerUsersDemo";
 import { UsersView, type UsersOps } from "./users-view";
 
-/** A demo refusal as the API would answer it. */
 // the API code of a demo refusal; any other refusal is a conflict
 const REFUSAL_CODE = new Map([["error.notFound", "NOT_FOUND"], ["errors.email_taken", "VALIDATION"]]);
+/** A demo refusal as the API would answer it. */
 const done = (refused: string | undefined): Promise<Awaited<ReturnType<UsersOps["invite"]>>> => {
   if (!refused) return Promise.resolve({ ok: true, value: null });
   const fieldErrors: Record<string, string> = refused === "errors.email_taken" ? { email: refused } : {};
