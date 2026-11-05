@@ -17,6 +17,10 @@ import { ConditionFields, WindowEditor } from "./policy-parts";
 import { DemoTest, NotificationPreview } from "./policy-checks";
 import { Icon } from "@ac/web/components/Icon";
 
+const CUSTOMER_A = "customer-a";
+const HQ_OPERATOR = "hq-operator";
+const UNIT_ONLINE_RTO = "unit-online-rto";
+
 /** API mode: the selected policy (`policyId`) or the owner customer of a new one (`new`, copied from the default rule
 `from`) from the URL (DD-A05 items 5, 8 and 9), whether the session may write policies, the display time zone a new
 one starts in, the active customers that may own one, and each customer's units (notifications.recipients lists a
@@ -28,7 +32,7 @@ export interface PoliciesLive {
 
 const CHANNEL: Record<Channel, string> = { inApp: "In-app", email: "Email", whatsapp: "WhatsApp" };
 // the Phase 1A demo's policies, customer and recipients (their data stays English, as the other demo screens)
-const demoRecipients: PolicyRecipient[] = [{ id: "customer-a", label: "customer-a", role: "client" }, { id: "hq-operator", label: "hq-operator", role: "HQ" }];
+const demoRecipients: PolicyRecipient[] = [{ id: CUSTOMER_A, label: CUSTOMER_A, role: "client" }, { id: HQ_OPERATOR, label: HQ_OPERATOR, role: "HQ" }];
 const demoPolicy = (id: string, name: string, sub: string, metric: string, threshold: number, recovery: number, duration: number, on: boolean, units: string[]): AdminPolicy => {
   return {
     id,
@@ -43,8 +47,8 @@ const demoPolicy = (id: string, name: string, sub: string, metric: string, thres
     kind: "alert",
     group: "CUSTOMER-A",
     units: units.length === 1 ? "1 unit" : `${String(units.length)} units`,
-    customerId: "customer-a",
-    customerName: "customer-a",
+    customerId: CUSTOMER_A,
+    customerName: CUSTOMER_A,
     priority: 50,
     timezone: "Asia/Kuala_Lumpur",
     operator: "gte",
@@ -54,9 +58,9 @@ const demoPolicy = (id: string, name: string, sub: string, metric: string, thres
     channels: ["inApp", "email"],
     recipients: demoRecipients,
     activeWindow: null,
-    madeBy: "hq-operator",
+    madeBy: HQ_OPERATOR,
     unitIds: units,
-    unitNames: units.map((u) => (u === "unit-online-rto" ? "Bedroom AC" : "Bedroom AC #2")),
+    unitNames: units.map((u) => (u === UNIT_ONLINE_RTO ? "Bedroom AC" : "Bedroom AC #2")),
     rules: [],
     settings: [],
   };
@@ -72,16 +76,16 @@ const demoRules: DefaultRule[] = [
 ];
 export const seedPolicies: AdminPolicy[] = [
   { ...demoPolicy("policy-default", "Default policy", "6 rules · ventilation (CO₂, PM2.5) + fault causes", "co2", 1000, 900, 600, true, []), kind: "default_alert", group: "DEFAULT · ON EVERY UNIT", customerId: null, units: "every unit",
-    rules: demoRules, settings: [{ ruleKey: "ac_offline", customerId: "customer-a", enabled: false, version: 1, reason: "Demo: customer switched the offline rule off", by: "hq-operator", at: "2026-09-14T00:00:00Z" }] },
-  demoPolicy("policy-temp-a", "Bedroom too hot", "Temperature ≥ 30 °C for 60 s", "temperature", 30, 28, 60, true, ["unit-online-rto", "unit-online-rto-2"]),
-  demoPolicy("policy-co2-a", "Stuffy office", "CO₂ ≥ 1200 ppm · 15 min · weekdays", "co2", 1200, 1000, 900, true, ["unit-online-rto", "unit-online-rto-2"]),
+    rules: demoRules, settings: [{ ruleKey: "ac_offline", customerId: CUSTOMER_A, enabled: false, version: 1, reason: "Demo: customer switched the offline rule off", by: HQ_OPERATOR, at: "2026-09-14T00:00:00Z" }] },
+  demoPolicy("policy-temp-a", "Bedroom too hot", "Temperature ≥ 30 °C for 60 s", "temperature", 30, 28, 60, true, [UNIT_ONLINE_RTO, "unit-online-rto-2"]),
+  demoPolicy("policy-co2-a", "Stuffy office", "CO₂ ≥ 1200 ppm · 15 min · weekdays", "co2", 1200, 1000, 900, true, [UNIT_ONLINE_RTO, "unit-online-rto-2"]),
   { ...demoPolicy("policy-humidity-a", "Night humidity", "Humidity ≥ 70 % · 30 min · 22–06", "humidity", 70, 65, 1800, false, []), severity: "normal" },
 ];
-export const demoCustomers = [{ id: "customer-a", name: "customer-a" }];
-const demoUnits = [{ id: "unit-online-rto", name: "Bedroom AC", customerId: "customer-a" }];
+export const demoCustomers = [{ id: CUSTOMER_A, name: CUSTOMER_A }];
+const demoUnits = [{ id: UNIT_ONLINE_RTO, name: "Bedroom AC", customerId: CUSTOMER_A }];
 const demoCandidates: ApiRecipient[] = [
-  { id: "customer-a", role: "client", displayLabel: "customer-a", allowedChannels: ["inApp", "email", "whatsapp"] },
-  { id: "hq-operator", role: "admin", displayLabel: "hq-operator", allowedChannels: ["inApp", "email"] },
+  { id: CUSTOMER_A, role: "client", displayLabel: CUSTOMER_A, allowedChannels: ["inApp", "email", "whatsapp"] },
+  { id: HQ_OPERATOR, role: "admin", displayLabel: HQ_OPERATOR, allowedChannels: ["inApp", "email"] },
 ];
 
 /** The selected policy, or the owner customer of a new one and the default rule it copies: URL state in API mode, local state in the demo. */
