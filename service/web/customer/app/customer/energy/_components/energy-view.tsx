@@ -43,7 +43,7 @@ export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
   const names = new Map(live.units.map((u) => [u.id, u.name]));
   const setUnits = (ids: string[]) => { nav({ unitIds: ids.join(","), baselineId: null }); };
   const isMulti = live.unitIds.length > 1;
-  const subject = isMulti ? t("{n} units", { n: live.unitIds.length }) : names.get(live.unitIds[0]) ?? "—";
+  const subject = isMulti ? t("{n} units", { n: live.unitIds.length }) : names.get(live.unitIds[0] ?? "") ?? "—";
   const chartSub = t(r?.baseline === null ? "kWh per day · {subject}" : "kWh per day · {subject} · baseline shown as an even daily share", { subject });
   const days = t(live.period.days === 1 ? "{n} day" : "{n} days", { n: live.period.days });
   if (live.units.length === 0) return <Page><Banner>{t("No air conditioner is registered yet — energy appears here once HQ adds your units.")}</Banner></Page>;

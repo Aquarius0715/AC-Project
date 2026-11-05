@@ -140,7 +140,7 @@ function List({ live, notice, setNotice, create, edit }: Readonly<{ live: Automa
       <p className="text-xs text-muted-foreground">{t("Priority when rules overlap: device capabilities & active restrictions → HQ policy → your automations. List order is not run priority. Missing condition data never counts as a match.")}</p>
       <Modal open={!!del} onClose={() => { setDel(null); }} title={t("Delete automation?")} footer={<><Btn onClick={() => { setDel(null); }}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending} onClick={() => del && remove(del)}>{t("Delete automation")}</Btn></>}>
         <p className="text-[13px]">{t("“{name}” will no longer run.", { name: del?.name ?? "" })}</p>
-        <p className="text-xs text-muted-foreground">{del && `${del.place.split(t(" · next run {when}", { when: "" }).trimEnd())[0]} · ${t(triggerInfo[del.trigger].label)} · ${del.when}.`} {t("Manual control and other automations are not affected. Commands it already sent stay in the history.")}</p>
+        <p className="text-xs text-muted-foreground">{del && `${del.place.split(t(" · next run {when}", { when: "" }).trimEnd())[0] ?? del.place} · ${t(triggerInfo[del.trigger].label)} · ${del.when}.`} {t("Manual control and other automations are not affected. Commands it already sent stay in the history.")}</p>
       </Modal>
     </Page>
   );
@@ -273,7 +273,7 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
                     {dayLong.map((d, k) => {
                       const isOn = draft.weekdays.includes(k + 1);
                       return <Plain key={d} type="button" aria-pressed={isOn} onClick={() => { set({ weekdays: isOn ? draft.weekdays.filter((x) => x !== k + 1) : [...draft.weekdays, k + 1] }); }}
-                        className={cx("rounded-full border px-3 py-1 text-[13px] font-semibold", isOn ? "border-primary bg-primary-soft text-primary" : "border-line bg-surface")}>{t(dayShort[k])}</Plain>;
+                        className={cx("rounded-full border px-3 py-1 text-[13px] font-semibold", isOn ? "border-primary bg-primary-soft text-primary" : "border-line bg-surface")}>{t(dayShort[k] ?? String(k + 1))}</Plain>;
                     })}
                   </div>
                 </Field>
@@ -404,7 +404,7 @@ function OnlyIf({ draft, errors, set }: Readonly<{ draft: Draft; errors: Record<
               {dayLong.map((d, k) => {
                 const isOn = x.weekdays.includes(k + 1);
                 return <Plain key={d} type="button" aria-pressed={isOn} onClick={() => { put(i, { ...x, weekdays: isOn ? x.weekdays.filter((w) => w !== k + 1) : [...x.weekdays, k + 1] }); }}
-                  className={cx("rounded-full border px-2 py-0.5 text-xs font-semibold", isOn ? "border-primary bg-primary-soft text-primary" : "border-line bg-surface")}>{t(dayShort[k])}</Plain>;
+                  className={cx("rounded-full border px-2 py-0.5 text-xs font-semibold", isOn ? "border-primary bg-primary-soft text-primary" : "border-line bg-surface")}>{t(dayShort[k] ?? String(k + 1))}</Plain>;
               })}
             </span>
           )}

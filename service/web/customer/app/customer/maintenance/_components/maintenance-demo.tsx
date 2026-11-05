@@ -120,7 +120,7 @@ function Detail({ j, onClose, open }: Readonly<{ j: Job; onClose: () => void; op
         <div className="mt-3 rounded-xl border border-[#f5c473] bg-[#fff8ec] p-4">
           <div className="flex flex-wrap items-center justify-between gap-2"><b className="text-[14px]">{p.by === "contractor" ? "Your service partner asks for another time (via HQ)" : "HQ proposes a new time"}</b><Badge tone="warn">Reply by {p.replyBy}</Badge></div>
           <div className="my-2 text-xl font-bold">{longDate(p.slot)}</div>
-          <SummaryList items={[["Who comes", p.by === "contractor" || p.who.startsWith("contractor") ? `Partner technician from ${p.who.split(" ", 1)[0]} (name shown once assigned)` : "HQ technician (name shown once confirmed)"], ["Message", `“${p.message}”`]]} />
+          <SummaryList items={[["Who comes", p.by === "contractor" || p.who.startsWith("contractor") ? `Partner technician from ${p.who.split(" ", 1)[0] ?? p.who} (name shown once assigned)` : "HQ technician (name shown once confirmed)"], ["Message", `“${p.message}”`]]} />
           <div className="mt-3 flex flex-wrap items-center justify-end gap-2"><span className="mr-auto text-[11px] text-warn">Accepting books this time. Declining keeps your request open.</span><Btn variant="danger" onClick={() => { open("decline"); }}>Decline…</Btn><Btn variant="primary" onClick={() => { jobActions.accept(j.id); toast("Time accepted — booking the technician"); }}><Icon name="check" />Accept this time</Btn></div>
         </div>
       )}
@@ -304,7 +304,7 @@ function FilterCare({ onRequest }: Readonly<{ onRequest: () => void }>) {
           { key: "h", label: "Run time", render: (r) => `${String(r.h)} h since cleaning` },
           { key: "p", label: "Progress", render: (r) => <div className="w-28"><UtilizationBar pct={Math.min(100, (r.h / 250) * 100)} tone={filterTone(r.st)} /></div>, hideBelow: "sm" },
           { key: "s", label: "Status", render: (r) => <Badge tone={filterTone(r.st)}>{r.st}</Badge> },
-          { key: "a", label: "", render: (r) => r.st === "Overdue" ? <Btn size="sm" variant="primary" onClick={onRequest}>Request cleaning</Btn> : <Btn size="sm" onClick={() => { setRows((s) => s.map((x) => (x.unit === r.unit ? { ...x, h: 0, st: "OK", loc: x.loc.split(" · ", 1)[0] + " · cleaned by you just now" } : x))); toast("Marked cleaned — counter reset"); }}>Mark cleaned</Btn> },
+          { key: "a", label: "", render: (r) => r.st === "Overdue" ? <Btn size="sm" variant="primary" onClick={onRequest}>Request cleaning</Btn> : <Btn size="sm" onClick={() => { setRows((s) => s.map((x) => (x.unit === r.unit ? { ...x, h: 0, st: "OK", loc: `${x.loc.split(" · ", 1)[0] ?? x.loc} · cleaned by you just now` } : x))); toast("Marked cleaned — counter reset"); }}>Mark cleaned</Btn> },
         ]} />
         <p className="mt-2 text-[11px] text-muted-foreground">Run time counts hours the AC was running. Unknown connection → “Unknown”.</p>
       </Card>

@@ -193,7 +193,7 @@ function TimesInput({ rows, onChange, error, label, firstId }: Readonly<{ rows: 
       <span id={titleId} className="text-[13px] font-semibold">{label ?? t("Your 3 preferred times")} <span className="font-normal text-muted-foreground">{t("· each 1–4 h, from tomorrow, all different · times in {zone}", { zone: timeZone })}</span></span>
       {rows.map((r, i) => (
         <div key={i} className="flex flex-wrap items-end gap-2">
-          <span className="mb-2 w-8 text-xs font-semibold text-primary">{t(["1st", "2nd", "3rd"][i])}</span>
+          <span className="mb-2 w-8 text-xs font-semibold text-primary">{t(["1st", "2nd", "3rd"][i] ?? "")}</span>
           <Field label={t("Date {n}", { n: i + 1 })}><Input id={i === 0 ? firstId : undefined} type="date" value={r.date} onChange={(e) => { set(i, "date", e.target.value); }} /></Field>
           <Field label={t("From {n}", { n: i + 1 })}><Input type="time" value={r.from} onChange={(e) => { set(i, "from", e.target.value); }} /></Field>
           <Field label={t("To {n}", { n: i + 1 })}><Input type="time" value={r.to} onChange={(e) => { set(i, "to", e.target.value); }} /></Field>
@@ -356,8 +356,8 @@ function ProblemModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now
       <Field label={t("What happened?")}><Choice value={reason} onChange={setReason} options={PROBLEMS.map((p) => ({ ...p, label: t(p.label) }))} /></Field>
       <Field label={t("Details (10–2000 characters)")} error={tried ? detailError ?? undefined : undefined}><Textarea value={details} maxLength={2000} onChange={(e) => { setDetails(e.target.value); }} /></Field>
       <Field label={t("Photos (optional, up to 5 JPEG/PNG)")} error={fileError ?? undefined}><Input type="file" accept="image/jpeg,image/png" multiple onChange={(e) => { setFiles(Array.from(e.target.files ?? [])); }} className="text-[13px]" /></Field>
-      <label className="flex items-center gap-2 text-[13px]"><Checkbox className="h-4 w-4 accent-[#005bea]" checked={!!visit} onCheckedChange={(v) => { setVisit(v ? threeRows(now, timeZone)[0] : null); }} />{t("Suggest a visit time")}</label>
-      {visit && <TimesInput rows={[visit]} onChange={(r) => { setVisit(r[0]); }} error={tried ? visitError : null} label={t("Preferred visit")} />}
+      <label className="flex items-center gap-2 text-[13px]"><Checkbox className="h-4 w-4 accent-[#005bea]" checked={!!visit} onCheckedChange={(v) => { setVisit(v ? threeRows(now, timeZone)[0] ?? null : null); }} />{t("Suggest a visit time")}</label>
+      {visit && <TimesInput rows={[visit]} onChange={(r) => { setVisit(r[0] ?? null); }} error={tried ? visitError : null} label={t("Preferred visit")} />}
       <Banner>{t("Creates a follow-up request linked to {job} (“Under HQ review”). HQ decides within 1 business day: rework (free) or a new request.", { job: j.id.slice(0, 8) })}</Banner>
     </Modal>
   );

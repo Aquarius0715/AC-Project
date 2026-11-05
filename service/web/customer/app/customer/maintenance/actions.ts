@@ -33,6 +33,7 @@ const write = (version: number) => ({ write: true, expectedVersion: version });
 export async function createRequest(input: { unitId: string; type: "reactive" | "preventive"; symptom: string; slots: Slot[]; contactWindow: string }) {
   return run(async () => {
     const [first, ...alternativeSlots] = input.slots;
+    if (!first) throw new Error("a request needs its 1st preferred time");
     const j = await coreOp<{ id: string }>("jobs.create", {
       unitId: input.unitId, type: input.type, symptom: input.symptom.trim(), requestedStart: first.startAt, requestedEnd: first.endAt, alternativeSlots,
       ...(input.contactWindow.trim() && { contactWindow: input.contactWindow.trim() }),

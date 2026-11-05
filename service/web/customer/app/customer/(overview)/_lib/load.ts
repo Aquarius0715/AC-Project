@@ -53,9 +53,9 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
   const air = sel.scope.find((u) => u.id === sel.unitId) ?? sel.scope.find((u) => u.latestMeasurements.some((m) => m.metric === "co2")) ?? sel.scope[0] ?? null;
   const hasCo2 = !!air?.latestMeasurements.some((m) => m.metric === "co2");
   // the last 24 hours in hourly averages of the valid CO2 readings, whole (bucketMinutes, IR605, IR607)
-  const series = async () => {
+  const series = async (unit: OverviewUnit) => {
     const to = Math.floor(nowMs / 60_000) * 60_000;
-    const page: ApiAirSeries = await coreOp("telemetry.series", { from: new Date(to - 86_400_000).toISOString(), to: new Date(to).toISOString(), unitIds: [air.id], metric: "co2", bucketMinutes: 60, query: {} });
+    const page: ApiAirSeries = await coreOp("telemetry.series", { from: new Date(to - 86_400_000).toISOString(), to: new Date(to).toISOString(), unitIds: [unit.id], metric: "co2", bucketMinutes: 60, query: {} });
     return bucketPoints(page.buckets ?? []);
   };
   // what is due or restricted (DEC-90, IR610): the overdue invoices and the restriction they caused, read as the payments
@@ -75,7 +75,7 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
   const inScope = automations.filter((a) => a.unitIds.some((u) => ids.includes(u))).toSorted((a, b) => Number(b.enabled) - Number(a.enabled) || a.name.localeCompare(b.name));
   const shown = inScope.slice(0, 3);
   const [summary, sums, co2, nexts, dueLines] = await Promise.all([
-    coreOp<Summary>("summaries.get", { kind: "customer", filters }), energy, hasCo2 ? series() : Promise.resolve(null),
+    coreOp<Summary>("summaries.get", { kind: "customer", filters }), energy, hasCo2 && air ? series(air) : Promise.resolve(null),
     Promise.all(shown.map((a) => (a.kind === "schedule" && a.enabled ? orNull(coreOp<ApiOccurrence[]>("automations.nextRuns", { automationId: a.id, count: 8 }).then((o) => o.find((x) => x.phase === "schedule_start")?.at ?? null)) : Promise.resolve(null)))), due
   ]);
   const unitName = new Map(units.map((u) => [u.id, u.displayName]));
@@ -95,7 +95,7 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
     units: sel.inProperty.map((u) => ({ id: u.id, name: u.displayName })), unitId: sel.unitId,
     counts: summary.counts,
     rows: overviewRows(sel.scope, (u) => place.get(u.id)?.place ?? "", i),
-    energy: sums ? energyCard(kind, sums[0], sums[1], week.map((d, k) => ({ label: d.label.split(" ", 1)[0], kWh: sums[2][k].totals.kWh })), sums[3].map((s) => s.totals.kWh), scopeText, i) : null,
+    energy: sums ? energyCard(kind, sums[0], sums[1], week.map((d, k) => ({ label: d.label.split(" ", 1)[0] ?? d.label, kWh: sums[2][k]?.totals.kWh ?? null })), sums[3].map((s) => s.totals.kWh), scopeText, i) : null,
     emissions: sums ? { ...emissionsCard(sums[0], baseline ? baseline.method : null, i), scope: scopeText } : null,
     air: air ? {
       id: air.id, room: roomOf(air), unit: air.displayName, co2: metricCard("co2", air.latestMeasurements.find((m) => m.metric === "co2"), true, i),
@@ -106,7 +106,7 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
       on: inScope.filter((a) => a.enabled).length, off: inScope.filter((a) => !a.enabled).length,
       items: shown.map((a, k) => {
         const u = units.find((x) => x.id === a.unitIds[0]);
-        const card = ruleCard(a, u ? { name: u.displayName, path: place.get(u.id)?.place ?? "", property: properties.find((p) => p.id === u.propertyId)?.name ?? "" } : null, nexts[k], !!consent?.granted, i);
+        const card = ruleCard(a, u ? { name: u.displayName, path: place.get(u.id)?.place ?? "", property: properties.find((p) => p.id === u.propertyId)?.name ?? "" } : null, nexts[k] ?? null, !!consent?.granted, i);
         const consentWord = t(consent?.granted ? "granted" : "not granted");
         const idle = triggerOf(a) === "location" ? t("{when} · location consent: {state}", { when: card.when, state: consentWord }) : card.when;
         const line = nexts[k] ? t("Next run: {when} · {unit}", { when: nextRunText(nexts[k], nowMs, i), unit: u?.displayName ?? "AC" }) : idle;

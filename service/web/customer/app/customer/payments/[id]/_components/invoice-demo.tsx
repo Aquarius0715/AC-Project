@@ -75,7 +75,7 @@ export function InvoiceDemo({ id, tab }: Readonly<{ id: string; tab?: string }>)
         <div className="flex min-w-0 flex-col gap-4">
           <Card title="Payment history">{phase === "confirmed" || isPaid ? <p className="text-[13px]">Demo card payment · {isPaid ? "Aug 8" : "just now"} · 120.00 MYR</p> : <p className="text-xs text-muted-foreground">No payments yet</p>}</Card>
           <Card title="Payment reminders" action={<Btn size="sm" variant="ghost" aria-label={reminders ? "Hide reminders" : "Show reminders"} aria-expanded={reminders} onClick={() => { setReminders((r) => !r); }}><Icon name={reminders ? "chevronUp" : "chevronDown"} /></Btn>} sub="Notifications only — not payment methods">
-            {reminders && [["Email", "Demo record Sep 10"], ["WhatsApp", "Demo record Sep 12"]].map(([c, d]) => <div key={c} className="flex flex-wrap items-center justify-between gap-2 border-t border-line py-2 text-[13px]"><span>{c} · {d}<span className="block text-xs text-muted-foreground">Sent {d.replace("Demo record ", "")} (demo record)</span></span><Btn size="sm" variant="ghost" onClick={() => { setPreview(c); }}>View preview</Btn></div>)}
+            {reminders && ([["Email", "Demo record Sep 10"], ["WhatsApp", "Demo record Sep 12"]] as const).map(([c, d]) => <div key={c} className="flex flex-wrap items-center justify-between gap-2 border-t border-line py-2 text-[13px]"><span>{c} · {d}<span className="block text-xs text-muted-foreground">Sent {d.replace("Demo record ", "")} (demo record)</span></span><Btn size="sm" variant="ghost" onClick={() => { setPreview(c); }}>View preview</Btn></div>)}
           </Card>
         </div>
       </div>

@@ -32,7 +32,7 @@ export function AutomationsDemo() {
   const [f, setF] = useState({ name: "", kind: "Schedule", time: "18:00", temp: "25", unit: "Bedroom AC" });
   const [errorText, setError] = useState<Record<string, string>>({});
 
-  const open = (a: Auto | "new") => { setEdit(a); setStep("form"); setError({}); setF(a === "new" ? { name: "", kind: "Schedule", time: "18:00", temp: "25", unit: "Bedroom AC" } : { name: a.name, kind: a.kind, time: "18:00", temp: "25", unit: a.unit.split(" · ", 1)[0] }); };
+  const open = (a: Auto | "new") => { setEdit(a); setStep("form"); setError({}); setF(a === "new" ? { name: "", kind: "Schedule", time: "18:00", temp: "25", unit: "Bedroom AC" } : { name: a.name, kind: a.kind, time: "18:00", temp: "25", unit: a.unit.split(" · ", 1)[0] ?? a.unit }); };
   const review = () => {
     const e: Record<string, string> = {};
     if (!f.name.trim()) e.name = "Name is required";

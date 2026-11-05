@@ -45,7 +45,7 @@ export default async function CustomerAutomationsPage({ searchParams }: Readonly
   const caps: Record<string, Caps | null> = {};
   if (editing) {
     const details = await Promise.all(acs.map((u) => orNull(coreOp<ApiUnitDetail>("units.get", { id: u.id }))));
-    for (const [i, d] of details.entries()) { caps[acs[i].id] = d?.capabilities ?? null; }
+    for (const [i, d] of details.entries()) { const ac = acs[i]; if (ac) caps[ac.id] = d?.capabilities ?? null; }
   }
   const live: AutomationsLive = {
     rules,
@@ -53,7 +53,7 @@ export default async function CustomerAutomationsPage({ searchParams }: Readonly
     caps,
     editing,
     timezone: prefs.timezone || "Asia/Kuala_Lumpur",
-    cards: rules.map((r) => ruleCard(r, ac.get(r.unitIds[0]) ?? null, nextRuns.get(r.id) ?? null, isGranted, i)),
+    cards: rules.map((r) => ruleCard(r, ac.get(r.unitIds[0] ?? "") ?? null, nextRuns.get(r.id) ?? null, isGranted, i)),
     consent: consent ? { version: consent.version, ...consentCard(consent, location.length, location.filter((r) => r.disabledReason === "consent_revoked").length, i) } : { version: null, ...consentCard(null, 0, 0, i) },
     nextRuns: Object.fromEntries(nextRuns),
   };

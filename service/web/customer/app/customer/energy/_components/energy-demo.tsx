@@ -27,8 +27,9 @@ export function EnergyDemo() {
       return s.length >= 4 ? s : [...s, u];
     });
   };
-  const actual = days.map((_, i) => +sel.reduce((a, u) => a + perUnit[u].actual[i], 0).toFixed(1));
-  const base = days.map((_, i) => sel.reduce((a, u) => a + perUnit[u].base[i], 0));
+  const actual = days.map((_, i) => +sel.reduce((a, u) => a + (perUnit[u]?.actual[i] ?? 0), 0).toFixed(1));
+  const base = days.map((_, i) => sel.reduce((a, u) => a + (perUnit[u]?.base[i] ?? 0), 0));
+  const scopeLabel = sel.length === 1 ? sel[0] ?? "" : `${String(sel.length)} units`;
   const sumA = +actual.reduce((a, b) => a + b, 0).toFixed(1);
   const sumB = base.reduce((a, b) => a + b, 0);
   const saved = +(sumB - sumA).toFixed(1);
@@ -43,7 +44,7 @@ export function EnergyDemo() {
         <div className="mt-3 flex flex-wrap items-center gap-3 text-[13px]"><span className="text-xs text-muted-foreground">Units (up to 4)</span>{Object.keys(perUnit).map((u) => <Check key={u} label={u} checked={sel.includes(u)} onChange={() => { toggle(u); }} />)}</div>
       </Card>
       <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
-        <Kpi label="Actual energy" value={sumA.toFixed(1)} unit="kWh" sub={`${sel.length === 1 ? sel[0] : sel.length + " units"} · 7 days · coverage 100%`} />
+        <Kpi label="Actual energy" value={sumA.toFixed(1)} unit="kWh" sub={`${scopeLabel} · 7 days · coverage 100%`} />
         <Kpi label="Estimated cost" value={(sumA * 0.5).toFixed(2)} unit="MYR" sub="0.5 MYR/kWh · tariff demo-v1 · taxes excluded" />
         <Kpi label="Savings vs baseline" value={saved.toFixed(1)} unit="kWh" tone="ok" sub={`${((saved / sumB) * 100).toFixed(1)}% · ${(saved * 0.5).toFixed(2)} MYR vs ${sumB.toFixed(1)} kWh baseline`} />
         <Kpi label="Data coverage" value={100} unit="%" sub="All 10,080 minutes observed" />
@@ -53,7 +54,7 @@ export function EnergyDemo() {
           <>
             <BarChart labels={week} series={[base, actual]} names={["Baseline (normal operation)", "Actual (measured)"]} unit="kWh" height={200} />
           </>
-        ) : <DataTable rows={days.map((d, i) => ({ d, a: actual[i], b: base[i] }))} rowKey={(r) => r.d} cols={[{ key: "d", label: "Day", render: (r) => r.d }, { key: "a", label: "Actual (kWh)", render: (r) => r.a }, { key: "b", label: "Baseline (kWh)", render: (r) => r.b }, { key: "s", label: "Difference", render: (r) => (r.b - r.a).toFixed(1) }]} />}
+        ) : <DataTable rows={days.map((d, i) => ({ d, a: actual[i] ?? 0, b: base[i] ?? 0 }))} rowKey={(r) => r.d} cols={[{ key: "d", label: "Day", render: (r) => r.d }, { key: "a", label: "Actual (kWh)", render: (r) => r.a }, { key: "b", label: "Baseline (kWh)", render: (r) => r.b }, { key: "s", label: "Difference", render: (r) => (r.b - r.a).toFixed(1) }]} />}
         <p className="mt-3 text-xs text-muted-foreground"><Icon name="time" /> <b>Peak window 17:00–21:00</b> — 34% of energy used in peak · highest draw 1.2 kW (Thu 18:40) · pre-cooling before 17:00 lowers peak cost</p>
       </Card>
       <Card title="Carbon impact" sub="Same period & units as above · factor-demo-2026 (0.5 kgCO2e/kWh, demo factor)" action={<LinkButton size="sm" href="/customer/energy/offsets">Offset these emissions<Icon name="arrowRight" /></LinkButton>}>

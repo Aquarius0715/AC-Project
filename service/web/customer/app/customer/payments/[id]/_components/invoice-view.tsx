@@ -100,8 +100,8 @@ function PaymentTab({ live }: Readonly<{ live: InvoiceLive }>) {
               </div>
             </div>
           )}
-          {isConfirmed && live.last && <div className="mt-4"><Banner tone="ok"><b>{t("Payment confirmed")}</b><div className="text-xs">{t("Reference {reference} · {method}. The invoice is now paid.", { reference: live.last.reference ?? "—", method: methodText(live.last.method, "recorded by HQ") })}{live.restriction?.notice.live ? ` ${t("A cooling-restriction release is requested — cooling returns only after the units confirm.")}` : ""}</div></Banner></div>}
-          {isFailed && live.last && <div className="mt-4"><Banner tone="crit"><b>{t("Payment failed")}</b><div className="text-xs">{t("Demo payment {id} failed. Nothing was charged; the invoice is still unpaid. Your method is kept — you can try again.", { id: live.last.id.slice(0, 8) })}</div></Banner></div>}
+          {isConfirmed && <PaymentResult live={live} outcome="confirmed" />}
+          {isFailed && <PaymentResult live={live} outcome="failed" />}
           {i.payable && !open && (
             <>
               <h3 className="mb-2 mt-4 text-[13px] font-bold">{t("Payment method")}</h3>
@@ -139,7 +139,7 @@ function PaymentTab({ live }: Readonly<{ live: InvoiceLive }>) {
       <Modal open={!!instructions} onClose={() => { setInstructions(null); }} title={t("Payment instructions (demo)")} footer={<Btn onClick={() => { setInstructions(null); }}>{t("Close")}</Btn>}>
         {instructions && <><p className="rounded-xl bg-surface2 p-3 text-[13px]">{t("Transfer {amount} for {target} to the demo bank account “AC Project HQ (demo)” with the invoice number as the reference. HQ records the transfer when it arrives.", { amount: i.amount, target: instructions.targetName })}</p><p className="mt-2 text-xs text-muted-foreground">{t("Viewing the instructions does not pay the invoice — it stays unpaid until HQ confirms the transfer.")}</p></>}
       </Modal>
-      <Modal open={!!preview} onClose={() => { setPreview(null); }} title={preview ? t("{channel} preview", { channel: t(channelName[preview.channel]) }) : ""} footer={<Btn onClick={() => { setPreview(null); }}>{t("Close")}</Btn>}>
+      <Modal open={!!preview} onClose={() => { setPreview(null); }} title={preview ? t("{channel} preview", { channel: textOf(channelName, preview.channel, t) ?? preview.channel }) : ""} footer={<Btn onClick={() => { setPreview(null); }}>{t("Close")}</Btn>}>
         {preview && <>
           {live.whatsapp && <div className="mb-2"><Choice value={preview.channel} onChange={(v: "email" | "whatsapp") => { show(v); }} options={[{ id: "email", label: t("Email") }, { id: "whatsapp", label: t("WhatsApp") }]} /></div>}
           <div className="rounded-xl bg-surface2 p-3 text-[13px]">{preview.text.subject && <b className="mb-1 block">{t("Subject: {subject}", { subject: preview.text.subject })}</b>}{preview.text.body}</div>
@@ -148,6 +148,16 @@ function PaymentTab({ live }: Readonly<{ live: InvoiceLive }>) {
       </Modal>
     </>
   );
+}
+
+/** The last payment's outcome under the form: confirmed with its reference (and any restriction release), or failed. */
+function PaymentResult({ live, outcome }: Readonly<{ live: InvoiceLive; outcome: "confirmed" | "failed" }>) {
+  const t = useT();
+  const { last } = live;
+  if (!last) return null;
+  if (outcome === "failed") return <div className="mt-4"><Banner tone="crit"><b>{t("Payment failed")}</b><div className="text-xs">{t("Demo payment {id} failed. Nothing was charged; the invoice is still unpaid. Your method is kept — you can try again.", { id: last.id.slice(0, 8) })}</div></Banner></div>;
+  const method = last.method ? (textOf(methodLabel, last.method, t) ?? last.method) : t("recorded by HQ");
+  return <div className="mt-4"><Banner tone="ok"><b>{t("Payment confirmed")}</b><div className="text-xs">{t("Reference {reference} · {method}. The invoice is now paid.", { reference: last.reference ?? "—", method: method })}{live.restriction?.notice.live ? ` ${t("A cooling-restriction release is requested — cooling returns only after the units confirm.")}` : ""}</div></Banner></div>;
 }
 
 function RestrictionBanner({ live }: Readonly<{ live: InvoiceLive }>) {

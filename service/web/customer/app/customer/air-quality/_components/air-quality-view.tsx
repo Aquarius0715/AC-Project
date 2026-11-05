@@ -47,7 +47,8 @@ export function AirQualityView({ live }: Readonly<{ live: AirLive | null }>) {
   const label = t(info.label);
   const pickRoom = (key: string) => {
     const r = live.rooms.find((x) => x.key === key);
-    if (r) patch({ spaceId: r.spaceId, unitId: r.units[0].id });
+    const first = r?.units[0];
+    if (r && first) patch({ spaceId: r.spaceId, unitId: first.id });
   };
   const noValid = byCount(c.readings, {
     none: t("No valid {metric} readings in this window — missing data is never drawn as a line.", { metric: label }),
@@ -63,7 +64,7 @@ export function AirQualityView({ live }: Readonly<{ live: AirLive | null }>) {
             {live.rooms.map((r) => <option key={r.key} value={r.key}>{t("Room: {room}", { room: r.label })}</option>)}
           </Select>
           <Select aria-label={t("Sensor")} className="w-auto py-1.5 font-semibold" value={live.unitId} onChange={(e) => { patch({ unitId: e.target.value }); }}>
-            {room.units.map((u) => <option key={u.id} value={u.id}>{t("Sensor: {name}", { name: u.name })}</option>)}
+            {(room?.units ?? []).map((u) => <option key={u.id} value={u.id}>{t("Sensor: {name}", { name: u.name })}</option>)}
           </Select>
         </div>
         <span className="flex items-center gap-2"><b>{t("Updated {time}", { time: live.updated })}</b><ConnBadge s={live.connection} /><Btn size="sm" variant="ghost" onClick={() => { router.refresh(); }}><Icon name="refresh" />{t("Refresh")}</Btn></span>

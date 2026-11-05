@@ -5,9 +5,10 @@ import { useState } from "react";
 import { Btn, Card, Field, Input, Modal, Page, PowerBadge, SummaryList, Badge, cx, useToast, Plain } from "@ac/web/components/ui";
 import { GroupControl, GUnit } from "@ac/web/components/Features";
 import { Icon, type IconName } from "@ac/web/components/Icon";
+import type { NonEmpty } from "@ac/web/lib/lists";
 
 interface Node { id: string; name: string; type: string; units?: number; children?: Node[]; unassigned?: boolean }
-const tree: Node[] = [
+const tree: NonEmpty<Node> = [
   { id: "home-a", name: "Home A", type: "Home", children: [
     { id: "1f", name: "1F", type: "Floor", children: [
       { id: "bedroom", name: "Bedroom", type: "Room", units: 2 },
@@ -45,7 +46,7 @@ function spaceTitle(sel: string, isRoom: boolean): string {
   if (sel === "meeting") return "Office A › 3F › Meeting room";
   if (sel === "home-a") return "Home A";
   if (!isRoom) return sel === "unassigned" ? "Unassigned units (1)" : "Home A";
-  return `Home A › 1F › ${sel[0].toUpperCase()}${sel.slice(1)}`;
+  return `Home A › 1F › ${sel.charAt(0).toUpperCase()}${sel.slice(1)}`;
 }
 const GROUP_SPACE = new Map([["ws", "Workstations"], ["meeting", "Meeting room"]]);
 function TreeRow({ n, depth, sel, onSel, onRename }: Readonly<{ n: Node; depth: number; sel: string; onSel: (id: string) => void; onRename: (n: Node) => void }>) {
@@ -98,7 +99,7 @@ export function PropertiesDemo() {
             <div className="mb-3 flex flex-wrap items-center gap-2"><span className="text-xs text-muted-foreground">{groupUnits[sel].length} ACs ·</span>{(["single", "group"] as const).map((m) => <Plain key={m} aria-pressed={mode === m} onClick={() => { setMode(m); }} className={cx("rounded-control border px-3 py-1 text-xs font-semibold", mode === m ? "border-primary bg-primary-soft text-primary" : "border-line")}>{mode === m && <Icon name="check" />}{m === "single" ? "Single AC" : "Group control"}</Plain>)}</div>
           )}
           {groupUnits[sel] && mode === "group" && <GroupControl space={GROUP_SPACE.get(sel) ?? "Bedroom"} units={groupUnits[sel]} />}
-          {sel === "ws" && mode === "single" && <div className="flex flex-col gap-2">{groupUnits.ws.map((u) => <Link key={u.id} href="/customer/units/unit-online-rto" className="flex items-center justify-between rounded-xl border border-line p-3 hover:bg-surface2/60"><b className="flex items-center gap-1.5"><Icon name="units" className="text-primary" />{u.name}</b><span className="flex items-center gap-3 text-xs"><PowerBadge s={u.state} />{u.temp ?? "—"} °C <Icon name="chevronRight" /></span></Link>)}</div>}
+          {sel === "ws" && mode === "single" && <div className="flex flex-col gap-2">{(groupUnits.ws ?? []).map((u) => <Link key={u.id} href="/customer/units/unit-online-rto" className="flex items-center justify-between rounded-xl border border-line p-3 hover:bg-surface2/60"><b className="flex items-center gap-1.5"><Icon name="units" className="text-primary" />{u.name}</b><span className="flex items-center gap-3 text-xs"><PowerBadge s={u.state} />{u.temp ?? "—"} °C <Icon name="chevronRight" /></span></Link>)}</div>}
           {us && mode === "single" && (
             <div className="flex flex-col gap-2">
               {us.map((u) => {
