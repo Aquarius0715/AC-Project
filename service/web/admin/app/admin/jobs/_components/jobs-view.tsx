@@ -464,7 +464,7 @@ function CostModal({ d, onClose, onFail }: Readonly<Omit<ModalProps, "live">>) {
   const t = useT();
   const j = d.job;
   const [pending, run] = useAction();
-  const [f, setF] = useState({ kind: j.status === "completed" || j.status === "submitted" ? "actual" : "estimate", description: "", visibility: "customer", amount: "", currency: "MYR" });
+  const [f, setF] = useState<{ kind: CostLine["kind"]; description: string; visibility: CostLine["visibility"]; amount: string; currency: string }>({ kind: j.status === "completed" || j.status === "submitted" ? "actual" : "estimate", description: "", visibility: "customer", amount: "", currency: "MYR" });
   const [tried, setTried] = useState(false);
   const { line, error } = costLineOf(f, t);
   const save = () => {
@@ -475,13 +475,13 @@ function CostModal({ d, onClose, onFail }: Readonly<Omit<ModalProps, "live">>) {
   return (
     <Modal open onClose={() => { onClose(); }} title={t("Add cost line")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t("Save")}</Btn></>}>
       <p className="text-xs text-muted-foreground">{j.id.slice(0, 8)} · {d.title} · {d.customer} — {t(d.costs.length === 1 ? "saved with the job’s other 1 line" : "saved with the job’s other {n} lines", { n: d.costs.length })}</p>
-      <Field label={t("Kind")}><Choice value={f.kind as CostLine["kind"]} onChange={(v) => { setF({ ...f, kind: v }); }} options={[{ id: "estimate", label: t("Estimate") }, { id: "actual", label: t("Actual") }]} /></Field>
+      <Field label={t("Kind")}><Choice<CostLine["kind"]> value={f.kind} onChange={(v) => { setF({ ...f, kind: v }); }} options={[{ id: "estimate", label: t("Estimate") }, { id: "actual", label: t("Actual") }]} /></Field>
       <Field label={t("Description · required (1–200)")}><Input value={f.description} maxLength={200} onChange={(e) => { setF({ ...f, description: e.target.value }); }} placeholder={t("Filter cleaning labour")} /></Field>
       <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
         <Field label={t("Amount")} error={tried && error ? error : undefined}><Input inputMode="decimal" value={f.amount} onChange={(e) => { setF({ ...f, amount: e.target.value }); }} placeholder="80.00" /></Field>
         <Field label={t("Currency")}><Select value={f.currency} onChange={(e) => { setF({ ...f, currency: e.target.value }); }}><option value="MYR">MYR</option><option value="USD">USD</option></Select></Field>
       </div>
-      <Field label={t("Visibility")} hint={t("Customer lines appear on the client’s job; internal lines stay with HQ.")}><Choice value={f.visibility as CostLine["visibility"]} onChange={(v) => { setF({ ...f, visibility: v }); }} options={[{ id: "customer", label: t("Customer") }, { id: "internal", label: t("Internal") }]} /></Field>
+      <Field label={t("Visibility")} hint={t("Customer lines appear on the client’s job; internal lines stay with HQ.")}><Choice<CostLine["visibility"]> value={f.visibility} onChange={(v) => { setF({ ...f, visibility: v }); }} options={[{ id: "customer", label: t("Customer") }, { id: "internal", label: t("Internal") }]} /></Field>
       <Banner>{t("Amounts are kept per currency and never converted. No payment is made.")}</Banner>
     </Modal>
   );
