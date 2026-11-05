@@ -13,12 +13,14 @@ const KEY = "ac-partner-users-v1";
 const ORG = "org-contractor-a";
 /** The demo session signs in as contractor-a. */
 export const DEMO_SELF = "contractor-a";
+const NOT_FOUND = "error.notFound";
+const OWN_ACCOUNT = "errors.own_account";
 const at = "2026-09-01T00:00:00Z";
 export const PARTNER_USERS_SEED: ApiPartnerUser[] = [
-  { id: "pu-contractor-a", version: 1, organizationId: ORG, membershipId: "contractor-a", email: "contractor-a@ac.local", displayName: "contractor-a", partnerRole: "contractor", status: "active", lastSignInAt: "2026-09-14T23:55:00Z", accessUntil: "2026-10-01T00:00:00Z", invitedAt: at, invitedByMembershipId: "contractor-a" },
-  { id: "pu-tech-external-a", version: 1, organizationId: ORG, membershipId: "tech-external-a", email: "tech-external-a@ac.local", displayName: "tech-external-a", partnerRole: "technician", status: "active", lastSignInAt: "2026-09-14T22:10:00Z", accessUntil: "2026-10-01T00:00:00Z", invitedAt: at, invitedByMembershipId: "contractor-a" },
+  { id: "pu-contractor-a", version: 1, organizationId: ORG, membershipId: DEMO_SELF, email: "contractor-a@ac.local", displayName: DEMO_SELF, partnerRole: "contractor", status: "active", lastSignInAt: "2026-09-14T23:55:00Z", accessUntil: "2026-10-01T00:00:00Z", invitedAt: at, invitedByMembershipId: DEMO_SELF },
+  { id: "pu-tech-external-a", version: 1, organizationId: ORG, membershipId: "tech-external-a", email: "tech-external-a@ac.local", displayName: "tech-external-a", partnerRole: "technician", status: "active", lastSignInAt: "2026-09-14T22:10:00Z", accessUntil: "2026-10-01T00:00:00Z", invitedAt: at, invitedByMembershipId: DEMO_SELF },
   // added with an account (IR461), not signed in yet
-  { id: "pu-invite", version: 1, organizationId: ORG, membershipId: "m-pu-invite", email: "new.tech@example.com", displayName: "New Tech", partnerRole: "technician", status: "invited", lastSignInAt: null, accessUntil: "2026-12-31T15:59:59Z", invitedAt: "2026-09-12T02:00:00Z", invitedByMembershipId: "contractor-a" },
+  { id: "pu-invite", version: 1, organizationId: ORG, membershipId: "m-pu-invite", email: "new.tech@example.com", displayName: "New Tech", partnerRole: "technician", status: "invited", lastSignInAt: null, accessUntil: "2026-12-31T15:59:59Z", invitedAt: "2026-09-12T02:00:00Z", invitedByMembershipId: DEMO_SELF },
 ];
 
 let state: ApiPartnerUser[] | null = null;
@@ -36,14 +38,14 @@ const lastContractor = (us: ApiPartnerUser[], u: ApiPartnerUser) =>
   u.partnerRole === "contractor" && u.status === "active" && us.every((x) => !(x.id !== u.id && x.partnerRole === "contractor" && x.status === "active"));
 /** A refusal as the API words it (messageKey), or undefined when done. */
 const guard = (us: ApiPartnerUser[], u: ApiPartnerUser | undefined) => {
-  if (!u) return "error.notFound";
-  if (u.membershipId === DEMO_SELF) return "errors.own_account";
+  if (!u) return NOT_FOUND;
+  if (u.membershipId === DEMO_SELF) return OWN_ACCOUNT;
   return lastContractor(us, u) ? "errors.last_contractor" : undefined;
 };
 /** The refusal of a change to a user's own account, or of one that does not exist. */
 const selfGuard = (u: ApiPartnerUser | undefined) => {
-  if (!u) return "error.notFound";
-  return u.membershipId === DEMO_SELF ? "errors.own_account" : undefined;
+  if (!u) return NOT_FOUND;
+  return u.membershipId === DEMO_SELF ? OWN_ACCOUNT : undefined;
 };
 
 export const partnerUserDemo = {
@@ -61,8 +63,8 @@ export const partnerUserDemo = {
   setAccess(id: string, accessUntil: string) {
     const us = load();
     const u = us.find((x) => x.id === id);
-    if (u?.partnerRole !== "technician") return "error.notFound";
-    if (u.membershipId === DEMO_SELF) return "errors.own_account";
+    if (u?.partnerRole !== "technician") return NOT_FOUND;
+    if (u.membershipId === DEMO_SELF) return OWN_ACCOUNT;
     save(us.map((x) => (x.id === id ? { ...x, accessUntil, version: x.version + 1 } : x)));
     return null;
   },
