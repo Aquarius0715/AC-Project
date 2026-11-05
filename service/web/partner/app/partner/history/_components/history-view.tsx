@@ -8,7 +8,8 @@ import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { CHANNELS, channelText, communicationRefusal, ROLES, TEMPLATES, type TimelineItem } from "@ac/web/lib/partnerHistory";
-import { communicate, type Communication, type CommunicationFailure } from "../actions";
+import { communicate } from "../actions";
+import { oneOf } from "@ac/web/lib/oneOf";
 import type { HistoryLive } from "../_lib/load";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 
@@ -134,7 +135,7 @@ function Compose({ detail, onPreview }: Readonly<{ detail: Extract<Detail, { mis
   const t = useT();
   const r = detail.row, mode = detail.mode;
   const [pending, run] = useAction();
-  const [template, setTemplate] = useState<string>(TEMPLATES[0].id);
+  const [template, setTemplate] = useState<(typeof TEMPLATES)[number]["id"]>(TEMPLATES[0].id);
   const [visibility, setVisibility] = useState<"internal" | "customer">("internal");
   const [role, setRole] = useState<string>(ROLES.find((x) => detail.recipients.some((p) => p.role === x.id))?.id ?? ROLES[0].id);
   const ofRole = detail.recipients.filter((p) => p.role === role);
@@ -151,8 +152,8 @@ function Compose({ detail, onPreview }: Readonly<{ detail: Extract<Detail, { mis
   const send = () => {
     setTried(true);
     if (!message.trim() || isTooLong || !chosen) return;
-    const ch = channels.some((c) => c.id === channel) ? channel : "inApp";
-    run(() => communicate({ jobId: r.id, version: r.version, saveNote: mode.kind === "note", templateKey: template as Communication["templateKey"], channel: ch as Communication["channel"], recipientMembershipId: chosen.id, message, visibility }),
+    const ch = channels.find((c) => c.id === channel)?.id ?? "inApp";
+    run(() => communicate({ jobId: r.id, version: r.version, saveNote: mode.kind === "note", templateKey: template, channel: ch, recipientMembershipId: chosen.id, message, visibility }),
       t(mode.kind === "note" ? "Note saved + preview created" : "Preview created"),
       (v) => {
         const label = ROLES.find((x) => x.id === role)?.label ?? role;
@@ -169,8 +170,8 @@ function Compose({ detail, onPreview }: Readonly<{ detail: Extract<Detail, { mis
         setMessage(""); setTried(false);
       },
       (f) => {
-        const c = f as CommunicationFailure;
-        setResult({ tone: c.noteSaved ? "warn" : "crit", text: t(c.noteSaved ? "The note was saved, but the preview failed: {reason}" : "Not saved: {reason} Your message is kept.", { reason: communicationRefusal(f, t) }) });
+        const noteSaved = "noteSaved" in f && f.noteSaved === true; // a communication failure says whether the note was kept
+        setResult({ tone: noteSaved ? "warn" : "crit", text: t(noteSaved ? "The note was saved, but the preview failed: {reason}" : "Not saved: {reason} Your message is kept.", { reason: communicationRefusal(f, t) }) });
       });
   };
   return (
@@ -178,7 +179,7 @@ function Compose({ detail, onPreview }: Readonly<{ detail: Extract<Detail, { mis
       <div className="flex flex-col gap-3">
         {mode.text && <Banner tone={isClosed ? undefined : "warn"}>{mode.text}</Banner>}
         {result && <Banner tone={result.tone}>{result.text}</Banner>}
-        <Field label={t("Template")}><Select value={template} disabled={isClosed} onChange={(e) => { setTemplate(e.target.value); }}>{TEMPLATES.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}</Select></Field>
+        <Field label={t("Template")}><Select value={template} disabled={isClosed} onChange={(e) => { setTemplate(oneOf(TEMPLATES.map((x) => x.id), e.target.value, template)); }}>{TEMPLATES.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}</Select></Field>
         {mode.kind === "note" && <Field label={t("Visibility")}><Choice value={visibility} onChange={setVisibility} options={[{ id: "internal", label: t("Internal (default)") }, { id: "customer", label: t("Customer-visible") }]} /></Field>}
         <Field label={t("Recipient role")} hint={chosen ? `${t(ROLES.find((x) => x.id === role)?.sub ?? "")} · ${chosen.displayLabel}` : t("Nobody of this role is part of the job.")}>
           <Select value={role} disabled={isClosed} onChange={(e) => { setRole(e.target.value); setRecipient(detail.recipients.find((p) => p.role === e.target.value)?.id ?? ""); }}>
