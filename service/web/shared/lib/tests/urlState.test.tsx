@@ -32,7 +32,7 @@ describe("URL query state", () => {
     const { result } = renderHook(() => useSearchParameter("tab"));
     history.replaceState(null, "", "/?tab=history");
     act(() => {
-      globalThis.dispatchEvent(new PopStateEvent("popstate"));
+      dispatchEvent(new PopStateEvent("popstate"));
     });
     expect(result.current).toBe("history");
   });
@@ -45,9 +45,9 @@ describe("stored values", () => {
     act(() => { setStoredValue("ac:lang", "ms"); });
     expect(result.current).toBe("ms");
     const events = vi.fn();
-    globalThis.addEventListener("ac:storagechange", events);
+    addEventListener("ac:storagechange", events);
     act(() => { setStoredValue("ac:lang", "ms"); });
-    globalThis.removeEventListener("ac:storagechange", events);
+    removeEventListener("ac:storagechange", events);
     expect(events).not.toHaveBeenCalled();
   });
 

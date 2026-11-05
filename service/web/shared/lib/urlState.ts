@@ -8,11 +8,11 @@ import { useSyncExternalStore } from "react";
 const CHANGE = "ac:urlchange";
 
 function subscribe(onChange: () => void) {
-  globalThis.addEventListener("popstate", onChange);
-  globalThis.addEventListener(CHANGE, onChange);
+  addEventListener("popstate", onChange);
+  addEventListener(CHANGE, onChange);
   return () => {
-    globalThis.removeEventListener("popstate", onChange);
-    globalThis.removeEventListener(CHANGE, onChange);
+    removeEventListener("popstate", onChange);
+    removeEventListener(CHANGE, onChange);
   };
 }
 
@@ -32,7 +32,7 @@ export function setSearchParameter(key: string, value: string | null) {
   if (value === null) u.searchParams.delete(key);
   else u.searchParams.set(key, value);
   history.replaceState(null, "", u);
-  globalThis.dispatchEvent(new Event(CHANGE));
+  dispatchEvent(new Event(CHANGE));
 }
 
 const STORAGE = "ac:storagechange";
@@ -41,11 +41,11 @@ const STORAGE = "ac:storagechange";
 export function useStoredValue(key: string): string | null {
   return useSyncExternalStore(
     (onChange) => {
-      globalThis.addEventListener("storage", onChange);
-      globalThis.addEventListener(STORAGE, onChange);
+      addEventListener("storage", onChange);
+      addEventListener(STORAGE, onChange);
       return () => {
-        globalThis.removeEventListener("storage", onChange);
-        globalThis.removeEventListener(STORAGE, onChange);
+        removeEventListener("storage", onChange);
+        removeEventListener(STORAGE, onChange);
       };
     },
     () => {
@@ -63,6 +63,6 @@ export function setStoredValue(key: string, value: string) {
   try {
     if (localStorage.getItem(key) === value) return;
     localStorage.setItem(key, value);
-    globalThis.dispatchEvent(new Event(STORAGE));
+    dispatchEvent(new Event(STORAGE));
   } catch {}
 }
