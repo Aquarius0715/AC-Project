@@ -121,11 +121,11 @@ unresolved information (normal severity) is counted separately and never in the 
 export function attentionCard(alerts: ApiAlert[], units: OverviewUnit[], nowMs: number, max = 3, i: I18n = EN): AttentionCard {
   const names = new Map(units.map((u) => [u.id, u.displayName]));
   const open = alerts.filter((a) => names.has(a.unitId) && a.status !== "resolved");
-  const warn = open.filter((a) => a.severity !== "normal").toSorted((a, b) => rank[a.severity] - rank[b.severity] || b.detectedAt.localeCompare(a.detectedAt));
+  const warn = open.filter((a): a is ApiAlert & { severity: "critical" | "warning" } => a.severity !== "normal").toSorted((a, b) => rank[a.severity] - rank[b.severity] || b.detectedAt.localeCompare(a.detectedAt));
   const info = open.filter((a) => a.severity === "normal");
   const titles = [...new Set(info.map((a) => alertTitle(a, i.t).toLowerCase()))];
   return {
-    items: warn.slice(0, max).map((a) => ({ id: a.id, title: alertTitle(a, i.t), severity: a.severity as "critical" | "warning", where: `${names.get(a.unitId) ?? "—"} · ${whenText(a.detectedAt, nowMs, i)}` })),
+    items: warn.slice(0, max).map((a) => ({ id: a.id, title: alertTitle(a, i.t), severity: a.severity, where: `${names.get(a.unitId) ?? "—"} · ${whenText(a.detectedAt, nowMs, i)}` })),
     more: Math.max(0, warn.length - max), info: { count: info.length, text: titles.join(", ") },
   };
 }

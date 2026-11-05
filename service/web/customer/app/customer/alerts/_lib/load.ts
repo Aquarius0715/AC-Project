@@ -11,6 +11,7 @@ import { i18nOf } from "@ac/web/lib/i18n";
 import { unitPlaces } from "@ac/web/lib/clientBilling";
 import { inboxAlerts, type AlertNote, type ApiAlert } from "@ac/web/lib/alerts";
 import { defaultRuleRows, policyCards, policyForm, type ApiAlertPolicy, type ApiDefaultPolicy } from "@ac/web/lib/customerPolicies";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { orNull } from "@ac/web/lib/promises";
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
@@ -18,7 +19,7 @@ const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 export async function loadAlerts(sp: Record<string, string | string[] | undefined>) {
   interface Unit { id: string; displayName: string; propertyId: string; spaceId: string | null }
   const tab = one(sp.tab) === "policies" ? "policies" as const : "alerts" as const;
-  const severity = one(sp.severity) === "critical" || one(sp.severity) === "warning" ? one(sp.severity) as "critical" | "warning" : null;
+  const severity = oneOf(["critical", "warning"] as const, one(sp.severity) ?? "", null);
   const isUnreadOnly = one(sp.unreadOnly) === "true";
   const unitId = one(sp.unitId);
   const [now, me, alerts, notes, summary, units, properties, spaces, policies, defaults, prefs, display] = await Promise.all([
