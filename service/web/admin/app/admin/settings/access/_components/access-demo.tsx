@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, ListRow, Modal, Page, Search, Select, Textarea, useToast } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
 import { type NonEmpty } from "@ac/web/lib/lists";
-import { type PermissionRow, permissionRows as rows } from "@ac/web/lib/members";
+import { allPermissions, type PermissionRow, permissionRows as rows } from "@ac/web/lib/members";
 
 const HQ = "HQ (tenant)";
 const CONTRACTOR_A = "contractor-a";
@@ -18,7 +18,7 @@ const users: NonEmpty<U> = [
   { id: "tech-external-old", role: "Technician · external · contractor-a", org: CONTRACTOR_A, email: "old@contractor-a.example", role2: "technician" },
 ];
 // 38 canonical permissions (BR-A03, IR107/IR115): resource rows with READ / WRITE plus independent actions (shared matrix).
-const all = rows.flatMap((r) => [r.read, r.write, ...(r.actions ?? [])].filter(Boolean) as string[]);
+const all = allPermissions;
 const notAdmin = new Set(["partner.accept", "partner.assign", "partner.review", "device.maintain", "control.diagnose", "restriction.write", "restriction.override"]);
 const preset: Record<U["role2"], string[]> = {
   admin: all.filter((p) => !notAdmin.has(p)),

@@ -10,6 +10,7 @@ import { intlTag } from "@ac/web/lib/i18n";
 import { useLocale, useT } from "@ac/web/components/I18n";
 import { exportReport, type ReportFile, type ReportInput } from "../actions";
 import { keysOf } from "@ac/web/lib/keysOf";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { Icon } from "@ac/web/components/Icon";
 
 export interface EnergyLive {
@@ -153,7 +154,7 @@ function ExportModal({ live, onClose }: Readonly<{ live: EnergyLive; onClose: ()
   const errorText = props.length === 0 ? t("Choose at least one location") : sectionError;
   const download = () => {
     const input: ReportInput = { propertyIds: props, month, sections, format };
-    const prefs = live.prefs && email !== live.prefs.monthlyReportEmail ? { locale: live.prefs.locale as "en" | "ms", timezone: live.prefs.timezone, value: email } : null;
+    const prefs = live.prefs && email !== live.prefs.monthlyReportEmail ? { locale: oneOf(["en", "ms"] as const, live.prefs.locale, "en"), timezone: live.prefs.timezone, value: email } : null;
     run(() => exportReport(input, prefs), t("Report ready"), setFile);
   };
   return (
