@@ -16,6 +16,7 @@ import { sendVoiceChange } from "@ac/web/screens/shell/assistant/actions";
 import { Icon, type IconName } from "./Icon";
 import { Sheet, SheetContent } from "@ac/web/components/ui/sheet";
 import { Button } from "@ac/web/components/ui/button";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { orNull } from "@ac/web/lib/promises";
 
 /** The header assistant (FR-X02, Figma Client 09a–09g). In API mode (`live`) it reads voice.resolveIntent with the
@@ -55,7 +56,7 @@ function Frame({ title, state, children, footer, lang, setLang, onClose, context
         <div className="flex items-center justify-between border-b border-line px-4 py-3">
           <h2 className="flex items-center gap-2 font-bold"><Icon name="mic" /> {title} <span className="rounded-full bg-surface2 px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">{state}</span></h2>
           <div className="flex items-center gap-2">
-            <Select aria-label={t("Language")} value={lang} onChange={(e) => setLang?.(e.target.value as Locale)} className="w-auto text-xs"><option value="en">English</option><option value="ms">Bahasa Melayu</option></Select>
+            <Select aria-label={t("Language")} value={lang} onChange={(e) => setLang?.(oneOf(["en", "ms"] as const, e.target.value, lang))} className="w-auto text-xs"><option value="en">English</option><option value="ms">Bahasa Melayu</option></Select>
             <Button variant="ghost" size="icon-sm" aria-label={t("Close")} onClick={onClose} className="text-muted-foreground"><Icon name="close" /></Button>
           </div>
         </div>

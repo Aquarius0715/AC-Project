@@ -15,6 +15,7 @@ import { useI18n, useT } from "@ac/web/components/I18n";
 import type { T } from "@ac/web/lib/i18n";
 import { sendCommand } from "../actions";
 import { RenameModal, type Renaming } from "../../_components/rename-modal";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 
 export interface PropertiesLive {
@@ -247,7 +248,7 @@ function GroupPanel({ live, space }: Readonly<{ live: PropertiesLive; space: str
           {ch.power && <>
             <Field label={t("Set temperature")}><div className="flex items-center gap-2"><Btn size="sm" onClick={() => { setCh({ ...ch, celsius: Math.max(lo, ch.celsius - 1) }); }} aria-label={t("Lower the temperature")}><Icon name="remove" /></Btn><b className="w-14 text-center">{ch.celsius} °C</b><Btn size="sm" onClick={() => { setCh({ ...ch, celsius: Math.min(hi, ch.celsius + 1) }); }} aria-label={t("Raise the temperature")}><Icon name="add" /></Btn></div></Field>
             <Field label={t("Mode")}><Choice value={ch.mode} onChange={(v: GroupChange["mode"]) => { setCh({ ...ch, mode: v }); }} options={[{ id: "cool", label: t("Cool") }, { id: "dry", label: t("Dry") }, { id: "fan", label: t("Fan") }]} /></Field>
-            <Field label={t("Fan")}><Choice value={ch.fan ?? "keep"} onChange={(v: string) => { setCh({ ...ch, fan: v === "keep" ? null : (v as GroupChange["fan"]) }); }} options={[{ id: "keep", label: t("Keep") }, { id: "low", label: t("Low") }, { id: "mid", label: t("Mid") }, { id: "high", label: t("High") }]} /></Field>
+            <Field label={t("Fan")}><Choice value={ch.fan ?? "keep"} onChange={(v: string) => { setCh({ ...ch, fan: oneOf(["low", "mid", "high"] as const, v, null) }); }} options={[{ id: "keep", label: t("Keep") }, { id: "low", label: t("Low") }, { id: "mid", label: t("Mid") }, { id: "high", label: t("High") }]} /></Field>
           </>}
           <Btn variant="primary" disabled={sel.length === 0 || sending} onClick={() => { setReview(plan(sel)); }}>{t("Review & send")}</Btn>
         </div>

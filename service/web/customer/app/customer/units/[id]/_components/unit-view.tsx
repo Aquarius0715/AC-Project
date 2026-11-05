@@ -101,8 +101,8 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
   const track = (c: ApiCommand) => { setSent((xs) => [c, ...xs.filter((x) => x.id !== c.id)]); };
   const reason = (key: string, code: string) => (textOf(REASONS, key, t) ?? code);
   const fail = (e: unknown) => { toast(e instanceof OpError ? t("Not sent: {reason}", { reason: reason(e.error.messageKey, e.error.code) }) : t("Not sent"), "warn"); };
-  const modeWord = (m: string | null) => (m && m in MODE_LABEL ? t(MODE_LABEL[m as keyof typeof MODE_LABEL]) : m ?? "—");
-  const fanWord = (f: string | null) => (f && f in FAN_LABEL ? t(FAN_LABEL[f as keyof typeof FAN_LABEL]) : f ?? "—");
+  const modeWord = (m: string | null) => (m === null ? "—" : textOf(MODE_LABEL, m, t) ?? m);
+  const fanWord = (f: string | null) => (f === null ? "—" : textOf(FAN_LABEL, f, t) ?? f);
   const changeText = (a: UnitAction) => {
     if (a.kind === "set_temperature") return t("Set temperature {from}°C → {to}°C", { from: confirmed, to: setpoint });
     if (a.kind === "set_mode") return t("Mode → {mode}", { mode: modeWord(mode) });
