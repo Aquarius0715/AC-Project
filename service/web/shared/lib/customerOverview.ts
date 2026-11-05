@@ -27,12 +27,13 @@ const one = (v: number) => (Math.round(v * 10) / 10).toFixed(1);
 export function overviewScope(units: OverviewUnit[], properties: ApiPropertyRow[], q: { propertyId?: string; unitId?: string }) {
   const props = properties.filter((p) => !p.archived);
   const live = units.filter((u) => !u.archived && props.some((p) => p.id === u.propertyId));
-  const propertyId = props.some((p) => p.id === q.propertyId) ? q.propertyId! : null;
+  const property = props.find((p) => p.id === q.propertyId);
+  const propertyId = property?.id ?? null;
   const inProperty = live.filter((u) => !propertyId || u.propertyId === propertyId).toSorted((a, b) => a.displayName.localeCompare(b.displayName));
-  const unitId = inProperty.some((u) => u.id === q.unitId) ? q.unitId! : null;
+  const unitId = inProperty.find((u) => u.id === q.unitId)?.id ?? null;
   return {
     propertyId, unitId, inProperty, scope: unitId ? inProperty.filter((u) => u.id === unitId) : inProperty,
-    propertyName: propertyId ? props.find((p) => p.id === propertyId)!.name : null,
+    propertyName: property?.name ?? null,
   };
 }
 
@@ -66,7 +67,7 @@ export function overviewRows(units: OverviewUnit[], place: (u: OverviewUnit) => 
   return units.map((u) => {
     const t = latestOf(u, "temperature"), h = latestOf(u, "humidity"), p = latestOf(u, "power");
     const last = [t, h, p].filter((m): m is ApiMeasurement => !!m).map((m) => m.observedAt).toSorted(byText).at(-1);
-    const power = current(p);
+    const power = current(p), temperature = current(t), humidity = current(h);
     const perUnit = p?.unit === "kW" ? 1000 : 1;
     const watts = power === null ? null : Math.round(power * perUnit);
     const reading = last ? showClock(last, i.display) : i.t("no reading yet");
@@ -74,7 +75,7 @@ export function overviewRows(units: OverviewUnit[], place: (u: OverviewUnit) => 
     return {
       id: u.id, name: u.displayName, place: place(u),
       observed: u.connection === "online" ? reading : i.t("last seen {when}", { when: seen }),
-      temp: current(t) === null ? null : airNumber("temperature", current(t)!), hum: current(h) === null ? null : airNumber("humidity", current(h)!),
+      temp: temperature === null ? null : airNumber("temperature", temperature), hum: humidity === null ? null : airNumber("humidity", humidity),
       power: watts === null ? null : String(watts),
       state: runState(u.effectivePowerState), conn: u.connection,
     };
@@ -91,7 +92,7 @@ export function energyCard(kind: OverviewPeriod, selected: ApiEnergySummary | nu
   const delta = total !== null && was !== null && was > 0 ? Math.round(((total - was) / was) * 100) : null;
   return {
     sub: `${i.t(periodLabel[kind])} · ${scope}`, total: total === null ? null : one(total),
-    delta: delta === null ? null : { text: i.t("{pct}% vs {previous} ({kWh} kWh)", { pct: Math.abs(delta), previous: i.t(previousName[kind]), kWh: one(was!) }), icon: trendIcon(delta), tone: delta <= 0 ? "ok" : "warn" },
+    delta: delta === null || was === null ? null : { text: i.t("{pct}% vs {previous} ({kWh} kWh)", { pct: Math.abs(delta), previous: i.t(previousName[kind]), kWh: one(was) }), icon: trendIcon(delta), tone: delta <= 0 ? "ok" : "warn" },
     labels: week.map((d) => d.label), series: [before.map((v) => v ?? 0), week.map((d) => d.kWh ?? 0)], gaps: week.some((d) => d.kWh === null) || before.includes(null),
   };
 }

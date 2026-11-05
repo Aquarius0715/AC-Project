@@ -99,8 +99,9 @@ export const breachRows = (sc: ApiScorecard, names: Map<string, string>, t: T = 
 /** The targets per plan type for the edit dialog: the one in effect (or the default) and a scheduled one, if any. */
 export function targetsByPlan(targets: ApiTargetView[], i: I18n = EN) {
   const { t, display } = i;
-  return (Object.keys(planLabel) as PlanType[]).map((plan) => {
-    const now = targets.find((x) => x.planType === plan && x.state !== "scheduled")!;
+  // a plan type without a target in force is not shown
+  const current = (Object.keys(planLabel) as PlanType[]).map((plan) => ({ plan, now: targets.find((x) => x.planType === plan && x.state !== "scheduled") }));
+  return current.filter((x): x is { plan: PlanType; now: ApiTargetView } => x.now !== undefined).map(({ plan, now }) => {
     const next = targets.filter((x) => x.planType === plan && x.state === "scheduled");
     const since = now.state === "default" ? t("default") : t("v{v} since {date}", { v: now.version, date: showDate(now.effectiveFrom, display) });
     return {

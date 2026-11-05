@@ -96,7 +96,7 @@ export function readingRows(ms: ApiReportMeasurement[], t: T = en): [string, str
 export function timeOnSiteText(ts: ApiReviewJob["timeOnSite"], i: I18n = EN): string {
   const { t, display } = i;
   if (!ts?.arrivedAt) return t("not recorded");
-  const from = ts.arrivedAt ?? ts.startedAt!;
+  const from = ts.arrivedAt;
   const span = ts.finishedAt ? showSpan(from, ts.finishedAt, display) : t("{from} – now", { from: showTime(from, display) });
   const mins = ts.onSiteMinutes ?? null;
   return mins === null ? span : t("{span} ({h} h {m} m)", { span, h: Math.floor(mins / 60), m: mins % 60 });

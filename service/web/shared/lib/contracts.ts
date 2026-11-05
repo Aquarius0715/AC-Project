@@ -52,9 +52,10 @@ export function unitOptions(units: ApiUnitBrief[], customers: ApiCustomer[], pro
   const property = new Map(properties.map((p) => [p.id, p.name]));
   const contractsOf = new Map<string, string[]>();
   for (const k of contracts) for (const u of k.unitIds) contractsOf.set(u, [...(contractsOf.get(u) ?? []), k.id]);
-  return units.filter((u) => !u.archived && customerOfOrg.has(u.customerOrgId)).map((u) => {
+  const owned = units.filter((u) => !u.archived).map((u) => ({ u, customerId: customerOfOrg.get(u.customerOrgId) }));
+  return owned.filter((x): x is { u: ApiUnitBrief; customerId: string } => x.customerId !== undefined).map(({ u, customerId }) => {
     return {
-      id: u.id, customerId: customerOfOrg.get(u.customerOrgId)!, label: u.displayName, where: property.get(u.propertyId) ?? "", otherContracts: contractsOf.get(u.id) ?? [],
+      customerId, id: u.id, label: u.displayName, where: property.get(u.propertyId) ?? "", otherContracts: contractsOf.get(u.id) ?? [],
     };
   });
 }

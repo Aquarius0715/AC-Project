@@ -188,8 +188,8 @@ export function contactError(v: string, tr: T = en): string | null {
 /** The client's notes and the job history from jobs.events (internal notes never reach the client, IR42). */
 export interface ApiClientEvent { id: string; action: string; occurredAt: string; actorUserId: string | null; note: { visibility: string; message: string } | null }
 export function notesOf(events: ApiClientEvent[], me: string, i: I18n = EN): { id: string; who: string; at: string; text: string }[] {
-  return events.filter((e) => e.note && e.note.visibility === "customer").toSorted((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt))
-    .map((e) => ({ id: e.id, who: i.t(e.actorUserId === me ? "You" : "Coordinator"), at: showTime(e.occurredAt, i.display), text: e.note!.message }));
+  return events.filter((e): e is typeof e & { note: NonNullable<typeof e.note> } => e.note?.visibility === "customer").toSorted((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt))
+    .map((e) => ({ id: e.id, who: i.t(e.actorUserId === me ? "You" : "Coordinator"), at: showTime(e.occurredAt, i.display), text: e.note.message }));
 }
 
 /** Readable refusals of the client's maintenance actions. */

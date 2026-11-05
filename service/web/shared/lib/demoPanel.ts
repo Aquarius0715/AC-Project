@@ -22,8 +22,8 @@ export const nextSequence = (events: ApiDeviceEvent[]) => Math.max(0, ...events.
 export interface DeviceOption { id: string; unit: string; label: string; connection: string; fault: string | null }
 /** One option per bound device: unit name, serial and connection; `fault` is the open connection fault to restore. */
 export function deviceOptions(devices: ApiDevice[], unitNames: Map<string, string>, faults: Map<string, string>): DeviceOption[] {
-  return devices.filter((d) => d.unitId && d.bindingId).map((d) => {
-    const unit = unitNames.get(d.unitId!) ?? "Unit";
+  return devices.filter((d): d is ApiDevice & { unitId: string } => !!d.unitId && !!d.bindingId).map((d) => {
+    const unit = unitNames.get(d.unitId) ?? "Unit";
     return { id: d.id, label: `${unit} · ${d.serial} · ${d.connection}`, connection: d.connection, fault: faults.get(d.id) ?? null, unit };
   });
 }

@@ -42,9 +42,9 @@ export function weekOf(nowIso: string): { from: string; to: string } {
 
 /** The period of the URL (from/to KL dates, at most 366 days) or this week, and its half-open instant range. */
 export function period(nowIso: string, from?: string, to?: string): { from: string; to: string; fromAt: string; toAt: string; days: string[]; label: string } {
-  const ok = (d?: string) => !!d && /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(Date.parse(`${d}T00:00:00Z`));
+  const ok = (d?: string): d is string => !!d && /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(Date.parse(`${d}T00:00:00Z`));
   let p = weekOf(nowIso);
-  if (ok(from) && ok(to) && from! <= to! && Date.parse(`${to ?? ""}T00:00:00Z`) - Date.parse(`${from ?? ""}T00:00:00Z`) <= 365 * day) p = { from: from!, to: to! };
+  if (ok(from) && ok(to) && from <= to && Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`) <= 365 * day) p = { from, to };
   const start = Date.parse(`${p.from}T00:00:00Z`) - KL_OFFSET, end = Date.parse(`${p.to}T00:00:00Z`) - KL_OFFSET + day;
   const days: string[] = [];
   for (let t = start; t < end && days.length < 31; t += day) days.push(ymd(t));
@@ -96,6 +96,8 @@ export function partnerJob(j: ApiPartnerJob, units: Map<string, string>): Partne
 }
 
 export type Bucket = "offered" | "unassigned" | "active" | "overdue" | "review" | "completed" | "other";
+// a job with its visit window
+type Slotted = PartnerJob & { slot: Slot };
 /** The progress bucket of a job: overdue is an assigned or started job whose work window has ended (IR89). */
 export function bucket(j: PartnerJob, now: number): Bucket {
   switch (j.status) {
@@ -141,17 +143,18 @@ export interface KpiTile { label: string; value: number; sub: string; href: stri
 from the list, and in progress / scheduled as the summary's active jobs without them. Each opens the job list. */
 export function kpis(counts: ApiCounts, jobs: PartnerJob[], now: number, names: Map<string, string>, period?: { from: string; to: string }, i: I18n = EN): KpiTile[] {
   const { t } = i;
+  type Offered = PartnerJob & { offerExpiresAt: string }; // an offer with its answer deadline
   const list = (tab: string) => `/partner/jobs?tab=${tab}${period ? `&from=${period.from}&to=${period.to}` : ""}`; // the list with the same period
-  const offers = jobs.filter((j) => j.status === "offered" && j.offerExpiresAt).toSorted((a, b) => Date.parse(a.offerExpiresAt!) - Date.parse(b.offerExpiresAt!));
+  const offers = jobs.filter((j): j is Offered => j.status === "offered" && j.offerExpiresAt !== null).toSorted((a, b) => Date.parse(a.offerExpiresAt) - Date.parse(b.offerExpiresAt));
   const unassigned = jobs.filter((j) => bucket(j, now) === "unassigned");
-  const running = jobs.filter((j) => (j.status === "assigned" || j.status === "in_progress") && j.slot).toSorted((a, b) => Date.parse(a.slot!.startAt) - Date.parse(b.slot!.startAt));
-  const next = running.find((j) => j.status === "in_progress") ?? running.find((j) => Date.parse(j.slot!.endAt) > now);
+  const running = jobs.filter((j): j is Slotted => (j.status === "assigned" || j.status === "in_progress") && j.slot !== null).toSorted((a, b) => Date.parse(a.slot.startAt) - Date.parse(b.slot.startAt));
+  const next = running.find((j) => j.status === "in_progress") ?? running.find((j) => Date.parse(j.slot.endAt) > now);
   const review = jobs.filter((j) => j.status === "submitted");
   const active = Math.max(0, counts.activeCount - unassigned.length);
   const who = (id: string | null) => names.get(id ?? "") ?? t("Technician");
-  const nextVisit = (j: NonNullable<typeof next>) => t(j.status === "in_progress" ? "{name} on site from {time}" : "{name} starts {time}", { name: who(j.technicianId), time: relativeTime(j.slot!.startAt, now, i) });
+  const nextVisit = (j: NonNullable<typeof next>) => t(j.status === "in_progress" ? "{name} on site from {time}" : "{name} starts {time}", { name: who(j.technicianId), time: relativeTime(j.slot.startAt, now, i) });
   return [
-    { label: t("Offers to answer"), value: counts.offerCount, sub: offers[0] ? t("{job} · expires in {left}", { job: offers[0].short, left: until(offers[0].offerExpiresAt!, now, t) }) : t("No open offers"), href: list("offered"), link: t("link::Open offers") },
+    { label: t("Offers to answer"), value: counts.offerCount, sub: offers[0] ? t("{job} · expires in {left}", { job: offers[0].short, left: until(offers[0].offerExpiresAt, now, t) }) : t("No open offers"), href: list("offered"), link: t("link::Open offers") },
     { label: t("Awaiting assignment"), value: unassigned.length, sub: unassigned.length > 0 ? t("Accepted, no technician yet") : "—", href: "/partner/schedule", link: t("Assign"), tone: unassigned.length > 0 ? "warn" : undefined },
     {
       label: t("In progress / scheduled"), value: active, href: list("active"), link: t("View jobs"),
@@ -187,8 +190,8 @@ export function actions(jobs: PartnerJob[], now: number, names: Map<string, stri
     const detail = j.offerExpiresAt ? t("Answer by {time} ({left} left)", { time: showTime(j.offerExpiresAt, display), left: until(j.offerExpiresAt, now, t) }) : t("Answer the offer");
     rows.push({ kind: "offer", badge: t("Offer"), title: label(j, t), href: `/partner/jobs/${j.id}`, button: t("Respond"), detail });
   }
-  for (const j of jobs.filter((x) => bucket(x, now) === "overdue")) {
-    const ended = t("Work window ended {time}", { time: showTime(j.slot!.endAt, display) });
+  for (const j of jobs.filter((x): x is Slotted => x.slot !== null && bucket(x, now) === "overdue")) {
+    const ended = t("Work window ended {time}", { time: showTime(j.slot.endAt, display) });
     rows.push({ kind: "overdue", badge: t("Overdue"), title: label(j, t), detail: j.technicianId ? `${ended} · ${names.get(j.technicianId) ?? t("technician")}` : ended, href: `/partner/schedule?jobId=${j.id}`, button: t("Reassign") });
   }
   for (const j of jobs.filter((x) => x.status === "submitted")) {

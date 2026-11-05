@@ -31,7 +31,7 @@ const hhmm = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString("en
 /** The latest valid reading of a metric (IR213): a stale, suspect or missing one is no current value. */
 const reading = (u: ApiUnit, metric: string) => {
   const m = u.latestMeasurements?.find((x) => x.metric === metric);
-  return m && m.quality === "valid" && m.value !== null ? m : null;
+  return m && m.quality === "valid" && m.value !== null ? { unit: m.unit, value: m.value } : null;
 };
 
 /** The row's room temperature, humidity and power (W) are the unit's latest readings, never its setting. */
@@ -42,9 +42,9 @@ export function unitRowFromApi(u: ApiUnit): UnitRow {
     name: u.displayName,
     loc: "",
     obs: u.connection === "online" ? hhmm(u.observedState.observedAt) : `last seen ${hhmm(u.lastSeenAt)}`,
-    temp: setpoint && Math.round(setpoint.value! * 10) / 10,
-    hum: hum && Math.round(hum.value!),
-    power: power && Math.round(power.unit === "kW" ? power.value! * 1000 : power.value!),
+    temp: setpoint && Math.round(setpoint.value * 10) / 10,
+    hum: hum && Math.round(hum.value),
+    power: power && Math.round(power.unit === "kW" ? power.value * 1000 : power.value),
     state: runState(u.effectivePowerState),
     conn: u.connection === "online" ? "online" : "offline",
   };

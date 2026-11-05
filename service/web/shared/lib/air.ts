@@ -64,9 +64,10 @@ export function airRooms(ps: ApiPropertyRow[], ss: ApiSpaceRow[], us: ApiUnitRow
   const live = us.filter((u) => !u.archived && props.has(u.propertyId));
   const units = (keep: (u: ApiUnitRow) => boolean) => live.filter((item) => keep(item)).map((u) => ({ id: u.id, name: u.displayName })).toSorted((a, b) => a.name.localeCompare(b.name));
   const out: (AirRoom & { sort: string })[] = [];
-  for (const s of ss.filter((x) => !x.archived && props.has(x.propertyId))) {
+  for (const s of ss.filter((x) => !x.archived)) {
+    const property = props.get(s.propertyId);
+    if (property === undefined) continue; // a room of an archived property
     const here = units((u) => u.spaceId === s.id);
-    const property = props.get(s.propertyId)!;
     if (here.length > 0) out.push({ key: s.id, spaceId: s.id, label: `${s.name} · ${[property, spacePath(s.parentSpaceId, ss)].filter(Boolean).join(" › ")}`, path: `${property} › ${spacePath(s.id, ss)}`, units: here, sort: `${property}\0${spacePath(s.id, ss)}` });
   }
   for (const [id, property] of props) {
@@ -78,7 +79,7 @@ export function airRooms(ps: ApiPropertyRow[], ss: ApiSpaceRow[], us: ApiUnitRow
 /** The room and unit shown: the URL unit when it is listed, else the URL room's (or the first room's) first unit. */
 export function airSelection(rooms: AirRoom[], unitId?: string, spaceId?: string): { room: AirRoom; unitId: string } | null {
   const byUnit = unitId ? rooms.find((r) => r.units.some((u) => u.id === unitId)) : undefined;
-  if (byUnit) return { room: byUnit, unitId: unitId! };
+  if (byUnit && unitId) return { room: byUnit, unitId };
   const room = rooms.find((r) => r.spaceId !== null && r.spaceId === spaceId) ?? rooms[0];
   return room ? { room, unitId: room.units[0].id } : null;
 }
@@ -307,7 +308,10 @@ export const ventMethods: { id: VentMethod; label: string }[] = [
 /** Durations offered by the Log ventilation modal (Figma 05c); ventilation.log accepts 1–240 minutes (IR110). */
 export const ventDurations = [5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240];
 /** The latest valid CO2 as the modal's “Current CO2” (what co2AtLog will record), or null. */
-export const co2Now = (co2?: ApiMeasurement, d: Display = DEFAULT_DISPLAY) => (validValue(co2) === null ? null : `${airNumber("co2", co2!.value!)} ppm · ${showClock(co2!.observedAt, d)}`);
+export const co2Now = (co2?: ApiMeasurement, d: Display = DEFAULT_DISPLAY) => {
+  const value = validValue(co2);
+  return value === null || !co2 ? null : `${airNumber("co2", value)} ppm · ${showClock(co2.observedAt, d)}`;
+};
 /** One ventilation history row: method and duration, the CO2 recorded at logging time, who and when (“today …” on the
 days next to now). */
 export function ventRow(v: ApiVentilationLog, me: string, names: Map<string, string>, nowMs: number, i: I18n = EN) {

@@ -12,6 +12,7 @@ export function GET(req: NextRequest) {
   const challenge = createHash("sha256").update(verifier).digest("base64url");
   const returnTo = req.nextUrl.searchParams.get("returnTo");
   const isReauth = req.nextUrl.searchParams.get("reauth") === "1";
+  const loginHint = req.nextUrl.searchParams.get("login_hint");
   const url = new URL(`${config.issuer}/protocol/openid-connect/auth`);
   url.search = new URLSearchParams({
     client_id: config.clientId,
@@ -21,7 +22,7 @@ export function GET(req: NextRequest) {
     state,
     code_challenge: challenge,
     code_challenge_method: "S256",
-    ...(req.nextUrl.searchParams.get("login_hint") && { login_hint: req.nextUrl.searchParams.get("login_hint")! }),
+    ...(loginHint && { login_hint: loginHint }),
     ...(isReauth && { prompt: "login" }),
   }).toString();
   const res = NextResponse.redirect(url);

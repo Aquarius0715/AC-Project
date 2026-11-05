@@ -78,11 +78,12 @@ export function certRows(members: ApiTeamMember[], certs: ApiCert[], jobs: CertJ
     // a renewal of an "other" certificate joins its original
     for (const [k, list] of [...groups]) {
       const of = list[0].renewalOf;
-      if (!(k.startsWith("other:") && of && groups.has(`other:${of}`))) {
+      const target = of ? groups.get(`other:${of}`) : undefined;
+      if (!(k.startsWith("other:") && target)) {
         continue;
       }
 
-      groups.get(`other:${of}`)!.push(...list); groups.delete(k);
+      target.push(...list); groups.delete(k);
     }
     const viaGrant = new Map<string, "pending" | "rejected">(); // no certificate on file yet: the HQ grant still decides (BR-P09)
     for (const [k, list] of groups) {
@@ -107,21 +108,21 @@ export function certRows(members: ApiTeamMember[], certs: ApiCert[], jobs: CertJ
     for (const code of QUALIFICATION_CODES) {
       if (groups.has(code) && !viaGrant.has(code)) continue;
       const upload = viaGrant.get(code);
-      const grant = (m.qualifications ?? []).filter((q) => q.code === code && !q.revokedAt && q.validUntil).toSorted((a, b) => Date.parse(b.validUntil!) - Date.parse(a.validUntil!))[0];
-      if (grant) {
-        const s = state(Date.parse(grant.validUntil!));
+      const until = (m.qualifications ?? []).map((q) => (q.code === code && !q.revokedAt ? q.validUntil : null)).filter((v): v is string => !!v).toSorted((a, b) => Date.parse(b) - Date.parse(a)).at(0);
+      if (until) {
+        const s = state(Date.parse(until));
         rows.push({
           key: `${m.id}:${code}`,
           technicianId: m.id,
           technician: m.displayName,
           name: qualificationLabel(code, t),
           detail: grantDetail(upload, t),
-          expires: businessDay(grant.validUntil!, locale),
-          expiresAt: grant.validUntil!,
+          expires: businessDay(until, locale),
+          expiresAt: until,
           status: s.status,
           badge: badgeOf(s.status, s.days),
           days: s.days,
-          blocks: blocks(m.id, code, Date.parse(grant.validUntil!)),
+          blocks: blocks(m.id, code, Date.parse(until)),
           cert: null,
           renewalPending: upload === "pending",
           training: null,
@@ -174,7 +175,7 @@ export function certKpis(rows: CertRow[], certs: ApiCert[], within: number, t: T
 /** The assignment impact (Figma 04-6): the first job an expiring, expired or missing qualification blocks. */
 export function impact(rows: CertRow[], jobs: CertJob[], t: T = en) {
   const row = rows.filter((r) => r.blocks.length && (r.status === "expiring" || r.status === "expired" || r.status === "not_held"))
-    .map((r) => ({ r, job: jobs.find((j) => j.jobId === r.blocks[0].jobId)! })).toSorted((a, b) => Date.parse(a.job.slot.startAt) - Date.parse(b.job.slot.startAt))[0];
+    .map((r) => ({ r, job: jobs.find((j) => j.jobId === r.blocks[0].jobId) })).filter((x): x is { r: CertRow; job: CertJob } => x.job !== undefined).toSorted((a, b) => Date.parse(a.job.slot.startAt) - Date.parse(b.job.slot.startAt))[0];
   if (!row) return null;
   const { r, job } = row;
   const day = r.blocks[0].day;

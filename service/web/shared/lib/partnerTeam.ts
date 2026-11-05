@@ -20,7 +20,7 @@ export type ApiTeamMember = ApiMember & { organizationId: string; employment: st
 
 /** The qualification register a filter offers (QualificationCode, SR13). */
 export const QUALIFICATION_CODES = ["demo_indoor", "demo_outdoor", "demo_electrical"] as const;
-const isDate = (d?: string) => !!d && /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(Date.parse(`${d}T00:00:00Z`));
+const isDate = (d?: string): d is string => !!d && /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(Date.parse(`${d}T00:00:00Z`));
 /** The Kuala Lumpur date (YYYY-MM-DD) of an instant. */
 export const klDate = (iso: string) => new Date(Date.parse(iso) + KL_OFFSET).toISOString().slice(0, 10);
 /** The instant a Kuala Lumpur day starts. */
@@ -30,8 +30,9 @@ export const klStart = (date: string) => new Date(Date.parse(`${date}T00:00:00Z`
 activeOnly (default true). */
 export function teamQuery(sp: { date?: string; qualification?: string; activeOnly?: string }, nowIso: string) {
   const today = klDate(nowIso);
-  const qualification = (QUALIFICATION_CODES as readonly string[]).includes(sp.qualification ?? "") ? sp.qualification! : null;
-  return { date: isDate(sp.date) ? sp.date! : today, activeOnly: sp.activeOnly !== "false", today, qualification };
+  const asked = sp.qualification;
+  const qualification = asked && (QUALIFICATION_CODES as readonly string[]).includes(asked) ? asked : null;
+  return { date: isDate(sp.date) ? sp.date : today, activeOnly: sp.activeOnly !== "false", today, qualification };
 }
 
 /** Whether a membership is valid now: [validFrom, validUntil). */

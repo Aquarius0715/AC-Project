@@ -40,7 +40,7 @@ export function candidateGroups(candidates: { unitId: string; pathLabel: string 
   const rooms = new Map<string, { unitId: string; name: string }[]>();
   for (const c of candidates) {
     const parts = c.pathLabel.split(" > ");
-    const name = parts.length > 1 ? parts.pop()! : c.pathLabel;
+    const name = parts.length > 1 ? parts.pop() ?? c.pathLabel : c.pathLabel;
     const path = parts.join(" › ");
     rooms.set(path, [...(rooms.get(path) ?? []), { unitId: c.unitId, name }]);
   }

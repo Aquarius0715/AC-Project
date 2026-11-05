@@ -60,11 +60,11 @@ export function standing(customerId: string, contracts: ApiContractLite[], overd
   const ids = new Set(mine.map((k) => k.id));
   const current = mine.filter((k) => Date.parse(k.startAt) <= t && t < Date.parse(k.endAt));
   const due = overdue.filter((i) => ids.has(i.contractId));
-  const r = (restrictions ?? []).filter((x) => x.contractId && ids.has(x.contractId) && x.state in restrictionRank).toSorted((a, b) => restrictionRank[a.state] - restrictionRank[b.state])[0];
+  const r = (restrictions ?? []).filter((x): x is ApiRestrictionLite & { contractId: string } => !!x.contractId && ids.has(x.contractId) && x.state in restrictionRank).toSorted((a, b) => restrictionRank[a.state] - restrictionRank[b.state])[0];
   return {
     plans: [...new Set(current.map((k) => k.planType))], contracts: current.length, contractUnits: new Set(current.flatMap((k) => k.unitIds)).size, overdue: due.length,
     overdueAmount: due.length > 0 ? amount(due.reduce((n, i) => n + i.amountMinor, 0), due[0].currency) : null,
-    restriction: r ? { id: r.id, state: r.state, contractId: r.contractId! } : unknownRestriction(mine, restrictions),
+    restriction: r ? { id: r.id, state: r.state, contractId: r.contractId } : unknownRestriction(mine, restrictions),
   };
 }
 export interface Mark { label: string; tone: "crit" | "warn" | "ok" | "muted"; icon?: IconName }
@@ -468,10 +468,10 @@ export function coverageRows(cs: ApiCoverage[], x: { unit: (id: string) => { nam
 }
 /** KPI tiles (Figma 02 warranty): under warranty (any unit whose warranty still runs), ending within 90 / 30 days, no coverage, contracts. */
 export function coverageKpis(rows: CoverageRow[], t: T = en) {
-  const running = rows.filter((r) => r.days !== null && r.days > 0);
+  const running = rows.filter((r): r is CoverageRow & { days: number } => r.days !== null && r.days > 0);
   const contracts = [...new Set(rows.flatMap((r) => (r.status === "contract" ? r.contracts.split(", ") : [])))];
   return {
-    total: rows.length, underWarranty: running.length, within90: running.filter((r) => r.days! <= 90).length, within30: running.filter((r) => r.days! <= 30).length,
+    total: rows.length, underWarranty: running.length, within90: running.filter((r) => r.days <= 90).length, within30: running.filter((r) => r.days <= 30).length,
     noCoverage: rows.filter((r) => r.status === "no_coverage").length, contract: rows.filter((r) => r.status === "contract").length,
     contractNames: contracts.length > 2 ? `${contracts.slice(0, 2).join(", ")} …` : contracts.join(", ") || t("none"),
   };
@@ -522,7 +522,8 @@ export const importFields = [
 export const importTemplate = toCsv(importFields.map((f) => f.key), [["Office A", "2F", "Meeting room 2", "Meeting room AC #2", "SPL-100", "", "2026-01-10", "2027-01-10"]]);
 /** The header cells and the number of records of a CSV text (RFC 4180 quotes; a BOM is ignored). */
 export function csvShape(text: string): { header: string[]; rows: number } {
-  const records: string[][] = [[]];
+  let row: string[] = []; // the record being read
+  const records: string[][] = [row];
   let cell = "", isQuoted = false;
   const t = text.replace(/^\uFEFF/, "");
   for (let i = 0; i < t.length; i++) {
@@ -534,13 +535,13 @@ export function csvShape(text: string): { header: string[]; rows: number } {
  isQuoted = true;
  break;
  }
- case ",": { records.at(-1)!.push(cell); cell = ""; 
+ case ",": { row.push(cell); cell = ""; 
  break;
  }
  case "\n": 
  case "\r": {
       if (ch === "\r" && t[i + 1] === "\n") i++;
-      records.at(-1)!.push(cell); cell = ""; records.push([]);
+      row.push(cell); cell = ""; row = []; records.push(row);
     
  break;
  }
@@ -548,7 +549,7 @@ export function csvShape(text: string): { header: string[]; rows: number } {
  }
  }
   }
-  records.at(-1)!.push(cell);
+  row.push(cell);
   const full = records.filter((r) => r.some((c) => c.trim() !== ""));
   return { header: (full[0] ?? []).map((h) => h.trim()), rows: Math.max(0, full.length - 1) };
 }

@@ -299,9 +299,10 @@ export function policyChanges(draft: AdminPolicy, saved: AdminPolicy, t: T = en)
 /** policies.save input for an alert policy (AlertPolicyInput of service-contracts.ts): without an id it creates one
 for its customer, with an id it updates that policy (expectedVersion). */
 export function alertPolicyInput(p: AdminPolicy): OpInput<"policies.save"> {
+  if (!p.customerId) throw new Error("an alert policy belongs to a customer");
   return {
     // an alert policy always belongs to a customer (the Default policy is saved as default_alert)
-    ...(p.id && { id: p.id }), kind: "alert" as const, name: p.name, timezone: p.timezone, enabled: p.on, priority: p.priority, customerId: p.customerId!,
+    ...(p.id && { id: p.id }), kind: "alert" as const, name: p.name, timezone: p.timezone, enabled: p.on, priority: p.priority, customerId: p.customerId,
     metric: p.metric as ContractMetric, operator: p.operator, threshold: p.threshold, recoveryThreshold: p.recovery, durationSeconds: p.duration,
     activeWindow: p.activeWindow ?? null, severity: p.severity, recipientMembershipIds: p.recipients.map((r) => r.id), channels: p.channels,
     escalateAfterMinutes: p.escalate, cooldownMinutes: p.cooldown,

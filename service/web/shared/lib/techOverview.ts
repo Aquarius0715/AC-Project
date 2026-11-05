@@ -111,9 +111,9 @@ const START_H = 8, END_H = 18;
 export function dayTimeline(rows: TechJobRow[], now: number): { hours: string[]; blocks: TimelineBlock[]; nowPct: number | null; now: string } {
   const day = Date.parse(`${klDate(now)}T00:00:00Z`) - KL;
   const pct = (ms: number) => Math.min(100, Math.max(0, ((ms - day) / 3_600_000 - START_H) / (END_H - START_H) * 100));
-  const blocks = rows.filter((r) => r.today && r.slot).map((r) => {
-    const left = pct(Date.parse(r.slot!.startAt)), right = pct(Date.parse(r.slot!.endAt));
-    return { id: r.id, short: r.short, width: Math.max(right - left, 2), text: `${windowText(r.slot!, now)} · ${r.short}`, current: r.status === "in_progress", left };
+  const blocks = rows.filter((r): r is typeof r & { slot: NonNullable<typeof r.slot> } => r.today && !!r.slot).map((r) => {
+    const left = pct(Date.parse(r.slot.startAt)), right = pct(Date.parse(r.slot.endAt));
+    return { id: r.id, short: r.short, width: Math.max(right - left, 2), text: `${windowText(r.slot, now)} · ${r.short}`, current: r.status === "in_progress", left };
   });
   const n = ((now - day) / 3_600_000);
   return { hours: ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00"], nowPct: n >= START_H && n <= END_H ? pct(now) : null, now: hhmm(new Date(now).toISOString()), blocks };

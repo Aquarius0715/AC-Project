@@ -98,9 +98,10 @@ export interface TechRow { id: string; name: string; sub: string; badge: { label
 export function technicianRows(technicians: ApiTechnician[], certs: ApiCertificate[], now: number, i: I18n = EN): TechRow[] {
   const { t } = i;
   return technicians.map((x) => {
-    const ended = x.validUntil && Date.parse(x.validUntil) <= now;
+    const until = x.validUntil;
+    const ended = until && Date.parse(until) <= now;
     const quals = x.qualifications.filter((q) => !q.revokedAt);
-    const sub = ended ? t("membership ended {date}", { date: dayMonth(x.validUntil!, i) }) : quals.map((q) => qualificationLabel(q.code, t).replace(/ (unit )?work$/, "")).join(" · ") || t("no qualifications");
+    const sub = ended ? t("membership ended {date}", { date: dayMonth(until, i) }) : quals.map((q) => qualificationLabel(q.code, t).replace(/ (unit )?work$/, "")).join(" · ") || t("no qualifications");
     const mine = certs.filter((c) => c.membershipId === x.id);
     const pending = mine.filter((c) => c.status === "pending_verification").length;
     const expiring = mine.filter((c) => c.status === "expiring");

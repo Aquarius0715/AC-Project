@@ -527,8 +527,8 @@ const hideCls = (m?: { hideBelow?: "sm" | "md" }) => (m?.hideBelow ? HIDE_CLS.ge
 /** A cell's content under one component type for good. A column's `render` is a new function on every render of the
 page, and FlexRender mounts a function as a component, so each render remounted every cell: a row's button that
 opened a dialog was gone when the dialog closed, and focus fell to the page (IR620). */
-function Cell<T>({ render, row }: { render: (r: T) => React.ReactNode; row: T }) {
-  return render(row);
+function Cell<T>({ render, row }: { render: ((r: T) => React.ReactNode) | undefined; row: T }) {
+  return render?.(row) ?? null; // every cell's column has its render; a missing one shows nothing
 }
 /** Responsive table: scrolls horizontally if needed; optional columns hide on narrow containers. A row that opens a
 record (`onRowClick`) is focusable and opens with Enter or Space as well as a click (keyboard access, IR294). */
@@ -565,7 +565,7 @@ export function DataTable<T extends RowData>({ cols, rows, rowKey, onRowClick, s
                 className={cx("data-[state=selected]:bg-primary-soft/60", onRowClick && "cursor-pointer outline-none focus-visible:bg-muted/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary")}>
                 {row.getAllCells().map((cell) => (
                   <TableCell key={cell.id} className={cx("px-3 py-2.5 whitespace-normal", hideCls(cell.column.columnDef.meta), cell.column.columnDef.meta?.className)}>
-                    <Cell render={renders.get(cell.column.id)!} row={r} />
+                    <Cell render={renders.get(cell.column.id)} row={r} />
                   </TableCell>
                 ))}
               </TableRow>

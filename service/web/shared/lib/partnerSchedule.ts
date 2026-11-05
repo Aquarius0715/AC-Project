@@ -46,7 +46,7 @@ export function scheduleRow(j: ApiPartnerJob, now: number, units: Map<string, st
   else if (j.status === "on_hold") [line, tone] = [t("On hold by HQ"), "warn"];
   else line = t("Rework · {name}", { name });
   const span = from && to ? Date.parse(to) - Date.parse(from) : 0;
-  const elapsedPct = span > 0 ? Math.min(100, Math.max(0, Math.round(((now - Date.parse(from!)) / span) * 100))) : 0;
+  const elapsedPct = from && span > 0 ? Math.min(100, Math.max(0, Math.round(((now - Date.parse(from)) / span) * 100))) : 0;
   const isOver = !!to && Date.parse(to) <= now;
   const isSoon = !!to && Date.parse(to) - now < 24 * 3_600_000;
   const leftText = (end: string) => (isOver ? t("Ended") : t("{left} left", { left: until(end, now, t) }));

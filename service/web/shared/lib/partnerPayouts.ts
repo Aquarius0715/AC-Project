@@ -92,7 +92,7 @@ function lineSub(status: LineStatus, l: ApiPayoutStatement["lines"][number], j: 
 still in quality review as “Not included · next statement” (AT-P10-B). */
 export function lineRows(s: ApiPayoutStatement, jobs: Map<string, JobLabel>, reviewing: ReviewingJob[], i: I18n = EN): LineRow[] {
   const { t, display } = i;
-  const byLine = new Map(s.queries.filter((q) => q.lineId).map((q) => [q.lineId!, q]));
+  const byLine = new Map(s.queries.filter((q): q is typeof q & { lineId: string } => !!q.lineId).map((q) => [q.lineId, q]));
   const inStatement = new Set(s.lines.map((l) => l.jobId));
   const rows: LineRow[] = s.lines.map((l) => {
     const j = jobs.get(l.jobId);

@@ -37,7 +37,7 @@ export function DemoView({ live }: Readonly<{ live: DemoLive }>) {
       reset={<><p className="text-[11px] text-muted-foreground">{t("Returns clock, subscriptions, image URLs, caches, and business data to their initial seed")}</p><Btn variant="danger" className="mt-3" disabled>{t("Reset demo data")}</Btn><p className="mt-2 text-[11px] text-muted-foreground">{t("The running Core API keeps shared data: rebuild it offline with make resetdb.")}</p></>}
       triggers={
         <>
-          {device && <Select aria-label={t("Device")} className="mb-3" value={device.id} onChange={(e) => { setPicked(e.target.value); }}>{live.devices!.map((d) => <option key={d.id} value={d.id}>{d.label}{d.fault ? ` · ${t("fault open")}` : ""}</option>)}</Select>}
+          {device && <Select aria-label={t("Device")} className="mb-3" value={device.id} onChange={(e) => { setPicked(e.target.value); }}>{(live.devices ?? []).map((d) => <option key={d.id} value={d.id}>{d.label}{d.fault ? ` · ${t("fault open")}` : ""}</option>)}</Select>}
           {device && live.hidden > 0 && <p className="-mt-2 mb-3 text-[11px] text-muted-foreground">{t(live.hidden === 1 ? "{n} more device needs a current assignment before their history can be read." : "{n} more devices need a current assignment before their history can be read.", { n: live.hidden })}</p>}
           <div className="grid-fluid" style={{ ["--min" as string]: "240px" }}>
             {device?.fault

@@ -244,14 +244,15 @@ function pausesText(count: number, pausedMs: number, t: T): string {
 }
 export function timeRows(ts: TimeOnSite | null | undefined, now: number, f: Fmt = EN_FMT): [string, string][] {
   const { t } = f;
-  if (!ts?.arrivedAt && !ts?.startedAt) return [[t("Arrived"), t("not checked in")]];
+  const arrived = ts?.arrivedAt ?? ts?.startedAt;
+  if (!ts || !arrived) return [[t("Arrived"), t("not checked in")]];
   const pauses = ts.pauses ?? [];
   const open = pauses.find((p) => !p.to);
   const paused = pauses.reduce((sum, p) => sum + ((p.to ? Date.parse(p.to) : now) - Date.parse(p.from)), 0);
-  const from = Date.parse(ts.arrivedAt ?? ts.startedAt!);
+  const from = Date.parse(arrived);
   const minutes = ts.onSiteMinutes ?? Math.max(0, Math.floor((((ts.finishedAt ? Date.parse(ts.finishedAt) : now) - from) - paused) / 60_000));
   return [
-    [t("Arrived"), `${f.clock(ts.arrivedAt ?? ts.startedAt!)} · ${t(ts.checkInMethod === "manual" ? "manual check-in" : "checked in")}`],
+    [t("Arrived"), `${f.clock(arrived)} · ${t(ts.checkInMethod === "manual" ? "manual check-in" : "checked in")}`],
     [t("Location"), checkInPlace(ts, t)],
     [t("Started"), ts.startedAt ? f.clock(ts.startedAt) : "—"],
     [t("Paused"), open ? t("since {time}", { time: f.clock(open.from) }) : pausesText(pauses.length, paused, t)],

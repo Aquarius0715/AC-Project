@@ -108,8 +108,9 @@ const load = (): State => {
   return state;
 };
 const save = () => {
-  writeDemo(KEY, state!.jobs);
-  writeDemo(NKEY, state!.notes);
+  const s = load();
+  writeDemo(KEY, s.jobs);
+  writeDemo(NKEY, s.notes);
   listeners.forEach((l) => { l(); });
 };
 const SERVER: State = { jobs: SEED, notes: [] };
@@ -139,7 +140,7 @@ function jobFromApi(j: ApiJob): Job {
     origin: j.origin === "periodic_plan" ? "plan" : "request",
     type: typeLabel[j.type] ?? "Reactive",
     symptom: "",
-    preferred: (j.preferredSlots ?? []).map((x) => slotOf(x)!),
+    preferred: (j.preferredSlots ?? []).map((x) => slotOf(x)).filter((s): s is Slot => s !== null),
     round: 1,
     scheduled: slotOf(j.scheduledSlot ?? (j.projection === "offer" ? j.requestedSlot : null)),
     delivery: null,

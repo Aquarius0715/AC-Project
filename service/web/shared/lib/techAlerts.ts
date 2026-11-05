@@ -94,7 +94,7 @@ export function alertView(a: ApiTechAlert, ctx: { alerts: ApiTechAlert[]; unit: 
   const history: AlertView["history"] = [];
   if (a.resolvedAt) history.push({ id: "resolved", time: when(a.resolvedAt), title: t("Resolved"), sub: a.resolutionReason ? resolutionText(a.resolutionReason, t) : "", badge: { text: t("Resolved"), tone: "ok" } });
   if (a.acknowledgedAt) history.push({ id: "acknowledged", time: when(a.acknowledgedAt), title: t("Acknowledged"), sub: "", badge: { text: t("Acknowledged"), tone: "primary" } });
-  history.push({ id: "raised", time: when(a.detectedAt), title: t("Raised"), sub: [evidenceText(a.evidenceText, t), words && t("{condition} for {duration}", { condition: words.raise, duration: durationText(rule!.durationSeconds, t) })].filter(Boolean).join(" · "), badge: { text: t(KIND[a.evidenceKind] ?? "Evidence"), tone: "primary" } });
+  history.push({ id: "raised", time: when(a.detectedAt), title: t("Raised"), sub: [evidenceText(a.evidenceText, t), rule && words && t("{condition} for {duration}", { condition: words.raise, duration: durationText(rule.durationSeconds, t) })].filter(Boolean).join(" · "), badge: { text: t(KIND[a.evidenceKind] ?? "Evidence"), tone: "primary" } });
   const prev = a.previousAlertId ? ctx.alerts.find((x) => x.id === a.previousAlertId) : undefined;
   const unit = ctx.unit ? unitPath(ctx.unit) : a.unitId.slice(0, 8);
   const resolver = a.status === "resolved" ? t("done {time}", { time: when(a.resolvedAt ?? a.detectedAt) }) : t(resolveWay(ctx.canResolve, !!rule));

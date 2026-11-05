@@ -81,10 +81,10 @@ export function defaultRuleRows(p: ApiDefaultPolicy, customerId: string | null, 
     const s = mine.get(r.ruleKey);
     return { ruleKey: r.ruleKey, name: r.name, condition: conditionText(r, t), category: r.category, type: textOf(categoryText, r.category, t) ?? r.category, severity: r.severity, enabled: s?.enabled ?? true, version: s?.version ?? 0 };
   });
-  const notes = rows.filter((r) => !r.enabled).map((r) => {
-    const s = mine.get(r.ruleKey)!;
-    return t("Turned off: “{rule}” — no alerts from this rule on any of your ACs (turned off {by}, {date}). HQ still sees device status.", { rule: r.name, by: t(s.changedByMembershipId === me ? "by you" : "by the account owner"), date: showDate(s.updatedAt, i.display) });
-  });
+  const turnedOff = rows.filter((r) => !r.enabled).map((r) => ({ r, s: mine.get(r.ruleKey) }));
+  const notes = turnedOff.filter((x): x is typeof x & { s: NonNullable<typeof x.s> } => x.s !== undefined).map(({ r, s }) => (
+    t("Turned off: “{rule}” — no alerts from this rule on any of your ACs (turned off {by}, {date}). HQ still sees device status.", { rule: r.name, by: t(s.changedByMembershipId === me ? "by you" : "by the account owner"), date: showDate(s.updatedAt, i.display) })
+  ));
   return { on: rows.filter((r) => r.enabled).length, rows, notes };
 }
 

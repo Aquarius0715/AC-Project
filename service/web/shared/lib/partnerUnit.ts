@@ -54,7 +54,7 @@ export function jobContext(j: Extract<ApiUnitJob, { projection: "summary" }>, na
   const tech = j.technicianMembershipId ? names.get(j.technicianMembershipId) ?? t("technician") : null;
   const from = j.accessValidFrom ?? null, to = j.accessValidUntil ?? null;
   const span = from && to ? Date.parse(to) - Date.parse(from) : 0;
-  const pct = span > 0 ? Math.min(100, Math.max(0, Math.round(((nowMs - Date.parse(from!)) / span) * 100))) : null;
+  const pct = from && span > 0 ? Math.min(100, Math.max(0, Math.round(((nowMs - Date.parse(from)) / span) * 100))) : null;
   return {
     id: j.id,
     techMissing: !tech,

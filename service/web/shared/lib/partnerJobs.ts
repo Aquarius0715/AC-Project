@@ -18,7 +18,7 @@ export type TabId = (typeof TABS)[number]["id"];
 export const tabOf = (v?: string): TabId => (TABS.find((t) => t.id === v)?.id ?? "all");
 /** The jobs.list filters of a tab within the period. */
 export function tabFilters(tab: TabId, fromAt: string, toAt: string): NonNullable<OpInput<"jobs.list">["filters"]> {
-  const statuses = TABS.find((t) => t.id === tab)!.statuses;
+  const statuses = (TABS.find((t) => t.id === tab) ?? TABS[0]).statuses;
   return { from: fromAt, to: toAt, ...(statuses && { statuses: [...statuses] }) };
 }
 
@@ -106,7 +106,8 @@ export function jobRow(raw: ApiPartnerJob, now: number, units: Map<string, strin
       return { id: j.id, href: `/partner/schedule?jobId=${j.id}`, line: t("Accepted · assign a technician for the agreed time"), tech: { name: t("Unassigned"), sub: t("assign before the delegation ends"), tone: "warn" }, slot: { main: due || "—", sub: t("Assign a technician") }, badge: { text: t("Accepted"), tone: "primary" }, title, origin };
     }
     case "overdue": {
-      return { id: j.id, href: detail, line: t("Work window ended {time} · report not submitted", { time: at(j.slot!.endAt) }), tech: technician ?? none, slot: { main: t("Ended {time}", { time: at(j.slot!.endAt) }), sub: t("Extend or reassign"), tone: "crit" }, badge: { text: t("Overdue"), tone: "crit" }, title, origin };
+      const ended = j.slot ? at(j.slot.endAt) : "—";
+      return { id: j.id, href: detail, line: t("Work window ended {time} · report not submitted", { time: ended }), tech: technician ?? none, slot: { main: t("Ended {time}", { time: ended }), sub: t("Extend or reassign"), tone: "crit" }, badge: { text: t("Overdue"), tone: "crit" }, title, origin };
     }
     case "review": {
       return { id: j.id, href: `/partner/jobs/${j.id}/review`, line: tech ? t("Submitted by {name} · awaiting your review", { name: tech }) : t("Submitted · awaiting your review"), tech: tech ? { name: tech, sub: t("report author") } : none, slot: { main: t("Report submitted"), sub: due }, badge: { text: t("Submitted"), tone: "primary" }, title, origin };
