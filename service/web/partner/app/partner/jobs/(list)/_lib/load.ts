@@ -35,7 +35,8 @@ export async function loadJobs(sp: { tab?: string; sort?: string; from?: string;
   ]);
   const unitNames = new Map(units.map((u) => [u.id, u.displayName]));
   const names = new Map(members.map((m) => [m.id, m.displayName]));
-  const page = isRestarted ? 1 : Number(sp.page) || (sp.cursor ? 2 : 1);
+  const cursorPage = sp.cursor ? 2 : 1; // a cursor without a page number is past the first page
+  const page = isRestarted ? 1 : Number(sp.page) || cursorPage;
   return {
     tab, sort, sortText: t(SORTS.find((s) => s.id === sort)!.text), restarted: isRestarted,
     tabs: TABS.map((tb, k) => ({ id: tb.id, label: t(tb.label), count: counts[k] })),

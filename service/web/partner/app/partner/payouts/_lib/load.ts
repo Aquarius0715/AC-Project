@@ -46,7 +46,8 @@ export async function loadPayouts(options: { statementId?: string; period?: stri
       const j = await quiet(coreOp<JobRow>("jobs.get", { jobId }));
       if (!j) return null;
       const unit = j.projection === "detail" ? await unitName(j.unitId, units) : null;
-      return [jobId, { title: `${typeLabel(j.type, t)}${unit ? ` · ${unit.split(" · ", 1)[0]}` : ""}`, sub: unit ? unit.split(" · ").slice(1).join(" · ") || null : (j.projection === "history" ? t("customer details closed with the delegation") : null) }];
+      const closed = j.projection === "history" ? t("customer details closed with the delegation") : null;
+      return [jobId, { title: `${typeLabel(j.type, t)}${unit ? ` · ${unit.split(" · ", 1)[0]}` : ""}`, sub: unit ? unit.split(" · ").slice(1).join(" · ") || null : closed }];
     })),
     Promise.all((reviewing?.items ?? []).filter((j) => j.projection === "detail" || j.projection === "summary").slice(0, 10).map(async (j): Promise<ReviewingJob> => {
       const name = await unitName(j.unitId, units);
@@ -58,12 +59,13 @@ export async function loadPayouts(options: { statementId?: string; period?: stri
   const card = cards?.items.find((c) => Date.parse(c.effectiveFrom) <= Date.parse(selected.payDate)) ?? cards?.items[0] ?? null;
   const rows = lineRows(selected, new Map(labels.filter((l): l is [string, JobLabel] => !!l)), inReview, i);
   const s = selected;
+  const paidDate = s.paidAt ? showDate(s.paidAt, display) : "—";
   live.selected = {
     statement: s,
     kpis: kpis(s, card ? `${card.id.slice(0, 8)} v${String(card.version)}` : null, i),
     questions: questionRows(s, rows, t),
     title: t("{id} · {period} · lines", { id: s.id.slice(0, 8), period: periodLabel(s.period, display.locale) }),
-    sub: t(s.status === "paid" ? "Rate card {card} · paid {date}" : "Rate card {card} · pays {date}", { card: card ? `rc ${card.id.slice(0, 8)} v${String(card.version)}` : t("set by HQ"), date: s.status === "paid" ? (s.paidAt ? showDate(s.paidAt, display) : "—") : businessDay(s.payDate, display.locale) }),
+    sub: t(s.status === "paid" ? "Rate card {card} · paid {date}" : "Rate card {card} · pays {date}", { card: card ? `rc ${card.id.slice(0, 8)} v${String(card.version)}` : t("set by HQ"), date: s.status === "paid" ? paidDate : businessDay(s.payDate, display.locale) }),
     totals: [[t("Gross"), money(s.grossMinor, s.currency)], [t("Deductions"), money(-s.deductionsMinor, s.currency)], [t("Net payable"), money(s.netMinor, s.currency)]],
     rows,
   };

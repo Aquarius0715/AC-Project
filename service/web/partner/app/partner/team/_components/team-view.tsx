@@ -11,8 +11,10 @@ import { clearUnavailability, setUnavailability } from "../actions";
 import { Certifications } from "./certifications";
 import type { TeamLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
+import { byCount } from "@ac/web/lib/i18n";
 
 type Live = Extract<TeamLive, { notFound: false }>;
+const DAY_TONE = new Map([["crit", "text-crit"], ["warn", "text-warn"]]);
 const cellTone: Record<WeekCell["kind"], string> = {
   busy: "bg-primary text-white", free: "border border-line bg-surface text-muted-foreground", off: "bg-warn-soft text-warn", none: "bg-surface2 text-muted-foreground",
 };
@@ -84,7 +86,7 @@ function Team({ live, tab, tabs }: Readonly<{ live: Live; tab: "members" | "cert
                     <UtilizationBar pct={r.week.pct} label={`${r.name}: ${r.week.text}`} />
                   </div>
                 )}
-                <div className="min-w-[180px] text-right"><span className={cx("block text-xs", r.day.tone === "crit" ? "text-crit" : (r.day.tone === "warn" ? "text-warn" : "text-ink"))}>{r.day.main}</span><span className="block text-[11px] text-muted-foreground">{r.day.sub}</span></div>
+                <div className="min-w-[180px] text-right"><span className={cx("block text-xs", DAY_TONE.get(r.day.tone ?? "") ?? "text-ink")}>{r.day.main}</span><span className="block text-[11px] text-muted-foreground">{r.day.sub}</span></div>
                 <div className="w-16 text-right"><b className="block text-lg">{r.util}</b><span className="block text-[10px] text-muted-foreground">{t("utilization")}</span></div>
               </li>
             ))}
@@ -217,8 +219,11 @@ function UnavailableDays({ live, onClose }: Readonly<{ live: Live; onClose: () =
     if (Object.keys(unavailabilityErrors(form, t)).length > 0) return;
     run(() => setUnavailability({ membershipId: form.membershipId || null, from: form.from, to: form.to, type: form.type as "annual_leave" | "sick" | "training" | "public_holiday" | "other", note: form.note.trim() || undefined }),
       (v) => {
-        return (v.conflicts === 0 ? t("Unavailable days saved — the available hours of those days are 0.")
-          : t(v.conflicts === 1 ? "Unavailable days saved — 1 confirmed assignment overlaps them; reassign it in Schedule & assignments." : "Unavailable days saved — {n} confirmed assignments overlap them; reassign them in Schedule & assignments.", { n: v.conflicts }));
+        return byCount(v.conflicts, {
+          none: t("Unavailable days saved — the available hours of those days are 0."),
+          one: t("Unavailable days saved — 1 confirmed assignment overlaps them; reassign it in Schedule & assignments."),
+          many: t("Unavailable days saved — {n} confirmed assignments overlap them; reassign them in Schedule & assignments.", { n: v.conflicts }),
+        });
       },
       () => { onClose(); },
       (f) => { const r = unavailabilityRefusal(f, t); setServer(r.fields); setRefused(r.text); });

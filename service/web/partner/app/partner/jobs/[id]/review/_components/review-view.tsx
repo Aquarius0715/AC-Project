@@ -26,9 +26,9 @@ export interface ReviewLive {
 }
 
 const refusal = (f: ActionFailure, t: T): string | null => {
-  return f.code === "CONFLICT" ? t("This report version was already accepted or returned, or the job changed in the meantime; the page shows the latest state.")
-    : f.code === "FORBIDDEN" ? t("A contributor to this report version cannot approve it, or your company does not hold this delegation.")
-    : f.code === "NOT_FOUND" ? t("This job is outside your company’s delegation.") : null;
+  if (f.code === "CONFLICT") return t("This report version was already accepted or returned, or the job changed in the meantime; the page shows the latest state.");
+  if (f.code === "FORBIDDEN") return t("A contributor to this report version cannot approve it, or your company does not hold this delegation.");
+  return f.code === "NOT_FOUND" ? t("This job is outside your company’s delegation.") : null;
 };
 const dot: Record<EvidenceRow["tone"], string> = { ok: "bg-ok", warn: "bg-warn", muted: "bg-line" };
 
@@ -52,7 +52,8 @@ export function ReviewView({ live }: Readonly<{ live: ReviewLive }>) {
   const items = ticked ?? r.rework.filter((x) => x.checked).map((x) => x.label);
   // the ticked items lead the reason the technician reads, as on HQ's dialog (IR609)
   const reason = returnReason(items, why, t);
-  const reasonError = why.trim() ? (reason.length > 1000 ? t("{n} / 1000 characters with the ticked items", { n: reason.length }) : null) : t("A reason is required (1–1000 characters)");
+  const tooLong = reason.length > 1000 ? t("{n} / 1000 characters with the ticked items", { n: reason.length }) : null;
+  const reasonError = why.trim() ? tooLong : t("A reason is required (1–1000 characters)");
   // a refused return takes focus to the reason, the one field to fix (IR597, as IR586)
   const badReason = (message = reasonError ?? t("A reason is required (1–1000 characters)")) => { setError(message); focusField("return-reason"); };
   const failed = (f: ActionFailure) => { setRefused(refusal(f, t)); if (f.fieldErrors.reason) badReason(); };

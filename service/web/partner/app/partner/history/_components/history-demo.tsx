@@ -9,6 +9,11 @@ import { jobEventTitle } from "@ac/web/lib/partnerOverview";
 interface ApiJobRow { projection: string; id?: string; jobId?: string; type: string; status: string; completedAt?: string | null }
 interface ApiEvent { id: string; action: string; occurredAt: string; note: { visibility: "internal" | "customer"; message: string } | null }
 interface TimelineEvent { t: string; title: string; d: string; c: boolean }
+/** A demo event's tone: rework warns, an accepted report is ok, anything else is plain. */
+function eventTone(title: string): "warn" | "ok" | undefined {
+  if (title.startsWith("Rework")) return "warn";
+  return title.includes("accepted") && title.startsWith("Report") ? "ok" : undefined;
+}
 const actionTitle = jobEventTitle; // shared with the overview (partnerOverview.ts)
 const kl = (iso: string) => new Date(iso).toLocaleString("en-MY", { dateStyle: "short", timeStyle: "short", hour12: false, timeZone: "Asia/Kuala_Lumpur" });
 function eventRow(e: ApiEvent): TimelineEvent {
@@ -51,7 +56,8 @@ export function HistoryDemo() {
   const isApi = jobs.source === "api";
   const sel = isApi ? (jobs.data?.find((j) => j.id === job) ?? null) : null;
   const evs = useOp<{ items: ApiEvent[] }, TimelineEvent[] | null>("jobs.events", { jobId: isApi ? job : "", query: { limit: 100, sort: { field: "occurredAt", direction: "desc" } } }, null, (p) => p.items.map((item) => eventRow(item)), !!sel);
-  const all: TimelineEvent[] = isApi ? (sel ? (evs.data ?? []) : []) : events;
+  const loaded = sel ? (evs.data ?? []) : []; // the selected job's events, once a job is selected
+  const all: TimelineEvent[] = isApi ? loaded : events;
   const shown = all.filter((e) => f === "all" || (f === "customer" ? e.c : !e.c));
   return (
     <Page>
@@ -62,7 +68,7 @@ export function HistoryDemo() {
           <div className="split">
             <Card title={`Job history — ${job}`} action={<Tabs value={f} onChange={setF} tabs={[{ id: "all", label: "All events", count: all.length }, { id: "customer", label: "Customer-visible", count: all.filter((e) => e.c).length }, { id: "internal", label: "Internal", count: all.filter((e) => !e.c).length }]} />}>
               {shown.length === 0 && <p className="text-[13px] text-muted-foreground">{evs.loading ? "Loading…" : "No events in this view."}</p>}
-              <Timeline items={shown.map((e) => ({ time: e.t.slice(5), title: e.title, detail: e.d, tone: e.title.startsWith("Rework") ? "warn" : (e.title.includes("accepted") && e.title.startsWith("Report") ? "ok" : undefined) }))} />
+              <Timeline items={shown.map((e) => ({ time: e.t.slice(5), title: e.title, detail: e.d, tone: eventTone(e.title) }))} />
             </Card>
             <div className="flex min-w-0 flex-col gap-4">
               <Card title="New communication preview">

@@ -124,6 +124,7 @@ function AssignCard({ sel, choice, zone, otherZone }: Readonly<{ sel: Selected; 
   const endOk = !m.endEditable || (end && Date.parse(slot.endAt) >= Date.parse(m.slot.endAt));
   const isReasonMissing = m.reasonRequired && !reason.trim();
   const isSame = tech === sel.currentId && (!m.endEditable || slot.endAt === m.slot.endAt);
+  const sameError = tried && isSame ? t("Choose another technician or a later end") : undefined;
   const save = () => {
     setTried(true);
     if (!tech || isReasonMissing || !endOk || isSame) return;
@@ -137,7 +138,7 @@ function AssignCard({ sel, choice, zone, otherZone }: Readonly<{ sel: Selected; 
       <div className="flex flex-col gap-3">
         {m.banner && <Banner tone={m.banner.tone === "muted" ? undefined : m.banner.tone}>{m.banner.text}</Banner>}
         {window && <Banner>{window}</Banner>}
-        <Field label={sel.currentId ? t("New technician (current: {name})", { name: currentName ?? "—" }) : t("Technician (own company, active, qualified)")} error={tried && !tech ? t("Choose a technician") : (tried && isSame ? t("Choose another technician or a later end") : undefined)}>
+        <Field label={sel.currentId ? t("New technician (current: {name})", { name: currentName ?? "—" }) : t("Technician (own company, active, qualified)")} error={tried && !tech ? t("Choose a technician") : sameError}>
           <div role="radiogroup" aria-label={t("Technician")} className="flex flex-col gap-1.5">
             {sel.candidates.length === 0 && <p className="text-[13px] text-muted-foreground">{t("No technicians in your company yet — add them in Team & capacity.")}</p>}
             {sel.candidates.map((c) => (

@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Badge, Banner, Btn, Card, Check, DataTable, EmptyState, Field, Input, Modal, Page, Search, Select, Stat, Tabs, UtilizationBar, useToast } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, DataTable, EmptyState, Field, Input, Modal, Page, Search, Select, Stat, Tabs, UtilizationBar, useToast, type Tone } from "@ac/web/components/ui";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
 import { Icon } from "@ac/web/components/Icon";
 
 // DATA_SOURCE=API: technicians of the company (members.list, IR172 displayName), a week of members.capacity and
 // members.setUnavailability. Qualification grants come from the memberships (contractors get no permissions/scopes, IR42).
+const CERT_TONE = new Map<string, Tone>([["Valid", "ok"], ["Expired", "muted"]]); // anything else is expiring
 const techs = [
   { id: "tech-external-a", quals: ["Split-unit refrigerant handling", "Electrical basics"], sub: "Refrigerant handling · Electrical basics · active since 2025-04", asg: "09:00–13:00 assigned", free: "13:00–17:00 free", used: 10, tot: 40, week: ["2 / 8 h", "4 / 8 h", "0 / 8 h", "4 / 8 h", "0 / 8 h", "—", "—"], active: true },
   { id: "tech-external-a2", quals: ["General maintenance"], sub: "General maintenance · active since 2026-02", asg: "13:00–17:00 assigned (job-p12)", free: "09:00–13:00 free", used: 8, tot: 40, week: ["0 / 8 h", "4 / 8 h", "4 / 8 h", "0 / 8 h", "0 / 8 h", "—", "—"], active: true },
@@ -81,7 +82,7 @@ function Certs({ onUpload }: Readonly<{ onUpload: () => void }>) {
       <Card title="Certificates — contractor-a">
         <DataTable rowKey={(r) => r.t + r.c} rows={rows} cols={[
           { key: "t", label: "Technician", render: (r) => <b>{r.t}</b> }, { key: "c", label: "Certificate", render: (r) => r.c }, { key: "u", label: "Valid until", render: (r) => r.until },
-          { key: "s", label: "Status", render: (r) => <Badge tone={r.st === "Valid" ? "ok" : (r.st === "Expired" ? "muted" : "warn")}>{r.st}</Badge> },
+          { key: "s", label: "Status", render: (r) => <Badge tone={CERT_TONE.get(r.st) ?? "warn"}>{r.st}</Badge> },
           { key: "a", label: "", render: (r) => (r.st.startsWith("Expiring") ? <Btn size="sm" variant="primary" onClick={onUpload}>Upload renewal</Btn> : null) },
         ]} />
         <p className="mt-2 text-[11px] text-muted-foreground">Only valid, HQ-verified certificates make a technician eligible for offers that require them.</p>

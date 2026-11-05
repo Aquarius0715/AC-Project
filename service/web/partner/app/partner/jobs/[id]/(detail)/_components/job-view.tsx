@@ -14,6 +14,9 @@ import { acceptOffer, declineOffer, proposeSlot, withdrawProposal } from "../act
 import type { JobDetailLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
 
+// a step's dot and label by its state; a step to do keeps the plain dot and a done step the plain label
+const STEP_DOT = new Map<string, string>([["done", "bg-primary text-white"], ["current", "border-2 border-primary text-primary"]]);
+const STEP_LABEL = new Map<string, string>([["todo", "text-muted-foreground"], ["current", "text-primary"]]);
 const scopeLabel: Record<string, string> = { indoor: "Indoor unit", outdoor: "Outdoor unit", electrical: "Electrical / control" };
 const statusTone: Record<string, "primary" | "ok" | "warn" | "crit" | "muted"> = { accepted: "primary", assigned: "primary", in_progress: "primary", submitted: "primary", completed: "ok", rework_requested: "warn", on_hold: "warn", cancelled: "muted" };
 const statusWord: Record<string, string> = {
@@ -223,8 +226,8 @@ function DetailView({ live }: Readonly<{ live: Extract<JobDetailLive, { kind: "d
             <ol className="flex flex-col gap-2">
               {x.steps.map((s, i) => (
                 <li key={s.label} className="flex items-start gap-2 text-xs">
-                  <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold ${s.state === "done" ? "bg-primary text-white" : (s.state === "current" ? "border-2 border-primary text-primary" : "border border-line text-muted-foreground")}`}>{s.state === "done" ? <Icon name="check" /> : i + 1}</span>
-                  <span><b className={s.state === "todo" ? "text-muted-foreground" : (s.state === "current" ? "text-primary" : "")}>{s.label}</b><span className="block text-[11px] text-muted-foreground">{s.atText ?? (s.state === "todo" ? t("next") : "")} · {s.sub}</span></span>
+                  <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold ${STEP_DOT.get(s.state) ?? "border border-line text-muted-foreground"}`}>{s.state === "done" ? <Icon name="check" /> : i + 1}</span>
+                  <span><b className={STEP_LABEL.get(s.state) ?? ""}>{s.label}</b><span className="block text-[11px] text-muted-foreground">{s.atText ?? (s.state === "todo" ? t("next") : "")} · {s.sub}</span></span>
                 </li>
               ))}
             </ol>

@@ -7,6 +7,7 @@ import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { BUCKETS, DAY_END, DAY_START, OVERVIEW_ROWS, type ActionRow } from "@ac/web/lib/partnerOverview";
 import type { OverviewLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
+import { byCount } from "@ac/web/lib/i18n";
 
 const badgeTone: Record<ActionRow["kind"], "primary" | "crit" | "warn"> = { offer: "primary", overdue: "crit", review: "primary", unassigned: "primary" };
 const hours = Array.from({ length: (DAY_END - DAY_START) / 2 + 1 }, (_, i) => DAY_START + i * 2);
@@ -35,7 +36,7 @@ export function OverviewView({ live }: Readonly<{ live: OverviewLive }>) {
         {live.kpis.map((k) => <Kpi key={k.href + k.label} label={k.label} value={k.value} sub={k.sub} href={k.href} link={k.link} tone={k.tone} />)}
       </div>
       <Card title={t("Job progress — {period}", { period })} action={<TextLink href="/partner/jobs">{t("Open all jobs")} <Icon name="arrowRight" /></TextLink>}>
-        <p className="mb-2 text-xs text-muted-foreground">{pr.total ? t(pr.total === 1 ? "{n} job · {done} completed ({pct}%) · counts use the same period as the Jobs list" : "{n} jobs · {done} completed ({pct}%) · counts use the same period as the Jobs list", { n: pr.total, done: pr.counts.completed, pct: pr.completedPct }) : t("No jobs yet — offers from HQ to your company will appear here and in Jobs.")}</p>
+        <p className="mb-2 text-xs text-muted-foreground">{byCount(pr.total, { none: t("No jobs yet — offers from HQ to your company will appear here and in Jobs."), one: t("{n} job · {done} completed ({pct}%) · counts use the same period as the Jobs list", { n: 1, done: pr.counts.completed, pct: pr.completedPct }), many: t("{n} jobs · {done} completed ({pct}%) · counts use the same period as the Jobs list", { n: pr.total, done: pr.counts.completed, pct: pr.completedPct }) })}</p>
         <div className="flex h-3 w-full overflow-hidden rounded-full bg-surface2" role="img" aria-label={t("Jobs by status")}>
           {pr.total > 0 && BUCKETS.map((b) => pr.counts[b.id] > 0 && <div key={b.id} className={cx("h-full", b.tone)} style={{ width: `${String((pr.counts[b.id] / pr.total) * 100)}%` }} title={`${t(b.label)}: ${String(pr.counts[b.id])}`} />)}
         </div>

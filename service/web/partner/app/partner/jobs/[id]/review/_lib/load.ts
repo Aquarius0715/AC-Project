@@ -25,8 +25,9 @@ export async function loadReview(jobId: string): Promise<ReviewLive> {
   names.set(me.userId, t("you")); // the signed-in reviewer is not in the technician list (members.list)
   const id = job.id ?? job.jobId ?? jobId;
   const unit = job.projection === "detail" && job.unitId ? await quiet(coreOp<ApiUnitDetail>("units.get", { id: job.unitId })) : null;
+  const unitRef = job.unitId ? t("unit {id}", { id: job.unitId.slice(0, 8) }) : null; // a unit that cannot be read is named by its ID
   const base = {
-    job: { id, version: job.version ?? 0, status: job.status, type: job.type, unit: unit ? `${unit.displayName} · ${unit.location.pathLabels.join(" › ")}` : (job.unitId ? t("unit {id}", { id: job.unitId.slice(0, 8) }) : null) },
+    job: { id, version: job.version ?? 0, status: job.status, type: job.type, unit: unit ? `${unit.displayName} · ${unit.location.pathLabels.join(" › ")}` : unitRef },
     reviewer: me.userId, report: null,
   };
   const ref = job.projection === "detail" ? job.reportRefs?.[job.reportRefs.length - 1] : undefined;
