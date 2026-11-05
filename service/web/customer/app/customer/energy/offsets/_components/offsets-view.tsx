@@ -39,7 +39,8 @@ export function OffsetsView({ live }: Readonly<{ live: Live }>) {
   const purposeError = purpose.trim().length === 0 || purpose.trim().length > 1000 ? t("1–1000 characters") : undefined;
   const ask = () => { run(() => getQuote({ purpose: purpose.trim(), amountKg: n, period: { from: live.period.from, to: live.period.to }, unitIds: live.unitIds }), t("Demo quote ready — no record was created"), (q) => { setQuote(q); setStep(1); }); };
   const confirm = () => {
-    return quote && run(() => requestOffset(quote.id, quote.version), t("Demo request recorded"), (r) => { setDone(r); setStep(3); },
+    if (!quote) return;
+    run(() => requestOffset(quote.id, quote.version), t("Demo request recorded"), (r) => { setDone(r); setStep(3); },
       (f) => { if (f.code !== "CONFLICT") {
         return;
       }

@@ -120,9 +120,9 @@ function Manager({ live }: Readonly<{ live: NonNullable<RestrictionsLive> }>) {
           </div>
         ) : <Card title={t("Restriction")}><EmptyState title={t("Nothing selected")}>{t("Choose a restriction.")}</EmptyState></Card>}
       </div>
-      <Modal open={!!retry} onClose={() => { setRetry(null); }} title={t(retry?.phase === "release" ? "Retry release" : "Retry apply")} footer={<><Btn onClick={() => { setRetry(null); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending || !retry?.reason.trim()} onClick={() => r && retry && run(() => retryUnits(r.id, r.version, retry.unitIds, retry.phase, r.rulesVersion, retry.reason.trim()), t("Retry sent"), () => { setRetry(null); })}>{t("Retry")}</Btn></>}>
+      <Modal open={!!retry} onClose={() => { setRetry(null); }} title={t(retry?.phase === "release" ? "Retry release" : "Retry apply")} footer={<><Btn onClick={() => { setRetry(null); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending || !retry?.reason.trim()} onClick={() => { if (r && retry) run(() => retryUnits(r.id, r.version, retry.unitIds, retry.phase, r.rulesVersion, retry.reason.trim()), t("Retry sent"), () => { setRetry(null); }); }}>{t("Retry")}</Btn></>}>
         <p className="text-xs text-muted-foreground">{t(retry?.phase === "release" ? "Sends a new remove command for the unit with rules version {rules}. An undeliverable unit returns Offline with nothing changed." : "Sends a new apply command for the unit with rules version {rules}. An undeliverable unit returns Offline with nothing changed.", { rules: r?.rulesVersion ?? "—" })}</p>
-        <Field label={t("Reason")}><Textarea value={retry?.reason ?? ""} maxLength={1000} onChange={(e) => retry && setRetry({ ...retry, reason: e.target.value })} /></Field>
+        <Field label={t("Reason")}><Textarea value={retry?.reason ?? ""} maxLength={1000} onChange={(e) => { if (retry) setRetry({ ...retry, reason: e.target.value }); }} /></Field>
       </Modal>
       {live.schedule && <ScheduleModal open={scheduling} onClose={() => { setScheduling(false); }} contracts={live.schedule} now={now} onDone={(id) => { setScheduling(false); nav({ restrictionId: id, status: null }); }} />}
     </Page>

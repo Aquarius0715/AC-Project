@@ -175,7 +175,7 @@ export function AuditView({ live }: Readonly<{ live?: AuditLive }>) {
           </div>
         </>
       ) : device && (
-        <DeviceEvents device={device} f={f} periodErr={periodProblem} zone={zone} live={!!live} onDate={changeDate} onDevice={(id) => { if (live) patch({ deviceId: id || null, eventId: null });; }} onEvent={(id) => live && patch({ eventId: id })} onReset={reset} />
+        <DeviceEvents device={device} f={f} periodErr={periodProblem} zone={zone} live={!!live} onDate={changeDate} onDevice={(id) => { if (live) patch({ deviceId: id || null, eventId: null }); }} onEvent={(id) => { if (live) patch({ eventId: id }); }} onReset={reset} />
       )}
     </Page>
   );

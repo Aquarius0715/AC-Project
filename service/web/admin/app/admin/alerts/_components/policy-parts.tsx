@@ -43,15 +43,15 @@ export function ConditionFields({ c, onChange, errors, tried, fixedMetric }: Rea
 /** “Only if …” (DD-A05 item 10): the days and local hours in the policy's time zone, or any time (null). */
 export function WindowEditor({ value, onChange, timezone, error }: Readonly<{ value: Window | null | undefined; onChange: (w: Window | null) => void; timezone: string; error?: string }>) {
   const t = useT();
-  const set = (w: Partial<Window>) => value && onChange({ ...value, ...w });
+  const set = (w: Partial<Window>) => { if (value) onChange({ ...value, ...w }); };
   return (
     <div className="flex flex-col gap-2">
       <Check label={t("Only on some days and times")} checked={!!value} onChange={(v) => { onChange(v ? { weekdays: [1, 2, 3, 4, 5], startLocal: "08:00", endLocal: "19:00" } : null); }} />
       {value ? (
         <div className="flex flex-wrap items-center gap-2">
-          <Btn size="sm" onClick={() => set({ weekdays: [1, 2, 3, 4, 5] })}>{t("Mon–Fri")}</Btn><Btn size="sm" onClick={() => set({ weekdays: [1, 2, 3, 4, 5, 6, 7] })}>{t("Every day")}</Btn>
-          {DAYS.map((d, i) => <Plain key={d} type="button" aria-pressed={value.weekdays.includes(i + 1)} onClick={() => set({ weekdays: value.weekdays.includes(i + 1) ? value.weekdays.filter((x) => x !== i + 1) : [...value.weekdays, i + 1].toSorted(byNumber) })} className={cx("rounded-control border px-2 py-1 text-xs font-semibold", value.weekdays.includes(i + 1) ? "border-primary bg-primary-soft text-primary" : "border-line")}>{t(d)}</Plain>)}
-          <Input aria-label={t("From")} type="time" className="w-32" value={value.startLocal} onChange={(e) => set({ startLocal: e.target.value })} /> – <Input aria-label={t("To")} type="time" className="w-32" value={value.endLocal} onChange={(e) => set({ endLocal: e.target.value })} />
+          <Btn size="sm" onClick={() => { set({ weekdays: [1, 2, 3, 4, 5] }); }}>{t("Mon–Fri")}</Btn><Btn size="sm" onClick={() => { set({ weekdays: [1, 2, 3, 4, 5, 6, 7] }); }}>{t("Every day")}</Btn>
+          {DAYS.map((d, i) => <Plain key={d} type="button" aria-pressed={value.weekdays.includes(i + 1)} onClick={() => { set({ weekdays: value.weekdays.includes(i + 1) ? value.weekdays.filter((x) => x !== i + 1) : [...value.weekdays, i + 1].toSorted(byNumber) }); }} className={cx("rounded-control border px-2 py-1 text-xs font-semibold", value.weekdays.includes(i + 1) ? "border-primary bg-primary-soft text-primary" : "border-line")}>{t(d)}</Plain>)}
+          <Input aria-label={t("From")} type="time" className="w-32" value={value.startLocal} onChange={(e) => { set({ startLocal: e.target.value }); }} /> – <Input aria-label={t("To")} type="time" className="w-32" value={value.endLocal} onChange={(e) => { set({ endLocal: e.target.value }); }} />
           <span className="text-xs text-muted-foreground">{timezone}</span>
         </div>
       ) : <p className="text-[13px]">{t("Any day · any time")}</p>}

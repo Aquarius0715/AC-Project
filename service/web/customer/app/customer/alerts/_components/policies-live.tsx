@@ -46,8 +46,10 @@ function PolicyList({ p, onDone, onFail }: Readonly<Props>) {
   const fail = (f: ActionFailure) => { onFail(f); };
   useEffect(() => { takeListFocus(); }, []);
   const { customerId } = p;
-  const toggleRule = (ruleKey: string, name: string, on: boolean, version: number) =>
-    d && customerId && run(() => setDefaultRule(d.id, ruleKey, customerId, on, version), t(on ? "“{name}” on" : "“{name}” off", { name }), () => { onDone(t(on ? "Default rule “{name}” switched on for all your ACs." : "Default rule “{name}” switched off for all your ACs.", { name })); }, fail);
+  const toggleRule = (ruleKey: string, name: string, on: boolean, version: number) => {
+    if (!d || !customerId) return;
+    run(() => setDefaultRule(d.id, ruleKey, customerId, on, version), t(on ? "“{name}” on" : "“{name}” off", { name }), () => { onDone(t(on ? "Default rule “{name}” switched on for all your ACs." : "Default rule “{name}” switched off for all your ACs.", { name })); }, fail);
+  };
   return (
     <>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -64,7 +66,7 @@ function PolicyList({ p, onDone, onFail }: Readonly<Props>) {
               <tr key={r.ruleKey} className={cx("border-t border-line", !r.enabled && "text-muted-foreground")}>
                 <td className="py-2 pr-3 font-semibold">{r.name}</td><td className="pr-3">{r.condition}</td><td className="pr-3"><Badge tone={r.category === "air_quality" ? "primary" : "muted"}>{r.type}</Badge></td>
                 <td className="pr-3"><SeverityBadge s={r.severity} /></td>
-                <td><Toggle on={r.enabled} disabled={!p.owner || pending} onChange={(v) => toggleRule(r.ruleKey, r.name, v, r.version)} label={r.name} /></td>
+                <td><Toggle on={r.enabled} disabled={!p.owner || pending} onChange={(v) => { toggleRule(r.ruleKey, r.name, v, r.version); }} label={r.name} /></td>
               </tr>
             ))}</tbody>
           </table></ScrollX>

@@ -39,7 +39,7 @@ export function useBffSession(): BffSession | null {
   const [s, setS] = useState<BffSession | null>(null);
   useEffect(() => {
     let isLive = true;
-    bffSession().then((v) => isLive && setS(v));
+    bffSession().then((v) => { if (isLive) setS(v); });
     return () => {
       isLive = false;
     };
@@ -62,8 +62,8 @@ export function useOp<T, R>(...[operation, input, mock, map, enabled = true]: [.
     if (!isActive) return;
     let isLive = true;
     read()
-      .then((data) => isLive && setState({ request, data, error: null }))
-      .catch((error: unknown) => isLive && setState((s) => ({ request, data: s.data, error: error instanceof OpError ? error : null })));
+      .then((data) => { if (isLive) setState({ request, data, error: null }); })
+      .catch((error: unknown) => { if (isLive) setState((s) => ({ request, data: s.data, error: error instanceof OpError ? error : null })); });
     return () => {
       isLive = false;
     };

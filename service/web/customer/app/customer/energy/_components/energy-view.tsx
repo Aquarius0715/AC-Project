@@ -96,7 +96,7 @@ export function EnergyView({ live }: Readonly<{ live: EnergyLive }>) {
           <span className="text-xs text-muted-foreground">{t("Units")}</span>
           {live.unitIds.map((u) => <Badge key={u} tone="primary">{names.get(u)}{live.unitIds.length > 1 && <Plain type="button" aria-label={t("Remove {name}", { name: names.get(u) ?? "" })} className="ml-1" onClick={() => { setUnits(live.unitIds.filter((x) => x !== u)); }}><Icon name="close" /></Plain>}</Badge>)}
           {live.unitIds.length < 4 && (
-            <Select aria-label={t("Compare unit")} className="w-auto" value="" onChange={(e) => e.target.value && setUnits([...live.unitIds, e.target.value])}>
+            <Select aria-label={t("Compare unit")} className="w-auto" value="" onChange={(e) => { if (e.target.value) setUnits([...live.unitIds, e.target.value]); }}>
               <option value="">{t("Add a unit to compare")}</option>{live.units.filter((u) => !live.unitIds.includes(u.id)).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
             </Select>
           )}

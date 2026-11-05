@@ -164,7 +164,11 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
   };
   const remove = () => {
     if (!draft || isNew) return;
-    if (!live) return (setDeleting(false), toast(t("“{name}” deleted", { name: draft.name })));
+    if (!live) {
+      setDeleting(false);
+      toast(t("“{name}” deleted", { name: draft.name }));
+      return;
+    }
     startTransition(async () => {
       const r = await deletePolicy(draft.id, draft.version);
       if (!r.ok) { toast(actionMessage(r, t), "crit"); return; }
@@ -174,7 +178,7 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
     });
   };
   const discard = () => { if (isNew) select(null); else { setDraft(p); setTried(false); } };
-  const toggleChannel = (c: Channel, on: boolean) => draft && set("channels", on ? [...new Set([...draft.channels, c])] : draft.channels.filter((x) => x !== c));
+  const toggleChannel = (c: Channel, on: boolean) => { if (draft) set("channels", on ? [...new Set([...draft.channels, c])] : draft.channels.filter((x) => x !== c)); };
   // Show disabled off hides the disabled policies, but never the one that is open
   const listed = pols.filter((x) => showOff || x.on || (!isNew && x.id === draft?.id));
   const groups = [...new Set([...listed.map((x) => x.group), ...(isNew ? [draft.group] : [])])];
@@ -246,7 +250,7 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
                   </div>
                 ))}
                 {(draft.recipients.length === 0 || (tried && errors.recipients)) && <p className={cx("py-1 text-xs", tried && errors.recipients ? "text-crit" : "text-muted-foreground")}>{tried && errors.recipients ? <span className="inline-flex items-center gap-1"><Icon name="error" />{errors.recipients}</span> : t("No recipients yet — add at least one.")}</p>}
-                <div className="flex flex-wrap gap-3 border-t border-line pt-2"><span className="text-xs text-muted-foreground">{t("Channels for every recipient:")}</span><Check label={t("In-app")} checked disabled /><Check label={t("Email")} checked={draft.channels.includes("email")} onChange={(v) => toggleChannel("email", v)} /><Check label="WhatsApp" checked={draft.channels.includes("whatsapp")} onChange={(v) => toggleChannel("whatsapp", v)} /></div>
+                <div className="flex flex-wrap gap-3 border-t border-line pt-2"><span className="text-xs text-muted-foreground">{t("Channels for every recipient:")}</span><Check label={t("In-app")} checked disabled /><Check label={t("Email")} checked={draft.channels.includes("email")} onChange={(v) => { toggleChannel("email", v); }} /><Check label="WhatsApp" checked={draft.channels.includes("whatsapp")} onChange={(v) => { toggleChannel("whatsapp", v); }} /></div>
                 <p className="text-[11px] text-muted-foreground">{t("In-app is always on. WhatsApp reaches only recipients who allowed that channel.")}</p>
               </section>
               <section className="grid-fluid" style={{ ["--min" as string]: "180px" }}><Field label={t("Cooldown (min)")} hint={t("Same severity is not re-sent within this window (1–1440)")} error={tried ? errors.cooldown : undefined}><Input type="number" value={draft.cooldown} onChange={(e) => { set("cooldown", +e.target.value); }} /></Field><Field label={t("Escalate after (min)")} hint={t("Escalate if still unacknowledged (1–1440)")} error={tried ? errors.escalate : undefined}><Input type="number" value={draft.escalate} onChange={(e) => { set("escalate", +e.target.value); }} /></Field></section>

@@ -101,10 +101,16 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
     if (bad) { focusField(memberFieldId(bad)); return; }
     run(() => saveMember(memberInput(d, sel?.id, zone), sel?.version), t(sel ? "Access saved — open screens pick up the new scope on their next action" : "Membership created"), (m) => { nav({ membershipId: m.id }); });
   };
-  const doRevoke = () => sel && revoke?.trim() && run(
-    () => revokeMember(memberInput({ ...d, permissions: sel.m.permissions, scopes: sel.m.scopes, reason: revoke.trim() }, sel.id, zone), sel.version), // ends now (IR492)
-    t("Access revoked — the membership is now inactive"), () => { revoked.current = true; setRevoke(null); });
-  const doSignOut = () => sel && signOut?.trim() && run(() => signOutEverywhere(sel.id, signOut), t("Signed out everywhere — every session of {name} has ended", { name: sel.name }), () => { setSignOut(null); });
+  const doRevoke = () => {
+    if (!sel || !revoke?.trim()) return;
+    run(
+      () => revokeMember(memberInput({ ...d, permissions: sel.m.permissions, scopes: sel.m.scopes, reason: revoke.trim() }, sel.id, zone), sel.version), // ends now (IR492)
+      t("Access revoked — the membership is now inactive"), () => { revoked.current = true; setRevoke(null); });
+  };
+  const doSignOut = () => {
+    if (!sel || !signOut?.trim()) return;
+    run(() => signOutEverywhere(sel.id, signOut), t("Signed out everywhere — every session of {name} has ended", { name: sel.name }), () => { setSignOut(null); });
+  };
   const fieldError = (k: string) => (tried ? errors[k] : undefined);
   const shown = live.rows.filter((r) => !q || `${r.name} ${r.label}`.toLowerCase().includes(q.toLowerCase()));
   return (

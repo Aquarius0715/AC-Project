@@ -57,7 +57,7 @@ export function ModelsTab({ live }: Readonly<{ live: DevicesLive }>) {
     if (Object.keys(errors).length > 0) return;
     run(() => saveCapability(capabilityInput(d, sel?.id), sel?.version), (k) => (sel ? t("Saved — capability version {v}", { v: k.version }) : t("Model created")), (k) => { setSelId(k.id); });
   };
-  const openHistory = () => sel && run(() => capabilityHistory(sel.id), (xs) => t(xs.length === 1 ? "1 version entry" : "{n} version entries", { n: xs.length }), setHistory);
+  const openHistory = () => { if (sel) run(() => capabilityHistory(sel.id), (xs) => t(xs.length === 1 ? "1 version entry" : "{n} version entries", { n: xs.length }), setHistory); };
   const fieldError = (k: string) => (tried ? errors[k] : undefined);
 
   return (

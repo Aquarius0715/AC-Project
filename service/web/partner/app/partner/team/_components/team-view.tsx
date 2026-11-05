@@ -57,7 +57,7 @@ function Team({ live, tab, tabs }: Readonly<{ live: Live; tab: "members" | "cert
     <Page>
       {tabs}
       <div className="flex flex-wrap items-center gap-2">
-        <Input type="date" aria-label={t("Date")} className="w-auto" value={q.date} onChange={(e) => e.target.value && patch({ date: e.target.value === q.today ? null : e.target.value })} />
+        <Input type="date" aria-label={t("Date")} className="w-auto" value={q.date} onChange={(e) => { if (e.target.value) patch({ date: e.target.value === q.today ? null : e.target.value }); }} />
         <Select aria-label={t("Qualification")} className="w-auto" value={q.qualification ?? ""} onChange={(e) => { patch({ qualification: e.target.value || null }); }}>
           <option value="">{t("All qualifications")}</option>
           {live.qualifications.map((x) => <option key={x.code} value={x.code}>{x.text}</option>)}

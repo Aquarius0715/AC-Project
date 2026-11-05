@@ -286,7 +286,7 @@ const AddLink = ({ depth, onClick, children }: { depth: number; onClick: () => v
 function LocationMenu({ onRename, onDelete }: Readonly<{ onRename: () => void; onDelete: () => void }>) {
   const t = useT();
   return (
-    <ActionMenu label={t("Location actions")} onChoose={(v) => (v === "rename" ? onRename() : v === "delete" && onDelete())}>
+    <ActionMenu label={t("Location actions")} onChoose={(v) => { new Map([["rename", onRename], ["delete", onDelete]]).get(v)?.(); }}>
       <option value="rename">{t("Rename")}</option><option value="delete">{t("Delete…")}</option>
     </ActionMenu>
   );

@@ -257,7 +257,7 @@ function CandidatePicker({ m, t, busy, onPick, onCancel }: Readonly<{
       )}
       <div className="mt-3 flex justify-end gap-2">
         <Btn size="sm" onClick={onCancel}>{t("Cancel")}</Btn>
-        <Btn variant="primary" size="sm" disabled={busy || !chosen} onClick={() => chosen && onPick(chosen)}>{t("Continue")}</Btn>
+        <Btn variant="primary" size="sm" disabled={busy || !chosen} onClick={() => { if (chosen) onPick(chosen); }}>{t("Continue")}</Btn>
       </div>
     </div>
   );

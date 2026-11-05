@@ -47,11 +47,11 @@ export function OffsetsView({ live }: Readonly<{ live: Live }>) {
     if (Object.keys(errors).length > 0) return;
     run(() => quoteOffset(quoteInput(d)), t("Demo quote ready — valid for 15 minutes"), setQuote);
   };
-  const request = () => quote && confirmed && run(() => requestOffset(quote.id, quote.version), t("Demo request recorded"), (id) => { close(); setD(blank); nav({ recordId: id }); });
+  const request = () => { if (quote && confirmed) run(() => requestOffset(quote.id, quote.version), t("Demo request recorded"), (id) => { close(); setD(blank); nav({ recordId: id }); }); };
   const done = { purchase_confirm: t("Demo purchase confirmed"), retire: t("Demo retired"), fail: t("Failure recorded — the previous stage is kept") };
   const current = sel?.current; // the attempt the demo steps act on
-  const step = (event: "purchase_confirm" | "retire" | "fail") => sel && current && run(() => simulateOffset(sel.id, sel.version, current.id, event), done[event], () => { setAck(false); });
-  const retry = () => sel && current && run(() => retryOffset(sel.id, sel.version, current.id), t("Retry started — a new attempt"), () => { setAck(false); });
+  const step = (event: "purchase_confirm" | "retire" | "fail") => { if (sel && current) run(() => simulateOffset(sel.id, sel.version, current.id, event), done[event], () => { setAck(false); }); };
+  const retry = () => { if (sel && current) run(() => retryOffset(sel.id, sel.version, current.id), t("Retry started — a new attempt"), () => { setAck(false); }); };
   return (
     <Page>
       <Banner tone="warn" action={<DemoBadge />}>{t("Demo only — quotes, purchases and retirements are simulated. No real credit, certificate, balance or market is involved.")}</Banner>
@@ -88,13 +88,13 @@ export function OffsetsView({ live }: Readonly<{ live: Live }>) {
                 ]} /></div>
               </Card>
               {live.canWrite && sel.state === "demo_requested" && sel.current && (
-                <Card title={t("Next step · demo purchase")}><div className="flex flex-wrap gap-2"><Btn variant="primary" disabled={pending} onClick={() => step("purchase_confirm")}>{t("Confirm simulated purchase")}</Btn><Btn disabled={pending} onClick={() => step("fail")}>{t("Simulate a failure")}</Btn></div></Card>
+                <Card title={t("Next step · demo purchase")}><div className="flex flex-wrap gap-2"><Btn variant="primary" disabled={pending} onClick={() => { step("purchase_confirm"); }}>{t("Confirm simulated purchase")}</Btn><Btn disabled={pending} onClick={() => { step("fail"); }}>{t("Simulate a failure")}</Btn></div></Card>
               )}
               {live.canWrite && sel.state === "demo_purchased" && sel.current && (
                 <Card title={t("Next step · demo retirement")}>
                   <Check label={t("I understand this is a demo retirement. It does not retire a real credit.")} checked={ack} onChange={setAck} />
                   <p className="my-1 text-[11px] text-muted-foreground">{t("Disabled until confirmed. Retiring before the purchase is not possible.")}</p>
-                  <div className="flex flex-wrap gap-2"><Btn variant="primary" disabled={pending || !ack} onClick={() => step("retire")}>{t("Retire whole amount (demo)")}</Btn><Btn disabled={pending} onClick={() => step("fail")}>{t("Simulate a failure")}</Btn></div>
+                  <div className="flex flex-wrap gap-2"><Btn variant="primary" disabled={pending || !ack} onClick={() => { step("retire"); }}>{t("Retire whole amount (demo)")}</Btn><Btn disabled={pending} onClick={() => { step("fail"); }}>{t("Simulate a failure")}</Btn></div>
                 </Card>
               )}
               <Card title={t("Event history")} action={<Link className="text-xs font-semibold text-primary" href="/admin/audit">{t("Open in audit")} <Icon name="arrowRight" /></Link>}>

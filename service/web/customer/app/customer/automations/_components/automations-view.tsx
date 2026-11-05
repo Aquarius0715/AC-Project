@@ -54,7 +54,7 @@ function ConsentCard({ live, compact }: Readonly<{ live: AutomationsLive; compac
   const [pending, run] = useAction();
   const c = live.consent;
   const consentVersion = c.version;
-  const flip = () => consentVersion !== null && run(() => updateConsent(!c.granted, consentVersion), t(c.granted ? "Location consent withdrawn — location automations are off" : "Location consent granted"));
+  const flip = () => { if (consentVersion !== null) run(() => updateConsent(!c.granted, consentVersion), t(c.granted ? "Location consent withdrawn — location automations are off" : "Location consent granted")); };
   const badgeIcon = c.tone === "warn" ? "unsupported" : "dot";
   const badge = <Badge tone={CONSENT_TONE.get(c.tone) ?? "muted"} icon={c.granted ? "check" : badgeIcon}>{c.title}</Badge>;
   const withdrawText = compact ? "Withdraw" : "Withdraw consent";
@@ -138,7 +138,7 @@ function List({ live, notice, setNotice, create, edit }: Readonly<{ live: Automa
         </div>
       )}
       <p className="text-xs text-muted-foreground">{t("Priority when rules overlap: device capabilities & active restrictions → HQ policy → your automations. List order is not run priority. Missing condition data never counts as a match.")}</p>
-      <Modal open={!!del} onClose={() => { setDel(null); }} title={t("Delete automation?")} footer={<><Btn onClick={() => { setDel(null); }}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending} onClick={() => del && remove(del)}>{t("Delete automation")}</Btn></>}>
+      <Modal open={!!del} onClose={() => { setDel(null); }} title={t("Delete automation?")} footer={<><Btn onClick={() => { setDel(null); }}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending} onClick={() => { if (del) remove(del); }}>{t("Delete automation")}</Btn></>}>
         <p className="text-[13px]">{t("“{name}” will no longer run.", { name: del?.name ?? "" })}</p>
         <p className="text-xs text-muted-foreground">{del && `${del.place.split(t(" · next run {when}", { when: "" }).trimEnd())[0] ?? del.place} · ${t(triggerInfo[del.trigger].label)} · ${del.when}.`} {t("Manual control and other automations are not affected. Commands it already sent stay in the history.")}</p>
       </Modal>

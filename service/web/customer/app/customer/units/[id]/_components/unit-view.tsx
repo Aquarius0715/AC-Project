@@ -147,7 +147,11 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
     toast(t(v ? "Power ON sent" : "Power OFF sent"));
   };
   const savePolicies = (ids: string[], message: string, tone?: "warn") => {
-    if (!d) return setAttached(ids), toast(message, tone);
+    if (!d) {
+      setAttached(ids);
+      toast(message, tone);
+      return;
+    }
     setUnitAlertPolicies(id, ids).then((res) => { if (res.ok) toast(message, tone); else toast(t("Not saved: {reason}", { reason: reason(res.messageKey, res.code) }), "warn"); }, fail);
   };
   const send = () => {
