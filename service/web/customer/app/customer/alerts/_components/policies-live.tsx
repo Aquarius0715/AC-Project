@@ -83,7 +83,7 @@ function PolicyList({ p, onDone, onFail }: Readonly<Props>) {
           }} /></span>}>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div className="text-[13px]">
-              <p><span className="text-muted-foreground">{t("When")}</span> {c.when}</p><p><span className="text-muted-foreground">{t("Then")}</span> {c.then}</p>
+              <p><span className="text-muted-foreground">{t("When")}</span> {c.when}</p><p><span className="text-muted-foreground">{t("Then")}</span> {c.response}</p>
               <p className={cx("mt-1 text-xs", c.attached.length > 0 ? "text-muted-foreground" : "text-warn")}>{c.attachedText}</p>
               {c.note && <p className="text-xs text-warn">{c.note}</p>}
             </div>
@@ -218,7 +218,7 @@ function PolicyEditor({ p, editor, onDone, onFail }: Props & { editor: NonNullab
         </Card>
       </div>
       {remove && editor.policy && (
-        <DeleteModal c={{ id: editor.policy.id, version: editor.policy.version, name: editor.policy.name, badge: "", enabled: editor.policy.enabled, when: "", then: "", attached: editor.attached, attachedText: "", note: null }} version={editor.policy.version}
+        <DeleteModal c={{ id: editor.policy.id, version: editor.policy.version, name: editor.policy.name, badge: "", enabled: editor.policy.enabled, when: "", response: "", attached: editor.attached, attachedText: "", note: null }} version={editor.policy.version}
           onClose={(text) => { setRemove(false); if (text) onDone(text); }} onFail={(x) => { setRemove(false); onFail(x); }} />
       )}
     </div>

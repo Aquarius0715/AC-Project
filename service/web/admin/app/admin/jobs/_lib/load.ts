@@ -181,7 +181,7 @@ export async function loadPlans(sp: SP) {
     detail: {
       plan, unit: names.units.get(plan.unitId) ?? unit?.displayName ?? t("Unit"), customer: customerOfUnit.get(plan.unitId) ?? t("customer"), location: unit?.location.pathLabels.join(" › ") ?? "",
       occurrences: [...plan.generatedOccurrences].toSorted((a, b) => Date.parse(b.occurrenceAt) - Date.parse(a.occurrenceAt)).map((o) => ({ ...o, date: planDate(o.occurrenceAt, i.display), status: status.get(o.jobId) ?? null })),
-      texts: { next: planDate(plan.nextDueAt, i.display), then: planDate(nextOccurrence(plan.nextDueAt, plan.recurrence.intervalMonths, plan.anchorDay), i.display) },
+      texts: { next: planDate(plan.nextDueAt, i.display), after: planDate(nextOccurrence(plan.nextDueAt, plan.recurrence.intervalMonths, plan.anchorDay), i.display) },
     },
   };
 }

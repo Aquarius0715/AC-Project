@@ -36,7 +36,7 @@ describe("customer automation sentences (FR-C04, FR-C05, IR260)", () => {
     expect([ruleCard(superseded, unit, null, true).skipped, ruleCard(superseded, unit, null, true, MS).skipped]).toEqual([
       "Last evaluation skipped Mon, 14 Sept, 22:00 MYT — another schedule starts at the same time and takes over",
       "Penilaian terakhir dilangkau Isn, 14 Sep, 22:00 MYT — jadual lain bermula pada masa yang sama dan mengambil alih"]);
-    expect(ruleCard(schedule, unit, "2026-09-14T10:00:00Z", true)).toMatchObject({ status: { text: "On", tone: "ok" }, then: "Power ON · at 22:00 → Power OFF (end action)", place: "Bedroom AC · Home A › Bedroom · next run Mon, 14 Sept, 18:00 MYT", note: null });
+    expect(ruleCard(schedule, unit, "2026-09-14T10:00:00Z", true)).toMatchObject({ status: { text: "On", tone: "ok" }, action: "Power ON · at 22:00 → Power OFF (end action)", place: "Bedroom AC · Home A › Bedroom · next run Mon, 14 Sept, 18:00 MYT", note: null });
     const off = { ...base, kind: "event", enabled: false, disabledReason: "consent_revoked", unitIds: ["u1", "u2"], condition: { type: "location", event: "departure" }, action: { kind: "set_power", power: false } } as ApiAutomation;
     expect(ruleCard(off, unit, null, false)).toMatchObject({ status: { text: "Disabled · consent revoked", tone: "warn" }, note: "Will not run: location consent withdrawn 10 Sept 2026. Existing commands are not cancelled.", place: "Bedroom AC (+1 more AC) · Home A › Bedroom", toggle: { allowed: false, hint: "Grant location consent first" } });
     expect(ruleCard(off, null, null, false, MS)).toMatchObject({ status: { text: "Dilumpuhkan · persetujuan ditarik balik" }, place: "AC tidak lagi tersedia", when: "Semua orang meninggalkan premis AC (peristiwa berlepas)" });

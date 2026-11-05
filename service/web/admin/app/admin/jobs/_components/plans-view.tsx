@@ -77,7 +77,7 @@ function PlanDetail({ d, now, notice, setNotice }: Readonly<{ d: Detail; now: nu
   const anchor = nextIso ? anchorOf(anchorPlan, due) : p.anchorDay;
   // the saved plan's following date comes from the loader; an edit computes it here
   const following = nextIso ? planDate(nextOccurrence(due, every, anchor), i.display) : null;
-  const then = isDirty ? following : d.texts.then;
+  const then = isDirty ? following : d.texts.after;
   const box = nextBox(p, now, isDirty, notice?.kind === "generated" ? notice : null, i, d.texts.next);
   const conflict = notice?.kind === "conflict" ? generateConflict(p, notice.attempted, i) : null;
   const save = () => {

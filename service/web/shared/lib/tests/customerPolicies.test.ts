@@ -43,9 +43,9 @@ describe("customer alert policies", () => {
 
   it("writes each own policy's When and Then and its attached ACs", () => {
     const [c] = policyCards([policy({ channels: ["inApp", "email"] })], (id) => ({ u1: "Workstations AC 1", u2: "Workstations AC 2" })[id]);
-    expect([c?.badge, c?.when, c?.then, c?.attachedText]).toEqual(["Air quality", "CO₂ ≥ 1200 ppm for 15 min · recover below 1000 ppm · only 08:00–19:00 on weekdays", "Warning · notify in-app + email", "Attached to 2 ACs: Workstations AC 1, Workstations AC 2"]);
+    expect([c?.badge, c?.when, c?.response, c?.attachedText]).toEqual(["Air quality", "CO₂ ≥ 1200 ppm for 15 min · recover below 1000 ppm · only 08:00–19:00 on weekdays", "Warning · notify in-app + email", "Attached to 2 ACs: Workstations AC 1, Workstations AC 2"]);
     expect(policyCards([policy({ unitIds: [], metric: "humidity", operator: "lte", threshold: 30, recoveryThreshold: 35, activeWindow: null, severity: "normal" })], vi.fn())[0])
-      .toMatchObject({ when: "Humidity ≤ 30 % for 15 min · recover above 35 %", then: "Info · notify in-app", attachedText: "Not attached to any AC yet — attach it from an AC’s page" });
+      .toMatchObject({ when: "Humidity ≤ 30 % for 15 min · recover above 35 %", response: "Info · notify in-app", attachedText: "Not attached to any AC yet — attach it from an AC’s page" });
   });
 
   it("checks the editor, says what it will do and keeps the hidden fields on edit (IR120)", () => {
@@ -69,7 +69,7 @@ describe("customer alert policies", () => {
     const t = translator("ms");
     expect(summaryText(f, t)).toBe("Ingatkan saya apabila CO₂ kekal ≥ 1200 ppm selama 15 min pada hari bekerja 08:00–19:00. Selesai di bawah 1000 ppm.");
     expect(policyErrors({ ...f, recovery: "1300", duration: "0" }, t)).toEqual({ recovery: "Pemulihan 1300 mesti di bawah ambang 1200 (arah untuk ≥)", duration: "Antara 1 s dan 24 j." });
-    expect(policyCards([policy({ channels: ["inApp", "email"] })], () => "AC 1", t)[0]).toMatchObject({ badge: "Kualiti udara", then: "Peringatan · maklumkan melalui dalam aplikasi + e-mel", attachedText: "Dilampirkan pada 2 AC: AC 1, AC 1" });
+    expect(policyCards([policy({ channels: ["inApp", "email"] })], () => "AC 1", t)[0]).toMatchObject({ badge: "Kualiti udara", response: "Peringatan · maklumkan melalui dalam aplikasi + e-mel", attachedText: "Dilampirkan pada 2 AC: AC 1, AC 1" });
     expect(policyRefusal({ code: "CONFLICT", fieldErrors: {} }, t)).toBe("Tidak disimpan: polisi ini telah berubah — versi terkini dipaparkan.");
   });
 });

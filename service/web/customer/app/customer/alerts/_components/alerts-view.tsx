@@ -17,9 +17,9 @@ const seed: Alert[] = [
 
 const defaultRules = [["Ventilation", "CO₂ ≥ 1000 ppm for 10 min", "Warning", true], ["Dust / filter", "PM2.5 ≥ 35 µg/m³ for 30 min", "Warning", true], ["Refrigerant low pressure", "Refrigerant pressure ≤ 350 kPa for 120 s", "Critical", true], ["Compressor short-cycling", "≥ 4 cycles / h for 3 h", "Warning", true], ["Clogged filter", "Airflow drop ≥ 30 % vs. baseline for 1 h", "Info", true], ["AC offline", "No heartbeat for 15 min", "Warning", false]] as const;
 const seedPolicies = [
-  { id: "p1", name: "Bedroom too hot", when: "Room temperature ≥ 30 °C for 60 s · recover below 28 °C", then: "Warning · notify in-app + email", att: "Attached to 2 ACs: Bedroom AC, Bedroom AC #2", on: true },
-  { id: "p2", name: "Stuffy office", when: "CO₂ ≥ 1200 ppm for 15 min · only 08:00–19:00 on weekdays", then: "Warning · notify in-app", att: "Attached to 2 ACs: Workstations AC 1, Workstations AC 2", on: true },
-  { id: "p3", name: "Night humidity", when: "Humidity ≥ 70 % for 30 min · only 22:00–06:00", then: "Info · notify in-app", att: "Not attached to any AC yet — attach it from an AC’s page", on: false },
+  { id: "p1", name: "Bedroom too hot", when: "Room temperature ≥ 30 °C for 60 s · recover below 28 °C", response: "Warning · notify in-app + email", att: "Attached to 2 ACs: Bedroom AC, Bedroom AC #2", on: true },
+  { id: "p2", name: "Stuffy office", when: "CO₂ ≥ 1200 ppm for 15 min · only 08:00–19:00 on weekdays", response: "Warning · notify in-app", att: "Attached to 2 ACs: Workstations AC 1, Workstations AC 2", on: true },
+  { id: "p3", name: "Night humidity", when: "Humidity ≥ 70 % for 30 min · only 22:00–06:00", response: "Info · notify in-app", att: "Not attached to any AC yet — attach it from an AC’s page", on: false },
 ];
 
 /** Alerts and alert policies of the Phase 1A demo (seed rows); API mode renders AlertsLiveView (alerts-live.tsx). */
@@ -92,13 +92,13 @@ export function PoliciesPanel() {
           <div className="grid-fluid" style={{ ["--min" as string]: "320px" }}>
             {policies.map((p) => (
               <Card key={p.id} title={p.name} action={<Toggle on={p.on} onChange={(v) => { setPolicies((s) => s.map((x) => (x.id === p.id ? { ...x, on: v } : x))); }} label={p.name} />}>
-                <p className="text-[13px]"><span className="text-muted-foreground">When</span> {p.when}</p><p className="text-[13px]"><span className="text-muted-foreground">Then</span> {p.then}</p><p className="my-1 text-xs text-muted-foreground">{p.att}</p>
+                <p className="text-[13px]"><span className="text-muted-foreground">When</span> {p.when}</p><p className="text-[13px]"><span className="text-muted-foreground">Then</span> {p.response}</p><p className="my-1 text-xs text-muted-foreground">{p.att}</p>
                 <div className="mt-2 flex gap-2"><Btn size="sm" onClick={() => { setEdit(p.id); setF({ ...f, name: p.name }); }}>Edit</Btn><Btn size="sm" variant="danger" onClick={() => { setPolicies((s) => s.filter((x) => x.id !== p.id)); toast("Policy deleted (detached from its ACs)", "warn"); }}>Delete</Btn></div>
               </Card>
             ))}
           </div>
           <p className="text-xs text-muted-foreground">A unit can carry several policies; each rule is checked separately. Missing or stale readings never raise an alert — they show “not measured”. Air-quality limits (CO₂ ppm, PM2.5 µg/m³) are regular alert policies.</p>
-      <Modal open={!!edit} onClose={() => { setEdit(null); }} wide title={edit === "new" ? "Create alert policy" : "Edit alert policy"} footer={<><Btn onClick={() => { setEdit(null); }}>Cancel</Btn><Btn variant="primary" disabled={!isRecOk || !f.name.trim()} onClick={() => { if (edit === "new") setPolicies((s) => [...s, { id: "n" + Date.now(), name: f.name, when: `${f.metric.toUpperCase()} ${f.op} ${f.val} for ${f.dur} min · recover below ${f.rec}`, then: `${f.sev} · notify in-app`, att: "Not attached to any AC yet — attach it from an AC’s page", on: true }]); toast("Policy saved"); setEdit(null); }}>Save policy</Btn></>}>
+      <Modal open={!!edit} onClose={() => { setEdit(null); }} wide title={edit === "new" ? "Create alert policy" : "Edit alert policy"} footer={<><Btn onClick={() => { setEdit(null); }}>Cancel</Btn><Btn variant="primary" disabled={!isRecOk || !f.name.trim()} onClick={() => { if (edit === "new") setPolicies((s) => [...s, { id: "n" + Date.now(), name: f.name, when: `${f.metric.toUpperCase()} ${f.op} ${f.val} for ${f.dur} min · recover below ${f.rec}`, response: `${f.sev} · notify in-app`, att: "Not attached to any AC yet — attach it from an AC’s page", on: true }]); toast("Policy saved"); setEdit(null); }}>Save policy</Btn></>}>
         <Field label="Name" error={f.name.trim() ? undefined : "Name is required"}><Input value={f.name} onChange={(e) => { setF({ ...f, name: e.target.value }); }} /></Field>
         <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}>
           <Field label="What to watch"><Select value={f.metric} onChange={(e) => { setF({ ...f, metric: e.target.value }); }}><option value="temp">Temperature (°C)</option><option value="hum">Humidity (%)</option><option value="co2">CO₂ (ppm)</option><option value="pm25">PM2.5 (µg/m³)</option><option value="pow">Power (W)</option></Select></Field>

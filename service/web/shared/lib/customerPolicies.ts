@@ -89,7 +89,7 @@ export function defaultRuleRows(p: ApiDefaultPolicy, customerId: string | null, 
 }
 
 export interface PolicyCard {
-  id: string; version: number; name: string; badge: string; enabled: boolean; when: string; then: string;
+  id: string; version: number; name: string; badge: string; enabled: boolean; when: string; response: string;
   attached: string[]; attachedText: string; note: string | null;
 }
 const GROUP_TEXT: Record<string, string> = { co2: "Air quality", pm25: "Air quality", temperature: "Temperature", humidity: "Humidity", power: "Power" };
@@ -106,7 +106,7 @@ export function policyCards(ps: ApiAlertPolicy[], unitName: (id: string) => stri
     return {
       id: p.id, version: p.version, name: p.name, badge: groupOf(p.metric, t), enabled: p.enabled,
       when: [conditionText(p, t), recoverText(p.operator, p.recoveryThreshold, p.metric, t), p.activeWindow ? windowText(p.activeWindow, t) : null].filter(Boolean).join(" · "),
-      then: t("{severity} · notify {channels}", { severity: t(severityText[p.severity]), channels: channelText(p.channels, t) }), attached: names,
+      response: t("{severity} · notify {channels}", { severity: t(severityText[p.severity]), channels: channelText(p.channels, t) }), attached: names,
       attachedText: attachedText(names, t),
       note: textOf(DISABLED_NOTE, p.disabledReason, t) ?? null,
     };

@@ -146,7 +146,7 @@ export function ruleSteps(a: ApiAutomation, t: T = en): RuleStep[] {
 
 /** One rule card of the list. */
 export interface RuleCard {
-  id: string; version: number; name: string; trigger: Trigger; when: string; then: string; steps: RuleStep[]; place: string; enabled: boolean;
+  id: string; version: number; name: string; trigger: Trigger; when: string; action: string; steps: RuleStep[]; place: string; enabled: boolean;
   status: { text: string; tone: "ok" | "warn" | "muted" }; note: string | null; skipped: string | null; toggle: { allowed: boolean; hint: string | null };
 }
 /** A rule's switch: on, disabled by the system (with the reason) or switched off. */
@@ -182,7 +182,7 @@ export function ruleCard(a: ApiAutomation, unit: { name: string; path: string; p
     version: a.version,
     name: a.name,
     when: whenText(a, place, t),
-    then: thenText(a, t),
+    action: thenText(a, t),
     steps: ruleSteps(a, t),
     enabled: a.enabled,
     place: `${where}${a.enabled && nextStart ? t(" · next run {when}", { when: runText(nextStart, a.timezone, i) }) : ""}`,
