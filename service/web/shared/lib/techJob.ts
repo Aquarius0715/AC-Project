@@ -68,7 +68,8 @@ export interface ApiTechReport {
   attachmentRefs: { id: string; name: string; mime: string; size: number; status: "processing" | "ready" | "failed" }[]; submittedAt: string | null; acceptedAt: string | null;
   reviewHistory: { reviewerUserId: string; reportVersion: number; decision: "accept" | "return"; reason: string | null; occurredAt: string }[];
 }
-export type Result = "normal" | "attention" | "not_inspected" | "not_applicable" | null;
+export const checkResults = ["normal", "attention", "not_inspected", "not_applicable"] as const;
+export type Result = (typeof checkResults)[number] | null;
 export interface DraftItem { componentGroup: Group; componentKey: string; result: Result; reason: string; evidenceIds: string[] }
 export interface DraftReading { id?: string; componentKey: string; metric: Metric; value: string; observedAt: string }
 export interface DraftPart {

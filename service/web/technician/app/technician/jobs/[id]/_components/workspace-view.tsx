@@ -6,12 +6,13 @@ import { Badge, Banner, Btn, Card, Choice, cx, DataTable, EmptyState, Field, Inp
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { focusField } from "@ac/web/lib/focusField";
-import { metricUnit, type Metric } from "@ac/web/lib/devices";
+import { metricUnit } from "@ac/web/lib/devices";
+import { oneOf } from "@ac/web/lib/oneOf";
 import { byCount, zonedInstant, type T, textOf } from "@ac/web/lib/i18n";
 import { typeLabel } from "@ac/web/lib/partnerJobDetail";
 import { actionMessage, fieldErrorTexts, type ActionFailure } from "@ac/web/lib/actionMessage";
 import {
-  CHECK_IN_API_FIELDS, CHECK_IN_FIELDS, checkInErrors, componentLabel, PART_FIELDS, partErrors, REFRIGERANT_FIELDS, refrigerantErrors, draftFrom, draftInput, fmtOf, followUpText, groupLabel, itemPhotos, linkPhoto, progress, readingMetrics, submitIssues, timeRows, versionRows, windowState,
+  CHECK_IN_API_FIELDS, CHECK_IN_FIELDS, checkInErrors, checkResults, componentLabel, PART_FIELDS, partErrors, REFRIGERANT_FIELDS, refrigerantErrors, draftFrom, draftInput, fmtOf, followUpText, groupLabel, itemPhotos, linkPhoto, progress, readingMetrics, submitIssues, timeRows, versionRows, windowState,
   type ApiTechReport, type CheckInField, type Draft, type DraftPart, type DraftRefrigerant, type Group, type Issue, type Known, type Result, type TimeOnSite,
 } from "@ac/web/lib/techJob";
 import { acknowledge, checkIn, pauseWork, resumeRework, saveDraft, signOff, submitReport, uploadPhoto } from "../actions";
@@ -37,6 +38,7 @@ const results: { id: NonNullable<Result>; label: string; tone: "ok" | "warn" | "
   { id: "normal", label: "Normal", tone: "ok" }, { id: "attention", label: "Attention", tone: "warn" }, { id: "not_inspected", label: "Not inspected", tone: "crit" }, { id: "not_applicable", label: "Not applicable", tone: "muted" },
 ];
 const statusText: Record<string, string> = { assigned: "assigned", in_progress: "in progress", on_hold: "on hold", submitted: "submitted", rework_requested: "returned for rework", completed: "completed", cancelled: "cancelled" };
+const metricIds = readingMetrics.map((r) => r.metric);
 const sources: { id: DraftPart["source"]; label: string }[] = [{ id: "van_stock", label: "Van stock" }, { id: "hq_warehouse", label: "HQ warehouse" }, { id: "bought_locally", label: "Bought locally" }];
 const FORBIDDEN: Record<string, string> = {
   "errors.assignment_not_started": "your work window has not started", "errors.assignment_ended": "your work window has ended", "errors.assignment_required": "you are not assigned to this job",
@@ -256,7 +258,7 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="text-[13px] font-semibold">{label(it.componentKey)}</span>
                       {isEditable ? (
-                        <div className="w-44"><Select id={`result-${it.componentKey}`} aria-label={t("Result of {item}", { item: label(it.componentKey) })} value={it.result ?? ""} onChange={(e) => { edit((d) => ({ ...d, items: d.items.map((x) => (x.componentKey === it.componentKey ? { ...x, result: (e.target.value || null) as Result } : x)) })); }}>
+                        <div className="w-44"><Select id={`result-${it.componentKey}`} aria-label={t("Result of {item}", { item: label(it.componentKey) })} value={it.result ?? ""} onChange={(e) => { edit((d) => ({ ...d, items: d.items.map((x) => (x.componentKey === it.componentKey ? { ...x, result: oneOf(checkResults, e.target.value, null) } : x)) })); }}>
                           <option value="">{t("— Select result")}</option>{results.map((r) => <option key={r.id} value={r.id}>{t(r.label)}</option>)}
                         </Select></div>
                       ) : readOnlyResult(it.result)}
@@ -303,7 +305,7 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
                 <thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th className="py-1">{t("Metric")}</th><th>{t("Value")}</th><th>{t("Unit")}</th><th>{t("Linked item")}</th><th>{t("Observed")}</th><th /></tr></thead>
                 <tbody>{draft.readings.map((m, i) => (
                   <tr key={i} className="border-t border-line align-middle">
-                    <td className="py-1.5 pr-2">{isEditable ? <Select aria-label={t("Metric")} value={m.metric} onChange={(e) => { edit((d) => ({ ...d, readings: d.readings.map((x, k) => (k === i ? { ...x, metric: e.target.value as Metric } : x)) })); }}>{readingMetrics.map((x) => <option key={x.metric} value={x.metric}>{t(x.label)}</option>)}</Select> : t(readingMetrics.find((x) => x.metric === m.metric)?.label ?? m.metric)}</td>
+                    <td className="py-1.5 pr-2">{isEditable ? <Select aria-label={t("Metric")} value={m.metric} onChange={(e) => { edit((d) => ({ ...d, readings: d.readings.map((x, k) => (k === i ? { ...x, metric: oneOf(metricIds, e.target.value, x.metric) } : x)) })); }}>{readingMetrics.map((x) => <option key={x.metric} value={x.metric}>{t(x.label)}</option>)}</Select> : t(readingMetrics.find((x) => x.metric === m.metric)?.label ?? m.metric)}</td>
                     <td className="pr-2">{isEditable ? <Input inputMode="decimal" value={m.value} aria-invalid={m.value.trim() !== "" && !Number.isFinite(Number(m.value))} onChange={(e) => { edit((d) => ({ ...d, readings: d.readings.map((x, k) => (k === i ? { ...x, value: e.target.value } : x)) })); }} /> : m.value || "—"}</td>
                     <td className="pr-2 text-muted-foreground">{metricUnit[m.metric]}</td>
                     <td className="pr-2">{isEditable ? <Select aria-label={t("Linked item")} value={m.componentKey} onChange={(e) => { edit((d) => ({ ...d, readings: d.readings.map((x, k) => (k === i ? { ...x, componentKey: e.target.value } : x)) })); }}>{live.components.map((c) => <option key={c.key} value={c.key}>{t(groupLabel[c.group])} › {label(c.key)}</option>)}</Select> : label(m.componentKey)}</td>
@@ -505,12 +507,12 @@ function PartModal({ open, parts, components, onClose, onAdd }: Readonly<{ open:
       {!picked && <Field label={t("Part name")} error={errors.name}><Input id="part-name" value={name} maxLength={120} onChange={(e) => { setName(e.target.value); setErrors(without(errors, "name")); }} /></Field>}
       <div className="grid-fluid" style={{ ["--min" as string]: "130px" }}>
         <Field label={t("Qty")} error={errors.qty}><Input id="part-qty" inputMode="numeric" value={qty} onChange={(e) => { setQty(e.target.value); setErrors(without(errors, "qty")); }} /></Field>
-        <Field label={t("Source")}><Select value={source} onChange={(e) => { setSource(e.target.value as DraftPart["source"]); }}>{sources.map((x) => <option key={x.id} value={x.id}>{t(x.label)}</option>)}</Select></Field>
+        <Field label={t("Source")}><Select value={source} onChange={(e) => { setSource(oneOf(sources.map((x) => x.id), e.target.value, source)); }}>{sources.map((x) => <option key={x.id} value={x.id}>{t(x.label)}</option>)}</Select></Field>
         <Field label={t("Lot / serial")}><Input value={lot} onChange={(e) => { setLot(e.target.value); }} /></Field>
       </div>
       <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
         <Field label={t("Replaces checklist item (optional)")}><Select value={replaces} onChange={(e) => { setReplaces(e.target.value); }}><option value="">—</option>{components.map((c) => <option key={c.key} value={c.key}>{t(groupLabel[c.group])} › {t(componentLabel[c.key] ?? c.key)}</option>)}</Select></Field>
-        {replaces && <Field label={t("Old part")}><Select value={disposal} onChange={(e) => { setDisposal(e.target.value as typeof disposal); }}><option value="">{t("Disposed on site")}</option><option value="returned">{t("Returned")}</option></Select></Field>}
+        {replaces && <Field label={t("Old part")}><Select value={disposal} onChange={(e) => { setDisposal(oneOf(["disposed_on_site", "returned"] as const, e.target.value, "")); }}><option value="">{t("Disposed on site")}</option><option value="returned">{t("Returned")}</option></Select></Field>}
       </div>
       {source === "bought_locally" && <p className="text-[11px] text-muted-foreground">{t("Keep the receipt — attach a photo of it with the report photos.")}</p>}
     </Modal>
@@ -538,13 +540,13 @@ function RefrigerantModal({ open, onClose, onAdd }: Readonly<{ open: boolean; on
   return (
     <Modal open={open} onClose={onClose} title={t("Refrigerant")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" onClick={add}>{t("Add")}</Btn></>}>
       <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}>
-        <Field label={t("Refrigerant")}><Select value={kind} onChange={(e) => { setKind(e.target.value as DraftRefrigerant["refrigerant"]); }}><option>R32</option><option>R410A</option></Select></Field>
+        <Field label={t("Refrigerant")}><Select value={kind} onChange={(e) => { setKind(oneOf(["R32", "R410A"] as const, e.target.value, kind)); }}><option>R32</option><option>R410A</option></Select></Field>
         <Field label={t("Cylinder ID")} error={errors.cylinder}><Input id="refrigerant-cylinder" value={cylinder} maxLength={64} placeholder="CYL-R32-0182" onChange={(e) => { setCylinder(e.target.value); clear("cylinder"); }} /></Field>
         <Field label={t("Recovered (kg)")} error={errors.recovered}><Input id="refrigerant-recovered" inputMode="decimal" value={recovered} onChange={(e) => { setRecovered(e.target.value); clear("recovered"); }} /></Field>
         <Field label={t("Charged (kg)")} error={errors.charged}><Input id="refrigerant-charged" inputMode="decimal" value={charged} onChange={(e) => { setCharged(e.target.value); clear("charged"); }} /></Field>
       </div>
       <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
-        <Field label={t("Leak check")}><Select value={leak} onChange={(e) => { setLeak(e.target.value as DraftRefrigerant["leakCheck"]); }}><option value="pass">{t("Pass")}</option><option value="fail">{t("Fail")}</option><option value="not_done">{t("Not done")}</option></Select></Field>
+        <Field label={t("Leak check")}><Select value={leak} onChange={(e) => { setLeak(oneOf(["pass", "fail", "not_done"] as const, e.target.value, leak)); }}><option value="pass">{t("Pass")}</option><option value="fail">{t("Fail")}</option><option value="not_done">{t("Not done")}</option></Select></Field>
         {leak !== "not_done" && <Field label={t("Method")}><Input value={method} onChange={(e) => { setMethod(e.target.value); }} /></Field>}
       </div>
     </Modal>
