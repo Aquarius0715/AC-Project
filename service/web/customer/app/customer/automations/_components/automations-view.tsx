@@ -21,7 +21,7 @@ import { Button } from "@ac/web/components/ui/button";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
 import { isAfter } from "@ac/web/lib/order";
-import { entryOf } from "@ac/web/lib/lookup";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 interface Ac { id: string; name: string; property: string; path: string }
 export interface AutomationsLive {
@@ -235,7 +235,7 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
       </div>
     );
     return (
-      <Field label={t("Action")} labelHidden hint={hint} error={errors[key] ?? (shown ? unsupported(value) : undefined)}>
+      <Field label={t("Action")} labelHidden hint={hint} error={lookup(errors, key) ?? (shown ? unsupported(value) : undefined)}>
         <div className="@container"><div className="grid grid-cols-1 items-start gap-3 @[22rem]:grid-cols-[minmax(120px,170px)_minmax(0,1fr)]">
           {part(t("Setting"), (
             <Select aria-label={t("{label} — setting", { label })} value={group?.id ?? ""} onChange={(e) => { pick(firstAction(options, e.target.value)); }}>
@@ -278,7 +278,7 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
                     {dayLong.map((d, k) => {
                       const isOn = draft.weekdays.includes(k + 1);
                       return <Plain key={d} type="button" aria-pressed={isOn} onClick={() => { set({ weekdays: isOn ? draft.weekdays.filter((x) => x !== k + 1) : [...draft.weekdays, k + 1] }); }}
-                        className={cx("rounded-full border px-3 py-1 text-[13px] font-semibold", isOn ? "border-primary bg-primary-soft text-primary" : BORDER_LINE_BG_SURFACE)}>{t(dayShort[k] ?? String(k + 1))}</Plain>;
+                        className={cx("rounded-full border px-3 py-1 text-[13px] font-semibold", isOn ? "border-primary bg-primary-soft text-primary" : BORDER_LINE_BG_SURFACE)}>{t(dayShort.at(k) ?? String(k + 1))}</Plain>;
                     })}
                   </div>
                 </Field>
@@ -409,7 +409,7 @@ function OnlyIf({ draft, errors, set }: Readonly<{ draft: Draft; errors: Record<
               {dayLong.map((d, k) => {
                 const isOn = x.weekdays.includes(k + 1);
                 return <Plain key={d} type="button" aria-pressed={isOn} onClick={() => { put(i, { ...x, weekdays: isOn ? x.weekdays.filter((w) => w !== k + 1) : [...x.weekdays, k + 1] }); }}
-                  className={cx("rounded-full border px-2 py-0.5 text-xs font-semibold", isOn ? "border-primary bg-primary-soft text-primary" : BORDER_LINE_BG_SURFACE)}>{t(dayShort[k] ?? String(k + 1))}</Plain>;
+                  className={cx("rounded-full border px-2 py-0.5 text-xs font-semibold", isOn ? "border-primary bg-primary-soft text-primary" : BORDER_LINE_BG_SURFACE)}>{t(dayShort.at(k) ?? String(k + 1))}</Plain>;
               })}
             </span>
           )}
@@ -419,7 +419,7 @@ function OnlyIf({ draft, errors, set }: Readonly<{ draft: Draft; errors: Record<
       ))}
       {errors.onlyIf && <p className="flex items-center gap-1 text-xs font-medium text-crit"><Icon name="error" />{errors.onlyIf}</p>}
       <div className="flex flex-wrap items-center gap-2">
-        {adding && choices.length > 0 ? choices.map((c) => <Btn key={c} size="sm" onClick={() => { set({ extras: [...extras, blankExtra(c)] }); setAdding(false); }}>{t(extraLabel[c])}</Btn>)
+        {adding && choices.length > 0 ? choices.map((c) => <Btn key={c} size="sm" onClick={() => { set({ extras: [...extras, blankExtra(c)] }); setAdding(false); }}>{t(entryOf(extraLabel, c))}</Btn>)
           : <Btn size="sm" disabled={choices.length === 0} onClick={() => { setAdding(true); }}><Icon name="add" /> {t("Add condition")}</Btn>}
         <span className="text-xs text-muted-foreground">{t(choices.length === 0 && extras.length > 0 ? "No more condition types for this trigger" : "e.g. only if someone is home · only if outdoor ≥ 30°C")}</span>
       </div>
