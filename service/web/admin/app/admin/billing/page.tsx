@@ -75,8 +75,7 @@ async function AdminBillingPageContent({ searchParams }: Readonly<PageProps<"/ad
         live.recipients = r.items;
       }
     }
-  }
-  if (tab === "payouts") { // the statement period, contractor and status are URL filters of payouts.list (DD-A23, IR322)
+  } else if (tab === "payouts") { // the statement period, contractor and status are URL filters of payouts.list (DD-A23, IR322)
     const period = /^\d{4}-(0[1-9]|1[0-2])$/.test(one("period") ?? "") ? one("period") : undefined;
     const contractorOrgId = one("contractorOrgId");
     const status = (["draft", "approved", "paid"] as const).find((x) => x === one("status"));

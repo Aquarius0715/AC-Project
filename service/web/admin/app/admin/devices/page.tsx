@@ -83,8 +83,7 @@ async function AdminDevicesPageContent({ searchParams }: Readonly<PageProps<"/ad
         events: eventRows(events.items, new Map(alerts.filter((a): a is ApiAlertLite => !!a).map((a) => [a.id, a])), now.getTime(), i),
       };
     }
-  }
-  if (tab === "firmware") {
+  } else if (tab === "firmware") {
     const [campaigns, members] = await Promise.all([
       coreOp<Page<ApiCampaign>>("firmwareCampaigns.list", { limit: 100, sort: { field: "createdAt", direction: "desc" } }),
       optional(coreAll<{ id: string; displayName: string }>("members.list"), []), // who scheduled it, where the session may read members (IR344)

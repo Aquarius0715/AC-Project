@@ -144,6 +144,9 @@ export function webConfig(tsconfigRootDir) {
         "unicorn/prefer-query-selector": "off",
         // an if / else if chain that ends at the last case needs no empty else (each branch sets one thing)
         "sonarjs/elseif-without-else": "off",
+        // the status chains put other tests between the cases (a work window that ended, an acknowledgement), which a
+        // switch cannot express
+        "unicorn/prefer-switch": "off",
         // a read that is mapped by one step, in a list of parallel reads (Promise.all([read().then((r) => r.total), ...])), is
         // clearer than a wrapping async function; failures are handled with recover()
         "unicorn/prefer-await": "off",
