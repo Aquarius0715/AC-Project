@@ -36,7 +36,7 @@ import { must } from "./must";
 
 const locationOf = (res: Response) => new URL(must(res.headers.get("location"))); // where a redirect leads
 
-const b64 = (v: unknown) => Buffer.from(JSON.stringify(v)).toString("base64url");
+const b64 = (v: unknown) => new TextEncoder().encode(JSON.stringify(v)).toBase64({ alphabet: "base64url" });
 const token = `${b64({ alg: "RS256" })}.${b64({ tenant_id: "t-1", membership_id: "m-1", role: "client" })}.sig`;
 const session: Session = { accessToken: token, refreshToken: "r-1", tenantId: "t-1", membershipId: "m-1", role: "client", expiresAt: Math.floor(Date.now() / 1000) + 300 };
 const json = (status: number, body: unknown) => Response.json(body, { status, headers: { "Content-Type": "application/json" } });

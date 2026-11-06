@@ -18,7 +18,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ cookies: () => Promise.resolve(jar) }));
 
 const NOW = Date.parse("2026-09-15T01:00:00Z");
-const b64 = (v: unknown) => Buffer.from(JSON.stringify(v)).toString("base64url");
+const b64 = (v: unknown) => new TextEncoder().encode(JSON.stringify(v)).toBase64({ alphabet: "base64url" });
 const token = (claims: Record<string, unknown>) => `${b64({ alg: "RS256" })}.${b64(claims)}.signature`;
 const tokenHolder = z.object({ refreshToken: z.string().nullable() });
 const claims = { tenant_id: "t-1", membership_id: "m-1", role: "client" };
@@ -40,8 +40,8 @@ describe("the sealed session cookie (AES-256-GCM, IR333)", () => {
     expect(unseal(t)).toEqual({ a: 1, b: "x" });
     const [ivPart, bodyPart] = t.split(".", 2);
     const iv = must(ivPart), body = must(bodyPart);
-    const flip = (v: string, i: number) => { const b = Buffer.from(v, "base64url"); b.writeUInt8(b.readUInt8(i) ^ 1, i); return b.toString("base64url"); };
-    expect([unseal(`${flip(iv, 0)}.${body}`), unseal(`${iv}.${flip(body, 0)}`), unseal(`${iv}.${flip(body, Buffer.from(body, "base64url").length - 1)}`),
+    const flip = (v: string, i: number) => { const b = Uint8Array.fromBase64(v, { alphabet: "base64url" }); b.set([(b.at(i) ?? 0) ^ 1], i); return b.toBase64({ alphabet: "base64url" }); };
+    expect([unseal(`${flip(iv, 0)}.${body}`), unseal(`${iv}.${flip(body, 0)}`), unseal(`${iv}.${flip(body, Uint8Array.fromBase64(body, { alphabet: "base64url" }).length - 1)}`),
       unseal(`${iv}.`), unseal(`.${body}`), unseal(iv), unseal(`${t}.x`), unseal(`${iv.slice(2)}.${body}`), unseal(undefined), unseal("")])
       .toEqual([null, null, null, null, null, null, null, null, null, null]);
   });
@@ -49,8 +49,8 @@ describe("the sealed session cookie (AES-256-GCM, IR333)", () => {
   it("keeps the tokens unreadable to the browser and never repeats a value", () => {
     const s = session();
     const t = seal(s);
-    const plain = Buffer.from(must(t.split(".", 2)[1]), "base64url").toString("latin1");
-    expect([plain.includes("accessToken"), plain.includes("r-1"), t.includes(Buffer.from(JSON.stringify(s)).toString("base64url").slice(0, 16))]).toEqual([false, false, false]);
+    const plain = new TextDecoder("latin1").decode(Uint8Array.fromBase64(must(t.split(".", 2)[1]), { alphabet: "base64url" }));
+    expect([plain.includes("accessToken"), plain.includes("r-1"), t.includes(b64(s).slice(0, 16))]).toEqual([false, false, false]);
     expect(seal(s)).not.toBe(t); // a fresh IV each time
     expect(unseal(t)).toEqual(s);
   });
@@ -84,7 +84,7 @@ describe("the sealed session cookie (AES-256-GCM, IR333)", () => {
     const iv = randomBytes(12);
     const c = createCipheriv("aes-256-gcm", cookieKey(), iv);
     const body = Buffer.concat([c.update("not json", "utf8"), c.final(), c.getAuthTag()]);
-    expect(unseal(`${iv.toString("base64url")}.${body.toString("base64url")}`)).toBeNull();
+    expect(unseal(`${iv.toBase64({ alphabet: "base64url" })}.${body.toBase64({ alphabet: "base64url" })}`)).toBeNull();
   });
 
   it("is httpOnly, lax, 30 minutes, and secure only on https", () => {

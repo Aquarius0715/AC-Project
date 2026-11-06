@@ -19,7 +19,7 @@ const open = () => attachmentResponse({ jobId: "j1", reportId: "r1", reportVersi
 // IR368: a photo whose name is not plain ASCII still opens, named in the header the RFC 5987 way
 describe("a stored report photo as a response", () => {
   it("is served under any name", async () => {
-    dal.coreOp.mockResolvedValueOnce({ name: "写真 1.jpg", mime: "image/jpeg", bytes: Buffer.from([0xFF, 0xD8, 0xFF, 0x01]).toString("base64") });
+    dal.coreOp.mockResolvedValueOnce({ name: "写真 1.jpg", mime: "image/jpeg", bytes: new Uint8Array([0xFF, 0xD8, 0xFF, 0x01]).toBase64() });
     const res = await open();
     expect(dal.coreOp).toHaveBeenCalledWith("attachments.getContent", { jobId: "j1", reportId: "r1", reportVersion: 2, attachmentId: "a1" });
     expect([res.status, res.headers.get("content-type"), res.headers.get("content-disposition")])
