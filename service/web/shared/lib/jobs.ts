@@ -226,7 +226,7 @@ export const jobActions = {
   /** Client: new request with 3 preferred times (FR-C09 / IR113). */
   create(p: { unitId: string; unit: string; loc: string; type: "Reactive" | "Preventive"; symptom: string; preferred: Slot[] }) {
     const s = load();
-    const n = s.jobs.filter((j) => /^job-c\d+$/.test(j.id)).map((j) => +j.id.slice(5)).reduce((a, b) => Math.max(a, b), 0) + 1;
+    const n = Math.max(0, ...s.jobs.filter((j) => /^job-c\d+$/.test(j.id)).map((j) => +j.id.slice(5))) + 1;
     const id = `job-c${String(n).padStart(2, "0")}`;
     state = { ...s, jobs: [req(id, { ...p, status: "requested", history: [{ at: NOW, text: "customer-a submitted the request with 3 preferred times" }] }), ...s.jobs] };
     save();
@@ -302,7 +302,7 @@ export const jobActions = {
     const s = load();
     const source = s.jobs.find((x) => x.id === fromId);
     if (source?.status !== "completed") return { error: "CONFLICT — only completed jobs can be reported" };
-    const n = s.jobs.filter((j) => /^job-c\d+$/.test(j.id)).map((j) => +j.id.slice(5)).reduce((a, b) => Math.max(a, b), 0) + 1;
+    const n = Math.max(0, ...s.jobs.filter((j) => /^job-c\d+$/.test(j.id)).map((j) => +j.id.slice(5))) + 1;
     const id = `job-c${String(n).padStart(2, "0")}`;
     const job = req(id, { unitId: source.unitId, unit: source.unit, loc: source.loc, type: "Reactive", symptom: `${reason} — ${details}`, status: "requested", followUpOf: fromId, followUpClass: "pending",
       preferred: visit ? [{ date: visit, win: "09:00–12:00" }] : [], history: [{ at: NOW, text: `customer-a reported a problem on ${fromId} — follow-up created, under HQ review` }] });

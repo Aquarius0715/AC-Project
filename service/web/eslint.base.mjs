@@ -138,6 +138,10 @@ export function webConfig(tsconfigRootDir) {
         // process), the BFF session cache, the demo stores and the focus handed to a remounted view. A holder object
         // would hide the same mutation behind a property
         "unicorn/no-top-level-assignment-in-function": "off",
+        // getElementById takes any id as it is (member-row-${id}, ids with dots); querySelector(`#${id}`) would need escaping
+        "unicorn/prefer-query-selector": "off",
+        // an if / else if chain that ends at the last case needs no empty else (each branch sets one thing)
+        "sonarjs/elseif-without-else": "off",
         // safe-regex flags every optional group that holds a quantifier (^\d+(\.\d+)?$), which is linear; these patterns run
         // on short trimmed form values. The ones that are not linear are caught by sonarjs/slow-regex and super-linear-regex
         "security/detect-unsafe-regex": "off",

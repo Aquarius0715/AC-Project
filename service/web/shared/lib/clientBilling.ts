@@ -26,10 +26,10 @@ export function unitPlaces(us: { id: string; displayName: string; propertyId: st
   const property = new Map(ps.map((p) => [p.id, p.name]));
   const space = new Map(ss.map((x) => [x.id, x]));
   const path = (id: string | null) => {
-    const out: string[] = [];
+    let out: string[] = [];
     let x = id ? space.get(id) : undefined;
     while (x) {
-      out.unshift(x.name);
+      out = [x.name, ...out];
       x = x.parentSpaceId ? space.get(x.parentSpaceId) : undefined;
     }
     return out;
