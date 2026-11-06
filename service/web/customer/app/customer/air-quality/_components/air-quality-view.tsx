@@ -13,6 +13,7 @@ import { logVentilation } from "../actions";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { byCount } from "@ac/web/lib/i18n";
+import { entryOf } from "@ac/web/lib/lookup";
 
 type Tone = MetricCard["feed"]["tone"];
 export interface AirLive {
@@ -88,7 +89,7 @@ export function AirQualityView({ live }: Readonly<{ live: AirLive | null }>) {
         <b>{live.strip.title}</b><div className="text-xs text-muted-foreground">{live.strip.text}{!live.spaceId && ` ${t("Ventilation logs belong to a room — HQ sets up the rooms, so ask HQ to place this unit in one.")}`}</div>
       </Banner>
       <Card title={c.title} sub={c.sub} action={<div className="flex flex-wrap gap-2">
-        <Tabs value={live.metric} onChange={(m) => { patch({ metric: m }); }} tabs={airMetrics.map((k) => ({ id: k, label: t(metricInfo[k].tab) }))} />
+        <Tabs value={live.metric} onChange={(m) => { patch({ metric: m }); }} tabs={airMetrics.map((k) => ({ id: k, label: t(entryOf(metricInfo, k).tab) }))} />
         <Tabs value={live.period} onChange={(p) => { patch({ period: p }); }} tabs={airPeriods.map((p) => ({ id: p, label: t(p) }))} />
         <Tabs value={view} onChange={setView} tabs={[{ id: "chart", label: t("Chart") }, { id: "table", label: t("Table") }]} />
       </div>}>

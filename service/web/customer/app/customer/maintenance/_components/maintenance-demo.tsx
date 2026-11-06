@@ -14,6 +14,7 @@ import { Checkbox } from "@ac/web/components/ui/checkbox";
 import { symptomLength } from "@ac/web/lib/customerMaintenance";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { orDash } from "@ac/web/lib/text";
+import { entryOf } from "@ac/web/lib/lookup";
 
 type StatusTab = "all" | "reply" | "requested" | "scheduled" | "progress" | "completed" | "cancelled";
 // the status tab of a job; the statuses of work under way count as in progress
@@ -195,7 +196,7 @@ function DeclineModal({ open, j, onClose, onDone }: Readonly<{ open: boolean; j:
   const [slots, setSlots] = useState<Slot[]>([{ date: "2026-10-02", win: TEXT_14_00_16_00 }, { date: "2026-10-05", win: "10:00–12:00" }, { date: "2026-10-06", win: TEXT_14_00_16_00 }]);
   const [tried, setTried] = useState(false);
   const errorText = tried && give ? preferredError(slots) : undefined;
-  const label = { not_home: "I’m not at home then", too_late: "Too late for me", other: "Other" }[reason];
+  const label = entryOf({ not_home: "I’m not at home then", too_late: "Too late for me", other: "Other" }, reason);
   return (
     <Modal open={open} onClose={onClose} title="Decline the proposed time" footer={<><Btn onClick={onClose}>Back</Btn><Btn variant="primary" onClick={() => { setTried(true); if (give && preferredError(slots)) return; jobActions.decline(j.id, label, comment.trim(), give ? slots : []); onDone(); }}>{give ? "Decline & send new times" : "Decline"}</Btn></>}>
       <p className="text-xs text-muted-foreground">{j.id} · {j.unit} · proposed {j.proposal ? longDate(j.proposal.slot) : ""}</p>
