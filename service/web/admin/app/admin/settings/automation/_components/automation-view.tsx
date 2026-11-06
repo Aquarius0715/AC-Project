@@ -13,6 +13,7 @@ import {
 import { oneOf } from "@ac/web/lib/oneOf";
 import { fireAuto, saveAutoPolicy, simulateAuto } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
+import { commonRange } from "@ac/web/lib/temperatureRange";
 
 interface UnitOption { id: string; name: string; customerId: string; propertyId: string; temperature: { min: number; max: number; step: number } | null; ventilation: boolean }
 interface Live {
@@ -52,7 +53,7 @@ export function AutomationView({ live }: Readonly<{ live: Live }>) {
   }
   const set = (patch: Partial<AutoDraft>) => { setD((x) => ({ ...x, ...patch })); };
   const targets = live.units.filter((u) => d.unitIds.includes(u.id));
-  const range = targets.reduce<{ min: number; max: number } | null>((acc, u) => (u.temperature ? { min: Math.max(acc?.min ?? -Infinity, u.temperature.min), max: Math.min(acc?.max ?? Infinity, u.temperature.max) } : acc), null);
+  const range = commonRange(targets);
   const errors = autoErrors(d, range, t);
   const name = (id: string) => live.units.find((u) => u.id === id)?.name ?? id.slice(0, 8);
   const scopeProps = live.properties.filter((p) => !live.scope.customerId || p.customerId === live.scope.customerId);

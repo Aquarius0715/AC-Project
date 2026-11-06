@@ -497,7 +497,8 @@ function ExtendModal({ d, live, until, onClose, onFail }: ModalProps & { until: 
   const j = d.job;
   const now = Date.parse(live.now);
   const [pending, run] = useAction();
-  const [end, setEnd] = useState(zonedInput(extendDefault(new Date(Math.max(Date.parse(until), now)).toISOString()), zone));
+  const extendFrom = new Date(Math.max(Date.parse(until), now)).toISOString();
+  const [end, setEnd] = useState(zonedInput(extendDefault(extendFrom), zone));
   const [r, setR] = useState("");
   const [tried, setTried] = useState(false);
   const at = end ? fromZonedInput(end, zone) : "";

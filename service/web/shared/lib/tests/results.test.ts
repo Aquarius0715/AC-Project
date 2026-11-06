@@ -75,7 +75,7 @@ function check(): { checked: number; problems: string[] } {
         if (top && keys.length === 0) { // the input picks the variant
           if (sv.some((m) => c.isTypeAssignableTo(m, d))) return;
           const tries = sv.map((m) => { const o: string[] = []; compare(m, d, path, depth + 1, o, false); return o; });
-          out.push(...tries.reduce((a, b) => (b.length < a.length ? b : a)));
+          out.push(...must(tries.toSorted((a, b) => a.length - b.length).at(0)));
           return;
         }
         if (top && dv.every((x) => !(isObject(x) && keys.some((k) => !!x.getProperty(k))))) {
@@ -109,7 +109,7 @@ function check(): { checked: number; problems: string[] } {
     };
     for (const sf of program.getSourceFiles()) {
       const f = sf.fileName;
-      if (!f.startsWith(directory + "/") || /node_modules|\/\.next\/|\/tests\/|\.d\.ts$/.test(f) || seen.has(f)) continue; // shared files once, by shared
+      if (!f.startsWith(directory + "/") || /node_modules|\/\.next\/|\/tests\/|(?:\.d\.ts$)/.test(f) || seen.has(f)) continue; // shared files once, by shared
       seen.add(f);
       const visit = (n: ts.Node) => {
         if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && calls.has(n.expression.text) && n.arguments[0] && ts.isStringLiteral(n.arguments[0])) {

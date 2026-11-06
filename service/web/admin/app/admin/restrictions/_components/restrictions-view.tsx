@@ -17,6 +17,7 @@ import { executeRestriction, reconcileUnits, requestRelease, retryUnits, schedul
 import { Icon } from "@ac/web/components/Icon";
 import { oneOf } from "@ac/web/lib/oneOf";
 import type { RestrictionRecoveryCase } from "@ac/web/lib/contracts.gen";
+import { commonRange } from "@ac/web/lib/temperatureRange";
 
 interface ScheduleContract {
   id: string; version: number; label: string; rulesVersion: string; recipients: number; invoices: { id: string; number: string }[];
@@ -146,7 +147,7 @@ function ScheduleModal({ open, onClose, contracts, now, onDone }: Readonly<{ ope
   const [tried, setTried] = useState(false);
   const k = contracts.find((c) => c.id === contractId);
   const chosen = k?.units.filter((u) => unitIds.includes(u.id)) ?? [];
-  const range = chosen.reduce<{ min: number; max: number } | null>((acc, u) => (u.temperature ? { min: Math.max(acc?.min ?? -Infinity, u.temperature.min), max: Math.min(acc?.max ?? Infinity, u.temperature.max) } : acc), null);
+  const range = commonRange(chosen);
   const sp = Number(setpoint);
   const at = executeAfter ? zonedInstant(executeAfter.slice(0, 10), executeAfter.slice(11, 16), zone) : "";
   const errors: Record<string, string> = {};

@@ -13,8 +13,6 @@ import { Icon } from "@ac/web/components/Icon";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { nonEmpty } from "@ac/web/lib/lists";
 
-type JobDialog = { kind: "book"; slot: Slot } | { kind: "propose" } | { kind: "new" } | { kind: "reason"; what: "rework" | "hold" | "reassign" } | { kind: "classify" };
-
 const PIPE: JobStatus[] = ["requested", TIME_PROPOSED, "offered", "accepted", "assigned", IN_PROGRESS, "submitted", "rework_requested", "completed", "on_hold"];
 const ORDER: JobStatus[] = ["requested", TIME_PROPOSED, "offered", "accepted", "assigned", IN_PROGRESS, "on_hold", "submitted", "rework_requested", "completed", "cancelled"];
 const plans = nonEmpty([
@@ -32,6 +30,7 @@ export function JobsDemo({ jobId, tab: initial }: Readonly<{ jobId?: string; tab
   const [origin, setOrigin] = useState<"all" | "request" | "plan">("all");
   const [delivery, setDelivery] = useState<"all" | "internal" | "contractor">("all");
   const [stage, setStage] = useState<JobStatus | null>(null);
+  type JobDialog = { kind: "book"; slot: Slot } | { kind: "propose" } | { kind: "new" } | { kind: "reason"; what: "rework" | "hold" | "reassign" } | { kind: "classify" };
   const [modal, setModal] = useState<JobDialog | null>(null);
   const list = [...jobs].filter((j) => j.status !== "cancelled").toSorted((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status))
     .filter((j) => (origin === "all" || j.origin === origin) && (delivery === "all" || j.delivery === delivery) && (!stage || j.status === stage));
