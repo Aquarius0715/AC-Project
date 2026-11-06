@@ -50,8 +50,8 @@ type Run = ReturnType<typeof useAction>[1];
 
 const scopes: Scope[] = ["indoor", "outdoor", "electrical"];
 const kindLabel: Record<string, string> = { home: "Home", office: "Office", floor: "Floor", area: "Area", room: "Room", space: "Space" };
-const addKind: Record<TreeSpace["kind"], string> = { floor: "Add floor", area: "Add area", room: "Add room", space: "Add space" };
-const deleteKind: Record<TreeSpace["kind"], string> = { floor: "Delete floor", area: "Delete area", room: "Delete room", space: "Delete space" };
+const kindAddLabel: Record<TreeSpace["kind"], string> = { floor: "Add floor", area: "Add area", room: "Add room", space: "Add space" };
+const kindDeleteLabel: Record<TreeSpace["kind"], string> = { floor: "Delete floor", area: "Delete area", room: "Delete room", space: "Delete space" };
 const powerLabel: Record<PowerState, string> = { on: "Running", off: "Stopped", unknown: "Unknown" };
 const connLabel: Record<Connection, string> = { online: "Online", offline: "Offline", unknown: "Unknown", connecting: "Connecting", error: "Error" };
 const scopeLabel: Record<Scope, string> = { indoor: "indoor", outdoor: "outdoor", electrical: "electrical" };
@@ -530,7 +530,7 @@ function SpaceModal({ c, init, pending, onClose, onSave }: Readonly<{ c: Custome
   const parents = p ? flatten(p.spaces) : [];
   const e = nameError(name, t);
   return (
-    <Modal open onClose={onClose} title={t("Add location")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!e) onSave({ propertyId, kind, parentSpaceId: parent || null, name: name.trim() }); }}>{t(addKind[kind])}</Btn></>}>
+    <Modal open onClose={onClose} title={t("Add location")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!e) onSave({ propertyId, kind, parentSpaceId: parent || null, name: name.trim() }); }}>{t(kindAddLabel[kind])}</Btn></>}>
       <div className="flex flex-col gap-3">
         <Field label={t("Property")}><Select value={propertyId} onChange={(x) => { setPropertyId(x.target.value); setParent(""); }}>{c.tree.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Select></Field>
         <Field label={t("Kind · required")} hint={t("floor · area · room · space (under the parent you pick)")}><Select value={kind} onChange={(x) => { setKind(oneOf(["floor", "area", "room", "space"] as const, x.target.value, kind)); }}>{(["floor", "area", "room", "space"] as const).map((k) => <option key={k} value={k}>{(textOf(kindLabel, k, t) ?? k)}</option>)}</Select></Field>
@@ -570,7 +570,7 @@ function ArchiveLocationModal({ p, s, pending, onClose, onSave }: Readonly<{ p?:
   const isBlocked = children > 0 || held > 0;
   const e = reasonError(reason, t);
   return (
-    <Modal open onClose={onClose} title={t("Delete {name}?", { name })} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending || isBlocked} onClick={() => { setTried(true); if (!e) onSave(reason.trim()); }}>{t(p ? "Delete property" : deleteKind[s?.kind ?? "room"])}</Btn></>}>
+    <Modal open onClose={onClose} title={t("Delete {name}?", { name })} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending || isBlocked} onClick={() => { setTried(true); if (!e) onSave(reason.trim()); }}>{t(p ? "Delete property" : kindDeleteLabel[s?.kind ?? "room"])}</Btn></>}>
       <div className="flex flex-col gap-3">
         <p className="text-[13px] text-muted-foreground">{t("Deleting takes the location out of the customer’s tree (archived). Its history stays in the audit log.")}</p>
         {isBlocked && <Banner tone="crit">{t("{name} still contains {what}. Move or delete them first (unit › Location).", { name, what: [children && count(t, children, "1 location", "{n} locations"), held && units(t, held)].filter(Boolean).join(t(" and ")) })}</Banner>}

@@ -145,11 +145,11 @@ export const customerDraft = (r?: CustomerRow): CustomerDraft => ({ billingName:
 export const profileLabel: Record<Profile, string> = { rto: "Rent-to-own (RTO)", general: "General care", energy: "Energy", environment: "Environment" };
 export function customerErrors(d: CustomerDraft, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
-  if (!between(d.billingName, 1, 120)) e.billingName = t(TEXT_1_120_CHARACTERS);
-  if (!between(d.name, 1, 120)) e.name = t(TEXT_1_120_CHARACTERS);
+  if (!hasLength(d.billingName, 120)) e.billingName = t(TEXT_1_120_CHARACTERS);
+  if (!hasLength(d.name, 120)) e.name = t(TEXT_1_120_CHARACTERS);
   return e;
 }
-const between = (s: string, min: number, max: number) => codePoints(s.trim()) >= min && codePoints(s.trim()) <= max;
+const hasLength = (s: string, max: number) => codePoints(s.trim()) >= 1 && codePoints(s.trim()) <= max;
 
 // ---- locations ----
 
@@ -234,7 +234,7 @@ export interface PropertyDraft { kind: "home" | "office"; name: string; address:
 export const propertyDraft = (p?: TreeProperty): PropertyDraft => ({ kind: p?.kind ?? "home", name: p?.name ?? "", address: p?.address ?? "", accessInstructions: p?.accessInstructions ?? "" });
 export function propertyErrors(d: PropertyDraft, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
-  if (!between(d.name, 1, 120)) e.name = t(TEXT_1_120_CHARACTERS);
+  if (!hasLength(d.name, 120)) e.name = t(TEXT_1_120_CHARACTERS);
   if (codePoints(d.address.trim()) > 500) e.address = t("At most 500 characters");
   if (codePoints(d.accessInstructions.trim()) > 1000) e.accessInstructions = t("At most 1000 characters");
   return e;
@@ -244,8 +244,8 @@ export const propertyInput = (d: PropertyDraft, orgId: string, id?: string) => {
     ...(id && { id }), customerOrgId: orgId, kind: d.kind, name: d.name.trim(), address: d.address.trim() || null, accessInstructions: d.accessInstructions.trim() || null,
   };
 };
-export const nameError = (name: string, t: T = translator("en")) => (between(name, 1, 120) ? undefined : t(TEXT_1_120_CHARACTERS));
-export const reasonError = (reason: string, t: T = translator("en")) => (between(reason, 1, 1000) ? undefined : t("A reason is required (1–1000 characters)"));
+export const nameError = (name: string, t: T = translator("en")) => (hasLength(name, 120) ? undefined : t(TEXT_1_120_CHARACTERS));
+export const reasonError = (reason: string, t: T = translator("en")) => (hasLength(reason, 1000) ? undefined : t("A reason is required (1–1000 characters)"));
 
 // ---- units ----
 
@@ -283,7 +283,7 @@ export const unitDraft = (u?: Pick<ApiUnitRow, "displayName" | "propertyId" | "s
 };
 export function unitErrors(d: UnitDraft, todayKL: string, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
-  if (!between(d.displayName, 1, 120)) e.displayName = t(TEXT_1_120_CHARACTERS);
+  if (!hasLength(d.displayName, 120)) e.displayName = t(TEXT_1_120_CHARACTERS);
   if (!d.propertyId) e.propertyId = t("Choose a location");
   if (!d.modelId) e.modelId = t("Choose a model");
   if (d.installedAt && isAfter(d.installedAt, todayKL)) e.installedAt = t("An installation date cannot be in the future");

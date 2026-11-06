@@ -45,9 +45,9 @@ export function ModelsTab({ live }: Readonly<{ live: DevicesLive }>) {
   const isDirty = changes.length > 0;
   const onModel = new Set(units.map((u) => u.id));
   const runningOn = (v: string) => live.devices.filter((x) => x.unitId && onModel.has(x.unitId) && x.fw === v).length;
-  const addProblem = adding === null ? null : firmwareProblem(adding, d.firmware, t);
+  const problemOnAdd = adding === null ? null : firmwareProblem(adding, d.firmware, t);
   const addVersion = () => {
-    if (adding === null || addProblem) return;
+    if (adding === null || problemOnAdd) return;
     set({ firmware: [...d.firmware, adding.trim()] });
     setAdding(null);
   };
@@ -113,11 +113,11 @@ export function ModelsTab({ live }: Readonly<{ live: DevicesLive }>) {
               {adding === null ? <Btn size="sm" variant="ghost" onClick={() => { setAdding(""); }}><Icon name="add" /> {t("Add version")}</Btn> : (
                 <span className="inline-flex items-center gap-1.5">
                   <Input aria-label={t("Firmware version")} className="w-28" ref={(el) => { el?.focus(); }} value={adding} maxLength={32} placeholder="v3" onChange={(e) => { setAdding(e.target.value); }} onKeyDown={(e) => { if (e.key === "Enter") { addVersion(); } if (e.key === "Escape") setAdding(null); }} />
-                  <Btn size="sm" disabled={!!addProblem} onClick={addVersion}>{t("Add")}</Btn><Btn size="sm" variant="ghost" onClick={() => { setAdding(null); }}>{t("Cancel")}</Btn>
+                  <Btn size="sm" disabled={!!problemOnAdd} onClick={addVersion}>{t("Add")}</Btn><Btn size="sm" variant="ghost" onClick={() => { setAdding(null); }}>{t("Cancel")}</Btn>
                 </span>
               )}
             </div>
-            {adding !== null && adding.trim() !== "" && addProblem && <p className="mt-1 flex items-center gap-1 text-xs text-crit"><Icon name="error" />{addProblem}</p>}
+            {adding !== null && adding.trim() !== "" && problemOnAdd && <p className="mt-1 flex items-center gap-1 text-xs text-crit"><Icon name="error" />{problemOnAdd}</p>}
             {fieldError("firmware") && <p className="mt-1 flex items-center gap-1 text-xs text-crit"><Icon name="error" />{fieldError("firmware")}</p>}
           </section>
           {sel && <section className="rounded-xl bg-surface2 p-3"><h3 className="mb-1 text-[13px] font-bold">{t("Impact of this change")}</h3><ul className="list-disc pl-5 text-xs"><li>{t(units.length === 1 ? "1 unit{list} moves to capability version {v}" : "{n} units{list} move to capability version {v}", { n: units.length, list: units.length > 0 ? ` — ${units.map((u) => u.label).join(", ")}` : "", v: sel.version + 1 })}</li><li>{t("Automation rules that no longer fit are disabled, with the reason that the capabilities changed")}</li><li>{t("Unfinished commands keep their original content")}</li></ul></section>}
