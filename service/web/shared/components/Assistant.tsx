@@ -121,7 +121,7 @@ function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
         // never a guess: the room first, then the AC in it (Figma 09d); each AC with its connection and confirmed setting
         const units = await Promise.all(r.candidates.map((c) => unit(c.unitId)));
         const status = Object.fromEntries(r.candidates.map((c, n) => {
-          const u = units[n];
+          const u = units.at(n);
           return [c.unitId, u ? connectionText(u, t) : ""];
         }));
         add({ kind: CANDIDATES, groups: candidateGroups(r.candidates), question, via, status });
@@ -235,7 +235,7 @@ function CandidatePicker({ m, t, busy, onPick, onCancel }: Readonly<{
   const isSeveral = m.groups.length > 1;
   const [room, setRoom] = useState(isSeveral ? -1 : 0);
   const [picked, setPicked] = useState<string | null>(null);
-  const g = m.groups[room];
+  const g = room >= 0 ? m.groups.at(room) : undefined;
   const only = g?.units.length === 1 ? g.units[0] : undefined; // a room with one AC needs no choice
   const chosen = only?.unitId ?? picked;
   return (

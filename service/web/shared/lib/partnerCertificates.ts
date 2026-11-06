@@ -17,7 +17,7 @@ import { z } from "zod";
 export const certificateCode = z.enum(["demo_indoor", "demo_outdoor", "demo_electrical", "other"]);
 import { codePoints } from "@ac/web/lib/text";
 import { isAfter } from "@ac/web/lib/order";
-import { lookup } from "@ac/web/lib/lookup";
+import { entryOf, lookup } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 const DAY = 86_400_000;
@@ -69,10 +69,10 @@ export function certRows(members: ApiTeamMember[], certs: ApiCert[], jobs: CertJ
     return { status: endsAt <= nowMs ? "expired" : soon, days };
   };
   const badgeOf = (s: CertStatus, days: number | null): CertRow["badge"] => {
-    return ({
+    return entryOf({
       valid: { text: t("Valid"), tone: "ok" as const }, expiring: { text: t("Expiring · {n} d", { n: days ?? 0 }), tone: "warn" as const }, expired: { text: t("Expired"), tone: "crit" as const },
       pending: { text: t("Pending HQ verification"), tone: "primary" as const }, rejected: { text: t("Rejected"), tone: "crit" as const }, not_held: { text: t("Not held"), tone: "muted" as const },
-    })[s];
+    }, s);
   };
   for (const m of members) {
     const isActive = activeNow(m, nowMs);
