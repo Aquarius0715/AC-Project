@@ -12,6 +12,7 @@ import { PlansView } from "./_components/plans-view";
 import { ContractorsView } from "./_components/contractors-view";
 import { SlaView } from "./_components/sla-view";
 import { loadContractors, loadJobs, loadPlans, loadSla } from "./_lib/load";
+import { firstOf as one } from "@ac/web/lib/searchParams";
 
 // a role without the page's read permission sees which one it needs, not a failure (IR582)
 export default async function AdminJobsPage(props: PageProps<"/admin/jobs">) {
@@ -21,7 +22,6 @@ export default async function AdminJobsPage(props: PageProps<"/admin/jobs">) {
 async function AdminJobsPageContent({ searchParams }: Readonly<PageProps<"/admin/jobs">>) {
   await connection();
   const sp = await searchParams;
-  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   if (!apiMode()) return <JobsDemo jobId={one(sp.jobId)} tab={one(sp.tab)} />;
   const asked = one(sp.tab);
   const tab = asked && ["plans", "contractors", "sla"].includes(asked) ? asked : "jobs";

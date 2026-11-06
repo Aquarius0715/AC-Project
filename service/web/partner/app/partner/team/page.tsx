@@ -8,12 +8,12 @@ import { apiMode } from "@ac/web/lib/dal";
 import { MockTeam } from "./_components/mock-team";
 import { TeamView } from "./_components/team-view";
 import { loadTeam } from "./_lib/load";
+import { firstOf as one } from "@ac/web/lib/searchParams";
 
 export default async function PartnerTeamPage({ searchParams }: Readonly<PageProps<"/partner/team">>) {
   await connection();
   if (!apiMode()) return <MockTeam />;
   const sp = await searchParams;
-  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const live = await loadTeam({
     date: one(sp.date), qualification: one(sp.qualification), activeOnly: one(sp.activeOnly), orgId: one(sp.orgId),
     membershipId: one(sp.membershipId), status: one(sp.status), expiringWithinDays: one(sp.expiringWithinDays),

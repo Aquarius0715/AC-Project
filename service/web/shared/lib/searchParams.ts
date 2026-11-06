@@ -3,6 +3,11 @@
 /** SearchParams is what Next.js passes a page as its awaited searchParams. */
 export type SearchParams = Readonly<Partial<Record<string, string | string[]>>>;
 
+/** firstOf is the first value of a parameter that may be given more than once. */
+export function firstOf(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 /** queryReader reads a parameter's text: undefined when it is missing, empty or given more than once. */
 export function queryReader(params: SearchParams): (key: string) => string | undefined {
   const values = new Map(Object.entries(params));

@@ -9,13 +9,13 @@ import { AlertEvidenceView } from "./_components/alert-evidence";
 import { MockAlertEvidence } from "./_components/mock-evidence";
 import { loadAlerts } from "./_lib/load";
 import { Icon } from "@ac/web/components/Icon";
+import { firstOf as one } from "@ac/web/lib/searchParams";
 
 export default async function TechnicianAlertsPage({ params, searchParams }: Readonly<PageProps<"/technician/units/[id]/alerts">>) {
   const { id } = await params;
   const sp = await searchParams;
   await connection();
   if (!apiMode()) return <MockAlertEvidence id={id} />;
-  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const live = await loadAlerts(id, { jobId: one(sp.jobId), alertId: one(sp.alertId) });
   if (live.kind === "unavailable") {
     return (

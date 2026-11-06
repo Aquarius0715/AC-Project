@@ -6,11 +6,11 @@ import { apiMode } from "@ac/web/lib/dal";
 import { OverviewDemo } from "./_components/overview-demo";
 import { OverviewView } from "./_components/overview-view";
 import { loadOverview } from "./_lib/load";
+import { firstOf as one } from "@ac/web/lib/searchParams";
 
 export default async function TechnicianOverviewPage({ searchParams }: Readonly<PageProps<"/technician">>) {
   await connection();
   const sp = await searchParams;
-  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   if (!apiMode()) return <OverviewDemo tab={one(sp.tab)} />;
   const live = await loadOverview({ tab: one(sp.tab), sort: one(sp.sort) });
   return <OverviewView live={live} />;

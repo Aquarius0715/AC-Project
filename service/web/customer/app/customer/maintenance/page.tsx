@@ -8,10 +8,10 @@ import { apiMode } from "@ac/web/lib/dal";
 import { MaintenanceDemo } from "./_components/maintenance-demo";
 import { MaintenanceView } from "./_components/maintenance-view";
 import { loadMaintenance } from "./_lib/load";
+import { firstOf as one } from "@ac/web/lib/searchParams";
 
 export default async function CustomerMaintenancePage({ searchParams }: PageProps<"/customer/maintenance">) {
   await connection();
   const sp = await searchParams;
-  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   return apiMode() ? <MaintenanceView live={await loadMaintenance(sp)} /> : <MaintenanceDemo jobId={one(sp.jobId)} initialTab={one(sp.tab)} />;
 }

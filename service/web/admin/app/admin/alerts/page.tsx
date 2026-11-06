@@ -12,10 +12,10 @@ import { NeedsAccess } from "@ac/web/components/NeedsAccess";
 
 import { AdminAlertsView } from "./_components/alerts-view";
 import { recover } from "@ac/web/lib/promises";
+import { firstOf as one } from "@ac/web/lib/searchParams";
 
 const ASSET_READ = "asset.read";
 
-const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 // names the session may not read (no identity.read or job.read)
 const optional = orWhenForbidden;
 const SEVERITIES: Severity[] = ["critical", "warning", "normal"];

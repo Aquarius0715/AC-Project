@@ -11,13 +11,13 @@ import { TechUnitDemo } from "./_components/unit-demo";
 import { TechUnitView } from "./_components/unit-view";
 import { loadTechUnit } from "./_lib/load";
 import { Icon } from "@ac/web/components/Icon";
+import { firstOf as one } from "@ac/web/lib/searchParams";
 
 export default async function TechnicianUnitPage({ params, searchParams }: Readonly<PageProps<"/technician/units/[id]">>) {
   const { id } = await params;
   const sp = await searchParams;
   await connection();
   if (!apiMode()) return <TechUnitDemo id={id} />;
-  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const live = await loadTechUnit(id, { jobId: one(sp.jobId), metric: one(sp.metric), period: one(sp.period) });
   if (!live) notFound();
   if (live.kind === "not_started") {
