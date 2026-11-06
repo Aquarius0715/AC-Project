@@ -12,9 +12,8 @@ const requestOf = (...args: Parameters<typeof coreRequest>) => must(coreRequest(
 /** The query of a request path as name → all values. */
 const query = (path: string) => {
   const u = new URL(`http://core${path}`);
-  const out: Record<string, string[]> = {};
   const keys = new Set(u.searchParams.keys());
-  for (const k of keys) out[k] = u.searchParams.getAll(k);
+  const out = Object.fromEntries([...keys].map((k) => [k, u.searchParams.getAll(k)]));
   return { pathname: u.pathname, out };
 };
 
@@ -65,6 +64,10 @@ describe("coreRequest", () => {
     expect(coreRequest(UNITS_SAVE, { id: "u1", displayName: "A" })).toEqual({ method: "PUT", path: "/v1/units/u1", body: '{"displayName":"A"}' });
     expect(coreRequest("units.delete", { id: "u1", reason: "duplicate entry" })).toEqual({ method: "DELETE", path: "/v1/units/u1?reason=duplicate+entry" });
     expect(coreRequest("jobs.checkIn", { jobId: "j1", method: "manual", reason: "no signal" })).toEqual({ method: "POST", path: "/v1/jobs/j1/check-in", body: '{"method":"manual","reason":"no signal"}' });
+  });
+
+  it("names no operation by an inherited property", () => {
+    for (const name of ["constructor", "__proto__", "toString", "hasOwnProperty"]) expect(coreRequest(name, {}), name).toBeNull();
   });
 
   it("chooses the route of the fixed field and takes nested path parameters out of the body", () => {

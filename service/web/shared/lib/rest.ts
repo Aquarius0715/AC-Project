@@ -9,6 +9,7 @@
 //     empty value), null and undefined left out;
 //   - POST, PUT and PATCH send the rest as the JSON body.
 // Pure code: the DAL (server) and the BFF relay share it; Vitest covers it.
+import { lookup as ownEntry } from "@ac/web/lib/lookup";
 import { coreRoutes, type CoreRoute } from "@ac/web/lib/routes.gen";
 
 export interface CoreRequest { method: CoreRoute["method"]; path: string; body?: string }
@@ -21,7 +22,7 @@ function lookup(node: Json, at: string[]): unknown {
   let current: unknown = node;
   for (const key of at) {
     if (!isObject(current)) return undefined;
-    current = current[key];
+    current = ownEntry(current, key);
   }
   return current;
 }
@@ -78,7 +79,7 @@ function flatten(q: URLSearchParams, prefix: string, node: Json, top: boolean) {
 
 /** The REST request of one operation call, or null for an operation outside the catalog. */
 export function coreRequest(operation: string, input: unknown): CoreRequest | null {
-  const routes = coreRoutes[operation];
+  const routes = ownEntry(coreRoutes, operation); // own entries only: "constructor" or "__proto__" name no operation
   if (!routes?.length) return null;
   const rest: Json = isObject(input) ? structuredClone(input) : {};
   const route = pick(routes, rest);
