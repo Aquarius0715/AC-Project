@@ -209,12 +209,22 @@ export function certificateErrors(f: CertForm, t: T = en): Partial<Record<"membe
   if (name < 1 || name > 120) e.name = t("1–120 characters");
   if (number < 1 || number > 64) e.number = t("1–64 characters");
   if (!isDate(f.issued)) e.issued = t("Choose the issue date");
-  if (!isDate(f.expires)) e.expires = t("Choose the expiry date");
-  else if (isDate(f.issued) && !isAfter(f.expires, f.issued)) e.expires = t("The expiry date must be after the issue date");
-  if (!f.file) e.file = t("Attach the certificate file");
-  else if (!FILE_TYPES.includes(f.file.type)) e.file = t("Use a PDF, JPG or PNG file");
-  else if (f.file.size > 10_000_000) e.file = t("The file is larger than 10 MB");
+  const expires = expiryError(f, t);
+  if (expires) e.expires = expires;
+  const file = fileError(f.file, t);
+  if (file) e.file = file;
   return e;
+}
+/** What is wrong with the expiry day, or undefined. */
+function expiryError(f: CertForm, t: T): string | undefined {
+  if (!isDate(f.expires)) return t("Choose the expiry date");
+  return isDate(f.issued) && !isAfter(f.expires, f.issued) ? t("The expiry date must be after the issue date") : undefined;
+}
+/** What is wrong with the attached file, or undefined. */
+function fileError(file: CertForm["file"], t: T): string | undefined {
+  if (!file) return t("Attach the certificate file");
+  if (!FILE_TYPES.includes(file.type)) return t("Use a PDF, JPG or PNG file");
+  return file.size > 10_000_000 ? t("The file is larger than 10 MB") : undefined;
 }
 /** The instants a form's Kuala Lumpur days stand for: the start of the issue day and of the expiry day. */
 export const certDates = (f: { issued: string; expires: string }) => ({ issuedAt: klStart(f.issued), expiresAt: klStart(f.expires) });
