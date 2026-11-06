@@ -112,7 +112,7 @@ export function ModelsTab({ live }: Readonly<{ live: DevicesLive }>) {
               })}
               {adding === null ? <Btn size="sm" variant="ghost" onClick={() => { setAdding(""); }}><Icon name="add" /> {t("Add version")}</Btn> : (
                 <span className="inline-flex items-center gap-1.5">
-                  <Input aria-label={t("Firmware version")} className="w-28" ref={(el) => { el?.focus(); }} value={adding} maxLength={32} placeholder="v3" onChange={(e) => { setAdding(e.target.value); }} onKeyDown={(e) => { if (e.key === "Enter") addVersion(); if (e.key === "Escape") setAdding(null); }} />
+                  <Input aria-label={t("Firmware version")} className="w-28" ref={(el) => { el?.focus(); }} value={adding} maxLength={32} placeholder="v3" onChange={(e) => { setAdding(e.target.value); }} onKeyDown={(e) => { if (e.key === "Enter") { addVersion(); } if (e.key === "Escape") setAdding(null); }} />
                   <Btn size="sm" disabled={!!addProblem} onClick={addVersion}>{t("Add")}</Btn><Btn size="sm" variant="ghost" onClick={() => { setAdding(null); }}>{t("Cancel")}</Btn>
                 </span>
               )}

@@ -282,7 +282,7 @@ export function BillingView({ live }: Readonly<{ live?: BillingLive }>) {
                 {iq.reply ? <p className="mt-3 text-[13px]"><b>{t("Reply:")}</b> {iq.reply}</p> : <>
                   <div className="mt-3"><Field label={t("Reply (in-app only)")} error={tried && !reply.trim() ? t("A reply is required") : undefined}><Textarea value={reply} onChange={(e) => { setReply(e.target.value); }} maxLength={2000} /></Field></div>
                   <p className="mt-1 text-[11px] text-muted-foreground">{t("A reply never changes invoices or restrictions.")}</p>
-                  <div className="mt-2 flex justify-end"><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!reply.trim()) return; if (!live) { toast(t("Reply recorded in-app")); return; } act(() => answerInquiry(iq.id, iq.version, reply.trim()), t("Reply sent in-app"), () => { setReply(""); setTried(false); }); }}>{t("Send reply")}</Btn></div>
+                  <div className="mt-2 flex justify-end"><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!reply.trim()) { return; } if (!live) { toast(t("Reply recorded in-app")); return; } act(() => answerInquiry(iq.id, iq.version, reply.trim()), t("Reply sent in-app"), () => { setReply(""); setTried(false); }); }}>{t("Send reply")}</Btn></div>
                 </>}
               </Card>
             )}

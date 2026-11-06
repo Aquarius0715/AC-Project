@@ -77,7 +77,7 @@ export function HistoryDemo() {
                   <Field label="Visibility"><Choice value={vis} onChange={setVis} options={[{ id: "internal", label: "Internal (default)" }, { id: "customer", label: "Customer-visible" }]} /></Field>
                   <Field label="Recipient role"><Select value={role} onChange={(e) => { setRole(e.target.value); }}><option value="hq">hq</option><option value="technician">technician</option><option value="customer">customer</option></Select></Field>
                   <Field label="Message (1–2000 chars)" error={tried && !notice.trim() ? "Message is required" : undefined}><Textarea value={notice} onChange={(e) => { setMessage(e.target.value); }} /></Field>
-                  <Btn variant="primary" disabled={isApi && sel?.projection === "history"} onClick={() => { setTried(true); if (!notice.trim()) return; setPreviews((p) => [{ k: `schedule_change → ${role}`, d: `in-app · preview · ${vis} · just now` }, ...p]); toast("Note saved + preview created"); }}>Save note & create preview</Btn>
+                  <Btn variant="primary" disabled={isApi && sel?.projection === "history"} onClick={() => { setTried(true); if (!notice.trim()) { return; } setPreviews((p) => [{ k: `schedule_change → ${role}`, d: `in-app · preview · ${vis} · just now` }, ...p]); toast("Note saved + preview created"); }}>Save note & create preview</Btn>
                   <p className="text-[11px] text-muted-foreground">No real sending. Free-form external recipients and other-job recipients are rejected. Internal notes stay hidden from customers.</p>
                 </div>
               </Card>

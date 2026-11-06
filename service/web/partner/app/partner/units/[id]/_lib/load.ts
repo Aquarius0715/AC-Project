@@ -34,10 +34,10 @@ export async function loadUnit(id: string, jobId?: string) {
   const i = i18nOf(display);
   const { t } = i;
   const nowMs = now.getTime();
-  const d = await coreOp<ApiUnitDetail>("units.get", { id }).catch((error: unknown) => { if (gone(error)) return null; throw error; });
+  const d = await coreOp<ApiUnitDetail>("units.get", { id }).catch((error: unknown) => { if (gone(error)) { return null; } throw error; });
   if (!d) {
     if (!jobId) return null; // not one of the company's units now: not found
-    const h = await coreOp<ApiPartnerJobDetail>("jobs.get", { jobId }).catch((error: unknown) => { if (gone(error)) return null; throw error; });
+    const h = await coreOp<ApiPartnerJobDetail>("jobs.get", { jobId }).catch((error: unknown) => { if (gone(error)) { return null; } throw error; });
     if (h?.projection !== "history") return null;
     return {
       kind: "snapshot" as const,

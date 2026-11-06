@@ -70,14 +70,14 @@ export function DevicesView({ initial }: Readonly<{ initial?: string }>) {
           {sel.tamper && <Card title="Device events" sub="connection, power and tamper are separate events" tone="crit" action={!ack && <Btn size="sm" variant="primary" onClick={() => { setAck(true); toast("alert-tamper-a acknowledged"); }}>Acknowledge alert-tamper-a <Icon name="arrowRight" /></Btn>}><Timeline items={events.map((e) => ({ time: e.t, title: e.title, detail: e.detail, tone: e.tone }))} /></Card>}
         </div>
       </div>
-      <Modal open={reg} onClose={() => { setReg(false); }} title="Register device" footer={<><Btn onClick={() => { setReg(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!f.serial.trim() || devices.some((d) => d.serial.toLowerCase() === f.serial.toLowerCase())) return; toast("Device registered"); setReg(false); }}>Register</Btn></>}>
+      <Modal open={reg} onClose={() => { setReg(false); }} title="Register device" footer={<><Btn onClick={() => { setReg(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!f.serial.trim() || devices.some((d) => d.serial.toLowerCase() === f.serial.toLowerCase())) { return; } toast("Device registered"); setReg(false); }}>Register</Btn></>}>
         <Field label="Serial" error={tried && !f.serial.trim() ? "Serial is required" : duplicate}><Input value={f.serial} onChange={(e) => { setF({ ...f, serial: e.target.value }); }} placeholder="AC-002" /></Field>
         <Field label="Unit to bind"><Input value={f.unit} onChange={(e) => { setF({ ...f, unit: e.target.value }); }} placeholder="unit-t11-new" /></Field>
       </Modal>
       <Modal open={!!cal} onClose={() => { setCal(null); }} title={`Calibrate ${cal ?? ""}`} footer={<><Btn onClick={() => { setCal(null); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setHist((h) => [`${cal ?? ""} · ref ${f.ref} / measured ${f.meas} · offset ${(+f.ref - +f.meas).toFixed(1)} · just now · you`, ...h]); setCal(null); toast("Calibration recorded"); }}>Record calibration</Btn></>}>
         <div className="grid-fluid" style={{ ["--min"as string]: "140px" }}><Field label="Reference value"><Input type="number" value={f.ref} onChange={(e) => { setF({ ...f, ref: e.target.value }); }} /></Field><Field label="Measured value"><Input type="number" value={f.meas} onChange={(e) => { setF({ ...f, meas: e.target.value }); }} /></Field></div>
       </Modal>
-      <Modal open={rebind} onClose={() => { setRebind(false); }} title="Rebind device" footer={<><Btn onClick={() => { setRebind(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!f.reason.trim()) return; setRebind(false); toast("Device rebound"); }}>Rebind</Btn></>}>
+      <Modal open={rebind} onClose={() => { setRebind(false); }} title="Rebind device" footer={<><Btn onClick={() => { setRebind(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!f.reason.trim()) { return; } setRebind(false); toast("Device rebound"); }}>Rebind</Btn></>}>
         <Field label="New unit"><Input placeholder="unit-…" /></Field>
         <Field label="Reason (required)" error={tried && !f.reason.trim() ? "A reason is required" : undefined}><Textarea value={f.reason} onChange={(e) => { setF({ ...f, reason: e.target.value }); }} /></Field>
       </Modal>

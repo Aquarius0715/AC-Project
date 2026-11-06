@@ -151,7 +151,7 @@ function ProposeModal({ j, x, technicians, onClose, onSend, pending }: Readonly<
   const startAt = zonedInstant(date, from, x.propose.zone), endAt = zonedInstant(date, to, x.propose.zone);
   const isOrder = !!startAt && !!endAt && isBefore(startAt, endAt);
   return (
-    <Modal open onClose={onClose} title={t("Propose another time")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!reason.trim() || !isOrder || !tech) return; onSend({ startAt, endAt }, tech, reason.trim()); }}>{t("Send to HQ")}</Btn></>}>
+    <Modal open onClose={onClose} title={t("Propose another time")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!reason.trim() || !isOrder || !tech) { return; } onSend({ startAt, endAt }, tech, reason.trim()); }}>{t("Send to HQ")}</Btn></>}>
       <p className="text-xs text-muted-foreground">{t("{id} · agreed with the client: {slot} · times in {zone}", { id: j.jobId.slice(0, 8), slot: x.visit, zone: x.propose.zone })}</p>
       <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}>
         <Field label={t("Date")}><Input type="date" value={date} onChange={(e) => { setDate(e.target.value); }} /></Field>

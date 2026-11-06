@@ -38,7 +38,7 @@ export function ReviewDemo({ id }: Readonly<{ id: string }>) {
           <Card title="Versions & linked alert"><SummaryList items={[["v1", "submitted 2026-09-20 16:40 by tech-external-a · reviewing now"], ["Vibration anomaly (alert)", "09-13 22:40 · stays open after completion"], ["Job due", "work window 09-18 → 09-23 00:00"]]} /></Card>
         </div>
       </div>
-      <Modal open={isReturned} onClose={() => { setReturned(false); }} title="Return for rework" footer={<><Btn onClick={() => { setReturned(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!why.trim()) return; setReturned(false); setState("returned"); toast("Returned for rework", "warn"); }}>Return report</Btn></>}>
+      <Modal open={isReturned} onClose={() => { setReturned(false); }} title="Return for rework" footer={<><Btn onClick={() => { setReturned(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!why.trim()) { return; } setReturned(false); setState("returned"); toast("Returned for rework", "warn"); }}>Return report</Btn></>}>
         <Field label="Reason (required)" error={tried && !why.trim() ? "A reason is required" : undefined}><Textarea value={why} onChange={(e) => { setWhy(e.target.value); }} placeholder="Missing evidence photo for indoor unit filter" /></Field>
       </Modal>
     </Page>

@@ -47,7 +47,7 @@ export async function loadControl(unitId: string, jobId: string | null) {
   };
   const base = { kind: "live" as const, canDiagnose: perms.has("control.diagnose"), unitHref, unit };
   if (!jobId) return { ...base, job: null, run: null, banner: null, active: false, history: [] };
-  const read = await coreOp<JobRead>("jobs.get", { jobId }).catch((error: unknown) => { if (gone(error)) return null; throw error; });
+  const read = await coreOp<JobRead>("jobs.get", { jobId }).catch((error: unknown) => { if (gone(error)) { return null; } throw error; });
   const job = read?.projection === "detail" ? read : null;
   if (!job) return null; // a refused job, or one whose window ended (a history snapshot): not the technician's to control
   const [runs, cmds] = await Promise.all([

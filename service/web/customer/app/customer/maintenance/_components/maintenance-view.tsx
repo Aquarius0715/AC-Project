@@ -294,7 +294,7 @@ function OtherTimeModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; n
   const slots = rows.map((r) => toSlot(r, display.timeZone));
   const errorText = preferredError(slots, now, 3, t);
   return (
-    <Modal open wide onClose={() => { onClose(); }} title={t("Request another time")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (errorText) return; run(() => requestReschedule(j.id, j.version, slots, comment), t("Sent to HQ"), () => { onClose(t("Asked HQ for another time — the visit goes back to booking with your 3 times.")); }, onFail); }}>{t("Send to HQ")}</Btn></>}>
+    <Modal open wide onClose={() => { onClose(); }} title={t("Request another time")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (errorText) { return; } run(() => requestReschedule(j.id, j.version, slots, comment), t("Sent to HQ"), () => { onClose(t("Asked HQ for another time — the visit goes back to booking with your 3 times.")); }, onFail); }}>{t("Send to HQ")}</Btn></>}>
       <p className="text-xs text-muted-foreground">{t("{job} · periodic visit {when} · up to 48 h before the visit", { job: j.id.slice(0, 8), when: j.scheduledSlot ? showTime(j.scheduledSlot.startAt, display) : "" })}</p>
       <TimesInput rows={rows} onChange={setRows} error={tried ? errorText : null} />
       <Field label={t("Comment (optional, up to 1000)")}><Input value={comment} maxLength={1000} onChange={(e) => { setComment(e.target.value); }} /></Field>
@@ -312,7 +312,7 @@ function RateModal({ d, onClose, onFail }: ModalProps & { d: Detail }) {
   const [comment, setComment] = useState(j.rating?.comment ?? "");
   const [tried, setTried] = useState(false);
   return (
-    <Modal open onClose={() => { onClose(); }} title={t(j.rating ? "Edit rating {job}" : "Confirm & rate {job}", { job: j.id.slice(0, 8) })} footer={<><Btn onClick={() => { onClose(); }}>{t("Not now")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!stars) return; run(() => rateJob(j.id, j.version, stars, tags, comment), t("Thanks — rating saved"), () => { onClose(t(j.rating ? "Thanks — rating updated ({stars} of 5 stars)." : "Thanks — job confirmed and rated ({stars} of 5 stars).", { stars })); }, onFail); }}>{t(j.rating ? "Save rating" : "Confirm & submit")}</Btn></>}>
+    <Modal open onClose={() => { onClose(); }} title={t(j.rating ? "Edit rating {job}" : "Confirm & rate {job}", { job: j.id.slice(0, 8) })} footer={<><Btn onClick={() => { onClose(); }}>{t("Not now")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!stars) { return; } run(() => rateJob(j.id, j.version, stars, tags, comment), t("Thanks — rating saved"), () => { onClose(t(j.rating ? "Thanks — rating updated ({stars} of 5 stars)." : "Thanks — job confirmed and rated ({stars} of 5 stars).", { stars })); }, onFail); }}>{t(j.rating ? "Save rating" : "Confirm & submit")}</Btn></>}>
       <Field label={t("How was the service? (required)")} error={tried && !stars ? t("Choose 1–5 stars") : undefined}><div className="flex gap-1 text-2xl">{STARS.map((n) => <Plain key={n} type="button" aria-label={t("{n} stars", { n })} aria-pressed={n === stars} onClick={() => { setStars(n); }} className={n <= stars ? "text-[#f59e0b]" : "text-line"}><Icon name="star" filled /></Plain>)}</div></Field>
       {/* the tags are stored in English (the API's values); only their labels follow the language */}
       <Field label={t("What went well? (optional)")}><div className="flex flex-wrap gap-1.5">{RATING_TAGS.map((tag) => <Plain key={tag} type="button" aria-pressed={tags.includes(tag)} onClick={() => { setTags((s) => (s.includes(tag) ? s.filter((x) => x !== tag) : [...s, tag])); }} className={cx("rounded-full border px-3 py-1 text-xs font-semibold", tags.includes(tag) ? "border-primary bg-primary-soft text-primary" : "border-line")}>{t(tag)}</Plain>)}</div></Field>
@@ -373,7 +373,7 @@ function NoteModal({ d, onClose, onFail }: ModalProps & { d: Detail }) {
   const [tried, setTried] = useState(false);
   const isBad = !text.trim() || text.length > 2000;
   return (
-    <Modal open onClose={() => { onClose(); }} title={t("Add a note for {job}", { job: j.id.slice(0, 8) })} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (isBad) return; run(() => addNote(j.id, j.version, text), t("Note sent"), () => { onClose(t("Note sent — HQ, the service partner and the technician can read it.")); }, onFail); }}>{t("Send note")}</Btn></>}>
+    <Modal open onClose={() => { onClose(); }} title={t("Add a note for {job}", { job: j.id.slice(0, 8) })} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (isBad) { return; } run(() => addNote(j.id, j.version, text), t("Note sent"), () => { onClose(t("Note sent — HQ, the service partner and the technician can read it.")); }, onFail); }}>{t("Send note")}</Btn></>}>
       <Field label={t("Note to the HQ coordinator (1–2000 characters)")} error={tried && isBad ? t("Write 1–2000 characters") : undefined} hint={`${String(text.length)} / 2000`}><Textarea value={text} maxLength={2000} onChange={(e) => { setText(e.target.value); }} placeholder={t("Please call 30 minutes before arriving — the gate code changed to 4821.")} /></Field>
       <Banner>{t("A note can’t change the visit time or the technician. To move the visit, write it here — HQ sends you a new time to accept. Notes are kept in the job history.")}</Banner>
     </Modal>
@@ -387,7 +387,7 @@ function CancelModal({ d, onClose, onFail }: ModalProps & { d: Detail }) {
   const [r, setR] = useState("");
   const [tried, setTried] = useState(false);
   return (
-    <Modal open onClose={() => { onClose(); }} title={t("Cancel {job}?", { job: j.id.slice(0, 8) })} footer={<><Btn onClick={() => { onClose(); }}>{t("Keep request")}</Btn><Btn variant="danger" disabled={pending} onClick={() => { setTried(true); if (!r.trim()) return; run(() => cancelRequest(j.id, j.version, r), t("Request cancelled"), () => { onClose(t("Request cancelled."), "warn"); }, onFail); }}>{t("Cancel request")}</Btn></>}>
+    <Modal open onClose={() => { onClose(); }} title={t("Cancel {job}?", { job: j.id.slice(0, 8) })} footer={<><Btn onClick={() => { onClose(); }}>{t("Keep request")}</Btn><Btn variant="danger" disabled={pending} onClick={() => { setTried(true); if (!r.trim()) { return; } run(() => cancelRequest(j.id, j.version, r), t("Request cancelled"), () => { onClose(t("Request cancelled."), "warn"); }, onFail); }}>{t("Cancel request")}</Btn></>}>
       <Field label={t("Reason (required, up to 1000)")} error={tried && !r.trim() ? t("A reason is required") : undefined}><Input value={r} maxLength={1000} onChange={(e) => { setR(e.target.value); }} placeholder={t("Resolved itself")} /></Field>
     </Modal>
   );

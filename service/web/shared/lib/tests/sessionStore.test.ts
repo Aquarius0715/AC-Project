@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Valkey as a map with expiry times (the commands the session store uses: GETEX EX, SET EX [XX], DEL)
 const kv = vi.hoisted(() => {
   const data = new Map<string, { value: string; until: number }>();
-  const live = (k: string) => { const r = data.get(k); if (r && r.until <= Date.now()) data.delete(k); return data.get(k); };
+  const live = (k: string) => { const r = data.get(k); if (r && r.until <= Date.now()) { data.delete(k); } return data.get(k); };
   const api = {
     down: false,
     getEx: vi.fn((k: string, o: { value: number }) => {

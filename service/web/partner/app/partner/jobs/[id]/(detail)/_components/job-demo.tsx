@@ -70,7 +70,7 @@ function ProposeTimeModal({ j, onClose, onDone }: Readonly<{ j: Pick<Job, "id" |
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
   return (
-    <Modal open onClose={onClose} title="Propose another time" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!reason.trim()) return; onDone({ date, win }, tech, reason.trim()); }}>Send to HQ</Btn></>}>
+    <Modal open onClose={onClose} title="Propose another time" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!reason.trim()) { return; } onDone({ date, win }, tech, reason.trim()); }}>Send to HQ</Btn></>}>
       <p className="text-xs text-muted-foreground">{j.id} · agreed with the client: {fmt(j.scheduled)}</p>
       <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}><Field label="Date"><Input type="date" value={date} onChange={(e) => { setDate(e.target.value); }} /></Field><Field label="Window"><Select value={win} onChange={(e) => { setWin(e.target.value); }}>{WINDOWS.map((w) => <option key={w}>{w}</option>)}</Select></Field></div>
       <Field label="Technician"><Select value={tech} onChange={(e) => { setTech(e.target.value); }}><option value="tech-external-a">tech-external-a · free 14:00–18:00 · refrigerant qualified</option><option value="tech-external-a2">tech-external-a2 · not qualified</option></Select></Field>
@@ -84,7 +84,7 @@ function DeclineModal({ id, onClose, onDone }: Readonly<{ id: string; onClose: (
   const [why, setWhy] = useState("");
   const [tried, setTried] = useState(false);
   return (
-    <Modal open onClose={onClose} title={`Decline offer ${id}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="danger" onClick={() => { setTried(true); if (!why.trim()) return; onDone(why.trim()); }}>Confirm decline</Btn></>}>
+    <Modal open onClose={onClose} title={`Decline offer ${id}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="danger" onClick={() => { setTried(true); if (!why.trim()) { return; } onDone(why.trim()); }}>Confirm decline</Btn></>}>
       <Field label="Decline reason (required, 1–1000 characters)" error={tried && !why.trim() ? "A reason is required (1–1000 characters)" : undefined}><Textarea value={why} onChange={(e) => { setWhy(e.target.value); }} placeholder="No qualified technician available at this time." /></Field>
     </Modal>
   );

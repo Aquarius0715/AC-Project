@@ -26,7 +26,7 @@ export function ExceptionDemo({ id }: Readonly<{ id: string }>) {
   const isNeedsDate = act === "defer" || act === "exempt";
   const [openedAt] = useState(() => Date.now()); // reference time for the date check (render stays pure)
   const dateError = tried && isNeedsDate && (!until || new Date(until).getTime() < openedAt - 86_400e3) ? "Date must be in the future" : undefined;
-  const run = () => { setTried(true); if (!reason.trim() || dateError) return; if (act === "override" && !hasOverride) { toast("FORBIDDEN — restriction.override required", "crit"); return; } setDone(true); toast("Action recorded"); };
+  const run = () => { setTried(true); if (!reason.trim() || dateError) { return; } if (act === "override" && !hasOverride) { toast("FORBIDDEN — restriction.override required", "crit"); return; } setDone(true); toast("Action recorded"); };
   return (
     <Page>
       <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href="/admin/restrictions" className="font-semibold text-primary"><Icon name="arrowLeft" /> Back</Link>/ <b className="text-ink">{id}</b></div>

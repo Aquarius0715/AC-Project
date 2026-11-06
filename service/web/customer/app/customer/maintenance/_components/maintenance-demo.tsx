@@ -198,7 +198,7 @@ function DeclineModal({ open, j, onClose, onDone }: Readonly<{ open: boolean; j:
   const errorText = tried && give ? preferredError(slots) : undefined;
   const label = entryOf({ not_home: "I’m not at home then", too_late: "Too late for me", other: "Other" }, reason);
   return (
-    <Modal open={open} onClose={onClose} title="Decline the proposed time" footer={<><Btn onClick={onClose}>Back</Btn><Btn variant="primary" onClick={() => { setTried(true); if (give && preferredError(slots)) return; jobActions.decline(j.id, label, comment.trim(), give ? slots : []); onDone(); }}>{give ? "Decline & send new times" : "Decline"}</Btn></>}>
+    <Modal open={open} onClose={onClose} title="Decline the proposed time" footer={<><Btn onClick={onClose}>Back</Btn><Btn variant="primary" onClick={() => { setTried(true); if (give && preferredError(slots)) { return; } jobActions.decline(j.id, label, comment.trim(), give ? slots : []); onDone(); }}>{give ? "Decline & send new times" : "Decline"}</Btn></>}>
       <p className="text-xs text-muted-foreground">{j.id} · {j.unit} · proposed {j.proposal ? longDate(j.proposal.slot) : ""}</p>
       <Field label="Reason"><Choice value={reason} onChange={setReason} options={[{ id: "not_home", label: "I’m not at home then" }, { id: "too_late", label: "Too late for me" }, { id: "other", label: "Other" }]} /></Field>
       <Field label="Comment to HQ (optional)"><Input value={comment} onChange={(e) => { setComment(e.target.value); }} placeholder="Away on Oct 1. Any weekday afternoon next week works." /></Field>
@@ -215,7 +215,7 @@ function OtherTimeModal({ open, j, onClose, onDone }: Readonly<{ open: boolean; 
   const [tried, setTried] = useState(false);
   const errorText = tried ? preferredError(slots) : undefined;
   return (
-    <Modal open={open} onClose={onClose} title="Request another time" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (preferredError(slots)) return; jobActions.requestOther(j.id, slots, comment.trim()); onDone(); }}>Send to HQ</Btn></>}>
+    <Modal open={open} onClose={onClose} title="Request another time" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (preferredError(slots)) { return; } jobActions.requestOther(j.id, slots, comment.trim()); onDone(); }}>Send to HQ</Btn></>}>
       <p className="text-xs text-muted-foreground">{j.id} · periodic visit {fmt(j.scheduled)} · up to 48 h before the visit</p>
       <PreferredSlotsInput value={slots} onChange={setSlots} error={errorText} />
       <Field label="Comment (optional)"><Input value={comment} onChange={(e) => { setComment(e.target.value); }} /></Field>
@@ -246,7 +246,7 @@ function ProblemModal({ open, j, onClose, onDone }: Readonly<{ open: boolean; j:
   const [tried, setTried] = useState(false);
   const [errorText, setError] = useState<string | undefined>();
   return (
-    <Modal open={open} onClose={onClose} title={`Report a problem — ${j.id}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (d.trim().length < 10 || d.length > 2000) return; const r = jobActions.reportProblem(j.id, entryOf(PROBLEM, reason), d.trim(), visit); if ("error" in r) { setError(r.error); return; } setD(""); setTried(false); onDone(r.id); }}>Send report</Btn></>}>
+    <Modal open={open} onClose={onClose} title={`Report a problem — ${j.id}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (d.trim().length < 10 || d.length > 2000) { return; } const r = jobActions.reportProblem(j.id, entryOf(PROBLEM, reason), d.trim(), visit); if ("error" in r) { setError(r.error); return; } setD(""); setTried(false); onDone(r.id); }}>Send report</Btn></>}>
       <Field label="What happened?"><Choice value={reason} onChange={setReason} options={[{ id: "same", label: "Same problem again" }, { id: "new", label: "New damage" }, { id: "incomplete", label: "Work not completed" }, { id: "other", label: "Other" }]} /></Field>
       <Field label="Details (10–2000 characters)" error={tried && (d.trim().length < 10 || d.length > 2000) ? "Describe the problem (10–2000 characters)" : undefined}><Textarea value={d} onChange={(e) => { setD(e.target.value); }} /></Field>
       <Field label="Preferred visit (optional)"><Input type="date" value={visit} onChange={(e) => { setVisit(e.target.value); }} /></Field>
@@ -268,7 +268,7 @@ function NoteModal({ open, j, onClose, onDone }: Readonly<{ open: boolean; j: Jo
   const [errorText, setError] = useState<string | undefined>();
   const isBad = !t.trim() || t.length > 2000;
   return (
-    <Modal open={open} onClose={onClose} title={`Add a note for ${j.id}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (isBad) return; const e = jobActions.addNote(j.id, t); if (e) { setError(e); return; } setT(""); setTried(false); onDone(); }}>Send note</Btn></>}>
+    <Modal open={open} onClose={onClose} title={`Add a note for ${j.id}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (isBad) { return; } const e = jobActions.addNote(j.id, t); if (e) { setError(e); return; } setT(""); setTried(false); onDone(); }}>Send note</Btn></>}>
       <Field label="Note to the HQ coordinator (1–2000 characters)" error={tried && isBad ? "Write 1–2000 characters" : undefined} hint={`${String(t.length)} / 2000 · Visible to: HQ coordinator${j.delivery === CONTRACTOR ? ` · ${orDash(j.contractor)}` : ""}${j.technician ? ` · assigned technician (${j.technician})` : ""}`}>
         <Textarea value={t} onChange={(e) => { setT(e.target.value); }} placeholder="Please call 30 minutes before arriving — the gate code changed to 4821." />
       </Field>
@@ -282,7 +282,7 @@ function CancelModal({ open, j, onClose, onDone }: Readonly<{ open: boolean; j: 
   const [r, setR] = useState("");
   const [tried, setTried] = useState(false);
   return (
-    <Modal open={open} onClose={onClose} title={`Cancel ${j.id}?`} footer={<><Btn onClick={onClose}>Keep request</Btn><Btn variant="danger" onClick={() => { setTried(true); if (!r.trim()) return; jobActions.cancel(j.id, r.trim()); onDone(); }}>Cancel request</Btn></>}>
+    <Modal open={open} onClose={onClose} title={`Cancel ${j.id}?`} footer={<><Btn onClick={onClose}>Keep request</Btn><Btn variant="danger" onClick={() => { setTried(true); if (!r.trim()) { return; } jobActions.cancel(j.id, r.trim()); onDone(); }}>Cancel request</Btn></>}>
       <Field label="Reason (required)" error={tried && !r.trim() ? "A reason is required" : undefined}><Input value={r} onChange={(e) => { setR(e.target.value); }} placeholder="Resolved itself" /></Field>
     </Modal>
   );

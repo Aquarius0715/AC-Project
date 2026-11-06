@@ -251,7 +251,7 @@ function ProposeModal({ j, onClose }: Readonly<{ j: Job; onClose: () => void }>)
   const [tried, setTried] = useState(false);
   const isPre = j.preferred.some((s) => s.date === date && s.win === win);
   return (
-    <Modal open onClose={onClose} title="Propose another time to the client" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!messageText.trim() || isPre) return; jobActions.propose(j.id, { date, win }, who, messageText.trim(), "09-24 18:00"); toast("Proposal sent — waiting for the client"); onClose(); }}>Send proposal</Btn></>}>
+    <Modal open onClose={onClose} title="Propose another time to the client" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!messageText.trim() || isPre) { return; } jobActions.propose(j.id, { date, win }, who, messageText.trim(), "09-24 18:00"); toast("Proposal sent — waiting for the client"); onClose(); }}>Send proposal</Btn></>}>
       <p className="text-xs text-muted-foreground">{j.id} · {j.customer} · {j.unit}</p>
       <div className="rounded-xl border-2 border-primary bg-primary-soft/50 p-3">
         <div className="mb-2 flex items-center justify-between"><b className="text-[13px] text-primary">Option A</b><Badge tone="ok">Fits · capacity held</Badge></div>
@@ -276,7 +276,7 @@ function NewJobModal({ onClose, onDone }: Readonly<{ onClose: () => void; onDone
   const [tried, setTried] = useState(false);
   const errorText = tried ? preferredError(slots) : undefined;
   return (
-    <Modal open onClose={onClose} title="New maintenance job" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (sym.trim().length < 10 || preferredError(slots)) return; const id = jobActions.create({ unitId: "unit-online-rto", unit: "Bedroom AC", loc: "Home A › 1F › Bedroom", type: "Reactive", symptom: sym.trim(), preferred: slots }); toast(`${id} created as Requested`); onDone(id); }}>Create as requested</Btn></>}>
+    <Modal open onClose={onClose} title="New maintenance job" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (sym.trim().length < 10 || preferredError(slots)) { return; } const id = jobActions.create({ unitId: "unit-online-rto", unit: "Bedroom AC", loc: "Home A › 1F › Bedroom", type: "Reactive", symptom: sym.trim(), preferred: slots }); toast(`${id} created as Requested`); onDone(id); }}>Create as requested</Btn></>}>
       <Field label="Customer · unit"><Select><option>customer-a · Bedroom AC (unit-online-rto)</option></Select></Field>
       <Field label="Symptom / scope (10+ characters)" error={tried && sym.trim().length < 10 ? "Enter at least 10 characters" : undefined}><Textarea value={sym} onChange={(e) => { setSym(e.target.value); }} placeholder="Customer called: unit leaks water at night." /></Field>
       <PreferredSlotsInput value={slots} onChange={setSlots} error={errorText} label="Customer’s preferred times (asked on the phone)" hint="Same rule as client requests: book one of these, or propose another time for the customer to accept." />
@@ -292,7 +292,7 @@ function ClassifyModal({ j, onClose }: Readonly<{ j: Job; onClose: () => void }>
   const [tried, setTried] = useState(false);
   const isBad = !r.trim() || r.length > 1000;
   return (
-    <Modal open onClose={onClose} title="Classify follow-up request" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (isBad) return; const e = jobActions.classifyFollowUp(j.id, cls, r); if (e) { toast(e, "warn"); return; } toast(cls === "rework" ? "Classified as rework (free) — book the client’s preferred visit" : "Classified as a new request — book it like any client request"); onClose(); }}>Classify</Btn></>}>
+    <Modal open onClose={onClose} title="Classify follow-up request" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (isBad) { return; } const e = jobActions.classifyFollowUp(j.id, cls, r); if (e) { toast(e, "warn"); return; } toast(cls === "rework" ? "Classified as rework (free) — book the client’s preferred visit" : "Classified as a new request — book it like any client request"); onClose(); }}>Classify</Btn></>}>
       <p className="text-xs text-muted-foreground">{j.id} · {j.customer} · {j.unit} — follow-up of {j.followUpOf}</p>
       <Field label="Classification · required"><Choice value={cls} onChange={setCls} options={[{ id: "rework", label: "Rework (free)" }, { id: "new_request", label: "New request" }]} /></Field>
       <Field label="Reason · required (1–1000 characters)" error={tried && isBad ? "A reason is required (1–1000 characters)" : undefined}><Textarea value={r} onChange={(e) => { setR(e.target.value); }} placeholder={`Drain pan still overflowing — same leak as ${j.followUpOf ?? "—"}.`} /></Field>
@@ -309,7 +309,7 @@ function ReasonModal({ what, j, onClose }: Readonly<{ what: "rework" | "hold" | 
   const title = known?.title ?? `Reassign ${j.id}`;
   const done = known?.done ?? "Reassigned — tech-internal-b must accept";
   return (
-    <Modal open onClose={onClose} title={title} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!r.trim()) return; if (what === "reassign" && j.scheduled) jobActions.book(j.id, j.scheduled, "internal", "tech-internal-b"); toast(done, "warn"); onClose(); }}>Confirm</Btn></>}>
+    <Modal open onClose={onClose} title={title} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!r.trim()) { return; } if (what === "reassign" && j.scheduled) { jobActions.book(j.id, j.scheduled, "internal", "tech-internal-b"); } toast(done, "warn"); onClose(); }}>Confirm</Btn></>}>
       {what === "reassign" && <Field label="New technician (same agreed time)"><Select><option>tech-internal-b · Available</option></Select></Field>}
       <Field label="Reason (required)" error={tried && !r.trim() ? "A reason is required" : undefined}><Textarea value={r} onChange={(e) => { setR(e.target.value); }} /></Field>
     </Modal>
