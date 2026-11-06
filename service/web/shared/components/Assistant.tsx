@@ -254,7 +254,7 @@ function CandidatePicker({ m, t, busy, onPick, onCancel }: Readonly<{
       {g && g.units.length > 1 && (
         <fieldset className="mt-3 flex flex-col gap-1.5">
           <legend className={isSeveral ? "mb-1.5 font-semibold" : "sr-only"}>{isSeveral ? t("Then: which AC in {path}?", { path: g.path }) : t("AC")}</legend>
-          <RadioGroup value={picked ?? ""} onValueChange={(v) => { setPicked(v); }} className="gap-1.5">
+          <RadioGroup value={picked ?? ""} onValueChange={(v: unknown) => { if (typeof v === "string") { setPicked(v); } }} className="gap-1.5">
             {g.units.map((u) => <RadioCard key={u.unitId} value={u.unitId} title={u.label} detail={m.status[u.unitId] ?? ""} />)}
           </RadioGroup>
         </fieldset>

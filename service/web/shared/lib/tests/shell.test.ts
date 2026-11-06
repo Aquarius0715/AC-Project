@@ -12,7 +12,7 @@ vi.mock("next/server", () => ({ connection: () => Promise.resolve() }));
 vi.mock("@ac/web/lib/dal", () => {
   return {
     apiMode: () => api.on,
-    coreOp: (...a: unknown[]) => coreOp(...a),
+    coreOp: (...a: unknown[]): unknown => coreOp(...a),
     coreIdentity: () => Promise.resolve({ displayName: "Tan Wei", organizationName: "Demo Customer A" }),
     coreDisplay: () => Promise.resolve({ language: "en", timeZone: "Asia/Kuala_Lumpur" }),
   };

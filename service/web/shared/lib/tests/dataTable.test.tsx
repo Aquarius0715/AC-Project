@@ -51,7 +51,7 @@ describe("DataTable", () => {
   });
 
   it("opens a record by a click, Enter or Space, and marks the open one", () => {
-    const open = vi.fn();
+    const open = vi.fn<(unit: (typeof units)[number]) => void>();
     render(<DataTable cols={cols} rows={units} rowKey={(u) => u.id} onRowClick={open} selectedKey="u-2" />);
     const [, bedroom, office] = screen.getAllByRole("row");
     expect([bedroom?.getAttribute("tabindex"), office?.getAttribute("tabindex")]).toEqual(["0", "0"]);
