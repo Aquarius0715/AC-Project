@@ -3,12 +3,21 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { fitFor, fmt, getJobState, jobActions, longDate, SEED, statusLabel, type Slot } from "@ac/web/lib/jobs";
 import { must } from "./must";
 
+const TEXT_14_00_16_00 = "14:00–16:00";
+const TEXT_2026_10_06 = "2026-10-06";
+const TEXT_10_00_12_00 = "10:00–12:00";
+const TECH_INTERNAL_A = "tech-internal-a";
+const JOB_INTERNAL_A = "job-internal-a";
+const CONTRACTOR = "contractor";
+const CONTRACTOR_A = "contractor-a";
+const TECH_EXTERNAL_A = "tech-external-a";
+
 // The Phase 1A maintenance demo (IR113, FR-X05): one store for the four apps of a tab. The actions are local and
 // synchronous, so a refusal comes back at once.
 const job = (id: string) => must(getJobState().jobs.find((j) => j.id === id));
 const notes = (role: string) => getJobState().notes.filter((n) => n.role === role);
-const slot: Slot = { date: "2026-10-05", win: "14:00–16:00" };
-const prefs: Slot[] = [{ date: "2026-10-06", win: "10:00–12:00" }, { date: "2026-10-07", win: "10:00–12:00" }, { date: "2026-10-08", win: "10:00–12:00" }];
+const slot: Slot = { date: "2026-10-05", win: TEXT_14_00_16_00 };
+const prefs: Slot[] = [{ date: TEXT_2026_10_06, win: TEXT_10_00_12_00 }, { date: "2026-10-07", win: TEXT_10_00_12_00 }, { date: "2026-10-08", win: TEXT_10_00_12_00 }];
 const completed = must(SEED.find((j) => j.status === "completed"));
 
 beforeEach(() => {
@@ -25,41 +34,41 @@ describe("a request in the maintenance demo", () => {
   });
 
   it("is booked at a preferred time for an internal technician, or offered to a contractor", () => {
-    jobActions.book("job-c07", slot, "internal", "tech-internal-a");
-    expect(job("job-c07")).toMatchObject({ status: "assigned", scheduled: slot, delivery: "internal", technician: "tech-internal-a", techAck: { status: "pending" } });
+    jobActions.book("job-c07", slot, "internal", TECH_INTERNAL_A);
+    expect(job("job-c07")).toMatchObject({ status: "assigned", scheduled: slot, delivery: "internal", technician: TECH_INTERNAL_A, techAck: { status: "pending" } });
     expect([notes("technician")[0]?.title, notes("client")[0]?.title]).toEqual(["New assignment job-c07", "Booked: job-c07"]);
-    jobActions.book("job-internal-a", slot, "contractor", "contractor-a");
-    expect(job("job-internal-a")).toMatchObject({ status: "offered", delivery: "contractor", contractor: "contractor-a", technician: null });
-    expect(notes("contractor")[0]?.title).toBe("New offer job-internal-a");
+    jobActions.book(JOB_INTERNAL_A, slot, CONTRACTOR, CONTRACTOR_A);
+    expect(job(JOB_INTERNAL_A)).toMatchObject({ status: "offered", delivery: CONTRACTOR, contractor: CONTRACTOR_A, technician: null });
+    expect(notes(CONTRACTOR)[0]?.title).toBe("New offer job-internal-a");
   });
 
   it("follows HQ's proposal: accepted with whoever was held, declined with new times, or withdrawn", () => {
-    jobActions.propose("job-c07", slot, "tech-internal-a", "Can we come then?", "09-24");
+    jobActions.propose("job-c07", slot, TECH_INTERNAL_A, "Can we come then?", "09-24");
     expect(job("job-c07")).toMatchObject({ status: "time_proposed", proposal: { by: "hq", status: "pending", replyBy: "09-24" } });
     jobActions.accept("job-c07");
-    expect(job("job-c07")).toMatchObject({ status: "assigned", delivery: "internal", technician: "tech-internal-a", proposal: { status: "accepted" } });
-    jobActions.propose("job-internal-a", slot, "contractor-a (held)", "Or then?", "09-24");
-    jobActions.accept("job-internal-a");
-    expect(job("job-internal-a")).toMatchObject({ status: "offered", delivery: "contractor", contractor: "contractor-a" });
+    expect(job("job-c07")).toMatchObject({ status: "assigned", delivery: "internal", technician: TECH_INTERNAL_A, proposal: { status: "accepted" } });
+    jobActions.propose(JOB_INTERNAL_A, slot, "contractor-a (held)", "Or then?", "09-24");
+    jobActions.accept(JOB_INTERNAL_A);
+    expect(job(JOB_INTERNAL_A)).toMatchObject({ status: "offered", delivery: CONTRACTOR, contractor: CONTRACTOR_A });
 
     jobActions.reset();
-    jobActions.propose("job-c07", slot, "tech-internal-a", "Can we come then?", "09-24");
+    jobActions.propose("job-c07", slot, TECH_INTERNAL_A, "Can we come then?", "09-24");
     jobActions.decline("job-c07", "time_not_suitable", "evenings only", prefs);
     expect(job("job-c07")).toMatchObject({ status: "requested", round: 2, preferred: prefs, declined: { reason: "time_not_suitable", comment: "evenings only" }, proposal: { status: "declined" } });
-    jobActions.propose("job-c07", slot, "tech-internal-a", "Or then?", "09-24");
+    jobActions.propose("job-c07", slot, TECH_INTERNAL_A, "Or then?", "09-24");
     jobActions.withdraw("job-c07");
     expect(job("job-c07")).toMatchObject({ status: "requested", proposal: { status: "withdrawn" } });
     expect(notes("client")[0]?.title).toBe("Proposal withdrawn — job-c07");
   });
 
   it("forwards a contractor's time to the customer, who approves it, or HQ keeps the agreed time", () => {
-    jobActions.partnerPropose("job-a11", slot, "tech-external-a", "van in repair");
-    expect(job("job-a11").partnerProposal).toMatchObject({ status: "pending", tech: "tech-external-a", reason: "van in repair" });
+    jobActions.partnerPropose("job-a11", slot, TECH_EXTERNAL_A, "van in repair");
+    expect(job("job-a11").partnerProposal).toMatchObject({ status: "pending", tech: TECH_EXTERNAL_A, reason: "van in repair" });
     jobActions.forwardPartner("job-a11", "09-24");
-    expect(job("job-a11")).toMatchObject({ status: "time_proposed", proposal: { by: "contractor", who: "contractor-a · tech-external-a" }, partnerProposal: { status: "sent_to_client" } });
+    expect(job("job-a11")).toMatchObject({ status: "time_proposed", proposal: { by: CONTRACTOR, who: "contractor-a · tech-external-a" }, partnerProposal: { status: "sent_to_client" } });
     jobActions.accept("job-a11");
     expect(job("job-a11")).toMatchObject({ status: "offered", scheduled: slot, proposal: { status: "accepted" }, partnerProposal: { status: "approved" } });
-    jobActions.partnerPropose("job-a11", slot, "tech-external-a", "again");
+    jobActions.partnerPropose("job-a11", slot, TECH_EXTERNAL_A, "again");
     jobActions.keepTime("job-a11");
     expect(job("job-a11").partnerProposal?.status).toBe("rejected");
     jobActions.partnerWithdraw("job-a11");
@@ -79,15 +88,15 @@ describe("notes, follow-ups and answers in the maintenance demo", () => {
     expect(jobActions.addNote("job-c07", " Gate code 4821 ")).toBeNull();
     expect(job("job-c07").notes?.at(-1)).toMatchObject({ by: "customer-a", text: "Gate code 4821" });
     jobActions.addNote("job-a11", "Parking at the back");
-    expect(notes("contractor")[0]?.title).toBe("Client note on job-a11");
+    expect(notes(CONTRACTOR)[0]?.title).toBe("Client note on job-a11");
   });
 
   it("opens a follow-up from a completed job only, and classifies it once", () => {
     expect(jobActions.reportProblem("job-c07", "same_problem", "still dripping", "")).toEqual({ error: "CONFLICT — only completed jobs can be reported" });
-    const reported = jobActions.reportProblem(completed.id, "same_problem", "still dripping", "2026-10-06");
+    const reported = jobActions.reportProblem(completed.id, "same_problem", "still dripping", TEXT_2026_10_06);
     expect(reported).toHaveProperty("id");
     const id = "id" in reported ? reported.id ?? "" : "";
-    expect(job(id)).toMatchObject({ status: "requested", followUpOf: completed.id, followUpClass: "pending", unitId: completed.unitId, preferred: [{ date: "2026-10-06", win: "09:00–12:00" }] });
+    expect(job(id)).toMatchObject({ status: "requested", followUpOf: completed.id, followUpClass: "pending", unitId: completed.unitId, preferred: [{ date: TEXT_2026_10_06, win: "09:00–12:00" }] });
     expect(jobActions.classifyFollowUp(id, "rework", " ")).toBe("A reason is required (1–1000 characters)");
     expect(jobActions.classifyFollowUp(id, "rework", "same fault")).toBeNull();
     expect(job(id)).toMatchObject({ followUpClass: "rework", followUpReason: "same fault" });
@@ -98,17 +107,17 @@ describe("notes, follow-ups and answers in the maintenance demo", () => {
   it("takes the contractor's and the technician's answers, and the customer's cancellation", () => {
     jobActions.partnerAccept("job-a11");
     expect(job("job-a11").status).toBe("accepted");
-    jobActions.partnerAssign("job-a11", "tech-external-a");
-    expect(job("job-a11")).toMatchObject({ status: "assigned", technician: "tech-external-a", techAck: { status: "pending" } });
+    jobActions.partnerAssign("job-a11", TECH_EXTERNAL_A);
+    expect(job("job-a11")).toMatchObject({ status: "assigned", technician: TECH_EXTERNAL_A, techAck: { status: "pending" } });
     jobActions.techCantMake("job-a11", "sick", "09-26 AM");
     expect(job("job-a11").techAck).toMatchObject({ status: "cant_make", reason: "sick", alt: "09-26 AM" });
-    expect(notes("contractor")[0]?.title).toBe("tech-external-a can’t make job-a11"); // the contractor's own job
+    expect(notes(CONTRACTOR)[0]?.title).toBe("tech-external-a can’t make job-a11"); // the contractor's own job
     jobActions.techAccept("job-c05");
     expect(job("job-c05").techAck?.status).toBe("accepted");
     expect(notes("client")[0]?.title).toBe("Technician confirmed — job-c05");
-    jobActions.book("job-internal-a", slot, "contractor", "contractor-a");
-    jobActions.partnerDecline("job-internal-a", "no free hours");
-    expect(job("job-internal-a")).toMatchObject({ status: "requested", contractor: null, delivery: null, scheduled: null });
+    jobActions.book(JOB_INTERNAL_A, slot, CONTRACTOR, CONTRACTOR_A);
+    jobActions.partnerDecline(JOB_INTERNAL_A, "no free hours");
+    expect(job(JOB_INTERNAL_A)).toMatchObject({ status: "requested", contractor: null, delivery: null, scheduled: null });
     jobActions.cancel("job-c07", "moved out");
     const cancelled = job("job-c07");
     expect(cancelled.status).toBe("cancelled");
@@ -127,8 +136,8 @@ describe("notes, follow-ups and answers in the maintenance demo", () => {
 
 describe("demo availability and slot texts", () => {
   it("names who fits a time and formats slots", () => {
-    expect([fitFor({ date: "2026-09-28", win: "14:00–16:00" }).fits, fitFor({ date: "2026-10-02", win: "14:00–16:00" }).fits, fitFor(slot).fits, fitFor({ date: "2026-10-05", win: "10:00–12:00" }).fits])
-      .toEqual(["none", "none", "both", "contractor"]);
+    expect([fitFor({ date: "2026-09-28", win: TEXT_14_00_16_00 }).fits, fitFor({ date: "2026-10-02", win: TEXT_14_00_16_00 }).fits, fitFor(slot).fits, fitFor({ date: "2026-10-05", win: TEXT_10_00_12_00 }).fits])
+      .toEqual(["none", "none", "both", CONTRACTOR]);
     expect([fmt(slot), fmt(null), longDate(slot)]).toEqual(["10-05 · 14:00–16:00", "—", "Mon 10-05 · 14:00–16:00"]);
     expect(Object.keys(statusLabel)).toHaveLength(11);
   });

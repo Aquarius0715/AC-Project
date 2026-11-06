@@ -8,6 +8,8 @@ import { typeLabel } from "@ac/web/lib/partnerJobDetail";
 import { wrapped } from "@ac/web/lib/text";
 import { entryOf } from "@ac/web/lib/lookup";
 
+const ADJUSTMENT = "adjustment";
+
 const en = translator("en");
 
 /** PayoutStatement of service-contracts.ts. */
@@ -22,7 +24,7 @@ export interface JobLabel { title: string; sub: string | null }
 /** A delegated job still in quality review (jobs.list status submitted): “Not included · next statement”. */
 export interface ReviewingJob { id: string; type: string; unitName: string | null; submittedAt?: string | null }
 
-const plain = (s: string) => s.replaceAll(/[   ]/g, " ");
+const plain = (s: string) => s.replaceAll(/[\u{A0}\u{2009}\u{202F}]/gu, " ");
 /** “Sept 2026” from a YYYY-MM period in the user's language. */
 export const periodLabel = (p: string, locale: Locale = "en") =>
   /^\d{4}-\d{2}$/.test(p) ? plain(new Date(`${p}-15T00:00:00Z`).toLocaleDateString(intlTag(locale), { month: "short", year: "numeric", timeZone: "UTC" })) : p;
@@ -55,7 +57,7 @@ export interface Kpi { label: string; value: string; sub: string; badge?: { labe
 export function kpis(s: ApiPayoutStatement, rateCard: string | null, i: I18n = EN): Kpi[] {
   const { t, display } = i;
   const jobs = new Set(s.lines.filter((l) => l.kind === "charge").map((l) => l.jobId)).size;
-  const deductions = s.lines.filter((l) => l.kind === "deduction" || (l.kind === "adjustment" && l.amountMinor < 0)).length;
+  const deductions = s.lines.filter((l) => l.kind === "deduction" || (l.kind === ADJUSTMENT && l.amountMinor < 0)).length;
   return [
     { label: t("Jobs paid"), value: String(jobs), sub: t("review-accepted in {month}", { month: monthName(s.period, display.locale) }) },
     { label: t("Gross"), value: money(s.grossMinor, s.currency), sub: rateCard ? t("rate card {card}", { card: rateCard }) : t("rate card set by HQ") },
@@ -77,17 +79,17 @@ function deductionsText(n: number, t: T): string {
   if (n === 0) return t("none");
   return t(n === 1 ? "1 rework deduction" : "{n} rework deductions", { n });
 }
-const LINE_TONE = new Map<LineStatus, "warn" | "primary">([["deduction", "warn"], ["adjustment", "primary"]]);
+const LINE_TONE = new Map<LineStatus, "warn" | "primary">([["deduction", "warn"], [ADJUSTMENT, "primary"]]);
 /** A statement line's work: a rework deduction, an HQ adjustment, or the job's title (its work type when unknown). */
 function lineWork(status: LineStatus, l: ApiPayoutStatement["lines"][number], j: JobLabel | undefined, t: T): string {
   if (status === "deduction") return t("Rework deduction");
-  if (status === "adjustment") return t(l.note ? "Adjustment" : "Adjustment from HQ");
+  if (status === ADJUSTMENT) return t(l.note ? "Adjustment" : "Adjustment from HQ");
   return j?.title ?? t(workLabel[l.workType]);
 }
 /** The line's second row: the note, the job's sub line, or why a deduction was made. */
 function lineSub(status: LineStatus, l: ApiPayoutStatement["lines"][number], j: JobLabel | undefined, t: T): string | null {
   if (status === "deduction") return l.note ?? t("report returned for rework");
-  if (status === "adjustment") return l.note ?? null;
+  if (status === ADJUSTMENT) return l.note ?? null;
   return j?.sub ?? l.note ?? null;
 }
 /** The lines table (Figma 06-1): charges, deductions and adjustments of the statement, then the company's jobs
@@ -98,7 +100,7 @@ export function lineRows(s: ApiPayoutStatement, jobs: Map<string, JobLabel>, rev
   const inStatement = new Set(s.lines.map((l) => l.jobId));
   const rows: LineRow[] = s.lines.map((l) => {
     const j = jobs.get(l.jobId);
-    const status: LineStatus = l.kind === "deduction" || l.kind === "adjustment" ? l.kind : "accepted";
+    const status: LineStatus = l.kind === "deduction" || l.kind === ADJUSTMENT ? l.kind : "accepted";
     return {
       key: l.id,
       lineId: l.id,
@@ -157,7 +159,7 @@ export function payoutPdf(s: ApiPayoutStatement, rows: LineRow[], company: strin
     `${t("Net payable").padEnd(57)} ${money(s.netMinor, s.currency).padStart(12)}`, "",
     t("Rates come from the contractor's rate card with HQ. Only review-accepted jobs are paid."), t("Demo document - not a tax invoice."),
   ];
-  const esc = (x: string) => x.replaceAll(/[^\x20-\x7E]/g, "-").replaceAll(/[\\()]/g, (c) => "\\" + c);
+  const esc = (x: string) => x.replaceAll(/[^\u{20}-\u{7E}]/gu, "-").replaceAll(/[\\()]/g, (c) => "\\" + c);
   const stream = `BT /F1 9 Tf 40 800 Td 12 TL ${text.map((l) => `(${esc(l)}) Tj T*`).join(" ")} ET`;
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",

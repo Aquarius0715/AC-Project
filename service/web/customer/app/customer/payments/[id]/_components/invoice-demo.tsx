@@ -1,4 +1,5 @@
 "use client";
+const PROCESSING = "processing";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -36,14 +37,14 @@ export function InvoiceDemo({ id, tab }: Readonly<{ id: string; tab?: string }>)
   const isPaid = id !== "invoice-overdue-a" && id !== "invoice-sep-a";
 
   const pay = () => {
-    setPhase("processing");
+    setPhase(PROCESSING);
     setTimeout(() => { setPhase(method === "debit" ? "failed" : "confirmed"); }, 1800);
   };
   // the amount card's badge: paid, confirmed or processing in this demo, else unpaid
   const amountBadge = () => {
     if (isPaid) return <Badge tone="ok" icon="check">Paid</Badge>;
     if (phase === "confirmed") return <Badge tone="ok" icon="check">Confirmed</Badge>;
-    return phase === "processing" ? <Badge tone="primary">Processing</Badge> : <Badge tone="crit">Unpaid</Badge>;
+    return phase === PROCESSING ? <Badge tone="primary">Processing</Badge> : <Badge tone="crit">Unpaid</Badge>;
   };
   return (
     <Page>
@@ -67,7 +68,7 @@ export function InvoiceDemo({ id, tab }: Readonly<{ id: string; tab?: string }>)
               <div className="mt-3 flex justify-end">{method === "bank" ? <Btn onClick={() => { toast("Bank instructions shown — invoice stays unpaid", "warn"); }}>View instructions</Btn> : <Btn variant="primary" onClick={pay}>Pay now</Btn>}</div>
             </>
           )}
-          {phase === "processing" && <div className="mt-4"><Banner>Processing… “Processing” is not paid. HQ confirms the payment.</Banner></div>}
+          {phase === PROCESSING && <div className="mt-4"><Banner>Processing… “Processing” is not paid. HQ confirms the payment.</Banner></div>}
           {phase === "confirmed" && <div className="mt-4"><Banner tone="ok">Payment confirmed (demo). Restriction release pending — cooling is restored only after the units confirm.</Banner></div>}
           {phase === "failed" && <div className="mt-4"><Banner tone="crit" action={<Btn size="sm" onClick={() => { setMethod("credit"); setPhase("choose"); }}>Retry</Btn>}>Payment failed — invoice stays unpaid. Retry or choose another method.</Banner></div>}
         </Card>

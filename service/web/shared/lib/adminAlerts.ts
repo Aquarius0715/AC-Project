@@ -13,6 +13,9 @@ import { filled } from "@ac/web/lib/filled";
 import { wrapped } from "@ac/web/lib/text";
 import { entryOf, lookup } from "@ac/web/lib/lookup";
 
+const TEMPERATURE = "temperature";
+const DEFAULT_ALERT = "default_alert";
+
 const en = translator("en");
 
 export type Severity = "critical" | "warning" | "normal";
@@ -80,7 +83,7 @@ export const metricLabel: Record<string, string> = {
 export const metricUnit: Record<string, string> = { temperature: "°C", humidity: "%", co2: "ppm", pm25: "µg/m³", power: "kW", vibration: "mm/s", refrigerant_pressure: "kPa", compressor_cycles: "cycles/h", airflow_drop: "%", heartbeat_gap: "min" };
 export const opSymbol: Record<Operator, string> = { gt: ">", gte: "≥", lt: "<", lte: "≤" };
 /** The metrics an HQ alert policy may watch (IR66 item 3, the Core API's hqMetrics); default rules have their own. */
-export const HQ_METRICS = ["temperature", "humidity", "co2", "pm25", "refrigerant_pressure", "vibration", "power"] as const;
+export const HQ_METRICS = [TEMPERATURE, "humidity", "co2", "pm25", "refrigerant_pressure", "vibration", "power"] as const;
 const sevRank: Record<Severity, number> = { critical: 0, warning: 1, normal: 2 };
 const stRank: Record<AlertState, number> = { open: 0, acknowledged: 1, resolved: 2 };
 const stLabel: Record<AlertState, string> = { open: "Open", acknowledged: "Acknowledged", resolved: "Resolved" };
@@ -135,15 +138,15 @@ export function policyRows(policies: ApiPolicy[], customers: ApiCustomerName[], 
   const member = new Map(members.map((m) => [m.id, m]));
   const unitName = new Map(units.map((u) => [u.id, u.displayName]));
   return policies
-    .filter((p): p is ApiPolicy & { kind: "alert" | "default_alert" } => p.kind === "alert" || p.kind === "default_alert")
+    .filter((p): p is ApiPolicy & { kind: "alert" | "default_alert" } => p.kind === "alert" || p.kind === DEFAULT_ALERT)
     // the default policy first, then by name
-    .toSorted((a, b) => Number(b.kind === "default_alert") - Number(a.kind === "default_alert") || a.name.localeCompare(b.name))
+    .toSorted((a, b) => Number(b.kind === DEFAULT_ALERT) - Number(a.kind === DEFAULT_ALERT) || a.name.localeCompare(b.name))
     .map((p) => {
       const customerName = p.customerId ? cust.get(p.customerId) ?? t("customer") : "";
       const op = p.operator ?? "gte";
       const metric = p.metric ?? "";
       const rules = p.rules?.length ?? 0;
-      const sub = p.kind === "default_alert"
+      const sub = p.kind === DEFAULT_ALERT
         ? byCount(rules, { one: t("1 rule · ventilation (CO₂, PM2.5) + fault causes"), many: t("{n} rules · ventilation (CO₂, PM2.5) + fault causes", { n: rules }) })
         : `${textOf(metricLabel, metric, t) ?? metric} ${entryOf(opSymbol, op)} ${String(p.threshold ?? "—")} ${lookup(metricUnit, metric) ?? ""} ${t("for {n} s", { n: p.durationSeconds ?? 0 })}`;
       const recipients = (p.recipientMembershipIds ?? []).map((id) => {
@@ -156,13 +159,13 @@ export function policyRows(policies: ApiPolicy[], customers: ApiCustomerName[], 
         version: p.version,
         kind: p.kind,
         name: p.name,
-        group: p.kind === "default_alert" ? t("DEFAULT · ON EVERY UNIT") : customerName.toUpperCase(),
+        group: p.kind === DEFAULT_ALERT ? t("DEFAULT · ON EVERY UNIT") : customerName.toUpperCase(),
         on: p.enabled,
-        units: p.kind === "default_alert" ? t("every unit") : byCount(p.unitIds.length, { one: t("1 unit"), many: t("{n} units", { n: p.unitIds.length }) }),
+        units: p.kind === DEFAULT_ALERT ? t("every unit") : byCount(p.unitIds.length, { one: t("1 unit"), many: t("{n} units", { n: p.unitIds.length }) }),
         customerId: p.customerId ?? null,
         priority: p.priority,
         timezone: p.timezone,
-        metric: p.metric ?? "temperature",
+        metric: p.metric ?? TEMPERATURE,
         operator: op,
         threshold: p.threshold ?? 0,
         recovery: p.recoveryThreshold ?? 0,
@@ -220,7 +223,7 @@ export function blankPolicyDraft(customer: { id: string; name: string }, timezon
     customerId: customer.id,
     customerName: customer.name,
     priority: 50,
-    metric: "temperature",
+    metric: TEMPERATURE,
     operator: "gte",
     threshold: 30,
     recovery: 28,
@@ -277,7 +280,7 @@ export const ruleChanges = (draft: AdminPolicy, saved: AdminPolicy): string[] =>
   draft.rules.filter((r) => { const o = saved.rules.find((x) => x.ruleKey === r.ruleKey); return !o || JSON.stringify(ruleShape(r)) !== JSON.stringify(ruleShape(o)); }).map((r) => r.name);
 
 const ruleCategories = ["air_quality", "fault", "maintenance", "connection"] as const;
-const contractMetrics = ["temperature", "humidity", "co2", "pm25", "power", "vibration", "refrigerant_pressure", "compressor_cycles", "airflow_drop", "heartbeat_gap"] as const satisfies readonly ContractMetric[];
+const contractMetrics = [TEMPERATURE, "humidity", "co2", "pm25", "power", "vibration", "refrigerant_pressure", "compressor_cycles", "airflow_drop", "heartbeat_gap"] as const satisfies readonly ContractMetric[];
 /** policies.save input for the default policy's limits (DefaultPolicyInput, IR120 item 2): all six rules in their order
 with their fixed key, name, category and metric; saving changes them for every unit. */
 export function defaultRulesInput(p: AdminPolicy): OpInput<"policies.save"> {

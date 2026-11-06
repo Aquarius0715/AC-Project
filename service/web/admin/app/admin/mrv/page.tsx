@@ -14,6 +14,8 @@ import { MRVDemo } from "./_components/mrv-demo";
 import { MRVView, type MRVLive } from "./_components/mrv-view";
 import { queryReader } from "@ac/web/lib/searchParams";
 
+const ORGANIZATIONID = "organizationId";
+
 interface Unit { id: string; displayName: string; customerOrgId: string; archived: boolean }
 
 // a role without the page's read permission sees which one it needs, not a failure (IR582)
@@ -46,13 +48,13 @@ async function AdminMRVPageContent({ searchParams }: Readonly<PageProps<"/admin/
     interface Page<T> { items: T[] }
     const status = one("status") === "draft" || one("status") === "demo_reviewed" ? one("status") : undefined;
     const filters = {
-      ...(one("organizationId") && { organizationId: one("organizationId") }), ...(one("unitId") && { unitId: one("unitId") }), ...(status && { status }),
+      ...(one(ORGANIZATIONID) && { organizationId: one(ORGANIZATIONID) }), ...(one("unitId") && { unitId: one("unitId") }), ...(status && { status }),
       ...(fromQ && { from: klInstant(fromQ) }), ...(toQ && { to: klInstant(toQ) }),
     };
     const list = await coreOp<Page<ApiMRVReport>>("mrv.list", { limit: 100, filters });
     const rows = reportRows(list.items, customers, i.t);
     const id = rows.find((r) => r.id === one("reportId"))?.id ?? rows[0]?.id;
-    live.reports = { rows, scope: { organizationId: one("organizationId"), unitId: one("unitId"), from: one("from") ?? "", to: one("to") ?? "", status } };
+    live.reports = { rows, scope: { organizationId: one(ORGANIZATIONID), unitId: one("unitId"), from: one("from") ?? "", to: one("to") ?? "", status } };
     if (id) {
       const wanted = Number(one("reportVersion"));
       const [versions, latest] = await Promise.all([

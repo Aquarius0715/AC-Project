@@ -2,6 +2,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
+const CUSTOMER_ALERTS = "/customer/alerts";
+
 // the request's cookie jar and a session store kept in memory (GETEX / SET / DEL)
 const jar = vi.hoisted(() => ({ value: null as string | null, get: vi.fn(), set: vi.fn(), delete: vi.fn() }));
 const kv = vi.hoisted(() => new Map<string, string>());
@@ -31,6 +33,7 @@ import { signedOutReason, signInAgainHref } from "@ac/web/lib/login";
 import { GET as login } from "@ac/web/bff/auth/login/route";
 import { GET as callback } from "@ac/web/bff/auth/callback/route";
 import { must } from "./must";
+
 const locationOf = (res: Response) => new URL(must(res.headers.get("location"))); // where a redirect leads
 
 const b64 = (v: unknown) => Buffer.from(JSON.stringify(v)).toString("base64url");
@@ -77,14 +80,14 @@ describe("signing in again after a revocation", () => {
 
   const signIn = (pending: { reauth?: boolean; returnTo?: string | null }, coreAnswer: Response) => {
     vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(url.includes("/protocol/openid-connect/token") ? json(200, { access_token: token, refresh_token: "r-1", expires_in: 300 }) : coreAnswer)));
-    const cookie = seal({ state: "s-1", verifier: "v-1", returnTo: "/customer/alerts", ...pending });
+    const cookie = seal({ state: "s-1", verifier: "v-1", returnTo: CUSTOMER_ALERTS, ...pending });
     return callback(new NextRequest("http://localhost:3000/bff/auth/callback?code=c-1&state=s-1", { headers: { cookie: `${OIDC_COOKIE}=${cookie}` } }));
   };
 
   it("turns a single sign-on answer with the old sign-in into one password prompt", async () => {
     const res = await signIn({}, json(401, revoked));
     const to = locationOf(res);
-    expect([to.pathname, to.searchParams.get("reauth"), to.searchParams.get("returnTo"), kv.size]).toEqual(["/bff/auth/login", "1", "/customer/alerts", 0]);
+    expect([to.pathname, to.searchParams.get("reauth"), to.searchParams.get("returnTo"), kv.size]).toEqual(["/bff/auth/login", "1", CUSTOMER_ALERTS, 0]);
   });
 
   it("gives up after the password prompt rather than looping", async () => {
@@ -94,7 +97,7 @@ describe("signing in again after a revocation", () => {
 
   it("starts the session when the Core API takes the sign-in", async () => {
     const res = await signIn({ reauth: true }, json(200, { data: {} }));
-    expect([locationOf(res).pathname, kv.size]).toEqual(["/customer/alerts", 1]);
+    expect([locationOf(res).pathname, kv.size]).toEqual([CUSTOMER_ALERTS, 1]);
   });
 
   // open redirects (security check R380): a crafted returnTo goes through the sign-in, the password prompt after a
@@ -110,7 +113,7 @@ describe("signing in again after a revocation", () => {
       const first = await kept(`${origin}/bff/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
       const refused = await signIn({ returnTo: first.returnTo }, json(401, revoked));
       const hop = locationOf(refused);
-      const second = await kept(hop.toString());
+      const second = await kept(hop.href);
       const signedIn = await signIn({ returnTo: second.returnTo, reauth: second.reauth }, json(200, { data: {} }));
       const home = locationOf(signedIn);
       expect([returnTo, hop.origin, hop.pathname, home.origin]).toEqual([returnTo, origin, "/bff/auth/login", origin]);

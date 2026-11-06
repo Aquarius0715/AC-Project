@@ -9,6 +9,14 @@ import { codePoints, isEmail } from "@ac/web/lib/text";
 import { isAfter } from "@ac/web/lib/order";
 import { lookup } from "@ac/web/lib/lookup";
 
+const CONTRACTOR = "contractor";
+const TECHNICIAN = "technician";
+const IDENTITY_WRITE = "identity.write";
+const DEVICE_MAINTAIN = "device.maintain";
+const CONTROL_DIAGNOSE = "control.diagnose";
+const RESTRICTION_OVERRIDE = "restriction.override";
+const NO_USER = "00000000-0000-0000-0000-000000000000";
+
 const en = translator("en");
 
 export type Role = "admin" | "contractor" | "technician";
@@ -22,10 +30,6 @@ export interface ApiMember {
 }
 export interface ApiOrganization { id: string; name: string; kind: "customer" | "contractor" | "operator"; status: string }
 
-const IDENTITY_WRITE = "identity.write";
-const DEVICE_MAINTAIN = "device.maintain";
-const CONTROL_DIAGNOSE = "control.diagnose";
-const RESTRICTION_OVERRIDE = "restriction.override";
 const PARTNER_ACTIONS = ["partner.accept", "partner.assign", "partner.review"];
 /** The permission matrix: one row per resource with Read / Write and independent actions (IR107). */
 export interface PermissionRow { res: string; read?: string; write?: string; actions?: string[] }
@@ -60,7 +64,7 @@ export function resourceWord(res: string, t: T = en): string {
 /** A role (and a technician's employment) as the screen words it. */
 export const roleWord = (role: Role, employment: ApiMember["employment"], t: T = en) => {
   if (role === "admin") return t("Admin");
-  if (role === "contractor") return t("Contractor");
+  if (role === CONTRACTOR) return t("Contractor");
   return t(employment === "external" ? "Technician · external" : "Technician · internal");
 };
 export const allPermissions = permissionRows.flatMap((r) => [r.read, r.write, ...(r.actions ?? [])].filter((p): p is string => !!p));
@@ -113,12 +117,11 @@ export const zonedLocal = (iso: string, zone: string) => {
 const zonedFrom = (local: string, zone: string) => zonedInstant(local.slice(0, 10), local.slice(11, 16), zone);
 
 /** The user ID members.save receives with newUser: none yet. */
-const NO_USER = "00000000-0000-0000-0000-000000000000";
 
 /** The form of a membership; the valid period is typed in the display time zone (NFR-08). A new one starts `now` (the
 business clock), as most do, so the period needs only its end (IR622). */
 export function memberDraft(m?: ApiMember, tenantId = "", zone = "Asia/Kuala_Lumpur", now?: string): MemberDraft {
-  if (!m || m.role === "client") return { userId: "", organizationId: "", role: "contractor", employment: "internal", permissions: roleDefaults.contractor, scopes: [], validFrom: now ? zonedLocal(now, zone) : "", validUntil: "", reason: "", creatingUser: false, inviteEmail: "", inviteName: "" };
+  if (!m || m.role === "client") return { userId: "", organizationId: "", role: CONTRACTOR, employment: "internal", permissions: roleDefaults.contractor, scopes: [], validFrom: now ? zonedLocal(now, zone) : "", validUntil: "", reason: "", creatingUser: false, inviteEmail: "", inviteName: "" };
   return {
     creatingUser: false, inviteEmail: "", inviteName: "",
     userId: m.userId, organizationId: m.organizationId, role: m.role, employment: m.employment ?? "internal", permissions: m.permissions, scopes: m.role === "admin" && m.scopes.length === 0 && tenantId ? [{ kind: "tenant", id: tenantId }] : m.scopes,
@@ -127,7 +130,7 @@ export function memberDraft(m?: ApiMember, tenantId = "", zone = "Asia/Kuala_Lum
 }
 
 /** The organization kind each role (and employment) belongs to. */
-export const orgKind = (role: Role, employment: MemberDraft["employment"]): ApiOrganization["kind"] => (role === "contractor" || (role === "technician" && employment === "external") ? "contractor" : "operator");
+export const orgKind = (role: Role, employment: MemberDraft["employment"]): ApiOrganization["kind"] => (role === CONTRACTOR || (role === TECHNICIAN && employment === "external") ? CONTRACTOR : "operator");
 
 /** The fields of the form with a check, top to bottom: a refused save focuses the first one with an error (IR622). */
 export const MEMBER_FIELDS = ["newUser.displayName", "newUser.email", "userId", "organizationId", "scopes", "validFrom", "validUntil", "permissions", "reason"] as const;
@@ -149,10 +152,10 @@ export function memberErrors(d: MemberDraft, ctx: { selfUserId: string; current?
   for (const r of permissionRows) if (r.write && d.permissions.includes(r.write) && r.read && !d.permissions.includes(r.read)) e.permissions = t("{write} needs {read}", { write: r.write, read: r.read });
   const gained = d.permissions.filter((p) => selfBlocked.includes(p) && !(ctx.current?.permissions ?? []).includes(p));
   if (!d.creatingUser && d.userId === ctx.selfUserId && gained.length > 0) e.permissions = t("Another identity administrator must grant {list} to you", { list: gained.join(", ") });
-  if (d.role === "technician" && d.scopes.length === 0) e.scopes = t("Add at least one unit, property or customer organization");
+  if (d.role === TECHNICIAN && d.scopes.length === 0) e.scopes = t("Add at least one unit, property or customer organization");
   if (!d.validFrom) e.validFrom = t("Required");
   if (d.validUntil && d.validFrom && !isAfter(d.validUntil, d.validFrom)) e.validUntil = t("Must be after valid from");
-  if (d.role === "technician" && d.employment === "external" && !d.validUntil) e.validUntil = t("External technicians need an end date");
+  if (d.role === TECHNICIAN && d.employment === "external" && !d.validUntil) e.validUntil = t("External technicians need an end date");
   if (codePoints(d.reason.trim()) === 0 || d.reason.length > 1000) e.reason = t("A change reason is required (1–1000 characters)");
   return e;
 }
@@ -160,7 +163,7 @@ export function memberErrors(d: MemberDraft, ctx: { selfUserId: string; current?
 /** members.save input; the valid period typed in `zone` becomes instants. */
 export function memberInput(d: MemberDraft, id?: string, zone = "Asia/Kuala_Lumpur"): OpInput<"members.save"> {
   return {
-    ...(id && { id }), organizationId: d.organizationId, role: d.role, employment: d.role === "technician" ? d.employment : null,
+    ...(id && { id }), organizationId: d.organizationId, role: d.role, employment: d.role === TECHNICIAN ? d.employment : null,
     // a new person goes as newUser, with no user ID yet (IR461)
     ...(!id && d.creatingUser ? { userId: NO_USER, "newUser": { email: d.inviteEmail.trim(), displayName: d.inviteName.trim() } } : { userId: d.userId }),
     permissions: d.permissions.filter(isPermission), scopes: d.scopes, validFrom: zonedFrom(d.validFrom, zone), validUntil: d.validUntil ? zonedFrom(d.validUntil, zone) : null, reason: d.reason.trim(),

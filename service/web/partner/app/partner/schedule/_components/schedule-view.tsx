@@ -1,4 +1,6 @@
 "use client";
+const TEXT_MUTED_FOREGROUND = "text-muted-foreground";
+const TEXT_PRIMARY = "text-primary";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -13,7 +15,7 @@ import { assignTechnician } from "../actions";
 import type { ScheduleLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
 
-const toneText: Record<string, string> = { crit: "text-crit", warn: "text-warn", muted: "text-muted-foreground", primary: "text-primary", ok: "text-ok" };
+const toneText: Record<string, string> = { crit: "text-crit", warn: "text-warn", muted: TEXT_MUTED_FOREGROUND, primary: TEXT_PRIMARY, ok: "text-ok" };
 const barTone: Record<string, string> = { crit: "bg-crit", warn: "bg-warn", primary: "bg-primary", muted: "bg-muted-foreground", ok: "bg-ok" };
 const cellTone: Record<WeekCell["kind"], string> = {
   booked: "bg-primary text-white", free: "border border-dashed border-line text-muted-foreground", leave: "bg-warn-soft text-warn", none: "bg-surface2 text-muted-foreground", proposal: "border-2 border-dashed border-primary bg-primary-soft/60 text-primary",
@@ -49,8 +51,8 @@ export function ScheduleView({ live }: Readonly<{ live: ScheduleLive }>) {
               {live.rows.map((r) => (
                 <ListRow key={r.id} selected={sel?.id === r.id} href={`/partner/schedule?jobId=${r.id}${live.sort === "status" ? "" : `&sort=${live.sort}`}`}>
                   <div className="min-w-0">
-                    <b className={cx("block truncate text-[13px]", sel?.id === r.id && "text-primary")}>{r.short} · {r.title}</b>
-                    <span className={cx("block text-xs", r.tone ? toneText[r.tone] : "text-muted-foreground")}>{r.line}</span>
+                    <b className={cx("block truncate text-[13px]", sel?.id === r.id && TEXT_PRIMARY)}>{r.short} · {r.title}</b>
+                    <span className={cx("block text-xs", r.tone ? toneText[r.tone] : TEXT_MUTED_FOREGROUND)}>{r.line}</span>
                   </div>
                 </ListRow>
               ))}
@@ -147,7 +149,7 @@ function AssignCard({ sel, choice, zone, otherZone }: Readonly<{ sel: Selected; 
               <Plain key={c.id} type="button" role="radio" aria-checked={tech === c.id} disabled={!c.eligible} onClick={() => { setTech(c.id); }}
                 className={cx("flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left", tech === c.id ? "border-primary bg-primary-soft/60" : "border-line bg-surface", !c.eligible && "cursor-not-allowed opacity-70")}>
                 {/* the name keeps at least 10rem; a long reason (the missing qualifications) goes below it and wraps */}
-                <span className="min-w-0 flex-[1_1_10rem]"><b className={cx("block text-[13px]", tech === c.id && "text-primary")}>{c.name}</b><span className="block text-[11px] text-muted-foreground">{c.sub}</span></span>
+                <span className="min-w-0 flex-[1_1_10rem]"><b className={cx("block text-[13px]", tech === c.id && TEXT_PRIMARY)}>{c.name}</b><span className="block text-[11px] text-muted-foreground">{c.sub}</span></span>
                 <Badge tone={c.badge.tone === "muted" ? "muted" : c.badge.tone} className="h-auto min-h-5 max-w-full whitespace-normal text-left">{c.badge.text}</Badge>
               </Plain>
             ))}
@@ -198,7 +200,7 @@ function WeekCard({ week, members, sel, choice, zone }: Readonly<{ week: NonNull
       {rows.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No technicians in your company yet.")}</p> : (
         <ScrollX>
           <table className="w-full min-w-[720px] text-[11px]">
-            <thead><tr><th className="p-1 text-left" />{week.dates.map((d, k) => <th key={d} className={cx("p-1 text-center font-semibold", d === week.today ? "text-primary" : "text-muted-foreground")}>{week.days[k]}</th>)}</tr></thead>
+            <thead><tr><th className="p-1 text-left" />{week.dates.map((d, k) => <th key={d} className={cx("p-1 text-center font-semibold", d === week.today ? TEXT_PRIMARY : TEXT_MUTED_FOREGROUND)}>{week.days[k]}</th>)}</tr></thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} className="border-t border-line">

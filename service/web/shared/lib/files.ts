@@ -17,7 +17,7 @@ export function uploadType(bytes: Uint8Array, browserType: string): string {
 // File names (IR368). The Core API refuses a name with control characters, path separators or bidirectional
 // formatting characters. The browser's File.name can hold them, so the Server Actions clean it first; the name is only a
 // label, and the bytes and their type are what count.
-const UNSAFE_NAME = /[\u0000-\u001F\u007F-\u009F\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/g;
+const UNSAFE_NAME = /[\u{0}-\u{1F}\u{7F}-\u{9F}\u{61C}\u{200E}\u{200F}\u{202A}-\u{202E}\u{2066}-\u{2069}]/gu;
 
 /** An upload's name as the API accepts it: unsafe characters dropped, "/" and "\" made "_", at most 200 characters
 (the extension kept), "upload" when nothing is left. */
@@ -40,7 +40,7 @@ name in filename* (RFC 5987, UTF-8). Header values carry no characters above U+0
 written into filename as it is makes the response throw (IR368). */
 export function contentDisposition(name: string, disposition: "inline" | "attachment" = "inline"): string {
   const clean = name.replaceAll(UNSAFE_NAME, "").trim() || "file";
-  const ascii = clean.replaceAll(/[^\x20-\x7E]/g, "_").replaceAll(/["\\]/g, "");
+  const ascii = clean.replaceAll(/[^\u{20}-\u{7E}]/gu, "_").replaceAll(/["\\]/g, "");
   const encoded = encodeURIComponent(clean).replaceAll(/['()*]/g, (c) => `%${(c.codePointAt(0) ?? 0).toString(16).toUpperCase()}`);
   return `${disposition}; filename="${ascii}"; filename*=UTF-8''${encoded}`;
 }

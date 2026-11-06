@@ -13,6 +13,9 @@ import { byNumber } from "@ac/web/lib/order";
 import { wrapped } from "@ac/web/lib/text";
 import { entryOf, lookup } from "@ac/web/lib/lookup";
 
+const AIR_QUALITY = "Air quality";
+const TEMPERATURE = "temperature";
+
 const en = translator("en");
 
 export interface PolicyWindow { weekdays: number[]; startLocal: string; endLocal: string }
@@ -34,7 +37,7 @@ const label: Record<string, string> = {
   compressor_cycles: "Compressor cycles", airflow_drop: "Airflow drop", heartbeat_gap: "Heartbeat gap", vibration: "Vibration",
 };
 export const severityText: Record<Severity, string> = { normal: "Info", warning: "Warning", critical: "Critical" };
-const categoryText: Record<ApiRule["category"], string> = { air_quality: "Air quality", fault: "Fault cause", maintenance: "Maintenance", connection: "Connection" };
+const categoryText: Record<ApiRule["category"], string> = { air_quality: AIR_QUALITY, fault: "Fault cause", maintenance: "Maintenance", connection: "Connection" };
 const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 /** “60 s”, “15 min”, “3 h”. */
@@ -95,7 +98,7 @@ export interface PolicyCard {
   id: string; version: number; name: string; badge: string; enabled: boolean; when: string; response: string;
   attached: string[]; attachedText: string; note: string | null;
 }
-const GROUP_TEXT: Record<string, string> = { co2: "Air quality", pm25: "Air quality", temperature: "Temperature", humidity: "Humidity", power: "Power" };
+const GROUP_TEXT: Record<string, string> = { co2: AIR_QUALITY, pm25: AIR_QUALITY, temperature: "Temperature", humidity: "Humidity", power: "Power" };
 const groupOf = (metric: string, t: T) => textOf(GROUP_TEXT, metric, t) ?? t(metric);
 const DISABLED_NOTE: Record<string, string> = { unit_archived: "An attached AC was archived.", capability_changed: "An attached AC's capabilities changed — check the condition." };
 function attachedText(names: string[], t: T): string {
@@ -122,15 +125,15 @@ export interface PolicyForm {
   windowOn: boolean; weekdays: number[]; start: string; end: string; severity: Severity; email: boolean;
 }
 export const metricGroups: { id: MetricGroup; label: string; sub: string }[] = [
-  { id: "temperature", label: "Temperature", sub: "°C" }, { id: "humidity", label: "Humidity", sub: "%" }, { id: "air", label: "Air quality", sub: "CO₂ ppm · PM2.5" }, { id: "power", label: "Power", sub: "kW" },
+  { id: TEMPERATURE, label: "Temperature", sub: "°C" }, { id: "humidity", label: "Humidity", sub: "%" }, { id: "air", label: AIR_QUALITY, sub: "CO₂ ppm · PM2.5" }, { id: "power", label: "Power", sub: "kW" },
 ];
-const groupMetric: Record<MetricGroup, string> = { temperature: "temperature", humidity: "humidity", air: "co2", power: "power" };
+const groupMetric: Record<MetricGroup, string> = { temperature: TEMPERATURE, humidity: "humidity", air: "co2", power: "power" };
 const METRIC_GROUP = new Map<string, MetricGroup>([["co2", "air"], ["pm25", "air"], ["humidity", "humidity"], ["power", "power"]]);
-export const groupOfMetric = (m: string): MetricGroup => METRIC_GROUP.get(m) ?? "temperature";
+export const groupOfMetric = (m: string): MetricGroup => METRIC_GROUP.get(m) ?? TEMPERATURE;
 export const metricOfGroup = (g: MetricGroup) => entryOf(groupMetric, g);
 /** The editor's values: an existing policy's, or a new one (room temperature ≥ 30 °C for 1 min, recovering below 28). */
 export function policyForm(p?: ApiAlertPolicy | null): PolicyForm {
-  if (!p) return { name: "", group: "temperature", metric: "temperature", operator: "gte", threshold: "30", recovery: "28", duration: "1", unit: "min", windowOn: false, weekdays: [1, 2, 3, 4, 5], start: "08:00", end: "19:00", severity: "warning", email: false };
+  if (!p) return { name: "", group: TEMPERATURE, metric: TEMPERATURE, operator: "gte", threshold: "30", recovery: "28", duration: "1", unit: "min", windowOn: false, weekdays: [1, 2, 3, 4, 5], start: "08:00", end: "19:00", severity: "warning", email: false };
   const isMin = p.durationSeconds % 60 === 0;
   return {
     name: p.name, group: groupOfMetric(p.metric), metric: p.metric, operator: p.operator, threshold: String(p.threshold), recovery: String(p.recoveryThreshold),

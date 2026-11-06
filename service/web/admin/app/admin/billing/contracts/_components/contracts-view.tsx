@@ -1,4 +1,11 @@
 "use client";
+const CUSTOMER_A = "customer-a";
+const CUSTOMER_B = "customer-b";
+const UNIT_NON_RTO = "unit-non-rto";
+const CONTRACT_RTO_A = "contract-rto-a";
+const UNIT_OFFLINE_RTO = "unit-offline-rto";
+const UNIT_LIMITED = "unit-limited";
+const UNIT_OTHER_CUSTOMER = "unit-other-customer";
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
@@ -15,14 +22,6 @@ import { byCount } from "@ac/web/lib/i18n";
 
 import { oneOf } from "@ac/web/lib/oneOf";
 import { nonEmpty } from "@ac/web/lib/lists";
-
-const CUSTOMER_A = "customer-a";
-const CUSTOMER_B = "customer-b";
-const UNIT_NON_RTO = "unit-non-rto";
-const CONTRACT_RTO_A = "contract-rto-a";
-const UNIT_OFFLINE_RTO = "unit-offline-rto";
-const UNIT_LIMITED = "unit-limited";
-const UNIT_OTHER_CUSTOMER = "unit-other-customer";
 
 interface Scope { customerId?: string; unitId?: string; kind?: PlanType }
 interface Live { scope: Scope; rows: ContractRow[]; counts: Record<PlanType | "all", number>; selectedId: string | null; customers: { id: string; name: string }[]; units: UnitOption[] }

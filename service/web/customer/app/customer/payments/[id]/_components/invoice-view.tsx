@@ -1,4 +1,9 @@
 "use client";
+const PROCESSING = "Processing";
+const RESTRICTION = "restriction";
+const DEMO_DEBIT_CARD = "demo_debit_card";
+const INSTRUCTIONS = "instructions";
+const RELEASE_REQUESTED = "release_requested";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -30,9 +35,9 @@ export interface InvoiceLive {
   inquiries: InquiryLine[]; inquiryId: string | null; reminders: { id: string; channel: string; at: string }[];
 }
 const statusTone = { Overdue: "crit", Unpaid: "warn", Processing: "primary", Paid: "ok" } as const;
-const STATUS_ICON = new Map<string, IconName>([["Overdue", "alert"], ["Paid", "check"], ["Processing", "refresh"]]);
+const STATUS_ICON = new Map<string, IconName>([["Overdue", "alert"], ["Paid", "check"], [PROCESSING, "refresh"]]);
 const paymentTone = { initiated: "primary", processing: "primary", confirmed: "ok", failed: "crit" } as const;
-const paymentLabel = { initiated: "Initiated", processing: "Processing", confirmed: "Paid", failed: "Failed" } as const;
+const paymentLabel = { initiated: "Initiated", processing: PROCESSING, confirmed: "Paid", failed: "Failed" } as const;
 const channelName: Record<string, string> = { email: "Email", whatsapp: "WhatsApp", inApp: "In-app" };
 
 /** Invoice / demo payment (FR-C11) and the cooling-restriction notice (FR-C12) in API mode. No card data is ever asked
@@ -50,7 +55,7 @@ export function InvoiceView({ live }: Readonly<{ live: InvoiceLive }>) {
         ...(live.restriction ? [{ id: "restriction" as const, label: t("Cooling restriction") }] : []),
         { id: "inquiry" as const, label: t("Inquiries"), count: live.inquiries.length },
       ]} />
-      {live.tab === "restriction" && live.restriction ? <RestrictionTab live={live} /> : null}{!(live.tab === "restriction" && live.restriction) && live.tab === "inquiry" && <InquiryTab live={live} />}{!(live.tab === "restriction" && live.restriction) && live.tab !== "inquiry" && <PaymentTab live={live} />}
+      {live.tab === RESTRICTION && live.restriction ? <RestrictionTab live={live} /> : null}{!(live.tab === RESTRICTION && live.restriction) && live.tab === "inquiry" && <InquiryTab live={live} />}{!(live.tab === RESTRICTION && live.restriction) && live.tab !== "inquiry" && <PaymentTab live={live} />}
     </Page>
   );
 }
@@ -59,7 +64,7 @@ function PaymentTab({ live }: Readonly<{ live: InvoiceLive }>) {
   type Choice3 = "demo_credit_card" | "demo_debit_card" | "instructions";
   const t = useT();
   const [pending, run] = useAction();
-  const [method, setMethod] = useState<Choice3>(live.last?.method === "demo_debit_card" ? "demo_debit_card" : "demo_credit_card");
+  const [method, setMethod] = useState<Choice3>(live.last?.method === DEMO_DEBIT_CARD ? DEMO_DEBIT_CARD : "demo_credit_card");
   const [instructions, setInstructions] = useState<PreviewParams | null>(null);
   const [preview, setPreview] = useState<{ channel: "email" | "whatsapp"; text: { subject: string | null; body: string } } | null>(null);
   const i = live.invoice;
@@ -68,15 +73,15 @@ function PaymentTab({ live }: Readonly<{ live: InvoiceLive }>) {
   const isConfirmed = i.status === "Paid" && live.last?.status === "confirmed";
   const methodText = (m: string | null, none: string) => (m ? (textOf(methodLabel, m, t) ?? m) : t(none));
   const pay = () => {
-    if (method === "instructions") run(() => paymentInstructions(i.id, i.version), t("Payment instructions shown — the invoice stays unpaid"), setInstructions); else run(() => startPayment(i.id, i.version, method), t("Demo payment started — processing"));
+    if (method === INSTRUCTIONS) run(() => paymentInstructions(i.id, i.version), t("Payment instructions shown — the invoice stays unpaid"), setInstructions); else run(() => startPayment(i.id, i.version, method), t("Demo payment started — processing"));
   };
   const show = (channel: "email" | "whatsapp") => { run(() => previewMessage(i.id, channel), t("Preview only — nothing was sent"), () => { setPreview({ channel, text: previewText(channel, i, t) }); }); };
   const methods = [
-    ["demo_credit_card", "Credit card (demo)", "Simulated card payment — no card details"], ["demo_debit_card", "Debit card (demo)", "Simulated card payment — no card details"],
-    ["instructions", "Payment instructions", "Bank transfer details — viewing them does not pay the invoice"],
+    ["demo_credit_card", "Credit card (demo)", "Simulated card payment — no card details"], [DEMO_DEBIT_CARD, "Debit card (demo)", "Simulated card payment — no card details"],
+    [INSTRUCTIONS, "Payment instructions", "Bank transfer details — viewing them does not pay the invoice"],
   ] as const;
   const payLabel = () => {
-    if (method === "instructions") return t("View instructions");
+    if (method === INSTRUCTIONS) return t("View instructions");
     return t(isFailed ? "Try again — Demo" : "Continue to payment — Demo");
   };
   return (
@@ -93,7 +98,7 @@ function PaymentTab({ live }: Readonly<{ live: InvoiceLive }>) {
               <div className="rounded-xl border border-dashed border-warn bg-warn-soft/30 p-3 text-[13px]">
                 <div className="mb-2 flex items-center gap-2"><DemoBadge /><b>{t("Demo payment provider")}</b><span className="text-xs text-muted-foreground">{t("test events, separate from the payment form")}</span></div>
                 <div className="flex flex-wrap gap-2">
-                  {open.status === "initiated" && <Btn size="sm" disabled={pending} onClick={() => { run(() => demoOutcome(open.id, open.version, "processing"), t("Payment is processing")); }}>{t("Processing")}</Btn>}
+                  {open.status === "initiated" && <Btn size="sm" disabled={pending} onClick={() => { run(() => demoOutcome(open.id, open.version, "processing"), t("Payment is processing")); }}>{t(PROCESSING)}</Btn>}
                   {open.status === "processing" && <Btn size="sm" variant="primary" disabled={pending} onClick={() => { run(() => demoOutcome(open.id, open.version, "confirm"), t("Payment confirmed — the invoice is paid")); }}>{t("Confirm receipt")}</Btn>}
                   <Btn size="sm" variant="danger" disabled={pending} onClick={() => { run(() => demoOutcome(open.id, open.version, "fail"), t("Payment declined — the invoice stays unpaid")); }}>{t("Decline")}</Btn>
                 </div>
@@ -165,8 +170,8 @@ function RestrictionBanner({ live }: Readonly<{ live: InvoiceLive }>) {
   const n = live.restriction?.notice;
   if (!n?.live) return null;
   return (
-    <Banner tone={n.state === "release_requested" ? "primary" : "warn"} action={<Link className="text-xs font-semibold text-primary" href={`/customer/payments/${live.invoice.id}?tab=restriction&restrictionId=${n.id}`}>{t("View restriction details")} <Icon name="arrowRight" /></Link>}>
-      <span className="flex flex-wrap items-center gap-2"><b>{t(n.state === "release_requested" ? "Cooling restriction — release requested" : "Cooling restriction active")}</b><Badge tone={stateTone(n.state)}>{n.label}</Badge></span>
+    <Banner tone={n.state === RELEASE_REQUESTED ? "primary" : "warn"} action={<Link className="text-xs font-semibold text-primary" href={`/customer/payments/${live.invoice.id}?tab=restriction&restrictionId=${n.id}`}>{t("View restriction details")} <Icon name="arrowRight" /></Link>}>
+      <span className="flex flex-wrap items-center gap-2"><b>{t(n.state === RELEASE_REQUESTED ? "Cooling restriction — release requested" : "Cooling restriction active")}</b><Badge tone={stateTone(n.state)}>{n.label}</Badge></span>
       <div className="text-xs">{t("{units} — {policy}. Related to payment, but separate from it: paying does not restore cooling immediately.", { units: n.units, policy: n.policy })}</div>
     </Banner>
   );
@@ -191,9 +196,9 @@ function RestrictionTab({ live }: Readonly<{ live: InvoiceLive }>) {
         </div>
         <h3 className="mb-2 mt-4 text-[13px] font-bold">{t("Timeline")}</h3>
         <Timeline items={r.timeline} />
-        {r.notice.state === "release_requested" && <div className="mt-3"><Banner>{t("Status stays “Release requested” until every unit confirms. It is never shown as Released while a device result is unknown.")}</Banner></div>}
+        {r.notice.state === RELEASE_REQUESTED && <div className="mt-3"><Banner>{t("Status stays “Release requested” until every unit confirms. It is never shown as Released while a device result is unknown.")}</Banner></div>}
       </Card>
-      <InquiryCard title={t("Send inquiry to HQ")} lines={r.inquiries} input={{ subjectType: "restriction", restrictionId: r.notice.id }} />
+      <InquiryCard title={t("Send inquiry to HQ")} lines={r.inquiries} input={{ subjectType: RESTRICTION, restrictionId: r.notice.id }} />
     </>
   );
 }

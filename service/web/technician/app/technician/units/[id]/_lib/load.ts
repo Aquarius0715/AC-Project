@@ -17,6 +17,9 @@ import {
   windowEvents, type ApiTechUnit, type Period, type Point,
 } from "@ac/web/lib/techUnit";
 
+const NOT_STARTED = "not_started";
+const MONITORING = "monitoring";
+
 interface Page<T> { items: T[]; nextCursor?: string | null; total?: number }
 const optional = orWhenRefused;
 const gone = (e: unknown) => e instanceof CoreError && (e.error.code === "NOT_FOUND" || e.error.code === "FORBIDDEN" || !!e.error.fieldErrors.id);
@@ -60,7 +63,7 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
     throw error;
   });
   if (d === null) return null; // not in the technician's assignments: not found (IR169)
-  if (d === "not_started") { // IR76: the start time comes from the URL's job; without it only the general sentence
+  if (d === NOT_STARTED) { // IR76: the start time comes from the URL's job; without it only the general sentence
     const job = sp.jobId ? await optional(coreOp<TechJobRead<{ assignment: { scheduledStart: string } | null }>>("jobs.get", { jobId: sp.jobId }), null) : null;
     const start = job?.projection === "detail" ? job.assignment?.scheduledStart ?? null : null;
     return {
@@ -73,13 +76,13 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
   const metric = metricOf(d, sp.metric), period = periodOf(sp.period);
   const { from, to } = periodRange(period, nowMs);
   const unitOf = (m: string) => d.latestMeasurements.find((x) => x.metric === m)?.unit ?? "";
-  const others = tab === "monitoring" ? d.latestMeasurements.filter((m) => m.metric !== metric).slice(0, 3).map((m) => m.metric) : [];
+  const others = tab === MONITORING ? d.latestMeasurements.filter((m) => m.metric !== metric).slice(0, 3).map((m) => m.metric) : [];
   const [alerts, jobs, points, more, devices] = await Promise.all([
     optional(coreItems<ApiAlert>("alerts.list", { limit: 50, filters: { unitId: id } }), [] as ApiAlert[]),
     optional(coreItems<ApiTechJobRow>("jobs.list", { limit: 20, filters: { unitId: id } }), [] as ApiTechJobRow[]),
     optional(series(id, metric, from, to, period, 4), NONE),
     Promise.all(others.map((m) => optional(series(id, m, from, to, period, 1), NONE))),
-    tab === "monitoring" ? optional(coreItems<{ id: string }>("devices.list", { limit: 5, filters: { unitId: id } }), []) : Promise.resolve([]),
+    tab === MONITORING ? optional(coreItems<{ id: string }>("devices.list", { limit: 5, filters: { unitId: id } }), []) : Promise.resolve([]),
   ]);
   const eventLists = await Promise.all(devices.map((x) => {
     return optional(coreItems<ApiDeviceEventFull>("devices.events", {

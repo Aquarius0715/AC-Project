@@ -26,9 +26,12 @@ import { UnitsDemo } from "./_components/units-demo";
 import { UnitsView, type CustomerLive, type UnitLive, type UnitsLive } from "./_components/units-view";
 import { queryReader } from "@ac/web/lib/searchParams";
 
+import { orNull } from "@ac/web/lib/promises";
+
 const RESTRICTION_READ = "restriction.read";
 const DEVICE_READ = "device.read";
-import { orNull } from "@ac/web/lib/promises";
+const CUSTOMERID = "customerId";
+const DEFAULT_ALERT = "default_alert";
 
 interface Audit { occurredAt: string; actorId: string; reason: string | null }
 interface JobForClaim { projection: "detail"; id: string; version: number; type: string; unitId: string; completedAt: string | null; costs: { kind: "estimate" | "actual"; amountMinor: number; currency: Currency }[]; reportRefs: { reportId: string; reportVersion: number }[] }
@@ -71,17 +74,17 @@ export default async function AdminUnitsPage({ searchParams }: Readonly<PageProp
     standingKnown: !!(contracts && overdue),
     kpis: registerKpis(rows, units, t),
     search: one("search") ?? "",
-    missing: !!one("customerId") && rows.every((r) => r.id !== one("customerId")),
+    missing: !!one(CUSTOMERID) && rows.every((r) => r.id !== one(CUSTOMERID)),
     top: one("tab") === "warranty" ? "warranty" : "customers",
     activeCustomers: rows.filter((r) => r.status === "active").map((r) => ({ id: r.id, name: r.name })),
     coverageAttention: null,
     rows,
   };
   // a unit link without its customer (the audit's related records, IR320) goes to the unit under its customer
-  const unitOrg = !one("customerId") && one("unitId") ? units.find((u) => u.id === one("unitId"))?.customerOrgId : undefined;
+  const unitOrg = !one(CUSTOMERID) && one("unitId") ? units.find((u) => u.id === one("unitId"))?.customerOrgId : undefined;
   const owner = unitOrg ? rows.find((r) => r.orgId === unitOrg) : undefined;
   if (owner) redirect(`/admin/units?customerId=${owner.id}&unitId=${one("unitId") ?? ""}`);
-  const cust = rows.find((r) => r.id === one("customerId"));
+  const cust = rows.find((r) => r.id === one(CUSTOMERID));
   if (!cust) {
     const coverage = has("asset.read", "contract.read") ? await coreAll<ApiCoverage>("units.coverage") : null;
     live.coverageAttention = coverage ? coverage.filter((c) => c.status === "expiring" || c.status === "no_coverage").length : null;
@@ -133,7 +136,7 @@ export default async function AdminUnitsPage({ searchParams }: Readonly<PageProp
     units: unitRows(filterUnits(at, { powerState, connections: conns, search: "" }), spaces, models, t),
     lastEdit: lastEdit ? `${showDate(lastEdit.occurredAt, i.display)} · ${memberName.get(lastEdit.actorId) ?? t("HQ")}` : null,
     policies: policies ? policyLines(policies, orgUnits.map((u) => u.id), (m) => memberName.get(m) ?? cust.name, i) : null,
-    rules: (() => { const d = policies?.find((p) => p.kind === "default_alert"); return d ? { policyId: d.id, items: defaultRules(d, i) } : null; })(),
+    rules: (() => { const d = policies?.find((p) => p.kind === DEFAULT_ALERT); return d ? { policyId: d.id, items: defaultRules(d, i) } : null; })(),
     canRules: has("alert.policy.write"),
     canAttach: has("asset.write", "alert.policy.write") && canPolicies,
     tree,
@@ -173,7 +176,7 @@ async function unitLive(d: ApiUnitDetail, x: Ctx): Promise<UnitLive> {
     ...(d.pendingCommandIds.length > 0 ? [{ label: t(d.pendingCommandIds.length === 1 ? "1 pending command" : "{n} pending commands", { n: d.pendingCommandIds.length }), href: null }] : []),
   ];
   const byId = new Map((x.policies ?? []).map((p) => [p.id, p]));
-  const defaults = x.policies?.find((p) => p.kind === "default_alert");
+  const defaults = x.policies?.find((p) => p.kind === DEFAULT_ALERT);
   const attached = [
     ...(defaults ? [{ id: defaults.id, kind: "default_alert" as const, name: defaults.name, type: t("Default"), condition: t((defaults.rules?.length ?? 0) === 1 ? "1 rule · ventilation and fault causes" : "{n} rules · ventilation and fault causes", { n: defaults.rules?.length ?? 0 }), madeBy: t("Always attached"), on: t((defaults.rules?.length ?? 0) === 1 ? "{on} of 1 rule on" : "{on} of {n} rules on", { on: defaultRules(defaults, x.i).filter((r) => r.enabled).length, n: defaults.rules?.length ?? 0 }) }] : []),
     ...d.alertPolicyIds.map((id) => {

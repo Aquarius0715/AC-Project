@@ -11,10 +11,13 @@ import { hhmm, onTeam, shortQualification, unavailabilityLabel, until, type ApiC
 import { oneOf } from "@ac/web/lib/oneOf";
 import { qualificationLabel, qualified, statusWord, type ApiDetail, type ApiOffer } from "@ac/web/lib/partnerJobDetail";
 
+const IN_PROGRESS = "in_progress";
+const TECHNICIAN = "technician";
+
 const en = translator("en");
 
 /** The states a contractor job can be (re)assigned in (IR123 item 4); an accepted offer before its window is listed too. */
-export const SCHEDULE_STATUSES = ["accepted", "assigned", "in_progress", "on_hold", "rework_requested"] as const;
+export const SCHEDULE_STATUSES = ["accepted", "assigned", IN_PROGRESS, "on_hold", "rework_requested"] as const;
 export const SORTS = [{ id: "status", text: "Status, earliest stage first" }, { id: "dueAt", text: "Deadline, soonest first" }] as const;
 export type ScheduleSort = (typeof SORTS)[number]["id"];
 export const sortOf = (v = ""): ScheduleSort => oneOf(SORTS.map((s) => s.id), v, "status");
@@ -35,15 +38,15 @@ export function scheduleRow(j: ApiPartnerJob, now: number, units: Map<string, st
   if (j.projection === "history") return null;
   const id = j.projection === "offer" ? j.jobId : j.id;
   const from = j.accessValidFrom ?? null, to = j.accessValidUntil ?? null;
-  const name = (j.projection === "summary" && j.technicianMembershipId ? names.get(j.technicianMembershipId) : undefined) ?? t("technician");
+  const name = (j.projection === "summary" && j.technicianMembershipId ? names.get(j.technicianMembershipId) : undefined) ?? t(TECHNICIAN);
   let line: string, tone: Tone | undefined;
   if (j.projection === "offer") [line, tone] = [from ? t("Accepted · delegation starts {time}", { time: showTime(from, display) }) : t("Accepted · delegation starts later"), "muted"];
-  else if ((j.status === "assigned" || j.status === "in_progress") && ended(j.scheduledSlot, now)) [line, tone] = [t("Work window ended · reassignment required"), "crit"];
+  else if ((j.status === "assigned" || j.status === IN_PROGRESS) && ended(j.scheduledSlot, now)) [line, tone] = [t("Work window ended · reassignment required"), "crit"];
   else if (j.status === "accepted") line = t("Accepted · awaiting assignment");
   else if (j.status === "assigned") {
     const ack = t(ACKS[j.assignmentAcknowledgement ?? ""] ?? "awaiting acceptance");
     [line, tone] = [t("Assigned · {name} · {ack}", { name, ack }), j.assignmentAcknowledgement === "cant_make" ? "warn" : undefined];
-  } else if (j.status === "in_progress") line = t("In progress · {name}", { name });
+  } else if (j.status === IN_PROGRESS) line = t("In progress · {name}", { name });
   else if (j.status === "on_hold") [line, tone] = [t("On hold by HQ"), "warn"];
   else line = t("Rework · {name}", { name });
   const span = from && to ? Date.parse(to) - Date.parse(from) : 0;
@@ -80,7 +83,7 @@ export function formMode(j: ApiDetail | ApiOffer, label: string, now: number, na
   if (j.projection === "offer") {
     return { kind: "blocked", title: assign, slot: j.visitSlot, banner: { tone: "primary", text: t("Accepted — the delegation period starts {time}; the technician can be assigned from then, for exactly {slot}.", { time: showTime(j.accessValidFrom, display), slot: span(j.visitSlot) }) } };
   }
-  const current = j.assignment ? names.get(j.assignment.technicianMembershipId) ?? t("technician") : null;
+  const current = j.assignment ? names.get(j.assignment.technicianMembershipId) ?? t(TECHNICIAN) : null;
   const slot = j.assignment ? { startAt: j.assignment.scheduledStart, endAt: j.assignment.scheduledEnd } : j.scheduledSlot ?? j.offer?.visitSlot ?? null;
   if (!slot) return { kind: "blocked", title: assign, slot: null, banner: { tone: "warn", text: t("No agreed visit time — HQ agrees one with the client first.") } };
   switch (j.status) {
@@ -92,7 +95,7 @@ export function formMode(j: ApiDetail | ApiOffer, label: string, now: number, na
         return { kind: "blocked", title: reschedule, banner: { tone: "crit", text: t("Work window ended; reassignment required. The agreed time {slot} passed while the job is still “assigned”. A new time needs the client’s agreement — HQ proposes it; tell HQ in the job history.", { slot: span(slot) }) }, slot };
       }
       const why = j.assignment?.cantMakeReason;
-      const name = current ?? t("technician");
+      const name = current ?? t(TECHNICIAN);
       return {
         kind: "reassign",
         title: t("Reassign — {job}", { job: label }),
@@ -108,7 +111,7 @@ export function formMode(j: ApiDetail | ApiOffer, label: string, now: number, na
         slot,
       };
     }
-    case "in_progress":
+    case IN_PROGRESS:
     case "on_hold":
     case "rework_requested": {
       return {
@@ -159,13 +162,13 @@ even when their access has ended, so the form can name whom it replaces. A forme
 HQ revoked, can take no job and stays out of the choice and the week (IR624). */
 export function scheduleTeam(members: ApiMember[], now: number, currentId: string | null): ApiMember[] {
   const team = new Set(onTeam(members, now).map((m) => m.id));
-  return members.filter((m) => m.role === "technician" && (team.has(m.id) || m.id === currentId));
+  return members.filter((m) => m.role === TECHNICIAN && (team.has(m.id) || m.id === currentId));
 }
 
 export function candidates(members: ApiMember[], eligible: Set<string>, required: string[], slot: Slot, day: ApiCapacity[], currentId: string | null, t: T = en): Candidate[] {
   const cap = new Map(day.map((c) => [c.membershipId, c]));
   const overlaps = (a: Slot, b: Slot) => Date.parse(a.startAt) < Date.parse(b.endAt) && Date.parse(b.startAt) < Date.parse(a.endAt);
-  const rows = members.filter((m) => m.role === "technician").map((m): Candidate => {
+  const rows = members.filter((m) => m.role === TECHNICIAN).map((m): Candidate => {
     const c = cap.get(m.id);
     const quals = (m.qualifications ?? []).filter((q) => !q.revokedAt).map((q) => qualificationLabel(q.code, t)).join(" · ") || t("no qualifications");
     const sub = `${quals} · ${freeText(c, t)}`;
@@ -193,7 +196,7 @@ leave or other unavailability, no hours or free; the selected technician's cell 
 proposal”. */
 export function weekGrid(dates: string[], members: ApiMember[], capacity: ApiCapacity[][], jobsOf: Map<string, { short: string; slot: Slot }[]>, proposal: { technicianId: string; slot: Slot; short: string } | null, t: T = en): WeekRow[] {
   const dayOf = (iso: string) => new Date(Date.parse(iso) + KL).toISOString().slice(0, 10);
-  return members.filter((m) => m.role === "technician").map((m) => {
+  return members.filter((m) => m.role === TECHNICIAN).map((m) => {
     let avail = 0;
     const cells = dates.map((date, k): WeekCell => {
       const c = capacity[k]?.find((x) => x.membershipId === m.id);

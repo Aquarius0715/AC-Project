@@ -1,4 +1,5 @@
 "use client";
+const signOut = "flex w-full items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold text-crit hover:bg-crit-soft/50";
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -28,7 +29,6 @@ export function useStoredRole(): Role {
   return fromPath ?? saved ?? "client";
 }
 
-const signOut = "flex w-full items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold text-crit hover:bg-crit-soft/50";
 const SHARED = SHARED_PAGES.map((s) => ({ ...s, icon: (s.href === "/notifications" ? "notifications" : "preferences") as IconName }));
 
 function NavLink({ href, label, icon, badge, active }: Readonly<{ href: string; label: string; icon: IconName; badge?: string; active: boolean }>) {
@@ -99,7 +99,6 @@ export function AppShell({ appRole: forced, live, children }: Readonly<{ appRole
   // the tab's title names the page in the display language after a client-side navigation too (WCAG 2.4.2, IR490)
   useEffect(() => { document.title = documentTitle(role, pathname, display.locale); }, [role, pathname, display.locale]);
   const isDemo = pathname === "/demo";
-
 
   const sidebar = (
     <>

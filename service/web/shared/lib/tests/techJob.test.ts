@@ -3,17 +3,27 @@ import { checkInErrors, CHECK_IN_API_FIELDS, componentsFor, partErrors, refriger
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 import { must } from "./must";
 
+const ELECTRICAL = "electrical";
+const TEXT_2026_09_14T02_00_00Z = "2026-09-14T02:00:00Z";
+const TEMPERATURE = "temperature";
+const TEXT_2026_09_14T02_10_00Z = "2026-09-14T02:10:00Z";
+const COMPRESSOR = "compressor";
+const TEXT_2026_09_14T04_00_00Z = "2026-09-14T04:00:00Z";
+const TEXT_2026_09_14T02_05_00Z = "2026-09-14T02:05:00Z";
+const LOCATION_QR = "location_qr";
+const ON_SITE_TIME = "On-site time";
+
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 
 const NOW = Date.parse("2026-09-14T03:00:00Z"); // 11:00 in Kuala Lumpur
-const all = componentsFor(["indoor", "outdoor", "electrical"]);
+const all = componentsFor(["indoor", "outdoor", ELECTRICAL]);
 const report = (over: Partial<ApiTechReport> = {}): ApiTechReport => {
   return {
     id: "rep", version: 3, jobId: "job", authorId: "tech", items: [
-      { id: "i1", componentGroup: "indoor", componentKey: "filter", result: "attention", reason: "dusty", evidenceIds: [], authorId: "tech", observedAt: "2026-09-14T02:00:00Z" },
-      { id: "i2", componentGroup: "electrical", componentKey: "wiring", result: "not_applicable", reason: "no wiring", evidenceIds: [], authorId: "tech", observedAt: "2026-09-14T02:00:00Z" },
+      { id: "i1", componentGroup: "indoor", componentKey: "filter", result: "attention", reason: "dusty", evidenceIds: [], authorId: "tech", observedAt: TEXT_2026_09_14T02_00_00Z },
+      { id: "i2", componentGroup: ELECTRICAL, componentKey: "wiring", result: "not_applicable", reason: "no wiring", evidenceIds: [], authorId: "tech", observedAt: TEXT_2026_09_14T02_00_00Z },
     ],
-    measurements: [{ id: "m1", componentKey: "outlet", metric: "temperature", value: 13.9, unit: "°C", observedAt: "2026-09-14T02:10:00Z", quality: "valid" }],
+    measurements: [{ id: "m1", componentKey: "outlet", metric: TEMPERATURE, value: 13.9, unit: "°C", observedAt: TEXT_2026_09_14T02_10_00Z, quality: "valid" }],
     parts: [], refrigerant: [], signOff: null, workText: "Cleaned the filter.", nextAction: { kind: "none" },
     attachmentRefs: [{ id: "a1", name: "p1.png", mime: "image/png", size: 10, status: "ready" }, { id: "a2", name: "p2.heic", mime: "image/png", size: 10, status: "failed" }],
     submittedAt: null, acceptedAt: null, reviewHistory: [], ...over,
@@ -24,9 +34,9 @@ describe("components", () => {
   it("follows the unit's service scope in canonical order", () => {
     expect(all).toHaveLength(18);
     expect(componentsFor(["indoor"]).map((c) => c.key)).toEqual(["filter", "evaporator_coil", "blower_motor", "blower_fan", "drain_pipe", "drain_pan", "outlet", "louver"]);
-    expect(componentsFor(["electrical", "outdoor"]).map((c) => c.group)).toEqual([...Array.from({ length: 5 }, () => "outdoor"), ...Array.from({ length: 5 }, () => "electrical")]);
+    expect(componentsFor([ELECTRICAL, "outdoor"]).map((c) => c.group)).toEqual([...Array.from({ length: 5 }, () => "outdoor"), ...Array.from({ length: 5 }, () => ELECTRICAL)]);
     expect(componentsFor([])).toEqual([]);
-    expect(groupOf("compressor")).toBe("outdoor");
+    expect(groupOf(COMPRESSOR)).toBe("outdoor");
     expect(groupOf("nope")).toBeNull();
   });
 });
@@ -37,21 +47,21 @@ describe("draft", () => {
     expect(d.items).toHaveLength(18);
     expect(d.items.find((i) => i.componentKey === "filter")).toMatchObject({ result: "attention", reason: "dusty" });
     expect(d.items.find((i) => i.componentKey === "louver")).toMatchObject({ result: null, reason: "" });
-    expect(d.readings).toEqual([{ id: "m1", componentKey: "outlet", metric: "temperature", value: "13.9", observedAt: "2026-09-14T02:10:00Z" }]);
+    expect(d.readings).toEqual([{ id: "m1", componentKey: "outlet", metric: TEMPERATURE, value: "13.9", observedAt: TEXT_2026_09_14T02_10_00Z }]);
     expect(d.attachmentIds).toEqual(["a1"]); // a failed upload is not part of the draft
     expect(draftFrom(null, componentsFor(["indoor"])).items.every((i) => i.result === null)).toBe(true);
   });
   it("builds the saveDraft body with trimmed reasons and numeric readings", () => {
     const d = draftFrom(report(), all);
     d.items[1] = { ...must(d.items[1]), result: "normal", reason: ' '.repeat(3) };
-    d.readings.push({ componentKey: "compressor", metric: "vibration", value: "", observedAt: "2026-09-14T02:20:00Z" });
+    d.readings.push({ componentKey: COMPRESSOR, metric: "vibration", value: "", observedAt: "2026-09-14T02:20:00Z" });
     d.nextAction = { kind: "follow_up", date: "2026-10-01T00:00:00.000Z", note: "  replace filter  " };
     const body = draftInput("job", "rep", d);
     expect(body.reportId).toBe("rep");
     expect(body.items[1]).toEqual({ componentGroup: "indoor", componentKey: "evaporator_coil", result: "normal", reason: null, evidenceIds: [] });
     expect(body.measurements).toEqual([
-      { id: "m1", componentKey: "outlet", metric: "temperature", value: 13.9, unit: "°C", observedAt: "2026-09-14T02:10:00Z" },
-      { componentKey: "compressor", metric: "vibration", value: null, unit: "mm/s", observedAt: "2026-09-14T02:20:00Z" },
+      { id: "m1", componentKey: "outlet", metric: TEMPERATURE, value: 13.9, unit: "°C", observedAt: TEXT_2026_09_14T02_10_00Z },
+      { componentKey: COMPRESSOR, metric: "vibration", value: null, unit: "mm/s", observedAt: "2026-09-14T02:20:00Z" },
     ]);
     expect(body.nextAction).toEqual({ kind: "follow_up", date: "2026-10-01T00:00:00.000Z", note: "replace filter" });
     expect("reportId" in draftInput("job", null, d)).toBe(false);
@@ -92,7 +102,7 @@ describe("submit checks", () => {
     const d = complete();
     d.items[7] = { ...must(d.items[7]), result: null };
     d.items[4] = { ...must(d.items[4]), result: "not_inspected", reason: "" };
-    d.readings.push({ componentKey: "fan", metric: "vibration", value: "abc", observedAt: "2026-09-14T02:00:00Z" });
+    d.readings.push({ componentKey: "fan", metric: "vibration", value: "abc", observedAt: TEXT_2026_09_14T02_00_00Z });
     d.workText = "short";
     d.nextAction = { kind: "follow_up", date: "2026-09-01T00:00:00Z", note: "" };
     d.parts = [{ name: "Filter", quantity: 0, catalogCode: null, source: "van_stock", lotSerial: null, replacesComponentKey: null, oldPartDisposal: null, receiptAttachmentId: null }];
@@ -102,12 +112,12 @@ describe("submit checks", () => {
       "Indoor › Drain pipe needs a reason", "Indoor › Louver has no result", "Fan reading is not a number", "Work performed must be 10–4000 characters",
       "A follow-up needs a future date and a note", "Part 1 (Filter) needs a quantity of 1–999", "Photo p2.heic is failed — remove or retry it",
     ]);
-    expect(progress(d, issues).map((g) => [g.group, g.done, g.total, g.issues])).toEqual([["indoor", 7, 8, 2], ["outdoor", 5, 5, 1], ["electrical", 5, 5, 0]]);
+    expect(progress(d, issues).map((g) => [g.group, g.done, g.total, g.issues])).toEqual([["indoor", 7, 8, 2], ["outdoor", 5, 5, 1], [ELECTRICAL, 5, 5, 0]]);
   });
 });
 
 describe("work window (IR76 / IR89)", () => {
-  const a = { scheduledStart: "2026-09-14T02:00:00Z", scheduledEnd: "2026-09-14T04:00:00Z" }; // 10:00–12:00
+  const a = { scheduledStart: TEXT_2026_09_14T02_00_00Z, scheduledEnd: TEXT_2026_09_14T04_00_00Z }; // 10:00–12:00
   it("tells before, open, ending and ended apart", () => {
     expect(windowState(null, NOW).phase).toBe("none");
     expect(windowState(a, Date.parse("2026-09-14T01:00:00Z"))).toEqual({ phase: "before", text: "Starts 14 Sept 2026, 10:00 am MYT · 14 Sept, 10:00 am – 12:00 pm MYT" });
@@ -116,7 +126,7 @@ describe("work window (IR76 / IR89)", () => {
     expect(windowState(a, Date.parse("2026-09-14T03:44:59Z")).phase).toBe("open");
     expect(windowState(a, Date.parse("2026-09-14T03:45:00Z"))).toEqual({ phase: "ending", text: line, notice: "Work window ends in 15 min — unsaved input will be discarded at 12:00 pm MYT." });
     expect(windowState(a, Date.parse("2026-09-14T03:59:30Z")).notice).toBe("Work window ends in 1 min — unsaved input will be discarded at 12:00 pm MYT.");
-    expect(windowState(a, Date.parse("2026-09-14T04:00:00Z")).phase).toBe("ended");
+    expect(windowState(a, Date.parse(TEXT_2026_09_14T04_00_00Z)).phase).toBe("ended");
     expect(warnAt(a.scheduledEnd)).toBe("2026-09-14T03:45:00.000Z");
   });
 });
@@ -124,13 +134,13 @@ describe("work window (IR76 / IR89)", () => {
 describe("time on site and versions", () => {
   it("shows the check-in evidence, pauses and the counted minutes", () => {
     expect(timeRows(null, NOW)).toEqual([["Arrived", "not checked in"]]);
-    const rows = timeRows({ arrivedAt: "2026-09-14T02:05:00Z", checkInMethod: "location_qr", distanceMeters: 78.4, startedAt: "2026-09-14T02:05:00Z", pauses: [{ from: "2026-09-14T02:30:00Z", to: "2026-09-14T02:40:00Z" }], finishedAt: null }, NOW);
-    expect(rows).toEqual([["Arrived", "10:05 am MYT · checked in"], ["Location", "78 m from site · QR matched"], ["Started", "10:05 am MYT"], ["Paused", "1 pause · 10 min"], ["Finished", "— (on submit)"], ["On-site time", "45 min"]]);
-    const paused = timeRows({ arrivedAt: "2026-09-14T02:05:00Z", checkInMethod: "manual", checkInReason: "no GPS", startedAt: "2026-09-14T02:05:00Z", pauses: [{ from: "2026-09-14T02:50:00Z", to: null }], finishedAt: null }, NOW);
+    const rows = timeRows({ arrivedAt: TEXT_2026_09_14T02_05_00Z, checkInMethod: LOCATION_QR, distanceMeters: 78.4, startedAt: TEXT_2026_09_14T02_05_00Z, pauses: [{ from: "2026-09-14T02:30:00Z", to: "2026-09-14T02:40:00Z" }], finishedAt: null }, NOW);
+    expect(rows).toEqual([["Arrived", "10:05 am MYT · checked in"], ["Location", "78 m from site · QR matched"], ["Started", "10:05 am MYT"], ["Paused", "1 pause · 10 min"], ["Finished", "— (on submit)"], [ON_SITE_TIME, "45 min"]]);
+    const paused = timeRows({ arrivedAt: TEXT_2026_09_14T02_05_00Z, checkInMethod: "manual", checkInReason: "no GPS", startedAt: TEXT_2026_09_14T02_05_00Z, pauses: [{ from: "2026-09-14T02:50:00Z", to: null }], finishedAt: null }, NOW);
     expect(paused[1]).toEqual(["Location", "manual — no GPS"]);
     expect(paused[3]).toEqual(["Paused", "since 10:50 am MYT"]);
-    expect(paused[5]).toEqual(["On-site time", "45 min"]);
-    expect(timeRows({ arrivedAt: "2026-09-14T02:05:00Z", startedAt: "2026-09-14T02:05:00Z", finishedAt: "2026-09-14T04:00:00Z", onSiteMinutes: 115, pauses: [] }, NOW)[5]).toEqual(["On-site time", "1 h 55 min"]);
+    expect(paused[5]).toEqual([ON_SITE_TIME, "45 min"]);
+    expect(timeRows({ arrivedAt: TEXT_2026_09_14T02_05_00Z, startedAt: TEXT_2026_09_14T02_05_00Z, finishedAt: TEXT_2026_09_14T04_00_00Z, onSiteMinutes: 115, pauses: [] }, NOW)[5]).toEqual([ON_SITE_TIME, "1 h 55 min"]);
   });
   it("lists the draft and the submitted versions with their review", () => {
     const reviews = report({ reviewHistory: [{ reviewerUserId: "c", reportVersion: 2, decision: "return", reason: "photo missing", occurredAt: "2026-09-14T02:30:00Z" }] }).reviewHistory;
@@ -145,12 +155,12 @@ describe("time on site and versions", () => {
 });
 
 describe("the server's formatting and Malay (IR282)", () => {
-  const a = { scheduledStart: "2026-09-14T02:00:00Z", scheduledEnd: "2026-09-14T04:00:00Z" };
+  const a = { scheduledStart: TEXT_2026_09_14T02_00_00Z, scheduledEnd: TEXT_2026_09_14T04_00_00Z };
   it("uses the instants the loader formatted and the browser only for new ones", () => {
-    const known = knownOf(MS, ["2026-09-14T04:00:00Z"], ["2026-09-14T02:00:00Z"], [[a.scheduledStart, a.scheduledEnd]]);
+    const known = knownOf(MS, [TEXT_2026_09_14T04_00_00Z], [TEXT_2026_09_14T02_00_00Z], [[a.scheduledStart, a.scheduledEnd]]);
     expect(known).toEqual({ clock: { "2026-09-14T04:00:00Z": "1:00 PTG GMT+9" }, stamp: { "2026-09-14T02:00:00Z": "14 Sep 2026, 11:00 PG GMT+9" }, span: { "2026-09-14T02:00:00Z|2026-09-14T04:00:00Z": "14 Sep, 11:00 PG – 1:00 PTG GMT+9" } });
     const f = fmtOf(MS, { clock: { "2026-09-14T04:00:00Z": "SERVER" }, stamp: {}, span: {} }); // a known instant is never formatted again
-    expect([f.clock("2026-09-14T04:00:00Z"), f.clock("2026-09-14T05:00:00Z")]).toEqual(["SERVER", "2:00 PTG GMT+9"]);
+    expect([f.clock(TEXT_2026_09_14T04_00_00Z), f.clock("2026-09-14T05:00:00Z")]).toEqual(["SERVER", "2:00 PTG GMT+9"]);
     const ending = windowState(a, Date.parse("2026-09-14T03:46:00Z"), fmtOf(MS, known));
     expect([ending.notice, ending.text]).toEqual(["Tetingkap kerja tamat dalam 14 min — input yang belum disimpan akan dibuang pada 1:00 PTG GMT+9.",
       "14 Sep, 11:00 PG – 1:00 PTG GMT+9 · amaran pada 12:45 PTG GMT+9 · dibuang pada 1:00 PTG GMT+9"]);
@@ -174,12 +184,12 @@ describe("the server's formatting and Malay (IR282)", () => {
 // IR620: Check in at site names the field to fix, so the form shows the error there and focuses it
 describe("check-in checks", () => {
   it("asks for the site within 200 m and the scanned label, or a reason for a manual check-in", () => {
-    expect(checkInErrors("location_qr", "40", "ac-unit:u-1", "")).toEqual({});
-    expect(checkInErrors("location_qr", "250", "", "")).toEqual({
+    expect(checkInErrors(LOCATION_QR, "40", "ac-unit:u-1", "")).toEqual({});
+    expect(checkInErrors(LOCATION_QR, "250", "", "")).toEqual({
       distance: "Location check-in needs you within 200 m of the site — check in manually with a reason otherwise",
       qr: "Scan the unit’s QR label",
     });
-    expect(Object.keys(checkInErrors("location_qr", "-1", "x", ""))).toEqual(["distance"]);
+    expect(Object.keys(checkInErrors(LOCATION_QR, "-1", "x", ""))).toEqual(["distance"]);
     expect(checkInErrors("manual", "250", "", "  ")).toEqual({ reason: "A reason is required for a manual check-in (1–1000 characters)" });
     expect(checkInErrors("manual", "", "", "No GPS in the plant room")).toEqual({});
     expect(checkInErrors("manual", "", "", "x".repeat(1001))).toHaveProperty("reason");

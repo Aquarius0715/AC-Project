@@ -1,4 +1,6 @@
 "use client";
+const ADD_CONTRACTOR = "Add contractor";
+const NEW_COMPANY = "new";
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -21,7 +23,6 @@ import { byCount } from "@ac/web/lib/i18n";
 
 type Detail = NonNullable<ContractorsLive["detail"]>;
 /** The organization choice of a company still to create (IR465). */
-const NEW_COMPANY = "new";
 
 type ModalState = null | { kind: "profile"; organizationId: string | null } | { kind: "status" } | { kind: "rates" } | { kind: "verify" } | { kind: "job" };
 
@@ -39,7 +40,7 @@ export function ContractorsView({ live }: Readonly<{ live: ContractorsLive }>) {
       <JobsTabs tab="contractors" counts={live.counts} q={{}} action={<Btn variant="primary" size="sm" onClick={() => { setModal({ kind: "job" }); }}><Icon name="add" /> {t("New job")}</Btn>} />
       {result && <Banner tone={result.tone}>{result.text}</Banner>}
       <div className="split-rev">
-        <Card title={t("Contractors")} className="self-start" action={<Btn size="sm" onClick={() => { setModal({ kind: "profile", organizationId: live.withoutProfile[0]?.id ?? null }); }}><Icon name="add" /> {t("Add contractor")}</Btn>}>
+        <Card title={t("Contractors")} className="self-start" action={<Btn size="sm" onClick={() => { setModal({ kind: "profile", organizationId: live.withoutProfile[0]?.id ?? null }); }}><Icon name="add" /> {t(ADD_CONTRACTOR)}</Btn>}>
           {live.rows.length === 0 ? <EmptyState title={t("No contractor organizations")}>{t("Add contractor creates the first company with its profile; its staff are added afterwards.")}</EmptyState> : (
             <div className="flex flex-col gap-1.5">{live.rows.map((r) => (
               <ListRow key={r.id} selected={d?.org.id === r.id} href={`/admin/jobs?tab=contractors&contractorId=${r.id}`}>
@@ -136,7 +137,7 @@ function ProfileModal({ live, d, organizationId, onClose, onFail }: ModalProps &
     (r) => { if (isMade) router.refresh(); else onFail(r); }); // the new company exists: fix the profile and save again
   };
   return (
-    <Modal open onClose={() => { onClose(); }} title={existing ? t("Edit {name}", { name: existing.name }) : t("Add contractor")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t(existing ? "Save" : "Add contractor")}</Btn></>}>
+    <Modal open onClose={() => { onClose(); }} title={existing ? t("Edit {name}", { name: existing.name }) : t(ADD_CONTRACTOR)} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t(existing ? "Save" : ADD_CONTRACTOR)}</Btn></>}>
       <Field label={t("Contractor organization")} hint={t(existing ? "A profile’s organization cannot change." : "A company without a profile, or a new company.")}><Select value={org} disabled={!!existing} onChange={(e) => { setOrg(e.target.value); }}>{choices.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}{!existing && <option value={NEW_COMPANY}>{t("New company…")}</option>}</Select></Field>
       {org === NEW_COMPANY && <Field label={t("Company name · required")} hint={t("The contractor company is created with this name, then its profile")} error={tried ? companyError : undefined}><Input value={company} maxLength={120} onChange={(e) => { setCompany(e.target.value); }} placeholder="Lim Aircon Services Sdn Bhd" /></Field>}
       <Field label={t("Registration number · required")} error={tried ? errors.registrationNo : undefined}><Input value={f.registrationNo} maxLength={64} onChange={(e) => { setF({ ...f, registrationNo: e.target.value }); }} placeholder="SSM 202301012345" /></Field>

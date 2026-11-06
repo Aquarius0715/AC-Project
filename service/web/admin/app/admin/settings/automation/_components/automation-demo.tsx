@@ -1,4 +1,5 @@
 "use client";
+const CUSTOMER_A = "CUSTOMER-A";
 
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, DataTable, Field, Input, ListRow, Page, Select, useToast, cx } from "@ac/web/components/ui";
@@ -7,9 +8,9 @@ import { nonEmpty } from "@ac/web/lib/lists";
 
 const pols = nonEmpty([
   { id: "p-shave", name: "Peak shaving", sub: "When peak active → fan low", pri: 70, group: "ACROSS CUSTOMERS", on: true },
-  { id: "policy-peak-a", name: "Peak-price pre-cool", sub: "When tariff > 0.6 MYR/kWh → set 26 °C", pri: 60, group: "CUSTOMER-A", on: true },
-  { id: "p-occ", name: "Occupancy stop", sub: "When not occupied → power off", pri: 50, group: "CUSTOMER-A", on: true },
-  { id: "p-solar", name: "Solar surplus cooling", sub: "When solar > 2 kW → set 24 °C", pri: 40, group: "CUSTOMER-A", on: false },
+  { id: "policy-peak-a", name: "Peak-price pre-cool", sub: "When tariff > 0.6 MYR/kWh → set 26 °C", pri: 60, group: CUSTOMER_A, on: true },
+  { id: "p-occ", name: "Occupancy stop", sub: "When not occupied → power off", pri: 50, group: CUSTOMER_A, on: true },
+  { id: "p-solar", name: "Solar surplus cooling", sub: "When solar > 2 kW → set 24 °C", pri: 40, group: CUSTOMER_A, on: false },
 ]);
 
 /** The Phase 1A demo of the HQ automation policies (fixture policies). */
@@ -35,7 +36,7 @@ export function AutomationDemo() {
       <div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">HQ automation policies · highest priority first</span><Check label="Show disabled" checked={showOff} onChange={setShowOff} /></div>
       <div className="split-rev">
         <Card title="HQ automation policies" action={<Btn size="sm" variant="primary" onClick={() => { toast("New policy draft created"); }}><Icon name="add" /> New</Btn>} className="self-start">
-          {["ACROSS CUSTOMERS", "CUSTOMER-A"].map((g) => <div key={g} className="mb-3"><div className="mb-1 text-[10px] font-bold tracking-wide text-muted-foreground">{g}</div><div className="flex flex-col gap-2">{pols.filter((p) => p.group === g && (showOff || p.on)).map((p) => <ListRow key={p.id} selected={sel.id === p.id} onClick={() => { setSel(p); setResult(null); setFired(false); }}><div className="min-w-0 flex-1"><b className="text-[13px]">{p.name}</b><div className="text-[11px] text-muted-foreground">{p.sub}</div><div className="text-[11px] text-muted-foreground">Priority {p.pri}{!p.on && " · Off"}</div></div></ListRow>)}</div></div>)}
+          {["ACROSS CUSTOMERS", CUSTOMER_A].map((g) => <div key={g} className="mb-3"><div className="mb-1 text-[10px] font-bold tracking-wide text-muted-foreground">{g}</div><div className="flex flex-col gap-2">{pols.filter((p) => p.group === g && (showOff || p.on)).map((p) => <ListRow key={p.id} selected={sel.id === p.id} onClick={() => { setSel(p); setResult(null); setFired(false); }}><div className="min-w-0 flex-1"><b className="text-[13px]">{p.name}</b><div className="text-[11px] text-muted-foreground">{p.sub}</div><div className="text-[11px] text-muted-foreground">Priority {p.pri}{!p.on && " · Off"}</div></div></ListRow>)}</div></div>)}
         </Card>
         <div className="flex min-w-0 flex-col gap-4">
           <Card title={sel.name} sub={`${sel.id} · HQ tier · owner hq-operator`} action={<Badge tone={sel.on ? "ok" : "muted"}>{sel.on ? "Enabled" : "Disabled"}</Badge>}>

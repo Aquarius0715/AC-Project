@@ -6,9 +6,12 @@ import {
 } from "@ac/web/lib/devices";
 import { i18nOf } from "@ac/web/lib/i18n";
 import { must } from "./must";
+
+const ASIA_TOKYO = "Asia/Tokyo";
+
 const firstRow = (...args: Parameters<typeof campaignRows>) => must(campaignRows(...args)[0]); // a campaign row the test expects
 
-const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
+const MS = i18nOf({ locale: "ms", timeZone: ASIA_TOKYO });
 const NOW = new Date("2026-09-14T01:00:00Z"); // 09:00 in Kuala Lumpur, 10:00 in Tokyo
 const cap: ApiCapability = {
   id: "m1", version: 3, updatedAt: "2026-09-10T02:00:00Z", manufacturer: "DemoAir", model: "SPL-100", control: true, modeControl: true, fanControl: false, temperature: { min: 16, max: 30, step: 1 },
@@ -30,9 +33,9 @@ describe("HQ device registry", () => {
   it("checks a campaign: waves, the start in the display time zone and the device window", () => {
     expect(parseWaves("10, 50, 100")?.map((w) => w.percent)).toEqual([10, 50, 100]);
     expect([parseWaves("50, 10, 100"), parseWaves("10, 50"), parseWaves("0, 100")]).toEqual([null, null, null]);
-    expect([campaignStart(draft({}), "Asia/Kuala_Lumpur"), campaignStart(draft({}), "Asia/Tokyo"), campaignStart(draft({ startAt: "" }), "Asia/Tokyo")]).toEqual(["2026-09-16T02:00:00.000Z", "2026-09-16T01:00:00.000Z", ""]);
-    expect(campaignErrors(draft({}), NOW, "Asia/Tokyo")).toEqual({});
-    expect(campaignErrors(draft({ startAt: "2026-09-15T09:30", waves: "10, 50", autoPause: "60", deviceIds: [] }), NOW, "Asia/Tokyo")).toEqual({
+    expect([campaignStart(draft({}), "Asia/Kuala_Lumpur"), campaignStart(draft({}), ASIA_TOKYO), campaignStart(draft({ startAt: "" }), ASIA_TOKYO)]).toEqual(["2026-09-16T02:00:00.000Z", "2026-09-16T01:00:00.000Z", ""]);
+    expect(campaignErrors(draft({}), NOW, ASIA_TOKYO)).toEqual({});
+    expect(campaignErrors(draft({ startAt: "2026-09-15T09:30", waves: "10, 50", autoPause: "60", deviceIds: [] }), NOW, ASIA_TOKYO)).toEqual({
       startAt: "At least 24 hours ahead", waves: "Ascending percentages ending at 100, e.g. 10, 50, 100", autoPause: "1–50 %", deviceIds: "Choose at least one device",
     }); // 09:30 tomorrow in Tokyo is 23.5 h ahead
     const c: ApiCampaign = { id: "k1", version: 1, modelId: "m1", fromVersions: [], targetVersion: "v2", deviceIds: ["d1"], waves: [{ label: "Wave 1 · 100 %", percent: 100 }], window: { startLocal: "02:00", endLocal: "05:00" },
@@ -66,7 +69,7 @@ describe("HQ device registry in Malay with the display time zone (IR295)", () =>
   it("words the rows, operations and campaign checks", () => {
     expect(modelRows([cap], units, [], MS)[0]).toMatchObject({ used: "1 unit · 0 peranti", updated: "10 Sep 2026, 11:00 PG GMT+9" });
     expect(deviceRows([device({ unitId: null })], units, MS.t)[0]?.unit).toBe("Tidak terikat");
-    expect(campaignErrors(draft({ modelId: "" }), NOW, "Asia/Tokyo", MS.t)).toEqual({ modelId: "Pilih model" });
+    expect(campaignErrors(draft({ modelId: "" }), NOW, ASIA_TOKYO, MS.t)).toEqual({ modelId: "Pilih model" });
     expect(campaignRows([{ id: "k", version: 1, modelId: "x", fromVersions: [], targetVersion: "v2", deviceIds: [], waves: [], window: { startLocal: "00:00", endLocal: "23:59" }, autoPauseFailurePercent: 10, startAt: "2026-09-16T02:00:00Z", state: "paused", checksum: "", createdAt: "2026-09-15T00:00:00Z", createdByMembershipId: null, progress: { succeeded: 0, installing: 0, pending: 0, failed: 0, skipped: 0 }, results: [], reason: null }], [], MS)[0])
       .toMatchObject({ model: "model", versions: "mana-mana → v2", start: "16 Sep 2026, 11:00 PG GMT+9" });
     expect(resultReason("errors.device_busy", MS.t)).toBe("Dilangkau — unit sedang sibuk (operasi, arahan, ujian diagnostik atau sekatan)");

@@ -6,6 +6,8 @@ import { EN, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { codePoints } from "@ac/web/lib/text";
 import { isAfter } from "@ac/web/lib/order";
 
+const KL = "Asia/Kuala_Lumpur";
+
 const en = translator("en");
 
 export type PlanType = "rto" | "general" | "energy" | "environment";
@@ -31,7 +33,6 @@ export interface ContractRow {
 }
 export interface UnitOption { id: string; customerId: string; label: string; where: string; otherContracts: string[] }
 
-const KL = "Asia/Kuala_Lumpur";
 /** The Kuala Lumpur calendar day of an instant (yyyy-mm-dd). */
 export const klDay = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: KL });
 

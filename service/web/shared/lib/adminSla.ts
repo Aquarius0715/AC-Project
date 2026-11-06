@@ -11,6 +11,8 @@ import { csvQuoted } from "@ac/web/lib/csv";
 import { keysOf } from "@ac/web/lib/keysOf";
 import type { IconName } from "@ac/web/components/Icon";
 
+const FIRST_TIME_FIX = "First-time fix";
+
 const en = translator("en");
 
 type PlanType = "rto" | "general" | "energy" | "environment";
@@ -56,7 +58,7 @@ export function slaTiles(sc: ApiScorecard, t: T = en): { label: string; value: s
   return [
     { label: hours.length === 1 ? t("Response ≤ {n} h", { n: hours[0] ?? 0 }) : t("Response within target"), value: pct(m.responseWithinTarget), sub: hours.length === 1 ? t("target 100 % of jobs") : t("≤ {hours} h by plan · target 100 %", { hours: hours.join(" / ") }), tone: below(m.responseWithinTarget, 100) },
     { label: t("Arrival in window"), value: pct(m.arrivalInWindow), sub: targetText(ts.map((x) => x.arrivalInWindowPercent), t), tone: below(m.arrivalInWindow, arrival) },
-    { label: t("First-time fix"), value: pct(m.firstTimeFix), sub: targetText(ts.map((x) => x.firstTimeFixPercent), t), tone: below(m.firstTimeFix, ftf) },
+    { label: t(FIRST_TIME_FIX), value: pct(m.firstTimeFix), sub: targetText(ts.map((x) => x.firstTimeFixPercent), t), tone: below(m.firstTimeFix, ftf) },
     { label: t("Avg. customer rating"), value: m.averageRating === null ? "—" : m.averageRating.toFixed(1), icon: m.averageRating === null ? undefined : "star", sub: t(m.ratingCount === 1 ? "1 rating" : "{n} ratings", { n: m.ratingCount }) },
     { label: t("Open & overdue"), value: String(m.openOverdue), sub: t(sc.breaches.length === 1 ? "1 breach in the period" : "{n} breaches in the period", { n: sc.breaches.length }), tone: m.openOverdue > 0 ? "crit" : undefined },
   ];
@@ -91,7 +93,7 @@ export function breachText(b: ApiBreach, t: T = en): string {
   const fixed: Record<string, string> = { arrival: "arrival outside the scheduled window", first_time_fix: "not fixed the first time", overdue: "open past its due time" };
   return textOf(fixed, b.kind, t) ?? b.detail;
 }
-const KIND: Record<string, string> = { response: "Response", arrival: "Arrival", first_time_fix: "First-time fix", overdue: "Overdue" };
+const KIND: Record<string, string> = { response: "Response", arrival: "Arrival", first_time_fix: FIRST_TIME_FIX, overdue: "Overdue" };
 const breachTone = (kind: string): Tone => (kind === "overdue" ? "crit" : "warn");
 /** The recent breaches (newest first, at most 50) with the customer and Open job →. */
 export const breachRows = (sc: ApiScorecard, names: Map<string, string>, t: T = en) =>
@@ -133,7 +135,7 @@ period's ends are dates in the display time zone. */
 export function slaCsv(rows: SlaRow[], period: { from: string; to: string }, i: I18n = EN): string {
   const { t, display } = i;
   const day = (iso: string) => zonedParts(iso, display.timeZone).date;
-  const head = ["Customer", "Plan", "Jobs", "Response", "Arrival", "First-time fix", "Rating", "Overdue", "Status", "Period from", "Period to"].map((h) => t(h));
+  const head = ["Customer", "Plan", "Jobs", "Response", "Arrival", FIRST_TIME_FIX, "Rating", "Overdue", "Status", "Period from", "Period to"].map((h) => t(h));
   return [head, ...rows.map((r) => [r.name, r.plan, r.jobs, r.response, r.arrival, r.ftf, r.rating, r.overdue, r.status.label, day(period.from), day(period.to)])].map((l) => l.map((item) => csvQuoted(item)).join(",")).join("\n") + "\n";
 }
 

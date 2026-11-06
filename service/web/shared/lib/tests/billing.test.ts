@@ -6,6 +6,8 @@ import {
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 import { must } from "./must";
 
+const PROCESSING = "processing";
+
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const NOW = new Date("2026-09-15T01:00:00Z");
 const customers: ApiCustomer[] = [{ id: "c1", name: "Demo Customer A", organizationId: "org-a", status: "active" }];
@@ -25,18 +27,18 @@ const statement: ApiStatement = {
 
 describe("HQ billing (FR-A08, FR-A23, DD-A08)", () => {
   it("rows invoices with Kuala Lumpur business days and the payment method as recorded", () => {
-    expect([invoiceStatus(invoice({}), NOW), invoiceStatus(invoice({ dueAt: "2026-09-20T16:00:00Z" }), NOW), invoiceStatus(invoice({ status: "processing" }), NOW), invoiceStatus(invoice({ status: "paid" }), NOW)])
+    expect([invoiceStatus(invoice({}), NOW), invoiceStatus(invoice({ dueAt: "2026-09-20T16:00:00Z" }), NOW), invoiceStatus(invoice({ status: PROCESSING }), NOW), invoiceStatus(invoice({ status: "paid" }), NOW)])
       .toEqual(["Overdue", "Unpaid", "Processing", "Paid"]);
-    const [a, b] = invoiceRows([invoice({}), invoice({ id: "i2", contractId: "kx", paymentMethod: "demo_credit_card", paymentStatus: "processing", status: "processing" })], contracts, customers, NOW);
+    const [a, b] = invoiceRows([invoice({}), invoice({ id: "i2", contractId: "kx", paymentMethod: "demo_credit_card", paymentStatus: PROCESSING, status: PROCESSING })], contracts, customers, NOW);
     expect(a).toMatchObject({ amt: "120.00 MYR", meta: "Demo Customer A · rto contract v1 · August 2026", method: "Method not selected", methodName: "Method not selected", paymentState: null, st: "Overdue", period: "1 Aug 2026 → 1 Sept 2026", due: "10 Sept 2026" });
-    expect(b).toMatchObject({ meta: "customer · kx · August 2026", method: "Credit card · processing", methodName: "Credit card", paymentState: "processing", customerId: "" });
+    expect(b).toMatchObject({ meta: "customer · kx · August 2026", method: "Credit card · processing", methodName: "Credit card", paymentState: PROCESSING, customerId: "" });
     expect([totals([must(a), must(b)], ["Overdue", "Processing"]), totals([must(a)], ["Paid"])]).toEqual(["240.00 MYR", "0.00"]);
   });
 
   it("words the payments of an invoice, inquiries, contracts and payout statements", () => {
     const d = invoiceDetail({ ...invoice({}), restrictionIds: ["r1"], paymentRefs: [
       { id: "p1", version: 1, amountMinor: 12_000, currency: "MYR", invoiceId: "i1", method: null, status: "confirmed", paymentReference: "BANK-1", confirmationReason: "Bank transfer", confirmedAt: "2026-09-12T02:00:00Z" },
-      { id: "p2", version: 3, amountMinor: 12_000, currency: "MYR", invoiceId: "i1", method: "demo_debit_card", status: "processing", paymentReference: null, confirmationReason: null, confirmedAt: null },
+      { id: "p2", version: 3, amountMinor: 12_000, currency: "MYR", invoiceId: "i1", method: "demo_debit_card", status: PROCESSING, paymentReference: null, confirmationReason: null, confirmedAt: null },
     ] });
     expect(d).toEqual({ id: "i1", version: 1, processingPaymentId: "p2", processingPaymentVersion: 3, restrictionIds: ["r1"], manualAllowed: false, payments: ["No method (recorded by HQ) · confirmed · ref BANK-1 · reason “Bank transfer”", "Debit card · processing"] });
     // IR447: only a failed (or expired) card payment leaves the invoice open to a manual payment

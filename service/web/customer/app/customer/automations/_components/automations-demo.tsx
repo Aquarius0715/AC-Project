@@ -1,4 +1,5 @@
 "use client";
+const BEDROOM_AC = "Bedroom AC";
 
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Choice, EmptyState, Field, Input, Modal, OnOffBadge, Page, PageHead, Select, SummaryList, Toggle, cx, useToast } from "@ac/web/components/ui";
@@ -18,7 +19,7 @@ const seed: Auto[] = [
   { id: "a3", name: "Night comfort", kind: "Schedule", icon: "schedule", when: "Every day 23:00 → 06:00 next day (overnight)", steps: [start("23:00", "Set temperature 26°C, fan Low"), end("06:00 next day", "Power OFF")], unit: "Bedroom AC #2 · next run tonight 23:00", on: true },
   { id: "a4", name: "Room empty stop", kind: "Presence", icon: "presence", when: "No one detected for 30 min (demo occupancy)", steps: then("Power OFF"), unit: "Study AC · Home A › 2F", note: "Last evaluation skipped 08:30 — occupancy data missing (never counted as a match)", on: true },
   { id: "a5", name: "Hot afternoon pre-cool", kind: "Weather", icon: "weather", when: "Outdoor temperature ≥ 33°C (demo weather) · Only if: weekday", steps: then("Set temperature 24°C"), unit: "Living room AC", on: false },
-  { id: "a6", name: "Vacation mode", kind: "Location", icon: "location", when: "Arrival at Home A", steps: then("Set temperature 25°C"), unit: "Bedroom AC", on: false },
+  { id: "a6", name: "Vacation mode", kind: "Location", icon: "location", when: "Arrival at Home A", steps: then("Set temperature 25°C"), unit: BEDROOM_AC, on: false },
 ];
 
 /** The Phase 1A demo of the automations screen (fixtures; DATA_SOURCE=API uses AutomationsView). */
@@ -29,10 +30,10 @@ export function AutomationsDemo() {
   const [edit, setEdit] = useState<Auto | "new" | null>(null);
   const [del, setDel] = useState<Auto | null>(null);
   const [step, setStep] = useState<"form" | "review">("form");
-  const [f, setF] = useState({ name: "", kind: "Schedule", time: "18:00", temp: "25", unit: "Bedroom AC" });
+  const [f, setF] = useState({ name: "", kind: "Schedule", time: "18:00", temp: "25", unit: BEDROOM_AC });
   const [errorText, setError] = useState<Record<string, string>>({});
 
-  const open = (a: Auto | "new") => { setEdit(a); setStep("form"); setError({}); setF(a === "new" ? { name: "", kind: "Schedule", time: "18:00", temp: "25", unit: "Bedroom AC" } : { name: a.name, kind: a.kind, time: "18:00", temp: "25", unit: a.unit.split(" · ", 1)[0] ?? a.unit }); };
+  const open = (a: Auto | "new") => { setEdit(a); setStep("form"); setError({}); setF(a === "new" ? { name: "", kind: "Schedule", time: "18:00", temp: "25", unit: BEDROOM_AC } : { name: a.name, kind: a.kind, time: "18:00", temp: "25", unit: a.unit.split(" · ", 1)[0] ?? a.unit }); };
   const review = () => {
     const e: Record<string, string> = {};
     if (!f.name.trim()) e.name = "Name is required";
@@ -101,7 +102,7 @@ export function AutomationsDemo() {
             <Field label="Name" error={errorText.name}><Input value={f.name} onChange={(e) => { setF({ ...f, name: e.target.value }); }} placeholder="e.g. Weekday pre-cool" /></Field>
             <Field label="Trigger" error={errorText.kind}><Choice<string> value={f.kind} onChange={(v) => { setF({ ...f, kind: v }); }} options={["Schedule", "Location", "Presence", "Weather"].map((k) => ({ id: k, label: k }))} /></Field>
             <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
-              <Field label="Air conditioner"><Select value={f.unit} onChange={(e) => { setF({ ...f, unit: e.target.value }); }}>{["Bedroom AC", "Bedroom AC #2", "Living room AC", "Kitchen AC", "Study AC"].map((u) => <option key={u}>{u}</option>)}</Select></Field>
+              <Field label="Air conditioner"><Select value={f.unit} onChange={(e) => { setF({ ...f, unit: e.target.value }); }}>{[BEDROOM_AC, "Bedroom AC #2", "Living room AC", "Kitchen AC", "Study AC"].map((u) => <option key={u}>{u}</option>)}</Select></Field>
               {f.kind === "Schedule" && <Field label="Time"><Input type="time" value={f.time} onChange={(e) => { setF({ ...f, time: e.target.value }); }} /></Field>}
               <Field label="Set temperature (°C)" error={errorText.temp}><Input type="number" value={f.temp} onChange={(e) => { setF({ ...f, temp: e.target.value }); }} /></Field>
             </div>

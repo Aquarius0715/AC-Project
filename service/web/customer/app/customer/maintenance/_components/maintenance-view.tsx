@@ -1,4 +1,5 @@
 "use client";
+const MY_REQUESTS = "My requests";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -59,12 +60,12 @@ export function MaintenanceView({ live }: Readonly<{ live: MaintenanceLive }>) {
   ) : <Card title={t("Filters by AC")}><p className="text-[13px] text-muted-foreground">{t("Loading filter care…")}</p></Card>);
   const requestsBody = () => {
     const { rateBanner } = live;
-    if (going) return <Card title={t("My requests")}><p className="text-[13px] text-muted-foreground">{t("Loading your requests…")}</p></Card>;
+    if (going) return <Card title={t(MY_REQUESTS)}><p className="text-[13px] text-muted-foreground">{t("Loading your requests…")}</p></Card>;
     return (
       <>
         {replies > 0 && <Banner tone="warn" icon="swap" action={<Btn size="sm" variant="primary" onClick={() => { setTab("reply"); const r = live.rows.find((x) => x.tab === "reply"); if (r) open(r.id); }}>{t("Review")}</Btn>}>{t("A new visit time needs your reply ({n}). Nothing is booked until you accept.", { n: replies })}</Banner>}
         {rateBanner && <Banner tone="ok" icon="check" action={<Btn size="sm" variant="primary" onClick={() => { open(rateBanner.jobId); }}>{t("Confirm & rate")}</Btn>}><b>{rateBanner.text}</b> {t("Is everything working? Your confirmation closes the job.")}</Banner>}
-        <PageHead title={t("My requests")} sub={t(live.rows.length === 1 ? "{n} request · sorted by status (business order)" : "{n} requests · sorted by status (business order)", { n: live.rows.length })} action={<Btn variant="primary" onClick={() => { setModal("new"); }}><Icon name="add" /> {t("New maintenance request")}</Btn>} />
+        <PageHead title={t(MY_REQUESTS)} sub={t(live.rows.length === 1 ? "{n} request · sorted by status (business order)" : "{n} requests · sorted by status (business order)", { n: live.rows.length })} action={<Btn variant="primary" onClick={() => { setModal("new"); }}><Icon name="add" /> {t("New maintenance request")}</Btn>} />
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Tabs value={tab} onChange={setTab} tabs={STATUS_TABS.filter(([s]) => s !== "reply" || replies > 0).map(([id, label]) => ({ id, label: t(label), count: count(id) }))} />
           <Select aria-label={t("Origin")} value={origin} onChange={(e) => { setOrigin(oneOf(["all", "request", "plan"] as const, e.target.value, origin)); }} className="w-auto"><option value="all">{t("Origin: All")}</option><option value="request">{t("Origin: Client request")}</option><option value="plan">{t("Origin: Periodic plan")}</option></Select>
@@ -92,7 +93,7 @@ export function MaintenanceView({ live }: Readonly<{ live: MaintenanceLive }>) {
   };
   return (
     <Page>
-      <Tabs value={page} onChange={go} tabs={[{ id: "requests", label: t("My requests") }, { id: "filters", label: t("Filter care") }]} />
+      <Tabs value={page} onChange={go} tabs={[{ id: "requests", label: t(MY_REQUESTS) }, { id: "filters", label: t("Filter care") }]} />
       {result && <Banner tone={result.tone}>{result.text}</Banner>}
       {page === "filters" ? filtersBody() : requestsBody()}
       {modal === "new" && <NewRequest live={live} prefill={prefill} onClose={(text, tone) => { setPrefill(null); close(text, tone); }} onFail={(f) => { setPrefill(null); fail(f); }} />}

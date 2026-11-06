@@ -5,6 +5,8 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const UNITS_LIST = "units.list";
+
 const callOp = vi.fn();
 vi.mock("@ac/web/lib/ops", async (original) => ({ ...(await original<typeof import("@ac/web/lib/ops")>()), callRelay: (...a: unknown[]) => callOp(...a) }));
 
@@ -28,7 +30,7 @@ describe("useOp", () => {
   it("keeps the mock value and calls nothing in mock mode", async () => {
     session("mock");
     const { useOp } = await load();
-    const { result } = renderHook(() => useOp<{ n: number }, number>("units.list", {}, 7, (d) => d.n));
+    const { result } = renderHook(() => useOp<{ n: number }, number>(UNITS_LIST, {}, 7, (d) => d.n));
     await waitFor(() => { expect(result.current.source).toBe("mock"); });
     expect(result.current).toMatchObject({ data: 7, loading: false, error: null });
     expect(callOp).not.toHaveBeenCalled();
@@ -37,7 +39,7 @@ describe("useOp", () => {
   it("reads an answer of another shape as the mock session", async () => {
     vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(Response.json({ dataSource: "api", signedIn: "yes" }))));
     const { useOp } = await load();
-    const { result } = renderHook(() => useOp<{ n: number }, number>("units.list", {}, 7, (d) => d.n));
+    const { result } = renderHook(() => useOp<{ n: number }, number>(UNITS_LIST, {}, 7, (d) => d.n));
     await waitFor(() => { expect(result.current.source).toBe("mock"); });
     expect(callOp).not.toHaveBeenCalled();
   });
@@ -46,10 +48,10 @@ describe("useOp", () => {
     session("api");
     callOp.mockResolvedValueOnce({ n: 1 }).mockResolvedValueOnce({ n: 2 });
     const { useOp, invalidate } = await load();
-    const { result } = renderHook(() => useOp<{ n: number }, number>("units.list", { limit: 5 }, 0, (d) => d.n * 10));
+    const { result } = renderHook(() => useOp<{ n: number }, number>(UNITS_LIST, { limit: 5 }, 0, (d) => d.n * 10));
     await waitFor(() => { expect(result.current.data).toBe(10); });
     expect(result.current).toMatchObject({ loading: false, error: null, source: "api" });
-    expect(callOp).toHaveBeenCalledWith("units.list", { limit: 5 });
+    expect(callOp).toHaveBeenCalledWith(UNITS_LIST, { limit: 5 });
     act(() => { invalidate(); });
     await waitFor(() => { expect(result.current.data).toBe(20); });
     expect(callOp).toHaveBeenCalledTimes(2);
@@ -60,7 +62,7 @@ describe("useOp", () => {
     const { useOp, invalidate } = await load();
     const { OpError } = await import("@ac/web/lib/ops"); // the instance the freshly loaded useOp sees
     callOp.mockResolvedValueOnce({ n: 3 });
-    const { result } = renderHook(() => useOp<{ n: number }, number>("units.list", {}, 0, (d) => d.n));
+    const { result } = renderHook(() => useOp<{ n: number }, number>(UNITS_LIST, {}, 0, (d) => d.n));
     await waitFor(() => { expect(result.current.data).toBe(3); });
     callOp.mockRejectedValueOnce(new OpError({ code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {}, correlationId: "c-1", retryAfterSeconds: null }, { status: 503 }));
     act(() => { invalidate(); });
@@ -71,7 +73,7 @@ describe("useOp", () => {
   it("does not read while disabled", async () => {
     session("api");
     const { useOp } = await load();
-    const { result } = renderHook(() => useOp<{ n: number }, number>("units.list", {}, 5, (d) => d.n, false));
+    const { result } = renderHook(() => useOp<{ n: number }, number>(UNITS_LIST, {}, 5, (d) => d.n, false));
     await waitFor(() => { expect(result.current.source).toBe("api"); });
     expect(result.current).toMatchObject({ data: 5, loading: false });
     expect(callOp).not.toHaveBeenCalled();

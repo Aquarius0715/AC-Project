@@ -1,4 +1,7 @@
 "use client";
+const IN_PROGRESS = "in_progress";
+const REFRIGERANT = "Refrigerant";
+const LOCATION_QR = "location_qr";
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useEffectEvent } from "react";
@@ -74,7 +77,7 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
   }, [live.now]);
   const editableReport = job.draftReportRef && live.report?.version === job.draftReportRef.reportVersion ? live.report : null;
   const componentKeys = live.components.map((c) => c.key);
-  const [draft, setDraft] = useState<Draft>(() => draftFrom(editableReport ?? (job.status === "in_progress" ? null : live.report), live.components));
+  const [draft, setDraft] = useState<Draft>(() => draftFrom(editableReport ?? (job.status === IN_PROGRESS ? null : live.report), live.components));
   const [rep, setRep] = useState<Rep | null>(editableReport);
   const [dirty, setDirty] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
@@ -107,12 +110,12 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
     if (win.phase === "ended") return t("The work window has ended — ask your coordinator to reschedule.");
     return t("On site: Start job opens Check in (location + unit QR); checking in starts the work.");
   };
-  const isInWork = job.status === "in_progress";
+  const isInWork = job.status === IN_PROGRESS;
   const isPaused = !!job.timeOnSite?.pauses?.some((p) => !p.to);
   const isEditable = isInWork && win.phase !== "ended" && win.phase !== "before";
   // the unit's alert evidence and diagnostics open for an active job inside its window: in progress, assigned or
   // returned for rework (IR94, IR283; Figma Technician 423:604)
-  const isUnitOpen = ["assigned", "in_progress", "rework_requested"].includes(job.status) && win.phase !== "ended" && win.phase !== "before";
+  const isUnitOpen = ["assigned", IN_PROGRESS, "rework_requested"].includes(job.status) && win.phase !== "ended" && win.phase !== "before";
   const failed = (x: ActionFailure) => { setRefused(refusal(x, t)); };
   const edit = (fn: (d: Draft) => Draft) => { setDraft(fn); setDirty(true); };
   const photos = (rep ?? live.report)?.attachmentRefs.filter((a) => a.id !== (rep ?? live.report)?.signOff?.signatureAttachmentId) ?? [];
@@ -192,7 +195,7 @@ export function WorkspaceView({ live }: Readonly<{ live: WorkspaceLive }>) {
   const viewAction = () => {
     if (!isEditable) return null;
     if (view === "readings") return <Btn size="sm" onClick={() => { addReading(tab === "outdoor" ? "refrigerant_pipe" : live.components[0]?.key ?? "filter"); }}><Icon name="add" /> {t("Add reading")}</Btn>;
-    if (view === "parts") return <span className="flex gap-2"><Btn size="sm" onClick={() => { setModal("part"); }}><Icon name="add" /> {t("Add part")}</Btn><Btn size="sm" onClick={() => { setModal("refrigerant"); }}><Icon name="add" /> {t("Refrigerant")}</Btn></span>;
+    if (view === "parts") return <span className="flex gap-2"><Btn size="sm" onClick={() => { setModal("part"); }}><Icon name="add" /> {t("Add part")}</Btn><Btn size="sm" onClick={() => { setModal("refrigerant"); }}><Icon name="add" /> {t(REFRIGERANT)}</Btn></span>;
     return null;
   };
   const addReading = (key: ComponentKey) => { edit((d) => ({ ...d, readings: [...d.readings, { componentKey: key, metric: "temperature", value: "", observedAt: new Date(now).toISOString() }] })); };
@@ -431,7 +434,7 @@ const CHECK_IN_IDS: Record<CheckInField, string> = { distance: "check-in-distanc
 
 function CheckInModal({ open, unitId, pending, errors, setErrors, onClose, onCheckIn }: Readonly<{ open: boolean; unitId: string; pending: boolean; errors: CheckInErrors; setErrors: (e: CheckInErrors) => void; onClose: () => void; onCheckIn: (method: "location_qr" | "manual", distance: number | null, qr: string | null, reason: string | null) => void }>) {
   const t = useT();
-  const [method, setMethod] = useState<"location_qr" | "manual">("location_qr");
+  const [method, setMethod] = useState<"location_qr" | "manual">(LOCATION_QR);
   const [distance, setDistance] = useState("40");
   const [qr, setQr] = useState(`ac-unit:${unitId}`);
   const [reason, setReason] = useState("");
@@ -443,12 +446,12 @@ function CheckInModal({ open, unitId, pending, errors, setErrors, onClose, onChe
     const bad = CHECK_IN_FIELDS.find((k) => e[k]);
     if (bad) { focusField(CHECK_IN_IDS[bad]); return; }
     if (method === "manual") onCheckIn("manual", null, null, reason.trim());
-    else onCheckIn("location_qr", Number(distance), qr.trim(), null);
+    else onCheckIn(LOCATION_QR, Number(distance), qr.trim(), null);
   };
   return (
     <Modal open={open} onClose={onClose} title={t("Check in at site")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={go}>{t("Check in & start")}</Btn></>}>
-      <Field label={t("How")}><Choice value={method} onChange={(v) => { setMethod(v); setErrors({}); }} options={[{ id: "location_qr", label: t("Location + unit QR") }, { id: "manual", label: t("Manual (reason)") }]} /></Field>
-      {method === "location_qr" ? (
+      <Field label={t("How")}><Choice value={method} onChange={(v) => { setMethod(v); setErrors({}); }} options={[{ id: LOCATION_QR, label: t("Location + unit QR") }, { id: "manual", label: t("Manual (reason)") }]} /></Field>
+      {method === LOCATION_QR ? (
         <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
           <Field label={t("Distance to the site (m)")} hint={t("Demo: the device's location service fills this; within 200 m")} error={errors.distance}><Input id={CHECK_IN_IDS.distance} inputMode="numeric" value={distance} onChange={(e) => { setDistance(e.target.value); clear("distance"); }} /></Field>
           <Field label={t("Scanned unit QR")} hint={t("Demo: the camera scan fills this")} error={errors.qr}><Input id={CHECK_IN_IDS.qr} value={qr} onChange={(e) => { setQr(e.target.value); clear("qr"); }} /></Field>
@@ -540,9 +543,9 @@ function RefrigerantModal({ open, onClose, onAdd }: Readonly<{ open: boolean; on
     onAdd({ refrigerant: kind, cylinderId: cylinder.trim(), recoveredKg: Number(recovered), chargedKg: Number(charged), leakCheck: leak, leakCheckMethod: leak === "not_done" ? null : method.trim() || null });
   };
   return (
-    <Modal open={open} onClose={onClose} title={t("Refrigerant")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" onClick={add}>{t("Add")}</Btn></>}>
+    <Modal open={open} onClose={onClose} title={t(REFRIGERANT)} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" onClick={add}>{t("Add")}</Btn></>}>
       <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}>
-        <Field label={t("Refrigerant")}><Select value={kind} onChange={(e) => { setKind(oneOf(["R32", "R410A"] as const, e.target.value, kind)); }}><option>R32</option><option>R410A</option></Select></Field>
+        <Field label={t(REFRIGERANT)}><Select value={kind} onChange={(e) => { setKind(oneOf(["R32", "R410A"] as const, e.target.value, kind)); }}><option>R32</option><option>R410A</option></Select></Field>
         <Field label={t("Cylinder ID")} error={errors.cylinder}><Input id="refrigerant-cylinder" value={cylinder} maxLength={64} placeholder="CYL-R32-0182" onChange={(e) => { setCylinder(e.target.value); clear("cylinder"); }} /></Field>
         <Field label={t("Recovered (kg)")} error={errors.recovered}><Input id="refrigerant-recovered" inputMode="decimal" value={recovered} onChange={(e) => { setRecovered(e.target.value); clear("recovered"); }} /></Field>
         <Field label={t("Charged (kg)")} error={errors.charged}><Input id="refrigerant-charged" inputMode="decimal" value={charged} onChange={(e) => { setCharged(e.target.value); clear("charged"); }} /></Field>

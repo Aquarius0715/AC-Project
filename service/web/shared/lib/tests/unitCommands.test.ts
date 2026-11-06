@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { waitForCommand } from "@ac/web/lib/unitCommands";
 import type { ApiCommand } from "@ac/web/lib/units";
 
+const ACKNOWLEDGED = "acknowledged";
+
 // commands.get goes through the BFF Route Handler (callOp); the polling is the client's (D04)
 const callOp = vi.hoisted(() => vi.fn());
 vi.mock("@ac/web/lib/ops", () => ({ callOp }));
@@ -16,7 +18,7 @@ afterEach(() => {
 
 describe("following a command until the device answers (D04, Unit Control and the assistant)", () => {
   it("reports every state every 2 s and stops at the first final one", async () => {
-    callOp.mockResolvedValueOnce(deviceCommand("sent")).mockResolvedValueOnce(deviceCommand("acknowledged"));
+    callOp.mockResolvedValueOnce(deviceCommand("sent")).mockResolvedValueOnce(deviceCommand(ACKNOWLEDGED));
     const seen: string[] = [];
     const done = waitForCommand(deviceCommand("requested"), (c) => seen.push(c.status));
     expect(seen).toEqual(["requested"]); // the first state at once
@@ -24,13 +26,13 @@ describe("following a command until the device answers (D04, Unit Control and th
     expect(callOp).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(2001);
     const acknowledged = await done;
-    expect(acknowledged.status).toBe("acknowledged");
-    expect(seen).toEqual(["requested", "sent", "acknowledged"]);
+    expect(acknowledged.status).toBe(ACKNOWLEDGED);
+    expect(seen).toEqual(["requested", "sent", ACKNOWLEDGED]);
     expect(callOp.mock.calls).toEqual([["commands.get", { id: "c1" }], ["commands.get", { id: "c1" }]]);
   });
 
   it("does not poll a command that is already final", async () => {
-    for (const s of ["acknowledged", "failed", "expired", "cancelled"] as const) {
+    for (const s of [ACKNOWLEDGED, "failed", "expired", "cancelled"] as const) {
       const seen: string[] = [];
       const final = await waitForCommand(deviceCommand(s), (c) => seen.push(c.status));
       expect(final.status).toBe(s);

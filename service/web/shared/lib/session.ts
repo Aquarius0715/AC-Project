@@ -10,6 +10,8 @@ import { createClient } from "@redis/client";
 import { z } from "zod";
 import { filled } from "@ac/web/lib/filled";
 
+const LOCAL_SECRET = "local-dev-session-secret-change-me";
+
 const roleSchema = z.enum(["client", "contractor", "technician", "admin"]);
 type Role = z.infer<typeof roleSchema>;
 
@@ -39,7 +41,6 @@ export const OIDC_COOKIE = `${httpsApp() ? "__Secure-" : ""}ac_oidc_${APP_ROLE}`
 export const MIN_SECRET_LENGTH = 32;
 
 /** The local default secret of plain-http runs (compose.yaml uses the same value). */
-const LOCAL_SECRET = "local-dev-session-secret-change-me";
 
 /** The cookie key: 32 bytes derived from SESSION_SECRET with HKDF-SHA256 (the secret itself is never the key). On HTTPS
 a missing, empty or short secret is refused rather than replaced by the local one, and so is the public local value
@@ -318,7 +319,7 @@ export async function readSession(): Promise<Session | null> {
 
 /** A same-origin path to return to after sign-in; rejects absolute, protocol-relative ("//host") and backslash forms. */
 export function safeReturnTo(v: string | null | undefined): string | null {
-  return !v || !v.startsWith("/") || v.startsWith("//") || v.includes("\\") || /[\u0000-\u001F]/.test(v) ? null : v;
+  return !v || !v.startsWith("/") || v.startsWith("//") || v.includes("\\") || /[\u{0}-\u{1F}]/u.test(v) ? null : v;
 }
 
 export const roleHome: Record<Session["role"], string> = { client: "/customer", contractor: "/partner", technician: "/technician", admin: "/admin" };

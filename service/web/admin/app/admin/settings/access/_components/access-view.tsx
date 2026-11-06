@@ -1,4 +1,8 @@
 "use client";
+const CONTRACTOR = "contractor";
+const ORGANIZATION = "organization";
+const TECHNICIAN = "technician";
+const PERMISSIONS = "permissions";
 
 import { useRef, useState } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, EmptyState, Field, Input, ListRow, Modal, Page, Search, SearchSelect, Select, Textarea, Plain, ScrollX, type Tone } from "@ac/web/components/ui";
@@ -68,13 +72,13 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
   // a role's starting scope: the tenant for HQ, the chosen organization for a contractor, none for a technician
   const roleScopes = (r: Role): ScopeRef[] => {
     if (r === "admin") return [{ kind: "tenant", id: live.tenantId }];
-    if (r === "contractor" && d.organizationId) return [{ kind: "organization", id: d.organizationId }];
+    if (r === CONTRACTOR && d.organizationId) return [{ kind: ORGANIZATION, id: d.organizationId }];
     return [];
   };
   const chooseRole = (r: Role) => {
     set({ role: r, permissions: roleDefaults[r], organizationId: "", scopes: roleScopes(r) });
   };
-  const chooseOrg = (id: string) => { set({ organizationId: id, scopes: d.role === "contractor" ? [{ kind: "organization", id }] : d.scopes }); };
+  const chooseOrg = (id: string) => { set({ organizationId: id, scopes: d.role === CONTRACTOR ? [{ kind: ORGANIZATION, id }] : d.scopes }); };
   const orgs = live.orgs.filter((o) => o.kind === orgKind(d.role, d.employment));
   const customers = live.orgs.filter((o) => o.kind === "customer");
   const scopeTargets = () => {
@@ -147,14 +151,14 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
                 </> : <Field label={t("User")} error={fieldError("userId")} hint={isNew ? undefined : t("Fixed after creation")}><Select id={memberFieldId("userId")} value={d.userId} disabled={!isNew || !live.canWrite} onChange={(e) => { set({ userId: e.target.value }); }}><option value="">{t("Select…")}</option>{live.users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</Select></Field>}
                 <Field label={t("Organization")} error={fieldError("organizationId")} hint={isNew ? undefined : t("Fixed after creation")}><Select id={memberFieldId("organizationId")} value={d.organizationId} disabled={!isNew || !live.canWrite} onChange={(e) => { chooseOrg(e.target.value); }}><option value="">{t("Select…")}</option>{orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</Select></Field>
               </div>
-              <div className="mt-3"><div className="mb-1 text-xs font-semibold">{t("Role")}</div>{isNew ? <Choice value={d.role} onChange={chooseRole} options={roles} /> : <Badge tone="primary">{roleWord(d.role, d.role === "technician" ? d.employment : null, t)}</Badge>}<p className="mt-1 text-[11px] text-muted-foreground">{t("Choosing a role only pre-checks its typical permissions; every permission below stays editable. The client role is not offered here.")}</p></div>
-              {d.role === "technician" && <div className="mt-3 max-w-xs"><Field label={t("Employment")}><Select value={d.employment} disabled={!isNew || !live.canWrite} onChange={(e) => { set({ employment: oneOf(["external", "internal"] as const, e.target.value, d.employment), organizationId: "" }); }}><option value="internal">{t("Internal (HQ field team)")}</option><option value="external">{t("External (contractor)")}</option></Select></Field></div>}
+              <div className="mt-3"><div className="mb-1 text-xs font-semibold">{t("Role")}</div>{isNew ? <Choice value={d.role} onChange={chooseRole} options={roles} /> : <Badge tone="primary">{roleWord(d.role, d.role === TECHNICIAN ? d.employment : null, t)}</Badge>}<p className="mt-1 text-[11px] text-muted-foreground">{t("Choosing a role only pre-checks its typical permissions; every permission below stays editable. The client role is not offered here.")}</p></div>
+              {d.role === TECHNICIAN && <div className="mt-3 max-w-xs"><Field label={t("Employment")}><Select value={d.employment} disabled={!isNew || !live.canWrite} onChange={(e) => { set({ employment: oneOf(["external", "internal"] as const, e.target.value, d.employment), organizationId: "" }); }}><option value="internal">{t("Internal (HQ field team)")}</option><option value="external">{t("External (contractor)")}</option></Select></Field></div>}
             </section>
             <section>
               <h3 className="mb-1 text-[13px] font-bold">{t("Scope")}</h3>
-              {d.role === "admin" ? <p className="text-xs text-muted-foreground">{t("Admins act on every customer of the tenant.")} <Badge tone="primary">{t("All customers (tenant)")}</Badge></p> : null}{d.role !== "admin" && d.role === "contractor" && <p className="text-xs text-muted-foreground">{d.organizationId ? t("Contractors act for their own organization ({name}).", { name: scopeName({ kind: "organization", id: d.organizationId }) }) : t("Contractors act for their own organization.")}</p>}{d.role !== "admin" && d.role !== "contractor" && <>
+              {d.role === "admin" ? <p className="text-xs text-muted-foreground">{t("Admins act on every customer of the tenant.")} <Badge tone="primary">{t("All customers (tenant)")}</Badge></p> : null}{d.role !== "admin" && d.role === CONTRACTOR && <p className="text-xs text-muted-foreground">{d.organizationId ? t("Contractors act for their own organization ({name}).", { name: scopeName({ kind: ORGANIZATION, id: d.organizationId }) }) : t("Contractors act for their own organization.")}</p>}{d.role !== "admin" && d.role !== CONTRACTOR && <>
                   <div className="flex flex-wrap gap-1.5">{d.scopes.map((s) => <span key={`${s.kind}:${s.id}`} className="inline-flex items-center gap-1 rounded-full bg-surface2 px-2.5 py-1 text-xs">{kindWord[s.kind] ?? s.kind} · {scopeName(s)}{live.canWrite && <Plain aria-label={t("Remove scope")} onClick={() => { set({ scopes: d.scopes.filter((x) => x !== s) }); }}><Icon name="close" /></Plain>}</span>)}{d.scopes.length === 0 && <span className="text-xs text-muted-foreground">{t("No targets — zero business targets.")}</span>}</div>
-                  {live.canWrite && <div className="mt-2 flex flex-wrap items-end gap-2"><Field label={t("Add scope")}><Select id={memberFieldId("scopes")} value={scopeKind} onChange={(e) => { setScopeKind(oneOf(["unit", "property", "organization"] as const, e.target.value, scopeKind)); setScopeId(""); }}><option value="unit">{t("Unit")}</option><option value="property">{t("Property")}</option><option value="organization">{t("Customer organization")}</option></Select></Field><Field label={t("Target")}><SearchSelect className="w-64" label={t("Target")} value={scopeId} onChange={setScopeId} placeholder={t("Type to search…")} options={targets.filter((x) => d.scopes.every((s) => s.id !== x.id)).map((x) => ({ id: x.id, label: x.name }))} /></Field><Btn size="sm" disabled={!scopeId} onClick={() => { set({ scopes: [...d.scopes, { kind: scopeKind, id: scopeId }] }); setScopeId(""); }}><Icon name="add" /> {t("Add")}</Btn></div>}
+                  {live.canWrite && <div className="mt-2 flex flex-wrap items-end gap-2"><Field label={t("Add scope")}><Select id={memberFieldId("scopes")} value={scopeKind} onChange={(e) => { setScopeKind(oneOf(["unit", "property", ORGANIZATION] as const, e.target.value, scopeKind)); setScopeId(""); }}><option value="unit">{t("Unit")}</option><option value="property">{t("Property")}</option><option value="organization">{t("Customer organization")}</option></Select></Field><Field label={t("Target")}><SearchSelect className="w-64" label={t("Target")} value={scopeId} onChange={setScopeId} placeholder={t("Type to search…")} options={targets.filter((x) => d.scopes.every((s) => s.id !== x.id)).map((x) => ({ id: x.id, label: x.name }))} /></Field><Btn size="sm" disabled={!scopeId} onClick={() => { set({ scopes: [...d.scopes, { kind: scopeKind, id: scopeId }] }); setScopeId(""); }}><Icon name="add" /> {t("Add")}</Btn></div>}
                   {fieldError("scopes") && <p className="mt-1 text-xs text-crit">{fieldError("scopes")}</p>}
                 </>}
             </section>
@@ -162,19 +166,19 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
               <h3 className="mb-2 text-[13px] font-bold">{t("Valid period")}</h3>
               <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
                 <Field label={t("Valid from")} error={fieldError("validFrom")} hint={t("Times in {zone}", { zone })}><Input id={memberFieldId("validFrom")} type="datetime-local" value={d.validFrom} disabled={!live.canWrite} onChange={(e) => { set({ validFrom: e.target.value }); }} /></Field>
-                <Field label={t("Valid until")} error={fieldError("validUntil")} hint={t(d.role === "technician" && d.employment === "external" ? "Required for external technicians" : "Optional — revoking sets it to now")}><Input id={memberFieldId("validUntil")} type="datetime-local" value={d.validUntil} disabled={!live.canWrite} onChange={(e) => { set({ validUntil: e.target.value }); }} /></Field>
+                <Field label={t("Valid until")} error={fieldError("validUntil")} hint={t(d.role === TECHNICIAN && d.employment === "external" ? "Required for external technicians" : "Optional — revoking sets it to now")}><Input id={memberFieldId("validUntil")} type="datetime-local" value={d.validUntil} disabled={!live.canWrite} onChange={(e) => { set({ validUntil: e.target.value }); }} /></Field>
               </div>
             </section>
             <section>
               <h3 className="mb-2 text-[13px] font-bold">{t("Permissions · {n} of {total}", { n: d.permissions.length, total: allPermissions.length })}</h3>
-              <ScrollX><table id={memberFieldId("permissions")} className="w-full min-w-[560px] text-left text-[13px]"><thead className="text-[11px] uppercase text-muted-foreground"><tr><th className="py-1.5 pr-3">{t("Resource")}</th><th className="pr-3">{t("permission::Read")}</th><th className="pr-3">{t("Write")}</th><th>{t("Actions")}</th></tr></thead><tbody>{permissionRows.map((r) => (
+              <ScrollX><table id={memberFieldId(PERMISSIONS)} className="w-full min-w-[560px] text-left text-[13px]"><thead className="text-[11px] uppercase text-muted-foreground"><tr><th className="py-1.5 pr-3">{t("Resource")}</th><th className="pr-3">{t("permission::Read")}</th><th className="pr-3">{t("Write")}</th><th>{t("Actions")}</th></tr></thead><tbody>{permissionRows.map((r) => (
                 <tr key={r.res} className="border-t border-line"><td className="py-2 pr-3 font-semibold">{resourceWord(r.res, t)}</td>
                   <td className="pr-3">{r.read ? <Check label={<span className="font-mono text-xs">{r.read}</span>} checked={has(r.read)} disabled={blocked(r.read) || has(r.write)} onChange={(v) => { if (r.read) toggle(r.read, v); }} /> : <span className="text-muted-foreground">—</span>}</td>
                   <td className="pr-3">{r.write ? <Check label={<span className="font-mono text-xs">{r.write}</span>} checked={has(r.write)} disabled={blocked(r.write)} onChange={(v) => { setWrite(r, v); }} /> : <span className="text-muted-foreground">—</span>}</td>
                   <td><div className="flex flex-wrap gap-x-3 gap-y-2">{(r.actions ?? []).map((a) => <Check key={a} label={<span className="font-mono text-xs">{a}</span>} checked={has(a)} disabled={blocked(a)} onChange={(v) => { toggle(a, v); }} />)}{!r.actions && <span className="text-muted-foreground">—</span>}</div></td></tr>
               ))}</tbody></table></ScrollX>
               <p className="mt-2 text-[11px] text-muted-foreground">{t("Write includes Read (Read is locked on while Write is on). Actions are independent of Read/Write — e.g. billing.write issues invoices but confirming payments needs billing.payment; mrv.write drafts reports but recording a review needs mrv.review and changing emission factors needs mrv.factors.")}{isSelf ? ` ${t("identity.write and restriction.override cannot be granted to yourself.")}` : ""}</p>
-              {fieldError("permissions") && <p className="mt-1 text-xs text-crit">{fieldError("permissions")}</p>}
+              {fieldError(PERMISSIONS) && <p className="mt-1 text-xs text-crit">{fieldError(PERMISSIONS)}</p>}
             </section>
             {live.canWrite && <>
               <Field label={t("Change reason · required")} error={fieldError("reason")} hint={t("1–1000 characters, stored in the audit log")}><Textarea id={memberFieldId("reason")} value={d.reason} maxLength={1000} onChange={(e) => { set({ reason: e.target.value }); }} /></Field>
@@ -186,7 +190,7 @@ export function AccessView({ live }: Readonly<{ live: Live }>) {
       </div>
       <Modal open={revoke !== null} onClose={() => { setRevoke(null); }} title={t("Revoke access — {name}", { name: sel?.name ?? "" })} finalFocus={() => (revoked.current && sel ? document.getElementById(`member-row-${sel.id}`) : true)} footer={<><Btn onClick={() => { setRevoke(null); }}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending || !revoke?.trim()} onClick={doRevoke}>{t("Revoke")}</Btn></>}>
         <p className="text-[13px]">{t("Revoking sets “Valid until” to now and turns their sign-in off. Only HQ can give the access back — their company or customer cannot extend, enable or add them again. The membership stays listed; nothing is deleted.")}</p>
-        {sel?.role === "technician" && <p className="mt-2 text-[11px] text-muted-foreground">{t("A job assigned to this technician that has not started is released and returns to be assigned; its assigners are notified.")}</p>}
+        {sel?.role === TECHNICIAN && <p className="mt-2 text-[11px] text-muted-foreground">{t("A job assigned to this technician that has not started is released and returns to be assigned; its assigners are notified.")}</p>}
         <Field label={t("Reason")}><Textarea value={revoke ?? ""} maxLength={1000} onChange={(e) => { setRevoke(e.target.value); }} /></Field>
       </Modal>
       <Modal open={signOut !== null} onClose={() => { setSignOut(null); }} title={t("Sign out {name} everywhere?", { name: sel?.name ?? "" })} footer={<><Btn onClick={() => { setSignOut(null); }}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending || !signOut?.trim()} onClick={doSignOut}>{t("Sign out everywhere")}</Btn></>}>

@@ -6,11 +6,13 @@ import { coveragePct, klInstant, klLocal, klStamp, one, saving, type ApiBaseline
 import { EN, intlTag, showDay, translator, type I18n, type Locale, type T } from "@ac/web/lib/i18n";
 import { filled } from "@ac/web/lib/filled";
 
+const ASIA_KUALA_LUMPUR = "Asia/Kuala_Lumpur";
+
 export type PeriodKind = "today" | "7d" | "30d" | "custom";
 export const periodKinds: PeriodKind[] = ["today", "7d", "30d", "custom"];
 const dayMs = 86_400_000;
 const addDays = (ymd: string, n: number) => new Date(Date.parse(`${ymd}T00:00:00Z`) + n * dayMs).toISOString().slice(0, 10);
-const fmt = (iso: string, locale: Locale) => new Date(iso).toLocaleString(intlTag(locale), { timeZone: "Asia/Kuala_Lumpur", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).replaceAll(/[\u{A0}\u{2009}\u{202F}]/gu, " ");
+const fmt = (iso: string, locale: Locale) => new Date(iso).toLocaleString(intlTag(locale), { timeZone: ASIA_KUALA_LUMPUR, month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).replaceAll(/[\u{A0}\u{2009}\u{202F}]/gu, " ");
 
 // the days of a preset period; the month is the remaining preset
 const SPAN_DAYS = new Map<PeriodKind, number>([["today", 1], ["7d", 7]]);
@@ -34,7 +36,7 @@ export function periodRange(kind: PeriodKind, now: Date, custom: { from?: string
   const tooLong = span > 366 * dayMs ? i.t("At most 366 days") : undefined;
   const error = span > 0 ? tooLong : i.t("The end must be after the start");
   const l = i.display.locale;
-  return { kind, from, to, days, error, label: i.t(days === 1 ? "{from} – {to} ({n} day) · {zone}" : "{from} – {to} ({n} days) · {zone}", { from: fmt(from, l), to: fmt(to, l), n: days, zone: "Asia/Kuala_Lumpur" }) };
+  return { kind, from, to, days, error, label: i.t(days === 1 ? "{from} – {to} ({n} day) · {zone}" : "{from} – {to} ({n} days) · {zone}", { from: fmt(from, l), to: fmt(to, l), n: days, zone: ASIA_KUALA_LUMPUR }) };
 }
 /** The Kuala Lumpur days of [from, to) (the last one ends at `to`), at most 31 for the daily chart, labelled “Mon 14”
 in the display language (Figma Client 04a). */
@@ -44,7 +46,7 @@ export function dayRanges(from: string, to: string, locale: Locale = "en"): { la
   while (Date.parse(start) < Date.parse(to) && out.length < 31) {
     const next = klInstant(`${addDays(klLocal(start).slice(0, 10), 1)}T00:00`);
     const end = Date.parse(next) < Date.parse(to) ? next : to;
-    out.push({ label: showDay(start, { locale, timeZone: "Asia/Kuala_Lumpur" }), from: start, to: end }); // "Mon 14" (Figma Client 04a)
+    out.push({ label: showDay(start, { locale, timeZone: ASIA_KUALA_LUMPUR }), from: start, to: end }); // "Mon 14" (Figma Client 04a)
     start = next;
   }
   return out;

@@ -5,6 +5,8 @@
 import type { Currency } from "@ac/web/lib/contracts.gen";
 import { EN, intlTag, showDate, showTime, translator, zonedInstant, zonedParts, type I18n, type Locale, type T } from "@ac/web/lib/i18n";
 
+const PROCESSING = "processing";
+
 const en = translator("en");
 export interface Range { from: string; to: string }
 export interface ApiInvoice { id: string; version: number; number: string; amountMinor: number; currency: Currency; contractId: string; contractVersion: number; period: Range; dueAt: string; status: "unpaid" | "processing" | "paid"; paymentMethod: string | null; paymentStatus: string | null; paidAt: string | null }
@@ -64,6 +66,7 @@ import { money } from "@ac/web/lib/money";
 import { isAfter } from "@ac/web/lib/order";
 import { withoutYear } from "@ac/web/lib/text";
 import { entryOf, lookup } from "@ac/web/lib/lookup";
+
 /** An amount with its sign: + for an addition, a minus sign for a deduction. */
 const signedMoney = (minor: number, currency: string) => `${minor > 0 ? "+" : "−"}${money(Math.abs(minor), currency)}`;
 const methodName = (m: string | null, t: T) => {
@@ -73,14 +76,14 @@ const methodName = (m: string | null, t: T) => {
 };
 /** A payment's status as the screen words it; another code stays as it is. */
 export const paymentWord = (s: string, t: T = en) => {
-  const words = new Map(Object.entries({ initiated: t("initiated"), processing: t("processing"), confirmed: t("confirmed"), failed: t("failed") }));
+  const words = new Map(Object.entries({ initiated: t("initiated"), processing: t(PROCESSING), confirmed: t("confirmed"), failed: t("failed") }));
   return words.get(s) ?? s; // a value the API adds before this table does
 };
 
 /** Invoice state for HQ: unpaid past its due date is overdue (IR04). */
 export function invoiceStatus(i: Pick<ApiInvoice, "status" | "dueAt">, now: Date): InvoiceStatus {
   if (i.status === "paid") return "Paid";
-  if (i.status === "processing") return "Processing";
+  if (i.status === PROCESSING) return "Processing";
   return Date.parse(i.dueAt) < now.getTime() ? "Overdue" : "Unpaid";
 }
 
@@ -122,7 +125,7 @@ export function totals(rows: InvoiceRow[], statuses: InvoiceStatus[]): string {
 }
 
 export function invoiceDetail(d: ApiInvoiceDetail, t: T = en): InvoiceDetail {
-  const processing = d.paymentRefs.find((p) => p.status === "processing");
+  const processing = d.paymentRefs.find((p) => p.status === PROCESSING);
   return {
     id: d.id, version: d.version, processingPaymentId: processing?.id ?? null, processingPaymentVersion: processing?.version ?? null,
     payments: d.paymentRefs.map((p) => {
@@ -133,7 +136,7 @@ export function invoiceDetail(d: ApiInvoiceDetail, t: T = en): InvoiceDetail {
     }),
     restrictionIds: d.restrictionIds,
     // payments.recordManual: refused while a payment is started, processing or confirmed; a failed one does not stop it (IR447)
-    manualAllowed: d.paymentRefs.every((p) => !(p.status === "initiated" || p.status === "processing" || p.status === "confirmed")),
+    manualAllowed: d.paymentRefs.every((p) => !(p.status === "initiated" || p.status === PROCESSING || p.status === "confirmed")),
   };
 }
 

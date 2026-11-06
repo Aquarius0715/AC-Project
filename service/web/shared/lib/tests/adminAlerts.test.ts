@@ -6,20 +6,35 @@ import {
 import { i18nOf } from "@ac/web/lib/i18n";
 import { must } from "./must";
 
-const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
+const ASIA_TOKYO = "Asia/Tokyo";
+const TEMPERATURE = "temperature";
+const BEDROOM_AC = "Bedroom AC";
+const DEMO_CUSTOMER_A = "Demo Customer A";
+const DEFAULT_ALERT = "default_alert";
+const DEFAULT_POLICY = "Default policy";
+const CUSTOMER_A = "customer-a";
+const REFRIGERANT_PRESSURE = "refrigerant_pressure";
+const HQ_OPERATOR = "hq-operator";
+const REFRIGERANT_LOW_PRESSURE = "refrigerant_low_pressure";
+const REFRIGERANT_LOW_PRESSURE_2 = "Refrigerant low pressure";
+const AC_OFFLINE = "ac_offline";
+const HEARTBEAT_GAP = "heartbeat_gap";
+const SUPPRESSED = "suppressed";
+
+const MS = i18nOf({ locale: "ms", timeZone: ASIA_TOKYO });
 const NOW = Date.parse("2026-09-14T01:00:00Z"); // 09:00 in Kuala Lumpur
 const alert = (over: Partial<ApiAdminAlert>): ApiAdminAlert => {
   return {
-    id: "alert-1", version: 1, unitId: "u1", policyId: "pol-1", type: "temperature", severity: "warning", status: "open", causeCode: "window_open", evidenceKind: "inferred",
+    id: "alert-1", version: 1, unitId: "u1", policyId: "pol-1", type: TEMPERATURE, severity: "warning", status: "open", causeCode: "window_open", evidenceKind: "inferred",
     evidenceText: "cooling load rose", observedAt: "2026-09-14T00:50:00Z", evidenceIds: [], detectedAt: "2026-09-14T00:55:00Z", acknowledgedAt: null, resolvedAt: null, resolutionReason: null, ...over,
   };
 };
-const units = [{ id: "u1", displayName: "Bedroom AC", customerOrgId: "org-a" }];
-const customers = [{ id: "c-a", name: "Demo Customer A", organizationId: "org-a" }];
+const units = [{ id: "u1", displayName: BEDROOM_AC, customerOrgId: "org-a" }];
+const customers = [{ id: "c-a", name: DEMO_CUSTOMER_A, organizationId: "org-a" }];
 const policy = (over: Partial<ApiPolicy>): ApiPolicy => {
   return {
     id: "pol-1", version: 2, kind: "alert", name: "Bedroom too hot", unitIds: ["u1", "u2"], timezone: "Asia/Kuala_Lumpur", enabled: true, priority: 50, customerId: "c-a",
-    recipientMembershipIds: ["m-1"], channels: ["inApp"], escalateAfterMinutes: 60, cooldownMinutes: 5, metric: "temperature", operator: "gte", threshold: 30, recoveryThreshold: 28, durationSeconds: 60, severity: "warning", ...over,
+    recipientMembershipIds: ["m-1"], channels: ["inApp"], escalateAfterMinutes: 60, cooldownMinutes: 5, metric: TEMPERATURE, operator: "gte", threshold: 30, recoveryThreshold: 28, durationSeconds: 60, severity: "warning", ...over,
   };
 };
 
@@ -44,12 +59,12 @@ describe("HQ alerts and alert policies", () => {
   });
 
   it("lists the policies, the default first, with their condition in words", () => {
-    const rows = policyRows([policy({}), policy({ id: "def", kind: "default_alert", name: "Default policy", customerId: null, rules: [{ ruleKey: "co2", name: "CO₂" }] }), policy({ id: "auto", kind: "automation" })],
-      customers, [{ id: "m-1", displayName: "customer-a", role: "client" }]);
+    const rows = policyRows([policy({}), policy({ id: "def", kind: DEFAULT_ALERT, name: DEFAULT_POLICY, customerId: null, rules: [{ ruleKey: "co2", name: "CO₂" }] }), policy({ id: "auto", kind: "automation" })],
+      customers, [{ id: "m-1", displayName: CUSTOMER_A, role: "client" }]);
     expect(rows.map((r) => [r.name, r.group, r.sub, r.units])).toEqual([
-      ["Default policy", "DEFAULT · ON EVERY UNIT", "1 rule · ventilation (CO₂, PM2.5) + fault causes", "every unit"], ["Bedroom too hot", "DEMO CUSTOMER A", "Temperature ≥ 30 °C for 60 s", "2 units"],
+      [DEFAULT_POLICY, "DEFAULT · ON EVERY UNIT", "1 rule · ventilation (CO₂, PM2.5) + fault causes", "every unit"], ["Bedroom too hot", "DEMO CUSTOMER A", "Temperature ≥ 30 °C for 60 s", "2 units"],
     ]);
-    expect(rows[1]?.recipients).toEqual([{ id: "m-1", label: "customer-a", role: "client" }]);
+    expect(rows[1]?.recipients).toEqual([{ id: "m-1", label: CUSTOMER_A, role: "client" }]);
     expect(alertPolicyInput(must(rows[1]))).toMatchObject({ id: "pol-1", kind: "alert", recoveryThreshold: 28, durationSeconds: 60, recipientMembershipIds: ["m-1"] });
   });
 
@@ -60,7 +75,7 @@ describe("HQ alerts and alert policies", () => {
       name: "1–120 characters", duration: "Duration must be 1–86400 s", cooldown: "1–1440", escalate: "1–1440", recovery: "Recovery 31 must be below the 30 threshold (direction for ≥)",
     });
     expect([recoveryError("lte", 350, 380), recoveryError("lt", 350, 300)]).toEqual([undefined, "Recovery 300 must be above the 350 threshold (direction for <)"]);
-    expect(HQ_METRICS).toEqual(["temperature", "humidity", "co2", "pm25", "refrigerant_pressure", "vibration", "power"]); // IR66 item 3
+    expect(HQ_METRICS).toEqual([TEMPERATURE, "humidity", "co2", "pm25", REFRIGERANT_PRESSURE, "vibration", "power"]); // IR66 item 3
     // IR120 item 3: a whole priority 0–100 and 1–20 recipients
     expect(policyErrors({ ...p, priority: 50.5, recipients: [] })).toEqual({ priority: "A whole number 0–100", recipients: "Add at least one recipient" });
     expect(policyErrors({ ...p, priority: 101, recipients: Array.from({ length: 21 }, (_, n) => ({ id: `m-${String(n)}`, label: "", role: "" })) })).toEqual({ priority: "A whole number 0–100", recipients: "At most 20 recipients" });
@@ -71,25 +86,25 @@ describe("HQ alerts and alert policies", () => {
   });
 
   it("names who made a policy and the units it is attached to (Figma 38:5, IR345)", () => {
-    const [r] = policyRows([policy({ ownerMembershipId: "m-hq" })], customers, [{ id: "m-hq", displayName: "hq-operator", role: "admin" }], undefined, [{ id: "u1", displayName: "Bedroom AC" }]);
-    expect([r?.madeBy, r?.unitIds, r?.unitNames]).toEqual(["hq-operator", ["u1", "u2"], ["Bedroom AC", "u2"]]); // a unit the list does not hold keeps its ID
+    const [r] = policyRows([policy({ ownerMembershipId: "m-hq" })], customers, [{ id: "m-hq", displayName: HQ_OPERATOR, role: "admin" }], undefined, [{ id: "u1", displayName: BEDROOM_AC }]);
+    expect([r?.madeBy, r?.unitIds, r?.unitNames]).toEqual([HQ_OPERATOR, ["u1", "u2"], [BEDROOM_AC, "u2"]]); // a unit the list does not hold keeps its ID
     expect(policyRows([policy({ ownerMembershipId: "m-gone" })], customers, [])[0]?.madeBy).toBe(""); // members unreadable
   });
 
   it("starts a new policy as DD-A05 says and creates it without an id (IR345)", () => {
-    const d = blankPolicyDraft({ id: "c-a", name: "Demo Customer A" }, "Asia/Tokyo");
-    expect([d.id, d.version, d.kind, d.customerId, d.group, d.timezone, d.on, d.priority, d.channels, d.recipients, d.unitIds]).toEqual(["", 0, "alert", "c-a", "DEMO CUSTOMER A", "Asia/Tokyo", false, 50, ["inApp"], [], []]);
+    const d = blankPolicyDraft({ id: "c-a", name: DEMO_CUSTOMER_A }, ASIA_TOKYO);
+    expect([d.id, d.version, d.kind, d.customerId, d.group, d.timezone, d.on, d.priority, d.channels, d.recipients, d.unitIds]).toEqual(["", 0, "alert", "c-a", "DEMO CUSTOMER A", ASIA_TOKYO, false, 50, ["inApp"], [], []]);
     expect(policyErrors(d)).toEqual({ name: "1–120 characters", recipients: "Add at least one recipient" });
-    const input = alertPolicyInput({ ...d, name: "Too hot", recipients: [{ id: "m-1", label: "customer-a", role: "client" }] });
+    const input = alertPolicyInput({ ...d, name: "Too hot", recipients: [{ id: "m-1", label: CUSTOMER_A, role: "client" }] });
     expect(input).not.toHaveProperty("id");
     expect(input).toEqual({
-      kind: "alert", name: "Too hot", timezone: "Asia/Tokyo", enabled: false, priority: 50, customerId: "c-a", metric: "temperature", operator: "gte", threshold: 30, recoveryThreshold: 28,
+      kind: "alert", name: "Too hot", timezone: ASIA_TOKYO, enabled: false, priority: 50, customerId: "c-a", metric: TEMPERATURE, operator: "gte", threshold: 30, recoveryThreshold: 28,
       durationSeconds: 60, activeWindow: null, severity: "warning", recipientMembershipIds: ["m-1"], channels: ["inApp"], escalateAfterMinutes: 60, cooldownMinutes: 5,
     });
   });
 
   it("names what a draft changes against the saved policy", () => {
-    const p = must(policyRows([policy({})], customers, [{ id: "m-1", displayName: "customer-a", role: "client" }])[0]);
+    const p = must(policyRows([policy({})], customers, [{ id: "m-1", displayName: CUSTOMER_A, role: "client" }])[0]);
     expect(policyChanges(p, p)).toEqual([]);
     expect(policyChanges({ ...p, channels: ["inApp"] }, { ...p, channels: ["inApp"] })).toEqual([]);
     expect(policyChanges({ ...p, on: false, threshold: 31, recipients: [], channels: ["email", "inApp"], escalate: 30 }, p)).toEqual(["Enabled", "Condition", "Recipients", "Channels", "Escalation"]);
@@ -106,7 +121,7 @@ describe("HQ alerts in Malay with the display time zone (IR292)", () => {
     expect([r.title, r.st, r.cause, r.evidenceRecords]).toEqual(["Kemungkinan tingkap terbuka", "Diakui", "window_open (disyaki)", "tiada dilampirkan"]);
     expect([r.time, r.detected]).toEqual(["hari ini 9:55 PG GMT+9", "14 Sep 2026, 9:55 PG GMT+9"]);
     expect(r.timeline.map((x) => x.title)).toEqual(["Amaran dikesan", "Diakui", "Diakui — menunggu penyelesaian"]);
-    const p = must(policyRows([policy({})], customers, [{ id: "m-1", displayName: "customer-a", role: "admin" }], MS.t)[0]);
+    const p = must(policyRows([policy({})], customers, [{ id: "m-1", displayName: CUSTOMER_A, role: "admin" }], MS.t)[0]);
     expect([p.sub, p.units, p.recipients[0]?.role]).toEqual(["Suhu ≥ 30 °C selama 60 s", "2 unit", "HQ"]);
     expect(policyErrors({ ...p, duration: 0 }, MS.t).duration).toBe("Tempoh mesti 1–86400 s");
   });
@@ -114,33 +129,33 @@ describe("HQ alerts in Malay with the display time zone (IR292)", () => {
 
 const defaults = (over: Partial<ApiPolicy> = {}): ApiPolicy => {
   return {
-    id: "def", version: 3, kind: "default_alert", name: "Default policy", unitIds: [], timezone: "Asia/Kuala_Lumpur", enabled: true, priority: 0, customerId: null,
+    id: "def", version: 3, kind: DEFAULT_ALERT, name: DEFAULT_POLICY, unitIds: [], timezone: "Asia/Kuala_Lumpur", enabled: true, priority: 0, customerId: null,
     rules: [
-      { ruleKey: "refrigerant_low_pressure", name: "Refrigerant low pressure", category: "fault", metric: "refrigerant_pressure", operator: "lte", threshold: 350, recoveryThreshold: 380, durationSeconds: 120, severity: "critical", activeWindow: null },
-      { ruleKey: "ac_offline", name: "AC offline", category: "connection", metric: "heartbeat_gap", operator: "gte", threshold: 15, recoveryThreshold: 1, durationSeconds: 1, severity: "warning", activeWindow: null },
+      { ruleKey: REFRIGERANT_LOW_PRESSURE, name: REFRIGERANT_LOW_PRESSURE_2, category: "fault", metric: REFRIGERANT_PRESSURE, operator: "lte", threshold: 350, recoveryThreshold: 380, durationSeconds: 120, severity: "critical", activeWindow: null },
+      { ruleKey: AC_OFFLINE, name: "AC offline", category: "connection", metric: HEARTBEAT_GAP, operator: "gte", threshold: 15, recoveryThreshold: 1, durationSeconds: 1, severity: "warning", activeWindow: null },
     ],
-    ruleSettings: [{ ruleKey: "ac_offline", customerId: "c-b", enabled: false, version: 2, reason: "rooftop unit replaced", changedByMembershipId: "m-hq", updatedAt: "2026-09-25T02:00:00Z" }],
+    ruleSettings: [{ ruleKey: AC_OFFLINE, customerId: "c-b", enabled: false, version: 2, reason: "rooftop unit replaced", changedByMembershipId: "m-hq", updatedAt: "2026-09-25T02:00:00Z" }],
     ...over,
   };
 };
 
 describe("the default policy's rules and the customers' switches (DD-A05 item 9, Figma 268:2, IR347)", () => {
-  const [p] = policyRows([defaults()], customers, [{ id: "m-hq", displayName: "hq-operator", role: "admin" }]);
+  const [p] = policyRows([defaults()], customers, [{ id: "m-hq", displayName: HQ_OPERATOR, role: "admin" }]);
 
   it("keeps each rule's condition and names who switched a rule for a customer", () => {
     expect(p?.rules.map((r) => [r.ruleKey, r.metric, r.operator, r.threshold, r.recovery, r.duration, r.severity])).toEqual([
-      ["refrigerant_low_pressure", "refrigerant_pressure", "lte", 350, 380, 120, "critical"], ["ac_offline", "heartbeat_gap", "gte", 15, 1, 1, "warning"],
+      [REFRIGERANT_LOW_PRESSURE, REFRIGERANT_PRESSURE, "lte", 350, 380, 120, "critical"], [AC_OFFLINE, HEARTBEAT_GAP, "gte", 15, 1, 1, "warning"],
     ]);
-    expect(p?.settings).toEqual([{ ruleKey: "ac_offline", customerId: "c-b", enabled: false, version: 2, reason: "rooftop unit replaced", by: "hq-operator", at: "2026-09-25T02:00:00Z" }]);
+    expect(p?.settings).toEqual([{ ruleKey: AC_OFFLINE, customerId: "c-b", enabled: false, version: 2, reason: "rooftop unit replaced", by: HQ_OPERATOR, at: "2026-09-25T02:00:00Z" }]);
     expect([settingText(undefined), settingText(p?.settings[0])]).toEqual(["On", "Off · by hq-operator, 25 Sept 2026 (rooftop unit replaced)"]);
     expect(settingText({ ...must(p?.settings[0]), enabled: true, reason: null, by: "" }, MS)).toBe("Hidup · 25 Sep 2026");
   });
 
   it("copies only a rule whose metric a policy may watch, with its name and condition", () => {
     expect(p?.rules.map((item) => copyable(item))).toEqual([true, false]); // heartbeat_gap is not one of the HQ metrics
-    const d = blankPolicyDraft({ id: "c-a", name: "Demo Customer A" }, "Asia/Tokyo", p?.rules[0]);
-    expect([d.id, d.name, d.metric, d.operator, d.threshold, d.recovery, d.duration, d.severity, d.on, d.timezone, d.customerId]).toEqual(["", "Refrigerant low pressure", "refrigerant_pressure", "lte", 350, 380, 120, "critical", false, "Asia/Tokyo", "c-a"]);
-    expect(blankPolicyDraft({ id: "c-a", name: "A" }, "UTC", p?.rules[1]).metric).toBe("temperature"); // not copyable: the plain draft
+    const d = blankPolicyDraft({ id: "c-a", name: DEMO_CUSTOMER_A }, ASIA_TOKYO, p?.rules[0]);
+    expect([d.id, d.name, d.metric, d.operator, d.threshold, d.recovery, d.duration, d.severity, d.on, d.timezone, d.customerId]).toEqual(["", REFRIGERANT_LOW_PRESSURE_2, REFRIGERANT_PRESSURE, "lte", 350, 380, 120, "critical", false, ASIA_TOKYO, "c-a"]);
+    expect(blankPolicyDraft({ id: "c-a", name: "A" }, "UTC", p?.rules[1]).metric).toBe(TEMPERATURE); // not copyable: the plain draft
   });
 
   it("checks a rule's condition, names the changed rules and saves all six with their fixed fields", () => {
@@ -148,11 +163,11 @@ describe("the default policy's rules and the customers' switches (DD-A05 item 9,
     expect(conditionErrors({ ...must(p?.rules[0]), recovery: 340, duration: 0 })).toEqual({ duration: "Duration must be 1–86400 s", recovery: "Recovery 340 must be above the 350 threshold (direction for ≤)" });
     const saved = must(p);
     const edited = { ...saved, rules: [{ ...must(saved.rules[0]), threshold: 340 }, must(saved.rules[1])] };
-    expect([ruleChanges(edited, saved), ruleChanges(saved, saved)]).toEqual([["Refrigerant low pressure"], []]);
+    expect([ruleChanges(edited, saved), ruleChanges(saved, saved)]).toEqual([[REFRIGERANT_LOW_PRESSURE_2], []]);
     expect(defaultRulesInput(edited)).toEqual({
-      id: "def", kind: "default_alert", rules: [
-        { ruleKey: "refrigerant_low_pressure", name: "Refrigerant low pressure", category: "fault", metric: "refrigerant_pressure", operator: "lte", threshold: 340, recoveryThreshold: 380, durationSeconds: 120, activeWindow: null, severity: "critical" },
-        { ruleKey: "ac_offline", name: "AC offline", category: "connection", metric: "heartbeat_gap", operator: "gte", threshold: 15, recoveryThreshold: 1, durationSeconds: 1, activeWindow: null, severity: "warning" },
+      id: "def", kind: DEFAULT_ALERT, rules: [
+        { ruleKey: REFRIGERANT_LOW_PRESSURE, name: REFRIGERANT_LOW_PRESSURE_2, category: "fault", metric: REFRIGERANT_PRESSURE, operator: "lte", threshold: 340, recoveryThreshold: 380, durationSeconds: 120, activeWindow: null, severity: "critical" },
+        { ruleKey: AC_OFFLINE, name: "AC offline", category: "connection", metric: HEARTBEAT_GAP, operator: "gte", threshold: 15, recoveryThreshold: 1, durationSeconds: 1, activeWindow: null, severity: "warning" },
       ],
     });
   });
@@ -161,20 +176,20 @@ describe("the default policy's rules and the customers' switches (DD-A05 item 9,
 const d = (decision: NotificationDecision["decision"], reason: NotificationDecision["reason"] = null): NotificationDecision => ({ unitId: "u1", policyId: "pol-1", decision, reason });
 
 describe("Test with demo data (DD-A05 item 7, IR348)", () => {
-  const p = { metric: "temperature", operator: "gte" as const, threshold: 30 };
+  const p = { metric: TEMPERATURE, operator: "gte" as const, threshold: 30 };
   it("words each decision of automations.simulate for the reading", () => {
-    expect([testOutcome(d("selected"), p, 30, "Bedroom AC"), testOutcome(d("failed", "no_recipient"), p, 31, "Bedroom AC")]).toEqual([
+    expect([testOutcome(d("selected"), p, 30, BEDROOM_AC), testOutcome(d("failed", "no_recipient"), p, 31, BEDROOM_AC)]).toEqual([
       { tone: "ok", text: "30 °C on Bedroom AC raises an alert and notifies the recipients — simulated, nothing is stored." },
       { tone: "crit", text: "An alert, but nobody is notified: no recipient may read Bedroom AC." },
     ]);
     // not due: below the threshold, or meeting it outside the active hours
-    expect([testOutcome(d("suppressed", "not_due"), p, 29.9, "Bedroom AC").text, testOutcome(d("suppressed", "not_due"), p, 30, "Bedroom AC").text]).toEqual([
+    expect([testOutcome(d(SUPPRESSED, "not_due"), p, 29.9, BEDROOM_AC).text, testOutcome(d(SUPPRESSED, "not_due"), p, 30, BEDROOM_AC).text]).toEqual([
       "No alert: 29.9 °C does not meet ≥ 30 °C.", "No alert: 30 °C meets ≥ 30 °C, but not within the active hours.",
     ]);
-    expect((["disabled", "cooldown", "quality", "owner_forbidden"] as const).map((r) => testOutcome(d("suppressed", r), p, 30, "Bedroom AC").tone)).toEqual(["warn", "muted", "warn", "warn"]);
+    expect((["disabled", "cooldown", "quality", "owner_forbidden"] as const).map((r) => testOutcome(d(SUPPRESSED, r), p, 30, BEDROOM_AC).tone)).toEqual(["warn", "muted", "warn", "warn"]);
     // within the cooldown, or the default policy's open alert already told (IR600)
-    expect(testOutcome(d("suppressed", "cooldown"), p, 30, "Bedroom AC").text).toBe("No new notice: one about Bedroom AC already went out — within the cooldown, or for its alert that is still open.");
-    expect(testOutcome(null, p, 30, "Bedroom AC")).toEqual({ tone: "warn", text: "The policy did not run on Bedroom AC — it is no longer attached to it." });
-    expect(testOutcome(d("suppressed", "not_due"), { metric: "refrigerant_pressure", operator: "lte", threshold: 350 }, 351, "AC", MS.t).text).toBe("Tiada amaran: 351 kPa tidak memenuhi ≤ 350 kPa.");
+    expect(testOutcome(d(SUPPRESSED, "cooldown"), p, 30, BEDROOM_AC).text).toBe("No new notice: one about Bedroom AC already went out — within the cooldown, or for its alert that is still open.");
+    expect(testOutcome(null, p, 30, BEDROOM_AC)).toEqual({ tone: "warn", text: "The policy did not run on Bedroom AC — it is no longer attached to it." });
+    expect(testOutcome(d(SUPPRESSED, "not_due"), { metric: REFRIGERANT_PRESSURE, operator: "lte", threshold: 350 }, 351, "AC", MS.t).text).toBe("Tiada amaran: 351 kPa tidak memenuhi ≤ 350 kPa.");
   });
 });

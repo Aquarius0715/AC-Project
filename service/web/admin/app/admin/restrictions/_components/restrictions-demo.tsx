@@ -1,4 +1,5 @@
 "use client";
+const RELEASE_REQUESTED = "Release requested";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -11,9 +12,9 @@ const seed: NonEmpty<R> = [
   { id: "restriction-limited-a", meta: "contract-rto-a · customer-a", policy: "Temperature limit ≥ 24 °C · 1 unit", st: "Applied", prog: "1/1 applied", tone: "warn" },
   { id: "restriction-rto-b", meta: "contract-rto-e · customer-e", policy: "Power off · 1 unit", st: "Scheduled", prog: "executes after 09-25 09:00", tone: "primary" },
   { id: "restriction-rto-c", meta: "contract-rto-c · customer-c", policy: "Power off · 2 units", st: "Released", prog: "released 09-08", tone: "ok" },
-  { id: "restriction-x06", meta: "contract-rto-x06 · customer-a", policy: "Temperature limit ≥ 25 °C · 2 units", st: "Release requested", prog: "1/2 released · 1 offline", tone: "unknown" },
+  { id: "restriction-x06", meta: "contract-rto-x06 · customer-a", policy: "Temperature limit ≥ 25 °C · 2 units", st: RELEASE_REQUESTED, prog: "1/2 released · 1 offline", tone: "unknown" },
 ];
-const flow = ["Scheduled", "Requested", "Applied", "Release requested", "Released"];
+const flow = ["Scheduled", "Requested", "Applied", RELEASE_REQUESTED, "Released"];
 
 /** The Phase 1A demo of the restriction manager (fixture restrictions). */
 export function RestrictionsDemo() {
@@ -37,7 +38,7 @@ export function RestrictionsDemo() {
           <Card title={sel.id} sub={`${sel.meta.split(" · ", 1)[0] ?? sel.meta} v1 · customer-a · rules demo-v1 · version 3`} action={<Link className="text-xs font-semibold text-primary" href={`/admin/restrictions/${sel.id}`}>Exception / override <Icon name="arrowRight" /></Link>}>
             <Steps steps={flow} current={currentRow} />
             <div className="mt-4"><SummaryList cols={2} items={[["Policy", `${sel.policy.split(" · ", 1)[0] ?? sel.policy}${sel.policy.includes("24") ? " — cooling setpoint ≥ 24 °C" : ""}`], ["Notice sent", "2026-09-12 08:00 · 1 client notified"], ["Executed after", "2026-09-13 08:00 · notice ≥ 24 h"], ["Grace / exception", "None"], ["Reason shown to the customer", "“Demo: invoice overdue since 2026-09-10”"]]} /></div>
-            <div className="mt-3 flex flex-wrap gap-2">{sel.st === "Scheduled" && <Btn variant="primary" onClick={() => { setSt("Applied"); toast("Executed — restriction applied"); }}>Execute (confirm at executeAfter)</Btn>}{sel.st === "Release requested" && <><Btn onClick={() => { toast("Retry sent to offline unit", "warn"); }}>Retry</Btn><Btn onClick={() => { setSt("Released"); toast("Reconciled — released"); }}>Reconcile</Btn></>}{sel.st === "Applied" && <Btn onClick={() => { setSt("Release requested"); toast("Release requested"); }}>Request release…</Btn>}</div>
+            <div className="mt-3 flex flex-wrap gap-2">{sel.st === "Scheduled" && <Btn variant="primary" onClick={() => { setSt("Applied"); toast("Executed — restriction applied"); }}>Execute (confirm at executeAfter)</Btn>}{sel.st === RELEASE_REQUESTED && <><Btn onClick={() => { toast("Retry sent to offline unit", "warn"); }}>Retry</Btn><Btn onClick={() => { setSt("Released"); toast("Reconciled — released"); }}>Reconcile</Btn></>}{sel.st === "Applied" && <Btn onClick={() => { setSt(RELEASE_REQUESTED); toast(RELEASE_REQUESTED); }}>Request release…</Btn>}</div>
           </Card>
           <Card title="Cause invoices" action={<Link className="text-xs font-semibold text-primary" href="/admin/billing">Open in Billing <Icon name="arrowRight" /></Link>}><p className="text-[13px]"><b>invoice-overdue-a</b> · 120.00 MYR <span className="text-muted-foreground">Aug 2026 · due 09-10</span></p><p className="mt-1 text-xs text-muted-foreground">1 of 1 cause invoices unpaid. When every cause invoice is paid, this restriction moves to release_requested automatically.</p></Card>
           <Card title="Units"><DataTable rows={[{ u: "unit-limited · Lobby AC", a: "—", r: sel.st === "Released" ? "released" : "—", o: "09-13 08:00:20 · setpoint ≥ 24 °C" }, ...(sel.id === "restriction-x06" ? [{ u: "unit-offline-rto · Study AC", a: "applied", r: "waiting (offline)", o: "no response" }] : [])]} rowKey={(r) => r.u} cols={[{ key: "u", label: "Unit", render: (r) => <b>{r.u}</b> }, { key: "a", label: "Apply", render: (r) => r.a }, { key: "r", label: "Release", render: (r) => r.r }, { key: "o", label: "Observed", render: (r) => r.o, hideBelow: "sm" }]} />

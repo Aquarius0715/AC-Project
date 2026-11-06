@@ -1,4 +1,8 @@
 "use client";
+const TECH_A = "tech-external-a";
+const Q_REFRIGERANT = "Split-unit refrigerant handling";
+const Q_ELECTRICAL = "Electrical basics";
+const Q_GENERAL = "General maintenance";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -9,10 +13,6 @@ import { Icon } from "@ac/web/components/Icon";
 // DATA_SOURCE=API: technicians of the company (members.list, IR172 displayName), a week of members.capacity and
 // members.setUnavailability. Qualification grants come from the memberships (contractors get no permissions/scopes, IR42).
 const CERT_TONE = new Map<string, Tone>([["Valid", "ok"], ["Expired", "muted"]]); // anything else is expiring
-const TECH_A = "tech-external-a";
-const Q_REFRIGERANT = "Split-unit refrigerant handling";
-const Q_ELECTRICAL = "Electrical basics";
-const Q_GENERAL = "General maintenance";
 const techs = [
   { id: TECH_A, quals: [Q_REFRIGERANT, Q_ELECTRICAL], sub: "Refrigerant handling · Electrical basics · active since 2025-04", asg: "09:00–13:00 assigned", free: "13:00–17:00 free", used: 10, tot: 40, week: ["2 / 8 h", "4 / 8 h", "0 / 8 h", "4 / 8 h", "0 / 8 h", "—", "—"], active: true },
   { id: "tech-external-a2", quals: [Q_GENERAL], sub: "General maintenance · active since 2026-02", asg: "13:00–17:00 assigned (job-p12)", free: "09:00–13:00 free", used: 8, tot: 40, week: ["0 / 8 h", "4 / 8 h", "4 / 8 h", "0 / 8 h", "0 / 8 h", "—", "—"], active: true },

@@ -13,6 +13,14 @@ import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { Slot } from "@ac/web/lib/partnerOverview";
 import { inspectionRows, readingRows, resultText, reworkItems, type ApiWorkReport } from "@ac/web/lib/partnerReview";
 
+const TIME_PROPOSED = "time_proposed";
+const IN_PROGRESS = "in_progress";
+const REWORK_REQUESTED = "rework_requested";
+const PERIODIC_PLAN = "periodic_plan";
+const TECHNICIAN = "technician";
+const CONTRACTOR = "contractor";
+const HQ_ESCALATION = "hq_escalation";
+
 export interface ApiHqRow {
   projection: "summary"; id: string; version: number; unitId: string; type: string; status: string; dueAt: string; requestedSlot: Slot; scheduledSlot: Slot | null;
   assignmentId: string | null; origin: string; preferredSlots: Slot[]; severity: string; displayStatus: string; assignmentAcknowledgement: "pending" | "accepted" | "cant_make" | null;
@@ -49,10 +57,10 @@ export const tomorrowIn = (now: number, zone: string) => zonedParts(new Date(now
 /** The pipeline stages with their jobs.list filter; Time proposed is a requested job with a pending SlotProposal (IR113). */
 export const STAGES = [
   { id: "requested", label: "Requested", filter: { status: "requested", proposalPending: false } },
-  { id: "time_proposed", label: "Time proposed", filter: { proposalPending: true } },
+  { id: TIME_PROPOSED, label: "Time proposed", filter: { proposalPending: true } },
   { id: "offered", label: "Offered", filter: { status: "offered" } }, { id: "accepted", label: "Accepted", filter: { status: "accepted" } },
-  { id: "assigned", label: "Assigned", filter: { status: "assigned" } }, { id: "in_progress", label: "In progress", filter: { status: "in_progress" } },
-  { id: "submitted", label: "Submitted", filter: { status: "submitted" } }, { id: "rework_requested", label: "Rework", filter: { status: "rework_requested" } },
+  { id: "assigned", label: "Assigned", filter: { status: "assigned" } }, { id: IN_PROGRESS, label: "In progress", filter: { status: IN_PROGRESS } },
+  { id: "submitted", label: "Submitted", filter: { status: "submitted" } }, { id: REWORK_REQUESTED, label: "Rework", filter: { status: REWORK_REQUESTED } },
   { id: "completed", label: "Completed", filter: { status: "completed" } }, { id: "on_hold", label: "On hold", filter: { status: "on_hold" } },
 ] as const;
 export type Stage = (typeof STAGES)[number]["id"];
@@ -71,7 +79,7 @@ export function periodOfQuery(q: Pick<Query, "from" | "to">): { from: string; to
 /** “Requested time 8 Sept, 12:00 am – 14 Sept, 12:09 pm MYT” for the period chip. */
 export const periodChip = (p: { from: string; to: string }, i: I18n = EN) => i.t("Requested time {span}", { span: showSpan(p.from, p.to, i.display) });
 /** Every status but cancelled: the list without a stage tile, and the jobs counted "in scope" (no tile names cancelled). */
-export const LISTED = ["requested", "offered", "accepted", "assigned", "in_progress", "submitted", "rework_requested", "completed", "on_hold"];
+export const LISTED = ["requested", "offered", "accepted", "assigned", IN_PROGRESS, "submitted", REWORK_REQUESTED, "completed", "on_hold"];
 const TYPE_IDS = new Set(["reactive", "periodic", "preventive"]);
 /** The jobs.list filters of the scope and the filter bar; delivery is the HQ organization (internal) or a contractor.
 The type and the default "not cancelled" are filters of jobs.list too (IR290), so its total counts what the list shows. */
@@ -80,7 +88,7 @@ export function filtersOf(q: Query, hqOrgId: string | null, withStage = true): R
   if (q.customerId) f.customerId = q.customerId;
   if (q.propertyId) f.propertyId = q.propertyId;
   if (q.unitId) f.unitId = q.unitId;
-  if (q.origin === "client_request" || q.origin === "periodic_plan") f.origin = q.origin;
+  if (q.origin === "client_request" || q.origin === PERIODIC_PLAN) f.origin = q.origin;
   if (q.type && TYPE_IDS.has(q.type)) f.type = q.type;
   const organizationId = q.delivery === "internal" ? hqOrgId : q.delivery;
   if (organizationId) f.organizationId = organizationId;
@@ -103,32 +111,32 @@ function requestedLine(j: ApiHqRow, i: I18n): string {
   const n = j.preferredSlots.length;
   if (n === 1) return t("1 preferred time · book one or propose", { n });
   if (n > 1) return t("{n} preferred times · book one or propose", { n });
-  if (j.origin === "periodic_plan") return t("plan occurrence {slot} · book it", { slot: slotText(j.requestedSlot, i) });
+  if (j.origin === PERIODIC_PLAN) return t("plan occurrence {slot} · book it", { slot: slotText(j.requestedSlot, i) });
   return t("due {time} · unassigned", { time: showTime(j.dueAt, i.display) });
 }
 /** One job of the list: unit, customer, type, origin, status (Time proposed derived, IR89 overdue) and what is next. */
 export function hqRow(j: ApiHqRow, now: number, n: Names, unitOrg: Map<string, string>, i: I18n = EN): HqRow {
   const { t } = i;
-  const tech = j.technicianMembershipId ? n.people.get(j.technicianMembershipId) ?? t("technician") : null;
-  const isOverdue = (j.status === "assigned" || j.status === "in_progress") && !!j.scheduledSlot && Date.parse(j.scheduledSlot.endAt) <= now;
+  const tech = j.technicianMembershipId ? n.people.get(j.technicianMembershipId) ?? t(TECHNICIAN) : null;
+  const isOverdue = (j.status === "assigned" || j.status === IN_PROGRESS) && !!j.scheduledSlot && Date.parse(j.scheduledSlot.endAt) <= now;
   const ended = isOverdue ? ` · ${t("window ended")}` : "";
   let line = "", lineTone: Tone | undefined;
-  switch (j.displayStatus === "time_proposed" ? "time_proposed" : j.status) {
+  switch (j.displayStatus === TIME_PROPOSED ? TIME_PROPOSED : j.status) {
     case "requested": { line = requestedLine(j, i); break;
     }
-    case "time_proposed": { line = t("Time proposed · waiting for the client"); break;
+    case TIME_PROPOSED: { line = t("Time proposed · waiting for the client"); break;
     }
     case "offered": { line = j.scheduledSlot ? t("Offer open · {slot}", { slot: slotText(j.scheduledSlot, i) }) : t("Offer open"); break;
     }
     case "accepted": { line = t("Contractor accepted · assigning their technician"); break;
     }
-    case "assigned": { [line, lineTone] = [`${tech ?? t("technician")} · ${ack(j.assignmentAcknowledgement, t)}${ended}`, j.assignmentAcknowledgement === "cant_make" ? "warn" : undefined]; break;
+    case "assigned": { [line, lineTone] = [`${tech ?? t(TECHNICIAN)} · ${ack(j.assignmentAcknowledgement, t)}${ended}`, j.assignmentAcknowledgement === "cant_make" ? "warn" : undefined]; break;
     }
-    case "in_progress": { line = `${t("{name} on site", { name: tech ?? t("technician") })}${ended}`; break;
+    case IN_PROGRESS: { line = `${t("{name} on site", { name: tech ?? t(TECHNICIAN) })}${ended}`; break;
     }
     case "submitted": { line = t(j.accessValidUntil ? "report submitted · contractor review first" : "report submitted · awaiting HQ review"); break;
     }
-    case "rework_requested": { line = t("returned for rework"); break;
+    case REWORK_REQUESTED: { line = t("returned for rework"); break;
     }
     case "on_hold": { [line, lineTone] = [t("on hold — scheduling and reports blocked"), "warn"]; break;
     }
@@ -141,17 +149,17 @@ export function hqRow(j: ApiHqRow, now: number, n: Names, unitOrg: Map<string, s
   if (j.followUpClass === "pending" && j.followUpOfJobId) [line, lineTone] = [t("Follow-up of {id} · classify by {time}", { id: j.followUpOfJobId.slice(0, 8), time: classifyBy(j.createdAt, i) }), "warn"];
   return {
     id: j.id, short: j.id.slice(0, 8), title: n.units.get(j.unitId) ?? t("Unit"), customer: n.customers.get(unitOrg.get(j.unitId) ?? "") ?? t("customer"),
-    type: typeLabel(j.type, t), origin: j.origin, status: j.displayStatus === "time_proposed" ? "time_proposed" : j.status, badge: { status: j.displayStatus === "time_proposed" ? "time_proposed" : j.status, overdue: isOverdue }, line, lineTone,
+    type: typeLabel(j.type, t), origin: j.origin, status: j.displayStatus === TIME_PROPOSED ? TIME_PROPOSED : j.status, badge: { status: j.displayStatus === TIME_PROPOSED ? TIME_PROPOSED : j.status, overdue: isOverdue }, line, lineTone,
   };
 }
 
 export interface Step { label: string; state: "done" | "current" | "todo" }
 /** The status stepper: internal delivery skips Offered / Accepted (DD-A06 item 6). */
 export function stepper(status: string, internal: boolean, t: T = en): Step[] {
-  const all = internal ? ["requested", "assigned", "in_progress", "submitted", "completed"] : ["requested", "offered", "accepted", "assigned", "in_progress", "submitted", "completed"];
+  const all = internal ? ["requested", "assigned", IN_PROGRESS, "submitted", "completed"] : ["requested", "offered", "accepted", "assigned", IN_PROGRESS, "submitted", "completed"];
   const labels: Record<string, string> = { requested: "Requested", offered: "Offered", accepted: "Accepted", assigned: "Assigned", in_progress: "In progress", submitted: "Submitted", completed: "Completed" };
   // a returned or held job is back at in progress; a cancelled one reaches no step
-  const reached = status === "rework_requested" || status === "on_hold" ? "in_progress" : status;
+  const reached = status === REWORK_REQUESTED || status === "on_hold" ? IN_PROGRESS : status;
   const at = status === "cancelled" ? -1 : all.indexOf(reached);
   const stateOf = (k: number): Step["state"] => {
     if (status === "completed" || k < at) return "done";
@@ -164,11 +172,11 @@ export function stepper(status: string, internal: boolean, t: T = en): Step[] {
 export function facts(j: ApiHqJob, n: Names, i: I18n = EN): { label: string; value: string; sub: string }[] {
   const { t } = i;
   const dueWhy = j.type === "reactive" ? "reactive SLA" : "plan occurrence";
-  const offeredTo = j.offer ? n.orgs.get(j.offer.contractorOrgId) ?? t("contractor") : "—";
+  const offeredTo = j.offer ? n.orgs.get(j.offer.contractorOrgId) ?? t(CONTRACTOR) : "—";
   return [
-    { label: t("Requested window"), value: slotText(j.requestedSlot, i), sub: t(j.origin === "periodic_plan" ? "the plan occurrence" : "the client’s 1st preferred time") },
+    { label: t("Requested window"), value: slotText(j.requestedSlot, i), sub: t(j.origin === PERIODIC_PLAN ? "the plan occurrence" : "the client’s 1st preferred time") },
     { label: t("Due"), value: showTime(j.dueAt, i.display), sub: t(j.dueAt === j.requestedSlot.endAt ? "= requested end" : dueWhy) },
-    { label: t("Scheduled"), value: j.scheduledSlot ? slotText(j.scheduledSlot, i) : t("not booked"), sub: j.assignment ? n.people.get(j.assignment.technicianMembershipId) ?? t("technician") : offeredTo },
+    { label: t("Scheduled"), value: j.scheduledSlot ? slotText(j.scheduledSlot, i) : t("not booked"), sub: j.assignment ? n.people.get(j.assignment.technicianMembershipId) ?? t(TECHNICIAN) : offeredTo },
     { label: t("Symptom"), value: j.symptom || "—", sub: j.contactWindow ? t("contact {window}", { window: j.contactWindow }) : t("no contact window") },
   ];
 }
@@ -194,15 +202,15 @@ function offerState(o: NonNullable<ApiHqJob["offer"]>, now: number, i: I18n): st
 export function delivery(j: ApiHqJob, n: Names, now: number, i: I18n = EN): Delivery | null {
   const { t, display } = i;
   const a = j.assignment, o = j.offer;
-  const tech = a ? n.people.get(a.technicianMembershipId) ?? t("technician") : "";
+  const tech = a ? n.people.get(a.technicianMembershipId) ?? t(TECHNICIAN) : "";
   const window = a ? slotText({ startAt: a.scheduledStart, endAt: a.scheduledEnd }, i) : "";
   const done = a?.status === "completed" ? ` · ${t("ended at completion")}` : "";
   const ackLine = a ? acknowledgement(a, tech, i) : null;
   if (o && j.contractorOrgId) {
-    const org = n.orgs.get(o.contractorOrgId) ?? t("contractor");
+    const org = n.orgs.get(o.contractorOrgId) ?? t(CONTRACTOR);
     const state = offerState(o, now, i);
     return {
-      kind: "contractor", title: t("Delivery · contractor {name}", { name: org }),
+      kind: CONTRACTOR, title: t("Delivery · contractor {name}", { name: org }),
       lines: [[t("Visit"), `${slotText(o.visitSlot, i)} · ${state}`], [t("Access"), `${showSpan(o.accessValidFrom, o.accessValidUntil, display)}${o.decision === "accept" && Date.parse(o.accessValidUntil) <= now ? ` · ${t("ended")}` : ""}`],
         [t("Technician"), a ? `${tech} · ${window}${done}` : t("not assigned by the contractor yet")]],
       ack: ackLine, cantMake: a?.status !== "completed" && a?.acknowledgement === "cant_make",
@@ -246,11 +254,11 @@ export function offerDefaults(slot: Slot, now: number): { offerExpiresAt: string
 
 /** Which of hold / resume / cancel HQ may use (IR56; hold only from in progress or submitted). */
 export function controls(status: string, t: T = en): { hold: boolean; resume: boolean; cancel: boolean; cancelWhy: string | null } {
-  const isCancel = ["requested", "offered", "accepted", "assigned", "on_hold", "rework_requested"].includes(status);
-  const isRunning = status === "in_progress" || status === "submitted";
+  const isCancel = ["requested", "offered", "accepted", "assigned", "on_hold", REWORK_REQUESTED].includes(status);
+  const isRunning = status === IN_PROGRESS || status === "submitted";
   const why = isRunning ? "Put the job on hold first." : "Completed and cancelled jobs cannot be cancelled.";
   const cancelWhy = isCancel ? null : t(why);
-  return { hold: status === "in_progress" || status === "submitted", resume: status === "on_hold", cancel: isCancel, cancelWhy };
+  return { hold: status === IN_PROGRESS || status === "submitted", resume: status === "on_hold", cancel: isCancel, cancelWhy };
 }
 
 /** The classify-by time of a follow-up: one business day (Mon–Fri in Kuala Lumpur) after it was created, as an instant
@@ -311,6 +319,7 @@ import { codePoints, wrapped } from "@ac/web/lib/text";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { isAfter } from "@ac/web/lib/order";
 import { entryOf, lookup } from "@ac/web/lib/lookup";
+
 /** Estimate and actual totals per currency, never converted (“80.00 MYR + 6.20 USD”). */
 export function costTotals(lines: CostLine[]): { estimate: string; actual: string } {
   const total = (kind: CostLine["kind"]) => {
@@ -329,7 +338,7 @@ export function costLineOf(f: { kind: string; description: string; visibility: s
 }
 
 /** HQ reviews internal jobs normally and contractor jobs only by escalation (reason required, IR31). */
-export const reviewModeOf = (j: Pick<ApiHqJob, "contractorOrgId">) => (j.contractorOrgId ? "hq_escalation" : "normal");
+export const reviewModeOf = (j: Pick<ApiHqJob, "contractorOrgId">) => (j.contractorOrgId ? HQ_ESCALATION : "normal");
 
 /** What is wrong with the contact window, or undefined (the API's ContactWindowOK rule). */
 function contactWindowError(contact: string, t: T): string | undefined {
@@ -382,10 +391,10 @@ export interface ReportCard {
 /** Why HQ may or may not review the report, in the job's state (English; the caller translates it). */
 function reviewNote(status: string, av: ApiWorkReport["reviewAvailability"], mode: ReportCard["mode"]): string {
   if (status === "completed") return "Accepted — the job is completed. Completion does not resolve linked alerts.";
-  if (status === "rework_requested") return "Returned for rework — the technician works on the next version.";
+  if (status === REWORK_REQUESTED) return "Returned for rework — the technician works on the next version.";
   if (status !== "submitted") return "The report is not under review in the job’s current state.";
   if (av.allowed) {
-    return mode === "hq_escalation" ? "The contractor reviews its own reports first. HQ may accept or return this one only by escalation, with a reason."
+    return mode === HQ_ESCALATION ? "The contractor reviews its own reports first. HQ may accept or return this one only by escalation, with a reason."
       : "You did not contribute to this report, so you can review it (self-approval is rejected).";
   }
   if (av.reason === "self_authored") return "You submitted this report version, so you cannot accept or return it (self-approval is rejected).";
@@ -393,7 +402,7 @@ function reviewNote(status: string, av: ApiWorkReport["reviewAvailability"], mod
 }
 /** The card's colour: a decision HQ may take (warn when it is an escalation), or the outcome. */
 function cardTone(isDecide: boolean, mode: ReportCard["mode"], status: string): ReportCard["tone"] {
-  if (isDecide) return mode === "hq_escalation" ? "warn" : "primary";
+  if (isDecide) return mode === HQ_ESCALATION ? "warn" : "primary";
   return status === "completed" ? "ok" : "muted";
 }
 /** The customer's sign-off: absent with the reason, signed by whom and when, or none. */
@@ -404,7 +413,7 @@ function signOffText(s: ApiWorkReport["signOff"], i: I18n): string {
 }
 export function reportCard(j: ApiHqJob, r: ApiWorkReport, byUser: Map<string, string>, i: I18n = EN): ReportCard {
   const { t, display } = i;
-  const author = byUser.get(r.authorId) ?? t("technician");
+  const author = byUser.get(r.authorId) ?? t(TECHNICIAN);
   const photos = r.attachmentRefs.filter((a) => a.status === "ready").length;
   const mode = reviewModeOf(j);
   const av = r.reviewAvailability;

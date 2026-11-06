@@ -19,6 +19,8 @@ import { RestrictionsView, type RestrictionsLive } from "./_components/restricti
 import { queryReader } from "@ac/web/lib/searchParams";
 import { orNull } from "@ac/web/lib/promises";
 
+const INVOICES_LIST = "invoices.list";
+
 const active = new Set<RestrictionState>(["scheduled", "requested", "applied", "release_requested"]);
 
 export default async function AdminRestrictionsPage({ searchParams }: Readonly<PageProps<"/admin/restrictions">>) {
@@ -55,7 +57,7 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
   const counts: Record<RestrictionState, number> = { scheduled: countOf("scheduled"), requested: countOf("requested"), applied: countOf("applied"), release_requested: countOf("release_requested"), released: countOf("released"), cancelled: countOf("cancelled") };
   // every restriction (the scope may narrow the list): the cause invoices of the filter and the units under restriction
   const all = Object.keys(filters).length > 0 ? await coreOp<Page<ApiRestriction>>("restrictions.list", { limit: 100 }) : scoped;
-  const invoicesOf = isFull ? await coreAll<ApiInvoice>("invoices.list") : [];
+  const invoicesOf = isFull ? await coreAll<ApiInvoice>(INVOICES_LIST) : [];
   const contractOf = new Map(contracts.items.map((k) => [k.id, k]));
   const causeIds = new Set(new Set(all.items.flatMap((x) => x.causeInvoiceIds ?? [])));
   const causes = invoicesOf.filter((x) => causeIds.has(x.id)).toSorted((a, b) => a.number.localeCompare(b.number))
@@ -78,7 +80,7 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
     const commandIds = r.perUnit.flatMap((u) => [u.applyCommandIds.at(-1), u.releaseCommandIds.at(-1)]).filter((x): x is string => !!x);
     const [commands, invoices] = await Promise.all([
       Promise.all(commandIds.map((c) => orNull(coreOp<ApiCommand>("commands.get", { id: c })))),
-      isFull && r.contractId ? coreOp<Page<ApiInvoice>>("invoices.list", { limit: 100, filters: { contractId: r.contractId } }) : Promise.resolve({ items: [] as ApiInvoice[] }),
+      isFull && r.contractId ? coreOp<Page<ApiInvoice>>(INVOICES_LIST, { limit: 100, filters: { contractId: r.contractId } }) : Promise.resolve({ items: [] as ApiInvoice[] }),
     ]);
     const invoice = new Map(invoices.items.map((i) => [i.id, i]));
     const causes = (r.causeInvoiceIds ?? []).map((i) => ({ id: i, number: invoice.get(i)?.number ?? i.slice(0, 8), paid: invoice.get(i)?.status === "paid", amountMinor: invoice.get(i)?.amountMinor ?? null, currency: invoice.get(i)?.currency ?? "" }));
@@ -100,7 +102,7 @@ export default async function AdminRestrictionsPage({ searchParams }: Readonly<P
 
   if (canWrite) { // the schedule form: eligible contracts, their overdue unpaid invoices, units and recipients
     const [overdue, caps, clients] = await Promise.all([
-      coreOp<Page<ApiInvoice>>("invoices.list", { limit: 100, filters: { overdueOnly: true } }),
+      coreOp<Page<ApiInvoice>>(INVOICES_LIST, { limit: 100, filters: { overdueOnly: true } }),
       coreAllPage<ApiCapability>("capabilities.list"),
       coreOp<Page<{ customerId: string; status: string }>>("clientUsers.list", { limit: 100, filters: { status: "active" } }),
     ]);

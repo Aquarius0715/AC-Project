@@ -12,6 +12,9 @@ import { byText } from "@ac/web/lib/order";
 import { wrapped } from "@ac/web/lib/text";
 import { lookup } from "@ac/web/lib/lookup";
 
+const RESTRICTION = "restriction";
+const KL = "Asia/Kuala_Lumpur";
+
 const en = translator("en");
 export type AuditResult = "Success" | "Denied" | "Failed" | "Pending";
 export interface AuditChange { field: string; before: string; after: string; changed: boolean }
@@ -29,7 +32,6 @@ export interface ApiAudit {
 /** The URL filters of the log (SCR-A16): the period, actor, target kind and ID, correlation ID, result and page size. */
 export interface AuditFilters { from: string; to: string; actorId: string; targetKind: string; targetId: string; correlationId: string; result: AuditResult | "All"; limit: number }
 
-const KL = "Asia/Kuala_Lumpur";
 /** The API's result and the word the screen files it under. */
 const RESULT_WORDS: [ApiAudit["result"], AuditResult][] = [["success", "Success"], ["denied", "Denied"], ["failed", "Failed"], ["pending", "Pending"]];
 const results = RESULT_WORDS.map(([, word]) => word);
@@ -145,7 +147,7 @@ export const correlationTrace = (group: ApiAudit[], i: I18n = EN) =>
 
 /** The target kinds the Target filter always offers, the records HQ looks up most; the kinds of the shown entries and
 the URL's kind join them (targetKind is a string like AuditView.targetRef.kind and the log records more kinds). */
-const KINDS = ["alert", "automation", "command", "contract", "device", "device_event", "invoice", "job", "membership", "payment", "policy", "restriction", "unit", "user"];
+const KINDS = ["alert", "automation", "command", "contract", "device", "device_event", "invoice", "job", "membership", "payment", "policy", RESTRICTION, "unit", "user"];
 export const targetKinds = (rows: Pick<AuditRow, "targetKind">[], current: string) => [...new Set([...KINDS, ...rows.map((r) => r.targetKind), ...(current ? [current] : [])])].toSorted(byText);
 
 /** The Actor filter's people by name: the users of the memberships the session may read (members.list), the actors of
@@ -178,8 +180,8 @@ export function relatedRecords(sel: ApiAudit, group: ApiAudit[], i: I18n = EN): 
     const via = a.id === sel.id ? "target" : "correlation";
     return { id: a.targetRef.id, note: t(via === "target" ? "this entry’s target" : "same correlation ID"), via };
   };
-  const restriction = ref("restriction");
-  if (restriction && sel.targetRef.kind === "restriction" && sel.targetRef.id === restriction.id) {
+  const restriction = ref(RESTRICTION);
+  if (restriction && sel.targetRef.kind === RESTRICTION && sel.targetRef.id === restriction.id) {
     const after = sel.maskedAfter ?? {};
     const known = after.state ? oneOf(states, after.state, undefined) : undefined;
     const state = known ? stateWord(known, t) : after.state;

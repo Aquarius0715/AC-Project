@@ -1,4 +1,5 @@
 "use client";
+const UNIT_ONLINE_RTO = "unit-online-rto";
 
 import { useState } from "react";
 import { Btn, Card, Check, Field, Input, ListRow, Page, Select, SummaryList, Tabs, useToast } from "@ac/web/components/ui";
@@ -8,16 +9,16 @@ import { byText } from "@ac/web/lib/order";
 import { nonEmpty } from "@ac/web/lib/lists";
 
 const baselines = nonEmpty([
-  { id: "baseline-energy-100", name: "baseline-energy-100", sub: "unit-online-rto · 100.0 kWh · demo_fixed", kwh: 100, units: ["unit-online-rto"] },
-  { id: "baseline-2units-100", name: "baseline-2units-100", sub: "unit-limited + unit-online-rto · 100.0 kWh", kwh: 100, units: ["unit-limited", "unit-online-rto"] },
+  { id: "baseline-energy-100", name: "baseline-energy-100", sub: "unit-online-rto · 100.0 kWh · demo_fixed", kwh: 100, units: [UNIT_ONLINE_RTO] },
+  { id: "baseline-2units-100", name: "baseline-2units-100", sub: "unit-limited + unit-online-rto · 100.0 kWh", kwh: 100, units: ["unit-limited", UNIT_ONLINE_RTO] },
 ]);
-const allUnits = ["unit-online-rto", "unit-limited", "unit-offline-rto"];
+const allUnits = [UNIT_ONLINE_RTO, "unit-limited", "unit-offline-rto"];
 
 /** The Phase 1A demo of the energy analysis (fixture baselines, editable actual value). */
 export function EnergyDemo() {
   const toast = useToast();
   const [tab, setTab] = useUrlTab<"analysis" | "baselines">({ analysis: "analysis", baselines: "baselines" }, "analysis");
-  const [units, setUnits] = useState<string[]>(["unit-online-rto"]);
+  const [units, setUnits] = useState<string[]>([UNIT_ONLINE_RTO]);
   const [bid, setBid] = useState(baselines[0].id);
   const [actual, setActual] = useState(80);
   const [sel, setSel] = useState(baselines[0]);

@@ -7,6 +7,11 @@ import { must } from "./must";
 import { bodyText, sentCall } from "./http";
 import { without } from "@ac/web/lib/omit";
 
+const SESSION_SECRET_2 = "SESSION_SECRET";
+const HTTPS_AC_EXAMPLE_COM = "https://ac.example.com";
+const TEST_CLIENT_SECRET = "test-client-secret";
+const HTTPS_ID_EXAMPLE_REALMS_AC = "https://id.example/realms/ac";
+
 // the BFF session (backend architecture §5) is server code: next/headers is the request's cookie jar
 const jar = vi.hoisted(() => ({ get: vi.fn(), set: vi.fn<(name: string, value: string, options: { maxAge?: number }) => void>(), delete: vi.fn() }));
 vi.mock("server-only", () => ({}));
@@ -51,31 +56,31 @@ describe("the sealed session cookie (AES-256-GCM, IR333)", () => {
   });
 
   it("depends on the server's secret", () => {
-    vi.stubEnv("SESSION_SECRET", "one");
+    vi.stubEnv(SESSION_SECRET_2, "one");
     const t = seal({ a: 1 });
-    vi.stubEnv("SESSION_SECRET", "two");
+    vi.stubEnv(SESSION_SECRET_2, "two");
     expect(unseal(t)).toBeNull();
-    vi.stubEnv("SESSION_SECRET", "one");
+    vi.stubEnv(SESSION_SECRET_2, "one");
     expect(unseal(t)).toEqual({ a: 1 });
   });
 
   it("on https needs a real secret: none, an empty, a short one or the local value seals nothing (IR367, IR430)", () => {
-    vi.stubEnv("APP_URL", "https://ac.example.com");
+    vi.stubEnv("APP_URL", HTTPS_AC_EXAMPLE_COM);
     for (const v of [undefined, "", "x".repeat(31), "local-dev-session-secret-change-me"]) {
-      vi.stubEnv("SESSION_SECRET", v);
+      vi.stubEnv(SESSION_SECRET_2, v);
       expect(() => cookieKey()).toThrow(/SESSION_SECRET/);
       expect(() => seal({ a: 1 })).toThrow(/SESSION_SECRET/);
     }
-    vi.stubEnv("SESSION_SECRET", "test-".padEnd(32, "s"));
+    vi.stubEnv(SESSION_SECRET_2, "test-".padEnd(32, "s"));
     expect(unseal(seal({ a: 1 }))).toEqual({ a: 1 });
     // a cookie sealed before the secret went missing cannot be opened either: the visitor is signed out
     const t = seal({ a: 1 });
-    vi.stubEnv("SESSION_SECRET", "");
+    vi.stubEnv(SESSION_SECRET_2, "");
     expect(unseal(t)).toBeNull();
   });
 
   it("refuses a correctly sealed body that is not JSON", () => {
-    vi.stubEnv("SESSION_SECRET", "s");
+    vi.stubEnv(SESSION_SECRET_2, "s");
     const iv = randomBytes(12);
     const c = createCipheriv("aes-256-gcm", cookieKey(), iv);
     const body = Buffer.concat([c.update("not json", "utf8"), c.final(), c.getAuthTag()]);
@@ -84,7 +89,7 @@ describe("the sealed session cookie (AES-256-GCM, IR333)", () => {
 
   it("is httpOnly, lax, 30 minutes, and secure only on https", () => {
     expect(cookieOptions()).toEqual({ httpOnly: true, sameSite: "lax", secure: false, path: "/", maxAge: 1800 });
-    vi.stubEnv("APP_URL", "https://ac.example.com");
+    vi.stubEnv("APP_URL", HTTPS_AC_EXAMPLE_COM);
     expect(cookieOptions().secure).toBe(true);
   });
 });
@@ -120,13 +125,13 @@ describe("refreshing the access token", () => {
 
   it("posts the refresh grant to the internal token endpoint and keeps the same tenant and membership", async () => {
     vi.stubEnv("OIDC_INTERNAL_ISSUER", "https://keycloak:8080/realms/ac");
-    vi.stubEnv("OIDC_APP_CLIENT_SECRET", "test-client-secret");
+    vi.stubEnv("OIDC_APP_CLIENT_SECRET", TEST_CLIENT_SECRET);
     const fetch = answer(200, { access_token: token(claims), refresh_token: "r-2", expires_in: 300 });
     vi.stubGlobal("fetch", fetch);
     expect(await refresh(session())).toMatchObject({ refreshToken: "r-2", tenantId: "t-1", membershipId: "m-1", expiresAt: NOW / 1000 + 300 });
     const [url, init] = sentCall(fetch.mock.calls);
     expect(url).toBe("https://keycloak:8080/realms/ac/protocol/openid-connect/token");
-    expect(Object.fromEntries(new URLSearchParams(bodyText(init)))).toEqual({ grant_type: "refresh_token", refresh_token: "r-1", client_id: "ac-web", client_secret: "test-client-secret" });
+    expect(Object.fromEntries(new URLSearchParams(bodyText(init)))).toEqual({ grant_type: "refresh_token", refresh_token: "r-1", client_id: "ac-web", client_secret: TEST_CLIENT_SECRET });
   });
 
   it("gives nothing for another membership, a refused grant, a network failure or no refresh token", async () => {
@@ -151,13 +156,13 @@ describe("refreshing the access token", () => {
 describe("ending the identity provider's session", () => {
   it("posts the refresh token with the client's credentials to the internal logout endpoint", async () => {
     vi.stubEnv("OIDC_INTERNAL_ISSUER", "https://keycloak:8080/realms/ac");
-    vi.stubEnv("OIDC_APP_CLIENT_SECRET", "test-client-secret");
+    vi.stubEnv("OIDC_APP_CLIENT_SECRET", TEST_CLIENT_SECRET);
     const fetch = vi.fn(() => Promise.resolve(new Response(null, { status: 204 })));
     vi.stubGlobal("fetch", fetch);
     expect(await endIdpSession("r-1")).toBe(true);
     const [url, init] = sentCall(fetch.mock.calls);
     expect([url, init.method]).toEqual(["https://keycloak:8080/realms/ac/protocol/openid-connect/logout", "POST"]);
-    expect(Object.fromEntries(new URLSearchParams(bodyText(init)))).toEqual({ refresh_token: "r-1", client_id: "ac-web", client_secret: "test-client-secret" });
+    expect(Object.fromEntries(new URLSearchParams(bodyText(init)))).toEqual({ refresh_token: "r-1", client_id: "ac-web", client_secret: TEST_CLIENT_SECRET });
     expect(init.signal).toBeInstanceOf(AbortSignal); // never waits long for the provider
   });
   it("answers false when the provider refuses or cannot be reached", async () => {
@@ -199,8 +204,8 @@ describe("reading the session in a route handler", () => {
 
 describe("the cookie names (IR374)", () => {
   it("carry __Host- / __Secure- on https, so only this host sets them, and are removed with the attributes they were set with", async () => {
-    vi.stubEnv("APP_URL", "https://ac.example.com");
-    vi.stubEnv("SESSION_SECRET", "test-".padEnd(32, "s"));
+    vi.stubEnv("APP_URL", HTTPS_AC_EXAMPLE_COM);
+    vi.stubEnv(SESSION_SECRET_2, "test-".padEnd(32, "s"));
     vi.resetModules();
     const https = await import("@ac/web/lib/session");
     expect([https.SESSION_COOKIE, https.OIDC_COOKIE]).toEqual(["__Host-ac_session_client", "__Secure-ac_oidc_client"]);
@@ -227,8 +232,8 @@ describe("where sign-in returns to", () => {
 describe("the identity provider's settings", () => {
   it("defaults to the local realm and reads the deployment's environment", () => {
     expect(oidcConfig()).toMatchObject({ issuer: "http://localhost:8081/realms/ac", internalIssuer: "http://localhost:8081/realms/ac", clientId: "ac-web", appUrl: "http://localhost:3000" });
-    vi.stubEnv("OIDC_ISSUER", "https://id.example/realms/ac");
+    vi.stubEnv("OIDC_ISSUER", HTTPS_ID_EXAMPLE_REALMS_AC);
     vi.stubEnv("OIDC_APP_CLIENT_ID", "ac-admin-web");
-    expect(oidcConfig()).toMatchObject({ issuer: "https://id.example/realms/ac", internalIssuer: "https://id.example/realms/ac", clientId: "ac-admin-web" });
+    expect(oidcConfig()).toMatchObject({ issuer: HTTPS_ID_EXAMPLE_REALMS_AC, internalIssuer: HTTPS_ID_EXAMPLE_REALMS_AC, clientId: "ac-admin-web" });
   });
 });

@@ -4,11 +4,15 @@ import {
 } from "@ac/web/lib/clientAutomations";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 
+const BEDROOM_AC = "Bedroom AC";
+const TEXT_2026_09_14T10_00_00Z = "2026-09-14T10:00:00Z";
+const TEXT_2026_09_14T14_00_00Z = "2026-09-14T14:00:00Z";
+
 const ms = translator("ms");
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const base = { id: "a1", version: 1, createdAt: "", updatedAt: "2026-09-10T02:00:00Z", name: "Evening cool", unitIds: ["u1"], ownerMembershipId: "m", timezone: "Asia/Kuala_Lumpur", enabled: true, priority: 1, disabledReason: null, onlyIf: [], lastRun: null };
 const schedule: Extract<ApiAutomation, { kind: "schedule" }> = { ...base, kind: "schedule", weekdays: [1, 2, 3, 4, 5], startLocal: "18:00", endLocal: "22:00", endsNextDay: false, startAction: { kind: "set_power", power: true }, endAction: { kind: "set_power", power: false } };
-const unit = { name: "Bedroom AC", path: "Home A › Bedroom", property: "Home A" };
+const unit = { name: BEDROOM_AC, path: "Home A › Bedroom", property: "Home A" };
 
 describe("customer automation sentences (FR-C04, FR-C05, IR260)", () => {
   it("names days and actions in English and Malay", () => {
@@ -24,19 +28,19 @@ describe("customer automation sentences (FR-C04, FR-C05, IR260)", () => {
   });
 
   it("keeps a rule's own time zone for its runs and adds the abbreviation (IR44)", () => {
-    expect(runText("2026-09-14T10:00:00Z")).toBe("Mon, 14 Sept, 18:00 MYT");
-    expect(runText("2026-09-14T10:00:00Z", "Asia/Kuala_Lumpur", MS)).toBe("Isn, 14 Sep, 18:00 MYT");
+    expect(runText(TEXT_2026_09_14T10_00_00Z)).toBe("Mon, 14 Sept, 18:00 MYT");
+    expect(runText(TEXT_2026_09_14T10_00_00Z, "Asia/Kuala_Lumpur", MS)).toBe("Isn, 14 Sep, 18:00 MYT");
   });
 
   it("builds the card: status, next run, a withdrawn consent and the toggle hint", () => {
-    expect(ruleCard(schedule, unit, "2026-09-14T10:00:00Z", true).steps).toEqual([ // one row each: the start and the end at their times
+    expect(ruleCard(schedule, unit, TEXT_2026_09_14T10_00_00Z, true).steps).toEqual([ // one row each: the start and the end at their times
       { key: "start", label: "Start", time: "18:00", action: "Power ON" }, { key: "end", label: "End", time: "22:00", action: "Power OFF" }]);
     expect(ruleCard({ ...schedule, endsNextDay: true }, unit, null, true).steps[1]?.time).toBe("22:00 next day");
-    const superseded = { ...schedule, lastRun: { at: "2026-09-14T14:00:00Z", outcome: "skipped", reason: "superseded", commandId: null } } as ApiAutomation; // IR504
+    const superseded = { ...schedule, lastRun: { at: TEXT_2026_09_14T14_00_00Z, outcome: "skipped", reason: "superseded", commandId: null } } as ApiAutomation; // IR504
     expect([ruleCard(superseded, unit, null, true).skipped, ruleCard(superseded, unit, null, true, MS).skipped]).toEqual([
       "Last evaluation skipped Mon, 14 Sept, 22:00 MYT — another schedule starts at the same time and takes over",
       "Penilaian terakhir dilangkau Isn, 14 Sep, 22:00 MYT — jadual lain bermula pada masa yang sama dan mengambil alih"]);
-    expect(ruleCard(schedule, unit, "2026-09-14T10:00:00Z", true)).toMatchObject({ status: { text: "On", tone: "ok" }, action: "Power ON · at 22:00 → Power OFF (end action)", place: "Bedroom AC · Home A › Bedroom · next run Mon, 14 Sept, 18:00 MYT", note: null });
+    expect(ruleCard(schedule, unit, TEXT_2026_09_14T10_00_00Z, true)).toMatchObject({ status: { text: "On", tone: "ok" }, action: "Power ON · at 22:00 → Power OFF (end action)", place: "Bedroom AC · Home A › Bedroom · next run Mon, 14 Sept, 18:00 MYT", note: null });
     const off = { ...base, kind: "event", enabled: false, disabledReason: "consent_revoked", unitIds: ["u1", "u2"], condition: { type: "location", event: "departure" }, action: { kind: "set_power", power: false } } as ApiAutomation;
     expect(ruleCard(off, unit, null, false)).toMatchObject({ status: { text: "Disabled · consent revoked", tone: "warn" }, note: "Will not run: location consent withdrawn 10 Sept 2026. Existing commands are not cancelled.", place: "Bedroom AC (+1 more AC) · Home A › Bedroom", toggle: { allowed: false, hint: "Grant location consent first" } });
     expect(ruleCard(off, null, null, false, MS)).toMatchObject({ status: { text: "Dilumpuhkan · persetujuan ditarik balik" }, place: "AC tidak lagi tersedia", when: "Semua orang meninggalkan premis AC (peristiwa berlepas)" });
@@ -44,8 +48,8 @@ describe("customer automation sentences (FR-C04, FR-C05, IR260)", () => {
 
   it("words the editor in both languages: summary, checks, options, tests and the consent card (IR264)", () => {
     const d = draftOf(schedule);
-    expect(summaryText(d, "Bedroom AC", "Home A")).toBe("When Weekdays at 18:00 → Bedroom AC power ON. At 22:00 → Bedroom AC power OFF.");
-    expect(summaryText({ ...d, endsNextDay: true, endLocal: "06:00", startAction: "temp:24" }, "Bedroom AC", "Home A", ms)).toBe("Apabila Hari bekerja pada 18:00 → tetapkan Bedroom AC kepada 24°C. Pada 06:00 (hari berikutnya) → Bedroom AC kuasa MATI.");
+    expect(summaryText(d, BEDROOM_AC, "Home A")).toBe("When Weekdays at 18:00 → Bedroom AC power ON. At 22:00 → Bedroom AC power OFF.");
+    expect(summaryText({ ...d, endsNextDay: true, endLocal: "06:00", startAction: "temp:24" }, BEDROOM_AC, "Home A", ms)).toBe("Apabila Hari bekerja pada 18:00 → tetapkan Bedroom AC kepada 24°C. Pada 06:00 (hari berikutnya) → Bedroom AC kuasa MATI.");
     expect(draftErrors({ ...d, name: "", weekdays: [], startLocal: "18:00", endLocal: "18:00" }, ms)).toEqual({ name: "1–120 aksara", weekdays: "Pilih sekurang-kurangnya satu hari", endLocal: "Mula dan tamat tidak boleh sama — bukan operasi 24 jam" });
     expect(apiErrors({ "draft.endsNextDay": "errors.over_24_hours", name: "error.length" }, ms)).toEqual({ endsNextDay: "Paling lama 24 jam", name: "1–120 aksara" });
     const choices = actionOptions({ control: true, modeControl: true, fanControl: false, temperature: { min: 24, max: 25, step: 1 }, modes: ["cool"], fanLevels: [] }, ms);
@@ -56,12 +60,12 @@ describe("customer automation sentences (FR-C04, FR-C05, IR260)", () => {
       .toEqual(["temp", "power", "temp:24", "power:on", "mode:cool", ""]);
     // the schedule test: a Monday start, its end, and the first day not selected (Saturday)
     const runs = [{ automationId: null, phase: "schedule_start" as const, at: "2026-09-18T10:00:00Z", action: { kind: "set_power" as const, power: true } }, { automationId: null, phase: "schedule_end" as const, at: "2026-09-18T14:00:00Z", action: { kind: "set_power" as const, power: false } }];
-    expect(scheduleTest(runs, d, "Bedroom AC", MS).map((r) => [r.title, r.detail])).toEqual([
+    expect(scheduleTest(runs, d, BEDROOM_AC, MS).map((r) => [r.title, r.detail])).toEqual([
       ["Jum, 18 Sep, 18:00 MYT — sepadan", "Akan menghantar 1 arahan: Bedroom AC · Kuasa HIDUP"],
       ["Jum, 18 Sep, 22:00 MYT — tindakan akhir", "Akan menghantar 1 arahan: Bedroom AC · Kuasa MATI"],
       ["Sab, 19 Sep, 18:00 MYT — tidak sepadan", "Sabtu tidak dipilih — tiada apa-apa akan dihantar"],
     ]);
-    expect(eventTest({ unitId: "u1", decision: "suppressed", ruleId: null, reason: "offline" }, "a1", new Map(), "Bedroom AC", { kind: "set_power", power: true }, "2026-09-14T01:00:00Z", MS))
+    expect(eventTest({ unitId: "u1", decision: "suppressed", ruleId: null, reason: "offline" }, "a1", new Map(), BEDROOM_AC, { kind: "set_power", power: true }, "2026-09-14T01:00:00Z", MS))
       .toMatchObject({ title: "Isn, 14 Sep, 09:00 MYT — tidak dihantar", detail: "Tiada apa-apa akan dihantar: AC di luar talian" });
     // a withdrawal that turned nothing off is plain; one that did warns, with the count (IR619)
     const revoked = { id: "c", version: 3, granted: false, grantedAt: null, revokedAt: "2026-09-20T01:49:00Z" };
@@ -71,7 +75,7 @@ describe("customer automation sentences (FR-C04, FR-C05, IR260)", () => {
     expect(warned.text).toMatch(/^Withdrawn 20 Sept 2026, 9:49 am MYT · 2 location automations were turned off/);
     expect(consentCard(revoked, 0, 0, MS).text).toMatch(/^Ditarik balik .* automasi lokasi tidak boleh berjalan/);
     expect(consentCard({ id: "c", version: 2, granted: true, grantedAt: "2026-09-10T02:00:00Z", revokedAt: null }, 1, 0, MS)).toMatchObject({ title: "Diberikan", text: "Diberikan 10 Sep 2026, 11:00 PG GMT+9 · digunakan hanya oleh 1 automasi lokasi · peristiwa lokasi demo (tiada sejarah GPS sebenar)." });
-    expect([runClock("2026-09-14T14:00:00Z"), runClock("2026-09-14T14:00:00Z", "Asia/Tokyo")]).toEqual(["22:00 MYT", "23:00 GMT+9"]);
+    expect([runClock(TEXT_2026_09_14T14_00_00Z), runClock(TEXT_2026_09_14T14_00_00Z, "Asia/Tokyo")]).toEqual(["22:00 MYT", "23:00 GMT+9"]);
   });
 });
 
@@ -88,8 +92,8 @@ describe("ventilation in a customer rule (DD-C05 “within unit capabilities”,
     const d = draftOf(rule);
     expect(d.action).toBe("vent:high"); // was "fan:undefined", which the API refused on save
     expect(saveInput(d)).toMatchObject({ kind: "event", action: { kind: "ventilate", level: "high" } });
-    expect(summaryText(d, "Bedroom AC", "Home A")).toBe("When someone is in the room → set Bedroom AC to ventilation high.");
-    expect(summaryText(d, "Bedroom AC", "Home A", ms)).toContain("pengudaraan tinggi");
+    expect(summaryText(d, BEDROOM_AC, "Home A")).toBe("When someone is in the room → set Bedroom AC to ventilation high.");
+    expect(summaryText(d, BEDROOM_AC, "Home A", ms)).toContain("pengudaraan tinggi");
   });
 });
 

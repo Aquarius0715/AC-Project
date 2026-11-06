@@ -3,6 +3,8 @@ import { translator } from "@ac/web/lib/i18n";
 import { unitDetail } from "./unitFixture";
 import { actionText, controlLayout, historyRow, latest, setsTemperature, type ApiCommand, type ApiUnitDetail } from "@ac/web/lib/units";
 
+const TEMPERATURE = "temperature";
+
 const ms = translator("ms");
 const tokyo = { locale: "en" as const, timeZone: "Asia/Tokyo" };
 const deviceCommand = (over: Partial<ApiCommand>): ApiCommand => ({ id: "cmd-12345678-abcd", action: { kind: "set_temperature", celsius: 24 }, status: "acknowledged", requestedAt: "2026-09-14T01:00:00Z", failureCode: null, ...over });
@@ -34,16 +36,16 @@ describe("unit commands and readings in the display language and time zone (FR-X
 
   it("keeps a stale reading's quality beside it and times it in the display time zone", () => {
     const d = unitDetail({ latestMeasurements: [
-      { id: "m1", unitId: "u1", sensorId: "s1", metric: "temperature", value: 28.04, unit: "°C", observedAt: "2026-09-14T01:12:00Z", origin: "measured", quality: "stale", qualityReason: null },
+      { id: "m1", unitId: "u1", sensorId: "s1", metric: TEMPERATURE, value: 28.04, unit: "°C", observedAt: "2026-09-14T01:12:00Z", origin: "measured", quality: "stale", qualityReason: null },
       { id: "m2", unitId: "u1", sensorId: "s2", metric: "humidity", value: null, unit: "%", observedAt: "2026-09-14T01:12:00Z", origin: "measured", quality: "missing", qualityReason: null },
     ] });
-    expect(latest(d, "temperature")).toEqual({ text: "28.0 °C (stale)", at: "9:12 am MYT" });
-    expect(latest(d, "temperature", ms, tokyo)).toEqual({ text: "28.0 °C (lapuk)", at: "10:12 am GMT+9" });
+    expect(latest(d, TEMPERATURE)).toEqual({ text: "28.0 °C (stale)", at: "9:12 am MYT" });
+    expect(latest(d, TEMPERATURE, ms, tokyo)).toEqual({ text: "28.0 °C (lapuk)", at: "10:12 am GMT+9" });
     expect([latest(d, "humidity"), latest(d, "power")]).toEqual([null, null]);
     // with the scenario's now (IR613): the same day keeps the time alone, another day adds the date
-    expect(latest(d, "temperature", undefined, undefined, Date.parse("2026-09-14T09:00:00Z"))?.at).toBe("9:12 am MYT");
-    expect(latest(d, "temperature", undefined, undefined, Date.parse("2026-09-23T06:00:00Z"))?.at).toBe("14 Sept 2026, 9:12 am MYT");
-    expect(latest(d, "temperature", ms, tokyo, Date.parse("2026-09-23T06:00:00Z"))?.at).toBe("14 Sept 2026, 10:12 am GMT+9");
+    expect(latest(d, TEMPERATURE, undefined, undefined, Date.parse("2026-09-14T09:00:00Z"))?.at).toBe("9:12 am MYT");
+    expect(latest(d, TEMPERATURE, undefined, undefined, Date.parse("2026-09-23T06:00:00Z"))?.at).toBe("14 Sept 2026, 9:12 am MYT");
+    expect(latest(d, TEMPERATURE, ms, tokyo, Date.parse("2026-09-23T06:00:00Z"))?.at).toBe("14 Sept 2026, 10:12 am GMT+9");
   });
 });
 

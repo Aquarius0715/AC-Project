@@ -14,6 +14,8 @@ import { WARN_MINUTES } from "@ac/web/lib/techJob";
 import { wrapped } from "@ac/web/lib/text";
 import { lookup } from "@ac/web/lib/lookup";
 
+const IN_PROGRESS = "in_progress";
+
 const en = translator("en");
 
 /** A technician's jobs.list row (IR23): the summary while the viewing window is open, the history after it. */
@@ -59,7 +61,7 @@ export function techRow(j: ApiTechJobRow, now: number, units: Map<string, string
   if (j.projection === "history") return null; // past assignments are not part of today's work
   const s = j.scheduledSlot;
   const isBefore = !!s && Date.parse(s.startAt) > now;
-  const isEnded = !!s && Date.parse(s.endAt) <= now && (j.status === "assigned" || j.status === "in_progress");
+  const isEnded = !!s && Date.parse(s.endAt) <= now && (j.status === "assigned" || j.status === IN_PROGRESS);
   const ack = j.assignmentAcknowledgement ?? null;
   const opens = isBefore ? relativeTime(s.startAt, now, i) : null;
   let badge: TechJobRow["badge"], note: string;
@@ -67,7 +69,7 @@ export function techRow(j: ApiTechJobRow, now: number, units: Map<string, string
   else if (ack === "cant_make" && j.status === "assigned") [badge, note] = [{ text: t("Can’t make it"), tone: "warn" }, t("you said you can’t make it — waiting for your contractor or HQ")];
   else if (isEnded) [badge, note] = [{ text: t("Work window ended"), tone: "crit" }, t("ask your contractor or HQ to extend or reassign")];
   else if (j.status === "assigned") [badge, note] = [{ text: t("Work not started"), tone: "primary" }, opens ? t("opens {time} (read-only until then)", { time: opens }) : t("check in to start")];
-  else if (j.status === "in_progress") [badge, note] = [{ text: t("In progress"), tone: "warn" }, t("report draft open")];
+  else if (j.status === IN_PROGRESS) [badge, note] = [{ text: t("In progress"), tone: "warn" }, t("report draft open")];
   else if (j.status === "on_hold") [badge, note] = [{ text: t("On hold"), tone: "warn" }, t("held by HQ — actions are blocked")];
   else if (j.status === "rework_requested") [badge, note] = [{ text: t("Rework requested"), tone: "warn" }, t("returned — resume in a new draft version")];
   else if (j.status === "submitted") [badge, note] = [{ text: t("Submitted"), tone: "primary" }, t("awaiting quality review (read-only)")];
@@ -77,7 +79,7 @@ export function techRow(j: ApiTechJobRow, now: number, units: Map<string, string
   const alert = j.severity === "critical" ? t("critical alert on the unit") : warning;
   const slotText = s ? showSpan(s.startAt, s.endAt, display) : "";
   // the last 15 minutes of an open window before unsaved input is discarded (IR89, Figma Technician 01)
-  const left = s && !isBefore && !isEnded && (j.status === "assigned" || j.status === "in_progress") ? Math.ceil((Date.parse(s.endAt) - now) / 60_000) : null;
+  const left = s && !isBefore && !isEnded && (j.status === "assigned" || j.status === IN_PROGRESS) ? Math.ceil((Date.parse(s.endAt) - now) / 60_000) : null;
   const ending = left !== null && left <= WARN_MINUTES ? t("window ends in {n} min", { n: left }) : "";
   return {
     id: j.id,
@@ -116,7 +118,7 @@ export function dayTimeline(rows: TechJobRow[], now: number): { hours: string[];
   const pct = (ms: number) => Math.min(100, Math.max(0, ((ms - day) / 3_600_000 - START_H) / (END_H - START_H) * 100));
   const blocks = rows.filter((r): r is typeof r & { slot: NonNullable<typeof r.slot> } => r.today && !!r.slot).map((r) => {
     const left = pct(Date.parse(r.slot.startAt)), right = pct(Date.parse(r.slot.endAt));
-    return { id: r.id, short: r.short, width: Math.max(right - left, 2), text: `${windowText(r.slot, now)} · ${r.short}`, current: r.status === "in_progress", left };
+    return { id: r.id, short: r.short, width: Math.max(right - left, 2), text: `${windowText(r.slot, now)} · ${r.short}`, current: r.status === IN_PROGRESS, left };
   });
   const n = ((now - day) / 3_600_000);
   return { hours: ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00"], nowPct: n >= START_H && n <= END_H ? pct(now) : null, now: hhmm(new Date(now).toISOString()), blocks };

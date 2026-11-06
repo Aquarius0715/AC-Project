@@ -7,25 +7,32 @@ import type { ApiPropertyRow, ApiSpaceRow, ApiUnitRow } from "@ac/web/lib/assets
 import { i18nOf, showClock, showDay } from "@ac/web/lib/i18n";
 import { setsTemperature, type ApiUnitDetail } from "@ac/web/lib/units";
 
+const TEMPERATURE = "temperature";
+const TEXT_2026_09_14T01_12_30Z = "2026-09-14T01:12:30Z";
+const SET_ON_THE_AC_ITSELF = "Set on the AC itself";
+const BEDROOM_AC = "Bedroom AC";
+const TEXT_2026_09_14T01_05_00Z = "2026-09-14T01:05:00Z";
+const GAP_NOT_JOINED = "Gap — not joined";
+
 const MS_TOKYO = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
-const UNIT_OF = new Map([["co2", "ppm"], ["pm25", "µg/m³"], ["temperature", "°C"]]); // humidity in %
+const UNIT_OF = new Map([["co2", "ppm"], ["pm25", "µg/m³"], [TEMPERATURE, "°C"]]); // humidity in %
 const m = (metric: string, value: number | null, over: Partial<ApiMeasurement> = {}): ApiMeasurement => {
   return {
-    id: "m", unitId: "u", sensorId: "s", metric, value, unit: UNIT_OF.get(metric) ?? "%", observedAt: "2026-09-14T01:12:30Z", origin: "measured", quality: "valid", qualityReason: null, ...over,
+    id: "m", unitId: "u", sensorId: "s", metric, value, unit: UNIT_OF.get(metric) ?? "%", observedAt: TEXT_2026_09_14T01_12_30Z, origin: "measured", quality: "valid", qualityReason: null, ...over,
   };
 };
 
 // as the air-quality page passes it: whether the unit page has a temperature row
-const advice = (cap: ApiUnitDetail["capabilities"]) => metricCard("temperature", m("temperature", 27.2), true, undefined, setsTemperature(cap)).advice;
+const advice = (cap: ApiUnitDetail["capabilities"]) => metricCard(TEMPERATURE, m(TEMPERATURE, 27.2), true, undefined, setsTemperature(cap)).advice;
 
 describe("air-quality metric cards (FR-C07, IR44, IR99, IR213, IR260)", () => {
   it("rounds per IR44 and states a live reading, its guide and advice", () => {
-    expect([airNumber("temperature", 28.05), airNumber("co2", 999.5), airNumber("pm25", 34.4), airNumber("power", 0.68)]).toEqual(["28.1", "1000", "34", "0.68"]);
+    expect([airNumber(TEMPERATURE, 28.05), airNumber("co2", 999.5), airNumber("pm25", 34.4), airNumber("power", 0.68)]).toEqual(["28.1", "1000", "34", "0.68"]);
     expect(metricCard("co2", m("co2", 1180), true)).toMatchObject({ value: "1180", feed: { text: "Live" }, status: { text: "High", tone: "warn" }, sub: "Observed 9:12 am MYT", advice: "Ventilation recommended (≥ 1000 ppm)", warn: true });
     expect(metricCard("pm25", m("pm25", 12, { origin: "estimated" }), true)).toMatchObject({ status: { text: "Within guide" }, sub: "Observed 9:12 am MYT · estimated", advice: "No current advice", warn: false });
-    expect(metricCard("temperature", m("temperature", 26), true)).toMatchObject({ status: { text: "Measured" }, advice: "Setpoint is on Unit Control" });
-    expect(metricCard("temperature", m("temperature", 26), true, undefined, false).advice).toBe("Set on the AC itself"); // a model without remote control
-    expect(metricCard("temperature", undefined, true, undefined, false).advice).toBe("Set on the AC itself");
+    expect(metricCard(TEMPERATURE, m(TEMPERATURE, 26), true)).toMatchObject({ status: { text: "Measured" }, advice: "Setpoint is on Unit Control" });
+    expect(metricCard(TEMPERATURE, m(TEMPERATURE, 26), true, undefined, false).advice).toBe(SET_ON_THE_AC_ITSELF); // a model without remote control
+    expect(metricCard(TEMPERATURE, undefined, true, undefined, false).advice).toBe(SET_ON_THE_AC_ITSELF);
   });
 
   it("points the temperature to Unit Control only when the model sets it there (IR544)", () => {
@@ -36,8 +43,8 @@ describe("air-quality metric cards (FR-C07, IR44, IR99, IR213, IR260)", () => {
       };
     };
     expect(advice(model({}))).toBe("Setpoint is on Unit Control");
-    expect(advice(model({ temperature: null }))).toBe("Set on the AC itself"); // the power alone (the live Daikin, DEC-89)
-    expect(advice(model({ control: false }))).toBe("Set on the AC itself"); // monitoring only
+    expect(advice(model({ temperature: null }))).toBe(SET_ON_THE_AC_ITSELF); // the power alone (the live Daikin, DEC-89)
+    expect(advice(model({ control: false }))).toBe(SET_ON_THE_AC_ITSELF); // monitoring only
   });
 
   it("never shows a stale, suspect, null or unsupported reading as a current value", () => {
@@ -50,7 +57,7 @@ describe("air-quality metric cards (FR-C07, IR44, IR99, IR213, IR260)", () => {
 
   it("words the card in Malay and times the reading in the display time zone", () => {
     expect(metricCard("co2", m("co2", 1180), true, MS_TOKYO)).toMatchObject({ feed: { text: "Langsung" }, status: { text: "Tinggi" }, sub: "Diperhatikan 10:12 PG GMT+9", advice: "Pengudaraan disyorkan (≥ 1000 ppm)" });
-    expect(metricCard("temperature", undefined, false, MS_TOKYO)).toMatchObject({ label: "Suhu", sub: "Tiada penderia Suhu pada model ini", feed: { text: "Tidak disokong" } });
+    expect(metricCard(TEMPERATURE, undefined, false, MS_TOKYO)).toMatchObject({ label: "Suhu", sub: "Tiada penderia Suhu pada model ini", feed: { text: "Tidak disokong" } });
   });
 });
 
@@ -65,21 +72,21 @@ describe("the air-quality screen in the display language and time zone (FR-C07, 
   const NOW = new Date("2026-09-14T01:12:40Z"); // Mon 09:12 KL
   const ps = [property("p1", "Home A")];
   const ss = [space("s1", null, "1F", "floor"), space("s2", "s1", "Bedroom", "room")];
-  const us = [unit("u1", "s2", "Bedroom AC"), unit("u2", null, "Porch AC")];
+  const us = [unit("u1", "s2", BEDROOM_AC), unit("u2", null, "Porch AC")];
 
   it("names the rooms, the guidance and the cleaning note in Malay", () => {
     expect(airRooms(ps, ss, us).map((r) => r.label)).toEqual(["Bedroom · Home A › 1F", "Not in a room · Home A"]);
     expect(airRooms(ps, ss, us, MS_TOKYO.t).map((r) => r.label)).toEqual(["Bedroom · Home A › 1F", "Bukan dalam bilik · Home A"]);
     const g = airGuidance(m("co2", 1180), m("pm25", 40), true);
     expect(g).toEqual(["ventilate", "clean"]);
-    expect(ventStrip(g, m("co2", 1180), "Bedroom", "Bedroom AC", true)).toEqual({
+    expect(ventStrip(g, m("co2", 1180), "Bedroom", BEDROOM_AC, true)).toEqual({
       tone: "warn", title: "Ventilation recommended", text: "CO2 1180 ppm in Bedroom (≥ 1000 ppm guide). Open a window or run your ventilation fan, then log it — the record is kept in this room’s ventilation history.",
     });
-    expect(ventStrip(airGuidance(m("co2", 1180), undefined, false), m("co2", 1180), "Bedroom", "Bedroom AC", false, MS_TOKYO.t)).toEqual({
+    expect(ventStrip(airGuidance(m("co2", 1180), undefined, false), m("co2", 1180), "Bedroom", BEDROOM_AC, false, MS_TOKYO.t)).toEqual({
       tone: "warn", title: "Udarakan secara manual, contohnya dengan membuka tingkap",
       text: "CO2 1180 ppm di Bedroom (panduan ≥ 1000 ppm). Bedroom AC tiada fungsi udara segar, jadi tiada apa-apa dihantar ke AC — buka tingkap, kemudian rekodkan apa yang anda lakukan.",
     });
-    expect([ventStrip(["unavailable"], undefined, "Bedroom", "Bedroom AC", true).title, ventStrip(["none"], m("co2", 600), "Bedroom", "Bedroom AC", false, MS_TOKYO.t).title, ventStrip(["none"], m("co2", 600), "Bedroom", "Bedroom AC", true, MS_TOKYO.t).title])
+    expect([ventStrip(["unavailable"], undefined, "Bedroom", BEDROOM_AC, true).title, ventStrip(["none"], m("co2", 600), "Bedroom", BEDROOM_AC, false, MS_TOKYO.t).title, ventStrip(["none"], m("co2", 600), "Bedroom", BEDROOM_AC, true, MS_TOKYO.t).title])
       .toEqual(["Not enough data to provide guidance", "Pengudaraan manual", "Tiada panduan semasa"]);
     expect([cleanNote(g, m("pm25", 40), "Bedroom", MS_TOKYO.t), cleanNote(["none"], m("pm25", 10), "Bedroom")]).toEqual([
       "Pembersihan dan pemeriksaan penapis disyorkan — PM2.5 40 µg/m³ di Bedroom (panduan ≥ 35 µg/m³). Minta pembersihan penapis daripada Penyelenggaraan.", null,
@@ -105,24 +112,24 @@ describe("the air-quality screen in the display language and time zone (FR-C07, 
     const week = airWindow("7d", NOW);
     expect([week.from, windowSub(week, "ppm", "Bedroom", MS_TOKYO)]).toEqual(["2026-09-07T16:00:00.000Z", "ppm · Bedroom · hari kalendar dalam Asia/Kuala_Lumpur dari 8 Sep 2026 hingga 10:12 PG GMT+9 sekarang · purata setiap jam"]);
     expect([axisLabels(week), axisLabels(week, MS_TOKYO)]).toEqual([["Tue 8", "Wed 9", "Fri 11", "Sat 12", "9:12 am now"], ["Sel 8", "Rab 9", "Jum 11", "Sab 12", "10:12 PG sekarang"]]);
-    expect([showClock("2026-09-14T01:12:30Z", MS_TOKYO.display, false), showDay("2026-09-14T01:12:30Z", MS_TOKYO.display), showDay("2026-09-13T20:00:00Z", { locale: "en", timeZone: "Not/AZone" })]).toEqual(["10:12 PG", "Isn 14", "Mon 14"]);
+    expect([showClock(TEXT_2026_09_14T01_12_30Z, MS_TOKYO.display, false), showDay(TEXT_2026_09_14T01_12_30Z, MS_TOKYO.display), showDay("2026-09-13T20:00:00Z", { locale: "en", timeZone: "Not/AZone" })]).toEqual(["10:12 PG", "Isn 14", "Mon 14"]);
   });
 
   it("lists each slot as a span, newest first, with the gaps merged", () => {
     const hour = airWindow("1h", NOW);
-    const slots = airSlots([m("co2", 800, { observedAt: "2026-09-14T00:14:00Z" }), m("co2", 820, { observedAt: "2026-09-14T00:15:30Z" }), m("co2", 900, { observedAt: "2026-09-14T01:05:00Z" })], hour);
+    const slots = airSlots([m("co2", 800, { observedAt: "2026-09-14T00:14:00Z" }), m("co2", 820, { observedAt: "2026-09-14T00:15:30Z" }), m("co2", 900, { observedAt: TEXT_2026_09_14T01_05_00Z })], hour);
     expect(airRows(slots, "co2", hour.slotMs).map((r) => [r.time, r.value, r.note])).toEqual([
-      ["14 Sept, 9:07 – 9:12 am MYT", "No data", "Gap — not joined"], ["14 Sept, 9:02 – 9:07 am MYT", "900 ppm", "1 reading"],
-      ["14 Sept, 8:17 – 9:02 am MYT", "No data", "Gap — not joined"], ["14 Sept, 8:12 – 8:17 am MYT", "810 ppm", "2 readings"],
+      ["14 Sept, 9:07 – 9:12 am MYT", "No data", GAP_NOT_JOINED], ["14 Sept, 9:02 – 9:07 am MYT", "900 ppm", "1 reading"],
+      ["14 Sept, 8:17 – 9:02 am MYT", "No data", GAP_NOT_JOINED], ["14 Sept, 8:12 – 8:17 am MYT", "810 ppm", "2 readings"],
     ]);
     expect(airRows(slots, "co2", hour.slotMs, MS_TOKYO).slice(0, 2).map((r) => [r.time, r.value, r.note])).toEqual([["14 Sep, 10:07–10:12 PG GMT+9", "Tiada data", "Jurang — tidak disambung"], ["14 Sep, 10:02–10:07 PG GMT+9", "900 ppm", "1 bacaan"]]);
   });
 
   it("says that the slots before a cut-off series' oldest loaded reading are not loaded, not a gap (IR592)", () => {
     const hour = airWindow("1h", NOW);
-    const slots = airSlots([m("co2", 900, { observedAt: "2026-09-14T01:05:00Z" })], hour); // only the newest page came back
-    expect(airRows(slots, "co2", hour.slotMs, undefined, "2026-09-14T01:05:00Z").map((r) => [r.time, r.value, r.note])).toEqual([
-      ["14 Sept, 9:07 – 9:12 am MYT", "No data", "Gap — not joined"], ["14 Sept, 9:02 – 9:07 am MYT", "900 ppm", "1 reading"],
+    const slots = airSlots([m("co2", 900, { observedAt: TEXT_2026_09_14T01_05_00Z })], hour); // only the newest page came back
+    expect(airRows(slots, "co2", hour.slotMs, undefined, TEXT_2026_09_14T01_05_00Z).map((r) => [r.time, r.value, r.note])).toEqual([
+      ["14 Sept, 9:07 – 9:12 am MYT", "No data", GAP_NOT_JOINED], ["14 Sept, 9:02 – 9:07 am MYT", "900 ppm", "1 reading"],
       ["14 Sept, 8:12 – 9:02 am MYT", "Not loaded", "Earlier readings are not loaded"],
     ]);
   });
@@ -130,9 +137,9 @@ describe("the air-quality screen in the display language and time zone (FR-C07, 
   it("words the ventilation log and its current CO2 in the display language and time zone (IR110)", () => {
     expect([co2Now(m("co2", 1180)), co2Now(m("co2", 1180), MS_TOKYO.display), co2Now(m("co2", 1180, { quality: "stale" }))]).toEqual(["1180 ppm · 9:12 am MYT", "1180 ppm · 10:12 PG GMT+9", null]);
     const v: ApiVentilationLog = {
-      id: "v1", spaceId: "s2", unitId: "u1", method: "window_opened", durationMinutes: 15, co2AtLog: { value: 1180, unit: "ppm", observedAt: "2026-09-14T01:00:00Z" }, loggedByMembershipId: "me", loggedAt: "2026-09-14T01:05:00Z",
+      id: "v1", spaceId: "s2", unitId: "u1", method: "window_opened", durationMinutes: 15, co2AtLog: { value: 1180, unit: "ppm", observedAt: "2026-09-14T01:00:00Z" }, loggedByMembershipId: "me", loggedAt: TEXT_2026_09_14T01_05_00Z,
     };
-    expect(ventRow(v, "me", new Map([["u1", "Bedroom AC"]]), NOW.getTime())).toEqual({ id: "v1", text: "Window opened · 15 min · Bedroom AC", co2: "CO2 1180 ppm at 9:00 am MYT", by: "by you", when: "today 9:05 am MYT" });
+    expect(ventRow(v, "me", new Map([["u1", BEDROOM_AC]]), NOW.getTime())).toEqual({ id: "v1", text: "Window opened · 15 min · Bedroom AC", co2: "CO2 1180 ppm at 9:00 am MYT", by: "by you", when: "today 9:05 am MYT" });
     expect(ventRow({ ...v, unitId: "u9", co2AtLog: null, loggedByMembershipId: "x", loggedAt: "2026-09-13T01:05:00Z" }, "me", new Map(), NOW.getTime(), MS_TOKYO))
       .toEqual({ id: "v1", text: "Tingkap dibuka · 15 min · unit lain", co2: "CO2 tidak diukur semasa merekod", by: "oleh ahli lain", when: "semalam 10:05 PG GMT+9" });
   });

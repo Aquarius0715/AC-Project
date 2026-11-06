@@ -11,10 +11,14 @@ import { DEFAULT_DISPLAY, EN, relativeTime, showClock, showDate, showDay, showSp
 import type { IconName } from "@ac/web/components/Icon";
 import { entryOf, lookup } from "@ac/web/lib/lookup";
 
+const TEMPERATURE = "temperature";
+const UNSUPPORTED = "unsupported";
+const KL = "Asia/Kuala_Lumpur";
+
 const en = translator("en");
 
 export type AirMetric = "co2" | "pm25" | "temperature" | "humidity";
-export const airMetrics: AirMetric[] = ["co2", "pm25", "temperature", "humidity"];
+export const airMetrics: AirMetric[] = ["co2", "pm25", TEMPERATURE, "humidity"];
 export type AirPeriod = "1h" | "24h" | "7d";
 export const airPeriods: AirPeriod[] = ["1h", "24h", "7d"];
 type Tone = "ok" | "warn" | "crit" | "unknown" | "primary" | "muted";
@@ -48,9 +52,8 @@ export const metricInfo: Record<AirMetric, { label: string; tab: string; unit: s
   humidity: { label: "Humidity", tab: "Humidity", unit: "%", guide: null },
 };
 
-const KL = "Asia/Kuala_Lumpur";
 const nf =(digits: number) => new Intl.NumberFormat("en-MY", { minimumFractionDigits: digits, maximumFractionDigits: digits, useGrouping: false });
-const DIGITS = new Map([["temperature", 1], ["humidity", 1], ["co2", 0], ["pm25", 0]]);
+const DIGITS = new Map([[TEMPERATURE, 1], ["humidity", 1], ["co2", 0], ["pm25", 0]]);
 /** IR44: temperature and humidity with one decimal, ppm and µg/m³ as integers, rounded half away from zero; other metrics as received. */
 export function airNumber(metric: string, v: number): string {
   const digits = DIGITS.get(metric) ?? null;
@@ -96,7 +99,7 @@ const reasonText: Record<string, string> = { unit_mismatch: "unit mismatch", non
 const originText: Record<string, string> = { estimated: "estimated", inspection: "inspection" };
 /** The advice line when there is no reading to advise on. */
 function noAdviceText(metric: AirMetric, setpoint: string): string {
-  if (metric === "temperature") return setpoint;
+  if (metric === TEMPERATURE) return setpoint;
   return metric === "humidity" ? "Not enough data for advice" : "Not enough data for {metric} advice";
 }
 /** A reading against its guide: measured (no guide), high, or within the guide. */
@@ -106,7 +109,7 @@ function guideStatus(guide: number | null, isHigh: boolean, t: T): MetricCard["s
 }
 /** What to do about a reading: ventilate (CO₂), clean the filter (PM2.5), the setpoint (temperature), or nothing. */
 function adviceText(metric: AirMetric, isHigh: boolean, setpoint: string): string {
-  if (metric === "temperature") return setpoint;
+  if (metric === TEMPERATURE) return setpoint;
   if (isHigh && metric === "co2") return "Ventilation recommended (≥ 1000 ppm)";
   if (isHigh && metric === "pm25") return "Filter cleaning recommended (≥ 35 µg/m³)";
   return "No current advice";
@@ -122,7 +125,7 @@ export function metricCard(metric: AirMetric, m: ApiMeasurement | undefined, has
   const noAdvice = t(noAdviceText(metric, setpoint), { metric: label });
   const unavailable = (sub: string, feed = { text: t("Unavailable"), tone: "unknown" as Tone, icon: "offline" as IconName }): MetricCard =>
     ({ metric, label, unit, feed, sub, value: null, status: { text: t("Not measured"), tone: "muted", icon: "dot" }, advice: noAdvice, warn: false });
-  if (!hasSensor) return unavailable(t("No {metric} sensor on this model", { metric: label }), { text: t("Unsupported"), tone: "muted", icon: "unsupported" });
+  if (!hasSensor) return unavailable(t("No {metric} sensor on this model", { metric: label }), { text: t("Unsupported"), tone: "muted", icon: UNSUPPORTED });
   if (!m) return unavailable(t("No reading yet"));
   const at = showClock(m.observedAt, display);
   if (m.quality === "stale") return unavailable(m.value === null ? t("No reading since {time}", { time: at }) : t("No reading since {time} (last {value} {unit})", { time: at, value: airNumber(metric, m.value), unit }));
@@ -192,7 +195,7 @@ export function allergenView(a: ApiAllergen | null, i: I18n = EN): { title: stri
   const { t, display } = i;
   const title = t("Allergen");
   if (!a) return { title, badge: { text: t("Unknown"), tone: "unknown", icon: "unknown" }, text: t("No observation for this selection — this does not mean “no allergens”.") };
-  if (a.availability === "unsupported") return { title, badge: { text: t("Unsupported"), tone: "muted", icon: "unsupported" }, text: t("This unit cannot observe allergens — this does not mean “no allergens”.") };
+  if (a.availability === UNSUPPORTED) return { title, badge: { text: t("Unsupported"), tone: "muted", icon: UNSUPPORTED }, text: t("This unit cannot observe allergens — this does not mean “no allergens”.") };
   if (a.availability === "not_measured") return { title, badge: { text: t("Not measured"), tone: "muted", icon: "dot" }, text: t("No observation — this does not mean “no allergens”.") };
   if (!a.substance || !a.sourceLabel || !a.observedAt || !a.evidenceText) return { title, badge: { text: t("Unknown"), tone: "unknown", icon: "unknown" }, text: t("Incomplete observation — shown as unknown, this does not mean “no allergens”.") };
   const value = a.value === null ? [] : [a.unit ? `${String(a.value)} ${a.unit}` : t("Value unknown (no unit)")];

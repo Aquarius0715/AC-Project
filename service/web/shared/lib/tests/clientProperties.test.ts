@@ -3,14 +3,16 @@ import { changeText, groupPlan, roomUnits, type GroupChange } from "@ac/web/lib/
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 
+const TEXT_2026_09_14T01_10_00Z = "2026-09-14T01:10:00Z";
+
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const unit = (id: string, over: Partial<ApiUnitDetail> = {}): ApiUnitDetail => {
   return {
     id, version: 1, spaceId: "room", displayName: `AC ${id}`, alertPolicyIds: [], connection: "online", effectivePowerState: "on",
-    observedState: { power: true, celsius: 26, mode: "cool", fanLevel: "mid", observedAt: "2026-09-14T01:00:00Z" }, lastSeenAt: "2026-09-14T01:10:00Z",
+    observedState: { power: true, celsius: 26, mode: "cool", fanLevel: "mid", observedAt: "2026-09-14T01:00:00Z" }, lastSeenAt: TEXT_2026_09_14T01_10_00Z,
     latestMeasurements: [
-      { id: "m1", unitId: id, sensorId: "s1", metric: "temperature", value: 27.04, unit: "°C", observedAt: "2026-09-14T01:10:00Z", origin: "measured", quality: "valid", qualityReason: null },
-      { id: "m2", unitId: id, sensorId: "s2", metric: "power", value: 0.68, unit: "kW", observedAt: "2026-09-14T01:10:00Z", origin: "measured", quality: "valid", qualityReason: null },
+      { id: "m1", unitId: id, sensorId: "s1", metric: "temperature", value: 27.04, unit: "°C", observedAt: TEXT_2026_09_14T01_10_00Z, origin: "measured", quality: "valid", qualityReason: null },
+      { id: "m2", unitId: id, sensorId: "s2", metric: "power", value: 0.68, unit: "kW", observedAt: TEXT_2026_09_14T01_10_00Z, origin: "measured", quality: "valid", qualityReason: null },
     ],
     capabilities: { manufacturer: "Demo", model: "M", control: true, modeControl: true, fanControl: true, temperature: { min: 16, max: 30, step: 1 }, modes: ["cool", "dry", "fan"], fanLevels: ["low", "mid", "high"], ventilation: false, ventilationLevels: [], sensors: [] },
     effectiveControlPolicy: { state: "unrestricted" }, controlAvailability: { state: "available" }, pendingCommands: [],

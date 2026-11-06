@@ -6,6 +6,8 @@ import { authProxy } from "@ac/web/proxy";
 import { STYLE_HASHES } from "@ac/web/lib/styleHashes.gen";
 import { must } from "./must";
 
+const LOCALHOST_3000 = "localhost:3000";
+
 // the proxy reads the session module, which is server code
 vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ cookies: () => Promise.resolve({ get: vi.fn(), set: vi.fn(), delete: vi.fn() }) }));
@@ -74,18 +76,18 @@ const h = (o: Record<string, string>) => new Headers(o);
 describe("a same-origin request", () => {
   it("passes from the app's pages and from clients that are not browser pages", () => {
     expect([
-      sameOriginRequest(h({ origin: "http://localhost:3000", host: "localhost:3000", "sec-fetch-site": "same-origin" })),
+      sameOriginRequest(h({ origin: "http://localhost:3000", host: LOCALHOST_3000, "sec-fetch-site": "same-origin" })),
       sameOriginRequest(h({ origin: "https://app.example.com", host: "app.internal:3000", "x-forwarded-host": "app.example.com" })), // behind the edge
-      sameOriginRequest(h({ host: "localhost:3000" })), // no Origin: not a browser page
-      sameOriginRequest(h({ "sec-fetch-site": "none", host: "localhost:3000" })), // typed in the address bar
+      sameOriginRequest(h({ host: LOCALHOST_3000 })), // no Origin: not a browser page
+      sameOriginRequest(h({ "sec-fetch-site": "none", host: LOCALHOST_3000 })), // typed in the address bar
     ]).toEqual([true, true, true, true]);
   });
   it("refuses another site, another host or a broken Origin", () => {
     expect([
-      sameOriginRequest(h({ "sec-fetch-site": "cross-site", host: "localhost:3000" })),
-      sameOriginRequest(h({ "sec-fetch-site": "same-site", origin: "http://localhost:3001", host: "localhost:3000" })), // another app of the same site
-      sameOriginRequest(h({ origin: "https://evil.example", host: "localhost:3000" })),
-      sameOriginRequest(h({ origin: "null", host: "localhost:3000" })),
+      sameOriginRequest(h({ "sec-fetch-site": "cross-site", host: LOCALHOST_3000 })),
+      sameOriginRequest(h({ "sec-fetch-site": "same-site", origin: "http://localhost:3001", host: LOCALHOST_3000 })), // another app of the same site
+      sameOriginRequest(h({ origin: "https://evil.example", host: LOCALHOST_3000 })),
+      sameOriginRequest(h({ origin: "null", host: LOCALHOST_3000 })),
     ]).toEqual([false, false, false, false]);
   });
 });

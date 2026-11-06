@@ -5,6 +5,8 @@ import { klInstant, klLocal, periodError, klStamp, one, saving, summaryView, typ
 import { EN, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { codePoints } from "@ac/web/lib/text";
 
+const CALCULATION_INCOMPLETE = "Calculation incomplete";
+
 const en = translator("en");
 
 /** MRVConditions of service-contracts.ts. */
@@ -29,7 +31,7 @@ export function reportRows(rs: ApiMRVReport[], orgs: { id: string; name: string 
       id: r.id, version: r.version, status: r.status, org: org.get(r.conditions.organizationId) ?? t("customer"),
       units: t(r.conditions.unitIds.length === 1 ? "1 unit" : "{n} units", { n: r.conditions.unitIds.length }),
       period: `${klStamp(r.conditions.from)} → ${klStamp(r.conditions.to)}`, incomplete: r.incomplete,
-      result: r.incomplete || r.summary.totals.emissionsKg === null ? t("Calculation incomplete") : `${one(r.summary.totals.emissionsKg)} kgCO₂e`,
+      result: r.incomplete || r.summary.totals.emissionsKg === null ? t(CALCULATION_INCOMPLETE) : `${one(r.summary.totals.emissionsKg)} kgCO₂e`,
     };
   });
 }
@@ -60,8 +62,8 @@ export function mrvView(p: ApiMRVPreview, orgs: { id: string; name: string }[], 
   const isIncomplete = p.incomplete || t.kWh === null || t.emissionsKg === null;
   return {
     incomplete: isIncomplete, summary: s,
-    electricity: t.kWh === null ? tr("Calculation incomplete") : `${one(t.kWh)} kWh`,
-    emissions: t.emissionsKg === null || isIncomplete ? tr("Calculation incomplete") : `${one(t.emissionsKg)} kgCO₂e`,
+    electricity: t.kWh === null ? tr(CALCULATION_INCOMPLETE) : `${one(t.kWh)} kWh`,
+    emissions: t.emissionsKg === null || isIncomplete ? tr(CALCULATION_INCOMPLETE) : `${one(t.emissionsKg)} kgCO₂e`,
     energyVsBaseline: saving(t.savedKWh, " kWh", one, tr), energyPercent: saving(t.savingPercentage, "%", one, tr), emissionsVsBaseline: saving(t.savedEmissionsKg, " kgCO₂e", one, tr),
     conditions: [
       [tr("Organization"), orgs.find((o) => o.id === p.conditions.organizationId)?.name ?? p.conditions.organizationId],

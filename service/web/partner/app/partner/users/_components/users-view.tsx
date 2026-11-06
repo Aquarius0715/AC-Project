@@ -1,4 +1,5 @@
 "use client";
+const TECHNICIAN = "technician";
 
 import { useId, useRef, useState } from "react";
 import { Badge, Banner, Btn, Card, DataTable, EmptyState, Field, Input, LinkButton, Modal, Page, PageHead, Select, Textarea, type Tone } from "@ac/web/components/ui";
@@ -62,7 +63,7 @@ export function UsersView({ data, ops, onStatus, sends = false }: Readonly<{ dat
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [until, setUntil] = useState("");
-  const [role, setRole] = useState<PartnerRole>("technician");
+  const [role, setRole] = useState<PartnerRole>(TECHNICIAN);
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
   const [server, setServer] = useState<Partial<Record<FieldKey, string>>>({});
@@ -80,14 +81,14 @@ export function UsersView({ data, ops, onStatus, sends = false }: Readonly<{ dat
   }
   // a technician's access ends at most a year ahead (IR461); three months is offered first
   const open = (d: Dialog) => {
-    setDialog(d); setTried(false); setReason(""); setEmail(""); setName(""); setRole("technician"); setServer({}); gone.current = false;
+    setDialog(d); setTried(false); setReason(""); setEmail(""); setName(""); setRole(TECHNICIAN); setServer({}); gone.current = false;
     setUntil(addDays(data.today, 90));
   };
   const close = () => { setDialog(null); };
   const isAdding = dialog?.kind === "invite";
   const emailError = isAdding ? partnerInviteError(email, data.all, t) : undefined;
   const nameProblem = isAdding ? nameError(name, t) : undefined;
-  const untilError = (isAdding && role === "technician") || dialog?.kind === "access" ? accessError(until, data.today, t) : undefined;
+  const untilError = (isAdding && role === TECHNICIAN) || dialog?.kind === "access" ? accessError(until, data.today, t) : undefined;
   const reasonProblem = dialog && !isAdding ? reasonError(reason, t) : undefined;
   const edit = (k: FieldKey) => { setServer((s) => (s[k] ? without(s, k) : s)); };
   const submit = () => {
@@ -105,7 +106,7 @@ export function UsersView({ data, ops, onStatus, sends = false }: Readonly<{ dat
       if (first) focusField(ids[first]);
     };
     const who = dialog.kind === "invite" ? name.trim() || email.trim() : dialog.row.name ?? dialog.row.email;
-    if (dialog.kind === "invite") run(() => ops.invite(email, role, name, role === "technician" ? accessEnd(until) : null), sends ? t("{name} added — a set-up e-mail is on its way to {email}", { name: who, email: email.trim() }) : t("{name} added — nothing is sent in the demo", { name: who }), close, refused);
+    if (dialog.kind === "invite") run(() => ops.invite(email, role, name, role === TECHNICIAN ? accessEnd(until) : null), sends ? t("{name} added — a set-up e-mail is on its way to {email}", { name: who, email: email.trim() }) : t("{name} added — nothing is sent in the demo", { name: who }), close, refused);
     else if (dialog.kind === "access") run(() => ops.access(dialog.row, accessEnd(until), reason), t("Access of {name} now ends {date}", { name: who, date: until }), close, refused);
     else if (dialog.kind === "remove") run(() => ops.remove(dialog.row, reason), t("{name} removed", { name: who }), () => { gone.current = true; close(); }, refused);
     else run(() => ops.setStatus(dialog.row, dialog.kind === "disable" ? "disabled" : "active", reason), t(dialog.kind === "disable" ? "{name} disabled — they can no longer sign in" : "{name} enabled again", { name: who }), close, refused);
@@ -171,7 +172,7 @@ export function UsersView({ data, ops, onStatus, sends = false }: Readonly<{ dat
             <Select aria-label={t("Role")} value={role} onChange={(e) => { setRole(oneOf(PARTNER_ROLES, e.target.value, role)); }}>{PARTNER_ROLES.map((r) => <option key={r} value={r}>{t(roleLabel[r])}</option>)}</Select>
           </Field>
         </>}
-        {((isAdding && role === "technician") || dialog?.kind === "access") &&
+        {((isAdding && role === TECHNICIAN) || dialog?.kind === "access") &&
           <Field label={t("Access until")} hint={t("The last day they can sign in, at most a year ahead (Kuala Lumpur time).")} error={(tried ? untilError : undefined) ?? server.until}>
             <Input id={ids.until} type="date" value={until} min={data.today} max={addDays(data.today, ACCESS_MAX_DAYS)} onChange={(e) => { setUntil(e.target.value); edit("until"); }} />
           </Field>}

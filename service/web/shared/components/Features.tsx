@@ -1,4 +1,6 @@
 "use client";
+const CUSTOMER_A = "customer-a";
+const CONTRACT_RTO_A = "contract-rto-a";
 
 /** Features confirmed from the Figma proposals on 2026-10-02 (FR-C14, C16, A18–A20, A23). */
 import { useState } from "react";
@@ -92,10 +94,10 @@ export function ImportCsvModal({ open, onClose }: Readonly<{ open: boolean; onCl
 export function WarrantyTab() {
   const toast = useToast();
   const rows = [
-    { u: "Living room AC", id: "unit-non-rto · Home A", c: "customer-a", m: "CS-3.5K", end: "2026-10-28", k: "—", st: "Ends in 27 d · no contract", tone: "warn" as const },
-    { u: "Bedroom AC", id: "unit-online-rto · Home A", c: "customer-a", m: "CS-2.5K", end: "2026-11-30", k: "contract-rto-a", st: "Covered by contract", tone: "ok" as const },
-    { u: "Lobby AC", id: "unit-limited · Office A", c: "customer-a", m: "CS-5.0K", end: "2027-03-31", k: "contract-rto-a", st: "Covered", tone: "ok" as const },
-    { u: "Meeting room AC", id: "Office A", c: "customer-a", m: "CS-2.5K", end: "2027-06-30", k: "contract-rto-a", st: "Covered", tone: "ok" as const },
+    { u: "Living room AC", id: "unit-non-rto · Home A", c: CUSTOMER_A, m: "CS-3.5K", end: "2026-10-28", k: "—", st: "Ends in 27 d · no contract", tone: "warn" as const },
+    { u: "Bedroom AC", id: "unit-online-rto · Home A", c: CUSTOMER_A, m: "CS-2.5K", end: "2026-11-30", k: CONTRACT_RTO_A, st: "Covered by contract", tone: "ok" as const },
+    { u: "Lobby AC", id: "unit-limited · Office A", c: CUSTOMER_A, m: "CS-5.0K", end: "2027-03-31", k: CONTRACT_RTO_A, st: "Covered", tone: "ok" as const },
+    { u: "Meeting room AC", id: "Office A", c: CUSTOMER_A, m: "CS-2.5K", end: "2027-06-30", k: CONTRACT_RTO_A, st: "Covered", tone: "ok" as const },
     { u: "Rooftop AC", id: "unit-p-rooftop", c: "customer-b", m: "VRF-12", end: "2026-08-31", k: "—", st: "No coverage", tone: "crit" as const },
   ];
   return (
@@ -162,7 +164,5 @@ export function ContractorPayouts() {
     </div>
   );
 }
-
-
 
 export {Toggle} from "./ui";

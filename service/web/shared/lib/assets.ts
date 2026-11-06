@@ -14,6 +14,9 @@ import { byText, isAfter, isBefore } from "@ac/web/lib/order";
 import { codePoints, isEmail, wrapped } from "@ac/web/lib/text";
 import { entryOf, lookup } from "@ac/web/lib/lookup";
 
+const TEXT_1_120_CHARACTERS = "1–120 characters";
+const DEFAULT_ALERT = "default_alert";
+
 export const profiles = ["rto", "general", "energy", "environment"] as const;
 export type Profile = (typeof profiles)[number];
 export type Connection = "online" | "offline" | "unknown" | "connecting" | "error";
@@ -142,8 +145,8 @@ export const customerDraft = (r?: CustomerRow): CustomerDraft => ({ billingName:
 export const profileLabel: Record<Profile, string> = { rto: "Rent-to-own (RTO)", general: "General care", energy: "Energy", environment: "Environment" };
 export function customerErrors(d: CustomerDraft, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
-  if (!between(d.billingName, 1, 120)) e.billingName = t("1–120 characters");
-  if (!between(d.name, 1, 120)) e.name = t("1–120 characters");
+  if (!between(d.billingName, 1, 120)) e.billingName = t(TEXT_1_120_CHARACTERS);
+  if (!between(d.name, 1, 120)) e.name = t(TEXT_1_120_CHARACTERS);
   return e;
 }
 const between = (s: string, min: number, max: number) => codePoints(s.trim()) >= min && codePoints(s.trim()) <= max;
@@ -231,7 +234,7 @@ export interface PropertyDraft { kind: "home" | "office"; name: string; address:
 export const propertyDraft = (p?: TreeProperty): PropertyDraft => ({ kind: p?.kind ?? "home", name: p?.name ?? "", address: p?.address ?? "", accessInstructions: p?.accessInstructions ?? "" });
 export function propertyErrors(d: PropertyDraft, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
-  if (!between(d.name, 1, 120)) e.name = t("1–120 characters");
+  if (!between(d.name, 1, 120)) e.name = t(TEXT_1_120_CHARACTERS);
   if (codePoints(d.address.trim()) > 500) e.address = t("At most 500 characters");
   if (codePoints(d.accessInstructions.trim()) > 1000) e.accessInstructions = t("At most 1000 characters");
   return e;
@@ -241,7 +244,7 @@ export const propertyInput = (d: PropertyDraft, orgId: string, id?: string) => {
     ...(id && { id }), customerOrgId: orgId, kind: d.kind, name: d.name.trim(), address: d.address.trim() || null, accessInstructions: d.accessInstructions.trim() || null,
   };
 };
-export const nameError = (name: string, t: T = translator("en")) => (between(name, 1, 120) ? undefined : t("1–120 characters"));
+export const nameError = (name: string, t: T = translator("en")) => (between(name, 1, 120) ? undefined : t(TEXT_1_120_CHARACTERS));
 export const reasonError = (reason: string, t: T = translator("en")) => (between(reason, 1, 1000) ? undefined : t("A reason is required (1–1000 characters)"));
 
 // ---- units ----
@@ -280,7 +283,7 @@ export const unitDraft = (u?: Pick<ApiUnitRow, "displayName" | "propertyId" | "s
 };
 export function unitErrors(d: UnitDraft, todayKL: string, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
-  if (!between(d.displayName, 1, 120)) e.displayName = t("1–120 characters");
+  if (!between(d.displayName, 1, 120)) e.displayName = t(TEXT_1_120_CHARACTERS);
   if (!d.propertyId) e.propertyId = t("Choose a location");
   if (!d.modelId) e.modelId = t("Choose a model");
   if (d.installedAt && isAfter(d.installedAt, todayKL)) e.installedAt = t("An installation date cannot be in the future");
@@ -352,11 +355,11 @@ system name in the display language (IR499). */
 export function policyLines(ps: ApiCustomerPolicy[], customerUnits: string[], owner: (membershipId: string) => string, i: I18n = EN): PolicyLine[] {
   const { t } = i;
   const mine = new Set(customerUnits);
-  return ps.filter((p): p is ApiCustomerPolicy & { kind: "alert" | "default_alert" } => p.kind === "alert" || p.kind === "default_alert")
+  return ps.filter((p): p is ApiCustomerPolicy & { kind: "alert" | "default_alert" } => p.kind === "alert" || p.kind === DEFAULT_ALERT)
     // the default policy first, then by name
-    .toSorted((a, b) => Number(b.kind === "default_alert") - Number(a.kind === "default_alert") || a.name.localeCompare(b.name))
+    .toSorted((a, b) => Number(b.kind === DEFAULT_ALERT) - Number(a.kind === DEFAULT_ALERT) || a.name.localeCompare(b.name))
     .map((p) => {
-      return p.kind === "default_alert"
+      return p.kind === DEFAULT_ALERT
         ? { id: p.id, version: p.version, kind: p.kind, name: p.name === "Default policy" ? t("Default policy") : p.name, type: t("Default"), condition: t((p.rules?.length ?? 0) === 1 ? "1 rule · {on} on for this customer" : "{n} rules · {on} on for this customer", { n: p.rules?.length ?? 0, on: defaultRules(p, i).filter((r) => r.enabled).length }), madeBy: t("HQ (template)"), units: mine.size, enabled: p.enabled }
         : { id: p.id, version: p.version, kind: p.kind, name: p.name, type: textOf(metricLabel, p.metric ?? "", t) ?? (p.metric ?? ""), condition: conditionText(p, i), madeBy: owner(p.ownerMembershipId), units: p.unitIds.filter((u) => mine.has(u)).length, enabled: p.enabled };
     });

@@ -4,19 +4,21 @@ import { describe, expect, it } from "vitest";
 import { documentTitle, pageLabel, ROLES, SHARED_PAGES } from "@ac/web/lib/nav";
 import { ms } from "@ac/web/lib/i18n-ms";
 
+const TECHNICIAN = "technician";
+
 describe("page names and document titles (IR490)", () => {
   it("names a page by its menu item, the longest matching path winning", () => {
     expect([
       pageLabel("client", "/customer"), pageLabel("client", "/customer/units/u1"), pageLabel("client", "/customer/payments/i1"),
-      pageLabel("admin", "/admin/billing/contracts"), pageLabel("admin", "/admin/billing"), pageLabel("technician", "/technician"),
+      pageLabel("admin", "/admin/billing/contracts"), pageLabel("admin", "/admin/billing"), pageLabel(TECHNICIAN, "/technician"),
     ]).toEqual(["Overview", "Units & locations", "Contracts & payments", "Contracts", "Billing", "Overview"]);
     // the pages a job leads to belong to the jobs item: the partner's unit view, the technician's job and unit pages
-    expect([pageLabel("contractor", "/partner/units/u1"), pageLabel("technician", "/technician/jobs/j1"), pageLabel("technician", "/technician/units/u1/control")])
+    expect([pageLabel("contractor", "/partner/units/u1"), pageLabel(TECHNICIAN, "/technician/jobs/j1"), pageLabel(TECHNICIAN, "/technician/units/u1/control")])
       .toEqual(["Jobs", "Assigned jobs", "Assigned jobs"]);
   });
 
   it("names the shared pages, Users and Demo controls, and nothing off the menu", () => {
-    expect([pageLabel("client", "/notifications"), pageLabel("admin", "/settings/preferences"), pageLabel("client", "/customer/users"), pageLabel("contractor", "/partner/users"), pageLabel("technician", "/demo"), pageLabel("client", "/login")])
+    expect([pageLabel("client", "/notifications"), pageLabel("admin", "/settings/preferences"), pageLabel("client", "/customer/users"), pageLabel("contractor", "/partner/users"), pageLabel(TECHNICIAN, "/demo"), pageLabel("client", "/login")])
       .toEqual(["Notifications", "Preferences", "Users", "Users", "Demo controls", null]);
   });
 

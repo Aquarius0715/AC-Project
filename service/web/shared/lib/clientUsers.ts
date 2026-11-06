@@ -1,4 +1,5 @@
 "use client";
+const KEY = "ac-client-users-v1";
 
 /**
 Shared client-user mock store (FR-A17 / FR-C19 / IR114). The customer owner (Client app,
@@ -19,7 +20,6 @@ const clientUser = z.object({
   lastSignIn: z.string().nullable(), invitedBy: z.string().optional(), invitedAt: z.string().optional(),
 }) satisfies z.ZodType<ClientUser>;
 
-const KEY = "ac-client-users-v1";
 export const CLIENT_USERS_SEED: ClientUser[] = [
   { id: "cu-tan-wei", name: "Tan Wei", email: "tan.wei@example.com", role: "owner", status: "active", lastSignIn: "2026-09-30 08:12" },
   { id: "cu-mei-tan", name: "Mei Tan", email: "mei.tan@example.com", role: "member", status: "active", lastSignIn: "2026-09-27 21:40" },

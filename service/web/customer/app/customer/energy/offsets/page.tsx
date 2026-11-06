@@ -13,6 +13,8 @@ import { OffsetsDemo } from "./_components/offsets-demo";
 import { OffsetsView } from "./_components/offsets-view";
 import { queryReader } from "@ac/web/lib/searchParams";
 
+const BASELINEID = "baselineId";
+
 export default async function CustomerOffsetsPage({ searchParams }: Readonly<PageProps<"/customer/energy/offsets">>) {
   await connection();
   if (!apiMode()) return <OffsetsDemo />;
@@ -28,7 +30,7 @@ export default async function CustomerOffsetsPage({ searchParams }: Readonly<Pag
   let estimate: { emissions: string; savedEmissions: string; factor: string; comparable: boolean } | null = null;
   if (unitIds.length > 0 && !period.error) {
     try {
-      const s = await coreOp<ApiEnergySummary>("energy.summary", { from: period.from, to: period.to, unitIds, ...(one("baselineId") && { baselineId: one("baselineId") }) });
+      const s = await coreOp<ApiEnergySummary>("energy.summary", { from: period.from, to: period.to, unitIds, ...(one(BASELINEID) && { baselineId: one(BASELINEID) }) });
       const v = summaryView(s, i);
       estimate = { emissions: v.emissions, savedEmissions: v.savedEmissions, comparable: v.comparable, factor: s.factorSnapshot ? `${s.factorSnapshot.region} ${String(s.factorSnapshot.year)}` : i.t("emission factor missing") };
     } catch (error) {
@@ -41,7 +43,7 @@ export default async function CustomerOffsetsPage({ searchParams }: Readonly<Pag
     estimate,
     subject: unitIds.map((u) => name.get(u) ?? u.slice(0, 8)).join(", "),
     period: { from: period.from, to: period.to, label: period.label },
-    back: selectionQuery({ unitIds, period: kind, from: one("from"), to: one("to"), baselineId: one("baselineId") }),
+    back: selectionQuery({ unitIds, period: kind, from: one("from"), to: one("to"), baselineId: one(BASELINEID) }),
     records: records.map((r) => ({ id: r.id, amountKg: r.amountKg, state: r.state, proof: r.demoCertificateRef ?? r.retirementRef ?? null, createdAt: r.createdAt })),
   }} />;
 }

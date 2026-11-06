@@ -9,6 +9,9 @@ import type { Slot } from "@ac/web/lib/partnerOverview";
 import type { IconName } from "@ac/web/components/Icon";
 import { z } from "zod";
 
+const TIME_PROPOSED = "time_proposed";
+const PERIODIC_PLAN = "periodic_plan";
+
 /** The reasons a client gives when reporting a problem with a completed job (jobs.reportProblem). */
 export const problemReason = z.enum(["same_problem", "new_damage", "not_completed", "other"]);
 import { codePoints, wrapped } from "@ac/web/lib/text";
@@ -51,10 +54,10 @@ export type StatusTab = "all" | "reply" | "requested" | "scheduled" | "progress"
 export const STATUS_TABS: [StatusTab, string][] = [["all", "All"], ["reply", "Needs your reply"], ["requested", "Requested"], ["scheduled", "Scheduled"], ["progress", "In progress"], ["completed", "Completed"], ["cancelled", "Cancelled"]];
 /** The tab of a request: Needs your reply = a pending proposal; Scheduled = a time is agreed (offered … assigned). */
 const TAB_OF = new Map<string, StatusTab>([
-  ["time_proposed", "reply"], ["requested", "requested"], ["offered", "scheduled"], ["accepted", "scheduled"], ["assigned", "scheduled"], ["completed", "completed"], ["cancelled", "cancelled"],
+  [TIME_PROPOSED, "reply"], ["requested", "requested"], ["offered", "scheduled"], ["accepted", "scheduled"], ["assigned", "scheduled"], ["completed", "completed"], ["cancelled", "cancelled"],
 ]);
 export const tabOf = (displayStatus: string): StatusTab => TAB_OF.get(displayStatus) ?? "progress";
-const ORDER = ["time_proposed", "requested", "in_progress", "rework_requested", "submitted", "offered", "accepted", "assigned", "on_hold", "completed", "cancelled"];
+const ORDER = [TIME_PROPOSED, "requested", "in_progress", "rework_requested", "submitted", "offered", "accepted", "assigned", "on_hold", "completed", "cancelled"];
 
 export interface ClientRow { id: string; short: string; unit: string; place: string; origin: "plan" | "request"; type: string; status: string; tab: StatusTab; line: string; icon: IconName; warn: boolean }
 const TYPE: Record<string, string> = { reactive: "Repair", preventive: "Preventive maintenance", periodic: "Periodic inspection" };
@@ -71,10 +74,10 @@ export function clientRows(rows: ApiClientRow[], unit: (id: string) => { name: s
   const slot = (s: Slot) => slotShort(s, i);
   return [...rows].toSorted((a, b) => ORDER.indexOf(a.displayStatus) - ORDER.indexOf(b.displayStatus) || Date.parse(a.dueAt) - Date.parse(b.dueAt)).map((j) => {
     const u = unit(j.unitId);
-    const isPlan = j.origin === "periodic_plan";
+    const isPlan = j.origin === PERIODIC_PLAN;
     let line = "", isWarn = false, icon: IconName = "time";
     switch (j.displayStatus) {
-      case "time_proposed": { [line, isWarn, icon] = [t("A new visit time needs your reply — nothing is booked until you accept"), true, "swap"]; break;
+      case TIME_PROPOSED: { [line, isWarn, icon] = [t("A new visit time needs your reply — nothing is booked until you accept"), true, "swap"]; break;
       }
       case "requested": { line = requestedLine(j, isPlan, slot, t); break;
       }
@@ -94,7 +97,7 @@ export function clientRows(rows: ApiClientRow[], unit: (id: string) => { name: s
 /** The detail facts (Figma 07b): unit, origin and type, follow-up, request, the agreed time, the technician once accepted. */
 export function detailFacts(j: ApiClientJob, unit: { name: string; place: string }, i: I18n = EN): [string, string][] {
   const { t } = i;
-  const isPlan = j.origin === "periodic_plan";
+  const isPlan = j.origin === PERIODIC_PLAN;
   const out: [string, string][] = [[t("Unit"), `${unit.name}${wrapped(unit.place, " · ")}`], [t("Origin · type"), isPlan ? t("Periodic plan · visit {date}", { date: j.occurrenceAt ? showDate(j.occurrenceAt, i.display) : "" }) : t("Client request · {type}", { type: t(lookup(TYPE, j.type) ?? j.type) })]];
   if (j.followUpOfJobId) out.push([t("Follow-up of"), `${j.followUpOfJobId.slice(0, 8)} · ${followUpText(j.followUpClass, t)}`]);
   if (!isPlan && j.symptom) out.push([t("Request"), `“${j.symptom}”`]);
@@ -113,7 +116,7 @@ export const followUpText = (c: ApiClientJob["followUpClass"], t: T = en) => t(F
 const RANK = ["1st", "2nd", "3rd"];
 /** The preferred times with the booked one marked (request origin, open jobs). */
 export function preferredLines(j: ApiClientJob, i: I18n = EN): { text: string; note: string | null }[] {
-  return j.origin === "periodic_plan" || ["completed", "cancelled"].includes(j.status) ? [] : j.preferredSlots.map((s, k) => ({ text: `${RANK[k] ? i.t(RANK[k]) : String(k + 1)} · ${slotLong(s, i)}`, note: sameSlot(s, j.scheduledSlot) ? i.t("booked") : null }));
+  return j.origin === PERIODIC_PLAN || ["completed", "cancelled"].includes(j.status) ? [] : j.preferredSlots.map((s, k) => ({ text: `${RANK[k] ? i.t(RANK[k]) : String(k + 1)} · ${slotLong(s, i)}`, note: sameSlot(s, j.scheduledSlot) ? i.t("booked") : null }));
 }
 
 /** The proposal to answer (Figma 07k): who proposes, the time, who comes, the message and the reply deadline. */
@@ -136,7 +139,7 @@ export const declinedNotice = (j: ApiClientJob, t: T = en) => {
 
 /** A plan visit the client may move (Figma 07n): an agreed plan visit at least 48 h ahead (IR113). */
 export function planVisit(j: ApiClientJob, now: number, t: T = en): { can: boolean; why: string | null } | null {
-  if (j.origin !== "periodic_plan" || !["offered", "accepted", "assigned"].includes(j.status)) return null;
+  if (j.origin !== PERIODIC_PLAN || !["offered", "accepted", "assigned"].includes(j.status)) return null;
   const start = j.scheduledSlot ? Date.parse(j.scheduledSlot.startAt) : null;
   return start !== null && start - now < 48 * 3_600_000 ? { can: false, why: t("Less than 48 h before the visit — contact HQ to change it.") } : { can: true, why: null };
 }

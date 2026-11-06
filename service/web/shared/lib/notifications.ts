@@ -7,6 +7,8 @@ import { channelText } from "@ac/web/lib/partnerHistory";
 import { DEFAULT_DISPLAY, showDate, showTime, translate, translator, type Display } from "@ac/web/lib/i18n";
 import { lookup } from "@ac/web/lib/lookup";
 
+const FIRMWARE_NOTICE = "Firmware update from {date}, {from}–{to} local time. The AC may restart for about 2 minutes.";
+
 type TargetKind = "unit" | "job" | "invoice" | "restriction" | "device" | "inquiry" | "client_user" | "partner_user" | "certificate";
 
 /** Notification of service-contracts.ts (fields shown in the inbox). */
@@ -85,7 +87,6 @@ const reasonWords: Record<string, string> = {
   technician_qualification_ended: "Technician’s qualification ended — to be reassigned",
 };
 /** The firmware campaign's advance notice (IR339): its day is dated again in the display language. */
-const FIRMWARE_NOTICE = "Firmware update from {date}, {from}–{to} local time. The AC may restart for about 2 minutes.";
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const firmwareNotice = /^Firmware update from (\d{1,2}) ([A-Z][a-z]{2}) (\d{4}), ([^\s–]+)–([^\s–]+) local time\. The AC may restart for about 2 minutes\.$/;
 

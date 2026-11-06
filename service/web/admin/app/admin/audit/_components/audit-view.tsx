@@ -1,4 +1,6 @@
 "use client";
+const HQ_OPERATOR = "hq-operator";
+const DEVICE_ONLINE_RTO = "device-online-rto";
 
 import { useRef, useState, type ReactNode } from "react";
 import { Badge, Banner, Btn, Card, Choice, DataTable, EmptyState, Field, Input, ListRow, Page, Select, SummaryList, Tabs, TextLink, Timeline, Plain } from "@ac/web/components/ui";
@@ -18,12 +20,12 @@ function commandFailure(code: string, t: T): string {
   return t(code === "NOT_FOUND" ? "This command is outside your scope or no longer exists." : "The command could not be loaded — try again.");
 }
 const seed: AuditRow[] = [
-  { id: "1", op: "restriction.override", target: "restriction · restriction-a41", targetKind: "restriction", targetId: "restriction-a41", versions: "version 3 → 4", actor: "hq-operator", actorId: "hq-operator", role: "admin", at: "09-22 09:14", occurred: "2026-09-22 09:14 (Asia/Kuala_Lumpur)", corr: "corr-7f21a9", res: "Success", reason: "Customer requested a short exception while the invoice is under review.",
+  { id: "1", op: "restriction.override", target: "restriction · restriction-a41", targetKind: "restriction", targetId: "restriction-a41", versions: "version 3 → 4", actor: HQ_OPERATOR, actorId: HQ_OPERATOR, role: "admin", at: "09-22 09:14", occurred: "2026-09-22 09:14 (Asia/Kuala_Lumpur)", corr: "corr-7f21a9", res: "Success", reason: "Customer requested a short exception while the invoice is under review.",
     changes: [{ field: "exception.until", before: "null", after: "2026-09-29 00:00", changed: true }, { field: "exception.reason", before: "null", after: "Invoice under review", changed: true }, { field: "contactPhone", before: "***masked***", after: "***masked***", changed: false }, { field: "state", before: "applied", after: "applied", changed: false }] },
   { id: "2", op: "access.grant", target: "membership · membership-b09", targetKind: "membership", targetId: "membership-b09", versions: null, actor: "contractor-lead-b", actorId: "contractor-lead-b", role: "contractor", at: "09-22 08:51", occurred: "2026-09-22 08:51 (Asia/Kuala_Lumpur)", corr: "corr-2c88e0", res: "Denied", reason: null, changes: [] },
-  { id: "3", op: "devices.calibrate", target: "device · device-online-rto", targetKind: "device", targetId: "device-online-rto", versions: "version 4 → 5", actor: "tech-ali", actorId: "tech-ali", role: "technician", at: "09-21 16:30", occurred: "2026-09-21 16:30 (Asia/Kuala_Lumpur)", corr: "corr-51d0aa", res: "Failed", reason: null, changes: [] },
-  { id: "4", op: "commands.create", target: "command · cmd-3310", targetKind: "command", targetId: "cmd-3310", versions: "version 1", actor: "hq-operator", actorId: "hq-operator", role: "admin", at: "09-20 10:14", occurred: "2026-09-20 10:14 (Asia/Kuala_Lumpur)", corr: "corr-115e6b", res: "Pending", reason: null, changes: [] },
-  { id: "5", op: "offsets.simulate · retire", target: "offset · offset-0231", targetKind: "offset_record", targetId: "offset-0231", versions: null, actor: "hq-operator", actorId: "hq-operator", role: "admin", at: "09-12 14:20", occurred: "2026-09-12 14:20 (Asia/Kuala_Lumpur)", corr: "corr-9a10f4", res: "Success", reason: null, changes: [] },
+  { id: "3", op: "devices.calibrate", target: "device · device-online-rto", targetKind: "device", targetId: DEVICE_ONLINE_RTO, versions: "version 4 → 5", actor: "tech-ali", actorId: "tech-ali", role: "technician", at: "09-21 16:30", occurred: "2026-09-21 16:30 (Asia/Kuala_Lumpur)", corr: "corr-51d0aa", res: "Failed", reason: null, changes: [] },
+  { id: "4", op: "commands.create", target: "command · cmd-3310", targetKind: "command", targetId: "cmd-3310", versions: "version 1", actor: HQ_OPERATOR, actorId: HQ_OPERATOR, role: "admin", at: "09-20 10:14", occurred: "2026-09-20 10:14 (Asia/Kuala_Lumpur)", corr: "corr-115e6b", res: "Pending", reason: null, changes: [] },
+  { id: "5", op: "offsets.simulate · retire", target: "offset · offset-0231", targetKind: "offset_record", targetId: "offset-0231", versions: null, actor: HQ_OPERATOR, actorId: HQ_OPERATOR, role: "admin", at: "09-12 14:20", occurred: "2026-09-12 14:20 (Asia/Kuala_Lumpur)", corr: "corr-9a10f4", res: "Success", reason: null, changes: [] },
 ];
 const seedRelated: Related = {
   restriction: { id: "restriction-a41", via: "target", note: "applied · exception until 09-29 — as this entry recorded it" }, command: { id: "cmd-3302", via: "correlation", note: "same correlation ID" }, job: null, unit: null,
@@ -108,7 +110,7 @@ export function AuditView({ live }: Readonly<{ live?: AuditLive }>) {
   const related = live ? live.related : demoRelated;
   const trace = live ? live.trace : [];
   const corr = live ? live.filters.correlationId : f.correlationId; // the searched correlation ID (typing waits 300 ms)
-  const device = live ? live.device : { options: [{ id: "device-online-rto", label: "device-online-rto · unit-online-rto" }], deviceId: "device-online-rto", missing: false, label: "device-online-rto · unit-online-rto", total: seedEvents.length, events: seedEvents, selected: null };
+  const device = live ? live.device : { options: [{ id: DEVICE_ONLINE_RTO, label: "device-online-rto · unit-online-rto" }], deviceId: DEVICE_ONLINE_RTO, missing: false, label: "device-online-rto · unit-online-rto", total: seedEvents.length, events: seedEvents, selected: null };
 
   return (
     <Page>

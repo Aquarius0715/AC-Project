@@ -1,4 +1,5 @@
 "use client";
+const base = "/customer/alerts?tab=policies";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -20,7 +21,6 @@ import { byCount, type T } from "@ac/web/lib/i18n";
 
 type Live = AlertsLive["policies"];
 interface Props { p: Live; onDone: (text: string) => void; onFail: (f: ActionFailure) => void }
-const base = "/customer/alerts?tab=policies";
 /** Where the focus goes once the list shows: the policy just saved, or the list after a delete. The editor and the list
 are different views, so the target waits for the list to mount (IR623). */
 let listFocus: string | null = null;

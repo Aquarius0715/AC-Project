@@ -10,6 +10,7 @@ import { i18nOf, showClock } from "@ac/web/lib/i18n";
 import { actions, activity, capacity, hhmm, klDay, kpis, onTeam, partnerJob, period, periodChoice, progress, timeline, timelinePct, type ApiCapacity, type ApiCounts, type ApiJobEvent, type ApiMember, type ApiPartnerJob } from "@ac/web/lib/partnerOverview";
 
 const KL = "Asia/Kuala_Lumpur";
+
 // not readable now: empty section
 const optional = orWhenRefused;
 

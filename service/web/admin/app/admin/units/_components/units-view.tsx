@@ -1,4 +1,9 @@
 "use client";
+const ADD_PROPERTY = "Add property";
+const VERSION_V = "version {v}";
+const DEFAULT_ALERT = "default_alert";
+const REASON_REQUIRED = "Reason · required";
+const MAINTENANCE_CONTRACT = "Maintenance contract";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -215,7 +220,7 @@ function CustomerScreen({ live, c }: Readonly<{ live: UnitsLive; c: CustomerLive
       ]} />
       {c.tab === "policies" && <PoliciesTab c={c} run={run} pending={pending} />}{c.tab === "users" && <UsersTab live={live} c={c} run={run} pending={pending} />}{c.tab !== "policies" && c.tab !== "users" && (
         <div className="split-rev">
-          <Card title={t("Locations")} action={canWrite && <Btn size="sm" onClick={() => { setM({ kind: "property" }); }}><Icon name="add" /> {t("Add property")}</Btn>} className="self-start">
+          <Card title={t("Locations")} action={canWrite && <Btn size="sm" onClick={() => { setM({ kind: "property" }); }}><Icon name="add" /> {t(ADD_PROPERTY)}</Btn>} className="self-start">
             {c.tree.length === 0 ? <EmptyState title={t("No properties yet")}>{t(canWrite ? "Add the customer’s home or office first." : "HQ has not registered a property yet.")}</EmptyState> : (
               <div className="flex flex-col gap-0.5">
                 {c.tree.map((p) => (
@@ -396,7 +401,7 @@ function UnitEdit({ live, c, x, nav, run, pending }: Readonly<{ live: UnitsLive;
   return (
     <>
       <Card title={<span className="flex flex-wrap items-center gap-2">{u.displayName}<PowerBadge s={POWER_STATE.get(u.effectivePowerState) ?? "unknown"} /><ConnBadge s={u.connection} />{x.seen && <span className="text-[11px] font-normal text-muted-foreground">{t("seen {time}", { time: x.seen })}</span>}{u.activeAlertCount > 0 && <Badge tone="warn" icon="warning">{count(t, u.activeAlertCount, "1 open alert", "{n} open alerts")}</Badge>}</span>}
-        sub={<>{u.id.slice(0, 8)} · {t("version {v}", { v: u.version })} · <Plain touch type="button" className="font-semibold text-primary" onClick={() => { nav({ unitId: null, locationId: u.archived ? null : u.spaceId ?? `unassigned:${u.propertyId}` }); }}><Icon name="chevronLeft" /> {t("back to {place}", { place: back })}</Plain></>}
+        sub={<>{u.id.slice(0, 8)} · {t(VERSION_V, { v: u.version })} · <Plain touch type="button" className="font-semibold text-primary" onClick={() => { nav({ unitId: null, locationId: u.archived ? null : u.spaceId ?? `unassigned:${u.propertyId}` }); }}><Icon name="chevronLeft" /> {t("back to {place}", { place: back })}</Plain></>}
         action={live.canWrite && !u.archived && <Btn size="sm" variant="danger" onClick={() => { setModal("delete"); }}>{t("Delete unit…")}</Btn>}>
         {u.archived && <div className="mb-3"><Banner tone="warn">{t("Read only — {note}. Deleted (archived) units are left out of lists, summaries and totals.", { note: x.archivedNote ?? "" })}</Banner></div>}
         <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
@@ -436,8 +441,8 @@ function UnitEdit({ live, c, x, nav, run, pending }: Readonly<{ live: UnitsLive;
           <div className="flex flex-col">
             {x.attached.map((p) => (
               <div key={p.id} className="flex flex-wrap items-center gap-2 border-t border-line py-2.5 text-[13px] first:border-0">
-                <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><b>{p.name}</b><Badge tone={p.kind === "default_alert" ? "primary" : "muted"}>{p.type}</Badge>{p.madeBy && <span className="text-[11px] text-muted-foreground">{p.madeBy}</span>}</div><div className="text-xs text-muted-foreground">{p.condition}{p.on ? ` · ${p.on}` : ""}</div></div>
-                <TextLink href={`/admin/alerts?tab=policies&customerId=${c.row.id}&unitId=${u.id}&policyId=${p.id}`}>{t(p.kind === "default_alert" ? "View" : "Edit")}</TextLink>
+                <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><b>{p.name}</b><Badge tone={p.kind === DEFAULT_ALERT ? "primary" : "muted"}>{p.type}</Badge>{p.madeBy && <span className="text-[11px] text-muted-foreground">{p.madeBy}</span>}</div><div className="text-xs text-muted-foreground">{p.condition}{p.on ? ` · ${p.on}` : ""}</div></div>
+                <TextLink href={`/admin/alerts?tab=policies&customerId=${c.row.id}&unitId=${u.id}&policyId=${p.id}`}>{t(p.kind === DEFAULT_ALERT ? "View" : "Edit")}</TextLink>
                 {p.kind === "alert" && c.canAttach && !u.archived && <Btn size="sm" variant="ghost" disabled={pending} onClick={() => { run(() => setUnitPolicies(u.id, u.version, attachedIds.filter((id) => id !== p.id)), t("“{name}” detached", { name: p.name })); }}>{t("Detach")}</Btn>}
               </div>
             ))}
@@ -471,10 +476,10 @@ function PoliciesTab({ c, run, pending }: Readonly<{ c: CustomerLive; run: Run; 
         action={<LinkButton size="sm" variant="primary" href={`/admin/alerts?tab=policies&customerId=${c.row.id}&new=${c.row.id}`}><Icon name="add" /> {t("New policy for {name}", { name: c.row.name })}</LinkButton>}>
         <DataTable rows={c.policies} rowKey={(p) => p.id} onRowClick={(p) => { router.push(`/admin/alerts?tab=policies&customerId=${c.row.id}&policyId=${p.id}`); }} cols={[
           { key: "n", label: t("Policy"), render: (p) => <><b>{p.name}</b>{!p.enabled && <Badge className="ml-2">{t("Off")}</Badge>}</> },
-          { key: "t", label: t("Type"), render: (p) => <Badge tone={p.kind === "default_alert" ? "primary" : "muted"}>{p.type}</Badge> },
+          { key: "t", label: t("Type"), render: (p) => <Badge tone={p.kind === DEFAULT_ALERT ? "primary" : "muted"}>{p.type}</Badge> },
           { key: "c", label: t("Condition"), render: (p) => p.condition, hideBelow: "sm" },
           { key: "m", label: t("Made by"), render: (p) => p.madeBy, hideBelow: "md" },
-          { key: "u", label: t("Units"), render: (p) => (p.kind === "default_alert" ? t("All {n}", { n: p.units }) : units(t, p.units)) },
+          { key: "u", label: t("Units"), render: (p) => (p.kind === DEFAULT_ALERT ? t("All {n}", { n: p.units }) : units(t, p.units)) },
         ]} />
         <p className="mt-2 text-[11px] text-muted-foreground">{t("A row opens the policy editor (Alert policies › Policies). The default policy is on every unit; its rules can be switched per customer but it cannot be detached.")}</p>
       </Card>
@@ -505,7 +510,7 @@ function PropertyModal({ p, pending, onClose, onSave }: Readonly<{ p?: TreePrope
   const e = propertyErrors(d, t);
   const fieldError = (k: string) => (tried ? e[k] : undefined);
   return (
-    <Modal open onClose={onClose} title={p ? t("Edit {name}", { name: p.name }) : t("Add property")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (Object.keys(e).length === 0) onSave(d); }}>{t(p ? "Save property" : "Add property")}</Btn></>}>
+    <Modal open onClose={onClose} title={p ? t("Edit {name}", { name: p.name }) : t(ADD_PROPERTY)} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (Object.keys(e).length === 0) onSave(d); }}>{t(p ? "Save property" : ADD_PROPERTY)}</Btn></>}>
       <div className="flex flex-col gap-3">
         <Field label={t("Kind · required")}><Choice value={d.kind} onChange={(v: "home" | "office") => { setD({ ...d, kind: v }); }} options={[{ id: "home", label: t("Home") }, { id: "office", label: t("Office") }]} /></Field>
         <Field label={t("Name · required")} hint={t("1–120 characters, unique among the customer’s properties")} error={fieldError("name")}><Input value={d.name} onChange={(x) => { setD({ ...d, name: x.target.value }); }} /></Field>
@@ -571,7 +576,7 @@ function ArchiveLocationModal({ p, s, pending, onClose, onSave }: Readonly<{ p?:
       <div className="flex flex-col gap-3">
         <p className="text-[13px] text-muted-foreground">{t("Deleting takes the location out of the customer’s tree (archived). Its history stays in the audit log.")}</p>
         {isBlocked && <Banner tone="crit">{t("{name} still contains {what}. Move or delete them first (unit › Location).", { name, what: [children && count(t, children, "1 location", "{n} locations"), held && units(t, held)].filter(Boolean).join(t(" and ")) })}</Banner>}
-        <Field label={t("Reason · required")} hint={t("1–1000 characters")} error={tried ? e : undefined}><Textarea rows={2} value={reason} disabled={isBlocked} onChange={(x) => { setReason(x.target.value); }} /></Field>
+        <Field label={t(REASON_REQUIRED)} hint={t("1–1000 characters")} error={tried ? e : undefined}><Textarea rows={2} value={reason} disabled={isBlocked} onChange={(x) => { setReason(x.target.value); }} /></Field>
       </div>
     </Modal>
   );
@@ -616,7 +621,7 @@ function RelocateModal({ u, from, to, pending, onClose, onSave }: Readonly<{ u: 
   return (
     <Modal open onClose={onClose} title={t("Change location")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!e) onSave(reason.trim()); }}>{t("Save location")}</Btn></>}>
       <div className="flex flex-col gap-3">
-        <SummaryList items={[[t("Unit"), `${u.displayName} · ${t("version {v}", { v: u.version })}`], [t("Current"), from], [t("New"), to]]} />
+        <SummaryList items={[[t("Unit"), `${u.displayName} · ${t(VERSION_V, { v: u.version })}`], [t("Current"), from], [t("New"), to]]} />
         <Field label={t("Change reason · required")} hint={t("1–1000 characters. Saved with the before/after values in the audit log.")} error={tried ? e : undefined}><Textarea rows={2} value={reason} onChange={(x) => { setReason(x.target.value); }} /></Field>
         <p className="text-[11px] text-muted-foreground">{t("Keeps the unit ID; version {from} → {to}. Alert policies stay attached to the unit.", { from: u.version, to: u.version + 1 })}</p>
       </div>
@@ -635,7 +640,7 @@ function DeleteUnitModal({ x, pending, onClose, onArchive, onDelete }: Readonly<
     <Modal open onClose={onClose} title={t("Delete unit")} footer={<><Btn onClick={onClose}>{t("Close")}</Btn><Btn variant="danger" disabled={pending || isBlocked} onClick={() => { go(onArchive); }}>{t("Delete unit")}</Btn></>}>
       <div className="flex flex-col gap-3">
         <p className="text-[13px] text-muted-foreground">{t("Removes the unit from lists, totals and candidates. Its history is kept (archived), and its active automations are switched off.")}</p>
-        <SummaryList items={[[t("Unit"), `${x.u.displayName} · ${t("version {v}", { v: x.u.version })}`], [t("Location"), x.path]]} />
+        <SummaryList items={[[t("Unit"), `${x.u.displayName} · ${t(VERSION_V, { v: x.u.version })}`], [t("Location"), x.path]]} />
         {isBlocked && x.blockers && (
           <Banner tone="crit"><b>{t("This unit is still in use")}</b>
             <ul className="mt-1 list-disc pl-4 [&>li]:leading-6">{x.blockers.map((b) => <li key={b.label}>{b.href ? <TextLink href={b.href}>{b.label}</TextLink> : b.label}</li>)}</ul>
@@ -643,7 +648,7 @@ function DeleteUnitModal({ x, pending, onClose, onArchive, onDelete }: Readonly<
           </Banner>
         )}
         {x.blockers === null && <Banner>{t("Your permissions don’t show this unit’s contracts, jobs or device binding; they are checked when you delete.")}</Banner>}
-        <Field label={t("Reason · required")} hint={t("1–1000 characters")} error={tried ? e : undefined}><Textarea rows={2} value={reason} onChange={(v) => { setReason(v.target.value); }} /></Field>
+        <Field label={t(REASON_REQUIRED)} hint={t("1–1000 characters")} error={tried ? e : undefined}><Textarea rows={2} value={reason} onChange={(v) => { setReason(v.target.value); }} /></Field>
         <details className="text-[12px] text-muted-foreground">
           <summary className="cursor-pointer font-semibold">{t("Registered by mistake?")}</summary>
           <p className="mt-1">{t("A unit that never had a contract, a job or an IoT device can be removed completely; any other unit is refused and has to be deleted as above.")}</p>
@@ -782,7 +787,7 @@ function ClientUserModal({ change, pending, onClose, onSave }: Readonly<{ change
         {kind === "remove" && <p className="text-[13px] text-muted-foreground">{t("The user loses access to the customer app; their membership ends now. The history stays in the audit log.")}</p>}
         {kind === "signout" && <p className="text-[13px] text-muted-foreground">{t("Ends every session of this user now, in all four apps. Their access stays: the next sign-in asks for their password again. For a lost device or a suspected takeover.")}</p>}
         {kind === "status" && <p className="text-[13px] text-muted-foreground">{t(u.status === "disabled" ? "The user can sign in again." : "The user cannot sign in until sign-in is enabled again; the membership ends now.")}</p>}
-        <Field label={t("Reason · required")} hint={t("1–1000 characters, stored in the audit log")} error={tried ? e : undefined}><Textarea rows={2} value={reason} onChange={(x) => { setReason(x.target.value); }} /></Field>
+        <Field label={t(REASON_REQUIRED)} hint={t("1–1000 characters, stored in the audit log")} error={tried ? e : undefined}><Textarea rows={2} value={reason} onChange={(x) => { setReason(x.target.value); }} /></Field>
       </div>
     </Modal>
   );
@@ -817,7 +822,7 @@ function WarrantyTab({ live }: Readonly<{ live: UnitsLive }>) {
           <option value="">{t("Customer: All")}</option>{w.customers.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
         </Select>
         <Select aria-label={t("Coverage")} className="w-auto" value={f.coverage} onChange={(e) => { setF({ ...f, coverage: oneOf(["", ...coverageStatuses], e.target.value, f.coverage) }); }}>
-          <option value="">{t("Coverage: All")}</option><option value="contract">{t("Maintenance contract")}</option><option value="under_warranty">{t("Under warranty")}</option><option value="expiring">{t("Ending within 90 days")}</option><option value="no_coverage">{t("No coverage")}</option>
+          <option value="">{t("Coverage: All")}</option><option value="contract">{t(MAINTENANCE_CONTRACT)}</option><option value="under_warranty">{t("Under warranty")}</option><option value="expiring">{t("Ending within 90 days")}</option><option value="no_coverage">{t("No coverage")}</option>
         </Select>
         <Select aria-label={t("Ends within")} className="w-auto" value={f.within} onChange={(e) => { setF({ ...f, within: oneOf(["", ...withinDays], e.target.value, f.within) }); }}>
           <option value="">{t("Ends within: any")}</option>{withinDays.map((d) => <option key={d} value={d}>{t("Ends within: {n} days", { n: d })}</option>)}
@@ -827,7 +832,7 @@ function WarrantyTab({ live }: Readonly<{ live: UnitsLive }>) {
         <Kpi label={t("Under warranty")} value={k.underWarranty} sub={t("of {units}", { units: units(t, k.total) })} />
         <Kpi label={t("Warranty ends ≤ 90 days")} value={k.within90} tone={k.within90 ? "warn" : undefined} sub={t("{n} within 30 days", { n: k.within30 })} />
         <Kpi label={t("Out of warranty, no contract")} value={k.noCoverage} tone={k.noCoverage ? "crit" : undefined} sub={t("Offer maintenance")} />
-        <Kpi label={t("Maintenance contract")} value={k.contract} sub={k.contractNames} />
+        <Kpi label={t(MAINTENANCE_CONTRACT)} value={k.contract} sub={k.contractNames} />
       </div>
       <Card title={t("Units by coverage end")} sub={t("{n} of {total}", { n: rows.length, total: w.rows.length })} action={<Btn size="sm" disabled={rows.length === 0} onClick={() => { download("warranty-coverage.csv", coverageCsv(rows)); }}>{t("Export CSV")}</Btn>}>
         <DataTable rows={rows} rowKey={(r) => r.unitId} cols={[
@@ -835,7 +840,7 @@ function WarrantyTab({ live }: Readonly<{ live: UnitsLive }>) {
           { key: "c", label: t("Customer"), render: (r) => r.customer, hideBelow: "sm" },
           { key: "m", label: t("Model"), render: (r) => r.model, hideBelow: "md" },
           { key: "w", label: t("Warranty end"), render: (r) => r.ends },
-          { key: "k", label: t("Maintenance contract"), render: (r) => r.contracts, hideBelow: "md" },
+          { key: "k", label: t(MAINTENANCE_CONTRACT), render: (r) => r.contracts, hideBelow: "md" },
           { key: "s", label: t("Status"), render: (r) => <Badge tone={coverageTone[r.status]}>{r.statusText}</Badge> },
           { key: "a", label: t("Action"), render: (r) => {
             const contractId = r.contractIds[0];
@@ -879,7 +884,7 @@ function ClaimModal({ x, pending, onClose, onSave }: Readonly<{ x: ClaimCandidat
         <SummaryList items={[[t("Job"), t("{type} · {id} · completed {date}", { type: typeLabel(x.type, t), id: x.jobId.slice(0, 8), date: x.completed })], [t("Parts in the report"), x.parts]]} />
         <Field label={t("Part · required")} hint={t("1–120 characters")} error={tried ? e.label : undefined}><Input value={label} onChange={(v) => { setLabel(v.target.value); }} /></Field>
         <Field label={t("Claim amount ({currency}) · required", { currency: x.currency })} error={tried ? e.value : undefined}><Input inputMode="decimal" value={value} onChange={(v) => { setValue(v.target.value); }} /></Field>
-        <Field label={t("Reason · required")} hint={t("1–1000 characters, e.g. the manufacturer’s claim reference")} error={tried ? e.reason : undefined}><Textarea rows={2} value={reason} onChange={(v) => { setReason(v.target.value); }} /></Field>
+        <Field label={t(REASON_REQUIRED)} hint={t("1–1000 characters, e.g. the manufacturer’s claim reference")} error={tried ? e.reason : undefined}><Textarea rows={2} value={reason} onChange={(v) => { setReason(v.target.value); }} /></Field>
       </div>
     </Modal>
   );

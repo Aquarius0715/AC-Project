@@ -8,6 +8,10 @@ import { consentNote } from "@ac/web/lib/preferences";
 import { byText } from "@ac/web/lib/order";
 import { must } from "./must";
 
+const TEXT_2026_09_16 = "2026-09-16";
+const ASIA_KUALA_LUMPUR = "Asia/Kuala_Lumpur";
+const ASIA_TOKYO = "Asia/Tokyo";
+
 /** A JSON text read, or null when it is not JSON. */
 function parsed(json: string): unknown {
   try {
@@ -101,7 +105,7 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
 
   // IR624: the apps speak English and Malay; a Japanese term of the specification ("受領") once reached the partner's schedule
   it("shows no Japanese term in a text the apps translate", () => {
-    expect(Object.keys(ms).filter((text) => /[\u3040-\u30FF\u4E00-\u9FFF]/.test(text))).toEqual([]);
+    expect(Object.keys(ms).filter((text) => /[\u{3040}-\u{30FF}\u{4E00}-\u{9FFF}]/u.test(text))).toEqual([]);
   });
 
   it("names every sidebar item and the role words of the four apps in Malay", () => {
@@ -125,15 +129,15 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
   });
 
   it("reads a typed date and time in the display time zone and prefills it back (NFR-08)", () => {
-    expect([zonedInstant("2026-09-16", "10:00", "Asia/Kuala_Lumpur"), zonedInstant("2026-09-16", "10:00", "Asia/Tokyo"), zonedInstant("2026-09-16", "10:00", "UTC")])
+    expect([zonedInstant(TEXT_2026_09_16, "10:00", ASIA_KUALA_LUMPUR), zonedInstant(TEXT_2026_09_16, "10:00", ASIA_TOKYO), zonedInstant(TEXT_2026_09_16, "10:00", "UTC")])
       .toEqual(["2026-09-16T02:00:00.000Z", "2026-09-16T01:00:00.000Z", "2026-09-16T10:00:00.000Z"]);
-    expect([zonedInstant("2026-09-16", "", "Asia/Tokyo"), zonedInstant("", "10:00", "Asia/Tokyo"), zonedInstant("2026-02-31", "10:00", "UTC")]).toEqual(["", "", "2026-03-03T10:00:00.000Z"]);
-    expect(zonedInstant("2026-09-16", "10:00", "Not/AZone")).toBe("2026-09-16T02:00:00.000Z"); // an unknown zone falls back to Kuala Lumpur
-    expect([zonedParts("2026-09-16T01:00:00Z", "Asia/Tokyo"), zonedParts("2026-09-15T23:30:00Z", "Asia/Kuala_Lumpur")]).toEqual([{ date: "2026-09-16", time: "10:00" }, { date: "2026-09-16", time: "07:30" }]);
+    expect([zonedInstant(TEXT_2026_09_16, "", ASIA_TOKYO), zonedInstant("", "10:00", ASIA_TOKYO), zonedInstant("2026-02-31", "10:00", "UTC")]).toEqual(["", "", "2026-03-03T10:00:00.000Z"]);
+    expect(zonedInstant(TEXT_2026_09_16, "10:00", "Not/AZone")).toBe("2026-09-16T02:00:00.000Z"); // an unknown zone falls back to Kuala Lumpur
+    expect([zonedParts("2026-09-16T01:00:00Z", ASIA_TOKYO), zonedParts("2026-09-15T23:30:00Z", ASIA_KUALA_LUMPUR)]).toEqual([{ date: TEXT_2026_09_16, time: "10:00" }, { date: TEXT_2026_09_16, time: "07:30" }]);
   });
 
   it("shows a span in one line, with plain spaces whatever the ICU (no hydration difference)", () => {
-    const span = showSpan("2026-09-16T02:00:00Z", "2026-09-16T04:00:00Z", { locale: "ms", timeZone: "Asia/Tokyo" }, true);
+    const span = showSpan("2026-09-16T02:00:00Z", "2026-09-16T04:00:00Z", { locale: "ms", timeZone: ASIA_TOKYO }, true);
     expect(span).toBe("Rab, 16 Sep, 11:00 PG – 1:00 PTG GMT+9");
     expect(/[\u{A0}\u{2009}\u{202F}]/u.test(span + showTime("2026-09-16T02:00:00Z"))).toBe(false);
     expect(showSpan("2026-09-14T00:00:00Z", "2026-09-20T00:00:00Z")).toBe("14 Sept, 8:00 am – 20 Sept, 8:00 am MYT");
@@ -141,13 +145,13 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
 
   it("shows a time in the user's language and time zone with the zone's abbreviation (IR44)", () => {
     const at = "2026-09-14T01:00:00Z";
-    expect([showTime(at), showTime(at, { locale: "ms", timeZone: "Asia/Kuala_Lumpur" }), showTime(at, { locale: "en", timeZone: "Asia/Tokyo" }), showTime(at, { locale: "en", timeZone: "UTC" })])
+    expect([showTime(at), showTime(at, { locale: "ms", timeZone: ASIA_KUALA_LUMPUR }), showTime(at, { locale: "en", timeZone: ASIA_TOKYO }), showTime(at, { locale: "en", timeZone: "UTC" })])
       .toEqual(["14 Sept 2026, 9:00 am MYT", "14 Sep 2026, 9:00 PG MYT", "14 Sept 2026, 10:00 am GMT+9", "14 Sept 2026, 1:00 am UTC"]);
   });
   it("shows a recent time alone on today and with its date on another day (IR613)", () => {
     const at = "2026-09-14T00:30:00Z"; // 8:30 am in Kuala Lumpur
     expect([showRecent(at, Date.parse("2026-09-14T10:00:00Z")), showRecent(at, Date.parse("2026-09-23T06:00:00Z")), showRecent(at, Date.parse("2026-09-13T17:00:00Z")), showRecent(null, 0)])
       .toEqual(["8:30 am MYT", "14 Sept 2026, 8:30 am MYT", "8:30 am MYT", "—"]); // 13 Sept 17:00 UTC is already the 14th in Kuala Lumpur
-    expect(showRecent(at, Date.parse("2026-09-14T15:30:00Z"), { locale: "en", timeZone: "Asia/Tokyo" })).toBe("14 Sept 2026, 9:30 am GMT+9"); // the 15th in Tokyo
+    expect(showRecent(at, Date.parse("2026-09-14T15:30:00Z"), { locale: "en", timeZone: ASIA_TOKYO })).toBe("14 Sept 2026, 9:30 am GMT+9"); // the 15th in Tokyo
   });
 });

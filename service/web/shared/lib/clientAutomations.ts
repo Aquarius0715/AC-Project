@@ -11,6 +11,10 @@ import { oneOf } from "@ac/web/lib/oneOf";
 import { isAfter } from "@ac/web/lib/order";
 import { entryOf, lookup } from "@ac/web/lib/lookup";
 
+const SET_TEMPERATURE = "set_temperature";
+const SET_UNIT_TO_VALUE = "set {unit} to {value}";
+const KL = "Asia/Kuala_Lumpur";
+
 const en = translator("en");
 
 export type Compare = "gt" | "gte" | "lt" | "lte";
@@ -66,7 +70,7 @@ export function actionLabel(a: UnitAction, t: T = en): string {
   switch (a.kind) {
     case "set_power": { return t(a.power ? "Power ON" : "Power OFF");
     }
-    case "set_temperature": { return t("Set temperature {celsius}°C", { celsius: a.celsius });
+    case SET_TEMPERATURE: { return t("Set temperature {celsius}°C", { celsius: a.celsius });
     }
     case "set_mode": { return t("Mode {mode}", { mode: textOf(modeWord, a.mode, t) ?? cap(a.mode) });
     }
@@ -111,7 +115,6 @@ export function thenText(a: ApiAutomation, t: T = en): string {
   return a.kind === "schedule" ? t("{start} · at {end} → {endAction} (end action)", { start: actionLabel(a.startAction, t), end: a.endLocal, endAction: actionLabel(a.endAction, t) }) : actionLabel(a.action, t);
 }
 
-const KL = "Asia/Kuala_Lumpur";
 /** "Mon, 28 Sept, 18:00 MYT": a rule's time in the rule's own time zone (a schedule keeps its local time, IR44 adds the
 zone's abbreviation), in the display language. */
 export function runText(iso: string, tz = KL, i: I18n = EN): string {
@@ -241,7 +244,7 @@ const extraDraftOf = (x: ExtraCondition): ExtraDraft => (x.type === "weather" ? 
 export const actionKey = (a: UnitAction): string => {
   switch (a.kind) {
     case "set_power": { return `power:${a.power ? "on" : "off"}`; }
-    case "set_temperature": { return `temp:${String(a.celsius)}`; }
+    case SET_TEMPERATURE: { return `temp:${String(a.celsius)}`; }
     case "set_mode": { return `mode:${a.mode}`; }
     case "set_fan": { return `fan:${a.fanLevel}`; }
     default: { return `vent:${a.level}`; }
@@ -250,7 +253,7 @@ export const actionKey = (a: UnitAction): string => {
 export function actionOf(key: string): UnitAction {
   const [k, v] = key.split(":", 2);
   if (k === "power") return { kind: "set_power", power: v === "on" };
-  if (k === "temp") return { kind: "set_temperature", celsius: Number(v) };
+  if (k === "temp") return { kind: SET_TEMPERATURE, celsius: Number(v) };
   if (k === "mode") return { kind: "set_mode", mode: oneOf(acModes, v ?? "", "cool") };
   if (k === "vent") return { kind: "ventilate", level: oneOf(fanLevels, v ?? "", "mid") };
   return { kind: "set_fan", fanLevel: oneOf(fanLevels, v ?? "", "mid") };
@@ -412,13 +415,13 @@ export function summaryText(d: Draft, unit: string, place: string, t: T = en): s
     switch (a.kind) {
       case "set_power": { return t(a.power ? "{unit} power ON" : "{unit} power OFF", { unit });
       }
-      case "set_temperature": { return t("set {unit} to {value}", { unit, value: `${String(a.celsius)}°C` });
+      case SET_TEMPERATURE: { return t(SET_UNIT_TO_VALUE, { unit, value: `${String(a.celsius)}°C` });
       }
-      case "set_mode": { return t("set {unit} to {value}", { unit, value: t("mode {mode}", { mode: (textOf(modeWord, a.mode, t) ?? a.mode).toLowerCase() }) });
+      case "set_mode": { return t(SET_UNIT_TO_VALUE, { unit, value: t("mode {mode}", { mode: (textOf(modeWord, a.mode, t) ?? a.mode).toLowerCase() }) });
       }
-      case "set_fan": { return t("set {unit} to {value}", { unit, value: t("fan {level}", { level: (textOf(fanWord, a.fanLevel, t) ?? a.fanLevel).toLowerCase() }) });
+      case "set_fan": { return t(SET_UNIT_TO_VALUE, { unit, value: t("fan {level}", { level: (textOf(fanWord, a.fanLevel, t) ?? a.fanLevel).toLowerCase() }) });
       }
-      case "ventilate": { return t("set {unit} to {value}", { unit, value: t("ventilation {level}", { level: (textOf(fanWord, a.level, t) ?? a.level).toLowerCase() }) });
+      case "ventilate": { return t(SET_UNIT_TO_VALUE, { unit, value: t("ventilation {level}", { level: (textOf(fanWord, a.level, t) ?? a.level).toLowerCase() }) });
       }
     }
   };

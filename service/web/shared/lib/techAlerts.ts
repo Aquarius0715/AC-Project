@@ -14,6 +14,8 @@ import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { lookup } from "@ac/web/lib/lookup";
 
+const ACKNOWLEDGED = "Acknowledged";
+
 /** AlertRule of service-contracts.ts: the condition of the alert's policy or default rule. */
 export interface ApiAlertRule { name: string; metric: string; operator: "gt" | "gte" | "lt" | "lte"; threshold: number; recoveryThreshold: number; durationSeconds: number }
 /** Alert of service-contracts.ts (the fields this screen shows). */
@@ -48,7 +50,7 @@ const KIND: Record<string, string> = { demo_observation: "Observed (demo)", infe
 const ORIGIN: Record<string, string> = { measured: "Measured", estimated: "Estimated", inspection: "Inspection" };
 const QUALITY: Record<string, string> = { valid: "good", stale: "stale", suspect: "suspect", missing: "missing" };
 const OPEN: [string, Tone] = ["Open", "crit"]; // an alert of an unknown status reads as open
-const STATE: Record<string, [string, Tone]> = { open: ["Open", "crit"], acknowledged: ["Acknowledged", "warn"], resolved: ["Resolved", "ok"] };
+const STATE: Record<string, [string, Tone]> = { open: ["Open", "crit"], acknowledged: [ACKNOWLEDGED, "warn"], resolved: ["Resolved", "ok"] };
 
 export interface EvidenceCard { kind: string; title: string; value: string; sub: string }
 export interface AlertView {
@@ -95,7 +97,7 @@ export function alertView(a: ApiTechAlert, ctx: { alerts: ApiTechAlert[]; unit: 
   }
   const history: AlertView["history"] = [];
   if (a.resolvedAt) history.push({ id: "resolved", time: when(a.resolvedAt), title: t("Resolved"), sub: a.resolutionReason ? resolutionText(a.resolutionReason, t) : "", badge: { text: t("Resolved"), tone: "ok" } });
-  if (a.acknowledgedAt) history.push({ id: "acknowledged", time: when(a.acknowledgedAt), title: t("Acknowledged"), sub: "", badge: { text: t("Acknowledged"), tone: "primary" } });
+  if (a.acknowledgedAt) history.push({ id: "acknowledged", time: when(a.acknowledgedAt), title: t(ACKNOWLEDGED), sub: "", badge: { text: t(ACKNOWLEDGED), tone: "primary" } });
   history.push({ id: "raised", time: when(a.detectedAt), title: t("Raised"), sub: [evidenceText(a.evidenceText, t), rule && words && t("{condition} for {duration}", { condition: words.raise, duration: durationText(rule.durationSeconds, t) })].filter(Boolean).join(" · "), badge: { text: t(lookup(KIND, a.evidenceKind) ?? "Evidence"), tone: "primary" } });
   const prev = a.previousAlertId ? ctx.alerts.find((x) => x.id === a.previousAlertId) : undefined;
   const unit = ctx.unit ? unitPath(ctx.unit) : a.unitId.slice(0, 8);

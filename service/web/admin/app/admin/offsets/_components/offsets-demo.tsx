@@ -1,4 +1,7 @@
 "use client";
+const CUSTOMER_A = "customer-a";
+const DEMO_KIND = "Demo offset";
+const OPERATOR_CONFIRMED = "hq-operator · demoConfirmed";
 
 import { useState } from "react";
 import { Banner, Btn, Card, Check, DemoBadge, Field, Input, ListRow, Modal, Page, Steps, SummaryList, Tabs, Timeline, useToast } from "@ac/web/components/ui";
@@ -6,9 +9,6 @@ import { useUrlTab } from "@ac/web/lib/useUrlTab";
 import { Icon } from "@ac/web/components/Icon";
 import { type NonEmpty } from "@ac/web/lib/lists";
 
-const CUSTOMER_A = "customer-a";
-const DEMO_KIND = "Demo offset";
-const OPERATOR_CONFIRMED = "hq-operator · demoConfirmed";
 interface O { id: string; cust: string; kind: string; amt: string; st: string; stage: number; tone: "primary" | "ok" | "warn" | "crit" }
 const seed: NonEmpty<O> = [
   { id: "offset-0231", cust: CUSTOMER_A, kind: DEMO_KIND, amt: "1.000", st: "DEMO-CERT-0231 · 09-12 14:20", stage: 4, tone: "ok" },

@@ -6,22 +6,30 @@ import {
 } from "@ac/web/lib/customerMaintenance";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 import { must } from "./must";
+
+const JOB_1_AAAA = "job-1-aaaa";
+const CLIENT_REQUEST = "client_request";
+const TEXT_2026_09_16T04_00_00Z = "2026-09-16T04:00:00Z";
+const TEXT_2026_09_16T02_00_00Z = "2026-09-16T02:00:00Z";
+const PERIODIC_PLAN = "periodic_plan";
+const TEXT_2026_09_13T01_00_00Z = "2026-09-13T01:00:00Z";
+
 const proposalOf = (...args: Parameters<typeof proposalCard>) => must(proposalCard(...args)); // the proposalCard a test expects
 
 const NOW = Date.parse("2026-09-14T01:00:00Z"); // Mon 09:00 KL
 const slot = (s: string, e: string) => ({ startAt: s, endAt: e });
 const row = (over: Partial<ApiClientRow>): ApiClientRow => {
   return {
-    projection: "summary", id: "job-1-aaaa", version: 1, unitId: "u1", type: "reactive", status: "requested", displayStatus: "requested", origin: "client_request", dueAt: "2026-09-16T04:00:00Z",
-    requestedSlot: slot("2026-09-16T02:00:00Z", "2026-09-16T04:00:00Z"), scheduledSlot: null, preferredSlots: [slot("2026-09-16T02:00:00Z", "2026-09-16T04:00:00Z"), slot("2026-09-17T02:00:00Z", "2026-09-17T04:00:00Z"), slot("2026-09-18T02:00:00Z", "2026-09-18T04:00:00Z")],
+    projection: "summary", id: JOB_1_AAAA, version: 1, unitId: "u1", type: "reactive", status: "requested", displayStatus: "requested", origin: CLIENT_REQUEST, dueAt: TEXT_2026_09_16T04_00_00Z,
+    requestedSlot: slot(TEXT_2026_09_16T02_00_00Z, TEXT_2026_09_16T04_00_00Z), scheduledSlot: null, preferredSlots: [slot(TEXT_2026_09_16T02_00_00Z, TEXT_2026_09_16T04_00_00Z), slot("2026-09-17T02:00:00Z", "2026-09-17T04:00:00Z"), slot("2026-09-18T02:00:00Z", "2026-09-18T04:00:00Z")],
     assignmentAcknowledgement: null, ...over,
   };
 };
 const job = (over: Partial<ApiClientJob>): ApiClientJob => {
   return {
-    projection: "detail", id: "job-1-aaaa", version: 3, unitId: "u1", type: "reactive", status: "requested", symptom: "Water dripping from the indoor unit", contactWindow: null, origin: "client_request",
-    planId: null, occurrenceAt: null, requestedSlot: slot("2026-09-16T02:00:00Z", "2026-09-16T04:00:00Z"), preferredSlots: row({}).preferredSlots, preferenceRound: 1, slotProposal: null, scheduledSlot: null,
-    dueAt: "2026-09-16T04:00:00Z", completedAt: null, contractorOrgId: null, followUpOfJobId: null, followUpClass: null, rating: null, customerConfirmedAt: null, reportRefs: [], assignment: null, ...over,
+    projection: "detail", id: JOB_1_AAAA, version: 3, unitId: "u1", type: "reactive", status: "requested", symptom: "Water dripping from the indoor unit", contactWindow: null, origin: CLIENT_REQUEST,
+    planId: null, occurrenceAt: null, requestedSlot: slot(TEXT_2026_09_16T02_00_00Z, TEXT_2026_09_16T04_00_00Z), preferredSlots: row({}).preferredSlots, preferenceRound: 1, slotProposal: null, scheduledSlot: null,
+    dueAt: TEXT_2026_09_16T04_00_00Z, completedAt: null, contractorOrgId: null, followUpOfJobId: null, followUpClass: null, rating: null, customerConfirmedAt: null, reportRefs: [], assignment: null, ...over,
   };
 };
 const unit = { name: "Bedroom AC", place: "Home A › 1F › Bedroom" };
@@ -32,11 +40,11 @@ describe("customer maintenance", () => {
     const rows = clientRows([
       row({ id: "job-c-done", status: "completed", displayStatus: "completed", scheduledSlot: slot("2026-09-08T02:00:00Z", "2026-09-08T03:00:00Z") }),
       row({}), row({ id: "job-prop", displayStatus: "time_proposed" }),
-      row({ id: "job-plan", origin: "periodic_plan", status: "assigned", displayStatus: "assigned", preferredSlots: [], scheduledSlot: slot("2026-12-08T02:00:00Z", "2026-12-08T03:00:00Z"), assignmentAcknowledgement: "accepted" }),
+      row({ id: "job-plan", origin: PERIODIC_PLAN, status: "assigned", displayStatus: "assigned", preferredSlots: [], scheduledSlot: slot("2026-12-08T02:00:00Z", "2026-12-08T03:00:00Z"), assignmentAcknowledgement: "accepted" }),
     ], () => unit);
     expect(rows.map((r) => [r.id, r.tab, r.origin, r.type, r.line, r.warn])).toEqual([
       ["job-prop", "reply", "request", "Repair", "A new visit time needs your reply — nothing is booked until you accept", true],
-      ["job-1-aaaa", "requested", "request", "Repair", "Preferred 16 Sept, 10:00 am – 12:00 pm MYT · +2 more (not confirmed yet)", false],
+      [JOB_1_AAAA, "requested", "request", "Repair", "Preferred 16 Sept, 10:00 am – 12:00 pm MYT · +2 more (not confirmed yet)", false],
       ["job-plan", "scheduled", "plan", "Periodic inspection", "Scheduled 8 Dec, 10:00 – 11:00 am MYT · technician confirmed", false],
       ["job-c-done", "completed", "request", "Repair", "Completed · visit 8 Sept, 10:00 – 11:00 am MYT · report available", false],
     ]);
@@ -63,15 +71,15 @@ describe("customer maintenance", () => {
     expect([p.title, p.when, p.who, p.replyBy, p.late]).toEqual(["HQ proposes a new time", "Sat, 19 Sept, 2:00 – 4:00 pm MYT", "An HQ technician (name shown once confirmed)", "16 Sept 2026, 9:00 am MYT", false]);
     expect(proposalCard(job({}), NOW)).toBeNull();
     expect(declinedNotice(job({ slotProposal: { ...p, hold: { kind: "internal" }, source: "hq", slot: slot("2026-09-19T06:00:00Z", "2026-09-19T08:00:00Z"), status: "declined", decidedAt: null, declineReason: "not_home", declineComment: null, replyBy: "" } }))).toBe("You declined the proposed time (not at home). HQ is looking at your new times.");
-    expect(planVisit(job({ origin: "periodic_plan", status: "assigned", scheduledSlot: slot("2026-12-08T02:00:00Z", "2026-12-08T03:00:00Z") }), NOW)).toEqual({ can: true, why: null });
-    expect(planVisit(job({ origin: "periodic_plan", status: "assigned", scheduledSlot: slot("2026-09-15T02:00:00Z", "2026-09-15T03:00:00Z") }), NOW)?.can).toBe(false);
+    expect(planVisit(job({ origin: PERIODIC_PLAN, status: "assigned", scheduledSlot: slot("2026-12-08T02:00:00Z", "2026-12-08T03:00:00Z") }), NOW)).toEqual({ can: true, why: null });
+    expect(planVisit(job({ origin: PERIODIC_PLAN, status: "assigned", scheduledSlot: slot("2026-09-15T02:00:00Z", "2026-09-15T03:00:00Z") }), NOW)?.can).toBe(false);
     expect(planVisit(job({}), NOW)).toBeNull();
   });
 
   it("offers Confirm & rate for 7 days and edits until editableUntil", () => {
-    expect(feedback(job({ status: "completed", completedAt: "2026-09-13T01:00:00Z" }), NOW).kind).toBe("rate");
+    expect(feedback(job({ status: "completed", completedAt: TEXT_2026_09_13T01_00_00Z }), NOW).kind).toBe("rate");
     expect(feedback(job({ status: "completed", completedAt: "2026-09-01T01:00:00Z" }), NOW).kind).toBe("none");
-    const rated = job({ status: "completed", completedAt: "2026-09-13T01:00:00Z", rating: { stars: 4, tags: ["On time"], comment: null, ratedAt: "2026-09-13T02:00:00Z", editableUntil: "2026-09-20T02:00:00Z" } });
+    const rated = job({ status: "completed", completedAt: TEXT_2026_09_13T01_00_00Z, rating: { stars: 4, tags: ["On time"], comment: null, ratedAt: "2026-09-13T02:00:00Z", editableUntil: "2026-09-20T02:00:00Z" } });
     expect(feedback(rated, NOW)).toEqual({ kind: "edit", stars: 4, report: true, text: " · On time · editable until 20 Sept 2026, 10:00 am MYT" });
     expect(feedback({ ...rated, rating: { ...must(rated.rating), editableUntil: "2026-09-13T03:00:00Z" } }, NOW).kind).toBe("rated");
     // a problem can be reported within 7 days of completion only, rated or not (as jobs.reportProblem allows)
@@ -85,9 +93,9 @@ describe("customer maintenance", () => {
     expect(preferredError(three.slice(0, 2), NOW)).toBe("Give 3 preferred times.");
     expect(preferredError([slot("2026-09-14T06:00:00Z", "2026-09-14T08:00:00Z"), ...three.slice(1)], NOW)).toBe("Times start on a later day than today (Kuala Lumpur).");
     expect(preferredError([must(three[0]), must(three[0]), must(three[1])], NOW)).toBe("The 3 times must be different.");
-    expect(preferredError([slot("2026-09-16T02:00:00Z", "2026-09-16T08:00:00Z"), ...three.slice(1)], NOW)).toBe("Each time is 1–4 hours long.");
+    expect(preferredError([slot(TEXT_2026_09_16T02_00_00Z, "2026-09-16T08:00:00Z"), ...three.slice(1)], NOW)).toBe("Each time is 1–4 hours long.");
     expect([contactError("Weekdays 09:00-18:00"), contactError("call +60 12-345 6789"), contactError("me@x.com")]).toEqual([null, expect.stringMatching(/No e-mail/), expect.stringMatching(/No e-mail/)]);
-    expect(notesOf([{ id: "e1", action: "note.added", occurredAt: "2026-09-14T01:00:00Z", actorUserId: "me", note: { visibility: "customer", message: "Gate code 4821" } }, { id: "e2", action: "job.created", occurredAt: "2026-09-13T01:00:00Z", actorUserId: "me", note: null }], "me"))
+    expect(notesOf([{ id: "e1", action: "note.added", occurredAt: "2026-09-14T01:00:00Z", actorUserId: "me", note: { visibility: "customer", message: "Gate code 4821" } }, { id: "e2", action: "job.created", occurredAt: TEXT_2026_09_13T01_00_00Z, actorUserId: "me", note: null }], "me"))
       .toEqual([{ id: "e1", who: "You", at: "14 Sept 2026, 9:00 am MYT", text: "Gate code 4821" }]);
     expect(clientJobRefusal({ code: "CONFLICT", messageKey: "errors.reschedule_too_late", fieldErrors: {} })).toBe("Not saved: less than 48 h before the visit — contact HQ.");
     // IR446: the proposal's hold no longer holds when the client accepts
@@ -97,8 +105,8 @@ describe("customer maintenance", () => {
   it("words the list, the detail and the checks in Malay, with times in the display time zone (IR262)", () => {
     const i = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
     const t = translator("ms");
-    const one = slot("2026-09-16T02:00:00Z", "2026-09-16T04:00:00Z");
-    const [row] = clientRows([{ projection: "summary", id: "job-1-aaaa", version: 1, unitId: "u1", type: "reactive", status: "requested", displayStatus: "requested", origin: "client_request", dueAt: "2026-09-20T00:00:00Z", requestedSlot: one, scheduledSlot: null, preferredSlots: [one, one, one], assignmentAcknowledgement: null }], () => ({ name: "Bedroom AC", place: "" }), i);
+    const one = slot(TEXT_2026_09_16T02_00_00Z, TEXT_2026_09_16T04_00_00Z);
+    const [row] = clientRows([{ projection: "summary", id: JOB_1_AAAA, version: 1, unitId: "u1", type: "reactive", status: "requested", displayStatus: "requested", origin: CLIENT_REQUEST, dueAt: "2026-09-20T00:00:00Z", requestedSlot: one, scheduledSlot: null, preferredSlots: [one, one, one], assignmentAcknowledgement: null }], () => ({ name: "Bedroom AC", place: "" }), i);
     expect([row?.type, row?.line]).toEqual(["Pembaikan", "Pilihan 16 Sep, 11:00 PG – 1:00 PTG GMT+9 · +2 lagi (belum disahkan)"]);
     expect(preferredError([one, { startAt: "", endAt: "" }, one], NOW, 3, t)).toBe("Masukkan tarikh dan kedua-dua masa bagi setiap masa pilihan.");
     expect(contactError("call 0123456789", t)).toMatch(/^Tiada alamat e-mel/);

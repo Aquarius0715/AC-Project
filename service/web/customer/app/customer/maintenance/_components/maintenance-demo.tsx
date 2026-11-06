@@ -1,4 +1,8 @@
 "use client";
+const TIME_PROPOSED = "time_proposed";
+const TEXT_14_00_16_00 = "14:00–16:00";
+const TEXT_09_00_11_00 = "09:00–11:00";
+const CONTRACTOR = "contractor";
 
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Choice, DataTable, Field, Input, ListRow, Modal, Page, PageHead, Select, SummaryList, Tabs, Textarea, Timeline, UtilizationBar, cx, useToast, Plain } from "@ac/web/components/ui";
@@ -14,14 +18,14 @@ import { orDash } from "@ac/web/lib/text";
 type StatusTab = "all" | "reply" | "requested" | "scheduled" | "progress" | "completed" | "cancelled";
 // the status tab of a job; the statuses of work under way count as in progress
 const TAB_OF = new Map<JobStatus, StatusTab>([
-  ["time_proposed", "reply"], ["requested", "requested"], ["offered", "scheduled"], ["accepted", "scheduled"], ["assigned", "scheduled"], ["completed", "completed"], ["cancelled", "cancelled"],
+  [TIME_PROPOSED, "reply"], ["requested", "requested"], ["offered", "scheduled"], ["accepted", "scheduled"], ["assigned", "scheduled"], ["completed", "completed"], ["cancelled", "cancelled"],
 ]);
 const tabOf = (s: JobStatus): StatusTab => TAB_OF.get(s) ?? "progress";
-const ORDER: JobStatus[] = ["time_proposed", "requested", "in_progress", "rework_requested", "submitted", "offered", "accepted", "assigned", "on_hold", "completed", "cancelled"];
-const blank = (): Slot[] => [{ date: "2026-09-28", win: "14:00–16:00" }, { date: "2026-09-29", win: "10:00–12:00" }, { date: "2026-09-30", win: "09:00–11:00" }];
+const ORDER: JobStatus[] = [TIME_PROPOSED, "requested", "in_progress", "rework_requested", "submitted", "offered", "accepted", "assigned", "on_hold", "completed", "cancelled"];
+const blank = (): Slot[] => [{ date: "2026-09-28", win: TEXT_14_00_16_00 }, { date: "2026-09-29", win: "10:00–12:00" }, { date: "2026-09-30", win: TEXT_09_00_11_00 }];
 
 function scheduleLine(j: Job) {
-  if (j.status === "time_proposed" && j.proposal) return { icon: "swap" as IconName, text: `${j.proposal.by === "contractor" ? "Service partner asks for" : "HQ proposed"} ${fmt(j.proposal.slot)} — reply by ${j.proposal.replyBy}`, warn: true };
+  if (j.status === TIME_PROPOSED && j.proposal) return { icon: "swap" as IconName, text: `${j.proposal.by === CONTRACTOR ? "Service partner asks for" : "HQ proposed"} ${fmt(j.proposal.slot)} — reply by ${j.proposal.replyBy}`, warn: true };
   if (j.status === "requested") return { icon: "time" as IconName, text: `Preferred ${fmt(j.preferred[0])}${j.preferred.length > 1 ? ` · +${String(j.preferred.length - 1)} more` : ""} (not confirmed yet)` };
   if (j.status === "completed") return { icon: "success" as IconName, text: `Completed ${fmt(j.scheduled)} · report available` };
   if (j.status === "cancelled") return { icon: "cancelled" as IconName, text: "Cancelled" };
@@ -51,7 +55,7 @@ export function MaintenanceDemo({ jobId, initialTab }: Readonly<{ jobId?: string
       <Tabs value={page} onChange={setPage} tabs={[{ id: "requests", label: "My requests" }, { id: "filters", label: "Filter care" }]} />
       {page === "filters" ? <FilterCare onRequest={() => { setPage("requests"); setModal("new"); }} /> : (
         <>
-          {replyCount > 0 && <Banner tone="warn" icon="swap" action={<Btn size="sm" variant="primary" onClick={() => { setTab("reply"); setSelId(jobs.find((j) => j.status === "time_proposed")?.id ?? null); }}>Review</Btn>}>A new visit time needs your reply ({replyCount}). Nothing is booked until you accept.</Banner>}
+          {replyCount > 0 && <Banner tone="warn" icon="swap" action={<Btn size="sm" variant="primary" onClick={() => { setTab("reply"); setSelId(jobs.find((j) => j.status === TIME_PROPOSED)?.id ?? null); }}>Review</Btn>}>A new visit time needs your reply ({replyCount}). Nothing is booked until you accept.</Banner>}
           {(() => { const done = all.find((j) => j.status === "completed" && j.id === "job-c02"); return done && !rated.has(done.id) ? <Banner tone="ok" icon="check" action={<span className="flex gap-2"><Btn size="sm" onClick={() => { setSelId(done.id); setModal("problem"); }}>Report a problem</Btn><Btn size="sm" variant="primary" onClick={() => { setSelId(done.id); setModal("rate"); }}>Confirm & rate</Btn></span>}><b>Work finished — job-c02 · Living room AC · Sep 8.</b> Is everything working? Your confirmation closes the job.</Banner> : null; })()}
           <PageHead title="My requests" sub={`${String(jobs.length)} requests · sorted by status (business order)`} action={<Btn variant="primary" onClick={() => { setModal("new"); }}><Icon name="add" /> New maintenance request</Btn>} />
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -102,26 +106,26 @@ function Detail({ j, onClose, open }: Readonly<{ j: Job; onClose: () => void; op
         ["Origin · type", j.origin === "plan" ? `Periodic plan · ${orDash(j.planId)} · visit ${orDash(j.planVisit)}` : `Client request · ${j.type}`],
         ...(j.followUpOf ? [["Follow-up of", <span key="f" className="flex flex-wrap items-center gap-2">{j.followUpOf}<FollowUpBadge j={j} /></span>] as [string, React.ReactNode]] : []),
         ...(j.origin === "request" ? [["Request", `“${j.symptom}”`] as [string, string]] : []),
-        ...(j.scheduled && j.status !== "time_proposed" ? [[j.origin === "plan" ? "Scheduled" : "Confirmed time", `${longDate(j.scheduled)}${j.origin === "plan" ? " · set by HQ from your plan" : ""}`] as [string, string]] : []),
-        ...(j.technician && j.techAck?.status === "accepted" ? [["Technician", `${j.technician}${j.delivery === "contractor" ? ` (${orDash(j.contractor)})` : " · HQ"}`] as [string, string]] : []),
+        ...(j.scheduled && j.status !== TIME_PROPOSED ? [[j.origin === "plan" ? "Scheduled" : "Confirmed time", `${longDate(j.scheduled)}${j.origin === "plan" ? " · set by HQ from your plan" : ""}`] as [string, string]] : []),
+        ...(j.technician && j.techAck?.status === "accepted" ? [["Technician", `${j.technician}${j.delivery === CONTRACTOR ? ` (${orDash(j.contractor)})` : " · HQ"}`] as [string, string]] : []),
       ]} />
       {j.origin === "request" && j.preferred.length > 0 && j.status !== "completed" && j.status !== "cancelled" && (
         <div className="mt-3 flex flex-col gap-1.5">
           <b className="text-[13px]">Your preferred times{j.round > 1 ? ` (round ${String(j.round)})` : ""}</b>
           {j.preferred.map((s, i) => {
             const chosen = s.date === j.scheduled?.date && s.win === j.scheduled.win;
-            const isNone = j.status === "time_proposed" && fitFor(s).fits === "none";
+            const isNone = j.status === TIME_PROPOSED && fitFor(s).fits === "none";
             const unavailable = isNone ? "Not available — no qualified technician free" : undefined;
             return <SlotLine key={i} i={i} slot={s} struck={isNone} note={chosen ? "booked" : unavailable} />;
           })}
         </div>
       )}
       {j.declined && j.status === "requested" && <div className="mt-3"><Banner tone="warn">You declined the proposed time ({j.declined.reason}). HQ is looking at your new times.</Banner></div>}
-      {j.status === "time_proposed" && p && (
+      {j.status === TIME_PROPOSED && p && (
         <div className="mt-3 rounded-xl border border-[#f5c473] bg-[#fff8ec] p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2"><b className="text-[14px]">{p.by === "contractor" ? "Your service partner asks for another time (via HQ)" : "HQ proposes a new time"}</b><Badge tone="warn">Reply by {p.replyBy}</Badge></div>
+          <div className="flex flex-wrap items-center justify-between gap-2"><b className="text-[14px]">{p.by === CONTRACTOR ? "Your service partner asks for another time (via HQ)" : "HQ proposes a new time"}</b><Badge tone="warn">Reply by {p.replyBy}</Badge></div>
           <div className="my-2 text-xl font-bold">{longDate(p.slot)}</div>
-          <SummaryList items={[["Who comes", p.by === "contractor" || p.who.startsWith("contractor") ? `Partner technician from ${p.who.split(" ", 1)[0] ?? p.who} (name shown once assigned)` : "HQ technician (name shown once confirmed)"], ["Message", `“${p.message}”`]]} />
+          <SummaryList items={[["Who comes", p.by === CONTRACTOR || p.who.startsWith(CONTRACTOR) ? `Partner technician from ${p.who.split(" ", 1)[0] ?? p.who} (name shown once assigned)` : "HQ technician (name shown once confirmed)"], ["Message", `“${p.message}”`]]} />
           <div className="mt-3 flex flex-wrap items-center justify-end gap-2"><span className="mr-auto text-[11px] text-warn">Accepting books this time. Declining keeps your request open.</span><Btn variant="danger" onClick={() => { open("decline"); }}>Decline…</Btn><Btn variant="primary" onClick={() => { jobActions.accept(j.id); toast("Time accepted — booking the technician"); }}><Icon name="check" />Accept this time</Btn></div>
         </div>
       )}
@@ -149,7 +153,7 @@ function Detail({ j, onClose, open }: Readonly<{ j: Job; onClose: () => void; op
       <p className="mt-4 text-[13px] font-bold">History</p>
       <Timeline items={j.history.slice(-5).map((h) => ({ time: h.at, title: h.text }))} />
       <div className="mt-3 flex flex-wrap justify-between gap-2">
-        {(j.status === "requested" || j.status === "time_proposed") && j.origin === "request" ? <Btn size="sm" variant="danger" onClick={() => { open("cancel"); }}>Cancel request</Btn> : <span />}
+        {(j.status === "requested" || j.status === TIME_PROPOSED) && j.origin === "request" ? <Btn size="sm" variant="danger" onClick={() => { open("cancel"); }}>Cancel request</Btn> : <span />}
         {j.status !== "completed" && j.status !== "cancelled" && <Btn size="sm" onClick={() => { open("note"); }}><Icon name="add" /> Add note</Btn>}
       </div>
       <p className="mt-2 text-[11px] text-muted-foreground">Cancel is possible until a time is booked. Any time outside your preferred times is booked only after you accept it. Notes can’t change the time or technician.</p>
@@ -188,7 +192,7 @@ function DeclineModal({ open, j, onClose, onDone }: Readonly<{ open: boolean; j:
   const [reason, setReason] = useState<"not_home" | "too_late" | "other">("not_home");
   const [comment, setComment] = useState("");
   const [give, setGive] = useState(true);
-  const [slots, setSlots] = useState<Slot[]>([{ date: "2026-10-02", win: "14:00–16:00" }, { date: "2026-10-05", win: "10:00–12:00" }, { date: "2026-10-06", win: "14:00–16:00" }]);
+  const [slots, setSlots] = useState<Slot[]>([{ date: "2026-10-02", win: TEXT_14_00_16_00 }, { date: "2026-10-05", win: "10:00–12:00" }, { date: "2026-10-06", win: TEXT_14_00_16_00 }]);
   const [tried, setTried] = useState(false);
   const errorText = tried && give ? preferredError(slots) : undefined;
   const label = { not_home: "I’m not at home then", too_late: "Too late for me", other: "Other" }[reason];
@@ -205,7 +209,7 @@ function DeclineModal({ open, j, onClose, onDone }: Readonly<{ open: boolean; j:
 }
 
 function OtherTimeModal({ open, j, onClose, onDone }: Readonly<{ open: boolean; j: Job; onClose: () => void; onDone: () => void }>) {
-  const [slots, setSlots] = useState<Slot[]>([{ date: "2026-12-09", win: "09:00–11:00" }, { date: "2026-12-10", win: "14:00–16:00" }, { date: "2026-12-11", win: "09:00–11:00" }]);
+  const [slots, setSlots] = useState<Slot[]>([{ date: "2026-12-09", win: TEXT_09_00_11_00 }, { date: "2026-12-10", win: TEXT_14_00_16_00 }, { date: "2026-12-11", win: TEXT_09_00_11_00 }]);
   const [comment, setComment] = useState("");
   const [tried, setTried] = useState(false);
   const errorText = tried ? preferredError(slots) : undefined;
@@ -264,7 +268,7 @@ function NoteModal({ open, j, onClose, onDone }: Readonly<{ open: boolean; j: Jo
   const isBad = !t.trim() || t.length > 2000;
   return (
     <Modal open={open} onClose={onClose} title={`Add a note for ${j.id}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (isBad) return; const e = jobActions.addNote(j.id, t); if (e) { setError(e); return; } setT(""); setTried(false); onDone(); }}>Send note</Btn></>}>
-      <Field label="Note to the HQ coordinator (1–2000 characters)" error={tried && isBad ? "Write 1–2000 characters" : undefined} hint={`${String(t.length)} / 2000 · Visible to: HQ coordinator${j.delivery === "contractor" ? ` · ${orDash(j.contractor)}` : ""}${j.technician ? ` · assigned technician (${j.technician})` : ""}`}>
+      <Field label="Note to the HQ coordinator (1–2000 characters)" error={tried && isBad ? "Write 1–2000 characters" : undefined} hint={`${String(t.length)} / 2000 · Visible to: HQ coordinator${j.delivery === CONTRACTOR ? ` · ${orDash(j.contractor)}` : ""}${j.technician ? ` · assigned technician (${j.technician})` : ""}`}>
         <Textarea value={t} onChange={(e) => { setT(e.target.value); }} placeholder="Please call 30 minutes before arriving — the gate code changed to 4821." />
       </Field>
       {errorText && <Banner tone="crit">{errorText}</Banner>}

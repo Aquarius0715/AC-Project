@@ -1,4 +1,5 @@
 "use client";
+const TECH_EXTERNAL_A = "tech-external-a";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -7,7 +8,7 @@ import { JobStatusBadge, OriginBadge, WINDOWS } from "@ac/web/components/JobBits
 import { Job, fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
 import { Icon } from "@ac/web/components/Icon";
 
-const cap = [["tech-external-a", "Refrigerant handling · valid to 2027-03-31", ["4 h", "4 h", "8 h", "—", "—"]], ["tech-external-a2", "No refrigerant qualification", ["—", "—", "—", "—", "—"]]] as const;
+const cap = [[TECH_EXTERNAL_A, "Refrigerant handling · valid to 2027-03-31", ["4 h", "4 h", "8 h", "—", "—"]], ["tech-external-a2", "No refrigerant qualification", ["—", "—", "—", "—", "—"]]] as const;
 
 /** The Phase 1A demo offer / job detail (DATA_SOURCE=mock): the shared job store and the seeded offer job-p09. */
 export function JobDemo({ id }: Readonly<{ id: string }>) {
@@ -50,7 +51,7 @@ function LiveOffer({ j }: Readonly<{ j: Job }>) {
         </Card>
         <div className="flex min-w-0 flex-col gap-4">
           <Card title={`Can your team take it? — ${fmt(j.scheduled)}`} action={<Link className="text-xs font-semibold text-primary" href="/partner/team">Team & capacity <Icon name="arrowRight" /></Link>}>
-            <SummaryList items={[["tech-external-a", <Badge key="a" tone="ok" icon="check">Fits · refrigerant qualified</Badge>], ["tech-external-a2", <Badge key="b" tone="muted">Not qualified</Badge>]]} />
+            <SummaryList items={[[TECH_EXTERNAL_A, <Badge key="a" tone="ok" icon="check">Fits · refrigerant qualified</Badge>], ["tech-external-a2", <Badge key="b" tone="muted">Not qualified</Badge>]]} />
             <p className="mt-2 text-[11px] text-muted-foreground">Own-company technicians only. No customer data before acceptance.</p>
           </Card>
           <Card title="Job history"><ul className="flex flex-col gap-1.5 text-xs">{j.history.slice(-5).map((h, i) => <li key={i}><span className="text-muted-foreground">{h.at}</span> · {h.text}</li>)}</ul></Card>
@@ -65,7 +66,7 @@ function LiveOffer({ j }: Readonly<{ j: Job }>) {
 function ProposeTimeModal({ j, onClose, onDone }: Readonly<{ j: Pick<Job, "id" | "scheduled">; onClose: () => void; onDone: (slot: { date: string; win: string }, tech: string, reason: string) => void }>) {
   const [date, setDate] = useState("2026-10-02");
   const [win, setWin] = useState("14:00–16:00");
-  const [tech, setTech] = useState("tech-external-a");
+  const [tech, setTech] = useState(TECH_EXTERNAL_A);
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
   return (

@@ -12,6 +12,8 @@ import { withAccess } from "@ac/web/lib/withAccess";
 import { ContractsView } from "./_components/contracts-view";
 import { queryReader } from "@ac/web/lib/searchParams";
 
+const CONTRACTS_LIST = "contracts.list";
+
 const plans: PlanType[] = ["rto", "general", "energy", "environment"];
 
 // a role without the page's read permission sees which one it needs, not a failure (IR582)
@@ -29,9 +31,9 @@ async function AdminContractsPageContent({ searchParams }: Readonly<PageProps<"/
   const where = { ...(scope.customerId && { customerId: scope.customerId }), ...(scope.unitId && { unitId: scope.unitId }) };
   const [display, all, inScope, scoped, customers, properties, units] = await Promise.all([
     coreDisplay(),
-    coreAll<ApiContractFull>("contracts.list"),
-    Object.keys(where).length > 0 ? coreAll<ApiContractFull>("contracts.list", { filters: where }) : null, // the plan counts of the scope
-    kind ? coreAll<ApiContractFull>("contracts.list", { filters: { ...where, kind } }) : null,
+    coreAll<ApiContractFull>(CONTRACTS_LIST),
+    Object.keys(where).length > 0 ? coreAll<ApiContractFull>(CONTRACTS_LIST, { filters: where }) : null, // the plan counts of the scope
+    kind ? coreAll<ApiContractFull>(CONTRACTS_LIST, { filters: { ...where, kind } }) : null,
     coreAllPage<ApiCustomer>("customers.list"),
     coreAllPage<ApiProperty>("properties.list"),
     coreAllPage<ApiUnitBrief>("units.list"),

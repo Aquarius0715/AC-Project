@@ -10,8 +10,9 @@ import { i18nOf } from "@ac/web/lib/i18n";
 import { adminAlertRows, policyRows, type AlertState, type ApiAdminAlert, type ApiCustomerName, type ApiMemberName, type ApiPolicy, type ApiUnitName, type Severity } from "@ac/web/lib/adminAlerts";
 import { NeedsAccess } from "@ac/web/components/NeedsAccess";
 
-const ASSET_READ = "asset.read";
 import { AdminAlertsView } from "./_components/alerts-view";
+
+const ASSET_READ = "asset.read";
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 // names the session may not read (no identity.read or job.read)

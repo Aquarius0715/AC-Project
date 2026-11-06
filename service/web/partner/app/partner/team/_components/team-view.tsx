@@ -1,4 +1,5 @@
 "use client";
+const OPEN_SCHEDULE = "Open schedule";
 
 import { useRef, useState } from "react";
 import { Badge, Banner, Btn, Card, cx, EmptyState, Field, Input, LinkButton, Modal, Page, Select, Tabs, TextLink, UtilizationBar, ScrollX } from "@ac/web/components/ui";
@@ -68,7 +69,7 @@ function Team({ live, tab, tabs }: Readonly<{ live: Live; tab: "members" | "cert
         </Btn>
       </div>
       <Card title={`${t("Technicians — {company}", { company: live.company })}${q.activeOnly ? ` · ${t("{n} active", { n: live.activeCount })}` : ""}`}
-        action={<div className="flex flex-wrap gap-2"><LinkButton href="/partner/schedule" size="sm">{t("Open schedule")} <Icon name="arrowRight" /></LinkButton><Btn size="sm" onClick={() => { setOpen(true); }} disabled={live.technicians.length === 0}><Icon name="add" /> {t("Unavailable days")}</Btn></div>}>
+        action={<div className="flex flex-wrap gap-2"><LinkButton href="/partner/schedule" size="sm">{t(OPEN_SCHEDULE)} <Icon name="arrowRight" /></LinkButton><Btn size="sm" onClick={() => { setOpen(true); }} disabled={live.technicians.length === 0}><Icon name="add" /> {t("Unavailable days")}</Btn></div>}>
         {isNone ? (
           <div className="py-6 text-center">
             <b className="text-[13px]">{t("No {company} technicians hold this qualification", { company: live.company })}</b>
@@ -173,7 +174,7 @@ function WeekCard({ live }: Readonly<{ live: Live }>) {
   const t = useT();
   const w = live.week;
   return (
-    <Card title={w.title} action={<TextLink href="/partner/schedule">{t("Open schedule")} <Icon name="arrowRight" /></TextLink>}>
+    <Card title={w.title} action={<TextLink href="/partner/schedule">{t(OPEN_SCHEDULE)} <Icon name="arrowRight" /></TextLink>}>
       <ScrollX>
         <table className="w-full min-w-[560px] text-xs">
           <thead><tr><th />{w.days.map((d, k) => <th key={w.dates[k]} className={cx("p-1 text-center font-semibold", k === w.dayIndex ? "text-primary" : "text-muted-foreground")}>{d}</th>)}</tr></thead>
@@ -232,7 +233,7 @@ function UnavailableDays({ live, onClose }: Readonly<{ live: Live; onClose: () =
   return (
     <Modal open onClose={onClose} title={t("Add unavailable days")} footer={<>
       <Btn onClick={onClose}>{t("Cancel")}</Btn>
-      <LinkButton href={conflicts[0] ? `/partner/schedule?jobId=${conflicts[0].jobId}` : "/partner/schedule"}>{t("Open schedule")} <Icon name="arrowRight" /></LinkButton>
+      <LinkButton href={conflicts[0] ? `/partner/schedule?jobId=${conflicts[0].jobId}` : "/partner/schedule"}>{t(OPEN_SCHEDULE)} <Icon name="arrowRight" /></LinkButton>
       <Btn variant="primary" disabled={pending} onClick={save}>{t("Save")}</Btn>
     </>}>
       <Field label={t("Technician")}>

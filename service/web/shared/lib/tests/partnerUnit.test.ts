@@ -6,22 +6,25 @@ import type { ApiHistory } from "@ac/web/lib/partnerJobDetail";
 import { unitDetail } from "./unitFixture";
 import { i18nOf } from "@ac/web/lib/i18n";
 
+const TEXT_2026_09_14T01_35_00Z = "2026-09-14T01:35:00Z";
+const JOB_P02_AAAA = "job-p02-aaaa";
+
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
-const NOW = Date.parse("2026-09-14T01:35:00Z"); // 09:35 in Kuala Lumpur
+const NOW = Date.parse(TEXT_2026_09_14T01_35_00Z); // 09:35 in Kuala Lumpur
 type Reading = ApiUnitDetail["latestMeasurements"][number];
 const m = (metric: Reading["metric"], value: number | null, unit: Reading["unit"], quality: Reading["quality"] = "valid"): Reading =>
-  ({ id: metric, unitId: "u1", sensorId: "s", observedAt: "2026-09-14T01:35:00Z", origin: "measured" as const, qualityReason: null, metric, value, unit, quality });
+  ({ id: metric, unitId: "u1", sensorId: "s", observedAt: TEXT_2026_09_14T01_35_00Z, origin: "measured" as const, qualityReason: null, metric, value, unit, quality });
 const unit = unitDetail({
-  id: "unit-p-rooftop", displayName: "Rooftop unit", connection: "online", lastSeenAt: "2026-09-14T01:35:00Z", serviceScope: ["indoor", "outdoor"],
+  id: "unit-p-rooftop", displayName: "Rooftop unit", connection: "online", lastSeenAt: TEXT_2026_09_14T01_35_00Z, serviceScope: ["indoor", "outdoor"],
   location: { pathLabels: ["customer-b", "Tower A rooftop"], address: null, accessInstructions: null },
   capabilities: {
     manufacturer: "cap-split-std", model: "v2", control: true, modeControl: true, fanControl: true, temperature: { min: 18, max: 30, step: 1 }, modes: ["cool", "dry", "fan"],
     fanLevels: ["low", "mid", "high"], ventilation: false, ventilationLevels: [], sensors: [],
   },
-  observedState: { power: true, celsius: 22, mode: "cool", fanLevel: "mid", observedAt: "2026-09-14T01:35:00Z" },
+  observedState: { power: true, celsius: 22, mode: "cool", fanLevel: "mid", observedAt: TEXT_2026_09_14T01_35_00Z },
   latestMeasurements: [m("temperature", 14.2, "°C"), m("refrigerant_pressure", 310, "kPa"), m("vibration", 2.1, "mm/s", "suspect")],
 });
-const job: ApiUnitJob = { projection: "summary", id: "job-p02-aaaa", type: "reactive", status: "accepted", scheduledSlot: null, technicianMembershipId: null, accessValidFrom: "2026-09-13T17:00:00Z", accessValidUntil: "2026-09-14T16:00:00Z" };
+const job: ApiUnitJob = { projection: "summary", id: JOB_P02_AAAA, type: "reactive", status: "accepted", scheduledSlot: null, technicianMembershipId: null, accessValidFrom: "2026-09-13T17:00:00Z", accessValidUntil: "2026-09-14T16:00:00Z" };
 
 describe("partner unit view", () => {
   it("states the register, the job context and the past work", () => {
@@ -30,11 +33,11 @@ describe("partner unit view", () => {
       rows: [["Location", "customer-b › Tower A rooftop"], ["Model", "cap-split-std v2"], ["Maintenance scope", "Indoor unit · Outdoor unit"]],
     });
     const other: ApiUnitJob = { ...job, id: "job-p09-bbbb" };
-    expect(contextJob([other, job], "job-p02-aaaa")).toBe(job);
+    expect(contextJob([other, job], JOB_P02_AAAA)).toBe(job);
     expect(contextJob([other, job], "nope")).toBe(other);
     expect(contextJob([{ projection: "history", jobId: "h", type: "periodic", status: "completed", completedAt: null }])).toBeNull();
     expect(jobContext(job, new Map(), NOW)).toEqual({
-      id: "job-p02-aaaa", techMissing: true, pct: 37,
+      id: JOB_P02_AAAA, techMissing: true, pct: 37,
       rows: [["Job", "job-p02- · Repair"], ["Technician", "Not assigned yet"], ["Access window", "14 Sept, 1:00 am – 15 Sept, 12:00 am MYT"]],
       note: "Access ends in 14 h. After that, live values are cleared and only a history snapshot remains.",
     });
@@ -57,8 +60,8 @@ describe("partner unit view", () => {
   });
 
   it("keeps only the company's own decisions after the delegation", () => {
-    const h: ApiHistory = { projection: "history", jobId: "job-p02-aaaa", type: "reactive", status: "completed", asOf: "2026-09-21T16:00:00Z", completedAt: "2026-09-21T08:00:00Z",
-      ownDecisionEvents: [{ id: "e", jobId: "job-p02-aaaa", actorUserId: "u", action: "offer.accepted", occurredAt: "2026-09-14T02:02:00Z" }], redactedReportSummary: { hasReport: true, acceptance: "accepted" } };
+    const h: ApiHistory = { projection: "history", jobId: JOB_P02_AAAA, type: "reactive", status: "completed", asOf: "2026-09-21T16:00:00Z", completedAt: "2026-09-21T08:00:00Z",
+      ownDecisionEvents: [{ id: "e", jobId: JOB_P02_AAAA, actorUserId: "u", action: "offer.accepted", occurredAt: "2026-09-14T02:02:00Z" }], redactedReportSummary: { hasReport: true, acceptance: "accepted" } };
     expect(snapshotRows(h)).toEqual([
       ["Your decision", "Accepted · 14 Sept 2026, 10:02 am MYT"], ["Work", "completed · 21 Sept 2026"], ["Report", "Submitted · accepted"], ["Live unit values", "Not available after the period"],
     ]);

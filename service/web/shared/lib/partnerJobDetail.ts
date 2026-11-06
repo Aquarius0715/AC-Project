@@ -11,6 +11,8 @@ import { jobEventTitle, klDay, until, type ApiCapacity, type ApiJobEvent, type A
 import type { ReportHistorySummary } from "@ac/web/lib/contracts.gen";
 import { lookup } from "@ac/web/lib/lookup";
 
+const IN_PROGRESS = "in_progress";
+
 const en = translator("en");
 
 export interface ApiProposal { id: string; offerId: string; slot: Slot; technicianMembershipId: string; reason: string; sentAt: string; status: "pending" | "sent_to_client" | "kept" | "approved" | "declined" | "withdrawn" }
@@ -127,10 +129,10 @@ export function fits(members: ApiMember[], required: string[], visit: Slot, days
 }
 
 export interface Step { label: string; at: string | null; atText: string | null; sub: string; state: "done" | "current" | "todo" }
-const ORDER = ["requested", "offered", "accepted", "assigned", "in_progress", "submitted", "completed"];
+const ORDER = ["requested", "offered", "accepted", "assigned", IN_PROGRESS, "submitted", "completed"];
 /** The step a status has reached: on hold and rework sit on in progress (accepted before a technician), cancelled on requested. */
 function reachedStep(status: string, hasTechnician: boolean): number {
-  if (status === "on_hold" || status === "rework_requested") return ORDER.indexOf(hasTechnician ? "in_progress" : "accepted");
+  if (status === "on_hold" || status === "rework_requested") return ORDER.indexOf(hasTechnician ? IN_PROGRESS : "accepted");
   return ORDER.indexOf(status === "cancelled" ? "requested" : status);
 }
 const ORIGIN_TEXT = new Map([["periodic_plan", "periodic plan"], ["client_request", "client request"]]);
@@ -171,13 +173,13 @@ export function detailBanner(j: ApiDetail, techName: string | null, now: number,
         : t("Accepted (receipt). Acceptance does not assign a technician or confirm a booking — assign one next.") };
     }
     case "assigned":
-    case "in_progress": {
+    case IN_PROGRESS: {
       const a = j.assignment;
       const ended = a && Date.parse(a.scheduledEnd) <= now;
       if (ended) return { tone: "crit", text: t("The work window ended {time} without a submitted report — extend or reassign in Schedule.", { time: showTime(a.scheduledEnd, display) }) };
       const ack = technicianAck(a, t);
       const slot = a ? showSpan(a.scheduledStart, a.scheduledEnd, display) : "";
-      return { tone: a?.acknowledgement === "cant_make" ? "warn" : "ok", text: t(j.status === "in_progress" ? "In progress — {name} · {slot} · {ack}." : "Assigned — {name} · {slot} · {ack}.", { name: techName ?? t("technician"), slot, ack }) };
+      return { tone: a?.acknowledgement === "cant_make" ? "warn" : "ok", text: t(j.status === IN_PROGRESS ? "In progress — {name} · {slot} · {ack}." : "Assigned — {name} · {slot} · {ack}.", { name: techName ?? t("technician"), slot, ack }) };
     }
     case "submitted": {
       return { tone: "primary", text: t("The report is submitted — review it before HQ releases it to the customer.") };

@@ -1,4 +1,5 @@
 "use client";
+const DEMO_REVIEWED = "demo_reviewed";
 
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Check, DemoBadge, EmptyState, Field, Input, ListRow, Modal, Page, Select, SummaryList, Tabs, Textarea, Timeline } from "@ac/web/components/ui";
@@ -92,7 +93,7 @@ function Reports({ live, r }: Readonly<{ live: MRVLive; r: NonNullable<MRVLive["
     run(() => recordReview(sel.report.id, sel.report.version, comment.trim()), (v) => t("Demo review recorded — version {v}", { v }), () => { setComment(""); nav({ reportVersion: null }); });
   };
   const orgUnits = d ? live.units.filter((u) => u.organizationId === d.organizationId) : [];
-  const isReviewed = sel?.report.status === "demo_reviewed";
+  const isReviewed = sel?.report.status === DEMO_REVIEWED;
   return (
     <>
       <div className="flex flex-wrap items-end gap-3">
@@ -105,7 +106,7 @@ function Reports({ live, r }: Readonly<{ live: MRVLive; r: NonNullable<MRVLive["
       </div>
       <div className="split-rev">
         <Card title={t("Scope 2 reports")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => { openDraft(); }}><Icon name="add" /> {t("New report")}</Btn>} className="self-start">
-          {r.rows.length === 0 ? <EmptyState title={t("No reports")}>{t("No report matches these filters.")}</EmptyState> : <div className="flex flex-col gap-2">{r.rows.map((x) => <ListRow key={x.id} selected={sel?.report.id === x.id} onClick={() => { nav({ reportId: x.id, reportVersion: null }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="text-[13px]">{x.id.slice(0, 8)} · v{x.version}</b><Badge tone={x.status === "demo_reviewed" ? "ok" : "muted"}>{t(x.status === "demo_reviewed" ? "Demo reviewed" : "Draft")}</Badge></div><div className="text-[11px] text-muted-foreground">{x.org} · {x.units} · {x.period}</div><div className={`text-[11px] ${x.incomplete ? "text-warn" : "text-muted-foreground"}`}>{x.result}</div></div></ListRow>)}</div>}
+          {r.rows.length === 0 ? <EmptyState title={t("No reports")}>{t("No report matches these filters.")}</EmptyState> : <div className="flex flex-col gap-2">{r.rows.map((x) => <ListRow key={x.id} selected={sel?.report.id === x.id} onClick={() => { nav({ reportId: x.id, reportVersion: null }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="text-[13px]">{x.id.slice(0, 8)} · v{x.version}</b><Badge tone={x.status === DEMO_REVIEWED ? "ok" : "muted"}>{t(x.status === DEMO_REVIEWED ? "Demo reviewed" : "Draft")}</Badge></div><div className="text-[11px] text-muted-foreground">{x.org} · {x.units} · {x.period}</div><div className={`text-[11px] ${x.incomplete ? "text-warn" : "text-muted-foreground"}`}>{x.result}</div></div></ListRow>)}</div>}
           <p className="mt-3 text-[11px] text-muted-foreground">{t("Every report is a demo — “Demo — unverified”. A demo review is not external certification.")}</p>
         </Card>
         {sel ? (

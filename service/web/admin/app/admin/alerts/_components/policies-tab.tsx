@@ -1,4 +1,10 @@
 "use client";
+const DEFAULT_ALERT = "default_alert";
+const NEW_ALERT_POLICY = "New alert policy";
+const DELETE_POLICY = "Delete policy";
+const CUSTOMER_A = "customer-a";
+const HQ_OPERATOR = "hq-operator";
+const UNIT_ONLINE_RTO = "unit-online-rto";
 
 import { useState, useTransition } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, EmptyState, Field, Input, ListRow, Modal, SearchSelect, Select, SeverityBadge, TextLink, Toggle, useToast, cx } from "@ac/web/components/ui";
@@ -17,10 +23,6 @@ import { ConditionFields, WindowEditor } from "./policy-parts";
 import { DemoTest, NotificationPreview } from "./policy-checks";
 import { Icon } from "@ac/web/components/Icon";
 import { entryOf } from "@ac/web/lib/lookup";
-
-const CUSTOMER_A = "customer-a";
-const HQ_OPERATOR = "hq-operator";
-const UNIT_ONLINE_RTO = "unit-online-rto";
 
 /** API mode: the selected policy (`policyId`) or the owner customer of a new one (`new`, copied from the default rule
 `from`) from the URL (DD-A05 items 5, 8 and 9), whether the session may write policies, the display time zone a new
@@ -76,7 +78,7 @@ const demoRules: DefaultRule[] = [
   rule("clogged_filter", "Clogged filter", "maintenance", "airflow_drop", "gte", 30, 20, 3600, "normal"), rule("ac_offline", "AC offline", "connection", "heartbeat_gap", "gte", 15, 1, 1, "warning"),
 ];
 export const seedPolicies: AdminPolicy[] = [
-  { ...demoPolicy("policy-default", "Default policy", "6 rules · ventilation (CO₂, PM2.5) + fault causes", "co2", 1000, 900, 600, true, []), kind: "default_alert", group: "DEFAULT · ON EVERY UNIT", customerId: null, units: "every unit",
+  { ...demoPolicy("policy-default", "Default policy", "6 rules · ventilation (CO₂, PM2.5) + fault causes", "co2", 1000, 900, 600, true, []), kind: DEFAULT_ALERT, group: "DEFAULT · ON EVERY UNIT", customerId: null, units: "every unit",
     rules: demoRules, settings: [{ ruleKey: "ac_offline", customerId: CUSTOMER_A, enabled: false, version: 1, reason: "Demo: customer switched the offline rule off", by: HQ_OPERATOR, at: "2026-09-14T00:00:00Z" }] },
   demoPolicy("policy-temp-a", "Bedroom too hot", "Temperature ≥ 30 °C for 60 s", "temperature", 30, 28, 60, true, [UNIT_ONLINE_RTO, "unit-online-rto-2"]),
   demoPolicy("policy-co2-a", "Stuffy office", "CO₂ ≥ 1200 ppm · 15 min · weekdays", "co2", 1200, 1000, 900, true, [UNIT_ONLINE_RTO, "unit-online-rto-2"]),
@@ -124,7 +126,7 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
   // says so instead of opening another policy), else the first customer policy
   const owner = sel.creatingFor ? customers.find((c) => c.id === sel.creatingFor) ?? null : null;
   const isMissing = !sel.creatingFor && !!sel.policyId && pols.every((x) => x.id !== sel.policyId);
-  const fromRule = sel.from ? pols.find((x) => x.kind === "default_alert")?.rules.find((r) => r.ruleKey === sel.from) : undefined;
+  const fromRule = sel.from ? pols.find((x) => x.kind === DEFAULT_ALERT)?.rules.find((r) => r.ruleKey === sel.from) : undefined;
   const shown = sel.creatingFor || isMissing ? null : pols.find((x) => x.id === sel.policyId) ?? pols.find((x) => x.kind === "alert") ?? pols[0] ?? null;
   const p = owner ? blankPolicyDraft(owner, live?.timezone ?? "Asia/Kuala_Lumpur", fromRule) : shown;
   const savedKey = p ? `${p.id}@${String(p.version)}` : "";
@@ -197,7 +199,7 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
               <div className="mb-1 text-[10px] font-bold tracking-wide text-muted-foreground">{g}</div>
               <div className="flex flex-col gap-2">
                 {isNew && draft.group === g && (
-                  <ListRow selected><div className="min-w-0 flex-1"><b className="text-[13px]">{draft.name.trim() || t("New alert policy")}</b><div className="text-[11px] text-muted-foreground">{t("not saved yet")}</div></div></ListRow>
+                  <ListRow selected><div className="min-w-0 flex-1"><b className="text-[13px]">{draft.name.trim() || t(NEW_ALERT_POLICY)}</b><div className="text-[11px] text-muted-foreground">{t("not saved yet")}</div></div></ListRow>
                 )}
                 {listed.filter((x) => x.group === g).map((x) => (
                   <ListRow key={x.id} selected={!isNew && draft?.id === x.id} onClick={() => { select(x.id); }}>
@@ -211,12 +213,12 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
             </div>
           ))}
         </Card>
-        {draft?.kind === "default_alert" && p && (
+        {draft?.kind === DEFAULT_ALERT && p && (
           <DefaultPolicyEditor p={p} customers={customers} units={units} canWrite={canWrite} copyFor={copyFor} onCopy={onCopy} demo={!live} />
         )}
-        {draft && !(draft.kind === "default_alert" && p) && (
+        {draft && !(draft.kind === DEFAULT_ALERT && p) && (
           <Card
-            title={<span className="inline-flex flex-wrap items-center gap-2">{draft.name.trim() || t("New alert policy")}<Badge tone={isNew ? "warn" : "muted"}>{isNew ? t("Not saved") : t("Policy v{n}", { n: draft.version })}</Badge></span>}
+            title={<span className="inline-flex flex-wrap items-center gap-2">{draft.name.trim() || t(NEW_ALERT_POLICY)}<Badge tone={isNew ? "warn" : "muted"}>{isNew ? t("Not saved") : t("Policy v{n}", { n: draft.version })}</Badge></span>}
             sub={[isNew ? t("new") : draft.id, draft.customerName, draft.madeBy && t("made by {name}", { name: draft.madeBy })].filter(Boolean).join(" · ")}
             action={<div className="flex items-center gap-2 text-xs font-semibold"><span aria-hidden>{t("Enabled")}</span><Toggle on={draft.on} onChange={(v) => { set("on", v); }} label={t("Enabled")} disabled={!canWrite} /></div>}>
             {!canWrite && <div className="mb-3"><Banner>{t("You can read this policy. Changing it needs alert.policy.write.")}</Banner></div>}
@@ -266,7 +268,7 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
             </div>
             {canWrite && (
               <div className="mt-5 flex flex-wrap items-center justify-end gap-2 border-t border-line pt-3">
-                {!isNew && <Btn variant="danger" disabled={pending} onClick={() => { setDeleting(true); }}>{t("Delete policy")}</Btn>}
+                {!isNew && <Btn variant="danger" disabled={pending} onClick={() => { setDeleting(true); }}>{t(DELETE_POLICY)}</Btn>}
                 <span className={cx("mr-auto text-[12px]", tried && problems ? "text-crit" : "text-muted-foreground")}>{status}</span>
                 <Btn disabled={pending || (!isNew && changes.length === 0)} onClick={discard}>{t("Discard")}</Btn>
                 <Btn variant="primary" disabled={pending || (!isNew && changes.length === 0)} onClick={save}>{t("Save policy")}</Btn>
@@ -283,7 +285,7 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
       {picking && draft && <RecipientPicker unitId={target} customer={draft.customerName} chosen={draft.recipients.map((r) => r.id)} demo={!live} onClose={() => { setPicking(false); }}
         onAdd={(rs) => { set("recipients", [...draft.recipients, ...rs]); setPicking(false); }} />}
       {deleting && draft && (
-        <Modal open onClose={() => { setDeleting(false); }} title={t("Delete policy")} footer={<><Btn onClick={() => { setDeleting(false); }}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending} onClick={remove}>{t("Delete policy")}</Btn></>}>
+        <Modal open onClose={() => { setDeleting(false); }} title={t(DELETE_POLICY)} footer={<><Btn onClick={() => { setDeleting(false); }}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending} onClick={remove}>{t(DELETE_POLICY)}</Btn></>}>
           <p className="text-[13px]">{draft.unitIds.length > 0 ? t("“{name}” is detached from {units} and deleted.", { name: draft.name, units: draft.units }) : t("“{name}” is deleted. It is not attached to any unit.", { name: draft.name })}</p>
           <p className="text-[11px] text-muted-foreground">{t("The alerts it raised stay in the history.")}</p>
         </Modal>
@@ -298,7 +300,7 @@ export function NewPolicyModal({ customers, initial, onClose, onStart }: Readonl
   const t = useT();
   const [c, setC] = useState(customers.find((x) => x.id === initial)?.id ?? "");
   return (
-    <Modal open onClose={onClose} title={t("New alert policy")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={!c} onClick={() => { onStart(c); }}>{t("Start the policy")}</Btn></>}>
+    <Modal open onClose={onClose} title={t(NEW_ALERT_POLICY)} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={!c} onClick={() => { onStart(c); }}>{t("Start the policy")}</Btn></>}>
       <p className="text-[13px] text-muted-foreground">{t("A policy belongs to one customer, and only that customer’s units can carry it. The owner cannot change once the policy is saved.")}</p>
       {customers.length === 0 ? <EmptyState title={t("No active customers")}>{t("A policy needs an active customer to own it.")}</EmptyState> : (
         <Field label={t("Owner (customer)")}><SearchSelect label={t("Owner (customer)")} value={c} onChange={setC} options={customers.map((x) => ({ id: x.id, label: x.name }))} /></Field>

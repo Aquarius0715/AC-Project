@@ -7,6 +7,8 @@ import { oneOf } from "@ac/web/lib/oneOf";
 import { codePoints, isEmail } from "@ac/web/lib/text";
 import { isAfter, isBefore } from "@ac/web/lib/order";
 
+const CONTRACTOR = "contractor";
+
 export type PartnerRole = "contractor" | "technician";
 export type PartnerStatus = "invited" | "active" | "disabled";
 /** PartnerUser of service-contracts.ts. */
@@ -30,7 +32,7 @@ export interface PartnerUserRow {
   accessDate: string | null;
 }
 
-export const PARTNER_ROLES: PartnerRole[] = ["contractor", "technician"];
+export const PARTNER_ROLES: PartnerRole[] = [CONTRACTOR, "technician"];
 export const roleLabel: Record<PartnerRole, string> = { contractor: "Contractor", technician: "Technician" };
 export const statusLabel: Record<PartnerStatus, string> = { invited: "Not signed in yet", active: "Active", disabled: "Disabled" };
 export const PARTNER_STATUSES: PartnerStatus[] = ["active", "invited", "disabled"];
@@ -40,10 +42,10 @@ access end has passed by `now` (the business clock) reads as ended: nothing to d
 access end can move again (IR461), and it can be removed. */
 export function partnerUserRows(us: ApiPartnerUser[], self: string | null, i: I18n = EN, now?: Date): PartnerUserRow[] {
   const { t } = i;
-  const contractors = us.filter((u) => u.partnerRole === "contractor" && u.status === "active").length;
+  const contractors = us.filter((u) => u.partnerRole === CONTRACTOR && u.status === "active").length;
   return [...us].toSorted((a, b) => (a.displayName ?? a.email).localeCompare(b.displayName ?? b.email)).map((u) => {
     const isYou = !!self && u.membershipId === self;
-    const isLastContractor = u.partnerRole === "contractor" && u.status === "active" && contractors === 1;
+    const isLastContractor = u.partnerRole === CONTRACTOR && u.status === "active" && contractors === 1;
     const isInvited = u.status === "invited";
     const isEnded = u.status !== "disabled" && !!now && !!u.accessUntil && Date.parse(u.accessUntil) <= now.getTime();
     const isBooked = !!u.booked && u.status === "active";

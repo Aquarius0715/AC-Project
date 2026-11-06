@@ -6,6 +6,8 @@ import {
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 import { must } from "./must";
 
+const BEDROOM_AC = "Bedroom AC";
+
 const NOW = Date.parse("2026-09-14T01:00:00Z"); // Mon 09:00 KL
 const st = (over: Partial<ApiFilterStatus>): ApiFilterStatus => {
   return {
@@ -18,7 +20,7 @@ const settings: ApiFilterSettings = { id: "", version: 0, customerId: "c", thres
 describe("customer filter care", () => {
   it("words the rows, an area and the reminders in Malay, days in the display time zone (IR262)", () => {
     const i = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
-    const r = filterRow(st({}), unit("u1", { name: "Bedroom AC" }), NOW, i);
+    const r = filterRow(st({}), unit("u1", { name: BEDROOM_AC }), NOW, i);
     expect([r.run, r.progress, r.last]).toEqual(["212 j sejak pembersihan", "85 % daripada 250 j", "kali terakhir dibersihkan 30 Ogo"]);
     const many = ["a", "b", "c", "d"].map((id) => st({ unitId: id, status: id === "a" ? "overdue" : "ok" }));
     const [line] = filterLines(many, many.map((m) => unit(m.unitId)), NOW, i);
@@ -29,8 +31,8 @@ describe("customer filter care", () => {
   });
 
   it("shows run time, progress and the last cleaning per AC (Figma 07j)", () => {
-    const r = filterRow(st({}), unit("u1", { name: "Bedroom AC" }), NOW);
-    expect([r.unit, r.run, r.pct, r.progress, r.last, r.jobId, r.state]).toEqual(["Bedroom AC", "212 h since cleaning", 85, "85 % of 250 h", "last cleaned 30 Aug", null, "due_soon"]);
+    const r = filterRow(st({}), unit("u1", { name: BEDROOM_AC }), NOW);
+    expect([r.unit, r.run, r.pct, r.progress, r.last, r.jobId, r.state]).toEqual([BEDROOM_AC, "212 h since cleaning", 85, "85 % of 250 h", "last cleaned 30 Aug", null, "due_soon"]);
     const over = filterRow(st({ runHoursSinceCleaning: 268, status: "overdue", lastCleanedAt: "2026-07-21T02:00:00Z" }), unit("u2"), NOW);
     expect([over.pct, over.progress, over.last]).toEqual([100, "100 % of 250 h", "last cleaned 21 Jul"]);
     const tech = filterRow(st({ runHoursSinceCleaning: 40, status: "ok", lastCleanedAt: "2026-09-08T03:00:00Z", lastCleanedBy: "technician", lastCleaningJobId: "job-c02" }), unit("u3"), NOW);

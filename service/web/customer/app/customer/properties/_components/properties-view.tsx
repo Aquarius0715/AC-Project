@@ -1,4 +1,5 @@
 "use client";
+const MY_PROPERTIES = "My properties";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -48,7 +49,7 @@ export function PropertiesView({ live }: Readonly<{ live: PropertiesLive }>) {
   return (
     <Page>
       <div className="split-rev">
-        <Card title={t("My properties")} action={<Badge tone="muted">{live.tree.length}</Badge>} className="self-start">
+        <Card title={t(MY_PROPERTIES)} action={<Badge tone="muted">{live.tree.length}</Badge>} className="self-start">
           <div className="flex flex-col text-[13px]">
             {live.tree.map((p) => (
               <div key={p.id}>
@@ -133,7 +134,7 @@ function Panel({ live, sel, rename, go }: Readonly<{ live: PropertiesLive; sel: 
     if (!s) return null;
     return (
       <>
-        <div className="text-[13px] text-muted-foreground">{t("My properties")} › <b className="text-ink">{p.name}</b></div>
+        <div className="text-[13px] text-muted-foreground">{t(MY_PROPERTIES)} › <b className="text-ink">{p.name}</b></div>
         <Card title={<span className="flex items-center gap-2">{p.name}<Badge tone="muted" icon="home">{kind(t, p.kind)}</Badge></span>}
           action={<Btn size="sm" onClick={() => { rename({ kind: "property", id: p.id, version: p.version, name: p.name, where: t("{name} · {kind} (property)", { name: p.name, kind: kind(t, p.kind) }) }); }}><Icon name="edit" />{t("Rename")}</Btn>}>
           <SummaryList cols={2} items={[[t("Type"), kind(t, s.kind)], [t("Floors"), s.floors.length > 0 ? `${String(s.floors.length)} (${s.floors.join(", ")})` : t("none")], [t("Rooms"), s.rooms], [t("Air conditioners"), t("{inRooms} in rooms · {unassigned} unassigned", { inRooms: s.inRooms, unassigned: s.unassigned })], [t("Last edited"), s.edited]]} />
@@ -162,7 +163,7 @@ function Panel({ live, sel, rename, go }: Readonly<{ live: PropertiesLive; sel: 
   const mode = canGroup ? live.mode : "single";
   return (
     <>
-      <div className="text-[13px] text-muted-foreground">{t("My properties")} › {sel.path.split(" › ").map((x, i, a) => <span key={i}>{i === a.length - 1 ? <b className="text-ink">{x}</b> : `${x} › `}</span>)}</div>
+      <div className="text-[13px] text-muted-foreground">{t(MY_PROPERTIES)} › {sel.path.split(" › ").map((x, i, a) => <span key={i}>{i === a.length - 1 ? <b className="text-ink">{x}</b> : `${x} › `}</span>)}</div>
       <Card title={<span className="flex items-center gap-2">{s.name}<Badge tone="muted">{kind(t, s.kind)}</Badge></span>}
         action={<Btn size="sm" onClick={() => { rename({ kind: "space", id: s.id, version: s.version, name: s.name, where: t("{name} · {kind} in {property}", { name: s.name, kind: kind(t, s.kind), property: p.name }) }); }}><Icon name="edit" />{t("Rename")}</Btn>}>
         {canGroup && (

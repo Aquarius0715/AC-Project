@@ -1,4 +1,6 @@
 "use client";
+const ACCEPTED_AWAITING_ASSIGNMENT = "Accepted · awaiting assignment";
+const TECH_EXTERNAL_A = "tech-external-a";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -10,12 +12,12 @@ import { orDash } from "@ac/web/lib/text";
 import { nonEmpty } from "@ac/web/lib/lists";
 
 const staticJobs = nonEmpty([
-  { id: "job-p02", unit: "Rooftop unit", st: "Accepted · awaiting assignment", win: "09-14 01:00 → 09-22 00:00", left: "14 h left" },
-  { id: "job-p12", unit: "Lobby AC", st: "Accepted · awaiting assignment", win: "09-19 09:00 → 09-24 18:00", left: "3 d 8 h left" },
+  { id: "job-p02", unit: "Rooftop unit", st: ACCEPTED_AWAITING_ASSIGNMENT, win: "09-14 01:00 → 09-22 00:00", left: "14 h left" },
+  { id: "job-p12", unit: "Lobby AC", st: ACCEPTED_AWAITING_ASSIGNMENT, win: "09-19 09:00 → 09-24 18:00", left: "3 d 8 h left" },
   { id: "job-contractor-a", unit: "Bedroom AC", st: "In progress · tech-external-a", win: "09-18 08:00 → 09-23 00:00", left: "1 d 14 h left" },
   { id: "job-p07", unit: "Server room AC", st: "Work window ended · reassignment required", win: "09-15 08:00 → 09-20 17:00", left: "Ended" },
 ]);
-const grid: [string, string, string[]][] = [["tech-external-a", "Refrigerant · 32 h avail.", ["10–12 job-p02", "09–13 job-contractor-a", "free", "13–17 job-c11", "free", "no hours", "no hours"]], ["tech-external-a2", "General · 40 h avail.", ["free", "free", "10–15 job-c09", "09–17 Leave", "09–12 job-c12", "no hours", "no hours"]]];
+const grid: [string, string, string[]][] = [[TECH_EXTERNAL_A, "Refrigerant · 32 h avail.", ["10–12 job-p02", "09–13 job-contractor-a", "free", "13–17 job-c11", "free", "no hours", "no hours"]], ["tech-external-a2", "General · 40 h avail.", ["free", "free", "10–15 job-c09", "09–17 Leave", "09–12 job-c12", "no hours", "no hours"]]];
 // the technician's answer and its banner tone; no answer yet is awaiting acceptance in the primary tone
 const ACK_WORD = new Map([["accepted", "accepted"], ["cant_make", "can’t make it"]]);
 const ACK_TONE = new Map<string, Tone>([["accepted", "ok"], ["cant_make", "warn"]]);
@@ -32,13 +34,13 @@ export function ScheduleDemo({ jobId }: Readonly<{ jobId?: string }>) {
   const toast = useToast();
   const store = useJobs();
   const live = store.filter((j) => j.contractor === "contractor-a" && (j.status === "accepted" || j.status === "assigned") && staticJobs.every((s) => s.id !== j.id));
-  const jobs = [...live.map((j) => ({ id: j.id, unit: j.unit, st: j.status === "accepted" ? "Accepted · awaiting assignment" : `Assigned · ${orDash(j.technician)} · ${ACK_WORD.get(j.techAck?.status ?? "") ?? "awaiting acceptance"}`, win: `${orDash(j.scheduled?.date.slice(5))} 00:00 → ${orDash(j.scheduled?.date.slice(5))} 23:59`, left: "fixed time", live: true })), ...staticJobs.map((j) => ({ ...j, live: false }))];
+  const jobs = [...live.map((j) => ({ id: j.id, unit: j.unit, st: j.status === "accepted" ? ACCEPTED_AWAITING_ASSIGNMENT : `Assigned · ${orDash(j.technician)} · ${ACK_WORD.get(j.techAck?.status ?? "") ?? "awaiting acceptance"}`, win: `${orDash(j.scheduled?.date.slice(5))} 00:00 → ${orDash(j.scheduled?.date.slice(5))} 23:59`, left: "fixed time", live: true })), ...staticJobs.map((j) => ({ ...j, live: false }))];
   const fallback = { ...staticJobs[0], live: false }; // the first fixture job when nothing is picked
   const [selId, setSelId] = useState(jobId ?? fallback.id);
   const sel = jobs.find((j) => j.id === selId) ?? fallback;
   const setSel = (j: (typeof jobs)[number]) => { setSelId(j.id); };
   const lj = store.find((j) => j.id === sel.id && sel.live);
-  const [tech, setTech] = useState("tech-external-a");
+  const [tech, setTech] = useState(TECH_EXTERNAL_A);
   const [start, setStart] = useState("2026-09-21T10:00");
   const [end, setEnd] = useState("2026-09-21T12:00");
   const [reason, setReason] = useState("");
@@ -51,7 +53,7 @@ export function ScheduleDemo({ jobId }: Readonly<{ jobId?: string }>) {
     const we = new Date(sel.id === "job-p02" ? "2026-09-22T00:00" : "2026-09-24T18:00");
     if (new Date(start) >= new Date(end)) { setMessage({ tone: "crit", t: "Start must be before end." }); return; }
     if (new Date(end) > we) { setMessage({ tone: "crit", t: "Slot is outside the delegation period (VALIDATION)." }); return; }
-    if (tech === "tech-external-a" && start.startsWith("2026-09-21T09")) { setMessage({ tone: "warn", t: "Overlaps a confirmed schedule for tech-external-a (CONFLICT)." }); return; }
+    if (tech === TECH_EXTERNAL_A && start.startsWith("2026-09-21T09")) { setMessage({ tone: "warn", t: "Overlaps a confirmed schedule for tech-external-a (CONFLICT)." }); return; }
     setAssigned((a) => [...a, sel.id]); setMessage({ tone: "ok", t: `Assigned ${tech} to ${sel.id}. Notifications sent (preview).` }); toast("Technician assigned");
   };
   return (

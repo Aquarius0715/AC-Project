@@ -116,6 +116,10 @@ export function webConfig(tsconfigRootDir) {
         // sonarjs/cognitive-complexity is the measure Go's gocognit takes, with its limit (30)
         "sonarjs/cyclomatic-complexity": ["error", { threshold: 30 }],
         "sonarjs/cognitive-complexity": ["error", 30],
+        // 4-2: a status, tone or kind is a union of its named values ("idle" | "running" | "failed" | "ok"); the default
+        // (2 members) would flag every such union. The limit is 9 members: the Core API state machines (a command, a
+        // proposal, a release) have up to 6 named states, and a page's modal state (new, decline, rate, ...) has up to 9.
+        "sonarjs/max-union-size": ["error", { threshold: 9 }],
         // 2: names say what a value is, and are not lengthened only for a rule: DOM and React attributes (checked,
         // disabled), the contract's fields (enabled, online) and predicates (overlaps, fits) are not renamed is…/has…
         "unicorn/consistent-boolean-name": "off",

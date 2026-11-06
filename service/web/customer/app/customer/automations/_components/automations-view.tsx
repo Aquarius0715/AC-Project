@@ -1,4 +1,6 @@
 "use client";
+const BORDER_LINE_BG_SURFACE = "border-line bg-surface";
+const CREATE_AUTOMATION = "Create automation";
 
 import { useEffect, useState, type ReactNode } from "react";
 import { Badge, Banner, Btn, Card, Choice, cx, EmptyState, Field, Input, Modal, Page, PageHead, Select, Toggle, Plain } from "@ac/web/components/ui";
@@ -44,7 +46,7 @@ const CONSENT_TONE = new Map<string, "ok" | "warn">([["ok", "ok"], ["warn", "war
 /** The consent card's frame: warned, compact (in the editor) or on the page. */
 function consentBox(tone: string, compact = false): string {
   if (tone === "warn") return "border-warn bg-warn-soft/60";
-  return compact ? "border-line bg-primary-soft/40" : "border-line bg-surface";
+  return compact ? "border-line bg-primary-soft/40" : BORDER_LINE_BG_SURFACE;
 }
 /** A rule's on/off line: on, disabled by the system (warn) or switched off. */
 function ruleState(enabled: boolean, tone: string): { cls: string; text: string } {
@@ -93,10 +95,10 @@ function List({ live, notice, setNotice, create, edit }: Readonly<{ live: Automa
   };
   return (
     <Page>
-      <PageHead title={t("Your automations")} sub={t(live.cards.length === 1 ? "{n} automation · {on} on · each rule controls one AC · checked again when it runs" : "{n} automations · {on} on · each rule controls one AC · checked again when it runs", { n: live.cards.length, on })} action={<Btn variant="primary" onClick={create}><Icon name="add" /> {t("Create automation")}</Btn>} />
+      <PageHead title={t("Your automations")} sub={t(live.cards.length === 1 ? "{n} automation · {on} on · each rule controls one AC · checked again when it runs" : "{n} automations · {on} on · each rule controls one AC · checked again when it runs", { n: live.cards.length, on })} action={<Btn variant="primary" onClick={create}><Icon name="add" /> {t(CREATE_AUTOMATION)}</Btn>} />
       {notice && <Banner tone="ok" action={<Btn size="sm" variant="ghost" onClick={() => { setNotice(null); }}>{t("Dismiss")}</Btn>}><b>{notice.title}</b><div className="text-xs text-muted-foreground">{notice.text}</div></Banner>}
       <ConsentCard live={live} />
-      {live.cards.length === 0 ? <EmptyState title={t("No automations yet")} action={<Btn size="sm" onClick={create}><Icon name="add" /> {t("Create automation")}</Btn>}>{t("Create one to pre-cool before you arrive or to stop an empty room. Saving sends no command — the automation runs at its time or event.")}</EmptyState> : (
+      {live.cards.length === 0 ? <EmptyState title={t("No automations yet")} action={<Btn size="sm" onClick={create}><Icon name="add" /> {t(CREATE_AUTOMATION)}</Btn>}>{t("Create one to pre-cool before you arrive or to stop an empty room. Saving sends no command — the automation runs at its time or event.")}</EmptyState> : (
         <div className="flex flex-col gap-3">
           {live.cards.map((c) => (
             <Card key={c.id} className={cx(c.status.tone === "warn" && "border-crit")}>
@@ -253,7 +255,7 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
   const step = (n: number, title: string, sub?: string) => <div className="flex items-start gap-2"><span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-ink text-[11px] font-bold text-white">{n}</span><div><div className="text-[15px] font-bold">{title}</div>{sub && <div className="text-xs text-muted-foreground">{sub}</div>}</div></div>;
   return (
     <Page>
-      <div className="text-[13px] text-muted-foreground"><Plain type="button" className="font-semibold text-primary" onClick={onCancel}><Icon name="arrowLeft" /> {t("Automations")}</Plain> › <b className="text-ink">{t(rule ? "Edit automation" : "Create automation")}</b></div>
+      <div className="text-[13px] text-muted-foreground"><Plain type="button" className="font-semibold text-primary" onClick={onCancel}><Icon name="arrowLeft" /> {t("Automations")}</Plain> › <b className="text-ink">{t(rule ? "Edit automation" : CREATE_AUTOMATION)}</b></div>
       <div className="split">
         <Card>
           <div className="flex flex-col gap-4">
@@ -275,7 +277,7 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
                     {dayLong.map((d, k) => {
                       const isOn = draft.weekdays.includes(k + 1);
                       return <Plain key={d} type="button" aria-pressed={isOn} onClick={() => { set({ weekdays: isOn ? draft.weekdays.filter((x) => x !== k + 1) : [...draft.weekdays, k + 1] }); }}
-                        className={cx("rounded-full border px-3 py-1 text-[13px] font-semibold", isOn ? "border-primary bg-primary-soft text-primary" : "border-line bg-surface")}>{t(dayShort[k] ?? String(k + 1))}</Plain>;
+                        className={cx("rounded-full border px-3 py-1 text-[13px] font-semibold", isOn ? "border-primary bg-primary-soft text-primary" : BORDER_LINE_BG_SURFACE)}>{t(dayShort[k] ?? String(k + 1))}</Plain>;
                     })}
                   </div>
                 </Field>
@@ -406,7 +408,7 @@ function OnlyIf({ draft, errors, set }: Readonly<{ draft: Draft; errors: Record<
               {dayLong.map((d, k) => {
                 const isOn = x.weekdays.includes(k + 1);
                 return <Plain key={d} type="button" aria-pressed={isOn} onClick={() => { put(i, { ...x, weekdays: isOn ? x.weekdays.filter((w) => w !== k + 1) : [...x.weekdays, k + 1] }); }}
-                  className={cx("rounded-full border px-2 py-0.5 text-xs font-semibold", isOn ? "border-primary bg-primary-soft text-primary" : "border-line bg-surface")}>{t(dayShort[k] ?? String(k + 1))}</Plain>;
+                  className={cx("rounded-full border px-2 py-0.5 text-xs font-semibold", isOn ? "border-primary bg-primary-soft text-primary" : BORDER_LINE_BG_SURFACE)}>{t(dayShort[k] ?? String(k + 1))}</Plain>;
               })}
             </span>
           )}

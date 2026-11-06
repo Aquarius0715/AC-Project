@@ -6,6 +6,10 @@ import {
 } from "@ac/web/lib/techDevices";
 import { i18nOf } from "@ac/web/lib/i18n";
 
+const TEXT_2026_09_14T01_00_00Z = "2026-09-14T01:00:00Z";
+const TEMPERATURE = "temperature";
+const TAMPER_SIGNAL = "tamper_signal";
+
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 
 // 2026-09-14T01:05:00Z is 09:05 in Kuala Lumpur (the display time zone of every mapper)
@@ -18,12 +22,12 @@ const device = (over: Partial<ApiDevice> = {}): ApiDevice => {
 const detail = (over: Partial<ApiDeviceDetail> = {}): ApiDeviceDetail => ({ ...device(), calibrationRefs: [], activeOperation: null, ...over });
 const op = (over: Partial<ApiDeviceOperation & { startedAt?: string | null; expiresAt?: string }> = {}): ApiDeviceOperation & { startedAt?: string | null; expiresAt?: string } => {
   return {
-    id: "op-1", kind: "check", status: "succeeded", targetVersion: null, failureCode: null, createdAt: "2026-09-14T01:00:00Z", finishedAt: "2026-09-14T01:00:05Z", ...over,
+    id: "op-1", kind: "check", status: "succeeded", targetVersion: null, failureCode: null, createdAt: TEXT_2026_09_14T01_00_00Z, finishedAt: "2026-09-14T01:00:05Z", ...over,
   };
 };
 const event = (over: Partial<ApiDeviceEventFull> = {}): ApiDeviceEventFull => {
   return {
-    id: "ev-1", version: 1, deviceId: "dev-1", eventType: "communication_lost", evidenceSource: "heartbeat", occurredAt: "2026-09-14T01:00:00Z", restoredAt: null, alertIds: [], recovery: null, responseNotes: [], ...over,
+    id: "ev-1", version: 1, deviceId: "dev-1", eventType: "communication_lost", evidenceSource: "heartbeat", occurredAt: TEXT_2026_09_14T01_00_00Z, restoredAt: null, alertIds: [], recovery: null, responseNotes: [], ...over,
   };
 };
 const alert = (over: Partial<ApiAlertLite> = {}): ApiAlertLite => ({ id: "al-1", version: 1, status: "open", type: "tamper", severity: "critical", ...over });
@@ -45,7 +49,7 @@ describe("techDeviceRows / filterOf", () => {
   it("sorts by serial and names the unit (Unbound without one)", () => {
     expect(rows.map((r) => r.serial)).toEqual(["AC-A", "AC-B", "AC-C"]);
     // HQ's No sensors chip (Figma Admin 246:2, IR319): a device without sensors
-    const bare = techDeviceRows([device({ id: "n", serial: "AC-N", sensors: [] }), device({ id: "s", serial: "AC-S", sensors: [{ id: "s1", metric: "temperature", unit: "°C", staleAfterSeconds: 120, calibratedAt: null }] })], new Map(), NOW);
+    const bare = techDeviceRows([device({ id: "n", serial: "AC-N", sensors: [] }), device({ id: "s", serial: "AC-S", sensors: [{ id: "s1", metric: TEMPERATURE, unit: "°C", staleAfterSeconds: 120, calibratedAt: null }] })], new Map(), NOW);
     expect([bare.map((r) => r.sensors > 0), bare.filter(filterOf("nosensors")).map((r) => r.id), HQ_FILTERS.map((f) => f.id)]).toEqual([[false, true], ["n"], ["all", "online", "offline", "tamper", "nosensors"]]);
     expect(rows[0]?.unit).toBe("Bedroom AC");
     expect(rows[1]?.unit).toBe("Unbound");
@@ -164,18 +168,18 @@ describe("device events (T12)", () => {
     const es = [
       lost, event({ id: "lost-old", occurredAt: "2026-09-13T23:00:00Z", restoredAt: "2026-09-13T23:30:00Z" }),
       event({ id: "power", eventType: "power_lost", evidenceSource: "power_signal", occurredAt: "2026-09-14T00:30:00Z" }),
-      event({ id: "tamper", eventType: "tamper", evidenceSource: "tamper_signal", occurredAt: "2026-09-14T00:40:00Z", restoredAt: "2026-09-14T00:50:00Z" }),
+      event({ id: "tamper", eventType: "tamper", evidenceSource: TAMPER_SIGNAL, occurredAt: "2026-09-14T00:40:00Z", restoredAt: "2026-09-14T00:50:00Z" }),
       event({ id: "back", eventType: "restored", occurredAt: "2026-09-14T00:50:00Z", recovery: { axis: "tamper", sourceEventId: "tamper", value: "clear" } }),
     ];
-    expect(openFaults(es)).toEqual({ connection: "2026-09-14T01:00:00Z", power: "2026-09-14T00:30:00Z" });
+    expect(openFaults(es)).toEqual({ connection: TEXT_2026_09_14T01_00_00Z, power: "2026-09-14T00:30:00Z" });
     expect(openFaults([])).toEqual({});
   });
   it("renders detection, evidence, alerts, recovery and notes per row", () => {
     const alerts = new Map([["al-1", alert()], ["al-2", alert({ id: "al-2", status: "acknowledged" })], ["al-3", alert({ id: "al-3", status: "resolved" })]]);
     const es = [
       event({ id: "r", eventType: "restored", occurredAt: "2026-09-14T01:10:00Z", recovery: { axis: "connection", sourceEventId: "lost", value: "online" } }),
-      event({ id: "t", eventType: "tamper", evidenceSource: "tamper_signal", alertIds: ["al-1", "missing"], responseNotes: [{ actorId: "u", message: "Cover refitted", at: "2026-09-14T01:02:00Z" }] }),
-      event({ id: "t2", eventType: "tamper", evidenceSource: "tamper_signal", alertIds: ["al-2"] }), event({ id: "t3", eventType: "tamper", evidenceSource: "tamper_signal", alertIds: ["al-3"] }),
+      event({ id: "t", eventType: "tamper", evidenceSource: TAMPER_SIGNAL, alertIds: ["al-1", "missing"], responseNotes: [{ actorId: "u", message: "Cover refitted", at: "2026-09-14T01:02:00Z" }] }),
+      event({ id: "t2", eventType: "tamper", evidenceSource: TAMPER_SIGNAL, alertIds: ["al-2"] }), event({ id: "t3", eventType: "tamper", evidenceSource: TAMPER_SIGNAL, alertIds: ["al-3"] }),
       { ...lost, restoredAt: "2026-09-14T01:10:00Z" }, event({ id: "f", eventType: "operation_failed" }), event({ id: "p", eventType: "power_lost", evidenceSource: "power_signal" }),
     ];
     const rows = eventRows(es, alerts, NOW);
@@ -204,7 +208,7 @@ describe("the device screens in Malay with the display time zone (IR287)", () =>
     expect(operationRows([op()], "v1", MS)[0]).toMatchObject({ kind: "Semakan sambungan", statusText: "Berjaya", detail: "denyutan disahkan" });
     expect(eventRows([event()], new Map(), NOW, MS)[0]).toMatchObject({ time: "hari ini 10:00 PG GMT+9", detail: "Denyutan terlepas (bukan bukti kehilangan kuasa) · heartbeat", recovery: "terbuka" });
     expect(failureText("TIMEOUT", MS.t)).toBe("tiada pengesahan dalam 60 s");
-    expect(sensorRows(device({ sensors: [{ id: "s1", metric: "temperature", unit: "°C", staleAfterSeconds: 120, calibratedAt: null }] }), MS)).toEqual([{ id: "s1", metric: "Suhu", unit: "°C", stale: "120 s", calibrated: "Tidak pernah" }]); // the metric in words (IR499)
+    expect(sensorRows(device({ sensors: [{ id: "s1", metric: TEMPERATURE, unit: "°C", staleAfterSeconds: 120, calibratedAt: null }] }), MS)).toEqual([{ id: "s1", metric: "Suhu", unit: "°C", stale: "120 s", calibrated: "Tidak pernah" }]); // the metric in words (IR499)
   });
   it("words a refused write and its fields", () => {
     expect(deviceRefusal({ code: "CONFLICT", messageKey: "errors.duplicate_serial", fieldErrors: {} })).toBe("This serial is already registered.");

@@ -1,4 +1,5 @@
 "use client";
+const UNASSIGNED = "unassigned";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -15,7 +16,7 @@ const tree: NonEmpty<Node> = [
       { id: "living", name: "Living room", type: "Room", units: 1 },
       { id: "kitchen", name: "Kitchen", type: "Room", units: 1 } ] },
     { id: "2f", name: "2F", type: "Floor", children: [{ id: "study", name: "Study", type: "Room", units: 1 }] },
-    { id: "unassigned", name: "Unassigned units", type: "", units: 1, unassigned: true },
+    { id: UNASSIGNED, name: "Unassigned units", type: "", units: 1, unassigned: true },
   ] },
   { id: "office-a", name: "Office A", type: "Office", children: [
     { id: "open", name: "Open office", type: "Area", children: [{ id: "ws", name: "Workstations", type: "Space", units: 8 }] },
@@ -45,7 +46,7 @@ function spaceTitle(sel: string, isRoom: boolean): string {
   if (sel === "ws") return "Office A › Open office › Workstations";
   if (sel === "meeting") return "Office A › 3F › Meeting room";
   if (sel === "home-a") return "Home A";
-  if (!isRoom) return sel === "unassigned" ? "Unassigned units (1)" : "Home A";
+  if (!isRoom) return sel === UNASSIGNED ? "Unassigned units (1)" : "Home A";
   return `Home A › 1F › ${sel.charAt(0).toUpperCase()}${sel.slice(1)}`;
 }
 const GROUP_SPACE = new Map([["ws", "Workstations"], ["meeting", "Meeting room"]]);
@@ -88,7 +89,7 @@ export function PropertiesDemo() {
           <div className="flex flex-col text-[13px]">{tree.map((n) => <TreeRow key={n.id} n={n} depth={0} sel={sel} onSel={(id) => { setSel(id); setMode("single"); }} onRename={startRename} />)}</div>
           <p className="mt-3 text-[11px] text-muted-foreground">Read-only — HQ sets up properties, floors, rooms and units. You can rename any location with its edit button or Rename; nothing else here changes the structure.</p>
         </Card>
-        <Card title={spaceTitle(sel, Object.hasOwn(roomUnits, sel))} sub={sel === "home-a" ? "Home A · Home" : undefined} action={sel !== "unassigned" && <Btn size="sm" onClick={() => { startRename(tree[0]); }}><Icon name="edit" />Rename</Btn>}>
+        <Card title={spaceTitle(sel, Object.hasOwn(roomUnits, sel))} sub={sel === "home-a" ? "Home A · Home" : undefined} action={sel !== UNASSIGNED && <Btn size="sm" onClick={() => { startRename(tree[0]); }}><Icon name="edit" />Rename</Btn>}>
           {sel === "home-a" && (
             <>
               <SummaryList cols={2} items={[["Type", "Home"], ["Floors", "2 (1F, 2F)"], ["Rooms", "4"], ["Air conditioners", "5 in rooms · 1 unassigned"], ["Last edited", "Sep 12 · version 3"]]} />
@@ -109,8 +110,8 @@ export function PropertiesDemo() {
               })}
             </div>
           )}
-          {sel !== "home-a" && !us && !groupUnits[sel] && sel !== "unassigned" && <p className="text-[13px] text-muted-foreground">{sel === "study" ? "Study AC is offline (unknown)." : "Select a room with air conditioners to see them here."}</p>}
-          {(sel === "home-a" || sel === "unassigned") && (
+          {sel !== "home-a" && !us && !groupUnits[sel] && sel !== UNASSIGNED && <p className="text-[13px] text-muted-foreground">{sel === "study" ? "Study AC is offline (unknown)." : "Select a room with air conditioners to see them here."}</p>}
+          {(sel === "home-a" || sel === UNASSIGNED) && (
             <div className="mt-2">
               <div className="mb-2 text-[13px] font-bold">? Unassigned units (1) <span className="text-xs font-normal text-muted-foreground">Not in any room</span></div>
               <Link href="/customer/units/unit-guest" className="flex items-center justify-between rounded-xl border border-line p-3 hover:bg-surface2/60"><span><b className="inline-flex items-center gap-1.5"><Icon name="units" className="text-primary" />Guest AC</b><span className="block text-[11px] text-muted-foreground">Home A · no room assigned</span></span><span className="text-xs">25.5 °C · 0 W <Icon name="chevronRight" /></span></Link>

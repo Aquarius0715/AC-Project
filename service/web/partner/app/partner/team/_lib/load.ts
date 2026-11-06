@@ -14,6 +14,8 @@ import { qualificationLabel, requiredFor } from "@ac/web/lib/partnerJobDetail";
 import { activeNow, grantRows, KL, listed, memberRows, QUALIFICATION_CODES, technicianNames, teamQuery, teamStats, UNAVAILABILITY_TYPES, unavailabilityRows, weekday, weekRows, type ApiTeamMember, type ApiUnavailability, type TeamJob } from "@ac/web/lib/partnerTeam";
 import { CERT_STATUSES, certKpis, certQuery, certRows, impact, WINDOWS, type ApiCert, type CertJob } from "@ac/web/lib/partnerCertificates";
 
+const TECHNICIAN = "technician";
+
 const optional = orWhenRefused;
 const plusDays = (date: string, n: number) => new Date(Date.parse(`${date}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 const noon = (date: string) => `${date}T04:00:00Z`; // 12:00 in Kuala Lumpur
@@ -35,10 +37,10 @@ export async function loadTeam(sp: TeamParams) {
   const dates = [0, 1, 2, 3, 4, 5, 6].map((n) => plusDays(week.from, n));
   const dayIndex = dates.indexOf(q.date);
   const [listedMembers, users] = await Promise.all([
-    coreAll<ApiTeamMember>("members.list", { filters: { role: "technician" } }),
-    optional(coreAll<{ membershipId: string | null; email: string }>("partnerUsers.list", { filters: { partnerRole: "technician" } }), []),
+    coreAll<ApiTeamMember>("members.list", { filters: { role: TECHNICIAN } }),
+    optional(coreAll<{ membershipId: string | null; email: string }>("partnerUsers.list", { filters: { partnerRole: TECHNICIAN } }), []),
   ]);
-  const techs = listedMembers.filter((m) => m.role === "technician");
+  const techs = listedMembers.filter((m) => m.role === TECHNICIAN);
   // one label per technician on the whole screen, sorted by it: a name two technicians share gets each one's e-mail
   const names = technicianNames(techs, new Map(users.flatMap((u) => (u.membershipId ? [[u.membershipId, u.email] as const] : []))));
   const members = techs.map((m) => ({ ...m, displayName: names.get(m.id) ?? m.displayName })).toSorted((a, b) => a.displayName.localeCompare(b.displayName) || a.id.localeCompare(b.id));

@@ -1,4 +1,9 @@
 "use client";
+const TIME_PROPOSED = "time_proposed";
+const IN_PROGRESS = "in_progress";
+const CONTRACTORS = "contractors";
+const CONTRACTOR = "contractor";
+const TEXT_10_00_12_00 = "10:00–12:00";
 
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Choice, DataTable, Field, Input, Kpi, ListRow, Modal, Page, Select, SummaryList, Tabs, Textarea, Timeline, cx, useToast, Plain } from "@ac/web/components/ui";
@@ -8,8 +13,8 @@ import { Icon } from "@ac/web/components/Icon";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { nonEmpty } from "@ac/web/lib/lists";
 
-const PIPE: JobStatus[] = ["requested", "time_proposed", "offered", "accepted", "assigned", "in_progress", "submitted", "rework_requested", "completed", "on_hold"];
-const ORDER: JobStatus[] = ["requested", "time_proposed", "offered", "accepted", "assigned", "in_progress", "on_hold", "submitted", "rework_requested", "completed", "cancelled"];
+const PIPE: JobStatus[] = ["requested", TIME_PROPOSED, "offered", "accepted", "assigned", IN_PROGRESS, "submitted", "rework_requested", "completed", "on_hold"];
+const ORDER: JobStatus[] = ["requested", TIME_PROPOSED, "offered", "accepted", "assigned", IN_PROGRESS, "on_hold", "submitted", "rework_requested", "completed", "cancelled"];
 const plans = nonEmpty([
   { id: "plan-living-a", name: "Living room AC — periodic inspection & filter cleaning", rule: "Every 3 months · day 8 · customer-a · next visit 2026-12-08", unit: "Living room AC", delivery: "Internal · tech-internal-b" },
   { id: "plan-lobby-b", name: "Lobby AC — quarterly inspection", rule: "Every 3 months · day 1 · customer-b · next 2026-11-01", unit: "Lobby AC", delivery: "Offer to contractor-a" },
@@ -20,7 +25,7 @@ export function JobsDemo({ jobId, tab: initial }: Readonly<{ jobId?: string; tab
   type Tab = "jobs" | "plans" | "contractors" | "sla";
   const sp = { jobId, tab: initial };
   const jobs = useJobs();
-  const [tab, setTab] = useState<Tab>(oneOf(["plans", "contractors", "sla"] as const, sp.tab ?? "", "jobs"));
+  const [tab, setTab] = useState<Tab>(oneOf(["plans", CONTRACTORS, "sla"] as const, sp.tab ?? "", "jobs"));
   const [selId, setSelId] = useState(sp.jobId ?? "job-c07");
   const [origin, setOrigin] = useState<"all" | "request" | "plan">("all");
   const [delivery, setDelivery] = useState<"all" | "internal" | "contractor">("all");
@@ -31,16 +36,16 @@ export function JobsDemo({ jobId, tab: initial }: Readonly<{ jobId?: string; tab
   const sel = jobs.find((j) => j.id === selId) ?? list[0];
   return (
     <Page className="max-w-[1440px]">
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: "jobs", label: "Jobs", count: jobs.filter((j) => j.status !== "cancelled").length }, { id: "plans", label: "Plans", count: 2 }, { id: "contractors", label: "Contractors", count: 3 }, { id: "sla", label: "SLA by customer" }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ id: "jobs", label: "Jobs", count: jobs.filter((j) => j.status !== "cancelled").length }, { id: "plans", label: "Plans", count: 2 }, { id: CONTRACTORS, label: "Contractors", count: 3 }, { id: "sla", label: "SLA by customer" }]} />
       {tab === "jobs" && (
         <>
           <div className="scroll-x"><div className="grid min-w-[880px] grid-cols-10 overflow-hidden rounded-2xl border border-line bg-surface">
-            {PIPE.map((s) => <Plain key={s} onClick={() => { setStage(stage === s ? null : s); }} className={cx("border-r border-line px-3 py-2 text-left last:border-r-0 hover:bg-surface2", stage === s && "bg-primary-soft")}><div className="text-[11px] text-muted-foreground">{statusLabel[s]}</div><div className={cx("text-lg font-bold", s === "time_proposed" && jobs.some((j) => j.status === s) && "text-warn")}>{jobs.filter((j) => j.status === s).length}</div></Plain>)}
+            {PIPE.map((s) => <Plain key={s} onClick={() => { setStage(stage === s ? null : s); }} className={cx("border-r border-line px-3 py-2 text-left last:border-r-0 hover:bg-surface2", stage === s && "bg-primary-soft")}><div className="text-[11px] text-muted-foreground">{statusLabel[s]}</div><div className={cx("text-lg font-bold", s === TIME_PROPOSED && jobs.some((j) => j.status === s) && "text-warn")}>{jobs.filter((j) => j.status === s).length}</div></Plain>)}
           </div></div>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap gap-2">
               <Select className="w-auto" aria-label="Origin" value={origin} onChange={(e) => { setOrigin(oneOf(["all", "request", "plan"] as const, e.target.value, origin)); }}><option value="all">Origin: All</option><option value="request">Origin: Client request</option><option value="plan">Origin: Periodic plan</option></Select>
-              <Select className="w-auto" aria-label="Delivery" value={delivery} onChange={(e) => { setDelivery(oneOf(["all", "internal", "contractor"] as const, e.target.value, delivery)); }}><option value="all">Delivery: All</option><option value="internal">Delivery: Internal</option><option value="contractor">Delivery: Contractor</option></Select>
+              <Select className="w-auto" aria-label="Delivery" value={delivery} onChange={(e) => { setDelivery(oneOf(["all", "internal", CONTRACTOR] as const, e.target.value, delivery)); }}><option value="all">Delivery: All</option><option value="internal">Delivery: Internal</option><option value="contractor">Delivery: Contractor</option></Select>
               {stage && <Btn size="sm" variant="ghost" onClick={() => { setStage(null); }}><Icon name="close" />{statusLabel[stage]}</Btn>}
             </div>
             <Btn variant="primary" onClick={() => { setModal({ kind: "new" }); }}><Icon name="add" /> New job</Btn>
@@ -62,7 +67,7 @@ export function JobsDemo({ jobId, tab: initial }: Readonly<{ jobId?: string; tab
         </>
       )}
       {tab === "plans" && <PlansDemo />}
-      {tab === "contractors" && <Contractors />}
+      {tab === CONTRACTORS && <Contractors />}
       {tab === "sla" && <Sla />}
       {modal?.kind === "book" && sel && <BookModal j={sel} slot={modal.slot} onClose={() => { setModal(null); }} />}
       {modal?.kind === "propose" && sel && <ProposeModal j={sel} onClose={() => { setModal(null); }} />}
@@ -101,16 +106,16 @@ function rowLine(j: Job) {
   switch (j.status) {
     case "requested": { return j.declined ? `Client declined · round ${String(j.round)} · ${String(j.preferred.length)} new times` : `${String(j.preferred.length)} preferred times · book one or propose`;
     }
-    case "time_proposed": { return `Proposed ${fmt(j.proposal?.slot)} · reply by ${j.proposal?.replyBy ?? "—"}`;
+    case TIME_PROPOSED: { return `Proposed ${fmt(j.proposal?.slot)} · reply by ${j.proposal?.replyBy ?? "—"}`;
     }
     case "offered": { return j.partnerProposal?.status === "pending" ? `${j.contractor ?? "—"} proposes ${fmt(j.partnerProposal.slot)} · needs client OK` : `Offer to ${j.contractor ?? "—"} · ${fmt(j.scheduled)}`;
     }
     case "accepted": { return `${j.contractor ?? "—"} accepted · assign technician`;
     }
-    case "assigned": { const via = j.delivery === "contractor" ? `${j.contractor ?? "—"} · ` : "Internal · ";
+    case "assigned": { const via = j.delivery === CONTRACTOR ? `${j.contractor ?? "—"} · ` : "Internal · ";
       return `${via}${j.technician ?? "—"} · ${ACK_WORD.get(j.techAck?.status ?? "") ?? "awaiting acceptance"}`;
     }
-    default: { return `${(j.delivery === "contractor" ? j.contractor : "Internal") ?? "—"} · ${j.technician ?? "—"} · ${fmt(j.scheduled)}`;
+    default: { return `${(j.delivery === CONTRACTOR ? j.contractor : "Internal") ?? "—"} · ${j.technician ?? "—"} · ${fmt(j.scheduled)}`;
     }
   }
 }
@@ -168,19 +173,19 @@ function JobDetail({ j, open }: Readonly<{ j: Job; open: (m: { kind: "book"; slo
         </>
       )}
 
-      {j.status === "time_proposed" && j.proposal && (
-        <Card tone="warn" title={j.proposal.by === "contractor" ? "Partner’s time sent to the client — waiting" : "Proposal sent — waiting for the client"} action={<Badge tone="warn">Reply by {j.proposal.replyBy}</Badge>}>
+      {j.status === TIME_PROPOSED && j.proposal && (
+        <Card tone="warn" title={j.proposal.by === CONTRACTOR ? "Partner’s time sent to the client — waiting" : "Proposal sent — waiting for the client"} action={<Badge tone="warn">Reply by {j.proposal.replyBy}</Badge>}>
           <SummaryList items={[["Proposed time", longDate(j.proposal.slot)], ["Held capacity", `${j.proposal.who} — booked automatically when the client accepts`], ["Message", `“${j.proposal.message}”`], ["Client", "Notified in the Client app · reminder 24 h before the deadline"]]} />
           <div className="mt-3 flex flex-wrap justify-end gap-2"><Btn variant="danger" onClick={() => { jobActions.withdraw(j.id); toast("Proposal withdrawn", "warn"); }}>Withdraw proposal</Btn><Btn onClick={() => { open({ kind: "propose" }); }}>Edit proposal…</Btn><Btn onClick={() => { toast("Reminder sent to the client"); }}>Remind client</Btn></div>
           <p className="mt-2 text-[11px] text-muted-foreground">Accept → booked with the held partner (no extra HQ step). Decline → back to Requested with the client’s reason and new times. No reply → stays Requested and a “Call the client” task is created.</p>
         </Card>
       )}
 
-      {(j.status === "offered" || j.status === "accepted" || j.status === "assigned" || j.status === "in_progress") && (
-        <Card title={j.delivery === "contractor" ? "Delivery · offer to contractor" : "Delivery · internal"}>
+      {(j.status === "offered" || j.status === "accepted" || j.status === "assigned" || j.status === IN_PROGRESS) && (
+        <Card title={j.delivery === CONTRACTOR ? "Delivery · offer to contractor" : "Delivery · internal"}>
           <SummaryList items={[
             ["Agreed time", j.scheduled ? `${longDate(j.scheduled)} (${agreedBy})` : "—"],
-            ...(j.delivery === "contractor" ? [["Contractor", `${j.contractor ?? "—"} · ${j.status === "offered" ? "offer open · expires 09-25 12:00" : "accepted"}`] as [string, string]] : []),
+            ...(j.delivery === CONTRACTOR ? [["Contractor", `${j.contractor ?? "—"} · ${j.status === "offered" ? "offer open · expires 09-25 12:00" : "accepted"}`] as [string, string]] : []),
             ["Technician", j.technician ? `${j.technician} · ${techAnswer(j)}` : "not assigned yet"],
           ]} />
           {j.techAck?.status === "cant_make" && <div className="mt-3"><Banner tone="warn" action={<span className="flex gap-2">{j.delivery === "internal" && <Btn size="sm" onClick={() => { open({ kind: "reason", what: "reassign" }); }}>Reassign…</Btn>}<Btn size="sm" variant="primary" onClick={() => { open({ kind: "propose" }); }}>Propose another time…</Btn></span>}>{j.technician}: “{j.techAck.reason}”{j.techAck.alt ? ` · could do ${j.techAck.alt}` : ""}. Any new time needs the client’s approval.</Banner></div>}
@@ -198,7 +203,7 @@ function JobDetail({ j, open }: Readonly<{ j: Job; open: (m: { kind: "book"; slo
       {j.status === "submitted" && (
         <Card title="Work report · version 1" sub={`Submitted by ${j.technician ?? "—"}`}>
           <SummaryList items={[["Filter cleaned", "Normal"], ["Drain line", "Normal"], ["Refrigerant pressure", "Normal · 412 kPa"], ["Airflow", "Needs attention · reduced on Low"]]} />
-          {j.delivery === "contractor" ? <p className="mt-2 text-xs text-muted-foreground">Outsourced job — the contractor reviews first; HQ reviews only on escalation.</p> : <>
+          {j.delivery === CONTRACTOR ? <p className="mt-2 text-xs text-muted-foreground">Outsourced job — the contractor reviews first; HQ reviews only on escalation.</p> : <>
             <p className="mt-2 text-xs text-ok">You did not contribute to this report, so you can review it (self-approval is rejected).</p>
             <div className="mt-3 flex flex-wrap gap-2"><Btn variant="primary" onClick={() => { toast("Report accepted — job completed"); }}>Accept report</Btn><Btn onClick={() => { open({ kind: "reason", what: "rework" }); }}>Return for rework…</Btn></div>
           </>}
@@ -217,12 +222,12 @@ function JobDetail({ j, open }: Readonly<{ j: Job; open: (m: { kind: "book"; slo
 function BookModal({ j, slot, onClose }: Readonly<{ j: Job; slot: Slot; onClose: () => void }>) {
   const toast = useToast();
   const f = fitFor(slot);
-  const [d, setD] = useState<"internal" | "contractor">(f.fits === "both" || f.fits === "internal" ? "internal" : "contractor");
+  const [d, setD] = useState<"internal" | "contractor">(f.fits === "both" || f.fits === "internal" ? "internal" : CONTRACTOR);
   return (
     <Modal open onClose={onClose} title={`Book ${j.id}`} footer={<><Btn onClick={onClose}><Icon name="arrowLeft" /> Back</Btn><Btn variant="primary" onClick={() => { jobActions.book(j.id, slot, d, d === "internal" ? "tech-internal-a" : "contractor-a"); toast(d === "internal" ? "Assigned — technician notified" : "Offer sent to contractor-a"); onClose(); }}>{d === "internal" ? "Assign" : "Send offer"}</Btn></>}>
       <p className="text-xs text-muted-foreground">{j.type} · {j.unit} · {j.customer} · {j.origin === "plan" ? "Periodic plan" : "Client request"}</p>
       <Field label="Visit time · from the client" hint="Cannot be edited here. Need another time? Close and use “Propose another time…” — the client must accept it."><div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold"><Icon name="locked" /> {longDate(slot)}</div></Field>
-      <Field label="Who does the work" hint={f.fits === "contractor" ? "No qualified HQ technician is free at this time — offer to a contractor." : undefined}><Choice value={d} onChange={setD} options={[...(f.fits === "contractor" ? [] : [{ id: "internal" as const, label: "Assign internally" }]), { id: "contractor" as const, label: "Offer to contractor" }]} /></Field>
+      <Field label="Who does the work" hint={f.fits === CONTRACTOR ? "No qualified HQ technician is free at this time — offer to a contractor." : undefined}><Choice value={d} onChange={setD} options={[...(f.fits === CONTRACTOR ? [] : [{ id: "internal" as const, label: "Assign internally" }]), { id: "contractor" as const, label: "Offer to contractor" }]} /></Field>
       {d === "internal" ? (
         <Field label="Technician" hint="Only members with valid qualifications for the whole slot are listed"><Select><option>tech-internal-a · Available</option></Select></Field>
       ) : (
@@ -240,7 +245,7 @@ function BookModal({ j, slot, onClose }: Readonly<{ j: Job; slot: Slot; onClose:
 function ProposeModal({ j, onClose }: Readonly<{ j: Job; onClose: () => void }>) {
   const toast = useToast();
   const [date, setDate] = useState("2026-10-01");
-  const [win, setWin] = useState("10:00–12:00");
+  const [win, setWin] = useState(TEXT_10_00_12_00);
   const [who, setWho] = useState("contractor-a · tech-external-a");
   const [messageText, setMessage] = useState("All qualified technicians are booked Sep 28–30. The earliest free slot is Thursday morning. Sorry for the wait.");
   const [tried, setTried] = useState(false);
@@ -252,7 +257,7 @@ function ProposeModal({ j, onClose }: Readonly<{ j: Job; onClose: () => void }>)
         <div className="mb-2 flex items-center justify-between"><b className="text-[13px] text-primary">Option A</b><Badge tone="ok">Fits · capacity held</Badge></div>
         <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
           <Field label="Date"><Input type="date" value={date} onChange={(e) => { setDate(e.target.value); }} /></Field>
-          <Field label="Window"><Select value={win} onChange={(e) => { setWin(e.target.value); }}>{["09:00–11:00", "10:00–12:00", "14:00–16:00"].map((w) => <option key={w}>{w}</option>)}</Select></Field>
+          <Field label="Window"><Select value={win} onChange={(e) => { setWin(e.target.value); }}>{["09:00–11:00", TEXT_10_00_12_00, "14:00–16:00"].map((w) => <option key={w}>{w}</option>)}</Select></Field>
         </div>
         <Field label="Who does it" className="mt-2"><Select value={who} onChange={(e) => { setWho(e.target.value); }}><option>contractor-a · tech-external-a</option><option>tech-internal-a</option></Select></Field>
         {isPre && <p className="mt-1 flex items-center gap-1 text-xs text-crit"><Icon name="error" />This is one of the client’s own times — book it directly instead.</p>}
@@ -267,7 +272,7 @@ function ProposeModal({ j, onClose }: Readonly<{ j: Job; onClose: () => void }>)
 function NewJobModal({ onClose, onDone }: Readonly<{ onClose: () => void; onDone: (id: string) => void }>) {
   const toast = useToast();
   const [sym, setSym] = useState("");
-  const [slots, setSlots] = useState<Slot[]>([{ date: "2026-10-05", win: "10:00–12:00" }, { date: "2026-10-06", win: "14:00–16:00" }, { date: "2026-10-07", win: "09:00–11:00" }]);
+  const [slots, setSlots] = useState<Slot[]>([{ date: "2026-10-05", win: TEXT_10_00_12_00 }, { date: "2026-10-06", win: "14:00–16:00" }, { date: "2026-10-07", win: "09:00–11:00" }]);
   const [tried, setTried] = useState(false);
   const errorText = tried ? preferredError(slots) : undefined;
   return (

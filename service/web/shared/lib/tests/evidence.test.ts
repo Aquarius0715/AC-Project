@@ -3,6 +3,9 @@ import { translator } from "@ac/web/lib/i18n";
 import { ms } from "@ac/web/lib/i18n-ms";
 import { EVIDENCE_KEYS, evidenceText, resolutionText } from "@ac/web/lib/evidence";
 
+const DEMO_COOLING_LOAD_ROSE_WHILE_THE_OUTDOOR = "Demo: cooling load rose while the outdoor temperature was stable.";
+const CLEANING_DUE_54_DAYS_SINCE_THE_LAST_CLEA = "Cleaning due (54 days since the last cleaning, run time unknown). Not a fault.";
+
 describe("evidence texts and resolution reasons in the display language (IR480, IR481)", () => {
   const en = translator("en"), malay = translator("ms");
 
@@ -11,13 +14,13 @@ describe("evidence texts and resolution reasons in the display language (IR480, 
   });
 
   it("keeps a stored English text in English and translates it into Malay", () => {
-    expect(evidenceText("Demo: cooling load rose while the outdoor temperature was stable.", en)).toBe("Demo: cooling load rose while the outdoor temperature was stable.");
-    expect(evidenceText("Demo: cooling load rose while the outdoor temperature was stable.", malay)).toBe(ms["Demo: cooling load rose while the outdoor temperature was stable."]);
+    expect(evidenceText(DEMO_COOLING_LOAD_ROSE_WHILE_THE_OUTDOOR, en)).toBe(DEMO_COOLING_LOAD_ROSE_WHILE_THE_OUTDOOR);
+    expect(evidenceText(DEMO_COOLING_LOAD_ROSE_WHILE_THE_OUTDOOR, malay)).toBe(ms["Demo: cooling load rose while the outdoor temperature was stable."]);
   });
 
   it("keeps the values inside a text: hours, days, a serial, a metric", () => {
-    expect(evidenceText("Cleaning due (54 days since the last cleaning, run time unknown). Not a fault.", malay)).toContain("54");
-    expect(evidenceText("Cleaning due (54 days since the last cleaning, run time unknown). Not a fault.", en)).toBe("Cleaning due (54 days since the last cleaning, run time unknown). Not a fault.");
+    expect(evidenceText(CLEANING_DUE_54_DAYS_SINCE_THE_LAST_CLEA, malay)).toContain("54");
+    expect(evidenceText(CLEANING_DUE_54_DAYS_SINCE_THE_LAST_CLEA, en)).toBe(CLEANING_DUE_54_DAYS_SINCE_THE_LAST_CLEA);
     expect(evidenceText("Cleaning due (310 h of run time since the last cleaning). Not a fault.", malay)).toContain("310");
     expect(evidenceText("Device SN-0042 reported its cover opened while powered (tamper_signal)", malay)).toContain("SN-0042");
     // the stored text keeps the server's event name; the screen says it in words (IR626)

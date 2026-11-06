@@ -1,4 +1,8 @@
 "use client";
+const EVAPORATOR_COIL = "Evaporator coil";
+const NOT_APPLICABLE = "not_applicable";
+const IN_PROGRESS = "In progress";
+const NOT_INSPECTED = "not_inspected";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -9,7 +13,7 @@ import { Job, fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
 import { Icon } from "@ac/web/components/Icon";
 
 const groups: Record<string, string[]> = {
-  indoor: ["Filter", "Evaporator coil", "Blower motor", "Blower fan", "Drain pipe", "Drain pan", "Outlet", "Louver"],
+  indoor: ["Filter", EVAPORATOR_COIL, "Blower motor", "Blower fan", "Drain pipe", "Drain pan", "Outlet", "Louver"],
   outdoor: ["Compressor", "Condenser coil", "Fan motor", "Refrigerant line", "Service valve"],
   electrical: ["Wiring insulation", "Capacitor", "Breaker", "Terminals", "Grounding"],
 };
@@ -78,11 +82,11 @@ function Workspace({ id }: Readonly<{ id: string }>) {
     u.searchParams.set("tab", t);
     history.replaceState(null, "", u);
   };
-  const [res, setRes] = useState<Record<string, R>>({ Filter: "attention", "Evaporator coil": "normal", "Blower motor": "normal", "Blower fan": "normal", "Drain pipe": "normal", "Drain pan": "normal", Outlet: "not_applicable" });
+  const [res, setRes] = useState<Record<string, R>>({ Filter: "attention", "Evaporator coil": "normal", "Blower motor": "normal", "Blower fan": "normal", "Drain pipe": "normal", "Drain pan": "normal", Outlet: NOT_APPLICABLE });
   const [why, setWhy] = useState<Record<string, string>>({ Filter: "heavy dust buildup, recommend replacement", Outlet: "no accessible outlet in this installation" });
-  const [readings, setReadings] = useState([["Supply air temperature", "14.2", "°C", "Evaporator coil"], ["Return air temperature", "25.8", "°C", "Evaporator coil"], ["Filter pressure drop", "118", "Pa", "Filter"], ["Blower motor current", "1.9", "A", "Blower motor"]]);
+  const [readings, setReadings] = useState([["Supply air temperature", "14.2", "°C", EVAPORATOR_COIL], ["Return air temperature", "25.8", "°C", EVAPORATOR_COIL], ["Filter pressure drop", "118", "Pa", "Filter"], ["Blower motor current", "1.9", "A", "Blower motor"]]);
   const [work, setWork] = useState("Cleaned filter, inspected coil and blower — all normal except filter (dust buildup, recommend replacement). No parts used yet.");
-  const [status, setStatus] = useState(DEMO_STATUS.get(id) ?? "In progress");
+  const [status, setStatus] = useState(DEMO_STATUS.get(id) ?? IN_PROGRESS);
   const [errs, setErrs] = useState<string[]>([]);
   const [confirm, setConfirm] = useState(false);
   const [view, setView] = useState<"readings" | "parts" | "time">("readings");
@@ -101,7 +105,7 @@ function Workspace({ id }: Readonly<{ id: string }>) {
     const nul = all.length - done;
     if (nul) e.push(`${String(nul)} items still null — each needs a result, or not_inspected / not_applicable with a reason.`);
     if (work.trim().length < 10) e.push("Work performed must be 10–4000 characters.");
-    for (const [k, v] of Object.entries(res)) { if ((v === "not_inspected" || v === "not_applicable") && !why[k]?.trim()) e.push(`${k}: reason required.`); }
+    for (const [k, v] of Object.entries(res)) { if ((v === NOT_INSPECTED || v === NOT_APPLICABLE) && !why[k]?.trim()) e.push(`${k}: reason required.`); }
     setErrs(e);
     if (e.length === 0) setConfirm(true);
   };
@@ -116,9 +120,9 @@ function Workspace({ id }: Readonly<{ id: string }>) {
       <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href="/technician" className="font-semibold text-primary"><Icon name="arrowLeft" /> Overview</Link><b className="text-ink">{id} · Bedroom AC</b><Badge tone={STATUS_TONE.get(status) ?? "warn"}>{status}</Badge></div>
       {status === "Assigned" && <Banner action={<span className="flex gap-2"><Btn size="sm" disabled>Start job</Btn><Btn size="sm" variant="ghost" onClick={() => { setCheckIn(true); }}>Preview check-in</Btn></span>}>Read-only until the window opens at 14:00 — Start is disabled before then. On site, Start job opens Check in (location + unit QR).</Banner>}
       {status === "Submitted" && <Banner tone="ok">Submitted v1 — read-only, awaiting quality review.</Banner>}
-      {status === "In progress" && <Banner tone="warn">Work window ends in 15 min — unsaved input will be discarded at 12:00.</Banner>}
-      {status === "On hold" && <Banner tone="warn" action={<Btn size="sm" variant="ghost" onClick={() => { setStatus("In progress"); }}>Demo: HQ resumes</Btn>}>On hold by HQ — saving and submitting are blocked. Your draft v2 is kept; continue when HQ resumes the job.</Banner>}
-      {status === "In progress" && <p className="text-right text-[11px] text-muted-foreground"><Plain className="underline" onClick={() => { setStatus("On hold"); }}>Demo: HQ puts the job on hold</Plain></p>}
+      {status === IN_PROGRESS && <Banner tone="warn">Work window ends in 15 min — unsaved input will be discarded at 12:00.</Banner>}
+      {status === "On hold" && <Banner tone="warn" action={<Btn size="sm" variant="ghost" onClick={() => { setStatus(IN_PROGRESS); }}>Demo: HQ resumes</Btn>}>On hold by HQ — saving and submitting are blocked. Your draft v2 is kept; continue when HQ resumes the job.</Banner>}
+      {status === IN_PROGRESS && <p className="text-right text-[11px] text-muted-foreground"><Plain className="underline" onClick={() => { setStatus("On hold"); }}>Demo: HQ puts the job on hold</Plain></p>}
       {errs.length > 0 && <Banner tone="crit"><b>Can’t submit:</b><ul className="list-disc pl-5 text-xs">{errs.slice(0, 5).map((e) => <li key={e}>{e}</li>)}</ul></Banner>}
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">
@@ -127,8 +131,8 @@ function Workspace({ id }: Readonly<{ id: string }>) {
               {(groups[tab] ?? []).map((k) => (
                 <li key={k} className="py-2.5">
                   <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[13px] font-semibold">{k}</span>
-                    <div className="flex flex-wrap gap-1">{([["normal", "Normal"], ["attention", "Attention"], ["not_inspected", "Not inspected"], ["not_applicable", "N/A"]] as const).map(([v, l]) => <Plain key={v} disabled={isReadOnly} onClick={() => { setRes((r) => ({ ...r, [k]: v })); }} aria-pressed={res[k] === v} className={cx("rounded-lg border px-2.5 py-1 text-xs font-semibold disabled:opacity-60", res[k] === v ? (CHOSEN.get(v) ?? "border-primary bg-primary-soft text-primary") : "border-line hover:bg-surface2")}>{l}</Plain>)}</div></div>
-                  {(res[k] === "attention" || res[k] === "not_inspected" || res[k] === "not_applicable") && <div className="mt-1.5"><Input disabled={isReadOnly} placeholder="Reason…" value={why[k] ?? ""} onChange={(e) => { setWhy((w) => ({ ...w, [k]: e.target.value })); }} /></div>}
+                    <div className="flex flex-wrap gap-1">{([["normal", "Normal"], ["attention", "Attention"], [NOT_INSPECTED, "Not inspected"], [NOT_APPLICABLE, "N/A"]] as const).map(([v, l]) => <Plain key={v} disabled={isReadOnly} onClick={() => { setRes((r) => ({ ...r, [k]: v })); }} aria-pressed={res[k] === v} className={cx("rounded-lg border px-2.5 py-1 text-xs font-semibold disabled:opacity-60", res[k] === v ? (CHOSEN.get(v) ?? "border-primary bg-primary-soft text-primary") : "border-line hover:bg-surface2")}>{l}</Plain>)}</div></div>
+                  {(res[k] === "attention" || res[k] === NOT_INSPECTED || res[k] === NOT_APPLICABLE) && <div className="mt-1.5"><Input disabled={isReadOnly} placeholder="Reason…" value={why[k] ?? ""} onChange={(e) => { setWhy((w) => ({ ...w, [k]: e.target.value })); }} /></div>}
                 </li>
               ))}
             </ul>

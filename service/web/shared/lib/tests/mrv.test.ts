@@ -6,17 +6,22 @@ import {
   type ApiMRVReport, type FactorDraft, type MRVDraft,
 } from "@ac/web/lib/mrv";
 
+const TEXT_2026_08_31T16_00_00Z = "2026-08-31T16:00:00Z";
+const AC_INPUT_ELECTRICITY = "ac_input_electricity";
+const DEMO_FICTIONAL = "Demo (fictional)";
+const DEMO_CUSTOMER_A = "Demo Customer A";
+
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const summary: ApiEnergySummary = {
-  period: { from: "2026-08-31T16:00:00Z", to: "2026-09-07T16:00:00Z" }, unitIds: ["u1", "u2"],
+  period: { from: TEXT_2026_08_31T16_00_00Z, to: "2026-09-07T16:00:00Z" }, unitIds: ["u1", "u2"],
   totals: { kWh: 120.25, amountMinor: 6012, savedKWh: -14.75, deltaKWh: 14.75, savingPercentage: -10.93, savedAmountMinor: -738, emissionsKg: 70.95, savedEmissionsKg: -8.7 },
   currency: "MYR", baselineRef: { id: "b1", version: 2 }, factorRef: { id: "f1", version: 1 },
   baselineSnapshot: {
-    id: "b1", version: 2, createdAt: "2026-08-01T00:00:00Z", unitIds: ["u1", "u2"], period: { from: "2026-08-24T16:00:00Z", to: "2026-08-31T16:00:00Z" },
-    method: "demo_fixed", baselineKWh: 105.5, quality: { kind: "modeled", coverage: null }, boundaryId: "ac_input_electricity", boundary: "AC input", assumptions: "Same week", source: "demo",
+    id: "b1", version: 2, createdAt: "2026-08-01T00:00:00Z", unitIds: ["u1", "u2"], period: { from: "2026-08-24T16:00:00Z", to: TEXT_2026_08_31T16_00_00Z },
+    method: "demo_fixed", baselineKWh: 105.5, quality: { kind: "modeled", coverage: null }, boundaryId: AC_INPUT_ELECTRICITY, boundary: "AC input", assumptions: "Same week", source: "demo",
   },
-  factorSnapshot: { id: "f1", version: 1, region: "Demo region", year: 2026, kgCO2ePerKWh: 0.59, source: "Demo (fictional)" },
-  tariffVersion: "tariff-demo-1", boundaryId: "ac_input_electricity", boundary: "AC input", coverage: 1, qualityWarnings: ["modeled_baseline"],
+  factorSnapshot: { id: "f1", version: 1, region: "Demo region", year: 2026, kgCO2ePerKWh: 0.59, source: DEMO_FICTIONAL },
+  tariffVersion: "tariff-demo-1", boundaryId: AC_INPUT_ELECTRICITY, boundary: "AC input", coverage: 1, qualityWarnings: ["modeled_baseline"],
 };
 const report: ApiMRVReport = {
   id: "r1234567-aaaa",
@@ -27,15 +32,15 @@ const report: ApiMRVReport = {
   scope: "scope_2",
   isDemo: true,
   incomplete: false,
-  conditions: { from: "2026-08-31T16:00:00Z", to: "2026-09-07T16:00:00Z", unitIds: ["u1", "u2"], baselineId: "b1", baselineVersion: 2, factorId: "f1", factorVersion: 1, boundaryId: "ac_input_electricity", boundary: "AC input", organizationId: "org-a" },
+  conditions: { from: TEXT_2026_08_31T16_00_00Z, to: "2026-09-07T16:00:00Z", unitIds: ["u1", "u2"], baselineId: "b1", baselineVersion: 2, factorId: "f1", factorVersion: 1, boundaryId: AC_INPUT_ELECTRICITY, boundary: "AC input", organizationId: "org-a" },
   reviewHistory: [{ userId: "user-hq-0001", reportVersion: 1, comment: "Looks consistent", at: "2026-09-14T01:30:00Z" }],
   summary,
 };
-const orgs = [{ id: "org-a", name: "Demo Customer A" }];
+const orgs = [{ id: "org-a", name: DEMO_CUSTOMER_A }];
 const units = [{ id: "u1", label: "Lobby AC" }, { id: "u2", label: "Bedroom AC" }];
 const draft = (over: Partial<MRVDraft>): MRVDraft => {
   return {
-    organizationId: "org-a", unitIds: ["u1"], from: "2026-09-01T00:00", to: "2026-09-08T00:00", baseline: versionKey("b1", 2), factor: versionKey("f1", 1), boundaryId: "ac_input_electricity", boundary: " AC input ", ...over,
+    organizationId: "org-a", unitIds: ["u1"], from: "2026-09-01T00:00", to: "2026-09-08T00:00", baseline: versionKey("b1", 2), factor: versionKey("f1", 1), boundaryId: AC_INPUT_ELECTRICITY, boundary: " AC input ", ...over,
   };
 };
 
@@ -43,7 +48,7 @@ describe("HQ digital MRV (FR-A14, DD-A14)", () => {
   it("lists reports with their Kuala Lumpur period and result, or says the calculation is incomplete", () => {
     const rows = reportRows([report, { ...report, id: "r2", conditions: { ...report.conditions, organizationId: "org-x", unitIds: ["u1"] }, incomplete: true }], orgs);
     expect(rows.map((r) => [r.org, r.units, r.period, r.result])).toEqual([
-      ["Demo Customer A", "2 units", "2026-09-01 00:00 → 2026-09-08 00:00", "71.0 kgCO₂e"], ["customer", "1 unit", "2026-09-01 00:00 → 2026-09-08 00:00", "Calculation incomplete"],
+      [DEMO_CUSTOMER_A, "2 units", "2026-09-01 00:00 → 2026-09-08 00:00", "71.0 kgCO₂e"], ["customer", "1 unit", "2026-09-01 00:00 → 2026-09-08 00:00", "Calculation incomplete"],
     ]);
   });
 
@@ -51,8 +56,8 @@ describe("HQ digital MRV (FR-A14, DD-A14)", () => {
     const v = mrvView(report, orgs, units);
     expect([v.incomplete, v.electricity, v.emissions, v.energyVsBaseline, v.energyPercent, v.emissionsVsBaseline]).toEqual([false, "120.3 kWh", "71.0 kgCO₂e", "Increase 14.8 kWh", "Increase 10.9%", "Increase 8.7 kgCO₂e"]);
     expect(v.conditions).toEqual([
-      ["Organization", "Demo Customer A"], ["Units", "Lobby AC, Bedroom AC"], ["Period", "2026-09-01 00:00 → 2026-09-08 00:00 (Asia/Kuala_Lumpur)"], ["Boundary", "ac_input_electricity — AC input"],
-      ["Baseline", "v2 · demo_fixed · 105.5 kWh"], ["Emission factor", "v1 · Demo region · 2026 · 0.59 kgCO₂e/kWh"], ["Factor source", "Demo (fictional)"], ["Coverage", "100.0%"],
+      ["Organization", DEMO_CUSTOMER_A], ["Units", "Lobby AC, Bedroom AC"], ["Period", "2026-09-01 00:00 → 2026-09-08 00:00 (Asia/Kuala_Lumpur)"], ["Boundary", "ac_input_electricity — AC input"],
+      ["Baseline", "v2 · demo_fixed · 105.5 kWh"], ["Emission factor", "v1 · Demo region · 2026 · 0.59 kgCO₂e/kWh"], ["Factor source", DEMO_FICTIONAL], ["Coverage", "100.0%"],
     ]);
     const missing = mrvView({ ...report, summary: { ...summary, factorSnapshot: null, totals: { ...summary.totals, emissionsKg: null } } }, orgs, units);
     expect([missing.incomplete, missing.emissions, missing.conditions[5]]).toEqual([true, "Calculation incomplete", ["Emission factor", "Calculation incomplete — factor missing"]]);
@@ -74,7 +79,7 @@ describe("HQ digital MRV (FR-A14, DD-A14)", () => {
   it("checks a demo emission factor (IR102: the unit is fixed)", () => {
     const f: FactorDraft = { region: " Demo region ", year: "2026", kgCO2ePerKWh: "0.59", source: " Demo (fictional) " };
     expect(factorErrors(f)).toEqual({});
-    expect(factorInput(f, "f1")).toEqual({ id: "f1", region: "Demo region", year: 2026, kgCO2ePerKWh: 0.59, source: "Demo (fictional)", isDemo: true });
+    expect(factorInput(f, "f1")).toEqual({ id: "f1", region: "Demo region", year: 2026, kgCO2ePerKWh: 0.59, source: DEMO_FICTIONAL, isDemo: true });
     expect(factorErrors({ region: "", year: "1999", kgCO2ePerKWh: "0", source: "" })).toEqual({
       region: "1–120 characters", year: "A year 2000–2100", kgCO2ePerKWh: "Above 0 and at most 10 kgCO₂e/kWh", source: "1–500 characters, stating the demo source",
     });

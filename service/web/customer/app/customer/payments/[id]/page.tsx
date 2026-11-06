@@ -21,6 +21,7 @@ import { InvoiceView, type InvoiceLive } from "./_components/invoice-view";
 import { queryReader } from "@ac/web/lib/searchParams";
 import { orNull } from "@ac/web/lib/promises";
 
+const RESTRICTION = "restriction";
 
 export default async function CustomerInvoicePage({ params, searchParams }: Readonly<PageProps<"/customer/payments/[id]">>) {
   interface Reminder { id: string; channel: string; occurredAt: string; target: { kind: string; id: string } }
@@ -63,12 +64,12 @@ export default async function CustomerInvoicePage({ params, searchParams }: Read
   const { open, last } = paymentPhase(inv.paymentRefs);
   const r = restrictions.find((x) => x.id === one("restrictionId")) ?? restrictions.find((x) => ["scheduled", "requested", "applied", "release_requested"].includes(x.state)) ?? restrictions[0] ?? null;
   const asked = one("tab") === "inquiry" ? "inquiry" : "payment";
-  const tab = one("tab") === "restriction" && r ? "restriction" : asked;
+  const tab = one("tab") === RESTRICTION && r ? RESTRICTION : asked;
   let restriction: InvoiceLive["restriction"] = null;
   if (r) {
     const ids = r.perUnit.flatMap((u) => [u.applyCommandIds.at(-1), u.releaseCommandIds.at(-1)]).filter((x): x is string => !!x);
     const [commands, about] = await Promise.all([
-      tab === "restriction" ? Promise.all(ids.map((c) => orNull(coreOp<ApiCommand>("commands.get", { id: c })))) : Promise.resolve([]),
+      tab === RESTRICTION ? Promise.all(ids.map((c) => orNull(coreOp<ApiCommand>("commands.get", { id: c })))) : Promise.resolve([]),
       coreAll<ApiInquiry>("inquiries.list", { filters: { restrictionId: r.id } }),
     ]);
     const byId = new Map(commands.filter((c): c is ApiCommand => !!c).map((c) => [c.id, c]));

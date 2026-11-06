@@ -18,6 +18,8 @@ import { PropertiesDemo } from "./_components/properties-demo";
 import { PropertiesView, type PropertiesLive } from "./_components/properties-view";
 import { queryReader } from "@ac/web/lib/searchParams";
 
+const PROPERTYID = "propertyId";
+
 export default async function CustomerPropertiesPage({ searchParams }: Readonly<PageProps<"/customer/properties">>) {
   await connection();
   if (!apiMode()) return <PropertiesDemo />;
@@ -30,8 +32,8 @@ export default async function CustomerPropertiesPage({ searchParams }: Readonly<
   const tree = locationTree(properties, spaces, units, properties[0]?.customerOrgId ?? "");
   const powerState = powerStates.find((p) => p === one("powerState"));
   const conns = (one("connections") ?? "").split(",").filter((c): c is Connection => (connections as string[]).includes(c));
-  const isFiltered = !one("spaceId") && !one("propertyId") && (!!powerState || conns.length > 0);
-  const propertySel = one("unassignedOnly") === "true" && one("propertyId") ? selection(tree, `unassigned:${one("propertyId") ?? ""}`, spaces) : selection(tree, one("propertyId"), spaces);
+  const isFiltered = !one("spaceId") && !one(PROPERTYID) && (!!powerState || conns.length > 0);
+  const propertySel = one("unassignedOnly") === "true" && one(PROPERTYID) ? selection(tree, `unassigned:${one(PROPERTYID) ?? ""}`, spaces) : selection(tree, one(PROPERTYID), spaces);
   const sel = one("spaceId") ? selection(tree, one("spaceId"), spaces) : propertySel;
   // the units whose detail the panel needs: the KPI filter, a room / area (descendants included) or the property's unassigned units
   const selectedUnits = () => {

@@ -14,12 +14,13 @@ import { byText } from "@ac/web/lib/order";
 import { runState } from "@ac/web/lib/units";
 import { entryOf } from "@ac/web/lib/lookup";
 
+const KL = "Asia/Kuala_Lumpur";
+
 export type OverviewPeriod = "today" | "7d" | "30d";
 export const OVERVIEW_PERIODS: { id: OverviewPeriod; label: string }[] = [{ id: "today", label: "Today" }, { id: "7d", label: "7d" }, { id: "30d", label: "30d" }];
 export const periodOf = (v?: string): OverviewPeriod => (v === "7d" || v === "30d" ? v : "today");
 export type OverviewUnit = ApiUnitRow & { latestMeasurements: ApiMeasurement[] };
 
-const KL = "Asia/Kuala_Lumpur";
 const hm = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { timeZone: KL, hour: "2-digit", minute: "2-digit", hour12: false });
 const md = (iso: string, i: I18n) => new Date(iso).toLocaleDateString(intlTag(i.display.locale), { timeZone: KL, month: "short", day: "numeric" });
 const one = (v: number) => (Math.round(v * 10) / 10).toFixed(1);

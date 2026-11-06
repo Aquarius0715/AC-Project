@@ -1,4 +1,5 @@
 "use client";
+const TEMPERATURE_LIMIT = "temperature_limit";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -135,7 +136,7 @@ function ScheduleModal({ open, onClose, contracts, now, onDone }: Readonly<{ ope
   const [pending, run] = useAction();
   const [contractId, setContractId] = useState("");
   const [unitIds, setUnitIds] = useState<string[]>([]);
-  const [kind, setKind] = useState<Policy["kind"]>("temperature_limit");
+  const [kind, setKind] = useState<Policy["kind"]>(TEMPERATURE_LIMIT);
   const [setpoint, setSetpoint] = useState("24");
   const [executeAfter, setExecuteAfter] = useState(() => {
     const p = zonedParts(new Date(now.getTime() + 25 * 3600 * 1000).toISOString(), zone); // a whole hour, 25 h ahead in the display zone
@@ -153,7 +154,7 @@ function ScheduleModal({ open, onClose, contracts, now, onDone }: Readonly<{ ope
   else if (k.invoices.length === 0) errors.contractId = t("This contract has no overdue unpaid invoice");
   else if (k.recipients === 0) errors.contractId = t("No active client can receive the notice");
   if (unitIds.length === 0) errors.unitIds = t("Choose at least one unit");
-  if (kind === "temperature_limit" && (!range || !(sp >= range.min && sp <= range.max))) errors.setpoint = range ? t("Within {min}–{max} °C for the chosen units", { min: range.min, max: range.max }) : t("The chosen units need a temperature range");
+  if (kind === TEMPERATURE_LIMIT && (!range || !(sp >= range.min && sp <= range.max))) errors.setpoint = range ? t("Within {min}–{max} °C for the chosen units", { min: range.min, max: range.max }) : t("The chosen units need a temperature range");
   if (!at || Date.parse(at) < now.getTime() + 24 * 3600 * 1000) errors.executeAfter = t("At least 24 hours from now");
   if (reason.trim().length === 0 || reason.length > 1000) errors.reason = t("1–1000 characters, shown to the customer");
   const save = () => {
@@ -180,8 +181,8 @@ function ScheduleModal({ open, onClose, contracts, now, onDone }: Readonly<{ ope
         <div><p className="mb-1 text-[13px] font-semibold">{t("Units")}</p><div className="flex flex-col gap-1">{k.units.map((u) => <Check key={u.id} disabled={!!u.blocked} checked={unitIds.includes(u.id)} onChange={(on) => { setUnitIds(on ? [...unitIds, u.id] : unitIds.filter((x) => x !== u.id)); }} label={<span>{u.name} <span className="text-xs text-muted-foreground">{u.blocked ? `— ${u.blocked}` : null}{!u.blocked && u.temperature && `${String(u.temperature.min)}–${String(u.temperature.max)} °C`}{!u.blocked && !u.temperature && t("no temperature setpoint")}</span></span>} />)}</div>{tried && errors.unitIds && <p className="mt-1 text-xs text-crit">{errors.unitIds}</p>}</div>
       </>}
       <div className="grid-fluid" style={{ ["--min" as string]: "190px" }}>
-        <Field label={t("Policy")}><Select value={kind} onChange={(e) => { setKind(oneOf(["temperature_limit", "power_off"] as const, e.target.value, kind)); }}><option value="temperature_limit">{t("Temperature limit")}</option><option value="power_off">{t("Power off")}</option></Select></Field>
-        {kind === "temperature_limit" && <Field label={t("Minimum cooling setpoint (°C)")} error={tried ? errors.setpoint : undefined}><Input type="number" value={setpoint} onChange={(e) => { setSetpoint(e.target.value); }} /></Field>}
+        <Field label={t("Policy")}><Select value={kind} onChange={(e) => { setKind(oneOf([TEMPERATURE_LIMIT, "power_off"] as const, e.target.value, kind)); }}><option value="temperature_limit">{t("Temperature limit")}</option><option value="power_off">{t("Power off")}</option></Select></Field>
+        {kind === TEMPERATURE_LIMIT && <Field label={t("Minimum cooling setpoint (°C)")} error={tried ? errors.setpoint : undefined}><Input type="number" value={setpoint} onChange={(e) => { setSetpoint(e.target.value); }} /></Field>}
         <Field label={t("Execute after")} error={tried ? errors.executeAfter : undefined} hint={t("The notice is sent now; at least 24 h ahead · times in {zone}", { zone })}><Input type="datetime-local" value={executeAfter} onChange={(e) => { setExecuteAfter(e.target.value); }} /></Field>
       </div>
       <Field label={t("Reason shown to the customer")} error={tried ? errors.reason : undefined}><Textarea value={reason} maxLength={1000} onChange={(e) => { setReason(e.target.value); }} placeholder={t("Demo: invoice overdue since 2026-09-10")} /></Field>

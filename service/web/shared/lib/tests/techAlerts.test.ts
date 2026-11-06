@@ -3,15 +3,18 @@ import { alertChoices, alertView, durationText, refusal, ruleWords, selectAlert,
 import { EN, i18nOf } from "@ac/web/lib/i18n";
 import { unitDetail } from "./unitFixture";
 
+const BEDROOM_TOO_HOT = "Bedroom too hot";
+const ALERT_TEMP_0 = "alert-temp-0";
+
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const NOW = Date.parse("2026-09-14T01:35:00Z"); // 09:35 in Kuala Lumpur
-const rule = { name: "Bedroom too hot", metric: "temperature", operator: "gte" as const, threshold: 30, recoveryThreshold: 28, durationSeconds: 60 };
+const rule = { name: BEDROOM_TOO_HOT, metric: "temperature", operator: "gte" as const, threshold: 30, recoveryThreshold: 28, durationSeconds: 60 };
 const base: ApiTechAlert = {
   id: "alert-temp-a", version: 1, unitId: "u1", type: "sensor", severity: "warning", status: "open", causeCode: "unknown", evidenceKind: "demo_observation",
   evidenceText: "temperature 30.4 °C", observedAt: "2026-09-14T01:12:00Z", detectedAt: "2026-09-14T01:12:00Z", acknowledgedAt: null, resolvedAt: null, resolutionReason: null,
-  previousAlertId: "alert-temp-0", policyId: "p1", rule,
+  previousAlertId: ALERT_TEMP_0, policyId: "p1", rule,
 };
-const earlier: ApiTechAlert = { ...base, id: "alert-temp-0", status: "resolved", detectedAt: "2026-09-02T02:00:00Z", resolvedAt: "2026-09-02T03:00:00Z", previousAlertId: null };
+const earlier: ApiTechAlert = { ...base, id: ALERT_TEMP_0, status: "resolved", detectedAt: "2026-09-02T02:00:00Z", resolvedAt: "2026-09-02T03:00:00Z", previousAlertId: null };
 const unit = unitDetail({
   id: "u1", displayName: "Bedroom AC", location: { pathLabels: ["Home A", "1F", "Bedroom"], address: null, accessInstructions: null },
   latestMeasurements: [{ id: "m1", unitId: "u1", sensorId: "s", metric: "temperature", value: 30.4, unit: "°C", observedAt: "2026-09-14T01:35:00Z", origin: "measured", quality: "valid", qualityReason: null }],
@@ -40,7 +43,7 @@ describe("technician alert evidence", () => {
     });
     expect(v.history).toEqual([{ id: "raised", time: "today 9:12 am MYT", title: "Raised", sub: "temperature 30.4 °C · Temperature ≥ 30.0 °C for 60 s", badge: { text: "Observed (demo)", tone: "primary" } }]);
     expect(v.related).toEqual([
-      ["Job", "job-t07- · Preventive maintenance"], ["Unit", "Bedroom AC · Home A › 1F › Bedroom"], ["Policy", "Bedroom too hot"], ["Recovery rule", "< 28.0 °C for 60 s"],
+      ["Job", "job-t07- · Preventive maintenance"], ["Unit", "Bedroom AC · Home A › 1F › Bedroom"], ["Policy", BEDROOM_TOO_HOT], ["Recovery rule", "< 28.0 °C for 60 s"],
       ["Previous alert", "2 Sept 2026 · resolved"], ["You can resolve", "with a remeasurement only"],
     ]);
   });
@@ -60,8 +63,8 @@ describe("technician alert evidence", () => {
 
   it("opens the URL's alert, else the worst unresolved, and words refusals", () => {
     const crit: ApiTechAlert = { ...base, id: "crit", severity: "critical", detectedAt: "2026-09-13T01:00:00Z" };
-    expect([selectAlert([base, crit, earlier], "alert-temp-0")?.id, selectAlert([base, crit, earlier])?.id, selectAlert([earlier])?.id, selectAlert([])]).toEqual(["alert-temp-0", "crit", "alert-temp-0", null]);
-    expect(alertChoices([earlier, base], NOW).map((c) => [c.id, c.title, c.sub])).toEqual([["alert-temp-a", "Bedroom too hot", "Open · today 9:12 am MYT"], ["alert-temp-0", "Bedroom too hot", "Resolved · 2 Sept 2026, 10:00 am MYT"]]);
+    expect([selectAlert([base, crit, earlier], ALERT_TEMP_0)?.id, selectAlert([base, crit, earlier])?.id, selectAlert([earlier])?.id, selectAlert([])]).toEqual([ALERT_TEMP_0, "crit", ALERT_TEMP_0, null]);
+    expect(alertChoices([earlier, base], NOW).map((c) => [c.id, c.title, c.sub])).toEqual([["alert-temp-a", BEDROOM_TOO_HOT, "Open · today 9:12 am MYT"], [ALERT_TEMP_0, BEDROOM_TOO_HOT, "Resolved · 2 Sept 2026, 10:00 am MYT"]]);
     const forbidden = alertView(base, ctx, NOW).resolution.forbidden;
     expect(refusal({ code: "FORBIDDEN", messageKey: "error.forbidden" }, forbidden, EN.t)).toBe(forbidden);
     expect(refusal({ code: "FORBIDDEN", messageKey: "errors.assignment_ended" }, forbidden, EN.t)).toBe("Your work window on this unit has ended.");

@@ -10,6 +10,8 @@ import { byText } from "@ac/web/lib/order";
 import { z } from "zod";
 import { codePoints, wrapped } from "@ac/web/lib/text";
 
+const KL = "Asia/Kuala_Lumpur";
+
 const en = translator("en");
 export type Mode = "cool" | "dry" | "fan";
 export type Fan = "low" | "mid" | "high";
@@ -52,7 +54,6 @@ export interface ApiCampaign {
   results: { deviceId: string; waveIndex: number; status: "pending" | "installing" | "succeeded" | "failed" | "skipped"; reasonKey: string | null; at: string | null }[]; reason: string | null;
 }
 
-const KL = "Asia/Kuala_Lumpur";
 export const klTime = (iso: string) =>
   new Date(iso).toLocaleString("en-CA", { timeZone: KL, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).replace(",", "");
 

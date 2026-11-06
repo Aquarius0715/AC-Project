@@ -1,4 +1,5 @@
 "use client";
+const SET_TEMPERATURE_FROM_C_TO_C = "Set temperature {from}°C → {to}°C";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -104,7 +105,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
   const modeWord = (m: string | null) => (m === null ? "—" : textOf(MODE_LABEL, m, t) ?? m);
   const fanWord = (f: string | null) => (f === null ? "—" : textOf(FAN_LABEL, f, t) ?? f);
   const changeText = (a: UnitAction) => {
-    if (a.kind === "set_temperature") return t("Set temperature {from}°C → {to}°C", { from: confirmed, to: setpoint });
+    if (a.kind === "set_temperature") return t(SET_TEMPERATURE_FROM_C_TO_C, { from: confirmed, to: setpoint });
     if (a.kind === "set_mode") return t("Mode → {mode}", { mode: modeWord(mode) });
     if (a.kind === "set_fan") return t("Fan → {fan}", { fan: fanWord(fan) });
     return "";
@@ -212,7 +213,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
               {isShowMode && <div><div className="mb-1 font-semibold">{t("Mode")}</div><Choice value={mode} disabled={isDisabled} onChange={(m) => { setMode(m); setEdited((e) => ({ ...e, mode: true })); }} options={modes.map((m) => ({ id: m, label: t(MODE_LABEL[m]) }))} /></div>}
               {isShowFan && <div><div className="mb-1 font-semibold">{t("Fan speed")}</div><Choice value={fan} disabled={isDisabled} onChange={(f) => { setFan(f); setEdited((e) => ({ ...e, fan: true })); }} options={fans.map((f) => ({ id: f, label: t(FAN_LABEL[f]) }))} /></div>}
               {layout.review && ( // a model with the power only sends it at once: nothing to review (Figma 02o)
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 p-3 text-xs"><span><b>{t(changeCount === 1 ? "{n} change:" : "{n} changes:", { n: changeCount })}</b> {d ? changes().map((item) => changeText(item)).join(" · ") || t("No change yet") : t("Set temperature {from}°C → {to}°C", { from: 26, to: setpoint })}<br /><span className="text-muted-foreground">{t("Target: {name} only · you will confirm before sending", { name: unit.name })}</span></span><Btn variant="primary" disabled={isDisabled || waiting || (d !== null && changes().length === 0)} onClick={() => { setConfirm(true); }}>{t(waiting ? "Waiting for device…" : "Review & send")}</Btn></div>
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 p-3 text-xs"><span><b>{t(changeCount === 1 ? "{n} change:" : "{n} changes:", { n: changeCount })}</b> {d ? changes().map((item) => changeText(item)).join(" · ") || t("No change yet") : t(SET_TEMPERATURE_FROM_C_TO_C, { from: 26, to: setpoint })}<br /><span className="text-muted-foreground">{t("Target: {name} only · you will confirm before sending", { name: unit.name })}</span></span><Btn variant="primary" disabled={isDisabled || waiting || (d !== null && changes().length === 0)} onClick={() => { setConfirm(true); }}>{t(waiting ? "Waiting for device…" : "Review & send")}</Btn></div>
               )}
               {waiting && <Banner>{t("Waiting for device response… The result is shown only after the device acknowledges (fails after 30 s).")}</Banner>}
               {isOffline && ( // Figma 02h: nothing is sent to an offline AC; a repair request is the way forward (IR243, IR315)
@@ -238,7 +239,7 @@ export function UnitView({ id, detail, room: roomRows, policies, defaults = null
         </div>
       </div>
       <Modal open={confirm} onClose={() => { setConfirm(false); }} title={t("Confirm command")} footer={<><Btn onClick={() => { setConfirm(false); }}>{t("Cancel")}</Btn><Btn variant="primary" onClick={send}>{t("Send to {name}", { name: unit.name })}</Btn></>}>
-        <SummaryList items={[[t("Target"), `${unit.loc} › ${unit.name}`], [t("Change"), d ? changes().map((item) => changeText(item)).join(" · ") : t("Set temperature {from}°C → {to}°C", { from: 26, to: setpoint })], [t("Mode / fan"), `${modeWord(mode)} / ${fanWord(fan)}`]]} />
+        <SummaryList items={[[t("Target"), `${unit.loc} › ${unit.name}`], [t("Change"), d ? changes().map((item) => changeText(item)).join(" · ") : t(SET_TEMPERATURE_FROM_C_TO_C, { from: 26, to: setpoint })], [t("Mode / fan"), `${modeWord(mode)} / ${fanWord(fan)}`]]} />
         <p className="text-xs text-muted-foreground">{t("Only {name} changes. The result shows after the device acknowledges.", { name: unit.name })}</p>
       </Modal>
       <Modal open={attachOpen} onClose={() => { setAttachOpen(false); }} title={t("Attach a policy to {name}", { name: unit.name })} footer={<><Btn onClick={() => { setAttachOpen(false); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={picked.length === 0} onClick={() => { savePolicies([...attached, ...picked], t(picked.length > 1 ? "{n} policies attached to this AC" : "{n} policy attached to this AC", { n: picked.length })); setAttachOpen(false); }}>{t("Attach")}</Btn></>}>

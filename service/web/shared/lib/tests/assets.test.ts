@@ -6,11 +6,15 @@ import { csvShape,
 import { i18nOf } from "@ac/web/lib/i18n";
 import { without } from "@ac/web/lib/omit";
 
+const BEDROOM_AC = "Bedroom AC";
+const BEDROOM_TOO_HOT = "Bedroom too hot";
+const CUSTOMER_A = "customer-a";
+
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const NOW = new Date("2026-09-14T01:00:00Z"); // 09:00 in Kuala Lumpur
 const unit = (over: Partial<ApiUnitRow>): ApiUnitRow => {
   return {
-    id: "u1", version: 3, customerOrgId: "org-a", propertyId: "p1", spaceId: "s1", displayName: "Bedroom AC", modelId: "m1", type: "split", installedAt: "2026-01-09T16:00:00Z",
+    id: "u1", version: 3, customerOrgId: "org-a", propertyId: "p1", spaceId: "s1", displayName: BEDROOM_AC, modelId: "m1", type: "split", installedAt: "2026-01-09T16:00:00Z",
     serviceScope: ["indoor", "outdoor"], alertPolicyIds: [], archived: false, capabilityVersion: 2, connection: "online", lastSeenAt: null, warrantyEndsAt: "2027-01-09T16:00:00Z",
     effectivePowerState: "on", activeAlertCount: 0, ...over,
   };
@@ -18,7 +22,7 @@ const unit = (over: Partial<ApiUnitRow>): ApiUnitRow => {
 const standing = (over: Partial<Standing>): Standing => ({ plans: ["rto"], contracts: 1, contractUnits: 2, overdue: 0, overdueAmount: null, restriction: null, ...over });
 const policy = (over: Partial<ApiCustomerPolicy>): ApiCustomerPolicy => {
   return {
-    id: "pol-1", version: 1, kind: "alert", name: "Bedroom too hot", unitIds: ["u1"], enabled: true, ownerMembershipId: "m-own", metric: "temperature", operator: "gte", threshold: 30, durationSeconds: 60, severity: "warning", ...over,
+    id: "pol-1", version: 1, kind: "alert", name: BEDROOM_TOO_HOT, unitIds: ["u1"], enabled: true, ownerMembershipId: "m-own", metric: "temperature", operator: "gte", threshold: 30, durationSeconds: 60, severity: "warning", ...over,
   };
 };
 /** A policy as an older answer sends it, without a severity. */
@@ -61,16 +65,16 @@ describe("HQ customers & units", () => {
     expect(conditionText(policy({ activeWindow: { weekdays: [1, 2, 3, 4, 5], startLocal: "08:00", endLocal: "19:00" } }))).toBe("Temperature ≥ 30 °C for 60 s, weekdays 08:00–19:00 → Warning");
     expect(conditionText(withoutSeverity({ metric: "heartbeat_gap", threshold: 10, activeWindow: { weekdays: [1, 3], startLocal: "22:00", endLocal: "06:00" } }))).toBe("No heartbeat for 10 min, Mon, Wed 22:00–06:00");
     expect(defaultRules(defaults)[0]).toMatchObject({ condition: "CO₂ (ppm) ≥ 1200 ppm for 15 min", enabled: false, note: "Off since 10 Sept 2026 · office closed" });
-    expect(policyLines([policy({}), defaults], ["u1"], () => "customer-a").map((p) => [p.name, p.type, p.condition, p.madeBy])).toEqual([
-      ["Default policy", "Default", "1 rule · 0 on for this customer", "HQ (template)"], ["Bedroom too hot", "Temperature", "Temperature ≥ 30 °C for 60 s → Warning", "customer-a"],
+    expect(policyLines([policy({}), defaults], ["u1"], () => CUSTOMER_A).map((p) => [p.name, p.type, p.condition, p.madeBy])).toEqual([
+      ["Default policy", "Default", "1 rule · 0 on for this customer", "HQ (template)"], [BEDROOM_TOO_HOT, "Temperature", "Temperature ≥ 30 °C for 60 s → Warning", CUSTOMER_A],
     ]);
     // the default policy's system name in the display language; a policy's own name as written (IR499)
-    expect(policyLines([policy({}), defaults], ["u1"], () => "customer-a", i18nOf({ locale: "ms", timeZone: "UTC" })).map((p) => p.name)).toEqual(["Polisi lalai", "Bedroom too hot"]);
+    expect(policyLines([policy({}), defaults], ["u1"], () => CUSTOMER_A, i18nOf({ locale: "ms", timeZone: "UTC" })).map((p) => p.name)).toEqual(["Polisi lalai", BEDROOM_TOO_HOT]);
   });
 
   it("shows coverage with Kuala Lumpur warranty days and the import messages", () => {
     const cov = (over: Partial<ApiCoverage>): ApiCoverage => ({ unitId: "u1", customerId: "c1", modelId: "m1", warrantyEndsAt: "2026-10-09T16:00:00Z", contractIds: [], status: "expiring", claimableJobIds: [], ...over });
-    const x = { unit: () => ({ name: "Bedroom AC", place: "Home A" }), customer: () => "Demo Customer A", model: () => "Daikin X", contract: (id: string) => `RTO until ${id}` };
+    const x = { unit: () => ({ name: BEDROOM_AC, place: "Home A" }), customer: () => "Demo Customer A", model: () => "Daikin X", contract: (id: string) => `RTO until ${id}` };
     const rows = coverageRows([cov({}), cov({ unitId: "u2", status: "no_coverage", warrantyEndsAt: null })], x, NOW);
     expect(rows.map((r) => [r.ends, r.endsDate, r.statusText])).toEqual([["10 Oct 2026", "2026-10-10", "Ends in 26 d · no contract"], ["—", "", "No warranty · no contract"]]);
     expect(coverageCsv(rows).split("\n", 2)[1]).toBe("Bedroom AC,u1,Demo Customer A,Daikin X,2026-10-10,,Ends in 26 d · no contract");
@@ -78,7 +82,7 @@ describe("HQ customers & units", () => {
     expect([importMessage(row({})), importMessage(row({ messageKey: "warning.importCreatesSpace", result: "warning" })), importMessage(row({ messageKey: null, result: "ready" }))])
       .toEqual(["Serial SN-1 is already bound to another unit.", "“2F” does not exist — it will be created.", "Ready"]);
     expect(errorReportCsv([row({}), row({ rowNumber: 3, result: "ready", messageKey: null })]).split("\n")).toEqual(["row,property,floor,room,unit_name,model_code,serial,result,message", "2,Office A,2F,,AC #2,SPL-100,SN-1,error,Serial SN-1 is already bound to another unit.", ""]);
-    expect(claimCandidate({ id: "job-1-aaaa", version: 2, type: "reactive", completedAt: "2026-09-01T03:00:00Z", costs: [] }, [], "Bedroom AC")).toMatchObject({ completed: "1 Sept 2026", parts: "parts listed in the report", amountMinor: null });
+    expect(claimCandidate({ id: "job-1-aaaa", version: 2, type: "reactive", completedAt: "2026-09-01T03:00:00Z", costs: [] }, [], BEDROOM_AC)).toMatchObject({ completed: "1 Sept 2026", parts: "parts listed in the report", amountMinor: null });
   });
 });
 

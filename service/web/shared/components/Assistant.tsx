@@ -1,4 +1,6 @@
 "use client";
+const CANDIDATES = "candidates";
+const CANCELLED_NOTHING_WAS_SENT = "Cancelled — nothing was sent.";
 
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -100,7 +102,7 @@ function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
   // D09: a language change discards an unconfirmed intent but keeps what was typed
   const setLang = (l: Locale) => {
     setLangState(l);
-    setMsgs((s) => s.filter((m) => m.kind !== "confirm" && m.kind !== "candidates"));
+    setMsgs((s) => s.filter((m) => m.kind !== "confirm" && m.kind !== CANDIDATES));
     if (state === "confirm" || state === "listening") setState("idle");
   };
 
@@ -115,14 +117,14 @@ function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
       } else if (r.kind === "unsupported") {
         add({ kind: "bot", text: t("Action unavailable. Try “{temperature}”, “{change}” or “{help}” — or type the AC's room.", ex) });
         setState("idle");
-      } else if (r.kind === "candidates") {
+      } else if (r.kind === CANDIDATES) {
         // never a guess: the room first, then the AC in it (Figma 09d); each AC with its connection and confirmed setting
         const units = await Promise.all(r.candidates.map((c) => unit(c.unitId)));
         const status = Object.fromEntries(r.candidates.map((c, n) => {
           const u = units[n];
           return [c.unitId, u ? connectionText(u, t) : ""];
         }));
-        add({ kind: "candidates", groups: candidateGroups(r.candidates), question, via, status });
+        add({ kind: CANDIDATES, groups: candidateGroups(r.candidates), question, via, status });
         setState("confirm");
       } else if (r.kind === "temperature") {
         const u = await unit(r.unitId);
@@ -188,10 +190,10 @@ function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
         {msgs.map((m, n) => {
           if (m.kind === "user") return <div key={n} className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-[13px] text-white">{m.text}<div className="text-[10px]">{t(m.via === "voice" ? "You · voice" : "You · text")}</div></div>;
           if (m.kind === "bot") return <div key={n} className={cx("max-w-[90%] rounded-2xl rounded-bl-sm px-3 py-2 text-[13px]", m.tone === "crit" ? "bg-crit-soft text-crit" : "bg-surface2")}>{m.text}</div>;
-          if (m.kind === "candidates") return (
+          if (m.kind === CANDIDATES) return (
             <CandidatePicker key={n} m={m} t={t} busy={busy}
-              onPick={(unitId) => { drop("candidates"); void ask(m.question, m.via, unitId); }}
-              onCancel={() => { drop("candidates"); setState("idle"); add({ kind: "bot", text: t("Cancelled — nothing was sent.") }); }} />);
+              onPick={(unitId) => { drop(CANDIDATES); void ask(m.question, m.via, unitId); }}
+              onCancel={() => { drop(CANDIDATES); setState("idle"); add({ kind: "bot", text: t(CANCELLED_NOTHING_WAS_SENT) }); }} />);
           if (m.kind === "confirm") {
             const card = changeCard(m.intent, m.unit, t);
             return (
@@ -199,7 +201,7 @@ function LiveAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
                 <div className="mb-2 font-bold">{t("I understood:")}</div>
                 <SummaryList items={[[t("Intent"), t("Change set temperature")], [t("Target"), card.target], [t("Current"), card.current], [t("Requested"), card.requested], [t("Allowed range"), card.range]]} />
                 <p className="my-2 text-xs text-muted-foreground">{card.supported ? t("Only {unit} changes. Same permission checks as Unit Control.", { unit: card.unit }) : t("{value} is outside what {unit} supports — sending it will be refused, nothing changes.", { value: card.requested, unit: card.unit })}</p>
-                <div className="flex gap-2"><Btn size="sm" onClick={() => { drop("confirm"); setState("idle"); add({ kind: "bot", text: t("Cancelled — nothing was sent.") }); }}>{t("Cancel")}</Btn><Btn variant="primary" size="sm" disabled={busy} onClick={() => { void confirm(m, lastQuestion); }}>{t("Confirm")}</Btn></div>
+                <div className="flex gap-2"><Btn size="sm" onClick={() => { drop("confirm"); setState("idle"); add({ kind: "bot", text: t(CANCELLED_NOTHING_WAS_SENT) }); }}>{t("Cancel")}</Btn><Btn variant="primary" size="sm" disabled={busy} onClick={() => { void confirm(m, lastQuestion); }}>{t("Confirm")}</Btn></div>
               </div>);
           }
           return (
@@ -340,7 +342,7 @@ function DemoAssistant({ onClose, context }: Readonly<{ onClose: () => void; con
               <div className="mb-2 font-bold">I understood:</div>
               <SummaryList items={[["Intent", "Change set temperature"], ["Target", `Home A › 1F › Bedroom › ${m.target}`], ["Current", "26°C (confirmed by device)"], ["Requested", `${String(m.temp)}°C`], ["Allowed range", "16–30°C · step 1"]]} />
               <p className="my-2 text-xs text-muted-foreground">Only {m.target} changes. Same permission checks as Unit Control.</p>
-              <div className="flex gap-2"><Btn variant="primary" size="sm" onClick={() => { send(m.target, m.temp); }}>Confirm & send</Btn><Btn size="sm" onClick={() => { setMsgs((s) => [...s.filter((x) => x.kind !== "confirm"), { kind: "bot", text: "Cancelled — nothing was sent." }]); }}>Cancel</Btn></div>
+              <div className="flex gap-2"><Btn variant="primary" size="sm" onClick={() => { send(m.target, m.temp); }}>Confirm & send</Btn><Btn size="sm" onClick={() => { setMsgs((s) => [...s.filter((x) => x.kind !== "confirm"), { kind: "bot", text: CANCELLED_NOTHING_WAS_SENT }]); }}>Cancel</Btn></div>
             </div>);
           if (m.kind === "ask") return (
             <div key={n} className="rounded-2xl bg-surface2 p-3 text-[13px]">

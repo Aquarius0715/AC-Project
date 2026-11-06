@@ -3,24 +3,29 @@ import { accessEnd, accessError, addDays, nameError, partnerInviteError, partner
 import { PARTNER_USERS_SEED } from "@ac/web/lib/partnerUsersDemo";
 import { must } from "./must";
 
+const CONTRACTOR_A = "contractor-a";
+const TEXT_2026_10_01T00_00_00Z = "2026-10-01T00:00:00Z";
+const TEXT_2026_10_02T00_00_00Z = "2026-10-02T00:00:00Z";
+const TEXT_2026_09_15 = "2026-09-15";
+
 const user = (p: Partial<ApiPartnerUser>): ApiPartnerUser => {
   return {
     id: "u", version: 1, organizationId: "org", membershipId: null, email: "x@example.com", displayName: null, partnerRole: "technician", status: "invited",
-    lastSignInAt: null, accessUntil: null, invitedAt: "2026-09-12T02:00:00Z", invitedByMembershipId: "contractor-a", ...p,
+    lastSignInAt: null, accessUntil: null, invitedAt: "2026-09-12T02:00:00Z", invitedByMembershipId: CONTRACTOR_A, ...p,
   };
 };
 
-const revoked = (status: "active" | "disabled") => partnerUserRows([user({ id: "r", displayName: "Gone", membershipId: "m", accessUntil: "2026-10-01T00:00:00Z", revokedAt: "2026-10-01T00:00:00Z", status })], null, undefined, new Date("2026-10-02T00:00:00Z"))[0];
+const revoked = (status: "active" | "disabled") => partnerUserRows([user({ id: "r", displayName: "Gone", membershipId: "m", accessUntil: TEXT_2026_10_01T00_00_00Z, revokedAt: TEXT_2026_10_01T00_00_00Z, status })], null, undefined, new Date(TEXT_2026_10_02T00_00_00Z))[0];
 
 describe("partnerUserRows (FR-P11)", () => {
   it("sorts by name, marks the caller's own account and gives it no actions", () => {
-    const rows = partnerUserRows(PARTNER_USERS_SEED, "contractor-a");
-    expect(rows.map((r) => r.name ?? r.email)).toEqual(["contractor-a", "New Tech", "tech-external-a"]);
+    const rows = partnerUserRows(PARTNER_USERS_SEED, CONTRACTOR_A);
+    expect(rows.map((r) => r.name ?? r.email)).toEqual([CONTRACTOR_A, "New Tech", "tech-external-a"]);
     const self = must(rows.find((r) => r.you));
     expect(self.actions).toEqual({ resend: false, access: false, disable: false, enable: false, remove: false });
   });
   it("offers resend, access and remove on a technician not signed in yet; access, disable and remove on an active one (IR461)", () => {
-    const rows = partnerUserRows(PARTNER_USERS_SEED, "contractor-a");
+    const rows = partnerUserRows(PARTNER_USERS_SEED, CONTRACTOR_A);
     const added = must(rows.find((r) => r.status === "invited"));
     expect(added.actions).toEqual({ resend: true, access: true, disable: false, enable: false, remove: true });
     expect(added.accessDate).toBe("2026-12-31");
@@ -34,17 +39,17 @@ describe("partnerUserRows (FR-P11)", () => {
     expect([rows[0]?.actions.disable, rows[0]?.actions.remove]).toEqual([false, false]);
   });
   it("reads an active account whose access end has passed as ended: no disable, only remove", () => {
-    const [r] = partnerUserRows([user({ id: "e", displayName: "Old", status: "active", membershipId: "m", accessUntil: "2026-10-01T00:00:00Z" })], null, undefined, new Date("2026-10-02T00:00:00Z"));
+    const [r] = partnerUserRows([user({ id: "e", displayName: "Old", status: "active", membershipId: "m", accessUntil: TEXT_2026_10_01T00_00_00Z })], null, undefined, new Date(TEXT_2026_10_02T00_00_00Z));
     expect(r?.ended).toBe(true);
     expect(r?.actions).toEqual({ resend: false, access: true, disable: false, enable: false, remove: true });
-    expect(partnerUserRows([user({ id: "e", displayName: "Old", status: "active", membershipId: "m", accessUntil: "2026-10-01T00:00:00Z" })], null, undefined, new Date("2026-09-15T00:00:00Z"))[0]?.ended).toBe(false);
+    expect(partnerUserRows([user({ id: "e", displayName: "Old", status: "active", membershipId: "m", accessUntil: TEXT_2026_10_01T00_00_00Z })], null, undefined, new Date("2026-09-15T00:00:00Z"))[0]?.ended).toBe(false);
   });
   it("leaves only removing to an account whose access HQ ended (IR508)", () => {
     expect([revoked("active")?.revoked, revoked("active")?.actions, revoked("disabled")?.actions]).toEqual([
       true, { resend: false, access: false, disable: false, enable: false, remove: true }, { resend: false, access: false, disable: false, enable: false, remove: true }]);
   });
   it("reads a technician not signed in yet whose access end has passed as ended: no resend until the end moves (IR461)", () => {
-    const [r] = partnerUserRows([user({ id: "n", displayName: "Late", membershipId: "m", accessUntil: "2026-10-01T00:00:00Z" })], null, undefined, new Date("2026-10-02T00:00:00Z"));
+    const [r] = partnerUserRows([user({ id: "n", displayName: "Late", membershipId: "m", accessUntil: TEXT_2026_10_01T00_00_00Z })], null, undefined, new Date(TEXT_2026_10_02T00_00_00Z));
     expect(r?.ended).toBe(true);
     expect(r?.actions).toEqual({ resend: false, access: true, disable: false, enable: false, remove: true });
   });
@@ -79,7 +84,7 @@ describe("partner invite checks", () => {
     expect(nameError(" Lim Wei Ming ")).toBeUndefined();
   });
   it("takes an access end from the business day to a year ahead, closing at the end of that Kuala Lumpur day (IR461)", () => {
-    expect([accessError("2026-09-14", "2026-09-15"), accessError("2026-09-15", "2026-09-15"), accessError(addDays("2026-09-15", 365), "2026-09-15"), accessError(addDays("2026-09-15", 366), "2026-09-15"), accessError("15/09/2026", "2026-09-15")])
+    expect([accessError("2026-09-14", TEXT_2026_09_15), accessError(TEXT_2026_09_15, TEXT_2026_09_15), accessError(addDays(TEXT_2026_09_15, 365), TEXT_2026_09_15), accessError(addDays(TEXT_2026_09_15, 366), TEXT_2026_09_15), accessError("15/09/2026", TEXT_2026_09_15)])
       .toEqual(["Today or later", undefined, undefined, "At most a year ahead", "A date"]);
     expect(accessEnd("2026-12-31")).toBe("2026-12-31T15:59:59.000Z");
   });

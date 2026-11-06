@@ -18,6 +18,8 @@ import { nextOccurrence, planDate, planRows, type ApiPlan } from "@ac/web/lib/ad
 import { breachRows, PERIODS, periodOf, slaRows, slaTiles, targetsByPlan, type ApiScorecard } from "@ac/web/lib/adminSla";
 import { contractorRows, kpiTiles, pendingCertificates, profileFacts, rateCardView, technicianRows, type ApiCertificate, type ApiProfile, type ApiRateCard, type ApiTechnician } from "@ac/web/lib/adminContractors";
 
+const TECHNICIAN = "technician";
+
 interface Page<T> { items: T[]; total: number }
 interface Org { id: string; name: string; kind: string; status: string }
 interface Member { id: string; userId: string; displayName: string; role: string; employment: string | null; organizationId: string; validUntil: string | null; qualifications: ApiTechnician["qualifications"] }
@@ -89,9 +91,9 @@ export async function loadJobs(sp: SP) {
     ...head, q, requestDraft: jobRequest, created, period, periodChip: period ? periodChip(period, i) : null, sort, sorts: SORTS.map((x) => ({ id: x.id, text: t(x.text) })), total: list.total,
     stages: STAGES.map((x, k) => ({ id: x.id, label: t(x.label), count: counts[k] ?? 0 })),
     deliveries: [{ id: "internal", name: t("Internal") }, ...contractors.map((c) => ({ id: c.id, name: c.name }))],
-    assignees: members.filter((m) => m.role === "technician").map((m) => ({ id: m.id, name: m.displayName })),
+    assignees: members.filter((m) => m.role === TECHNICIAN).map((m) => ({ id: m.id, name: m.displayName })),
     contractors: contractors.map((c) => ({ id: c.id, name: c.name, status: profiles.find((p) => p.organizationId === c.id)?.status === "suspended" ? "suspended" : c.status })),
-    internalTechs: members.filter((m) => m.role === "technician" && m.employment === "internal").map((m) => ({ id: m.id, name: m.displayName })),
+    internalTechs: members.filter((m) => m.role === TECHNICIAN && m.employment === "internal").map((m) => ({ id: m.id, name: m.displayName })),
     rows,
   };
   const pick = one(sp.jobId) ?? rows[0]?.id;
@@ -134,7 +136,7 @@ export async function loadJobs(sp: SP) {
           id: e.id, at: showTime(e.occurredAt, i.display), text: `${textOf(jobEventTitle, e.action, t) ?? e.action.replaceAll(/[._]/g, " ")}${e.actorUserId ? ` · ${byUser.get(e.actorUserId) ?? t("client")}` : ""}`,
         };
       }),
-      partnerTech: pp ? names.people.get(pp.technicianMembershipId) ?? t("technician") : null,
+      partnerTech: pp ? names.people.get(pp.technicianMembershipId) ?? t(TECHNICIAN) : null,
       holdWho: sp2 ? holdName(sp2.hold) : null,
       // the times the detail shows on its first render, formatted here in the display time zone (IR290)
       texts: {
@@ -196,7 +198,7 @@ export async function loadContractors(sp: SP) {
   const { t } = i;
   const nowMs = now.getTime();
   const profiles = await optional(coreAll<ApiProfile>("contractors.list"), [] as ApiProfile[]);
-  const technicians: ApiTechnician[] = members.filter((m) => m.role === "technician" && orgs.some((o) => o.id === m.organizationId))
+  const technicians: ApiTechnician[] = members.filter((m) => m.role === TECHNICIAN && orgs.some((o) => o.id === m.organizationId))
     .map((m) => ({ id: m.id, displayName: m.displayName, organizationId: m.organizationId, role: m.role, validUntil: m.validUntil ?? null, qualifications: m.qualifications ?? [] }));
   const rows = contractorRows(orgs.map((o) => ({ id: o.id, name: o.name })), profiles, technicians, t);
   const base = { ...head, q: {}, rows, withoutProfile: orgs.filter((o) => profiles.every((p) => p.organizationId !== o.id)).map((o) => ({ id: o.id, name: o.name })) };
@@ -220,7 +222,7 @@ export async function loadContractors(sp: SP) {
       facts: profile ? profileFacts(profile, nowMs, i) : null,
       rates: rateCardView(cards, inEffect, nowMs, i),
       techs: technicianRows(mine, certs, nowMs, i),
-      pending: pendingCertificates(certs).map((c) => ({ id: c.id, version: c.version, technician: names.people.get(c.membershipId) ?? t("technician"), name: c.name, code: c.code, number: c.number, issuedAt: c.issuedAt, expiresAt: c.expiresAt, fileName: c.fileName, renewal: !!c.renewalOf })),
+      pending: pendingCertificates(certs).map((c) => ({ id: c.id, version: c.version, technician: names.people.get(c.membershipId) ?? t(TECHNICIAN), name: c.name, code: c.code, number: c.number, issuedAt: c.issuedAt, expiresAt: c.expiresAt, fileName: c.fileName, renewal: !!c.renewalOf })),
       profile,
     },
   };

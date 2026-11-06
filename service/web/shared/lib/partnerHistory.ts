@@ -9,10 +9,12 @@ import { oneOf } from "@ac/web/lib/oneOf";
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import { lookup } from "@ac/web/lib/lookup";
 
+const IN_PROGRESS = "in_progress";
+
 const en = translator("en");
 
 /** The states a job has after the company accepted it; offers appear here only after acceptance. */
-export const HISTORY_STATUSES = ["accepted", "assigned", "in_progress", "on_hold", "rework_requested", "submitted", "completed", "cancelled"] as const;
+export const HISTORY_STATUSES = ["accepted", "assigned", IN_PROGRESS, "on_hold", "rework_requested", "submitted", "completed", "cancelled"] as const;
 export const TABS = [
   { id: "all", label: "All" }, { id: "active", label: "Active" }, { id: "review", label: "Review" }, { id: "completed", label: "Completed" }, { id: "ended", label: "Delegation ended" },
 ] as const;
@@ -38,7 +40,7 @@ export function eventSummary(events: (ApiJobEvent & { note?: ApiEvent["note"] })
   const latest = [...events].toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || b.id.localeCompare(a.id))[0];
   return { count: events.length, customerVisible: events.filter((item) => customerVisible(item)).length, notes: events.filter((e) => e.note).length, latest: latest ? { action: latest.action, occurredAt: latest.occurredAt } : null };
 }
-const ACTIVE = new Set(["accepted", "assigned", "in_progress", "on_hold", "rework_requested"]);
+const ACTIVE = new Set(["accepted", "assigned", IN_PROGRESS, "on_hold", "rework_requested"]);
 const DONE_TAB = new Map<string, "review" | "completed">([["submitted", "review"], ["completed", "completed"]]);
 /** The delegation's end: ended at a past time, or until a later one. */
 function delegationText(until: string, now: number, { t, display }: I18n): string {
@@ -81,7 +83,7 @@ export function historyRow(j: ApiPartnerJob, now: number, units: Map<string, str
   }
   const tech = j.technicianMembershipId ? names.get(j.technicianMembershipId) ?? t("technician") : null;
   const ack = ACKS[j.assignmentAcknowledgement ?? ""];
-  const isOverdue = (j.status === "assigned" || j.status === "in_progress") && !!j.scheduledSlot && Date.parse(j.scheduledSlot.endAt) <= now;
+  const isOverdue = (j.status === "assigned" || j.status === IN_PROGRESS) && !!j.scheduledSlot && Date.parse(j.scheduledSlot.endAt) <= now;
   const until = j.accessValidUntil ?? null;
   const delegation = until ? delegationText(until, now, i) : "—";
   const tab = ACTIVE.has(j.status) ? "active" : (DONE_TAB.get(j.status) ?? null);

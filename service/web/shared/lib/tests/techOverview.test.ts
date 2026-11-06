@@ -3,6 +3,11 @@ import { alertRows, dayTimeline, isToday, kpis, reportRows, sortOf, tabOf, techR
 import type { ApiAlert } from "@ac/web/lib/alerts";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 import { must } from "./must";
+
+const IN_PROGRESS = "in_progress";
+const TEXT_2026_09_21T02_00_00Z = "2026-09-21T02:00:00Z";
+const TEXT_2026_09_21T04_00_00Z = "2026-09-21T04:00:00Z";
+
 const techRowOf = (...args: Parameters<typeof techRow>) => must(techRow(...args)); // the techRow a test expects
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
@@ -25,13 +30,13 @@ describe("technician overview", () => {
     const pending = techRowOf(row({ assignmentAcknowledgement: "pending", scheduledSlot: slot("2026-09-23T02:00:00Z", "2026-09-23T04:00:00Z") }), NOW, units);
     expect([pending.badge, pending.ackPending, pending.today, pending.line]).toEqual([{ text: "Not accepted", tone: "warn" }, true, false, "Repair · window 23 Sept, 10:00 am – 12:00 pm MYT · new assignment — review and accept it"]);
     expect(techRowOf(row({ status: "completed", scheduledSlot: slot("2026-09-14T00:00:00Z", "2026-09-20T00:00:00Z") }), NOW, units).slotText).toBe("14 Sept, 8:00 am – 20 Sept, 8:00 am MYT");
-    const running = techRowOf(row({ status: "in_progress", severity: "critical", scheduledSlot: slot("2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z") }), NOW, units);
+    const running = techRowOf(row({ status: IN_PROGRESS, severity: "critical", scheduledSlot: slot(TEXT_2026_09_21T02_00_00Z, TEXT_2026_09_21T04_00_00Z) }), NOW, units);
     // 11:45: the last 15 minutes before unsaved input is discarded (IR89, Figma Technician 01)
     expect([running.badge.text, running.line]).toEqual(["In progress", "Repair · window 21 Sept, 10:00 am – 12:00 pm MYT · critical alert on the unit · report draft open · window ends in 15 min"]);
     expect(techRowOf(row({ scheduledSlot: slot("2026-09-21T03:00:00Z", "2026-09-21T05:00:00Z") }), NOW, units).line).toBe("Repair · window 21 Sept, 11:00 am – 1:00 pm MYT · check in to start");
     expect(techRowOf(row({ scheduledSlot: slot("2026-09-21T02:30:00Z", "2026-09-21T03:55:00Z") }), NOW, units).line).toBe("Repair · window 21 Sept, 10:30 – 11:55 am MYT · check in to start · window ends in 10 min");
-    expect(techRowOf(row({ status: "submitted", scheduledSlot: slot("2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z") }), NOW, units).line).not.toContain("window ends");
-    expect(techRowOf(row({ status: "in_progress", scheduledSlot: slot("2026-09-21T00:00:00Z", "2026-09-21T02:00:00Z") }), NOW, units).badge).toEqual({ text: "Work window ended", tone: "crit" });
+    expect(techRowOf(row({ status: "submitted", scheduledSlot: slot(TEXT_2026_09_21T02_00_00Z, TEXT_2026_09_21T04_00_00Z) }), NOW, units).line).not.toContain("window ends");
+    expect(techRowOf(row({ status: IN_PROGRESS, scheduledSlot: slot("2026-09-21T00:00:00Z", TEXT_2026_09_21T02_00_00Z) }), NOW, units).badge).toEqual({ text: "Work window ended", tone: "crit" });
     expect(techRowOf(row({ status: "rework_requested" }), NOW, units).badge.text).toBe("Rework requested");
     expect(techRow({ projection: "history", jobId: "h", type: "periodic", status: "completed", completedAt: null }, NOW, units)).toBeNull();
     expect([tabOf("all"), tabOf("x"), sortOf("dueAt"), sortOf("x")]).toEqual(["all", "today", "dueAt", "severity"]);
@@ -39,7 +44,7 @@ describe("technician overview", () => {
 
   it("fills the tiles, today's timeline and the side cards", () => {
     const rows = [
-      techRowOf(row({ id: "job-a", status: "in_progress", scheduledSlot: slot("2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z") }), NOW, units),
+      techRowOf(row({ id: "job-a", status: IN_PROGRESS, scheduledSlot: slot(TEXT_2026_09_21T02_00_00Z, TEXT_2026_09_21T04_00_00Z) }), NOW, units),
       techRowOf(row({ id: "job-b" }), NOW, units),
       techRowOf(row({ id: "job-c", status: "submitted", scheduledSlot: slot("2026-09-19T02:00:00Z", "2026-09-19T04:00:00Z") }), NOW, units),
     ];

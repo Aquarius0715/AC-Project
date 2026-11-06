@@ -8,6 +8,10 @@ import { EN, intlTag, relativeTime, showTime, translator, type I18n, type Locale
 import { wrapped } from "@ac/web/lib/text";
 import { isAfter } from "@ac/web/lib/order";
 
+const UNASSIGNED = "unassigned";
+const IN_PROGRESS = "in_progress";
+const TECHNICIAN = "technician";
+
 const en = translator("en");
 
 export interface Slot { startAt: string; endAt: string }
@@ -105,10 +109,10 @@ export function bucket(j: PartnerJob, now: number): Bucket {
       return "offered";
     }
     case "accepted": {
-      return j.assignmentId ? "active" : "unassigned";
+      return j.assignmentId ? "active" : UNASSIGNED;
     }
     case "assigned":
-    case "in_progress": {
+    case IN_PROGRESS: {
       return j.slot && Date.parse(j.slot.endAt) <= now ? "overdue" : "active";
     }
     case "rework_requested":
@@ -146,14 +150,14 @@ export function kpis(counts: ApiCounts, jobs: PartnerJob[], now: number, names: 
   type Offered = PartnerJob & { offerExpiresAt: string }; // an offer with its answer deadline
   const list = (tab: string) => `/partner/jobs?tab=${tab}${period ? `&from=${period.from}&to=${period.to}` : ""}`; // the list with the same period
   const offers = jobs.filter((j): j is Offered => j.status === "offered" && j.offerExpiresAt !== null).toSorted((a, b) => Date.parse(a.offerExpiresAt) - Date.parse(b.offerExpiresAt));
-  const unassigned = jobs.filter((j) => bucket(j, now) === "unassigned");
+  const unassigned = jobs.filter((j) => bucket(j, now) === UNASSIGNED);
   type Slotted = PartnerJob & { slot: Slot }; // a job with its visit window
-  const running = jobs.filter((j): j is Slotted => (j.status === "assigned" || j.status === "in_progress") && j.slot !== null).toSorted((a, b) => Date.parse(a.slot.startAt) - Date.parse(b.slot.startAt));
-  const next = running.find((j) => j.status === "in_progress") ?? running.find((j) => Date.parse(j.slot.endAt) > now);
+  const running = jobs.filter((j): j is Slotted => (j.status === "assigned" || j.status === IN_PROGRESS) && j.slot !== null).toSorted((a, b) => Date.parse(a.slot.startAt) - Date.parse(b.slot.startAt));
+  const next = running.find((j) => j.status === IN_PROGRESS) ?? running.find((j) => Date.parse(j.slot.endAt) > now);
   const review = jobs.filter((j) => j.status === "submitted");
   const active = Math.max(0, counts.activeCount - unassigned.length);
   const who = (id: string | null) => names.get(id ?? "") ?? t("Technician");
-  const nextVisit = (j: NonNullable<typeof next>) => t(j.status === "in_progress" ? "{name} on site from {time}" : "{name} starts {time}", { name: who(j.technicianId), time: relativeTime(j.slot.startAt, now, i) });
+  const nextVisit = (j: NonNullable<typeof next>) => t(j.status === IN_PROGRESS ? "{name} on site from {time}" : "{name} starts {time}", { name: who(j.technicianId), time: relativeTime(j.slot.startAt, now, i) });
   return [
     { label: t("Offers to answer"), value: counts.offerCount, sub: offers[0] ? t("{job} · expires in {left}", { job: offers[0].short, left: until(offers[0].offerExpiresAt, now, t) }) : t("No open offers"), href: list("offered"), link: t("link::Open offers") },
     { label: t("Awaiting assignment"), value: unassigned.length, sub: unassigned.length > 0 ? t("Accepted, no technician yet") : "—", href: "/partner/schedule", link: t("Assign"), tone: unassigned.length > 0 ? "warn" : undefined },
@@ -167,7 +171,7 @@ export function kpis(counts: ApiCounts, jobs: PartnerJob[], now: number, names: 
 }
 
 export const BUCKETS: { id: Exclude<Bucket, "other">; label: string; tone: string }[] = [
-  { id: "offered", label: "Offered", tone: "bg-warn/25" }, { id: "unassigned", label: "Accepted · unassigned", tone: "bg-primary/20" },
+  { id: "offered", label: "Offered", tone: "bg-warn/25" }, { id: UNASSIGNED, label: "Accepted · unassigned", tone: "bg-primary/20" },
   { id: "active", label: "Assigned / in progress", tone: "bg-primary" }, { id: "overdue", label: "Overdue", tone: "bg-crit/70" },
   { id: "review", label: "Submitted · in review", tone: "bg-warn" }, { id: "completed", label: "Completed", tone: "bg-ok" },
 ];
@@ -195,7 +199,7 @@ export function actions(jobs: PartnerJob[], now: number, names: Map<string, stri
   for (const j of jobs) {
     if (j.slot === null || bucket(j, now) !== "overdue") continue;
     const ended = t("Work window ended {time}", { time: showTime(j.slot.endAt, display) });
-    rows.push({ kind: "overdue", badge: t("Overdue"), title: label(j, t), detail: j.technicianId ? `${ended} · ${names.get(j.technicianId) ?? t("technician")}` : ended, href: `/partner/schedule?jobId=${j.id}`, button: t("Reassign") });
+    rows.push({ kind: "overdue", badge: t("Overdue"), title: label(j, t), detail: j.technicianId ? `${ended} · ${names.get(j.technicianId) ?? t(TECHNICIAN)}` : ended, href: `/partner/schedule?jobId=${j.id}`, button: t("Reassign") });
   }
   for (const j of jobs) {
     if (j.status !== "submitted") continue;
@@ -203,9 +207,9 @@ export function actions(jobs: PartnerJob[], now: number, names: Map<string, stri
     rows.push({ kind: "review", badge: t("Submitted"), title: label(j, t), detail: by, href: `/partner/jobs/${j.id}/review`, button: t("Review") });
   }
   for (const j of jobs) {
-    if (bucket(j, now) !== "unassigned") continue;
+    if (bucket(j, now) !== UNASSIGNED) continue;
     const detail = j.dueAt ? t("No technician · due {time}", { time: showTime(j.dueAt, display) }) : t("No technician");
-    rows.push({ kind: "unassigned", badge: t("Accepted"), title: label(j, t), href: `/partner/schedule?jobId=${j.id}`, button: t("Assign"), detail });
+    rows.push({ kind: UNASSIGNED, badge: t("Accepted"), title: label(j, t), href: `/partner/schedule?jobId=${j.id}`, button: t("Assign"), detail });
   }
   return rows;
 }
@@ -226,7 +230,7 @@ export const unavailabilityLabel = (type: string, t: T = en) => (textOf(UNAVAILA
 
 /** The technicians who can still work: access neither revoked by HQ nor past its end (IR575). The overview's timeline
 and capacity list them; a former technician stays in Team & capacity and in job history. */
-export const onTeam = (members: ApiMember[], now: number) => members.filter((m) => m.role === "technician" && !m.revokedAt && (!m.validUntil || Date.parse(m.validUntil) > now));
+export const onTeam = (members: ApiMember[], now: number) => members.filter((m) => m.role === TECHNICIAN && !m.revokedAt && (!m.validUntil || Date.parse(m.validUntil) > now));
 /** How many technicians each overview card shows; the rest are one link away (IR575). */
 export const OVERVIEW_ROWS = 8;
 
@@ -235,7 +239,7 @@ export interface TimelineRow { id: string; name: string; sub: string; blocks: { 
 Lumpur hours like its axis: those with work or away first, by their first slot, then the free ones by name (IR575). */
 export function timeline(today: ApiCapacity[], members: ApiMember[], date: string, t: T = en): TimelineRow[] {
   const cap = new Map(today.map((c) => [c.membershipId, c]));
-  return members.filter((m) => m.role === "technician").map((m) => {
+  return members.filter((m) => m.role === TECHNICIAN).map((m) => {
     const c = cap.get(m.id);
     const blocks = (c?.assignedSlots ?? []).map((s) => {
       const left = timelinePct(s.startAt, date), right = timelinePct(s.endAt, date);
@@ -261,7 +265,7 @@ export function capacity(days: ApiCapacity[][], members: ApiMember[], t: T = en)
   }
   const h = (min: number) => t("{n} h", { n: Math.round((min / 60) * 10) / 10 });
   const of = (m: ApiMember) => sum.get(m.id) ?? { assigned: 0, available: null };
-  return members.filter((m) => m.role === "technician").toSorted((a, b) => of(b).assigned - of(a).assigned || a.displayName.localeCompare(b.displayName)).map((m) => {
+  return members.filter((m) => m.role === TECHNICIAN).toSorted((a, b) => of(b).assigned - of(a).assigned || a.displayName.localeCompare(b.displayName)).map((m) => {
     const s = of(m);
     const pct = s.available ? Math.min(100, Math.round((s.assigned / s.available) * 100)) : null;
     return { id: m.id, name: m.displayName, text: `${h(s.assigned)} / ${s.available === null ? "—" : h(s.available)} · ${pct === null ? "—" : `${String(pct)}%`}`, pct };

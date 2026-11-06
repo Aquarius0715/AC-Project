@@ -14,6 +14,8 @@ import {
 } from "@ac/web/lib/techControl";
 import { orNull } from "@ac/web/lib/promises";
 
+const NOT_STARTED = "not_started";
+
 const gone = (e: unknown) => e instanceof CoreError && (e.error.code === "NOT_FOUND" || e.error.code === "FORBIDDEN" || !!e.error.fieldErrors.id || !!e.error.fieldErrors.jobId);
 
 export async function loadControl(unitId: string, jobId: string | null) {
@@ -28,7 +30,7 @@ export async function loadControl(unitId: string, jobId: string | null) {
   });
   if (d === null) return null; // not in the technician's assignments: not found (IR169)
   const unitHref = `/technician/units/${unitId}${jobId ? `?jobId=${jobId}` : ""}`;
-  if (d === "not_started") { // IR76: the start time from the URL's job
+  if (d === NOT_STARTED) { // IR76: the start time from the URL's job
     const job = jobId ? await orNull(coreOp<JobRead>("jobs.get", { jobId })) : null;
     const start = job?.projection === "detail" ? job.assignment?.scheduledStart ?? null : null;
     return {

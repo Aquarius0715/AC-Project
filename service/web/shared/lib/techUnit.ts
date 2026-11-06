@@ -19,6 +19,8 @@ import type { Metric } from "@ac/web/lib/contracts.gen";
 import { wrapped } from "@ac/web/lib/text";
 import { entryOf, lookup } from "@ac/web/lib/lookup";
 
+const TEMPERATURE = "temperature";
+
 /** units.get as the technician reads it (ACUnit.type is part of the unit). */
 export type ApiTechUnit = ApiUnitDetail & { type?: string | null };
 export interface Point { value: number | null; observedAt: string; quality?: string }
@@ -41,7 +43,7 @@ export function metricOf(d: ApiTechUnit, v?: string): Metric {
   const measured = d.latestMeasurements.map((m) => m.metric);
   const asked = measured.find((m) => m === v);
   if (asked) return asked;
-  return measured.includes("temperature") ? "temperature" : measured[0] ?? "temperature";
+  return measured.includes(TEMPERATURE) ? TEMPERATURE : measured[0] ?? TEMPERATURE;
 }
 const label = (metric: string, t: T) => (textOf(metricLabel, metric, t) ?? metric.replaceAll('_', " "));
 
@@ -109,7 +111,7 @@ export function liveTiles(d: ApiTechUnit, nowMs: number, i: I18n = EN): Record<"
   };
   const s = d.observedState;
   return {
-    temperature: reading("temperature"), power: reading("power"),
+    temperature: reading(TEMPERATURE), power: reading("power"),
     operation: { label: t("Operation"), value: operationText(s, t), sub: seen(s.observedAt) },
     connection: {
       label: t("Connection"), value: t(lookup(CONNECTION, d.connection) ?? d.connection), tone: isDown ? "crit" : undefined,

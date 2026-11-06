@@ -1,4 +1,8 @@
 "use client";
+const CONTRACTOR = "contractor";
+const TECHNICIAN = "technician";
+const HQ = "HQ (tenant)";
+const CONTRACTOR_A = "contractor-a";
 
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, ListRow, Modal, Page, Search, Select, Textarea, useToast } from "@ac/web/components/ui";
@@ -6,16 +10,14 @@ import { Icon } from "@ac/web/components/Icon";
 import { type NonEmpty } from "@ac/web/lib/lists";
 import { allPermissions, type PermissionRow, permissionRows as rows } from "@ac/web/lib/members";
 
-const HQ = "HQ (tenant)";
-const CONTRACTOR_A = "contractor-a";
 interface U { id: string; role: string; org: string; email: string; role2: "admin" | "contractor" | "technician" }
 const users: NonEmpty<U> = [
   { id: "hq-operator", role: "Admin · HQ", org: HQ, email: "r.operator@hq.example", role2: "admin" },
   { id: "hq-restriction-manager", role: "Admin · HQ", org: HQ, email: "r.lim@hq.example", role2: "admin" },
-  { id: "aziz.contractor-a", role: "Contractor · contractor-a", org: CONTRACTOR_A, email: "aziz@contractor-a.example", role2: "contractor" },
-  { id: "tech-internal-a", role: "Technician · internal · HQ field team", org: HQ, email: "ali@hq.example", role2: "technician" },
-  { id: "tech-external-b", role: "Technician · external · contractor-a", org: CONTRACTOR_A, email: "b@contractor-a.example", role2: "technician" },
-  { id: "tech-external-old", role: "Technician · external · contractor-a", org: CONTRACTOR_A, email: "old@contractor-a.example", role2: "technician" },
+  { id: "aziz.contractor-a", role: "Contractor · contractor-a", org: CONTRACTOR_A, email: "aziz@contractor-a.example", role2: CONTRACTOR },
+  { id: "tech-internal-a", role: "Technician · internal · HQ field team", org: HQ, email: "ali@hq.example", role2: TECHNICIAN },
+  { id: "tech-external-b", role: "Technician · external · contractor-a", org: CONTRACTOR_A, email: "b@contractor-a.example", role2: TECHNICIAN },
+  { id: "tech-external-old", role: "Technician · external · contractor-a", org: CONTRACTOR_A, email: "old@contractor-a.example", role2: TECHNICIAN },
 ];
 // 38 canonical permissions (BR-A03, IR107/IR115): resource rows with READ / WRITE plus independent actions (shared matrix).
 const all = allPermissions;
@@ -38,7 +40,7 @@ export function AccessDemo() {
   const [message, setMessage] = useState<{ t: "crit" | "ok" | "warn"; m: string } | null>(null);
   const [revoke, setRevoke] = useState(false);
   const list = users.filter((u) => !q || (u.id + u.role + u.email).toLowerCase().includes(q.toLowerCase()));
-  const pick = (u: U | "new") => { setSel(u); setMessage(null); const r = u === "new" ? "contractor" : u.role2; setRole(r); setChecked(preset[r]); setReason(""); setEnd(u !== "new" && u.id.startsWith("tech-external") ? "" : ""); };
+  const pick = (u: U | "new") => { setSel(u); setMessage(null); const r = u === "new" ? CONTRACTOR : u.role2; setRole(r); setChecked(preset[r]); setReason(""); setEnd(u !== "new" && u.id.startsWith("tech-external") ? "" : ""); };
   const choose = (r: U["role2"]) => { setRole(r); setChecked(preset[r]); };
   const total = all.length;
   const has = (p?: string) => !!p && checked.includes(p);
@@ -51,7 +53,7 @@ export function AccessDemo() {
   };
   const save = () => {
     if (!reason.trim()) { setMessage({ t: "crit", m: "Change reason is required (1–1000 characters)." }); return; }
-    if (role === "technician" && sel !== "new" && sel.role.includes("external") && !end) { setMessage({ t: "crit", m: "External technicians need a “Valid until” end date (VALIDATION)." }); return; }
+    if (role === TECHNICIAN && sel !== "new" && sel.role.includes("external") && !end) { setMessage({ t: "crit", m: "External technicians need a “Valid until” end date (VALIDATION)." }); return; }
     if (checked.includes("restriction.override") && sel !== "new" && sel.id === "hq-operator") { setMessage({ t: "crit", m: "FORBIDDEN — you cannot grant yourself restriction.override." }); return; }
     setMessage({ t: "ok", m: "Saved — scopeVersion incremented and recorded in the audit log." }); toast("Access saved");
   };
@@ -73,7 +75,7 @@ export function AccessDemo() {
                 <Field label="Organization"><Select defaultValue={current?.org}><option>HQ (tenant)</option><option>contractor-a</option></Select></Field>
                 <Field label="Person (email)"><Input defaultValue={current?.email ?? ""} placeholder="name@example.com" /></Field>
               </div>
-              <div className="mt-3"><div className="mb-1 text-xs font-semibold">Role</div><Choice value={role} onChange={choose} options={[{ id: "admin", label: "Admin" }, { id: "contractor", label: "Contractor" }, { id: "technician", label: "Technician" }]} /><p className="mt-1 text-[11px] text-muted-foreground">Client role is not offered here (Customers & units › Users).</p></div>
+              <div className="mt-3"><div className="mb-1 text-xs font-semibold">Role</div><Choice value={role} onChange={choose} options={[{ id: "admin", label: "Admin" }, { id: CONTRACTOR, label: "Contractor" }, { id: TECHNICIAN, label: "Technician" }]} /><p className="mt-1 text-[11px] text-muted-foreground">Client role is not offered here (Customers & units › Users).</p></div>
             </section>
             <section><h3 className="mb-1 text-[13px] font-bold">Scope</h3><p className="text-xs text-muted-foreground">Admins act on every customer of the tenant. <Badge tone="primary">All customers (HQ tenant)</Badge></p></section>
             <section>

@@ -4,17 +4,26 @@ import { amount, baselineErrors, baselineRows, coveragePct, one, roundAway, savi
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 import { must } from "./must";
 
+const TEXT_2026_09_14T01_30_00Z = "2026-09-14T01:30:00Z";
+const AC_INPUT_ELECTRICITY = "ac_input_electricity";
+const PARTIAL_COVERAGE = "partial_coverage";
+const TIDAK_DAPAT_DIKIRA = "Tidak dapat dikira";
+const TEXT_2026_09_13T16_00_00_000Z = "2026-09-13T16:00:00.000Z";
+const TEXT_2026_09_01T00_00 = "2026-09-01T00:00";
+const TEXT_2026_09_12T16_00_00Z = "2026-09-12T16:00:00Z";
+const TEXT_2026_09_01_00_00_2026_09_08_00_00 = "2026-09-01 00:00 → 2026-09-08 00:00";
+
 const NOW = new Date("2026-09-14T01:30:20Z"); // Mon 09:30 KL
 const summary: ApiEnergySummary = {
-  period: { from: "2026-09-07T16:00:00Z", to: "2026-09-14T01:30:00Z" }, unitIds: ["u1", "u2"],
+  period: { from: "2026-09-07T16:00:00Z", to: TEXT_2026_09_14T01_30_00Z }, unitIds: ["u1", "u2"],
   totals: { kWh: 120.25, amountMinor: 6012, savedKWh: 14.75, deltaKWh: -14.75, savingPercentage: 10.93, savedAmountMinor: 738, emissionsKg: 70.95, savedEmissionsKg: 8.7 },
   currency: "MYR", baselineRef: { id: "b1", version: 2 }, factorRef: { id: "f1", version: 1 },
   baselineSnapshot: {
     id: "b1", version: 2, createdAt: "2026-09-01T00:00:00Z", unitIds: ["u1", "u2"], period: { from: "2026-08-31T16:00:00Z", to: "2026-09-07T16:00:00Z" },
-    method: "demo_period_comparison", baselineKWh: 135, quality: { kind: "measured", coverage: 1 }, boundaryId: "ac_input_electricity", boundary: "AC input", assumptions: "Same week", source: "demo",
+    method: "demo_period_comparison", baselineKWh: 135, quality: { kind: "measured", coverage: 1 }, boundaryId: AC_INPUT_ELECTRICITY, boundary: "AC input", assumptions: "Same week", source: "demo",
   },
   factorSnapshot: { id: "f1", version: 1, region: "MY-Peninsular", year: 2025, kgCO2ePerKWh: 0.59, source: "demo factor" },
-  tariffVersion: "TNB-C1-2026", boundaryId: "ac_input_electricity", boundary: "AC input", coverage: 0.9875, qualityWarnings: ["partial_coverage", "modeled_baseline"],
+  tariffVersion: "TNB-C1-2026", boundaryId: AC_INPUT_ELECTRICITY, boundary: "AC input", coverage: 0.9875, qualityWarnings: [PARTIAL_COVERAGE, "modeled_baseline"],
 };
 const empty: ApiEnergySummary = {
   ...summary, baselineRef: null, factorRef: null, baselineSnapshot: null, factorSnapshot: null, coverage: null, qualityWarnings: ["factor_missing"],
@@ -32,8 +41,8 @@ describe("customer energy & cost (FR-C06, FR-C13)", () => {
     expect([saving(null, " kWh"), saving(0.04, " kWh"), saving(12.34, " kWh"), saving(-3.25, "%")]).toEqual(["Cannot calculate", "No change 0.0 kWh", "Reduction 12.3 kWh", "Increase 3.3%"]);
     const t = translator("ms");
     expect([saving(null, "", undefined, t), saving(0, " kWh", undefined, t), saving(12.34, " kWh", undefined, t), saving(-3.25, "%", undefined, t)])
-      .toEqual(["Tidak dapat dikira", "Tiada perubahan 0.0 kWh", "Pengurangan 12.3 kWh", "Peningkatan 3.3%"]);
-    expect([warning("partial_coverage"), warning("partial_coverage", t), warning("a_new_code", t)])
+      .toEqual([TIDAK_DAPAT_DIKIRA, "Tiada perubahan 0.0 kWh", "Pengurangan 12.3 kWh", "Peningkatan 3.3%"]);
+    expect([warning(PARTIAL_COVERAGE), warning(PARTIAL_COVERAGE, t), warning("a_new_code", t)])
       .toEqual(["Partial coverage — some expected readings are missing or invalid", "Liputan separa — sesetengah bacaan yang dijangka tiada atau tidak sah", "a_new_code"]);
   });
 
@@ -62,26 +71,26 @@ describe("customer energy & cost (FR-C06, FR-C13)", () => {
     const api = summaryView({ ...summary, boundary: "AC equipment input electricity (excludes shared equipment, solar and batteries)" }, i);
     expect([api.conditions[1]?.[1], v.conditions[1]?.[1]]).toEqual(["ac_input_electricity — Elektrik input peralatan AC (tidak termasuk peralatan dikongsi, solar dan bateri)", "ac_input_electricity — AC input"]);
     const none = summaryView(empty, i);
-    expect([none.actual, none.baseline, none.difference, none.cost, none.savedCost, none.coverage, none.comparable]).toEqual(["Tiada bacaan sah", "Tiada garis dasar", "Tidak dapat dikira", "—", "Tidak dapat dikira", "—", false]);
+    expect([none.actual, none.baseline, none.difference, none.cost, none.savedCost, none.coverage, none.comparable]).toEqual(["Tiada bacaan sah", "Tiada garis dasar", TIDAK_DAPAT_DIKIRA, "—", TIDAK_DAPAT_DIKIRA, "—", false]);
     expect([none.conditions[2]?.[1], none.conditions[3], none.warnings]).toEqual(["tiada yang dipilih", ["Faktor pelepasan", "tiada"], ["Faktor pelepasan tiada — pelepasan tidak dapat dikira"]]);
   });
 
   it("takes whole Kuala Lumpur days up to the current minute and labels them in the display language (DD-C06)", () => {
-    expect(periodRange("today", NOW)).toEqual({ kind: "today", from: "2026-09-13T16:00:00.000Z", to: "2026-09-14T01:30:00.000Z", days: 1, label: "14 Sept, 00:00 – 14 Sept, 09:30 (1 day) · Asia/Kuala_Lumpur" });
+    expect(periodRange("today", NOW)).toEqual({ kind: "today", from: TEXT_2026_09_13T16_00_00_000Z, to: "2026-09-14T01:30:00.000Z", days: 1, label: "14 Sept, 00:00 – 14 Sept, 09:30 (1 day) · Asia/Kuala_Lumpur" });
     const i = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
     const week = periodRange("7d", NOW, {}, i);
     expect([week.from, week.days, week.label]).toEqual(["2026-09-07T16:00:00.000Z", 7, "8 Sep, 00:00 – 14 Sep, 09:30 (7 hari) · Asia/Kuala_Lumpur"]);
     expect(periodRange("30d", NOW).from).toBe("2026-08-15T16:00:00.000Z");
-    expect([periodRange("custom", NOW, { from: "2026-09-10T00:00", to: "2026-09-09T00:00" }, i).error, periodRange("custom", NOW, { from: "2025-01-01T00:00", to: "2026-09-01T00:00" }, i).error])
+    expect([periodRange("custom", NOW, { from: "2026-09-10T00:00", to: "2026-09-09T00:00" }, i).error, periodRange("custom", NOW, { from: "2025-01-01T00:00", to: TEXT_2026_09_01T00_00 }, i).error])
       .toEqual(["Tamat mesti selepas mula", "Paling lama 366 hari"]);
-    const custom = periodRange("custom", NOW, { from: "2026-09-01T00:00" });
+    const custom = periodRange("custom", NOW, { from: TEXT_2026_09_01T00_00 });
     expect([custom.from, custom.to, custom.days, custom.error]).toEqual(["2026-08-31T16:00:00.000Z", "2026-09-14T01:30:00.000Z", 14, undefined]);
   });
 
   it("splits the period into Kuala Lumpur days named in the display language (Figma Client 04a)", () => {
-    const days = dayRanges("2026-09-12T16:00:00Z", "2026-09-14T01:30:00Z");
-    expect(days).toEqual([{ label: "Sun 13", from: "2026-09-12T16:00:00Z", to: "2026-09-13T16:00:00.000Z" }, { label: "Mon 14", from: "2026-09-13T16:00:00.000Z", to: "2026-09-14T01:30:00Z" }]);
-    expect(dayRanges("2026-09-12T16:00:00Z", "2026-09-14T01:30:00Z", "ms").map((d) => d.label)).toEqual(["Ahd 13", "Isn 14"]);
+    const days = dayRanges(TEXT_2026_09_12T16_00_00Z, TEXT_2026_09_14T01_30_00Z);
+    expect(days).toEqual([{ label: "Sun 13", from: TEXT_2026_09_12T16_00_00Z, to: TEXT_2026_09_13T16_00_00_000Z }, { label: "Mon 14", from: TEXT_2026_09_13T16_00_00_000Z, to: TEXT_2026_09_14T01_30_00Z }]);
+    expect(dayRanges(TEXT_2026_09_12T16_00_00Z, TEXT_2026_09_14T01_30_00Z, "ms").map((d) => d.label)).toEqual(["Ahd 13", "Isn 14"]);
     expect(dayRanges("2026-01-01T00:00:00Z", "2026-03-01T00:00:00Z")).toHaveLength(31);
   });
 
@@ -105,7 +114,7 @@ describe("customer energy & cost (FR-C06, FR-C13)", () => {
 
   it("carries the selection to the offsets page as URL parameters (FR-C13)", () => {
     expect(selectionQuery({ unitIds: ["u1", "u2"], period: "7d", baselineId: "b1" })).toBe("unitIds=u1%2Cu2&period=7d&baselineId=b1");
-    expect(selectionQuery({ unitIds: ["u1"], period: "custom", from: "2026-09-01T00:00", to: "2026-09-08T00:00" })).toBe("unitIds=u1&period=custom&from=2026-09-01T00%3A00&to=2026-09-08T00%3A00");
+    expect(selectionQuery({ unitIds: ["u1"], period: "custom", from: TEXT_2026_09_01T00_00, to: "2026-09-08T00:00" })).toBe("unitIds=u1&period=custom&from=2026-09-01T00%3A00&to=2026-09-08T00%3A00");
   });
 });
 
@@ -114,14 +123,14 @@ describe("HQ energy baselines in the display language (IR296)", () => {
     const b = must(summary.baselineSnapshot);
     const ms = translator("ms");
     expect(baselineRows([b, { ...b, id: "b2", unitIds: ["u1"], baselineKWh: null }]).map((r) => [r.value, r.units, r.period])).toEqual([
-      ["135.0 kWh", "2 units", "2026-09-01 00:00 → 2026-09-08 00:00"], ["no value", "1 unit", "2026-09-01 00:00 → 2026-09-08 00:00"],
+      ["135.0 kWh", "2 units", TEXT_2026_09_01_00_00_2026_09_08_00_00], ["no value", "1 unit", TEXT_2026_09_01_00_00_2026_09_08_00_00],
     ]);
-    expect(baselineRows([{ ...b, baselineKWh: null }], ms).map((r) => [r.value, r.units, r.period])).toEqual([["tiada nilai", "2 unit", "2026-09-01 00:00 → 2026-09-08 00:00"]]);
-    const draft: BaselineDraft = { unitIds: [], from: "2026-09-08T00:00", to: "2026-09-01T00:00", method: "demo_period_comparison", baselineKWh: "", boundaryId: "whole_building_electricity", boundary: "", assumptions: "x", source: "" };
+    expect(baselineRows([{ ...b, baselineKWh: null }], ms).map((r) => [r.value, r.units, r.period])).toEqual([["tiada nilai", "2 unit", TEXT_2026_09_01_00_00_2026_09_08_00_00]]);
+    const draft: BaselineDraft = { unitIds: [], from: "2026-09-08T00:00", to: TEXT_2026_09_01T00_00, method: "demo_period_comparison", baselineKWh: "", boundaryId: "whole_building_electricity", boundary: "", assumptions: "x", source: "" };
     expect(baselineErrors(draft, ms)).toEqual({
       unitIds: "Pilih 1–100 unit", period: "Tamat mesti selepas mula", boundaryId: "Perbandingan tempoh mengukur elektrik input AC sahaja", boundary: "1–500 aksara", source: "1–500 aksara",
     });
-    expect(baselineErrors({ ...draft, unitIds: ["u1"], from: "2025-01-01T00:00", to: "2026-09-01T00:00", method: "demo_fixed", baselineKWh: "-1", boundaryId: "ac_input_electricity", boundary: "AC", source: "demo" }))
+    expect(baselineErrors({ ...draft, unitIds: ["u1"], from: "2025-01-01T00:00", to: TEXT_2026_09_01T00_00, method: "demo_fixed", baselineKWh: "-1", boundaryId: AC_INPUT_ELECTRICITY, boundary: "AC", source: "demo" }))
       .toEqual({ period: "At most 366 days", baselineKWh: "A value ≥ 0 kWh" });
     // an empty period asks for both ends instead of saying the end is before the start; the option names its dates (IR586)
     expect([baselineErrors({ ...draft, from: "", to: "" }).period, baselineErrors({ ...draft, from: "", to: "" }, ms).period]).toEqual(["Enter the start and the end", "Masukkan masa mula dan tamat"]);

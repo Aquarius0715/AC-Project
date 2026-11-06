@@ -5,31 +5,37 @@ import {
 } from "@ac/web/lib/adminContractors";
 import { i18nOf } from "@ac/web/lib/i18n";
 
+const DEMO_CONTRACTOR_A = "Demo Contractor A";
+const TEXT_2026_09_01T00_00_00Z = "2026-09-01T00:00:00Z";
+const DEMO_INDOOR = "demo_indoor";
+const TEXT_2026_10_01T00_00_00Z = "2026-10-01T00:00:00Z";
+const REPAIR_BASE = "repair_base";
+
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 
 const NOW = Date.parse("2026-09-14T01:00:00Z"); // Mon 09:00 KL
 const kpis = { period: { from: "2026-06-16T01:00:00Z", to: "2026-09-14T01:00:00Z" }, offerAcceptance: 92, arrivalInWindow: 96.2, firstTimeAccepted: 84, averageRating: 4.6, ratingCount: 12, reworkRate: 8 };
 const profile = (over: Partial<ApiProfile>): ApiProfile => {
   return {
-    id: "p-a", version: 2, organizationId: "org-a", name: "Demo Contractor A", status: "active", registrationNo: "SSM 202301012345", serviceAreas: ["Kuala Lumpur", "Selangor"],
+    id: "p-a", version: 2, organizationId: "org-a", name: DEMO_CONTRACTOR_A, status: "active", registrationNo: "SSM 202301012345", serviceAreas: ["Kuala Lumpur", "Selangor"],
     contactEmail: "ops@contractor-a.example", insuranceValidUntil: "2027-01-31T00:00:00Z", delegation: { from: "2026-04-01T00:00:00Z", to: "2027-01-31T00:00:00Z" }, rateCardId: "rc-3",
-    suspendedReason: null, kpis, createdAt: "2026-04-01T00:00:00Z", updatedAt: "2026-09-01T00:00:00Z", ...over,
+    suspendedReason: null, kpis, createdAt: "2026-04-01T00:00:00Z", updatedAt: TEXT_2026_09_01T00_00_00Z, ...over,
   };
 };
 const tech = (over: Partial<ApiTechnician>): ApiTechnician => {
   return { id: "m-a", displayName: "tech-external-a", organizationId: "org-a", role: "technician", validUntil: null,
-    qualifications: [{ code: "demo_indoor", validFrom: "2026-09-01T00:00:00Z", validUntil: "2027-09-01T00:00:00Z", revokedAt: null }], ...over };
+    qualifications: [{ code: DEMO_INDOOR, validFrom: TEXT_2026_09_01T00_00_00Z, validUntil: "2027-09-01T00:00:00Z", revokedAt: null }], ...over };
 };
 const cert = (over: Partial<ApiCertificate>): ApiCertificate => {
-  return { id: "c1", version: 1, membershipId: "m-a", organizationId: "org-a", code: "demo_indoor", name: "Indoor", number: "N-1",
-    issuedAt: "2025-10-15T00:00:00Z", expiresAt: "2026-10-15T00:00:00Z", fileName: "cert.pdf", status: "expiring", renewalOf: null, createdAt: "2026-09-01T00:00:00Z", ...over };
+  return { id: "c1", version: 1, membershipId: "m-a", organizationId: "org-a", code: DEMO_INDOOR, name: "Indoor", number: "N-1",
+    issuedAt: "2025-10-15T00:00:00Z", expiresAt: "2026-10-15T00:00:00Z", fileName: "cert.pdf", status: "expiring", renewalOf: null, createdAt: TEXT_2026_09_01T00_00_00Z, ...over };
 };
 
 describe("HQ contractor register", () => {
   it("lists every contractor organization, with or without a profile", () => {
-    const rows = contractorRows([{ id: "org-b", name: "Demo Contractor B" }, { id: "org-a", name: "Demo Contractor A" }], [profile({}), profile({ id: "p-c", organizationId: "org-c", name: "C", status: "suspended" })], [tech({}), tech({ id: "m-a2" })]);
+    const rows = contractorRows([{ id: "org-b", name: "Demo Contractor B" }, { id: "org-a", name: DEMO_CONTRACTOR_A }], [profile({}), profile({ id: "p-c", organizationId: "org-c", name: "C", status: "suspended" })], [tech({}), tech({ id: "m-a2" })]);
     expect(rows).toEqual([
-      { id: "org-a", name: "Demo Contractor A", sub: "Kuala Lumpur, Selangor · 2 technicians", badge: { label: "Active", tone: "ok" } },
+      { id: "org-a", name: DEMO_CONTRACTOR_A, sub: "Kuala Lumpur, Selangor · 2 technicians", badge: { label: "Active", tone: "ok" } },
       { id: "org-b", name: "Demo Contractor B", sub: "no contractor profile yet · 0 technicians", badge: { label: "No profile", tone: "muted" } },
     ]);
     expect(contractorRows([{ id: "org-c", name: "C" }], [profile({ organizationId: "org-c", status: "suspended" })], [])[0]).toMatchObject({ sub: "Kuala Lumpur, Selangor · offers suspended", badge: { label: "Suspended", tone: "crit" } });
@@ -46,7 +52,7 @@ describe("HQ contractor register", () => {
 
   it("shows the rate card in effect and the scheduled ones", () => {
     const cards: ApiRateCard[] = [
-      { id: "rc-4", version: 4, contractorOrgId: "org-a", effectiveFrom: "2026-10-01T00:00:00Z", currency: "MYR", lines: [{ workType: "repair_base", amountMinor: 47_000, note: null }] },
+      { id: "rc-4", version: 4, contractorOrgId: "org-a", effectiveFrom: TEXT_2026_10_01T00_00_00Z, currency: "MYR", lines: [{ workType: REPAIR_BASE, amountMinor: 47_000, note: null }] },
       { id: "rc-3", version: 3, contractorOrgId: "org-a", effectiveFrom: "2026-06-01T00:00:00Z", currency: "MYR", lines: [{ workType: "rework_deduction", amountMinor: 12_000, note: "2nd return" }, { workType: "periodic_inspection", amountMinor: 38_000, note: "per unit visit" }] },
     ];
     const v = rateCardView(cards, "rc-3", NOW);
@@ -59,8 +65,8 @@ describe("HQ contractor register", () => {
 
   it("names each technician's certificate state", () => {
     const rows = technicianRows([
-      tech({}), tech({ id: "m-a2", displayName: "tech-external-a2" }), tech({ id: "m-b", displayName: "tech-external-b", validUntil: "2026-09-01T00:00:00Z" }),
-      tech({ id: "m-c", displayName: "tech-c", qualifications: [{ code: "demo_indoor", validFrom: "2026-01-01T00:00:00Z", validUntil: "2026-10-01T00:00:00Z", revokedAt: null }] }),
+      tech({}), tech({ id: "m-a2", displayName: "tech-external-a2" }), tech({ id: "m-b", displayName: "tech-external-b", validUntil: TEXT_2026_09_01T00_00_00Z }),
+      tech({ id: "m-c", displayName: "tech-c", qualifications: [{ code: DEMO_INDOOR, validFrom: "2026-01-01T00:00:00Z", validUntil: TEXT_2026_10_01T00_00_00Z, revokedAt: null }] }),
       tech({ id: "m-d", displayName: "tech-d" }),
     ], [cert({}), cert({ id: "c2", membershipId: "m-d", status: "pending_verification" })], NOW);
     expect(rows.map((r) => [r.name, r.sub, r.badge.label])).toEqual([
@@ -73,10 +79,10 @@ describe("HQ contractor register", () => {
   it("checks the profile and rate card forms", () => {
     expect(profileErrors({ registrationNo: "SSM 1", serviceAreas: "Penang, Kedah", contactEmail: "ops@b.example" })).toEqual({});
     expect(profileErrors({ registrationNo: " ", serviceAreas: "Penang, penang", contactEmail: "nope" })).toEqual({ registrationNo: "1–64 characters.", serviceAreas: "1–20 different areas, comma-separated.", contactEmail: "A valid e-mail address." });
-    const lines = [{ workType: "repair_base", amount: "450", note: "" }];
-    expect(rateCardErrors({ effectiveFrom: "2026-10-01T00:00:00Z", lines }, NOW)).toEqual({});
-    expect(rateCardErrors({ effectiveFrom: "2026-09-01T00:00:00Z", lines: [...lines, ...lines] }, NOW)).toEqual({ effectiveFrom: "Effective from a future date.", lines: "Each work type once." });
-    expect(rateCardErrors({ effectiveFrom: "2026-10-01T00:00:00Z", lines: [{ workType: "emergency", amount: "-1", note: "" }] }, NOW).lines).toMatch(/non-negative/);
+    const lines = [{ workType: REPAIR_BASE, amount: "450", note: "" }];
+    expect(rateCardErrors({ effectiveFrom: TEXT_2026_10_01T00_00_00Z, lines }, NOW)).toEqual({});
+    expect(rateCardErrors({ effectiveFrom: TEXT_2026_09_01T00_00_00Z, lines: [...lines, ...lines] }, NOW)).toEqual({ effectiveFrom: "Effective from a future date.", lines: "Each work type once." });
+    expect(rateCardErrors({ effectiveFrom: TEXT_2026_10_01T00_00_00Z, lines: [{ workType: "emergency", amount: "-1", note: "" }] }, NOW).lines).toMatch(/non-negative/);
     expect(nextMonthStart(NOW)).toBe("2026-09-30T16:00:00.000Z"); // 2026-10-01 00:00 KL
     expect(contractorRefusal({ code: "CONFLICT", messageKey: "errors.profile_exists", fieldErrors: {} })).toBe("Not saved: this organization already has a contractor profile.");
   });
@@ -87,7 +93,7 @@ describe("HQ contractor register in Malay (IR291)", () => {
     expect(contractorRows([{ id: "org-b", name: "B" }], [], [], MS.t)[0]).toMatchObject({ sub: "belum ada profil kontraktor · 0 juruteknik", badge: { label: "Tiada profil" } });
     expect(kpiTiles(kpis, MS.t).map((k) => k.label)).toEqual(["Penerimaan tawaran", "Ketibaan dalam tetingkap", "Laporan diterima kali pertama", "Penilaian pelanggan", "Kadar kerja semula"]);
     expect(profileFacts(profile({ insuranceValidUntil: "2027-01-30T16:00:00Z" }), NOW, MS)[4]).toEqual(["Insurans", "sah hingga 31 Jan 2027"]); // 00:00 on the 31st in Kuala Lumpur, whatever the display zone
-    const v = rateCardView([{ id: "rc-3", version: 3, contractorOrgId: "org-a", effectiveFrom: "2026-05-31T16:00:00Z", currency: "MYR", lines: [{ workType: "repair_base", amountMinor: 47_000, note: null }] }], "rc-3", NOW, MS);
+    const v = rateCardView([{ id: "rc-3", version: 3, contractorOrgId: "org-a", effectiveFrom: "2026-05-31T16:00:00Z", currency: "MYR", lines: [{ workType: REPAIR_BASE, amountMinor: 47_000, note: null }] }], "rc-3", NOW, MS);
     expect([v.current?.title, v.current?.lines[0]?.label]).toEqual(["Kad kadar v3 (dari 1 Jun 2026)", "Pembaikan — lawatan asas"]);
     expect(technicianRows([tech({})], [cert({})], NOW, MS)[0]?.badge.label).toBe("1 hampir tamat · 15 Okt");
     expect(contractorRefusal({ code: "NOT_FOUND", messageKey: "error.notFound", fieldErrors: {} }, MS.t)).toBe("Kontraktor atau sijil tidak lagi wujud.");

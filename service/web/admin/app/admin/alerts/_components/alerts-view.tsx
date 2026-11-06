@@ -1,4 +1,7 @@
 "use client";
+const ACKNOWLEDGED = "Acknowledged";
+const ACKNOWLEDGED_2 = "acknowledged";
+const CUSTOMER_A_BEDROOM_AC = "customer-a · Bedroom AC";
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
@@ -18,11 +21,11 @@ import { ScopeBar } from "../../jobs/_components/jobs-header";
 import { Icon } from "@ac/web/components/Icon";
 import { entryOf } from "@ac/web/lib/lookup";
 
-const ST: Record<AlertState, string> = { open: "Open", acknowledged: "Acknowledged", resolved: "Resolved" };
+const ST: Record<AlertState, string> = { open: "Open", acknowledged: ACKNOWLEDGED, resolved: "Resolved" };
 const LIST: Record<AlertState, string> = { open: "Open alerts", acknowledged: "Acknowledged alerts", resolved: "Resolved alerts" };
 const SEVERITY: [Severity, string][] = [["critical", "Severity: Critical"], ["warning", "Severity: Warning"], ["normal", "Severity: Info"]];
 // the Phase 1A demo's fixture rows (their data stays English, as the other demo screens)
-const STATE_TITLE = new Map([["resolved", "Resolved"], ["acknowledged", "Acknowledged — waiting for resolution"]]);
+const STATE_TITLE = new Map([["resolved", "Resolved"], [ACKNOWLEDGED_2, "Acknowledged — waiting for resolution"]]);
 const demoTimeline = (time: string, st: AlertState): AdminAlert["timeline"] => {
   return [
     { time, title: "Alert detected", detail: "Load increase with stable outdoor temperature", tone: "warn" },
@@ -57,10 +60,10 @@ const demoAlert = (id: string, title: string, time: string, sev: Severity, meta:
 };
 const seedAlerts: AdminAlert[] = [
   demoAlert("alert-c08-critical", "High temperature observed", "08:55", "critical", "customer-a · Bedroom AC · no policy"),
-  demoAlert("alert-insulation-a", "Poor insulation suspected", "08:45", "warning", "customer-a · Bedroom AC"),
-  demoAlert("alert-temp-a", "Temperature ≥ 30 °C for 60 s", "08:58", "warning", "customer-a · Bedroom AC"),
-  demoAlert("alert-unknown-a", "Cooling load increase", "08:48", "warning", "customer-a · Bedroom AC"),
-  demoAlert("alert-window-a", "Possible open window", "08:50", "warning", "customer-a · Bedroom AC"),
+  demoAlert("alert-insulation-a", "Poor insulation suspected", "08:45", "warning", CUSTOMER_A_BEDROOM_AC),
+  demoAlert("alert-temp-a", "Temperature ≥ 30 °C for 60 s", "08:58", "warning", CUSTOMER_A_BEDROOM_AC),
+  demoAlert("alert-unknown-a", "Cooling load increase", "08:48", "warning", CUSTOMER_A_BEDROOM_AC),
+  demoAlert("alert-window-a", "Possible open window", "08:50", "warning", CUSTOMER_A_BEDROOM_AC),
 ];
 // the demo's remeasurements of the Bedroom AC after its alerts (Figma Admin 259:2)
 const demoEvidence: ApiEvidenceCandidate[] = [
@@ -144,9 +147,9 @@ export function AdminAlertsView({ live }: Readonly<{ live?: Live }>) {
   const demoState = (id: string, state: AlertState) => { setDemoList((l) => l.map((x) => (x.id === id ? { ...x, state, st: t(entryOf(ST, state)), timeline: demoTimeline(x.time, state) } : x))); };
   const acknowledge = () => {
     if (!a) return;
-    if (live) { act(() => acknowledgeAlert(a.id, a.version), t("Acknowledged")); return; }
-    demoState(a.id, "acknowledged");
-    toast(t("Acknowledged"));
+    if (live) { act(() => acknowledgeAlert(a.id, a.version), t(ACKNOWLEDGED)); return; }
+    demoState(a.id, ACKNOWLEDGED_2);
+    toast(t(ACKNOWLEDGED));
   };
   const doResolve = () => {
     setTried(true);
@@ -157,7 +160,7 @@ export function AdminAlertsView({ live }: Readonly<{ live?: Live }>) {
     setResolve(false);
     toast(t("Alert resolved"));
   };
-  const counts: [AlertState, number][] = [["open", al.filter((x) => x.state === "open").length], ["acknowledged", al.filter((x) => x.state === "acknowledged").length], ["resolved", al.filter((x) => x.state === "resolved").length]];
+  const counts: [AlertState, number][] = [["open", al.filter((x) => x.state === "open").length], [ACKNOWLEDGED_2, al.filter((x) => x.state === ACKNOWLEDGED_2).length], ["resolved", al.filter((x) => x.state === "resolved").length]];
   const openish = al.filter((x) => x.state !== "resolved");
   const scopeName = live?.scopeName ?? t("all customers");
 

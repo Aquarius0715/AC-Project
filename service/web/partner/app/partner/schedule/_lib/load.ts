@@ -13,10 +13,11 @@ import { requiredFor, type ApiPartnerJobDetail } from "@ac/web/lib/partnerJobDet
 import { klDay, weekOf, type ApiCapacity, type ApiMember, type ApiPartnerJob, type Slot } from "@ac/web/lib/partnerOverview";
 import { candidates, formMode, SCHEDULE_STATUSES, scheduleRow, scheduleTeam, sortOf, SORTS, type ScheduleRow } from "@ac/web/lib/partnerSchedule";
 
+const KL = "Asia/Kuala_Lumpur";
+
 const optional = orWhenRefused;
 const plusDays = (date: string, n: number) => new Date(Date.parse(`${date}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 const klDate = (iso: string) => new Date(Date.parse(iso) + 8 * 3_600_000).toISOString().slice(0, 10);
-const KL = "Asia/Kuala_Lumpur";
 
 export async function loadSchedule(sp: { jobId?: string; sort?: string }) {
   interface Page<T> { items: T[]; total: number }

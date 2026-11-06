@@ -1,11 +1,11 @@
 "use client";
+const CHANGE = "ac:urlchange";
+const STORAGE = "ac:storagechange";
 
 // URL query state as an external store (React: useSyncExternalStore for browser APIs). Reading the URL this way needs
 // no effect and no Suspense boundary: the server snapshot is empty, the client snapshot is location.search, and
 // writes use history.replaceState plus a notification so every subscriber re-renders.
 import { useSyncExternalStore } from "react";
-
-const CHANGE = "ac:urlchange";
 
 function subscribe(onChange: () => void) {
   addEventListener("popstate", onChange);
@@ -34,8 +34,6 @@ export function setSearchParameter(key: string, value: string | null) {
   history.replaceState(null, "", u);
   dispatchEvent(new Event(CHANGE));
 }
-
-const STORAGE = "ac:storagechange";
 
 /** A localStorage value as an external store (null on the server or when storage is blocked). */
 export function useStoredValue(key: string): string | null {

@@ -1,4 +1,6 @@
 "use client";
+const ADD_CERTIFICATE = "Add certificate";
+const TECHNICIAN = "Technician";
 
 import { useId, useState } from "react";
 import { Badge, Banner, Btn, Card, cx, DataTable, Field, Input, LinkButton, Modal, Select, SummaryList, Textarea } from "@ac/web/components/ui";
@@ -28,7 +30,7 @@ export function Certifications({ live }: Readonly<{ live: Live }>) {
   const action = (r: CertRow) => (
     <div className="flex flex-wrap items-center justify-end gap-1.5">
       {r.actions.includes("renew") && <Btn size="sm" variant={r.status === "expiring" ? "primary" : "secondary"} onClick={() => { setOpen({ kind: "renew", row: r }); }}>{t("Upload renewal")}</Btn>}
-      {r.actions.includes("add") && <Btn size="sm" onClick={() => { setOpen({ kind: "add", row: r }); }}>{t(r.status === "not_held" ? "Add certificate" : "Upload certificate")}</Btn>}
+      {r.actions.includes("add") && <Btn size="sm" onClick={() => { setOpen({ kind: "add", row: r }); }}>{t(r.status === "not_held" ? ADD_CERTIFICATE : "Upload certificate")}</Btn>}
       {r.actions.includes("training") && <Btn size="sm" onClick={() => { setOpen({ kind: "training", row: r }); }}>{t("Request training")}</Btn>}
       {r.actions.includes("view") && <Btn size="sm" variant="ghost" onClick={() => { setOpen({ kind: "view", row: r }); }}>{t("View")}</Btn>}
       {r.renewalPending && <span className="text-[11px] text-primary">{t("Renewal pending HQ verification")}</span>}
@@ -38,7 +40,7 @@ export function Certifications({ live }: Readonly<{ live: Live }>) {
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
-        <Select aria-label={t("Technician")} className="w-auto" value={q.membershipId ?? ""} onChange={(e) => { patch({ membershipId: e.target.value || null }); }}>
+        <Select aria-label={t(TECHNICIAN)} className="w-auto" value={q.membershipId ?? ""} onChange={(e) => { patch({ membershipId: e.target.value || null }); }}>
           <option value="">{t("Technician: All")}</option>
           {c.people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </Select>
@@ -60,10 +62,10 @@ export function Certifications({ live }: Readonly<{ live: Live }>) {
         ))}
       </div>
       <div className="split">
-        <Card title={t("Certificates — {company}", { company: live.company })} action={<Btn size="sm" onClick={() => { setOpen({ kind: "add", row: null }); }} disabled={c.people.every((p) => !p.active)}><Icon name="add" /> {t("Add certificate")}</Btn>}>
+        <Card title={t("Certificates — {company}", { company: live.company })} action={<Btn size="sm" onClick={() => { setOpen({ kind: "add", row: null }); }} disabled={c.people.every((p) => !p.active)}><Icon name="add" /> {t(ADD_CERTIFICATE)}</Btn>}>
           {c.rows.length === 0 ? <p className="py-4 text-[13px] text-muted-foreground">{t("No certificates match these filters.")}</p> : (
             <DataTable rowKey={(r) => r.key} rows={c.rows} cols={[
-              { key: "t", label: t("Technician"), render: (r) => <b className="whitespace-nowrap">{r.technician}</b> },
+              { key: "t", label: t(TECHNICIAN), render: (r) => <b className="whitespace-nowrap">{r.technician}</b> },
               { key: "c", label: t("Certificate"), render: (r) => <span><b className="block">{r.name}</b><span className="block text-[11px] text-muted-foreground">{r.detail}</span></span> },
               { key: "e", label: t("Expires"), render: (r) => <span className="whitespace-nowrap">{r.expires}</span> },
               { key: "s", label: t("Status"), render: (r) => <Badge tone={r.badge.tone}>{r.badge.text}</Badge> },
@@ -126,15 +128,15 @@ function CertificateModal({ live, kind, row, onClose }: Readonly<{ live: Live; k
       (f) => { const r = certificateRefusal(f, t); setServer(r.fields); setRefused(r.text); });
   };
   return (
-    <Modal open onClose={onClose} title={renew ? t("Upload renewal — {name}", { name: row.name }) : t("Add certificate")} footer={<>
+    <Modal open onClose={onClose} title={renew ? t("Upload renewal — {name}", { name: row.name }) : t(ADD_CERTIFICATE)} footer={<>
       <Btn onClick={onClose}>{t("Cancel")}</Btn>
       <Btn variant="primary" disabled={pending} onClick={save}>{t("Submit for verification")}</Btn>
     </>}>
       {renew ? (
-        <SummaryList items={[[t("Technician"), row.technician], [t("Current"), t("{number} · expires {date}", { number: renew.number, date: row.expires })]]} />
+        <SummaryList items={[[t(TECHNICIAN), row.technician], [t("Current"), t("{number} · expires {date}", { number: renew.number, date: row.expires })]]} />
       ) : (
         <>
-          <Field label={t("Technician")} error={fieldError("membershipId")}>
+          <Field label={t(TECHNICIAN)} error={fieldError("membershipId")}>
             <Select id={ids.membershipId} value={form.membershipId} onChange={(e) => { set({ membershipId: e.target.value }); }}>
               {c.people.filter((p) => p.active).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </Select>
@@ -188,7 +190,7 @@ function TrainingModal({ row, onClose }: Readonly<{ row: CertRow; onClose: () =>
       <Btn onClick={onClose}>{t("Cancel")}</Btn>
       <Btn variant="primary" disabled={pending} onClick={save}>{t("Request training")}</Btn>
     </>}>
-      <SummaryList items={[[t("Technician"), row.technician], [t("Certificate"), `${row.name} · ${row.badge.text}`]]} />
+      <SummaryList items={[[t(TECHNICIAN), row.technician], [t("Certificate"), `${row.name} · ${row.badge.text}`]]} />
       <Field label={t("Note (required, 1–1000 characters)")} error={tried && isBad ? t("A note is required (1–1000 characters)") : undefined}>
         <Textarea value={note} maxLength={1000} onChange={(e) => { setNote(e.target.value); }} placeholder={t("Refresher course before the certificate expires.")} />
       </Field>
@@ -201,7 +203,7 @@ function ViewModal({ row, onClose }: Readonly<{ row: CertRow; onClose: () => voi
   const t = useT();
   return (
     <Modal open onClose={onClose} title={row.name} footer={<Btn onClick={onClose}>{t("Close")}</Btn>}>
-      <SummaryList items={[[t("Technician"), row.technician], [t("Certificate number"), row.cert?.number ?? "—"], [t("Details"), row.detail], [t("Expires"), row.expires], [t("Status"), row.badge.text]]} />
+      <SummaryList items={[[t(TECHNICIAN), row.technician], [t("Certificate number"), row.cert?.number ?? "—"], [t("Details"), row.detail], [t("Expires"), row.expires], [t("Status"), row.badge.text]]} />
       {row.cert?.fileName
         ? <p className="text-[13px]"><a href={`/partner/certificates/${row.cert.id}/document`} target="_blank" rel="noreferrer" className="font-semibold text-primary"><Icon name="external" /> {t("Open the document")}</a></p>
         : <p className="text-[11px] text-muted-foreground">{t("No document was uploaded with this certificate.")}</p>}

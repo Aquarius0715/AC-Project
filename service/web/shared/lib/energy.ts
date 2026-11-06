@@ -6,13 +6,16 @@ import type { OpInput } from "@ac/web/lib/opTypes";
 import { codePoints } from "@ac/web/lib/text";
 import { isBefore } from "@ac/web/lib/order";
 
+const DEMO_FIXED = "demo_fixed";
+const BOUNDARY_TEXT = "AC equipment input electricity (excludes shared equipment, solar and batteries)";
+const KL = "Asia/Kuala_Lumpur";
+
 const en = translator("en");
 
 /** Round half away from zero to `digits` decimals of the value as written (1.005 → 1.01; IR44: never
 Number.prototype.toFixed for rounding). Never -0, which Intl shows as "-0.0" (IR265). */
 /** The API's fixed explanation of the actual-data boundary (IR11), shown in the display language like stored evidence
 (IR480); a baseline's own boundary text is the user's and stays as written. */
-const BOUNDARY_TEXT = "AC equipment input electricity (excludes shared equipment, solar and batteries)";
 
 export function roundAway(x: number, digits: number): number {
   if (!Number.isFinite(x)) return x;
@@ -69,7 +72,6 @@ export interface ApiEnergySummary {
   tariffVersion: string; boundaryId: BoundaryId; boundary: string; coverage: number | null; qualityWarnings: string[];
 }
 
-const KL = "Asia/Kuala_Lumpur";
 export const klStamp = (iso: string) =>
   new Date(iso).toLocaleString("en-CA", { timeZone: KL, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).replace(",", "");
 /** An instant as the datetime-local value in Kuala Lumpur ("2026-09-14T08:00"). */
@@ -138,7 +140,7 @@ export function baselineRows(bs: ApiBaseline[], t: T = en): BaselineRow[] {
 export interface BaselineDraft { unitIds: string[]; from: string; to: string; method: ApiBaseline["method"]; baselineKWh: string; boundaryId: BoundaryId; boundary: string; assumptions: string; source: string }
 export function baselineDraft(b?: ApiBaseline): BaselineDraft {
   return {
-    unitIds: b?.unitIds ?? [], from: b ? klLocal(b.period.from) : "", to: b ? klLocal(b.period.to) : "", method: b?.method ?? "demo_fixed",
+    unitIds: b?.unitIds ?? [], from: b ? klLocal(b.period.from) : "", to: b ? klLocal(b.period.to) : "", method: b?.method ?? DEMO_FIXED,
     baselineKWh: b?.baselineKWh === null || b?.baselineKWh === undefined ? "" : String(b.baselineKWh), boundaryId: b?.boundaryId ?? "ac_input_electricity",
     boundary: b?.boundary ?? "", assumptions: b?.assumptions ?? "", source: b?.source ?? "",
   };
@@ -156,7 +158,7 @@ export function baselineErrors(d: BaselineDraft, t: T = en): Record<string, stri
   if (d.unitIds.length === 0 || d.unitIds.length > 100) e.unitIds = t("Choose 1–100 units");
   const period = periodError(d.from, d.to, t) ?? (Date.parse(klInstant(d.to)) - Date.parse(klInstant(d.from)) > 366 * 24 * 3600 * 1000 ? t("At most 366 days") : undefined);
   if (period) e.period = period;
-  if (d.method === "demo_fixed" && !(d.baselineKWh.trim() !== "" && Number.isFinite(+d.baselineKWh) && +d.baselineKWh >= 0)) e.baselineKWh = t("A value ≥ 0 kWh");
+  if (d.method === DEMO_FIXED && !(d.baselineKWh.trim() !== "" && Number.isFinite(+d.baselineKWh) && +d.baselineKWh >= 0)) e.baselineKWh = t("A value ≥ 0 kWh");
   if (d.method === "demo_period_comparison" && d.boundaryId === "whole_building_electricity") e.boundaryId = t("Period comparison measures AC input electricity only");
   if (codePoints(d.boundary.trim()) === 0 || d.boundary.length > 500) e.boundary = t("1–500 characters");
   if (codePoints(d.assumptions.trim()) === 0 || d.assumptions.length > 2000) e.assumptions = t("1–2000 characters");
@@ -166,5 +168,5 @@ export function baselineErrors(d: BaselineDraft, t: T = en): Record<string, stri
 export function baselineInput(d: BaselineDraft, id?: string): OpInput<"baselines.save"> {
   const base = { ...(id && { id }), unitIds: d.unitIds, period: { from: klInstant(d.from), to: klInstant(d.to) }, boundaryId: d.boundaryId, boundary: d.boundary.trim(), assumptions: d.assumptions.trim(), source: d.source.trim() };
   // a fixed baseline carries its kWh; a period comparison computes it (the contract's two cases)
-  return d.method === "demo_fixed" ? { ...base, method: "demo_fixed", baselineKWh: Number(d.baselineKWh) } : { ...base, method: "demo_period_comparison" };
+  return d.method === DEMO_FIXED ? { ...base, method: DEMO_FIXED, baselineKWh: Number(d.baselineKWh) } : { ...base, method: "demo_period_comparison" };
 }

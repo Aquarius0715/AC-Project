@@ -7,6 +7,8 @@ import type { Fact } from "@ac/web/lib/contracts.gen";
 import { codePoints } from "@ac/web/lib/text";
 import { entryOf, lookup } from "@ac/web/lib/lookup";
 
+const SET_TEMPERATURE = "set_temperature";
+
 const en = translator("en");
 
 export type Compare = "gt" | "gte" | "lt" | "lte";
@@ -17,7 +19,7 @@ export type UnitAction =
   | { kind: "set_power"; power: boolean } | { kind: "set_temperature"; celsius: number } | { kind: "set_mode"; mode: "cool" | "dry" | "fan" }
   | { kind: "set_fan"; fanLevel: "low" | "mid" | "high" } | { kind: "ventilate"; level: "low" | "mid" | "high" };
 /** What a form control can choose, in the order the screen lists it. */
-export const actionKinds = ["set_power", "set_temperature", "set_mode", "set_fan", "ventilate"] as const satisfies readonly UnitAction["kind"][];
+export const actionKinds = ["set_power", SET_TEMPERATURE, "set_mode", "set_fan", "ventilate"] as const satisfies readonly UnitAction["kind"][];
 export const acModes = ["cool", "dry", "fan"] as const;
 export const fanLevels = ["low", "mid", "high"] as const;
 export const factQualities = ["valid", "missing", "stale", "suspect"] as const;
@@ -58,7 +60,7 @@ export function actionText(a: UnitAction, t: T = en): string {
   switch (a.kind) {
     case "set_power": { return t(a.power ? "turn the AC on" : "turn the AC off");
     }
-    case "set_temperature": { return t("set the temperature to {value} °C", { value: a.celsius });
+    case SET_TEMPERATURE: { return t("set the temperature to {value} °C", { value: a.celsius });
     }
     case "set_mode": { return t("switch to {mode} mode", { mode: modeWord(a.mode, t) });
     }
@@ -117,7 +119,7 @@ export function autoDraft(p?: ApiAutoPolicy, timezone = "Asia/Kuala_Lumpur"): Au
     name: p?.name ?? "", priority: String(p?.priority ?? 50), timezone: p?.timezone ?? timezone, enabled: p?.enabled ?? false, unitIds: p?.unitIds ?? [],
     type: c?.type ?? "tariff", flag: conditionFlag(c),
     operator: c && "operator" in c ? c.operator : "gt", value: c && "value" in c ? String(c.value) : "0.6",
-    actionKind: a?.kind ?? "set_temperature", power: a?.kind === "set_power" && a.power, celsius: a?.kind === "set_temperature" ? String(a.celsius) : "26",
+    actionKind: a?.kind ?? SET_TEMPERATURE, power: a?.kind === "set_power" && a.power, celsius: a?.kind === SET_TEMPERATURE ? String(a.celsius) : "26",
     mode: a?.kind === "set_mode" ? a.mode : "cool", level: actionLevel(a),
   };
 }
@@ -129,7 +131,7 @@ export function autoErrors(d: AutoDraft, temperatureRange: { min: number; max: n
   if (!d.timezone.trim()) e.timezone = t("Required");
   if (d.unitIds.length === 0) e.unitIds = t("Choose at least one unit");
   if ((d.type === "tariff" || d.type === "solar" || d.type === "battery") && (d.value.trim() === "" || Number.isNaN(Number(d.value)) || Number(d.value) < 0)) e.value = t("A value ≥ 0");
-  if (d.actionKind === "set_temperature") {
+  if (d.actionKind === SET_TEMPERATURE) {
     const c = Number(d.celsius);
     const celsiusProblem = celsiusError(c, temperatureRange, t);
     if (celsiusProblem) e.celsius = celsiusProblem;
@@ -152,7 +154,7 @@ function draftCondition(d: AutoDraft): AutoCondition {
 function draftAction(d: AutoDraft): UnitAction {
   switch (d.actionKind) {
     case "set_power": { return { kind: "set_power", power: d.power }; }
-    case "set_temperature": { return { kind: "set_temperature", celsius: Number(d.celsius) }; }
+    case SET_TEMPERATURE: { return { kind: SET_TEMPERATURE, celsius: Number(d.celsius) }; }
     case "set_mode": { return { kind: "set_mode", mode: d.mode }; }
     case "set_fan": { return { kind: "set_fan", fanLevel: d.level }; }
     default: { return { kind: "ventilate", level: d.level }; }

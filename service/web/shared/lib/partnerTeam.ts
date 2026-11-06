@@ -43,7 +43,7 @@ const pct = (assigned: number, available: number) => (available > 0 ? Math.round
 /** The short weekday of a Kuala Lumpur date in the user's language (“Tue”, “Sel”). */
 export const weekday = (date: string, locale: Locale) => new Date(`${date}T04:00:00Z`).toLocaleDateString(intlTag(locale), { weekday: "short", timeZone: KL });
 /** “Apr 2025”: the month a membership started, a Kuala Lumpur date in the user's language. */
-const month = (iso: string, locale: Locale) => new Date(iso).toLocaleDateString(intlTag(locale), { month: "short", year: "numeric", timeZone: KL }).replaceAll(/[   ]/g, " ");
+const month = (iso: string, locale: Locale) => new Date(iso).toLocaleDateString(intlTag(locale), { month: "short", year: "numeric", timeZone: KL }).replaceAll(/[\u{A0}\u{2009}\u{202F}]/gu, " ");
 const overlaps = (a: Slot, b: Slot) => Date.parse(a.startAt) < Date.parse(b.endAt) && Date.parse(b.startAt) < Date.parse(a.endAt);
 
 /** A technician's job with a booked time (jobs.list per technician): its short ID, the slot and the slot as text. */

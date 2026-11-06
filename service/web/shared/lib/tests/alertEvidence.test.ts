@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import { evidenceHeading, evidenceProblem, evidenceRefusal, evidenceRows, MAX_EVIDENCE, togglePick, type ApiEvidenceCandidate } from "@ac/web/lib/alertEvidence";
 import { EN, i18nOf } from "@ac/web/lib/i18n";
 
+const REMEASUREMENT = "remeasurement";
+
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Kuala_Lumpur" });
 const NOW = Date.parse("2026-09-14T01:35:00Z"); // 09:35 in Kuala Lumpur
 const reading = (id: string, metric: string, value: number | null, unit: string, at: string, origin: ApiEvidenceCandidate["origin"] = "measured"): ApiEvidenceCandidate =>
-  ({ id, metric, value, unit, origin, kind: "remeasurement", observedAt: at, quality: "valid", eventType: null });
+  ({ id, metric, value, unit, origin, kind: REMEASUREMENT, observedAt: at, quality: "valid", eventType: null });
 const items: ApiEvidenceCandidate[] = [
   reading("m-temp", "temperature", 26.4, "°C", "2026-09-14T01:20:00Z"),
   reading("m-co2", "co2", 650, "ppm", "2026-09-14T01:15:00Z", "inspection"),
@@ -16,8 +18,8 @@ const items: ApiEvidenceCandidate[] = [
 describe("alert resolution evidence (IR327)", () => {
   it("lists each candidate with what it is, when, and where it comes from", () => {
     expect(evidenceRows(items, NOW)).toEqual([
-      { id: "m-temp", kind: "remeasurement", title: "Remeasurement · Temperature 26.4 °C · today 9:20 am MYT", sub: "measured · valid" },
-      { id: "m-co2", kind: "remeasurement", title: "Remeasurement · CO₂ 650 ppm · today 9:15 am MYT", sub: "recorded on site · valid" }, // the label's “(ppm)” left to the value
+      { id: "m-temp", kind: REMEASUREMENT, title: "Remeasurement · Temperature 26.4 °C · today 9:20 am MYT", sub: "measured · valid" },
+      { id: "m-co2", kind: REMEASUREMENT, title: "Remeasurement · CO₂ 650 ppm · today 9:15 am MYT", sub: "recorded on site · valid" }, // the label's “(ppm)” left to the value
       { id: "e-restored", kind: "device_event", title: "Device event · today 9:12 am MYT", sub: "The device's signal is back" },
       { id: "0b6c2f4e-0000-4000-8000-000000000001", kind: "detection", title: "Evidence attached to this alert", sub: "0b6c2f4e · observed today 7:50 am MYT" },
     ]);

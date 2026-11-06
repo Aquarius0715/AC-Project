@@ -1,4 +1,5 @@
 "use server";
+const OFFSETS_SIMULATE = "offsets.simulate";
 
 // Server Actions of the offset demo (FR-A15): offsets.preview creates a demo quote and offsets.simulate moves a record
 // through the simulated request, purchase, retirement, failure and retry (demo-only operations, IR operation catalog).
@@ -26,15 +27,15 @@ export async function quoteOffset(input: { customerId: string; purpose: string; 
 
 /** offsets.simulate request: the quote becomes a demo_requested record. */
 export async function requestOffset(quoteId: string, quoteVersion: number) {
-  return run(async () => { const r = await coreOp<{ id: string }>("offsets.simulate", { event: "request", demoConfirmed: true, quoteId, quoteVersion }, { write: true }); return r.id; });
+  return run(async () => { const r = await coreOp<{ id: string }>(OFFSETS_SIMULATE, { event: "request", demoConfirmed: true, quoteId, quoteVersion }, { write: true }); return r.id; });
 }
 
 /** offsets.simulate purchase_confirm / retire / fail of the current attempt (a fresh event ID per click). */
 export async function simulateOffset(recordId: string, version: number, attemptId: string, event: "purchase_confirm" | "retire" | "fail") {
-  return run(async () => { await coreOp("offsets.simulate", { event, recordId, attemptId, eventId: crypto.randomUUID(), demoConfirmed: true }, { write: true, expectedVersion: version }); return null; });
+  return run(async () => { await coreOp(OFFSETS_SIMULATE, { event, recordId, attemptId, eventId: crypto.randomUUID(), demoConfirmed: true }, { write: true, expectedVersion: version }); return null; });
 }
 
 /** offsets.simulate retry of the failed current attempt. */
 export async function retryOffset(recordId: string, version: number, attemptId: string) {
-  return run(async () => { await coreOp("offsets.simulate", { event: "retry", demoConfirmed: true, recordId, attemptId }, { write: true, expectedVersion: version }); return null; });
+  return run(async () => { await coreOp(OFFSETS_SIMULATE, { event: "retry", demoConfirmed: true, recordId, attemptId }, { write: true, expectedVersion: version }); return null; });
 }

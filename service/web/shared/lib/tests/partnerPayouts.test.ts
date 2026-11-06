@@ -3,6 +3,10 @@ import { kpis, lineRows, money, payoutPdf, periodLabel, questionRows, statementR
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 import { must } from "./must";
 
+const JOB_BBBBBBBB = "job-bbbbbbbb";
+const PERIODIC_INSPECTION = "Periodic inspection";
+const JOB_EEEEEEEE = "job-eeeeeeee";
+
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const ms = translator("ms");
 
@@ -11,8 +15,8 @@ const statement = (over: Partial<ApiPayoutStatement> = {}): ApiPayoutStatement =
   return {
     id: "stmt-2026-08-aaaa", version: 2, contractorOrgId: "org-contractor-a", period: "2026-08", status: "approved", currency: "MYR", grossMinor: 128_000, deductionsMinor: 12_000, netMinor: 116_000,
     payDate: "2026-09-15T00:00:00Z", approvedByMembershipId: "hq", paidAt: null, queries: [],
-    lines: [line(), line({ id: "l2", jobId: "job-bbbbbbbb", workType: "periodic_inspection", amountMinor: 38_000, acceptedAt: "2026-08-12T03:00:00Z" }),
-      line({ id: "l3", jobId: "job-bbbbbbbb", workType: "rework_deduction", amountMinor: 12_000, kind: "deduction", acceptedAt: "2026-08-12T03:00:00Z" }),
+    lines: [line(), line({ id: "l2", jobId: JOB_BBBBBBBB, workType: "periodic_inspection", amountMinor: 38_000, acceptedAt: "2026-08-12T03:00:00Z" }),
+      line({ id: "l3", jobId: JOB_BBBBBBBB, workType: "rework_deduction", amountMinor: 12_000, kind: "deduction", acceptedAt: "2026-08-12T03:00:00Z" }),
       line({ id: "l4", jobId: "job-cccccccc", amountMinor: 45_000, acceptedAt: "2026-08-20T03:00:00Z" })],
     ...over,
   };
@@ -47,14 +51,14 @@ describe("KPIs", () => {
 });
 
 describe("lines table", () => {
-  const jobs = new Map([["job-aaaaaaaa", { title: "Repair · Bedroom AC", sub: "Home A" }], ["job-bbbbbbbb", { title: "Periodic inspection", sub: "customer details closed with the delegation" }]]);
+  const jobs = new Map([["job-aaaaaaaa", { title: "Repair · Bedroom AC", sub: "Home A" }], [JOB_BBBBBBBB, { title: PERIODIC_INSPECTION, sub: "customer details closed with the delegation" }]]);
   it("prices charges, deductions and adjustments and appends the jobs still in review", () => {
     const s = statement({ lines: [...statement().lines, line({ id: "l5", jobId: "job-dddddddd", kind: "adjustment", amountMinor: -5000, note: null, acceptedAt: null })] });
-    const rows = lineRows(s, jobs, [{ id: "job-cccccccc", type: "reactive", unitName: "Lobby AC" }, { id: "job-eeeeeeee", type: "periodic", unitName: null }]);
+    const rows = lineRows(s, jobs, [{ id: "job-cccccccc", type: "reactive", unitName: "Lobby AC" }, { id: JOB_EEEEEEEE, type: "periodic", unitName: null }]);
     expect(rows.map((r) => [r.job, r.work, r.accepted, r.status, r.statusText, r.amount])).toEqual([
-      ["job-aaaa", "Repair · Bedroom AC", "5 Aug", "accepted", "Accepted", "450.00"], ["job-bbbb", "Periodic inspection", "12 Aug", "accepted", "Accepted", "380.00"],
+      ["job-aaaa", "Repair · Bedroom AC", "5 Aug", "accepted", "Accepted", "450.00"], ["job-bbbb", PERIODIC_INSPECTION, "12 Aug", "accepted", "Accepted", "380.00"],
       ["job-bbbb", "Rework deduction", "12 Aug", "deduction", "Deduction", "− 120.00"], ["job-cccc", "Repair", "20 Aug", "accepted", "Accepted", "450.00"],
-      ["job-dddd", "Adjustment from HQ", "—", "adjustment", "Adjustment", "− 50.00"], ["job-eeee", "Periodic inspection", "—", "not_included", "Not included", "—"],
+      ["job-dddd", "Adjustment from HQ", "—", "adjustment", "Adjustment", "− 50.00"], ["job-eeee", PERIODIC_INSPECTION, "—", "not_included", "Not included", "—"],
     ]);
     expect(rows[0]?.sub).toBe("Home A");
     expect(rows[2]?.sub).toBe("report returned for rework");
@@ -75,14 +79,14 @@ describe("lines table", () => {
 
 describe("payoutPdf", () => {
   it("builds a valid one-page PDF with ASCII text and correct xref offsets", () => {
-    const rows = lineRows(statement(), new Map(), [{ id: "job-eeeeeeee", type: "periodic", unitName: null }]);
+    const rows = lineRows(statement(), new Map(), [{ id: JOB_EEEEEEEE, type: "periodic", unitName: null }]);
     const pdf = payoutPdf(statement(), rows, "Contractor (A) − demo");
     expect(pdf.startsWith("%PDF-1.4\n")).toBe(true);
     expect(pdf).toContain("/Type /Catalog");
     expect(pdf).toContain("/BaseFont /Courier");
     expect(pdf).toContain("Contractor \\(A\\) - demo"); // parentheses escaped, non-ASCII replaced
     expect(pdf).toContain("(Net payable");
-    expect(pdf).not.toMatch(/[^\x00-\x7F]/);
+    expect(pdf).not.toMatch(/[^\u{0}-\u{7F}]/u);
     expect(pdf.match(/\) Tj/g) ?? []).toHaveLength(16); // 2 header + blank + column head + rule + 4 statement lines (Not included rows are left out) + rule + 3 totals + blank + 2 notes
     const xref = Number(must(/startxref\n(\d+)/.exec(pdf))[1]);
     expect(pdf.slice(xref, xref + 4)).toBe("xref");
@@ -100,7 +104,7 @@ describe("payouts in Malay (IR279)", () => {
     expect(kpis(statement(), "e8c270a5 v3", MS).map((k) => [k.label, k.sub])).toEqual([
       ["Kerja dibayar", "diterima dalam semakan pada Ogos"], ["Kasar", "kad kadar e8c270a5 v3"], ["Potongan", "1 potongan kerja semula"], ["Bersih perlu dibayar", ""],
     ]);
-    const rows = lineRows(statement(), new Map(), [{ id: "job-eeeeeeee", type: "periodic", unitName: null }], MS);
+    const rows = lineRows(statement(), new Map(), [{ id: JOB_EEEEEEEE, type: "periodic", unitName: null }], MS);
     expect(rows.map((r) => [r.work, r.accepted, r.statusText])).toEqual([
       ["Pembaikan", "5 Ogo", "Diterima"], ["Pemeriksaan berkala", "12 Ogo", "Diterima"], ["Potongan kerja semula", "12 Ogo", "Potongan"], ["Pembaikan", "20 Ogo", "Diterima"], ["Pemeriksaan berkala", "—", "Tidak termasuk"],
     ]);
@@ -109,6 +113,6 @@ describe("payouts in Malay (IR279)", () => {
     const pdf = payoutPdf(statement(), rows, "Demo Contractor A", ms, "ms");
     expect(pdf).toContain("(PENYATA BAYARAN stmt-202  Ogo 2026)");
     expect(pdf).toContain("(Bersih perlu dibayar");
-    expect(pdf).not.toMatch(/[^\x00-\x7F]/);
+    expect(pdf).not.toMatch(/[^\u{0}-\u{7F}]/u);
   });
 });
