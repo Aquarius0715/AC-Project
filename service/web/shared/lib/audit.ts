@@ -26,7 +26,8 @@ export interface AuditRow {
 /** AuditView of service-contracts.ts. */
 export interface ApiAudit {
   id: string; actorId: string; actorName: string | null; actorRoleAtTime: string; action: string; targetRef: { kind: string; id: string }; previousVersion: number | null; nextVersion: number | null;
-  occurredAt: string; correlationId: string; result: "success" | "denied" | "failed" | "pending"; maskedBefore: Record<string, string | null>; maskedAfter: Record<string, string | null>; reason: string | null;
+  occurredAt: string; correlationId: string; result: "success" | "denied" | "failed" | "pending"; /** null when the row has no change to show: the Go view marshals a nil map as null */
+  maskedBefore: Record<string, string | null> | null; maskedAfter: Record<string, string | null> | null; reason: string | null;
 }
 
 /** The URL filters of the log (SCR-A16): the period, actor, target kind and ID, correlation ID, result and page size. */
