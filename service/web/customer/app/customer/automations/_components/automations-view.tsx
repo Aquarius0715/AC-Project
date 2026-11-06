@@ -21,6 +21,7 @@ import { Button } from "@ac/web/components/ui/button";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
 import { isAfter } from "@ac/web/lib/order";
+import { entryOf } from "@ac/web/lib/lookup";
 
 interface Ac { id: string; name: string; property: string; path: string }
 export interface AutomationsLive {
@@ -265,7 +266,7 @@ function Editor({ live, onDone, onCancel }: Readonly<{ live: AutomationsLive; on
               {triggers.map((tr) => (
                 <Plain key={tr} type="button" role="radio" aria-checked={draft.trigger === tr} disabled={!!rule && (tr === "schedule") !== isSched} onClick={() => { set({ trigger: tr, extras: fitExtras({ ...draft, trigger: tr }) }); }}
                   className={cx("rounded-xl border px-3 py-2 text-left disabled:cursor-not-allowed disabled:opacity-50", draft.trigger === tr ? "border-primary bg-primary-soft text-primary ring-1 ring-primary" : "border-line bg-surface hover:bg-surface2")}>
-                  <div className="flex items-center gap-1.5 text-[13px] font-semibold"><Icon name={triggerInfo[tr].icon} />{t(triggerInfo[tr].label)}</div><div className="text-[11px] text-muted-foreground">{t(triggerInfo[tr].sub)}</div>
+                  <div className="flex items-center gap-1.5 text-[13px] font-semibold"><Icon name={entryOf(triggerInfo, tr).icon} />{t(entryOf(triggerInfo, tr).label)}</div><div className="text-[11px] text-muted-foreground">{t(entryOf(triggerInfo, tr).sub)}</div>
                 </Plain>
               ))}
             </div>
