@@ -234,7 +234,7 @@ export interface CampaignDraft { modelId: string; targetVersion: string; deviceI
 export function parseWaves(s: string): { label: string; percent: number }[] | null {
   const ps = s.split(",").map((x) => Number(x.replace("%", "").trim()));
   if (ps.length === 0 || ps.some((p) => !Number.isSafeInteger(p) || p < 1 || p > 100)) return null;
-  for (let i = 1; i < ps.length; i++) if ((ps[i] ?? 0) <= (ps[i - 1] ?? 0)) return null;
+  for (let i = 1; i < ps.length; i++) if ((ps.at(i) ?? 0) <= (ps.at(i - 1) ?? 0)) return null;
   return ps.at(-1) === 100 ? ps.map((p, i) => ({ label: i === ps.length - 1 ? `Wave ${String(i + 1)} · 100 %` : `Wave ${String(i + 1)} · ${String(p)} %`, percent: p })) : null;
 }
 /** The campaign's start as an instant: the datetime-local value read in the display time zone ("" while empty). */

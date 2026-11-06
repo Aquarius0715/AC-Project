@@ -11,7 +11,7 @@ const signatures: [string, number[]][] = [
 
 /** The type of an upload from its leading bytes, or the browser's type when the bytes are no known type. */
 export function uploadType(bytes: Uint8Array, browserType: string): string {
-  return signatures.find(([, sig]) => sig.every((b, i) => bytes[i] === b))?.[0] ?? browserType;
+  return signatures.find(([, sig]) => sig.every((b, i) => bytes.at(i) === b))?.[0] ?? browserType;
 }
 
 // File names (IR368). The Core API refuses a name with control characters, path separators or bidirectional

@@ -29,7 +29,7 @@ export function translate(locale: Locale, text: string, params?: Params): string
       console.warn(`[i18n] no Malay text for "${text}"`);
     }
   }
-  return params ? base.replaceAll(/\{(\w+)\}/g, (all, k: string) => (k in params ? String(params[k]) : all)) : base;
+  return params ? base.replaceAll(/\{(\w+)\}/g, (all, k: string) => { const v = lookup(params, k); return v === undefined ? all : String(v); }) : base;
 }
 
 export const translator = (locale: Locale): T => (text, params) => translate(locale, text, params);
