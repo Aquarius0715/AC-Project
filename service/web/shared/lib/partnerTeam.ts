@@ -11,6 +11,7 @@ import { qualificationLabel, qualified } from "@ac/web/lib/partnerJobDetail";
 import { freeSlots } from "@ac/web/lib/partnerSchedule";
 import { codePoints } from "@ac/web/lib/text";
 import { isAfter, isBefore } from "@ac/web/lib/order";
+import { lookup } from "@ac/web/lib/lookup";
 
 const en = translator("en");
 const DAY = 86_400_000, KL_OFFSET = 8 * 3_600_000;
@@ -65,7 +66,7 @@ export function memberRows(members: ApiTeamMember[], week: ApiCapacity[][], dayI
     const assigned = caps.reduce((a, c) => a + (c?.assignedMinutes ?? 0), 0), available = caps.reduce((a, c) => a + (c?.availableMinutes ?? 0), 0);
     const row = { id: m.id, name: m.displayName, sub: `${quals} · ${since}`, active: isActive, week: { text: t("{a} h / {b} h", { a: hours(assigned), b: hours(available) }), pct: pct(assigned, available) } };
     if (!isActive) return { ...row, week: { text: "—", pct: null }, day: { main: t("Expired — cannot be assigned"), sub: "—", tone: "crit" }, util: "—" };
-    const c = caps[dayIndex];
+    const c = caps.at(dayIndex);
     if (c?.unavailability) return { ...row, day: { main: t("Unavailable · {reason}", { reason: unavailabilityLabel(c.unavailability, t) }), sub: "—", tone: "warn" }, util: "—" };
     if (!c?.availableMinutes) return { ...row, day: { main: t("No available hours set"), sub: "—" }, util: "—" };
     const mine = jobs.filter((j) => j.technicianId === m.id);
@@ -104,7 +105,7 @@ export function teamStats(members: ApiTeamMember[], week: ApiCapacity[][], dayIn
   const ids = new Set(members.map((m) => m.id));
   const mine = (d: ApiCapacity[]) => d.filter((c) => ids.has(c.membershipId));
   const assigned = week.flatMap((item) => mine(item)).reduce((a, c) => a + c.assignedMinutes, 0), available = week.flatMap((item) => mine(item)).reduce((a, c) => a + (c.availableMinutes ?? 0), 0);
-  const free = mine(week[dayIndex] ?? []).reduce((a, c) => a + Math.max(0, (c.availableMinutes ?? 0) - c.assignedMinutes), 0);
+  const free = mine(week.at(dayIndex) ?? []).reduce((a, c) => a + Math.max(0, (c.availableMinutes ?? 0) - c.assignedMinutes), 0);
   const usage = pct(assigned, available);
   return { assigned: t("{n} h", { n: hours(assigned) }), available: t("{n} h", { n: hours(available) }), utilization: usage === null ? "—" : `${String(usage)}%`, free: t("{n} h", { n: hours(free) }) };
 }
@@ -194,7 +195,7 @@ const FIELD_TEXT: Record<string, Record<string, string>> = {
 export function unavailabilityRefusal(f: { code: string; fieldErrors: Record<string, string> }, t: T = en): { fields: Record<string, string>; text: string | null } {
   if (f.code === "NOT_FOUND") return { fields: {}, text: t("That technician is no longer in your company — reload the page.") };
   if (f.code !== "VALIDATION") return { fields: {}, text: null }; // the toast says it (actionMessage)
-  const fields = Object.fromEntries(Object.entries(f.fieldErrors).map(([k, v]) => [k, FIELD_TEXT[k]?.[v] ? t(FIELD_TEXT[k][v]) : v]));
+  const fields = Object.fromEntries(Object.entries(f.fieldErrors).map(([k, v]) => { const text = lookup(lookup(FIELD_TEXT, k) ?? {}, v); return [k, text ? t(text) : v]; }));
   return { fields, text: Object.keys(fields).length > 0 ? null : t("Check the input.") };
 }
 
