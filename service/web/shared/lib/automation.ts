@@ -131,10 +131,15 @@ export function autoErrors(d: AutoDraft, temperatureRange: { min: number; max: n
   if ((d.type === "tariff" || d.type === "solar" || d.type === "battery") && (d.value.trim() === "" || Number.isNaN(Number(d.value)) || Number(d.value) < 0)) e.value = t("A value ≥ 0");
   if (d.actionKind === "set_temperature") {
     const c = Number(d.celsius);
-    if (!Number.isFinite(c)) e.celsius = t("A temperature");
-    else if (temperatureRange && (c < temperatureRange.min || c > temperatureRange.max)) e.celsius = t("Within {min}–{max} °C on every target unit", { min: temperatureRange.min, max: temperatureRange.max });
+    const celsiusProblem = celsiusError(c, temperatureRange, t);
+    if (celsiusProblem) e.celsius = celsiusProblem;
   }
   return e;
+}
+/** What is wrong with the temperature, or undefined: not a number, or outside the range every target unit allows. */
+function celsiusError(c: number, range: { min: number; max: number } | null | undefined, t: T): string | undefined {
+  if (!Number.isFinite(c)) return t("A temperature");
+  return range && (c < range.min || c > range.max) ? t("Within {min}–{max} °C on every target unit", { min: range.min, max: range.max }) : undefined;
 }
 function draftCondition(d: AutoDraft): AutoCondition {
   switch (d.type) {

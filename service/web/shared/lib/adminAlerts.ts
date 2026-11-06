@@ -255,8 +255,7 @@ export function policyErrors(p: Pick<AdminPolicy, "name" | "priority" | "duratio
   if (!(Number.isSafeInteger(p.priority) && p.priority >= 0 && p.priority <= 100)) e.priority = t("A whole number 0–100");
   if (!(p.cooldown >= 1 && p.cooldown <= 1440)) e.cooldown = t("1–1440");
   if (!(p.escalate >= 1 && p.escalate <= 1440)) e.escalate = t("1–1440");
-  if (p.recipients.length === 0) e.recipients = t("Add at least one recipient");
-  else if (p.recipients.length > 20) e.recipients = t("At most 20 recipients");
+  if (p.recipients.length === 0 || p.recipients.length > 20) e.recipients = t(p.recipients.length === 0 ? "Add at least one recipient" : "At most 20 recipients");
   return e;
 }
 
