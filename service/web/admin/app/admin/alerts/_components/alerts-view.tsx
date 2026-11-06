@@ -19,7 +19,7 @@ import { acknowledgeAlert, resolveAlert, type ActionResult } from "../actions";
 import { demoCustomers, NewPolicyModal, PoliciesTab, seedPolicies, type PoliciesLive, type PolicySel } from "./policies-tab";
 import { ScopeBar } from "../../jobs/_components/jobs-header";
 import { Icon } from "@ac/web/components/Icon";
-import { entryOf, lookup } from "@ac/web/lib/lookup";
+import { entryOf } from "@ac/web/lib/lookup";
 
 const ST: Record<AlertState, string> = { open: "Open", acknowledged: ACKNOWLEDGED, resolved: "Resolved" };
 const LIST: Record<AlertState, string> = { open: "Open alerts", acknowledged: "Acknowledged alerts", resolved: "Resolved alerts" };
