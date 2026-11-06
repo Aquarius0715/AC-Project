@@ -17,6 +17,7 @@ import { I18nProvider } from "./I18n";
 import { useBffSession } from "@ac/web/lib/useOp";
 import { Sheet, SheetContent } from "@ac/web/components/ui/sheet";
 import { Button } from "@ac/web/components/ui/button";
+import { lookup } from "@ac/web/lib/lookup";
 
 export function useStoredRole(): Role {
   const pathname = usePathname();
@@ -75,7 +76,10 @@ export function AppShell({ appRole: forced, live, children }: Readonly<{ appRole
   const scope = live ? (live.organization || config.scope).toUpperCase() : config.scope;
   const [roleWord = "", persona = ""] = config.chip.split(" — ", 2);
   const chip = `${t(roleWord)} — ${live ? live.user || t("signed in") : persona}`;
-  const count = (href: string) => (live?.badges[href] ? String(live.badges[href]) : undefined);
+  const count = (href: string) => {
+    const badge = lookup(live?.badges ?? {}, href);
+    return badge ? String(badge) : undefined;
+  };
   const pathname = usePathname();
   const session = useBffSession();
   // Users is owner-only (FR-C19): the session's client role in API mode, the demo persona otherwise
