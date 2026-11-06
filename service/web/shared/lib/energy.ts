@@ -143,14 +143,19 @@ export function baselineDraft(b?: ApiBaseline): BaselineDraft {
     boundary: b?.boundary ?? "", assumptions: b?.assumptions ?? "", source: b?.source ?? "",
   };
 }
+/** periodError words what is wrong with a period of two dates, or is undefined: an empty period is not an end before its start (IR586). */
+export function periodError(from: string, to: string, t: T): string | undefined {
+  if (!from || !to) return t("Enter the start and the end");
+  return isBefore(from, to) ? undefined : t("The end must be after the start");
+}
+
 /** baselines.save rules (IR baselines.save item 3) checked before the call, worded in the display language; the API
 checks them again. */
 export function baselineErrors(d: BaselineDraft, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
   if (d.unitIds.length === 0 || d.unitIds.length > 100) e.unitIds = t("Choose 1–100 units");
-  if (!d.from || !d.to) e.period = t("Enter the start and the end"); // an empty period is not an end before its start (IR586)
-  else if (!isBefore(d.from, d.to)) e.period = t("The end must be after the start");
-  else if (Date.parse(klInstant(d.to)) - Date.parse(klInstant(d.from)) > 366 * 24 * 3600 * 1000) e.period = t("At most 366 days");
+  const period = periodError(d.from, d.to, t) ?? (Date.parse(klInstant(d.to)) - Date.parse(klInstant(d.from)) > 366 * 24 * 3600 * 1000 ? t("At most 366 days") : undefined);
+  if (period) e.period = period;
   if (d.method === "demo_fixed" && !(d.baselineKWh.trim() !== "" && Number.isFinite(+d.baselineKWh) && +d.baselineKWh >= 0)) e.baselineKWh = t("A value ≥ 0 kWh");
   if (d.method === "demo_period_comparison" && d.boundaryId === "whole_building_electricity") e.boundaryId = t("Period comparison measures AC input electricity only");
   if (codePoints(d.boundary.trim()) === 0 || d.boundary.length > 500) e.boundary = t("1–500 characters");

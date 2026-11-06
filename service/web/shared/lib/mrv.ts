@@ -1,10 +1,9 @@
 // Digital MRV demo (FR-A14, DATA_SOURCE=API): Scope 2 reports, their versions and emission factors projected for
 // /admin/mrv. Pure code shared by the Server Component and the client view; texts in the display language (`t` / `i`).
 // Report periods are Kuala Lumpur business time and say so; review times are in the display time zone (IR297).
-import { klInstant, klLocal, klStamp, one, saving, summaryView, type ApiBaseline, type ApiEnergySummary, type BoundaryId, type SummaryView } from "@ac/web/lib/energy";
+import { klInstant, klLocal, periodError, klStamp, one, saving, summaryView, type ApiBaseline, type ApiEnergySummary, type BoundaryId, type SummaryView } from "@ac/web/lib/energy";
 import { EN, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { codePoints } from "@ac/web/lib/text";
-import { isBefore } from "@ac/web/lib/order";
 
 const en = translator("en");
 
@@ -88,8 +87,8 @@ export function mrvDraftErrors(d: MRVDraft, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
   if (!d.organizationId) e.organizationId = t("Choose a customer organization");
   if (d.unitIds.length === 0 || d.unitIds.length > 100) e.unitIds = t("Choose 1–100 units");
-  if (!d.from || !d.to) e.period = t("Enter the start and the end"); // an empty period is not an end before its start (IR586)
-  else if (!isBefore(d.from, d.to)) e.period = t("The end must be after the start");
+  const period = periodError(d.from, d.to, t);
+  if (period) e.period = period;
   if (!d.baseline) e.baseline = t("Choose a baseline version");
   if (!d.factor) e.factor = t("Choose an emission factor version");
   if (codePoints(d.boundary.trim()) === 0 || d.boundary.length > 500) e.boundary = t("1–500 characters");
