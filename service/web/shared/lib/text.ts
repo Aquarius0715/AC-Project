@@ -19,3 +19,13 @@ export const isEmail = (text: string): boolean => {
   const [local = "", domain = ""] = parts;
   return local !== "" && domain.slice(1, -1).includes(".");
 };
+
+/** withoutNote drops a trailing "(…)" note and the space before it (the same as replacing /\s*\([^)]*\)$/, without a pattern that can backtrack). */
+export const withoutNote = (text: string): string => {
+  if (!text.endsWith(")")) return text;
+  const open = text.indexOf("(", text.slice(0, -1).lastIndexOf(")") + 1);
+  return open === -1 ? text : text.slice(0, open).trimEnd();
+};
+
+/** withoutYear drops a trailing four-digit year and the space before it (the same as replacing /\s*\d{4}$/). */
+export const withoutYear = (text: string): string => (/^\d{4}$/.test(text.slice(-4)) ? text.slice(0, -4).trimEnd() : text);

@@ -86,7 +86,7 @@ const reasonWords: Record<string, string> = {
 /** The firmware campaign's advance notice (IR339): its day is dated again in the display language. */
 const FIRMWARE_NOTICE = "Firmware update from {date}, {from}–{to} local time. The AC may restart for about 2 minutes.";
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const firmwareNotice = /^Firmware update from (\d{1,2}) ([A-Z][a-z]{2}) (\d{4}), (\S+)–(\S+) local time\. The AC may restart for about 2 minutes\.$/;
+const firmwareNotice = /^Firmware update from (\d{1,2}) ([A-Z][a-z]{2}) (\d{4}), ([^\s–]+)–([^\s–]+) local time\. The AC may restart for about 2 minutes\.$/;
 
 /** The dictionary keys of the detail line (the key check of the tests). */
 export const NOTIFICATION_KEYS = [...Object.values(statusWords), ...Object.values(reasonWords), FIRMWARE_NOTICE];

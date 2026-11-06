@@ -54,7 +54,7 @@ export function billingMonths(fromM?: string, toM?: string): { from?: string; to
 /** The billing months in the user's language: “Aug – Sept 2026”, “from Aug 2026”, “until Sept 2026”; null without any. */
 export function monthsText(from: string | undefined, to: string | undefined, i: I18n = EN): string | null {
   const name = (m: string) => periodName(m, i.display.locale);
-  if (from && to) return from === to ? name(from) : i.t("{from} – {to}", { from: from.slice(0, 4) === to.slice(0, 4) ? name(from).replace(/\s*\d{4}$/, "") : name(from), to: name(to) });
+  if (from && to) return from === to ? name(from) : i.t("{from} – {to}", { from: from.slice(0, 4) === to.slice(0, 4) ? withoutYear(name(from)) : name(from), to: name(to) });
   if (from) return i.t("from {month}", { month: name(from) });
   if (to) return i.t("until {month}", { month: name(to) });
   return null;
@@ -62,6 +62,7 @@ export function monthsText(from: string | undefined, to: string | undefined, i: 
 export { money } from "@ac/web/lib/money";
 import { money } from "@ac/web/lib/money";
 import { isAfter } from "@ac/web/lib/order";
+import { withoutYear } from "@ac/web/lib/text";
 /** An amount with its sign: + for an addition, a minus sign for a deduction. */
 const signedMoney = (minor: number, currency: string) => `${minor > 0 ? "+" : "−"}${money(Math.abs(minor), currency)}`;
 const methodName = (m: string | null, t: T) => {

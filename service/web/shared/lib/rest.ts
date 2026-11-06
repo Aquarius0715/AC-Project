@@ -15,7 +15,7 @@ export interface CoreRequest { method: CoreRoute["method"]; path: string; body?:
 
 type Json = Record<string, unknown>;
 const isObject = (v: unknown): v is Json => typeof v === "object" && v !== null && !Array.isArray(v);
-const pathParams = (path: string) => [...path.matchAll(/\{([^}]+)\}/g)].map((m) => m[1] ?? "");
+const pathParams = (path: string) => [...path.matchAll(/\{([^{}]+)\}/g)].map((m) => m[1] ?? "");
 
 function lookup(node: Json, at: string[]): unknown {
   let current: unknown = node;

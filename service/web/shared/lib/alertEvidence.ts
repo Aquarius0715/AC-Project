@@ -7,6 +7,7 @@
 import { EN, relativeTime, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { metricLabel } from "@ac/web/lib/adminAlerts";
 import { airNumber } from "@ac/web/lib/air";
+import { withoutNote } from "@ac/web/lib/text";
 
 /** EvidenceCandidate of service-contracts.ts. */
 export interface ApiEvidenceCandidate {
@@ -19,7 +20,7 @@ export interface EvidenceRow { id: string; kind: ApiEvidenceCandidate["kind"]; t
 const ORIGIN: Record<string, string> = { measured: "measured", inspection: "recorded on site", estimated: "estimated" };
 const EVENT: Record<string, string> = { restored: "The device's signal is back" };
 /** The metric's name without the unit some labels carry (“CO₂ (ppm)” → “CO₂”): the value names its unit. */
-const metricName = (metric: string, t: T) => textOf(metricLabel, metric, t)?.replace(/\s*\([^)]*\)$/, "") ?? metric.replaceAll('_', " ");
+const metricName = (metric: string, t: T) => withoutNote(textOf(metricLabel, metric, t) ?? metric.replaceAll('_', " "));
 
 /** The candidates as the picker lists them: the newest first, as alerts.evidence returns them. */
 export function evidenceRows(items: ApiEvidenceCandidate[], nowMs: number, i: I18n = EN): EvidenceRow[] {
