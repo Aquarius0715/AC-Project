@@ -51,7 +51,7 @@ export async function loadJobDetail(jobId: string) {
     return {
       kind: "offer" as const,
       events: event,
-      fits: fits(members, job.requiredQualifications, job.visitSlot, dates.map((date, k) => ({ date, capacity: days[k] ?? [] })), "offer", undefined, i),
+      fits: fits(members, job.requiredQualifications, job.visitSlot, dates.map((date, k) => ({ date, capacity: days.at(k) ?? [] })), "offer", undefined, i),
       text: {
         expires: showTime(job.offerExpiresAt, display), visit: showSpan(job.visitSlot.startAt, job.visitSlot.endAt, display),
         access: showSpan(job.accessValidFrom, job.accessValidUntil, display), accessFrom: showTime(job.accessValidFrom, display), offered: showTime(job.offeredAt, display),
@@ -80,7 +80,7 @@ export async function loadJobDetail(jobId: string) {
     kind: "detail" as const,
     events: event,
     alerts: linked,
-    fits: fits(members, required, visit, dates.map((date, k) => ({ date, capacity: days[k] ?? [] })), "detail", job.assignment?.technicianMembershipId, i),
+    fits: fits(members, required, visit, dates.map((date, k) => ({ date, capacity: days.at(k) ?? [] })), "detail", job.assignment?.technicianMembershipId, i),
     text: {
       tech, banner: detailBanner(job, tech, ms, i), steps: timeline(job.status, event, !!job.assignment, job.origin, i),
       visit: job.offer ? showSpan(job.offer.visitSlot.startAt, job.offer.visitSlot.endAt, display) : showSpan(job.requestedSlot.startAt, job.requestedSlot.endAt, display),

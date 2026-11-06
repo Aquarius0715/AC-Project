@@ -13,6 +13,7 @@ import { kpis, lineRows, money, periodLabel, questionRows, statementRows, topicL
 import type { PayoutsLive } from "../_components/payouts-view";
 import { keysOf } from "@ac/web/lib/keysOf";
 import { byText } from "@ac/web/lib/order";
+import { entryOf } from "@ac/web/lib/lookup";
 
 const quiet = orAbsent;
 const unitName = async (id: string | undefined, cache: Map<string, Promise<string | null>>) => {
@@ -41,7 +42,7 @@ export async function loadPayouts(options: { statementId?: string; period?: stri
   const live: PayoutsLive = {
     periods: [...new Set(all.map((s) => s.period))].toSorted(byText).toReversed().map((p) => ({ value: p, text: periodLabel(p, display.locale) })), period: options.period ?? "", status: status ?? "",
     statements: statementRows(shown, i), selected: null, company: who.organizationName || t("your company"),
-    topics: keysOf(topicLabel).map((x) => ({ id: x, text: t(topicLabel[x]) })),
+    topics: keysOf(topicLabel).map((x) => ({ id: x, text: t(entryOf(topicLabel, x)) })),
   };
   if (!selected) return live;
   const [cards, labels, inReview] = await Promise.all([

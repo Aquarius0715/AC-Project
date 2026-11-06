@@ -8,6 +8,7 @@ import { coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
 import type { CampaignDraft, Metric } from "@ac/web/lib/devices";
 import { parseWaves } from "@ac/web/lib/devices";
 import type { OpInput } from "@ac/web/lib/opTypes";
+import { lookup } from "@ac/web/lib/lookup";
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
 
@@ -39,7 +40,7 @@ export async function capabilityHistory(capabilityId: string) {
     return page.items.map((a): HistoryEntry => {
       return {
         at: a.occurredAt, actor: a.actorId, from: a.previousVersion, to: a.nextVersion, reason: a.reason,
-        changes: Object.keys({ ...a.maskedBefore, ...a.maskedAfter }).filter((k) => a.maskedBefore?.[k] !== a.maskedAfter?.[k]),
+        changes: Object.keys({ ...a.maskedBefore, ...a.maskedAfter }).filter((k) => lookup(a.maskedBefore ?? {}, k) !== lookup(a.maskedAfter ?? {}, k)),
       };
     });
   }, false);

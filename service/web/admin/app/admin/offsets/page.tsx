@@ -14,6 +14,7 @@ import { OffsetsDemo } from "./_components/offsets-demo";
 import { OffsetsView } from "./_components/offsets-view";
 import { keysOf } from "@ac/web/lib/keysOf";
 import { queryReader } from "@ac/web/lib/searchParams";
+import { entryOf } from "@ac/web/lib/lookup";
 
 const STATES = ["demo_requested", "demo_purchased", "demo_retired", "failed"] as const;
 const CREATED = { "7d": 7, "30d": 30, "90d": 90, all: null } as const;
@@ -35,7 +36,7 @@ async function AdminOffsetsPageContent({ searchParams }: Readonly<PageProps<"/ad
   const status = STATES.find((x) => x === one("status"));
   const created = keysOf(CREATED).find((k) => k === one("created")) ?? "30d";
   const now = await coreNow();
-  const days = CREATED[created];
+  const days = entryOf(CREATED, created);
   const filters = { ...(customerId && { customerId }), ...(status && { status }), ...(days !== null && { from: new Date(now.getTime() - days * 86_400_000).toISOString() }) };
   const [perms, display, records, customers, units] = await Promise.all([
     corePermissions(), coreDisplay(),

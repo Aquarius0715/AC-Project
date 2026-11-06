@@ -42,7 +42,7 @@ export async function loadJobs(sp: { tab?: string; sort?: string; from?: string;
   const page = isRestarted ? 1 : Number(sp.page) || cursorPage;
   return {
     tab, sort, sortText: t((SORTS.find((s) => s.id === sort) ?? SORTS[0]).text), restarted: isRestarted,
-    tabs: TABS.map((tb, k) => ({ id: tb.id, label: t(tb.label), count: counts[k] })),
+    tabs: TABS.map((tb, k) => ({ id: tb.id, label: t(tb.label), count: counts.at(k) ?? 0 })),
     sorts: SORTS.map((s) => ({ id: s.id, label: t("Sort: {sort}", { sort: t(s.label) }) })),
     ...periodChoice(p, nowIso, i), // period + periods
     rows: list.items.map((j) => jobRow(j, now.getTime(), unitNames, names, i)),

@@ -232,7 +232,7 @@ export function preferredRows(j: ApiHqJob, eligible: { id: string; displayName: 
   const { t } = i;
   const isPlan = j.preferredSlots.length === 0;
   return agreedSlots(j).map((s, k) => {
-    const people = eligible[k] ?? [];
+    const people = eligible.at(k) ?? [];
     const isPast = Date.parse(s.startAt) <= now;
     const free = people.length > 0 ? people.map((p) => p.displayName).join(", ") : t("no qualified HQ technician free");
     return { rank: k + 1, slot: s, text: longSlot(s, i), hq: isPast ? t("in the past") : free, fits: !isPast && people.length > 0, people: isPast ? [] : people, plan: isPlan };
