@@ -37,19 +37,21 @@ export const cx = cn;
 
 /* ───────────── Badges ───────────── */
 export type Tone = "ok" | "warn" | "crit" | "unknown" | "primary" | "muted";
-const toneCls: Record<Tone, string> = {
-  ok: "bg-ok-soft text-ok",
-  warn: "bg-warn-soft text-warn",
-  crit: "bg-crit-soft text-crit",
-  unknown: "bg-unknown-soft text-unknown",
-  primary: "bg-primary-soft text-primary",
-  muted: "bg-surface2 text-muted-foreground",
-};
+function toneClass(tone: Tone): string {
+  switch (tone) {
+    case "ok": { return "bg-ok-soft text-ok"; }
+    case "warn": { return "bg-warn-soft text-warn"; }
+    case "crit": { return "bg-crit-soft text-crit"; }
+    case "unknown": { return "bg-unknown-soft text-unknown"; }
+    case "primary": { return "bg-primary-soft text-primary"; }
+    case "muted": { return "bg-surface2 text-muted-foreground"; }
+  }
+}
 
 /** A status badge: the shadcn/ui Badge in the tone's colours. */
 export function Badge({ tone = "muted", icon, children, className }: Readonly<{ tone?: Tone; icon?: IconName; children: React.ReactNode; className?: string }>) {
   return (
-    <UIBadge variant="secondary" className={cn(toneCls[tone], className)}>
+    <UIBadge variant="secondary" className={cn(toneClass(tone), className)}>
       {icon && <Icon name={icon} />}
       {children}
     </UIBadge>
@@ -92,13 +94,21 @@ export const DemoBadge = () => <Badge tone="warn" className="uppercase tracking-
 /* ───────────── Buttons ───────────── */
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 // the product's button names on the shadcn/ui Button variants; ghost keeps the primary colour of a text action
-const variantOf = { primary: "default", secondary: "outline", ghost: "ghost", danger: "destructive" } as const;
+type ShadcnVariant = "default" | "outline" | "ghost" | "destructive";
+function variantOf(v: ButtonVariant): ShadcnVariant {
+  switch (v) {
+    case "primary": { return "default"; }
+    case "secondary": { return "outline"; }
+    case "ghost": { return "ghost"; }
+    case "danger": { return "destructive"; }
+  }
+}
 const variantCls = (v: ButtonVariant) => cn(v === "secondary" && "bg-card", v === "ghost" && "text-primary hover:bg-accent hover:text-primary");
 const sizeOf = (size: "sm" | "md") => (size === "sm" ? "sm" : "default");
-const buttonClass = (v: ButtonVariant, size: "sm" | "md") => cn(buttonVariants({ variant: variantOf[v], size: sizeOf(size) }), variantCls(v));
+const buttonClass = (v: ButtonVariant, size: "sm" | "md") => cn(buttonVariants({ variant: variantOf(v), size: sizeOf(size) }), variantCls(v));
 
 export function Btn({ variant = "secondary", size = "md", className, ...p }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant; size?: "sm" | "md" }) {
-  return <Button type="button" {...p} variant={variantOf[variant]} size={sizeOf(size)} className={cn(variantCls(variant), className)} />;
+  return <Button type="button" {...p} variant={variantOf(variant)} size={sizeOf(size)} className={cn(variantCls(variant), className)} />;
 }
 export function LinkButton({ href, variant = "secondary", size = "md", className, children }: Readonly<{ href: string; variant?: ButtonVariant; size?: "sm" | "md"; className?: string; children: React.ReactNode }>) {
   return <Link href={href} className={cx(buttonClass(variant, size), className)}>{children}</Link>;
