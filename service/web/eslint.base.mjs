@@ -210,6 +210,9 @@ export function webConfig(tsconfigRootDir) {
         "sonarjs/regex-complexity": "off",
         "sonarjs/expression-complexity": "off",
         "unicorn/max-nested-calls": "off",
+        // a mock consumes its queue with shift(), and a case passes undefined on purpose to show the default
+        "unicorn/no-array-front-mutation": "off",
+        "sonarjs/no-undefined-argument": "off",
         // tests read the repository's own files (the catalog, the sources they check) by a computed path
         "security/detect-non-literal-fs-filename": "off",
       },
@@ -270,6 +273,21 @@ export function webConfig(tsconfigRootDir) {
       // directory of the file
       files: ["**/next.config.ts"],
       rules: { "unicorn/prefer-module": "off" },
+    },
+    {
+      // the Malay dictionary is one table of texts (a line per English text), not code to be split
+      files: ["**/lib/i18n-ms.ts"],
+      rules: { "sonarjs/max-lines": "off" },
+    },
+    {
+      // this test runs the compiled string literal of the build output in a vm to read the CSS the browser gets
+      files: ["**/tests/styleHashes.test.ts"],
+      rules: { "sonarjs/code-eval": "off" },
+    },
+    {
+      // the contract tests assert through check(), which calls expect
+      files: ["**/tests/contractInputs.test.ts"],
+      rules: { "vitest/expect-expect": ["error", { assertFunctionNames: ["expect", "check"] }] },
     },
     { linterOptions: { reportUnusedDisableDirectives: "error" } },
     // generated files are fixed by their generators (make swagger / go run ./cmd/gen/ops), never by hand or by a fix

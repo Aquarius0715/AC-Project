@@ -211,7 +211,7 @@ function update(id: string, fn: (j: Job) => Partial<Job>, log?: string) {
 }
 function notify(role: Note["role"], title: string, detail: string, href: string) {
   const s = load();
-  state = { ...s, notes: [{ id: globalThis.crypto.randomUUID(), at: "just now", read: false, role, title, detail, href }, ...s.notes] };
+  state = { ...s, notes: [{ id: crypto.randomUUID(), at: "just now", read: false, role, title, detail, href }, ...s.notes] };
   save();
 }
 export const fmt = (s: Slot | null | undefined) => (s ? `${s.date.slice(5)} · ${s.win}` : "—");

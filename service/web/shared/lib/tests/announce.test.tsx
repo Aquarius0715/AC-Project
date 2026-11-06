@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Banner, ToastProvider, useToast } from "@ac/web/components/ui";
 
 // Sonner keeps its toasts in one store for the page and replays the ones still open to a new Toaster: clear it after each
-// test (DEC-75, IR403)
+// case (DEC-75, IR403)
 afterEach(() => { cleanup(); toast.dismiss(); });
 
 function Pusher() {
