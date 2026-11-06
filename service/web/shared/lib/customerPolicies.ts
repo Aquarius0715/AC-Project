@@ -10,6 +10,7 @@ import type { OpInput } from "@ac/web/lib/opTypes";
 import { metrics } from "@ac/web/lib/devices";
 import { oneOfOrThrow } from "@ac/web/lib/oneOf";
 import { byNumber } from "@ac/web/lib/order";
+import { wrapped } from "@ac/web/lib/text";
 
 const en = translator("en");
 
@@ -66,7 +67,7 @@ const daysText = (weekdays: number[], t: T) => {
 /** “only 08:00–19:00 on weekdays”, “only 22:00–06:00”, “only 09:00–12:00 on Sat, Sun”. */
 export function windowText(w: PolicyWindow, t: T = en): string {
   const d = daysText(w.weekdays, t);
-  return `${t("only {from}–{to}", { from: w.startLocal, to: w.endLocal })}${d ? ` ${d}` : ""}`;
+  return `${t("only {from}–{to}", { from: w.startLocal, to: w.endLocal })}${wrapped(d, " ")}`;
 }
 const recoverText = (op: Operator, v: number, metric: string, t: T) => t(op === "gt" || op === "gte" ? "recover below {value} {unit}" : "recover above {value} {unit}", { value: v, unit: metricUnit[metric] ?? "" }).trim();
 const CHANNEL_TEXT = new Map<Channel, string>([["inApp", "in-app"], ["email", "email"], ["whatsapp", "WhatsApp"]]);

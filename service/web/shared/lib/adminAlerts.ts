@@ -10,6 +10,7 @@ import type { Metric as ContractMetric } from "@ac/web/lib/contracts.gen";
 import { oneOfOrThrow } from "@ac/web/lib/oneOf";
 import { byNumber, byText } from "@ac/web/lib/order";
 import { filled } from "@ac/web/lib/filled";
+import { wrapped } from "@ac/web/lib/text";
 
 const en = translator("en");
 
@@ -199,7 +200,7 @@ export function settingText(s: RuleSettingRow | undefined, i: I18n = EN): string
   const { t } = i;
   if (!s) return t("On");
   const who = s.by ? `${t("by {name}", { name: s.by })}, ` : "";
-  return `${t(s.enabled ? "On" : "Off")} · ${who}${showDate(s.at, i.display)}${s.reason ? ` (${s.reason})` : ""}`;
+  return `${t(s.enabled ? "On" : "Off")} · ${who}${showDate(s.at, i.display)}${wrapped(s.reason, " (", ")")}`;
 }
 
 /** A new, unsaved alert policy of a customer as DD-A05 starts one (IR345): the display time zone (Preferences), off and

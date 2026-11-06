@@ -4,6 +4,7 @@
 // time zone, formatted by the loader on the server (IR274).
 import { EN, showSpan, showTime, translator, type I18n, type T, textOf } from "@ac/web/lib/i18n";
 import { evidenceText } from "@ac/web/lib/evidence";
+import { wrapped } from "@ac/web/lib/text";
 
 const en = translator("en");
 
@@ -52,7 +53,7 @@ export function reworkItems(items: Pick<InspectionRow, "label" | "result" | "rea
   const word = (r: ApiInspectionItem["result"]) => t(r ? resultText[r].label : "No result").toLowerCase();
   return [
     ...items.filter((x) => x.result === null || x.result === "attention" || x.result === "not_inspected")
-      .map((x) => ({ label: `${x.label} — ${word(x.result)}${x.reason ? ` (${x.reason})` : ""}`, checked: true })),
+      .map((x) => ({ label: `${x.label} — ${word(x.result)}${wrapped(x.reason, " (", ")")}`, checked: true })),
     ...readings.map(([label]) => ({ label: t("{reading} — re-measure", { reading: label }), checked: false })),
     { label: t("Photos — add more evidence"), checked: photos === 0 },
   ];

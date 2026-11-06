@@ -5,6 +5,7 @@
 // deadlines, starts and the activity are instants in the user's display time zone (IR44).
 import { klTime } from "@ac/web/lib/devices";
 import { EN, intlTag, relativeTime, showTime, translator, type I18n, type Locale, type T, textOf } from "@ac/web/lib/i18n";
+import { wrapped } from "@ac/web/lib/text";
 
 const en = translator("en");
 
@@ -289,6 +290,6 @@ export function activity(events: ApiJobEvent[], jobs: Map<string, PartnerJob>, m
     const j = jobs.get(e.jobId);
     const who = e.actorUserId ? byUser.get(e.actorUserId) : null;
     const title = textOf(jobEventTitle, e.action, t) ?? e.action.replaceAll(/[._]/g, " ");
-    return { id: e.id, time: relativeTime(e.occurredAt, now, i), text: `${title} — ${j ? label(j, t) : e.jobId.slice(0, 8)}${who ? ` (${who})` : ""}`, href: `/partner/history?jobId=${e.jobId}` };
+    return { id: e.id, time: relativeTime(e.occurredAt, now, i), text: `${title} — ${j ? label(j, t) : e.jobId.slice(0, 8)}${wrapped(who, " (", ")")}`, href: `/partner/history?jobId=${e.jobId}` };
   });
 }

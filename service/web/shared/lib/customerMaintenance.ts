@@ -11,7 +11,7 @@ import { z } from "zod";
 
 /** The reasons a client gives when reporting a problem with a completed job (jobs.reportProblem). */
 export const problemReason = z.enum(["same_problem", "new_damage", "not_completed", "other"]);
-import { codePoints } from "@ac/web/lib/text";
+import { codePoints, wrapped } from "@ac/web/lib/text";
 
 export interface ApiClientRow {
   projection: "summary"; id: string; version: number; unitId: string; type: string; status: string; displayStatus: string; origin: string; dueAt: string;
@@ -94,7 +94,7 @@ export function clientRows(rows: ApiClientRow[], unit: (id: string) => { name: s
 export function detailFacts(j: ApiClientJob, unit: { name: string; place: string }, i: I18n = EN): [string, string][] {
   const { t } = i;
   const isPlan = j.origin === "periodic_plan";
-  const out: [string, string][] = [[t("Unit"), `${unit.name}${unit.place ? ` · ${unit.place}` : ""}`], [t("Origin · type"), isPlan ? t("Periodic plan · visit {date}", { date: j.occurrenceAt ? showDate(j.occurrenceAt, i.display) : "" }) : t("Client request · {type}", { type: t(TYPE[j.type] ?? j.type) })]];
+  const out: [string, string][] = [[t("Unit"), `${unit.name}${wrapped(unit.place, " · ")}`], [t("Origin · type"), isPlan ? t("Periodic plan · visit {date}", { date: j.occurrenceAt ? showDate(j.occurrenceAt, i.display) : "" }) : t("Client request · {type}", { type: t(TYPE[j.type] ?? j.type) })]];
   if (j.followUpOfJobId) out.push([t("Follow-up of"), `${j.followUpOfJobId.slice(0, 8)} · ${followUpText(j.followUpClass, t)}`]);
   if (!isPlan && j.symptom) out.push([t("Request"), `“${j.symptom}”`]);
   const photos = (j.problemPhotos ?? []).filter((p) => p.status === "ready").length; // HQ and the technician see them too (IR437)

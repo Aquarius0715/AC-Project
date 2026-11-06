@@ -8,7 +8,7 @@ import type { OpInput } from "@ac/web/lib/opTypes";
 import type { UnitSymbol } from "@ac/web/lib/contracts.gen";
 import { byText } from "@ac/web/lib/order";
 import { z } from "zod";
-import { codePoints } from "@ac/web/lib/text";
+import { codePoints, wrapped } from "@ac/web/lib/text";
 
 const en = translator("en");
 export type Mode = "cool" | "dry" | "fan";
@@ -182,7 +182,7 @@ export function campaignRows(cs: ApiCampaign[], caps: ApiCapability[], i: I18n =
 /** The signed artifact digest as Figma Admin 04-9 shows it: "sha256 9f3c…a1". */
 export function shortChecksum(sum: string): string {
   const [algo = "", hex = ""] = sum.includes(":") ? sum.split(":", 2) : ["", sum];
-  return `${algo ? `${algo} ` : ""}${hex.length > 8 ? `${hex.slice(0, 4)}…${hex.slice(-2)}` : hex}`;
+  return `${wrapped(algo, "", " ")}${hex.length > 8 ? `${hex.slice(0, 4)}…${hex.slice(-2)}` : hex}`;
 }
 
 /** The campaign's facts above its waves (Figma Admin 04-9): model and versions with the signed digest, the install

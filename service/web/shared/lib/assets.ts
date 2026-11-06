@@ -11,7 +11,7 @@ import { metricLabel, metricUnit, opSymbol, type Operator, type Severity } from 
 import { csvCell } from "@ac/web/lib/csv";
 import type { IconName } from "@ac/web/components/Icon";
 import { byText } from "@ac/web/lib/order";
-import { codePoints } from "@ac/web/lib/text";
+import { codePoints, wrapped } from "@ac/web/lib/text";
 
 export const profiles = ["rto", "general", "energy", "environment"] as const;
 export type Profile = (typeof profiles)[number];
@@ -497,7 +497,7 @@ export interface ClaimCandidate { jobId: string; version: number; unit: string; 
 interface Part { name: string; quantity: number; catalogCode: string | null }
 interface Cost { kind: "estimate" | "actual"; amountMinor: number; currency: Currency }
 export function claimCandidate(j: { id: string; version: number; type: string; completedAt: string | null; costs: Cost[] }, parts: Part[], unit: string, i: I18n = EN): ClaimCandidate {
-  const label = parts.map((p) => `${p.name}${p.catalogCode ? ` ${p.catalogCode}` : ""} ×${String(p.quantity)}`).join(", ");
+  const label = parts.map((p) => `${p.name}${wrapped(p.catalogCode, " ")} ×${String(p.quantity)}`).join(", ");
   const actual = j.costs.filter((c) => c.kind === "actual");
   return {
     jobId: j.id,

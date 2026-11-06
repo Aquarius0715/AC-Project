@@ -11,6 +11,7 @@ import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { Slot } from "@ac/web/lib/partnerOverview";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { WARN_MINUTES } from "@ac/web/lib/techJob";
+import { wrapped } from "@ac/web/lib/text";
 
 const en = translator("en");
 
@@ -129,7 +130,7 @@ export function alertRows(alerts: ApiAlert[], units: Map<string, string>, jobOfU
   return alerts.filter((a) => a.status !== "resolved").toSorted((a, b) => rank[a.severity] - rank[b.severity] || Date.parse(b.detectedAt) - Date.parse(a.detectedAt)).map((a) => {
     const job = jobOfUnit.get(a.unitId);
     return {
-      id: a.id, title: alertTitle(a, t), severity: a.severity, href: `/technician/units/${a.unitId}/alerts?${job ? `jobId=${job}&` : ""}alertId=${a.id}`,
+      id: a.id, title: alertTitle(a, t), severity: a.severity, href: `/technician/units/${a.unitId}/alerts?${wrapped(job, "jobId=", "&")}alertId=${a.id}`,
       sub: `${units.get(a.unitId) ?? t("unit")} · ${textOf(ALERT_STATE, a.status, t) ?? a.status} · ${showTime(a.detectedAt, display)}`,
     };
   });

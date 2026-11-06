@@ -12,6 +12,7 @@ import { z } from "zod";
 import { readDemoAs, writeDemo } from "@ac/web/lib/demoStore";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { useOp } from "@ac/web/lib/useOp";
+import { wrapped } from "@ac/web/lib/text";
 
 export interface Slot { date: string; win: string }
 export type Origin = "request" | "plan";
@@ -274,11 +275,11 @@ export const jobActions = {
         partnerProposal: j.partnerProposal ? { ...j.partnerProposal, status: "rejected" } : null,
       };
     }, `Client declined the proposed time · ${reason}${preferred.length > 0 ? " · sent 3 new times" : ""}`);
-    notify("admin", `Client declined the proposal — ${id}`, `${reason}${comment ? ` — “${comment}”` : ""}`, `/admin/jobs?jobId=${id}`);
+    notify("admin", `Client declined the proposal — ${id}`, `${reason}${wrapped(comment, " — “", "”")}`, `/admin/jobs?jobId=${id}`);
   },
   /** Client asks for another time for a periodic plan visit. */
   requestOther(id: string, preferred: Slot[], comment: string) {
-    update(id, (j) => ({ status: "requested", round: j.round + 1, scheduled: null, technician: null, techAck: null, preferred }), `Client asked for another time${comment ? ` — “${comment}”` : ""}`);
+    update(id, (j) => ({ status: "requested", round: j.round + 1, scheduled: null, technician: null, techAck: null, preferred }), `Client asked for another time${wrapped(comment, " — “", "”")}`);
     notify("admin", `Client asked to move ${id}`, "3 new preferred times", `/admin/jobs?jobId=${id}`);
   },
   /** Client: coordination note on an open job (IR114) — never changes time, assignee or status. */
@@ -345,7 +346,7 @@ export const jobActions = {
   techCantMake(id: string, reason: string, alt: string) {
     const j = load().jobs.find((x) => x.id === id);
     update(id, () => ({ techAck: { status: "cant_make", at: NOW, reason, alt } }), `${j?.technician ?? "—"} can’t make the time · ${reason}`);
-    notify(j?.delivery === "contractor" ? "contractor" : "admin", `${j?.technician ?? "—"} can’t make ${id}`, `${reason}${alt ? ` · could do ${alt}` : ""}`, j?.delivery === "contractor" ? "/partner/schedule" : `/admin/jobs?jobId=${id}`);
+    notify(j?.delivery === "contractor" ? "contractor" : "admin", `${j?.technician ?? "—"} can’t make ${id}`, `${reason}${wrapped(alt, " · could do ")}`, j?.delivery === "contractor" ? "/partner/schedule" : `/admin/jobs?jobId=${id}`);
   },
 };
 

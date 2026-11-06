@@ -4,7 +4,7 @@
 // (IR298).
 import { klInstant } from "@ac/web/lib/energy";
 import { EN, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
-import { codePoints } from "@ac/web/lib/text";
+import { codePoints, wrapped } from "@ac/web/lib/text";
 
 const en = translator("en");
 
@@ -51,7 +51,7 @@ export function eventItem(e: ApiOffsetRecord["eventHistory"][number], i: I18n = 
     "offsets.request": t("Demo request"), "offsets.purchase_confirm": t("Demo purchase confirmed"), "offsets.retire": t("Demo retirement"), "offsets.fail": t("Simulated failure"), "offsets.retry": t("Retry started"),
   };
   const result: Record<string, string> = { success: t("done"), denied: t("denied"), failed: t("failed"), pending: t("pending") };
-  return { time: showTime(e.occurredAt, i.display), title: `${action[e.action] ?? e.action} · ${result[e.result] ?? e.result}`, detail: `${e.actorName ?? e.actorId.slice(0, 8)}${e.reason ? ` · ${e.reason}` : ""}` }; // who acted (IR305)
+  return { time: showTime(e.occurredAt, i.display), title: `${action[e.action] ?? e.action} · ${result[e.result] ?? e.result}`, detail: `${e.actorName ?? e.actorId.slice(0, 8)}${wrapped(e.reason, " · ")}` }; // who acted (IR305)
 }
 
 export function recordRows(rs: ApiOffsetRecord[], customers: { id: string; name: string }[], i: I18n = EN): RecordRow[] {

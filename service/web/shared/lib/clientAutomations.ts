@@ -5,7 +5,7 @@ import { EN, intlTag, showDate, showTime, translator, type I18n, type T, textOf 
 import type { UnitAction } from "@ac/web/lib/contracts.gen";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { IconName } from "@ac/web/components/Icon";
-import { codePoints } from "@ac/web/lib/text";
+import { codePoints, wrapped } from "@ac/web/lib/text";
 import { acModes, fanLevels } from "@ac/web/lib/automation";
 import { oneOf } from "@ac/web/lib/oneOf";
 
@@ -117,7 +117,7 @@ export function runText(iso: string, tz = KL, i: I18n = EN): string {
   const tag = intlTag(i.display.locale);
   try {
     const zone = new Intl.DateTimeFormat(tag, { timeZone: tz, timeZoneName: "short" }).formatToParts(d).find((p) => p.type === "timeZoneName")?.value;
-    return `${d.toLocaleString(tag, { timeZone: tz, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}${zone ? ` ${zone}` : ""}`;
+    return `${d.toLocaleString(tag, { timeZone: tz, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}${wrapped(zone, " ")}`;
   } catch {
     return runText(iso, KL, i);
   }
@@ -128,7 +128,7 @@ export function runClock(iso: string, tz = KL, i: I18n = EN): string {
   const tag = intlTag(i.display.locale);
   try {
     const zone = new Intl.DateTimeFormat(tag, { timeZone: tz, timeZoneName: "short" }).formatToParts(d).find((p) => p.type === "timeZoneName")?.value;
-    return `${d.toLocaleTimeString(tag, { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}${zone ? ` ${zone}` : ""}`;
+    return `${d.toLocaleTimeString(tag, { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}${wrapped(zone, " ")}`;
   } catch {
     return runClock(iso, KL, i);
   }

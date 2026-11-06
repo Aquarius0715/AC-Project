@@ -5,6 +5,7 @@
 import { EN, intlTag, showDate, showDayMonth, translator, type I18n, type Locale, type T } from "@ac/web/lib/i18n";
 import { businessDay } from "@ac/web/lib/clientBilling";
 import { typeLabel } from "@ac/web/lib/partnerJobDetail";
+import { wrapped } from "@ac/web/lib/text";
 
 const en = translator("en");
 
@@ -116,7 +117,7 @@ export function lineRows(s: ApiPayoutStatement, jobs: Map<string, JobLabel>, rev
   for (const j of reviewing) {
     if (inStatement.has(j.id)) continue;
     rows.push({
-      key: `review-${j.id}`, lineId: null, jobId: j.id, job: j.id.slice(0, 8), work: `${typeLabel(j.type, t)}${j.unitName ? ` · ${j.unitName}` : ""}`, sub: t("awaiting quality review"),
+      key: `review-${j.id}`, lineId: null, jobId: j.id, job: j.id.slice(0, 8), work: `${typeLabel(j.type, t)}${wrapped(j.unitName, " · ")}`, sub: t("awaiting quality review"),
       accepted: "—", status: "not_included", statusText: t(STATUS_TEXT.not_included), tone: "muted", amount: "—", question: null, askable: false,
     });
   }

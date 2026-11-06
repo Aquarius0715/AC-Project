@@ -16,6 +16,7 @@ import type { ApiTechJobRow } from "@ac/web/lib/techOverview";
 import type { ApiDeviceEventFull } from "@ac/web/lib/techDevices";
 import { oneOf } from "@ac/web/lib/oneOf";
 import type { Metric } from "@ac/web/lib/contracts.gen";
+import { wrapped } from "@ac/web/lib/text";
 
 /** units.get as the technician reads it (ACUnit.type is part of the unit). */
 export type ApiTechUnit = ApiUnitDetail & { type?: string | null };
@@ -150,7 +151,7 @@ export function seriesChart(metric: string, unit: string, items: Point[], p: Per
   const start = windowStart(at, p, display);
   const isCut = !complete && total > items.length;
   const n = complete ? total : items.length;
-  const name = `${label(metric, t)}${unit ? ` (${unit})` : ""}`;
+  const name = `${label(metric, t)}${wrapped(unit, " (", ")")}`;
   return {
     title: p === "7d" ? t("{metric} · last 7 days (Kuala Lumpur calendar days)", { metric: name }) : t("{metric} · last {period} (rolling)", { metric: name, period: t(p === "1h" ? "1 h" : "24 h") }),
     labels: [start, "", "", "", t("now")],

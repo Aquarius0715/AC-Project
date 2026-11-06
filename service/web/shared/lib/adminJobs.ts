@@ -306,7 +306,7 @@ export interface CostLine { kind: "estimate" | "actual"; description: string; vi
 /** “80.00 MYR” from minor units. */
 export { money } from "@ac/web/lib/money";
 import { money } from "@ac/web/lib/money";
-import { codePoints } from "@ac/web/lib/text";
+import { codePoints, wrapped } from "@ac/web/lib/text";
 import { oneOf } from "@ac/web/lib/oneOf";
 /** Estimate and actual totals per currency, never converted (“80.00 MYR + 6.20 USD”). */
 export function costTotals(lines: CostLine[]): { estimate: string; actual: string } {
@@ -418,7 +418,7 @@ export function reportCard(j: ApiHqJob, r: ApiWorkReport, byUser: Map<string, st
     signOff: signOffText(r.signOff, i),
     reviews: [...r.reviewHistory].toSorted((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)).map((h) => {
       return {
-        text: `${t(h.decision === "accept" ? "v{version} accepted {time} by {name}" : "v{version} returned {time} by {name}", { version: h.reportVersion, time: showTime(h.occurredAt, display), name: byUser.get(h.reviewerUserId) ?? t("reviewer") })}${h.reason ? ` — “${h.reason}”` : ""}`,
+        text: `${t(h.decision === "accept" ? "v{version} accepted {time} by {name}" : "v{version} returned {time} by {name}", { version: h.reportVersion, time: showTime(h.occurredAt, display), name: byUser.get(h.reviewerUserId) ?? t("reviewer") })}${wrapped(h.reason, " — “", "”")}`,
         tone: h.decision === "accept" ? "ok" : "warn",
       };
     }), author, rows, readings, mode, note,

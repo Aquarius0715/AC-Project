@@ -7,6 +7,7 @@ import { byCount, EN, showSpan, translator, type I18n, type T } from "@ac/web/li
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { Slot } from "@ac/web/lib/partnerOverview";
 import type { TechJobRead } from "@ac/web/lib/techJob";
+import { wrapped } from "@ac/web/lib/text";
 
 const en = translator("en");
 
@@ -40,7 +41,7 @@ export function qrMatch(r: ApiQrResolution, unit: ApiQrUnit | null, job: ApiQrJo
       text: [s ? showSpan(s.startAt, s.endAt, display) : "", j ? typeLabel(j.type, t) : "", j ? statusWord(j.status, t) : "", alerts].filter(Boolean).join(" · "), tone: isToday ? "ok" : "primary",
     };
   }
-  return { title, sub, job: card, unitHref: `/technician/units/${r.unitId}${r.jobId ? `?jobId=${r.jobId}` : ""}`, jobHref: r.jobId ? `/technician/jobs/${r.jobId}` : null };
+  return { title, sub, job: card, unitHref: `/technician/units/${r.unitId}${wrapped(r.jobId, "?jobId=")}`, jobHref: r.jobId ? `/technician/jobs/${r.jobId}` : null };
 }
 
 /** Readable refusals of a scan: anything outside the user's assignments is absent without unit data (DD-T13). `absent`

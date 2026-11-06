@@ -9,6 +9,7 @@ import { stateWord, states } from "@ac/web/lib/restrictions";
 import { oneOf } from "@ac/web/lib/oneOf";
 import { eventCause, eventRows, type ApiAlertLite, type ApiDeviceEventFull } from "@ac/web/lib/techDevices";
 import { byText } from "@ac/web/lib/order";
+import { wrapped } from "@ac/web/lib/text";
 
 const en = translator("en");
 export type AuditResult = "Success" | "Denied" | "Failed" | "Pending";
@@ -132,7 +133,7 @@ export const auditItem = (a: ApiAudit, i: I18n = EN) => {
   const reason = reasonText(a, i.t);
   return {
     time: showTime(a.occurredAt, i.display), title: `${a.action} · ${resultWord(resultOf(a.result), i.t)}`,
-    detail: `${a.actorName ?? a.actorId} (${roleAtTimeWord(a.actorRoleAtTime, i.t)})${reason ? ` · ${reason}` : ""}`,
+    detail: `${a.actorName ?? a.actorId} (${roleAtTimeWord(a.actorRoleAtTime, i.t)})${wrapped(reason, " · ")}`,
   };
 };
 
