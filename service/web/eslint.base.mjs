@@ -130,6 +130,9 @@ export function webConfig(tsconfigRootDir) {
         // 4-2: a try block with a fetch or a parse, one branch and its result is small enough to read with its catch; the default
         // (1) allows a single call. A block above 4 is split by hand
         "unicorn/try-complexity": ["error", { max: 4 }],
+        // 4-2: the order of a guard (`!reason.trim() || !isOrder || !tech`) follows how the form reads, and moving an operand
+        // changes what short-circuits; the rule only saves a call that has no side effect
+        "unicorn/prefer-simple-condition-first": "off",
         // safe-regex flags every optional group that holds a quantifier (^\d+(\.\d+)?$), which is linear; these patterns run
         // on short trimmed form values. The ones that are not linear are caught by sonarjs/slow-regex and super-linear-regex
         "security/detect-unsafe-regex": "off",
