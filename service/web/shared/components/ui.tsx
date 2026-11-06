@@ -379,7 +379,7 @@ export function CodeInput({ value, onChange, label, length = 6 }: Readonly<{ val
     <div className="relative inline-flex gap-2">
       {Array.from({ length }, (_, i) => {
         return (
-          <span key={i} aria-hidden className={cx("grid h-10 w-10 place-items-center rounded-lg border bg-surface text-lg font-semibold", focused && i === next ? "border-primary ring-2 ring-primary/20" : "border-line")}>{value[i] ?? ""}</span>
+          <span key={i} aria-hidden className={cx("grid h-10 w-10 place-items-center rounded-lg border bg-surface text-lg font-semibold", focused && i === next ? "border-primary ring-2 ring-primary/20" : "border-line")}>{value.at(i) ?? ""}</span>
         );
       })}
       <input aria-label={label} inputMode="numeric" autoComplete="one-time-code" maxLength={length} value={value}
@@ -604,8 +604,8 @@ const axisTick = { fontSize: 10 };
 export function BarChart({ labels, series, names, unit, height = 160, colors = ["#c9d8ee", "#005bea"] }: Readonly<{ labels: string[]; series: number[][]; names?: string[]; unit?: string; height?: number; colors?: string[] }>) {
   const t = useT();
   const max = Math.max(1, ...series.flat()) * 1.1;
-  const data = labels.map((label, i) => ({ label, ...Object.fromEntries(series.map((s, j) => [`s${String(j)}`, s[i]])) }));
-  const config: ChartConfig = Object.fromEntries(series.map((_, j) => [`s${String(j)}`, { label: names?.[j] ?? t("Value"), color: colors[j % colors.length] }]));
+  const data = labels.map((label, i) => ({ label, ...Object.fromEntries(series.map((s, j) => [`s${String(j)}`, s.at(i)])) }));
+  const config: ChartConfig = Object.fromEntries(series.map((_, j) => [`s${String(j)}`, { label: names?.at(j) ?? t("Value"), color: colors.at(j % colors.length) }]));
   return (
     <ChartContainer config={config} className="aspect-auto w-full" style={{ height: height + (names ? 28 : 0) }}>
       <RBarChart data={data} margin={{ top: unit ? 14 : 6, right: 4, bottom: 0, left: 0 }} title={t("Bar chart")}>
@@ -642,7 +642,7 @@ export function LineChart({ points, min, max, threshold, height = 120, color = "
       if (last?.[1] === i - 1) last[1] = i;
     else gaps.push([i, i]);
   }
-  const isolated = (i: number) => points[i] !== null && (i === 0 || points[i - 1] === null) && (i === last || points[i + 1] === null);
+  const isolated = (i: number) => points.at(i) !== null && (i === 0 || points.at(i - 1) === null) && (i === last || points.at(i + 1) === null);
   // the labels sit evenly from the first point to the last, the outer ones flush with the ends
   const at = (k: number) => (labels && labels.length > 1 ? (last * k) / (labels.length - 1) : 0);
   return (
@@ -650,7 +650,7 @@ export function LineChart({ points, min, max, threshold, height = 120, color = "
       <RLineChart data={data} margin={{ top: 8, right: 6, bottom: labels ? 0 : 4, left: 6 }} title={t("Line chart")}>
         {ticks && <CartesianGrid vertical={false} />}
         <XAxis type="number" dataKey="i" domain={[0, last]} hide={!labels} ticks={labels?.map((_, k) => at(k))} interval={0} tickLine={false} axisLine={false}
-          tick={({ x, y, index }) => <text x={x} y={y} dy={8} fontSize={10} className="fill-muted-foreground" textAnchor={tickAnchor(index, labels?.length ?? 0)}>{labels?.[index]}</text>} />
+          tick={({ x, y, index }) => <text x={x} y={y} dy={8} fontSize={10} className="fill-muted-foreground" textAnchor={tickAnchor(index, labels?.length ?? 0)}>{labels?.at(index)}</text>} />
         <YAxis domain={[lo, hi]} hide={!ticks} ticks={ticks} mirror tickLine={false} axisLine={false} tick={axisTick} />
         {shadeGaps && vals.length > 0 && gaps.map(([a, b]) => <ReferenceArea key={a} x1={Math.max(0, a - 0.5)} x2={Math.min(last, b + 0.5)} fill="#94a3b8" fillOpacity={0.14} />)}
         {threshold !== undefined && <ReferenceLine y={threshold} stroke="var(--color-crit)" strokeDasharray="4 3" />}

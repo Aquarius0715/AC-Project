@@ -4,6 +4,7 @@ import { createContext, useContext, useId, useMemo, type CSSProperties, type Com
 import { cn } from "cn"
 import { cssVariables } from "@ac/web/lib/cssVariables"
 import { Legend, ResponsiveContainer, Tooltip, type DefaultLegendContentProps, type DefaultTooltipContentProps, type TooltipValueType } from "recharts"
+import { lookup } from "@ac/web/lib/lookup";
 
 // The themes a config colour may name; the product draws the light one (chartColors below)
 type Theme = "light" | "dark"
@@ -134,7 +135,7 @@ function ChartTooltipContent({
     const itemConfig = getPayloadConfigFromPayload(config, item, key)
     const value =
       !labelKey && typeof label === "string"
-        ? (config[label]?.label ?? label)
+        ? (lookup(config, label)?.label ?? label)
         : itemConfig?.label
 
     if (labelFormatter) {
@@ -330,7 +331,7 @@ function getPayloadConfigFromPayload(
     (payloadPayload ? stringAt(payloadPayload, key) : undefined) ??
     key
 
-  return (configLabelKey in config ? config[configLabelKey] : config[key]) ?? null
+  return (configLabelKey in config ? lookup(config, configLabelKey) : lookup(config, key)) ?? null
 }
 
 export {
