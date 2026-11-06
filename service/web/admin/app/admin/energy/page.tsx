@@ -23,9 +23,9 @@ const minute = (d: Date) => new Date(Math.floor(d.getTime() / 60_000) * 60_000);
 async function summaryOf(input: OpInput<"energy.summary">, t: T): Promise<{ summary: ApiEnergySummary | null; error?: string }> {
   try {
     return { summary: await coreOp<ApiEnergySummary>("energy.summary", input) };
-  } catch (caught) {
-    if (!(caught instanceof CoreError) || caught.error.code !== "VALIDATION") throw caught;
-    return { summary: null, error: actionMessage(caught.error, t) };
+  } catch (error) {
+    if (!(error instanceof CoreError) || error.error.code !== "VALIDATION") throw error;
+    return { summary: null, error: actionMessage(error.error, t) };
   }
 }
 

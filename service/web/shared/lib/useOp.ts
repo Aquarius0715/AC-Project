@@ -75,7 +75,7 @@ export function useOp<T, R>(...[operation, input, mock, map, enabled = true]: [.
   useEffect(() => {
     let isLive = isActive; // an inactive read does not run; its cleanup has nothing to stop
     if (isActive) {
-      recover(read()
+      void recover(read()
         .then((data) => { if (isLive) setState({ request, data, error: null }); }), (error: unknown) => { if (isLive) setState((s) => ({ request, data: s.data, error: error instanceof OpError ? error : null })); });
     }
     return () => {

@@ -249,6 +249,18 @@ export function webConfig(tsconfigRootDir) {
       files: ["**/app/**/{page,layout,template,default,error,global-error,loading,not-found,forbidden,unauthorized,route}.{ts,tsx}"],
       rules: { "unicorn/no-barrel-files": "off" },
     },
+    {
+      // shadcn/ui imports cn from lib/utils; the file re-exports the one helper from its package, as shadcn's own
+      // components.json expects ("utils": "@ac/web/lib/utils")
+      files: ["**/lib/utils.ts"],
+      rules: { "unicorn/no-barrel-files": "off" },
+    },
+    {
+      // Next.js runs next.config.ts as CommonJS here (the packages have no "type": "module"), where __dirname is the
+      // directory of the file
+      files: ["**/next.config.ts"],
+      rules: { "unicorn/prefer-module": "off" },
+    },
     { linterOptions: { reportUnusedDisableDirectives: "error" } },
     // generated files are fixed by their generators (make swagger / go run ./cmd/gen/ops), never by hand or by a fix
     globalIgnores([
